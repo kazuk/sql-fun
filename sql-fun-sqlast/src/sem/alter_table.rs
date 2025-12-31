@@ -112,10 +112,76 @@ where
         analyze_scaler_expr(context, &with_clause, &from_clause, cmd.get_def())?;
     context = new_context;
 
+    // FIXME: check table, column existing
+
     Ok((
         AlterObjSubCommand::SetColumnDefault(column_name, Box::new(expr)),
         context,
     ))
+}
+
+#[cfg(test)]
+mod test_analyze_alter_obj_column_default {
+    use crate::{
+        sem::{ScalarConstExpr, SemScalarExpr, alter_table::AlterObjSubCommand},
+        syn::NodeInner,
+        test_helpers::{SynBuilder, TestParseContext, test_context},
+    };
+    use testresult::TestResult;
+
+    #[rstest::rstest]
+    fn test_analyze_alter_obj_column_default(test_context: TestParseContext) -> TestResult {
+        // alter table ...
+        //   alter column value set default(0)
+        let builder = SynBuilder::new();
+        let value = builder.const_int4(0);
+        let cmd =
+            builder.alter_table_cmd_set_column_default("value", NodeInner::AConst(value).into());
+
+        let (res, _) = super::analyze_alter_obj_column_default(test_context, cmd)?;
+        let AlterObjSubCommand::SetColumnDefault(col_name, expr) = res else {
+            panic!("unexpected respose {res:#?}");
+        };
+        assert_eq!(col_name.as_str(), "value");
+        let SemScalarExpr::Const(ScalarConstExpr::Integer(val)) = *expr else {
+            panic!("unexpected expr {expr:#?}");
+        };
+        assert_eq!(val, 0);
+
+        Ok(())
+    }
+}
+
+pub fn analyze_alter_table_cmd<TParseContext>(
+    mut context: TParseContext,
+    table_name: &TableName,
+    cmd: crate::syn::AlterTableCmd,
+    subtyp: AlterTableType,
+) -> Result<(AlterObjSubCommand, TParseContext), AnalysisError>
+where
+    TParseContext: ParseContext,
+{
+    let sub_cmd = match subtyp {
+        AlterTableType::AtChangeOwner => analyze_alter_obj_change_owner(&mut context, cmd)?,
+        AlterTableType::AtColumnDefault => {
+            let (column_default, new_context) = analyze_alter_obj_column_default(context, cmd)?;
+            context = new_context;
+            column_default
+        }
+        AlterTableType::AtAddConstraint => {
+            analyze_alter_obj_add_constraint(&mut context, table_name, cmd)?
+        }
+        AlterTableType::AtClusterOn => {
+            let index_name = cmd.get_name();
+            if context.get_index(&index_name).is_none() {
+                context.report_problem(AnalysisProblem::index_not_found(&index_name));
+            }
+            AlterObjSubCommand::ClusterOn(cmd.get_name())
+        }
+
+        _ => todo!("{subtyp:?}"),
+    };
+    Ok((sub_cmd, context))
 }
 
 pub fn analyze_alter_table_statement<TParseContext>(
@@ -142,26 +208,8 @@ where
         let Some(subtyp) = cmd.get_subtype().as_inner() else {
             AnalysisError::raise_unexpected_none("alter_table_cmd.subtype")?
         };
-        let sub_cmd = match subtyp {
-            AlterTableType::AtChangeOwner => analyze_alter_obj_change_owner(&context, cmd)?,
-            AlterTableType::AtColumnDefault => {
-                let (column_default, new_context) = analyze_alter_obj_column_default(context, cmd)?;
-                context = new_context;
-                column_default
-            }
-            AlterTableType::AtAddConstraint => {
-                analyze_alter_obj_add_constraint(&mut context, &table_name, cmd)?
-            }
-            AlterTableType::AtClusterOn => {
-                let index_name = cmd.get_name();
-                if context.get_index(&index_name).is_none() {
-                    context.report_problem(AnalysisProblem::index_not_found(&index_name));
-                }
-                AlterObjSubCommand::ClusterOn(cmd.get_name())
-            }
-
-            _ => todo!("{subtyp:?}"),
-        };
+        let (sub_cmd, new_context) = analyze_alter_table_cmd(context, &table_name, cmd, subtyp)?;
+        context = new_context;
         sub_cmds.push(sub_cmd);
     }
     let alter_table = AlterTable {
@@ -173,6 +221,43 @@ where
         SemAst::AlterTable(alter_table),
         context,
     ))
+}
+
+#[cfg(test)]
+mod test_analyze_alter_table_statement {
+    use crate::{
+        AstAndContextPair,
+        sem::{FullName, SemAst},
+        syn::{AliasOpt, NodeInner, ObjectType},
+        test_helpers::{SynBuilder, TestParseContext, test_context},
+    };
+    use testresult::TestResult;
+
+    #[rstest::rstest]
+    fn test_analyze_alter_table_statement(mut test_context: TestParseContext) -> TestResult {
+        test_context.setup_table("table1", &[]);
+
+        let builder = SynBuilder::new();
+        let relation = builder.range_var(
+            &FullName::with_schema("public", "table1"),
+            &AliasOpt::none(),
+        );
+        let cmd = builder.alter_table_cmd_set_column_default(
+            "col1",
+            NodeInner::AConst(builder.const_int4(10)).into(),
+        );
+        let cmds = builder.as_node_list(&[NodeInner::AlterTableCmd(cmd).into()]);
+        let alter_table_stmt =
+            builder.alter_table_stmt(relation.into(), cmds, ObjectType::ObjectTable.into());
+        let AstAndContextPair(res, ctx) =
+            super::analyze_alter_table_statement(test_context, &None, alter_table_stmt)?;
+        let SemAst::AlterTable(at) = res else {
+            panic!("unexpected type {res:?}")
+        };
+        assert_eq!( at.commands.len(), 1);
+        assert_eq!( ctx.alter_tables_len(),1 );
+        Ok(())
+    }
 }
 
 #[tracing::instrument(skip(context, _parent_schema, syn))]

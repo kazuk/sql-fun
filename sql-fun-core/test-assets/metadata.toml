@@ -1,0 +1,5 @@
+[package.metadata.database]
+engine = "PostgreSQL"
+dialect = "postgres"
+version = "17"
+extensions = [{ name = "uuid-ossp", version = "1.0" }]

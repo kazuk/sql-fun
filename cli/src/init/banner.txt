@@ -1,0 +1,3 @@
+Welcome to `sql-fun`
+
+`sql-fun` is a SQL semantic validator and query execution code generator for Rust.

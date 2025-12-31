@@ -1,0 +1,126 @@
+{# enum_template.j2 (askama / escape="none") #}
+
+// from enum def
+#[allow(dead_code)]
+mod {{ enum_module_name }} {
+#[allow(unused_imports)]
+use super::*;
+
+/// list of {{ enum_type_name }}
+#[derive(Debug,Clone, serde::Serialize, serde::Deserialize)]
+pub struct {{ enum_type_name }}List(Vec<{{ enum_type_name }}>);
+
+impl From<Vec<::pg_query::protobuf::{{ enum_type_name }}>> for {{ enum_type_name }}List {
+  fn from(value: Vec<::pg_query::protobuf::{{ enum_type_name }}>) -> Self {
+    Self(value.into_iter().map({{ enum_type_name }}::from).collect())
+  }
+}
+
+/// optional list of {{ enum_type_name }}
+#[derive(Debug,Clone,Copy, serde::Serialize, serde::Deserialize)]
+pub struct {{ enum_type_name }}Opt(Option<{{ enum_type_name }}>);
+
+impl crate::syn::Opt<{{ enum_type_name }}> for {{ enum_type_name }}Opt
+{
+    fn as_inner(&self) -> Option<{{ enum_type_name }}> {
+        self.0
+    }
+}
+
+impl From<Option<{{ enum_type_name }}>> for {{ enum_type_name }}Opt
+{
+    fn from(value: Option<{{ enum_type_name }}>) -> Self {
+        Self(value)
+    }
+}
+
+impl From<{{ enum_type_name }}> for {{ enum_type_name }}Opt
+{
+    fn from(value: {{ enum_type_name }}) -> Self {
+        Self(Some(value))
+    }
+}
+
+impl From<&{{ enum_type_name }}Opt> for {{ enum_type_name }}Opt
+{
+    fn from(value: &{{ enum_type_name }}Opt) -> Self {
+        *value
+    }
+}
+
+impl From<i32> for {{ enum_type_name }}Opt
+{
+    fn from(value: i32) -> Self {
+        Self(Some({{ enum_type_name }}::from(value)))
+    }
+}
+
+impl From<&{{ enum_type_name }}> for {{ enum_type_name }}Opt
+{
+    fn from(value: &{{ enum_type_name }}) -> Self {
+        Self(Some(*value))
+    }
+}
+
+impl {{ enum_type_name }}Opt {
+    /// returns None variant
+    pub fn none() -> Self {
+        Self(None)
+    }
+}
+
+impl From<Option<::pg_query::protobuf::{{ enum_type_name }}>> for {{ enum_type_name }} {
+  fn from(value: Option<::pg_query::protobuf::{{ enum_type_name }}>) -> Self {
+    match value {
+      Some(v) => Self::from(v),
+      None => Self::OptionNone
+    }
+  }
+}
+
+impl From<Option<Box<::pg_query::protobuf::{{ enum_type_name }}>>> for {{ enum_type_name }} {
+  fn from(value: Option<Box<::pg_query::protobuf::{{ enum_type_name }}>>) -> Self {
+    match value {
+      Some(v) => Self::from(*v),
+      None => Self::OptionNone
+    }
+  }
+}
+
+/// {{ enum_type_name }} enum
+#[derive(Debug,Clone,Copy, serde::Serialize, serde::Deserialize)]
+pub enum {{ enum_type_name }} {
+{% for val in enum_type.value %}
+    /// {{ val.variant_name(enum_type_name) }}
+    {{ val.variant_name(enum_type_name) }} = {{ val.variant_value() }},
+{% endfor %}
+    /// None
+    OptionNone = {{ enum_type.none_variant_value() }}
+}
+
+impl From<::pg_query::protobuf::{{ enum_type_name }}> for {{ enum_type_name }} {
+  fn from(value: ::pg_query::protobuf::{{ enum_type_name }}) -> Self {
+    use ::pg_query::protobuf::{{ enum_type_name }} as S;
+    match value {
+{% for val in enum_type.value %}
+      S::{{ val.variant_name(enum_type_name) }} => Self::{{ val.variant_name(enum_type_name) }},
+{% endfor %}
+    }
+  }
+}
+
+impl From<i32> for {{ enum_type_name }} {
+  fn from(value: i32) -> Self {
+    match value {
+{% for val in enum_type.value %}
+      {{ val.variant_value() }} => Self::{{ val.variant_name(enum_type_name) }},
+{% endfor %}
+      _ => Self::OptionNone,
+    }
+  }
+}
+
+} // mod {{ enum_module_name }}
+
+#[allow(unused_imports)]
+pub use {{ enum_module_name }}::{ {{ enum_type_name }}, {{ enum_type_name }}List, {{ enum_type_name }}Opt };

@@ -1,0 +1,3 @@
+# buf.yaml
+version: v1
+name: my/local/schema

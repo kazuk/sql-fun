@@ -1,0 +1,5 @@
+[package.metadata.database]
+dialect = "postgres"
+engine = "postgres"
+version = "17"
+search_path = ["public"]

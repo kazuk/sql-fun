@@ -1,0 +1,73 @@
+use super::IndirectionExpr;
+use crate::{
+    sem::{
+        AnalysisError, FromClause, ParseContext, SemScalarExpr, TypeReference, WithClause,
+        analyze_scaler_expr,
+    },
+    syn::Opt,
+};
+
+#[derive(Debug, Clone, Eq, Hash, PartialEq, serde::Serialize, serde::Deserialize)]
+pub struct ArrayIndex {
+    array: SemScalarExpr,
+    index: SemScalarExpr,
+    item_type: Option<TypeReference>,
+}
+
+impl ArrayIndex {
+    pub fn new(
+        array: SemScalarExpr,
+        index: SemScalarExpr,
+        item_type: Option<TypeReference>,
+    ) -> Self {
+        Self {
+            array,
+            index,
+            item_type,
+        }
+    }
+
+    pub fn array(&self) -> &SemScalarExpr {
+        &self.array
+    }
+
+    pub fn item_type(&self) -> &Option<TypeReference> {
+        &self.item_type
+    }
+
+    pub fn array_index<TParseContext>(
+        array: SemScalarExpr,
+        index: SemScalarExpr,
+        context: &mut TParseContext,
+    ) -> IndirectionExpr
+    where
+        TParseContext: ParseContext,
+    {
+        array.require_array(context);
+        index.fits_array_index(context);
+        let item_type = array
+            .get_type()
+            .and_then(|v| context.get_array_item_type(&v));
+
+        IndirectionExpr::ArrayIndex(Box::new(Self::new(array, index, item_type)))
+    }
+
+    pub fn analyze_index<TParseContext>(
+        mut context: TParseContext,
+        with_clause: &WithClause,
+        from_clause: &FromClause,
+        arg: SemScalarExpr,
+        indicies: &crate::syn::AIndices,
+    ) -> Result<(IndirectionExpr, TParseContext), AnalysisError>
+    where
+        TParseContext: ParseContext,
+    {
+        let Some(uidx) = indicies.get_uidx().as_inner() else {
+            AnalysisError::raise_unexpected_none("aindicies.uidx")?
+        };
+        let (rexpr, new_context) = analyze_scaler_expr(context, with_clause, from_clause, uidx)?;
+        context = new_context;
+        let arg = ArrayIndex::array_index(arg, rexpr, &mut context);
+        Ok((arg, context))
+    }
+}

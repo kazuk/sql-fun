@@ -1,0 +1,231 @@
+{
+  "!!": [
+    {
+      "input": "tsquery",
+      "result": "tsquery",
+      "strict": true
+    }
+  ],
+  "#": [
+    {
+      "input": "path",
+      "result": "int4",
+      "strict": true
+    },
+    {
+      "input": "polygon",
+      "result": "int4",
+      "strict": true
+    }
+  ],
+  "+": [
+    {
+      "input": "int8",
+      "result": "int8",
+      "strict": true
+    },
+    {
+      "input": "int2",
+      "result": "int2",
+      "strict": true
+    },
+    {
+      "input": "int4",
+      "result": "int4",
+      "strict": true
+    },
+    {
+      "input": "float4",
+      "result": "float4",
+      "strict": true
+    },
+    {
+      "input": "float8",
+      "result": "float8",
+      "strict": true
+    },
+    {
+      "input": "numeric",
+      "result": "numeric",
+      "strict": true
+    }
+  ],
+  "-": [
+    {
+      "input": "int8",
+      "result": "int8",
+      "strict": true
+    },
+    {
+      "input": "int4",
+      "result": "int4",
+      "strict": true
+    },
+    {
+      "input": "int2",
+      "result": "int2",
+      "strict": true
+    },
+    {
+      "input": "float4",
+      "result": "float4",
+      "strict": true
+    },
+    {
+      "input": "float8",
+      "result": "float8",
+      "strict": true
+    },
+    {
+      "input": "interval",
+      "result": "interval",
+      "strict": true
+    },
+    {
+      "input": "numeric",
+      "result": "numeric",
+      "strict": true
+    }
+  ],
+  "?-": [
+    {
+      "input": "lseg",
+      "result": "bool",
+      "strict": true
+    },
+    {
+      "input": "line",
+      "result": "bool",
+      "strict": true
+    }
+  ],
+  "?|": [
+    {
+      "input": "lseg",
+      "result": "bool",
+      "strict": true
+    },
+    {
+      "input": "line",
+      "result": "bool",
+      "strict": true
+    }
+  ],
+  "@": [
+    {
+      "input": "int8",
+      "result": "int8",
+      "strict": true
+    },
+    {
+      "input": "float4",
+      "result": "float4",
+      "strict": true
+    },
+    {
+      "input": "float8",
+      "result": "float8",
+      "strict": true
+    },
+    {
+      "input": "int2",
+      "result": "int2",
+      "strict": true
+    },
+    {
+      "input": "int4",
+      "result": "int4",
+      "strict": true
+    },
+    {
+      "input": "numeric",
+      "result": "numeric",
+      "strict": true
+    }
+  ],
+  "@-@": [
+    {
+      "input": "path",
+      "result": "float8",
+      "strict": true
+    },
+    {
+      "input": "lseg",
+      "result": "float8",
+      "strict": true
+    }
+  ],
+  "@@": [
+    {
+      "input": "box",
+      "result": "point",
+      "strict": true
+    },
+    {
+      "input": "lseg",
+      "result": "point",
+      "strict": true
+    },
+    {
+      "input": "polygon",
+      "result": "point",
+      "strict": true
+    },
+    {
+      "input": "circle",
+      "result": "point",
+      "strict": true
+    }
+  ],
+  "|/": [
+    {
+      "input": "float8",
+      "result": "float8",
+      "strict": true
+    }
+  ],
+  "||/": [
+    {
+      "input": "float8",
+      "result": "float8",
+      "strict": true
+    }
+  ],
+  "~": [
+    {
+      "input": "macaddr",
+      "result": "macaddr",
+      "strict": true
+    },
+    {
+      "input": "macaddr8",
+      "result": "macaddr8",
+      "strict": true
+    },
+    {
+      "input": "inet",
+      "result": "inet",
+      "strict": true
+    },
+    {
+      "input": "bit",
+      "result": "bit",
+      "strict": true
+    },
+    {
+      "input": "int2",
+      "result": "int2",
+      "strict": true
+    },
+    {
+      "input": "int4",
+      "result": "int4",
+      "strict": true
+    },
+    {
+      "input": "int8",
+      "result": "int8",
+      "strict": true
+    }
+  ]
+}

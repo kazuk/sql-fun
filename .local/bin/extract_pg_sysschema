@@ -1,0 +1,372 @@
+#!/bin/bash
+
+#
+# Extract PostgreSQL System Table / System View Schema
+#
+# Note: 
+#
+# This script runs PostgreSQL official image in docker.
+#
+
+set -euo pipefail
+
+PGVER="${1:-"17"}"                  # 例: 15 / 16 / 17 / 18
+
+TAG="postgres:${PGVER}"
+NAME="pgcat_dump_${PGVER}"
+OUT="pg_catalog_${PGVER}.schema.sql"
+PSQL="docker exec -i $NAME psql -X -qAt -U postgres -d postgres -v ON_ERROR_STOP=1 "
+BUILTIN_BASE_PATH="${SQL_FUN_HOME}/postgres/${PGVER}"
+BUILTIN_SQL_PATH="${BUILTIN_BASE_PATH}/schema.sql"
+
+# starting postgres docker container
+docker rm -f "$NAME" >/dev/null 2>&1 || true
+docker run \
+  -d \
+  --name "${NAME}" \
+  -e POSTGRES_HOST_AUTH_METHOD=trust \
+  -p 55432:5432 \
+  "${TAG}" > /dev/null
+
+# wait ready to connection
+until docker exec "${NAME}" \
+  pg_isready -U postgres >/dev/null 2>&1; 
+do 
+  sleep 0.5; 
+done
+
+DOMAINS=$(
+${PSQL} -X -qAt <<'SQL'
+  select coalesce(json_agg(t), '[]'::json)
+  from (
+    select d.domain_schema, d.domain_name, d.data_type
+    from information_schema.domains d
+  ) t;
+SQL
+)
+
+TABLES=$(
+${PSQL} -X -qAt <<'SQL'
+  select coalesce(json_agg(t),'[]'::json)
+  from (
+    select n.nspname as schema, c.relname as table
+    from pg_catalog.pg_class c
+    join pg_catalog.pg_namespace n on n.oid=c.relnamespace
+    where c.relkind='r' and n.nspname in ('pg_catalog','information_schema')
+    order by 1,2
+  ) t;
+SQL
+)
+
+BUILTIN_COLUMNS=$(
+${PSQL} -X -qAt <<'SQL'
+  select coalesce(json_agg(t),'[]'::json)
+  from (
+    select
+      n.nspname  as schema,
+      c.relname  as table,
+      a.attnum   as ordinal,
+      a.attname  as column,
+      case when ty.typtype='p' then ty.typname
+           else format_type(a.atttypid,a.atttypmod)
+      end        as data_type,
+      a.attnotnull as not_null,
+      pg_get_expr(d.adbin,d.adrelid) as default_expr
+    from pg_catalog.pg_class c
+    join pg_catalog.pg_namespace n on n.oid=c.relnamespace
+    join pg_catalog.pg_attribute a on a.attrelid=c.oid
+    join pg_catalog.pg_type ty on ty.oid=a.atttypid
+    left join pg_catalog.pg_attrdef d on d.adrelid=a.attrelid and d.adnum=a.attnum
+    where c.relkind='r' and a.attnum>0 and not a.attisdropped
+      and n.nspname in ('pg_catalog','information_schema')
+    order by 1,2,3
+  ) t;
+SQL
+)
+
+echo 'functions'
+
+TABLE_FUNCTIONS=$(
+  $PSQL << 'SQL'
+with base as (
+  select
+    p.oid,
+    n.nspname as schema,
+    p.proname,
+    p.prorettype,
+    p.proretset,
+    p.proargtypes,
+    p.proallargtypes,
+    p.proargmodes,
+    p.proargnames
+  from pg_catalog.pg_proc p
+  join pg_catalog.pg_namespace n on n.oid = p.pronamespace
+  where n.nspname in ('information_schema')
+    and p.prokind = 'f'
+    and p.proretset
+),
+-- arguments
+args as (
+  select
+    b.oid,
+    json_agg(
+      json_build_object(
+        'name', case when b.proargnames is not null then b.proargnames[i] else null end,
+        'type', (coalesce(b.proallargtypes, b.proargtypes::oid[]))[i]::regtype::text,
+        'mode', coalesce(b.proargmodes[i], 'i'),
+        'variadic', coalesce(b.proargmodes[i] = 'v', false)
+      )
+      order by i
+    ) as args_json,
+    pg_get_function_arguments(b.oid) as args_decl
+  from base b
+  left join lateral generate_subscripts(coalesce(b.proallargtypes, b.proargtypes::oid[]), 1) g(i) on true
+  group by b.oid
+),
+-- composite types
+composite_cols as (
+  select
+    b.oid,
+    json_agg(
+      json_build_object('name', a.attname, 'type', a.atttypid::regtype::text)
+      order by a.attnum
+    ) as cols
+  from base b
+  join pg_catalog.pg_type t on t.oid = b.prorettype and t.typtype = 'c'
+  join pg_catalog.pg_class c on c.oid = t.typrelid
+  join pg_catalog.pg_attribute a
+    on a.attrelid = c.oid and a.attnum > 0 and not a.attisdropped
+  group by b.oid
+),
+-- outputs
+record_outs as (
+  select
+    b.oid,
+    json_agg(
+      json_build_object(
+        'name', coalesce(b.proargnames[i], format('column%s', i)),
+        'type', (b.proallargtypes[i])::regtype::text
+      )
+      order by i
+    ) as cols
+  from base b
+  cross join lateral generate_subscripts(b.proallargtypes, 1) g(i)
+  where b.prorettype = 'pg_catalog.record'::regtype
+    and b.proallargtypes is not null
+    and b.proargmodes[i] in ('o','t')  -- OUT / TABLE
+  group by b.oid
+),
+-- objects
+objs as (
+  select
+    json_build_object(
+      'schema', b.schema,
+      'name',   b.proname,
+      'signature', (b.oid::regprocedure)::text,
+      'args_decl', a.args_decl,
+      'args', coalesce(a.args_json, '[]'::json),
+      'return', json_build_object(
+        'kind',
+          case when cc.cols is not null then 'setof_composite'
+               when ro.cols is not null then 'setof_record'
+               else 'setof_scalar' end,
+        'type', (b.prorettype::regtype)::text,
+        'columns',
+          case
+            when cc.cols is not null then cc.cols
+            when ro.cols is not null then ro.cols
+            else json_build_array(
+                   json_build_object('name', b.proname, 'type', (b.prorettype::regtype)::text)
+                 )
+          end,
+        'needs_column_definition',
+          (b.prorettype = 'pg_catalog.record'::regtype and ro.cols is null)
+      )
+    ) as obj
+  from base b
+  left join args a on a.oid = b.oid
+  left join composite_cols cc on cc.oid = b.oid
+  left join record_outs ro on ro.oid = b.oid
+)
+select coalesce(json_agg(obj order by 1), '[]'::json)
+from objs;
+SQL
+)
+
+SCALAR_FUNCTIONS=$(
+  $PSQL << 'SQL'
+with base as (
+  select
+    p.oid,
+    n.nspname as schema,
+    p.proname,
+    p.prorettype,
+    p.proretset,
+    p.proargtypes,
+    p.proallargtypes,
+    p.proargmodes,
+    p.proargnames
+  from pg_catalog.pg_proc p
+  join pg_catalog.pg_namespace n on n.oid = p.pronamespace
+  where n.nspname = 'information_schema'
+    and p.prokind = 'f'
+    and not p.proretset
+),
+scalars as (
+  -- filter out table function
+  select *
+  from base b
+  where b.prorettype <> 'pg_catalog.record'::regtype
+    and not ( coalesce(b.proargmodes, array[]::"char"[]) && array['o'::"char",'t'::"char",'b'::"char"] )
+),
+args as (
+  select
+    b.oid,
+    pg_get_function_arguments(b.oid) as args_decl,
+    json_agg(
+      json_build_object(
+        'name', case when b.proargnames is not null then b.proargnames[i] else null end,
+        'type', (coalesce(b.proallargtypes, b.proargtypes::oid[]))[i]::regtype::text,
+        'mode', coalesce(b.proargmodes[i], 'i'),
+        'variadic', coalesce(b.proargmodes[i] = 'v', false)
+      )
+      order by i
+    ) as args_json
+  from scalars b
+  left join lateral generate_subscripts(coalesce(b.proallargtypes, b.proargtypes::oid[]), 1) g(i) on true
+  group by b.oid
+),
+objs as (
+  select
+    json_build_object(
+      'schema', s.schema,
+      'name',   s.proname,
+      'signature', (s.oid::regprocedure)::text,
+      'args_decl', coalesce(a.args_decl, ''),
+      'args',      coalesce(a.args_json, '[]'::json),
+      'return', json_build_object(
+        'kind', 'scalar',
+        'type', (s.prorettype::regtype)::text
+      )
+    ) as obj,
+    (s.oid::regprocedure)::text as sig
+  from scalars s
+  left join args a on a.oid = s.oid
+)
+select coalesce(json_agg(obj order by sig), '[]'::json)
+from objs;
+SQL
+)
+
+
+echo 'query views'
+
+VIEWS=$(
+$PSQL <<'SQL'
+WITH RECURSIVE view_nodes AS (
+  SELECT c.oid, n.nspname AS schema, c.relname AS view,
+         CASE c.relkind WHEN 'm' THEN 'materialized' ELSE 'view' END AS kind
+  FROM pg_class c
+  JOIN pg_namespace n ON n.oid = c.relnamespace
+  WHERE c.relkind IN ('v','m')
+    AND n.nspname IN ('pg_catalog','information_schema')
+),
+edges AS (
+  -- view -> referenced view
+  SELECT DISTINCT v.oid AS view_oid, r.oid AS ref_oid
+  FROM pg_rewrite rw
+  JOIN pg_class v  ON v.oid = rw.ev_class AND v.relkind IN ('v','m')
+  JOIN pg_namespace nv ON nv.oid = v.relnamespace
+  JOIN pg_depend d ON d.classid = 'pg_rewrite'::regclass
+                   AND d.objid   = rw.oid
+                   AND d.refclassid = 'pg_class'::regclass
+                   AND d.deptype = 'n'
+  JOIN pg_class r  ON r.oid = d.refobjid AND r.relkind IN ('v','m')
+  JOIN pg_namespace nr ON nr.oid = r.relnamespace
+  WHERE nv.nspname IN ('pg_catalog','information_schema')
+    AND nr.nspname IN ('pg_catalog','information_schema')
+),
+roots AS (
+  SELECT vn.oid
+  FROM view_nodes vn
+  WHERE NOT EXISTS (SELECT 1 FROM edges e WHERE e.view_oid = vn.oid)
+),
+walk AS (
+  SELECT r.oid, 0 AS depth FROM roots r
+  UNION ALL
+  SELECT e.view_oid, w.depth + 1
+  FROM edges e
+  JOIN walk  w ON e.ref_oid = w.oid
+),
+mindepth AS (
+  SELECT oid, MIN(depth) AS depth
+  FROM walk GROUP BY oid
+)
+SELECT COALESCE(json_agg(
+  json_build_object(
+    'schema', vn.schema,
+    'view',   vn.view,
+    'kind',   vn.kind,
+    'definition', pg_get_viewdef(vn.oid, true)
+  )
+  ORDER BY md.depth, vn.schema, vn.view
+), '[]'::json)
+FROM mindepth md
+JOIN view_nodes vn ON vn.oid = md.oid;
+SQL
+)
+
+TEMPLATE_DIR="$(dirname $0)"
+
+echo 'writing domains'
+TEMPLATE_PATH="${TEMPLATE_DIR}/create_domain_sql.hbs"
+echo "${DOMAINS}" \
+ | hbs -i "${TEMPLATE_PATH}" -e sql --stdout > "${BUILTIN_SQL_PATH}"
+
+echo 'writing tables'
+TEMPLATE_PATH="${TEMPLATE_DIR}/create_table_sql.hbs"
+echo "${BUILTIN_COLUMNS}" \
+ | jq '[ group_by(.schema + .table) 
+    | .[] 
+    | { 
+        "schema": .[0].schema, 
+        "table": .[0].table, 
+        "columns": 
+          [ 
+            ( .[] 
+              | { 
+                "ordinal": .ordinal,
+                "column": .column,
+                "data_type": .data_type,
+                "not_null": .not_null,
+                "default_expr": .default_expr 
+              }
+            )
+          ] 
+      } ]' \
+ | hbs -i "${TEMPLATE_PATH}" -e sql --stdout >> "${BUILTIN_SQL_PATH}"
+
+echo 'writing table functions'
+TEMPLATE_PATH="${TEMPLATE_DIR}/create_table_func_sql.hbs"
+echo ${TABLE_FUNCTIONS} \
+ | hbs -i "${TEMPLATE_PATH}" -e sql --stdout >> "${BUILTIN_SQL_PATH}"
+
+echo 'writing scalar functions'
+TEMPLATE_PATH="${TEMPLATE_DIR}/create_scalar_func_sql.hbs"
+echo ${SCALAR_FUNCTIONS} \
+ | hbs -i "${TEMPLATE_PATH}" -e sql --stdout >> "${BUILTIN_SQL_PATH}"
+
+echo 'writing views'
+TEMPLATE_PATH="${TEMPLATE_DIR}/create_view_sql.hbs"
+echo "${VIEWS}" \
+ | hbs -i "${TEMPLATE_PATH}" -e sql --stdout >> "${BUILTIN_SQL_PATH}"
+
+echo 'extract extensions'
+EXTENSION_BASE_PATH="${SQL_FUN_HOME}/postgres/${PGVER}/"
+mkdir -p "${EXTENSION_BASE_PATH}"
+
+SHAREDIR=$(docker exec "${NAME}" sh -lc 'pg_config --sharedir')
+docker cp "${NAME}":"${SHAREDIR}/extension" "${EXTENSION_BASE_PATH}"
+
+echo "stop and remove container"
+docker rm -f "$NAME" >/dev/null 2>&1 || true

@@ -1,0 +1,22 @@
+[package]
+name = "sql-fun-server"
+version = "0.1.0"
+edition = "2024"
+license = "MIT"
+
+[lints]
+workspace = true
+
+[dependencies]
+clap = { workspace = true }
+derive-getters = { workspace = true }
+fs2 = { workspace = true }
+rand = { workspace = true }
+serde = { workspace = true }
+serde_json = { workspace = true }
+sysinfo = { workspace = true }
+thiserror = { workspace = true }
+tokio = { workspace = true }
+
+[dev-dependencies]
+testresult.workspace = true

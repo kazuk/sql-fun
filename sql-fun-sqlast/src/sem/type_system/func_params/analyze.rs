@@ -1,0 +1,146 @@
+use crate::{
+    sem::{
+        AnalysisError, ColumnDefinition, ColumnName, FullName, FunctionParam, ParseContext,
+        TypeReference,
+        type_system::func_params::{
+            FunctionParameterTrait, in_out_param::FunctionParamInOut, in_param::FunctionParamIn,
+            out_param::FunctionParamOut, table_param::FunctionParamTable,
+            variadic_param::FunctionParamVariadic,
+        },
+    },
+    syn::{FunctionParameterMode, Opt},
+};
+
+impl FunctionParam {
+    /// analyze syntax node
+    pub fn analyze<TParseContext>(
+        mut context: TParseContext,
+        param: crate::syn::FunctionParameter,
+    ) -> Result<(FunctionParam, TParseContext), AnalysisError>
+    where
+        TParseContext: ParseContext,
+    {
+        let Some(param_mode) = param.get_mode().as_inner() else {
+            AnalysisError::raise_unexpected_none("function_parameter.mode")?
+        };
+
+        let (function_param, new_context) = match param_mode {
+            FunctionParameterMode::FuncParamIn => FunctionParamIn::from_syn(context, param)?,
+            FunctionParameterMode::FuncParamOut => FunctionParamOut::from_syn(context, param)?,
+            FunctionParameterMode::FuncParamInout => FunctionParamInOut::from_syn(context, param)?,
+            FunctionParameterMode::FuncParamVariadic => {
+                FunctionParamVariadic::from_syn(context, param)?
+            }
+            FunctionParameterMode::FuncParamTable => FunctionParamTable::from_syn(context, param)?,
+            FunctionParameterMode::FuncParamDefault => FunctionParamIn::from_syn(context, param)?,
+            _ => AnalysisError::raise_unexpected_input("function_parameter.mode")?,
+        };
+        context = new_context;
+
+        Ok((function_param, context))
+    }
+}
+
+#[cfg(test)]
+mod test_function_param_analyze {
+    use testresult::TestResult;
+
+    use crate::{
+        sem::{FullName, FunctionParam, LocalName, SchemaName, TypeDefinition},
+        syn::FunctionParameterMode,
+        test_helpers::{SynBuilder, TestParseContext, test_context},
+    };
+
+    #[rstest::rstest]
+    #[case(FunctionParameterMode::FuncParamIn)]
+    #[case(FunctionParameterMode::FuncParamOut)]
+    #[case(FunctionParameterMode::FuncParamInout)]
+    #[case(FunctionParameterMode::FuncParamVariadic)]
+    #[case(FunctionParameterMode::FuncParamTable)]
+    fn test_analyze(
+        mut test_context: TestParseContext,
+        #[case] mode: FunctionParameterMode,
+    ) -> TestResult {
+        test_context.set_get_search_path_result(&vec![
+            SchemaName::from("public"),
+            SchemaName::from("pg_catalog"),
+        ]);
+        let int4_name = FullName::new(
+            &None,
+            &Some(SchemaName::from("pg_catalog")),
+            &LocalName::from("int4"),
+        );
+        let int4_type = TypeDefinition::builtin(&int4_name);
+        test_context.set_get_type_impl_result(&int4_name, &int4_type);
+        let builder = SynBuilder::new();
+        let arg_type = builder.type_name(&["int4"]);
+
+        let func_param = builder.function_parameter("param", arg_type.into(), mode.into());
+
+        FunctionParam::analyze(test_context, func_param)?;
+        Ok(())
+    }
+}
+
+impl super::FunctionParam {
+    /// analyze [crate::syn::FunctionParameter] as column definition
+    pub fn analyze_as_column_definition(
+        param: &crate::syn::FunctionParameter,
+    ) -> Result<ColumnDefinition, AnalysisError> {
+        let Some(arg_type) = param.get_arg_type().as_inner() else {
+            AnalysisError::raise_unexpected_none("functionparameter.arg_type")?
+        };
+        let arg_type = FullName::try_from(arg_type)?;
+        let value = ColumnDefinition::new(
+            &Some(ColumnName::from(param.get_name())),
+            Some(&TypeReference::from_full_name(arg_type)),
+            None,
+        );
+        Ok(value)
+    }
+
+    /// test paramter is a output param
+    pub fn is_output_param(param: &crate::syn::FunctionParameter) -> Result<bool, AnalysisError> {
+        let Some(mode) = param.get_mode().as_inner() else {
+            AnalysisError::raise_unexpected_none("functionparameter.mode")?
+        };
+        Ok(matches!(mode, FunctionParameterMode::FuncParamOut))
+    }
+}
+
+#[cfg(test)]
+mod test_function_param_analyze_as_column_definition {
+    use testresult::TestResult;
+
+    use crate::{
+        sem::{FullName, FunctionParam, LocalName, SchemaName, TypeDefinition},
+        syn::FunctionParameterMode,
+        test_helpers::{SynBuilder, TestParseContext, test_context},
+    };
+
+    #[rstest::rstest]
+    fn test_analyze_as_column_definition(mut test_context: TestParseContext) -> TestResult {
+        test_context.set_get_search_path_result(&vec![
+            SchemaName::from("public"),
+            SchemaName::from("pg_catalog"),
+        ]);
+        let int4_name = FullName::new(
+            &None,
+            &Some(SchemaName::from("pg_catalog")),
+            &LocalName::from("int4"),
+        );
+        let int4_type = TypeDefinition::builtin(&int4_name);
+        test_context.set_get_type_impl_result(&int4_name, &int4_type);
+        let builder = SynBuilder::new();
+        let arg_type = builder.type_name(&["int4"]);
+
+        let func_param = builder.function_parameter(
+            "param",
+            arg_type.into(),
+            FunctionParameterMode::FuncParamOut,
+        );
+        let _column_def = FunctionParam::analyze_as_column_definition(&func_param)?;
+        assert!(FunctionParam::is_output_param(&func_param)?);
+        Ok(())
+    }
+}

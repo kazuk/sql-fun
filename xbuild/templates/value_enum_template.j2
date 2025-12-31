@@ -1,0 +1,249 @@
+{# oneof_message_enum_template.j2 (askama / escape="none" 推奨) #}
+
+{# 期待するコンテキスト:
+   - enum_module_name: String
+   - enum_type_name: String
+   - internal_enum_type_name: String
+   - internal_enum_field_name: String
+   - fields: Vec<MessageTypeField>  // enum_type.field 相当（メソッド呼び出し可能）
+#}
+
+// from message type
+
+#[cfg(test)]
+pub use self::{{ enum_module_name }}::{{ enum_type_name }}Inner;
+
+#[allow(dead_code)]
+mod {{ enum_module_name }} {
+#[allow(unused_imports)]
+use super::*;
+
+#[cfg(test)]
+pub use self::inner::{{ enum_type_name }} as {{ enum_type_name }}Inner;
+
+/// {{ enum_type_name }}
+#[derive(Debug,Clone, serde::Serialize, serde::Deserialize)]
+pub struct {{ enum_type_name }}(self::inner::{{ enum_type_name }});
+
+#[cfg(test)]
+impl From<{{ enum_type_name }}Inner> for {{ enum_type_name }} {
+  fn from(value: {{ enum_type_name }}Inner) -> Self {
+    Self(value)
+  }
+}
+
+/// {{ enum_type_name }}Opt as alias {{ enum_type_name }}
+pub type {{ enum_type_name }}Opt = {{ enum_type_name }};
+
+impl crate::syn::Opt<{{ enum_type_name }}> for {{ enum_type_name }}
+{
+    fn as_inner(&self) -> Option<{{ enum_type_name }}> {
+        match &self.0 {
+            self::inner::{{ enum_type_name }}::None => None,
+            _ => Some(self.clone())
+        }
+    }
+}
+
+/// list of {{ enum_type_name }}
+#[derive(Debug, Clone, serde::Serialize, serde::Deserialize, Default)]
+pub struct {{ enum_type_name }}List(Vec<{{ enum_type_name }}>);
+
+#[cfg(test)]
+impl From<Vec<{{ enum_type_name }}>> for {{ enum_type_name }}List {
+  fn from(value: Vec<{{ enum_type_name }}>) -> Self {
+    Self(value)
+  }
+}
+
+#[cfg(test)]
+impl From<Vec<{{ enum_type_name }}>> for {{ enum_type_name }}ListOpt {
+  fn from(value: Vec<{{ enum_type_name }}>) -> Self {
+    Self(Some(value))
+  }
+}
+
+/// optional list of {{ enum_type_name }}
+#[derive(Debug,Clone, serde::Serialize, serde::Deserialize, Default)]
+pub struct {{ enum_type_name }}ListOpt(Option<Vec<{{ enum_type_name }}>>);
+
+impl crate::syn::ListOpt<{{ enum_type_name }}> for {{ enum_type_name }}ListOpt {
+  type OptType={{ enum_type_name }}Opt;
+
+  fn as_inner(&self) -> Option<Vec<{{ enum_type_name }}>>
+  {
+    self.0.clone()
+  }
+}
+
+impl From<Option<{{ enum_type_name }}>> for {{ enum_type_name }}
+{
+    fn from(value: Option<{{ enum_type_name }}>) -> Self {
+      match value {
+        Some(v) => v,
+        None => Self(self::inner::{{ enum_type_name }}::None)
+      }
+    }
+}
+
+impl {{ enum_type_name }}ListOpt {
+    /// returns Some(None) valiant
+    pub fn none() -> Self {
+      Self(None)
+    }
+}
+
+impl From<&{{ enum_type_name }}List> for {{ enum_type_name }}ListOpt {
+  fn from(value: &{{ enum_type_name }}List) -> Self {
+    Self(Some(value.0.clone()))
+  }
+}
+
+impl From<Vec<::pg_query::protobuf::{{ enum_type_name }}>> for {{ enum_type_name }}List {
+  fn from(value: Vec<::pg_query::protobuf::{{ enum_type_name }}>) -> Self {
+    Self(value.into_iter().map({{ enum_type_name }}::from).collect())
+  }
+}
+
+impl From<Option<::pg_query::protobuf::{{ enum_type_name }}>> for {{ enum_type_name }} {
+  fn from(value: Option<::pg_query::protobuf::{{ enum_type_name }}>) -> Self {
+    match value {
+      Some(v) => Self::from(v),
+      None => Self(self::inner::{{ enum_type_name }}::None)
+    }
+  }
+}
+
+impl From<Option<Box<::pg_query::protobuf::{{ enum_type_name }}>>> for {{ enum_type_name }} {
+  fn from(value: Option<Box<::pg_query::protobuf::{{ enum_type_name }}>>) -> Self {
+    match value {
+      Some(v) => Self::from(*v),
+      None => Self(self::inner::{{ enum_type_name }}::None)
+    }
+  }
+}
+
+impl {{ enum_type_name }}
+{
+  /// returns None variant
+  pub fn none() -> Self {
+    Self(self::inner::{{ enum_type_name }}::None)
+  }
+}
+
+impl From<&{{ enum_type_name }}> for {{ enum_type_name }} {
+  fn from(value: &{{ enum_type_name }}) -> Self {
+    value.clone()
+  }
+}
+
+impl From<::pg_query::protobuf::{{ enum_type_name }}> for {{ enum_type_name }} {
+  fn from(value: ::pg_query::protobuf::{{ enum_type_name }}) -> Self {
+    Self(self::inner::{{ enum_type_name }}::from(value))
+  }
+}
+
+mod inner {
+#[allow(unused_imports)]
+use super::*;
+
+/// {{ enum_type_name }}
+#[derive(Debug,Clone,serde::Serialize, serde::Deserialize)]
+pub enum {{ enum_type_name }} {
+  /// empty defalut variant
+  None,
+{% for field in fields %}
+{% if field.oneof_index.is_some() %}
+  /// {{ field.enum_variant_name() }}
+  {{ field.enum_variant_name() }}(super::{{ field.enum_variant_struct_name() }}),
+{% endif %}
+{% endfor %}
+}
+
+{% for field in fields %}
+{% if field.oneof_index.is_some() %}
+impl From<super::{{ field.enum_variant_struct_name() }}> for {{ enum_type_name }} {
+  fn from(value: super::{{ field.enum_variant_struct_name() }})-> Self {
+    Self::{{ field.enum_variant_name() }}(value)
+  }
+}
+
+impl From<::pg_query::protobuf::{{ field.enum_variant_struct_name() }}> for {{ enum_type_name }} {
+    fn from(value: ::pg_query::protobuf::{{ field.enum_variant_struct_name() }}) -> Self {
+        Self::{{ field.enum_variant_name() }}(super::{{ field.enum_variant_struct_name() }}::from(value))
+    }
+}
+
+{% endif %}
+{% endfor %}
+
+impl From<::pg_query::protobuf::{{ enum_type_name }}> for {{ enum_type_name }} {
+  fn from(value: ::pg_query::protobuf::{{ enum_type_name }}) -> Self {
+    Self::from(value.{{ internal_enum_field_name }})
+  }
+}
+
+impl From<::pg_query::protobuf::{{ enum_module_name }}::{{ internal_enum_type_name }}> for {{ enum_type_name }} {
+    fn from( value: ::pg_query::protobuf::{{ enum_module_name }}::{{ internal_enum_type_name }} ) -> Self {
+        use  ::pg_query::protobuf::{{ enum_module_name }}::{{ internal_enum_type_name }} as S;
+        match value {
+{% for field in fields %}
+{% if field.oneof_index.is_some() %}
+            S::{{ field.enum_variant_name() }}(v) => Self::{{ field.enum_variant_name() }}(v.into()),
+{% endif %}
+{% endfor %}
+        }        
+    }
+}
+
+impl From<Option<::pg_query::protobuf::{{ enum_module_name }}::{{ internal_enum_type_name }}>> for {{ enum_type_name }} {
+  fn from(value: Option<::pg_query::protobuf::{{ enum_module_name }}::{{ internal_enum_type_name }}>) -> Self {
+    match value {
+      Some(v) => Self::from(v),
+      None => Self::None
+    }
+  }
+}
+
+} // mod inner
+
+{% for field in fields %}
+{% if field.oneof_index.is_some() %}
+impl {{ enum_type_name }}
+{
+  /// cast as {{ field.enum_variant_name() }}
+  pub fn {{ field.variant_as_fn_name() }}(&self) -> {{ field.enum_variant_struct_name() }}Opt {
+    match self {
+      Self(self::inner::{{enum_type_name}}::{{ field.enum_variant_name() }}(v)) => {{ field.enum_variant_struct_name() }}Opt::from(v),
+      _ => {{ field.enum_variant_struct_name() }}Opt::none()
+    }
+  }
+
+  /// test variant kind
+  pub fn {{ field.variant_is_fn_name() }}(&self) -> bool {
+    matches!( self, Self( self::inner::{{enum_type_name}}::{{ field.enum_variant_name() }}(_) ) )
+  }
+}
+{% endif %}
+{% endfor %}
+
+impl From<::pg_query::protobuf::{{ enum_module_name }}::{{ internal_enum_type_name }}> for {{ enum_type_name }} {
+  fn from(value: ::pg_query::protobuf::{{ enum_module_name }}::{{ internal_enum_type_name }}) -> Self {
+    #[allow(unused_imports)]
+    use ::pg_query::protobuf::{{ enum_module_name }}::{{ internal_enum_type_name }} as S;
+    Self(
+    match value {
+{% for field in fields %}
+{% if field.oneof_index.is_some() %}
+      S::{{ field.enum_variant_name() }}(v) => inner::{{enum_type_name}}::from({{ field.enum_variant_struct_name() }}::from(v)),
+{% endif %}
+{% endfor %}
+    }
+    )
+  }
+}
+
+} // mod {{ enum_module_name }}
+
+#[allow(unused_imports)]
+pub use self::{{ enum_module_name }}::{ {{ enum_type_name }}, {{ enum_type_name }}Opt, {{ enum_type_name }}List, {{ enum_type_name }}ListOpt };

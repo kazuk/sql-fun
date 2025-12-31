@@ -1,0 +1,10 @@
+[book]
+authors = ["kazuk"]
+language = "en"
+multilingual = false
+src = "book"
+title = "sql-fun user manual"
+
+[build]
+build-dir = "user_manual"
+create-missing = true

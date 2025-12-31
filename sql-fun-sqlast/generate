@@ -1,0 +1,7 @@
+#!/bin/bash
+
+cargo x enum-types ./sql-fun-sqlast/schema.json > ./sql-fun-sqlast/src/syn/generated.rs
+cargo x struct-types ./sql-fun-sqlast/schema.json >> ./sql-fun-sqlast/src/syn/generated.rs
+
+cargo fmt
+

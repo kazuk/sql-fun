@@ -1,0 +1,19 @@
+[package]
+name = "adventure-works"
+license = "MIT"
+version = "0.1.0"
+edition = "2024"
+
+[lints]
+workspace = true
+
+[dependencies]
+anyhow.workspace = true
+derive_builder.workspace = true
+futures-util.workspace = true
+tokio.workspace = true
+tokio-postgres.workspace = true
+tracing.workspace = true
+
+
+sql-fun = { path = "../.." }

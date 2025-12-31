@@ -1,0 +1,37 @@
+use std::fmt::Display;
+
+use crate::{
+    sem::{AnalysisError, FullName},
+    syn::RangeVar,
+};
+
+/// table name
+#[derive(Debug, Clone, Eq, Hash, PartialEq, serde::Serialize, serde::Deserialize)]
+pub struct TableName(FullName);
+
+impl Display for TableName {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        self.0.fmt(f)
+    }
+}
+
+impl TableName {
+    /// gets name content
+    pub fn full_name(&self) -> &FullName {
+        &self.0
+    }
+}
+
+impl From<FullName> for TableName {
+    fn from(value: FullName) -> Self {
+        Self(value)
+    }
+}
+
+impl TryFrom<RangeVar> for TableName {
+    type Error = AnalysisError;
+
+    fn try_from(value: RangeVar) -> Result<Self, Self::Error> {
+        Ok(Self(FullName::try_from(value)?))
+    }
+}

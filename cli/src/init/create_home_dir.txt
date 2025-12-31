@@ -1,0 +1,19 @@
+Creating the `sql-fun` home directory...
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+
+`sql-fun` requires metadata in order to analyze SQL:
+
+ - Built-in database types, functions, operators, and casts
+ - Built-in object definitions
+ - PostgreSQL extension definitions
+
+The `sql-fun` home directory stores all of this. 
+
+# Configuring the `sql-fun` home directory
+
+By default, the home directory is located at `${HOME}/.sqlfun/`.
+
+You can customize this location with:
+
+  - the `--sql-fun-home` command-line option
+  - the `SQL_FUN_HOME` environment variable

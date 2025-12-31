@@ -1,0 +1,10 @@
+/* 
+  Postgres system table DDLs
+
+  extracted from docker image.
+*/ 
+
+{{#each this}}
+CREATE DOMAIN "{{domain_schema}}"."{{domain_name}}" as {{data_type}};
+
+{{/each}}

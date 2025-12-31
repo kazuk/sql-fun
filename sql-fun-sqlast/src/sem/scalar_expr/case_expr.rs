@@ -1,0 +1,322 @@
+use std::collections::{HashMap, HashSet};
+
+use crate::{
+    sem::{
+        AnalysisError, AnalysisProblem, FromClause, ParseContext, SemScalarExpr, TypeReference,
+        WithClause, analyze_scaler_expr,
+        scalar_expr::{AnalyzeScalarExpr, SemScalarExprNode},
+    },
+    syn::{ListOpt as _, Opt},
+};
+
+pub struct CaseExprAnalysisContext<'a> {
+    with_clause: &'a WithClause,
+    from_clause: &'a FromClause,
+    case_arg: Option<SemScalarExpr>,
+    nullabilities: Vec<Option<bool>>,
+    when_exprs: Vec<CaseWhen>,
+    result_types: HashSet<TypeReference>,
+    default_expr: Option<SemScalarExpr>,
+}
+
+impl<'a> CaseExprAnalysisContext<'a> {
+    fn new(with_clause: &'a WithClause, from_clause: &'a FromClause) -> Self {
+        Self {
+            with_clause,
+            from_clause,
+            case_arg: None,
+            nullabilities: Default::default(),
+            when_exprs: Default::default(),
+            result_types: Default::default(),
+            default_expr: None,
+        }
+    }
+
+    fn analyze_case_arg<TParseContext>(
+        &mut self,
+        context: TParseContext,
+        syn: &crate::syn::CaseExpr,
+    ) -> Result<TParseContext, AnalysisError>
+    where
+        TParseContext: ParseContext,
+    {
+        if let Some(arg) = syn.get_arg().as_inner() {
+            let (arg_expr, new_context) =
+                analyze_scaler_expr(context, self.with_clause, self.from_clause, arg)?;
+            self.case_arg = Some(arg_expr);
+            Ok(new_context)
+        } else {
+            Ok(context)
+        }
+    }
+
+    fn analyze_case_when<TParseContext>(
+        &self,
+        context: TParseContext,
+        syn: crate::syn::CaseWhen,
+    ) -> Result<(CaseWhen, TParseContext), AnalysisError>
+    where
+        TParseContext: ParseContext,
+    {
+        let Some(when_value) = syn.get_expr().as_inner() else {
+            AnalysisError::raise_unexpected_none("casewhen.expr")?
+        };
+        let Some(result) = syn.get_result().as_inner() else {
+            AnalysisError::raise_unexpected_none("casewhen.result")?
+        };
+        let (when_value, new_context) =
+            analyze_scaler_expr(context, self.with_clause, self.from_clause, when_value)?;
+        let (result, new_conext) =
+            analyze_scaler_expr(new_context, self.with_clause, self.from_clause, result)?;
+        Ok((CaseWhen::new(when_value, result), new_conext))
+    }
+
+    fn analyze_case_when_list<TParseContext>(
+        &mut self,
+        mut context: TParseContext,
+        args: Vec<crate::syn::CaseWhen>,
+    ) -> Result<TParseContext, AnalysisError>
+    where
+        TParseContext: ParseContext,
+    {
+        for arg in args {
+            let (when_expr, new_context) = self.analyze_case_when(context, arg)?;
+            context = new_context;
+
+            if let Some(result_type) = when_expr.result.get_type() {
+                if result_type.is_dynamic() {
+                    self.result_types.insert(result_type);
+                } else if let Some(result_type) = context.canonicalize_type_ref(&result_type) {
+                    self.result_types.insert(result_type);
+                } else {
+                    context.report_problem(AnalysisProblem::expression_type_not_known(
+                        &when_expr.result,
+                    ));
+                }
+            } else {
+                context.report_problem(AnalysisProblem::case_when_type_unknown(
+                    when_expr.result.clone(),
+                ));
+            }
+
+            self.nullabilities.push(when_expr.result.is_not_null());
+            self.when_exprs.push(when_expr);
+        }
+        Ok(context)
+    }
+
+    fn analyze_default_expr<TParseContext>(
+        &mut self,
+        mut context: TParseContext,
+        syn: crate::syn::CaseExpr,
+    ) -> Result<TParseContext, AnalysisError>
+    where
+        TParseContext: ParseContext,
+    {
+        let Some(def_result) = syn.get_defresult().as_inner() else {
+            return Ok(context);
+        };
+
+        let (default_expr, new_context) =
+            analyze_scaler_expr(context, self.with_clause, self.from_clause, def_result)?;
+        context = new_context;
+
+        if let Some(default_result_type) = default_expr.get_type() {
+            if default_result_type.is_dynamic() {
+                self.result_types.insert(default_result_type);
+            } else if let Some(default_result_type) =
+                context.canonicalize_type_ref(&default_result_type)
+            {
+                self.result_types.insert(default_result_type);
+            } else {
+                context.report_problem(AnalysisProblem::expression_type_not_known(&default_expr));
+            }
+        } else {
+            context.report_problem(AnalysisProblem::case_when_type_unknown(
+                default_expr.clone(),
+            ));
+        }
+        self.nullabilities.push(default_expr.is_not_null());
+        self.default_expr = Some(default_expr);
+        Ok(context)
+    }
+
+    fn cast_args<TParseContext>(
+        &mut self,
+        context: &mut TParseContext,
+        result_type: &TypeReference,
+    ) -> Option<TypeReference>
+    where
+        TParseContext: ParseContext,
+    {
+        for when_expr in self.when_exprs.iter_mut() {
+            let Some(_ty) = when_expr.result.get_type() else {
+                continue;
+            };
+            SemScalarExpr::implicit_cast_if_require(context, result_type, &mut when_expr.result);
+        }
+        if let Some(default) = self.default_expr.as_mut() {
+            SemScalarExpr::implicit_cast_if_require(context, result_type, default);
+        }
+
+        Some(result_type.clone())
+    }
+
+    fn type_fixup<TParseContext>(
+        &mut self,
+        context: &mut TParseContext,
+    ) -> Result<Option<TypeReference>, AnalysisError>
+    where
+        TParseContext: ParseContext,
+    {
+        if self.result_types.len() == 1 {
+            return Ok(self.result_types.iter().next().cloned());
+        }
+
+        let mut cast_candiates = HashMap::new();
+        let result_types = self.result_types.clone();
+        for ty1 in &result_types {
+            for ty2 in &result_types {
+                if ty1 == ty2 {
+                    continue;
+                }
+                let Some(cast) = context.get_implicit_cast(&ty1, &ty2) else {
+                    continue;
+                };
+                cast_candiates
+                    .entry(ty2)
+                    .and_modify(|v: &mut Vec<_>| v.push(cast.clone()))
+                    .or_insert(vec![cast.clone()]);
+            }
+        }
+
+        if cast_candiates.is_empty() {
+            context.report_problem(AnalysisProblem::incompatible_case_values(result_types));
+            Ok(None)
+        } else if cast_candiates.len() == 1 {
+            let Some((result_type, _casts)) = cast_candiates.into_iter().next() else {
+                AnalysisError::raise_unexpected_none("cast candiates")?
+            };
+            Ok(self.cast_args(context, &result_type))
+        } else {
+            let mut implicit_castable = Vec::new();
+            for (ty, _casts) in cast_candiates {
+                if self
+                    .result_types
+                    .iter()
+                    .all(|t| context.get_implicit_cast(t, &ty).is_some())
+                {
+                    implicit_castable.push(ty);
+                }
+            }
+
+            if implicit_castable.len() == 1 {
+                Ok(implicit_castable.into_iter().next().cloned())
+            } else {
+                todo!("{implicit_castable:#?}");
+            }
+        }
+    }
+
+    fn is_not_null(&self) -> Option<bool> {
+        if self.nullabilities.iter().any(|n| n == &Some(false)) {
+            Some(false)
+        } else if self.nullabilities.iter().all(|n| n.is_some()) {
+            Some(true)
+        } else {
+            None
+        }
+    }
+
+    fn into_case_expr<TParseContext>(
+        mut self,
+        context: &mut TParseContext,
+    ) -> Result<CaseExpr, AnalysisError>
+    where
+        TParseContext: ParseContext,
+    {
+        let case_expr_type = self.type_fixup(context)?;
+        let is_not_null = self.is_not_null();
+        Ok(CaseExpr {
+            arg_expr: Box::new(self.case_arg),
+            default_expr: Box::new(self.default_expr),
+            when_exprs: self.when_exprs,
+            case_expr_type,
+            is_not_null,
+        })
+    }
+}
+
+#[derive(Debug, Clone, Eq, Hash, PartialEq, serde::Serialize, serde::Deserialize)]
+pub struct CaseWhen {
+    when_value: SemScalarExpr,
+    result: SemScalarExpr,
+}
+
+impl CaseWhen {
+    pub fn new(when_value: SemScalarExpr, result: SemScalarExpr) -> Self {
+        Self { when_value, result }
+    }
+}
+
+/// case expression
+#[derive(Debug, Clone, Eq, Hash, PartialEq, serde::Serialize, serde::Deserialize)]
+pub struct CaseExpr {
+    arg_expr: Box<Option<SemScalarExpr>>,
+    when_exprs: Vec<CaseWhen>,
+    default_expr: Box<Option<SemScalarExpr>>,
+    case_expr_type: Option<TypeReference>,
+    is_not_null: Option<bool>,
+}
+
+impl CaseExpr {
+    /// create a instance
+    pub fn new(
+        arg_expr: Box<Option<SemScalarExpr>>,
+        when_exprs: Vec<CaseWhen>,
+        default_expr: Box<Option<SemScalarExpr>>,
+        case_expr_type: Option<TypeReference>,
+        is_not_null: Option<bool>,
+    ) -> Self {
+        Self {
+            arg_expr,
+            when_exprs,
+            default_expr,
+            case_expr_type,
+            is_not_null,
+        }
+    }
+}
+
+impl SemScalarExprNode for CaseExpr {
+    fn get_type(&self) -> Option<TypeReference> {
+        self.case_expr_type.clone()
+    }
+
+    fn is_not_null(&self) -> Option<bool> {
+        self.is_not_null
+    }
+}
+
+impl<TParseContext> AnalyzeScalarExpr<TParseContext, crate::syn::CaseExpr> for CaseExpr
+where
+    TParseContext: ParseContext,
+{
+    fn analyze_scalar_expr(
+        mut context: TParseContext,
+        with_clause: &WithClause,
+        from_clause: &FromClause,
+        syn: crate::syn::CaseExpr,
+    ) -> Result<(SemScalarExpr, TParseContext), AnalysisError> {
+        let mut analisys_context = CaseExprAnalysisContext::new(with_clause, from_clause);
+
+        context = analisys_context.analyze_case_arg(context, &syn)?;
+        let Some(args) = syn.get_args().map(|v| v.as_case_when()) else {
+            AnalysisError::raise_unexpected_none("caseexpr.args")?
+        };
+        context = analisys_context.analyze_case_when_list(context, args)?;
+        context = analisys_context.analyze_default_expr(context, syn)?;
+        let case = analisys_context.into_case_expr(&mut context)?;
+        Ok((SemScalarExpr::Case(case), context))
+    }
+}

@@ -1,0 +1,10 @@
+{{#each this}}
+create function {{schema}}.{{name}}({{args_decl}}) 
+  returns {{return.type}} 
+  language sql as 
+$$
+-- 
+$$;
+
+{{/each}}
+

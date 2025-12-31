@@ -1,0 +1,29 @@
+[package]
+name = "sql-fun-sqlast"
+license = "MIT"
+version = "0.1.0"
+edition = "2024"
+description = "semantic analyzer for PostgreSQL"
+
+[lints]
+workspace = true
+
+[dependencies]
+derive-getters = { workspace = true }
+derive_builder = { workspace = true }
+itertools = { workspace = true }
+pg_query = { workspace = true }
+serde = { workspace = true }
+serde_json = { workspace = true }
+thiserror = { workspace = true }
+tracing = { workspace = true }
+sql-fun-core = { workspace = true }
+combine = { workspace = true }
+
+[dev-dependencies]
+ctor = { workspace = true }
+testresult = { workspace = true }
+tracing-subscriber = { workspace = true }
+rstest = { workspace = true }
+clap = { workspace = true }
+backtrace-on-stack-overflow.workspace = true

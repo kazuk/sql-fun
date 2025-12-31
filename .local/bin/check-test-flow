@@ -1,0 +1,101 @@
+#!/usr/bin/env bash
+set -euo pipefail
+
+function usage() {
+  cat <<USAGE
+usage: check-test-flow [--all-features] [--since=<rev>|<rev1>..<rev2>] [--workspace-only] [--changed-only] [--nextest-extra="..."]
+USAGE
+}
+
+ALL_FEATURES=0
+SINCE=""
+WORKSPACE_ONLY=0
+CHANGED_ONLY=0
+NEXTEST_EXTRA=""
+
+for a in "$@"; do
+  case "$a" in
+    --all-features) ALL_FEATURES=1 ;;
+    --since=*)      SINCE="${a#*=}" ;;
+    --workspace-only) WORKSPACE_ONLY=1 ;;
+    --changed-only)   CHANGED_ONLY=1 ;;
+    --nextest-extra=*) NEXTEST_EXTRA="${a#*=}" ;;
+    -h|--help) usage; exit 0 ;;
+    *) echo "unknown arg: $a" >&2; usage; exit 1 ;;
+  esac
+done
+
+cd "$(git rev-parse --show-toplevel)"
+
+command -v jq >/dev/null || { echo "jq required"; exit 1; }
+command -v cargo-nextest >/dev/null || { echo "cargo-nextest required"; exit 1; }
+
+META_JSON="$(cargo metadata --no-deps --format-version=1)"
+declare -A PKG_BY_MANIFEST=()
+while read -r manifest name; do
+  PKG_BY_MANIFEST["$manifest"]="$name"
+done < <(jq -r '.packages[] | "\(.manifest_path)\t\(.name)"' <<<"$META_JSON")
+
+
+function collect_changed() {
+  if [[ -n "$SINCE" ]]; then
+    git diff --name-only "$SINCE"
+  else
+    git diff --name-only
+    git diff --name-only --cached
+    git ls-files --others --exclude-standard
+  fi
+}
+
+mapfile -t CHANGED < <(collect_changed | grep -v '^target/' | grep -E '\.(rs|toml)$' | sort -u)
+
+declare -A AFFECTED=()
+for f in "${CHANGED[@]:-}"; do
+  [[ -f "$f" ]] || continue
+  p="$(realpath -m "$f")"
+  d="$(dirname "$p")"
+  while [[ "$d" != "/" ]]; do
+    cand="$d/Cargo.toml"
+    if [[ -f "$cand" ]]; then
+      if [[ -n "${PKG_BY_MANIFEST[$cand]+x}" ]]; then
+        AFFECTED["${PKG_BY_MANIFEST[$cand]}"]=1
+      fi
+      break
+    fi
+    d="$(dirname "$d")"
+  done
+done
+
+FEATURES=()
+[[ "$ALL_FEATURES" == "1" ]] && FEATURES+=(--all-features)
+
+function run_check()   { echo ">> cargo check $*";   cargo check   "$@"; }
+function run_nextest() { echo ">> cargo nextest run $*"; cargo nextest run "$@"; }
+
+if (( WORKSPACE_ONLY == 0 )); then
+  if (( ${#AFFECTED[@]} > 0 )); then
+    echo "== Affected crates: ${!AFFECTED[*]}"
+    for pkg in "${!AFFECTED[@]}"; do
+      run_check   -p "$pkg" "${FEATURES[@]}"
+      run_nextest -p "$pkg" "${FEATURES[@]}" ${NEXTEST_EXTRA}  --no-tests pass
+    done
+  else
+    echo "== No affected crates detected."
+    (( CHANGED_ONLY == 1 )) && exit 0
+  fi
+fi
+
+echo "== Workspace verification"
+run_check   --workspace "${FEATURES[@]}"
+run_nextest --workspace "${FEATURES[@]}" "${FAILFAST_FLAGS[@]}" ${NEXTEST_EXTRA} --no-tests pass
+
+echo "== Formatting sources"
+cargo fmt
+cargo sort
+
+echo "== Linting"
+cargo clippy
+taplo lint
+
+echo "== Document build"
+cargo doc --workspace --no-deps

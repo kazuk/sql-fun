@@ -1,0 +1,51 @@
+#!/bin/bash
+set -euo pipefail
+
+# 未カバー行数(= total - covered)が多い順に上位N件を表示する
+# 例:
+#   TOPN=10 ./cov-top-uncovered.sh
+#   TOPN=20 ./cov-top-uncovered.sh --workspace --all-features
+#
+# NOTE:
+# - cargo-llvm-cov の --json は llvm-cov export の JSON を吐きます（files[].summary.lines.* を利用）
+# - 重複ファイルが出た場合は「total/uncovered は max、percent は min(最悪値)」で集約します
+
+TOPN="${TOPN:-20}"
+
+cargo llvm-cov nextest --workspace
+
+if ! command -v jq >/dev/null 2>&1; then
+  echo "jq not found" >&2
+  exit 127
+fi
+
+json="$(
+  cargo llvm-cov report --json --summary-only "$@"
+)"
+
+jq -r --argjson topn "$TOPN" '
+def fs:
+  {
+    filename: .filename,
+    total: (.summary.lines.count // 0),
+    covered: (.summary.lines.covered // 0),
+    uncovered: ((.summary.lines.count // 0) - (.summary.lines.covered // 0)),
+    percent: (.summary.lines.percent // 0)
+  };
+
+[
+  .data[]?.files[]? | fs
+]
+| group_by(.filename)
+| map({
+    filename: .[0].filename,
+    total: (map(.total) | max),
+    uncovered: (map(.uncovered) | max),
+    percent: (map(.percent) | min)
+  })
+| map(select(.total > 0 and .uncovered > 0))
+| sort_by(.uncovered) | reverse
+| .[:$topn]
+| .[]
+| "\(.uncovered)\t\(.total)\t\(.percent)\t\(.filename)"
+' <<<"$json" | column -t

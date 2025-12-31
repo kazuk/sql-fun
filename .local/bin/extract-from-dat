@@ -1,0 +1,174 @@
+#!/bin/bash
+
+set -euo pipefail
+
+POSTGRES_VERSION="${1:-"17"}"
+
+PG_TYPE_DAT="${GIT_ROOT}/postgres/src/include/catalog/pg_type.dat"
+PG_CAST_DAT="${GIT_ROOT}/postgres/src/include/catalog/pg_cast.dat"
+PG_PROC_DAT="${GIT_ROOT}/postgres/src/include/catalog/pg_proc.dat"
+PG_OPERATOR_DAT="${GIT_ROOT}/postgres/src/include/catalog/pg_operator.dat"
+
+BUILTIN_BASE_PATH="${SQL_FUN_HOME}/postgres/${POSTGRES_VERSION}"
+BUILTIN_TYPE_PATH="${BUILTIN_BASE_PATH}/pg_type.json"
+BUILTIN_FUNC_PATH="${BUILTIN_BASE_PATH}/functions.json"
+BUILTIN_FUNC_DETAIL_PATH="${BUILTIN_BASE_PATH}/func_detail.json"
+BUILTIN_BINARY="${BUILTIN_BASE_PATH}/binary_op.json"
+BUITIN_LEFT_UNARY="${BUILTIN_BASE_PATH}/left_unary_op.json"
+BUITIN_RIGHT_UNARY="${BUILTIN_BASE_PATH}/right_unary_op.json"
+BUITIN_CASTS="${BUILTIN_BASE_PATH}/casts.json"
+
+# extract types
+cargo run -q -p parse_dat ${PG_TYPE_DAT} \
+  | jq '[
+  .[] 
+  | { "name": .typname } ]
+  ' > "${BUILTIN_TYPE_PATH}"
+
+# extract functions
+cargo run -q -p parse_dat -- "${PG_PROC_DAT}" \
+  | jq '
+      [ .[]
+        | select((.descr // "") | test("I/O|support") | not)
+        | select(.prorettype != "trigger")
+        | select(.prorettype != "internal")
+        | select((.proargtypes // "") | test("internal") | not)
+        | select(.proname | test("^[a-z]"))
+        | select(.proname != .prorettype)
+        | { name: .proname,
+            args: (.proargtypes // "" | split(" ") | map(select(. != ""))),
+            ret: .prorettype,
+            is_strict: (.proisstrict !="f" ) }
+      ]
+      | group_by(.name)
+      | map({ name: .[0].name, overloads: . })
+    ' > "${BUILTIN_FUNC_PATH}"
+
+cargo run -q -p parse_dat -- "${PG_PROC_DAT}" \
+  | jq '
+    [ .[]
+      | select(.proallargtypes != null)
+      | { name: .proname,
+          allargtypes: .proallargtypes,
+          argmodes: .proargmodes,
+          argnames: .proargnames
+        }
+    ]
+    ' > ${BUILTIN_FUNC_DETAIL_PATH}
+
+# extract operators
+PROCS_TEMP=$(cargo run -q -p parse_dat -- "${PG_PROC_DAT}")
+QUERY='
+    [ (
+      .[] 
+      | select( .proargtypes!="" )
+      | select( (.proargtypes | split(" ") | length )==$argnum)
+      ) 
+    ]
+    | group_by(.proname) 
+    | map( { 
+        "key": .[0].proname, 
+        "value": ( 
+          group_by(.proargtypes) |
+          map( 
+            { 
+              key: .[0].proargtypes ,
+              value: ( 
+                .[] 
+                | { 
+                    "prorettype": .prorettype , 
+                    "prostrict": ( .proisstrict!="f" ) 
+                  } 
+              )
+            }
+          )
+          | from_entries
+        )
+      } 
+    ) 
+    | from_entries 
+'
+
+BINARY_PROCS=$(echo "${PROCS_TEMP}" | jq --argjson argnum 2 "${QUERY}")
+UNARY_PROCS=$(echo "${PROCS_TEMP}" | jq --argjson argnum 1 "${QUERY}")
+OPERATORS=$(cargo run -q -p parse_dat -- "${PG_OPERATOR_DAT}")
+
+# binary operators
+echo "${OPERATORS}" \
+ | jq --slurpfile proc <(echo "$BINARY_PROCS") '
+    def lookup_strict(oprcode; left; right):
+      $proc[0][oprcode][left + " " + right].prostrict;
+    
+    map(select(.oprleft != "0" and .oprright != "0"))
+    | group_by(.oprname)
+    | map({
+        key: .[0].oprname,
+        value: map(
+          {
+            left: .oprleft,
+            right: .oprright,
+            result: .oprresult,
+            strict: (lookup_strict(.oprcode; .oprleft; .oprright) // false)
+          }
+        )
+      })
+    | from_entries
+  ' > "$BUILTIN_BINARY"
+
+# left unary operators
+echo "${OPERATORS}" \
+ | jq --slurpfile proc <(echo "$UNARY_PROCS") '
+  def lookup_strict_unary(oprcode; argtype):
+    $proc[0][oprcode][argtype].prostrict;
+
+  map(select(.oprleft != "0" and .oprright == "0"))
+  | group_by(.oprname)
+  | map({
+      key: .[0].oprname,
+      value: map({
+        input: .oprleft,
+        result: .oprresult,
+        strict: (lookup_strict_unary(.oprcode; .oprleft) // false)
+      })
+    })
+  | from_entries
+' > "$BUITIN_LEFT_UNARY"
+
+
+# right unary operators
+echo "${OPERATORS}" \
+ | jq --slurpfile proc <(echo "$UNARY_PROCS") '
+  def lookup_strict_unary(oprcode; argtype):
+    $proc[0][oprcode][argtype].prostrict;
+
+  map(select(.oprleft == "0" and .oprright != "0"))
+  | group_by(.oprname)
+  | map({
+      key: .[0].oprname,
+      value: map({
+        input: .oprright,
+        result: .oprresult,
+        strict: (lookup_strict_unary(.oprcode; .oprright) // false)
+      })
+    })
+  | from_entries
+' > "$BUITIN_RIGHT_UNARY"
+
+## extract cast definitions
+PREFFERD_TYPES=$(cargo run -q -p parse_dat -- "$PG_TYPE_DAT" \
+  | jq '.[] | select(.typispreferred=="t") | .typname ' )
+
+cargo run -q -p parse_dat -- "$PG_CAST_DAT" \
+  | jq --slurpfile preferred <(echo "$PREFFERD_TYPES") '
+      reduce .[] as $c ({}; 
+        .[$c.castsource] = (
+          (.[$c.castsource] // {}) 
+          + { ($c.casttarget): { 
+            func: $c.castfunc, 
+            method: $c.castmethod, 
+            context: $c.castcontext, 
+            is_prefferd: ($preferred[0] | index($c.casttarget) != null) } }
+        )
+      )
+    ' > "$BUITIN_CASTS"
+

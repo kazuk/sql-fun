@@ -1,0 +1,7 @@
+
+[alias]
+x = "run -p xbuild --"
+
+[env]
+SQL_FUN_HOME = "./sql-fun-home"
+# RUST_MIN_STACK = "16777216"

@@ -1,0 +1,283 @@
+{# struct_template.j2 (askama) #}
+
+/// message type {{ struct_name }}
+#[allow(dead_code)]
+mod {{ module_name }} {
+
+    #[allow(unused_imports)]
+    use super::*;
+
+    /// {{ struct_name }}
+    #[derive(Debug,Clone, serde::Serialize, serde::Deserialize )]
+    pub struct {{ struct_name }}(Box<self::inner::{{ struct_name }}>);
+
+    /// optional {{ struct_name }}
+    #[derive(Debug,Clone, serde::Serialize, serde::Deserialize )]
+    pub struct {{ struct_name }}Opt(Option<{{ struct_name }}>);
+
+    #[cfg(test)]
+    impl From<self::inner::{{ struct_name }}> for {{ struct_name }} {
+        fn from(value: self::inner::{{ struct_name }}) -> Self {
+            Self(Box::new(value))
+        }
+    }
+
+    impl crate::syn::Opt<{{ struct_name }}> for {{ struct_name }}Opt
+    {
+        fn as_inner(&self) -> Option<{{ struct_name }}> {
+            self.0.clone()
+        }
+    }
+
+    /// {{ struct_name }} list
+    #[derive(Debug,Clone, serde::Serialize, serde::Deserialize )]
+    pub struct {{ struct_name }}List(Vec<{{ struct_name }}>);
+
+    /// optional {{ struct_name }} list
+    #[derive(Debug,Clone, serde::Serialize, serde::Deserialize )]
+    pub struct {{ struct_name }}ListOpt(Option<Vec<{{ struct_name }}>>);
+
+    impl crate::syn::ListOpt<{{ struct_name }}> for {{ struct_name }}ListOpt {
+        type OptType={{ struct_name }}Opt;
+
+        fn as_inner(&self) -> Option<Vec<{{ struct_name }}>>
+        {
+            self.0.clone()
+        }
+    }
+
+    impl From<Option<{{ struct_name }}>> for {{ struct_name }}Opt
+    {
+        fn from(value: Option<{{ struct_name }}>) -> Self { Self(value) }
+    }
+
+    impl From<::pg_query::protobuf::{{ struct_name }}> for {{ struct_name }} {
+        fn from(value: ::pg_query::protobuf::{{ struct_name }}) -> Self {
+            Self(Box::new(self::inner::{{ struct_name }}::from(value)))
+        }
+    }
+
+    impl From<Box<::pg_query::protobuf::{{ struct_name }}>> for {{ struct_name }} {
+        fn from(value: Box<::pg_query::protobuf::{{ struct_name }}>) -> Self {
+            Self(Box::new(self::inner::{{ struct_name }}::from(*value)))
+        }
+    }
+
+    impl {{ struct_name }}Opt
+    {
+        /// returns None Value
+        pub fn none() -> Self {
+            Self(None)
+        }
+    }
+
+    impl From<{{ struct_name }}> for {{ struct_name }}Opt
+    {
+        fn from(value: {{ struct_name }}) -> Self {
+            Self(Some(value))
+        }
+    }
+
+    impl From<&{{ struct_name }}> for {{ struct_name }}Opt
+    {
+        fn from(value: &{{ struct_name }}) -> Self {
+            Self(Some(value.clone()))
+        }
+    }
+
+    impl From<&{{ struct_name }}Opt> for {{ struct_name }}Opt
+    {
+        fn from(value: &{{ struct_name }}Opt) -> Self {
+            value.clone()
+        }
+    }
+
+    impl From<Option<::pg_query::protobuf::{{ struct_name }}>> for {{ struct_name }}Opt
+    {
+        fn from(value: Option<::pg_query::protobuf::{{ struct_name }}>) -> Self {
+            Self(value.map({{ struct_name }}::from))
+        }
+    }
+
+    impl From<Option<Box<::pg_query::protobuf::{{ struct_name }}>>> for {{ struct_name }}Opt
+    {
+        fn from(value: Option<Box<::pg_query::protobuf::{{ struct_name }}>>) -> Self {
+            Self(value.map(|v| {{ struct_name }}::from(*v)))
+        }
+    }
+
+    impl {{ struct_name }}ListOpt {
+        /// returns None value
+        pub fn none() -> Self {
+            Self(None)
+        }
+    }
+
+    impl From<&{{ struct_name }}List> for {{ struct_name }}ListOpt {
+        fn from(value: &{{ struct_name }}List) -> Self {
+            Self(Some(value.0.clone()))
+        }
+    }
+
+
+    impl From<Vec<{{ struct_name }}>> for {{ struct_name }}List {
+        fn from(value: Vec<{{ struct_name }}>) -> Self {
+            Self(value)
+        }
+    }
+
+    impl From<Vec<::pg_query::protobuf::{{ struct_name }}>> for {{ struct_name }}List {
+        fn from(value: Vec<::pg_query::protobuf::{{ struct_name }}>) -> Self {
+            Self(
+                value
+                .into_iter()
+                .map({{ struct_name }}::from)
+                .collect()
+            )
+        }
+    }
+
+    mod inner {
+
+        #[allow(unused_imports)]
+        use super::*;
+
+        #[cfg_attr(test, derive(derive_builder::Builder))]
+        #[derive(Clone, Debug, serde::Serialize, serde::Deserialize )]
+        pub struct {{ struct_name }} {
+            {% for field in struct_type.field() %}
+                /// {{ field.struct_field_name() }}
+                {{ field.struct_field_name() }}: {{ field.struct_field_type(false) }},
+            {% endfor %}
+        }
+
+        impl From<::pg_query::protobuf::{{ struct_name }}> for {{ struct_name }} {
+            fn from({{ struct_type.value_param_name() }}: ::pg_query::protobuf::{{ struct_name }}) -> Self {
+
+            {% for field in struct_type.field() %}
+                {% set is_prim = field.struct_field_is_primitive() %}
+                {% set field_name = field.struct_field_name() %}
+                {% set field_type = field.struct_field_type_turbo(false) %}
+                {% set var_name = field.local_var_name() %}
+                {% if is_prim %}
+                    let {{ var_name }} = {{ struct_type.value_param_name() }}.{{ field_name }};
+                {% else %}
+                    let {{ var_name }} = {{ field_type }}::from({{ struct_type.value_param_name() }}.{{ field_name }});
+                {% endif %}
+            {% endfor %}
+                Self {
+            {% for field in struct_type.field() %}
+                {% set field_name = field.struct_field_name() %}
+                {% if field_name == "value" %}
+                        value: value_{% if !loop.last %},{% endif %}
+                {% else %}
+                        {{ field_name }}{% if !loop.last %},{% endif %}
+                {% endif %}
+            {% endfor %}
+                }
+            }
+        }
+
+{% for field in struct_type.field() %}
+    {% set getter = field.getter_fn_name() %}
+    {% set name = field.struct_field_name() %}
+    {% set ty = field.getter_return_type(false) %}
+    {% set is_prim = field.struct_field_is_primitive() %}
+
+    {% if is_prim %}
+        {% if field.struct_field_no_from() %}
+            {% if ty == "Vec<u64>" %}
+    impl {{ struct_name }}
+    {
+        /// get {{ name }}
+        pub fn {{ getter }}(& self) -> {{ ty }} {
+            self.{{ name }}.clone()
+        }
+    }
+            {% else %}
+    impl {{ struct_name }}
+    {
+        /// get {{ name }}
+        pub fn {{ getter }}(& self) -> {{ ty }} {
+            self.{{ name }}
+        }
+    }
+            {% endif %}
+        {% else %}
+            {% set ty_turbo = field.struct_field_type_turbo(false) %}
+    impl {{ struct_name }}
+    {
+        /// get {{ name }}
+        pub fn {{ getter }}(& self) -> {{ ty }} {
+            {{ ty_turbo }}::from(&self.{{ name }})
+        }
+    }
+            {% endif %}
+        {% else %}
+    impl {{ struct_name }}
+    {
+        /// get {{ name }}
+        pub fn {{ getter }}(& self) -> {{ ty }} {
+            {{ ty }}::from(&self.{{ name }})
+        }
+    }
+    {% endif %}
+{% endfor %}
+
+    } // mod inner
+
+{% for field in struct_type.field() %}
+    {% if field.struct_field_is_primitive() %}
+
+    impl {{ struct_name }}
+    {
+        /// get {{ field.field_name() }}
+        pub fn {{ field.getter_fn_name() }}(&self) -> {{ field.getter_return_type(false) }} {
+            self.0.{{ field.getter_fn_name() }}()
+        }
+    }
+
+    impl {{ struct_name }}Opt
+    {
+        /// get {{ field.field_name() }}
+        pub fn {{ field.getter_fn_name() }}(&self) -> Option<{{ field.getter_return_type(false) }}> {
+            self.0.as_ref().map(|v| v.{{ field.getter_fn_name() }}())
+        }
+    }
+
+    {% else %}
+
+    impl {{ struct_name }}
+    {
+        /// get {{ field.field_name() }}
+        pub fn {{ field.getter_fn_name() }}(&self) -> {{ field.getter_return_type(false) }} {
+            self.0.{{ field.getter_fn_name() }}()
+        }
+    }
+
+    impl {{ struct_name }}Opt
+    {
+        /// get {{ field.field_name() }}
+        pub fn {{ field.getter_fn_name() }}(&self) -> {{ field.getter_return_type(false) }} {
+            match &self.0 {
+                Some(v) => v.{{ field.getter_fn_name() }}(),
+                _ => {{ field.getter_return_type(false) }}::none()
+            }
+        }
+    }
+
+    {% endif %}
+{% endfor %}
+
+    #[cfg(test)] pub use self::inner::{{struct_name}}Builder;
+
+} // mod {{ module_name }}
+
+#[allow(unused_imports)] pub use self::{{ module_name }}::{
+    {{ struct_name }},
+    {{ struct_name }}Opt,
+    {{ struct_name }}List,
+    {{ struct_name }}ListOpt
+};
+
+#[cfg(test)] pub use self::{{ module_name }}::{{ struct_name }}Builder;

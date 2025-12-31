@@ -1,0 +1,17 @@
+[package]
+name = "xbuild"
+license = "MIT"
+version = "0.1.0"
+edition = "2024"
+
+[lints]
+workspace = true
+
+[dependencies]
+anyhow.workspace = true
+askama.workspace = true
+clap.workspace = true
+convert_case.workspace = true
+j9.workspace = true
+serde.workspace = true
+serde_json.workspace = true

@@ -1,0 +1,68 @@
+use std::convert::Infallible;
+
+use crate::sem::{FunctionParam, TypeReference};
+
+#[derive(thiserror::Error, Debug)]
+pub enum TypeError {
+    #[error("parameter binding failed , no parameter supplied for parameter {0}")]
+    BindFailed(Box<FunctionParam>),
+
+    #[error("simple inference failed, require array type {0}")]
+    RequireArray(TypeReference),
+
+    #[error("simple inference failed, require non-array type {0}")]
+    RequireNonArray(TypeReference),
+
+    #[error("simple inference failed, require range type {0}")]
+    RequireRangeType(TypeReference),
+
+    #[error("simple inference failed, require multi range type {0}")]
+    RequireMultiRangeType(TypeReference),
+
+    #[error("simple inference failed, no argument for inference")]
+    SimpleInferNoArgs(),
+
+    #[error("simple inference failed, ambigous")]
+    SimpleInferAmbigous(Vec<TypeReference>),
+
+    #[error("common inference failed : no implicit castable")]
+    CommonInferNoImplicitCastable(),
+
+    #[error("common inference failed : ambigous")]
+    CommonInferAmbigous(),
+
+    #[error("Unexpeced error (cast not found in castable list items)")]
+    UnexpectedCastNotFound,
+
+    #[error("Implicit cast not found")]
+    ImplicitCastNotFound(String, String),
+}
+
+impl TypeError {
+    pub fn common_infer_no_implict_castable() -> Result<Infallible, Self> {
+        Err(Self::CommonInferNoImplicitCastable())
+    }
+
+    pub fn unexpected_cast_not_found() -> Result<Infallible, Self> {
+        Err(Self::UnexpectedCastNotFound)
+    }
+
+    pub fn common_infer_ambigous() -> Result<Infallible, Self> {
+        Err(Self::CommonInferAmbigous())
+    }
+
+    pub fn implicit_cast_not_found(
+        source_type: &str,
+        target_type: &str,
+    ) -> Result<Infallible, Self> {
+        Err(Self::ImplicitCastNotFound(
+            String::from(source_type),
+            String::from(target_type),
+        ))
+    }
+
+    pub fn never() -> ! {
+        // TODO: remove this function on complete never-type support comes in Rust
+        unreachable!("Ok(Infallible)")
+    }
+}

@@ -125,13 +125,12 @@ impl DataSource {
 
         let (left_source, new_context) =
             Self::analyze_from_clause_node(context, with_clause, &from_clause, left)?;
-        from_clause.push(left_source.clone());
-
         context = new_context;
         let (right_source, new_context) =
             Self::analyze_from_clause_node(context, with_clause, &from_clause, right)?;
         context = new_context;
 
+        from_clause.push(left_source.clone());
         from_clause.push(right_source.clone());
 
         let qualifications = if let Some(qualifications) = join_expr.get_quals().as_inner() {

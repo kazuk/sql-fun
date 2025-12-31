@@ -3,9 +3,10 @@ mod impl_analyze_range_var_node;
 use crate::{
     AstAndContextPair,
     sem::{
-        AliasSpec, AnalysisError, DataSourceRowFunctions, DataSourceRowsFromFunc, FromClause,
-        FullName, JoinKind, ParseContext, SemAst, WithClause, analyze_node,
-        data_source::JoinExprDataSource,
+        AliasSpec, AnalysisError, ColumnName, DataSourceRowFunctions, DataSourceRowsFromFunc,
+        FromClause, FullName, JoinKind, ParseContext, SemAst, WithClause, analyze_node,
+        analyze_scaler_expr,
+        data_source::{JoinExprDataSource, join_expr::JoinUsingClause},
     },
     syn::{ListOpt, Opt},
 };
@@ -72,8 +73,40 @@ mod test_analyze_range_subselect {
 }
 
 impl DataSource {
+    fn analyze_join_using_clause<TParseContext>(
+        mut context: TParseContext,
+        join_expr: crate::syn::JoinExpr,
+    ) -> Result<(Option<JoinUsingClause>, TParseContext), AnalysisError>
+    where
+        TParseContext: ParseContext,
+    {
+        if let Some(using_columns) = join_expr.get_using_clause().as_inner()
+            && !using_columns.is_empty()
+        {
+            let using_columns: Vec<ColumnName> = using_columns
+                .iter()
+                .filter_map(|c| c.as_string().get_sval())
+                .map(|v| ColumnName::from(v.as_str()))
+                .collect();
+
+            let (alias, new_context) =
+                if let Some(alias) = join_expr.get_join_using_alias().as_inner() {
+                    let (alias, new_context) = AliasSpec::analyze_without_relname(context, &alias)?;
+                    (Some(alias), new_context)
+                } else {
+                    (None, context)
+                };
+
+            context = new_context;
+            let join_using = JoinUsingClause::new(&using_columns, &alias);
+            Ok((Some(join_using), context))
+        } else {
+            Ok((None, context))
+        }
+    }
+
     fn analyze_join_expr<TParseContext>(
-        context: TParseContext,
+        mut context: TParseContext,
         with_clause: &WithClause,
         from_clause: &FromClause,
         join_expr: crate::syn::JoinExpr,
@@ -81,6 +114,8 @@ impl DataSource {
     where
         TParseContext: ParseContext,
     {
+        let mut from_clause = from_clause.clone();
+
         let Some(left) = join_expr.get_larg().as_inner() else {
             AnalysisError::raise_unexpected_none("join_expr.larg")?
         };
@@ -89,17 +124,123 @@ impl DataSource {
         };
 
         let (left_source, new_context) =
-            Self::analyze_from_clause_node(context, with_clause, from_clause, left)?;
+            Self::analyze_from_clause_node(context, with_clause, &from_clause, left)?;
+        context = new_context;
         let (right_source, new_context) =
-            Self::analyze_from_clause_node(new_context, with_clause, from_clause, right)?;
+            Self::analyze_from_clause_node(context, with_clause, &from_clause, right)?;
+        context = new_context;
+
+        from_clause.push(left_source.clone());
+        from_clause.push(right_source.clone());
+
+        let qualifications = if let Some(qualifications) = join_expr.get_quals().as_inner() {
+            let (quals, new_context) =
+                analyze_scaler_expr(context, with_clause, &from_clause, qualifications)?;
+            context = new_context;
+            Some(quals)
+        } else {
+            None
+        };
+
+        let alias = if let Some(alias) = join_expr.get_alias().as_inner() {
+            let (alias, new_context) = AliasSpec::analyze_without_relname(context, &alias)?;
+            context = new_context;
+            Some(alias)
+        } else {
+            None
+        };
 
         let join_kind = JoinKind::try_from(join_expr.get_jointype())?;
+        let natural = join_expr.get_is_natural();
+        let (using_clause, new_context) = Self::analyze_join_using_clause(context, join_expr)?;
+        context = new_context;
+
         Ok((
-            JoinExprDataSource::new_data_source(&join_kind, &left_source, &right_source),
-            new_context,
+            JoinExprDataSource::new_data_source(
+                &join_kind,
+                &left_source,
+                &right_source,
+                &qualifications,
+                &alias,
+                &using_clause,
+                natural,
+            ),
+            context,
         ))
     }
+}
 
+#[cfg(test)]
+mod test_analyze_join_expr {
+    use crate::{
+        sem::{
+            ColumnDefinition, ColumnName, FromClause,
+            FullName, SchemaName, TypeReference,
+            WithClause,
+        },
+        syn::{AliasOpt, JoinType, NodeInner},
+        test_helpers::{SynBuilder, TestParseContext, test_context},
+    };
+    use testresult::TestResult;
+
+    #[rstest::rstest]
+    fn test_analyze_join_expr(mut test_context: TestParseContext) -> TestResult {
+        test_context.set_get_search_path_result(&vec![
+            SchemaName::from("public"),
+            SchemaName::from("pg_catalog"),
+        ]);
+        let int4_type_ref = TypeReference::from_master_type_name("int4");
+        test_context.setup_type(int4_type_ref.clone());
+        let columns = vec![ColumnDefinition::new(
+            &Some(ColumnName::from("id")),
+            Some(&int4_type_ref),
+            Some(true),
+        )];
+        test_context.setup_table("table1", &columns);
+        test_context.setup_table("table2", &columns);
+        test_context.setup_binary("=", "int4", "int4", "bool", true);
+
+        let builder = SynBuilder::new();
+
+        let name = FullName::from_local_name("table1");
+        let alias = builder.alias("t1", &[]);
+        let table1 = NodeInner::RangeVar(builder.range_var(&name, &alias.into()));
+        let name = FullName::from_local_name("table2");
+        let alias = builder.alias("t2", &[]);
+        let table2 = NodeInner::RangeVar(builder.range_var(&name, &alias.into()));
+        let left = builder.column_ref("t1", "id");
+        let right = builder.column_ref("t2", "id");
+        let qual = builder.operator_equals(
+            NodeInner::ColumnRef(left).into(),
+            NodeInner::ColumnRef(right).into(),
+        );
+
+        let join_expr = builder.join_expr(
+            JoinType::JoinInner.into(),
+            table1.into(),
+            table2.into(),
+            qual,
+            AliasOpt::none(),
+            &[],
+            AliasOpt::none(),
+            false,
+        );
+
+        let with_clause = WithClause::default();
+        let from_clause = FromClause::default();
+
+        let (_ds, _) = super::DataSource::analyze_join_expr(
+            test_context,
+            &with_clause,
+            &from_clause,
+            join_expr,
+        )?;
+
+        Ok(())
+    }
+}
+
+impl DataSource {
     fn analyze_range_table_func<TParseContext>(
         context: TParseContext,
         with_clause: &WithClause,

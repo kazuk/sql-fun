@@ -31,7 +31,21 @@ impl<'a> CaseExprAnalysisContext<'a> {
             default_expr: None,
         }
     }
+}
 
+#[cfg(test)]
+mod test_case_expr_analysis_context_new {
+    use crate::sem::{FromClause, WithClause};
+
+    #[test]
+    pub fn test_case_expr_analysis_context_new() {
+        let with_clause = WithClause::default();
+        let from_clause = FromClause::default();
+        let _ = super::CaseExprAnalysisContext::new(&with_clause, &from_clause);
+    }
+}
+
+impl<'a> CaseExprAnalysisContext<'a> {
     fn analyze_case_arg<TParseContext>(
         &mut self,
         context: TParseContext,
@@ -49,7 +63,49 @@ impl<'a> CaseExprAnalysisContext<'a> {
             Ok(context)
         }
     }
+}
 
+#[cfg(test)]
+mod test_case_expr_analysis_context_analyze_case_arg {
+    use testresult::TestResult;
+
+    use crate::{
+        sem::{FromClause, WithClause},
+        syn::{Node, NodeInner, NodeList},
+        test_helpers::{SynBuilder, TestParseContext, test_context},
+    };
+
+    #[rstest::rstest]
+    fn test_analyze_case_arg_none(test_context: TestParseContext) -> TestResult {
+        let with_clause = WithClause::default();
+        let from_clause = FromClause::default();
+        let mut acontext = super::CaseExprAnalysisContext::new(&with_clause, &from_clause);
+
+        let builder = SynBuilder::new();
+        let case_expr = builder.case_expr(Node::none(), NodeList::default(), Node::none());
+
+        let _new_context = acontext.analyze_case_arg(test_context, &case_expr)?;
+        assert!(acontext.case_arg.is_none());
+        Ok(())
+    }
+
+    #[rstest::rstest]
+    fn test_analyze_case_arg_some(test_context: TestParseContext) -> TestResult {
+        let with_clause = WithClause::default();
+        let from_clause = FromClause::default();
+        let mut acontext = super::CaseExprAnalysisContext::new(&with_clause, &from_clause);
+
+        let builder = SynBuilder::new();
+        let arg_expr = NodeInner::AConst(builder.const_int4(10));
+        let case_expr = builder.case_expr(arg_expr.into(), NodeList::default(), Node::none());
+
+        let _new_context = acontext.analyze_case_arg(test_context, &case_expr)?;
+        assert!(acontext.case_arg.is_some());
+        Ok(())
+    }
+}
+
+impl<'a> CaseExprAnalysisContext<'a> {
     fn analyze_case_when<TParseContext>(
         &self,
         context: TParseContext,
@@ -70,7 +126,44 @@ impl<'a> CaseExprAnalysisContext<'a> {
             analyze_scaler_expr(new_context, self.with_clause, self.from_clause, result)?;
         Ok((CaseWhen::new(when_value, result), new_conext))
     }
+}
 
+#[cfg(test)]
+mod test_case_expr_analysis_context_analyze_case_when {
+    use testresult::TestResult;
+
+    use crate::{
+        sem::{FromClause, ScalarConstExpr, SemScalarExpr, WithClause},
+        syn::NodeInner,
+        test_helpers::{SynBuilder, TestParseContext, test_context},
+    };
+
+    #[rstest::rstest]
+    fn test_analyze_case_when(test_context: TestParseContext) -> TestResult {
+        let with_clause = WithClause::default();
+        let from_clause = FromClause::default();
+        let acontext = super::CaseExprAnalysisContext::new(&with_clause, &from_clause);
+
+        let builder = SynBuilder::new();
+        let expr = NodeInner::AConst(builder.const_int4(10));
+        let result = NodeInner::AConst(builder.const_int4(20));
+        let case_when = builder.case_when(expr.into(), result.into());
+        let (sem_case_when, _) = acontext.analyze_case_when(test_context, case_when)?;
+        let SemScalarExpr::Const(ScalarConstExpr::Integer(expr_value)) = sem_case_when.when_value
+        else {
+            panic!("unexpected when_value {sem_case_when:?}")
+        };
+        assert_eq!(10, expr_value);
+        let SemScalarExpr::Const(ScalarConstExpr::Integer(result_value)) = sem_case_when.result
+        else {
+            panic!("unexpected result {sem_case_when:?}")
+        };
+        assert_eq!(20, result_value);
+        Ok(())
+    }
+}
+
+impl<'a> CaseExprAnalysisContext<'a> {
     fn analyze_case_when_list<TParseContext>(
         &mut self,
         mut context: TParseContext,
@@ -104,7 +197,47 @@ impl<'a> CaseExprAnalysisContext<'a> {
         }
         Ok(context)
     }
+}
 
+#[cfg(test)]
+mod test_case_expr_analysis_context_analyze_case_when_list {
+    use crate::{
+        sem::{FromClause, PgBuiltInType, WithClause},
+        syn::NodeInner,
+        test_helpers::{SynBuilder, TestParseContext, test_context},
+    };
+    use testresult::TestResult;
+
+    #[rstest::rstest]
+    fn test_analyze_case_when_list(mut test_context: TestParseContext) -> TestResult {
+        test_context.setup_type(PgBuiltInType::int4());
+        test_context.setup_type(PgBuiltInType::text());
+
+        let with_clause = WithClause::default();
+        let from_clause = FromClause::default();
+        let mut acontext = super::CaseExprAnalysisContext::new(&with_clause, &from_clause);
+
+        let builder = SynBuilder::new();
+
+        let expr = NodeInner::AConst(builder.const_int4(10));
+        let result = NodeInner::AConst(builder.const_int4(20));
+        let case_when_int = builder.case_when(expr.into(), result.into());
+
+        let expr = NodeInner::AConst(builder.const_sval("a"));
+        let result = NodeInner::AConst(builder.const_sval("b"));
+        let case_when_sval = builder.case_when(expr.into(), result.into());
+
+        let when_values = vec![case_when_int, case_when_sval];
+
+        let _ = acontext.analyze_case_when_list(test_context, when_values)?;
+        assert_eq!(acontext.result_types.len(), 2);
+        assert_eq!(acontext.nullabilities.len(), 2);
+        assert_eq!(acontext.when_exprs.len(), 2);
+        Ok(())
+    }
+}
+
+impl<'a> CaseExprAnalysisContext<'a> {
     fn analyze_default_expr<TParseContext>(
         &mut self,
         mut context: TParseContext,
@@ -140,7 +273,49 @@ impl<'a> CaseExprAnalysisContext<'a> {
         self.default_expr = Some(default_expr);
         Ok(context)
     }
+}
 
+#[cfg(test)]
+mod test_case_expr_analysis_context_analyze_default_expr {
+    use crate::{
+        sem::{FromClause, PgBuiltInType, WithClause},
+        syn::{Node, NodeInner, NodeList},
+        test_helpers::{SynBuilder, TestParseContext, test_context},
+    };
+    use testresult::TestResult;
+
+    #[rstest::rstest]
+    fn test_analyze_default_expr_none(test_context: TestParseContext) -> TestResult {
+        let with_clause = WithClause::default();
+        let from_clause = FromClause::default();
+        let mut acontext = super::CaseExprAnalysisContext::new(&with_clause, &from_clause);
+
+        let builder = SynBuilder::new();
+        let case_expr = builder.case_expr(Node::none(), NodeList::default(), Node::none());
+
+        let _new_context = acontext.analyze_default_expr(test_context, case_expr)?;
+        assert!(acontext.default_expr.is_none());
+        Ok(())
+    }
+
+    #[rstest::rstest]
+    fn test_analyze_default_expr_some(mut test_context: TestParseContext) -> TestResult {
+        test_context.setup_type(PgBuiltInType::int4());
+        let with_clause = WithClause::default();
+        let from_clause = FromClause::default();
+        let mut acontext = super::CaseExprAnalysisContext::new(&with_clause, &from_clause);
+        let builder = SynBuilder::new();
+        let expr = NodeInner::AConst(builder.const_int4(10));
+        let case_expr = builder.case_expr(Node::none(), NodeList::default(), expr.into());
+
+        let _new_context = acontext.analyze_default_expr(test_context, case_expr)?;
+
+        assert!(acontext.default_expr.is_some());
+        Ok(())
+    }
+}
+
+impl<'a> CaseExprAnalysisContext<'a> {
     fn cast_args<TParseContext>(
         &mut self,
         context: &mut TParseContext,

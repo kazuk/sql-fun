@@ -81,7 +81,6 @@ mod test_data_source_analyze_range_var_node {
         ]);
         let table_full_name = FullName::with_schema("public", "table1");
         let table_definition = CreateTable::new(TableName::from(table_full_name.clone()), vec![]);
-
         test_context.set_get_table_impl_result(&table_full_name, &Some(table_definition));
 
         let (_ds, _context) = DataSource::analyze_range_var_node(test_context, &with_clause, syn)?;

@@ -18,6 +18,7 @@ pub struct TestParseContext {
     type_definitions: HashMap<FullName, TypeDefinition>,
     table_definitions: HashMap<FullName, Option<CreateTable>>,
     view_definitions: HashMap<FullName, Option<ViewLike>>,
+    alter_tables: Vec<AlterTable>,
 }
 
 /// get [TestParseContext]

@@ -175,6 +175,43 @@ where
     ))
 }
 
+#[cfg(test)]
+mod test_analyze_alter_table_statement {
+    use crate::{
+        AstAndContextPair,
+        sem::{FullName, SemAst},
+        syn::{AliasOpt, NodeInner, ObjectType},
+        test_helpers::{SynBuilder, TestParseContext, test_context},
+    };
+    use testresult::TestResult;
+
+    #[rstest::rstest]
+    fn test_analyze_alter_table_statement(mut test_context: TestParseContext) -> TestResult {
+        test_context.setup_table("table1", &[]);
+
+        let builder = SynBuilder::new();
+        let relation = builder.range_var(
+            &FullName::with_schema("public", "table1"),
+            &AliasOpt::none(),
+        );
+        let cmd = builder.alter_table_cmd_set_column_default(
+            "col1",
+            NodeInner::AConst(builder.const_int4(10)).into(),
+        );
+        let cmds = builder.as_node_list(&[NodeInner::AlterTableCmd(cmd).into()]);
+        let alter_table_stmt =
+            builder.alter_table_stmt(relation.into(), cmds, ObjectType::ObjectTable.into());
+        let AstAndContextPair(res, ctx) =
+            super::analyze_alter_table_statement(test_context, &None, alter_table_stmt)?;
+        let SemAst::AlterTable(at) = res else {
+            panic!("unexpected type {res:?}")
+        };
+        assert_eq!(at.commands.len(), 1);
+        assert_eq!(ctx.alter_tables_len(), 1);
+        Ok(())
+    }
+}
+
 #[tracing::instrument(skip(context, _parent_schema, syn))]
 pub fn analyze_alter_view_statement<TParseContext>(
     mut context: TParseContext,

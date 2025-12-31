@@ -5,7 +5,15 @@ use std::collections::HashMap;
 use crate::{
     StringSpan,
     sem::{
-        AlterSequence, AlterTable, AlterView, AnalysisError, AnalysisProblem, BaseParseContext, BinaryOperatorDefinition, CastContext, CastDefinition, ColumnDefinition, Comment, CreateCompositType, CreateDomain, CreateEnum, CreateExtension, CreateFunction, CreateIndex, CreateSchema, CreateSequence, CreateTable, CreateTableAs, CreateView, FullName, FunctionInfoRead, FunctionInfoWrite, FunctionOverloadCollection, IndexInfoRead, OperatorDefinition, OperatorInfoRead, OperatorName, ParseContext, SchemaName, SearchPathRead, SequenceInfoRead, SequenceInfoWrite, TableInfoRead, TableInfoWrite, TableName, TypeDefinition, TypeInfoRead, TypeInfoWrite, TypeReference, ValidOperatorName, VariableSet, ViewInfoRead, ViewInfoWrite, ViewLike
+        AlterSequence, AlterTable, AlterView, AnalysisError, AnalysisProblem, BaseParseContext,
+        BinaryOperatorDefinition, CastContext, CastDefinition, ColumnDefinition, Comment,
+        CreateCompositType, CreateDomain, CreateEnum, CreateExtension, CreateFunction, CreateIndex,
+        CreateSchema, CreateSequence, CreateTable, CreateTableAs, CreateView, FullName,
+        FunctionInfoRead, FunctionInfoWrite, FunctionOverloadCollection, IndexInfoRead,
+        OperatorDefinition, OperatorInfoRead, OperatorName, ParseContext, SchemaName,
+        SearchPathRead, SequenceInfoRead, SequenceInfoWrite, TableInfoRead, TableInfoWrite,
+        TableName, TypeDefinition, TypeInfoRead, TypeInfoWrite, TypeReference, ValidOperatorName,
+        VariableSet, ViewInfoRead, ViewInfoWrite, ViewLike,
     },
 };
 
@@ -18,6 +26,7 @@ pub struct TestParseContext {
     type_definitions: HashMap<FullName, TypeDefinition>,
     table_definitions: HashMap<FullName, Option<CreateTable>>,
     view_definitions: HashMap<FullName, Option<ViewLike>>,
+    alter_tables: Vec<AlterTable>
 }
 
 /// get [TestParseContext]
@@ -124,6 +133,11 @@ impl TestParseContext {
             CreateTable::new(TableName::from(table_full_name.clone()), columns.to_vec());
         self.set_get_table_impl_result(&table_full_name, &Some(table_definition));
     }
+
+    /// get alter table command length
+    pub fn alter_tables_len(&self) -> usize {
+        self.alter_tables.len()
+    }
 }
 
 impl TableInfoRead for TestParseContext {
@@ -137,8 +151,9 @@ impl TableInfoRead for TestParseContext {
 }
 
 impl TableInfoWrite for TestParseContext {
-    fn apply_alter_table(self, _alter_table: &AlterTable) -> Result<Self, AnalysisError> {
-        todo!()
+    fn apply_alter_table(mut self, alter_table: &AlterTable) -> Result<Self, AnalysisError> {
+        self.alter_tables.push(alter_table.clone());
+        Ok(self)
     }
 
     fn insert_create_table(&mut self, _name: &FullName, _create_table: &CreateTable) {

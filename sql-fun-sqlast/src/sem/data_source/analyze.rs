@@ -174,8 +174,7 @@ impl DataSource {
 mod test_analyze_join_expr {
     use crate::{
         sem::{
-            ColumnDefinition, ColumnName, FromClause,
-            FullName, SchemaName, TypeReference,
+            ColumnDefinition, ColumnName, FromClause, FullName, SchemaName, TypeReference,
             WithClause,
         },
         syn::{AliasOpt, JoinType, NodeInner},

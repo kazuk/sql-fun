@@ -2,12 +2,12 @@ use crate::{
     sem::FullName,
     syn::{
         AConst, AConstInner, AExprKind, Alias, AliasBuilder, AliasOpt, AlterTableCmd,
-        AlterTableCmdBuilder, AlterTableType, CaseExpr, CaseWhen, ConstrType, Constraint,
-        ConstraintBuilder, DropBehaviorOpt, FunctionParameter, FunctionParameterBuilder,
-        FunctionParameterMode, IntegerBuilder, IntoClauseOpt, JoinExpr, JoinTypeOpt,
-        LimitOptionOpt, Node, NodeInner, NodeList, NodeOpt, RangeSubselect, RangeSubselectBuilder,
-        RangeVarOpt, ResTarget, RoleSpecOpt, SelectStmt, SelectStmtOpt, SetOperation,
-        StringBuilder, TypeName, TypeNameOpt, WithClauseOpt,
+        AlterTableCmdBuilder, AlterTableStmt, AlterTableStmtBuilder, AlterTableType, CaseExpr,
+        CaseWhen, ConstrType, Constraint, ConstraintBuilder, DropBehaviorOpt, FunctionParameter,
+        FunctionParameterBuilder, FunctionParameterMode, IntegerBuilder, IntoClauseOpt, JoinExpr,
+        JoinTypeOpt, LimitOptionOpt, Node, NodeInner, NodeList, NodeOpt, ObjectType,
+        RangeSubselect, RangeSubselectBuilder, RangeVarOpt, ResTarget, RoleSpecOpt, SelectStmt,
+        SelectStmtOpt, SetOperation, StringBuilder, TypeName, TypeNameOpt, WithClauseOpt,
     },
 };
 
@@ -150,6 +150,43 @@ impl SynBuilder {
             .behavior(DropBehaviorOpt::none())
             .missing_ok(false)
             .recurse(false)
+            .build()
+            .unwrap()
+            .into()
+    }
+
+    /// create [crate::syn::AlterTableCmd] set column default
+    pub fn alter_table_cmd_set_column_default(
+        &self,
+        column_name: &str,
+        default_expr: Node,
+    ) -> AlterTableCmd {
+        AlterTableCmdBuilder::default()
+            .subtype(AlterTableType::AtColumnDefault.into())
+            .name(column_name.to_string())
+            .num(0)
+            .newowner(RoleSpecOpt::none())
+            .def(default_expr)
+            .behavior(DropBehaviorOpt::none())
+            .missing_ok(false)
+            .recurse(false)
+            .build()
+            .unwrap()
+            .into()
+    }
+
+    /// create [crate::syn::AlterTableStmt]
+    pub fn alter_table_stmt(
+        &self,
+        relation: RangeVarOpt,
+        cmds: NodeList,
+        objtype: ObjectType,
+    ) -> AlterTableStmt {
+        AlterTableStmtBuilder::default()
+            .relation(relation)
+            .cmds(cmds)
+            .objtype(objtype.into())
+            .missing_ok(false)
             .build()
             .unwrap()
             .into()

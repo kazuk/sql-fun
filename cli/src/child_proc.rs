@@ -11,7 +11,29 @@ use tokio::{
     process::Command,
 };
 
-use crate::{LinesBufReader, StdStream};
+use crate::StdStream;
+
+struct LinesBufReader<Read>
+where
+    Read: AsyncRead + Unpin,
+{
+    reader: BufReader<Read>,
+    line_buffer: String,
+    eof: bool,
+}
+
+impl<Read> LinesBufReader<Read>
+where
+    Read: AsyncRead + Unpin,
+{
+    pub fn new(read: Read) -> Self {
+        Self {
+            reader: BufReader::new(read),
+            line_buffer: String::new(),
+            eof: false,
+        }
+    }
+}
 
 struct ChildProcess {
     child: Child,

@@ -2496,6 +2496,7 @@ dependencies = [
  "either",
  "log",
  "serde",
+ "tempfile",
  "testresult",
  "thiserror 2.0.17",
  "toml",

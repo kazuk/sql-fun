@@ -254,8 +254,8 @@ mod test_analyze_alter_table_statement {
         let SemAst::AlterTable(at) = res else {
             panic!("unexpected type {res:?}")
         };
-        assert_eq!( at.commands.len(), 1);
-        assert_eq!( ctx.alter_tables_len(),1 );
+        assert_eq!(at.commands.len(), 1);
+        assert_eq!(ctx.alter_tables_len(), 1);
         Ok(())
     }
 }

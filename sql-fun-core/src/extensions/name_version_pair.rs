@@ -52,7 +52,25 @@ impl ExtensionNameVersionPair {
         };
         Ok(())
     }
+}
 
+#[cfg(test)]
+mod test_validate_name {
+    use super::ExtensionNameVersionPair;
+
+    #[test]
+    fn test_validate_name_invalid() {
+        assert!(ExtensionNameVersionPair::validate_name("..").is_err());
+        assert!(ExtensionNameVersionPair::validate_name("name:invalid").is_err());
+    }
+
+    #[test]
+    fn test_validate_name_valid() {
+        assert!(ExtensionNameVersionPair::validate_name("ext_name").is_ok());
+    }
+}
+
+impl ExtensionNameVersionPair {
     /// creates instance
     pub fn try_new(
         name: &str,
@@ -65,7 +83,29 @@ impl ExtensionNameVersionPair {
             version: version.clone(),
         })
     }
+}
 
+#[cfg(test)]
+mod test_try_new {
+    use super::ExtensionNameVersionPair;
+
+    #[test]
+    fn test_try_new_ok() {
+        let version = Some(super::ExtensionVersion::new("1.0"));
+        let result = ExtensionNameVersionPair::try_new("ext", &version).unwrap();
+        assert_eq!("ext", result.name);
+        assert!(result.version.is_some());
+    }
+
+    #[test]
+    fn test_try_new_invalid_name() {
+        let version = None;
+        let result = ExtensionNameVersionPair::try_new("..", &version);
+        assert!(result.is_err());
+    }
+}
+
+impl ExtensionNameVersionPair {
     /// get extension sql path
     pub fn resolve_version<P: AsRef<Path>>(
         &mut self,
@@ -130,7 +170,84 @@ impl ExtensionNameVersionPair {
             )
         }
     }
+}
 
+#[cfg(test)]
+mod test_resolve_version {
+    use std::fs::File;
+
+    use testresult::TestResult;
+
+    use super::ExtensionNameVersionPair;
+
+    #[test]
+    fn test_resolve_version_with_version() -> TestResult {
+        let tmp_dir = tempfile::tempdir()?;
+        let file_path = tmp_dir.path().join("ext--1.0.sql");
+        File::create(&file_path)?;
+
+        let version = Some(super::ExtensionVersion::try_from("1.0")?);
+        let mut pair = ExtensionNameVersionPair::try_new("ext", &version)?;
+        let resolved = pair.resolve_version(tmp_dir.path())?;
+
+        assert_eq!(file_path, resolved);
+        Ok(())
+    }
+
+    #[test]
+    fn test_resolve_version_missing_file() -> TestResult {
+        let tmp_dir = tempfile::tempdir()?;
+        let version = Some(super::ExtensionVersion::try_from("1.0")?);
+        let mut pair = ExtensionNameVersionPair::try_new("ext", &version)?;
+
+        let result = pair.resolve_version(tmp_dir.path());
+        assert!(result.is_err());
+        Ok(())
+    }
+
+    #[test]
+    fn test_resolve_version_from_extension_files_single() -> TestResult {
+        let tmp_dir = tempfile::tempdir()?;
+        let file_path = tmp_dir.path().join("ext--1.0.sql");
+        File::create(&file_path)?;
+
+        let version = None;
+        let mut pair = ExtensionNameVersionPair::try_new("ext", &version)?;
+        let resolved = pair.resolve_version_from_extension_files(tmp_dir.path())?;
+
+        assert_eq!(file_path, resolved);
+        assert_eq!(Some(super::ExtensionVersion::new("1.0")), pair.version);
+        Ok(())
+    }
+
+    #[test]
+    fn test_resolve_version_from_extension_files_multiple() -> TestResult {
+        let tmp_dir = tempfile::tempdir()?;
+        File::create(tmp_dir.path().join("ext--1.0.sql"))?;
+        File::create(tmp_dir.path().join("ext--2.0.sql"))?;
+
+        let version = None;
+        let mut pair = ExtensionNameVersionPair::try_new("ext", &version)?;
+        let result = pair.resolve_version_from_extension_files(tmp_dir.path());
+
+        assert!(result.is_err());
+        Ok(())
+    }
+
+    #[test]
+    fn test_resolve_version_from_extension_files_missing() -> TestResult {
+        let tmp_dir = tempfile::tempdir()?;
+
+        let version = None;
+        let mut pair = ExtensionNameVersionPair::try_new("ext", &version)?;
+        let result = pair.resolve_version_from_extension_files(tmp_dir.path());
+
+        assert!(result.is_err());
+        Ok(())
+    }
+}
+
+impl ExtensionNameVersionPair {
     fn name_parser<Input>() -> impl Parser<Input, Output = String>
     where
         Input: Stream<Token = char>,
@@ -146,7 +263,32 @@ impl ExtensionNameVersionPair {
     {
         many1(satisfy(|c: char| c != ',' && !c.is_whitespace()))
     }
+}
 
+#[cfg(test)]
+mod test_parsers {
+    use combine::EasyParser;
+
+    #[test]
+    fn test_name_parser() {
+        let (parsed, remaining) = super::ExtensionNameVersionPair::name_parser()
+            .easy_parse("extension-1.0 rest")
+            .unwrap();
+        assert_eq!("extension-1.0", parsed);
+        assert_eq!(" rest", remaining);
+    }
+
+    #[test]
+    fn test_version_parser() {
+        let (parsed, remaining) = super::ExtensionNameVersionPair::version_parser()
+            .easy_parse("1.0,rest")
+            .unwrap();
+        assert_eq!("1.0", parsed);
+        assert_eq!(",rest", remaining);
+    }
+}
+
+impl ExtensionNameVersionPair {
     pub(crate) fn parser<Input>()
     -> impl Parser<Input, Output = Result<ExtensionNameVersionPair, ExtensionConfigError>>
     where
@@ -164,7 +306,40 @@ impl ExtensionNameVersionPair {
                 ExtensionNameVersionPair::try_new(&name, &version)
             })
     }
+}
 
+#[cfg(test)]
+mod test_parser {
+    use combine::EasyParser;
+
+    use super::ExtensionNameVersionPair;
+
+    #[test]
+    fn test_parser_with_version() {
+        let (pair, remaining) = ExtensionNameVersionPair::parser()
+            .easy_parse("ext@1.0,rest")
+            .unwrap();
+
+        let pair = pair.unwrap();
+        assert_eq!("ext", pair.name);
+        assert_eq!(Some(super::ExtensionVersion::new("1.0")), pair.version);
+        assert_eq!(",rest", remaining);
+    }
+
+    #[test]
+    fn test_parser_without_version() {
+        let (pair, remaining) = ExtensionNameVersionPair::parser()
+            .easy_parse("ext rest")
+            .unwrap();
+
+        let pair = pair.unwrap();
+        assert_eq!("ext", pair.name);
+        assert!(pair.version.is_none());
+        assert_eq!(" rest", remaining);
+    }
+}
+
+impl ExtensionNameVersionPair {
     /// parse name from str
     ///
     /// returns (parsed_name, remaining)
@@ -175,7 +350,21 @@ impl ExtensionNameVersionPair {
         let parse_result = Self::name_parser().easy_parse(expect_name);
         parse_result.map_err(|e| e.to_string())
     }
+}
 
+#[cfg(test)]
+mod test_parse_name {
+    use super::ExtensionNameVersionPair;
+
+    #[test]
+    fn test_parse_name_ok() {
+        let (parsed, remaining) = ExtensionNameVersionPair::parse_name("ext rest").unwrap();
+        assert_eq!("ext", parsed);
+        assert_eq!(" rest", remaining);
+    }
+}
+
+impl ExtensionNameVersionPair {
     /// parse version from str
     ///
     /// returns (parsed_version, remaining)
@@ -184,5 +373,17 @@ impl ExtensionNameVersionPair {
         Self::version_parser()
             .easy_parse(input)
             .map_err(|e| e.to_string())
+    }
+}
+
+#[cfg(test)]
+mod test_parse_version {
+    use super::ExtensionNameVersionPair;
+
+    #[test]
+    fn test_parse_version_ok() {
+        let (parsed, remaining) = ExtensionNameVersionPair::parse_version("1.0 rest").unwrap();
+        assert_eq!("1.0", parsed);
+        assert_eq!(" rest", remaining);
     }
 }

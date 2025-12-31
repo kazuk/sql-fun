@@ -1,0 +1,9 @@
+#!/bin/bash
+
+if [ "${GIT_ROOT}" == "" ] ; then
+    export GIT_ROOT="$(git rev-parse --show-toplevel)"
+fi
+
+# update stats/coverage.txt
+cargo llvm-cov --all --no-fail-fast --summary-only nextest \
+    > "${GIT_ROOT}/stats/coverage.txt"

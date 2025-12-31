@@ -1,13 +1,32 @@
 use crate::sem::{
-    AliasSpec, ColumnName, DataSource, JoinKind, Nullable, ParseContext, WithClause,
+    AliasSpec, ColumnName, DataSource, JoinKind, Nullable, ParseContext, SemScalarExpr, WithClause,
     data_source::AliasName,
 };
+
+#[derive(Debug, Clone, Eq, Hash, PartialEq, serde::Serialize, serde::Deserialize)]
+pub struct JoinUsingClause {
+    using_columns: Vec<ColumnName>,
+    alias: Option<AliasSpec>,
+}
+
+impl JoinUsingClause {
+    pub(super) fn new(using_columns: &Vec<ColumnName>, alias: &Option<AliasSpec>) -> Self {
+        Self {
+            using_columns: using_columns.clone(),
+            alias: alias.clone(),
+        }
+    }
+}
 
 #[derive(Debug, Clone, Eq, Hash, PartialEq, serde::Serialize, serde::Deserialize)]
 pub struct JoinExprDataSource {
     kind: JoinKind,
     left: DataSource,
     right: DataSource,
+    qualifications: Option<SemScalarExpr>,
+    alias: Option<AliasSpec>,
+    using_clause: Option<JoinUsingClause>,
+    natural: bool,
 }
 
 impl JoinExprDataSource {
@@ -15,11 +34,19 @@ impl JoinExprDataSource {
         kind: &JoinKind,
         left: &DataSource,
         right: &DataSource,
+        qualifications: &Option<SemScalarExpr>,
+        alias: &Option<AliasSpec>,
+        using_clause: &Option<JoinUsingClause>,
+        natural: bool,
     ) -> DataSource {
         DataSource::JoinExpr(Box::new(Self {
             kind: kind.clone(),
             left: left.clone(),
             right: right.clone(),
+            qualifications: qualifications.clone(),
+            alias: alias.clone(),
+            using_clause: using_clause.clone(),
+            natural,
         }))
     }
 

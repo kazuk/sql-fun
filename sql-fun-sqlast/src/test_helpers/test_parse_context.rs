@@ -5,14 +5,7 @@ use std::collections::HashMap;
 use crate::{
     StringSpan,
     sem::{
-        AlterSequence, AlterTable, AlterView, AnalysisError, AnalysisProblem, BaseParseContext,
-        CastDefinition, Comment, CreateCompositType, CreateDomain, CreateEnum, CreateExtension,
-        CreateFunction, CreateIndex, CreateSchema, CreateSequence, CreateTable, CreateTableAs,
-        CreateView, FullName, FunctionInfoRead, FunctionInfoWrite, FunctionOverloadCollection,
-        IndexInfoRead, OperatorDefinition, OperatorInfoRead, OperatorName, ParseContext,
-        SchemaName, SearchPathRead, SequenceInfoRead, SequenceInfoWrite, TableInfoRead,
-        TableInfoWrite, TableName, TypeDefinition, TypeInfoRead, TypeInfoWrite, TypeReference,
-        VariableSet, ViewInfoRead, ViewInfoWrite, ViewLike,
+        AlterSequence, AlterTable, AlterView, AnalysisError, AnalysisProblem, BaseParseContext, BinaryOperatorDefinition, CastContext, CastDefinition, ColumnDefinition, Comment, CreateCompositType, CreateDomain, CreateEnum, CreateExtension, CreateFunction, CreateIndex, CreateSchema, CreateSequence, CreateTable, CreateTableAs, CreateView, FullName, FunctionInfoRead, FunctionInfoWrite, FunctionOverloadCollection, IndexInfoRead, OperatorDefinition, OperatorInfoRead, OperatorName, ParseContext, SchemaName, SearchPathRead, SequenceInfoRead, SequenceInfoWrite, TableInfoRead, TableInfoWrite, TableName, TypeDefinition, TypeInfoRead, TypeInfoWrite, TypeReference, ValidOperatorName, VariableSet, ViewInfoRead, ViewInfoWrite, ViewLike
     },
 };
 
@@ -34,20 +27,6 @@ pub fn test_context() -> TestParseContext {
 }
 
 impl TestParseContext {
-    /// setup [OperatorInfoRead::get_operator_op] result
-    pub fn set_get_operator_op_result(
-        &mut self,
-        operator_name: &OperatorName,
-        has_left: bool,
-        has_right: bool,
-        result: Option<&OperatorDefinition>,
-    ) {
-        self.operator_op_results.insert(
-            (operator_name.clone(), has_left, has_right),
-            result.cloned(),
-        );
-    }
-
     /// setup [SearchPathRead::get_search_path] result
     pub fn set_get_search_path_result(&mut self, search_path: &Vec<SchemaName>) {
         self.search_path = search_path.clone()
@@ -61,6 +40,16 @@ impl TestParseContext {
     ) {
         self.type_definitions
             .insert(type_name.clone(), type_definition.clone());
+    }
+
+    /// setup type for TypeReference
+    pub fn setup_type(&mut self, type_ref: TypeReference) {
+        let type_name = type_ref.full_name();
+        let type_definition = TypeDefinition::builtin(type_name);
+        self.set_get_type_impl_result(type_name, &type_definition);
+
+        let cast_definition = Some(CastDefinition::new(CastContext::NoConversion));
+        self.set_get_implicit_cast_result(&type_ref, &type_ref, cast_definition);
     }
 }
 
@@ -127,6 +116,14 @@ impl TestParseContext {
         self.table_definitions
             .insert(table_name.clone(), table_definition.clone());
     }
+
+    /// setup [TableInfoRead::get_table_impl] resut
+    pub fn setup_table(&mut self, table_name: &str, columns: &[ColumnDefinition]) {
+        let table_full_name = FullName::with_schema("public", table_name);
+        let table_definition =
+            CreateTable::new(TableName::from(table_full_name.clone()), columns.to_vec());
+        self.set_get_table_impl_result(&table_full_name, &Some(table_definition));
+    }
 }
 
 impl TableInfoRead for TestParseContext {
@@ -165,6 +162,42 @@ impl SequenceInfoRead for TestParseContext {
     }
 }
 
+impl TestParseContext {
+    /// setup [OperatorInfoRead::get_operator_op] result
+    pub fn set_get_operator_op_result(
+        &mut self,
+        operator_name: &OperatorName,
+        has_left: bool,
+        has_right: bool,
+        result: Option<&OperatorDefinition>,
+    ) {
+        self.operator_op_results.insert(
+            (operator_name.clone(), has_left, has_right),
+            result.cloned(),
+        );
+    }
+
+    /// setup [OperatorInfoRead::get_operator_op] result
+    pub fn setup_binary(
+        &mut self,
+        name: &str,
+        left_type: &str,
+        right_type: &str,
+        ret_type: &str,
+        strict: bool,
+    ) {
+        let name = OperatorName::Valid(ValidOperatorName::new(name));
+        let binary = BinaryOperatorDefinition::new(
+            &TypeReference::from_master_type_name(left_type),
+            &TypeReference::from_master_type_name(right_type),
+            &TypeReference::from_master_type_name(ret_type),
+            strict,
+        );
+        let op_def = OperatorDefinition::Binary(vec![binary]);
+        self.set_get_operator_op_result(&name, true, true, Some(&op_def));
+    }
+}
+
 impl OperatorInfoRead for TestParseContext {
     fn get_operator_op(
         &self,
@@ -191,6 +224,7 @@ impl IndexInfoRead for TestParseContext {
 }
 
 impl BaseParseContext for TestParseContext {
+    #[track_caller]
     fn report_problem(&mut self, problem: AnalysisProblem) {
         todo!("{problem:#?}")
     }

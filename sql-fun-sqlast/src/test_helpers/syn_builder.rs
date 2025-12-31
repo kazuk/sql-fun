@@ -1,12 +1,13 @@
 use crate::{
     sem::FullName,
     syn::{
-        AConst, AConstInner, Alias, AliasBuilder, AliasOpt, AlterTableCmd, AlterTableCmdBuilder,
-        AlterTableType, ConstrType, Constraint, ConstraintBuilder, DropBehaviorOpt,
-        FunctionParameter, FunctionParameterBuilder, FunctionParameterMode, IntegerBuilder,
-        IntoClauseOpt, LimitOptionOpt, Node, NodeInner, NodeList, RangeSubselect,
-        RangeSubselectBuilder, RangeVarOpt, ResTarget, RoleSpecOpt, SelectStmt, SelectStmtOpt,
-        SetOperation, StringBuilder, TypeName, TypeNameOpt, WithClauseOpt,
+        AConst, AConstInner, AExprKind, Alias, AliasBuilder, AliasOpt, AlterTableCmd,
+        AlterTableCmdBuilder, AlterTableType, CaseExpr, CaseWhen, ConstrType, Constraint,
+        ConstraintBuilder, DropBehaviorOpt, FunctionParameter, FunctionParameterBuilder,
+        FunctionParameterMode, IntegerBuilder, IntoClauseOpt, JoinExpr, JoinTypeOpt,
+        LimitOptionOpt, Node, NodeInner, NodeList, NodeOpt, RangeSubselect, RangeSubselectBuilder,
+        RangeVarOpt, ResTarget, RoleSpecOpt, SelectStmt, SelectStmtOpt, SetOperation,
+        StringBuilder, TypeName, TypeNameOpt, WithClauseOpt,
     },
 };
 
@@ -292,5 +293,113 @@ impl SynBuilder {
                 .into(),
         )
         .into()
+    }
+
+    /// create [crate::syn::AConst] as Sval
+    pub fn const_sval(&self, value: &str) -> AConst {
+        AConstInner::Sval(
+            StringBuilder::default()
+                .sval(String::from(value))
+                .build()
+                .unwrap()
+                .into(),
+        )
+        .into()
+    }
+
+    /// create [crate::syn::CaseExpr]
+    pub fn case_expr(&self, arg: NodeOpt, args: NodeList, default: NodeOpt) -> CaseExpr {
+        crate::syn::CaseExprBuilder::default()
+            .xpr(Node::none())
+            .casetype(0)
+            .casecollid(0)
+            .arg(arg)
+            .args(args)
+            .defresult(default)
+            .location(0)
+            .build()
+            .unwrap()
+            .into()
+    }
+
+    /// create [crate::syn::CaseWhen]
+    pub fn case_when(&self, expr: NodeOpt, result: NodeOpt) -> CaseWhen {
+        crate::syn::CaseWhenBuilder::default()
+            .xpr(Node::none())
+            .expr(expr)
+            .result(result)
+            .location(0)
+            .build()
+            .unwrap()
+            .into()
+    }
+
+    /// create [crate::syn::JoinExpr]
+    pub fn join_expr(
+        &self,
+        join_type: JoinTypeOpt,
+        left: NodeOpt,
+        right: NodeOpt,
+        qualifications: NodeOpt,
+        alias: AliasOpt,
+        using_clause: &[&str],
+        join_using_alias: AliasOpt,
+        is_natural: bool,
+    ) -> JoinExpr {
+        let using_items = self.string_node_list(using_clause);
+        crate::syn::JoinExprBuilder::default()
+            .jointype(join_type)
+            .is_natural(is_natural)
+            .larg(left)
+            .rarg(right)
+            .quals(qualifications)
+            .alias(alias)
+            .using_clause(using_items)
+            .join_using_alias(join_using_alias)
+            .rtindex(0)
+            .build()
+            .unwrap()
+            .into()
+    }
+
+    /// create [crate::syn::AExpr]
+    pub fn binary(&self, operator: &str, left: Node, right: Node) -> crate::syn::AExpr {
+        let name = self.as_node_list(&[self.as_string_node(self.string(operator))]);
+
+        crate::syn::AExprBuilder::default()
+            .kind(AExprKind::AexprOp.into())
+            .name(name)
+            .lexpr(left)
+            .rexpr(right)
+            .location(0)
+            .build()
+            .unwrap()
+            .into()
+    }
+
+    /// create equals [crate::syn::AExpr] as [crate::syn::Node]
+    pub fn operator_equals(&self, left: Node, right: Node) -> crate::syn::Node {
+        NodeInner::AExpr(self.binary("=", left, right)).into()
+    }
+
+    /// create a [crate::syn::NodeList] of [crate::syn::String]
+    pub fn string_node_list(&self, items: &[&str]) -> crate::syn::NodeList {
+        let mut nodes = Vec::new();
+        for item in items {
+            let item = self.string(&item);
+            nodes.push(self.as_string_node(item))
+        }
+        self.as_node_list(&nodes)
+    }
+
+    /// create [crate::syn::ColumnRef]
+    pub fn column_ref(&self, rel_name: &str, col_name: &str) -> crate::syn::ColumnRef {
+        let fields = self.string_node_list(&vec![rel_name, col_name]);
+        crate::syn::ColumnRefBuilder::default()
+            .fields(fields)
+            .location(0)
+            .build()
+            .unwrap()
+            .into()
     }
 }

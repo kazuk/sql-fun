@@ -10,6 +10,7 @@ on:
 
 env:
   CARGO_TERM_COLOR: never
+  USER: runner
 
 jobs:
   build:
@@ -22,18 +23,47 @@ jobs:
     steps:
       - uses: actions/checkout@v4
 
+      - run: |
+          curl -fsSL https://cli.github.com/packages/githubcli-archive-keyring.gpg \
+            | sudo dd of=/usr/share/keyrings/githubcli-archive-keyring.gpg
+          sudo apt-get update \
+            && sudo apt-get install -y autoconf libtool libtool-bin
+          rustup component add rustfmt clippy
+          cargo install --locked sccache cargo-sort
+
+      - uses: actions/cache@v4
+        with:
+          path: |
+            /usr/local/cargo/registry
+            /usr/local/cargo/git
+          key: cargo-${{ runner.os }}-${{ hashFiles('**/Cargo.lock') }}
+          restore-keys: |
+            cargo-${{ runner.os }}-
+
+      - uses: actions/cache@v4
+        with:
+          path: /github/home/.cache/sccache
+          key: sccache-${{ runner.os }}-${{ hashFiles('**/Cargo.lock') }}
+          restore-keys: |
+            sccache-${{ runner.os }}-
+
       - name: buil and test
         run: |
+          export GIT_ROOT="$(git rev-parse --show-toplevel)"
+          export SQL_FUN_HOME="${GIT_ROOT}/sql-fun-home"
+          sccache --start-server || true
+
           .local/bin/check-test-flow --nextest-extra=" 
             --config-file ./ci/nextest/config.toml 
             --profile ci 
             --show-progress none"
+          sccache --show-stats || true
 
       - name: Test Report
         uses: dorny/test-reporter@v2
         if: ${{ !cancelled() }}
         with:
           name: nextest tests
-          path: target/nextest/junit.xml
+          path: target/nextest/ci/junit.xml
           reporter: java-junit
 

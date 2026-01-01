@@ -8,7 +8,7 @@ use crate::{
     syn::Opt,
 };
 
-/// analyze [crate::syn::Node] as scaler expression
+/// analyze [`crate::syn::Node`] as scaler expression
 pub fn analyze_scaler_expr<TParseContext>(
     context: TParseContext,
     with_clause: &WithClause,

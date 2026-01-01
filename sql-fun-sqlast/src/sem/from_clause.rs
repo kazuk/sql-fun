@@ -13,10 +13,10 @@ pub struct FromClause(Vec<DataSource>);
 impl FromClause {
     /// add data source
     pub fn push(&mut self, source: DataSource) {
-        self.0.push(source)
+        self.0.push(source);
     }
 
-    /// analyze from-cluse [crate::syn::NodeListOpt]
+    /// analyze from-cluse [`crate::syn::NodeListOpt`]
     pub fn analyze<TParseContext>(
         mut context: TParseContext,
         with_clause: &WithClause,
@@ -41,7 +41,7 @@ impl FromClause {
                 if existing_aliases.contains(&alias) {
                     context.report_problem(AnalysisProblem::duplicate_alias(alias.name()));
                 }
-                existing_aliases.push(alias)
+                existing_aliases.push(alias);
             }
             from_clause.push(source);
         }
@@ -49,6 +49,7 @@ impl FromClause {
     }
 
     /// get data-source by alias name
+    #[must_use]
     pub fn resolve_alias(&self, alias_name: &AliasName) -> Option<(&DataSource, Nullable)> {
         for source in &self.0 {
             if let Some(resolved) = source.resolve_alias(alias_name) {

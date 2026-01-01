@@ -5,7 +5,7 @@ use crate::{
 
 use super::{AnalysisError, AnalysisProblem, FullName, ParseContext, SemAst};
 
-/// analyzed [crate::syn::CreateDomainStmt]
+/// analyzed [`crate::syn::CreateDomainStmt`]
 #[derive(Debug, Clone, Eq, Hash, PartialEq, serde::Serialize, serde::Deserialize)]
 pub struct CreateDomain {
     type_ref: TypeReference,
@@ -14,17 +14,19 @@ pub struct CreateDomain {
 
 impl CreateDomain {
     /// get name
+    #[must_use]
     pub fn name(&self) -> &FullName {
         self.type_ref.full_name()
     }
 
     /// get base type reference
+    #[must_use]
     pub fn type_ref(&self) -> &TypeReference {
         &self.type_ref
     }
 }
 
-/// analyze [crate::syn::CreateDomainStmt]
+/// analyze [`crate::syn::CreateDomainStmt`]
 pub fn analyze_create_domain<TParseContext>(
     mut context: TParseContext,
     syn: crate::syn::CreateDomainStmt,

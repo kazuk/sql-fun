@@ -30,7 +30,7 @@ impl UnaryCastCandiate {
         for overload in overloads {
             if let Some(arg_cast) = context.get_implicit_cast(arg_type, overload.arg_type()) {
                 let priority = arg_cast.context().overload_priority_score();
-                candiates.push(Self::new(arg_cast.context(), priority, overload.clone()))
+                candiates.push(Self::new(arg_cast.context(), priority, overload.clone()));
             }
         }
         candiates

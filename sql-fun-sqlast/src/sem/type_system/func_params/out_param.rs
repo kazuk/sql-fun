@@ -12,6 +12,7 @@ use super::{FunctionParam, FunctionParameterTrait, ParameterBindResult};
 
 impl FunctionParam {
     /// create new output parameter instance
+    #[must_use]
     pub fn new_output_param(name: &Option<String>, param_type: &Option<TypeReference>) -> Self {
         Self::Out(FunctionParamOut::new(name, param_type))
     }
@@ -132,13 +133,13 @@ impl FunctionParameterTrait for FunctionParamOut {
 
     fn apply_simple_infer_result(&mut self, simple_infer_result: &TypeReference) {
         if let Some(ty) = self.param_type.as_mut() {
-            ty.apply_simple_infer_result(simple_infer_result)
+            ty.apply_simple_infer_result(simple_infer_result);
         }
     }
 
     fn apply_common_infer_result(&mut self, common_infer_result: &TypeReference) {
         if let Some(ty) = self.param_type.as_mut() {
-            ty.apply_common_infer_result(common_infer_result)
+            ty.apply_common_infer_result(common_infer_result);
         }
     }
 }

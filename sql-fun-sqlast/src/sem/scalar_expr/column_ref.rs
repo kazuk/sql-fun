@@ -71,6 +71,7 @@ impl SemScalarExprNode for ColumnReferenceExpr {
 
 impl ColumnReferenceExpr {
     /// get column type
+    #[must_use]
     pub fn get_type(&self) -> Option<TypeReference> {
         match self {
             Self::CteColumn(r) => r.get_type(),
@@ -87,6 +88,7 @@ impl ColumnReferenceExpr {
     }
 
     /// get column is not null
+    #[must_use]
     pub fn is_not_null(&self) -> Option<bool> {
         match self {
             Self::CteColumn(r) => r.is_not_null(),
@@ -103,6 +105,7 @@ impl ColumnReferenceExpr {
     }
 
     /// get column definition
+    #[must_use]
     pub fn get_column_def(&self) -> &Option<ColumnDefinition> {
         match self {
             Self::CteColumn(r) => r.get_column_def(),
@@ -119,6 +122,7 @@ impl ColumnReferenceExpr {
     }
 
     /// get column name
+    #[must_use]
     pub fn get_column_name(&self) -> &ColumnName {
         match self {
             Self::CteColumn(r) => r.get_column_name(),
@@ -190,13 +194,13 @@ where
             AnalysisError::raise_unexpected_none("column_ref.fields")?
         };
 
-        let fields: Vec<String> = fields.iter().map(|v| v.get_sval()).collect();
+        let fields: Vec<String> = fields.iter().map(crate::syn::String::get_sval).collect();
         if fields.len() > 2 {
             AnalysisError::raise_unexpected_input(&format!(
                 "unexpected len column_ref.fields {}",
                 fields.len()
             ))?;
-        };
+        }
 
         if fields.len() == 1 {
             let column = ColumnName::from(fields[0].clone());

@@ -20,7 +20,7 @@ impl TableDataSource {
     }
 
     pub(super) fn push_alias_names(&self, names: &mut Vec<AliasSpec>) {
-        names.push(self.alias.clone())
+        names.push(self.alias.clone());
     }
 
     pub(super) fn resolve_alias<'a>(
@@ -46,7 +46,7 @@ impl TableDataSource {
         if let Some(table) = context.get_table(&self.name)
             && table.has_column(column)
         {
-            names.push(self.alias.clone())
+            names.push(self.alias.clone());
         }
     }
 

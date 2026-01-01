@@ -70,7 +70,7 @@ impl PgFunctionDetail {
     pub fn arg_length(&self) -> usize {
         assert_eq!(self.allargtypes.len(), self.argmodes.len());
         if let Some(argnames) = &self.argnames {
-            assert_eq!(self.allargtypes.len(), argnames.len())
+            assert_eq!(self.allargtypes.len(), argnames.len());
         }
         self.allargtypes.len()
     }
@@ -78,7 +78,7 @@ impl PgFunctionDetail {
     pub fn arg_nth(&self, index: usize) -> Option<PgFunctionArgRef<'_>> {
         if index >= self.allargtypes.len() {
             return None;
-        };
+        }
         let arg_name = self.argnames.as_ref().map(|names| &names[index]);
         Some(PgFunctionArgRef {
             arg_type: &self.allargtypes[index],
@@ -161,17 +161,17 @@ impl PgBuiltInFunctions {
                         let arg_name = arg.arg_name.cloned();
                         let arg_type = Some(TypeReference::from_master_type_name(arg.arg_type));
 
-                        args.push(FunctionParam::new_input_param(&arg_name, &arg_type, &None))
+                        args.push(FunctionParam::new_input_param(&arg_name, &arg_type, &None));
                     }
                     PgArgMode::Out => {
                         let arg_name = arg.arg_name.cloned();
                         let arg_type = Some(TypeReference::from_master_type_name(arg.arg_type));
-                        args.push(FunctionParam::new_output_param(&arg_name, &arg_type))
+                        args.push(FunctionParam::new_output_param(&arg_name, &arg_type));
                     }
                     PgArgMode::Variadic => {
                         let arg_name = arg.arg_name.cloned();
                         let arg_type = Some(TypeReference::from_master_type_name(arg.arg_type));
-                        args.push(FunctionParam::new_variadig_param(&arg_name, &arg_type))
+                        args.push(FunctionParam::new_variadig_param(&arg_name, &arg_type));
                     }
                 }
             }
@@ -186,7 +186,7 @@ impl PgBuiltInFunctions {
             let type_def = TypeDefinition::CompositType(create_comp_type);
             let ret_type = TypeReference::dynamic(&type_def);
 
-            variants.push(&OverloadVariant::new(&Some(ret_type), &args, true, false))
+            variants.push(&OverloadVariant::new(&Some(ret_type), &args, true, false));
         } else {
             for overload in func_def {
                 let ret_type = Some(TypeReference::from_master_type_name(&overload.ret));
@@ -215,7 +215,7 @@ impl PgBuiltInFunctions {
                 let col_type = TypeReference::from_master_type_name(out_arg.arg_type);
 
                 columns.push(ColumnDefinition::new(
-                    &out_arg.arg_name.map(|v| ColumnName::from(v.to_string())),
+                    &out_arg.arg_name.map(|v| ColumnName::from(v.clone())),
                     Some(&col_type),
                     None,
                 ))

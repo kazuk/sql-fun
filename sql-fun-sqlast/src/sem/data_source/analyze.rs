@@ -318,13 +318,13 @@ impl DataSource {
         let functions: Vec<_> = functions
             .iter()
             .flatten()
-            .filter_map(|v| v.as_inner())
+            .filter_map(crate::syn::Opt::as_inner)
             .collect();
         if functions.len() != 1 {
             AnalysisError::raise_unexpected_input(&format!(
                 "RangeFunction.functions len!=1 : {functions:?}"
-            ))?
-        };
+            ))?;
+        }
         let function = &functions[0];
 
         let Some(call) = function.as_func_call().as_inner() else {

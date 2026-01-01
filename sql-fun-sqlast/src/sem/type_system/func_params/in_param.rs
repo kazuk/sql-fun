@@ -11,6 +11,7 @@ use super::{FunctionParam, FunctionParameterTrait, ParameterBindResult};
 
 impl FunctionParam {
     /// create new input parameter instance
+    #[must_use]
     pub fn new_input_param(
         name: &Option<String>,
         param_type: &Option<TypeReference>,
@@ -138,7 +139,7 @@ impl FunctionParameterTrait for FunctionParamIn {
 
     fn apply_simple_infer_result(&mut self, simple_infer_result: &TypeReference) {
         if let Some(ty) = self.param_type.as_mut() {
-            ty.apply_simple_infer_result(simple_infer_result)
+            ty.apply_simple_infer_result(simple_infer_result);
         }
     }
 

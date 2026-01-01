@@ -7,15 +7,18 @@ pub struct LocalName(String);
 
 impl LocalName {
     /// create from string
+    #[must_use]
     pub fn from(value: &str) -> Self {
         Self(value.to_string())
     }
     /// convert to string
+    #[must_use]
     pub fn as_str(&self) -> &str {
         &self.0
     }
 
     /// local name is record
+    #[must_use]
     pub fn is_record(&self) -> bool {
         &self.0 == "record"
     }

@@ -9,7 +9,7 @@ use crate::{
 
 use super::{AnalysisError, FullName, ParseContext, SelectStatement, SemAst, analyze_select};
 
-/// analyzed [crate::syn::ViewStmt]
+/// analyzed [`crate::syn::ViewStmt`]
 #[derive(Debug, Clone)]
 pub struct CreateView {
     name: FullName,
@@ -21,6 +21,7 @@ pub struct CreateView {
 
 impl CreateView {
     /// create instance
+    #[must_use]
     pub fn new(
         name: &FullName,
         query: &SelectStatement,
@@ -38,16 +39,19 @@ impl CreateView {
     }
 
     /// name of view
+    #[must_use]
     pub fn name(&self) -> &FullName {
         &self.name
     }
 
     /// get result set column
+    #[must_use]
     pub fn get_column_def(&self, column_name: &ColumnName) -> Option<ColumnDefinition> {
         self.query.get_result_column_def(column_name)
     }
 
     /// test column existing
+    #[must_use]
     pub fn has_column(&self, column: &ColumnName) -> bool {
         self.query.has_column(column)
     }
@@ -58,9 +62,7 @@ impl CreateView {
 
         for cmd in alter_view.commands() {
             match cmd {
-                AlterObjSubCommand::ChangeOwner(new_owner) => {
-                    self.owner = Some(new_owner.to_string())
-                }
+                AlterObjSubCommand::ChangeOwner(new_owner) => self.owner = Some(new_owner.clone()),
                 _ => todo!(),
             }
         }
@@ -69,12 +71,13 @@ impl CreateView {
     }
 
     /// view is materialized
+    #[must_use]
     pub fn is_materialized(&self) -> bool {
         self.materialized
     }
 }
 
-/// analyze [crate::syn::ViewStmt]
+/// analyze [`crate::syn::ViewStmt`]
 #[tracing::instrument(skip(context))]
 pub fn analyze_create_view<TParseContext>(
     context: TParseContext,

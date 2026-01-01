@@ -2,7 +2,7 @@ use crate::{sem::AstAndContextPair, syn::ListOpt};
 
 use super::{AnalysisError, FullName, ParseContext, SemAst};
 
-/// analyzed [crate::syn::CreateEnumStmt]
+/// analyzed [`crate::syn::CreateEnumStmt`]
 #[derive(Debug, Clone, Eq, Hash, PartialEq, serde::Serialize, serde::Deserialize)]
 pub struct CreateEnum {
     name: FullName,
@@ -11,11 +11,13 @@ pub struct CreateEnum {
 
 impl CreateEnum {
     /// get name
+    #[must_use]
     pub fn name(&self) -> &FullName {
         &self.name
     }
 
     /// get values
+    #[must_use]
     pub fn values(&self) -> &Vec<EnumValueDefinition> {
         &self.values
     }
@@ -26,7 +28,7 @@ pub struct EnumValueDefinition {
     name: String,
 }
 
-/// analyze [crate::syn::CreateEnumStmt]
+/// analyze [`crate::syn::CreateEnumStmt`]
 pub fn analyze_create_enum_type<TParseContext>(
     context: TParseContext,
     _parent_schema: &Option<String>,

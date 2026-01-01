@@ -45,7 +45,7 @@ mod test_case_expr_analysis_context_new {
     }
 }
 
-impl<'a> CaseExprAnalysisContext<'a> {
+impl CaseExprAnalysisContext<'_> {
     fn analyze_case_arg<TParseContext>(
         &mut self,
         context: TParseContext,
@@ -105,7 +105,7 @@ mod test_case_expr_analysis_context_analyze_case_arg {
     }
 }
 
-impl<'a> CaseExprAnalysisContext<'a> {
+impl CaseExprAnalysisContext<'_> {
     fn analyze_case_when<TParseContext>(
         &self,
         mut context: TParseContext,
@@ -165,7 +165,7 @@ mod test_case_expr_analysis_context_analyze_case_when {
     }
 }
 
-impl<'a> CaseExprAnalysisContext<'a> {
+impl CaseExprAnalysisContext<'_> {
     fn analyze_case_when_list<TParseContext>(
         &mut self,
         mut context: TParseContext,
@@ -239,7 +239,7 @@ mod test_case_expr_analysis_context_analyze_case_when_list {
     }
 }
 
-impl<'a> CaseExprAnalysisContext<'a> {
+impl CaseExprAnalysisContext<'_> {
     fn analyze_default_expr<TParseContext>(
         &mut self,
         mut context: TParseContext,
@@ -317,7 +317,7 @@ mod test_case_expr_analysis_context_analyze_default_expr {
     }
 }
 
-impl<'a> CaseExprAnalysisContext<'a> {
+impl CaseExprAnalysisContext<'_> {
     fn cast_args<TParseContext>(
         &mut self,
         context: &mut TParseContext,
@@ -326,7 +326,7 @@ impl<'a> CaseExprAnalysisContext<'a> {
     where
         TParseContext: ParseContext,
     {
-        for when_expr in self.when_exprs.iter_mut() {
+        for when_expr in &mut self.when_exprs {
             let Some(_ty) = when_expr.result.get_type() else {
                 continue;
             };
@@ -357,7 +357,7 @@ impl<'a> CaseExprAnalysisContext<'a> {
                 if ty1 == ty2 {
                     continue;
                 }
-                let Some(cast) = context.get_implicit_cast(&ty1, &ty2) else {
+                let Some(cast) = context.get_implicit_cast(ty1, ty2) else {
                     continue;
                 };
                 cast_candiates
@@ -374,14 +374,14 @@ impl<'a> CaseExprAnalysisContext<'a> {
             let Some((result_type, _casts)) = cast_candiates.into_iter().next() else {
                 AnalysisError::raise_unexpected_none("cast candiates")?
             };
-            Ok(self.cast_args(context, &result_type))
+            Ok(self.cast_args(context, result_type))
         } else {
             let mut implicit_castable = Vec::new();
             for (ty, _casts) in cast_candiates {
                 if self
                     .result_types
                     .iter()
-                    .all(|t| context.get_implicit_cast(t, &ty).is_some())
+                    .all(|t| context.get_implicit_cast(t, ty).is_some())
                 {
                     implicit_castable.push(ty);
                 }
@@ -398,7 +398,7 @@ impl<'a> CaseExprAnalysisContext<'a> {
     fn is_not_null(&self) -> Option<bool> {
         if self.nullabilities.iter().any(|n| n == &Some(false)) {
             Some(false)
-        } else if self.nullabilities.iter().all(|n| n.is_some()) {
+        } else if self.nullabilities.iter().all(std::option::Option::is_some) {
             Some(true)
         } else {
             None
@@ -448,6 +448,7 @@ pub struct CaseExpr {
 
 impl CaseExpr {
     /// create a instance
+    #[must_use]
     pub fn new(
         arg_expr: Box<Option<SemScalarExpr>>,
         when_exprs: Vec<CaseWhen>,

@@ -7,7 +7,7 @@ use crate::{
     syn::{ListOpt, Opt},
 };
 
-/// analyzed [crate::syn::CreateFunctionStmt]
+/// analyzed [`crate::syn::CreateFunctionStmt`]
 #[derive(Debug, Clone)]
 pub struct CreateFunction {
     name: FullName,
@@ -17,6 +17,7 @@ pub struct CreateFunction {
 
 impl CreateFunction {
     /// create new instance
+    #[must_use]
     pub fn new(
         name: &FullName,
         overloads: &FunctionOverloadCollection,
@@ -30,6 +31,7 @@ impl CreateFunction {
     }
 
     /// list function overload (Using in builtin / extensions only)
+    #[must_use]
     pub fn overloads(&self) -> &FunctionOverloadCollection {
         &self.overloads
     }
@@ -51,6 +53,7 @@ impl CreateFunction {
     }
 
     /// return trure if function is returns set
+    #[must_use]
     pub fn is_table_function(&self) -> bool {
         self.returning_columdef.is_some()
     }
@@ -58,12 +61,13 @@ impl CreateFunction {
 
 impl CreateFunction {
     /// get function name
+    #[must_use]
     pub fn name(&self) -> &FullName {
         &self.name
     }
 }
 
-/// analyze [crate::syn::CreateFunctionStmt]
+/// analyze [`crate::syn::CreateFunctionStmt`]
 pub fn analyze_create_function<TParseContext>(
     mut context: TParseContext,
     _parent_schema: &Option<String>,

@@ -18,6 +18,6 @@ pub trait CastInfoRead {
         target_type: &TypeReference,
     ) -> Option<CastDefinition>;
 
-    /// list implicit castable types from source_type
+    /// list implicit castable types from `source_type`
     fn get_implicit_castable(&self, source_type: &TypeReference) -> HashSet<TypeReference>;
 }

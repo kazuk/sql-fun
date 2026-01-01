@@ -50,7 +50,7 @@ impl BooleanExpr {
             let (arg_expr, new_context) =
                 analyze_scaler_expr(context, with_clause, from_clause, node)?;
             context = new_context;
-            results.push(arg_expr)
+            results.push(arg_expr);
         }
         Ok((results, context))
     }
@@ -111,7 +111,7 @@ where
             BoolExprType::NotExpr => {
                 if args.len() != 1 {
                     AnalysisError::raise_unexpected_input("boolexpr.args len")?;
-                };
+                }
                 BooleanExprBody::not(&args[0])
             }
             _ => AnalysisError::raise_unexpected_input("boolexpr.boolop unexpected value")?,
@@ -121,7 +121,7 @@ where
     }
 }
 
-/// NullTestExpr
+/// `NullTestExpr`
 #[derive(Debug, Clone, Eq, Hash, PartialEq, serde::Serialize, serde::Deserialize)]
 pub struct NullTestExpr {
     null_test_type: NullTestType,

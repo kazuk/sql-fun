@@ -33,6 +33,7 @@ impl NameResolution {
 
 impl AnalysisProblem {
     /// column not found in view
+    #[must_use]
     pub fn column_not_found_in_view(view_name: &ViewName, column: &ColumnName) -> Self {
         Self::NameResolution(NameResolution::column_not_found_in_view(view_name, column))
     }

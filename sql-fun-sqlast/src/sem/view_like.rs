@@ -13,6 +13,10 @@ pub enum ViewLike {
 
 impl ViewLike {
     /// apply alter view statement
+    ///
+    /// # Errors
+    ///
+    /// - `AnalysisError`
     pub fn apply_alter(&mut self, alter_view: &AlterView) -> Result<(), AnalysisError> {
         match self {
             Self::View(create_view) => create_view.apply_alter(alter_view),
@@ -21,6 +25,7 @@ impl ViewLike {
     }
 
     /// get column definition by column name
+    #[must_use]
     pub fn get_column_def(&self, column_name: &ColumnName) -> Option<ColumnDefinition> {
         match self {
             Self::View(create_view) => create_view.get_column_def(column_name),
@@ -29,6 +34,7 @@ impl ViewLike {
     }
 
     /// return true if column exist
+    #[must_use]
     pub fn has_column(&self, column_name: &ColumnName) -> bool {
         match self {
             Self::View(create_view) => create_view.has_column(column_name),

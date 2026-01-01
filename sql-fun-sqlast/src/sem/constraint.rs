@@ -13,12 +13,12 @@ pub use self::{
     foreign::ForeignKeyConstraint, primary::PrimaryKeyConstraint, unique::UniqueConstraint,
 };
 
-/// analyze [crate::syn::Constraint] variants
+/// analyze [`crate::syn::Constraint`] variants
 pub trait AnalizeConstraint<TParseContext>
 where
     TParseContext: ParseContext,
 {
-    /// analyze [crate::syn::Constraint] variants
+    /// analyze [`crate::syn::Constraint`] variants
     fn analyze(
         context: &mut TParseContext,
         target_table: Option<&TableName>,
@@ -26,7 +26,7 @@ where
     ) -> Result<Constraint, AnalysisError>;
 }
 
-/// analyzed [crate::syn::Constraint]
+/// analyzed [`crate::syn::Constraint`]
 #[derive(Debug, Clone)]
 pub enum Constraint {
     /// primary key constraint
@@ -39,6 +39,7 @@ pub enum Constraint {
 
 impl Constraint {
     /// get constraint name
+    #[must_use]
     pub fn name(&self) -> &str {
         match self {
             Self::PrimaryKey(pk) => pk.name(),
@@ -57,11 +58,13 @@ impl Constraint {
     }
 
     /// return true if constraint is primary key
+    #[must_use]
     pub fn is_primary_key_constraint(&self) -> bool {
         matches!(self, Self::PrimaryKey(_))
     }
 
     /// get primary key reference
+    #[must_use]
     pub fn as_primary_key_constraint(&self) -> Option<&PrimaryKeyConstraint> {
         match self {
             Self::PrimaryKey(p) => Some(p),

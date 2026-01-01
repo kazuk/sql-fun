@@ -28,6 +28,7 @@ pub enum TypeDefinition {
 
 impl TypeDefinition {
     /// type is array?
+    #[must_use]
     pub fn is_array(&self) -> Option<bool> {
         match self {
             Self::Enum(_) => Some(false),
@@ -40,6 +41,7 @@ impl TypeDefinition {
     }
 
     /// table definition reference
+    #[must_use]
     pub fn table_ref(table_name: &TableName) -> Self {
         let tr = TypeReference::from_full_name(table_name.full_name().clone());
         Self::TableRef(table_name.clone(), tr)
@@ -47,11 +49,13 @@ impl TypeDefinition {
 
     /// get reference of type
     #[deprecated = "use type_reference"]
+    #[must_use]
     pub fn unsafe_type_reference(&self) -> &TypeReference {
         self.type_reference().unwrap()
     }
 
     /// get reference of type
+    #[must_use]
     pub fn type_reference(&self) -> Option<&TypeReference> {
         match self {
             Self::Builtin(tr) => Some(tr),
@@ -63,6 +67,7 @@ impl TypeDefinition {
     }
 
     /// get a name of type
+    #[must_use]
     pub fn full_name(&self) -> Option<&FullName> {
         match self {
             Self::Enum(create_enum) => Some(create_enum.name()),
@@ -75,11 +80,13 @@ impl TypeDefinition {
     }
 
     /// get builtin type by name
+    #[must_use]
     pub fn builtin(full_name: &FullName) -> Self {
         Self::Builtin(TypeReference::concrete_type_ref(full_name, false))
     }
 
     /// check type compatibility
+    #[must_use]
     pub fn compatible_with(&self, other: &TypeDefinition) -> bool {
         if self.full_name() == other.full_name() {
             true
@@ -89,11 +96,13 @@ impl TypeDefinition {
     }
 
     /// test a type is composite type
+    #[must_use]
     pub fn is_composit_type(&self) -> bool {
         matches!(&self, Self::CompositType(_))
     }
 
     /// enumelate members
+    #[must_use]
     pub fn get_composit_type_columns(&self) -> ColumnCollection {
         match &self {
             Self::CompositType(ct) => ct.get_column_collection(),
@@ -160,36 +169,43 @@ impl PgBuiltInType {
     }
 
     /// get built-in boolean type reference
+    #[must_use]
     pub fn bool() -> TypeReference {
         Self::builtin_reference("bool")
     }
 
     /// get built-in `int4` type reference
+    #[must_use]
     pub fn int2() -> TypeReference {
         Self::builtin_reference("int4")
     }
 
     /// get built-in `int4` type reference
+    #[must_use]
     pub fn int4() -> TypeReference {
         Self::builtin_reference("int4")
     }
 
     /// get built-in `int4` type reference
+    #[must_use]
     pub fn int8() -> TypeReference {
         Self::builtin_reference("int8")
     }
 
     /// get built-in `numeric` type reference
+    #[must_use]
     pub fn numeric() -> TypeReference {
         Self::builtin_reference("numeric")
     }
 
     /// get built-in `text` type reference
+    #[must_use]
     pub fn text() -> TypeReference {
         Self::builtin_reference("text")
     }
 
     /// get built-in `varbit` type reference
+    #[must_use]
     pub fn varbit() -> TypeReference {
         Self::builtin_reference("varbit")
     }

@@ -11,6 +11,7 @@ pub struct BinaryOperatorDefinition {
 
 impl BinaryOperatorDefinition {
     /// create instance
+    #[must_use]
     pub fn new(
         left_arg_type: &TypeReference,
         right_arg_type: &TypeReference,
@@ -26,21 +27,25 @@ impl BinaryOperatorDefinition {
     }
 
     /// operator return type
+    #[must_use]
     pub fn get_return_type(&self) -> &TypeReference {
         &self.result_type
     }
 
     /// strict
+    #[must_use]
     pub fn is_strict(&self) -> bool {
         self.strict
     }
 
     /// left argument type
+    #[must_use]
     pub fn left_arg_type(&self) -> &TypeReference {
         &self.left_arg_type
     }
 
     /// right argument type
+    #[must_use]
     pub fn right_arg_type(&self) -> &TypeReference {
         &self.right_arg_type
     }
@@ -56,6 +61,7 @@ pub struct UnaryOperatorDefinition {
 
 impl UnaryOperatorDefinition {
     /// create instance
+    #[must_use]
     pub fn new(arg_type: &TypeReference, result_type: &TypeReference, strict: bool) -> Self {
         Self {
             arg_type: arg_type.clone(),
@@ -65,16 +71,19 @@ impl UnaryOperatorDefinition {
     }
 
     /// return type of operator
+    #[must_use]
     pub fn get_return_type(&self) -> &TypeReference {
         &self.result_type
     }
 
     /// strict
+    #[must_use]
     pub fn is_strict(&self) -> bool {
         self.strict
     }
 
     /// argument type
+    #[must_use]
     pub fn arg_type(&self) -> &TypeReference {
         &self.arg_type
     }
@@ -93,16 +102,19 @@ pub enum OperatorDefinition {
 
 impl OperatorDefinition {
     /// binary
+    #[must_use]
     pub fn binary(binaries: &[BinaryOperatorDefinition]) -> Self {
         Self::Binary(Vec::from_iter(binaries.to_vec()))
     }
 
     /// left assoc unary
+    #[must_use]
     pub fn left_unary(unaries: &[UnaryOperatorDefinition]) -> Self {
         Self::LeftUnary(Vec::from_iter(unaries.to_vec()))
     }
 
     /// right assoc unary
+    #[must_use]
     pub fn right_unary(unaries: &[UnaryOperatorDefinition]) -> Self {
         Self::RightUnary(Vec::from_iter(unaries.to_vec()))
     }

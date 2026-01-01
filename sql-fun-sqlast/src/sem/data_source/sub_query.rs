@@ -20,7 +20,7 @@ impl SubQueryDataSource {
     }
 
     pub(super) fn push_alias_names(&self, names: &mut Vec<AliasSpec>) {
-        names.push(self.alias.clone())
+        names.push(self.alias.clone());
     }
 
     pub(super) fn resolve_alias<'a>(
@@ -45,7 +45,7 @@ impl SubQueryDataSource {
         TParseContext: ParseContext,
     {
         if self.select_statement.has_column(column) {
-            names.push(self.alias.clone())
+            names.push(self.alias.clone());
         }
     }
 

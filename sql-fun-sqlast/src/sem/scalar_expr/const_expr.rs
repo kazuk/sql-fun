@@ -24,11 +24,13 @@ pub enum ScalarConstExpr {
 
 impl ScalarConstExpr {
     /// create a NULL
+    #[must_use]
     pub fn null() -> SemScalarExpr {
         SemScalarExpr::Const(Self::Null)
     }
 
     /// create integer constant value
+    #[must_use]
     pub fn new_integer(value: i32) -> Self {
         Self::Integer(value)
     }

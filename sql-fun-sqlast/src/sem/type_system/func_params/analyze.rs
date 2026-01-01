@@ -83,7 +83,7 @@ mod test_function_param_analyze {
 }
 
 impl super::FunctionParam {
-    /// analyze [crate::syn::FunctionParameter] as column definition
+    /// analyze [`crate::syn::FunctionParameter`] as column definition
     pub fn analyze_as_column_definition(
         param: &crate::syn::FunctionParameter,
     ) -> Result<ColumnDefinition, AnalysisError> {

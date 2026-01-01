@@ -33,7 +33,7 @@ impl PgBuiltinOperators {
             super::deserialize_from_path(path)?;
 
         let mut master = TrieMap::new();
-        for (k, v) in master_definitions.iter() {
+        for (k, v) in &master_definitions {
             let mut overloads = Vec::new();
             for overload in v {
                 let left = TypeReference::from_master_type_name(&overload.left);
@@ -57,7 +57,7 @@ impl PgBuiltinOperators {
         let master_definitions: HashMap<String, Vec<UnaryOperatorTypeDecl>> =
             super::deserialize_from_path(path)?;
         let mut master = TrieMap::new();
-        for (k, v) in master_definitions.iter() {
+        for (k, v) in &master_definitions {
             let mut overloads = Vec::new();
             for overload in v {
                 let input = TypeReference::from_master_type_name(&overload.input);
@@ -77,7 +77,7 @@ impl PgBuiltinOperators {
         let master_definitions: HashMap<String, Vec<UnaryOperatorTypeDecl>> =
             super::deserialize_from_path(path)?;
         let mut master = TrieMap::new();
-        for (k, v) in master_definitions.iter() {
+        for (k, v) in &master_definitions {
             let mut overloads = Vec::new();
             for overload in v {
                 let input = TypeReference::from_master_type_name(&overload.input);

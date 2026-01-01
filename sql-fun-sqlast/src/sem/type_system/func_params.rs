@@ -92,6 +92,7 @@ mod test_function_param_display {
 
 impl FunctionParam {
     /// get a type
+    #[must_use]
     pub fn get_type(&self) -> &Option<TypeReference> {
         match self {
             Self::In(v) => v.param_type(),
@@ -120,7 +121,7 @@ impl FunctionParam {
         for param in params {
             if FunctionParam::is_output_param(param)? {
                 let value = FunctionParam::analyze_as_column_definition(param)?;
-                columns.push(value)
+                columns.push(value);
             }
         }
         Ok(Some(ColumnCollection::new(columns)))
@@ -193,6 +194,7 @@ impl FunctionParam {
     }
 
     /// get composite type field definition for this parameter
+    #[must_use]
     pub fn field_definition(&self) -> Option<CompositeFieldDefinition> {
         match self {
             Self::Out(p) => p.composite_field_definition(),
@@ -243,7 +245,7 @@ impl FunctionParam {
             for source_type in source_types {
                 if let Some(st) = source_type {
                     if let Some(cast) = context.get_implicit_cast(st, target_type) {
-                        scores.push(cast.context().overload_priority_score())
+                        scores.push(cast.context().overload_priority_score());
                     } else {
                         TypeError::implicit_cast_not_found(
                             &format!("{st}"),

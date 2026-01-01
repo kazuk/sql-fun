@@ -4,7 +4,7 @@ use super::{AnalysisError, ParseContext, SemAst};
 #[derive(Debug, Clone, Eq, Hash, PartialEq, serde::Serialize, serde::Deserialize)]
 pub struct DeleteStatement {}
 
-/// analyze [crate::syn::DeleteStmt]
+/// analyze [`crate::syn::DeleteStmt`]
 pub fn analyze_delete_statement<TParseContext>(
     context: TParseContext,
     _parent_schema: &Option<String>,

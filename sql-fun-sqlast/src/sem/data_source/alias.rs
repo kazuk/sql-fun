@@ -35,11 +35,13 @@ pub struct AliasSpec {
 
 impl AliasSpec {
     /// get alias name
+    #[must_use]
     pub fn name(&self) -> &AliasName {
         &self.alias_name
     }
 
     /// create alias spec from only local name
+    #[must_use]
     pub fn from_local_name(local_name: &str) -> Self {
         Self {
             alias_name: AliasName(String::from(local_name)),
@@ -109,6 +111,7 @@ impl AliasSpec {
     }
 
     /// find column name from delived column list
+    #[must_use]
     pub fn derived_column_index(&self, column: &ColumnName) -> Option<usize> {
         if let Some((position, _)) = self
             .derived_column_names
@@ -122,6 +125,7 @@ impl AliasSpec {
     }
 
     /// get length of derived column list
+    #[must_use]
     pub fn len_derived_column(&self) -> usize {
         self.derived_column_names.len()
     }

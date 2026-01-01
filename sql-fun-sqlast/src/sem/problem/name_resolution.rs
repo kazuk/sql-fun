@@ -139,7 +139,7 @@ impl NameResolution {
 
     /// alias name undefined
     pub fn undefined_alias(alias_name: &String) -> Self {
-        Self::UndefinedAlias(alias_name.to_string())
+        Self::UndefinedAlias(alias_name.clone())
     }
 }
 
@@ -242,6 +242,7 @@ impl AnalysisProblem {
     }
 
     /// undefined alias
+    #[must_use]
     pub fn undefined_alias(alias_name: String) -> Self {
         Self::NameResolution(NameResolution::undefined_alias(&alias_name))
     }

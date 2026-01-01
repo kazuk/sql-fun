@@ -35,10 +35,10 @@ impl IndirectionExpr {
     where
         TParseContext: ParseContext,
     {
-        if !indicies.get_is_slice() {
-            ArrayIndex::analyze_index(context, with_clause, from_clause, arg, &indicies)
-        } else {
+        if indicies.get_is_slice() {
             ArraySlice::analyze_slice(context, with_clause, from_clause, arg, indicies)
+        } else {
+            ArrayIndex::analyze_index(context, with_clause, from_clause, arg, &indicies)
         }
     }
 }
@@ -92,7 +92,7 @@ where
                     arg,
                     member,
                     &mut context,
-                ))
+                ));
             } else {
                 AnalysisError::raise_unexpected_input(&format!("indirection item: {item:?}"))?;
             }

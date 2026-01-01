@@ -50,7 +50,7 @@ pub fn analyze_node<TParseContext: ParseContext>(
     }
 
     if let Some(variable_set) = statement.as_variable_set_stmt().as_inner() {
-        return analyze_variable_set(context, variable_set);
+        return analyze_variable_set(context, &variable_set);
     }
 
     if let Some(select) = statement.as_select_stmt().as_inner() {

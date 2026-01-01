@@ -14,20 +14,22 @@ pub struct VariableSet {
 
 impl VariableSet {
     /// name of variable
+    #[must_use]
     pub fn name(&self) -> &str {
         &self.name
     }
 
     /// value of variable
+    #[must_use]
     pub fn value(&self) -> &SemScalarExpr {
         &self.value
     }
 }
 
-/// analyze VariableSetStmt
+/// analyze `VariableSetStmt`
 pub fn analyze_variable_set<TParseContext>(
     mut context: TParseContext,
-    syn: crate::syn::VariableSetStmt,
+    syn: &crate::syn::VariableSetStmt,
 ) -> Result<AstAndContextPair<TParseContext>, AnalysisError>
 where
     TParseContext: ParseContext,
@@ -37,8 +39,8 @@ where
         AnalysisError::raise_unexpected_none("VariableSetStmt.args")?
     };
     if args.len() != 1 {
-        AnalysisError::raise_unexpected_input("VariableSetStmt.args len!=1")?
-    };
+        AnalysisError::raise_unexpected_input("VariableSetStmt.args len!=1")?;
+    }
 
     let (value, new_context) = analyze_scaler_expr(
         context,

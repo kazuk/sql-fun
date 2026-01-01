@@ -2,7 +2,7 @@ use crate::sem::AstAndContextPair;
 
 use super::{AnalysisError, ParseContext, SemAst};
 
-/// analyzed [crate::syn::CreateExtensionStmt]
+/// analyzed [`crate::syn::CreateExtensionStmt`]
 #[derive(Debug, Clone)]
 pub struct CreateExtension {
     name: String,
@@ -10,12 +10,13 @@ pub struct CreateExtension {
 
 impl CreateExtension {
     /// get extension name
+    #[must_use]
     pub fn name(&self) -> &str {
         &self.name
     }
 }
 
-/// analyze [crate::syn::CreateExtensionStmt]
+/// analyze [`crate::syn::CreateExtensionStmt`]
 pub fn analyze_create_extension<TParseContext>(
     context: TParseContext,
     _parent_schema: &Option<String>,

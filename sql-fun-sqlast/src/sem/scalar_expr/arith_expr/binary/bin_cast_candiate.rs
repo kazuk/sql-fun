@@ -47,7 +47,7 @@ impl BinaryCastCandiate {
                     right_cast.context(),
                     priority,
                     overload.clone(),
-                ))
+                ));
             }
         }
         candidates

@@ -93,13 +93,13 @@ impl FunctionParameterTrait for FunctionParamTable {
 
     fn apply_simple_infer_result(&mut self, simple_infer_result: &TypeReference) {
         if let Some(ty) = self.param_type.as_mut() {
-            ty.apply_simple_infer_result(simple_infer_result)
+            ty.apply_simple_infer_result(simple_infer_result);
         }
     }
 
     fn apply_common_infer_result(&mut self, common_infer_result: &TypeReference) {
         if let Some(ty) = self.param_type.as_mut() {
-            ty.apply_common_infer_result(common_infer_result)
+            ty.apply_common_infer_result(common_infer_result);
         }
     }
 }

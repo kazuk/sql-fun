@@ -1,0 +1,12 @@
+#!/bin/bash
+set -euo pipefail
+set +x
+
+umask 077
+: "${GH_TOKEN:?}"
+
+printf '%s' "$GH_TOKEN" \
+ | gh auth login --hostname github.com --with-token
+
+unset GH_TOKEN
+gh auth status || true

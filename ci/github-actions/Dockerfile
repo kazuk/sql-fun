@@ -24,7 +24,7 @@ RUN curl -fsSL https://sh.rustup.rs \
   && rustc -V && cargo -V
 
 RUN cargo install --locked --force --root /opt/tools \
-  cargo-llvm-cov mdbook cargo-deny tera-cli taplo-cli cargo-nextest
+  cargo-llvm-cov mdbook cargo-deny tera-cli taplo-cli cargo-nextest sccache cargo-sort
 
 FROM ubuntu:24.04
 
@@ -34,12 +34,12 @@ ENV DEBIAN_FRONTEND=noninteractive \
     PATH=/usr/local/cargo/bin:/usr/local/rustup/bin:/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin
 
 RUN apt-get update && apt-get install -y --no-install-recommends \
-  curl sudo
+  ca-certificates curl sudo
 
 RUN curl -fsSL https://cli.github.com/packages/githubcli-archive-keyring.gpg \
  | sudo dd of=/usr/share/keyrings/githubcli-archive-keyring.gpg
 
- RUN chmod go+r /usr/share/keyrings/githubcli-archive-keyring.gpg \
+RUN chmod go+r /usr/share/keyrings/githubcli-archive-keyring.gpg \
  && echo "deb [arch=$(dpkg --print-architecture) signed-by=/usr/share/keyrings/githubcli-archive-keyring.gpg] https://cli.github.com/packages stable main" \
   | sudo tee /etc/apt/sources.list.d/github-cli.list 
 
@@ -54,7 +54,7 @@ RUN apt-get update && apt-get install -y --no-install-recommends \
 # Rust (stable)
 RUN curl -fsSL https://sh.rustup.rs | sh -s -- -y --profile minimal --default-toolchain stable \
   && rustc -V && cargo -V
-
+RUN rustup component add rustfmt clippy
 RUN git config --system --add safe.directory '*'
 
 COPY --from=builder /opt/tools/bin /usr/local/cargo/bin

@@ -49,6 +49,12 @@ pub struct TcpJsonRpcClinetAsync {
 }
 
 impl TcpJsonRpcClinetAsync {
+    /// convert stream to client
+    ///
+    /// # Errors
+    ///
+    /// - `std::io::Error`
+    ///
     pub fn try_from(stream: TcpStream) -> Result<Self, std::io::Error> {
         let (sender, reciever) = tokio::sync::mpsc::channel(5);
         let (request_sender, tx_request) = tokio::sync::mpsc::channel(5);
@@ -78,6 +84,11 @@ impl TcpJsonRpcClinetAsync {
         result
     }
 
+    /// Invoke a method
+    ///
+    /// # Errors
+    ///
+    /// - `TcpJsonRpcClinetAsyncError`
     pub async fn invoke_method(
         &mut self,
         method: &str,
@@ -164,6 +175,8 @@ impl TcpJsonRpcClinetAsync {
                 }
                 InflightRequests::ResponseRecieved(json_rpc_response) => {
                     let id = json_rpc_response.id;
+
+                    #[allow(clippy::similar_names)]
                     let Some(recieved) = rec.remove(&id) else {
                         continue;
                     };

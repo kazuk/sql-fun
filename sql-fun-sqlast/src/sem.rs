@@ -182,7 +182,7 @@ pub enum SemAst {
 }
 
 impl SemAst {
-    /// unwrap node as SelectStatement
+    /// unwrap node as `SelectStatement``
     pub fn into_select_statemtnt(self) -> Option<SelectStatement> {
         match self {
             SemAst::SelectStatement(select_statement) => Some(select_statement),

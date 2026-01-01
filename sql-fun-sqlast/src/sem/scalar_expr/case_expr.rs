@@ -108,7 +108,7 @@ mod test_case_expr_analysis_context_analyze_case_arg {
 impl<'a> CaseExprAnalysisContext<'a> {
     fn analyze_case_when<TParseContext>(
         &self,
-        context: TParseContext,
+        mut context: TParseContext,
         syn: crate::syn::CaseWhen,
     ) -> Result<(CaseWhen, TParseContext), AnalysisError>
     where
@@ -122,9 +122,11 @@ impl<'a> CaseExprAnalysisContext<'a> {
         };
         let (when_value, new_context) =
             analyze_scaler_expr(context, self.with_clause, self.from_clause, when_value)?;
-        let (result, new_conext) =
-            analyze_scaler_expr(new_context, self.with_clause, self.from_clause, result)?;
-        Ok((CaseWhen::new(when_value, result), new_conext))
+        context = new_context;
+        let (result, new_context) =
+            analyze_scaler_expr(context, self.with_clause, self.from_clause, result)?;
+        context = new_context;
+        Ok((CaseWhen::new(when_value, result), context))
     }
 }
 

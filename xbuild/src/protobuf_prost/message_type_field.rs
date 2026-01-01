@@ -13,7 +13,7 @@ pub struct MessageTypeField {
 }
 
 impl MessageTypeField {
-    /// field_name
+    /// `field_name`
     pub fn field_name(&self) -> &str {
         &self.name
     }
@@ -42,7 +42,7 @@ impl MessageTypeField {
                 .as_ref()
                 .expect("must have type_name")
                 .split('.')
-                .last()
+                .next_back()
                 .expect("type_name last");
             type_name_last.to_case(Case::Pascal)
         } else {
@@ -94,7 +94,7 @@ impl MessageTypeField {
                 .as_ref()
                 .expect("must have type_name")
                 .split('.')
-                .last()
+                .next_back()
                 .expect("type_name last")
                 .to_string();
             type_name_last = type_name_last.to_case(Case::Pascal);
@@ -103,12 +103,10 @@ impl MessageTypeField {
             }
             if self.label == "LABEL_REPEATED" {
                 format!("{type_name_last}ListOpt")
+            } else if no_optional {
+                type_name_last
             } else {
-                if no_optional {
-                    type_name_last
-                } else {
-                    format!("{type_name_last}Opt")
-                }
+                format!("{type_name_last}Opt")
             }
         }
     }
@@ -139,7 +137,7 @@ impl MessageTypeField {
                 .as_ref()
                 .expect("must have type_name")
                 .split('.')
-                .last()
+                .next_back()
                 .expect("type_name last")
                 .to_string();
             type_name_last = type_name_last.to_case(Case::Pascal);
@@ -148,19 +146,17 @@ impl MessageTypeField {
             }
             if self.label == "LABEL_REPEATED" {
                 format!("{type_name_last}List")
+            } else if no_optional {
+                type_name_last
             } else {
-                if no_optional {
-                    type_name_last
-                } else {
-                    format!("{type_name_last}Opt")
-                }
+                format!("{type_name_last}Opt")
             }
         }
     }
 
     pub fn struct_field_no_from(&self) -> bool {
         let type_turbo = self.struct_field_type_turbo(false);
-        if type_turbo == "i32"
+        type_turbo == "i32"
             || type_turbo == "i64"
             || type_turbo == "bool"
             || type_turbo == "f32"
@@ -168,11 +164,6 @@ impl MessageTypeField {
             || type_turbo == "u32"
             || type_turbo == "u64"
             || type_turbo == "Vec::<u64>"
-        {
-            true
-        } else {
-            false
-        }
     }
 
     /// struct field type
@@ -201,7 +192,7 @@ impl MessageTypeField {
                 .as_ref()
                 .expect("must have type_name")
                 .split('.')
-                .last()
+                .next_back()
                 .expect("type_name last")
                 .to_string();
             type_name_last = type_name_last.to_case(Case::Pascal);
@@ -210,12 +201,10 @@ impl MessageTypeField {
             }
             if self.label == "LABEL_REPEATED" {
                 format!("{type_name_last}List")
+            } else if no_optional {
+                type_name_last.clone()
             } else {
-                if no_optional {
-                    type_name_last.to_string()
-                } else {
-                    format!("{type_name_last}Opt")
-                }
+                format!("{type_name_last}Opt")
             }
         }
     }

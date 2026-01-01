@@ -94,7 +94,7 @@ cargo fmt
 cargo sort
 
 echo "== Linting"
-cargo clippy
+cargo clippy --no-deps --workspace
 taplo lint
 
 echo "== Document build"

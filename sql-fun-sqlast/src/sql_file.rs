@@ -59,13 +59,13 @@ impl Iterator for LineWithLfIter {
     fn next(&mut self) -> Option<Self::Item> {
         if self.eof {
             return None;
-        };
+        }
 
         let mut buf = String::new();
         match self.reader.read_line(&mut buf) {
             Ok(read) => {
                 if read == 0 {
-                    self.eof = true
+                    self.eof = true;
                 }
                 Some(Ok(buf))
             }

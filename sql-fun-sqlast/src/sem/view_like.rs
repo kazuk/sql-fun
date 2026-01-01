@@ -37,6 +37,7 @@ impl ViewLike {
     }
 
     /// check view is materialized
+    #[must_use]
     pub fn is_materialized(&self) -> bool {
         matches!(self, Self::MaterializedView(_))
     }

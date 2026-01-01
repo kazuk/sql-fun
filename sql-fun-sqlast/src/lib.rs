@@ -34,6 +34,11 @@ where
 }
 
 /// parse SQL statement
+///
+/// # Errors
+///
+/// - [`pg_query::Error`] : syntax error
+///
 pub fn parse(sql: &str) -> Result<ParseResult, pg_query::Error> {
     let parse_result = ::pg_query::parse(sql)?;
     Ok(ParseResult::from(parse_result.protobuf))
@@ -60,6 +65,11 @@ pub struct StringSpan {
 
 impl StringSpan {
     /// get content span
+    ///
+    /// # Panics
+    ///
+    /// content not in container range
+    #[must_use]
     pub fn from_str_in_str(container: &StdString, content: &str) -> Self {
         let offset = offset_in_string(container, content).expect("content in container");
         let len = content.len();

@@ -46,5 +46,5 @@ pub fn generate_sql_query_many(
         .block
         .stmts
         .push(syn::parse2(sql_execution_code)?);
-    Ok(TokenStream::from(quote! { #function_ast }))
+    Ok(quote! { #function_ast })
 }

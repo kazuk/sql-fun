@@ -55,4 +55,6 @@ RUN apt-get update && apt-get install -y --no-install-recommends \
 RUN curl -fsSL https://sh.rustup.rs | sh -s -- -y --profile minimal --default-toolchain stable \
   && rustc -V && cargo -V
 
+RUN git config --system --add safe.directory '*'
+
 COPY --from=builder /opt/tools/bin /usr/local/cargo/bin

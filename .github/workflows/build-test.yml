@@ -16,20 +16,12 @@ jobs:
   build:
     runs-on: ubuntu-24.04
     container:
-      image: ghcr.io/kazuk/ci-builder@sha256:23d5245a24c3b23ea8165cfaeec31042e56861fb383e9b61c5435effe6d6b6c5
+      image: ghcr.io/kazuk/ci-builder@sha256:ee0061c563127b65f9d3f8f6dc3d9ba760890893064abb39d32eb72569775821
       credentials:
         username: ${{ github.actor }}
         password: ${{ secrets.GITHUB_TOKEN }}
     steps:
       - uses: actions/checkout@v4
-
-      - run: |
-          curl -fsSL https://cli.github.com/packages/githubcli-archive-keyring.gpg \
-            | sudo dd of=/usr/share/keyrings/githubcli-archive-keyring.gpg
-          sudo apt-get update \
-            && sudo apt-get install -y autoconf libtool libtool-bin
-          rustup component add rustfmt clippy
-          cargo install --locked sccache cargo-sort
 
       - uses: actions/cache@v4
         with:

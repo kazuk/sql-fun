@@ -43,13 +43,14 @@ jobs:
         run: |
           export GIT_ROOT="$(git rev-parse --show-toplevel)"
           export SQL_FUN_HOME="${GIT_ROOT}/sql-fun-home"
-          sccache --start-server || true
-
+          sccache --start-server
+          export RUSTC_WRAPPER=sccache
+          export SCCACHE_DIR=/github/home/.cache/sccache
           .local/bin/check-test-flow --nextest-extra=" 
             --config-file ./ci/nextest/config.toml 
             --profile ci 
             --show-progress none"
-          sccache --show-stats || true
+          sccache --show-stats
 
       - name: Test Report
         uses: dorny/test-reporter@v2

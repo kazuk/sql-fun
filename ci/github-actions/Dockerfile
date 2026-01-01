@@ -47,7 +47,7 @@ RUN apt-get update && apt-get install -y --no-install-recommends \
     ca-certificates curl direnv git gh \
     build-essential pkg-config \
     unzip zip xz-utils sudo \
-    libssl-dev clang jq \
+    libssl-dev clang jq autoconf libtool libtool-bin\
     postgresql-client libpq-dev \
   && rm -rf /var/lib/apt/lists/*
 

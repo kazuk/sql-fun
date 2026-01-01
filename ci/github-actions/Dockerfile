@@ -24,7 +24,7 @@ RUN curl -fsSL https://sh.rustup.rs \
   && rustc -V && cargo -V
 
 RUN cargo install --locked --force --root /opt/tools \
-  cargo-llvm-cov mdbook cargo-deny tera-cli 
+  cargo-llvm-cov mdbook cargo-deny tera-cli taplo-cli cargo-nextest
 
 FROM ubuntu:24.04
 
@@ -54,5 +54,7 @@ RUN apt-get update && apt-get install -y --no-install-recommends \
 # Rust (stable)
 RUN curl -fsSL https://sh.rustup.rs | sh -s -- -y --profile minimal --default-toolchain stable \
   && rustc -V && cargo -V
+
+RUN git config --system --add safe.directory '*'
 
 COPY --from=builder /opt/tools/bin /usr/local/cargo/bin

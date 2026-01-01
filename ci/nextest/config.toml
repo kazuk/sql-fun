@@ -1,0 +1,6 @@
+[profile.ci]
+fail-fast = false
+slow-timeout = "20s"
+junit.path = "target/nextest/junit.xml"
+
+

@@ -1,0 +1,39 @@
+name: build and test
+
+on:
+  pull_request:
+    types:
+      - opened
+      - synchronize
+      - reopened
+  merge_group:
+
+env:
+  CARGO_TERM_COLOR: never
+
+jobs:
+  build:
+    runs-on: ubuntu-24.04
+    container:
+      image: ghcr.io/kazuk/ci-builder@sha256:4b8163c998cb0b1c5e16ec784f20bc6f3f6c0b1ad3a9073d940544c7965d2cc7
+      credentials:
+        username: ${{ github.actor }}
+        password: ${{ secrets.GITHUB_TOKEN }}
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: buil and test
+        run: |
+          .local/bin/check-test-flow --nextest-extra=" 
+            --config-file ./ci/nextest/config.toml 
+            --profile ci 
+            --show-progress none"
+
+      - name: Test Report
+        uses: dorny/test-reporter@v2
+        if: ${{ !cancelled() }}
+        with:
+          name: nextest tests
+          path: target/nextest/junit.xml
+          reporter: java-junit
+

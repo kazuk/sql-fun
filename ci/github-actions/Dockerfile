@@ -24,7 +24,7 @@ RUN curl -fsSL https://sh.rustup.rs \
   && rustc -V && cargo -V
 
 RUN cargo install --locked --force --root /opt/tools \
-  cargo-llvm-cov mdbook cargo-deny tera-cli 
+  cargo-llvm-cov mdbook cargo-deny tera-cli taplo-cli
 
 FROM ubuntu:24.04
 

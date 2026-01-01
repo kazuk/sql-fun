@@ -67,16 +67,32 @@ use ::url::Url;
 // - struct
 // - inline module 
 
-#[cfg(test)]
-mod tests {
-    // tests goes here
-    //   The basic rules also apply under the `tests` module.  
-    //   Whether code reviews should strongly enforce them is a separate matter.
-}
-
 ```
 
-- importing items
+### Test placement
+
+- Place tests **immediately after the implementation block or function they cover**.  
+  Co-locating tests with the code they verify reduces the risk of tests being orphaned or forgotten when modules are split or reorganized. Keep the test module focused on the nearby implementation; broader integration tests belong in dedicated test modules/files.
+
+```rust
+impl Foo {
+    pub fn new(value: i32) -> Self {
+        Self { value }
+    }
+}
+
+#[cfg(test)]
+mod test_foo_new {
+    #[test]
+    fn constructs_foo_with_value() {
+        let foo = super::Foo::new(10);
+        assert_eq!(10, foo.value);
+    }
+}
+```
+
+### Importing items
+
   - `*` import is prohibited. (including `prelude` import)
   - macro importing is prohibited. (including derive / proc-macro)  
     Do NOT! 

@@ -148,7 +148,7 @@ impl MetadataArgs {
     /// # Errors
     ///
     /// Returns [`SqlFunArgsError::FilePathNotFound`] if the schema file does not exist.
-    pub fn schema_file(&self, metadata_file: &PathBuf) -> Result<PathBuf, SqlFunArgsError> {
+    pub fn schema_file(&self, metadata_file: &Path) -> Result<PathBuf, SqlFunArgsError> {
         if let Some(schema_file) = &self.schema_file {
             if schema_file.exists() {
                 Ok(schema_file.clone())

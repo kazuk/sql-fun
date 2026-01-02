@@ -12,6 +12,10 @@ use std::process::ExitCode;
 pub use self::runnable::{RunableCommand, StdStream};
 
 /// Runs builtin CLI subcommands
+///
+/// # Errors
+///
+/// Returns an error if executing the chosen subcommand fails.
 pub async fn run_builtin(args: &SqlFunArgs) -> Result<ExitCode, anyhow::Error> {
     let sub_command = args.cli_sub_command();
     match sub_command {

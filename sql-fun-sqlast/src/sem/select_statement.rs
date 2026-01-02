@@ -11,6 +11,7 @@ mod result_column;
 pub use self::result_column::ResultColumnCollection;
 
 /// select statement
+#[allow(clippy::large_enum_variant)]
 #[derive(Debug, Clone, Eq, Hash, PartialEq, serde::Serialize, serde::Deserialize)]
 pub enum SelectStatement {
     /// simple query

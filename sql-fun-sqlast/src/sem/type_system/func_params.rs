@@ -136,6 +136,7 @@ impl FunctionParam {
     /// # Errors
     ///
     /// Propagates [`TypeError`] when binding fails.
+    #[expect(rustdoc::private_intra_doc_links)]
     pub fn bind_arg(
         &self,
         arg_types: &mut ArgumentBindingCollection,
@@ -154,6 +155,7 @@ impl FunctionParam {
     /// # Errors
     ///
     /// Returns [`TypeError`] if inferring argument types fails.
+    #[expect(rustdoc::private_intra_doc_links)]
     pub fn collect_simple(
         &self,
         context: &mut SimpleInferContext,
@@ -173,6 +175,7 @@ impl FunctionParam {
     /// # Errors
     ///
     /// Returns [`TypeError`] if type inference fails.
+    #[expect(rustdoc::private_intra_doc_links)]
     pub fn collect_common(
         &self,
         context: &mut CommonInferContext,
@@ -225,6 +228,7 @@ impl FunctionParam {
     /// # Errors
     ///
     /// Returns [`TypeError`] when an implicit cast cannot be resolved.
+    #[expect(rustdoc::private_intra_doc_links)]
     pub fn test_castability_one<TParseContext>(
         &self,
         context: &TParseContext,
@@ -255,6 +259,7 @@ impl FunctionParam {
     /// # Errors
     ///
     /// Returns [`TypeError`] when any argument cannot be implicitly cast.
+    #[expect(rustdoc::private_intra_doc_links)]
     pub fn test_castability_variadic<TParseContext>(
         &self,
         context: &TParseContext,

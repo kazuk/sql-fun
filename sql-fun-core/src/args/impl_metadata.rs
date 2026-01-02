@@ -1,4 +1,4 @@
-use std::path::PathBuf;
+use std::path::{Path, PathBuf};
 
 use crate::SqlFunArgsError;
 
@@ -32,7 +32,7 @@ impl super::SqlFunArgs {
     /// # Errors
     ///
     /// Returns [`SqlFunArgsError::FilePathNotFound`] when the schema file is missing.
-    pub fn schema_file(&self, metadata_file: &PathBuf) -> Result<PathBuf, SqlFunArgsError> {
+    pub fn schema_file(&self, metadata_file: &Path) -> Result<PathBuf, SqlFunArgsError> {
         self.metadata_args.schema_file(metadata_file)
     }
 }

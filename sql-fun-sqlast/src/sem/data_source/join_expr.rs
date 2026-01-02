@@ -10,9 +10,9 @@ pub struct JoinUsingClause {
 }
 
 impl JoinUsingClause {
-    pub(super) fn new(using_columns: &Vec<ColumnName>, alias: &Option<AliasSpec>) -> Self {
+    pub(super) fn new(using_columns: &[ColumnName], alias: &Option<AliasSpec>) -> Self {
         Self {
-            using_columns: using_columns.clone(),
+            using_columns: using_columns.to_owned(),
             alias: alias.clone(),
         }
     }

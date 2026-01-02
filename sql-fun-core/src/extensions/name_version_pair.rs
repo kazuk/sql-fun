@@ -46,10 +46,15 @@ mod test_extension_name_version_pair_display {
 
 impl ExtensionNameVersionPair {
     /// validate str for extension name
+    ///
+    /// # Errors
+    ///
+    /// Returns [`ExtensionConfigError::InvalidExtensionName`] when the provided
+    /// name contains unsupported characters.
     pub fn validate_name(name: &str) -> Result<(), ExtensionConfigError> {
         if name == "." || name == ".." || name.contains([':', '/', '\\']) {
-            ExtensionConfigError::invalid_extension_name(name)?
-        };
+            ExtensionConfigError::invalid_extension_name(name)?;
+        }
         Ok(())
     }
 }
@@ -72,6 +77,10 @@ mod test_validate_name {
 
 impl ExtensionNameVersionPair {
     /// creates instance
+    ///
+    /// # Errors
+    ///
+    /// Returns [`ExtensionConfigError`] if the extension name is invalid.
     pub fn try_new(
         name: &str,
         version: &Option<ExtensionVersion>,
@@ -107,6 +116,11 @@ mod test_try_new {
 
 impl ExtensionNameVersionPair {
     /// get extension sql path
+    ///
+    /// # Errors
+    ///
+    /// Returns [`ExtensionConfigError`] when the SQL file cannot be located or
+    /// metadata resolution fails.
     pub fn resolve_version<P: AsRef<Path>>(
         &mut self,
         base_path: P,
@@ -125,6 +139,11 @@ impl ExtensionNameVersionPair {
         }
     }
 
+    ///
+    /// # Errors
+    ///
+    /// Returns [`ExtensionConfigError`] when directory traversal fails or when
+    /// the version cannot be inferred uniquely.
     fn resolve_version_from_extension_files<P: AsRef<Path>>(
         &mut self,
         base_path: P,
@@ -342,10 +361,13 @@ mod test_parser {
 impl ExtensionNameVersionPair {
     /// parse name from str
     ///
-    /// returns (parsed_name, remaining)
+    /// returns (`parsed_name`, remaining)
     ///
-    /// Note: parsed name was not strictly checked use [Self::validate_name]
+    /// Note: parsed name was not strictly checked use [`Self::validate_name`]
     ///
+    /// # Errors
+    ///
+    /// Returns [`String`] when parsing fails.
     pub fn parse_name(expect_name: &str) -> Result<(String, &str), String> {
         let parse_result = Self::name_parser().easy_parse(expect_name);
         parse_result.map_err(|e| e.to_string())
@@ -367,8 +389,11 @@ mod test_parse_name {
 impl ExtensionNameVersionPair {
     /// parse version from str
     ///
-    /// returns (parsed_version, remaining)
+    /// returns (`parsed_version`, remaining)
     ///
+    /// # Errors
+    ///
+    /// Returns [`String`] when parsing fails.
     pub fn parse_version(input: &str) -> Result<(String, &str), String> {
         Self::version_parser()
             .easy_parse(input)

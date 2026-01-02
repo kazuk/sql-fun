@@ -28,7 +28,7 @@ impl MemberRef {
     }
 
     fn test_member_exist<TParseContext>(
-        member: &String,
+        member: &str,
         context: &mut TParseContext,
         td: &TypeDefinition,
         ty: &TypeReference,

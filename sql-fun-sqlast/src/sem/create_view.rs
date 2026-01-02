@@ -25,14 +25,14 @@ impl CreateView {
     pub fn new(
         name: &FullName,
         query: &SelectStatement,
-        alter_statements: &Vec<AlterView>,
+        alter_statements: &[AlterView],
         owner: &Option<String>,
         materialized: bool,
     ) -> Self {
         Self {
             name: name.clone(),
             query: query.clone(),
-            alter_statements: alter_statements.clone(),
+            alter_statements: alter_statements.to_owned(),
             owner: owner.clone(),
             materialized,
         }
@@ -101,13 +101,7 @@ where
         AnalysisError::raise_unexpected_none("select_statement")?
     };
     let name = FullName::try_from(view)?;
-    let create_view = CreateView::new(
-        &name,
-        &stmt,
-        &Default::default(),
-        &Default::default(),
-        false,
-    );
+    let create_view = CreateView::new(&name, &stmt, &[], &Default::default(), false);
     let context = context.apply_create_view(&create_view)?;
     Ok(AstAndContextPair::new(
         SemAst::CreateView(create_view),

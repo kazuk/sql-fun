@@ -70,7 +70,7 @@ impl SqlFunArgs {
         matches!(self.command, CliSubCommand::Initialize(_))
     }
 
-    /// get CliSubCommand
+    /// get [`CliSubCommand`]
     #[must_use]
     pub fn cli_sub_command(&self) -> &CliSubCommand {
         &self.command
@@ -103,7 +103,7 @@ impl SqlFunArgs {
         &self.command
     }
 
-    /// get PostgreSQL version
+    /// get `PostgreSQL` version
     ///
     /// # Errors
     ///
@@ -115,7 +115,7 @@ impl SqlFunArgs {
         self.postgres_args.postgres_version(metadata)
     }
 
-    /// get PostgreSQL search path
+    /// get `PostgreSQL` search path
     ///
     /// # Errors
     ///
@@ -128,6 +128,11 @@ impl SqlFunArgs {
     }
 
     /// get postgres extensions
+    ///
+    /// # Errors
+    ///
+    /// Propagates [`SqlFunArgsError`] if metadata lookup fails or the extension
+    /// configuration is invalid.
     pub fn postgres_extensions(
         &self,
         metadata: &SqlFunMetadata,
@@ -136,6 +141,10 @@ impl SqlFunArgs {
     }
 
     /// get builtin schema directory path
+    ///
+    /// # Errors
+    ///
+    /// Returns [`SqlFunArgsError`] if the builtin directory cannot be resolved.
     pub fn builtin_info_dir(&self, metadata: &SqlFunMetadata) -> Result<PathBuf, SqlFunArgsError> {
         if let Some(arg) = self.postgres_args.builtin_schema_dir() {
             Ok(arg.clone())
@@ -147,6 +156,10 @@ impl SqlFunArgs {
     }
 
     /// set directory path of extensions
+    ///
+    /// # Errors
+    ///
+    /// Returns [`SqlFunArgsError`] when the path components cannot be derived.
     pub fn postgres_extensions_dir(
         &self,
         metadata: &SqlFunMetadata,
@@ -168,6 +181,11 @@ impl SqlFunArgs {
     const SQL_FUN_NO_BUILTIN: &str = "SQL_FUN_NO_BUILTIN";
 
     /// get environemnts for child process
+    ///
+    /// # Errors
+    ///
+    /// Returns [`SqlFunArgsError`] if metadata fails to load or env generation
+    /// encounters an error.
     pub fn environments(&self) -> Result<HashMap<String, String>, SqlFunArgsError> {
         let mut result = HashMap::new();
         let metadata_file = self.metadata_file()?;
@@ -197,6 +215,7 @@ pub struct DaemonControlArgs {
 
 impl SqlFunArgs {
     /// Initialize and parse arguments
+    #[must_use]
     pub fn parse_args() -> Self {
         let mut args = SqlFunArgs::parse();
         if args.verbose {

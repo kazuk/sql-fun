@@ -37,8 +37,8 @@ impl FromStr for EngineVersion {
 impl std::fmt::Display for EngineVersion {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         match &self.0 {
-            Either::Left(v) => write!(f, "{}", v),
-            Either::Right(v) => write!(f, "{}", v),
+            Either::Left(v) => write!(f, "{v}"),
+            Either::Right(v) => write!(f, "{v}"),
         }
     }
 }
@@ -65,7 +65,7 @@ impl EngineVersion {
 /// Well known database engine
 #[derive(serde::Deserialize, Debug)]
 pub enum WellKnownDbEngine {
-    /// PostgreSQL Engine
+    /// `PostgreSQL` Engine
     PostgreSQL,
 }
 
@@ -99,25 +99,29 @@ impl<'de> serde::Deserialize<'de> for DatabaseEngine {
 }
 
 impl DatabaseEngine {
+    #[must_use]
     pub fn is_wellknown(&self) -> bool {
         self.0.is_left()
     }
 
+    #[must_use]
     pub fn is_custom(&self) -> bool {
         self.0.is_right()
     }
 
+    #[must_use]
     pub fn as_wellknown(&self) -> Option<&WellKnownDbEngine> {
         match &self.0 {
             Either::Left(l) => Some(l),
-            _ => None,
+            Either::Right(_) => None,
         }
     }
 
+    #[must_use]
     pub fn as_custom(&self) -> Option<&String> {
         match &self.0 {
             Either::Right(r) => Some(r),
-            _ => None,
+            Either::Left(_) => None,
         }
     }
 }
@@ -163,6 +167,10 @@ pub enum MetadataError {
 
 impl MetadataError {
     /// error in load metadata from file
+    ///
+    /// # Errors
+    ///
+    /// Always returns [`MetadataError::MetadataLoadFromFile`].
     pub fn metadata_load_from_file<T, P: AsRef<Path>>(path: P, message: &str) -> Result<T, Self> {
         Err(Self::MetadataLoadFromFile(
             path.as_ref().to_path_buf(),
@@ -171,6 +179,10 @@ impl MetadataError {
     }
 
     /// CTE catalog not exist
+    ///
+    /// # Errors
+    ///
+    /// Always returns [`MetadataError::CteCatalogNotExist`].
     pub fn cte_catalog_not_exist<T, P: AsRef<Path>>(path: P) -> Result<T, Self> {
         Err(Self::CteCatalogNotExist(path.as_ref().to_path_buf()))
     }
@@ -181,6 +193,10 @@ impl SqlFunMetadata {
     ///
     /// - source toml requires Cargo.toml like structure.
     /// - this function retrieves package.metadata.database and deserialize metadata
+    ///
+    /// # Errors
+    ///
+    /// Returns [`MetadataError`] if the file cannot be read or parsed.
     pub fn load_from<P: AsRef<Path> + std::fmt::Debug>(path: P) -> Result<Self, MetadataError> {
         let file_text = std::fs::read_to_string(&path)?;
 
@@ -216,29 +232,39 @@ impl SqlFunMetadata {
     }
 
     /// deserialize form TOML Value
+    ///
+    /// # Errors
+    ///
+    /// Returns [`MetadataError`] when TOML conversion fails.
     pub(crate) fn from_value(database: &toml::Value) -> Result<Self, MetadataError> {
         let db_matadata: Self = database.clone().try_into()?;
         Ok(db_matadata)
     }
 
     /// get CTE catalog directory path
+    ///
+    /// # Errors
+    ///
+    /// Returns [`MetadataError`] if the catalog path does not exist.
     pub fn cte_catalog(&self) -> Result<Option<&PathBuf>, MetadataError> {
         let Some(cte_catalog) = &self.cte_catalog else {
             return Ok(None);
         };
-        if !cte_catalog.exists() {
-            MetadataError::cte_catalog_not_exist(cte_catalog)?
-        } else {
+        if cte_catalog.exists() {
             Ok(Some(cte_catalog))
+        } else {
+            MetadataError::cte_catalog_not_exist(cte_catalog)?
         }
     }
 
     /// get SQL dialect
+    #[must_use]
     pub fn sql_dialect(&self) -> SqlDialect {
         self.dialect
     }
 
     /// get db engine
+    #[must_use]
     pub fn engine(&self) -> &DatabaseEngine {
         &self.engine
     }
@@ -247,8 +273,9 @@ impl SqlFunMetadata {
     ///
     ///  this function returns just metadata defined.
     ///
-    /// See [crate::SqlFunArgs::postgres_version] for argument precedence.
+    /// See [`crate::SqlFunArgs::postgres_version`] for argument precedence.
     ///
+    #[must_use]
     pub fn engine_version(&self) -> &Option<EngineVersion> {
         &self.engine_version
     }
@@ -257,13 +284,15 @@ impl SqlFunMetadata {
     ///
     ///  this function returns just metadata defined.
     ///
-    /// See [crate::SqlFunArgs::postgres_search_path] for argument precedence.
+    /// See [`crate::SqlFunArgs::postgres_search_path`] for argument precedence.
     ///  
+    #[must_use]
     pub fn search_path(&self) -> &Option<Vec<String>> {
         &self.search_path
     }
 
-    /// get PostgreSQL extensions allowed
+    /// get `PostgreSQL` extensions allowed
+    #[must_use]
     pub fn postgres_extensions(&self) -> &Option<PostgresExtensionsCollection> {
         &self.extensions
     }

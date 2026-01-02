@@ -138,8 +138,8 @@ impl NameResolution {
     }
 
     /// alias name undefined
-    pub fn undefined_alias(alias_name: &String) -> Self {
-        Self::UndefinedAlias(alias_name.clone())
+    pub fn undefined_alias(alias_name: &str) -> Self {
+        Self::UndefinedAlias(alias_name.to_owned())
     }
 }
 

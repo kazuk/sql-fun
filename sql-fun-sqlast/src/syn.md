@@ -1,6 +1,6 @@
 # `pg_query` AST wrapper
 
- This module wraps [pg_query] AST struct and enums.
+ This module wraps [`pg_query`] AST struct and enums.
 
 - `enum` convert to variant `as_variant_name`
 - access `struct` field `get_field_name`
@@ -9,7 +9,7 @@
 
 ## sturct wrapping
 
-- `Struct` : [std::rc::Rc] wrapping struct value
+- `Struct` : [`std::rc::Rc`] wrapping struct value
   - expose fiels getter `get_field_name` returns field value.
 - `StructOpt` : new-type wrapping `Option<Struct>`
   - expose field getter `get_field_name` returns Option value.

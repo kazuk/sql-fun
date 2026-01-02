@@ -10,7 +10,7 @@ impl EnumTypeValue {
     pub fn variant_name(&self, enum_type_name: &str) -> String {
         let pascal_cased = self.name.to_case(Case::Pascal);
         let variant_name = pascal_cased
-            .strip_prefix(&enum_type_name)
+            .strip_prefix(enum_type_name)
             .map(str::to_string)
             .unwrap_or(pascal_cased);
         if variant_name.is_empty() {

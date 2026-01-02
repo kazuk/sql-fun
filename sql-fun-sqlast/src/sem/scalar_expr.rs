@@ -99,7 +99,7 @@ pub enum SemScalarExpr {
     ///
     /// # Note
     ///
-    /// ImplicitCast is not in Syntax level AST.
+    /// `ImplicitCast` is not in Syntax level AST.
     ///
     /// `sql-fun` inserts implicit cast at a implicit coversion as needed.
     ///
@@ -124,6 +124,7 @@ impl SemScalarExpr {
     }
 
     /// determine expresion value type
+    #[must_use]
     pub fn get_type(&self) -> Option<TypeReference> {
         match self {
             Self::Const(scalar_const_expr) => scalar_const_expr.get_type(),
@@ -149,6 +150,7 @@ impl SemScalarExpr {
     }
 
     /// determine expression value is nullable
+    #[must_use]
     pub fn is_not_null(&self) -> Option<bool> {
         match self {
             Self::Const(scalar_const_expr) => scalar_const_expr.is_not_null(),
@@ -174,6 +176,7 @@ impl SemScalarExpr {
     }
 
     /// get column definition
+    #[must_use]
     pub fn get_column_def(&self) -> Option<ColumnDefinition> {
         match self {
             Self::ColumnRef(c) => c.get_column_def().clone(),
@@ -182,7 +185,8 @@ impl SemScalarExpr {
         }
     }
 
-    /// convert value_expr with implicit casting
+    /// convert `value_expr` with implicit casting
+    #[must_use]
     pub fn wrap_implicit_cast(taget_type: &TypeReference, value_expr: &SemScalarExpr) -> Self {
         Self::ImplicitCast(ImplicitCastExpr::new(value_expr, taget_type))
     }
@@ -200,7 +204,7 @@ impl SemScalarExpr {
         };
         if &ty == result_type {
             return;
-        };
+        }
 
         let Some(cast) = context.get_implicit_cast(&ty, result_type) else {
             context.report_problem(AnalysisProblem::implicit_cast_not_found(&ty, result_type));
@@ -212,15 +216,16 @@ impl SemScalarExpr {
     }
 
     /// get column name
+    #[must_use]
     pub fn get_column_name(&self) -> String {
         match self {
-            Self::Const(_scalar_const_expr) => String::from(""),
+            Self::Const(_scalar_const_expr) => String::new(),
             Self::ColumnRef(cr) => cr.get_column_name().to_string(),
-            Self::FuncCall(_func_call_expr) => String::from(""),
+            Self::FuncCall(_func_call_expr) => String::new(),
             Self::Arith(_arith_expr) => todo!(),
-            Self::TypeCast(_type_cast_expr) => String::from(""),
+            Self::TypeCast(_type_cast_expr) => String::new(),
             Self::Case(_case_expr) => todo!(),
-            Self::Boolean(_boolean_expr) => String::from(""),
+            Self::Boolean(_boolean_expr) => String::new(),
             Self::NullTest(_null_test_expr) => todo!(),
             Self::SubLink(_sub_link_expr) => todo!(),
             Self::Coalesce(_coalesce_expr) => todo!(),
@@ -265,7 +270,7 @@ impl SemScalarExpr {
                 .get_implicit_cast(&ty, &PgBuiltInType::int8())
                 .is_none()
         {
-            context.report_problem(AnalysisProblem::array_index_type_missmatch(&self, &ty));
+            context.report_problem(AnalysisProblem::array_index_type_missmatch(self, &ty));
         }
     }
 }

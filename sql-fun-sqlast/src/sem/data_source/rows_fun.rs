@@ -37,6 +37,7 @@ impl DataSourceRowFunctions {
     }
 
     /// get alias name
+    #[must_use]
     pub fn get_aliases(&self) -> Vec<AliasSpec> {
         vec![self.alias.clone()]
     }
@@ -52,7 +53,7 @@ pub enum DataSourceRowsFromFunc {
 }
 
 impl DataSourceRowsFromFunc {
-    /// analyze FuncCall node in RangeFunction.functions
+    /// analyze `FuncCall` node in RangeFunction.functions
     pub fn analyze_func_call<TParseContext>(
         mut context: TParseContext,
         with_clause: &WithClause,

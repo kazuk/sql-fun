@@ -148,7 +148,7 @@ impl ResultColumnCollection {
             let Some(_col_name) = column.column_name() else {
                 AnalysisError::raise_unexpected_none("ResultColumn.column_name")?
             };
-            columns.push(column.create_column_definition())
+            columns.push(column.create_column_definition());
         }
         Ok(columns)
     }

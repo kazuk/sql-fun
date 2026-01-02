@@ -195,7 +195,7 @@ impl SearchPathRead for BaseContext {
 
 impl BaseParseContext for BaseContext {
     fn report_problem(&mut self, problem: AnalysisProblem) {
-        self.problems.push(problem)
+        self.problems.push(problem);
     }
 
     fn extend(&mut self, extension: Box<dyn BaseParseContext>) {

@@ -9,6 +9,11 @@ pub trait Opt<T> {
     }
 
     /// get inner value
+    ///
+    /// # Errors
+    ///
+    /// - `err` if item is None
+    ///
     fn ok_or_else<E, F>(&self, err: F) -> Result<T, E>
     where
         F: FnOnce() -> E,

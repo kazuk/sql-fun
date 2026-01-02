@@ -30,6 +30,7 @@ struct ValueEnumTemplate {
 
 #[derive(Template)]
 #[template(path = "kind_enum_template.j2", escape = "none")]
+#[expect(clippy::struct_field_names)]
 struct KindEnumTemplate {
     enum_module_name: String,
     enum_type_name: String,
@@ -52,8 +53,8 @@ impl EnumTypesCommand {
 
                 let enum_module_name = enum_type.module_name();
                 let enum_type_name = enum_type.enum_type_name();
-                let internal_enum_type_name = enum_type.internal_enum_type_name(0 as usize);
-                let internal_enum_field_name = enum_type.internal_enum_field_name(0 as usize);
+                let internal_enum_type_name = enum_type.internal_enum_type_name(0_usize);
+                let internal_enum_field_name = enum_type.internal_enum_field_name(0_usize);
 
                 let template = ValueEnumTemplate {
                     fields: enum_type.field().clone(),
@@ -64,7 +65,7 @@ impl EnumTypesCommand {
                 };
                 let enum_source = template.render()?;
 
-                println!("{}", enum_source);
+                println!("{enum_source}");
             }
         }
 
@@ -72,16 +73,16 @@ impl EnumTypesCommand {
 
         for enum_type in enum_types {
             let enum_type: EnumType = serde_json::from_str(&enum_type)?;
-            let enum_module_name = enum_type.module_name().to_string();
-            let enum_type_name = enum_type.enum_type_name().to_string();
+            let enum_module_name = enum_type.module_name().clone();
+            let enum_type_name = enum_type.enum_type_name().clone();
             let template = KindEnumTemplate {
-                enum_type,
                 enum_module_name,
                 enum_type_name,
+                enum_type,
             };
             let enum_source = template.render()?;
 
-            println!("{}", enum_source);
+            println!("{enum_source}");
         }
 
         Ok(())
@@ -123,7 +124,7 @@ impl StructTypesCommand {
                 let source = getter_template.render()?;
                 struct_source.push_str(&source);
 
-                println!("{}", struct_source)
+                println!("{struct_source}");
             }
         }
         Ok(())

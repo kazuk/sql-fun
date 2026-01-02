@@ -26,7 +26,7 @@ pub enum ParseDumpFileError {
     ///
     /// # Note
     ///
-    /// Semantic analysis normaly continues semantic error and reports to [crate::sem::ParseContext].
+    /// Semantic analysis normaly continues semantic error and reports to [`crate::sem::ParseContext`].
     ///
     /// Semantic Analysis Error indicates Analyzer Bug.(Unexpected syntax AST structure)
     ///
@@ -35,6 +35,11 @@ pub enum ParseDumpFileError {
 }
 
 /// load schema dump file
+///
+/// # Errors
+///
+/// - [`ParseDumpFileError`]
+///
 pub fn parse_schema_file<TContext>(
     dump_file: &Path,
     input_context: TContext,
@@ -52,7 +57,7 @@ where
         let syn = parse(statement)?;
         let AstAndContextPair(sem, rcontext) = semantic_analysis(context, syn)?;
         sem_results.push(sem);
-        context = rcontext
+        context = rcontext;
     }
     Ok(ParsedSchemaDump(sem_results, context))
 }
@@ -194,6 +199,6 @@ where
     }
 
     fn set_statement_span(&mut self, statement_span: StringSpan) {
-        self.1.set_statement_span(statement_span)
+        self.1.set_statement_span(statement_span);
     }
 }

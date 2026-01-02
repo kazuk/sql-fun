@@ -43,9 +43,10 @@ pub enum AnalysisError {
 }
 
 impl AnalysisError {
-    /// raises UnexpectedNone
+    /// raises `UnexpectedNone`
     #[deprecated = "use raise_unexpected_none"]
     #[track_caller]
+    #[must_use]
     pub fn unexpected_none(message: &str) -> Self {
         #[cfg(test)]
         panic!("unexpected none {message}");
@@ -54,14 +55,15 @@ impl AnalysisError {
         AnalysisError::UnexpectedNone(String::from(message))
     }
 
-    /// raise UnexpectedNone error
+    /// raise `UnexpectedNone` error
     pub fn raise_unexpected_none<T>(message: &str) -> Result<T, Self> {
         Err(AnalysisError::UnexpectedNone(String::from(message)))
     }
 
-    /// raise UnexpectedInput error
+    /// raise `UnexpectedInput` error
     #[deprecated = "use raise_unexpected_input"]
     #[track_caller]
+    #[must_use]
     pub fn unexpected_input(message: &str) -> Self {
         #[cfg(test)]
         panic!("unexpected input {message}");
@@ -70,7 +72,7 @@ impl AnalysisError {
         AnalysisError::UnexpectedInput(String::from(message))
     }
 
-    /// raise UnexpectedInput error
+    /// raise `UnexpectedInput` error
     #[track_caller]
     pub fn raise_unexpected_input<T>(message: &str) -> Result<T, Self> {
         #[cfg(test)]
@@ -88,11 +90,12 @@ impl AnalysisError {
     #[expect(missing_docs)]
     #[deprecated]
     #[track_caller]
+    #[must_use]
     pub fn extension_schema_not_found(extension_name: &str) -> Self {
         Self::ExtensionSchemaNotFound(String::from(extension_name))
     }
 
-    /// wraps std::error::Error
+    /// wraps `std::error::Error`
     #[track_caller]
     pub fn generic_error<E: std::error::Error + 'static + Send>(error: E) -> Self {
         #[cfg(test)]
@@ -104,6 +107,7 @@ impl AnalysisError {
 
     /// inconsistent type reference
     #[track_caller]
+    #[must_use]
     pub fn type_canonicalize_failed(_expr_type: &TypeReference) -> Self {
         todo!()
     }
@@ -111,6 +115,7 @@ impl AnalysisError {
     #[expect(missing_docs)]
     #[deprecated]
     #[track_caller]
+    #[must_use]
     pub fn alter_table_not_found(_table_name: &TableName) -> Self {
         todo!()
     }
@@ -118,6 +123,7 @@ impl AnalysisError {
     #[expect(missing_docs)]
     #[deprecated]
     #[track_caller]
+    #[must_use]
     pub fn alter_view_not_found(_view_name: &ViewName) -> Self {
         todo!()
     }
@@ -125,6 +131,7 @@ impl AnalysisError {
     #[expect(missing_docs)]
     #[deprecated]
     #[track_caller]
+    #[must_use]
     pub fn alter_seq_not_found(_seq_name: &FullName) -> Self {
         todo!()
     }

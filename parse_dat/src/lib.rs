@@ -46,6 +46,11 @@ pub enum ParseDatError {
 }
 
 impl ParseDatArgs {
+    /// Parse the input file and optionally write JSON output.
+    ///
+    /// # Errors
+    ///
+    /// Returns [`ParseDatError`] when reading, parsing, or writing the data fails.
     pub fn run(&self) -> Result<(), ParseDatError> {
         // parse and collect detailed errors
         let content = fs::read_to_string(&self.input_file)?;
@@ -73,12 +78,16 @@ impl ParseDatArgs {
                 self.input_file.display()
             )));
         }
-        let value = result.output().unwrap();
+        let Some(value) = result.output() else {
+            return Err(ParseDatError::Parse(String::from(
+                "parser produced no output",
+            )));
+        };
         let output = serde_json::to_string_pretty(&value)?;
         if let Some(outfile) = &self.output_file {
             fs::write(outfile, output)?;
         } else {
-            print!("{}", output);
+            print!("{output}");
         }
         Ok(())
     }
@@ -94,9 +103,7 @@ fn just_ws<'a>(expect: char) -> impl Parser<'a, &'a str, char, extra::Err<Rich<'
     ws().ignore_then(just(expect)).then_ignore(ws())
 }
 
-fn just_ws_str<'a>(
-    expect: &'a str,
-) -> impl Parser<'a, &'a str, &'a str, extra::Err<Rich<'a, char>>> {
+fn just_ws_str(expect: &str) -> impl Parser<'_, &str, &str, extra::Err<Rich<'_, char>>> {
     ws().ignore_then(just(expect).labelled("expect"))
         .then_ignore(ws())
 }

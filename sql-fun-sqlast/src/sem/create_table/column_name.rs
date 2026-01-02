@@ -6,11 +6,13 @@ pub struct ColumnName(String);
 
 impl ColumnName {
     /// create from string
+    #[must_use]
     pub fn new(name: &str) -> Self {
         Self(String::from(name))
     }
 
     /// get as &str
+    #[must_use]
     pub fn as_str(&self) -> &str {
         self.0.as_str()
     }

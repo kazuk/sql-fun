@@ -5,7 +5,7 @@ use crate::{
     syn::ListOpt,
 };
 
-/// key of DefElem
+/// key of `DefElem`
 #[derive(Debug, Clone, Eq, PartialEq, Hash)]
 pub struct DefElemKey {
     namespace: String,
@@ -20,7 +20,8 @@ impl DefElemKey {
         }
     }
 
-    /// strict DefElem name
+    /// strict `DefElem` name
+    #[must_use]
     pub fn strict() -> Self {
         Self::new("", "strict")
     }
@@ -32,23 +33,25 @@ impl From<&crate::syn::DefElem> for DefElemKey {
     }
 }
 
-/// hash map of DefElem
+/// hash map of `DefElem`
 #[derive(Debug, Clone, Default)]
 pub struct DefElemList(HashMap<DefElemKey, crate::syn::Node>);
 
 impl DefElemList {
     /// test key exists
+    #[must_use]
     pub fn contains(&self, key: &DefElemKey) -> bool {
         self.0.contains_key(key)
     }
 
     /// get key value
+    #[must_use]
     pub fn get(&self, key: &DefElemKey) -> Option<&crate::syn::Node> {
         self.0.get(key)
     }
 }
 
-/// analyze [crate::syn::NodeListOpt] as [DefElemList]
+/// analyze [`crate::syn::NodeListOpt`] as [`DefElemList`]
 pub fn analyze_def_elem_list<TParseContext>(
     mut context: TParseContext,
     syn: crate::syn::NodeListOpt,

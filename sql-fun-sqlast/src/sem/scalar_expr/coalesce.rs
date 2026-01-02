@@ -53,7 +53,7 @@ where
             if let Some(fnn) = &first_non_null {
                 context.report_problem(AnalysisProblem::unreachable_coalesce_argument(
                     &arg_expr, fnn,
-                ))
+                ));
             } else if let Some(nn) = &arg_expr.is_not_null()
                 && *nn
             {
@@ -114,8 +114,8 @@ where
                             final_candiates.insert(candiate1.clone());
                         }
                     } else {
-                        AnalysisError::raise_unexpected_none("cast candiate lookup")?
-                    };
+                        AnalysisError::raise_unexpected_none("cast candiate lookup")?;
+                    }
                 }
             }
             let choose = final_candiates.iter().next();

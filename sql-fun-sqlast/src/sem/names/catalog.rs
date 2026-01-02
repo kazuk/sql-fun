@@ -7,10 +7,12 @@ pub struct CatalogName(String);
 
 impl CatalogName {
     /// create from string
+    #[must_use]
     pub fn from(value: &str) -> Self {
         Self(value.to_string())
     }
     /// convert to string
+    #[must_use]
     pub fn as_str(&self) -> &str {
         &self.0
     }

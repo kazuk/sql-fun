@@ -11,7 +11,7 @@ pub struct CompositeFieldCollection(Vec<CompositeFieldDefinition>);
 
 impl CompositeFieldCollection {
     pub fn push(&mut self, item: CompositeFieldDefinition) {
-        self.0.push(item)
+        self.0.push(item);
     }
 
     /// get a table column collection
@@ -19,7 +19,7 @@ impl CompositeFieldCollection {
         let mut columns = Vec::new();
         for field in &self.0 {
             let col_def = ColumnDefinition::new(
-                &Some(ColumnName::from(field.name.to_string())),
+                &Some(ColumnName::from(field.name.clone())),
                 field.field_type.as_ref(),
                 field.is_not_null,
             );
@@ -34,7 +34,7 @@ impl CompositeFieldCollection {
     }
 }
 
-/// analyzed [crate::syn::CompositeTypeStmt]
+/// analyzed [`crate::syn::CompositeTypeStmt`]
 #[derive(Debug, Clone, Eq, Hash, PartialEq, serde::Serialize, serde::Deserialize)]
 pub struct CreateCompositType {
     type_ref: Option<TypeReference>,
@@ -45,6 +45,7 @@ impl CreateCompositType {
     /// name of composite type,
     ///
     /// When instanse is dynamic type and no-name , returns None
+    #[must_use]
     pub fn name(&self) -> Option<&FullName> {
         self.type_ref.as_ref().map(|f| f.full_name())
     }
@@ -52,21 +53,25 @@ impl CreateCompositType {
     /// get concrete type reference
     ///
     /// When instance is dynamic type and no-named returns Name
+    #[must_use]
     pub fn type_ref(&self) -> &Option<TypeReference> {
         &self.type_ref
     }
 
     /// get a table column collection
+    #[must_use]
     pub fn get_column_collection(&self) -> ColumnCollection {
         self.fields.get_column_collection()
     }
 
     /// find member field by name
+    #[must_use]
     pub fn get_member(&self, member: &str) -> Option<&CompositeFieldDefinition> {
         self.fields.get_member(member)
     }
 
     /// create a dynamic composite type with field collection
+    #[must_use]
     pub fn from_fields(fields: &CompositeFieldCollection) -> Self {
         Self {
             type_ref: None,
@@ -123,7 +128,7 @@ impl TryFrom<&ColumnDef> for CompositeFieldDefinition {
     }
 }
 
-/// analyze [crate::syn::CompositeTypeStmt]
+/// analyze [`crate::syn::CompositeTypeStmt`]
 #[tracing::instrument(skip(context, _parent_schema, syn))]
 pub fn analyze_create_comp_type<TParseContext>(
     context: TParseContext,
@@ -141,7 +146,7 @@ where
     };
     let mut fields = CompositeFieldCollection::default();
     for coldef in coldeflist {
-        fields.push(CompositeFieldDefinition::try_from(&coldef)?)
+        fields.push(CompositeFieldDefinition::try_from(&coldef)?);
     }
 
     let name = FullName::try_from(typevar)?;

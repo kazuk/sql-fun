@@ -4,6 +4,7 @@ use std::{
     time::Duration,
 };
 
+use anyhow::Context;
 use sql_fun_core::{CliSubCommand, SqlFunArgs};
 use tokio::{
     io::{AsyncBufReadExt, AsyncRead, BufReader},
@@ -18,7 +19,7 @@ pub enum StdStream {
     Stderr(String),
 }
 
-/// runnable command wrapper for [CliSubCommand]
+/// runnable command wrapper for [`CliSubCommand`]
 pub struct RunableCommand {
     binary: PathBuf,
     sub_command: CliSubCommand,
@@ -39,10 +40,10 @@ impl TryFrom<&CliSubCommand> for RunableCommand {
 
         if binary_paths.is_empty() {
             anyhow::bail!("expected binary not found {}", binary_names.join(", "))
-        };
+        }
         if binary_paths.len() > 1 {
             anyhow::bail!("ambiguous binary found {binary_paths:?}")
-        };
+        }
 
         Ok(Self {
             binary: binary_paths[0].clone(),
@@ -56,8 +57,8 @@ impl RunableCommand {
     fn send_sigterm(child: &Child) -> Result<(), anyhow::Error> {
         use ::nix::unistd::Pid;
         use nix::sys::signal::Signal;
-        let pid = child.id().expect("child has pid") as i32;
-        nix::sys::signal::kill(Pid::from_raw(pid), Signal::SIGTERM)?;
+        let pid = Pid::from_raw(Self::pid_as_i32(child)?);
+        nix::sys::signal::kill(pid, Signal::SIGTERM)?;
         Ok(())
     }
 
@@ -81,11 +82,15 @@ impl RunableCommand {
     }
 
     /// execute binary
+    ///
+    /// # Errors
+    ///
+    /// Returns an error when spawning or waiting on the child process fails.
     pub async fn execute(&self, args: &SqlFunArgs) -> Result<ExitCode, anyhow::Error> {
         match &self.sub_command {
             CliSubCommand::External(external_args) => {
                 let exit_code = self.run_external(args, external_args).await?;
-                Ok(ExitCode::from(exit_code as u8))
+                Ok(ExitCode::from(u8::try_from(exit_code).unwrap_or(u8::MAX)))
             }
             CliSubCommand::Start(_daemon_control_args) => todo!(),
             CliSubCommand::Stop(_daemon_control_args) => todo!(),
@@ -99,7 +104,7 @@ impl RunableCommand {
     async fn run_external(
         &self,
         core_args: &SqlFunArgs,
-        args: &Vec<String>,
+        args: &[String],
     ) -> Result<i32, anyhow::Error> {
         let envs = core_args.environments()?;
         let mut child = Command::new(&self.binary)
@@ -125,8 +130,7 @@ impl RunableCommand {
         #[cfg(unix)]
         let mut term_sent = false;
         let timeout = Duration::from_secs(30);
-        use tokio::time::sleep;
-        let grace_timer = sleep(Duration::MAX);
+        let grace_timer = tokio::time::sleep(Duration::MAX);
         tokio::pin!(grace_timer);
         let status_result = loop {
             let stream_item = tokio::select! {
@@ -148,10 +152,10 @@ impl RunableCommand {
                 status = child.wait() => {
                     break status;
                 },
-                _ = sleep(timeout) => {
+                () = tokio::time::sleep(timeout) => {
                     #[cfg(unix)]
                     if !term_sent {
-                        let pid = child.id().expect("child has pid") as i32;
+                        let pid = Self::pid_as_i32(&child)?;
                         eprintln!("Timeout reached, sending SIGTERM {pid}");
                         Self::send_sigterm(&child)?;
                         grace_timer.as_mut().reset(tokio::time::Instant::now() + timeout);
@@ -162,13 +166,13 @@ impl RunableCommand {
                     child.start_kill()?;
                     continue;
                 },
-                _ = &mut grace_timer => {
+                () = &mut grace_timer => {
                     eprintln!("Terminating");
                     child.start_kill()?;
                     continue;
                 }
             };
-            stream_items.push(stream_item)
+            stream_items.push(stream_item);
         };
         if !stderr_eof {
             while stderr.read_line(&mut stderr_line_buf).await? != 0 {
@@ -197,5 +201,11 @@ impl RunableCommand {
             }
         });
         Ok(exit_code)
+    }
+
+    #[cfg(unix)]
+    fn pid_as_i32(child: &Child) -> Result<i32, anyhow::Error> {
+        let pid = child.id().context("child has pid")?;
+        i32::try_from(pid).context("pid does not fit into i32")
     }
 }

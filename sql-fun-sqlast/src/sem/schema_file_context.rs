@@ -160,7 +160,7 @@ where
     TBaseContext: BaseParseContext + std::fmt::Debug,
 {
     fn report_problem(&mut self, problem: AnalysisProblem) {
-        self.problems.push(problem)
+        self.problems.push(problem);
     }
 
     fn extend(&mut self, extension: Box<dyn BaseParseContext>) {
@@ -168,7 +168,7 @@ where
     }
 
     fn set_statement_span(&mut self, statement_span: StringSpan) {
-        self.statement_span = statement_span
+        self.statement_span = statement_span;
     }
 }
 

@@ -50,10 +50,10 @@ impl ArraySlice {
         array.require_array(context);
         if let Some(lower_index) = &lower {
             lower_index.fits_array_index(context);
-        };
+        }
         if let Some(upper_index) = &upper {
             upper_index.fits_array_index(context);
-        };
+        }
 
         IndirectionExpr::ArraySlice(Box::new(Self::new(array, lower, upper)))
     }

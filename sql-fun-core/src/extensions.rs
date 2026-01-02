@@ -9,13 +9,14 @@ pub use self::{
 
 use std::fmt::Display;
 
-/// Vesion text for PostgreSQL extensions
+/// Vesion text for `PostgreSQL` extensions
 #[derive(Debug, serde::Deserialize, serde::Serialize, Clone, PartialEq)]
 #[serde(transparent)]
 pub struct ExtensionVersion(String);
 
 impl ExtensionVersion {
     /// create instance
+    #[must_use]
     pub fn new(version: &str) -> Self {
         ExtensionVersion(version.to_string())
     }
@@ -26,8 +27,8 @@ impl TryFrom<&str> for ExtensionVersion {
 
     fn try_from(value: &str) -> Result<Self, Self::Error> {
         if value == "." || value == ".." || value.contains([':', '/', '\\']) {
-            ExtensionConfigError::invalid_extension_version(value)?
-        };
+            ExtensionConfigError::invalid_extension_version(value)?;
+        }
         Ok(Self(value.to_string()))
     }
 }

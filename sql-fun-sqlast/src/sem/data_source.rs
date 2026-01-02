@@ -140,6 +140,7 @@ impl DataSource {
     }
 
     /// get alias name for data sources
+    #[must_use]
     pub fn get_aliases(&self) -> Vec<AliasSpec> {
         let mut results = Vec::new();
         self.push_alias_names(&mut results);
@@ -147,6 +148,7 @@ impl DataSource {
     }
 
     /// resolve alias name to data source
+    #[must_use]
     pub fn resolve_alias(&self, name: &AliasName) -> Option<(&DataSource, Nullable)> {
         match self {
             Self::CteQuery(d) => d.resolve_alias(self, name),
@@ -184,13 +186,13 @@ impl DataSource {
             Self::Table(d) => d.get_aliases_for_column(column, context, &mut result),
             Self::View(d) => d.get_aliases_for_column(column, context, &mut result),
             Self::JoinExpr(d) => {
-                d.get_aliases_for_column(column, context, with_clause, &mut result)
+                d.get_aliases_for_column(column, context, with_clause, &mut result);
             }
             Self::SubQuery(d) => {
-                d.get_aliases_for_column(column, context, with_clause, &mut result)
+                d.get_aliases_for_column(column, context, with_clause, &mut result);
             }
             Self::CallTableFunc(d) => {
-                d.get_aliases_for_column(column, context, with_clause, &mut result)
+                d.get_aliases_for_column(column, context, with_clause, &mut result);
             }
             Self::UndefinedTableFunc(_) => {}
             Self::RangeTableSample() => todo!(),

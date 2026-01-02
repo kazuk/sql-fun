@@ -7,16 +7,19 @@ pub struct SchemaName(String);
 
 impl SchemaName {
     /// create from string
+    #[must_use]
     pub fn from(value: &str) -> Self {
         Self(value.to_string())
     }
 
     /// convert to string
+    #[must_use]
     pub fn as_str(&self) -> &str {
         &self.0
     }
 
     /// test schema is `pg_catalog`
+    #[must_use]
     pub fn is_pg_catalog(&self) -> bool {
         &self.0 == "pg_catalog"
     }

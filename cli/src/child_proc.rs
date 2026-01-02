@@ -4,6 +4,8 @@ use std::{
     time::Duration,
 };
 
+use anyhow::Context;
+
 #[cfg(unix)]
 use tokio::process::Child;
 use tokio::{
@@ -44,14 +46,14 @@ struct ChildProcess {
 
 impl ChildProcess {
     #[expect(dead_code)]
-    pub async fn start_new(
+    pub fn start_new(
         command: &str,
         args: &[&str],
-        envs: HashMap<String, String>,
+        envs: &HashMap<String, String>,
     ) -> Result<Self, anyhow::Error> {
         let mut child = Command::new(command)
             .env_clear()
-            .envs(&envs)
+            .envs(envs)
             .args(args)
             .stdout(Stdio::piped())
             .stderr(Stdio::piped())
@@ -69,7 +71,7 @@ impl ChildProcess {
             child,
             stdout,
             stderr,
-            stream_items: Default::default(),
+            stream_items: Vec::default(),
         })
     }
 
@@ -118,7 +120,7 @@ impl ChildProcess {
     {
         let mut results = Vec::new();
         while source.reader.read_line(&mut source.line_buffer).await? != 0 {
-            results.push(source.line_buffer.to_string());
+            results.push(source.line_buffer.clone());
             source.line_buffer.clear();
         }
         Ok(results)
@@ -153,10 +155,10 @@ impl ChildProcess {
                 status = self.child.wait() => {
                     break status;
                 },
-                _ = sleep(timeout) => {
+                () = sleep(timeout) => {
                     #[cfg(unix)]
                     if !term_sent {
-                        let pid = self.child.id().expect("child has pid") as i32;
+                        let pid = Self::pid_as_i32(&self.child)?;
                         eprintln!("Timeout reached, sending SIGTERM {pid}");
                         Self::send_sigterm(&self.child)?;
                         grace_timer.as_mut().reset(tokio::time::Instant::now() + timeout);
@@ -167,13 +169,13 @@ impl ChildProcess {
                     self.child.start_kill()?;
                     continue;
                 },
-                _ = &mut grace_timer => {
+                () = &mut grace_timer => {
                     eprintln!("Terminating");
                     self.child.start_kill()?;
                     continue;
                 }
             };
-            self.stream_items.push(stream_item)
+            self.stream_items.push(stream_item);
         };
         self.read_to_eof().await?;
         Ok(status_result?)
@@ -197,8 +199,14 @@ impl ChildProcess {
     fn send_sigterm(child: &Child) -> Result<(), anyhow::Error> {
         use ::nix::unistd::Pid;
         use nix::sys::signal::Signal;
-        let pid = child.id().expect("child has pid") as i32;
-        nix::sys::signal::kill(Pid::from_raw(pid), Signal::SIGTERM)?;
+        let pid = Pid::from_raw(Self::pid_as_i32(child)?);
+        nix::sys::signal::kill(pid, Signal::SIGTERM)?;
         Ok(())
+    }
+
+    #[cfg(unix)]
+    fn pid_as_i32(child: &Child) -> Result<i32, anyhow::Error> {
+        let pid = child.id().context("child has pid")?;
+        i32::try_from(pid).context("pid does not fit into i32")
     }
 }

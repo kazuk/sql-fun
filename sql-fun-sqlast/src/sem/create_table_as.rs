@@ -5,7 +5,7 @@ use crate::{
 
 use super::{AlterView, AnalysisError, CreateTable, FullName, ParseContext, SemAst, TableName};
 
-/// analyzed [crate::syn::CreateTableAsStmt]
+/// analyzed [`crate::syn::CreateTableAsStmt`]
 #[derive(Debug, Clone)]
 pub struct CreateTableAs {
     name: FullName,
@@ -18,11 +18,13 @@ pub struct CreateTableAs {
 
 impl CreateTableAs {
     /// object name
+    #[must_use]
     pub fn name(&self) -> &FullName {
         &self.name
     }
 
     /// object type
+    #[must_use]
     pub fn obj_type(&self) -> ObjectType {
         self.obj_type
     }
@@ -32,9 +34,7 @@ impl CreateTableAs {
 
         for cmd in alter_view.commands() {
             match cmd {
-                AlterObjSubCommand::ChangeOwner(new_owner) => {
-                    self.owner = Some(new_owner.to_string())
-                }
+                AlterObjSubCommand::ChangeOwner(new_owner) => self.owner = Some(new_owner.clone()),
                 _ => todo!(),
             }
         }
@@ -54,7 +54,7 @@ impl CreateTableAs {
     }
 }
 
-/// analyze [crate::syn::CreateTableAsStmt]
+/// analyze [`crate::syn::CreateTableAsStmt`]
 #[tracing::instrument(skip_all)]
 pub fn analyze_create_table_as<TParseContext>(
     context: TParseContext,

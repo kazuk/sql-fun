@@ -11,6 +11,7 @@ use crate::sem::{
 pub use self::{name_resolution::NameResolution, overload_resolution::OverloadResolution};
 
 /// Semantic analysis problems
+#[allow(clippy::large_enum_variant)]
 #[derive(Debug, Clone)]
 pub enum AnalysisProblem {
     /// Name resolution problems

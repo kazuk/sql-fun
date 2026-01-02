@@ -17,7 +17,7 @@ pub enum SortOrder {
     Desc,
 }
 
-/// IndexElement has column or expression
+/// `IndexElement` has column or expression
 #[derive(Debug, Clone)]
 pub enum IndexElement {
     /// column valiant
@@ -38,7 +38,7 @@ impl From<&SemScalarExpr> for IndexElement {
     }
 }
 
-/// combine column and sort order , col_name
+/// combine column and sort order , `col_name`
 #[expect(dead_code)]
 #[derive(Debug, Clone)]
 pub struct IndexElementWithOrder {
@@ -49,6 +49,7 @@ pub struct IndexElementWithOrder {
 
 impl IndexElementWithOrder {
     /// create instance
+    #[must_use]
     pub fn new(element: &IndexElement, order: SortOrder, col_name: &Option<String>) -> Self {
         Self {
             element: element.clone(),
@@ -79,7 +80,7 @@ impl IndexElementCollection {
     }
 }
 
-/// analyzed [crate::syn::IndexStmt]
+/// analyzed [`crate::syn::IndexStmt`]
 #[expect(dead_code)]
 #[derive(Debug, Clone)]
 pub struct CreateIndex {
@@ -92,6 +93,7 @@ pub struct CreateIndex {
 
 impl CreateIndex {
     /// create a instance
+    #[must_use]
     pub fn new(name: &str, table: &TableName, key_columns: &IndexElementCollection) -> Self {
         Self {
             name: name.to_string(),
@@ -102,7 +104,8 @@ impl CreateIndex {
         }
     }
 
-    /// create with include_columns
+    /// create with `include_columns`
+    #[must_use]
     pub fn new_with_include_column(
         name: &str,
         table: &TableName,
@@ -119,6 +122,7 @@ impl CreateIndex {
     }
 
     /// get index name
+    #[must_use]
     pub fn name(&self) -> &str {
         &self.name
     }
@@ -175,7 +179,7 @@ impl CreateIndex {
     }
 }
 
-/// analyze [crate::syn::IndexStmt]
+/// analyze [`crate::syn::IndexStmt`]
 pub fn analyze_index_stmt<TParseContext>(
     mut context: TParseContext,
     _parent_schema: &Option<String>,

@@ -40,7 +40,7 @@ where
             let (sem_elm, new_context) =
                 analyze_scaler_expr(context, with_clause, from_clause, element)?;
             context = new_context;
-            exprs.push(sem_elm)
+            exprs.push(sem_elm);
         }
 
         Ok((SemScalarExpr::Array(Self(exprs)), context))

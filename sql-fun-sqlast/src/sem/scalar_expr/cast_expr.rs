@@ -17,6 +17,7 @@ pub struct ImplicitCastExpr {
 
 impl ImplicitCastExpr {
     /// create a implicit cast expression
+    #[must_use]
     pub fn new(value: &SemScalarExpr, cast_target: &TypeReference) -> Self {
         Self {
             value: Box::new(value.clone()),

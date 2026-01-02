@@ -11,6 +11,7 @@ mod result_column;
 pub use self::result_column::ResultColumnCollection;
 
 /// select statement
+#[allow(clippy::large_enum_variant)]
 #[derive(Debug, Clone, Eq, Hash, PartialEq, serde::Serialize, serde::Deserialize)]
 pub enum SelectStatement {
     /// simple query
@@ -25,26 +26,31 @@ pub enum SelectStatement {
 
 impl SelectStatement {
     /// create a simple select query node
+    #[must_use]
     pub fn simple(node: &SelectStatementNode) -> Self {
         Self::Simple(node.clone())
     }
 
     /// create a union node
+    #[must_use]
     pub fn union(left: SelectStatement, right: SelectStatement) -> Self {
         Self::Union(Box::new(left), Box::new(right))
     }
 
     /// create a intersect node
+    #[must_use]
     pub fn intersect(left: SelectStatement, right: SelectStatement) -> Self {
         Self::Intersect(Box::new(left), Box::new(right))
     }
 
     /// create except node
+    #[must_use]
     pub fn except(left: SelectStatement, right: SelectStatement) -> Self {
         Self::Except(Box::new(left), Box::new(right))
     }
 
     /// get column definition by name
+    #[must_use]
     pub fn get_result_column_def(&self, column: &ColumnName) -> Option<ColumnDefinition> {
         match self {
             Self::Simple(query) => query.get_result_column_def(column),
@@ -55,6 +61,7 @@ impl SelectStatement {
     }
 
     /// check column existing
+    #[must_use]
     pub fn has_column(&self, column: &ColumnName) -> bool {
         match self {
             Self::Simple(query) => query.has_column(column),
@@ -65,12 +72,13 @@ impl SelectStatement {
     }
 
     /// enumerate result set columns
+    #[must_use]
     pub fn result_columns(&self) -> &ResultColumnCollection {
         match self {
             Self::Simple(query) => &query.result_columns,
-            Self::Union(l, _r) => &l.result_columns(),
-            Self::Intersect(l, _r) => &l.result_columns(),
-            Self::Except(l, _r) => &l.result_columns(),
+            Self::Union(l, _r) => l.result_columns(),
+            Self::Intersect(l, _r) => l.result_columns(),
+            Self::Except(l, _r) => l.result_columns(),
         }
     }
 
@@ -131,7 +139,7 @@ impl SelectStatementNode {
     }
 }
 
-/// analyze [crate::syn::SelectStmt]
+/// analyze [`crate::syn::SelectStmt`]
 pub fn analyze_select<TParseContext>(
     context: TParseContext,
     syn: crate::syn::SelectStmt,
@@ -218,7 +226,7 @@ where
     ))
 }
 
-/// analyze [crate::syn::SelectStmt]
+/// analyze [`crate::syn::SelectStmt`]
 pub fn analyze_select_node<TParseContext>(
     mut context: TParseContext,
     syn: crate::syn::SelectStmt,

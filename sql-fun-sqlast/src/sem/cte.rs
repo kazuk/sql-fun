@@ -108,7 +108,7 @@ impl CteStatement {
     }
 }
 
-/// analyzed [crate::syn::WithClauseOpt]
+/// analyzed [`crate::syn::WithClauseOpt`]
 #[derive(Debug, Clone, Default, Eq, PartialEq, serde::Serialize, serde::Deserialize)]
 pub struct WithClause(HashMap<CteName, CteStatement>);
 
@@ -123,16 +123,17 @@ impl std::hash::Hash for WithClause {
 
 impl WithClause {
     /// get CTE query by name
+    #[must_use]
     pub fn get(&self, name: &CteName) -> Option<&CteStatement> {
         self.0.get(name)
     }
 
     /// insert named CTE item
     pub fn insert(&mut self, name: &CteName, statement: CteStatement) {
-        self.0.insert(name.to_string(), statement);
+        self.0.insert(name.clone(), statement);
     }
 
-    /// analyze [crate::syn::WithClauseOpt]
+    /// analyze [`crate::syn::WithClauseOpt`]
     pub fn analyze<TParseContext>(
         mut context: TParseContext,
         syn: crate::syn::WithClauseOpt,

@@ -1,25 +1,38 @@
-use std::path::PathBuf;
+use std::path::{Path, PathBuf};
 
 use crate::SqlFunArgsError;
 
 impl super::SqlFunArgs {
     /// gets metadata format value in args
+    #[must_use]
     pub fn metadata_format(&self) -> &str {
         self.metadata_args.metadata_format()
     }
 
     /// return raw value for `--metadata-file`
+    ///
+    /// # Errors
+    ///
+    /// Returns [`SqlFunArgsError::NotSupported`] if the metadata format is not `TOML`.
     pub fn metadata_file_raw(&self) -> Result<&str, SqlFunArgsError> {
         self.metadata_args.metadata_file_raw()
     }
 
     /// search metadata file with same-owner policy
+    ///
+    /// # Errors
+    ///
+    /// Propagates errors when current directory or metadata path resolution fails.
     pub fn metadata_file(&self) -> Result<PathBuf, SqlFunArgsError> {
         self.metadata_args.metadata_file()
     }
 
     /// get schema file
-    pub fn schema_file(&self, metadata_file: &PathBuf) -> Result<PathBuf, SqlFunArgsError> {
+    ///
+    /// # Errors
+    ///
+    /// Returns [`SqlFunArgsError::FilePathNotFound`] when the schema file is missing.
+    pub fn schema_file(&self, metadata_file: &Path) -> Result<PathBuf, SqlFunArgsError> {
         self.metadata_args.schema_file(metadata_file)
     }
 }

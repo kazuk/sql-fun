@@ -55,8 +55,8 @@ where
 pub trait OperatorInfoRead {
     /// get operator definition,
     ///
-    /// has_left, has_right both true then returns Binary operator.
-    /// one of has_left, has_right is ture then returns Left unary or Right unary operator.
+    /// `has_left`, `has_right` both true then returns Binary operator.
+    /// one of `has_left`, `has_right` is ture then returns Left unary or Right unary operator.
     ///
     fn get_operator_op(
         &self,
@@ -84,9 +84,9 @@ pub trait SearchPathRead {
 
 /// schema information database
 ///
-/// BaseParseContext is a Immutable view of schema information,
+/// `BaseParseContext` is a Immutable view of schema information,
 ///
-/// [ParseContext] presents mutate functions.
+/// [`ParseContext`] presents mutate functions.
 ///
 pub trait BaseParseContext:
     CastInfoRead

@@ -14,7 +14,7 @@ impl ViewDataSource {
     }
 
     pub(super) fn push_alias_names(&self, names: &mut Vec<AliasSpec>) {
-        names.push(self.alias.clone())
+        names.push(self.alias.clone());
     }
 
     pub(super) fn resolve_alias<'a>(
@@ -40,7 +40,7 @@ impl ViewDataSource {
         if let Some(view) = context.get_view(&self.view)
             && view.has_column(column)
         {
-            names.push(self.alias.clone())
+            names.push(self.alias.clone());
         }
     }
 

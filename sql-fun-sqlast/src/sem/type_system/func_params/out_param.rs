@@ -12,8 +12,9 @@ use super::{FunctionParam, FunctionParameterTrait, ParameterBindResult};
 
 impl FunctionParam {
     /// create new output parameter instance
+    #[must_use]
     pub fn new_output_param(name: &Option<String>, param_type: &Option<TypeReference>) -> Self {
-        Self::Out(FunctionParamOut::new(name, param_type))
+        Self::Out(FunctionParamOut::new(name.as_ref(), param_type.as_ref()))
     }
 }
 
@@ -43,10 +44,10 @@ pub struct FunctionParamOut {
 }
 
 impl FunctionParamOut {
-    pub fn new(name: &Option<String>, param_type: &Option<TypeReference>) -> Self {
+    pub fn new(name: Option<&String>, param_type: Option<&TypeReference>) -> Self {
         Self {
-            name: name.clone(),
-            param_type: param_type.clone(),
+            name: name.cloned(),
+            param_type: param_type.cloned(),
         }
     }
 
@@ -83,12 +84,12 @@ impl std::fmt::Display for FunctionParamOut {
 }
 
 impl FunctionParameterTrait for FunctionParamOut {
-    fn name(&self) -> &Option<String> {
-        &self.name
+    fn name(&self) -> Option<&String> {
+        self.name.as_ref()
     }
 
-    fn param_type(&self) -> &Option<TypeReference> {
-        &self.param_type
+    fn param_type(&self) -> Option<&TypeReference> {
+        self.param_type.as_ref()
     }
 
     fn default_expr(&self) -> Option<&SemScalarExpr> {
@@ -132,13 +133,13 @@ impl FunctionParameterTrait for FunctionParamOut {
 
     fn apply_simple_infer_result(&mut self, simple_infer_result: &TypeReference) {
         if let Some(ty) = self.param_type.as_mut() {
-            ty.apply_simple_infer_result(simple_infer_result)
+            ty.apply_simple_infer_result(simple_infer_result);
         }
     }
 
     fn apply_common_infer_result(&mut self, common_infer_result: &TypeReference) {
         if let Some(ty) = self.param_type.as_mut() {
-            ty.apply_common_infer_result(common_infer_result)
+            ty.apply_common_infer_result(common_infer_result);
         }
     }
 }

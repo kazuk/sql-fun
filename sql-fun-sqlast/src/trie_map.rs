@@ -46,6 +46,7 @@ impl<TValue> Default for TrieMap<TValue> {
 
 impl<TValue> TrieMap<TValue> {
     /// create a empty instance
+    #[must_use]
     pub fn new() -> Self {
         Self {
             empty_node: None,
@@ -61,7 +62,7 @@ impl<TValue> TrieMap<TValue> {
         let key = KeyFragment::from(key.as_bytes());
         let start_byte = key.start_byte();
         if let Some(match_node) = self.nodes.find_by_start_byte_mut(start_byte) {
-            match_node.insert(key, value)
+            match_node.insert(&key, value)
         } else {
             let new_node = TrieNode::new(key, value);
             self.nodes.insert(new_node);
@@ -84,14 +85,14 @@ impl<TValue> TrieMap<TValue> {
         }
         let mut frag = KeyFragment::from(key.as_bytes());
         let mut node = self.nodes.find_by_fragment(&frag)?;
-        frag = node.split_key(frag)?;
+        frag = node.split_key(&frag)?;
         if frag.is_empty() {
             return node.value.as_ref();
         }
 
         loop {
             node = node.children.find_by_fragment(&frag)?;
-            frag = node.split_key(frag)?;
+            frag = node.split_key(&frag)?;
             if frag.is_empty() {
                 return node.value.as_ref();
             }
@@ -105,14 +106,14 @@ impl<TValue> TrieMap<TValue> {
         }
         let mut frag = KeyFragment::from(key.as_bytes());
         let mut node = self.nodes.find_by_fragment_mut(&frag)?;
-        frag = node.split_key(frag)?;
+        frag = node.split_key(&frag)?;
         if frag.is_empty() {
             return node.value.as_mut();
         }
 
         loop {
             node = node.children.find_by_fragment_mut(&frag)?;
-            frag = node.split_key(frag)?;
+            frag = node.split_key(&frag)?;
             if frag.is_empty() {
                 return node.value.as_mut();
             }
@@ -144,7 +145,7 @@ impl<'a, TValue> Iterator for TrieMapIter<'a, TValue> {
 
     fn next(&mut self) -> Option<Self::Item> {
         if let Some(empty_node) = self.empty_node.take() {
-            return Some((String::from(""), empty_node));
+            return Some((String::new(), empty_node));
         }
         let (fragments, item) = self.leaf_iter.next()?;
 

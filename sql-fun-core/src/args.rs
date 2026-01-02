@@ -65,21 +65,31 @@ pub struct SqlFunArgs {
 
 impl SqlFunArgs {
     /// returns true for builtin subcommand
+    #[must_use]
     pub fn is_builtin(&self) -> bool {
         matches!(self.command, CliSubCommand::Initialize(_))
     }
 
-    /// get CliSubCommand
+    /// get [`CliSubCommand`]
+    #[must_use]
     pub fn cli_sub_command(&self) -> &CliSubCommand {
         &self.command
     }
 
     /// get SQL dialect
+    ///
+    /// # Errors
+    ///
+    /// Returns [`SqlFunArgsError`] when dialect resolution fails.
     pub fn sql_dialect(&self, metadata: &SqlFunMetadata) -> Result<SqlDialect, SqlFunArgsError> {
         self.metadata_args.sql_dialect(metadata)
     }
 
     /// get CTE catalog directory
+    ///
+    /// # Errors
+    ///
+    /// Propagates [`SqlFunArgsError`] from metadata lookups.
     pub fn cte_catalog_dir(
         &self,
         metadata: &SqlFunMetadata,
@@ -88,11 +98,16 @@ impl SqlFunArgs {
     }
 
     /// get command
+    #[must_use]
     pub fn command(&self) -> &CliSubCommand {
         &self.command
     }
 
-    /// get PostgreSQL version
+    /// get `PostgreSQL` version
+    ///
+    /// # Errors
+    ///
+    /// Returns [`SqlFunArgsError`] when the version cannot be determined.
     pub fn postgres_version(
         &self,
         metadata: &SqlFunMetadata,
@@ -100,7 +115,11 @@ impl SqlFunArgs {
         self.postgres_args.postgres_version(metadata)
     }
 
-    /// get PostgreSQL search path
+    /// get `PostgreSQL` search path
+    ///
+    /// # Errors
+    ///
+    /// Returns [`SqlFunArgsError`] when metadata retrieval fails.
     pub fn postgres_search_path(
         &self,
         metadata: &SqlFunMetadata,
@@ -109,6 +128,11 @@ impl SqlFunArgs {
     }
 
     /// get postgres extensions
+    ///
+    /// # Errors
+    ///
+    /// Propagates [`SqlFunArgsError`] if metadata lookup fails or the extension
+    /// configuration is invalid.
     pub fn postgres_extensions(
         &self,
         metadata: &SqlFunMetadata,
@@ -117,8 +141,12 @@ impl SqlFunArgs {
     }
 
     /// get builtin schema directory path
+    ///
+    /// # Errors
+    ///
+    /// Returns [`SqlFunArgsError`] if the builtin directory cannot be resolved.
     pub fn builtin_info_dir(&self, metadata: &SqlFunMetadata) -> Result<PathBuf, SqlFunArgsError> {
-        if let Some(arg) = &self.postgres_args.builtin_schema_dir() {
+        if let Some(arg) = self.postgres_args.builtin_schema_dir() {
             Ok(arg.clone())
         } else {
             let home = self.sql_fun_home()?;
@@ -128,11 +156,15 @@ impl SqlFunArgs {
     }
 
     /// set directory path of extensions
+    ///
+    /// # Errors
+    ///
+    /// Returns [`SqlFunArgsError`] when the path components cannot be derived.
     pub fn postgres_extensions_dir(
         &self,
         metadata: &SqlFunMetadata,
     ) -> Result<PathBuf, SqlFunArgsError> {
-        if let Some(ext_dir) = &self.postgres_args.postgres_extensions_dir() {
+        if let Some(ext_dir) = self.postgres_args.postgres_extensions_dir() {
             Ok(ext_dir.clone())
         } else {
             let home = self.sql_fun_home()?;
@@ -149,6 +181,11 @@ impl SqlFunArgs {
     const SQL_FUN_NO_BUILTIN: &str = "SQL_FUN_NO_BUILTIN";
 
     /// get environemnts for child process
+    ///
+    /// # Errors
+    ///
+    /// Returns [`SqlFunArgsError`] if metadata fails to load or env generation
+    /// encounters an error.
     pub fn environments(&self) -> Result<HashMap<String, String>, SqlFunArgsError> {
         let mut result = HashMap::new();
         let metadata_file = self.metadata_file()?;
@@ -156,19 +193,14 @@ impl SqlFunArgs {
 
         self.metadata_args.get_envs(&mut result, &metadata)?;
         self.postgres_args.get_envs(&mut result, self, &metadata)?;
-        self.log_args.get_envs(&mut result)?;
+        self.log_args.get_envs(&mut result);
 
-        insert_to_result(
-            &mut result,
-            Self::SQL_FUN_OUTPUT_FORMAT,
-            &self.output_format,
+        result.insert(
+            Self::SQL_FUN_OUTPUT_FORMAT.to_string(),
+            self.output_format.clone(),
         );
 
-        return Ok(result);
-
-        fn insert_to_result(result: &mut HashMap<String, String>, name: &str, value: &str) {
-            result.insert(name.to_string(), value.to_string());
-        }
+        Ok(result)
     }
 }
 
@@ -183,6 +215,7 @@ pub struct DaemonControlArgs {
 
 impl SqlFunArgs {
     /// Initialize and parse arguments
+    #[must_use]
     pub fn parse_args() -> Self {
         let mut args = SqlFunArgs::parse();
         if args.verbose {

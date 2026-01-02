@@ -31,6 +31,7 @@ mod implementation {
 
     impl FuncCallExpr {
         /// create a instance
+        #[must_use]
         pub fn new(
             func_name: &FullName,
             overload: &Option<OverloadVariant>,
@@ -44,11 +45,13 @@ mod implementation {
         }
 
         /// resolved calling overload
+        #[must_use]
         pub fn overload(&self) -> &Option<OverloadVariant> {
             &self.overload
         }
 
         /// argument expression and definitions
+        #[must_use]
         pub fn args(&self) -> &IVec<FuncCallArgs> {
             &self.args
         }
@@ -133,7 +136,7 @@ impl FuncCallExpr {
                 }
             }
 
-            args.push(FuncCallArgs::new(&arg, &arg_def.cloned()))
+            args.push(FuncCallArgs::new(&arg, &arg_def.cloned()));
         }
         Ok(args.into())
     }
@@ -187,7 +190,7 @@ where
             let (sem_arg, new_context) =
                 analyze_scaler_expr(context, with_clause, from_clause, arg)?;
             context = new_context;
-            arg_exprs.push(sem_arg)
+            arg_exprs.push(sem_arg);
         }
 
         if let Some(overloads) = context.get_function_by_name(&func_name) {

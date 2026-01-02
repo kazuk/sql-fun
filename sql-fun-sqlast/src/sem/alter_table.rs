@@ -105,7 +105,7 @@ fn analyze_alter_obj_column_default<TParseContext>(
 where
     TParseContext: ParseContext,
 {
-    let column_name = ColumnName::from(cmd.get_name().to_string());
+    let column_name = ColumnName::from(cmd.get_name().clone());
     let with_clause = WithClause::default();
     let from_clause = FromClause::default();
     let (expr, new_context) =
@@ -162,7 +162,7 @@ where
     TParseContext: ParseContext,
 {
     let sub_cmd = match subtyp {
-        AlterTableType::AtChangeOwner => analyze_alter_obj_change_owner(&mut context, cmd)?,
+        AlterTableType::AtChangeOwner => analyze_alter_obj_change_owner(&context, cmd)?,
         AlterTableType::AtColumnDefault => {
             let (column_default, new_context) = analyze_alter_obj_column_default(context, cmd)?;
             context = new_context;
@@ -350,7 +350,7 @@ where
     ))
 }
 
-/// analyze [crate::syn::AlterTableStmt]
+/// analyze [`crate::syn::AlterTableStmt`]
 #[tracing::instrument(skip(context, parent_schema, syn))]
 pub fn analyze_alter_statement<TParseContext>(
     context: TParseContext,

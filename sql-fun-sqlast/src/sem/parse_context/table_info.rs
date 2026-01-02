@@ -2,7 +2,7 @@ use crate::sem::{AlterTable, AnalysisError, CreateTable, FullName};
 
 /// get table definition
 pub trait TableInfoRead {
-    /// get `CREATE TABLE` statement by full_name
+    /// get `CREATE TABLE` statement by `full_name`
     fn get_table_impl(&self, key: &FullName) -> Option<&CreateTable>;
 }
 

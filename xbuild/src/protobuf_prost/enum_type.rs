@@ -10,11 +10,11 @@ pub struct EnumType {
     pub(crate) value: Vec<EnumTypeValue>,
 }
 impl EnumType {
-    /// module name for MessageType
+    /// module name for `MessageType`
     pub fn module_name(&self) -> String {
         self.name.to_case(Case::Snake)
     }
-    /// enum type name for MessageType
+    /// enum type name for `MessageType`
     pub fn enum_type_name(&self) -> String {
         self.name.to_case(Case::Pascal)
     }

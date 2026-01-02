@@ -18,7 +18,7 @@ fn binary_is_not_null(left: &SemScalarExpr, right: &SemScalarExpr) -> Option<boo
         if !l {
             Some(false)
         } else if let Some(r) = right.is_not_null() {
-            if !r { Some(false) } else { Some(true) }
+            if r { Some(true) } else { Some(false) }
         } else {
             None
         }

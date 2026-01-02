@@ -22,7 +22,7 @@ pub async fn initialize(
         }
     }
     let home_arg = init_args.sql_fun_home();
-    let _home = prepare_home(yes, home_arg)?;
+    let _home = prepare_home(yes, home_arg.as_ref())?;
 
     todo!();
 }

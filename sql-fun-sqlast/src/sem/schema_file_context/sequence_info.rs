@@ -49,7 +49,7 @@ where
         };
 
         seq.apply_alter(alter_seq)?;
-        self.sequences.insert(&seq_name, &seq);
+        self.sequences.insert(seq_name, &seq);
         Ok(self)
     }
 
@@ -58,7 +58,7 @@ where
         create_sequence: &CreateSequence,
     ) -> Result<Self, AnalysisError> {
         let name = create_sequence.name();
-        self.sequences.insert(&name, create_sequence);
+        self.sequences.insert(name, create_sequence);
         Ok(self)
     }
 }

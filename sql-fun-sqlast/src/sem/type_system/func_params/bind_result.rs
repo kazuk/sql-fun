@@ -18,12 +18,12 @@ pub enum ParameterBindResult {
 }
 
 impl ParameterBindResult {
-    pub fn one_in(param: &FunctionParamIn, arg: &Option<TypeReference>) -> Self {
-        Self::One(arg.clone(), FunctionParam::from(param))
+    pub fn one_in(param: &FunctionParamIn, arg: Option<&TypeReference>) -> Self {
+        Self::One(arg.cloned(), FunctionParam::from(param))
     }
 
-    pub fn one_in_out(param: &FunctionParamInOut, arg: &Option<TypeReference>) -> Self {
-        Self::One(arg.clone(), FunctionParam::from(param))
+    pub fn one_in_out(param: &FunctionParamInOut, arg: Option<&TypeReference>) -> Self {
+        Self::One(arg.cloned(), FunctionParam::from(param))
     }
 
     pub fn variadic(param: &FunctionParamVariadic, args: &IVec<Option<TypeReference>>) -> Self {
@@ -43,23 +43,36 @@ impl ParameterBindResult {
     }
 
     /// collect simple inference parameters
+    ///
+    /// # Errors
+    ///
+    /// Returns [`TypeError`] if inference fails.
     pub fn collect_simple(&self, context: &mut SimpleInferContext) -> Result<(), TypeError> {
         match self {
-            Self::One(_, fp) => fp.collect_simple(context, self),
-            Self::NoInputParam(fp) => fp.collect_simple(context, self),
-            Self::VariadicParam(_, fp) => fp.collect_simple(context, self),
+            Self::One(_, fp) | Self::NoInputParam(fp) | Self::VariadicParam(_, fp) => {
+                fp.collect_simple(context, self)
+            }
         }
     }
 
     /// collect common infer parameters
+    ///
+    /// # Errors
+    ///
+    /// Returns [`TypeError`] if inference fails.
     pub fn collect_common(&self, context: &mut CommonInferContext) -> Result<(), TypeError> {
         match self {
-            Self::One(_, fp) => fp.collect_common(context, self),
-            Self::NoInputParam(fp) => fp.collect_common(context, self),
-            Self::VariadicParam(_, fp) => fp.collect_common(context, self),
+            Self::One(_, fp) | Self::NoInputParam(fp) | Self::VariadicParam(_, fp) => {
+                fp.collect_common(context, self)
+            }
         }
     }
 
+    /// test castability score for the bound arguments
+    ///
+    /// # Errors
+    ///
+    /// Returns [`TypeError`] when implicit casts cannot be resolved.
     pub fn test_castability<TParseContext>(&self, context: &TParseContext) -> Result<i32, TypeError>
     where
         TParseContext: ParseContext,
@@ -77,7 +90,7 @@ mod test_parameter_bind_result {
     use sql_fun_core::IVec;
 
     use crate::sem::{
-        TypeReference,
+        SemScalarExpr, TypeReference,
         type_system::func_params::{
             in_out_param::FunctionParamInOut, in_param::FunctionParamIn,
             variadic_param::FunctionParamVariadic,
@@ -88,34 +101,32 @@ mod test_parameter_bind_result {
 
     #[test]
     fn test_one_in() {
-        let param = FunctionParamIn::new(
-            &Some(String::from("para")),
-            &Some(TypeReference::from_master_type_name("int4")),
-            &None,
-        );
+        let name = Some(String::from("para"));
+        let param_type = Some(TypeReference::from_master_type_name("int4"));
+        let default_expr: Option<SemScalarExpr> = None;
+        let param = FunctionParamIn::new(name.as_ref(), param_type.as_ref(), default_expr.as_ref());
         let arg = Some(TypeReference::from_master_type_name("int4"));
-        let bind = ParameterBindResult::one_in(&param, &arg);
+        let bind = ParameterBindResult::one_in(&param, arg.as_ref());
         assert!(matches!(bind, ParameterBindResult::One(_, _)))
     }
 
     #[test]
     fn test_one_in_out() {
-        let param = FunctionParamInOut::new(
-            &Some(String::from("para")),
-            &Some(TypeReference::from_master_type_name("int4")),
-            &None,
-        );
+        let name = Some(String::from("para"));
+        let param_type = Some(TypeReference::from_master_type_name("int4"));
+        let default_expr: Option<SemScalarExpr> = None;
+        let param =
+            FunctionParamInOut::new(name.as_ref(), param_type.as_ref(), default_expr.as_ref());
         let arg = Some(TypeReference::from_master_type_name("int4"));
-        let bind = ParameterBindResult::one_in_out(&param, &arg);
+        let bind = ParameterBindResult::one_in_out(&param, arg.as_ref());
         assert!(matches!(bind, ParameterBindResult::One(_, _)))
     }
 
     #[test]
     fn test_variadic() {
-        let param = FunctionParamVariadic::new(
-            &Some(String::from("para")),
-            &Some(TypeReference::from_master_type_name("int4")),
-        );
+        let name = Some(String::from("para"));
+        let param_type = Some(TypeReference::from_master_type_name("int4"));
+        let param = FunctionParamVariadic::new(name.as_ref(), param_type.as_ref());
         let args = vec![Some(TypeReference::from_master_type_name("int4"))];
         let bind = ParameterBindResult::variadic(&param, &IVec::from(args));
         assert!(matches!(bind, ParameterBindResult::VariadicParam(_, _)))

@@ -66,7 +66,7 @@ impl KeyFragment<'_> {
 #[derive(Debug)]
 pub(super) struct BoxedKeyFragment(Box<[u8]>);
 
-impl<'a> From<KeyFragment<'a>> for BoxedKeyFragment {
+impl From<KeyFragment<'_>> for BoxedKeyFragment {
     fn from(value: KeyFragment<'_>) -> Self {
         Self(value.0.to_vec().into_boxed_slice())
     }
@@ -77,7 +77,7 @@ impl BoxedKeyFragment {
         self.0[0]
     }
 
-    pub(super) fn as_ref<'a>(&'a self) -> KeyFragment<'a> {
+    pub(super) fn as_ref(&self) -> KeyFragment<'_> {
         KeyFragment::from(self.0.as_ref())
     }
 }

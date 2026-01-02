@@ -11,7 +11,8 @@ pub use self::{
 };
 
 impl TypeName {
-    /// convert TypeName to full_name string
+    /// convert `TypeName` to `full_name` string
+    #[must_use]
     pub fn full_name(&self) -> std::string::String {
         let Some(names) = self.get_names().as_inner() else {
             return std::string::String::from("");

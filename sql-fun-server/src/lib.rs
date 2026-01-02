@@ -13,6 +13,11 @@ pub struct Args {
     user: String,
 }
 
+/// Run the server event loop until interrupted.
+///
+/// # Errors
+///
+/// Returns [`ServerError`] when binding or accepting sockets fails.
 pub async fn service() -> Result<(), ServerError> {
     let args = Args::parse();
 
@@ -68,20 +73,19 @@ impl ReadableBuffer {
     fn fill_buff(&mut self) {
         if self.current_buffer.is_none() {
             self.inner_bufpos = 0;
-            self.current_buffer = self.buffer_rx.blocking_recv()
+            self.current_buffer = self.buffer_rx.blocking_recv();
         }
     }
 
     fn return_buff(&mut self) -> std::io::Result<()> {
-        let Some(bufflen) = self.current_buffer.as_ref().map(|v| v.len()) else {
+        let Some(bufflen) = self.current_buffer.as_ref().map(Vec::len) else {
             return Ok(());
         };
         if bufflen == self.inner_bufpos {
             let mut buffer = self.current_buffer.take().unwrap();
             buffer.clear();
-            match self.return_tx.blocking_send(buffer) {
-                Ok(_) => {}
-                Err(_) => Err(std::io::Error::other("sender closed"))?,
+            if self.return_tx.blocking_send(buffer).is_err() {
+                return Err(std::io::Error::other("sender closed"));
             }
             self.inner_bufpos = 0;
         }
@@ -118,7 +122,7 @@ impl PipeBuffer {
         byte: u8,
     ) -> Result<usize, std::io::Error> {
         let Some(mut buff) = self.return_rx.recv().await else {
-            return Err(std::io::Error::other("reciever closed"))?;
+            return Err(std::io::Error::other("receiver closed"))?;
         };
         buff.clear();
         let size = source.read_until(byte, &mut buff).await?;
@@ -126,7 +130,7 @@ impl PipeBuffer {
             self.buffer_tx
                 .send(buff)
                 .await
-                .map_err(|_| std::io::Error::other("No reciever"))?;
+                .map_err(|_| std::io::Error::other("No receiver"))?;
         }
         Ok(size)
     }

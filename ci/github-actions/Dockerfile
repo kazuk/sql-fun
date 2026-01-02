@@ -55,6 +55,18 @@ RUN apt-get update && apt-get install -y --no-install-recommends \
 RUN curl -fsSL https://sh.rustup.rs | sh -s -- -y --profile minimal --default-toolchain stable \
   && rustc -V && cargo -V
 RUN rustup component add rustfmt clippy
+RUN rustup component add llvm-tools-preview --toolchain stable-x86_64-unknown-linux-gnu
+
+# Node.js + npm (for installing Codex CLI)
+RUN apt-get update && apt-get install -y --no-install-recommends \
+    nodejs npm \
+  && rm -rf /var/lib/apt/lists/*
+
+# Codex CLI
+RUN npm i -g @openai/codex@latest \
+  && codex --version
+
 RUN git config --system --add safe.directory '*'
 
+RUN apt-get update && apt-get install -y autoconf automake libtool libtool-bin 
 COPY --from=builder /opt/tools/bin /usr/local/cargo/bin

@@ -68,5 +68,5 @@ RUN npm i -g @openai/codex@latest \
 
 RUN git config --system --add safe.directory '*'
 
-RUN apt-get update && apt-get install -y autoconf automake libtool libtool-bin 
+RUN apt-get update && apt-get install -y autoconf automake libtool libtool-bin bsdextrautils
 COPY --from=builder /opt/tools/bin /usr/local/cargo/bin

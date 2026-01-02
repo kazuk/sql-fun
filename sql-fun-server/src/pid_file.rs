@@ -46,7 +46,6 @@ impl PidFile {
 
     fn default_path(args: &Args) -> PathBuf {
         let mut pid_path = PathBuf::from("/tmp");
-
         pid_path.push(&args.user);
         pid_path.push("sql-fun-server.pid");
         pid_path

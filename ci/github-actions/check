@@ -1,0 +1,75 @@
+#!/bin/bash
+set -eu
+
+CLEAN_TARGET=0
+
+for a in "$@"; do
+    case "$a" in
+      --clean) CLEAN_TARGET=1 ;;
+    esac
+done
+
+# GIT_ROOT setup in our repostitory .envrc
+docker build \
+  ${GIT_ROOT}/ci/github-actions/. \
+  -t ci-builder:local
+
+if (( CLEAN_TARGET == 1 )); then
+    docker volume rm -f ci_target 2>/dev/null || true
+fi
+
+if docker volume inspect "user_home" >/dev/null 2>&1; then
+  echo "exists"
+else
+  docker volume create user_home
+  docker run --rm -t \
+    --user root \
+    -e HOST_UID="$(id -u)" \
+    -e HOST_GID="$(id -g)" \
+    --volume "user_home:/home:rw" \
+    ci-builder:local \
+    bash -lc '
+      uid="$HOST_UID"
+      gid="$HOST_GID"
+      mkdir -p /home/builder
+      chown -R $uid:$gid /home/builder
+      install -m 0644 -o "$uid" -g "$gid" /dev/stdin /home/builder/.bashrc <<'"'"'EOF'"'"'
+# minimal bashrc (container)
+# direnv hook
+if command -v direnv >/dev/null 2>&1; then
+  eval "$(direnv hook bash)"
+fi
+EOF
+    '
+fi
+
+if docker volume inspect "ci_target" >/dev/null 2>&1; then
+  echo "exists"
+else
+  docker volume create ci_target
+  docker run --rm -t \
+    --user root \
+    --volume "ci_target:/home/builder/workspace/target:rw" \
+    ci-builder:local \
+    bash -lc "chown -R $(id -u):$(id -g) /home/builder/workspace/target"
+fi
+
+docker_args=()
+if [[ -n "${OPENAI_API_KEY:-}" ]]; then
+  docker_args+=( -e "OPENAI_API_KEY=$OPENAI_API_KEY" )
+else
+  echo "Warning: OPENAI_API_KEY is not set; AI/LLM tasks are disabled."
+fi
+
+docker run --rm -it \
+  --user "$(id -u):$(id -g)" \
+  --volume "user_home:/home:rw" \
+  --volume "${GIT_ROOT}:/home/builder/workspace:rw" \
+  --volume "ci_target:/home/builder/workspace/target:rw" \
+  -e HOME=/home/builder \
+  -e CARGO_HOME=/home/builder/.cargo \
+  -e USER=builder \
+  -e GITHUB_TOKEN=$(gh auth token) \
+  "${docker_args[@]}" \
+  -w /home/builder/workspace \
+  ci-builder:local bash

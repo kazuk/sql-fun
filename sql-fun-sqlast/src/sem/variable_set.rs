@@ -27,6 +27,10 @@ impl VariableSet {
 }
 
 /// analyze `VariableSetStmt`
+///
+/// # Errors
+///
+/// Returns [`AnalysisError`] when the variable assignment is semantically invalid.
 pub fn analyze_variable_set<TParseContext>(
     mut context: TParseContext,
     syn: &crate::syn::VariableSetStmt,

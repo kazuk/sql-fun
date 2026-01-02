@@ -12,6 +12,15 @@ pub struct FunctionOverloadCollection {
     overloads: Vec<OverloadVariant>,
 }
 
+impl<'a> IntoIterator for &'a FunctionOverloadCollection {
+    type Item = &'a OverloadVariant;
+    type IntoIter = std::slice::Iter<'a, OverloadVariant>;
+
+    fn into_iter(self) -> Self::IntoIter {
+        self.iter()
+    }
+}
+
 impl FunctionOverloadCollection {
     /// create new instance
     #[must_use]
@@ -157,7 +166,7 @@ impl FunctionOverloadCollection {
 
         if candiates.len() == 1 {
             // candiates[0]
-            Some(candiates.into_iter().next().unwrap().0)
+            candiates.into_iter().next().map(|(overload, _)| overload)
         } else {
             // multiple overload found, then ambigous
             None

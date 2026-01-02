@@ -23,13 +23,15 @@ pub struct ArgumentBindingCollection(VecDeque<Option<TypeReference>>);
 
 impl ArgumentBindingCollection {
     pub fn from_expr_list(expr_list: &[SemScalarExpr]) -> Self {
-        Self(VecDeque::from_iter(
+        Self(
             expr_list
                 .iter()
-                .map(super::scalar_expr::SemScalarExpr::get_type),
-        ))
+                .map(super::scalar_expr::SemScalarExpr::get_type)
+                .collect(),
+        )
     }
 
+    #[allow(clippy::option_option)]
     pub fn pop_front(&mut self) -> Option<Option<TypeReference>> {
         self.0.pop_front()
     }

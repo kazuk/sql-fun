@@ -45,25 +45,30 @@ impl CliSubCommand {
     }
 
     /// binary name expects
+    #[must_use]
     pub fn binary_names(&self) -> Vec<String> {
         let (only_deamon, name) = match self {
-            CliSubCommand::Start(daemon_control_args) => (true, &daemon_control_args.daemon_name),
-            CliSubCommand::Stop(daemon_control_args) => (true, &daemon_control_args.daemon_name),
-            CliSubCommand::Status(daemon_control_args) => (true, &daemon_control_args.daemon_name),
-            CliSubCommand::Restart(daemon_control_args) => (true, &daemon_control_args.daemon_name),
-            CliSubCommand::External(args) => {
-                assert!(!args.is_empty()); // clap guarantees args non empty
-                (false, &args[0])
+            CliSubCommand::Start(daemon_control_args)
+            | CliSubCommand::Stop(daemon_control_args)
+            | CliSubCommand::Status(daemon_control_args)
+            | CliSubCommand::Restart(daemon_control_args) => {
+                (true, daemon_control_args.daemon_name.clone())
             }
-            CliSubCommand::Initialize(_) => unreachable!(),
-            CliSubCommand::Versions => todo!(),
+            CliSubCommand::External(args) => {
+                let Some(name) = args.first() else {
+                    return Vec::new();
+                };
+                (false, name.clone())
+            }
+            CliSubCommand::Initialize(_) => (false, "init".to_string()),
+            CliSubCommand::Versions => (false, "versions".to_string()),
         };
         if only_deamon {
-            vec![Self::daemon_binary_name(name)]
+            vec![Self::daemon_binary_name(&name)]
         } else {
             vec![
-                Self::external_binary_name(name),
-                Self::daemon_binary_name(name),
+                Self::external_binary_name(&name),
+                Self::daemon_binary_name(&name),
             ]
         }
     }

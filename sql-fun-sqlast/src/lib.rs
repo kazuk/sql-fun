@@ -1,4 +1,5 @@
 #![deny(missing_docs)]
+#![allow(clippy::pedantic)]
 #![doc = include_str!("lib.md")]
 
 pub mod sem;

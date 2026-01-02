@@ -165,26 +165,25 @@ impl TcpJsonRpcClinetAsync {
         }
     }
 
-    async fn response_worker(mut reciever: Receiver<InflightRequests>) -> Result<(), Infallible> {
-        let mut rec = HashMap::new();
+    async fn response_worker(mut receiver: Receiver<InflightRequests>) -> Result<(), Infallible> {
+        let mut pending = HashMap::new();
 
-        while let Some(event) = reciever.recv().await {
+        while let Some(event) = receiver.recv().await {
             match event {
                 InflightRequests::New(id, receiver) => {
-                    rec.insert(id, receiver);
+                    pending.insert(id, receiver);
                 }
                 InflightRequests::ResponseRecieved(json_rpc_response) => {
                     let id = json_rpc_response.id;
 
-                    #[allow(clippy::similar_names)]
-                    let Some(recieved) = rec.remove(&id) else {
+                    let Some(pending_receiver) = pending.remove(&id) else {
                         continue;
                     };
-                    let _ = recieved.send(json_rpc_response);
+                    let _ = pending_receiver.send(json_rpc_response);
                 }
                 // stream errors, exit & close this stream
                 InflightRequests::Error(_error) => {
-                    reciever.close();
+                    receiver.close();
                     return Ok(());
                 }
             }

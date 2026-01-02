@@ -28,9 +28,9 @@ pub struct InitializeArgs {
     #[arg(long, short = 'H', value_hint = ValueHint::DirPath)]
     sql_fun_home: Option<PathBuf>,
 
-    /// Database connection URL (e.g., postgres://user:pass@host:5432/dbname).
+    /// Database connection URL (e.g., <postgres://user:pass@host:5432/dbname>).
     ///
-    /// If provided, `sql-fun`` will connect to the database and build the
+    /// If provided, `sql-fun` will connect to the database and build the
     /// built-in object catalog directly from the live server.
     ///
     /// This bypasses artifact download (see --github-repo / --sql-fun-version).
@@ -45,7 +45,7 @@ pub struct InitializeArgs {
     #[arg(long, default_value = "kazuk/sql-fun")]
     github_repo: String,
 
-    /// `sql-fun`` version to use when downloading artifacts (semver).
+    /// `sql-fun` version to use when downloading artifacts (semver).
     ///
     ///       If omitted, the latest stable release is used.
     ///
@@ -62,7 +62,7 @@ pub struct InitializeArgs {
     #[arg(long, value_delimiter = ',', num_args = 1..)]
     engine_versions: Option<Vec<String>>,
 
-    /// Limit initialization to the specified PostgreSQL extensions.
+    /// Limit initialization to the specified `PostgreSQL` extensions.
     ///
     /// Accepts multiple values (repeatable) or comma-separated lists.
     ///
@@ -73,12 +73,14 @@ pub struct InitializeArgs {
 }
 
 impl InitializeArgs {
-    /// returns assume_yes value
+    /// returns `assume_yes` value
+    #[must_use]
     pub fn assume_yes(&self) -> bool {
         self.assume_yes
     }
 
-    /// returns sql_fun_home value
+    /// returns `sql_fun_home` value
+    #[must_use]
     pub fn sql_fun_home(&self) -> &Option<PathBuf> {
         &self.sql_fun_home
     }

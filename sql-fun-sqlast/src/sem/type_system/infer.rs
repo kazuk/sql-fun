@@ -18,10 +18,9 @@ pub struct SimpleInferContext {
 
 impl SimpleInferContext {
     /// insert candiate for anyelement
-    fn push_element(&mut self, ty: &TypeReference) -> Result<(), TypeError> {
+    fn push_element(&mut self, ty: &TypeReference) {
         self.element_types.insert(ty.clone());
         self.set_require_infer();
-        Ok(())
     }
 
     /// insert candiate for anyarray
@@ -39,13 +38,15 @@ impl SimpleInferContext {
         if ty.is_array().unwrap_or(false) {
             Err(TypeError::RequireNonArray(ty.clone()))
         } else {
-            self.push_element(ty)
+            self.push_element(ty);
+            Ok(())
         }
     }
 
     fn push_range_element(&mut self, ty: &TypeReference) -> Result<(), TypeError> {
         if ty.is_range() {
-            self.push_element(&ty.range_subtype())
+            self.push_element(&ty.range_subtype());
+            Ok(())
         } else {
             Err(TypeError::RequireRangeType(ty.clone()))
         }
@@ -53,7 +54,8 @@ impl SimpleInferContext {
 
     fn push_multi_range_element(&mut self, ty: &TypeReference) -> Result<(), TypeError> {
         if ty.is_multi_range() {
-            self.push_element(&ty.multi_range_base_element())
+            self.push_element(&ty.multi_range_base_element());
+            Ok(())
         } else {
             Err(TypeError::RequireMultiRangeType(ty.clone()))
         }
@@ -63,18 +65,18 @@ impl SimpleInferContext {
     pub fn push_input_param(
         &mut self,
         param_type: &TypeReference,
-        arg_type: TypeReference,
+        arg_type: &TypeReference,
     ) -> Result<(), TypeError> {
         if param_type.is_any_element() {
-            self.push_element(&arg_type)?;
+            self.push_element(arg_type);
         } else if param_type.is_any_array() {
-            self.push_array(&arg_type)?;
+            self.push_array(arg_type)?;
         } else if param_type.is_any_non_array() {
-            self.push_non_array_element(&arg_type)?;
+            self.push_non_array_element(arg_type)?;
         } else if param_type.is_any_range() {
-            self.push_range_element(&arg_type)?;
+            self.push_range_element(arg_type)?;
         } else if param_type.is_any_multi_range() {
-            self.push_multi_range_element(&arg_type)?;
+            self.push_multi_range_element(arg_type)?;
         }
 
         Ok(())
@@ -114,7 +116,7 @@ impl SimpleInferContext {
             && param.is_input_param()
         {
             for arg_type in bind.get_arg_types() {
-                self.push_input_param(param_type, arg_type)?;
+                self.push_input_param(param_type, &arg_type)?;
             }
         }
         Ok(())
@@ -135,7 +137,7 @@ mod test_simple_infer_context {
         let param_type = TypeReference::from_full_name(FullName::with_schema("pg_catalog", "int4"));
         let arg_type = TypeReference::from_full_name(FullName::with_schema("pg_catalog", "int4"));
 
-        context.push_input_param(&param_type, arg_type)?;
+        context.push_input_param(&param_type, &arg_type)?;
         assert!(!context.is_require_infer());
         assert!(context.element_types.is_empty());
         assert!(matches!(
@@ -148,7 +150,7 @@ mod test_simple_infer_context {
         assert!(param_type.is_simple_infer_arg());
         assert!(param_type.is_any_element());
         let arg_type = TypeReference::from_full_name(FullName::with_schema("pg_catalog", "int4"));
-        context.push_input_param(&param_type, arg_type.clone())?;
+        context.push_input_param(&param_type, &arg_type)?;
 
         assert!(context.is_require_infer());
         assert!(context.element_types.contains(&arg_type));
@@ -160,7 +162,7 @@ mod test_simple_infer_context {
         let arg_type =
             TypeReference::concrete_type_ref(&FullName::with_schema("pg_catalog", "int4"), true);
 
-        context.push_input_param(&param_type, arg_type.clone())?;
+        context.push_input_param(&param_type, &arg_type)?;
         assert!(context.is_require_infer());
         assert_eq!(context.element_types.iter().count(), 1);
         assert!(context.get_inference_result().is_ok());
@@ -170,7 +172,7 @@ mod test_simple_infer_context {
         assert!(param_type.is_simple_infer_arg());
         assert!(param_type.is_any_element());
         let arg_type = TypeReference::from_full_name(FullName::with_schema("pg_catalog", "int8"));
-        context.push_input_param(&param_type, arg_type.clone())?;
+        context.push_input_param(&param_type, &arg_type)?;
         assert_eq!(context.element_types.iter().count(), 2);
         assert!(matches!(
             context.get_inference_result(),
@@ -188,9 +190,8 @@ pub struct CommonInferContext {
 }
 
 impl CommonInferContext {
-    pub fn push_compat_element(&mut self, ty: &TypeReference) -> Result<(), TypeError> {
+    pub fn push_compat_element(&mut self, ty: &TypeReference) {
         self.element_types.insert(ty.clone());
-        Ok(())
     }
 
     pub fn push_compat_array(&mut self, array_ty: &TypeReference) -> Result<(), TypeError> {
@@ -206,13 +207,15 @@ impl CommonInferContext {
         if ty.is_array().unwrap_or(false) {
             Err(TypeError::RequireNonArray(ty.clone()))
         } else {
-            self.push_compat_element(ty)
+            self.push_compat_element(ty);
+            Ok(())
         }
     }
 
     fn push_compat_range_element(&mut self, ty: &TypeReference) -> Result<(), TypeError> {
         if ty.is_range() {
-            self.push_compat_element(&ty.range_subtype())
+            self.push_compat_element(&ty.range_subtype());
+            Ok(())
         } else {
             Err(TypeError::RequireRangeType(ty.clone()))
         }
@@ -220,7 +223,8 @@ impl CommonInferContext {
 
     fn push_compat_multi_range_element(&mut self, ty: &TypeReference) -> Result<(), TypeError> {
         if ty.is_multi_range() {
-            self.push_compat_element(&ty.multi_range_base_element())
+            self.push_compat_element(&ty.multi_range_base_element());
+            Ok(())
         } else {
             Err(TypeError::RequireMultiRangeType(ty.clone()))
         }
@@ -233,7 +237,7 @@ impl CommonInferContext {
         arg_type: &TypeReference,
     ) -> Result<(), TypeError> {
         if param_type.is_any_compatible() {
-            self.push_compat_element(arg_type)?;
+            self.push_compat_element(arg_type);
         } else if param_type.is_any_compatible_array() {
             self.push_compat_array(arg_type)?;
         } else if param_type.is_any_compatible_non_array() {

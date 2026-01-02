@@ -9,6 +9,9 @@ impl SqlFunArgs {
     /// If `--sql-fun-home` or `SQL_FUN_HOME` env present : configured value
     /// Else returns `${HOME}/.sql-fun`
     ///
+    /// # Errors
+    ///
+    /// Returns [`SqlFunArgsError`] when the home directory cannot be resolved.
     pub fn sql_fun_home(&self) -> Result<PathBuf, SqlFunArgsError> {
         self.metadata_args.sql_fun_home()
     }

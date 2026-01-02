@@ -46,12 +46,12 @@ impl std::fmt::Display for FunctionParamTable {
 }
 
 impl FunctionParameterTrait for FunctionParamTable {
-    fn name(&self) -> &Option<String> {
-        &self.name
+    fn name(&self) -> Option<&String> {
+        self.name.as_ref()
     }
 
-    fn param_type(&self) -> &Option<TypeReference> {
-        &self.param_type
+    fn param_type(&self) -> Option<&TypeReference> {
+        self.param_type.as_ref()
     }
 
     fn default_expr(&self) -> Option<&SemScalarExpr> {

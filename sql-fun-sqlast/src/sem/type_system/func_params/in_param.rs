@@ -17,7 +17,11 @@ impl FunctionParam {
         param_type: &Option<TypeReference>,
         default_expr: &Option<SemScalarExpr>,
     ) -> Self {
-        Self::In(FunctionParamIn::new(name, param_type, default_expr))
+        Self::In(FunctionParamIn::new(
+            name.as_ref(),
+            param_type.as_ref(),
+            default_expr.as_ref(),
+        ))
     }
 }
 
@@ -50,14 +54,14 @@ pub struct FunctionParamIn {
 
 impl FunctionParamIn {
     pub fn new(
-        name: &Option<String>,
-        param_type: &Option<TypeReference>,
-        default_expr: &Option<SemScalarExpr>,
+        name: Option<&String>,
+        param_type: Option<&TypeReference>,
+        default_expr: Option<&SemScalarExpr>,
     ) -> Self {
         Self {
-            name: name.clone(),
-            param_type: param_type.clone(),
-            default_expr: default_expr.clone(),
+            name: name.cloned(),
+            param_type: param_type.cloned(),
+            default_expr: default_expr.cloned(),
         }
     }
 }
@@ -74,12 +78,12 @@ impl std::fmt::Display for FunctionParamIn {
 }
 
 impl FunctionParameterTrait for FunctionParamIn {
-    fn name(&self) -> &Option<String> {
-        &self.name
+    fn name(&self) -> Option<&String> {
+        self.name.as_ref()
     }
 
-    fn param_type(&self) -> &Option<TypeReference> {
-        &self.param_type
+    fn param_type(&self) -> Option<&TypeReference> {
+        self.param_type.as_ref()
     }
 
     fn default_expr(&self) -> Option<&SemScalarExpr> {
@@ -130,7 +134,7 @@ impl FunctionParameterTrait for FunctionParamIn {
                 self.clone(),
             ))))?
         };
-        Ok(ParameterBindResult::one_in(self, &arg))
+        Ok(ParameterBindResult::one_in(self, arg.as_ref()))
     }
 
     fn is_input_param(&self) -> bool {

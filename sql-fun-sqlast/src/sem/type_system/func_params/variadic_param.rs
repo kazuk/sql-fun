@@ -12,7 +12,10 @@ impl FunctionParam {
     /// create new variadic parameter
     #[must_use]
     pub fn new_variadig_param(name: &Option<String>, param_type: &Option<TypeReference>) -> Self {
-        Self::Variadic(FunctionParamVariadic::new(name, param_type))
+        Self::Variadic(FunctionParamVariadic::new(
+            name.as_ref(),
+            param_type.as_ref(),
+        ))
     }
 }
 
@@ -41,10 +44,10 @@ pub struct FunctionParamVariadic {
     param_type: Option<TypeReference>,
 }
 impl FunctionParamVariadic {
-    pub fn new(name: &Option<String>, param_type: &Option<TypeReference>) -> Self {
+    pub fn new(name: Option<&String>, param_type: Option<&TypeReference>) -> Self {
         Self {
-            name: name.clone(),
-            param_type: param_type.clone(),
+            name: name.cloned(),
+            param_type: param_type.cloned(),
         }
     }
 }
@@ -61,12 +64,12 @@ impl std::fmt::Display for FunctionParamVariadic {
 }
 
 impl FunctionParameterTrait for FunctionParamVariadic {
-    fn name(&self) -> &Option<String> {
-        &self.name
+    fn name(&self) -> Option<&String> {
+        self.name.as_ref()
     }
 
-    fn param_type(&self) -> &Option<TypeReference> {
-        &self.param_type
+    fn param_type(&self) -> Option<&TypeReference> {
+        self.param_type.as_ref()
     }
 
     fn default_expr(&self) -> Option<&SemScalarExpr> {

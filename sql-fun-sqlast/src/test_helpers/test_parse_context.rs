@@ -1,6 +1,6 @@
 mod cast_info;
 
-use std::collections::HashMap;
+use std::collections::{HashMap, HashSet};
 
 use crate::{
     StringSpan,
@@ -21,6 +21,7 @@ use crate::{
 #[derive(Debug, Default)]
 pub struct TestParseContext {
     implicit_cast_results: HashMap<TypeReference, HashMap<TypeReference, Option<CastDefinition>>>,
+    implicit_castable_results: HashMap<TypeReference, HashSet<TypeReference>>,
     operator_op_results: HashMap<(OperatorName, bool, bool), Option<OperatorDefinition>>,
     search_path: Vec<SchemaName>,
     type_definitions: HashMap<FullName, TypeDefinition>,

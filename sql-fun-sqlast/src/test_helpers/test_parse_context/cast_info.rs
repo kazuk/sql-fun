@@ -1,3 +1,5 @@
+use std::collections::HashSet;
+
 use crate::sem::{CastDefinition, CastInfoRead, TypeReference};
 
 use super::TestParseContext;
@@ -15,6 +17,28 @@ impl TestParseContext {
             .entry(source_type.clone())
             .or_default();
         val.insert(target_type.clone(), result_value);
+    }
+
+    /// setup [CastInfoRead::get_implicit_castable] result
+    pub fn set_get_implicit_castable_result(
+        &mut self,
+        source_type: &TypeReference,
+        target_types: &HashSet<TypeReference>,
+    ) {
+        self.implicit_castable_results
+            .insert(source_type.clone(), target_types.clone());
+    }
+
+    /// add a single implicit castable target
+    pub fn add_implicit_castable(
+        &mut self,
+        source_type: &TypeReference,
+        target_type: &TypeReference,
+    ) {
+        self.implicit_castable_results
+            .entry(source_type.clone())
+            .or_default()
+            .insert(target_type.clone());
     }
 }
 
@@ -38,8 +62,11 @@ impl CastInfoRead for TestParseContext {
 
     fn get_implicit_castable(
         &self,
-        _source_type: &TypeReference,
+        source_type: &TypeReference,
     ) -> std::collections::HashSet<TypeReference> {
-        todo!()
+        self.implicit_castable_results
+            .get(source_type)
+            .cloned()
+            .unwrap_or_default()
     }
 }

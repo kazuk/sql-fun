@@ -86,7 +86,11 @@ impl DataSourceRowsFromFunc {
                 return Ok((Self::UndefinedFuncCall(fun_name, arg_exprs), context));
             };
             let columns = overload.returning_table();
-            Ok((Self::FuncCall(fun_name, arg_exprs, columns), context))
+            let resolved_fun_name = context.resolve_function_name_with_search_path(&fun_name);
+            Ok((
+                Self::FuncCall(resolved_fun_name, arg_exprs, columns),
+                context,
+            ))
         } else {
             context.report_problem(AnalysisProblem::table_function_not_found(&fun_name))?;
             Ok((Self::UndefinedFuncCall(fun_name, arg_exprs), context))

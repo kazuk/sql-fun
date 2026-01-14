@@ -276,7 +276,54 @@ impl DataSource {
             tokens,
         )
     }
+}
 
+#[cfg(test)]
+mod test_data_source_analyze_range_table_func {
+    use sql_fun_core::IVec;
+    use testresult::TestResult;
+
+    use crate::{
+        sem::{DataSource, SchemaName, WithClause},
+        test_helpers::{SynBuilder, TestParseContext, setup_function_overload, test_context},
+    };
+
+    #[rstest::rstest]
+    fn test_analyze_range_table_func(mut test_context: TestParseContext) -> TestResult {
+        test_context.set_get_search_path_result(&vec![SchemaName::from("public")]);
+        let (int4, overload) = setup_function_overload();
+        test_context.setup_type(int4);
+        test_context.setup_function("table_func", &[overload.clone()]);
+
+        let builder = SynBuilder::new();
+        let func_call_node = builder.build_func_call_node("table_func");
+        let alias = builder.alias("func_alias", &[]);
+        let range_table_func = builder.build_range_table_func(func_call_node, alias);
+        let tokens = IVec::default();
+        let with_clause = WithClause::default();
+        let from_clause = super::FromClause::default();
+
+        let (ds, _) = super::DataSource::analyze_range_table_func(
+            test_context,
+            &with_clause,
+            &from_clause,
+            range_table_func,
+            &tokens,
+        )?;
+
+        let mut aliases = Vec::new();
+        ds.push_alias_names(&mut aliases);
+        assert_eq!(aliases.len(), 1);
+        assert_eq!(aliases[0].name().as_str(), "func_alias");
+        let DataSource::CallTableFunc(table_func_ds) = ds else {
+            panic!("expected table function datasource");
+        };
+        assert_eq!(table_func_ds.function(), &overload);
+        Ok(())
+    }
+}
+
+impl DataSource {
     fn analyze_range_func_rows_from<TParseContext>(
         mut context: TParseContext,
         with_clause: &WithClause,
@@ -312,7 +359,59 @@ impl DataSource {
 
         Ok((Self::RowFunctions(rf), context))
     }
+}
 
+#[cfg(test)]
+mod test_data_source_analyze_range_func_rows_from {
+    use sql_fun_core::IVec;
+    use testresult::TestResult;
+
+    use crate::{
+        sem::{
+            AliasSpec, DataSource, DataSourceRowFunctions, DataSourceRowsFromFunc, SchemaName,
+            WithClause,
+        },
+        test_helpers::{SynBuilder, TestParseContext, setup_function_overload, test_context},
+    };
+
+    #[rstest::rstest]
+    fn test_analyze_range_func_rows_from(mut test_context: TestParseContext) -> TestResult {
+        test_context.set_get_search_path_result(&vec![SchemaName::from("public")]);
+        let (int4, overload) = setup_function_overload();
+        test_context.setup_type(int4);
+        let func_name = test_context.setup_function("rows_func", &[overload.clone()]);
+
+        let builder = SynBuilder::new();
+        let func_call_node = builder.build_func_call_node(func_name.local_name().as_str());
+        let range_function = builder.build_range_function(func_call_node, "rows_alias", true);
+        let tokens = IVec::default();
+        let with_clause = WithClause::default();
+        let from_clause = super::FromClause::default();
+
+        let (ds, _) = super::DataSource::analyze_range_func_rows_from(
+            test_context,
+            &with_clause,
+            &from_clause,
+            range_function,
+            &tokens,
+        )?;
+
+        let expected_rows_func = DataSourceRowsFromFunc::FuncCall(
+            func_name.clone(),
+            Vec::new(),
+            overload.returning_table(),
+        );
+        let expected_functions: IVec<_> = vec![expected_rows_func].into();
+        let expected_alias = AliasSpec::from_local_name("rows_alias");
+        let expected_row_functions =
+            DataSourceRowFunctions::new(&expected_functions, &expected_alias);
+        let expected = DataSource::RowFunctions(expected_row_functions);
+        assert_eq!(expected, ds);
+        Ok(())
+    }
+}
+
+impl DataSource {
     fn analyze_range_func<TParseContext>(
         context: TParseContext,
         with_clause: &WithClause,
@@ -366,7 +465,54 @@ impl DataSource {
             tokens,
         )
     }
+}
 
+#[cfg(test)]
+mod test_data_source_analyze_range_functions {
+    use sql_fun_core::IVec;
+    use testresult::TestResult;
+
+    use crate::{
+        sem::{DataSource, SchemaName, WithClause},
+        test_helpers::{SynBuilder, TestParseContext, setup_function_overload, test_context},
+    };
+
+    #[rstest::rstest]
+    fn test_analyze_range_func(mut test_context: TestParseContext) -> TestResult {
+        test_context.set_get_search_path_result(&vec![SchemaName::from("public")]);
+        let (int4, overload) = setup_function_overload();
+        test_context.setup_type(int4);
+        test_context.setup_function("set_func", &[overload.clone()]);
+
+        let builder = SynBuilder::new();
+        let func_call_node = builder.build_func_call_node("set_func");
+        let functions_node = builder.build_list_node(vec![func_call_node]);
+        let range_function = builder.build_range_function(functions_node, "set_alias", false);
+        let tokens = IVec::default();
+        let with_clause = WithClause::default();
+        let from_clause = super::FromClause::default();
+
+        let (ds, _) = super::DataSource::analyze_range_func(
+            test_context,
+            &with_clause,
+            &from_clause,
+            range_function,
+            &tokens,
+        )?;
+
+        let mut aliases = Vec::new();
+        ds.push_alias_names(&mut aliases);
+        assert_eq!(aliases.len(), 1);
+        assert_eq!(aliases[0].name().as_str(), "set_alias");
+        let DataSource::CallTableFunc(table_func) = ds else {
+            panic!("expected table function datasource");
+        };
+        assert_eq!(table_func.function(), &overload);
+        Ok(())
+    }
+}
+
+impl DataSource {
     /// semantic analyze from clause items
     pub fn analyze_from_clause_node<TParseContext>(
         context: TParseContext,

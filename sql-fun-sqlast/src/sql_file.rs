@@ -76,7 +76,8 @@ impl Iterator for LineWithLfIter {
 
 fn comment_psql_meta_command(line: String) -> String {
     if line.trim_start().starts_with('\\') {
-        format!("-- {line}")
+        let line_value = &line[3..]; // preserve line length
+        format!("-- {line_value}")
     } else {
         line
     }

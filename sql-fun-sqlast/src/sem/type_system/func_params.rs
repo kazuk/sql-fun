@@ -13,10 +13,15 @@ use self::{
 };
 use sql_fun_core::IVec;
 
-use crate::sem::{
-    AnalysisError, ColumnCollection, ParseContext, SemScalarExpr, TypeReference,
-    create_comp_type::CompositeFieldDefinition,
-    type_system::{ArgumentBindingCollection, CommonInferContext, SimpleInferContext, TypeError},
+use crate::{
+    sem::{
+        AnalysisError, ColumnCollection, ParseContext, SemScalarExpr, TypeReference,
+        create_comp_type::CompositeFieldDefinition,
+        type_system::{
+            ArgumentBindingCollection, CommonInferContext, SimpleInferContext, TypeError,
+        },
+    },
+    syn::ScanToken,
 };
 
 pub trait FunctionParameterTrait: std::fmt::Display
@@ -31,6 +36,7 @@ where
     fn from_syn<TParseContext>(
         context: TParseContext,
         param: crate::syn::FunctionParameter,
+        tokens: &IVec<ScanToken>,
     ) -> Result<(FunctionParam, TParseContext), AnalysisError>
     where
         Self: Sized,

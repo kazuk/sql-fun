@@ -1,6 +1,6 @@
 use std::path::{Path, PathBuf};
 
-use crate::{ExtensionConfigError, MetadataError, args::ConfigurationKind};
+use crate::{ExtensionConfigError, HighlighterThemeError, MetadataError, args::ConfigurationKind};
 
 /// Error definition for [`crate::SqlFunArgs`]
 #[derive(Debug, thiserror::Error)]
@@ -52,6 +52,10 @@ pub enum SqlFunArgsError {
     /// Home for `sql-fun` not exists
     #[error("home of sql-fun not eists : {0}")]
     SqlFunHomeNotExist(PathBuf),
+
+    /// Syntax highlighter theme file related errors
+    #[error(transparent)]
+    Highlighter(#[from] HighlighterThemeError),
 }
 
 impl From<std::io::Error> for SqlFunArgsError {

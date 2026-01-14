@@ -79,7 +79,7 @@ impl ViewColumnRef {
 
         let column_def = view.get_column_def(column);
         if column_def.is_none() {
-            context.report_problem(AnalysisProblem::column_not_found_in_view(view_name, column));
+            context.report_problem(AnalysisProblem::column_not_found_in_view(view_name, column))?;
         }
         let col_ref = ViewColumnRef::new(alias, column, view_name, &column_def, nullability);
         Ok((

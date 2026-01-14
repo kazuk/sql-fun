@@ -1,6 +1,11 @@
-use crate::sem::{
-    AnalysisError, FromClause, ParseContext, PgBuiltInType, SemScalarExpr, TypeReference,
-    WithClause,
+use sql_fun_core::IVec;
+
+use crate::{
+    sem::{
+        AnalysisError, FromClause, ParseContext, PgBuiltInType, SemScalarExpr, TypeReference,
+        WithClause,
+    },
+    syn::ScanToken,
 };
 
 use super::{AnalyzeScalarExpr, SemScalarExprNode};
@@ -45,6 +50,7 @@ where
         _with_clause: &WithClause,
         _from_clause: &FromClause,
         syn: crate::syn::AConst,
+        _tokens: &IVec<ScanToken>,
     ) -> Result<(SemScalarExpr, TParseContext), AnalysisError> {
         let cval = if let Some(ival) = syn.as_ival().get_ival() {
             ScalarConstExpr::Integer(ival)

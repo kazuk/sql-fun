@@ -6,7 +6,7 @@ use crate::{
         FullName, Nullable, ParseContext, SemScalarExpr, WithClause, analyze_scaler_expr,
         data_source::AliasName, type_system::ArgumentBindingCollection,
     },
-    syn::{ListOpt, Opt},
+    syn::{ListOpt, Opt, ScanToken},
 };
 
 /// row functions
@@ -59,6 +59,7 @@ impl DataSourceRowsFromFunc {
         with_clause: &WithClause,
         from_clause: &FromClause,
         func_call: crate::syn::FuncCall,
+        tokens: &IVec<ScanToken>,
     ) -> Result<(Self, TParseContext), AnalysisError>
     where
         TParseContext: ParseContext,
@@ -70,7 +71,8 @@ impl DataSourceRowsFromFunc {
         let mut arg_exprs = Vec::new();
         let mut arg_types = ArgumentBindingCollection::default();
         for arg in args {
-            let (arg, new_context) = analyze_scaler_expr(context, with_clause, from_clause, arg)?;
+            let (arg, new_context) =
+                analyze_scaler_expr(context, with_clause, from_clause, arg, tokens)?;
             context = new_context;
             arg_types.push(arg.get_type());
             arg_exprs.push(arg);
@@ -80,13 +82,13 @@ impl DataSourceRowsFromFunc {
             let Some(overload) = overloads.resolve_overload(&mut context, &arg_types) else {
                 context.report_problem(AnalysisProblem::function_overload_resolution_failed(
                     &fun_name, &arg_types,
-                ));
+                ))?;
                 return Ok((Self::UndefinedFuncCall(fun_name, arg_exprs), context));
             };
             let columns = overload.returning_table();
             Ok((Self::FuncCall(fun_name, arg_exprs, columns), context))
         } else {
-            context.report_problem(AnalysisProblem::table_function_not_found(&fun_name));
+            context.report_problem(AnalysisProblem::table_function_not_found(&fun_name))?;
             Ok((Self::UndefinedFuncCall(fun_name, arg_exprs), context))
         }
     }
@@ -97,12 +99,13 @@ impl DataSourceRowsFromFunc {
         with_clause: &WithClause,
         from_clause: &FromClause,
         function: crate::syn::Node,
+        tokens: &IVec<ScanToken>,
     ) -> Result<(Self, TParseContext), AnalysisError>
     where
         TParseContext: ParseContext,
     {
         if let Some(func_call) = function.as_func_call().as_inner() {
-            Self::analyze_func_call(context, with_clause, from_clause, func_call)
+            Self::analyze_func_call(context, with_clause, from_clause, func_call, tokens)
         } else if let Some(_sqlvf) = function.as_sqlvalue_function().as_inner() {
             todo!()
         } else {

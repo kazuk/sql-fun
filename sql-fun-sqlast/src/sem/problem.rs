@@ -1,14 +1,22 @@
+#![doc= include_str!("problem.md")]
+
 mod name_resolution;
 mod overload_resolution;
+mod sql_highlighter;
 
 use std::collections::HashSet;
 
+use miette::GraphicalReportHandler;
+use sql_fun_core::HighlighterTheme;
+
 use crate::sem::{
-    DefElemKey, FullName, OperatorName, SemScalarExpr, TypeDefinition, TypeReference,
-    create_table::ViewName, type_system::ArgumentBindingCollection,
+    AnalysisError, DefElemKey, FullName, OperatorName, SemScalarExpr, TypeDefinition,
+    TypeReference, create_table::ViewName, type_system::ArgumentBindingCollection,
 };
 
-pub use self::{name_resolution::NameResolution, overload_resolution::OverloadResolution};
+pub use self::name_resolution::{DomainBaseTypeNameNotFound, NameResolution};
+
+pub(crate) use self::{overload_resolution::OverloadResolution, sql_highlighter::SqlHighlighter};
 
 /// Semantic analysis problems
 #[allow(clippy::large_enum_variant)]
@@ -68,6 +76,22 @@ pub enum AnalysisProblem {
 }
 
 impl AnalysisProblem {
+    /// covert problem to report
+    pub fn render_report(
+        &self,
+        theme: &HighlighterTheme,
+        source: String,
+    ) -> Result<String, AnalysisError> {
+        let report_handler = GraphicalReportHandler::new()
+            .with_syntax_highlighting(SqlHighlighter::from_theme(theme)?);
+
+        let report = match self {
+            Self::NameResolution(nr) => nr.render_report(&report_handler, source),
+            _ => todo!(),
+        };
+        Ok(report)
+    }
+
     /// extension not found
     #[tracing::instrument()]
     pub fn extension_not_found(name: &str) -> Self {

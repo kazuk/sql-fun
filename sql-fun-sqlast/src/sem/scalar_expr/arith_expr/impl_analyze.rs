@@ -1,9 +1,11 @@
+use sql_fun_core::IVec;
+
 use crate::{
     sem::{
         AnalysisError, FromClause, OperatorName, ParseContext, SemScalarExpr, WithClause,
         scalar_expr::AnalyzeScalarExpr,
     },
-    syn::{AExprKind, Opt},
+    syn::{AExprKind, Opt, ScanToken},
 };
 
 use super::ArithExpr;
@@ -39,6 +41,7 @@ where
         with_clause: &WithClause,
         from_clause: &FromClause,
         syn: crate::syn::AExpr,
+        tokens: &IVec<ScanToken>,
     ) -> Result<(SemScalarExpr, TParseContext), AnalysisError> {
         let Some(kind) = syn.get_kind().as_inner() else {
             AnalysisError::raise_unexpected_none("a_expr.kind")?
@@ -49,6 +52,7 @@ where
             with_clause,
             from_clause,
             syn.get_lexpr().as_inner(),
+            tokens,
         )?;
         context = new_context;
         let (rexpr, new_context) = Self::analyze_optional_expr(
@@ -56,11 +60,12 @@ where
             with_clause,
             from_clause,
             syn.get_rexpr().as_inner(),
+            tokens,
         )?;
         context = new_context;
 
         if kind.has_name()? {
-            let Some(name) = OperatorName::try_from_report(syn.get_name(), &mut context) else {
+            let Some(name) = OperatorName::try_from_report(syn.get_name(), &mut context)? else {
                 AnalysisError::raise_unexpected_none("a_expr.name")?
             };
             match kind {

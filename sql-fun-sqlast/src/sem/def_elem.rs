@@ -69,7 +69,7 @@ where
         let key = DefElemKey::from(&def_elem);
         let arg = def_elem.get_arg();
         if items.contains_key(&key) {
-            context.report_problem(AnalysisProblem::duplicate_def_elem_key(&key));
+            context.report_problem(AnalysisProblem::duplicate_def_elem_key(&key))?;
         }
         items.insert(key, arg);
     }

@@ -1,6 +1,8 @@
+use sql_fun_core::IVec;
+
 use crate::{
     sem::{AstAndContextPair, FromClause, SemScalarExpr, WithClause, analyze_scaler_expr},
-    syn::ListOpt,
+    syn::{ListOpt, ScanToken},
 };
 
 use super::{AnalysisError, ParseContext, SemAst};
@@ -34,6 +36,7 @@ impl VariableSet {
 pub fn analyze_variable_set<TParseContext>(
     mut context: TParseContext,
     syn: &crate::syn::VariableSetStmt,
+    tokens: &IVec<ScanToken>,
 ) -> Result<AstAndContextPair<TParseContext>, AnalysisError>
 where
     TParseContext: ParseContext,
@@ -51,6 +54,7 @@ where
         &WithClause::default(),
         &FromClause::default(),
         args[0].clone(),
+        tokens,
     )?;
     context = new_context;
 

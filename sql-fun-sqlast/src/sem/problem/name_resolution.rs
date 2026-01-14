@@ -1,19 +1,80 @@
 mod column_not_found;
+use miette::{GraphicalReportHandler, LabeledSpan, NamedSource, Report};
 
 use super::AnalysisProblem;
 
-use crate::sem::{
-    CteName, FullName, TableName, TypeReference,
-    create_table::{ColumnName, ViewName},
-    data_source::AliasName,
+use crate::{
+    StringSpan,
+    sem::{
+        CteName, FullName, TableName, TypeReference,
+        create_table::{ColumnName, ViewName},
+        data_source::AliasName,
+    },
 };
+
+/// Domain base type name not found
+#[derive(Debug, Clone)]
+pub struct DomainBaseTypeNameNotFound {
+    domain_type_name: FullName,
+    base_type_name: String,
+    base_type_name_span: StringSpan,
+}
+
+impl DomainBaseTypeNameNotFound {
+    /// create instance
+    pub fn new(
+        domain_type_name: &FullName,
+        base_type_name: &str,
+        base_type_name_span: &StringSpan,
+    ) -> Self {
+        Self {
+            domain_type_name: domain_type_name.clone(),
+            base_type_name: base_type_name.to_string(),
+            base_type_name_span: *base_type_name_span,
+        }
+    }
+
+    /// domain type name
+    pub fn domain_type_name(&self) -> &FullName {
+        &self.domain_type_name
+    }
+
+    /// base type name
+    pub fn base_type_name(&self) -> &str {
+        &self.base_type_name
+    }
+
+    fn base_type_name_span(&self) -> LabeledSpan {
+        self.base_type_name_span.new_labeled_span("base type name")
+    }
+
+    pub(crate) fn generate_report(
+        &self,
+        handler: &GraphicalReportHandler,
+        source: String,
+    ) -> String {
+        let diag = miette::MietteDiagnostic::new("Domain base type not found")
+            .with_code("SF000001")
+            .with_severity(miette::Severity::Error)
+            .with_label(self.base_type_name_span());
+
+        let report = Report::new(diag).with_source_code(NamedSource::new("SQL", source));
+
+        let mut out = String::new();
+        handler
+            .render_report(&mut out, &*report)
+            .expect("render_report failed");
+        out
+    }
+}
 
 /// Name resolution problems
 #[derive(Debug, Clone)]
 pub enum NameResolution {
     /// type .1 not found in current context
     ///   on create domain .0
-    DomainTypeNameNotFound(FullName, String),
+    #[doc = include_str!("domain_type_name_not_found.md")]
+    DomainTypeNameNotFound(DomainBaseTypeNameNotFound),
 
     /// function not found
     FunctionNotFound(FullName),
@@ -74,31 +135,45 @@ pub enum NameResolution {
 }
 
 impl NameResolution {
-    pub fn duplicate_alias(alias_name: &AliasName) -> Self {
+    pub(crate) fn render_report(
+        &self,
+        report_handler: &GraphicalReportHandler,
+        source: String,
+    ) -> String {
+        match self {
+            Self::DomainTypeNameNotFound(d) => d.generate_report(report_handler, source),
+            _ => todo!(),
+        }
+    }
+
+    pub(crate) fn duplicate_alias(alias_name: &AliasName) -> Self {
         Self::DuplicateAlias(alias_name.clone())
     }
 
-    pub fn composite_type_field_not_found(type_ref: &TypeReference, field_name: &str) -> Self {
+    pub(crate) fn composite_type_field_not_found(
+        type_ref: &TypeReference,
+        field_name: &str,
+    ) -> Self {
         Self::CompositeTypeFieldNotFound(type_ref.clone(), field_name.to_string())
     }
 
-    pub fn ambiguous_column(column_name: &ColumnName) -> Self {
+    pub(crate) fn ambiguous_column(column_name: &ColumnName) -> Self {
         Self::AmbiguousColumn(column_name.clone())
     }
 
-    pub fn table_not_found(table_name: &TableName) -> Self {
+    pub(crate) fn table_not_found(table_name: &TableName) -> Self {
         Self::TableNotFound(table_name.clone())
     }
 
-    pub fn sequence_not_found(sequence_name: &FullName) -> Self {
+    pub(crate) fn sequence_not_found(sequence_name: &FullName) -> Self {
         Self::SequenceNotFound(sequence_name.clone())
     }
 
-    pub fn index_not_found(index_name: &str) -> Self {
+    pub(crate) fn index_not_found(index_name: &str) -> Self {
         Self::IndexNotFound(index_name.to_string())
     }
 
-    pub fn view_not_found(view_name: &ViewName) -> Self {
+    pub(crate) fn view_not_found(view_name: &ViewName) -> Self {
         Self::ViewNotFound(view_name.clone())
     }
 
@@ -107,8 +182,15 @@ impl NameResolution {
     pub fn domain_type_name_not_found(
         domain_name: &FullName,
         type_name: &crate::syn::TypeName,
+        type_name_span: &StringSpan,
     ) -> Self {
-        Self::DomainTypeNameNotFound(domain_name.clone(), type_name.full_name())
+        let problem = DomainBaseTypeNameNotFound::new(
+            domain_name,
+            type_name.full_name().as_str(),
+            type_name_span,
+        );
+
+        Self::DomainTypeNameNotFound(problem)
     }
 
     /// specified table not found
@@ -202,10 +284,12 @@ impl AnalysisProblem {
     pub fn domain_type_name_not_found(
         domain_name: &FullName,
         type_name: &crate::syn::TypeName,
+        type_name_span: &StringSpan,
     ) -> Self {
         Self::NameResolution(NameResolution::domain_type_name_not_found(
             domain_name,
             type_name,
+            type_name_span,
         ))
     }
 

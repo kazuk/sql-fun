@@ -242,7 +242,7 @@ where
             if let Some(type_ref) = sem_type.type_reference().cloned() {
                 Some(type_ref)
             } else {
-                context.report_problem(AnalysisProblem::unexpected_dynamic_type(&sem_type));
+                context.report_problem(AnalysisProblem::unexpected_dynamic_type(&sem_type))?;
                 None
             }
         } else {
@@ -250,7 +250,7 @@ where
                 &table_name,
                 &colname,
                 &key,
-            ));
+            ))?;
             None
         };
 

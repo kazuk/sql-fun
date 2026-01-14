@@ -71,11 +71,11 @@ where
                         context.report_problem(AnalysisProblem::column_not_found_in_table(
                             table_name,
                             key_col_name,
-                        ));
+                        ))?;
                     }
                 }
             } else {
-                context.report_problem(AnalysisProblem::relation_not_found(table_name));
+                context.report_problem(AnalysisProblem::relation_not_found(table_name))?;
             }
         }
 

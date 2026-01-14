@@ -16,6 +16,8 @@ mod param_ref;
 mod sql_value;
 mod sub_link;
 
+use sql_fun_core::IVec;
+
 pub use self::{
     analyze::analyze_scaler_expr,
     arith_expr::ArithExpr,
@@ -36,9 +38,12 @@ pub use self::{
     sub_link::SubLinkExpr,
 };
 
-use crate::sem::{
-    AnalysisError, AnalysisProblem, FromClause, ParseContext, PgBuiltInType, TypeReference,
-    WithClause, create_table::ColumnDefinition,
+use crate::{
+    sem::{
+        AnalysisError, AnalysisProblem, FromClause, ParseContext, PgBuiltInType, TypeReference,
+        WithClause, create_table::ColumnDefinition,
+    },
+    syn::ScanToken,
 };
 
 trait AnalyzeScalarExpr<TParseContext, TNode>
@@ -50,6 +55,7 @@ where
         with_clause: &WithClause,
         from_clause: &FromClause,
         syn: TNode,
+        tokens: &IVec<ScanToken>,
     ) -> Result<(SemScalarExpr, TParseContext), AnalysisError>;
 }
 
@@ -196,23 +202,25 @@ impl SemScalarExpr {
         context: &mut TParseContext,
         result_type: &TypeReference,
         expr: &mut SemScalarExpr,
-    ) where
+    ) -> Result<(), AnalysisError>
+    where
         TParseContext: ParseContext,
     {
         let Some(ty) = expr.get_type() else {
-            return;
+            return Ok(());
         };
         if &ty == result_type {
-            return;
+            return Ok(());
         }
 
         let Some(cast) = context.get_implicit_cast(&ty, result_type) else {
-            context.report_problem(AnalysisProblem::implicit_cast_not_found(&ty, result_type));
-            return;
+            context.report_problem(AnalysisProblem::implicit_cast_not_found(&ty, result_type))?;
+            return Ok(());
         };
         if !cast.is_no_coversion() {
             *expr = SemScalarExpr::wrap_implicit_cast(result_type, expr);
         }
+        Ok(())
     }
 
     /// get column name
@@ -242,7 +250,10 @@ impl SemScalarExpr {
     }
 
     /// test expression is array and report
-    pub fn require_array<TParseContext>(&self, context: &mut TParseContext)
+    pub fn require_array<TParseContext>(
+        &self,
+        context: &mut TParseContext,
+    ) -> Result<(), AnalysisError>
     where
         TParseContext: ParseContext,
     {
@@ -250,12 +261,16 @@ impl SemScalarExpr {
             && let Some(is_array) = ty.is_array()
             && !is_array
         {
-            context.report_problem(AnalysisProblem::array_required(self, &ty));
+            context.report_problem(AnalysisProblem::array_required(self, &ty))?;
         }
+        Ok(())
     }
 
     /// test fits array index
-    pub fn fits_array_index<TParseContext>(&self, context: &mut TParseContext)
+    pub fn fits_array_index<TParseContext>(
+        &self,
+        context: &mut TParseContext,
+    ) -> Result<(), AnalysisError>
     where
         TParseContext: ParseContext,
     {
@@ -270,7 +285,8 @@ impl SemScalarExpr {
                 .get_implicit_cast(&ty, &PgBuiltInType::int8())
                 .is_none()
         {
-            context.report_problem(AnalysisProblem::array_index_type_missmatch(self, &ty));
+            context.report_problem(AnalysisProblem::array_index_type_missmatch(self, &ty))?;
         }
+        Ok(())
     }
 }

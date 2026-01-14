@@ -1,10 +1,12 @@
+use sql_fun_core::IVec;
+
 use crate::{
     AstAndContextPair,
     sem::{
         AnalysisError, FromClause, ParseContext, SelectStatement, SemScalarExpr, TypeReference,
         WithClause, analyze_select,
     },
-    syn::Opt,
+    syn::{Opt, ScanToken},
 };
 
 use super::{AnalyzeScalarExpr, SemScalarExprNode};
@@ -35,11 +37,13 @@ where
         _with_clause: &WithClause,
         _from_clause: &FromClause,
         syn: crate::syn::SubLink,
+        tokens: &IVec<ScanToken>,
     ) -> Result<(SemScalarExpr, TParseContext), AnalysisError> {
         let Some(subselect) = syn.get_subselect().as_select_stmt().as_inner() else {
             AnalysisError::raise_unexpected_none("sublink.subselect")?
         };
-        let AstAndContextPair(select_stmt, new_context) = analyze_select(context, subselect)?;
+        let AstAndContextPair(select_stmt, new_context) =
+            analyze_select(context, subselect, tokens)?;
         context = new_context;
         let Some(select_stmt) = select_stmt.into_select_statemtnt() else {
             AnalysisError::raise_unexpected_none("select_statemnt")?

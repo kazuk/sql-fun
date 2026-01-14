@@ -361,7 +361,9 @@ impl CaseExprAnalysisContext<'_> {
 
         Ok(Some(result_type.clone()))
     }
+}
 
+impl CaseExprAnalysisContext<'_> {
     fn type_fixup<TParseContext>(
         &mut self,
         context: &mut TParseContext,
@@ -373,14 +375,53 @@ impl CaseExprAnalysisContext<'_> {
             return Ok(self.result_types.iter().next().cloned());
         }
 
+        let cast_candiates = self.enumerate_cast_candiates(context);
+        if cast_candiates.is_empty() {
+            context.report_problem(AnalysisProblem::incompatible_case_values(
+                self.result_types.clone(),
+            ))?;
+            Ok(None)
+        } else if cast_candiates.len() == 1 {
+            let Some((result_type, _casts)) = cast_candiates.into_iter().next() else {
+                AnalysisError::raise_unexpected_none("cast candiates")?
+            };
+            Ok(self.cast_args(context, &result_type)?)
+        } else {
+            let mut implicit_castable = Vec::new();
+            for (ty, _casts) in cast_candiates {
+                if self
+                    .result_types
+                    .iter()
+                    .all(|t| context.get_implicit_cast(t, &ty).is_some())
+                {
+                    implicit_castable.push(ty);
+                }
+            }
+
+            if implicit_castable.len() == 1 {
+                Ok(implicit_castable.into_iter().next())
+            } else {
+                todo!("{implicit_castable:#?}");
+            }
+        }
+    }
+}
+
+impl CaseExprAnalysisContext<'_> {
+    fn enumerate_cast_candiates<TParseContext>(
+        &mut self,
+        context: &mut TParseContext,
+    ) -> HashMap<TypeReference, Vec<crate::sem::CastDefinition>>
+    where
+        TParseContext: ParseContext,
+    {
         let mut cast_candiates = HashMap::new();
-        let result_types = self.result_types.clone();
-        for ty1 in &result_types {
-            for ty2 in &result_types {
+        for ty1 in self.result_types.clone() {
+            for ty2 in self.result_types.clone() {
                 if ty1 == ty2 {
                     continue;
                 }
-                let Some(cast) = context.get_implicit_cast(ty1, ty2) else {
+                let Some(cast) = context.get_implicit_cast(&ty1, &ty2) else {
                     continue;
                 };
                 cast_candiates
@@ -389,35 +430,11 @@ impl CaseExprAnalysisContext<'_> {
                     .or_insert(vec![cast.clone()]);
             }
         }
-
-        if cast_candiates.is_empty() {
-            context.report_problem(AnalysisProblem::incompatible_case_values(result_types))?;
-            Ok(None)
-        } else if cast_candiates.len() == 1 {
-            let Some((result_type, _casts)) = cast_candiates.into_iter().next() else {
-                AnalysisError::raise_unexpected_none("cast candiates")?
-            };
-            Ok(self.cast_args(context, result_type)?)
-        } else {
-            let mut implicit_castable = Vec::new();
-            for (ty, _casts) in cast_candiates {
-                if self
-                    .result_types
-                    .iter()
-                    .all(|t| context.get_implicit_cast(t, ty).is_some())
-                {
-                    implicit_castable.push(ty);
-                }
-            }
-
-            if implicit_castable.len() == 1 {
-                Ok(implicit_castable.into_iter().next().cloned())
-            } else {
-                todo!("{implicit_castable:#?}");
-            }
-        }
+        cast_candiates
     }
+}
 
+impl CaseExprAnalysisContext<'_> {
     fn is_not_null(&self) -> Option<bool> {
         if self.nullabilities.iter().any(|n| n == &Some(false)) {
             Some(false)
@@ -427,7 +444,9 @@ impl CaseExprAnalysisContext<'_> {
             None
         }
     }
+}
 
+impl CaseExprAnalysisContext<'_> {
     fn into_case_expr<TParseContext>(
         mut self,
         context: &mut TParseContext,

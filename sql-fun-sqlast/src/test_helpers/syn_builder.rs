@@ -3,11 +3,13 @@ use crate::{
     syn::{
         AConst, AConstInner, AExprKind, Alias, AliasBuilder, AliasOpt, AlterTableCmd,
         AlterTableCmdBuilder, AlterTableStmt, AlterTableStmtBuilder, AlterTableType, CaseExpr,
-        CaseWhen, ConstrType, Constraint, ConstraintBuilder, DropBehaviorOpt, FunctionParameter,
-        FunctionParameterBuilder, FunctionParameterMode, IntegerBuilder, IntoClauseOpt, JoinExpr,
-        JoinTypeOpt, LimitOptionOpt, Node, NodeInner, NodeList, NodeOpt, ObjectType,
-        RangeSubselect, RangeSubselectBuilder, RangeVarOpt, ResTarget, RoleSpecOpt, SelectStmt,
-        SelectStmtOpt, SetOperation, StringBuilder, TypeName, TypeNameOpt, WithClauseOpt,
+        CaseWhen, CoercionFormOpt, ConstrType, Constraint, ConstraintBuilder, DropBehaviorOpt,
+        FuncCallBuilder, FunctionParameter, FunctionParameterBuilder, FunctionParameterMode,
+        IntegerBuilder, IntoClauseOpt, JoinExpr, JoinTypeOpt, LimitOptionOpt, ListBuilder, Node,
+        NodeInner, NodeList, NodeOpt, ObjectType, RangeFunction, RangeFunctionBuilder,
+        RangeSubselect, RangeSubselectBuilder, RangeTableFunc, RangeTableFuncBuilder, RangeVarOpt,
+        ResTarget, RoleSpecOpt, SelectStmt, SelectStmtOpt, SetOperation, StringBuilder, TypeName,
+        TypeNameOpt, WindowDefOpt, WithClauseOpt,
     },
 };
 
@@ -434,6 +436,70 @@ impl SynBuilder {
         let fields = self.string_node_list(&vec![rel_name, col_name]);
         crate::syn::ColumnRefBuilder::default()
             .fields(fields)
+            .location(0)
+            .build()
+            .unwrap()
+            .into()
+    }
+
+    /// create [crate::syn::FuncCall] as Node
+    pub fn build_func_call_node(&self, func_name: &str) -> Node {
+        let func_name_node = self.as_string_node(self.string(func_name));
+        let func_name = NodeList::from(vec![func_name_node]);
+        let func_call = FuncCallBuilder::default()
+            .funcname(func_name)
+            .args(NodeList::default())
+            .agg_order(NodeList::default())
+            .agg_filter(Node::none())
+            .over(WindowDefOpt::none())
+            .agg_within_group(false)
+            .agg_star(false)
+            .agg_distinct(false)
+            .func_variadic(false)
+            .funcformat(CoercionFormOpt::none())
+            .location(0)
+            .build()
+            .unwrap();
+        NodeInner::FuncCall(func_call.into()).into()
+    }
+
+    /// buid [crate::syn::RangeFunction]
+    pub fn build_range_function(
+        &self,
+        func_call_node: Node,
+        alias_name: &str,
+        is_rows_from: bool,
+    ) -> RangeFunction {
+        RangeFunctionBuilder::default()
+            .lateral(false)
+            .ordinality(false)
+            .is_rowsfrom(is_rows_from)
+            .functions(NodeList::from(vec![func_call_node]))
+            .alias(AliasOpt::from(self.alias(alias_name, &[])))
+            .coldeflist(NodeList::default())
+            .build()
+            .unwrap()
+            .into()
+    }
+
+    /// build [crate::syn::List] as Node
+    pub fn build_list_node(&self, nodes: Vec<Node>) -> Node {
+        let list = ListBuilder::default()
+            .items(NodeList::from(nodes))
+            .build()
+            .unwrap();
+        NodeInner::List(list.into()).into()
+    }
+
+    /// build [crate::syn::RangeTableFunc]
+    pub fn build_range_table_func(&self, func_call_node: Node, alias: Alias) -> RangeTableFunc {
+        RangeTableFuncBuilder::default()
+            .lateral(false)
+            .docexpr(Node::none())
+            .rowexpr(func_call_node)
+            .namespaces(NodeList::default())
+            .columns(NodeList::default())
+            .alias(AliasOpt::from(alias))
             .location(0)
             .build()
             .unwrap()

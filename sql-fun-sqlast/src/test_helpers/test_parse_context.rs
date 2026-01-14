@@ -10,10 +10,10 @@ use crate::{
         CreateCompositType, CreateDomain, CreateEnum, CreateExtension, CreateFunction, CreateIndex,
         CreateSchema, CreateSequence, CreateTable, CreateTableAs, CreateView, FullName,
         FunctionInfoRead, FunctionInfoWrite, FunctionOverloadCollection, IndexInfoRead,
-        OperatorDefinition, OperatorInfoRead, OperatorName, ParseContext, SchemaName,
-        SearchPathRead, SequenceInfoRead, SequenceInfoWrite, TableInfoRead, TableInfoWrite,
-        TableName, TypeDefinition, TypeInfoRead, TypeInfoWrite, TypeReference, ValidOperatorName,
-        VariableSet, ViewInfoRead, ViewInfoWrite, ViewLike,
+        OperatorDefinition, OperatorInfoRead, OperatorName, OverloadVariant, ParseContext,
+        SchemaName, SearchPathRead, SequenceInfoRead, SequenceInfoWrite, TableInfoRead,
+        TableInfoWrite, TableName, TypeDefinition, TypeInfoRead, TypeInfoWrite, TypeReference,
+        ValidOperatorName, VariableSet, ViewInfoRead, ViewInfoWrite, ViewLike,
     },
 };
 
@@ -27,7 +27,9 @@ pub struct TestParseContext {
     type_definitions: HashMap<FullName, TypeDefinition>,
     table_definitions: HashMap<FullName, Option<CreateTable>>,
     view_definitions: HashMap<FullName, Option<ViewLike>>,
+    function_definitions: HashMap<FullName, FunctionOverloadCollection>,
     alter_tables: Vec<AlterTable>,
+    problems: Vec<AnalysisProblem>,
 }
 
 /// get [TestParseContext]
@@ -228,8 +230,8 @@ impl OperatorInfoRead for TestParseContext {
 }
 
 impl FunctionInfoRead for TestParseContext {
-    fn get_function_impl(&self, _name: &FullName) -> Option<FunctionOverloadCollection> {
-        todo!()
+    fn get_function_impl(&self, name: &FullName) -> Option<FunctionOverloadCollection> {
+        self.function_definitions.get(name).cloned()
     }
 }
 
@@ -242,7 +244,8 @@ impl IndexInfoRead for TestParseContext {
 impl BaseParseContext for TestParseContext {
     #[track_caller]
     fn report_problem(&mut self, problem: AnalysisProblem) -> Result<(), AnalysisError> {
-        todo!("{problem:#?}")
+        self.problems.push(problem);
+        Ok(())
     }
 
     fn extend(&mut self, _extension: Box<dyn BaseParseContext>) {
@@ -333,5 +336,31 @@ impl ParseContext for TestParseContext {
 
     fn apply_create_index(self, _create_index: &CreateIndex) -> Result<Self, AnalysisError> {
         todo!()
+    }
+}
+
+impl TestParseContext {
+    /// setup [FunctionInfoRead::get_function_impl] result
+    pub fn set_get_function_impl_result(
+        &mut self,
+        name: &FullName,
+        overloads: &FunctionOverloadCollection,
+    ) {
+        self.function_definitions
+            .insert(name.clone(), overloads.clone());
+    }
+
+    /// setup function overload collection with variants
+    pub fn setup_function(&mut self, name: &str, overloads: &[OverloadVariant]) -> FullName {
+        let name = FullName::with_schema("public", name);
+        let overloads = FunctionOverloadCollection::new(overloads);
+        self.set_get_function_impl_result(&name, &overloads);
+        name
+    }
+
+    /// number of reported problems
+    #[must_use]
+    pub fn reported_problem_count(&self) -> usize {
+        self.problems.len()
     }
 }

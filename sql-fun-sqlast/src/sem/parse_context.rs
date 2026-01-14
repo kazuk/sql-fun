@@ -173,7 +173,19 @@ pub trait BaseParseContext:
 
     /// get `CREATE FUNCTION` statement by function name
     fn get_function_by_name(&self, name: &FullName) -> Option<FunctionOverloadCollection> {
-        expand_search_path_inst(self, name, |_key| self.get_function_impl(name))
+        expand_search_path_inst(self, name, |key| self.get_function_impl(key))
+    }
+
+    /// get resolved function name
+    fn resolve_function_name_with_search_path(&self, fun_name: &FullName) -> FullName {
+        if fun_name.schema().is_some() {
+            return fun_name.clone();
+        }
+
+        expand_search_path_inst(self, fun_name, |key| {
+            self.get_function_impl(key).map(|_| key.clone())
+        })
+        .unwrap_or_else(|| fun_name.clone())
     }
 
     /// reporting a analysis errors

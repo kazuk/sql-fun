@@ -1,8 +1,10 @@
+use sql_fun_core::IVec;
+
 use crate::{
     sem::{
         AnalysisError, FromClause, FullName, ParseContext, SemScalarExpr, TypeReference, WithClause,
     },
-    syn::{Opt, SqlValueFunctionOp},
+    syn::{Opt, ScanToken, SqlValueFunctionOp},
 };
 
 use super::{AnalyzeScalarExpr, SemScalarExprNode};
@@ -89,6 +91,7 @@ where
         _with_clause: &WithClause,
         _from_clause: &FromClause,
         syn: crate::syn::SqlValueFunction,
+        _tokens: &IVec<ScanToken>,
     ) -> Result<(SemScalarExpr, TParseContext), AnalysisError> {
         let Some(operator) = syn.get_op().as_inner() else {
             AnalysisError::raise_unexpected_none("sqlvaluefunction.op")?

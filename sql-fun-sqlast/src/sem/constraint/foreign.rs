@@ -54,11 +54,11 @@ where
         if let Some(s) = source_table
             && context.get_table(s).is_none()
         {
-            context.report_problem(AnalysisProblem::relation_not_found(s));
+            context.report_problem(AnalysisProblem::relation_not_found(s))?;
         }
         let target_table = TableName::try_from(target_table)?;
         if context.get_table(&target_table).is_none() {
-            context.report_problem(AnalysisProblem::relation_not_found(&target_table));
+            context.report_problem(AnalysisProblem::relation_not_found(&target_table))?;
         }
 
         let target_columns = if let Some(target_columns) = constraint
@@ -82,7 +82,7 @@ where
                     context.report_problem(AnalysisProblem::column_not_found_in_table(
                         table_name,
                         key_col_name,
-                    ));
+                    ))?;
                 }
             }
         }
@@ -95,7 +95,7 @@ where
                     context.report_problem(AnalysisProblem::column_not_found_in_table(
                         &target_table,
                         key_col_name,
-                    ));
+                    ))?;
                 }
             }
         }

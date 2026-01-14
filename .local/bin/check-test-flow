@@ -97,5 +97,9 @@ echo "== Linting"
 cargo clippy --no-deps --workspace
 taplo lint
 
-echo "== Document build"
-cargo doc --workspace --no-deps
+###### FIXME:
+# OOM killed : rustdoc 1.92.0 (ded5c06cf 2025-12-08)
+# try on next stable release
+#
+# echo "== Document build"
+# cargo doc --workspace --no-deps

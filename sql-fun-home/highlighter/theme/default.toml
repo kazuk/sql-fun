@@ -1,0 +1,9 @@
+#
+#  sql-fun  SQL syntax highlighter default theme
+#
+
+identifier = { foreground="yellow" }
+constant = { foreground="cyan" }
+comment = { foreground="green", dimmed=true }
+keyword = { foreground="blue" }
+

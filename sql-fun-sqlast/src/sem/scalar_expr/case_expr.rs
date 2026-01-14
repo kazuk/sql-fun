@@ -1,12 +1,14 @@
 use std::collections::{HashMap, HashSet};
 
+use sql_fun_core::IVec;
+
 use crate::{
     sem::{
         AnalysisError, AnalysisProblem, FromClause, ParseContext, SemScalarExpr, TypeReference,
         WithClause, analyze_scaler_expr,
         scalar_expr::{AnalyzeScalarExpr, SemScalarExprNode},
     },
-    syn::{ListOpt as _, Opt},
+    syn::{ListOpt as _, Opt, ScanToken},
 };
 
 pub struct CaseExprAnalysisContext<'a> {
@@ -50,13 +52,14 @@ impl CaseExprAnalysisContext<'_> {
         &mut self,
         context: TParseContext,
         syn: &crate::syn::CaseExpr,
+        tokens: &IVec<ScanToken>,
     ) -> Result<TParseContext, AnalysisError>
     where
         TParseContext: ParseContext,
     {
         if let Some(arg) = syn.get_arg().as_inner() {
             let (arg_expr, new_context) =
-                analyze_scaler_expr(context, self.with_clause, self.from_clause, arg)?;
+                analyze_scaler_expr(context, self.with_clause, self.from_clause, arg, tokens)?;
             self.case_arg = Some(arg_expr);
             Ok(new_context)
         } else {
@@ -67,6 +70,7 @@ impl CaseExprAnalysisContext<'_> {
 
 #[cfg(test)]
 mod test_case_expr_analysis_context_analyze_case_arg {
+    use sql_fun_core::IVec;
     use testresult::TestResult;
 
     use crate::{
@@ -83,8 +87,8 @@ mod test_case_expr_analysis_context_analyze_case_arg {
 
         let builder = SynBuilder::new();
         let case_expr = builder.case_expr(Node::none(), NodeList::default(), Node::none());
-
-        let _new_context = acontext.analyze_case_arg(test_context, &case_expr)?;
+        let tokens = IVec::default();
+        let _new_context = acontext.analyze_case_arg(test_context, &case_expr, &tokens)?;
         assert!(acontext.case_arg.is_none());
         Ok(())
     }
@@ -98,8 +102,8 @@ mod test_case_expr_analysis_context_analyze_case_arg {
         let builder = SynBuilder::new();
         let arg_expr = NodeInner::AConst(builder.const_int4(10));
         let case_expr = builder.case_expr(arg_expr.into(), NodeList::default(), Node::none());
-
-        let _new_context = acontext.analyze_case_arg(test_context, &case_expr)?;
+        let tokens = IVec::default();
+        let _new_context = acontext.analyze_case_arg(test_context, &case_expr, &tokens)?;
         assert!(acontext.case_arg.is_some());
         Ok(())
     }
@@ -110,6 +114,7 @@ impl CaseExprAnalysisContext<'_> {
         &self,
         mut context: TParseContext,
         syn: crate::syn::CaseWhen,
+        tokens: &IVec<ScanToken>,
     ) -> Result<(CaseWhen, TParseContext), AnalysisError>
     where
         TParseContext: ParseContext,
@@ -120,11 +125,16 @@ impl CaseExprAnalysisContext<'_> {
         let Some(result) = syn.get_result().as_inner() else {
             AnalysisError::raise_unexpected_none("casewhen.result")?
         };
-        let (when_value, new_context) =
-            analyze_scaler_expr(context, self.with_clause, self.from_clause, when_value)?;
+        let (when_value, new_context) = analyze_scaler_expr(
+            context,
+            self.with_clause,
+            self.from_clause,
+            when_value,
+            tokens,
+        )?;
         context = new_context;
         let (result, new_context) =
-            analyze_scaler_expr(context, self.with_clause, self.from_clause, result)?;
+            analyze_scaler_expr(context, self.with_clause, self.from_clause, result, tokens)?;
         context = new_context;
         Ok((CaseWhen::new(when_value, result), context))
     }
@@ -132,6 +142,7 @@ impl CaseExprAnalysisContext<'_> {
 
 #[cfg(test)]
 mod test_case_expr_analysis_context_analyze_case_when {
+    use sql_fun_core::IVec;
     use testresult::TestResult;
 
     use crate::{
@@ -150,7 +161,8 @@ mod test_case_expr_analysis_context_analyze_case_when {
         let expr = NodeInner::AConst(builder.const_int4(10));
         let result = NodeInner::AConst(builder.const_int4(20));
         let case_when = builder.case_when(expr.into(), result.into());
-        let (sem_case_when, _) = acontext.analyze_case_when(test_context, case_when)?;
+        let tokens = IVec::default();
+        let (sem_case_when, _) = acontext.analyze_case_when(test_context, case_when, &tokens)?;
         let SemScalarExpr::Const(ScalarConstExpr::Integer(expr_value)) = sem_case_when.when_value
         else {
             panic!("unexpected when_value {sem_case_when:?}")
@@ -170,12 +182,13 @@ impl CaseExprAnalysisContext<'_> {
         &mut self,
         mut context: TParseContext,
         args: Vec<crate::syn::CaseWhen>,
+        tokens: &IVec<ScanToken>,
     ) -> Result<TParseContext, AnalysisError>
     where
         TParseContext: ParseContext,
     {
         for arg in args {
-            let (when_expr, new_context) = self.analyze_case_when(context, arg)?;
+            let (when_expr, new_context) = self.analyze_case_when(context, arg, tokens)?;
             context = new_context;
 
             if let Some(result_type) = when_expr.result.get_type() {
@@ -186,12 +199,12 @@ impl CaseExprAnalysisContext<'_> {
                 } else {
                     context.report_problem(AnalysisProblem::expression_type_not_known(
                         &when_expr.result,
-                    ));
+                    ))?;
                 }
             } else {
                 context.report_problem(AnalysisProblem::case_when_type_unknown(
                     when_expr.result.clone(),
-                ));
+                ))?;
             }
 
             self.nullabilities.push(when_expr.result.is_not_null());
@@ -208,6 +221,7 @@ mod test_case_expr_analysis_context_analyze_case_when_list {
         syn::NodeInner,
         test_helpers::{SynBuilder, TestParseContext, test_context},
     };
+    use sql_fun_core::IVec;
     use testresult::TestResult;
 
     #[rstest::rstest]
@@ -230,8 +244,9 @@ mod test_case_expr_analysis_context_analyze_case_when_list {
         let case_when_sval = builder.case_when(expr.into(), result.into());
 
         let when_values = vec![case_when_int, case_when_sval];
+        let tokens = IVec::default();
 
-        let _ = acontext.analyze_case_when_list(test_context, when_values)?;
+        let _ = acontext.analyze_case_when_list(test_context, when_values, &tokens)?;
         assert_eq!(acontext.result_types.len(), 2);
         assert_eq!(acontext.nullabilities.len(), 2);
         assert_eq!(acontext.when_exprs.len(), 2);
@@ -244,6 +259,7 @@ impl CaseExprAnalysisContext<'_> {
         &mut self,
         mut context: TParseContext,
         syn: crate::syn::CaseExpr,
+        tokens: &IVec<ScanToken>,
     ) -> Result<TParseContext, AnalysisError>
     where
         TParseContext: ParseContext,
@@ -252,8 +268,13 @@ impl CaseExprAnalysisContext<'_> {
             return Ok(context);
         };
 
-        let (default_expr, new_context) =
-            analyze_scaler_expr(context, self.with_clause, self.from_clause, def_result)?;
+        let (default_expr, new_context) = analyze_scaler_expr(
+            context,
+            self.with_clause,
+            self.from_clause,
+            def_result,
+            tokens,
+        )?;
         context = new_context;
 
         if let Some(default_result_type) = default_expr.get_type() {
@@ -264,12 +285,13 @@ impl CaseExprAnalysisContext<'_> {
             {
                 self.result_types.insert(default_result_type);
             } else {
-                context.report_problem(AnalysisProblem::expression_type_not_known(&default_expr));
+                context
+                    .report_problem(AnalysisProblem::expression_type_not_known(&default_expr))?;
             }
         } else {
             context.report_problem(AnalysisProblem::case_when_type_unknown(
                 default_expr.clone(),
-            ));
+            ))?;
         }
         self.nullabilities.push(default_expr.is_not_null());
         self.default_expr = Some(default_expr);
@@ -284,6 +306,7 @@ mod test_case_expr_analysis_context_analyze_default_expr {
         syn::{Node, NodeInner, NodeList},
         test_helpers::{SynBuilder, TestParseContext, test_context},
     };
+    use sql_fun_core::IVec;
     use testresult::TestResult;
 
     #[rstest::rstest]
@@ -294,8 +317,8 @@ mod test_case_expr_analysis_context_analyze_default_expr {
 
         let builder = SynBuilder::new();
         let case_expr = builder.case_expr(Node::none(), NodeList::default(), Node::none());
-
-        let _new_context = acontext.analyze_default_expr(test_context, case_expr)?;
+        let tokens = IVec::default();
+        let _new_context = acontext.analyze_default_expr(test_context, case_expr, &tokens)?;
         assert!(acontext.default_expr.is_none());
         Ok(())
     }
@@ -309,8 +332,8 @@ mod test_case_expr_analysis_context_analyze_default_expr {
         let builder = SynBuilder::new();
         let expr = NodeInner::AConst(builder.const_int4(10));
         let case_expr = builder.case_expr(Node::none(), NodeList::default(), expr.into());
-
-        let _new_context = acontext.analyze_default_expr(test_context, case_expr)?;
+        let tokens = IVec::default();
+        let _new_context = acontext.analyze_default_expr(test_context, case_expr, &tokens)?;
 
         assert!(acontext.default_expr.is_some());
         Ok(())
@@ -322,7 +345,7 @@ impl CaseExprAnalysisContext<'_> {
         &mut self,
         context: &mut TParseContext,
         result_type: &TypeReference,
-    ) -> Option<TypeReference>
+    ) -> Result<Option<TypeReference>, AnalysisError>
     where
         TParseContext: ParseContext,
     {
@@ -330,13 +353,13 @@ impl CaseExprAnalysisContext<'_> {
             let Some(_ty) = when_expr.result.get_type() else {
                 continue;
             };
-            SemScalarExpr::implicit_cast_if_require(context, result_type, &mut when_expr.result);
+            SemScalarExpr::implicit_cast_if_require(context, result_type, &mut when_expr.result)?;
         }
         if let Some(default) = self.default_expr.as_mut() {
-            SemScalarExpr::implicit_cast_if_require(context, result_type, default);
+            SemScalarExpr::implicit_cast_if_require(context, result_type, default)?;
         }
 
-        Some(result_type.clone())
+        Ok(Some(result_type.clone()))
     }
 
     fn type_fixup<TParseContext>(
@@ -368,13 +391,13 @@ impl CaseExprAnalysisContext<'_> {
         }
 
         if cast_candiates.is_empty() {
-            context.report_problem(AnalysisProblem::incompatible_case_values(result_types));
+            context.report_problem(AnalysisProblem::incompatible_case_values(result_types))?;
             Ok(None)
         } else if cast_candiates.len() == 1 {
             let Some((result_type, _casts)) = cast_candiates.into_iter().next() else {
                 AnalysisError::raise_unexpected_none("cast candiates")?
             };
-            Ok(self.cast_args(context, result_type))
+            Ok(self.cast_args(context, result_type)?)
         } else {
             let mut implicit_castable = Vec::new();
             for (ty, _casts) in cast_candiates {
@@ -485,15 +508,16 @@ where
         with_clause: &WithClause,
         from_clause: &FromClause,
         syn: crate::syn::CaseExpr,
+        tokens: &IVec<ScanToken>,
     ) -> Result<(SemScalarExpr, TParseContext), AnalysisError> {
         let mut analisys_context = CaseExprAnalysisContext::new(with_clause, from_clause);
 
-        context = analisys_context.analyze_case_arg(context, &syn)?;
+        context = analisys_context.analyze_case_arg(context, &syn, tokens)?;
         let Some(args) = syn.get_args().map(|v| v.as_case_when()) else {
             AnalysisError::raise_unexpected_none("caseexpr.args")?
         };
-        context = analisys_context.analyze_case_when_list(context, args)?;
-        context = analisys_context.analyze_default_expr(context, syn)?;
+        context = analisys_context.analyze_case_when_list(context, args, tokens)?;
+        context = analisys_context.analyze_default_expr(context, syn, tokens)?;
         let case = analisys_context.into_case_expr(&mut context)?;
         Ok((SemScalarExpr::Case(case), context))
     }

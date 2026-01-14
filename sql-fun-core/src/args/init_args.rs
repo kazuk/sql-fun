@@ -18,12 +18,12 @@ pub struct InitializeArgs {
 
     /// `sql-fun` Home directory path. (optional)
     ///
-    /// 　　Path to the sql-fun home directory.
+    /// Path to the sql-fun home directory.
     ///
-    ///       This is where catalogs, extensions, and configuration files are stored.
-    ///       If not specified, defaults to "${HOME}/.sql-fun".
+    /// This is where catalogs, extensions, and configuration files are stored.
+    /// If not specified, defaults to "${HOME}/.sql-fun".
     ///
-    ///    [default: ${HOME}/.sql-fun]
+    /// [default: ${HOME}/.sql-fun]
     ///
     #[arg(long, short = 'H', value_hint = ValueHint::DirPath)]
     sql_fun_home: Option<PathBuf>,
@@ -47,7 +47,7 @@ pub struct InitializeArgs {
 
     /// `sql-fun` version to use when downloading artifacts (semver).
     ///
-    ///       If omitted, the latest stable release is used.
+    /// If omitted, the latest stable release is used.
     ///
     /// [default: latest stable release]
     #[arg(long)]

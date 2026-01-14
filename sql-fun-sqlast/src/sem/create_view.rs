@@ -1,10 +1,12 @@
+use sql_fun_core::IVec;
+
 use crate::{
     sem::{
         AlterView, AstAndContextPair,
         alter_table::AlterObjSubCommand,
         create_table::{ColumnDefinition, ColumnName},
     },
-    syn::Opt,
+    syn::{Opt, ScanToken},
 };
 
 use super::{AnalysisError, FullName, ParseContext, SelectStatement, SemAst, analyze_select};
@@ -83,6 +85,7 @@ pub fn analyze_create_view<TParseContext>(
     context: TParseContext,
     parent_schema: &Option<String>,
     syn: crate::syn::ViewStmt,
+    tokens: &IVec<ScanToken>,
 ) -> Result<AstAndContextPair<TParseContext>, AnalysisError>
 where
     TParseContext: ParseContext,
@@ -96,7 +99,7 @@ where
         AnalysisError::raise_unexpected_none("view_stmt.query")?
     };
 
-    let AstAndContextPair(select, context) = analyze_select(context, query)?;
+    let AstAndContextPair(select, context) = analyze_select(context, query, tokens)?;
     let SemAst::SelectStatement(stmt) = select else {
         AnalysisError::raise_unexpected_none("select_statement")?
     };

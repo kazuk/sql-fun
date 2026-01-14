@@ -1,4 +1,8 @@
-use std::convert::Infallible;
+use std::{
+    convert::Infallible,
+    io::ErrorKind,
+    path::{Path, PathBuf},
+};
 
 use crate::sem::{AnalysisProblem, ParseContext, TypeReference};
 
@@ -40,6 +44,14 @@ pub enum AnalysisError {
     /// metadata related errors
     #[error(transparent)]
     Meta(#[from] sql_fun_core::MetadataError),
+
+    /// highlighter theme replated errors
+    #[error(transparent)]
+    HighlighterTheme(#[from] sql_fun_core::HighlighterThemeError),
+
+    /// file not found
+    #[error("file not found : {0}")]
+    FileNotFound(PathBuf),
 }
 
 impl AnalysisError {
@@ -87,9 +99,25 @@ impl AnalysisError {
         todo!()
     }
 
+    /// file not found
+    pub fn file_not_found<P>(file_path: P) -> Result<Infallible, Self>
+    where
+        P: AsRef<Path>,
+    {
+        Err(Self::FileNotFound(file_path.as_ref().to_path_buf()))
+    }
+
     /// never returns from this
     pub fn never() -> ! {
         unreachable!("this function calls with Ok(Infallble) instanciated")
+    }
+
+    /// unexpected eof error
+    pub fn unexpected_eof() -> Self {
+        AnalysisError::Io(std::io::Error::new(
+            ErrorKind::UnexpectedEof,
+            "unexpected eof",
+        ))
     }
 }
 
@@ -112,10 +140,14 @@ impl ProblemLikeError {
         }
     }
 
-    pub fn report_problem_to<TParseContext>(self, context: &mut TParseContext)
+    pub fn report_problem_to<TParseContext>(
+        self,
+        context: &mut TParseContext,
+    ) -> Result<(), AnalysisError>
     where
         TParseContext: ParseContext,
     {
-        context.report_problem(self.into_problem());
+        context.report_problem(self.into_problem())?;
+        Ok(())
     }
 }

@@ -4,6 +4,11 @@ mod table_info;
 mod type_info;
 mod view_info;
 
+use std::{
+    io::{Read, Seek},
+    path::Path,
+};
+
 pub use self::{
     cast_info::CastInfoRead,
     seq_info::{SequenceInfoRead, SequenceInfoWrite},
@@ -24,7 +29,47 @@ use crate::{
         type_system::ArgumentBindingCollection,
     },
 };
-use sql_fun_core::IVec;
+use sql_fun_core::{IVec, SqlFunArgs};
+
+/// provide access to source SQL file
+pub trait SourceAccessService: std::fmt::Debug {
+    /// Get source span as String
+    fn get_source_span(
+        &self,
+        _config_args: &SqlFunArgs,
+        source_path: &Path,
+        span: StringSpan,
+    ) -> Result<String, AnalysisError> {
+        let source_path = if source_path.is_absolute() {
+            source_path
+        } else {
+            // TODO resove path
+            source_path
+        };
+
+        if !source_path.exists() {
+            AnalysisError::file_not_found(source_path)?;
+            AnalysisError::never()
+        };
+
+        let mut file = std::fs::File::open(source_path)?;
+        file.seek(span.seek_pos())?;
+        let mut source_span = file.take(span.len() as u64);
+        let mut buf = String::default();
+        let result_len = source_span.read_to_string(&mut buf)?;
+        if result_len != span.len() {
+            Err(AnalysisError::unexpected_eof())
+        } else {
+            Ok(buf)
+        }
+    }
+}
+
+/// default implementation for SourceAccessService
+#[derive(Debug, Default)]
+pub struct DefaultSourceAccessService {}
+
+impl SourceAccessService for DefaultSourceAccessService {}
 
 /// get index definition
 pub trait IndexInfoRead {
@@ -100,6 +145,12 @@ pub trait BaseParseContext:
     + SearchPathRead
     + std::fmt::Debug
 {
+    /// get context args
+    fn get_args(&self) -> &SqlFunArgs;
+
+    /// get SQL file path
+    fn get_source_file_path(&self) -> Option<&Path>;
+
     /// get type by name
     fn get_type(&self, key: &FullName) -> Option<&TypeDefinition> {
         expand_search_path(self, key, |k| self.get_type_impl(k))
@@ -126,13 +177,16 @@ pub trait BaseParseContext:
     }
 
     /// reporting a analysis errors
-    fn report_problem(&mut self, problem: AnalysisProblem);
+    fn report_problem(&mut self, problem: AnalysisProblem) -> Result<(), AnalysisError>;
 
     /// Load extension and bind to this context
     fn extend(&mut self, extension: Box<dyn BaseParseContext>);
 
     /// update location for current statement.
     fn set_statement_span(&mut self, statement_span: StringSpan);
+
+    /// setup source access service
+    fn set_source_file(&mut self, source_acess_service: Box<dyn SourceAccessService>);
 
     /// canonicalize a type reference
     fn canonicalize_type_ref(&self, type_ref: &TypeReference) -> Option<TypeReference> {
@@ -245,14 +299,14 @@ where
         arg_types: ArgumentBindingCollection,
     ) -> Result<DataSource, AnalysisError> {
         let Some(overloads) = self.get_function_by_name(&func_name) else {
-            self.report_problem(AnalysisProblem::table_function_not_found(&func_name));
+            self.report_problem(AnalysisProblem::table_function_not_found(&func_name))?;
             return DataSource::undefined_table_function(call, arg_exprs, alias_name);
         };
 
         let Some(calling_overload) = overloads.resolve_overload(self, &arg_types) else {
             self.report_problem(
                 AnalysisProblem::parameter_type_missmatch_for_table_function(call, arg_types),
-            );
+            )?;
             return DataSource::undefined_table_function(call, arg_exprs, alias_name);
         };
 

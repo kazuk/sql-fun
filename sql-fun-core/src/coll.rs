@@ -4,10 +4,16 @@
 ///
 /// Fixed length immutable vector (Boxed slice)
 ///
-#[derive(Clone, serde::Serialize, serde::Deserialize, PartialEq, Eq, Hash, Debug, Default)]
+#[derive(Clone, serde::Serialize, serde::Deserialize, PartialEq, Eq, Hash, Debug)]
 #[repr(transparent)]
 #[serde(transparent)]
 pub struct IVec<T>(Box<[T]>);
+
+impl<T> Default for IVec<T> {
+    fn default() -> Self {
+        Self(Box::default())
+    }
+}
 
 impl<T> From<Vec<T>> for IVec<T> {
     fn from(value: Vec<T>) -> Self {

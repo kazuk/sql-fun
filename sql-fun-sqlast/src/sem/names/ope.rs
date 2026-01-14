@@ -1,7 +1,7 @@
 use std::fmt::Display;
 
 use crate::{
-    sem::{ParseContext, error::ProblemLikeError},
+    sem::{AnalysisError, ParseContext, error::ProblemLikeError},
     syn::{ListOpt, NodeListOpt},
 };
 
@@ -69,14 +69,14 @@ impl OperatorName {
     pub fn try_from_report<TParseContext: ParseContext>(
         value: NodeListOpt,
         context: &mut TParseContext,
-    ) -> Option<Self> {
+    ) -> Result<Option<Self>, AnalysisError> {
         let result = ValidOperatorName::try_from(value);
         match result {
-            Ok(Some(v)) => Some(Self::Valid(v)),
-            Ok(None) => None,
+            Ok(Some(v)) => Ok(Some(Self::Valid(v))),
+            Ok(None) => Ok(None),
             Err(e) => {
-                e.report_problem_to(context);
-                Some(Self::Invalid)
+                e.report_problem_to(context)?;
+                Ok(Some(Self::Invalid))
             }
         }
     }

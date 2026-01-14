@@ -44,7 +44,7 @@ where
     {
         let seq_name = alter_seq.seq_name();
         let Some(mut seq) = self.get_sequence(seq_name).cloned() else {
-            self.report_problem(AnalysisProblem::sequence_not_found(seq_name));
+            self.report_problem(AnalysisProblem::sequence_not_found(seq_name))?;
             return Ok(self);
         };
 

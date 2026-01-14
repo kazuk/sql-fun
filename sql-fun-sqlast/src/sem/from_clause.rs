@@ -1,9 +1,11 @@
+use sql_fun_core::IVec;
+
 use crate::{
     sem::{
         AliasSpec, AnalysisError, AnalysisProblem, DataSource, Nullable, ParseContext, WithClause,
         create_table::ColumnName, data_source::AliasName,
     },
-    syn::ListOpt,
+    syn::{ListOpt, ScanToken},
 };
 
 /// semantic representation for `FROM` clause
@@ -21,6 +23,7 @@ impl FromClause {
         mut context: TParseContext,
         with_clause: &WithClause,
         syn: crate::syn::NodeListOpt,
+        tokens: &IVec<ScanToken>,
     ) -> Result<(FromClause, TParseContext), AnalysisError>
     where
         TParseContext: ParseContext,
@@ -32,14 +35,19 @@ impl FromClause {
         let mut existing_aliases = Vec::new();
 
         for node in nodes {
-            let (source, new_context) =
-                DataSource::analyze_from_clause_node(context, with_clause, &from_clause, node)?;
+            let (source, new_context) = DataSource::analyze_from_clause_node(
+                context,
+                with_clause,
+                &from_clause,
+                node,
+                tokens,
+            )?;
             context = new_context;
 
             let aliases = source.get_aliases();
             for alias in aliases {
                 if existing_aliases.contains(&alias) {
-                    context.report_problem(AnalysisProblem::duplicate_alias(alias.name()));
+                    context.report_problem(AnalysisProblem::duplicate_alias(alias.name()))?;
                 }
                 existing_aliases.push(alias);
             }

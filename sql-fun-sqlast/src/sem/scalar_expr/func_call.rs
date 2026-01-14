@@ -5,7 +5,7 @@ use crate::{
         AnalysisError, AnalysisProblem, FromClause, FullName, OverloadVariant, ParseContext,
         SemScalarExpr, TypeReference, WithClause, type_system::ArgumentBindingCollection,
     },
-    syn::ListOpt,
+    syn::{ListOpt, ScanToken},
 };
 
 use super::{SemScalarExprNode, analyze_scaler_expr};
@@ -130,9 +130,11 @@ impl FuncCallExpr {
                         arg = SemScalarExpr::wrap_implicit_cast(target_type, &arg);
                     }
                 } else {
-                    context.report_problem(AnalysisProblem::function_arg_implicit_cast_not_found(
-                        func_name, index, t, &arg,
-                    ));
+                    context.report_problem(
+                        AnalysisProblem::function_arg_implicit_cast_not_found(
+                            func_name, index, t, &arg,
+                        ),
+                    )?;
                 }
             }
 
@@ -178,6 +180,7 @@ where
         with_clause: &WithClause,
         from_clause: &FromClause,
         syn: crate::syn::FuncCall,
+        tokens: &IVec<ScanToken>,
     ) -> Result<(SemScalarExpr, TParseContext), AnalysisError> {
         let func_name = FullName::try_from(syn.get_funcname())?;
 
@@ -188,7 +191,7 @@ where
         let mut arg_exprs = Vec::new();
         for arg in args {
             let (sem_arg, new_context) =
-                analyze_scaler_expr(context, with_clause, from_clause, arg)?;
+                analyze_scaler_expr(context, with_clause, from_clause, arg, tokens)?;
             context = new_context;
             arg_exprs.push(sem_arg);
         }
@@ -207,11 +210,11 @@ where
             } else {
                 context.report_problem(AnalysisProblem::function_overload_resolution_failed(
                     &func_name, &arg_types,
-                ));
+                ))?;
                 Self::partial_response(context, func_name, arg_exprs)
             }
         } else {
-            context.report_problem(AnalysisProblem::function_not_found(&func_name));
+            context.report_problem(AnalysisProblem::function_not_found(&func_name))?;
             Self::partial_response(context, func_name, arg_exprs)
         }
     }

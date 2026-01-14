@@ -19,6 +19,8 @@ thiserror = { workspace = true }
 tracing = { workspace = true }
 sql-fun-core = { workspace = true }
 combine = { workspace = true }
+miette = { workspace = true }
+owo-colors = { workspace = true }
 
 [dev-dependencies]
 ctor = { workspace = true }

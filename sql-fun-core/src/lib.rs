@@ -8,6 +8,7 @@ mod args;
 mod builtin;
 mod coll;
 mod extensions;
+mod highlighter;
 mod metadata;
 
 use std::{fmt::Display, str::FromStr};
@@ -20,6 +21,7 @@ pub use self::{
         ExtensionConfigError, ExtensionNameVersionPair, ExtensionVersion,
         PostgresExtensionsCollection,
     },
+    highlighter::{HighlighterStyle, HighlighterTheme, HighlighterThemeError, TerminalColor},
     metadata::{MetadataError, SqlFunMetadata},
 };
 

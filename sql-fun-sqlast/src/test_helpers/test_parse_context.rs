@@ -241,7 +241,7 @@ impl IndexInfoRead for TestParseContext {
 
 impl BaseParseContext for TestParseContext {
     #[track_caller]
-    fn report_problem(&mut self, problem: AnalysisProblem) {
+    fn report_problem(&mut self, problem: AnalysisProblem) -> Result<(), AnalysisError> {
         todo!("{problem:#?}")
     }
 
@@ -250,6 +250,18 @@ impl BaseParseContext for TestParseContext {
     }
 
     fn set_statement_span(&mut self, _statement_span: StringSpan) {
+        todo!()
+    }
+
+    fn get_args(&self) -> &sql_fun_core::SqlFunArgs {
+        todo!()
+    }
+
+    fn get_source_file_path(&self) -> Option<&std::path::Path> {
+        todo!()
+    }
+
+    fn set_source_file(&mut self, _source_acess_service: Box<dyn crate::sem::SourceAccessService>) {
         todo!()
     }
 }

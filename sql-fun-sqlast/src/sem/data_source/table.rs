@@ -77,7 +77,7 @@ impl TableDataSource {
             } else {
                 context.report_problem(
                     AnalysisProblem::table_not_have_column_for_derived_column_name(),
-                );
+                )?;
                 None
             }
         } else if let Some(column_def) =
@@ -87,7 +87,7 @@ impl TableDataSource {
         } else {
             context.report_problem(AnalysisProblem::column_not_found_in_table(
                 &self.name, column,
-            ));
+            ))?;
             None
         };
         Ok(ColumnReferenceExpr::TableColumn(TableColumnRef::new(

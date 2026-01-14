@@ -192,7 +192,7 @@ impl ArithExpr {
                         &left_type,
                         &right_type,
                     ),
-                );
+                )?;
                 return Ok(ResolvedBinaryOperator::new(None, lexpr, rexpr));
             }
             let filtered = BinaryCastCandiate::filter_best_candiate(candiates);
@@ -201,7 +201,7 @@ impl ArithExpr {
                     &operator_def,
                     &left_type,
                     &right_type,
-                ));
+                ))?;
             }
             let candiate = &filtered[0];
             let (lexpr, rexpr) = candiate.wrap_implicit_cast(lexpr, rexpr);
@@ -212,10 +212,10 @@ impl ArithExpr {
             ))
         } else {
             if lexpr.get_type().is_none() {
-                context.report_problem(AnalysisProblem::expression_type_not_known(&lexpr));
+                context.report_problem(AnalysisProblem::expression_type_not_known(&lexpr))?;
             }
             if rexpr.get_type().is_none() {
-                context.report_problem(AnalysisProblem::expression_type_not_known(&rexpr));
+                context.report_problem(AnalysisProblem::expression_type_not_known(&rexpr))?;
             }
 
             tracing::info!("argument type unknown");

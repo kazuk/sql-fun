@@ -1,10 +1,12 @@
+use sql_fun_core::IVec;
+
 use crate::{
     sem::{
         AnalysisError, FromClause, FullName, ParseContext, SemScalarExpr, TypeReference,
         WithClause, analyze_scaler_expr,
         type_system::{ArgumentBindingCollection, TypeError},
     },
-    syn::Opt,
+    syn::{Opt, ScanToken},
 };
 
 use super::{FunctionParam, FunctionParameterTrait, ParameterBindResult};
@@ -93,6 +95,7 @@ impl FunctionParameterTrait for FunctionParamIn {
     fn from_syn<TParseContext>(
         mut context: TParseContext,
         param: crate::syn::FunctionParameter,
+        tokens: &IVec<ScanToken>,
     ) -> Result<(FunctionParam, TParseContext), AnalysisError>
     where
         TParseContext: ParseContext,
@@ -106,7 +109,7 @@ impl FunctionParameterTrait for FunctionParamIn {
             let with_clause = WithClause::default();
             let from_clause = FromClause::default();
             let (ex, new_context) =
-                analyze_scaler_expr(context, &with_clause, &from_clause, def_expr)?;
+                analyze_scaler_expr(context, &with_clause, &from_clause, def_expr, tokens)?;
             (Some(ex), new_context)
         } else {
             (None, context)

@@ -74,8 +74,9 @@ impl CteDataSource {
             if let Some(column_def) = cte.get_column_at(context, index) {
                 Some(column_def)
             } else {
-                context
-                    .report_problem(AnalysisProblem::cte_not_have_column_for_derived_column_name());
+                context.report_problem(
+                    AnalysisProblem::cte_not_have_column_for_derived_column_name(),
+                )?;
                 None
             }
         } else if let Some(column_def) =
@@ -83,7 +84,7 @@ impl CteDataSource {
         {
             Some(column_def)
         } else {
-            context.report_problem(AnalysisProblem::column_not_found_in_cte(&self.name, column));
+            context.report_problem(AnalysisProblem::column_not_found_in_cte(&self.name, column))?;
             None
         };
         Ok(ColumnReferenceExpr::CteColumn(CteColumnRef::new(

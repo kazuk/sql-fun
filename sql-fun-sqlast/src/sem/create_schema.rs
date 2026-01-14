@@ -1,4 +1,9 @@
-use crate::{sem::AstAndContextPair, syn::ListOpt};
+use sql_fun_core::IVec;
+
+use crate::{
+    sem::AstAndContextPair,
+    syn::{ListOpt, ScanToken},
+};
 
 use super::{AnalysisError, ParseContext, SemAst};
 
@@ -22,6 +27,7 @@ impl CreateSchema {
 pub fn analyze_create_schema<TParseContext>(
     mut context: TParseContext,
     syn: crate::syn::CreateSchemaStmt,
+    tokens: &IVec<ScanToken>,
 ) -> Result<AstAndContextPair<TParseContext>, AnalysisError>
 where
     TParseContext: ParseContext,
@@ -34,7 +40,8 @@ where
 
     let mut sems = Vec::new();
     for elt in elts {
-        let AstAndContextPair(sem, new_context) = super::analyze_node(context, &schema_name, elt)?;
+        let AstAndContextPair(sem, new_context) =
+            super::analyze_node(context, &schema_name, elt, tokens)?;
         context = new_context;
         sems.push(sem);
     }

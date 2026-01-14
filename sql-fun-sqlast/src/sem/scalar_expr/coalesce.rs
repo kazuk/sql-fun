@@ -1,11 +1,13 @@
 use std::collections::HashSet;
 
+use sql_fun_core::IVec;
+
 use crate::{
     sem::{
         AnalysisError, AnalysisProblem, FromClause, ParseContext, SemScalarExpr, TypeReference,
         WithClause, analyze_scaler_expr,
     },
-    syn::ListOpt,
+    syn::{ListOpt, ScanToken},
 };
 
 use super::{AnalyzeScalarExpr, SemScalarExprNode};
@@ -36,6 +38,7 @@ where
         with_clause: &WithClause,
         from_clause: &FromClause,
         syn: crate::syn::CoalesceExpr,
+        tokens: &IVec<ScanToken>,
     ) -> Result<(SemScalarExpr, TParseContext), AnalysisError> {
         let Some(args) = syn.get_args().as_inner() else {
             AnalysisError::raise_unexpected_none("CoalesceExpr.args")?
@@ -47,13 +50,13 @@ where
 
         for arg in args {
             let (arg_expr, new_context) =
-                analyze_scaler_expr(context, with_clause, from_clause, arg)?;
+                analyze_scaler_expr(context, with_clause, from_clause, arg, tokens)?;
             context = new_context;
 
             if let Some(fnn) = &first_non_null {
                 context.report_problem(AnalysisProblem::unreachable_coalesce_argument(
                     &arg_expr, fnn,
-                ));
+                ))?;
             } else if let Some(nn) = &arg_expr.is_not_null()
                 && *nn
             {
@@ -66,7 +69,8 @@ where
                 };
                 expr_types.insert(type_ref);
             } else {
-                context.report_problem(AnalysisProblem::unknown_type_in_coalesce_expr(&arg_expr));
+                context
+                    .report_problem(AnalysisProblem::unknown_type_in_coalesce_expr(&arg_expr))?;
             }
             arg_exprs.push(arg_expr);
         }
@@ -124,11 +128,11 @@ where
                     &arg_exprs,
                     &final_candiates,
                     choose,
-                ));
+                ))?;
             }
             choose
         } else {
-            context.report_problem(AnalysisProblem::coalesce_expr_type_unknown(&arg_exprs));
+            context.report_problem(AnalysisProblem::coalesce_expr_type_unknown(&arg_exprs))?;
             None
         };
 

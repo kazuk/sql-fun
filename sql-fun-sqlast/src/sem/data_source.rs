@@ -10,6 +10,8 @@ mod table_fun;
 mod undefined;
 mod view;
 
+use sql_fun_core::IVec;
+
 pub use self::{
     alias::{AliasName, AliasSpec},
     cte::CteDataSource,
@@ -29,7 +31,7 @@ use crate::{
         analyze_scaler_expr, scalar_expr::ColumnReferenceExpr,
         type_system::ArgumentBindingCollection,
     },
-    syn::ListOpt,
+    syn::{ListOpt, ScanToken},
 };
 
 /// source nullability type
@@ -208,6 +210,7 @@ impl DataSource {
         from_clause: &FromClause,
         call: crate::syn::FuncCall,
         alias: Option<crate::syn::Alias>,
+        tokens: &IVec<ScanToken>,
     ) -> Result<(DataSource, TParseContext), AnalysisError>
     where
         TParseContext: ParseContext,
@@ -227,7 +230,7 @@ impl DataSource {
         if let Some(args) = call.get_args().as_inner() {
             for arg in args {
                 let (sarg, new_context) =
-                    analyze_scaler_expr(context, with_clause, from_clause, arg)?;
+                    analyze_scaler_expr(context, with_clause, from_clause, arg, tokens)?;
                 context = new_context;
                 arg_types.push(sarg.get_type());
                 arg_exprs.push(sarg);

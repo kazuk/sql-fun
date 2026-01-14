@@ -57,7 +57,7 @@ where
     fn apply_alter_table(mut self, alter_table: &AlterTable) -> Result<Self, AnalysisError> {
         let table_name = alter_table.table();
         let Some(table) = self.get_table(table_name).cloned() else {
-            self.report_problem(AnalysisProblem::table_not_found(table_name));
+            self.report_problem(AnalysisProblem::table_not_found(table_name))?;
             return Ok(self);
         };
 

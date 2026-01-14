@@ -1,6 +1,8 @@
+use sql_fun_core::IVec;
+
 use crate::{
     sem::{AstAndContextPair, alter_table::AlterObjSubCommand, create_table::ColumnDefinition},
-    syn::{ObjectType, Opt},
+    syn::{ObjectType, Opt, ScanToken},
 };
 
 use super::{AlterView, AnalysisError, CreateTable, FullName, ParseContext, SemAst, TableName};
@@ -60,6 +62,7 @@ pub fn analyze_create_table_as<TParseContext>(
     context: TParseContext,
     parent_schema: &Option<String>,
     syn: crate::syn::CreateTableAsStmt,
+    tokens: &IVec<ScanToken>,
 ) -> Result<AstAndContextPair<TParseContext>, AnalysisError>
 where
     TParseContext: ParseContext,
@@ -78,7 +81,7 @@ where
     let Some(q) = syn.get_query().as_inner() else {
         AnalysisError::raise_unexpected_none("create_table_as.query")?
     };
-    let AstAndContextPair(sem, context) = super::analyze_node(context, parent_schema, q)?;
+    let AstAndContextPair(sem, context) = super::analyze_node(context, parent_schema, q, tokens)?;
     let context = match &sem {
         SemAst::SelectStatement(s) => {
             let columns = s.result_columns().column_definitions()?;

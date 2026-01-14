@@ -34,16 +34,18 @@ impl UndefinedAliasColumnRef {
         context: &mut TParseContext,
         alias: &AliasName,
         column: &ColumnName,
-    ) -> SemScalarExpr
+    ) -> Result<SemScalarExpr, AnalysisError>
     where
         TParseContext: ParseContext,
     {
-        context.report_problem(AnalysisProblem::undefined_alias(alias.to_string()));
+        context.report_problem(AnalysisProblem::undefined_alias(alias.to_string()))?;
 
-        SemScalarExpr::ColumnRef(ColumnReferenceExpr::UndefinedAlias(Self {
-            alias: alias.clone(),
-            column: column.clone(),
-        }))
+        Ok(SemScalarExpr::ColumnRef(
+            ColumnReferenceExpr::UndefinedAlias(Self {
+                alias: alias.clone(),
+                column: column.clone(),
+            }),
+        ))
     }
 }
 

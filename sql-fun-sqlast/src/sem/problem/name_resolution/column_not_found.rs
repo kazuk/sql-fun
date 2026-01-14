@@ -5,23 +5,26 @@ use crate::sem::{
 use super::NameResolution;
 
 impl NameResolution {
-    pub fn column_not_found_in_view(view_name: &ViewName, column: &ColumnName) -> Self {
+    pub(crate) fn column_not_found_in_view(view_name: &ViewName, column: &ColumnName) -> Self {
         Self::ColumnNotFoundInView(view_name.clone(), column.clone())
     }
 
-    pub fn column_not_found_in_cte(cte_name: &CteName, column: &ColumnName) -> Self {
+    pub(crate) fn column_not_found_in_cte(cte_name: &CteName, column: &ColumnName) -> Self {
         Self::ColumnNotFoundInCte(cte_name.clone(), column.clone())
     }
 
-    pub fn column_not_found_in_table(table_name: &TableName, column: &ColumnName) -> Self {
+    pub(crate) fn column_not_found_in_table(table_name: &TableName, column: &ColumnName) -> Self {
         Self::ColumnNotFoundInTable(table_name.clone(), column.clone())
     }
 
-    pub fn column_not_found_in_subquery(alias_name: &AliasName, column: &ColumnName) -> Self {
+    pub(crate) fn column_not_found_in_subquery(
+        alias_name: &AliasName,
+        column: &ColumnName,
+    ) -> Self {
         Self::ColumnNotFoundInSubQuery(alias_name.clone(), column.clone())
     }
 
-    pub fn column_not_found_in_source(column: &ColumnName) -> Self {
+    pub(crate) fn column_not_found_in_source(column: &ColumnName) -> Self {
         Self::ColumnNotFoundInSource(column.clone())
     }
 

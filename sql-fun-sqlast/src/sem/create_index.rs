@@ -5,7 +5,7 @@ use crate::{
         AnalysisError, AstAndContextPair, ColumnName, FromClause, ParseContext, SemAst,
         SemScalarExpr, TableName, WithClause, analyze_scaler_expr,
     },
-    syn::{ListOpt, Opt, SortByDir},
+    syn::{ListOpt, Opt, ScanToken, SortByDir},
 };
 
 /// Index item sort order
@@ -145,6 +145,7 @@ impl CreateIndex {
     fn analyze_index_elem<TParseContext>(
         mut context: TParseContext,
         keys: Vec<crate::syn::IndexElem>,
+        tokens: &IVec<ScanToken>,
     ) -> Result<(IndexElementCollection, TParseContext), AnalysisError>
     where
         TParseContext: ParseContext,
@@ -157,6 +158,7 @@ impl CreateIndex {
                     &WithClause::default(),
                     &FromClause::default(),
                     expr,
+                    tokens,
                 )?;
                 context = new_context;
                 IndexElement::from(&scaler_expr)
@@ -184,6 +186,7 @@ pub fn analyze_index_stmt<TParseContext>(
     mut context: TParseContext,
     _parent_schema: &Option<String>,
     syn: crate::syn::IndexStmt,
+    tokens: &IVec<ScanToken>,
 ) -> Result<AstAndContextPair<TParseContext>, AnalysisError>
 where
     TParseContext: ParseContext,
@@ -199,12 +202,12 @@ where
     let table = TableName::try_from(table)?;
     let unique = syn.get_unique();
 
-    let (key_columns, new_context) = CreateIndex::analyze_index_elem(context, keys)?;
+    let (key_columns, new_context) = CreateIndex::analyze_index_elem(context, keys, tokens)?;
     context = new_context;
 
     let include_columns =
         if let Some(includes) = syn.get_index_including_params().map(|v| v.as_index_elem()) {
-            let (cols, new_context) = CreateIndex::analyze_index_elem(context, includes)?;
+            let (cols, new_context) = CreateIndex::analyze_index_elem(context, includes, tokens)?;
             context = new_context;
             cols
         } else {

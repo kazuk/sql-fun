@@ -1,9 +1,11 @@
+use sql_fun_core::IVec;
+
 use crate::{
     sem::{
         AnalysisError, FromClause, ParseContext, PgBuiltInType, SemScalarExpr, TypeReference,
         WithClause, analyze_scaler_expr,
     },
-    syn::{BoolExprType, ListOpt, Opt},
+    syn::{BoolExprType, ListOpt, Opt, ScanToken},
 };
 
 use super::{AnalyzeScalarExpr, SemScalarExprNode};
@@ -41,6 +43,7 @@ impl BooleanExpr {
         with_clause: &WithClause,
         from_clause: &FromClause,
         nodes: Vec<crate::syn::Node>,
+        tokens: &IVec<ScanToken>,
     ) -> Result<(Vec<SemScalarExpr>, TParseContext), AnalysisError>
     where
         TParseContext: ParseContext,
@@ -48,7 +51,7 @@ impl BooleanExpr {
         let mut results = Vec::new();
         for node in nodes {
             let (arg_expr, new_context) =
-                analyze_scaler_expr(context, with_clause, from_clause, node)?;
+                analyze_scaler_expr(context, with_clause, from_clause, node, tokens)?;
             context = new_context;
             results.push(arg_expr);
         }
@@ -95,6 +98,7 @@ where
         with_clause: &WithClause,
         from_clause: &FromClause,
         syn: crate::syn::BoolExpr,
+        tokens: &IVec<ScanToken>,
     ) -> Result<(SemScalarExpr, TParseContext), AnalysisError> {
         let Some(boolop) = syn.get_boolop().as_inner() else {
             AnalysisError::raise_unexpected_none("boolexpr.boolop")?
@@ -102,7 +106,8 @@ where
         let Some(args) = syn.get_args().as_inner() else {
             AnalysisError::raise_unexpected_none("boolexpr.args")?
         };
-        let (args, new_context) = Self::analyze_args(context, with_clause, from_clause, args)?;
+        let (args, new_context) =
+            Self::analyze_args(context, with_clause, from_clause, args, tokens)?;
         context = new_context;
 
         let body = match boolop {
@@ -167,6 +172,7 @@ where
         with_clause: &WithClause,
         from_clause: &FromClause,
         syn: crate::syn::NullTest,
+        tokens: &IVec<ScanToken>,
     ) -> Result<(SemScalarExpr, TParseContext), AnalysisError> {
         let Some(null_test_type) = syn.get_nulltesttype().as_inner() else {
             AnalysisError::raise_unexpected_none("NullTest.nulltesttype")?
@@ -174,7 +180,8 @@ where
         let Some(arg) = syn.get_arg().as_inner() else {
             AnalysisError::raise_unexpected_none("NullTest.arg")?
         };
-        let (arg_expr, new_context) = analyze_scaler_expr(context, with_clause, from_clause, arg)?;
+        let (arg_expr, new_context) =
+            analyze_scaler_expr(context, with_clause, from_clause, arg, tokens)?;
         context = new_context;
         Ok((
             SemScalarExpr::NullTest(Self {

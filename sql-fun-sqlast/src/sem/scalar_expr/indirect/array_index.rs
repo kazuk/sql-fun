@@ -1,10 +1,12 @@
+use sql_fun_core::IVec;
+
 use super::IndirectionExpr;
 use crate::{
     sem::{
         AnalysisError, FromClause, ParseContext, SemScalarExpr, TypeReference, WithClause,
         analyze_scaler_expr,
     },
-    syn::Opt,
+    syn::{Opt, ScanToken},
 };
 
 #[derive(Debug, Clone, Eq, Hash, PartialEq, serde::Serialize, serde::Deserialize)]
@@ -39,17 +41,19 @@ impl ArrayIndex {
         array: SemScalarExpr,
         index: SemScalarExpr,
         context: &mut TParseContext,
-    ) -> IndirectionExpr
+    ) -> Result<IndirectionExpr, AnalysisError>
     where
         TParseContext: ParseContext,
     {
-        array.require_array(context);
-        index.fits_array_index(context);
+        array.require_array(context)?;
+        index.fits_array_index(context)?;
         let item_type = array
             .get_type()
             .and_then(|v| context.get_array_item_type(&v));
 
-        IndirectionExpr::ArrayIndex(Box::new(Self::new(array, index, item_type)))
+        Ok(IndirectionExpr::ArrayIndex(Box::new(Self::new(
+            array, index, item_type,
+        ))))
     }
 
     pub fn analyze_index<TParseContext>(
@@ -58,6 +62,7 @@ impl ArrayIndex {
         from_clause: &FromClause,
         arg: SemScalarExpr,
         indicies: &crate::syn::AIndices,
+        tokens: &IVec<ScanToken>,
     ) -> Result<(IndirectionExpr, TParseContext), AnalysisError>
     where
         TParseContext: ParseContext,
@@ -65,9 +70,10 @@ impl ArrayIndex {
         let Some(uidx) = indicies.get_uidx().as_inner() else {
             AnalysisError::raise_unexpected_none("aindicies.uidx")?
         };
-        let (rexpr, new_context) = analyze_scaler_expr(context, with_clause, from_clause, uidx)?;
+        let (rexpr, new_context) =
+            analyze_scaler_expr(context, with_clause, from_clause, uidx, tokens)?;
         context = new_context;
-        let arg = ArrayIndex::array_index(arg, rexpr, &mut context);
+        let arg = ArrayIndex::array_index(arg, rexpr, &mut context)?;
         Ok((arg, context))
     }
 }

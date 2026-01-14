@@ -1,9 +1,11 @@
+use sql_fun_core::IVec;
+
 use crate::{
     sem::{
         AnalysisError, FullName, FunctionParam, ParseContext, SemScalarExpr, TypeReference,
         type_system::{ArgumentBindingCollection, TypeError},
     },
-    syn::Opt,
+    syn::{Opt, ScanToken},
 };
 
 use super::{FunctionParameterTrait, ParameterBindResult};
@@ -79,6 +81,7 @@ impl FunctionParameterTrait for FunctionParamVariadic {
     fn from_syn<TParseContext>(
         context: TParseContext,
         param: crate::syn::FunctionParameter,
+        _tokens: &IVec<ScanToken>,
     ) -> Result<(FunctionParam, TParseContext), AnalysisError>
     where
         TParseContext: ParseContext,

@@ -1,14 +1,14 @@
 use std::path::Path;
 
 use crate::{
-    AstAndContextPair, StringSpan, parse, read_sql_file,
+    AstAndContextPair, StringSpan, parse, read_sql_file, scan,
     sem::{
         AnalysisError, AnalysisProblem, BaseParseContext, CastDefinition, CastInfoRead,
         CreateIndex, CreateSequence, CreateTable, FullName, FunctionInfoRead,
         FunctionOverloadCollection, IndexInfoRead, OperatorDefinition, OperatorInfoRead,
         OperatorName, SchemaFileContext, SchemaName, SearchPathRead, SemAst, SequenceInfoRead,
-        TableInfoRead, TypeDefinition, TypeInfoRead, TypeReference, ViewInfoRead, ViewLike,
-        semantic_analysis,
+        SourceAccessService, TableInfoRead, TypeDefinition, TypeInfoRead, TypeReference,
+        ViewInfoRead, ViewLike, semantic_analysis,
     },
 };
 /// Error for reading schema dump
@@ -50,12 +50,13 @@ where
     let sql_statements = read_sql_file(dump_file)?;
 
     let statements = ::pg_query::split_with_parser(&sql_statements)?;
-    let mut context = SchemaFileContext::new(input_context);
+    let mut context = SchemaFileContext::new(dump_file, input_context);
     let mut sem_results = Vec::new();
     for statement in statements {
         context.set_statement_span(StringSpan::from_str_in_str(&sql_statements, statement));
         let syn = parse(statement)?;
-        let AstAndContextPair(sem, rcontext) = semantic_analysis(context, syn)?;
+        let tokens = scan(statement)?;
+        let AstAndContextPair(sem, rcontext) = semantic_analysis(context, syn, &tokens)?;
         sem_results.push(sem);
         context = rcontext;
     }
@@ -190,15 +191,28 @@ impl<TContext> BaseParseContext for ParsedSchemaDump<TContext>
 where
     TContext: BaseParseContext + std::fmt::Debug,
 {
-    fn report_problem(&mut self, _problem: AnalysisProblem) {
-        todo!()
+    fn report_problem(&mut self, problem: AnalysisProblem) -> Result<(), AnalysisError> {
+        self.1.report_problem(problem)?;
+        Ok(())
     }
 
-    fn extend(&mut self, _extension: Box<dyn BaseParseContext>) {
-        todo!()
+    fn extend(&mut self, extension: Box<dyn BaseParseContext>) {
+        self.1.extend(extension);
     }
 
     fn set_statement_span(&mut self, statement_span: StringSpan) {
         self.1.set_statement_span(statement_span);
+    }
+
+    fn get_args(&self) -> &sql_fun_core::SqlFunArgs {
+        self.1.get_args()
+    }
+
+    fn get_source_file_path(&self) -> Option<&Path> {
+        self.1.get_source_file_path()
+    }
+
+    fn set_source_file(&mut self, source_acess_service: Box<dyn SourceAccessService>) {
+        self.1.set_source_file(source_acess_service);
     }
 }

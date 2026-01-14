@@ -80,7 +80,7 @@ impl TableFunctionColumnRef {
         if column_def.is_none() {
             context.report_problem(AnalysisProblem::column_not_found_in_table_function(
                 alias, column,
-            ));
+            ))?;
         }
         let col_ref = Self::new(
             alias,

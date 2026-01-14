@@ -1,3 +1,5 @@
+use sql_fun_core::IVec;
+
 use crate::{
     sem::{
         AnalysisError, ColumnCollection, ColumnDefinition, ColumnName, FullName, FunctionParam,
@@ -5,7 +7,7 @@ use crate::{
         create_comp_type::CompositeFieldDefinition,
         type_system::{ArgumentBindingCollection, TypeError, func_params::ParameterBindResult},
     },
-    syn::Opt,
+    syn::{Opt, ScanToken},
 };
 
 use super::FunctionParameterTrait;
@@ -61,6 +63,7 @@ impl FunctionParameterTrait for FunctionParamTable {
     fn from_syn<TParseContext>(
         context: TParseContext,
         param: crate::syn::FunctionParameter,
+        _tokens: &IVec<ScanToken>,
     ) -> Result<(FunctionParam, TParseContext), AnalysisError>
     where
         TParseContext: ParseContext,

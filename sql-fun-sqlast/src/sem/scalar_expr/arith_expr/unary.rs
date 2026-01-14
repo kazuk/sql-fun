@@ -130,10 +130,12 @@ impl super::ArithExpr {
             let candiates =
                 UnaryCastCandiate::enumerate_from_context(context, overloads, &arg_type);
             if candiates.is_empty() {
-                context.report_problem(AnalysisProblem::unary_operator_overload_resolution_failed(
-                    &operator_def,
-                    &arg_type,
-                ));
+                context.report_problem(
+                    AnalysisProblem::unary_operator_overload_resolution_failed(
+                        &operator_def,
+                        &arg_type,
+                    ),
+                )?;
                 return Ok(ResolvedUnaryOperator::new(None, input));
             }
             let filtered = UnaryCastCandiate::filter_best_candiate(candiates);
@@ -141,7 +143,7 @@ impl super::ArithExpr {
                 context.report_problem(AnalysisProblem::unary_operator_overload_ambiguous(
                     &operator_def,
                     &arg_type,
-                ));
+                ))?;
             }
             let candiate = &filtered[0];
             let arg_expr = candiate.wrap_implicit_cast(input);

@@ -1,10 +1,12 @@
+use sql_fun_core::IVec;
+
 use super::IndirectionExpr;
 use crate::{
     sem::{
         AnalysisError, FromClause, ParseContext, SemScalarExpr, TypeReference, WithClause,
         analyze_scaler_expr,
     },
-    syn::Opt,
+    syn::{Opt, ScanToken},
 };
 
 #[derive(Debug, Clone, Eq, Hash, PartialEq, serde::Serialize, serde::Deserialize)]
@@ -43,19 +45,21 @@ impl ArraySlice {
         lower: Option<SemScalarExpr>,
         upper: Option<SemScalarExpr>,
         context: &mut TParseContext,
-    ) -> IndirectionExpr
+    ) -> Result<IndirectionExpr, AnalysisError>
     where
         TParseContext: ParseContext,
     {
-        array.require_array(context);
+        array.require_array(context)?;
         if let Some(lower_index) = &lower {
-            lower_index.fits_array_index(context);
+            lower_index.fits_array_index(context)?;
         }
         if let Some(upper_index) = &upper {
-            upper_index.fits_array_index(context);
+            upper_index.fits_array_index(context)?;
         }
 
-        IndirectionExpr::ArraySlice(Box::new(Self::new(array, lower, upper)))
+        Ok(IndirectionExpr::ArraySlice(Box::new(Self::new(
+            array, lower, upper,
+        ))))
     }
 
     fn analyze_index<TParseContext>(
@@ -63,6 +67,7 @@ impl ArraySlice {
         with_clause: &WithClause,
         from_clause: &FromClause,
         index: crate::syn::Node,
+        tokens: &IVec<ScanToken>,
     ) -> Result<(Option<SemScalarExpr>, TParseContext), AnalysisError>
     where
         TParseContext: ParseContext,
@@ -70,7 +75,8 @@ impl ArraySlice {
         let Some(index) = index.as_inner() else {
             return Ok((None, context));
         };
-        let (lexpr, new_context) = analyze_scaler_expr(context, with_clause, from_clause, index)?;
+        let (lexpr, new_context) =
+            analyze_scaler_expr(context, with_clause, from_clause, index, tokens)?;
         Ok((Some(lexpr), new_context))
     }
 
@@ -80,17 +86,28 @@ impl ArraySlice {
         from_clause: &FromClause,
         arg: SemScalarExpr,
         indicies: crate::syn::AIndices,
+        tokens: &IVec<ScanToken>,
     ) -> Result<(IndirectionExpr, TParseContext), AnalysisError>
     where
         TParseContext: ParseContext,
     {
-        let (lexpr, new_context) =
-            Self::analyze_index(context, with_clause, from_clause, indicies.get_lidx())?;
+        let (lexpr, new_context) = Self::analyze_index(
+            context,
+            with_clause,
+            from_clause,
+            indicies.get_lidx(),
+            tokens,
+        )?;
         context = new_context;
-        let (rexpr, new_context) =
-            Self::analyze_index(context, with_clause, from_clause, indicies.get_uidx())?;
+        let (rexpr, new_context) = Self::analyze_index(
+            context,
+            with_clause,
+            from_clause,
+            indicies.get_uidx(),
+            tokens,
+        )?;
         context = new_context;
-        let arg = ArraySlice::array_slice(arg, lexpr, rexpr, &mut context);
+        let arg = ArraySlice::array_slice(arg, lexpr, rexpr, &mut context)?;
         Ok((arg, context))
     }
 }

@@ -26,11 +26,9 @@ use super::{
 };
 
 /// schema informations for Builtin and extensions
-#[expect(dead_code)]
 #[derive(Debug)]
 pub struct BaseContext {
     context_args: SqlFunArgs,
-    problems: Vec<AnalysisProblem>,
     types: TrieMap<TypeDefinition>,
     casts: TrieMap<TrieMap<CastDefinition>>,
     binary_operators: TrieMap<OperatorDefinition>,
@@ -40,6 +38,8 @@ pub struct BaseContext {
     statement_span: StringSpan,
     search_path: Vec<SchemaName>,
     functions: PgBuiltInFunctions,
+    source_provider: Option<Box<dyn super::SourceAccessService>>,
+    problems: Vec<AnalysisProblem>,
 }
 
 #[derive(serde::Deserialize)]
@@ -67,7 +67,6 @@ impl BaseContext {
         Ok(Self {
             context_args,
             functions,
-            problems: Default::default(),
             types: builtin_type_data,
             casts,
             binary_operators,
@@ -75,7 +74,9 @@ impl BaseContext {
             right_unary_operators,
             extensions: Default::default(),
             statement_span: Default::default(),
+            source_provider: None,
             search_path,
+            problems: Default::default(),
         })
     }
 
@@ -194,8 +195,13 @@ impl SearchPathRead for BaseContext {
 }
 
 impl BaseParseContext for BaseContext {
-    fn report_problem(&mut self, problem: AnalysisProblem) {
+    fn get_args(&self) -> &SqlFunArgs {
+        &self.context_args
+    }
+
+    fn report_problem(&mut self, problem: AnalysisProblem) -> Result<(), AnalysisError> {
         self.problems.push(problem);
+        Ok(())
     }
 
     fn extend(&mut self, extension: Box<dyn BaseParseContext>) {
@@ -204,6 +210,14 @@ impl BaseParseContext for BaseContext {
 
     fn set_statement_span(&mut self, statement_span: StringSpan) {
         self.statement_span = statement_span;
+    }
+
+    fn get_source_file_path(&self) -> Option<&Path> {
+        None // BaseContext contains built-in data item, from Non SQL Source
+    }
+
+    fn set_source_file(&mut self, source_acess_service: Box<dyn super::SourceAccessService>) {
+        self.source_provider = Some(source_acess_service)
     }
 }
 

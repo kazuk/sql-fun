@@ -70,7 +70,7 @@ impl SubQueryDataSource {
             } else {
                 context.report_problem(
                     AnalysisProblem::subquery_not_have_column_for_derived_column_name(),
-                );
+                )?;
                 None
             }
         } else if let Some(result_column_ref) =
@@ -82,7 +82,7 @@ impl SubQueryDataSource {
             context.report_problem(AnalysisProblem::column_not_found_in_subquery(
                 self.alias.name(),
                 column,
-            ));
+            ))?;
             None
         };
 

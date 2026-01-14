@@ -2,12 +2,14 @@ mod array_index;
 mod array_slice;
 mod member_ref;
 
+use sql_fun_core::IVec;
+
 use crate::{
     sem::{
         AnalysisError, FromClause, ParseContext, SemScalarExpr, TypeReference, WithClause,
         analyze_scaler_expr,
     },
-    syn::{ListOpt, Opt},
+    syn::{ListOpt, Opt, ScanToken},
 };
 
 use self::{array_index::ArrayIndex, array_slice::ArraySlice, member_ref::MemberRef};
@@ -31,14 +33,15 @@ impl IndirectionExpr {
         from_clause: &FromClause,
         arg: SemScalarExpr,
         indicies: crate::syn::AIndices,
+        tokens: &IVec<ScanToken>,
     ) -> Result<(Self, TParseContext), AnalysisError>
     where
         TParseContext: ParseContext,
     {
         if indicies.get_is_slice() {
-            ArraySlice::analyze_slice(context, with_clause, from_clause, arg, indicies)
+            ArraySlice::analyze_slice(context, with_clause, from_clause, arg, indicies, tokens)
         } else {
-            ArrayIndex::analyze_index(context, with_clause, from_clause, arg, &indicies)
+            ArrayIndex::analyze_index(context, with_clause, from_clause, arg, &indicies, tokens)
         }
     }
 }
@@ -70,6 +73,7 @@ where
         with_clause: &WithClause,
         from_clause: &FromClause,
         syn: crate::syn::AIndirection,
+        tokens: &IVec<ScanToken>,
     ) -> Result<(SemScalarExpr, TParseContext), AnalysisError> {
         let Some(arg) = syn.get_arg().as_inner() else {
             AnalysisError::raise_unexpected_none("aindirection.arg")?
@@ -78,13 +82,20 @@ where
         let Some(indirection) = syn.get_indirection().as_inner() else {
             AnalysisError::raise_unexpected_none("aindirection.indirection")?
         };
-        let (mut arg, new_context) = analyze_scaler_expr(context, with_clause, from_clause, arg)?;
+        let (mut arg, new_context) =
+            analyze_scaler_expr(context, with_clause, from_clause, arg, tokens)?;
         context = new_context;
 
         for item in indirection {
             if let Some(indicies) = item.as_a_indices().as_inner() {
-                let (new_arg, new_context) =
-                    Self::analyze_indicies(context, with_clause, from_clause, arg, indicies)?;
+                let (new_arg, new_context) = Self::analyze_indicies(
+                    context,
+                    with_clause,
+                    from_clause,
+                    arg,
+                    indicies,
+                    tokens,
+                )?;
                 context = new_context;
                 arg = SemScalarExpr::Indirection(new_arg);
             } else if let Some(member) = item.as_string().get_sval() {
@@ -92,7 +103,7 @@ where
                     arg,
                     member,
                     &mut context,
-                ));
+                )?);
             } else {
                 AnalysisError::raise_unexpected_input(&format!("indirection item: {item:?}"))?;
             }

@@ -12,7 +12,8 @@ done
 # GIT_ROOT setup in our repostitory .envrc
 docker build \
   ${GIT_ROOT}/ci/github-actions/. \
-  -t ci-builder:local
+  -t ci-builder:local \
+  --build-arg "SERENA_TAG=v0.1.4"
 
 if (( CLEAN_TARGET == 1 )); then
     docker volume rm -f ci_target 2>/dev/null || true

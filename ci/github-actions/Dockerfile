@@ -2,29 +2,36 @@
 
 FROM ubuntu:24.04 AS builder
 
+ARG SERENA_TAG
+ARG SERENA_DOWNLOAD_BASE="https://github.com/oraios/serena/archive/refs/tags/"
+
 ENV DEBIAN_FRONTEND=noninteractive \
     RUSTUP_HOME=/usr/local/rustup \
     CARGO_HOME=/usr/local/cargo \
     PATH=/usr/local/cargo/bin:/usr/local/rustup/bin:/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin
 
 RUN apt-get update \
-  && apt-get install -y --no-install-recommends \
+    && apt-get install -y --no-install-recommends \
     ca-certificates curl wget git openssh-client \
     unzip zip xz-utils sudo \
     build-essential pkg-config \
     libssl-dev clang \
     postgresql-client libpq-dev \
-  && rm -rf /var/lib/apt/lists/*
+    && rm -rf /var/lib/apt/lists/*
 
 RUN sudo apt-get update \
- && sudo apt-get install -y automake autoconf libtool make pkg-config
+    && sudo apt-get install -y automake autoconf libtool make pkg-config
 
 RUN curl -fsSL https://sh.rustup.rs \
- | sh -s -- -y --profile minimal --default-toolchain stable \
-  && rustc -V && cargo -V
+    | sh -s -- -y --profile minimal --default-toolchain stable \
+    && rustc -V && cargo -V
 
 RUN cargo install --locked --force --root /opt/tools \
-  cargo-llvm-cov mdbook cargo-deny tera-cli taplo-cli cargo-nextest sccache cargo-sort
+    cargo-llvm-cov mdbook cargo-deny tera-cli taplo-cli cargo-nextest sccache cargo-sort
+
+# https://github.com/oraios/serena/archive/refs/tags/v0.1.4.tar.gz
+RUN curl -fsSL -o /opt/serena.tar.gz \
+    "${SERENA_DOWNLOAD_BASE}${SERENA_TAG}.tar.gz"
 
 FROM ubuntu:24.04
 
@@ -34,14 +41,14 @@ ENV DEBIAN_FRONTEND=noninteractive \
     PATH=/usr/local/cargo/bin:/usr/local/rustup/bin:/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin
 
 RUN apt-get update && apt-get install -y --no-install-recommends \
-  ca-certificates curl sudo
+    ca-certificates curl sudo
 
 RUN curl -fsSL https://cli.github.com/packages/githubcli-archive-keyring.gpg \
- | sudo dd of=/usr/share/keyrings/githubcli-archive-keyring.gpg
+    | sudo dd of=/usr/share/keyrings/githubcli-archive-keyring.gpg
 
 RUN chmod go+r /usr/share/keyrings/githubcli-archive-keyring.gpg \
- && echo "deb [arch=$(dpkg --print-architecture) signed-by=/usr/share/keyrings/githubcli-archive-keyring.gpg] https://cli.github.com/packages stable main" \
-  | sudo tee /etc/apt/sources.list.d/github-cli.list 
+    && echo "deb [arch=$(dpkg --print-architecture) signed-by=/usr/share/keyrings/githubcli-archive-keyring.gpg] https://cli.github.com/packages stable main" \
+    | sudo tee /etc/apt/sources.list.d/github-cli.list
 
 RUN apt-get update && apt-get install -y --no-install-recommends \
     ca-certificates curl direnv git gh \
@@ -49,24 +56,35 @@ RUN apt-get update && apt-get install -y --no-install-recommends \
     unzip zip xz-utils sudo \
     libssl-dev clang jq \
     postgresql-client libpq-dev \
-  && rm -rf /var/lib/apt/lists/*
+    && rm -rf /var/lib/apt/lists/*
 
 # Rust (stable)
 RUN curl -fsSL https://sh.rustup.rs | sh -s -- -y --profile minimal --default-toolchain stable \
-  && rustc -V && cargo -V
+    && rustc -V && cargo -V
 RUN rustup component add rustfmt clippy
 RUN rustup component add llvm-tools-preview --toolchain stable-x86_64-unknown-linux-gnu
 
 # Node.js + npm (for installing Codex CLI)
 RUN apt-get update && apt-get install -y --no-install-recommends \
     nodejs npm \
-  && rm -rf /var/lib/apt/lists/*
+    && rm -rf /var/lib/apt/lists/*
 
 # Codex CLI
 RUN npm i -g @openai/codex@latest \
-  && codex --version
+    && codex --version
 
 RUN git config --system --add safe.directory '*'
 
 RUN apt-get update && apt-get install -y autoconf automake libtool libtool-bin bsdextrautils
+
+# install uv
+RUN curl -LsSf https://astral.sh/uv/install.sh \
+    | env UV_UNMANAGED_INSTALL="/usr/local/bin" sh
+
 COPY --from=builder /opt/tools/bin /usr/local/cargo/bin
+COPY --from=builder /opt/serena.tar.gz /opt/serena.tar.gz
+
+COPY resources/serena-wrapper.sh /usr/local/bin/serena
+RUN chmod +x /usr/local/bin/serena
+
+RUN rustup component add rust-analyzer rust-src

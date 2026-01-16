@@ -64,9 +64,16 @@ RUN curl -fsSL https://sh.rustup.rs | sh -s -- -y --profile minimal --default-to
 RUN rustup component add rustfmt clippy
 RUN rustup component add llvm-tools-preview --toolchain stable-x86_64-unknown-linux-gnu
 
-# Node.js + npm (for installing Codex CLI)
-RUN apt-get update && apt-get install -y --no-install-recommends \
-    nodejs npm \
+# Node.js 22 (for Codex CLI + other MCP tools)
+RUN apt-get update && apt-get install -y --no-install-recommends ca-certificates curl gnupg \
+    && mkdir -p /etc/apt/keyrings \
+    && curl -fsSL https://deb.nodesource.com/gpgkey/nodesource-repo.gpg.key \
+    | gpg --dearmor -o /etc/apt/keyrings/nodesource.gpg \
+    && echo "deb [signed-by=/etc/apt/keyrings/nodesource.gpg] https://deb.nodesource.com/node_22.x nodistro main" \
+    > /etc/apt/sources.list.d/nodesource.list \
+    && apt-get update \
+    && apt-get install -y --no-install-recommends nodejs \
+    && node -v && npm -v \
     && rm -rf /var/lib/apt/lists/*
 
 # Codex CLI

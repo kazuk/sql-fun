@@ -52,6 +52,10 @@ pub enum AnalysisError {
     /// file not found
     #[error("file not found : {0}")]
     FileNotFound(PathBuf),
+
+    /// formatting error
+    #[error(transparent)]
+    FormattingError(#[from] std::fmt::Error),
 }
 
 impl AnalysisError {

@@ -214,7 +214,9 @@ where
                 Self::partial_response(context, func_name, arg_exprs)
             }
         } else {
-            context.report_problem(AnalysisProblem::function_not_found(&func_name))?;
+            let span = syn.get_funcname_span(tokens);
+
+            context.report_problem(AnalysisProblem::function_not_found(&func_name, &span))?;
             Self::partial_response(context, func_name, arg_exprs)
         }
     }

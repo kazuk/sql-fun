@@ -61,33 +61,49 @@ impl TypeName {
         if location <= 0 {
             panic!("invalid location {self:?}")
         }
-        let (start_token, tok) = tokens
-            .iter()
-            .find_position(|t| t.get_start() == location)
-            .unwrap();
-        let mut result_span = StringSpan::from_scan_token(tok);
-        let names_token = &mut tokens.as_slice()[start_token..].iter();
-        let mut expect_ident = true;
-        for tok in names_token {
-            if tok.is_comment() {
-                continue;
-            }
-            if expect_ident {
-                if tok.is_ident() {
-                    result_span.extend(&StringSpan::from_scan_token(tok));
-                    expect_ident = false;
-                    continue;
-                } else {
-                    break;
-                }
-            } else if tok.is_dot() {
+        identifier_many_dot_identifier(tokens, location)
+    }
+}
+
+/// get span for identifier *( dot identifier )
+fn identifier_many_dot_identifier(tokens: &IVec<ScanToken>, location: i32) -> StringSpan {
+    let (start_token_index, tok) = tokens
+        .iter()
+        .find_position(|t| t.get_start() == location)
+        .unwrap();
+    let mut result_span = StringSpan::from_scan_token(tok);
+    let names_token = &mut tokens.as_slice()[start_token_index..].iter();
+    let mut expect_ident = true;
+    for tok in names_token {
+        if tok.is_comment() {
+            continue;
+        }
+        if expect_ident {
+            if tok.is_ident() {
                 result_span.extend(&StringSpan::from_scan_token(tok));
-                expect_ident = true;
+                expect_ident = false;
                 continue;
             } else {
                 break;
             }
+        } else if tok.is_dot() {
+            result_span.extend(&StringSpan::from_scan_token(tok));
+            expect_ident = true;
+            continue;
+        } else {
+            break;
         }
-        result_span
+    }
+    result_span
+}
+
+impl FuncCall {
+    /// get `funcname` span
+    pub fn get_funcname_span(&self, tokens: &IVec<ScanToken>) -> StringSpan {
+        let location = self.get_location();
+        if location <= 0 {
+            panic!("invalid location {self:?}")
+        }
+        identifier_many_dot_identifier(tokens, location)
     }
 }

@@ -1,0 +1,5 @@
+#!/bin/bash
+
+SKILL_NAME='$implement-unit-tests'
+
+codex exec --sandbox workspace-write "'Run ${SKILL_NAME} source='$1' '"

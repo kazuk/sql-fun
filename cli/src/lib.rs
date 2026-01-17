@@ -11,6 +11,10 @@ use std::process::ExitCode;
 
 pub use self::runnable::{RunableCommand, StdStream};
 
+#[cfg(test)]
+/// Test helpers for the sql-fun CLI crate.
+pub mod test_helpers;
+
 /// Runs builtin CLI subcommands
 ///
 /// # Errors

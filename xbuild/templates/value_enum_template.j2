@@ -1,6 +1,6 @@
 {# oneof_message_enum_template.j2 (askama / escape="none" 推奨) #}
 
-{# 
+{#
    - enum_module_name: String
    - enum_type_name: String
    - internal_enum_type_name: String
@@ -23,7 +23,8 @@ use super::*;
 pub use self::inner::{{ enum_type_name }} as {{ enum_type_name }}Inner;
 
 /// `{{ enum_type_name }}`
-#[derive(Debug,Clone, serde::Serialize, serde::Deserialize)]
+#[derive(Debug, Clone)]
+#[cfg_attr(feature="syn_serde", derive(serde::Serialize, serde::Deserialize))]
 pub struct {{ enum_type_name }}(self::inner::{{ enum_type_name }});
 
 #[cfg(test)]
@@ -47,7 +48,8 @@ impl crate::syn::Opt<{{ enum_type_name }}> for {{ enum_type_name }}
 }
 
 /// list of `{{ enum_type_name }}`
-#[derive(Debug, Clone, serde::Serialize, serde::Deserialize, Default)]
+#[derive(Debug, Clone, Default)]
+#[cfg_attr(feature="syn_serde", derive(serde::Serialize, serde::Deserialize))]
 pub struct {{ enum_type_name }}List(Vec<{{ enum_type_name }}>);
 
 #[cfg(test)]
@@ -65,7 +67,8 @@ impl From<Vec<{{ enum_type_name }}>> for {{ enum_type_name }}ListOpt {
 }
 
 /// optional list of `{{ enum_type_name }}`
-#[derive(Debug,Clone, serde::Serialize, serde::Deserialize, Default)]
+#[derive(Debug, Clone, Default)]
+#[cfg_attr(feature="syn_serde", derive(serde::Serialize, serde::Deserialize))]
 pub struct {{ enum_type_name }}ListOpt(Option<Vec<{{ enum_type_name }}>>);
 
 impl crate::syn::ListOpt<{{ enum_type_name }}> for {{ enum_type_name }}ListOpt {
@@ -151,7 +154,8 @@ mod inner {
 use super::*;
 
 /// `{{ enum_type_name }}`
-#[derive(Debug,Clone,serde::Serialize, serde::Deserialize)]
+#[derive(Debug, Clone)]
+#[cfg_attr(feature="syn_serde", derive(serde::Serialize, serde::Deserialize))]
 #[allow(clippy::too_many_lines)]
 pub enum {{ enum_type_name }} {
   /// empty defalut variant
@@ -197,7 +201,7 @@ impl From<::pg_query::protobuf::{{ enum_module_name }}::{{ internal_enum_type_na
             S::{{ field.enum_variant_name() }}(v) => Self::{{ field.enum_variant_name() }}(v.into()),
 {% endif %}
 {% endfor %}
-        }        
+        }
     }
 }
 

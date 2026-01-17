@@ -45,7 +45,7 @@ struct ChildProcess {
 }
 
 impl ChildProcess {
-    #[expect(dead_code)]
+    #[cfg_attr(not(test), expect(dead_code))]
     pub fn start_new(
         command: &str,
         args: &[&str],
@@ -77,7 +77,7 @@ impl ChildProcess {
 }
 
 impl ChildProcess {
-    #[expect(dead_code)]
+    #[cfg_attr(not(test), expect(dead_code))]
     async fn read_line_from<Stdio>(
         from: &mut BufReader<Stdio>,
         buffer: &mut String,
@@ -236,7 +236,7 @@ mod test_child_process_read_to_eof_from {
 }
 
 impl ChildProcess {
-    #[expect(dead_code)]
+    #[cfg_attr(not(test), expect(dead_code))]
     pub async fn poll_exit(&mut self) -> Result<ExitStatus, anyhow::Error> {
         use tokio::time::sleep;
 

@@ -13,7 +13,8 @@ mod node {
     pub use self::inner::Node as NodeInner;
 
     /// `Node`
-    #[derive(Debug, Clone, serde::Serialize, serde::Deserialize)]
+    #[derive(Debug, Clone)]
+    #[cfg_attr(feature = "syn_serde", derive(serde::Serialize, serde::Deserialize))]
     pub struct Node(self::inner::Node);
 
     #[cfg(test)]
@@ -36,7 +37,8 @@ mod node {
     }
 
     /// list of `Node`
-    #[derive(Debug, Clone, serde::Serialize, serde::Deserialize, Default)]
+    #[derive(Debug, Clone, Default)]
+    #[cfg_attr(feature = "syn_serde", derive(serde::Serialize, serde::Deserialize))]
     pub struct NodeList(Vec<Node>);
 
     #[cfg(test)]
@@ -54,7 +56,8 @@ mod node {
     }
 
     /// optional list of `Node`
-    #[derive(Debug, Clone, serde::Serialize, serde::Deserialize, Default)]
+    #[derive(Debug, Clone, Default)]
+    #[cfg_attr(feature = "syn_serde", derive(serde::Serialize, serde::Deserialize))]
     pub struct NodeListOpt(Option<Vec<Node>>);
 
     impl crate::syn::ListOpt<Node> for NodeListOpt {
@@ -137,7 +140,8 @@ mod node {
         use super::*;
 
         /// `Node`
-        #[derive(Debug, Clone, serde::Serialize, serde::Deserialize)]
+        #[derive(Debug, Clone)]
+        #[cfg_attr(feature = "syn_serde", derive(serde::Serialize, serde::Deserialize))]
         #[allow(clippy::too_many_lines)]
         pub enum Node {
             /// empty defalut variant
@@ -9921,7 +9925,8 @@ mod a_const {
     pub use self::inner::AConst as AConstInner;
 
     /// `AConst`
-    #[derive(Debug, Clone, serde::Serialize, serde::Deserialize)]
+    #[derive(Debug, Clone)]
+    #[cfg_attr(feature = "syn_serde", derive(serde::Serialize, serde::Deserialize))]
     pub struct AConst(self::inner::AConst);
 
     #[cfg(test)]
@@ -9944,7 +9949,8 @@ mod a_const {
     }
 
     /// list of `AConst`
-    #[derive(Debug, Clone, serde::Serialize, serde::Deserialize, Default)]
+    #[derive(Debug, Clone, Default)]
+    #[cfg_attr(feature = "syn_serde", derive(serde::Serialize, serde::Deserialize))]
     pub struct AConstList(Vec<AConst>);
 
     #[cfg(test)]
@@ -9962,7 +9968,8 @@ mod a_const {
     }
 
     /// optional list of `AConst`
-    #[derive(Debug, Clone, serde::Serialize, serde::Deserialize, Default)]
+    #[derive(Debug, Clone, Default)]
+    #[cfg_attr(feature = "syn_serde", derive(serde::Serialize, serde::Deserialize))]
     pub struct AConstListOpt(Option<Vec<AConst>>);
 
     impl crate::syn::ListOpt<AConst> for AConstListOpt {
@@ -10045,7 +10052,8 @@ mod a_const {
         use super::*;
 
         /// `AConst`
-        #[derive(Debug, Clone, serde::Serialize, serde::Deserialize)]
+        #[derive(Debug, Clone)]
+        #[cfg_attr(feature = "syn_serde", derive(serde::Serialize, serde::Deserialize))]
         #[allow(clippy::too_many_lines)]
         pub enum AConst {
             /// empty defalut variant
@@ -10276,7 +10284,8 @@ mod query_source {
     use super::*;
 
     /// list of `QuerySource`
-    #[derive(Debug, Clone, serde::Serialize, serde::Deserialize)]
+    #[derive(Debug, Clone)]
+    #[cfg_attr(feature = "syn_serde", derive(serde::Serialize, serde::Deserialize))]
     pub struct QuerySourceList(Vec<QuerySource>);
 
     impl From<Vec<::pg_query::protobuf::QuerySource>> for QuerySourceList {
@@ -10286,7 +10295,8 @@ mod query_source {
     }
 
     /// optional list of `QuerySource`
-    #[derive(Debug, Clone, Copy, serde::Serialize, serde::Deserialize)]
+    #[derive(Debug, Clone, Copy)]
+    #[cfg_attr(feature = "syn_serde", derive(serde::Serialize, serde::Deserialize))]
     pub struct QuerySourceOpt(Option<QuerySource>);
 
     impl crate::syn::Opt<QuerySource> for QuerySourceOpt {
@@ -10352,7 +10362,8 @@ mod query_source {
     }
 
     /// `QuerySource` enum
-    #[derive(Debug, Clone, Copy, serde::Serialize, serde::Deserialize)]
+    #[derive(Debug, Clone, Copy)]
+    #[cfg_attr(feature = "syn_serde", derive(serde::Serialize, serde::Deserialize))]
     pub enum QuerySource {
         /// `Undefined`
         Undefined = 0,
@@ -10428,7 +10439,8 @@ mod sort_by_dir {
     use super::*;
 
     /// list of `SortByDir`
-    #[derive(Debug, Clone, serde::Serialize, serde::Deserialize)]
+    #[derive(Debug, Clone)]
+    #[cfg_attr(feature = "syn_serde", derive(serde::Serialize, serde::Deserialize))]
     pub struct SortByDirList(Vec<SortByDir>);
 
     impl From<Vec<::pg_query::protobuf::SortByDir>> for SortByDirList {
@@ -10438,7 +10450,8 @@ mod sort_by_dir {
     }
 
     /// optional list of `SortByDir`
-    #[derive(Debug, Clone, Copy, serde::Serialize, serde::Deserialize)]
+    #[derive(Debug, Clone, Copy)]
+    #[cfg_attr(feature = "syn_serde", derive(serde::Serialize, serde::Deserialize))]
     pub struct SortByDirOpt(Option<SortByDir>);
 
     impl crate::syn::Opt<SortByDir> for SortByDirOpt {
@@ -10504,7 +10517,8 @@ mod sort_by_dir {
     }
 
     /// `SortByDir` enum
-    #[derive(Debug, Clone, Copy, serde::Serialize, serde::Deserialize)]
+    #[derive(Debug, Clone, Copy)]
+    #[cfg_attr(feature = "syn_serde", derive(serde::Serialize, serde::Deserialize))]
     pub enum SortByDir {
         /// `Undefined`
         Undefined = 0,
@@ -10573,7 +10587,8 @@ mod sort_by_nulls {
     use super::*;
 
     /// list of `SortByNulls`
-    #[derive(Debug, Clone, serde::Serialize, serde::Deserialize)]
+    #[derive(Debug, Clone)]
+    #[cfg_attr(feature = "syn_serde", derive(serde::Serialize, serde::Deserialize))]
     pub struct SortByNullsList(Vec<SortByNulls>);
 
     impl From<Vec<::pg_query::protobuf::SortByNulls>> for SortByNullsList {
@@ -10583,7 +10598,8 @@ mod sort_by_nulls {
     }
 
     /// optional list of `SortByNulls`
-    #[derive(Debug, Clone, Copy, serde::Serialize, serde::Deserialize)]
+    #[derive(Debug, Clone, Copy)]
+    #[cfg_attr(feature = "syn_serde", derive(serde::Serialize, serde::Deserialize))]
     pub struct SortByNullsOpt(Option<SortByNulls>);
 
     impl crate::syn::Opt<SortByNulls> for SortByNullsOpt {
@@ -10649,7 +10665,8 @@ mod sort_by_nulls {
     }
 
     /// `SortByNulls` enum
-    #[derive(Debug, Clone, Copy, serde::Serialize, serde::Deserialize)]
+    #[derive(Debug, Clone, Copy)]
+    #[cfg_attr(feature = "syn_serde", derive(serde::Serialize, serde::Deserialize))]
     pub enum SortByNulls {
         /// `Undefined`
         Undefined = 0,
@@ -10711,7 +10728,8 @@ mod set_quantifier {
     use super::*;
 
     /// list of `SetQuantifier`
-    #[derive(Debug, Clone, serde::Serialize, serde::Deserialize)]
+    #[derive(Debug, Clone)]
+    #[cfg_attr(feature = "syn_serde", derive(serde::Serialize, serde::Deserialize))]
     pub struct SetQuantifierList(Vec<SetQuantifier>);
 
     impl From<Vec<::pg_query::protobuf::SetQuantifier>> for SetQuantifierList {
@@ -10721,7 +10739,8 @@ mod set_quantifier {
     }
 
     /// optional list of `SetQuantifier`
-    #[derive(Debug, Clone, Copy, serde::Serialize, serde::Deserialize)]
+    #[derive(Debug, Clone, Copy)]
+    #[cfg_attr(feature = "syn_serde", derive(serde::Serialize, serde::Deserialize))]
     pub struct SetQuantifierOpt(Option<SetQuantifier>);
 
     impl crate::syn::Opt<SetQuantifier> for SetQuantifierOpt {
@@ -10787,7 +10806,8 @@ mod set_quantifier {
     }
 
     /// `SetQuantifier` enum
-    #[derive(Debug, Clone, Copy, serde::Serialize, serde::Deserialize)]
+    #[derive(Debug, Clone, Copy)]
+    #[cfg_attr(feature = "syn_serde", derive(serde::Serialize, serde::Deserialize))]
     pub enum SetQuantifier {
         /// `Undefined`
         Undefined = 0,
@@ -10849,7 +10869,8 @@ mod a_expr_kind {
     use super::*;
 
     /// list of `AExprKind`
-    #[derive(Debug, Clone, serde::Serialize, serde::Deserialize)]
+    #[derive(Debug, Clone)]
+    #[cfg_attr(feature = "syn_serde", derive(serde::Serialize, serde::Deserialize))]
     pub struct AExprKindList(Vec<AExprKind>);
 
     impl From<Vec<::pg_query::protobuf::AExprKind>> for AExprKindList {
@@ -10859,7 +10880,8 @@ mod a_expr_kind {
     }
 
     /// optional list of `AExprKind`
-    #[derive(Debug, Clone, Copy, serde::Serialize, serde::Deserialize)]
+    #[derive(Debug, Clone, Copy)]
+    #[cfg_attr(feature = "syn_serde", derive(serde::Serialize, serde::Deserialize))]
     pub struct AExprKindOpt(Option<AExprKind>);
 
     impl crate::syn::Opt<AExprKind> for AExprKindOpt {
@@ -10925,7 +10947,8 @@ mod a_expr_kind {
     }
 
     /// `AExprKind` enum
-    #[derive(Debug, Clone, Copy, serde::Serialize, serde::Deserialize)]
+    #[derive(Debug, Clone, Copy)]
+    #[cfg_attr(feature = "syn_serde", derive(serde::Serialize, serde::Deserialize))]
     pub enum AExprKind {
         /// `Undefined`
         Undefined = 0,
@@ -11064,7 +11087,8 @@ mod role_spec_type {
     use super::*;
 
     /// list of `RoleSpecType`
-    #[derive(Debug, Clone, serde::Serialize, serde::Deserialize)]
+    #[derive(Debug, Clone)]
+    #[cfg_attr(feature = "syn_serde", derive(serde::Serialize, serde::Deserialize))]
     pub struct RoleSpecTypeList(Vec<RoleSpecType>);
 
     impl From<Vec<::pg_query::protobuf::RoleSpecType>> for RoleSpecTypeList {
@@ -11074,7 +11098,8 @@ mod role_spec_type {
     }
 
     /// optional list of `RoleSpecType`
-    #[derive(Debug, Clone, Copy, serde::Serialize, serde::Deserialize)]
+    #[derive(Debug, Clone, Copy)]
+    #[cfg_attr(feature = "syn_serde", derive(serde::Serialize, serde::Deserialize))]
     pub struct RoleSpecTypeOpt(Option<RoleSpecType>);
 
     impl crate::syn::Opt<RoleSpecType> for RoleSpecTypeOpt {
@@ -11140,7 +11165,8 @@ mod role_spec_type {
     }
 
     /// `RoleSpecType` enum
-    #[derive(Debug, Clone, Copy, serde::Serialize, serde::Deserialize)]
+    #[derive(Debug, Clone, Copy)]
+    #[cfg_attr(feature = "syn_serde", derive(serde::Serialize, serde::Deserialize))]
     pub enum RoleSpecType {
         /// `Undefined`
         Undefined = 0,
@@ -11216,7 +11242,8 @@ mod table_like_option {
     use super::*;
 
     /// list of `TableLikeOption`
-    #[derive(Debug, Clone, serde::Serialize, serde::Deserialize)]
+    #[derive(Debug, Clone)]
+    #[cfg_attr(feature = "syn_serde", derive(serde::Serialize, serde::Deserialize))]
     pub struct TableLikeOptionList(Vec<TableLikeOption>);
 
     impl From<Vec<::pg_query::protobuf::TableLikeOption>> for TableLikeOptionList {
@@ -11226,7 +11253,8 @@ mod table_like_option {
     }
 
     /// optional list of `TableLikeOption`
-    #[derive(Debug, Clone, Copy, serde::Serialize, serde::Deserialize)]
+    #[derive(Debug, Clone, Copy)]
+    #[cfg_attr(feature = "syn_serde", derive(serde::Serialize, serde::Deserialize))]
     pub struct TableLikeOptionOpt(Option<TableLikeOption>);
 
     impl crate::syn::Opt<TableLikeOption> for TableLikeOptionOpt {
@@ -11292,7 +11320,8 @@ mod table_like_option {
     }
 
     /// `TableLikeOption` enum
-    #[derive(Debug, Clone, Copy, serde::Serialize, serde::Deserialize)]
+    #[derive(Debug, Clone, Copy)]
+    #[cfg_attr(feature = "syn_serde", derive(serde::Serialize, serde::Deserialize))]
     pub enum TableLikeOption {
         /// `Undefined`
         Undefined = 0,
@@ -11403,7 +11432,8 @@ mod def_elem_action {
     use super::*;
 
     /// list of `DefElemAction`
-    #[derive(Debug, Clone, serde::Serialize, serde::Deserialize)]
+    #[derive(Debug, Clone)]
+    #[cfg_attr(feature = "syn_serde", derive(serde::Serialize, serde::Deserialize))]
     pub struct DefElemActionList(Vec<DefElemAction>);
 
     impl From<Vec<::pg_query::protobuf::DefElemAction>> for DefElemActionList {
@@ -11413,7 +11443,8 @@ mod def_elem_action {
     }
 
     /// optional list of `DefElemAction`
-    #[derive(Debug, Clone, Copy, serde::Serialize, serde::Deserialize)]
+    #[derive(Debug, Clone, Copy)]
+    #[cfg_attr(feature = "syn_serde", derive(serde::Serialize, serde::Deserialize))]
     pub struct DefElemActionOpt(Option<DefElemAction>);
 
     impl crate::syn::Opt<DefElemAction> for DefElemActionOpt {
@@ -11479,7 +11510,8 @@ mod def_elem_action {
     }
 
     /// `DefElemAction` enum
-    #[derive(Debug, Clone, Copy, serde::Serialize, serde::Deserialize)]
+    #[derive(Debug, Clone, Copy)]
+    #[cfg_attr(feature = "syn_serde", derive(serde::Serialize, serde::Deserialize))]
     pub enum DefElemAction {
         /// `Undefined`
         Undefined = 0,
@@ -11548,7 +11580,8 @@ mod partition_strategy {
     use super::*;
 
     /// list of `PartitionStrategy`
-    #[derive(Debug, Clone, serde::Serialize, serde::Deserialize)]
+    #[derive(Debug, Clone)]
+    #[cfg_attr(feature = "syn_serde", derive(serde::Serialize, serde::Deserialize))]
     pub struct PartitionStrategyList(Vec<PartitionStrategy>);
 
     impl From<Vec<::pg_query::protobuf::PartitionStrategy>> for PartitionStrategyList {
@@ -11558,7 +11591,8 @@ mod partition_strategy {
     }
 
     /// optional list of `PartitionStrategy`
-    #[derive(Debug, Clone, Copy, serde::Serialize, serde::Deserialize)]
+    #[derive(Debug, Clone, Copy)]
+    #[cfg_attr(feature = "syn_serde", derive(serde::Serialize, serde::Deserialize))]
     pub struct PartitionStrategyOpt(Option<PartitionStrategy>);
 
     impl crate::syn::Opt<PartitionStrategy> for PartitionStrategyOpt {
@@ -11624,7 +11658,8 @@ mod partition_strategy {
     }
 
     /// `PartitionStrategy` enum
-    #[derive(Debug, Clone, Copy, serde::Serialize, serde::Deserialize)]
+    #[derive(Debug, Clone, Copy)]
+    #[cfg_attr(feature = "syn_serde", derive(serde::Serialize, serde::Deserialize))]
     pub enum PartitionStrategy {
         /// `Undefined`
         Undefined = 0,
@@ -11686,7 +11721,8 @@ mod partition_range_datum_kind {
     use super::*;
 
     /// list of `PartitionRangeDatumKind`
-    #[derive(Debug, Clone, serde::Serialize, serde::Deserialize)]
+    #[derive(Debug, Clone)]
+    #[cfg_attr(feature = "syn_serde", derive(serde::Serialize, serde::Deserialize))]
     pub struct PartitionRangeDatumKindList(Vec<PartitionRangeDatumKind>);
 
     impl From<Vec<::pg_query::protobuf::PartitionRangeDatumKind>> for PartitionRangeDatumKindList {
@@ -11701,7 +11737,8 @@ mod partition_range_datum_kind {
     }
 
     /// optional list of `PartitionRangeDatumKind`
-    #[derive(Debug, Clone, Copy, serde::Serialize, serde::Deserialize)]
+    #[derive(Debug, Clone, Copy)]
+    #[cfg_attr(feature = "syn_serde", derive(serde::Serialize, serde::Deserialize))]
     pub struct PartitionRangeDatumKindOpt(Option<PartitionRangeDatumKind>);
 
     impl crate::syn::Opt<PartitionRangeDatumKind> for PartitionRangeDatumKindOpt {
@@ -11767,7 +11804,8 @@ mod partition_range_datum_kind {
     }
 
     /// `PartitionRangeDatumKind` enum
-    #[derive(Debug, Clone, Copy, serde::Serialize, serde::Deserialize)]
+    #[derive(Debug, Clone, Copy)]
+    #[cfg_attr(feature = "syn_serde", derive(serde::Serialize, serde::Deserialize))]
     pub enum PartitionRangeDatumKind {
         /// `Undefined`
         Undefined = 0,
@@ -11831,7 +11869,8 @@ mod rte_kind {
     use super::*;
 
     /// list of `RteKind`
-    #[derive(Debug, Clone, serde::Serialize, serde::Deserialize)]
+    #[derive(Debug, Clone)]
+    #[cfg_attr(feature = "syn_serde", derive(serde::Serialize, serde::Deserialize))]
     pub struct RteKindList(Vec<RteKind>);
 
     impl From<Vec<::pg_query::protobuf::RteKind>> for RteKindList {
@@ -11841,7 +11880,8 @@ mod rte_kind {
     }
 
     /// optional list of `RteKind`
-    #[derive(Debug, Clone, Copy, serde::Serialize, serde::Deserialize)]
+    #[derive(Debug, Clone, Copy)]
+    #[cfg_attr(feature = "syn_serde", derive(serde::Serialize, serde::Deserialize))]
     pub struct RteKindOpt(Option<RteKind>);
 
     impl crate::syn::Opt<RteKind> for RteKindOpt {
@@ -11907,7 +11947,8 @@ mod rte_kind {
     }
 
     /// `RteKind` enum
-    #[derive(Debug, Clone, Copy, serde::Serialize, serde::Deserialize)]
+    #[derive(Debug, Clone, Copy)]
+    #[cfg_attr(feature = "syn_serde", derive(serde::Serialize, serde::Deserialize))]
     pub enum RteKind {
         /// `RtekindUndefined`
         RtekindUndefined = 0,
@@ -12011,7 +12052,8 @@ mod wco_kind {
     use super::*;
 
     /// list of `WcoKind`
-    #[derive(Debug, Clone, serde::Serialize, serde::Deserialize)]
+    #[derive(Debug, Clone)]
+    #[cfg_attr(feature = "syn_serde", derive(serde::Serialize, serde::Deserialize))]
     pub struct WcoKindList(Vec<WcoKind>);
 
     impl From<Vec<::pg_query::protobuf::WcoKind>> for WcoKindList {
@@ -12021,7 +12063,8 @@ mod wco_kind {
     }
 
     /// optional list of `WcoKind`
-    #[derive(Debug, Clone, Copy, serde::Serialize, serde::Deserialize)]
+    #[derive(Debug, Clone, Copy)]
+    #[cfg_attr(feature = "syn_serde", derive(serde::Serialize, serde::Deserialize))]
     pub struct WcoKindOpt(Option<WcoKind>);
 
     impl crate::syn::Opt<WcoKind> for WcoKindOpt {
@@ -12087,7 +12130,8 @@ mod wco_kind {
     }
 
     /// `WcoKind` enum
-    #[derive(Debug, Clone, Copy, serde::Serialize, serde::Deserialize)]
+    #[derive(Debug, Clone, Copy)]
+    #[cfg_attr(feature = "syn_serde", derive(serde::Serialize, serde::Deserialize))]
     pub enum WcoKind {
         /// `WcokindUndefined`
         WcokindUndefined = 0,
@@ -12170,7 +12214,8 @@ mod grouping_set_kind {
     use super::*;
 
     /// list of `GroupingSetKind`
-    #[derive(Debug, Clone, serde::Serialize, serde::Deserialize)]
+    #[derive(Debug, Clone)]
+    #[cfg_attr(feature = "syn_serde", derive(serde::Serialize, serde::Deserialize))]
     pub struct GroupingSetKindList(Vec<GroupingSetKind>);
 
     impl From<Vec<::pg_query::protobuf::GroupingSetKind>> for GroupingSetKindList {
@@ -12180,7 +12225,8 @@ mod grouping_set_kind {
     }
 
     /// optional list of `GroupingSetKind`
-    #[derive(Debug, Clone, Copy, serde::Serialize, serde::Deserialize)]
+    #[derive(Debug, Clone, Copy)]
+    #[cfg_attr(feature = "syn_serde", derive(serde::Serialize, serde::Deserialize))]
     pub struct GroupingSetKindOpt(Option<GroupingSetKind>);
 
     impl crate::syn::Opt<GroupingSetKind> for GroupingSetKindOpt {
@@ -12246,7 +12292,8 @@ mod grouping_set_kind {
     }
 
     /// `GroupingSetKind` enum
-    #[derive(Debug, Clone, Copy, serde::Serialize, serde::Deserialize)]
+    #[derive(Debug, Clone, Copy)]
+    #[cfg_attr(feature = "syn_serde", derive(serde::Serialize, serde::Deserialize))]
     pub enum GroupingSetKind {
         /// `Undefined`
         Undefined = 0,
@@ -12322,7 +12369,8 @@ mod cte_materialize {
     use super::*;
 
     /// list of `CteMaterialize`
-    #[derive(Debug, Clone, serde::Serialize, serde::Deserialize)]
+    #[derive(Debug, Clone)]
+    #[cfg_attr(feature = "syn_serde", derive(serde::Serialize, serde::Deserialize))]
     pub struct CteMaterializeList(Vec<CteMaterialize>);
 
     impl From<Vec<::pg_query::protobuf::CteMaterialize>> for CteMaterializeList {
@@ -12332,7 +12380,8 @@ mod cte_materialize {
     }
 
     /// optional list of `CteMaterialize`
-    #[derive(Debug, Clone, Copy, serde::Serialize, serde::Deserialize)]
+    #[derive(Debug, Clone, Copy)]
+    #[cfg_attr(feature = "syn_serde", derive(serde::Serialize, serde::Deserialize))]
     pub struct CteMaterializeOpt(Option<CteMaterialize>);
 
     impl crate::syn::Opt<CteMaterialize> for CteMaterializeOpt {
@@ -12398,7 +12447,8 @@ mod cte_materialize {
     }
 
     /// `CteMaterialize` enum
-    #[derive(Debug, Clone, Copy, serde::Serialize, serde::Deserialize)]
+    #[derive(Debug, Clone, Copy)]
+    #[cfg_attr(feature = "syn_serde", derive(serde::Serialize, serde::Deserialize))]
     pub enum CteMaterialize {
         /// `CtematerializeUndefined`
         CtematerializeUndefined = 0,
@@ -12460,7 +12510,8 @@ mod json_quotes {
     use super::*;
 
     /// list of `JsonQuotes`
-    #[derive(Debug, Clone, serde::Serialize, serde::Deserialize)]
+    #[derive(Debug, Clone)]
+    #[cfg_attr(feature = "syn_serde", derive(serde::Serialize, serde::Deserialize))]
     pub struct JsonQuotesList(Vec<JsonQuotes>);
 
     impl From<Vec<::pg_query::protobuf::JsonQuotes>> for JsonQuotesList {
@@ -12470,7 +12521,8 @@ mod json_quotes {
     }
 
     /// optional list of `JsonQuotes`
-    #[derive(Debug, Clone, Copy, serde::Serialize, serde::Deserialize)]
+    #[derive(Debug, Clone, Copy)]
+    #[cfg_attr(feature = "syn_serde", derive(serde::Serialize, serde::Deserialize))]
     pub struct JsonQuotesOpt(Option<JsonQuotes>);
 
     impl crate::syn::Opt<JsonQuotes> for JsonQuotesOpt {
@@ -12536,7 +12588,8 @@ mod json_quotes {
     }
 
     /// `JsonQuotes` enum
-    #[derive(Debug, Clone, Copy, serde::Serialize, serde::Deserialize)]
+    #[derive(Debug, Clone, Copy)]
+    #[cfg_attr(feature = "syn_serde", derive(serde::Serialize, serde::Deserialize))]
     pub enum JsonQuotes {
         /// `Undefined`
         Undefined = 0,
@@ -12598,7 +12651,8 @@ mod json_table_column_type {
     use super::*;
 
     /// list of `JsonTableColumnType`
-    #[derive(Debug, Clone, serde::Serialize, serde::Deserialize)]
+    #[derive(Debug, Clone)]
+    #[cfg_attr(feature = "syn_serde", derive(serde::Serialize, serde::Deserialize))]
     pub struct JsonTableColumnTypeList(Vec<JsonTableColumnType>);
 
     impl From<Vec<::pg_query::protobuf::JsonTableColumnType>> for JsonTableColumnTypeList {
@@ -12608,7 +12662,8 @@ mod json_table_column_type {
     }
 
     /// optional list of `JsonTableColumnType`
-    #[derive(Debug, Clone, Copy, serde::Serialize, serde::Deserialize)]
+    #[derive(Debug, Clone, Copy)]
+    #[cfg_attr(feature = "syn_serde", derive(serde::Serialize, serde::Deserialize))]
     pub struct JsonTableColumnTypeOpt(Option<JsonTableColumnType>);
 
     impl crate::syn::Opt<JsonTableColumnType> for JsonTableColumnTypeOpt {
@@ -12674,7 +12729,8 @@ mod json_table_column_type {
     }
 
     /// `JsonTableColumnType` enum
-    #[derive(Debug, Clone, Copy, serde::Serialize, serde::Deserialize)]
+    #[derive(Debug, Clone, Copy)]
+    #[cfg_attr(feature = "syn_serde", derive(serde::Serialize, serde::Deserialize))]
     pub enum JsonTableColumnType {
         /// `Undefined`
         Undefined = 0,
@@ -12752,7 +12808,8 @@ mod set_operation {
     use super::*;
 
     /// list of `SetOperation`
-    #[derive(Debug, Clone, serde::Serialize, serde::Deserialize)]
+    #[derive(Debug, Clone)]
+    #[cfg_attr(feature = "syn_serde", derive(serde::Serialize, serde::Deserialize))]
     pub struct SetOperationList(Vec<SetOperation>);
 
     impl From<Vec<::pg_query::protobuf::SetOperation>> for SetOperationList {
@@ -12762,7 +12819,8 @@ mod set_operation {
     }
 
     /// optional list of `SetOperation`
-    #[derive(Debug, Clone, Copy, serde::Serialize, serde::Deserialize)]
+    #[derive(Debug, Clone, Copy)]
+    #[cfg_attr(feature = "syn_serde", derive(serde::Serialize, serde::Deserialize))]
     pub struct SetOperationOpt(Option<SetOperation>);
 
     impl crate::syn::Opt<SetOperation> for SetOperationOpt {
@@ -12828,7 +12886,8 @@ mod set_operation {
     }
 
     /// `SetOperation` enum
-    #[derive(Debug, Clone, Copy, serde::Serialize, serde::Deserialize)]
+    #[derive(Debug, Clone, Copy)]
+    #[cfg_attr(feature = "syn_serde", derive(serde::Serialize, serde::Deserialize))]
     pub enum SetOperation {
         /// `Undefined`
         Undefined = 0,
@@ -12897,7 +12956,8 @@ mod object_type {
     use super::*;
 
     /// list of `ObjectType`
-    #[derive(Debug, Clone, serde::Serialize, serde::Deserialize)]
+    #[derive(Debug, Clone)]
+    #[cfg_attr(feature = "syn_serde", derive(serde::Serialize, serde::Deserialize))]
     pub struct ObjectTypeList(Vec<ObjectType>);
 
     impl From<Vec<::pg_query::protobuf::ObjectType>> for ObjectTypeList {
@@ -12907,7 +12967,8 @@ mod object_type {
     }
 
     /// optional list of `ObjectType`
-    #[derive(Debug, Clone, Copy, serde::Serialize, serde::Deserialize)]
+    #[derive(Debug, Clone, Copy)]
+    #[cfg_attr(feature = "syn_serde", derive(serde::Serialize, serde::Deserialize))]
     pub struct ObjectTypeOpt(Option<ObjectType>);
 
     impl crate::syn::Opt<ObjectType> for ObjectTypeOpt {
@@ -12973,7 +13034,8 @@ mod object_type {
     }
 
     /// `ObjectType` enum
-    #[derive(Debug, Clone, Copy, serde::Serialize, serde::Deserialize)]
+    #[derive(Debug, Clone, Copy)]
+    #[cfg_attr(feature = "syn_serde", derive(serde::Serialize, serde::Deserialize))]
     pub enum ObjectType {
         /// `Undefined`
         Undefined = 0,
@@ -13378,7 +13440,8 @@ mod drop_behavior {
     use super::*;
 
     /// list of `DropBehavior`
-    #[derive(Debug, Clone, serde::Serialize, serde::Deserialize)]
+    #[derive(Debug, Clone)]
+    #[cfg_attr(feature = "syn_serde", derive(serde::Serialize, serde::Deserialize))]
     pub struct DropBehaviorList(Vec<DropBehavior>);
 
     impl From<Vec<::pg_query::protobuf::DropBehavior>> for DropBehaviorList {
@@ -13388,7 +13451,8 @@ mod drop_behavior {
     }
 
     /// optional list of `DropBehavior`
-    #[derive(Debug, Clone, Copy, serde::Serialize, serde::Deserialize)]
+    #[derive(Debug, Clone, Copy)]
+    #[cfg_attr(feature = "syn_serde", derive(serde::Serialize, serde::Deserialize))]
     pub struct DropBehaviorOpt(Option<DropBehavior>);
 
     impl crate::syn::Opt<DropBehavior> for DropBehaviorOpt {
@@ -13454,7 +13518,8 @@ mod drop_behavior {
     }
 
     /// `DropBehavior` enum
-    #[derive(Debug, Clone, Copy, serde::Serialize, serde::Deserialize)]
+    #[derive(Debug, Clone, Copy)]
+    #[cfg_attr(feature = "syn_serde", derive(serde::Serialize, serde::Deserialize))]
     pub enum DropBehavior {
         /// `Undefined`
         Undefined = 0,
@@ -13509,7 +13574,8 @@ mod alter_table_type {
     use super::*;
 
     /// list of `AlterTableType`
-    #[derive(Debug, Clone, serde::Serialize, serde::Deserialize)]
+    #[derive(Debug, Clone)]
+    #[cfg_attr(feature = "syn_serde", derive(serde::Serialize, serde::Deserialize))]
     pub struct AlterTableTypeList(Vec<AlterTableType>);
 
     impl From<Vec<::pg_query::protobuf::AlterTableType>> for AlterTableTypeList {
@@ -13519,7 +13585,8 @@ mod alter_table_type {
     }
 
     /// optional list of `AlterTableType`
-    #[derive(Debug, Clone, Copy, serde::Serialize, serde::Deserialize)]
+    #[derive(Debug, Clone, Copy)]
+    #[cfg_attr(feature = "syn_serde", derive(serde::Serialize, serde::Deserialize))]
     pub struct AlterTableTypeOpt(Option<AlterTableType>);
 
     impl crate::syn::Opt<AlterTableType> for AlterTableTypeOpt {
@@ -13585,7 +13652,8 @@ mod alter_table_type {
     }
 
     /// `AlterTableType` enum
-    #[derive(Debug, Clone, Copy, serde::Serialize, serde::Deserialize)]
+    #[derive(Debug, Clone, Copy)]
+    #[cfg_attr(feature = "syn_serde", derive(serde::Serialize, serde::Deserialize))]
     pub enum AlterTableType {
         /// `Undefined`
         Undefined = 0,
@@ -14095,7 +14163,8 @@ mod grant_target_type {
     use super::*;
 
     /// list of `GrantTargetType`
-    #[derive(Debug, Clone, serde::Serialize, serde::Deserialize)]
+    #[derive(Debug, Clone)]
+    #[cfg_attr(feature = "syn_serde", derive(serde::Serialize, serde::Deserialize))]
     pub struct GrantTargetTypeList(Vec<GrantTargetType>);
 
     impl From<Vec<::pg_query::protobuf::GrantTargetType>> for GrantTargetTypeList {
@@ -14105,7 +14174,8 @@ mod grant_target_type {
     }
 
     /// optional list of `GrantTargetType`
-    #[derive(Debug, Clone, Copy, serde::Serialize, serde::Deserialize)]
+    #[derive(Debug, Clone, Copy)]
+    #[cfg_attr(feature = "syn_serde", derive(serde::Serialize, serde::Deserialize))]
     pub struct GrantTargetTypeOpt(Option<GrantTargetType>);
 
     impl crate::syn::Opt<GrantTargetType> for GrantTargetTypeOpt {
@@ -14171,7 +14241,8 @@ mod grant_target_type {
     }
 
     /// `GrantTargetType` enum
-    #[derive(Debug, Clone, Copy, serde::Serialize, serde::Deserialize)]
+    #[derive(Debug, Clone, Copy)]
+    #[cfg_attr(feature = "syn_serde", derive(serde::Serialize, serde::Deserialize))]
     pub enum GrantTargetType {
         /// `Undefined`
         Undefined = 0,
@@ -14233,7 +14304,8 @@ mod variable_set_kind {
     use super::*;
 
     /// list of `VariableSetKind`
-    #[derive(Debug, Clone, serde::Serialize, serde::Deserialize)]
+    #[derive(Debug, Clone)]
+    #[cfg_attr(feature = "syn_serde", derive(serde::Serialize, serde::Deserialize))]
     pub struct VariableSetKindList(Vec<VariableSetKind>);
 
     impl From<Vec<::pg_query::protobuf::VariableSetKind>> for VariableSetKindList {
@@ -14243,7 +14315,8 @@ mod variable_set_kind {
     }
 
     /// optional list of `VariableSetKind`
-    #[derive(Debug, Clone, Copy, serde::Serialize, serde::Deserialize)]
+    #[derive(Debug, Clone, Copy)]
+    #[cfg_attr(feature = "syn_serde", derive(serde::Serialize, serde::Deserialize))]
     pub struct VariableSetKindOpt(Option<VariableSetKind>);
 
     impl crate::syn::Opt<VariableSetKind> for VariableSetKindOpt {
@@ -14309,7 +14382,8 @@ mod variable_set_kind {
     }
 
     /// `VariableSetKind` enum
-    #[derive(Debug, Clone, Copy, serde::Serialize, serde::Deserialize)]
+    #[derive(Debug, Clone, Copy)]
+    #[cfg_attr(feature = "syn_serde", derive(serde::Serialize, serde::Deserialize))]
     pub enum VariableSetKind {
         /// `Undefined`
         Undefined = 0,
@@ -14392,7 +14466,8 @@ mod constr_type {
     use super::*;
 
     /// list of `ConstrType`
-    #[derive(Debug, Clone, serde::Serialize, serde::Deserialize)]
+    #[derive(Debug, Clone)]
+    #[cfg_attr(feature = "syn_serde", derive(serde::Serialize, serde::Deserialize))]
     pub struct ConstrTypeList(Vec<ConstrType>);
 
     impl From<Vec<::pg_query::protobuf::ConstrType>> for ConstrTypeList {
@@ -14402,7 +14477,8 @@ mod constr_type {
     }
 
     /// optional list of `ConstrType`
-    #[derive(Debug, Clone, Copy, serde::Serialize, serde::Deserialize)]
+    #[derive(Debug, Clone, Copy)]
+    #[cfg_attr(feature = "syn_serde", derive(serde::Serialize, serde::Deserialize))]
     pub struct ConstrTypeOpt(Option<ConstrType>);
 
     impl crate::syn::Opt<ConstrType> for ConstrTypeOpt {
@@ -14468,7 +14544,8 @@ mod constr_type {
     }
 
     /// `ConstrType` enum
-    #[derive(Debug, Clone, Copy, serde::Serialize, serde::Deserialize)]
+    #[derive(Debug, Clone, Copy)]
+    #[cfg_attr(feature = "syn_serde", derive(serde::Serialize, serde::Deserialize))]
     pub enum ConstrType {
         /// `Undefined`
         Undefined = 0,
@@ -14607,7 +14684,8 @@ mod import_foreign_schema_type {
     use super::*;
 
     /// list of `ImportForeignSchemaType`
-    #[derive(Debug, Clone, serde::Serialize, serde::Deserialize)]
+    #[derive(Debug, Clone)]
+    #[cfg_attr(feature = "syn_serde", derive(serde::Serialize, serde::Deserialize))]
     pub struct ImportForeignSchemaTypeList(Vec<ImportForeignSchemaType>);
 
     impl From<Vec<::pg_query::protobuf::ImportForeignSchemaType>> for ImportForeignSchemaTypeList {
@@ -14622,7 +14700,8 @@ mod import_foreign_schema_type {
     }
 
     /// optional list of `ImportForeignSchemaType`
-    #[derive(Debug, Clone, Copy, serde::Serialize, serde::Deserialize)]
+    #[derive(Debug, Clone, Copy)]
+    #[cfg_attr(feature = "syn_serde", derive(serde::Serialize, serde::Deserialize))]
     pub struct ImportForeignSchemaTypeOpt(Option<ImportForeignSchemaType>);
 
     impl crate::syn::Opt<ImportForeignSchemaType> for ImportForeignSchemaTypeOpt {
@@ -14688,7 +14767,8 @@ mod import_foreign_schema_type {
     }
 
     /// `ImportForeignSchemaType` enum
-    #[derive(Debug, Clone, Copy, serde::Serialize, serde::Deserialize)]
+    #[derive(Debug, Clone, Copy)]
+    #[cfg_attr(feature = "syn_serde", derive(serde::Serialize, serde::Deserialize))]
     pub enum ImportForeignSchemaType {
         /// `Undefined`
         Undefined = 0,
@@ -14752,7 +14832,8 @@ mod role_stmt_type {
     use super::*;
 
     /// list of `RoleStmtType`
-    #[derive(Debug, Clone, serde::Serialize, serde::Deserialize)]
+    #[derive(Debug, Clone)]
+    #[cfg_attr(feature = "syn_serde", derive(serde::Serialize, serde::Deserialize))]
     pub struct RoleStmtTypeList(Vec<RoleStmtType>);
 
     impl From<Vec<::pg_query::protobuf::RoleStmtType>> for RoleStmtTypeList {
@@ -14762,7 +14843,8 @@ mod role_stmt_type {
     }
 
     /// optional list of `RoleStmtType`
-    #[derive(Debug, Clone, Copy, serde::Serialize, serde::Deserialize)]
+    #[derive(Debug, Clone, Copy)]
+    #[cfg_attr(feature = "syn_serde", derive(serde::Serialize, serde::Deserialize))]
     pub struct RoleStmtTypeOpt(Option<RoleStmtType>);
 
     impl crate::syn::Opt<RoleStmtType> for RoleStmtTypeOpt {
@@ -14828,7 +14910,8 @@ mod role_stmt_type {
     }
 
     /// `RoleStmtType` enum
-    #[derive(Debug, Clone, Copy, serde::Serialize, serde::Deserialize)]
+    #[derive(Debug, Clone, Copy)]
+    #[cfg_attr(feature = "syn_serde", derive(serde::Serialize, serde::Deserialize))]
     pub enum RoleStmtType {
         /// `Undefined`
         Undefined = 0,
@@ -14890,7 +14973,8 @@ mod fetch_direction {
     use super::*;
 
     /// list of `FetchDirection`
-    #[derive(Debug, Clone, serde::Serialize, serde::Deserialize)]
+    #[derive(Debug, Clone)]
+    #[cfg_attr(feature = "syn_serde", derive(serde::Serialize, serde::Deserialize))]
     pub struct FetchDirectionList(Vec<FetchDirection>);
 
     impl From<Vec<::pg_query::protobuf::FetchDirection>> for FetchDirectionList {
@@ -14900,7 +14984,8 @@ mod fetch_direction {
     }
 
     /// optional list of `FetchDirection`
-    #[derive(Debug, Clone, Copy, serde::Serialize, serde::Deserialize)]
+    #[derive(Debug, Clone, Copy)]
+    #[cfg_attr(feature = "syn_serde", derive(serde::Serialize, serde::Deserialize))]
     pub struct FetchDirectionOpt(Option<FetchDirection>);
 
     impl crate::syn::Opt<FetchDirection> for FetchDirectionOpt {
@@ -14966,7 +15051,8 @@ mod fetch_direction {
     }
 
     /// `FetchDirection` enum
-    #[derive(Debug, Clone, Copy, serde::Serialize, serde::Deserialize)]
+    #[derive(Debug, Clone, Copy)]
+    #[cfg_attr(feature = "syn_serde", derive(serde::Serialize, serde::Deserialize))]
     pub enum FetchDirection {
         /// `Undefined`
         Undefined = 0,
@@ -15035,7 +15121,8 @@ mod function_parameter_mode {
     use super::*;
 
     /// list of `FunctionParameterMode`
-    #[derive(Debug, Clone, serde::Serialize, serde::Deserialize)]
+    #[derive(Debug, Clone)]
+    #[cfg_attr(feature = "syn_serde", derive(serde::Serialize, serde::Deserialize))]
     pub struct FunctionParameterModeList(Vec<FunctionParameterMode>);
 
     impl From<Vec<::pg_query::protobuf::FunctionParameterMode>> for FunctionParameterModeList {
@@ -15045,7 +15132,8 @@ mod function_parameter_mode {
     }
 
     /// optional list of `FunctionParameterMode`
-    #[derive(Debug, Clone, Copy, serde::Serialize, serde::Deserialize)]
+    #[derive(Debug, Clone, Copy)]
+    #[cfg_attr(feature = "syn_serde", derive(serde::Serialize, serde::Deserialize))]
     pub struct FunctionParameterModeOpt(Option<FunctionParameterMode>);
 
     impl crate::syn::Opt<FunctionParameterMode> for FunctionParameterModeOpt {
@@ -15111,7 +15199,8 @@ mod function_parameter_mode {
     }
 
     /// `FunctionParameterMode` enum
-    #[derive(Debug, Clone, Copy, serde::Serialize, serde::Deserialize)]
+    #[derive(Debug, Clone, Copy)]
+    #[cfg_attr(feature = "syn_serde", derive(serde::Serialize, serde::Deserialize))]
     pub enum FunctionParameterMode {
         /// `Undefined`
         Undefined = 0,
@@ -15196,7 +15285,8 @@ mod transaction_stmt_kind {
     use super::*;
 
     /// list of `TransactionStmtKind`
-    #[derive(Debug, Clone, serde::Serialize, serde::Deserialize)]
+    #[derive(Debug, Clone)]
+    #[cfg_attr(feature = "syn_serde", derive(serde::Serialize, serde::Deserialize))]
     pub struct TransactionStmtKindList(Vec<TransactionStmtKind>);
 
     impl From<Vec<::pg_query::protobuf::TransactionStmtKind>> for TransactionStmtKindList {
@@ -15206,7 +15296,8 @@ mod transaction_stmt_kind {
     }
 
     /// optional list of `TransactionStmtKind`
-    #[derive(Debug, Clone, Copy, serde::Serialize, serde::Deserialize)]
+    #[derive(Debug, Clone, Copy)]
+    #[cfg_attr(feature = "syn_serde", derive(serde::Serialize, serde::Deserialize))]
     pub struct TransactionStmtKindOpt(Option<TransactionStmtKind>);
 
     impl crate::syn::Opt<TransactionStmtKind> for TransactionStmtKindOpt {
@@ -15272,7 +15363,8 @@ mod transaction_stmt_kind {
     }
 
     /// `TransactionStmtKind` enum
-    #[derive(Debug, Clone, Copy, serde::Serialize, serde::Deserialize)]
+    #[derive(Debug, Clone, Copy)]
+    #[cfg_attr(feature = "syn_serde", derive(serde::Serialize, serde::Deserialize))]
     pub enum TransactionStmtKind {
         /// `Undefined`
         Undefined = 0,
@@ -15385,7 +15477,8 @@ mod view_check_option {
     use super::*;
 
     /// list of `ViewCheckOption`
-    #[derive(Debug, Clone, serde::Serialize, serde::Deserialize)]
+    #[derive(Debug, Clone)]
+    #[cfg_attr(feature = "syn_serde", derive(serde::Serialize, serde::Deserialize))]
     pub struct ViewCheckOptionList(Vec<ViewCheckOption>);
 
     impl From<Vec<::pg_query::protobuf::ViewCheckOption>> for ViewCheckOptionList {
@@ -15395,7 +15488,8 @@ mod view_check_option {
     }
 
     /// optional list of `ViewCheckOption`
-    #[derive(Debug, Clone, Copy, serde::Serialize, serde::Deserialize)]
+    #[derive(Debug, Clone, Copy)]
+    #[cfg_attr(feature = "syn_serde", derive(serde::Serialize, serde::Deserialize))]
     pub struct ViewCheckOptionOpt(Option<ViewCheckOption>);
 
     impl crate::syn::Opt<ViewCheckOption> for ViewCheckOptionOpt {
@@ -15461,7 +15555,8 @@ mod view_check_option {
     }
 
     /// `ViewCheckOption` enum
-    #[derive(Debug, Clone, Copy, serde::Serialize, serde::Deserialize)]
+    #[derive(Debug, Clone, Copy)]
+    #[cfg_attr(feature = "syn_serde", derive(serde::Serialize, serde::Deserialize))]
     pub enum ViewCheckOption {
         /// `Undefined`
         Undefined = 0,
@@ -15523,7 +15618,8 @@ mod discard_mode {
     use super::*;
 
     /// list of `DiscardMode`
-    #[derive(Debug, Clone, serde::Serialize, serde::Deserialize)]
+    #[derive(Debug, Clone)]
+    #[cfg_attr(feature = "syn_serde", derive(serde::Serialize, serde::Deserialize))]
     pub struct DiscardModeList(Vec<DiscardMode>);
 
     impl From<Vec<::pg_query::protobuf::DiscardMode>> for DiscardModeList {
@@ -15533,7 +15629,8 @@ mod discard_mode {
     }
 
     /// optional list of `DiscardMode`
-    #[derive(Debug, Clone, Copy, serde::Serialize, serde::Deserialize)]
+    #[derive(Debug, Clone, Copy)]
+    #[cfg_attr(feature = "syn_serde", derive(serde::Serialize, serde::Deserialize))]
     pub struct DiscardModeOpt(Option<DiscardMode>);
 
     impl crate::syn::Opt<DiscardMode> for DiscardModeOpt {
@@ -15599,7 +15696,8 @@ mod discard_mode {
     }
 
     /// `DiscardMode` enum
-    #[derive(Debug, Clone, Copy, serde::Serialize, serde::Deserialize)]
+    #[derive(Debug, Clone, Copy)]
+    #[cfg_attr(feature = "syn_serde", derive(serde::Serialize, serde::Deserialize))]
     pub enum DiscardMode {
         /// `Undefined`
         Undefined = 0,
@@ -15668,7 +15766,8 @@ mod reindex_object_type {
     use super::*;
 
     /// list of `ReindexObjectType`
-    #[derive(Debug, Clone, serde::Serialize, serde::Deserialize)]
+    #[derive(Debug, Clone)]
+    #[cfg_attr(feature = "syn_serde", derive(serde::Serialize, serde::Deserialize))]
     pub struct ReindexObjectTypeList(Vec<ReindexObjectType>);
 
     impl From<Vec<::pg_query::protobuf::ReindexObjectType>> for ReindexObjectTypeList {
@@ -15678,7 +15777,8 @@ mod reindex_object_type {
     }
 
     /// optional list of `ReindexObjectType`
-    #[derive(Debug, Clone, Copy, serde::Serialize, serde::Deserialize)]
+    #[derive(Debug, Clone, Copy)]
+    #[cfg_attr(feature = "syn_serde", derive(serde::Serialize, serde::Deserialize))]
     pub struct ReindexObjectTypeOpt(Option<ReindexObjectType>);
 
     impl crate::syn::Opt<ReindexObjectType> for ReindexObjectTypeOpt {
@@ -15744,7 +15844,8 @@ mod reindex_object_type {
     }
 
     /// `ReindexObjectType` enum
-    #[derive(Debug, Clone, Copy, serde::Serialize, serde::Deserialize)]
+    #[derive(Debug, Clone, Copy)]
+    #[cfg_attr(feature = "syn_serde", derive(serde::Serialize, serde::Deserialize))]
     pub enum ReindexObjectType {
         /// `Undefined`
         Undefined = 0,
@@ -15820,7 +15921,8 @@ mod alter_ts_config_type {
     use super::*;
 
     /// list of `AlterTsConfigType`
-    #[derive(Debug, Clone, serde::Serialize, serde::Deserialize)]
+    #[derive(Debug, Clone)]
+    #[cfg_attr(feature = "syn_serde", derive(serde::Serialize, serde::Deserialize))]
     pub struct AlterTsConfigTypeList(Vec<AlterTsConfigType>);
 
     impl From<Vec<::pg_query::protobuf::AlterTsConfigType>> for AlterTsConfigTypeList {
@@ -15830,7 +15932,8 @@ mod alter_ts_config_type {
     }
 
     /// optional list of `AlterTsConfigType`
-    #[derive(Debug, Clone, Copy, serde::Serialize, serde::Deserialize)]
+    #[derive(Debug, Clone, Copy)]
+    #[cfg_attr(feature = "syn_serde", derive(serde::Serialize, serde::Deserialize))]
     pub struct AlterTsConfigTypeOpt(Option<AlterTsConfigType>);
 
     impl crate::syn::Opt<AlterTsConfigType> for AlterTsConfigTypeOpt {
@@ -15896,7 +15999,8 @@ mod alter_ts_config_type {
     }
 
     /// `AlterTsConfigType` enum
-    #[derive(Debug, Clone, Copy, serde::Serialize, serde::Deserialize)]
+    #[derive(Debug, Clone, Copy)]
+    #[cfg_attr(feature = "syn_serde", derive(serde::Serialize, serde::Deserialize))]
     pub enum AlterTsConfigType {
         /// `AlterTsconfigTypeUndefined`
         AlterTsconfigTypeUndefined = 0,
@@ -15972,7 +16076,8 @@ mod publication_obj_spec_type {
     use super::*;
 
     /// list of `PublicationObjSpecType`
-    #[derive(Debug, Clone, serde::Serialize, serde::Deserialize)]
+    #[derive(Debug, Clone)]
+    #[cfg_attr(feature = "syn_serde", derive(serde::Serialize, serde::Deserialize))]
     pub struct PublicationObjSpecTypeList(Vec<PublicationObjSpecType>);
 
     impl From<Vec<::pg_query::protobuf::PublicationObjSpecType>> for PublicationObjSpecTypeList {
@@ -15987,7 +16092,8 @@ mod publication_obj_spec_type {
     }
 
     /// optional list of `PublicationObjSpecType`
-    #[derive(Debug, Clone, Copy, serde::Serialize, serde::Deserialize)]
+    #[derive(Debug, Clone, Copy)]
+    #[cfg_attr(feature = "syn_serde", derive(serde::Serialize, serde::Deserialize))]
     pub struct PublicationObjSpecTypeOpt(Option<PublicationObjSpecType>);
 
     impl crate::syn::Opt<PublicationObjSpecType> for PublicationObjSpecTypeOpt {
@@ -16053,7 +16159,8 @@ mod publication_obj_spec_type {
     }
 
     /// `PublicationObjSpecType` enum
-    #[derive(Debug, Clone, Copy, serde::Serialize, serde::Deserialize)]
+    #[derive(Debug, Clone, Copy)]
+    #[cfg_attr(feature = "syn_serde", derive(serde::Serialize, serde::Deserialize))]
     pub enum PublicationObjSpecType {
         /// `Undefined`
         Undefined = 0,
@@ -16124,7 +16231,8 @@ mod alter_publication_action {
     use super::*;
 
     /// list of `AlterPublicationAction`
-    #[derive(Debug, Clone, serde::Serialize, serde::Deserialize)]
+    #[derive(Debug, Clone)]
+    #[cfg_attr(feature = "syn_serde", derive(serde::Serialize, serde::Deserialize))]
     pub struct AlterPublicationActionList(Vec<AlterPublicationAction>);
 
     impl From<Vec<::pg_query::protobuf::AlterPublicationAction>> for AlterPublicationActionList {
@@ -16139,7 +16247,8 @@ mod alter_publication_action {
     }
 
     /// optional list of `AlterPublicationAction`
-    #[derive(Debug, Clone, Copy, serde::Serialize, serde::Deserialize)]
+    #[derive(Debug, Clone, Copy)]
+    #[cfg_attr(feature = "syn_serde", derive(serde::Serialize, serde::Deserialize))]
     pub struct AlterPublicationActionOpt(Option<AlterPublicationAction>);
 
     impl crate::syn::Opt<AlterPublicationAction> for AlterPublicationActionOpt {
@@ -16205,7 +16314,8 @@ mod alter_publication_action {
     }
 
     /// `AlterPublicationAction` enum
-    #[derive(Debug, Clone, Copy, serde::Serialize, serde::Deserialize)]
+    #[derive(Debug, Clone, Copy)]
+    #[cfg_attr(feature = "syn_serde", derive(serde::Serialize, serde::Deserialize))]
     pub enum AlterPublicationAction {
         /// `Undefined`
         Undefined = 0,
@@ -16269,7 +16379,8 @@ mod alter_subscription_type {
     use super::*;
 
     /// list of `AlterSubscriptionType`
-    #[derive(Debug, Clone, serde::Serialize, serde::Deserialize)]
+    #[derive(Debug, Clone)]
+    #[cfg_attr(feature = "syn_serde", derive(serde::Serialize, serde::Deserialize))]
     pub struct AlterSubscriptionTypeList(Vec<AlterSubscriptionType>);
 
     impl From<Vec<::pg_query::protobuf::AlterSubscriptionType>> for AlterSubscriptionTypeList {
@@ -16279,7 +16390,8 @@ mod alter_subscription_type {
     }
 
     /// optional list of `AlterSubscriptionType`
-    #[derive(Debug, Clone, Copy, serde::Serialize, serde::Deserialize)]
+    #[derive(Debug, Clone, Copy)]
+    #[cfg_attr(feature = "syn_serde", derive(serde::Serialize, serde::Deserialize))]
     pub struct AlterSubscriptionTypeOpt(Option<AlterSubscriptionType>);
 
     impl crate::syn::Opt<AlterSubscriptionType> for AlterSubscriptionTypeOpt {
@@ -16345,7 +16457,8 @@ mod alter_subscription_type {
     }
 
     /// `AlterSubscriptionType` enum
-    #[derive(Debug, Clone, Copy, serde::Serialize, serde::Deserialize)]
+    #[derive(Debug, Clone, Copy)]
+    #[cfg_attr(feature = "syn_serde", derive(serde::Serialize, serde::Deserialize))]
     pub enum AlterSubscriptionType {
         /// `Undefined`
         Undefined = 0,
@@ -16444,7 +16557,8 @@ mod overriding_kind {
     use super::*;
 
     /// list of `OverridingKind`
-    #[derive(Debug, Clone, serde::Serialize, serde::Deserialize)]
+    #[derive(Debug, Clone)]
+    #[cfg_attr(feature = "syn_serde", derive(serde::Serialize, serde::Deserialize))]
     pub struct OverridingKindList(Vec<OverridingKind>);
 
     impl From<Vec<::pg_query::protobuf::OverridingKind>> for OverridingKindList {
@@ -16454,7 +16568,8 @@ mod overriding_kind {
     }
 
     /// optional list of `OverridingKind`
-    #[derive(Debug, Clone, Copy, serde::Serialize, serde::Deserialize)]
+    #[derive(Debug, Clone, Copy)]
+    #[cfg_attr(feature = "syn_serde", derive(serde::Serialize, serde::Deserialize))]
     pub struct OverridingKindOpt(Option<OverridingKind>);
 
     impl crate::syn::Opt<OverridingKind> for OverridingKindOpt {
@@ -16520,7 +16635,8 @@ mod overriding_kind {
     }
 
     /// `OverridingKind` enum
-    #[derive(Debug, Clone, Copy, serde::Serialize, serde::Deserialize)]
+    #[derive(Debug, Clone, Copy)]
+    #[cfg_attr(feature = "syn_serde", derive(serde::Serialize, serde::Deserialize))]
     pub enum OverridingKind {
         /// `Undefined`
         Undefined = 0,
@@ -16582,7 +16698,8 @@ mod on_commit_action {
     use super::*;
 
     /// list of `OnCommitAction`
-    #[derive(Debug, Clone, serde::Serialize, serde::Deserialize)]
+    #[derive(Debug, Clone)]
+    #[cfg_attr(feature = "syn_serde", derive(serde::Serialize, serde::Deserialize))]
     pub struct OnCommitActionList(Vec<OnCommitAction>);
 
     impl From<Vec<::pg_query::protobuf::OnCommitAction>> for OnCommitActionList {
@@ -16592,7 +16709,8 @@ mod on_commit_action {
     }
 
     /// optional list of `OnCommitAction`
-    #[derive(Debug, Clone, Copy, serde::Serialize, serde::Deserialize)]
+    #[derive(Debug, Clone, Copy)]
+    #[cfg_attr(feature = "syn_serde", derive(serde::Serialize, serde::Deserialize))]
     pub struct OnCommitActionOpt(Option<OnCommitAction>);
 
     impl crate::syn::Opt<OnCommitAction> for OnCommitActionOpt {
@@ -16658,7 +16776,8 @@ mod on_commit_action {
     }
 
     /// `OnCommitAction` enum
-    #[derive(Debug, Clone, Copy, serde::Serialize, serde::Deserialize)]
+    #[derive(Debug, Clone, Copy)]
+    #[cfg_attr(feature = "syn_serde", derive(serde::Serialize, serde::Deserialize))]
     pub enum OnCommitAction {
         /// `Undefined`
         Undefined = 0,
@@ -16727,7 +16846,8 @@ mod table_func_type {
     use super::*;
 
     /// list of `TableFuncType`
-    #[derive(Debug, Clone, serde::Serialize, serde::Deserialize)]
+    #[derive(Debug, Clone)]
+    #[cfg_attr(feature = "syn_serde", derive(serde::Serialize, serde::Deserialize))]
     pub struct TableFuncTypeList(Vec<TableFuncType>);
 
     impl From<Vec<::pg_query::protobuf::TableFuncType>> for TableFuncTypeList {
@@ -16737,7 +16857,8 @@ mod table_func_type {
     }
 
     /// optional list of `TableFuncType`
-    #[derive(Debug, Clone, Copy, serde::Serialize, serde::Deserialize)]
+    #[derive(Debug, Clone, Copy)]
+    #[cfg_attr(feature = "syn_serde", derive(serde::Serialize, serde::Deserialize))]
     pub struct TableFuncTypeOpt(Option<TableFuncType>);
 
     impl crate::syn::Opt<TableFuncType> for TableFuncTypeOpt {
@@ -16803,7 +16924,8 @@ mod table_func_type {
     }
 
     /// `TableFuncType` enum
-    #[derive(Debug, Clone, Copy, serde::Serialize, serde::Deserialize)]
+    #[derive(Debug, Clone, Copy)]
+    #[cfg_attr(feature = "syn_serde", derive(serde::Serialize, serde::Deserialize))]
     pub enum TableFuncType {
         /// `Undefined`
         Undefined = 0,
@@ -16858,7 +16980,8 @@ mod param_kind {
     use super::*;
 
     /// list of `ParamKind`
-    #[derive(Debug, Clone, serde::Serialize, serde::Deserialize)]
+    #[derive(Debug, Clone)]
+    #[cfg_attr(feature = "syn_serde", derive(serde::Serialize, serde::Deserialize))]
     pub struct ParamKindList(Vec<ParamKind>);
 
     impl From<Vec<::pg_query::protobuf::ParamKind>> for ParamKindList {
@@ -16868,7 +16991,8 @@ mod param_kind {
     }
 
     /// optional list of `ParamKind`
-    #[derive(Debug, Clone, Copy, serde::Serialize, serde::Deserialize)]
+    #[derive(Debug, Clone, Copy)]
+    #[cfg_attr(feature = "syn_serde", derive(serde::Serialize, serde::Deserialize))]
     pub struct ParamKindOpt(Option<ParamKind>);
 
     impl crate::syn::Opt<ParamKind> for ParamKindOpt {
@@ -16934,7 +17058,8 @@ mod param_kind {
     }
 
     /// `ParamKind` enum
-    #[derive(Debug, Clone, Copy, serde::Serialize, serde::Deserialize)]
+    #[derive(Debug, Clone, Copy)]
+    #[cfg_attr(feature = "syn_serde", derive(serde::Serialize, serde::Deserialize))]
     pub enum ParamKind {
         /// `Undefined`
         Undefined = 0,
@@ -17003,7 +17128,8 @@ mod coercion_context {
     use super::*;
 
     /// list of `CoercionContext`
-    #[derive(Debug, Clone, serde::Serialize, serde::Deserialize)]
+    #[derive(Debug, Clone)]
+    #[cfg_attr(feature = "syn_serde", derive(serde::Serialize, serde::Deserialize))]
     pub struct CoercionContextList(Vec<CoercionContext>);
 
     impl From<Vec<::pg_query::protobuf::CoercionContext>> for CoercionContextList {
@@ -17013,7 +17139,8 @@ mod coercion_context {
     }
 
     /// optional list of `CoercionContext`
-    #[derive(Debug, Clone, Copy, serde::Serialize, serde::Deserialize)]
+    #[derive(Debug, Clone, Copy)]
+    #[cfg_attr(feature = "syn_serde", derive(serde::Serialize, serde::Deserialize))]
     pub struct CoercionContextOpt(Option<CoercionContext>);
 
     impl crate::syn::Opt<CoercionContext> for CoercionContextOpt {
@@ -17079,7 +17206,8 @@ mod coercion_context {
     }
 
     /// `CoercionContext` enum
-    #[derive(Debug, Clone, Copy, serde::Serialize, serde::Deserialize)]
+    #[derive(Debug, Clone, Copy)]
+    #[cfg_attr(feature = "syn_serde", derive(serde::Serialize, serde::Deserialize))]
     pub enum CoercionContext {
         /// `Undefined`
         Undefined = 0,
@@ -17148,7 +17276,8 @@ mod coercion_form {
     use super::*;
 
     /// list of `CoercionForm`
-    #[derive(Debug, Clone, serde::Serialize, serde::Deserialize)]
+    #[derive(Debug, Clone)]
+    #[cfg_attr(feature = "syn_serde", derive(serde::Serialize, serde::Deserialize))]
     pub struct CoercionFormList(Vec<CoercionForm>);
 
     impl From<Vec<::pg_query::protobuf::CoercionForm>> for CoercionFormList {
@@ -17158,7 +17287,8 @@ mod coercion_form {
     }
 
     /// optional list of `CoercionForm`
-    #[derive(Debug, Clone, Copy, serde::Serialize, serde::Deserialize)]
+    #[derive(Debug, Clone, Copy)]
+    #[cfg_attr(feature = "syn_serde", derive(serde::Serialize, serde::Deserialize))]
     pub struct CoercionFormOpt(Option<CoercionForm>);
 
     impl crate::syn::Opt<CoercionForm> for CoercionFormOpt {
@@ -17224,7 +17354,8 @@ mod coercion_form {
     }
 
     /// `CoercionForm` enum
-    #[derive(Debug, Clone, Copy, serde::Serialize, serde::Deserialize)]
+    #[derive(Debug, Clone, Copy)]
+    #[cfg_attr(feature = "syn_serde", derive(serde::Serialize, serde::Deserialize))]
     pub enum CoercionForm {
         /// `Undefined`
         Undefined = 0,
@@ -17293,7 +17424,8 @@ mod bool_expr_type {
     use super::*;
 
     /// list of `BoolExprType`
-    #[derive(Debug, Clone, serde::Serialize, serde::Deserialize)]
+    #[derive(Debug, Clone)]
+    #[cfg_attr(feature = "syn_serde", derive(serde::Serialize, serde::Deserialize))]
     pub struct BoolExprTypeList(Vec<BoolExprType>);
 
     impl From<Vec<::pg_query::protobuf::BoolExprType>> for BoolExprTypeList {
@@ -17303,7 +17435,8 @@ mod bool_expr_type {
     }
 
     /// optional list of `BoolExprType`
-    #[derive(Debug, Clone, Copy, serde::Serialize, serde::Deserialize)]
+    #[derive(Debug, Clone, Copy)]
+    #[cfg_attr(feature = "syn_serde", derive(serde::Serialize, serde::Deserialize))]
     pub struct BoolExprTypeOpt(Option<BoolExprType>);
 
     impl crate::syn::Opt<BoolExprType> for BoolExprTypeOpt {
@@ -17369,7 +17502,8 @@ mod bool_expr_type {
     }
 
     /// `BoolExprType` enum
-    #[derive(Debug, Clone, Copy, serde::Serialize, serde::Deserialize)]
+    #[derive(Debug, Clone, Copy)]
+    #[cfg_attr(feature = "syn_serde", derive(serde::Serialize, serde::Deserialize))]
     pub enum BoolExprType {
         /// `Undefined`
         Undefined = 0,
@@ -17431,7 +17565,8 @@ mod sub_link_type {
     use super::*;
 
     /// list of `SubLinkType`
-    #[derive(Debug, Clone, serde::Serialize, serde::Deserialize)]
+    #[derive(Debug, Clone)]
+    #[cfg_attr(feature = "syn_serde", derive(serde::Serialize, serde::Deserialize))]
     pub struct SubLinkTypeList(Vec<SubLinkType>);
 
     impl From<Vec<::pg_query::protobuf::SubLinkType>> for SubLinkTypeList {
@@ -17441,7 +17576,8 @@ mod sub_link_type {
     }
 
     /// optional list of `SubLinkType`
-    #[derive(Debug, Clone, Copy, serde::Serialize, serde::Deserialize)]
+    #[derive(Debug, Clone, Copy)]
+    #[cfg_attr(feature = "syn_serde", derive(serde::Serialize, serde::Deserialize))]
     pub struct SubLinkTypeOpt(Option<SubLinkType>);
 
     impl crate::syn::Opt<SubLinkType> for SubLinkTypeOpt {
@@ -17507,7 +17643,8 @@ mod sub_link_type {
     }
 
     /// `SubLinkType` enum
-    #[derive(Debug, Clone, Copy, serde::Serialize, serde::Deserialize)]
+    #[derive(Debug, Clone, Copy)]
+    #[cfg_attr(feature = "syn_serde", derive(serde::Serialize, serde::Deserialize))]
     pub enum SubLinkType {
         /// `Undefined`
         Undefined = 0,
@@ -17604,7 +17741,8 @@ mod row_compare_type {
     use super::*;
 
     /// list of `RowCompareType`
-    #[derive(Debug, Clone, serde::Serialize, serde::Deserialize)]
+    #[derive(Debug, Clone)]
+    #[cfg_attr(feature = "syn_serde", derive(serde::Serialize, serde::Deserialize))]
     pub struct RowCompareTypeList(Vec<RowCompareType>);
 
     impl From<Vec<::pg_query::protobuf::RowCompareType>> for RowCompareTypeList {
@@ -17614,7 +17752,8 @@ mod row_compare_type {
     }
 
     /// optional list of `RowCompareType`
-    #[derive(Debug, Clone, Copy, serde::Serialize, serde::Deserialize)]
+    #[derive(Debug, Clone, Copy)]
+    #[cfg_attr(feature = "syn_serde", derive(serde::Serialize, serde::Deserialize))]
     pub struct RowCompareTypeOpt(Option<RowCompareType>);
 
     impl crate::syn::Opt<RowCompareType> for RowCompareTypeOpt {
@@ -17680,7 +17819,8 @@ mod row_compare_type {
     }
 
     /// `RowCompareType` enum
-    #[derive(Debug, Clone, Copy, serde::Serialize, serde::Deserialize)]
+    #[derive(Debug, Clone, Copy)]
+    #[cfg_attr(feature = "syn_serde", derive(serde::Serialize, serde::Deserialize))]
     pub enum RowCompareType {
         /// `Undefined`
         Undefined = 0,
@@ -17763,7 +17903,8 @@ mod min_max_op {
     use super::*;
 
     /// list of `MinMaxOp`
-    #[derive(Debug, Clone, serde::Serialize, serde::Deserialize)]
+    #[derive(Debug, Clone)]
+    #[cfg_attr(feature = "syn_serde", derive(serde::Serialize, serde::Deserialize))]
     pub struct MinMaxOpList(Vec<MinMaxOp>);
 
     impl From<Vec<::pg_query::protobuf::MinMaxOp>> for MinMaxOpList {
@@ -17773,7 +17914,8 @@ mod min_max_op {
     }
 
     /// optional list of `MinMaxOp`
-    #[derive(Debug, Clone, Copy, serde::Serialize, serde::Deserialize)]
+    #[derive(Debug, Clone, Copy)]
+    #[cfg_attr(feature = "syn_serde", derive(serde::Serialize, serde::Deserialize))]
     pub struct MinMaxOpOpt(Option<MinMaxOp>);
 
     impl crate::syn::Opt<MinMaxOp> for MinMaxOpOpt {
@@ -17839,7 +17981,8 @@ mod min_max_op {
     }
 
     /// `MinMaxOp` enum
-    #[derive(Debug, Clone, Copy, serde::Serialize, serde::Deserialize)]
+    #[derive(Debug, Clone, Copy)]
+    #[cfg_attr(feature = "syn_serde", derive(serde::Serialize, serde::Deserialize))]
     pub enum MinMaxOp {
         /// `Undefined`
         Undefined = 0,
@@ -17894,7 +18037,8 @@ mod sql_value_function_op {
     use super::*;
 
     /// list of `SqlValueFunctionOp`
-    #[derive(Debug, Clone, serde::Serialize, serde::Deserialize)]
+    #[derive(Debug, Clone)]
+    #[cfg_attr(feature = "syn_serde", derive(serde::Serialize, serde::Deserialize))]
     pub struct SqlValueFunctionOpList(Vec<SqlValueFunctionOp>);
 
     impl From<Vec<::pg_query::protobuf::SqlValueFunctionOp>> for SqlValueFunctionOpList {
@@ -17904,7 +18048,8 @@ mod sql_value_function_op {
     }
 
     /// optional list of `SqlValueFunctionOp`
-    #[derive(Debug, Clone, Copy, serde::Serialize, serde::Deserialize)]
+    #[derive(Debug, Clone, Copy)]
+    #[cfg_attr(feature = "syn_serde", derive(serde::Serialize, serde::Deserialize))]
     pub struct SqlValueFunctionOpOpt(Option<SqlValueFunctionOp>);
 
     impl crate::syn::Opt<SqlValueFunctionOp> for SqlValueFunctionOpOpt {
@@ -17970,7 +18115,8 @@ mod sql_value_function_op {
     }
 
     /// `SqlValueFunctionOp` enum
-    #[derive(Debug, Clone, Copy, serde::Serialize, serde::Deserialize)]
+    #[derive(Debug, Clone, Copy)]
+    #[cfg_attr(feature = "syn_serde", derive(serde::Serialize, serde::Deserialize))]
     pub enum SqlValueFunctionOp {
         /// `SqlvalueFunctionOpUndefined`
         SqlvalueFunctionOpUndefined = 0,
@@ -18118,7 +18264,8 @@ mod xml_expr_op {
     use super::*;
 
     /// list of `XmlExprOp`
-    #[derive(Debug, Clone, serde::Serialize, serde::Deserialize)]
+    #[derive(Debug, Clone)]
+    #[cfg_attr(feature = "syn_serde", derive(serde::Serialize, serde::Deserialize))]
     pub struct XmlExprOpList(Vec<XmlExprOp>);
 
     impl From<Vec<::pg_query::protobuf::XmlExprOp>> for XmlExprOpList {
@@ -18128,7 +18275,8 @@ mod xml_expr_op {
     }
 
     /// optional list of `XmlExprOp`
-    #[derive(Debug, Clone, Copy, serde::Serialize, serde::Deserialize)]
+    #[derive(Debug, Clone, Copy)]
+    #[cfg_attr(feature = "syn_serde", derive(serde::Serialize, serde::Deserialize))]
     pub struct XmlExprOpOpt(Option<XmlExprOp>);
 
     impl crate::syn::Opt<XmlExprOp> for XmlExprOpOpt {
@@ -18194,7 +18342,8 @@ mod xml_expr_op {
     }
 
     /// `XmlExprOp` enum
-    #[derive(Debug, Clone, Copy, serde::Serialize, serde::Deserialize)]
+    #[derive(Debug, Clone, Copy)]
+    #[cfg_attr(feature = "syn_serde", derive(serde::Serialize, serde::Deserialize))]
     pub enum XmlExprOp {
         /// `Undefined`
         Undefined = 0,
@@ -18291,7 +18440,8 @@ mod xml_option_type {
     use super::*;
 
     /// list of `XmlOptionType`
-    #[derive(Debug, Clone, serde::Serialize, serde::Deserialize)]
+    #[derive(Debug, Clone)]
+    #[cfg_attr(feature = "syn_serde", derive(serde::Serialize, serde::Deserialize))]
     pub struct XmlOptionTypeList(Vec<XmlOptionType>);
 
     impl From<Vec<::pg_query::protobuf::XmlOptionType>> for XmlOptionTypeList {
@@ -18301,7 +18451,8 @@ mod xml_option_type {
     }
 
     /// optional list of `XmlOptionType`
-    #[derive(Debug, Clone, Copy, serde::Serialize, serde::Deserialize)]
+    #[derive(Debug, Clone, Copy)]
+    #[cfg_attr(feature = "syn_serde", derive(serde::Serialize, serde::Deserialize))]
     pub struct XmlOptionTypeOpt(Option<XmlOptionType>);
 
     impl crate::syn::Opt<XmlOptionType> for XmlOptionTypeOpt {
@@ -18367,7 +18518,8 @@ mod xml_option_type {
     }
 
     /// `XmlOptionType` enum
-    #[derive(Debug, Clone, Copy, serde::Serialize, serde::Deserialize)]
+    #[derive(Debug, Clone, Copy)]
+    #[cfg_attr(feature = "syn_serde", derive(serde::Serialize, serde::Deserialize))]
     pub enum XmlOptionType {
         /// `Undefined`
         Undefined = 0,
@@ -18422,7 +18574,8 @@ mod json_encoding {
     use super::*;
 
     /// list of `JsonEncoding`
-    #[derive(Debug, Clone, serde::Serialize, serde::Deserialize)]
+    #[derive(Debug, Clone)]
+    #[cfg_attr(feature = "syn_serde", derive(serde::Serialize, serde::Deserialize))]
     pub struct JsonEncodingList(Vec<JsonEncoding>);
 
     impl From<Vec<::pg_query::protobuf::JsonEncoding>> for JsonEncodingList {
@@ -18432,7 +18585,8 @@ mod json_encoding {
     }
 
     /// optional list of `JsonEncoding`
-    #[derive(Debug, Clone, Copy, serde::Serialize, serde::Deserialize)]
+    #[derive(Debug, Clone, Copy)]
+    #[cfg_attr(feature = "syn_serde", derive(serde::Serialize, serde::Deserialize))]
     pub struct JsonEncodingOpt(Option<JsonEncoding>);
 
     impl crate::syn::Opt<JsonEncoding> for JsonEncodingOpt {
@@ -18498,7 +18652,8 @@ mod json_encoding {
     }
 
     /// `JsonEncoding` enum
-    #[derive(Debug, Clone, Copy, serde::Serialize, serde::Deserialize)]
+    #[derive(Debug, Clone, Copy)]
+    #[cfg_attr(feature = "syn_serde", derive(serde::Serialize, serde::Deserialize))]
     pub enum JsonEncoding {
         /// `Undefined`
         Undefined = 0,
@@ -18567,7 +18722,8 @@ mod json_format_type {
     use super::*;
 
     /// list of `JsonFormatType`
-    #[derive(Debug, Clone, serde::Serialize, serde::Deserialize)]
+    #[derive(Debug, Clone)]
+    #[cfg_attr(feature = "syn_serde", derive(serde::Serialize, serde::Deserialize))]
     pub struct JsonFormatTypeList(Vec<JsonFormatType>);
 
     impl From<Vec<::pg_query::protobuf::JsonFormatType>> for JsonFormatTypeList {
@@ -18577,7 +18733,8 @@ mod json_format_type {
     }
 
     /// optional list of `JsonFormatType`
-    #[derive(Debug, Clone, Copy, serde::Serialize, serde::Deserialize)]
+    #[derive(Debug, Clone, Copy)]
+    #[cfg_attr(feature = "syn_serde", derive(serde::Serialize, serde::Deserialize))]
     pub struct JsonFormatTypeOpt(Option<JsonFormatType>);
 
     impl crate::syn::Opt<JsonFormatType> for JsonFormatTypeOpt {
@@ -18643,7 +18800,8 @@ mod json_format_type {
     }
 
     /// `JsonFormatType` enum
-    #[derive(Debug, Clone, Copy, serde::Serialize, serde::Deserialize)]
+    #[derive(Debug, Clone, Copy)]
+    #[cfg_attr(feature = "syn_serde", derive(serde::Serialize, serde::Deserialize))]
     pub enum JsonFormatType {
         /// `Undefined`
         Undefined = 0,
@@ -18705,7 +18863,8 @@ mod json_constructor_type {
     use super::*;
 
     /// list of `JsonConstructorType`
-    #[derive(Debug, Clone, serde::Serialize, serde::Deserialize)]
+    #[derive(Debug, Clone)]
+    #[cfg_attr(feature = "syn_serde", derive(serde::Serialize, serde::Deserialize))]
     pub struct JsonConstructorTypeList(Vec<JsonConstructorType>);
 
     impl From<Vec<::pg_query::protobuf::JsonConstructorType>> for JsonConstructorTypeList {
@@ -18715,7 +18874,8 @@ mod json_constructor_type {
     }
 
     /// optional list of `JsonConstructorType`
-    #[derive(Debug, Clone, Copy, serde::Serialize, serde::Deserialize)]
+    #[derive(Debug, Clone, Copy)]
+    #[cfg_attr(feature = "syn_serde", derive(serde::Serialize, serde::Deserialize))]
     pub struct JsonConstructorTypeOpt(Option<JsonConstructorType>);
 
     impl crate::syn::Opt<JsonConstructorType> for JsonConstructorTypeOpt {
@@ -18781,7 +18941,8 @@ mod json_constructor_type {
     }
 
     /// `JsonConstructorType` enum
-    #[derive(Debug, Clone, Copy, serde::Serialize, serde::Deserialize)]
+    #[derive(Debug, Clone, Copy)]
+    #[cfg_attr(feature = "syn_serde", derive(serde::Serialize, serde::Deserialize))]
     pub enum JsonConstructorType {
         /// `Undefined`
         Undefined = 0,
@@ -18873,7 +19034,8 @@ mod json_value_type {
     use super::*;
 
     /// list of `JsonValueType`
-    #[derive(Debug, Clone, serde::Serialize, serde::Deserialize)]
+    #[derive(Debug, Clone)]
+    #[cfg_attr(feature = "syn_serde", derive(serde::Serialize, serde::Deserialize))]
     pub struct JsonValueTypeList(Vec<JsonValueType>);
 
     impl From<Vec<::pg_query::protobuf::JsonValueType>> for JsonValueTypeList {
@@ -18883,7 +19045,8 @@ mod json_value_type {
     }
 
     /// optional list of `JsonValueType`
-    #[derive(Debug, Clone, Copy, serde::Serialize, serde::Deserialize)]
+    #[derive(Debug, Clone, Copy)]
+    #[cfg_attr(feature = "syn_serde", derive(serde::Serialize, serde::Deserialize))]
     pub struct JsonValueTypeOpt(Option<JsonValueType>);
 
     impl crate::syn::Opt<JsonValueType> for JsonValueTypeOpt {
@@ -18949,7 +19112,8 @@ mod json_value_type {
     }
 
     /// `JsonValueType` enum
-    #[derive(Debug, Clone, Copy, serde::Serialize, serde::Deserialize)]
+    #[derive(Debug, Clone, Copy)]
+    #[cfg_attr(feature = "syn_serde", derive(serde::Serialize, serde::Deserialize))]
     pub enum JsonValueType {
         /// `Undefined`
         Undefined = 0,
@@ -19018,7 +19182,8 @@ mod json_wrapper {
     use super::*;
 
     /// list of `JsonWrapper`
-    #[derive(Debug, Clone, serde::Serialize, serde::Deserialize)]
+    #[derive(Debug, Clone)]
+    #[cfg_attr(feature = "syn_serde", derive(serde::Serialize, serde::Deserialize))]
     pub struct JsonWrapperList(Vec<JsonWrapper>);
 
     impl From<Vec<::pg_query::protobuf::JsonWrapper>> for JsonWrapperList {
@@ -19028,7 +19193,8 @@ mod json_wrapper {
     }
 
     /// optional list of `JsonWrapper`
-    #[derive(Debug, Clone, Copy, serde::Serialize, serde::Deserialize)]
+    #[derive(Debug, Clone, Copy)]
+    #[cfg_attr(feature = "syn_serde", derive(serde::Serialize, serde::Deserialize))]
     pub struct JsonWrapperOpt(Option<JsonWrapper>);
 
     impl crate::syn::Opt<JsonWrapper> for JsonWrapperOpt {
@@ -19094,7 +19260,8 @@ mod json_wrapper {
     }
 
     /// `JsonWrapper` enum
-    #[derive(Debug, Clone, Copy, serde::Serialize, serde::Deserialize)]
+    #[derive(Debug, Clone, Copy)]
+    #[cfg_attr(feature = "syn_serde", derive(serde::Serialize, serde::Deserialize))]
     pub enum JsonWrapper {
         /// `Undefined`
         Undefined = 0,
@@ -19163,7 +19330,8 @@ mod json_behavior_type {
     use super::*;
 
     /// list of `JsonBehaviorType`
-    #[derive(Debug, Clone, serde::Serialize, serde::Deserialize)]
+    #[derive(Debug, Clone)]
+    #[cfg_attr(feature = "syn_serde", derive(serde::Serialize, serde::Deserialize))]
     pub struct JsonBehaviorTypeList(Vec<JsonBehaviorType>);
 
     impl From<Vec<::pg_query::protobuf::JsonBehaviorType>> for JsonBehaviorTypeList {
@@ -19173,7 +19341,8 @@ mod json_behavior_type {
     }
 
     /// optional list of `JsonBehaviorType`
-    #[derive(Debug, Clone, Copy, serde::Serialize, serde::Deserialize)]
+    #[derive(Debug, Clone, Copy)]
+    #[cfg_attr(feature = "syn_serde", derive(serde::Serialize, serde::Deserialize))]
     pub struct JsonBehaviorTypeOpt(Option<JsonBehaviorType>);
 
     impl crate::syn::Opt<JsonBehaviorType> for JsonBehaviorTypeOpt {
@@ -19239,7 +19408,8 @@ mod json_behavior_type {
     }
 
     /// `JsonBehaviorType` enum
-    #[derive(Debug, Clone, Copy, serde::Serialize, serde::Deserialize)]
+    #[derive(Debug, Clone, Copy)]
+    #[cfg_attr(feature = "syn_serde", derive(serde::Serialize, serde::Deserialize))]
     pub enum JsonBehaviorType {
         /// `Undefined`
         Undefined = 0,
@@ -19343,7 +19513,8 @@ mod json_expr_op {
     use super::*;
 
     /// list of `JsonExprOp`
-    #[derive(Debug, Clone, serde::Serialize, serde::Deserialize)]
+    #[derive(Debug, Clone)]
+    #[cfg_attr(feature = "syn_serde", derive(serde::Serialize, serde::Deserialize))]
     pub struct JsonExprOpList(Vec<JsonExprOp>);
 
     impl From<Vec<::pg_query::protobuf::JsonExprOp>> for JsonExprOpList {
@@ -19353,7 +19524,8 @@ mod json_expr_op {
     }
 
     /// optional list of `JsonExprOp`
-    #[derive(Debug, Clone, Copy, serde::Serialize, serde::Deserialize)]
+    #[derive(Debug, Clone, Copy)]
+    #[cfg_attr(feature = "syn_serde", derive(serde::Serialize, serde::Deserialize))]
     pub struct JsonExprOpOpt(Option<JsonExprOp>);
 
     impl crate::syn::Opt<JsonExprOp> for JsonExprOpOpt {
@@ -19419,7 +19591,8 @@ mod json_expr_op {
     }
 
     /// `JsonExprOp` enum
-    #[derive(Debug, Clone, Copy, serde::Serialize, serde::Deserialize)]
+    #[derive(Debug, Clone, Copy)]
+    #[cfg_attr(feature = "syn_serde", derive(serde::Serialize, serde::Deserialize))]
     pub enum JsonExprOp {
         /// `Undefined`
         Undefined = 0,
@@ -19488,7 +19661,8 @@ mod null_test_type {
     use super::*;
 
     /// list of `NullTestType`
-    #[derive(Debug, Clone, serde::Serialize, serde::Deserialize)]
+    #[derive(Debug, Clone)]
+    #[cfg_attr(feature = "syn_serde", derive(serde::Serialize, serde::Deserialize))]
     pub struct NullTestTypeList(Vec<NullTestType>);
 
     impl From<Vec<::pg_query::protobuf::NullTestType>> for NullTestTypeList {
@@ -19498,7 +19672,8 @@ mod null_test_type {
     }
 
     /// optional list of `NullTestType`
-    #[derive(Debug, Clone, Copy, serde::Serialize, serde::Deserialize)]
+    #[derive(Debug, Clone, Copy)]
+    #[cfg_attr(feature = "syn_serde", derive(serde::Serialize, serde::Deserialize))]
     pub struct NullTestTypeOpt(Option<NullTestType>);
 
     impl crate::syn::Opt<NullTestType> for NullTestTypeOpt {
@@ -19564,7 +19739,8 @@ mod null_test_type {
     }
 
     /// `NullTestType` enum
-    #[derive(Debug, Clone, Copy, serde::Serialize, serde::Deserialize)]
+    #[derive(Debug, Clone, Copy)]
+    #[cfg_attr(feature = "syn_serde", derive(serde::Serialize, serde::Deserialize))]
     pub enum NullTestType {
         /// `Undefined`
         Undefined = 0,
@@ -19619,7 +19795,8 @@ mod bool_test_type {
     use super::*;
 
     /// list of `BoolTestType`
-    #[derive(Debug, Clone, serde::Serialize, serde::Deserialize)]
+    #[derive(Debug, Clone)]
+    #[cfg_attr(feature = "syn_serde", derive(serde::Serialize, serde::Deserialize))]
     pub struct BoolTestTypeList(Vec<BoolTestType>);
 
     impl From<Vec<::pg_query::protobuf::BoolTestType>> for BoolTestTypeList {
@@ -19629,7 +19806,8 @@ mod bool_test_type {
     }
 
     /// optional list of `BoolTestType`
-    #[derive(Debug, Clone, Copy, serde::Serialize, serde::Deserialize)]
+    #[derive(Debug, Clone, Copy)]
+    #[cfg_attr(feature = "syn_serde", derive(serde::Serialize, serde::Deserialize))]
     pub struct BoolTestTypeOpt(Option<BoolTestType>);
 
     impl crate::syn::Opt<BoolTestType> for BoolTestTypeOpt {
@@ -19695,7 +19873,8 @@ mod bool_test_type {
     }
 
     /// `BoolTestType` enum
-    #[derive(Debug, Clone, Copy, serde::Serialize, serde::Deserialize)]
+    #[derive(Debug, Clone, Copy)]
+    #[cfg_attr(feature = "syn_serde", derive(serde::Serialize, serde::Deserialize))]
     pub enum BoolTestType {
         /// `Undefined`
         Undefined = 0,
@@ -19778,7 +19957,8 @@ mod merge_match_kind {
     use super::*;
 
     /// list of `MergeMatchKind`
-    #[derive(Debug, Clone, serde::Serialize, serde::Deserialize)]
+    #[derive(Debug, Clone)]
+    #[cfg_attr(feature = "syn_serde", derive(serde::Serialize, serde::Deserialize))]
     pub struct MergeMatchKindList(Vec<MergeMatchKind>);
 
     impl From<Vec<::pg_query::protobuf::MergeMatchKind>> for MergeMatchKindList {
@@ -19788,7 +19968,8 @@ mod merge_match_kind {
     }
 
     /// optional list of `MergeMatchKind`
-    #[derive(Debug, Clone, Copy, serde::Serialize, serde::Deserialize)]
+    #[derive(Debug, Clone, Copy)]
+    #[cfg_attr(feature = "syn_serde", derive(serde::Serialize, serde::Deserialize))]
     pub struct MergeMatchKindOpt(Option<MergeMatchKind>);
 
     impl crate::syn::Opt<MergeMatchKind> for MergeMatchKindOpt {
@@ -19854,7 +20035,8 @@ mod merge_match_kind {
     }
 
     /// `MergeMatchKind` enum
-    #[derive(Debug, Clone, Copy, serde::Serialize, serde::Deserialize)]
+    #[derive(Debug, Clone, Copy)]
+    #[cfg_attr(feature = "syn_serde", derive(serde::Serialize, serde::Deserialize))]
     pub enum MergeMatchKind {
         /// `Undefined`
         Undefined = 0,
@@ -19916,7 +20098,8 @@ mod cmd_type {
     use super::*;
 
     /// list of `CmdType`
-    #[derive(Debug, Clone, serde::Serialize, serde::Deserialize)]
+    #[derive(Debug, Clone)]
+    #[cfg_attr(feature = "syn_serde", derive(serde::Serialize, serde::Deserialize))]
     pub struct CmdTypeList(Vec<CmdType>);
 
     impl From<Vec<::pg_query::protobuf::CmdType>> for CmdTypeList {
@@ -19926,7 +20109,8 @@ mod cmd_type {
     }
 
     /// optional list of `CmdType`
-    #[derive(Debug, Clone, Copy, serde::Serialize, serde::Deserialize)]
+    #[derive(Debug, Clone, Copy)]
+    #[cfg_attr(feature = "syn_serde", derive(serde::Serialize, serde::Deserialize))]
     pub struct CmdTypeOpt(Option<CmdType>);
 
     impl crate::syn::Opt<CmdType> for CmdTypeOpt {
@@ -19992,7 +20176,8 @@ mod cmd_type {
     }
 
     /// `CmdType` enum
-    #[derive(Debug, Clone, Copy, serde::Serialize, serde::Deserialize)]
+    #[derive(Debug, Clone, Copy)]
+    #[cfg_attr(feature = "syn_serde", derive(serde::Serialize, serde::Deserialize))]
     pub enum CmdType {
         /// `Undefined`
         Undefined = 0,
@@ -20089,7 +20274,8 @@ mod join_type {
     use super::*;
 
     /// list of `JoinType`
-    #[derive(Debug, Clone, serde::Serialize, serde::Deserialize)]
+    #[derive(Debug, Clone)]
+    #[cfg_attr(feature = "syn_serde", derive(serde::Serialize, serde::Deserialize))]
     pub struct JoinTypeList(Vec<JoinType>);
 
     impl From<Vec<::pg_query::protobuf::JoinType>> for JoinTypeList {
@@ -20099,7 +20285,8 @@ mod join_type {
     }
 
     /// optional list of `JoinType`
-    #[derive(Debug, Clone, Copy, serde::Serialize, serde::Deserialize)]
+    #[derive(Debug, Clone, Copy)]
+    #[cfg_attr(feature = "syn_serde", derive(serde::Serialize, serde::Deserialize))]
     pub struct JoinTypeOpt(Option<JoinType>);
 
     impl crate::syn::Opt<JoinType> for JoinTypeOpt {
@@ -20165,7 +20352,8 @@ mod join_type {
     }
 
     /// `JoinType` enum
-    #[derive(Debug, Clone, Copy, serde::Serialize, serde::Deserialize)]
+    #[derive(Debug, Clone, Copy)]
+    #[cfg_attr(feature = "syn_serde", derive(serde::Serialize, serde::Deserialize))]
     pub enum JoinType {
         /// `Undefined`
         Undefined = 0,
@@ -20269,7 +20457,8 @@ mod agg_strategy {
     use super::*;
 
     /// list of `AggStrategy`
-    #[derive(Debug, Clone, serde::Serialize, serde::Deserialize)]
+    #[derive(Debug, Clone)]
+    #[cfg_attr(feature = "syn_serde", derive(serde::Serialize, serde::Deserialize))]
     pub struct AggStrategyList(Vec<AggStrategy>);
 
     impl From<Vec<::pg_query::protobuf::AggStrategy>> for AggStrategyList {
@@ -20279,7 +20468,8 @@ mod agg_strategy {
     }
 
     /// optional list of `AggStrategy`
-    #[derive(Debug, Clone, Copy, serde::Serialize, serde::Deserialize)]
+    #[derive(Debug, Clone, Copy)]
+    #[cfg_attr(feature = "syn_serde", derive(serde::Serialize, serde::Deserialize))]
     pub struct AggStrategyOpt(Option<AggStrategy>);
 
     impl crate::syn::Opt<AggStrategy> for AggStrategyOpt {
@@ -20345,7 +20535,8 @@ mod agg_strategy {
     }
 
     /// `AggStrategy` enum
-    #[derive(Debug, Clone, Copy, serde::Serialize, serde::Deserialize)]
+    #[derive(Debug, Clone, Copy)]
+    #[cfg_attr(feature = "syn_serde", derive(serde::Serialize, serde::Deserialize))]
     pub enum AggStrategy {
         /// `Undefined`
         Undefined = 0,
@@ -20414,7 +20605,8 @@ mod agg_split {
     use super::*;
 
     /// list of `AggSplit`
-    #[derive(Debug, Clone, serde::Serialize, serde::Deserialize)]
+    #[derive(Debug, Clone)]
+    #[cfg_attr(feature = "syn_serde", derive(serde::Serialize, serde::Deserialize))]
     pub struct AggSplitList(Vec<AggSplit>);
 
     impl From<Vec<::pg_query::protobuf::AggSplit>> for AggSplitList {
@@ -20424,7 +20616,8 @@ mod agg_split {
     }
 
     /// optional list of `AggSplit`
-    #[derive(Debug, Clone, Copy, serde::Serialize, serde::Deserialize)]
+    #[derive(Debug, Clone, Copy)]
+    #[cfg_attr(feature = "syn_serde", derive(serde::Serialize, serde::Deserialize))]
     pub struct AggSplitOpt(Option<AggSplit>);
 
     impl crate::syn::Opt<AggSplit> for AggSplitOpt {
@@ -20490,7 +20683,8 @@ mod agg_split {
     }
 
     /// `AggSplit` enum
-    #[derive(Debug, Clone, Copy, serde::Serialize, serde::Deserialize)]
+    #[derive(Debug, Clone, Copy)]
+    #[cfg_attr(feature = "syn_serde", derive(serde::Serialize, serde::Deserialize))]
     pub enum AggSplit {
         /// `Undefined`
         Undefined = 0,
@@ -20552,7 +20746,8 @@ mod set_op_cmd {
     use super::*;
 
     /// list of `SetOpCmd`
-    #[derive(Debug, Clone, serde::Serialize, serde::Deserialize)]
+    #[derive(Debug, Clone)]
+    #[cfg_attr(feature = "syn_serde", derive(serde::Serialize, serde::Deserialize))]
     pub struct SetOpCmdList(Vec<SetOpCmd>);
 
     impl From<Vec<::pg_query::protobuf::SetOpCmd>> for SetOpCmdList {
@@ -20562,7 +20757,8 @@ mod set_op_cmd {
     }
 
     /// optional list of `SetOpCmd`
-    #[derive(Debug, Clone, Copy, serde::Serialize, serde::Deserialize)]
+    #[derive(Debug, Clone, Copy)]
+    #[cfg_attr(feature = "syn_serde", derive(serde::Serialize, serde::Deserialize))]
     pub struct SetOpCmdOpt(Option<SetOpCmd>);
 
     impl crate::syn::Opt<SetOpCmd> for SetOpCmdOpt {
@@ -20628,7 +20824,8 @@ mod set_op_cmd {
     }
 
     /// `SetOpCmd` enum
-    #[derive(Debug, Clone, Copy, serde::Serialize, serde::Deserialize)]
+    #[derive(Debug, Clone, Copy)]
+    #[cfg_attr(feature = "syn_serde", derive(serde::Serialize, serde::Deserialize))]
     pub enum SetOpCmd {
         /// `Undefined`
         Undefined = 0,
@@ -20697,7 +20894,8 @@ mod set_op_strategy {
     use super::*;
 
     /// list of `SetOpStrategy`
-    #[derive(Debug, Clone, serde::Serialize, serde::Deserialize)]
+    #[derive(Debug, Clone)]
+    #[cfg_attr(feature = "syn_serde", derive(serde::Serialize, serde::Deserialize))]
     pub struct SetOpStrategyList(Vec<SetOpStrategy>);
 
     impl From<Vec<::pg_query::protobuf::SetOpStrategy>> for SetOpStrategyList {
@@ -20707,7 +20905,8 @@ mod set_op_strategy {
     }
 
     /// optional list of `SetOpStrategy`
-    #[derive(Debug, Clone, Copy, serde::Serialize, serde::Deserialize)]
+    #[derive(Debug, Clone, Copy)]
+    #[cfg_attr(feature = "syn_serde", derive(serde::Serialize, serde::Deserialize))]
     pub struct SetOpStrategyOpt(Option<SetOpStrategy>);
 
     impl crate::syn::Opt<SetOpStrategy> for SetOpStrategyOpt {
@@ -20773,7 +20972,8 @@ mod set_op_strategy {
     }
 
     /// `SetOpStrategy` enum
-    #[derive(Debug, Clone, Copy, serde::Serialize, serde::Deserialize)]
+    #[derive(Debug, Clone, Copy)]
+    #[cfg_attr(feature = "syn_serde", derive(serde::Serialize, serde::Deserialize))]
     pub enum SetOpStrategy {
         /// `Undefined`
         Undefined = 0,
@@ -20828,7 +21028,8 @@ mod on_conflict_action {
     use super::*;
 
     /// list of `OnConflictAction`
-    #[derive(Debug, Clone, serde::Serialize, serde::Deserialize)]
+    #[derive(Debug, Clone)]
+    #[cfg_attr(feature = "syn_serde", derive(serde::Serialize, serde::Deserialize))]
     pub struct OnConflictActionList(Vec<OnConflictAction>);
 
     impl From<Vec<::pg_query::protobuf::OnConflictAction>> for OnConflictActionList {
@@ -20838,7 +21039,8 @@ mod on_conflict_action {
     }
 
     /// optional list of `OnConflictAction`
-    #[derive(Debug, Clone, Copy, serde::Serialize, serde::Deserialize)]
+    #[derive(Debug, Clone, Copy)]
+    #[cfg_attr(feature = "syn_serde", derive(serde::Serialize, serde::Deserialize))]
     pub struct OnConflictActionOpt(Option<OnConflictAction>);
 
     impl crate::syn::Opt<OnConflictAction> for OnConflictActionOpt {
@@ -20904,7 +21106,8 @@ mod on_conflict_action {
     }
 
     /// `OnConflictAction` enum
-    #[derive(Debug, Clone, Copy, serde::Serialize, serde::Deserialize)]
+    #[derive(Debug, Clone, Copy)]
+    #[cfg_attr(feature = "syn_serde", derive(serde::Serialize, serde::Deserialize))]
     pub enum OnConflictAction {
         /// `Undefined`
         Undefined = 0,
@@ -20966,7 +21169,8 @@ mod limit_option {
     use super::*;
 
     /// list of `LimitOption`
-    #[derive(Debug, Clone, serde::Serialize, serde::Deserialize)]
+    #[derive(Debug, Clone)]
+    #[cfg_attr(feature = "syn_serde", derive(serde::Serialize, serde::Deserialize))]
     pub struct LimitOptionList(Vec<LimitOption>);
 
     impl From<Vec<::pg_query::protobuf::LimitOption>> for LimitOptionList {
@@ -20976,7 +21180,8 @@ mod limit_option {
     }
 
     /// optional list of `LimitOption`
-    #[derive(Debug, Clone, Copy, serde::Serialize, serde::Deserialize)]
+    #[derive(Debug, Clone, Copy)]
+    #[cfg_attr(feature = "syn_serde", derive(serde::Serialize, serde::Deserialize))]
     pub struct LimitOptionOpt(Option<LimitOption>);
 
     impl crate::syn::Opt<LimitOption> for LimitOptionOpt {
@@ -21042,7 +21247,8 @@ mod limit_option {
     }
 
     /// `LimitOption` enum
-    #[derive(Debug, Clone, Copy, serde::Serialize, serde::Deserialize)]
+    #[derive(Debug, Clone, Copy)]
+    #[cfg_attr(feature = "syn_serde", derive(serde::Serialize, serde::Deserialize))]
     pub enum LimitOption {
         /// `Undefined`
         Undefined = 0,
@@ -21104,7 +21310,8 @@ mod lock_clause_strength {
     use super::*;
 
     /// list of `LockClauseStrength`
-    #[derive(Debug, Clone, serde::Serialize, serde::Deserialize)]
+    #[derive(Debug, Clone)]
+    #[cfg_attr(feature = "syn_serde", derive(serde::Serialize, serde::Deserialize))]
     pub struct LockClauseStrengthList(Vec<LockClauseStrength>);
 
     impl From<Vec<::pg_query::protobuf::LockClauseStrength>> for LockClauseStrengthList {
@@ -21114,7 +21321,8 @@ mod lock_clause_strength {
     }
 
     /// optional list of `LockClauseStrength`
-    #[derive(Debug, Clone, Copy, serde::Serialize, serde::Deserialize)]
+    #[derive(Debug, Clone, Copy)]
+    #[cfg_attr(feature = "syn_serde", derive(serde::Serialize, serde::Deserialize))]
     pub struct LockClauseStrengthOpt(Option<LockClauseStrength>);
 
     impl crate::syn::Opt<LockClauseStrength> for LockClauseStrengthOpt {
@@ -21180,7 +21388,8 @@ mod lock_clause_strength {
     }
 
     /// `LockClauseStrength` enum
-    #[derive(Debug, Clone, Copy, serde::Serialize, serde::Deserialize)]
+    #[derive(Debug, Clone, Copy)]
+    #[cfg_attr(feature = "syn_serde", derive(serde::Serialize, serde::Deserialize))]
     pub enum LockClauseStrength {
         /// `Undefined`
         Undefined = 0,
@@ -21256,7 +21465,8 @@ mod lock_wait_policy {
     use super::*;
 
     /// list of `LockWaitPolicy`
-    #[derive(Debug, Clone, serde::Serialize, serde::Deserialize)]
+    #[derive(Debug, Clone)]
+    #[cfg_attr(feature = "syn_serde", derive(serde::Serialize, serde::Deserialize))]
     pub struct LockWaitPolicyList(Vec<LockWaitPolicy>);
 
     impl From<Vec<::pg_query::protobuf::LockWaitPolicy>> for LockWaitPolicyList {
@@ -21266,7 +21476,8 @@ mod lock_wait_policy {
     }
 
     /// optional list of `LockWaitPolicy`
-    #[derive(Debug, Clone, Copy, serde::Serialize, serde::Deserialize)]
+    #[derive(Debug, Clone, Copy)]
+    #[cfg_attr(feature = "syn_serde", derive(serde::Serialize, serde::Deserialize))]
     pub struct LockWaitPolicyOpt(Option<LockWaitPolicy>);
 
     impl crate::syn::Opt<LockWaitPolicy> for LockWaitPolicyOpt {
@@ -21332,7 +21543,8 @@ mod lock_wait_policy {
     }
 
     /// `LockWaitPolicy` enum
-    #[derive(Debug, Clone, Copy, serde::Serialize, serde::Deserialize)]
+    #[derive(Debug, Clone, Copy)]
+    #[cfg_attr(feature = "syn_serde", derive(serde::Serialize, serde::Deserialize))]
     pub enum LockWaitPolicy {
         /// `Undefined`
         Undefined = 0,
@@ -21394,7 +21606,8 @@ mod lock_tuple_mode {
     use super::*;
 
     /// list of `LockTupleMode`
-    #[derive(Debug, Clone, serde::Serialize, serde::Deserialize)]
+    #[derive(Debug, Clone)]
+    #[cfg_attr(feature = "syn_serde", derive(serde::Serialize, serde::Deserialize))]
     pub struct LockTupleModeList(Vec<LockTupleMode>);
 
     impl From<Vec<::pg_query::protobuf::LockTupleMode>> for LockTupleModeList {
@@ -21404,7 +21617,8 @@ mod lock_tuple_mode {
     }
 
     /// optional list of `LockTupleMode`
-    #[derive(Debug, Clone, Copy, serde::Serialize, serde::Deserialize)]
+    #[derive(Debug, Clone, Copy)]
+    #[cfg_attr(feature = "syn_serde", derive(serde::Serialize, serde::Deserialize))]
     pub struct LockTupleModeOpt(Option<LockTupleMode>);
 
     impl crate::syn::Opt<LockTupleMode> for LockTupleModeOpt {
@@ -21470,7 +21684,8 @@ mod lock_tuple_mode {
     }
 
     /// `LockTupleMode` enum
-    #[derive(Debug, Clone, Copy, serde::Serialize, serde::Deserialize)]
+    #[derive(Debug, Clone, Copy)]
+    #[cfg_attr(feature = "syn_serde", derive(serde::Serialize, serde::Deserialize))]
     pub enum LockTupleMode {
         /// `Undefined`
         Undefined = 0,
@@ -21539,7 +21754,8 @@ mod keyword_kind {
     use super::*;
 
     /// list of `KeywordKind`
-    #[derive(Debug, Clone, serde::Serialize, serde::Deserialize)]
+    #[derive(Debug, Clone)]
+    #[cfg_attr(feature = "syn_serde", derive(serde::Serialize, serde::Deserialize))]
     pub struct KeywordKindList(Vec<KeywordKind>);
 
     impl From<Vec<::pg_query::protobuf::KeywordKind>> for KeywordKindList {
@@ -21549,7 +21765,8 @@ mod keyword_kind {
     }
 
     /// optional list of `KeywordKind`
-    #[derive(Debug, Clone, Copy, serde::Serialize, serde::Deserialize)]
+    #[derive(Debug, Clone, Copy)]
+    #[cfg_attr(feature = "syn_serde", derive(serde::Serialize, serde::Deserialize))]
     pub struct KeywordKindOpt(Option<KeywordKind>);
 
     impl crate::syn::Opt<KeywordKind> for KeywordKindOpt {
@@ -21615,7 +21832,8 @@ mod keyword_kind {
     }
 
     /// `KeywordKind` enum
-    #[derive(Debug, Clone, Copy, serde::Serialize, serde::Deserialize)]
+    #[derive(Debug, Clone, Copy)]
+    #[cfg_attr(feature = "syn_serde", derive(serde::Serialize, serde::Deserialize))]
     pub enum KeywordKind {
         /// `NoKeyword`
         NoKeyword = 0,
@@ -21684,7 +21902,8 @@ mod token {
     use super::*;
 
     /// list of `Token`
-    #[derive(Debug, Clone, serde::Serialize, serde::Deserialize)]
+    #[derive(Debug, Clone)]
+    #[cfg_attr(feature = "syn_serde", derive(serde::Serialize, serde::Deserialize))]
     pub struct TokenList(Vec<Token>);
 
     impl From<Vec<::pg_query::protobuf::Token>> for TokenList {
@@ -21694,7 +21913,8 @@ mod token {
     }
 
     /// optional list of `Token`
-    #[derive(Debug, Clone, Copy, serde::Serialize, serde::Deserialize)]
+    #[derive(Debug, Clone, Copy)]
+    #[cfg_attr(feature = "syn_serde", derive(serde::Serialize, serde::Deserialize))]
     pub struct TokenOpt(Option<Token>);
 
     impl crate::syn::Opt<Token> for TokenOpt {
@@ -21760,7 +21980,8 @@ mod token {
     }
 
     /// `Token` enum
-    #[derive(Debug, Clone, Copy, serde::Serialize, serde::Deserialize)]
+    #[derive(Debug, Clone, Copy)]
+    #[cfg_attr(feature = "syn_serde", derive(serde::Serialize, serde::Deserialize))]
     pub enum Token {
         /// `Nul`
         Nul = 0,
@@ -25590,11 +25811,13 @@ mod parse_result {
     use super::*;
 
     /// `ParseResult`
-    #[derive(Debug, Clone, serde::Serialize, serde::Deserialize)]
+    #[derive(Debug, Clone)]
+    #[cfg_attr(feature = "syn_serde", derive(serde::Serialize, serde::Deserialize))]
     pub struct ParseResult(Box<self::inner::ParseResult>);
 
     /// optional `ParseResult`
-    #[derive(Debug, Clone, serde::Serialize, serde::Deserialize)]
+    #[derive(Debug, Clone)]
+    #[cfg_attr(feature = "syn_serde", derive(serde::Serialize, serde::Deserialize))]
     pub struct ParseResultOpt(Option<ParseResult>);
 
     #[cfg(test)]
@@ -25611,11 +25834,13 @@ mod parse_result {
     }
 
     /// `ParseResult` list
-    #[derive(Debug, Clone, serde::Serialize, serde::Deserialize)]
+    #[derive(Debug, Clone)]
+    #[cfg_attr(feature = "syn_serde", derive(serde::Serialize, serde::Deserialize))]
     pub struct ParseResultList(Vec<ParseResult>);
 
     /// optional `ParseResult` list
-    #[derive(Debug, Clone, serde::Serialize, serde::Deserialize)]
+    #[derive(Debug, Clone)]
+    #[cfg_attr(feature = "syn_serde", derive(serde::Serialize, serde::Deserialize))]
     pub struct ParseResultListOpt(Option<Vec<ParseResult>>);
 
     impl crate::syn::ListOpt<ParseResult> for ParseResultListOpt {
@@ -25715,7 +25940,8 @@ mod parse_result {
         use super::*;
 
         #[cfg_attr(test, derive(derive_builder::Builder))]
-        #[derive(Clone, Debug, serde::Serialize, serde::Deserialize)]
+        #[cfg_attr(feature = "syn_serde", derive(serde::Serialize, serde::Deserialize))]
+        #[derive(Clone, Debug)]
         #[allow(clippy::struct_excessive_bools)]
         #[allow(clippy::struct_field_names)]
         pub struct ParseResult {
@@ -25807,11 +26033,13 @@ mod scan_result {
     use super::*;
 
     /// `ScanResult`
-    #[derive(Debug, Clone, serde::Serialize, serde::Deserialize)]
+    #[derive(Debug, Clone)]
+    #[cfg_attr(feature = "syn_serde", derive(serde::Serialize, serde::Deserialize))]
     pub struct ScanResult(Box<self::inner::ScanResult>);
 
     /// optional `ScanResult`
-    #[derive(Debug, Clone, serde::Serialize, serde::Deserialize)]
+    #[derive(Debug, Clone)]
+    #[cfg_attr(feature = "syn_serde", derive(serde::Serialize, serde::Deserialize))]
     pub struct ScanResultOpt(Option<ScanResult>);
 
     #[cfg(test)]
@@ -25828,11 +26056,13 @@ mod scan_result {
     }
 
     /// `ScanResult` list
-    #[derive(Debug, Clone, serde::Serialize, serde::Deserialize)]
+    #[derive(Debug, Clone)]
+    #[cfg_attr(feature = "syn_serde", derive(serde::Serialize, serde::Deserialize))]
     pub struct ScanResultList(Vec<ScanResult>);
 
     /// optional `ScanResult` list
-    #[derive(Debug, Clone, serde::Serialize, serde::Deserialize)]
+    #[derive(Debug, Clone)]
+    #[cfg_attr(feature = "syn_serde", derive(serde::Serialize, serde::Deserialize))]
     pub struct ScanResultListOpt(Option<Vec<ScanResult>>);
 
     impl crate::syn::ListOpt<ScanResult> for ScanResultListOpt {
@@ -25932,7 +26162,8 @@ mod scan_result {
         use super::*;
 
         #[cfg_attr(test, derive(derive_builder::Builder))]
-        #[derive(Clone, Debug, serde::Serialize, serde::Deserialize)]
+        #[cfg_attr(feature = "syn_serde", derive(serde::Serialize, serde::Deserialize))]
+        #[derive(Clone, Debug)]
         #[allow(clippy::struct_excessive_bools)]
         #[allow(clippy::struct_field_names)]
         pub struct ScanResult {
@@ -26024,11 +26255,13 @@ mod integer {
     use super::*;
 
     /// `Integer`
-    #[derive(Debug, Clone, serde::Serialize, serde::Deserialize)]
+    #[derive(Debug, Clone)]
+    #[cfg_attr(feature = "syn_serde", derive(serde::Serialize, serde::Deserialize))]
     pub struct Integer(Box<self::inner::Integer>);
 
     /// optional `Integer`
-    #[derive(Debug, Clone, serde::Serialize, serde::Deserialize)]
+    #[derive(Debug, Clone)]
+    #[cfg_attr(feature = "syn_serde", derive(serde::Serialize, serde::Deserialize))]
     pub struct IntegerOpt(Option<Integer>);
 
     #[cfg(test)]
@@ -26045,11 +26278,13 @@ mod integer {
     }
 
     /// `Integer` list
-    #[derive(Debug, Clone, serde::Serialize, serde::Deserialize)]
+    #[derive(Debug, Clone)]
+    #[cfg_attr(feature = "syn_serde", derive(serde::Serialize, serde::Deserialize))]
     pub struct IntegerList(Vec<Integer>);
 
     /// optional `Integer` list
-    #[derive(Debug, Clone, serde::Serialize, serde::Deserialize)]
+    #[derive(Debug, Clone)]
+    #[cfg_attr(feature = "syn_serde", derive(serde::Serialize, serde::Deserialize))]
     pub struct IntegerListOpt(Option<Vec<Integer>>);
 
     impl crate::syn::ListOpt<Integer> for IntegerListOpt {
@@ -26149,7 +26384,8 @@ mod integer {
         use super::*;
 
         #[cfg_attr(test, derive(derive_builder::Builder))]
-        #[derive(Clone, Debug, serde::Serialize, serde::Deserialize)]
+        #[cfg_attr(feature = "syn_serde", derive(serde::Serialize, serde::Deserialize))]
+        #[derive(Clone, Debug)]
         #[allow(clippy::struct_excessive_bools)]
         #[allow(clippy::struct_field_names)]
         pub struct Integer {
@@ -26209,11 +26445,13 @@ mod float {
     use super::*;
 
     /// `Float`
-    #[derive(Debug, Clone, serde::Serialize, serde::Deserialize)]
+    #[derive(Debug, Clone)]
+    #[cfg_attr(feature = "syn_serde", derive(serde::Serialize, serde::Deserialize))]
     pub struct Float(Box<self::inner::Float>);
 
     /// optional `Float`
-    #[derive(Debug, Clone, serde::Serialize, serde::Deserialize)]
+    #[derive(Debug, Clone)]
+    #[cfg_attr(feature = "syn_serde", derive(serde::Serialize, serde::Deserialize))]
     pub struct FloatOpt(Option<Float>);
 
     #[cfg(test)]
@@ -26230,11 +26468,13 @@ mod float {
     }
 
     /// `Float` list
-    #[derive(Debug, Clone, serde::Serialize, serde::Deserialize)]
+    #[derive(Debug, Clone)]
+    #[cfg_attr(feature = "syn_serde", derive(serde::Serialize, serde::Deserialize))]
     pub struct FloatList(Vec<Float>);
 
     /// optional `Float` list
-    #[derive(Debug, Clone, serde::Serialize, serde::Deserialize)]
+    #[derive(Debug, Clone)]
+    #[cfg_attr(feature = "syn_serde", derive(serde::Serialize, serde::Deserialize))]
     pub struct FloatListOpt(Option<Vec<Float>>);
 
     impl crate::syn::ListOpt<Float> for FloatListOpt {
@@ -26334,7 +26574,8 @@ mod float {
         use super::*;
 
         #[cfg_attr(test, derive(derive_builder::Builder))]
-        #[derive(Clone, Debug, serde::Serialize, serde::Deserialize)]
+        #[cfg_attr(feature = "syn_serde", derive(serde::Serialize, serde::Deserialize))]
+        #[derive(Clone, Debug)]
         #[allow(clippy::struct_excessive_bools)]
         #[allow(clippy::struct_field_names)]
         pub struct Float {
@@ -26394,11 +26635,13 @@ mod boolean {
     use super::*;
 
     /// `Boolean`
-    #[derive(Debug, Clone, serde::Serialize, serde::Deserialize)]
+    #[derive(Debug, Clone)]
+    #[cfg_attr(feature = "syn_serde", derive(serde::Serialize, serde::Deserialize))]
     pub struct Boolean(Box<self::inner::Boolean>);
 
     /// optional `Boolean`
-    #[derive(Debug, Clone, serde::Serialize, serde::Deserialize)]
+    #[derive(Debug, Clone)]
+    #[cfg_attr(feature = "syn_serde", derive(serde::Serialize, serde::Deserialize))]
     pub struct BooleanOpt(Option<Boolean>);
 
     #[cfg(test)]
@@ -26415,11 +26658,13 @@ mod boolean {
     }
 
     /// `Boolean` list
-    #[derive(Debug, Clone, serde::Serialize, serde::Deserialize)]
+    #[derive(Debug, Clone)]
+    #[cfg_attr(feature = "syn_serde", derive(serde::Serialize, serde::Deserialize))]
     pub struct BooleanList(Vec<Boolean>);
 
     /// optional `Boolean` list
-    #[derive(Debug, Clone, serde::Serialize, serde::Deserialize)]
+    #[derive(Debug, Clone)]
+    #[cfg_attr(feature = "syn_serde", derive(serde::Serialize, serde::Deserialize))]
     pub struct BooleanListOpt(Option<Vec<Boolean>>);
 
     impl crate::syn::ListOpt<Boolean> for BooleanListOpt {
@@ -26519,7 +26764,8 @@ mod boolean {
         use super::*;
 
         #[cfg_attr(test, derive(derive_builder::Builder))]
-        #[derive(Clone, Debug, serde::Serialize, serde::Deserialize)]
+        #[cfg_attr(feature = "syn_serde", derive(serde::Serialize, serde::Deserialize))]
+        #[derive(Clone, Debug)]
         #[allow(clippy::struct_excessive_bools)]
         #[allow(clippy::struct_field_names)]
         pub struct Boolean {
@@ -26579,11 +26825,13 @@ mod string {
     use super::*;
 
     /// `String`
-    #[derive(Debug, Clone, serde::Serialize, serde::Deserialize)]
+    #[derive(Debug, Clone)]
+    #[cfg_attr(feature = "syn_serde", derive(serde::Serialize, serde::Deserialize))]
     pub struct String(Box<self::inner::String>);
 
     /// optional `String`
-    #[derive(Debug, Clone, serde::Serialize, serde::Deserialize)]
+    #[derive(Debug, Clone)]
+    #[cfg_attr(feature = "syn_serde", derive(serde::Serialize, serde::Deserialize))]
     pub struct StringOpt(Option<String>);
 
     #[cfg(test)]
@@ -26600,11 +26848,13 @@ mod string {
     }
 
     /// `String` list
-    #[derive(Debug, Clone, serde::Serialize, serde::Deserialize)]
+    #[derive(Debug, Clone)]
+    #[cfg_attr(feature = "syn_serde", derive(serde::Serialize, serde::Deserialize))]
     pub struct StringList(Vec<String>);
 
     /// optional `String` list
-    #[derive(Debug, Clone, serde::Serialize, serde::Deserialize)]
+    #[derive(Debug, Clone)]
+    #[cfg_attr(feature = "syn_serde", derive(serde::Serialize, serde::Deserialize))]
     pub struct StringListOpt(Option<Vec<String>>);
 
     impl crate::syn::ListOpt<String> for StringListOpt {
@@ -26704,7 +26954,8 @@ mod string {
         use super::*;
 
         #[cfg_attr(test, derive(derive_builder::Builder))]
-        #[derive(Clone, Debug, serde::Serialize, serde::Deserialize)]
+        #[cfg_attr(feature = "syn_serde", derive(serde::Serialize, serde::Deserialize))]
+        #[derive(Clone, Debug)]
         #[allow(clippy::struct_excessive_bools)]
         #[allow(clippy::struct_field_names)]
         pub struct String {
@@ -26764,11 +27015,13 @@ mod bit_string {
     use super::*;
 
     /// `BitString`
-    #[derive(Debug, Clone, serde::Serialize, serde::Deserialize)]
+    #[derive(Debug, Clone)]
+    #[cfg_attr(feature = "syn_serde", derive(serde::Serialize, serde::Deserialize))]
     pub struct BitString(Box<self::inner::BitString>);
 
     /// optional `BitString`
-    #[derive(Debug, Clone, serde::Serialize, serde::Deserialize)]
+    #[derive(Debug, Clone)]
+    #[cfg_attr(feature = "syn_serde", derive(serde::Serialize, serde::Deserialize))]
     pub struct BitStringOpt(Option<BitString>);
 
     #[cfg(test)]
@@ -26785,11 +27038,13 @@ mod bit_string {
     }
 
     /// `BitString` list
-    #[derive(Debug, Clone, serde::Serialize, serde::Deserialize)]
+    #[derive(Debug, Clone)]
+    #[cfg_attr(feature = "syn_serde", derive(serde::Serialize, serde::Deserialize))]
     pub struct BitStringList(Vec<BitString>);
 
     /// optional `BitString` list
-    #[derive(Debug, Clone, serde::Serialize, serde::Deserialize)]
+    #[derive(Debug, Clone)]
+    #[cfg_attr(feature = "syn_serde", derive(serde::Serialize, serde::Deserialize))]
     pub struct BitStringListOpt(Option<Vec<BitString>>);
 
     impl crate::syn::ListOpt<BitString> for BitStringListOpt {
@@ -26889,7 +27144,8 @@ mod bit_string {
         use super::*;
 
         #[cfg_attr(test, derive(derive_builder::Builder))]
-        #[derive(Clone, Debug, serde::Serialize, serde::Deserialize)]
+        #[cfg_attr(feature = "syn_serde", derive(serde::Serialize, serde::Deserialize))]
+        #[derive(Clone, Debug)]
         #[allow(clippy::struct_excessive_bools)]
         #[allow(clippy::struct_field_names)]
         pub struct BitString {
@@ -26949,11 +27205,13 @@ mod list {
     use super::*;
 
     /// `List`
-    #[derive(Debug, Clone, serde::Serialize, serde::Deserialize)]
+    #[derive(Debug, Clone)]
+    #[cfg_attr(feature = "syn_serde", derive(serde::Serialize, serde::Deserialize))]
     pub struct List(Box<self::inner::List>);
 
     /// optional `List`
-    #[derive(Debug, Clone, serde::Serialize, serde::Deserialize)]
+    #[derive(Debug, Clone)]
+    #[cfg_attr(feature = "syn_serde", derive(serde::Serialize, serde::Deserialize))]
     pub struct ListOpt(Option<List>);
 
     #[cfg(test)]
@@ -26970,11 +27228,13 @@ mod list {
     }
 
     /// `List` list
-    #[derive(Debug, Clone, serde::Serialize, serde::Deserialize)]
+    #[derive(Debug, Clone)]
+    #[cfg_attr(feature = "syn_serde", derive(serde::Serialize, serde::Deserialize))]
     pub struct ListList(Vec<List>);
 
     /// optional `List` list
-    #[derive(Debug, Clone, serde::Serialize, serde::Deserialize)]
+    #[derive(Debug, Clone)]
+    #[cfg_attr(feature = "syn_serde", derive(serde::Serialize, serde::Deserialize))]
     pub struct ListListOpt(Option<Vec<List>>);
 
     impl crate::syn::ListOpt<List> for ListListOpt {
@@ -27074,7 +27334,8 @@ mod list {
         use super::*;
 
         #[cfg_attr(test, derive(derive_builder::Builder))]
-        #[derive(Clone, Debug, serde::Serialize, serde::Deserialize)]
+        #[cfg_attr(feature = "syn_serde", derive(serde::Serialize, serde::Deserialize))]
+        #[derive(Clone, Debug)]
         #[allow(clippy::struct_excessive_bools)]
         #[allow(clippy::struct_field_names)]
         pub struct List {
@@ -27137,11 +27398,13 @@ mod oid_list {
     use super::*;
 
     /// `OidList`
-    #[derive(Debug, Clone, serde::Serialize, serde::Deserialize)]
+    #[derive(Debug, Clone)]
+    #[cfg_attr(feature = "syn_serde", derive(serde::Serialize, serde::Deserialize))]
     pub struct OidList(Box<self::inner::OidList>);
 
     /// optional `OidList`
-    #[derive(Debug, Clone, serde::Serialize, serde::Deserialize)]
+    #[derive(Debug, Clone)]
+    #[cfg_attr(feature = "syn_serde", derive(serde::Serialize, serde::Deserialize))]
     pub struct OidListOpt(Option<OidList>);
 
     #[cfg(test)]
@@ -27158,11 +27421,13 @@ mod oid_list {
     }
 
     /// `OidList` list
-    #[derive(Debug, Clone, serde::Serialize, serde::Deserialize)]
+    #[derive(Debug, Clone)]
+    #[cfg_attr(feature = "syn_serde", derive(serde::Serialize, serde::Deserialize))]
     pub struct OidListList(Vec<OidList>);
 
     /// optional `OidList` list
-    #[derive(Debug, Clone, serde::Serialize, serde::Deserialize)]
+    #[derive(Debug, Clone)]
+    #[cfg_attr(feature = "syn_serde", derive(serde::Serialize, serde::Deserialize))]
     pub struct OidListListOpt(Option<Vec<OidList>>);
 
     impl crate::syn::ListOpt<OidList> for OidListListOpt {
@@ -27262,7 +27527,8 @@ mod oid_list {
         use super::*;
 
         #[cfg_attr(test, derive(derive_builder::Builder))]
-        #[derive(Clone, Debug, serde::Serialize, serde::Deserialize)]
+        #[cfg_attr(feature = "syn_serde", derive(serde::Serialize, serde::Deserialize))]
+        #[derive(Clone, Debug)]
         #[allow(clippy::struct_excessive_bools)]
         #[allow(clippy::struct_field_names)]
         pub struct OidList {
@@ -27325,11 +27591,13 @@ mod int_list {
     use super::*;
 
     /// `IntList`
-    #[derive(Debug, Clone, serde::Serialize, serde::Deserialize)]
+    #[derive(Debug, Clone)]
+    #[cfg_attr(feature = "syn_serde", derive(serde::Serialize, serde::Deserialize))]
     pub struct IntList(Box<self::inner::IntList>);
 
     /// optional `IntList`
-    #[derive(Debug, Clone, serde::Serialize, serde::Deserialize)]
+    #[derive(Debug, Clone)]
+    #[cfg_attr(feature = "syn_serde", derive(serde::Serialize, serde::Deserialize))]
     pub struct IntListOpt(Option<IntList>);
 
     #[cfg(test)]
@@ -27346,11 +27614,13 @@ mod int_list {
     }
 
     /// `IntList` list
-    #[derive(Debug, Clone, serde::Serialize, serde::Deserialize)]
+    #[derive(Debug, Clone)]
+    #[cfg_attr(feature = "syn_serde", derive(serde::Serialize, serde::Deserialize))]
     pub struct IntListList(Vec<IntList>);
 
     /// optional `IntList` list
-    #[derive(Debug, Clone, serde::Serialize, serde::Deserialize)]
+    #[derive(Debug, Clone)]
+    #[cfg_attr(feature = "syn_serde", derive(serde::Serialize, serde::Deserialize))]
     pub struct IntListListOpt(Option<Vec<IntList>>);
 
     impl crate::syn::ListOpt<IntList> for IntListListOpt {
@@ -27450,7 +27720,8 @@ mod int_list {
         use super::*;
 
         #[cfg_attr(test, derive(derive_builder::Builder))]
-        #[derive(Clone, Debug, serde::Serialize, serde::Deserialize)]
+        #[cfg_attr(feature = "syn_serde", derive(serde::Serialize, serde::Deserialize))]
+        #[derive(Clone, Debug)]
         #[allow(clippy::struct_excessive_bools)]
         #[allow(clippy::struct_field_names)]
         pub struct IntList {
@@ -27513,11 +27784,13 @@ mod alias {
     use super::*;
 
     /// `Alias`
-    #[derive(Debug, Clone, serde::Serialize, serde::Deserialize)]
+    #[derive(Debug, Clone)]
+    #[cfg_attr(feature = "syn_serde", derive(serde::Serialize, serde::Deserialize))]
     pub struct Alias(Box<self::inner::Alias>);
 
     /// optional `Alias`
-    #[derive(Debug, Clone, serde::Serialize, serde::Deserialize)]
+    #[derive(Debug, Clone)]
+    #[cfg_attr(feature = "syn_serde", derive(serde::Serialize, serde::Deserialize))]
     pub struct AliasOpt(Option<Alias>);
 
     #[cfg(test)]
@@ -27534,11 +27807,13 @@ mod alias {
     }
 
     /// `Alias` list
-    #[derive(Debug, Clone, serde::Serialize, serde::Deserialize)]
+    #[derive(Debug, Clone)]
+    #[cfg_attr(feature = "syn_serde", derive(serde::Serialize, serde::Deserialize))]
     pub struct AliasList(Vec<Alias>);
 
     /// optional `Alias` list
-    #[derive(Debug, Clone, serde::Serialize, serde::Deserialize)]
+    #[derive(Debug, Clone)]
+    #[cfg_attr(feature = "syn_serde", derive(serde::Serialize, serde::Deserialize))]
     pub struct AliasListOpt(Option<Vec<Alias>>);
 
     impl crate::syn::ListOpt<Alias> for AliasListOpt {
@@ -27638,7 +27913,8 @@ mod alias {
         use super::*;
 
         #[cfg_attr(test, derive(derive_builder::Builder))]
-        #[derive(Clone, Debug, serde::Serialize, serde::Deserialize)]
+        #[cfg_attr(feature = "syn_serde", derive(serde::Serialize, serde::Deserialize))]
+        #[derive(Clone, Debug)]
         #[allow(clippy::struct_excessive_bools)]
         #[allow(clippy::struct_field_names)]
         pub struct Alias {
@@ -27734,11 +28010,13 @@ mod range_var {
     use super::*;
 
     /// `RangeVar`
-    #[derive(Debug, Clone, serde::Serialize, serde::Deserialize)]
+    #[derive(Debug, Clone)]
+    #[cfg_attr(feature = "syn_serde", derive(serde::Serialize, serde::Deserialize))]
     pub struct RangeVar(Box<self::inner::RangeVar>);
 
     /// optional `RangeVar`
-    #[derive(Debug, Clone, serde::Serialize, serde::Deserialize)]
+    #[derive(Debug, Clone)]
+    #[cfg_attr(feature = "syn_serde", derive(serde::Serialize, serde::Deserialize))]
     pub struct RangeVarOpt(Option<RangeVar>);
 
     #[cfg(test)]
@@ -27755,11 +28033,13 @@ mod range_var {
     }
 
     /// `RangeVar` list
-    #[derive(Debug, Clone, serde::Serialize, serde::Deserialize)]
+    #[derive(Debug, Clone)]
+    #[cfg_attr(feature = "syn_serde", derive(serde::Serialize, serde::Deserialize))]
     pub struct RangeVarList(Vec<RangeVar>);
 
     /// optional `RangeVar` list
-    #[derive(Debug, Clone, serde::Serialize, serde::Deserialize)]
+    #[derive(Debug, Clone)]
+    #[cfg_attr(feature = "syn_serde", derive(serde::Serialize, serde::Deserialize))]
     pub struct RangeVarListOpt(Option<Vec<RangeVar>>);
 
     impl crate::syn::ListOpt<RangeVar> for RangeVarListOpt {
@@ -27859,7 +28139,8 @@ mod range_var {
         use super::*;
 
         #[cfg_attr(test, derive(derive_builder::Builder))]
-        #[derive(Clone, Debug, serde::Serialize, serde::Deserialize)]
+        #[cfg_attr(feature = "syn_serde", derive(serde::Serialize, serde::Deserialize))]
+        #[derive(Clone, Debug)]
         #[allow(clippy::struct_excessive_bools)]
         #[allow(clippy::struct_field_names)]
         pub struct RangeVar {
@@ -28110,11 +28391,13 @@ mod table_func {
     use super::*;
 
     /// `TableFunc`
-    #[derive(Debug, Clone, serde::Serialize, serde::Deserialize)]
+    #[derive(Debug, Clone)]
+    #[cfg_attr(feature = "syn_serde", derive(serde::Serialize, serde::Deserialize))]
     pub struct TableFunc(Box<self::inner::TableFunc>);
 
     /// optional `TableFunc`
-    #[derive(Debug, Clone, serde::Serialize, serde::Deserialize)]
+    #[derive(Debug, Clone)]
+    #[cfg_attr(feature = "syn_serde", derive(serde::Serialize, serde::Deserialize))]
     pub struct TableFuncOpt(Option<TableFunc>);
 
     #[cfg(test)]
@@ -28131,11 +28414,13 @@ mod table_func {
     }
 
     /// `TableFunc` list
-    #[derive(Debug, Clone, serde::Serialize, serde::Deserialize)]
+    #[derive(Debug, Clone)]
+    #[cfg_attr(feature = "syn_serde", derive(serde::Serialize, serde::Deserialize))]
     pub struct TableFuncList(Vec<TableFunc>);
 
     /// optional `TableFunc` list
-    #[derive(Debug, Clone, serde::Serialize, serde::Deserialize)]
+    #[derive(Debug, Clone)]
+    #[cfg_attr(feature = "syn_serde", derive(serde::Serialize, serde::Deserialize))]
     pub struct TableFuncListOpt(Option<Vec<TableFunc>>);
 
     impl crate::syn::ListOpt<TableFunc> for TableFuncListOpt {
@@ -28235,7 +28520,8 @@ mod table_func {
         use super::*;
 
         #[cfg_attr(test, derive(derive_builder::Builder))]
-        #[derive(Clone, Debug, serde::Serialize, serde::Deserialize)]
+        #[cfg_attr(feature = "syn_serde", derive(serde::Serialize, serde::Deserialize))]
+        #[derive(Clone, Debug)]
         #[allow(clippy::struct_excessive_bools)]
         #[allow(clippy::struct_field_names)]
         pub struct TableFunc {
@@ -28835,11 +29121,13 @@ mod into_clause {
     use super::*;
 
     /// `IntoClause`
-    #[derive(Debug, Clone, serde::Serialize, serde::Deserialize)]
+    #[derive(Debug, Clone)]
+    #[cfg_attr(feature = "syn_serde", derive(serde::Serialize, serde::Deserialize))]
     pub struct IntoClause(Box<self::inner::IntoClause>);
 
     /// optional `IntoClause`
-    #[derive(Debug, Clone, serde::Serialize, serde::Deserialize)]
+    #[derive(Debug, Clone)]
+    #[cfg_attr(feature = "syn_serde", derive(serde::Serialize, serde::Deserialize))]
     pub struct IntoClauseOpt(Option<IntoClause>);
 
     #[cfg(test)]
@@ -28856,11 +29144,13 @@ mod into_clause {
     }
 
     /// `IntoClause` list
-    #[derive(Debug, Clone, serde::Serialize, serde::Deserialize)]
+    #[derive(Debug, Clone)]
+    #[cfg_attr(feature = "syn_serde", derive(serde::Serialize, serde::Deserialize))]
     pub struct IntoClauseList(Vec<IntoClause>);
 
     /// optional `IntoClause` list
-    #[derive(Debug, Clone, serde::Serialize, serde::Deserialize)]
+    #[derive(Debug, Clone)]
+    #[cfg_attr(feature = "syn_serde", derive(serde::Serialize, serde::Deserialize))]
     pub struct IntoClauseListOpt(Option<Vec<IntoClause>>);
 
     impl crate::syn::ListOpt<IntoClause> for IntoClauseListOpt {
@@ -28960,7 +29250,8 @@ mod into_clause {
         use super::*;
 
         #[cfg_attr(test, derive(derive_builder::Builder))]
-        #[derive(Clone, Debug, serde::Serialize, serde::Deserialize)]
+        #[cfg_attr(feature = "syn_serde", derive(serde::Serialize, serde::Deserialize))]
+        #[derive(Clone, Debug)]
         #[allow(clippy::struct_excessive_bools)]
         #[allow(clippy::struct_field_names)]
         pub struct IntoClause {
@@ -29254,11 +29545,13 @@ mod var {
     use super::*;
 
     /// `Var`
-    #[derive(Debug, Clone, serde::Serialize, serde::Deserialize)]
+    #[derive(Debug, Clone)]
+    #[cfg_attr(feature = "syn_serde", derive(serde::Serialize, serde::Deserialize))]
     pub struct Var(Box<self::inner::Var>);
 
     /// optional `Var`
-    #[derive(Debug, Clone, serde::Serialize, serde::Deserialize)]
+    #[derive(Debug, Clone)]
+    #[cfg_attr(feature = "syn_serde", derive(serde::Serialize, serde::Deserialize))]
     pub struct VarOpt(Option<Var>);
 
     #[cfg(test)]
@@ -29275,11 +29568,13 @@ mod var {
     }
 
     /// `Var` list
-    #[derive(Debug, Clone, serde::Serialize, serde::Deserialize)]
+    #[derive(Debug, Clone)]
+    #[cfg_attr(feature = "syn_serde", derive(serde::Serialize, serde::Deserialize))]
     pub struct VarList(Vec<Var>);
 
     /// optional `Var` list
-    #[derive(Debug, Clone, serde::Serialize, serde::Deserialize)]
+    #[derive(Debug, Clone)]
+    #[cfg_attr(feature = "syn_serde", derive(serde::Serialize, serde::Deserialize))]
     pub struct VarListOpt(Option<Vec<Var>>);
 
     impl crate::syn::ListOpt<Var> for VarListOpt {
@@ -29379,7 +29674,8 @@ mod var {
         use super::*;
 
         #[cfg_attr(test, derive(derive_builder::Builder))]
-        #[derive(Clone, Debug, serde::Serialize, serde::Deserialize)]
+        #[cfg_attr(feature = "syn_serde", derive(serde::Serialize, serde::Deserialize))]
+        #[derive(Clone, Debug)]
         #[allow(clippy::struct_excessive_bools)]
         #[allow(clippy::struct_field_names)]
         pub struct Var {
@@ -29692,11 +29988,13 @@ mod param {
     use super::*;
 
     /// `Param`
-    #[derive(Debug, Clone, serde::Serialize, serde::Deserialize)]
+    #[derive(Debug, Clone)]
+    #[cfg_attr(feature = "syn_serde", derive(serde::Serialize, serde::Deserialize))]
     pub struct Param(Box<self::inner::Param>);
 
     /// optional `Param`
-    #[derive(Debug, Clone, serde::Serialize, serde::Deserialize)]
+    #[derive(Debug, Clone)]
+    #[cfg_attr(feature = "syn_serde", derive(serde::Serialize, serde::Deserialize))]
     pub struct ParamOpt(Option<Param>);
 
     #[cfg(test)]
@@ -29713,11 +30011,13 @@ mod param {
     }
 
     /// `Param` list
-    #[derive(Debug, Clone, serde::Serialize, serde::Deserialize)]
+    #[derive(Debug, Clone)]
+    #[cfg_attr(feature = "syn_serde", derive(serde::Serialize, serde::Deserialize))]
     pub struct ParamList(Vec<Param>);
 
     /// optional `Param` list
-    #[derive(Debug, Clone, serde::Serialize, serde::Deserialize)]
+    #[derive(Debug, Clone)]
+    #[cfg_attr(feature = "syn_serde", derive(serde::Serialize, serde::Deserialize))]
     pub struct ParamListOpt(Option<Vec<Param>>);
 
     impl crate::syn::ListOpt<Param> for ParamListOpt {
@@ -29817,7 +30117,8 @@ mod param {
         use super::*;
 
         #[cfg_attr(test, derive(derive_builder::Builder))]
-        #[derive(Clone, Debug, serde::Serialize, serde::Deserialize)]
+        #[cfg_attr(feature = "syn_serde", derive(serde::Serialize, serde::Deserialize))]
+        #[derive(Clone, Debug)]
         #[allow(clippy::struct_excessive_bools)]
         #[allow(clippy::struct_field_names)]
         pub struct Param {
@@ -30071,11 +30372,13 @@ mod aggref {
     use super::*;
 
     /// `Aggref`
-    #[derive(Debug, Clone, serde::Serialize, serde::Deserialize)]
+    #[derive(Debug, Clone)]
+    #[cfg_attr(feature = "syn_serde", derive(serde::Serialize, serde::Deserialize))]
     pub struct Aggref(Box<self::inner::Aggref>);
 
     /// optional `Aggref`
-    #[derive(Debug, Clone, serde::Serialize, serde::Deserialize)]
+    #[derive(Debug, Clone)]
+    #[cfg_attr(feature = "syn_serde", derive(serde::Serialize, serde::Deserialize))]
     pub struct AggrefOpt(Option<Aggref>);
 
     #[cfg(test)]
@@ -30092,11 +30395,13 @@ mod aggref {
     }
 
     /// `Aggref` list
-    #[derive(Debug, Clone, serde::Serialize, serde::Deserialize)]
+    #[derive(Debug, Clone)]
+    #[cfg_attr(feature = "syn_serde", derive(serde::Serialize, serde::Deserialize))]
     pub struct AggrefList(Vec<Aggref>);
 
     /// optional `Aggref` list
-    #[derive(Debug, Clone, serde::Serialize, serde::Deserialize)]
+    #[derive(Debug, Clone)]
+    #[cfg_attr(feature = "syn_serde", derive(serde::Serialize, serde::Deserialize))]
     pub struct AggrefListOpt(Option<Vec<Aggref>>);
 
     impl crate::syn::ListOpt<Aggref> for AggrefListOpt {
@@ -30196,7 +30501,8 @@ mod aggref {
         use super::*;
 
         #[cfg_attr(test, derive(derive_builder::Builder))]
-        #[derive(Clone, Debug, serde::Serialize, serde::Deserialize)]
+        #[cfg_attr(feature = "syn_serde", derive(serde::Serialize, serde::Deserialize))]
+        #[derive(Clone, Debug)]
         #[allow(clippy::struct_excessive_bools)]
         #[allow(clippy::struct_field_names)]
         pub struct Aggref {
@@ -30840,11 +31146,13 @@ mod grouping_func {
     use super::*;
 
     /// `GroupingFunc`
-    #[derive(Debug, Clone, serde::Serialize, serde::Deserialize)]
+    #[derive(Debug, Clone)]
+    #[cfg_attr(feature = "syn_serde", derive(serde::Serialize, serde::Deserialize))]
     pub struct GroupingFunc(Box<self::inner::GroupingFunc>);
 
     /// optional `GroupingFunc`
-    #[derive(Debug, Clone, serde::Serialize, serde::Deserialize)]
+    #[derive(Debug, Clone)]
+    #[cfg_attr(feature = "syn_serde", derive(serde::Serialize, serde::Deserialize))]
     pub struct GroupingFuncOpt(Option<GroupingFunc>);
 
     #[cfg(test)]
@@ -30861,11 +31169,13 @@ mod grouping_func {
     }
 
     /// `GroupingFunc` list
-    #[derive(Debug, Clone, serde::Serialize, serde::Deserialize)]
+    #[derive(Debug, Clone)]
+    #[cfg_attr(feature = "syn_serde", derive(serde::Serialize, serde::Deserialize))]
     pub struct GroupingFuncList(Vec<GroupingFunc>);
 
     /// optional `GroupingFunc` list
-    #[derive(Debug, Clone, serde::Serialize, serde::Deserialize)]
+    #[derive(Debug, Clone)]
+    #[cfg_attr(feature = "syn_serde", derive(serde::Serialize, serde::Deserialize))]
     pub struct GroupingFuncListOpt(Option<Vec<GroupingFunc>>);
 
     impl crate::syn::ListOpt<GroupingFunc> for GroupingFuncListOpt {
@@ -30965,7 +31275,8 @@ mod grouping_func {
         use super::*;
 
         #[cfg_attr(test, derive(derive_builder::Builder))]
-        #[derive(Clone, Debug, serde::Serialize, serde::Deserialize)]
+        #[cfg_attr(feature = "syn_serde", derive(serde::Serialize, serde::Deserialize))]
+        #[derive(Clone, Debug)]
         #[allow(clippy::struct_excessive_bools)]
         #[allow(clippy::struct_field_names)]
         pub struct GroupingFunc {
@@ -31162,11 +31473,13 @@ mod window_func {
     use super::*;
 
     /// `WindowFunc`
-    #[derive(Debug, Clone, serde::Serialize, serde::Deserialize)]
+    #[derive(Debug, Clone)]
+    #[cfg_attr(feature = "syn_serde", derive(serde::Serialize, serde::Deserialize))]
     pub struct WindowFunc(Box<self::inner::WindowFunc>);
 
     /// optional `WindowFunc`
-    #[derive(Debug, Clone, serde::Serialize, serde::Deserialize)]
+    #[derive(Debug, Clone)]
+    #[cfg_attr(feature = "syn_serde", derive(serde::Serialize, serde::Deserialize))]
     pub struct WindowFuncOpt(Option<WindowFunc>);
 
     #[cfg(test)]
@@ -31183,11 +31496,13 @@ mod window_func {
     }
 
     /// `WindowFunc` list
-    #[derive(Debug, Clone, serde::Serialize, serde::Deserialize)]
+    #[derive(Debug, Clone)]
+    #[cfg_attr(feature = "syn_serde", derive(serde::Serialize, serde::Deserialize))]
     pub struct WindowFuncList(Vec<WindowFunc>);
 
     /// optional `WindowFunc` list
-    #[derive(Debug, Clone, serde::Serialize, serde::Deserialize)]
+    #[derive(Debug, Clone)]
+    #[cfg_attr(feature = "syn_serde", derive(serde::Serialize, serde::Deserialize))]
     pub struct WindowFuncListOpt(Option<Vec<WindowFunc>>);
 
     impl crate::syn::ListOpt<WindowFunc> for WindowFuncListOpt {
@@ -31287,7 +31602,8 @@ mod window_func {
         use super::*;
 
         #[cfg_attr(test, derive(derive_builder::Builder))]
-        #[derive(Clone, Debug, serde::Serialize, serde::Deserialize)]
+        #[cfg_attr(feature = "syn_serde", derive(serde::Serialize, serde::Deserialize))]
+        #[derive(Clone, Debug)]
         #[allow(clippy::struct_excessive_bools)]
         #[allow(clippy::struct_field_names)]
         pub struct WindowFunc {
@@ -31702,11 +32018,13 @@ mod window_func_run_condition {
     use super::*;
 
     /// `WindowFuncRunCondition`
-    #[derive(Debug, Clone, serde::Serialize, serde::Deserialize)]
+    #[derive(Debug, Clone)]
+    #[cfg_attr(feature = "syn_serde", derive(serde::Serialize, serde::Deserialize))]
     pub struct WindowFuncRunCondition(Box<self::inner::WindowFuncRunCondition>);
 
     /// optional `WindowFuncRunCondition`
-    #[derive(Debug, Clone, serde::Serialize, serde::Deserialize)]
+    #[derive(Debug, Clone)]
+    #[cfg_attr(feature = "syn_serde", derive(serde::Serialize, serde::Deserialize))]
     pub struct WindowFuncRunConditionOpt(Option<WindowFuncRunCondition>);
 
     #[cfg(test)]
@@ -31723,11 +32041,13 @@ mod window_func_run_condition {
     }
 
     /// `WindowFuncRunCondition` list
-    #[derive(Debug, Clone, serde::Serialize, serde::Deserialize)]
+    #[derive(Debug, Clone)]
+    #[cfg_attr(feature = "syn_serde", derive(serde::Serialize, serde::Deserialize))]
     pub struct WindowFuncRunConditionList(Vec<WindowFuncRunCondition>);
 
     /// optional `WindowFuncRunCondition` list
-    #[derive(Debug, Clone, serde::Serialize, serde::Deserialize)]
+    #[derive(Debug, Clone)]
+    #[cfg_attr(feature = "syn_serde", derive(serde::Serialize, serde::Deserialize))]
     pub struct WindowFuncRunConditionListOpt(Option<Vec<WindowFuncRunCondition>>);
 
     impl crate::syn::ListOpt<WindowFuncRunCondition> for WindowFuncRunConditionListOpt {
@@ -31832,7 +32152,8 @@ mod window_func_run_condition {
         use super::*;
 
         #[cfg_attr(test, derive(derive_builder::Builder))]
-        #[derive(Clone, Debug, serde::Serialize, serde::Deserialize)]
+        #[cfg_attr(feature = "syn_serde", derive(serde::Serialize, serde::Deserialize))]
+        #[derive(Clone, Debug)]
         #[allow(clippy::struct_excessive_bools)]
         #[allow(clippy::struct_field_names)]
         pub struct WindowFuncRunCondition {
@@ -32027,11 +32348,13 @@ mod merge_support_func {
     use super::*;
 
     /// `MergeSupportFunc`
-    #[derive(Debug, Clone, serde::Serialize, serde::Deserialize)]
+    #[derive(Debug, Clone)]
+    #[cfg_attr(feature = "syn_serde", derive(serde::Serialize, serde::Deserialize))]
     pub struct MergeSupportFunc(Box<self::inner::MergeSupportFunc>);
 
     /// optional `MergeSupportFunc`
-    #[derive(Debug, Clone, serde::Serialize, serde::Deserialize)]
+    #[derive(Debug, Clone)]
+    #[cfg_attr(feature = "syn_serde", derive(serde::Serialize, serde::Deserialize))]
     pub struct MergeSupportFuncOpt(Option<MergeSupportFunc>);
 
     #[cfg(test)]
@@ -32048,11 +32371,13 @@ mod merge_support_func {
     }
 
     /// `MergeSupportFunc` list
-    #[derive(Debug, Clone, serde::Serialize, serde::Deserialize)]
+    #[derive(Debug, Clone)]
+    #[cfg_attr(feature = "syn_serde", derive(serde::Serialize, serde::Deserialize))]
     pub struct MergeSupportFuncList(Vec<MergeSupportFunc>);
 
     /// optional `MergeSupportFunc` list
-    #[derive(Debug, Clone, serde::Serialize, serde::Deserialize)]
+    #[derive(Debug, Clone)]
+    #[cfg_attr(feature = "syn_serde", derive(serde::Serialize, serde::Deserialize))]
     pub struct MergeSupportFuncListOpt(Option<Vec<MergeSupportFunc>>);
 
     impl crate::syn::ListOpt<MergeSupportFunc> for MergeSupportFuncListOpt {
@@ -32152,7 +32477,8 @@ mod merge_support_func {
         use super::*;
 
         #[cfg_attr(test, derive(derive_builder::Builder))]
-        #[derive(Clone, Debug, serde::Serialize, serde::Deserialize)]
+        #[cfg_attr(feature = "syn_serde", derive(serde::Serialize, serde::Deserialize))]
+        #[derive(Clone, Debug)]
         #[allow(clippy::struct_excessive_bools)]
         #[allow(clippy::struct_field_names)]
         pub struct MergeSupportFunc {
@@ -32312,11 +32638,13 @@ mod subscripting_ref {
     use super::*;
 
     /// `SubscriptingRef`
-    #[derive(Debug, Clone, serde::Serialize, serde::Deserialize)]
+    #[derive(Debug, Clone)]
+    #[cfg_attr(feature = "syn_serde", derive(serde::Serialize, serde::Deserialize))]
     pub struct SubscriptingRef(Box<self::inner::SubscriptingRef>);
 
     /// optional `SubscriptingRef`
-    #[derive(Debug, Clone, serde::Serialize, serde::Deserialize)]
+    #[derive(Debug, Clone)]
+    #[cfg_attr(feature = "syn_serde", derive(serde::Serialize, serde::Deserialize))]
     pub struct SubscriptingRefOpt(Option<SubscriptingRef>);
 
     #[cfg(test)]
@@ -32333,11 +32661,13 @@ mod subscripting_ref {
     }
 
     /// `SubscriptingRef` list
-    #[derive(Debug, Clone, serde::Serialize, serde::Deserialize)]
+    #[derive(Debug, Clone)]
+    #[cfg_attr(feature = "syn_serde", derive(serde::Serialize, serde::Deserialize))]
     pub struct SubscriptingRefList(Vec<SubscriptingRef>);
 
     /// optional `SubscriptingRef` list
-    #[derive(Debug, Clone, serde::Serialize, serde::Deserialize)]
+    #[derive(Debug, Clone)]
+    #[cfg_attr(feature = "syn_serde", derive(serde::Serialize, serde::Deserialize))]
     pub struct SubscriptingRefListOpt(Option<Vec<SubscriptingRef>>);
 
     impl crate::syn::ListOpt<SubscriptingRef> for SubscriptingRefListOpt {
@@ -32437,7 +32767,8 @@ mod subscripting_ref {
         use super::*;
 
         #[cfg_attr(test, derive(derive_builder::Builder))]
-        #[derive(Clone, Debug, serde::Serialize, serde::Deserialize)]
+        #[cfg_attr(feature = "syn_serde", derive(serde::Serialize, serde::Deserialize))]
+        #[derive(Clone, Debug)]
         #[allow(clippy::struct_excessive_bools)]
         #[allow(clippy::struct_field_names)]
         pub struct SubscriptingRef {
@@ -32795,11 +33126,13 @@ mod func_expr {
     use super::*;
 
     /// `FuncExpr`
-    #[derive(Debug, Clone, serde::Serialize, serde::Deserialize)]
+    #[derive(Debug, Clone)]
+    #[cfg_attr(feature = "syn_serde", derive(serde::Serialize, serde::Deserialize))]
     pub struct FuncExpr(Box<self::inner::FuncExpr>);
 
     /// optional `FuncExpr`
-    #[derive(Debug, Clone, serde::Serialize, serde::Deserialize)]
+    #[derive(Debug, Clone)]
+    #[cfg_attr(feature = "syn_serde", derive(serde::Serialize, serde::Deserialize))]
     pub struct FuncExprOpt(Option<FuncExpr>);
 
     #[cfg(test)]
@@ -32816,11 +33149,13 @@ mod func_expr {
     }
 
     /// `FuncExpr` list
-    #[derive(Debug, Clone, serde::Serialize, serde::Deserialize)]
+    #[derive(Debug, Clone)]
+    #[cfg_attr(feature = "syn_serde", derive(serde::Serialize, serde::Deserialize))]
     pub struct FuncExprList(Vec<FuncExpr>);
 
     /// optional `FuncExpr` list
-    #[derive(Debug, Clone, serde::Serialize, serde::Deserialize)]
+    #[derive(Debug, Clone)]
+    #[cfg_attr(feature = "syn_serde", derive(serde::Serialize, serde::Deserialize))]
     pub struct FuncExprListOpt(Option<Vec<FuncExpr>>);
 
     impl crate::syn::ListOpt<FuncExpr> for FuncExprListOpt {
@@ -32920,7 +33255,8 @@ mod func_expr {
         use super::*;
 
         #[cfg_attr(test, derive(derive_builder::Builder))]
-        #[derive(Clone, Debug, serde::Serialize, serde::Deserialize)]
+        #[cfg_attr(feature = "syn_serde", derive(serde::Serialize, serde::Deserialize))]
+        #[derive(Clone, Debug)]
         #[allow(clippy::struct_excessive_bools)]
         #[allow(clippy::struct_field_names)]
         pub struct FuncExpr {
@@ -33270,11 +33606,13 @@ mod named_arg_expr {
     use super::*;
 
     /// `NamedArgExpr`
-    #[derive(Debug, Clone, serde::Serialize, serde::Deserialize)]
+    #[derive(Debug, Clone)]
+    #[cfg_attr(feature = "syn_serde", derive(serde::Serialize, serde::Deserialize))]
     pub struct NamedArgExpr(Box<self::inner::NamedArgExpr>);
 
     /// optional `NamedArgExpr`
-    #[derive(Debug, Clone, serde::Serialize, serde::Deserialize)]
+    #[derive(Debug, Clone)]
+    #[cfg_attr(feature = "syn_serde", derive(serde::Serialize, serde::Deserialize))]
     pub struct NamedArgExprOpt(Option<NamedArgExpr>);
 
     #[cfg(test)]
@@ -33291,11 +33629,13 @@ mod named_arg_expr {
     }
 
     /// `NamedArgExpr` list
-    #[derive(Debug, Clone, serde::Serialize, serde::Deserialize)]
+    #[derive(Debug, Clone)]
+    #[cfg_attr(feature = "syn_serde", derive(serde::Serialize, serde::Deserialize))]
     pub struct NamedArgExprList(Vec<NamedArgExpr>);
 
     /// optional `NamedArgExpr` list
-    #[derive(Debug, Clone, serde::Serialize, serde::Deserialize)]
+    #[derive(Debug, Clone)]
+    #[cfg_attr(feature = "syn_serde", derive(serde::Serialize, serde::Deserialize))]
     pub struct NamedArgExprListOpt(Option<Vec<NamedArgExpr>>);
 
     impl crate::syn::ListOpt<NamedArgExpr> for NamedArgExprListOpt {
@@ -33395,7 +33735,8 @@ mod named_arg_expr {
         use super::*;
 
         #[cfg_attr(test, derive(derive_builder::Builder))]
-        #[derive(Clone, Debug, serde::Serialize, serde::Deserialize)]
+        #[cfg_attr(feature = "syn_serde", derive(serde::Serialize, serde::Deserialize))]
+        #[derive(Clone, Debug)]
         #[allow(clippy::struct_excessive_bools)]
         #[allow(clippy::struct_field_names)]
         pub struct NamedArgExpr {
@@ -33589,11 +33930,13 @@ mod op_expr {
     use super::*;
 
     /// `OpExpr`
-    #[derive(Debug, Clone, serde::Serialize, serde::Deserialize)]
+    #[derive(Debug, Clone)]
+    #[cfg_attr(feature = "syn_serde", derive(serde::Serialize, serde::Deserialize))]
     pub struct OpExpr(Box<self::inner::OpExpr>);
 
     /// optional `OpExpr`
-    #[derive(Debug, Clone, serde::Serialize, serde::Deserialize)]
+    #[derive(Debug, Clone)]
+    #[cfg_attr(feature = "syn_serde", derive(serde::Serialize, serde::Deserialize))]
     pub struct OpExprOpt(Option<OpExpr>);
 
     #[cfg(test)]
@@ -33610,11 +33953,13 @@ mod op_expr {
     }
 
     /// `OpExpr` list
-    #[derive(Debug, Clone, serde::Serialize, serde::Deserialize)]
+    #[derive(Debug, Clone)]
+    #[cfg_attr(feature = "syn_serde", derive(serde::Serialize, serde::Deserialize))]
     pub struct OpExprList(Vec<OpExpr>);
 
     /// optional `OpExpr` list
-    #[derive(Debug, Clone, serde::Serialize, serde::Deserialize)]
+    #[derive(Debug, Clone)]
+    #[cfg_attr(feature = "syn_serde", derive(serde::Serialize, serde::Deserialize))]
     pub struct OpExprListOpt(Option<Vec<OpExpr>>);
 
     impl crate::syn::ListOpt<OpExpr> for OpExprListOpt {
@@ -33714,7 +34059,8 @@ mod op_expr {
         use super::*;
 
         #[cfg_attr(test, derive(derive_builder::Builder))]
-        #[derive(Clone, Debug, serde::Serialize, serde::Deserialize)]
+        #[cfg_attr(feature = "syn_serde", derive(serde::Serialize, serde::Deserialize))]
+        #[derive(Clone, Debug)]
         #[allow(clippy::struct_excessive_bools)]
         #[allow(clippy::struct_field_names)]
         pub struct OpExpr {
@@ -33999,11 +34345,13 @@ mod distinct_expr {
     use super::*;
 
     /// `DistinctExpr`
-    #[derive(Debug, Clone, serde::Serialize, serde::Deserialize)]
+    #[derive(Debug, Clone)]
+    #[cfg_attr(feature = "syn_serde", derive(serde::Serialize, serde::Deserialize))]
     pub struct DistinctExpr(Box<self::inner::DistinctExpr>);
 
     /// optional `DistinctExpr`
-    #[derive(Debug, Clone, serde::Serialize, serde::Deserialize)]
+    #[derive(Debug, Clone)]
+    #[cfg_attr(feature = "syn_serde", derive(serde::Serialize, serde::Deserialize))]
     pub struct DistinctExprOpt(Option<DistinctExpr>);
 
     #[cfg(test)]
@@ -34020,11 +34368,13 @@ mod distinct_expr {
     }
 
     /// `DistinctExpr` list
-    #[derive(Debug, Clone, serde::Serialize, serde::Deserialize)]
+    #[derive(Debug, Clone)]
+    #[cfg_attr(feature = "syn_serde", derive(serde::Serialize, serde::Deserialize))]
     pub struct DistinctExprList(Vec<DistinctExpr>);
 
     /// optional `DistinctExpr` list
-    #[derive(Debug, Clone, serde::Serialize, serde::Deserialize)]
+    #[derive(Debug, Clone)]
+    #[cfg_attr(feature = "syn_serde", derive(serde::Serialize, serde::Deserialize))]
     pub struct DistinctExprListOpt(Option<Vec<DistinctExpr>>);
 
     impl crate::syn::ListOpt<DistinctExpr> for DistinctExprListOpt {
@@ -34124,7 +34474,8 @@ mod distinct_expr {
         use super::*;
 
         #[cfg_attr(test, derive(derive_builder::Builder))]
-        #[derive(Clone, Debug, serde::Serialize, serde::Deserialize)]
+        #[cfg_attr(feature = "syn_serde", derive(serde::Serialize, serde::Deserialize))]
+        #[derive(Clone, Debug)]
         #[allow(clippy::struct_excessive_bools)]
         #[allow(clippy::struct_field_names)]
         pub struct DistinctExpr {
@@ -34411,11 +34762,13 @@ mod null_if_expr {
     use super::*;
 
     /// `NullIfExpr`
-    #[derive(Debug, Clone, serde::Serialize, serde::Deserialize)]
+    #[derive(Debug, Clone)]
+    #[cfg_attr(feature = "syn_serde", derive(serde::Serialize, serde::Deserialize))]
     pub struct NullIfExpr(Box<self::inner::NullIfExpr>);
 
     /// optional `NullIfExpr`
-    #[derive(Debug, Clone, serde::Serialize, serde::Deserialize)]
+    #[derive(Debug, Clone)]
+    #[cfg_attr(feature = "syn_serde", derive(serde::Serialize, serde::Deserialize))]
     pub struct NullIfExprOpt(Option<NullIfExpr>);
 
     #[cfg(test)]
@@ -34432,11 +34785,13 @@ mod null_if_expr {
     }
 
     /// `NullIfExpr` list
-    #[derive(Debug, Clone, serde::Serialize, serde::Deserialize)]
+    #[derive(Debug, Clone)]
+    #[cfg_attr(feature = "syn_serde", derive(serde::Serialize, serde::Deserialize))]
     pub struct NullIfExprList(Vec<NullIfExpr>);
 
     /// optional `NullIfExpr` list
-    #[derive(Debug, Clone, serde::Serialize, serde::Deserialize)]
+    #[derive(Debug, Clone)]
+    #[cfg_attr(feature = "syn_serde", derive(serde::Serialize, serde::Deserialize))]
     pub struct NullIfExprListOpt(Option<Vec<NullIfExpr>>);
 
     impl crate::syn::ListOpt<NullIfExpr> for NullIfExprListOpt {
@@ -34536,7 +34891,8 @@ mod null_if_expr {
         use super::*;
 
         #[cfg_attr(test, derive(derive_builder::Builder))]
-        #[derive(Clone, Debug, serde::Serialize, serde::Deserialize)]
+        #[cfg_attr(feature = "syn_serde", derive(serde::Serialize, serde::Deserialize))]
+        #[derive(Clone, Debug)]
         #[allow(clippy::struct_excessive_bools)]
         #[allow(clippy::struct_field_names)]
         pub struct NullIfExpr {
@@ -34821,11 +35177,13 @@ mod scalar_array_op_expr {
     use super::*;
 
     /// `ScalarArrayOpExpr`
-    #[derive(Debug, Clone, serde::Serialize, serde::Deserialize)]
+    #[derive(Debug, Clone)]
+    #[cfg_attr(feature = "syn_serde", derive(serde::Serialize, serde::Deserialize))]
     pub struct ScalarArrayOpExpr(Box<self::inner::ScalarArrayOpExpr>);
 
     /// optional `ScalarArrayOpExpr`
-    #[derive(Debug, Clone, serde::Serialize, serde::Deserialize)]
+    #[derive(Debug, Clone)]
+    #[cfg_attr(feature = "syn_serde", derive(serde::Serialize, serde::Deserialize))]
     pub struct ScalarArrayOpExprOpt(Option<ScalarArrayOpExpr>);
 
     #[cfg(test)]
@@ -34842,11 +35200,13 @@ mod scalar_array_op_expr {
     }
 
     /// `ScalarArrayOpExpr` list
-    #[derive(Debug, Clone, serde::Serialize, serde::Deserialize)]
+    #[derive(Debug, Clone)]
+    #[cfg_attr(feature = "syn_serde", derive(serde::Serialize, serde::Deserialize))]
     pub struct ScalarArrayOpExprList(Vec<ScalarArrayOpExpr>);
 
     /// optional `ScalarArrayOpExpr` list
-    #[derive(Debug, Clone, serde::Serialize, serde::Deserialize)]
+    #[derive(Debug, Clone)]
+    #[cfg_attr(feature = "syn_serde", derive(serde::Serialize, serde::Deserialize))]
     pub struct ScalarArrayOpExprListOpt(Option<Vec<ScalarArrayOpExpr>>);
 
     impl crate::syn::ListOpt<ScalarArrayOpExpr> for ScalarArrayOpExprListOpt {
@@ -34946,7 +35306,8 @@ mod scalar_array_op_expr {
         use super::*;
 
         #[cfg_attr(test, derive(derive_builder::Builder))]
-        #[derive(Clone, Debug, serde::Serialize, serde::Deserialize)]
+        #[cfg_attr(feature = "syn_serde", derive(serde::Serialize, serde::Deserialize))]
+        #[derive(Clone, Debug)]
         #[allow(clippy::struct_excessive_bools)]
         #[allow(clippy::struct_field_names)]
         pub struct ScalarArrayOpExpr {
@@ -35171,11 +35532,13 @@ mod bool_expr {
     use super::*;
 
     /// `BoolExpr`
-    #[derive(Debug, Clone, serde::Serialize, serde::Deserialize)]
+    #[derive(Debug, Clone)]
+    #[cfg_attr(feature = "syn_serde", derive(serde::Serialize, serde::Deserialize))]
     pub struct BoolExpr(Box<self::inner::BoolExpr>);
 
     /// optional `BoolExpr`
-    #[derive(Debug, Clone, serde::Serialize, serde::Deserialize)]
+    #[derive(Debug, Clone)]
+    #[cfg_attr(feature = "syn_serde", derive(serde::Serialize, serde::Deserialize))]
     pub struct BoolExprOpt(Option<BoolExpr>);
 
     #[cfg(test)]
@@ -35192,11 +35555,13 @@ mod bool_expr {
     }
 
     /// `BoolExpr` list
-    #[derive(Debug, Clone, serde::Serialize, serde::Deserialize)]
+    #[derive(Debug, Clone)]
+    #[cfg_attr(feature = "syn_serde", derive(serde::Serialize, serde::Deserialize))]
     pub struct BoolExprList(Vec<BoolExpr>);
 
     /// optional `BoolExpr` list
-    #[derive(Debug, Clone, serde::Serialize, serde::Deserialize)]
+    #[derive(Debug, Clone)]
+    #[cfg_attr(feature = "syn_serde", derive(serde::Serialize, serde::Deserialize))]
     pub struct BoolExprListOpt(Option<Vec<BoolExpr>>);
 
     impl crate::syn::ListOpt<BoolExpr> for BoolExprListOpt {
@@ -35296,7 +35661,8 @@ mod bool_expr {
         use super::*;
 
         #[cfg_attr(test, derive(derive_builder::Builder))]
-        #[derive(Clone, Debug, serde::Serialize, serde::Deserialize)]
+        #[cfg_attr(feature = "syn_serde", derive(serde::Serialize, serde::Deserialize))]
+        #[derive(Clone, Debug)]
         #[allow(clippy::struct_excessive_bools)]
         #[allow(clippy::struct_field_names)]
         pub struct BoolExpr {
@@ -35460,11 +35826,13 @@ mod sub_link {
     use super::*;
 
     /// `SubLink`
-    #[derive(Debug, Clone, serde::Serialize, serde::Deserialize)]
+    #[derive(Debug, Clone)]
+    #[cfg_attr(feature = "syn_serde", derive(serde::Serialize, serde::Deserialize))]
     pub struct SubLink(Box<self::inner::SubLink>);
 
     /// optional `SubLink`
-    #[derive(Debug, Clone, serde::Serialize, serde::Deserialize)]
+    #[derive(Debug, Clone)]
+    #[cfg_attr(feature = "syn_serde", derive(serde::Serialize, serde::Deserialize))]
     pub struct SubLinkOpt(Option<SubLink>);
 
     #[cfg(test)]
@@ -35481,11 +35849,13 @@ mod sub_link {
     }
 
     /// `SubLink` list
-    #[derive(Debug, Clone, serde::Serialize, serde::Deserialize)]
+    #[derive(Debug, Clone)]
+    #[cfg_attr(feature = "syn_serde", derive(serde::Serialize, serde::Deserialize))]
     pub struct SubLinkList(Vec<SubLink>);
 
     /// optional `SubLink` list
-    #[derive(Debug, Clone, serde::Serialize, serde::Deserialize)]
+    #[derive(Debug, Clone)]
+    #[cfg_attr(feature = "syn_serde", derive(serde::Serialize, serde::Deserialize))]
     pub struct SubLinkListOpt(Option<Vec<SubLink>>);
 
     impl crate::syn::ListOpt<SubLink> for SubLinkListOpt {
@@ -35585,7 +35955,8 @@ mod sub_link {
         use super::*;
 
         #[cfg_attr(test, derive(derive_builder::Builder))]
-        #[derive(Clone, Debug, serde::Serialize, serde::Deserialize)]
+        #[cfg_attr(feature = "syn_serde", derive(serde::Serialize, serde::Deserialize))]
+        #[derive(Clone, Debug)]
         #[allow(clippy::struct_excessive_bools)]
         #[allow(clippy::struct_field_names)]
         pub struct SubLink {
@@ -35848,11 +36219,13 @@ mod sub_plan {
     use super::*;
 
     /// `SubPlan`
-    #[derive(Debug, Clone, serde::Serialize, serde::Deserialize)]
+    #[derive(Debug, Clone)]
+    #[cfg_attr(feature = "syn_serde", derive(serde::Serialize, serde::Deserialize))]
     pub struct SubPlan(Box<self::inner::SubPlan>);
 
     /// optional `SubPlan`
-    #[derive(Debug, Clone, serde::Serialize, serde::Deserialize)]
+    #[derive(Debug, Clone)]
+    #[cfg_attr(feature = "syn_serde", derive(serde::Serialize, serde::Deserialize))]
     pub struct SubPlanOpt(Option<SubPlan>);
 
     #[cfg(test)]
@@ -35869,11 +36242,13 @@ mod sub_plan {
     }
 
     /// `SubPlan` list
-    #[derive(Debug, Clone, serde::Serialize, serde::Deserialize)]
+    #[derive(Debug, Clone)]
+    #[cfg_attr(feature = "syn_serde", derive(serde::Serialize, serde::Deserialize))]
     pub struct SubPlanList(Vec<SubPlan>);
 
     /// optional `SubPlan` list
-    #[derive(Debug, Clone, serde::Serialize, serde::Deserialize)]
+    #[derive(Debug, Clone)]
+    #[cfg_attr(feature = "syn_serde", derive(serde::Serialize, serde::Deserialize))]
     pub struct SubPlanListOpt(Option<Vec<SubPlan>>);
 
     impl crate::syn::ListOpt<SubPlan> for SubPlanListOpt {
@@ -35973,7 +36348,8 @@ mod sub_plan {
         use super::*;
 
         #[cfg_attr(test, derive(derive_builder::Builder))]
-        #[derive(Clone, Debug, serde::Serialize, serde::Deserialize)]
+        #[cfg_attr(feature = "syn_serde", derive(serde::Serialize, serde::Deserialize))]
+        #[derive(Clone, Debug)]
         #[allow(clippy::struct_excessive_bools)]
         #[allow(clippy::struct_field_names)]
         pub struct SubPlan {
@@ -36552,11 +36928,13 @@ mod alternative_sub_plan {
     use super::*;
 
     /// `AlternativeSubPlan`
-    #[derive(Debug, Clone, serde::Serialize, serde::Deserialize)]
+    #[derive(Debug, Clone)]
+    #[cfg_attr(feature = "syn_serde", derive(serde::Serialize, serde::Deserialize))]
     pub struct AlternativeSubPlan(Box<self::inner::AlternativeSubPlan>);
 
     /// optional `AlternativeSubPlan`
-    #[derive(Debug, Clone, serde::Serialize, serde::Deserialize)]
+    #[derive(Debug, Clone)]
+    #[cfg_attr(feature = "syn_serde", derive(serde::Serialize, serde::Deserialize))]
     pub struct AlternativeSubPlanOpt(Option<AlternativeSubPlan>);
 
     #[cfg(test)]
@@ -36573,11 +36951,13 @@ mod alternative_sub_plan {
     }
 
     /// `AlternativeSubPlan` list
-    #[derive(Debug, Clone, serde::Serialize, serde::Deserialize)]
+    #[derive(Debug, Clone)]
+    #[cfg_attr(feature = "syn_serde", derive(serde::Serialize, serde::Deserialize))]
     pub struct AlternativeSubPlanList(Vec<AlternativeSubPlan>);
 
     /// optional `AlternativeSubPlan` list
-    #[derive(Debug, Clone, serde::Serialize, serde::Deserialize)]
+    #[derive(Debug, Clone)]
+    #[cfg_attr(feature = "syn_serde", derive(serde::Serialize, serde::Deserialize))]
     pub struct AlternativeSubPlanListOpt(Option<Vec<AlternativeSubPlan>>);
 
     impl crate::syn::ListOpt<AlternativeSubPlan> for AlternativeSubPlanListOpt {
@@ -36677,7 +37057,8 @@ mod alternative_sub_plan {
         use super::*;
 
         #[cfg_attr(test, derive(derive_builder::Builder))]
-        #[derive(Clone, Debug, serde::Serialize, serde::Deserialize)]
+        #[cfg_attr(feature = "syn_serde", derive(serde::Serialize, serde::Deserialize))]
+        #[derive(Clone, Debug)]
         #[allow(clippy::struct_excessive_bools)]
         #[allow(clippy::struct_field_names)]
         pub struct AlternativeSubPlan {
@@ -36774,11 +37155,13 @@ mod field_select {
     use super::*;
 
     /// `FieldSelect`
-    #[derive(Debug, Clone, serde::Serialize, serde::Deserialize)]
+    #[derive(Debug, Clone)]
+    #[cfg_attr(feature = "syn_serde", derive(serde::Serialize, serde::Deserialize))]
     pub struct FieldSelect(Box<self::inner::FieldSelect>);
 
     /// optional `FieldSelect`
-    #[derive(Debug, Clone, serde::Serialize, serde::Deserialize)]
+    #[derive(Debug, Clone)]
+    #[cfg_attr(feature = "syn_serde", derive(serde::Serialize, serde::Deserialize))]
     pub struct FieldSelectOpt(Option<FieldSelect>);
 
     #[cfg(test)]
@@ -36795,11 +37178,13 @@ mod field_select {
     }
 
     /// `FieldSelect` list
-    #[derive(Debug, Clone, serde::Serialize, serde::Deserialize)]
+    #[derive(Debug, Clone)]
+    #[cfg_attr(feature = "syn_serde", derive(serde::Serialize, serde::Deserialize))]
     pub struct FieldSelectList(Vec<FieldSelect>);
 
     /// optional `FieldSelect` list
-    #[derive(Debug, Clone, serde::Serialize, serde::Deserialize)]
+    #[derive(Debug, Clone)]
+    #[cfg_attr(feature = "syn_serde", derive(serde::Serialize, serde::Deserialize))]
     pub struct FieldSelectListOpt(Option<Vec<FieldSelect>>);
 
     impl crate::syn::ListOpt<FieldSelect> for FieldSelectListOpt {
@@ -36899,7 +37284,8 @@ mod field_select {
         use super::*;
 
         #[cfg_attr(test, derive(derive_builder::Builder))]
-        #[derive(Clone, Debug, serde::Serialize, serde::Deserialize)]
+        #[cfg_attr(feature = "syn_serde", derive(serde::Serialize, serde::Deserialize))]
+        #[derive(Clone, Debug)]
         #[allow(clippy::struct_excessive_bools)]
         #[allow(clippy::struct_field_names)]
         pub struct FieldSelect {
@@ -37122,11 +37508,13 @@ mod field_store {
     use super::*;
 
     /// `FieldStore`
-    #[derive(Debug, Clone, serde::Serialize, serde::Deserialize)]
+    #[derive(Debug, Clone)]
+    #[cfg_attr(feature = "syn_serde", derive(serde::Serialize, serde::Deserialize))]
     pub struct FieldStore(Box<self::inner::FieldStore>);
 
     /// optional `FieldStore`
-    #[derive(Debug, Clone, serde::Serialize, serde::Deserialize)]
+    #[derive(Debug, Clone)]
+    #[cfg_attr(feature = "syn_serde", derive(serde::Serialize, serde::Deserialize))]
     pub struct FieldStoreOpt(Option<FieldStore>);
 
     #[cfg(test)]
@@ -37143,11 +37531,13 @@ mod field_store {
     }
 
     /// `FieldStore` list
-    #[derive(Debug, Clone, serde::Serialize, serde::Deserialize)]
+    #[derive(Debug, Clone)]
+    #[cfg_attr(feature = "syn_serde", derive(serde::Serialize, serde::Deserialize))]
     pub struct FieldStoreList(Vec<FieldStore>);
 
     /// optional `FieldStore` list
-    #[derive(Debug, Clone, serde::Serialize, serde::Deserialize)]
+    #[derive(Debug, Clone)]
+    #[cfg_attr(feature = "syn_serde", derive(serde::Serialize, serde::Deserialize))]
     pub struct FieldStoreListOpt(Option<Vec<FieldStore>>);
 
     impl crate::syn::ListOpt<FieldStore> for FieldStoreListOpt {
@@ -37247,7 +37637,8 @@ mod field_store {
         use super::*;
 
         #[cfg_attr(test, derive(derive_builder::Builder))]
-        #[derive(Clone, Debug, serde::Serialize, serde::Deserialize)]
+        #[cfg_attr(feature = "syn_serde", derive(serde::Serialize, serde::Deserialize))]
+        #[derive(Clone, Debug)]
         #[allow(clippy::struct_excessive_bools)]
         #[allow(clippy::struct_field_names)]
         pub struct FieldStore {
@@ -37445,11 +37836,13 @@ mod relabel_type {
     use super::*;
 
     /// `RelabelType`
-    #[derive(Debug, Clone, serde::Serialize, serde::Deserialize)]
+    #[derive(Debug, Clone)]
+    #[cfg_attr(feature = "syn_serde", derive(serde::Serialize, serde::Deserialize))]
     pub struct RelabelType(Box<self::inner::RelabelType>);
 
     /// optional `RelabelType`
-    #[derive(Debug, Clone, serde::Serialize, serde::Deserialize)]
+    #[derive(Debug, Clone)]
+    #[cfg_attr(feature = "syn_serde", derive(serde::Serialize, serde::Deserialize))]
     pub struct RelabelTypeOpt(Option<RelabelType>);
 
     #[cfg(test)]
@@ -37466,11 +37859,13 @@ mod relabel_type {
     }
 
     /// `RelabelType` list
-    #[derive(Debug, Clone, serde::Serialize, serde::Deserialize)]
+    #[derive(Debug, Clone)]
+    #[cfg_attr(feature = "syn_serde", derive(serde::Serialize, serde::Deserialize))]
     pub struct RelabelTypeList(Vec<RelabelType>);
 
     /// optional `RelabelType` list
-    #[derive(Debug, Clone, serde::Serialize, serde::Deserialize)]
+    #[derive(Debug, Clone)]
+    #[cfg_attr(feature = "syn_serde", derive(serde::Serialize, serde::Deserialize))]
     pub struct RelabelTypeListOpt(Option<Vec<RelabelType>>);
 
     impl crate::syn::ListOpt<RelabelType> for RelabelTypeListOpt {
@@ -37570,7 +37965,8 @@ mod relabel_type {
         use super::*;
 
         #[cfg_attr(test, derive(derive_builder::Builder))]
-        #[derive(Clone, Debug, serde::Serialize, serde::Deserialize)]
+        #[cfg_attr(feature = "syn_serde", derive(serde::Serialize, serde::Deserialize))]
+        #[derive(Clone, Debug)]
         #[allow(clippy::struct_excessive_bools)]
         #[allow(clippy::struct_field_names)]
         pub struct RelabelType {
@@ -37827,11 +38223,13 @@ mod coerce_via_io {
     use super::*;
 
     /// `CoerceViaIo`
-    #[derive(Debug, Clone, serde::Serialize, serde::Deserialize)]
+    #[derive(Debug, Clone)]
+    #[cfg_attr(feature = "syn_serde", derive(serde::Serialize, serde::Deserialize))]
     pub struct CoerceViaIo(Box<self::inner::CoerceViaIo>);
 
     /// optional `CoerceViaIo`
-    #[derive(Debug, Clone, serde::Serialize, serde::Deserialize)]
+    #[derive(Debug, Clone)]
+    #[cfg_attr(feature = "syn_serde", derive(serde::Serialize, serde::Deserialize))]
     pub struct CoerceViaIoOpt(Option<CoerceViaIo>);
 
     #[cfg(test)]
@@ -37848,11 +38246,13 @@ mod coerce_via_io {
     }
 
     /// `CoerceViaIo` list
-    #[derive(Debug, Clone, serde::Serialize, serde::Deserialize)]
+    #[derive(Debug, Clone)]
+    #[cfg_attr(feature = "syn_serde", derive(serde::Serialize, serde::Deserialize))]
     pub struct CoerceViaIoList(Vec<CoerceViaIo>);
 
     /// optional `CoerceViaIo` list
-    #[derive(Debug, Clone, serde::Serialize, serde::Deserialize)]
+    #[derive(Debug, Clone)]
+    #[cfg_attr(feature = "syn_serde", derive(serde::Serialize, serde::Deserialize))]
     pub struct CoerceViaIoListOpt(Option<Vec<CoerceViaIo>>);
 
     impl crate::syn::ListOpt<CoerceViaIo> for CoerceViaIoListOpt {
@@ -37952,7 +38352,8 @@ mod coerce_via_io {
         use super::*;
 
         #[cfg_attr(test, derive(derive_builder::Builder))]
-        #[derive(Clone, Debug, serde::Serialize, serde::Deserialize)]
+        #[cfg_attr(feature = "syn_serde", derive(serde::Serialize, serde::Deserialize))]
+        #[derive(Clone, Debug)]
         #[allow(clippy::struct_excessive_bools)]
         #[allow(clippy::struct_field_names)]
         pub struct CoerceViaIo {
@@ -38178,11 +38579,13 @@ mod array_coerce_expr {
     use super::*;
 
     /// `ArrayCoerceExpr`
-    #[derive(Debug, Clone, serde::Serialize, serde::Deserialize)]
+    #[derive(Debug, Clone)]
+    #[cfg_attr(feature = "syn_serde", derive(serde::Serialize, serde::Deserialize))]
     pub struct ArrayCoerceExpr(Box<self::inner::ArrayCoerceExpr>);
 
     /// optional `ArrayCoerceExpr`
-    #[derive(Debug, Clone, serde::Serialize, serde::Deserialize)]
+    #[derive(Debug, Clone)]
+    #[cfg_attr(feature = "syn_serde", derive(serde::Serialize, serde::Deserialize))]
     pub struct ArrayCoerceExprOpt(Option<ArrayCoerceExpr>);
 
     #[cfg(test)]
@@ -38199,11 +38602,13 @@ mod array_coerce_expr {
     }
 
     /// `ArrayCoerceExpr` list
-    #[derive(Debug, Clone, serde::Serialize, serde::Deserialize)]
+    #[derive(Debug, Clone)]
+    #[cfg_attr(feature = "syn_serde", derive(serde::Serialize, serde::Deserialize))]
     pub struct ArrayCoerceExprList(Vec<ArrayCoerceExpr>);
 
     /// optional `ArrayCoerceExpr` list
-    #[derive(Debug, Clone, serde::Serialize, serde::Deserialize)]
+    #[derive(Debug, Clone)]
+    #[cfg_attr(feature = "syn_serde", derive(serde::Serialize, serde::Deserialize))]
     pub struct ArrayCoerceExprListOpt(Option<Vec<ArrayCoerceExpr>>);
 
     impl crate::syn::ListOpt<ArrayCoerceExpr> for ArrayCoerceExprListOpt {
@@ -38303,7 +38708,8 @@ mod array_coerce_expr {
         use super::*;
 
         #[cfg_attr(test, derive(derive_builder::Builder))]
-        #[derive(Clone, Debug, serde::Serialize, serde::Deserialize)]
+        #[cfg_attr(feature = "syn_serde", derive(serde::Serialize, serde::Deserialize))]
+        #[derive(Clone, Debug)]
         #[allow(clippy::struct_excessive_bools)]
         #[allow(clippy::struct_field_names)]
         pub struct ArrayCoerceExpr {
@@ -38596,11 +39002,13 @@ mod convert_rowtype_expr {
     use super::*;
 
     /// `ConvertRowtypeExpr`
-    #[derive(Debug, Clone, serde::Serialize, serde::Deserialize)]
+    #[derive(Debug, Clone)]
+    #[cfg_attr(feature = "syn_serde", derive(serde::Serialize, serde::Deserialize))]
     pub struct ConvertRowtypeExpr(Box<self::inner::ConvertRowtypeExpr>);
 
     /// optional `ConvertRowtypeExpr`
-    #[derive(Debug, Clone, serde::Serialize, serde::Deserialize)]
+    #[derive(Debug, Clone)]
+    #[cfg_attr(feature = "syn_serde", derive(serde::Serialize, serde::Deserialize))]
     pub struct ConvertRowtypeExprOpt(Option<ConvertRowtypeExpr>);
 
     #[cfg(test)]
@@ -38617,11 +39025,13 @@ mod convert_rowtype_expr {
     }
 
     /// `ConvertRowtypeExpr` list
-    #[derive(Debug, Clone, serde::Serialize, serde::Deserialize)]
+    #[derive(Debug, Clone)]
+    #[cfg_attr(feature = "syn_serde", derive(serde::Serialize, serde::Deserialize))]
     pub struct ConvertRowtypeExprList(Vec<ConvertRowtypeExpr>);
 
     /// optional `ConvertRowtypeExpr` list
-    #[derive(Debug, Clone, serde::Serialize, serde::Deserialize)]
+    #[derive(Debug, Clone)]
+    #[cfg_attr(feature = "syn_serde", derive(serde::Serialize, serde::Deserialize))]
     pub struct ConvertRowtypeExprListOpt(Option<Vec<ConvertRowtypeExpr>>);
 
     impl crate::syn::ListOpt<ConvertRowtypeExpr> for ConvertRowtypeExprListOpt {
@@ -38721,7 +39131,8 @@ mod convert_rowtype_expr {
         use super::*;
 
         #[cfg_attr(test, derive(derive_builder::Builder))]
-        #[derive(Clone, Debug, serde::Serialize, serde::Deserialize)]
+        #[cfg_attr(feature = "syn_serde", derive(serde::Serialize, serde::Deserialize))]
+        #[derive(Clone, Debug)]
         #[allow(clippy::struct_excessive_bools)]
         #[allow(clippy::struct_field_names)]
         pub struct ConvertRowtypeExpr {
@@ -38918,11 +39329,13 @@ mod collate_expr {
     use super::*;
 
     /// `CollateExpr`
-    #[derive(Debug, Clone, serde::Serialize, serde::Deserialize)]
+    #[derive(Debug, Clone)]
+    #[cfg_attr(feature = "syn_serde", derive(serde::Serialize, serde::Deserialize))]
     pub struct CollateExpr(Box<self::inner::CollateExpr>);
 
     /// optional `CollateExpr`
-    #[derive(Debug, Clone, serde::Serialize, serde::Deserialize)]
+    #[derive(Debug, Clone)]
+    #[cfg_attr(feature = "syn_serde", derive(serde::Serialize, serde::Deserialize))]
     pub struct CollateExprOpt(Option<CollateExpr>);
 
     #[cfg(test)]
@@ -38939,11 +39352,13 @@ mod collate_expr {
     }
 
     /// `CollateExpr` list
-    #[derive(Debug, Clone, serde::Serialize, serde::Deserialize)]
+    #[derive(Debug, Clone)]
+    #[cfg_attr(feature = "syn_serde", derive(serde::Serialize, serde::Deserialize))]
     pub struct CollateExprList(Vec<CollateExpr>);
 
     /// optional `CollateExpr` list
-    #[derive(Debug, Clone, serde::Serialize, serde::Deserialize)]
+    #[derive(Debug, Clone)]
+    #[cfg_attr(feature = "syn_serde", derive(serde::Serialize, serde::Deserialize))]
     pub struct CollateExprListOpt(Option<Vec<CollateExpr>>);
 
     impl crate::syn::ListOpt<CollateExpr> for CollateExprListOpt {
@@ -39043,7 +39458,8 @@ mod collate_expr {
         use super::*;
 
         #[cfg_attr(test, derive(derive_builder::Builder))]
-        #[derive(Clone, Debug, serde::Serialize, serde::Deserialize)]
+        #[cfg_attr(feature = "syn_serde", derive(serde::Serialize, serde::Deserialize))]
+        #[derive(Clone, Debug)]
         #[allow(clippy::struct_excessive_bools)]
         #[allow(clippy::struct_field_names)]
         pub struct CollateExpr {
@@ -39204,11 +39620,13 @@ mod case_expr {
     use super::*;
 
     /// `CaseExpr`
-    #[derive(Debug, Clone, serde::Serialize, serde::Deserialize)]
+    #[derive(Debug, Clone)]
+    #[cfg_attr(feature = "syn_serde", derive(serde::Serialize, serde::Deserialize))]
     pub struct CaseExpr(Box<self::inner::CaseExpr>);
 
     /// optional `CaseExpr`
-    #[derive(Debug, Clone, serde::Serialize, serde::Deserialize)]
+    #[derive(Debug, Clone)]
+    #[cfg_attr(feature = "syn_serde", derive(serde::Serialize, serde::Deserialize))]
     pub struct CaseExprOpt(Option<CaseExpr>);
 
     #[cfg(test)]
@@ -39225,11 +39643,13 @@ mod case_expr {
     }
 
     /// `CaseExpr` list
-    #[derive(Debug, Clone, serde::Serialize, serde::Deserialize)]
+    #[derive(Debug, Clone)]
+    #[cfg_attr(feature = "syn_serde", derive(serde::Serialize, serde::Deserialize))]
     pub struct CaseExprList(Vec<CaseExpr>);
 
     /// optional `CaseExpr` list
-    #[derive(Debug, Clone, serde::Serialize, serde::Deserialize)]
+    #[derive(Debug, Clone)]
+    #[cfg_attr(feature = "syn_serde", derive(serde::Serialize, serde::Deserialize))]
     pub struct CaseExprListOpt(Option<Vec<CaseExpr>>);
 
     impl crate::syn::ListOpt<CaseExpr> for CaseExprListOpt {
@@ -39329,7 +39749,8 @@ mod case_expr {
         use super::*;
 
         #[cfg_attr(test, derive(derive_builder::Builder))]
-        #[derive(Clone, Debug, serde::Serialize, serde::Deserialize)]
+        #[cfg_attr(feature = "syn_serde", derive(serde::Serialize, serde::Deserialize))]
+        #[derive(Clone, Debug)]
         #[allow(clippy::struct_excessive_bools)]
         #[allow(clippy::struct_field_names)]
         pub struct CaseExpr {
@@ -39589,11 +40010,13 @@ mod case_when {
     use super::*;
 
     /// `CaseWhen`
-    #[derive(Debug, Clone, serde::Serialize, serde::Deserialize)]
+    #[derive(Debug, Clone)]
+    #[cfg_attr(feature = "syn_serde", derive(serde::Serialize, serde::Deserialize))]
     pub struct CaseWhen(Box<self::inner::CaseWhen>);
 
     /// optional `CaseWhen`
-    #[derive(Debug, Clone, serde::Serialize, serde::Deserialize)]
+    #[derive(Debug, Clone)]
+    #[cfg_attr(feature = "syn_serde", derive(serde::Serialize, serde::Deserialize))]
     pub struct CaseWhenOpt(Option<CaseWhen>);
 
     #[cfg(test)]
@@ -39610,11 +40033,13 @@ mod case_when {
     }
 
     /// `CaseWhen` list
-    #[derive(Debug, Clone, serde::Serialize, serde::Deserialize)]
+    #[derive(Debug, Clone)]
+    #[cfg_attr(feature = "syn_serde", derive(serde::Serialize, serde::Deserialize))]
     pub struct CaseWhenList(Vec<CaseWhen>);
 
     /// optional `CaseWhen` list
-    #[derive(Debug, Clone, serde::Serialize, serde::Deserialize)]
+    #[derive(Debug, Clone)]
+    #[cfg_attr(feature = "syn_serde", derive(serde::Serialize, serde::Deserialize))]
     pub struct CaseWhenListOpt(Option<Vec<CaseWhen>>);
 
     impl crate::syn::ListOpt<CaseWhen> for CaseWhenListOpt {
@@ -39714,7 +40139,8 @@ mod case_when {
         use super::*;
 
         #[cfg_attr(test, derive(derive_builder::Builder))]
-        #[derive(Clone, Debug, serde::Serialize, serde::Deserialize)]
+        #[cfg_attr(feature = "syn_serde", derive(serde::Serialize, serde::Deserialize))]
+        #[derive(Clone, Debug)]
         #[allow(clippy::struct_excessive_bools)]
         #[allow(clippy::struct_field_names)]
         pub struct CaseWhen {
@@ -39878,11 +40304,13 @@ mod case_test_expr {
     use super::*;
 
     /// `CaseTestExpr`
-    #[derive(Debug, Clone, serde::Serialize, serde::Deserialize)]
+    #[derive(Debug, Clone)]
+    #[cfg_attr(feature = "syn_serde", derive(serde::Serialize, serde::Deserialize))]
     pub struct CaseTestExpr(Box<self::inner::CaseTestExpr>);
 
     /// optional `CaseTestExpr`
-    #[derive(Debug, Clone, serde::Serialize, serde::Deserialize)]
+    #[derive(Debug, Clone)]
+    #[cfg_attr(feature = "syn_serde", derive(serde::Serialize, serde::Deserialize))]
     pub struct CaseTestExprOpt(Option<CaseTestExpr>);
 
     #[cfg(test)]
@@ -39899,11 +40327,13 @@ mod case_test_expr {
     }
 
     /// `CaseTestExpr` list
-    #[derive(Debug, Clone, serde::Serialize, serde::Deserialize)]
+    #[derive(Debug, Clone)]
+    #[cfg_attr(feature = "syn_serde", derive(serde::Serialize, serde::Deserialize))]
     pub struct CaseTestExprList(Vec<CaseTestExpr>);
 
     /// optional `CaseTestExpr` list
-    #[derive(Debug, Clone, serde::Serialize, serde::Deserialize)]
+    #[derive(Debug, Clone)]
+    #[cfg_attr(feature = "syn_serde", derive(serde::Serialize, serde::Deserialize))]
     pub struct CaseTestExprListOpt(Option<Vec<CaseTestExpr>>);
 
     impl crate::syn::ListOpt<CaseTestExpr> for CaseTestExprListOpt {
@@ -40003,7 +40433,8 @@ mod case_test_expr {
         use super::*;
 
         #[cfg_attr(test, derive(derive_builder::Builder))]
-        #[derive(Clone, Debug, serde::Serialize, serde::Deserialize)]
+        #[cfg_attr(feature = "syn_serde", derive(serde::Serialize, serde::Deserialize))]
+        #[derive(Clone, Debug)]
         #[allow(clippy::struct_excessive_bools)]
         #[allow(clippy::struct_field_names)]
         pub struct CaseTestExpr {
@@ -40163,11 +40594,13 @@ mod array_expr {
     use super::*;
 
     /// `ArrayExpr`
-    #[derive(Debug, Clone, serde::Serialize, serde::Deserialize)]
+    #[derive(Debug, Clone)]
+    #[cfg_attr(feature = "syn_serde", derive(serde::Serialize, serde::Deserialize))]
     pub struct ArrayExpr(Box<self::inner::ArrayExpr>);
 
     /// optional `ArrayExpr`
-    #[derive(Debug, Clone, serde::Serialize, serde::Deserialize)]
+    #[derive(Debug, Clone)]
+    #[cfg_attr(feature = "syn_serde", derive(serde::Serialize, serde::Deserialize))]
     pub struct ArrayExprOpt(Option<ArrayExpr>);
 
     #[cfg(test)]
@@ -40184,11 +40617,13 @@ mod array_expr {
     }
 
     /// `ArrayExpr` list
-    #[derive(Debug, Clone, serde::Serialize, serde::Deserialize)]
+    #[derive(Debug, Clone)]
+    #[cfg_attr(feature = "syn_serde", derive(serde::Serialize, serde::Deserialize))]
     pub struct ArrayExprList(Vec<ArrayExpr>);
 
     /// optional `ArrayExpr` list
-    #[derive(Debug, Clone, serde::Serialize, serde::Deserialize)]
+    #[derive(Debug, Clone)]
+    #[cfg_attr(feature = "syn_serde", derive(serde::Serialize, serde::Deserialize))]
     pub struct ArrayExprListOpt(Option<Vec<ArrayExpr>>);
 
     impl crate::syn::ListOpt<ArrayExpr> for ArrayExprListOpt {
@@ -40288,7 +40723,8 @@ mod array_expr {
         use super::*;
 
         #[cfg_attr(test, derive(derive_builder::Builder))]
-        #[derive(Clone, Debug, serde::Serialize, serde::Deserialize)]
+        #[cfg_attr(feature = "syn_serde", derive(serde::Serialize, serde::Deserialize))]
+        #[derive(Clone, Debug)]
         #[allow(clippy::struct_excessive_bools)]
         #[allow(clippy::struct_field_names)]
         pub struct ArrayExpr {
@@ -40542,11 +40978,13 @@ mod row_expr {
     use super::*;
 
     /// `RowExpr`
-    #[derive(Debug, Clone, serde::Serialize, serde::Deserialize)]
+    #[derive(Debug, Clone)]
+    #[cfg_attr(feature = "syn_serde", derive(serde::Serialize, serde::Deserialize))]
     pub struct RowExpr(Box<self::inner::RowExpr>);
 
     /// optional `RowExpr`
-    #[derive(Debug, Clone, serde::Serialize, serde::Deserialize)]
+    #[derive(Debug, Clone)]
+    #[cfg_attr(feature = "syn_serde", derive(serde::Serialize, serde::Deserialize))]
     pub struct RowExprOpt(Option<RowExpr>);
 
     #[cfg(test)]
@@ -40563,11 +41001,13 @@ mod row_expr {
     }
 
     /// `RowExpr` list
-    #[derive(Debug, Clone, serde::Serialize, serde::Deserialize)]
+    #[derive(Debug, Clone)]
+    #[cfg_attr(feature = "syn_serde", derive(serde::Serialize, serde::Deserialize))]
     pub struct RowExprList(Vec<RowExpr>);
 
     /// optional `RowExpr` list
-    #[derive(Debug, Clone, serde::Serialize, serde::Deserialize)]
+    #[derive(Debug, Clone)]
+    #[cfg_attr(feature = "syn_serde", derive(serde::Serialize, serde::Deserialize))]
     pub struct RowExprListOpt(Option<Vec<RowExpr>>);
 
     impl crate::syn::ListOpt<RowExpr> for RowExprListOpt {
@@ -40667,7 +41107,8 @@ mod row_expr {
         use super::*;
 
         #[cfg_attr(test, derive(derive_builder::Builder))]
-        #[derive(Clone, Debug, serde::Serialize, serde::Deserialize)]
+        #[cfg_attr(feature = "syn_serde", derive(serde::Serialize, serde::Deserialize))]
+        #[derive(Clone, Debug)]
         #[allow(clippy::struct_excessive_bools)]
         #[allow(clippy::struct_field_names)]
         pub struct RowExpr {
@@ -40896,11 +41337,13 @@ mod row_compare_expr {
     use super::*;
 
     /// `RowCompareExpr`
-    #[derive(Debug, Clone, serde::Serialize, serde::Deserialize)]
+    #[derive(Debug, Clone)]
+    #[cfg_attr(feature = "syn_serde", derive(serde::Serialize, serde::Deserialize))]
     pub struct RowCompareExpr(Box<self::inner::RowCompareExpr>);
 
     /// optional `RowCompareExpr`
-    #[derive(Debug, Clone, serde::Serialize, serde::Deserialize)]
+    #[derive(Debug, Clone)]
+    #[cfg_attr(feature = "syn_serde", derive(serde::Serialize, serde::Deserialize))]
     pub struct RowCompareExprOpt(Option<RowCompareExpr>);
 
     #[cfg(test)]
@@ -40917,11 +41360,13 @@ mod row_compare_expr {
     }
 
     /// `RowCompareExpr` list
-    #[derive(Debug, Clone, serde::Serialize, serde::Deserialize)]
+    #[derive(Debug, Clone)]
+    #[cfg_attr(feature = "syn_serde", derive(serde::Serialize, serde::Deserialize))]
     pub struct RowCompareExprList(Vec<RowCompareExpr>);
 
     /// optional `RowCompareExpr` list
-    #[derive(Debug, Clone, serde::Serialize, serde::Deserialize)]
+    #[derive(Debug, Clone)]
+    #[cfg_attr(feature = "syn_serde", derive(serde::Serialize, serde::Deserialize))]
     pub struct RowCompareExprListOpt(Option<Vec<RowCompareExpr>>);
 
     impl crate::syn::ListOpt<RowCompareExpr> for RowCompareExprListOpt {
@@ -41021,7 +41466,8 @@ mod row_compare_expr {
         use super::*;
 
         #[cfg_attr(test, derive(derive_builder::Builder))]
-        #[derive(Clone, Debug, serde::Serialize, serde::Deserialize)]
+        #[cfg_attr(feature = "syn_serde", derive(serde::Serialize, serde::Deserialize))]
+        #[derive(Clone, Debug)]
         #[allow(clippy::struct_excessive_bools)]
         #[allow(clippy::struct_field_names)]
         pub struct RowCompareExpr {
@@ -41292,11 +41738,13 @@ mod coalesce_expr {
     use super::*;
 
     /// `CoalesceExpr`
-    #[derive(Debug, Clone, serde::Serialize, serde::Deserialize)]
+    #[derive(Debug, Clone)]
+    #[cfg_attr(feature = "syn_serde", derive(serde::Serialize, serde::Deserialize))]
     pub struct CoalesceExpr(Box<self::inner::CoalesceExpr>);
 
     /// optional `CoalesceExpr`
-    #[derive(Debug, Clone, serde::Serialize, serde::Deserialize)]
+    #[derive(Debug, Clone)]
+    #[cfg_attr(feature = "syn_serde", derive(serde::Serialize, serde::Deserialize))]
     pub struct CoalesceExprOpt(Option<CoalesceExpr>);
 
     #[cfg(test)]
@@ -41313,11 +41761,13 @@ mod coalesce_expr {
     }
 
     /// `CoalesceExpr` list
-    #[derive(Debug, Clone, serde::Serialize, serde::Deserialize)]
+    #[derive(Debug, Clone)]
+    #[cfg_attr(feature = "syn_serde", derive(serde::Serialize, serde::Deserialize))]
     pub struct CoalesceExprList(Vec<CoalesceExpr>);
 
     /// optional `CoalesceExpr` list
-    #[derive(Debug, Clone, serde::Serialize, serde::Deserialize)]
+    #[derive(Debug, Clone)]
+    #[cfg_attr(feature = "syn_serde", derive(serde::Serialize, serde::Deserialize))]
     pub struct CoalesceExprListOpt(Option<Vec<CoalesceExpr>>);
 
     impl crate::syn::ListOpt<CoalesceExpr> for CoalesceExprListOpt {
@@ -41417,7 +41867,8 @@ mod coalesce_expr {
         use super::*;
 
         #[cfg_attr(test, derive(derive_builder::Builder))]
-        #[derive(Clone, Debug, serde::Serialize, serde::Deserialize)]
+        #[cfg_attr(feature = "syn_serde", derive(serde::Serialize, serde::Deserialize))]
+        #[derive(Clone, Debug)]
         #[allow(clippy::struct_excessive_bools)]
         #[allow(clippy::struct_field_names)]
         pub struct CoalesceExpr {
@@ -41611,11 +42062,13 @@ mod min_max_expr {
     use super::*;
 
     /// `MinMaxExpr`
-    #[derive(Debug, Clone, serde::Serialize, serde::Deserialize)]
+    #[derive(Debug, Clone)]
+    #[cfg_attr(feature = "syn_serde", derive(serde::Serialize, serde::Deserialize))]
     pub struct MinMaxExpr(Box<self::inner::MinMaxExpr>);
 
     /// optional `MinMaxExpr`
-    #[derive(Debug, Clone, serde::Serialize, serde::Deserialize)]
+    #[derive(Debug, Clone)]
+    #[cfg_attr(feature = "syn_serde", derive(serde::Serialize, serde::Deserialize))]
     pub struct MinMaxExprOpt(Option<MinMaxExpr>);
 
     #[cfg(test)]
@@ -41632,11 +42085,13 @@ mod min_max_expr {
     }
 
     /// `MinMaxExpr` list
-    #[derive(Debug, Clone, serde::Serialize, serde::Deserialize)]
+    #[derive(Debug, Clone)]
+    #[cfg_attr(feature = "syn_serde", derive(serde::Serialize, serde::Deserialize))]
     pub struct MinMaxExprList(Vec<MinMaxExpr>);
 
     /// optional `MinMaxExpr` list
-    #[derive(Debug, Clone, serde::Serialize, serde::Deserialize)]
+    #[derive(Debug, Clone)]
+    #[cfg_attr(feature = "syn_serde", derive(serde::Serialize, serde::Deserialize))]
     pub struct MinMaxExprListOpt(Option<Vec<MinMaxExpr>>);
 
     impl crate::syn::ListOpt<MinMaxExpr> for MinMaxExprListOpt {
@@ -41736,7 +42191,8 @@ mod min_max_expr {
         use super::*;
 
         #[cfg_attr(test, derive(derive_builder::Builder))]
-        #[derive(Clone, Debug, serde::Serialize, serde::Deserialize)]
+        #[cfg_attr(feature = "syn_serde", derive(serde::Serialize, serde::Deserialize))]
+        #[derive(Clone, Debug)]
         #[allow(clippy::struct_excessive_bools)]
         #[allow(clippy::struct_field_names)]
         pub struct MinMaxExpr {
@@ -41993,11 +42449,13 @@ mod sql_value_function {
     use super::*;
 
     /// `SqlValueFunction`
-    #[derive(Debug, Clone, serde::Serialize, serde::Deserialize)]
+    #[derive(Debug, Clone)]
+    #[cfg_attr(feature = "syn_serde", derive(serde::Serialize, serde::Deserialize))]
     pub struct SqlValueFunction(Box<self::inner::SqlValueFunction>);
 
     /// optional `SqlValueFunction`
-    #[derive(Debug, Clone, serde::Serialize, serde::Deserialize)]
+    #[derive(Debug, Clone)]
+    #[cfg_attr(feature = "syn_serde", derive(serde::Serialize, serde::Deserialize))]
     pub struct SqlValueFunctionOpt(Option<SqlValueFunction>);
 
     #[cfg(test)]
@@ -42014,11 +42472,13 @@ mod sql_value_function {
     }
 
     /// `SqlValueFunction` list
-    #[derive(Debug, Clone, serde::Serialize, serde::Deserialize)]
+    #[derive(Debug, Clone)]
+    #[cfg_attr(feature = "syn_serde", derive(serde::Serialize, serde::Deserialize))]
     pub struct SqlValueFunctionList(Vec<SqlValueFunction>);
 
     /// optional `SqlValueFunction` list
-    #[derive(Debug, Clone, serde::Serialize, serde::Deserialize)]
+    #[derive(Debug, Clone)]
+    #[cfg_attr(feature = "syn_serde", derive(serde::Serialize, serde::Deserialize))]
     pub struct SqlValueFunctionListOpt(Option<Vec<SqlValueFunction>>);
 
     impl crate::syn::ListOpt<SqlValueFunction> for SqlValueFunctionListOpt {
@@ -42118,7 +42578,8 @@ mod sql_value_function {
         use super::*;
 
         #[cfg_attr(test, derive(derive_builder::Builder))]
-        #[derive(Clone, Debug, serde::Serialize, serde::Deserialize)]
+        #[cfg_attr(feature = "syn_serde", derive(serde::Serialize, serde::Deserialize))]
+        #[derive(Clone, Debug)]
         #[allow(clippy::struct_excessive_bools)]
         #[allow(clippy::struct_field_names)]
         pub struct SqlValueFunction {
@@ -42312,11 +42773,13 @@ mod xml_expr {
     use super::*;
 
     /// `XmlExpr`
-    #[derive(Debug, Clone, serde::Serialize, serde::Deserialize)]
+    #[derive(Debug, Clone)]
+    #[cfg_attr(feature = "syn_serde", derive(serde::Serialize, serde::Deserialize))]
     pub struct XmlExpr(Box<self::inner::XmlExpr>);
 
     /// optional `XmlExpr`
-    #[derive(Debug, Clone, serde::Serialize, serde::Deserialize)]
+    #[derive(Debug, Clone)]
+    #[cfg_attr(feature = "syn_serde", derive(serde::Serialize, serde::Deserialize))]
     pub struct XmlExprOpt(Option<XmlExpr>);
 
     #[cfg(test)]
@@ -42333,11 +42796,13 @@ mod xml_expr {
     }
 
     /// `XmlExpr` list
-    #[derive(Debug, Clone, serde::Serialize, serde::Deserialize)]
+    #[derive(Debug, Clone)]
+    #[cfg_attr(feature = "syn_serde", derive(serde::Serialize, serde::Deserialize))]
     pub struct XmlExprList(Vec<XmlExpr>);
 
     /// optional `XmlExpr` list
-    #[derive(Debug, Clone, serde::Serialize, serde::Deserialize)]
+    #[derive(Debug, Clone)]
+    #[cfg_attr(feature = "syn_serde", derive(serde::Serialize, serde::Deserialize))]
     pub struct XmlExprListOpt(Option<Vec<XmlExpr>>);
 
     impl crate::syn::ListOpt<XmlExpr> for XmlExprListOpt {
@@ -42437,7 +42902,8 @@ mod xml_expr {
         use super::*;
 
         #[cfg_attr(test, derive(derive_builder::Builder))]
-        #[derive(Clone, Debug, serde::Serialize, serde::Deserialize)]
+        #[cfg_attr(feature = "syn_serde", derive(serde::Serialize, serde::Deserialize))]
+        #[derive(Clone, Debug)]
         #[allow(clippy::struct_excessive_bools)]
         #[allow(clippy::struct_field_names)]
         pub struct XmlExpr {
@@ -42827,11 +43293,13 @@ mod json_format {
     use super::*;
 
     /// `JsonFormat`
-    #[derive(Debug, Clone, serde::Serialize, serde::Deserialize)]
+    #[derive(Debug, Clone)]
+    #[cfg_attr(feature = "syn_serde", derive(serde::Serialize, serde::Deserialize))]
     pub struct JsonFormat(Box<self::inner::JsonFormat>);
 
     /// optional `JsonFormat`
-    #[derive(Debug, Clone, serde::Serialize, serde::Deserialize)]
+    #[derive(Debug, Clone)]
+    #[cfg_attr(feature = "syn_serde", derive(serde::Serialize, serde::Deserialize))]
     pub struct JsonFormatOpt(Option<JsonFormat>);
 
     #[cfg(test)]
@@ -42848,11 +43316,13 @@ mod json_format {
     }
 
     /// `JsonFormat` list
-    #[derive(Debug, Clone, serde::Serialize, serde::Deserialize)]
+    #[derive(Debug, Clone)]
+    #[cfg_attr(feature = "syn_serde", derive(serde::Serialize, serde::Deserialize))]
     pub struct JsonFormatList(Vec<JsonFormat>);
 
     /// optional `JsonFormat` list
-    #[derive(Debug, Clone, serde::Serialize, serde::Deserialize)]
+    #[derive(Debug, Clone)]
+    #[cfg_attr(feature = "syn_serde", derive(serde::Serialize, serde::Deserialize))]
     pub struct JsonFormatListOpt(Option<Vec<JsonFormat>>);
 
     impl crate::syn::ListOpt<JsonFormat> for JsonFormatListOpt {
@@ -42952,7 +43422,8 @@ mod json_format {
         use super::*;
 
         #[cfg_attr(test, derive(derive_builder::Builder))]
-        #[derive(Clone, Debug, serde::Serialize, serde::Deserialize)]
+        #[cfg_attr(feature = "syn_serde", derive(serde::Serialize, serde::Deserialize))]
+        #[derive(Clone, Debug)]
         #[allow(clippy::struct_excessive_bools)]
         #[allow(clippy::struct_field_names)]
         pub struct JsonFormat {
@@ -43082,11 +43553,13 @@ mod json_returning {
     use super::*;
 
     /// `JsonReturning`
-    #[derive(Debug, Clone, serde::Serialize, serde::Deserialize)]
+    #[derive(Debug, Clone)]
+    #[cfg_attr(feature = "syn_serde", derive(serde::Serialize, serde::Deserialize))]
     pub struct JsonReturning(Box<self::inner::JsonReturning>);
 
     /// optional `JsonReturning`
-    #[derive(Debug, Clone, serde::Serialize, serde::Deserialize)]
+    #[derive(Debug, Clone)]
+    #[cfg_attr(feature = "syn_serde", derive(serde::Serialize, serde::Deserialize))]
     pub struct JsonReturningOpt(Option<JsonReturning>);
 
     #[cfg(test)]
@@ -43103,11 +43576,13 @@ mod json_returning {
     }
 
     /// `JsonReturning` list
-    #[derive(Debug, Clone, serde::Serialize, serde::Deserialize)]
+    #[derive(Debug, Clone)]
+    #[cfg_attr(feature = "syn_serde", derive(serde::Serialize, serde::Deserialize))]
     pub struct JsonReturningList(Vec<JsonReturning>);
 
     /// optional `JsonReturning` list
-    #[derive(Debug, Clone, serde::Serialize, serde::Deserialize)]
+    #[derive(Debug, Clone)]
+    #[cfg_attr(feature = "syn_serde", derive(serde::Serialize, serde::Deserialize))]
     pub struct JsonReturningListOpt(Option<Vec<JsonReturning>>);
 
     impl crate::syn::ListOpt<JsonReturning> for JsonReturningListOpt {
@@ -43207,7 +43682,8 @@ mod json_returning {
         use super::*;
 
         #[cfg_attr(test, derive(derive_builder::Builder))]
-        #[derive(Clone, Debug, serde::Serialize, serde::Deserialize)]
+        #[cfg_attr(feature = "syn_serde", derive(serde::Serialize, serde::Deserialize))]
+        #[derive(Clone, Debug)]
         #[allow(clippy::struct_excessive_bools)]
         #[allow(clippy::struct_field_names)]
         pub struct JsonReturning {
@@ -43336,11 +43812,13 @@ mod json_value_expr {
     use super::*;
 
     /// `JsonValueExpr`
-    #[derive(Debug, Clone, serde::Serialize, serde::Deserialize)]
+    #[derive(Debug, Clone)]
+    #[cfg_attr(feature = "syn_serde", derive(serde::Serialize, serde::Deserialize))]
     pub struct JsonValueExpr(Box<self::inner::JsonValueExpr>);
 
     /// optional `JsonValueExpr`
-    #[derive(Debug, Clone, serde::Serialize, serde::Deserialize)]
+    #[derive(Debug, Clone)]
+    #[cfg_attr(feature = "syn_serde", derive(serde::Serialize, serde::Deserialize))]
     pub struct JsonValueExprOpt(Option<JsonValueExpr>);
 
     #[cfg(test)]
@@ -43357,11 +43835,13 @@ mod json_value_expr {
     }
 
     /// `JsonValueExpr` list
-    #[derive(Debug, Clone, serde::Serialize, serde::Deserialize)]
+    #[derive(Debug, Clone)]
+    #[cfg_attr(feature = "syn_serde", derive(serde::Serialize, serde::Deserialize))]
     pub struct JsonValueExprList(Vec<JsonValueExpr>);
 
     /// optional `JsonValueExpr` list
-    #[derive(Debug, Clone, serde::Serialize, serde::Deserialize)]
+    #[derive(Debug, Clone)]
+    #[cfg_attr(feature = "syn_serde", derive(serde::Serialize, serde::Deserialize))]
     pub struct JsonValueExprListOpt(Option<Vec<JsonValueExpr>>);
 
     impl crate::syn::ListOpt<JsonValueExpr> for JsonValueExprListOpt {
@@ -43461,7 +43941,8 @@ mod json_value_expr {
         use super::*;
 
         #[cfg_attr(test, derive(derive_builder::Builder))]
-        #[derive(Clone, Debug, serde::Serialize, serde::Deserialize)]
+        #[cfg_attr(feature = "syn_serde", derive(serde::Serialize, serde::Deserialize))]
+        #[derive(Clone, Debug)]
         #[allow(clippy::struct_excessive_bools)]
         #[allow(clippy::struct_field_names)]
         pub struct JsonValueExpr {
@@ -43596,11 +44077,13 @@ mod json_constructor_expr {
     use super::*;
 
     /// `JsonConstructorExpr`
-    #[derive(Debug, Clone, serde::Serialize, serde::Deserialize)]
+    #[derive(Debug, Clone)]
+    #[cfg_attr(feature = "syn_serde", derive(serde::Serialize, serde::Deserialize))]
     pub struct JsonConstructorExpr(Box<self::inner::JsonConstructorExpr>);
 
     /// optional `JsonConstructorExpr`
-    #[derive(Debug, Clone, serde::Serialize, serde::Deserialize)]
+    #[derive(Debug, Clone)]
+    #[cfg_attr(feature = "syn_serde", derive(serde::Serialize, serde::Deserialize))]
     pub struct JsonConstructorExprOpt(Option<JsonConstructorExpr>);
 
     #[cfg(test)]
@@ -43617,11 +44100,13 @@ mod json_constructor_expr {
     }
 
     /// `JsonConstructorExpr` list
-    #[derive(Debug, Clone, serde::Serialize, serde::Deserialize)]
+    #[derive(Debug, Clone)]
+    #[cfg_attr(feature = "syn_serde", derive(serde::Serialize, serde::Deserialize))]
     pub struct JsonConstructorExprList(Vec<JsonConstructorExpr>);
 
     /// optional `JsonConstructorExpr` list
-    #[derive(Debug, Clone, serde::Serialize, serde::Deserialize)]
+    #[derive(Debug, Clone)]
+    #[cfg_attr(feature = "syn_serde", derive(serde::Serialize, serde::Deserialize))]
     pub struct JsonConstructorExprListOpt(Option<Vec<JsonConstructorExpr>>);
 
     impl crate::syn::ListOpt<JsonConstructorExpr> for JsonConstructorExprListOpt {
@@ -43721,7 +44206,8 @@ mod json_constructor_expr {
         use super::*;
 
         #[cfg_attr(test, derive(derive_builder::Builder))]
-        #[derive(Clone, Debug, serde::Serialize, serde::Deserialize)]
+        #[cfg_attr(feature = "syn_serde", derive(serde::Serialize, serde::Deserialize))]
+        #[derive(Clone, Debug)]
         #[allow(clippy::struct_excessive_bools)]
         #[allow(clippy::struct_field_names)]
         pub struct JsonConstructorExpr {
@@ -44052,11 +44538,13 @@ mod json_is_predicate {
     use super::*;
 
     /// `JsonIsPredicate`
-    #[derive(Debug, Clone, serde::Serialize, serde::Deserialize)]
+    #[derive(Debug, Clone)]
+    #[cfg_attr(feature = "syn_serde", derive(serde::Serialize, serde::Deserialize))]
     pub struct JsonIsPredicate(Box<self::inner::JsonIsPredicate>);
 
     /// optional `JsonIsPredicate`
-    #[derive(Debug, Clone, serde::Serialize, serde::Deserialize)]
+    #[derive(Debug, Clone)]
+    #[cfg_attr(feature = "syn_serde", derive(serde::Serialize, serde::Deserialize))]
     pub struct JsonIsPredicateOpt(Option<JsonIsPredicate>);
 
     #[cfg(test)]
@@ -44073,11 +44561,13 @@ mod json_is_predicate {
     }
 
     /// `JsonIsPredicate` list
-    #[derive(Debug, Clone, serde::Serialize, serde::Deserialize)]
+    #[derive(Debug, Clone)]
+    #[cfg_attr(feature = "syn_serde", derive(serde::Serialize, serde::Deserialize))]
     pub struct JsonIsPredicateList(Vec<JsonIsPredicate>);
 
     /// optional `JsonIsPredicate` list
-    #[derive(Debug, Clone, serde::Serialize, serde::Deserialize)]
+    #[derive(Debug, Clone)]
+    #[cfg_attr(feature = "syn_serde", derive(serde::Serialize, serde::Deserialize))]
     pub struct JsonIsPredicateListOpt(Option<Vec<JsonIsPredicate>>);
 
     impl crate::syn::ListOpt<JsonIsPredicate> for JsonIsPredicateListOpt {
@@ -44177,7 +44667,8 @@ mod json_is_predicate {
         use super::*;
 
         #[cfg_attr(test, derive(derive_builder::Builder))]
-        #[derive(Clone, Debug, serde::Serialize, serde::Deserialize)]
+        #[cfg_attr(feature = "syn_serde", derive(serde::Serialize, serde::Deserialize))]
+        #[derive(Clone, Debug)]
         #[allow(clippy::struct_excessive_bools)]
         #[allow(clippy::struct_field_names)]
         pub struct JsonIsPredicate {
@@ -44374,11 +44865,13 @@ mod json_behavior {
     use super::*;
 
     /// `JsonBehavior`
-    #[derive(Debug, Clone, serde::Serialize, serde::Deserialize)]
+    #[derive(Debug, Clone)]
+    #[cfg_attr(feature = "syn_serde", derive(serde::Serialize, serde::Deserialize))]
     pub struct JsonBehavior(Box<self::inner::JsonBehavior>);
 
     /// optional `JsonBehavior`
-    #[derive(Debug, Clone, serde::Serialize, serde::Deserialize)]
+    #[derive(Debug, Clone)]
+    #[cfg_attr(feature = "syn_serde", derive(serde::Serialize, serde::Deserialize))]
     pub struct JsonBehaviorOpt(Option<JsonBehavior>);
 
     #[cfg(test)]
@@ -44395,11 +44888,13 @@ mod json_behavior {
     }
 
     /// `JsonBehavior` list
-    #[derive(Debug, Clone, serde::Serialize, serde::Deserialize)]
+    #[derive(Debug, Clone)]
+    #[cfg_attr(feature = "syn_serde", derive(serde::Serialize, serde::Deserialize))]
     pub struct JsonBehaviorList(Vec<JsonBehavior>);
 
     /// optional `JsonBehavior` list
-    #[derive(Debug, Clone, serde::Serialize, serde::Deserialize)]
+    #[derive(Debug, Clone)]
+    #[cfg_attr(feature = "syn_serde", derive(serde::Serialize, serde::Deserialize))]
     pub struct JsonBehaviorListOpt(Option<Vec<JsonBehavior>>);
 
     impl crate::syn::ListOpt<JsonBehavior> for JsonBehaviorListOpt {
@@ -44499,7 +44994,8 @@ mod json_behavior {
         use super::*;
 
         #[cfg_attr(test, derive(derive_builder::Builder))]
-        #[derive(Clone, Debug, serde::Serialize, serde::Deserialize)]
+        #[cfg_attr(feature = "syn_serde", derive(serde::Serialize, serde::Deserialize))]
+        #[derive(Clone, Debug)]
         #[allow(clippy::struct_excessive_bools)]
         #[allow(clippy::struct_field_names)]
         pub struct JsonBehavior {
@@ -44662,11 +45158,13 @@ mod json_expr {
     use super::*;
 
     /// `JsonExpr`
-    #[derive(Debug, Clone, serde::Serialize, serde::Deserialize)]
+    #[derive(Debug, Clone)]
+    #[cfg_attr(feature = "syn_serde", derive(serde::Serialize, serde::Deserialize))]
     pub struct JsonExpr(Box<self::inner::JsonExpr>);
 
     /// optional `JsonExpr`
-    #[derive(Debug, Clone, serde::Serialize, serde::Deserialize)]
+    #[derive(Debug, Clone)]
+    #[cfg_attr(feature = "syn_serde", derive(serde::Serialize, serde::Deserialize))]
     pub struct JsonExprOpt(Option<JsonExpr>);
 
     #[cfg(test)]
@@ -44683,11 +45181,13 @@ mod json_expr {
     }
 
     /// `JsonExpr` list
-    #[derive(Debug, Clone, serde::Serialize, serde::Deserialize)]
+    #[derive(Debug, Clone)]
+    #[cfg_attr(feature = "syn_serde", derive(serde::Serialize, serde::Deserialize))]
     pub struct JsonExprList(Vec<JsonExpr>);
 
     /// optional `JsonExpr` list
-    #[derive(Debug, Clone, serde::Serialize, serde::Deserialize)]
+    #[derive(Debug, Clone)]
+    #[cfg_attr(feature = "syn_serde", derive(serde::Serialize, serde::Deserialize))]
     pub struct JsonExprListOpt(Option<Vec<JsonExpr>>);
 
     impl crate::syn::ListOpt<JsonExpr> for JsonExprListOpt {
@@ -44787,7 +45287,8 @@ mod json_expr {
         use super::*;
 
         #[cfg_attr(test, derive(derive_builder::Builder))]
-        #[derive(Clone, Debug, serde::Serialize, serde::Deserialize)]
+        #[cfg_attr(feature = "syn_serde", derive(serde::Serialize, serde::Deserialize))]
+        #[derive(Clone, Debug)]
         #[allow(clippy::struct_excessive_bools)]
         #[allow(clippy::struct_field_names)]
         pub struct JsonExpr {
@@ -45378,11 +45879,13 @@ mod json_table_path {
     use super::*;
 
     /// `JsonTablePath`
-    #[derive(Debug, Clone, serde::Serialize, serde::Deserialize)]
+    #[derive(Debug, Clone)]
+    #[cfg_attr(feature = "syn_serde", derive(serde::Serialize, serde::Deserialize))]
     pub struct JsonTablePath(Box<self::inner::JsonTablePath>);
 
     /// optional `JsonTablePath`
-    #[derive(Debug, Clone, serde::Serialize, serde::Deserialize)]
+    #[derive(Debug, Clone)]
+    #[cfg_attr(feature = "syn_serde", derive(serde::Serialize, serde::Deserialize))]
     pub struct JsonTablePathOpt(Option<JsonTablePath>);
 
     #[cfg(test)]
@@ -45399,11 +45902,13 @@ mod json_table_path {
     }
 
     /// `JsonTablePath` list
-    #[derive(Debug, Clone, serde::Serialize, serde::Deserialize)]
+    #[derive(Debug, Clone)]
+    #[cfg_attr(feature = "syn_serde", derive(serde::Serialize, serde::Deserialize))]
     pub struct JsonTablePathList(Vec<JsonTablePath>);
 
     /// optional `JsonTablePath` list
-    #[derive(Debug, Clone, serde::Serialize, serde::Deserialize)]
+    #[derive(Debug, Clone)]
+    #[cfg_attr(feature = "syn_serde", derive(serde::Serialize, serde::Deserialize))]
     pub struct JsonTablePathListOpt(Option<Vec<JsonTablePath>>);
 
     impl crate::syn::ListOpt<JsonTablePath> for JsonTablePathListOpt {
@@ -45503,7 +46008,8 @@ mod json_table_path {
         use super::*;
 
         #[cfg_attr(test, derive(derive_builder::Builder))]
-        #[derive(Clone, Debug, serde::Serialize, serde::Deserialize)]
+        #[cfg_attr(feature = "syn_serde", derive(serde::Serialize, serde::Deserialize))]
+        #[derive(Clone, Debug)]
         #[allow(clippy::struct_excessive_bools)]
         #[allow(clippy::struct_field_names)]
         pub struct JsonTablePath {
@@ -45565,11 +46071,13 @@ mod json_table_path_scan {
     use super::*;
 
     /// `JsonTablePathScan`
-    #[derive(Debug, Clone, serde::Serialize, serde::Deserialize)]
+    #[derive(Debug, Clone)]
+    #[cfg_attr(feature = "syn_serde", derive(serde::Serialize, serde::Deserialize))]
     pub struct JsonTablePathScan(Box<self::inner::JsonTablePathScan>);
 
     /// optional `JsonTablePathScan`
-    #[derive(Debug, Clone, serde::Serialize, serde::Deserialize)]
+    #[derive(Debug, Clone)]
+    #[cfg_attr(feature = "syn_serde", derive(serde::Serialize, serde::Deserialize))]
     pub struct JsonTablePathScanOpt(Option<JsonTablePathScan>);
 
     #[cfg(test)]
@@ -45586,11 +46094,13 @@ mod json_table_path_scan {
     }
 
     /// `JsonTablePathScan` list
-    #[derive(Debug, Clone, serde::Serialize, serde::Deserialize)]
+    #[derive(Debug, Clone)]
+    #[cfg_attr(feature = "syn_serde", derive(serde::Serialize, serde::Deserialize))]
     pub struct JsonTablePathScanList(Vec<JsonTablePathScan>);
 
     /// optional `JsonTablePathScan` list
-    #[derive(Debug, Clone, serde::Serialize, serde::Deserialize)]
+    #[derive(Debug, Clone)]
+    #[cfg_attr(feature = "syn_serde", derive(serde::Serialize, serde::Deserialize))]
     pub struct JsonTablePathScanListOpt(Option<Vec<JsonTablePathScan>>);
 
     impl crate::syn::ListOpt<JsonTablePathScan> for JsonTablePathScanListOpt {
@@ -45690,7 +46200,8 @@ mod json_table_path_scan {
         use super::*;
 
         #[cfg_attr(test, derive(derive_builder::Builder))]
-        #[derive(Clone, Debug, serde::Serialize, serde::Deserialize)]
+        #[cfg_attr(feature = "syn_serde", derive(serde::Serialize, serde::Deserialize))]
+        #[derive(Clone, Debug)]
         #[allow(clippy::struct_excessive_bools)]
         #[allow(clippy::struct_field_names)]
         pub struct JsonTablePathScan {
@@ -45918,11 +46429,13 @@ mod json_table_sibling_join {
     use super::*;
 
     /// `JsonTableSiblingJoin`
-    #[derive(Debug, Clone, serde::Serialize, serde::Deserialize)]
+    #[derive(Debug, Clone)]
+    #[cfg_attr(feature = "syn_serde", derive(serde::Serialize, serde::Deserialize))]
     pub struct JsonTableSiblingJoin(Box<self::inner::JsonTableSiblingJoin>);
 
     /// optional `JsonTableSiblingJoin`
-    #[derive(Debug, Clone, serde::Serialize, serde::Deserialize)]
+    #[derive(Debug, Clone)]
+    #[cfg_attr(feature = "syn_serde", derive(serde::Serialize, serde::Deserialize))]
     pub struct JsonTableSiblingJoinOpt(Option<JsonTableSiblingJoin>);
 
     #[cfg(test)]
@@ -45939,11 +46452,13 @@ mod json_table_sibling_join {
     }
 
     /// `JsonTableSiblingJoin` list
-    #[derive(Debug, Clone, serde::Serialize, serde::Deserialize)]
+    #[derive(Debug, Clone)]
+    #[cfg_attr(feature = "syn_serde", derive(serde::Serialize, serde::Deserialize))]
     pub struct JsonTableSiblingJoinList(Vec<JsonTableSiblingJoin>);
 
     /// optional `JsonTableSiblingJoin` list
-    #[derive(Debug, Clone, serde::Serialize, serde::Deserialize)]
+    #[derive(Debug, Clone)]
+    #[cfg_attr(feature = "syn_serde", derive(serde::Serialize, serde::Deserialize))]
     pub struct JsonTableSiblingJoinListOpt(Option<Vec<JsonTableSiblingJoin>>);
 
     impl crate::syn::ListOpt<JsonTableSiblingJoin> for JsonTableSiblingJoinListOpt {
@@ -46043,7 +46558,8 @@ mod json_table_sibling_join {
         use super::*;
 
         #[cfg_attr(test, derive(derive_builder::Builder))]
-        #[derive(Clone, Debug, serde::Serialize, serde::Deserialize)]
+        #[cfg_attr(feature = "syn_serde", derive(serde::Serialize, serde::Deserialize))]
+        #[derive(Clone, Debug)]
         #[allow(clippy::struct_excessive_bools)]
         #[allow(clippy::struct_field_names)]
         pub struct JsonTableSiblingJoin {
@@ -46173,11 +46689,13 @@ mod null_test {
     use super::*;
 
     /// `NullTest`
-    #[derive(Debug, Clone, serde::Serialize, serde::Deserialize)]
+    #[derive(Debug, Clone)]
+    #[cfg_attr(feature = "syn_serde", derive(serde::Serialize, serde::Deserialize))]
     pub struct NullTest(Box<self::inner::NullTest>);
 
     /// optional `NullTest`
-    #[derive(Debug, Clone, serde::Serialize, serde::Deserialize)]
+    #[derive(Debug, Clone)]
+    #[cfg_attr(feature = "syn_serde", derive(serde::Serialize, serde::Deserialize))]
     pub struct NullTestOpt(Option<NullTest>);
 
     #[cfg(test)]
@@ -46194,11 +46712,13 @@ mod null_test {
     }
 
     /// `NullTest` list
-    #[derive(Debug, Clone, serde::Serialize, serde::Deserialize)]
+    #[derive(Debug, Clone)]
+    #[cfg_attr(feature = "syn_serde", derive(serde::Serialize, serde::Deserialize))]
     pub struct NullTestList(Vec<NullTest>);
 
     /// optional `NullTest` list
-    #[derive(Debug, Clone, serde::Serialize, serde::Deserialize)]
+    #[derive(Debug, Clone)]
+    #[cfg_attr(feature = "syn_serde", derive(serde::Serialize, serde::Deserialize))]
     pub struct NullTestListOpt(Option<Vec<NullTest>>);
 
     impl crate::syn::ListOpt<NullTest> for NullTestListOpt {
@@ -46298,7 +46818,8 @@ mod null_test {
         use super::*;
 
         #[cfg_attr(test, derive(derive_builder::Builder))]
-        #[derive(Clone, Debug, serde::Serialize, serde::Deserialize)]
+        #[cfg_attr(feature = "syn_serde", derive(serde::Serialize, serde::Deserialize))]
+        #[derive(Clone, Debug)]
         #[allow(clippy::struct_excessive_bools)]
         #[allow(clippy::struct_field_names)]
         pub struct NullTest {
@@ -46493,11 +47014,13 @@ mod boolean_test {
     use super::*;
 
     /// `BooleanTest`
-    #[derive(Debug, Clone, serde::Serialize, serde::Deserialize)]
+    #[derive(Debug, Clone)]
+    #[cfg_attr(feature = "syn_serde", derive(serde::Serialize, serde::Deserialize))]
     pub struct BooleanTest(Box<self::inner::BooleanTest>);
 
     /// optional `BooleanTest`
-    #[derive(Debug, Clone, serde::Serialize, serde::Deserialize)]
+    #[derive(Debug, Clone)]
+    #[cfg_attr(feature = "syn_serde", derive(serde::Serialize, serde::Deserialize))]
     pub struct BooleanTestOpt(Option<BooleanTest>);
 
     #[cfg(test)]
@@ -46514,11 +47037,13 @@ mod boolean_test {
     }
 
     /// `BooleanTest` list
-    #[derive(Debug, Clone, serde::Serialize, serde::Deserialize)]
+    #[derive(Debug, Clone)]
+    #[cfg_attr(feature = "syn_serde", derive(serde::Serialize, serde::Deserialize))]
     pub struct BooleanTestList(Vec<BooleanTest>);
 
     /// optional `BooleanTest` list
-    #[derive(Debug, Clone, serde::Serialize, serde::Deserialize)]
+    #[derive(Debug, Clone)]
+    #[cfg_attr(feature = "syn_serde", derive(serde::Serialize, serde::Deserialize))]
     pub struct BooleanTestListOpt(Option<Vec<BooleanTest>>);
 
     impl crate::syn::ListOpt<BooleanTest> for BooleanTestListOpt {
@@ -46618,7 +47143,8 @@ mod boolean_test {
         use super::*;
 
         #[cfg_attr(test, derive(derive_builder::Builder))]
-        #[derive(Clone, Debug, serde::Serialize, serde::Deserialize)]
+        #[cfg_attr(feature = "syn_serde", derive(serde::Serialize, serde::Deserialize))]
+        #[derive(Clone, Debug)]
         #[allow(clippy::struct_excessive_bools)]
         #[allow(clippy::struct_field_names)]
         pub struct BooleanTest {
@@ -46782,11 +47308,13 @@ mod merge_action {
     use super::*;
 
     /// `MergeAction`
-    #[derive(Debug, Clone, serde::Serialize, serde::Deserialize)]
+    #[derive(Debug, Clone)]
+    #[cfg_attr(feature = "syn_serde", derive(serde::Serialize, serde::Deserialize))]
     pub struct MergeAction(Box<self::inner::MergeAction>);
 
     /// optional `MergeAction`
-    #[derive(Debug, Clone, serde::Serialize, serde::Deserialize)]
+    #[derive(Debug, Clone)]
+    #[cfg_attr(feature = "syn_serde", derive(serde::Serialize, serde::Deserialize))]
     pub struct MergeActionOpt(Option<MergeAction>);
 
     #[cfg(test)]
@@ -46803,11 +47331,13 @@ mod merge_action {
     }
 
     /// `MergeAction` list
-    #[derive(Debug, Clone, serde::Serialize, serde::Deserialize)]
+    #[derive(Debug, Clone)]
+    #[cfg_attr(feature = "syn_serde", derive(serde::Serialize, serde::Deserialize))]
     pub struct MergeActionList(Vec<MergeAction>);
 
     /// optional `MergeAction` list
-    #[derive(Debug, Clone, serde::Serialize, serde::Deserialize)]
+    #[derive(Debug, Clone)]
+    #[cfg_attr(feature = "syn_serde", derive(serde::Serialize, serde::Deserialize))]
     pub struct MergeActionListOpt(Option<Vec<MergeAction>>);
 
     impl crate::syn::ListOpt<MergeAction> for MergeActionListOpt {
@@ -46907,7 +47437,8 @@ mod merge_action {
         use super::*;
 
         #[cfg_attr(test, derive(derive_builder::Builder))]
-        #[derive(Clone, Debug, serde::Serialize, serde::Deserialize)]
+        #[cfg_attr(feature = "syn_serde", derive(serde::Serialize, serde::Deserialize))]
+        #[derive(Clone, Debug)]
         #[allow(clippy::struct_excessive_bools)]
         #[allow(clippy::struct_field_names)]
         pub struct MergeAction {
@@ -47142,11 +47673,13 @@ mod coerce_to_domain {
     use super::*;
 
     /// `CoerceToDomain`
-    #[derive(Debug, Clone, serde::Serialize, serde::Deserialize)]
+    #[derive(Debug, Clone)]
+    #[cfg_attr(feature = "syn_serde", derive(serde::Serialize, serde::Deserialize))]
     pub struct CoerceToDomain(Box<self::inner::CoerceToDomain>);
 
     /// optional `CoerceToDomain`
-    #[derive(Debug, Clone, serde::Serialize, serde::Deserialize)]
+    #[derive(Debug, Clone)]
+    #[cfg_attr(feature = "syn_serde", derive(serde::Serialize, serde::Deserialize))]
     pub struct CoerceToDomainOpt(Option<CoerceToDomain>);
 
     #[cfg(test)]
@@ -47163,11 +47696,13 @@ mod coerce_to_domain {
     }
 
     /// `CoerceToDomain` list
-    #[derive(Debug, Clone, serde::Serialize, serde::Deserialize)]
+    #[derive(Debug, Clone)]
+    #[cfg_attr(feature = "syn_serde", derive(serde::Serialize, serde::Deserialize))]
     pub struct CoerceToDomainList(Vec<CoerceToDomain>);
 
     /// optional `CoerceToDomain` list
-    #[derive(Debug, Clone, serde::Serialize, serde::Deserialize)]
+    #[derive(Debug, Clone)]
+    #[cfg_attr(feature = "syn_serde", derive(serde::Serialize, serde::Deserialize))]
     pub struct CoerceToDomainListOpt(Option<Vec<CoerceToDomain>>);
 
     impl crate::syn::ListOpt<CoerceToDomain> for CoerceToDomainListOpt {
@@ -47267,7 +47802,8 @@ mod coerce_to_domain {
         use super::*;
 
         #[cfg_attr(test, derive(derive_builder::Builder))]
-        #[derive(Clone, Debug, serde::Serialize, serde::Deserialize)]
+        #[cfg_attr(feature = "syn_serde", derive(serde::Serialize, serde::Deserialize))]
+        #[derive(Clone, Debug)]
         #[allow(clippy::struct_excessive_bools)]
         #[allow(clippy::struct_field_names)]
         pub struct CoerceToDomain {
@@ -47526,11 +48062,13 @@ mod coerce_to_domain_value {
     use super::*;
 
     /// `CoerceToDomainValue`
-    #[derive(Debug, Clone, serde::Serialize, serde::Deserialize)]
+    #[derive(Debug, Clone)]
+    #[cfg_attr(feature = "syn_serde", derive(serde::Serialize, serde::Deserialize))]
     pub struct CoerceToDomainValue(Box<self::inner::CoerceToDomainValue>);
 
     /// optional `CoerceToDomainValue`
-    #[derive(Debug, Clone, serde::Serialize, serde::Deserialize)]
+    #[derive(Debug, Clone)]
+    #[cfg_attr(feature = "syn_serde", derive(serde::Serialize, serde::Deserialize))]
     pub struct CoerceToDomainValueOpt(Option<CoerceToDomainValue>);
 
     #[cfg(test)]
@@ -47547,11 +48085,13 @@ mod coerce_to_domain_value {
     }
 
     /// `CoerceToDomainValue` list
-    #[derive(Debug, Clone, serde::Serialize, serde::Deserialize)]
+    #[derive(Debug, Clone)]
+    #[cfg_attr(feature = "syn_serde", derive(serde::Serialize, serde::Deserialize))]
     pub struct CoerceToDomainValueList(Vec<CoerceToDomainValue>);
 
     /// optional `CoerceToDomainValue` list
-    #[derive(Debug, Clone, serde::Serialize, serde::Deserialize)]
+    #[derive(Debug, Clone)]
+    #[cfg_attr(feature = "syn_serde", derive(serde::Serialize, serde::Deserialize))]
     pub struct CoerceToDomainValueListOpt(Option<Vec<CoerceToDomainValue>>);
 
     impl crate::syn::ListOpt<CoerceToDomainValue> for CoerceToDomainValueListOpt {
@@ -47651,7 +48191,8 @@ mod coerce_to_domain_value {
         use super::*;
 
         #[cfg_attr(test, derive(derive_builder::Builder))]
-        #[derive(Clone, Debug, serde::Serialize, serde::Deserialize)]
+        #[cfg_attr(feature = "syn_serde", derive(serde::Serialize, serde::Deserialize))]
+        #[derive(Clone, Debug)]
         #[allow(clippy::struct_excessive_bools)]
         #[allow(clippy::struct_field_names)]
         pub struct CoerceToDomainValue {
@@ -47843,11 +48384,13 @@ mod set_to_default {
     use super::*;
 
     /// `SetToDefault`
-    #[derive(Debug, Clone, serde::Serialize, serde::Deserialize)]
+    #[derive(Debug, Clone)]
+    #[cfg_attr(feature = "syn_serde", derive(serde::Serialize, serde::Deserialize))]
     pub struct SetToDefault(Box<self::inner::SetToDefault>);
 
     /// optional `SetToDefault`
-    #[derive(Debug, Clone, serde::Serialize, serde::Deserialize)]
+    #[derive(Debug, Clone)]
+    #[cfg_attr(feature = "syn_serde", derive(serde::Serialize, serde::Deserialize))]
     pub struct SetToDefaultOpt(Option<SetToDefault>);
 
     #[cfg(test)]
@@ -47864,11 +48407,13 @@ mod set_to_default {
     }
 
     /// `SetToDefault` list
-    #[derive(Debug, Clone, serde::Serialize, serde::Deserialize)]
+    #[derive(Debug, Clone)]
+    #[cfg_attr(feature = "syn_serde", derive(serde::Serialize, serde::Deserialize))]
     pub struct SetToDefaultList(Vec<SetToDefault>);
 
     /// optional `SetToDefault` list
-    #[derive(Debug, Clone, serde::Serialize, serde::Deserialize)]
+    #[derive(Debug, Clone)]
+    #[cfg_attr(feature = "syn_serde", derive(serde::Serialize, serde::Deserialize))]
     pub struct SetToDefaultListOpt(Option<Vec<SetToDefault>>);
 
     impl crate::syn::ListOpt<SetToDefault> for SetToDefaultListOpt {
@@ -47968,7 +48513,8 @@ mod set_to_default {
         use super::*;
 
         #[cfg_attr(test, derive(derive_builder::Builder))]
-        #[derive(Clone, Debug, serde::Serialize, serde::Deserialize)]
+        #[cfg_attr(feature = "syn_serde", derive(serde::Serialize, serde::Deserialize))]
+        #[derive(Clone, Debug)]
         #[allow(clippy::struct_excessive_bools)]
         #[allow(clippy::struct_field_names)]
         pub struct SetToDefault {
@@ -48159,11 +48705,13 @@ mod current_of_expr {
     use super::*;
 
     /// `CurrentOfExpr`
-    #[derive(Debug, Clone, serde::Serialize, serde::Deserialize)]
+    #[derive(Debug, Clone)]
+    #[cfg_attr(feature = "syn_serde", derive(serde::Serialize, serde::Deserialize))]
     pub struct CurrentOfExpr(Box<self::inner::CurrentOfExpr>);
 
     /// optional `CurrentOfExpr`
-    #[derive(Debug, Clone, serde::Serialize, serde::Deserialize)]
+    #[derive(Debug, Clone)]
+    #[cfg_attr(feature = "syn_serde", derive(serde::Serialize, serde::Deserialize))]
     pub struct CurrentOfExprOpt(Option<CurrentOfExpr>);
 
     #[cfg(test)]
@@ -48180,11 +48728,13 @@ mod current_of_expr {
     }
 
     /// `CurrentOfExpr` list
-    #[derive(Debug, Clone, serde::Serialize, serde::Deserialize)]
+    #[derive(Debug, Clone)]
+    #[cfg_attr(feature = "syn_serde", derive(serde::Serialize, serde::Deserialize))]
     pub struct CurrentOfExprList(Vec<CurrentOfExpr>);
 
     /// optional `CurrentOfExpr` list
-    #[derive(Debug, Clone, serde::Serialize, serde::Deserialize)]
+    #[derive(Debug, Clone)]
+    #[cfg_attr(feature = "syn_serde", derive(serde::Serialize, serde::Deserialize))]
     pub struct CurrentOfExprListOpt(Option<Vec<CurrentOfExpr>>);
 
     impl crate::syn::ListOpt<CurrentOfExpr> for CurrentOfExprListOpt {
@@ -48284,7 +48834,8 @@ mod current_of_expr {
         use super::*;
 
         #[cfg_attr(test, derive(derive_builder::Builder))]
-        #[derive(Clone, Debug, serde::Serialize, serde::Deserialize)]
+        #[cfg_attr(feature = "syn_serde", derive(serde::Serialize, serde::Deserialize))]
+        #[derive(Clone, Debug)]
         #[allow(clippy::struct_excessive_bools)]
         #[allow(clippy::struct_field_names)]
         pub struct CurrentOfExpr {
@@ -48444,11 +48995,13 @@ mod next_value_expr {
     use super::*;
 
     /// `NextValueExpr`
-    #[derive(Debug, Clone, serde::Serialize, serde::Deserialize)]
+    #[derive(Debug, Clone)]
+    #[cfg_attr(feature = "syn_serde", derive(serde::Serialize, serde::Deserialize))]
     pub struct NextValueExpr(Box<self::inner::NextValueExpr>);
 
     /// optional `NextValueExpr`
-    #[derive(Debug, Clone, serde::Serialize, serde::Deserialize)]
+    #[derive(Debug, Clone)]
+    #[cfg_attr(feature = "syn_serde", derive(serde::Serialize, serde::Deserialize))]
     pub struct NextValueExprOpt(Option<NextValueExpr>);
 
     #[cfg(test)]
@@ -48465,11 +49018,13 @@ mod next_value_expr {
     }
 
     /// `NextValueExpr` list
-    #[derive(Debug, Clone, serde::Serialize, serde::Deserialize)]
+    #[derive(Debug, Clone)]
+    #[cfg_attr(feature = "syn_serde", derive(serde::Serialize, serde::Deserialize))]
     pub struct NextValueExprList(Vec<NextValueExpr>);
 
     /// optional `NextValueExpr` list
-    #[derive(Debug, Clone, serde::Serialize, serde::Deserialize)]
+    #[derive(Debug, Clone)]
+    #[cfg_attr(feature = "syn_serde", derive(serde::Serialize, serde::Deserialize))]
     pub struct NextValueExprListOpt(Option<Vec<NextValueExpr>>);
 
     impl crate::syn::ListOpt<NextValueExpr> for NextValueExprListOpt {
@@ -48569,7 +49124,8 @@ mod next_value_expr {
         use super::*;
 
         #[cfg_attr(test, derive(derive_builder::Builder))]
-        #[derive(Clone, Debug, serde::Serialize, serde::Deserialize)]
+        #[cfg_attr(feature = "syn_serde", derive(serde::Serialize, serde::Deserialize))]
+        #[derive(Clone, Debug)]
         #[allow(clippy::struct_excessive_bools)]
         #[allow(clippy::struct_field_names)]
         pub struct NextValueExpr {
@@ -48698,11 +49254,13 @@ mod inference_elem {
     use super::*;
 
     /// `InferenceElem`
-    #[derive(Debug, Clone, serde::Serialize, serde::Deserialize)]
+    #[derive(Debug, Clone)]
+    #[cfg_attr(feature = "syn_serde", derive(serde::Serialize, serde::Deserialize))]
     pub struct InferenceElem(Box<self::inner::InferenceElem>);
 
     /// optional `InferenceElem`
-    #[derive(Debug, Clone, serde::Serialize, serde::Deserialize)]
+    #[derive(Debug, Clone)]
+    #[cfg_attr(feature = "syn_serde", derive(serde::Serialize, serde::Deserialize))]
     pub struct InferenceElemOpt(Option<InferenceElem>);
 
     #[cfg(test)]
@@ -48719,11 +49277,13 @@ mod inference_elem {
     }
 
     /// `InferenceElem` list
-    #[derive(Debug, Clone, serde::Serialize, serde::Deserialize)]
+    #[derive(Debug, Clone)]
+    #[cfg_attr(feature = "syn_serde", derive(serde::Serialize, serde::Deserialize))]
     pub struct InferenceElemList(Vec<InferenceElem>);
 
     /// optional `InferenceElem` list
-    #[derive(Debug, Clone, serde::Serialize, serde::Deserialize)]
+    #[derive(Debug, Clone)]
+    #[cfg_attr(feature = "syn_serde", derive(serde::Serialize, serde::Deserialize))]
     pub struct InferenceElemListOpt(Option<Vec<InferenceElem>>);
 
     impl crate::syn::ListOpt<InferenceElem> for InferenceElemListOpt {
@@ -48823,7 +49383,8 @@ mod inference_elem {
         use super::*;
 
         #[cfg_attr(test, derive(derive_builder::Builder))]
-        #[derive(Clone, Debug, serde::Serialize, serde::Deserialize)]
+        #[cfg_attr(feature = "syn_serde", derive(serde::Serialize, serde::Deserialize))]
+        #[derive(Clone, Debug)]
         #[allow(clippy::struct_excessive_bools)]
         #[allow(clippy::struct_field_names)]
         pub struct InferenceElem {
@@ -48986,11 +49547,13 @@ mod target_entry {
     use super::*;
 
     /// `TargetEntry`
-    #[derive(Debug, Clone, serde::Serialize, serde::Deserialize)]
+    #[derive(Debug, Clone)]
+    #[cfg_attr(feature = "syn_serde", derive(serde::Serialize, serde::Deserialize))]
     pub struct TargetEntry(Box<self::inner::TargetEntry>);
 
     /// optional `TargetEntry`
-    #[derive(Debug, Clone, serde::Serialize, serde::Deserialize)]
+    #[derive(Debug, Clone)]
+    #[cfg_attr(feature = "syn_serde", derive(serde::Serialize, serde::Deserialize))]
     pub struct TargetEntryOpt(Option<TargetEntry>);
 
     #[cfg(test)]
@@ -49007,11 +49570,13 @@ mod target_entry {
     }
 
     /// `TargetEntry` list
-    #[derive(Debug, Clone, serde::Serialize, serde::Deserialize)]
+    #[derive(Debug, Clone)]
+    #[cfg_attr(feature = "syn_serde", derive(serde::Serialize, serde::Deserialize))]
     pub struct TargetEntryList(Vec<TargetEntry>);
 
     /// optional `TargetEntry` list
-    #[derive(Debug, Clone, serde::Serialize, serde::Deserialize)]
+    #[derive(Debug, Clone)]
+    #[cfg_attr(feature = "syn_serde", derive(serde::Serialize, serde::Deserialize))]
     pub struct TargetEntryListOpt(Option<Vec<TargetEntry>>);
 
     impl crate::syn::ListOpt<TargetEntry> for TargetEntryListOpt {
@@ -49111,7 +49676,8 @@ mod target_entry {
         use super::*;
 
         #[cfg_attr(test, derive(derive_builder::Builder))]
-        #[derive(Clone, Debug, serde::Serialize, serde::Deserialize)]
+        #[cfg_attr(feature = "syn_serde", derive(serde::Serialize, serde::Deserialize))]
+        #[derive(Clone, Debug)]
         #[allow(clippy::struct_excessive_bools)]
         #[allow(clippy::struct_field_names)]
         pub struct TargetEntry {
@@ -49396,11 +49962,13 @@ mod range_tbl_ref {
     use super::*;
 
     /// `RangeTblRef`
-    #[derive(Debug, Clone, serde::Serialize, serde::Deserialize)]
+    #[derive(Debug, Clone)]
+    #[cfg_attr(feature = "syn_serde", derive(serde::Serialize, serde::Deserialize))]
     pub struct RangeTblRef(Box<self::inner::RangeTblRef>);
 
     /// optional `RangeTblRef`
-    #[derive(Debug, Clone, serde::Serialize, serde::Deserialize)]
+    #[derive(Debug, Clone)]
+    #[cfg_attr(feature = "syn_serde", derive(serde::Serialize, serde::Deserialize))]
     pub struct RangeTblRefOpt(Option<RangeTblRef>);
 
     #[cfg(test)]
@@ -49417,11 +49985,13 @@ mod range_tbl_ref {
     }
 
     /// `RangeTblRef` list
-    #[derive(Debug, Clone, serde::Serialize, serde::Deserialize)]
+    #[derive(Debug, Clone)]
+    #[cfg_attr(feature = "syn_serde", derive(serde::Serialize, serde::Deserialize))]
     pub struct RangeTblRefList(Vec<RangeTblRef>);
 
     /// optional `RangeTblRef` list
-    #[derive(Debug, Clone, serde::Serialize, serde::Deserialize)]
+    #[derive(Debug, Clone)]
+    #[cfg_attr(feature = "syn_serde", derive(serde::Serialize, serde::Deserialize))]
     pub struct RangeTblRefListOpt(Option<Vec<RangeTblRef>>);
 
     impl crate::syn::ListOpt<RangeTblRef> for RangeTblRefListOpt {
@@ -49521,7 +50091,8 @@ mod range_tbl_ref {
         use super::*;
 
         #[cfg_attr(test, derive(derive_builder::Builder))]
-        #[derive(Clone, Debug, serde::Serialize, serde::Deserialize)]
+        #[cfg_attr(feature = "syn_serde", derive(serde::Serialize, serde::Deserialize))]
+        #[derive(Clone, Debug)]
         #[allow(clippy::struct_excessive_bools)]
         #[allow(clippy::struct_field_names)]
         pub struct RangeTblRef {
@@ -49581,11 +50152,13 @@ mod join_expr {
     use super::*;
 
     /// `JoinExpr`
-    #[derive(Debug, Clone, serde::Serialize, serde::Deserialize)]
+    #[derive(Debug, Clone)]
+    #[cfg_attr(feature = "syn_serde", derive(serde::Serialize, serde::Deserialize))]
     pub struct JoinExpr(Box<self::inner::JoinExpr>);
 
     /// optional `JoinExpr`
-    #[derive(Debug, Clone, serde::Serialize, serde::Deserialize)]
+    #[derive(Debug, Clone)]
+    #[cfg_attr(feature = "syn_serde", derive(serde::Serialize, serde::Deserialize))]
     pub struct JoinExprOpt(Option<JoinExpr>);
 
     #[cfg(test)]
@@ -49602,11 +50175,13 @@ mod join_expr {
     }
 
     /// `JoinExpr` list
-    #[derive(Debug, Clone, serde::Serialize, serde::Deserialize)]
+    #[derive(Debug, Clone)]
+    #[cfg_attr(feature = "syn_serde", derive(serde::Serialize, serde::Deserialize))]
     pub struct JoinExprList(Vec<JoinExpr>);
 
     /// optional `JoinExpr` list
-    #[derive(Debug, Clone, serde::Serialize, serde::Deserialize)]
+    #[derive(Debug, Clone)]
+    #[cfg_attr(feature = "syn_serde", derive(serde::Serialize, serde::Deserialize))]
     pub struct JoinExprListOpt(Option<Vec<JoinExpr>>);
 
     impl crate::syn::ListOpt<JoinExpr> for JoinExprListOpt {
@@ -49706,7 +50281,8 @@ mod join_expr {
         use super::*;
 
         #[cfg_attr(test, derive(derive_builder::Builder))]
-        #[derive(Clone, Debug, serde::Serialize, serde::Deserialize)]
+        #[cfg_attr(feature = "syn_serde", derive(serde::Serialize, serde::Deserialize))]
+        #[derive(Clone, Debug)]
         #[allow(clippy::struct_excessive_bools)]
         #[allow(clippy::struct_field_names)]
         pub struct JoinExpr {
@@ -50037,11 +50613,13 @@ mod from_expr {
     use super::*;
 
     /// `FromExpr`
-    #[derive(Debug, Clone, serde::Serialize, serde::Deserialize)]
+    #[derive(Debug, Clone)]
+    #[cfg_attr(feature = "syn_serde", derive(serde::Serialize, serde::Deserialize))]
     pub struct FromExpr(Box<self::inner::FromExpr>);
 
     /// optional `FromExpr`
-    #[derive(Debug, Clone, serde::Serialize, serde::Deserialize)]
+    #[derive(Debug, Clone)]
+    #[cfg_attr(feature = "syn_serde", derive(serde::Serialize, serde::Deserialize))]
     pub struct FromExprOpt(Option<FromExpr>);
 
     #[cfg(test)]
@@ -50058,11 +50636,13 @@ mod from_expr {
     }
 
     /// `FromExpr` list
-    #[derive(Debug, Clone, serde::Serialize, serde::Deserialize)]
+    #[derive(Debug, Clone)]
+    #[cfg_attr(feature = "syn_serde", derive(serde::Serialize, serde::Deserialize))]
     pub struct FromExprList(Vec<FromExpr>);
 
     /// optional `FromExpr` list
-    #[derive(Debug, Clone, serde::Serialize, serde::Deserialize)]
+    #[derive(Debug, Clone)]
+    #[cfg_attr(feature = "syn_serde", derive(serde::Serialize, serde::Deserialize))]
     pub struct FromExprListOpt(Option<Vec<FromExpr>>);
 
     impl crate::syn::ListOpt<FromExpr> for FromExprListOpt {
@@ -50162,7 +50742,8 @@ mod from_expr {
         use super::*;
 
         #[cfg_attr(test, derive(derive_builder::Builder))]
-        #[derive(Clone, Debug, serde::Serialize, serde::Deserialize)]
+        #[cfg_attr(feature = "syn_serde", derive(serde::Serialize, serde::Deserialize))]
+        #[derive(Clone, Debug)]
         #[allow(clippy::struct_excessive_bools)]
         #[allow(clippy::struct_field_names)]
         pub struct FromExpr {
@@ -50257,11 +50838,13 @@ mod on_conflict_expr {
     use super::*;
 
     /// `OnConflictExpr`
-    #[derive(Debug, Clone, serde::Serialize, serde::Deserialize)]
+    #[derive(Debug, Clone)]
+    #[cfg_attr(feature = "syn_serde", derive(serde::Serialize, serde::Deserialize))]
     pub struct OnConflictExpr(Box<self::inner::OnConflictExpr>);
 
     /// optional `OnConflictExpr`
-    #[derive(Debug, Clone, serde::Serialize, serde::Deserialize)]
+    #[derive(Debug, Clone)]
+    #[cfg_attr(feature = "syn_serde", derive(serde::Serialize, serde::Deserialize))]
     pub struct OnConflictExprOpt(Option<OnConflictExpr>);
 
     #[cfg(test)]
@@ -50278,11 +50861,13 @@ mod on_conflict_expr {
     }
 
     /// `OnConflictExpr` list
-    #[derive(Debug, Clone, serde::Serialize, serde::Deserialize)]
+    #[derive(Debug, Clone)]
+    #[cfg_attr(feature = "syn_serde", derive(serde::Serialize, serde::Deserialize))]
     pub struct OnConflictExprList(Vec<OnConflictExpr>);
 
     /// optional `OnConflictExpr` list
-    #[derive(Debug, Clone, serde::Serialize, serde::Deserialize)]
+    #[derive(Debug, Clone)]
+    #[cfg_attr(feature = "syn_serde", derive(serde::Serialize, serde::Deserialize))]
     pub struct OnConflictExprListOpt(Option<Vec<OnConflictExpr>>);
 
     impl crate::syn::ListOpt<OnConflictExpr> for OnConflictExprListOpt {
@@ -50382,7 +50967,8 @@ mod on_conflict_expr {
         use super::*;
 
         #[cfg_attr(test, derive(derive_builder::Builder))]
-        #[derive(Clone, Debug, serde::Serialize, serde::Deserialize)]
+        #[cfg_attr(feature = "syn_serde", derive(serde::Serialize, serde::Deserialize))]
+        #[derive(Clone, Debug)]
         #[allow(clippy::struct_excessive_bools)]
         #[allow(clippy::struct_field_names)]
         pub struct OnConflictExpr {
@@ -50681,11 +51267,13 @@ mod query {
     use super::*;
 
     /// `Query`
-    #[derive(Debug, Clone, serde::Serialize, serde::Deserialize)]
+    #[derive(Debug, Clone)]
+    #[cfg_attr(feature = "syn_serde", derive(serde::Serialize, serde::Deserialize))]
     pub struct Query(Box<self::inner::Query>);
 
     /// optional `Query`
-    #[derive(Debug, Clone, serde::Serialize, serde::Deserialize)]
+    #[derive(Debug, Clone)]
+    #[cfg_attr(feature = "syn_serde", derive(serde::Serialize, serde::Deserialize))]
     pub struct QueryOpt(Option<Query>);
 
     #[cfg(test)]
@@ -50702,11 +51290,13 @@ mod query {
     }
 
     /// `Query` list
-    #[derive(Debug, Clone, serde::Serialize, serde::Deserialize)]
+    #[derive(Debug, Clone)]
+    #[cfg_attr(feature = "syn_serde", derive(serde::Serialize, serde::Deserialize))]
     pub struct QueryList(Vec<Query>);
 
     /// optional `Query` list
-    #[derive(Debug, Clone, serde::Serialize, serde::Deserialize)]
+    #[derive(Debug, Clone)]
+    #[cfg_attr(feature = "syn_serde", derive(serde::Serialize, serde::Deserialize))]
     pub struct QueryListOpt(Option<Vec<Query>>);
 
     impl crate::syn::ListOpt<Query> for QueryListOpt {
@@ -50806,7 +51396,8 @@ mod query {
         use super::*;
 
         #[cfg_attr(test, derive(derive_builder::Builder))]
-        #[derive(Clone, Debug, serde::Serialize, serde::Deserialize)]
+        #[cfg_attr(feature = "syn_serde", derive(serde::Serialize, serde::Deserialize))]
+        #[derive(Clone, Debug)]
         #[allow(clippy::struct_excessive_bools)]
         #[allow(clippy::struct_field_names)]
         pub struct Query {
@@ -52217,11 +52808,13 @@ mod type_name {
     use super::*;
 
     /// `TypeName`
-    #[derive(Debug, Clone, serde::Serialize, serde::Deserialize)]
+    #[derive(Debug, Clone)]
+    #[cfg_attr(feature = "syn_serde", derive(serde::Serialize, serde::Deserialize))]
     pub struct TypeName(Box<self::inner::TypeName>);
 
     /// optional `TypeName`
-    #[derive(Debug, Clone, serde::Serialize, serde::Deserialize)]
+    #[derive(Debug, Clone)]
+    #[cfg_attr(feature = "syn_serde", derive(serde::Serialize, serde::Deserialize))]
     pub struct TypeNameOpt(Option<TypeName>);
 
     #[cfg(test)]
@@ -52238,11 +52831,13 @@ mod type_name {
     }
 
     /// `TypeName` list
-    #[derive(Debug, Clone, serde::Serialize, serde::Deserialize)]
+    #[derive(Debug, Clone)]
+    #[cfg_attr(feature = "syn_serde", derive(serde::Serialize, serde::Deserialize))]
     pub struct TypeNameList(Vec<TypeName>);
 
     /// optional `TypeName` list
-    #[derive(Debug, Clone, serde::Serialize, serde::Deserialize)]
+    #[derive(Debug, Clone)]
+    #[cfg_attr(feature = "syn_serde", derive(serde::Serialize, serde::Deserialize))]
     pub struct TypeNameListOpt(Option<Vec<TypeName>>);
 
     impl crate::syn::ListOpt<TypeName> for TypeNameListOpt {
@@ -52342,7 +52937,8 @@ mod type_name {
         use super::*;
 
         #[cfg_attr(test, derive(derive_builder::Builder))]
-        #[derive(Clone, Debug, serde::Serialize, serde::Deserialize)]
+        #[cfg_attr(feature = "syn_serde", derive(serde::Serialize, serde::Deserialize))]
+        #[derive(Clone, Debug)]
         #[allow(clippy::struct_excessive_bools)]
         #[allow(clippy::struct_field_names)]
         pub struct TypeName {
@@ -52630,11 +53226,13 @@ mod column_ref {
     use super::*;
 
     /// `ColumnRef`
-    #[derive(Debug, Clone, serde::Serialize, serde::Deserialize)]
+    #[derive(Debug, Clone)]
+    #[cfg_attr(feature = "syn_serde", derive(serde::Serialize, serde::Deserialize))]
     pub struct ColumnRef(Box<self::inner::ColumnRef>);
 
     /// optional `ColumnRef`
-    #[derive(Debug, Clone, serde::Serialize, serde::Deserialize)]
+    #[derive(Debug, Clone)]
+    #[cfg_attr(feature = "syn_serde", derive(serde::Serialize, serde::Deserialize))]
     pub struct ColumnRefOpt(Option<ColumnRef>);
 
     #[cfg(test)]
@@ -52651,11 +53249,13 @@ mod column_ref {
     }
 
     /// `ColumnRef` list
-    #[derive(Debug, Clone, serde::Serialize, serde::Deserialize)]
+    #[derive(Debug, Clone)]
+    #[cfg_attr(feature = "syn_serde", derive(serde::Serialize, serde::Deserialize))]
     pub struct ColumnRefList(Vec<ColumnRef>);
 
     /// optional `ColumnRef` list
-    #[derive(Debug, Clone, serde::Serialize, serde::Deserialize)]
+    #[derive(Debug, Clone)]
+    #[cfg_attr(feature = "syn_serde", derive(serde::Serialize, serde::Deserialize))]
     pub struct ColumnRefListOpt(Option<Vec<ColumnRef>>);
 
     impl crate::syn::ListOpt<ColumnRef> for ColumnRefListOpt {
@@ -52755,7 +53355,8 @@ mod column_ref {
         use super::*;
 
         #[cfg_attr(test, derive(derive_builder::Builder))]
-        #[derive(Clone, Debug, serde::Serialize, serde::Deserialize)]
+        #[cfg_attr(feature = "syn_serde", derive(serde::Serialize, serde::Deserialize))]
+        #[derive(Clone, Debug)]
         #[allow(clippy::struct_excessive_bools)]
         #[allow(clippy::struct_field_names)]
         pub struct ColumnRef {
@@ -52847,11 +53448,13 @@ mod param_ref {
     use super::*;
 
     /// `ParamRef`
-    #[derive(Debug, Clone, serde::Serialize, serde::Deserialize)]
+    #[derive(Debug, Clone)]
+    #[cfg_attr(feature = "syn_serde", derive(serde::Serialize, serde::Deserialize))]
     pub struct ParamRef(Box<self::inner::ParamRef>);
 
     /// optional `ParamRef`
-    #[derive(Debug, Clone, serde::Serialize, serde::Deserialize)]
+    #[derive(Debug, Clone)]
+    #[cfg_attr(feature = "syn_serde", derive(serde::Serialize, serde::Deserialize))]
     pub struct ParamRefOpt(Option<ParamRef>);
 
     #[cfg(test)]
@@ -52868,11 +53471,13 @@ mod param_ref {
     }
 
     /// `ParamRef` list
-    #[derive(Debug, Clone, serde::Serialize, serde::Deserialize)]
+    #[derive(Debug, Clone)]
+    #[cfg_attr(feature = "syn_serde", derive(serde::Serialize, serde::Deserialize))]
     pub struct ParamRefList(Vec<ParamRef>);
 
     /// optional `ParamRef` list
-    #[derive(Debug, Clone, serde::Serialize, serde::Deserialize)]
+    #[derive(Debug, Clone)]
+    #[cfg_attr(feature = "syn_serde", derive(serde::Serialize, serde::Deserialize))]
     pub struct ParamRefListOpt(Option<Vec<ParamRef>>);
 
     impl crate::syn::ListOpt<ParamRef> for ParamRefListOpt {
@@ -52972,7 +53577,8 @@ mod param_ref {
         use super::*;
 
         #[cfg_attr(test, derive(derive_builder::Builder))]
-        #[derive(Clone, Debug, serde::Serialize, serde::Deserialize)]
+        #[cfg_attr(feature = "syn_serde", derive(serde::Serialize, serde::Deserialize))]
+        #[derive(Clone, Debug)]
         #[allow(clippy::struct_excessive_bools)]
         #[allow(clippy::struct_field_names)]
         pub struct ParamRef {
@@ -53061,11 +53667,13 @@ mod a_expr {
     use super::*;
 
     /// `AExpr`
-    #[derive(Debug, Clone, serde::Serialize, serde::Deserialize)]
+    #[derive(Debug, Clone)]
+    #[cfg_attr(feature = "syn_serde", derive(serde::Serialize, serde::Deserialize))]
     pub struct AExpr(Box<self::inner::AExpr>);
 
     /// optional `AExpr`
-    #[derive(Debug, Clone, serde::Serialize, serde::Deserialize)]
+    #[derive(Debug, Clone)]
+    #[cfg_attr(feature = "syn_serde", derive(serde::Serialize, serde::Deserialize))]
     pub struct AExprOpt(Option<AExpr>);
 
     #[cfg(test)]
@@ -53082,11 +53690,13 @@ mod a_expr {
     }
 
     /// `AExpr` list
-    #[derive(Debug, Clone, serde::Serialize, serde::Deserialize)]
+    #[derive(Debug, Clone)]
+    #[cfg_attr(feature = "syn_serde", derive(serde::Serialize, serde::Deserialize))]
     pub struct AExprList(Vec<AExpr>);
 
     /// optional `AExpr` list
-    #[derive(Debug, Clone, serde::Serialize, serde::Deserialize)]
+    #[derive(Debug, Clone)]
+    #[cfg_attr(feature = "syn_serde", derive(serde::Serialize, serde::Deserialize))]
     pub struct AExprListOpt(Option<Vec<AExpr>>);
 
     impl crate::syn::ListOpt<AExpr> for AExprListOpt {
@@ -53186,7 +53796,8 @@ mod a_expr {
         use super::*;
 
         #[cfg_attr(test, derive(derive_builder::Builder))]
-        #[derive(Clone, Debug, serde::Serialize, serde::Deserialize)]
+        #[cfg_attr(feature = "syn_serde", derive(serde::Serialize, serde::Deserialize))]
+        #[derive(Clone, Debug)]
         #[allow(clippy::struct_excessive_bools)]
         #[allow(clippy::struct_field_names)]
         pub struct AExpr {
@@ -53384,11 +53995,13 @@ mod type_cast {
     use super::*;
 
     /// `TypeCast`
-    #[derive(Debug, Clone, serde::Serialize, serde::Deserialize)]
+    #[derive(Debug, Clone)]
+    #[cfg_attr(feature = "syn_serde", derive(serde::Serialize, serde::Deserialize))]
     pub struct TypeCast(Box<self::inner::TypeCast>);
 
     /// optional `TypeCast`
-    #[derive(Debug, Clone, serde::Serialize, serde::Deserialize)]
+    #[derive(Debug, Clone)]
+    #[cfg_attr(feature = "syn_serde", derive(serde::Serialize, serde::Deserialize))]
     pub struct TypeCastOpt(Option<TypeCast>);
 
     #[cfg(test)]
@@ -53405,11 +54018,13 @@ mod type_cast {
     }
 
     /// `TypeCast` list
-    #[derive(Debug, Clone, serde::Serialize, serde::Deserialize)]
+    #[derive(Debug, Clone)]
+    #[cfg_attr(feature = "syn_serde", derive(serde::Serialize, serde::Deserialize))]
     pub struct TypeCastList(Vec<TypeCast>);
 
     /// optional `TypeCast` list
-    #[derive(Debug, Clone, serde::Serialize, serde::Deserialize)]
+    #[derive(Debug, Clone)]
+    #[cfg_attr(feature = "syn_serde", derive(serde::Serialize, serde::Deserialize))]
     pub struct TypeCastListOpt(Option<Vec<TypeCast>>);
 
     impl crate::syn::ListOpt<TypeCast> for TypeCastListOpt {
@@ -53509,7 +54124,8 @@ mod type_cast {
         use super::*;
 
         #[cfg_attr(test, derive(derive_builder::Builder))]
-        #[derive(Clone, Debug, serde::Serialize, serde::Deserialize)]
+        #[cfg_attr(feature = "syn_serde", derive(serde::Serialize, serde::Deserialize))]
+        #[derive(Clone, Debug)]
         #[allow(clippy::struct_excessive_bools)]
         #[allow(clippy::struct_field_names)]
         pub struct TypeCast {
@@ -53639,11 +54255,13 @@ mod collate_clause {
     use super::*;
 
     /// `CollateClause`
-    #[derive(Debug, Clone, serde::Serialize, serde::Deserialize)]
+    #[derive(Debug, Clone)]
+    #[cfg_attr(feature = "syn_serde", derive(serde::Serialize, serde::Deserialize))]
     pub struct CollateClause(Box<self::inner::CollateClause>);
 
     /// optional `CollateClause`
-    #[derive(Debug, Clone, serde::Serialize, serde::Deserialize)]
+    #[derive(Debug, Clone)]
+    #[cfg_attr(feature = "syn_serde", derive(serde::Serialize, serde::Deserialize))]
     pub struct CollateClauseOpt(Option<CollateClause>);
 
     #[cfg(test)]
@@ -53660,11 +54278,13 @@ mod collate_clause {
     }
 
     /// `CollateClause` list
-    #[derive(Debug, Clone, serde::Serialize, serde::Deserialize)]
+    #[derive(Debug, Clone)]
+    #[cfg_attr(feature = "syn_serde", derive(serde::Serialize, serde::Deserialize))]
     pub struct CollateClauseList(Vec<CollateClause>);
 
     /// optional `CollateClause` list
-    #[derive(Debug, Clone, serde::Serialize, serde::Deserialize)]
+    #[derive(Debug, Clone)]
+    #[cfg_attr(feature = "syn_serde", derive(serde::Serialize, serde::Deserialize))]
     pub struct CollateClauseListOpt(Option<Vec<CollateClause>>);
 
     impl crate::syn::ListOpt<CollateClause> for CollateClauseListOpt {
@@ -53764,7 +54384,8 @@ mod collate_clause {
         use super::*;
 
         #[cfg_attr(test, derive(derive_builder::Builder))]
-        #[derive(Clone, Debug, serde::Serialize, serde::Deserialize)]
+        #[cfg_attr(feature = "syn_serde", derive(serde::Serialize, serde::Deserialize))]
+        #[derive(Clone, Debug)]
         #[allow(clippy::struct_excessive_bools)]
         #[allow(clippy::struct_field_names)]
         pub struct CollateClause {
@@ -53896,11 +54517,13 @@ mod role_spec {
     use super::*;
 
     /// `RoleSpec`
-    #[derive(Debug, Clone, serde::Serialize, serde::Deserialize)]
+    #[derive(Debug, Clone)]
+    #[cfg_attr(feature = "syn_serde", derive(serde::Serialize, serde::Deserialize))]
     pub struct RoleSpec(Box<self::inner::RoleSpec>);
 
     /// optional `RoleSpec`
-    #[derive(Debug, Clone, serde::Serialize, serde::Deserialize)]
+    #[derive(Debug, Clone)]
+    #[cfg_attr(feature = "syn_serde", derive(serde::Serialize, serde::Deserialize))]
     pub struct RoleSpecOpt(Option<RoleSpec>);
 
     #[cfg(test)]
@@ -53917,11 +54540,13 @@ mod role_spec {
     }
 
     /// `RoleSpec` list
-    #[derive(Debug, Clone, serde::Serialize, serde::Deserialize)]
+    #[derive(Debug, Clone)]
+    #[cfg_attr(feature = "syn_serde", derive(serde::Serialize, serde::Deserialize))]
     pub struct RoleSpecList(Vec<RoleSpec>);
 
     /// optional `RoleSpec` list
-    #[derive(Debug, Clone, serde::Serialize, serde::Deserialize)]
+    #[derive(Debug, Clone)]
+    #[cfg_attr(feature = "syn_serde", derive(serde::Serialize, serde::Deserialize))]
     pub struct RoleSpecListOpt(Option<Vec<RoleSpec>>);
 
     impl crate::syn::ListOpt<RoleSpec> for RoleSpecListOpt {
@@ -54021,7 +54646,8 @@ mod role_spec {
         use super::*;
 
         #[cfg_attr(test, derive(derive_builder::Builder))]
-        #[derive(Clone, Debug, serde::Serialize, serde::Deserialize)]
+        #[cfg_attr(feature = "syn_serde", derive(serde::Serialize, serde::Deserialize))]
+        #[derive(Clone, Debug)]
         #[allow(clippy::struct_excessive_bools)]
         #[allow(clippy::struct_field_names)]
         pub struct RoleSpec {
@@ -54148,11 +54774,13 @@ mod func_call {
     use super::*;
 
     /// `FuncCall`
-    #[derive(Debug, Clone, serde::Serialize, serde::Deserialize)]
+    #[derive(Debug, Clone)]
+    #[cfg_attr(feature = "syn_serde", derive(serde::Serialize, serde::Deserialize))]
     pub struct FuncCall(Box<self::inner::FuncCall>);
 
     /// optional `FuncCall`
-    #[derive(Debug, Clone, serde::Serialize, serde::Deserialize)]
+    #[derive(Debug, Clone)]
+    #[cfg_attr(feature = "syn_serde", derive(serde::Serialize, serde::Deserialize))]
     pub struct FuncCallOpt(Option<FuncCall>);
 
     #[cfg(test)]
@@ -54169,11 +54797,13 @@ mod func_call {
     }
 
     /// `FuncCall` list
-    #[derive(Debug, Clone, serde::Serialize, serde::Deserialize)]
+    #[derive(Debug, Clone)]
+    #[cfg_attr(feature = "syn_serde", derive(serde::Serialize, serde::Deserialize))]
     pub struct FuncCallList(Vec<FuncCall>);
 
     /// optional `FuncCall` list
-    #[derive(Debug, Clone, serde::Serialize, serde::Deserialize)]
+    #[derive(Debug, Clone)]
+    #[cfg_attr(feature = "syn_serde", derive(serde::Serialize, serde::Deserialize))]
     pub struct FuncCallListOpt(Option<Vec<FuncCall>>);
 
     impl crate::syn::ListOpt<FuncCall> for FuncCallListOpt {
@@ -54273,7 +54903,8 @@ mod func_call {
         use super::*;
 
         #[cfg_attr(test, derive(derive_builder::Builder))]
-        #[derive(Clone, Debug, serde::Serialize, serde::Deserialize)]
+        #[cfg_attr(feature = "syn_serde", derive(serde::Serialize, serde::Deserialize))]
+        #[derive(Clone, Debug)]
         #[allow(clippy::struct_excessive_bools)]
         #[allow(clippy::struct_field_names)]
         pub struct FuncCall {
@@ -54663,11 +55294,13 @@ mod a_star {
     use super::*;
 
     /// `AStar`
-    #[derive(Debug, Clone, serde::Serialize, serde::Deserialize)]
+    #[derive(Debug, Clone)]
+    #[cfg_attr(feature = "syn_serde", derive(serde::Serialize, serde::Deserialize))]
     pub struct AStar(Box<self::inner::AStar>);
 
     /// optional `AStar`
-    #[derive(Debug, Clone, serde::Serialize, serde::Deserialize)]
+    #[derive(Debug, Clone)]
+    #[cfg_attr(feature = "syn_serde", derive(serde::Serialize, serde::Deserialize))]
     pub struct AStarOpt(Option<AStar>);
 
     #[cfg(test)]
@@ -54684,11 +55317,13 @@ mod a_star {
     }
 
     /// `AStar` list
-    #[derive(Debug, Clone, serde::Serialize, serde::Deserialize)]
+    #[derive(Debug, Clone)]
+    #[cfg_attr(feature = "syn_serde", derive(serde::Serialize, serde::Deserialize))]
     pub struct AStarList(Vec<AStar>);
 
     /// optional `AStar` list
-    #[derive(Debug, Clone, serde::Serialize, serde::Deserialize)]
+    #[derive(Debug, Clone)]
+    #[cfg_attr(feature = "syn_serde", derive(serde::Serialize, serde::Deserialize))]
     pub struct AStarListOpt(Option<Vec<AStar>>);
 
     impl crate::syn::ListOpt<AStar> for AStarListOpt {
@@ -54788,7 +55423,8 @@ mod a_star {
         use super::*;
 
         #[cfg_attr(test, derive(derive_builder::Builder))]
-        #[derive(Clone, Debug, serde::Serialize, serde::Deserialize)]
+        #[cfg_attr(feature = "syn_serde", derive(serde::Serialize, serde::Deserialize))]
+        #[derive(Clone, Debug)]
         #[allow(clippy::struct_excessive_bools)]
         #[allow(clippy::struct_field_names)]
         pub struct AStar {}
@@ -54819,11 +55455,13 @@ mod a_indices {
     use super::*;
 
     /// `AIndices`
-    #[derive(Debug, Clone, serde::Serialize, serde::Deserialize)]
+    #[derive(Debug, Clone)]
+    #[cfg_attr(feature = "syn_serde", derive(serde::Serialize, serde::Deserialize))]
     pub struct AIndices(Box<self::inner::AIndices>);
 
     /// optional `AIndices`
-    #[derive(Debug, Clone, serde::Serialize, serde::Deserialize)]
+    #[derive(Debug, Clone)]
+    #[cfg_attr(feature = "syn_serde", derive(serde::Serialize, serde::Deserialize))]
     pub struct AIndicesOpt(Option<AIndices>);
 
     #[cfg(test)]
@@ -54840,11 +55478,13 @@ mod a_indices {
     }
 
     /// `AIndices` list
-    #[derive(Debug, Clone, serde::Serialize, serde::Deserialize)]
+    #[derive(Debug, Clone)]
+    #[cfg_attr(feature = "syn_serde", derive(serde::Serialize, serde::Deserialize))]
     pub struct AIndicesList(Vec<AIndices>);
 
     /// optional `AIndices` list
-    #[derive(Debug, Clone, serde::Serialize, serde::Deserialize)]
+    #[derive(Debug, Clone)]
+    #[cfg_attr(feature = "syn_serde", derive(serde::Serialize, serde::Deserialize))]
     pub struct AIndicesListOpt(Option<Vec<AIndices>>);
 
     impl crate::syn::ListOpt<AIndices> for AIndicesListOpt {
@@ -54944,7 +55584,8 @@ mod a_indices {
         use super::*;
 
         #[cfg_attr(test, derive(derive_builder::Builder))]
-        #[derive(Clone, Debug, serde::Serialize, serde::Deserialize)]
+        #[cfg_attr(feature = "syn_serde", derive(serde::Serialize, serde::Deserialize))]
+        #[derive(Clone, Debug)]
         #[allow(clippy::struct_excessive_bools)]
         #[allow(clippy::struct_field_names)]
         pub struct AIndices {
@@ -55074,11 +55715,13 @@ mod a_indirection {
     use super::*;
 
     /// `AIndirection`
-    #[derive(Debug, Clone, serde::Serialize, serde::Deserialize)]
+    #[derive(Debug, Clone)]
+    #[cfg_attr(feature = "syn_serde", derive(serde::Serialize, serde::Deserialize))]
     pub struct AIndirection(Box<self::inner::AIndirection>);
 
     /// optional `AIndirection`
-    #[derive(Debug, Clone, serde::Serialize, serde::Deserialize)]
+    #[derive(Debug, Clone)]
+    #[cfg_attr(feature = "syn_serde", derive(serde::Serialize, serde::Deserialize))]
     pub struct AIndirectionOpt(Option<AIndirection>);
 
     #[cfg(test)]
@@ -55095,11 +55738,13 @@ mod a_indirection {
     }
 
     /// `AIndirection` list
-    #[derive(Debug, Clone, serde::Serialize, serde::Deserialize)]
+    #[derive(Debug, Clone)]
+    #[cfg_attr(feature = "syn_serde", derive(serde::Serialize, serde::Deserialize))]
     pub struct AIndirectionList(Vec<AIndirection>);
 
     /// optional `AIndirection` list
-    #[derive(Debug, Clone, serde::Serialize, serde::Deserialize)]
+    #[derive(Debug, Clone)]
+    #[cfg_attr(feature = "syn_serde", derive(serde::Serialize, serde::Deserialize))]
     pub struct AIndirectionListOpt(Option<Vec<AIndirection>>);
 
     impl crate::syn::ListOpt<AIndirection> for AIndirectionListOpt {
@@ -55199,7 +55844,8 @@ mod a_indirection {
         use super::*;
 
         #[cfg_attr(test, derive(derive_builder::Builder))]
-        #[derive(Clone, Debug, serde::Serialize, serde::Deserialize)]
+        #[cfg_attr(feature = "syn_serde", derive(serde::Serialize, serde::Deserialize))]
+        #[derive(Clone, Debug)]
         #[allow(clippy::struct_excessive_bools)]
         #[allow(clippy::struct_field_names)]
         pub struct AIndirection {
@@ -55296,11 +55942,13 @@ mod a_array_expr {
     use super::*;
 
     /// `AArrayExpr`
-    #[derive(Debug, Clone, serde::Serialize, serde::Deserialize)]
+    #[derive(Debug, Clone)]
+    #[cfg_attr(feature = "syn_serde", derive(serde::Serialize, serde::Deserialize))]
     pub struct AArrayExpr(Box<self::inner::AArrayExpr>);
 
     /// optional `AArrayExpr`
-    #[derive(Debug, Clone, serde::Serialize, serde::Deserialize)]
+    #[derive(Debug, Clone)]
+    #[cfg_attr(feature = "syn_serde", derive(serde::Serialize, serde::Deserialize))]
     pub struct AArrayExprOpt(Option<AArrayExpr>);
 
     #[cfg(test)]
@@ -55317,11 +55965,13 @@ mod a_array_expr {
     }
 
     /// `AArrayExpr` list
-    #[derive(Debug, Clone, serde::Serialize, serde::Deserialize)]
+    #[derive(Debug, Clone)]
+    #[cfg_attr(feature = "syn_serde", derive(serde::Serialize, serde::Deserialize))]
     pub struct AArrayExprList(Vec<AArrayExpr>);
 
     /// optional `AArrayExpr` list
-    #[derive(Debug, Clone, serde::Serialize, serde::Deserialize)]
+    #[derive(Debug, Clone)]
+    #[cfg_attr(feature = "syn_serde", derive(serde::Serialize, serde::Deserialize))]
     pub struct AArrayExprListOpt(Option<Vec<AArrayExpr>>);
 
     impl crate::syn::ListOpt<AArrayExpr> for AArrayExprListOpt {
@@ -55421,7 +56071,8 @@ mod a_array_expr {
         use super::*;
 
         #[cfg_attr(test, derive(derive_builder::Builder))]
-        #[derive(Clone, Debug, serde::Serialize, serde::Deserialize)]
+        #[cfg_attr(feature = "syn_serde", derive(serde::Serialize, serde::Deserialize))]
+        #[derive(Clone, Debug)]
         #[allow(clippy::struct_excessive_bools)]
         #[allow(clippy::struct_field_names)]
         pub struct AArrayExpr {
@@ -55513,11 +56164,13 @@ mod res_target {
     use super::*;
 
     /// `ResTarget`
-    #[derive(Debug, Clone, serde::Serialize, serde::Deserialize)]
+    #[derive(Debug, Clone)]
+    #[cfg_attr(feature = "syn_serde", derive(serde::Serialize, serde::Deserialize))]
     pub struct ResTarget(Box<self::inner::ResTarget>);
 
     /// optional `ResTarget`
-    #[derive(Debug, Clone, serde::Serialize, serde::Deserialize)]
+    #[derive(Debug, Clone)]
+    #[cfg_attr(feature = "syn_serde", derive(serde::Serialize, serde::Deserialize))]
     pub struct ResTargetOpt(Option<ResTarget>);
 
     #[cfg(test)]
@@ -55534,11 +56187,13 @@ mod res_target {
     }
 
     /// `ResTarget` list
-    #[derive(Debug, Clone, serde::Serialize, serde::Deserialize)]
+    #[derive(Debug, Clone)]
+    #[cfg_attr(feature = "syn_serde", derive(serde::Serialize, serde::Deserialize))]
     pub struct ResTargetList(Vec<ResTarget>);
 
     /// optional `ResTarget` list
-    #[derive(Debug, Clone, serde::Serialize, serde::Deserialize)]
+    #[derive(Debug, Clone)]
+    #[cfg_attr(feature = "syn_serde", derive(serde::Serialize, serde::Deserialize))]
     pub struct ResTargetListOpt(Option<Vec<ResTarget>>);
 
     impl crate::syn::ListOpt<ResTarget> for ResTargetListOpt {
@@ -55638,7 +56293,8 @@ mod res_target {
         use super::*;
 
         #[cfg_attr(test, derive(derive_builder::Builder))]
-        #[derive(Clone, Debug, serde::Serialize, serde::Deserialize)]
+        #[cfg_attr(feature = "syn_serde", derive(serde::Serialize, serde::Deserialize))]
+        #[derive(Clone, Debug)]
         #[allow(clippy::struct_excessive_bools)]
         #[allow(clippy::struct_field_names)]
         pub struct ResTarget {
@@ -55799,11 +56455,13 @@ mod multi_assign_ref {
     use super::*;
 
     /// `MultiAssignRef`
-    #[derive(Debug, Clone, serde::Serialize, serde::Deserialize)]
+    #[derive(Debug, Clone)]
+    #[cfg_attr(feature = "syn_serde", derive(serde::Serialize, serde::Deserialize))]
     pub struct MultiAssignRef(Box<self::inner::MultiAssignRef>);
 
     /// optional `MultiAssignRef`
-    #[derive(Debug, Clone, serde::Serialize, serde::Deserialize)]
+    #[derive(Debug, Clone)]
+    #[cfg_attr(feature = "syn_serde", derive(serde::Serialize, serde::Deserialize))]
     pub struct MultiAssignRefOpt(Option<MultiAssignRef>);
 
     #[cfg(test)]
@@ -55820,11 +56478,13 @@ mod multi_assign_ref {
     }
 
     /// `MultiAssignRef` list
-    #[derive(Debug, Clone, serde::Serialize, serde::Deserialize)]
+    #[derive(Debug, Clone)]
+    #[cfg_attr(feature = "syn_serde", derive(serde::Serialize, serde::Deserialize))]
     pub struct MultiAssignRefList(Vec<MultiAssignRef>);
 
     /// optional `MultiAssignRef` list
-    #[derive(Debug, Clone, serde::Serialize, serde::Deserialize)]
+    #[derive(Debug, Clone)]
+    #[cfg_attr(feature = "syn_serde", derive(serde::Serialize, serde::Deserialize))]
     pub struct MultiAssignRefListOpt(Option<Vec<MultiAssignRef>>);
 
     impl crate::syn::ListOpt<MultiAssignRef> for MultiAssignRefListOpt {
@@ -55924,7 +56584,8 @@ mod multi_assign_ref {
         use super::*;
 
         #[cfg_attr(test, derive(derive_builder::Builder))]
-        #[derive(Clone, Debug, serde::Serialize, serde::Deserialize)]
+        #[cfg_attr(feature = "syn_serde", derive(serde::Serialize, serde::Deserialize))]
+        #[derive(Clone, Debug)]
         #[allow(clippy::struct_excessive_bools)]
         #[allow(clippy::struct_field_names)]
         pub struct MultiAssignRef {
@@ -56053,11 +56714,13 @@ mod sort_by {
     use super::*;
 
     /// `SortBy`
-    #[derive(Debug, Clone, serde::Serialize, serde::Deserialize)]
+    #[derive(Debug, Clone)]
+    #[cfg_attr(feature = "syn_serde", derive(serde::Serialize, serde::Deserialize))]
     pub struct SortBy(Box<self::inner::SortBy>);
 
     /// optional `SortBy`
-    #[derive(Debug, Clone, serde::Serialize, serde::Deserialize)]
+    #[derive(Debug, Clone)]
+    #[cfg_attr(feature = "syn_serde", derive(serde::Serialize, serde::Deserialize))]
     pub struct SortByOpt(Option<SortBy>);
 
     #[cfg(test)]
@@ -56074,11 +56737,13 @@ mod sort_by {
     }
 
     /// `SortBy` list
-    #[derive(Debug, Clone, serde::Serialize, serde::Deserialize)]
+    #[derive(Debug, Clone)]
+    #[cfg_attr(feature = "syn_serde", derive(serde::Serialize, serde::Deserialize))]
     pub struct SortByList(Vec<SortBy>);
 
     /// optional `SortBy` list
-    #[derive(Debug, Clone, serde::Serialize, serde::Deserialize)]
+    #[derive(Debug, Clone)]
+    #[cfg_attr(feature = "syn_serde", derive(serde::Serialize, serde::Deserialize))]
     pub struct SortByListOpt(Option<Vec<SortBy>>);
 
     impl crate::syn::ListOpt<SortBy> for SortByListOpt {
@@ -56178,7 +56843,8 @@ mod sort_by {
         use super::*;
 
         #[cfg_attr(test, derive(derive_builder::Builder))]
-        #[derive(Clone, Debug, serde::Serialize, serde::Deserialize)]
+        #[cfg_attr(feature = "syn_serde", derive(serde::Serialize, serde::Deserialize))]
+        #[derive(Clone, Debug)]
         #[allow(clippy::struct_excessive_bools)]
         #[allow(clippy::struct_field_names)]
         pub struct SortBy {
@@ -56376,11 +57042,13 @@ mod window_def {
     use super::*;
 
     /// `WindowDef`
-    #[derive(Debug, Clone, serde::Serialize, serde::Deserialize)]
+    #[derive(Debug, Clone)]
+    #[cfg_attr(feature = "syn_serde", derive(serde::Serialize, serde::Deserialize))]
     pub struct WindowDef(Box<self::inner::WindowDef>);
 
     /// optional `WindowDef`
-    #[derive(Debug, Clone, serde::Serialize, serde::Deserialize)]
+    #[derive(Debug, Clone)]
+    #[cfg_attr(feature = "syn_serde", derive(serde::Serialize, serde::Deserialize))]
     pub struct WindowDefOpt(Option<WindowDef>);
 
     #[cfg(test)]
@@ -56397,11 +57065,13 @@ mod window_def {
     }
 
     /// `WindowDef` list
-    #[derive(Debug, Clone, serde::Serialize, serde::Deserialize)]
+    #[derive(Debug, Clone)]
+    #[cfg_attr(feature = "syn_serde", derive(serde::Serialize, serde::Deserialize))]
     pub struct WindowDefList(Vec<WindowDef>);
 
     /// optional `WindowDef` list
-    #[derive(Debug, Clone, serde::Serialize, serde::Deserialize)]
+    #[derive(Debug, Clone)]
+    #[cfg_attr(feature = "syn_serde", derive(serde::Serialize, serde::Deserialize))]
     pub struct WindowDefListOpt(Option<Vec<WindowDef>>);
 
     impl crate::syn::ListOpt<WindowDef> for WindowDefListOpt {
@@ -56501,7 +57171,8 @@ mod window_def {
         use super::*;
 
         #[cfg_attr(test, derive(derive_builder::Builder))]
-        #[derive(Clone, Debug, serde::Serialize, serde::Deserialize)]
+        #[cfg_attr(feature = "syn_serde", derive(serde::Serialize, serde::Deserialize))]
+        #[derive(Clone, Debug)]
         #[allow(clippy::struct_excessive_bools)]
         #[allow(clippy::struct_field_names)]
         pub struct WindowDef {
@@ -56792,11 +57463,13 @@ mod range_subselect {
     use super::*;
 
     /// `RangeSubselect`
-    #[derive(Debug, Clone, serde::Serialize, serde::Deserialize)]
+    #[derive(Debug, Clone)]
+    #[cfg_attr(feature = "syn_serde", derive(serde::Serialize, serde::Deserialize))]
     pub struct RangeSubselect(Box<self::inner::RangeSubselect>);
 
     /// optional `RangeSubselect`
-    #[derive(Debug, Clone, serde::Serialize, serde::Deserialize)]
+    #[derive(Debug, Clone)]
+    #[cfg_attr(feature = "syn_serde", derive(serde::Serialize, serde::Deserialize))]
     pub struct RangeSubselectOpt(Option<RangeSubselect>);
 
     #[cfg(test)]
@@ -56813,11 +57486,13 @@ mod range_subselect {
     }
 
     /// `RangeSubselect` list
-    #[derive(Debug, Clone, serde::Serialize, serde::Deserialize)]
+    #[derive(Debug, Clone)]
+    #[cfg_attr(feature = "syn_serde", derive(serde::Serialize, serde::Deserialize))]
     pub struct RangeSubselectList(Vec<RangeSubselect>);
 
     /// optional `RangeSubselect` list
-    #[derive(Debug, Clone, serde::Serialize, serde::Deserialize)]
+    #[derive(Debug, Clone)]
+    #[cfg_attr(feature = "syn_serde", derive(serde::Serialize, serde::Deserialize))]
     pub struct RangeSubselectListOpt(Option<Vec<RangeSubselect>>);
 
     impl crate::syn::ListOpt<RangeSubselect> for RangeSubselectListOpt {
@@ -56917,7 +57592,8 @@ mod range_subselect {
         use super::*;
 
         #[cfg_attr(test, derive(derive_builder::Builder))]
-        #[derive(Clone, Debug, serde::Serialize, serde::Deserialize)]
+        #[cfg_attr(feature = "syn_serde", derive(serde::Serialize, serde::Deserialize))]
+        #[derive(Clone, Debug)]
         #[allow(clippy::struct_excessive_bools)]
         #[allow(clippy::struct_field_names)]
         pub struct RangeSubselect {
@@ -57049,11 +57725,13 @@ mod range_function {
     use super::*;
 
     /// `RangeFunction`
-    #[derive(Debug, Clone, serde::Serialize, serde::Deserialize)]
+    #[derive(Debug, Clone)]
+    #[cfg_attr(feature = "syn_serde", derive(serde::Serialize, serde::Deserialize))]
     pub struct RangeFunction(Box<self::inner::RangeFunction>);
 
     /// optional `RangeFunction`
-    #[derive(Debug, Clone, serde::Serialize, serde::Deserialize)]
+    #[derive(Debug, Clone)]
+    #[cfg_attr(feature = "syn_serde", derive(serde::Serialize, serde::Deserialize))]
     pub struct RangeFunctionOpt(Option<RangeFunction>);
 
     #[cfg(test)]
@@ -57070,11 +57748,13 @@ mod range_function {
     }
 
     /// `RangeFunction` list
-    #[derive(Debug, Clone, serde::Serialize, serde::Deserialize)]
+    #[derive(Debug, Clone)]
+    #[cfg_attr(feature = "syn_serde", derive(serde::Serialize, serde::Deserialize))]
     pub struct RangeFunctionList(Vec<RangeFunction>);
 
     /// optional `RangeFunction` list
-    #[derive(Debug, Clone, serde::Serialize, serde::Deserialize)]
+    #[derive(Debug, Clone)]
+    #[cfg_attr(feature = "syn_serde", derive(serde::Serialize, serde::Deserialize))]
     pub struct RangeFunctionListOpt(Option<Vec<RangeFunction>>);
 
     impl crate::syn::ListOpt<RangeFunction> for RangeFunctionListOpt {
@@ -57174,7 +57854,8 @@ mod range_function {
         use super::*;
 
         #[cfg_attr(test, derive(derive_builder::Builder))]
-        #[derive(Clone, Debug, serde::Serialize, serde::Deserialize)]
+        #[cfg_attr(feature = "syn_serde", derive(serde::Serialize, serde::Deserialize))]
+        #[derive(Clone, Debug)]
         #[allow(clippy::struct_excessive_bools)]
         #[allow(clippy::struct_field_names)]
         pub struct RangeFunction {
@@ -57402,11 +58083,13 @@ mod range_table_func {
     use super::*;
 
     /// `RangeTableFunc`
-    #[derive(Debug, Clone, serde::Serialize, serde::Deserialize)]
+    #[derive(Debug, Clone)]
+    #[cfg_attr(feature = "syn_serde", derive(serde::Serialize, serde::Deserialize))]
     pub struct RangeTableFunc(Box<self::inner::RangeTableFunc>);
 
     /// optional `RangeTableFunc`
-    #[derive(Debug, Clone, serde::Serialize, serde::Deserialize)]
+    #[derive(Debug, Clone)]
+    #[cfg_attr(feature = "syn_serde", derive(serde::Serialize, serde::Deserialize))]
     pub struct RangeTableFuncOpt(Option<RangeTableFunc>);
 
     #[cfg(test)]
@@ -57423,11 +58106,13 @@ mod range_table_func {
     }
 
     /// `RangeTableFunc` list
-    #[derive(Debug, Clone, serde::Serialize, serde::Deserialize)]
+    #[derive(Debug, Clone)]
+    #[cfg_attr(feature = "syn_serde", derive(serde::Serialize, serde::Deserialize))]
     pub struct RangeTableFuncList(Vec<RangeTableFunc>);
 
     /// optional `RangeTableFunc` list
-    #[derive(Debug, Clone, serde::Serialize, serde::Deserialize)]
+    #[derive(Debug, Clone)]
+    #[cfg_attr(feature = "syn_serde", derive(serde::Serialize, serde::Deserialize))]
     pub struct RangeTableFuncListOpt(Option<Vec<RangeTableFunc>>);
 
     impl crate::syn::ListOpt<RangeTableFunc> for RangeTableFuncListOpt {
@@ -57527,7 +58212,8 @@ mod range_table_func {
         use super::*;
 
         #[cfg_attr(test, derive(derive_builder::Builder))]
-        #[derive(Clone, Debug, serde::Serialize, serde::Deserialize)]
+        #[cfg_attr(feature = "syn_serde", derive(serde::Serialize, serde::Deserialize))]
+        #[derive(Clone, Debug)]
         #[allow(clippy::struct_excessive_bools)]
         #[allow(clippy::struct_field_names)]
         pub struct RangeTableFunc {
@@ -57792,11 +58478,13 @@ mod range_table_func_col {
     use super::*;
 
     /// `RangeTableFuncCol`
-    #[derive(Debug, Clone, serde::Serialize, serde::Deserialize)]
+    #[derive(Debug, Clone)]
+    #[cfg_attr(feature = "syn_serde", derive(serde::Serialize, serde::Deserialize))]
     pub struct RangeTableFuncCol(Box<self::inner::RangeTableFuncCol>);
 
     /// optional `RangeTableFuncCol`
-    #[derive(Debug, Clone, serde::Serialize, serde::Deserialize)]
+    #[derive(Debug, Clone)]
+    #[cfg_attr(feature = "syn_serde", derive(serde::Serialize, serde::Deserialize))]
     pub struct RangeTableFuncColOpt(Option<RangeTableFuncCol>);
 
     #[cfg(test)]
@@ -57813,11 +58501,13 @@ mod range_table_func_col {
     }
 
     /// `RangeTableFuncCol` list
-    #[derive(Debug, Clone, serde::Serialize, serde::Deserialize)]
+    #[derive(Debug, Clone)]
+    #[cfg_attr(feature = "syn_serde", derive(serde::Serialize, serde::Deserialize))]
     pub struct RangeTableFuncColList(Vec<RangeTableFuncCol>);
 
     /// optional `RangeTableFuncCol` list
-    #[derive(Debug, Clone, serde::Serialize, serde::Deserialize)]
+    #[derive(Debug, Clone)]
+    #[cfg_attr(feature = "syn_serde", derive(serde::Serialize, serde::Deserialize))]
     pub struct RangeTableFuncColListOpt(Option<Vec<RangeTableFuncCol>>);
 
     impl crate::syn::ListOpt<RangeTableFuncCol> for RangeTableFuncColListOpt {
@@ -57917,7 +58607,8 @@ mod range_table_func_col {
         use super::*;
 
         #[cfg_attr(test, derive(derive_builder::Builder))]
-        #[derive(Clone, Debug, serde::Serialize, serde::Deserialize)]
+        #[cfg_attr(feature = "syn_serde", derive(serde::Serialize, serde::Deserialize))]
+        #[derive(Clone, Debug)]
         #[allow(clippy::struct_excessive_bools)]
         #[allow(clippy::struct_field_names)]
         pub struct RangeTableFuncCol {
@@ -58176,11 +58867,13 @@ mod range_table_sample {
     use super::*;
 
     /// `RangeTableSample`
-    #[derive(Debug, Clone, serde::Serialize, serde::Deserialize)]
+    #[derive(Debug, Clone)]
+    #[cfg_attr(feature = "syn_serde", derive(serde::Serialize, serde::Deserialize))]
     pub struct RangeTableSample(Box<self::inner::RangeTableSample>);
 
     /// optional `RangeTableSample`
-    #[derive(Debug, Clone, serde::Serialize, serde::Deserialize)]
+    #[derive(Debug, Clone)]
+    #[cfg_attr(feature = "syn_serde", derive(serde::Serialize, serde::Deserialize))]
     pub struct RangeTableSampleOpt(Option<RangeTableSample>);
 
     #[cfg(test)]
@@ -58197,11 +58890,13 @@ mod range_table_sample {
     }
 
     /// `RangeTableSample` list
-    #[derive(Debug, Clone, serde::Serialize, serde::Deserialize)]
+    #[derive(Debug, Clone)]
+    #[cfg_attr(feature = "syn_serde", derive(serde::Serialize, serde::Deserialize))]
     pub struct RangeTableSampleList(Vec<RangeTableSample>);
 
     /// optional `RangeTableSample` list
-    #[derive(Debug, Clone, serde::Serialize, serde::Deserialize)]
+    #[derive(Debug, Clone)]
+    #[cfg_attr(feature = "syn_serde", derive(serde::Serialize, serde::Deserialize))]
     pub struct RangeTableSampleListOpt(Option<Vec<RangeTableSample>>);
 
     impl crate::syn::ListOpt<RangeTableSample> for RangeTableSampleListOpt {
@@ -58301,7 +58996,8 @@ mod range_table_sample {
         use super::*;
 
         #[cfg_attr(test, derive(derive_builder::Builder))]
-        #[derive(Clone, Debug, serde::Serialize, serde::Deserialize)]
+        #[cfg_attr(feature = "syn_serde", derive(serde::Serialize, serde::Deserialize))]
+        #[derive(Clone, Debug)]
         #[allow(clippy::struct_excessive_bools)]
         #[allow(clippy::struct_field_names)]
         pub struct RangeTableSample {
@@ -58501,11 +59197,13 @@ mod column_def {
     use super::*;
 
     /// `ColumnDef`
-    #[derive(Debug, Clone, serde::Serialize, serde::Deserialize)]
+    #[derive(Debug, Clone)]
+    #[cfg_attr(feature = "syn_serde", derive(serde::Serialize, serde::Deserialize))]
     pub struct ColumnDef(Box<self::inner::ColumnDef>);
 
     /// optional `ColumnDef`
-    #[derive(Debug, Clone, serde::Serialize, serde::Deserialize)]
+    #[derive(Debug, Clone)]
+    #[cfg_attr(feature = "syn_serde", derive(serde::Serialize, serde::Deserialize))]
     pub struct ColumnDefOpt(Option<ColumnDef>);
 
     #[cfg(test)]
@@ -58522,11 +59220,13 @@ mod column_def {
     }
 
     /// `ColumnDef` list
-    #[derive(Debug, Clone, serde::Serialize, serde::Deserialize)]
+    #[derive(Debug, Clone)]
+    #[cfg_attr(feature = "syn_serde", derive(serde::Serialize, serde::Deserialize))]
     pub struct ColumnDefList(Vec<ColumnDef>);
 
     /// optional `ColumnDef` list
-    #[derive(Debug, Clone, serde::Serialize, serde::Deserialize)]
+    #[derive(Debug, Clone)]
+    #[cfg_attr(feature = "syn_serde", derive(serde::Serialize, serde::Deserialize))]
     pub struct ColumnDefListOpt(Option<Vec<ColumnDef>>);
 
     impl crate::syn::ListOpt<ColumnDef> for ColumnDefListOpt {
@@ -58626,7 +59326,8 @@ mod column_def {
         use super::*;
 
         #[cfg_attr(test, derive(derive_builder::Builder))]
-        #[derive(Clone, Debug, serde::Serialize, serde::Deserialize)]
+        #[cfg_attr(feature = "syn_serde", derive(serde::Serialize, serde::Deserialize))]
+        #[derive(Clone, Debug)]
         #[allow(clippy::struct_excessive_bools)]
         #[allow(clippy::struct_field_names)]
         pub struct ColumnDef {
@@ -59267,11 +59968,13 @@ mod table_like_clause {
     use super::*;
 
     /// `TableLikeClause`
-    #[derive(Debug, Clone, serde::Serialize, serde::Deserialize)]
+    #[derive(Debug, Clone)]
+    #[cfg_attr(feature = "syn_serde", derive(serde::Serialize, serde::Deserialize))]
     pub struct TableLikeClause(Box<self::inner::TableLikeClause>);
 
     /// optional `TableLikeClause`
-    #[derive(Debug, Clone, serde::Serialize, serde::Deserialize)]
+    #[derive(Debug, Clone)]
+    #[cfg_attr(feature = "syn_serde", derive(serde::Serialize, serde::Deserialize))]
     pub struct TableLikeClauseOpt(Option<TableLikeClause>);
 
     #[cfg(test)]
@@ -59288,11 +59991,13 @@ mod table_like_clause {
     }
 
     /// `TableLikeClause` list
-    #[derive(Debug, Clone, serde::Serialize, serde::Deserialize)]
+    #[derive(Debug, Clone)]
+    #[cfg_attr(feature = "syn_serde", derive(serde::Serialize, serde::Deserialize))]
     pub struct TableLikeClauseList(Vec<TableLikeClause>);
 
     /// optional `TableLikeClause` list
-    #[derive(Debug, Clone, serde::Serialize, serde::Deserialize)]
+    #[derive(Debug, Clone)]
+    #[cfg_attr(feature = "syn_serde", derive(serde::Serialize, serde::Deserialize))]
     pub struct TableLikeClauseListOpt(Option<Vec<TableLikeClause>>);
 
     impl crate::syn::ListOpt<TableLikeClause> for TableLikeClauseListOpt {
@@ -59392,7 +60097,8 @@ mod table_like_clause {
         use super::*;
 
         #[cfg_attr(test, derive(derive_builder::Builder))]
-        #[derive(Clone, Debug, serde::Serialize, serde::Deserialize)]
+        #[cfg_attr(feature = "syn_serde", derive(serde::Serialize, serde::Deserialize))]
+        #[derive(Clone, Debug)]
         #[allow(clippy::struct_excessive_bools)]
         #[allow(clippy::struct_field_names)]
         pub struct TableLikeClause {
@@ -59521,11 +60227,13 @@ mod index_elem {
     use super::*;
 
     /// `IndexElem`
-    #[derive(Debug, Clone, serde::Serialize, serde::Deserialize)]
+    #[derive(Debug, Clone)]
+    #[cfg_attr(feature = "syn_serde", derive(serde::Serialize, serde::Deserialize))]
     pub struct IndexElem(Box<self::inner::IndexElem>);
 
     /// optional `IndexElem`
-    #[derive(Debug, Clone, serde::Serialize, serde::Deserialize)]
+    #[derive(Debug, Clone)]
+    #[cfg_attr(feature = "syn_serde", derive(serde::Serialize, serde::Deserialize))]
     pub struct IndexElemOpt(Option<IndexElem>);
 
     #[cfg(test)]
@@ -59542,11 +60250,13 @@ mod index_elem {
     }
 
     /// `IndexElem` list
-    #[derive(Debug, Clone, serde::Serialize, serde::Deserialize)]
+    #[derive(Debug, Clone)]
+    #[cfg_attr(feature = "syn_serde", derive(serde::Serialize, serde::Deserialize))]
     pub struct IndexElemList(Vec<IndexElem>);
 
     /// optional `IndexElem` list
-    #[derive(Debug, Clone, serde::Serialize, serde::Deserialize)]
+    #[derive(Debug, Clone)]
+    #[cfg_attr(feature = "syn_serde", derive(serde::Serialize, serde::Deserialize))]
     pub struct IndexElemListOpt(Option<Vec<IndexElem>>);
 
     impl crate::syn::ListOpt<IndexElem> for IndexElemListOpt {
@@ -59646,7 +60356,8 @@ mod index_elem {
         use super::*;
 
         #[cfg_attr(test, derive(derive_builder::Builder))]
-        #[derive(Clone, Debug, serde::Serialize, serde::Deserialize)]
+        #[cfg_attr(feature = "syn_serde", derive(serde::Serialize, serde::Deserialize))]
+        #[derive(Clone, Debug)]
         #[allow(clippy::struct_excessive_bools)]
         #[allow(clippy::struct_field_names)]
         pub struct IndexElem {
@@ -59943,11 +60654,13 @@ mod def_elem {
     use super::*;
 
     /// `DefElem`
-    #[derive(Debug, Clone, serde::Serialize, serde::Deserialize)]
+    #[derive(Debug, Clone)]
+    #[cfg_attr(feature = "syn_serde", derive(serde::Serialize, serde::Deserialize))]
     pub struct DefElem(Box<self::inner::DefElem>);
 
     /// optional `DefElem`
-    #[derive(Debug, Clone, serde::Serialize, serde::Deserialize)]
+    #[derive(Debug, Clone)]
+    #[cfg_attr(feature = "syn_serde", derive(serde::Serialize, serde::Deserialize))]
     pub struct DefElemOpt(Option<DefElem>);
 
     #[cfg(test)]
@@ -59964,11 +60677,13 @@ mod def_elem {
     }
 
     /// `DefElem` list
-    #[derive(Debug, Clone, serde::Serialize, serde::Deserialize)]
+    #[derive(Debug, Clone)]
+    #[cfg_attr(feature = "syn_serde", derive(serde::Serialize, serde::Deserialize))]
     pub struct DefElemList(Vec<DefElem>);
 
     /// optional `DefElem` list
-    #[derive(Debug, Clone, serde::Serialize, serde::Deserialize)]
+    #[derive(Debug, Clone)]
+    #[cfg_attr(feature = "syn_serde", derive(serde::Serialize, serde::Deserialize))]
     pub struct DefElemListOpt(Option<Vec<DefElem>>);
 
     impl crate::syn::ListOpt<DefElem> for DefElemListOpt {
@@ -60068,7 +60783,8 @@ mod def_elem {
         use super::*;
 
         #[cfg_attr(test, derive(derive_builder::Builder))]
-        #[derive(Clone, Debug, serde::Serialize, serde::Deserialize)]
+        #[cfg_attr(feature = "syn_serde", derive(serde::Serialize, serde::Deserialize))]
+        #[derive(Clone, Debug)]
         #[allow(clippy::struct_excessive_bools)]
         #[allow(clippy::struct_field_names)]
         pub struct DefElem {
@@ -60260,11 +60976,13 @@ mod locking_clause {
     use super::*;
 
     /// `LockingClause`
-    #[derive(Debug, Clone, serde::Serialize, serde::Deserialize)]
+    #[derive(Debug, Clone)]
+    #[cfg_attr(feature = "syn_serde", derive(serde::Serialize, serde::Deserialize))]
     pub struct LockingClause(Box<self::inner::LockingClause>);
 
     /// optional `LockingClause`
-    #[derive(Debug, Clone, serde::Serialize, serde::Deserialize)]
+    #[derive(Debug, Clone)]
+    #[cfg_attr(feature = "syn_serde", derive(serde::Serialize, serde::Deserialize))]
     pub struct LockingClauseOpt(Option<LockingClause>);
 
     #[cfg(test)]
@@ -60281,11 +60999,13 @@ mod locking_clause {
     }
 
     /// `LockingClause` list
-    #[derive(Debug, Clone, serde::Serialize, serde::Deserialize)]
+    #[derive(Debug, Clone)]
+    #[cfg_attr(feature = "syn_serde", derive(serde::Serialize, serde::Deserialize))]
     pub struct LockingClauseList(Vec<LockingClause>);
 
     /// optional `LockingClause` list
-    #[derive(Debug, Clone, serde::Serialize, serde::Deserialize)]
+    #[derive(Debug, Clone)]
+    #[cfg_attr(feature = "syn_serde", derive(serde::Serialize, serde::Deserialize))]
     pub struct LockingClauseListOpt(Option<Vec<LockingClause>>);
 
     impl crate::syn::ListOpt<LockingClause> for LockingClauseListOpt {
@@ -60385,7 +61105,8 @@ mod locking_clause {
         use super::*;
 
         #[cfg_attr(test, derive(derive_builder::Builder))]
-        #[derive(Clone, Debug, serde::Serialize, serde::Deserialize)]
+        #[cfg_attr(feature = "syn_serde", derive(serde::Serialize, serde::Deserialize))]
+        #[derive(Clone, Debug)]
         #[allow(clippy::struct_excessive_bools)]
         #[allow(clippy::struct_field_names)]
         pub struct LockingClause {
@@ -60520,11 +61241,13 @@ mod xml_serialize {
     use super::*;
 
     /// `XmlSerialize`
-    #[derive(Debug, Clone, serde::Serialize, serde::Deserialize)]
+    #[derive(Debug, Clone)]
+    #[cfg_attr(feature = "syn_serde", derive(serde::Serialize, serde::Deserialize))]
     pub struct XmlSerialize(Box<self::inner::XmlSerialize>);
 
     /// optional `XmlSerialize`
-    #[derive(Debug, Clone, serde::Serialize, serde::Deserialize)]
+    #[derive(Debug, Clone)]
+    #[cfg_attr(feature = "syn_serde", derive(serde::Serialize, serde::Deserialize))]
     pub struct XmlSerializeOpt(Option<XmlSerialize>);
 
     #[cfg(test)]
@@ -60541,11 +61264,13 @@ mod xml_serialize {
     }
 
     /// `XmlSerialize` list
-    #[derive(Debug, Clone, serde::Serialize, serde::Deserialize)]
+    #[derive(Debug, Clone)]
+    #[cfg_attr(feature = "syn_serde", derive(serde::Serialize, serde::Deserialize))]
     pub struct XmlSerializeList(Vec<XmlSerialize>);
 
     /// optional `XmlSerialize` list
-    #[derive(Debug, Clone, serde::Serialize, serde::Deserialize)]
+    #[derive(Debug, Clone)]
+    #[cfg_attr(feature = "syn_serde", derive(serde::Serialize, serde::Deserialize))]
     pub struct XmlSerializeListOpt(Option<Vec<XmlSerialize>>);
 
     impl crate::syn::ListOpt<XmlSerialize> for XmlSerializeListOpt {
@@ -60645,7 +61370,8 @@ mod xml_serialize {
         use super::*;
 
         #[cfg_attr(test, derive(derive_builder::Builder))]
-        #[derive(Clone, Debug, serde::Serialize, serde::Deserialize)]
+        #[cfg_attr(feature = "syn_serde", derive(serde::Serialize, serde::Deserialize))]
+        #[derive(Clone, Debug)]
         #[allow(clippy::struct_excessive_bools)]
         #[allow(clippy::struct_field_names)]
         pub struct XmlSerialize {
@@ -60842,11 +61568,13 @@ mod partition_elem {
     use super::*;
 
     /// `PartitionElem`
-    #[derive(Debug, Clone, serde::Serialize, serde::Deserialize)]
+    #[derive(Debug, Clone)]
+    #[cfg_attr(feature = "syn_serde", derive(serde::Serialize, serde::Deserialize))]
     pub struct PartitionElem(Box<self::inner::PartitionElem>);
 
     /// optional `PartitionElem`
-    #[derive(Debug, Clone, serde::Serialize, serde::Deserialize)]
+    #[derive(Debug, Clone)]
+    #[cfg_attr(feature = "syn_serde", derive(serde::Serialize, serde::Deserialize))]
     pub struct PartitionElemOpt(Option<PartitionElem>);
 
     #[cfg(test)]
@@ -60863,11 +61591,13 @@ mod partition_elem {
     }
 
     /// `PartitionElem` list
-    #[derive(Debug, Clone, serde::Serialize, serde::Deserialize)]
+    #[derive(Debug, Clone)]
+    #[cfg_attr(feature = "syn_serde", derive(serde::Serialize, serde::Deserialize))]
     pub struct PartitionElemList(Vec<PartitionElem>);
 
     /// optional `PartitionElem` list
-    #[derive(Debug, Clone, serde::Serialize, serde::Deserialize)]
+    #[derive(Debug, Clone)]
+    #[cfg_attr(feature = "syn_serde", derive(serde::Serialize, serde::Deserialize))]
     pub struct PartitionElemListOpt(Option<Vec<PartitionElem>>);
 
     impl crate::syn::ListOpt<PartitionElem> for PartitionElemListOpt {
@@ -60967,7 +61697,8 @@ mod partition_elem {
         use super::*;
 
         #[cfg_attr(test, derive(derive_builder::Builder))]
-        #[derive(Clone, Debug, serde::Serialize, serde::Deserialize)]
+        #[cfg_attr(feature = "syn_serde", derive(serde::Serialize, serde::Deserialize))]
+        #[derive(Clone, Debug)]
         #[allow(clippy::struct_excessive_bools)]
         #[allow(clippy::struct_field_names)]
         pub struct PartitionElem {
@@ -61164,11 +61895,13 @@ mod partition_spec {
     use super::*;
 
     /// `PartitionSpec`
-    #[derive(Debug, Clone, serde::Serialize, serde::Deserialize)]
+    #[derive(Debug, Clone)]
+    #[cfg_attr(feature = "syn_serde", derive(serde::Serialize, serde::Deserialize))]
     pub struct PartitionSpec(Box<self::inner::PartitionSpec>);
 
     /// optional `PartitionSpec`
-    #[derive(Debug, Clone, serde::Serialize, serde::Deserialize)]
+    #[derive(Debug, Clone)]
+    #[cfg_attr(feature = "syn_serde", derive(serde::Serialize, serde::Deserialize))]
     pub struct PartitionSpecOpt(Option<PartitionSpec>);
 
     #[cfg(test)]
@@ -61185,11 +61918,13 @@ mod partition_spec {
     }
 
     /// `PartitionSpec` list
-    #[derive(Debug, Clone, serde::Serialize, serde::Deserialize)]
+    #[derive(Debug, Clone)]
+    #[cfg_attr(feature = "syn_serde", derive(serde::Serialize, serde::Deserialize))]
     pub struct PartitionSpecList(Vec<PartitionSpec>);
 
     /// optional `PartitionSpec` list
-    #[derive(Debug, Clone, serde::Serialize, serde::Deserialize)]
+    #[derive(Debug, Clone)]
+    #[cfg_attr(feature = "syn_serde", derive(serde::Serialize, serde::Deserialize))]
     pub struct PartitionSpecListOpt(Option<Vec<PartitionSpec>>);
 
     impl crate::syn::ListOpt<PartitionSpec> for PartitionSpecListOpt {
@@ -61289,7 +62024,8 @@ mod partition_spec {
         use super::*;
 
         #[cfg_attr(test, derive(derive_builder::Builder))]
-        #[derive(Clone, Debug, serde::Serialize, serde::Deserialize)]
+        #[cfg_attr(feature = "syn_serde", derive(serde::Serialize, serde::Deserialize))]
+        #[derive(Clone, Debug)]
         #[allow(clippy::struct_excessive_bools)]
         #[allow(clippy::struct_field_names)]
         pub struct PartitionSpec {
@@ -61421,11 +62157,13 @@ mod partition_bound_spec {
     use super::*;
 
     /// `PartitionBoundSpec`
-    #[derive(Debug, Clone, serde::Serialize, serde::Deserialize)]
+    #[derive(Debug, Clone)]
+    #[cfg_attr(feature = "syn_serde", derive(serde::Serialize, serde::Deserialize))]
     pub struct PartitionBoundSpec(Box<self::inner::PartitionBoundSpec>);
 
     /// optional `PartitionBoundSpec`
-    #[derive(Debug, Clone, serde::Serialize, serde::Deserialize)]
+    #[derive(Debug, Clone)]
+    #[cfg_attr(feature = "syn_serde", derive(serde::Serialize, serde::Deserialize))]
     pub struct PartitionBoundSpecOpt(Option<PartitionBoundSpec>);
 
     #[cfg(test)]
@@ -61442,11 +62180,13 @@ mod partition_bound_spec {
     }
 
     /// `PartitionBoundSpec` list
-    #[derive(Debug, Clone, serde::Serialize, serde::Deserialize)]
+    #[derive(Debug, Clone)]
+    #[cfg_attr(feature = "syn_serde", derive(serde::Serialize, serde::Deserialize))]
     pub struct PartitionBoundSpecList(Vec<PartitionBoundSpec>);
 
     /// optional `PartitionBoundSpec` list
-    #[derive(Debug, Clone, serde::Serialize, serde::Deserialize)]
+    #[derive(Debug, Clone)]
+    #[cfg_attr(feature = "syn_serde", derive(serde::Serialize, serde::Deserialize))]
     pub struct PartitionBoundSpecListOpt(Option<Vec<PartitionBoundSpec>>);
 
     impl crate::syn::ListOpt<PartitionBoundSpec> for PartitionBoundSpecListOpt {
@@ -61546,7 +62286,8 @@ mod partition_bound_spec {
         use super::*;
 
         #[cfg_attr(test, derive(derive_builder::Builder))]
-        #[derive(Clone, Debug, serde::Serialize, serde::Deserialize)]
+        #[cfg_attr(feature = "syn_serde", derive(serde::Serialize, serde::Deserialize))]
+        #[derive(Clone, Debug)]
         #[allow(clippy::struct_excessive_bools)]
         #[allow(clippy::struct_field_names)]
         pub struct PartitionBoundSpec {
@@ -61836,11 +62577,13 @@ mod partition_range_datum {
     use super::*;
 
     /// `PartitionRangeDatum`
-    #[derive(Debug, Clone, serde::Serialize, serde::Deserialize)]
+    #[derive(Debug, Clone)]
+    #[cfg_attr(feature = "syn_serde", derive(serde::Serialize, serde::Deserialize))]
     pub struct PartitionRangeDatum(Box<self::inner::PartitionRangeDatum>);
 
     /// optional `PartitionRangeDatum`
-    #[derive(Debug, Clone, serde::Serialize, serde::Deserialize)]
+    #[derive(Debug, Clone)]
+    #[cfg_attr(feature = "syn_serde", derive(serde::Serialize, serde::Deserialize))]
     pub struct PartitionRangeDatumOpt(Option<PartitionRangeDatum>);
 
     #[cfg(test)]
@@ -61857,11 +62600,13 @@ mod partition_range_datum {
     }
 
     /// `PartitionRangeDatum` list
-    #[derive(Debug, Clone, serde::Serialize, serde::Deserialize)]
+    #[derive(Debug, Clone)]
+    #[cfg_attr(feature = "syn_serde", derive(serde::Serialize, serde::Deserialize))]
     pub struct PartitionRangeDatumList(Vec<PartitionRangeDatum>);
 
     /// optional `PartitionRangeDatum` list
-    #[derive(Debug, Clone, serde::Serialize, serde::Deserialize)]
+    #[derive(Debug, Clone)]
+    #[cfg_attr(feature = "syn_serde", derive(serde::Serialize, serde::Deserialize))]
     pub struct PartitionRangeDatumListOpt(Option<Vec<PartitionRangeDatum>>);
 
     impl crate::syn::ListOpt<PartitionRangeDatum> for PartitionRangeDatumListOpt {
@@ -61961,7 +62706,8 @@ mod partition_range_datum {
         use super::*;
 
         #[cfg_attr(test, derive(derive_builder::Builder))]
-        #[derive(Clone, Debug, serde::Serialize, serde::Deserialize)]
+        #[cfg_attr(feature = "syn_serde", derive(serde::Serialize, serde::Deserialize))]
+        #[derive(Clone, Debug)]
         #[allow(clippy::struct_excessive_bools)]
         #[allow(clippy::struct_field_names)]
         pub struct PartitionRangeDatum {
@@ -62094,11 +62840,13 @@ mod single_partition_spec {
     use super::*;
 
     /// `SinglePartitionSpec`
-    #[derive(Debug, Clone, serde::Serialize, serde::Deserialize)]
+    #[derive(Debug, Clone)]
+    #[cfg_attr(feature = "syn_serde", derive(serde::Serialize, serde::Deserialize))]
     pub struct SinglePartitionSpec(Box<self::inner::SinglePartitionSpec>);
 
     /// optional `SinglePartitionSpec`
-    #[derive(Debug, Clone, serde::Serialize, serde::Deserialize)]
+    #[derive(Debug, Clone)]
+    #[cfg_attr(feature = "syn_serde", derive(serde::Serialize, serde::Deserialize))]
     pub struct SinglePartitionSpecOpt(Option<SinglePartitionSpec>);
 
     #[cfg(test)]
@@ -62115,11 +62863,13 @@ mod single_partition_spec {
     }
 
     /// `SinglePartitionSpec` list
-    #[derive(Debug, Clone, serde::Serialize, serde::Deserialize)]
+    #[derive(Debug, Clone)]
+    #[cfg_attr(feature = "syn_serde", derive(serde::Serialize, serde::Deserialize))]
     pub struct SinglePartitionSpecList(Vec<SinglePartitionSpec>);
 
     /// optional `SinglePartitionSpec` list
-    #[derive(Debug, Clone, serde::Serialize, serde::Deserialize)]
+    #[derive(Debug, Clone)]
+    #[cfg_attr(feature = "syn_serde", derive(serde::Serialize, serde::Deserialize))]
     pub struct SinglePartitionSpecListOpt(Option<Vec<SinglePartitionSpec>>);
 
     impl crate::syn::ListOpt<SinglePartitionSpec> for SinglePartitionSpecListOpt {
@@ -62219,7 +62969,8 @@ mod single_partition_spec {
         use super::*;
 
         #[cfg_attr(test, derive(derive_builder::Builder))]
-        #[derive(Clone, Debug, serde::Serialize, serde::Deserialize)]
+        #[cfg_attr(feature = "syn_serde", derive(serde::Serialize, serde::Deserialize))]
+        #[derive(Clone, Debug)]
         #[allow(clippy::struct_excessive_bools)]
         #[allow(clippy::struct_field_names)]
         pub struct SinglePartitionSpec {}
@@ -62253,11 +63004,13 @@ mod partition_cmd {
     use super::*;
 
     /// `PartitionCmd`
-    #[derive(Debug, Clone, serde::Serialize, serde::Deserialize)]
+    #[derive(Debug, Clone)]
+    #[cfg_attr(feature = "syn_serde", derive(serde::Serialize, serde::Deserialize))]
     pub struct PartitionCmd(Box<self::inner::PartitionCmd>);
 
     /// optional `PartitionCmd`
-    #[derive(Debug, Clone, serde::Serialize, serde::Deserialize)]
+    #[derive(Debug, Clone)]
+    #[cfg_attr(feature = "syn_serde", derive(serde::Serialize, serde::Deserialize))]
     pub struct PartitionCmdOpt(Option<PartitionCmd>);
 
     #[cfg(test)]
@@ -62274,11 +63027,13 @@ mod partition_cmd {
     }
 
     /// `PartitionCmd` list
-    #[derive(Debug, Clone, serde::Serialize, serde::Deserialize)]
+    #[derive(Debug, Clone)]
+    #[cfg_attr(feature = "syn_serde", derive(serde::Serialize, serde::Deserialize))]
     pub struct PartitionCmdList(Vec<PartitionCmd>);
 
     /// optional `PartitionCmd` list
-    #[derive(Debug, Clone, serde::Serialize, serde::Deserialize)]
+    #[derive(Debug, Clone)]
+    #[cfg_attr(feature = "syn_serde", derive(serde::Serialize, serde::Deserialize))]
     pub struct PartitionCmdListOpt(Option<Vec<PartitionCmd>>);
 
     impl crate::syn::ListOpt<PartitionCmd> for PartitionCmdListOpt {
@@ -62378,7 +63133,8 @@ mod partition_cmd {
         use super::*;
 
         #[cfg_attr(test, derive(derive_builder::Builder))]
-        #[derive(Clone, Debug, serde::Serialize, serde::Deserialize)]
+        #[cfg_attr(feature = "syn_serde", derive(serde::Serialize, serde::Deserialize))]
+        #[derive(Clone, Debug)]
         #[allow(clippy::struct_excessive_bools)]
         #[allow(clippy::struct_field_names)]
         pub struct PartitionCmd {
@@ -62510,11 +63266,13 @@ mod range_tbl_entry {
     use super::*;
 
     /// `RangeTblEntry`
-    #[derive(Debug, Clone, serde::Serialize, serde::Deserialize)]
+    #[derive(Debug, Clone)]
+    #[cfg_attr(feature = "syn_serde", derive(serde::Serialize, serde::Deserialize))]
     pub struct RangeTblEntry(Box<self::inner::RangeTblEntry>);
 
     /// optional `RangeTblEntry`
-    #[derive(Debug, Clone, serde::Serialize, serde::Deserialize)]
+    #[derive(Debug, Clone)]
+    #[cfg_attr(feature = "syn_serde", derive(serde::Serialize, serde::Deserialize))]
     pub struct RangeTblEntryOpt(Option<RangeTblEntry>);
 
     #[cfg(test)]
@@ -62531,11 +63289,13 @@ mod range_tbl_entry {
     }
 
     /// `RangeTblEntry` list
-    #[derive(Debug, Clone, serde::Serialize, serde::Deserialize)]
+    #[derive(Debug, Clone)]
+    #[cfg_attr(feature = "syn_serde", derive(serde::Serialize, serde::Deserialize))]
     pub struct RangeTblEntryList(Vec<RangeTblEntry>);
 
     /// optional `RangeTblEntry` list
-    #[derive(Debug, Clone, serde::Serialize, serde::Deserialize)]
+    #[derive(Debug, Clone)]
+    #[cfg_attr(feature = "syn_serde", derive(serde::Serialize, serde::Deserialize))]
     pub struct RangeTblEntryListOpt(Option<Vec<RangeTblEntry>>);
 
     impl crate::syn::ListOpt<RangeTblEntry> for RangeTblEntryListOpt {
@@ -62635,7 +63395,8 @@ mod range_tbl_entry {
         use super::*;
 
         #[cfg_attr(test, derive(derive_builder::Builder))]
-        #[derive(Clone, Debug, serde::Serialize, serde::Deserialize)]
+        #[cfg_attr(feature = "syn_serde", derive(serde::Serialize, serde::Deserialize))]
+        #[derive(Clone, Debug)]
         #[allow(clippy::struct_excessive_bools)]
         #[allow(clippy::struct_field_names)]
         pub struct RangeTblEntry {
@@ -63711,11 +64472,13 @@ mod rte_permission_info {
     use super::*;
 
     /// `RtePermissionInfo`
-    #[derive(Debug, Clone, serde::Serialize, serde::Deserialize)]
+    #[derive(Debug, Clone)]
+    #[cfg_attr(feature = "syn_serde", derive(serde::Serialize, serde::Deserialize))]
     pub struct RtePermissionInfo(Box<self::inner::RtePermissionInfo>);
 
     /// optional `RtePermissionInfo`
-    #[derive(Debug, Clone, serde::Serialize, serde::Deserialize)]
+    #[derive(Debug, Clone)]
+    #[cfg_attr(feature = "syn_serde", derive(serde::Serialize, serde::Deserialize))]
     pub struct RtePermissionInfoOpt(Option<RtePermissionInfo>);
 
     #[cfg(test)]
@@ -63732,11 +64495,13 @@ mod rte_permission_info {
     }
 
     /// `RtePermissionInfo` list
-    #[derive(Debug, Clone, serde::Serialize, serde::Deserialize)]
+    #[derive(Debug, Clone)]
+    #[cfg_attr(feature = "syn_serde", derive(serde::Serialize, serde::Deserialize))]
     pub struct RtePermissionInfoList(Vec<RtePermissionInfo>);
 
     /// optional `RtePermissionInfo` list
-    #[derive(Debug, Clone, serde::Serialize, serde::Deserialize)]
+    #[derive(Debug, Clone)]
+    #[cfg_attr(feature = "syn_serde", derive(serde::Serialize, serde::Deserialize))]
     pub struct RtePermissionInfoListOpt(Option<Vec<RtePermissionInfo>>);
 
     impl crate::syn::ListOpt<RtePermissionInfo> for RtePermissionInfoListOpt {
@@ -63836,7 +64601,8 @@ mod rte_permission_info {
         use super::*;
 
         #[cfg_attr(test, derive(derive_builder::Builder))]
-        #[derive(Clone, Debug, serde::Serialize, serde::Deserialize)]
+        #[cfg_attr(feature = "syn_serde", derive(serde::Serialize, serde::Deserialize))]
+        #[derive(Clone, Debug)]
         #[allow(clippy::struct_excessive_bools)]
         #[allow(clippy::struct_field_names)]
         pub struct RtePermissionInfo {
@@ -64086,11 +64852,13 @@ mod range_tbl_function {
     use super::*;
 
     /// `RangeTblFunction`
-    #[derive(Debug, Clone, serde::Serialize, serde::Deserialize)]
+    #[derive(Debug, Clone)]
+    #[cfg_attr(feature = "syn_serde", derive(serde::Serialize, serde::Deserialize))]
     pub struct RangeTblFunction(Box<self::inner::RangeTblFunction>);
 
     /// optional `RangeTblFunction`
-    #[derive(Debug, Clone, serde::Serialize, serde::Deserialize)]
+    #[derive(Debug, Clone)]
+    #[cfg_attr(feature = "syn_serde", derive(serde::Serialize, serde::Deserialize))]
     pub struct RangeTblFunctionOpt(Option<RangeTblFunction>);
 
     #[cfg(test)]
@@ -64107,11 +64875,13 @@ mod range_tbl_function {
     }
 
     /// `RangeTblFunction` list
-    #[derive(Debug, Clone, serde::Serialize, serde::Deserialize)]
+    #[derive(Debug, Clone)]
+    #[cfg_attr(feature = "syn_serde", derive(serde::Serialize, serde::Deserialize))]
     pub struct RangeTblFunctionList(Vec<RangeTblFunction>);
 
     /// optional `RangeTblFunction` list
-    #[derive(Debug, Clone, serde::Serialize, serde::Deserialize)]
+    #[derive(Debug, Clone)]
+    #[cfg_attr(feature = "syn_serde", derive(serde::Serialize, serde::Deserialize))]
     pub struct RangeTblFunctionListOpt(Option<Vec<RangeTblFunction>>);
 
     impl crate::syn::ListOpt<RangeTblFunction> for RangeTblFunctionListOpt {
@@ -64211,7 +64981,8 @@ mod range_tbl_function {
         use super::*;
 
         #[cfg_attr(test, derive(derive_builder::Builder))]
-        #[derive(Clone, Debug, serde::Serialize, serde::Deserialize)]
+        #[cfg_attr(feature = "syn_serde", derive(serde::Serialize, serde::Deserialize))]
+        #[derive(Clone, Debug)]
         #[allow(clippy::struct_excessive_bools)]
         #[allow(clippy::struct_field_names)]
         pub struct RangeTblFunction {
@@ -64476,11 +65247,13 @@ mod table_sample_clause {
     use super::*;
 
     /// `TableSampleClause`
-    #[derive(Debug, Clone, serde::Serialize, serde::Deserialize)]
+    #[derive(Debug, Clone)]
+    #[cfg_attr(feature = "syn_serde", derive(serde::Serialize, serde::Deserialize))]
     pub struct TableSampleClause(Box<self::inner::TableSampleClause>);
 
     /// optional `TableSampleClause`
-    #[derive(Debug, Clone, serde::Serialize, serde::Deserialize)]
+    #[derive(Debug, Clone)]
+    #[cfg_attr(feature = "syn_serde", derive(serde::Serialize, serde::Deserialize))]
     pub struct TableSampleClauseOpt(Option<TableSampleClause>);
 
     #[cfg(test)]
@@ -64497,11 +65270,13 @@ mod table_sample_clause {
     }
 
     /// `TableSampleClause` list
-    #[derive(Debug, Clone, serde::Serialize, serde::Deserialize)]
+    #[derive(Debug, Clone)]
+    #[cfg_attr(feature = "syn_serde", derive(serde::Serialize, serde::Deserialize))]
     pub struct TableSampleClauseList(Vec<TableSampleClause>);
 
     /// optional `TableSampleClause` list
-    #[derive(Debug, Clone, serde::Serialize, serde::Deserialize)]
+    #[derive(Debug, Clone)]
+    #[cfg_attr(feature = "syn_serde", derive(serde::Serialize, serde::Deserialize))]
     pub struct TableSampleClauseListOpt(Option<Vec<TableSampleClause>>);
 
     impl crate::syn::ListOpt<TableSampleClause> for TableSampleClauseListOpt {
@@ -64601,7 +65376,8 @@ mod table_sample_clause {
         use super::*;
 
         #[cfg_attr(test, derive(derive_builder::Builder))]
-        #[derive(Clone, Debug, serde::Serialize, serde::Deserialize)]
+        #[cfg_attr(feature = "syn_serde", derive(serde::Serialize, serde::Deserialize))]
+        #[derive(Clone, Debug)]
         #[allow(clippy::struct_excessive_bools)]
         #[allow(clippy::struct_field_names)]
         pub struct TableSampleClause {
@@ -64733,11 +65509,13 @@ mod with_check_option {
     use super::*;
 
     /// `WithCheckOption`
-    #[derive(Debug, Clone, serde::Serialize, serde::Deserialize)]
+    #[derive(Debug, Clone)]
+    #[cfg_attr(feature = "syn_serde", derive(serde::Serialize, serde::Deserialize))]
     pub struct WithCheckOption(Box<self::inner::WithCheckOption>);
 
     /// optional `WithCheckOption`
-    #[derive(Debug, Clone, serde::Serialize, serde::Deserialize)]
+    #[derive(Debug, Clone)]
+    #[cfg_attr(feature = "syn_serde", derive(serde::Serialize, serde::Deserialize))]
     pub struct WithCheckOptionOpt(Option<WithCheckOption>);
 
     #[cfg(test)]
@@ -64754,11 +65532,13 @@ mod with_check_option {
     }
 
     /// `WithCheckOption` list
-    #[derive(Debug, Clone, serde::Serialize, serde::Deserialize)]
+    #[derive(Debug, Clone)]
+    #[cfg_attr(feature = "syn_serde", derive(serde::Serialize, serde::Deserialize))]
     pub struct WithCheckOptionList(Vec<WithCheckOption>);
 
     /// optional `WithCheckOption` list
-    #[derive(Debug, Clone, serde::Serialize, serde::Deserialize)]
+    #[derive(Debug, Clone)]
+    #[cfg_attr(feature = "syn_serde", derive(serde::Serialize, serde::Deserialize))]
     pub struct WithCheckOptionListOpt(Option<Vec<WithCheckOption>>);
 
     impl crate::syn::ListOpt<WithCheckOption> for WithCheckOptionListOpt {
@@ -64858,7 +65638,8 @@ mod with_check_option {
         use super::*;
 
         #[cfg_attr(test, derive(derive_builder::Builder))]
-        #[derive(Clone, Debug, serde::Serialize, serde::Deserialize)]
+        #[cfg_attr(feature = "syn_serde", derive(serde::Serialize, serde::Deserialize))]
+        #[derive(Clone, Debug)]
         #[allow(clippy::struct_excessive_bools)]
         #[allow(clippy::struct_field_names)]
         pub struct WithCheckOption {
@@ -65052,11 +65833,13 @@ mod sort_group_clause {
     use super::*;
 
     /// `SortGroupClause`
-    #[derive(Debug, Clone, serde::Serialize, serde::Deserialize)]
+    #[derive(Debug, Clone)]
+    #[cfg_attr(feature = "syn_serde", derive(serde::Serialize, serde::Deserialize))]
     pub struct SortGroupClause(Box<self::inner::SortGroupClause>);
 
     /// optional `SortGroupClause`
-    #[derive(Debug, Clone, serde::Serialize, serde::Deserialize)]
+    #[derive(Debug, Clone)]
+    #[cfg_attr(feature = "syn_serde", derive(serde::Serialize, serde::Deserialize))]
     pub struct SortGroupClauseOpt(Option<SortGroupClause>);
 
     #[cfg(test)]
@@ -65073,11 +65856,13 @@ mod sort_group_clause {
     }
 
     /// `SortGroupClause` list
-    #[derive(Debug, Clone, serde::Serialize, serde::Deserialize)]
+    #[derive(Debug, Clone)]
+    #[cfg_attr(feature = "syn_serde", derive(serde::Serialize, serde::Deserialize))]
     pub struct SortGroupClauseList(Vec<SortGroupClause>);
 
     /// optional `SortGroupClause` list
-    #[derive(Debug, Clone, serde::Serialize, serde::Deserialize)]
+    #[derive(Debug, Clone)]
+    #[cfg_attr(feature = "syn_serde", derive(serde::Serialize, serde::Deserialize))]
     pub struct SortGroupClauseListOpt(Option<Vec<SortGroupClause>>);
 
     impl crate::syn::ListOpt<SortGroupClause> for SortGroupClauseListOpt {
@@ -65177,7 +65962,8 @@ mod sort_group_clause {
         use super::*;
 
         #[cfg_attr(test, derive(derive_builder::Builder))]
-        #[derive(Clone, Debug, serde::Serialize, serde::Deserialize)]
+        #[cfg_attr(feature = "syn_serde", derive(serde::Serialize, serde::Deserialize))]
+        #[derive(Clone, Debug)]
         #[allow(clippy::struct_excessive_bools)]
         #[allow(clippy::struct_field_names)]
         pub struct SortGroupClause {
@@ -65365,11 +66151,13 @@ mod grouping_set {
     use super::*;
 
     /// `GroupingSet`
-    #[derive(Debug, Clone, serde::Serialize, serde::Deserialize)]
+    #[derive(Debug, Clone)]
+    #[cfg_attr(feature = "syn_serde", derive(serde::Serialize, serde::Deserialize))]
     pub struct GroupingSet(Box<self::inner::GroupingSet>);
 
     /// optional `GroupingSet`
-    #[derive(Debug, Clone, serde::Serialize, serde::Deserialize)]
+    #[derive(Debug, Clone)]
+    #[cfg_attr(feature = "syn_serde", derive(serde::Serialize, serde::Deserialize))]
     pub struct GroupingSetOpt(Option<GroupingSet>);
 
     #[cfg(test)]
@@ -65386,11 +66174,13 @@ mod grouping_set {
     }
 
     /// `GroupingSet` list
-    #[derive(Debug, Clone, serde::Serialize, serde::Deserialize)]
+    #[derive(Debug, Clone)]
+    #[cfg_attr(feature = "syn_serde", derive(serde::Serialize, serde::Deserialize))]
     pub struct GroupingSetList(Vec<GroupingSet>);
 
     /// optional `GroupingSet` list
-    #[derive(Debug, Clone, serde::Serialize, serde::Deserialize)]
+    #[derive(Debug, Clone)]
+    #[cfg_attr(feature = "syn_serde", derive(serde::Serialize, serde::Deserialize))]
     pub struct GroupingSetListOpt(Option<Vec<GroupingSet>>);
 
     impl crate::syn::ListOpt<GroupingSet> for GroupingSetListOpt {
@@ -65490,7 +66280,8 @@ mod grouping_set {
         use super::*;
 
         #[cfg_attr(test, derive(derive_builder::Builder))]
-        #[derive(Clone, Debug, serde::Serialize, serde::Deserialize)]
+        #[cfg_attr(feature = "syn_serde", derive(serde::Serialize, serde::Deserialize))]
+        #[derive(Clone, Debug)]
         #[allow(clippy::struct_excessive_bools)]
         #[allow(clippy::struct_field_names)]
         pub struct GroupingSet {
@@ -65620,11 +66411,13 @@ mod window_clause {
     use super::*;
 
     /// `WindowClause`
-    #[derive(Debug, Clone, serde::Serialize, serde::Deserialize)]
+    #[derive(Debug, Clone)]
+    #[cfg_attr(feature = "syn_serde", derive(serde::Serialize, serde::Deserialize))]
     pub struct WindowClause(Box<self::inner::WindowClause>);
 
     /// optional `WindowClause`
-    #[derive(Debug, Clone, serde::Serialize, serde::Deserialize)]
+    #[derive(Debug, Clone)]
+    #[cfg_attr(feature = "syn_serde", derive(serde::Serialize, serde::Deserialize))]
     pub struct WindowClauseOpt(Option<WindowClause>);
 
     #[cfg(test)]
@@ -65641,11 +66434,13 @@ mod window_clause {
     }
 
     /// `WindowClause` list
-    #[derive(Debug, Clone, serde::Serialize, serde::Deserialize)]
+    #[derive(Debug, Clone)]
+    #[cfg_attr(feature = "syn_serde", derive(serde::Serialize, serde::Deserialize))]
     pub struct WindowClauseList(Vec<WindowClause>);
 
     /// optional `WindowClause` list
-    #[derive(Debug, Clone, serde::Serialize, serde::Deserialize)]
+    #[derive(Debug, Clone)]
+    #[cfg_attr(feature = "syn_serde", derive(serde::Serialize, serde::Deserialize))]
     pub struct WindowClauseListOpt(Option<Vec<WindowClause>>);
 
     impl crate::syn::ListOpt<WindowClause> for WindowClauseListOpt {
@@ -65745,7 +66540,8 @@ mod window_clause {
         use super::*;
 
         #[cfg_attr(test, derive(derive_builder::Builder))]
-        #[derive(Clone, Debug, serde::Serialize, serde::Deserialize)]
+        #[cfg_attr(feature = "syn_serde", derive(serde::Serialize, serde::Deserialize))]
+        #[derive(Clone, Debug)]
         #[allow(clippy::struct_excessive_bools)]
         #[allow(clippy::struct_field_names)]
         pub struct WindowClause {
@@ -66224,11 +67020,13 @@ mod row_mark_clause {
     use super::*;
 
     /// `RowMarkClause`
-    #[derive(Debug, Clone, serde::Serialize, serde::Deserialize)]
+    #[derive(Debug, Clone)]
+    #[cfg_attr(feature = "syn_serde", derive(serde::Serialize, serde::Deserialize))]
     pub struct RowMarkClause(Box<self::inner::RowMarkClause>);
 
     /// optional `RowMarkClause`
-    #[derive(Debug, Clone, serde::Serialize, serde::Deserialize)]
+    #[derive(Debug, Clone)]
+    #[cfg_attr(feature = "syn_serde", derive(serde::Serialize, serde::Deserialize))]
     pub struct RowMarkClauseOpt(Option<RowMarkClause>);
 
     #[cfg(test)]
@@ -66245,11 +67043,13 @@ mod row_mark_clause {
     }
 
     /// `RowMarkClause` list
-    #[derive(Debug, Clone, serde::Serialize, serde::Deserialize)]
+    #[derive(Debug, Clone)]
+    #[cfg_attr(feature = "syn_serde", derive(serde::Serialize, serde::Deserialize))]
     pub struct RowMarkClauseList(Vec<RowMarkClause>);
 
     /// optional `RowMarkClause` list
-    #[derive(Debug, Clone, serde::Serialize, serde::Deserialize)]
+    #[derive(Debug, Clone)]
+    #[cfg_attr(feature = "syn_serde", derive(serde::Serialize, serde::Deserialize))]
     pub struct RowMarkClauseListOpt(Option<Vec<RowMarkClause>>);
 
     impl crate::syn::ListOpt<RowMarkClause> for RowMarkClauseListOpt {
@@ -66349,7 +67149,8 @@ mod row_mark_clause {
         use super::*;
 
         #[cfg_attr(test, derive(derive_builder::Builder))]
-        #[derive(Clone, Debug, serde::Serialize, serde::Deserialize)]
+        #[cfg_attr(feature = "syn_serde", derive(serde::Serialize, serde::Deserialize))]
+        #[derive(Clone, Debug)]
         #[allow(clippy::struct_excessive_bools)]
         #[allow(clippy::struct_field_names)]
         pub struct RowMarkClause {
@@ -66512,11 +67313,13 @@ mod with_clause {
     use super::*;
 
     /// `WithClause`
-    #[derive(Debug, Clone, serde::Serialize, serde::Deserialize)]
+    #[derive(Debug, Clone)]
+    #[cfg_attr(feature = "syn_serde", derive(serde::Serialize, serde::Deserialize))]
     pub struct WithClause(Box<self::inner::WithClause>);
 
     /// optional `WithClause`
-    #[derive(Debug, Clone, serde::Serialize, serde::Deserialize)]
+    #[derive(Debug, Clone)]
+    #[cfg_attr(feature = "syn_serde", derive(serde::Serialize, serde::Deserialize))]
     pub struct WithClauseOpt(Option<WithClause>);
 
     #[cfg(test)]
@@ -66533,11 +67336,13 @@ mod with_clause {
     }
 
     /// `WithClause` list
-    #[derive(Debug, Clone, serde::Serialize, serde::Deserialize)]
+    #[derive(Debug, Clone)]
+    #[cfg_attr(feature = "syn_serde", derive(serde::Serialize, serde::Deserialize))]
     pub struct WithClauseList(Vec<WithClause>);
 
     /// optional `WithClause` list
-    #[derive(Debug, Clone, serde::Serialize, serde::Deserialize)]
+    #[derive(Debug, Clone)]
+    #[cfg_attr(feature = "syn_serde", derive(serde::Serialize, serde::Deserialize))]
     pub struct WithClauseListOpt(Option<Vec<WithClause>>);
 
     impl crate::syn::ListOpt<WithClause> for WithClauseListOpt {
@@ -66637,7 +67442,8 @@ mod with_clause {
         use super::*;
 
         #[cfg_attr(test, derive(derive_builder::Builder))]
-        #[derive(Clone, Debug, serde::Serialize, serde::Deserialize)]
+        #[cfg_attr(feature = "syn_serde", derive(serde::Serialize, serde::Deserialize))]
+        #[derive(Clone, Debug)]
         #[allow(clippy::struct_excessive_bools)]
         #[allow(clippy::struct_field_names)]
         pub struct WithClause {
@@ -66764,11 +67570,13 @@ mod infer_clause {
     use super::*;
 
     /// `InferClause`
-    #[derive(Debug, Clone, serde::Serialize, serde::Deserialize)]
+    #[derive(Debug, Clone)]
+    #[cfg_attr(feature = "syn_serde", derive(serde::Serialize, serde::Deserialize))]
     pub struct InferClause(Box<self::inner::InferClause>);
 
     /// optional `InferClause`
-    #[derive(Debug, Clone, serde::Serialize, serde::Deserialize)]
+    #[derive(Debug, Clone)]
+    #[cfg_attr(feature = "syn_serde", derive(serde::Serialize, serde::Deserialize))]
     pub struct InferClauseOpt(Option<InferClause>);
 
     #[cfg(test)]
@@ -66785,11 +67593,13 @@ mod infer_clause {
     }
 
     /// `InferClause` list
-    #[derive(Debug, Clone, serde::Serialize, serde::Deserialize)]
+    #[derive(Debug, Clone)]
+    #[cfg_attr(feature = "syn_serde", derive(serde::Serialize, serde::Deserialize))]
     pub struct InferClauseList(Vec<InferClause>);
 
     /// optional `InferClause` list
-    #[derive(Debug, Clone, serde::Serialize, serde::Deserialize)]
+    #[derive(Debug, Clone)]
+    #[cfg_attr(feature = "syn_serde", derive(serde::Serialize, serde::Deserialize))]
     pub struct InferClauseListOpt(Option<Vec<InferClause>>);
 
     impl crate::syn::ListOpt<InferClause> for InferClauseListOpt {
@@ -66889,7 +67699,8 @@ mod infer_clause {
         use super::*;
 
         #[cfg_attr(test, derive(derive_builder::Builder))]
-        #[derive(Clone, Debug, serde::Serialize, serde::Deserialize)]
+        #[cfg_attr(feature = "syn_serde", derive(serde::Serialize, serde::Deserialize))]
+        #[derive(Clone, Debug)]
         #[allow(clippy::struct_excessive_bools)]
         #[allow(clippy::struct_field_names)]
         pub struct InferClause {
@@ -67050,11 +67861,13 @@ mod on_conflict_clause {
     use super::*;
 
     /// `OnConflictClause`
-    #[derive(Debug, Clone, serde::Serialize, serde::Deserialize)]
+    #[derive(Debug, Clone)]
+    #[cfg_attr(feature = "syn_serde", derive(serde::Serialize, serde::Deserialize))]
     pub struct OnConflictClause(Box<self::inner::OnConflictClause>);
 
     /// optional `OnConflictClause`
-    #[derive(Debug, Clone, serde::Serialize, serde::Deserialize)]
+    #[derive(Debug, Clone)]
+    #[cfg_attr(feature = "syn_serde", derive(serde::Serialize, serde::Deserialize))]
     pub struct OnConflictClauseOpt(Option<OnConflictClause>);
 
     #[cfg(test)]
@@ -67071,11 +67884,13 @@ mod on_conflict_clause {
     }
 
     /// `OnConflictClause` list
-    #[derive(Debug, Clone, serde::Serialize, serde::Deserialize)]
+    #[derive(Debug, Clone)]
+    #[cfg_attr(feature = "syn_serde", derive(serde::Serialize, serde::Deserialize))]
     pub struct OnConflictClauseList(Vec<OnConflictClause>);
 
     /// optional `OnConflictClause` list
-    #[derive(Debug, Clone, serde::Serialize, serde::Deserialize)]
+    #[derive(Debug, Clone)]
+    #[cfg_attr(feature = "syn_serde", derive(serde::Serialize, serde::Deserialize))]
     pub struct OnConflictClauseListOpt(Option<Vec<OnConflictClause>>);
 
     impl crate::syn::ListOpt<OnConflictClause> for OnConflictClauseListOpt {
@@ -67175,7 +67990,8 @@ mod on_conflict_clause {
         use super::*;
 
         #[cfg_attr(test, derive(derive_builder::Builder))]
-        #[derive(Clone, Debug, serde::Serialize, serde::Deserialize)]
+        #[cfg_attr(feature = "syn_serde", derive(serde::Serialize, serde::Deserialize))]
+        #[derive(Clone, Debug)]
         #[allow(clippy::struct_excessive_bools)]
         #[allow(clippy::struct_field_names)]
         pub struct OnConflictClause {
@@ -67375,11 +68191,13 @@ mod cte_search_clause {
     use super::*;
 
     /// `CteSearchClause`
-    #[derive(Debug, Clone, serde::Serialize, serde::Deserialize)]
+    #[derive(Debug, Clone)]
+    #[cfg_attr(feature = "syn_serde", derive(serde::Serialize, serde::Deserialize))]
     pub struct CteSearchClause(Box<self::inner::CteSearchClause>);
 
     /// optional `CteSearchClause`
-    #[derive(Debug, Clone, serde::Serialize, serde::Deserialize)]
+    #[derive(Debug, Clone)]
+    #[cfg_attr(feature = "syn_serde", derive(serde::Serialize, serde::Deserialize))]
     pub struct CteSearchClauseOpt(Option<CteSearchClause>);
 
     #[cfg(test)]
@@ -67396,11 +68214,13 @@ mod cte_search_clause {
     }
 
     /// `CteSearchClause` list
-    #[derive(Debug, Clone, serde::Serialize, serde::Deserialize)]
+    #[derive(Debug, Clone)]
+    #[cfg_attr(feature = "syn_serde", derive(serde::Serialize, serde::Deserialize))]
     pub struct CteSearchClauseList(Vec<CteSearchClause>);
 
     /// optional `CteSearchClause` list
-    #[derive(Debug, Clone, serde::Serialize, serde::Deserialize)]
+    #[derive(Debug, Clone)]
+    #[cfg_attr(feature = "syn_serde", derive(serde::Serialize, serde::Deserialize))]
     pub struct CteSearchClauseListOpt(Option<Vec<CteSearchClause>>);
 
     impl crate::syn::ListOpt<CteSearchClause> for CteSearchClauseListOpt {
@@ -67500,7 +68320,8 @@ mod cte_search_clause {
         use super::*;
 
         #[cfg_attr(test, derive(derive_builder::Builder))]
-        #[derive(Clone, Debug, serde::Serialize, serde::Deserialize)]
+        #[cfg_attr(feature = "syn_serde", derive(serde::Serialize, serde::Deserialize))]
+        #[derive(Clone, Debug)]
         #[allow(clippy::struct_excessive_bools)]
         #[allow(clippy::struct_field_names)]
         pub struct CteSearchClause {
@@ -67662,11 +68483,13 @@ mod cte_cycle_clause {
     use super::*;
 
     /// `CteCycleClause`
-    #[derive(Debug, Clone, serde::Serialize, serde::Deserialize)]
+    #[derive(Debug, Clone)]
+    #[cfg_attr(feature = "syn_serde", derive(serde::Serialize, serde::Deserialize))]
     pub struct CteCycleClause(Box<self::inner::CteCycleClause>);
 
     /// optional `CteCycleClause`
-    #[derive(Debug, Clone, serde::Serialize, serde::Deserialize)]
+    #[derive(Debug, Clone)]
+    #[cfg_attr(feature = "syn_serde", derive(serde::Serialize, serde::Deserialize))]
     pub struct CteCycleClauseOpt(Option<CteCycleClause>);
 
     #[cfg(test)]
@@ -67683,11 +68506,13 @@ mod cte_cycle_clause {
     }
 
     /// `CteCycleClause` list
-    #[derive(Debug, Clone, serde::Serialize, serde::Deserialize)]
+    #[derive(Debug, Clone)]
+    #[cfg_attr(feature = "syn_serde", derive(serde::Serialize, serde::Deserialize))]
     pub struct CteCycleClauseList(Vec<CteCycleClause>);
 
     /// optional `CteCycleClause` list
-    #[derive(Debug, Clone, serde::Serialize, serde::Deserialize)]
+    #[derive(Debug, Clone)]
+    #[cfg_attr(feature = "syn_serde", derive(serde::Serialize, serde::Deserialize))]
     pub struct CteCycleClauseListOpt(Option<Vec<CteCycleClause>>);
 
     impl crate::syn::ListOpt<CteCycleClause> for CteCycleClauseListOpt {
@@ -67787,7 +68612,8 @@ mod cte_cycle_clause {
         use super::*;
 
         #[cfg_attr(test, derive(derive_builder::Builder))]
-        #[derive(Clone, Debug, serde::Serialize, serde::Deserialize)]
+        #[cfg_attr(feature = "syn_serde", derive(serde::Serialize, serde::Deserialize))]
+        #[derive(Clone, Debug)]
         #[allow(clippy::struct_excessive_bools)]
         #[allow(clippy::struct_field_names)]
         pub struct CteCycleClause {
@@ -68141,11 +68967,13 @@ mod common_table_expr {
     use super::*;
 
     /// `CommonTableExpr`
-    #[derive(Debug, Clone, serde::Serialize, serde::Deserialize)]
+    #[derive(Debug, Clone)]
+    #[cfg_attr(feature = "syn_serde", derive(serde::Serialize, serde::Deserialize))]
     pub struct CommonTableExpr(Box<self::inner::CommonTableExpr>);
 
     /// optional `CommonTableExpr`
-    #[derive(Debug, Clone, serde::Serialize, serde::Deserialize)]
+    #[derive(Debug, Clone)]
+    #[cfg_attr(feature = "syn_serde", derive(serde::Serialize, serde::Deserialize))]
     pub struct CommonTableExprOpt(Option<CommonTableExpr>);
 
     #[cfg(test)]
@@ -68162,11 +68990,13 @@ mod common_table_expr {
     }
 
     /// `CommonTableExpr` list
-    #[derive(Debug, Clone, serde::Serialize, serde::Deserialize)]
+    #[derive(Debug, Clone)]
+    #[cfg_attr(feature = "syn_serde", derive(serde::Serialize, serde::Deserialize))]
     pub struct CommonTableExprList(Vec<CommonTableExpr>);
 
     /// optional `CommonTableExpr` list
-    #[derive(Debug, Clone, serde::Serialize, serde::Deserialize)]
+    #[derive(Debug, Clone)]
+    #[cfg_attr(feature = "syn_serde", derive(serde::Serialize, serde::Deserialize))]
     pub struct CommonTableExprListOpt(Option<Vec<CommonTableExpr>>);
 
     impl crate::syn::ListOpt<CommonTableExpr> for CommonTableExprListOpt {
@@ -68266,7 +69096,8 @@ mod common_table_expr {
         use super::*;
 
         #[cfg_attr(test, derive(derive_builder::Builder))]
-        #[derive(Clone, Debug, serde::Serialize, serde::Deserialize)]
+        #[cfg_attr(feature = "syn_serde", derive(serde::Serialize, serde::Deserialize))]
+        #[derive(Clone, Debug)]
         #[allow(clippy::struct_excessive_bools)]
         #[allow(clippy::struct_field_names)]
         pub struct CommonTableExpr {
@@ -68729,11 +69560,13 @@ mod merge_when_clause {
     use super::*;
 
     /// `MergeWhenClause`
-    #[derive(Debug, Clone, serde::Serialize, serde::Deserialize)]
+    #[derive(Debug, Clone)]
+    #[cfg_attr(feature = "syn_serde", derive(serde::Serialize, serde::Deserialize))]
     pub struct MergeWhenClause(Box<self::inner::MergeWhenClause>);
 
     /// optional `MergeWhenClause`
-    #[derive(Debug, Clone, serde::Serialize, serde::Deserialize)]
+    #[derive(Debug, Clone)]
+    #[cfg_attr(feature = "syn_serde", derive(serde::Serialize, serde::Deserialize))]
     pub struct MergeWhenClauseOpt(Option<MergeWhenClause>);
 
     #[cfg(test)]
@@ -68750,11 +69583,13 @@ mod merge_when_clause {
     }
 
     /// `MergeWhenClause` list
-    #[derive(Debug, Clone, serde::Serialize, serde::Deserialize)]
+    #[derive(Debug, Clone)]
+    #[cfg_attr(feature = "syn_serde", derive(serde::Serialize, serde::Deserialize))]
     pub struct MergeWhenClauseList(Vec<MergeWhenClause>);
 
     /// optional `MergeWhenClause` list
-    #[derive(Debug, Clone, serde::Serialize, serde::Deserialize)]
+    #[derive(Debug, Clone)]
+    #[cfg_attr(feature = "syn_serde", derive(serde::Serialize, serde::Deserialize))]
     pub struct MergeWhenClauseListOpt(Option<Vec<MergeWhenClause>>);
 
     impl crate::syn::ListOpt<MergeWhenClause> for MergeWhenClauseListOpt {
@@ -68854,7 +69689,8 @@ mod merge_when_clause {
         use super::*;
 
         #[cfg_attr(test, derive(derive_builder::Builder))]
-        #[derive(Clone, Debug, serde::Serialize, serde::Deserialize)]
+        #[cfg_attr(feature = "syn_serde", derive(serde::Serialize, serde::Deserialize))]
+        #[derive(Clone, Debug)]
         #[allow(clippy::struct_excessive_bools)]
         #[allow(clippy::struct_field_names)]
         pub struct MergeWhenClause {
@@ -69091,11 +69927,13 @@ mod trigger_transition {
     use super::*;
 
     /// `TriggerTransition`
-    #[derive(Debug, Clone, serde::Serialize, serde::Deserialize)]
+    #[derive(Debug, Clone)]
+    #[cfg_attr(feature = "syn_serde", derive(serde::Serialize, serde::Deserialize))]
     pub struct TriggerTransition(Box<self::inner::TriggerTransition>);
 
     /// optional `TriggerTransition`
-    #[derive(Debug, Clone, serde::Serialize, serde::Deserialize)]
+    #[derive(Debug, Clone)]
+    #[cfg_attr(feature = "syn_serde", derive(serde::Serialize, serde::Deserialize))]
     pub struct TriggerTransitionOpt(Option<TriggerTransition>);
 
     #[cfg(test)]
@@ -69112,11 +69950,13 @@ mod trigger_transition {
     }
 
     /// `TriggerTransition` list
-    #[derive(Debug, Clone, serde::Serialize, serde::Deserialize)]
+    #[derive(Debug, Clone)]
+    #[cfg_attr(feature = "syn_serde", derive(serde::Serialize, serde::Deserialize))]
     pub struct TriggerTransitionList(Vec<TriggerTransition>);
 
     /// optional `TriggerTransition` list
-    #[derive(Debug, Clone, serde::Serialize, serde::Deserialize)]
+    #[derive(Debug, Clone)]
+    #[cfg_attr(feature = "syn_serde", derive(serde::Serialize, serde::Deserialize))]
     pub struct TriggerTransitionListOpt(Option<Vec<TriggerTransition>>);
 
     impl crate::syn::ListOpt<TriggerTransition> for TriggerTransitionListOpt {
@@ -69216,7 +70056,8 @@ mod trigger_transition {
         use super::*;
 
         #[cfg_attr(test, derive(derive_builder::Builder))]
-        #[derive(Clone, Debug, serde::Serialize, serde::Deserialize)]
+        #[cfg_attr(feature = "syn_serde", derive(serde::Serialize, serde::Deserialize))]
+        #[derive(Clone, Debug)]
         #[allow(clippy::struct_excessive_bools)]
         #[allow(clippy::struct_field_names)]
         pub struct TriggerTransition {
@@ -69342,11 +70183,13 @@ mod json_output {
     use super::*;
 
     /// `JsonOutput`
-    #[derive(Debug, Clone, serde::Serialize, serde::Deserialize)]
+    #[derive(Debug, Clone)]
+    #[cfg_attr(feature = "syn_serde", derive(serde::Serialize, serde::Deserialize))]
     pub struct JsonOutput(Box<self::inner::JsonOutput>);
 
     /// optional `JsonOutput`
-    #[derive(Debug, Clone, serde::Serialize, serde::Deserialize)]
+    #[derive(Debug, Clone)]
+    #[cfg_attr(feature = "syn_serde", derive(serde::Serialize, serde::Deserialize))]
     pub struct JsonOutputOpt(Option<JsonOutput>);
 
     #[cfg(test)]
@@ -69363,11 +70206,13 @@ mod json_output {
     }
 
     /// `JsonOutput` list
-    #[derive(Debug, Clone, serde::Serialize, serde::Deserialize)]
+    #[derive(Debug, Clone)]
+    #[cfg_attr(feature = "syn_serde", derive(serde::Serialize, serde::Deserialize))]
     pub struct JsonOutputList(Vec<JsonOutput>);
 
     /// optional `JsonOutput` list
-    #[derive(Debug, Clone, serde::Serialize, serde::Deserialize)]
+    #[derive(Debug, Clone)]
+    #[cfg_attr(feature = "syn_serde", derive(serde::Serialize, serde::Deserialize))]
     pub struct JsonOutputListOpt(Option<Vec<JsonOutput>>);
 
     impl crate::syn::ListOpt<JsonOutput> for JsonOutputListOpt {
@@ -69467,7 +70312,8 @@ mod json_output {
         use super::*;
 
         #[cfg_attr(test, derive(derive_builder::Builder))]
-        #[derive(Clone, Debug, serde::Serialize, serde::Deserialize)]
+        #[cfg_attr(feature = "syn_serde", derive(serde::Serialize, serde::Deserialize))]
+        #[derive(Clone, Debug)]
         #[allow(clippy::struct_excessive_bools)]
         #[allow(clippy::struct_field_names)]
         pub struct JsonOutput {
@@ -69566,11 +70412,13 @@ mod json_argument {
     use super::*;
 
     /// `JsonArgument`
-    #[derive(Debug, Clone, serde::Serialize, serde::Deserialize)]
+    #[derive(Debug, Clone)]
+    #[cfg_attr(feature = "syn_serde", derive(serde::Serialize, serde::Deserialize))]
     pub struct JsonArgument(Box<self::inner::JsonArgument>);
 
     /// optional `JsonArgument`
-    #[derive(Debug, Clone, serde::Serialize, serde::Deserialize)]
+    #[derive(Debug, Clone)]
+    #[cfg_attr(feature = "syn_serde", derive(serde::Serialize, serde::Deserialize))]
     pub struct JsonArgumentOpt(Option<JsonArgument>);
 
     #[cfg(test)]
@@ -69587,11 +70435,13 @@ mod json_argument {
     }
 
     /// `JsonArgument` list
-    #[derive(Debug, Clone, serde::Serialize, serde::Deserialize)]
+    #[derive(Debug, Clone)]
+    #[cfg_attr(feature = "syn_serde", derive(serde::Serialize, serde::Deserialize))]
     pub struct JsonArgumentList(Vec<JsonArgument>);
 
     /// optional `JsonArgument` list
-    #[derive(Debug, Clone, serde::Serialize, serde::Deserialize)]
+    #[derive(Debug, Clone)]
+    #[cfg_attr(feature = "syn_serde", derive(serde::Serialize, serde::Deserialize))]
     pub struct JsonArgumentListOpt(Option<Vec<JsonArgument>>);
 
     impl crate::syn::ListOpt<JsonArgument> for JsonArgumentListOpt {
@@ -69691,7 +70541,8 @@ mod json_argument {
         use super::*;
 
         #[cfg_attr(test, derive(derive_builder::Builder))]
-        #[derive(Clone, Debug, serde::Serialize, serde::Deserialize)]
+        #[cfg_attr(feature = "syn_serde", derive(serde::Serialize, serde::Deserialize))]
+        #[derive(Clone, Debug)]
         #[allow(clippy::struct_excessive_bools)]
         #[allow(clippy::struct_field_names)]
         pub struct JsonArgument {
@@ -69785,11 +70636,13 @@ mod json_func_expr {
     use super::*;
 
     /// `JsonFuncExpr`
-    #[derive(Debug, Clone, serde::Serialize, serde::Deserialize)]
+    #[derive(Debug, Clone)]
+    #[cfg_attr(feature = "syn_serde", derive(serde::Serialize, serde::Deserialize))]
     pub struct JsonFuncExpr(Box<self::inner::JsonFuncExpr>);
 
     /// optional `JsonFuncExpr`
-    #[derive(Debug, Clone, serde::Serialize, serde::Deserialize)]
+    #[derive(Debug, Clone)]
+    #[cfg_attr(feature = "syn_serde", derive(serde::Serialize, serde::Deserialize))]
     pub struct JsonFuncExprOpt(Option<JsonFuncExpr>);
 
     #[cfg(test)]
@@ -69806,11 +70659,13 @@ mod json_func_expr {
     }
 
     /// `JsonFuncExpr` list
-    #[derive(Debug, Clone, serde::Serialize, serde::Deserialize)]
+    #[derive(Debug, Clone)]
+    #[cfg_attr(feature = "syn_serde", derive(serde::Serialize, serde::Deserialize))]
     pub struct JsonFuncExprList(Vec<JsonFuncExpr>);
 
     /// optional `JsonFuncExpr` list
-    #[derive(Debug, Clone, serde::Serialize, serde::Deserialize)]
+    #[derive(Debug, Clone)]
+    #[cfg_attr(feature = "syn_serde", derive(serde::Serialize, serde::Deserialize))]
     pub struct JsonFuncExprListOpt(Option<Vec<JsonFuncExpr>>);
 
     impl crate::syn::ListOpt<JsonFuncExpr> for JsonFuncExprListOpt {
@@ -69910,7 +70765,8 @@ mod json_func_expr {
         use super::*;
 
         #[cfg_attr(test, derive(derive_builder::Builder))]
-        #[derive(Clone, Debug, serde::Serialize, serde::Deserialize)]
+        #[cfg_attr(feature = "syn_serde", derive(serde::Serialize, serde::Deserialize))]
+        #[derive(Clone, Debug)]
         #[allow(clippy::struct_excessive_bools)]
         #[allow(clippy::struct_field_names)]
         pub struct JsonFuncExpr {
@@ -70311,11 +71167,13 @@ mod json_table_path_spec {
     use super::*;
 
     /// `JsonTablePathSpec`
-    #[derive(Debug, Clone, serde::Serialize, serde::Deserialize)]
+    #[derive(Debug, Clone)]
+    #[cfg_attr(feature = "syn_serde", derive(serde::Serialize, serde::Deserialize))]
     pub struct JsonTablePathSpec(Box<self::inner::JsonTablePathSpec>);
 
     /// optional `JsonTablePathSpec`
-    #[derive(Debug, Clone, serde::Serialize, serde::Deserialize)]
+    #[derive(Debug, Clone)]
+    #[cfg_attr(feature = "syn_serde", derive(serde::Serialize, serde::Deserialize))]
     pub struct JsonTablePathSpecOpt(Option<JsonTablePathSpec>);
 
     #[cfg(test)]
@@ -70332,11 +71190,13 @@ mod json_table_path_spec {
     }
 
     /// `JsonTablePathSpec` list
-    #[derive(Debug, Clone, serde::Serialize, serde::Deserialize)]
+    #[derive(Debug, Clone)]
+    #[cfg_attr(feature = "syn_serde", derive(serde::Serialize, serde::Deserialize))]
     pub struct JsonTablePathSpecList(Vec<JsonTablePathSpec>);
 
     /// optional `JsonTablePathSpec` list
-    #[derive(Debug, Clone, serde::Serialize, serde::Deserialize)]
+    #[derive(Debug, Clone)]
+    #[cfg_attr(feature = "syn_serde", derive(serde::Serialize, serde::Deserialize))]
     pub struct JsonTablePathSpecListOpt(Option<Vec<JsonTablePathSpec>>);
 
     impl crate::syn::ListOpt<JsonTablePathSpec> for JsonTablePathSpecListOpt {
@@ -70436,7 +71296,8 @@ mod json_table_path_spec {
         use super::*;
 
         #[cfg_attr(test, derive(derive_builder::Builder))]
-        #[derive(Clone, Debug, serde::Serialize, serde::Deserialize)]
+        #[cfg_attr(feature = "syn_serde", derive(serde::Serialize, serde::Deserialize))]
+        #[derive(Clone, Debug)]
         #[allow(clippy::struct_excessive_bools)]
         #[allow(clippy::struct_field_names)]
         pub struct JsonTablePathSpec {
@@ -70596,11 +71457,13 @@ mod json_table {
     use super::*;
 
     /// `JsonTable`
-    #[derive(Debug, Clone, serde::Serialize, serde::Deserialize)]
+    #[derive(Debug, Clone)]
+    #[cfg_attr(feature = "syn_serde", derive(serde::Serialize, serde::Deserialize))]
     pub struct JsonTable(Box<self::inner::JsonTable>);
 
     /// optional `JsonTable`
-    #[derive(Debug, Clone, serde::Serialize, serde::Deserialize)]
+    #[derive(Debug, Clone)]
+    #[cfg_attr(feature = "syn_serde", derive(serde::Serialize, serde::Deserialize))]
     pub struct JsonTableOpt(Option<JsonTable>);
 
     #[cfg(test)]
@@ -70617,11 +71480,13 @@ mod json_table {
     }
 
     /// `JsonTable` list
-    #[derive(Debug, Clone, serde::Serialize, serde::Deserialize)]
+    #[derive(Debug, Clone)]
+    #[cfg_attr(feature = "syn_serde", derive(serde::Serialize, serde::Deserialize))]
     pub struct JsonTableList(Vec<JsonTable>);
 
     /// optional `JsonTable` list
-    #[derive(Debug, Clone, serde::Serialize, serde::Deserialize)]
+    #[derive(Debug, Clone)]
+    #[cfg_attr(feature = "syn_serde", derive(serde::Serialize, serde::Deserialize))]
     pub struct JsonTableListOpt(Option<Vec<JsonTable>>);
 
     impl crate::syn::ListOpt<JsonTable> for JsonTableListOpt {
@@ -70721,7 +71586,8 @@ mod json_table {
         use super::*;
 
         #[cfg_attr(test, derive(derive_builder::Builder))]
-        #[derive(Clone, Debug, serde::Serialize, serde::Deserialize)]
+        #[cfg_attr(feature = "syn_serde", derive(serde::Serialize, serde::Deserialize))]
+        #[derive(Clone, Debug)]
         #[allow(clippy::struct_excessive_bools)]
         #[allow(clippy::struct_field_names)]
         pub struct JsonTable {
@@ -71018,11 +71884,13 @@ mod json_table_column {
     use super::*;
 
     /// `JsonTableColumn`
-    #[derive(Debug, Clone, serde::Serialize, serde::Deserialize)]
+    #[derive(Debug, Clone)]
+    #[cfg_attr(feature = "syn_serde", derive(serde::Serialize, serde::Deserialize))]
     pub struct JsonTableColumn(Box<self::inner::JsonTableColumn>);
 
     /// optional `JsonTableColumn`
-    #[derive(Debug, Clone, serde::Serialize, serde::Deserialize)]
+    #[derive(Debug, Clone)]
+    #[cfg_attr(feature = "syn_serde", derive(serde::Serialize, serde::Deserialize))]
     pub struct JsonTableColumnOpt(Option<JsonTableColumn>);
 
     #[cfg(test)]
@@ -71039,11 +71907,13 @@ mod json_table_column {
     }
 
     /// `JsonTableColumn` list
-    #[derive(Debug, Clone, serde::Serialize, serde::Deserialize)]
+    #[derive(Debug, Clone)]
+    #[cfg_attr(feature = "syn_serde", derive(serde::Serialize, serde::Deserialize))]
     pub struct JsonTableColumnList(Vec<JsonTableColumn>);
 
     /// optional `JsonTableColumn` list
-    #[derive(Debug, Clone, serde::Serialize, serde::Deserialize)]
+    #[derive(Debug, Clone)]
+    #[cfg_attr(feature = "syn_serde", derive(serde::Serialize, serde::Deserialize))]
     pub struct JsonTableColumnListOpt(Option<Vec<JsonTableColumn>>);
 
     impl crate::syn::ListOpt<JsonTableColumn> for JsonTableColumnListOpt {
@@ -71143,7 +72013,8 @@ mod json_table_column {
         use super::*;
 
         #[cfg_attr(test, derive(derive_builder::Builder))]
-        #[derive(Clone, Debug, serde::Serialize, serde::Deserialize)]
+        #[cfg_attr(feature = "syn_serde", derive(serde::Serialize, serde::Deserialize))]
+        #[derive(Clone, Debug)]
         #[allow(clippy::struct_excessive_bools)]
         #[allow(clippy::struct_field_names)]
         pub struct JsonTableColumn {
@@ -71544,11 +72415,13 @@ mod json_key_value {
     use super::*;
 
     /// `JsonKeyValue`
-    #[derive(Debug, Clone, serde::Serialize, serde::Deserialize)]
+    #[derive(Debug, Clone)]
+    #[cfg_attr(feature = "syn_serde", derive(serde::Serialize, serde::Deserialize))]
     pub struct JsonKeyValue(Box<self::inner::JsonKeyValue>);
 
     /// optional `JsonKeyValue`
-    #[derive(Debug, Clone, serde::Serialize, serde::Deserialize)]
+    #[derive(Debug, Clone)]
+    #[cfg_attr(feature = "syn_serde", derive(serde::Serialize, serde::Deserialize))]
     pub struct JsonKeyValueOpt(Option<JsonKeyValue>);
 
     #[cfg(test)]
@@ -71565,11 +72438,13 @@ mod json_key_value {
     }
 
     /// `JsonKeyValue` list
-    #[derive(Debug, Clone, serde::Serialize, serde::Deserialize)]
+    #[derive(Debug, Clone)]
+    #[cfg_attr(feature = "syn_serde", derive(serde::Serialize, serde::Deserialize))]
     pub struct JsonKeyValueList(Vec<JsonKeyValue>);
 
     /// optional `JsonKeyValue` list
-    #[derive(Debug, Clone, serde::Serialize, serde::Deserialize)]
+    #[derive(Debug, Clone)]
+    #[cfg_attr(feature = "syn_serde", derive(serde::Serialize, serde::Deserialize))]
     pub struct JsonKeyValueListOpt(Option<Vec<JsonKeyValue>>);
 
     impl crate::syn::ListOpt<JsonKeyValue> for JsonKeyValueListOpt {
@@ -71669,7 +72544,8 @@ mod json_key_value {
         use super::*;
 
         #[cfg_attr(test, derive(derive_builder::Builder))]
-        #[derive(Clone, Debug, serde::Serialize, serde::Deserialize)]
+        #[cfg_attr(feature = "syn_serde", derive(serde::Serialize, serde::Deserialize))]
+        #[derive(Clone, Debug)]
         #[allow(clippy::struct_excessive_bools)]
         #[allow(clippy::struct_field_names)]
         pub struct JsonKeyValue {
@@ -71766,11 +72642,13 @@ mod json_parse_expr {
     use super::*;
 
     /// `JsonParseExpr`
-    #[derive(Debug, Clone, serde::Serialize, serde::Deserialize)]
+    #[derive(Debug, Clone)]
+    #[cfg_attr(feature = "syn_serde", derive(serde::Serialize, serde::Deserialize))]
     pub struct JsonParseExpr(Box<self::inner::JsonParseExpr>);
 
     /// optional `JsonParseExpr`
-    #[derive(Debug, Clone, serde::Serialize, serde::Deserialize)]
+    #[derive(Debug, Clone)]
+    #[cfg_attr(feature = "syn_serde", derive(serde::Serialize, serde::Deserialize))]
     pub struct JsonParseExprOpt(Option<JsonParseExpr>);
 
     #[cfg(test)]
@@ -71787,11 +72665,13 @@ mod json_parse_expr {
     }
 
     /// `JsonParseExpr` list
-    #[derive(Debug, Clone, serde::Serialize, serde::Deserialize)]
+    #[derive(Debug, Clone)]
+    #[cfg_attr(feature = "syn_serde", derive(serde::Serialize, serde::Deserialize))]
     pub struct JsonParseExprList(Vec<JsonParseExpr>);
 
     /// optional `JsonParseExpr` list
-    #[derive(Debug, Clone, serde::Serialize, serde::Deserialize)]
+    #[derive(Debug, Clone)]
+    #[cfg_attr(feature = "syn_serde", derive(serde::Serialize, serde::Deserialize))]
     pub struct JsonParseExprListOpt(Option<Vec<JsonParseExpr>>);
 
     impl crate::syn::ListOpt<JsonParseExpr> for JsonParseExprListOpt {
@@ -71891,7 +72771,8 @@ mod json_parse_expr {
         use super::*;
 
         #[cfg_attr(test, derive(derive_builder::Builder))]
-        #[derive(Clone, Debug, serde::Serialize, serde::Deserialize)]
+        #[cfg_attr(feature = "syn_serde", derive(serde::Serialize, serde::Deserialize))]
+        #[derive(Clone, Debug)]
         #[allow(clippy::struct_excessive_bools)]
         #[allow(clippy::struct_field_names)]
         pub struct JsonParseExpr {
@@ -72054,11 +72935,13 @@ mod json_scalar_expr {
     use super::*;
 
     /// `JsonScalarExpr`
-    #[derive(Debug, Clone, serde::Serialize, serde::Deserialize)]
+    #[derive(Debug, Clone)]
+    #[cfg_attr(feature = "syn_serde", derive(serde::Serialize, serde::Deserialize))]
     pub struct JsonScalarExpr(Box<self::inner::JsonScalarExpr>);
 
     /// optional `JsonScalarExpr`
-    #[derive(Debug, Clone, serde::Serialize, serde::Deserialize)]
+    #[derive(Debug, Clone)]
+    #[cfg_attr(feature = "syn_serde", derive(serde::Serialize, serde::Deserialize))]
     pub struct JsonScalarExprOpt(Option<JsonScalarExpr>);
 
     #[cfg(test)]
@@ -72075,11 +72958,13 @@ mod json_scalar_expr {
     }
 
     /// `JsonScalarExpr` list
-    #[derive(Debug, Clone, serde::Serialize, serde::Deserialize)]
+    #[derive(Debug, Clone)]
+    #[cfg_attr(feature = "syn_serde", derive(serde::Serialize, serde::Deserialize))]
     pub struct JsonScalarExprList(Vec<JsonScalarExpr>);
 
     /// optional `JsonScalarExpr` list
-    #[derive(Debug, Clone, serde::Serialize, serde::Deserialize)]
+    #[derive(Debug, Clone)]
+    #[cfg_attr(feature = "syn_serde", derive(serde::Serialize, serde::Deserialize))]
     pub struct JsonScalarExprListOpt(Option<Vec<JsonScalarExpr>>);
 
     impl crate::syn::ListOpt<JsonScalarExpr> for JsonScalarExprListOpt {
@@ -72179,7 +73064,8 @@ mod json_scalar_expr {
         use super::*;
 
         #[cfg_attr(test, derive(derive_builder::Builder))]
-        #[derive(Clone, Debug, serde::Serialize, serde::Deserialize)]
+        #[cfg_attr(feature = "syn_serde", derive(serde::Serialize, serde::Deserialize))]
+        #[derive(Clone, Debug)]
         #[allow(clippy::struct_excessive_bools)]
         #[allow(clippy::struct_field_names)]
         pub struct JsonScalarExpr {
@@ -72311,11 +73197,13 @@ mod json_serialize_expr {
     use super::*;
 
     /// `JsonSerializeExpr`
-    #[derive(Debug, Clone, serde::Serialize, serde::Deserialize)]
+    #[derive(Debug, Clone)]
+    #[cfg_attr(feature = "syn_serde", derive(serde::Serialize, serde::Deserialize))]
     pub struct JsonSerializeExpr(Box<self::inner::JsonSerializeExpr>);
 
     /// optional `JsonSerializeExpr`
-    #[derive(Debug, Clone, serde::Serialize, serde::Deserialize)]
+    #[derive(Debug, Clone)]
+    #[cfg_attr(feature = "syn_serde", derive(serde::Serialize, serde::Deserialize))]
     pub struct JsonSerializeExprOpt(Option<JsonSerializeExpr>);
 
     #[cfg(test)]
@@ -72332,11 +73220,13 @@ mod json_serialize_expr {
     }
 
     /// `JsonSerializeExpr` list
-    #[derive(Debug, Clone, serde::Serialize, serde::Deserialize)]
+    #[derive(Debug, Clone)]
+    #[cfg_attr(feature = "syn_serde", derive(serde::Serialize, serde::Deserialize))]
     pub struct JsonSerializeExprList(Vec<JsonSerializeExpr>);
 
     /// optional `JsonSerializeExpr` list
-    #[derive(Debug, Clone, serde::Serialize, serde::Deserialize)]
+    #[derive(Debug, Clone)]
+    #[cfg_attr(feature = "syn_serde", derive(serde::Serialize, serde::Deserialize))]
     pub struct JsonSerializeExprListOpt(Option<Vec<JsonSerializeExpr>>);
 
     impl crate::syn::ListOpt<JsonSerializeExpr> for JsonSerializeExprListOpt {
@@ -72436,7 +73326,8 @@ mod json_serialize_expr {
         use super::*;
 
         #[cfg_attr(test, derive(derive_builder::Builder))]
-        #[derive(Clone, Debug, serde::Serialize, serde::Deserialize)]
+        #[cfg_attr(feature = "syn_serde", derive(serde::Serialize, serde::Deserialize))]
+        #[derive(Clone, Debug)]
         #[allow(clippy::struct_excessive_bools)]
         #[allow(clippy::struct_field_names)]
         pub struct JsonSerializeExpr {
@@ -72568,11 +73459,13 @@ mod json_object_constructor {
     use super::*;
 
     /// `JsonObjectConstructor`
-    #[derive(Debug, Clone, serde::Serialize, serde::Deserialize)]
+    #[derive(Debug, Clone)]
+    #[cfg_attr(feature = "syn_serde", derive(serde::Serialize, serde::Deserialize))]
     pub struct JsonObjectConstructor(Box<self::inner::JsonObjectConstructor>);
 
     /// optional `JsonObjectConstructor`
-    #[derive(Debug, Clone, serde::Serialize, serde::Deserialize)]
+    #[derive(Debug, Clone)]
+    #[cfg_attr(feature = "syn_serde", derive(serde::Serialize, serde::Deserialize))]
     pub struct JsonObjectConstructorOpt(Option<JsonObjectConstructor>);
 
     #[cfg(test)]
@@ -72589,11 +73482,13 @@ mod json_object_constructor {
     }
 
     /// `JsonObjectConstructor` list
-    #[derive(Debug, Clone, serde::Serialize, serde::Deserialize)]
+    #[derive(Debug, Clone)]
+    #[cfg_attr(feature = "syn_serde", derive(serde::Serialize, serde::Deserialize))]
     pub struct JsonObjectConstructorList(Vec<JsonObjectConstructor>);
 
     /// optional `JsonObjectConstructor` list
-    #[derive(Debug, Clone, serde::Serialize, serde::Deserialize)]
+    #[derive(Debug, Clone)]
+    #[cfg_attr(feature = "syn_serde", derive(serde::Serialize, serde::Deserialize))]
     pub struct JsonObjectConstructorListOpt(Option<Vec<JsonObjectConstructor>>);
 
     impl crate::syn::ListOpt<JsonObjectConstructor> for JsonObjectConstructorListOpt {
@@ -72693,7 +73588,8 @@ mod json_object_constructor {
         use super::*;
 
         #[cfg_attr(test, derive(derive_builder::Builder))]
-        #[derive(Clone, Debug, serde::Serialize, serde::Deserialize)]
+        #[cfg_attr(feature = "syn_serde", derive(serde::Serialize, serde::Deserialize))]
+        #[derive(Clone, Debug)]
         #[allow(clippy::struct_excessive_bools)]
         #[allow(clippy::struct_field_names)]
         pub struct JsonObjectConstructor {
@@ -72890,11 +73786,13 @@ mod json_array_constructor {
     use super::*;
 
     /// `JsonArrayConstructor`
-    #[derive(Debug, Clone, serde::Serialize, serde::Deserialize)]
+    #[derive(Debug, Clone)]
+    #[cfg_attr(feature = "syn_serde", derive(serde::Serialize, serde::Deserialize))]
     pub struct JsonArrayConstructor(Box<self::inner::JsonArrayConstructor>);
 
     /// optional `JsonArrayConstructor`
-    #[derive(Debug, Clone, serde::Serialize, serde::Deserialize)]
+    #[derive(Debug, Clone)]
+    #[cfg_attr(feature = "syn_serde", derive(serde::Serialize, serde::Deserialize))]
     pub struct JsonArrayConstructorOpt(Option<JsonArrayConstructor>);
 
     #[cfg(test)]
@@ -72911,11 +73809,13 @@ mod json_array_constructor {
     }
 
     /// `JsonArrayConstructor` list
-    #[derive(Debug, Clone, serde::Serialize, serde::Deserialize)]
+    #[derive(Debug, Clone)]
+    #[cfg_attr(feature = "syn_serde", derive(serde::Serialize, serde::Deserialize))]
     pub struct JsonArrayConstructorList(Vec<JsonArrayConstructor>);
 
     /// optional `JsonArrayConstructor` list
-    #[derive(Debug, Clone, serde::Serialize, serde::Deserialize)]
+    #[derive(Debug, Clone)]
+    #[cfg_attr(feature = "syn_serde", derive(serde::Serialize, serde::Deserialize))]
     pub struct JsonArrayConstructorListOpt(Option<Vec<JsonArrayConstructor>>);
 
     impl crate::syn::ListOpt<JsonArrayConstructor> for JsonArrayConstructorListOpt {
@@ -73015,7 +73915,8 @@ mod json_array_constructor {
         use super::*;
 
         #[cfg_attr(test, derive(derive_builder::Builder))]
-        #[derive(Clone, Debug, serde::Serialize, serde::Deserialize)]
+        #[cfg_attr(feature = "syn_serde", derive(serde::Serialize, serde::Deserialize))]
+        #[derive(Clone, Debug)]
         #[allow(clippy::struct_excessive_bools)]
         #[allow(clippy::struct_field_names)]
         pub struct JsonArrayConstructor {
@@ -73181,11 +74082,13 @@ mod json_array_query_constructor {
     use super::*;
 
     /// `JsonArrayQueryConstructor`
-    #[derive(Debug, Clone, serde::Serialize, serde::Deserialize)]
+    #[derive(Debug, Clone)]
+    #[cfg_attr(feature = "syn_serde", derive(serde::Serialize, serde::Deserialize))]
     pub struct JsonArrayQueryConstructor(Box<self::inner::JsonArrayQueryConstructor>);
 
     /// optional `JsonArrayQueryConstructor`
-    #[derive(Debug, Clone, serde::Serialize, serde::Deserialize)]
+    #[derive(Debug, Clone)]
+    #[cfg_attr(feature = "syn_serde", derive(serde::Serialize, serde::Deserialize))]
     pub struct JsonArrayQueryConstructorOpt(Option<JsonArrayQueryConstructor>);
 
     #[cfg(test)]
@@ -73202,11 +74105,13 @@ mod json_array_query_constructor {
     }
 
     /// `JsonArrayQueryConstructor` list
-    #[derive(Debug, Clone, serde::Serialize, serde::Deserialize)]
+    #[derive(Debug, Clone)]
+    #[cfg_attr(feature = "syn_serde", derive(serde::Serialize, serde::Deserialize))]
     pub struct JsonArrayQueryConstructorList(Vec<JsonArrayQueryConstructor>);
 
     /// optional `JsonArrayQueryConstructor` list
-    #[derive(Debug, Clone, serde::Serialize, serde::Deserialize)]
+    #[derive(Debug, Clone)]
+    #[cfg_attr(feature = "syn_serde", derive(serde::Serialize, serde::Deserialize))]
     pub struct JsonArrayQueryConstructorListOpt(Option<Vec<JsonArrayQueryConstructor>>);
 
     impl crate::syn::ListOpt<JsonArrayQueryConstructor> for JsonArrayQueryConstructorListOpt {
@@ -73319,7 +74224,8 @@ mod json_array_query_constructor {
         use super::*;
 
         #[cfg_attr(test, derive(derive_builder::Builder))]
-        #[derive(Clone, Debug, serde::Serialize, serde::Deserialize)]
+        #[cfg_attr(feature = "syn_serde", derive(serde::Serialize, serde::Deserialize))]
+        #[derive(Clone, Debug)]
         #[allow(clippy::struct_excessive_bools)]
         #[allow(clippy::struct_field_names)]
         pub struct JsonArrayQueryConstructor {
@@ -73519,11 +74425,13 @@ mod json_agg_constructor {
     use super::*;
 
     /// `JsonAggConstructor`
-    #[derive(Debug, Clone, serde::Serialize, serde::Deserialize)]
+    #[derive(Debug, Clone)]
+    #[cfg_attr(feature = "syn_serde", derive(serde::Serialize, serde::Deserialize))]
     pub struct JsonAggConstructor(Box<self::inner::JsonAggConstructor>);
 
     /// optional `JsonAggConstructor`
-    #[derive(Debug, Clone, serde::Serialize, serde::Deserialize)]
+    #[derive(Debug, Clone)]
+    #[cfg_attr(feature = "syn_serde", derive(serde::Serialize, serde::Deserialize))]
     pub struct JsonAggConstructorOpt(Option<JsonAggConstructor>);
 
     #[cfg(test)]
@@ -73540,11 +74448,13 @@ mod json_agg_constructor {
     }
 
     /// `JsonAggConstructor` list
-    #[derive(Debug, Clone, serde::Serialize, serde::Deserialize)]
+    #[derive(Debug, Clone)]
+    #[cfg_attr(feature = "syn_serde", derive(serde::Serialize, serde::Deserialize))]
     pub struct JsonAggConstructorList(Vec<JsonAggConstructor>);
 
     /// optional `JsonAggConstructor` list
-    #[derive(Debug, Clone, serde::Serialize, serde::Deserialize)]
+    #[derive(Debug, Clone)]
+    #[cfg_attr(feature = "syn_serde", derive(serde::Serialize, serde::Deserialize))]
     pub struct JsonAggConstructorListOpt(Option<Vec<JsonAggConstructor>>);
 
     impl crate::syn::ListOpt<JsonAggConstructor> for JsonAggConstructorListOpt {
@@ -73644,7 +74554,8 @@ mod json_agg_constructor {
         use super::*;
 
         #[cfg_attr(test, derive(derive_builder::Builder))]
-        #[derive(Clone, Debug, serde::Serialize, serde::Deserialize)]
+        #[cfg_attr(feature = "syn_serde", derive(serde::Serialize, serde::Deserialize))]
+        #[derive(Clone, Debug)]
         #[allow(clippy::struct_excessive_bools)]
         #[allow(clippy::struct_field_names)]
         pub struct JsonAggConstructor {
@@ -73844,11 +74755,13 @@ mod json_object_agg {
     use super::*;
 
     /// `JsonObjectAgg`
-    #[derive(Debug, Clone, serde::Serialize, serde::Deserialize)]
+    #[derive(Debug, Clone)]
+    #[cfg_attr(feature = "syn_serde", derive(serde::Serialize, serde::Deserialize))]
     pub struct JsonObjectAgg(Box<self::inner::JsonObjectAgg>);
 
     /// optional `JsonObjectAgg`
-    #[derive(Debug, Clone, serde::Serialize, serde::Deserialize)]
+    #[derive(Debug, Clone)]
+    #[cfg_attr(feature = "syn_serde", derive(serde::Serialize, serde::Deserialize))]
     pub struct JsonObjectAggOpt(Option<JsonObjectAgg>);
 
     #[cfg(test)]
@@ -73865,11 +74778,13 @@ mod json_object_agg {
     }
 
     /// `JsonObjectAgg` list
-    #[derive(Debug, Clone, serde::Serialize, serde::Deserialize)]
+    #[derive(Debug, Clone)]
+    #[cfg_attr(feature = "syn_serde", derive(serde::Serialize, serde::Deserialize))]
     pub struct JsonObjectAggList(Vec<JsonObjectAgg>);
 
     /// optional `JsonObjectAgg` list
-    #[derive(Debug, Clone, serde::Serialize, serde::Deserialize)]
+    #[derive(Debug, Clone)]
+    #[cfg_attr(feature = "syn_serde", derive(serde::Serialize, serde::Deserialize))]
     pub struct JsonObjectAggListOpt(Option<Vec<JsonObjectAgg>>);
 
     impl crate::syn::ListOpt<JsonObjectAgg> for JsonObjectAggListOpt {
@@ -73969,7 +74884,8 @@ mod json_object_agg {
         use super::*;
 
         #[cfg_attr(test, derive(derive_builder::Builder))]
-        #[derive(Clone, Debug, serde::Serialize, serde::Deserialize)]
+        #[cfg_attr(feature = "syn_serde", derive(serde::Serialize, serde::Deserialize))]
+        #[derive(Clone, Debug)]
         #[allow(clippy::struct_excessive_bools)]
         #[allow(clippy::struct_field_names)]
         pub struct JsonObjectAgg {
@@ -74132,11 +75048,13 @@ mod json_array_agg {
     use super::*;
 
     /// `JsonArrayAgg`
-    #[derive(Debug, Clone, serde::Serialize, serde::Deserialize)]
+    #[derive(Debug, Clone)]
+    #[cfg_attr(feature = "syn_serde", derive(serde::Serialize, serde::Deserialize))]
     pub struct JsonArrayAgg(Box<self::inner::JsonArrayAgg>);
 
     /// optional `JsonArrayAgg`
-    #[derive(Debug, Clone, serde::Serialize, serde::Deserialize)]
+    #[derive(Debug, Clone)]
+    #[cfg_attr(feature = "syn_serde", derive(serde::Serialize, serde::Deserialize))]
     pub struct JsonArrayAggOpt(Option<JsonArrayAgg>);
 
     #[cfg(test)]
@@ -74153,11 +75071,13 @@ mod json_array_agg {
     }
 
     /// `JsonArrayAgg` list
-    #[derive(Debug, Clone, serde::Serialize, serde::Deserialize)]
+    #[derive(Debug, Clone)]
+    #[cfg_attr(feature = "syn_serde", derive(serde::Serialize, serde::Deserialize))]
     pub struct JsonArrayAggList(Vec<JsonArrayAgg>);
 
     /// optional `JsonArrayAgg` list
-    #[derive(Debug, Clone, serde::Serialize, serde::Deserialize)]
+    #[derive(Debug, Clone)]
+    #[cfg_attr(feature = "syn_serde", derive(serde::Serialize, serde::Deserialize))]
     pub struct JsonArrayAggListOpt(Option<Vec<JsonArrayAgg>>);
 
     impl crate::syn::ListOpt<JsonArrayAgg> for JsonArrayAggListOpt {
@@ -74257,7 +75177,8 @@ mod json_array_agg {
         use super::*;
 
         #[cfg_attr(test, derive(derive_builder::Builder))]
-        #[derive(Clone, Debug, serde::Serialize, serde::Deserialize)]
+        #[cfg_attr(feature = "syn_serde", derive(serde::Serialize, serde::Deserialize))]
+        #[derive(Clone, Debug)]
         #[allow(clippy::struct_excessive_bools)]
         #[allow(clippy::struct_field_names)]
         pub struct JsonArrayAgg {
@@ -74389,11 +75310,13 @@ mod raw_stmt {
     use super::*;
 
     /// `RawStmt`
-    #[derive(Debug, Clone, serde::Serialize, serde::Deserialize)]
+    #[derive(Debug, Clone)]
+    #[cfg_attr(feature = "syn_serde", derive(serde::Serialize, serde::Deserialize))]
     pub struct RawStmt(Box<self::inner::RawStmt>);
 
     /// optional `RawStmt`
-    #[derive(Debug, Clone, serde::Serialize, serde::Deserialize)]
+    #[derive(Debug, Clone)]
+    #[cfg_attr(feature = "syn_serde", derive(serde::Serialize, serde::Deserialize))]
     pub struct RawStmtOpt(Option<RawStmt>);
 
     #[cfg(test)]
@@ -74410,11 +75333,13 @@ mod raw_stmt {
     }
 
     /// `RawStmt` list
-    #[derive(Debug, Clone, serde::Serialize, serde::Deserialize)]
+    #[derive(Debug, Clone)]
+    #[cfg_attr(feature = "syn_serde", derive(serde::Serialize, serde::Deserialize))]
     pub struct RawStmtList(Vec<RawStmt>);
 
     /// optional `RawStmt` list
-    #[derive(Debug, Clone, serde::Serialize, serde::Deserialize)]
+    #[derive(Debug, Clone)]
+    #[cfg_attr(feature = "syn_serde", derive(serde::Serialize, serde::Deserialize))]
     pub struct RawStmtListOpt(Option<Vec<RawStmt>>);
 
     impl crate::syn::ListOpt<RawStmt> for RawStmtListOpt {
@@ -74514,7 +75439,8 @@ mod raw_stmt {
         use super::*;
 
         #[cfg_attr(test, derive(derive_builder::Builder))]
-        #[derive(Clone, Debug, serde::Serialize, serde::Deserialize)]
+        #[cfg_attr(feature = "syn_serde", derive(serde::Serialize, serde::Deserialize))]
+        #[derive(Clone, Debug)]
         #[allow(clippy::struct_excessive_bools)]
         #[allow(clippy::struct_field_names)]
         pub struct RawStmt {
@@ -74641,11 +75567,13 @@ mod insert_stmt {
     use super::*;
 
     /// `InsertStmt`
-    #[derive(Debug, Clone, serde::Serialize, serde::Deserialize)]
+    #[derive(Debug, Clone)]
+    #[cfg_attr(feature = "syn_serde", derive(serde::Serialize, serde::Deserialize))]
     pub struct InsertStmt(Box<self::inner::InsertStmt>);
 
     /// optional `InsertStmt`
-    #[derive(Debug, Clone, serde::Serialize, serde::Deserialize)]
+    #[derive(Debug, Clone)]
+    #[cfg_attr(feature = "syn_serde", derive(serde::Serialize, serde::Deserialize))]
     pub struct InsertStmtOpt(Option<InsertStmt>);
 
     #[cfg(test)]
@@ -74662,11 +75590,13 @@ mod insert_stmt {
     }
 
     /// `InsertStmt` list
-    #[derive(Debug, Clone, serde::Serialize, serde::Deserialize)]
+    #[derive(Debug, Clone)]
+    #[cfg_attr(feature = "syn_serde", derive(serde::Serialize, serde::Deserialize))]
     pub struct InsertStmtList(Vec<InsertStmt>);
 
     /// optional `InsertStmt` list
-    #[derive(Debug, Clone, serde::Serialize, serde::Deserialize)]
+    #[derive(Debug, Clone)]
+    #[cfg_attr(feature = "syn_serde", derive(serde::Serialize, serde::Deserialize))]
     pub struct InsertStmtListOpt(Option<Vec<InsertStmt>>);
 
     impl crate::syn::ListOpt<InsertStmt> for InsertStmtListOpt {
@@ -74766,7 +75696,8 @@ mod insert_stmt {
         use super::*;
 
         #[cfg_attr(test, derive(derive_builder::Builder))]
-        #[derive(Clone, Debug, serde::Serialize, serde::Deserialize)]
+        #[cfg_attr(feature = "syn_serde", derive(serde::Serialize, serde::Deserialize))]
+        #[derive(Clone, Debug)]
         #[allow(clippy::struct_excessive_bools)]
         #[allow(clippy::struct_field_names)]
         pub struct InsertStmt {
@@ -75035,11 +75966,13 @@ mod delete_stmt {
     use super::*;
 
     /// `DeleteStmt`
-    #[derive(Debug, Clone, serde::Serialize, serde::Deserialize)]
+    #[derive(Debug, Clone)]
+    #[cfg_attr(feature = "syn_serde", derive(serde::Serialize, serde::Deserialize))]
     pub struct DeleteStmt(Box<self::inner::DeleteStmt>);
 
     /// optional `DeleteStmt`
-    #[derive(Debug, Clone, serde::Serialize, serde::Deserialize)]
+    #[derive(Debug, Clone)]
+    #[cfg_attr(feature = "syn_serde", derive(serde::Serialize, serde::Deserialize))]
     pub struct DeleteStmtOpt(Option<DeleteStmt>);
 
     #[cfg(test)]
@@ -75056,11 +75989,13 @@ mod delete_stmt {
     }
 
     /// `DeleteStmt` list
-    #[derive(Debug, Clone, serde::Serialize, serde::Deserialize)]
+    #[derive(Debug, Clone)]
+    #[cfg_attr(feature = "syn_serde", derive(serde::Serialize, serde::Deserialize))]
     pub struct DeleteStmtList(Vec<DeleteStmt>);
 
     /// optional `DeleteStmt` list
-    #[derive(Debug, Clone, serde::Serialize, serde::Deserialize)]
+    #[derive(Debug, Clone)]
+    #[cfg_attr(feature = "syn_serde", derive(serde::Serialize, serde::Deserialize))]
     pub struct DeleteStmtListOpt(Option<Vec<DeleteStmt>>);
 
     impl crate::syn::ListOpt<DeleteStmt> for DeleteStmtListOpt {
@@ -75160,7 +76095,8 @@ mod delete_stmt {
         use super::*;
 
         #[cfg_attr(test, derive(derive_builder::Builder))]
-        #[derive(Clone, Debug, serde::Serialize, serde::Deserialize)]
+        #[cfg_attr(feature = "syn_serde", derive(serde::Serialize, serde::Deserialize))]
+        #[derive(Clone, Debug)]
         #[allow(clippy::struct_excessive_bools)]
         #[allow(clippy::struct_field_names)]
         pub struct DeleteStmt {
@@ -75361,11 +76297,13 @@ mod update_stmt {
     use super::*;
 
     /// `UpdateStmt`
-    #[derive(Debug, Clone, serde::Serialize, serde::Deserialize)]
+    #[derive(Debug, Clone)]
+    #[cfg_attr(feature = "syn_serde", derive(serde::Serialize, serde::Deserialize))]
     pub struct UpdateStmt(Box<self::inner::UpdateStmt>);
 
     /// optional `UpdateStmt`
-    #[derive(Debug, Clone, serde::Serialize, serde::Deserialize)]
+    #[derive(Debug, Clone)]
+    #[cfg_attr(feature = "syn_serde", derive(serde::Serialize, serde::Deserialize))]
     pub struct UpdateStmtOpt(Option<UpdateStmt>);
 
     #[cfg(test)]
@@ -75382,11 +76320,13 @@ mod update_stmt {
     }
 
     /// `UpdateStmt` list
-    #[derive(Debug, Clone, serde::Serialize, serde::Deserialize)]
+    #[derive(Debug, Clone)]
+    #[cfg_attr(feature = "syn_serde", derive(serde::Serialize, serde::Deserialize))]
     pub struct UpdateStmtList(Vec<UpdateStmt>);
 
     /// optional `UpdateStmt` list
-    #[derive(Debug, Clone, serde::Serialize, serde::Deserialize)]
+    #[derive(Debug, Clone)]
+    #[cfg_attr(feature = "syn_serde", derive(serde::Serialize, serde::Deserialize))]
     pub struct UpdateStmtListOpt(Option<Vec<UpdateStmt>>);
 
     impl crate::syn::ListOpt<UpdateStmt> for UpdateStmtListOpt {
@@ -75486,7 +76426,8 @@ mod update_stmt {
         use super::*;
 
         #[cfg_attr(test, derive(derive_builder::Builder))]
-        #[derive(Clone, Debug, serde::Serialize, serde::Deserialize)]
+        #[cfg_attr(feature = "syn_serde", derive(serde::Serialize, serde::Deserialize))]
+        #[derive(Clone, Debug)]
         #[allow(clippy::struct_excessive_bools)]
         #[allow(clippy::struct_field_names)]
         pub struct UpdateStmt {
@@ -75721,11 +76662,13 @@ mod merge_stmt {
     use super::*;
 
     /// `MergeStmt`
-    #[derive(Debug, Clone, serde::Serialize, serde::Deserialize)]
+    #[derive(Debug, Clone)]
+    #[cfg_attr(feature = "syn_serde", derive(serde::Serialize, serde::Deserialize))]
     pub struct MergeStmt(Box<self::inner::MergeStmt>);
 
     /// optional `MergeStmt`
-    #[derive(Debug, Clone, serde::Serialize, serde::Deserialize)]
+    #[derive(Debug, Clone)]
+    #[cfg_attr(feature = "syn_serde", derive(serde::Serialize, serde::Deserialize))]
     pub struct MergeStmtOpt(Option<MergeStmt>);
 
     #[cfg(test)]
@@ -75742,11 +76685,13 @@ mod merge_stmt {
     }
 
     /// `MergeStmt` list
-    #[derive(Debug, Clone, serde::Serialize, serde::Deserialize)]
+    #[derive(Debug, Clone)]
+    #[cfg_attr(feature = "syn_serde", derive(serde::Serialize, serde::Deserialize))]
     pub struct MergeStmtList(Vec<MergeStmt>);
 
     /// optional `MergeStmt` list
-    #[derive(Debug, Clone, serde::Serialize, serde::Deserialize)]
+    #[derive(Debug, Clone)]
+    #[cfg_attr(feature = "syn_serde", derive(serde::Serialize, serde::Deserialize))]
     pub struct MergeStmtListOpt(Option<Vec<MergeStmt>>);
 
     impl crate::syn::ListOpt<MergeStmt> for MergeStmtListOpt {
@@ -75846,7 +76791,8 @@ mod merge_stmt {
         use super::*;
 
         #[cfg_attr(test, derive(derive_builder::Builder))]
-        #[derive(Clone, Debug, serde::Serialize, serde::Deserialize)]
+        #[cfg_attr(feature = "syn_serde", derive(serde::Serialize, serde::Deserialize))]
+        #[derive(Clone, Debug)]
         #[allow(clippy::struct_excessive_bools)]
         #[allow(clippy::struct_field_names)]
         pub struct MergeStmt {
@@ -76081,11 +77027,13 @@ mod select_stmt {
     use super::*;
 
     /// `SelectStmt`
-    #[derive(Debug, Clone, serde::Serialize, serde::Deserialize)]
+    #[derive(Debug, Clone)]
+    #[cfg_attr(feature = "syn_serde", derive(serde::Serialize, serde::Deserialize))]
     pub struct SelectStmt(Box<self::inner::SelectStmt>);
 
     /// optional `SelectStmt`
-    #[derive(Debug, Clone, serde::Serialize, serde::Deserialize)]
+    #[derive(Debug, Clone)]
+    #[cfg_attr(feature = "syn_serde", derive(serde::Serialize, serde::Deserialize))]
     pub struct SelectStmtOpt(Option<SelectStmt>);
 
     #[cfg(test)]
@@ -76102,11 +77050,13 @@ mod select_stmt {
     }
 
     /// `SelectStmt` list
-    #[derive(Debug, Clone, serde::Serialize, serde::Deserialize)]
+    #[derive(Debug, Clone)]
+    #[cfg_attr(feature = "syn_serde", derive(serde::Serialize, serde::Deserialize))]
     pub struct SelectStmtList(Vec<SelectStmt>);
 
     /// optional `SelectStmt` list
-    #[derive(Debug, Clone, serde::Serialize, serde::Deserialize)]
+    #[derive(Debug, Clone)]
+    #[cfg_attr(feature = "syn_serde", derive(serde::Serialize, serde::Deserialize))]
     pub struct SelectStmtListOpt(Option<Vec<SelectStmt>>);
 
     impl crate::syn::ListOpt<SelectStmt> for SelectStmtListOpt {
@@ -76206,7 +77156,8 @@ mod select_stmt {
         use super::*;
 
         #[cfg_attr(test, derive(derive_builder::Builder))]
-        #[derive(Clone, Debug, serde::Serialize, serde::Deserialize)]
+        #[cfg_attr(feature = "syn_serde", derive(serde::Serialize, serde::Deserialize))]
+        #[derive(Clone, Debug)]
         #[allow(clippy::struct_excessive_bools)]
         #[allow(clippy::struct_field_names)]
         pub struct SelectStmt {
@@ -76911,11 +77862,13 @@ mod set_operation_stmt {
     use super::*;
 
     /// `SetOperationStmt`
-    #[derive(Debug, Clone, serde::Serialize, serde::Deserialize)]
+    #[derive(Debug, Clone)]
+    #[cfg_attr(feature = "syn_serde", derive(serde::Serialize, serde::Deserialize))]
     pub struct SetOperationStmt(Box<self::inner::SetOperationStmt>);
 
     /// optional `SetOperationStmt`
-    #[derive(Debug, Clone, serde::Serialize, serde::Deserialize)]
+    #[derive(Debug, Clone)]
+    #[cfg_attr(feature = "syn_serde", derive(serde::Serialize, serde::Deserialize))]
     pub struct SetOperationStmtOpt(Option<SetOperationStmt>);
 
     #[cfg(test)]
@@ -76932,11 +77885,13 @@ mod set_operation_stmt {
     }
 
     /// `SetOperationStmt` list
-    #[derive(Debug, Clone, serde::Serialize, serde::Deserialize)]
+    #[derive(Debug, Clone)]
+    #[cfg_attr(feature = "syn_serde", derive(serde::Serialize, serde::Deserialize))]
     pub struct SetOperationStmtList(Vec<SetOperationStmt>);
 
     /// optional `SetOperationStmt` list
-    #[derive(Debug, Clone, serde::Serialize, serde::Deserialize)]
+    #[derive(Debug, Clone)]
+    #[cfg_attr(feature = "syn_serde", derive(serde::Serialize, serde::Deserialize))]
     pub struct SetOperationStmtListOpt(Option<Vec<SetOperationStmt>>);
 
     impl crate::syn::ListOpt<SetOperationStmt> for SetOperationStmtListOpt {
@@ -77036,7 +77991,8 @@ mod set_operation_stmt {
         use super::*;
 
         #[cfg_attr(test, derive(derive_builder::Builder))]
-        #[derive(Clone, Debug, serde::Serialize, serde::Deserialize)]
+        #[cfg_attr(feature = "syn_serde", derive(serde::Serialize, serde::Deserialize))]
+        #[derive(Clone, Debug)]
         #[allow(clippy::struct_excessive_bools)]
         #[allow(clippy::struct_field_names)]
         pub struct SetOperationStmt {
@@ -77338,11 +78294,13 @@ mod return_stmt {
     use super::*;
 
     /// `ReturnStmt`
-    #[derive(Debug, Clone, serde::Serialize, serde::Deserialize)]
+    #[derive(Debug, Clone)]
+    #[cfg_attr(feature = "syn_serde", derive(serde::Serialize, serde::Deserialize))]
     pub struct ReturnStmt(Box<self::inner::ReturnStmt>);
 
     /// optional `ReturnStmt`
-    #[derive(Debug, Clone, serde::Serialize, serde::Deserialize)]
+    #[derive(Debug, Clone)]
+    #[cfg_attr(feature = "syn_serde", derive(serde::Serialize, serde::Deserialize))]
     pub struct ReturnStmtOpt(Option<ReturnStmt>);
 
     #[cfg(test)]
@@ -77359,11 +78317,13 @@ mod return_stmt {
     }
 
     /// `ReturnStmt` list
-    #[derive(Debug, Clone, serde::Serialize, serde::Deserialize)]
+    #[derive(Debug, Clone)]
+    #[cfg_attr(feature = "syn_serde", derive(serde::Serialize, serde::Deserialize))]
     pub struct ReturnStmtList(Vec<ReturnStmt>);
 
     /// optional `ReturnStmt` list
-    #[derive(Debug, Clone, serde::Serialize, serde::Deserialize)]
+    #[derive(Debug, Clone)]
+    #[cfg_attr(feature = "syn_serde", derive(serde::Serialize, serde::Deserialize))]
     pub struct ReturnStmtListOpt(Option<Vec<ReturnStmt>>);
 
     impl crate::syn::ListOpt<ReturnStmt> for ReturnStmtListOpt {
@@ -77463,7 +78423,8 @@ mod return_stmt {
         use super::*;
 
         #[cfg_attr(test, derive(derive_builder::Builder))]
-        #[derive(Clone, Debug, serde::Serialize, serde::Deserialize)]
+        #[cfg_attr(feature = "syn_serde", derive(serde::Serialize, serde::Deserialize))]
+        #[derive(Clone, Debug)]
         #[allow(clippy::struct_excessive_bools)]
         #[allow(clippy::struct_field_names)]
         pub struct ReturnStmt {
@@ -77526,11 +78487,13 @@ mod pl_assign_stmt {
     use super::*;
 
     /// `PlAssignStmt`
-    #[derive(Debug, Clone, serde::Serialize, serde::Deserialize)]
+    #[derive(Debug, Clone)]
+    #[cfg_attr(feature = "syn_serde", derive(serde::Serialize, serde::Deserialize))]
     pub struct PlAssignStmt(Box<self::inner::PlAssignStmt>);
 
     /// optional `PlAssignStmt`
-    #[derive(Debug, Clone, serde::Serialize, serde::Deserialize)]
+    #[derive(Debug, Clone)]
+    #[cfg_attr(feature = "syn_serde", derive(serde::Serialize, serde::Deserialize))]
     pub struct PlAssignStmtOpt(Option<PlAssignStmt>);
 
     #[cfg(test)]
@@ -77547,11 +78510,13 @@ mod pl_assign_stmt {
     }
 
     /// `PlAssignStmt` list
-    #[derive(Debug, Clone, serde::Serialize, serde::Deserialize)]
+    #[derive(Debug, Clone)]
+    #[cfg_attr(feature = "syn_serde", derive(serde::Serialize, serde::Deserialize))]
     pub struct PlAssignStmtList(Vec<PlAssignStmt>);
 
     /// optional `PlAssignStmt` list
-    #[derive(Debug, Clone, serde::Serialize, serde::Deserialize)]
+    #[derive(Debug, Clone)]
+    #[cfg_attr(feature = "syn_serde", derive(serde::Serialize, serde::Deserialize))]
     pub struct PlAssignStmtListOpt(Option<Vec<PlAssignStmt>>);
 
     impl crate::syn::ListOpt<PlAssignStmt> for PlAssignStmtListOpt {
@@ -77651,7 +78616,8 @@ mod pl_assign_stmt {
         use super::*;
 
         #[cfg_attr(test, derive(derive_builder::Builder))]
-        #[derive(Clone, Debug, serde::Serialize, serde::Deserialize)]
+        #[cfg_attr(feature = "syn_serde", derive(serde::Serialize, serde::Deserialize))]
+        #[derive(Clone, Debug)]
         #[allow(clippy::struct_excessive_bools)]
         #[allow(clippy::struct_field_names)]
         pub struct PlAssignStmt {
@@ -77845,11 +78811,13 @@ mod create_schema_stmt {
     use super::*;
 
     /// `CreateSchemaStmt`
-    #[derive(Debug, Clone, serde::Serialize, serde::Deserialize)]
+    #[derive(Debug, Clone)]
+    #[cfg_attr(feature = "syn_serde", derive(serde::Serialize, serde::Deserialize))]
     pub struct CreateSchemaStmt(Box<self::inner::CreateSchemaStmt>);
 
     /// optional `CreateSchemaStmt`
-    #[derive(Debug, Clone, serde::Serialize, serde::Deserialize)]
+    #[derive(Debug, Clone)]
+    #[cfg_attr(feature = "syn_serde", derive(serde::Serialize, serde::Deserialize))]
     pub struct CreateSchemaStmtOpt(Option<CreateSchemaStmt>);
 
     #[cfg(test)]
@@ -77866,11 +78834,13 @@ mod create_schema_stmt {
     }
 
     /// `CreateSchemaStmt` list
-    #[derive(Debug, Clone, serde::Serialize, serde::Deserialize)]
+    #[derive(Debug, Clone)]
+    #[cfg_attr(feature = "syn_serde", derive(serde::Serialize, serde::Deserialize))]
     pub struct CreateSchemaStmtList(Vec<CreateSchemaStmt>);
 
     /// optional `CreateSchemaStmt` list
-    #[derive(Debug, Clone, serde::Serialize, serde::Deserialize)]
+    #[derive(Debug, Clone)]
+    #[cfg_attr(feature = "syn_serde", derive(serde::Serialize, serde::Deserialize))]
     pub struct CreateSchemaStmtListOpt(Option<Vec<CreateSchemaStmt>>);
 
     impl crate::syn::ListOpt<CreateSchemaStmt> for CreateSchemaStmtListOpt {
@@ -77970,7 +78940,8 @@ mod create_schema_stmt {
         use super::*;
 
         #[cfg_attr(test, derive(derive_builder::Builder))]
-        #[derive(Clone, Debug, serde::Serialize, serde::Deserialize)]
+        #[cfg_attr(feature = "syn_serde", derive(serde::Serialize, serde::Deserialize))]
+        #[derive(Clone, Debug)]
         #[allow(clippy::struct_excessive_bools)]
         #[allow(clippy::struct_field_names)]
         pub struct CreateSchemaStmt {
@@ -78133,11 +79104,13 @@ mod alter_table_stmt {
     use super::*;
 
     /// `AlterTableStmt`
-    #[derive(Debug, Clone, serde::Serialize, serde::Deserialize)]
+    #[derive(Debug, Clone)]
+    #[cfg_attr(feature = "syn_serde", derive(serde::Serialize, serde::Deserialize))]
     pub struct AlterTableStmt(Box<self::inner::AlterTableStmt>);
 
     /// optional `AlterTableStmt`
-    #[derive(Debug, Clone, serde::Serialize, serde::Deserialize)]
+    #[derive(Debug, Clone)]
+    #[cfg_attr(feature = "syn_serde", derive(serde::Serialize, serde::Deserialize))]
     pub struct AlterTableStmtOpt(Option<AlterTableStmt>);
 
     #[cfg(test)]
@@ -78154,11 +79127,13 @@ mod alter_table_stmt {
     }
 
     /// `AlterTableStmt` list
-    #[derive(Debug, Clone, serde::Serialize, serde::Deserialize)]
+    #[derive(Debug, Clone)]
+    #[cfg_attr(feature = "syn_serde", derive(serde::Serialize, serde::Deserialize))]
     pub struct AlterTableStmtList(Vec<AlterTableStmt>);
 
     /// optional `AlterTableStmt` list
-    #[derive(Debug, Clone, serde::Serialize, serde::Deserialize)]
+    #[derive(Debug, Clone)]
+    #[cfg_attr(feature = "syn_serde", derive(serde::Serialize, serde::Deserialize))]
     pub struct AlterTableStmtListOpt(Option<Vec<AlterTableStmt>>);
 
     impl crate::syn::ListOpt<AlterTableStmt> for AlterTableStmtListOpt {
@@ -78258,7 +79233,8 @@ mod alter_table_stmt {
         use super::*;
 
         #[cfg_attr(test, derive(derive_builder::Builder))]
-        #[derive(Clone, Debug, serde::Serialize, serde::Deserialize)]
+        #[cfg_attr(feature = "syn_serde", derive(serde::Serialize, serde::Deserialize))]
+        #[derive(Clone, Debug)]
         #[allow(clippy::struct_excessive_bools)]
         #[allow(clippy::struct_field_names)]
         pub struct AlterTableStmt {
@@ -78424,11 +79400,13 @@ mod replica_identity_stmt {
     use super::*;
 
     /// `ReplicaIdentityStmt`
-    #[derive(Debug, Clone, serde::Serialize, serde::Deserialize)]
+    #[derive(Debug, Clone)]
+    #[cfg_attr(feature = "syn_serde", derive(serde::Serialize, serde::Deserialize))]
     pub struct ReplicaIdentityStmt(Box<self::inner::ReplicaIdentityStmt>);
 
     /// optional `ReplicaIdentityStmt`
-    #[derive(Debug, Clone, serde::Serialize, serde::Deserialize)]
+    #[derive(Debug, Clone)]
+    #[cfg_attr(feature = "syn_serde", derive(serde::Serialize, serde::Deserialize))]
     pub struct ReplicaIdentityStmtOpt(Option<ReplicaIdentityStmt>);
 
     #[cfg(test)]
@@ -78445,11 +79423,13 @@ mod replica_identity_stmt {
     }
 
     /// `ReplicaIdentityStmt` list
-    #[derive(Debug, Clone, serde::Serialize, serde::Deserialize)]
+    #[derive(Debug, Clone)]
+    #[cfg_attr(feature = "syn_serde", derive(serde::Serialize, serde::Deserialize))]
     pub struct ReplicaIdentityStmtList(Vec<ReplicaIdentityStmt>);
 
     /// optional `ReplicaIdentityStmt` list
-    #[derive(Debug, Clone, serde::Serialize, serde::Deserialize)]
+    #[derive(Debug, Clone)]
+    #[cfg_attr(feature = "syn_serde", derive(serde::Serialize, serde::Deserialize))]
     pub struct ReplicaIdentityStmtListOpt(Option<Vec<ReplicaIdentityStmt>>);
 
     impl crate::syn::ListOpt<ReplicaIdentityStmt> for ReplicaIdentityStmtListOpt {
@@ -78549,7 +79529,8 @@ mod replica_identity_stmt {
         use super::*;
 
         #[cfg_attr(test, derive(derive_builder::Builder))]
-        #[derive(Clone, Debug, serde::Serialize, serde::Deserialize)]
+        #[cfg_attr(feature = "syn_serde", derive(serde::Serialize, serde::Deserialize))]
+        #[derive(Clone, Debug)]
         #[allow(clippy::struct_excessive_bools)]
         #[allow(clippy::struct_field_names)]
         pub struct ReplicaIdentityStmt {
@@ -78645,11 +79626,13 @@ mod alter_table_cmd {
     use super::*;
 
     /// `AlterTableCmd`
-    #[derive(Debug, Clone, serde::Serialize, serde::Deserialize)]
+    #[derive(Debug, Clone)]
+    #[cfg_attr(feature = "syn_serde", derive(serde::Serialize, serde::Deserialize))]
     pub struct AlterTableCmd(Box<self::inner::AlterTableCmd>);
 
     /// optional `AlterTableCmd`
-    #[derive(Debug, Clone, serde::Serialize, serde::Deserialize)]
+    #[derive(Debug, Clone)]
+    #[cfg_attr(feature = "syn_serde", derive(serde::Serialize, serde::Deserialize))]
     pub struct AlterTableCmdOpt(Option<AlterTableCmd>);
 
     #[cfg(test)]
@@ -78666,11 +79649,13 @@ mod alter_table_cmd {
     }
 
     /// `AlterTableCmd` list
-    #[derive(Debug, Clone, serde::Serialize, serde::Deserialize)]
+    #[derive(Debug, Clone)]
+    #[cfg_attr(feature = "syn_serde", derive(serde::Serialize, serde::Deserialize))]
     pub struct AlterTableCmdList(Vec<AlterTableCmd>);
 
     /// optional `AlterTableCmd` list
-    #[derive(Debug, Clone, serde::Serialize, serde::Deserialize)]
+    #[derive(Debug, Clone)]
+    #[cfg_attr(feature = "syn_serde", derive(serde::Serialize, serde::Deserialize))]
     pub struct AlterTableCmdListOpt(Option<Vec<AlterTableCmd>>);
 
     impl crate::syn::ListOpt<AlterTableCmd> for AlterTableCmdListOpt {
@@ -78770,7 +79755,8 @@ mod alter_table_cmd {
         use super::*;
 
         #[cfg_attr(test, derive(derive_builder::Builder))]
-        #[derive(Clone, Debug, serde::Serialize, serde::Deserialize)]
+        #[cfg_attr(feature = "syn_serde", derive(serde::Serialize, serde::Deserialize))]
+        #[derive(Clone, Debug)]
         #[allow(clippy::struct_excessive_bools)]
         #[allow(clippy::struct_field_names)]
         pub struct AlterTableCmd {
@@ -79063,11 +80049,13 @@ mod alter_collation_stmt {
     use super::*;
 
     /// `AlterCollationStmt`
-    #[derive(Debug, Clone, serde::Serialize, serde::Deserialize)]
+    #[derive(Debug, Clone)]
+    #[cfg_attr(feature = "syn_serde", derive(serde::Serialize, serde::Deserialize))]
     pub struct AlterCollationStmt(Box<self::inner::AlterCollationStmt>);
 
     /// optional `AlterCollationStmt`
-    #[derive(Debug, Clone, serde::Serialize, serde::Deserialize)]
+    #[derive(Debug, Clone)]
+    #[cfg_attr(feature = "syn_serde", derive(serde::Serialize, serde::Deserialize))]
     pub struct AlterCollationStmtOpt(Option<AlterCollationStmt>);
 
     #[cfg(test)]
@@ -79084,11 +80072,13 @@ mod alter_collation_stmt {
     }
 
     /// `AlterCollationStmt` list
-    #[derive(Debug, Clone, serde::Serialize, serde::Deserialize)]
+    #[derive(Debug, Clone)]
+    #[cfg_attr(feature = "syn_serde", derive(serde::Serialize, serde::Deserialize))]
     pub struct AlterCollationStmtList(Vec<AlterCollationStmt>);
 
     /// optional `AlterCollationStmt` list
-    #[derive(Debug, Clone, serde::Serialize, serde::Deserialize)]
+    #[derive(Debug, Clone)]
+    #[cfg_attr(feature = "syn_serde", derive(serde::Serialize, serde::Deserialize))]
     pub struct AlterCollationStmtListOpt(Option<Vec<AlterCollationStmt>>);
 
     impl crate::syn::ListOpt<AlterCollationStmt> for AlterCollationStmtListOpt {
@@ -79188,7 +80178,8 @@ mod alter_collation_stmt {
         use super::*;
 
         #[cfg_attr(test, derive(derive_builder::Builder))]
-        #[derive(Clone, Debug, serde::Serialize, serde::Deserialize)]
+        #[cfg_attr(feature = "syn_serde", derive(serde::Serialize, serde::Deserialize))]
+        #[derive(Clone, Debug)]
         #[allow(clippy::struct_excessive_bools)]
         #[allow(clippy::struct_field_names)]
         pub struct AlterCollationStmt {
@@ -79253,11 +80244,13 @@ mod alter_domain_stmt {
     use super::*;
 
     /// `AlterDomainStmt`
-    #[derive(Debug, Clone, serde::Serialize, serde::Deserialize)]
+    #[derive(Debug, Clone)]
+    #[cfg_attr(feature = "syn_serde", derive(serde::Serialize, serde::Deserialize))]
     pub struct AlterDomainStmt(Box<self::inner::AlterDomainStmt>);
 
     /// optional `AlterDomainStmt`
-    #[derive(Debug, Clone, serde::Serialize, serde::Deserialize)]
+    #[derive(Debug, Clone)]
+    #[cfg_attr(feature = "syn_serde", derive(serde::Serialize, serde::Deserialize))]
     pub struct AlterDomainStmtOpt(Option<AlterDomainStmt>);
 
     #[cfg(test)]
@@ -79274,11 +80267,13 @@ mod alter_domain_stmt {
     }
 
     /// `AlterDomainStmt` list
-    #[derive(Debug, Clone, serde::Serialize, serde::Deserialize)]
+    #[derive(Debug, Clone)]
+    #[cfg_attr(feature = "syn_serde", derive(serde::Serialize, serde::Deserialize))]
     pub struct AlterDomainStmtList(Vec<AlterDomainStmt>);
 
     /// optional `AlterDomainStmt` list
-    #[derive(Debug, Clone, serde::Serialize, serde::Deserialize)]
+    #[derive(Debug, Clone)]
+    #[cfg_attr(feature = "syn_serde", derive(serde::Serialize, serde::Deserialize))]
     pub struct AlterDomainStmtListOpt(Option<Vec<AlterDomainStmt>>);
 
     impl crate::syn::ListOpt<AlterDomainStmt> for AlterDomainStmtListOpt {
@@ -79378,7 +80373,8 @@ mod alter_domain_stmt {
         use super::*;
 
         #[cfg_attr(test, derive(derive_builder::Builder))]
-        #[derive(Clone, Debug, serde::Serialize, serde::Deserialize)]
+        #[cfg_attr(feature = "syn_serde", derive(serde::Serialize, serde::Deserialize))]
+        #[derive(Clone, Debug)]
         #[allow(clippy::struct_excessive_bools)]
         #[allow(clippy::struct_field_names)]
         pub struct AlterDomainStmt {
@@ -79606,11 +80602,13 @@ mod grant_stmt {
     use super::*;
 
     /// `GrantStmt`
-    #[derive(Debug, Clone, serde::Serialize, serde::Deserialize)]
+    #[derive(Debug, Clone)]
+    #[cfg_attr(feature = "syn_serde", derive(serde::Serialize, serde::Deserialize))]
     pub struct GrantStmt(Box<self::inner::GrantStmt>);
 
     /// optional `GrantStmt`
-    #[derive(Debug, Clone, serde::Serialize, serde::Deserialize)]
+    #[derive(Debug, Clone)]
+    #[cfg_attr(feature = "syn_serde", derive(serde::Serialize, serde::Deserialize))]
     pub struct GrantStmtOpt(Option<GrantStmt>);
 
     #[cfg(test)]
@@ -79627,11 +80625,13 @@ mod grant_stmt {
     }
 
     /// `GrantStmt` list
-    #[derive(Debug, Clone, serde::Serialize, serde::Deserialize)]
+    #[derive(Debug, Clone)]
+    #[cfg_attr(feature = "syn_serde", derive(serde::Serialize, serde::Deserialize))]
     pub struct GrantStmtList(Vec<GrantStmt>);
 
     /// optional `GrantStmt` list
-    #[derive(Debug, Clone, serde::Serialize, serde::Deserialize)]
+    #[derive(Debug, Clone)]
+    #[cfg_attr(feature = "syn_serde", derive(serde::Serialize, serde::Deserialize))]
     pub struct GrantStmtListOpt(Option<Vec<GrantStmt>>);
 
     impl crate::syn::ListOpt<GrantStmt> for GrantStmtListOpt {
@@ -79731,7 +80731,8 @@ mod grant_stmt {
         use super::*;
 
         #[cfg_attr(test, derive(derive_builder::Builder))]
-        #[derive(Clone, Debug, serde::Serialize, serde::Deserialize)]
+        #[cfg_attr(feature = "syn_serde", derive(serde::Serialize, serde::Deserialize))]
+        #[derive(Clone, Debug)]
         #[allow(clippy::struct_excessive_bools)]
         #[allow(clippy::struct_field_names)]
         pub struct GrantStmt {
@@ -80062,11 +81063,13 @@ mod object_with_args {
     use super::*;
 
     /// `ObjectWithArgs`
-    #[derive(Debug, Clone, serde::Serialize, serde::Deserialize)]
+    #[derive(Debug, Clone)]
+    #[cfg_attr(feature = "syn_serde", derive(serde::Serialize, serde::Deserialize))]
     pub struct ObjectWithArgs(Box<self::inner::ObjectWithArgs>);
 
     /// optional `ObjectWithArgs`
-    #[derive(Debug, Clone, serde::Serialize, serde::Deserialize)]
+    #[derive(Debug, Clone)]
+    #[cfg_attr(feature = "syn_serde", derive(serde::Serialize, serde::Deserialize))]
     pub struct ObjectWithArgsOpt(Option<ObjectWithArgs>);
 
     #[cfg(test)]
@@ -80083,11 +81086,13 @@ mod object_with_args {
     }
 
     /// `ObjectWithArgs` list
-    #[derive(Debug, Clone, serde::Serialize, serde::Deserialize)]
+    #[derive(Debug, Clone)]
+    #[cfg_attr(feature = "syn_serde", derive(serde::Serialize, serde::Deserialize))]
     pub struct ObjectWithArgsList(Vec<ObjectWithArgs>);
 
     /// optional `ObjectWithArgs` list
-    #[derive(Debug, Clone, serde::Serialize, serde::Deserialize)]
+    #[derive(Debug, Clone)]
+    #[cfg_attr(feature = "syn_serde", derive(serde::Serialize, serde::Deserialize))]
     pub struct ObjectWithArgsListOpt(Option<Vec<ObjectWithArgs>>);
 
     impl crate::syn::ListOpt<ObjectWithArgs> for ObjectWithArgsListOpt {
@@ -80187,7 +81192,8 @@ mod object_with_args {
         use super::*;
 
         #[cfg_attr(test, derive(derive_builder::Builder))]
-        #[derive(Clone, Debug, serde::Serialize, serde::Deserialize)]
+        #[cfg_attr(feature = "syn_serde", derive(serde::Serialize, serde::Deserialize))]
+        #[derive(Clone, Debug)]
         #[allow(clippy::struct_excessive_bools)]
         #[allow(clippy::struct_field_names)]
         pub struct ObjectWithArgs {
@@ -80353,11 +81359,13 @@ mod access_priv {
     use super::*;
 
     /// `AccessPriv`
-    #[derive(Debug, Clone, serde::Serialize, serde::Deserialize)]
+    #[derive(Debug, Clone)]
+    #[cfg_attr(feature = "syn_serde", derive(serde::Serialize, serde::Deserialize))]
     pub struct AccessPriv(Box<self::inner::AccessPriv>);
 
     /// optional `AccessPriv`
-    #[derive(Debug, Clone, serde::Serialize, serde::Deserialize)]
+    #[derive(Debug, Clone)]
+    #[cfg_attr(feature = "syn_serde", derive(serde::Serialize, serde::Deserialize))]
     pub struct AccessPrivOpt(Option<AccessPriv>);
 
     #[cfg(test)]
@@ -80374,11 +81382,13 @@ mod access_priv {
     }
 
     /// `AccessPriv` list
-    #[derive(Debug, Clone, serde::Serialize, serde::Deserialize)]
+    #[derive(Debug, Clone)]
+    #[cfg_attr(feature = "syn_serde", derive(serde::Serialize, serde::Deserialize))]
     pub struct AccessPrivList(Vec<AccessPriv>);
 
     /// optional `AccessPriv` list
-    #[derive(Debug, Clone, serde::Serialize, serde::Deserialize)]
+    #[derive(Debug, Clone)]
+    #[cfg_attr(feature = "syn_serde", derive(serde::Serialize, serde::Deserialize))]
     pub struct AccessPrivListOpt(Option<Vec<AccessPriv>>);
 
     impl crate::syn::ListOpt<AccessPriv> for AccessPrivListOpt {
@@ -80478,7 +81488,8 @@ mod access_priv {
         use super::*;
 
         #[cfg_attr(test, derive(derive_builder::Builder))]
-        #[derive(Clone, Debug, serde::Serialize, serde::Deserialize)]
+        #[cfg_attr(feature = "syn_serde", derive(serde::Serialize, serde::Deserialize))]
+        #[derive(Clone, Debug)]
         #[allow(clippy::struct_excessive_bools)]
         #[allow(clippy::struct_field_names)]
         pub struct AccessPriv {
@@ -80570,11 +81581,13 @@ mod grant_role_stmt {
     use super::*;
 
     /// `GrantRoleStmt`
-    #[derive(Debug, Clone, serde::Serialize, serde::Deserialize)]
+    #[derive(Debug, Clone)]
+    #[cfg_attr(feature = "syn_serde", derive(serde::Serialize, serde::Deserialize))]
     pub struct GrantRoleStmt(Box<self::inner::GrantRoleStmt>);
 
     /// optional `GrantRoleStmt`
-    #[derive(Debug, Clone, serde::Serialize, serde::Deserialize)]
+    #[derive(Debug, Clone)]
+    #[cfg_attr(feature = "syn_serde", derive(serde::Serialize, serde::Deserialize))]
     pub struct GrantRoleStmtOpt(Option<GrantRoleStmt>);
 
     #[cfg(test)]
@@ -80591,11 +81604,13 @@ mod grant_role_stmt {
     }
 
     /// `GrantRoleStmt` list
-    #[derive(Debug, Clone, serde::Serialize, serde::Deserialize)]
+    #[derive(Debug, Clone)]
+    #[cfg_attr(feature = "syn_serde", derive(serde::Serialize, serde::Deserialize))]
     pub struct GrantRoleStmtList(Vec<GrantRoleStmt>);
 
     /// optional `GrantRoleStmt` list
-    #[derive(Debug, Clone, serde::Serialize, serde::Deserialize)]
+    #[derive(Debug, Clone)]
+    #[cfg_attr(feature = "syn_serde", derive(serde::Serialize, serde::Deserialize))]
     pub struct GrantRoleStmtListOpt(Option<Vec<GrantRoleStmt>>);
 
     impl crate::syn::ListOpt<GrantRoleStmt> for GrantRoleStmtListOpt {
@@ -80695,7 +81710,8 @@ mod grant_role_stmt {
         use super::*;
 
         #[cfg_attr(test, derive(derive_builder::Builder))]
-        #[derive(Clone, Debug, serde::Serialize, serde::Deserialize)]
+        #[cfg_attr(feature = "syn_serde", derive(serde::Serialize, serde::Deserialize))]
+        #[derive(Clone, Debug)]
         #[allow(clippy::struct_excessive_bools)]
         #[allow(clippy::struct_field_names)]
         pub struct GrantRoleStmt {
@@ -80929,11 +81945,13 @@ mod alter_default_privileges_stmt {
     use super::*;
 
     /// `AlterDefaultPrivilegesStmt`
-    #[derive(Debug, Clone, serde::Serialize, serde::Deserialize)]
+    #[derive(Debug, Clone)]
+    #[cfg_attr(feature = "syn_serde", derive(serde::Serialize, serde::Deserialize))]
     pub struct AlterDefaultPrivilegesStmt(Box<self::inner::AlterDefaultPrivilegesStmt>);
 
     /// optional `AlterDefaultPrivilegesStmt`
-    #[derive(Debug, Clone, serde::Serialize, serde::Deserialize)]
+    #[derive(Debug, Clone)]
+    #[cfg_attr(feature = "syn_serde", derive(serde::Serialize, serde::Deserialize))]
     pub struct AlterDefaultPrivilegesStmtOpt(Option<AlterDefaultPrivilegesStmt>);
 
     #[cfg(test)]
@@ -80950,11 +81968,13 @@ mod alter_default_privileges_stmt {
     }
 
     /// `AlterDefaultPrivilegesStmt` list
-    #[derive(Debug, Clone, serde::Serialize, serde::Deserialize)]
+    #[derive(Debug, Clone)]
+    #[cfg_attr(feature = "syn_serde", derive(serde::Serialize, serde::Deserialize))]
     pub struct AlterDefaultPrivilegesStmtList(Vec<AlterDefaultPrivilegesStmt>);
 
     /// optional `AlterDefaultPrivilegesStmt` list
-    #[derive(Debug, Clone, serde::Serialize, serde::Deserialize)]
+    #[derive(Debug, Clone)]
+    #[cfg_attr(feature = "syn_serde", derive(serde::Serialize, serde::Deserialize))]
     pub struct AlterDefaultPrivilegesStmtListOpt(Option<Vec<AlterDefaultPrivilegesStmt>>);
 
     impl crate::syn::ListOpt<AlterDefaultPrivilegesStmt> for AlterDefaultPrivilegesStmtListOpt {
@@ -81069,7 +82089,8 @@ mod alter_default_privileges_stmt {
         use super::*;
 
         #[cfg_attr(test, derive(derive_builder::Builder))]
-        #[derive(Clone, Debug, serde::Serialize, serde::Deserialize)]
+        #[cfg_attr(feature = "syn_serde", derive(serde::Serialize, serde::Deserialize))]
+        #[derive(Clone, Debug)]
         #[allow(clippy::struct_excessive_bools)]
         #[allow(clippy::struct_field_names)]
         pub struct AlterDefaultPrivilegesStmt {
@@ -81167,11 +82188,13 @@ mod copy_stmt {
     use super::*;
 
     /// `CopyStmt`
-    #[derive(Debug, Clone, serde::Serialize, serde::Deserialize)]
+    #[derive(Debug, Clone)]
+    #[cfg_attr(feature = "syn_serde", derive(serde::Serialize, serde::Deserialize))]
     pub struct CopyStmt(Box<self::inner::CopyStmt>);
 
     /// optional `CopyStmt`
-    #[derive(Debug, Clone, serde::Serialize, serde::Deserialize)]
+    #[derive(Debug, Clone)]
+    #[cfg_attr(feature = "syn_serde", derive(serde::Serialize, serde::Deserialize))]
     pub struct CopyStmtOpt(Option<CopyStmt>);
 
     #[cfg(test)]
@@ -81188,11 +82211,13 @@ mod copy_stmt {
     }
 
     /// `CopyStmt` list
-    #[derive(Debug, Clone, serde::Serialize, serde::Deserialize)]
+    #[derive(Debug, Clone)]
+    #[cfg_attr(feature = "syn_serde", derive(serde::Serialize, serde::Deserialize))]
     pub struct CopyStmtList(Vec<CopyStmt>);
 
     /// optional `CopyStmt` list
-    #[derive(Debug, Clone, serde::Serialize, serde::Deserialize)]
+    #[derive(Debug, Clone)]
+    #[cfg_attr(feature = "syn_serde", derive(serde::Serialize, serde::Deserialize))]
     pub struct CopyStmtListOpt(Option<Vec<CopyStmt>>);
 
     impl crate::syn::ListOpt<CopyStmt> for CopyStmtListOpt {
@@ -81292,7 +82317,8 @@ mod copy_stmt {
         use super::*;
 
         #[cfg_attr(test, derive(derive_builder::Builder))]
-        #[derive(Clone, Debug, serde::Serialize, serde::Deserialize)]
+        #[cfg_attr(feature = "syn_serde", derive(serde::Serialize, serde::Deserialize))]
+        #[derive(Clone, Debug)]
         #[allow(clippy::struct_excessive_bools)]
         #[allow(clippy::struct_field_names)]
         pub struct CopyStmt {
@@ -81586,11 +82612,13 @@ mod variable_set_stmt {
     use super::*;
 
     /// `VariableSetStmt`
-    #[derive(Debug, Clone, serde::Serialize, serde::Deserialize)]
+    #[derive(Debug, Clone)]
+    #[cfg_attr(feature = "syn_serde", derive(serde::Serialize, serde::Deserialize))]
     pub struct VariableSetStmt(Box<self::inner::VariableSetStmt>);
 
     /// optional `VariableSetStmt`
-    #[derive(Debug, Clone, serde::Serialize, serde::Deserialize)]
+    #[derive(Debug, Clone)]
+    #[cfg_attr(feature = "syn_serde", derive(serde::Serialize, serde::Deserialize))]
     pub struct VariableSetStmtOpt(Option<VariableSetStmt>);
 
     #[cfg(test)]
@@ -81607,11 +82635,13 @@ mod variable_set_stmt {
     }
 
     /// `VariableSetStmt` list
-    #[derive(Debug, Clone, serde::Serialize, serde::Deserialize)]
+    #[derive(Debug, Clone)]
+    #[cfg_attr(feature = "syn_serde", derive(serde::Serialize, serde::Deserialize))]
     pub struct VariableSetStmtList(Vec<VariableSetStmt>);
 
     /// optional `VariableSetStmt` list
-    #[derive(Debug, Clone, serde::Serialize, serde::Deserialize)]
+    #[derive(Debug, Clone)]
+    #[cfg_attr(feature = "syn_serde", derive(serde::Serialize, serde::Deserialize))]
     pub struct VariableSetStmtListOpt(Option<Vec<VariableSetStmt>>);
 
     impl crate::syn::ListOpt<VariableSetStmt> for VariableSetStmtListOpt {
@@ -81711,7 +82741,8 @@ mod variable_set_stmt {
         use super::*;
 
         #[cfg_attr(test, derive(derive_builder::Builder))]
-        #[derive(Clone, Debug, serde::Serialize, serde::Deserialize)]
+        #[cfg_attr(feature = "syn_serde", derive(serde::Serialize, serde::Deserialize))]
+        #[derive(Clone, Debug)]
         #[allow(clippy::struct_excessive_bools)]
         #[allow(clippy::struct_field_names)]
         pub struct VariableSetStmt {
@@ -81874,11 +82905,13 @@ mod variable_show_stmt {
     use super::*;
 
     /// `VariableShowStmt`
-    #[derive(Debug, Clone, serde::Serialize, serde::Deserialize)]
+    #[derive(Debug, Clone)]
+    #[cfg_attr(feature = "syn_serde", derive(serde::Serialize, serde::Deserialize))]
     pub struct VariableShowStmt(Box<self::inner::VariableShowStmt>);
 
     /// optional `VariableShowStmt`
-    #[derive(Debug, Clone, serde::Serialize, serde::Deserialize)]
+    #[derive(Debug, Clone)]
+    #[cfg_attr(feature = "syn_serde", derive(serde::Serialize, serde::Deserialize))]
     pub struct VariableShowStmtOpt(Option<VariableShowStmt>);
 
     #[cfg(test)]
@@ -81895,11 +82928,13 @@ mod variable_show_stmt {
     }
 
     /// `VariableShowStmt` list
-    #[derive(Debug, Clone, serde::Serialize, serde::Deserialize)]
+    #[derive(Debug, Clone)]
+    #[cfg_attr(feature = "syn_serde", derive(serde::Serialize, serde::Deserialize))]
     pub struct VariableShowStmtList(Vec<VariableShowStmt>);
 
     /// optional `VariableShowStmt` list
-    #[derive(Debug, Clone, serde::Serialize, serde::Deserialize)]
+    #[derive(Debug, Clone)]
+    #[cfg_attr(feature = "syn_serde", derive(serde::Serialize, serde::Deserialize))]
     pub struct VariableShowStmtListOpt(Option<Vec<VariableShowStmt>>);
 
     impl crate::syn::ListOpt<VariableShowStmt> for VariableShowStmtListOpt {
@@ -81999,7 +83034,8 @@ mod variable_show_stmt {
         use super::*;
 
         #[cfg_attr(test, derive(derive_builder::Builder))]
-        #[derive(Clone, Debug, serde::Serialize, serde::Deserialize)]
+        #[cfg_attr(feature = "syn_serde", derive(serde::Serialize, serde::Deserialize))]
+        #[derive(Clone, Debug)]
         #[allow(clippy::struct_excessive_bools)]
         #[allow(clippy::struct_field_names)]
         pub struct VariableShowStmt {
@@ -82061,11 +83097,13 @@ mod create_stmt {
     use super::*;
 
     /// `CreateStmt`
-    #[derive(Debug, Clone, serde::Serialize, serde::Deserialize)]
+    #[derive(Debug, Clone)]
+    #[cfg_attr(feature = "syn_serde", derive(serde::Serialize, serde::Deserialize))]
     pub struct CreateStmt(Box<self::inner::CreateStmt>);
 
     /// optional `CreateStmt`
-    #[derive(Debug, Clone, serde::Serialize, serde::Deserialize)]
+    #[derive(Debug, Clone)]
+    #[cfg_attr(feature = "syn_serde", derive(serde::Serialize, serde::Deserialize))]
     pub struct CreateStmtOpt(Option<CreateStmt>);
 
     #[cfg(test)]
@@ -82082,11 +83120,13 @@ mod create_stmt {
     }
 
     /// `CreateStmt` list
-    #[derive(Debug, Clone, serde::Serialize, serde::Deserialize)]
+    #[derive(Debug, Clone)]
+    #[cfg_attr(feature = "syn_serde", derive(serde::Serialize, serde::Deserialize))]
     pub struct CreateStmtList(Vec<CreateStmt>);
 
     /// optional `CreateStmt` list
-    #[derive(Debug, Clone, serde::Serialize, serde::Deserialize)]
+    #[derive(Debug, Clone)]
+    #[cfg_attr(feature = "syn_serde", derive(serde::Serialize, serde::Deserialize))]
     pub struct CreateStmtListOpt(Option<Vec<CreateStmt>>);
 
     impl crate::syn::ListOpt<CreateStmt> for CreateStmtListOpt {
@@ -82186,7 +83226,8 @@ mod create_stmt {
         use super::*;
 
         #[cfg_attr(test, derive(derive_builder::Builder))]
-        #[derive(Clone, Debug, serde::Serialize, serde::Deserialize)]
+        #[cfg_attr(feature = "syn_serde", derive(serde::Serialize, serde::Deserialize))]
+        #[derive(Clone, Debug)]
         #[allow(clippy::struct_excessive_bools)]
         #[allow(clippy::struct_field_names)]
         pub struct CreateStmt {
@@ -82616,11 +83657,13 @@ mod constraint {
     use super::*;
 
     /// `Constraint`
-    #[derive(Debug, Clone, serde::Serialize, serde::Deserialize)]
+    #[derive(Debug, Clone)]
+    #[cfg_attr(feature = "syn_serde", derive(serde::Serialize, serde::Deserialize))]
     pub struct Constraint(Box<self::inner::Constraint>);
 
     /// optional `Constraint`
-    #[derive(Debug, Clone, serde::Serialize, serde::Deserialize)]
+    #[derive(Debug, Clone)]
+    #[cfg_attr(feature = "syn_serde", derive(serde::Serialize, serde::Deserialize))]
     pub struct ConstraintOpt(Option<Constraint>);
 
     #[cfg(test)]
@@ -82637,11 +83680,13 @@ mod constraint {
     }
 
     /// `Constraint` list
-    #[derive(Debug, Clone, serde::Serialize, serde::Deserialize)]
+    #[derive(Debug, Clone)]
+    #[cfg_attr(feature = "syn_serde", derive(serde::Serialize, serde::Deserialize))]
     pub struct ConstraintList(Vec<Constraint>);
 
     /// optional `Constraint` list
-    #[derive(Debug, Clone, serde::Serialize, serde::Deserialize)]
+    #[derive(Debug, Clone)]
+    #[cfg_attr(feature = "syn_serde", derive(serde::Serialize, serde::Deserialize))]
     pub struct ConstraintListOpt(Option<Vec<Constraint>>);
 
     impl crate::syn::ListOpt<Constraint> for ConstraintListOpt {
@@ -82741,7 +83786,8 @@ mod constraint {
         use super::*;
 
         #[cfg_attr(test, derive(derive_builder::Builder))]
-        #[derive(Clone, Debug, serde::Serialize, serde::Deserialize)]
+        #[cfg_attr(feature = "syn_serde", derive(serde::Serialize, serde::Deserialize))]
+        #[derive(Clone, Debug)]
         #[allow(clippy::struct_excessive_bools)]
         #[allow(clippy::struct_field_names)]
         pub struct Constraint {
@@ -83769,11 +84815,13 @@ mod create_table_space_stmt {
     use super::*;
 
     /// `CreateTableSpaceStmt`
-    #[derive(Debug, Clone, serde::Serialize, serde::Deserialize)]
+    #[derive(Debug, Clone)]
+    #[cfg_attr(feature = "syn_serde", derive(serde::Serialize, serde::Deserialize))]
     pub struct CreateTableSpaceStmt(Box<self::inner::CreateTableSpaceStmt>);
 
     /// optional `CreateTableSpaceStmt`
-    #[derive(Debug, Clone, serde::Serialize, serde::Deserialize)]
+    #[derive(Debug, Clone)]
+    #[cfg_attr(feature = "syn_serde", derive(serde::Serialize, serde::Deserialize))]
     pub struct CreateTableSpaceStmtOpt(Option<CreateTableSpaceStmt>);
 
     #[cfg(test)]
@@ -83790,11 +84838,13 @@ mod create_table_space_stmt {
     }
 
     /// `CreateTableSpaceStmt` list
-    #[derive(Debug, Clone, serde::Serialize, serde::Deserialize)]
+    #[derive(Debug, Clone)]
+    #[cfg_attr(feature = "syn_serde", derive(serde::Serialize, serde::Deserialize))]
     pub struct CreateTableSpaceStmtList(Vec<CreateTableSpaceStmt>);
 
     /// optional `CreateTableSpaceStmt` list
-    #[derive(Debug, Clone, serde::Serialize, serde::Deserialize)]
+    #[derive(Debug, Clone)]
+    #[cfg_attr(feature = "syn_serde", derive(serde::Serialize, serde::Deserialize))]
     pub struct CreateTableSpaceStmtListOpt(Option<Vec<CreateTableSpaceStmt>>);
 
     impl crate::syn::ListOpt<CreateTableSpaceStmt> for CreateTableSpaceStmtListOpt {
@@ -83894,7 +84944,8 @@ mod create_table_space_stmt {
         use super::*;
 
         #[cfg_attr(test, derive(derive_builder::Builder))]
-        #[derive(Clone, Debug, serde::Serialize, serde::Deserialize)]
+        #[cfg_attr(feature = "syn_serde", derive(serde::Serialize, serde::Deserialize))]
+        #[derive(Clone, Debug)]
         #[allow(clippy::struct_excessive_bools)]
         #[allow(clippy::struct_field_names)]
         pub struct CreateTableSpaceStmt {
@@ -84060,11 +85111,13 @@ mod drop_table_space_stmt {
     use super::*;
 
     /// `DropTableSpaceStmt`
-    #[derive(Debug, Clone, serde::Serialize, serde::Deserialize)]
+    #[derive(Debug, Clone)]
+    #[cfg_attr(feature = "syn_serde", derive(serde::Serialize, serde::Deserialize))]
     pub struct DropTableSpaceStmt(Box<self::inner::DropTableSpaceStmt>);
 
     /// optional `DropTableSpaceStmt`
-    #[derive(Debug, Clone, serde::Serialize, serde::Deserialize)]
+    #[derive(Debug, Clone)]
+    #[cfg_attr(feature = "syn_serde", derive(serde::Serialize, serde::Deserialize))]
     pub struct DropTableSpaceStmtOpt(Option<DropTableSpaceStmt>);
 
     #[cfg(test)]
@@ -84081,11 +85134,13 @@ mod drop_table_space_stmt {
     }
 
     /// `DropTableSpaceStmt` list
-    #[derive(Debug, Clone, serde::Serialize, serde::Deserialize)]
+    #[derive(Debug, Clone)]
+    #[cfg_attr(feature = "syn_serde", derive(serde::Serialize, serde::Deserialize))]
     pub struct DropTableSpaceStmtList(Vec<DropTableSpaceStmt>);
 
     /// optional `DropTableSpaceStmt` list
-    #[derive(Debug, Clone, serde::Serialize, serde::Deserialize)]
+    #[derive(Debug, Clone)]
+    #[cfg_attr(feature = "syn_serde", derive(serde::Serialize, serde::Deserialize))]
     pub struct DropTableSpaceStmtListOpt(Option<Vec<DropTableSpaceStmt>>);
 
     impl crate::syn::ListOpt<DropTableSpaceStmt> for DropTableSpaceStmtListOpt {
@@ -84185,7 +85240,8 @@ mod drop_table_space_stmt {
         use super::*;
 
         #[cfg_attr(test, derive(derive_builder::Builder))]
-        #[derive(Clone, Debug, serde::Serialize, serde::Deserialize)]
+        #[cfg_attr(feature = "syn_serde", derive(serde::Serialize, serde::Deserialize))]
+        #[derive(Clone, Debug)]
         #[allow(clippy::struct_excessive_bools)]
         #[allow(clippy::struct_field_names)]
         pub struct DropTableSpaceStmt {
@@ -84280,11 +85336,13 @@ mod alter_table_space_options_stmt {
     use super::*;
 
     /// `AlterTableSpaceOptionsStmt`
-    #[derive(Debug, Clone, serde::Serialize, serde::Deserialize)]
+    #[derive(Debug, Clone)]
+    #[cfg_attr(feature = "syn_serde", derive(serde::Serialize, serde::Deserialize))]
     pub struct AlterTableSpaceOptionsStmt(Box<self::inner::AlterTableSpaceOptionsStmt>);
 
     /// optional `AlterTableSpaceOptionsStmt`
-    #[derive(Debug, Clone, serde::Serialize, serde::Deserialize)]
+    #[derive(Debug, Clone)]
+    #[cfg_attr(feature = "syn_serde", derive(serde::Serialize, serde::Deserialize))]
     pub struct AlterTableSpaceOptionsStmtOpt(Option<AlterTableSpaceOptionsStmt>);
 
     #[cfg(test)]
@@ -84301,11 +85359,13 @@ mod alter_table_space_options_stmt {
     }
 
     /// `AlterTableSpaceOptionsStmt` list
-    #[derive(Debug, Clone, serde::Serialize, serde::Deserialize)]
+    #[derive(Debug, Clone)]
+    #[cfg_attr(feature = "syn_serde", derive(serde::Serialize, serde::Deserialize))]
     pub struct AlterTableSpaceOptionsStmtList(Vec<AlterTableSpaceOptionsStmt>);
 
     /// optional `AlterTableSpaceOptionsStmt` list
-    #[derive(Debug, Clone, serde::Serialize, serde::Deserialize)]
+    #[derive(Debug, Clone)]
+    #[cfg_attr(feature = "syn_serde", derive(serde::Serialize, serde::Deserialize))]
     pub struct AlterTableSpaceOptionsStmtListOpt(Option<Vec<AlterTableSpaceOptionsStmt>>);
 
     impl crate::syn::ListOpt<AlterTableSpaceOptionsStmt> for AlterTableSpaceOptionsStmtListOpt {
@@ -84420,7 +85480,8 @@ mod alter_table_space_options_stmt {
         use super::*;
 
         #[cfg_attr(test, derive(derive_builder::Builder))]
-        #[derive(Clone, Debug, serde::Serialize, serde::Deserialize)]
+        #[cfg_attr(feature = "syn_serde", derive(serde::Serialize, serde::Deserialize))]
+        #[derive(Clone, Debug)]
         #[allow(clippy::struct_excessive_bools)]
         #[allow(clippy::struct_field_names)]
         pub struct AlterTableSpaceOptionsStmt {
@@ -84554,11 +85615,13 @@ mod alter_table_move_all_stmt {
     use super::*;
 
     /// `AlterTableMoveAllStmt`
-    #[derive(Debug, Clone, serde::Serialize, serde::Deserialize)]
+    #[derive(Debug, Clone)]
+    #[cfg_attr(feature = "syn_serde", derive(serde::Serialize, serde::Deserialize))]
     pub struct AlterTableMoveAllStmt(Box<self::inner::AlterTableMoveAllStmt>);
 
     /// optional `AlterTableMoveAllStmt`
-    #[derive(Debug, Clone, serde::Serialize, serde::Deserialize)]
+    #[derive(Debug, Clone)]
+    #[cfg_attr(feature = "syn_serde", derive(serde::Serialize, serde::Deserialize))]
     pub struct AlterTableMoveAllStmtOpt(Option<AlterTableMoveAllStmt>);
 
     #[cfg(test)]
@@ -84575,11 +85638,13 @@ mod alter_table_move_all_stmt {
     }
 
     /// `AlterTableMoveAllStmt` list
-    #[derive(Debug, Clone, serde::Serialize, serde::Deserialize)]
+    #[derive(Debug, Clone)]
+    #[cfg_attr(feature = "syn_serde", derive(serde::Serialize, serde::Deserialize))]
     pub struct AlterTableMoveAllStmtList(Vec<AlterTableMoveAllStmt>);
 
     /// optional `AlterTableMoveAllStmt` list
-    #[derive(Debug, Clone, serde::Serialize, serde::Deserialize)]
+    #[derive(Debug, Clone)]
+    #[cfg_attr(feature = "syn_serde", derive(serde::Serialize, serde::Deserialize))]
     pub struct AlterTableMoveAllStmtListOpt(Option<Vec<AlterTableMoveAllStmt>>);
 
     impl crate::syn::ListOpt<AlterTableMoveAllStmt> for AlterTableMoveAllStmtListOpt {
@@ -84679,7 +85744,8 @@ mod alter_table_move_all_stmt {
         use super::*;
 
         #[cfg_attr(test, derive(derive_builder::Builder))]
-        #[derive(Clone, Debug, serde::Serialize, serde::Deserialize)]
+        #[cfg_attr(feature = "syn_serde", derive(serde::Serialize, serde::Deserialize))]
+        #[derive(Clone, Debug)]
         #[allow(clippy::struct_excessive_bools)]
         #[allow(clippy::struct_field_names)]
         pub struct AlterTableMoveAllStmt {
@@ -84878,11 +85944,13 @@ mod create_extension_stmt {
     use super::*;
 
     /// `CreateExtensionStmt`
-    #[derive(Debug, Clone, serde::Serialize, serde::Deserialize)]
+    #[derive(Debug, Clone)]
+    #[cfg_attr(feature = "syn_serde", derive(serde::Serialize, serde::Deserialize))]
     pub struct CreateExtensionStmt(Box<self::inner::CreateExtensionStmt>);
 
     /// optional `CreateExtensionStmt`
-    #[derive(Debug, Clone, serde::Serialize, serde::Deserialize)]
+    #[derive(Debug, Clone)]
+    #[cfg_attr(feature = "syn_serde", derive(serde::Serialize, serde::Deserialize))]
     pub struct CreateExtensionStmtOpt(Option<CreateExtensionStmt>);
 
     #[cfg(test)]
@@ -84899,11 +85967,13 @@ mod create_extension_stmt {
     }
 
     /// `CreateExtensionStmt` list
-    #[derive(Debug, Clone, serde::Serialize, serde::Deserialize)]
+    #[derive(Debug, Clone)]
+    #[cfg_attr(feature = "syn_serde", derive(serde::Serialize, serde::Deserialize))]
     pub struct CreateExtensionStmtList(Vec<CreateExtensionStmt>);
 
     /// optional `CreateExtensionStmt` list
-    #[derive(Debug, Clone, serde::Serialize, serde::Deserialize)]
+    #[derive(Debug, Clone)]
+    #[cfg_attr(feature = "syn_serde", derive(serde::Serialize, serde::Deserialize))]
     pub struct CreateExtensionStmtListOpt(Option<Vec<CreateExtensionStmt>>);
 
     impl crate::syn::ListOpt<CreateExtensionStmt> for CreateExtensionStmtListOpt {
@@ -85003,7 +86073,8 @@ mod create_extension_stmt {
         use super::*;
 
         #[cfg_attr(test, derive(derive_builder::Builder))]
-        #[derive(Clone, Debug, serde::Serialize, serde::Deserialize)]
+        #[cfg_attr(feature = "syn_serde", derive(serde::Serialize, serde::Deserialize))]
+        #[derive(Clone, Debug)]
         #[allow(clippy::struct_excessive_bools)]
         #[allow(clippy::struct_field_names)]
         pub struct CreateExtensionStmt {
@@ -85133,11 +86204,13 @@ mod alter_extension_stmt {
     use super::*;
 
     /// `AlterExtensionStmt`
-    #[derive(Debug, Clone, serde::Serialize, serde::Deserialize)]
+    #[derive(Debug, Clone)]
+    #[cfg_attr(feature = "syn_serde", derive(serde::Serialize, serde::Deserialize))]
     pub struct AlterExtensionStmt(Box<self::inner::AlterExtensionStmt>);
 
     /// optional `AlterExtensionStmt`
-    #[derive(Debug, Clone, serde::Serialize, serde::Deserialize)]
+    #[derive(Debug, Clone)]
+    #[cfg_attr(feature = "syn_serde", derive(serde::Serialize, serde::Deserialize))]
     pub struct AlterExtensionStmtOpt(Option<AlterExtensionStmt>);
 
     #[cfg(test)]
@@ -85154,11 +86227,13 @@ mod alter_extension_stmt {
     }
 
     /// `AlterExtensionStmt` list
-    #[derive(Debug, Clone, serde::Serialize, serde::Deserialize)]
+    #[derive(Debug, Clone)]
+    #[cfg_attr(feature = "syn_serde", derive(serde::Serialize, serde::Deserialize))]
     pub struct AlterExtensionStmtList(Vec<AlterExtensionStmt>);
 
     /// optional `AlterExtensionStmt` list
-    #[derive(Debug, Clone, serde::Serialize, serde::Deserialize)]
+    #[derive(Debug, Clone)]
+    #[cfg_attr(feature = "syn_serde", derive(serde::Serialize, serde::Deserialize))]
     pub struct AlterExtensionStmtListOpt(Option<Vec<AlterExtensionStmt>>);
 
     impl crate::syn::ListOpt<AlterExtensionStmt> for AlterExtensionStmtListOpt {
@@ -85258,7 +86333,8 @@ mod alter_extension_stmt {
         use super::*;
 
         #[cfg_attr(test, derive(derive_builder::Builder))]
-        #[derive(Clone, Debug, serde::Serialize, serde::Deserialize)]
+        #[cfg_attr(feature = "syn_serde", derive(serde::Serialize, serde::Deserialize))]
+        #[derive(Clone, Debug)]
         #[allow(clippy::struct_excessive_bools)]
         #[allow(clippy::struct_field_names)]
         pub struct AlterExtensionStmt {
@@ -85352,11 +86428,13 @@ mod alter_extension_contents_stmt {
     use super::*;
 
     /// `AlterExtensionContentsStmt`
-    #[derive(Debug, Clone, serde::Serialize, serde::Deserialize)]
+    #[derive(Debug, Clone)]
+    #[cfg_attr(feature = "syn_serde", derive(serde::Serialize, serde::Deserialize))]
     pub struct AlterExtensionContentsStmt(Box<self::inner::AlterExtensionContentsStmt>);
 
     /// optional `AlterExtensionContentsStmt`
-    #[derive(Debug, Clone, serde::Serialize, serde::Deserialize)]
+    #[derive(Debug, Clone)]
+    #[cfg_attr(feature = "syn_serde", derive(serde::Serialize, serde::Deserialize))]
     pub struct AlterExtensionContentsStmtOpt(Option<AlterExtensionContentsStmt>);
 
     #[cfg(test)]
@@ -85373,11 +86451,13 @@ mod alter_extension_contents_stmt {
     }
 
     /// `AlterExtensionContentsStmt` list
-    #[derive(Debug, Clone, serde::Serialize, serde::Deserialize)]
+    #[derive(Debug, Clone)]
+    #[cfg_attr(feature = "syn_serde", derive(serde::Serialize, serde::Deserialize))]
     pub struct AlterExtensionContentsStmtList(Vec<AlterExtensionContentsStmt>);
 
     /// optional `AlterExtensionContentsStmt` list
-    #[derive(Debug, Clone, serde::Serialize, serde::Deserialize)]
+    #[derive(Debug, Clone)]
+    #[cfg_attr(feature = "syn_serde", derive(serde::Serialize, serde::Deserialize))]
     pub struct AlterExtensionContentsStmtListOpt(Option<Vec<AlterExtensionContentsStmt>>);
 
     impl crate::syn::ListOpt<AlterExtensionContentsStmt> for AlterExtensionContentsStmtListOpt {
@@ -85492,7 +86572,8 @@ mod alter_extension_contents_stmt {
         use super::*;
 
         #[cfg_attr(test, derive(derive_builder::Builder))]
-        #[derive(Clone, Debug, serde::Serialize, serde::Deserialize)]
+        #[cfg_attr(feature = "syn_serde", derive(serde::Serialize, serde::Deserialize))]
+        #[derive(Clone, Debug)]
         #[allow(clippy::struct_excessive_bools)]
         #[allow(clippy::struct_field_names)]
         pub struct AlterExtensionContentsStmt {
@@ -85656,11 +86737,13 @@ mod create_fdw_stmt {
     use super::*;
 
     /// `CreateFdwStmt`
-    #[derive(Debug, Clone, serde::Serialize, serde::Deserialize)]
+    #[derive(Debug, Clone)]
+    #[cfg_attr(feature = "syn_serde", derive(serde::Serialize, serde::Deserialize))]
     pub struct CreateFdwStmt(Box<self::inner::CreateFdwStmt>);
 
     /// optional `CreateFdwStmt`
-    #[derive(Debug, Clone, serde::Serialize, serde::Deserialize)]
+    #[derive(Debug, Clone)]
+    #[cfg_attr(feature = "syn_serde", derive(serde::Serialize, serde::Deserialize))]
     pub struct CreateFdwStmtOpt(Option<CreateFdwStmt>);
 
     #[cfg(test)]
@@ -85677,11 +86760,13 @@ mod create_fdw_stmt {
     }
 
     /// `CreateFdwStmt` list
-    #[derive(Debug, Clone, serde::Serialize, serde::Deserialize)]
+    #[derive(Debug, Clone)]
+    #[cfg_attr(feature = "syn_serde", derive(serde::Serialize, serde::Deserialize))]
     pub struct CreateFdwStmtList(Vec<CreateFdwStmt>);
 
     /// optional `CreateFdwStmt` list
-    #[derive(Debug, Clone, serde::Serialize, serde::Deserialize)]
+    #[derive(Debug, Clone)]
+    #[cfg_attr(feature = "syn_serde", derive(serde::Serialize, serde::Deserialize))]
     pub struct CreateFdwStmtListOpt(Option<Vec<CreateFdwStmt>>);
 
     impl crate::syn::ListOpt<CreateFdwStmt> for CreateFdwStmtListOpt {
@@ -85781,7 +86866,8 @@ mod create_fdw_stmt {
         use super::*;
 
         #[cfg_attr(test, derive(derive_builder::Builder))]
-        #[derive(Clone, Debug, serde::Serialize, serde::Deserialize)]
+        #[cfg_attr(feature = "syn_serde", derive(serde::Serialize, serde::Deserialize))]
+        #[derive(Clone, Debug)]
         #[allow(clippy::struct_excessive_bools)]
         #[allow(clippy::struct_field_names)]
         pub struct CreateFdwStmt {
@@ -85913,11 +86999,13 @@ mod alter_fdw_stmt {
     use super::*;
 
     /// `AlterFdwStmt`
-    #[derive(Debug, Clone, serde::Serialize, serde::Deserialize)]
+    #[derive(Debug, Clone)]
+    #[cfg_attr(feature = "syn_serde", derive(serde::Serialize, serde::Deserialize))]
     pub struct AlterFdwStmt(Box<self::inner::AlterFdwStmt>);
 
     /// optional `AlterFdwStmt`
-    #[derive(Debug, Clone, serde::Serialize, serde::Deserialize)]
+    #[derive(Debug, Clone)]
+    #[cfg_attr(feature = "syn_serde", derive(serde::Serialize, serde::Deserialize))]
     pub struct AlterFdwStmtOpt(Option<AlterFdwStmt>);
 
     #[cfg(test)]
@@ -85934,11 +87022,13 @@ mod alter_fdw_stmt {
     }
 
     /// `AlterFdwStmt` list
-    #[derive(Debug, Clone, serde::Serialize, serde::Deserialize)]
+    #[derive(Debug, Clone)]
+    #[cfg_attr(feature = "syn_serde", derive(serde::Serialize, serde::Deserialize))]
     pub struct AlterFdwStmtList(Vec<AlterFdwStmt>);
 
     /// optional `AlterFdwStmt` list
-    #[derive(Debug, Clone, serde::Serialize, serde::Deserialize)]
+    #[derive(Debug, Clone)]
+    #[cfg_attr(feature = "syn_serde", derive(serde::Serialize, serde::Deserialize))]
     pub struct AlterFdwStmtListOpt(Option<Vec<AlterFdwStmt>>);
 
     impl crate::syn::ListOpt<AlterFdwStmt> for AlterFdwStmtListOpt {
@@ -86038,7 +87128,8 @@ mod alter_fdw_stmt {
         use super::*;
 
         #[cfg_attr(test, derive(derive_builder::Builder))]
-        #[derive(Clone, Debug, serde::Serialize, serde::Deserialize)]
+        #[cfg_attr(feature = "syn_serde", derive(serde::Serialize, serde::Deserialize))]
+        #[derive(Clone, Debug)]
         #[allow(clippy::struct_excessive_bools)]
         #[allow(clippy::struct_field_names)]
         pub struct AlterFdwStmt {
@@ -86170,11 +87261,13 @@ mod create_foreign_server_stmt {
     use super::*;
 
     /// `CreateForeignServerStmt`
-    #[derive(Debug, Clone, serde::Serialize, serde::Deserialize)]
+    #[derive(Debug, Clone)]
+    #[cfg_attr(feature = "syn_serde", derive(serde::Serialize, serde::Deserialize))]
     pub struct CreateForeignServerStmt(Box<self::inner::CreateForeignServerStmt>);
 
     /// optional `CreateForeignServerStmt`
-    #[derive(Debug, Clone, serde::Serialize, serde::Deserialize)]
+    #[derive(Debug, Clone)]
+    #[cfg_attr(feature = "syn_serde", derive(serde::Serialize, serde::Deserialize))]
     pub struct CreateForeignServerStmtOpt(Option<CreateForeignServerStmt>);
 
     #[cfg(test)]
@@ -86191,11 +87284,13 @@ mod create_foreign_server_stmt {
     }
 
     /// `CreateForeignServerStmt` list
-    #[derive(Debug, Clone, serde::Serialize, serde::Deserialize)]
+    #[derive(Debug, Clone)]
+    #[cfg_attr(feature = "syn_serde", derive(serde::Serialize, serde::Deserialize))]
     pub struct CreateForeignServerStmtList(Vec<CreateForeignServerStmt>);
 
     /// optional `CreateForeignServerStmt` list
-    #[derive(Debug, Clone, serde::Serialize, serde::Deserialize)]
+    #[derive(Debug, Clone)]
+    #[cfg_attr(feature = "syn_serde", derive(serde::Serialize, serde::Deserialize))]
     pub struct CreateForeignServerStmtListOpt(Option<Vec<CreateForeignServerStmt>>);
 
     impl crate::syn::ListOpt<CreateForeignServerStmt> for CreateForeignServerStmtListOpt {
@@ -86302,7 +87397,8 @@ mod create_foreign_server_stmt {
         use super::*;
 
         #[cfg_attr(test, derive(derive_builder::Builder))]
-        #[derive(Clone, Debug, serde::Serialize, serde::Deserialize)]
+        #[cfg_attr(feature = "syn_serde", derive(serde::Serialize, serde::Deserialize))]
+        #[derive(Clone, Debug)]
         #[allow(clippy::struct_excessive_bools)]
         #[allow(clippy::struct_field_names)]
         pub struct CreateForeignServerStmt {
@@ -86527,11 +87623,13 @@ mod alter_foreign_server_stmt {
     use super::*;
 
     /// `AlterForeignServerStmt`
-    #[derive(Debug, Clone, serde::Serialize, serde::Deserialize)]
+    #[derive(Debug, Clone)]
+    #[cfg_attr(feature = "syn_serde", derive(serde::Serialize, serde::Deserialize))]
     pub struct AlterForeignServerStmt(Box<self::inner::AlterForeignServerStmt>);
 
     /// optional `AlterForeignServerStmt`
-    #[derive(Debug, Clone, serde::Serialize, serde::Deserialize)]
+    #[derive(Debug, Clone)]
+    #[cfg_attr(feature = "syn_serde", derive(serde::Serialize, serde::Deserialize))]
     pub struct AlterForeignServerStmtOpt(Option<AlterForeignServerStmt>);
 
     #[cfg(test)]
@@ -86548,11 +87646,13 @@ mod alter_foreign_server_stmt {
     }
 
     /// `AlterForeignServerStmt` list
-    #[derive(Debug, Clone, serde::Serialize, serde::Deserialize)]
+    #[derive(Debug, Clone)]
+    #[cfg_attr(feature = "syn_serde", derive(serde::Serialize, serde::Deserialize))]
     pub struct AlterForeignServerStmtList(Vec<AlterForeignServerStmt>);
 
     /// optional `AlterForeignServerStmt` list
-    #[derive(Debug, Clone, serde::Serialize, serde::Deserialize)]
+    #[derive(Debug, Clone)]
+    #[cfg_attr(feature = "syn_serde", derive(serde::Serialize, serde::Deserialize))]
     pub struct AlterForeignServerStmtListOpt(Option<Vec<AlterForeignServerStmt>>);
 
     impl crate::syn::ListOpt<AlterForeignServerStmt> for AlterForeignServerStmtListOpt {
@@ -86657,7 +87757,8 @@ mod alter_foreign_server_stmt {
         use super::*;
 
         #[cfg_attr(test, derive(derive_builder::Builder))]
-        #[derive(Clone, Debug, serde::Serialize, serde::Deserialize)]
+        #[cfg_attr(feature = "syn_serde", derive(serde::Serialize, serde::Deserialize))]
+        #[derive(Clone, Debug)]
         #[allow(clippy::struct_excessive_bools)]
         #[allow(clippy::struct_field_names)]
         pub struct AlterForeignServerStmt {
@@ -86818,11 +87919,13 @@ mod create_foreign_table_stmt {
     use super::*;
 
     /// `CreateForeignTableStmt`
-    #[derive(Debug, Clone, serde::Serialize, serde::Deserialize)]
+    #[derive(Debug, Clone)]
+    #[cfg_attr(feature = "syn_serde", derive(serde::Serialize, serde::Deserialize))]
     pub struct CreateForeignTableStmt(Box<self::inner::CreateForeignTableStmt>);
 
     /// optional `CreateForeignTableStmt`
-    #[derive(Debug, Clone, serde::Serialize, serde::Deserialize)]
+    #[derive(Debug, Clone)]
+    #[cfg_attr(feature = "syn_serde", derive(serde::Serialize, serde::Deserialize))]
     pub struct CreateForeignTableStmtOpt(Option<CreateForeignTableStmt>);
 
     #[cfg(test)]
@@ -86839,11 +87942,13 @@ mod create_foreign_table_stmt {
     }
 
     /// `CreateForeignTableStmt` list
-    #[derive(Debug, Clone, serde::Serialize, serde::Deserialize)]
+    #[derive(Debug, Clone)]
+    #[cfg_attr(feature = "syn_serde", derive(serde::Serialize, serde::Deserialize))]
     pub struct CreateForeignTableStmtList(Vec<CreateForeignTableStmt>);
 
     /// optional `CreateForeignTableStmt` list
-    #[derive(Debug, Clone, serde::Serialize, serde::Deserialize)]
+    #[derive(Debug, Clone)]
+    #[cfg_attr(feature = "syn_serde", derive(serde::Serialize, serde::Deserialize))]
     pub struct CreateForeignTableStmtListOpt(Option<Vec<CreateForeignTableStmt>>);
 
     impl crate::syn::ListOpt<CreateForeignTableStmt> for CreateForeignTableStmtListOpt {
@@ -86948,7 +88053,8 @@ mod create_foreign_table_stmt {
         use super::*;
 
         #[cfg_attr(test, derive(derive_builder::Builder))]
-        #[derive(Clone, Debug, serde::Serialize, serde::Deserialize)]
+        #[cfg_attr(feature = "syn_serde", derive(serde::Serialize, serde::Deserialize))]
+        #[derive(Clone, Debug)]
         #[allow(clippy::struct_excessive_bools)]
         #[allow(clippy::struct_field_names)]
         pub struct CreateForeignTableStmt {
@@ -87081,11 +88187,13 @@ mod create_user_mapping_stmt {
     use super::*;
 
     /// `CreateUserMappingStmt`
-    #[derive(Debug, Clone, serde::Serialize, serde::Deserialize)]
+    #[derive(Debug, Clone)]
+    #[cfg_attr(feature = "syn_serde", derive(serde::Serialize, serde::Deserialize))]
     pub struct CreateUserMappingStmt(Box<self::inner::CreateUserMappingStmt>);
 
     /// optional `CreateUserMappingStmt`
-    #[derive(Debug, Clone, serde::Serialize, serde::Deserialize)]
+    #[derive(Debug, Clone)]
+    #[cfg_attr(feature = "syn_serde", derive(serde::Serialize, serde::Deserialize))]
     pub struct CreateUserMappingStmtOpt(Option<CreateUserMappingStmt>);
 
     #[cfg(test)]
@@ -87102,11 +88210,13 @@ mod create_user_mapping_stmt {
     }
 
     /// `CreateUserMappingStmt` list
-    #[derive(Debug, Clone, serde::Serialize, serde::Deserialize)]
+    #[derive(Debug, Clone)]
+    #[cfg_attr(feature = "syn_serde", derive(serde::Serialize, serde::Deserialize))]
     pub struct CreateUserMappingStmtList(Vec<CreateUserMappingStmt>);
 
     /// optional `CreateUserMappingStmt` list
-    #[derive(Debug, Clone, serde::Serialize, serde::Deserialize)]
+    #[derive(Debug, Clone)]
+    #[cfg_attr(feature = "syn_serde", derive(serde::Serialize, serde::Deserialize))]
     pub struct CreateUserMappingStmtListOpt(Option<Vec<CreateUserMappingStmt>>);
 
     impl crate::syn::ListOpt<CreateUserMappingStmt> for CreateUserMappingStmtListOpt {
@@ -87206,7 +88316,8 @@ mod create_user_mapping_stmt {
         use super::*;
 
         #[cfg_attr(test, derive(derive_builder::Builder))]
-        #[derive(Clone, Debug, serde::Serialize, serde::Deserialize)]
+        #[cfg_attr(feature = "syn_serde", derive(serde::Serialize, serde::Deserialize))]
+        #[derive(Clone, Debug)]
         #[allow(clippy::struct_excessive_bools)]
         #[allow(clippy::struct_field_names)]
         pub struct CreateUserMappingStmt {
@@ -87372,11 +88483,13 @@ mod alter_user_mapping_stmt {
     use super::*;
 
     /// `AlterUserMappingStmt`
-    #[derive(Debug, Clone, serde::Serialize, serde::Deserialize)]
+    #[derive(Debug, Clone)]
+    #[cfg_attr(feature = "syn_serde", derive(serde::Serialize, serde::Deserialize))]
     pub struct AlterUserMappingStmt(Box<self::inner::AlterUserMappingStmt>);
 
     /// optional `AlterUserMappingStmt`
-    #[derive(Debug, Clone, serde::Serialize, serde::Deserialize)]
+    #[derive(Debug, Clone)]
+    #[cfg_attr(feature = "syn_serde", derive(serde::Serialize, serde::Deserialize))]
     pub struct AlterUserMappingStmtOpt(Option<AlterUserMappingStmt>);
 
     #[cfg(test)]
@@ -87393,11 +88506,13 @@ mod alter_user_mapping_stmt {
     }
 
     /// `AlterUserMappingStmt` list
-    #[derive(Debug, Clone, serde::Serialize, serde::Deserialize)]
+    #[derive(Debug, Clone)]
+    #[cfg_attr(feature = "syn_serde", derive(serde::Serialize, serde::Deserialize))]
     pub struct AlterUserMappingStmtList(Vec<AlterUserMappingStmt>);
 
     /// optional `AlterUserMappingStmt` list
-    #[derive(Debug, Clone, serde::Serialize, serde::Deserialize)]
+    #[derive(Debug, Clone)]
+    #[cfg_attr(feature = "syn_serde", derive(serde::Serialize, serde::Deserialize))]
     pub struct AlterUserMappingStmtListOpt(Option<Vec<AlterUserMappingStmt>>);
 
     impl crate::syn::ListOpt<AlterUserMappingStmt> for AlterUserMappingStmtListOpt {
@@ -87497,7 +88612,8 @@ mod alter_user_mapping_stmt {
         use super::*;
 
         #[cfg_attr(test, derive(derive_builder::Builder))]
-        #[derive(Clone, Debug, serde::Serialize, serde::Deserialize)]
+        #[cfg_attr(feature = "syn_serde", derive(serde::Serialize, serde::Deserialize))]
+        #[derive(Clone, Debug)]
         #[allow(clippy::struct_excessive_bools)]
         #[allow(clippy::struct_field_names)]
         pub struct AlterUserMappingStmt {
@@ -87630,11 +88746,13 @@ mod drop_user_mapping_stmt {
     use super::*;
 
     /// `DropUserMappingStmt`
-    #[derive(Debug, Clone, serde::Serialize, serde::Deserialize)]
+    #[derive(Debug, Clone)]
+    #[cfg_attr(feature = "syn_serde", derive(serde::Serialize, serde::Deserialize))]
     pub struct DropUserMappingStmt(Box<self::inner::DropUserMappingStmt>);
 
     /// optional `DropUserMappingStmt`
-    #[derive(Debug, Clone, serde::Serialize, serde::Deserialize)]
+    #[derive(Debug, Clone)]
+    #[cfg_attr(feature = "syn_serde", derive(serde::Serialize, serde::Deserialize))]
     pub struct DropUserMappingStmtOpt(Option<DropUserMappingStmt>);
 
     #[cfg(test)]
@@ -87651,11 +88769,13 @@ mod drop_user_mapping_stmt {
     }
 
     /// `DropUserMappingStmt` list
-    #[derive(Debug, Clone, serde::Serialize, serde::Deserialize)]
+    #[derive(Debug, Clone)]
+    #[cfg_attr(feature = "syn_serde", derive(serde::Serialize, serde::Deserialize))]
     pub struct DropUserMappingStmtList(Vec<DropUserMappingStmt>);
 
     /// optional `DropUserMappingStmt` list
-    #[derive(Debug, Clone, serde::Serialize, serde::Deserialize)]
+    #[derive(Debug, Clone)]
+    #[cfg_attr(feature = "syn_serde", derive(serde::Serialize, serde::Deserialize))]
     pub struct DropUserMappingStmtListOpt(Option<Vec<DropUserMappingStmt>>);
 
     impl crate::syn::ListOpt<DropUserMappingStmt> for DropUserMappingStmtListOpt {
@@ -87755,7 +88875,8 @@ mod drop_user_mapping_stmt {
         use super::*;
 
         #[cfg_attr(test, derive(derive_builder::Builder))]
-        #[derive(Clone, Debug, serde::Serialize, serde::Deserialize)]
+        #[cfg_attr(feature = "syn_serde", derive(serde::Serialize, serde::Deserialize))]
+        #[derive(Clone, Debug)]
         #[allow(clippy::struct_excessive_bools)]
         #[allow(clippy::struct_field_names)]
         pub struct DropUserMappingStmt {
@@ -87885,11 +89006,13 @@ mod import_foreign_schema_stmt {
     use super::*;
 
     /// `ImportForeignSchemaStmt`
-    #[derive(Debug, Clone, serde::Serialize, serde::Deserialize)]
+    #[derive(Debug, Clone)]
+    #[cfg_attr(feature = "syn_serde", derive(serde::Serialize, serde::Deserialize))]
     pub struct ImportForeignSchemaStmt(Box<self::inner::ImportForeignSchemaStmt>);
 
     /// optional `ImportForeignSchemaStmt`
-    #[derive(Debug, Clone, serde::Serialize, serde::Deserialize)]
+    #[derive(Debug, Clone)]
+    #[cfg_attr(feature = "syn_serde", derive(serde::Serialize, serde::Deserialize))]
     pub struct ImportForeignSchemaStmtOpt(Option<ImportForeignSchemaStmt>);
 
     #[cfg(test)]
@@ -87906,11 +89029,13 @@ mod import_foreign_schema_stmt {
     }
 
     /// `ImportForeignSchemaStmt` list
-    #[derive(Debug, Clone, serde::Serialize, serde::Deserialize)]
+    #[derive(Debug, Clone)]
+    #[cfg_attr(feature = "syn_serde", derive(serde::Serialize, serde::Deserialize))]
     pub struct ImportForeignSchemaStmtList(Vec<ImportForeignSchemaStmt>);
 
     /// optional `ImportForeignSchemaStmt` list
-    #[derive(Debug, Clone, serde::Serialize, serde::Deserialize)]
+    #[derive(Debug, Clone)]
+    #[cfg_attr(feature = "syn_serde", derive(serde::Serialize, serde::Deserialize))]
     pub struct ImportForeignSchemaStmtListOpt(Option<Vec<ImportForeignSchemaStmt>>);
 
     impl crate::syn::ListOpt<ImportForeignSchemaStmt> for ImportForeignSchemaStmtListOpt {
@@ -88017,7 +89142,8 @@ mod import_foreign_schema_stmt {
         use super::*;
 
         #[cfg_attr(test, derive(derive_builder::Builder))]
-        #[derive(Clone, Debug, serde::Serialize, serde::Deserialize)]
+        #[cfg_attr(feature = "syn_serde", derive(serde::Serialize, serde::Deserialize))]
+        #[derive(Clone, Debug)]
         #[allow(clippy::struct_excessive_bools)]
         #[allow(clippy::struct_field_names)]
         pub struct ImportForeignSchemaStmt {
@@ -88252,11 +89378,13 @@ mod create_policy_stmt {
     use super::*;
 
     /// `CreatePolicyStmt`
-    #[derive(Debug, Clone, serde::Serialize, serde::Deserialize)]
+    #[derive(Debug, Clone)]
+    #[cfg_attr(feature = "syn_serde", derive(serde::Serialize, serde::Deserialize))]
     pub struct CreatePolicyStmt(Box<self::inner::CreatePolicyStmt>);
 
     /// optional `CreatePolicyStmt`
-    #[derive(Debug, Clone, serde::Serialize, serde::Deserialize)]
+    #[derive(Debug, Clone)]
+    #[cfg_attr(feature = "syn_serde", derive(serde::Serialize, serde::Deserialize))]
     pub struct CreatePolicyStmtOpt(Option<CreatePolicyStmt>);
 
     #[cfg(test)]
@@ -88273,11 +89401,13 @@ mod create_policy_stmt {
     }
 
     /// `CreatePolicyStmt` list
-    #[derive(Debug, Clone, serde::Serialize, serde::Deserialize)]
+    #[derive(Debug, Clone)]
+    #[cfg_attr(feature = "syn_serde", derive(serde::Serialize, serde::Deserialize))]
     pub struct CreatePolicyStmtList(Vec<CreatePolicyStmt>);
 
     /// optional `CreatePolicyStmt` list
-    #[derive(Debug, Clone, serde::Serialize, serde::Deserialize)]
+    #[derive(Debug, Clone)]
+    #[cfg_attr(feature = "syn_serde", derive(serde::Serialize, serde::Deserialize))]
     pub struct CreatePolicyStmtListOpt(Option<Vec<CreatePolicyStmt>>);
 
     impl crate::syn::ListOpt<CreatePolicyStmt> for CreatePolicyStmtListOpt {
@@ -88377,7 +89507,8 @@ mod create_policy_stmt {
         use super::*;
 
         #[cfg_attr(test, derive(derive_builder::Builder))]
-        #[derive(Clone, Debug, serde::Serialize, serde::Deserialize)]
+        #[cfg_attr(feature = "syn_serde", derive(serde::Serialize, serde::Deserialize))]
+        #[derive(Clone, Debug)]
         #[allow(clippy::struct_excessive_bools)]
         #[allow(clippy::struct_field_names)]
         pub struct CreatePolicyStmt {
@@ -88639,11 +89770,13 @@ mod alter_policy_stmt {
     use super::*;
 
     /// `AlterPolicyStmt`
-    #[derive(Debug, Clone, serde::Serialize, serde::Deserialize)]
+    #[derive(Debug, Clone)]
+    #[cfg_attr(feature = "syn_serde", derive(serde::Serialize, serde::Deserialize))]
     pub struct AlterPolicyStmt(Box<self::inner::AlterPolicyStmt>);
 
     /// optional `AlterPolicyStmt`
-    #[derive(Debug, Clone, serde::Serialize, serde::Deserialize)]
+    #[derive(Debug, Clone)]
+    #[cfg_attr(feature = "syn_serde", derive(serde::Serialize, serde::Deserialize))]
     pub struct AlterPolicyStmtOpt(Option<AlterPolicyStmt>);
 
     #[cfg(test)]
@@ -88660,11 +89793,13 @@ mod alter_policy_stmt {
     }
 
     /// `AlterPolicyStmt` list
-    #[derive(Debug, Clone, serde::Serialize, serde::Deserialize)]
+    #[derive(Debug, Clone)]
+    #[cfg_attr(feature = "syn_serde", derive(serde::Serialize, serde::Deserialize))]
     pub struct AlterPolicyStmtList(Vec<AlterPolicyStmt>);
 
     /// optional `AlterPolicyStmt` list
-    #[derive(Debug, Clone, serde::Serialize, serde::Deserialize)]
+    #[derive(Debug, Clone)]
+    #[cfg_attr(feature = "syn_serde", derive(serde::Serialize, serde::Deserialize))]
     pub struct AlterPolicyStmtListOpt(Option<Vec<AlterPolicyStmt>>);
 
     impl crate::syn::ListOpt<AlterPolicyStmt> for AlterPolicyStmtListOpt {
@@ -88764,7 +89899,8 @@ mod alter_policy_stmt {
         use super::*;
 
         #[cfg_attr(test, derive(derive_builder::Builder))]
-        #[derive(Clone, Debug, serde::Serialize, serde::Deserialize)]
+        #[cfg_attr(feature = "syn_serde", derive(serde::Serialize, serde::Deserialize))]
+        #[derive(Clone, Debug)]
         #[allow(clippy::struct_excessive_bools)]
         #[allow(clippy::struct_field_names)]
         pub struct AlterPolicyStmt {
@@ -88964,11 +90100,13 @@ mod create_am_stmt {
     use super::*;
 
     /// `CreateAmStmt`
-    #[derive(Debug, Clone, serde::Serialize, serde::Deserialize)]
+    #[derive(Debug, Clone)]
+    #[cfg_attr(feature = "syn_serde", derive(serde::Serialize, serde::Deserialize))]
     pub struct CreateAmStmt(Box<self::inner::CreateAmStmt>);
 
     /// optional `CreateAmStmt`
-    #[derive(Debug, Clone, serde::Serialize, serde::Deserialize)]
+    #[derive(Debug, Clone)]
+    #[cfg_attr(feature = "syn_serde", derive(serde::Serialize, serde::Deserialize))]
     pub struct CreateAmStmtOpt(Option<CreateAmStmt>);
 
     #[cfg(test)]
@@ -88985,11 +90123,13 @@ mod create_am_stmt {
     }
 
     /// `CreateAmStmt` list
-    #[derive(Debug, Clone, serde::Serialize, serde::Deserialize)]
+    #[derive(Debug, Clone)]
+    #[cfg_attr(feature = "syn_serde", derive(serde::Serialize, serde::Deserialize))]
     pub struct CreateAmStmtList(Vec<CreateAmStmt>);
 
     /// optional `CreateAmStmt` list
-    #[derive(Debug, Clone, serde::Serialize, serde::Deserialize)]
+    #[derive(Debug, Clone)]
+    #[cfg_attr(feature = "syn_serde", derive(serde::Serialize, serde::Deserialize))]
     pub struct CreateAmStmtListOpt(Option<Vec<CreateAmStmt>>);
 
     impl crate::syn::ListOpt<CreateAmStmt> for CreateAmStmtListOpt {
@@ -89089,7 +90229,8 @@ mod create_am_stmt {
         use super::*;
 
         #[cfg_attr(test, derive(derive_builder::Builder))]
-        #[derive(Clone, Debug, serde::Serialize, serde::Deserialize)]
+        #[cfg_attr(feature = "syn_serde", derive(serde::Serialize, serde::Deserialize))]
+        #[derive(Clone, Debug)]
         #[allow(clippy::struct_excessive_bools)]
         #[allow(clippy::struct_field_names)]
         pub struct CreateAmStmt {
@@ -89218,11 +90359,13 @@ mod create_trig_stmt {
     use super::*;
 
     /// `CreateTrigStmt`
-    #[derive(Debug, Clone, serde::Serialize, serde::Deserialize)]
+    #[derive(Debug, Clone)]
+    #[cfg_attr(feature = "syn_serde", derive(serde::Serialize, serde::Deserialize))]
     pub struct CreateTrigStmt(Box<self::inner::CreateTrigStmt>);
 
     /// optional `CreateTrigStmt`
-    #[derive(Debug, Clone, serde::Serialize, serde::Deserialize)]
+    #[derive(Debug, Clone)]
+    #[cfg_attr(feature = "syn_serde", derive(serde::Serialize, serde::Deserialize))]
     pub struct CreateTrigStmtOpt(Option<CreateTrigStmt>);
 
     #[cfg(test)]
@@ -89239,11 +90382,13 @@ mod create_trig_stmt {
     }
 
     /// `CreateTrigStmt` list
-    #[derive(Debug, Clone, serde::Serialize, serde::Deserialize)]
+    #[derive(Debug, Clone)]
+    #[cfg_attr(feature = "syn_serde", derive(serde::Serialize, serde::Deserialize))]
     pub struct CreateTrigStmtList(Vec<CreateTrigStmt>);
 
     /// optional `CreateTrigStmt` list
-    #[derive(Debug, Clone, serde::Serialize, serde::Deserialize)]
+    #[derive(Debug, Clone)]
+    #[cfg_attr(feature = "syn_serde", derive(serde::Serialize, serde::Deserialize))]
     pub struct CreateTrigStmtListOpt(Option<Vec<CreateTrigStmt>>);
 
     impl crate::syn::ListOpt<CreateTrigStmt> for CreateTrigStmtListOpt {
@@ -89343,7 +90488,8 @@ mod create_trig_stmt {
         use super::*;
 
         #[cfg_attr(test, derive(derive_builder::Builder))]
-        #[derive(Clone, Debug, serde::Serialize, serde::Deserialize)]
+        #[cfg_attr(feature = "syn_serde", derive(serde::Serialize, serde::Deserialize))]
+        #[derive(Clone, Debug)]
         #[allow(clippy::struct_excessive_bools)]
         #[allow(clippy::struct_field_names)]
         pub struct CreateTrigStmt {
@@ -89862,11 +91008,13 @@ mod create_event_trig_stmt {
     use super::*;
 
     /// `CreateEventTrigStmt`
-    #[derive(Debug, Clone, serde::Serialize, serde::Deserialize)]
+    #[derive(Debug, Clone)]
+    #[cfg_attr(feature = "syn_serde", derive(serde::Serialize, serde::Deserialize))]
     pub struct CreateEventTrigStmt(Box<self::inner::CreateEventTrigStmt>);
 
     /// optional `CreateEventTrigStmt`
-    #[derive(Debug, Clone, serde::Serialize, serde::Deserialize)]
+    #[derive(Debug, Clone)]
+    #[cfg_attr(feature = "syn_serde", derive(serde::Serialize, serde::Deserialize))]
     pub struct CreateEventTrigStmtOpt(Option<CreateEventTrigStmt>);
 
     #[cfg(test)]
@@ -89883,11 +91031,13 @@ mod create_event_trig_stmt {
     }
 
     /// `CreateEventTrigStmt` list
-    #[derive(Debug, Clone, serde::Serialize, serde::Deserialize)]
+    #[derive(Debug, Clone)]
+    #[cfg_attr(feature = "syn_serde", derive(serde::Serialize, serde::Deserialize))]
     pub struct CreateEventTrigStmtList(Vec<CreateEventTrigStmt>);
 
     /// optional `CreateEventTrigStmt` list
-    #[derive(Debug, Clone, serde::Serialize, serde::Deserialize)]
+    #[derive(Debug, Clone)]
+    #[cfg_attr(feature = "syn_serde", derive(serde::Serialize, serde::Deserialize))]
     pub struct CreateEventTrigStmtListOpt(Option<Vec<CreateEventTrigStmt>>);
 
     impl crate::syn::ListOpt<CreateEventTrigStmt> for CreateEventTrigStmtListOpt {
@@ -89987,7 +91137,8 @@ mod create_event_trig_stmt {
         use super::*;
 
         #[cfg_attr(test, derive(derive_builder::Builder))]
-        #[derive(Clone, Debug, serde::Serialize, serde::Deserialize)]
+        #[cfg_attr(feature = "syn_serde", derive(serde::Serialize, serde::Deserialize))]
+        #[derive(Clone, Debug)]
         #[allow(clippy::struct_excessive_bools)]
         #[allow(clippy::struct_field_names)]
         pub struct CreateEventTrigStmt {
@@ -90151,11 +91302,13 @@ mod alter_event_trig_stmt {
     use super::*;
 
     /// `AlterEventTrigStmt`
-    #[derive(Debug, Clone, serde::Serialize, serde::Deserialize)]
+    #[derive(Debug, Clone)]
+    #[cfg_attr(feature = "syn_serde", derive(serde::Serialize, serde::Deserialize))]
     pub struct AlterEventTrigStmt(Box<self::inner::AlterEventTrigStmt>);
 
     /// optional `AlterEventTrigStmt`
-    #[derive(Debug, Clone, serde::Serialize, serde::Deserialize)]
+    #[derive(Debug, Clone)]
+    #[cfg_attr(feature = "syn_serde", derive(serde::Serialize, serde::Deserialize))]
     pub struct AlterEventTrigStmtOpt(Option<AlterEventTrigStmt>);
 
     #[cfg(test)]
@@ -90172,11 +91325,13 @@ mod alter_event_trig_stmt {
     }
 
     /// `AlterEventTrigStmt` list
-    #[derive(Debug, Clone, serde::Serialize, serde::Deserialize)]
+    #[derive(Debug, Clone)]
+    #[cfg_attr(feature = "syn_serde", derive(serde::Serialize, serde::Deserialize))]
     pub struct AlterEventTrigStmtList(Vec<AlterEventTrigStmt>);
 
     /// optional `AlterEventTrigStmt` list
-    #[derive(Debug, Clone, serde::Serialize, serde::Deserialize)]
+    #[derive(Debug, Clone)]
+    #[cfg_attr(feature = "syn_serde", derive(serde::Serialize, serde::Deserialize))]
     pub struct AlterEventTrigStmtListOpt(Option<Vec<AlterEventTrigStmt>>);
 
     impl crate::syn::ListOpt<AlterEventTrigStmt> for AlterEventTrigStmtListOpt {
@@ -90276,7 +91431,8 @@ mod alter_event_trig_stmt {
         use super::*;
 
         #[cfg_attr(test, derive(derive_builder::Builder))]
-        #[derive(Clone, Debug, serde::Serialize, serde::Deserialize)]
+        #[cfg_attr(feature = "syn_serde", derive(serde::Serialize, serde::Deserialize))]
+        #[derive(Clone, Debug)]
         #[allow(clippy::struct_excessive_bools)]
         #[allow(clippy::struct_field_names)]
         pub struct AlterEventTrigStmt {
@@ -90371,11 +91527,13 @@ mod create_p_lang_stmt {
     use super::*;
 
     /// `CreatePLangStmt`
-    #[derive(Debug, Clone, serde::Serialize, serde::Deserialize)]
+    #[derive(Debug, Clone)]
+    #[cfg_attr(feature = "syn_serde", derive(serde::Serialize, serde::Deserialize))]
     pub struct CreatePLangStmt(Box<self::inner::CreatePLangStmt>);
 
     /// optional `CreatePLangStmt`
-    #[derive(Debug, Clone, serde::Serialize, serde::Deserialize)]
+    #[derive(Debug, Clone)]
+    #[cfg_attr(feature = "syn_serde", derive(serde::Serialize, serde::Deserialize))]
     pub struct CreatePLangStmtOpt(Option<CreatePLangStmt>);
 
     #[cfg(test)]
@@ -90392,11 +91550,13 @@ mod create_p_lang_stmt {
     }
 
     /// `CreatePLangStmt` list
-    #[derive(Debug, Clone, serde::Serialize, serde::Deserialize)]
+    #[derive(Debug, Clone)]
+    #[cfg_attr(feature = "syn_serde", derive(serde::Serialize, serde::Deserialize))]
     pub struct CreatePLangStmtList(Vec<CreatePLangStmt>);
 
     /// optional `CreatePLangStmt` list
-    #[derive(Debug, Clone, serde::Serialize, serde::Deserialize)]
+    #[derive(Debug, Clone)]
+    #[cfg_attr(feature = "syn_serde", derive(serde::Serialize, serde::Deserialize))]
     pub struct CreatePLangStmtListOpt(Option<Vec<CreatePLangStmt>>);
 
     impl crate::syn::ListOpt<CreatePLangStmt> for CreatePLangStmtListOpt {
@@ -90496,7 +91656,8 @@ mod create_p_lang_stmt {
         use super::*;
 
         #[cfg_attr(test, derive(derive_builder::Builder))]
-        #[derive(Clone, Debug, serde::Serialize, serde::Deserialize)]
+        #[cfg_attr(feature = "syn_serde", derive(serde::Serialize, serde::Deserialize))]
+        #[derive(Clone, Debug)]
         #[allow(clippy::struct_excessive_bools)]
         #[allow(clippy::struct_field_names)]
         pub struct CreatePLangStmt {
@@ -90724,11 +91885,13 @@ mod create_role_stmt {
     use super::*;
 
     /// `CreateRoleStmt`
-    #[derive(Debug, Clone, serde::Serialize, serde::Deserialize)]
+    #[derive(Debug, Clone)]
+    #[cfg_attr(feature = "syn_serde", derive(serde::Serialize, serde::Deserialize))]
     pub struct CreateRoleStmt(Box<self::inner::CreateRoleStmt>);
 
     /// optional `CreateRoleStmt`
-    #[derive(Debug, Clone, serde::Serialize, serde::Deserialize)]
+    #[derive(Debug, Clone)]
+    #[cfg_attr(feature = "syn_serde", derive(serde::Serialize, serde::Deserialize))]
     pub struct CreateRoleStmtOpt(Option<CreateRoleStmt>);
 
     #[cfg(test)]
@@ -90745,11 +91908,13 @@ mod create_role_stmt {
     }
 
     /// `CreateRoleStmt` list
-    #[derive(Debug, Clone, serde::Serialize, serde::Deserialize)]
+    #[derive(Debug, Clone)]
+    #[cfg_attr(feature = "syn_serde", derive(serde::Serialize, serde::Deserialize))]
     pub struct CreateRoleStmtList(Vec<CreateRoleStmt>);
 
     /// optional `CreateRoleStmt` list
-    #[derive(Debug, Clone, serde::Serialize, serde::Deserialize)]
+    #[derive(Debug, Clone)]
+    #[cfg_attr(feature = "syn_serde", derive(serde::Serialize, serde::Deserialize))]
     pub struct CreateRoleStmtListOpt(Option<Vec<CreateRoleStmt>>);
 
     impl crate::syn::ListOpt<CreateRoleStmt> for CreateRoleStmtListOpt {
@@ -90849,7 +92014,8 @@ mod create_role_stmt {
         use super::*;
 
         #[cfg_attr(test, derive(derive_builder::Builder))]
-        #[derive(Clone, Debug, serde::Serialize, serde::Deserialize)]
+        #[cfg_attr(feature = "syn_serde", derive(serde::Serialize, serde::Deserialize))]
+        #[derive(Clone, Debug)]
         #[allow(clippy::struct_excessive_bools)]
         #[allow(clippy::struct_field_names)]
         pub struct CreateRoleStmt {
@@ -90981,11 +92147,13 @@ mod alter_role_stmt {
     use super::*;
 
     /// `AlterRoleStmt`
-    #[derive(Debug, Clone, serde::Serialize, serde::Deserialize)]
+    #[derive(Debug, Clone)]
+    #[cfg_attr(feature = "syn_serde", derive(serde::Serialize, serde::Deserialize))]
     pub struct AlterRoleStmt(Box<self::inner::AlterRoleStmt>);
 
     /// optional `AlterRoleStmt`
-    #[derive(Debug, Clone, serde::Serialize, serde::Deserialize)]
+    #[derive(Debug, Clone)]
+    #[cfg_attr(feature = "syn_serde", derive(serde::Serialize, serde::Deserialize))]
     pub struct AlterRoleStmtOpt(Option<AlterRoleStmt>);
 
     #[cfg(test)]
@@ -91002,11 +92170,13 @@ mod alter_role_stmt {
     }
 
     /// `AlterRoleStmt` list
-    #[derive(Debug, Clone, serde::Serialize, serde::Deserialize)]
+    #[derive(Debug, Clone)]
+    #[cfg_attr(feature = "syn_serde", derive(serde::Serialize, serde::Deserialize))]
     pub struct AlterRoleStmtList(Vec<AlterRoleStmt>);
 
     /// optional `AlterRoleStmt` list
-    #[derive(Debug, Clone, serde::Serialize, serde::Deserialize)]
+    #[derive(Debug, Clone)]
+    #[cfg_attr(feature = "syn_serde", derive(serde::Serialize, serde::Deserialize))]
     pub struct AlterRoleStmtListOpt(Option<Vec<AlterRoleStmt>>);
 
     impl crate::syn::ListOpt<AlterRoleStmt> for AlterRoleStmtListOpt {
@@ -91106,7 +92276,8 @@ mod alter_role_stmt {
         use super::*;
 
         #[cfg_attr(test, derive(derive_builder::Builder))]
-        #[derive(Clone, Debug, serde::Serialize, serde::Deserialize)]
+        #[cfg_attr(feature = "syn_serde", derive(serde::Serialize, serde::Deserialize))]
+        #[derive(Clone, Debug)]
         #[allow(clippy::struct_excessive_bools)]
         #[allow(clippy::struct_field_names)]
         pub struct AlterRoleStmt {
@@ -91238,11 +92409,13 @@ mod alter_role_set_stmt {
     use super::*;
 
     /// `AlterRoleSetStmt`
-    #[derive(Debug, Clone, serde::Serialize, serde::Deserialize)]
+    #[derive(Debug, Clone)]
+    #[cfg_attr(feature = "syn_serde", derive(serde::Serialize, serde::Deserialize))]
     pub struct AlterRoleSetStmt(Box<self::inner::AlterRoleSetStmt>);
 
     /// optional `AlterRoleSetStmt`
-    #[derive(Debug, Clone, serde::Serialize, serde::Deserialize)]
+    #[derive(Debug, Clone)]
+    #[cfg_attr(feature = "syn_serde", derive(serde::Serialize, serde::Deserialize))]
     pub struct AlterRoleSetStmtOpt(Option<AlterRoleSetStmt>);
 
     #[cfg(test)]
@@ -91259,11 +92432,13 @@ mod alter_role_set_stmt {
     }
 
     /// `AlterRoleSetStmt` list
-    #[derive(Debug, Clone, serde::Serialize, serde::Deserialize)]
+    #[derive(Debug, Clone)]
+    #[cfg_attr(feature = "syn_serde", derive(serde::Serialize, serde::Deserialize))]
     pub struct AlterRoleSetStmtList(Vec<AlterRoleSetStmt>);
 
     /// optional `AlterRoleSetStmt` list
-    #[derive(Debug, Clone, serde::Serialize, serde::Deserialize)]
+    #[derive(Debug, Clone)]
+    #[cfg_attr(feature = "syn_serde", derive(serde::Serialize, serde::Deserialize))]
     pub struct AlterRoleSetStmtListOpt(Option<Vec<AlterRoleSetStmt>>);
 
     impl crate::syn::ListOpt<AlterRoleSetStmt> for AlterRoleSetStmtListOpt {
@@ -91363,7 +92538,8 @@ mod alter_role_set_stmt {
         use super::*;
 
         #[cfg_attr(test, derive(derive_builder::Builder))]
-        #[derive(Clone, Debug, serde::Serialize, serde::Deserialize)]
+        #[cfg_attr(feature = "syn_serde", derive(serde::Serialize, serde::Deserialize))]
+        #[derive(Clone, Debug)]
         #[allow(clippy::struct_excessive_bools)]
         #[allow(clippy::struct_field_names)]
         pub struct AlterRoleSetStmt {
@@ -91495,11 +92671,13 @@ mod drop_role_stmt {
     use super::*;
 
     /// `DropRoleStmt`
-    #[derive(Debug, Clone, serde::Serialize, serde::Deserialize)]
+    #[derive(Debug, Clone)]
+    #[cfg_attr(feature = "syn_serde", derive(serde::Serialize, serde::Deserialize))]
     pub struct DropRoleStmt(Box<self::inner::DropRoleStmt>);
 
     /// optional `DropRoleStmt`
-    #[derive(Debug, Clone, serde::Serialize, serde::Deserialize)]
+    #[derive(Debug, Clone)]
+    #[cfg_attr(feature = "syn_serde", derive(serde::Serialize, serde::Deserialize))]
     pub struct DropRoleStmtOpt(Option<DropRoleStmt>);
 
     #[cfg(test)]
@@ -91516,11 +92694,13 @@ mod drop_role_stmt {
     }
 
     /// `DropRoleStmt` list
-    #[derive(Debug, Clone, serde::Serialize, serde::Deserialize)]
+    #[derive(Debug, Clone)]
+    #[cfg_attr(feature = "syn_serde", derive(serde::Serialize, serde::Deserialize))]
     pub struct DropRoleStmtList(Vec<DropRoleStmt>);
 
     /// optional `DropRoleStmt` list
-    #[derive(Debug, Clone, serde::Serialize, serde::Deserialize)]
+    #[derive(Debug, Clone)]
+    #[cfg_attr(feature = "syn_serde", derive(serde::Serialize, serde::Deserialize))]
     pub struct DropRoleStmtListOpt(Option<Vec<DropRoleStmt>>);
 
     impl crate::syn::ListOpt<DropRoleStmt> for DropRoleStmtListOpt {
@@ -91620,7 +92800,8 @@ mod drop_role_stmt {
         use super::*;
 
         #[cfg_attr(test, derive(derive_builder::Builder))]
-        #[derive(Clone, Debug, serde::Serialize, serde::Deserialize)]
+        #[cfg_attr(feature = "syn_serde", derive(serde::Serialize, serde::Deserialize))]
+        #[derive(Clone, Debug)]
         #[allow(clippy::struct_excessive_bools)]
         #[allow(clippy::struct_field_names)]
         pub struct DropRoleStmt {
@@ -91714,11 +92895,13 @@ mod create_seq_stmt {
     use super::*;
 
     /// `CreateSeqStmt`
-    #[derive(Debug, Clone, serde::Serialize, serde::Deserialize)]
+    #[derive(Debug, Clone)]
+    #[cfg_attr(feature = "syn_serde", derive(serde::Serialize, serde::Deserialize))]
     pub struct CreateSeqStmt(Box<self::inner::CreateSeqStmt>);
 
     /// optional `CreateSeqStmt`
-    #[derive(Debug, Clone, serde::Serialize, serde::Deserialize)]
+    #[derive(Debug, Clone)]
+    #[cfg_attr(feature = "syn_serde", derive(serde::Serialize, serde::Deserialize))]
     pub struct CreateSeqStmtOpt(Option<CreateSeqStmt>);
 
     #[cfg(test)]
@@ -91735,11 +92918,13 @@ mod create_seq_stmt {
     }
 
     /// `CreateSeqStmt` list
-    #[derive(Debug, Clone, serde::Serialize, serde::Deserialize)]
+    #[derive(Debug, Clone)]
+    #[cfg_attr(feature = "syn_serde", derive(serde::Serialize, serde::Deserialize))]
     pub struct CreateSeqStmtList(Vec<CreateSeqStmt>);
 
     /// optional `CreateSeqStmt` list
-    #[derive(Debug, Clone, serde::Serialize, serde::Deserialize)]
+    #[derive(Debug, Clone)]
+    #[cfg_attr(feature = "syn_serde", derive(serde::Serialize, serde::Deserialize))]
     pub struct CreateSeqStmtListOpt(Option<Vec<CreateSeqStmt>>);
 
     impl crate::syn::ListOpt<CreateSeqStmt> for CreateSeqStmtListOpt {
@@ -91839,7 +93024,8 @@ mod create_seq_stmt {
         use super::*;
 
         #[cfg_attr(test, derive(derive_builder::Builder))]
-        #[derive(Clone, Debug, serde::Serialize, serde::Deserialize)]
+        #[cfg_attr(feature = "syn_serde", derive(serde::Serialize, serde::Deserialize))]
+        #[derive(Clone, Debug)]
         #[allow(clippy::struct_excessive_bools)]
         #[allow(clippy::struct_field_names)]
         pub struct CreateSeqStmt {
@@ -92033,11 +93219,13 @@ mod alter_seq_stmt {
     use super::*;
 
     /// `AlterSeqStmt`
-    #[derive(Debug, Clone, serde::Serialize, serde::Deserialize)]
+    #[derive(Debug, Clone)]
+    #[cfg_attr(feature = "syn_serde", derive(serde::Serialize, serde::Deserialize))]
     pub struct AlterSeqStmt(Box<self::inner::AlterSeqStmt>);
 
     /// optional `AlterSeqStmt`
-    #[derive(Debug, Clone, serde::Serialize, serde::Deserialize)]
+    #[derive(Debug, Clone)]
+    #[cfg_attr(feature = "syn_serde", derive(serde::Serialize, serde::Deserialize))]
     pub struct AlterSeqStmtOpt(Option<AlterSeqStmt>);
 
     #[cfg(test)]
@@ -92054,11 +93242,13 @@ mod alter_seq_stmt {
     }
 
     /// `AlterSeqStmt` list
-    #[derive(Debug, Clone, serde::Serialize, serde::Deserialize)]
+    #[derive(Debug, Clone)]
+    #[cfg_attr(feature = "syn_serde", derive(serde::Serialize, serde::Deserialize))]
     pub struct AlterSeqStmtList(Vec<AlterSeqStmt>);
 
     /// optional `AlterSeqStmt` list
-    #[derive(Debug, Clone, serde::Serialize, serde::Deserialize)]
+    #[derive(Debug, Clone)]
+    #[cfg_attr(feature = "syn_serde", derive(serde::Serialize, serde::Deserialize))]
     pub struct AlterSeqStmtListOpt(Option<Vec<AlterSeqStmt>>);
 
     impl crate::syn::ListOpt<AlterSeqStmt> for AlterSeqStmtListOpt {
@@ -92158,7 +93348,8 @@ mod alter_seq_stmt {
         use super::*;
 
         #[cfg_attr(test, derive(derive_builder::Builder))]
-        #[derive(Clone, Debug, serde::Serialize, serde::Deserialize)]
+        #[cfg_attr(feature = "syn_serde", derive(serde::Serialize, serde::Deserialize))]
+        #[derive(Clone, Debug)]
         #[allow(clippy::struct_excessive_bools)]
         #[allow(clippy::struct_field_names)]
         pub struct AlterSeqStmt {
@@ -92321,11 +93512,13 @@ mod define_stmt {
     use super::*;
 
     /// `DefineStmt`
-    #[derive(Debug, Clone, serde::Serialize, serde::Deserialize)]
+    #[derive(Debug, Clone)]
+    #[cfg_attr(feature = "syn_serde", derive(serde::Serialize, serde::Deserialize))]
     pub struct DefineStmt(Box<self::inner::DefineStmt>);
 
     /// optional `DefineStmt`
-    #[derive(Debug, Clone, serde::Serialize, serde::Deserialize)]
+    #[derive(Debug, Clone)]
+    #[cfg_attr(feature = "syn_serde", derive(serde::Serialize, serde::Deserialize))]
     pub struct DefineStmtOpt(Option<DefineStmt>);
 
     #[cfg(test)]
@@ -92342,11 +93535,13 @@ mod define_stmt {
     }
 
     /// `DefineStmt` list
-    #[derive(Debug, Clone, serde::Serialize, serde::Deserialize)]
+    #[derive(Debug, Clone)]
+    #[cfg_attr(feature = "syn_serde", derive(serde::Serialize, serde::Deserialize))]
     pub struct DefineStmtList(Vec<DefineStmt>);
 
     /// optional `DefineStmt` list
-    #[derive(Debug, Clone, serde::Serialize, serde::Deserialize)]
+    #[derive(Debug, Clone)]
+    #[cfg_attr(feature = "syn_serde", derive(serde::Serialize, serde::Deserialize))]
     pub struct DefineStmtListOpt(Option<Vec<DefineStmt>>);
 
     impl crate::syn::ListOpt<DefineStmt> for DefineStmtListOpt {
@@ -92446,7 +93641,8 @@ mod define_stmt {
         use super::*;
 
         #[cfg_attr(test, derive(derive_builder::Builder))]
-        #[derive(Clone, Debug, serde::Serialize, serde::Deserialize)]
+        #[cfg_attr(feature = "syn_serde", derive(serde::Serialize, serde::Deserialize))]
+        #[derive(Clone, Debug)]
         #[allow(clippy::struct_excessive_bools)]
         #[allow(clippy::struct_field_names)]
         pub struct DefineStmt {
@@ -92706,11 +93902,13 @@ mod create_domain_stmt {
     use super::*;
 
     /// `CreateDomainStmt`
-    #[derive(Debug, Clone, serde::Serialize, serde::Deserialize)]
+    #[derive(Debug, Clone)]
+    #[cfg_attr(feature = "syn_serde", derive(serde::Serialize, serde::Deserialize))]
     pub struct CreateDomainStmt(Box<self::inner::CreateDomainStmt>);
 
     /// optional `CreateDomainStmt`
-    #[derive(Debug, Clone, serde::Serialize, serde::Deserialize)]
+    #[derive(Debug, Clone)]
+    #[cfg_attr(feature = "syn_serde", derive(serde::Serialize, serde::Deserialize))]
     pub struct CreateDomainStmtOpt(Option<CreateDomainStmt>);
 
     #[cfg(test)]
@@ -92727,11 +93925,13 @@ mod create_domain_stmt {
     }
 
     /// `CreateDomainStmt` list
-    #[derive(Debug, Clone, serde::Serialize, serde::Deserialize)]
+    #[derive(Debug, Clone)]
+    #[cfg_attr(feature = "syn_serde", derive(serde::Serialize, serde::Deserialize))]
     pub struct CreateDomainStmtList(Vec<CreateDomainStmt>);
 
     /// optional `CreateDomainStmt` list
-    #[derive(Debug, Clone, serde::Serialize, serde::Deserialize)]
+    #[derive(Debug, Clone)]
+    #[cfg_attr(feature = "syn_serde", derive(serde::Serialize, serde::Deserialize))]
     pub struct CreateDomainStmtListOpt(Option<Vec<CreateDomainStmt>>);
 
     impl crate::syn::ListOpt<CreateDomainStmt> for CreateDomainStmtListOpt {
@@ -92831,7 +94031,8 @@ mod create_domain_stmt {
         use super::*;
 
         #[cfg_attr(test, derive(derive_builder::Builder))]
-        #[derive(Clone, Debug, serde::Serialize, serde::Deserialize)]
+        #[cfg_attr(feature = "syn_serde", derive(serde::Serialize, serde::Deserialize))]
+        #[derive(Clone, Debug)]
         #[allow(clippy::struct_excessive_bools)]
         #[allow(clippy::struct_field_names)]
         pub struct CreateDomainStmt {
@@ -93000,11 +94201,13 @@ mod create_op_class_stmt {
     use super::*;
 
     /// `CreateOpClassStmt`
-    #[derive(Debug, Clone, serde::Serialize, serde::Deserialize)]
+    #[derive(Debug, Clone)]
+    #[cfg_attr(feature = "syn_serde", derive(serde::Serialize, serde::Deserialize))]
     pub struct CreateOpClassStmt(Box<self::inner::CreateOpClassStmt>);
 
     /// optional `CreateOpClassStmt`
-    #[derive(Debug, Clone, serde::Serialize, serde::Deserialize)]
+    #[derive(Debug, Clone)]
+    #[cfg_attr(feature = "syn_serde", derive(serde::Serialize, serde::Deserialize))]
     pub struct CreateOpClassStmtOpt(Option<CreateOpClassStmt>);
 
     #[cfg(test)]
@@ -93021,11 +94224,13 @@ mod create_op_class_stmt {
     }
 
     /// `CreateOpClassStmt` list
-    #[derive(Debug, Clone, serde::Serialize, serde::Deserialize)]
+    #[derive(Debug, Clone)]
+    #[cfg_attr(feature = "syn_serde", derive(serde::Serialize, serde::Deserialize))]
     pub struct CreateOpClassStmtList(Vec<CreateOpClassStmt>);
 
     /// optional `CreateOpClassStmt` list
-    #[derive(Debug, Clone, serde::Serialize, serde::Deserialize)]
+    #[derive(Debug, Clone)]
+    #[cfg_attr(feature = "syn_serde", derive(serde::Serialize, serde::Deserialize))]
     pub struct CreateOpClassStmtListOpt(Option<Vec<CreateOpClassStmt>>);
 
     impl crate::syn::ListOpt<CreateOpClassStmt> for CreateOpClassStmtListOpt {
@@ -93125,7 +94330,8 @@ mod create_op_class_stmt {
         use super::*;
 
         #[cfg_attr(test, derive(derive_builder::Builder))]
-        #[derive(Clone, Debug, serde::Serialize, serde::Deserialize)]
+        #[cfg_attr(feature = "syn_serde", derive(serde::Serialize, serde::Deserialize))]
+        #[derive(Clone, Debug)]
         #[allow(clippy::struct_excessive_bools)]
         #[allow(clippy::struct_field_names)]
         pub struct CreateOpClassStmt {
@@ -93356,11 +94562,13 @@ mod create_op_class_item {
     use super::*;
 
     /// `CreateOpClassItem`
-    #[derive(Debug, Clone, serde::Serialize, serde::Deserialize)]
+    #[derive(Debug, Clone)]
+    #[cfg_attr(feature = "syn_serde", derive(serde::Serialize, serde::Deserialize))]
     pub struct CreateOpClassItem(Box<self::inner::CreateOpClassItem>);
 
     /// optional `CreateOpClassItem`
-    #[derive(Debug, Clone, serde::Serialize, serde::Deserialize)]
+    #[derive(Debug, Clone)]
+    #[cfg_attr(feature = "syn_serde", derive(serde::Serialize, serde::Deserialize))]
     pub struct CreateOpClassItemOpt(Option<CreateOpClassItem>);
 
     #[cfg(test)]
@@ -93377,11 +94585,13 @@ mod create_op_class_item {
     }
 
     /// `CreateOpClassItem` list
-    #[derive(Debug, Clone, serde::Serialize, serde::Deserialize)]
+    #[derive(Debug, Clone)]
+    #[cfg_attr(feature = "syn_serde", derive(serde::Serialize, serde::Deserialize))]
     pub struct CreateOpClassItemList(Vec<CreateOpClassItem>);
 
     /// optional `CreateOpClassItem` list
-    #[derive(Debug, Clone, serde::Serialize, serde::Deserialize)]
+    #[derive(Debug, Clone)]
+    #[cfg_attr(feature = "syn_serde", derive(serde::Serialize, serde::Deserialize))]
     pub struct CreateOpClassItemListOpt(Option<Vec<CreateOpClassItem>>);
 
     impl crate::syn::ListOpt<CreateOpClassItem> for CreateOpClassItemListOpt {
@@ -93481,7 +94691,8 @@ mod create_op_class_item {
         use super::*;
 
         #[cfg_attr(test, derive(derive_builder::Builder))]
-        #[derive(Clone, Debug, serde::Serialize, serde::Deserialize)]
+        #[cfg_attr(feature = "syn_serde", derive(serde::Serialize, serde::Deserialize))]
+        #[derive(Clone, Debug)]
         #[allow(clippy::struct_excessive_bools)]
         #[allow(clippy::struct_field_names)]
         pub struct CreateOpClassItem {
@@ -93712,11 +94923,13 @@ mod create_op_family_stmt {
     use super::*;
 
     /// `CreateOpFamilyStmt`
-    #[derive(Debug, Clone, serde::Serialize, serde::Deserialize)]
+    #[derive(Debug, Clone)]
+    #[cfg_attr(feature = "syn_serde", derive(serde::Serialize, serde::Deserialize))]
     pub struct CreateOpFamilyStmt(Box<self::inner::CreateOpFamilyStmt>);
 
     /// optional `CreateOpFamilyStmt`
-    #[derive(Debug, Clone, serde::Serialize, serde::Deserialize)]
+    #[derive(Debug, Clone)]
+    #[cfg_attr(feature = "syn_serde", derive(serde::Serialize, serde::Deserialize))]
     pub struct CreateOpFamilyStmtOpt(Option<CreateOpFamilyStmt>);
 
     #[cfg(test)]
@@ -93733,11 +94946,13 @@ mod create_op_family_stmt {
     }
 
     /// `CreateOpFamilyStmt` list
-    #[derive(Debug, Clone, serde::Serialize, serde::Deserialize)]
+    #[derive(Debug, Clone)]
+    #[cfg_attr(feature = "syn_serde", derive(serde::Serialize, serde::Deserialize))]
     pub struct CreateOpFamilyStmtList(Vec<CreateOpFamilyStmt>);
 
     /// optional `CreateOpFamilyStmt` list
-    #[derive(Debug, Clone, serde::Serialize, serde::Deserialize)]
+    #[derive(Debug, Clone)]
+    #[cfg_attr(feature = "syn_serde", derive(serde::Serialize, serde::Deserialize))]
     pub struct CreateOpFamilyStmtListOpt(Option<Vec<CreateOpFamilyStmt>>);
 
     impl crate::syn::ListOpt<CreateOpFamilyStmt> for CreateOpFamilyStmtListOpt {
@@ -93837,7 +95052,8 @@ mod create_op_family_stmt {
         use super::*;
 
         #[cfg_attr(test, derive(derive_builder::Builder))]
-        #[derive(Clone, Debug, serde::Serialize, serde::Deserialize)]
+        #[cfg_attr(feature = "syn_serde", derive(serde::Serialize, serde::Deserialize))]
+        #[derive(Clone, Debug)]
         #[allow(clippy::struct_excessive_bools)]
         #[allow(clippy::struct_field_names)]
         pub struct CreateOpFamilyStmt {
@@ -93935,11 +95151,13 @@ mod alter_op_family_stmt {
     use super::*;
 
     /// `AlterOpFamilyStmt`
-    #[derive(Debug, Clone, serde::Serialize, serde::Deserialize)]
+    #[derive(Debug, Clone)]
+    #[cfg_attr(feature = "syn_serde", derive(serde::Serialize, serde::Deserialize))]
     pub struct AlterOpFamilyStmt(Box<self::inner::AlterOpFamilyStmt>);
 
     /// optional `AlterOpFamilyStmt`
-    #[derive(Debug, Clone, serde::Serialize, serde::Deserialize)]
+    #[derive(Debug, Clone)]
+    #[cfg_attr(feature = "syn_serde", derive(serde::Serialize, serde::Deserialize))]
     pub struct AlterOpFamilyStmtOpt(Option<AlterOpFamilyStmt>);
 
     #[cfg(test)]
@@ -93956,11 +95174,13 @@ mod alter_op_family_stmt {
     }
 
     /// `AlterOpFamilyStmt` list
-    #[derive(Debug, Clone, serde::Serialize, serde::Deserialize)]
+    #[derive(Debug, Clone)]
+    #[cfg_attr(feature = "syn_serde", derive(serde::Serialize, serde::Deserialize))]
     pub struct AlterOpFamilyStmtList(Vec<AlterOpFamilyStmt>);
 
     /// optional `AlterOpFamilyStmt` list
-    #[derive(Debug, Clone, serde::Serialize, serde::Deserialize)]
+    #[derive(Debug, Clone)]
+    #[cfg_attr(feature = "syn_serde", derive(serde::Serialize, serde::Deserialize))]
     pub struct AlterOpFamilyStmtListOpt(Option<Vec<AlterOpFamilyStmt>>);
 
     impl crate::syn::ListOpt<AlterOpFamilyStmt> for AlterOpFamilyStmtListOpt {
@@ -94060,7 +95280,8 @@ mod alter_op_family_stmt {
         use super::*;
 
         #[cfg_attr(test, derive(derive_builder::Builder))]
-        #[derive(Clone, Debug, serde::Serialize, serde::Deserialize)]
+        #[cfg_attr(feature = "syn_serde", derive(serde::Serialize, serde::Deserialize))]
+        #[derive(Clone, Debug)]
         #[allow(clippy::struct_excessive_bools)]
         #[allow(clippy::struct_field_names)]
         pub struct AlterOpFamilyStmt {
@@ -94223,11 +95444,13 @@ mod drop_stmt {
     use super::*;
 
     /// `DropStmt`
-    #[derive(Debug, Clone, serde::Serialize, serde::Deserialize)]
+    #[derive(Debug, Clone)]
+    #[cfg_attr(feature = "syn_serde", derive(serde::Serialize, serde::Deserialize))]
     pub struct DropStmt(Box<self::inner::DropStmt>);
 
     /// optional `DropStmt`
-    #[derive(Debug, Clone, serde::Serialize, serde::Deserialize)]
+    #[derive(Debug, Clone)]
+    #[cfg_attr(feature = "syn_serde", derive(serde::Serialize, serde::Deserialize))]
     pub struct DropStmtOpt(Option<DropStmt>);
 
     #[cfg(test)]
@@ -94244,11 +95467,13 @@ mod drop_stmt {
     }
 
     /// `DropStmt` list
-    #[derive(Debug, Clone, serde::Serialize, serde::Deserialize)]
+    #[derive(Debug, Clone)]
+    #[cfg_attr(feature = "syn_serde", derive(serde::Serialize, serde::Deserialize))]
     pub struct DropStmtList(Vec<DropStmt>);
 
     /// optional `DropStmt` list
-    #[derive(Debug, Clone, serde::Serialize, serde::Deserialize)]
+    #[derive(Debug, Clone)]
+    #[cfg_attr(feature = "syn_serde", derive(serde::Serialize, serde::Deserialize))]
     pub struct DropStmtListOpt(Option<Vec<DropStmt>>);
 
     impl crate::syn::ListOpt<DropStmt> for DropStmtListOpt {
@@ -94348,7 +95573,8 @@ mod drop_stmt {
         use super::*;
 
         #[cfg_attr(test, derive(derive_builder::Builder))]
-        #[derive(Clone, Debug, serde::Serialize, serde::Deserialize)]
+        #[cfg_attr(feature = "syn_serde", derive(serde::Serialize, serde::Deserialize))]
+        #[derive(Clone, Debug)]
         #[allow(clippy::struct_excessive_bools)]
         #[allow(clippy::struct_field_names)]
         pub struct DropStmt {
@@ -94543,11 +95769,13 @@ mod truncate_stmt {
     use super::*;
 
     /// `TruncateStmt`
-    #[derive(Debug, Clone, serde::Serialize, serde::Deserialize)]
+    #[derive(Debug, Clone)]
+    #[cfg_attr(feature = "syn_serde", derive(serde::Serialize, serde::Deserialize))]
     pub struct TruncateStmt(Box<self::inner::TruncateStmt>);
 
     /// optional `TruncateStmt`
-    #[derive(Debug, Clone, serde::Serialize, serde::Deserialize)]
+    #[derive(Debug, Clone)]
+    #[cfg_attr(feature = "syn_serde", derive(serde::Serialize, serde::Deserialize))]
     pub struct TruncateStmtOpt(Option<TruncateStmt>);
 
     #[cfg(test)]
@@ -94564,11 +95792,13 @@ mod truncate_stmt {
     }
 
     /// `TruncateStmt` list
-    #[derive(Debug, Clone, serde::Serialize, serde::Deserialize)]
+    #[derive(Debug, Clone)]
+    #[cfg_attr(feature = "syn_serde", derive(serde::Serialize, serde::Deserialize))]
     pub struct TruncateStmtList(Vec<TruncateStmt>);
 
     /// optional `TruncateStmt` list
-    #[derive(Debug, Clone, serde::Serialize, serde::Deserialize)]
+    #[derive(Debug, Clone)]
+    #[cfg_attr(feature = "syn_serde", derive(serde::Serialize, serde::Deserialize))]
     pub struct TruncateStmtListOpt(Option<Vec<TruncateStmt>>);
 
     impl crate::syn::ListOpt<TruncateStmt> for TruncateStmtListOpt {
@@ -94668,7 +95898,8 @@ mod truncate_stmt {
         use super::*;
 
         #[cfg_attr(test, derive(derive_builder::Builder))]
-        #[derive(Clone, Debug, serde::Serialize, serde::Deserialize)]
+        #[cfg_attr(feature = "syn_serde", derive(serde::Serialize, serde::Deserialize))]
+        #[derive(Clone, Debug)]
         #[allow(clippy::struct_excessive_bools)]
         #[allow(clippy::struct_field_names)]
         pub struct TruncateStmt {
@@ -94800,11 +96031,13 @@ mod comment_stmt {
     use super::*;
 
     /// `CommentStmt`
-    #[derive(Debug, Clone, serde::Serialize, serde::Deserialize)]
+    #[derive(Debug, Clone)]
+    #[cfg_attr(feature = "syn_serde", derive(serde::Serialize, serde::Deserialize))]
     pub struct CommentStmt(Box<self::inner::CommentStmt>);
 
     /// optional `CommentStmt`
-    #[derive(Debug, Clone, serde::Serialize, serde::Deserialize)]
+    #[derive(Debug, Clone)]
+    #[cfg_attr(feature = "syn_serde", derive(serde::Serialize, serde::Deserialize))]
     pub struct CommentStmtOpt(Option<CommentStmt>);
 
     #[cfg(test)]
@@ -94821,11 +96054,13 @@ mod comment_stmt {
     }
 
     /// `CommentStmt` list
-    #[derive(Debug, Clone, serde::Serialize, serde::Deserialize)]
+    #[derive(Debug, Clone)]
+    #[cfg_attr(feature = "syn_serde", derive(serde::Serialize, serde::Deserialize))]
     pub struct CommentStmtList(Vec<CommentStmt>);
 
     /// optional `CommentStmt` list
-    #[derive(Debug, Clone, serde::Serialize, serde::Deserialize)]
+    #[derive(Debug, Clone)]
+    #[cfg_attr(feature = "syn_serde", derive(serde::Serialize, serde::Deserialize))]
     pub struct CommentStmtListOpt(Option<Vec<CommentStmt>>);
 
     impl crate::syn::ListOpt<CommentStmt> for CommentStmtListOpt {
@@ -94925,7 +96160,8 @@ mod comment_stmt {
         use super::*;
 
         #[cfg_attr(test, derive(derive_builder::Builder))]
-        #[derive(Clone, Debug, serde::Serialize, serde::Deserialize)]
+        #[cfg_attr(feature = "syn_serde", derive(serde::Serialize, serde::Deserialize))]
+        #[derive(Clone, Debug)]
         #[allow(clippy::struct_excessive_bools)]
         #[allow(clippy::struct_field_names)]
         pub struct CommentStmt {
@@ -95055,11 +96291,13 @@ mod sec_label_stmt {
     use super::*;
 
     /// `SecLabelStmt`
-    #[derive(Debug, Clone, serde::Serialize, serde::Deserialize)]
+    #[derive(Debug, Clone)]
+    #[cfg_attr(feature = "syn_serde", derive(serde::Serialize, serde::Deserialize))]
     pub struct SecLabelStmt(Box<self::inner::SecLabelStmt>);
 
     /// optional `SecLabelStmt`
-    #[derive(Debug, Clone, serde::Serialize, serde::Deserialize)]
+    #[derive(Debug, Clone)]
+    #[cfg_attr(feature = "syn_serde", derive(serde::Serialize, serde::Deserialize))]
     pub struct SecLabelStmtOpt(Option<SecLabelStmt>);
 
     #[cfg(test)]
@@ -95076,11 +96314,13 @@ mod sec_label_stmt {
     }
 
     /// `SecLabelStmt` list
-    #[derive(Debug, Clone, serde::Serialize, serde::Deserialize)]
+    #[derive(Debug, Clone)]
+    #[cfg_attr(feature = "syn_serde", derive(serde::Serialize, serde::Deserialize))]
     pub struct SecLabelStmtList(Vec<SecLabelStmt>);
 
     /// optional `SecLabelStmt` list
-    #[derive(Debug, Clone, serde::Serialize, serde::Deserialize)]
+    #[derive(Debug, Clone)]
+    #[cfg_attr(feature = "syn_serde", derive(serde::Serialize, serde::Deserialize))]
     pub struct SecLabelStmtListOpt(Option<Vec<SecLabelStmt>>);
 
     impl crate::syn::ListOpt<SecLabelStmt> for SecLabelStmtListOpt {
@@ -95180,7 +96420,8 @@ mod sec_label_stmt {
         use super::*;
 
         #[cfg_attr(test, derive(derive_builder::Builder))]
-        #[derive(Clone, Debug, serde::Serialize, serde::Deserialize)]
+        #[cfg_attr(feature = "syn_serde", derive(serde::Serialize, serde::Deserialize))]
+        #[derive(Clone, Debug)]
         #[allow(clippy::struct_excessive_bools)]
         #[allow(clippy::struct_field_names)]
         pub struct SecLabelStmt {
@@ -95343,11 +96584,13 @@ mod declare_cursor_stmt {
     use super::*;
 
     /// `DeclareCursorStmt`
-    #[derive(Debug, Clone, serde::Serialize, serde::Deserialize)]
+    #[derive(Debug, Clone)]
+    #[cfg_attr(feature = "syn_serde", derive(serde::Serialize, serde::Deserialize))]
     pub struct DeclareCursorStmt(Box<self::inner::DeclareCursorStmt>);
 
     /// optional `DeclareCursorStmt`
-    #[derive(Debug, Clone, serde::Serialize, serde::Deserialize)]
+    #[derive(Debug, Clone)]
+    #[cfg_attr(feature = "syn_serde", derive(serde::Serialize, serde::Deserialize))]
     pub struct DeclareCursorStmtOpt(Option<DeclareCursorStmt>);
 
     #[cfg(test)]
@@ -95364,11 +96607,13 @@ mod declare_cursor_stmt {
     }
 
     /// `DeclareCursorStmt` list
-    #[derive(Debug, Clone, serde::Serialize, serde::Deserialize)]
+    #[derive(Debug, Clone)]
+    #[cfg_attr(feature = "syn_serde", derive(serde::Serialize, serde::Deserialize))]
     pub struct DeclareCursorStmtList(Vec<DeclareCursorStmt>);
 
     /// optional `DeclareCursorStmt` list
-    #[derive(Debug, Clone, serde::Serialize, serde::Deserialize)]
+    #[derive(Debug, Clone)]
+    #[cfg_attr(feature = "syn_serde", derive(serde::Serialize, serde::Deserialize))]
     pub struct DeclareCursorStmtListOpt(Option<Vec<DeclareCursorStmt>>);
 
     impl crate::syn::ListOpt<DeclareCursorStmt> for DeclareCursorStmtListOpt {
@@ -95468,7 +96713,8 @@ mod declare_cursor_stmt {
         use super::*;
 
         #[cfg_attr(test, derive(derive_builder::Builder))]
-        #[derive(Clone, Debug, serde::Serialize, serde::Deserialize)]
+        #[cfg_attr(feature = "syn_serde", derive(serde::Serialize, serde::Deserialize))]
+        #[derive(Clone, Debug)]
         #[allow(clippy::struct_excessive_bools)]
         #[allow(clippy::struct_field_names)]
         pub struct DeclareCursorStmt {
@@ -95597,11 +96843,13 @@ mod close_portal_stmt {
     use super::*;
 
     /// `ClosePortalStmt`
-    #[derive(Debug, Clone, serde::Serialize, serde::Deserialize)]
+    #[derive(Debug, Clone)]
+    #[cfg_attr(feature = "syn_serde", derive(serde::Serialize, serde::Deserialize))]
     pub struct ClosePortalStmt(Box<self::inner::ClosePortalStmt>);
 
     /// optional `ClosePortalStmt`
-    #[derive(Debug, Clone, serde::Serialize, serde::Deserialize)]
+    #[derive(Debug, Clone)]
+    #[cfg_attr(feature = "syn_serde", derive(serde::Serialize, serde::Deserialize))]
     pub struct ClosePortalStmtOpt(Option<ClosePortalStmt>);
 
     #[cfg(test)]
@@ -95618,11 +96866,13 @@ mod close_portal_stmt {
     }
 
     /// `ClosePortalStmt` list
-    #[derive(Debug, Clone, serde::Serialize, serde::Deserialize)]
+    #[derive(Debug, Clone)]
+    #[cfg_attr(feature = "syn_serde", derive(serde::Serialize, serde::Deserialize))]
     pub struct ClosePortalStmtList(Vec<ClosePortalStmt>);
 
     /// optional `ClosePortalStmt` list
-    #[derive(Debug, Clone, serde::Serialize, serde::Deserialize)]
+    #[derive(Debug, Clone)]
+    #[cfg_attr(feature = "syn_serde", derive(serde::Serialize, serde::Deserialize))]
     pub struct ClosePortalStmtListOpt(Option<Vec<ClosePortalStmt>>);
 
     impl crate::syn::ListOpt<ClosePortalStmt> for ClosePortalStmtListOpt {
@@ -95722,7 +96972,8 @@ mod close_portal_stmt {
         use super::*;
 
         #[cfg_attr(test, derive(derive_builder::Builder))]
-        #[derive(Clone, Debug, serde::Serialize, serde::Deserialize)]
+        #[cfg_attr(feature = "syn_serde", derive(serde::Serialize, serde::Deserialize))]
+        #[derive(Clone, Debug)]
         #[allow(clippy::struct_excessive_bools)]
         #[allow(clippy::struct_field_names)]
         pub struct ClosePortalStmt {
@@ -95784,11 +97035,13 @@ mod fetch_stmt {
     use super::*;
 
     /// `FetchStmt`
-    #[derive(Debug, Clone, serde::Serialize, serde::Deserialize)]
+    #[derive(Debug, Clone)]
+    #[cfg_attr(feature = "syn_serde", derive(serde::Serialize, serde::Deserialize))]
     pub struct FetchStmt(Box<self::inner::FetchStmt>);
 
     /// optional `FetchStmt`
-    #[derive(Debug, Clone, serde::Serialize, serde::Deserialize)]
+    #[derive(Debug, Clone)]
+    #[cfg_attr(feature = "syn_serde", derive(serde::Serialize, serde::Deserialize))]
     pub struct FetchStmtOpt(Option<FetchStmt>);
 
     #[cfg(test)]
@@ -95805,11 +97058,13 @@ mod fetch_stmt {
     }
 
     /// `FetchStmt` list
-    #[derive(Debug, Clone, serde::Serialize, serde::Deserialize)]
+    #[derive(Debug, Clone)]
+    #[cfg_attr(feature = "syn_serde", derive(serde::Serialize, serde::Deserialize))]
     pub struct FetchStmtList(Vec<FetchStmt>);
 
     /// optional `FetchStmt` list
-    #[derive(Debug, Clone, serde::Serialize, serde::Deserialize)]
+    #[derive(Debug, Clone)]
+    #[cfg_attr(feature = "syn_serde", derive(serde::Serialize, serde::Deserialize))]
     pub struct FetchStmtListOpt(Option<Vec<FetchStmt>>);
 
     impl crate::syn::ListOpt<FetchStmt> for FetchStmtListOpt {
@@ -95909,7 +97164,8 @@ mod fetch_stmt {
         use super::*;
 
         #[cfg_attr(test, derive(derive_builder::Builder))]
-        #[derive(Clone, Debug, serde::Serialize, serde::Deserialize)]
+        #[cfg_attr(feature = "syn_serde", derive(serde::Serialize, serde::Deserialize))]
+        #[derive(Clone, Debug)]
         #[allow(clippy::struct_excessive_bools)]
         #[allow(clippy::struct_field_names)]
         pub struct FetchStmt {
@@ -96067,11 +97323,13 @@ mod index_stmt {
     use super::*;
 
     /// `IndexStmt`
-    #[derive(Debug, Clone, serde::Serialize, serde::Deserialize)]
+    #[derive(Debug, Clone)]
+    #[cfg_attr(feature = "syn_serde", derive(serde::Serialize, serde::Deserialize))]
     pub struct IndexStmt(Box<self::inner::IndexStmt>);
 
     /// optional `IndexStmt`
-    #[derive(Debug, Clone, serde::Serialize, serde::Deserialize)]
+    #[derive(Debug, Clone)]
+    #[cfg_attr(feature = "syn_serde", derive(serde::Serialize, serde::Deserialize))]
     pub struct IndexStmtOpt(Option<IndexStmt>);
 
     #[cfg(test)]
@@ -96088,11 +97346,13 @@ mod index_stmt {
     }
 
     /// `IndexStmt` list
-    #[derive(Debug, Clone, serde::Serialize, serde::Deserialize)]
+    #[derive(Debug, Clone)]
+    #[cfg_attr(feature = "syn_serde", derive(serde::Serialize, serde::Deserialize))]
     pub struct IndexStmtList(Vec<IndexStmt>);
 
     /// optional `IndexStmt` list
-    #[derive(Debug, Clone, serde::Serialize, serde::Deserialize)]
+    #[derive(Debug, Clone)]
+    #[cfg_attr(feature = "syn_serde", derive(serde::Serialize, serde::Deserialize))]
     pub struct IndexStmtListOpt(Option<Vec<IndexStmt>>);
 
     impl crate::syn::ListOpt<IndexStmt> for IndexStmtListOpt {
@@ -96192,7 +97452,8 @@ mod index_stmt {
         use super::*;
 
         #[cfg_attr(test, derive(derive_builder::Builder))]
-        #[derive(Clone, Debug, serde::Serialize, serde::Deserialize)]
+        #[cfg_attr(feature = "syn_serde", derive(serde::Serialize, serde::Deserialize))]
+        #[derive(Clone, Debug)]
         #[allow(clippy::struct_excessive_bools)]
         #[allow(clippy::struct_field_names)]
         pub struct IndexStmt {
@@ -96987,11 +98248,13 @@ mod create_stats_stmt {
     use super::*;
 
     /// `CreateStatsStmt`
-    #[derive(Debug, Clone, serde::Serialize, serde::Deserialize)]
+    #[derive(Debug, Clone)]
+    #[cfg_attr(feature = "syn_serde", derive(serde::Serialize, serde::Deserialize))]
     pub struct CreateStatsStmt(Box<self::inner::CreateStatsStmt>);
 
     /// optional `CreateStatsStmt`
-    #[derive(Debug, Clone, serde::Serialize, serde::Deserialize)]
+    #[derive(Debug, Clone)]
+    #[cfg_attr(feature = "syn_serde", derive(serde::Serialize, serde::Deserialize))]
     pub struct CreateStatsStmtOpt(Option<CreateStatsStmt>);
 
     #[cfg(test)]
@@ -97008,11 +98271,13 @@ mod create_stats_stmt {
     }
 
     /// `CreateStatsStmt` list
-    #[derive(Debug, Clone, serde::Serialize, serde::Deserialize)]
+    #[derive(Debug, Clone)]
+    #[cfg_attr(feature = "syn_serde", derive(serde::Serialize, serde::Deserialize))]
     pub struct CreateStatsStmtList(Vec<CreateStatsStmt>);
 
     /// optional `CreateStatsStmt` list
-    #[derive(Debug, Clone, serde::Serialize, serde::Deserialize)]
+    #[derive(Debug, Clone)]
+    #[cfg_attr(feature = "syn_serde", derive(serde::Serialize, serde::Deserialize))]
     pub struct CreateStatsStmtListOpt(Option<Vec<CreateStatsStmt>>);
 
     impl crate::syn::ListOpt<CreateStatsStmt> for CreateStatsStmtListOpt {
@@ -97112,7 +98377,8 @@ mod create_stats_stmt {
         use super::*;
 
         #[cfg_attr(test, derive(derive_builder::Builder))]
-        #[derive(Clone, Debug, serde::Serialize, serde::Deserialize)]
+        #[cfg_attr(feature = "syn_serde", derive(serde::Serialize, serde::Deserialize))]
+        #[derive(Clone, Debug)]
         #[allow(clippy::struct_excessive_bools)]
         #[allow(clippy::struct_field_names)]
         pub struct CreateStatsStmt {
@@ -97374,11 +98640,13 @@ mod stats_elem {
     use super::*;
 
     /// `StatsElem`
-    #[derive(Debug, Clone, serde::Serialize, serde::Deserialize)]
+    #[derive(Debug, Clone)]
+    #[cfg_attr(feature = "syn_serde", derive(serde::Serialize, serde::Deserialize))]
     pub struct StatsElem(Box<self::inner::StatsElem>);
 
     /// optional `StatsElem`
-    #[derive(Debug, Clone, serde::Serialize, serde::Deserialize)]
+    #[derive(Debug, Clone)]
+    #[cfg_attr(feature = "syn_serde", derive(serde::Serialize, serde::Deserialize))]
     pub struct StatsElemOpt(Option<StatsElem>);
 
     #[cfg(test)]
@@ -97395,11 +98663,13 @@ mod stats_elem {
     }
 
     /// `StatsElem` list
-    #[derive(Debug, Clone, serde::Serialize, serde::Deserialize)]
+    #[derive(Debug, Clone)]
+    #[cfg_attr(feature = "syn_serde", derive(serde::Serialize, serde::Deserialize))]
     pub struct StatsElemList(Vec<StatsElem>);
 
     /// optional `StatsElem` list
-    #[derive(Debug, Clone, serde::Serialize, serde::Deserialize)]
+    #[derive(Debug, Clone)]
+    #[cfg_attr(feature = "syn_serde", derive(serde::Serialize, serde::Deserialize))]
     pub struct StatsElemListOpt(Option<Vec<StatsElem>>);
 
     impl crate::syn::ListOpt<StatsElem> for StatsElemListOpt {
@@ -97499,7 +98769,8 @@ mod stats_elem {
         use super::*;
 
         #[cfg_attr(test, derive(derive_builder::Builder))]
-        #[derive(Clone, Debug, serde::Serialize, serde::Deserialize)]
+        #[cfg_attr(feature = "syn_serde", derive(serde::Serialize, serde::Deserialize))]
+        #[derive(Clone, Debug)]
         #[allow(clippy::struct_excessive_bools)]
         #[allow(clippy::struct_field_names)]
         pub struct StatsElem {
@@ -97591,11 +98862,13 @@ mod alter_stats_stmt {
     use super::*;
 
     /// `AlterStatsStmt`
-    #[derive(Debug, Clone, serde::Serialize, serde::Deserialize)]
+    #[derive(Debug, Clone)]
+    #[cfg_attr(feature = "syn_serde", derive(serde::Serialize, serde::Deserialize))]
     pub struct AlterStatsStmt(Box<self::inner::AlterStatsStmt>);
 
     /// optional `AlterStatsStmt`
-    #[derive(Debug, Clone, serde::Serialize, serde::Deserialize)]
+    #[derive(Debug, Clone)]
+    #[cfg_attr(feature = "syn_serde", derive(serde::Serialize, serde::Deserialize))]
     pub struct AlterStatsStmtOpt(Option<AlterStatsStmt>);
 
     #[cfg(test)]
@@ -97612,11 +98885,13 @@ mod alter_stats_stmt {
     }
 
     /// `AlterStatsStmt` list
-    #[derive(Debug, Clone, serde::Serialize, serde::Deserialize)]
+    #[derive(Debug, Clone)]
+    #[cfg_attr(feature = "syn_serde", derive(serde::Serialize, serde::Deserialize))]
     pub struct AlterStatsStmtList(Vec<AlterStatsStmt>);
 
     /// optional `AlterStatsStmt` list
-    #[derive(Debug, Clone, serde::Serialize, serde::Deserialize)]
+    #[derive(Debug, Clone)]
+    #[cfg_attr(feature = "syn_serde", derive(serde::Serialize, serde::Deserialize))]
     pub struct AlterStatsStmtListOpt(Option<Vec<AlterStatsStmt>>);
 
     impl crate::syn::ListOpt<AlterStatsStmt> for AlterStatsStmtListOpt {
@@ -97716,7 +98991,8 @@ mod alter_stats_stmt {
         use super::*;
 
         #[cfg_attr(test, derive(derive_builder::Builder))]
-        #[derive(Clone, Debug, serde::Serialize, serde::Deserialize)]
+        #[cfg_attr(feature = "syn_serde", derive(serde::Serialize, serde::Deserialize))]
+        #[derive(Clone, Debug)]
         #[allow(clippy::struct_excessive_bools)]
         #[allow(clippy::struct_field_names)]
         pub struct AlterStatsStmt {
@@ -97848,11 +99124,13 @@ mod create_function_stmt {
     use super::*;
 
     /// `CreateFunctionStmt`
-    #[derive(Debug, Clone, serde::Serialize, serde::Deserialize)]
+    #[derive(Debug, Clone)]
+    #[cfg_attr(feature = "syn_serde", derive(serde::Serialize, serde::Deserialize))]
     pub struct CreateFunctionStmt(Box<self::inner::CreateFunctionStmt>);
 
     /// optional `CreateFunctionStmt`
-    #[derive(Debug, Clone, serde::Serialize, serde::Deserialize)]
+    #[derive(Debug, Clone)]
+    #[cfg_attr(feature = "syn_serde", derive(serde::Serialize, serde::Deserialize))]
     pub struct CreateFunctionStmtOpt(Option<CreateFunctionStmt>);
 
     #[cfg(test)]
@@ -97869,11 +99147,13 @@ mod create_function_stmt {
     }
 
     /// `CreateFunctionStmt` list
-    #[derive(Debug, Clone, serde::Serialize, serde::Deserialize)]
+    #[derive(Debug, Clone)]
+    #[cfg_attr(feature = "syn_serde", derive(serde::Serialize, serde::Deserialize))]
     pub struct CreateFunctionStmtList(Vec<CreateFunctionStmt>);
 
     /// optional `CreateFunctionStmt` list
-    #[derive(Debug, Clone, serde::Serialize, serde::Deserialize)]
+    #[derive(Debug, Clone)]
+    #[cfg_attr(feature = "syn_serde", derive(serde::Serialize, serde::Deserialize))]
     pub struct CreateFunctionStmtListOpt(Option<Vec<CreateFunctionStmt>>);
 
     impl crate::syn::ListOpt<CreateFunctionStmt> for CreateFunctionStmtListOpt {
@@ -97973,7 +99253,8 @@ mod create_function_stmt {
         use super::*;
 
         #[cfg_attr(test, derive(derive_builder::Builder))]
-        #[derive(Clone, Debug, serde::Serialize, serde::Deserialize)]
+        #[cfg_attr(feature = "syn_serde", derive(serde::Serialize, serde::Deserialize))]
+        #[derive(Clone, Debug)]
         #[allow(clippy::struct_excessive_bools)]
         #[allow(clippy::struct_field_names)]
         pub struct CreateFunctionStmt {
@@ -98238,11 +99519,13 @@ mod function_parameter {
     use super::*;
 
     /// `FunctionParameter`
-    #[derive(Debug, Clone, serde::Serialize, serde::Deserialize)]
+    #[derive(Debug, Clone)]
+    #[cfg_attr(feature = "syn_serde", derive(serde::Serialize, serde::Deserialize))]
     pub struct FunctionParameter(Box<self::inner::FunctionParameter>);
 
     /// optional `FunctionParameter`
-    #[derive(Debug, Clone, serde::Serialize, serde::Deserialize)]
+    #[derive(Debug, Clone)]
+    #[cfg_attr(feature = "syn_serde", derive(serde::Serialize, serde::Deserialize))]
     pub struct FunctionParameterOpt(Option<FunctionParameter>);
 
     #[cfg(test)]
@@ -98259,11 +99542,13 @@ mod function_parameter {
     }
 
     /// `FunctionParameter` list
-    #[derive(Debug, Clone, serde::Serialize, serde::Deserialize)]
+    #[derive(Debug, Clone)]
+    #[cfg_attr(feature = "syn_serde", derive(serde::Serialize, serde::Deserialize))]
     pub struct FunctionParameterList(Vec<FunctionParameter>);
 
     /// optional `FunctionParameter` list
-    #[derive(Debug, Clone, serde::Serialize, serde::Deserialize)]
+    #[derive(Debug, Clone)]
+    #[cfg_attr(feature = "syn_serde", derive(serde::Serialize, serde::Deserialize))]
     pub struct FunctionParameterListOpt(Option<Vec<FunctionParameter>>);
 
     impl crate::syn::ListOpt<FunctionParameter> for FunctionParameterListOpt {
@@ -98363,7 +99648,8 @@ mod function_parameter {
         use super::*;
 
         #[cfg_attr(test, derive(derive_builder::Builder))]
-        #[derive(Clone, Debug, serde::Serialize, serde::Deserialize)]
+        #[cfg_attr(feature = "syn_serde", derive(serde::Serialize, serde::Deserialize))]
+        #[derive(Clone, Debug)]
         #[allow(clippy::struct_excessive_bools)]
         #[allow(clippy::struct_field_names)]
         pub struct FunctionParameter {
@@ -98529,11 +99815,13 @@ mod alter_function_stmt {
     use super::*;
 
     /// `AlterFunctionStmt`
-    #[derive(Debug, Clone, serde::Serialize, serde::Deserialize)]
+    #[derive(Debug, Clone)]
+    #[cfg_attr(feature = "syn_serde", derive(serde::Serialize, serde::Deserialize))]
     pub struct AlterFunctionStmt(Box<self::inner::AlterFunctionStmt>);
 
     /// optional `AlterFunctionStmt`
-    #[derive(Debug, Clone, serde::Serialize, serde::Deserialize)]
+    #[derive(Debug, Clone)]
+    #[cfg_attr(feature = "syn_serde", derive(serde::Serialize, serde::Deserialize))]
     pub struct AlterFunctionStmtOpt(Option<AlterFunctionStmt>);
 
     #[cfg(test)]
@@ -98550,11 +99838,13 @@ mod alter_function_stmt {
     }
 
     /// `AlterFunctionStmt` list
-    #[derive(Debug, Clone, serde::Serialize, serde::Deserialize)]
+    #[derive(Debug, Clone)]
+    #[cfg_attr(feature = "syn_serde", derive(serde::Serialize, serde::Deserialize))]
     pub struct AlterFunctionStmtList(Vec<AlterFunctionStmt>);
 
     /// optional `AlterFunctionStmt` list
-    #[derive(Debug, Clone, serde::Serialize, serde::Deserialize)]
+    #[derive(Debug, Clone)]
+    #[cfg_attr(feature = "syn_serde", derive(serde::Serialize, serde::Deserialize))]
     pub struct AlterFunctionStmtListOpt(Option<Vec<AlterFunctionStmt>>);
 
     impl crate::syn::ListOpt<AlterFunctionStmt> for AlterFunctionStmtListOpt {
@@ -98654,7 +99944,8 @@ mod alter_function_stmt {
         use super::*;
 
         #[cfg_attr(test, derive(derive_builder::Builder))]
-        #[derive(Clone, Debug, serde::Serialize, serde::Deserialize)]
+        #[cfg_attr(feature = "syn_serde", derive(serde::Serialize, serde::Deserialize))]
+        #[derive(Clone, Debug)]
         #[allow(clippy::struct_excessive_bools)]
         #[allow(clippy::struct_field_names)]
         pub struct AlterFunctionStmt {
@@ -98789,11 +100080,13 @@ mod do_stmt {
     use super::*;
 
     /// `DoStmt`
-    #[derive(Debug, Clone, serde::Serialize, serde::Deserialize)]
+    #[derive(Debug, Clone)]
+    #[cfg_attr(feature = "syn_serde", derive(serde::Serialize, serde::Deserialize))]
     pub struct DoStmt(Box<self::inner::DoStmt>);
 
     /// optional `DoStmt`
-    #[derive(Debug, Clone, serde::Serialize, serde::Deserialize)]
+    #[derive(Debug, Clone)]
+    #[cfg_attr(feature = "syn_serde", derive(serde::Serialize, serde::Deserialize))]
     pub struct DoStmtOpt(Option<DoStmt>);
 
     #[cfg(test)]
@@ -98810,11 +100103,13 @@ mod do_stmt {
     }
 
     /// `DoStmt` list
-    #[derive(Debug, Clone, serde::Serialize, serde::Deserialize)]
+    #[derive(Debug, Clone)]
+    #[cfg_attr(feature = "syn_serde", derive(serde::Serialize, serde::Deserialize))]
     pub struct DoStmtList(Vec<DoStmt>);
 
     /// optional `DoStmt` list
-    #[derive(Debug, Clone, serde::Serialize, serde::Deserialize)]
+    #[derive(Debug, Clone)]
+    #[cfg_attr(feature = "syn_serde", derive(serde::Serialize, serde::Deserialize))]
     pub struct DoStmtListOpt(Option<Vec<DoStmt>>);
 
     impl crate::syn::ListOpt<DoStmt> for DoStmtListOpt {
@@ -98914,7 +100209,8 @@ mod do_stmt {
         use super::*;
 
         #[cfg_attr(test, derive(derive_builder::Builder))]
-        #[derive(Clone, Debug, serde::Serialize, serde::Deserialize)]
+        #[cfg_attr(feature = "syn_serde", derive(serde::Serialize, serde::Deserialize))]
+        #[derive(Clone, Debug)]
         #[allow(clippy::struct_excessive_bools)]
         #[allow(clippy::struct_field_names)]
         pub struct DoStmt {
@@ -98977,11 +100273,13 @@ mod inline_code_block {
     use super::*;
 
     /// `InlineCodeBlock`
-    #[derive(Debug, Clone, serde::Serialize, serde::Deserialize)]
+    #[derive(Debug, Clone)]
+    #[cfg_attr(feature = "syn_serde", derive(serde::Serialize, serde::Deserialize))]
     pub struct InlineCodeBlock(Box<self::inner::InlineCodeBlock>);
 
     /// optional `InlineCodeBlock`
-    #[derive(Debug, Clone, serde::Serialize, serde::Deserialize)]
+    #[derive(Debug, Clone)]
+    #[cfg_attr(feature = "syn_serde", derive(serde::Serialize, serde::Deserialize))]
     pub struct InlineCodeBlockOpt(Option<InlineCodeBlock>);
 
     #[cfg(test)]
@@ -98998,11 +100296,13 @@ mod inline_code_block {
     }
 
     /// `InlineCodeBlock` list
-    #[derive(Debug, Clone, serde::Serialize, serde::Deserialize)]
+    #[derive(Debug, Clone)]
+    #[cfg_attr(feature = "syn_serde", derive(serde::Serialize, serde::Deserialize))]
     pub struct InlineCodeBlockList(Vec<InlineCodeBlock>);
 
     /// optional `InlineCodeBlock` list
-    #[derive(Debug, Clone, serde::Serialize, serde::Deserialize)]
+    #[derive(Debug, Clone)]
+    #[cfg_attr(feature = "syn_serde", derive(serde::Serialize, serde::Deserialize))]
     pub struct InlineCodeBlockListOpt(Option<Vec<InlineCodeBlock>>);
 
     impl crate::syn::ListOpt<InlineCodeBlock> for InlineCodeBlockListOpt {
@@ -99102,7 +100402,8 @@ mod inline_code_block {
         use super::*;
 
         #[cfg_attr(test, derive(derive_builder::Builder))]
-        #[derive(Clone, Debug, serde::Serialize, serde::Deserialize)]
+        #[cfg_attr(feature = "syn_serde", derive(serde::Serialize, serde::Deserialize))]
+        #[derive(Clone, Debug)]
         #[allow(clippy::struct_excessive_bools)]
         #[allow(clippy::struct_field_names)]
         pub struct InlineCodeBlock {
@@ -99259,11 +100560,13 @@ mod call_stmt {
     use super::*;
 
     /// `CallStmt`
-    #[derive(Debug, Clone, serde::Serialize, serde::Deserialize)]
+    #[derive(Debug, Clone)]
+    #[cfg_attr(feature = "syn_serde", derive(serde::Serialize, serde::Deserialize))]
     pub struct CallStmt(Box<self::inner::CallStmt>);
 
     /// optional `CallStmt`
-    #[derive(Debug, Clone, serde::Serialize, serde::Deserialize)]
+    #[derive(Debug, Clone)]
+    #[cfg_attr(feature = "syn_serde", derive(serde::Serialize, serde::Deserialize))]
     pub struct CallStmtOpt(Option<CallStmt>);
 
     #[cfg(test)]
@@ -99280,11 +100583,13 @@ mod call_stmt {
     }
 
     /// `CallStmt` list
-    #[derive(Debug, Clone, serde::Serialize, serde::Deserialize)]
+    #[derive(Debug, Clone)]
+    #[cfg_attr(feature = "syn_serde", derive(serde::Serialize, serde::Deserialize))]
     pub struct CallStmtList(Vec<CallStmt>);
 
     /// optional `CallStmt` list
-    #[derive(Debug, Clone, serde::Serialize, serde::Deserialize)]
+    #[derive(Debug, Clone)]
+    #[cfg_attr(feature = "syn_serde", derive(serde::Serialize, serde::Deserialize))]
     pub struct CallStmtListOpt(Option<Vec<CallStmt>>);
 
     impl crate::syn::ListOpt<CallStmt> for CallStmtListOpt {
@@ -99384,7 +100689,8 @@ mod call_stmt {
         use super::*;
 
         #[cfg_attr(test, derive(derive_builder::Builder))]
-        #[derive(Clone, Debug, serde::Serialize, serde::Deserialize)]
+        #[cfg_attr(feature = "syn_serde", derive(serde::Serialize, serde::Deserialize))]
+        #[derive(Clone, Debug)]
         #[allow(clippy::struct_excessive_bools)]
         #[allow(clippy::struct_field_names)]
         pub struct CallStmt {
@@ -99517,11 +100823,13 @@ mod call_context {
     use super::*;
 
     /// `CallContext`
-    #[derive(Debug, Clone, serde::Serialize, serde::Deserialize)]
+    #[derive(Debug, Clone)]
+    #[cfg_attr(feature = "syn_serde", derive(serde::Serialize, serde::Deserialize))]
     pub struct CallContext(Box<self::inner::CallContext>);
 
     /// optional `CallContext`
-    #[derive(Debug, Clone, serde::Serialize, serde::Deserialize)]
+    #[derive(Debug, Clone)]
+    #[cfg_attr(feature = "syn_serde", derive(serde::Serialize, serde::Deserialize))]
     pub struct CallContextOpt(Option<CallContext>);
 
     #[cfg(test)]
@@ -99538,11 +100846,13 @@ mod call_context {
     }
 
     /// `CallContext` list
-    #[derive(Debug, Clone, serde::Serialize, serde::Deserialize)]
+    #[derive(Debug, Clone)]
+    #[cfg_attr(feature = "syn_serde", derive(serde::Serialize, serde::Deserialize))]
     pub struct CallContextList(Vec<CallContext>);
 
     /// optional `CallContext` list
-    #[derive(Debug, Clone, serde::Serialize, serde::Deserialize)]
+    #[derive(Debug, Clone)]
+    #[cfg_attr(feature = "syn_serde", derive(serde::Serialize, serde::Deserialize))]
     pub struct CallContextListOpt(Option<Vec<CallContext>>);
 
     impl crate::syn::ListOpt<CallContext> for CallContextListOpt {
@@ -99642,7 +100952,8 @@ mod call_context {
         use super::*;
 
         #[cfg_attr(test, derive(derive_builder::Builder))]
-        #[derive(Clone, Debug, serde::Serialize, serde::Deserialize)]
+        #[cfg_attr(feature = "syn_serde", derive(serde::Serialize, serde::Deserialize))]
+        #[derive(Clone, Debug)]
         #[allow(clippy::struct_excessive_bools)]
         #[allow(clippy::struct_field_names)]
         pub struct CallContext {
@@ -99702,11 +101013,13 @@ mod rename_stmt {
     use super::*;
 
     /// `RenameStmt`
-    #[derive(Debug, Clone, serde::Serialize, serde::Deserialize)]
+    #[derive(Debug, Clone)]
+    #[cfg_attr(feature = "syn_serde", derive(serde::Serialize, serde::Deserialize))]
     pub struct RenameStmt(Box<self::inner::RenameStmt>);
 
     /// optional `RenameStmt`
-    #[derive(Debug, Clone, serde::Serialize, serde::Deserialize)]
+    #[derive(Debug, Clone)]
+    #[cfg_attr(feature = "syn_serde", derive(serde::Serialize, serde::Deserialize))]
     pub struct RenameStmtOpt(Option<RenameStmt>);
 
     #[cfg(test)]
@@ -99723,11 +101036,13 @@ mod rename_stmt {
     }
 
     /// `RenameStmt` list
-    #[derive(Debug, Clone, serde::Serialize, serde::Deserialize)]
+    #[derive(Debug, Clone)]
+    #[cfg_attr(feature = "syn_serde", derive(serde::Serialize, serde::Deserialize))]
     pub struct RenameStmtList(Vec<RenameStmt>);
 
     /// optional `RenameStmt` list
-    #[derive(Debug, Clone, serde::Serialize, serde::Deserialize)]
+    #[derive(Debug, Clone)]
+    #[cfg_attr(feature = "syn_serde", derive(serde::Serialize, serde::Deserialize))]
     pub struct RenameStmtListOpt(Option<Vec<RenameStmt>>);
 
     impl crate::syn::ListOpt<RenameStmt> for RenameStmtListOpt {
@@ -99827,7 +101142,8 @@ mod rename_stmt {
         use super::*;
 
         #[cfg_attr(test, derive(derive_builder::Builder))]
-        #[derive(Clone, Debug, serde::Serialize, serde::Deserialize)]
+        #[cfg_attr(feature = "syn_serde", derive(serde::Serialize, serde::Deserialize))]
+        #[derive(Clone, Debug)]
         #[allow(clippy::struct_excessive_bools)]
         #[allow(clippy::struct_field_names)]
         pub struct RenameStmt {
@@ -100121,11 +101437,13 @@ mod alter_object_depends_stmt {
     use super::*;
 
     /// `AlterObjectDependsStmt`
-    #[derive(Debug, Clone, serde::Serialize, serde::Deserialize)]
+    #[derive(Debug, Clone)]
+    #[cfg_attr(feature = "syn_serde", derive(serde::Serialize, serde::Deserialize))]
     pub struct AlterObjectDependsStmt(Box<self::inner::AlterObjectDependsStmt>);
 
     /// optional `AlterObjectDependsStmt`
-    #[derive(Debug, Clone, serde::Serialize, serde::Deserialize)]
+    #[derive(Debug, Clone)]
+    #[cfg_attr(feature = "syn_serde", derive(serde::Serialize, serde::Deserialize))]
     pub struct AlterObjectDependsStmtOpt(Option<AlterObjectDependsStmt>);
 
     #[cfg(test)]
@@ -100142,11 +101460,13 @@ mod alter_object_depends_stmt {
     }
 
     /// `AlterObjectDependsStmt` list
-    #[derive(Debug, Clone, serde::Serialize, serde::Deserialize)]
+    #[derive(Debug, Clone)]
+    #[cfg_attr(feature = "syn_serde", derive(serde::Serialize, serde::Deserialize))]
     pub struct AlterObjectDependsStmtList(Vec<AlterObjectDependsStmt>);
 
     /// optional `AlterObjectDependsStmt` list
-    #[derive(Debug, Clone, serde::Serialize, serde::Deserialize)]
+    #[derive(Debug, Clone)]
+    #[cfg_attr(feature = "syn_serde", derive(serde::Serialize, serde::Deserialize))]
     pub struct AlterObjectDependsStmtListOpt(Option<Vec<AlterObjectDependsStmt>>);
 
     impl crate::syn::ListOpt<AlterObjectDependsStmt> for AlterObjectDependsStmtListOpt {
@@ -100251,7 +101571,8 @@ mod alter_object_depends_stmt {
         use super::*;
 
         #[cfg_attr(test, derive(derive_builder::Builder))]
-        #[derive(Clone, Debug, serde::Serialize, serde::Deserialize)]
+        #[cfg_attr(feature = "syn_serde", derive(serde::Serialize, serde::Deserialize))]
+        #[derive(Clone, Debug)]
         #[allow(clippy::struct_excessive_bools)]
         #[allow(clippy::struct_field_names)]
         pub struct AlterObjectDependsStmt {
@@ -100452,11 +101773,13 @@ mod alter_object_schema_stmt {
     use super::*;
 
     /// `AlterObjectSchemaStmt`
-    #[derive(Debug, Clone, serde::Serialize, serde::Deserialize)]
+    #[derive(Debug, Clone)]
+    #[cfg_attr(feature = "syn_serde", derive(serde::Serialize, serde::Deserialize))]
     pub struct AlterObjectSchemaStmt(Box<self::inner::AlterObjectSchemaStmt>);
 
     /// optional `AlterObjectSchemaStmt`
-    #[derive(Debug, Clone, serde::Serialize, serde::Deserialize)]
+    #[derive(Debug, Clone)]
+    #[cfg_attr(feature = "syn_serde", derive(serde::Serialize, serde::Deserialize))]
     pub struct AlterObjectSchemaStmtOpt(Option<AlterObjectSchemaStmt>);
 
     #[cfg(test)]
@@ -100473,11 +101796,13 @@ mod alter_object_schema_stmt {
     }
 
     /// `AlterObjectSchemaStmt` list
-    #[derive(Debug, Clone, serde::Serialize, serde::Deserialize)]
+    #[derive(Debug, Clone)]
+    #[cfg_attr(feature = "syn_serde", derive(serde::Serialize, serde::Deserialize))]
     pub struct AlterObjectSchemaStmtList(Vec<AlterObjectSchemaStmt>);
 
     /// optional `AlterObjectSchemaStmt` list
-    #[derive(Debug, Clone, serde::Serialize, serde::Deserialize)]
+    #[derive(Debug, Clone)]
+    #[cfg_attr(feature = "syn_serde", derive(serde::Serialize, serde::Deserialize))]
     pub struct AlterObjectSchemaStmtListOpt(Option<Vec<AlterObjectSchemaStmt>>);
 
     impl crate::syn::ListOpt<AlterObjectSchemaStmt> for AlterObjectSchemaStmtListOpt {
@@ -100577,7 +101902,8 @@ mod alter_object_schema_stmt {
         use super::*;
 
         #[cfg_attr(test, derive(derive_builder::Builder))]
-        #[derive(Clone, Debug, serde::Serialize, serde::Deserialize)]
+        #[cfg_attr(feature = "syn_serde", derive(serde::Serialize, serde::Deserialize))]
+        #[derive(Clone, Debug)]
         #[allow(clippy::struct_excessive_bools)]
         #[allow(clippy::struct_field_names)]
         pub struct AlterObjectSchemaStmt {
@@ -100775,11 +102101,13 @@ mod alter_owner_stmt {
     use super::*;
 
     /// `AlterOwnerStmt`
-    #[derive(Debug, Clone, serde::Serialize, serde::Deserialize)]
+    #[derive(Debug, Clone)]
+    #[cfg_attr(feature = "syn_serde", derive(serde::Serialize, serde::Deserialize))]
     pub struct AlterOwnerStmt(Box<self::inner::AlterOwnerStmt>);
 
     /// optional `AlterOwnerStmt`
-    #[derive(Debug, Clone, serde::Serialize, serde::Deserialize)]
+    #[derive(Debug, Clone)]
+    #[cfg_attr(feature = "syn_serde", derive(serde::Serialize, serde::Deserialize))]
     pub struct AlterOwnerStmtOpt(Option<AlterOwnerStmt>);
 
     #[cfg(test)]
@@ -100796,11 +102124,13 @@ mod alter_owner_stmt {
     }
 
     /// `AlterOwnerStmt` list
-    #[derive(Debug, Clone, serde::Serialize, serde::Deserialize)]
+    #[derive(Debug, Clone)]
+    #[cfg_attr(feature = "syn_serde", derive(serde::Serialize, serde::Deserialize))]
     pub struct AlterOwnerStmtList(Vec<AlterOwnerStmt>);
 
     /// optional `AlterOwnerStmt` list
-    #[derive(Debug, Clone, serde::Serialize, serde::Deserialize)]
+    #[derive(Debug, Clone)]
+    #[cfg_attr(feature = "syn_serde", derive(serde::Serialize, serde::Deserialize))]
     pub struct AlterOwnerStmtListOpt(Option<Vec<AlterOwnerStmt>>);
 
     impl crate::syn::ListOpt<AlterOwnerStmt> for AlterOwnerStmtListOpt {
@@ -100900,7 +102230,8 @@ mod alter_owner_stmt {
         use super::*;
 
         #[cfg_attr(test, derive(derive_builder::Builder))]
-        #[derive(Clone, Debug, serde::Serialize, serde::Deserialize)]
+        #[cfg_attr(feature = "syn_serde", derive(serde::Serialize, serde::Deserialize))]
+        #[derive(Clone, Debug)]
         #[allow(clippy::struct_excessive_bools)]
         #[allow(clippy::struct_field_names)]
         pub struct AlterOwnerStmt {
@@ -101069,11 +102400,13 @@ mod alter_operator_stmt {
     use super::*;
 
     /// `AlterOperatorStmt`
-    #[derive(Debug, Clone, serde::Serialize, serde::Deserialize)]
+    #[derive(Debug, Clone)]
+    #[cfg_attr(feature = "syn_serde", derive(serde::Serialize, serde::Deserialize))]
     pub struct AlterOperatorStmt(Box<self::inner::AlterOperatorStmt>);
 
     /// optional `AlterOperatorStmt`
-    #[derive(Debug, Clone, serde::Serialize, serde::Deserialize)]
+    #[derive(Debug, Clone)]
+    #[cfg_attr(feature = "syn_serde", derive(serde::Serialize, serde::Deserialize))]
     pub struct AlterOperatorStmtOpt(Option<AlterOperatorStmt>);
 
     #[cfg(test)]
@@ -101090,11 +102423,13 @@ mod alter_operator_stmt {
     }
 
     /// `AlterOperatorStmt` list
-    #[derive(Debug, Clone, serde::Serialize, serde::Deserialize)]
+    #[derive(Debug, Clone)]
+    #[cfg_attr(feature = "syn_serde", derive(serde::Serialize, serde::Deserialize))]
     pub struct AlterOperatorStmtList(Vec<AlterOperatorStmt>);
 
     /// optional `AlterOperatorStmt` list
-    #[derive(Debug, Clone, serde::Serialize, serde::Deserialize)]
+    #[derive(Debug, Clone)]
+    #[cfg_attr(feature = "syn_serde", derive(serde::Serialize, serde::Deserialize))]
     pub struct AlterOperatorStmtListOpt(Option<Vec<AlterOperatorStmt>>);
 
     impl crate::syn::ListOpt<AlterOperatorStmt> for AlterOperatorStmtListOpt {
@@ -101194,7 +102529,8 @@ mod alter_operator_stmt {
         use super::*;
 
         #[cfg_attr(test, derive(derive_builder::Builder))]
-        #[derive(Clone, Debug, serde::Serialize, serde::Deserialize)]
+        #[cfg_attr(feature = "syn_serde", derive(serde::Serialize, serde::Deserialize))]
+        #[derive(Clone, Debug)]
         #[allow(clippy::struct_excessive_bools)]
         #[allow(clippy::struct_field_names)]
         pub struct AlterOperatorStmt {
@@ -101291,11 +102627,13 @@ mod alter_type_stmt {
     use super::*;
 
     /// `AlterTypeStmt`
-    #[derive(Debug, Clone, serde::Serialize, serde::Deserialize)]
+    #[derive(Debug, Clone)]
+    #[cfg_attr(feature = "syn_serde", derive(serde::Serialize, serde::Deserialize))]
     pub struct AlterTypeStmt(Box<self::inner::AlterTypeStmt>);
 
     /// optional `AlterTypeStmt`
-    #[derive(Debug, Clone, serde::Serialize, serde::Deserialize)]
+    #[derive(Debug, Clone)]
+    #[cfg_attr(feature = "syn_serde", derive(serde::Serialize, serde::Deserialize))]
     pub struct AlterTypeStmtOpt(Option<AlterTypeStmt>);
 
     #[cfg(test)]
@@ -101312,11 +102650,13 @@ mod alter_type_stmt {
     }
 
     /// `AlterTypeStmt` list
-    #[derive(Debug, Clone, serde::Serialize, serde::Deserialize)]
+    #[derive(Debug, Clone)]
+    #[cfg_attr(feature = "syn_serde", derive(serde::Serialize, serde::Deserialize))]
     pub struct AlterTypeStmtList(Vec<AlterTypeStmt>);
 
     /// optional `AlterTypeStmt` list
-    #[derive(Debug, Clone, serde::Serialize, serde::Deserialize)]
+    #[derive(Debug, Clone)]
+    #[cfg_attr(feature = "syn_serde", derive(serde::Serialize, serde::Deserialize))]
     pub struct AlterTypeStmtListOpt(Option<Vec<AlterTypeStmt>>);
 
     impl crate::syn::ListOpt<AlterTypeStmt> for AlterTypeStmtListOpt {
@@ -101416,7 +102756,8 @@ mod alter_type_stmt {
         use super::*;
 
         #[cfg_attr(test, derive(derive_builder::Builder))]
-        #[derive(Clone, Debug, serde::Serialize, serde::Deserialize)]
+        #[cfg_attr(feature = "syn_serde", derive(serde::Serialize, serde::Deserialize))]
+        #[derive(Clone, Debug)]
         #[allow(clippy::struct_excessive_bools)]
         #[allow(clippy::struct_field_names)]
         pub struct AlterTypeStmt {
@@ -101513,11 +102854,13 @@ mod rule_stmt {
     use super::*;
 
     /// `RuleStmt`
-    #[derive(Debug, Clone, serde::Serialize, serde::Deserialize)]
+    #[derive(Debug, Clone)]
+    #[cfg_attr(feature = "syn_serde", derive(serde::Serialize, serde::Deserialize))]
     pub struct RuleStmt(Box<self::inner::RuleStmt>);
 
     /// optional `RuleStmt`
-    #[derive(Debug, Clone, serde::Serialize, serde::Deserialize)]
+    #[derive(Debug, Clone)]
+    #[cfg_attr(feature = "syn_serde", derive(serde::Serialize, serde::Deserialize))]
     pub struct RuleStmtOpt(Option<RuleStmt>);
 
     #[cfg(test)]
@@ -101534,11 +102877,13 @@ mod rule_stmt {
     }
 
     /// `RuleStmt` list
-    #[derive(Debug, Clone, serde::Serialize, serde::Deserialize)]
+    #[derive(Debug, Clone)]
+    #[cfg_attr(feature = "syn_serde", derive(serde::Serialize, serde::Deserialize))]
     pub struct RuleStmtList(Vec<RuleStmt>);
 
     /// optional `RuleStmt` list
-    #[derive(Debug, Clone, serde::Serialize, serde::Deserialize)]
+    #[derive(Debug, Clone)]
+    #[cfg_attr(feature = "syn_serde", derive(serde::Serialize, serde::Deserialize))]
     pub struct RuleStmtListOpt(Option<Vec<RuleStmt>>);
 
     impl crate::syn::ListOpt<RuleStmt> for RuleStmtListOpt {
@@ -101638,7 +102983,8 @@ mod rule_stmt {
         use super::*;
 
         #[cfg_attr(test, derive(derive_builder::Builder))]
-        #[derive(Clone, Debug, serde::Serialize, serde::Deserialize)]
+        #[cfg_attr(feature = "syn_serde", derive(serde::Serialize, serde::Deserialize))]
+        #[derive(Clone, Debug)]
         #[allow(clippy::struct_excessive_bools)]
         #[allow(clippy::struct_field_names)]
         pub struct RuleStmt {
@@ -101898,11 +103244,13 @@ mod notify_stmt {
     use super::*;
 
     /// `NotifyStmt`
-    #[derive(Debug, Clone, serde::Serialize, serde::Deserialize)]
+    #[derive(Debug, Clone)]
+    #[cfg_attr(feature = "syn_serde", derive(serde::Serialize, serde::Deserialize))]
     pub struct NotifyStmt(Box<self::inner::NotifyStmt>);
 
     /// optional `NotifyStmt`
-    #[derive(Debug, Clone, serde::Serialize, serde::Deserialize)]
+    #[derive(Debug, Clone)]
+    #[cfg_attr(feature = "syn_serde", derive(serde::Serialize, serde::Deserialize))]
     pub struct NotifyStmtOpt(Option<NotifyStmt>);
 
     #[cfg(test)]
@@ -101919,11 +103267,13 @@ mod notify_stmt {
     }
 
     /// `NotifyStmt` list
-    #[derive(Debug, Clone, serde::Serialize, serde::Deserialize)]
+    #[derive(Debug, Clone)]
+    #[cfg_attr(feature = "syn_serde", derive(serde::Serialize, serde::Deserialize))]
     pub struct NotifyStmtList(Vec<NotifyStmt>);
 
     /// optional `NotifyStmt` list
-    #[derive(Debug, Clone, serde::Serialize, serde::Deserialize)]
+    #[derive(Debug, Clone)]
+    #[cfg_attr(feature = "syn_serde", derive(serde::Serialize, serde::Deserialize))]
     pub struct NotifyStmtListOpt(Option<Vec<NotifyStmt>>);
 
     impl crate::syn::ListOpt<NotifyStmt> for NotifyStmtListOpt {
@@ -102023,7 +103373,8 @@ mod notify_stmt {
         use super::*;
 
         #[cfg_attr(test, derive(derive_builder::Builder))]
-        #[derive(Clone, Debug, serde::Serialize, serde::Deserialize)]
+        #[cfg_attr(feature = "syn_serde", derive(serde::Serialize, serde::Deserialize))]
+        #[derive(Clone, Debug)]
         #[allow(clippy::struct_excessive_bools)]
         #[allow(clippy::struct_field_names)]
         pub struct NotifyStmt {
@@ -102116,11 +103467,13 @@ mod listen_stmt {
     use super::*;
 
     /// `ListenStmt`
-    #[derive(Debug, Clone, serde::Serialize, serde::Deserialize)]
+    #[derive(Debug, Clone)]
+    #[cfg_attr(feature = "syn_serde", derive(serde::Serialize, serde::Deserialize))]
     pub struct ListenStmt(Box<self::inner::ListenStmt>);
 
     /// optional `ListenStmt`
-    #[derive(Debug, Clone, serde::Serialize, serde::Deserialize)]
+    #[derive(Debug, Clone)]
+    #[cfg_attr(feature = "syn_serde", derive(serde::Serialize, serde::Deserialize))]
     pub struct ListenStmtOpt(Option<ListenStmt>);
 
     #[cfg(test)]
@@ -102137,11 +103490,13 @@ mod listen_stmt {
     }
 
     /// `ListenStmt` list
-    #[derive(Debug, Clone, serde::Serialize, serde::Deserialize)]
+    #[derive(Debug, Clone)]
+    #[cfg_attr(feature = "syn_serde", derive(serde::Serialize, serde::Deserialize))]
     pub struct ListenStmtList(Vec<ListenStmt>);
 
     /// optional `ListenStmt` list
-    #[derive(Debug, Clone, serde::Serialize, serde::Deserialize)]
+    #[derive(Debug, Clone)]
+    #[cfg_attr(feature = "syn_serde", derive(serde::Serialize, serde::Deserialize))]
     pub struct ListenStmtListOpt(Option<Vec<ListenStmt>>);
 
     impl crate::syn::ListOpt<ListenStmt> for ListenStmtListOpt {
@@ -102241,7 +103596,8 @@ mod listen_stmt {
         use super::*;
 
         #[cfg_attr(test, derive(derive_builder::Builder))]
-        #[derive(Clone, Debug, serde::Serialize, serde::Deserialize)]
+        #[cfg_attr(feature = "syn_serde", derive(serde::Serialize, serde::Deserialize))]
+        #[derive(Clone, Debug)]
         #[allow(clippy::struct_excessive_bools)]
         #[allow(clippy::struct_field_names)]
         pub struct ListenStmt {
@@ -102301,11 +103657,13 @@ mod unlisten_stmt {
     use super::*;
 
     /// `UnlistenStmt`
-    #[derive(Debug, Clone, serde::Serialize, serde::Deserialize)]
+    #[derive(Debug, Clone)]
+    #[cfg_attr(feature = "syn_serde", derive(serde::Serialize, serde::Deserialize))]
     pub struct UnlistenStmt(Box<self::inner::UnlistenStmt>);
 
     /// optional `UnlistenStmt`
-    #[derive(Debug, Clone, serde::Serialize, serde::Deserialize)]
+    #[derive(Debug, Clone)]
+    #[cfg_attr(feature = "syn_serde", derive(serde::Serialize, serde::Deserialize))]
     pub struct UnlistenStmtOpt(Option<UnlistenStmt>);
 
     #[cfg(test)]
@@ -102322,11 +103680,13 @@ mod unlisten_stmt {
     }
 
     /// `UnlistenStmt` list
-    #[derive(Debug, Clone, serde::Serialize, serde::Deserialize)]
+    #[derive(Debug, Clone)]
+    #[cfg_attr(feature = "syn_serde", derive(serde::Serialize, serde::Deserialize))]
     pub struct UnlistenStmtList(Vec<UnlistenStmt>);
 
     /// optional `UnlistenStmt` list
-    #[derive(Debug, Clone, serde::Serialize, serde::Deserialize)]
+    #[derive(Debug, Clone)]
+    #[cfg_attr(feature = "syn_serde", derive(serde::Serialize, serde::Deserialize))]
     pub struct UnlistenStmtListOpt(Option<Vec<UnlistenStmt>>);
 
     impl crate::syn::ListOpt<UnlistenStmt> for UnlistenStmtListOpt {
@@ -102426,7 +103786,8 @@ mod unlisten_stmt {
         use super::*;
 
         #[cfg_attr(test, derive(derive_builder::Builder))]
-        #[derive(Clone, Debug, serde::Serialize, serde::Deserialize)]
+        #[cfg_attr(feature = "syn_serde", derive(serde::Serialize, serde::Deserialize))]
+        #[derive(Clone, Debug)]
         #[allow(clippy::struct_excessive_bools)]
         #[allow(clippy::struct_field_names)]
         pub struct UnlistenStmt {
@@ -102488,11 +103849,13 @@ mod transaction_stmt {
     use super::*;
 
     /// `TransactionStmt`
-    #[derive(Debug, Clone, serde::Serialize, serde::Deserialize)]
+    #[derive(Debug, Clone)]
+    #[cfg_attr(feature = "syn_serde", derive(serde::Serialize, serde::Deserialize))]
     pub struct TransactionStmt(Box<self::inner::TransactionStmt>);
 
     /// optional `TransactionStmt`
-    #[derive(Debug, Clone, serde::Serialize, serde::Deserialize)]
+    #[derive(Debug, Clone)]
+    #[cfg_attr(feature = "syn_serde", derive(serde::Serialize, serde::Deserialize))]
     pub struct TransactionStmtOpt(Option<TransactionStmt>);
 
     #[cfg(test)]
@@ -102509,11 +103872,13 @@ mod transaction_stmt {
     }
 
     /// `TransactionStmt` list
-    #[derive(Debug, Clone, serde::Serialize, serde::Deserialize)]
+    #[derive(Debug, Clone)]
+    #[cfg_attr(feature = "syn_serde", derive(serde::Serialize, serde::Deserialize))]
     pub struct TransactionStmtList(Vec<TransactionStmt>);
 
     /// optional `TransactionStmt` list
-    #[derive(Debug, Clone, serde::Serialize, serde::Deserialize)]
+    #[derive(Debug, Clone)]
+    #[cfg_attr(feature = "syn_serde", derive(serde::Serialize, serde::Deserialize))]
     pub struct TransactionStmtListOpt(Option<Vec<TransactionStmt>>);
 
     impl crate::syn::ListOpt<TransactionStmt> for TransactionStmtListOpt {
@@ -102613,7 +103978,8 @@ mod transaction_stmt {
         use super::*;
 
         #[cfg_attr(test, derive(derive_builder::Builder))]
-        #[derive(Clone, Debug, serde::Serialize, serde::Deserialize)]
+        #[cfg_attr(feature = "syn_serde", derive(serde::Serialize, serde::Deserialize))]
+        #[derive(Clone, Debug)]
         #[allow(clippy::struct_excessive_bools)]
         #[allow(clippy::struct_field_names)]
         pub struct TransactionStmt {
@@ -102838,11 +104204,13 @@ mod composite_type_stmt {
     use super::*;
 
     /// `CompositeTypeStmt`
-    #[derive(Debug, Clone, serde::Serialize, serde::Deserialize)]
+    #[derive(Debug, Clone)]
+    #[cfg_attr(feature = "syn_serde", derive(serde::Serialize, serde::Deserialize))]
     pub struct CompositeTypeStmt(Box<self::inner::CompositeTypeStmt>);
 
     /// optional `CompositeTypeStmt`
-    #[derive(Debug, Clone, serde::Serialize, serde::Deserialize)]
+    #[derive(Debug, Clone)]
+    #[cfg_attr(feature = "syn_serde", derive(serde::Serialize, serde::Deserialize))]
     pub struct CompositeTypeStmtOpt(Option<CompositeTypeStmt>);
 
     #[cfg(test)]
@@ -102859,11 +104227,13 @@ mod composite_type_stmt {
     }
 
     /// `CompositeTypeStmt` list
-    #[derive(Debug, Clone, serde::Serialize, serde::Deserialize)]
+    #[derive(Debug, Clone)]
+    #[cfg_attr(feature = "syn_serde", derive(serde::Serialize, serde::Deserialize))]
     pub struct CompositeTypeStmtList(Vec<CompositeTypeStmt>);
 
     /// optional `CompositeTypeStmt` list
-    #[derive(Debug, Clone, serde::Serialize, serde::Deserialize)]
+    #[derive(Debug, Clone)]
+    #[cfg_attr(feature = "syn_serde", derive(serde::Serialize, serde::Deserialize))]
     pub struct CompositeTypeStmtListOpt(Option<Vec<CompositeTypeStmt>>);
 
     impl crate::syn::ListOpt<CompositeTypeStmt> for CompositeTypeStmtListOpt {
@@ -102963,7 +104333,8 @@ mod composite_type_stmt {
         use super::*;
 
         #[cfg_attr(test, derive(derive_builder::Builder))]
-        #[derive(Clone, Debug, serde::Serialize, serde::Deserialize)]
+        #[cfg_attr(feature = "syn_serde", derive(serde::Serialize, serde::Deserialize))]
+        #[derive(Clone, Debug)]
         #[allow(clippy::struct_excessive_bools)]
         #[allow(clippy::struct_field_names)]
         pub struct CompositeTypeStmt {
@@ -103064,11 +104435,13 @@ mod create_enum_stmt {
     use super::*;
 
     /// `CreateEnumStmt`
-    #[derive(Debug, Clone, serde::Serialize, serde::Deserialize)]
+    #[derive(Debug, Clone)]
+    #[cfg_attr(feature = "syn_serde", derive(serde::Serialize, serde::Deserialize))]
     pub struct CreateEnumStmt(Box<self::inner::CreateEnumStmt>);
 
     /// optional `CreateEnumStmt`
-    #[derive(Debug, Clone, serde::Serialize, serde::Deserialize)]
+    #[derive(Debug, Clone)]
+    #[cfg_attr(feature = "syn_serde", derive(serde::Serialize, serde::Deserialize))]
     pub struct CreateEnumStmtOpt(Option<CreateEnumStmt>);
 
     #[cfg(test)]
@@ -103085,11 +104458,13 @@ mod create_enum_stmt {
     }
 
     /// `CreateEnumStmt` list
-    #[derive(Debug, Clone, serde::Serialize, serde::Deserialize)]
+    #[derive(Debug, Clone)]
+    #[cfg_attr(feature = "syn_serde", derive(serde::Serialize, serde::Deserialize))]
     pub struct CreateEnumStmtList(Vec<CreateEnumStmt>);
 
     /// optional `CreateEnumStmt` list
-    #[derive(Debug, Clone, serde::Serialize, serde::Deserialize)]
+    #[derive(Debug, Clone)]
+    #[cfg_attr(feature = "syn_serde", derive(serde::Serialize, serde::Deserialize))]
     pub struct CreateEnumStmtListOpt(Option<Vec<CreateEnumStmt>>);
 
     impl crate::syn::ListOpt<CreateEnumStmt> for CreateEnumStmtListOpt {
@@ -103189,7 +104564,8 @@ mod create_enum_stmt {
         use super::*;
 
         #[cfg_attr(test, derive(derive_builder::Builder))]
-        #[derive(Clone, Debug, serde::Serialize, serde::Deserialize)]
+        #[cfg_attr(feature = "syn_serde", derive(serde::Serialize, serde::Deserialize))]
+        #[derive(Clone, Debug)]
         #[allow(clippy::struct_excessive_bools)]
         #[allow(clippy::struct_field_names)]
         pub struct CreateEnumStmt {
@@ -103286,11 +104662,13 @@ mod create_range_stmt {
     use super::*;
 
     /// `CreateRangeStmt`
-    #[derive(Debug, Clone, serde::Serialize, serde::Deserialize)]
+    #[derive(Debug, Clone)]
+    #[cfg_attr(feature = "syn_serde", derive(serde::Serialize, serde::Deserialize))]
     pub struct CreateRangeStmt(Box<self::inner::CreateRangeStmt>);
 
     /// optional `CreateRangeStmt`
-    #[derive(Debug, Clone, serde::Serialize, serde::Deserialize)]
+    #[derive(Debug, Clone)]
+    #[cfg_attr(feature = "syn_serde", derive(serde::Serialize, serde::Deserialize))]
     pub struct CreateRangeStmtOpt(Option<CreateRangeStmt>);
 
     #[cfg(test)]
@@ -103307,11 +104685,13 @@ mod create_range_stmt {
     }
 
     /// `CreateRangeStmt` list
-    #[derive(Debug, Clone, serde::Serialize, serde::Deserialize)]
+    #[derive(Debug, Clone)]
+    #[cfg_attr(feature = "syn_serde", derive(serde::Serialize, serde::Deserialize))]
     pub struct CreateRangeStmtList(Vec<CreateRangeStmt>);
 
     /// optional `CreateRangeStmt` list
-    #[derive(Debug, Clone, serde::Serialize, serde::Deserialize)]
+    #[derive(Debug, Clone)]
+    #[cfg_attr(feature = "syn_serde", derive(serde::Serialize, serde::Deserialize))]
     pub struct CreateRangeStmtListOpt(Option<Vec<CreateRangeStmt>>);
 
     impl crate::syn::ListOpt<CreateRangeStmt> for CreateRangeStmtListOpt {
@@ -103411,7 +104791,8 @@ mod create_range_stmt {
         use super::*;
 
         #[cfg_attr(test, derive(derive_builder::Builder))]
-        #[derive(Clone, Debug, serde::Serialize, serde::Deserialize)]
+        #[cfg_attr(feature = "syn_serde", derive(serde::Serialize, serde::Deserialize))]
+        #[derive(Clone, Debug)]
         #[allow(clippy::struct_excessive_bools)]
         #[allow(clippy::struct_field_names)]
         pub struct CreateRangeStmt {
@@ -103508,11 +104889,13 @@ mod alter_enum_stmt {
     use super::*;
 
     /// `AlterEnumStmt`
-    #[derive(Debug, Clone, serde::Serialize, serde::Deserialize)]
+    #[derive(Debug, Clone)]
+    #[cfg_attr(feature = "syn_serde", derive(serde::Serialize, serde::Deserialize))]
     pub struct AlterEnumStmt(Box<self::inner::AlterEnumStmt>);
 
     /// optional `AlterEnumStmt`
-    #[derive(Debug, Clone, serde::Serialize, serde::Deserialize)]
+    #[derive(Debug, Clone)]
+    #[cfg_attr(feature = "syn_serde", derive(serde::Serialize, serde::Deserialize))]
     pub struct AlterEnumStmtOpt(Option<AlterEnumStmt>);
 
     #[cfg(test)]
@@ -103529,11 +104912,13 @@ mod alter_enum_stmt {
     }
 
     /// `AlterEnumStmt` list
-    #[derive(Debug, Clone, serde::Serialize, serde::Deserialize)]
+    #[derive(Debug, Clone)]
+    #[cfg_attr(feature = "syn_serde", derive(serde::Serialize, serde::Deserialize))]
     pub struct AlterEnumStmtList(Vec<AlterEnumStmt>);
 
     /// optional `AlterEnumStmt` list
-    #[derive(Debug, Clone, serde::Serialize, serde::Deserialize)]
+    #[derive(Debug, Clone)]
+    #[cfg_attr(feature = "syn_serde", derive(serde::Serialize, serde::Deserialize))]
     pub struct AlterEnumStmtListOpt(Option<Vec<AlterEnumStmt>>);
 
     impl crate::syn::ListOpt<AlterEnumStmt> for AlterEnumStmtListOpt {
@@ -103633,7 +105018,8 @@ mod alter_enum_stmt {
         use super::*;
 
         #[cfg_attr(test, derive(derive_builder::Builder))]
-        #[derive(Clone, Debug, serde::Serialize, serde::Deserialize)]
+        #[cfg_attr(feature = "syn_serde", derive(serde::Serialize, serde::Deserialize))]
+        #[derive(Clone, Debug)]
         #[allow(clippy::struct_excessive_bools)]
         #[allow(clippy::struct_field_names)]
         pub struct AlterEnumStmt {
@@ -103857,11 +105243,13 @@ mod view_stmt {
     use super::*;
 
     /// `ViewStmt`
-    #[derive(Debug, Clone, serde::Serialize, serde::Deserialize)]
+    #[derive(Debug, Clone)]
+    #[cfg_attr(feature = "syn_serde", derive(serde::Serialize, serde::Deserialize))]
     pub struct ViewStmt(Box<self::inner::ViewStmt>);
 
     /// optional `ViewStmt`
-    #[derive(Debug, Clone, serde::Serialize, serde::Deserialize)]
+    #[derive(Debug, Clone)]
+    #[cfg_attr(feature = "syn_serde", derive(serde::Serialize, serde::Deserialize))]
     pub struct ViewStmtOpt(Option<ViewStmt>);
 
     #[cfg(test)]
@@ -103878,11 +105266,13 @@ mod view_stmt {
     }
 
     /// `ViewStmt` list
-    #[derive(Debug, Clone, serde::Serialize, serde::Deserialize)]
+    #[derive(Debug, Clone)]
+    #[cfg_attr(feature = "syn_serde", derive(serde::Serialize, serde::Deserialize))]
     pub struct ViewStmtList(Vec<ViewStmt>);
 
     /// optional `ViewStmt` list
-    #[derive(Debug, Clone, serde::Serialize, serde::Deserialize)]
+    #[derive(Debug, Clone)]
+    #[cfg_attr(feature = "syn_serde", derive(serde::Serialize, serde::Deserialize))]
     pub struct ViewStmtListOpt(Option<Vec<ViewStmt>>);
 
     impl crate::syn::ListOpt<ViewStmt> for ViewStmtListOpt {
@@ -103982,7 +105372,8 @@ mod view_stmt {
         use super::*;
 
         #[cfg_attr(test, derive(derive_builder::Builder))]
-        #[derive(Clone, Debug, serde::Serialize, serde::Deserialize)]
+        #[cfg_attr(feature = "syn_serde", derive(serde::Serialize, serde::Deserialize))]
+        #[derive(Clone, Debug)]
         #[allow(clippy::struct_excessive_bools)]
         #[allow(clippy::struct_field_names)]
         pub struct ViewStmt {
@@ -104214,11 +105605,13 @@ mod load_stmt {
     use super::*;
 
     /// `LoadStmt`
-    #[derive(Debug, Clone, serde::Serialize, serde::Deserialize)]
+    #[derive(Debug, Clone)]
+    #[cfg_attr(feature = "syn_serde", derive(serde::Serialize, serde::Deserialize))]
     pub struct LoadStmt(Box<self::inner::LoadStmt>);
 
     /// optional `LoadStmt`
-    #[derive(Debug, Clone, serde::Serialize, serde::Deserialize)]
+    #[derive(Debug, Clone)]
+    #[cfg_attr(feature = "syn_serde", derive(serde::Serialize, serde::Deserialize))]
     pub struct LoadStmtOpt(Option<LoadStmt>);
 
     #[cfg(test)]
@@ -104235,11 +105628,13 @@ mod load_stmt {
     }
 
     /// `LoadStmt` list
-    #[derive(Debug, Clone, serde::Serialize, serde::Deserialize)]
+    #[derive(Debug, Clone)]
+    #[cfg_attr(feature = "syn_serde", derive(serde::Serialize, serde::Deserialize))]
     pub struct LoadStmtList(Vec<LoadStmt>);
 
     /// optional `LoadStmt` list
-    #[derive(Debug, Clone, serde::Serialize, serde::Deserialize)]
+    #[derive(Debug, Clone)]
+    #[cfg_attr(feature = "syn_serde", derive(serde::Serialize, serde::Deserialize))]
     pub struct LoadStmtListOpt(Option<Vec<LoadStmt>>);
 
     impl crate::syn::ListOpt<LoadStmt> for LoadStmtListOpt {
@@ -104339,7 +105734,8 @@ mod load_stmt {
         use super::*;
 
         #[cfg_attr(test, derive(derive_builder::Builder))]
-        #[derive(Clone, Debug, serde::Serialize, serde::Deserialize)]
+        #[cfg_attr(feature = "syn_serde", derive(serde::Serialize, serde::Deserialize))]
+        #[derive(Clone, Debug)]
         #[allow(clippy::struct_excessive_bools)]
         #[allow(clippy::struct_field_names)]
         pub struct LoadStmt {
@@ -104399,11 +105795,13 @@ mod createdb_stmt {
     use super::*;
 
     /// `CreatedbStmt`
-    #[derive(Debug, Clone, serde::Serialize, serde::Deserialize)]
+    #[derive(Debug, Clone)]
+    #[cfg_attr(feature = "syn_serde", derive(serde::Serialize, serde::Deserialize))]
     pub struct CreatedbStmt(Box<self::inner::CreatedbStmt>);
 
     /// optional `CreatedbStmt`
-    #[derive(Debug, Clone, serde::Serialize, serde::Deserialize)]
+    #[derive(Debug, Clone)]
+    #[cfg_attr(feature = "syn_serde", derive(serde::Serialize, serde::Deserialize))]
     pub struct CreatedbStmtOpt(Option<CreatedbStmt>);
 
     #[cfg(test)]
@@ -104420,11 +105818,13 @@ mod createdb_stmt {
     }
 
     /// `CreatedbStmt` list
-    #[derive(Debug, Clone, serde::Serialize, serde::Deserialize)]
+    #[derive(Debug, Clone)]
+    #[cfg_attr(feature = "syn_serde", derive(serde::Serialize, serde::Deserialize))]
     pub struct CreatedbStmtList(Vec<CreatedbStmt>);
 
     /// optional `CreatedbStmt` list
-    #[derive(Debug, Clone, serde::Serialize, serde::Deserialize)]
+    #[derive(Debug, Clone)]
+    #[cfg_attr(feature = "syn_serde", derive(serde::Serialize, serde::Deserialize))]
     pub struct CreatedbStmtListOpt(Option<Vec<CreatedbStmt>>);
 
     impl crate::syn::ListOpt<CreatedbStmt> for CreatedbStmtListOpt {
@@ -104524,7 +105924,8 @@ mod createdb_stmt {
         use super::*;
 
         #[cfg_attr(test, derive(derive_builder::Builder))]
-        #[derive(Clone, Debug, serde::Serialize, serde::Deserialize)]
+        #[cfg_attr(feature = "syn_serde", derive(serde::Serialize, serde::Deserialize))]
+        #[derive(Clone, Debug)]
         #[allow(clippy::struct_excessive_bools)]
         #[allow(clippy::struct_field_names)]
         pub struct CreatedbStmt {
@@ -104618,11 +106019,13 @@ mod alter_database_stmt {
     use super::*;
 
     /// `AlterDatabaseStmt`
-    #[derive(Debug, Clone, serde::Serialize, serde::Deserialize)]
+    #[derive(Debug, Clone)]
+    #[cfg_attr(feature = "syn_serde", derive(serde::Serialize, serde::Deserialize))]
     pub struct AlterDatabaseStmt(Box<self::inner::AlterDatabaseStmt>);
 
     /// optional `AlterDatabaseStmt`
-    #[derive(Debug, Clone, serde::Serialize, serde::Deserialize)]
+    #[derive(Debug, Clone)]
+    #[cfg_attr(feature = "syn_serde", derive(serde::Serialize, serde::Deserialize))]
     pub struct AlterDatabaseStmtOpt(Option<AlterDatabaseStmt>);
 
     #[cfg(test)]
@@ -104639,11 +106042,13 @@ mod alter_database_stmt {
     }
 
     /// `AlterDatabaseStmt` list
-    #[derive(Debug, Clone, serde::Serialize, serde::Deserialize)]
+    #[derive(Debug, Clone)]
+    #[cfg_attr(feature = "syn_serde", derive(serde::Serialize, serde::Deserialize))]
     pub struct AlterDatabaseStmtList(Vec<AlterDatabaseStmt>);
 
     /// optional `AlterDatabaseStmt` list
-    #[derive(Debug, Clone, serde::Serialize, serde::Deserialize)]
+    #[derive(Debug, Clone)]
+    #[cfg_attr(feature = "syn_serde", derive(serde::Serialize, serde::Deserialize))]
     pub struct AlterDatabaseStmtListOpt(Option<Vec<AlterDatabaseStmt>>);
 
     impl crate::syn::ListOpt<AlterDatabaseStmt> for AlterDatabaseStmtListOpt {
@@ -104743,7 +106148,8 @@ mod alter_database_stmt {
         use super::*;
 
         #[cfg_attr(test, derive(derive_builder::Builder))]
-        #[derive(Clone, Debug, serde::Serialize, serde::Deserialize)]
+        #[cfg_attr(feature = "syn_serde", derive(serde::Serialize, serde::Deserialize))]
+        #[derive(Clone, Debug)]
         #[allow(clippy::struct_excessive_bools)]
         #[allow(clippy::struct_field_names)]
         pub struct AlterDatabaseStmt {
@@ -104837,11 +106243,13 @@ mod alter_database_refresh_coll_stmt {
     use super::*;
 
     /// `AlterDatabaseRefreshCollStmt`
-    #[derive(Debug, Clone, serde::Serialize, serde::Deserialize)]
+    #[derive(Debug, Clone)]
+    #[cfg_attr(feature = "syn_serde", derive(serde::Serialize, serde::Deserialize))]
     pub struct AlterDatabaseRefreshCollStmt(Box<self::inner::AlterDatabaseRefreshCollStmt>);
 
     /// optional `AlterDatabaseRefreshCollStmt`
-    #[derive(Debug, Clone, serde::Serialize, serde::Deserialize)]
+    #[derive(Debug, Clone)]
+    #[cfg_attr(feature = "syn_serde", derive(serde::Serialize, serde::Deserialize))]
     pub struct AlterDatabaseRefreshCollStmtOpt(Option<AlterDatabaseRefreshCollStmt>);
 
     #[cfg(test)]
@@ -104858,11 +106266,13 @@ mod alter_database_refresh_coll_stmt {
     }
 
     /// `AlterDatabaseRefreshCollStmt` list
-    #[derive(Debug, Clone, serde::Serialize, serde::Deserialize)]
+    #[derive(Debug, Clone)]
+    #[cfg_attr(feature = "syn_serde", derive(serde::Serialize, serde::Deserialize))]
     pub struct AlterDatabaseRefreshCollStmtList(Vec<AlterDatabaseRefreshCollStmt>);
 
     /// optional `AlterDatabaseRefreshCollStmt` list
-    #[derive(Debug, Clone, serde::Serialize, serde::Deserialize)]
+    #[derive(Debug, Clone)]
+    #[cfg_attr(feature = "syn_serde", derive(serde::Serialize, serde::Deserialize))]
     pub struct AlterDatabaseRefreshCollStmtListOpt(Option<Vec<AlterDatabaseRefreshCollStmt>>);
 
     impl crate::syn::ListOpt<AlterDatabaseRefreshCollStmt> for AlterDatabaseRefreshCollStmtListOpt {
@@ -104979,7 +106389,8 @@ mod alter_database_refresh_coll_stmt {
         use super::*;
 
         #[cfg_attr(test, derive(derive_builder::Builder))]
-        #[derive(Clone, Debug, serde::Serialize, serde::Deserialize)]
+        #[cfg_attr(feature = "syn_serde", derive(serde::Serialize, serde::Deserialize))]
+        #[derive(Clone, Debug)]
         #[allow(clippy::struct_excessive_bools)]
         #[allow(clippy::struct_field_names)]
         pub struct AlterDatabaseRefreshCollStmt {
@@ -105044,11 +106455,13 @@ mod alter_database_set_stmt {
     use super::*;
 
     /// `AlterDatabaseSetStmt`
-    #[derive(Debug, Clone, serde::Serialize, serde::Deserialize)]
+    #[derive(Debug, Clone)]
+    #[cfg_attr(feature = "syn_serde", derive(serde::Serialize, serde::Deserialize))]
     pub struct AlterDatabaseSetStmt(Box<self::inner::AlterDatabaseSetStmt>);
 
     /// optional `AlterDatabaseSetStmt`
-    #[derive(Debug, Clone, serde::Serialize, serde::Deserialize)]
+    #[derive(Debug, Clone)]
+    #[cfg_attr(feature = "syn_serde", derive(serde::Serialize, serde::Deserialize))]
     pub struct AlterDatabaseSetStmtOpt(Option<AlterDatabaseSetStmt>);
 
     #[cfg(test)]
@@ -105065,11 +106478,13 @@ mod alter_database_set_stmt {
     }
 
     /// `AlterDatabaseSetStmt` list
-    #[derive(Debug, Clone, serde::Serialize, serde::Deserialize)]
+    #[derive(Debug, Clone)]
+    #[cfg_attr(feature = "syn_serde", derive(serde::Serialize, serde::Deserialize))]
     pub struct AlterDatabaseSetStmtList(Vec<AlterDatabaseSetStmt>);
 
     /// optional `AlterDatabaseSetStmt` list
-    #[derive(Debug, Clone, serde::Serialize, serde::Deserialize)]
+    #[derive(Debug, Clone)]
+    #[cfg_attr(feature = "syn_serde", derive(serde::Serialize, serde::Deserialize))]
     pub struct AlterDatabaseSetStmtListOpt(Option<Vec<AlterDatabaseSetStmt>>);
 
     impl crate::syn::ListOpt<AlterDatabaseSetStmt> for AlterDatabaseSetStmtListOpt {
@@ -105169,7 +106584,8 @@ mod alter_database_set_stmt {
         use super::*;
 
         #[cfg_attr(test, derive(derive_builder::Builder))]
-        #[derive(Clone, Debug, serde::Serialize, serde::Deserialize)]
+        #[cfg_attr(feature = "syn_serde", derive(serde::Serialize, serde::Deserialize))]
+        #[derive(Clone, Debug)]
         #[allow(clippy::struct_excessive_bools)]
         #[allow(clippy::struct_field_names)]
         pub struct AlterDatabaseSetStmt {
@@ -105264,11 +106680,13 @@ mod dropdb_stmt {
     use super::*;
 
     /// `DropdbStmt`
-    #[derive(Debug, Clone, serde::Serialize, serde::Deserialize)]
+    #[derive(Debug, Clone)]
+    #[cfg_attr(feature = "syn_serde", derive(serde::Serialize, serde::Deserialize))]
     pub struct DropdbStmt(Box<self::inner::DropdbStmt>);
 
     /// optional `DropdbStmt`
-    #[derive(Debug, Clone, serde::Serialize, serde::Deserialize)]
+    #[derive(Debug, Clone)]
+    #[cfg_attr(feature = "syn_serde", derive(serde::Serialize, serde::Deserialize))]
     pub struct DropdbStmtOpt(Option<DropdbStmt>);
 
     #[cfg(test)]
@@ -105285,11 +106703,13 @@ mod dropdb_stmt {
     }
 
     /// `DropdbStmt` list
-    #[derive(Debug, Clone, serde::Serialize, serde::Deserialize)]
+    #[derive(Debug, Clone)]
+    #[cfg_attr(feature = "syn_serde", derive(serde::Serialize, serde::Deserialize))]
     pub struct DropdbStmtList(Vec<DropdbStmt>);
 
     /// optional `DropdbStmt` list
-    #[derive(Debug, Clone, serde::Serialize, serde::Deserialize)]
+    #[derive(Debug, Clone)]
+    #[cfg_attr(feature = "syn_serde", derive(serde::Serialize, serde::Deserialize))]
     pub struct DropdbStmtListOpt(Option<Vec<DropdbStmt>>);
 
     impl crate::syn::ListOpt<DropdbStmt> for DropdbStmtListOpt {
@@ -105389,7 +106809,8 @@ mod dropdb_stmt {
         use super::*;
 
         #[cfg_attr(test, derive(derive_builder::Builder))]
-        #[derive(Clone, Debug, serde::Serialize, serde::Deserialize)]
+        #[cfg_attr(feature = "syn_serde", derive(serde::Serialize, serde::Deserialize))]
+        #[derive(Clone, Debug)]
         #[allow(clippy::struct_excessive_bools)]
         #[allow(clippy::struct_field_names)]
         pub struct DropdbStmt {
@@ -105516,11 +106937,13 @@ mod alter_system_stmt {
     use super::*;
 
     /// `AlterSystemStmt`
-    #[derive(Debug, Clone, serde::Serialize, serde::Deserialize)]
+    #[derive(Debug, Clone)]
+    #[cfg_attr(feature = "syn_serde", derive(serde::Serialize, serde::Deserialize))]
     pub struct AlterSystemStmt(Box<self::inner::AlterSystemStmt>);
 
     /// optional `AlterSystemStmt`
-    #[derive(Debug, Clone, serde::Serialize, serde::Deserialize)]
+    #[derive(Debug, Clone)]
+    #[cfg_attr(feature = "syn_serde", derive(serde::Serialize, serde::Deserialize))]
     pub struct AlterSystemStmtOpt(Option<AlterSystemStmt>);
 
     #[cfg(test)]
@@ -105537,11 +106960,13 @@ mod alter_system_stmt {
     }
 
     /// `AlterSystemStmt` list
-    #[derive(Debug, Clone, serde::Serialize, serde::Deserialize)]
+    #[derive(Debug, Clone)]
+    #[cfg_attr(feature = "syn_serde", derive(serde::Serialize, serde::Deserialize))]
     pub struct AlterSystemStmtList(Vec<AlterSystemStmt>);
 
     /// optional `AlterSystemStmt` list
-    #[derive(Debug, Clone, serde::Serialize, serde::Deserialize)]
+    #[derive(Debug, Clone)]
+    #[cfg_attr(feature = "syn_serde", derive(serde::Serialize, serde::Deserialize))]
     pub struct AlterSystemStmtListOpt(Option<Vec<AlterSystemStmt>>);
 
     impl crate::syn::ListOpt<AlterSystemStmt> for AlterSystemStmtListOpt {
@@ -105641,7 +107066,8 @@ mod alter_system_stmt {
         use super::*;
 
         #[cfg_attr(test, derive(derive_builder::Builder))]
-        #[derive(Clone, Debug, serde::Serialize, serde::Deserialize)]
+        #[cfg_attr(feature = "syn_serde", derive(serde::Serialize, serde::Deserialize))]
+        #[derive(Clone, Debug)]
         #[allow(clippy::struct_excessive_bools)]
         #[allow(clippy::struct_field_names)]
         pub struct AlterSystemStmt {
@@ -105706,11 +107132,13 @@ mod cluster_stmt {
     use super::*;
 
     /// `ClusterStmt`
-    #[derive(Debug, Clone, serde::Serialize, serde::Deserialize)]
+    #[derive(Debug, Clone)]
+    #[cfg_attr(feature = "syn_serde", derive(serde::Serialize, serde::Deserialize))]
     pub struct ClusterStmt(Box<self::inner::ClusterStmt>);
 
     /// optional `ClusterStmt`
-    #[derive(Debug, Clone, serde::Serialize, serde::Deserialize)]
+    #[derive(Debug, Clone)]
+    #[cfg_attr(feature = "syn_serde", derive(serde::Serialize, serde::Deserialize))]
     pub struct ClusterStmtOpt(Option<ClusterStmt>);
 
     #[cfg(test)]
@@ -105727,11 +107155,13 @@ mod cluster_stmt {
     }
 
     /// `ClusterStmt` list
-    #[derive(Debug, Clone, serde::Serialize, serde::Deserialize)]
+    #[derive(Debug, Clone)]
+    #[cfg_attr(feature = "syn_serde", derive(serde::Serialize, serde::Deserialize))]
     pub struct ClusterStmtList(Vec<ClusterStmt>);
 
     /// optional `ClusterStmt` list
-    #[derive(Debug, Clone, serde::Serialize, serde::Deserialize)]
+    #[derive(Debug, Clone)]
+    #[cfg_attr(feature = "syn_serde", derive(serde::Serialize, serde::Deserialize))]
     pub struct ClusterStmtListOpt(Option<Vec<ClusterStmt>>);
 
     impl crate::syn::ListOpt<ClusterStmt> for ClusterStmtListOpt {
@@ -105831,7 +107261,8 @@ mod cluster_stmt {
         use super::*;
 
         #[cfg_attr(test, derive(derive_builder::Builder))]
-        #[derive(Clone, Debug, serde::Serialize, serde::Deserialize)]
+        #[cfg_attr(feature = "syn_serde", derive(serde::Serialize, serde::Deserialize))]
+        #[derive(Clone, Debug)]
         #[allow(clippy::struct_excessive_bools)]
         #[allow(clippy::struct_field_names)]
         pub struct ClusterStmt {
@@ -105961,11 +107392,13 @@ mod vacuum_stmt {
     use super::*;
 
     /// `VacuumStmt`
-    #[derive(Debug, Clone, serde::Serialize, serde::Deserialize)]
+    #[derive(Debug, Clone)]
+    #[cfg_attr(feature = "syn_serde", derive(serde::Serialize, serde::Deserialize))]
     pub struct VacuumStmt(Box<self::inner::VacuumStmt>);
 
     /// optional `VacuumStmt`
-    #[derive(Debug, Clone, serde::Serialize, serde::Deserialize)]
+    #[derive(Debug, Clone)]
+    #[cfg_attr(feature = "syn_serde", derive(serde::Serialize, serde::Deserialize))]
     pub struct VacuumStmtOpt(Option<VacuumStmt>);
 
     #[cfg(test)]
@@ -105982,11 +107415,13 @@ mod vacuum_stmt {
     }
 
     /// `VacuumStmt` list
-    #[derive(Debug, Clone, serde::Serialize, serde::Deserialize)]
+    #[derive(Debug, Clone)]
+    #[cfg_attr(feature = "syn_serde", derive(serde::Serialize, serde::Deserialize))]
     pub struct VacuumStmtList(Vec<VacuumStmt>);
 
     /// optional `VacuumStmt` list
-    #[derive(Debug, Clone, serde::Serialize, serde::Deserialize)]
+    #[derive(Debug, Clone)]
+    #[cfg_attr(feature = "syn_serde", derive(serde::Serialize, serde::Deserialize))]
     pub struct VacuumStmtListOpt(Option<Vec<VacuumStmt>>);
 
     impl crate::syn::ListOpt<VacuumStmt> for VacuumStmtListOpt {
@@ -106086,7 +107521,8 @@ mod vacuum_stmt {
         use super::*;
 
         #[cfg_attr(test, derive(derive_builder::Builder))]
-        #[derive(Clone, Debug, serde::Serialize, serde::Deserialize)]
+        #[cfg_attr(feature = "syn_serde", derive(serde::Serialize, serde::Deserialize))]
+        #[derive(Clone, Debug)]
         #[allow(clippy::struct_excessive_bools)]
         #[allow(clippy::struct_field_names)]
         pub struct VacuumStmt {
@@ -106216,11 +107652,13 @@ mod vacuum_relation {
     use super::*;
 
     /// `VacuumRelation`
-    #[derive(Debug, Clone, serde::Serialize, serde::Deserialize)]
+    #[derive(Debug, Clone)]
+    #[cfg_attr(feature = "syn_serde", derive(serde::Serialize, serde::Deserialize))]
     pub struct VacuumRelation(Box<self::inner::VacuumRelation>);
 
     /// optional `VacuumRelation`
-    #[derive(Debug, Clone, serde::Serialize, serde::Deserialize)]
+    #[derive(Debug, Clone)]
+    #[cfg_attr(feature = "syn_serde", derive(serde::Serialize, serde::Deserialize))]
     pub struct VacuumRelationOpt(Option<VacuumRelation>);
 
     #[cfg(test)]
@@ -106237,11 +107675,13 @@ mod vacuum_relation {
     }
 
     /// `VacuumRelation` list
-    #[derive(Debug, Clone, serde::Serialize, serde::Deserialize)]
+    #[derive(Debug, Clone)]
+    #[cfg_attr(feature = "syn_serde", derive(serde::Serialize, serde::Deserialize))]
     pub struct VacuumRelationList(Vec<VacuumRelation>);
 
     /// optional `VacuumRelation` list
-    #[derive(Debug, Clone, serde::Serialize, serde::Deserialize)]
+    #[derive(Debug, Clone)]
+    #[cfg_attr(feature = "syn_serde", derive(serde::Serialize, serde::Deserialize))]
     pub struct VacuumRelationListOpt(Option<Vec<VacuumRelation>>);
 
     impl crate::syn::ListOpt<VacuumRelation> for VacuumRelationListOpt {
@@ -106341,7 +107781,8 @@ mod vacuum_relation {
         use super::*;
 
         #[cfg_attr(test, derive(derive_builder::Builder))]
-        #[derive(Clone, Debug, serde::Serialize, serde::Deserialize)]
+        #[cfg_attr(feature = "syn_serde", derive(serde::Serialize, serde::Deserialize))]
+        #[derive(Clone, Debug)]
         #[allow(clippy::struct_excessive_bools)]
         #[allow(clippy::struct_field_names)]
         pub struct VacuumRelation {
@@ -106473,11 +107914,13 @@ mod explain_stmt {
     use super::*;
 
     /// `ExplainStmt`
-    #[derive(Debug, Clone, serde::Serialize, serde::Deserialize)]
+    #[derive(Debug, Clone)]
+    #[cfg_attr(feature = "syn_serde", derive(serde::Serialize, serde::Deserialize))]
     pub struct ExplainStmt(Box<self::inner::ExplainStmt>);
 
     /// optional `ExplainStmt`
-    #[derive(Debug, Clone, serde::Serialize, serde::Deserialize)]
+    #[derive(Debug, Clone)]
+    #[cfg_attr(feature = "syn_serde", derive(serde::Serialize, serde::Deserialize))]
     pub struct ExplainStmtOpt(Option<ExplainStmt>);
 
     #[cfg(test)]
@@ -106494,11 +107937,13 @@ mod explain_stmt {
     }
 
     /// `ExplainStmt` list
-    #[derive(Debug, Clone, serde::Serialize, serde::Deserialize)]
+    #[derive(Debug, Clone)]
+    #[cfg_attr(feature = "syn_serde", derive(serde::Serialize, serde::Deserialize))]
     pub struct ExplainStmtList(Vec<ExplainStmt>);
 
     /// optional `ExplainStmt` list
-    #[derive(Debug, Clone, serde::Serialize, serde::Deserialize)]
+    #[derive(Debug, Clone)]
+    #[cfg_attr(feature = "syn_serde", derive(serde::Serialize, serde::Deserialize))]
     pub struct ExplainStmtListOpt(Option<Vec<ExplainStmt>>);
 
     impl crate::syn::ListOpt<ExplainStmt> for ExplainStmtListOpt {
@@ -106598,7 +108043,8 @@ mod explain_stmt {
         use super::*;
 
         #[cfg_attr(test, derive(derive_builder::Builder))]
-        #[derive(Clone, Debug, serde::Serialize, serde::Deserialize)]
+        #[cfg_attr(feature = "syn_serde", derive(serde::Serialize, serde::Deserialize))]
+        #[derive(Clone, Debug)]
         #[allow(clippy::struct_excessive_bools)]
         #[allow(clippy::struct_field_names)]
         pub struct ExplainStmt {
@@ -106693,11 +108139,13 @@ mod create_table_as_stmt {
     use super::*;
 
     /// `CreateTableAsStmt`
-    #[derive(Debug, Clone, serde::Serialize, serde::Deserialize)]
+    #[derive(Debug, Clone)]
+    #[cfg_attr(feature = "syn_serde", derive(serde::Serialize, serde::Deserialize))]
     pub struct CreateTableAsStmt(Box<self::inner::CreateTableAsStmt>);
 
     /// optional `CreateTableAsStmt`
-    #[derive(Debug, Clone, serde::Serialize, serde::Deserialize)]
+    #[derive(Debug, Clone)]
+    #[cfg_attr(feature = "syn_serde", derive(serde::Serialize, serde::Deserialize))]
     pub struct CreateTableAsStmtOpt(Option<CreateTableAsStmt>);
 
     #[cfg(test)]
@@ -106714,11 +108162,13 @@ mod create_table_as_stmt {
     }
 
     /// `CreateTableAsStmt` list
-    #[derive(Debug, Clone, serde::Serialize, serde::Deserialize)]
+    #[derive(Debug, Clone)]
+    #[cfg_attr(feature = "syn_serde", derive(serde::Serialize, serde::Deserialize))]
     pub struct CreateTableAsStmtList(Vec<CreateTableAsStmt>);
 
     /// optional `CreateTableAsStmt` list
-    #[derive(Debug, Clone, serde::Serialize, serde::Deserialize)]
+    #[derive(Debug, Clone)]
+    #[cfg_attr(feature = "syn_serde", derive(serde::Serialize, serde::Deserialize))]
     pub struct CreateTableAsStmtListOpt(Option<Vec<CreateTableAsStmt>>);
 
     impl crate::syn::ListOpt<CreateTableAsStmt> for CreateTableAsStmtListOpt {
@@ -106818,7 +108268,8 @@ mod create_table_as_stmt {
         use super::*;
 
         #[cfg_attr(test, derive(derive_builder::Builder))]
-        #[derive(Clone, Debug, serde::Serialize, serde::Deserialize)]
+        #[cfg_attr(feature = "syn_serde", derive(serde::Serialize, serde::Deserialize))]
+        #[derive(Clone, Debug)]
         #[allow(clippy::struct_excessive_bools)]
         #[allow(clippy::struct_field_names)]
         pub struct CreateTableAsStmt {
@@ -107015,11 +108466,13 @@ mod refresh_mat_view_stmt {
     use super::*;
 
     /// `RefreshMatViewStmt`
-    #[derive(Debug, Clone, serde::Serialize, serde::Deserialize)]
+    #[derive(Debug, Clone)]
+    #[cfg_attr(feature = "syn_serde", derive(serde::Serialize, serde::Deserialize))]
     pub struct RefreshMatViewStmt(Box<self::inner::RefreshMatViewStmt>);
 
     /// optional `RefreshMatViewStmt`
-    #[derive(Debug, Clone, serde::Serialize, serde::Deserialize)]
+    #[derive(Debug, Clone)]
+    #[cfg_attr(feature = "syn_serde", derive(serde::Serialize, serde::Deserialize))]
     pub struct RefreshMatViewStmtOpt(Option<RefreshMatViewStmt>);
 
     #[cfg(test)]
@@ -107036,11 +108489,13 @@ mod refresh_mat_view_stmt {
     }
 
     /// `RefreshMatViewStmt` list
-    #[derive(Debug, Clone, serde::Serialize, serde::Deserialize)]
+    #[derive(Debug, Clone)]
+    #[cfg_attr(feature = "syn_serde", derive(serde::Serialize, serde::Deserialize))]
     pub struct RefreshMatViewStmtList(Vec<RefreshMatViewStmt>);
 
     /// optional `RefreshMatViewStmt` list
-    #[derive(Debug, Clone, serde::Serialize, serde::Deserialize)]
+    #[derive(Debug, Clone)]
+    #[cfg_attr(feature = "syn_serde", derive(serde::Serialize, serde::Deserialize))]
     pub struct RefreshMatViewStmtListOpt(Option<Vec<RefreshMatViewStmt>>);
 
     impl crate::syn::ListOpt<RefreshMatViewStmt> for RefreshMatViewStmtListOpt {
@@ -107140,7 +108595,8 @@ mod refresh_mat_view_stmt {
         use super::*;
 
         #[cfg_attr(test, derive(derive_builder::Builder))]
-        #[derive(Clone, Debug, serde::Serialize, serde::Deserialize)]
+        #[cfg_attr(feature = "syn_serde", derive(serde::Serialize, serde::Deserialize))]
+        #[derive(Clone, Debug)]
         #[allow(clippy::struct_excessive_bools)]
         #[allow(clippy::struct_field_names)]
         pub struct RefreshMatViewStmt {
@@ -107269,11 +108725,13 @@ mod check_point_stmt {
     use super::*;
 
     /// `CheckPointStmt`
-    #[derive(Debug, Clone, serde::Serialize, serde::Deserialize)]
+    #[derive(Debug, Clone)]
+    #[cfg_attr(feature = "syn_serde", derive(serde::Serialize, serde::Deserialize))]
     pub struct CheckPointStmt(Box<self::inner::CheckPointStmt>);
 
     /// optional `CheckPointStmt`
-    #[derive(Debug, Clone, serde::Serialize, serde::Deserialize)]
+    #[derive(Debug, Clone)]
+    #[cfg_attr(feature = "syn_serde", derive(serde::Serialize, serde::Deserialize))]
     pub struct CheckPointStmtOpt(Option<CheckPointStmt>);
 
     #[cfg(test)]
@@ -107290,11 +108748,13 @@ mod check_point_stmt {
     }
 
     /// `CheckPointStmt` list
-    #[derive(Debug, Clone, serde::Serialize, serde::Deserialize)]
+    #[derive(Debug, Clone)]
+    #[cfg_attr(feature = "syn_serde", derive(serde::Serialize, serde::Deserialize))]
     pub struct CheckPointStmtList(Vec<CheckPointStmt>);
 
     /// optional `CheckPointStmt` list
-    #[derive(Debug, Clone, serde::Serialize, serde::Deserialize)]
+    #[derive(Debug, Clone)]
+    #[cfg_attr(feature = "syn_serde", derive(serde::Serialize, serde::Deserialize))]
     pub struct CheckPointStmtListOpt(Option<Vec<CheckPointStmt>>);
 
     impl crate::syn::ListOpt<CheckPointStmt> for CheckPointStmtListOpt {
@@ -107394,7 +108854,8 @@ mod check_point_stmt {
         use super::*;
 
         #[cfg_attr(test, derive(derive_builder::Builder))]
-        #[derive(Clone, Debug, serde::Serialize, serde::Deserialize)]
+        #[cfg_attr(feature = "syn_serde", derive(serde::Serialize, serde::Deserialize))]
+        #[derive(Clone, Debug)]
         #[allow(clippy::struct_excessive_bools)]
         #[allow(clippy::struct_field_names)]
         pub struct CheckPointStmt {}
@@ -107427,11 +108888,13 @@ mod discard_stmt {
     use super::*;
 
     /// `DiscardStmt`
-    #[derive(Debug, Clone, serde::Serialize, serde::Deserialize)]
+    #[derive(Debug, Clone)]
+    #[cfg_attr(feature = "syn_serde", derive(serde::Serialize, serde::Deserialize))]
     pub struct DiscardStmt(Box<self::inner::DiscardStmt>);
 
     /// optional `DiscardStmt`
-    #[derive(Debug, Clone, serde::Serialize, serde::Deserialize)]
+    #[derive(Debug, Clone)]
+    #[cfg_attr(feature = "syn_serde", derive(serde::Serialize, serde::Deserialize))]
     pub struct DiscardStmtOpt(Option<DiscardStmt>);
 
     #[cfg(test)]
@@ -107448,11 +108911,13 @@ mod discard_stmt {
     }
 
     /// `DiscardStmt` list
-    #[derive(Debug, Clone, serde::Serialize, serde::Deserialize)]
+    #[derive(Debug, Clone)]
+    #[cfg_attr(feature = "syn_serde", derive(serde::Serialize, serde::Deserialize))]
     pub struct DiscardStmtList(Vec<DiscardStmt>);
 
     /// optional `DiscardStmt` list
-    #[derive(Debug, Clone, serde::Serialize, serde::Deserialize)]
+    #[derive(Debug, Clone)]
+    #[cfg_attr(feature = "syn_serde", derive(serde::Serialize, serde::Deserialize))]
     pub struct DiscardStmtListOpt(Option<Vec<DiscardStmt>>);
 
     impl crate::syn::ListOpt<DiscardStmt> for DiscardStmtListOpt {
@@ -107552,7 +109017,8 @@ mod discard_stmt {
         use super::*;
 
         #[cfg_attr(test, derive(derive_builder::Builder))]
-        #[derive(Clone, Debug, serde::Serialize, serde::Deserialize)]
+        #[cfg_attr(feature = "syn_serde", derive(serde::Serialize, serde::Deserialize))]
+        #[derive(Clone, Debug)]
         #[allow(clippy::struct_excessive_bools)]
         #[allow(clippy::struct_field_names)]
         pub struct DiscardStmt {
@@ -107615,11 +109081,13 @@ mod lock_stmt {
     use super::*;
 
     /// `LockStmt`
-    #[derive(Debug, Clone, serde::Serialize, serde::Deserialize)]
+    #[derive(Debug, Clone)]
+    #[cfg_attr(feature = "syn_serde", derive(serde::Serialize, serde::Deserialize))]
     pub struct LockStmt(Box<self::inner::LockStmt>);
 
     /// optional `LockStmt`
-    #[derive(Debug, Clone, serde::Serialize, serde::Deserialize)]
+    #[derive(Debug, Clone)]
+    #[cfg_attr(feature = "syn_serde", derive(serde::Serialize, serde::Deserialize))]
     pub struct LockStmtOpt(Option<LockStmt>);
 
     #[cfg(test)]
@@ -107636,11 +109104,13 @@ mod lock_stmt {
     }
 
     /// `LockStmt` list
-    #[derive(Debug, Clone, serde::Serialize, serde::Deserialize)]
+    #[derive(Debug, Clone)]
+    #[cfg_attr(feature = "syn_serde", derive(serde::Serialize, serde::Deserialize))]
     pub struct LockStmtList(Vec<LockStmt>);
 
     /// optional `LockStmt` list
-    #[derive(Debug, Clone, serde::Serialize, serde::Deserialize)]
+    #[derive(Debug, Clone)]
+    #[cfg_attr(feature = "syn_serde", derive(serde::Serialize, serde::Deserialize))]
     pub struct LockStmtListOpt(Option<Vec<LockStmt>>);
 
     impl crate::syn::ListOpt<LockStmt> for LockStmtListOpt {
@@ -107740,7 +109210,8 @@ mod lock_stmt {
         use super::*;
 
         #[cfg_attr(test, derive(derive_builder::Builder))]
-        #[derive(Clone, Debug, serde::Serialize, serde::Deserialize)]
+        #[cfg_attr(feature = "syn_serde", derive(serde::Serialize, serde::Deserialize))]
+        #[derive(Clone, Debug)]
         #[allow(clippy::struct_excessive_bools)]
         #[allow(clippy::struct_field_names)]
         pub struct LockStmt {
@@ -107867,11 +109338,13 @@ mod constraints_set_stmt {
     use super::*;
 
     /// `ConstraintsSetStmt`
-    #[derive(Debug, Clone, serde::Serialize, serde::Deserialize)]
+    #[derive(Debug, Clone)]
+    #[cfg_attr(feature = "syn_serde", derive(serde::Serialize, serde::Deserialize))]
     pub struct ConstraintsSetStmt(Box<self::inner::ConstraintsSetStmt>);
 
     /// optional `ConstraintsSetStmt`
-    #[derive(Debug, Clone, serde::Serialize, serde::Deserialize)]
+    #[derive(Debug, Clone)]
+    #[cfg_attr(feature = "syn_serde", derive(serde::Serialize, serde::Deserialize))]
     pub struct ConstraintsSetStmtOpt(Option<ConstraintsSetStmt>);
 
     #[cfg(test)]
@@ -107888,11 +109361,13 @@ mod constraints_set_stmt {
     }
 
     /// `ConstraintsSetStmt` list
-    #[derive(Debug, Clone, serde::Serialize, serde::Deserialize)]
+    #[derive(Debug, Clone)]
+    #[cfg_attr(feature = "syn_serde", derive(serde::Serialize, serde::Deserialize))]
     pub struct ConstraintsSetStmtList(Vec<ConstraintsSetStmt>);
 
     /// optional `ConstraintsSetStmt` list
-    #[derive(Debug, Clone, serde::Serialize, serde::Deserialize)]
+    #[derive(Debug, Clone)]
+    #[cfg_attr(feature = "syn_serde", derive(serde::Serialize, serde::Deserialize))]
     pub struct ConstraintsSetStmtListOpt(Option<Vec<ConstraintsSetStmt>>);
 
     impl crate::syn::ListOpt<ConstraintsSetStmt> for ConstraintsSetStmtListOpt {
@@ -107992,7 +109467,8 @@ mod constraints_set_stmt {
         use super::*;
 
         #[cfg_attr(test, derive(derive_builder::Builder))]
-        #[derive(Clone, Debug, serde::Serialize, serde::Deserialize)]
+        #[cfg_attr(feature = "syn_serde", derive(serde::Serialize, serde::Deserialize))]
+        #[derive(Clone, Debug)]
         #[allow(clippy::struct_excessive_bools)]
         #[allow(clippy::struct_field_names)]
         pub struct ConstraintsSetStmt {
@@ -108090,11 +109566,13 @@ mod reindex_stmt {
     use super::*;
 
     /// `ReindexStmt`
-    #[derive(Debug, Clone, serde::Serialize, serde::Deserialize)]
+    #[derive(Debug, Clone)]
+    #[cfg_attr(feature = "syn_serde", derive(serde::Serialize, serde::Deserialize))]
     pub struct ReindexStmt(Box<self::inner::ReindexStmt>);
 
     /// optional `ReindexStmt`
-    #[derive(Debug, Clone, serde::Serialize, serde::Deserialize)]
+    #[derive(Debug, Clone)]
+    #[cfg_attr(feature = "syn_serde", derive(serde::Serialize, serde::Deserialize))]
     pub struct ReindexStmtOpt(Option<ReindexStmt>);
 
     #[cfg(test)]
@@ -108111,11 +109589,13 @@ mod reindex_stmt {
     }
 
     /// `ReindexStmt` list
-    #[derive(Debug, Clone, serde::Serialize, serde::Deserialize)]
+    #[derive(Debug, Clone)]
+    #[cfg_attr(feature = "syn_serde", derive(serde::Serialize, serde::Deserialize))]
     pub struct ReindexStmtList(Vec<ReindexStmt>);
 
     /// optional `ReindexStmt` list
-    #[derive(Debug, Clone, serde::Serialize, serde::Deserialize)]
+    #[derive(Debug, Clone)]
+    #[cfg_attr(feature = "syn_serde", derive(serde::Serialize, serde::Deserialize))]
     pub struct ReindexStmtListOpt(Option<Vec<ReindexStmt>>);
 
     impl crate::syn::ListOpt<ReindexStmt> for ReindexStmtListOpt {
@@ -108215,7 +109695,8 @@ mod reindex_stmt {
         use super::*;
 
         #[cfg_attr(test, derive(derive_builder::Builder))]
-        #[derive(Clone, Debug, serde::Serialize, serde::Deserialize)]
+        #[cfg_attr(feature = "syn_serde", derive(serde::Serialize, serde::Deserialize))]
+        #[derive(Clone, Debug)]
         #[allow(clippy::struct_excessive_bools)]
         #[allow(clippy::struct_field_names)]
         pub struct ReindexStmt {
@@ -108379,11 +109860,13 @@ mod create_conversion_stmt {
     use super::*;
 
     /// `CreateConversionStmt`
-    #[derive(Debug, Clone, serde::Serialize, serde::Deserialize)]
+    #[derive(Debug, Clone)]
+    #[cfg_attr(feature = "syn_serde", derive(serde::Serialize, serde::Deserialize))]
     pub struct CreateConversionStmt(Box<self::inner::CreateConversionStmt>);
 
     /// optional `CreateConversionStmt`
-    #[derive(Debug, Clone, serde::Serialize, serde::Deserialize)]
+    #[derive(Debug, Clone)]
+    #[cfg_attr(feature = "syn_serde", derive(serde::Serialize, serde::Deserialize))]
     pub struct CreateConversionStmtOpt(Option<CreateConversionStmt>);
 
     #[cfg(test)]
@@ -108400,11 +109883,13 @@ mod create_conversion_stmt {
     }
 
     /// `CreateConversionStmt` list
-    #[derive(Debug, Clone, serde::Serialize, serde::Deserialize)]
+    #[derive(Debug, Clone)]
+    #[cfg_attr(feature = "syn_serde", derive(serde::Serialize, serde::Deserialize))]
     pub struct CreateConversionStmtList(Vec<CreateConversionStmt>);
 
     /// optional `CreateConversionStmt` list
-    #[derive(Debug, Clone, serde::Serialize, serde::Deserialize)]
+    #[derive(Debug, Clone)]
+    #[cfg_attr(feature = "syn_serde", derive(serde::Serialize, serde::Deserialize))]
     pub struct CreateConversionStmtListOpt(Option<Vec<CreateConversionStmt>>);
 
     impl crate::syn::ListOpt<CreateConversionStmt> for CreateConversionStmtListOpt {
@@ -108504,7 +109989,8 @@ mod create_conversion_stmt {
         use super::*;
 
         #[cfg_attr(test, derive(derive_builder::Builder))]
-        #[derive(Clone, Debug, serde::Serialize, serde::Deserialize)]
+        #[cfg_attr(feature = "syn_serde", derive(serde::Serialize, serde::Deserialize))]
+        #[derive(Clone, Debug)]
         #[allow(clippy::struct_excessive_bools)]
         #[allow(clippy::struct_field_names)]
         pub struct CreateConversionStmt {
@@ -108703,11 +110189,13 @@ mod create_cast_stmt {
     use super::*;
 
     /// `CreateCastStmt`
-    #[derive(Debug, Clone, serde::Serialize, serde::Deserialize)]
+    #[derive(Debug, Clone)]
+    #[cfg_attr(feature = "syn_serde", derive(serde::Serialize, serde::Deserialize))]
     pub struct CreateCastStmt(Box<self::inner::CreateCastStmt>);
 
     /// optional `CreateCastStmt`
-    #[derive(Debug, Clone, serde::Serialize, serde::Deserialize)]
+    #[derive(Debug, Clone)]
+    #[cfg_attr(feature = "syn_serde", derive(serde::Serialize, serde::Deserialize))]
     pub struct CreateCastStmtOpt(Option<CreateCastStmt>);
 
     #[cfg(test)]
@@ -108724,11 +110212,13 @@ mod create_cast_stmt {
     }
 
     /// `CreateCastStmt` list
-    #[derive(Debug, Clone, serde::Serialize, serde::Deserialize)]
+    #[derive(Debug, Clone)]
+    #[cfg_attr(feature = "syn_serde", derive(serde::Serialize, serde::Deserialize))]
     pub struct CreateCastStmtList(Vec<CreateCastStmt>);
 
     /// optional `CreateCastStmt` list
-    #[derive(Debug, Clone, serde::Serialize, serde::Deserialize)]
+    #[derive(Debug, Clone)]
+    #[cfg_attr(feature = "syn_serde", derive(serde::Serialize, serde::Deserialize))]
     pub struct CreateCastStmtListOpt(Option<Vec<CreateCastStmt>>);
 
     impl crate::syn::ListOpt<CreateCastStmt> for CreateCastStmtListOpt {
@@ -108828,7 +110318,8 @@ mod create_cast_stmt {
         use super::*;
 
         #[cfg_attr(test, derive(derive_builder::Builder))]
-        #[derive(Clone, Debug, serde::Serialize, serde::Deserialize)]
+        #[cfg_attr(feature = "syn_serde", derive(serde::Serialize, serde::Deserialize))]
+        #[derive(Clone, Debug)]
         #[allow(clippy::struct_excessive_bools)]
         #[allow(clippy::struct_field_names)]
         pub struct CreateCastStmt {
@@ -109028,11 +110519,13 @@ mod create_transform_stmt {
     use super::*;
 
     /// `CreateTransformStmt`
-    #[derive(Debug, Clone, serde::Serialize, serde::Deserialize)]
+    #[derive(Debug, Clone)]
+    #[cfg_attr(feature = "syn_serde", derive(serde::Serialize, serde::Deserialize))]
     pub struct CreateTransformStmt(Box<self::inner::CreateTransformStmt>);
 
     /// optional `CreateTransformStmt`
-    #[derive(Debug, Clone, serde::Serialize, serde::Deserialize)]
+    #[derive(Debug, Clone)]
+    #[cfg_attr(feature = "syn_serde", derive(serde::Serialize, serde::Deserialize))]
     pub struct CreateTransformStmtOpt(Option<CreateTransformStmt>);
 
     #[cfg(test)]
@@ -109049,11 +110542,13 @@ mod create_transform_stmt {
     }
 
     /// `CreateTransformStmt` list
-    #[derive(Debug, Clone, serde::Serialize, serde::Deserialize)]
+    #[derive(Debug, Clone)]
+    #[cfg_attr(feature = "syn_serde", derive(serde::Serialize, serde::Deserialize))]
     pub struct CreateTransformStmtList(Vec<CreateTransformStmt>);
 
     /// optional `CreateTransformStmt` list
-    #[derive(Debug, Clone, serde::Serialize, serde::Deserialize)]
+    #[derive(Debug, Clone)]
+    #[cfg_attr(feature = "syn_serde", derive(serde::Serialize, serde::Deserialize))]
     pub struct CreateTransformStmtListOpt(Option<Vec<CreateTransformStmt>>);
 
     impl crate::syn::ListOpt<CreateTransformStmt> for CreateTransformStmtListOpt {
@@ -109153,7 +110648,8 @@ mod create_transform_stmt {
         use super::*;
 
         #[cfg_attr(test, derive(derive_builder::Builder))]
-        #[derive(Clone, Debug, serde::Serialize, serde::Deserialize)]
+        #[cfg_attr(feature = "syn_serde", derive(serde::Serialize, serde::Deserialize))]
+        #[derive(Clone, Debug)]
         #[allow(clippy::struct_excessive_bools)]
         #[allow(clippy::struct_field_names)]
         pub struct CreateTransformStmt {
@@ -109351,11 +110847,13 @@ mod prepare_stmt {
     use super::*;
 
     /// `PrepareStmt`
-    #[derive(Debug, Clone, serde::Serialize, serde::Deserialize)]
+    #[derive(Debug, Clone)]
+    #[cfg_attr(feature = "syn_serde", derive(serde::Serialize, serde::Deserialize))]
     pub struct PrepareStmt(Box<self::inner::PrepareStmt>);
 
     /// optional `PrepareStmt`
-    #[derive(Debug, Clone, serde::Serialize, serde::Deserialize)]
+    #[derive(Debug, Clone)]
+    #[cfg_attr(feature = "syn_serde", derive(serde::Serialize, serde::Deserialize))]
     pub struct PrepareStmtOpt(Option<PrepareStmt>);
 
     #[cfg(test)]
@@ -109372,11 +110870,13 @@ mod prepare_stmt {
     }
 
     /// `PrepareStmt` list
-    #[derive(Debug, Clone, serde::Serialize, serde::Deserialize)]
+    #[derive(Debug, Clone)]
+    #[cfg_attr(feature = "syn_serde", derive(serde::Serialize, serde::Deserialize))]
     pub struct PrepareStmtList(Vec<PrepareStmt>);
 
     /// optional `PrepareStmt` list
-    #[derive(Debug, Clone, serde::Serialize, serde::Deserialize)]
+    #[derive(Debug, Clone)]
+    #[cfg_attr(feature = "syn_serde", derive(serde::Serialize, serde::Deserialize))]
     pub struct PrepareStmtListOpt(Option<Vec<PrepareStmt>>);
 
     impl crate::syn::ListOpt<PrepareStmt> for PrepareStmtListOpt {
@@ -109476,7 +110976,8 @@ mod prepare_stmt {
         use super::*;
 
         #[cfg_attr(test, derive(derive_builder::Builder))]
-        #[derive(Clone, Debug, serde::Serialize, serde::Deserialize)]
+        #[cfg_attr(feature = "syn_serde", derive(serde::Serialize, serde::Deserialize))]
+        #[derive(Clone, Debug)]
         #[allow(clippy::struct_excessive_bools)]
         #[allow(clippy::struct_field_names)]
         pub struct PrepareStmt {
@@ -109606,11 +111107,13 @@ mod execute_stmt {
     use super::*;
 
     /// `ExecuteStmt`
-    #[derive(Debug, Clone, serde::Serialize, serde::Deserialize)]
+    #[derive(Debug, Clone)]
+    #[cfg_attr(feature = "syn_serde", derive(serde::Serialize, serde::Deserialize))]
     pub struct ExecuteStmt(Box<self::inner::ExecuteStmt>);
 
     /// optional `ExecuteStmt`
-    #[derive(Debug, Clone, serde::Serialize, serde::Deserialize)]
+    #[derive(Debug, Clone)]
+    #[cfg_attr(feature = "syn_serde", derive(serde::Serialize, serde::Deserialize))]
     pub struct ExecuteStmtOpt(Option<ExecuteStmt>);
 
     #[cfg(test)]
@@ -109627,11 +111130,13 @@ mod execute_stmt {
     }
 
     /// `ExecuteStmt` list
-    #[derive(Debug, Clone, serde::Serialize, serde::Deserialize)]
+    #[derive(Debug, Clone)]
+    #[cfg_attr(feature = "syn_serde", derive(serde::Serialize, serde::Deserialize))]
     pub struct ExecuteStmtList(Vec<ExecuteStmt>);
 
     /// optional `ExecuteStmt` list
-    #[derive(Debug, Clone, serde::Serialize, serde::Deserialize)]
+    #[derive(Debug, Clone)]
+    #[cfg_attr(feature = "syn_serde", derive(serde::Serialize, serde::Deserialize))]
     pub struct ExecuteStmtListOpt(Option<Vec<ExecuteStmt>>);
 
     impl crate::syn::ListOpt<ExecuteStmt> for ExecuteStmtListOpt {
@@ -109731,7 +111236,8 @@ mod execute_stmt {
         use super::*;
 
         #[cfg_attr(test, derive(derive_builder::Builder))]
-        #[derive(Clone, Debug, serde::Serialize, serde::Deserialize)]
+        #[cfg_attr(feature = "syn_serde", derive(serde::Serialize, serde::Deserialize))]
+        #[derive(Clone, Debug)]
         #[allow(clippy::struct_excessive_bools)]
         #[allow(clippy::struct_field_names)]
         pub struct ExecuteStmt {
@@ -109823,11 +111329,13 @@ mod deallocate_stmt {
     use super::*;
 
     /// `DeallocateStmt`
-    #[derive(Debug, Clone, serde::Serialize, serde::Deserialize)]
+    #[derive(Debug, Clone)]
+    #[cfg_attr(feature = "syn_serde", derive(serde::Serialize, serde::Deserialize))]
     pub struct DeallocateStmt(Box<self::inner::DeallocateStmt>);
 
     /// optional `DeallocateStmt`
-    #[derive(Debug, Clone, serde::Serialize, serde::Deserialize)]
+    #[derive(Debug, Clone)]
+    #[cfg_attr(feature = "syn_serde", derive(serde::Serialize, serde::Deserialize))]
     pub struct DeallocateStmtOpt(Option<DeallocateStmt>);
 
     #[cfg(test)]
@@ -109844,11 +111352,13 @@ mod deallocate_stmt {
     }
 
     /// `DeallocateStmt` list
-    #[derive(Debug, Clone, serde::Serialize, serde::Deserialize)]
+    #[derive(Debug, Clone)]
+    #[cfg_attr(feature = "syn_serde", derive(serde::Serialize, serde::Deserialize))]
     pub struct DeallocateStmtList(Vec<DeallocateStmt>);
 
     /// optional `DeallocateStmt` list
-    #[derive(Debug, Clone, serde::Serialize, serde::Deserialize)]
+    #[derive(Debug, Clone)]
+    #[cfg_attr(feature = "syn_serde", derive(serde::Serialize, serde::Deserialize))]
     pub struct DeallocateStmtListOpt(Option<Vec<DeallocateStmt>>);
 
     impl crate::syn::ListOpt<DeallocateStmt> for DeallocateStmtListOpt {
@@ -109948,7 +111458,8 @@ mod deallocate_stmt {
         use super::*;
 
         #[cfg_attr(test, derive(derive_builder::Builder))]
-        #[derive(Clone, Debug, serde::Serialize, serde::Deserialize)]
+        #[cfg_attr(feature = "syn_serde", derive(serde::Serialize, serde::Deserialize))]
+        #[derive(Clone, Debug)]
         #[allow(clippy::struct_excessive_bools)]
         #[allow(clippy::struct_field_names)]
         pub struct DeallocateStmt {
@@ -110074,11 +111585,13 @@ mod drop_owned_stmt {
     use super::*;
 
     /// `DropOwnedStmt`
-    #[derive(Debug, Clone, serde::Serialize, serde::Deserialize)]
+    #[derive(Debug, Clone)]
+    #[cfg_attr(feature = "syn_serde", derive(serde::Serialize, serde::Deserialize))]
     pub struct DropOwnedStmt(Box<self::inner::DropOwnedStmt>);
 
     /// optional `DropOwnedStmt`
-    #[derive(Debug, Clone, serde::Serialize, serde::Deserialize)]
+    #[derive(Debug, Clone)]
+    #[cfg_attr(feature = "syn_serde", derive(serde::Serialize, serde::Deserialize))]
     pub struct DropOwnedStmtOpt(Option<DropOwnedStmt>);
 
     #[cfg(test)]
@@ -110095,11 +111608,13 @@ mod drop_owned_stmt {
     }
 
     /// `DropOwnedStmt` list
-    #[derive(Debug, Clone, serde::Serialize, serde::Deserialize)]
+    #[derive(Debug, Clone)]
+    #[cfg_attr(feature = "syn_serde", derive(serde::Serialize, serde::Deserialize))]
     pub struct DropOwnedStmtList(Vec<DropOwnedStmt>);
 
     /// optional `DropOwnedStmt` list
-    #[derive(Debug, Clone, serde::Serialize, serde::Deserialize)]
+    #[derive(Debug, Clone)]
+    #[cfg_attr(feature = "syn_serde", derive(serde::Serialize, serde::Deserialize))]
     pub struct DropOwnedStmtListOpt(Option<Vec<DropOwnedStmt>>);
 
     impl crate::syn::ListOpt<DropOwnedStmt> for DropOwnedStmtListOpt {
@@ -110199,7 +111714,8 @@ mod drop_owned_stmt {
         use super::*;
 
         #[cfg_attr(test, derive(derive_builder::Builder))]
-        #[derive(Clone, Debug, serde::Serialize, serde::Deserialize)]
+        #[cfg_attr(feature = "syn_serde", derive(serde::Serialize, serde::Deserialize))]
+        #[derive(Clone, Debug)]
         #[allow(clippy::struct_excessive_bools)]
         #[allow(clippy::struct_field_names)]
         pub struct DropOwnedStmt {
@@ -110296,11 +111812,13 @@ mod reassign_owned_stmt {
     use super::*;
 
     /// `ReassignOwnedStmt`
-    #[derive(Debug, Clone, serde::Serialize, serde::Deserialize)]
+    #[derive(Debug, Clone)]
+    #[cfg_attr(feature = "syn_serde", derive(serde::Serialize, serde::Deserialize))]
     pub struct ReassignOwnedStmt(Box<self::inner::ReassignOwnedStmt>);
 
     /// optional `ReassignOwnedStmt`
-    #[derive(Debug, Clone, serde::Serialize, serde::Deserialize)]
+    #[derive(Debug, Clone)]
+    #[cfg_attr(feature = "syn_serde", derive(serde::Serialize, serde::Deserialize))]
     pub struct ReassignOwnedStmtOpt(Option<ReassignOwnedStmt>);
 
     #[cfg(test)]
@@ -110317,11 +111835,13 @@ mod reassign_owned_stmt {
     }
 
     /// `ReassignOwnedStmt` list
-    #[derive(Debug, Clone, serde::Serialize, serde::Deserialize)]
+    #[derive(Debug, Clone)]
+    #[cfg_attr(feature = "syn_serde", derive(serde::Serialize, serde::Deserialize))]
     pub struct ReassignOwnedStmtList(Vec<ReassignOwnedStmt>);
 
     /// optional `ReassignOwnedStmt` list
-    #[derive(Debug, Clone, serde::Serialize, serde::Deserialize)]
+    #[derive(Debug, Clone)]
+    #[cfg_attr(feature = "syn_serde", derive(serde::Serialize, serde::Deserialize))]
     pub struct ReassignOwnedStmtListOpt(Option<Vec<ReassignOwnedStmt>>);
 
     impl crate::syn::ListOpt<ReassignOwnedStmt> for ReassignOwnedStmtListOpt {
@@ -110421,7 +111941,8 @@ mod reassign_owned_stmt {
         use super::*;
 
         #[cfg_attr(test, derive(derive_builder::Builder))]
-        #[derive(Clone, Debug, serde::Serialize, serde::Deserialize)]
+        #[cfg_attr(feature = "syn_serde", derive(serde::Serialize, serde::Deserialize))]
+        #[derive(Clone, Debug)]
         #[allow(clippy::struct_excessive_bools)]
         #[allow(clippy::struct_field_names)]
         pub struct ReassignOwnedStmt {
@@ -110518,11 +112039,13 @@ mod alter_ts_dictionary_stmt {
     use super::*;
 
     /// `AlterTsDictionaryStmt`
-    #[derive(Debug, Clone, serde::Serialize, serde::Deserialize)]
+    #[derive(Debug, Clone)]
+    #[cfg_attr(feature = "syn_serde", derive(serde::Serialize, serde::Deserialize))]
     pub struct AlterTsDictionaryStmt(Box<self::inner::AlterTsDictionaryStmt>);
 
     /// optional `AlterTsDictionaryStmt`
-    #[derive(Debug, Clone, serde::Serialize, serde::Deserialize)]
+    #[derive(Debug, Clone)]
+    #[cfg_attr(feature = "syn_serde", derive(serde::Serialize, serde::Deserialize))]
     pub struct AlterTsDictionaryStmtOpt(Option<AlterTsDictionaryStmt>);
 
     #[cfg(test)]
@@ -110539,11 +112062,13 @@ mod alter_ts_dictionary_stmt {
     }
 
     /// `AlterTsDictionaryStmt` list
-    #[derive(Debug, Clone, serde::Serialize, serde::Deserialize)]
+    #[derive(Debug, Clone)]
+    #[cfg_attr(feature = "syn_serde", derive(serde::Serialize, serde::Deserialize))]
     pub struct AlterTsDictionaryStmtList(Vec<AlterTsDictionaryStmt>);
 
     /// optional `AlterTsDictionaryStmt` list
-    #[derive(Debug, Clone, serde::Serialize, serde::Deserialize)]
+    #[derive(Debug, Clone)]
+    #[cfg_attr(feature = "syn_serde", derive(serde::Serialize, serde::Deserialize))]
     pub struct AlterTsDictionaryStmtListOpt(Option<Vec<AlterTsDictionaryStmt>>);
 
     impl crate::syn::ListOpt<AlterTsDictionaryStmt> for AlterTsDictionaryStmtListOpt {
@@ -110643,7 +112168,8 @@ mod alter_ts_dictionary_stmt {
         use super::*;
 
         #[cfg_attr(test, derive(derive_builder::Builder))]
-        #[derive(Clone, Debug, serde::Serialize, serde::Deserialize)]
+        #[cfg_attr(feature = "syn_serde", derive(serde::Serialize, serde::Deserialize))]
+        #[derive(Clone, Debug)]
         #[allow(clippy::struct_excessive_bools)]
         #[allow(clippy::struct_field_names)]
         pub struct AlterTsDictionaryStmt {
@@ -110741,11 +112267,13 @@ mod alter_ts_configuration_stmt {
     use super::*;
 
     /// `AlterTsConfigurationStmt`
-    #[derive(Debug, Clone, serde::Serialize, serde::Deserialize)]
+    #[derive(Debug, Clone)]
+    #[cfg_attr(feature = "syn_serde", derive(serde::Serialize, serde::Deserialize))]
     pub struct AlterTsConfigurationStmt(Box<self::inner::AlterTsConfigurationStmt>);
 
     /// optional `AlterTsConfigurationStmt`
-    #[derive(Debug, Clone, serde::Serialize, serde::Deserialize)]
+    #[derive(Debug, Clone)]
+    #[cfg_attr(feature = "syn_serde", derive(serde::Serialize, serde::Deserialize))]
     pub struct AlterTsConfigurationStmtOpt(Option<AlterTsConfigurationStmt>);
 
     #[cfg(test)]
@@ -110762,11 +112290,13 @@ mod alter_ts_configuration_stmt {
     }
 
     /// `AlterTsConfigurationStmt` list
-    #[derive(Debug, Clone, serde::Serialize, serde::Deserialize)]
+    #[derive(Debug, Clone)]
+    #[cfg_attr(feature = "syn_serde", derive(serde::Serialize, serde::Deserialize))]
     pub struct AlterTsConfigurationStmtList(Vec<AlterTsConfigurationStmt>);
 
     /// optional `AlterTsConfigurationStmt` list
-    #[derive(Debug, Clone, serde::Serialize, serde::Deserialize)]
+    #[derive(Debug, Clone)]
+    #[cfg_attr(feature = "syn_serde", derive(serde::Serialize, serde::Deserialize))]
     pub struct AlterTsConfigurationStmtListOpt(Option<Vec<AlterTsConfigurationStmt>>);
 
     impl crate::syn::ListOpt<AlterTsConfigurationStmt> for AlterTsConfigurationStmtListOpt {
@@ -110875,7 +112405,8 @@ mod alter_ts_configuration_stmt {
         use super::*;
 
         #[cfg_attr(test, derive(derive_builder::Builder))]
-        #[derive(Clone, Debug, serde::Serialize, serde::Deserialize)]
+        #[cfg_attr(feature = "syn_serde", derive(serde::Serialize, serde::Deserialize))]
+        #[derive(Clone, Debug)]
         #[allow(clippy::struct_excessive_bools)]
         #[allow(clippy::struct_field_names)]
         pub struct AlterTsConfigurationStmt {
@@ -111140,11 +112671,13 @@ mod publication_table {
     use super::*;
 
     /// `PublicationTable`
-    #[derive(Debug, Clone, serde::Serialize, serde::Deserialize)]
+    #[derive(Debug, Clone)]
+    #[cfg_attr(feature = "syn_serde", derive(serde::Serialize, serde::Deserialize))]
     pub struct PublicationTable(Box<self::inner::PublicationTable>);
 
     /// optional `PublicationTable`
-    #[derive(Debug, Clone, serde::Serialize, serde::Deserialize)]
+    #[derive(Debug, Clone)]
+    #[cfg_attr(feature = "syn_serde", derive(serde::Serialize, serde::Deserialize))]
     pub struct PublicationTableOpt(Option<PublicationTable>);
 
     #[cfg(test)]
@@ -111161,11 +112694,13 @@ mod publication_table {
     }
 
     /// `PublicationTable` list
-    #[derive(Debug, Clone, serde::Serialize, serde::Deserialize)]
+    #[derive(Debug, Clone)]
+    #[cfg_attr(feature = "syn_serde", derive(serde::Serialize, serde::Deserialize))]
     pub struct PublicationTableList(Vec<PublicationTable>);
 
     /// optional `PublicationTable` list
-    #[derive(Debug, Clone, serde::Serialize, serde::Deserialize)]
+    #[derive(Debug, Clone)]
+    #[cfg_attr(feature = "syn_serde", derive(serde::Serialize, serde::Deserialize))]
     pub struct PublicationTableListOpt(Option<Vec<PublicationTable>>);
 
     impl crate::syn::ListOpt<PublicationTable> for PublicationTableListOpt {
@@ -111265,7 +112800,8 @@ mod publication_table {
         use super::*;
 
         #[cfg_attr(test, derive(derive_builder::Builder))]
-        #[derive(Clone, Debug, serde::Serialize, serde::Deserialize)]
+        #[cfg_attr(feature = "syn_serde", derive(serde::Serialize, serde::Deserialize))]
+        #[derive(Clone, Debug)]
         #[allow(clippy::struct_excessive_bools)]
         #[allow(clippy::struct_field_names)]
         pub struct PublicationTable {
@@ -111400,11 +112936,13 @@ mod publication_obj_spec {
     use super::*;
 
     /// `PublicationObjSpec`
-    #[derive(Debug, Clone, serde::Serialize, serde::Deserialize)]
+    #[derive(Debug, Clone)]
+    #[cfg_attr(feature = "syn_serde", derive(serde::Serialize, serde::Deserialize))]
     pub struct PublicationObjSpec(Box<self::inner::PublicationObjSpec>);
 
     /// optional `PublicationObjSpec`
-    #[derive(Debug, Clone, serde::Serialize, serde::Deserialize)]
+    #[derive(Debug, Clone)]
+    #[cfg_attr(feature = "syn_serde", derive(serde::Serialize, serde::Deserialize))]
     pub struct PublicationObjSpecOpt(Option<PublicationObjSpec>);
 
     #[cfg(test)]
@@ -111421,11 +112959,13 @@ mod publication_obj_spec {
     }
 
     /// `PublicationObjSpec` list
-    #[derive(Debug, Clone, serde::Serialize, serde::Deserialize)]
+    #[derive(Debug, Clone)]
+    #[cfg_attr(feature = "syn_serde", derive(serde::Serialize, serde::Deserialize))]
     pub struct PublicationObjSpecList(Vec<PublicationObjSpec>);
 
     /// optional `PublicationObjSpec` list
-    #[derive(Debug, Clone, serde::Serialize, serde::Deserialize)]
+    #[derive(Debug, Clone)]
+    #[cfg_attr(feature = "syn_serde", derive(serde::Serialize, serde::Deserialize))]
     pub struct PublicationObjSpecListOpt(Option<Vec<PublicationObjSpec>>);
 
     impl crate::syn::ListOpt<PublicationObjSpec> for PublicationObjSpecListOpt {
@@ -111525,7 +113065,8 @@ mod publication_obj_spec {
         use super::*;
 
         #[cfg_attr(test, derive(derive_builder::Builder))]
-        #[derive(Clone, Debug, serde::Serialize, serde::Deserialize)]
+        #[cfg_attr(feature = "syn_serde", derive(serde::Serialize, serde::Deserialize))]
+        #[derive(Clone, Debug)]
         #[allow(clippy::struct_excessive_bools)]
         #[allow(clippy::struct_field_names)]
         pub struct PublicationObjSpec {
@@ -111688,11 +113229,13 @@ mod create_publication_stmt {
     use super::*;
 
     /// `CreatePublicationStmt`
-    #[derive(Debug, Clone, serde::Serialize, serde::Deserialize)]
+    #[derive(Debug, Clone)]
+    #[cfg_attr(feature = "syn_serde", derive(serde::Serialize, serde::Deserialize))]
     pub struct CreatePublicationStmt(Box<self::inner::CreatePublicationStmt>);
 
     /// optional `CreatePublicationStmt`
-    #[derive(Debug, Clone, serde::Serialize, serde::Deserialize)]
+    #[derive(Debug, Clone)]
+    #[cfg_attr(feature = "syn_serde", derive(serde::Serialize, serde::Deserialize))]
     pub struct CreatePublicationStmtOpt(Option<CreatePublicationStmt>);
 
     #[cfg(test)]
@@ -111709,11 +113252,13 @@ mod create_publication_stmt {
     }
 
     /// `CreatePublicationStmt` list
-    #[derive(Debug, Clone, serde::Serialize, serde::Deserialize)]
+    #[derive(Debug, Clone)]
+    #[cfg_attr(feature = "syn_serde", derive(serde::Serialize, serde::Deserialize))]
     pub struct CreatePublicationStmtList(Vec<CreatePublicationStmt>);
 
     /// optional `CreatePublicationStmt` list
-    #[derive(Debug, Clone, serde::Serialize, serde::Deserialize)]
+    #[derive(Debug, Clone)]
+    #[cfg_attr(feature = "syn_serde", derive(serde::Serialize, serde::Deserialize))]
     pub struct CreatePublicationStmtListOpt(Option<Vec<CreatePublicationStmt>>);
 
     impl crate::syn::ListOpt<CreatePublicationStmt> for CreatePublicationStmtListOpt {
@@ -111813,7 +113358,8 @@ mod create_publication_stmt {
         use super::*;
 
         #[cfg_attr(test, derive(derive_builder::Builder))]
-        #[derive(Clone, Debug, serde::Serialize, serde::Deserialize)]
+        #[cfg_attr(feature = "syn_serde", derive(serde::Serialize, serde::Deserialize))]
+        #[derive(Clone, Debug)]
         #[allow(clippy::struct_excessive_bools)]
         #[allow(clippy::struct_field_names)]
         pub struct CreatePublicationStmt {
@@ -111979,11 +113525,13 @@ mod alter_publication_stmt {
     use super::*;
 
     /// `AlterPublicationStmt`
-    #[derive(Debug, Clone, serde::Serialize, serde::Deserialize)]
+    #[derive(Debug, Clone)]
+    #[cfg_attr(feature = "syn_serde", derive(serde::Serialize, serde::Deserialize))]
     pub struct AlterPublicationStmt(Box<self::inner::AlterPublicationStmt>);
 
     /// optional `AlterPublicationStmt`
-    #[derive(Debug, Clone, serde::Serialize, serde::Deserialize)]
+    #[derive(Debug, Clone)]
+    #[cfg_attr(feature = "syn_serde", derive(serde::Serialize, serde::Deserialize))]
     pub struct AlterPublicationStmtOpt(Option<AlterPublicationStmt>);
 
     #[cfg(test)]
@@ -112000,11 +113548,13 @@ mod alter_publication_stmt {
     }
 
     /// `AlterPublicationStmt` list
-    #[derive(Debug, Clone, serde::Serialize, serde::Deserialize)]
+    #[derive(Debug, Clone)]
+    #[cfg_attr(feature = "syn_serde", derive(serde::Serialize, serde::Deserialize))]
     pub struct AlterPublicationStmtList(Vec<AlterPublicationStmt>);
 
     /// optional `AlterPublicationStmt` list
-    #[derive(Debug, Clone, serde::Serialize, serde::Deserialize)]
+    #[derive(Debug, Clone)]
+    #[cfg_attr(feature = "syn_serde", derive(serde::Serialize, serde::Deserialize))]
     pub struct AlterPublicationStmtListOpt(Option<Vec<AlterPublicationStmt>>);
 
     impl crate::syn::ListOpt<AlterPublicationStmt> for AlterPublicationStmtListOpt {
@@ -112104,7 +113654,8 @@ mod alter_publication_stmt {
         use super::*;
 
         #[cfg_attr(test, derive(derive_builder::Builder))]
-        #[derive(Clone, Debug, serde::Serialize, serde::Deserialize)]
+        #[cfg_attr(feature = "syn_serde", derive(serde::Serialize, serde::Deserialize))]
+        #[derive(Clone, Debug)]
         #[allow(clippy::struct_excessive_bools)]
         #[allow(clippy::struct_field_names)]
         pub struct AlterPublicationStmt {
@@ -112304,11 +113855,13 @@ mod create_subscription_stmt {
     use super::*;
 
     /// `CreateSubscriptionStmt`
-    #[derive(Debug, Clone, serde::Serialize, serde::Deserialize)]
+    #[derive(Debug, Clone)]
+    #[cfg_attr(feature = "syn_serde", derive(serde::Serialize, serde::Deserialize))]
     pub struct CreateSubscriptionStmt(Box<self::inner::CreateSubscriptionStmt>);
 
     /// optional `CreateSubscriptionStmt`
-    #[derive(Debug, Clone, serde::Serialize, serde::Deserialize)]
+    #[derive(Debug, Clone)]
+    #[cfg_attr(feature = "syn_serde", derive(serde::Serialize, serde::Deserialize))]
     pub struct CreateSubscriptionStmtOpt(Option<CreateSubscriptionStmt>);
 
     #[cfg(test)]
@@ -112325,11 +113878,13 @@ mod create_subscription_stmt {
     }
 
     /// `CreateSubscriptionStmt` list
-    #[derive(Debug, Clone, serde::Serialize, serde::Deserialize)]
+    #[derive(Debug, Clone)]
+    #[cfg_attr(feature = "syn_serde", derive(serde::Serialize, serde::Deserialize))]
     pub struct CreateSubscriptionStmtList(Vec<CreateSubscriptionStmt>);
 
     /// optional `CreateSubscriptionStmt` list
-    #[derive(Debug, Clone, serde::Serialize, serde::Deserialize)]
+    #[derive(Debug, Clone)]
+    #[cfg_attr(feature = "syn_serde", derive(serde::Serialize, serde::Deserialize))]
     pub struct CreateSubscriptionStmtListOpt(Option<Vec<CreateSubscriptionStmt>>);
 
     impl crate::syn::ListOpt<CreateSubscriptionStmt> for CreateSubscriptionStmtListOpt {
@@ -112434,7 +113989,8 @@ mod create_subscription_stmt {
         use super::*;
 
         #[cfg_attr(test, derive(derive_builder::Builder))]
-        #[derive(Clone, Debug, serde::Serialize, serde::Deserialize)]
+        #[cfg_attr(feature = "syn_serde", derive(serde::Serialize, serde::Deserialize))]
+        #[derive(Clone, Debug)]
         #[allow(clippy::struct_excessive_bools)]
         #[allow(clippy::struct_field_names)]
         pub struct CreateSubscriptionStmt {
@@ -112598,11 +114154,13 @@ mod alter_subscription_stmt {
     use super::*;
 
     /// `AlterSubscriptionStmt`
-    #[derive(Debug, Clone, serde::Serialize, serde::Deserialize)]
+    #[derive(Debug, Clone)]
+    #[cfg_attr(feature = "syn_serde", derive(serde::Serialize, serde::Deserialize))]
     pub struct AlterSubscriptionStmt(Box<self::inner::AlterSubscriptionStmt>);
 
     /// optional `AlterSubscriptionStmt`
-    #[derive(Debug, Clone, serde::Serialize, serde::Deserialize)]
+    #[derive(Debug, Clone)]
+    #[cfg_attr(feature = "syn_serde", derive(serde::Serialize, serde::Deserialize))]
     pub struct AlterSubscriptionStmtOpt(Option<AlterSubscriptionStmt>);
 
     #[cfg(test)]
@@ -112619,11 +114177,13 @@ mod alter_subscription_stmt {
     }
 
     /// `AlterSubscriptionStmt` list
-    #[derive(Debug, Clone, serde::Serialize, serde::Deserialize)]
+    #[derive(Debug, Clone)]
+    #[cfg_attr(feature = "syn_serde", derive(serde::Serialize, serde::Deserialize))]
     pub struct AlterSubscriptionStmtList(Vec<AlterSubscriptionStmt>);
 
     /// optional `AlterSubscriptionStmt` list
-    #[derive(Debug, Clone, serde::Serialize, serde::Deserialize)]
+    #[derive(Debug, Clone)]
+    #[cfg_attr(feature = "syn_serde", derive(serde::Serialize, serde::Deserialize))]
     pub struct AlterSubscriptionStmtListOpt(Option<Vec<AlterSubscriptionStmt>>);
 
     impl crate::syn::ListOpt<AlterSubscriptionStmt> for AlterSubscriptionStmtListOpt {
@@ -112723,7 +114283,8 @@ mod alter_subscription_stmt {
         use super::*;
 
         #[cfg_attr(test, derive(derive_builder::Builder))]
-        #[derive(Clone, Debug, serde::Serialize, serde::Deserialize)]
+        #[cfg_attr(feature = "syn_serde", derive(serde::Serialize, serde::Deserialize))]
+        #[derive(Clone, Debug)]
         #[allow(clippy::struct_excessive_bools)]
         #[allow(clippy::struct_field_names)]
         pub struct AlterSubscriptionStmt {
@@ -112921,11 +114482,13 @@ mod drop_subscription_stmt {
     use super::*;
 
     /// `DropSubscriptionStmt`
-    #[derive(Debug, Clone, serde::Serialize, serde::Deserialize)]
+    #[derive(Debug, Clone)]
+    #[cfg_attr(feature = "syn_serde", derive(serde::Serialize, serde::Deserialize))]
     pub struct DropSubscriptionStmt(Box<self::inner::DropSubscriptionStmt>);
 
     /// optional `DropSubscriptionStmt`
-    #[derive(Debug, Clone, serde::Serialize, serde::Deserialize)]
+    #[derive(Debug, Clone)]
+    #[cfg_attr(feature = "syn_serde", derive(serde::Serialize, serde::Deserialize))]
     pub struct DropSubscriptionStmtOpt(Option<DropSubscriptionStmt>);
 
     #[cfg(test)]
@@ -112942,11 +114505,13 @@ mod drop_subscription_stmt {
     }
 
     /// `DropSubscriptionStmt` list
-    #[derive(Debug, Clone, serde::Serialize, serde::Deserialize)]
+    #[derive(Debug, Clone)]
+    #[cfg_attr(feature = "syn_serde", derive(serde::Serialize, serde::Deserialize))]
     pub struct DropSubscriptionStmtList(Vec<DropSubscriptionStmt>);
 
     /// optional `DropSubscriptionStmt` list
-    #[derive(Debug, Clone, serde::Serialize, serde::Deserialize)]
+    #[derive(Debug, Clone)]
+    #[cfg_attr(feature = "syn_serde", derive(serde::Serialize, serde::Deserialize))]
     pub struct DropSubscriptionStmtListOpt(Option<Vec<DropSubscriptionStmt>>);
 
     impl crate::syn::ListOpt<DropSubscriptionStmt> for DropSubscriptionStmtListOpt {
@@ -113046,7 +114611,8 @@ mod drop_subscription_stmt {
         use super::*;
 
         #[cfg_attr(test, derive(derive_builder::Builder))]
-        #[derive(Clone, Debug, serde::Serialize, serde::Deserialize)]
+        #[cfg_attr(feature = "syn_serde", derive(serde::Serialize, serde::Deserialize))]
+        #[derive(Clone, Debug)]
         #[allow(clippy::struct_excessive_bools)]
         #[allow(clippy::struct_field_names)]
         pub struct DropSubscriptionStmt {
@@ -113176,11 +114742,13 @@ mod scan_token {
     use super::*;
 
     /// `ScanToken`
-    #[derive(Debug, Clone, serde::Serialize, serde::Deserialize)]
+    #[derive(Debug, Clone)]
+    #[cfg_attr(feature = "syn_serde", derive(serde::Serialize, serde::Deserialize))]
     pub struct ScanToken(Box<self::inner::ScanToken>);
 
     /// optional `ScanToken`
-    #[derive(Debug, Clone, serde::Serialize, serde::Deserialize)]
+    #[derive(Debug, Clone)]
+    #[cfg_attr(feature = "syn_serde", derive(serde::Serialize, serde::Deserialize))]
     pub struct ScanTokenOpt(Option<ScanToken>);
 
     #[cfg(test)]
@@ -113197,11 +114765,13 @@ mod scan_token {
     }
 
     /// `ScanToken` list
-    #[derive(Debug, Clone, serde::Serialize, serde::Deserialize)]
+    #[derive(Debug, Clone)]
+    #[cfg_attr(feature = "syn_serde", derive(serde::Serialize, serde::Deserialize))]
     pub struct ScanTokenList(Vec<ScanToken>);
 
     /// optional `ScanToken` list
-    #[derive(Debug, Clone, serde::Serialize, serde::Deserialize)]
+    #[derive(Debug, Clone)]
+    #[cfg_attr(feature = "syn_serde", derive(serde::Serialize, serde::Deserialize))]
     pub struct ScanTokenListOpt(Option<Vec<ScanToken>>);
 
     impl crate::syn::ListOpt<ScanToken> for ScanTokenListOpt {
@@ -113301,7 +114871,8 @@ mod scan_token {
         use super::*;
 
         #[cfg_attr(test, derive(derive_builder::Builder))]
-        #[derive(Clone, Debug, serde::Serialize, serde::Deserialize)]
+        #[cfg_attr(feature = "syn_serde", derive(serde::Serialize, serde::Deserialize))]
+        #[derive(Clone, Debug)]
         #[allow(clippy::struct_excessive_bools)]
         #[allow(clippy::struct_field_names)]
         pub struct ScanToken {

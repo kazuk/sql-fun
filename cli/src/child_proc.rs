@@ -292,6 +292,40 @@ impl ChildProcess {
     }
 }
 
+#[cfg(test)]
+#[cfg(unix)]
+mod test_child_process_poll_exit {
+    use super::ChildProcess;
+    use crate::StdStream;
+    use std::collections::HashMap;
+
+    #[tokio::test]
+    async fn collects_stdout_and_stderr() {
+        let envs = HashMap::new();
+        let mut child = ChildProcess::start_new(
+            "/bin/sh",
+            &["-c", "printf 'out1\\nout2\\n'; printf 'err1\\n' 1>&2"],
+            &envs,
+        )
+        .expect("start child");
+
+        let status = child.poll_exit().await.expect("poll exit");
+
+        let mut stdout_lines = Vec::new();
+        let mut stderr_lines = Vec::new();
+        for item in &child.stream_items {
+            match item {
+                StdStream::Stdout(line) => stdout_lines.push(line.clone()),
+                StdStream::Stderr(line) => stderr_lines.push(line.clone()),
+            }
+        }
+
+        assert!(status.success());
+        assert_eq!(vec!["out1\n", "out2\n"], stdout_lines);
+        assert_eq!(vec!["err1\n"], stderr_lines);
+    }
+}
+
 impl ChildProcess {
     async fn read_to_eof(&mut self) -> Result<(), anyhow::Error> {
         if !self.stderr.eof {

@@ -7,7 +7,8 @@ mod {{ enum_module_name }} {
 use super::*;
 
 /// list of `{{ enum_type_name }}`
-#[derive(Debug,Clone, serde::Serialize, serde::Deserialize)]
+#[derive(Debug, Clone)]
+#[cfg_attr(feature="syn_serde", derive(serde::Serialize, serde::Deserialize))]
 pub struct {{ enum_type_name }}List(Vec<{{ enum_type_name }}>);
 
 impl From<Vec<::pg_query::protobuf::{{ enum_type_name }}>> for {{ enum_type_name }}List {
@@ -17,7 +18,8 @@ impl From<Vec<::pg_query::protobuf::{{ enum_type_name }}>> for {{ enum_type_name
 }
 
 /// optional list of `{{ enum_type_name }}`
-#[derive(Debug,Clone,Copy, serde::Serialize, serde::Deserialize)]
+#[derive(Debug, Clone, Copy)]
+#[cfg_attr(feature="syn_serde", derive(serde::Serialize, serde::Deserialize))]
 pub struct {{ enum_type_name }}Opt(Option<{{ enum_type_name }}>);
 
 impl crate::syn::Opt<{{ enum_type_name }}> for {{ enum_type_name }}Opt
@@ -89,7 +91,8 @@ impl From<Option<Box<::pg_query::protobuf::{{ enum_type_name }}>>> for {{ enum_t
 }
 
 /// `{{ enum_type_name }}` enum
-#[derive(Debug,Clone,Copy, serde::Serialize, serde::Deserialize)]
+#[derive(Debug, Clone, Copy)]
+#[cfg_attr(feature="syn_serde", derive(serde::Serialize, serde::Deserialize))]
 pub enum {{ enum_type_name }} {
 {% for val in enum_type.value %}
     /// `{{ val.variant_name(enum_type_name) }}`

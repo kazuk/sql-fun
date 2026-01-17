@@ -9,11 +9,13 @@ mod {{ module_name }} {
     use super::*;
 
     /// `{{ struct_name }}`
-    #[derive(Debug,Clone, serde::Serialize, serde::Deserialize )]
+    #[derive(Debug, Clone)]
+    #[cfg_attr(feature="syn_serde", derive(serde::Serialize, serde::Deserialize))]
     pub struct {{ struct_name }}(Box<self::inner::{{ struct_name }}>);
 
     /// optional `{{ struct_name }}`
-    #[derive(Debug,Clone, serde::Serialize, serde::Deserialize )]
+    #[derive(Debug, Clone)]
+    #[cfg_attr(feature="syn_serde", derive(serde::Serialize, serde::Deserialize))]
     pub struct {{ struct_name }}Opt(Option<{{ struct_name }}>);
 
     #[cfg(test)]
@@ -31,11 +33,13 @@ mod {{ module_name }} {
     }
 
     /// `{{ struct_name }}` list
-    #[derive(Debug,Clone, serde::Serialize, serde::Deserialize )]
+    #[derive(Debug, Clone)]
+    #[cfg_attr(feature="syn_serde", derive(serde::Serialize, serde::Deserialize))]
     pub struct {{ struct_name }}List(Vec<{{ struct_name }}>);
 
     /// optional `{{ struct_name }}` list
-    #[derive(Debug,Clone, serde::Serialize, serde::Deserialize )]
+    #[derive(Debug, Clone)]
+    #[cfg_attr(feature="syn_serde", derive(serde::Serialize, serde::Deserialize))]
     pub struct {{ struct_name }}ListOpt(Option<Vec<{{ struct_name }}>>);
 
     impl crate::syn::ListOpt<{{ struct_name }}> for {{ struct_name }}ListOpt {
@@ -147,7 +151,8 @@ mod {{ module_name }} {
         use super::*;
 
         #[cfg_attr(test, derive(derive_builder::Builder))]
-        #[derive(Clone, Debug, serde::Serialize, serde::Deserialize )]
+        #[cfg_attr(feature="syn_serde", derive(serde::Serialize, serde::Deserialize))]
+        #[derive(Clone, Debug)]
         #[allow(clippy::struct_excessive_bools)]
         #[allow(clippy::struct_field_names)]
         pub struct {{ struct_name }} {

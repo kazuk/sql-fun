@@ -7,6 +7,8 @@ description: |
 
 # Implement unit test
 
+ Add unit tests to specified source, and run.
+
 ## Required parameters
 The user must provide parameters in one line:
 
@@ -14,8 +16,31 @@ The user must provide parameters in one line:
 
 ## Execution rules
 
+- If you modify somewhat MUST run tests with `check-test-flow`.
+- If struct or enum `impl` block contains multiple `fn`. separete to per-item `impl` blocks
+  ```rust
+  impl SomeWhat {
+    fn a() { ... }
+    fn b() { ... }
+    fn c() { ... }
+  }
+  ```
+  to be
+  ```rust
+  impl SomeWhat {
+    fn a() { ... }
+  }
+  impl SomeWhat {
+    fn b() { ... }
+  }
+  impl SomeWhat {
+    fn c() { ... }
+  }
+  ```
+
 - Place tests immediately after the implementation block or function they cover.
-　　- See /docs/internal-rules/rust-coding-guidline.md#test-placement
+  - See `docs/internal-rules/rust-coding-guidline.md#test-placement`
+
 - Use crate-level `test_helpers` module for helper functions/types.
   - If `src/test_helpers.rs` does not exist, create it.
   - Ensure `src/lib.rs` contains:
@@ -23,6 +48,7 @@ The user must provide parameters in one line:
     #[cfg(test)]
     pub mod test_helpers;
     ```
+
 - Extract helpers into `crate::test_helpers` to keep tests simple, BUT:
   - Do NOT move test-case-specific inputs/expected values into `test_helpers` as hardcoded constants.
   - `test_helpers` must be generic and parameterized:
@@ -31,6 +57,9 @@ The user must provide parameters in one line:
   - Test case data (inputs and expected outputs) must stay in the test module:
     - Keep them inline in each test, or
     - Use table-driven tests in the test module (arrays/vec of cases) and pass each case into helpers.
+- When function seems low-testability.
+  - plan refactor for testability and Add TODO comment like bellow.
+    `// TODO: TESTABILITY: extact for loop inner to function`
 - Use `check-test-flow` script for test compilation and run.
 - After tests pass, run `./.local/bin/update-stats` to update coverage statistics.
 

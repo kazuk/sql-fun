@@ -1,0 +1,47 @@
+---
+name: implement-unit-test
+description: |
+  Implement Rust unit tests for a specified source file.
+  Use when the user provides coverage-driven target files.
+---
+
+# Implement unit test
+
+## Required parameters
+The user must provide parameters in one line:
+
+- source=<path>
+
+## Execution rules
+
+- Place tests immediately after the implementation block or function they cover.
+　　- See /docs/internal-rules/rust-coding-guidline.md#test-placement
+- Use crate-level `test_helpers` module for helper functions/types.
+  - If `src/test_helpers.rs` does not exist, create it.
+  - Ensure `src/lib.rs` contains:
+    ```rust
+    #[cfg(test)]
+    pub mod test_helpers;
+    ```
+- Extract helpers into `crate::test_helpers` to keep tests simple, BUT:
+  - Do NOT move test-case-specific inputs/expected values into `test_helpers` as hardcoded constants.
+  - `test_helpers` must be generic and parameterized:
+    - Provide builders/parsers/assert helpers that take inputs as parameters.
+    - Prefer `fn make_* (..params..)` / `fn parse_* (input: &str)` / `fn assert_* (actual, expected)` style helpers.
+  - Test case data (inputs and expected outputs) must stay in the test module:
+    - Keep them inline in each test, or
+    - Use table-driven tests in the test module (arrays/vec of cases) and pass each case into helpers.
+- Use `check-test-flow` script for test compilation and run.
+- After tests pass, run `./.local/bin/update-stats` to update coverage statistics.
+
+## Missing parameters
+- If `source` is missing, ask only for `source` and proceed.
+
+## Procedure
+
+1. Open `source` and identify testable units.
+2. Design test input and design helper function.
+3. Implement unit tests.
+4. Run `check-test-flow` script for test verification.
+5. If `check-test-flow` fails, fix and re-run until it passes.
+6. Finaly run `update-stats` for update coverage statistics.

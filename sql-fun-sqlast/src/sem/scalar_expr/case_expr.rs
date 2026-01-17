@@ -407,6 +407,83 @@ impl CaseExprAnalysisContext<'_> {
     }
 }
 
+#[cfg(test)]
+mod test_case_expr_analysis_context_type_fixup {
+    use sql_fun_core::IVec;
+    use testresult::TestResult;
+
+    use super::SemScalarExprNode;
+    use crate::{
+        sem::{CastContext, CastDefinition, FromClause, PgBuiltInType, SemScalarExpr, WithClause},
+        syn::NodeInner,
+        test_helpers::{SynBuilder, TestParseContext, test_context},
+    };
+
+    #[rstest::rstest]
+    fn test_type_fixup_with_implicit_cast(mut test_context: TestParseContext) -> TestResult {
+        test_context.setup_type(PgBuiltInType::int4());
+        test_context.setup_type(PgBuiltInType::text());
+        let int4 = PgBuiltInType::int4();
+        let text = PgBuiltInType::text();
+        test_context.set_get_implicit_cast_result(
+            &int4,
+            &text,
+            Some(CastDefinition::new(CastContext::Implicit)),
+        );
+
+        let with_clause = WithClause::default();
+        let from_clause = FromClause::default();
+        let mut acontext = super::CaseExprAnalysisContext::new(&with_clause, &from_clause);
+
+        let builder = SynBuilder::new();
+        let expr = NodeInner::AConst(builder.const_int4(1));
+        let result = NodeInner::AConst(builder.const_int4(10));
+        let when_int = builder.case_when(expr.into(), result.into());
+
+        let expr = NodeInner::AConst(builder.const_sval("a"));
+        let result = NodeInner::AConst(builder.const_sval("b"));
+        let when_text = builder.case_when(expr.into(), result.into());
+
+        let tokens = IVec::default();
+        let mut context =
+            acontext.analyze_case_when_list(test_context, vec![when_int, when_text], &tokens)?;
+        let result_type = acontext.type_fixup(&mut context)?;
+        assert_eq!(Some(text.clone()), result_type);
+
+        match &acontext.when_exprs[0].result {
+            SemScalarExpr::ImplicitCast(cast_expr) => {
+                assert_eq!(Some(text.clone()), cast_expr.get_type());
+            }
+            other => panic!("expected implicit cast, got {other:?}"),
+        }
+
+        match &acontext.when_exprs[1].result {
+            SemScalarExpr::Const(_) => {}
+            other => panic!("expected const, got {other:?}"),
+        }
+        Ok(())
+    }
+
+    #[rstest::rstest]
+    fn test_type_fixup_no_cast_candidates(mut test_context: TestParseContext) -> TestResult {
+        let int4 = PgBuiltInType::int4();
+        let text = PgBuiltInType::text();
+        test_context.setup_type(int4.clone());
+        test_context.setup_type(text.clone());
+
+        let with_clause = WithClause::default();
+        let from_clause = FromClause::default();
+        let mut acontext = super::CaseExprAnalysisContext::new(&with_clause, &from_clause);
+        acontext.result_types.insert(int4);
+        acontext.result_types.insert(text);
+
+        let result = acontext.type_fixup(&mut test_context)?;
+        assert!(result.is_none());
+        assert_eq!(1, test_context.reported_problem_count());
+        Ok(())
+    }
+}
+
 impl CaseExprAnalysisContext<'_> {
     fn enumerate_cast_candiates<TParseContext>(
         &mut self,
@@ -434,6 +511,42 @@ impl CaseExprAnalysisContext<'_> {
     }
 }
 
+#[cfg(test)]
+mod test_case_expr_analysis_context_enumerate_cast_candiates {
+    use testresult::TestResult;
+
+    use crate::{
+        sem::{CastContext, CastDefinition, FromClause, PgBuiltInType, WithClause},
+        test_helpers::{TestParseContext, test_context},
+    };
+
+    #[rstest::rstest]
+    fn test_enumerate_cast_candiates_single(mut test_context: TestParseContext) -> TestResult {
+        let int4 = PgBuiltInType::int4();
+        let text = PgBuiltInType::text();
+        test_context.setup_type(int4.clone());
+        test_context.setup_type(text.clone());
+        test_context.set_get_implicit_cast_result(
+            &int4,
+            &text,
+            Some(CastDefinition::new(CastContext::Implicit)),
+        );
+
+        let with_clause = WithClause::default();
+        let from_clause = FromClause::default();
+        let mut acontext = super::CaseExprAnalysisContext::new(&with_clause, &from_clause);
+        acontext.result_types.insert(int4);
+        acontext.result_types.insert(text.clone());
+
+        let cast_candidates = acontext.enumerate_cast_candiates(&mut test_context);
+        let Some(casts) = cast_candidates.get(&text) else {
+            panic!("expected cast candidates for text");
+        };
+        assert_eq!(1, casts.len());
+        Ok(())
+    }
+}
+
 impl CaseExprAnalysisContext<'_> {
     fn is_not_null(&self) -> Option<bool> {
         if self.nullabilities.iter().any(|n| n == &Some(false)) {
@@ -443,6 +556,41 @@ impl CaseExprAnalysisContext<'_> {
         } else {
             None
         }
+    }
+}
+
+#[cfg(test)]
+mod test_case_expr_analysis_context_is_not_null {
+    use crate::sem::{FromClause, WithClause};
+
+    #[test]
+    fn test_is_not_null_any_false() {
+        let with_clause = WithClause::default();
+        let from_clause = FromClause::default();
+        let mut acontext = super::CaseExprAnalysisContext::new(&with_clause, &from_clause);
+
+        acontext.nullabilities = vec![Some(true), Some(false)];
+        assert_eq!(Some(false), acontext.is_not_null());
+    }
+
+    #[test]
+    fn test_is_not_null_all_some() {
+        let with_clause = WithClause::default();
+        let from_clause = FromClause::default();
+        let mut acontext = super::CaseExprAnalysisContext::new(&with_clause, &from_clause);
+
+        acontext.nullabilities = vec![Some(true), Some(true)];
+        assert_eq!(Some(true), acontext.is_not_null());
+    }
+
+    #[test]
+    fn test_is_not_null_with_unknown() {
+        let with_clause = WithClause::default();
+        let from_clause = FromClause::default();
+        let mut acontext = super::CaseExprAnalysisContext::new(&with_clause, &from_clause);
+
+        acontext.nullabilities = vec![Some(true), None];
+        assert_eq!(None, acontext.is_not_null());
     }
 }
 

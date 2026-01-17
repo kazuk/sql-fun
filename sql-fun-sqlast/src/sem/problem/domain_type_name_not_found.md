@@ -8,7 +8,7 @@ Official Document: [CREATE DOMAIN statement](https://www.postgresql.org/docs/cur
 CREATE DOMAIN name AS base_type;
 ```
 
-- `base_type` not found in schema analysis context.
+- `base_type` not found in schema semantic analysis context.
 
 ## Why
 

@@ -1,12 +1,12 @@
 mod column_not_found;
-use miette::{GraphicalReportHandler, LabeledSpan, NamedSource, Report};
+use miette::GraphicalReportHandler;
 
-use super::AnalysisProblem;
+use super::{AnalysisProblem, Problem, RenderProblemReport};
 
 use crate::{
     StringSpan,
     sem::{
-        CteName, FullName, TableName, TypeReference,
+        AnalysisError, CteName, FullName, TableName, TypeReference,
         create_table::{ColumnName, ViewName},
         data_source::AliasName,
     },
@@ -43,41 +43,68 @@ impl DomainBaseTypeNameNotFound {
     pub fn base_type_name(&self) -> &str {
         &self.base_type_name
     }
+}
 
-    fn base_type_name_span(&self) -> LabeledSpan {
-        self.base_type_name_span.new_labeled_span("base type name")
-    }
+impl Problem for DomainBaseTypeNameNotFound {
+    const CODE: &'static str = "SF000001";
+    const SEVERITY: miette::Severity = miette::Severity::Error;
+    const MESSAGE: &'static str = "Domain base type not found";
+    const SPAN_LABEL: &'static str = "base type name";
 
-    pub(crate) fn generate_report(
-        &self,
-        handler: &GraphicalReportHandler,
-        source: String,
-    ) -> String {
-        let diag = miette::MietteDiagnostic::new("Domain base type not found")
-            .with_code("SF000001")
-            .with_severity(miette::Severity::Error)
-            .with_label(self.base_type_name_span());
-
-        let report = Report::new(diag).with_source_code(NamedSource::new("SQL", source));
-
-        let mut out = String::new();
-        handler
-            .render_report(&mut out, &*report)
-            .expect("render_report failed");
-        out
+    fn get_problem_span(&self) -> StringSpan {
+        self.base_type_name_span
     }
 }
+
+impl RenderProblemReport for DomainBaseTypeNameNotFound {}
+
+#[derive(Debug, Clone)]
+pub struct FunctionNotFound {
+    function_name: FullName,
+    function_span: StringSpan,
+}
+
+impl FunctionNotFound {
+    /// create instance
+    pub fn new(function_name: &FullName, function_span: &StringSpan) -> Self {
+        Self {
+            function_name: function_name.clone(),
+            function_span: *function_span,
+        }
+    }
+
+    /// specified function name
+    pub fn function_name(&self) -> &FullName {
+        &self.function_name
+    }
+
+    /// span of function name
+    pub fn function_span(&self) -> &StringSpan {
+        &self.function_span
+    }
+}
+
+impl Problem for FunctionNotFound {
+    const CODE: &'static str = "SF00002";
+    const MESSAGE: &'static str = "Function not found";
+    const SEVERITY: miette::Severity = miette::Severity::Error;
+    const SPAN_LABEL: &'static str = "function name";
+
+    fn get_problem_span(&self) -> StringSpan {
+        self.function_span
+    }
+}
+
+impl RenderProblemReport for FunctionNotFound {}
 
 /// Name resolution problems
 #[derive(Debug, Clone)]
 pub enum NameResolution {
-    /// type .1 not found in current context
-    ///   on create domain .0
     #[doc = include_str!("domain_type_name_not_found.md")]
     DomainTypeNameNotFound(DomainBaseTypeNameNotFound),
 
-    /// function not found
-    FunctionNotFound(FullName),
+    #[doc = include_str!("function_not_found.md")]
+    FunctionNotFound(FunctionNotFound),
 
     /// table function not found
     TableFunctionNotFound(FullName),
@@ -139,9 +166,10 @@ impl NameResolution {
         &self,
         report_handler: &GraphicalReportHandler,
         source: String,
-    ) -> String {
+    ) -> Result<String, AnalysisError> {
         match self {
             Self::DomainTypeNameNotFound(d) => d.generate_report(report_handler, source),
+            Self::FunctionNotFound(d) => d.generate_report(report_handler, source),
             _ => todo!(),
         }
     }
@@ -200,8 +228,8 @@ impl NameResolution {
     }
 
     /// calling function not found
-    pub fn function_not_found(func_name: &FullName) -> Self {
-        Self::FunctionNotFound(func_name.clone())
+    pub fn function_not_found(func_name: &FullName, func_span: &StringSpan) -> Self {
+        Self::FunctionNotFound(FunctionNotFound::new(func_name, func_span))
     }
 
     /// specified table function not found
@@ -302,8 +330,8 @@ impl AnalysisProblem {
     /// calling function not found
     #[track_caller]
     #[tracing::instrument()]
-    pub fn function_not_found(func_name: &FullName) -> Self {
-        Self::NameResolution(NameResolution::function_not_found(func_name))
+    pub fn function_not_found(func_name: &FullName, func_span: &StringSpan) -> Self {
+        Self::NameResolution(NameResolution::function_not_found(func_name, func_span))
     }
 
     /// specified table function not found

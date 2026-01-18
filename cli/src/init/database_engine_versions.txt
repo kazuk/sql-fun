@@ -1,0 +1,10 @@
+Database engine versions
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+
+Choose Database Engine versions
+
+16: PostgreSQL version 16
+17: PostgreSQL version 17
+18: PostgreSQL version 18
+
+ built-in object data file stored in ${SQL_FUN_HOME}/postgres/[VERSION]/

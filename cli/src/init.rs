@@ -1,5 +1,7 @@
+mod database_engine_versions;
 mod prepare_home;
-use self::prepare_home::prepare_home;
+
+use self::{database_engine_versions::select_engine_version, prepare_home::prepare_home};
 
 use sql_fun_core::{InitializeArgs, SqlFunArgs};
 use std::process::ExitCode;
@@ -24,5 +26,7 @@ pub async fn initialize(
     let home_arg = init_args.sql_fun_home();
     let _home = prepare_home(yes, home_arg.as_ref())?;
 
+    let versions = init_args.engine_versions();
+    let _versions = select_engine_version(yes, versions)?;
     todo!();
 }

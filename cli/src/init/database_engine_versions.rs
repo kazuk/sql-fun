@@ -57,10 +57,10 @@ pub fn select_engine_version(
     let message = include_str!("database_engine_versions.txt");
     println!("{message}");
     let options = ALL_SUPPORTED_VERSIONS.to_vec();
-    let versions: Vec<_> = versions
+    let versions = versions
         .into_iter()
-        .map(|s| PostgresVersions::from_str(&s).unwrap())
-        .collect();
+        .map(|s| PostgresVersions::from_str(&s))
+        .collect::<Result<Vec<_>, _>>()?;
     if yes {
         return Ok(versions);
     }

@@ -1,0 +1,8 @@
+Database engine built-in objects data
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+
+Choose a source for Built-in Database Types, Functions, Operators, Casts data
+pg_catalog and information_schame Tables, Functions, Views.
+
+1: PostgreSQL official docker image (recommended: needs docker support on your host)
+2: `sql-fun` release assets

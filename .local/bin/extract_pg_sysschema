@@ -3,7 +3,7 @@
 #
 # Extract PostgreSQL System Table / System View Schema
 #
-# Note: 
+# Note:
 #
 # This script runs PostgreSQL official image in docker.
 #
@@ -19,6 +19,9 @@ PSQL="docker exec -i $NAME psql -X -qAt -U postgres -d postgres -v ON_ERROR_STOP
 BUILTIN_BASE_PATH="${SQL_FUN_HOME}/postgres/${PGVER}"
 BUILTIN_SQL_PATH="${BUILTIN_BASE_PATH}/schema.sql"
 
+
+mkdir -p "${BUILTIN_BASE_PATH}"
+
 # starting postgres docker container
 docker rm -f "$NAME" >/dev/null 2>&1 || true
 docker run \
@@ -30,9 +33,9 @@ docker run \
 
 # wait ready to connection
 until docker exec "${NAME}" \
-  pg_isready -U postgres >/dev/null 2>&1; 
-do 
-  sleep 0.5; 
+  pg_isready -U postgres >/dev/null 2>&1;
+do
+  sleep 0.5;
 done
 
 DOMAINS=$(
@@ -326,23 +329,23 @@ echo "${DOMAINS}" \
 echo 'writing tables'
 TEMPLATE_PATH="${TEMPLATE_DIR}/create_table_sql.hbs"
 echo "${BUILTIN_COLUMNS}" \
- | jq '[ group_by(.schema + .table) 
-    | .[] 
-    | { 
-        "schema": .[0].schema, 
-        "table": .[0].table, 
-        "columns": 
-          [ 
-            ( .[] 
-              | { 
+ | jq '[ group_by(.schema + .table)
+    | .[]
+    | {
+        "schema": .[0].schema,
+        "table": .[0].table,
+        "columns":
+          [
+            ( .[]
+              | {
                 "ordinal": .ordinal,
                 "column": .column,
                 "data_type": .data_type,
                 "not_null": .not_null,
-                "default_expr": .default_expr 
+                "default_expr": .default_expr
               }
             )
-          ] 
+          ]
       } ]' \
  | hbs -i "${TEMPLATE_PATH}" -e sql --stdout >> "${BUILTIN_SQL_PATH}"
 

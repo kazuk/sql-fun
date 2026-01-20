@@ -1,4 +1,7 @@
-use std::path::{Path, PathBuf};
+use std::{
+    fs::create_dir_all,
+    path::{Path, PathBuf},
+};
 
 use inquire::{
     CustomUserError,
@@ -33,8 +36,19 @@ pub fn prepare_home(
         }
     } else {
         let default_home = shellexpand::tilde("~/.sqlfun");
-        let home_path = edit_home_path(&default_home)?;
-        Ok(home_path)
+        if assume_yes {
+            println!("create directory {default_home}");
+            let path = PathBuf::from(&String::from(default_home));
+            if path.exists() {
+                println!("ready exists");
+            } else {
+                create_dir_all(&path)?;
+            }
+            Ok(path)
+        } else {
+            let home_path = edit_home_path(&default_home)?;
+            Ok(home_path)
+        }
     }
 }
 
@@ -48,7 +62,7 @@ fn new_absolute_path_validator(input: &str) -> Result<Validation, CustomUserErro
         )));
     }
     if path.exists() {
-        return Ok(Validation::Invalid(ErrorMessage::from("ready exists")));
+        return Ok(Validation::Valid);
     }
     let Some(parent) = path.parent() else {
         return Ok(Validation::Invalid(ErrorMessage::from(

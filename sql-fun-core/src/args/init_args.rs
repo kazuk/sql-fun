@@ -1,6 +1,7 @@
 use std::path::PathBuf;
 
-use clap::ValueHint;
+use clap::{CommandFactory, ValueHint};
+
 use url::Url;
 
 /// Initialize `sql-fun` environments
@@ -83,5 +84,25 @@ impl InitializeArgs {
     #[must_use]
     pub fn sql_fun_home(&self) -> &Option<PathBuf> {
         &self.sql_fun_home
+    }
+
+    /// returns `engine_versions` values
+    #[must_use]
+    pub fn engine_versions(&self) -> Vec<String> {
+        if let Some(versions) = &self.engine_versions {
+            versions.clone()
+        } else {
+            vec![String::from("16"), String::from("17"), String::from("18")]
+        }
+    }
+
+    /// print long help
+    ///
+    /// # Errors
+    ///
+    /// [`std::io::Error`] : IO error
+    ///
+    pub fn print_long_help() -> Result<(), std::io::Error> {
+        Self::command().print_long_help()
     }
 }

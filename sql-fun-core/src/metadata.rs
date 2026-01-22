@@ -143,6 +143,8 @@ pub struct SqlFunMetadata {
     search_path: Option<Vec<String>>,
     /// CTE catalog directory path
     cte_catalog: Option<PathBuf>,
+    /// Database connection dirver/midle-ware
+    connector: Option<String>,
 }
 
 /// metadata related error
@@ -228,6 +230,7 @@ impl SqlFunMetadata {
                 &format!("package.metadata.database not defined in {path_hint:?}"),
             )?
         };
+
         Self::from_value(database)
     }
 
@@ -285,7 +288,7 @@ impl SqlFunMetadata {
     ///  this function returns just metadata defined.
     ///
     /// See [`crate::SqlFunArgs::postgres_search_path`] for argument precedence.
-    ///  
+    ///
     #[must_use]
     pub fn search_path(&self) -> &Option<Vec<String>> {
         &self.search_path
@@ -295,5 +298,11 @@ impl SqlFunMetadata {
     #[must_use]
     pub fn postgres_extensions(&self) -> &Option<PostgresExtensionsCollection> {
         &self.extensions
+    }
+
+    /// get database connection driver / middle-ware
+    #[must_use]
+    pub fn connector(&self) -> &Option<String> {
+        &self.connector
     }
 }

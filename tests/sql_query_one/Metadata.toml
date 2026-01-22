@@ -1,0 +1,5 @@
+[package.metadata.database]
+connector = "tokio-postgres"
+engine = "PostgreSQL"
+version = "17"
+dialect = "postgres"

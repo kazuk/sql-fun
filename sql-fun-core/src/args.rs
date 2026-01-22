@@ -77,20 +77,14 @@ pub struct SqlFunArgs {
     /// Subcommand to execute (internal or external)
     #[clap(subcommand)]
     #[serde(skip)]
-    command: CliSubCommand,
+    command: Option<CliSubCommand>,
 }
 
 impl SqlFunArgs {
     /// returns true for builtin subcommand
     #[must_use]
     pub fn is_builtin(&self) -> bool {
-        matches!(self.command, CliSubCommand::Initialize(_))
-    }
-
-    /// get [`CliSubCommand`]
-    #[must_use]
-    pub fn cli_sub_command(&self) -> &CliSubCommand {
-        &self.command
+        matches!(self.command, Some(CliSubCommand::Initialize(_)))
     }
 
     /// get SQL dialect
@@ -116,7 +110,7 @@ impl SqlFunArgs {
 
     /// get command
     #[must_use]
-    pub fn command(&self) -> &CliSubCommand {
+    pub fn command(&self) -> &Option<CliSubCommand> {
         &self.command
     }
 
@@ -283,6 +277,19 @@ impl SqlFunArgs {
             args.log_args.set_log_level("debug");
         }
         args
+    }
+
+    /// Initialize for `proc_macro`
+    ///
+    /// # Errors
+    ///
+    /// Returns [`SqlFunArgsError`] if failed
+    pub fn try_from_env() -> Result<Self, SqlFunArgsError> {
+        let mut args = SqlFunArgs::try_parse_from(Vec::<String>::default())?;
+        if args.verbose {
+            args.log_args.set_log_level("debug");
+        }
+        Ok(args)
     }
 }
 

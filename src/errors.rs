@@ -28,6 +28,12 @@ pub enum SqlFunErrorInner {
 
     #[error("file IO error")]
     Io(#[from] std::io::Error),
+
+    #[error(transparent)]
+    Args(#[from] sql_fun_core::SqlFunArgsError),
+
+    #[error(transparent)]
+    ArgMetadata(#[from] sql_fun_core::MetadataError),
 }
 
 impl SqlFunErrorInner {
@@ -56,6 +62,12 @@ Fix: Use `AS` to name computed columns."#,
             .into_compile_error()
             .into(),
             Self::Io(e) => syn::Error::new_spanned("", format!("IO error {e:?}"))
+                .into_compile_error()
+                .into(),
+            Self::Args(e) => syn::Error::new_spanned("", format!("Argument error {e:?}"))
+                .into_compile_error()
+                .into(),
+            Self::ArgMetadata(e) => syn::Error::new_spanned("", format!("Metadata error {e:?}"))
                 .into_compile_error()
                 .into(),
         }
@@ -96,6 +108,18 @@ impl From<TokioPostgresCodeGeneratorBuilderError> for SqlFunError {
 
 impl From<std::io::Error> for SqlFunError {
     fn from(err: std::io::Error) -> Self {
+        Self(SqlFunErrorInner::from(err))
+    }
+}
+
+impl From<sql_fun_core::SqlFunArgsError> for SqlFunError {
+    fn from(err: sql_fun_core::SqlFunArgsError) -> Self {
+        Self(SqlFunErrorInner::from(err))
+    }
+}
+
+impl From<sql_fun_core::MetadataError> for SqlFunError {
+    fn from(err: sql_fun_core::MetadataError) -> Self {
         Self(SqlFunErrorInner::from(err))
     }
 }

@@ -41,6 +41,10 @@ pub struct MetadataArgs {
     /// Directory for CTE catalog
     #[clap(long, env = Self::SQL_FUN_CTE_CATALOG_DIR)]
     cte_catalog_dir: Option<PathBuf>,
+
+    /// metadata search start directory
+    #[clap(long, env = Self::CARGO_METADATA_DIR)]
+    metadata_dir: Option<PathBuf>,
 }
 
 impl MetadataArgs {
@@ -51,6 +55,7 @@ impl MetadataArgs {
     const SQL_FUN_SCHEMA_FILE: &str = "SQL_FUN_SCHEMA_FILE";
     const SQL_FUN_DIALECT: &str = "SQL_FUN_DIALECT";
     const SQL_FUN_CTE_CATALOG_DIR: &str = "SQL_FUN_CTE_CATALOG_DIR";
+    const CARGO_METADATA_DIR: &str = "CARGO_METADATA_DIR";
 
     /// get home dir path
     ///
@@ -118,10 +123,23 @@ impl MetadataArgs {
                 SqlFunArgsError::file_path_not_found(raw_arg)?
             }
         } else {
-            let current_dir = std::env::current_dir()?;
-            let owner = path_owner(&current_dir)?;
+            let metadata_dir = if let Some(metadata_dir) = &self.metadata_dir {
+                metadata_dir
+            } else {
+                &std::env::current_dir()?
+            };
+            let owner = path_owner(metadata_dir)?;
+            let mut file = metadata_dir.clone();
+            file.push(&raw_arg);
+            if file.exists() {
+                let file_owner = path_owner(&file)?;
+                if owner == file_owner {
+                    return Ok(file);
+                }
+            }
+
             log::trace!("searching {} with owner {owner}", raw_arg.display());
-            for ancestor in current_dir.ancestors() {
+            for ancestor in metadata_dir.ancestors() {
                 let dir_owner = path_owner(ancestor)?;
                 if owner != dir_owner {
                     log::error!("owner not match for {}", ancestor.display());

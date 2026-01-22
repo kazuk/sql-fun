@@ -6,6 +6,8 @@ version = "0.1.0"
 edition = "2024"
 authors = ["kazuk"]
 
+[package.metadata]
+
 [package.metadata.database]
 connector = "tokio-postgres"
 
@@ -87,6 +89,7 @@ tokio-postgres = "0.7"
 toml = "0.9.8"
 tracing = "0.1"
 tracing-subscriber = { version = "0.3", features = ["fmt", "env-filter"] }
+trybuild = { version = "1.0.114", features = ["diff"] }
 url = { version = "2.5", features = ["serde"] }
 walkdir = "2.3"
 which = "4.4"
@@ -102,6 +105,7 @@ proc-macro2 = { workspace = true }
 quote = { workspace = true }
 sha2 = { workspace = true }
 smallvec = { workspace = true }
+sql-fun-core = { workspace = true }
 syn = { workspace = true }
 thiserror = { workspace = true }
 toml = { workspace = true }
@@ -113,3 +117,4 @@ rstest = { workspace = true }
 tokio = { workspace = true }
 tokio-postgres = { workspace = true }
 tracing = { workspace = true }
+trybuild = { workspace = true }

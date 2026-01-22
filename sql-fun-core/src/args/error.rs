@@ -56,6 +56,10 @@ pub enum SqlFunArgsError {
     /// Syntax highlighter theme file related errors
     #[error(transparent)]
     Highlighter(#[from] HighlighterThemeError),
+
+    /// Argument or environment valiable parse error
+    #[error(transparent)]
+    Clap(#[from] clap::Error),
 }
 
 impl From<std::io::Error> for SqlFunArgsError {

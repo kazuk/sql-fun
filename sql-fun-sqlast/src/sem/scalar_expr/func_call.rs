@@ -43,13 +43,17 @@ mod implementation {
                 args: args.clone(),
             }
         }
+    }
 
+    impl FuncCallExpr {
         /// resolved calling overload
         #[must_use]
         pub fn overload(&self) -> &Option<OverloadVariant> {
             &self.overload
         }
+    }
 
+    impl FuncCallExpr {
         /// argument expression and definitions
         #[must_use]
         pub fn args(&self) -> &IVec<FuncCallArgs> {
@@ -64,11 +68,15 @@ mod implementation {
                 arg_definition: arg_definition.clone(),
             }
         }
+    }
 
+    impl FuncCallArgs {
         pub fn arg_expr(&self) -> &SemScalarExpr {
             &self.arg_expr
         }
+    }
 
+    impl FuncCallArgs {
         pub fn arg_definition(&self) -> &Option<FunctionParam> {
             &self.arg_definition
         }
@@ -93,7 +101,9 @@ impl FuncCallExpr {
         let fc = FuncCallExpr::new(&func_name, &None, &args);
         Ok((SemScalarExpr::FuncCall(fc), context))
     }
+}
 
+impl FuncCallExpr {
     fn cast_operand_expression<TParseContext>(
         context: &mut TParseContext,
         func_name: &FullName,
@@ -219,5 +229,242 @@ where
             context.report_problem(AnalysisProblem::function_not_found(&func_name, &span))?;
             Self::partial_response(context, func_name, arg_exprs)
         }
+    }
+}
+
+#[cfg(test)]
+mod test_func_call_expr_analyze_scalar_expr {
+    use sql_fun_core::IVec;
+    use testresult::TestResult;
+
+    use crate::{
+        sem::{
+            FromClause, FunctionParam, OverloadVariant, PgBuiltInType, SchemaName, SemScalarExpr,
+            WithClause,
+        },
+        syn::{
+            KeywordKindOpt, Node, NodeInner, NodeList, ScanToken, ScanTokenBuilder, Token, TokenOpt,
+        },
+        test_helpers::{SynBuilder, TestParseContext, test_context},
+    };
+
+    use crate::sem::scalar_expr::AnalyzeScalarExpr;
+
+    fn func_name_tokens() -> IVec<ScanToken> {
+        let token = ScanTokenBuilder::default()
+            .start(1)
+            .end(1)
+            .token(TokenOpt::from(Token::Ident))
+            .keyword_kind(KeywordKindOpt::none())
+            .build()
+            .unwrap();
+        vec![token.into()].into()
+    }
+
+    #[rstest::rstest]
+    fn test_analyze_scalar_expr_reports_missing_function(
+        mut test_context: TestParseContext,
+    ) -> TestResult {
+        test_context.set_get_search_path_result(&vec![SchemaName::from("public")]);
+
+        let builder = SynBuilder::new();
+        let arg_expr = Node::from(NodeInner::AConst(builder.const_int4(1)));
+        let args = NodeList::from(vec![arg_expr]);
+        let func_name_node = builder.as_string_node(builder.string("missing_func"));
+        let funcname = NodeList::from(vec![func_name_node]);
+        let func_call = builder.func_call(funcname, args);
+
+        let tokens = func_name_tokens();
+        let with_clause = WithClause::default();
+        let from_clause = FromClause::default();
+        let (expr, context) = super::FuncCallExpr::analyze_scalar_expr(
+            test_context,
+            &with_clause,
+            &from_clause,
+            func_call,
+            &tokens,
+        )?;
+
+        assert_eq!(1, context.reported_problem_count());
+        let SemScalarExpr::FuncCall(func_call_expr) = expr else {
+            panic!("expected func call expression");
+        };
+        assert!(func_call_expr.overload().is_none());
+        assert_eq!(1, func_call_expr.args().len());
+        assert!(matches!(
+            func_call_expr.args()[0].arg_expr(),
+            SemScalarExpr::Const(_)
+        ));
+        assert!(func_call_expr.args()[0].arg_definition().is_none());
+        Ok(())
+    }
+
+    #[rstest::rstest]
+    fn test_analyze_scalar_expr_resolves_overload(
+        mut test_context: TestParseContext,
+    ) -> TestResult {
+        test_context.set_get_search_path_result(&vec![SchemaName::from("public")]);
+        let int4 = PgBuiltInType::int4();
+        test_context.setup_type(int4.clone());
+
+        let params = vec![FunctionParam::new_input_param(
+            &Some("arg".to_string()),
+            &Some(int4.clone()),
+            &None,
+        )];
+        let overload = OverloadVariant::new(&Some(int4.clone()), &params, false, false);
+        test_context.setup_function("test_func", &[overload.clone()]);
+
+        let builder = SynBuilder::new();
+        let arg_expr = Node::from(NodeInner::AConst(builder.const_int4(1)));
+        let args = NodeList::from(vec![arg_expr]);
+        let func_name_node = builder.as_string_node(builder.string("test_func"));
+        let funcname = NodeList::from(vec![func_name_node]);
+        let func_call = builder.func_call(funcname, args);
+
+        let tokens = func_name_tokens();
+        let with_clause = WithClause::default();
+        let from_clause = FromClause::default();
+        let (expr, context) = super::FuncCallExpr::analyze_scalar_expr(
+            test_context,
+            &with_clause,
+            &from_clause,
+            func_call,
+            &tokens,
+        )?;
+
+        assert_eq!(0, context.reported_problem_count());
+        let SemScalarExpr::FuncCall(func_call_expr) = expr else {
+            panic!("expected func call expression");
+        };
+        assert_eq!(Some(&overload), func_call_expr.overload().as_ref());
+        assert!(func_call_expr.args()[0].arg_definition().is_some());
+        assert!(matches!(
+            func_call_expr.args()[0].arg_expr(),
+            SemScalarExpr::Const(_)
+        ));
+        Ok(())
+    }
+}
+
+#[cfg(test)]
+mod test_func_call_expr_cast_operand_expression {
+    use sql_fun_core::IVec;
+    use testresult::TestResult;
+
+    use crate::{
+        sem::{
+            CastContext, CastDefinition, FullName, FunctionParam, OverloadVariant, PgBuiltInType,
+            ScalarConstExpr, SemScalarExpr,
+        },
+        test_helpers::{TestParseContext, test_context},
+    };
+
+    #[rstest::rstest]
+    fn test_cast_operand_expression_inserts_implicit_cast(
+        mut test_context: TestParseContext,
+    ) -> TestResult {
+        let int4 = PgBuiltInType::int4();
+        let text = PgBuiltInType::text();
+        test_context.setup_type(int4.clone());
+        test_context.setup_type(text.clone());
+        test_context.set_get_implicit_cast_result(
+            &int4,
+            &text,
+            Some(CastDefinition::new(CastContext::Implicit)),
+        );
+
+        let func_name = FullName::with_schema("public", "test_func");
+        let arg_exprs: IVec<SemScalarExpr> =
+            vec![SemScalarExpr::new_const(ScalarConstExpr::new_integer(1))].into();
+        let params = vec![FunctionParam::new_input_param(
+            &Some("arg".to_string()),
+            &Some(text.clone()),
+            &None,
+        )];
+        let overload = OverloadVariant::new(&Some(text), &params, false, false);
+
+        let args = super::FuncCallExpr::cast_operand_expression(
+            &mut test_context,
+            &func_name,
+            &arg_exprs,
+            &overload,
+        )?;
+
+        assert!(matches!(args[0].arg_expr(), SemScalarExpr::ImplicitCast(_)));
+        Ok(())
+    }
+
+    #[rstest::rstest]
+    fn test_cast_operand_expression_reports_missing_cast(
+        mut test_context: TestParseContext,
+    ) -> TestResult {
+        let int4 = PgBuiltInType::int4();
+        let text = PgBuiltInType::text();
+        test_context.setup_type(int4.clone());
+        test_context.setup_type(text.clone());
+
+        let func_name = FullName::with_schema("public", "test_func");
+        let arg_exprs: IVec<SemScalarExpr> =
+            vec![SemScalarExpr::new_const(ScalarConstExpr::new_integer(1))].into();
+        let params = vec![FunctionParam::new_input_param(
+            &Some("arg".to_string()),
+            &Some(text),
+            &None,
+        )];
+        let overload = OverloadVariant::new(&None, &params, false, false);
+
+        let args = super::FuncCallExpr::cast_operand_expression(
+            &mut test_context,
+            &func_name,
+            &arg_exprs,
+            &overload,
+        )?;
+
+        assert!(matches!(args[0].arg_expr(), SemScalarExpr::Const(_)));
+        assert_eq!(1, test_context.reported_problem_count());
+        Ok(())
+    }
+}
+
+#[cfg(test)]
+mod test_func_call_expr_is_not_null {
+    use sql_fun_core::IVec;
+
+    use super::{FuncCallArgs, FuncCallExpr};
+    use crate::sem::scalar_expr::SemScalarExprNode;
+    use crate::sem::{FullName, OverloadVariant, PgBuiltInType, ScalarConstExpr, SemScalarExpr};
+
+    #[test]
+    fn test_is_not_null_strict_with_nullable_arg_returns_false() {
+        let overload = OverloadVariant::new(&Some(PgBuiltInType::int4()), &vec![], true, true);
+        let func_name = FullName::with_schema("public", "test_func");
+        let arg_expr = ScalarConstExpr::null();
+        let args: IVec<FuncCallArgs> = vec![FuncCallArgs::new(&arg_expr, &None)].into();
+        let func_call = FuncCallExpr::new(&func_name, &Some(overload), &args);
+
+        assert_eq!(Some(false), func_call.is_not_null());
+    }
+
+    #[test]
+    fn test_is_not_null_non_strict_returns_returns_not_null() {
+        let overload = OverloadVariant::new(&Some(PgBuiltInType::int4()), &vec![], false, true);
+        let func_name = FullName::with_schema("public", "test_func");
+        let arg_expr = ScalarConstExpr::null();
+        let args: IVec<FuncCallArgs> = vec![FuncCallArgs::new(&arg_expr, &None)].into();
+        let func_call = FuncCallExpr::new(&func_name, &Some(overload), &args);
+
+        assert_eq!(Some(true), func_call.is_not_null());
+    }
+
+    #[test]
+    fn test_is_not_null_strict_with_not_null_args_returns_returns_not_null() {
+        let overload = OverloadVariant::new(&Some(PgBuiltInType::int4()), &vec![], true, false);
+        let func_name = FullName::with_schema("public", "test_func");
+        let arg_expr = SemScalarExpr::new_const(ScalarConstExpr::new_integer(1));
+        let args: IVec<FuncCallArgs> = vec![FuncCallArgs::new(&arg_expr, &None)].into();
+        let func_call = FuncCallExpr::new(&func_name, &Some(overload), &args);
+
+        assert_eq!(Some(false), func_call.is_not_null());
     }
 }

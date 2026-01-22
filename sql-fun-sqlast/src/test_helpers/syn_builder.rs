@@ -47,6 +47,25 @@ impl SynBuilder {
         NodeList::default()
     }
 
+    /// create [crate::syn::FuncCall] with common defaults
+    pub fn func_call(&self, funcname: NodeList, args: NodeList) -> crate::syn::FuncCall {
+        FuncCallBuilder::default()
+            .funcname(funcname)
+            .args(args)
+            .agg_order(NodeList::default())
+            .agg_filter(Node::none())
+            .over(WindowDefOpt::none())
+            .agg_within_group(false)
+            .agg_star(false)
+            .agg_distinct(false)
+            .func_variadic(false)
+            .funcformat(CoercionFormOpt::none())
+            .location(1)
+            .build()
+            .unwrap()
+            .into()
+    }
+
     /// create [TypeName]
     pub fn type_name(&self, name_items: &[&str]) -> TypeName {
         let mut names = Vec::new();

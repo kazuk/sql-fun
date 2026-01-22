@@ -14,6 +14,18 @@ The user must provide parameters in one line:
 
 - source=<path>
 
+## Missing parameters
+- If `source` is missing, ask only for `source` and proceed.
+
+## Procedure
+
+1. Open `source` and identify testable units.
+2. Design test input and design helper function.
+3. Implement unit tests.
+4. MUST Run `check-test-flow` script for test verification.
+5. If `check-test-flow` fails, fix and re-run until it passes.
+6. Finaly run `update-stats` for update coverage statistics.
+
 ## Execution rules
 
 - If you modify somewhat MUST run tests with `check-test-flow`.
@@ -62,15 +74,3 @@ The user must provide parameters in one line:
     `// TODO: TESTABILITY: extact for loop inner to function`
 - Use `check-test-flow` script for test compilation and run.
 - After tests pass, run `./.local/bin/update-stats` to update coverage statistics.
-
-## Missing parameters
-- If `source` is missing, ask only for `source` and proceed.
-
-## Procedure
-
-1. Open `source` and identify testable units.
-2. Design test input and design helper function.
-3. Implement unit tests.
-4. Run `check-test-flow` script for test verification.
-5. If `check-test-flow` fails, fix and re-run until it passes.
-6. Finaly run `update-stats` for update coverage statistics.

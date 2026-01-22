@@ -90,17 +90,15 @@ impl MetadataArgs {
     ///
     /// Returns [`SqlFunArgsError::NotSupported`] when the format is not `TOML`.
     pub fn metadata_file_raw(&self) -> Result<&str, SqlFunArgsError> {
-        if self.metadata_file.is_none() {
-            if self.metadata_format() == "TOML" {
-                Ok("Cargo.toml")
-            } else {
-                Err(SqlFunArgsError::NotSupported(
-                    String::from("--metadata-format"),
-                    String::from(self.metadata_format()),
-                ))
-            }
+        if let Some(metadata_file) = self.metadata_file.as_deref() {
+            Ok(metadata_file)
+        } else if self.metadata_format() == "TOML" {
+            Ok("Cargo.toml")
         } else {
-            Ok(self.metadata_file.as_ref().unwrap())
+            Err(SqlFunArgsError::NotSupported(
+                String::from("--metadata-format"),
+                String::from(self.metadata_format()),
+            ))
         }
     }
 

@@ -70,7 +70,7 @@ impl MessageTypeField {
     }
 
     pub fn getter_return_type(&self, no_optional: bool) -> String {
-        if self.type_name.is_none() {
+        let Some(type_name) = self.type_name.as_ref() else {
             let value_type = match self.r#type.as_str() {
                 "TYPE_INT32" => "i32",
                 "TYPE_INT64" => "i64",
@@ -82,38 +82,35 @@ impl MessageTypeField {
                 _ => panic!("unknown type"),
             }
             .to_string();
-            if self.label == "LABEL_REPEATED" {
+            return if self.label == "LABEL_REPEATED" {
                 format!("Vec<{value_type}>")
             } else {
                 value_type
-            }
+            };
+        };
+
+        // TYPE_ENUM / TYPE_MESSAGE
+        let mut type_name_last = type_name
+            .split('.')
+            .next_back()
+            .unwrap_or(type_name)
+            .to_string();
+        type_name_last = type_name_last.to_case(Case::Pascal);
+        if &type_name_last == "String" {
+            type_name_last = String::from("super::String");
+        }
+        if self.label == "LABEL_REPEATED" {
+            format!("{type_name_last}ListOpt")
+        } else if no_optional {
+            type_name_last
         } else {
-            // TYPE_ENUM / TYPE_MESSAGE
-            let mut type_name_last = self
-                .type_name
-                .as_ref()
-                .expect("must have type_name")
-                .split('.')
-                .next_back()
-                .expect("type_name last")
-                .to_string();
-            type_name_last = type_name_last.to_case(Case::Pascal);
-            if &type_name_last == "String" {
-                type_name_last = String::from("super::String");
-            }
-            if self.label == "LABEL_REPEATED" {
-                format!("{type_name_last}ListOpt")
-            } else if no_optional {
-                type_name_last
-            } else {
-                format!("{type_name_last}Opt")
-            }
+            format!("{type_name_last}Opt")
         }
     }
 
     /// struct field type
     pub fn struct_field_type(&self, no_optional: bool) -> String {
-        if self.type_name.is_none() {
+        let Some(type_name) = self.type_name.as_ref() else {
             let value_type = match self.r#type.as_str() {
                 "TYPE_INT32" => "i32",
                 "TYPE_INT64" => "i64",
@@ -125,32 +122,29 @@ impl MessageTypeField {
                 _ => panic!("unknown type"),
             }
             .to_string();
-            if self.label == "LABEL_REPEATED" {
+            return if self.label == "LABEL_REPEATED" {
                 format!("Vec<{value_type}>")
             } else {
                 value_type
-            }
+            };
+        };
+
+        // TYPE_ENUM / TYPE_MESSAGE
+        let mut type_name_last = type_name
+            .split('.')
+            .next_back()
+            .unwrap_or(type_name)
+            .to_string();
+        type_name_last = type_name_last.to_case(Case::Pascal);
+        if &type_name_last == "String" {
+            type_name_last = String::from("super::String");
+        }
+        if self.label == "LABEL_REPEATED" {
+            format!("{type_name_last}List")
+        } else if no_optional {
+            type_name_last
         } else {
-            // TYPE_ENUM / TYPE_MESSAGE
-            let mut type_name_last = self
-                .type_name
-                .as_ref()
-                .expect("must have type_name")
-                .split('.')
-                .next_back()
-                .expect("type_name last")
-                .to_string();
-            type_name_last = type_name_last.to_case(Case::Pascal);
-            if &type_name_last == "String" {
-                type_name_last = String::from("super::String");
-            }
-            if self.label == "LABEL_REPEATED" {
-                format!("{type_name_last}List")
-            } else if no_optional {
-                type_name_last
-            } else {
-                format!("{type_name_last}Opt")
-            }
+            format!("{type_name_last}Opt")
         }
     }
 
@@ -168,7 +162,7 @@ impl MessageTypeField {
 
     /// struct field type
     pub fn struct_field_type_turbo(&self, no_optional: bool) -> String {
-        if self.type_name.is_none() {
+        let Some(type_name) = self.type_name.as_ref() else {
             let value_type = match self.r#type.as_str() {
                 "TYPE_INT32" => "i32",
                 "TYPE_INT64" => "i64",
@@ -180,32 +174,29 @@ impl MessageTypeField {
                 _ => panic!("unknown type"),
             }
             .to_string();
-            if self.label == "LABEL_REPEATED" {
+            return if self.label == "LABEL_REPEATED" {
                 format!("Vec::<{value_type}>")
             } else {
                 value_type
-            }
+            };
+        };
+
+        // TYPE_ENUM / TYPE_MESSAGE
+        let mut type_name_last = type_name
+            .split('.')
+            .next_back()
+            .unwrap_or(type_name)
+            .to_string();
+        type_name_last = type_name_last.to_case(Case::Pascal);
+        if type_name_last == "String" {
+            type_name_last = String::from("super::String");
+        }
+        if self.label == "LABEL_REPEATED" {
+            format!("{type_name_last}List")
+        } else if no_optional {
+            type_name_last.clone()
         } else {
-            // TYPE_ENUM / TYPE_MESSAGE
-            let mut type_name_last: String = self
-                .type_name
-                .as_ref()
-                .expect("must have type_name")
-                .split('.')
-                .next_back()
-                .expect("type_name last")
-                .to_string();
-            type_name_last = type_name_last.to_case(Case::Pascal);
-            if type_name_last == "String" {
-                type_name_last = String::from("super::String");
-            }
-            if self.label == "LABEL_REPEATED" {
-                format!("{type_name_last}List")
-            } else if no_optional {
-                type_name_last.clone()
-            } else {
-                format!("{type_name_last}Opt")
-            }
+            format!("{type_name_last}Opt")
         }
     }
 

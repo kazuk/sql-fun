@@ -108,6 +108,12 @@ pub enum AnalysisProblem {
 
     /// member access requires composite type
     MemberAccessRequiresCompositeType(FullName, String),
+
+    /// function argument implicit cast not found
+    FunctionArgImplicitCastNotFound(FullName, usize, TypeDefinition, SemScalarExpr),
+
+    /// implicit cast not found
+    ImplicitCastNotFound(TypeReference, TypeReference),
 }
 
 impl AnalysisProblem {
@@ -246,7 +252,7 @@ impl AnalysisProblem {
         t: &TypeDefinition,
         arg: &SemScalarExpr,
     ) -> Self {
-        todo!()
+        Self::FunctionArgImplicitCastNotFound(func_name.clone(), index, t.clone(), arg.clone())
     }
 
     /// view used as materialized view, but not a materialized view
@@ -276,7 +282,7 @@ impl AnalysisProblem {
     /// implicit cast not found
     #[tracing::instrument()]
     pub fn implicit_cast_not_found(ty: &TypeReference, result_type: &TypeReference) -> Self {
-        todo!()
+        Self::ImplicitCastNotFound(ty.clone(), result_type.clone())
     }
 
     /// incompatible cast values

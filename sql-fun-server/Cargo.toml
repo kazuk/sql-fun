@@ -10,6 +10,7 @@ workspace = true
 [dependencies]
 clap = { workspace = true }
 derive-getters = { workspace = true }
+either.workspace = true
 fs2 = { workspace = true }
 rand = { workspace = true }
 serde = { workspace = true }
@@ -17,6 +18,7 @@ serde_json = { workspace = true }
 sysinfo = { workspace = true }
 thiserror = { workspace = true }
 tokio = { workspace = true }
+tracing.workspace = true
 
 [dev-dependencies]
 testresult.workspace = true

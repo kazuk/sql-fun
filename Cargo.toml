@@ -20,6 +20,7 @@ members = [
     "sql-fun-client",
     "sql-fun-core",
     "sql-fun-server",
+    "sql-fun-server-api",
     "sql-fun-sqlast",
     "xbuild",
 ]

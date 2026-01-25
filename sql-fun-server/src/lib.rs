@@ -5,7 +5,10 @@ mod pid_file;
 use clap::Parser;
 use pid_file::PidFile;
 use std::net::SocketAddr;
-use tokio::{io::AsyncBufReadExt, net::TcpStream};
+use tokio::{
+    io::{AsyncBufReadExt, AsyncWriteExt},
+    net::TcpStream,
+};
 
 #[derive(clap::Parser, Clone)]
 pub struct Args {
@@ -30,24 +33,86 @@ pub async fn service() -> Result<(), ServerError> {
     };
 
     loop {
+        eprintln!("Server started at {local_addr}");
+
         let (accepted_socker, remote_addr) = listner.accept().await?;
 
         tokio::task::spawn(async move { serve_client(accepted_socker, remote_addr).await });
     }
 }
 
-#[derive(serde::Deserialize)]
-struct JsonRpcRequest {}
+pub async fn process_request(
+    _request_message: &JsonRpcRequest,
+) -> Result<serde_json::Value, JsonRpcError> {
+    Ok(serde_json::Value::Null)
+}
 
-async fn serve_client(stream: TcpStream, _addr: SocketAddr) -> Result<(), ServerError> {
-    let (read_half, _write_half) = stream.into_split();
+#[derive(serde::Deserialize)]
+pub struct JsonRpcRequest {
+    #[serde(rename = "jsonrpc")]
+    json_rpc_version: String,
+    id: serde_json::Value,
+    method: String,
+    params: Option<serde_json::Value>,
+}
+
+#[derive(serde::Serialize)]
+struct JsonRpcResponse {
+    #[serde(rename = "jsonrpc")]
+    json_rpc_version: String,
+    id: Option<serde_json::Value>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    result: Option<serde_json::Value>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    error: Option<JsonRpcError>,
+}
+
+impl JsonRpcResponse {
+    pub fn success(request: &JsonRpcRequest, value: serde_json::Value) -> Self {
+        Self {
+            json_rpc_version: String::from("2.0"),
+            id: Some(request.id.clone()),
+            result: Some(value),
+            error: None,
+        }
+    }
+
+    pub fn error(request: &JsonRpcRequest, error: &JsonRpcError) -> Self {
+        Self {
+            json_rpc_version: String::from("2.0"),
+            id: Some(request.id.clone()),
+            result: None,
+            error: Some(error.clone()),
+        }
+    }
+}
+
+#[derive(serde::Serialize, Clone)]
+pub struct JsonRpcError {
+    code: i32,
+    message: String,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    data: Option<serde_json::Value>,
+}
+
+async fn serve_client(stream: TcpStream, addr: SocketAddr) -> Result<(), ServerError> {
+    let (read_half, mut write_half) = stream.into_split();
     let mut buf_read = tokio::io::BufReader::new(read_half);
 
-    let mut line = String::new();
-    buf_read.read_line(&mut line).await?;
-
-    let _request_message: JsonRpcRequest = serde_json::from_str(&line)?;
-    todo!();
+    loop {
+        let mut line = String::new();
+        buf_read.read_line(&mut line).await?;
+        tracing::info!("{addr}: recieved {line}");
+        let request_message: JsonRpcRequest = serde_json::from_str(&line)?;
+        let response = process_request(&request_message).await;
+        let response = match response {
+            Ok(result) => JsonRpcResponse::success(&request_message, result),
+            Err(error) => JsonRpcResponse::error(&request_message, &error),
+        };
+        let response_json = serde_json::to_string(&response)?;
+        tracing::info!("{addr}: sending {response_json}");
+        write_half.write_all(response_json.as_bytes()).await?;
+    }
 }
 
 #[derive(thiserror::Error, Debug)]

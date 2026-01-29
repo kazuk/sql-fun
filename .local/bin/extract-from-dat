@@ -22,6 +22,7 @@ BUITIN_CASTS="${BUILTIN_BASE_PATH}/casts.json"
 cargo run -q -p parse_dat ${PG_TYPE_DAT} \
   | jq '[
   .[] 
+  | select(.typtype != "c")
   | { "name": .typname } ]
   ' > "${BUILTIN_TYPE_PATH}"
 
@@ -171,4 +172,3 @@ cargo run -q -p parse_dat -- "$PG_CAST_DAT" \
         )
       )
     ' > "$BUITIN_CASTS"
-

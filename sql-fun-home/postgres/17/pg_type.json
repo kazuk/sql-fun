@@ -45,18 +45,6 @@
     "name": "oidvector"
   },
   {
-    "name": "pg_type"
-  },
-  {
-    "name": "pg_attribute"
-  },
-  {
-    "name": "pg_proc"
-  },
-  {
-    "name": "pg_class"
-  },
-  {
     "name": "json"
   },
   {

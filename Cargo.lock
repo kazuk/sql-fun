@@ -2579,6 +2579,7 @@ dependencies = [
 name = "sql-fun-server"
 version = "0.1.0"
 dependencies = [
+ "async-trait",
  "clap",
  "derive-getters",
  "either",
@@ -2586,6 +2587,7 @@ dependencies = [
  "rand",
  "serde",
  "serde_json",
+ "sql-fun-server-api",
  "sysinfo",
  "testresult",
  "thiserror 2.0.17",

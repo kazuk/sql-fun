@@ -4,7 +4,12 @@ mod pid_file;
 
 use clap::Parser;
 use pid_file::PidFile;
-use std::net::SocketAddr;
+use sql_fun_server_api::{
+    AnalyzeQueryArgs, AnalyzeQueryResponse, Collection, DescribeTableArgs, DescribeTableResponse,
+    InitializeSchemaArgs, ListObjectArgs, ObjectSummary, ReadCollectionArgs, ReleaseCollectionArgs,
+    SchemaContext, SqlFunServerApi, SqlFunServerApiError,
+};
+use std::{net::SocketAddr, sync::LazyLock};
 use tokio::{
     io::{AsyncBufReadExt, AsyncWriteExt},
     net::TcpStream,
@@ -41,10 +46,104 @@ pub async fn service() -> Result<(), ServerError> {
     }
 }
 
+pub struct Api {}
+static API_IMPL: LazyLock<Api> = LazyLock::new(|| Api {});
+
+impl Api {
+    #[must_use]
+    pub fn api_impl() -> &'static Self {
+        &API_IMPL
+    }
+}
+
+#[async_trait::async_trait]
+impl sql_fun_server_api::SqlFunServerApi for Api {
+    /// Initialize schema-aware query analysis context
+    async fn initialize_schema_context(
+        &self,
+        _args: InitializeSchemaArgs,
+    ) -> Result<SchemaContext, SqlFunServerApiError> {
+        todo!()
+    }
+
+    /// Read a collection
+    ///
+    /// When server returns multiple items, server keeps scrollable collection,
+    /// [`read_collection`] reads items in collection.
+    ///
+    /// # Return value
+    ///
+    /// returns [Collection<T>], T depends collection item type
+    ///
+    async fn read_collection(
+        &self,
+        _args: ReadCollectionArgs,
+    ) -> Result<serde_json::Value, SqlFunServerApiError> {
+        todo!()
+    }
+
+    /// Release a collection
+    ///
+    /// When server returns collection, server keeps scrollable collection,
+    /// [`release_collection`] release a server side collection.
+    ///
+    async fn release_collection(
+        &self,
+        _args: ReleaseCollectionArgs,
+    ) -> Result<(), SqlFunServerApiError> {
+        todo!()
+    }
+
+    /// analyze query
+    async fn analyze_query(
+        &self,
+        _args: AnalyzeQueryArgs,
+    ) -> Result<AnalyzeQueryResponse, SqlFunServerApiError> {
+        todo!()
+    }
+
+    /// list schema objects
+    async fn list_objects(
+        &self,
+        _args: ListObjectArgs,
+    ) -> Result<Collection<ObjectSummary>, SqlFunServerApiError> {
+        todo!()
+    }
+
+    /// describe a table
+    async fn describe_table(
+        &self,
+        _args: DescribeTableArgs,
+    ) -> Result<DescribeTableResponse, SqlFunServerApiError> {
+        todo!()
+    }
+}
+
+/// process a request
+///
+/// # Errors
+///
+/// [`JsonRpcError`]
 pub async fn process_request(
-    _request_message: &JsonRpcRequest,
+    request_message: &JsonRpcRequest,
 ) -> Result<serde_json::Value, JsonRpcError> {
-    Ok(serde_json::Value::Null)
+    let method = request_message.method.as_str();
+
+    match method {
+        "initialize_schema_context" => {
+            let Some(ref params) = request_message.params else {
+                Err(JsonRpcError::parameter_required(method))?
+            };
+            let initialize_arg: InitializeSchemaArgs = serde_json::from_value(params.clone())?;
+            let result = Api::api_impl()
+                .initialize_schema_context(initialize_arg)
+                .await?;
+            let result_value = serde_json::to_value(result)?;
+            Ok(result_value)
+        }
+
+        _ => Err(JsonRpcError::unknown_method(method)),
+    }
 }
 
 #[derive(serde::Deserialize)]
@@ -93,6 +192,72 @@ pub struct JsonRpcError {
     message: String,
     #[serde(skip_serializing_if = "Option::is_none")]
     data: Option<serde_json::Value>,
+}
+
+impl From<serde_json::Error> for JsonRpcError {
+    fn from(_value: serde_json::Error) -> Self {
+        Self::json_deserialize_error()
+    }
+}
+
+impl From<SqlFunServerApiError> for JsonRpcError {
+    fn from(value: SqlFunServerApiError) -> Self {
+        Self::server_api_execution_error(value)
+    }
+}
+
+impl JsonRpcError {
+    /// error code for parameter missing
+    // TODO: Fixme value
+    const CODE_PARAMETER_REQUIRED: i32 = 0;
+
+    /// error code for unknown method
+    // TODO: Fixme value
+    const CODE_UNKNOWN_METHOD: i32 = 0;
+
+    /// error code for json deserialize error
+    // TODO: Fixme value
+    const CODE_JSON_DESERIALIZE_ERROR: i32 = 0;
+
+    /// error code for internal server error
+    // TODO: Fixme value
+    const CODE_INTERNAL_SERVER_ERROR: i32 = 0;
+
+    #[must_use]
+    pub fn parameter_required(method: &str) -> Self {
+        Self {
+            code: Self::CODE_PARAMETER_REQUIRED,
+            message: format!("required params for method : {method}"),
+            data: None,
+        }
+    }
+
+    #[must_use]
+    pub fn unknown_method(method: &str) -> Self {
+        Self {
+            code: Self::CODE_UNKNOWN_METHOD,
+            message: format!("unknown method : {method}"),
+            data: None,
+        }
+    }
+
+    #[must_use]
+    pub fn json_deserialize_error() -> Self {
+        Self {
+            code: Self::CODE_JSON_DESERIALIZE_ERROR,
+            message: "unexpected params".to_string(),
+            data: None,
+        }
+    }
+
+    #[must_use]
+    pub fn server_api_execution_error(_err: SqlFunServerApiError) -> Self {
+        Self {
+            code: Self::CODE_INTERNAL_SERVER_ERROR,
+            message: "internal server error".to_string(),
+            data: None,
+        }
+    }
 }
 
 async fn serve_client(stream: TcpStream, addr: SocketAddr) -> Result<(), ServerError> {

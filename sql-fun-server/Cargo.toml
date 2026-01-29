@@ -19,6 +19,8 @@ sysinfo = { workspace = true }
 thiserror = { workspace = true }
 tokio = { workspace = true }
 tracing.workspace = true
+sql-fun-server-api.workspace = true
+async-trait.workspace = true
 
 [dev-dependencies]
 testresult.workspace = true

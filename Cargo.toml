@@ -46,6 +46,7 @@ multiple_crate_versions = "allow"
 [workspace.dependencies]
 anyhow = { version = "1.0", features = ["backtrace"] }
 askama = "0.15"
+async-trait = "0.1.89"
 backtrace-on-stack-overflow = "0.3"
 bollard = "0.19"
 chumsky = "0.12"
@@ -80,11 +81,13 @@ sha2 = "0.10"
 shellexpand = "3.1"
 smallvec = "1.15"
 sql-fun-core = { path = "./sql-fun-core" }
+sql-fun-server-api = { path = "sql-fun-server-api" }
 sql-fun-sqlast = { path = "./sql-fun-sqlast" }
 syn = "2.0"
 sysinfo = "0.37"
 testresult = "0.4"
 thiserror = "2.0"
+time = { version = "0.3.45", features = ["serde"] }
 tokio = { version = "1.47", features = ["full"] }
 tokio-postgres = "0.7"
 toml = "0.9.8"

@@ -29,6 +29,7 @@ pub struct TestParseContext {
     view_definitions: HashMap<FullName, Option<ViewLike>>,
     function_definitions: HashMap<FullName, FunctionOverloadCollection>,
     alter_tables: Vec<AlterTable>,
+    create_indexes: Vec<CreateIndex>,
     problems: Vec<AnalysisProblem>,
 }
 
@@ -140,6 +141,16 @@ impl TestParseContext {
     /// get alter table command length
     pub fn alter_tables_len(&self) -> usize {
         self.alter_tables.len()
+    }
+
+    /// get applied create index length
+    pub fn create_indexes_len(&self) -> usize {
+        self.create_indexes.len()
+    }
+
+    /// get last applied create index
+    pub fn last_create_index(&self) -> Option<&CreateIndex> {
+        self.create_indexes.last()
     }
 }
 
@@ -335,7 +346,9 @@ impl ParseContext for TestParseContext {
     }
 
     fn apply_create_index(self, _create_index: &CreateIndex) -> Result<Self, AnalysisError> {
-        todo!()
+        let mut context = self;
+        context.create_indexes.push(_create_index.clone());
+        Ok(context)
     }
 }
 

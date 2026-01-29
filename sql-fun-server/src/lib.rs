@@ -274,7 +274,9 @@ async fn serve_client(stream: TcpStream, addr: SocketAddr) -> Result<(), ServerE
             Ok(result) => JsonRpcResponse::success(&request_message, result),
             Err(error) => JsonRpcResponse::error(&request_message, &error),
         };
-        let response_json = serde_json::to_string(&response)?;
+        let mut response_json = serde_json::to_string(&response)?;
+        response_json.push_str("\n");
+
         tracing::info!("{addr}: sending {response_json}");
         write_half.write_all(response_json.as_bytes()).await?;
     }

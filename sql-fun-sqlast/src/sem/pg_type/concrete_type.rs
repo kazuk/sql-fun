@@ -49,10 +49,10 @@ impl ConcreteTypeReference {
 
     /// is range type?
     pub fn is_range(&self) -> bool {
-        if !self.is_array {
-            self.base.is_range()
-        } else {
+        if self.is_array {
             false
+        } else {
+            self.base.is_range()
         }
     }
 
@@ -180,7 +180,7 @@ impl ConcreteTypeReference {
     pub fn apply_simple_infer_result(&mut self, infer_result_type: &TypeReference) {
         if self.is_any_element() {
             self.base = infer_result_type.full_name().clone();
-            self.is_array = infer_result_type.is_array().unwrap_or(false)
+            self.is_array = infer_result_type.is_array().unwrap_or(false);
         } else if self.is_any_array() {
             self.base = infer_result_type.full_name().clone();
             self.is_array = true;
@@ -202,7 +202,7 @@ impl ConcreteTypeReference {
     pub fn apply_common_infer_result(&mut self, infer_result_type: &TypeReference) {
         if self.is_any_compatible() {
             self.base = infer_result_type.full_name().clone();
-            self.is_array = infer_result_type.is_array().unwrap_or(false)
+            self.is_array = infer_result_type.is_array().unwrap_or(false);
         } else if self.is_any_compatible_array() {
             self.base = infer_result_type.full_name().clone();
             self.is_array = true;

@@ -17,7 +17,10 @@ pub use self::{
     metadata_args::MetadataArgs, postgres::PostgresArgs,
 };
 
-use crate::{PostgresExtensionsCollection, SqlDialect, SqlFunMetadata, metadata::EngineVersion};
+use crate::{
+    HighlighterTheme, PostgresExtensionsCollection, SqlDialect, SqlFunMetadata, TerminalColor,
+    metadata::EngineVersion,
+};
 
 #[derive(Debug)]
 pub enum ConfigurationKind {
@@ -49,6 +52,20 @@ pub struct SqlFunArgs {
     #[clap(long, env = Self::SQL_FUN_OUTPUT_FORMAT, default_value = "text")]
     output_format: String,
 
+    /// Terminal Color
+    #[clap(long, env = Self::SQL_FUN_TERM_COLOR, default_value = "auto")]
+    term_color: TerminalColor,
+
+    /// Syntax Highlighter Theme
+    ///
+    /// default values:
+    ///
+    /// when `--term-color` is `never` : then monochrome plain texts
+    /// when `--term-color` is `ansi` : `${SQL_FUN_HOME}/highlighter/default.toml`
+    ///
+    #[clap(long, env = Self::SQL_FUN_HIGHLIGHTER_THEME)]
+    highlighter_theme: Option<PathBuf>,
+
     /// Verbose mode (equivalent to --log-level=debug)
     #[clap(long)]
     verbose: bool,
@@ -60,26 +77,30 @@ pub struct SqlFunArgs {
     /// Subcommand to execute (internal or external)
     #[clap(subcommand)]
     #[serde(skip)]
-    command: CliSubCommand,
+    command: Option<CliSubCommand>,
 }
 
 impl SqlFunArgs {
     /// returns true for builtin subcommand
+    #[must_use]
     pub fn is_builtin(&self) -> bool {
-        matches!(self.command, CliSubCommand::Initialize(_))
-    }
-
-    /// get CliSubCommand
-    pub fn cli_sub_command(&self) -> &CliSubCommand {
-        &self.command
+        matches!(self.command, Some(CliSubCommand::Initialize(_)))
     }
 
     /// get SQL dialect
+    ///
+    /// # Errors
+    ///
+    /// Returns [`SqlFunArgsError`] when dialect resolution fails.
     pub fn sql_dialect(&self, metadata: &SqlFunMetadata) -> Result<SqlDialect, SqlFunArgsError> {
         self.metadata_args.sql_dialect(metadata)
     }
 
     /// get CTE catalog directory
+    ///
+    /// # Errors
+    ///
+    /// Propagates [`SqlFunArgsError`] from metadata lookups.
     pub fn cte_catalog_dir(
         &self,
         metadata: &SqlFunMetadata,
@@ -88,11 +109,16 @@ impl SqlFunArgs {
     }
 
     /// get command
-    pub fn command(&self) -> &CliSubCommand {
+    #[must_use]
+    pub fn command(&self) -> &Option<CliSubCommand> {
         &self.command
     }
 
-    /// get PostgreSQL version
+    /// get `PostgreSQL` version
+    ///
+    /// # Errors
+    ///
+    /// Returns [`SqlFunArgsError`] when the version cannot be determined.
     pub fn postgres_version(
         &self,
         metadata: &SqlFunMetadata,
@@ -100,7 +126,11 @@ impl SqlFunArgs {
         self.postgres_args.postgres_version(metadata)
     }
 
-    /// get PostgreSQL search path
+    /// get `PostgreSQL` search path
+    ///
+    /// # Errors
+    ///
+    /// Returns [`SqlFunArgsError`] when metadata retrieval fails.
     pub fn postgres_search_path(
         &self,
         metadata: &SqlFunMetadata,
@@ -109,6 +139,11 @@ impl SqlFunArgs {
     }
 
     /// get postgres extensions
+    ///
+    /// # Errors
+    ///
+    /// Propagates [`SqlFunArgsError`] if metadata lookup fails or the extension
+    /// configuration is invalid.
     pub fn postgres_extensions(
         &self,
         metadata: &SqlFunMetadata,
@@ -117,8 +152,12 @@ impl SqlFunArgs {
     }
 
     /// get builtin schema directory path
+    ///
+    /// # Errors
+    ///
+    /// Returns [`SqlFunArgsError`] if the builtin directory cannot be resolved.
     pub fn builtin_info_dir(&self, metadata: &SqlFunMetadata) -> Result<PathBuf, SqlFunArgsError> {
-        if let Some(arg) = &self.postgres_args.builtin_schema_dir() {
+        if let Some(arg) = self.postgres_args.builtin_schema_dir() {
             Ok(arg.clone())
         } else {
             let home = self.sql_fun_home()?;
@@ -128,11 +167,15 @@ impl SqlFunArgs {
     }
 
     /// set directory path of extensions
+    ///
+    /// # Errors
+    ///
+    /// Returns [`SqlFunArgsError`] when the path components cannot be derived.
     pub fn postgres_extensions_dir(
         &self,
         metadata: &SqlFunMetadata,
     ) -> Result<PathBuf, SqlFunArgsError> {
-        if let Some(ext_dir) = &self.postgres_args.postgres_extensions_dir() {
+        if let Some(ext_dir) = self.postgres_args.postgres_extensions_dir() {
             Ok(ext_dir.clone())
         } else {
             let home = self.sql_fun_home()?;
@@ -147,8 +190,15 @@ impl SqlFunArgs {
 
     const SQL_FUN_OUTPUT_FORMAT: &str = "SQL_FUN_OUTPUT_FORMAT";
     const SQL_FUN_NO_BUILTIN: &str = "SQL_FUN_NO_BUILTIN";
+    const SQL_FUN_TERM_COLOR: &str = "SQL_FUN_TERM_COLOR";
+    const SQL_FUN_HIGHLIGHTER_THEME: &str = "SQL_FUN_HIGHLIGHTER_THEME";
 
     /// get environemnts for child process
+    ///
+    /// # Errors
+    ///
+    /// Returns [`SqlFunArgsError`] if metadata fails to load or env generation
+    /// encounters an error.
     pub fn environments(&self) -> Result<HashMap<String, String>, SqlFunArgsError> {
         let mut result = HashMap::new();
         let metadata_file = self.metadata_file()?;
@@ -156,18 +206,55 @@ impl SqlFunArgs {
 
         self.metadata_args.get_envs(&mut result, &metadata)?;
         self.postgres_args.get_envs(&mut result, self, &metadata)?;
-        self.log_args.get_envs(&mut result)?;
+        self.log_args.get_envs(&mut result);
 
-        insert_to_result(
-            &mut result,
-            Self::SQL_FUN_OUTPUT_FORMAT,
-            &self.output_format,
+        result.insert(
+            Self::SQL_FUN_OUTPUT_FORMAT.to_string(),
+            self.output_format.clone(),
         );
 
-        return Ok(result);
+        Ok(result)
+    }
 
-        fn insert_to_result(result: &mut HashMap<String, String>, name: &str, value: &str) {
-            result.insert(name.to_string(), value.to_string());
+    /// get terminal color value
+    #[must_use]
+    pub fn term_color(&self) -> TerminalColor {
+        self.term_color.get_value()
+    }
+
+    /// get syntax highlighter theme
+    ///
+    /// when [`Self::term_color`] is never, returns [`HighlighterTheme::default`]
+    /// when [`Self::highlighter_theme`] is None, returns `${SQL_FUN_HOME}/highlighter/default.toml`
+    /// when [`Self::highlighter_theme`] is Some and relative path,
+    ///     returns ${SQL_FUN_HOME}/highlighter/specified-path
+    /// when [`Self::highlighter_theme`] is Some and absolute path,
+    ///     returns load from absolute path
+    ///
+    /// # Errors
+    ///
+    /// Returns [`SqlFunArgsError`] if faild load theme.
+    ///
+    pub fn highlighter_theme(&self) -> Result<HighlighterTheme, SqlFunArgsError> {
+        let term_color = self.term_color();
+        if term_color.is_never() {
+            Ok(HighlighterTheme::default())
+        } else {
+            let theme_path = if let Some(theme_path) = &self.highlighter_theme {
+                if theme_path.is_absolute() {
+                    theme_path.clone()
+                } else {
+                    let mut base = self.sql_fun_home()?;
+                    base.push("highlighter");
+                    base.push(theme_path);
+                    base
+                }
+            } else {
+                let mut path = self.sql_fun_home()?;
+                path.push("highlighter/default.toml");
+                path
+            };
+            Ok(HighlighterTheme::from_toml(theme_path)?)
         }
     }
 }
@@ -183,12 +270,26 @@ pub struct DaemonControlArgs {
 
 impl SqlFunArgs {
     /// Initialize and parse arguments
+    #[must_use]
     pub fn parse_args() -> Self {
         let mut args = SqlFunArgs::parse();
         if args.verbose {
             args.log_args.set_log_level("debug");
         }
         args
+    }
+
+    /// Initialize for `proc_macro`
+    ///
+    /// # Errors
+    ///
+    /// Returns [`SqlFunArgsError`] if failed
+    pub fn try_from_env() -> Result<Self, SqlFunArgsError> {
+        let mut args = SqlFunArgs::try_parse_from(Vec::<String>::default())?;
+        if args.verbose {
+            args.log_args.set_log_level("debug");
+        }
+        Ok(args)
     }
 }
 

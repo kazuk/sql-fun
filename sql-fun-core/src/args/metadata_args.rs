@@ -14,7 +14,7 @@ fn path_owner<P: AsRef<Path>>(path: P) -> Result<u32, std::io::Error> {
 
 #[derive(clap::Args, Debug, serde::Serialize, serde::Deserialize, Clone)]
 pub struct MetadataArgs {
-    /// home_dir
+    /// `home_dir`
     #[clap(long, env = Self::SQL_FUN_HOME)]
     sql_fun_home: Option<PathBuf>,
 
@@ -57,6 +57,9 @@ impl MetadataArgs {
     /// If `--sql-fun-home` or `SQL_FUN_HOME` env present : configured value
     /// Else returns `${HOME}/.sql-fun`
     ///
+    /// # Errors
+    ///
+    /// Returns [`SqlFunArgsError`] when the directory cannot be determined or does not exist.
     pub fn sql_fun_home(&self) -> Result<PathBuf, SqlFunArgsError> {
         if let Some(home_arg) = &self.sql_fun_home {
             let result = if home_arg.is_relative() {
@@ -82,22 +85,28 @@ impl MetadataArgs {
     }
 
     /// return raw value for `--metadata-file`
+    ///
+    /// # Errors
+    ///
+    /// Returns [`SqlFunArgsError::NotSupported`] when the format is not `TOML`.
     pub fn metadata_file_raw(&self) -> Result<&str, SqlFunArgsError> {
-        if self.metadata_file.is_none() {
-            if self.metadata_format() == "TOML" {
-                Ok("Cargo.toml")
-            } else {
-                Err(SqlFunArgsError::NotSupported(
-                    String::from("--metadata-format"),
-                    String::from(self.metadata_format()),
-                ))
-            }
+        if let Some(metadata_file) = self.metadata_file.as_deref() {
+            Ok(metadata_file)
+        } else if self.metadata_format() == "TOML" {
+            Ok("Cargo.toml")
         } else {
-            Ok(self.metadata_file.as_ref().unwrap())
+            Err(SqlFunArgsError::NotSupported(
+                String::from("--metadata-format"),
+                String::from(self.metadata_format()),
+            ))
         }
     }
 
     /// search metadata file with same-owner policy
+    ///
+    /// # Errors
+    ///
+    /// Returns [`SqlFunArgsError::FilePathNotFound`] if no matching file is located.
     pub fn metadata_file(&self) -> Result<PathBuf, SqlFunArgsError> {
         let raw_arg = PathBuf::from(self.metadata_file_raw()?);
         if raw_arg.is_absolute() {
@@ -109,11 +118,11 @@ impl MetadataArgs {
         } else {
             let current_dir = std::env::current_dir()?;
             let owner = path_owner(&current_dir)?;
-            log::trace!("searching {raw_arg:?} with owner {owner}");
+            log::trace!("searching {} with owner {owner}", raw_arg.display());
             for ancestor in current_dir.ancestors() {
                 let dir_owner = path_owner(ancestor)?;
                 if owner != dir_owner {
-                    log::error!("owner not match for {ancestor:?}");
+                    log::error!("owner not match for {}", ancestor.display());
                     break;
                 }
                 let mut file = ancestor.to_path_buf();
@@ -122,20 +131,22 @@ impl MetadataArgs {
                     let file_owner = path_owner(&file)?;
                     if owner == file_owner {
                         return Ok(file);
-                    } else {
-                        log::error!("owner not match for {file:?}");
-                        break;
                     }
-                } else {
-                    log::trace!("{file:?} not exist");
+                    log::error!("owner not match for {}", file.display());
+                    break;
                 }
+                log::trace!("{} not exist", file.display());
             }
             SqlFunArgsError::file_path_not_found(raw_arg)?
         }
     }
 
     /// get schema file
-    pub fn schema_file(&self, metadata_file: &PathBuf) -> Result<PathBuf, SqlFunArgsError> {
+    ///
+    /// # Errors
+    ///
+    /// Returns [`SqlFunArgsError::FilePathNotFound`] if the schema file does not exist.
+    pub fn schema_file(&self, metadata_file: &Path) -> Result<PathBuf, SqlFunArgsError> {
         if let Some(schema_file) = &self.schema_file {
             if schema_file.exists() {
                 Ok(schema_file.clone())
@@ -146,7 +157,8 @@ impl MetadataArgs {
             let schema = &self.schema;
             let Some(schema_dir) = metadata_file.parent() else {
                 Err(SqlFunArgsError::Unexpected(format!(
-                    "unexpected metadata_file.parent() is none: {metadata_file:?}"
+                    "unexpected metadata_file.parent() is none: {}",
+                    metadata_file.display()
                 )))?
             };
             let schema_file = schema_dir.join(format!("sqlfun.{schema}.sql"));
@@ -160,6 +172,10 @@ impl MetadataArgs {
     }
 
     /// get SQL dialect
+    ///
+    /// # Errors
+    ///
+    /// Returns [`SqlFunArgsError::NotSupported`] for unknown dialect names.
     pub fn sql_dialect(&self, metadata: &SqlFunMetadata) -> Result<SqlDialect, SqlFunArgsError> {
         let Some(dialect) = &self.sql_dialect else {
             return Ok(metadata.sql_dialect());
@@ -171,6 +187,10 @@ impl MetadataArgs {
     }
 
     /// get CTE catalog directory
+    ///
+    /// # Errors
+    ///
+    /// Propagates [`SqlFunArgsError`] from metadata lookups.
     pub fn cte_catalog_dir(
         &self,
         metadata: &SqlFunMetadata,
@@ -184,6 +204,11 @@ impl MetadataArgs {
         }
     }
 
+    /// Populate env map with derived values.
+    ///
+    /// # Errors
+    ///
+    /// Returns [`SqlFunArgsError`] when metadata resolution fails.
     pub fn get_envs(
         &self,
         envs: &mut HashMap<String, String>,
@@ -191,40 +216,35 @@ impl MetadataArgs {
     ) -> Result<(), SqlFunArgsError> {
         let metadata_file = self.metadata_file()?;
 
-        insert_to_result(
-            envs,
-            Self::SQL_FUN_HOME,
-            &self.sql_fun_home()?.to_string_lossy(),
+        envs.insert(
+            Self::SQL_FUN_HOME.to_string(),
+            self.sql_fun_home()?.to_string_lossy().to_string(),
         );
-        insert_to_result(envs, Self::SQL_FUN_METADATA_FORMAT, self.metadata_format());
-
-        insert_to_result(
-            envs,
-            Self::SQL_FUN_METADATA_FILE,
-            &metadata_file.to_string_lossy(),
+        envs.insert(
+            Self::SQL_FUN_METADATA_FORMAT.to_string(),
+            self.metadata_format().to_string(),
         );
-        insert_to_result(envs, Self::SQL_FUN_SCHEMA, &self.schema);
-        insert_to_result(
-            envs,
-            Self::SQL_FUN_SCHEMA_FILE,
-            &self.schema_file(&metadata_file)?.to_string_lossy(),
+        envs.insert(
+            Self::SQL_FUN_METADATA_FILE.to_string(),
+            metadata_file.to_string_lossy().to_string(),
         );
-        insert_to_result(
-            envs,
-            Self::SQL_FUN_DIALECT,
-            &self.sql_dialect(metadata)?.to_string(),
+        envs.insert(Self::SQL_FUN_SCHEMA.to_string(), self.schema.clone());
+        envs.insert(
+            Self::SQL_FUN_SCHEMA_FILE.to_string(),
+            self.schema_file(&metadata_file)?
+                .to_string_lossy()
+                .to_string(),
+        );
+        envs.insert(
+            Self::SQL_FUN_DIALECT.to_string(),
+            self.sql_dialect(metadata)?.to_string(),
         );
         if let Some(cte_catalog_dir) = self.cte_catalog_dir(metadata)? {
-            insert_to_result(
-                envs,
-                Self::SQL_FUN_CTE_CATALOG_DIR,
-                &cte_catalog_dir.to_string_lossy(),
+            envs.insert(
+                Self::SQL_FUN_CTE_CATALOG_DIR.to_string(),
+                cte_catalog_dir.to_string_lossy().to_string(),
             );
         }
-        return Ok(());
-
-        fn insert_to_result(result: &mut HashMap<String, String>, name: &str, value: &str) {
-            result.insert(name.to_string(), value.to_string());
-        }
+        Ok(())
     }
 }

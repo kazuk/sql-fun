@@ -18,12 +18,12 @@ struct MessageTypeOneofDecl {
 }
 
 impl MessageType {
-    /// module name for MessageType
+    /// module name for `MessageType`
     pub fn module_name(&self) -> String {
         self.name.to_case(Case::Snake)
     }
 
-    /// enum type name for MessageType
+    /// enum type name for `MessageType`
     pub fn enum_type_name(&self) -> String {
         self.name.to_case(Case::Pascal)
     }
@@ -38,7 +38,7 @@ impl MessageType {
         oneof_decl.name.to_case(Case::Camel)
     }
 
-    /// struct type name for MessageType
+    /// struct type name for `MessageType`
     pub fn struct_type_name(&self) -> String {
         self.name.to_case(Case::Pascal)
     }

@@ -1,6 +1,11 @@
-use crate::sem::{
-    AnalysisError, FromClause, ParseContext, PgBuiltInType, SemScalarExpr, TypeReference,
-    WithClause,
+use sql_fun_core::IVec;
+
+use crate::{
+    sem::{
+        AnalysisError, FromClause, ParseContext, PgBuiltInType, SemScalarExpr, TypeReference,
+        WithClause,
+    },
+    syn::ScanToken,
 };
 
 use super::{AnalyzeScalarExpr, SemScalarExprNode};
@@ -24,11 +29,13 @@ pub enum ScalarConstExpr {
 
 impl ScalarConstExpr {
     /// create a NULL
+    #[must_use]
     pub fn null() -> SemScalarExpr {
         SemScalarExpr::Const(Self::Null)
     }
 
     /// create integer constant value
+    #[must_use]
     pub fn new_integer(value: i32) -> Self {
         Self::Integer(value)
     }
@@ -43,6 +50,7 @@ where
         _with_clause: &WithClause,
         _from_clause: &FromClause,
         syn: crate::syn::AConst,
+        _tokens: &IVec<ScanToken>,
     ) -> Result<(SemScalarExpr, TParseContext), AnalysisError> {
         let cval = if let Some(ival) = syn.as_ival().get_ival() {
             ScalarConstExpr::Integer(ival)

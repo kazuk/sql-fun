@@ -1,5 +1,7 @@
 use std::collections::HashMap;
 
+use sql_fun_core::IVec;
+
 use crate::{
     sem::{
         AnalysisError, AstAndContextPair, DeleteStatement, InsertStatement, ParseContext,
@@ -7,7 +9,7 @@ use crate::{
         analyze_insert_statement, analyze_select, analyze_update_statement,
         create_table::{ColumnDefinition, ColumnName},
     },
-    syn::{ListOpt, Opt},
+    syn::{ListOpt, Opt, ScanToken},
 };
 
 /// CTE name
@@ -30,6 +32,7 @@ impl CteStatement {
     fn analyze_syn<TParseContext>(
         context: TParseContext,
         syn: crate::syn::CommonTableExpr,
+        tokens: &IVec<ScanToken>,
     ) -> Result<(CteStatement, TParseContext), AnalysisError>
     where
         TParseContext: ParseContext,
@@ -37,7 +40,7 @@ impl CteStatement {
         let query = syn.get_ctequery();
 
         if let Some(select) = query.as_select_stmt().as_inner() {
-            let AstAndContextPair(sem, new_context) = analyze_select(context, select)?;
+            let AstAndContextPair(sem, new_context) = analyze_select(context, select, tokens)?;
             let SemAst::SelectStatement(s) = sem else {
                 AnalysisError::raise_unexpected_none("SemAst::SelectStatement")?
             };
@@ -108,7 +111,7 @@ impl CteStatement {
     }
 }
 
-/// analyzed [crate::syn::WithClauseOpt]
+/// analyzed [`crate::syn::WithClauseOpt`]
 #[derive(Debug, Clone, Default, Eq, PartialEq, serde::Serialize, serde::Deserialize)]
 pub struct WithClause(HashMap<CteName, CteStatement>);
 
@@ -123,19 +126,21 @@ impl std::hash::Hash for WithClause {
 
 impl WithClause {
     /// get CTE query by name
+    #[must_use]
     pub fn get(&self, name: &CteName) -> Option<&CteStatement> {
         self.0.get(name)
     }
 
     /// insert named CTE item
     pub fn insert(&mut self, name: &CteName, statement: CteStatement) {
-        self.0.insert(name.to_string(), statement);
+        self.0.insert(name.clone(), statement);
     }
 
-    /// analyze [crate::syn::WithClauseOpt]
+    /// analyze [`crate::syn::WithClauseOpt`]
     pub fn analyze<TParseContext>(
         mut context: TParseContext,
         syn: crate::syn::WithClauseOpt,
+        tokens: &IVec<ScanToken>,
     ) -> Result<(WithClause, TParseContext), AnalysisError>
     where
         TParseContext: ParseContext,
@@ -150,7 +155,7 @@ impl WithClause {
                 AnalysisError::raise_unexpected_none("cte.as_common_table_expr")?
             };
             let name = table_expr.get_ctename();
-            let (cte, new_context) = CteStatement::analyze_syn(context, table_expr)?;
+            let (cte, new_context) = CteStatement::analyze_syn(context, table_expr, tokens)?;
             with.insert(&name, cte);
             context = new_context;
         }

@@ -8,6 +8,7 @@ mod args;
 mod builtin;
 mod coll;
 mod extensions;
+mod highlighter;
 mod metadata;
 
 use std::{fmt::Display, str::FromStr};
@@ -20,19 +21,20 @@ pub use self::{
         ExtensionConfigError, ExtensionNameVersionPair, ExtensionVersion,
         PostgresExtensionsCollection,
     },
+    highlighter::{HighlighterStyle, HighlighterTheme, HighlighterThemeError, TerminalColor},
     metadata::{MetadataError, SqlFunMetadata},
 };
 
-/// Supporting PostgreSQL Database engine versions
+/// Supporting `PostgreSQL` Database engine versions
 #[derive(Debug, serde::Deserialize, serde::Serialize, Clone, Copy, PartialEq)]
 pub enum PostgresVersion {
-    /// PostgreSQL version 15
+    /// `PostgreSQL` version 15
     #[serde(rename = "15")]
     Ver15,
-    /// PostgreSQL version 16
+    /// `PostgreSQL` version 16
     #[serde(rename = "16")]
     Ver16,
-    /// PostgreSQL version 17
+    /// `PostgreSQL` version 17
     #[serde(rename = "17")]
     Ver17,
 

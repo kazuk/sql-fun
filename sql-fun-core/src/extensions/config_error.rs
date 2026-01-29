@@ -31,17 +31,29 @@ pub enum ExtensionConfigError {
 }
 
 impl ExtensionConfigError {
-    /// raise InvalidExtensionName
+    /// raise `InvalidExtensionName`
+    ///
+    /// # Errors
+    ///
+    /// Always returns [`ExtensionConfigError::InvalidExtensionName`].
     pub fn invalid_extension_name<T>(name: &str) -> Result<T, Self> {
         Err(Self::InvalidExtensionName(name.to_string()))
     }
 
-    /// raise InvalidExtensionVersion
+    /// raise `InvalidExtensionVersion`
+    ///
+    /// # Errors
+    ///
+    /// Always returns [`ExtensionConfigError::InvalidExtensionVersion`].
     pub fn invalid_extension_version<T>(version: &str) -> Result<T, Self> {
         Err(Self::InvalidExtensionVersion(version.to_string()))
     }
 
-    /// raise ExtensionNotFound
+    /// raise `ExtensionNotFound`
+    ///
+    /// # Errors
+    ///
+    /// Always returns [`ExtensionConfigError::ExtensionNotFound`].
     pub fn extension_not_found<T, P: AsRef<Path>>(name: &str, base_path: P) -> Result<T, Self> {
         Err(Self::ExtensionNotFound(
             name.to_string(),
@@ -49,7 +61,11 @@ impl ExtensionConfigError {
         ))
     }
 
-    /// raise MultipleExtensionVersion
+    /// raise `MultipleExtensionVersion`
+    ///
+    /// # Errors
+    ///
+    /// Always returns [`ExtensionConfigError::MultipleExtensionVersion`].
     pub fn multiple_extension_version<T, P: AsRef<Path>>(
         name: &str,
         base_path: P,
@@ -62,7 +78,11 @@ impl ExtensionConfigError {
         ))
     }
 
-    /// raise ExtensionSqlNotExist
+    /// raise `ExtensionSqlNotExist`
+    ///
+    /// # Errors
+    ///
+    /// Always returns [`ExtensionConfigError::ExtensionSqlNotExist`].
     pub fn extension_sql_not_exist<T, P: AsRef<Path>>(
         extension_name: &str,
         version: &ExtensionVersion,

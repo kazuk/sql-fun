@@ -6,6 +6,7 @@ use std::os::unix::fs::OpenOptionsExt;
 use crate::{Args, ServerError};
 
 #[derive(serde::Deserialize, serde::Serialize, derive_getters::Getters)]
+#[allow(clippy::struct_field_names)]
 pub struct PidFile {
     pid: u32,
     port: u16,
@@ -29,7 +30,11 @@ impl PidFile {
     fn new(port: u16) -> Self {
         let mut arr = [0u8; 20];
         ::rand::fill(&mut arr[..]);
-        let token = arr.iter().map(|b| format!("{:02x}", b)).collect();
+        let mut token = String::new();
+        for b in &arr {
+            use std::fmt::Write as _;
+            let _ = write!(token, "{b:02x}");
+        }
         Self {
             pid: std::process::id(),
             pid_file_path: None,
@@ -41,14 +46,13 @@ impl PidFile {
 
     fn default_path(args: &Args) -> PathBuf {
         let mut pid_path = PathBuf::from("/tmp");
-
         pid_path.push(&args.user);
         pid_path.push("sql-fun-server.pid");
         pid_path
     }
 
     fn from_file(path: &Path) -> Result<Self, ServerError> {
-        let pid_file_content = std::fs::read_to_string(&path)?;
+        let pid_file_content = std::fs::read_to_string(path)?;
         let pid_file: Self = serde_json::from_str(&pid_file_content)?;
         Ok(pid_file)
     }
@@ -104,7 +108,7 @@ impl PidFile {
         args: &Args,
         port: u16,
     ) -> Result<Option<Self>, ServerError> {
-        let pid_path = PidFile::default_path(&args);
+        let pid_path = PidFile::default_path(args);
         if pid_path.exists() {
             let pid_file = PidFile::from_file(&pid_path)?;
             if pid_file.process_exists() {

@@ -1,4 +1,5 @@
 #![deny(missing_docs)]
+#![allow(clippy::pedantic)]
 #![doc = include_str!("lib.md")]
 
 pub mod sem;
@@ -8,10 +9,13 @@ mod schema_dump_file;
 mod sql_file;
 mod trie_map;
 
+use miette::LabeledSpan;
+use sql_fun_core::IVec;
+
 use self::sql_file::read_sql_file;
 pub use self::trie_map::TrieMap;
 
-use std::string::String as StdString;
+use std::{io::SeekFrom, string::String as StdString};
 
 use crate::{
     sem::{ParseContext, SemAst},
@@ -34,9 +38,24 @@ where
 }
 
 /// parse SQL statement
+///
+/// # Errors
+///
+/// - [`pg_query::Error`] : syntax error
+///
 pub fn parse(sql: &str) -> Result<ParseResult, pg_query::Error> {
     let parse_result = ::pg_query::parse(sql)?;
     Ok(ParseResult::from(parse_result.protobuf))
+}
+
+/// scan SQL Statement
+pub fn scan(sql: &str) -> Result<IVec<crate::syn::ScanToken>, pg_query::Error> {
+    let scan_result = ::pg_query::scan(sql)?;
+    let mut tokens = Vec::new();
+    for token in scan_result.tokens {
+        tokens.push(crate::syn::ScanToken::from(token));
+    }
+    Ok(tokens.into())
 }
 
 fn offset_in_string(haystack: &StdString, needle: &str) -> Option<usize> {
@@ -51,7 +70,6 @@ fn offset_in_string(haystack: &StdString, needle: &str) -> Option<usize> {
 }
 
 ///  offset and length for SQL statement
-#[expect(dead_code)]
 #[derive(Debug, Clone, Copy, Default)]
 pub struct StringSpan {
     offset: usize,
@@ -60,10 +78,52 @@ pub struct StringSpan {
 
 impl StringSpan {
     /// get content span
+    ///
+    /// # Panics
+    ///
+    /// content not in container range
+    #[must_use]
     pub fn from_str_in_str(container: &StdString, content: &str) -> Self {
         let offset = offset_in_string(container, content).expect("content in container");
         let len = content.len();
         Self { offset, len }
+    }
+
+    /// seek position for this string span
+    pub fn seek_pos(&self) -> SeekFrom {
+        SeekFrom::Start(self.offset as u64)
+    }
+
+    /// get length of this span
+    pub fn len(&self) -> usize {
+        self.len
+    }
+
+    /// Return true when len equals 0
+    pub fn is_empty(&self) -> bool {
+        self.len == 0
+    }
+
+    fn new_labeled_span(&self, label: &str) -> LabeledSpan {
+        LabeledSpan::new(Some(String::from(label)), self.offset, self.len)
+    }
+
+    fn from_scan_token(tok: &crate::syn::ScanToken) -> Self {
+        Self {
+            offset: tok.get_start() as usize,
+            len: (tok.get_end() - tok.get_start()) as usize,
+        }
+    }
+
+    /// get end position
+    pub fn end_pos(&self) -> usize {
+        self.offset + self.len
+    }
+
+    /// merge two span
+    pub fn extend(&mut self, other: &Self) {
+        self.offset = std::cmp::min(self.offset, other.offset);
+        self.len = std::cmp::max(self.end_pos(), other.end_pos()) - self.offset;
     }
 }
 

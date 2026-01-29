@@ -1,4 +1,5 @@
 use proc_macro2::TokenStream;
+use sql_fun_core::{SqlFunArgs, SqlFunMetadata};
 use syn::ItemFn;
 
 use crate::{
@@ -13,7 +14,10 @@ pub fn generate_sql_query_many(
     sql_str: String,
     item: TokenStream,
 ) -> Result<TokenStream, SqlFunError> {
-    let _connector = Connector::get_connector()?;
+    let args = SqlFunArgs::try_from_env()?;
+    let metadata = SqlFunMetadata::load_from(args.metadata_file()?)?;
+    let _connector = Connector::get_connector(&metadata)?;
+
     let mut code_generator_builder = TokioPostgresCodeGenerator::builder();
     let mut function_ast: ItemFn = syn::parse2(item)?;
 
@@ -46,5 +50,5 @@ pub fn generate_sql_query_many(
         .block
         .stmts
         .push(syn::parse2(sql_execution_code)?);
-    Ok(TokenStream::from(quote! { #function_ast }))
+    Ok(quote! { #function_ast })
 }

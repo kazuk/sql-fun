@@ -52,6 +52,7 @@ impl TryFrom<JoinTypeOpt> for JoinKind {
 
 impl JoinKind {
     /// get left nullability
+    #[must_use]
     pub fn left_nullable(&self, in_nullable: Nullable) -> Nullable {
         match self {
             JoinKind::Inner => in_nullable,
@@ -67,6 +68,7 @@ impl JoinKind {
     }
 
     /// get right nullability
+    #[must_use]
     pub fn right_nullable(&self, in_nullable: Nullable) -> Nullable {
         match self {
             JoinKind::Inner => in_nullable,

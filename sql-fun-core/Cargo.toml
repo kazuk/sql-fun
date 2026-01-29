@@ -17,8 +17,12 @@ log = { workspace = true }
 serde = { workspace = true }
 thiserror = { workspace = true }
 toml = { workspace = true }
-url.workspace = true
+url = { workspace = true }
+miette = { workspace = true }
+owo-colors = { workspace = true }
+fs-err = "3.2.2"
 
 [dev-dependencies]
 testresult = { workspace = true }
+rstest = { workspace = true }
 tempfile = "3"

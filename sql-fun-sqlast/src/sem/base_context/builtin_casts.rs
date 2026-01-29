@@ -53,8 +53,8 @@ impl CastInfoRead for super::BaseContext {
         target_type: &TypeReference,
     ) -> Option<super::CastDefinition> {
         // TODO: normalize / fix search path
-        let source_local_name = source_type.full_name().local_name().to_string();
-        let target_local_name = target_type.full_name().local_name().to_string();
+        let source_local_name = source_type.full_name().local_name().clone();
+        let target_local_name = target_type.full_name().local_name().clone();
         if source_local_name == target_local_name {
             return Some(CastDefinition::new(CastContext::NoConversion));
         }
@@ -74,8 +74,8 @@ impl CastInfoRead for super::BaseContext {
         target_type: &TypeReference,
     ) -> Option<super::CastDefinition> {
         // TODO: normalize / fix search path
-        let source_local_name = source_type.full_name().local_name().to_string();
-        let target_local_name = target_type.full_name().local_name().to_string();
+        let source_local_name = source_type.full_name().local_name().clone();
+        let target_local_name = target_type.full_name().local_name().clone();
         if source_local_name == target_local_name {
             return Some(CastDefinition::new(CastContext::NoConversion));
         }
@@ -93,7 +93,7 @@ impl CastInfoRead for super::BaseContext {
     fn get_implicit_castable(&self, source_type: &TypeReference) -> HashSet<TypeReference> {
         use std::str::FromStr;
 
-        let source_local_name = source_type.full_name().local_name().to_string();
+        let source_local_name = source_type.full_name().local_name().clone();
         let Some(from_source) = &self.casts.get(&source_local_name) else {
             return HashSet::default();
         };

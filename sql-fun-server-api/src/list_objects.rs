@@ -1,0 +1,96 @@
+use std::path::PathBuf;
+
+use crate::TextSpan;
+
+/// filter condition for string
+#[derive(serde::Serialize, serde::Deserialize)]
+pub enum StringPred {
+    /// exact matchs string
+    Exact(String),
+    /// match prefix
+    StartsWith(String),
+    /// match postfix
+    EndsWith(String),
+}
+
+/// filter condition for object name
+#[derive(serde::Serialize, serde::Deserialize)]
+pub enum NameQuery {
+    /// local name
+    LocalName(StringPred),
+    /// shcema name
+    SchemaName(StringPred),
+}
+
+/// object kind.
+#[derive(serde::Serialize, serde::Deserialize)]
+pub enum ObjectKind {
+    /// All object kind
+    ///
+    /// Used only in object query predicate.
+    All,
+    /// table
+    Table,
+    /// view
+    View,
+    /// type
+    Type,
+    /// function
+    Function,
+    /// materialized view
+    MaterializedView,
+    /// sequence
+    Sequence,
+    /// trigger
+    Trigger,
+    /// index
+    Index,
+}
+
+/// filter conditions
+#[derive(serde::Serialize, serde::Deserialize)]
+pub enum ObjectQuery {
+    /// object kind
+    Kind(ObjectKind),
+    /// object schema name, local name predicate
+    Name(NameQuery),
+    /// filter any condition
+    Or(Vec<ObjectQuery>),
+    /// filter all condition
+    And(Vec<ObjectQuery>),
+    /// negate condition
+    Not(Box<ObjectQuery>),
+}
+
+/// specify optional field to retuns API result
+#[derive(serde::Serialize, serde::Deserialize)]
+pub enum ObjectSummaryField {
+    /// returns `definition_file` field
+    DefinitionFile,
+    /// returns `definition_span` field
+    DefinitionSpan,
+}
+
+/// argument for [`SqlFunServerApi::list_object`]
+#[derive(serde::Serialize, serde::Deserialize, derive_getters::Getters)]
+pub struct ListObjectArgs {
+    /// predicate
+    predicate: ObjectQuery,
+    /// extra field
+    extra_fields: Vec<ObjectSummaryField>,
+}
+
+/// database object summary
+#[derive(serde::Serialize, serde::Deserialize, derive_getters::Getters)]
+pub struct ObjectSummary {
+    /// schema name
+    schema_name: String,
+    /// local name
+    local_name: String,
+    /// object kind
+    kind: ObjectKind,
+    /// definition SQL file
+    definition_file: Option<PathBuf>,
+    /// definition statement span
+    definition_span: Option<TextSpan>,
+}

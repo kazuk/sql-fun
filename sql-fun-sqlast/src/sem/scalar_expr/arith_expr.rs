@@ -5,9 +5,14 @@ mod impl_build_op;
 mod null_if;
 mod unary;
 
-use crate::sem::{
-    AnalysisError, FromClause, ParseContext, SemScalarExpr, TypeReference, WithClause,
-    analyze_scaler_expr, scalar_expr::SemScalarExprNode,
+use sql_fun_core::IVec;
+
+use crate::{
+    sem::{
+        AnalysisError, FromClause, ParseContext, SemScalarExpr, TypeReference, WithClause,
+        analyze_scaler_expr, scalar_expr::SemScalarExprNode,
+    },
+    syn::ScanToken,
 };
 
 pub use self::{
@@ -148,6 +153,7 @@ impl ArithExpr {
         with_clause: &WithClause,
         from_clause: &FromClause,
         expr: Option<crate::syn::Node>,
+        tokens: &IVec<ScanToken>,
     ) -> Result<(Option<SemScalarExpr>, TParseContext), AnalysisError>
     where
         TParseContext: ParseContext,
@@ -155,7 +161,8 @@ impl ArithExpr {
         let Some(expr) = expr else {
             return Ok((None, context));
         };
-        let (sem_expr, new_context) = analyze_scaler_expr(context, with_clause, from_clause, expr)?;
+        let (sem_expr, new_context) =
+            analyze_scaler_expr(context, with_clause, from_clause, expr, tokens)?;
         Ok((Some(sem_expr), new_context))
     }
 }

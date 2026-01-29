@@ -45,7 +45,7 @@ impl TableFunctionDataSource {
     }
 
     pub(super) fn push_alias_names(&self, names: &mut Vec<AliasSpec>) {
-        names.push(self.alias.clone())
+        names.push(self.alias.clone());
     }
 
     pub(super) fn resolve_alias<'a>(
@@ -71,7 +71,7 @@ impl TableFunctionDataSource {
     {
         let returning_table = &self.function.returning_table();
         if returning_table.has_column(column) {
-            names.push(self.alias.clone())
+            names.push(self.alias.clone());
         }
     }
 }

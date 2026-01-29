@@ -1,17 +1,23 @@
+use sql_fun_core::IVec;
+
 use crate::{
     sem::{
         AnalysisError, FullName, FunctionParam, ParseContext, SemScalarExpr, TypeReference,
         type_system::{ArgumentBindingCollection, TypeError},
     },
-    syn::Opt,
+    syn::{Opt, ScanToken},
 };
 
 use super::{FunctionParameterTrait, ParameterBindResult};
 
 impl FunctionParam {
     /// create new variadic parameter
+    #[must_use]
     pub fn new_variadig_param(name: &Option<String>, param_type: &Option<TypeReference>) -> Self {
-        Self::Variadic(FunctionParamVariadic::new(name, param_type))
+        Self::Variadic(FunctionParamVariadic::new(
+            name.as_ref(),
+            param_type.as_ref(),
+        ))
     }
 }
 
@@ -40,10 +46,10 @@ pub struct FunctionParamVariadic {
     param_type: Option<TypeReference>,
 }
 impl FunctionParamVariadic {
-    pub fn new(name: &Option<String>, param_type: &Option<TypeReference>) -> Self {
+    pub fn new(name: Option<&String>, param_type: Option<&TypeReference>) -> Self {
         Self {
-            name: name.clone(),
-            param_type: param_type.clone(),
+            name: name.cloned(),
+            param_type: param_type.cloned(),
         }
     }
 }
@@ -60,12 +66,12 @@ impl std::fmt::Display for FunctionParamVariadic {
 }
 
 impl FunctionParameterTrait for FunctionParamVariadic {
-    fn name(&self) -> &Option<String> {
-        &self.name
+    fn name(&self) -> Option<&String> {
+        self.name.as_ref()
     }
 
-    fn param_type(&self) -> &Option<TypeReference> {
-        &self.param_type
+    fn param_type(&self) -> Option<&TypeReference> {
+        self.param_type.as_ref()
     }
 
     fn default_expr(&self) -> Option<&SemScalarExpr> {
@@ -75,6 +81,7 @@ impl FunctionParameterTrait for FunctionParamVariadic {
     fn from_syn<TParseContext>(
         context: TParseContext,
         param: crate::syn::FunctionParameter,
+        _tokens: &IVec<ScanToken>,
     ) -> Result<(FunctionParam, TParseContext), AnalysisError>
     where
         TParseContext: ParseContext,
@@ -111,13 +118,13 @@ impl FunctionParameterTrait for FunctionParamVariadic {
 
     fn apply_simple_infer_result(&mut self, simple_infer_result: &TypeReference) {
         if let Some(ty) = self.param_type.as_mut() {
-            ty.apply_simple_infer_result(simple_infer_result)
+            ty.apply_simple_infer_result(simple_infer_result);
         }
     }
 
     fn apply_common_infer_result(&mut self, common_infer_result: &TypeReference) {
         if let Some(ty) = self.param_type.as_mut() {
-            ty.apply_common_infer_result(common_infer_result)
+            ty.apply_common_infer_result(common_infer_result);
         }
     }
 }

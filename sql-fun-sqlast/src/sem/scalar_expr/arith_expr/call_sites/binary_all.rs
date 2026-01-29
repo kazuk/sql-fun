@@ -79,7 +79,7 @@ impl UndefinedOperatorAllCallSite {
             name,
             &Some(lexpr.clone()),
             &Some(rexpr.clone()),
-        ));
+        ))?;
         let call_site = UndefinedOperatorAllCallSite {
             operator_name: name.clone(),
             larg: lexpr,

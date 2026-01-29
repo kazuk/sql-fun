@@ -85,6 +85,9 @@ pub struct TcpJsonRpcClinet {
 }
 
 impl TcpJsonRpcClinet {
+    /// # Errors
+    ///
+    /// - `std::io::Error`
     pub fn try_from(stream: std::net::TcpStream) -> Result<Self, std::io::Error> {
         let buff_read = BufReader::new(stream.try_clone()?);
         Ok(Self {
@@ -100,6 +103,9 @@ impl TcpJsonRpcClinet {
         result
     }
 
+    /// # Errors
+    ///
+    /// - `JsonRpcClientError`
     pub fn invoke_method(
         &mut self,
         method: &str,

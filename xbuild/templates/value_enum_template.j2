@@ -1,11 +1,11 @@
 {# oneof_message_enum_template.j2 (askama / escape="none" 推奨) #}
 
-{# 期待するコンテキスト:
+{#
    - enum_module_name: String
    - enum_type_name: String
    - internal_enum_type_name: String
    - internal_enum_field_name: String
-   - fields: Vec<MessageTypeField>  // enum_type.field 相当（メソッド呼び出し可能）
+   - fields: Vec<MessageTypeField>
 #}
 
 // from message type
@@ -16,13 +16,15 @@ pub use self::{{ enum_module_name }}::{{ enum_type_name }}Inner;
 #[allow(dead_code)]
 mod {{ enum_module_name }} {
 #[allow(unused_imports)]
+#[allow(clippy::wildcard_imports)]
 use super::*;
 
 #[cfg(test)]
 pub use self::inner::{{ enum_type_name }} as {{ enum_type_name }}Inner;
 
-/// {{ enum_type_name }}
-#[derive(Debug,Clone, serde::Serialize, serde::Deserialize)]
+/// `{{ enum_type_name }}`
+#[derive(Debug, Clone)]
+#[cfg_attr(feature="syn_serde", derive(serde::Serialize, serde::Deserialize))]
 pub struct {{ enum_type_name }}(self::inner::{{ enum_type_name }});
 
 #[cfg(test)]
@@ -32,7 +34,7 @@ impl From<{{ enum_type_name }}Inner> for {{ enum_type_name }} {
   }
 }
 
-/// {{ enum_type_name }}Opt as alias {{ enum_type_name }}
+/// `{{ enum_type_name }}Opt` as alias `{{ enum_type_name }}`
 pub type {{ enum_type_name }}Opt = {{ enum_type_name }};
 
 impl crate::syn::Opt<{{ enum_type_name }}> for {{ enum_type_name }}
@@ -45,8 +47,9 @@ impl crate::syn::Opt<{{ enum_type_name }}> for {{ enum_type_name }}
     }
 }
 
-/// list of {{ enum_type_name }}
-#[derive(Debug, Clone, serde::Serialize, serde::Deserialize, Default)]
+/// list of `{{ enum_type_name }}`
+#[derive(Debug, Clone, Default)]
+#[cfg_attr(feature="syn_serde", derive(serde::Serialize, serde::Deserialize))]
 pub struct {{ enum_type_name }}List(Vec<{{ enum_type_name }}>);
 
 #[cfg(test)]
@@ -63,8 +66,9 @@ impl From<Vec<{{ enum_type_name }}>> for {{ enum_type_name }}ListOpt {
   }
 }
 
-/// optional list of {{ enum_type_name }}
-#[derive(Debug,Clone, serde::Serialize, serde::Deserialize, Default)]
+/// optional list of `{{ enum_type_name }}`
+#[derive(Debug, Clone, Default)]
+#[cfg_attr(feature="syn_serde", derive(serde::Serialize, serde::Deserialize))]
 pub struct {{ enum_type_name }}ListOpt(Option<Vec<{{ enum_type_name }}>>);
 
 impl crate::syn::ListOpt<{{ enum_type_name }}> for {{ enum_type_name }}ListOpt {
@@ -88,6 +92,7 @@ impl From<Option<{{ enum_type_name }}>> for {{ enum_type_name }}
 
 impl {{ enum_type_name }}ListOpt {
     /// returns Some(None) valiant
+    #[must_use]
     pub fn none() -> Self {
       Self(None)
     }
@@ -126,6 +131,7 @@ impl From<Option<Box<::pg_query::protobuf::{{ enum_type_name }}>>> for {{ enum_t
 impl {{ enum_type_name }}
 {
   /// returns None variant
+  #[must_use]
   pub fn none() -> Self {
     Self(self::inner::{{ enum_type_name }}::None)
   }
@@ -147,14 +153,16 @@ mod inner {
 #[allow(unused_imports)]
 use super::*;
 
-/// {{ enum_type_name }}
-#[derive(Debug,Clone,serde::Serialize, serde::Deserialize)]
+/// `{{ enum_type_name }}`
+#[derive(Debug, Clone)]
+#[cfg_attr(feature="syn_serde", derive(serde::Serialize, serde::Deserialize))]
+#[allow(clippy::too_many_lines)]
 pub enum {{ enum_type_name }} {
   /// empty defalut variant
   None,
 {% for field in fields %}
 {% if field.oneof_index.is_some() %}
-  /// {{ field.enum_variant_name() }}
+  /// `{{ field.enum_variant_name() }}`
   {{ field.enum_variant_name() }}(super::{{ field.enum_variant_struct_name() }}),
 {% endif %}
 {% endfor %}
@@ -184,6 +192,7 @@ impl From<::pg_query::protobuf::{{ enum_type_name }}> for {{ enum_type_name }} {
 }
 
 impl From<::pg_query::protobuf::{{ enum_module_name }}::{{ internal_enum_type_name }}> for {{ enum_type_name }} {
+    #[allow(clippy::too_many_lines)]
     fn from( value: ::pg_query::protobuf::{{ enum_module_name }}::{{ internal_enum_type_name }} ) -> Self {
         use  ::pg_query::protobuf::{{ enum_module_name }}::{{ internal_enum_type_name }} as S;
         match value {
@@ -192,7 +201,7 @@ impl From<::pg_query::protobuf::{{ enum_module_name }}::{{ internal_enum_type_na
             S::{{ field.enum_variant_name() }}(v) => Self::{{ field.enum_variant_name() }}(v.into()),
 {% endif %}
 {% endfor %}
-        }        
+        }
     }
 }
 
@@ -211,7 +220,8 @@ impl From<Option<::pg_query::protobuf::{{ enum_module_name }}::{{ internal_enum_
 {% if field.oneof_index.is_some() %}
 impl {{ enum_type_name }}
 {
-  /// cast as {{ field.enum_variant_name() }}
+  /// cast as `{{ field.enum_variant_name() }}`
+  #[must_use]
   pub fn {{ field.variant_as_fn_name() }}(&self) -> {{ field.enum_variant_struct_name() }}Opt {
     match self {
       Self(self::inner::{{enum_type_name}}::{{ field.enum_variant_name() }}(v)) => {{ field.enum_variant_struct_name() }}Opt::from(v),
@@ -220,6 +230,7 @@ impl {{ enum_type_name }}
   }
 
   /// test variant kind
+  #[must_use]
   pub fn {{ field.variant_is_fn_name() }}(&self) -> bool {
     matches!( self, Self( self::inner::{{enum_type_name}}::{{ field.enum_variant_name() }}(_) ) )
   }
@@ -228,6 +239,7 @@ impl {{ enum_type_name }}
 {% endfor %}
 
 impl From<::pg_query::protobuf::{{ enum_module_name }}::{{ internal_enum_type_name }}> for {{ enum_type_name }} {
+  #[allow(clippy::too_many_lines)]
   fn from(value: ::pg_query::protobuf::{{ enum_module_name }}::{{ internal_enum_type_name }}) -> Self {
     #[allow(unused_imports)]
     use ::pg_query::protobuf::{{ enum_module_name }}::{{ internal_enum_type_name }} as S;

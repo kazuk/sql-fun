@@ -6,6 +6,8 @@ version = "0.1.0"
 edition = "2024"
 authors = ["kazuk"]
 
+[package.metadata]
+
 [package.metadata.database]
 connector = "tokio-postgres"
 
@@ -18,6 +20,7 @@ members = [
     "sql-fun-client",
     "sql-fun-core",
     "sql-fun-server",
+    "sql-fun-server-api",
     "sql-fun-sqlast",
     "xbuild",
 ]
@@ -37,10 +40,13 @@ style = { level = "warn", priority = -1 }
 complexity = { level = "warn", priority = -1 }
 pedantic = { level = "warn", priority = -1 }
 cargo = { level = "warn", priority = -1 }
+cargo_common_metadata = "allow"
+multiple_crate_versions = "allow"
 
 [workspace.dependencies]
 anyhow = { version = "1.0", features = ["backtrace"] }
 askama = "0.15"
+async-trait = "0.1.89"
 backtrace-on-stack-overflow = "0.3"
 bollard = "0.19"
 chumsky = "0.12"
@@ -61,7 +67,9 @@ inquire = "0.9"
 itertools = "0.14"
 j9 = "0.1"
 log = "0.4"
+miette = { version = "7.6.0", features = ["fancy"] }
 nix = { version = "0.30", features = ["process", "signal"] }
+owo-colors = "4.2.3"
 pg_query = "6.1"
 proc-macro2 = "1.0"
 quote = "1.0"
@@ -73,16 +81,19 @@ sha2 = "0.10"
 shellexpand = "3.1"
 smallvec = "1.15"
 sql-fun-core = { path = "./sql-fun-core" }
+sql-fun-server-api = { path = "sql-fun-server-api" }
 sql-fun-sqlast = { path = "./sql-fun-sqlast" }
 syn = "2.0"
 sysinfo = "0.37"
 testresult = "0.4"
 thiserror = "2.0"
+time = { version = "0.3.45", features = ["serde"] }
 tokio = { version = "1.47", features = ["full"] }
 tokio-postgres = "0.7"
 toml = "0.9.8"
 tracing = "0.1"
 tracing-subscriber = { version = "0.3", features = ["fmt", "env-filter"] }
+trybuild = { version = "1.0.114", features = ["diff"] }
 url = { version = "2.5", features = ["serde"] }
 walkdir = "2.3"
 which = "4.4"
@@ -98,6 +109,7 @@ proc-macro2 = { workspace = true }
 quote = { workspace = true }
 sha2 = { workspace = true }
 smallvec = { workspace = true }
+sql-fun-core = { workspace = true }
 syn = { workspace = true }
 thiserror = { workspace = true }
 toml = { workspace = true }
@@ -109,3 +121,4 @@ rstest = { workspace = true }
 tokio = { workspace = true }
 tokio-postgres = { workspace = true }
 tracing = { workspace = true }
+trybuild = { workspace = true }

@@ -5,6 +5,10 @@ version = "0.1.0"
 edition = "2024"
 description = "semantic analyzer for PostgreSQL"
 
+[features]
+default = []
+syn_serde = []
+
 [lints]
 workspace = true
 
@@ -19,6 +23,8 @@ thiserror = { workspace = true }
 tracing = { workspace = true }
 sql-fun-core = { workspace = true }
 combine = { workspace = true }
+miette = { workspace = true }
+owo-colors = { workspace = true }
 
 [dev-dependencies]
 ctor = { workspace = true }

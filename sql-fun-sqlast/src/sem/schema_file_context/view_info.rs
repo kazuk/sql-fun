@@ -46,7 +46,7 @@ where
     {
         let view_name = alter_view.view();
         let Some(mut view) = self.get_view(view_name).cloned() else {
-            self.report_problem(AnalysisProblem::view_not_found(view_name));
+            self.report_problem(AnalysisProblem::view_not_found(view_name))?;
             return Ok(self);
         };
 

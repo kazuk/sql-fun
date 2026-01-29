@@ -44,6 +44,7 @@ impl super::ColumnReference for TableColumnRef {
 
 impl TableColumnRef {
     /// create instance
+    #[must_use]
     pub fn new(
         alias: &AliasName,
         column: &ColumnName,

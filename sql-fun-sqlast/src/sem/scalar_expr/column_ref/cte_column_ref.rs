@@ -44,6 +44,7 @@ impl super::ColumnReference for CteColumnRef {
 
 impl CteColumnRef {
     /// create instance
+    #[must_use]
     pub fn new(
         alias: &AliasName,
         cte_name: &CteName,

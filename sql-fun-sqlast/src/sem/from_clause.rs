@@ -1,9 +1,11 @@
+use sql_fun_core::IVec;
+
 use crate::{
     sem::{
         AliasSpec, AnalysisError, AnalysisProblem, DataSource, Nullable, ParseContext, WithClause,
         create_table::ColumnName, data_source::AliasName,
     },
-    syn::ListOpt,
+    syn::{ListOpt, ScanToken},
 };
 
 /// semantic representation for `FROM` clause
@@ -13,14 +15,15 @@ pub struct FromClause(Vec<DataSource>);
 impl FromClause {
     /// add data source
     pub fn push(&mut self, source: DataSource) {
-        self.0.push(source)
+        self.0.push(source);
     }
 
-    /// analyze from-cluse [crate::syn::NodeListOpt]
+    /// analyze from-cluse [`crate::syn::NodeListOpt`]
     pub fn analyze<TParseContext>(
         mut context: TParseContext,
         with_clause: &WithClause,
         syn: crate::syn::NodeListOpt,
+        tokens: &IVec<ScanToken>,
     ) -> Result<(FromClause, TParseContext), AnalysisError>
     where
         TParseContext: ParseContext,
@@ -32,16 +35,21 @@ impl FromClause {
         let mut existing_aliases = Vec::new();
 
         for node in nodes {
-            let (source, new_context) =
-                DataSource::analyze_from_clause_node(context, with_clause, &from_clause, node)?;
+            let (source, new_context) = DataSource::analyze_from_clause_node(
+                context,
+                with_clause,
+                &from_clause,
+                node,
+                tokens,
+            )?;
             context = new_context;
 
             let aliases = source.get_aliases();
             for alias in aliases {
                 if existing_aliases.contains(&alias) {
-                    context.report_problem(AnalysisProblem::duplicate_alias(alias.name()));
+                    context.report_problem(AnalysisProblem::duplicate_alias(alias.name()))?;
                 }
-                existing_aliases.push(alias)
+                existing_aliases.push(alias);
             }
             from_clause.push(source);
         }
@@ -49,6 +57,7 @@ impl FromClause {
     }
 
     /// get data-source by alias name
+    #[must_use]
     pub fn resolve_alias(&self, alias_name: &AliasName) -> Option<(&DataSource, Nullable)> {
         for source in &self.0 {
             if let Some(resolved) = source.resolve_alias(alias_name) {

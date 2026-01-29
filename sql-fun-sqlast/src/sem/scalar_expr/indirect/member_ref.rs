@@ -1,5 +1,7 @@
 use super::IndirectionExpr;
-use crate::sem::{AnalysisProblem, ParseContext, SemScalarExpr, TypeDefinition, TypeReference};
+use crate::sem::{
+    AnalysisError, AnalysisProblem, ParseContext, SemScalarExpr, TypeDefinition, TypeReference,
+};
 
 #[derive(Debug, Clone, Eq, Hash, PartialEq, serde::Serialize, serde::Deserialize)]
 pub struct MemberRef {
@@ -28,19 +30,19 @@ impl MemberRef {
     }
 
     fn test_member_exist<TParseContext>(
-        member: &String,
+        member: &str,
         context: &mut TParseContext,
         td: &TypeDefinition,
         ty: &TypeReference,
-    ) -> Option<TypeReference>
+    ) -> Result<Option<TypeReference>, AnalysisError>
     where
         TParseContext: ParseContext,
     {
         if let Some(member_type) = td.get_member_type(context, member) {
-            Some(member_type)
+            Ok(Some(member_type))
         } else {
-            context.report_problem(AnalysisProblem::composite_type_field_not_found(ty, member));
-            None
+            context.report_problem(AnalysisProblem::composite_type_field_not_found(ty, member))?;
+            Ok(None)
         }
     }
 
@@ -48,25 +50,29 @@ impl MemberRef {
         source: SemScalarExpr,
         member: String,
         context: &mut TParseContext,
-    ) -> IndirectionExpr
+    ) -> Result<IndirectionExpr, AnalysisError>
     where
         TParseContext: ParseContext,
     {
         let member_type = if let Some(ty) = &source.get_type() {
             if let Some(td) = ty.type_definition().cloned() {
-                Self::test_member_exist(&member, context, &td, ty)
+                Self::test_member_exist(&member, context, &td, ty)?
             } else if let Some(td) = context.get_type(ty.full_name()).cloned() {
-                Self::test_member_exist(&member, context, &td, ty)
+                Self::test_member_exist(&member, context, &td, ty)?
             } else {
                 context.report_problem(AnalysisProblem::member_access_requires_composite_type(
                     ty.full_name(),
                     &member,
-                ));
+                ))?;
                 None
             }
         } else {
             None
         };
-        IndirectionExpr::MemberRef(Box::new(MemberRef::new(source, member, member_type)))
+        Ok(IndirectionExpr::MemberRef(Box::new(MemberRef::new(
+            source,
+            member,
+            member_type,
+        ))))
     }
 }

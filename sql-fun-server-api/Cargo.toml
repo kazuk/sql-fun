@@ -1,0 +1,19 @@
+[package]
+name = "sql-fun-server-api"
+version = "0.1.0"
+edition = "2024"
+
+[dependencies]
+async-trait.workspace = true
+thiserror.workspace = true
+serde.workspace = true
+time.workspace = true
+serde_json.workspace = true
+url.workspace = true
+derive-getters.workspace = true
+
+[dev-dependencies]
+testresult.workspace = true
+
+[lints]
+workspace = true

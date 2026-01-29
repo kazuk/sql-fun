@@ -13,6 +13,9 @@ enum Command {
 }
 
 impl Args {
+    /// # Errors
+    ///
+    /// - `anyhow::Error`
     pub fn run(&self) -> Result<(), anyhow::Error> {
         self.command.run(self)
     }

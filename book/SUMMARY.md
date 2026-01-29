@@ -6,6 +6,10 @@
 - [Database Performance Management](./database-performance-management.md)
 - [Design philosophies](./design-philosophies.md)
 
+## SQL re-write features
+
+- [Batch query support](./sql-rewrite/batching.md)
+
 ## `sql-fun` command line reference
 
 ### Subcommands

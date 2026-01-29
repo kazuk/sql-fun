@@ -1,3 +1,5 @@
+use sql_fun_core::IVec;
+
 use crate::{
     sem::{
         AnalysisError, ColumnCollection, ColumnDefinition, ColumnName, FullName, FunctionParam,
@@ -5,7 +7,7 @@ use crate::{
         create_comp_type::CompositeFieldDefinition,
         type_system::{ArgumentBindingCollection, TypeError, func_params::ParameterBindResult},
     },
-    syn::Opt,
+    syn::{Opt, ScanToken},
 };
 
 use super::FunctionParameterTrait;
@@ -46,12 +48,12 @@ impl std::fmt::Display for FunctionParamTable {
 }
 
 impl FunctionParameterTrait for FunctionParamTable {
-    fn name(&self) -> &Option<String> {
-        &self.name
+    fn name(&self) -> Option<&String> {
+        self.name.as_ref()
     }
 
-    fn param_type(&self) -> &Option<TypeReference> {
-        &self.param_type
+    fn param_type(&self) -> Option<&TypeReference> {
+        self.param_type.as_ref()
     }
 
     fn default_expr(&self) -> Option<&SemScalarExpr> {
@@ -61,6 +63,7 @@ impl FunctionParameterTrait for FunctionParamTable {
     fn from_syn<TParseContext>(
         context: TParseContext,
         param: crate::syn::FunctionParameter,
+        _tokens: &IVec<ScanToken>,
     ) -> Result<(FunctionParam, TParseContext), AnalysisError>
     where
         TParseContext: ParseContext,
@@ -93,13 +96,13 @@ impl FunctionParameterTrait for FunctionParamTable {
 
     fn apply_simple_infer_result(&mut self, simple_infer_result: &TypeReference) {
         if let Some(ty) = self.param_type.as_mut() {
-            ty.apply_simple_infer_result(simple_infer_result)
+            ty.apply_simple_infer_result(simple_infer_result);
         }
     }
 
     fn apply_common_infer_result(&mut self, common_infer_result: &TypeReference) {
         if let Some(ty) = self.param_type.as_mut() {
-            ty.apply_common_infer_result(common_infer_result)
+            ty.apply_common_infer_result(common_infer_result);
         }
     }
 }

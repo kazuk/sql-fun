@@ -6,8 +6,9 @@ mod {{ enum_module_name }} {
 #[allow(unused_imports)]
 use super::*;
 
-/// list of {{ enum_type_name }}
-#[derive(Debug,Clone, serde::Serialize, serde::Deserialize)]
+/// list of `{{ enum_type_name }}`
+#[derive(Debug, Clone)]
+#[cfg_attr(feature="syn_serde", derive(serde::Serialize, serde::Deserialize))]
 pub struct {{ enum_type_name }}List(Vec<{{ enum_type_name }}>);
 
 impl From<Vec<::pg_query::protobuf::{{ enum_type_name }}>> for {{ enum_type_name }}List {
@@ -16,8 +17,9 @@ impl From<Vec<::pg_query::protobuf::{{ enum_type_name }}>> for {{ enum_type_name
   }
 }
 
-/// optional list of {{ enum_type_name }}
-#[derive(Debug,Clone,Copy, serde::Serialize, serde::Deserialize)]
+/// optional list of `{{ enum_type_name }}`
+#[derive(Debug, Clone, Copy)]
+#[cfg_attr(feature="syn_serde", derive(serde::Serialize, serde::Deserialize))]
 pub struct {{ enum_type_name }}Opt(Option<{{ enum_type_name }}>);
 
 impl crate::syn::Opt<{{ enum_type_name }}> for {{ enum_type_name }}Opt
@@ -64,6 +66,7 @@ impl From<&{{ enum_type_name }}> for {{ enum_type_name }}Opt
 
 impl {{ enum_type_name }}Opt {
     /// returns None variant
+    #[must_use]
     pub fn none() -> Self {
         Self(None)
     }
@@ -87,11 +90,12 @@ impl From<Option<Box<::pg_query::protobuf::{{ enum_type_name }}>>> for {{ enum_t
   }
 }
 
-/// {{ enum_type_name }} enum
-#[derive(Debug,Clone,Copy, serde::Serialize, serde::Deserialize)]
+/// `{{ enum_type_name }}` enum
+#[derive(Debug, Clone, Copy)]
+#[cfg_attr(feature="syn_serde", derive(serde::Serialize, serde::Deserialize))]
 pub enum {{ enum_type_name }} {
 {% for val in enum_type.value %}
-    /// {{ val.variant_name(enum_type_name) }}
+    /// `{{ val.variant_name(enum_type_name) }}`
     {{ val.variant_name(enum_type_name) }} = {{ val.variant_value() }},
 {% endfor %}
     /// None
@@ -99,6 +103,7 @@ pub enum {{ enum_type_name }} {
 }
 
 impl From<::pg_query::protobuf::{{ enum_type_name }}> for {{ enum_type_name }} {
+  #[allow(clippy::too_many_lines)]
   fn from(value: ::pg_query::protobuf::{{ enum_type_name }}) -> Self {
     use ::pg_query::protobuf::{{ enum_type_name }} as S;
     match value {
@@ -110,6 +115,7 @@ impl From<::pg_query::protobuf::{{ enum_type_name }}> for {{ enum_type_name }} {
 }
 
 impl From<i32> for {{ enum_type_name }} {
+  #[allow(clippy::too_many_lines)]
   fn from(value: i32) -> Self {
     match value {
 {% for val in enum_type.value %}

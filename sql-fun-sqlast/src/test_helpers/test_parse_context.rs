@@ -1,6 +1,6 @@
 mod cast_info;
 
-use std::collections::HashMap;
+use std::collections::{HashMap, HashSet};
 
 use crate::{
     StringSpan,
@@ -10,10 +10,10 @@ use crate::{
         CreateCompositType, CreateDomain, CreateEnum, CreateExtension, CreateFunction, CreateIndex,
         CreateSchema, CreateSequence, CreateTable, CreateTableAs, CreateView, FullName,
         FunctionInfoRead, FunctionInfoWrite, FunctionOverloadCollection, IndexInfoRead,
-        OperatorDefinition, OperatorInfoRead, OperatorName, ParseContext, SchemaName,
-        SearchPathRead, SequenceInfoRead, SequenceInfoWrite, TableInfoRead, TableInfoWrite,
-        TableName, TypeDefinition, TypeInfoRead, TypeInfoWrite, TypeReference, ValidOperatorName,
-        VariableSet, ViewInfoRead, ViewInfoWrite, ViewLike,
+        OperatorDefinition, OperatorInfoRead, OperatorName, OverloadVariant, ParseContext,
+        SchemaName, SearchPathRead, SequenceInfoRead, SequenceInfoWrite, TableInfoRead,
+        TableInfoWrite, TableName, TypeDefinition, TypeInfoRead, TypeInfoWrite, TypeReference,
+        ValidOperatorName, VariableSet, ViewInfoRead, ViewInfoWrite, ViewLike,
     },
 };
 
@@ -21,12 +21,16 @@ use crate::{
 #[derive(Debug, Default)]
 pub struct TestParseContext {
     implicit_cast_results: HashMap<TypeReference, HashMap<TypeReference, Option<CastDefinition>>>,
+    implicit_castable_results: HashMap<TypeReference, HashSet<TypeReference>>,
     operator_op_results: HashMap<(OperatorName, bool, bool), Option<OperatorDefinition>>,
     search_path: Vec<SchemaName>,
     type_definitions: HashMap<FullName, TypeDefinition>,
     table_definitions: HashMap<FullName, Option<CreateTable>>,
     view_definitions: HashMap<FullName, Option<ViewLike>>,
+    function_definitions: HashMap<FullName, FunctionOverloadCollection>,
     alter_tables: Vec<AlterTable>,
+    create_indexes: Vec<CreateIndex>,
+    problems: Vec<AnalysisProblem>,
 }
 
 /// get [TestParseContext]
@@ -138,6 +142,16 @@ impl TestParseContext {
     pub fn alter_tables_len(&self) -> usize {
         self.alter_tables.len()
     }
+
+    /// get applied create index length
+    pub fn create_indexes_len(&self) -> usize {
+        self.create_indexes.len()
+    }
+
+    /// get last applied create index
+    pub fn last_create_index(&self) -> Option<&CreateIndex> {
+        self.create_indexes.last()
+    }
 }
 
 impl TableInfoRead for TestParseContext {
@@ -227,8 +241,8 @@ impl OperatorInfoRead for TestParseContext {
 }
 
 impl FunctionInfoRead for TestParseContext {
-    fn get_function_impl(&self, _name: &FullName) -> Option<FunctionOverloadCollection> {
-        todo!()
+    fn get_function_impl(&self, name: &FullName) -> Option<FunctionOverloadCollection> {
+        self.function_definitions.get(name).cloned()
     }
 }
 
@@ -240,8 +254,9 @@ impl IndexInfoRead for TestParseContext {
 
 impl BaseParseContext for TestParseContext {
     #[track_caller]
-    fn report_problem(&mut self, problem: AnalysisProblem) {
-        todo!("{problem:#?}")
+    fn report_problem(&mut self, problem: AnalysisProblem) -> Result<(), AnalysisError> {
+        self.problems.push(problem);
+        Ok(())
     }
 
     fn extend(&mut self, _extension: Box<dyn BaseParseContext>) {
@@ -249,6 +264,18 @@ impl BaseParseContext for TestParseContext {
     }
 
     fn set_statement_span(&mut self, _statement_span: StringSpan) {
+        todo!()
+    }
+
+    fn get_args(&self) -> &sql_fun_core::SqlFunArgs {
+        todo!()
+    }
+
+    fn get_source_file_path(&self) -> Option<&std::path::Path> {
+        todo!()
+    }
+
+    fn set_source_file(&mut self, _source_acess_service: Box<dyn crate::sem::SourceAccessService>) {
         todo!()
     }
 }
@@ -319,6 +346,34 @@ impl ParseContext for TestParseContext {
     }
 
     fn apply_create_index(self, _create_index: &CreateIndex) -> Result<Self, AnalysisError> {
-        todo!()
+        let mut context = self;
+        context.create_indexes.push(_create_index.clone());
+        Ok(context)
+    }
+}
+
+impl TestParseContext {
+    /// setup [FunctionInfoRead::get_function_impl] result
+    pub fn set_get_function_impl_result(
+        &mut self,
+        name: &FullName,
+        overloads: &FunctionOverloadCollection,
+    ) {
+        self.function_definitions
+            .insert(name.clone(), overloads.clone());
+    }
+
+    /// setup function overload collection with variants
+    pub fn setup_function(&mut self, name: &str, overloads: &[OverloadVariant]) -> FullName {
+        let name = FullName::with_schema("public", name);
+        let overloads = FunctionOverloadCollection::new(overloads);
+        self.set_get_function_impl_result(&name, &overloads);
+        name
+    }
+
+    /// number of reported problems
+    #[must_use]
+    pub fn reported_problem_count(&self) -> usize {
+        self.problems.len()
     }
 }

@@ -5,6 +5,10 @@ mod table_info;
 mod type_info;
 mod view_info;
 
+use std::path::{Path, PathBuf};
+
+use sql_fun_core::SqlFunArgs;
+
 use self::{
     func_info::FunctionDefinitionCollection, sequence_info::SequenceInfoCollection,
     table_info::TableDefinitionCollection, type_info::TypeDefinitionCollection,
@@ -16,7 +20,7 @@ use crate::{
     sem::{
         AnalysisError, AnalysisProblem, BaseParseContext, CastDefinition, Comment, CreateExtension,
         CreateIndex, CreateSchema, ImplicitChange, OperatorDefinition, OperatorInfoRead,
-        OperatorName, ParseContext, SchemaName, SemScalarExpr, VariableSet,
+        OperatorName, ParseContext, SchemaName, SemScalarExpr, SourceAccessService, VariableSet,
         parse_context::{IndexInfoRead, SearchPathRead},
     },
     syn::ObjectType,
@@ -37,7 +41,6 @@ where
     schemas: TrieMap<CreateSchema>,
     sequences: SequenceInfoCollection,
     comments: TrieMap<(ObjectType, String)>,
-    problems: Vec<AnalysisProblem>,
     views: ViewInformationCollection,
     casts: TrieMap<TrieMap<CastDefinition>>,
     binary_operators: TrieMap<OperatorDefinition>,
@@ -45,6 +48,9 @@ where
     right_unary_operators: TrieMap<OperatorDefinition>,
     indexes: TrieMap<CreateIndex>,
     statement_span: StringSpan,
+    sql_source_path: PathBuf,
+    source_access_service: Option<Box<dyn SourceAccessService>>,
+    reports: Vec<String>,
 }
 
 impl<TBaseContext> SchemaFileContext<TBaseContext>
@@ -52,9 +58,10 @@ where
     TBaseContext: BaseParseContext + std::fmt::Debug,
 {
     /// create context for loading schema file
-    pub fn new(base: TBaseContext) -> Self {
+    pub fn new(sql_source_path: &Path, base: TBaseContext) -> Self {
         Self {
             base,
+            sql_source_path: sql_source_path.to_path_buf(),
             types: TypeDefinitionCollection::default(),
             tables: TableDefinitionCollection::default(),
             functions: FunctionDefinitionCollection::default(),
@@ -63,7 +70,6 @@ where
             schemas: TrieMap::default(),
             sequences: SequenceInfoCollection::default(),
             comments: TrieMap::default(),
-            problems: Vec::default(),
             views: ViewInformationCollection::default(),
             casts: TrieMap::default(),
             binary_operators: TrieMap::default(),
@@ -71,6 +77,8 @@ where
             right_unary_operators: TrieMap::default(),
             statement_span: StringSpan::default(),
             indexes: TrieMap::default(),
+            source_access_service: None,
+            reports: Default::default(),
         }
     }
 
@@ -87,6 +95,8 @@ where
 
 #[cfg(test)]
 mod test_schema_file_context {
+    use std::path::Path;
+
     use crate::{
         sem::SchemaFileContext,
         test_helpers::{TestParseContext, test_context},
@@ -94,7 +104,8 @@ mod test_schema_file_context {
 
     #[rstest::rstest]
     fn test_new(test_context: TestParseContext) {
-        let _context = SchemaFileContext::new(test_context);
+        let path = Path::new("hoge.sql");
+        let _context = SchemaFileContext::new(&path, test_context);
     }
 }
 
@@ -159,8 +170,29 @@ impl<TBaseContext> BaseParseContext for SchemaFileContext<TBaseContext>
 where
     TBaseContext: BaseParseContext + std::fmt::Debug,
 {
-    fn report_problem(&mut self, problem: AnalysisProblem) {
-        self.problems.push(problem)
+    fn get_args(&self) -> &SqlFunArgs {
+        self.base.get_args()
+    }
+
+    fn get_source_file_path(&self) -> Option<&Path> {
+        Some(self.sql_source_path.as_path())
+    }
+
+    fn report_problem(&mut self, problem: AnalysisProblem) -> Result<(), AnalysisError> {
+        if let Some(source_provider) = &self.source_access_service {
+            let source = source_provider.get_source_span(
+                self.get_args(),
+                self.sql_source_path.as_path(),
+                self.statement_span,
+            )?;
+            let theme = self.base.get_args().highlighter_theme()?;
+
+            let report = problem.render_report(&theme, source)?;
+            eprintln!("{report}");
+            self.reports.push(report)
+        }
+
+        self.base.report_problem(problem)
     }
 
     fn extend(&mut self, extension: Box<dyn BaseParseContext>) {
@@ -168,7 +200,11 @@ where
     }
 
     fn set_statement_span(&mut self, statement_span: StringSpan) {
-        self.statement_span = statement_span
+        self.statement_span = statement_span;
+    }
+
+    fn set_source_file(&mut self, source_access_service: Box<dyn super::SourceAccessService>) {
+        self.source_access_service = Some(source_access_service);
     }
 }
 

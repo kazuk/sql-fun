@@ -1,5 +1,5 @@
 use std::{
-    fmt::Display,
+    fmt::{Display, Write},
     path::{Path, PathBuf},
     str::FromStr,
 };
@@ -36,23 +36,32 @@ impl PostgresExtensionsCollection {
     ///
     /// guranties returned paths exists true
     ///
+    /// # Errors
+    ///
+    /// Returns [`ExtensionConfigError`] when any referenced SQL file cannot be
+    /// resolved.
     pub fn sql_files<P: AsRef<Path>>(
         &mut self,
         base_path: P,
     ) -> Result<IVec<PathBuf>, ExtensionConfigError> {
         let mut result = Vec::new();
-        for item in self.0.iter_mut() {
-            result.push(item.resolve_version(&base_path)?)
+        for item in &mut self.0 {
+            result.push(item.resolve_version(&base_path)?);
         }
         Ok(IVec::from(result))
     }
 
     /// resolve versions for extensions
+    ///
+    /// # Errors
+    ///
+    /// Returns [`ExtensionConfigError`] when extension versions cannot be
+    /// determined.
     pub fn resolve_versions<P: AsRef<Path>>(
         &mut self,
         base_path: P,
     ) -> Result<(), ExtensionConfigError> {
-        for item in self.0.iter_mut() {
+        for item in &mut self.0 {
             item.resolve_version(&base_path)?;
         }
         Ok(())
@@ -90,13 +99,13 @@ impl PostgresExtensionsCollection {
         for item in parsed.0 {
             match item {
                 Ok(v) => results.push(v),
-                Err(e) => errors.push_str(&format!("{e}\n")),
+                Err(e) => writeln!(&mut errors, "{e}").expect("writing to string"),
             }
         }
-        if !errors.is_empty() {
-            Err(errors)
-        } else {
+        if errors.is_empty() {
             Ok(results)
+        } else {
+            Err(errors)
         }
     }
 }

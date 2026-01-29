@@ -12,8 +12,18 @@ pub struct FunctionOverloadCollection {
     overloads: Vec<OverloadVariant>,
 }
 
+impl<'a> IntoIterator for &'a FunctionOverloadCollection {
+    type Item = &'a OverloadVariant;
+    type IntoIter = std::slice::Iter<'a, OverloadVariant>;
+
+    fn into_iter(self) -> Self::IntoIter {
+        self.iter()
+    }
+}
+
 impl FunctionOverloadCollection {
     /// create new instance
+    #[must_use]
     pub fn new(overloads: &[OverloadVariant]) -> Self {
         Self {
             overloads: overloads.to_vec(),
@@ -26,16 +36,19 @@ impl FunctionOverloadCollection {
     }
 
     /// number of items
+    #[must_use]
     pub fn len(&self) -> usize {
         self.overloads.len()
     }
 
     /// Returns true if empty
+    #[must_use]
     pub fn is_empty(&self) -> bool {
         self.overloads.is_empty()
     }
 
     /// get item from index
+    #[must_use]
     pub fn get_at(&self, index: usize) -> Option<&OverloadVariant> {
         self.overloads.get(index)
     }
@@ -46,6 +59,7 @@ impl FunctionOverloadCollection {
     }
 
     /// get merged collection
+    #[must_use]
     pub fn merged(mut self, mut other: Self) -> Self {
         self.overloads.append(&mut other.overloads);
         self
@@ -54,14 +68,14 @@ impl FunctionOverloadCollection {
     /// insert overload variants
     pub fn append_overloads(&mut self, variants: &[OverloadVariant]) {
         for variant in variants {
-            self.overloads.push(variant.clone())
+            self.overloads.push(variant.clone());
         }
     }
 
     /// insert overload variants
     pub fn append(&mut self, variants: &Self) {
         for variant in &variants.overloads {
-            self.overloads.push(variant.clone())
+            self.overloads.push(variant.clone());
         }
     }
 
@@ -75,7 +89,7 @@ impl FunctionOverloadCollection {
         }
         if simple_infer_context.is_require_infer() {
             let infered_type = simple_infer_context.get_inference_result()?;
-            overload.apply_simple_infer_result(&infered_type)
+            overload.apply_simple_infer_result(&infered_type);
         }
         Ok(())
     }
@@ -130,11 +144,11 @@ impl FunctionOverloadCollection {
                 continue 'overload;
             };
 
-            let Ok(_) = Self::infer_simple(&bind_result, &mut overload) else {
+            let Ok(()) = Self::infer_simple(&bind_result, &mut overload) else {
                 continue 'overload;
             };
 
-            let Ok(_) = Self::infer_common(&bind_result, &mut overload, context) else {
+            let Ok(()) = Self::infer_common(&bind_result, &mut overload, context) else {
                 continue 'overload;
             };
 
@@ -152,7 +166,7 @@ impl FunctionOverloadCollection {
 
         if candiates.len() == 1 {
             // candiates[0]
-            Some(candiates.into_iter().next().unwrap().0)
+            candiates.into_iter().next().map(|(overload, _)| overload)
         } else {
             // multiple overload found, then ambigous
             None

@@ -2,11 +2,11 @@ use crate::sem::AstAndContextPair;
 
 use super::{AnalysisError, ParseContext, SemAst};
 
-/// analyzed [crate::syn::AlterOwnerStmt]
+/// analyzed [`crate::syn::AlterOwnerStmt`]
 #[derive(Debug, Clone)]
 pub struct AlterOwner {}
 
-/// analyze [crate::syn::AlterOwnerStmt]
+/// analyze [`crate::syn::AlterOwnerStmt`]
 pub fn analyze_alter_owner<TParseContext>(
     context: TParseContext,
     _syn: crate::syn::AlterOwnerStmt,

@@ -44,12 +44,12 @@ where
     {
         let seq_name = alter_seq.seq_name();
         let Some(mut seq) = self.get_sequence(seq_name).cloned() else {
-            self.report_problem(AnalysisProblem::sequence_not_found(seq_name));
+            self.report_problem(AnalysisProblem::sequence_not_found(seq_name))?;
             return Ok(self);
         };
 
         seq.apply_alter(alter_seq)?;
-        self.sequences.insert(&seq_name, &seq);
+        self.sequences.insert(seq_name, &seq);
         Ok(self)
     }
 
@@ -58,7 +58,7 @@ where
         create_sequence: &CreateSequence,
     ) -> Result<Self, AnalysisError> {
         let name = create_sequence.name();
-        self.sequences.insert(&name, create_sequence);
+        self.sequences.insert(name, create_sequence);
         Ok(self)
     }
 }

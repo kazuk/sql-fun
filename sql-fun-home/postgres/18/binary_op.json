@@ -1,0 +1,4688 @@
+{
+  "!~": [
+    {
+      "left": "name",
+      "right": "text",
+      "result": "bool",
+      "strict": true
+    },
+    {
+      "left": "text",
+      "right": "text",
+      "result": "bool",
+      "strict": true
+    },
+    {
+      "left": "bpchar",
+      "right": "text",
+      "result": "bool",
+      "strict": true
+    }
+  ],
+  "!~*": [
+    {
+      "left": "name",
+      "right": "text",
+      "result": "bool",
+      "strict": true
+    },
+    {
+      "left": "text",
+      "right": "text",
+      "result": "bool",
+      "strict": true
+    },
+    {
+      "left": "bpchar",
+      "right": "text",
+      "result": "bool",
+      "strict": true
+    }
+  ],
+  "!~~": [
+    {
+      "left": "name",
+      "right": "text",
+      "result": "bool",
+      "strict": true
+    },
+    {
+      "left": "text",
+      "right": "text",
+      "result": "bool",
+      "strict": true
+    },
+    {
+      "left": "bpchar",
+      "right": "text",
+      "result": "bool",
+      "strict": true
+    },
+    {
+      "left": "bytea",
+      "right": "bytea",
+      "result": "bool",
+      "strict": true
+    }
+  ],
+  "!~~*": [
+    {
+      "left": "name",
+      "right": "text",
+      "result": "bool",
+      "strict": true
+    },
+    {
+      "left": "text",
+      "right": "text",
+      "result": "bool",
+      "strict": true
+    },
+    {
+      "left": "bpchar",
+      "right": "text",
+      "result": "bool",
+      "strict": true
+    }
+  ],
+  "#": [
+    {
+      "left": "box",
+      "right": "box",
+      "result": "box",
+      "strict": true
+    },
+    {
+      "left": "lseg",
+      "right": "lseg",
+      "result": "point",
+      "strict": true
+    },
+    {
+      "left": "line",
+      "right": "line",
+      "result": "point",
+      "strict": true
+    },
+    {
+      "left": "bit",
+      "right": "bit",
+      "result": "bit",
+      "strict": true
+    },
+    {
+      "left": "int2",
+      "right": "int2",
+      "result": "int2",
+      "strict": true
+    },
+    {
+      "left": "int4",
+      "right": "int4",
+      "result": "int4",
+      "strict": true
+    },
+    {
+      "left": "int8",
+      "right": "int8",
+      "result": "int8",
+      "strict": true
+    }
+  ],
+  "##": [
+    {
+      "left": "point",
+      "right": "line",
+      "result": "point",
+      "strict": true
+    },
+    {
+      "left": "point",
+      "right": "lseg",
+      "result": "point",
+      "strict": true
+    },
+    {
+      "left": "point",
+      "right": "box",
+      "result": "point",
+      "strict": true
+    },
+    {
+      "left": "lseg",
+      "right": "box",
+      "result": "point",
+      "strict": true
+    },
+    {
+      "left": "line",
+      "right": "lseg",
+      "result": "point",
+      "strict": true
+    },
+    {
+      "left": "lseg",
+      "right": "lseg",
+      "result": "point",
+      "strict": true
+    }
+  ],
+  "#-": [
+    {
+      "left": "jsonb",
+      "right": "_text",
+      "result": "jsonb",
+      "strict": true
+    }
+  ],
+  "#>": [
+    {
+      "left": "json",
+      "right": "_text",
+      "result": "json",
+      "strict": true
+    },
+    {
+      "left": "jsonb",
+      "right": "_text",
+      "result": "jsonb",
+      "strict": true
+    }
+  ],
+  "#>>": [
+    {
+      "left": "json",
+      "right": "_text",
+      "result": "text",
+      "strict": true
+    },
+    {
+      "left": "jsonb",
+      "right": "_text",
+      "result": "text",
+      "strict": true
+    }
+  ],
+  "%": [
+    {
+      "left": "int8",
+      "right": "int8",
+      "result": "int8",
+      "strict": true
+    },
+    {
+      "left": "int2",
+      "right": "int2",
+      "result": "int2",
+      "strict": true
+    },
+    {
+      "left": "int4",
+      "right": "int4",
+      "result": "int4",
+      "strict": true
+    },
+    {
+      "left": "numeric",
+      "right": "numeric",
+      "result": "numeric",
+      "strict": true
+    }
+  ],
+  "&": [
+    {
+      "left": "macaddr",
+      "right": "macaddr",
+      "result": "macaddr",
+      "strict": true
+    },
+    {
+      "left": "macaddr8",
+      "right": "macaddr8",
+      "result": "macaddr8",
+      "strict": true
+    },
+    {
+      "left": "inet",
+      "right": "inet",
+      "result": "inet",
+      "strict": true
+    },
+    {
+      "left": "bit",
+      "right": "bit",
+      "result": "bit",
+      "strict": true
+    },
+    {
+      "left": "int2",
+      "right": "int2",
+      "result": "int2",
+      "strict": true
+    },
+    {
+      "left": "int4",
+      "right": "int4",
+      "result": "int4",
+      "strict": true
+    },
+    {
+      "left": "int8",
+      "right": "int8",
+      "result": "int8",
+      "strict": true
+    }
+  ],
+  "&&": [
+    {
+      "left": "polygon",
+      "right": "polygon",
+      "result": "bool",
+      "strict": true
+    },
+    {
+      "left": "box",
+      "right": "box",
+      "result": "bool",
+      "strict": true
+    },
+    {
+      "left": "circle",
+      "right": "circle",
+      "result": "bool",
+      "strict": true
+    },
+    {
+      "left": "inet",
+      "right": "inet",
+      "result": "bool",
+      "strict": true
+    },
+    {
+      "left": "anyarray",
+      "right": "anyarray",
+      "result": "bool",
+      "strict": true
+    },
+    {
+      "left": "tsquery",
+      "right": "tsquery",
+      "result": "tsquery",
+      "strict": true
+    },
+    {
+      "left": "anyrange",
+      "right": "anyrange",
+      "result": "bool",
+      "strict": true
+    },
+    {
+      "left": "anyrange",
+      "right": "anymultirange",
+      "result": "bool",
+      "strict": true
+    },
+    {
+      "left": "anymultirange",
+      "right": "anyrange",
+      "result": "bool",
+      "strict": true
+    },
+    {
+      "left": "anymultirange",
+      "right": "anymultirange",
+      "result": "bool",
+      "strict": true
+    }
+  ],
+  "&<": [
+    {
+      "left": "polygon",
+      "right": "polygon",
+      "result": "bool",
+      "strict": true
+    },
+    {
+      "left": "box",
+      "right": "box",
+      "result": "bool",
+      "strict": true
+    },
+    {
+      "left": "circle",
+      "right": "circle",
+      "result": "bool",
+      "strict": true
+    },
+    {
+      "left": "anyrange",
+      "right": "anyrange",
+      "result": "bool",
+      "strict": true
+    },
+    {
+      "left": "anyrange",
+      "right": "anymultirange",
+      "result": "bool",
+      "strict": true
+    },
+    {
+      "left": "anymultirange",
+      "right": "anyrange",
+      "result": "bool",
+      "strict": true
+    },
+    {
+      "left": "anymultirange",
+      "right": "anymultirange",
+      "result": "bool",
+      "strict": true
+    }
+  ],
+  "&<|": [
+    {
+      "left": "box",
+      "right": "box",
+      "result": "bool",
+      "strict": true
+    },
+    {
+      "left": "polygon",
+      "right": "polygon",
+      "result": "bool",
+      "strict": true
+    },
+    {
+      "left": "circle",
+      "right": "circle",
+      "result": "bool",
+      "strict": true
+    }
+  ],
+  "&>": [
+    {
+      "left": "polygon",
+      "right": "polygon",
+      "result": "bool",
+      "strict": true
+    },
+    {
+      "left": "box",
+      "right": "box",
+      "result": "bool",
+      "strict": true
+    },
+    {
+      "left": "circle",
+      "right": "circle",
+      "result": "bool",
+      "strict": true
+    },
+    {
+      "left": "anyrange",
+      "right": "anyrange",
+      "result": "bool",
+      "strict": true
+    },
+    {
+      "left": "anyrange",
+      "right": "anymultirange",
+      "result": "bool",
+      "strict": true
+    },
+    {
+      "left": "anymultirange",
+      "right": "anyrange",
+      "result": "bool",
+      "strict": true
+    },
+    {
+      "left": "anymultirange",
+      "right": "anymultirange",
+      "result": "bool",
+      "strict": true
+    }
+  ],
+  "*": [
+    {
+      "left": "int4",
+      "right": "int4",
+      "result": "int4",
+      "strict": true
+    },
+    {
+      "left": "int2",
+      "right": "int2",
+      "result": "int2",
+      "strict": true
+    },
+    {
+      "left": "int2",
+      "right": "int4",
+      "result": "int4",
+      "strict": true
+    },
+    {
+      "left": "int4",
+      "right": "int2",
+      "result": "int4",
+      "strict": true
+    },
+    {
+      "left": "float4",
+      "right": "float4",
+      "result": "float4",
+      "strict": true
+    },
+    {
+      "left": "float8",
+      "right": "float8",
+      "result": "float8",
+      "strict": true
+    },
+    {
+      "left": "int8",
+      "right": "int8",
+      "result": "int8",
+      "strict": true
+    },
+    {
+      "left": "int8",
+      "right": "int4",
+      "result": "int8",
+      "strict": true
+    },
+    {
+      "left": "int4",
+      "right": "int8",
+      "result": "int8",
+      "strict": true
+    },
+    {
+      "left": "int8",
+      "right": "int2",
+      "result": "int8",
+      "strict": true
+    },
+    {
+      "left": "int2",
+      "right": "int8",
+      "result": "int8",
+      "strict": true
+    },
+    {
+      "left": "point",
+      "right": "point",
+      "result": "point",
+      "strict": true
+    },
+    {
+      "left": "path",
+      "right": "point",
+      "result": "path",
+      "strict": true
+    },
+    {
+      "left": "box",
+      "right": "point",
+      "result": "box",
+      "strict": true
+    },
+    {
+      "left": "money",
+      "right": "float4",
+      "result": "money",
+      "strict": true
+    },
+    {
+      "left": "float4",
+      "right": "money",
+      "result": "money",
+      "strict": true
+    },
+    {
+      "left": "money",
+      "right": "float8",
+      "result": "money",
+      "strict": true
+    },
+    {
+      "left": "money",
+      "right": "int8",
+      "result": "money",
+      "strict": true
+    },
+    {
+      "left": "money",
+      "right": "int4",
+      "result": "money",
+      "strict": true
+    },
+    {
+      "left": "money",
+      "right": "int2",
+      "result": "money",
+      "strict": true
+    },
+    {
+      "left": "float8",
+      "right": "money",
+      "result": "money",
+      "strict": true
+    },
+    {
+      "left": "int8",
+      "right": "money",
+      "result": "money",
+      "strict": true
+    },
+    {
+      "left": "int4",
+      "right": "money",
+      "result": "money",
+      "strict": true
+    },
+    {
+      "left": "int2",
+      "right": "money",
+      "result": "money",
+      "strict": true
+    },
+    {
+      "left": "float4",
+      "right": "float8",
+      "result": "float8",
+      "strict": true
+    },
+    {
+      "left": "float8",
+      "right": "float4",
+      "result": "float8",
+      "strict": true
+    },
+    {
+      "left": "circle",
+      "right": "point",
+      "result": "circle",
+      "strict": true
+    },
+    {
+      "left": "interval",
+      "right": "float8",
+      "result": "interval",
+      "strict": true
+    },
+    {
+      "left": "float8",
+      "right": "interval",
+      "result": "interval",
+      "strict": true
+    },
+    {
+      "left": "numeric",
+      "right": "numeric",
+      "result": "numeric",
+      "strict": true
+    },
+    {
+      "left": "anyrange",
+      "right": "anyrange",
+      "result": "anyrange",
+      "strict": true
+    },
+    {
+      "left": "anymultirange",
+      "right": "anymultirange",
+      "result": "anymultirange",
+      "strict": true
+    }
+  ],
+  "*<": [
+    {
+      "left": "record",
+      "right": "record",
+      "result": "bool",
+      "strict": true
+    }
+  ],
+  "*<=": [
+    {
+      "left": "record",
+      "right": "record",
+      "result": "bool",
+      "strict": true
+    }
+  ],
+  "*<>": [
+    {
+      "left": "record",
+      "right": "record",
+      "result": "bool",
+      "strict": true
+    }
+  ],
+  "*=": [
+    {
+      "left": "record",
+      "right": "record",
+      "result": "bool",
+      "strict": true
+    }
+  ],
+  "*>": [
+    {
+      "left": "record",
+      "right": "record",
+      "result": "bool",
+      "strict": true
+    }
+  ],
+  "*>=": [
+    {
+      "left": "record",
+      "right": "record",
+      "result": "bool",
+      "strict": true
+    }
+  ],
+  "+": [
+    {
+      "left": "int2",
+      "right": "int2",
+      "result": "int2",
+      "strict": true
+    },
+    {
+      "left": "int4",
+      "right": "int4",
+      "result": "int4",
+      "strict": true
+    },
+    {
+      "left": "int2",
+      "right": "int4",
+      "result": "int4",
+      "strict": true
+    },
+    {
+      "left": "int4",
+      "right": "int2",
+      "result": "int4",
+      "strict": true
+    },
+    {
+      "left": "float4",
+      "right": "float4",
+      "result": "float4",
+      "strict": true
+    },
+    {
+      "left": "float8",
+      "right": "float8",
+      "result": "float8",
+      "strict": true
+    },
+    {
+      "left": "int8",
+      "right": "int8",
+      "result": "int8",
+      "strict": true
+    },
+    {
+      "left": "int8",
+      "right": "int4",
+      "result": "int8",
+      "strict": true
+    },
+    {
+      "left": "int4",
+      "right": "int8",
+      "result": "int8",
+      "strict": true
+    },
+    {
+      "left": "int8",
+      "right": "int2",
+      "result": "int8",
+      "strict": true
+    },
+    {
+      "left": "int2",
+      "right": "int8",
+      "result": "int8",
+      "strict": true
+    },
+    {
+      "left": "point",
+      "right": "point",
+      "result": "point",
+      "strict": true
+    },
+    {
+      "left": "path",
+      "right": "path",
+      "result": "path",
+      "strict": true
+    },
+    {
+      "left": "path",
+      "right": "point",
+      "result": "path",
+      "strict": true
+    },
+    {
+      "left": "box",
+      "right": "point",
+      "result": "box",
+      "strict": true
+    },
+    {
+      "left": "money",
+      "right": "money",
+      "result": "money",
+      "strict": true
+    },
+    {
+      "left": "_aclitem",
+      "right": "aclitem",
+      "result": "_aclitem",
+      "strict": true
+    },
+    {
+      "left": "date",
+      "right": "interval",
+      "result": "timestamp",
+      "strict": true
+    },
+    {
+      "left": "date",
+      "right": "int4",
+      "result": "date",
+      "strict": true
+    },
+    {
+      "left": "float4",
+      "right": "float8",
+      "result": "float8",
+      "strict": true
+    },
+    {
+      "left": "float8",
+      "right": "float4",
+      "result": "float8",
+      "strict": true
+    },
+    {
+      "left": "timestamptz",
+      "right": "interval",
+      "result": "timestamptz",
+      "strict": true
+    },
+    {
+      "left": "interval",
+      "right": "interval",
+      "result": "interval",
+      "strict": true
+    },
+    {
+      "left": "date",
+      "right": "time",
+      "result": "timestamp",
+      "strict": true
+    },
+    {
+      "left": "date",
+      "right": "timetz",
+      "result": "timestamptz",
+      "strict": true
+    },
+    {
+      "left": "time",
+      "right": "date",
+      "result": "timestamp",
+      "strict": true
+    },
+    {
+      "left": "timetz",
+      "right": "date",
+      "result": "timestamptz",
+      "strict": true
+    },
+    {
+      "left": "circle",
+      "right": "point",
+      "result": "circle",
+      "strict": true
+    },
+    {
+      "left": "inet",
+      "right": "int8",
+      "result": "inet",
+      "strict": true
+    },
+    {
+      "left": "int8",
+      "right": "inet",
+      "result": "inet",
+      "strict": true
+    },
+    {
+      "left": "numeric",
+      "right": "numeric",
+      "result": "numeric",
+      "strict": true
+    },
+    {
+      "left": "time",
+      "right": "interval",
+      "result": "time",
+      "strict": true
+    },
+    {
+      "left": "timetz",
+      "right": "interval",
+      "result": "timetz",
+      "strict": true
+    },
+    {
+      "left": "interval",
+      "right": "time",
+      "result": "time",
+      "strict": true
+    },
+    {
+      "left": "timestamp",
+      "right": "interval",
+      "result": "timestamp",
+      "strict": true
+    },
+    {
+      "left": "interval",
+      "right": "date",
+      "result": "timestamp",
+      "strict": true
+    },
+    {
+      "left": "interval",
+      "right": "timetz",
+      "result": "timetz",
+      "strict": true
+    },
+    {
+      "left": "interval",
+      "right": "timestamp",
+      "result": "timestamp",
+      "strict": true
+    },
+    {
+      "left": "interval",
+      "right": "timestamptz",
+      "result": "timestamptz",
+      "strict": true
+    },
+    {
+      "left": "int4",
+      "right": "date",
+      "result": "date",
+      "strict": true
+    },
+    {
+      "left": "pg_lsn",
+      "right": "numeric",
+      "result": "pg_lsn",
+      "strict": true
+    },
+    {
+      "left": "numeric",
+      "right": "pg_lsn",
+      "result": "pg_lsn",
+      "strict": true
+    },
+    {
+      "left": "anyrange",
+      "right": "anyrange",
+      "result": "anyrange",
+      "strict": true
+    },
+    {
+      "left": "anymultirange",
+      "right": "anymultirange",
+      "result": "anymultirange",
+      "strict": true
+    }
+  ],
+  "-": [
+    {
+      "left": "int2",
+      "right": "int2",
+      "result": "int2",
+      "strict": true
+    },
+    {
+      "left": "int4",
+      "right": "int4",
+      "result": "int4",
+      "strict": true
+    },
+    {
+      "left": "int2",
+      "right": "int4",
+      "result": "int4",
+      "strict": true
+    },
+    {
+      "left": "int4",
+      "right": "int2",
+      "result": "int4",
+      "strict": true
+    },
+    {
+      "left": "float4",
+      "right": "float4",
+      "result": "float4",
+      "strict": true
+    },
+    {
+      "left": "float8",
+      "right": "float8",
+      "result": "float8",
+      "strict": true
+    },
+    {
+      "left": "int8",
+      "right": "int8",
+      "result": "int8",
+      "strict": true
+    },
+    {
+      "left": "int8",
+      "right": "int4",
+      "result": "int8",
+      "strict": true
+    },
+    {
+      "left": "int4",
+      "right": "int8",
+      "result": "int8",
+      "strict": true
+    },
+    {
+      "left": "int8",
+      "right": "int2",
+      "result": "int8",
+      "strict": true
+    },
+    {
+      "left": "int2",
+      "right": "int8",
+      "result": "int8",
+      "strict": true
+    },
+    {
+      "left": "point",
+      "right": "point",
+      "result": "point",
+      "strict": true
+    },
+    {
+      "left": "path",
+      "right": "point",
+      "result": "path",
+      "strict": true
+    },
+    {
+      "left": "box",
+      "right": "point",
+      "result": "box",
+      "strict": true
+    },
+    {
+      "left": "money",
+      "right": "money",
+      "result": "money",
+      "strict": true
+    },
+    {
+      "left": "_aclitem",
+      "right": "aclitem",
+      "result": "_aclitem",
+      "strict": true
+    },
+    {
+      "left": "date",
+      "right": "interval",
+      "result": "timestamp",
+      "strict": true
+    },
+    {
+      "left": "date",
+      "right": "date",
+      "result": "int4",
+      "strict": true
+    },
+    {
+      "left": "date",
+      "right": "int4",
+      "result": "date",
+      "strict": true
+    },
+    {
+      "left": "float4",
+      "right": "float8",
+      "result": "float8",
+      "strict": true
+    },
+    {
+      "left": "float8",
+      "right": "float4",
+      "result": "float8",
+      "strict": true
+    },
+    {
+      "left": "timestamptz",
+      "right": "timestamptz",
+      "result": "interval",
+      "strict": true
+    },
+    {
+      "left": "timestamptz",
+      "right": "interval",
+      "result": "timestamptz",
+      "strict": true
+    },
+    {
+      "left": "interval",
+      "right": "interval",
+      "result": "interval",
+      "strict": true
+    },
+    {
+      "left": "time",
+      "right": "time",
+      "result": "interval",
+      "strict": true
+    },
+    {
+      "left": "circle",
+      "right": "point",
+      "result": "circle",
+      "strict": true
+    },
+    {
+      "left": "inet",
+      "right": "int8",
+      "result": "inet",
+      "strict": true
+    },
+    {
+      "left": "inet",
+      "right": "inet",
+      "result": "int8",
+      "strict": true
+    },
+    {
+      "left": "numeric",
+      "right": "numeric",
+      "result": "numeric",
+      "strict": true
+    },
+    {
+      "left": "time",
+      "right": "interval",
+      "result": "time",
+      "strict": true
+    },
+    {
+      "left": "timetz",
+      "right": "interval",
+      "result": "timetz",
+      "strict": true
+    },
+    {
+      "left": "timestamp",
+      "right": "timestamp",
+      "result": "interval",
+      "strict": true
+    },
+    {
+      "left": "timestamp",
+      "right": "interval",
+      "result": "timestamp",
+      "strict": true
+    },
+    {
+      "left": "pg_lsn",
+      "right": "pg_lsn",
+      "result": "numeric",
+      "strict": true
+    },
+    {
+      "left": "pg_lsn",
+      "right": "numeric",
+      "result": "pg_lsn",
+      "strict": true
+    },
+    {
+      "left": "anyrange",
+      "right": "anyrange",
+      "result": "anyrange",
+      "strict": true
+    },
+    {
+      "left": "jsonb",
+      "right": "text",
+      "result": "jsonb",
+      "strict": false
+    },
+    {
+      "left": "jsonb",
+      "right": "_text",
+      "result": "jsonb",
+      "strict": false
+    },
+    {
+      "left": "jsonb",
+      "right": "int4",
+      "result": "jsonb",
+      "strict": false
+    },
+    {
+      "left": "anymultirange",
+      "right": "anymultirange",
+      "result": "anymultirange",
+      "strict": true
+    }
+  ],
+  "->": [
+    {
+      "left": "json",
+      "right": "text",
+      "result": "json",
+      "strict": true
+    },
+    {
+      "left": "json",
+      "right": "int4",
+      "result": "json",
+      "strict": true
+    },
+    {
+      "left": "jsonb",
+      "right": "text",
+      "result": "jsonb",
+      "strict": true
+    },
+    {
+      "left": "jsonb",
+      "right": "int4",
+      "result": "jsonb",
+      "strict": true
+    }
+  ],
+  "->>": [
+    {
+      "left": "json",
+      "right": "text",
+      "result": "text",
+      "strict": true
+    },
+    {
+      "left": "json",
+      "right": "int4",
+      "result": "text",
+      "strict": true
+    },
+    {
+      "left": "jsonb",
+      "right": "text",
+      "result": "text",
+      "strict": true
+    },
+    {
+      "left": "jsonb",
+      "right": "int4",
+      "result": "text",
+      "strict": true
+    }
+  ],
+  "-|-": [
+    {
+      "left": "anyrange",
+      "right": "anyrange",
+      "result": "bool",
+      "strict": true
+    },
+    {
+      "left": "anyrange",
+      "right": "anymultirange",
+      "result": "bool",
+      "strict": true
+    },
+    {
+      "left": "anymultirange",
+      "right": "anyrange",
+      "result": "bool",
+      "strict": true
+    },
+    {
+      "left": "anymultirange",
+      "right": "anymultirange",
+      "result": "bool",
+      "strict": true
+    }
+  ],
+  "/": [
+    {
+      "left": "int2",
+      "right": "int2",
+      "result": "int2",
+      "strict": true
+    },
+    {
+      "left": "int4",
+      "right": "int4",
+      "result": "int4",
+      "strict": true
+    },
+    {
+      "left": "int2",
+      "right": "int4",
+      "result": "int4",
+      "strict": true
+    },
+    {
+      "left": "int4",
+      "right": "int2",
+      "result": "int4",
+      "strict": true
+    },
+    {
+      "left": "float4",
+      "right": "float4",
+      "result": "float4",
+      "strict": true
+    },
+    {
+      "left": "float8",
+      "right": "float8",
+      "result": "float8",
+      "strict": true
+    },
+    {
+      "left": "int8",
+      "right": "int8",
+      "result": "int8",
+      "strict": true
+    },
+    {
+      "left": "int8",
+      "right": "int4",
+      "result": "int8",
+      "strict": true
+    },
+    {
+      "left": "int4",
+      "right": "int8",
+      "result": "int8",
+      "strict": true
+    },
+    {
+      "left": "int8",
+      "right": "int2",
+      "result": "int8",
+      "strict": true
+    },
+    {
+      "left": "int2",
+      "right": "int8",
+      "result": "int8",
+      "strict": true
+    },
+    {
+      "left": "point",
+      "right": "point",
+      "result": "point",
+      "strict": true
+    },
+    {
+      "left": "path",
+      "right": "point",
+      "result": "path",
+      "strict": true
+    },
+    {
+      "left": "box",
+      "right": "point",
+      "result": "box",
+      "strict": true
+    },
+    {
+      "left": "money",
+      "right": "float4",
+      "result": "money",
+      "strict": true
+    },
+    {
+      "left": "money",
+      "right": "float8",
+      "result": "money",
+      "strict": true
+    },
+    {
+      "left": "money",
+      "right": "int8",
+      "result": "money",
+      "strict": true
+    },
+    {
+      "left": "money",
+      "right": "int4",
+      "result": "money",
+      "strict": true
+    },
+    {
+      "left": "money",
+      "right": "int2",
+      "result": "money",
+      "strict": true
+    },
+    {
+      "left": "money",
+      "right": "money",
+      "result": "float8",
+      "strict": true
+    },
+    {
+      "left": "float4",
+      "right": "float8",
+      "result": "float8",
+      "strict": true
+    },
+    {
+      "left": "float8",
+      "right": "float4",
+      "result": "float8",
+      "strict": true
+    },
+    {
+      "left": "circle",
+      "right": "point",
+      "result": "circle",
+      "strict": true
+    },
+    {
+      "left": "interval",
+      "right": "float8",
+      "result": "interval",
+      "strict": true
+    },
+    {
+      "left": "numeric",
+      "right": "numeric",
+      "result": "numeric",
+      "strict": true
+    }
+  ],
+  "<": [
+    {
+      "left": "int4",
+      "right": "int8",
+      "result": "bool",
+      "strict": true
+    },
+    {
+      "left": "bool",
+      "right": "bool",
+      "result": "bool",
+      "strict": true
+    },
+    {
+      "left": "int2",
+      "right": "int2",
+      "result": "bool",
+      "strict": true
+    },
+    {
+      "left": "int4",
+      "right": "int4",
+      "result": "bool",
+      "strict": true
+    },
+    {
+      "left": "name",
+      "right": "text",
+      "result": "bool",
+      "strict": true
+    },
+    {
+      "left": "text",
+      "right": "name",
+      "result": "bool",
+      "strict": true
+    },
+    {
+      "left": "xid8",
+      "right": "xid8",
+      "result": "bool",
+      "strict": true
+    },
+    {
+      "left": "tid",
+      "right": "tid",
+      "result": "bool",
+      "strict": true
+    },
+    {
+      "left": "int8",
+      "right": "int8",
+      "result": "bool",
+      "strict": true
+    },
+    {
+      "left": "int8",
+      "right": "int4",
+      "result": "bool",
+      "strict": true
+    },
+    {
+      "left": "box",
+      "right": "box",
+      "result": "bool",
+      "strict": true
+    },
+    {
+      "left": "int2",
+      "right": "int4",
+      "result": "bool",
+      "strict": true
+    },
+    {
+      "left": "int4",
+      "right": "int2",
+      "result": "bool",
+      "strict": true
+    },
+    {
+      "left": "oid",
+      "right": "oid",
+      "result": "bool",
+      "strict": true
+    },
+    {
+      "left": "oidvector",
+      "right": "oidvector",
+      "result": "bool",
+      "strict": true
+    },
+    {
+      "left": "float4",
+      "right": "float4",
+      "result": "bool",
+      "strict": true
+    },
+    {
+      "left": "char",
+      "right": "char",
+      "result": "bool",
+      "strict": true
+    },
+    {
+      "left": "name",
+      "right": "name",
+      "result": "bool",
+      "strict": true
+    },
+    {
+      "left": "text",
+      "right": "text",
+      "result": "bool",
+      "strict": true
+    },
+    {
+      "left": "float8",
+      "right": "float8",
+      "result": "bool",
+      "strict": true
+    },
+    {
+      "left": "path",
+      "right": "path",
+      "result": "bool",
+      "strict": true
+    },
+    {
+      "left": "money",
+      "right": "money",
+      "result": "bool",
+      "strict": true
+    },
+    {
+      "left": "bpchar",
+      "right": "bpchar",
+      "result": "bool",
+      "strict": true
+    },
+    {
+      "left": "anyarray",
+      "right": "anyarray",
+      "result": "bool",
+      "strict": true
+    },
+    {
+      "left": "date",
+      "right": "date",
+      "result": "bool",
+      "strict": true
+    },
+    {
+      "left": "time",
+      "right": "time",
+      "result": "bool",
+      "strict": true
+    },
+    {
+      "left": "timetz",
+      "right": "timetz",
+      "result": "bool",
+      "strict": true
+    },
+    {
+      "left": "float4",
+      "right": "float8",
+      "result": "bool",
+      "strict": true
+    },
+    {
+      "left": "float8",
+      "right": "float4",
+      "result": "bool",
+      "strict": true
+    },
+    {
+      "left": "timestamptz",
+      "right": "timestamptz",
+      "result": "bool",
+      "strict": true
+    },
+    {
+      "left": "interval",
+      "right": "interval",
+      "result": "bool",
+      "strict": true
+    },
+    {
+      "left": "circle",
+      "right": "circle",
+      "result": "bool",
+      "strict": true
+    },
+    {
+      "left": "lseg",
+      "right": "lseg",
+      "result": "bool",
+      "strict": true
+    },
+    {
+      "left": "macaddr",
+      "right": "macaddr",
+      "result": "bool",
+      "strict": true
+    },
+    {
+      "left": "macaddr8",
+      "right": "macaddr8",
+      "result": "bool",
+      "strict": true
+    },
+    {
+      "left": "inet",
+      "right": "inet",
+      "result": "bool",
+      "strict": true
+    },
+    {
+      "left": "numeric",
+      "right": "numeric",
+      "result": "bool",
+      "strict": true
+    },
+    {
+      "left": "bit",
+      "right": "bit",
+      "result": "bool",
+      "strict": true
+    },
+    {
+      "left": "varbit",
+      "right": "varbit",
+      "result": "bool",
+      "strict": true
+    },
+    {
+      "left": "int2",
+      "right": "int8",
+      "result": "bool",
+      "strict": true
+    },
+    {
+      "left": "int8",
+      "right": "int2",
+      "result": "bool",
+      "strict": true
+    },
+    {
+      "left": "bytea",
+      "right": "bytea",
+      "result": "bool",
+      "strict": true
+    },
+    {
+      "left": "timestamp",
+      "right": "timestamp",
+      "result": "bool",
+      "strict": true
+    },
+    {
+      "left": "date",
+      "right": "timestamp",
+      "result": "bool",
+      "strict": true
+    },
+    {
+      "left": "date",
+      "right": "timestamptz",
+      "result": "bool",
+      "strict": true
+    },
+    {
+      "left": "timestamp",
+      "right": "date",
+      "result": "bool",
+      "strict": true
+    },
+    {
+      "left": "timestamptz",
+      "right": "date",
+      "result": "bool",
+      "strict": true
+    },
+    {
+      "left": "timestamp",
+      "right": "timestamptz",
+      "result": "bool",
+      "strict": true
+    },
+    {
+      "left": "timestamptz",
+      "right": "timestamp",
+      "result": "bool",
+      "strict": true
+    },
+    {
+      "left": "uuid",
+      "right": "uuid",
+      "result": "bool",
+      "strict": true
+    },
+    {
+      "left": "pg_lsn",
+      "right": "pg_lsn",
+      "result": "bool",
+      "strict": true
+    },
+    {
+      "left": "anyenum",
+      "right": "anyenum",
+      "result": "bool",
+      "strict": true
+    },
+    {
+      "left": "tsvector",
+      "right": "tsvector",
+      "result": "bool",
+      "strict": true
+    },
+    {
+      "left": "tsquery",
+      "right": "tsquery",
+      "result": "bool",
+      "strict": true
+    },
+    {
+      "left": "record",
+      "right": "record",
+      "result": "bool",
+      "strict": true
+    },
+    {
+      "left": "anyrange",
+      "right": "anyrange",
+      "result": "bool",
+      "strict": true
+    },
+    {
+      "left": "jsonb",
+      "right": "jsonb",
+      "result": "bool",
+      "strict": true
+    },
+    {
+      "left": "anymultirange",
+      "right": "anymultirange",
+      "result": "bool",
+      "strict": true
+    }
+  ],
+  "<->": [
+    {
+      "left": "point",
+      "right": "point",
+      "result": "float8",
+      "strict": true
+    },
+    {
+      "left": "point",
+      "right": "line",
+      "result": "float8",
+      "strict": true
+    },
+    {
+      "left": "line",
+      "right": "point",
+      "result": "float8",
+      "strict": true
+    },
+    {
+      "left": "point",
+      "right": "lseg",
+      "result": "float8",
+      "strict": true
+    },
+    {
+      "left": "lseg",
+      "right": "point",
+      "result": "float8",
+      "strict": true
+    },
+    {
+      "left": "point",
+      "right": "box",
+      "result": "float8",
+      "strict": true
+    },
+    {
+      "left": "box",
+      "right": "point",
+      "result": "float8",
+      "strict": true
+    },
+    {
+      "left": "lseg",
+      "right": "line",
+      "result": "float8",
+      "strict": true
+    },
+    {
+      "left": "line",
+      "right": "lseg",
+      "result": "float8",
+      "strict": true
+    },
+    {
+      "left": "lseg",
+      "right": "box",
+      "result": "float8",
+      "strict": true
+    },
+    {
+      "left": "box",
+      "right": "lseg",
+      "result": "float8",
+      "strict": true
+    },
+    {
+      "left": "point",
+      "right": "path",
+      "result": "float8",
+      "strict": true
+    },
+    {
+      "left": "path",
+      "right": "point",
+      "result": "float8",
+      "strict": true
+    },
+    {
+      "left": "box",
+      "right": "box",
+      "result": "float8",
+      "strict": true
+    },
+    {
+      "left": "path",
+      "right": "path",
+      "result": "float8",
+      "strict": true
+    },
+    {
+      "left": "line",
+      "right": "line",
+      "result": "float8",
+      "strict": true
+    },
+    {
+      "left": "lseg",
+      "right": "lseg",
+      "result": "float8",
+      "strict": true
+    },
+    {
+      "left": "polygon",
+      "right": "polygon",
+      "result": "float8",
+      "strict": true
+    },
+    {
+      "left": "circle",
+      "right": "circle",
+      "result": "float8",
+      "strict": true
+    },
+    {
+      "left": "point",
+      "right": "circle",
+      "result": "float8",
+      "strict": true
+    },
+    {
+      "left": "circle",
+      "right": "point",
+      "result": "float8",
+      "strict": true
+    },
+    {
+      "left": "point",
+      "right": "polygon",
+      "result": "float8",
+      "strict": true
+    },
+    {
+      "left": "polygon",
+      "right": "point",
+      "result": "float8",
+      "strict": true
+    },
+    {
+      "left": "circle",
+      "right": "polygon",
+      "result": "float8",
+      "strict": true
+    },
+    {
+      "left": "polygon",
+      "right": "circle",
+      "result": "float8",
+      "strict": true
+    },
+    {
+      "left": "tsquery",
+      "right": "tsquery",
+      "result": "tsquery",
+      "strict": false
+    }
+  ],
+  "<<": [
+    {
+      "left": "polygon",
+      "right": "polygon",
+      "result": "bool",
+      "strict": true
+    },
+    {
+      "left": "box",
+      "right": "box",
+      "result": "bool",
+      "strict": true
+    },
+    {
+      "left": "point",
+      "right": "point",
+      "result": "bool",
+      "strict": true
+    },
+    {
+      "left": "circle",
+      "right": "circle",
+      "result": "bool",
+      "strict": true
+    },
+    {
+      "left": "inet",
+      "right": "inet",
+      "result": "bool",
+      "strict": true
+    },
+    {
+      "left": "bit",
+      "right": "int4",
+      "result": "bit",
+      "strict": true
+    },
+    {
+      "left": "int2",
+      "right": "int4",
+      "result": "int2",
+      "strict": true
+    },
+    {
+      "left": "int4",
+      "right": "int4",
+      "result": "int4",
+      "strict": true
+    },
+    {
+      "left": "int8",
+      "right": "int4",
+      "result": "int8",
+      "strict": true
+    },
+    {
+      "left": "anyrange",
+      "right": "anyrange",
+      "result": "bool",
+      "strict": true
+    },
+    {
+      "left": "anyrange",
+      "right": "anymultirange",
+      "result": "bool",
+      "strict": true
+    },
+    {
+      "left": "anymultirange",
+      "right": "anyrange",
+      "result": "bool",
+      "strict": true
+    },
+    {
+      "left": "anymultirange",
+      "right": "anymultirange",
+      "result": "bool",
+      "strict": true
+    }
+  ],
+  "<<=": [
+    {
+      "left": "inet",
+      "right": "inet",
+      "result": "bool",
+      "strict": true
+    }
+  ],
+  "<<|": [
+    {
+      "left": "circle",
+      "right": "circle",
+      "result": "bool",
+      "strict": true
+    },
+    {
+      "left": "point",
+      "right": "point",
+      "result": "bool",
+      "strict": true
+    },
+    {
+      "left": "box",
+      "right": "box",
+      "result": "bool",
+      "strict": true
+    },
+    {
+      "left": "polygon",
+      "right": "polygon",
+      "result": "bool",
+      "strict": true
+    }
+  ],
+  "<=": [
+    {
+      "left": "int4",
+      "right": "int8",
+      "result": "bool",
+      "strict": true
+    },
+    {
+      "left": "bool",
+      "right": "bool",
+      "result": "bool",
+      "strict": true
+    },
+    {
+      "left": "name",
+      "right": "text",
+      "result": "bool",
+      "strict": true
+    },
+    {
+      "left": "text",
+      "right": "name",
+      "result": "bool",
+      "strict": true
+    },
+    {
+      "left": "xid8",
+      "right": "xid8",
+      "result": "bool",
+      "strict": true
+    },
+    {
+      "left": "tid",
+      "right": "tid",
+      "result": "bool",
+      "strict": true
+    },
+    {
+      "left": "int8",
+      "right": "int8",
+      "result": "bool",
+      "strict": true
+    },
+    {
+      "left": "int8",
+      "right": "int4",
+      "result": "bool",
+      "strict": true
+    },
+    {
+      "left": "box",
+      "right": "box",
+      "result": "bool",
+      "strict": true
+    },
+    {
+      "left": "int2",
+      "right": "int2",
+      "result": "bool",
+      "strict": true
+    },
+    {
+      "left": "int4",
+      "right": "int4",
+      "result": "bool",
+      "strict": true
+    },
+    {
+      "left": "int2",
+      "right": "int4",
+      "result": "bool",
+      "strict": true
+    },
+    {
+      "left": "int4",
+      "right": "int2",
+      "result": "bool",
+      "strict": true
+    },
+    {
+      "left": "oid",
+      "right": "oid",
+      "result": "bool",
+      "strict": true
+    },
+    {
+      "left": "oidvector",
+      "right": "oidvector",
+      "result": "bool",
+      "strict": true
+    },
+    {
+      "left": "float4",
+      "right": "float4",
+      "result": "bool",
+      "strict": true
+    },
+    {
+      "left": "char",
+      "right": "char",
+      "result": "bool",
+      "strict": true
+    },
+    {
+      "left": "name",
+      "right": "name",
+      "result": "bool",
+      "strict": true
+    },
+    {
+      "left": "text",
+      "right": "text",
+      "result": "bool",
+      "strict": true
+    },
+    {
+      "left": "float8",
+      "right": "float8",
+      "result": "bool",
+      "strict": true
+    },
+    {
+      "left": "path",
+      "right": "path",
+      "result": "bool",
+      "strict": true
+    },
+    {
+      "left": "money",
+      "right": "money",
+      "result": "bool",
+      "strict": true
+    },
+    {
+      "left": "bpchar",
+      "right": "bpchar",
+      "result": "bool",
+      "strict": true
+    },
+    {
+      "left": "anyarray",
+      "right": "anyarray",
+      "result": "bool",
+      "strict": true
+    },
+    {
+      "left": "date",
+      "right": "date",
+      "result": "bool",
+      "strict": true
+    },
+    {
+      "left": "time",
+      "right": "time",
+      "result": "bool",
+      "strict": true
+    },
+    {
+      "left": "timetz",
+      "right": "timetz",
+      "result": "bool",
+      "strict": true
+    },
+    {
+      "left": "float4",
+      "right": "float8",
+      "result": "bool",
+      "strict": true
+    },
+    {
+      "left": "float8",
+      "right": "float4",
+      "result": "bool",
+      "strict": true
+    },
+    {
+      "left": "timestamptz",
+      "right": "timestamptz",
+      "result": "bool",
+      "strict": true
+    },
+    {
+      "left": "interval",
+      "right": "interval",
+      "result": "bool",
+      "strict": true
+    },
+    {
+      "left": "circle",
+      "right": "circle",
+      "result": "bool",
+      "strict": true
+    },
+    {
+      "left": "lseg",
+      "right": "lseg",
+      "result": "bool",
+      "strict": true
+    },
+    {
+      "left": "macaddr",
+      "right": "macaddr",
+      "result": "bool",
+      "strict": true
+    },
+    {
+      "left": "macaddr8",
+      "right": "macaddr8",
+      "result": "bool",
+      "strict": true
+    },
+    {
+      "left": "inet",
+      "right": "inet",
+      "result": "bool",
+      "strict": true
+    },
+    {
+      "left": "numeric",
+      "right": "numeric",
+      "result": "bool",
+      "strict": true
+    },
+    {
+      "left": "bit",
+      "right": "bit",
+      "result": "bool",
+      "strict": true
+    },
+    {
+      "left": "varbit",
+      "right": "varbit",
+      "result": "bool",
+      "strict": true
+    },
+    {
+      "left": "int2",
+      "right": "int8",
+      "result": "bool",
+      "strict": true
+    },
+    {
+      "left": "int8",
+      "right": "int2",
+      "result": "bool",
+      "strict": true
+    },
+    {
+      "left": "bytea",
+      "right": "bytea",
+      "result": "bool",
+      "strict": true
+    },
+    {
+      "left": "timestamp",
+      "right": "timestamp",
+      "result": "bool",
+      "strict": true
+    },
+    {
+      "left": "date",
+      "right": "timestamp",
+      "result": "bool",
+      "strict": true
+    },
+    {
+      "left": "date",
+      "right": "timestamptz",
+      "result": "bool",
+      "strict": true
+    },
+    {
+      "left": "timestamp",
+      "right": "date",
+      "result": "bool",
+      "strict": true
+    },
+    {
+      "left": "timestamptz",
+      "right": "date",
+      "result": "bool",
+      "strict": true
+    },
+    {
+      "left": "timestamp",
+      "right": "timestamptz",
+      "result": "bool",
+      "strict": true
+    },
+    {
+      "left": "timestamptz",
+      "right": "timestamp",
+      "result": "bool",
+      "strict": true
+    },
+    {
+      "left": "uuid",
+      "right": "uuid",
+      "result": "bool",
+      "strict": true
+    },
+    {
+      "left": "pg_lsn",
+      "right": "pg_lsn",
+      "result": "bool",
+      "strict": true
+    },
+    {
+      "left": "anyenum",
+      "right": "anyenum",
+      "result": "bool",
+      "strict": true
+    },
+    {
+      "left": "tsvector",
+      "right": "tsvector",
+      "result": "bool",
+      "strict": true
+    },
+    {
+      "left": "tsquery",
+      "right": "tsquery",
+      "result": "bool",
+      "strict": true
+    },
+    {
+      "left": "record",
+      "right": "record",
+      "result": "bool",
+      "strict": true
+    },
+    {
+      "left": "anyrange",
+      "right": "anyrange",
+      "result": "bool",
+      "strict": true
+    },
+    {
+      "left": "jsonb",
+      "right": "jsonb",
+      "result": "bool",
+      "strict": true
+    },
+    {
+      "left": "anymultirange",
+      "right": "anymultirange",
+      "result": "bool",
+      "strict": true
+    }
+  ],
+  "<>": [
+    {
+      "left": "int4",
+      "right": "int8",
+      "result": "bool",
+      "strict": true
+    },
+    {
+      "left": "bool",
+      "right": "bool",
+      "result": "bool",
+      "strict": true
+    },
+    {
+      "left": "name",
+      "right": "text",
+      "result": "bool",
+      "strict": true
+    },
+    {
+      "left": "text",
+      "right": "name",
+      "result": "bool",
+      "strict": true
+    },
+    {
+      "left": "xid",
+      "right": "xid",
+      "result": "bool",
+      "strict": true
+    },
+    {
+      "left": "xid",
+      "right": "int4",
+      "result": "bool",
+      "strict": true
+    },
+    {
+      "left": "xid8",
+      "right": "xid8",
+      "result": "bool",
+      "strict": true
+    },
+    {
+      "left": "tid",
+      "right": "tid",
+      "result": "bool",
+      "strict": true
+    },
+    {
+      "left": "int8",
+      "right": "int8",
+      "result": "bool",
+      "strict": true
+    },
+    {
+      "left": "int8",
+      "right": "int4",
+      "result": "bool",
+      "strict": true
+    },
+    {
+      "left": "int4",
+      "right": "int4",
+      "result": "bool",
+      "strict": true
+    },
+    {
+      "left": "int2",
+      "right": "int2",
+      "result": "bool",
+      "strict": true
+    },
+    {
+      "left": "text",
+      "right": "text",
+      "result": "bool",
+      "strict": true
+    },
+    {
+      "left": "int2",
+      "right": "int4",
+      "result": "bool",
+      "strict": true
+    },
+    {
+      "left": "int4",
+      "right": "int2",
+      "result": "bool",
+      "strict": true
+    },
+    {
+      "left": "oid",
+      "right": "oid",
+      "result": "bool",
+      "strict": true
+    },
+    {
+      "left": "oidvector",
+      "right": "oidvector",
+      "result": "bool",
+      "strict": true
+    },
+    {
+      "left": "float4",
+      "right": "float4",
+      "result": "bool",
+      "strict": true
+    },
+    {
+      "left": "char",
+      "right": "char",
+      "result": "bool",
+      "strict": true
+    },
+    {
+      "left": "name",
+      "right": "name",
+      "result": "bool",
+      "strict": true
+    },
+    {
+      "left": "float8",
+      "right": "float8",
+      "result": "bool",
+      "strict": true
+    },
+    {
+      "left": "point",
+      "right": "point",
+      "result": "bool",
+      "strict": true
+    },
+    {
+      "left": "money",
+      "right": "money",
+      "result": "bool",
+      "strict": true
+    },
+    {
+      "left": "bpchar",
+      "right": "bpchar",
+      "result": "bool",
+      "strict": true
+    },
+    {
+      "left": "anyarray",
+      "right": "anyarray",
+      "result": "bool",
+      "strict": true
+    },
+    {
+      "left": "date",
+      "right": "date",
+      "result": "bool",
+      "strict": true
+    },
+    {
+      "left": "time",
+      "right": "time",
+      "result": "bool",
+      "strict": true
+    },
+    {
+      "left": "timetz",
+      "right": "timetz",
+      "result": "bool",
+      "strict": true
+    },
+    {
+      "left": "float4",
+      "right": "float8",
+      "result": "bool",
+      "strict": true
+    },
+    {
+      "left": "float8",
+      "right": "float4",
+      "result": "bool",
+      "strict": true
+    },
+    {
+      "left": "timestamptz",
+      "right": "timestamptz",
+      "result": "bool",
+      "strict": true
+    },
+    {
+      "left": "interval",
+      "right": "interval",
+      "result": "bool",
+      "strict": true
+    },
+    {
+      "left": "circle",
+      "right": "circle",
+      "result": "bool",
+      "strict": true
+    },
+    {
+      "left": "lseg",
+      "right": "lseg",
+      "result": "bool",
+      "strict": true
+    },
+    {
+      "left": "macaddr",
+      "right": "macaddr",
+      "result": "bool",
+      "strict": true
+    },
+    {
+      "left": "macaddr8",
+      "right": "macaddr8",
+      "result": "bool",
+      "strict": true
+    },
+    {
+      "left": "inet",
+      "right": "inet",
+      "result": "bool",
+      "strict": true
+    },
+    {
+      "left": "numeric",
+      "right": "numeric",
+      "result": "bool",
+      "strict": true
+    },
+    {
+      "left": "bit",
+      "right": "bit",
+      "result": "bool",
+      "strict": true
+    },
+    {
+      "left": "varbit",
+      "right": "varbit",
+      "result": "bool",
+      "strict": true
+    },
+    {
+      "left": "int2",
+      "right": "int8",
+      "result": "bool",
+      "strict": true
+    },
+    {
+      "left": "int8",
+      "right": "int2",
+      "result": "bool",
+      "strict": true
+    },
+    {
+      "left": "bytea",
+      "right": "bytea",
+      "result": "bool",
+      "strict": true
+    },
+    {
+      "left": "timestamp",
+      "right": "timestamp",
+      "result": "bool",
+      "strict": true
+    },
+    {
+      "left": "date",
+      "right": "timestamp",
+      "result": "bool",
+      "strict": true
+    },
+    {
+      "left": "date",
+      "right": "timestamptz",
+      "result": "bool",
+      "strict": true
+    },
+    {
+      "left": "timestamp",
+      "right": "date",
+      "result": "bool",
+      "strict": true
+    },
+    {
+      "left": "timestamptz",
+      "right": "date",
+      "result": "bool",
+      "strict": true
+    },
+    {
+      "left": "timestamp",
+      "right": "timestamptz",
+      "result": "bool",
+      "strict": true
+    },
+    {
+      "left": "timestamptz",
+      "right": "timestamp",
+      "result": "bool",
+      "strict": true
+    },
+    {
+      "left": "uuid",
+      "right": "uuid",
+      "result": "bool",
+      "strict": true
+    },
+    {
+      "left": "pg_lsn",
+      "right": "pg_lsn",
+      "result": "bool",
+      "strict": true
+    },
+    {
+      "left": "anyenum",
+      "right": "anyenum",
+      "result": "bool",
+      "strict": true
+    },
+    {
+      "left": "tsvector",
+      "right": "tsvector",
+      "result": "bool",
+      "strict": true
+    },
+    {
+      "left": "tsquery",
+      "right": "tsquery",
+      "result": "bool",
+      "strict": true
+    },
+    {
+      "left": "record",
+      "right": "record",
+      "result": "bool",
+      "strict": true
+    },
+    {
+      "left": "anyrange",
+      "right": "anyrange",
+      "result": "bool",
+      "strict": true
+    },
+    {
+      "left": "jsonb",
+      "right": "jsonb",
+      "result": "bool",
+      "strict": true
+    },
+    {
+      "left": "anymultirange",
+      "right": "anymultirange",
+      "result": "bool",
+      "strict": true
+    }
+  ],
+  "<@": [
+    {
+      "left": "polygon",
+      "right": "polygon",
+      "result": "bool",
+      "strict": true
+    },
+    {
+      "left": "box",
+      "right": "box",
+      "result": "bool",
+      "strict": true
+    },
+    {
+      "left": "point",
+      "right": "box",
+      "result": "bool",
+      "strict": true
+    },
+    {
+      "left": "point",
+      "right": "path",
+      "result": "bool",
+      "strict": true
+    },
+    {
+      "left": "point",
+      "right": "polygon",
+      "result": "bool",
+      "strict": true
+    },
+    {
+      "left": "point",
+      "right": "circle",
+      "result": "bool",
+      "strict": true
+    },
+    {
+      "left": "circle",
+      "right": "circle",
+      "result": "bool",
+      "strict": true
+    },
+    {
+      "left": "point",
+      "right": "line",
+      "result": "bool",
+      "strict": true
+    },
+    {
+      "left": "point",
+      "right": "lseg",
+      "result": "bool",
+      "strict": true
+    },
+    {
+      "left": "lseg",
+      "right": "line",
+      "result": "bool",
+      "strict": true
+    },
+    {
+      "left": "lseg",
+      "right": "box",
+      "result": "bool",
+      "strict": true
+    },
+    {
+      "left": "anyarray",
+      "right": "anyarray",
+      "result": "bool",
+      "strict": true
+    },
+    {
+      "left": "tsquery",
+      "right": "tsquery",
+      "result": "bool",
+      "strict": true
+    },
+    {
+      "left": "anyelement",
+      "right": "anyrange",
+      "result": "bool",
+      "strict": true
+    },
+    {
+      "left": "anyrange",
+      "right": "anyrange",
+      "result": "bool",
+      "strict": true
+    },
+    {
+      "left": "jsonb",
+      "right": "jsonb",
+      "result": "bool",
+      "strict": true
+    },
+    {
+      "left": "anyelement",
+      "right": "anymultirange",
+      "result": "bool",
+      "strict": true
+    },
+    {
+      "left": "anyrange",
+      "right": "anymultirange",
+      "result": "bool",
+      "strict": true
+    },
+    {
+      "left": "anymultirange",
+      "right": "anymultirange",
+      "result": "bool",
+      "strict": true
+    },
+    {
+      "left": "anymultirange",
+      "right": "anyrange",
+      "result": "bool",
+      "strict": true
+    }
+  ],
+  "<^": [
+    {
+      "left": "point",
+      "right": "point",
+      "result": "bool",
+      "strict": true
+    },
+    {
+      "left": "box",
+      "right": "box",
+      "result": "bool",
+      "strict": true
+    }
+  ],
+  "=": [
+    {
+      "left": "int4",
+      "right": "int8",
+      "result": "bool",
+      "strict": true
+    },
+    {
+      "left": "bool",
+      "right": "bool",
+      "result": "bool",
+      "strict": true
+    },
+    {
+      "left": "char",
+      "right": "char",
+      "result": "bool",
+      "strict": true
+    },
+    {
+      "left": "name",
+      "right": "name",
+      "result": "bool",
+      "strict": true
+    },
+    {
+      "left": "int2",
+      "right": "int2",
+      "result": "bool",
+      "strict": true
+    },
+    {
+      "left": "int4",
+      "right": "int4",
+      "result": "bool",
+      "strict": true
+    },
+    {
+      "left": "text",
+      "right": "text",
+      "result": "bool",
+      "strict": true
+    },
+    {
+      "left": "name",
+      "right": "text",
+      "result": "bool",
+      "strict": true
+    },
+    {
+      "left": "text",
+      "right": "name",
+      "result": "bool",
+      "strict": true
+    },
+    {
+      "left": "xid",
+      "right": "xid",
+      "result": "bool",
+      "strict": true
+    },
+    {
+      "left": "xid",
+      "right": "int4",
+      "result": "bool",
+      "strict": true
+    },
+    {
+      "left": "xid8",
+      "right": "xid8",
+      "result": "bool",
+      "strict": true
+    },
+    {
+      "left": "cid",
+      "right": "cid",
+      "result": "bool",
+      "strict": true
+    },
+    {
+      "left": "tid",
+      "right": "tid",
+      "result": "bool",
+      "strict": true
+    },
+    {
+      "left": "int8",
+      "right": "int8",
+      "result": "bool",
+      "strict": true
+    },
+    {
+      "left": "int8",
+      "right": "int4",
+      "result": "bool",
+      "strict": true
+    },
+    {
+      "left": "box",
+      "right": "box",
+      "result": "bool",
+      "strict": true
+    },
+    {
+      "left": "int2",
+      "right": "int4",
+      "result": "bool",
+      "strict": true
+    },
+    {
+      "left": "int4",
+      "right": "int2",
+      "result": "bool",
+      "strict": true
+    },
+    {
+      "left": "oid",
+      "right": "oid",
+      "result": "bool",
+      "strict": true
+    },
+    {
+      "left": "oidvector",
+      "right": "oidvector",
+      "result": "bool",
+      "strict": true
+    },
+    {
+      "left": "float4",
+      "right": "float4",
+      "result": "bool",
+      "strict": true
+    },
+    {
+      "left": "float8",
+      "right": "float8",
+      "result": "bool",
+      "strict": true
+    },
+    {
+      "left": "path",
+      "right": "path",
+      "result": "bool",
+      "strict": true
+    },
+    {
+      "left": "money",
+      "right": "money",
+      "result": "bool",
+      "strict": true
+    },
+    {
+      "left": "aclitem",
+      "right": "aclitem",
+      "result": "bool",
+      "strict": true
+    },
+    {
+      "left": "bpchar",
+      "right": "bpchar",
+      "result": "bool",
+      "strict": true
+    },
+    {
+      "left": "anyarray",
+      "right": "anyarray",
+      "result": "bool",
+      "strict": true
+    },
+    {
+      "left": "date",
+      "right": "date",
+      "result": "bool",
+      "strict": true
+    },
+    {
+      "left": "time",
+      "right": "time",
+      "result": "bool",
+      "strict": true
+    },
+    {
+      "left": "timetz",
+      "right": "timetz",
+      "result": "bool",
+      "strict": true
+    },
+    {
+      "left": "float4",
+      "right": "float8",
+      "result": "bool",
+      "strict": true
+    },
+    {
+      "left": "float8",
+      "right": "float4",
+      "result": "bool",
+      "strict": true
+    },
+    {
+      "left": "timestamptz",
+      "right": "timestamptz",
+      "result": "bool",
+      "strict": true
+    },
+    {
+      "left": "interval",
+      "right": "interval",
+      "result": "bool",
+      "strict": true
+    },
+    {
+      "left": "circle",
+      "right": "circle",
+      "result": "bool",
+      "strict": true
+    },
+    {
+      "left": "lseg",
+      "right": "lseg",
+      "result": "bool",
+      "strict": true
+    },
+    {
+      "left": "line",
+      "right": "line",
+      "result": "bool",
+      "strict": true
+    },
+    {
+      "left": "macaddr",
+      "right": "macaddr",
+      "result": "bool",
+      "strict": true
+    },
+    {
+      "left": "macaddr8",
+      "right": "macaddr8",
+      "result": "bool",
+      "strict": true
+    },
+    {
+      "left": "inet",
+      "right": "inet",
+      "result": "bool",
+      "strict": true
+    },
+    {
+      "left": "numeric",
+      "right": "numeric",
+      "result": "bool",
+      "strict": true
+    },
+    {
+      "left": "bit",
+      "right": "bit",
+      "result": "bool",
+      "strict": true
+    },
+    {
+      "left": "varbit",
+      "right": "varbit",
+      "result": "bool",
+      "strict": true
+    },
+    {
+      "left": "int2",
+      "right": "int8",
+      "result": "bool",
+      "strict": true
+    },
+    {
+      "left": "int8",
+      "right": "int2",
+      "result": "bool",
+      "strict": true
+    },
+    {
+      "left": "bytea",
+      "right": "bytea",
+      "result": "bool",
+      "strict": true
+    },
+    {
+      "left": "timestamp",
+      "right": "timestamp",
+      "result": "bool",
+      "strict": true
+    },
+    {
+      "left": "date",
+      "right": "timestamp",
+      "result": "bool",
+      "strict": true
+    },
+    {
+      "left": "date",
+      "right": "timestamptz",
+      "result": "bool",
+      "strict": true
+    },
+    {
+      "left": "timestamp",
+      "right": "date",
+      "result": "bool",
+      "strict": true
+    },
+    {
+      "left": "timestamptz",
+      "right": "date",
+      "result": "bool",
+      "strict": true
+    },
+    {
+      "left": "timestamp",
+      "right": "timestamptz",
+      "result": "bool",
+      "strict": true
+    },
+    {
+      "left": "timestamptz",
+      "right": "timestamp",
+      "result": "bool",
+      "strict": true
+    },
+    {
+      "left": "uuid",
+      "right": "uuid",
+      "result": "bool",
+      "strict": true
+    },
+    {
+      "left": "pg_lsn",
+      "right": "pg_lsn",
+      "result": "bool",
+      "strict": true
+    },
+    {
+      "left": "anyenum",
+      "right": "anyenum",
+      "result": "bool",
+      "strict": true
+    },
+    {
+      "left": "tsvector",
+      "right": "tsvector",
+      "result": "bool",
+      "strict": true
+    },
+    {
+      "left": "tsquery",
+      "right": "tsquery",
+      "result": "bool",
+      "strict": true
+    },
+    {
+      "left": "record",
+      "right": "record",
+      "result": "bool",
+      "strict": true
+    },
+    {
+      "left": "anyrange",
+      "right": "anyrange",
+      "result": "bool",
+      "strict": true
+    },
+    {
+      "left": "jsonb",
+      "right": "jsonb",
+      "result": "bool",
+      "strict": true
+    },
+    {
+      "left": "anymultirange",
+      "right": "anymultirange",
+      "result": "bool",
+      "strict": true
+    }
+  ],
+  ">": [
+    {
+      "left": "int4",
+      "right": "int8",
+      "result": "bool",
+      "strict": true
+    },
+    {
+      "left": "bool",
+      "right": "bool",
+      "result": "bool",
+      "strict": true
+    },
+    {
+      "left": "name",
+      "right": "text",
+      "result": "bool",
+      "strict": true
+    },
+    {
+      "left": "text",
+      "right": "name",
+      "result": "bool",
+      "strict": true
+    },
+    {
+      "left": "xid8",
+      "right": "xid8",
+      "result": "bool",
+      "strict": true
+    },
+    {
+      "left": "tid",
+      "right": "tid",
+      "result": "bool",
+      "strict": true
+    },
+    {
+      "left": "int8",
+      "right": "int8",
+      "result": "bool",
+      "strict": true
+    },
+    {
+      "left": "int8",
+      "right": "int4",
+      "result": "bool",
+      "strict": true
+    },
+    {
+      "left": "box",
+      "right": "box",
+      "result": "bool",
+      "strict": true
+    },
+    {
+      "left": "int2",
+      "right": "int2",
+      "result": "bool",
+      "strict": true
+    },
+    {
+      "left": "int4",
+      "right": "int4",
+      "result": "bool",
+      "strict": true
+    },
+    {
+      "left": "int2",
+      "right": "int4",
+      "result": "bool",
+      "strict": true
+    },
+    {
+      "left": "int4",
+      "right": "int2",
+      "result": "bool",
+      "strict": true
+    },
+    {
+      "left": "oid",
+      "right": "oid",
+      "result": "bool",
+      "strict": true
+    },
+    {
+      "left": "oidvector",
+      "right": "oidvector",
+      "result": "bool",
+      "strict": true
+    },
+    {
+      "left": "float4",
+      "right": "float4",
+      "result": "bool",
+      "strict": true
+    },
+    {
+      "left": "char",
+      "right": "char",
+      "result": "bool",
+      "strict": true
+    },
+    {
+      "left": "name",
+      "right": "name",
+      "result": "bool",
+      "strict": true
+    },
+    {
+      "left": "text",
+      "right": "text",
+      "result": "bool",
+      "strict": true
+    },
+    {
+      "left": "float8",
+      "right": "float8",
+      "result": "bool",
+      "strict": true
+    },
+    {
+      "left": "path",
+      "right": "path",
+      "result": "bool",
+      "strict": true
+    },
+    {
+      "left": "money",
+      "right": "money",
+      "result": "bool",
+      "strict": true
+    },
+    {
+      "left": "bpchar",
+      "right": "bpchar",
+      "result": "bool",
+      "strict": true
+    },
+    {
+      "left": "anyarray",
+      "right": "anyarray",
+      "result": "bool",
+      "strict": true
+    },
+    {
+      "left": "date",
+      "right": "date",
+      "result": "bool",
+      "strict": true
+    },
+    {
+      "left": "time",
+      "right": "time",
+      "result": "bool",
+      "strict": true
+    },
+    {
+      "left": "timetz",
+      "right": "timetz",
+      "result": "bool",
+      "strict": true
+    },
+    {
+      "left": "float4",
+      "right": "float8",
+      "result": "bool",
+      "strict": true
+    },
+    {
+      "left": "float8",
+      "right": "float4",
+      "result": "bool",
+      "strict": true
+    },
+    {
+      "left": "timestamptz",
+      "right": "timestamptz",
+      "result": "bool",
+      "strict": true
+    },
+    {
+      "left": "interval",
+      "right": "interval",
+      "result": "bool",
+      "strict": true
+    },
+    {
+      "left": "circle",
+      "right": "circle",
+      "result": "bool",
+      "strict": true
+    },
+    {
+      "left": "lseg",
+      "right": "lseg",
+      "result": "bool",
+      "strict": true
+    },
+    {
+      "left": "macaddr",
+      "right": "macaddr",
+      "result": "bool",
+      "strict": true
+    },
+    {
+      "left": "macaddr8",
+      "right": "macaddr8",
+      "result": "bool",
+      "strict": true
+    },
+    {
+      "left": "inet",
+      "right": "inet",
+      "result": "bool",
+      "strict": true
+    },
+    {
+      "left": "numeric",
+      "right": "numeric",
+      "result": "bool",
+      "strict": true
+    },
+    {
+      "left": "bit",
+      "right": "bit",
+      "result": "bool",
+      "strict": true
+    },
+    {
+      "left": "varbit",
+      "right": "varbit",
+      "result": "bool",
+      "strict": true
+    },
+    {
+      "left": "int2",
+      "right": "int8",
+      "result": "bool",
+      "strict": true
+    },
+    {
+      "left": "int8",
+      "right": "int2",
+      "result": "bool",
+      "strict": true
+    },
+    {
+      "left": "bytea",
+      "right": "bytea",
+      "result": "bool",
+      "strict": true
+    },
+    {
+      "left": "timestamp",
+      "right": "timestamp",
+      "result": "bool",
+      "strict": true
+    },
+    {
+      "left": "date",
+      "right": "timestamp",
+      "result": "bool",
+      "strict": true
+    },
+    {
+      "left": "date",
+      "right": "timestamptz",
+      "result": "bool",
+      "strict": true
+    },
+    {
+      "left": "timestamp",
+      "right": "date",
+      "result": "bool",
+      "strict": true
+    },
+    {
+      "left": "timestamptz",
+      "right": "date",
+      "result": "bool",
+      "strict": true
+    },
+    {
+      "left": "timestamp",
+      "right": "timestamptz",
+      "result": "bool",
+      "strict": true
+    },
+    {
+      "left": "timestamptz",
+      "right": "timestamp",
+      "result": "bool",
+      "strict": true
+    },
+    {
+      "left": "uuid",
+      "right": "uuid",
+      "result": "bool",
+      "strict": true
+    },
+    {
+      "left": "pg_lsn",
+      "right": "pg_lsn",
+      "result": "bool",
+      "strict": true
+    },
+    {
+      "left": "anyenum",
+      "right": "anyenum",
+      "result": "bool",
+      "strict": true
+    },
+    {
+      "left": "tsvector",
+      "right": "tsvector",
+      "result": "bool",
+      "strict": true
+    },
+    {
+      "left": "tsquery",
+      "right": "tsquery",
+      "result": "bool",
+      "strict": true
+    },
+    {
+      "left": "record",
+      "right": "record",
+      "result": "bool",
+      "strict": true
+    },
+    {
+      "left": "anyrange",
+      "right": "anyrange",
+      "result": "bool",
+      "strict": true
+    },
+    {
+      "left": "jsonb",
+      "right": "jsonb",
+      "result": "bool",
+      "strict": true
+    },
+    {
+      "left": "anymultirange",
+      "right": "anymultirange",
+      "result": "bool",
+      "strict": true
+    }
+  ],
+  ">=": [
+    {
+      "left": "int4",
+      "right": "int8",
+      "result": "bool",
+      "strict": true
+    },
+    {
+      "left": "bool",
+      "right": "bool",
+      "result": "bool",
+      "strict": true
+    },
+    {
+      "left": "name",
+      "right": "text",
+      "result": "bool",
+      "strict": true
+    },
+    {
+      "left": "text",
+      "right": "name",
+      "result": "bool",
+      "strict": true
+    },
+    {
+      "left": "xid8",
+      "right": "xid8",
+      "result": "bool",
+      "strict": true
+    },
+    {
+      "left": "tid",
+      "right": "tid",
+      "result": "bool",
+      "strict": true
+    },
+    {
+      "left": "int8",
+      "right": "int8",
+      "result": "bool",
+      "strict": true
+    },
+    {
+      "left": "int8",
+      "right": "int4",
+      "result": "bool",
+      "strict": true
+    },
+    {
+      "left": "box",
+      "right": "box",
+      "result": "bool",
+      "strict": true
+    },
+    {
+      "left": "int2",
+      "right": "int2",
+      "result": "bool",
+      "strict": true
+    },
+    {
+      "left": "int4",
+      "right": "int4",
+      "result": "bool",
+      "strict": true
+    },
+    {
+      "left": "int2",
+      "right": "int4",
+      "result": "bool",
+      "strict": true
+    },
+    {
+      "left": "int4",
+      "right": "int2",
+      "result": "bool",
+      "strict": true
+    },
+    {
+      "left": "oid",
+      "right": "oid",
+      "result": "bool",
+      "strict": true
+    },
+    {
+      "left": "oidvector",
+      "right": "oidvector",
+      "result": "bool",
+      "strict": true
+    },
+    {
+      "left": "float4",
+      "right": "float4",
+      "result": "bool",
+      "strict": true
+    },
+    {
+      "left": "char",
+      "right": "char",
+      "result": "bool",
+      "strict": true
+    },
+    {
+      "left": "name",
+      "right": "name",
+      "result": "bool",
+      "strict": true
+    },
+    {
+      "left": "text",
+      "right": "text",
+      "result": "bool",
+      "strict": true
+    },
+    {
+      "left": "float8",
+      "right": "float8",
+      "result": "bool",
+      "strict": true
+    },
+    {
+      "left": "path",
+      "right": "path",
+      "result": "bool",
+      "strict": true
+    },
+    {
+      "left": "money",
+      "right": "money",
+      "result": "bool",
+      "strict": true
+    },
+    {
+      "left": "bpchar",
+      "right": "bpchar",
+      "result": "bool",
+      "strict": true
+    },
+    {
+      "left": "anyarray",
+      "right": "anyarray",
+      "result": "bool",
+      "strict": true
+    },
+    {
+      "left": "date",
+      "right": "date",
+      "result": "bool",
+      "strict": true
+    },
+    {
+      "left": "time",
+      "right": "time",
+      "result": "bool",
+      "strict": true
+    },
+    {
+      "left": "timetz",
+      "right": "timetz",
+      "result": "bool",
+      "strict": true
+    },
+    {
+      "left": "float4",
+      "right": "float8",
+      "result": "bool",
+      "strict": true
+    },
+    {
+      "left": "float8",
+      "right": "float4",
+      "result": "bool",
+      "strict": true
+    },
+    {
+      "left": "timestamptz",
+      "right": "timestamptz",
+      "result": "bool",
+      "strict": true
+    },
+    {
+      "left": "interval",
+      "right": "interval",
+      "result": "bool",
+      "strict": true
+    },
+    {
+      "left": "circle",
+      "right": "circle",
+      "result": "bool",
+      "strict": true
+    },
+    {
+      "left": "lseg",
+      "right": "lseg",
+      "result": "bool",
+      "strict": true
+    },
+    {
+      "left": "macaddr",
+      "right": "macaddr",
+      "result": "bool",
+      "strict": true
+    },
+    {
+      "left": "macaddr8",
+      "right": "macaddr8",
+      "result": "bool",
+      "strict": true
+    },
+    {
+      "left": "inet",
+      "right": "inet",
+      "result": "bool",
+      "strict": true
+    },
+    {
+      "left": "numeric",
+      "right": "numeric",
+      "result": "bool",
+      "strict": true
+    },
+    {
+      "left": "bit",
+      "right": "bit",
+      "result": "bool",
+      "strict": true
+    },
+    {
+      "left": "varbit",
+      "right": "varbit",
+      "result": "bool",
+      "strict": true
+    },
+    {
+      "left": "int2",
+      "right": "int8",
+      "result": "bool",
+      "strict": true
+    },
+    {
+      "left": "int8",
+      "right": "int2",
+      "result": "bool",
+      "strict": true
+    },
+    {
+      "left": "bytea",
+      "right": "bytea",
+      "result": "bool",
+      "strict": true
+    },
+    {
+      "left": "timestamp",
+      "right": "timestamp",
+      "result": "bool",
+      "strict": true
+    },
+    {
+      "left": "date",
+      "right": "timestamp",
+      "result": "bool",
+      "strict": true
+    },
+    {
+      "left": "date",
+      "right": "timestamptz",
+      "result": "bool",
+      "strict": true
+    },
+    {
+      "left": "timestamp",
+      "right": "date",
+      "result": "bool",
+      "strict": true
+    },
+    {
+      "left": "timestamptz",
+      "right": "date",
+      "result": "bool",
+      "strict": true
+    },
+    {
+      "left": "timestamp",
+      "right": "timestamptz",
+      "result": "bool",
+      "strict": true
+    },
+    {
+      "left": "timestamptz",
+      "right": "timestamp",
+      "result": "bool",
+      "strict": true
+    },
+    {
+      "left": "uuid",
+      "right": "uuid",
+      "result": "bool",
+      "strict": true
+    },
+    {
+      "left": "pg_lsn",
+      "right": "pg_lsn",
+      "result": "bool",
+      "strict": true
+    },
+    {
+      "left": "anyenum",
+      "right": "anyenum",
+      "result": "bool",
+      "strict": true
+    },
+    {
+      "left": "tsvector",
+      "right": "tsvector",
+      "result": "bool",
+      "strict": true
+    },
+    {
+      "left": "tsquery",
+      "right": "tsquery",
+      "result": "bool",
+      "strict": true
+    },
+    {
+      "left": "record",
+      "right": "record",
+      "result": "bool",
+      "strict": true
+    },
+    {
+      "left": "anyrange",
+      "right": "anyrange",
+      "result": "bool",
+      "strict": true
+    },
+    {
+      "left": "jsonb",
+      "right": "jsonb",
+      "result": "bool",
+      "strict": true
+    },
+    {
+      "left": "anymultirange",
+      "right": "anymultirange",
+      "result": "bool",
+      "strict": true
+    }
+  ],
+  ">>": [
+    {
+      "left": "polygon",
+      "right": "polygon",
+      "result": "bool",
+      "strict": true
+    },
+    {
+      "left": "box",
+      "right": "box",
+      "result": "bool",
+      "strict": true
+    },
+    {
+      "left": "point",
+      "right": "point",
+      "result": "bool",
+      "strict": true
+    },
+    {
+      "left": "circle",
+      "right": "circle",
+      "result": "bool",
+      "strict": true
+    },
+    {
+      "left": "inet",
+      "right": "inet",
+      "result": "bool",
+      "strict": true
+    },
+    {
+      "left": "bit",
+      "right": "int4",
+      "result": "bit",
+      "strict": true
+    },
+    {
+      "left": "int2",
+      "right": "int4",
+      "result": "int2",
+      "strict": true
+    },
+    {
+      "left": "int4",
+      "right": "int4",
+      "result": "int4",
+      "strict": true
+    },
+    {
+      "left": "int8",
+      "right": "int4",
+      "result": "int8",
+      "strict": true
+    },
+    {
+      "left": "anyrange",
+      "right": "anyrange",
+      "result": "bool",
+      "strict": true
+    },
+    {
+      "left": "anyrange",
+      "right": "anymultirange",
+      "result": "bool",
+      "strict": true
+    },
+    {
+      "left": "anymultirange",
+      "right": "anyrange",
+      "result": "bool",
+      "strict": true
+    },
+    {
+      "left": "anymultirange",
+      "right": "anymultirange",
+      "result": "bool",
+      "strict": true
+    }
+  ],
+  ">>=": [
+    {
+      "left": "inet",
+      "right": "inet",
+      "result": "bool",
+      "strict": true
+    }
+  ],
+  ">^": [
+    {
+      "left": "point",
+      "right": "point",
+      "result": "bool",
+      "strict": true
+    },
+    {
+      "left": "box",
+      "right": "box",
+      "result": "bool",
+      "strict": true
+    }
+  ],
+  "?": [
+    {
+      "left": "jsonb",
+      "right": "text",
+      "result": "bool",
+      "strict": true
+    }
+  ],
+  "?#": [
+    {
+      "left": "path",
+      "right": "path",
+      "result": "bool",
+      "strict": true
+    },
+    {
+      "left": "box",
+      "right": "box",
+      "result": "bool",
+      "strict": true
+    },
+    {
+      "left": "lseg",
+      "right": "lseg",
+      "result": "bool",
+      "strict": true
+    },
+    {
+      "left": "lseg",
+      "right": "line",
+      "result": "bool",
+      "strict": true
+    },
+    {
+      "left": "lseg",
+      "right": "box",
+      "result": "bool",
+      "strict": true
+    },
+    {
+      "left": "line",
+      "right": "box",
+      "result": "bool",
+      "strict": true
+    },
+    {
+      "left": "line",
+      "right": "line",
+      "result": "bool",
+      "strict": true
+    }
+  ],
+  "?&": [
+    {
+      "left": "jsonb",
+      "right": "_text",
+      "result": "bool",
+      "strict": true
+    }
+  ],
+  "?-": [
+    {
+      "left": "point",
+      "right": "point",
+      "result": "bool",
+      "strict": true
+    }
+  ],
+  "?-|": [
+    {
+      "left": "lseg",
+      "right": "lseg",
+      "result": "bool",
+      "strict": true
+    },
+    {
+      "left": "line",
+      "right": "line",
+      "result": "bool",
+      "strict": true
+    }
+  ],
+  "?|": [
+    {
+      "left": "point",
+      "right": "point",
+      "result": "bool",
+      "strict": true
+    },
+    {
+      "left": "jsonb",
+      "right": "_text",
+      "result": "bool",
+      "strict": true
+    }
+  ],
+  "?||": [
+    {
+      "left": "lseg",
+      "right": "lseg",
+      "result": "bool",
+      "strict": true
+    },
+    {
+      "left": "line",
+      "right": "line",
+      "result": "bool",
+      "strict": true
+    }
+  ],
+  "@>": [
+    {
+      "left": "polygon",
+      "right": "polygon",
+      "result": "bool",
+      "strict": true
+    },
+    {
+      "left": "box",
+      "right": "box",
+      "result": "bool",
+      "strict": true
+    },
+    {
+      "left": "box",
+      "right": "point",
+      "result": "bool",
+      "strict": true
+    },
+    {
+      "left": "path",
+      "right": "point",
+      "result": "bool",
+      "strict": true
+    },
+    {
+      "left": "polygon",
+      "right": "point",
+      "result": "bool",
+      "strict": true
+    },
+    {
+      "left": "circle",
+      "right": "point",
+      "result": "bool",
+      "strict": true
+    },
+    {
+      "left": "_aclitem",
+      "right": "aclitem",
+      "result": "bool",
+      "strict": true
+    },
+    {
+      "left": "circle",
+      "right": "circle",
+      "result": "bool",
+      "strict": true
+    },
+    {
+      "left": "anyarray",
+      "right": "anyarray",
+      "result": "bool",
+      "strict": true
+    },
+    {
+      "left": "tsquery",
+      "right": "tsquery",
+      "result": "bool",
+      "strict": true
+    },
+    {
+      "left": "anyrange",
+      "right": "anyelement",
+      "result": "bool",
+      "strict": true
+    },
+    {
+      "left": "anyrange",
+      "right": "anyrange",
+      "result": "bool",
+      "strict": true
+    },
+    {
+      "left": "jsonb",
+      "right": "jsonb",
+      "result": "bool",
+      "strict": true
+    },
+    {
+      "left": "anymultirange",
+      "right": "anyelement",
+      "result": "bool",
+      "strict": true
+    },
+    {
+      "left": "anymultirange",
+      "right": "anyrange",
+      "result": "bool",
+      "strict": true
+    },
+    {
+      "left": "anymultirange",
+      "right": "anymultirange",
+      "result": "bool",
+      "strict": true
+    },
+    {
+      "left": "anyrange",
+      "right": "anymultirange",
+      "result": "bool",
+      "strict": true
+    }
+  ],
+  "@?": [
+    {
+      "left": "jsonb",
+      "right": "jsonpath",
+      "result": "bool",
+      "strict": false
+    }
+  ],
+  "@@": [
+    {
+      "left": "tsvector",
+      "right": "tsquery",
+      "result": "bool",
+      "strict": true
+    },
+    {
+      "left": "tsquery",
+      "right": "tsvector",
+      "result": "bool",
+      "strict": true
+    },
+    {
+      "left": "text",
+      "right": "text",
+      "result": "bool",
+      "strict": true
+    },
+    {
+      "left": "text",
+      "right": "tsquery",
+      "result": "bool",
+      "strict": true
+    },
+    {
+      "left": "jsonb",
+      "right": "jsonpath",
+      "result": "bool",
+      "strict": false
+    }
+  ],
+  "@@@": [
+    {
+      "left": "tsvector",
+      "right": "tsquery",
+      "result": "bool",
+      "strict": true
+    },
+    {
+      "left": "tsquery",
+      "right": "tsvector",
+      "result": "bool",
+      "strict": true
+    }
+  ],
+  "^": [
+    {
+      "left": "float8",
+      "right": "float8",
+      "result": "float8",
+      "strict": true
+    },
+    {
+      "left": "numeric",
+      "right": "numeric",
+      "result": "numeric",
+      "strict": true
+    }
+  ],
+  "^@": [
+    {
+      "left": "text",
+      "right": "text",
+      "result": "bool",
+      "strict": true
+    }
+  ],
+  "|": [
+    {
+      "left": "macaddr",
+      "right": "macaddr",
+      "result": "macaddr",
+      "strict": true
+    },
+    {
+      "left": "macaddr8",
+      "right": "macaddr8",
+      "result": "macaddr8",
+      "strict": true
+    },
+    {
+      "left": "inet",
+      "right": "inet",
+      "result": "inet",
+      "strict": true
+    },
+    {
+      "left": "bit",
+      "right": "bit",
+      "result": "bit",
+      "strict": true
+    },
+    {
+      "left": "int2",
+      "right": "int2",
+      "result": "int2",
+      "strict": true
+    },
+    {
+      "left": "int4",
+      "right": "int4",
+      "result": "int4",
+      "strict": true
+    },
+    {
+      "left": "int8",
+      "right": "int8",
+      "result": "int8",
+      "strict": true
+    }
+  ],
+  "|&>": [
+    {
+      "left": "box",
+      "right": "box",
+      "result": "bool",
+      "strict": true
+    },
+    {
+      "left": "polygon",
+      "right": "polygon",
+      "result": "bool",
+      "strict": true
+    },
+    {
+      "left": "circle",
+      "right": "circle",
+      "result": "bool",
+      "strict": true
+    }
+  ],
+  "|>>": [
+    {
+      "left": "circle",
+      "right": "circle",
+      "result": "bool",
+      "strict": true
+    },
+    {
+      "left": "point",
+      "right": "point",
+      "result": "bool",
+      "strict": true
+    },
+    {
+      "left": "box",
+      "right": "box",
+      "result": "bool",
+      "strict": true
+    },
+    {
+      "left": "polygon",
+      "right": "polygon",
+      "result": "bool",
+      "strict": true
+    }
+  ],
+  "||": [
+    {
+      "left": "anycompatiblearray",
+      "right": "anycompatible",
+      "result": "anycompatiblearray",
+      "strict": false
+    },
+    {
+      "left": "anycompatible",
+      "right": "anycompatiblearray",
+      "result": "anycompatiblearray",
+      "strict": false
+    },
+    {
+      "left": "anycompatiblearray",
+      "right": "anycompatiblearray",
+      "result": "anycompatiblearray",
+      "strict": false
+    },
+    {
+      "left": "text",
+      "right": "text",
+      "result": "text",
+      "strict": true
+    },
+    {
+      "left": "varbit",
+      "right": "varbit",
+      "result": "varbit",
+      "strict": true
+    },
+    {
+      "left": "bytea",
+      "right": "bytea",
+      "result": "bytea",
+      "strict": true
+    },
+    {
+      "left": "text",
+      "right": "anynonarray",
+      "result": "text",
+      "strict": true
+    },
+    {
+      "left": "anynonarray",
+      "right": "text",
+      "result": "text",
+      "strict": true
+    },
+    {
+      "left": "tsvector",
+      "right": "tsvector",
+      "result": "tsvector",
+      "strict": true
+    },
+    {
+      "left": "tsquery",
+      "right": "tsquery",
+      "result": "tsquery",
+      "strict": true
+    },
+    {
+      "left": "jsonb",
+      "right": "jsonb",
+      "result": "jsonb",
+      "strict": true
+    }
+  ],
+  "~": [
+    {
+      "left": "name",
+      "right": "text",
+      "result": "bool",
+      "strict": true
+    },
+    {
+      "left": "text",
+      "right": "text",
+      "result": "bool",
+      "strict": true
+    },
+    {
+      "left": "bpchar",
+      "right": "text",
+      "result": "bool",
+      "strict": true
+    }
+  ],
+  "~*": [
+    {
+      "left": "name",
+      "right": "text",
+      "result": "bool",
+      "strict": true
+    },
+    {
+      "left": "text",
+      "right": "text",
+      "result": "bool",
+      "strict": true
+    },
+    {
+      "left": "bpchar",
+      "right": "text",
+      "result": "bool",
+      "strict": true
+    }
+  ],
+  "~<=~": [
+    {
+      "left": "text",
+      "right": "text",
+      "result": "bool",
+      "strict": true
+    },
+    {
+      "left": "bpchar",
+      "right": "bpchar",
+      "result": "bool",
+      "strict": true
+    }
+  ],
+  "~<~": [
+    {
+      "left": "text",
+      "right": "text",
+      "result": "bool",
+      "strict": true
+    },
+    {
+      "left": "bpchar",
+      "right": "bpchar",
+      "result": "bool",
+      "strict": true
+    }
+  ],
+  "~=": [
+    {
+      "left": "polygon",
+      "right": "polygon",
+      "result": "bool",
+      "strict": true
+    },
+    {
+      "left": "box",
+      "right": "box",
+      "result": "bool",
+      "strict": true
+    },
+    {
+      "left": "point",
+      "right": "point",
+      "result": "bool",
+      "strict": true
+    },
+    {
+      "left": "circle",
+      "right": "circle",
+      "result": "bool",
+      "strict": true
+    }
+  ],
+  "~>=~": [
+    {
+      "left": "text",
+      "right": "text",
+      "result": "bool",
+      "strict": true
+    },
+    {
+      "left": "bpchar",
+      "right": "bpchar",
+      "result": "bool",
+      "strict": true
+    }
+  ],
+  "~>~": [
+    {
+      "left": "text",
+      "right": "text",
+      "result": "bool",
+      "strict": true
+    },
+    {
+      "left": "bpchar",
+      "right": "bpchar",
+      "result": "bool",
+      "strict": true
+    }
+  ],
+  "~~": [
+    {
+      "left": "name",
+      "right": "text",
+      "result": "bool",
+      "strict": true
+    },
+    {
+      "left": "text",
+      "right": "text",
+      "result": "bool",
+      "strict": true
+    },
+    {
+      "left": "bpchar",
+      "right": "text",
+      "result": "bool",
+      "strict": true
+    },
+    {
+      "left": "bytea",
+      "right": "bytea",
+      "result": "bool",
+      "strict": true
+    }
+  ],
+  "~~*": [
+    {
+      "left": "name",
+      "right": "text",
+      "result": "bool",
+      "strict": true
+    },
+    {
+      "left": "text",
+      "right": "text",
+      "result": "bool",
+      "strict": true
+    },
+    {
+      "left": "bpchar",
+      "right": "text",
+      "result": "bool",
+      "strict": true
+    }
+  ]
+}

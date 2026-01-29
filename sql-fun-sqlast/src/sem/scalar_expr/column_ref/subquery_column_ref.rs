@@ -39,6 +39,7 @@ impl super::ColumnReference for SubQueryColumnRef {
 
 impl SubQueryColumnRef {
     /// create instance
+    #[must_use]
     pub fn new(
         alias: &AliasName,
         column: &ColumnName,

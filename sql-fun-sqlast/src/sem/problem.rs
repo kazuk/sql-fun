@@ -1,16 +1,60 @@
+#![doc= include_str!("problem.md")]
+
 mod name_resolution;
 mod overload_resolution;
+mod sql_highlighter;
 
 use std::collections::HashSet;
 
-use crate::sem::{
-    DefElemKey, FullName, OperatorName, SemScalarExpr, TypeDefinition, TypeReference,
-    create_table::ViewName, type_system::ArgumentBindingCollection,
+use miette::{GraphicalReportHandler, LabeledSpan, NamedSource, Report};
+use sql_fun_core::HighlighterTheme;
+
+use crate::{
+    StringSpan,
+    sem::{
+        AnalysisError, DefElemKey, FullName, OperatorName, SemScalarExpr, TypeDefinition,
+        TypeReference, create_table::ViewName, type_system::ArgumentBindingCollection,
+    },
 };
 
-pub use self::{name_resolution::NameResolution, overload_resolution::OverloadResolution};
+pub use self::name_resolution::{DomainBaseTypeNameNotFound, NameResolution};
+
+pub(crate) use self::{overload_resolution::OverloadResolution, sql_highlighter::SqlHighlighter};
+
+trait Problem {
+    const CODE: &'static str;
+    const MESSAGE: &'static str;
+    const SEVERITY: miette::Severity;
+    const SPAN_LABEL: &'static str;
+
+    fn get_problem_span(&self) -> StringSpan;
+
+    fn labeled_problem_span(&self) -> LabeledSpan {
+        self.get_problem_span().new_labeled_span(Self::SPAN_LABEL)
+    }
+}
+
+trait RenderProblemReport: Problem {
+    fn generate_report(
+        &self,
+        handler: &GraphicalReportHandler,
+        source: String,
+    ) -> Result<String, AnalysisError> {
+        let diag = miette::MietteDiagnostic::new(Self::MESSAGE)
+            .with_code(Self::CODE)
+            .with_severity(Self::SEVERITY)
+            .with_label(self.labeled_problem_span());
+
+        let report = Report::new(diag).with_source_code(NamedSource::new("SQL", source));
+
+        let mut out = String::new();
+        handler.render_report(&mut out, &*report)?;
+        Ok(out)
+    }
+}
 
 /// Semantic analysis problems
+#[allow(clippy::large_enum_variant)]
 #[derive(Debug, Clone)]
 pub enum AnalysisProblem {
     /// Name resolution problems
@@ -64,9 +108,31 @@ pub enum AnalysisProblem {
 
     /// member access requires composite type
     MemberAccessRequiresCompositeType(FullName, String),
+
+    /// function argument implicit cast not found
+    FunctionArgImplicitCastNotFound(FullName, usize, TypeDefinition, SemScalarExpr),
+
+    /// implicit cast not found
+    ImplicitCastNotFound(TypeReference, TypeReference),
 }
 
 impl AnalysisProblem {
+    /// covert problem to report
+    pub fn render_report(
+        &self,
+        theme: &HighlighterTheme,
+        source: String,
+    ) -> Result<String, AnalysisError> {
+        let report_handler = GraphicalReportHandler::new()
+            .with_syntax_highlighting(SqlHighlighter::from_theme(theme)?);
+
+        let report = match self {
+            Self::NameResolution(nr) => nr.render_report(&report_handler, source)?,
+            _ => todo!(),
+        };
+        Ok(report)
+    }
+
     /// extension not found
     #[tracing::instrument()]
     pub fn extension_not_found(name: &str) -> Self {
@@ -186,7 +252,7 @@ impl AnalysisProblem {
         t: &TypeDefinition,
         arg: &SemScalarExpr,
     ) -> Self {
-        todo!()
+        Self::FunctionArgImplicitCastNotFound(func_name.clone(), index, t.clone(), arg.clone())
     }
 
     /// view used as materialized view, but not a materialized view
@@ -216,7 +282,7 @@ impl AnalysisProblem {
     /// implicit cast not found
     #[tracing::instrument()]
     pub fn implicit_cast_not_found(ty: &TypeReference, result_type: &TypeReference) -> Self {
-        todo!()
+        Self::ImplicitCastNotFound(ty.clone(), result_type.clone())
     }
 
     /// incompatible cast values

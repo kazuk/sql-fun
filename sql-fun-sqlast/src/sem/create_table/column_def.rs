@@ -22,6 +22,7 @@ impl Clone for ColumnDefinition {
 
 impl ColumnDefinition {
     /// create instance
+    #[must_use]
     pub fn new(
         name: &Option<ColumnName>,
         type_ref: Option<&TypeReference>,
@@ -36,22 +37,25 @@ impl ColumnDefinition {
     }
 
     /// get name of column
+    #[must_use]
     pub fn name(&self) -> &Option<ColumnName> {
         &self.name
     }
 
-    /// get [TypeReference]
+    /// get [`TypeReference`]
+    #[must_use]
     pub fn get_type(&self) -> Option<TypeReference> {
         self.type_ref.clone()
     }
 
     /// column nullability
+    #[must_use]
     pub fn is_not_null(&self) -> Option<bool> {
         self.is_not_null
     }
 
     /// apply default expression to column
     pub fn set_default(&mut self, scalar_expr: &SemScalarExpr) {
-        self.default = Some(Box::new(scalar_expr.clone()))
+        self.default = Some(Box::new(scalar_expr.clone()));
     }
 }

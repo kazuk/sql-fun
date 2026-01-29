@@ -5,7 +5,7 @@ use crate::{
 
 use super::{AnalysisError, FullName, ParseContext, SemAst, alter_table::AlterObjSubCommand};
 
-/// analyzed [crate::syn::CreateSeqStmt]
+/// analyzed [`crate::syn::CreateSeqStmt`]
 #[derive(Debug, Clone)]
 pub struct CreateSequence {
     name: FullName,
@@ -15,6 +15,7 @@ pub struct CreateSequence {
 
 impl CreateSequence {
     /// create instance
+    #[must_use]
     pub fn new(name: &FullName) -> Self {
         Self {
             name: name.clone(),
@@ -24,6 +25,7 @@ impl CreateSequence {
     }
 
     /// get sequence name
+    #[must_use]
     pub fn name(&self) -> &FullName {
         &self.name
     }
@@ -34,7 +36,7 @@ impl CreateSequence {
 
         for cmd in alter_seq.commands() {
             match cmd {
-                AlterObjSubCommand::ChangeOwner(s) => self.owner = Some(s.to_string()),
+                AlterObjSubCommand::ChangeOwner(s) => self.owner = Some(s.clone()),
                 AlterObjSubCommand::SetColumnDefault(_column_name, _sem_scalar_expr) => todo!(),
                 AlterObjSubCommand::AddConstraint(_constraint) => todo!(),
                 AlterObjSubCommand::ClusterOn(_) => todo!(),
@@ -44,7 +46,7 @@ impl CreateSequence {
     }
 }
 
-/// analyze [crate::syn::CreateSeqStmt]
+/// analyze [`crate::syn::CreateSeqStmt`]
 pub fn analyze_create_seq<TParseContext>(
     context: TParseContext,
     _parent_schema: &Option<String>,

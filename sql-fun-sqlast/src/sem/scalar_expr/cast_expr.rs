@@ -1,9 +1,11 @@
+use sql_fun_core::IVec;
+
 use crate::{
     sem::{
         AnalysisError, AnalysisProblem, FromClause, FullName, ParseContext, SemScalarExpr,
         TypeReference, WithClause, analyze_scaler_expr,
     },
-    syn::Opt,
+    syn::{Opt, ScanToken},
 };
 
 use super::{AnalyzeScalarExpr, SemScalarExprNode};
@@ -17,6 +19,7 @@ pub struct ImplicitCastExpr {
 
 impl ImplicitCastExpr {
     /// create a implicit cast expression
+    #[must_use]
     pub fn new(value: &SemScalarExpr, cast_target: &TypeReference) -> Self {
         Self {
             value: Box::new(value.clone()),
@@ -70,6 +73,7 @@ where
         with_clause: &WithClause,
         from_clause: &FromClause,
         syn: crate::syn::TypeCast,
+        tokens: &IVec<ScanToken>,
     ) -> Result<(SemScalarExpr, TParseContext), AnalysisError> {
         let Some(arg) = syn.get_arg().as_inner() else {
             AnalysisError::raise_unexpected_none("typecast.arg")?
@@ -79,7 +83,8 @@ where
         };
         let target_type = TypeReference::from_full_name(FullName::try_from(target_type)?);
 
-        let (arg, new_context) = analyze_scaler_expr(context, with_clause, from_clause, arg)?;
+        let (arg, new_context) =
+            analyze_scaler_expr(context, with_clause, from_clause, arg, tokens)?;
         context = new_context;
 
         if let Some(from_type) = arg.get_type() {
@@ -88,7 +93,7 @@ where
                 context.report_problem(AnalysisProblem::explicit_cast_not_defined(
                     &from_type,
                     &target_type,
-                ));
+                ))?;
             }
         }
 

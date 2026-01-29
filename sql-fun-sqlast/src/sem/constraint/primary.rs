@@ -20,6 +20,7 @@ pub struct PrimaryKeyConstraint {
 
 impl PrimaryKeyConstraint {
     /// primary key name
+    #[must_use]
     pub fn name(&self) -> &str {
         &self.name
     }
@@ -39,6 +40,7 @@ impl PrimaryKeyConstraint {
     }
 
     /// list of primary key columns
+    #[must_use]
     pub fn keys(&self) -> &IVec<ColumnName> {
         &self.keys
     }
@@ -69,11 +71,11 @@ where
                         context.report_problem(AnalysisProblem::column_not_found_in_table(
                             table_name,
                             key_col_name,
-                        ))
+                        ))?;
                     }
                 }
             } else {
-                context.report_problem(AnalysisProblem::relation_not_found(table_name))
+                context.report_problem(AnalysisProblem::relation_not_found(table_name))?;
             }
         }
 

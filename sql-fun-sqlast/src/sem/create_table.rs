@@ -31,6 +31,7 @@ pub struct ColumnCollection(Vec<ColumnDefinition>);
 
 impl ColumnCollection {
     /// add column
+    #[must_use]
     pub fn new(columns: Vec<ColumnDefinition>) -> Self {
         Self(columns)
     }
@@ -43,6 +44,7 @@ impl ColumnCollection {
     }
 
     /// get column definition by name
+    #[must_use]
     pub fn get_column_def(&self, column_name: &ColumnName) -> Option<&ColumnDefinition> {
         self.0
             .iter()
@@ -50,16 +52,19 @@ impl ColumnCollection {
     }
 
     /// test column existing
+    #[must_use]
     pub fn has_column(&self, column: &ColumnName) -> bool {
         self.0.iter().any(|c| c.name().as_ref() == Some(column))
     }
 
     /// get column definition by index
+    #[must_use]
     pub fn get_at(&self, column_index: usize) -> Option<&ColumnDefinition> {
         self.0.get(column_index)
     }
 
     /// get column definition with skip count
+    #[must_use]
     pub fn get_column_def_with_skip_count(
         &self,
         column_name: &ColumnName,
@@ -72,7 +77,7 @@ impl ColumnCollection {
 
     /// append column definition
     pub fn push(&mut self, column: &ColumnDefinition) {
-        self.0.push(column.clone())
+        self.0.push(column.clone());
     }
 }
 
@@ -102,6 +107,7 @@ impl Clone for CreateTable {
 
 impl CreateTable {
     /// new instance with column definitions
+    #[must_use]
     pub fn new(name: TableName, columns: Vec<ColumnDefinition>) -> Self {
         Self {
             name,
@@ -114,18 +120,20 @@ impl CreateTable {
     }
 
     /// get table name
+    #[must_use]
     pub fn name(&self) -> &TableName {
         &self.name
     }
 
     /// get column definition by column name
+    #[must_use]
     pub fn get_column_def(&self, column_name: &ColumnName) -> Option<&ColumnDefinition> {
         self.columns.get_column_def(column_name)
     }
 
     /// Look up a column definition by *original* column name, ignoring the first `skip_count` columns.
     ///
-    /// This is used to implement PostgreSQL's behavior for a table alias with a column alias list:
+    /// This is used to implement `PostgreSQL`'s behavior for a table alias with a column alias list:
     ///
     /// ```sql
     /// SELECT ... FROM users AS u(id, name);
@@ -139,6 +147,7 @@ impl CreateTable {
     /// then `u.user_id` is not accessible when `skip_count >= 1` (e.g. `u(id, name)` makes `skip_count = 2`).
     /// However, columns after the first `skip_count` columns are still accessible by their original names.
     ///
+    #[must_use]
     pub fn get_column_def_with_skip_count(
         &self,
         column_name: &ColumnName,
@@ -149,11 +158,13 @@ impl CreateTable {
     }
 
     /// get column definition by index
+    #[must_use]
     pub fn get_column_at(&self, column_index: usize) -> Option<&ColumnDefinition> {
         self.columns.get_at(column_index)
     }
 
     /// check column existing
+    #[must_use]
     pub fn has_column(&self, column: &ColumnName) -> bool {
         self.columns.has_column(column)
     }
@@ -167,9 +178,7 @@ impl CreateTable {
 
         for cmd in alter_table.commands() {
             match cmd {
-                AlterObjSubCommand::ChangeOwner(new_owner) => {
-                    self.owner = Some(new_owner.to_string())
-                }
+                AlterObjSubCommand::ChangeOwner(new_owner) => self.owner = Some(new_owner.clone()),
                 AlterObjSubCommand::SetColumnDefault(column_name, sem_scalar_expr) => {
                     if let Some(column) = self.columns.get_column_mut(column_name) {
                         column.set_default(sem_scalar_expr);
@@ -181,7 +190,7 @@ impl CreateTable {
                     return constraint.implicit_changes();
                 }
                 AlterObjSubCommand::ClusterOn(index_name) => {
-                    self.cluster_on = Some(index_name.to_string())
+                    self.cluster_on = Some(index_name.clone())
                 }
             }
         }
@@ -190,6 +199,7 @@ impl CreateTable {
     }
 
     /// get primary key column names
+    #[must_use]
     pub fn primary_key_columns(&self) -> Vec<&ColumnName> {
         if let Some(pk) = self
             .constraints
@@ -203,7 +213,7 @@ impl CreateTable {
     }
 }
 
-/// analyze [crate::syn::CreateStmt]
+/// analyze [`crate::syn::CreateStmt`]
 #[tracing::instrument(skip(context))]
 pub fn analyze_create_stmt<TParseContext>(
     mut context: TParseContext,
@@ -232,7 +242,7 @@ where
             if let Some(type_ref) = sem_type.type_reference().cloned() {
                 Some(type_ref)
             } else {
-                context.report_problem(AnalysisProblem::unexpected_dynamic_type(&sem_type));
+                context.report_problem(AnalysisProblem::unexpected_dynamic_type(&sem_type))?;
                 None
             }
         } else {
@@ -240,7 +250,7 @@ where
                 &table_name,
                 &colname,
                 &key,
-            ));
+            ))?;
             None
         };
 

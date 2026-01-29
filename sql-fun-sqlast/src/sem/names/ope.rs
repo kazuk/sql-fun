@@ -1,7 +1,7 @@
 use std::fmt::Display;
 
 use crate::{
-    sem::{ParseContext, error::ProblemLikeError},
+    sem::{AnalysisError, ParseContext, error::ProblemLikeError},
     syn::{ListOpt, NodeListOpt},
 };
 
@@ -25,7 +25,7 @@ impl Display for ValidOperatorName {
 }
 
 impl ValidOperatorName {
-    /// create from [crate::syn::NodeListOpt]
+    /// create from [`crate::syn::NodeListOpt`]
     pub fn try_from(value: NodeListOpt) -> Result<Option<Self>, ProblemLikeError> {
         let Some(items) = value.map_values(|v| v.as_string().get_sval()) else {
             return Ok(None);
@@ -35,12 +35,12 @@ impl ValidOperatorName {
         } else if items.len() == 1 {
             Ok(Some(ValidOperatorName {
                 schema_name: None,
-                op_name: items[0].to_string(),
+                op_name: items[0].clone(),
             }))
         } else {
             Ok(Some(ValidOperatorName {
                 schema_name: Some(SchemaName::from(items[0].as_str())),
-                op_name: items[1].to_string(),
+                op_name: items[1].clone(),
             }))
         }
     }
@@ -69,24 +69,26 @@ impl OperatorName {
     pub fn try_from_report<TParseContext: ParseContext>(
         value: NodeListOpt,
         context: &mut TParseContext,
-    ) -> Option<Self> {
+    ) -> Result<Option<Self>, AnalysisError> {
         let result = ValidOperatorName::try_from(value);
         match result {
-            Ok(Some(v)) => Some(Self::Valid(v)),
-            Ok(None) => None,
+            Ok(Some(v)) => Ok(Some(Self::Valid(v))),
+            Ok(None) => Ok(None),
             Err(e) => {
-                e.report_problem_to(context);
-                Some(Self::Invalid)
+                e.report_problem_to(context)?;
+                Ok(Some(Self::Invalid))
             }
         }
     }
 
     /// operator name is valid
+    #[must_use]
     pub fn is_valid(&self) -> bool {
         matches!(self, Self::Valid(_))
     }
 
     /// get name of operator, require vaild
+    #[must_use]
     pub fn to_name_string(&self) -> String {
         match self {
             Self::Valid(v) => v.to_string(),

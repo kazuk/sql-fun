@@ -1,0 +1,54 @@
+#!/bin/bash
+
+set -euo pipefail
+
+USE_LOGIN_AS_NAME=0
+
+for a in "$@"; do
+  case "$a" in
+    --use-login-as-name) USE_LOGIN_AS_NAME=1;;
+  esac
+done
+
+# make sure loggin
+gh auth status
+
+# get current user in github
+USER_OBJ=$(gh api user)
+
+# configure git
+if (( USE_LOGIN_AS_NAME == 1 )); then
+  USER_NAME=$(echo ${USER_OBJ} | jq -r '.login')
+else
+  USER_NAME=$(echo ${USER_OBJ} | jq -r '.name')
+fi
+USER_EMAIL=$(echo ${USER_OBJ} | jq -r '.email')
+
+echo "Configure your git account ${USER_NAME}<${USER_EMAIL}>"
+
+if [[ "${USER_NAME}" == "null" || -z "${USER_NAME}" ]]; then
+  echo 'Warning: Name configuration invalid 
+
+  please manually configure "user.name" like a bellow.
+
+$ git config --global user.name "your name"
+
+'
+else
+  git config --global user.name "${USER_NAME}"
+fi
+
+if [[ "${USER_EMAIL}" == "null" || -z "${USER_EMAIL}" ]]; then
+  echo 'Warning: Your GitHub email setting is private. 
+
+  please manually configure "user.email" like a bellow.
+
+$ git config --global user.email your-email@goes-here 
+
+'
+else
+  git config --global user.email "${USER_EMAIL}"
+fi
+
+# show configured items
+git config --list --global | grep -E '^user.'

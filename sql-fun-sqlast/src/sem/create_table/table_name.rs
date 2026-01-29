@@ -17,6 +17,7 @@ impl Display for TableName {
 
 impl TableName {
     /// gets name content
+    #[must_use]
     pub fn full_name(&self) -> &FullName {
         &self.0
     }

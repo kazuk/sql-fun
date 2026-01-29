@@ -4,7 +4,7 @@ use super::{AnalysisError, ParseContext, SemAst};
 #[derive(Debug, Clone, Eq, Hash, PartialEq, serde::Serialize, serde::Deserialize)]
 pub struct InsertStatement {}
 
-/// analyze [crate::syn::InsertStmt]
+/// analyze [`crate::syn::InsertStmt`]
 pub fn analyze_insert_statement<TParseContext>(
     context: TParseContext,
     _parent_schema: &Option<String>,

@@ -46,7 +46,7 @@ impl DataSource {
         } else {
             context.report_problem(AnalysisProblem::relation_not_found(&TableName::try_from(
                 range_var,
-            )?));
+            )?))?;
             Ok((Self::unknown(&relname, &alias_name), context))
         }
     }

@@ -20,7 +20,7 @@ impl SubQueryDataSource {
     }
 
     pub(super) fn push_alias_names(&self, names: &mut Vec<AliasSpec>) {
-        names.push(self.alias.clone())
+        names.push(self.alias.clone());
     }
 
     pub(super) fn resolve_alias<'a>(
@@ -45,7 +45,7 @@ impl SubQueryDataSource {
         TParseContext: ParseContext,
     {
         if self.select_statement.has_column(column) {
-            names.push(self.alias.clone())
+            names.push(self.alias.clone());
         }
     }
 
@@ -70,7 +70,7 @@ impl SubQueryDataSource {
             } else {
                 context.report_problem(
                     AnalysisProblem::subquery_not_have_column_for_derived_column_name(),
-                );
+                )?;
                 None
             }
         } else if let Some(result_column_ref) =
@@ -82,7 +82,7 @@ impl SubQueryDataSource {
             context.report_problem(AnalysisProblem::column_not_found_in_subquery(
                 self.alias.name(),
                 column,
-            ));
+            ))?;
             None
         };
 

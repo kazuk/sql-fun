@@ -5,6 +5,8 @@ mod table_column_ref;
 mod table_func_col_ref;
 mod view_column_ref;
 
+use sql_fun_core::IVec;
+
 pub use self::{
     cte_column_ref::CteColumnRef,
     invalid_column_ref::{
@@ -23,7 +25,7 @@ use crate::{
         data_source::AliasName,
         scalar_expr::{AnalyzeScalarExpr, SemScalarExprNode},
     },
-    syn::ListOpt,
+    syn::{ListOpt, ScanToken},
 };
 
 trait ColumnReference {
@@ -71,6 +73,7 @@ impl SemScalarExprNode for ColumnReferenceExpr {
 
 impl ColumnReferenceExpr {
     /// get column type
+    #[must_use]
     pub fn get_type(&self) -> Option<TypeReference> {
         match self {
             Self::CteColumn(r) => r.get_type(),
@@ -87,6 +90,7 @@ impl ColumnReferenceExpr {
     }
 
     /// get column is not null
+    #[must_use]
     pub fn is_not_null(&self) -> Option<bool> {
         match self {
             Self::CteColumn(r) => r.is_not_null(),
@@ -103,6 +107,7 @@ impl ColumnReferenceExpr {
     }
 
     /// get column definition
+    #[must_use]
     pub fn get_column_def(&self) -> &Option<ColumnDefinition> {
         match self {
             Self::CteColumn(r) => r.get_column_def(),
@@ -119,6 +124,7 @@ impl ColumnReferenceExpr {
     }
 
     /// get column name
+    #[must_use]
     pub fn get_column_name(&self) -> &ColumnName {
         match self {
             Self::CteColumn(r) => r.get_column_name(),
@@ -138,24 +144,28 @@ impl ColumnReferenceExpr {
     pub fn undefined_column_with_report<TParseContext>(
         context: &mut TParseContext,
         column: &ColumnName,
-    ) -> SemScalarExpr
+    ) -> Result<SemScalarExpr, AnalysisError>
     where
         TParseContext: ParseContext,
     {
-        context.report_problem(AnalysisProblem::column_not_found_in_source(column));
-        SemScalarExpr::ColumnRef(Self::UndefinedColumn(column.clone()))
+        context.report_problem(AnalysisProblem::column_not_found_in_source(column))?;
+        Ok(SemScalarExpr::ColumnRef(Self::UndefinedColumn(
+            column.clone(),
+        )))
     }
 
     /// create ambigous column reference instance
     pub fn ambiguous_column_with_report<TParseContext>(
         context: &mut TParseContext,
         column: &ColumnName,
-    ) -> SemScalarExpr
+    ) -> Result<SemScalarExpr, AnalysisError>
     where
         TParseContext: ParseContext,
     {
-        context.report_problem(AnalysisProblem::ambiguous_column(column));
-        SemScalarExpr::ColumnRef(Self::AmbiguousColumnRef(column.clone()))
+        context.report_problem(AnalysisProblem::ambiguous_column(column))?;
+        Ok(SemScalarExpr::ColumnRef(Self::AmbiguousColumnRef(
+            column.clone(),
+        )))
     }
 
     fn source_ref<TParseContext>(
@@ -169,7 +179,8 @@ impl ColumnReferenceExpr {
         TParseContext: ParseContext,
     {
         let Some((from_def, nullability)) = from_clause.resolve_alias(alias) else {
-            let scalar_expr = UndefinedAliasColumnRef::new_with_report(&mut context, alias, column);
+            let scalar_expr =
+                UndefinedAliasColumnRef::new_with_report(&mut context, alias, column)?;
             return Ok((scalar_expr, context));
         };
         from_def.create_column_ref(context, with_clause, alias, column, nullability)
@@ -185,18 +196,19 @@ where
         with_clause: &WithClause,
         from_clause: &FromClause,
         syn: crate::syn::ColumnRef,
+        _tokens: &IVec<ScanToken>,
     ) -> Result<(SemScalarExpr, TParseContext), AnalysisError> {
         let Some(fields) = syn.get_fields().map(|v| v.as_string()) else {
             AnalysisError::raise_unexpected_none("column_ref.fields")?
         };
 
-        let fields: Vec<String> = fields.iter().map(|v| v.get_sval()).collect();
+        let fields: Vec<String> = fields.iter().map(crate::syn::String::get_sval).collect();
         if fields.len() > 2 {
             AnalysisError::raise_unexpected_input(&format!(
                 "unexpected len column_ref.fields {}",
                 fields.len()
             ))?;
-        };
+        }
 
         if fields.len() == 1 {
             let column = ColumnName::from(fields[0].clone());
@@ -205,12 +217,12 @@ where
                 from_clause.find_alias_for_column(&column, &context, with_clause)
             else {
                 let scalar_expr =
-                    ColumnReferenceExpr::ambiguous_column_with_report(&mut context, &column);
+                    ColumnReferenceExpr::ambiguous_column_with_report(&mut context, &column)?;
                 return Ok((scalar_expr, context));
             };
             let Some(alias) = find_alias_result else {
                 let scalar_expr =
-                    ColumnReferenceExpr::undefined_column_with_report(&mut context, &column);
+                    ColumnReferenceExpr::undefined_column_with_report(&mut context, &column)?;
                 return Ok((scalar_expr, context));
             };
             Self::source_ref(context, with_clause, from_clause, alias.name(), &column)

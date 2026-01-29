@@ -1,4 +1,9 @@
-use crate::sem::{AnalysisError, FromClause, ParseContext, TypeReference, WithClause};
+use sql_fun_core::IVec;
+
+use crate::{
+    sem::{AnalysisError, FromClause, ParseContext, TypeReference, WithClause},
+    syn::ScanToken,
+};
 
 use super::{AnalyzeScalarExpr, SemScalarExpr, SemScalarExprNode};
 
@@ -25,6 +30,7 @@ where
         _with_clause: &WithClause,
         _from_clause: &FromClause,
         _syn: crate::syn::ParamRef,
+        _tokens: &IVec<ScanToken>,
     ) -> Result<(SemScalarExpr, TParseContext), AnalysisError> {
         todo!()
     }

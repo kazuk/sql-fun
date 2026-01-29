@@ -1,3 +1,5 @@
+use sql_fun_core::IVec;
+
 use crate::{
     sem::{
         AnalysisError, ColumnDefinition, ColumnName, FromClause, FullName, FunctionParam,
@@ -5,7 +7,7 @@ use crate::{
         create_comp_type::CompositeFieldDefinition,
         type_system::{ArgumentBindingCollection, TypeError},
     },
-    syn::Opt,
+    syn::{Opt, ScanToken},
 };
 
 use super::FunctionParameterTrait;
@@ -26,14 +28,14 @@ pub struct FunctionParamInOut {
 
 impl FunctionParamInOut {
     pub fn new(
-        name: &Option<String>,
-        param_type: &Option<TypeReference>,
-        default_expr: &Option<SemScalarExpr>,
+        name: Option<&String>,
+        param_type: Option<&TypeReference>,
+        default_expr: Option<&SemScalarExpr>,
     ) -> Self {
         Self {
-            name: name.clone(),
-            param_type: param_type.clone(),
-            default_expr: default_expr.clone(),
+            name: name.cloned(),
+            param_type: param_type.cloned(),
+            default_expr: default_expr.cloned(),
         }
     }
 
@@ -60,12 +62,12 @@ impl std::fmt::Display for FunctionParamInOut {
 }
 
 impl FunctionParameterTrait for FunctionParamInOut {
-    fn name(&self) -> &Option<String> {
-        &self.name
+    fn name(&self) -> Option<&String> {
+        self.name.as_ref()
     }
 
-    fn param_type(&self) -> &Option<TypeReference> {
-        &self.param_type
+    fn param_type(&self) -> Option<&TypeReference> {
+        self.param_type.as_ref()
     }
 
     fn default_expr(&self) -> Option<&SemScalarExpr> {
@@ -75,6 +77,7 @@ impl FunctionParameterTrait for FunctionParamInOut {
     fn from_syn<TParseContext>(
         mut context: TParseContext,
         param: crate::syn::FunctionParameter,
+        tokens: &IVec<ScanToken>,
     ) -> Result<(FunctionParam, TParseContext), AnalysisError>
     where
         TParseContext: ParseContext,
@@ -88,7 +91,7 @@ impl FunctionParameterTrait for FunctionParamInOut {
             let with_clause = WithClause::default();
             let from_clause = FromClause::default();
             let (ex, new_context) =
-                analyze_scaler_expr(context, &with_clause, &from_clause, def_expr)?;
+                analyze_scaler_expr(context, &with_clause, &from_clause, def_expr, tokens)?;
             (Some(ex), new_context)
         } else {
             (None, context)
@@ -116,7 +119,7 @@ impl FunctionParameterTrait for FunctionParamInOut {
                 self.clone(),
             ))))?
         };
-        Ok(ParameterBindResult::one_in_out(self, &arg))
+        Ok(ParameterBindResult::one_in_out(self, arg.as_ref()))
     }
 
     fn is_input_param(&self) -> bool {
@@ -125,13 +128,13 @@ impl FunctionParameterTrait for FunctionParamInOut {
 
     fn apply_simple_infer_result(&mut self, simple_infer_result: &TypeReference) {
         if let Some(ty) = self.param_type.as_mut() {
-            ty.apply_simple_infer_result(simple_infer_result)
+            ty.apply_simple_infer_result(simple_infer_result);
         }
     }
 
     fn apply_common_infer_result(&mut self, common_infer_result: &TypeReference) {
         if let Some(ty) = self.param_type.as_mut() {
-            ty.apply_common_infer_result(common_infer_result)
+            ty.apply_common_infer_result(common_infer_result);
         }
     }
 }

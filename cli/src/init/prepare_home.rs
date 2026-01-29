@@ -1,4 +1,7 @@
-use std::path::PathBuf;
+use std::{
+    fs::create_dir_all,
+    path::{Path, PathBuf},
+};
 
 use inquire::{
     CustomUserError,
@@ -7,7 +10,7 @@ use inquire::{
 
 pub fn prepare_home(
     assume_yes: bool,
-    home_arg: &Option<PathBuf>,
+    home_arg: Option<&PathBuf>,
 ) -> Result<PathBuf, anyhow::Error> {
     if !assume_yes {
         let create_home_dir_description = include_str!("create_home_dir.txt");
@@ -17,7 +20,7 @@ pub fn prepare_home(
     if let Some(home) = home_arg {
         if home.exists() {
             // home directory exits
-            eprintln!("{home:?} directory exists.");
+            eprintln!("{} directory exists.", home.display());
             Ok(home.clone())
         } else {
             // home directory not exists
@@ -33,12 +36,24 @@ pub fn prepare_home(
         }
     } else {
         let default_home = shellexpand::tilde("~/.sqlfun");
-        let home_path = edit_home_path(&default_home)?;
-        Ok(home_path)
+        if assume_yes {
+            println!("create directory {default_home}");
+            let path = PathBuf::from(&String::from(default_home));
+            if path.exists() {
+                println!("ready exists");
+            } else {
+                create_dir_all(&path)?;
+            }
+            Ok(path)
+        } else {
+            let home_path = edit_home_path(&default_home)?;
+            Ok(home_path)
+        }
     }
 }
 
 /// Validate input path is absolute and, non exists, parent path exists
+#[allow(clippy::unnecessary_wraps)]
 fn new_absolute_path_validator(input: &str) -> Result<Validation, CustomUserError> {
     let path = PathBuf::from(input);
     if !path.is_absolute() {
@@ -47,7 +62,7 @@ fn new_absolute_path_validator(input: &str) -> Result<Validation, CustomUserErro
         )));
     }
     if path.exists() {
-        return Ok(Validation::Invalid(ErrorMessage::from("ready exists")));
+        return Ok(Validation::Valid);
     }
     let Some(parent) = path.parent() else {
         return Ok(Validation::Invalid(ErrorMessage::from(
@@ -56,9 +71,10 @@ fn new_absolute_path_validator(input: &str) -> Result<Validation, CustomUserErro
     };
     if !parent.exists() {
         return Ok(Validation::Invalid(ErrorMessage::from(format!(
-            "{parent:?} not exist"
+            "{} not exist",
+            parent.display()
         ))));
-    };
+    }
     Ok(Validation::Valid)
 }
 
@@ -74,22 +90,22 @@ fn edit_home_path(default_home: &str) -> Result<PathBuf, anyhow::Error> {
 
         match std::fs::create_dir_all(&path) {
             Ok(()) => {
-                eprintln!("{path:?} create successfully");
+                eprintln!("{} create successfully", path.display());
                 return Ok(path);
             }
             Err(e) => {
-                eprintln!("{path:?} create failed {e} ");
-                eprintln!("please specify other path.")
+                eprintln!("{} create failed {e} ", path.display());
+                eprintln!("please specify other path.");
             }
         }
     }
 }
 
-fn create_confirm(home: &PathBuf, assume_yes: bool) -> Result<bool, anyhow::Error> {
+fn create_confirm(home: &Path, assume_yes: bool) -> Result<bool, anyhow::Error> {
     if assume_yes {
         return Ok(true);
     }
-    let confirmed = inquire::Confirm::new(&format!("Create the {home:?}?")).prompt()?;
+    let confirmed = inquire::Confirm::new(&format!("Create the {}?", home.display())).prompt()?;
 
     Ok(confirmed)
 }

@@ -12,7 +12,10 @@ impl TryFrom<NodeListOpt> for FullName {
         let Some(name_elements) = value.map(|v| v.as_string()) else {
             AnalysisError::raise_unexpected_none("node_list")?
         };
-        let elements: Vec<String> = name_elements.iter().map(|v| v.get_sval()).collect();
+        let elements: Vec<String> = name_elements
+            .iter()
+            .map(crate::syn::String::get_sval)
+            .collect();
         match elements.len() {
             3 => Ok(Self {
                 catalog: Some(CatalogName::from(&elements[0])),
@@ -68,7 +71,7 @@ impl TryFrom<TypeName> for FullName {
         let Some(names) = value.get_names().map(|v| v.as_string()) else {
             AnalysisError::raise_unexpected_none("type_name.names")?
         };
-        let names: Vec<String> = names.iter().map(|v| v.get_sval()).collect();
+        let names: Vec<String> = names.iter().map(crate::syn::String::get_sval).collect();
 
         match names.len() {
             3 => Ok(Self {

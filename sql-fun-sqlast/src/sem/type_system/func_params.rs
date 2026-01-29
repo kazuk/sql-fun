@@ -13,24 +13,30 @@ use self::{
 };
 use sql_fun_core::IVec;
 
-use crate::sem::{
-    AnalysisError, ColumnCollection, ParseContext, SemScalarExpr, TypeReference,
-    create_comp_type::CompositeFieldDefinition,
-    type_system::{ArgumentBindingCollection, CommonInferContext, SimpleInferContext, TypeError},
+use crate::{
+    sem::{
+        AnalysisError, ColumnCollection, ParseContext, SemScalarExpr, TypeReference,
+        create_comp_type::CompositeFieldDefinition,
+        type_system::{
+            ArgumentBindingCollection, CommonInferContext, SimpleInferContext, TypeError,
+        },
+    },
+    syn::ScanToken,
 };
 
 pub trait FunctionParameterTrait: std::fmt::Display
 where
     Self: Sized,
 {
-    fn name(&self) -> &Option<String>;
-    fn param_type(&self) -> &Option<TypeReference>;
+    fn name(&self) -> Option<&String>;
+    fn param_type(&self) -> Option<&TypeReference>;
     fn default_expr(&self) -> Option<&SemScalarExpr>;
     fn is_input_param(&self) -> bool;
 
     fn from_syn<TParseContext>(
         context: TParseContext,
         param: crate::syn::FunctionParameter,
+        tokens: &IVec<ScanToken>,
     ) -> Result<(FunctionParam, TParseContext), AnalysisError>
     where
         Self: Sized,
@@ -92,7 +98,8 @@ mod test_function_param_display {
 
 impl FunctionParam {
     /// get a type
-    pub fn get_type(&self) -> &Option<TypeReference> {
+    #[must_use]
+    pub fn get_type(&self) -> Option<&TypeReference> {
         match self {
             Self::In(v) => v.param_type(),
             Self::Out(v) => v.param_type(),
@@ -113,6 +120,10 @@ impl FunctionParam {
     }
 
     /// analyze output parameter as column collection
+    ///
+    /// # Errors
+    ///
+    /// Returns [`AnalysisError`] if any parameter fails to parse.
     pub fn collect_output_params_as_columns(
         params: &Vec<crate::syn::FunctionParameter>,
     ) -> Result<Option<ColumnCollection>, AnalysisError> {
@@ -120,13 +131,18 @@ impl FunctionParam {
         for param in params {
             if FunctionParam::is_output_param(param)? {
                 let value = FunctionParam::analyze_as_column_definition(param)?;
-                columns.push(value)
+                columns.push(value);
             }
         }
         Ok(Some(ColumnCollection::new(columns)))
     }
 
     /// bind argument to function parameter
+    ///
+    /// # Errors
+    ///
+    /// Propagates [`TypeError`] when binding fails.
+    #[expect(rustdoc::private_intra_doc_links)]
     pub fn bind_arg(
         &self,
         arg_types: &mut ArgumentBindingCollection,
@@ -141,6 +157,11 @@ impl FunctionParam {
     }
 
     /// collect simple infer parameters
+    ///
+    /// # Errors
+    ///
+    /// Returns [`TypeError`] if inferring argument types fails.
+    #[expect(rustdoc::private_intra_doc_links)]
     pub fn collect_simple(
         &self,
         context: &mut SimpleInferContext,
@@ -156,6 +177,11 @@ impl FunctionParam {
     }
 
     /// collect common infer parameters
+    ///
+    /// # Errors
+    ///
+    /// Returns [`TypeError`] if type inference fails.
+    #[expect(rustdoc::private_intra_doc_links)]
     pub fn collect_common(
         &self,
         context: &mut CommonInferContext,
@@ -193,6 +219,7 @@ impl FunctionParam {
     }
 
     /// get composite type field definition for this parameter
+    #[must_use]
     pub fn field_definition(&self) -> Option<CompositeFieldDefinition> {
         match self {
             Self::Out(p) => p.composite_field_definition(),
@@ -203,6 +230,11 @@ impl FunctionParam {
     }
 
     /// tests implicit cast is avaiable
+    ///
+    /// # Errors
+    ///
+    /// Returns [`TypeError`] when an implicit cast cannot be resolved.
+    #[expect(rustdoc::private_intra_doc_links)]
     pub fn test_castability_one<TParseContext>(
         &self,
         context: &TParseContext,
@@ -229,6 +261,11 @@ impl FunctionParam {
     }
 
     /// tests implicit cast is avaiable for variadic arguments
+    ///
+    /// # Errors
+    ///
+    /// Returns [`TypeError`] when any argument cannot be implicitly cast.
+    #[expect(rustdoc::private_intra_doc_links)]
     pub fn test_castability_variadic<TParseContext>(
         &self,
         context: &TParseContext,
@@ -243,7 +280,7 @@ impl FunctionParam {
             for source_type in source_types {
                 if let Some(st) = source_type {
                     if let Some(cast) = context.get_implicit_cast(st, target_type) {
-                        scores.push(cast.context().overload_priority_score())
+                        scores.push(cast.context().overload_priority_score());
                     } else {
                         TypeError::implicit_cast_not_found(
                             &format!("{st}"),

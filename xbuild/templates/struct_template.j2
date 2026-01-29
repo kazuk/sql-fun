@@ -1,18 +1,21 @@
 {# struct_template.j2 (askama) #}
 
-/// message type {{ struct_name }}
+/// message type `{{ struct_name }}`
 #[allow(dead_code)]
 mod {{ module_name }} {
 
     #[allow(unused_imports)]
+    #[allow(clippy::wildcard_imports)]
     use super::*;
 
-    /// {{ struct_name }}
-    #[derive(Debug,Clone, serde::Serialize, serde::Deserialize )]
+    /// `{{ struct_name }}`
+    #[derive(Debug, Clone)]
+    #[cfg_attr(feature="syn_serde", derive(serde::Serialize, serde::Deserialize))]
     pub struct {{ struct_name }}(Box<self::inner::{{ struct_name }}>);
 
-    /// optional {{ struct_name }}
-    #[derive(Debug,Clone, serde::Serialize, serde::Deserialize )]
+    /// optional `{{ struct_name }}`
+    #[derive(Debug, Clone)]
+    #[cfg_attr(feature="syn_serde", derive(serde::Serialize, serde::Deserialize))]
     pub struct {{ struct_name }}Opt(Option<{{ struct_name }}>);
 
     #[cfg(test)]
@@ -29,12 +32,14 @@ mod {{ module_name }} {
         }
     }
 
-    /// {{ struct_name }} list
-    #[derive(Debug,Clone, serde::Serialize, serde::Deserialize )]
+    /// `{{ struct_name }}` list
+    #[derive(Debug, Clone)]
+    #[cfg_attr(feature="syn_serde", derive(serde::Serialize, serde::Deserialize))]
     pub struct {{ struct_name }}List(Vec<{{ struct_name }}>);
 
-    /// optional {{ struct_name }} list
-    #[derive(Debug,Clone, serde::Serialize, serde::Deserialize )]
+    /// optional `{{ struct_name }}` list
+    #[derive(Debug, Clone)]
+    #[cfg_attr(feature="syn_serde", derive(serde::Serialize, serde::Deserialize))]
     pub struct {{ struct_name }}ListOpt(Option<Vec<{{ struct_name }}>>);
 
     impl crate::syn::ListOpt<{{ struct_name }}> for {{ struct_name }}ListOpt {
@@ -66,6 +71,7 @@ mod {{ module_name }} {
     impl {{ struct_name }}Opt
     {
         /// returns None Value
+        #[must_use]
         pub fn none() -> Self {
             Self(None)
         }
@@ -108,6 +114,7 @@ mod {{ module_name }} {
 
     impl {{ struct_name }}ListOpt {
         /// returns None value
+        #[must_use]
         pub fn none() -> Self {
             Self(None)
         }
@@ -140,13 +147,17 @@ mod {{ module_name }} {
     mod inner {
 
         #[allow(unused_imports)]
+        #[allow(clippy::wildcard_imports)]
         use super::*;
 
         #[cfg_attr(test, derive(derive_builder::Builder))]
-        #[derive(Clone, Debug, serde::Serialize, serde::Deserialize )]
+        #[cfg_attr(feature="syn_serde", derive(serde::Serialize, serde::Deserialize))]
+        #[derive(Clone, Debug)]
+        #[allow(clippy::struct_excessive_bools)]
+        #[allow(clippy::struct_field_names)]
         pub struct {{ struct_name }} {
             {% for field in struct_type.field() %}
-                /// {{ field.struct_field_name() }}
+                /// `{{ field.struct_field_name() }}`
                 {{ field.struct_field_name() }}: {{ field.struct_field_type(false) }},
             {% endfor %}
         }
@@ -189,7 +200,8 @@ mod {{ module_name }} {
             {% if ty == "Vec<u64>" %}
     impl {{ struct_name }}
     {
-        /// get {{ name }}
+        /// get `{{ name }}`
+        #[must_use]
         pub fn {{ getter }}(& self) -> {{ ty }} {
             self.{{ name }}.clone()
         }
@@ -197,7 +209,8 @@ mod {{ module_name }} {
             {% else %}
     impl {{ struct_name }}
     {
-        /// get {{ name }}
+        /// get `{{ name }}`
+        #[must_use]
         pub fn {{ getter }}(& self) -> {{ ty }} {
             self.{{ name }}
         }
@@ -207,7 +220,8 @@ mod {{ module_name }} {
             {% set ty_turbo = field.struct_field_type_turbo(false) %}
     impl {{ struct_name }}
     {
-        /// get {{ name }}
+        /// get `{{ name }}`
+        #[must_use]
         pub fn {{ getter }}(& self) -> {{ ty }} {
             {{ ty_turbo }}::from(&self.{{ name }})
         }
@@ -216,7 +230,8 @@ mod {{ module_name }} {
         {% else %}
     impl {{ struct_name }}
     {
-        /// get {{ name }}
+        /// get `{{ name }}`
+        #[must_use]
         pub fn {{ getter }}(& self) -> {{ ty }} {
             {{ ty }}::from(&self.{{ name }})
         }
@@ -231,7 +246,8 @@ mod {{ module_name }} {
 
     impl {{ struct_name }}
     {
-        /// get {{ field.field_name() }}
+        /// get `{{ field.field_name() }}`
+        #[must_use]
         pub fn {{ field.getter_fn_name() }}(&self) -> {{ field.getter_return_type(false) }} {
             self.0.{{ field.getter_fn_name() }}()
         }
@@ -239,9 +255,10 @@ mod {{ module_name }} {
 
     impl {{ struct_name }}Opt
     {
-        /// get {{ field.field_name() }}
+        /// get `{{ field.field_name() }}`
+        #[must_use]
         pub fn {{ field.getter_fn_name() }}(&self) -> Option<{{ field.getter_return_type(false) }}> {
-            self.0.as_ref().map(|v| v.{{ field.getter_fn_name() }}())
+            self.0.as_ref().map( {{ struct_name }}::{{ field.getter_fn_name() }})
         }
     }
 
@@ -249,7 +266,8 @@ mod {{ module_name }} {
 
     impl {{ struct_name }}
     {
-        /// get {{ field.field_name() }}
+        /// get `{{ field.field_name() }}`
+        #[must_use]
         pub fn {{ field.getter_fn_name() }}(&self) -> {{ field.getter_return_type(false) }} {
             self.0.{{ field.getter_fn_name() }}()
         }
@@ -257,7 +275,8 @@ mod {{ module_name }} {
 
     impl {{ struct_name }}Opt
     {
-        /// get {{ field.field_name() }}
+        /// get `{{ field.field_name() }}`
+        #[must_use]
         pub fn {{ field.getter_fn_name() }}(&self) -> {{ field.getter_return_type(false) }} {
             match &self.0 {
                 Some(v) => v.{{ field.getter_fn_name() }}(),

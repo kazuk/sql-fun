@@ -10,6 +10,8 @@ mod table_fun;
 mod undefined;
 mod view;
 
+use sql_fun_core::IVec;
+
 pub use self::{
     alias::{AliasName, AliasSpec},
     cte::CteDataSource,
@@ -29,7 +31,7 @@ use crate::{
         analyze_scaler_expr, scalar_expr::ColumnReferenceExpr,
         type_system::ArgumentBindingCollection,
     },
-    syn::ListOpt,
+    syn::{ListOpt, ScanToken},
 };
 
 /// source nullability type
@@ -140,6 +142,7 @@ impl DataSource {
     }
 
     /// get alias name for data sources
+    #[must_use]
     pub fn get_aliases(&self) -> Vec<AliasSpec> {
         let mut results = Vec::new();
         self.push_alias_names(&mut results);
@@ -147,6 +150,7 @@ impl DataSource {
     }
 
     /// resolve alias name to data source
+    #[must_use]
     pub fn resolve_alias(&self, name: &AliasName) -> Option<(&DataSource, Nullable)> {
         match self {
             Self::CteQuery(d) => d.resolve_alias(self, name),
@@ -184,13 +188,13 @@ impl DataSource {
             Self::Table(d) => d.get_aliases_for_column(column, context, &mut result),
             Self::View(d) => d.get_aliases_for_column(column, context, &mut result),
             Self::JoinExpr(d) => {
-                d.get_aliases_for_column(column, context, with_clause, &mut result)
+                d.get_aliases_for_column(column, context, with_clause, &mut result);
             }
             Self::SubQuery(d) => {
-                d.get_aliases_for_column(column, context, with_clause, &mut result)
+                d.get_aliases_for_column(column, context, with_clause, &mut result);
             }
             Self::CallTableFunc(d) => {
-                d.get_aliases_for_column(column, context, with_clause, &mut result)
+                d.get_aliases_for_column(column, context, with_clause, &mut result);
             }
             Self::UndefinedTableFunc(_) => {}
             Self::RangeTableSample() => todo!(),
@@ -206,6 +210,7 @@ impl DataSource {
         from_clause: &FromClause,
         call: crate::syn::FuncCall,
         alias: Option<crate::syn::Alias>,
+        tokens: &IVec<ScanToken>,
     ) -> Result<(DataSource, TParseContext), AnalysisError>
     where
         TParseContext: ParseContext,
@@ -225,7 +230,7 @@ impl DataSource {
         if let Some(args) = call.get_args().as_inner() {
             for arg in args {
                 let (sarg, new_context) =
-                    analyze_scaler_expr(context, with_clause, from_clause, arg)?;
+                    analyze_scaler_expr(context, with_clause, from_clause, arg, tokens)?;
                 context = new_context;
                 arg_types.push(sarg.get_type());
                 arg_exprs.push(sarg);

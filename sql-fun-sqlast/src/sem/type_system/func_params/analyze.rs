@@ -1,3 +1,5 @@
+use sql_fun_core::IVec;
+
 use crate::{
     sem::{
         AnalysisError, ColumnDefinition, ColumnName, FullName, FunctionParam, ParseContext,
@@ -8,14 +10,19 @@ use crate::{
             variadic_param::FunctionParamVariadic,
         },
     },
-    syn::{FunctionParameterMode, Opt},
+    syn::{FunctionParameterMode, Opt, ScanToken},
 };
 
 impl FunctionParam {
     /// analyze syntax node
+    ///
+    /// # Errors
+    ///
+    /// Returns [`AnalysisError`] when the function parameter mode or type is missing or invalid.
     pub fn analyze<TParseContext>(
         mut context: TParseContext,
         param: crate::syn::FunctionParameter,
+        tokens: &IVec<ScanToken>,
     ) -> Result<(FunctionParam, TParseContext), AnalysisError>
     where
         TParseContext: ParseContext,
@@ -25,14 +32,21 @@ impl FunctionParam {
         };
 
         let (function_param, new_context) = match param_mode {
-            FunctionParameterMode::FuncParamIn => FunctionParamIn::from_syn(context, param)?,
-            FunctionParameterMode::FuncParamOut => FunctionParamOut::from_syn(context, param)?,
-            FunctionParameterMode::FuncParamInout => FunctionParamInOut::from_syn(context, param)?,
-            FunctionParameterMode::FuncParamVariadic => {
-                FunctionParamVariadic::from_syn(context, param)?
+            FunctionParameterMode::FuncParamIn | FunctionParameterMode::FuncParamDefault => {
+                FunctionParamIn::from_syn(context, param, tokens)?
             }
-            FunctionParameterMode::FuncParamTable => FunctionParamTable::from_syn(context, param)?,
-            FunctionParameterMode::FuncParamDefault => FunctionParamIn::from_syn(context, param)?,
+            FunctionParameterMode::FuncParamOut => {
+                FunctionParamOut::from_syn(context, param, tokens)?
+            }
+            FunctionParameterMode::FuncParamInout => {
+                FunctionParamInOut::from_syn(context, param, tokens)?
+            }
+            FunctionParameterMode::FuncParamVariadic => {
+                FunctionParamVariadic::from_syn(context, param, tokens)?
+            }
+            FunctionParameterMode::FuncParamTable => {
+                FunctionParamTable::from_syn(context, param, tokens)?
+            }
             _ => AnalysisError::raise_unexpected_input("function_parameter.mode")?,
         };
         context = new_context;
@@ -43,6 +57,7 @@ impl FunctionParam {
 
 #[cfg(test)]
 mod test_function_param_analyze {
+    use sql_fun_core::IVec;
     use testresult::TestResult;
 
     use crate::{
@@ -76,14 +91,19 @@ mod test_function_param_analyze {
         let arg_type = builder.type_name(&["int4"]);
 
         let func_param = builder.function_parameter("param", arg_type.into(), mode.into());
+        let tokens = IVec::default();
 
-        FunctionParam::analyze(test_context, func_param)?;
+        FunctionParam::analyze(test_context, func_param, &tokens)?;
         Ok(())
     }
 }
 
 impl super::FunctionParam {
-    /// analyze [crate::syn::FunctionParameter] as column definition
+    /// analyze [`crate::syn::FunctionParameter`] as column definition
+    ///
+    /// # Errors
+    ///
+    /// Returns [`AnalysisError`] when the parameter is missing its type or uses an invalid identifier.
     pub fn analyze_as_column_definition(
         param: &crate::syn::FunctionParameter,
     ) -> Result<ColumnDefinition, AnalysisError> {
@@ -100,6 +120,10 @@ impl super::FunctionParam {
     }
 
     /// test paramter is a output param
+    ///
+    /// # Errors
+    ///
+    /// Returns [`AnalysisError`] when the parameter mode is missing.
     pub fn is_output_param(param: &crate::syn::FunctionParameter) -> Result<bool, AnalysisError> {
         let Some(mode) = param.get_mode().as_inner() else {
             AnalysisError::raise_unexpected_none("functionparameter.mode")?

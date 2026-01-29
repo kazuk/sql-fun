@@ -1,6 +1,7 @@
 use std::path::PathBuf;
 
-use clap::ValueHint;
+use clap::{CommandFactory, ValueHint};
+
 use url::Url;
 
 /// Initialize `sql-fun` environments
@@ -18,19 +19,19 @@ pub struct InitializeArgs {
 
     /// `sql-fun` Home directory path. (optional)
     ///
-    /// 　　Path to the sql-fun home directory.
+    /// Path to the sql-fun home directory.
     ///
-    ///       This is where catalogs, extensions, and configuration files are stored.
-    ///       If not specified, defaults to "${HOME}/.sql-fun".
+    /// This is where catalogs, extensions, and configuration files are stored.
+    /// If not specified, defaults to "${HOME}/.sql-fun".
     ///
-    ///    [default: ${HOME}/.sql-fun]
+    /// [default: ${HOME}/.sql-fun]
     ///
     #[arg(long, short = 'H', value_hint = ValueHint::DirPath)]
     sql_fun_home: Option<PathBuf>,
 
-    /// Database connection URL (e.g., postgres://user:pass@host:5432/dbname).
+    /// Database connection URL (e.g., <postgres://user:pass@host:5432/dbname>).
     ///
-    /// If provided, `sql-fun`` will connect to the database and build the
+    /// If provided, `sql-fun` will connect to the database and build the
     /// built-in object catalog directly from the live server.
     ///
     /// This bypasses artifact download (see --github-repo / --sql-fun-version).
@@ -45,9 +46,9 @@ pub struct InitializeArgs {
     #[arg(long, default_value = "kazuk/sql-fun")]
     github_repo: String,
 
-    /// `sql-fun`` version to use when downloading artifacts (semver).
+    /// `sql-fun` version to use when downloading artifacts (semver).
     ///
-    ///       If omitted, the latest stable release is used.
+    /// If omitted, the latest stable release is used.
     ///
     /// [default: latest stable release]
     #[arg(long)]
@@ -62,7 +63,7 @@ pub struct InitializeArgs {
     #[arg(long, value_delimiter = ',', num_args = 1..)]
     engine_versions: Option<Vec<String>>,
 
-    /// Limit initialization to the specified PostgreSQL extensions.
+    /// Limit initialization to the specified `PostgreSQL` extensions.
     ///
     /// Accepts multiple values (repeatable) or comma-separated lists.
     ///
@@ -73,13 +74,35 @@ pub struct InitializeArgs {
 }
 
 impl InitializeArgs {
-    /// returns assume_yes value
+    /// returns `assume_yes` value
+    #[must_use]
     pub fn assume_yes(&self) -> bool {
         self.assume_yes
     }
 
-    /// returns sql_fun_home value
+    /// returns `sql_fun_home` value
+    #[must_use]
     pub fn sql_fun_home(&self) -> &Option<PathBuf> {
         &self.sql_fun_home
+    }
+
+    /// returns `engine_versions` values
+    #[must_use]
+    pub fn engine_versions(&self) -> Vec<String> {
+        if let Some(versions) = &self.engine_versions {
+            versions.clone()
+        } else {
+            vec![String::from("16"), String::from("17"), String::from("18")]
+        }
+    }
+
+    /// print long help
+    ///
+    /// # Errors
+    ///
+    /// [`std::io::Error`] : IO error
+    ///
+    pub fn print_long_help() -> Result<(), std::io::Error> {
+        Self::command().print_long_help()
     }
 }

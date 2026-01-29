@@ -1,15 +1,17 @@
+use sql_fun_core::IVec;
+
 use crate::{
     sem::{
         AlterView, AstAndContextPair,
         alter_table::AlterObjSubCommand,
         create_table::{ColumnDefinition, ColumnName},
     },
-    syn::Opt,
+    syn::{Opt, ScanToken},
 };
 
 use super::{AnalysisError, FullName, ParseContext, SelectStatement, SemAst, analyze_select};
 
-/// analyzed [crate::syn::ViewStmt]
+/// analyzed [`crate::syn::ViewStmt`]
 #[derive(Debug, Clone)]
 pub struct CreateView {
     name: FullName,
@@ -21,33 +23,37 @@ pub struct CreateView {
 
 impl CreateView {
     /// create instance
+    #[must_use]
     pub fn new(
         name: &FullName,
         query: &SelectStatement,
-        alter_statements: &Vec<AlterView>,
+        alter_statements: &[AlterView],
         owner: &Option<String>,
         materialized: bool,
     ) -> Self {
         Self {
             name: name.clone(),
             query: query.clone(),
-            alter_statements: alter_statements.clone(),
+            alter_statements: alter_statements.to_owned(),
             owner: owner.clone(),
             materialized,
         }
     }
 
     /// name of view
+    #[must_use]
     pub fn name(&self) -> &FullName {
         &self.name
     }
 
     /// get result set column
+    #[must_use]
     pub fn get_column_def(&self, column_name: &ColumnName) -> Option<ColumnDefinition> {
         self.query.get_result_column_def(column_name)
     }
 
     /// test column existing
+    #[must_use]
     pub fn has_column(&self, column: &ColumnName) -> bool {
         self.query.has_column(column)
     }
@@ -58,9 +64,7 @@ impl CreateView {
 
         for cmd in alter_view.commands() {
             match cmd {
-                AlterObjSubCommand::ChangeOwner(new_owner) => {
-                    self.owner = Some(new_owner.to_string())
-                }
+                AlterObjSubCommand::ChangeOwner(new_owner) => self.owner = Some(new_owner.clone()),
                 _ => todo!(),
             }
         }
@@ -69,17 +73,19 @@ impl CreateView {
     }
 
     /// view is materialized
+    #[must_use]
     pub fn is_materialized(&self) -> bool {
         self.materialized
     }
 }
 
-/// analyze [crate::syn::ViewStmt]
+/// analyze [`crate::syn::ViewStmt`]
 #[tracing::instrument(skip(context))]
 pub fn analyze_create_view<TParseContext>(
     context: TParseContext,
     parent_schema: &Option<String>,
     syn: crate::syn::ViewStmt,
+    tokens: &IVec<ScanToken>,
 ) -> Result<AstAndContextPair<TParseContext>, AnalysisError>
 where
     TParseContext: ParseContext,
@@ -93,18 +99,12 @@ where
         AnalysisError::raise_unexpected_none("view_stmt.query")?
     };
 
-    let AstAndContextPair(select, context) = analyze_select(context, query)?;
+    let AstAndContextPair(select, context) = analyze_select(context, query, tokens)?;
     let SemAst::SelectStatement(stmt) = select else {
         AnalysisError::raise_unexpected_none("select_statement")?
     };
     let name = FullName::try_from(view)?;
-    let create_view = CreateView::new(
-        &name,
-        &stmt,
-        &Default::default(),
-        &Default::default(),
-        false,
-    );
+    let create_view = CreateView::new(&name, &stmt, &[], &Default::default(), false);
     let context = context.apply_create_view(&create_view)?;
     Ok(AstAndContextPair::new(
         SemAst::CreateView(create_view),

@@ -1,3 +1,5 @@
+use sql_fun_core::IVec;
+
 use crate::{
     AstAndContextPair,
     sem::{
@@ -14,12 +16,13 @@ use crate::{
 pub fn semantic_analysis<TParseContext>(
     context: TParseContext,
     syn: ParseResult,
+    tokens: &IVec<crate::syn::ScanToken>,
 ) -> Result<AstAndContextPair<TParseContext>, AnalysisError>
 where
     TParseContext: ParseContext,
 {
     let statement = syn.get_stmts().get(0).get_stmt();
-    analyze_node(context, &None, statement)
+    analyze_node(context, &None, statement, tokens)
 }
 
 /// analyze node
@@ -28,6 +31,7 @@ pub fn analyze_node<TParseContext: ParseContext>(
     context: TParseContext,
     parent_schema: &Option<String>,
     statement: crate::syn::Node,
+    tokens: &IVec<crate::syn::ScanToken>,
 ) -> Result<AstAndContextPair<TParseContext>, AnalysisError> {
     if let Some(create) = statement.as_create_stmt().as_inner() {
         return analyze_create_stmt(context, parent_schema, create);
@@ -46,19 +50,19 @@ pub fn analyze_node<TParseContext: ParseContext>(
     }
 
     if let Some(create_function) = statement.as_create_function_stmt().as_inner() {
-        return analyze_create_function(context, parent_schema, create_function);
+        return analyze_create_function(context, parent_schema, create_function, tokens);
     }
 
     if let Some(variable_set) = statement.as_variable_set_stmt().as_inner() {
-        return analyze_variable_set(context, variable_set);
+        return analyze_variable_set(context, &variable_set, tokens);
     }
 
     if let Some(select) = statement.as_select_stmt().as_inner() {
-        return analyze_select(context, select);
+        return analyze_select(context, select, tokens);
     }
 
     if let Some(create_schema) = statement.as_create_schema_stmt().as_inner() {
-        return analyze_create_schema(context, create_schema);
+        return analyze_create_schema(context, create_schema, tokens);
     }
 
     if let Some(alter_owner) = statement.as_alter_owner_stmt().as_inner() {
@@ -70,15 +74,15 @@ pub fn analyze_node<TParseContext: ParseContext>(
     }
 
     if let Some(domain) = statement.as_create_domain_stmt().as_inner() {
-        return analyze_create_domain(context, domain);
+        return analyze_create_domain(context, domain, tokens);
     }
 
     if let Some(alter_table) = statement.as_alter_table_stmt().as_inner() {
-        return analyze_alter_statement(context, parent_schema, alter_table);
+        return analyze_alter_statement(context, parent_schema, alter_table, tokens);
     }
 
     if let Some(create_view) = statement.as_view_stmt().as_inner() {
-        return analyze_create_view(context, parent_schema, create_view);
+        return analyze_create_view(context, parent_schema, create_view, tokens);
     }
 
     if let Some(create_seq) = statement.as_create_seq_stmt().as_inner() {
@@ -90,11 +94,11 @@ pub fn analyze_node<TParseContext: ParseContext>(
     }
 
     if let Some(create_table_as) = statement.as_create_table_as_stmt().as_inner() {
-        return analyze_create_table_as(context, parent_schema, create_table_as);
+        return analyze_create_table_as(context, parent_schema, create_table_as, tokens);
     }
 
     if let Some(index_stmt) = statement.as_index_stmt().as_inner() {
-        return analyze_index_stmt(context, parent_schema, index_stmt);
+        return analyze_index_stmt(context, parent_schema, index_stmt, tokens);
     }
 
     todo!("handle {statement:?}");
@@ -109,6 +113,7 @@ mod tests {
     };
 
     use sql_fun_core::SqlFunArgs;
+    use std::path::Path;
     use testresult::TestResult;
 
     #[rstest::rstest]
@@ -129,12 +134,14 @@ LANGUAGE C STRICT IMMUTABLE PARALLEL SAFE;"#
         context_args: SqlFunArgs,
     ) -> TestResult {
         let parsed = crate::parse(sql)?;
+        let tokens = crate::scan(sql)?;
+
         eprintln!("{parsed:?}");
 
         let base_context = BaseContext::new(context_args)?;
-
-        let file_context = SchemaFileContext::new(base_context);
-        let AstAndContextPair(_ast, _context) = semantic_analysis(file_context, parsed)?;
+        let path = Path::new("test.sql");
+        let file_context = SchemaFileContext::new(&path, base_context);
+        let AstAndContextPair(_ast, _context) = semantic_analysis(file_context, parsed, &tokens)?;
 
         Ok(())
     }

@@ -10,30 +10,53 @@ on:
 
 env:
   CARGO_TERM_COLOR: never
+  USER: runner
 
 jobs:
   build:
     runs-on: ubuntu-24.04
     container:
-      image: ghcr.io/kazuk/ci-builder@sha256:4b8163c998cb0b1c5e16ec784f20bc6f3f6c0b1ad3a9073d940544c7965d2cc7
+      image: ghcr.io/kazuk/ci-builder@sha256:ee0061c563127b65f9d3f8f6dc3d9ba760890893064abb39d32eb72569775821
       credentials:
         username: ${{ github.actor }}
         password: ${{ secrets.GITHUB_TOKEN }}
     steps:
       - uses: actions/checkout@v4
 
+      - uses: actions/cache@v4
+        with:
+          path: |
+            /usr/local/cargo/registry
+            /usr/local/cargo/git
+          key: cargo-${{ runner.os }}-${{ hashFiles('**/Cargo.lock') }}
+          restore-keys: |
+            cargo-${{ runner.os }}-
+
+      - uses: actions/cache@v4
+        with:
+          path: /github/home/.cache/sccache
+          key: sccache-${{ runner.os }}-${{ hashFiles('**/Cargo.lock') }}
+          restore-keys: |
+            sccache-${{ runner.os }}-
+
       - name: buil and test
         run: |
+          export GIT_ROOT="$(git rev-parse --show-toplevel)"
+          export SQL_FUN_HOME="${GIT_ROOT}/sql-fun-home"
+          sccache --start-server
+          export RUSTC_WRAPPER=sccache
+          export SCCACHE_DIR=/github/home/.cache/sccache
           .local/bin/check-test-flow --nextest-extra=" 
             --config-file ./ci/nextest/config.toml 
             --profile ci 
             --show-progress none"
+          sccache --show-stats
 
       - name: Test Report
         uses: dorny/test-reporter@v2
         if: ${{ !cancelled() }}
         with:
           name: nextest tests
-          path: target/nextest/junit.xml
+          path: target/nextest/ci/junit.xml
           reporter: java-junit
 

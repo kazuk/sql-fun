@@ -11,9 +11,20 @@ use std::process::ExitCode;
 
 pub use self::runnable::{RunableCommand, StdStream};
 
+#[cfg(test)]
+/// Test helpers for the sql-fun CLI crate.
+pub mod test_helpers;
+
 /// Runs builtin CLI subcommands
+///
+/// # Errors
+///
+/// Returns an error if executing the chosen subcommand fails.
 pub async fn run_builtin(args: &SqlFunArgs) -> Result<ExitCode, anyhow::Error> {
-    let sub_command = args.cli_sub_command();
+    let Some(sub_command) = args.command() else {
+        eprintln!("no sub-command specified");
+        return Ok(ExitCode::SUCCESS);
+    };
     match sub_command {
         CliSubCommand::Initialize(init_args) => Ok(initialize(args, init_args).await?),
         _ => unreachable!(),

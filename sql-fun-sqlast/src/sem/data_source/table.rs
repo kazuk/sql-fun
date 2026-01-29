@@ -20,7 +20,7 @@ impl TableDataSource {
     }
 
     pub(super) fn push_alias_names(&self, names: &mut Vec<AliasSpec>) {
-        names.push(self.alias.clone())
+        names.push(self.alias.clone());
     }
 
     pub(super) fn resolve_alias<'a>(
@@ -46,7 +46,7 @@ impl TableDataSource {
         if let Some(table) = context.get_table(&self.name)
             && table.has_column(column)
         {
-            names.push(self.alias.clone())
+            names.push(self.alias.clone());
         }
     }
 
@@ -77,7 +77,7 @@ impl TableDataSource {
             } else {
                 context.report_problem(
                     AnalysisProblem::table_not_have_column_for_derived_column_name(),
-                );
+                )?;
                 None
             }
         } else if let Some(column_def) =
@@ -87,7 +87,7 @@ impl TableDataSource {
         } else {
             context.report_problem(AnalysisProblem::column_not_found_in_table(
                 &self.name, column,
-            ));
+            ))?;
             None
         };
         Ok(ColumnReferenceExpr::TableColumn(TableColumnRef::new(

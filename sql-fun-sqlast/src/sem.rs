@@ -29,7 +29,6 @@ mod names;
 mod operators;
 mod parse_context;
 mod pg_type;
-mod problem;
 mod scalar_expr;
 mod schema_file_context;
 mod search_path;
@@ -39,6 +38,8 @@ mod type_system;
 mod update_statement;
 mod variable_set;
 mod view_like;
+
+pub mod problem;
 
 pub use self::{
     alter_owner::{AlterOwner, analyze_alter_owner},
@@ -76,9 +77,10 @@ pub use self::{
     names::{CatalogName, FullName, LocalName, OperatorName, SchemaName, ValidOperatorName},
     operators::{BinaryOperatorDefinition, OperatorDefinition, UnaryOperatorDefinition},
     parse_context::{
-        BaseParseContext, CastInfoRead, FunctionInfoRead, FunctionInfoWrite, IndexInfoRead,
-        OperatorInfoRead, ParseContext, SearchPathRead, SequenceInfoRead, SequenceInfoWrite,
-        TableInfoRead, TableInfoWrite, TypeInfoRead, TypeInfoWrite, ViewInfoRead, ViewInfoWrite,
+        BaseParseContext, CastInfoRead, DefaultSourceAccessService, FunctionInfoRead,
+        FunctionInfoWrite, IndexInfoRead, OperatorInfoRead, ParseContext, SearchPathRead,
+        SequenceInfoRead, SequenceInfoWrite, SourceAccessService, TableInfoRead, TableInfoWrite,
+        TypeInfoRead, TypeInfoWrite, ViewInfoRead, ViewInfoWrite,
     },
     pg_type::{PgBuiltInType, TypeDefinition, TypeReference},
     problem::AnalysisProblem,
@@ -182,7 +184,8 @@ pub enum SemAst {
 }
 
 impl SemAst {
-    /// unwrap node as SelectStatement
+    /// unwrap node as `SelectStatement`
+    #[must_use]
     pub fn into_select_statemtnt(self) -> Option<SelectStatement> {
         match self {
             SemAst::SelectStatement(select_statement) => Some(select_statement),

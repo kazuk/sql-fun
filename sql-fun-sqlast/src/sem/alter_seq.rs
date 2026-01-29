@@ -5,7 +5,7 @@ use crate::{
 
 use super::{AnalysisError, ParseContext, SemAst};
 
-/// analyzed [crate::syn::AlterSeqStmt]
+/// analyzed [`crate::syn::AlterSeqStmt`]
 #[derive(Debug, Clone, derive_getters::Getters)]
 pub struct AlterSequence {
     seq_name: FullName,
@@ -14,6 +14,7 @@ pub struct AlterSequence {
 
 impl AlterSequence {
     /// create `alter sequence` statement
+    #[must_use]
     pub fn new(seq_name: &FullName, commands: &[AlterObjSubCommand]) -> Self {
         Self {
             seq_name: seq_name.clone(),
@@ -22,7 +23,7 @@ impl AlterSequence {
     }
 }
 
-/// analyze [crate::syn::AlterSeqStmt]
+/// analyze [`crate::syn::AlterSeqStmt`]
 pub fn analyze_alter_seq<TParseContext>(
     mut context: TParseContext,
     _parent_schema: &Option<String>,

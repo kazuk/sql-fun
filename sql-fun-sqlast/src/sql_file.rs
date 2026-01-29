@@ -59,13 +59,13 @@ impl Iterator for LineWithLfIter {
     fn next(&mut self) -> Option<Self::Item> {
         if self.eof {
             return None;
-        };
+        }
 
         let mut buf = String::new();
         match self.reader.read_line(&mut buf) {
             Ok(read) => {
                 if read == 0 {
-                    self.eof = true
+                    self.eof = true;
                 }
                 Some(Ok(buf))
             }
@@ -76,7 +76,8 @@ impl Iterator for LineWithLfIter {
 
 fn comment_psql_meta_command(line: String) -> String {
     if line.trim_start().starts_with('\\') {
-        format!("-- {line}")
+        let line_value = &line[3..]; // preserve line length
+        format!("-- {line_value}")
     } else {
         line
     }

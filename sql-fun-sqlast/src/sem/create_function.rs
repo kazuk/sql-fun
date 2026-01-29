@@ -1,13 +1,15 @@
+use sql_fun_core::IVec;
+
 use crate::{
     sem::{
         AnalysisError, AnalysisProblem, AstAndContextPair, ColumnCollection, ColumnDefinition,
         DefElemKey, FullName, FunctionOverloadCollection, FunctionParam, OverloadVariant,
         ParseContext, SemAst, type_system::ArgumentBindingCollection,
     },
-    syn::{ListOpt, Opt},
+    syn::{ListOpt, Opt, ScanToken},
 };
 
-/// analyzed [crate::syn::CreateFunctionStmt]
+/// analyzed [`crate::syn::CreateFunctionStmt`]
 #[derive(Debug, Clone)]
 pub struct CreateFunction {
     name: FullName,
@@ -17,6 +19,7 @@ pub struct CreateFunction {
 
 impl CreateFunction {
     /// create new instance
+    #[must_use]
     pub fn new(
         name: &FullName,
         overloads: &FunctionOverloadCollection,
@@ -30,6 +33,7 @@ impl CreateFunction {
     }
 
     /// list function overload (Using in builtin / extensions only)
+    #[must_use]
     pub fn overloads(&self) -> &FunctionOverloadCollection {
         &self.overloads
     }
@@ -51,6 +55,7 @@ impl CreateFunction {
     }
 
     /// return trure if function is returns set
+    #[must_use]
     pub fn is_table_function(&self) -> bool {
         self.returning_columdef.is_some()
     }
@@ -58,16 +63,18 @@ impl CreateFunction {
 
 impl CreateFunction {
     /// get function name
+    #[must_use]
     pub fn name(&self) -> &FullName {
         &self.name
     }
 }
 
-/// analyze [crate::syn::CreateFunctionStmt]
+/// analyze [`crate::syn::CreateFunctionStmt`]
 pub fn analyze_create_function<TParseContext>(
     mut context: TParseContext,
     _parent_schema: &Option<String>,
     syn: crate::syn::CreateFunctionStmt,
+    tokens: &IVec<ScanToken>,
 ) -> Result<AstAndContextPair<TParseContext>, AnalysisError>
 where
     TParseContext: ParseContext,
@@ -99,7 +106,7 @@ where
         } else {
             context.report_problem(AnalysisProblem::function_result_set_type_not_found(
                 &ret_type,
-            ));
+            ))?;
             Some(ColumnCollection::new(Vec::new()))
         }
     } else {
@@ -111,7 +118,7 @@ where
     let is_strict = def_elem_list.contains(&DefElemKey::strict());
     let mut func_params = Vec::new();
     for param in params {
-        let (function_param, new_context) = FunctionParam::analyze(context, param)?;
+        let (function_param, new_context) = FunctionParam::analyze(context, param, tokens)?;
         context = new_context;
         func_params.push(function_param);
     }

@@ -1,6 +1,8 @@
+use sql_fun_core::IVec;
+
 use crate::{
     sem::{AstAndContextPair, FromClause, SemScalarExpr, WithClause, analyze_scaler_expr},
-    syn::ListOpt,
+    syn::{ListOpt, ScanToken},
 };
 
 use super::{AnalysisError, ParseContext, SemAst};
@@ -14,20 +16,27 @@ pub struct VariableSet {
 
 impl VariableSet {
     /// name of variable
+    #[must_use]
     pub fn name(&self) -> &str {
         &self.name
     }
 
     /// value of variable
+    #[must_use]
     pub fn value(&self) -> &SemScalarExpr {
         &self.value
     }
 }
 
-/// analyze VariableSetStmt
+/// analyze `VariableSetStmt`
+///
+/// # Errors
+///
+/// Returns [`AnalysisError`] when the variable assignment is semantically invalid.
 pub fn analyze_variable_set<TParseContext>(
     mut context: TParseContext,
-    syn: crate::syn::VariableSetStmt,
+    syn: &crate::syn::VariableSetStmt,
+    tokens: &IVec<ScanToken>,
 ) -> Result<AstAndContextPair<TParseContext>, AnalysisError>
 where
     TParseContext: ParseContext,
@@ -37,14 +46,15 @@ where
         AnalysisError::raise_unexpected_none("VariableSetStmt.args")?
     };
     if args.len() != 1 {
-        AnalysisError::raise_unexpected_input("VariableSetStmt.args len!=1")?
-    };
+        AnalysisError::raise_unexpected_input("VariableSetStmt.args len!=1")?;
+    }
 
     let (value, new_context) = analyze_scaler_expr(
         context,
         &WithClause::default(),
         &FromClause::default(),
         args[0].clone(),
+        tokens,
     )?;
     context = new_context;
 

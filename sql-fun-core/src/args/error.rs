@@ -1,8 +1,8 @@
 use std::path::{Path, PathBuf};
 
-use crate::{ExtensionConfigError, MetadataError, args::ConfigurationKind};
+use crate::{ExtensionConfigError, HighlighterThemeError, MetadataError, args::ConfigurationKind};
 
-/// Error definition for [crate::SqlFunArgs]
+/// Error definition for [`crate::SqlFunArgs`]
 #[derive(Debug, thiserror::Error)]
 pub enum SqlFunArgsError {
     /// Not supported value
@@ -33,25 +33,33 @@ pub enum SqlFunArgsError {
     #[error(transparent)]
     Metadata(#[from] MetadataError),
 
-    /// Invalid PostgreSQL enging version specified
+    /// Invalid `PostgreSQL` engine version specified
     #[error("Invalid PostgreSQL engine version specified as {0}")]
     InvalidPostgresEngineVersion(String),
 
-    /// InsufficientConfiguration in metadata / args
+    /// `InsufficientConfiguration` in metadata / args
     #[error("Insufficient configuration in metadata and arguments : {0} not specified")]
     InsufficientConfiguration(ConfigurationKind),
 
-    /// Parse error in PostgreSQL extensions
+    /// Parse error in `PostgreSQL` extensions
     #[error("parse error {0} : {1}")]
     PgExtenstionsParse(String, String),
 
-    /// PostgreSQL extension related errors
+    /// `PostgreSQL` extension related errors
     #[error(transparent)]
     ExtensionConfig(#[from] ExtensionConfigError),
 
     /// Home for `sql-fun` not exists
     #[error("home of sql-fun not eists : {0}")]
     SqlFunHomeNotExist(PathBuf),
+
+    /// Syntax highlighter theme file related errors
+    #[error(transparent)]
+    Highlighter(#[from] HighlighterThemeError),
+
+    /// Argument or environment valiable parse error
+    #[error(transparent)]
+    Clap(#[from] clap::Error),
 }
 
 impl From<std::io::Error> for SqlFunArgsError {
@@ -63,7 +71,11 @@ impl From<std::io::Error> for SqlFunArgsError {
 }
 
 impl SqlFunArgsError {
-    /// std::env::home_dir returns None
+    /// `std::env::home_dir` returns None
+    ///
+    /// # Errors
+    ///
+    /// Always returns [`SqlFunArgsError::UserHomeNotDefined`].
     #[track_caller]
     pub fn user_home_not_defined<T>() -> Result<T, Self> {
         log::error!("std::env::home_dir returns none");
@@ -71,12 +83,20 @@ impl SqlFunArgsError {
     }
 
     /// `sql-fun` home not exists
+    ///
+    /// # Errors
+    ///
+    /// Always returns [`SqlFunArgsError::SqlFunHomeNotExist`].
     #[track_caller]
     pub fn home_not_exist<T, P: AsRef<Path>>(path: P) -> Result<T, Self> {
         Err(Self::SqlFunHomeNotExist(path.as_ref().to_path_buf()))
     }
 
-    /// raize FilePathNotFound
+    /// raize `FilePathNotFound`
+    ///
+    /// # Errors
+    ///
+    /// Always returns [`SqlFunArgsError::FilePathNotFound`] outside of tests.
     #[track_caller]
     pub fn file_path_not_found<T, P: AsRef<Path> + std::fmt::Debug>(path: P) -> Result<T, Self> {
         #[cfg(test)]
@@ -87,18 +107,30 @@ impl SqlFunArgsError {
     }
 
     /// not supported value used
+    ///
+    /// # Errors
+    ///
+    /// Always returns [`SqlFunArgsError::NotSupported`].
     pub fn not_suppoted<T>(value: &str, category: &str) -> Result<T, Self> {
         log::error!("Not supported value {value} for {category}.");
         Err(Self::NotSupported(category.to_string(), value.to_string()))
     }
 
     /// invalid postgres engine version specified
+    ///
+    /// # Errors
+    ///
+    /// Always returns [`SqlFunArgsError::InvalidPostgresEngineVersion`].
     pub fn invalid_engine_version<T>(value: &str) -> Result<T, Self> {
         log::error!("Invalid PostgreSQL engine version {value}");
         Err(Self::InvalidPostgresEngineVersion(value.to_string()))
     }
 
     /// postgres engine version not specified
+    ///
+    /// # Errors
+    ///
+    /// Always returns [`SqlFunArgsError::InsufficientConfiguration`].
     pub fn no_postgres_engine_version_specified<T>() -> Result<T, Self> {
         Err(Self::InsufficientConfiguration(
             ConfigurationKind::EngineVersion,
@@ -106,6 +138,10 @@ impl SqlFunArgsError {
     }
 
     /// extension list parse error
+    ///
+    /// # Errors
+    ///
+    /// Always returns [`SqlFunArgsError::PgExtenstionsParse`].
     pub fn parsing_postgres_extensions<T>(message: &str, source: &str) -> Result<T, Self> {
         Err(Self::PgExtenstionsParse(
             message.to_string(),

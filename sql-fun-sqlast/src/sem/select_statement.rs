@@ -1,16 +1,19 @@
+use sql_fun_core::IVec;
+
 use crate::{
     sem::{
         AnalysisError, AstAndContextPair, CreateCompositType, FromClause, ParseContext, SemAst,
         SemScalarExpr, TypeDefinition, TypeReference, WithClause, analyze_scaler_expr,
         create_table::{ColumnDefinition, ColumnName},
     },
-    syn::{ListOpt, Opt, SetOperation},
+    syn::{ListOpt, Opt, ScanToken, SetOperation},
 };
 
 mod result_column;
 pub use self::result_column::ResultColumnCollection;
 
 /// select statement
+#[allow(clippy::large_enum_variant)]
 #[derive(Debug, Clone, Eq, Hash, PartialEq, serde::Serialize, serde::Deserialize)]
 pub enum SelectStatement {
     /// simple query
@@ -25,26 +28,31 @@ pub enum SelectStatement {
 
 impl SelectStatement {
     /// create a simple select query node
+    #[must_use]
     pub fn simple(node: &SelectStatementNode) -> Self {
         Self::Simple(node.clone())
     }
 
     /// create a union node
+    #[must_use]
     pub fn union(left: SelectStatement, right: SelectStatement) -> Self {
         Self::Union(Box::new(left), Box::new(right))
     }
 
     /// create a intersect node
+    #[must_use]
     pub fn intersect(left: SelectStatement, right: SelectStatement) -> Self {
         Self::Intersect(Box::new(left), Box::new(right))
     }
 
     /// create except node
+    #[must_use]
     pub fn except(left: SelectStatement, right: SelectStatement) -> Self {
         Self::Except(Box::new(left), Box::new(right))
     }
 
     /// get column definition by name
+    #[must_use]
     pub fn get_result_column_def(&self, column: &ColumnName) -> Option<ColumnDefinition> {
         match self {
             Self::Simple(query) => query.get_result_column_def(column),
@@ -55,6 +63,7 @@ impl SelectStatement {
     }
 
     /// check column existing
+    #[must_use]
     pub fn has_column(&self, column: &ColumnName) -> bool {
         match self {
             Self::Simple(query) => query.has_column(column),
@@ -65,12 +74,13 @@ impl SelectStatement {
     }
 
     /// enumerate result set columns
+    #[must_use]
     pub fn result_columns(&self) -> &ResultColumnCollection {
         match self {
             Self::Simple(query) => &query.result_columns,
-            Self::Union(l, _r) => &l.result_columns(),
-            Self::Intersect(l, _r) => &l.result_columns(),
-            Self::Except(l, _r) => &l.result_columns(),
+            Self::Union(l, _r) => l.result_columns(),
+            Self::Intersect(l, _r) => l.result_columns(),
+            Self::Except(l, _r) => l.result_columns(),
         }
     }
 
@@ -131,10 +141,11 @@ impl SelectStatementNode {
     }
 }
 
-/// analyze [crate::syn::SelectStmt]
+/// analyze [`crate::syn::SelectStmt`]
 pub fn analyze_select<TParseContext>(
     context: TParseContext,
     syn: crate::syn::SelectStmt,
+    tokens: &IVec<ScanToken>,
 ) -> Result<AstAndContextPair<TParseContext>, AnalysisError>
 where
     TParseContext: ParseContext,
@@ -145,15 +156,15 @@ where
 
     match set_operation {
         SetOperation::SetopNone => {
-            let (node, context) = analyze_select_node(context, syn)?;
+            let (node, context) = analyze_select_node(context, syn, tokens)?;
             Ok(AstAndContextPair::new(
                 SemAst::SelectStatement(node),
                 context,
             ))
         }
-        SetOperation::SetopUnion => analyze_select_union(context, &syn),
-        SetOperation::SetopIntersect => analyze_select_intersect(context, &syn),
-        SetOperation::SetopExcept => analyze_select_except(context, &syn),
+        SetOperation::SetopUnion => analyze_select_union(context, &syn, tokens),
+        SetOperation::SetopIntersect => analyze_select_intersect(context, &syn, tokens),
+        SetOperation::SetopExcept => analyze_select_except(context, &syn, tokens),
         _ => AnalysisError::raise_unexpected_input("selectstmt.op")?,
     }
 }
@@ -161,6 +172,7 @@ where
 fn analyze_setop_select<TParseContext>(
     context: TParseContext,
     syn: &crate::syn::SelectStmt,
+    tokens: &IVec<ScanToken>,
 ) -> Result<(SelectStatement, SelectStatement, TParseContext), AnalysisError>
 where
     TParseContext: ParseContext,
@@ -171,19 +183,20 @@ where
     let Some(rarg) = syn.get_rarg().as_inner() else {
         AnalysisError::raise_unexpected_none("selectstmt.rarg")?
     };
-    let (larg, context) = analyze_select_node(context, larg)?;
-    let (rarg, context) = analyze_select_node(context, rarg)?;
+    let (larg, context) = analyze_select_node(context, larg, tokens)?;
+    let (rarg, context) = analyze_select_node(context, rarg, tokens)?;
     Ok((larg, rarg, context))
 }
 
 fn analyze_select_except<TParseContext>(
     context: TParseContext,
     syn: &crate::syn::SelectStmt,
+    tokens: &IVec<ScanToken>,
 ) -> Result<AstAndContextPair<TParseContext>, AnalysisError>
 where
     TParseContext: ParseContext,
 {
-    let (larg, rarg, context) = analyze_setop_select(context, syn)?;
+    let (larg, rarg, context) = analyze_setop_select(context, syn, tokens)?;
     Ok(AstAndContextPair::new(
         SemAst::SelectStatement(SelectStatement::except(larg, rarg)),
         context,
@@ -193,11 +206,12 @@ where
 fn analyze_select_intersect<TParseContext>(
     context: TParseContext,
     syn: &crate::syn::SelectStmt,
+    tokens: &IVec<ScanToken>,
 ) -> Result<AstAndContextPair<TParseContext>, AnalysisError>
 where
     TParseContext: ParseContext,
 {
-    let (larg, rarg, context) = analyze_setop_select(context, syn)?;
+    let (larg, rarg, context) = analyze_setop_select(context, syn, tokens)?;
     Ok(AstAndContextPair::new(
         SemAst::SelectStatement(SelectStatement::intersect(larg, rarg)),
         context,
@@ -207,34 +221,36 @@ where
 fn analyze_select_union<TParseContext>(
     context: TParseContext,
     syn: &crate::syn::SelectStmt,
+    tokens: &IVec<ScanToken>,
 ) -> Result<AstAndContextPair<TParseContext>, AnalysisError>
 where
     TParseContext: ParseContext,
 {
-    let (larg, rarg, context) = analyze_setop_select(context, syn)?;
+    let (larg, rarg, context) = analyze_setop_select(context, syn, tokens)?;
     Ok(AstAndContextPair::new(
         SemAst::SelectStatement(SelectStatement::union(larg, rarg)),
         context,
     ))
 }
 
-/// analyze [crate::syn::SelectStmt]
+/// analyze [`crate::syn::SelectStmt`]
 pub fn analyze_select_node<TParseContext>(
     mut context: TParseContext,
     syn: crate::syn::SelectStmt,
+    tokens: &IVec<ScanToken>,
 ) -> Result<(SelectStatement, TParseContext), AnalysisError>
 where
     TParseContext: ParseContext,
 {
-    let (with_clause, new_context) = WithClause::analyze(context, syn.get_with_clause())?;
+    let (with_clause, new_context) = WithClause::analyze(context, syn.get_with_clause(), tokens)?;
     context = new_context;
     let (from_clause, new_context) =
-        FromClause::analyze(context, &with_clause, syn.get_from_clause())?;
+        FromClause::analyze(context, &with_clause, syn.get_from_clause(), tokens)?;
     context = new_context;
 
     let where_clause = if let Some(where_clause) = syn.get_where_clause().as_inner() {
         let (where_expr, new_context) =
-            analyze_scaler_expr(context, &with_clause, &from_clause, where_clause)?;
+            analyze_scaler_expr(context, &with_clause, &from_clause, where_clause, tokens)?;
         context = new_context;
         Some(where_expr)
     } else {
@@ -249,7 +265,8 @@ where
         let Some(val) = res_target.get_val().as_inner() else {
             AnalysisError::raise_unexpected_none("restarget.val")?
         };
-        let (val_sem, new_context) = analyze_scaler_expr(context, &with_clause, &from_clause, val)?;
+        let (val_sem, new_context) =
+            analyze_scaler_expr(context, &with_clause, &from_clause, val, tokens)?;
         context = new_context;
 
         let mut name = res_target.get_name();

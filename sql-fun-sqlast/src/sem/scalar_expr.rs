@@ -180,7 +180,26 @@ impl SemScalarExpr {
             Self::ColumnRef(cr) => cr.is_not_null(),
         }
     }
+}
 
+#[cfg(test)]
+mod test_get_type_and_is_not_null {
+    use super::{ScalarConstExpr, SemScalarExpr};
+    use crate::sem::PgBuiltInType;
+
+    #[test]
+    fn get_type_and_is_not_null_for_const() {
+        let int_expr = SemScalarExpr::Const(ScalarConstExpr::new_integer(10));
+        let null_expr = SemScalarExpr::Const(ScalarConstExpr::Null);
+
+        assert_eq!(int_expr.get_type(), Some(PgBuiltInType::int4()));
+        assert_eq!(int_expr.is_not_null(), Some(true));
+        assert_eq!(null_expr.get_type(), None);
+        assert_eq!(null_expr.is_not_null(), Some(false));
+    }
+}
+
+impl SemScalarExpr {
     /// get column definition
     #[must_use]
     pub fn get_column_def(&self) -> Option<ColumnDefinition> {
@@ -189,38 +208,6 @@ impl SemScalarExpr {
             Self::TypeCast(_) | SemScalarExpr::FuncCall(_) => None,
             _ => todo!("not implemented {self:?}"),
         }
-    }
-
-    /// convert `value_expr` with implicit casting
-    #[must_use]
-    pub fn wrap_implicit_cast(taget_type: &TypeReference, value_expr: &SemScalarExpr) -> Self {
-        Self::ImplicitCast(ImplicitCastExpr::new(value_expr, taget_type))
-    }
-
-    /// convert expression type with implicit cast
-    pub fn implicit_cast_if_require<TParseContext>(
-        context: &mut TParseContext,
-        result_type: &TypeReference,
-        expr: &mut SemScalarExpr,
-    ) -> Result<(), AnalysisError>
-    where
-        TParseContext: ParseContext,
-    {
-        let Some(ty) = expr.get_type() else {
-            return Ok(());
-        };
-        if &ty == result_type {
-            return Ok(());
-        }
-
-        let Some(cast) = context.get_implicit_cast(&ty, result_type) else {
-            context.report_problem(AnalysisProblem::implicit_cast_not_found(&ty, result_type))?;
-            return Ok(());
-        };
-        if !cast.is_no_coversion() {
-            *expr = SemScalarExpr::wrap_implicit_cast(result_type, expr);
-        }
-        Ok(())
     }
 
     /// get column name
@@ -248,7 +235,151 @@ impl SemScalarExpr {
             Self::Unexpected(_node) => todo!(),
         }
     }
+}
 
+#[cfg(test)]
+mod test_get_column_def_and_name {
+    use super::{ColumnReferenceExpr, SemScalarExpr, TableColumnRef, TypeReference};
+    use crate::sem::{
+        FullName, PgBuiltInType,
+        create_table::{ColumnDefinition, ColumnName, TableName},
+        data_source::AliasName,
+    };
+
+    fn make_table_column_expr(
+        column_name: &str,
+        column_type: &TypeReference,
+        is_not_null: Option<bool>,
+    ) -> SemScalarExpr {
+        let alias = AliasName::from("t");
+        let column = ColumnName::from(column_name);
+        let table_name = TableName::from(FullName::with_schema("public", "tbl"));
+        let col_def = ColumnDefinition::new(&Some(column.clone()), Some(column_type), is_not_null);
+        let table_column = TableColumnRef::new(&alias, &column, &table_name, Some(&col_def), false);
+        SemScalarExpr::ColumnRef(ColumnReferenceExpr::TableColumn(table_column))
+    }
+
+    #[test]
+    fn get_column_def_and_name_from_column_ref() {
+        let col_type = PgBuiltInType::int4();
+        let expr = make_table_column_expr("col", &col_type, Some(true));
+
+        let col_def = expr.get_column_def().expect("column definition");
+        assert_eq!(col_def.get_type(), Some(col_type));
+        assert_eq!(expr.get_column_name(), "col");
+    }
+}
+
+impl SemScalarExpr {
+    /// convert `value_expr` with implicit casting
+    #[must_use]
+    pub fn wrap_implicit_cast(taget_type: &TypeReference, value_expr: &SemScalarExpr) -> Self {
+        Self::ImplicitCast(ImplicitCastExpr::new(value_expr, taget_type))
+    }
+}
+
+#[cfg(test)]
+mod test_wrap_implicit_cast {
+    use super::{ScalarConstExpr, SemScalarExpr};
+    use crate::sem::PgBuiltInType;
+
+    #[test]
+    fn wrap_implicit_cast_sets_type() {
+        let base_expr = SemScalarExpr::Const(ScalarConstExpr::new_integer(1));
+        let target_type = PgBuiltInType::int8();
+        let wrapped = SemScalarExpr::wrap_implicit_cast(&target_type, &base_expr);
+
+        match wrapped {
+            SemScalarExpr::ImplicitCast(_) => {
+                assert_eq!(wrapped.get_type(), Some(target_type));
+            }
+            _ => panic!("expected implicit cast expression"),
+        }
+    }
+}
+
+impl SemScalarExpr {
+    /// convert expression type with implicit cast
+    pub fn implicit_cast_if_require<TParseContext>(
+        context: &mut TParseContext,
+        result_type: &TypeReference,
+        expr: &mut SemScalarExpr,
+    ) -> Result<(), AnalysisError>
+    where
+        TParseContext: ParseContext,
+    {
+        let Some(ty) = expr.get_type() else {
+            return Ok(());
+        };
+        if &ty == result_type {
+            return Ok(());
+        }
+
+        let Some(cast) = context.get_implicit_cast(&ty, result_type) else {
+            context.report_problem(AnalysisProblem::implicit_cast_not_found(&ty, result_type))?;
+            return Ok(());
+        };
+        if !cast.is_no_coversion() {
+            *expr = SemScalarExpr::wrap_implicit_cast(result_type, expr);
+        }
+        Ok(())
+    }
+}
+
+#[cfg(test)]
+mod test_implicit_cast_if_require {
+    use super::{ScalarConstExpr, SemScalarExpr};
+    use crate::sem::{CastContext, CastDefinition, PgBuiltInType};
+    use crate::test_helpers::TestParseContext;
+
+    #[test]
+    fn implicit_cast_if_require_no_change_when_same_type() {
+        let mut context = TestParseContext::default();
+        let target_type = PgBuiltInType::int4();
+        let mut expr = SemScalarExpr::Const(ScalarConstExpr::new_integer(3));
+
+        SemScalarExpr::implicit_cast_if_require(&mut context, &target_type, &mut expr)
+            .expect("implicit cast check");
+
+        assert!(matches!(expr, SemScalarExpr::Const(_)));
+        assert_eq!(context.reported_problem_count(), 0);
+    }
+
+    #[test]
+    fn implicit_cast_if_require_wraps_on_available_cast() {
+        let mut context = TestParseContext::default();
+        let source_type = PgBuiltInType::int4();
+        let target_type = PgBuiltInType::int8();
+        context.set_get_implicit_cast_result(
+            &source_type,
+            &target_type,
+            Some(CastDefinition::new(CastContext::Implicit)),
+        );
+
+        let mut expr = SemScalarExpr::Const(ScalarConstExpr::new_integer(3));
+        SemScalarExpr::implicit_cast_if_require(&mut context, &target_type, &mut expr)
+            .expect("implicit cast check");
+
+        assert!(matches!(expr, SemScalarExpr::ImplicitCast(_)));
+        assert_eq!(expr.get_type(), Some(target_type));
+        assert_eq!(context.reported_problem_count(), 0);
+    }
+
+    #[test]
+    fn implicit_cast_if_require_reports_when_missing_cast() {
+        let mut context = TestParseContext::default();
+        let target_type = PgBuiltInType::int8();
+        let mut expr = SemScalarExpr::Const(ScalarConstExpr::new_integer(3));
+
+        SemScalarExpr::implicit_cast_if_require(&mut context, &target_type, &mut expr)
+            .expect("implicit cast check");
+
+        assert!(matches!(expr, SemScalarExpr::Const(_)));
+        assert_eq!(context.reported_problem_count(), 1);
+    }
+}
+
+impl SemScalarExpr {
     /// test expression is array and report
     pub fn require_array<TParseContext>(
         &self,
@@ -265,7 +396,36 @@ impl SemScalarExpr {
         }
         Ok(())
     }
+}
 
+#[cfg(test)]
+mod test_require_array {
+    use super::{ImplicitCastExpr, ScalarConstExpr, SemScalarExpr, TypeReference};
+    use crate::sem::PgBuiltInType;
+    use crate::test_helpers::TestParseContext;
+
+    #[test]
+    fn require_array_reports_for_non_array() {
+        let mut context = TestParseContext::default();
+        let expr = SemScalarExpr::Const(ScalarConstExpr::new_integer(5));
+
+        expr.require_array(&mut context).expect("require array");
+        assert_eq!(context.reported_problem_count(), 1);
+    }
+
+    #[test]
+    fn require_array_accepts_array_type() {
+        let mut context = TestParseContext::default();
+        let base_expr = SemScalarExpr::Const(ScalarConstExpr::new_integer(5));
+        let array_type = TypeReference::concrete_type_ref(PgBuiltInType::int4().full_name(), true);
+        let expr = SemScalarExpr::ImplicitCast(ImplicitCastExpr::new(&base_expr, &array_type));
+
+        expr.require_array(&mut context).expect("require array");
+        assert_eq!(context.reported_problem_count(), 0);
+    }
+}
+
+impl SemScalarExpr {
     /// test fits array index
     pub fn fits_array_index<TParseContext>(
         &self,
@@ -288,5 +448,38 @@ impl SemScalarExpr {
             context.report_problem(AnalysisProblem::array_index_type_missmatch(self, &ty))?;
         }
         Ok(())
+    }
+}
+
+#[cfg(test)]
+mod test_fits_array_index {
+    use super::{ScalarConstExpr, SemScalarExpr};
+    use crate::sem::{CastContext, CastDefinition, PgBuiltInType};
+    use crate::test_helpers::TestParseContext;
+
+    #[test]
+    fn fits_array_index_reports_when_not_castable() {
+        let mut context = TestParseContext::default();
+        let expr = SemScalarExpr::Const(ScalarConstExpr::String("value".to_string()));
+
+        expr.fits_array_index(&mut context)
+            .expect("array index check");
+        assert_eq!(context.reported_problem_count(), 1);
+    }
+
+    #[test]
+    fn fits_array_index_accepts_castable_type() {
+        let mut context = TestParseContext::default();
+        let int4 = PgBuiltInType::int4();
+        context.set_get_implicit_cast_result(
+            &int4,
+            &int4,
+            Some(CastDefinition::new(CastContext::NoConversion)),
+        );
+        let expr = SemScalarExpr::Const(ScalarConstExpr::new_integer(7));
+
+        expr.fits_array_index(&mut context)
+            .expect("array index check");
+        assert_eq!(context.reported_problem_count(), 0);
     }
 }

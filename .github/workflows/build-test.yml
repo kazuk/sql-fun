@@ -39,6 +39,10 @@ jobs:
           restore-keys: |
             sccache-${{ runner.os }}-
 
+      - name: check dependencies
+        run: |
+          cargo deny check
+
       - name: buil and test
         run: |
           export GIT_ROOT="$(git rev-parse --show-toplevel)"

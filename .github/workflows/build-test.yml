@@ -39,6 +39,10 @@ jobs:
           restore-keys: |
             sccache-${{ runner.os }}-
 
+      - name: check dependencies
+        run: |
+          cargo deny check
+
       - name: buil and test
         run: |
           export GIT_ROOT="$(git rev-parse --show-toplevel)"
@@ -46,9 +50,9 @@ jobs:
           sccache --start-server
           export RUSTC_WRAPPER=sccache
           export SCCACHE_DIR=/github/home/.cache/sccache
-          .local/bin/check-test-flow --nextest-extra=" 
-            --config-file ./ci/nextest/config.toml 
-            --profile ci 
+          .local/bin/check-test-flow --nextest-extra="
+            --config-file ./ci/nextest/config.toml
+            --profile ci
             --show-progress none"
           sccache --show-stats
 
@@ -59,4 +63,3 @@ jobs:
           name: nextest tests
           path: target/nextest/ci/junit.xml
           reporter: java-junit
-

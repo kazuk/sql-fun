@@ -2,7 +2,7 @@ name: github actions custom image publisher
 
 on:
   push:
-    branches: [ "ci-image" ]
+    branches: ["ci-image"]
 
 permissions:
   contents: read
@@ -39,6 +39,8 @@ jobs:
           tags: ${{ env.LOCAL_IMAGE_TAG }}
           cache-from: type=gha
           cache-to: type=gha,mode=max
+          build-args: |
+            SERENA_TAG=v0.1.4
 
       - name: Smoke test
         run: |

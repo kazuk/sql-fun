@@ -16,7 +16,7 @@ jobs:
   build:
     runs-on: ubuntu-24.04
     container:
-      image: ghcr.io/kazuk/ci-builder@sha256:ee0061c563127b65f9d3f8f6dc3d9ba760890893064abb39d32eb72569775821
+      image: ghcr.io/kazuk/ci-builder@sha256:359df7b978d88f96c3bb049570821d096fa0b423a933ae968fd96ed8c80f5aee
       credentials:
         username: ${{ github.actor }}
         password: ${{ secrets.GITHUB_TOKEN }}
@@ -46,9 +46,9 @@ jobs:
           sccache --start-server
           export RUSTC_WRAPPER=sccache
           export SCCACHE_DIR=/github/home/.cache/sccache
-          .local/bin/check-test-flow --nextest-extra=" 
-            --config-file ./ci/nextest/config.toml 
-            --profile ci 
+          .local/bin/check-test-flow --nextest-extra="
+            --config-file ./ci/nextest/config.toml
+            --profile ci
             --show-progress none"
           sccache --show-stats
 
@@ -59,4 +59,3 @@ jobs:
           name: nextest tests
           path: target/nextest/ci/junit.xml
           reporter: java-junit
-

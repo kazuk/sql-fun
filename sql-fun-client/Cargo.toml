@@ -3,6 +3,7 @@ name = "sql-fun-client"
 version = "0.1.0"
 edition = "2024"
 license = "MIT"
+description = "callable client for sql-fun-server-api"
 
 [lints]
 workspace = true
@@ -14,3 +15,4 @@ serde.workspace = true
 serde_json.workspace = true
 thiserror.workspace = true
 tokio.workspace = true
+sql-fun-server-api.workspace = true

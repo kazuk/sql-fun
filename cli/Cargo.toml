@@ -3,6 +3,7 @@ name = "sql-fun-cli"
 license = "MIT"
 version = "0.1.0"
 edition = "2024"
+description = "command line tool for sql-fun"
 
 [lints]
 workspace = true
@@ -34,6 +35,4 @@ nix.workspace = true
 bollard.workspace = true
 futures-util.workspace = true
 derive_builder.workspace = true
-
-
-sql-fun-core = { path = "../sql-fun-core" }
+sql-fun-core.workspace = true

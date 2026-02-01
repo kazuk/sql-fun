@@ -3,6 +3,7 @@ name = "xbuild"
 license = "MIT"
 version = "0.1.0"
 edition = "2024"
+publish = false
 
 [lints]
 workspace = true

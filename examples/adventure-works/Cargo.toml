@@ -1,8 +1,11 @@
 [package]
 name = "adventure-works"
 license = "MIT"
-version = "0.1.0"
+version = "0.1.1"
 edition = "2024"
+publish = false
+description = "adventure works schema example"
+repository = "https://github.com/kazuk/sql-fun"
 
 [lints]
 workspace = true
@@ -14,6 +17,4 @@ futures-util.workspace = true
 tokio.workspace = true
 tokio-postgres.workspace = true
 tracing.workspace = true
-
-
-sql-fun = { path = "../.." }
+sql-fun.workspace = true

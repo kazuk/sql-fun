@@ -3,6 +3,12 @@ name = "sql-fun-server"
 version = "0.1.0"
 edition = "2024"
 license = "MIT"
+description = "schema data service for sql-fun"
+
+[[bin]]
+name = "sql-fun-server"
+path = "src/main.rs"
+doc = false
 
 [lints]
 workspace = true
@@ -21,6 +27,7 @@ tokio = { workspace = true }
 tracing.workspace = true
 sql-fun-server-api.workspace = true
 async-trait.workspace = true
+sql-fun-sqlast.workspace = true
 
 [dev-dependencies]
 testresult.workspace = true

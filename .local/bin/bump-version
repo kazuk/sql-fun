@@ -1,0 +1,30 @@
+#!/bin/bash
+
+# [semver](https://github.com/masa213f/semver)
+
+PACKAGE=${1}
+MODE=${2}
+
+CURRENT_VERSION=$(
+    cargo metadata --format-version 1 \
+    | jq --arg name ${PACKAGE}  -r '
+        .packages[]
+        | select(.name==$name)
+        | .version')
+CURRENT_MAJOR=$(semver --json ${CURRENT_VERSION} | jq '.major')
+
+if [ $CURRENT_MAJOR -eq 0 ] ; then
+    case "${MODE}" in
+      "major")
+        echo ${CURRENT_VERSION} | semver-bump minor
+        ;;
+      "minor")
+        echo ${CURRENT_VERSION} | semver-bump patch
+        ;;
+      "patch")
+        echo ${CURRENT_VERSION} | semver-bump patch
+        ;;
+    esac
+else
+    echo ${CURRENT_VERSION} | semver-bump ${MODE}
+fi

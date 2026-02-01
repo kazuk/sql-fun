@@ -1,0 +1,44 @@
+#!/bin/bash
+set -e
+
+ALLOW_DIRTY_OPT=""
+
+while (( "$#" )); do
+  case "$1" in
+    --allow-dirty)
+      ALLOW_DIRTY_OPT="--allow-dirty"
+      shift
+      ;;
+    -*|--*=) # unsupported flags
+      echo "Error: Unsupported flag $1" >&2
+      exit 1
+      ;;
+  esac
+done
+
+# depends  (no internal dependencies)
+cargo publish -p sql-fun-core ${ALLOW_DIRTY_OPT}
+sleep 60
+
+# depends  sql-fun-core
+cargo publish -p sql-fun-sqlast ${ALLOW_DIRTY_OPT}
+sleep 60
+
+# depends  (no internal dependencies)
+cargo publish -p sql-fun-server-api ${ALLOW_DIRTY_OPT}
+sleep 60
+
+# depends  sql-fun-server-api, sql-fun-sqlast, sql-fun-core
+cargo publish -p sql-fun-server ${ALLOW_DIRTY_OPT}
+sleep 60
+
+# depends  sql-fun-server-api, sql-fun-core
+cargo publish -p sql-fun-client ${ALLOW_DIRTY_OPT}
+sleep 60
+
+# depends  sql-fun-client, sql-fun-core
+cargo publish -p sql-fun-cli ${ALLOW_DIRTY_OPT}
+sleep 60
+
+# depends  sql-fun-client
+cargo publish -p sql-fun ${ALLOW_DIRTY_OPT}

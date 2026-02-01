@@ -19,7 +19,7 @@ checksum = "320119579fcad9c21884f5c4861d16174d0e06250625266f50fe6898340abefa"
 
 [[package]]
 name = "adventure-works"
-version = "0.1.0"
+version = "0.1.1"
 dependencies = [
  "anyhow",
  "derive_builder",
@@ -2488,6 +2488,7 @@ dependencies = [
  "rstest",
  "sha2",
  "smallvec",
+ "sql-fun-client",
  "sql-fun-core",
  "syn",
  "thiserror 2.0.18",
@@ -2532,13 +2533,14 @@ version = "0.1.0"
 dependencies = [
  "serde",
  "serde_json",
+ "sql-fun-server-api",
  "thiserror 2.0.18",
  "tokio",
 ]
 
 [[package]]
 name = "sql-fun-core"
-version = "0.1.0"
+version = "0.1.1"
 dependencies = [
  "clap",
  "combine",
@@ -2569,6 +2571,7 @@ dependencies = [
  "serde",
  "serde_json",
  "sql-fun-server-api",
+ "sql-fun-sqlast",
  "sysinfo",
  "testresult",
  "thiserror 2.0.18",

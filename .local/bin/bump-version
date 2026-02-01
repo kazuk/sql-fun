@@ -5,7 +5,12 @@
 PACKAGE=${1}
 MODE=${2}
 
-CURRENT_VERSION=$(cargo metadata --format-version 1 | jq -r '.packages[] | select(.name=="sql-fun") | .version')
+CURRENT_VERSION=$(
+    cargo metadata --format-version 1 \
+    | jq --arg name ${PACKAGE}  -r '
+        .packages[]
+        | select(.name==$name)
+        | .version')
 CURRENT_MAJOR=$(semver --json ${CURRENT_VERSION} | jq '.major')
 
 if [ $CURRENT_MAJOR -eq 0 ] ; then

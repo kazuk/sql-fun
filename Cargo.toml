@@ -7,7 +7,7 @@ edition = "2024"
 authors = ["kazuk"]
 description = "SQL query/statement execution code generator"
 repository = "https://github.com/kazuk/sql-fun/"
-exclude = [ "/postgres" ]
+exclude = ["/postgres"]
 
 [package.metadata]
 
@@ -29,16 +29,16 @@ members = [
 ]
 
 [workspace.metadata]
-baseline="v0.1.0-baseline"
+baseline = "v0.1.0-baseline"
 
 [workspace.metadata.next-release]
-sql-fun="patch"
-sql-fun-cli="patch"
-sql-fun-server="patch"
-sql-fun-server-api="patch"
-sql-fun-core="patch"
-sql-fun-client="patch"
-sql-fun-sqlast="patch"
+sql-fun = "patch"
+sql-fun-cli = "patch"
+sql-fun-server = "patch"
+sql-fun-server-api = "patch"
+sql-fun-core = "patch"
+sql-fun-client = "patch"
+sql-fun-sqlast = "patch"
 
 [workspace.lints]
 
@@ -96,11 +96,11 @@ serde_json = "1.0"
 sha2 = "0.10"
 shellexpand = "3.1"
 smallvec = "1.15"
-sql-fun = { path= ".", version = "0.1.0" }
-sql-fun-core = { path = "./sql-fun-core", version = "0.1.1" }
+sql-fun = { path = ".", version = "0.1.0" }
 sql-fun-client = { path = "./sql-fun-client", version = "0.1.0" }
+sql-fun-core = { path = "./sql-fun-core", version = "0.1.1" }
 sql-fun-server-api = { path = "sql-fun-server-api", version = "0.1.0" }
-sql-fun-sqlast = { path = "./sql-fun-sqlast", version = "0.1.0", features=[] }
+sql-fun-sqlast = { path = "./sql-fun-sqlast", version = "0.1.0", features = [] }
 syn = "2.0"
 sysinfo = "0.37"
 testresult = "0.4"
@@ -127,11 +127,11 @@ proc-macro2 = { workspace = true }
 quote = { workspace = true }
 sha2 = { workspace = true }
 smallvec = { workspace = true }
+sql-fun-client = { workspace = true }
 sql-fun-core = { workspace = true }
 syn = { workspace = true }
 thiserror = { workspace = true }
 toml = { workspace = true }
-sql-fun-client = { workspace = true }
 
 [dev-dependencies]
 anyhow = { workspace = true }

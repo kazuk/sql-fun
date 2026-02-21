@@ -1,32 +1,94 @@
 use std::{collections::HashMap, path::PathBuf, str::FromStr};
 
 use crate::{
-    PostgresExtensionsCollection, SqlFunArgs, SqlFunArgsError, SqlFunMetadata,
-    metadata::EngineVersion,
+    PostgresExtensionsCollection, PostgresExtensionsParseError, SqlFunArgs, SqlFunArgsBuilder,
+    SqlFunArgsBuilderError, SqlFunArgsError, SqlFunMetadata, metadata::PostgresEngineVersion,
 };
 
-#[derive(clap::Args, Debug, serde::Serialize, serde::Deserialize, Clone)]
-
+#[derive(
+    clap::Args, Debug, serde::Serialize, serde::Deserialize, Clone, derive_builder::Builder,
+)]
+#[builder(build_fn(error = "SqlFunArgsBuilderError"))]
 pub struct PostgresArgs {
     /// `PostgreSQL` search path
     #[clap(long("pg_search_path"), env = Self::SQL_FUN_PG_SEARCH_PATH)]
+    #[builder(setter(into, strip_option), default)]
     postgres_search_path: Option<Vec<String>>,
 
     /// `PostgreSQL` version for built-in schema
     #[clap(long, env = Self::SQL_FUN_POSTGRES_VERSION)]
+    #[builder(setter(into, strip_option), default)]
     postgres_version: Option<String>,
 
     /// Comma-separated Postgres extensions (name[@version])
-    #[clap(long, env = Self::SQL_FUN_EXTENSIONS )]
-    postgres_extensions: Option<String>,
+    #[clap(long, env = Self::SQL_FUN_EXTENSIONS, value_parser=PostgresExtensionsCollection::parse_arg )]
+    #[builder(default, setter(strip_option))]
+    postgres_extensions: Option<PostgresExtensionsCollection>,
 
     /// Built-in schema directory (overrides version)
     #[clap(long, env = Self::SQL_FUN_BUITIN_SCHEMA)]
+    #[builder(setter(into, strip_option), default)]
     builtin_schema_dir: Option<PathBuf>,
 
     /// Directory for Postgres extension SQL files
     #[clap(long, env = Self::SQL_FUN_EXTENSIONS_DIR)]
+    #[builder(setter(into, strip_option), default)]
     postgres_extensions_dir: Option<PathBuf>,
+}
+
+impl SqlFunArgsBuilder {
+    /// `PostgreSQL` search path
+    pub fn postgres_search_path<Value>(&mut self, value: Value) -> &mut Self
+    where
+        Value: Into<Vec<String>>,
+    {
+        self.postgres_args.postgres_search_path(value);
+        self
+    }
+
+    /// `PostgreSQL` version for built-in schema
+    pub fn postgres_version<Value>(&mut self, value: Value) -> &mut Self
+    where
+        Value: Into<PostgresEngineVersion>,
+    {
+        let engine_version = value.into();
+        self.postgres_args
+            .postgres_version(format!("{engine_version}"));
+        self
+    }
+
+    /// Comma-separated Postgres extensions (name[@version])
+    ///
+    /// # Errors
+    ///
+    /// When parsing error returns reason and remains pair.
+    ///
+    pub fn postgres_extensions(
+        &mut self,
+        value: String,
+    ) -> Result<&mut Self, PostgresExtensionsParseError> {
+        let value = PostgresExtensionsCollection::try_from(value)?;
+        self.postgres_args.postgres_extensions(value);
+        Ok(self)
+    }
+
+    /// Built-in schema directory (overrides version)
+    pub fn builtin_schema_dir<Value>(&mut self, value: Value) -> &mut Self
+    where
+        Value: Into<PathBuf>,
+    {
+        self.postgres_args.builtin_schema_dir(value);
+        self
+    }
+
+    /// Directory for Postgres extension SQL files
+    pub fn postgres_extensions_dir<Value>(&mut self, value: Value) -> &mut Self
+    where
+        Value: Into<PathBuf>,
+    {
+        self.postgres_args.postgres_extensions_dir(value);
+        self
+    }
 }
 
 impl PostgresArgs {
@@ -56,34 +118,27 @@ impl PostgresArgs {
     pub fn postgres_version(
         &self,
         metadata: &SqlFunMetadata,
-    ) -> Result<EngineVersion, SqlFunArgsError> {
+    ) -> Result<PostgresEngineVersion, SqlFunArgsError> {
         let Some(version) = &self.postgres_version else {
             let Some(engine_version) = metadata.engine_version() else {
                 SqlFunArgsError::no_postgres_engine_version_specified()?
             };
             return Ok(engine_version.clone());
         };
-        let Ok(version) = EngineVersion::from_str(version) else {
+        let Ok(version) = PostgresEngineVersion::from_str(version) else {
             SqlFunArgsError::invalid_engine_version(version)?
         };
         Ok(version)
     }
 
     /// get postgres extensions
-    pub fn postgres_extensions(
-        &self,
-        metadata: &SqlFunMetadata,
-    ) -> Result<PostgresExtensionsCollection, SqlFunArgsError> {
+    pub fn postgres_extensions(&self, metadata: &SqlFunMetadata) -> PostgresExtensionsCollection {
         if let Some(extensions) = &self.postgres_extensions {
-            let parse_result = PostgresExtensionsCollection::from_str(extensions);
-            match parse_result {
-                Ok(v) => Ok(v),
-                Err((msg, source)) => SqlFunArgsError::parsing_postgres_extensions(&msg, &source),
-            }
+            extensions.clone()
         } else if let Some(extensions) = metadata.postgres_extensions() {
-            Ok(extensions.clone())
+            extensions.clone()
         } else {
-            Ok(PostgresExtensionsCollection::default())
+            PostgresExtensionsCollection::default()
         }
     }
 
@@ -111,7 +166,7 @@ impl PostgresArgs {
         );
 
         let extensions_dir = args.postgres_extensions_dir(metadata)?;
-        let extensions = &mut self.postgres_extensions(metadata)?;
+        let extensions = &mut self.postgres_extensions(metadata);
         extensions.resolve_versions(&extensions_dir)?;
 
         envs.insert(

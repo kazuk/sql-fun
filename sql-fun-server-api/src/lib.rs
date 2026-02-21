@@ -28,7 +28,7 @@ pub use self::{
     },
 };
 
-use std::path::PathBuf;
+use std::{convert::Infallible, error::Error as StdError, path::PathBuf};
 
 /// semantic analysis context handle
 #[derive(serde::Serialize, serde::Deserialize)]
@@ -101,6 +101,55 @@ pub enum SqlFunServerApiError {
     /// server keeping to many collections for client, release collection for new listing/analyse request.
     #[error("require release collection {0:?}")]
     RequireReleseCollection(Vec<CollectionHandle>),
+
+    /// Generic unexpected error
+    #[error("unexpected {0}")]
+    Unexpected(String),
+
+    /// schema context initialize error
+    #[error("schema context initialize failed : {0}")]
+    SchemaContextInitializeFailed(String),
+}
+
+impl SqlFunServerApiError {
+    /// raise a [`Self::Unexpected`] error
+    ///
+    /// # Errors
+    ///
+    /// always raise a [`Self::Unexpected`] error
+    ///
+    pub fn raise_unexpected(message: &str) -> Result<Infallible, Self> {
+        Err(Self::new_unexpected(message))
+    }
+
+    /// new [`Self::Unexpected`] error instance
+    #[must_use]
+    pub fn new_unexpected(message: &str) -> Self {
+        Self::Unexpected(String::from(message))
+    }
+
+    /// raise a [`Self::SchemaContextInitializeFailed`] error
+    ///
+    /// # Errors
+    ///
+    /// always raize a [`Self::SchemaContextInitializeFailed`] error
+    ///
+    pub fn raise_schema_context_initialize_failed<E>(error: E) -> Result<Infallible, Self>
+    where
+        E: StdError,
+    {
+        Err(Self::new_schema_context_initialize_failed(error))
+    }
+
+    /// create new [`Self::SchemaContextInitializeFailed`] error instance
+    #[must_use]
+    pub fn new_schema_context_initialize_failed<E>(error: E) -> Self
+    where
+        E: StdError,
+    {
+        let message = format!("{error}");
+        Self::SchemaContextInitializeFailed(message)
+    }
 }
 
 /// database type reference

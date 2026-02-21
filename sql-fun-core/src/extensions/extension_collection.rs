@@ -13,7 +13,7 @@ use combine::{
 use crate::{ExtensionConfigError, ExtensionNameVersionPair, IVec};
 
 /// collection for postgres extensions
-#[derive(Debug, serde::Deserialize, Clone, Default)]
+#[derive(Debug, serde::Deserialize, serde::Serialize, Clone, Default)]
 #[serde(transparent)]
 pub struct PostgresExtensionsCollection(IVec<ExtensionNameVersionPair>);
 
@@ -30,7 +30,55 @@ impl Display for PostgresExtensionsCollection {
     }
 }
 
+/// parse error
+#[derive(Debug)]
+pub struct PostgresExtensionsParseError {
+    message: String,
+    original: String,
+}
+
+impl std::fmt::Display for PostgresExtensionsParseError {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        write!(f, "parse error: {}\n  {}", self.message, self.original)
+    }
+}
+
+impl PostgresExtensionsParseError {
+    fn new(message: &str, original: &str) -> Self {
+        Self {
+            message: String::from(message),
+            original: String::from(original),
+        }
+    }
+}
+
+impl TryFrom<String> for PostgresExtensionsCollection {
+    type Error = PostgresExtensionsParseError;
+
+    fn try_from(value: String) -> Result<Self, Self::Error> {
+        PostgresExtensionsCollection::from_str(&value)
+    }
+}
+
+impl FromStr for PostgresExtensionsCollection {
+    type Err = PostgresExtensionsParseError;
+
+    fn from_str(s: &str) -> Result<Self, Self::Err> {
+        let parse_result = Self::parse(s);
+        match parse_result {
+            Ok(result) => Ok(Self(IVec::from(result))),
+            Err(msg) => Err(PostgresExtensionsParseError::new(&msg, s)),
+        }
+    }
+}
+
 impl PostgresExtensionsCollection {
+    pub(crate) fn parse_arg(value: &str) -> Result<Self, String> {
+        let result = Self::from_str(value)
+            .map_err(|_| String::from("can not to parse extensions collection"))?;
+        Ok(result)
+    }
+
     ///
     /// get extension SQL file paths
     ///
@@ -106,18 +154,6 @@ impl PostgresExtensionsCollection {
             Ok(results)
         } else {
             Err(errors)
-        }
-    }
-}
-
-impl FromStr for PostgresExtensionsCollection {
-    type Err = (String, String);
-
-    fn from_str(s: &str) -> Result<Self, Self::Err> {
-        let parse_result = Self::parse(s);
-        match parse_result {
-            Ok(result) => Ok(Self(IVec::from(result))),
-            Err(msg) => Err((msg, s.to_string())),
         }
     }
 }

@@ -46,6 +46,19 @@ impl SqlFunArgsBuilder {
         self
     }
 
+    /// `PostgreSQL` search path from comma-separated string
+    pub fn postgres_search_path_from_csv(&mut self, value: &str) -> &mut Self {
+        let search_path = value
+            .split(',')
+            .filter(|item| !item.is_empty())
+            .map(ToString::to_string)
+            .collect::<Vec<_>>();
+        if !search_path.is_empty() {
+            self.postgres_search_path(search_path);
+        }
+        self
+    }
+
     /// `PostgreSQL` version for built-in schema
     pub fn postgres_version<Value>(&mut self, value: Value) -> &mut Self
     where
@@ -97,6 +110,33 @@ impl PostgresArgs {
     const SQL_FUN_EXTENSIONS: &str = "SQL_FUN_EXTENSIONS";
     const SQL_FUN_BUITIN_SCHEMA: &str = "SQL_FUN_BUITIN_SCHEMA";
     const SQL_FUN_EXTENSIONS_DIR: &str = "SQL_FUN_EXTENSIONS_DIR";
+
+    pub(crate) fn apply_envs(
+        builder: &mut SqlFunArgsBuilder,
+        envs: &HashMap<String, String>,
+    ) -> Result<(), SqlFunArgsError> {
+        if let Some(value) = envs.get(Self::SQL_FUN_PG_SEARCH_PATH) {
+            builder.postgres_search_path_from_csv(value);
+        }
+        if let Some(value) = envs.get(Self::SQL_FUN_POSTGRES_VERSION) {
+            let Ok(version) = PostgresEngineVersion::from_str(value) else {
+                return SqlFunArgsError::invalid_engine_version(value);
+            };
+            builder.postgres_version(version);
+        }
+        if let Some(value) = envs.get(Self::SQL_FUN_EXTENSIONS).cloned()
+            && let Err(err) = builder.postgres_extensions(value.clone())
+        {
+            return SqlFunArgsError::parsing_postgres_extensions(&err.to_string(), &value);
+        }
+        if let Some(value) = envs.get(Self::SQL_FUN_BUITIN_SCHEMA) {
+            builder.builtin_schema_dir(PathBuf::from(value));
+        }
+        if let Some(value) = envs.get(Self::SQL_FUN_EXTENSIONS_DIR) {
+            builder.postgres_extensions_dir(PathBuf::from(value));
+        }
+        Ok(())
+    }
 
     /// get `PostgreSQL` search path
     #[allow(clippy::unnecessary_wraps)]

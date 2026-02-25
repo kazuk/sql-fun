@@ -48,6 +48,15 @@ impl LoggingArgs {
     const SQL_FUN_LOG_LEVEL: &str = "SQL_FUN_LOG_LEVEL";
     const SQL_FUN_LOG_FILE: &str = "SQL_FUN_LOG_FILE";
 
+    pub(crate) fn apply_envs(builder: &mut SqlFunArgsBuilder, envs: &HashMap<String, String>) {
+        if let Some(value) = envs.get(Self::SQL_FUN_LOG_LEVEL) {
+            builder.log_level(value);
+        }
+        if let Some(value) = envs.get(Self::SQL_FUN_LOG_FILE) {
+            builder.log_file(PathBuf::from(value));
+        }
+    }
+
     pub fn get_envs(&self, envs: &mut HashMap<String, String>) {
         if let Some(log_file) = &self.log_file {
             envs.insert(

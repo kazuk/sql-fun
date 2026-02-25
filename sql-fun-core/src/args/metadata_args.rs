@@ -143,6 +143,37 @@ impl MetadataArgs {
     const SQL_FUN_METADATA_FORMAT_DEFAULT: &str = "TOML";
     const SQL_FUN_METADATA_SCHEMA_DEFAULT: &str = "develop";
 
+    pub(crate) fn apply_envs(
+        builder: &mut SqlFunArgsBuilder,
+        envs: &HashMap<String, String>,
+    ) -> Result<(), SqlFunArgsError> {
+        if let Some(value) = envs.get(Self::SQL_FUN_HOME) {
+            builder.sql_fun_home(value);
+        }
+        if let Some(value) = envs.get(Self::SQL_FUN_METADATA_FORMAT) {
+            builder.metadata_format(value);
+        }
+        if let Some(value) = envs.get(Self::SQL_FUN_METADATA_FILE) {
+            builder.metadata_file(value);
+        }
+        if let Some(value) = envs.get(Self::SQL_FUN_SCHEMA) {
+            builder.schema(value);
+        }
+        if let Some(value) = envs.get(Self::SQL_FUN_SCHEMA_FILE) {
+            builder.schema_file(PathBuf::from(value));
+        }
+        if let Some(value) = envs.get(Self::SQL_FUN_DIALECT) {
+            let Ok(dialect) = SqlDialect::from_str(value) else {
+                return SqlFunArgsError::not_suppoted(value, "SQL Dialect");
+            };
+            builder.sql_dialect(dialect);
+        }
+        if let Some(value) = envs.get(Self::SQL_FUN_CTE_CATALOG_DIR) {
+            builder.cte_catalog_dir(PathBuf::from(value));
+        }
+        Ok(())
+    }
+
     /// get home dir path
     ///
     /// If `--sql-fun-home` or `SQL_FUN_HOME` env present : configured value

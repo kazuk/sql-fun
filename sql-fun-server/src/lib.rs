@@ -58,24 +58,6 @@ pub async fn service() -> Result<(), ServerError> {
     }
 }
 
-pub struct InitializeSchemaArgsHandler(InitializeSchemaArgs);
-
-impl InitializeSchemaArgsHandler {
-    fn new(args: InitializeSchemaArgs) -> Self {
-        Self(args)
-    }
-
-    #[expect(clippy::unused_self)]
-    fn build_args(&self) -> Result<SqlFunArgs, SqlFunServerApiError> {
-        let builder = SqlFunArgs::builder();
-
-        let args = builder
-            .build()
-            .map_err(|e| SqlFunServerApiError::new_unexpected(&e.to_string()))?;
-        Ok(args)
-    }
-}
-
 pub struct Api {}
 
 static API_IMPL: LazyLock<Api> = LazyLock::new(|| Api {});
@@ -91,6 +73,7 @@ impl Api {
         &self,
         args: InitializeSchemaArgs,
     ) -> Result<SchemaContext, SqlFunServerError> {
+        let mut builder = SqlFunArgs::builder(args.environments())?;
         let dialect = CoreDialect::from(args.engine_dialect());
         let engine_version = CorePostgresVersion::try_from(args.engine_version())?;
         let extensions = args.extensions();
@@ -102,13 +85,14 @@ impl Api {
             .collect();
         let extensions = extensions.join(",");
 
-        let context_args = SqlFunArgs::builder()
+        let context_args = builder
             .sql_dialect(dialect)
             .postgres_version(engine_version)
             .postgres_search_path(search_path.clone())
             .postgres_extensions(extensions)?
             .schema_file(schema_dump)
             .build()?;
+
         let metadata = context_args.load_metadata()?;
         let version = context_args.postgres_version(&metadata)?;
         let mut builtin_schema = version.definition_base_path(context_args.sql_fun_home()?);

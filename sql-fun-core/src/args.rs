@@ -114,22 +114,64 @@ impl SqlFunArgsBuilder {
 }
 
 impl SqlFunArgs {
-    /// create a builder instance
-    #[must_use]
-    pub fn builder() -> SqlFunArgsBuilder {
-        SqlFunArgsBuilder::default()
+    /// create a builder instance with environments
+    ///
+    /// # Errors
+    ///
+    /// Returns [`SqlFunArgsError`] when parsing environment values fails.
+    pub fn builder(envs: &HashMap<String, String>) -> Result<SqlFunArgsBuilder, SqlFunArgsError> {
+        let mut builder = SqlFunArgsBuilder::default();
+
+        MetadataArgs::apply_envs(&mut builder, envs)?;
+        PostgresArgs::apply_envs(&mut builder, envs)?;
+        LoggingArgs::apply_envs(&mut builder, envs);
+
+        if let Some(value) = envs.get(Self::SQL_FUN_OUTPUT_FORMAT) {
+            builder.output_format(value);
+        }
+        if let Some(value) = envs.get(Self::SQL_FUN_TERM_COLOR) {
+            let color = parse_terminal_color(value)?;
+            builder.term_color(color);
+        }
+        if let Some(value) = envs.get(Self::SQL_FUN_HIGHLIGHTER_THEME) {
+            builder.highlighter_theme(PathBuf::from(value));
+        }
+        if let Some(value) = envs.get(Self::SQL_FUN_NO_BUILTIN) {
+            builder.no_builtin_tables(parse_bool_env(value)?);
+        }
+
+        Ok(builder)
+    }
+}
+
+fn parse_terminal_color(value: &str) -> Result<TerminalColor, SqlFunArgsError> {
+    match value.to_lowercase().as_str() {
+        "auto" => Ok(TerminalColor::Auto),
+        "ansi" => Ok(TerminalColor::Ansi),
+        "never" => Ok(TerminalColor::Never),
+        _ => SqlFunArgsError::not_suppoted(value, "Terminal Color"),
+    }
+}
+
+fn parse_bool_env(value: &str) -> Result<bool, SqlFunArgsError> {
+    match value.to_lowercase().as_str() {
+        "1" | "true" | "yes" | "on" => Ok(true),
+        "0" | "false" | "no" | "off" => Ok(false),
+        _ => SqlFunArgsError::not_suppoted(value, "Boolean"),
     }
 }
 
 #[cfg(test)]
 mod test_sql_fun_args_builder {
+    use std::collections::HashMap;
+
     use testresult::TestResult;
 
     use crate::SqlFunArgs;
 
     #[test]
     fn test_builder() -> TestResult {
-        let mut builder = SqlFunArgs::builder();
+        let mut builder = SqlFunArgs::builder(&HashMap::default())?;
         let args = builder.sql_fun_home("sql-fun-home").build()?;
 
         assert_matches::assert_matches!(args.command(), None);

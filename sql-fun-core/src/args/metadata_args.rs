@@ -5,42 +5,130 @@ use std::{
     str::FromStr,
 };
 
-use crate::{SqlDialect, SqlFunArgsError, SqlFunMetadata};
+use crate::{
+    SqlDialect, SqlFunArgsBuilder, SqlFunArgsBuilderError, SqlFunArgsError, SqlFunMetadata,
+};
 
 fn path_owner<P: AsRef<Path>>(path: P) -> Result<u32, std::io::Error> {
     let meta = std::fs::metadata(path)?;
     Ok(meta.uid())
 }
 
-#[derive(clap::Args, Debug, serde::Serialize, serde::Deserialize, Clone)]
+#[derive(
+    clap::Args, Debug, serde::Serialize, serde::Deserialize, Clone, derive_builder::Builder,
+)]
+#[builder(build_fn(error = "SqlFunArgsBuilderError"))]
 pub struct MetadataArgs {
     /// `home_dir`
     #[clap(long, env = Self::SQL_FUN_HOME)]
+    #[builder(setter(into, strip_option))]
     sql_fun_home: Option<PathBuf>,
 
     /// Metadata file format (TOML)
     #[clap(long, env = Self::SQL_FUN_METADATA_FORMAT, default_value = "TOML")]
+    #[builder(setter(into), default = "Self::sql_fun_metadata_format_default()")]
     metadata_format: String,
 
     /// Path to metadata file (Cargo.toml)
     #[clap(long, env = Self::SQL_FUN_METADATA_FILE)]
+    #[builder(setter(into, strip_option), default)]
     metadata_file: Option<String>,
 
     /// Schema selector
     #[clap(long, env = Self::SQL_FUN_SCHEMA, default_value = "develop")]
+    #[builder(setter(into), default = "Self::sql_fun_metadata_schema_default()")]
     schema: String,
 
     /// Schema dump file (overrides --schema)
     #[clap(long, env = Self::SQL_FUN_SCHEMA_FILE )]
+    #[builder(setter(into, strip_option), default)]
     schema_file: Option<PathBuf>,
 
     /// SQL dialect (e.g., postgresql)
     #[clap(long, env = Self::SQL_FUN_DIALECT)]
+    #[builder(setter(into, strip_option), default)]
     sql_dialect: Option<String>,
 
     /// Directory for CTE catalog
     #[clap(long, env = Self::SQL_FUN_CTE_CATALOG_DIR)]
+    #[builder(setter(into, strip_option), default)]
     cte_catalog_dir: Option<PathBuf>,
+}
+
+impl MetadataArgsBuilder {
+    fn sql_fun_metadata_format_default() -> String {
+        String::from(MetadataArgs::SQL_FUN_METADATA_FORMAT_DEFAULT)
+    }
+
+    fn sql_fun_metadata_schema_default() -> String {
+        String::from(MetadataArgs::SQL_FUN_METADATA_SCHEMA_DEFAULT)
+    }
+}
+
+impl SqlFunArgsBuilder {
+    /// `home_dir`
+    pub fn sql_fun_home<Value>(&mut self, value: Value) -> &mut Self
+    where
+        Value: Into<PathBuf>,
+    {
+        self.metadata_args.sql_fun_home(value);
+        self
+    }
+
+    /// Metadata file format (TOML)
+    pub fn metadata_format<Value>(&mut self, value: Value) -> &mut Self
+    where
+        Value: Into<String>,
+    {
+        self.metadata_args.metadata_format(value);
+        self
+    }
+
+    /// Path to metadata file (Cargo.toml)
+    pub fn metadata_file<Value>(&mut self, value: Value) -> &mut Self
+    where
+        Value: Into<String>,
+    {
+        self.metadata_args.metadata_file(value);
+        self
+    }
+
+    /// Schema selector
+    pub fn schema<Value>(&mut self, value: Value) -> &mut Self
+    where
+        Value: Into<String>,
+    {
+        self.metadata_args.schema(value);
+        self
+    }
+
+    /// Schema dump file (overrides --schema)
+    pub fn schema_file<Value>(&mut self, value: Value) -> &mut Self
+    where
+        Value: Into<PathBuf>,
+    {
+        self.metadata_args.schema_file(value);
+        self
+    }
+
+    /// SQL Dialect
+    pub fn sql_dialect<Value>(&mut self, value: Value) -> &mut Self
+    where
+        Value: Into<SqlDialect>,
+    {
+        let dialect = value.into();
+        self.metadata_args.sql_dialect(dialect.to_string());
+        self
+    }
+
+    /// Directory for CTE catalog
+    pub fn cte_catalog_dir<Value>(&mut self, value: Value) -> &mut Self
+    where
+        Value: Into<PathBuf>,
+    {
+        self.metadata_args.cte_catalog_dir(value);
+        self
+    }
 }
 
 impl MetadataArgs {
@@ -51,6 +139,40 @@ impl MetadataArgs {
     const SQL_FUN_SCHEMA_FILE: &str = "SQL_FUN_SCHEMA_FILE";
     const SQL_FUN_DIALECT: &str = "SQL_FUN_DIALECT";
     const SQL_FUN_CTE_CATALOG_DIR: &str = "SQL_FUN_CTE_CATALOG_DIR";
+
+    const SQL_FUN_METADATA_FORMAT_DEFAULT: &str = "TOML";
+    const SQL_FUN_METADATA_SCHEMA_DEFAULT: &str = "develop";
+
+    pub(crate) fn apply_envs(
+        builder: &mut SqlFunArgsBuilder,
+        envs: &HashMap<String, String>,
+    ) -> Result<(), SqlFunArgsError> {
+        if let Some(value) = envs.get(Self::SQL_FUN_HOME) {
+            builder.sql_fun_home(value);
+        }
+        if let Some(value) = envs.get(Self::SQL_FUN_METADATA_FORMAT) {
+            builder.metadata_format(value);
+        }
+        if let Some(value) = envs.get(Self::SQL_FUN_METADATA_FILE) {
+            builder.metadata_file(value);
+        }
+        if let Some(value) = envs.get(Self::SQL_FUN_SCHEMA) {
+            builder.schema(value);
+        }
+        if let Some(value) = envs.get(Self::SQL_FUN_SCHEMA_FILE) {
+            builder.schema_file(PathBuf::from(value));
+        }
+        if let Some(value) = envs.get(Self::SQL_FUN_DIALECT) {
+            let Ok(dialect) = SqlDialect::from_str(value) else {
+                return SqlFunArgsError::not_suppoted(value, "SQL Dialect");
+            };
+            builder.sql_dialect(dialect);
+        }
+        if let Some(value) = envs.get(Self::SQL_FUN_CTE_CATALOG_DIR) {
+            builder.cte_catalog_dir(PathBuf::from(value));
+        }
+        Ok(())
+    }
 
     /// get home dir path
     ///

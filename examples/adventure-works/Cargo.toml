@@ -7,14 +7,14 @@ publish = false
 description = "adventure works schema example"
 repository = "https://github.com/kazuk/sql-fun"
 
-[lints]
-workspace = true
-
 [dependencies]
 anyhow.workspace = true
 derive_builder.workspace = true
 futures-util.workspace = true
+sql-fun.workspace = true
 tokio.workspace = true
 tokio-postgres.workspace = true
 tracing.workspace = true
-sql-fun.workspace = true
+
+[lints]
+workspace = true

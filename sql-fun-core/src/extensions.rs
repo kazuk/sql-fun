@@ -3,7 +3,8 @@ mod extension_collection;
 mod name_version_pair;
 
 pub use self::{
-    config_error::ExtensionConfigError, extension_collection::PostgresExtensionsCollection,
+    config_error::ExtensionConfigError,
+    extension_collection::{PostgresExtensionsCollection, PostgresExtensionsParseError},
     name_version_pair::ExtensionNameVersionPair,
 };
 

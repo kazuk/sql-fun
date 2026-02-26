@@ -5,26 +5,28 @@ edition = "2024"
 license = "MIT"
 description = "common dependencies for sql-fun"
 
-[lints]
-workspace = true
-
 [features]
 beta_postgres_versions = []
 
 [dependencies]
 clap = { workspace = true }
 combine = { workspace = true }
+derive_builder = { workspace = true }
 either = { workspace = true }
+fs-err = "3.2.2"
 log = { workspace = true }
+miette = { workspace = true }
+owo-colors = { workspace = true }
 serde = { workspace = true }
 thiserror = { workspace = true }
 toml = { workspace = true }
 url = { workspace = true }
-miette = { workspace = true }
-owo-colors = { workspace = true }
-fs-err = "3.2.2"
 
 [dev-dependencies]
-testresult = { workspace = true }
+assert_matches = { workspace = true }
 rstest = { workspace = true }
 tempfile = "3"
+testresult = { workspace = true }
+
+[lints]
+workspace = true

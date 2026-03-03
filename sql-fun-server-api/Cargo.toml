@@ -13,9 +13,22 @@ time.workspace = true
 serde_json.workspace = true
 url.workspace = true
 derive-getters.workspace = true
+typed-openrpc = { workspace = true, optional = true }
+schemars = { workspace = true, optional = true }
+clap = { workspace = true, optional = true }
+anyhow = { workspace = true, optional = true }
 
 [dev-dependencies]
 testresult.workspace = true
 
 [lints]
 workspace = true
+
+[features]
+bin-deps = ["dep:clap", "dep:anyhow"]
+openrpc-schema = [ "dep:typed-openrpc", "dep:schemars"]
+
+[[bin]]
+name = "openrpc-spec"
+path = "src/bin/openrpc_spec.rs"
+required-features = [ "openrpc-schema", "bin-deps"]

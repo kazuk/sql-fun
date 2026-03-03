@@ -7,6 +7,8 @@ mod describe_table;
 mod initialize_schema;
 mod list_objects;
 
+#[cfg(feature = "openrpc-schema")]
+pub use self::rpc_schema::register_methods;
 pub use self::{
     analyze_query::{
         AnalyzeQueryArgs, AnalyzeQueryInput, AnalyzeQueryItem, AnalyzeQueryResponse, ColumnAccess,
@@ -31,11 +33,13 @@ pub use self::{
 use std::path::PathBuf;
 
 /// semantic analysis context handle
+#[cfg_attr(feature = "openrpc-schema", derive(schemars::JsonSchema))]
 #[derive(serde::Serialize, serde::Deserialize)]
 #[serde(transparent)]
 pub struct ContextHandle(String);
 
 /// position in SQL text
+#[cfg_attr(feature = "openrpc-schema", derive(schemars::JsonSchema))]
 #[derive(serde::Serialize, serde::Deserialize, derive_getters::Getters)]
 pub struct TextPosition {
     /// seek offset from file start
@@ -68,6 +72,7 @@ mod test_text_position {
 }
 
 /// span in SQL text
+#[cfg_attr(feature = "openrpc-schema", derive(schemars::JsonSchema))]
 #[derive(serde::Serialize, serde::Deserialize, derive_getters::Getters)]
 pub struct TextSpan {
     /// span start position
@@ -78,6 +83,7 @@ pub struct TextSpan {
 }
 
 /// semantic analysis probrem
+#[cfg_attr(feature = "openrpc-schema", derive(schemars::JsonSchema))]
 #[derive(serde::Serialize, serde::Deserialize, derive_getters::Getters)]
 pub struct AnalysisProbrem {
     /// error code
@@ -94,6 +100,7 @@ pub struct AnalysisProbrem {
 }
 
 /// error for api
+#[cfg_attr(feature = "openrpc-schema", derive(schemars::JsonSchema))]
 #[derive(thiserror::Error, Debug, serde::Serialize, serde::Deserialize)]
 pub enum SqlFunServerApiError {
     /// require release collection
@@ -104,6 +111,7 @@ pub enum SqlFunServerApiError {
 }
 
 /// database type reference
+#[cfg_attr(feature = "openrpc-schema", derive(schemars::JsonSchema))]
 #[derive(serde::Serialize, serde::Deserialize, derive_getters::Getters)]
 pub struct TypeReference {
     /// schema name
@@ -113,6 +121,7 @@ pub struct TypeReference {
 }
 
 /// nullability
+#[cfg_attr(feature = "openrpc-schema", derive(schemars::JsonSchema))]
 #[derive(serde::Serialize, serde::Deserialize)]
 pub enum Nullability {
     /// not null
@@ -173,4 +182,70 @@ pub trait SqlFunServerApi {
         &self,
         args: DescribeTableArgs,
     ) -> Result<DescribeTableResponse, SqlFunServerApiError>;
+}
+
+#[cfg(feature = "openrpc-schema")]
+mod rpc_schema {
+
+    /// JSON-RPC method definition for initialize_schema_context method
+    use typed_openrpc::RpcMethod;
+
+    pub struct InitializeSchemaContextMethod;
+
+    impl RpcMethod for InitializeSchemaContextMethod {
+        const NAME: &'static str = "initialize_schema_context";
+        const SUMMARY: &'static str = "load schema dump file for semantic analysis";
+
+        type Params = super::InitializeSchemaArgs;
+        type Result = super::SchemaContext;
+    }
+
+    pub struct ReadCollectionMethod;
+
+    impl RpcMethod for ReadCollectionMethod {
+        const NAME: &'static str = "read_collection";
+        const SUMMARY: &'static str = "read a collection";
+
+        type Params = super::ReadCollectionArgs;
+        type Result = super::Collection<serde_json::Value>;
+    }
+
+    pub struct ReleaseCollectionMethod;
+
+    impl RpcMethod for ReleaseCollectionMethod {
+        const NAME: &'static str = "release_collection";
+        const SUMMARY: &'static str = "release a collection";
+
+        type Params = super::ReleaseCollectionArgs;
+        type Result = ();
+    }
+
+    pub struct AnalyzeQueryMethod;
+
+    impl RpcMethod for AnalyzeQueryMethod {
+        const NAME: &'static str = "analyze_query";
+        const SUMMARY: &'static str = "analyze a query";
+
+        type Params = super::AnalyzeQueryArgs;
+        type Result = super::AnalyzeQueryResponse;
+    }
+
+    pub struct ListObjectMethod;
+
+    impl RpcMethod for ListObjectMethod {
+        const NAME: &'static str = "list_object";
+        const SUMMARY: &'static str = "list schema objects";
+
+        type Params = super::ListObjectArgs;
+        type Result = super::Collection<super::ObjectSummary>;
+    }
+
+    /// register all JSON-RPC methods
+    pub fn register_methods(registry: &mut typed_openrpc::Registry) {
+        registry.register_method::<InitializeSchemaContextMethod>();
+        registry.register_method::<ReadCollectionMethod>();
+        registry.register_method::<ReleaseCollectionMethod>();
+        registry.register_method::<AnalyzeQueryMethod>();
+        registry.register_method::<ListObjectMethod>();
+    }
 }

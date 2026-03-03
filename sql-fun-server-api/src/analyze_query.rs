@@ -8,6 +8,7 @@ use crate::{
 };
 
 /// SQL file input source
+#[cfg_attr(feature = "openrpc-schema", derive(schemars::JsonSchema))]
 #[derive(serde::Serialize, serde::Deserialize)]
 pub enum AnalyzeQueryInput {
     /// actual text
@@ -19,6 +20,7 @@ pub enum AnalyzeQueryInput {
 }
 
 /// [`SqlFunServerApi::analyze_query`] request arguments
+#[cfg_attr(feature = "openrpc-schema", derive(schemars::JsonSchema))]
 #[derive(serde::Serialize, serde::Deserialize)]
 pub struct AnalyzeQueryArgs {
     /// specify semantic analysis context
@@ -28,12 +30,14 @@ pub struct AnalyzeQueryArgs {
 }
 
 /// response for [`SqlFunServerApi::analyze_query`]
+#[cfg_attr(feature = "openrpc-schema", derive(schemars::JsonSchema))]
 #[derive(serde::Serialize, serde::Deserialize, derive_getters::Getters)]
 pub struct AnalyzeQueryResponse {
     queries: Collection<AnalyzeQueryItem>,
 }
 
 /// kind of semantic analyzed query
+#[cfg_attr(feature = "openrpc-schema", derive(schemars::JsonSchema))]
 #[derive(serde::Serialize, serde::Deserialize)]
 pub enum QueryKind {
     /// select statement
@@ -49,6 +53,7 @@ pub enum QueryKind {
 }
 
 /// analyzed single query
+#[cfg_attr(feature = "openrpc-schema", derive(schemars::JsonSchema))]
 #[derive(serde::Serialize, serde::Deserialize, derive_getters::Getters)]
 pub struct AnalyzeQueryItem {
     /// query span in input
@@ -74,6 +79,7 @@ pub struct AnalyzeQueryItem {
 }
 
 /// parameter spec
+#[cfg_attr(feature = "openrpc-schema", derive(schemars::JsonSchema))]
 #[derive(serde::Serialize, serde::Deserialize, derive_getters::Getters)]
 pub struct ParameterDescribe {
     /// name for parameter
@@ -87,6 +93,7 @@ pub struct ParameterDescribe {
 }
 
 /// column access kind
+#[cfg_attr(feature = "openrpc-schema", derive(schemars::JsonSchema))]
 #[derive(serde::Serialize, serde::Deserialize)]
 pub enum ColumnAccessKind {
     /// Column accessed in select statement column list.
@@ -127,6 +134,7 @@ pub enum ColumnAccessKind {
 }
 
 /// column access
+#[cfg_attr(feature = "openrpc-schema", derive(schemars::JsonSchema))]
 #[derive(serde::Serialize, serde::Deserialize, derive_getters::Getters)]
 pub struct ColumnAccess {
     /// accessing span
@@ -152,6 +160,7 @@ pub struct ColumnAccess {
 }
 
 /// result set column description item
+#[cfg_attr(feature = "openrpc-schema", derive(schemars::JsonSchema))]
 #[derive(serde::Serialize, serde::Deserialize, derive_getters::Getters)]
 pub struct ResultSetColumn {
     /// column ordinal

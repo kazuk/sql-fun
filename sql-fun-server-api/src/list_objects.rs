@@ -3,6 +3,7 @@ use std::path::PathBuf;
 use crate::TextSpan;
 
 /// filter condition for string
+#[cfg_attr(feature = "openrpc-schema", derive(schemars::JsonSchema))]
 #[derive(serde::Serialize, serde::Deserialize)]
 pub enum StringPred {
     /// exact matchs string
@@ -14,6 +15,7 @@ pub enum StringPred {
 }
 
 /// filter condition for object name
+#[cfg_attr(feature = "openrpc-schema", derive(schemars::JsonSchema))]
 #[derive(serde::Serialize, serde::Deserialize)]
 pub enum NameQuery {
     /// local name
@@ -23,6 +25,7 @@ pub enum NameQuery {
 }
 
 /// object kind.
+#[cfg_attr(feature = "openrpc-schema", derive(schemars::JsonSchema))]
 #[derive(serde::Serialize, serde::Deserialize)]
 pub enum ObjectKind {
     /// All object kind
@@ -48,6 +51,7 @@ pub enum ObjectKind {
 }
 
 /// filter conditions
+#[cfg_attr(feature = "openrpc-schema", derive(schemars::JsonSchema))]
 #[derive(serde::Serialize, serde::Deserialize)]
 pub enum ObjectQuery {
     /// object kind
@@ -63,6 +67,7 @@ pub enum ObjectQuery {
 }
 
 /// specify optional field to retuns API result
+#[cfg_attr(feature = "openrpc-schema", derive(schemars::JsonSchema))]
 #[derive(serde::Serialize, serde::Deserialize)]
 pub enum ObjectSummaryField {
     /// returns `definition_file` field
@@ -72,6 +77,7 @@ pub enum ObjectSummaryField {
 }
 
 /// argument for [`SqlFunServerApi::list_object`]
+#[cfg_attr(feature = "openrpc-schema", derive(schemars::JsonSchema))]
 #[derive(serde::Serialize, serde::Deserialize, derive_getters::Getters)]
 pub struct ListObjectArgs {
     /// predicate
@@ -81,6 +87,7 @@ pub struct ListObjectArgs {
 }
 
 /// database object summary
+#[cfg_attr(feature = "openrpc-schema", derive(schemars::JsonSchema))]
 #[derive(serde::Serialize, serde::Deserialize, derive_getters::Getters)]
 pub struct ObjectSummary {
     /// schema name

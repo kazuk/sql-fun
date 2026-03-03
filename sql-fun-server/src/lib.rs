@@ -213,6 +213,7 @@ async fn serve_client(stream: TcpStream, addr: SocketAddr) -> Result<(), ServerE
         };
         let mut response_json = serde_json::to_string(&response)?;
         response_json.push('\n');
+
         tracing::info!("{addr}: sending {response_json}");
         write_half.write_all(response_json.as_bytes()).await?;
     }

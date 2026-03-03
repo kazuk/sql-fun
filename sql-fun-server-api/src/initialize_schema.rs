@@ -3,6 +3,7 @@ use std::{collections::HashMap, path::PathBuf};
 use crate::{AnalysisProbrem, Collection, ContextHandle};
 
 /// Engine dialect selecting SQL syntax perser.
+#[cfg_attr(feature = "openrpc-schema", derive(schemars::JsonSchema))]
 #[derive(serde::Serialize, serde::Deserialize)]
 pub enum EngineDialect {
     /// `PostgreSQL` valiant, selects parser as `pg_query`
@@ -10,6 +11,7 @@ pub enum EngineDialect {
 }
 
 /// Selecting database builtin objects
+#[cfg_attr(feature = "openrpc-schema", derive(schemars::JsonSchema))]
 #[derive(serde::Serialize, serde::Deserialize)]
 pub enum EngineVersion {
     /// `PostgreSQL` and version string.
@@ -17,6 +19,7 @@ pub enum EngineVersion {
 }
 
 /// `PostgreSQL` extension
+#[cfg_attr(feature = "openrpc-schema", derive(schemars::JsonSchema))]
 #[derive(serde::Serialize, serde::Deserialize, derive_getters::Getters)]
 pub struct ExtensionSpec {
     /// Name for extension
@@ -26,6 +29,7 @@ pub struct ExtensionSpec {
 }
 
 /// Load schema dump and initialize semantic analysis context
+#[cfg_attr(feature = "openrpc-schema", derive(schemars::JsonSchema))]
 #[derive(serde::Serialize, serde::Deserialize, derive_getters::Getters)]
 pub struct InitializeSchemaArgs {
     /// SQL dialect for schema
@@ -48,6 +52,7 @@ pub struct InitializeSchemaArgs {
 }
 
 /// schema context
+#[cfg_attr(feature = "openrpc-schema", derive(schemars::JsonSchema))]
 #[derive(serde::Serialize, serde::Deserialize, derive_getters::Getters)]
 pub struct SchemaContext {
     /// context handle

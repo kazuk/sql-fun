@@ -207,7 +207,6 @@ deny = [
 # Certain crates/versions that will be skipped when doing duplicate detection.
 skip = [
     "unicode-width@0.1.14",
-    "unicode-width@0.1.15",
     "thiserror-impl@1.0.69",
     "thiserror@1.0.69",
     "rustix@0.38.44",

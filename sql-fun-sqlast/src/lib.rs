@@ -22,6 +22,8 @@ use crate::{
     syn::ParseResult,
 };
 
+pub use sql_fun_core::{SqlFunArgs, SqlFunArgsBuilder, SqlFunArgsError};
+
 /// Semantic AST and parse context result
 pub struct AstAndContextPair<TParseContext>(SemAst, TParseContext)
 where

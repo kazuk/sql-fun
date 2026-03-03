@@ -5,30 +5,30 @@ edition = "2024"
 license = "MIT"
 description = "API type crate for sql-fun-server"
 
+[[bin]]
+name = "openrpc-spec"
+path = "src/bin/openrpc_spec.rs"
+required-features = ["openrpc-schema", "bin-deps"]
+
+[features]
+bin-deps = ["dep:clap", "dep:anyhow"]
+openrpc-schema = ["dep:typed-openrpc", "dep:schemars"]
+
 [dependencies]
-async-trait.workspace = true
-thiserror.workspace = true
-serde.workspace = true
-time.workspace = true
-serde_json.workspace = true
-url.workspace = true
-derive-getters.workspace = true
-typed-openrpc = { workspace = true, optional = true }
-schemars = { workspace = true, optional = true }
-clap = { workspace = true, optional = true }
 anyhow = { workspace = true, optional = true }
+async-trait.workspace = true
+clap = { workspace = true, optional = true }
+derive-getters.workspace = true
+schemars = { workspace = true, optional = true }
+serde.workspace = true
+serde_json.workspace = true
+thiserror.workspace = true
+time.workspace = true
+typed-openrpc = { workspace = true, optional = true }
+url.workspace = true
 
 [dev-dependencies]
 testresult.workspace = true
 
 [lints]
 workspace = true
-
-[features]
-bin-deps = ["dep:clap", "dep:anyhow"]
-openrpc-schema = [ "dep:typed-openrpc", "dep:schemars"]
-
-[[bin]]
-name = "openrpc-spec"
-path = "src/bin/openrpc_spec.rs"
-required-features = [ "openrpc-schema", "bin-deps"]

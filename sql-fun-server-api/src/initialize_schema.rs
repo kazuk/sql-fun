@@ -1,4 +1,4 @@
-use std::path::PathBuf;
+use std::{collections::HashMap, path::PathBuf};
 
 use crate::{AnalysisProbrem, Collection, ContextHandle};
 
@@ -46,6 +46,9 @@ pub struct InitializeSchemaArgs {
 
     /// schema dump file
     schema_dump: PathBuf,
+
+    /// environment variables for initialization
+    environments: HashMap<String, String>,
 }
 
 /// schema context

@@ -7,10 +7,11 @@ use either::Either;
 
 use crate::{PostgresExtensionsCollection, PostgresVersion, SqlDialect};
 
+/// engine version for `PostgreSQL`
 #[derive(Debug, Clone, PartialEq)]
-pub struct EngineVersion(Either<PostgresVersion, String>);
+pub struct PostgresEngineVersion(Either<PostgresVersion, String>);
 
-impl<'de> serde::Deserialize<'de> for EngineVersion {
+impl<'de> serde::Deserialize<'de> for PostgresEngineVersion {
     fn deserialize<D>(deserializer: D) -> Result<Self, D::Error>
     where
         D: serde::Deserializer<'de>,
@@ -21,7 +22,7 @@ impl<'de> serde::Deserialize<'de> for EngineVersion {
     }
 }
 
-impl FromStr for EngineVersion {
+impl FromStr for PostgresEngineVersion {
     type Err = String;
 
     fn from_str(s: &str) -> Result<Self, Self::Err> {
@@ -34,7 +35,7 @@ impl FromStr for EngineVersion {
     }
 }
 
-impl std::fmt::Display for EngineVersion {
+impl std::fmt::Display for PostgresEngineVersion {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         match &self.0 {
             Either::Left(v) => write!(f, "{v}"),
@@ -43,11 +44,14 @@ impl std::fmt::Display for EngineVersion {
     }
 }
 
-impl EngineVersion {
+impl PostgresEngineVersion {
+    /// is wellknown version
+    #[must_use]
     pub fn is_wellknown(&self) -> bool {
         self.0.is_left()
     }
 
+    /// get definition base path
     pub fn definition_base_path<P: AsRef<Path>>(&self, home: P) -> PathBuf {
         if self.is_wellknown() {
             home.as_ref()
@@ -136,7 +140,7 @@ pub struct SqlFunMetadata {
     dialect: SqlDialect,
     /// Database engine version
     #[serde(rename = "version")]
-    engine_version: Option<EngineVersion>,
+    engine_version: Option<PostgresEngineVersion>,
     /// Database extensions
     extensions: Option<PostgresExtensionsCollection>,
     /// Schema search path
@@ -279,7 +283,7 @@ impl SqlFunMetadata {
     /// See [`crate::SqlFunArgs::postgres_version`] for argument precedence.
     ///
     #[must_use]
-    pub fn engine_version(&self) -> &Option<EngineVersion> {
+    pub fn engine_version(&self) -> &Option<PostgresEngineVersion> {
         &self.engine_version
     }
 

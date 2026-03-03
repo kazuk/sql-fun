@@ -11,15 +11,18 @@ use std::{collections::HashMap, fmt::Display, path::PathBuf};
 
 use clap::Parser;
 
-use self::log_args::LoggingArgs;
 pub use self::{
-    cli_sub_command::CliSubCommand, error::SqlFunArgsError, init_args::InitializeArgs,
-    metadata_args::MetadataArgs, postgres::PostgresArgs,
+    cli_sub_command::CliSubCommand,
+    error::SqlFunArgsError,
+    init_args::InitializeArgs,
+    log_args::{LoggingArgs, LoggingArgsBuilder},
+    metadata_args::{MetadataArgs, MetadataArgsBuilder},
+    postgres::{PostgresArgs, PostgresArgsBuilder},
 };
 
 use crate::{
     HighlighterTheme, PostgresExtensionsCollection, SqlDialect, SqlFunMetadata, TerminalColor,
-    metadata::EngineVersion,
+    metadata::PostgresEngineVersion,
 };
 
 #[derive(Debug)]
@@ -36,24 +39,45 @@ impl Display for ConfigurationKind {
 }
 
 /// Common `sql-fun` CLI arguments and environment variables
-#[derive(clap::Parser, Debug, serde::Serialize, serde::Deserialize, Clone)]
+#[derive(
+    clap::Parser, Debug, serde::Serialize, serde::Deserialize, Clone, derive_builder::Builder,
+)]
 #[clap(name = "sql-fun", version, about, long_about = None)]
 pub struct SqlFunArgs {
+    /// metadata arguments
     #[command(flatten)]
+    #[builder(
+        private,
+        field(ty = "MetadataArgsBuilder", build = "self.metadata_args.build()?")
+    )]
     metadata_args: MetadataArgs,
 
+    /// postgres arguments
     #[command(flatten)]
+    #[builder(
+        private,
+        field(ty = "PostgresArgsBuilder", build = "self.postgres_args.build()?")
+    )]
     postgres_args: PostgresArgs,
 
     #[command(flatten)]
+    #[builder(
+        private,
+        field(ty = "LoggingArgsBuilder", build = "self.log_args.build()?")
+    )]
     log_args: LoggingArgs,
 
     /// Output format (text or json)
     #[clap(long, env = Self::SQL_FUN_OUTPUT_FORMAT, default_value = "text")]
+    #[builder(
+        setter(into),
+        default = "String::from(Self::SQL_FUN_OUTPUT_FORMAT_DEFAULT)"
+    )]
     output_format: String,
 
     /// Terminal Color
     #[clap(long, env = Self::SQL_FUN_TERM_COLOR, default_value = "auto")]
+    #[builder(setter(into), default = "Self::SQL_FUN_TERM_COLOR_DEFAULT")]
     term_color: TerminalColor,
 
     /// Syntax Highlighter Theme
@@ -64,20 +88,96 @@ pub struct SqlFunArgs {
     /// when `--term-color` is `ansi` : `${SQL_FUN_HOME}/highlighter/default.toml`
     ///
     #[clap(long, env = Self::SQL_FUN_HIGHLIGHTER_THEME)]
+    #[builder(setter(into, strip_option), default)]
     highlighter_theme: Option<PathBuf>,
 
     /// Verbose mode (equivalent to --log-level=debug)
     #[clap(long)]
+    #[builder(default)]
     verbose: bool,
 
     /// Disable loading built-in tables/views
     #[clap(long, env = Self::SQL_FUN_NO_BUILTIN)]
+    #[builder(default)]
     no_builtin_tables: bool,
 
     /// Subcommand to execute (internal or external)
     #[clap(subcommand)]
     #[serde(skip)]
+    #[builder(setter(into, strip_option), default)]
     command: Option<CliSubCommand>,
+}
+
+impl SqlFunArgsBuilder {
+    const SQL_FUN_OUTPUT_FORMAT_DEFAULT: &str = "text";
+    const SQL_FUN_TERM_COLOR_DEFAULT: TerminalColor = TerminalColor::Auto;
+}
+
+impl SqlFunArgs {
+    /// create a builder instance with environments
+    ///
+    /// # Errors
+    ///
+    /// Returns [`SqlFunArgsError`] when parsing environment values fails.
+    pub fn builder(envs: &HashMap<String, String>) -> Result<SqlFunArgsBuilder, SqlFunArgsError> {
+        let mut builder = SqlFunArgsBuilder::default();
+
+        MetadataArgs::apply_envs(&mut builder, envs)?;
+        PostgresArgs::apply_envs(&mut builder, envs)?;
+        LoggingArgs::apply_envs(&mut builder, envs);
+
+        if let Some(value) = envs.get(Self::SQL_FUN_OUTPUT_FORMAT) {
+            builder.output_format(value);
+        }
+        if let Some(value) = envs.get(Self::SQL_FUN_TERM_COLOR) {
+            let color = parse_terminal_color(value)?;
+            builder.term_color(color);
+        }
+        if let Some(value) = envs.get(Self::SQL_FUN_HIGHLIGHTER_THEME) {
+            builder.highlighter_theme(PathBuf::from(value));
+        }
+        if let Some(value) = envs.get(Self::SQL_FUN_NO_BUILTIN) {
+            builder.no_builtin_tables(parse_bool_env(value)?);
+        }
+
+        Ok(builder)
+    }
+}
+
+fn parse_terminal_color(value: &str) -> Result<TerminalColor, SqlFunArgsError> {
+    match value.to_lowercase().as_str() {
+        "auto" => Ok(TerminalColor::Auto),
+        "ansi" => Ok(TerminalColor::Ansi),
+        "never" => Ok(TerminalColor::Never),
+        _ => SqlFunArgsError::not_suppoted(value, "Terminal Color"),
+    }
+}
+
+fn parse_bool_env(value: &str) -> Result<bool, SqlFunArgsError> {
+    match value.to_lowercase().as_str() {
+        "1" | "true" | "yes" | "on" => Ok(true),
+        "0" | "false" | "no" | "off" => Ok(false),
+        _ => SqlFunArgsError::not_suppoted(value, "Boolean"),
+    }
+}
+
+#[cfg(test)]
+mod test_sql_fun_args_builder {
+    use std::collections::HashMap;
+
+    use testresult::TestResult;
+
+    use crate::SqlFunArgs;
+
+    #[test]
+    fn test_builder() -> TestResult {
+        let mut builder = SqlFunArgs::builder(&HashMap::default())?;
+        let args = builder.sql_fun_home("sql-fun-home").build()?;
+
+        assert_matches::assert_matches!(args.command(), None);
+
+        Ok(())
+    }
 }
 
 impl SqlFunArgs {
@@ -85,6 +185,17 @@ impl SqlFunArgs {
     #[must_use]
     pub fn is_builtin(&self) -> bool {
         matches!(self.command, Some(CliSubCommand::Initialize(_)))
+    }
+
+    /// load metadata
+    ///
+    /// # Errors
+    ///
+    /// [`SqlFunArgsError`] when metadata configuration or IO error
+    ///
+    pub fn load_metadata(&self) -> Result<SqlFunMetadata, SqlFunArgsError> {
+        let metadata_file = self.metadata_file()?;
+        Ok(SqlFunMetadata::load_from(metadata_file)?)
     }
 
     /// get SQL dialect
@@ -122,7 +233,7 @@ impl SqlFunArgs {
     pub fn postgres_version(
         &self,
         metadata: &SqlFunMetadata,
-    ) -> Result<EngineVersion, SqlFunArgsError> {
+    ) -> Result<PostgresEngineVersion, SqlFunArgsError> {
         self.postgres_args.postgres_version(metadata)
     }
 
@@ -139,15 +250,8 @@ impl SqlFunArgs {
     }
 
     /// get postgres extensions
-    ///
-    /// # Errors
-    ///
-    /// Propagates [`SqlFunArgsError`] if metadata lookup fails or the extension
-    /// configuration is invalid.
-    pub fn postgres_extensions(
-        &self,
-        metadata: &SqlFunMetadata,
-    ) -> Result<PostgresExtensionsCollection, SqlFunArgsError> {
+    #[must_use]
+    pub fn postgres_extensions(&self, metadata: &SqlFunMetadata) -> PostgresExtensionsCollection {
         self.postgres_args.postgres_extensions(metadata)
     }
 

@@ -62,6 +62,7 @@ multiple_crate_versions = "allow"
 [workspace.dependencies]
 anyhow = { version = "1.0", features = ["backtrace"] }
 askama = "0.15"
+assert_matches = { version = "1" }
 async-trait = "0.1.89"
 backtrace-on-stack-overflow = "0.3"
 bollard = "0.19"

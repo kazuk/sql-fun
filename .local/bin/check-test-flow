@@ -91,11 +91,11 @@ run_nextest --workspace "${FEATURES[@]}" "${FAILFAST_FLAGS[@]}" ${NEXTEST_EXTRA}
 
 echo "== Formatting sources"
 cargo fmt
-cargo sort
+cargo sort --workspace
 
 echo "== Linting"
 cargo clippy --no-deps --workspace
-taplo lint
+RUST_LOG=error taplo lint
 
 echo "== Generate server API spec document"
 cargo run -p sql-fun-server-api --features openrpc-schema,bin-deps \

@@ -12,7 +12,7 @@ use std::{
 use crate::{ExtensionConfigError, ExtensionVersion};
 
 /// Postgres extensin name version pair.
-#[derive(Debug, serde::Deserialize, Clone, Default)]
+#[derive(Debug, serde::Deserialize, serde::Serialize, Clone, Default)]
 pub struct ExtensionNameVersionPair {
     name: String,
     version: Option<ExtensionVersion>,

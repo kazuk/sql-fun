@@ -14,15 +14,18 @@ mod metadata;
 use std::{fmt::Display, str::FromStr};
 
 pub use self::{
-    args::{CliSubCommand, DaemonControlArgs, InitializeArgs, SqlFunArgs, SqlFunArgsError},
+    args::{
+        CliSubCommand, DaemonControlArgs, InitializeArgs, SqlFunArgs, SqlFunArgsBuilder,
+        SqlFunArgsBuilderError, SqlFunArgsError,
+    },
     builtin::PostgresBuiltinPaths,
     coll::IVec,
     extensions::{
         ExtensionConfigError, ExtensionNameVersionPair, ExtensionVersion,
-        PostgresExtensionsCollection,
+        PostgresExtensionsCollection, PostgresExtensionsParseError,
     },
     highlighter::{HighlighterStyle, HighlighterTheme, HighlighterThemeError, TerminalColor},
-    metadata::{MetadataError, SqlFunMetadata},
+    metadata::{MetadataError, PostgresEngineVersion, SqlFunMetadata},
 };
 
 /// Supporting `PostgreSQL` Database engine versions

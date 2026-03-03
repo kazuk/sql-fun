@@ -44,7 +44,7 @@ mod test_metadata {
     use clap::{Parser, builder::OsStr};
     use testresult::TestResult;
 
-    use crate::{SqlDialect, SqlFunArgs, SqlFunMetadata, metadata::EngineVersion};
+    use crate::{PostgresEngineVersion, SqlDialect, SqlFunArgs, SqlFunMetadata};
 
     #[test]
     pub fn test_metadata_format() -> TestResult {
@@ -103,7 +103,10 @@ mod test_metadata {
         let sql_dialect = metadata.sql_dialect();
         assert_eq!(sql_dialect, SqlDialect::PostgreSQL);
         let engine_version = metadata.engine_version();
-        assert_eq!(engine_version, &Some(EngineVersion::from_str("17")?));
+        assert_eq!(
+            engine_version,
+            &Some(PostgresEngineVersion::from_str("17")?)
+        );
 
         Ok(())
     }

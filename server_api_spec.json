@@ -72,6 +72,13 @@
                 "$ref": "#/$defs/EngineVersion",
                 "description": "Used for loading builtin schema objects"
               },
+              "environments": {
+                "additionalProperties": {
+                  "type": "string"
+                },
+                "description": "environment variables for initialization",
+                "type": "object"
+              },
               "extensions": {
                 "description": "Enabled extensions",
                 "items": {
@@ -96,7 +103,8 @@
               "engine_version",
               "extensions",
               "search_path",
-              "schema_dump"
+              "schema_dump",
+              "environments"
             ],
             "title": "InitializeSchemaArgs",
             "type": "object"

@@ -106,6 +106,7 @@ where
     Value: Clone + std::fmt::Debug,
     Error: Clone + std::fmt::Debug,
 {
+    Starting,
     Pending(PendingFut<Value, Error>),
     Occupied(Value, Instant),
     Error(Error, Instant),
@@ -148,7 +149,7 @@ where
 
     pub fn last_used(&self) -> Option<Instant> {
         match self {
-            Self::Pending(_) => None,
+            Self::Pending(_) | Self::Starting => None,
             Self::Occupied(_, lu) | Self::Error(_, lu) => Some(*lu),
         }
     }
@@ -183,11 +184,31 @@ where
         }
     }
 
-    async fn get_entry(&self, key: &Key) -> Option<CacheEntry<Value, Error>> {
+    async fn get_entry_or_insert_starting(&self, key: &Key) -> Option<CacheEntry<Value, Error>> {
         let mut entries = self.entries.write().await;
         if let Some(entry) = entries.get_mut(key) {
             entry.update_last_used();
             Some(entry.clone())
+        } else {
+            entries.insert(*key, CacheEntry::Starting);
+            None
+        }
+    }
+
+    async fn get_entry_expect_pending(&self, key: &Key) -> Option<CacheEntry<Value, Error>> {
+        let entry = loop {
+            let entry = {
+                let entries = self.entries.read().await;
+                entries.get(key).cloned()
+            };
+            if matches!(entry, Some(CacheEntry::Starting)) {
+                tokio::task::yield_now().await;
+                continue;
+            }
+            break entry;
+        };
+        if matches!(entry, Some(CacheEntry::Pending(_))) {
+            entry
         } else {
             None
         }
@@ -205,7 +226,9 @@ where
     ) -> Result<Value, Error> {
         let mut entries = self.entries.write().await;
         if let Some(entry) = entries.get_mut(key) {
-            entry.update_with_result(&value);
+            if matches!(entry, CacheEntry::Pending(_)) {
+                entry.update_with_result(&value);
+            }
             entry.to_result()
         } else {
             value
@@ -218,12 +241,36 @@ where
     ///
     /// when loader function returns error
     ///
+    /// # Remarks:
+    ///
+    /// This method is not cancellation-safe. Callers must not cancel/drop the
+    /// future before it completes; doing so may leave the cache in a
+    /// Starting/Pending state. Panics inside the loader can also leave a Starting
+    /// entry behind.
+    ///
     pub async fn get(&self, key: Key) -> Result<Value, Error> {
-        if let Some(entry) = self.get_entry(&key).await {
+        if let Some(entry) = self.get_entry_or_insert_starting(&key).await {
             match entry {
-                CacheEntry::Pending(cell) => cell.await,
+                CacheEntry::Pending(cell) => {
+                    let result = cell.await;
+                    self.update_entry_with_value(&key, result).await
+                }
                 CacheEntry::Occupied(value, _ttl) => Ok(value),
                 CacheEntry::Error(e, _ttl) => Err(e),
+                CacheEntry::Starting => {
+                    if let Some(CacheEntry::Pending(cell)) =
+                        self.get_entry_expect_pending(&key).await
+                    {
+                        let result = cell.await;
+                        self.update_entry_with_value(&key, result).await
+                    } else {
+                        // can not to catch pending state
+                        // may be loader is immediately completed and current state is Occupied / Error.
+                        //
+                        // then recursive call to this function results correct value
+                        self.get(key).await
+                    }
+                }
             }
         } else {
             let pending_fut = self.load_fn.load(key);

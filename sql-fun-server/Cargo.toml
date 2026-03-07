@@ -16,6 +16,9 @@ clap = { workspace = true }
 derive-getters = { workspace = true }
 either.workspace = true
 fs2 = { workspace = true }
+futures-core.workspace = true
+futures-util.workspace = true
+indexmap = { workspace = true }
 rand = { workspace = true }
 serde = { workspace = true }
 serde_json = { workspace = true }

@@ -76,7 +76,7 @@ derive-getters = "0.5"
 derive_builder = "0.20"
 directories = "6.0"
 either = { version = "1.15", features = ["serde"] }
-env_logger = "0.10"
+env_logger = "0.11"
 fs2 = "0.4"
 futures-core = "0.3"
 futures-util = "0.3"

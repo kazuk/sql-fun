@@ -92,7 +92,7 @@ owo-colors = "4.2.3"
 pg_query = "6.1"
 proc-macro2 = "1.0"
 quote = "1.0"
-rand = "0.9"
+rand = "0.10"
 rstest = "0.26"
 schemars = { version = "1.2.1", features = ["url2"] }
 serde = { version = "1.0", features = ["derive"] }

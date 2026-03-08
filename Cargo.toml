@@ -65,7 +65,7 @@ askama = "0.15"
 assert_matches = { version = "1" }
 async-trait = "0.1.89"
 backtrace-on-stack-overflow = "0.3"
-bollard = "0.19"
+bollard = "0.20"
 chumsky = "0.12"
 clap = { version = "4.5", features = ["derive", "env"] }
 combine = "4.6"

@@ -12,6 +12,7 @@ rust-version.workspace = true
 
 [features]
 beta_postgres_versions = []
+sqlite = []
 
 [dependencies]
 clap = { workspace = true }

@@ -139,6 +139,9 @@ yaml_serde = "0.10.4"
 [lib]
 proc-macro = true
 
+[features]
+sqlite = ["sql-fun-core/sqlite", "sql-fun-client/sqlite"]
+
 [dependencies]
 compact_str = { workspace = true }
 derive_builder = { workspace = true }

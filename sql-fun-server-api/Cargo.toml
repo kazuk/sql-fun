@@ -17,6 +17,7 @@ required-features = ["openrpc-schema", "bin-deps"]
 [features]
 bin-deps = ["dep:clap", "dep:anyhow"]
 openrpc-schema = ["dep:typed-openrpc", "dep:schemars"]
+sqlite = []
 
 [dependencies]
 anyhow = { workspace = true, optional = true }

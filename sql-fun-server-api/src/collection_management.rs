@@ -6,7 +6,7 @@ use time::UtcDateTime;
 #[serde(transparent)]
 pub struct CollectionHandle(String);
 
-/// argument for [`SqlFunServerApi::release_collection`]
+/// argument for [`crate::SqlFunServerApi::release_collection`]
 #[cfg_attr(feature = "openrpc-schema", derive(schemars::JsonSchema))]
 #[derive(serde::Serialize, serde::Deserialize, derive_getters::Getters)]
 pub struct ReleaseCollectionArgs {
@@ -14,7 +14,7 @@ pub struct ReleaseCollectionArgs {
     collection_handle: CollectionHandle,
 }
 
-/// argument for [`SqlFunServerApi::read_collection`]
+/// argument for [`crate::SqlFunServerApi::read_collection`]
 ///
 /// The item type returned by `read_collection` is identical to the element type
 /// of the original `Collection<T>` that produced the handle, and never changes.

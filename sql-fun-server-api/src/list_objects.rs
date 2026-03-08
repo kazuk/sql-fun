@@ -76,7 +76,7 @@ pub enum ObjectSummaryField {
     DefinitionSpan,
 }
 
-/// argument for [`SqlFunServerApi::list_object`]
+/// argument for [`crate::SqlFunServerApi::list_objects`]
 #[cfg_attr(feature = "openrpc-schema", derive(schemars::JsonSchema))]
 #[derive(serde::Serialize, serde::Deserialize, derive_getters::Getters)]
 pub struct ListObjectArgs {

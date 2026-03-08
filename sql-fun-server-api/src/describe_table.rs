@@ -27,14 +27,14 @@ pub struct TableConstraint {
     // TODO: definition
 }
 
-/// argument for [`SqlFunServerApi::describe_table`]
+/// argument for [`crate::SqlFunServerApi::describe_table`]
 #[derive(serde::Serialize, serde::Deserialize, derive_getters::Getters)]
 pub struct DescribeTableArgs {
     schema_name: String,
     local_name: String,
 }
 
-/// response type for [`SqlFunServerApi::describe_table`]
+/// response type for [`crate::SqlFunServerApi::describe_table`]
 #[derive(serde::Serialize, serde::Deserialize, derive_getters::Getters)]
 pub struct DescribeTableResponse {
     definition_file: PathBuf,

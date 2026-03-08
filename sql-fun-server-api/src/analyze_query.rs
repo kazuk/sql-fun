@@ -19,7 +19,7 @@ pub enum AnalyzeQueryInput {
     Url(Url),
 }
 
-/// [`SqlFunServerApi::analyze_query`] request arguments
+/// [`crate::SqlFunServerApi::analyze_query`] request arguments
 #[cfg_attr(feature = "openrpc-schema", derive(schemars::JsonSchema))]
 #[derive(serde::Serialize, serde::Deserialize)]
 pub struct AnalyzeQueryArgs {
@@ -29,7 +29,7 @@ pub struct AnalyzeQueryArgs {
     query: AnalyzeQueryInput,
 }
 
-/// response for [`SqlFunServerApi::analyze_query`]
+/// response for [`crate::SqlFunServerApi::analyze_query`]
 #[cfg_attr(feature = "openrpc-schema", derive(schemars::JsonSchema))]
 #[derive(serde::Serialize, serde::Deserialize, derive_getters::Getters)]
 pub struct AnalyzeQueryResponse {

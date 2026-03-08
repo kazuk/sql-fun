@@ -70,7 +70,7 @@ impl SqlFunArgsBuilder {
         self
     }
 
-    /// Comma-separated Postgres extensions (name[@version])
+    /// Comma-separated Postgres extensions (`name[@version]`)
     ///
     /// # Errors
     ///

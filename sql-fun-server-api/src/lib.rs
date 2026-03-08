@@ -193,11 +193,11 @@ pub trait SqlFunServerApi {
     /// Read a collection
     ///
     /// When server returns multiple items, server keeps scrollable collection,
-    /// [`read_collection`] reads items in collection.
+    /// [`SqlFunServerApi::read_collection`] reads items in collection.
     ///
     /// # Return value
     ///
-    /// returns [Collection<T>], T depends collection item type
+    /// returns [`Collection<T>`], T depends collection item type
     ///
     async fn read_collection(
         &self,
@@ -207,7 +207,7 @@ pub trait SqlFunServerApi {
     /// Release a collection
     ///
     /// When server returns collection, server keeps scrollable collection,
-    /// [`release_collection`] release a server side collection.
+    /// [`SqlFunServerApi::release_collection`] release a server side collection.
     ///
     async fn release_collection(
         &self,

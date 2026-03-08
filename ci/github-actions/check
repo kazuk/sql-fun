@@ -2,15 +2,24 @@
 set -eu
 
 CLEAN_TARGET=0
+REBUILD=0
 
 for a in "$@"; do
     case "$a" in
       --clean) CLEAN_TARGET=1 ;;
+      --rebuild) REBUILD=1 ;;
     esac
 done
 
+if (( REBUILD ==1 )); then
+    REBUILD_ARGS="--pull --no-cache"
+else
+    REBUILD_ARGS=""
+fi
+
 # GIT_ROOT setup in our repostitory .envrc
 docker build \
+  ${REBUILD_ARGS} \
   ${GIT_ROOT}/ci/github-actions/. \
   -t ci-builder:local \
   --build-arg "SERENA_TAG=v0.1.4"

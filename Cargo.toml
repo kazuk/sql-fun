@@ -65,18 +65,18 @@ askama = "0.15"
 assert_matches = { version = "1" }
 async-trait = "0.1.89"
 backtrace-on-stack-overflow = "0.3"
-bollard = "0.19"
+bollard = "0.20"
 chumsky = "0.12"
 clap = { version = "4.5", features = ["derive", "env"] }
 combine = "4.6"
 compact_str = "0.9"
-convert_case = "0.10"
+convert_case = "0.11"
 ctor = "0.6"
 derive-getters = "0.5"
 derive_builder = "0.20"
 directories = "6.0"
 either = { version = "1.15", features = ["serde"] }
-env_logger = "0.10"
+env_logger = "0.11"
 fs2 = "0.4"
 futures-core = "0.3"
 futures-util = "0.3"
@@ -87,12 +87,12 @@ itertools = "0.14"
 j9 = "0.1"
 log = "0.4"
 miette = { version = "7.6.0", features = ["fancy"] }
-nix = { version = "0.30", features = ["process", "signal"] }
+nix = { version = "0.31", features = ["process", "signal"] }
 owo-colors = "4.2.3"
 pg_query = "6.1"
 proc-macro2 = "1.0"
 quote = "1.0"
-rand = "0.9"
+rand = "0.10"
 rstest = "0.26"
 schemars = { version = "1.2.1", features = ["url2"] }
 serde = { version = "1.0", features = ["derive"] }
@@ -106,20 +106,20 @@ sql-fun-core = { path = "./sql-fun-core", version = "0.1.1" }
 sql-fun-server-api = { path = "sql-fun-server-api", version = "0.1.0" }
 sql-fun-sqlast = { path = "./sql-fun-sqlast", version = "0.1.0", features = [] }
 syn = "2.0"
-sysinfo = "0.37"
+sysinfo = "0.38"
 testresult = "0.4"
 thiserror = "2.0"
 time = { version = "0.3.45", features = ["serde"] }
 tokio = { version = "1.47", features = ["full"] }
 tokio-postgres = "0.7"
-toml = "0.9.8"
+toml = "1.0.6"
 tracing = "0.1"
 tracing-subscriber = { version = "0.3", features = ["fmt", "env-filter"] }
 trybuild = { version = "1.0.114", features = ["diff"] }
 typed-openrpc = "0.1.1"
 url = { version = "2.5", features = ["serde"] }
 walkdir = "2.3"
-which = "4.4"
+which = "8.0"
 
 [lib]
 proc-macro = true

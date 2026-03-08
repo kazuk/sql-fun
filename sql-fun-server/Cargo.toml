@@ -14,6 +14,13 @@ name = "sql-fun-server"
 path = "src/main.rs"
 doc = false
 
+[features]
+sqlite = [
+    "sql-fun-core/sqlite",
+    "sql-fun-sqlast/sqlite",
+    "sql-fun-server-api/sqlite",
+]
+
 [dependencies]
 async-trait.workspace = true
 clap = { workspace = true }

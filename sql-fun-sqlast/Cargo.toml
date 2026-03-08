@@ -13,6 +13,8 @@ rust-version.workspace = true
 [features]
 default = []
 syn_serde = []
+sqlite = ["turso_parser", "sql-fun-core/sqlite"]
+turso_parser = ["dep:turso_parser"]
 
 [dependencies]
 combine = { workspace = true }
@@ -27,6 +29,7 @@ serde_json = { workspace = true }
 sql-fun-core = { workspace = true }
 thiserror = { workspace = true }
 tracing = { workspace = true }
+turso_parser = { version = "0.5.0", optional = true }
 
 [dev-dependencies]
 assert_matches.workspace = true

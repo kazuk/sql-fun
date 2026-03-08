@@ -3063,6 +3063,7 @@ dependencies = [
  "thiserror 2.0.20",
  "tracing",
  "tracing-subscriber",
+ "turso_parser",
 ]
 
 [[package]]
@@ -3604,6 +3605,32 @@ dependencies = [
  "target-tuple",
  "termcolor",
  "toml",
+]
+
+[[package]]
+name = "turso_macros"
+version = "0.5.3"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "9c846c30c3cb085884a8bbaba7760bdcc406ff2176cbde1e51d41b6057171fd4"
+dependencies = [
+ "proc-macro2",
+ "quote",
+ "syn",
+]
+
+[[package]]
+name = "turso_parser"
+version = "0.5.3"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "8402ba98c236e3e6d6ed6a43557a9a0b3a682f86a37fcafe02b659b9e6c06b82"
+dependencies = [
+ "bitflags 2.11.0",
+ "memchr",
+ "miette",
+ "strum",
+ "strum_macros",
+ "thiserror 2.0.18",
+ "turso_macros",
 ]
 
 [[package]]

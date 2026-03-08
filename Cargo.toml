@@ -87,7 +87,7 @@ itertools = "0.14"
 j9 = "0.1"
 log = "0.4"
 miette = { version = "7.6.0", features = ["fancy"] }
-nix = { version = "0.30", features = ["process", "signal"] }
+nix = { version = "0.31", features = ["process", "signal"] }
 owo-colors = "4.2.3"
 pg_query = "6.1"
 proc-macro2 = "1.0"

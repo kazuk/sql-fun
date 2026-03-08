@@ -119,7 +119,7 @@ trybuild = { version = "1.0.114", features = ["diff"] }
 typed-openrpc = "0.1.1"
 url = { version = "2.5", features = ["serde"] }
 walkdir = "2.3"
-which = "4.4"
+which = "8.0"
 
 [lib]
 proc-macro = true

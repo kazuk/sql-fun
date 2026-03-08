@@ -106,7 +106,7 @@ sql-fun-core = { path = "./sql-fun-core", version = "0.1.1" }
 sql-fun-server-api = { path = "sql-fun-server-api", version = "0.1.0" }
 sql-fun-sqlast = { path = "./sql-fun-sqlast", version = "0.1.0", features = [] }
 syn = "2.0"
-sysinfo = "0.37"
+sysinfo = "0.38"
 testresult = "0.4"
 thiserror = "2.0"
 time = { version = "0.3.45", features = ["serde"] }

@@ -28,8 +28,7 @@ pub use self::{
 use crate::{
     sem::{
         AnalysisError, ColumnName, FromClause, FullName, ParseContext, SemScalarExpr, WithClause,
-        analyze_scaler_expr, scalar_expr::ColumnReferenceExpr,
-        type_system::ArgumentBindingCollection,
+        scalar_expr::ColumnReferenceExpr, type_system::ArgumentBindingCollection,
     },
     syn::{ListOpt, ScanToken},
 };
@@ -229,8 +228,13 @@ impl DataSource {
         let mut arg_types = ArgumentBindingCollection::default();
         if let Some(args) = call.get_args().as_inner() {
             for arg in args {
-                let (sarg, new_context) =
-                    analyze_scaler_expr(context, with_clause, from_clause, arg, tokens)?;
+                let (sarg, new_context) = SemScalarExpr::analyze_scaler_expr(
+                    context,
+                    with_clause,
+                    from_clause,
+                    arg,
+                    tokens,
+                )?;
                 context = new_context;
                 arg_types.push(sarg.get_type());
                 arg_exprs.push(sarg);

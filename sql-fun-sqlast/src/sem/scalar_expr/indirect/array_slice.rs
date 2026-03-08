@@ -2,10 +2,7 @@ use sql_fun_core::IVec;
 
 use super::IndirectionExpr;
 use crate::{
-    sem::{
-        AnalysisError, FromClause, ParseContext, SemScalarExpr, TypeReference, WithClause,
-        analyze_scaler_expr,
-    },
+    sem::{AnalysisError, FromClause, ParseContext, SemScalarExpr, TypeReference, WithClause},
     syn::{Opt, ScanToken},
 };
 
@@ -76,7 +73,7 @@ impl ArraySlice {
             return Ok((None, context));
         };
         let (lexpr, new_context) =
-            analyze_scaler_expr(context, with_clause, from_clause, index, tokens)?;
+            SemScalarExpr::analyze_scaler_expr(context, with_clause, from_clause, index, tokens)?;
         Ok((Some(lexpr), new_context))
     }
 

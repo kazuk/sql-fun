@@ -1,14 +1,14 @@
 use std::path::Path;
 
 use crate::{
-    AstAndContextPair, StringSpan, parse, read_sql_file, scan,
+    PostgresDialect, StringSpan,
     sem::{
         AnalysisError, AnalysisProblem, BaseParseContext, CastDefinition, CastInfoRead,
         CreateIndex, CreateSequence, CreateTable, FullName, FunctionInfoRead,
         FunctionOverloadCollection, IndexInfoRead, OperatorDefinition, OperatorInfoRead,
         OperatorName, SchemaFileContext, SchemaName, SearchPathRead, SemAst, SequenceInfoRead,
         SourceAccessService, TableInfoRead, TypeDefinition, TypeInfoRead, TypeReference,
-        ViewInfoRead, ViewLike, semantic_analysis,
+        ViewInfoRead, ViewLike,
     },
 };
 /// Error for reading schema dump
@@ -40,6 +40,8 @@ pub enum ParseDumpFileError {
 ///
 /// - [`ParseDumpFileError`]
 ///
+#[expect(dead_code)]
+#[deprecated = "use PostgresDialect::parse_schema_file"]
 pub fn parse_schema_file<TContext>(
     dump_file: &Path,
     input_context: TContext,
@@ -47,20 +49,7 @@ pub fn parse_schema_file<TContext>(
 where
     TContext: BaseParseContext + std::fmt::Debug,
 {
-    let sql_statements = read_sql_file(dump_file)?;
-
-    let statements = ::pg_query::split_with_parser(&sql_statements)?;
-    let mut context = SchemaFileContext::new(dump_file, input_context);
-    let mut sem_results = Vec::new();
-    for statement in statements {
-        context.set_statement_span(StringSpan::from_str_in_str(&sql_statements, statement));
-        let syn = parse(statement)?;
-        let tokens = scan(statement)?;
-        let AstAndContextPair(sem, rcontext) = semantic_analysis(context, syn, &tokens)?;
-        sem_results.push(sem);
-        context = rcontext;
-    }
-    Ok(ParsedSchemaDump(sem_results, context))
+    PostgresDialect::parse_schema_file(dump_file, input_context)
 }
 
 ///  schema dump file context
@@ -69,6 +58,16 @@ where
 pub struct ParsedSchemaDump<TContext>(Vec<SemAst>, SchemaFileContext<TContext>)
 where
     TContext: BaseParseContext + std::fmt::Debug;
+
+impl<TContext> ParsedSchemaDump<TContext>
+where
+    TContext: BaseParseContext + std::fmt::Debug,
+{
+    /// create instance
+    pub fn new(sem_results: Vec<SemAst>, context: SchemaFileContext<TContext>) -> Self {
+        Self(sem_results, context)
+    }
+}
 
 impl<TContext> TypeInfoRead for ParsedSchemaDump<TContext>
 where

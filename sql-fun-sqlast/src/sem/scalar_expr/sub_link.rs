@@ -4,7 +4,7 @@ use crate::{
     AstAndContextPair,
     sem::{
         AnalysisError, FromClause, ParseContext, SelectStatement, SemScalarExpr, TypeReference,
-        WithClause, analyze_select,
+        WithClause,
     },
     syn::{Opt, ScanToken},
 };
@@ -43,7 +43,7 @@ where
             AnalysisError::raise_unexpected_none("sublink.subselect")?
         };
         let AstAndContextPair(select_stmt, new_context) =
-            analyze_select(context, subselect, tokens)?;
+            SelectStatement::analyze_select(context, subselect, tokens)?;
         context = new_context;
         let Some(select_stmt) = select_stmt.into_select_statemtnt() else {
             AnalysisError::raise_unexpected_none("select_statemnt")?

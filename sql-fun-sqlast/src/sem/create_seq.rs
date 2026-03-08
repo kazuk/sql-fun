@@ -44,25 +44,38 @@ impl CreateSequence {
         }
         Ok(())
     }
+
+    /// analyze [`crate::syn::CreateSeqStmt`]
+    pub fn analyze_create_seq<TParseContext>(
+        context: TParseContext,
+        _parent_schema: &Option<String>,
+        syn: crate::syn::CreateSeqStmt,
+    ) -> Result<AstAndContextPair<TParseContext>, AnalysisError>
+    where
+        TParseContext: ParseContext,
+    {
+        let Some(name) = syn.get_sequence().as_inner() else {
+            AnalysisError::raise_unexpected_none("create_seq.sequence")?
+        };
+
+        let create_sequence = CreateSequence::new(&FullName::try_from(name)?);
+        let context = context.apply_create_sequence(&create_sequence)?;
+        Ok(AstAndContextPair::new(
+            SemAst::CreateSequence(create_sequence),
+            context,
+        ))
+    }
 }
 
 /// analyze [`crate::syn::CreateSeqStmt`]
+#[deprecated = "use CreateSequence::analyze_create_seq"]
 pub fn analyze_create_seq<TParseContext>(
     context: TParseContext,
-    _parent_schema: &Option<String>,
+    parent_schema: &Option<String>,
     syn: crate::syn::CreateSeqStmt,
 ) -> Result<AstAndContextPair<TParseContext>, AnalysisError>
 where
     TParseContext: ParseContext,
 {
-    let Some(name) = syn.get_sequence().as_inner() else {
-        AnalysisError::raise_unexpected_none("create_seq.sequence")?
-    };
-
-    let create_sequence = CreateSequence::new(&FullName::try_from(name)?);
-    let context = context.apply_create_sequence(&create_sequence)?;
-    Ok(AstAndContextPair::new(
-        SemAst::CreateSequence(create_sequence),
-        context,
-    ))
+    CreateSequence::analyze_create_seq(context, parent_schema, syn)
 }

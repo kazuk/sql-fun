@@ -5,7 +5,7 @@ use sql_fun_core::IVec;
 use crate::{
     sem::{
         AnalysisError, AnalysisProblem, FromClause, ParseContext, SemScalarExpr, TypeReference,
-        WithClause, analyze_scaler_expr,
+        WithClause,
         scalar_expr::{AnalyzeScalarExpr, SemScalarExprNode},
     },
     syn::{ListOpt as _, Opt, ScanToken},
@@ -58,8 +58,13 @@ impl CaseExprAnalysisContext<'_> {
         TParseContext: ParseContext,
     {
         if let Some(arg) = syn.get_arg().as_inner() {
-            let (arg_expr, new_context) =
-                analyze_scaler_expr(context, self.with_clause, self.from_clause, arg, tokens)?;
+            let (arg_expr, new_context) = SemScalarExpr::analyze_scaler_expr(
+                context,
+                self.with_clause,
+                self.from_clause,
+                arg,
+                tokens,
+            )?;
             self.case_arg = Some(arg_expr);
             Ok(new_context)
         } else {
@@ -125,7 +130,7 @@ impl CaseExprAnalysisContext<'_> {
         let Some(result) = syn.get_result().as_inner() else {
             AnalysisError::raise_unexpected_none("casewhen.result")?
         };
-        let (when_value, new_context) = analyze_scaler_expr(
+        let (when_value, new_context) = SemScalarExpr::analyze_scaler_expr(
             context,
             self.with_clause,
             self.from_clause,
@@ -133,8 +138,13 @@ impl CaseExprAnalysisContext<'_> {
             tokens,
         )?;
         context = new_context;
-        let (result, new_context) =
-            analyze_scaler_expr(context, self.with_clause, self.from_clause, result, tokens)?;
+        let (result, new_context) = SemScalarExpr::analyze_scaler_expr(
+            context,
+            self.with_clause,
+            self.from_clause,
+            result,
+            tokens,
+        )?;
         context = new_context;
         Ok((CaseWhen::new(when_value, result), context))
     }
@@ -268,7 +278,7 @@ impl CaseExprAnalysisContext<'_> {
             return Ok(context);
         };
 
-        let (default_expr, new_context) = analyze_scaler_expr(
+        let (default_expr, new_context) = SemScalarExpr::analyze_scaler_expr(
             context,
             self.with_clause,
             self.from_clause,

@@ -18,8 +18,10 @@ mod sub_link;
 
 use sql_fun_core::IVec;
 
+#[expect(deprecated)]
+pub use self::analyze::analyze_scaler_expr;
+
 pub use self::{
-    analyze::analyze_scaler_expr,
     arith_expr::ArithExpr,
     array::ArrayExpr,
     boolean::{BooleanExpr, NullTestExpr},

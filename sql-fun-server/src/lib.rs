@@ -27,7 +27,7 @@ use sql_fun_server_api::{
     InitializeSchemaArgs, ListObjectArgs, ObjectSummary, ReadCollectionArgs, ReleaseCollectionArgs,
     SchemaContext, SqlFunServerApi, SqlFunServerApiError,
 };
-use sql_fun_sqlast::{SqlFunArgs, sem::BaseContext};
+use sql_fun_sqlast::{PostgresDialect, SqlFunArgs, sem::BaseContext};
 use std::{
     convert::Into,
     hash::RandomState,
@@ -370,7 +370,7 @@ impl Api {
         builtin_schema.push("schema.sql");
 
         let base_context = BaseContext::new(context_args.clone())?;
-        sql_fun_sqlast::parse_schema_file(&builtin_schema, base_context)?;
+        PostgresDialect::parse_schema_file(&builtin_schema, base_context)?;
 
         todo!();
     }

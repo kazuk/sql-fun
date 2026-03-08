@@ -3,7 +3,7 @@ use sql_fun_core::IVec;
 use crate::{
     sem::{
         AnalysisError, FromClause, ParseContext, PgBuiltInType, SemScalarExpr, TypeReference,
-        WithClause, analyze_scaler_expr,
+        WithClause,
     },
     syn::{BoolExprType, ListOpt, Opt, ScanToken},
 };
@@ -50,8 +50,13 @@ impl BooleanExpr {
     {
         let mut results = Vec::new();
         for node in nodes {
-            let (arg_expr, new_context) =
-                analyze_scaler_expr(context, with_clause, from_clause, node, tokens)?;
+            let (arg_expr, new_context) = SemScalarExpr::analyze_scaler_expr(
+                context,
+                with_clause,
+                from_clause,
+                node,
+                tokens,
+            )?;
             context = new_context;
             results.push(arg_expr);
         }
@@ -181,7 +186,7 @@ where
             AnalysisError::raise_unexpected_none("NullTest.arg")?
         };
         let (arg_expr, new_context) =
-            analyze_scaler_expr(context, with_clause, from_clause, arg, tokens)?;
+            SemScalarExpr::analyze_scaler_expr(context, with_clause, from_clause, arg, tokens)?;
         context = new_context;
         Ok((
             SemScalarExpr::NullTest(Self {

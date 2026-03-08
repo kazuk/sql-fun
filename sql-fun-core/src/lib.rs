@@ -57,7 +57,7 @@ impl FromStr for PostgresVersion {
             "16" => Ok(Self::Ver16),
             "17" => Ok(Self::Ver17),
             #[cfg(feature = "beta_postgres_versions")]
-            "18" => Ok(PostgresVersion::Ver18),
+            "18" => Ok(Self::Ver18),
             _ => Err(s.to_string()),
         }
     }

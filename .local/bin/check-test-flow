@@ -109,9 +109,5 @@ cargo deny check
 echo "== check dependency updates"
 cargo +nightly update -Z unstable-options --dry-run --breaking
 
-###### FIXME:
-# OOM killed : rustdoc 1.92.0 (ded5c06cf 2025-12-08)
-# try on next stable release
-#
-# echo "== Document build"
-# cargo doc --workspace --no-deps
+echo "== Document build"
+cargo doc --workspace --no-deps

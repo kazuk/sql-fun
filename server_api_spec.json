@@ -294,7 +294,7 @@
               }
             },
             "$schema": "https://json-schema.org/draft/2020-12/schema",
-            "description": "argument for [`SqlFunServerApi::read_collection`]\n\nThe item type returned by `read_collection` is identical to the element type\nof the original `Collection<T>` that produced the handle, and never changes.\nThis method only reads the continuation of that collection; no type conversion\nis performed.",
+            "description": "argument for [`crate::SqlFunServerApi::read_collection`]\n\nThe item type returned by `read_collection` is identical to the element type\nof the original `Collection<T>` that produced the handle, and never changes.\nThis method only reads the continuation of that collection; no type conversion\nis performed.",
             "properties": {
               "collection_handle": {
                 "$ref": "#/$defs/CollectionHandle",
@@ -398,7 +398,7 @@
               }
             },
             "$schema": "https://json-schema.org/draft/2020-12/schema",
-            "description": "argument for [`SqlFunServerApi::release_collection`]",
+            "description": "argument for [`crate::SqlFunServerApi::release_collection`]",
             "properties": {
               "collection_handle": {
                 "$ref": "#/$defs/CollectionHandle",
@@ -484,7 +484,7 @@
               }
             },
             "$schema": "https://json-schema.org/draft/2020-12/schema",
-            "description": "[`SqlFunServerApi::analyze_query`] request arguments",
+            "description": "[`crate::SqlFunServerApi::analyze_query`] request arguments",
             "properties": {
               "context_handle": {
                 "$ref": "#/$defs/ContextHandle",
@@ -1247,7 +1247,7 @@
             }
           },
           "$schema": "https://json-schema.org/draft/2020-12/schema",
-          "description": "response for [`SqlFunServerApi::analyze_query`]",
+          "description": "response for [`crate::SqlFunServerApi::analyze_query`]",
           "properties": {
             "queries": {
               "$ref": "#/$defs/Collection"
@@ -1490,7 +1490,7 @@
               }
             },
             "$schema": "https://json-schema.org/draft/2020-12/schema",
-            "description": "argument for [`SqlFunServerApi::list_object`]",
+            "description": "argument for [`crate::SqlFunServerApi::list_objects`]",
             "properties": {
               "extra_fields": {
                 "description": "extra field",

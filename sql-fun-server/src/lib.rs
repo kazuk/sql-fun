@@ -6,11 +6,15 @@ mod error;
 mod json_rpc;
 mod pid_file;
 
-pub use self::buffers::{PipeBuffer, ReadableBuffer};
+pub use self::{
+    buffers::{PipeBuffer, ReadableBuffer},
+    json_rpc::JsonRpcError,
+};
+
 use self::{
     core_wrapping::{CoreDialect, CorePostgresVersion},
     error::SqlFunServerError,
-    json_rpc::{JsonRpcError, JsonRpcRequest, JsonRpcResponse},
+    json_rpc::{JsonRpcRequest, JsonRpcResponse},
 };
 
 use clap::Parser;
@@ -387,11 +391,11 @@ impl sql_fun_server_api::SqlFunServerApi for Api {
     /// Read a collection
     ///
     /// When server returns multiple items, server keeps scrollable collection,
-    /// [`read_collection`] reads items in collection.
+    /// [`crate::SqlFunServerApi::read_collection`] reads items in collection.
     ///
     /// # Return value
     ///
-    /// returns [Collection<T>], T depends collection item type
+    /// returns [`Collection<T>`], T depends collection item type
     ///
     async fn read_collection(
         &self,
@@ -403,7 +407,7 @@ impl sql_fun_server_api::SqlFunServerApi for Api {
     /// Release a collection
     ///
     /// When server returns collection, server keeps scrollable collection,
-    /// [`release_collection`] release a server side collection.
+    /// [`SqlFunServerApi::release_collection`] release a server side collection.
     ///
     async fn release_collection(
         &self,

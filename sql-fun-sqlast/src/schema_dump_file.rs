@@ -32,6 +32,11 @@ pub enum ParseDumpFileError {
     ///
     #[error(transparent)]
     Sem(#[from] AnalysisError),
+
+    /// Syntax Error
+    #[cfg(feature = "sqlite")]
+    #[error(transparent)]
+    SqliteSyn(#[from] ::turso_parser::error::Error),
 }
 
 /// load schema dump file

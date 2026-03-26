@@ -36,3 +36,24 @@ impl TryFrom<RangeVar> for TableName {
         Ok(Self(FullName::try_from(value)?))
     }
 }
+
+#[cfg(feature = "sqlite")]
+use crate::syn::sqlite::{Name, QualifiedName};
+
+#[cfg(feature = "sqlite")]
+impl TryFrom<&QualifiedName> for TableName {
+    type Error = AnalysisError;
+
+    fn try_from(value: &QualifiedName) -> Result<Self, Self::Error> {
+        Ok(Self(FullName::try_from(value)?))
+    }
+}
+
+#[cfg(feature = "sqlite")]
+impl TryFrom<&Name> for TableName {
+    type Error = AnalysisError;
+
+    fn try_from(value: &Name) -> Result<Self, Self::Error> {
+        Ok(Self(FullName::from_local_name(value.value())))
+    }
+}

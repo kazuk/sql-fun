@@ -13,7 +13,9 @@ use crate::{
 pub struct ColumnDefinition {
     name: Option<ColumnName>,
     type_ref: Option<TypeReference>,
+    #[deprecated = "query from constraints"]
     is_not_null: Option<bool>,
+    #[deprecated = "query from constraints"]
     default: Option<Box<SemScalarExpr>>,
     constraints: Vec<ColumnConstraint>,
 }
@@ -23,8 +25,10 @@ impl Clone for ColumnDefinition {
         Self {
             name: self.name.clone(),
             type_ref: self.type_ref.clone(),
+            #[expect(deprecated)]
             is_not_null: self.is_not_null,
-            default: Default::default(),
+            #[expect(deprecated)]
+            default: self.default.clone(),
             constraints: self.constraints.clone(),
         }
     }
@@ -42,7 +46,9 @@ impl ColumnDefinition {
         Self {
             name: name.clone(),
             type_ref: type_ref.cloned(),
+            #[expect(deprecated)]
             is_not_null,
+            #[expect(deprecated)]
             default: Default::default(),
             constraints: constraints.to_vec(),
         }
@@ -63,10 +69,12 @@ impl ColumnDefinition {
     /// column nullability
     #[must_use]
     pub fn is_not_null(&self) -> Option<bool> {
+        #[expect(deprecated)]
         self.is_not_null
     }
 
     /// apply default expression to column
+    #[expect(deprecated)]
     pub fn set_default(&mut self, scalar_expr: &SemScalarExpr) {
         self.default = Some(Box::new(scalar_expr.clone()));
     }

@@ -192,6 +192,21 @@ impl CreateTable {
                 AlterObjSubCommand::ClusterOn(index_name) => {
                     self.cluster_on = Some(index_name.clone())
                 }
+                AlterObjSubCommand::RenameTo(_) => {
+                    todo!()
+                }
+                AlterObjSubCommand::AddColumn(_) => {
+                    todo!()
+                }
+                AlterObjSubCommand::AlterColumn(_, _) => {
+                    todo!()
+                }
+                AlterObjSubCommand::RenameColumn(_, _) => {
+                    todo!()
+                }
+                AlterObjSubCommand::DropColumn(_) => {
+                    todo!()
+                }
             }
         }
 
@@ -257,6 +272,7 @@ impl CreateTable {
                 &Some(colname),
                 type_ref.as_ref(),
                 Some(is_not_null),
+                &[],
             ));
         }
         let table_def = Self::new(table_name, cols);

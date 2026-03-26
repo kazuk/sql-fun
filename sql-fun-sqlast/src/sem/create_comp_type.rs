@@ -22,6 +22,7 @@ impl CompositeFieldCollection {
                 &Some(ColumnName::from(field.name.clone())),
                 field.field_type.as_ref(),
                 field.is_not_null,
+                &[],
             );
             columns.push(col_def);
         }

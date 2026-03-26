@@ -256,7 +256,8 @@ mod test_get_column_def_and_name {
         let alias = AliasName::from("t");
         let column = ColumnName::from(column_name);
         let table_name = TableName::from(FullName::with_schema("public", "tbl"));
-        let col_def = ColumnDefinition::new(&Some(column.clone()), Some(column_type), is_not_null);
+        let col_def =
+            ColumnDefinition::new(&Some(column.clone()), Some(column_type), is_not_null, &[]);
         let table_column = TableColumnRef::new(&alias, &column, &table_name, Some(&col_def), false);
         SemScalarExpr::ColumnRef(ColumnReferenceExpr::TableColumn(table_column))
     }

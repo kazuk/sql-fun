@@ -2,8 +2,8 @@ use sql_fun_core::IVec;
 
 use crate::{
     sem::{
-        AlterSequence, AstAndContextPair, ColumnName, Constraint, FromClause, SemScalarExpr,
-        ViewName, WithClause,
+        AlterSequence, AstAndContextPair, ColumnDefinition, ColumnName, Constraint, FromClause,
+        SemScalarExpr, ViewName, WithClause,
     },
     syn::{AlterTableType, ListOpt, ObjectType, Opt, ScanToken},
 };
@@ -105,6 +105,7 @@ mod test_analyze_alter_table_statement {
         syn::{AliasOpt, NodeInner, ObjectType},
         test_helpers::{SynBuilder, TestParseContext, test_context},
     };
+
     use sql_fun_core::IVec;
     use testresult::TestResult;
 
@@ -136,6 +137,7 @@ mod test_analyze_alter_table_statement {
         };
         assert_eq!(at.commands.len(), 1);
         assert_eq!(ctx.alter_tables_len(), 1);
+        assert_eq!(ctx.reported_problem_count(), 1);
         Ok(())
     }
 }
@@ -205,6 +207,31 @@ pub enum AlterObjSubCommand {
     SetColumnDefault(ColumnName, Box<SemScalarExpr>),
     AddConstraint(Constraint),
     ClusterOn(String),
+
+    RenameTo(TableName),
+    AddColumn(ColumnDefinition),
+    AlterColumn(ColumnName, ColumnDefinition),
+    RenameColumn(ColumnName, ColumnName),
+    DropColumn(ColumnName),
+}
+
+fn report_missing_column_in_table<TParseContext>(
+    context: &mut TParseContext,
+    table_name: &TableName,
+    column_name: &ColumnName,
+) -> Result<(), AnalysisError>
+where
+    TParseContext: ParseContext,
+{
+    if let Some(table) = context.get_table(table_name)
+        && !table.has_column(column_name)
+    {
+        context.report_problem(AnalysisProblem::column_not_found_in_table(
+            table_name,
+            column_name,
+        ))?;
+    }
+    Ok(())
 }
 
 pub fn analyze_alter_obj_change_owner<TParseContext>(
@@ -236,6 +263,7 @@ mod test_analyze_alter_obj_change_owner {
 impl AlterObjSubCommand {
     fn analyze_alter_obj_column_default<TParseContext>(
         mut context: TParseContext,
+        table_name: &TableName,
         cmd: crate::syn::AlterTableCmd,
         tokens: &IVec<ScanToken>,
     ) -> Result<(Self, TParseContext), AnalysisError>
@@ -254,7 +282,7 @@ impl AlterObjSubCommand {
         )?;
         context = new_context;
 
-        // FIXME: check table, column existing
+        report_missing_column_in_table(&mut context, table_name, &column_name)?;
 
         Ok((Self::SetColumnDefault(column_name, Box::new(expr)), context))
     }
@@ -263,7 +291,9 @@ impl AlterObjSubCommand {
 #[cfg(test)]
 mod test_analyze_alter_obj_column_default {
     use crate::{
-        sem::{ScalarConstExpr, SemScalarExpr, alter_table::AlterObjSubCommand},
+        sem::{
+            FullName, ScalarConstExpr, SemScalarExpr, TableName, alter_table::AlterObjSubCommand,
+        },
         syn::NodeInner,
         test_helpers::{SynBuilder, TestParseContext, test_context},
     };
@@ -271,17 +301,32 @@ mod test_analyze_alter_obj_column_default {
     use testresult::TestResult;
 
     #[rstest::rstest]
-    fn test_analyze_alter_obj_column_default(test_context: TestParseContext) -> TestResult {
+    fn test_analyze_alter_obj_column_default(mut test_context: TestParseContext) -> TestResult {
         // alter table ...
         //   alter column value set default(0)
+        test_context.setup_table(
+            "table1",
+            &[crate::sem::ColumnDefinition::new(
+                &Some(crate::sem::ColumnName::from("value")),
+                None,
+                None,
+                &[],
+            )],
+        );
+
         let builder = SynBuilder::new();
         let value = builder.const_int4(0);
         let cmd =
             builder.alter_table_cmd_set_column_default("value", NodeInner::AConst(value).into());
         let tokens = IVec::default();
+        let table_name = TableName::from(FullName::with_schema("public", "table1"));
 
-        let (res, _) =
-            AlterObjSubCommand::analyze_alter_obj_column_default(test_context, cmd, &tokens)?;
+        let (res, test_context) = AlterObjSubCommand::analyze_alter_obj_column_default(
+            test_context,
+            &table_name,
+            cmd,
+            &tokens,
+        )?;
         let AlterObjSubCommand::SetColumnDefault(col_name, expr) = res else {
             panic!("unexpected respose {res:#?}");
         };
@@ -290,6 +335,7 @@ mod test_analyze_alter_obj_column_default {
             panic!("unexpected expr {expr:#?}");
         };
         assert_eq!(val, 0);
+        assert_eq!(test_context.reported_problem_count(), 0);
 
         Ok(())
     }
@@ -310,7 +356,7 @@ impl AlterObjSubCommand {
             AlterTableType::AtChangeOwner => analyze_alter_obj_change_owner(&context, cmd)?,
             AlterTableType::AtColumnDefault => {
                 let (column_default, new_context) =
-                    Self::analyze_alter_obj_column_default(context, cmd, tokens)?;
+                    Self::analyze_alter_obj_column_default(context, table_name, cmd, tokens)?;
                 context = new_context;
                 column_default
             }
@@ -323,6 +369,12 @@ impl AlterObjSubCommand {
                     context.report_problem(AnalysisProblem::index_not_found(&index_name))?;
                 }
                 Self::ClusterOn(cmd.get_name())
+            }
+            AlterTableType::AtAddColumn => {
+                todo!()
+            }
+            AlterTableType::AtDropColumn => {
+                todo!()
             }
 
             _ => todo!("{subtyp:?}"),

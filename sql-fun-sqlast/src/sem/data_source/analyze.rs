@@ -206,6 +206,7 @@ mod test_analyze_join_expr {
             &Some(ColumnName::from("id")),
             Some(&int4_type_ref),
             Some(true),
+            &[],
         )];
         test_context.setup_table("table1", &columns);
         test_context.setup_table("table2", &columns);

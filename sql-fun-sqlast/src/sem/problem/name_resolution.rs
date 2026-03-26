@@ -121,6 +121,9 @@ pub enum NameResolution {
     /// column not found in table
     ColumnNotFoundInTable(TableName, ColumnName),
 
+    /// column already exists in table
+    ColumnAlreadyExists(TableName, ColumnName),
+
     /// column not found in CTE
     ColumnNotFoundInCte(CteName, ColumnName),
 
@@ -145,6 +148,9 @@ pub enum NameResolution {
     /// table .0 not found in current context
     RelationNotFound(String),
 
+    /// relation already exists in current context
+    RelationAlreadyExists(String),
+
     /// view not found
     ViewNotFound(ViewName),
 
@@ -159,6 +165,9 @@ pub enum NameResolution {
 
     /// composite type field not found
     CompositeTypeFieldNotFound(TypeReference, String),
+
+    /// collation not found
+    CollationNotFound(String),
 }
 
 impl NameResolution {
@@ -227,6 +236,12 @@ impl NameResolution {
         Self::RelationNotFound(table_name.to_string())
     }
 
+    /// specified relation already exists
+    #[tracing::instrument()]
+    pub fn relation_already_exists(table_name: &TableName) -> Self {
+        Self::RelationAlreadyExists(table_name.to_string())
+    }
+
     /// calling function not found
     pub fn function_not_found(func_name: &FullName, func_span: &StringSpan) -> Self {
         Self::FunctionNotFound(FunctionNotFound::new(func_name, func_span))
@@ -250,6 +265,16 @@ impl NameResolution {
     /// alias name undefined
     pub fn undefined_alias(alias_name: &str) -> Self {
         Self::UndefinedAlias(alias_name.to_owned())
+    }
+
+    /// column already exists in table
+    pub fn column_already_exists(table_name: &TableName, col_name: &ColumnName) -> Self {
+        Self::ColumnAlreadyExists(table_name.clone(), col_name.clone())
+    }
+
+    /// collation name not found
+    pub fn collation_not_found(collation_name: &str) -> Self {
+        Self::CollationNotFound(String::from(collation_name))
     }
 }
 
@@ -327,6 +352,12 @@ impl AnalysisProblem {
         Self::NameResolution(NameResolution::relation_not_found(table_name))
     }
 
+    /// specified relation already exists
+    #[tracing::instrument()]
+    pub fn relation_already_exists(table_name: &TableName) -> Self {
+        Self::NameResolution(NameResolution::relation_already_exists(table_name))
+    }
+
     /// calling function not found
     #[track_caller]
     #[tracing::instrument()]
@@ -353,9 +384,20 @@ impl AnalysisProblem {
         ))
     }
 
+    /// column already exists in table
+    #[tracing::instrument()]
+    pub fn column_already_exists(table_name: &TableName, col_name: &ColumnName) -> Self {
+        Self::NameResolution(NameResolution::column_already_exists(table_name, col_name))
+    }
+
     /// undefined alias
     #[must_use]
     pub fn undefined_alias(alias_name: String) -> Self {
         Self::NameResolution(NameResolution::undefined_alias(&alias_name))
+    }
+
+    /// collation name not found
+    pub fn collation_name_not_found(collation_name: &str) -> Self {
+        Self::NameResolution(NameResolution::collation_not_found(collation_name))
     }
 }

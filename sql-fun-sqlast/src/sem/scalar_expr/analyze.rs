@@ -1,5 +1,7 @@
 use sql_fun_core::IVec;
 
+#[cfg(feature = "sqlite")]
+use crate::SqliteToken;
 use crate::{
     sem::{
         AnalysisError, ArithExpr, ArrayExpr, BooleanExpr, CaseExpr, CoalesceExpr, CollateExpr,
@@ -10,6 +12,52 @@ use crate::{
     },
     syn::{Opt, ScanToken},
 };
+
+#[cfg(feature = "sqlite")]
+use super::boolean::{BooleanExprBody, NullTestType};
+
+#[cfg(feature = "sqlite")]
+fn unsupported_sqlite_expr(kind: &str) -> SemScalarExpr {
+    SemScalarExpr::Unexpected(format!("sqlite expr not yet supported: {kind}"))
+}
+
+#[cfg(feature = "sqlite")]
+fn normalize_sqlite_string_literal(value: &str) -> String {
+    if value.len() >= 2 && value.starts_with('\'') && value.ends_with('\'') {
+        value[1..value.len() - 1].replace("''", "'")
+    } else {
+        String::from(value)
+    }
+}
+
+#[cfg(feature = "sqlite")]
+fn analyze_sqlite_literal(literal: &crate::syn::sqlite::Literal) -> SemScalarExpr {
+    use crate::syn::sqlite::Literal;
+
+    match literal {
+        Literal::Numeric(value) => {
+            if let Ok(integer) = value.value_text().parse::<i32>() {
+                SemScalarExpr::Const(ScalarConstExpr::Integer(integer))
+            } else {
+                SemScalarExpr::Const(ScalarConstExpr::Float(String::from(value.value_text())))
+            }
+        }
+        Literal::String(value) => SemScalarExpr::Const(ScalarConstExpr::String(
+            normalize_sqlite_string_literal(value.value()),
+        )),
+        Literal::Null(_) => ScalarConstExpr::null(),
+        Literal::True(value) | Literal::False(value) => {
+            SemScalarExpr::Const(ScalarConstExpr::Bool(value.value()))
+        }
+        Literal::CurrentDate(_) => SemScalarExpr::SqlValue(SqlValueExpr::CurrentDate),
+        Literal::CurrentTime(_) => SemScalarExpr::SqlValue(SqlValueExpr::CurrentTime(None)),
+        Literal::CurrentTimestamp(_) => {
+            SemScalarExpr::SqlValue(SqlValueExpr::CurrentTimestamp(None))
+        }
+        Literal::Blob(_) => unsupported_sqlite_expr("blob literal"),
+        Literal::Keyword(_) => unsupported_sqlite_expr("keyword literal"),
+    }
+}
 
 impl SemScalarExpr {
     /// analyze [`crate::syn::Node`] as scaler expression
@@ -67,6 +115,155 @@ impl SemScalarExpr {
                 "analyze_scaler_expr unexpected node :{syn:?} "
             ))
         }
+    }
+
+    /// analyze sqlite expression
+    #[cfg(feature = "sqlite")]
+    pub fn analyze_sqlite_scaler_expr<TParseContext>(
+        mut context: TParseContext,
+        with_clause: &WithClause,
+        from_clause: &FromClause,
+        syn: &crate::syn::sqlite::Expr,
+        tokens: &IVec<SqliteToken<'_>>,
+    ) -> Result<(SemScalarExpr, TParseContext), AnalysisError>
+    where
+        TParseContext: ParseContext,
+    {
+        use crate::syn::sqlite::{Expr, Operator, UnaryOperator};
+
+        let expr = match syn {
+            Expr::Literal(literal) => analyze_sqlite_literal(literal),
+            Expr::Parenthesized(parenthesized) => {
+                if let [expr] = parenthesized.expr() {
+                    let (expr, new_context) = Self::analyze_sqlite_scaler_expr(
+                        context,
+                        with_clause,
+                        from_clause,
+                        expr,
+                        tokens,
+                    )?;
+                    context = new_context;
+                    expr
+                } else {
+                    unsupported_sqlite_expr("row-value expr")
+                }
+            }
+            Expr::Unary(expr_unary) => {
+                let (expr, new_context) = Self::analyze_sqlite_scaler_expr(
+                    context,
+                    with_clause,
+                    from_clause,
+                    expr_unary.expr(),
+                    tokens,
+                )?;
+                context = new_context;
+
+                match expr_unary.unary_operator() {
+                    UnaryOperator::Positive => expr,
+                    UnaryOperator::Negative => match expr {
+                        SemScalarExpr::Const(ScalarConstExpr::Integer(value)) => {
+                            SemScalarExpr::Const(ScalarConstExpr::Integer(-value))
+                        }
+                        SemScalarExpr::Const(ScalarConstExpr::Float(value)) => {
+                            SemScalarExpr::Const(ScalarConstExpr::Float(format!("-{value}")))
+                        }
+                        _ => unsupported_sqlite_expr("unary negative expr"),
+                    },
+                    UnaryOperator::Not => {
+                        SemScalarExpr::Boolean(BooleanExpr::new(BooleanExprBody::not(&expr)))
+                    }
+                    UnaryOperator::BitwiseNot => unsupported_sqlite_expr("bitwise not expr"),
+                }
+            }
+            Expr::IsNull(expr_is_null) => {
+                let (expr, new_context) = Self::analyze_sqlite_scaler_expr(
+                    context,
+                    with_clause,
+                    from_clause,
+                    expr_is_null.expr(),
+                    tokens,
+                )?;
+                context = new_context;
+                SemScalarExpr::NullTest(NullTestExpr::new(NullTestType::IsNull, expr))
+            }
+            Expr::NotNull(expr_not_null) => {
+                let (expr, new_context) = Self::analyze_sqlite_scaler_expr(
+                    context,
+                    with_clause,
+                    from_clause,
+                    expr_not_null.expr(),
+                    tokens,
+                )?;
+                context = new_context;
+                SemScalarExpr::NullTest(NullTestExpr::new(NullTestType::IsNotNull, expr))
+            }
+            Expr::Binary(expr_binary) => {
+                let (left, new_context) = Self::analyze_sqlite_scaler_expr(
+                    context,
+                    with_clause,
+                    from_clause,
+                    expr_binary.left(),
+                    tokens,
+                )?;
+                context = new_context;
+                let (right, new_context) = Self::analyze_sqlite_scaler_expr(
+                    context,
+                    with_clause,
+                    from_clause,
+                    expr_binary.right(),
+                    tokens,
+                )?;
+                context = new_context;
+
+                match expr_binary.operator() {
+                    Operator::And => {
+                        SemScalarExpr::Boolean(BooleanExpr::new(BooleanExprBody::and(&[
+                            left, right,
+                        ])))
+                    }
+                    Operator::Or => {
+                        SemScalarExpr::Boolean(BooleanExpr::new(BooleanExprBody::or(&[
+                            left, right,
+                        ])))
+                    }
+                    _ => unsupported_sqlite_expr("binary expr"),
+                }
+            }
+            Expr::Collate(expr_collate) => {
+                let (expr, new_context) = Self::analyze_sqlite_scaler_expr(
+                    context,
+                    with_clause,
+                    from_clause,
+                    expr_collate.expr(),
+                    tokens,
+                )?;
+                context = new_context;
+                expr
+            }
+            Expr::Between(_) => unsupported_sqlite_expr("between expr"),
+            Expr::Register(_) => unsupported_sqlite_expr("register expr"),
+            Expr::Case(_) => unsupported_sqlite_expr("case expr"),
+            Expr::Cast(_) => unsupported_sqlite_expr("cast expr"),
+            Expr::DoublyQualified(_) => unsupported_sqlite_expr("doubly qualified expr"),
+            Expr::Exists(_) => unsupported_sqlite_expr("exists expr"),
+            Expr::FunctionCall(_) => unsupported_sqlite_expr("function call expr"),
+            Expr::FunctionCallStar(_) => unsupported_sqlite_expr("function call star expr"),
+            Expr::Id(_) => unsupported_sqlite_expr("id expr"),
+            Expr::Column(_) => unsupported_sqlite_expr("column expr"),
+            Expr::RowId(_) => unsupported_sqlite_expr("rowid expr"),
+            Expr::InList(_) => unsupported_sqlite_expr("in-list expr"),
+            Expr::InSelect(_) => unsupported_sqlite_expr("in-select expr"),
+            Expr::InTable(_) => unsupported_sqlite_expr("in-table expr"),
+            Expr::Like(_) => unsupported_sqlite_expr("like expr"),
+            Expr::Name(_) => unsupported_sqlite_expr("name expr"),
+            Expr::Qualified(_) => unsupported_sqlite_expr("qualified expr"),
+            Expr::Raise(_) => unsupported_sqlite_expr("raise expr"),
+            Expr::Subquery(_) => unsupported_sqlite_expr("subquery expr"),
+            Expr::Variable(_) => unsupported_sqlite_expr("variable expr"),
+            Expr::SubqueryResult(_) => unsupported_sqlite_expr("subquery result expr"),
+        };
+
+        Ok((expr, context))
     }
 }
 

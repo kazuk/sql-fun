@@ -42,6 +42,11 @@ mod view_like;
 
 pub mod problem;
 
+#[cfg(feature = "sqlite")]
+use sql_fun_core::IVec;
+#[cfg(feature = "sqlite")]
+use turso_parser::ast::Cmd;
+
 #[expect(deprecated)]
 pub use self::{
     alter_owner::AlterOwner,
@@ -104,6 +109,8 @@ pub use self::{
 };
 
 pub use crate::AstAndContextPair;
+#[cfg(feature = "sqlite")]
+use crate::{SqliteToken, syn::sqlite::Stmt};
 
 use crate::StringSpan;
 
@@ -270,6 +277,72 @@ impl SemAst {
         match self {
             Self::SelectStatement(select_statement) => Some(select_statement),
             _ => None,
+        }
+    }
+
+    /// analyze [`Cmd`]
+    #[cfg(feature = "sqlite")]
+    pub fn semantic_analysis_sqlite<TContext>(
+        context: TContext,
+        syn: Cmd,
+        tokens: &IVec<SqliteToken<'_>>,
+    ) -> Result<AstAndContextPair<TContext>, AnalysisError>
+    where
+        TContext: ParseContext,
+    {
+        match syn {
+            Cmd::Explain(stmt) => {
+                Self::semantic_analysis_sqlite_stmt(context, Stmt::from(stmt), tokens)
+            }
+            Cmd::ExplainQueryPlan(stmt) => {
+                Self::semantic_analysis_sqlite_stmt(context, Stmt::from(stmt), tokens)
+            }
+            Cmd::Stmt(stmt) => {
+                Self::semantic_analysis_sqlite_stmt(context, Stmt::from(stmt), tokens)
+            }
+        }
+    }
+
+    /// analyze [`Stmt`]
+    #[cfg(feature = "sqlite")]
+    pub fn semantic_analysis_sqlite_stmt<TContext>(
+        _context: TContext,
+        syn: Stmt,
+        _tokens: &IVec<SqliteToken<'_>>,
+    ) -> Result<AstAndContextPair<TContext>, AnalysisError>
+    where
+        TContext: ParseContext,
+    {
+        match syn {
+            Stmt::AlterTable(_alter_table) => todo!(),
+            Stmt::Analyze(_analyze_statement) => todo!(),
+            Stmt::Attach(_attach_statement) => todo!(),
+            Stmt::Detach(_detach_statement) => todo!(),
+            Stmt::Vacuum(_vacuum_statement) => todo!(),
+            Stmt::Begin(_begin_statement) => todo!(),
+            Stmt::Commit(_commit_statement) => todo!(),
+            Stmt::Release(_release_statement) => todo!(),
+            Stmt::Rollback(_rollback_statement) => todo!(),
+            Stmt::Savepoint(_savepoint_statement) => todo!(),
+            Stmt::CreateIndex(_create_index_statement) => todo!(),
+            Stmt::DropIndex(_drop_index_statement) => todo!(),
+            Stmt::Reindex(_reindex_statement) => todo!(),
+            Stmt::Optimize(_optimize_statement) => todo!(),
+            Stmt::CreateTable(_create_table_statement) => todo!(),
+            Stmt::CreateVirtualTable(_create_virtual_table) => todo!(),
+            Stmt::DropTable(_drop_table_statement) => todo!(),
+            Stmt::CreateTrigger(_create_trigger_statement) => todo!(),
+            Stmt::DropTrigger(_drop_trigger_statement) => todo!(),
+            Stmt::CreateView(_create_view) => todo!(),
+            Stmt::CreateMaterializedView(_create_materialized_view) => todo!(),
+            Stmt::DropView(_drop_view) => todo!(),
+            Stmt::CreateType(_create_type_statement) => todo!(),
+            Stmt::DropType(_drop_type_statement) => todo!(),
+            Stmt::Select(_select) => todo!(),
+            Stmt::Update(_update) => todo!(),
+            Stmt::Delete(_delete_statement) => todo!(),
+            Stmt::Insert(_insert_statement) => todo!(),
+            Stmt::Pragma(_pragma_statement) => todo!(),
         }
     }
 }

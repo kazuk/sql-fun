@@ -1,5 +1,8 @@
 use std::fmt::Display;
 
+#[cfg(feature = "sqlite")]
+use crate::sem::AnalysisError;
+
 /// part of name specifies schema
 #[derive(Debug, Clone, Eq, PartialEq, Hash, serde::Serialize, serde::Deserialize)]
 #[serde(transparent)]
@@ -28,5 +31,14 @@ impl SchemaName {
 impl Display for SchemaName {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         write!(f, "{}", self.0)
+    }
+}
+
+#[cfg(feature = "sqlite")]
+impl TryFrom<&crate::syn::sqlite::Name> for SchemaName {
+    type Error = AnalysisError;
+
+    fn try_from(value: &crate::syn::sqlite::Name) -> Result<Self, Self::Error> {
+        Ok(Self::from(value.value()))
     }
 }

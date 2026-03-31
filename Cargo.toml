@@ -67,7 +67,7 @@ async-trait = "0.1.89"
 backtrace-on-stack-overflow = "0.3"
 bollard = "0.20"
 chumsky = "0.12"
-clap = { version = "4.5", features = ["derive", "env"] }
+clap = { version = "4.6", features = ["derive", "env"] }
 combine = "4.6"
 compact_str = "0.9"
 convert_case = "0.11"

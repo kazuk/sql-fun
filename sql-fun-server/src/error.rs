@@ -54,15 +54,15 @@ impl SqlFunServerError {
 impl From<SqlFunServerError> for SqlFunServerApiError {
     fn from(value: SqlFunServerError) -> Self {
         if value.is_unexpected() {
-            SqlFunServerApiError::new_unexpected(&value.to_string())
+            Self::new_unexpected(&value.to_string())
         } else if value.is_context_initialize() {
-            SqlFunServerApiError::new_schema_context_initialize_failed(value)
+            Self::new_schema_context_initialize_failed(value)
         } else {
             #[cfg(test)]
             panic!("unknown error {value} no mapping defined");
 
             #[cfg(not(test))]
-            SqlFunServerApiError::new_unexpected("unknown error")
+            Self::new_unexpected("unknown error")
         }
     }
 }

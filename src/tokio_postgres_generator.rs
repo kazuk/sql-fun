@@ -35,7 +35,7 @@ fn extract_placeholders(sql_str: &str) -> (Vec<String>, String) {
 
     let mut start = 0;
     while let Some((placeholder, remains)) = sql_str[start..].find("${").map(|start| {
-        let end = sql_str[start..].find("}").map(|end| start + end).unwrap();
+        let end = sql_str[start..].find('}').map(|end| start + end).unwrap();
         (&sql_str[start + 2..end], end + 1)
     }) {
         if !placeholder_names.contains(&placeholder.to_string()) {
@@ -73,7 +73,7 @@ fn validate_function_arguments(
                 }
             }
         }
-        _ => {
+        syn::FnArg::Receiver(_) => {
             return Err(SqlFunError::custom(
                 "client argument must be a typed argument",
             ));
@@ -81,7 +81,7 @@ fn validate_function_arguments(
     };
     for name in placeholders {
         let mut found = false;
-        for arg in function_ast.sig.inputs.iter() {
+        for arg in &function_ast.sig.inputs {
             if let syn::FnArg::Typed(pat_type) = arg {
                 let pat = pat_type.pat.as_ref();
                 if let syn::Pat::Ident(ident) = pat

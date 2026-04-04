@@ -1,5 +1,6 @@
 #![doc = include_str!("syn.md")]
 
+#[expect(clippy::use_self)]
 mod generated;
 mod syn_ext;
 

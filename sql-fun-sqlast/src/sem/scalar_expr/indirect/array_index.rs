@@ -73,7 +73,7 @@ impl ArrayIndex {
         let (rexpr, new_context) =
             analyze_scaler_expr(context, with_clause, from_clause, uidx, tokens)?;
         context = new_context;
-        let arg = ArrayIndex::array_index(arg, rexpr, &mut context)?;
+        let arg = Self::array_index(arg, rexpr, &mut context)?;
         Ok((arg, context))
     }
 }

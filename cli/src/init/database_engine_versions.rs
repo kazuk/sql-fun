@@ -13,9 +13,9 @@ pub enum PostgresVersions {
 impl std::fmt::Display for PostgresVersions {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         match self {
-            PostgresVersions::Postgres16 => write!(f, "PostgreSQL Version 16"),
-            PostgresVersions::Postgres17 => write!(f, "PostgreSQL Version 17"),
-            PostgresVersions::Postgres18 => write!(f, "PostgreSQL Version 18"),
+            Self::Postgres16 => write!(f, "PostgreSQL Version 16"),
+            Self::Postgres17 => write!(f, "PostgreSQL Version 17"),
+            Self::Postgres18 => write!(f, "PostgreSQL Version 18"),
         }
     }
 }

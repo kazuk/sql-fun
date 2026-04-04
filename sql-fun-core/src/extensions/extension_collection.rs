@@ -56,7 +56,7 @@ impl TryFrom<String> for PostgresExtensionsCollection {
     type Error = PostgresExtensionsParseError;
 
     fn try_from(value: String) -> Result<Self, Self::Error> {
-        PostgresExtensionsCollection::from_str(&value)
+        Self::from_str(&value)
     }
 }
 

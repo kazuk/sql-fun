@@ -69,7 +69,7 @@ impl MemberRef {
         } else {
             None
         };
-        Ok(IndirectionExpr::MemberRef(Box::new(MemberRef::new(
+        Ok(IndirectionExpr::MemberRef(Box::new(Self::new(
             source,
             member,
             member_type,

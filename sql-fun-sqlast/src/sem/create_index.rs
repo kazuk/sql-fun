@@ -254,7 +254,7 @@ impl CreateIndex {
                 IndexElement::from(&ColumnName::from(name))
             };
 
-            let order = CreateIndex::sort_order(&key)?;
+            let order = Self::sort_order(&key)?;
             let col_name = key.get_indexcolname();
             let col_name = if col_name.is_empty() {
                 None

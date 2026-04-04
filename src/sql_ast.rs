@@ -1,3 +1,5 @@
+use std::clone::Clone;
+
 use pg_query::{
     Node, NodeEnum, NodeRef,
     protobuf::{ColumnRef, ResTarget},
@@ -6,21 +8,21 @@ use pg_query::{
 use crate::errors::SqlFunError;
 
 fn get_res_target_column_name(res_target: &ResTarget) -> Option<String> {
-    if !res_target.name.is_empty() {
-        Some(res_target.name.clone())
-    } else {
+    if res_target.name.is_empty() {
         let column_ref = get_column_ref_from_res_target(res_target)?;
         let last_field = column_ref.fields.last().map(|v| &v.node)?;
         let NodeEnum::String(string) = last_field.as_ref()? else {
             return None;
         };
         Some(string.sval.clone())
+    } else {
+        Some(res_target.name.clone())
     }
 }
 
 fn get_column_ref_from_res_target(res_target: &ResTarget) -> Option<ColumnRef> {
     let val = res_target.val.as_ref().map(|v| &v.node);
-    let Some(NodeEnum::ColumnRef(column_ref)) = val.and_then(|v| v.clone()) else {
+    let Some(NodeEnum::ColumnRef(column_ref)) = val.and_then(Clone::clone) else {
         return None;
     };
     Some(column_ref)
@@ -41,7 +43,7 @@ pub fn node_list_to_res_target_list(node_list: &Vec<Node>) -> Vec<ResTarget> {
     res_target_list
 }
 
-pub fn get_returning_res_target(sql_ast: &NodeRef) -> Vec<ResTarget> {
+pub fn get_returning_res_target(sql_ast: &NodeRef<'_>) -> Vec<ResTarget> {
     match sql_ast {
         NodeRef::SelectStmt(select_stmt) => {
             node_list_to_res_target_list(select_stmt.target_list.as_ref())
@@ -59,7 +61,7 @@ pub fn get_returning_res_target(sql_ast: &NodeRef) -> Vec<ResTarget> {
     }
 }
 
-pub fn get_result_columns(sql_ast: &NodeRef) -> Result<Vec<String>, SqlFunError> {
+pub fn get_result_columns(sql_ast: &NodeRef<'_>) -> Result<Vec<String>, SqlFunError> {
     let res_targets = get_returning_res_target(sql_ast);
     let mut columns = Vec::new();
     for res_target in res_targets {

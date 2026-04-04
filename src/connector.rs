@@ -7,12 +7,12 @@ pub enum Connector {
 }
 
 impl Connector {
-    pub fn get_connector(metadata: &SqlFunMetadata) -> Result<Connector, SqlFunError> {
+    pub fn get_connector(metadata: &SqlFunMetadata) -> Result<Self, SqlFunError> {
         let Some(connector) = metadata.connector() else {
             Err(SqlFunError::custom("connector not defined"))?
         };
         if connector == "tokio-postgres" {
-            return Ok(Connector::TokioPostgres);
+            return Ok(Self::TokioPostgres);
         }
 
         Err(SqlFunError::custom("Unsupported database connector"))

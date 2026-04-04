@@ -216,13 +216,11 @@ where
             let Ok(find_alias_result) =
                 from_clause.find_alias_for_column(&column, &context, with_clause)
             else {
-                let scalar_expr =
-                    ColumnReferenceExpr::ambiguous_column_with_report(&mut context, &column)?;
+                let scalar_expr = Self::ambiguous_column_with_report(&mut context, &column)?;
                 return Ok((scalar_expr, context));
             };
             let Some(alias) = find_alias_result else {
-                let scalar_expr =
-                    ColumnReferenceExpr::undefined_column_with_report(&mut context, &column)?;
+                let scalar_expr = Self::undefined_column_with_report(&mut context, &column)?;
                 return Ok((scalar_expr, context));
             };
             Self::source_ref(context, with_clause, from_clause, alias.name(), &column)

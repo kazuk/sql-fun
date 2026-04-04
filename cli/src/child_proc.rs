@@ -67,7 +67,7 @@ impl ChildProcess {
         let stdout = LinesBufReader::new(stdout);
         let stderr = LinesBufReader::new(stderr);
 
-        Ok(ChildProcess {
+        Ok(Self {
             child,
             stdout,
             stderr,

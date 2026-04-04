@@ -69,13 +69,13 @@ pub enum FunctionParam {
 impl std::fmt::Display for FunctionParam {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         match self {
-            FunctionParam::In(function_param_in) => write!(f, "{function_param_in}"),
-            FunctionParam::Out(function_param_out) => write!(f, "{function_param_out}"),
-            FunctionParam::InOut(function_param_in_out) => write!(f, "{function_param_in_out}"),
-            FunctionParam::Variadic(function_param_variadic) => {
+            Self::In(function_param_in) => write!(f, "{function_param_in}"),
+            Self::Out(function_param_out) => write!(f, "{function_param_out}"),
+            Self::InOut(function_param_in_out) => write!(f, "{function_param_in_out}"),
+            Self::Variadic(function_param_variadic) => {
                 write!(f, "{function_param_variadic}")
             }
-            FunctionParam::Table(function_param_table) => write!(f, "{function_param_table}"),
+            Self::Table(function_param_table) => write!(f, "{function_param_table}"),
         }
     }
 }
@@ -129,8 +129,8 @@ impl FunctionParam {
     ) -> Result<Option<ColumnCollection>, AnalysisError> {
         let mut columns = Vec::new();
         for param in params {
-            if FunctionParam::is_output_param(param)? {
-                let value = FunctionParam::analyze_as_column_definition(param)?;
+            if Self::is_output_param(param)? {
+                let value = Self::analyze_as_column_definition(param)?;
                 columns.push(value);
             }
         }

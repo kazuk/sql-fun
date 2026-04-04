@@ -33,12 +33,12 @@ impl ValidOperatorName {
         if items.is_empty() || items.len() >= 2 {
             Err(ProblemLikeError::invalid_operator_name(items))?
         } else if items.len() == 1 {
-            Ok(Some(ValidOperatorName {
+            Ok(Some(Self {
                 schema_name: None,
                 op_name: items[0].clone(),
             }))
         } else {
-            Ok(Some(ValidOperatorName {
+            Ok(Some(Self {
                 schema_name: Some(SchemaName::from(items[0].as_str())),
                 op_name: items[1].clone(),
             }))

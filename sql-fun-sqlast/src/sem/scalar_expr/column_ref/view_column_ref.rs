@@ -81,7 +81,7 @@ impl ViewColumnRef {
         if column_def.is_none() {
             context.report_problem(AnalysisProblem::column_not_found_in_view(view_name, column))?;
         }
-        let col_ref = ViewColumnRef::new(alias, column, view_name, &column_def, nullability);
+        let col_ref = Self::new(alias, column, view_name, &column_def, nullability);
         Ok((
             SemScalarExpr::ColumnRef(ColumnReferenceExpr::ViewColumn(col_ref)),
             context,

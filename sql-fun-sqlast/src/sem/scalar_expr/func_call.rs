@@ -98,7 +98,7 @@ impl FuncCallExpr {
             .iter()
             .map(|a| FuncCallArgs::new(a, &None))
             .collect();
-        let fc = FuncCallExpr::new(&func_name, &None, &args);
+        let fc = Self::new(&func_name, &None, &args);
         Ok((SemScalarExpr::FuncCall(fc), context))
     }
 }
@@ -215,7 +215,7 @@ where
                     &arg_exprs.into(),
                     &overload,
                 )?;
-                let fc = FuncCallExpr::new(&func_name, &Some(overload.clone()), &args);
+                let fc = Self::new(&func_name, &Some(overload.clone()), &args);
                 Ok((SemScalarExpr::FuncCall(fc), context))
             } else {
                 context.report_problem(AnalysisProblem::function_overload_resolution_failed(

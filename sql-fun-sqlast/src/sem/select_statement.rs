@@ -19,11 +19,11 @@ pub enum SelectStatement {
     /// simple query
     Simple(SelectStatementNode),
     /// union
-    Union(Box<SelectStatement>, Box<SelectStatement>),
+    Union(Box<Self>, Box<Self>),
     /// intersect
-    Intersect(Box<SelectStatement>, Box<SelectStatement>),
+    Intersect(Box<Self>, Box<Self>),
     /// except
-    Except(Box<SelectStatement>, Box<SelectStatement>),
+    Except(Box<Self>, Box<Self>),
 }
 
 impl SelectStatement {
@@ -35,19 +35,19 @@ impl SelectStatement {
 
     /// create a union node
     #[must_use]
-    pub fn union(left: SelectStatement, right: SelectStatement) -> Self {
+    pub fn union(left: Self, right: Self) -> Self {
         Self::Union(Box::new(left), Box::new(right))
     }
 
     /// create a intersect node
     #[must_use]
-    pub fn intersect(left: SelectStatement, right: SelectStatement) -> Self {
+    pub fn intersect(left: Self, right: Self) -> Self {
         Self::Intersect(Box::new(left), Box::new(right))
     }
 
     /// create except node
     #[must_use]
-    pub fn except(left: SelectStatement, right: SelectStatement) -> Self {
+    pub fn except(left: Self, right: Self) -> Self {
         Self::Except(Box::new(left), Box::new(right))
     }
 

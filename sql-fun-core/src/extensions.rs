@@ -19,7 +19,7 @@ impl ExtensionVersion {
     /// create instance
     #[must_use]
     pub fn new(version: &str) -> Self {
-        ExtensionVersion(version.to_string())
+        Self(version.to_string())
     }
 }
 

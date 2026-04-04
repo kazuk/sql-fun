@@ -87,7 +87,7 @@ impl TypeDefinition {
 
     /// check type compatibility
     #[must_use]
-    pub fn compatible_with(&self, other: &TypeDefinition) -> bool {
+    pub fn compatible_with(&self, other: &Self) -> bool {
         if self.full_name() == other.full_name() {
             true
         } else {
@@ -120,17 +120,17 @@ impl TypeDefinition {
         TParseContext: ParseContext,
     {
         match self {
-            TypeDefinition::Enum(_create_enum) => todo!(),
-            TypeDefinition::CompositType(create_composit_type) => {
+            Self::Enum(_create_enum) => todo!(),
+            Self::CompositType(create_composit_type) => {
                 create_composit_type.get_member(member)?.get_type()
             }
-            TypeDefinition::Domain(_create_domain) => todo!(),
-            TypeDefinition::Builtin(_type_reference) => None,
-            TypeDefinition::TableRef(table_name, _type_reference) => context
+            Self::Domain(_create_domain) => todo!(),
+            Self::Builtin(_type_reference) => None,
+            Self::TableRef(table_name, _type_reference) => context
                 .get_table(table_name)?
                 .get_column_def(&ColumnName::from(member))?
                 .get_type(),
-            TypeDefinition::ImplicitComposite(cols) => {
+            Self::ImplicitComposite(cols) => {
                 let cd = cols.get_column_def(&ColumnName::from(member))?;
                 cd.get_type()
             }

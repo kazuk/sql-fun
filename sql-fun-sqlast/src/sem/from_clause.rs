@@ -24,14 +24,14 @@ impl FromClause {
         with_clause: &WithClause,
         syn: crate::syn::NodeListOpt,
         tokens: &IVec<ScanToken>,
-    ) -> Result<(FromClause, TParseContext), AnalysisError>
+    ) -> Result<(Self, TParseContext), AnalysisError>
     where
         TParseContext: ParseContext,
     {
         let Some(nodes) = syn.as_inner() else {
             AnalysisError::raise_unexpected_none("from_clause.as_inner")?
         };
-        let mut from_clause = FromClause::default();
+        let mut from_clause = Self::default();
         let mut existing_aliases = Vec::new();
 
         for node in nodes {

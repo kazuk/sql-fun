@@ -4,12 +4,14 @@ use std::{
     time::Duration,
 };
 
+use crate::CliSubCommand;
 use anyhow::Context;
-use sql_fun_core::{CliSubCommand, SqlFunArgs};
 use tokio::{
     io::{AsyncBufReadExt, AsyncRead, BufReader},
     process::{Child, Command},
 };
+
+use crate::SqlFunCliArgs;
 
 /// command output / error stream
 pub enum StdStream {
@@ -86,7 +88,7 @@ impl RunableCommand {
     /// # Errors
     ///
     /// Returns an error when spawning or waiting on the child process fails.
-    pub async fn execute(&self, args: &SqlFunArgs) -> Result<ExitCode, anyhow::Error> {
+    pub async fn execute(&self, args: &SqlFunCliArgs) -> Result<ExitCode, anyhow::Error> {
         match &self.sub_command {
             CliSubCommand::External(external_args) => {
                 let exit_code = self.run_external(args, external_args).await?;
@@ -97,16 +99,17 @@ impl RunableCommand {
             CliSubCommand::Status(_daemon_control_args) => todo!(),
             CliSubCommand::Restart(_daemon_control_args) => todo!(),
             CliSubCommand::Initialize(_initialize_args) => todo!(),
+            CliSubCommand::Check(_check_args) => todo!(),
             CliSubCommand::Versions => todo!(),
         }
     }
 
     async fn run_external(
         &self,
-        core_args: &SqlFunArgs,
+        core_args: &SqlFunCliArgs,
         args: &[String],
     ) -> Result<i32, anyhow::Error> {
-        let envs = core_args.environments()?;
+        let envs = core_args.common_args.environments()?;
         let mut child = Command::new(&self.binary)
             .env_clear()
             .envs(&envs)

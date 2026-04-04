@@ -48,12 +48,7 @@ mod test_metadata {
 
     #[test]
     pub fn test_metadata_format() -> TestResult {
-        let args = SqlFunArgs::try_parse_from(vec![
-            "sqlfun",
-            "--sql-fun-home",
-            "../sql-fun-home",
-            "subcmd",
-        ])?;
+        let args = SqlFunArgs::try_parse_from(vec!["sqlfun", "--sql-fun-home", "../sql-fun-home"])?;
         let metadata_format = args.metadata_format();
         assert_eq!(metadata_format, "TOML");
         Ok(())
@@ -61,12 +56,7 @@ mod test_metadata {
 
     #[test]
     pub fn test_metadata_file_raw() -> TestResult {
-        let args = SqlFunArgs::try_parse_from(vec![
-            "sqlfun",
-            "--sql-fun-home",
-            "../sql-fun-home",
-            "subcmd",
-        ])?;
+        let args = SqlFunArgs::try_parse_from(vec!["sqlfun", "--sql-fun-home", "../sql-fun-home"])?;
         let metadata_file_raw = args.metadata_file_raw()?;
         assert_eq!(metadata_file_raw, "Cargo.toml");
         Ok(())
@@ -74,12 +64,7 @@ mod test_metadata {
 
     #[test]
     pub fn test_metadata_file() -> TestResult {
-        let args = SqlFunArgs::try_parse_from(vec![
-            "sqlfun",
-            "--sql-fun-home",
-            "../sql-fun-home",
-            "subcmd",
-        ])?;
+        let args = SqlFunArgs::try_parse_from(vec!["sqlfun", "--sql-fun-home", "../sql-fun-home"])?;
         let metadata_file = args.metadata_file()?;
         assert_eq!(
             metadata_file.parent().unwrap().file_stem().unwrap(),
@@ -96,7 +81,6 @@ mod test_metadata {
             "../sql-fun-home",
             "--metadata-file",
             "test-assets/metadata.toml",
-            "subcmd",
         ])?;
         let metadata_file = args.metadata_file()?;
         let metadata = SqlFunMetadata::load_from(metadata_file)?;

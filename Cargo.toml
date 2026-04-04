@@ -28,6 +28,10 @@ members = [
     "xbuild",
 ]
 
+[workspace.package]
+repository = "https://github.com/kazuk/sql-fun/"
+keywords = ["PostgreSQL", "SQLite", "SQL", "Semantic validator", "Schema aware validator"]
+
 [workspace.metadata]
 baseline = "v0.1.0-baseline"
 
@@ -66,6 +70,7 @@ assert_matches = { version = "1" }
 async-trait = "0.1.89"
 backtrace-on-stack-overflow = "0.3"
 bollard = "0.20"
+cargo_metadata = "0.23.1"
 chumsky = "0.12"
 clap = { version = "4.6", features = ["derive", "env"] }
 combine = "4.6"
@@ -105,8 +110,9 @@ sql-fun-client = { path = "./sql-fun-client", version = "0.1.0" }
 sql-fun-core = { path = "./sql-fun-core", version = "0.1.1" }
 sql-fun-server-api = { path = "sql-fun-server-api", version = "0.1.0" }
 sql-fun-sqlast = { path = "./sql-fun-sqlast", version = "0.1.0", features = [] }
-syn = "2.0"
+syn = { version = "2.0", features = ["full", "visit"] }
 sysinfo = "0.38"
+tempfile = "3.27.0"
 testresult = "0.4"
 thiserror = "2.0"
 time = { version = "0.3.45", features = ["serde"] }

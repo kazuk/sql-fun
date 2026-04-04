@@ -1,20 +1,37 @@
 # Installation
 
+`sql-fun` supports `PostgreSQL`, `SQLite` and is designed to work with the `tokio-postgres` or `rusqlite` connector.
+
+ SQLite support needs feature flag `sqlite`
+
 `sql-fun` is a procedural macro crate. You can install it using `cargo add`:
 
 ```console
 cargo add sql-fun
+cargo install sql-fun-cli sql-fun-server
 ```
 
-`sql-fun` supports `PostgreSQL` and is designed to work with the `tokio-postgres` connector.
+```console
+cargo add sql-fun --features "sqlite"
+cargo install sql-fun-cli sql-fun-server --features "sqlite"
+```
+
+`sql-fun-cli` for CLI tool for `sql-fun`. `sql-fun-server` provides cache for schema objects.
 
 Specify this in your Cargo.toml as follows:
 
 ```toml
 [package.metadata.database]
-engine="postgres"
-connector = "tokio-postgres"
+default = {
+    engine="postgres",
+    connector = "tokio-postgres"
+}
 ```
+
+- `engine`: Can be "postgres" or "sqlite".
+- `connector`: specify database connector library.
+  - When `engine` is "postgres": Can be "tokio-postgres".
+  - When `engine` is "sqlite": Can be "rusqlite".
 
 If you're starting a new project, you may also need to install the required dependencies:
 

@@ -168,7 +168,6 @@ mod tests {
             "sql_fun.metadata.toml",
             "--sql-fun-home",
             env!("SQL_FUN_HOME"),
-            "subcmd",
         ])
         .unwrap()
     }

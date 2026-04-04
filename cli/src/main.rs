@@ -1,11 +1,11 @@
+use clap::Parser;
 use std::process::ExitCode;
 
-use sql_fun_cli::RunableCommand;
-use sql_fun_core::SqlFunArgs;
+use sql_fun_cli::{RunableCommand, SqlFunCliArgs};
 
 #[tokio::main]
 pub async fn main() -> Result<ExitCode, anyhow::Error> {
-    let args = SqlFunArgs::parse_args();
+    let args = SqlFunCliArgs::parse();
 
     let exit_code = if args.is_builtin() {
         sql_fun_cli::run_builtin(&args).await?

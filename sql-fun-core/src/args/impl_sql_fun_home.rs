@@ -26,12 +26,7 @@ mod test_sql_fun_home {
 
     #[test]
     pub fn test_home() -> TestResult {
-        let args = SqlFunArgs::try_parse_from(vec![
-            "sqlfun",
-            "--sql-fun-home",
-            "../sql-fun-home",
-            "subcmd",
-        ])?;
+        let args = SqlFunArgs::try_parse_from(vec!["sqlfun", "--sql-fun-home", "../sql-fun-home"])?;
         let home = args.sql_fun_home()?;
 
         assert!(home.is_absolute());

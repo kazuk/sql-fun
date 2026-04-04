@@ -15,8 +15,7 @@ use std::{fmt::Display, str::FromStr};
 
 pub use self::{
     args::{
-        CliSubCommand, DaemonControlArgs, InitializeArgs, SqlFunArgs, SqlFunArgsBuilder,
-        SqlFunArgsBuilderError, SqlFunArgsError,
+        InitializeArgs, SqlFunArgs, SqlFunArgsBuilder, SqlFunArgsBuilderError, SqlFunArgsError,
     },
     builtin::PostgresBuiltinPaths,
     coll::IVec,

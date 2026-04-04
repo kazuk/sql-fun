@@ -24,6 +24,7 @@ members = [
     "sql-fun-core",
     "sql-fun-server",
     "sql-fun-server-api",
+    "sql-fun-codegen",
     "sql-fun-sqlast",
     "xbuild",
 ]

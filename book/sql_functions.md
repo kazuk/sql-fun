@@ -2,6 +2,74 @@
 
 `sql-fun` code generators translates `SQL` into Rust function.
 
+## Attribute arguments
+
+Attribute arguments specifies SQL statement and datasource.
+
+- `sql`: SQL statement literal, conflicts with `sql_file`
+- `sql_file`: SQL statement from file, conflicts with `sql`
+  - SQL statement embedding in structured file
+    - When `sql_file` contains `#`, file can be JSON/TOML/YAML formatted structured file.
+    - After `#` for JSON-Path to SQL string.
+  - relative path from source file.
+- `datasource`: specify datasource name
+
+### Attribute argument examples
+
+Specify SQL statement in source file.
+
+```rust
+#[sql_fun::sql_query_many( sql="select id, name from users" )]
+```
+
+Specify SQL statement by separated file.
+
+```rust
+#[sel_fun::sql_query_one( sql_file = "select_user_by_id.sql" )]
+```
+
+```sql:select_user_by_id.sql
+select id, name from users where id = ${id}
+```
+
+Specify SQL statement by TOML.
+
+```rust
+#[sql_fun::sql_query_one( sql_file = "queries.toml#$.select_user_by_id" )]
+```
+
+```toml:queries.toml
+select_user_by_id = """
+  select id, name from users where id=${id}
+"""
+```
+
+`datasource` specify a database schema.
+
+```toml:Cargo.toml
+[package.metadata.database]
+default = {
+　　engine="postgres",
+  connector="tokio_postgres"
+}
+edge = {
+  engine="sqlite"
+  connector="rusqlite"
+}
+```
+
+```rust
+// query from default
+#[sql_fun::sql_query_many( sql="select id, name from users" )]
+...
+
+// query from edge
+#[sql_fun::sql_query_many( 
+    datasource="edge",
+    sql="select id, name from products" )]
+...
+```
+
 
 ## Function signiture requirements
 
@@ -195,7 +263,7 @@ These names also appear as query identifiers in the generated `sql-fun.{schema}.
 ### Conditional SQL Example:
 
 ```rust
-#[sql_fun::sql_query_many("select id, name from users #{where_clause}")]
+#[sql_fun::sql_query_many(sql = "select id, name from users #{where_clause}")]
 #[sql_fragment(
     where_clause,
     name,
@@ -239,7 +307,7 @@ This expansion is recursive — each case is its own `sql_query_many`.
 You can also match on a tuple:
 
 ```rust
-#[sql_fun::sql_query_many("select id, name from users #{where_clause}")]
+#[sql_fun::sql_query_many( sql= "select id, name from users #{where_clause}")]
 #[sql_fragment(
     where_clause,
     (name, age_min, age_max),
@@ -647,4 +715,3 @@ It parses SQL, binds it to Rust function signatures, and lets one query
 reuse another as a CTE in a safe, structured way. Everything that happens
 *inside* a result set — aggregation, object mapping, domain modeling —
 is intentionally left to user code or external libraries.
-

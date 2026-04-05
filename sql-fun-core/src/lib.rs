@@ -10,6 +10,9 @@ mod coll;
 mod extensions;
 mod highlighter;
 mod metadata;
+#[cfg(test)]
+/// Shared helpers for crate unit tests.
+pub mod test_helpers;
 
 use std::{fmt::Display, str::FromStr};
 

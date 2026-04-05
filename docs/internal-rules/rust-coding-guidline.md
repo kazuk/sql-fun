@@ -73,6 +73,12 @@ use ::url::Url;
 
 - Place tests **immediately after the implementation block or function they cover**.  
   Co-locating tests with the code they verify reduces the risk of tests being orphaned or forgotten when modules are split or reorganized. Keep the test module focused on the nearby implementation; broader integration tests belong in dedicated test modules/files.
+- Test code SHOULD stay at roughly the same abstraction level as the behavior under test.  
+  If a unit test needs repeated low-level setup such as writing fixture files, assembling TOML strings, or enumerating environment variables, move that setup behind domain-oriented helpers in a `test_helpers` module.
+- Repeated setup in tests MUST be expressed in terms of the test's intent, not the storage or transport details.  
+  Prefer helpers such as `write_metadata_project(...)` or `TestMetadataEnvs` over open-coded `write_file`, raw `HashMap` assembly, or large inline fixture literals at each call site.
+- When a test reads like filesystem choreography or key-value plumbing instead of a specification of behavior, treat that as a design smell in the test code.  
+  Raise the abstraction in `test_helpers` until the test body primarily communicates the scenario, action, and assertion.
 
 ```rust
 impl Foo {
@@ -87,6 +93,25 @@ mod test_foo_new {
     fn constructs_foo_with_value() {
         let foo = super::Foo::new(10);
         assert_eq!(10, foo.value);
+    }
+}
+```
+
+```rust
+#[cfg(test)]
+mod test_metadata_args {
+    use crate::test_helpers::{TestMetadataEnvs, write_metadata_project_with_cte};
+
+    #[test]
+    fn applies_metadata_related_environment_values() {
+        let fixture = write_metadata_project_with_cte(&project_dir, "fixture", "qa", "cte")
+            .expect("metadata fixture");
+        let envs = TestMetadataEnvs::new()
+            .with_metadata_project_with_cte(&fixture, "qa")
+            .with_sql_dialect("postgresql")
+            .into_map();
+
+        // test body now describes behavior instead of setup mechanics
     }
 }
 ```

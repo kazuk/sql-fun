@@ -81,7 +81,7 @@ impl AlterTable {
         };
         match obj_type {
             ObjectType::ObjectTable => {
-                AlterTable::analyze_alter_table_statement(context, parent_schema, syn, tokens)
+                Self::analyze_alter_table_statement(context, parent_schema, syn, tokens)
             }
             ObjectType::ObjectView => {
                 AlterView::analyze_alter_view_statement(context, parent_schema, false, syn)
@@ -238,7 +238,7 @@ impl AlterObjSubCommand {
         mut context: TParseContext,
         cmd: crate::syn::AlterTableCmd,
         tokens: &IVec<ScanToken>,
-    ) -> Result<(AlterObjSubCommand, TParseContext), AnalysisError>
+    ) -> Result<(Self, TParseContext), AnalysisError>
     where
         TParseContext: ParseContext,
     {
@@ -256,10 +256,7 @@ impl AlterObjSubCommand {
 
         // FIXME: check table, column existing
 
-        Ok((
-            AlterObjSubCommand::SetColumnDefault(column_name, Box::new(expr)),
-            context,
-        ))
+        Ok((Self::SetColumnDefault(column_name, Box::new(expr)), context))
     }
 }
 
@@ -305,7 +302,7 @@ impl AlterObjSubCommand {
         cmd: crate::syn::AlterTableCmd,
         subtyp: AlterTableType,
         tokens: &IVec<ScanToken>,
-    ) -> Result<(AlterObjSubCommand, TParseContext), AnalysisError>
+    ) -> Result<(Self, TParseContext), AnalysisError>
     where
         TParseContext: ParseContext,
     {
@@ -313,7 +310,7 @@ impl AlterObjSubCommand {
             AlterTableType::AtChangeOwner => analyze_alter_obj_change_owner(&context, cmd)?,
             AlterTableType::AtColumnDefault => {
                 let (column_default, new_context) =
-                    AlterObjSubCommand::analyze_alter_obj_column_default(context, cmd, tokens)?;
+                    Self::analyze_alter_obj_column_default(context, cmd, tokens)?;
                 context = new_context;
                 column_default
             }
@@ -325,7 +322,7 @@ impl AlterObjSubCommand {
                 if context.get_index(&index_name).is_none() {
                     context.report_problem(AnalysisProblem::index_not_found(&index_name))?;
                 }
-                AlterObjSubCommand::ClusterOn(cmd.get_name())
+                Self::ClusterOn(cmd.get_name())
             }
 
             _ => todo!("{subtyp:?}"),

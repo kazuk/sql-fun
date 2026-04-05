@@ -132,7 +132,7 @@ impl CreateFunction {
             false,
         );
 
-        let func = CreateFunction::new(
+        let func = Self::new(
             &name,
             &FunctionOverloadCollection::new(&[overload_variant]),
             &returning_col_def,

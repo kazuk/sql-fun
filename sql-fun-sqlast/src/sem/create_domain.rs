@@ -45,7 +45,7 @@ impl CreateDomain {
 
         let create_domain =
             if let Some(base_type) = context.get_type(&FullName::try_from(base.clone())?) {
-                CreateDomain {
+                Self {
                     type_ref: TypeReference::from_full_name(name),
                     base_type: base_type.full_name().cloned(),
                 }
@@ -53,7 +53,7 @@ impl CreateDomain {
                 context.report_problem(AnalysisProblem::domain_type_name_not_found(
                     &name, &base, &base_span,
                 ))?;
-                CreateDomain {
+                Self {
                     type_ref: TypeReference::from_full_name(name),
                     base_type: None,
                 }

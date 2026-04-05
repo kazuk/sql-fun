@@ -104,7 +104,7 @@ impl SelectStatement {
     {
         let (larg, rarg, context) = Self::analyze_setop_select(context, syn, tokens)?;
         Ok(AstAndContextPair::new(
-            SemAst::SelectStatement(SelectStatement::union(larg, rarg)),
+            SemAst::SelectStatement(Self::union(larg, rarg)),
             context,
         ))
     }
@@ -119,7 +119,7 @@ impl SelectStatement {
     {
         let (larg, rarg, context) = Self::analyze_setop_select(context, syn, tokens)?;
         Ok(AstAndContextPair::new(
-            SemAst::SelectStatement(SelectStatement::intersect(larg, rarg)),
+            SemAst::SelectStatement(Self::intersect(larg, rarg)),
             context,
         ))
     }
@@ -134,7 +134,7 @@ impl SelectStatement {
     {
         let (larg, rarg, context) = Self::analyze_setop_select(context, syn, tokens)?;
         Ok(AstAndContextPair::new(
-            SemAst::SelectStatement(SelectStatement::except(larg, rarg)),
+            SemAst::SelectStatement(Self::except(larg, rarg)),
             context,
         ))
     }
@@ -143,7 +143,7 @@ impl SelectStatement {
         context: TParseContext,
         syn: &crate::syn::SelectStmt,
         tokens: &IVec<ScanToken>,
-    ) -> Result<(SelectStatement, SelectStatement, TParseContext), AnalysisError>
+    ) -> Result<(Self, Self, TParseContext), AnalysisError>
     where
         TParseContext: ParseContext,
     {
@@ -180,15 +180,9 @@ impl SelectStatement {
                     context,
                 ))
             }
-            SetOperation::SetopUnion => {
-                SelectStatement::analyze_select_union(context, &syn, tokens)
-            }
-            SetOperation::SetopIntersect => {
-                SelectStatement::analyze_select_intersect(context, &syn, tokens)
-            }
-            SetOperation::SetopExcept => {
-                SelectStatement::analyze_select_except(context, &syn, tokens)
-            }
+            SetOperation::SetopUnion => Self::analyze_select_union(context, &syn, tokens),
+            SetOperation::SetopIntersect => Self::analyze_select_intersect(context, &syn, tokens),
+            SetOperation::SetopExcept => Self::analyze_select_except(context, &syn, tokens),
             _ => AnalysisError::raise_unexpected_input("selectstmt.op")?,
         }
     }
@@ -294,8 +288,7 @@ impl SelectStatementNode {
             result_columns.push_column(&name, &val_sem);
         }
 
-        let select =
-            SelectStatementNode::new(&result_columns, &with_clause, &from_clause, &where_clause);
+        let select = Self::new(&result_columns, &with_clause, &from_clause, &where_clause);
         Ok((SelectStatement::simple(&select), context))
     }
 }

@@ -104,7 +104,7 @@ impl CreateView {
             AnalysisError::raise_unexpected_none("select_statement")?
         };
         let name = FullName::try_from(view)?;
-        let create_view = CreateView::new(&name, &stmt, &[], &Default::default(), false);
+        let create_view = Self::new(&name, &stmt, &[], &Default::default(), false);
         let context = context.apply_create_view(&create_view)?;
         Ok(AstAndContextPair::new(
             SemAst::CreateView(create_view),

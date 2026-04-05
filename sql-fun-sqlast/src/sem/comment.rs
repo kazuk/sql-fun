@@ -59,7 +59,7 @@ impl Comment {
         };
 
         let comment = syn.get_comment();
-        let comment = Comment {
+        let comment = Self {
             target: items,
             object_type,
             comment,

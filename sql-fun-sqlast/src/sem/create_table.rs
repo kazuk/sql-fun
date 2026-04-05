@@ -259,7 +259,7 @@ impl CreateTable {
                 Some(is_not_null),
             ));
         }
-        let table_def = CreateTable::new(table_name, cols);
+        let table_def = Self::new(table_name, cols);
         let result_context = context.apply_create_table(&table_def)?;
         Ok(AstAndContextPair::new(
             SemAst::CreateTable(table_def),

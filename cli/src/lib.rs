@@ -6,7 +6,6 @@ mod docker;
 mod init;
 mod runnable;
 
-use self::cli_sub_command::CliSubCommand;
 use self::init::initialize;
 
 use ::sql_fun_core::SqlFunArgs;
@@ -14,6 +13,7 @@ use std::process::ExitCode;
 
 pub use self::{
     check::CheckArgs,
+    cli_sub_command::CliSubCommand,
     runnable::{RunableCommand, StdStream},
 };
 

@@ -44,7 +44,7 @@ impl CreateSchema {
             context = new_context;
             sems.push(sem);
         }
-        let schema = CreateSchema {
+        let schema = Self {
             name: name.clone(),
             elements: sems,
         };

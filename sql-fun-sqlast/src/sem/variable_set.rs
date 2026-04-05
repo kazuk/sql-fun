@@ -57,7 +57,7 @@ impl VariableSet {
         )?;
         context = new_context;
 
-        let var_set = VariableSet { name, value };
+        let var_set = Self { name, value };
         let result_context = context.apply_variable_set(&var_set)?;
         Ok(AstAndContextPair::new(
             SemAst::VariableSet(var_set),

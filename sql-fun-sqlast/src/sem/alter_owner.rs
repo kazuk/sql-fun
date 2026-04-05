@@ -15,10 +15,7 @@ impl AlterOwner {
     where
         TParseContext: ParseContext,
     {
-        Ok(AstAndContextPair::new(
-            SemAst::AlterOwner(AlterOwner {}),
-            context,
-        ))
+        Ok(AstAndContextPair::new(SemAst::AlterOwner(Self {}), context))
     }
 }
 

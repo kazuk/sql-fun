@@ -22,7 +22,7 @@ impl SemAst {
         TParseContext: ParseContext,
     {
         let statement = syn.get_stmts().get(0).get_stmt();
-        SemAst::analyze_node(context, &None, statement, tokens)
+        Self::analyze_node(context, &None, statement, tokens)
     }
 }
 

@@ -58,7 +58,7 @@ impl CreateSequence {
             AnalysisError::raise_unexpected_none("create_seq.sequence")?
         };
 
-        let create_sequence = CreateSequence::new(&FullName::try_from(name)?);
+        let create_sequence = Self::new(&FullName::try_from(name)?);
         let context = context.apply_create_sequence(&create_sequence)?;
         Ok(AstAndContextPair::new(
             SemAst::CreateSequence(create_sequence),

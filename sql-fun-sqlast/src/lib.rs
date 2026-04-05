@@ -85,8 +85,8 @@ impl PostgresDialect {
         let mut sem_results = Vec::new();
         for statement in statements {
             context.set_statement_span(StringSpan::from_str_in_str(&sql_statements, statement));
-            let syn = PostgresDialect::parse(statement)?;
-            let tokens = PostgresDialect::scan(statement)?;
+            let syn = Self::parse(statement)?;
+            let tokens = Self::scan(statement)?;
             let AstAndContextPair(sem, rcontext) =
                 SemAst::semantic_analysis(context, syn, &tokens)?;
             sem_results.push(sem);

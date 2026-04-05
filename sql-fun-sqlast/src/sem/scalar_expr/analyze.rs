@@ -18,7 +18,7 @@ impl SemScalarExpr {
         from_clause: &FromClause,
         syn: crate::syn::Node,
         tokens: &IVec<ScanToken>,
-    ) -> Result<(SemScalarExpr, TParseContext), AnalysisError>
+    ) -> Result<(Self, TParseContext), AnalysisError>
     where
         TParseContext: ParseContext,
     {

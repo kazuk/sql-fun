@@ -101,7 +101,7 @@ impl CreateCompositType {
         }
 
         let name = FullName::try_from(typevar)?;
-        let comp_def = CreateCompositType {
+        let comp_def = Self {
             type_ref: Some(TypeReference::from_full_name(name.clone())),
             fields,
         };

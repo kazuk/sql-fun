@@ -87,7 +87,7 @@ impl Constraint {
         let Some(constraint) = cmd.get_def().as_constraint().as_inner() else {
             AnalysisError::raise_unexpected_none("alter_table_cmd.def as constraint")?
         };
-        let constraint = Constraint::analyze(context, Some(target_table), constraint)?;
+        let constraint = Self::analyze(context, Some(target_table), constraint)?;
         Ok(AlterObjSubCommand::AddConstraint(constraint))
     }
 }

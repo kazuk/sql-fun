@@ -25,7 +25,7 @@ impl CreateExtension {
         TParseContext: ParseContext,
     {
         let name = syn.get_extname();
-        let extension = CreateExtension { name };
+        let extension = Self { name };
         let result_context = context.apply_create_extension(&extension)?;
         Ok(AstAndContextPair::new(
             SemAst::CreateExtension(extension),

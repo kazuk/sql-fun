@@ -90,7 +90,7 @@ impl CreateTableAs {
             }
             _ => AnalysisError::raise_unexpected_none("SemAst As Select statement")?,
         };
-        let create_table_as = CreateTableAs {
+        let create_table_as = Self {
             name,
             query: Box::new(sem),
             obj_type,

@@ -36,7 +36,7 @@ impl AlterSequence {
         };
         let seq = FullName::try_from(seq)?;
 
-        let alter_seq = AlterSequence {
+        let alter_seq = Self {
             seq_name: seq,
             commands: Default::default(),
         };

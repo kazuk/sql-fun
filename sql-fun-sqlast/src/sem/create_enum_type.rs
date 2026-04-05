@@ -40,7 +40,7 @@ impl CreateEnum {
             .map(|v| EnumValueDefinition { name: v.get_sval() })
             .collect();
 
-        let enum_def = CreateEnum {
+        let enum_def = Self {
             name,
             values: enum_values,
         };

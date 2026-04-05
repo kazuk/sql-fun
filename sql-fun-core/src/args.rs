@@ -324,7 +324,6 @@ impl SqlFunArgs {
     }
 }
 
-
 impl SqlFunArgs {
     /// Initialize and parse arguments
     #[must_use]

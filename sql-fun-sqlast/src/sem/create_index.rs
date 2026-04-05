@@ -358,20 +358,19 @@ impl CreateIndex {
         let table = TableName::try_from(table)?;
         let unique = syn.get_unique();
 
-        let (key_columns, new_context) = CreateIndex::analyze_index_elem(context, keys, tokens)?;
+        let (key_columns, new_context) = Self::analyze_index_elem(context, keys, tokens)?;
         context = new_context;
 
-        let include_columns = if let Some(includes) =
-            syn.get_index_including_params().map(|v| v.as_index_elem())
-        {
-            let (cols, new_context) = CreateIndex::analyze_index_elem(context, includes, tokens)?;
-            context = new_context;
-            cols
-        } else {
-            IndexElementCollection::default()
-        };
+        let include_columns =
+            if let Some(includes) = syn.get_index_including_params().map(|v| v.as_index_elem()) {
+                let (cols, new_context) = Self::analyze_index_elem(context, includes, tokens)?;
+                context = new_context;
+                cols
+            } else {
+                IndexElementCollection::default()
+            };
 
-        let create_index = CreateIndex {
+        let create_index = Self {
             name,
             table,
             key_columns,

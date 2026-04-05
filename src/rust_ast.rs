@@ -101,7 +101,7 @@ mod test_get_result_types {
 }
 
 pub fn get_last_parameter_type_from_fn_trait(
-    handler_ty: Punctuated<TypeParamBound, syn::token::Plus>,
+    handler_ty: &Punctuated<TypeParamBound, syn::token::Plus>,
 ) -> Option<Path> {
     handler_ty.iter().find_map(|f| {
         let TypeParamBound::Trait(tb) = f else {
@@ -111,7 +111,7 @@ pub fn get_last_parameter_type_from_fn_trait(
 
         if seg.ident != "Fn" {
             return None;
-        };
+        }
         let PathArguments::Parenthesized(pga) = &seg.arguments else {
             return None;
         };
@@ -132,21 +132,21 @@ mod test_get_last_parameter_type_from_fn_trait {
     fn picks_last_input() {
         let bounds: Punctuated<TypeParamBound, syn::token::Plus> =
             ::syn::parse_quote!(Fn(i32, MyType) -> bool + Send);
-        let path = get_last_parameter_type_from_fn_trait(bounds).expect("expected path");
+        let path = get_last_parameter_type_from_fn_trait(&bounds).expect("expected path");
         assert_eq!(path.to_token_stream().to_string(), "MyType");
     }
 
     #[test]
     fn ignores_non_fn() {
         let bounds: Punctuated<TypeParamBound, syn::token::Plus> = ::syn::parse_quote!(Send + Sync);
-        assert!(get_last_parameter_type_from_fn_trait(bounds).is_none());
+        assert!(get_last_parameter_type_from_fn_trait(&bounds).is_none());
     }
 
     #[test]
     fn requires_path_type() {
         let bounds: Punctuated<TypeParamBound, syn::token::Plus> =
             ::syn::parse_quote!(Fn(i32, (u32, u32)) + Send);
-        assert!(get_last_parameter_type_from_fn_trait(bounds).is_none());
+        assert!(get_last_parameter_type_from_fn_trait(&bounds).is_none());
     }
 }
 

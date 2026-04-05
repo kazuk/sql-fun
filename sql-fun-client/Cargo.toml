@@ -4,6 +4,10 @@ version = "0.1.0"
 edition = "2024"
 license = "MIT"
 description = "callable client for sql-fun-server-api"
+categories = ["database", "development-tools"]
+keywords.workspace = true
+repository.workspace = true
+readme = "README.md"
 
 [features]
 

@@ -4,6 +4,9 @@ version = "0.1.0"
 edition = "2024"
 license = "MIT"
 description = "schema data service for sql-fun"
+categories = ["database", "development-tools", "command-line-utilities"]
+keywords.workspace = true
+repository.workspace = true
 
 [[bin]]
 name = "sql-fun-server"

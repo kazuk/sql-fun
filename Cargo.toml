@@ -6,8 +6,10 @@ version = "0.1.0"
 edition = "2024"
 authors = ["kazuk"]
 description = "SQL query/statement execution code generator"
-repository = "https://github.com/kazuk/sql-fun/"
+repository.workspace = true
 exclude = ["/postgres"]
+categories = ["database", "development-tools"]
+keywords.workspace = true
 
 [package.metadata]
 
@@ -21,10 +23,10 @@ members = [
     "examples/adventure-works",
     "parse_dat",
     "sql-fun-client",
+    "sql-fun-codegen",
     "sql-fun-core",
     "sql-fun-server",
     "sql-fun-server-api",
-    "sql-fun-codegen",
     "sql-fun-sqlast",
     "xbuild",
 ]
@@ -61,8 +63,8 @@ style = { level = "warn", priority = -1 }
 complexity = { level = "warn", priority = -1 }
 pedantic = { level = "warn", priority = -1 }
 cargo = { level = "warn", priority = -1 }
-cargo_common_metadata = "allow"
-multiple_crate_versions = "allow"
+use_self = { level = "warn" }
+multiple_crate_versions = { level = "allow" }
 
 [workspace.dependencies]
 anyhow = { version = "1.0", features = ["backtrace"] }
@@ -153,3 +155,6 @@ tokio = { workspace = true }
 tokio-postgres = { workspace = true }
 tracing = { workspace = true }
 trybuild = { workspace = true }
+
+[lints]
+workspace = true

@@ -9,9 +9,9 @@ use crate::{
 };
 use quote::quote;
 
-/// generate sql_query_many
+/// generate `sql_query_many`
 pub fn generate_sql_query_many(
-    sql_str: String,
+    sql_str: &str,
     item: TokenStream,
 ) -> Result<TokenStream, SqlFunError> {
     let args = SqlFunArgs::try_from_env()?;
@@ -25,7 +25,7 @@ pub fn generate_sql_query_many(
         return Err(SqlFunError::custom("function must be async"));
     }
 
-    code_generator_builder.set_sql(&function_ast, &sql_str)?;
+    code_generator_builder.set_sql(&function_ast, sql_str)?;
 
     code_generator_builder.handler_arg(handler_arg_name(&function_ast)?);
     code_generator_builder.collector_arg(collector_arg_name(&function_ast)?);
@@ -36,7 +36,7 @@ pub fn generate_sql_query_many(
     };
 
     code_generator_builder.row_type(
-        get_last_parameter_type_from_fn_trait(handler_ty)
+        get_last_parameter_type_from_fn_trait(&handler_ty)
             .ok_or_else(|| SqlFunError::custom("failed to get row type"))?,
     );
 

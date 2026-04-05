@@ -4,6 +4,10 @@ version = "0.1.0"
 edition = "2024"
 license = "MIT"
 description = "API type crate for sql-fun-server"
+categories = ["database", "development-tools"]
+keywords.workspace = true
+repository.workspace = true
+readme = "README.md"
 
 [[bin]]
 name = "openrpc-spec"

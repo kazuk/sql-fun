@@ -4,6 +4,10 @@ license = "MIT"
 version = "0.1.0"
 edition = "2024"
 description = "semantic analyzer for PostgreSQL"
+categories = ["database", "development-tools"]
+keywords.workspace = true
+repository.workspace = true
+readme = "README.md"
 
 [features]
 default = []

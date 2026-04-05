@@ -115,6 +115,7 @@ impl super::FunctionParam {
             &Some(ColumnName::from(param.get_name())),
             Some(&TypeReference::from_full_name(arg_type)),
             None,
+            &[],
         );
         Ok(value)
     }

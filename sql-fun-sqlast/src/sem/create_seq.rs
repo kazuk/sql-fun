@@ -37,9 +37,17 @@ impl CreateSequence {
         for cmd in alter_seq.commands() {
             match cmd {
                 AlterObjSubCommand::ChangeOwner(s) => self.owner = Some(s.clone()),
-                AlterObjSubCommand::SetColumnDefault(_column_name, _sem_scalar_expr) => todo!(),
-                AlterObjSubCommand::AddConstraint(_constraint) => todo!(),
-                AlterObjSubCommand::ClusterOn(_) => todo!(),
+                AlterObjSubCommand::AddConstraint(_)
+                | AlterObjSubCommand::ClusterOn(_)
+                | AlterObjSubCommand::RenameTo(_)
+                | AlterObjSubCommand::AddColumn(_)
+                | AlterObjSubCommand::AlterColumn(_, _)
+                | AlterObjSubCommand::RenameColumn(_, _)
+                | AlterObjSubCommand::DropColumn(_)
+                | AlterObjSubCommand::SetColumnDefault(_, _) => {
+                    AnalysisError::raise_unexpected_input("unexpected alter sequence alter cmd")?;
+                    AnalysisError::never()
+                }
             }
         }
         Ok(())

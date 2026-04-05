@@ -218,6 +218,7 @@ impl PgBuiltInFunctions {
                     &out_arg.arg_name.map(|v| ColumnName::from(v.clone())),
                     Some(&col_type),
                     None,
+                    &[],
                 ))
             }
 

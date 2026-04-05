@@ -96,7 +96,7 @@ impl CreateFunction {
                     Some(result_set_type.get_composit_type_columns())
                 } else if let Some(result_type) = result_set_type.type_reference() {
                     // returning record type
-                    let columns = vec![ColumnDefinition::new(&None, Some(result_type), None)];
+                    let columns = vec![ColumnDefinition::new(&None, Some(result_type), None, &[])];
                     Some(ColumnCollection::new(columns))
                 } else {
                     // returns dynamic type

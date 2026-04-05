@@ -54,7 +54,12 @@ impl ResultColumn {
 
 impl ResultColumn {
     pub fn create_column_definition(&self) -> ColumnDefinition {
-        ColumnDefinition::new(&self.col_name, self.col_type.as_ref(), self.is_not_null)
+        ColumnDefinition::new(
+            &self.col_name,
+            self.col_type.as_ref(),
+            self.is_not_null,
+            &[],
+        )
     }
 }
 

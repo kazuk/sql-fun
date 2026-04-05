@@ -38,6 +38,11 @@ pub struct BooleanExpr {
 }
 
 impl BooleanExpr {
+    /// create boolean expression from body
+    pub fn new(body: BooleanExprBody) -> Self {
+        Self { body }
+    }
+
     fn analyze_args<TParseContext>(
         mut context: TParseContext,
         with_clause: &WithClause,
@@ -142,6 +147,16 @@ pub struct NullTestExpr {
 pub enum NullTestType {
     IsNull,
     IsNotNull,
+}
+
+impl NullTestExpr {
+    /// create null test expression from semantic input expression
+    pub fn new(null_test_type: NullTestType, arg_expr: SemScalarExpr) -> Self {
+        Self {
+            null_test_type,
+            arg_expr: Box::new(arg_expr),
+        }
+    }
 }
 
 impl TryFrom<crate::syn::NullTestType> for NullTestType {

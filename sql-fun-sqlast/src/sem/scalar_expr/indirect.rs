@@ -49,17 +49,17 @@ impl IndirectionExpr {
 impl SemScalarExprNode for IndirectionExpr {
     fn get_type(&self) -> Option<TypeReference> {
         match &self {
-            IndirectionExpr::ArrayIndex(ind) => ind.item_type().clone(),
-            IndirectionExpr::ArraySlice(slice) => slice.array_type().clone(),
-            IndirectionExpr::MemberRef(mem_ref) => mem_ref.member_type().clone(),
+            Self::ArrayIndex(ind) => ind.item_type().clone(),
+            Self::ArraySlice(slice) => slice.array_type().clone(),
+            Self::MemberRef(mem_ref) => mem_ref.member_type().clone(),
         }
     }
 
     fn is_not_null(&self) -> Option<bool> {
         match &self {
-            IndirectionExpr::ArrayIndex(ind) => ind.array().is_not_null(),
-            IndirectionExpr::ArraySlice(slice) => slice.array_is_not_null(),
-            IndirectionExpr::MemberRef(mem_ref) => mem_ref.base_is_not_null(),
+            Self::ArrayIndex(ind) => ind.array().is_not_null(),
+            Self::ArraySlice(slice) => slice.array_is_not_null(),
+            Self::MemberRef(mem_ref) => mem_ref.base_is_not_null(),
         }
     }
 }

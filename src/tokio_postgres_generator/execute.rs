@@ -3,7 +3,7 @@ use quote::quote;
 
 impl TokioPostgresCodeGenerator {
     pub fn generate_execute(self) -> proc_macro2::TokenStream {
-        let TokioPostgresCodeGenerator {
+        let Self {
             sql_str,
             client_arg_name,
             placeholders,

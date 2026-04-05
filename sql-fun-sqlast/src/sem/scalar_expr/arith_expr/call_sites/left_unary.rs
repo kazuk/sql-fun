@@ -20,7 +20,7 @@ impl LeftUnaryCallSite {
     where
         TParseContext: ParseContext,
     {
-        let call_site = LeftUnaryCallSite {
+        let call_site = Self {
             operator_name: name.clone(),
             operator_def,
             arg: lexpr,

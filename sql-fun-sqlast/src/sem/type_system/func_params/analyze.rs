@@ -23,7 +23,7 @@ impl FunctionParam {
         mut context: TParseContext,
         param: crate::syn::FunctionParameter,
         tokens: &IVec<ScanToken>,
-    ) -> Result<(FunctionParam, TParseContext), AnalysisError>
+    ) -> Result<(Self, TParseContext), AnalysisError>
     where
         TParseContext: ParseContext,
     {

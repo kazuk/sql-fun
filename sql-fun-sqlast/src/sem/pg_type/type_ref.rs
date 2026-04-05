@@ -16,7 +16,7 @@ pub enum TypeReference {
 impl TypeReference {
     /// create a reference for dynamic type
     #[must_use]
-    pub fn dynamic(type_def: &TypeDefinition) -> TypeReference {
+    pub fn dynamic(type_def: &TypeDefinition) -> Self {
         Self::Dynamic(DynamicTypeReference::new(type_def))
     }
 
@@ -118,7 +118,7 @@ impl TypeReference {
 
     /// get base element type from multi range type
     #[must_use]
-    pub fn multi_range_base_element(&self) -> TypeReference {
+    pub fn multi_range_base_element(&self) -> Self {
         match self {
             Self::Concrete(c) => c.multi_range_base_element(),
             Self::Dynamic(_d) => todo!(),
@@ -235,7 +235,7 @@ impl TypeReference {
 
     /// convert to range type
     #[must_use]
-    pub fn into_range_type(&self) -> TypeReference {
+    pub fn into_range_type(&self) -> Self {
         match self {
             Self::Concrete(c) => c.get_range_type(),
             Self::Dynamic(_d) => todo!(),
@@ -244,7 +244,7 @@ impl TypeReference {
 
     /// convert to multi range type
     #[must_use]
-    pub fn into_multi_range_type(&self) -> TypeReference {
+    pub fn into_multi_range_type(&self) -> Self {
         match self {
             Self::Concrete(c) => c.get_multi_range_type(),
             Self::Dynamic(_d) => todo!(),
@@ -252,7 +252,7 @@ impl TypeReference {
     }
 
     /// apply simple inference result
-    pub fn apply_simple_infer_result(&mut self, infer_result_type: &TypeReference) {
+    pub fn apply_simple_infer_result(&mut self, infer_result_type: &Self) {
         match self {
             Self::Concrete(c) => c.apply_simple_infer_result(infer_result_type),
             Self::Dynamic(_d) => todo!(),
@@ -260,7 +260,7 @@ impl TypeReference {
     }
 
     /// apply common inference result
-    pub fn apply_common_infer_result(&mut self, infer_result_type: &TypeReference) {
+    pub fn apply_common_infer_result(&mut self, infer_result_type: &Self) {
         match self {
             Self::Concrete(c) => c.apply_common_infer_result(infer_result_type),
             Self::Dynamic(_d) => todo!(),

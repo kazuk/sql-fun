@@ -108,15 +108,15 @@ impl PidFile {
         args: &Args,
         port: u16,
     ) -> Result<Option<Self>, ServerError> {
-        let pid_path = PidFile::default_path(args);
+        let pid_path = Self::default_path(args);
         if pid_path.exists() {
-            let pid_file = PidFile::from_file(&pid_path)?;
+            let pid_file = Self::from_file(&pid_path)?;
             if pid_file.process_exists() {
                 return Ok(None);
             }
             std::fs::remove_file(&pid_path)?;
         }
-        let mut pid_file = PidFile::new(port);
+        let mut pid_file = Self::new(port);
         pid_file.write_to_path(&pid_path)?;
         Ok(Some(pid_file))
     }

@@ -96,8 +96,8 @@ impl<'de> serde::Deserialize<'de> for DatabaseEngine {
     {
         let s = String::deserialize(deserializer)?;
         Ok(match s.parse::<WellKnownDbEngine>() {
-            Ok(wk) => DatabaseEngine(Either::Left(wk)),
-            Err(_) => DatabaseEngine(Either::Right(s)),
+            Ok(wk) => Self(Either::Left(wk)),
+            Err(_) => Self(Either::Right(s)),
         })
     }
 }

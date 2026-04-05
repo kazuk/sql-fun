@@ -151,7 +151,7 @@ impl DataSource {
 
     /// resolve alias name to data source
     #[must_use]
-    pub fn resolve_alias(&self, name: &AliasName) -> Option<(&DataSource, Nullable)> {
+    pub fn resolve_alias(&self, name: &AliasName) -> Option<(&Self, Nullable)> {
         match self {
             Self::CteQuery(d) => d.resolve_alias(self, name),
             Self::Table(d) => d.resolve_alias(self, name),
@@ -211,7 +211,7 @@ impl DataSource {
         call: crate::syn::FuncCall,
         alias: Option<crate::syn::Alias>,
         tokens: &IVec<ScanToken>,
-    ) -> Result<(DataSource, TParseContext), AnalysisError>
+    ) -> Result<(Self, TParseContext), AnalysisError>
     where
         TParseContext: ParseContext,
     {

@@ -36,7 +36,7 @@ impl<TValue> TrieNode<TValue> {
             let (common_key, other_key, _) = self_key.split_key(new_key, common_prefix_len);
             let mut old_children = TrieLeafs::new();
             std::mem::swap(&mut self.children, &mut old_children);
-            let child = TrieNode {
+            let child = Self {
                 key: BoxedKeyFragment::from(other_key),
                 value: self.value.take(),
                 children: old_children,
@@ -62,7 +62,7 @@ impl<TValue> TrieNode<TValue> {
                 match_node.insert(&least_key, value)
             } else {
                 // No match found, create a new child node
-                let new_node = TrieNode::new(least_key, value);
+                let new_node = Self::new(least_key, value);
                 self.children.insert(new_node);
                 None
             }

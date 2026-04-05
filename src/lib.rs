@@ -33,7 +33,7 @@ use syn::{Ident, ItemFn, LitStr, Path, Type, parse_macro_input};
 
 ///
 /// fill table/view fields to struct
-///  
+///
 #[proc_macro_attribute]
 pub fn from_table(
     table_name: proc_macro::TokenStream,
@@ -47,6 +47,7 @@ pub fn from_table(
     }
 }
 
+#[expect(clippy::unnecessary_wraps)]
 fn generate_table_struct(
     _table_name: String,
     item: TokenStream,
@@ -62,7 +63,7 @@ pub fn sql_query_one(
 ) -> proc_macro::TokenStream {
     let sql_str = parse_macro_input!(sql_attr as LitStr).value();
 
-    match generate_sql_query_one(sql_str, item.into()) {
+    match generate_sql_query_one(&sql_str, item.into()) {
         Ok(ts) => ts.into(),
         Err(err) => err.to_compile_error(),
     }
@@ -76,7 +77,7 @@ pub fn sql_query_opt(
 ) -> proc_macro::TokenStream {
     let sql_str = parse_macro_input!(sql_attr as LitStr).value();
 
-    match generate_sql_query_opt(sql_str, item.into()) {
+    match generate_sql_query_opt(&sql_str, item.into()) {
         Ok(ts) => ts.into(),
         Err(err) => err.to_compile_error(),
     }
@@ -90,7 +91,7 @@ pub fn sql_query_many(
 ) -> proc_macro::TokenStream {
     let sql_str = parse_macro_input!(sql_attr as LitStr).value();
 
-    match generate_sql_query_many(sql_str, item.into()) {
+    match generate_sql_query_many(&sql_str, item.into()) {
         Ok(ts) => ts.into(),
         Err(err) => err.to_compile_error(),
     }
@@ -112,7 +113,7 @@ pub fn sql_query_many(
 /// connector = "tokio-postgres"
 /// ```
 ///
-/// sql_fun supports only the `tokio-postgres` for database connector(currently).
+/// `sql_fun` supports only the `tokio-postgres` for database connector(currently).
 ///
 #[proc_macro_attribute]
 pub fn sql_statement(
@@ -121,7 +122,7 @@ pub fn sql_statement(
 ) -> proc_macro::TokenStream {
     let sql_str = parse_macro_input!(sql_attr as LitStr).value();
 
-    match generate_sql_execute(sql_str, item.into()) {
+    match generate_sql_execute(&sql_str, item.into()) {
         Ok(ts) => ts.into(),
         Err(err) => err.to_compile_error(),
     }

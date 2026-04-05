@@ -205,7 +205,7 @@ impl SemScalarExpr {
     pub fn get_column_def(&self) -> Option<ColumnDefinition> {
         match self {
             Self::ColumnRef(c) => c.get_column_def().clone(),
-            Self::TypeCast(_) | SemScalarExpr::FuncCall(_) => None,
+            Self::TypeCast(_) | Self::FuncCall(_) => None,
             _ => todo!("not implemented {self:?}"),
         }
     }
@@ -273,7 +273,7 @@ mod test_get_column_def_and_name {
 impl SemScalarExpr {
     /// convert `value_expr` with implicit casting
     #[must_use]
-    pub fn wrap_implicit_cast(taget_type: &TypeReference, value_expr: &SemScalarExpr) -> Self {
+    pub fn wrap_implicit_cast(taget_type: &TypeReference, value_expr: &Self) -> Self {
         Self::ImplicitCast(ImplicitCastExpr::new(value_expr, taget_type))
     }
 }
@@ -303,7 +303,7 @@ impl SemScalarExpr {
     pub fn implicit_cast_if_require<TParseContext>(
         context: &mut TParseContext,
         result_type: &TypeReference,
-        expr: &mut SemScalarExpr,
+        expr: &mut Self,
     ) -> Result<(), AnalysisError>
     where
         TParseContext: ParseContext,
@@ -320,7 +320,7 @@ impl SemScalarExpr {
             return Ok(());
         };
         if !cast.is_no_coversion() {
-            *expr = SemScalarExpr::wrap_implicit_cast(result_type, expr);
+            *expr = Self::wrap_implicit_cast(result_type, expr);
         }
         Ok(())
     }

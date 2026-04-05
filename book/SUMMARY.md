@@ -14,6 +14,8 @@
 
 ### Subcommands
 
+- [init](./cli/init.md) sub command
+- [check](./cli/check.md) sub command
 - [api](./cli/api-subcommand.md)
 - [api-help](./cli/api-help-subcommand.md)
 

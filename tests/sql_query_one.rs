@@ -15,6 +15,7 @@ fn test_sql_query_one() {
 
     std::fs::write(metadata_path, include_str!("./sql_query_one/Metadata.toml")).unwrap();
 
+    #[expect(unsafe_code)]
     unsafe {
         std::env::set_var("SQL_FUN_METADATA_FILE", "Metadata.toml");
         std::env::set_var("CARGO_TARGET_DIR", &dir);

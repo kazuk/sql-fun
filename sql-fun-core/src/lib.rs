@@ -15,8 +15,7 @@ use std::{fmt::Display, str::FromStr};
 
 pub use self::{
     args::{
-        CliSubCommand, DaemonControlArgs, InitializeArgs, SqlFunArgs, SqlFunArgsBuilder,
-        SqlFunArgsBuilderError, SqlFunArgsError,
+        InitializeArgs, SqlFunArgs, SqlFunArgsBuilder, SqlFunArgsBuilderError, SqlFunArgsError,
     },
     builtin::PostgresBuiltinPaths,
     coll::IVec,
@@ -41,7 +40,7 @@ pub enum PostgresVersion {
     #[serde(rename = "17")]
     Ver17,
 
-    #[cfg(feature = "beta_postgres_versions")]
+    /// `PostgreSQL` version 18
     #[serde(rename = "18")]
     Ver18,
 }
@@ -51,9 +50,9 @@ impl FromStr for PostgresVersion {
 
     fn from_str(s: &str) -> Result<Self, Self::Err> {
         match s {
-            "15" => Ok(PostgresVersion::Ver15),
-            "16" => Ok(PostgresVersion::Ver16),
-            "17" => Ok(PostgresVersion::Ver17),
+            "15" => Ok(Self::Ver15),
+            "16" => Ok(Self::Ver16),
+            "17" => Ok(Self::Ver17),
             #[cfg(feature = "beta_postgres_versions")]
             "18" => Ok(PostgresVersion::Ver18),
             _ => Err(s.to_string()),
@@ -64,11 +63,10 @@ impl FromStr for PostgresVersion {
 impl Display for PostgresVersion {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         let value = match self {
-            PostgresVersion::Ver15 => "15",
-            PostgresVersion::Ver16 => "16",
-            PostgresVersion::Ver17 => "17",
-            #[cfg(feature = "beta_postgres_versions")]
-            PostgresVersion::Ver18 => "18",
+            Self::Ver15 => "15",
+            Self::Ver16 => "16",
+            Self::Ver17 => "17",
+            Self::Ver18 => "18",
         };
         f.write_str(value)
     }
@@ -96,7 +94,7 @@ impl FromStr for SqlDialect {
 impl Display for SqlDialect {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         match self {
-            SqlDialect::PostgreSQL => write!(f, "postgresql"),
+            Self::PostgreSQL => write!(f, "postgresql"),
         }
     }
 }

@@ -55,15 +55,15 @@ impl JoinKind {
     #[must_use]
     pub fn left_nullable(&self, in_nullable: Nullable) -> Nullable {
         match self {
-            JoinKind::Inner => in_nullable,
-            JoinKind::Left => in_nullable,
-            JoinKind::Right => true,
-            JoinKind::Full => true,
-            JoinKind::Semi => in_nullable,
-            JoinKind::Anti => in_nullable,
-            JoinKind::RightAnti => false,
-            JoinKind::UniqueInner => in_nullable,
-            JoinKind::UniqueOuter => true,
+            Self::Inner => in_nullable,
+            Self::Left => in_nullable,
+            Self::Right => true,
+            Self::Full => true,
+            Self::Semi => in_nullable,
+            Self::Anti => in_nullable,
+            Self::RightAnti => false,
+            Self::UniqueInner => in_nullable,
+            Self::UniqueOuter => true,
         }
     }
 
@@ -71,15 +71,15 @@ impl JoinKind {
     #[must_use]
     pub fn right_nullable(&self, in_nullable: Nullable) -> Nullable {
         match self {
-            JoinKind::Inner => in_nullable,
-            JoinKind::Left => true,
-            JoinKind::Right => in_nullable,
-            JoinKind::Full => true,
-            JoinKind::Semi => in_nullable,
-            JoinKind::Anti => in_nullable,
-            JoinKind::RightAnti => false,
-            JoinKind::UniqueInner => in_nullable,
-            JoinKind::UniqueOuter => true,
+            Self::Inner => in_nullable,
+            Self::Left => true,
+            Self::Right => in_nullable,
+            Self::Full => true,
+            Self::Semi => in_nullable,
+            Self::Anti => in_nullable,
+            Self::RightAnti => false,
+            Self::UniqueInner => in_nullable,
+            Self::UniqueOuter => true,
         }
     }
 }

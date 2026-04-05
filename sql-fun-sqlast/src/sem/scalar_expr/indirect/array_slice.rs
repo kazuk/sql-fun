@@ -107,7 +107,7 @@ impl ArraySlice {
             tokens,
         )?;
         context = new_context;
-        let arg = ArraySlice::array_slice(arg, lexpr, rexpr, &mut context)?;
+        let arg = Self::array_slice(arg, lexpr, rexpr, &mut context)?;
         Ok((arg, context))
     }
 }

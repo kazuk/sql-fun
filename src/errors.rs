@@ -55,9 +55,9 @@ impl SqlFunErrorInner {
             Self::Custom(err) => syn::Error::new_spanned("", err).into_compile_error().into(),
             Self::UnnamedColumnInResultSet => syn::Error::new_spanned(
                 "",
-                r#"Unnamed column found in result set.
+                "Unnamed column found in result set.
 Column expressions must have an alias.
-Fix: Use `AS` to name computed columns."#,
+Fix: Use `AS` to name computed columns.",
             )
             .into_compile_error()
             .into(),

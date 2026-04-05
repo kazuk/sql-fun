@@ -13,21 +13,21 @@ use super::ArithExpr;
 impl AExprKind {
     fn has_name(&self) -> Result<bool, AnalysisError> {
         match self {
-            AExprKind::Undefined | AExprKind::OptionNone => {
+            Self::Undefined | Self::OptionNone => {
                 AnalysisError::raise_unexpected_input("aexpr_kind")
             }
-            AExprKind::AexprOp | AExprKind::AexprOpAny | AExprKind::AexprOpAll => Ok(true),
-            AExprKind::AexprDistinct
-            | AExprKind::AexprNotDistinct
-            | AExprKind::AexprNullif
-            | AExprKind::AexprIn
-            | AExprKind::AexprLike
-            | AExprKind::AexprIlike
-            | AExprKind::AexprSimilar
-            | AExprKind::AexprBetween
-            | AExprKind::AexprNotBetween
-            | AExprKind::AexprBetweenSym
-            | AExprKind::AexprNotBetweenSym => Ok(false),
+            Self::AexprOp | Self::AexprOpAny | Self::AexprOpAll => Ok(true),
+            Self::AexprDistinct
+            | Self::AexprNotDistinct
+            | Self::AexprNullif
+            | Self::AexprIn
+            | Self::AexprLike
+            | Self::AexprIlike
+            | Self::AexprSimilar
+            | Self::AexprBetween
+            | Self::AexprNotBetween
+            | Self::AexprBetweenSym
+            | Self::AexprNotBetweenSym => Ok(false),
         }
     }
 }

@@ -17,15 +17,17 @@ If you're writing raw SQL and wish Rust could help more: this is it.
 
 - It runs entirely at **compile time** — there is no runtime component.
 - It requires **no runtime dependencies** in your application.
-- It is designed for `PostgreSQL`:
-  - SQL is parsed using `pg_query`, a full `PostgreSQL` parser.
-    - You can use the full range of `PostgreSQL` syntax with no limitations.
-  - All SQL statements are validated at compile time.
+- It is designed for `PostgreSQL` and `SQLite`:
+  - `PostgreSQL` dialect
+    - SQL is parsed using `pg_query`, a full `PostgreSQL` parser.
+      - You can use the full range of `PostgreSQL` syntax with no limitations.
+    - All SQL statements are validated at compile time.
+  - `SQLite` dialect
+    - SQL is parsed using `turso_parser`, a full `SQLite` parser.
 - It does not try to model your entire database schema.
   - Instead, it focuses only on what your application actually *does*—the SQL queries it runs.
   - This keeps the tool lightweight, focused, and reliable.
-- It generates code compatible with `tokio-postgres`, the primary runtime `sql-fun` targets.
-
+- It generates code compatible with `tokio-postgres` or `rusqlite`, the primary runtime `sql-fun` targets.
 
 ## Schema-aware validation
 
@@ -44,9 +46,9 @@ you can switch between them by setting the SQL_FUN_SCHEMA environment variable.
 For example:
 
 ```console
-SQL_FUN_SCHEMA=prod cargo check
-
+SQL_FUN_SCHEMA=prod sql-fun check
 ```
+
 will use schema.prod.sql instead.
 
 
@@ -132,4 +134,3 @@ Unlike many ORMs, `sql-fun` makes it clear exactly what SQL will be executed—n
 This means your carefully written SQL is preserved—not buried in macros or lost to code generation.
 
 Even if you switch to another tool in the future, you’ll always have a clear, structured record of your queries.
-

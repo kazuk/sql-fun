@@ -5,11 +5,8 @@ use syn::ItemFn;
 
 use crate::{Connector, SqlFunError, TokioPostgresCodeGenerator};
 
-/// generate for sql_execture
-pub fn generate_sql_execute(
-    sql_str: String,
-    item: TokenStream,
-) -> Result<TokenStream, SqlFunError> {
+/// generate for `sql_execture`
+pub fn generate_sql_execute(sql_str: &str, item: TokenStream) -> Result<TokenStream, SqlFunError> {
     let args = SqlFunArgs::try_from_env()?;
     let metadata = SqlFunMetadata::load_from(args.metadata_file()?)?;
     let _connector = Connector::get_connector(&metadata)?;
@@ -21,7 +18,7 @@ pub fn generate_sql_execute(
         return Err(SqlFunError::custom("function must be async"));
     }
 
-    code_generator_builder.set_sql(&function_ast, &sql_str)?;
+    code_generator_builder.set_sql(&function_ast, sql_str)?;
 
     let generator = code_generator_builder.build()?;
     let sql_execution_code = generator.generate_execute();

@@ -4,6 +4,10 @@ version = "0.1.1"
 edition = "2024"
 license = "MIT"
 description = "common dependencies for sql-fun"
+categories = ["database", "development-tools"]
+keywords.workspace = true
+repository.workspace = true
+readme = "README.md"
 
 [features]
 beta_postgres_versions = []

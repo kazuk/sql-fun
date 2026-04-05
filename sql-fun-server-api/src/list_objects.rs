@@ -59,11 +59,11 @@ pub enum ObjectQuery {
     /// object schema name, local name predicate
     Name(NameQuery),
     /// filter any condition
-    Or(Vec<ObjectQuery>),
+    Or(Vec<Self>),
     /// filter all condition
-    And(Vec<ObjectQuery>),
+    And(Vec<Self>),
     /// negate condition
-    Not(Box<ObjectQuery>),
+    Not(Box<Self>),
 }
 
 /// specify optional field to retuns API result

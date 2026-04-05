@@ -85,9 +85,9 @@ impl FullName {
 
     /// supply `catalog_name`
     #[must_use]
-    pub fn catalog_default(&self, catalog_name: &str) -> FullName {
+    pub fn catalog_default(&self, catalog_name: &str) -> Self {
         if self.catalog().is_none() && self.schema().is_none() {
-            FullName::with_catalog(catalog_name, None, self.name().as_str())
+            Self::with_catalog(catalog_name, None, self.name().as_str())
         } else {
             self.clone()
         }
@@ -95,7 +95,7 @@ impl FullName {
 
     /// create `FullName` from only local part
     #[must_use]
-    pub fn from_local_name(local_name: &str) -> FullName {
+    pub fn from_local_name(local_name: &str) -> Self {
         Self {
             catalog: None,
             schema: None,

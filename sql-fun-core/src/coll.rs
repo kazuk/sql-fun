@@ -23,7 +23,7 @@ impl<T> From<Vec<T>> for IVec<T> {
 
 impl<T> FromIterator<T> for IVec<T> {
     fn from_iter<I: IntoIterator<Item = T>>(iter: I) -> Self {
-        IVec(iter.into_iter().collect::<Vec<_>>().into_boxed_slice())
+        Self(iter.into_iter().collect::<Vec<_>>().into_boxed_slice())
     }
 }
 

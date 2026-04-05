@@ -46,7 +46,7 @@ pub struct TypeCastExpr {
 }
 
 impl TypeCastExpr {
-    fn new(target_type: TypeReference, arg: SemScalarExpr) -> TypeCastExpr {
+    fn new(target_type: TypeReference, arg: SemScalarExpr) -> Self {
         Self {
             target_type,
             arg: Box::new(arg),

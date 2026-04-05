@@ -61,7 +61,7 @@ pub enum AnalysisError {
 impl AnalysisError {
     /// raise `UnexpectedNone` error
     pub fn raise_unexpected_none<T>(message: &str) -> Result<T, Self> {
-        Err(AnalysisError::UnexpectedNone(String::from(message)))
+        Err(Self::UnexpectedNone(String::from(message)))
     }
 
     /// raise `UnexpectedInput` error
@@ -71,7 +71,7 @@ impl AnalysisError {
         panic!("unexpected input {message}");
 
         #[cfg_attr(test, expect(unreachable_code))]
-        Err(AnalysisError::UnexpectedInput(String::from(message)))
+        Err(Self::UnexpectedInput(String::from(message)))
     }
 
     /// type name is invalid format
@@ -118,7 +118,7 @@ impl AnalysisError {
 
     /// unexpected eof error
     pub fn unexpected_eof() -> Self {
-        AnalysisError::Io(std::io::Error::new(
+        Self::Io(std::io::Error::new(
             ErrorKind::UnexpectedEof,
             "unexpected eof",
         ))

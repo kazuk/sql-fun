@@ -1,0 +1,24 @@
+[package]
+name = "sql-fun-codegen"
+license = "MIT"
+version = "0.1.0"
+edition = "2024"
+categories = ["database", "development-tools"]
+keywords.workspace = true
+repository.workspace = true
+description = "proc-macro helper objects for sql-fun"
+readme = "README.md"
+
+[dependencies]
+darling = "0.23.0"
+proc-macro2.workspace = true
+quote.workspace = true
+syn.workspace = true
+thiserror.workspace = true
+
+[dev-dependencies]
+rstest.workspace = true
+testresult.workspace = true
+
+[lints]
+workspace = true

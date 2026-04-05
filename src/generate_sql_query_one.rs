@@ -5,9 +5,9 @@ use syn::ItemFn;
 use crate::{Connector, SqlFunError, TokioPostgresCodeGenerator, get_result_type_args};
 use sql_fun_core::{SqlFunArgs, SqlFunMetadata};
 
-/// generate sql_query_one
+/// generate `sql_query_one`
 pub fn generate_sql_query_one(
-    sql_str: String,
+    sql_str: &str,
     item: TokenStream,
 ) -> Result<TokenStream, SqlFunError> {
     let args = SqlFunArgs::try_from_env()?;
@@ -21,7 +21,7 @@ pub fn generate_sql_query_one(
         return Err(SqlFunError::custom("function must be async"));
     }
 
-    code_generator_builder.set_sql(&function_ast, &sql_str)?;
+    code_generator_builder.set_sql(&function_ast, sql_str)?;
 
     let (row_type, error_type) = get_result_type_args(&function_ast)?;
 

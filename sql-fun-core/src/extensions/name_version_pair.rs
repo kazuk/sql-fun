@@ -308,8 +308,7 @@ mod test_parsers {
 }
 
 impl ExtensionNameVersionPair {
-    pub(crate) fn parser<Input>()
-    -> impl Parser<Input, Output = Result<ExtensionNameVersionPair, ExtensionConfigError>>
+    pub(crate) fn parser<Input>() -> impl Parser<Input, Output = Result<Self, ExtensionConfigError>>
     where
         Input: Stream<Token = char>,
         Input::Error: ParseError<Input::Token, Input::Range, Input::Position>,
@@ -322,7 +321,7 @@ impl ExtensionNameVersionPair {
                 let version = ver
                     .map(|v| ExtensionVersion::try_from(v.as_str()))
                     .transpose()?;
-                ExtensionNameVersionPair::try_new(&name, &version)
+                Self::try_new(&name, &version)
             })
     }
 }

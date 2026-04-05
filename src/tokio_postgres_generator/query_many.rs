@@ -3,7 +3,7 @@ use quote::quote;
 
 impl TokioPostgresCodeGenerator {
     pub fn generate_query_many(self) -> proc_macro2::TokenStream {
-        let TokioPostgresCodeGenerator {
+        let Self {
             row_type,
             error_type: _,
             client_arg_name,

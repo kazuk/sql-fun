@@ -1,4 +1,3 @@
-mod cli_sub_command;
 mod error;
 mod impl_metadata;
 mod impl_sql_fun_home;
@@ -12,7 +11,6 @@ use std::{collections::HashMap, fmt::Display, path::PathBuf};
 use clap::Parser;
 
 pub use self::{
-    cli_sub_command::CliSubCommand,
     error::SqlFunArgsError,
     init_args::InitializeArgs,
     log_args::{LoggingArgs, LoggingArgsBuilder},
@@ -33,7 +31,7 @@ pub enum ConfigurationKind {
 impl Display for ConfigurationKind {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         match self {
-            ConfigurationKind::EngineVersion => write!(f, "Database engine version"),
+            Self::EngineVersion => write!(f, "Database engine version"),
         }
     }
 }
@@ -100,12 +98,6 @@ pub struct SqlFunArgs {
     #[clap(long, env = Self::SQL_FUN_NO_BUILTIN)]
     #[builder(default)]
     no_builtin_tables: bool,
-
-    /// Subcommand to execute (internal or external)
-    #[clap(subcommand)]
-    #[serde(skip)]
-    #[builder(setter(into, strip_option), default)]
-    command: Option<CliSubCommand>,
 }
 
 impl SqlFunArgsBuilder {
@@ -161,32 +153,7 @@ fn parse_bool_env(value: &str) -> Result<bool, SqlFunArgsError> {
     }
 }
 
-#[cfg(test)]
-mod test_sql_fun_args_builder {
-    use std::collections::HashMap;
-
-    use testresult::TestResult;
-
-    use crate::SqlFunArgs;
-
-    #[test]
-    fn test_builder() -> TestResult {
-        let mut builder = SqlFunArgs::builder(&HashMap::default())?;
-        let args = builder.sql_fun_home("sql-fun-home").build()?;
-
-        assert_matches::assert_matches!(args.command(), None);
-
-        Ok(())
-    }
-}
-
 impl SqlFunArgs {
-    /// returns true for builtin subcommand
-    #[must_use]
-    pub fn is_builtin(&self) -> bool {
-        matches!(self.command, Some(CliSubCommand::Initialize(_)))
-    }
-
     /// load metadata
     ///
     /// # Errors
@@ -217,12 +184,6 @@ impl SqlFunArgs {
         metadata: &SqlFunMetadata,
     ) -> Result<Option<PathBuf>, SqlFunArgsError> {
         self.metadata_args.cte_catalog_dir(metadata)
-    }
-
-    /// get command
-    #[must_use]
-    pub fn command(&self) -> &Option<CliSubCommand> {
-        &self.command
     }
 
     /// get `PostgreSQL` version
@@ -363,20 +324,12 @@ impl SqlFunArgs {
     }
 }
 
-/// deamon control args
-#[derive(clap::Parser, Debug, Clone, serde::Serialize, serde::Deserialize)]
-pub struct DaemonControlArgs {
-    /// daemon extension name
-    daemon_name: String,
-    /// daemon arguments
-    daemon_args: Vec<String>,
-}
 
 impl SqlFunArgs {
     /// Initialize and parse arguments
     #[must_use]
     pub fn parse_args() -> Self {
-        let mut args = SqlFunArgs::parse();
+        let mut args = Self::parse();
         if args.verbose {
             args.log_args.set_log_level("debug");
         }
@@ -389,7 +342,7 @@ impl SqlFunArgs {
     ///
     /// Returns [`SqlFunArgsError`] if failed
     pub fn try_from_env() -> Result<Self, SqlFunArgsError> {
-        let mut args = SqlFunArgs::try_parse_from(Vec::<String>::default())?;
+        let mut args = Self::try_parse_from(Vec::<String>::default())?;
         if args.verbose {
             args.log_args.set_log_level("debug");
         }
@@ -407,12 +360,7 @@ mod tests {
 
     #[test]
     pub fn test_schema_file() -> TestResult {
-        let args = SqlFunArgs::try_parse_from(vec![
-            "sqlfun",
-            "--sql-fun-home",
-            "../sql-fun-home",
-            "subcmd",
-        ])?;
+        let args = SqlFunArgs::try_parse_from(vec!["sqlfun", "--sql-fun-home", "../sql-fun-home"])?;
         let metadata_file = args.metadata_file()?;
         let expect_file = metadata_file.with_file_name("sqlfun.develop.sql");
         let mut created = false;

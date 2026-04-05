@@ -33,7 +33,7 @@ impl CteStatement {
         context: TParseContext,
         syn: crate::syn::CommonTableExpr,
         tokens: &IVec<ScanToken>,
-    ) -> Result<(CteStatement, TParseContext), AnalysisError>
+    ) -> Result<(Self, TParseContext), AnalysisError>
     where
         TParseContext: ParseContext,
     {
@@ -44,25 +44,25 @@ impl CteStatement {
             let SemAst::SelectStatement(s) = sem else {
                 AnalysisError::raise_unexpected_none("SemAst::SelectStatement")?
             };
-            Ok((CteStatement::Select(Box::new(s)), new_context))
+            Ok((Self::Select(Box::new(s)), new_context))
         } else if let Some(insert) = query.as_insert_stmt().as_inner() {
             let (sem, new_context) = analyze_insert_statement(context, &None, insert)?;
             let SemAst::InsertStatement(s) = sem else {
                 AnalysisError::raise_unexpected_none("SemAst::InsertStatement")?
             };
-            Ok((CteStatement::Insert(s), new_context))
+            Ok((Self::Insert(s), new_context))
         } else if let Some(update) = query.as_update_stmt().as_inner() {
             let (sem, new_context) = analyze_update_statement(context, &None, update)?;
             let SemAst::UpdateStatement(s) = sem else {
                 AnalysisError::raise_unexpected_none("SemAst::UpdateStatement")?
             };
-            Ok((CteStatement::Update(s), new_context))
+            Ok((Self::Update(s), new_context))
         } else if let Some(delete) = query.as_delete_stmt().as_inner() {
             let (sem, new_context) = analyze_delete_statement(context, &None, delete)?;
             let SemAst::DeleteStatement(s) = sem else {
                 AnalysisError::raise_unexpected_none("SemAst::DeleteStatement")?
             };
-            Ok((CteStatement::Delete(s), new_context))
+            Ok((Self::Delete(s), new_context))
         } else {
             AnalysisError::raise_unexpected_none("common_table_expr.query")?
         }
@@ -141,11 +141,11 @@ impl WithClause {
         mut context: TParseContext,
         syn: crate::syn::WithClauseOpt,
         tokens: &IVec<ScanToken>,
-    ) -> Result<(WithClause, TParseContext), AnalysisError>
+    ) -> Result<(Self, TParseContext), AnalysisError>
     where
         TParseContext: ParseContext,
     {
-        let mut with = WithClause::default();
+        let mut with = Self::default();
         let Some(ctes) = syn.get_ctes().as_inner() else {
             return Ok((with, context));
         };

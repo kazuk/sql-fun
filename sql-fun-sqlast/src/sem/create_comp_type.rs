@@ -78,6 +78,40 @@ impl CreateCompositType {
             fields: fields.clone(),
         }
     }
+
+    /// analyze [`crate::syn::CompositeTypeStmt`]
+    #[tracing::instrument(skip(context, _parent_schema, syn))]
+    pub fn analyze_create_comp_type<TParseContext>(
+        context: TParseContext,
+        _parent_schema: &Option<String>,
+        syn: crate::syn::CompositeTypeStmt,
+    ) -> Result<AstAndContextPair<TParseContext>, AnalysisError>
+    where
+        TParseContext: ParseContext,
+    {
+        let Some(typevar) = syn.get_typevar().as_inner() else {
+            AnalysisError::raise_unexpected_none("composite_type_stmt.typevar")?
+        };
+        let Some(coldeflist) = syn.get_coldeflist().map(|v| v.as_column_def()) else {
+            AnalysisError::raise_unexpected_none("composite_type.coldeflist")?
+        };
+        let mut fields = CompositeFieldCollection::default();
+        for coldef in coldeflist {
+            fields.push(CompositeFieldDefinition::try_from(&coldef)?);
+        }
+
+        let name = FullName::try_from(typevar)?;
+        let comp_def = Self {
+            type_ref: Some(TypeReference::from_full_name(name.clone())),
+            fields,
+        };
+        let result_context = context.apply_create_comp_type(&comp_def)?;
+
+        Ok(AstAndContextPair::new(
+            SemAst::CreateCompType(comp_def),
+            result_context,
+        ))
+    }
 }
 
 #[derive(Debug, Clone, Eq, Hash, PartialEq, serde::Serialize, serde::Deserialize)]
@@ -129,35 +163,14 @@ impl TryFrom<&ColumnDef> for CompositeFieldDefinition {
 }
 
 /// analyze [`crate::syn::CompositeTypeStmt`]
-#[tracing::instrument(skip(context, _parent_schema, syn))]
+#[deprecated = "use CreateCompositType::analyze_create_comp_type"]
 pub fn analyze_create_comp_type<TParseContext>(
     context: TParseContext,
-    _parent_schema: &Option<String>,
+    parent_schema: &Option<String>,
     syn: crate::syn::CompositeTypeStmt,
 ) -> Result<AstAndContextPair<TParseContext>, AnalysisError>
 where
     TParseContext: ParseContext,
 {
-    let Some(typevar) = syn.get_typevar().as_inner() else {
-        AnalysisError::raise_unexpected_none("composite_type_stmt.typevar")?
-    };
-    let Some(coldeflist) = syn.get_coldeflist().map(|v| v.as_column_def()) else {
-        AnalysisError::raise_unexpected_none("composite_type.coldeflist")?
-    };
-    let mut fields = CompositeFieldCollection::default();
-    for coldef in coldeflist {
-        fields.push(CompositeFieldDefinition::try_from(&coldef)?);
-    }
-
-    let name = FullName::try_from(typevar)?;
-    let comp_def = CreateCompositType {
-        type_ref: Some(TypeReference::from_full_name(name.clone())),
-        fields,
-    };
-    let result_context = context.apply_create_comp_type(&comp_def)?;
-
-    Ok(AstAndContextPair::new(
-        SemAst::CreateCompType(comp_def),
-        result_context,
-    ))
+    CreateCompositType::analyze_create_comp_type(context, parent_schema, syn)
 }

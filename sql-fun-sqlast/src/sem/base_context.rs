@@ -11,19 +11,16 @@ use crate::{
     StringSpan, TrieMap,
     sem::{
         AnalysisError, AnalysisProblem, BaseParseContext, CastDefinition, CreateTable, FullName,
-        IndexInfoRead, LocalName, OperatorDefinition, SchemaName, TypeDefinition, TypeReference,
-        ViewLike, parse_context::SearchPathRead,
+        FunctionInfoRead, FunctionOverloadCollection, IndexInfoRead, LocalName, OperatorDefinition,
+        SchemaName, TypeDefinition, TypeReference, ViewLike,
+        parse_context::{
+            OperatorInfoRead, SearchPathRead, SequenceInfoRead, TableInfoRead, TypeInfoRead,
+            ViewInfoRead,
+        },
     },
 };
 use serde::de::DeserializeOwned;
 use sql_fun_core::{PostgresBuiltinPaths, SqlFunArgs, SqlFunMetadata};
-
-use super::{
-    FunctionInfoRead, FunctionOverloadCollection,
-    parse_context::{
-        OperatorInfoRead, SequenceInfoRead, TableInfoRead, TypeInfoRead, ViewInfoRead,
-    },
-};
 
 /// schema informations for Builtin and extensions
 #[derive(Debug)]

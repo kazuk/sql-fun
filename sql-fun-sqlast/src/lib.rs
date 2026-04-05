@@ -15,13 +15,14 @@ use sql_fun_core::IVec;
 use self::sql_file::read_sql_file;
 pub use self::trie_map::TrieMap;
 
-use std::{io::SeekFrom, string::String as StdString};
+use std::{io::SeekFrom, path::Path, string::String as StdString};
 
 use crate::{
-    sem::{ParseContext, SemAst},
+    sem::{BaseParseContext, ParseContext, SchemaFileContext, SemAst},
     syn::ParseResult,
 };
 
+pub use self::schema_dump_file::{ParseDumpFileError, ParsedSchemaDump};
 pub use sql_fun_core::{SqlFunArgs, SqlFunArgsBuilder, SqlFunArgsError};
 
 /// Semantic AST and parse context result
@@ -39,25 +40,77 @@ where
     }
 }
 
+/// dialect for PostgreSQL
+pub struct PostgresDialect;
+
+impl PostgresDialect {
+    /// parse SQL statement
+    ///
+    /// # Errors
+    ///
+    /// - [`pg_query::Error`] : syntax error
+    ///
+    pub fn parse(sql: &str) -> Result<ParseResult, pg_query::Error> {
+        let parse_result = ::pg_query::parse(sql)?;
+        Ok(ParseResult::from(parse_result.protobuf))
+    }
+
+    /// scan SQL Statement
+    pub fn scan(sql: &str) -> Result<IVec<crate::syn::ScanToken>, pg_query::Error> {
+        let scan_result = ::pg_query::scan(sql)?;
+        let mut tokens = Vec::new();
+        for token in scan_result.tokens {
+            tokens.push(crate::syn::ScanToken::from(token));
+        }
+        Ok(tokens.into())
+    }
+
+    /// load schema dump file
+    ///
+    /// # Errors
+    ///
+    /// - [`ParseDumpFileError`]
+    ///
+    pub fn parse_schema_file<TContext>(
+        dump_file: &Path,
+        input_context: TContext,
+    ) -> Result<ParsedSchemaDump<TContext>, ParseDumpFileError>
+    where
+        TContext: BaseParseContext + std::fmt::Debug,
+    {
+        let sql_statements = read_sql_file(dump_file)?;
+
+        let statements = ::pg_query::split_with_parser(&sql_statements)?;
+        let mut context = SchemaFileContext::new(dump_file, input_context);
+        let mut sem_results = Vec::new();
+        for statement in statements {
+            context.set_statement_span(StringSpan::from_str_in_str(&sql_statements, statement));
+            let syn = Self::parse(statement)?;
+            let tokens = Self::scan(statement)?;
+            let AstAndContextPair(sem, rcontext) =
+                SemAst::semantic_analysis(context, syn, &tokens)?;
+            sem_results.push(sem);
+            context = rcontext;
+        }
+        Ok(ParsedSchemaDump::new(sem_results, context))
+    }
+}
+
 /// parse SQL statement
 ///
 /// # Errors
 ///
 /// - [`pg_query::Error`] : syntax error
 ///
+#[deprecated = "use PostgresDialect::parse"]
 pub fn parse(sql: &str) -> Result<ParseResult, pg_query::Error> {
-    let parse_result = ::pg_query::parse(sql)?;
-    Ok(ParseResult::from(parse_result.protobuf))
+    PostgresDialect::parse(sql)
 }
 
 /// scan SQL Statement
+#[deprecated = "use PostgresDialect::scan"]
 pub fn scan(sql: &str) -> Result<IVec<crate::syn::ScanToken>, pg_query::Error> {
-    let scan_result = ::pg_query::scan(sql)?;
-    let mut tokens = Vec::new();
-    for token in scan_result.tokens {
-        tokens.push(crate::syn::ScanToken::from(token));
-    }
-    Ok(tokens.into())
+    PostgresDialect::scan(sql)
 }
 
 fn offset_in_string(haystack: &StdString, needle: &str) -> Option<usize> {
@@ -129,8 +182,6 @@ impl StringSpan {
     }
 }
 
-pub use self::schema_dump_file::{ParseDumpFileError, ParsedSchemaDump, parse_schema_file};
-
 #[cfg(test)]
 pub mod test_helpers;
 
@@ -140,11 +191,11 @@ mod tests {
     use std::path::PathBuf;
 
     use crate::{
+        PostgresDialect,
         sem::{BaseContext, BaseParseContext},
         syn::{ListOpt, Opt},
     };
 
-    use super::{parse, parse_schema_file};
     use clap::Parser;
     use sql_fun_core::SqlFunArgs;
     use testresult::TestResult;
@@ -198,7 +249,7 @@ mod tests {
 
     #[test]
     fn test_parse_simple_query() -> TestResult {
-        let result = parse("select * from users where id=0")?;
+        let result = PostgresDialect::parse("select * from users where id=0")?;
         let Some(relname) = result
             .get_stmts()
             .get(0)
@@ -219,7 +270,7 @@ mod tests {
 
     #[test]
     fn test_create_composit_type() -> TestResult {
-        let result = parse("CREATE TYPE compfoo AS (f1 int, f2 text);")?;
+        let result = PostgresDialect::parse("CREATE TYPE compfoo AS (f1 int, f2 text);")?;
         let stmt = result.get_stmts().get(0).get_stmt();
 
         let Some(ct) = stmt.as_composite_type_stmt().as_inner() else {
@@ -233,7 +284,7 @@ mod tests {
 
     #[test]
     fn test_create_range_type() -> TestResult {
-        let result = parse(
+        let result = PostgresDialect::parse(
             "CREATE TYPE float8_range AS RANGE (subtype = float8, subtype_diff = float8mi);",
         )?;
         let stmt = result.get_stmts().get(0).get_stmt();
@@ -249,7 +300,7 @@ mod tests {
 
     #[test]
     fn test_create_base_type() -> TestResult {
-        let result = parse(
+        let result = PostgresDialect::parse(
             "CREATE TYPE box (
     INTERNALLENGTH = 16,
     INPUT = my_box_in_function,
@@ -278,16 +329,16 @@ mod tests {
         let builtin_context = BaseContext::new(context_args.clone())?;
         let home_path = PathBuf::from(env!("SQL_FUN_HOME"));
         let builtin = home_path.join("postgres/17/schema.sql");
-        let builtin = parse_schema_file(&builtin, builtin_context)?;
+        let builtin = PostgresDialect::parse_schema_file(&builtin, builtin_context)?;
         analyze_context.extend(Box::new(builtin));
 
         let tablefunc_ext = home_path.join("postgres/17/extension/tablefunc--1.0.sql");
         let input_context = BaseContext::new(context_args.clone())?;
-        let tablefunc_ext = parse_schema_file(&tablefunc_ext, input_context)?;
+        let tablefunc_ext = PostgresDialect::parse_schema_file(&tablefunc_ext, input_context)?;
 
         analyze_context.extend(Box::new(tablefunc_ext));
         let file = PathBuf::from("../examples/adventure-works/schema.develop.sql");
-        let _dump = parse_schema_file(&file, analyze_context)?;
+        let _dump = PostgresDialect::parse_schema_file(&file, analyze_context)?;
         Ok(())
     }
 }

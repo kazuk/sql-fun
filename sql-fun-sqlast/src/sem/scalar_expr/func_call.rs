@@ -8,7 +8,7 @@ use crate::{
     syn::{ListOpt, ScanToken},
 };
 
-use super::{SemScalarExprNode, analyze_scaler_expr};
+use super::SemScalarExprNode;
 
 mod implementation {
     use sql_fun_core::IVec;
@@ -201,7 +201,7 @@ where
         let mut arg_exprs = Vec::new();
         for arg in args {
             let (sem_arg, new_context) =
-                analyze_scaler_expr(context, with_clause, from_clause, arg, tokens)?;
+                SemScalarExpr::analyze_scaler_expr(context, with_clause, from_clause, arg, tokens)?;
             context = new_context;
             arg_exprs.push(sem_arg);
         }

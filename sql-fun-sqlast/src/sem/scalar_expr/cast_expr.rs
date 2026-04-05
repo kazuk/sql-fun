@@ -3,7 +3,7 @@ use sql_fun_core::IVec;
 use crate::{
     sem::{
         AnalysisError, AnalysisProblem, FromClause, FullName, ParseContext, SemScalarExpr,
-        TypeReference, WithClause, analyze_scaler_expr,
+        TypeReference, WithClause,
     },
     syn::{Opt, ScanToken},
 };
@@ -84,7 +84,7 @@ where
         let target_type = TypeReference::from_full_name(FullName::try_from(target_type)?);
 
         let (arg, new_context) =
-            analyze_scaler_expr(context, with_clause, from_clause, arg, tokens)?;
+            SemScalarExpr::analyze_scaler_expr(context, with_clause, from_clause, arg, tokens)?;
         context = new_context;
 
         if let Some(from_type) = arg.get_type() {

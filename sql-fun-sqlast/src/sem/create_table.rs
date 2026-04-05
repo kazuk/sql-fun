@@ -14,7 +14,7 @@ use crate::{
         AlterTable, AnalysisError, AnalysisProblem, AstAndContextPair, Constraint, FullName,
         ImplicitChange, ParseContext, SemAst, alter_table::AlterObjSubCommand,
     },
-    syn::{CreateStmt, ListOpt, Opt},
+    syn::{ListOpt, Opt},
 };
 
 #[macro_use]
@@ -211,59 +211,72 @@ impl CreateTable {
             Vec::new()
         }
     }
+
+    /// analyze [`crate::syn::CreateStmt`]
+    #[tracing::instrument(skip(context))]
+    pub fn analyze_create_stmt<TParseContext>(
+        mut context: TParseContext,
+        parent_schema: &Option<String>,
+        create: crate::syn::CreateStmt,
+    ) -> Result<AstAndContextPair<TParseContext>, AnalysisError>
+    where
+        TParseContext: ParseContext,
+    {
+        let table_name = create.get_relation().unwrap();
+        let table_name = TableName::try_from(table_name)?;
+        let Some(column_defs) = create.get_table_elts().map(|f| f.as_column_def()) else {
+            AnalysisError::raise_unexpected_none("create_stmt.get_table_elts")?
+        };
+        let mut cols: Vec<ColumnDefinition> = Vec::new();
+        for column_def in column_defs {
+            let colname = column_def.get_colname();
+            let colname = ColumnName::new(&colname);
+            let Some(type_name) = column_def.get_type_name().as_inner() else {
+                AnalysisError::raise_unexpected_none("column_def.get_type_name")?
+            };
+            let is_not_null = column_def.get_is_not_null();
+
+            let key = FullName::try_from(type_name)?;
+            let type_ref = if let Some(sem_type) = context.get_type(&key).cloned() {
+                if let Some(type_ref) = sem_type.type_reference().cloned() {
+                    Some(type_ref)
+                } else {
+                    context.report_problem(AnalysisProblem::unexpected_dynamic_type(&sem_type))?;
+                    None
+                }
+            } else {
+                context.report_problem(AnalysisProblem::column_type_not_found(
+                    &table_name,
+                    &colname,
+                    &key,
+                ))?;
+                None
+            };
+
+            cols.push(ColumnDefinition::new(
+                &Some(colname),
+                type_ref.as_ref(),
+                Some(is_not_null),
+            ));
+        }
+        let table_def = Self::new(table_name, cols);
+        let result_context = context.apply_create_table(&table_def)?;
+        Ok(AstAndContextPair::new(
+            SemAst::CreateTable(table_def),
+            result_context,
+        ))
+    }
 }
 
 /// analyze [`crate::syn::CreateStmt`]
-#[tracing::instrument(skip(context))]
+#[deprecated = "use CreateTable::analyze_create_stmt"]
 pub fn analyze_create_stmt<TParseContext>(
-    mut context: TParseContext,
+    context: TParseContext,
     parent_schema: &Option<String>,
-    create: CreateStmt,
+    create: crate::syn::CreateStmt,
 ) -> Result<AstAndContextPair<TParseContext>, AnalysisError>
 where
     TParseContext: ParseContext,
 {
-    let table_name = create.get_relation().unwrap();
-    let table_name = TableName::try_from(table_name)?;
-    let Some(column_defs) = create.get_table_elts().map(|f| f.as_column_def()) else {
-        AnalysisError::raise_unexpected_none("create_stmt.get_table_elts")?
-    };
-    let mut cols: Vec<ColumnDefinition> = Vec::new();
-    for column_def in column_defs {
-        let colname = column_def.get_colname();
-        let colname = ColumnName::new(&colname);
-        let Some(type_name) = column_def.get_type_name().as_inner() else {
-            AnalysisError::raise_unexpected_none("column_def.get_type_name")?
-        };
-        let is_not_null = column_def.get_is_not_null();
-
-        let key = FullName::try_from(type_name)?;
-        let type_ref = if let Some(sem_type) = context.get_type(&key).cloned() {
-            if let Some(type_ref) = sem_type.type_reference().cloned() {
-                Some(type_ref)
-            } else {
-                context.report_problem(AnalysisProblem::unexpected_dynamic_type(&sem_type))?;
-                None
-            }
-        } else {
-            context.report_problem(AnalysisProblem::column_type_not_found(
-                &table_name,
-                &colname,
-                &key,
-            ))?;
-            None
-        };
-
-        cols.push(ColumnDefinition::new(
-            &Some(colname),
-            type_ref.as_ref(),
-            Some(is_not_null),
-        ));
-    }
-    let table_def = CreateTable::new(table_name, cols);
-    let result_context = context.apply_create_table(&table_def)?;
-    Ok(AstAndContextPair::new(
-        SemAst::CreateTable(table_def),
-        result_context,
-    ))
+    CreateTable::analyze_create_stmt(context, parent_schema, create)
 }

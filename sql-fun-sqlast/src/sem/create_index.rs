@@ -3,7 +3,7 @@ use sql_fun_core::IVec;
 use crate::{
     sem::{
         AnalysisError, AstAndContextPair, ColumnName, FromClause, ParseContext, SemAst,
-        SemScalarExpr, TableName, WithClause, analyze_scaler_expr,
+        SemScalarExpr, TableName, WithClause,
     },
     syn::{ListOpt, Opt, ScanToken, SortByDir},
 };
@@ -240,7 +240,7 @@ impl CreateIndex {
         let mut key_columns = IndexElementCollection::default();
         for key in keys {
             let element = if let Some(expr) = key.get_expr().as_inner() {
-                let (scaler_expr, new_context) = analyze_scaler_expr(
+                let (scaler_expr, new_context) = SemScalarExpr::analyze_scaler_expr(
                     context,
                     &WithClause::default(),
                     &FromClause::default(),
@@ -336,53 +336,69 @@ mod analyze_index_elem_tests {
     }
 }
 
+impl CreateIndex {
+    /// analyze [`crate::syn::IndexStmt`]
+    pub fn analyze_index_stmt<TParseContext>(
+        mut context: TParseContext,
+        _parent_schema: &Option<String>,
+        syn: crate::syn::IndexStmt,
+        tokens: &IVec<ScanToken>,
+    ) -> Result<AstAndContextPair<TParseContext>, AnalysisError>
+    where
+        TParseContext: ParseContext,
+    {
+        let Some(table) = syn.get_relation().as_inner() else {
+            AnalysisError::raise_unexpected_none("indexstmt.relation")?
+        };
+        let Some(keys) = syn.get_index_params().map(|v| v.as_index_elem()) else {
+            AnalysisError::raise_unexpected_none("indexstmt.index_params")?
+        };
+
+        let name = syn.get_idxname();
+        let table = TableName::try_from(table)?;
+        let unique = syn.get_unique();
+
+        let (key_columns, new_context) = Self::analyze_index_elem(context, keys, tokens)?;
+        context = new_context;
+
+        let include_columns =
+            if let Some(includes) = syn.get_index_including_params().map(|v| v.as_index_elem()) {
+                let (cols, new_context) = Self::analyze_index_elem(context, includes, tokens)?;
+                context = new_context;
+                cols
+            } else {
+                IndexElementCollection::default()
+            };
+
+        let create_index = Self {
+            name,
+            table,
+            key_columns,
+            include_columns,
+            unique,
+        };
+
+        context = context.apply_create_index(&create_index)?;
+
+        Ok(AstAndContextPair::new(
+            SemAst::CreateIndex(create_index),
+            context,
+        ))
+    }
+}
+
 /// analyze [`crate::syn::IndexStmt`]
+#[deprecated = "use CreateIndex::analyze_index_stmt"]
 pub fn analyze_index_stmt<TParseContext>(
-    mut context: TParseContext,
-    _parent_schema: &Option<String>,
+    context: TParseContext,
+    parent_schema: &Option<String>,
     syn: crate::syn::IndexStmt,
     tokens: &IVec<ScanToken>,
 ) -> Result<AstAndContextPair<TParseContext>, AnalysisError>
 where
     TParseContext: ParseContext,
 {
-    let Some(table) = syn.get_relation().as_inner() else {
-        AnalysisError::raise_unexpected_none("indexstmt.relation")?
-    };
-    let Some(keys) = syn.get_index_params().map(|v| v.as_index_elem()) else {
-        AnalysisError::raise_unexpected_none("indexstmt.index_params")?
-    };
-
-    let name = syn.get_idxname();
-    let table = TableName::try_from(table)?;
-    let unique = syn.get_unique();
-
-    let (key_columns, new_context) = CreateIndex::analyze_index_elem(context, keys, tokens)?;
-    context = new_context;
-
-    let include_columns =
-        if let Some(includes) = syn.get_index_including_params().map(|v| v.as_index_elem()) {
-            let (cols, new_context) = CreateIndex::analyze_index_elem(context, includes, tokens)?;
-            context = new_context;
-            cols
-        } else {
-            IndexElementCollection::default()
-        };
-
-    let create_index = CreateIndex {
-        name,
-        table,
-        key_columns,
-        include_columns,
-        unique,
-    };
-
-    context = context.apply_create_index(&create_index)?;
-
-    Ok(AstAndContextPair::new(
-        SemAst::CreateIndex(create_index),
-        context,
-    ))
+    CreateIndex::analyze_index_stmt(context, parent_schema, syn, tokens)
 }
 
 #[cfg(test)]
@@ -418,7 +434,8 @@ mod analyze_index_stmt_tests {
         let tokens: IVec<ScanToken> = IVec::default();
 
         let AstAndContextPair(ast, context) =
-            analyze_index_stmt(test_context, &None, index_stmt, &tokens).expect("analyze index");
+            CreateIndex::analyze_index_stmt(test_context, &None, index_stmt, &tokens)
+                .expect("analyze index");
 
         let SemAst::CreateIndex(create_index) = ast else {
             panic!("expected create index ast");

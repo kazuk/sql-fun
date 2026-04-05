@@ -6,8 +6,7 @@ use crate::{
     AstAndContextPair,
     sem::{
         AliasSpec, AnalysisError, ColumnName, DataSourceRowFunctions, DataSourceRowsFromFunc,
-        FromClause, FullName, JoinKind, ParseContext, SemAst, WithClause, analyze_node,
-        analyze_scaler_expr,
+        FromClause, FullName, JoinKind, ParseContext, SemAst, SemScalarExpr, WithClause,
         data_source::{JoinExprDataSource, join_expr::JoinUsingClause},
     },
     syn::{ListOpt, Opt, ScanToken},
@@ -34,7 +33,8 @@ impl DataSource {
         let Some(query) = range_subsel.get_subquery().as_inner() else {
             AnalysisError::raise_unexpected_none("range_subselect.subquery")?
         };
-        let AstAndContextPair(sem, new_context) = analyze_node(context, &None, query, tokens)?;
+        let AstAndContextPair(sem, new_context) =
+            SemAst::analyze_node(context, &None, query, tokens)?;
         let SemAst::SelectStatement(s) = sem else {
             AnalysisError::raise_unexpected_none("subquery is not select?")?
         };
@@ -140,8 +140,13 @@ impl DataSource {
         from_clause.push(right_source.clone());
 
         let qualifications = if let Some(qualifications) = join_expr.get_quals().as_inner() {
-            let (quals, new_context) =
-                analyze_scaler_expr(context, with_clause, &from_clause, qualifications, tokens)?;
+            let (quals, new_context) = SemScalarExpr::analyze_scaler_expr(
+                context,
+                with_clause,
+                &from_clause,
+                qualifications,
+                tokens,
+            )?;
             context = new_context;
             Some(quals)
         } else {

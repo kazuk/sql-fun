@@ -5,10 +5,7 @@ mod member_ref;
 use sql_fun_core::IVec;
 
 use crate::{
-    sem::{
-        AnalysisError, FromClause, ParseContext, SemScalarExpr, TypeReference, WithClause,
-        analyze_scaler_expr,
-    },
+    sem::{AnalysisError, FromClause, ParseContext, SemScalarExpr, TypeReference, WithClause},
     syn::{ListOpt, Opt, ScanToken},
 };
 
@@ -83,7 +80,7 @@ where
             AnalysisError::raise_unexpected_none("aindirection.indirection")?
         };
         let (mut arg, new_context) =
-            analyze_scaler_expr(context, with_clause, from_clause, arg, tokens)?;
+            SemScalarExpr::analyze_scaler_expr(context, with_clause, from_clause, arg, tokens)?;
         context = new_context;
 
         for item in indirection {

@@ -6,7 +6,7 @@ use crate::{
     sem::{
         AnalysisError, AstAndContextPair, DeleteStatement, InsertStatement, ParseContext,
         SelectStatement, SemAst, UpdateStatement, analyze_delete_statement,
-        analyze_insert_statement, analyze_select, analyze_update_statement,
+        analyze_insert_statement, analyze_update_statement,
         create_table::{ColumnDefinition, ColumnName},
     },
     syn::{ListOpt, Opt, ScanToken},
@@ -40,7 +40,8 @@ impl CteStatement {
         let query = syn.get_ctequery();
 
         if let Some(select) = query.as_select_stmt().as_inner() {
-            let AstAndContextPair(sem, new_context) = analyze_select(context, select, tokens)?;
+            let AstAndContextPair(sem, new_context) =
+                SelectStatement::analyze_select(context, select, tokens)?;
             let SemAst::SelectStatement(s) = sem else {
                 AnalysisError::raise_unexpected_none("SemAst::SelectStatement")?
             };

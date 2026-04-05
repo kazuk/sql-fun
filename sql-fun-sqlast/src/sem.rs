@@ -41,9 +41,10 @@ mod view_like;
 
 pub mod problem;
 
+#[expect(deprecated)]
 pub use self::{
-    alter_owner::{AlterOwner, analyze_alter_owner},
-    alter_seq::{AlterSequence, analyze_alter_seq},
+    alter_owner::AlterOwner,
+    alter_seq::AlterSequence,
     alter_table::{AlterTable, AlterView, analyze_alter_statement},
     base_context::BaseContext,
     cast::{CastContext, CastDefinition},

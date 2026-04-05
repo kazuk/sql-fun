@@ -54,10 +54,59 @@ impl CreateTableAs {
     pub(crate) fn has_column(&self, _column_name: &super::ColumnName) -> bool {
         todo!()
     }
+
+    /// analyze [`crate::syn::CreateTableAsStmt`]
+    #[tracing::instrument(skip_all)]
+    pub fn analyze_create_table_as<TParseContext>(
+        context: TParseContext,
+        parent_schema: &Option<String>,
+        syn: crate::syn::CreateTableAsStmt,
+        tokens: &IVec<ScanToken>,
+    ) -> Result<AstAndContextPair<TParseContext>, AnalysisError>
+    where
+        TParseContext: ParseContext,
+    {
+        let Some(obj_type) = syn.get_objtype().as_inner() else {
+            AnalysisError::raise_unexpected_none("create_table_as.obj_type")?
+        };
+
+        let Some(into) = syn.get_into().as_inner() else {
+            AnalysisError::raise_unexpected_none("create_table_as.into")?
+        };
+        let Some(into_rel) = into.get_rel().as_inner() else {
+            AnalysisError::raise_unexpected_none("into_clause.rel")?
+        };
+        let name = FullName::try_from(into_rel.clone())?;
+        let Some(q) = syn.get_query().as_inner() else {
+            AnalysisError::raise_unexpected_none("create_table_as.query")?
+        };
+        let AstAndContextPair(sem, context) =
+            SemAst::analyze_node(context, parent_schema, q, tokens)?;
+        let context = match &sem {
+            SemAst::SelectStatement(s) => {
+                let columns = s.result_columns().column_definitions()?;
+                let create_table = CreateTable::new(TableName::try_from(into_rel)?, columns);
+                context.apply_create_table(&create_table)?
+            }
+            _ => AnalysisError::raise_unexpected_none("SemAst As Select statement")?,
+        };
+        let create_table_as = Self {
+            name,
+            query: Box::new(sem),
+            obj_type,
+            owner: None,
+            alter_statements: Vec::new(),
+        };
+        let result_context = context.apply_create_table_as(&create_table_as)?;
+        Ok(AstAndContextPair::new(
+            SemAst::CreateTableAs(create_table_as),
+            result_context,
+        ))
+    }
 }
 
 /// analyze [`crate::syn::CreateTableAsStmt`]
-#[tracing::instrument(skip_all)]
+#[deprecated = "use CreateTableAs::analyze_create_table_as"]
 pub fn analyze_create_table_as<TParseContext>(
     context: TParseContext,
     parent_schema: &Option<String>,
@@ -67,39 +116,5 @@ pub fn analyze_create_table_as<TParseContext>(
 where
     TParseContext: ParseContext,
 {
-    let Some(obj_type) = syn.get_objtype().as_inner() else {
-        AnalysisError::raise_unexpected_none("create_table_as.obj_type")?
-    };
-
-    let Some(into) = syn.get_into().as_inner() else {
-        AnalysisError::raise_unexpected_none("create_table_as.into")?
-    };
-    let Some(into_rel) = into.get_rel().as_inner() else {
-        AnalysisError::raise_unexpected_none("into_clause.rel")?
-    };
-    let name = FullName::try_from(into_rel.clone())?;
-    let Some(q) = syn.get_query().as_inner() else {
-        AnalysisError::raise_unexpected_none("create_table_as.query")?
-    };
-    let AstAndContextPair(sem, context) = super::analyze_node(context, parent_schema, q, tokens)?;
-    let context = match &sem {
-        SemAst::SelectStatement(s) => {
-            let columns = s.result_columns().column_definitions()?;
-            let create_table = CreateTable::new(TableName::try_from(into_rel)?, columns);
-            context.apply_create_table(&create_table)?
-        }
-        _ => AnalysisError::raise_unexpected_none("SemAst As Select statement")?,
-    };
-    let create_table_as = CreateTableAs {
-        name,
-        query: Box::new(sem),
-        obj_type,
-        owner: None,
-        alter_statements: Vec::new(),
-    };
-    let result_context = context.apply_create_table_as(&create_table_as)?;
-    Ok(AstAndContextPair::new(
-        SemAst::CreateTableAs(create_table_as),
-        result_context,
-    ))
+    CreateTableAs::analyze_create_table_as(context, parent_schema, syn, tokens)
 }

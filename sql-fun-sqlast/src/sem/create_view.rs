@@ -9,7 +9,7 @@ use crate::{
     syn::{Opt, ScanToken},
 };
 
-use super::{AnalysisError, FullName, ParseContext, SelectStatement, SemAst, analyze_select};
+use super::{AnalysisError, FullName, ParseContext, SelectStatement, SemAst};
 
 /// analyzed [`crate::syn::ViewStmt`]
 #[derive(Debug, Clone)]
@@ -77,10 +77,44 @@ impl CreateView {
     pub fn is_materialized(&self) -> bool {
         self.materialized
     }
+
+    /// analyze [`crate::syn::ViewStmt`]
+    #[tracing::instrument(skip(context))]
+    pub fn analyze_create_view<TParseContext>(
+        context: TParseContext,
+        parent_schema: &Option<String>,
+        syn: crate::syn::ViewStmt,
+        tokens: &IVec<ScanToken>,
+    ) -> Result<AstAndContextPair<TParseContext>, AnalysisError>
+    where
+        TParseContext: ParseContext,
+    {
+        let Some(view) = syn.get_view().as_inner() else {
+            AnalysisError::raise_unexpected_none("view_stmt.view")?
+        };
+        let _materialized = syn.get_options();
+
+        let Some(query) = syn.get_query().as_select_stmt().as_inner() else {
+            AnalysisError::raise_unexpected_none("view_stmt.query")?
+        };
+
+        let AstAndContextPair(select, context) =
+            SelectStatement::analyze_select(context, query, tokens)?;
+        let SemAst::SelectStatement(stmt) = select else {
+            AnalysisError::raise_unexpected_none("select_statement")?
+        };
+        let name = FullName::try_from(view)?;
+        let create_view = Self::new(&name, &stmt, &[], &Default::default(), false);
+        let context = context.apply_create_view(&create_view)?;
+        Ok(AstAndContextPair::new(
+            SemAst::CreateView(create_view),
+            context,
+        ))
+    }
 }
 
 /// analyze [`crate::syn::ViewStmt`]
-#[tracing::instrument(skip(context))]
+#[deprecated = "use analyze_create_view"]
 pub fn analyze_create_view<TParseContext>(
     context: TParseContext,
     parent_schema: &Option<String>,
@@ -90,24 +124,5 @@ pub fn analyze_create_view<TParseContext>(
 where
     TParseContext: ParseContext,
 {
-    let Some(view) = syn.get_view().as_inner() else {
-        AnalysisError::raise_unexpected_none("view_stmt.view")?
-    };
-    let _materialized = syn.get_options();
-
-    let Some(query) = syn.get_query().as_select_stmt().as_inner() else {
-        AnalysisError::raise_unexpected_none("view_stmt.query")?
-    };
-
-    let AstAndContextPair(select, context) = analyze_select(context, query, tokens)?;
-    let SemAst::SelectStatement(stmt) = select else {
-        AnalysisError::raise_unexpected_none("select_statement")?
-    };
-    let name = FullName::try_from(view)?;
-    let create_view = CreateView::new(&name, &stmt, &[], &Default::default(), false);
-    let context = context.apply_create_view(&create_view)?;
-    Ok(AstAndContextPair::new(
-        SemAst::CreateView(create_view),
-        context,
-    ))
+    CreateView::analyze_create_view(context, parent_schema, syn, tokens)
 }

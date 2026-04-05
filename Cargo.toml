@@ -119,7 +119,7 @@ tempfile = "3.27.0"
 testresult = "0.4"
 thiserror = "2.0"
 time = { version = "0.3.45", features = ["serde"] }
-tokio = { version = "1.47", features = ["full"] }
+tokio = { version = "1.51", features = ["full"] }
 tokio-postgres = "0.7"
 toml = "1.0.6"
 tracing = "0.1"

@@ -2,8 +2,8 @@ use bollard::{
     Docker,
     exec::StartExecResults,
     models::ExecConfig,
+    plugin::ContainerCreateBody,
     query_parameters::{CreateContainerOptions, CreateImageOptionsBuilder, StartContainerOptions},
-    secret::ContainerCreateBody,
 };
 use futures_util::{TryStreamExt, stream::StreamExt};
 

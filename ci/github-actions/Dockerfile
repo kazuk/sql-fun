@@ -61,6 +61,7 @@ RUN apt-get update && apt-get install -y --no-install-recommends \
 # Rust (stable)
 RUN curl -fsSL https://sh.rustup.rs | sh -s -- -y --profile minimal --default-toolchain stable \
     && rustc -V && cargo -V
+RUN rustup toolchain install nightly
 RUN rustup component add rustfmt clippy
 RUN rustup component add llvm-tools-preview --toolchain stable-x86_64-unknown-linux-gnu
 

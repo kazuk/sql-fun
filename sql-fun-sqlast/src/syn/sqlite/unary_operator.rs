@@ -1,6 +1,7 @@
 use turso_parser::ast::UnaryOperator as UnaryOperatorIn;
 
 /// unary operator
+#[derive(Debug)]
 pub enum UnaryOperator {
     /// bitwise not operator
     BitwiseNot,

@@ -1,6 +1,7 @@
 use turso_parser::ast::LikeOperator as LikeOperatorIn;
 
 /// like operator
+#[derive(Debug)]
 pub enum LikeOperator {
     /// glob
     Glob,

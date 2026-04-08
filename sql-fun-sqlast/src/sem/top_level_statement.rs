@@ -49,7 +49,7 @@ impl SemAst {
         tokens: &IVec<crate::syn::ScanToken>,
     ) -> Result<AstAndContextPair<TParseContext>, AnalysisError> {
         if let Some(create) = statement.as_create_stmt().as_inner() {
-            return CreateTable::analyze_create_stmt(context, parent_schema, create);
+            return CreateTable::analyze_create_stmt(context, parent_schema, create, tokens);
         }
 
         if let Some(create) = statement.as_create_enum_stmt().as_inner() {

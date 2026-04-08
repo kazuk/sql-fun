@@ -1,7 +1,10 @@
 use sql_fun_core::IVec;
 
 use crate::{
-    sem::{AstAndContextPair, alter_table::AlterObjSubCommand, create_table::ColumnDefinition},
+    sem::{
+        AstAndContextPair, CreateTableMode, alter_table::AlterObjSubCommand,
+        create_table::ColumnDefinition,
+    },
     syn::{ObjectType, Opt, ScanToken},
 };
 
@@ -85,7 +88,13 @@ impl CreateTableAs {
         let context = match &sem {
             SemAst::SelectStatement(s) => {
                 let columns = s.result_columns().column_definitions()?;
-                let create_table = CreateTable::new(TableName::try_from(into_rel)?, columns);
+                // FIXME: create table mode , temporary value
+                let create_table = CreateTable::new(
+                    &TableName::try_from(into_rel)?,
+                    columns,
+                    CreateTableMode::Default,
+                    false,
+                );
                 context.apply_create_table(&create_table)?
             }
             _ => AnalysisError::raise_unexpected_none("SemAst As Select statement")?,

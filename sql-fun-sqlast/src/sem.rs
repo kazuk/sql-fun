@@ -61,8 +61,8 @@ pub use self::{
     create_schema::{CreateSchema, analyze_create_schema},
     create_seq::{CreateSequence, analyze_create_seq},
     create_table::{
-        ColumnCollection, ColumnDefinition, ColumnName, CreateTable, TableName, ViewName,
-        analyze_create_stmt,
+        ColumnCollection, ColumnDefinition, ColumnName, CreateTable, CreateTableMode, TableName,
+        ViewName, analyze_create_stmt,
     },
     create_table_as::{CreateTableAs, analyze_create_table_as},
     create_view::{CreateView, analyze_create_view},

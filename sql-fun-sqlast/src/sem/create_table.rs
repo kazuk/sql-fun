@@ -7,14 +7,15 @@ pub use self::{
     column_def::ColumnDefinition, column_name::ColumnName, table_name::TableName,
     view_name::ViewName,
 };
+use sql_fun_core::IVec;
 use std::collections::HashMap;
 
 use crate::{
     sem::{
-        AlterTable, AnalysisError, AnalysisProblem, AstAndContextPair, Constraint, FullName,
-        ImplicitChange, ParseContext, SemAst, alter_table::AlterObjSubCommand,
+        AlterTable, AnalysisError, AstAndContextPair, Constraint, ImplicitChange, ParseContext,
+        SemAst, alter_table::AlterObjSubCommand,
     },
-    syn::{ListOpt, Opt},
+    syn::{ListOpt, Opt, ScanToken},
 };
 
 #[macro_use]
@@ -81,6 +82,32 @@ impl ColumnCollection {
     }
 }
 
+/// mode of `CREATE TABLE` statement
+#[derive(Debug, Clone, Copy)]
+pub enum CreateTableMode {
+    /// create table mode default
+    Default,
+    /// create table with `IF NOT EXISTS`
+    IfNotExists,
+    /// create table with `OR REPLACE`
+    ///
+    /// # Note
+    ///
+    /// This valiant is not used in now, `PostgreSQL` and `SQLite` not supports `create table or replace`
+    OrReplace,
+}
+
+impl CreateTableMode {
+    /// create instance for if not exists
+    pub fn from_if_not_exists(if_not_exists: bool) -> Self {
+        if if_not_exists {
+            Self::IfNotExists
+        } else {
+            Self::Default
+        }
+    }
+}
+
 /// `create table` SQL statement
 #[derive(Debug)]
 pub struct CreateTable {
@@ -90,6 +117,8 @@ pub struct CreateTable {
     owner: Option<String>,
     cluster_on: Option<String>,
     constraints: HashMap<String, Constraint>,
+    mode: CreateTableMode,
+    temporary: bool,
 }
 
 impl Clone for CreateTable {
@@ -101,6 +130,8 @@ impl Clone for CreateTable {
             owner: Default::default(),
             cluster_on: Default::default(),
             constraints: Default::default(),
+            mode: self.mode,
+            temporary: self.temporary,
         }
     }
 }
@@ -108,14 +139,21 @@ impl Clone for CreateTable {
 impl CreateTable {
     /// new instance with column definitions
     #[must_use]
-    pub fn new(name: TableName, columns: Vec<ColumnDefinition>) -> Self {
+    pub fn new(
+        name: &TableName,
+        columns: Vec<ColumnDefinition>,
+        mode: CreateTableMode,
+        temporary: bool,
+    ) -> Self {
         Self {
-            name,
+            name: name.clone(),
             columns: ColumnCollection(columns),
             alter_statements: Default::default(),
             owner: Default::default(),
             cluster_on: Default::default(),
             constraints: Default::default(),
+            mode,
+            temporary,
         }
     }
 
@@ -233,6 +271,7 @@ impl CreateTable {
         mut context: TParseContext,
         parent_schema: &Option<String>,
         create: crate::syn::CreateStmt,
+        tokens: &IVec<ScanToken>,
     ) -> Result<AstAndContextPair<TParseContext>, AnalysisError>
     where
         TParseContext: ParseContext,
@@ -244,42 +283,21 @@ impl CreateTable {
         };
         let mut cols: Vec<ColumnDefinition> = Vec::new();
         for column_def in column_defs {
-            let colname = column_def.get_colname();
-            let colname = ColumnName::new(&colname);
-            let Some(type_name) = column_def.get_type_name().as_inner() else {
-                AnalysisError::raise_unexpected_none("column_def.get_type_name")?
-            };
-            let is_not_null = column_def.get_is_not_null();
-
-            let key = FullName::try_from(type_name)?;
-            let type_ref = if let Some(sem_type) = context.get_type(&key).cloned() {
-                if let Some(type_ref) = sem_type.type_reference().cloned() {
-                    Some(type_ref)
-                } else {
-                    context.report_problem(AnalysisProblem::unexpected_dynamic_type(&sem_type))?;
-                    None
-                }
-            } else {
-                context.report_problem(AnalysisProblem::column_type_not_found(
-                    &table_name,
-                    &colname,
-                    &key,
-                ))?;
-                None
-            };
-
-            cols.push(ColumnDefinition::new(
-                &Some(colname),
-                type_ref.as_ref(),
-                Some(is_not_null),
-                &[],
-            ));
+            let (coldef, new_context) =
+                ColumnDefinition::analyze_column_def(context, &table_name, &column_def, tokens)?;
+            context = new_context;
+            cols.push(coldef);
         }
-        let table_def = Self::new(table_name, cols);
-        let result_context = context.apply_create_table(&table_def)?;
+        let table_def = Self::new(
+            &table_name,
+            cols,
+            CreateTableMode::from_if_not_exists(create.get_if_not_exists()),
+            false,
+        );
+        context = context.apply_create_table(&table_def)?;
         Ok(AstAndContextPair::new(
             SemAst::CreateTable(table_def),
-            result_context,
+            context,
         ))
     }
 }
@@ -290,9 +308,10 @@ pub fn analyze_create_stmt<TParseContext>(
     context: TParseContext,
     parent_schema: &Option<String>,
     create: crate::syn::CreateStmt,
+    tokens: &IVec<ScanToken>,
 ) -> Result<AstAndContextPair<TParseContext>, AnalysisError>
 where
     TParseContext: ParseContext,
 {
-    CreateTable::analyze_create_stmt(context, parent_schema, create)
+    CreateTable::analyze_create_stmt(context, parent_schema, create, tokens)
 }

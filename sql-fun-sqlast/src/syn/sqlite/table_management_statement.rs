@@ -66,7 +66,7 @@ impl From<AlterTableIn> for AlterTable {
 }
 
 /// create table statement
-#[derive(derive_getters::Getters)]
+#[derive(Debug, derive_getters::Getters, derive_getters::Dissolve)]
 pub struct CreateTableStatement {
     temporary: bool,
     if_not_exists: bool,
@@ -94,6 +94,7 @@ impl CreateTableStatement {
 use turso_parser::ast::CreateTableBody as CreateTableBodyIn;
 
 /// create table body
+#[derive(Debug)]
 pub enum CreateTableBody {
     /// columns and constraints definitions
     ColumnsAndConstraint(ColumnsAndConstraint),
@@ -122,7 +123,7 @@ impl From<CreateTableBodyIn> for CreateTableBody {
 }
 
 /// column and constraint definitions
-#[derive(derive_getters::Getters)]
+#[derive(Debug, derive_getters::Getters)]
 pub struct ColumnsAndConstraint {
     columns: Vec<ColumnDefinition>,
     constraints: Vec<NamedTableConstraint>,
@@ -147,7 +148,7 @@ impl ColumnsAndConstraint {
 use turso_parser::ast::NamedTableConstraint as NamedTableConstraintIn;
 
 /// table constraint with name
-#[derive(derive_getters::Getters)]
+#[derive(Debug, derive_getters::Getters)]
 pub struct NamedTableConstraint {
     name: Option<Name>,
     constraint: TableConstraint,
@@ -165,6 +166,7 @@ impl From<NamedTableConstraintIn> for NamedTableConstraint {
 use turso_parser::ast::NamedColumnConstraint as NamedColumnConstraintIn;
 
 /// column constraint with name
+#[derive(Debug)]
 pub struct NamedColumnConstraint {
     name: Option<Name>,
     constraint: ColumnConstraint,
@@ -194,7 +196,7 @@ impl NamedColumnConstraint {
 use turso_parser::ast::TableOptions as TableOptionsIn;
 
 /// table options
-#[derive(derive_getters::Getters)]
+#[derive(Debug, derive_getters::Getters)]
 pub struct TableOptions {
     without_rowid_text: Option<String>,
     strict_text: Option<String>,

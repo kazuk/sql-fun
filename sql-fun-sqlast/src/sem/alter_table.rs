@@ -120,6 +120,7 @@ impl AlterTable {
         mut context: TParseContext,
         syn: crate::syn::sqlite::AlterTable,
         tokens: &IVec<SqliteToken<'_>>,
+        source_span: &SourcePathWithSpan,
     ) -> Result<AstAndContextPair<TParseContext>, AnalysisError>
     where
         TParseContext: ParseContext,
@@ -137,6 +138,7 @@ impl AlterTable {
         let alter_table = Self {
             table: table_name,
             commands: vec![sub_cmd],
+            source_span: source_span.clone(),
         };
         context = context.apply_alter_table(&alter_table)?;
         Ok(AstAndContextPair::new(
@@ -220,13 +222,13 @@ mod test_analyze_alter_table_statement {
     }
 
     #[cfg(feature = "sqlite")]
-    #[test]
-    fn test_analyze_sqlite_alter_table_reports_missing_relation() {
+    #[rstest::rstest]
+    fn test_analyze_sqlite_alter_table_reports_missing_relation(source_span: SourcePathWithSpan) {
         let (alter_table, tokens) = parse_sqlite_alter_table("alter table users rename to members");
         let context = TestParseContext::default();
 
         let AstAndContextPair(res, context) =
-            AlterTable::analyze_alter_table(context, alter_table, &tokens)
+            AlterTable::analyze_alter_table(context, alter_table, &tokens, &source_span)
                 .expect("sqlite alter table should analyze");
         let SemAst::AlterTable(at) = res else {
             panic!("unexpected type {res:?}")
@@ -252,71 +254,79 @@ mod test_analyze_alter_table_statement {
     }
 
     #[cfg(feature = "sqlite")]
-    #[test]
-    fn test_analyze_sqlite_alter_table_reports_existing_relation() {
+    #[rstest::rstest]
+    fn test_analyze_sqlite_alter_table_reports_existing_relation(source_span: SourcePathWithSpan) {
         let (alter_table, tokens) = parse_sqlite_alter_table("alter table users rename to members");
         let mut context = sqlite_context();
-        context.setup_table("users", &[]);
-        context.setup_table("members", &[]);
+        context.setup_table("users", &[], &source_span);
+        context.setup_table("members", &[], &source_span);
 
         let AstAndContextPair(_, context) =
-            AlterTable::analyze_alter_table(context, alter_table, &tokens)
+            AlterTable::analyze_alter_table(context, alter_table, &tokens, &source_span)
                 .expect("sqlite alter table should analyze");
         assert_eq!(context.reported_problem_count(), 1);
     }
 
     #[cfg(feature = "sqlite")]
-    #[test]
-    fn test_analyze_sqlite_alter_table_reports_existing_column() {
+    #[rstest::rstest]
+    fn test_analyze_sqlite_alter_table_reports_existing_column(source_span: SourcePathWithSpan) {
         let (alter_table, tokens) =
             parse_sqlite_alter_table("alter table users add column name text");
         let mut context = sqlite_context();
-        context.setup_table("users", &[make_column("name")]);
+        context.setup_table("users", &[make_column("name")], &source_span);
 
         let AstAndContextPair(_, context) =
-            AlterTable::analyze_alter_table(context, alter_table, &tokens)
+            AlterTable::analyze_alter_table(context, alter_table, &tokens, &source_span)
                 .expect("sqlite alter table should analyze");
         assert_eq!(context.reported_problem_count(), 1);
     }
 
     #[cfg(feature = "sqlite")]
-    #[test]
-    fn test_analyze_sqlite_alter_table_reports_missing_column() {
+    #[rstest::rstest]
+    fn test_analyze_sqlite_alter_table_reports_missing_column(source_span: SourcePathWithSpan) {
         let (alter_table, tokens) =
             parse_sqlite_alter_table("alter table users rename column missing to renamed");
         let mut context = sqlite_context();
-        context.setup_table("users", &[make_column("name")]);
+        context.setup_table("users", &[make_column("name")], &source_span);
 
         let AstAndContextPair(_, context) =
-            AlterTable::analyze_alter_table(context, alter_table, &tokens)
+            AlterTable::analyze_alter_table(context, alter_table, &tokens, &source_span)
                 .expect("sqlite alter table should analyze");
         assert_eq!(context.reported_problem_count(), 1);
     }
 
     #[cfg(feature = "sqlite")]
-    #[test]
-    fn test_analyze_sqlite_alter_table_reports_rename_target_column_exists() {
+    #[rstest::rstest]
+    fn test_analyze_sqlite_alter_table_reports_rename_target_column_exists(
+        source_span: SourcePathWithSpan,
+    ) {
         let (alter_table, tokens) =
             parse_sqlite_alter_table("alter table users rename column name to email");
         let mut context = sqlite_context();
-        context.setup_table("users", &[make_column("name"), make_column("email")]);
+        context.setup_table(
+            "users",
+            &[make_column("name"), make_column("email")],
+            &source_span,
+        );
 
         let AstAndContextPair(_, context) =
-            AlterTable::analyze_alter_table(context, alter_table, &tokens)
+            AlterTable::analyze_alter_table(context, alter_table, &tokens, &source_span)
                 .expect("sqlite alter table should analyze");
         assert_eq!(context.reported_problem_count(), 1);
     }
 
     #[cfg(feature = "sqlite")]
-    #[test]
-    fn test_analyze_sqlite_alter_table_reports_drop_missing_column() {
+    #[rstest::rstest]
+    fn test_analyze_sqlite_alter_table_reports_drop_missing_column(
+        source_span: SourcePathWithSpan,
+    ) {
         let (alter_table, tokens) =
             parse_sqlite_alter_table("alter table users drop column missing");
         let mut context = sqlite_context();
-        context.setup_table("users", &[make_column("name")]);
+        context.setup_table("users", &[make_column("name")], &source_span);
 
         let AstAndContextPair(_, context) =
-            AlterTable::analyze_alter_table(context, alter_table, &tokens)
+            AlterTable::analyze_alter_table(context, alter_table, &tokens, &source_span)
                 .expect("sqlite alter table should analyze");
         assert_eq!(context.reported_problem_count(), 1);
     }

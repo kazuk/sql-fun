@@ -3,6 +3,7 @@ use turso_parser::ast::Over as OverIn;
 use crate::syn::sqlite::{Name, Window};
 
 /// over clause
+#[derive(Debug)]
 pub enum Over {
     /// window
     Window(Window),

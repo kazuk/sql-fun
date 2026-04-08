@@ -1,7 +1,7 @@
 use crate::syn::sqlite::{Expr, IndexedColumn, Name, ResolveType, SortOrder, SortedColumn};
 
 /// primary key constraint
-#[derive(derive_getters::Getters)]
+#[derive(Debug, derive_getters::Getters)]
 pub struct PrimaryKeyConstraint {
     columns: Vec<SortedColumn>,
     auto_increment: bool,
@@ -24,7 +24,7 @@ impl PrimaryKeyConstraint {
 }
 
 /// unique constraint
-#[derive(derive_getters::Getters)]
+#[derive(Debug, derive_getters::Getters)]
 pub struct UniqueConstraint {
     columns: Vec<SortedColumn>,
     conflict_clause: Option<ResolveType>,
@@ -41,7 +41,7 @@ impl UniqueConstraint {
 }
 
 /// check constraint
-#[derive(derive_getters::Getters)]
+#[derive(Debug, derive_getters::Getters)]
 pub struct CheckConstraint {
     expr: Box<Expr>,
 }
@@ -58,6 +58,7 @@ impl CheckConstraint {
 use turso_parser::ast::RefAct as RefActIn;
 
 /// ref action
+#[derive(Debug)]
 pub enum RefAct {
     /// set null
     SetNull,
@@ -86,6 +87,7 @@ impl From<RefActIn> for RefAct {
 use turso_parser::ast::RefArg as RefArgIn;
 
 /// ref argument
+#[derive(Debug)]
 pub enum RefArg {
     /// delete
     OnDelete(RefAct),
@@ -111,7 +113,7 @@ impl From<RefArgIn> for RefArg {
 use turso_parser::ast::ForeignKeyClause as ForeignKeyClauseIn;
 
 /// foreign key clause
-#[derive(derive_getters::Getters)]
+#[derive(Debug, derive_getters::Getters)]
 pub struct ForeignKeyClause {
     table_name: Name,
     columns: Vec<IndexedColumn>,
@@ -131,6 +133,7 @@ impl From<ForeignKeyClauseIn> for ForeignKeyClause {
 use turso_parser::ast::InitDeferredPred as InitDefferPredIn;
 
 /// init deferred predicate
+#[derive(Debug)]
 pub enum InitDeferredPred {
     /// initially deferred
     InitiallyDeferred,
@@ -150,7 +153,7 @@ impl From<InitDefferPredIn> for InitDeferredPred {
 use turso_parser::ast::DeferSubclause as DeferSubclauseIn;
 
 /// defer subclause
-#[derive(derive_getters::Getters)]
+#[derive(Debug, derive_getters::Getters)]
 pub struct DeferSubclause {
     deferrable: bool,
     init_deferred: Option<InitDeferredPred>,
@@ -166,7 +169,7 @@ impl From<DeferSubclauseIn> for DeferSubclause {
 }
 
 /// foreign key constraint
-#[derive(derive_getters::Getters)]
+#[derive(Debug, derive_getters::Getters)]
 pub struct ForeignKeyConstraint {
     columns: Vec<IndexedColumn>,
     clause: ForeignKeyClause,
@@ -191,6 +194,7 @@ impl ForeignKeyConstraint {
 use turso_parser::ast::TableConstraint as TableConstraintIn;
 
 /// table constraint
+#[derive(Debug)]
 pub enum TableConstraint {
     /// primary key
     PrimaryKey(PrimaryKeyConstraint),
@@ -236,6 +240,7 @@ impl From<TableConstraintIn> for TableConstraint {
 }
 
 /// primary key constraint
+#[derive(Debug)]
 pub struct PrimaryKeyColumnConstraint {
     order: Option<SortOrder>,
     conflict_clause: Option<ResolveType>,
@@ -273,6 +278,7 @@ impl PrimaryKeyColumnConstraint {
 }
 
 /// not null column constraint
+#[derive(Debug)]
 pub struct NotNullColumnConstraint {
     nullable: bool,
     conflict_clause: Option<ResolveType>,
@@ -299,6 +305,7 @@ impl NotNullColumnConstraint {
 }
 
 /// unique column constraint
+#[derive(Debug)]
 pub struct UniqueColumnConstraint {
     conflict_clause: Option<ResolveType>,
 }
@@ -316,6 +323,7 @@ impl UniqueColumnConstraint {
 }
 
 /// check column constraint
+#[derive(Debug)]
 pub struct CheckColumnConstraint {
     expr: Box<Expr>,
 }
@@ -335,6 +343,7 @@ impl CheckColumnConstraint {
 }
 
 /// default column constraint
+#[derive(Debug)]
 pub struct DefaultColumnConstraint {
     expr: Box<Expr>,
 }
@@ -354,6 +363,7 @@ impl DefaultColumnConstraint {
 }
 
 /// collate column constraint
+#[derive(Debug)]
 pub struct CollateColumnConstraint {
     collation_name: Name,
 }
@@ -371,7 +381,7 @@ impl CollateColumnConstraint {
 }
 
 /// foreign key column constraint
-#[derive(derive_getters::Getters)]
+#[derive(Debug, derive_getters::Getters)]
 pub struct ForeignKeyColumnConstraint {
     clause: ForeignKeyClause,
     defer_clause: Option<DeferSubclause>,
@@ -388,7 +398,7 @@ impl ForeignKeyColumnConstraint {
 }
 
 /// generated column constraint
-#[derive(derive_getters::Getters)]
+#[derive(Debug, derive_getters::Getters)]
 pub struct GeneratedColumnConstraint {
     expr: Box<Expr>,
     typ: Option<Name>,
@@ -407,6 +417,7 @@ impl GeneratedColumnConstraint {
 use turso_parser::ast::ColumnConstraint as ColumnConstraintIn;
 
 /// column constraint
+#[derive(Debug)]
 pub enum ColumnConstraint {
     /// primary key
     PrimaryKey(PrimaryKeyColumnConstraint),

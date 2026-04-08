@@ -121,6 +121,7 @@ pub use self::{
 use turso_parser::ast::As as AsIn;
 
 /// as clause
+#[derive(Debug)]
 pub enum As {
     /// as
     As(Name),

@@ -1,6 +1,7 @@
 use turso_parser::ast::TableInternalId as TableInternalIdIn;
 
 /// Table internal id
+#[derive(Debug)]
 pub struct TableInternalId(TableInternalIdIn);
 
 impl From<TableInternalIdIn> for TableInternalId {

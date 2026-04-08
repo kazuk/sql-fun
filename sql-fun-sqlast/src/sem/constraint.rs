@@ -107,7 +107,12 @@ mod test_analyze_alter_obj_add_constraint {
         let constraint = builder.constraint_primary_key();
         let alter_table_cmd = builder.alter_table_cmd_add_constraint(constraint);
         let table_name = TableName::from(FullName::with_schema("public", "table1"));
-        let create_table = CreateTable::new(table_name.clone(), vec![]);
+        let create_table = CreateTable::new(
+            &table_name,
+            vec![],
+            crate::sem::CreateTableMode::Default,
+            false,
+        );
         test_context.set_get_table_impl_result(table_name.full_name(), &Some(create_table));
         let _result = Constraint::analyze_alter_obj_add_constraint(
             &mut test_context,

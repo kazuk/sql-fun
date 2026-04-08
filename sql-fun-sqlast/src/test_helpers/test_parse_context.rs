@@ -8,8 +8,8 @@ use crate::{
         AlterSequence, AlterTable, AlterView, AnalysisError, AnalysisProblem, BaseParseContext,
         BinaryOperatorDefinition, CastContext, CastDefinition, ColumnDefinition, Comment,
         CreateCompositType, CreateDomain, CreateEnum, CreateExtension, CreateFunction, CreateIndex,
-        CreateSchema, CreateSequence, CreateTable, CreateTableAs, CreateView, FullName,
-        FunctionInfoRead, FunctionInfoWrite, FunctionOverloadCollection, IndexInfoRead,
+        CreateSchema, CreateSequence, CreateTable, CreateTableAs, CreateTableMode, CreateView,
+        FullName, FunctionInfoRead, FunctionInfoWrite, FunctionOverloadCollection, IndexInfoRead,
         OperatorDefinition, OperatorInfoRead, OperatorName, OverloadVariant, ParseContext,
         SchemaName, SearchPathRead, SequenceInfoRead, SequenceInfoWrite, TableInfoRead,
         TableInfoWrite, TableName, TypeDefinition, TypeInfoRead, TypeInfoWrite, TypeReference,
@@ -133,8 +133,12 @@ impl TestParseContext {
     /// setup [TableInfoRead::get_table_impl] resut
     pub fn setup_table(&mut self, table_name: &str, columns: &[ColumnDefinition]) {
         let table_full_name = FullName::with_schema("public", table_name);
-        let table_definition =
-            CreateTable::new(TableName::from(table_full_name.clone()), columns.to_vec());
+        let table_definition = CreateTable::new(
+            &TableName::from(table_full_name.clone()),
+            columns.to_vec(),
+            CreateTableMode::Default,
+            false,
+        );
         self.set_get_table_impl_result(&table_full_name, &Some(table_definition));
     }
 

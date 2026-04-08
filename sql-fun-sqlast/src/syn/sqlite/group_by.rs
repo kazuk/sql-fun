@@ -3,7 +3,7 @@ use turso_parser::ast::GroupBy as GroupByIn;
 use crate::syn::sqlite::Expr;
 
 /// group by clause
-#[derive(derive_getters::Getters)]
+#[derive(Debug, derive_getters::Getters)]
 pub struct GroupBy {
     exprs: Vec<Box<Expr>>,
     having: Option<Box<Expr>>,

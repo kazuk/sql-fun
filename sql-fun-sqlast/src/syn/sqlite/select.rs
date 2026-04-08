@@ -4,7 +4,7 @@ use crate::syn::sqlite::{
 };
 
 /// select statement
-#[derive(derive_getters::Getters)]
+#[derive(Debug, derive_getters::Getters)]
 pub struct Select {
     with: Option<With>,
     body: SelectBody,
@@ -26,7 +26,7 @@ impl From<SelectIn> for Select {
 }
 
 /// select statement body
-#[derive(derive_getters::Getters)]
+#[derive(Debug, derive_getters::Getters)]
 pub struct SelectBody {
     select: OneSelect,
     compounds: Vec<CompoundSelect>,
@@ -47,7 +47,7 @@ impl From<SelectBodyIn> for SelectBody {
 }
 
 /// one select item
-#[derive(derive_getters::Getters)]
+#[derive(Debug, derive_getters::Getters)]
 pub struct OneSelectItem {
     distinctness: Option<Distinctness>,
     columns: Vec<ResultColumn>,
@@ -81,6 +81,7 @@ impl OneSelectItem {
 use turso_parser::ast::OneSelect as OneSelectIn;
 
 /// one select
+#[derive(Debug)]
 pub enum OneSelect {
     /// select
     Select(OneSelectItem),
@@ -119,7 +120,7 @@ impl From<OneSelectIn> for OneSelect {
 use turso_parser::ast::CompoundSelect as CompoundSelectIn;
 
 /// compound select
-#[derive(derive_getters::Getters)]
+#[derive(Debug, derive_getters::Getters)]
 pub struct CompoundSelect {
     operator: CompoundOperator,
     select: OneSelect,
@@ -137,6 +138,7 @@ impl From<CompoundSelectIn> for CompoundSelect {
 use turso_parser::ast::CompoundOperator as CompoundOperatorIn;
 
 /// compound operator
+#[derive(Debug)]
 pub enum CompoundOperator {
     /// union
     Union,
@@ -162,7 +164,7 @@ impl From<CompoundOperatorIn> for CompoundOperator {
 use turso_parser::ast::IndexedColumn as IndexedColumnIn;
 
 /// indexed column
-#[derive(derive_getters::Getters)]
+#[derive(Debug, derive_getters::Getters)]
 pub struct IndexedColumn {
     column_name: Name,
     collation_name: Option<Name>,
@@ -182,7 +184,7 @@ impl From<IndexedColumnIn> for IndexedColumn {
 use turso_parser::ast::Limit as LimitIn;
 
 /// limit clause
-#[derive(derive_getters::Getters)]
+#[derive(Debug, derive_getters::Getters)]
 pub struct Limit {
     expr: Box<Expr>,
     offset: Option<Box<Expr>>,
@@ -210,6 +212,7 @@ impl From<LimitIn> for Limit {
 use turso_parser::ast::Distinctness as DistinctnessIn;
 
 /// distinctness
+#[derive(Debug)]
 pub enum Distinctness {
     /// distinct
     Distinct,
@@ -229,6 +232,7 @@ impl From<DistinctnessIn> for Distinctness {
 use turso_parser::ast::ResultColumn as ResultColumnIn;
 
 /// result column
+#[derive(Debug)]
 pub enum ResultColumn {
     /// expressions
     Expr(ResultColumnExpr),

@@ -1,6 +1,7 @@
 use turso_parser::ast::Literal as LiteralIn;
 
 /// numeric literal
+#[derive(Debug)]
 pub struct NumericLiteral(String);
 
 impl NumericLiteral {
@@ -11,6 +12,7 @@ impl NumericLiteral {
 }
 
 /// string literal
+#[derive(Debug)]
 pub struct StringLiteral(String);
 
 impl StringLiteral {
@@ -20,6 +22,7 @@ impl StringLiteral {
     }
 }
 /// blob literal
+#[derive(Debug)]
 pub struct BlobLiteral(String);
 
 impl BlobLiteral {
@@ -30,6 +33,7 @@ impl BlobLiteral {
 }
 
 /// keyword literal
+#[derive(Debug)]
 pub struct KeywordLiteral(String);
 
 impl KeywordLiteral {
@@ -40,9 +44,11 @@ impl KeywordLiteral {
 }
 
 /// null literal
+#[derive(Debug)]
 pub struct NullLiteral;
 
 /// boolean literal
+#[derive(Debug)]
 pub struct BooleanLiteral(bool);
 
 impl BooleanLiteral {
@@ -53,6 +59,7 @@ impl BooleanLiteral {
 }
 
 /// timestamp
+#[derive(Debug)]
 pub struct TimestampLiteral(TimestampKind);
 
 impl TimestampLiteral {
@@ -63,6 +70,7 @@ impl TimestampLiteral {
 }
 
 /// timestamp kind
+#[derive(Debug)]
 pub enum TimestampKind {
     /// date only
     Date,
@@ -73,6 +81,7 @@ pub enum TimestampKind {
 }
 
 /// literal
+#[derive(Debug)]
 pub enum Literal {
     /// numeric literal
     Numeric(NumericLiteral),

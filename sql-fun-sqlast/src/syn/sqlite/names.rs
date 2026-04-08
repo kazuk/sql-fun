@@ -1,7 +1,7 @@
 use turso_parser::ast::QualifiedName as QualifiedNameIn;
 
 /// qualified name
-#[derive(derive_getters::Getters)]
+#[derive(Debug, derive_getters::Getters)]
 pub struct QualifiedName {
     #[getter(skip)]
     db_name: Option<Name>,
@@ -35,7 +35,7 @@ impl QualifiedName {
 use turso_parser::ast::Name as NameIn;
 
 /// name value
-#[derive(derive_getters::Getters)]
+#[derive(Debug, derive_getters::Getters)]
 pub struct Name {
     quote: Option<char>,
     #[getter(skip)]

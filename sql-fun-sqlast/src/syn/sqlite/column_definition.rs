@@ -3,6 +3,7 @@ use turso_parser::ast::ColumnDefinition as ColumnDefinitionIn;
 use crate::syn::sqlite::{Name, NamedColumnConstraint, Type};
 
 /// column definition
+#[derive(Debug)]
 pub struct ColumnDefinition {
     col_name: Name,
     col_type: Option<Type>,

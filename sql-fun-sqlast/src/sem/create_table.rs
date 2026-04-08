@@ -18,6 +18,9 @@ use crate::{
     syn::{ListOpt, Opt, ScanToken},
 };
 
+#[cfg(feature = "sqlite")]
+use crate::{SqliteToken, syn::sqlite::CreateTableBody};
+
 #[macro_use]
 #[path = "./macros.rs"]
 mod macros;
@@ -299,6 +302,92 @@ impl CreateTable {
             SemAst::CreateTable(table_def),
             context,
         ))
+    }
+
+    /// analyze [`crate::syn::sqlite::ColumnAndConstraint`]
+    #[cfg(feature = "sqlite")]
+    pub fn analyze_columns_and_constraint<TParseContext>(
+        mut context: TParseContext,
+        _parent_schema: &Option<String>,
+        table_name: &TableName,
+        mode: &CreateTableMode,
+        temporary: bool,
+        syn: crate::syn::sqlite::ColumnsAndConstraint,
+        tokens: &IVec<SqliteToken<'_>>,
+    ) -> Result<(Self, TParseContext), AnalysisError>
+    where
+        TParseContext: ParseContext,
+    {
+        let mut cols = Vec::new();
+        for col_def in syn.columns() {
+            let (col, new_context) =
+                ColumnDefinition::analyze_column_definition(context, table_name, col_def, tokens)?;
+            context = new_context;
+            cols.push(col);
+        }
+
+        let table_def = Self::new(table_name, cols, *mode, temporary);
+        Ok((table_def, context))
+    }
+
+    /// analyze [`crate::syn::sqlite::CreateTableBody`]
+    #[cfg(feature = "sqlite")]
+    pub fn analyze_create_table_body<TParseContext>(
+        context: TParseContext,
+        parent_schema: &Option<String>,
+        table_name: &TableName,
+        mode: &CreateTableMode,
+        temporary: bool,
+        syn: CreateTableBody,
+        tokens: &IVec<SqliteToken<'_>>,
+    ) -> Result<AstAndContextPair<TParseContext>, AnalysisError>
+    where
+        TParseContext: ParseContext,
+    {
+        use crate::syn::sqlite::CreateTableBody;
+
+        match syn {
+            CreateTableBody::ColumnsAndConstraint(columns_and_constraint) => {
+                let (result, context) = Self::analyze_columns_and_constraint(
+                    context,
+                    parent_schema,
+                    table_name,
+                    mode,
+                    temporary,
+                    columns_and_constraint,
+                    tokens,
+                )?;
+                Ok(AstAndContextPair::new(SemAst::CreateTable(result), context))
+            }
+            CreateTableBody::AsSelect(_select) => todo!(),
+        }
+    }
+
+    /// analyze [`crate::syn::sqlite::CreateTableStatement`]
+    #[cfg(feature = "sqlite")]
+    #[tracing::instrument(skip(context))]
+    pub fn analyze_create_table<TParseContext>(
+        context: TParseContext,
+        parent_schema: &Option<String>,
+        syn: crate::syn::sqlite::CreateTableStatement,
+        tokens: &IVec<SqliteToken<'_>>,
+    ) -> Result<AstAndContextPair<TParseContext>, AnalysisError>
+    where
+        TParseContext: ParseContext,
+    {
+        let (temporary, if_not_exists, table_name, body) = syn.dissolve();
+        let table_name = TableName::try_from(&table_name)?;
+        let mode = CreateTableMode::from_if_not_exists(if_not_exists);
+
+        Self::analyze_create_table_body(
+            context,
+            parent_schema,
+            &table_name,
+            &mode,
+            temporary,
+            body,
+            tokens,
+        )
     }
 }
 

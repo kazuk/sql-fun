@@ -6,7 +6,7 @@ use crate::syn::sqlite::{
 };
 
 /// between expression
-#[derive(derive_getters::Getters)]
+#[derive(Debug, derive_getters::Getters)]
 pub struct ExprBetween {
     lhs: Box<Expr>,
     not: bool,
@@ -27,7 +27,7 @@ impl ExprBetween {
 }
 
 /// binary expression
-#[derive(derive_getters::Getters)]
+#[derive(Debug, derive_getters::Getters)]
 pub struct ExprBinary {
     left: Box<Expr>,
     operator: Operator,
@@ -46,6 +46,7 @@ impl ExprBinary {
 }
 
 /// case when
+#[derive(Debug)]
 pub struct CaseWhenThenPair(Box<Expr>, Box<Expr>);
 
 impl From<(Box<ExprIn>, Box<ExprIn>)> for CaseWhenThenPair {
@@ -72,7 +73,7 @@ impl CaseWhenThenPair {
 }
 
 /// case expression
-#[derive(derive_getters::Getters)]
+#[derive(Debug, derive_getters::Getters)]
 pub struct ExprCase {
     base: Option<Box<Expr>>,
     when_then_pairs: Vec<CaseWhenThenPair>,
@@ -98,7 +99,7 @@ impl ExprCase {
 }
 
 /// cast expression
-#[derive(derive_getters::Getters)]
+#[derive(Debug, derive_getters::Getters)]
 pub struct ExprCast {
     expr: Box<Expr>,
     type_name: Option<Type>,
@@ -115,7 +116,7 @@ impl ExprCast {
 }
 
 /// collate expression
-#[derive(derive_getters::Getters)]
+#[derive(Debug, derive_getters::Getters)]
 pub struct ExprCollate {
     expr: Box<Expr>,
     name: Name,
@@ -132,7 +133,7 @@ impl ExprCollate {
 }
 
 /// doubly qualified expression
-#[derive(derive_getters::Getters)]
+#[derive(Debug, derive_getters::Getters)]
 pub struct ExprDoublyQualified {
     schema: Name,
     table: Name,
@@ -151,7 +152,7 @@ impl ExprDoublyQualified {
 }
 
 /// function call expression
-#[derive(derive_getters::Getters)]
+#[derive(Debug, derive_getters::Getters)]
 pub struct ExprFunctionCall {
     name: Name,
     distinctness: Option<Distinctness>,
@@ -180,7 +181,7 @@ impl ExprFunctionCall {
 }
 
 /// function call star
-#[derive(derive_getters::Getters)]
+#[derive(Debug, derive_getters::Getters)]
 pub struct ExprFunctionCallStar {
     name: Name,
     filter_over: FunctionTail,
@@ -194,7 +195,7 @@ impl ExprFunctionCallStar {
 }
 
 /// column expression
-#[derive(derive_getters::Getters)]
+#[derive(Debug, derive_getters::Getters)]
 pub struct ExprColumn {
     database: Option<usize>,
     table: TableInternalId,
@@ -220,7 +221,7 @@ impl ExprColumn {
 }
 
 /// row-id expression
-#[derive(derive_getters::Getters)]
+#[derive(Debug, derive_getters::Getters)]
 pub struct ExprRowId {
     database: Option<usize>,
     table: TableInternalId,
@@ -234,7 +235,7 @@ impl ExprRowId {
 }
 
 /// in list expression
-#[derive(derive_getters::Getters)]
+#[derive(Debug, derive_getters::Getters)]
 pub struct ExprInList {
     lhs: Box<Expr>,
     not: bool,
@@ -253,7 +254,7 @@ impl ExprInList {
 }
 
 /// in select expression
-#[derive(derive_getters::Getters)]
+#[derive(Debug, derive_getters::Getters)]
 pub struct ExprInSelect {
     lhs: Box<Expr>,
     not: bool,
@@ -272,7 +273,7 @@ impl ExprInSelect {
 }
 
 /// in table expression
-#[derive(derive_getters::Getters)]
+#[derive(Debug, derive_getters::Getters)]
 pub struct ExprInTable {
     lhs: Box<Expr>,
     not: bool,
@@ -293,6 +294,7 @@ impl ExprInTable {
 }
 
 /// is null expression
+#[derive(Debug)]
 pub struct ExprIsNull(Box<Expr>);
 
 impl ExprIsNull {
@@ -308,7 +310,7 @@ impl ExprIsNull {
 }
 
 /// like expression
-#[derive(derive_getters::Getters)]
+#[derive(Debug, derive_getters::Getters)]
 pub struct ExprLike {
     lhs: Box<Expr>,
     not: bool,
@@ -331,6 +333,7 @@ impl ExprLike {
 }
 
 /// not null expression
+#[derive(Debug)]
 pub struct ExprNotNull(Box<Expr>);
 
 impl ExprNotNull {
@@ -346,6 +349,7 @@ impl ExprNotNull {
 }
 
 /// parenthesized expression
+#[derive(Debug)]
 pub struct Parenthesized(Vec<Box<Expr>>);
 
 impl Parenthesized {
@@ -361,7 +365,7 @@ impl Parenthesized {
 }
 
 /// qualified expression
-#[derive(derive_getters::Getters)]
+#[derive(Debug, derive_getters::Getters)]
 pub struct Qualified {
     table: Name,
     column: Name,
@@ -375,7 +379,7 @@ impl Qualified {
 }
 
 /// raise expression
-#[derive(derive_getters::Getters)]
+#[derive(Debug, derive_getters::Getters)]
 pub struct ExprRaise {
     resolve_type: ResolveType,
     expr: Option<Box<Expr>>,
@@ -392,7 +396,7 @@ impl ExprRaise {
 }
 
 /// unary expression
-#[derive(derive_getters::Getters)]
+#[derive(Debug, derive_getters::Getters)]
 pub struct ExprUnary {
     unary_operator: UnaryOperator,
     expr: Box<Expr>,
@@ -409,6 +413,7 @@ impl ExprUnary {
 }
 
 /// variable expression
+#[derive(Debug)]
 pub struct Variable(String);
 
 impl Variable {
@@ -424,7 +429,7 @@ impl Variable {
 }
 
 /// sub query result expression
-#[derive(derive_getters::Getters)]
+#[derive(Debug, derive_getters::Getters)]
 pub struct SubqueryResult {
     subquery_id: TableInternalId,
     lhs: Option<Box<Expr>>,
@@ -450,7 +455,7 @@ impl SubqueryResult {
 }
 
 /// result column expression
-#[derive(derive_getters::Getters)]
+#[derive(Debug, derive_getters::Getters)]
 pub struct ResultColumnExpr {
     expr: Box<Expr>,
     as_: Option<As>,
@@ -467,6 +472,7 @@ impl ResultColumnExpr {
 }
 
 /// expression
+#[derive(Debug)]
 pub enum Expr {
     /// between
     Between(ExprBetween),
@@ -666,6 +672,7 @@ impl From<ExprIn> for Expr {
 use turso_parser::ast::Operator as OperatorIn;
 
 /// operator
+#[derive(Debug)]
 pub enum Operator {
     /// add
     Add,

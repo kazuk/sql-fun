@@ -306,15 +306,22 @@ impl SemAst {
     /// analyze [`Stmt`]
     #[cfg(feature = "sqlite")]
     pub fn semantic_analysis_sqlite_stmt<TContext>(
-        _context: TContext,
+        context: TContext,
         syn: Stmt,
-        _tokens: &IVec<SqliteToken<'_>>,
+        tokens: &IVec<SqliteToken<'_>>,
     ) -> Result<AstAndContextPair<TContext>, AnalysisError>
     where
         TContext: ParseContext,
     {
+        let Some(source_span) = context.get_source_path_with_span().cloned() else {
+            AnalysisError::raise_unexpected_none("context.source_path_with_span")?;
+            AnalysisError::never()
+        };
         match syn {
-            Stmt::AlterTable(_alter_table) => todo!(),
+            Stmt::AlterTable(alter_table) => {
+                AlterTable::analyze_alter_table(context, alter_table, tokens, &source_span)
+            }
+            Stmt::CreateTable(_create_table_statement) => todo!(),
             Stmt::Analyze(_analyze_statement) => todo!(),
             Stmt::Attach(_attach_statement) => todo!(),
             Stmt::Detach(_detach_statement) => todo!(),
@@ -328,7 +335,6 @@ impl SemAst {
             Stmt::DropIndex(_drop_index_statement) => todo!(),
             Stmt::Reindex(_reindex_statement) => todo!(),
             Stmt::Optimize(_optimize_statement) => todo!(),
-            Stmt::CreateTable(_create_table_statement) => todo!(),
             Stmt::CreateVirtualTable(_create_virtual_table) => todo!(),
             Stmt::DropTable(_drop_table_statement) => todo!(),
             Stmt::CreateTrigger(_create_trigger_statement) => todo!(),

@@ -72,7 +72,7 @@ askama = "0.16"
 assert_matches = { version = "1" }
 async-trait = "0.1.89"
 backtrace-on-stack-overflow = "0.3"
-bollard = "0.20"
+bollard = "0.21"
 cargo_metadata = "0.23.1"
 chumsky = "0.12"
 clap = { version = "4.6", features = ["derive", "env"] }

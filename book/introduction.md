@@ -29,6 +29,8 @@ If you're writing raw SQL and wish Rust could help more: this is it.
   - This keeps the tool lightweight, focused, and reliable.
 - It generates code compatible with `tokio-postgres` or `rusqlite`, the primary runtime `sql-fun` targets.
 
+![sql-fun dataflow](./dataflow.svg)
+
 ## Schema-aware validation
 
 Just place a schema dump file (e.g., `schema.develop.sql`) in the same folder as your Cargo.toml.
@@ -41,7 +43,7 @@ pg_dump ... -s > schema.develop.sql
 
 If you use multiple schemas (e.g., dev vs prod),
 
-you can switch between them by setting the SQL_FUN_SCHEMA environment variable.
+you can switch between them by setting the `SQL_FUN_SCHEMA` environment variable.
 
 For example:
 
@@ -51,6 +53,46 @@ SQL_FUN_SCHEMA=prod sql-fun check
 
 will use schema.prod.sql instead.
 
+## Reuseable CTE
+
+`sql-fun` support query reuse as CTE.
+
+### Reuse a query function as CTE.
+ 
+When `cte_name` references function name, function's query copies as CTE.
+
+```rust
+/// example query function definition
+#[sql_fun::sql_query_many(sql="select u.id, u.name from users u where u.is_active=TRUE ")]
+async fn select_all_active_users(client: &Client, collector: Collector, handler: Handler) 
+  -> Result<Vec<User>,Error>
+{
+}
+
+///
+/// with 
+///   active_users 
+///     as select u.id, u.name from users u where u.is_active=TRUE
+/// select ... from active_users au where au.id=$1
+/// 
+#[sql_fun::sql_query_one("select from active_users au where au.id=${id}")]
+#[with( cte_name="select_all_active_users", alias="active_users" )]
+async fn select_active_user_by_id( ... ) -> Result<User, Error>
+```
+
+### Reuseable query definition in CTE catalog
+
+CTE catalog is a TOML file, CTE definition is a toml table `[cte."key"]`. with `query` value.
+
+```toml
+sql_fun_cte_catalog_format_version="1"
+sql_dialect="PostgreSQL"
+
+[cte."select_all_active_users"]
+query="""
+select u.id, u.name from users u where u.is_active=TRUE
+""""
+```
 
 ## CRUD table generation
 
@@ -59,19 +101,19 @@ will use schema.prod.sql instead.
 Given this example Rust code:
 
 ```rust
-#[sql_fun::sql_query_one("insert into users (name) values (${name}) returning id")]
+#[sql_fun::sql_query_one(sql="insert into users (name) values (${name}) returning id")]
 async fn insert_user(client: &Client, name: &str ) 
   -> Result<IdRow, ApplicationError> {};
 
-#[sql_fun::sql_query_opt("select id, name from users where id=${id}")]
+#[sql_fun::sql_query_opt(sql="select id, name from users where id=${id}")]
 async fn select_user_by_id(client: &Client, id: i64 ) 
   -> Result<Option<UserRow>, ApplicationError> {};
 
-#[sql_fun::sql_query_opt("select id, name from users where name=${name}")]
+#[sql_fun::sql_query_opt(sql="select id, name from users where name=${name}")]
 async fn find_user_by_name(client: &Client, name: &str ) 
   -> Result<Option<UserRow>, ApplicationError> {};
 
-#[sql_fun::sql_query_opt("delete from users u where id=${name} returning u.id")]
+#[sql_fun::sql_query_opt(sql="delete from users u where id=${name} returning u.id")]
 async fn delete_user_by_id(client: &Client, id: i64 ) 
   -> Result<Option<IdRow>, ApplicationError> {};
 ```

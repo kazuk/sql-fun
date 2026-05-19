@@ -8,6 +8,7 @@ keywords.workspace = true
 repository.workspace = true
 description = "proc-macro helper objects for sql-fun"
 readme = "README.md"
+rust-version.workspace = true
 
 [dependencies]
 darling = "0.23.0"

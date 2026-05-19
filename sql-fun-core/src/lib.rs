@@ -7,9 +7,22 @@
 mod args;
 mod builtin;
 mod coll;
+mod cte_catalog;
 mod extensions;
 mod highlighter;
 mod metadata;
+mod placehlodered_sql;
+
+pub use self::{
+    cte_catalog::{
+        CatalogFileIndex, CteAlias, CteCatalog, CteCatalogCheckError, CteCatalogEntry,
+        CteCatalogError, CteCatalogReference, CteName, CteParameter, CteParameterBinding,
+        CteParameterBindingCollection, CteParameterCollection, CteParameterRename,
+        ParameterRenameCollection,
+    },
+    placehlodered_sql::PlaceholderedSql,
+};
+
 #[cfg(test)]
 /// Shared helpers for crate unit tests.
 pub mod test_helpers;

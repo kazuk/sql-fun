@@ -6,10 +6,11 @@ version = "0.1.0"
 edition = "2024"
 authors = ["kazuk"]
 description = "SQL query/statement execution code generator"
-repository.workspace = true
 exclude = ["/postgres"]
 categories = ["database", "development-tools"]
 keywords.workspace = true
+repository.workspace = true
+rust-version.workspace = true
 
 [package.metadata]
 
@@ -32,6 +33,7 @@ members = [
 ]
 
 [workspace.package]
+rust-version = "1.93.1"
 repository = "https://github.com/kazuk/sql-fun/"
 keywords = ["PostgreSQL", "SQLite", "SQL", "Semantic validator", "Schema aware validator"]
 
@@ -85,6 +87,7 @@ derive_builder = "0.20"
 directories = "6.0"
 either = { version = "1.15", features = ["serde"] }
 env_logger = "0.11"
+fs-err = "3.2.2"
 fs2 = "0.4"
 futures-core = "0.3"
 futures-util = "0.3"
@@ -97,8 +100,9 @@ log = "0.4"
 miette = { version = "7.6.0", features = ["fancy"] }
 nix = { version = "0.31", features = ["process", "signal"] }
 owo-colors = "4.2.3"
+petgraph = "0.8.3"
 pg_query = "6.1"
-proc-macro2 = "1.0"
+proc-macro2 = { version = "1.0", features = ["span-locations"] }
 quote = "1.0"
 rand = "0.10"
 rstest = "0.26"
@@ -110,6 +114,7 @@ shellexpand = "3.1"
 smallvec = "1.15"
 sql-fun = { path = ".", version = "0.1.0" }
 sql-fun-client = { path = "./sql-fun-client", version = "0.1.0" }
+sql-fun-codegen = { path = "./sql-fun-codegen", version = "0.1.0" }
 sql-fun-core = { path = "./sql-fun-core", version = "0.1.1" }
 sql-fun-server-api = { path = "sql-fun-server-api", version = "0.1.0" }
 sql-fun-sqlast = { path = "./sql-fun-sqlast", version = "0.1.0", features = [] }
@@ -129,6 +134,7 @@ typed-openrpc = "0.1.1"
 url = { version = "2.5", features = ["serde"] }
 walkdir = "2.3"
 which = "8.0"
+yaml_serde = "0.10.4"
 
 [lib]
 proc-macro = true

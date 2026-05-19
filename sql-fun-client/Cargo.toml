@@ -8,6 +8,7 @@ categories = ["database", "development-tools"]
 keywords.workspace = true
 repository.workspace = true
 readme = "README.md"
+rust-version.workspace = true
 
 [features]
 

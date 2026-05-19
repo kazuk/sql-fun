@@ -238,7 +238,6 @@ mod tests {
             .with_span_events(FmtSpan::ACTIVE)
             .fmt_fields(debug_fn(|writer, field, value| {
                 if field.name() == "message" {
-                    use core::fmt::Write as _;
                     write!(writer, "{value:?}")
                 } else {
                     Ok(())

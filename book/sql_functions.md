@@ -16,7 +16,7 @@ Attribute arguments specifies SQL statement and datasource.
 
 ### Attribute argument examples
 
-Specify SQL statement in source file.
+Specify SQL statement in source file. `sql` argument or `sql_file` argument.
 
 ```rust
 #[sql_fun::sql_query_many( sql="select id, name from users" )]
@@ -78,8 +78,8 @@ edge = {
   - `sql_fun::sql_query_opt`: Expects zero or one row; return type must be `Result<Option<RowType>, E>`.
   - `sql_fun::sql_query_many`: Expects multiple rows (possibly zero); return type must be `Result<Collector, E>`.
   - `sql_fun::sql_statement`: Executes a statement that returns no rows; return type must be `Result<i64, E>`, where the value is the number of affected rows.
-- require `async` function.
-- The SQL must be provided as a string literal..
+- When async connector is used, function requires `async`.
+  - `tokio-postgres` is a async connector , `rusqlite` is not a async connector.
 - The first argument represents the database connection.
   - This may be any type, such as `Client`, `Transaction`, or a user-defined wrapper type.
     - It must support the methods `prepare`, `query_one`, `query_opt`, `query_raw`, or `execute` with compatible signatures.

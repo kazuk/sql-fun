@@ -223,7 +223,7 @@ mod tests {
         .unwrap()
     }
 
-    #[ctor::ctor]
+    #[ctor::ctor(unsafe)]
     fn init_tracing() {
         use tracing_subscriber::{
             EnvFilter,

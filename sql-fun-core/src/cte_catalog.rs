@@ -628,7 +628,7 @@ impl CteCatalog<'_> {
     /// - [`CteCatalogError`]: when some errors
     ///
     pub fn load(cte_catalog_dir: &Path) -> Result<Self, CteCatalogError> {
-        if cte_catalog_dir.exists() {
+        if !cte_catalog_dir.exists() {
             CteCatalogError::raise_path_not_exist(cte_catalog_dir)?;
         }
         if !cte_catalog_dir.is_dir() {

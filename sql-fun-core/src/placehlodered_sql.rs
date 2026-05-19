@@ -72,7 +72,7 @@ impl NamedParameterPlaceholder {
         });
         char('$').with(between(
             char('{').skip(spaces()),
-            spaces().with(char(']')),
+            spaces().with(char('}')),
             name_with_type_opt,
         ))
     }

@@ -1,27 +1,27 @@
 use turso_parser::ast::SubqueryType as SubqueryTypeInput;
 
 /// exists subquery
-#[derive(Debug, derive_getters::Getters)]
+#[derive(Clone, Debug, derive_getters::Getters)]
 pub struct SubqueryTypeExists {
     result_reg: usize,
 }
 
 /// row value subquery
-#[derive(Debug, derive_getters::Getters)]
+#[derive(Clone, Debug, derive_getters::Getters)]
 pub struct SubqueryTypeRowValue {
     result_reg_start: usize,
     num_regs: usize,
 }
 
 /// In type subquery
-#[derive(Debug, derive_getters::Getters)]
+#[derive(Clone, Debug, derive_getters::Getters)]
 pub struct SubqueryTypeIn {
     cursor_id: usize,
     affinity_str: String,
 }
 
 /// sub-query type
-#[derive(Debug)]
+#[derive(Clone, Debug)]
 pub enum SubqueryType {
     /// exists sub-query
     Exists(SubqueryTypeExists),

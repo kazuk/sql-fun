@@ -1,7 +1,7 @@
 use turso_parser::ast::ResolveType as ResolveTypeIn;
 
 /// resolve type
-#[derive(Debug)]
+#[derive(Clone, Debug)]
 pub enum ResolveType {
     /// rollback
     Rollback,

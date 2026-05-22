@@ -1,7 +1,7 @@
 use turso_parser::ast::Literal as LiteralIn;
 
 /// numeric literal
-#[derive(Debug)]
+#[derive(Clone, Debug)]
 pub struct NumericLiteral(String);
 
 impl NumericLiteral {
@@ -12,7 +12,7 @@ impl NumericLiteral {
 }
 
 /// string literal
-#[derive(Debug)]
+#[derive(Clone, Debug)]
 pub struct StringLiteral(String);
 
 impl StringLiteral {
@@ -22,7 +22,7 @@ impl StringLiteral {
     }
 }
 /// blob literal
-#[derive(Debug)]
+#[derive(Clone, Debug)]
 pub struct BlobLiteral(String);
 
 impl BlobLiteral {
@@ -33,7 +33,7 @@ impl BlobLiteral {
 }
 
 /// keyword literal
-#[derive(Debug)]
+#[derive(Clone, Debug)]
 pub struct KeywordLiteral(String);
 
 impl KeywordLiteral {
@@ -44,11 +44,11 @@ impl KeywordLiteral {
 }
 
 /// null literal
-#[derive(Debug)]
+#[derive(Clone, Debug)]
 pub struct NullLiteral;
 
 /// boolean literal
-#[derive(Debug)]
+#[derive(Clone, Debug)]
 pub struct BooleanLiteral(bool);
 
 impl BooleanLiteral {
@@ -59,7 +59,7 @@ impl BooleanLiteral {
 }
 
 /// timestamp
-#[derive(Debug)]
+#[derive(Clone, Debug)]
 pub struct TimestampLiteral(TimestampKind);
 
 impl TimestampLiteral {
@@ -70,7 +70,7 @@ impl TimestampLiteral {
 }
 
 /// timestamp kind
-#[derive(Debug)]
+#[derive(Clone, Debug)]
 pub enum TimestampKind {
     /// date only
     Date,
@@ -81,7 +81,7 @@ pub enum TimestampKind {
 }
 
 /// literal
-#[derive(Debug)]
+#[derive(Clone, Debug)]
 pub enum Literal {
     /// numeric literal
     Numeric(NumericLiteral),

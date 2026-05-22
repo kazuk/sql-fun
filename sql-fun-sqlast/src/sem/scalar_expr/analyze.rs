@@ -271,6 +271,10 @@ impl SemScalarExpr {
             Expr::Subquery(_) => unsupported_sqlite_expr("subquery expr"),
             Expr::Variable(_) => unsupported_sqlite_expr("variable expr"),
             Expr::SubqueryResult(_) => unsupported_sqlite_expr("subquery result expr"),
+            Expr::FieldAccess(_) => todo!(),
+            Expr::Default => todo!(),
+            Expr::Array(_) => todo!(),
+            Expr::Subscript(_) => todo!(),
         };
 
         Ok((expr, context))

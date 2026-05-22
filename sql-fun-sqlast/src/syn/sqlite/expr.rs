@@ -1,478 +1,49 @@
+mod array;
+mod between;
+mod binary;
+mod case;
+mod cast;
+mod collate;
+mod column;
+mod field_access;
+mod function_call;
+mod in_expr;
+mod like;
+mod null_test;
+mod paren;
+mod qualified;
+mod raise;
+mod subquery;
+mod unary;
+mod variable;
+
 use turso_parser::ast::Expr as ExprIn;
 
-use crate::syn::sqlite::{
-    As, Distinctness, FunctionTail, LikeOperator, Literal, Name, QualifiedName, ResolveType,
-    Select, SortedColumn, SubqueryType, TableInternalId, Type, UnaryOperator,
+use crate::syn::sqlite::{Literal, Name, Select};
+
+pub use self::{
+    array::{Array, Subscript},
+    between::ExprBetween,
+    binary::{ExprBinary, Operator},
+    case::{CaseWhenThenPair, ExprCase},
+    cast::ExprCast,
+    collate::ExprCollate,
+    column::{ExprColumn, ExprRowId},
+    field_access::{FieldAccess, FieldAccessResolution},
+    function_call::{ExprFunctionCall, ExprFunctionCallStar},
+    in_expr::{ExprInList, ExprInSelect, ExprInTable},
+    like::{ExprLike, LikeOperator},
+    null_test::{ExprIsNull, ExprNotNull},
+    paren::Parenthesized,
+    qualified::{ExprDoublyQualified, Qualified},
+    raise::ExprRaise,
+    subquery::SubqueryResult,
+    unary::{ExprUnary, UnaryOperator},
+    variable::Variable,
 };
 
-/// between expression
-#[derive(Debug, derive_getters::Getters)]
-pub struct ExprBetween {
-    lhs: Box<Expr>,
-    not: bool,
-    start: Box<Expr>,
-    end: Box<Expr>,
-}
-
-impl ExprBetween {
-    /// create instance
-    pub fn new(lhs: Expr, not: bool, start: Expr, end: Expr) -> Self {
-        Self {
-            lhs: Box::new(lhs),
-            not,
-            start: Box::new(start),
-            end: Box::new(end),
-        }
-    }
-}
-
-/// binary expression
-#[derive(Debug, derive_getters::Getters)]
-pub struct ExprBinary {
-    left: Box<Expr>,
-    operator: Operator,
-    right: Box<Expr>,
-}
-
-impl ExprBinary {
-    /// create instance
-    pub fn new(left: Expr, operator: Operator, right: Expr) -> Self {
-        Self {
-            left: Box::new(left),
-            operator,
-            right: Box::new(right),
-        }
-    }
-}
-
-/// case when
-#[derive(Debug)]
-pub struct CaseWhenThenPair(Box<Expr>, Box<Expr>);
-
-impl From<(Box<ExprIn>, Box<ExprIn>)> for CaseWhenThenPair {
-    fn from(value: (Box<ExprIn>, Box<ExprIn>)) -> Self {
-        Self::new(Expr::from(*value.0), Expr::from(*value.1))
-    }
-}
-
-impl CaseWhenThenPair {
-    /// create instance
-    pub fn new(when: Expr, then: Expr) -> Self {
-        Self(Box::new(when), Box::new(then))
-    }
-
-    /// when expression
-    pub fn when(&self) -> &Expr {
-        self.0.as_ref()
-    }
-
-    /// then expression
-    pub fn then(&self) -> &Expr {
-        self.1.as_ref()
-    }
-}
-
-/// case expression
-#[derive(Debug, derive_getters::Getters)]
-pub struct ExprCase {
-    base: Option<Box<Expr>>,
-    when_then_pairs: Vec<CaseWhenThenPair>,
-    else_expr: Option<Box<Expr>>,
-}
-
-impl ExprCase {
-    /// create instance
-    pub fn new(
-        base: Option<Expr>,
-        when_then_pairs: Vec<(Box<ExprIn>, Box<ExprIn>)>,
-        else_expr: Option<Expr>,
-    ) -> Self {
-        Self {
-            base: base.map(Box::new),
-            when_then_pairs: when_then_pairs
-                .into_iter()
-                .map(CaseWhenThenPair::from)
-                .collect(),
-            else_expr: else_expr.map(Box::new),
-        }
-    }
-}
-
-/// cast expression
-#[derive(Debug, derive_getters::Getters)]
-pub struct ExprCast {
-    expr: Box<Expr>,
-    type_name: Option<Type>,
-}
-
-impl ExprCast {
-    /// create instance
-    pub fn new(expr: Expr, type_name: Option<Type>) -> Self {
-        Self {
-            expr: Box::new(expr),
-            type_name,
-        }
-    }
-}
-
-/// collate expression
-#[derive(Debug, derive_getters::Getters)]
-pub struct ExprCollate {
-    expr: Box<Expr>,
-    name: Name,
-}
-
-impl ExprCollate {
-    /// create instance
-    pub fn new(expr: Expr, name: Name) -> Self {
-        Self {
-            expr: Box::new(expr),
-            name,
-        }
-    }
-}
-
-/// doubly qualified expression
-#[derive(Debug, derive_getters::Getters)]
-pub struct ExprDoublyQualified {
-    schema: Name,
-    table: Name,
-    column: Name,
-}
-
-impl ExprDoublyQualified {
-    /// create instance
-    pub fn new(schema: Name, table: Name, column: Name) -> Self {
-        Self {
-            schema,
-            table,
-            column,
-        }
-    }
-}
-
-/// function call expression
-#[derive(Debug, derive_getters::Getters)]
-pub struct ExprFunctionCall {
-    name: Name,
-    distinctness: Option<Distinctness>,
-    args: Vec<Box<Expr>>,
-    order_by: Vec<SortedColumn>,
-    filter_over: FunctionTail,
-}
-
-impl ExprFunctionCall {
-    /// create instance
-    pub fn new(
-        name: Name,
-        distinctness: Option<Distinctness>,
-        args: Vec<Expr>,
-        order_by: Vec<SortedColumn>,
-        filter_over: FunctionTail,
-    ) -> Self {
-        Self {
-            name,
-            distinctness,
-            args: args.into_iter().map(Box::new).collect(),
-            order_by,
-            filter_over,
-        }
-    }
-}
-
-/// function call star
-#[derive(Debug, derive_getters::Getters)]
-pub struct ExprFunctionCallStar {
-    name: Name,
-    filter_over: FunctionTail,
-}
-
-impl ExprFunctionCallStar {
-    /// create instance
-    pub fn new(name: Name, filter_over: FunctionTail) -> Self {
-        Self { name, filter_over }
-    }
-}
-
-/// column expression
-#[derive(Debug, derive_getters::Getters)]
-pub struct ExprColumn {
-    database: Option<usize>,
-    table: TableInternalId,
-    column: usize,
-    is_rowid_alias: bool,
-}
-
-impl ExprColumn {
-    /// create instance
-    pub fn new(
-        database: Option<usize>,
-        table: TableInternalId,
-        column: usize,
-        is_rowid_alias: bool,
-    ) -> Self {
-        Self {
-            database,
-            table,
-            column,
-            is_rowid_alias,
-        }
-    }
-}
-
-/// row-id expression
-#[derive(Debug, derive_getters::Getters)]
-pub struct ExprRowId {
-    database: Option<usize>,
-    table: TableInternalId,
-}
-
-impl ExprRowId {
-    /// create instance
-    pub fn new(database: Option<usize>, table: TableInternalId) -> Self {
-        Self { database, table }
-    }
-}
-
-/// in list expression
-#[derive(Debug, derive_getters::Getters)]
-pub struct ExprInList {
-    lhs: Box<Expr>,
-    not: bool,
-    rhs: Vec<Box<Expr>>,
-}
-
-impl ExprInList {
-    /// create instance
-    pub fn new(lhs: Expr, not: bool, rhs: Vec<Expr>) -> Self {
-        Self {
-            lhs: Box::new(lhs),
-            not,
-            rhs: rhs.into_iter().map(Box::new).collect(),
-        }
-    }
-}
-
-/// in select expression
-#[derive(Debug, derive_getters::Getters)]
-pub struct ExprInSelect {
-    lhs: Box<Expr>,
-    not: bool,
-    rhs: Select,
-}
-
-impl ExprInSelect {
-    /// create instance
-    pub fn new(lhs: Expr, not: bool, rhs: Select) -> Self {
-        Self {
-            lhs: Box::new(lhs),
-            not,
-            rhs,
-        }
-    }
-}
-
-/// in table expression
-#[derive(Debug, derive_getters::Getters)]
-pub struct ExprInTable {
-    lhs: Box<Expr>,
-    not: bool,
-    rhs: QualifiedName,
-    args: Vec<Box<Expr>>,
-}
-
-impl ExprInTable {
-    /// create instance
-    pub fn new(lhs: Expr, not: bool, rhs: QualifiedName, args: Vec<Expr>) -> Self {
-        Self {
-            lhs: Box::new(lhs),
-            not,
-            rhs,
-            args: args.into_iter().map(Box::new).collect(),
-        }
-    }
-}
-
-/// is null expression
-#[derive(Debug)]
-pub struct ExprIsNull(Box<Expr>);
-
-impl ExprIsNull {
-    /// create instance
-    pub fn new(expr: Expr) -> Self {
-        Self(Box::new(expr))
-    }
-
-    /// expression
-    pub fn expr(&self) -> &Expr {
-        self.0.as_ref()
-    }
-}
-
-/// like expression
-#[derive(Debug, derive_getters::Getters)]
-pub struct ExprLike {
-    lhs: Box<Expr>,
-    not: bool,
-    op: LikeOperator,
-    rhs: Box<Expr>,
-    escape: Option<Box<Expr>>,
-}
-
-impl ExprLike {
-    /// create instance
-    pub fn new(lhs: Expr, not: bool, op: LikeOperator, rhs: Expr, escape: Option<Expr>) -> Self {
-        Self {
-            lhs: Box::new(lhs),
-            not,
-            op,
-            rhs: Box::new(rhs),
-            escape: escape.map(Box::new),
-        }
-    }
-}
-
-/// not null expression
-#[derive(Debug)]
-pub struct ExprNotNull(Box<Expr>);
-
-impl ExprNotNull {
-    /// create instance
-    pub fn new(expr: Expr) -> Self {
-        Self(Box::new(expr))
-    }
-
-    /// expression
-    pub fn expr(&self) -> &Expr {
-        self.0.as_ref()
-    }
-}
-
-/// parenthesized expression
-#[derive(Debug)]
-pub struct Parenthesized(Vec<Box<Expr>>);
-
-impl Parenthesized {
-    /// create instance
-    pub fn new(items: Vec<Expr>) -> Self {
-        Self(items.into_iter().map(Box::new).collect())
-    }
-
-    /// expression
-    pub fn expr(&self) -> &[Box<Expr>] {
-        self.0.as_ref()
-    }
-}
-
-/// qualified expression
-#[derive(Debug, derive_getters::Getters)]
-pub struct Qualified {
-    table: Name,
-    column: Name,
-}
-
-impl Qualified {
-    /// create instance
-    pub fn new(table: Name, column: Name) -> Self {
-        Self { table, column }
-    }
-}
-
-/// raise expression
-#[derive(Debug, derive_getters::Getters)]
-pub struct ExprRaise {
-    resolve_type: ResolveType,
-    expr: Option<Box<Expr>>,
-}
-
-impl ExprRaise {
-    /// create instance
-    pub fn new(resolve_type: ResolveType, expr: Option<Expr>) -> Self {
-        Self {
-            resolve_type,
-            expr: expr.map(Box::new),
-        }
-    }
-}
-
-/// unary expression
-#[derive(Debug, derive_getters::Getters)]
-pub struct ExprUnary {
-    unary_operator: UnaryOperator,
-    expr: Box<Expr>,
-}
-
-impl ExprUnary {
-    /// create instance
-    pub fn new(unary_operator: UnaryOperator, expr: Expr) -> Self {
-        Self {
-            unary_operator,
-            expr: Box::new(expr),
-        }
-    }
-}
-
-/// variable expression
-#[derive(Debug)]
-pub struct Variable(String);
-
-impl Variable {
-    /// create instance
-    pub fn new(name: String) -> Self {
-        Self(name)
-    }
-
-    /// variable name
-    pub fn name(&self) -> &str {
-        self.0.as_str()
-    }
-}
-
-/// sub query result expression
-#[derive(Debug, derive_getters::Getters)]
-pub struct SubqueryResult {
-    subquery_id: TableInternalId,
-    lhs: Option<Box<Expr>>,
-    not_in: bool,
-    query_type: SubqueryType,
-}
-
-impl SubqueryResult {
-    /// create instance
-    pub fn new(
-        subquery_id: TableInternalId,
-        lhs: Option<Expr>,
-        not_in: bool,
-        query_type: SubqueryType,
-    ) -> Self {
-        Self {
-            subquery_id,
-            lhs: lhs.map(Box::new),
-            not_in,
-            query_type,
-        }
-    }
-}
-
-/// result column expression
-#[derive(Debug, derive_getters::Getters)]
-pub struct ResultColumnExpr {
-    expr: Box<Expr>,
-    as_: Option<As>,
-}
-
-impl ResultColumnExpr {
-    /// create instance
-    pub fn new(expr: Expr, as_: Option<As>) -> Self {
-        Self {
-            expr: Box::new(expr),
-            as_,
-        }
-    }
-}
-
 /// expression
-#[derive(Debug)]
+#[derive(Clone, Debug)]
 pub enum Expr {
     /// between
     Between(ExprBetween),
@@ -530,6 +101,53 @@ pub enum Expr {
     Variable(Variable),
     /// subquery result
     SubqueryResult(SubqueryResult),
+    /// field access
+    FieldAccess(FieldAccess),
+    /// default
+    Default,
+    /// array
+    Array(Array),
+    /// subscript
+    Subscript(Subscript),
+}
+
+impl Expr {
+    /// create Register variant
+    pub fn register(size: usize) -> Self {
+        Self::Register(size)
+    }
+
+    /// create Exists variant
+    pub fn exists<SELECT>(select: SELECT) -> Self
+    where
+        SELECT: Into<Select>,
+    {
+        Self::Exists(select.into())
+    }
+
+    /// create Id variant
+    pub fn id<NAME>(name: NAME) -> Self
+    where
+        NAME: Into<Name>,
+    {
+        Self::Id(name.into())
+    }
+
+    /// create Name variant
+    pub fn name<NAME>(name: NAME) -> Self
+    where
+        NAME: Into<Name>,
+    {
+        Self::Name(name.into())
+    }
+
+    /// create Literal variant
+    pub fn literal<Lit>(literal: Lit) -> Self
+    where
+        Lit: Into<Literal>,
+    {
+        Self::Literal(literal.into())
+    }
 }
 
 impl From<ExprIn> for Expr {
@@ -540,214 +158,83 @@ impl From<ExprIn> for Expr {
                 not,
                 start,
                 end,
-            } => Self::Between(ExprBetween::new(
-                Expr::from(*lhs),
-                not,
-                Expr::from(*start),
-                Expr::from(*end),
-            )),
-            ExprIn::Binary(expr, operator, expr1) => Self::Binary(ExprBinary::new(
-                Expr::from(*expr),
-                Operator::from(operator),
-                Expr::from(*expr1),
-            )),
-            ExprIn::Register(siz) => Self::Register(siz),
+            } => Self::between(lhs, not, start, end),
+            ExprIn::Binary(left, operator, right) => Self::binary(left, operator, right),
+            ExprIn::Register(siz) => Self::register(siz),
             ExprIn::Case {
                 base,
                 when_then_pairs,
                 else_expr,
-            } => Self::Case(ExprCase::new(
-                base.map(|e| Expr::from(*e)),
-                when_then_pairs,
-                else_expr.map(|e| Expr::from(*e)),
-            )),
-            ExprIn::Cast { expr, type_name } => {
-                Self::Cast(ExprCast::new(Expr::from(*expr), type_name.map(Type::from)))
+            } => Self::case(base, when_then_pairs, else_expr),
+            ExprIn::Cast { expr, type_name } => Self::cast(expr, type_name),
+            ExprIn::Collate(expr, name) => Self::collate(expr, name),
+            ExprIn::DoublyQualified(schema, table, column) => {
+                Self::doubly_qualified(schema, table, column)
             }
-            ExprIn::Collate(expr, name) => {
-                Self::Collate(ExprCollate::new(Expr::from(*expr), Name::from(name)))
-            }
-            ExprIn::DoublyQualified(schema, table, column) => Self::DoublyQualified(
-                ExprDoublyQualified::new(Name::from(schema), Name::from(table), Name::from(column)),
-            ),
-            ExprIn::Exists(select) => Self::Exists(Select::from(select)),
+            ExprIn::Exists(select) => Self::exists(select),
             ExprIn::FunctionCall {
                 name,
                 distinctness,
                 args,
                 order_by,
                 filter_over,
-            } => Self::FunctionCall(ExprFunctionCall::new(
-                Name::from(name),
-                distinctness.map(Distinctness::from),
-                args.into_iter().map(|v| Expr::from(*v)).collect(),
-                order_by.into_iter().map(SortedColumn::from).collect(),
-                FunctionTail::from(filter_over),
-            )),
-            ExprIn::FunctionCallStar { name, filter_over } => Self::FunctionCallStar(
-                ExprFunctionCallStar::new(Name::from(name), FunctionTail::from(filter_over)),
-            ),
-            ExprIn::Id(name) => Self::Id(Name::from(name)),
+            } => Self::function_call(name, distinctness, args, order_by, filter_over),
+            ExprIn::FunctionCallStar { name, filter_over } => {
+                Self::function_call_star(name, filter_over)
+            }
+            ExprIn::Id(name) => Self::id(name),
             ExprIn::Column {
                 database,
                 table,
                 column,
                 is_rowid_alias,
-            } => Self::Column(ExprColumn::new(
-                database,
-                TableInternalId::from(table),
-                column,
-                is_rowid_alias,
-            )),
-            ExprIn::RowId { database, table } => {
-                Self::RowId(ExprRowId::new(database, TableInternalId::from(table)))
-            }
-            ExprIn::InList { lhs, not, rhs } => Self::InList(ExprInList::new(
-                Expr::from(*lhs),
-                not,
-                rhs.into_iter().map(|v| Expr::from(*v)).collect(),
-            )),
-            ExprIn::InSelect { lhs, not, rhs } => {
-                Self::InSelect(ExprInSelect::new(Expr::from(*lhs), not, Select::from(rhs)))
-            }
+            } => Self::column(database, table, column, is_rowid_alias),
+            ExprIn::RowId { database, table } => Self::row_id(database, table),
+            ExprIn::InList { lhs, not, rhs } => Self::in_list(lhs, not, rhs),
+            ExprIn::InSelect { lhs, not, rhs } => Self::in_select(lhs, not, rhs),
             ExprIn::InTable {
                 lhs,
                 not,
                 rhs,
                 args,
-            } => Self::InTable(ExprInTable::new(
-                Expr::from(*lhs),
-                not,
-                QualifiedName::from(rhs),
-                args.into_iter().map(|v| Expr::from(*v)).collect(),
-            )),
-            ExprIn::IsNull(expr) => Self::IsNull(ExprIsNull::new(Expr::from(*expr))),
+            } => Self::in_table(lhs, not, rhs, args),
+            ExprIn::IsNull(expr) => Self::is_null(expr),
+            ExprIn::NotNull(expr) => Self::not_null(expr),
             ExprIn::Like {
                 lhs,
                 not,
                 op,
                 rhs,
                 escape,
-            } => Self::Like(ExprLike::new(
-                Expr::from(*lhs),
-                not,
-                LikeOperator::from(op),
-                Expr::from(*rhs),
-                escape.map(|v| Expr::from(*v)),
-            )),
-            ExprIn::Literal(literal) => Self::Literal(Literal::from(literal)),
-            ExprIn::Name(name) => Self::Name(Name::from(name)),
-            ExprIn::NotNull(expr) => Self::NotNull(ExprNotNull::new(Expr::from(*expr))),
-            ExprIn::Parenthesized(exprs) => Self::Parenthesized(Parenthesized::new(
-                exprs.into_iter().map(|v| Expr::from(*v)).collect(),
-            )),
-            ExprIn::Qualified(table, column) => {
-                Self::Qualified(Qualified::new(Name::from(table), Name::from(column)))
-            }
-            ExprIn::Raise(resolve_type, expr) => Self::Raise(ExprRaise::new(
-                ResolveType::from(resolve_type),
-                expr.map(|v| Expr::from(*v)),
-            )),
-            ExprIn::Subquery(select) => Self::Subquery(Select::from(select)),
-            ExprIn::Unary(unary_operator, expr) => Self::Unary(ExprUnary::new(
-                UnaryOperator::from(unary_operator),
-                Expr::from(*expr),
-            )),
-            ExprIn::Variable(v) => Self::Variable(Variable::new(v)),
+            } => Self::like(lhs, not, op, rhs, escape),
+            ExprIn::Literal(literal) => Self::literal(literal),
+            ExprIn::Name(name) => Self::name(name),
+            ExprIn::Parenthesized(exprs) => Self::parenthesized(exprs),
+            ExprIn::Qualified(table, column) => Self::qualified(table, column),
+            ExprIn::Raise(resolve_type, expr) => Self::raise(resolve_type, expr),
+            ExprIn::Subquery(select) => Self::subquery(select),
+            ExprIn::Unary(unary_operator, expr) => Self::unary(unary_operator, expr),
+            ExprIn::Variable(v) => Self::variable(v),
             ExprIn::SubqueryResult {
                 subquery_id,
                 lhs,
                 not_in,
                 query_type,
-            } => Self::SubqueryResult(SubqueryResult::new(
-                TableInternalId::from(subquery_id),
-                lhs.map(|e| Expr::from(*e)),
-                not_in,
-                SubqueryType::from(query_type),
-            )),
+            } => Self::subquery_result(subquery_id, lhs, not_in, query_type),
+            ExprIn::FieldAccess {
+                base,
+                field,
+                resolved,
+            } => Self::field_access(base, field, resolved),
+            ExprIn::Default => Self::Default,
+            ExprIn::Array { elements } => Self::array(elements),
+            ExprIn::Subscript { base, index } => Self::subscript(base, index),
         }
     }
 }
 
-use turso_parser::ast::Operator as OperatorIn;
-
-/// operator
-#[derive(Debug)]
-pub enum Operator {
-    /// add
-    Add,
-    /// logical and
-    And,
-    /// arrow right
-    ArrowRight,
-    /// arrow right shift
-    ArrowRightShift,
-    /// bitwise and
-    BitwiseAnd,
-    /// bitwise or
-    BitwiseOr,
-    /// bitwise not
-    BitwiseNot,
-    /// concat
-    Concat,
-    /// equals
-    Equals,
-    /// divide
-    Divide,
-    /// grater
-    Grater,
-    /// grater equals
-    GraterEquals,
-    /// is
-    Is,
-    /// is not
-    IsNot,
-    /// left shift
-    LeftShift,
-    /// less
-    Less,
-    /// less equals
-    LessEqales,
-    /// modulus
-    Modulus,
-    /// multiply
-    Multiply,
-    /// not equals
-    NotEquals,
-    /// logical or
-    Or,
-    /// right shift
-    RightShift,
-    /// subtract
-    Subtract,
-}
-
-impl From<OperatorIn> for Operator {
-    fn from(value: OperatorIn) -> Self {
-        match value {
-            OperatorIn::Add => Self::Add,
-            OperatorIn::And => Self::And,
-            OperatorIn::ArrowRight => Self::ArrowRight,
-            OperatorIn::ArrowRightShift => Self::ArrowRightShift,
-            OperatorIn::BitwiseAnd => Self::BitwiseAnd,
-            OperatorIn::BitwiseOr => Self::BitwiseOr,
-            OperatorIn::BitwiseNot => Self::BitwiseNot,
-            OperatorIn::Concat => Self::Concat,
-            OperatorIn::Equals => Self::Equals,
-            OperatorIn::Divide => Self::Divide,
-            OperatorIn::Greater => Self::Grater,
-            OperatorIn::GreaterEquals => Self::GraterEquals,
-            OperatorIn::Is => Self::Is,
-            OperatorIn::IsNot => Self::IsNot,
-            OperatorIn::LeftShift => Self::LeftShift,
-            OperatorIn::Less => Self::Less,
-            OperatorIn::LessEquals => Self::LessEqales,
-            OperatorIn::Modulus => Self::Modulus,
-            OperatorIn::Multiply => Self::Multiply,
-            OperatorIn::NotEquals => Self::NotEquals,
-            OperatorIn::Or => Self::Or,
-            OperatorIn::RightShift => Self::RightShift,
-            OperatorIn::Subtract => Self::Subtract,
-        }
+impl From<Box<ExprIn>> for Expr {
+    fn from(value: Box<ExprIn>) -> Self {
+        Expr::from(*value)
     }
 }

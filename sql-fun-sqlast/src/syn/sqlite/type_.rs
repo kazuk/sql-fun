@@ -1,7 +1,7 @@
 use turso_parser::ast::Type as TypeIn;
 
 /// type
-#[derive(Debug)]
+#[derive(Clone, Debug)]
 pub struct Type {
     name: String,
     size: Option<TypeSize>,
@@ -33,7 +33,7 @@ use turso_parser::ast::TypeSize as TypeSizeIn;
 use crate::syn::sqlite::Expr;
 
 /// type size value
-#[derive(Debug)]
+#[derive(Clone, Debug)]
 pub enum TypeSize {
     /// max size
     MaxSize(Box<Expr>),

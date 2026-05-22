@@ -3,7 +3,7 @@ use turso_parser::ast::Window as WindowIn;
 use crate::syn::sqlite::{Expr, FrameClause, Name, SortedColumn};
 
 /// window
-#[derive(Debug, derive_getters::Getters)]
+#[derive(Clone, Debug, derive_getters::Getters)]
 pub struct Window {
     base: Option<Name>,
     partition_by: Vec<Box<Expr>>,
@@ -46,7 +46,7 @@ impl From<WindowIn> for Window {
 use turso_parser::ast::WindowDef as WindowDefIn;
 
 /// window def
-#[derive(Debug, derive_getters::Getters)]
+#[derive(Clone, Debug, derive_getters::Getters)]
 pub struct WindowDef {
     name: Name,
     window: Window,

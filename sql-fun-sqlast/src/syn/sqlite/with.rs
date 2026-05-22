@@ -3,7 +3,7 @@ use crate::syn::sqlite::{IndexedColumn, Name, Select};
 use turso_parser::ast::With as WithIn;
 
 /// with clause
-#[derive(Debug, derive_getters::Getters)]
+#[derive(Clone, Debug, derive_getters::Getters)]
 pub struct With {
     recursive: bool,
     ctes: Vec<CommonTableExpr>,
@@ -21,7 +21,7 @@ impl From<WithIn> for With {
 use turso_parser::ast::CommonTableExpr as CommonTableExprIn;
 
 /// Common table expression
-#[derive(Debug, derive_getters::Getters)]
+#[derive(Clone, Debug, derive_getters::Getters)]
 pub struct CommonTableExpr {
     table_name: Name,
     columns: Vec<IndexedColumn>,
@@ -43,7 +43,7 @@ impl From<CommonTableExprIn> for CommonTableExpr {
 use turso_parser::ast::Materialized as MaterializedIn;
 
 /// materialized option value
-#[derive(Debug)]
+#[derive(Clone, Debug)]
 pub enum Materialized {
     /// Any
     Any,

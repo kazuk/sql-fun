@@ -3333,9 +3333,9 @@ dependencies = [
 
 [[package]]
 name = "turso_macros"
-version = "0.5.0"
+version = "0.6.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "18687fe83de76951957ce1b3599af16a4627b94c9a17fd4e09c6a28f0bbe0ca7"
+checksum = "97578dbe06dd73634457b38b3546b868b4886aebefa57570b11a899679355761"
 dependencies = [
  "proc-macro2",
  "quote",
@@ -3344,9 +3344,9 @@ dependencies = [
 
 [[package]]
 name = "turso_parser"
-version = "0.5.0"
+version = "0.6.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "c41725404271e703fc734d1b211c53541821dfa2701895ec2d89c85a10e8514d"
+checksum = "aa8dd793f7e9c467568275b0acddfd527ec19b7d1057bed41364b4c77b1111b3"
 dependencies = [
  "bitflags 2.11.0",
  "memchr",

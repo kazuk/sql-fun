@@ -3,7 +3,7 @@ use crate::syn::sqlite::Expr;
 use turso_parser::ast::SortedColumn as SortedColumnIn;
 
 /// sorted column
-#[derive(Debug, derive_getters::Getters)]
+#[derive(Clone, Debug, derive_getters::Getters)]
 pub struct SortedColumn {
     expr: Box<Expr>,
     order: Option<SortOrder>,
@@ -43,7 +43,7 @@ impl From<SortOrderIn> for SortOrder {
 use turso_parser::ast::NullsOrder as NullsOrderIn;
 
 /// nulls order option
-#[derive(Debug)]
+#[derive(Clone, Debug)]
 pub enum NullsOrder {
     /// first
     First,

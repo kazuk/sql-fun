@@ -3,7 +3,7 @@ use crate::syn::sqlite::Expr;
 use turso_parser::ast::FrameClause as FrameClauseIn;
 
 /// frame clause
-#[derive(Debug, derive_getters::Getters)]
+#[derive(Clone, Debug, derive_getters::Getters)]
 pub struct FrameClause {
     mode: FrameMode,
     start: FrameBound,
@@ -25,7 +25,7 @@ impl From<FrameClauseIn> for FrameClause {
 use turso_parser::ast::FrameMode as FrameModeIn;
 
 /// frame mode
-#[derive(Debug)]
+#[derive(Clone, Debug)]
 pub enum FrameMode {
     /// groups
     Groups,
@@ -48,7 +48,7 @@ impl From<FrameModeIn> for FrameMode {
 use turso_parser::ast::FrameBound as FrameBoundIn;
 
 /// frame bound
-#[derive(Debug)]
+#[derive(Clone, Debug)]
 pub enum FrameBound {
     /// current row
     CurrentRow,
@@ -77,7 +77,7 @@ impl From<FrameBoundIn> for FrameBound {
 use turso_parser::ast::FrameExclude as FrameExcludeIn;
 
 /// frame exclude
-#[derive(Debug)]
+#[derive(Clone, Debug)]
 pub enum FrameExclude {
     /// no-others
     NoOthers,

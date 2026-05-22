@@ -401,15 +401,31 @@ impl ForeignKeyColumnConstraint {
 #[derive(Debug, derive_getters::Getters)]
 pub struct GeneratedColumnConstraint {
     expr: Box<Expr>,
-    typ: Option<Name>,
+    typ: Option<GeneratedColumnType>,
 }
 
 impl GeneratedColumnConstraint {
     /// create instance
-    pub fn new(expr: Expr, typ: Option<Name>) -> Self {
+    pub fn new(expr: Expr, typ: Option<GeneratedColumnType>) -> Self {
         Self {
             expr: Box::new(expr),
             typ,
+        }
+    }
+}
+
+#[derive(Debug)]
+pub enum GeneratedColumnType {
+    Stored,
+    Virtual,
+}
+
+use turso_parser::ast::GeneratedColumnType as GeneratedColumnTypeIn;
+impl From<GeneratedColumnTypeIn> for GeneratedColumnType {
+    fn from(value: GeneratedColumnTypeIn) -> Self {
+        match value {
+            GeneratedColumnTypeIn::Stored => Self::Stored,
+            GeneratedColumnTypeIn::Virtual => Self::Virtual,
         }
     }
 }
@@ -475,9 +491,12 @@ impl From<ColumnConstraintIn> for ColumnConstraint {
                 ForeignKeyClause::from(clause),
                 defer_clause.map(DeferSubclause::from),
             )),
-            ColumnConstraintIn::Generated { expr, typ } => Self::Generated(
-                GeneratedColumnConstraint::new(Expr::from(*expr), typ.map(Name::from)),
-            ),
+            ColumnConstraintIn::Generated { expr, typ } => {
+                Self::Generated(GeneratedColumnConstraint::new(
+                    Expr::from(*expr),
+                    typ.map(GeneratedColumnType::from),
+                ))
+            }
         }
     }
 }

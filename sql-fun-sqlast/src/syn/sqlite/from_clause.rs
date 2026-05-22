@@ -3,7 +3,7 @@ use crate::syn::sqlite::{As, Expr, Name, QualifiedName, Select};
 use turso_parser::ast::FromClause as FromClauseIn;
 
 /// from clause
-#[derive(Debug, derive_getters::Getters)]
+#[derive(Clone, Debug, derive_getters::Getters)]
 pub struct FromClause {
     select: Box<SelectTable>,
     joins: Vec<JoinedSelectTable>,
@@ -23,7 +23,7 @@ impl From<FromClauseIn> for FromClause {
 }
 
 /// select table tbale
-#[derive(Debug, derive_getters::Getters)]
+#[derive(Clone, Debug, derive_getters::Getters)]
 pub struct SelectTableTable {
     qualified_name: QualifiedName,
     as_: Option<As>,
@@ -42,7 +42,7 @@ impl SelectTableTable {
 }
 
 /// select table cell
-#[derive(Debug, derive_getters::Getters)]
+#[derive(Clone, Debug, derive_getters::Getters)]
 pub struct SelectTableTableCell {
     qualified_name: QualifiedName,
     exprs: Vec<Box<Expr>>,
@@ -61,7 +61,7 @@ impl SelectTableTableCell {
 }
 
 /// select table select
-#[derive(Debug, derive_getters::Getters)]
+#[derive(Clone, Debug, derive_getters::Getters)]
 pub struct SelectTableSelect {
     select: Select,
     as_: Option<As>,
@@ -75,7 +75,7 @@ impl SelectTableSelect {
 }
 
 /// select table sub
-#[derive(Debug, derive_getters::Getters)]
+#[derive(Clone, Debug, derive_getters::Getters)]
 pub struct SelectTableSub {
     from_clause: FromClause,
     as_: Option<As>,
@@ -91,7 +91,7 @@ impl SelectTableSub {
 use turso_parser::ast::SelectTable as SelectTableIn;
 
 /// select table
-#[derive(Debug)]
+#[derive(Clone, Debug)]
 pub enum SelectTable {
     /// table
     Table(SelectTableTable),
@@ -135,7 +135,7 @@ impl From<SelectTableIn> for SelectTable {
 use turso_parser::ast::JoinedSelectTable as JoinedSelectTableIn;
 
 /// joined select table
-#[derive(Debug, derive_getters::Getters)]
+#[derive(Clone, Debug, derive_getters::Getters)]
 pub struct JoinedSelectTable {
     operator: JoinOperator,
     table: Box<SelectTable>,
@@ -155,7 +155,7 @@ impl From<JoinedSelectTableIn> for JoinedSelectTable {
 use turso_parser::ast::Indexed as IndexedIn;
 
 /// indexed
-#[derive(Debug)]
+#[derive(Clone, Debug)]
 pub enum Indexed {
     /// indexed by
     IndexedBy(Name),
@@ -175,7 +175,7 @@ impl From<IndexedIn> for Indexed {
 use turso_parser::ast::JoinOperator as JoinOperatorIn;
 
 /// join operator
-#[derive(Debug)]
+#[derive(Clone, Debug)]
 pub enum JoinOperator {
     /// comma
     Comma,
@@ -195,7 +195,7 @@ impl From<JoinOperatorIn> for JoinOperator {
 use turso_parser::ast::JoinConstraint as JoinConstraintIn;
 
 /// join constraint
-#[derive(Debug)]
+#[derive(Clone, Debug)]
 pub enum JoinConstraint {
     /// on
     On(Box<Expr>),
@@ -217,7 +217,7 @@ impl From<JoinConstraintIn> for JoinConstraint {
 use turso_parser::ast::JoinType as JoinTypeIn;
 
 /// join type
-#[derive(Debug)]
+#[derive(Clone, Debug)]
 pub struct JoinType(JoinTypeIn);
 
 impl JoinType {

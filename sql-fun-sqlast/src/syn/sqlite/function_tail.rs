@@ -3,7 +3,7 @@ use turso_parser::ast::FunctionTail as FunctionTailIn;
 use crate::syn::sqlite::{Expr, Over};
 
 /// function tail
-#[derive(Debug, derive_getters::Getters)]
+#[derive(Clone, Debug, derive_getters::Getters)]
 pub struct FunctionTail {
     filter_clause: Option<Box<Expr>>,
     over_clause: Option<Over>,

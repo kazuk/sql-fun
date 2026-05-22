@@ -2,6 +2,7 @@
 #![allow(clippy::pedantic)]
 #![doc = include_str!("lib.md")]
 
+pub mod engine_specific;
 pub mod sem;
 pub mod syn;
 

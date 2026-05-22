@@ -386,6 +386,8 @@ impl SemAst {
             Stmt::Delete(_delete_statement) => todo!(),
             Stmt::Insert(_insert_statement) => todo!(),
             Stmt::Pragma(_pragma_statement) => todo!(),
+            Stmt::CreateDomain(_create_domain_statement) => todo!(),
+            Stmt::DropDomain(_drop_domain_statement) => todo!(),
         }
     }
 }

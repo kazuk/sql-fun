@@ -17,6 +17,7 @@ mod column_definition;
 mod connection_context_statement;
 mod constraints;
 mod delete_statement;
+mod domain;
 mod expr;
 mod frame_clause;
 mod from_clause;
@@ -24,7 +25,6 @@ mod function_tail;
 mod group_by;
 mod index_statement;
 mod insert_statement;
-mod like_operator;
 mod literal;
 mod maintenance_statement;
 mod names;
@@ -40,14 +40,13 @@ mod transaction_statement;
 mod trigger_statement;
 mod type_;
 mod type_statements;
-mod unary_operator;
 mod update_statement;
 mod upsert;
 mod view_management_statements;
 mod window;
 mod with;
 
-use crate::syn::sqlite::pragma::PragmaBody;
+use crate::syn::sqlite::{domain::DomainConstraint, pragma::PragmaBody};
 
 pub use self::{
     analyze_statement::AnalyzeStatement,
@@ -61,11 +60,13 @@ pub use self::{
         UniqueColumnConstraint, UniqueConstraint,
     },
     delete_statement::DeleteStatement,
+    domain::{CreateDomainStatement, DropDomainStatement},
     expr::{
-        CaseWhenThenPair, Expr, ExprBetween, ExprBinary, ExprCase, ExprCast, ExprCollate,
+        Array, CaseWhenThenPair, Expr, ExprBetween, ExprBinary, ExprCase, ExprCast, ExprCollate,
         ExprColumn, ExprDoublyQualified, ExprFunctionCall, ExprFunctionCallStar, ExprInList,
         ExprInSelect, ExprInTable, ExprIsNull, ExprLike, ExprNotNull, ExprRaise, ExprRowId,
-        ExprUnary, Operator, Parenthesized, Qualified, ResultColumnExpr, SubqueryResult, Variable,
+        ExprUnary, FieldAccess, FieldAccessResolution, LikeOperator, Operator, Parenthesized,
+        Qualified, SubqueryResult, Subscript, UnaryOperator, Variable,
     },
     frame_clause::{FrameBound, FrameClause, FrameExclude, FrameMode},
     from_clause::{
@@ -78,7 +79,6 @@ pub use self::{
         CreateIndexStatement, DropIndexStatement, OptimizeStatement, ReindexStatement,
     },
     insert_statement::{InsertBody, InsertBodySelect, InsertStatement},
-    like_operator::LikeOperator,
     literal::{
         BlobLiteral, BooleanLiteral, KeywordLiteral, Literal, NullLiteral, NumericLiteral,
         StringLiteral, TimestampKind, TimestampLiteral,
@@ -90,7 +90,7 @@ pub use self::{
     resolve_type::ResolveType,
     select::{
         CompoundOperator, CompoundSelect, Distinctness, IndexedColumn, Limit, OneSelect,
-        OneSelectItem, ResultColumn, Select, SelectBody,
+        OneSelectItem, ResultColumn, ResultColumnExpr, Select, SelectBody,
     },
     sorted_column::{NullsOrder, SortOrder, SortedColumn},
     subquery_type::{SubqueryType, SubqueryTypeExists, SubqueryTypeIn, SubqueryTypeRowValue},
@@ -110,7 +110,6 @@ pub use self::{
     },
     type_::{Type, TypeSize},
     type_statements::{CreateTypeBody, CreateTypeStatement, DropTypeStatement},
-    unary_operator::UnaryOperator,
     update_statement::{Set, Update},
     upsert::{Upsert, UpsertDo, UpsertDoSet, UpsertIndex},
     view_management_statements::{CreateMaterializedView, CreateView, DropView},
@@ -121,12 +120,14 @@ pub use self::{
 use turso_parser::ast::As as AsIn;
 
 /// as clause
-#[derive(Debug)]
+#[derive(Clone, Debug)]
 pub enum As {
     /// as
     As(Name),
     /// elided
     Elided(Name),
+    /// implicit column name
+    ImplicitColumnName(Name),
 }
 
 impl From<AsIn> for As {
@@ -134,6 +135,7 @@ impl From<AsIn> for As {
         match value {
             AsIn::As(name) => Self::As(Name::from(name)),
             AsIn::Elided(name) => Self::Elided(Name::from(name)),
+            AsIn::ImplicitColumnName(name) => Self::ImplicitColumnName(Name::from(name)),
         }
     }
 }
@@ -196,6 +198,11 @@ pub enum Stmt {
     CreateType(CreateTypeStatement),
     /// drop type
     DropType(DropTypeStatement),
+
+    /// create domain
+    CreateDomain(CreateDomainStatement),
+    /// drop domain
+    DropDomain(DropDomainStatement),
 
     /// select
     Select(Select),
@@ -406,6 +413,28 @@ impl From<StmtIn> for Stmt {
             StmtIn::Optimize { idx_name } => {
                 Self::Optimize(OptimizeStatement::new(idx_name.map(QualifiedName::from)))
             }
+            StmtIn::CreateDomain {
+                if_not_exists,
+                domain_name,
+                base_type,
+                default,
+                not_null,
+                constraints,
+            } => Self::CreateDomain(CreateDomainStatement::new(
+                if_not_exists,
+                &domain_name,
+                &base_type,
+                default.map(|v| Expr::from(*v)),
+                not_null,
+                constraints
+                    .into_iter()
+                    .map(DomainConstraint::from)
+                    .collect(),
+            )),
+            StmtIn::DropDomain {
+                if_exists,
+                domain_name,
+            } => Self::DropDomain(DropDomainStatement::new(if_exists, &domain_name)),
         }
     }
 }

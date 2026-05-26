@@ -336,6 +336,7 @@ impl CreateTable {
 
     /// analyze [`crate::syn::sqlite::ColumnAndConstraint`]
     #[cfg(feature = "sqlite")]
+    #[expect(clippy::too_many_arguments)]
     pub fn analyze_columns_and_constraint<TParseContext>(
         mut context: TParseContext,
         _parent_schema: &Option<String>,
@@ -363,6 +364,7 @@ impl CreateTable {
 
     /// analyze [`crate::syn::sqlite::CreateTableBody`]
     #[cfg(feature = "sqlite")]
+    #[expect(clippy::too_many_arguments)]
     pub fn analyze_create_table_body<TParseContext>(
         context: TParseContext,
         parent_schema: &Option<String>,
@@ -500,6 +502,31 @@ impl DropTable {
             if_exists: syn.get_missing_ok(),
             table_names,
             cascade,
+        };
+        context = context.apply_drop_table(&result)?;
+        Ok(AstAndContextPair::new(SemAst::DropTable(result), context))
+    }
+
+    ///
+    /// analyze DropTableStatemtn for SQLite dialect
+    ///
+    #[cfg(feature = "sqlite")]
+    pub fn analyze_drop_table<TParseContext>(
+        mut context: TParseContext,
+        syn: crate::syn::sqlite::DropTableStatement,
+        _tokens: &IVec<SqliteToken<'_>>,
+    ) -> Result<AstAndContextPair<TParseContext>, AnalysisError>
+    where
+        TParseContext: ParseContext,
+    {
+        let if_exists = syn.if_exists();
+        let table_name = TableName::try_from(syn.name())?;
+        if context.get_table(&table_name).is_none() {
+            context.report_problem(AnalysisProblem::table_not_found(&table_name))?;
+        }
+        let result = Self {
+            if_exists: *if_exists,
+            table_name: table_name.to_owned(),
         };
         context = context.apply_drop_table(&result)?;
         Ok(AstAndContextPair::new(SemAst::DropTable(result), context))

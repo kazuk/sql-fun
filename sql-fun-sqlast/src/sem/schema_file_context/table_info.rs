@@ -1,8 +1,8 @@
 use crate::{
     TrieMap,
     sem::{
-        AlterTable, AnalysisError, AnalysisProblem, BaseParseContext, CreateTable, FullName,
-        ImplicitChange, TableInfoRead, TableInfoWrite, TableName,
+        AlterTable, AnalysisError, AnalysisProblem, BaseParseContext, CreateTable, DropTable,
+        FullName, ImplicitChange, TableInfoRead, TableInfoWrite, TableName,
     },
 };
 
@@ -16,8 +16,12 @@ impl TableDefinitionCollection {
         self.0.insert(&name.to_string(), create_table.clone());
     }
 
-    fn get(&self, name: &str) -> Option<&CreateTable> {
-        self.0.get(name)
+    fn get(&self, name: &FullName) -> Option<&CreateTable> {
+        self.0.get(&name.to_string())
+    }
+
+    fn get_mut(&mut self, name: &FullName) -> Option<&mut CreateTable> {
+        self.0.get_mut(&name.to_string())
     }
 
     fn apply_alter(
@@ -30,6 +34,16 @@ impl TableDefinitionCollection {
         self.insert_create_table(table_name.full_name(), &table);
         Ok(implicit_changes)
     }
+
+    fn push_drop_statement(&mut self, drop_table: &DropTable) -> Result<bool, AnalysisError> {
+        let name = drop_table.table_name();
+        if let Some(table) = self.get_mut(name.full_name()) {
+            table.push_drop_statement(drop_table);
+            Ok(true)
+        } else {
+            Ok(false)
+        }
+    }
 }
 
 impl<TBaseContext> TableInfoRead for SchemaFileContext<TBaseContext>
@@ -37,7 +51,7 @@ where
     TBaseContext: BaseParseContext + std::fmt::Debug,
 {
     fn get_table_impl(&self, key: &FullName) -> Option<&CreateTable> {
-        if let Some(v) = self.tables.get(&key.to_string()) {
+        if let Some(v) = self.tables.get(key) {
             Some(v)
         } else {
             self.base.get_table_impl(key)
@@ -49,10 +63,6 @@ impl<TBaseContext> TableInfoWrite for SchemaFileContext<TBaseContext>
 where
     TBaseContext: BaseParseContext + std::fmt::Debug,
 {
-    fn insert_create_table(&mut self, name: &FullName, create_table: &CreateTable) {
-        self.tables.insert_create_table(name, create_table);
-    }
-
     #[tracing::instrument(skip(self))]
     fn apply_alter_table(mut self, alter_table: &AlterTable) -> Result<Self, AnalysisError> {
         let table_name = alter_table.table();
@@ -67,5 +77,21 @@ where
             context = context.apply_implicit_change(implicit_change)?;
         }
         Ok(context)
+    }
+
+    fn apply_drop_table(
+        mut self,
+        drop_table: &crate::sem::DropTable,
+    ) -> Result<Self, AnalysisError> {
+        let table_name = drop_table.table_name();
+        if !self.tables.push_drop_statement(drop_table)? {
+            self.report_problem(AnalysisProblem::table_not_found(table_name))?;
+            return Ok(self);
+        }
+        Ok(self)
+    }
+
+    fn insert_create_table(&mut self, name: &FullName, create_table: &CreateTable) {
+        self.tables.insert_create_table(name, create_table);
     }
 }

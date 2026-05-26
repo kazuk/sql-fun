@@ -1,4 +1,4 @@
-use crate::sem::{AlterTable, AnalysisError, CreateTable, FullName};
+use crate::sem::{AlterTable, AnalysisError, CreateTable, DropTable, FullName};
 
 /// get table definition
 pub trait TableInfoRead {
@@ -13,6 +13,16 @@ where
 {
     /// apply `alter table` statement to current schema
     fn apply_alter_table(self, alter_table: &AlterTable) -> Result<Self, AnalysisError>;
+
+    /// apply `drop table` statement to current schema
+    ///
+    /// # Note
+    ///
+    /// `sql-fun` only records `DROP TABLE` statement existing.
+    ///
+    /// Schema dump is a Source of Truth, can not to change table existing state.
+    ///
+    fn apply_drop_table(self, drop_table: &DropTable) -> Result<Self, AnalysisError>;
 
     /// insert create table statement
     fn insert_create_table(&mut self, name: &FullName, create_table: &CreateTable);

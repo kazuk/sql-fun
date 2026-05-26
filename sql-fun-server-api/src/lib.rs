@@ -236,7 +236,7 @@ pub trait SqlFunServerApi {
 #[cfg(feature = "openrpc-schema")]
 mod rpc_schema {
 
-    /// JSON-RPC method definition for initialize_schema_context method
+    /// JSON-RPC method definition for `initialize_schema_context` method
     use typed_openrpc::RpcMethod;
 
     pub struct InitializeSchemaContextMethod;

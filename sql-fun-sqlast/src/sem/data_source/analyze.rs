@@ -51,13 +51,18 @@ mod test_analyze_range_subselect {
     use testresult::TestResult;
 
     use crate::{
+        sem::{MutSourcePathWithSpan, SourcePathWithSpan},
         syn::{Node, NodeList, WithClauseOpt},
-        test_helpers::{SynBuilder, TestParseContext, test_context},
+        test_helpers::{SynBuilder, TestParseContext, source_span, test_context},
     };
 
     #[rstest::rstest]
-    fn test_analyze_range_subselect(test_context: TestParseContext) -> TestResult {
+    fn test_analyze_range_subselect(
+        mut test_context: TestParseContext,
+        source_span: SourcePathWithSpan,
+    ) -> TestResult {
         let builder = SynBuilder::new();
+        test_context.set_source_path_with_span(&source_span);
 
         let res_target = builder.res_target(
             "name",
@@ -183,19 +188,23 @@ impl DataSource {
 
 #[cfg(test)]
 mod test_analyze_join_expr {
+
     use crate::{
         sem::{
-            ColumnDefinition, ColumnName, FromClause, FullName, SchemaName, TypeReference,
-            WithClause,
+            ColumnDefinition, ColumnName, FromClause, FullName, SchemaName, SourcePathWithSpan,
+            TypeReference, WithClause,
         },
         syn::{AliasOpt, JoinType, NodeInner},
-        test_helpers::{SynBuilder, TestParseContext, test_context},
+        test_helpers::{SynBuilder, TestParseContext, source_span, test_context},
     };
     use sql_fun_core::IVec;
     use testresult::TestResult;
 
     #[rstest::rstest]
-    fn test_analyze_join_expr(mut test_context: TestParseContext) -> TestResult {
+    fn test_analyze_join_expr(
+        mut test_context: TestParseContext,
+        source_span: SourcePathWithSpan,
+    ) -> TestResult {
         test_context.set_get_search_path_result(&vec![
             SchemaName::from("public"),
             SchemaName::from("pg_catalog"),
@@ -208,8 +217,8 @@ mod test_analyze_join_expr {
             Some(true),
             &[],
         )];
-        test_context.setup_table("table1", &columns);
-        test_context.setup_table("table2", &columns);
+        test_context.setup_table("table1", &columns, &source_span);
+        test_context.setup_table("table2", &columns, &source_span);
         test_context.setup_binary("=", "int4", "int4", "bool", true);
 
         let builder = SynBuilder::new();

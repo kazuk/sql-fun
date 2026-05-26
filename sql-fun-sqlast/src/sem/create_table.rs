@@ -12,8 +12,9 @@ use std::collections::HashMap;
 
 use crate::{
     sem::{
-        AlterTable, AnalysisError, AstAndContextPair, Constraint, ImplicitChange, ParseContext,
-        SemAst, alter_table::AlterObjSubCommand,
+        AlterTable, AnalysisError, AnalysisProblem, AstAndContextPair, Constraint, FullName,
+        GetSourcePathWithSpan, ImplicitChange, ParseContext, SemAst, SourcePathWithSpan,
+        alter_table::AlterObjSubCommand,
     },
     syn::{ListOpt, Opt, ScanToken},
 };
@@ -114,11 +115,13 @@ pub struct CreateTable {
     name: TableName,
     columns: ColumnCollection,
     alter_statements: Vec<AlterTable>,
+    drop_statements: Vec<DropTable>,
     owner: Option<String>,
     cluster_on: Option<String>,
     constraints: HashMap<String, Constraint>,
     mode: CreateTableMode,
     temporary: bool,
+    source: SourcePathWithSpan,
 }
 
 impl Clone for CreateTable {
@@ -126,13 +129,21 @@ impl Clone for CreateTable {
         Self {
             name: self.name.clone(),
             columns: self.columns.clone(),
-            alter_statements: Default::default(),
+            alter_statements: self.alter_statements.clone(),
+            drop_statements: self.drop_statements.clone(),
             owner: Default::default(),
             cluster_on: Default::default(),
             constraints: Default::default(),
             mode: self.mode,
             temporary: self.temporary,
+            source: self.source.clone(),
         }
+    }
+}
+
+impl GetSourcePathWithSpan for CreateTable {
+    fn get_source_path_with_span(&self) -> &SourcePathWithSpan {
+        &self.source
     }
 }
 
@@ -144,16 +155,19 @@ impl CreateTable {
         columns: Vec<ColumnDefinition>,
         mode: CreateTableMode,
         temporary: bool,
+        source: &SourcePathWithSpan,
     ) -> Self {
         Self {
             name: name.clone(),
             columns: ColumnCollection(columns),
             alter_statements: Default::default(),
+            drop_statements: Default::default(),
             owner: Default::default(),
             cluster_on: Default::default(),
             constraints: Default::default(),
             mode,
             temporary,
+            source: source.clone(),
         }
     }
 
@@ -272,6 +286,7 @@ impl CreateTable {
         parent_schema: &Option<String>,
         create: crate::syn::CreateStmt,
         tokens: &IVec<ScanToken>,
+        source_span: &SourcePathWithSpan,
     ) -> Result<AstAndContextPair<TParseContext>, AnalysisError>
     where
         TParseContext: ParseContext,
@@ -293,6 +308,7 @@ impl CreateTable {
             cols,
             CreateTableMode::from_if_not_exists(create.get_if_not_exists()),
             false,
+            source_span,
         );
         context = context.apply_create_table(&table_def)?;
         Ok(AstAndContextPair::new(
@@ -300,18 +316,63 @@ impl CreateTable {
             context,
         ))
     }
+
+    pub(crate) fn push_drop_statement(&mut self, drop_table: &DropTable) {
+        self.drop_statements.push(drop_table.clone());
+    }
 }
 
-/// analyze [`crate::syn::CreateStmt`]
-#[deprecated = "use CreateTable::analyze_create_stmt"]
-pub fn analyze_create_stmt<TParseContext>(
-    context: TParseContext,
-    parent_schema: &Option<String>,
-    create: crate::syn::CreateStmt,
-    tokens: &IVec<ScanToken>,
-) -> Result<AstAndContextPair<TParseContext>, AnalysisError>
-where
-    TParseContext: ParseContext,
-{
-    CreateTable::analyze_create_stmt(context, parent_schema, create, tokens)
+/// `DROP TABLE` statement
+#[derive(Debug, Clone)]
+pub struct DropTable {
+    if_exists: bool,
+    table_name: TableName,
+}
+
+impl DropTable {
+    /// True when `IF EXISTS` or same meaning specified.
+    pub fn if_exists(&self) -> bool {
+        self.if_exists
+    }
+
+    /// get target table name.
+    pub fn table_name(&self) -> &TableName {
+        &self.table_name
+    }
+}
+
+impl DropTable {
+    ///
+    /// analyze DropStmt as Drop Table for Postgres dialect
+    ///
+    /// # Panics
+    ///
+    /// When drop statement is not targeting table.
+    ///
+    pub fn analyze_drop_stmt<TParseContext>(
+        mut context: TParseContext,
+        syn: crate::syn::DropStmt,
+        _tokens: &IVec<ScanToken>,
+    ) -> Result<AstAndContextPair<TParseContext>, AnalysisError>
+    where
+        TParseContext: ParseContext,
+    {
+        assert!(matches!(
+            syn.get_remove_type().as_inner(),
+            Some(crate::syn::ObjectType::ObjectTable)
+        ));
+
+        let objects = FullName::try_from(syn.get_objects())?;
+        let table_name = TableName::from(objects);
+        if context.get_table(&table_name).is_none() {
+            context.report_problem(AnalysisProblem::table_not_found(&table_name))?;
+        }
+
+        let result = Self {
+            if_exists: syn.get_missing_ok(),
+            table_name,
+        };
+        context = context.apply_drop_table(&result)?;
+        Ok(AstAndContextPair::new(SemAst::DropTable(result), context))
+    }
 }

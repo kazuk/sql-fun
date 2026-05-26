@@ -97,12 +97,15 @@ mod test_analyze_alter_obj_add_constraint {
     use testresult::TestResult;
 
     use crate::{
-        sem::{Constraint, CreateTable, FullName, TableName},
-        test_helpers::{SynBuilder, TestParseContext, test_context},
+        sem::{Constraint, CreateTable, FullName, SourcePathWithSpan, TableName},
+        test_helpers::{SynBuilder, TestParseContext, source_span, test_context},
     };
 
     #[rstest::rstest]
-    fn test_analyze_alter_obj_add_constraint(mut test_context: TestParseContext) -> TestResult {
+    fn test_analyze_alter_obj_add_constraint(
+        mut test_context: TestParseContext,
+        source_span: SourcePathWithSpan,
+    ) -> TestResult {
         let builder = SynBuilder::new();
         let constraint = builder.constraint_primary_key();
         let alter_table_cmd = builder.alter_table_cmd_add_constraint(constraint);
@@ -112,6 +115,7 @@ mod test_analyze_alter_obj_add_constraint {
             vec![],
             crate::sem::CreateTableMode::Default,
             false,
+            &source_span,
         );
         test_context.set_get_table_impl_result(table_name.full_name(), &Some(create_table));
         let _result = Constraint::analyze_alter_obj_add_constraint(

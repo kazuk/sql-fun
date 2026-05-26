@@ -563,7 +563,7 @@ impl AlterObjSubCommand {
         table_name: &TableName,
         body: &crate::syn::sqlite::AlterTableBody,
         tokens: &IVec<SqliteToken<'_>>,
-    ) -> Result<(AlterObjSubCommand, TParseContext), AnalysisError>
+    ) -> Result<(Self, TParseContext), AnalysisError>
     where
         TParseContext: ParseContext,
     {

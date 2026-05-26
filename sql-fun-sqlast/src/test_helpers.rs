@@ -28,5 +28,5 @@ pub fn setup_function_overload() -> (TypeReference, OverloadVariant) {
 #[rstest::fixture]
 pub fn source_span() -> SourcePathWithSpan {
     let source_one = PathBuf::from("source_one.sql");
-    SourcePathWithSpan::new(&source_one, &StringSpan::default())
+    SourcePathWithSpan::new(&source_one, &StringSpan::new(0, 0))
 }

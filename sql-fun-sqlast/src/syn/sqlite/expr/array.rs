@@ -4,12 +4,12 @@ use super::Expr;
 
 /// array expression
 #[derive(Clone, Debug)]
-pub struct Array(Vec<Box<Expr>>);
+pub struct Array(Vec<Expr>);
 
 impl Array {
     /// create instance
     pub fn new(elements: Vec<Expr>) -> Self {
-        Self(elements.into_iter().map(Box::new).collect())
+        Self(elements)
     }
 
     /// enumerate elements
@@ -20,8 +20,8 @@ impl Array {
     where
         Gate: TursoArrayFeature,
     {
-        gate.array_element_access(&self)?;
-        Ok(self.0.iter().map(|v| v.as_ref()))
+        gate.array_element_access(self)?;
+        Ok(self.0.iter())
     }
 }
 
@@ -29,7 +29,7 @@ impl Expr {
     /// create Array variant
     pub fn array<E>(elements: Vec<E>) -> Self
     where
-        E: Into<Expr>,
+        E: Into<Self>,
     {
         Self::Array(Array::new(elements.into_iter().map(|v| v.into()).collect()))
     }
@@ -56,7 +56,7 @@ impl Subscript {
     where
         Gate: TursoArrayFeature,
     {
-        gate.subscript_base_access(&self)?;
+        gate.subscript_base_access(self)?;
         Ok(&self.base)
     }
 
@@ -65,7 +65,7 @@ impl Subscript {
     where
         Gate: TursoArrayFeature,
     {
-        gate.subscript_index_access(&self)?;
+        gate.subscript_index_access(self)?;
         Ok(&self.index)
     }
 }
@@ -74,8 +74,8 @@ impl Expr {
     /// create Subscript variant
     pub fn subscript<B, I>(base: B, index: I) -> Self
     where
-        B: Into<Expr>,
-        I: Into<Expr>,
+        B: Into<Self>,
+        I: Into<Self>,
     {
         Self::Subscript(Subscript::new(base.into(), index.into()))
     }

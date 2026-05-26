@@ -15,6 +15,7 @@ pub struct CreateIndexStatement {
 
 impl CreateIndexStatement {
     /// create instance
+    #[expect(clippy::too_many_arguments)]
     pub fn new(
         unique: bool,
         if_not_exists: bool,

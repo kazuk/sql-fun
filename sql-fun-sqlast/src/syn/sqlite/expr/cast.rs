@@ -22,7 +22,7 @@ impl Expr {
     /// create cast variant
     pub fn cast<EXPR, TY>(expr: EXPR, type_name: Option<TY>) -> Self
     where
-        EXPR: Into<Expr>,
+        EXPR: Into<Self>,
         TY: Into<Type>,
     {
         Self::Cast(ExprCast::new(expr.into(), type_name.map(|v| v.into())))

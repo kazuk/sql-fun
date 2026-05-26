@@ -22,7 +22,7 @@ impl Expr {
     /// create collate variant
     pub fn collate<EXPR, NAME>(expr: EXPR, name: NAME) -> Self
     where
-        EXPR: Into<Expr>,
+        EXPR: Into<Self>,
         NAME: Into<Name>,
     {
         Self::Collate(ExprCollate::new(expr.into(), name.into()))

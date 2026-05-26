@@ -23,7 +23,7 @@ impl Expr {
     pub fn raise<Res, Ex>(resolve_type: Res, expr: Option<Ex>) -> Self
     where
         Res: Into<ResolveType>,
-        Ex: Into<Expr>,
+        Ex: Into<Self>,
     {
         Self::Raise(ExprRaise::new(resolve_type.into(), expr.map(|v| v.into())))
     }

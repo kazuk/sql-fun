@@ -53,7 +53,7 @@ impl CreateDomainStatement {
             if_not_exists,
             domain_name: String::from(domain_name),
             base_type: String::from(base_type),
-            default: default.map(|e| Box::new(e)),
+            default: default.map(Box::new),
             not_null,
             constraints,
         }

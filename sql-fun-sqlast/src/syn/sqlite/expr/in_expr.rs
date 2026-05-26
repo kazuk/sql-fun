@@ -7,7 +7,7 @@ use super::Expr;
 pub struct ExprInList {
     lhs: Box<Expr>,
     not: bool,
-    rhs: Vec<Box<Expr>>,
+    rhs: Vec<Expr>,
 }
 
 impl ExprInList {
@@ -16,7 +16,7 @@ impl ExprInList {
         Self {
             lhs: Box::new(lhs),
             not,
-            rhs: rhs.into_iter().map(Box::new).collect(),
+            rhs,
         }
     }
 }
@@ -25,8 +25,8 @@ impl Expr {
     /// create InList variant
     pub fn in_list<VALUE, ListItem>(value: VALUE, not: bool, list: Vec<ListItem>) -> Self
     where
-        VALUE: Into<Expr>,
-        ListItem: Into<Expr>,
+        VALUE: Into<Self>,
+        ListItem: Into<Self>,
     {
         Self::InList(ExprInList::new(
             value.into(),
@@ -59,7 +59,7 @@ impl Expr {
     /// create InSelect variant
     pub fn in_select<VALUE, SELECT>(value: VALUE, not: bool, select: SELECT) -> Self
     where
-        VALUE: Into<Expr>,
+        VALUE: Into<Self>,
         SELECT: Into<Select>,
     {
         Self::InSelect(ExprInSelect::new(value.into(), not, select.into()))
@@ -72,7 +72,7 @@ pub struct ExprInTable {
     lhs: Box<Expr>,
     not: bool,
     rhs: QualifiedName,
-    args: Vec<Box<Expr>>,
+    args: Vec<Expr>,
 }
 
 impl ExprInTable {
@@ -82,7 +82,7 @@ impl ExprInTable {
             lhs: Box::new(lhs),
             not,
             rhs,
-            args: args.into_iter().map(Box::new).collect(),
+            args,
         }
     }
 }
@@ -96,9 +96,9 @@ impl Expr {
         args: Vec<ARG>,
     ) -> Self
     where
-        VALUE: Into<Expr>,
+        VALUE: Into<Self>,
         TABLE: Into<QualifiedName>,
-        ARG: Into<Expr>,
+        ARG: Into<Self>,
     {
         Self::InTable(ExprInTable::new(
             value.into(),

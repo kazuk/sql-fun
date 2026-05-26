@@ -6,7 +6,7 @@ use crate::syn::sqlite::{Distinctness, FunctionTail, Name, SortedColumn};
 pub struct ExprFunctionCall {
     name: Name,
     distinctness: Option<Distinctness>,
-    args: Vec<Box<Expr>>,
+    args: Vec<Expr>,
     order_by: Vec<SortedColumn>,
     filter_over: FunctionTail,
 }
@@ -23,7 +23,7 @@ impl ExprFunctionCall {
         Self {
             name,
             distinctness,
-            args: args.into_iter().map(Box::new).collect(),
+            args,
             order_by,
             filter_over,
         }
@@ -42,7 +42,7 @@ impl Expr {
     where
         NAME: Into<Name>,
         DISTINCT: Into<Distinctness>,
-        ARG: Into<Expr>,
+        ARG: Into<Self>,
         SORT: Into<SortedColumn>,
         TAIL: Into<FunctionTail>,
     {

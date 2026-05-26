@@ -81,6 +81,7 @@ impl<'a> SqliteLexer<'a> {
     /// # Error
     ///
     /// [`TursoError`] for lexial error
+    #[expect(clippy::should_implement_trait)]
     pub fn next(&mut self) -> Result<Option<SqliteToken<'a>>, TursoError> {
         let Some(token) = self.lexer.next().transpose()? else {
             return Ok(None);

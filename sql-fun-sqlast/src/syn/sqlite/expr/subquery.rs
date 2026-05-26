@@ -48,7 +48,7 @@ impl Expr {
     ) -> Self
     where
         ID: Into<TableInternalId>,
-        EX: Into<Expr>,
+        EX: Into<Self>,
         ST: Into<SubqueryType>,
     {
         Self::SubqueryResult(SubqueryResult::new(

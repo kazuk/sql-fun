@@ -109,10 +109,11 @@ pub use self::{
 };
 
 pub use crate::AstAndContextPair;
-#[cfg(feature = "sqlite")]
-use crate::{SqliteToken, syn::sqlite::Stmt};
 
 use crate::StringSpan;
+
+#[cfg(feature = "sqlite")]
+use crate::{SqliteToken, syn::sqlite::Stmt};
 
 use std::{
     fmt::Debug,
@@ -300,57 +301,6 @@ impl SemAst {
             Cmd::Stmt(stmt) => {
                 Self::semantic_analysis_sqlite_stmt(context, Stmt::from(stmt), tokens)
             }
-        }
-    }
-
-    /// analyze [`Stmt`]
-    #[cfg(feature = "sqlite")]
-    pub fn semantic_analysis_sqlite_stmt<TContext>(
-        context: TContext,
-        syn: Stmt,
-        tokens: &IVec<SqliteToken<'_>>,
-    ) -> Result<AstAndContextPair<TContext>, AnalysisError>
-    where
-        TContext: ParseContext,
-    {
-        let Some(source_span) = context.get_source_path_with_span().cloned() else {
-            AnalysisError::raise_unexpected_none("context.source_path_with_span")?;
-            AnalysisError::never()
-        };
-        match syn {
-            Stmt::AlterTable(alter_table) => {
-                AlterTable::analyze_alter_table(context, alter_table, tokens, &source_span)
-            }
-            Stmt::CreateTable(_create_table_statement) => todo!(),
-            Stmt::Analyze(_analyze_statement) => todo!(),
-            Stmt::Attach(_attach_statement) => todo!(),
-            Stmt::Detach(_detach_statement) => todo!(),
-            Stmt::Vacuum(_vacuum_statement) => todo!(),
-            Stmt::Begin(_begin_statement) => todo!(),
-            Stmt::Commit(_commit_statement) => todo!(),
-            Stmt::Release(_release_statement) => todo!(),
-            Stmt::Rollback(_rollback_statement) => todo!(),
-            Stmt::Savepoint(_savepoint_statement) => todo!(),
-            Stmt::CreateIndex(_create_index_statement) => todo!(),
-            Stmt::DropIndex(_drop_index_statement) => todo!(),
-            Stmt::Reindex(_reindex_statement) => todo!(),
-            Stmt::Optimize(_optimize_statement) => todo!(),
-            Stmt::CreateVirtualTable(_create_virtual_table) => todo!(),
-            Stmt::DropTable(_drop_table_statement) => todo!(),
-            Stmt::CreateTrigger(_create_trigger_statement) => todo!(),
-            Stmt::DropTrigger(_drop_trigger_statement) => todo!(),
-            Stmt::CreateView(_create_view) => todo!(),
-            Stmt::CreateMaterializedView(_create_materialized_view) => todo!(),
-            Stmt::DropView(_drop_view) => todo!(),
-            Stmt::CreateType(_create_type_statement) => todo!(),
-            Stmt::DropType(_drop_type_statement) => todo!(),
-            Stmt::Select(_select) => todo!(),
-            Stmt::Update(_update) => todo!(),
-            Stmt::Delete(_delete_statement) => todo!(),
-            Stmt::Insert(_insert_statement) => todo!(),
-            Stmt::Pragma(_pragma_statement) => todo!(),
-            Stmt::CreateDomain(_create_domain_statement) => todo!(),
-            Stmt::DropDomain(_drop_domain_statement) => todo!(),
         }
     }
 }

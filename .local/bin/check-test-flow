@@ -94,7 +94,7 @@ cargo fmt
 cargo sort --workspace
 
 echo "== Linting"
-cargo clippy --no-deps --workspace
+cargo clippy --no-deps --workspace "${FEATURES[@]}"
 RUST_LOG=error taplo lint
 
 echo "== Generate server API spec document"

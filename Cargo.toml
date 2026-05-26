@@ -85,7 +85,7 @@ ctor = "1.0"
 derive-getters = "0.5"
 derive_builder = "0.20"
 directories = "6.0"
-either = { version = "1.15", features = ["serde"] }
+either = { version = "1.16", features = ["serde"] }
 env_logger = "0.11"
 fs-err = "3.2.2"
 fs2 = "0.4"

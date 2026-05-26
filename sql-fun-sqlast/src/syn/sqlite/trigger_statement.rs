@@ -202,6 +202,7 @@ pub struct CreateTriggerStatement {
 
 impl CreateTriggerStatement {
     /// create instance
+    #[expect(clippy::too_many_arguments)]
     pub fn new(
         temporary: bool,
         if_not_exists: bool,

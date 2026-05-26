@@ -25,9 +25,9 @@ impl Expr {
     /// create between variant
     pub fn between<LHS, START, END>(lhs: LHS, not: bool, start: START, end: END) -> Self
     where
-        LHS: Into<Expr>,
-        START: Into<Expr>,
-        END: Into<Expr>,
+        LHS: Into<Self>,
+        START: Into<Self>,
+        END: Into<Self>,
     {
         Self::Between(ExprBetween::new(lhs.into(), not, start.into(), end.into()))
     }

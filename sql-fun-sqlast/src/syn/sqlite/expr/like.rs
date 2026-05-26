@@ -33,10 +33,10 @@ impl Expr {
         escape: Option<Escape>,
     ) -> Self
     where
-        Value: Into<Expr>,
+        Value: Into<Self>,
         Ope: Into<LikeOperator>,
-        Pat: Into<Expr>,
-        Escape: Into<Expr>,
+        Pat: Into<Self>,
+        Escape: Into<Self>,
     {
         Self::Like(ExprLike::new(
             value.into(),

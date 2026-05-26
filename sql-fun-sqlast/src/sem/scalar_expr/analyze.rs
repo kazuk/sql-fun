@@ -119,13 +119,14 @@ impl SemScalarExpr {
 
     /// analyze sqlite expression
     #[cfg(feature = "sqlite")]
+    #[expect(clippy::only_used_in_recursion)]
     pub fn analyze_sqlite_scaler_expr<TParseContext>(
         mut context: TParseContext,
         with_clause: &WithClause,
         from_clause: &FromClause,
         syn: &crate::syn::sqlite::Expr,
         tokens: &IVec<SqliteToken<'_>>,
-    ) -> Result<(SemScalarExpr, TParseContext), AnalysisError>
+    ) -> Result<(Self, TParseContext), AnalysisError>
     where
         TParseContext: ParseContext,
     {
@@ -161,16 +162,16 @@ impl SemScalarExpr {
                 match expr_unary.unary_operator() {
                     UnaryOperator::Positive => expr,
                     UnaryOperator::Negative => match expr {
-                        SemScalarExpr::Const(ScalarConstExpr::Integer(value)) => {
-                            SemScalarExpr::Const(ScalarConstExpr::Integer(-value))
+                        Self::Const(ScalarConstExpr::Integer(value)) => {
+                            Self::Const(ScalarConstExpr::Integer(-value))
                         }
-                        SemScalarExpr::Const(ScalarConstExpr::Float(value)) => {
-                            SemScalarExpr::Const(ScalarConstExpr::Float(format!("-{value}")))
+                        Self::Const(ScalarConstExpr::Float(value)) => {
+                            Self::Const(ScalarConstExpr::Float(format!("-{value}")))
                         }
                         _ => unsupported_sqlite_expr("unary negative expr"),
                     },
                     UnaryOperator::Not => {
-                        SemScalarExpr::Boolean(BooleanExpr::new(BooleanExprBody::not(&expr)))
+                        Self::Boolean(BooleanExpr::new(BooleanExprBody::not(&expr)))
                     }
                     UnaryOperator::BitwiseNot => unsupported_sqlite_expr("bitwise not expr"),
                 }
@@ -184,7 +185,7 @@ impl SemScalarExpr {
                     tokens,
                 )?;
                 context = new_context;
-                SemScalarExpr::NullTest(NullTestExpr::new(NullTestType::IsNull, expr))
+                Self::NullTest(NullTestExpr::new(NullTestType::IsNull, expr))
             }
             Expr::NotNull(expr_not_null) => {
                 let (expr, new_context) = Self::analyze_sqlite_scaler_expr(
@@ -195,7 +196,7 @@ impl SemScalarExpr {
                     tokens,
                 )?;
                 context = new_context;
-                SemScalarExpr::NullTest(NullTestExpr::new(NullTestType::IsNotNull, expr))
+                Self::NullTest(NullTestExpr::new(NullTestType::IsNotNull, expr))
             }
             Expr::Binary(expr_binary) => {
                 let (left, new_context) = Self::analyze_sqlite_scaler_expr(
@@ -217,14 +218,10 @@ impl SemScalarExpr {
 
                 match expr_binary.operator() {
                     Operator::And => {
-                        SemScalarExpr::Boolean(BooleanExpr::new(BooleanExprBody::and(&[
-                            left, right,
-                        ])))
+                        Self::Boolean(BooleanExpr::new(BooleanExprBody::and(&[left, right])))
                     }
                     Operator::Or => {
-                        SemScalarExpr::Boolean(BooleanExpr::new(BooleanExprBody::or(&[
-                            left, right,
-                        ])))
+                        Self::Boolean(BooleanExpr::new(BooleanExprBody::or(&[left, right])))
                     }
                     _ => unsupported_sqlite_expr("binary expr"),
                 }

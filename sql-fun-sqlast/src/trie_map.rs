@@ -99,6 +99,11 @@ impl<TValue> TrieMap<TValue> {
         }
     }
 
+    /// return true when key exists
+    pub fn contains(&self, key: &str) -> bool {
+        self.get(key).is_some()
+    }
+
     /// get mutable reference by key
     pub fn get_mut(&mut self, key: &str) -> Option<&mut TValue> {
         if key.is_empty() {

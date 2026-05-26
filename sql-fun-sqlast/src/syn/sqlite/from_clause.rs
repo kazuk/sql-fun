@@ -45,7 +45,7 @@ impl SelectTableTable {
 #[derive(Clone, Debug, derive_getters::Getters)]
 pub struct SelectTableTableCell {
     qualified_name: QualifiedName,
-    exprs: Vec<Box<Expr>>,
+    exprs: Vec<Expr>,
     as_: Option<As>,
 }
 
@@ -54,7 +54,7 @@ impl SelectTableTableCell {
     pub fn new(qualified_name: QualifiedName, exprs: Vec<Expr>, as_: Option<As>) -> Self {
         Self {
             qualified_name,
-            exprs: exprs.into_iter().map(Box::new).collect(),
+            exprs,
             as_,
         }
     }

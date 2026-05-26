@@ -37,7 +37,7 @@ use turso_parser::ast::InsertBody as InsertBodyIn;
 /// insert statement body
 pub enum InsertBody {
     /// select
-    Select(InsertBodySelect),
+    Select(Box<InsertBodySelect>),
     /// default values
     DefaultValues,
 }
@@ -45,10 +45,10 @@ pub enum InsertBody {
 impl From<InsertBodyIn> for InsertBody {
     fn from(value: InsertBodyIn) -> Self {
         match value {
-            InsertBodyIn::Select(select, upsert) => Self::Select(InsertBodySelect::new(
+            InsertBodyIn::Select(select, upsert) => Self::Select(Box::new(InsertBodySelect::new(
                 Select::from(select),
                 upsert.map(|u| Upsert::from(*u)),
-            )),
+            ))),
             InsertBodyIn::DefaultValues => Self::DefaultValues,
         }
     }

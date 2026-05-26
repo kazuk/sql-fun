@@ -62,7 +62,7 @@ impl Expr {
     /// create FieldAccess variant
     pub fn field_access<E, N, FAR>(base: E, field: N, resolved: Option<FAR>) -> Self
     where
-        E: Into<Expr>,
+        E: Into<Self>,
         N: Into<Name>,
         FAR: Into<FieldAccessResolution>,
     {

@@ -22,7 +22,7 @@ impl Expr {
     pub fn unary<Ope, Value>(unary_operator: Ope, expr: Value) -> Self
     where
         Ope: Into<UnaryOperator>,
-        Value: Into<Expr>,
+        Value: Into<Self>,
     {
         Self::Unary(ExprUnary::new(unary_operator.into(), expr.into()))
     }

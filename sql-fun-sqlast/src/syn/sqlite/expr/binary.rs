@@ -23,9 +23,9 @@ impl Expr {
     /// create binary variant
     pub fn binary<LEFT, OP, RIGHT>(left: LEFT, op: OP, right: RIGHT) -> Self
     where
-        LEFT: Into<Expr>,
+        LEFT: Into<Self>,
         OP: Into<Operator>,
-        RIGHT: Into<Expr>,
+        RIGHT: Into<Self>,
     {
         Self::Binary(ExprBinary::new(left.into(), op.into(), right.into()))
     }

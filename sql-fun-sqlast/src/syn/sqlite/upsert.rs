@@ -7,15 +7,15 @@ use turso_parser::ast::Upsert as UpsertIn;
 pub struct Upsert {
     index: Option<UpsertIndex>,
     do_clause: UpsertDo,
-    next: Option<Box<Upsert>>,
+    next: Option<Box<Self>>,
 }
 
 impl From<UpsertIn> for Upsert {
     fn from(value: UpsertIn) -> Self {
-        Upsert {
+        Self {
             index: value.index.map(UpsertIndex::from),
             do_clause: UpsertDo::from(value.do_clause),
-            next: value.next.map(|v| Box::new(Upsert::from(*v))),
+            next: value.next.map(|v| Box::new(Self::from(*v))),
         }
     }
 }

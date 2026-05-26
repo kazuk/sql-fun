@@ -6,7 +6,7 @@ use crate::syn::sqlite::{Expr, FrameClause, Name, SortedColumn};
 #[derive(Clone, Debug, derive_getters::Getters)]
 pub struct Window {
     base: Option<Name>,
-    partition_by: Vec<Box<Expr>>,
+    partition_by: Vec<Expr>,
     order_by: Vec<SortedColumn>,
     frame_clause: Option<FrameClause>,
 }
@@ -21,7 +21,7 @@ impl Window {
     ) -> Self {
         Self {
             base,
-            partition_by: partition_by.into_iter().map(Box::new).collect(),
+            partition_by,
             order_by,
             frame_clause,
         }

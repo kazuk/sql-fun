@@ -235,6 +235,6 @@ impl From<ExprIn> for Expr {
 
 impl From<Box<ExprIn>> for Expr {
     fn from(value: Box<ExprIn>) -> Self {
-        Expr::from(*value)
+        Self::from(*value)
     }
 }

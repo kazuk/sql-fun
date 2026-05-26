@@ -212,7 +212,7 @@ impl From<TableOptionsIn> for TableOptions {
 }
 
 /// drop table statement
-#[derive(derive_getters::Getters)]
+#[derive(Debug, derive_getters::Getters)]
 pub struct DropTableStatement {
     if_exists: bool,
     name: QualifiedName,

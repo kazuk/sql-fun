@@ -59,11 +59,11 @@ impl Expr {
         base: Option<Box<ExprIn>>,
         when_then_pairs: Vec<(Box<ExprIn>, Box<ExprIn>)>,
         else_expr: Option<Box<ExprIn>>,
-    ) -> Expr {
+    ) -> Self {
         Self::Case(ExprCase::new(
-            base.map(|e| Expr::from(*e)),
+            base.map(|e| Self::from(*e)),
             when_then_pairs,
-            else_expr.map(|e| Expr::from(*e)),
+            else_expr.map(|e| Self::from(*e)),
         ))
     }
 }

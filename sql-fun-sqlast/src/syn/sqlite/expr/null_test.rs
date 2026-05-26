@@ -20,7 +20,7 @@ impl Expr {
     /// create IsNull variant
     pub fn is_null<Value>(value: Value) -> Self
     where
-        Value: Into<Expr>,
+        Value: Into<Self>,
     {
         Self::IsNull(ExprIsNull::new(value.into()))
     }
@@ -46,7 +46,7 @@ impl Expr {
     /// create NotNull variant
     pub fn not_null<Value>(value: Value) -> Self
     where
-        Value: Into<Expr>,
+        Value: Into<Self>,
     {
         Self::NotNull(ExprNotNull::new(value.into()))
     }

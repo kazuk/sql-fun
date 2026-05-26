@@ -9,11 +9,12 @@ use crate::{
         BinaryOperatorDefinition, CastContext, CastDefinition, ColumnDefinition, Comment,
         CreateCompositType, CreateDomain, CreateEnum, CreateExtension, CreateFunction, CreateIndex,
         CreateSchema, CreateSequence, CreateTable, CreateTableAs, CreateTableMode, CreateView,
-        FullName, FunctionInfoRead, FunctionInfoWrite, FunctionOverloadCollection, IndexInfoRead,
-        OperatorDefinition, OperatorInfoRead, OperatorName, OverloadVariant, ParseContext,
-        SchemaName, SearchPathRead, SequenceInfoRead, SequenceInfoWrite, TableInfoRead,
-        TableInfoWrite, TableName, TypeDefinition, TypeInfoRead, TypeInfoWrite, TypeReference,
-        ValidOperatorName, VariableSet, ViewInfoRead, ViewInfoWrite, ViewLike,
+        DropTable, FullName, FunctionInfoRead, FunctionInfoWrite, FunctionOverloadCollection,
+        GetSourcePathWithSpanOpt, IndexInfoRead, MutSourcePathWithSpan, OperatorDefinition,
+        OperatorInfoRead, OperatorName, OverloadVariant, ParseContext, SchemaName, SearchPathRead,
+        SequenceInfoRead, SequenceInfoWrite, SourcePathWithSpan, TableInfoRead, TableInfoWrite,
+        TableName, TypeDefinition, TypeInfoRead, TypeInfoWrite, TypeReference, ValidOperatorName,
+        VariableSet, ViewInfoRead, ViewInfoWrite, ViewLike,
     },
 };
 
@@ -29,8 +30,10 @@ pub struct TestParseContext {
     view_definitions: HashMap<FullName, Option<ViewLike>>,
     function_definitions: HashMap<FullName, FunctionOverloadCollection>,
     alter_tables: Vec<AlterTable>,
+    drop_tables: Vec<DropTable>,
     create_indexes: Vec<CreateIndex>,
     problems: Vec<AnalysisProblem>,
+    source: Option<SourcePathWithSpan>,
 }
 
 /// get [TestParseContext]
@@ -63,6 +66,18 @@ impl TestParseContext {
 
         let cast_definition = Some(CastDefinition::new(CastContext::NoConversion));
         self.set_get_implicit_cast_result(&type_ref, &type_ref, cast_definition);
+    }
+}
+
+impl GetSourcePathWithSpanOpt for TestParseContext {
+    fn get_source_path_with_span(&self) -> Option<&SourcePathWithSpan> {
+        self.source.as_ref()
+    }
+}
+
+impl MutSourcePathWithSpan for TestParseContext {
+    fn set_source_path_with_span(&mut self, value: &SourcePathWithSpan) {
+        self.source = Some(value.clone())
     }
 }
 
@@ -131,13 +146,19 @@ impl TestParseContext {
     }
 
     /// setup [TableInfoRead::get_table_impl] resut
-    pub fn setup_table(&mut self, table_name: &str, columns: &[ColumnDefinition]) {
+    pub fn setup_table(
+        &mut self,
+        table_name: &str,
+        columns: &[ColumnDefinition],
+        source_span: &SourcePathWithSpan,
+    ) {
         let table_full_name = FullName::with_schema("public", table_name);
         let table_definition = CreateTable::new(
             &TableName::from(table_full_name.clone()),
             columns.to_vec(),
             CreateTableMode::Default,
             false,
+            source_span,
         );
         self.set_get_table_impl_result(&table_full_name, &Some(table_definition));
     }
@@ -171,6 +192,11 @@ impl TableInfoRead for TestParseContext {
 impl TableInfoWrite for TestParseContext {
     fn apply_alter_table(mut self, alter_table: &AlterTable) -> Result<Self, AnalysisError> {
         self.alter_tables.push(alter_table.clone());
+        Ok(self)
+    }
+
+    fn apply_drop_table(mut self, drop_table: &DropTable) -> Result<Self, AnalysisError> {
+        self.drop_tables.push(drop_table.clone());
         Ok(self)
     }
 

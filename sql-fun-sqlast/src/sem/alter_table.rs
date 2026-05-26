@@ -3,7 +3,7 @@ use sql_fun_core::IVec;
 use crate::{
     sem::{
         AlterSequence, AstAndContextPair, ColumnDefinition, ColumnName, Constraint, FromClause,
-        SemScalarExpr, ViewName, WithClause,
+        GetSourcePathWithSpan, SemScalarExpr, SourcePathWithSpan, ViewName, WithClause,
     },
     syn::{AlterTableType, ListOpt, ObjectType, Opt, ScanToken},
 };
@@ -15,6 +15,13 @@ use super::{AnalysisError, AnalysisProblem, ParseContext, SemAst, create_table::
 pub struct AlterTable {
     table: TableName,
     commands: Vec<AlterObjSubCommand>,
+    source_span: SourcePathWithSpan,
+}
+
+impl GetSourcePathWithSpan for AlterTable {
+    fn get_source_path_with_span(&self) -> &SourcePathWithSpan {
+        &self.source_span
+    }
 }
 
 impl AlterTable {
@@ -24,6 +31,7 @@ impl AlterTable {
         _parent_schema: &Option<String>,
         syn: crate::syn::AlterTableStmt,
         tokens: &IVec<ScanToken>,
+        source_span: &SourcePathWithSpan,
     ) -> Result<AstAndContextPair<TParseContext>, AnalysisError>
     where
         TParseContext: ParseContext,
@@ -57,6 +65,7 @@ impl AlterTable {
         let alter_table = Self {
             table: table_name,
             commands: sub_cmds,
+            source_span: source_span.clone(),
         };
         context = context.apply_alter_table(&alter_table)?;
         Ok(AstAndContextPair::new(
@@ -72,6 +81,7 @@ impl AlterTable {
         parent_schema: &Option<String>,
         syn: crate::syn::AlterTableStmt,
         tokens: &IVec<ScanToken>,
+        source_span: &SourcePathWithSpan,
     ) -> Result<AstAndContextPair<TParseContext>, AnalysisError>
     where
         TParseContext: ParseContext,
@@ -80,9 +90,13 @@ impl AlterTable {
             AnalysisError::raise_unexpected_none("alter_table_stmt.objtype")?
         };
         match obj_type {
-            ObjectType::ObjectTable => {
-                Self::analyze_alter_table_statement(context, parent_schema, syn, tokens)
-            }
+            ObjectType::ObjectTable => Self::analyze_alter_table_statement(
+                context,
+                parent_schema,
+                syn,
+                tokens,
+                source_span,
+            ),
             ObjectType::ObjectView => {
                 AlterView::analyze_alter_view_statement(context, parent_schema, false, syn)
             }
@@ -101,17 +115,20 @@ impl AlterTable {
 mod test_analyze_alter_table_statement {
     use crate::{
         AstAndContextPair,
-        sem::{AlterTable, FullName, SemAst},
+        sem::{AlterTable, FullName, SemAst, SourcePathWithSpan},
         syn::{AliasOpt, NodeInner, ObjectType},
-        test_helpers::{SynBuilder, TestParseContext, test_context},
+        test_helpers::{SynBuilder, TestParseContext, source_span, test_context},
     };
 
     use sql_fun_core::IVec;
     use testresult::TestResult;
 
     #[rstest::rstest]
-    fn test_analyze_alter_table_statement(mut test_context: TestParseContext) -> TestResult {
-        test_context.setup_table("table1", &[]);
+    fn test_analyze_alter_table_statement(
+        mut test_context: TestParseContext,
+        source_span: SourcePathWithSpan,
+    ) -> TestResult {
+        test_context.setup_table("table1", &[], &source_span);
 
         let builder = SynBuilder::new();
         let relation = builder.range_var(
@@ -131,6 +148,7 @@ mod test_analyze_alter_table_statement {
             &None,
             alter_table_stmt,
             &tokens,
+            &source_span,
         )?;
         let SemAst::AlterTable(at) = res else {
             panic!("unexpected type {res:?}")
@@ -292,16 +310,20 @@ impl AlterObjSubCommand {
 mod test_analyze_alter_obj_column_default {
     use crate::{
         sem::{
-            FullName, ScalarConstExpr, SemScalarExpr, TableName, alter_table::AlterObjSubCommand,
+            FullName, ScalarConstExpr, SemScalarExpr, SourcePathWithSpan, TableName,
+            alter_table::AlterObjSubCommand,
         },
         syn::NodeInner,
-        test_helpers::{SynBuilder, TestParseContext, test_context},
+        test_helpers::{SynBuilder, TestParseContext, source_span, test_context},
     };
     use sql_fun_core::IVec;
     use testresult::TestResult;
 
     #[rstest::rstest]
-    fn test_analyze_alter_obj_column_default(mut test_context: TestParseContext) -> TestResult {
+    fn test_analyze_alter_obj_column_default(
+        mut test_context: TestParseContext,
+        source_span: SourcePathWithSpan,
+    ) -> TestResult {
         // alter table ...
         //   alter column value set default(0)
         test_context.setup_table(
@@ -312,6 +334,7 @@ mod test_analyze_alter_obj_column_default {
                 None,
                 &[],
             )],
+            &source_span,
         );
 
         let builder = SynBuilder::new();
@@ -398,20 +421,6 @@ where
     AlterObjSubCommand::analyze_alter_table_cmd(context, table_name, cmd, subtyp, tokens)
 }
 
-#[deprecated = "use AlterTable::analyze_alter_table_statement"]
-#[expect(dead_code)]
-pub fn analyze_alter_table_statement<TParseContext>(
-    context: TParseContext,
-    parent_schema: &Option<String>,
-    syn: crate::syn::AlterTableStmt,
-    tokens: &IVec<ScanToken>,
-) -> Result<AstAndContextPair<TParseContext>, AnalysisError>
-where
-    TParseContext: ParseContext,
-{
-    AlterTable::analyze_alter_table_statement(context, parent_schema, syn, tokens)
-}
-
 #[deprecated = "use AlterView::analyze_alter_view_statement"]
 #[expect(dead_code)]
 pub fn analyze_alter_view_statement<TParseContext>(
@@ -437,18 +446,4 @@ where
     TParseContext: ParseContext,
 {
     AlterSequence::analyze_alter_seq_statement(context, parent_schema, syn)
-}
-
-/// analyze [`crate::syn::AlterTableStmt`]
-#[deprecated = "use AlterTable::analyze_alter_statement"]
-pub fn analyze_alter_statement<TParseContext>(
-    context: TParseContext,
-    parent_schema: &Option<String>,
-    syn: crate::syn::AlterTableStmt,
-    tokens: &IVec<ScanToken>,
-) -> Result<AstAndContextPair<TParseContext>, AnalysisError>
-where
-    TParseContext: ParseContext,
-{
-    AlterTable::analyze_alter_statement(context, parent_schema, syn, tokens)
 }

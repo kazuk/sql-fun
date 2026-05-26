@@ -11,8 +11,9 @@ use crate::{
     StringSpan, TrieMap,
     sem::{
         AnalysisError, AnalysisProblem, BaseParseContext, CastDefinition, CreateTable, FullName,
-        FunctionInfoRead, FunctionOverloadCollection, IndexInfoRead, LocalName, OperatorDefinition,
-        SchemaName, TypeDefinition, TypeReference, ViewLike,
+        FunctionInfoRead, FunctionOverloadCollection, GetSourcePathWithSpanOpt, IndexInfoRead,
+        LocalName, MutSourcePathWithSpan, OperatorDefinition, SchemaName, SourcePathWithSpan,
+        TypeDefinition, TypeReference, ViewLike,
         parse_context::{
             OperatorInfoRead, SearchPathRead, SequenceInfoRead, TableInfoRead, TypeInfoRead,
             ViewInfoRead,
@@ -37,6 +38,7 @@ pub struct BaseContext {
     functions: PgBuiltInFunctions,
     source_provider: Option<Box<dyn super::SourceAccessService>>,
     problems: Vec<AnalysisProblem>,
+    source: Option<SourcePathWithSpan>,
 }
 
 #[derive(serde::Deserialize)]
@@ -74,6 +76,7 @@ impl BaseContext {
             source_provider: None,
             search_path,
             problems: Default::default(),
+            source: None,
         })
     }
 
@@ -188,6 +191,18 @@ impl SearchPathRead for BaseContext {
 
     fn get_search_path(&self) -> &[SchemaName] {
         &self.search_path
+    }
+}
+
+impl GetSourcePathWithSpanOpt for BaseContext {
+    fn get_source_path_with_span(&self) -> Option<&SourcePathWithSpan> {
+        self.source.as_ref()
+    }
+}
+
+impl MutSourcePathWithSpan for BaseContext {
+    fn set_source_path_with_span(&mut self, value: &SourcePathWithSpan) {
+        self.source = Some(value.clone())
     }
 }
 

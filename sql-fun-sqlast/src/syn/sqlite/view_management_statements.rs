@@ -1,4 +1,8 @@
-use crate::syn::sqlite::{IndexedColumn, QualifiedName, Select};
+use crate::{
+    engine_specific::TursoMaterializedViewFeature,
+    sem::AnalysisError,
+    syn::sqlite::{IndexedColumn, QualifiedName, Select},
+};
 
 /// create view statement
 #[derive(derive_getters::Getters)]
@@ -30,9 +34,14 @@ impl CreateView {
 }
 
 /// create materialized view statement
+///
+/// This AST is turso experimental feature
+/// accessing `view_name` reports notify `engine_specific::TursoMaterializedViewFeature`
+///
 #[derive(derive_getters::Getters)]
 pub struct CreateMaterializedView {
     if_not_exists: bool,
+    #[getter(skip)]
     view_name: QualifiedName,
     columns: Vec<IndexedColumn>,
     select: Select,
@@ -52,6 +61,15 @@ impl CreateMaterializedView {
             columns,
             select,
         }
+    }
+
+    /// get view_name
+    pub fn view_name<Gate>(&self, gate: &mut Gate) -> Result<&QualifiedName, AnalysisError>
+    where
+        Gate: TursoMaterializedViewFeature,
+    {
+        gate.create_materialized_view_used(self)?;
+        Ok(&self.view_name)
     }
 }
 

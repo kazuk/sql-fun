@@ -1,9 +1,12 @@
+use crate::engine_specific::TursoCustomTypeFeature;
+use crate::sem::AnalysisError;
 use crate::syn::sqlite::{Expr, Name, Type};
 
 /// create type statement
 #[derive(derive_getters::Getters)]
 pub struct CreateTypeStatement {
     if_not_exists: bool,
+    #[getter(skip)]
     type_name: String,
     body: CreateTypeBody,
 }
@@ -16,6 +19,15 @@ impl CreateTypeStatement {
             type_name,
             body,
         }
+    }
+
+    /// type name
+    pub fn type_name<Gate>(&self, gate: &mut Gate) -> Result<&str, AnalysisError>
+    where
+        Gate: TursoCustomTypeFeature,
+    {
+        gate.create_type_used(self)?;
+        Ok(&self.type_name)
     }
 }
 
@@ -146,6 +158,7 @@ impl From<TypeOperatorIn> for TypeOperator {
 #[derive(derive_getters::Getters)]
 pub struct DropTypeStatement {
     if_exists: bool,
+    #[getter(skip)]
     type_name: String,
 }
 
@@ -156,5 +169,14 @@ impl DropTypeStatement {
             if_exists,
             type_name,
         }
+    }
+
+    /// type_name value
+    pub fn type_name<Gate>(&self, gate: &mut Gate) -> Result<&str, AnalysisError>
+    where
+        Gate: TursoCustomTypeFeature,
+    {
+        gate.drop_type_used(self)?;
+        Ok(&self.type_name)
     }
 }

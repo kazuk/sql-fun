@@ -1,4 +1,8 @@
-use crate::syn::sqlite::{Expr, Name, QualifiedName, SortedColumn};
+use crate::{
+    engine_specific::TursoOptimizeIndexFeature,
+    sem::AnalysisError,
+    syn::sqlite::{Expr, Name, QualifiedName, SortedColumn},
+};
 
 /// create index statement
 #[derive(derive_getters::Getters)]
@@ -73,7 +77,6 @@ impl ReindexStatement {
 }
 
 /// optimize statement
-#[derive(derive_getters::Getters)]
 pub struct OptimizeStatement {
     idx_name: Option<QualifiedName>,
 }
@@ -82,5 +85,14 @@ impl OptimizeStatement {
     /// create instance
     pub fn new(idx_name: Option<QualifiedName>) -> Self {
         Self { idx_name }
+    }
+
+    /// index name
+    pub fn idx_name<Gate>(&self, gate: &mut Gate) -> Result<Option<&QualifiedName>, AnalysisError>
+    where
+        Gate: TursoOptimizeIndexFeature,
+    {
+        gate.optimize_statement_used(self)?;
+        Ok(self.idx_name.as_ref())
     }
 }

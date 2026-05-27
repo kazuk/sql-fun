@@ -438,3 +438,64 @@ impl From<StmtIn> for Stmt {
         }
     }
 }
+
+#[cfg(test)]
+mod test_stmt_from {
+    use testresult::TestResult;
+    use turso_parser::{ast::Cmd, parser::Parser};
+
+    #[rstest::rstest]
+    #[case::alter_table("alter table users add column age int")]
+    #[case::analyze("analyze table_one")]
+    #[case::attach("attach database 'test.db' as test_db")]
+    #[case::begin("begin")]
+    #[case::commit("commit")]
+    #[case::create_index("create index index_one on table_one (col1, col2)")]
+    #[case::create_table("create table users (id int not null, name text)")]
+    #[case::create_trigger(
+        r#"CREATE TRIGGER update_customer_address UPDATE OF address ON customers
+      BEGIN
+        UPDATE orders SET address = new.address WHERE customer_name = old.name;
+      END;"#
+    )] // https://sqlite.org/lang_createtrigger.html
+    #[case::create_view(r#"create view view_one as select id,name from table_one"#)]
+    #[case::create_mat_view(
+        r#"CREATE MATERIALIZED VIEW customer_totals AS
+    SELECT
+        customer_id,
+        COUNT(*) AS order_count,
+        SUM(amount) AS total_spent
+    FROM orders
+    GROUP BY customer_id"#
+    )]
+    #[case::create_virt_table("create virtual table vt using module_one")]
+    #[case::create_type("CREATE TYPE platform_id AS UNION(telegram INT, slack TEXT, signal TEXT)")] // https://turso.tech/blog/turso-0.6.0
+    #[case::delete("delete from users where id=1")]
+    #[case::detach("detach database temp")]
+    #[case::drop_index("drop index index_one")]
+    #[case::drop_table("drop table table_one")]
+    #[case::drop_trigger("drop trigger trigger_one")]
+    #[case::drop_view("drop view view_one")]
+    #[case::drop_type("drop type custom_type_one")]
+    #[case::insert("insert into users (id, name) values(0, 'test user')")]
+    #[case::pragma("PRAGMA index_info('idx52')")] // https://sqlite.org/pragma.html#syntax
+    #[case::reindex("reindex index_one")]
+    #[case::release("release savepoint savepoint_one")]
+    #[case::rollback("rollback")]
+    #[case::savepoint("savepoint savepoint_one")]
+    #[case::select("select * from users")]
+    #[case::update("update users set name='test user' where id=0 ")]
+    #[case::vacuum("vacuum edge_db into 'edge.db'")]
+    #[case::optimize("OPTIMIZE INDEX idx_articles")] // https://github.com/tursodatabase/turso/blob/main/docs/manual.md#index-maintenance
+    #[case::create_domain("create domain user_name as text")]
+    #[case::drop_domain("drop domain user_name")]
+    fn test_stmt_from_simple(#[case] sql: &str) -> TestResult {
+        let mut parser = Parser::new(sql.as_bytes());
+        let cmd = parser.next_cmd()?.unwrap();
+        let Cmd::Stmt(stmt) = cmd else {
+            panic!("cmd is not stmt")
+        };
+        let _stmt = super::Stmt::from(stmt);
+        Ok(())
+    }
+}

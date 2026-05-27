@@ -5,5 +5,5 @@ if [ "${GIT_ROOT}" == "" ] ; then
 fi
 
 # update stats/coverage.txt
-cargo llvm-cov --all --no-fail-fast --summary-only nextest \
+cargo llvm-cov --all-features --all --no-fail-fast --summary-only nextest \
     > "${GIT_ROOT}/stats/coverage.txt"

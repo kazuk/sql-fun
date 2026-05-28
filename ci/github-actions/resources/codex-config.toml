@@ -1,0 +1,67 @@
+# codex configurations
+#
+#   original-file: ci/github-actions/resources/codex-config.toml
+
+
+# The Docker container is the sandbox boundary for this CI environment.
+sandbox_mode = "danger-full-access"
+approval_policy = "never"
+
+[projects."/home/builder/workspace"]
+trust_level = "trusted"
+
+[mcp_servers.docs-rs]
+command = "npx"
+args = ["-y", "@nuskey8/docs-rs-mcp@latest"]
+
+[mcp_servers.docs-rs.tools.docs_rs_get_item]
+approval_mode = "approve"
+
+[mcp_servers.docs-rs.tools.docs_rs_readme]
+approval_mode = "approve"
+
+[mcp_servers.docs-rs.tools.docs_rs_search_crates]
+approval_mode = "approve"
+
+[mcp_servers.docs-rs.tools.docs_rs_search_in_crate]
+approval_mode = "approve"
+
+[mcp_servers.serena]
+command = "serena"
+args = ["start-mcp-server"]
+
+[mcp_servers.serena.tools.activate_project]
+approval_mode = "approve"
+
+[mcp_servers.serena.tools.check_onboarding_performed]
+approval_mode = "approve"
+
+[mcp_servers.serena.tools.find_file]
+approval_mode = "approve"
+
+[mcp_servers.serena.tools.find_symbol]
+approval_mode = "approve"
+
+[mcp_servers.serena.tools.get_symbols_overview]
+approval_mode = "approve"
+
+[mcp_servers.serena.tools.list_dir]
+approval_mode = "approve"
+
+[mcp_servers.serena.tools.read_file]
+approval_mode = "approve"
+
+[mcp_servers.serena.tools.search_for_pattern]
+approval_mode = "approve"
+
+[mcp_servers.serena.tools.execute_shell_command]
+approval_mode = "approve"
+
+[mcp_servers.serena.tools.think_about_collected_information]
+approval_mode = "approve"
+
+[mcp_servers.serena.tools.think_about_task_adherence]
+approval_mode = "approve"
+
+[mcp_servers.serena.tools.think_about_whether_you_are_done]
+approval_mode = "approve"

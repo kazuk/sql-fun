@@ -36,3 +36,6 @@ Before submitting a pull request, update statistics by running the `update-stats
 
 - Coding guidlines exists in `docs/internal-rules/rust-coding-guidline.md`
 
+# Lookup dependency documentation
+
+- When consulting Rust dependency documentation, first determine the resolved crate version from Cargo.lock. If Cargo.lock is unavailable or the dependency is not locked, inspect the relevant Cargo.toml version requirement before using docs.rs.

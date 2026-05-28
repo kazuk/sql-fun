@@ -3,7 +3,7 @@ use std::{
     path::{Path, PathBuf},
 };
 
-use crate::{MetadataError, SqlFunMetadata};
+use crate::{CteCatalog, CteCatalogCheckError, CteName, MetadataError, SqlFunMetadata};
 
 /// Temporary project directory used by unit tests.
 pub struct TestProjectDir(tempfile::TempDir);
@@ -217,6 +217,36 @@ pub fn write_schema_dump(
     schema: &str,
 ) -> Result<PathBuf, std::io::Error> {
     write_sql_fixture(project_dir, &format!("sqlfun.{schema}.sql"))
+}
+
+/// Write a CTE catalog TOML fixture with the standard catalog header.
+pub fn write_cte_catalog_toml(
+    project_dir: &TestProjectDir,
+    relative: &str,
+    body: &str,
+) -> Result<PathBuf, std::io::Error> {
+    project_dir.write_file(
+        relative,
+        &format!(
+            "sql_fun_cte_catalog_format_version = \"1\"
+sql_dialect = \"PostgreSQL\"
+
+{body}
+"
+        ),
+    )
+}
+
+/// test specific validation error exists
+pub fn cte_catalog_has_error(
+    catalog: &CteCatalog<'_>,
+    cte_name: &str,
+    predicate: impl Fn(&CteCatalogCheckError<'_>) -> bool,
+) -> bool {
+    let entry = catalog
+        .get_cte(&CteName::new(cte_name))
+        .expect("cte should exist");
+    entry.errors().has_error(predicate)
 }
 
 /// Write a manifest and matching schema dump for a metadata test fixture.

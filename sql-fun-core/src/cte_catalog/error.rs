@@ -197,4 +197,9 @@ impl<'a> CteCatalogCheckErrorCollection<'a> {
     pub fn is_empty(&self) -> bool {
         self.0.is_empty()
     }
+
+    #[cfg(test)]
+    pub fn has_error(&self, predicate: impl Fn(&CteCatalogCheckError<'_>) -> bool) -> bool {
+        self.0.iter().any(predicate)
+    }
 }

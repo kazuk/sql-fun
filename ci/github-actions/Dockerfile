@@ -93,6 +93,8 @@ COPY --from=builder /opt/tools/bin /usr/local/cargo/bin
 COPY --from=builder /opt/serena.tar.gz /opt/serena.tar.gz
 
 COPY resources/serena-wrapper.sh /usr/local/bin/serena
+COPY resources/codex-config.toml /usr/local/config-template/codex-config.toml
+
 RUN chmod +x /usr/local/bin/serena
 
 RUN rustup component add rust-analyzer rust-src

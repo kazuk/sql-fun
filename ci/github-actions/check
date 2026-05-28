@@ -32,17 +32,23 @@ if docker volume inspect "user_home" >/dev/null 2>&1; then
   echo "exists"
 else
   docker volume create user_home
-  docker run --rm -t \
-    --user root \
-    -e HOST_UID="$(id -u)" \
-    -e HOST_GID="$(id -g)" \
-    --volume "user_home:/home:rw" \
-    ci-builder:local \
-    bash -lc '
-      uid="$HOST_UID"
-      gid="$HOST_GID"
-      mkdir -p /home/builder
-      chown -R $uid:$gid /home/builder
+fi
+
+docker run --rm -t \
+  --user root \
+  -e HOST_UID="$(id -u)" \
+  -e HOST_GID="$(id -g)" \
+  --volume "user_home:/home:rw" \
+  ci-builder:local \
+  bash -lc '
+    uid="$HOST_UID"
+    gid="$HOST_GID"
+    mkdir -p /home/builder/.codex
+    chown -R $uid:$gid /home/builder
+    install -m 0644 -o "$uid" -g "$gid" \
+      /usr/local/config-template/codex-config.toml \
+      /home/builder/.codex/config.toml
+    if [[ ! -f /home/builder/.bashrc ]]; then
       install -m 0644 -o "$uid" -g "$gid" /dev/stdin /home/builder/.bashrc <<'"'"'EOF'"'"'
 # minimal bashrc (container)
 # direnv hook
@@ -50,8 +56,8 @@ if command -v direnv >/dev/null 2>&1; then
   eval "$(direnv hook bash)"
 fi
 EOF
-    '
-fi
+    fi
+  '
 
 if docker volume inspect "ci_target" >/dev/null 2>&1; then
   echo "exists"

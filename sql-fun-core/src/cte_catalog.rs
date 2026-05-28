@@ -25,6 +25,14 @@ pub use self::params::{
 #[serde(transparent)]
 pub struct CteName(String);
 
+impl CteName {
+    /// create instance
+    #[must_use]
+    pub fn new(name: &str) -> Self {
+        Self(name.to_string())
+    }
+}
+
 impl Display for CteName {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         f.write_str(&self.0)
@@ -241,6 +249,12 @@ impl<'a> CteCatalogEntry<'a> {
             CteCatalogError::never()
         };
         Ok(parameters)
+    }
+
+    /// get validation errors on entry
+    #[must_use]
+    pub fn errors(&self) -> &CteCatalogCheckErrorCollection<'_> {
+        &self.errors
     }
 }
 
@@ -499,7 +513,61 @@ impl CteCatalog<'_> {
         }
         Ok(())
     }
+}
 
+#[cfg(test)]
+mod cte_catalog_load_from_tests {
+    use assert_matches::assert_matches;
+    use testresult::TestResult;
+
+    use crate::test_helpers::{TestProjectDir, write_cte_catalog_toml};
+
+    use super::{CteCatalog, CteCatalogError, CteName};
+
+    #[test]
+    fn load_from_registers_entry_and_source_file() -> TestResult {
+        let project_dir = TestProjectDir::new()?;
+        let catalog_file = write_cte_catalog_toml(
+            &project_dir,
+            "cte/users.toml",
+            r#"[cte.active_users]
+query = "select * from users where id = ${user_id}"
+"#,
+        )?;
+        let mut catalog = CteCatalog::default();
+
+        catalog.load_from(&catalog_file)?;
+
+        let active_users = CteName::new("active_users");
+        let entry = catalog.get_cte(&active_users).expect("cte should exist");
+        assert_eq!(catalog.get_file_of(&entry), &catalog_file);
+        assert!(!entry.has_error());
+        Ok(())
+    }
+
+    #[test]
+    fn load_from_rejects_non_catalog_file() -> TestResult {
+        let project_dir = TestProjectDir::new()?;
+        let catalog_file = project_dir.write_file(
+            "cte/not_catalog.toml",
+            "[cte.active_users]
+query = \"select * from users\"
+",
+        )?;
+        let mut catalog = CteCatalog::default();
+
+        let err = catalog
+            .load_from(&catalog_file)
+            .expect_err("should reject missing header");
+        assert_matches!(
+            err,
+            CteCatalogError::FileIsNotCteCatalog(path) if path == catalog_file
+        );
+        Ok(())
+    }
+}
+
+impl CteCatalog<'_> {
     /// get cte by name
     #[must_use]
     pub fn get_cte(&self, cte_name: &CteName) -> Option<Ref<'_, CteCatalogEntry<'_>>> {
@@ -539,7 +607,53 @@ impl CteCatalog<'_> {
             entry.push_cyclic_dependency(&with_item);
         }
     }
+}
 
+#[cfg(test)]
+mod cte_catalog_build_dependency_graph_tests {
+    use testresult::TestResult;
+
+    use crate::{
+        CteCatalog, CteCatalogCheckError, CteName,
+        test_helpers::{TestProjectDir, cte_catalog_has_error, write_cte_catalog_toml},
+    };
+
+    #[test]
+    fn build_dependency_graph_marks_cycles() -> TestResult {
+        let project_dir = TestProjectDir::new()?;
+        let catalog_file = write_cte_catalog_toml(
+            &project_dir,
+            "cte/catalog.toml",
+            r#"[cte.a]
+query = "select * from b"
+with = [{ cte_name = "b", alias = "b" }]
+
+[cte.b]
+query = "select * from a"
+with = [{ cte_name = "a", alias = "a" }]
+"#,
+        )?;
+        let mut catalog = CteCatalog::default();
+        catalog.load_from(&catalog_file)?;
+
+        assert!(!catalog.check_dependencies_exist());
+        catalog.build_dependency_graph();
+
+        assert_eq!(catalog.dependencies.node_count(), 2);
+        assert_eq!(catalog.dependencies.edge_count(), 2);
+        assert!(cte_catalog_has_error(&catalog, "a", |error| matches!(
+            error,
+            CteCatalogCheckError::CyclicDependency(name, _) if name == &CteName::new("a")
+        )));
+        assert!(cte_catalog_has_error(&catalog, "b", |error| matches!(
+            error,
+            CteCatalogCheckError::CyclicDependency(name, _) if name == &CteName::new("b")
+        )));
+        Ok(())
+    }
+}
+
+impl CteCatalog<'_> {
     fn list_cyclic_dependencies(&self) -> Vec<(CteName, CteCatalogReference)> {
         let mut results = Vec::new();
         for (cte_name, entry) in &self.entries {
@@ -577,30 +691,124 @@ impl CteCatalog<'_> {
             }
         }
     }
+}
 
+#[cfg(test)]
+mod cte_ctalog_fixup_parameters_tests {
+    use testresult::TestResult;
+
+    use crate::{
+        CteCatalog, CteName,
+        placehlodered_sql::ParameterName,
+        test_helpers::{TestProjectDir, write_cte_catalog_toml},
+    };
+
+    #[test]
+    fn fixup_parameters_cascades_dependency_parameters() -> TestResult {
+        let project_dir = TestProjectDir::new()?;
+        let catalog_file = write_cte_catalog_toml(
+            &project_dir,
+            "cte/catalog.toml",
+            r#"[cte.parent]
+query = "select * from child where id = ${parent_id}"
+with = [{ cte_name = "child", alias = "child" }]
+
+[cte.child]
+query = "select * from users where id = ${child_id}"
+"#,
+        )?;
+        let mut catalog = CteCatalog::default();
+        catalog.load_from(&catalog_file)?;
+
+        assert!(!catalog.check_dependencies_exist());
+        catalog.fixup_parameters();
+
+        let child = catalog
+            .get_cte(&CteName::new("child"))
+            .expect("child should exist");
+        let child_params = child
+            .get_parameters()
+            .expect("child parameters should exist");
+        assert!(child_params.exists(&ParameterName::from("child_id")));
+        assert!(!child_params.exists(&ParameterName::from("parent_id")));
+
+        let parent = catalog
+            .get_cte(&CteName::new("parent"))
+            .expect("parent should exist");
+        let parent_params = parent
+            .get_parameters()
+            .expect("parent parameters should exist");
+        assert!(parent_params.exists(&ParameterName::from("child_id")));
+        assert!(parent_params.exists(&ParameterName::from("parent_id")));
+        Ok(())
+    }
+}
+
+impl CteCatalog<'_> {
     /// check all entry references exist
     #[expect(clippy::missing_panics_doc)]
     pub fn check_dependencies_exist(&mut self) -> bool {
         let mut error_found = false;
         let keys: HashSet<CteName> = self.entries.keys().cloned().collect();
         for key in &keys {
-            let mut entry = self
-                .entries
-                .get_mut(key)
-                .expect("key existing")
-                .borrow_mut();
-            for reference in entry.with.clone() {
+            let references = {
+                let entry = self.entries.get(key).expect("key existing").borrow();
+                entry.with.clone()
+            };
+            for reference in references {
                 if keys.contains(reference.cte_name()) {
-                    entry.dependents.push(key.clone());
+                    let mut referenced_entry = self
+                        .entries
+                        .get_mut(reference.cte_name())
+                        .expect("key existing")
+                        .borrow_mut();
+                    referenced_entry.dependents.push(key.clone());
                 } else {
                     error_found = true;
+                    let mut entry = self
+                        .entries
+                        .get_mut(key)
+                        .expect("key existing")
+                        .borrow_mut();
                     entry.push_undefined_entry_reference(reference.cte_name());
                 }
             }
         }
         error_found
     }
+}
 
+#[cfg(test)]
+mod cte_catalog_check_dependencies_exist_tests {
+    use testresult::TestResult;
+
+    use super::{CteCatalog, CteCatalogCheckError, CteName};
+    use crate::test_helpers::{TestProjectDir, cte_catalog_has_error, write_cte_catalog_toml};
+
+    #[test]
+    fn check_dependencies_exist_marks_missing_references() -> TestResult {
+        let project_dir = TestProjectDir::new()?;
+        let catalog_file = write_cte_catalog_toml(
+            &project_dir,
+            "cte/catalog.toml",
+            r#"[cte.parent]
+query = "select * from missing_cte"
+with = [{ cte_name = "missing_cte", alias = "m" }]
+"#,
+        )?;
+        let mut catalog = CteCatalog::default();
+        catalog.load_from(&catalog_file)?;
+
+        assert!(catalog.check_dependencies_exist());
+        assert!(cte_catalog_has_error(&catalog, "parent", |error| matches!(
+            error,
+            CteCatalogCheckError::UndefinedEntryReference(name) if name == &CteName::new("missing_cte")
+        )));
+        Ok(())
+    }
+}
+
+impl CteCatalog<'_> {
     /// check unused
     pub fn check_unused_definition(&mut self) -> bool {
         let mut error_found = false;
@@ -613,14 +821,79 @@ impl CteCatalog<'_> {
         }
         error_found
     }
+}
 
+#[cfg(test)]
+mod cte_catalog_check_unused_definition_tests {
+    use testresult::TestResult;
+
+    use crate::{
+        CteCatalog, CteCatalogCheckError, CteName,
+        test_helpers::{TestProjectDir, cte_catalog_has_error, write_cte_catalog_toml},
+    };
+
+    #[test]
+    fn check_unused_definition_only_flags_entries_without_dependents() -> TestResult {
+        let project_dir = TestProjectDir::new()?;
+        let catalog_file = write_cte_catalog_toml(
+            &project_dir,
+            "cte/catalog.toml",
+            r#"[cte.parent]
+query = "select * from child where id = ${parent_id}"
+with = [{ cte_name = "child", alias = "child" }]
+
+[cte.child]
+query = "select * from users where id = ${child_id}"
+"#,
+        )?;
+        let mut catalog = CteCatalog::default();
+        catalog.load_from(&catalog_file)?;
+
+        assert!(!catalog.check_dependencies_exist());
+        assert!(catalog.check_unused_definition());
+
+        let child = catalog
+            .get_cte(&CteName::new("child"))
+            .expect("child should exist");
+        assert_eq!(child.dependents, vec![CteName::new("parent")]);
+        assert!(!cte_catalog_has_error(&catalog, "child", |error| matches!(
+            error,
+            CteCatalogCheckError::UnusedCteEntry
+        )));
+        assert!(cte_catalog_has_error(&catalog, "parent", |error| matches!(
+            error,
+            CteCatalogCheckError::UnusedCteEntry
+        )));
+        Ok(())
+    }
+}
+
+impl CteCatalog<'_> {
     fn supported_extension(extension: Option<&OsStr>) -> bool {
         let Some(extension) = extension else {
             return false;
         };
         extension == "toml" || extension == "yaml" || extension == "json"
     }
+}
 
+#[cfg(test)]
+mod cte_catalog_supported_extension_tests {
+    use std::ffi::OsStr;
+
+    use super::CteCatalog;
+
+    #[test]
+    fn supported_extension_values() {
+        assert!(CteCatalog::supported_extension(Some(OsStr::new("toml"))));
+        assert!(CteCatalog::supported_extension(Some(OsStr::new("yaml"))));
+        assert!(CteCatalog::supported_extension(Some(OsStr::new("json"))));
+        assert!(!CteCatalog::supported_extension(Some(OsStr::new("txt"))));
+        assert!(!CteCatalog::supported_extension(None));
+    }
+}
+
+impl CteCatalog<'_> {
     /// load cte catalog from specified directory
     ///
     /// # Errors
@@ -639,16 +912,77 @@ impl CteCatalog<'_> {
             let mut catalog = Self::default();
 
             let walk_dir = WalkDir::new(cte_catalog_dir).follow_links(true).into_iter();
-            let iter = walk_dir.filter_entry(|e| Self::supported_extension(e.path().extension()));
+            let iter = walk_dir.filter_entry(|e| {
+                e.path().is_dir() || Self::supported_extension(e.path().extension())
+            });
             for file in iter {
-                catalog.load_from(file?.path())?;
+                let file = file?;
+                if file.file_type().is_file() {
+                    catalog.load_from(file.path())?;
+                }
             }
             catalog
         };
 
         Ok(catalog)
     }
+}
 
+#[cfg(test)]
+mod cte_catalog_load_tests {
+    use assert_matches::assert_matches;
+    use std::path::Path;
+    use testresult::TestResult;
+
+    use crate::{
+        CteCatalog, CteCatalogError, CteName,
+        test_helpers::{TestProjectDir, write_cte_catalog_toml},
+    };
+
+    #[test]
+    fn load_reads_supported_files_recursively() -> TestResult {
+        let project_dir = TestProjectDir::new()?;
+        let cte_dir = project_dir.create_dir("cte")?;
+        let direct_file = write_cte_catalog_toml(
+            &project_dir,
+            "cte/direct.toml",
+            r#"[cte.direct]
+query = "select 1"
+"#,
+        )?;
+        let nested_file = write_cte_catalog_toml(
+            &project_dir,
+            "cte/nested/child.toml",
+            r#"[cte.nested]
+query = "select 2"
+"#,
+        )?;
+
+        let catalog = CteCatalog::load(cte_dir.as_path())?;
+
+        let direct = catalog
+            .get_cte(&CteName::new("direct"))
+            .expect("direct should exist");
+        assert_eq!(catalog.get_file_of(&direct), &direct_file);
+        let nested = catalog
+            .get_cte(&CteName::new("nested"))
+            .expect("nested should exist");
+        assert_eq!(catalog.get_file_of(&nested), &nested_file);
+        Ok(())
+    }
+
+    #[test]
+    fn load_rejects_file_path() -> TestResult {
+        let project_dir = TestProjectDir::new()?;
+        let file = project_dir.write_file("cte.toml", "")?;
+
+        let err = CteCatalog::load(Path::new(&file)).expect_err("file path should be rejected");
+        assert_matches!(err, CteCatalogError::PathIsNotDirectory(path) if path == file);
+        Ok(())
+    }
+}
+
+impl CteCatalog<'_> {
     fn push_file<'a, P: AsRef<Path>>(&mut self, path: P) -> CatalogFileIndex<'a> {
         let index = self.files.len();
         self.files.push(path.as_ref().to_path_buf());

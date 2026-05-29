@@ -217,10 +217,7 @@ mod test_sqlite_column_definition {
     use super::{ColumnConstraint, ColumnDefinition};
     use crate::{
         SqliteToken,
-        sem::{
-            FullName, ScalarConstExpr, SchemaName, SemScalarExpr, SqlValueExpr, TableName,
-            TypeReference,
-        },
+        sem::{FullName, SchemaName, SemScalarExpr, TableName, TypeReference},
         sqlite::SqliteDialect,
         syn::sqlite::{CreateTableBody, Stmt},
         test_helpers::TestParseContext,
@@ -240,9 +237,8 @@ mod test_sqlite_column_definition {
             turso_parser::ast::Cmd::Stmt(stmt) => Stmt::from(stmt),
             _ => panic!("expected sqlite statement command"),
         };
-        let create_table = match stmt {
-            Stmt::CreateTable(create_table) => create_table,
-            _ => panic!("expected create table statement"),
+        let Some(create_table) = stmt.into_create_table() else {
+            panic!("expected create table statement")
         };
         (create_table, tokens)
     }
@@ -261,8 +257,11 @@ mod test_sqlite_column_definition {
         context
     }
 
-    #[test]
-    fn analyze_sqlite_column_definition_collects_constraints() {
+    #[rstest::fixture]
+    fn create_table_statement<'a>() -> (
+        crate::syn::sqlite::CreateTableStatement,
+        IVec<SqliteToken<'a>>,
+    ) {
         let sql = r#"
             create table users (
                 id integer primary key not null unique,
@@ -270,11 +269,32 @@ mod test_sqlite_column_definition {
                 active integer check (true and true),
                 created_at text default current_timestamp)
         "#;
-        let (create_table, tokens) = parse_create_table(sql);
-        let body = match create_table.body() {
-            CreateTableBody::ColumnsAndConstraint(body) => body,
-            _ => panic!("expected column-based create table body"),
+        let cmd = SqliteDialect::parse(sql)
+            .expect("sqlite parse should succeed")
+            .expect("statement should exist");
+        let tokens = SqliteDialect::scan(sql).expect("sqlite scan should succeed");
+        let stmt = match cmd {
+            turso_parser::ast::Cmd::Stmt(stmt) => Stmt::from(stmt),
+            _ => panic!("expected sqlite statement command"),
         };
+        let Some(create_table) = stmt.into_create_table() else {
+            panic!("expected create table statement")
+        };
+        (create_table, tokens)
+    }
+
+    #[rstest::rstest]
+    fn analyze_sqlite_column_definition_collects_constraints<'a>(
+        create_table_statement: (
+            crate::syn::sqlite::CreateTableStatement,
+            IVec<SqliteToken<'a>>,
+        ),
+    ) {
+        let (create_table, tokens) = create_table_statement;
+        let Some(body) = create_table.body().as_columns_and_constraint() else {
+            panic!("expected column-based create table body");
+        };
+
         let table_name = TableName::try_from(create_table.table_name())
             .expect("table name should convert into semantic table name");
         let mut context = setup_context();
@@ -302,22 +322,21 @@ mod test_sqlite_column_definition {
         .expect("name column should analyze");
         context = new_context;
         assert_eq!(name_col.constraints().len(), 2);
-        match &name_col.constraints()[0] {
-            ColumnConstraint::Default(default) => {
-                let value = match default.expr() {
-                    SemScalarExpr::Const(ScalarConstExpr::String(v)) => v,
-                    _ => panic!("expect const string"),
-                };
-                assert_eq!(value, "guest");
-            }
-            _ => panic!("expected string default constraint"),
-        }
-        match &name_col.constraints()[1] {
-            ColumnConstraint::Collate(collate) => {
-                assert_eq!(collate.collation_name(), "nocase")
-            }
-            _ => panic!("expected collate constraint"),
-        }
+        let Some(default) = &name_col.constraints()[0].as_default() else {
+            panic!("expected string default constraint");
+        };
+        let Some(const_value) = default.expr().as_const() else {
+            panic!("expect const string")
+        };
+        let Some(value) = const_value.as_string() else {
+            panic!("expect const string")
+        };
+        assert_eq!(value, "guest");
+
+        let Some(collate) = &name_col.constraints()[1].as_collate() else {
+            panic!("expected collate constraint")
+        };
+        assert_eq!(collate.collation_name(), "nocase");
 
         let (active_col, new_context) = ColumnDefinition::analyze_column_definition(
             context,
@@ -328,12 +347,11 @@ mod test_sqlite_column_definition {
         .expect("active column should analyze");
         context = new_context;
         assert_eq!(active_col.constraints().len(), 1);
-        match &active_col.constraints()[0] {
-            ColumnConstraint::Check(check_constraint) => {
-                assert_matches!(check_constraint.expr(), SemScalarExpr::Boolean(_));
-            }
-            _ => panic!("expected check constraint"),
-        }
+
+        let Some(check_constraint) = &active_col.constraints()[0].as_check() else {
+            panic!("expected check constraint")
+        };
+        assert_matches!(check_constraint.expr(), SemScalarExpr::Boolean(_));
 
         let (created_at_col, context) = ColumnDefinition::analyze_column_definition(
             context,
@@ -343,13 +361,17 @@ mod test_sqlite_column_definition {
         )
         .expect("created_at column should analyze");
         assert_eq!(created_at_col.constraints().len(), 1);
-        match &created_at_col.constraints()[0] {
-            ColumnConstraint::Default(default) => match default.expr() {
-                SemScalarExpr::SqlValue(SqlValueExpr::CurrentTimestamp(None)) => {}
-                _ => panic!("expected current_timestamp"),
-            },
-            _ => panic!("default constraint"),
-        }
+        let Some(default) = &created_at_col.constraints()[0].as_default() else {
+            panic!("default constraint")
+        };
+        let Some(sql_value) = default.expr().as_sql_value() else {
+            panic!("expected SqlValue")
+        };
+        let Ok(time_prec) = sql_value.as_current_timestamp() else {
+            panic!("expected current_timestamp")
+        };
+        assert!(time_prec.is_none());
+
         assert_eq!(context.reported_problem_count(), 0);
     }
 

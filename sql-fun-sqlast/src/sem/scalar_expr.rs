@@ -118,6 +118,22 @@ pub enum SemScalarExpr {
 }
 
 impl SemScalarExpr {
+    /// get Const variant
+    pub fn as_const(&self) -> Option<&ScalarConstExpr> {
+        match self {
+            Self::Const(c) => Some(c),
+            _ => None,
+        }
+    }
+
+    /// get SqlValue variant
+    pub fn as_sql_value(&self) -> Option<&SqlValueExpr> {
+        match self {
+            Self::SqlValue(v) => Some(v),
+            _ => None,
+        }
+    }
+
     /// create new const expr
     #[cfg(test)]
     pub fn new_const(value: ScalarConstExpr) -> Self {

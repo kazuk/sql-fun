@@ -28,6 +28,14 @@ pub enum ScalarConstExpr {
 }
 
 impl ScalarConstExpr {
+    /// get string variant value
+    pub fn as_string(&self) -> Option<&str> {
+        match self {
+            Self::String(s) => Some(s.as_str()),
+            _ => None,
+        }
+    }
+
     /// create a NULL
     #[must_use]
     pub fn null() -> SemScalarExpr {

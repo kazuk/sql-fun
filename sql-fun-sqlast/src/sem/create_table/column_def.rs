@@ -197,7 +197,7 @@ impl ColumnDefinition {
                     result.set_not_null(Some(nullable_constraint.is_not_null()));
                 }
                 ColumnConstraint::Default(default_constraint) => {
-                    result.set_default(&default_constraint.expr());
+                    result.set_default(default_constraint.expr());
                 }
                 _ => {}
             }

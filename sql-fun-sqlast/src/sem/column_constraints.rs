@@ -26,6 +26,32 @@ pub enum ColumnConstraint {
 }
 
 impl ColumnConstraint {
+    /// get Default variant
+    pub fn as_default(&self) -> Option<&DefaultColumnConstraint> {
+        match self {
+            Self::Default(c) => Some(c),
+            _ => None,
+        }
+    }
+
+    /// get Collate variant
+    pub fn as_collate(&self) -> Option<&CollateColumnConstraint> {
+        match self {
+            Self::Collate(c) => Some(c),
+            _ => None,
+        }
+    }
+
+    /// get Check variant
+    pub fn as_check(&self) -> Option<&CheckColumnConstraint> {
+        match self {
+            Self::Check(c) => Some(c),
+            _ => None,
+        }
+    }
+}
+
+impl ColumnConstraint {
     pub(crate) fn analyze_constraint<TParseContext>(
         mut context: TParseContext,
         table_name: &TableName,

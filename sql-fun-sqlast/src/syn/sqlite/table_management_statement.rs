@@ -102,6 +102,16 @@ pub enum CreateTableBody {
     AsSelect(Select),
 }
 
+impl CreateTableBody {
+    /// get ColumnsAndConstraint valiant
+    pub fn as_columns_and_constraint(&self) -> Option<&ColumnsAndConstraint> {
+        match self {
+            Self::ColumnsAndConstraint(v) => Some(v),
+            _ => None,
+        }
+    }
+}
+
 impl From<CreateTableBodyIn> for CreateTableBody {
     fn from(value: CreateTableBodyIn) -> Self {
         match value {

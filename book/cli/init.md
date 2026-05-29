@@ -2,7 +2,7 @@
 
 `init` sub command prepare and configures `sql-fun`.
 
-1. Create `sql-fun` home dirctory.
+1. Create `sql-fun` home directory.
    - `sql-fun` home directory contains
      - DB Engine builtin objects information
        - Extract from `PostgreSQL` docker image
@@ -17,7 +17,7 @@
 sql-fun init
 ```
 
-### Download release artifact for DB Engine builtin object informations
+### Download release artifact for DB Engine builtin object information
 
 Shorthand
 
@@ -31,13 +31,13 @@ This command line same as bellow.
 sql-fun init --yes --github-repo "kazuk/sql-fun" 
 ```
 
-### Extract DB Engine builtin object informations from your database
+### Extract DB Engine builtin object information from your database
 
 ```console
 sql-fun init --yes --database-url postgres://your-db-host/database
 ```
 
-### Extract DB Engine builtin object informations from docker image
+### Extract DB Engine builtin object information from docker image
 
 ```console
 sql-fun init --yes --docker-image-tag "postgres:latest"
@@ -56,5 +56,5 @@ sql-fun init --yes --docker-image-tag "postgres:latest"
   - default is latest stable release
 - `--engine-version`: Limit initialization to the specified database engine versions.
   - default: install ALL engine versions in artifact
-- `--postgres-extensions`: Limit initialization to the specified `PostgreSQL` extentions
+- `--postgres-extensions`: Limit initialization to the specified `PostgreSQL` extensions
   - default: install ALL extensions

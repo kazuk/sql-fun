@@ -1098,8 +1098,8 @@
                   },
                   "type": "array"
                 },
-                "type_candiate": {
-                  "description": "type candiates for this parameter",
+                "type_candidate": {
+                  "description": "type candidates for this parameter",
                   "items": {
                     "$ref": "#/$defs/TypeReference"
                   },
@@ -1109,7 +1109,7 @@
               "required": [
                 "name",
                 "spans",
-                "type_candiate",
+                "type_candidate",
                 "nullability"
               ],
               "type": "object"
@@ -1430,7 +1430,7 @@
                 ]
               },
               "ObjectSummaryField": {
-                "description": "specify optional field to retuns API result",
+                "description": "specify optional field to returns API result",
                 "oneOf": [
                   {
                     "const": "DefinitionFile",
@@ -1449,7 +1449,7 @@
                 "oneOf": [
                   {
                     "additionalProperties": false,
-                    "description": "exact matchs string",
+                    "description": "exact matches string",
                     "properties": {
                       "Exact": {
                         "type": "string"

@@ -120,7 +120,7 @@ impl super::FunctionParam {
         Ok(value)
     }
 
-    /// test paramter is a output param
+    /// test parameter is a output param
     ///
     /// # Errors
     ///

@@ -82,7 +82,7 @@ impl ArraySlice {
         with_clause: &WithClause,
         from_clause: &FromClause,
         arg: SemScalarExpr,
-        indicies: crate::syn::AIndices,
+        indices: crate::syn::AIndices,
         tokens: &IVec<ScanToken>,
     ) -> Result<(IndirectionExpr, TParseContext), AnalysisError>
     where
@@ -92,7 +92,7 @@ impl ArraySlice {
             context,
             with_clause,
             from_clause,
-            indicies.get_lidx(),
+            indices.get_lidx(),
             tokens,
         )?;
         context = new_context;
@@ -100,7 +100,7 @@ impl ArraySlice {
             context,
             with_clause,
             from_clause,
-            indicies.get_uidx(),
+            indices.get_uidx(),
             tokens,
         )?;
         context = new_context;

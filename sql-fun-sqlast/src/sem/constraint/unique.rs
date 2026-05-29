@@ -34,7 +34,7 @@ impl UniqueConstraint {
     }
 }
 
-impl<TParseContext> super::AnalizeConstraint<TParseContext> for UniqueConstraint
+impl<TParseContext> super::AnalyzeConstraint<TParseContext> for UniqueConstraint
 where
     TParseContext: ParseContext,
 {

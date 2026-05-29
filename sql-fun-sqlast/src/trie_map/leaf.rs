@@ -1,9 +1,9 @@
 use super::{KeyFragment, TrieNode, TrieNodeIter};
 
 #[derive(Debug)]
-pub(super) struct TrieLeafs<TValue>(Vec<TrieNode<TValue>>);
+pub(super) struct TrieLeaves<TValue>(Vec<TrieNode<TValue>>);
 
-impl<TValue> TrieLeafs<TValue> {
+impl<TValue> TrieLeaves<TValue> {
     pub(super) fn new() -> Self {
         Self::with_capacity(0)
     }

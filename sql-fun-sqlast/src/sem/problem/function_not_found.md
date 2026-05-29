@@ -12,7 +12,7 @@ SELECT function_name();
 SELECT * from function_name()
 ```
 
-- `function_name` not found in schema sematic analysis context.
+- `function_name` not found in schema semantic analysis context.
 
 ## Why
 

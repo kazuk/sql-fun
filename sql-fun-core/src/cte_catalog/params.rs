@@ -35,7 +35,7 @@ pub struct CteParameter {
     type_hints: Vec<PlaceholderTypeHint>,
 }
 
-/// paramter value binding
+/// parameter value binding
 #[derive(Debug, Clone)]
 pub struct CteParameterBinding {
     cte_name: CteName,
@@ -63,7 +63,7 @@ impl CteParameterBinding {
         &self.name_in_query
     }
 
-    /// enumrate type hints in definition
+    /// enumerate type hints in definition
     #[must_use]
     pub fn type_hints(&self) -> &[PlaceholderTypeHint] {
         self.type_hints.as_ref()
@@ -132,10 +132,10 @@ impl CteParameterCollection {
     pub fn push_query_parameter(
         &mut self,
         cte_name: &CteName,
-        paremeter_name: &ParameterName,
+        parameter_name: &ParameterName,
         hints: &Vec<PlaceholderTypeHint>,
     ) {
-        match self.parameters.entry(paremeter_name.clone()) {
+        match self.parameters.entry(parameter_name.clone()) {
             Entry::Occupied(mut o) => {
                 let bindings = o.get_mut();
                 bindings.push_binding(cte_name, hints);
@@ -180,7 +180,7 @@ impl CteParameterCollection {
         self.parameters.contains_key(parameter_name)
     }
 
-    /// get paramter names
+    /// get parameter names
     pub fn parameter_names(&self) -> impl Iterator<Item = &ParameterName> {
         self.parameters.keys()
     }
@@ -218,7 +218,7 @@ impl From<HashMap<String, Vec<CteParameterRename>>> for ParameterRenameCollectio
 }
 
 impl ParameterRenameCollection {
-    /// get parameter rename by parmeter name
+    /// get parameter rename by parameter name
     #[must_use]
     pub fn get(&self, param_name: &ParameterName) -> Option<&Vec<CteParameterRename>> {
         self.0.get(param_name)

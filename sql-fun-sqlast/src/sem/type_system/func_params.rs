@@ -113,7 +113,7 @@ impl FunctionParam {
     pub fn append_returning_column(&self, column_collection: &mut ColumnCollection) {
         match self {
             Self::Out(p) => p.append_returning_column(column_collection),
-            Self::InOut(p) => p.append_returnig_colum(column_collection),
+            Self::InOut(p) => p.append_returning_column(column_collection),
             Self::Table(p) => p.append_returning_column(column_collection),
             _ => {}
         }
@@ -229,7 +229,7 @@ impl FunctionParam {
         }
     }
 
-    /// tests implicit cast is avaiable
+    /// tests implicit cast is available
     ///
     /// # Errors
     ///
@@ -260,7 +260,7 @@ impl FunctionParam {
         }
     }
 
-    /// tests implicit cast is avaiable for variadic arguments
+    /// tests implicit cast is available for variadic arguments
     ///
     /// # Errors
     ///

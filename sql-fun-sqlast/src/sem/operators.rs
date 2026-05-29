@@ -1,6 +1,6 @@
 use crate::sem::TypeReference;
 
-/// Binary opreators
+/// Binary operators
 #[derive(Debug, Clone, Eq, Hash, PartialEq, serde::Serialize, serde::Deserialize)]
 pub struct BinaryOperatorDefinition {
     left_arg_type: TypeReference,

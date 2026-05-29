@@ -22,12 +22,12 @@ pub enum StdStream {
 }
 
 /// runnable command wrapper for [`CliSubCommand`]
-pub struct RunableCommand {
+pub struct RunnableCommand {
     binary: PathBuf,
     sub_command: CliSubCommand,
 }
 
-impl TryFrom<&CliSubCommand> for RunableCommand {
+impl TryFrom<&CliSubCommand> for RunnableCommand {
     type Error = anyhow::Error;
 
     fn try_from(value: &CliSubCommand) -> Result<Self, Self::Error> {
@@ -54,7 +54,7 @@ impl TryFrom<&CliSubCommand> for RunableCommand {
     }
 }
 
-impl RunableCommand {
+impl RunnableCommand {
     #[cfg(unix)]
     fn send_sigterm(child: &Child) -> Result<(), anyhow::Error> {
         use ::nix::unistd::Pid;

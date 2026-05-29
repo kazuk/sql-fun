@@ -11,7 +11,7 @@ pub struct ColumnDefinition {
     column_type: TypeReference,
     /// nullability
     nullability: Nullability,
-    /// column contraints
+    /// column constraints
     constraint: Vec<ColumnConstraint>,
 }
 

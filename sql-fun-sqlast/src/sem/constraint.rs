@@ -14,7 +14,7 @@ pub use self::{
 };
 
 /// analyze [`crate::syn::Constraint`] variants
-pub trait AnalizeConstraint<TParseContext>
+pub trait AnalyzeConstraint<TParseContext>
 where
     TParseContext: ParseContext,
 {
@@ -127,7 +127,7 @@ mod test_analyze_alter_obj_add_constraint {
     }
 }
 
-impl<TParseContext> AnalizeConstraint<TParseContext> for Constraint
+impl<TParseContext> AnalyzeConstraint<TParseContext> for Constraint
 where
     TParseContext: ParseContext,
 {

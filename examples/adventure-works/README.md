@@ -309,7 +309,7 @@ First option , most faster way.
 struct IndividualCustomer {}
 ```
 
-this sturct fits `select ic.* from sales.vindividualcustomer ic`.
+this struct fits `select ic.* from sales.vindividualcustomer ic`.
 
 
 

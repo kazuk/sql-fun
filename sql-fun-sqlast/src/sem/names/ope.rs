@@ -87,7 +87,7 @@ impl OperatorName {
         matches!(self, Self::Valid(_))
     }
 
-    /// get name of operator, require vaild
+    /// get name of operator, require valid
     #[must_use]
     pub fn to_name_string(&self) -> String {
         match self {

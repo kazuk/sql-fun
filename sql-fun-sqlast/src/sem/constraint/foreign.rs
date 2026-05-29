@@ -1,6 +1,6 @@
 use crate::{
     sem::{
-        AnalizeConstraint, AnalysisError, AnalysisProblem, ColumnName, Constraint, ImplicitChange,
+        AnalysisError, AnalysisProblem, AnalyzeConstraint, ColumnName, Constraint, ImplicitChange,
         ParseContext, TableName,
     },
     syn::{ListOpt, Opt},
@@ -29,7 +29,7 @@ impl ForeignKeyConstraint {
     }
 }
 
-impl<TParseContext> AnalizeConstraint<TParseContext> for ForeignKeyConstraint
+impl<TParseContext> AnalyzeConstraint<TParseContext> for ForeignKeyConstraint
 where
     TParseContext: ParseContext,
 {

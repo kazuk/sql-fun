@@ -20,7 +20,7 @@ pub use self::{
 use crate::{
     StringSpan,
     sem::{
-        AliasSpec, AnalysisError, AnalysisProblem, Comment, CreateCompositType, CreateDomain,
+        AliasSpec, AnalysisError, AnalysisProblem, Comment, CreateCompositeType, CreateDomain,
         CreateEnum, CreateExtension, CreateFunction, CreateIndex, CreateSchema, CreateSequence,
         CreateTable, DataSource, FullName, FunctionOverloadCollection, GetSourcePathWithSpanOpt,
         MutSourcePathWithSpan, OperatorDefinition, OperatorName, SchemaName, SemScalarExpr,
@@ -43,7 +43,7 @@ pub trait SourceAccessService: std::fmt::Debug {
         let source_path = if source_path.is_absolute() {
             source_path
         } else {
-            // TODO resove path
+            // TODO resolve path
             source_path
         };
 
@@ -101,7 +101,7 @@ pub trait OperatorInfoRead {
     /// get operator definition,
     ///
     /// `has_left`, `has_right` both true then returns Binary operator.
-    /// one of `has_left`, `has_right` is ture then returns Left unary or Right unary operator.
+    /// one of `has_left`, `has_right` is true then returns Left unary or Right unary operator.
     ///
     fn get_operator_op(
         &self,
@@ -113,7 +113,7 @@ pub trait OperatorInfoRead {
 
 /// search path
 pub trait SearchPathRead {
-    /// set serach path
+    /// set search path
     fn set_search_path(&mut self, search_path: Vec<SchemaName>);
 
     /// get search path
@@ -200,7 +200,7 @@ pub trait BaseParseContext:
     fn set_statement_span(&mut self, statement_span: StringSpan);
 
     /// setup source access service
-    fn set_source_file(&mut self, source_acess_service: Box<dyn SourceAccessService>);
+    fn set_source_file(&mut self, source_access_service: Box<dyn SourceAccessService>);
 
     /// canonicalize a type reference
     fn canonicalize_type_ref(&self, type_ref: &TypeReference) -> Option<TypeReference> {
@@ -229,7 +229,7 @@ where
     /// apply `create type` (composite type) to current schema
     fn apply_create_comp_type(
         mut self,
-        create_comp_type: &CreateCompositType,
+        create_comp_type: &CreateCompositeType,
     ) -> Result<Self, AnalysisError> {
         let Some(name) = create_comp_type.name() else {
             AnalysisError::raise_register_dynamic_type(create_comp_type)?;
@@ -318,9 +318,9 @@ where
         };
 
         let Some(calling_overload) = overloads.resolve_overload(self, &arg_types) else {
-            self.report_problem(
-                AnalysisProblem::parameter_type_missmatch_for_table_function(call, arg_types),
-            )?;
+            self.report_problem(AnalysisProblem::parameter_type_mismatch_for_table_function(
+                call, arg_types,
+            ))?;
             return DataSource::undefined_table_function(call, arg_exprs, alias_name);
         };
 

@@ -23,7 +23,7 @@ use crate::{
 use serde::de::DeserializeOwned;
 use sql_fun_core::{PostgresBuiltinPaths, SqlFunArgs, SqlFunMetadata};
 
-/// schema informations for Builtin and extensions
+/// schema information for Builtin and extensions
 #[derive(Debug)]
 pub struct BaseContext {
     context_args: SqlFunArgs,
@@ -228,8 +228,8 @@ impl BaseParseContext for BaseContext {
         None // BaseContext contains built-in data item, from Non SQL Source
     }
 
-    fn set_source_file(&mut self, source_acess_service: Box<dyn super::SourceAccessService>) {
-        self.source_provider = Some(source_acess_service)
+    fn set_source_file(&mut self, source_access_service: Box<dyn super::SourceAccessService>) {
+        self.source_provider = Some(source_access_service)
     }
 }
 

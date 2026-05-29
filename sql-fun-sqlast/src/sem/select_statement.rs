@@ -2,7 +2,7 @@ use sql_fun_core::IVec;
 
 use crate::{
     sem::{
-        AnalysisError, AstAndContextPair, CreateCompositType, FromClause, ParseContext, SemAst,
+        AnalysisError, AstAndContextPair, CreateCompositeType, FromClause, ParseContext, SemAst,
         SemScalarExpr, TypeDefinition, TypeReference, WithClause,
         create_table::{ColumnDefinition, ColumnName},
     },
@@ -228,8 +228,8 @@ impl SelectStatementNode {
 
     fn returning_composite_type(&self) -> Result<TypeReference, AnalysisError> {
         let fields = self.result_columns.composite_field_collection()?;
-        let cct = CreateCompositType::from_fields(&fields);
-        let type_def = TypeDefinition::CompositType(cct);
+        let cct = CreateCompositeType::from_fields(&fields);
+        let type_def = TypeDefinition::CompositeType(cct);
         Ok(TypeReference::dynamic(&type_def))
     }
 

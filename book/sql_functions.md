@@ -71,7 +71,7 @@ edge = {
 ```
 
 
-## Function signiture requirements
+## Function signature requirements
 
 - Functions must be annotated with one of the following:
   - `sql_fun::sql_query_one`: Expects a single row; return type must be `Result<RowType, E>`.
@@ -112,7 +112,7 @@ The `derive_builder::Builder` crate satisfies most of these requirements. You on
 
 ```rust
 #[derive(derive_builder::Builder)]
-sturct RowType {
+struct RowType {
     //... fields gose here.
 }
 
@@ -183,7 +183,7 @@ async fn execute_select_users_by_name_like(
 ```
 
 
-## Paramter binding
+## Parameter binding
 
 - In the SQL string, bind parameters using `${...}` syntax.
 - Named parameters like `${name}` are converted to positional placeholders like `$1`, `$2`, etc.

@@ -22,7 +22,7 @@
                                     <div>
                                         <ul>
                                             <li>
-                                                Used by running application. without query documations.
+                                                Used by running application. without query documentations.
                                             </li>
                                             <ul>
                                                 <li>
@@ -465,7 +465,7 @@
                                             sql-fun
                                         </b>
                                         <span style="background-color: transparent;">
-                                            query semantic analisys.
+                                            query semantic analysis.
                                         </span>
                                     </div>
                                     <div>
@@ -483,7 +483,7 @@
                         </div>
                     </foreignObject>
                     <text x="219" y="874" fill="light-dark(#000000, #ffffff)" font-family="&quot;Helvetica&quot;" font-size="12px" text-anchor="middle">
-                        sql-fun query semantic analisys....
+                        sql-fun query semantic analysis....
                     </text>
                 </switch>
             </g>

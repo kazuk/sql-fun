@@ -37,7 +37,7 @@ If both CLI option and environment variable are provided, the CLI option wins.
 |---|---|---|---|
 `--postgres-version <version>` | `SQL_FUN_POSTGRES_VERSION` | from metadata (`[package.metadata.database] engine_version`) | Select the base PostgreSQL version used to resolve built-in objects.
 `--no-builtin-tables` | `SQL_FUN_NO_BUILTIN` | (n/a) | Disable loading the built-in tables/views.
-`--builtin-schema-file <file>` | `SQL_FUN_BUITIN_SCHEMA` | See above | Use the specified SQL file as the built-in schema instead of the default versioned file.
+`--builtin-schema-file <file>` | `SQL_FUN_BUILTIN_SCHEMA` | See above | Use the specified SQL file as the built-in schema instead of the default versioned file.
 
 > Precedence: `--builtin-schema-file` takes priority over `--postgres-version`.  
 > If `--no-builtin-tables` is set, no built-in schema is loaded regardless of the other options.

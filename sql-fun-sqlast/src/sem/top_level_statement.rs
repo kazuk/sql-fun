@@ -3,7 +3,7 @@ use sql_fun_core::IVec;
 use crate::{
     AstAndContextPair,
     sem::{
-        AlterOwner, AlterSequence, AlterTable, AnalysisError, Comment, CreateCompositType,
+        AlterOwner, AlterSequence, AlterTable, AnalysisError, Comment, CreateCompositeType,
         CreateDomain, CreateEnum, CreateExtension, CreateFunction, CreateIndex, CreateSchema,
         CreateSequence, CreateTable, CreateTableAs, CreateView, ParseContext, SelectStatement,
         SemAst, VariableSet, create_table::DropTable,
@@ -97,7 +97,11 @@ impl SemAst {
         }
 
         if let Some(comp_type) = statement.as_composite_type_stmt().as_inner() {
-            return CreateCompositType::analyze_create_comp_type(context, parent_schema, comp_type);
+            return CreateCompositeType::analyze_create_comp_type(
+                context,
+                parent_schema,
+                comp_type,
+            );
         }
 
         if let Some(create_extension) = statement.as_create_extension_stmt().as_inner() {

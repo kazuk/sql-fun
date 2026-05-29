@@ -10,7 +10,7 @@ pub use self::{
 
 use std::fmt::Display;
 
-/// Vesion text for `PostgreSQL` extensions
+/// Version text for `PostgreSQL` extensions
 #[derive(Debug, serde::Deserialize, serde::Serialize, Clone, PartialEq)]
 #[serde(transparent)]
 pub struct ExtensionVersion(String);

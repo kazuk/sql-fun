@@ -24,7 +24,7 @@ mod node;
 
 use self::{
     key_fragment::{BoxedKeyFragment, KeyFragment},
-    leaf::{TrieLeafIter, TrieLeafs},
+    leaf::{TrieLeafIter, TrieLeaves},
     node::{TrieNode, TrieNodeIter},
 };
 
@@ -35,7 +35,7 @@ pub struct TrieMap<TValue> {
     /// Value for the empty key
     empty_node: Option<TValue>,
     /// Top-level nodes
-    nodes: TrieLeafs<TValue>,
+    nodes: TrieLeaves<TValue>,
 }
 
 impl<TValue> Default for TrieMap<TValue> {
@@ -50,7 +50,7 @@ impl<TValue> TrieMap<TValue> {
     pub fn new() -> Self {
         Self {
             empty_node: None,
-            nodes: TrieLeafs::new(),
+            nodes: TrieLeaves::new(),
         }
     }
 

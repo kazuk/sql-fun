@@ -22,16 +22,16 @@ pub enum TypeError {
     #[error("simple inference failed, no argument for inference")]
     SimpleInferNoArgs(),
 
-    #[error("simple inference failed, ambigous")]
-    SimpleInferAmbigous(Vec<TypeReference>),
+    #[error("simple inference failed, ambiguous")]
+    SimpleInferAmbiguous(Vec<TypeReference>),
 
     #[error("common inference failed : no implicit castable")]
     CommonInferNoImplicitCastable(),
 
-    #[error("common inference failed : ambigous")]
-    CommonInferAmbigous(),
+    #[error("common inference failed : ambiguous")]
+    CommonInferAmbiguous(),
 
-    #[error("Unexpeced error (cast not found in castable list items)")]
+    #[error("Unexpected error (cast not found in castable list items)")]
     UnexpectedCastNotFound,
 
     #[error("Implicit cast not found")]
@@ -39,7 +39,7 @@ pub enum TypeError {
 }
 
 impl TypeError {
-    pub fn common_infer_no_implict_castable() -> Result<Infallible, Self> {
+    pub fn common_infer_no_implicit_castable() -> Result<Infallible, Self> {
         Err(Self::CommonInferNoImplicitCastable())
     }
 
@@ -47,8 +47,8 @@ impl TypeError {
         Err(Self::UnexpectedCastNotFound)
     }
 
-    pub fn common_infer_ambigous() -> Result<Infallible, Self> {
-        Err(Self::CommonInferAmbigous())
+    pub fn common_infer_ambiguous() -> Result<Infallible, Self> {
+        Err(Self::CommonInferAmbiguous())
     }
 
     pub fn implicit_cast_not_found(

@@ -24,21 +24,21 @@ pub enum IndirectionExpr {
 }
 
 impl IndirectionExpr {
-    fn analyze_indicies<TParseContext>(
+    fn analyze_indices<TParseContext>(
         context: TParseContext,
         with_clause: &WithClause,
         from_clause: &FromClause,
         arg: SemScalarExpr,
-        indicies: crate::syn::AIndices,
+        indices: crate::syn::AIndices,
         tokens: &IVec<ScanToken>,
     ) -> Result<(Self, TParseContext), AnalysisError>
     where
         TParseContext: ParseContext,
     {
-        if indicies.get_is_slice() {
-            ArraySlice::analyze_slice(context, with_clause, from_clause, arg, indicies, tokens)
+        if indices.get_is_slice() {
+            ArraySlice::analyze_slice(context, with_clause, from_clause, arg, indices, tokens)
         } else {
-            ArrayIndex::analyze_index(context, with_clause, from_clause, arg, &indicies, tokens)
+            ArrayIndex::analyze_index(context, with_clause, from_clause, arg, &indices, tokens)
         }
     }
 }
@@ -84,15 +84,9 @@ where
         context = new_context;
 
         for item in indirection {
-            if let Some(indicies) = item.as_a_indices().as_inner() {
-                let (new_arg, new_context) = Self::analyze_indicies(
-                    context,
-                    with_clause,
-                    from_clause,
-                    arg,
-                    indicies,
-                    tokens,
-                )?;
+            if let Some(indices) = item.as_a_indices().as_inner() {
+                let (new_arg, new_context) =
+                    Self::analyze_indices(context, with_clause, from_clause, arg, indices, tokens)?;
                 context = new_context;
                 arg = SemScalarExpr::Indirection(new_arg);
             } else if let Some(member) = item.as_string().get_sval() {

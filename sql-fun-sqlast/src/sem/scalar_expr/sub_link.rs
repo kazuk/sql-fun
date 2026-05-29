@@ -46,7 +46,7 @@ where
             SelectStatement::analyze_select(context, subselect, tokens)?;
         context = new_context;
         let Some(select_stmt) = select_stmt.into_select_statemtnt() else {
-            AnalysisError::raise_unexpected_none("select_statemnt")?
+            AnalysisError::raise_unexpected_none("select_statement")?
         };
 
         let type_ref = select_stmt.returning_composite_type()?;

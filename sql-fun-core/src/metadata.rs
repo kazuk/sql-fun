@@ -244,8 +244,8 @@ impl SqlFunMetadata {
     ///
     /// Returns [`MetadataError`] when TOML conversion fails.
     pub(crate) fn from_value(database: &toml::Value) -> Result<Self, MetadataError> {
-        let db_matadata: Self = database.clone().try_into()?;
-        Ok(db_matadata)
+        let db_metadata: Self = database.clone().try_into()?;
+        Ok(db_metadata)
     }
 
     /// get CTE catalog directory path

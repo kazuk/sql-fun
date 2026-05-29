@@ -43,7 +43,7 @@ For other ecosystems, `sql-fun` can be used as a **stand-alone SQL semantic vali
 ## Directory structure
 
 - `src` :
-  Procedual macro implementations
+  Procedural macro implementations
 
 - `sql-fun-sqlast/` :
   `sql-fun` semantic SQL parser 

@@ -16,12 +16,12 @@ use crate::{JsonRpcError, JsonRpcRequest, JsonRpcResponse, JsonRpcResponseBody};
 
 pub enum InflightRequests {
     New(u64, tokio::sync::oneshot::Sender<JsonRpcResponse>),
-    ResponseRecieved(JsonRpcResponse),
-    Error(Box<TcpJsonRpcClinetAsyncError>),
+    ResponseReceived(JsonRpcResponse),
+    Error(Box<TcpJsonRpcClientAsyncError>),
 }
 
 #[derive(Debug, thiserror::Error)]
-pub enum TcpJsonRpcClinetAsyncError {
+pub enum TcpJsonRpcClientAsyncError {
     #[error(transparent)]
     ChannelError(#[from] tokio::sync::mpsc::error::SendError<InflightRequests>),
 
@@ -42,13 +42,13 @@ pub enum TcpJsonRpcClinetAsyncError {
 }
 
 #[derive(Debug)]
-pub struct TcpJsonRpcClinetAsync {
+pub struct TcpJsonRpcClientAsync {
     requests: Sender<InflightRequests>,
     send_requests: Sender<JsonRpcRequest>,
     id: u64,
 }
 
-impl TcpJsonRpcClinetAsync {
+impl TcpJsonRpcClientAsync {
     /// convert stream to client
     ///
     /// # Errors
@@ -56,7 +56,7 @@ impl TcpJsonRpcClinetAsync {
     /// - `std::io::Error`
     ///
     pub fn try_from(stream: TcpStream) -> Result<Self, std::io::Error> {
-        let (sender, reciever) = tokio::sync::mpsc::channel(5);
+        let (sender, receiver) = tokio::sync::mpsc::channel(5);
         let (request_sender, tx_request) = tokio::sync::mpsc::channel(5);
 
         let response_sender = sender.clone();
@@ -67,8 +67,8 @@ impl TcpJsonRpcClinetAsync {
         });
 
         tokio::task::spawn(async move {
-            // manage inflight request responces
-            Self::response_worker(reciever).await
+            // manage inflight request responses
+            Self::response_worker(receiver).await
         });
 
         Ok(Self {
@@ -88,12 +88,12 @@ impl TcpJsonRpcClinetAsync {
     ///
     /// # Errors
     ///
-    /// - `TcpJsonRpcClinetAsyncError`
+    /// - `TcpJsonRpcClientAsyncError`
     pub async fn invoke_method(
         &mut self,
         method: &str,
         params: Vec<serde_json::Value>,
-    ) -> Result<serde_json::Value, TcpJsonRpcClinetAsyncError> {
+    ) -> Result<serde_json::Value, TcpJsonRpcClientAsyncError> {
         let (sender, receiver) = oneshot::channel();
 
         let id = self.get_id();
@@ -108,20 +108,20 @@ impl TcpJsonRpcClinetAsync {
 
         match response.body {
             JsonRpcResponseBody::Response(value) => Ok(value),
-            JsonRpcResponseBody::Error(err) => Err(TcpJsonRpcClinetAsyncError::from(err)),
+            JsonRpcResponseBody::Error(err) => Err(TcpJsonRpcClientAsyncError::from(err)),
         }
     }
 
-    async fn recieve_one_response(
+    async fn receive_one_response(
         response_sender: &Sender<InflightRequests>,
         buff_reader: &mut BufReader<ReadHalf<'_>>,
-    ) -> Result<(), TcpJsonRpcClinetAsyncError> {
+    ) -> Result<(), TcpJsonRpcClientAsyncError> {
         let mut buf = String::new();
         buff_reader.read_line(&mut buf).await?;
 
         let response: JsonRpcResponse = serde_json::from_str(&buf)?;
         response_sender
-            .send(InflightRequests::ResponseRecieved(response))
+            .send(InflightRequests::ResponseReceived(response))
             .await?;
         Ok(())
     }
@@ -129,7 +129,7 @@ impl TcpJsonRpcClinetAsync {
     async fn send_one_request(
         writer: &mut WriteHalf<'_>,
         request: JsonRpcRequest,
-    ) -> Result<(), TcpJsonRpcClinetAsyncError> {
+    ) -> Result<(), TcpJsonRpcClientAsyncError> {
         let mut json = serde_json::to_string(&request)?;
         json.push('\n');
         writer.write_all(json.as_bytes()).await?;
@@ -154,7 +154,7 @@ impl TcpJsonRpcClinetAsync {
                             .await;
                     }
                 },
-                result = Self::recieve_one_response(&response_sender, &mut buff_reader) => {
+                result = Self::receive_one_response(&response_sender, &mut buff_reader) => {
                     if let Err(e) = result {
                         let _ = response_sender
                             .send(InflightRequests::Error(Box::new(e)))
@@ -173,7 +173,7 @@ impl TcpJsonRpcClinetAsync {
                 InflightRequests::New(id, receiver) => {
                     pending.insert(id, receiver);
                 }
-                InflightRequests::ResponseRecieved(json_rpc_response) => {
+                InflightRequests::ResponseReceived(json_rpc_response) => {
                     let id = json_rpc_response.id;
 
                     let Some(pending_receiver) = pending.remove(&id) else {

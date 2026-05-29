@@ -1,4 +1,4 @@
-mod bin_cast_candiate;
+mod bin_cast_candidate;
 mod impl_build_binary_op;
 mod impl_build_op_any;
 
@@ -9,7 +9,7 @@ use crate::sem::{
 
 use super::{ArithExpr, UndefinedOperatorAllCallSite};
 
-use self::bin_cast_candiate::BinaryCastCandiate;
+use self::bin_cast_candidate::BinaryCastCandidate;
 
 impl ArithExpr {
     /// create a instance
@@ -179,13 +179,13 @@ impl ArithExpr {
         if let Some(left_type) = lexpr.get_type()
             && let Some(right_type) = rexpr.get_type()
         {
-            let candiates = BinaryCastCandiate::enumerate_from_context(
+            let candidates = BinaryCastCandidate::enumerate_from_context(
                 context,
                 overloads,
                 &left_type,
                 &right_type,
             );
-            if candiates.is_empty() {
+            if candidates.is_empty() {
                 context.report_problem(
                     AnalysisProblem::binary_operator_overload_resolution_failed(
                         &operator_def,
@@ -195,7 +195,7 @@ impl ArithExpr {
                 )?;
                 return Ok(ResolvedBinaryOperator::new(None, lexpr, rexpr));
             }
-            let filtered = BinaryCastCandiate::filter_best_candiate(candiates);
+            let filtered = BinaryCastCandidate::filter_best_candidate(candidates);
             if filtered.len() > 1 {
                 context.report_problem(AnalysisProblem::binary_operator_overload_ambiguous(
                     &operator_def,
@@ -203,10 +203,10 @@ impl ArithExpr {
                     &right_type,
                 ))?;
             }
-            let candiate = &filtered[0];
-            let (lexpr, rexpr) = candiate.wrap_implicit_cast(lexpr, rexpr);
+            let candidate = &filtered[0];
+            let (lexpr, rexpr) = candidate.wrap_implicit_cast(lexpr, rexpr);
             Ok(ResolvedBinaryOperator::new(
-                Some(candiate.operator().clone()),
+                Some(candidate.operator().clone()),
                 lexpr,
                 rexpr,
             ))

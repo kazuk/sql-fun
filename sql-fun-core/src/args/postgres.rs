@@ -26,7 +26,7 @@ pub struct PostgresArgs {
     postgres_extensions: Option<PostgresExtensionsCollection>,
 
     /// Built-in schema directory (overrides version)
-    #[clap(long, env = Self::SQL_FUN_BUITIN_SCHEMA)]
+    #[clap(long, env = Self::SQL_FUN_BUILTIN_SCHEMA)]
     #[builder(setter(into, strip_option), default)]
     builtin_schema_dir: Option<PathBuf>,
 
@@ -108,7 +108,7 @@ impl PostgresArgs {
     const SQL_FUN_PG_SEARCH_PATH: &str = "SQL_FUN_PG_SEARCH_PATH";
     const SQL_FUN_POSTGRES_VERSION: &str = "SQL_FUN_POSTGRES_VERSION";
     const SQL_FUN_EXTENSIONS: &str = "SQL_FUN_EXTENSIONS";
-    const SQL_FUN_BUITIN_SCHEMA: &str = "SQL_FUN_BUITIN_SCHEMA";
+    const SQL_FUN_BUILTIN_SCHEMA: &str = "SQL_FUN_BUILTIN_SCHEMA";
     const SQL_FUN_EXTENSIONS_DIR: &str = "SQL_FUN_EXTENSIONS_DIR";
 
     pub(crate) fn apply_envs(
@@ -129,7 +129,7 @@ impl PostgresArgs {
         {
             return SqlFunArgsError::parsing_postgres_extensions(&err.to_string(), &value);
         }
-        if let Some(value) = envs.get(Self::SQL_FUN_BUITIN_SCHEMA) {
+        if let Some(value) = envs.get(Self::SQL_FUN_BUILTIN_SCHEMA) {
             builder.builtin_schema_dir(PathBuf::from(value));
         }
         if let Some(value) = envs.get(Self::SQL_FUN_EXTENSIONS_DIR) {
@@ -215,7 +215,7 @@ impl PostgresArgs {
         );
         envs.insert(Self::SQL_FUN_EXTENSIONS.to_string(), extensions.to_string());
         envs.insert(
-            Self::SQL_FUN_BUITIN_SCHEMA.to_string(),
+            Self::SQL_FUN_BUILTIN_SCHEMA.to_string(),
             args.builtin_info_dir(metadata)?
                 .to_string_lossy()
                 .to_string(),

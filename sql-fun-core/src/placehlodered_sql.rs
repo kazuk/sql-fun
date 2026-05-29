@@ -64,7 +64,7 @@ pub struct NamedParameterPlaceholder {
 }
 
 impl NamedParameterPlaceholder {
-    /// get parser acceptes `${ name:type_hint }` or `${name}`
+    /// get parser accepts `${ name:type_hint }` or `${name}`
     pub fn parser<'a>() -> impl combine::Parser<&'a str, Output = Self> {
         let name_with_type_opt = (ident(), optional(ident())).map(|(name, type_hint)| Self {
             name: ParameterName(name),

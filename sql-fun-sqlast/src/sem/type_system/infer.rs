@@ -17,13 +17,13 @@ pub struct SimpleInferContext {
 }
 
 impl SimpleInferContext {
-    /// insert candiate for anyelement
+    /// insert candidate for anyelement
     fn push_element(&mut self, ty: &TypeReference) {
         self.element_types.insert(ty.clone());
         self.set_require_infer();
     }
 
-    /// insert candiate for anyarray
+    /// insert candidate for anyarray
     fn push_array(&mut self, array_ty: &TypeReference) -> Result<(), TypeError> {
         if array_ty.is_array().unwrap_or(false) {
             self.element_types.insert(array_ty.element_type());
@@ -88,7 +88,7 @@ impl SimpleInferContext {
             return Err(TypeError::SimpleInferNoArgs());
         }
         if self.element_types.len() != 1 {
-            return Err(TypeError::SimpleInferAmbigous(
+            return Err(TypeError::SimpleInferAmbiguous(
                 self.element_types.iter().cloned().collect(),
             ));
         }
@@ -132,7 +132,7 @@ mod test_simple_infer_context {
     use super::SimpleInferContext;
 
     #[test]
-    fn test_simple_infer_minimun() -> TestResult {
+    fn test_simple_infer_minimum() -> TestResult {
         let mut context = SimpleInferContext::default();
         let param_type = TypeReference::from_full_name(FullName::with_schema("pg_catalog", "int4"));
         let arg_type = TypeReference::from_full_name(FullName::with_schema("pg_catalog", "int4"));
@@ -176,7 +176,7 @@ mod test_simple_infer_context {
         assert_eq!(context.element_types.iter().count(), 2);
         assert!(matches!(
             context.get_inference_result(),
-            Err(TypeError::SimpleInferAmbigous(_))
+            Err(TypeError::SimpleInferAmbiguous(_))
         ));
 
         Ok(())
@@ -278,32 +278,32 @@ impl CommonInferContext {
             castables.push(context.get_implicit_castable(source_type));
         }
 
-        let candiates = Self::common_types(&castables.into());
+        let candidates = Self::common_types(&castables.into());
 
-        if candiates.is_empty() {
-            TypeError::common_infer_no_implict_castable()?;
+        if candidates.is_empty() {
+            TypeError::common_infer_no_implicit_castable()?;
         }
-        if candiates.len() == 1 {
-            return Ok(candiates.iter().next().unwrap().clone());
+        if candidates.len() == 1 {
+            return Ok(candidates.iter().next().unwrap().clone());
         }
 
         let mut scoreboard = Vec::new();
-        for candiate in candiates {
+        for candidate in candidates {
             let mut score = 0i32;
             for source_type in &self.element_types {
-                let Some(cast) = context.get_implicit_cast(source_type, &candiate) else {
+                let Some(cast) = context.get_implicit_cast(source_type, &candidate) else {
                     TypeError::unexpected_cast_not_found()?;
                     TypeError::never();
                 };
 
                 score += cast.context().overload_priority_score();
             }
-            scoreboard.push((score, candiate));
+            scoreboard.push((score, candidate));
         }
         let max_score = scoreboard.iter().map(|c| c.0).max().unwrap();
         let results: Vec<_> = scoreboard.iter().filter(|v| v.0 == max_score).collect();
         if results.len() != 1 {
-            TypeError::common_infer_ambigous()?;
+            TypeError::common_infer_ambiguous()?;
         }
         Ok(results[0].1.clone())
     }

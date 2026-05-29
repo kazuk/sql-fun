@@ -32,7 +32,7 @@ impl AlterSequence {
         TParseContext: ParseContext,
     {
         let Some(seq) = syn.get_sequence().as_inner() else {
-            AnalysisError::raise_unexpected_none("AlterSeqStmt.seuqence")?
+            AnalysisError::raise_unexpected_none("AlterSeqStmt.sequence")?
         };
         let seq = FullName::try_from(seq)?;
 

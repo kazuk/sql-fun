@@ -88,8 +88,8 @@ impl FunctionOverloadCollection {
             param.collect_simple(&mut simple_infer_context)?;
         }
         if simple_infer_context.is_require_infer() {
-            let infered_type = simple_infer_context.get_inference_result()?;
-            overload.apply_simple_infer_result(&infered_type);
+            let inferred_type = simple_infer_context.get_inference_result()?;
+            overload.apply_simple_infer_result(&inferred_type);
         }
         Ok(())
     }
@@ -107,8 +107,8 @@ impl FunctionOverloadCollection {
             param.collect_common(&mut common_infer_context)?;
         }
         if common_infer_context.is_require_infer() {
-            let infered_type = common_infer_context.get_inference_result(context)?;
-            overload.apply_common_infer_result(&infered_type);
+            let inferred_type = common_infer_context.get_inference_result(context)?;
+            overload.apply_common_infer_result(&inferred_type);
         }
         Ok(())
     }
@@ -136,7 +136,7 @@ impl FunctionOverloadCollection {
     where
         TParseContext: ParseContext,
     {
-        let mut candiates = Vec::new();
+        let mut candidates = Vec::new();
 
         'overload: for overload in &self.overloads {
             let mut overload = overload.clone();
@@ -152,7 +152,7 @@ impl FunctionOverloadCollection {
                 continue 'overload;
             };
 
-            // re binding with infered type
+            // re binding with inferred type
             let Ok(bind_result) = overload.bind_args(arg_types.clone()) else {
                 continue 'overload;
             };
@@ -161,14 +161,14 @@ impl FunctionOverloadCollection {
                 continue 'overload;
             };
 
-            candiates.push((overload, score));
+            candidates.push((overload, score));
         }
 
-        if candiates.len() == 1 {
-            // candiates[0]
-            candiates.into_iter().next().map(|(overload, _)| overload)
+        if candidates.len() == 1 {
+            // candidates[0]
+            candidates.into_iter().next().map(|(overload, _)| overload)
         } else {
-            // multiple overload found, then ambigous
+            // multiple overload found, then ambiguous
             None
         }
     }

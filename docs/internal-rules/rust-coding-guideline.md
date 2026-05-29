@@ -1,4 +1,4 @@
-# Rust coding guidlines for `sql-fun`
+# Rust coding guidelines for `sql-fun`
 
 ## Principle: Minimal Work, Maximal Maintainability
 
@@ -34,7 +34,7 @@ Prefer the solution that yields **the fewest moving parts** and **least opportun
 > Aim for the **lowest hand-count** implementation that keeps the codebase hard to dirty and easy to change.
 
 
-## module sturcture
+## module structure
 
 Basic structure defined in bellow.
 
@@ -281,7 +281,7 @@ mod test_metadata_args {
 
 ## Tuple
 
-- MUST use tuple struct in public API, anonymouse tuple can be use in short and limited scope.
+- MUST use tuple struct in public API, anonymous tuple can be use in short and limited scope.
   Do NOT!
   ```rust
   pub fn some_what_pair() -> (String, u32)

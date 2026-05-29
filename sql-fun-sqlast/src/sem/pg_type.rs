@@ -3,7 +3,7 @@ mod dynamic_type;
 mod type_ref;
 
 use crate::sem::{
-    ColumnCollection, ColumnName, CreateCompositType, CreateDomain, CreateEnum, FullName,
+    ColumnCollection, ColumnName, CreateCompositeType, CreateDomain, CreateEnum, FullName,
     LocalName, ParseContext, SchemaName, TableName,
 };
 
@@ -15,7 +15,7 @@ pub enum TypeDefinition {
     /// an enum type
     Enum(CreateEnum),
     /// a composite type
-    CompositType(CreateCompositType),
+    CompositeType(CreateCompositeType),
     /// a domain type
     Domain(CreateDomain),
     /// a builtin type
@@ -32,7 +32,7 @@ impl TypeDefinition {
     pub fn is_array(&self) -> Option<bool> {
         match self {
             Self::Enum(_) => Some(false),
-            Self::CompositType(_) => Some(false),
+            Self::CompositeType(_) => Some(false),
             Self::Domain(create_domain) => create_domain.type_ref().is_array(),
             Self::Builtin(type_reference) => type_reference.is_array(),
             Self::TableRef(_, type_reference) => type_reference.is_array(),
@@ -60,7 +60,7 @@ impl TypeDefinition {
         match self {
             Self::Builtin(tr) => Some(tr),
             Self::Domain(ct) => Some(ct.type_ref()),
-            Self::CompositType(ct) => ct.type_ref().as_ref(),
+            Self::CompositeType(ct) => ct.type_ref().as_ref(),
             Self::TableRef(_, tr) => Some(tr),
             _ => todo!("self:?"),
         }
@@ -71,7 +71,7 @@ impl TypeDefinition {
     pub fn full_name(&self) -> Option<&FullName> {
         match self {
             Self::Enum(create_enum) => Some(create_enum.name()),
-            Self::CompositType(create_composit_type) => create_composit_type.name(),
+            Self::CompositeType(create_composite_type) => create_composite_type.name(),
             Self::Domain(create_domain) => Some(create_domain.name()),
             Self::Builtin(tr) => Some(tr.full_name()),
             Self::TableRef(t, _) => Some(t.full_name()),
@@ -97,15 +97,15 @@ impl TypeDefinition {
 
     /// test a type is composite type
     #[must_use]
-    pub fn is_composit_type(&self) -> bool {
-        matches!(&self, Self::CompositType(_))
+    pub fn is_composite_type(&self) -> bool {
+        matches!(&self, Self::CompositeType(_))
     }
 
     /// enumelate members
     #[must_use]
-    pub fn get_composit_type_columns(&self) -> ColumnCollection {
+    pub fn get_composite_type_columns(&self) -> ColumnCollection {
         match &self {
-            Self::CompositType(ct) => ct.get_column_collection(),
+            Self::CompositeType(ct) => ct.get_column_collection(),
             _ => unreachable!(),
         }
     }
@@ -121,8 +121,8 @@ impl TypeDefinition {
     {
         match self {
             Self::Enum(_create_enum) => todo!(),
-            Self::CompositType(create_composit_type) => {
-                create_composit_type.get_member(member)?.get_type()
+            Self::CompositeType(create_composite_type) => {
+                create_composite_type.get_member(member)?.get_type()
             }
             Self::Domain(_create_domain) => todo!(),
             Self::Builtin(_type_reference) => None,
@@ -144,9 +144,9 @@ impl From<&CreateEnum> for TypeDefinition {
     }
 }
 
-impl From<&CreateCompositType> for TypeDefinition {
-    fn from(value: &CreateCompositType) -> Self {
-        Self::CompositType(value.clone())
+impl From<&CreateCompositeType> for TypeDefinition {
+    fn from(value: &CreateCompositeType) -> Self {
+        Self::CompositeType(value.clone())
     }
 }
 

@@ -10,7 +10,7 @@ pub enum OverloadResolution {
     /// Binary operator overload resolve failed
     BinaryOperatorOverloadResolutionFailed(OperatorDefinition, TypeReference, TypeReference),
 
-    /// Unary operator overload resove failed
+    /// Unary operator overload resolve failed
     UnaryOperatorOverloadResolutionFailed(OperatorDefinition, TypeReference),
 
     /// Ambiguous operator overload
@@ -21,7 +21,7 @@ pub enum OverloadResolution {
 }
 
 impl OverloadResolution {
-    /// function argument type missmatch to overloads
+    /// function argument type mismatch to overloads
     pub fn function_overload_resolution_failed(
         func_name: &FullName,
         arg_types: &ArgumentBindingCollection,
@@ -73,7 +73,7 @@ impl OverloadResolution {
 }
 
 impl super::AnalysisProblem {
-    /// function argument type missmatch to overloads
+    /// function argument type mismatch to overloads
     #[tracing::instrument()]
     pub fn function_overload_resolution_failed(
         func_name: &FullName,

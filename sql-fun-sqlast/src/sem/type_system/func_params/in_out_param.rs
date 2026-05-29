@@ -43,7 +43,7 @@ impl FunctionParamInOut {
         todo!()
     }
 
-    pub fn append_returnig_colum(&self, column_collection: &mut crate::sem::ColumnCollection) {
+    pub fn append_returning_column(&self, column_collection: &mut crate::sem::ColumnCollection) {
         let col_name = self.name.as_ref().map(|v| ColumnName::from(v.as_str()));
         let col_def = ColumnDefinition::new(&col_name, self.param_type.as_ref(), None, &[]);
         column_collection.push(&col_def);

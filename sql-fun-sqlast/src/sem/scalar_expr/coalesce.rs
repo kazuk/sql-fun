@@ -87,46 +87,46 @@ where
             ));
         }
 
-        let mut candiates: Option<HashSet<TypeReference>> = None;
+        let mut candidates: Option<HashSet<TypeReference>> = None;
         for expr_type in &expr_types {
-            if let Some(can) = candiates {
-                candiates = Some(
+            if let Some(can) = candidates {
+                candidates = Some(
                     can.intersection(&context.get_implicit_castable(expr_type))
                         .cloned()
                         .collect(),
                 );
             } else {
-                candiates = Some(context.get_implicit_castable(expr_type));
+                candidates = Some(context.get_implicit_castable(expr_type));
             }
         }
-        let mut final_candiates = HashSet::new();
-        let coalesce_type = if let Some(ref candiates) = candiates
-            && !candiates.is_empty()
+        let mut final_candidates = HashSet::new();
+        let coalesce_type = if let Some(ref candidates) = candidates
+            && !candidates.is_empty()
         {
-            for candiate1 in candiates {
-                for candiate2 in candiates {
-                    if candiate1 == candiate2 {
+            for candidate1 in candidates {
+                for candidate2 in candidates {
+                    if candidate1 == candidate2 {
                         continue;
                     }
 
-                    if let Some(cast) = context.get_implicit_cast(candiate1, candiate2) {
-                        if cast.is_no_coversion() || cast.is_implicit_preferred() {
-                            final_candiates.insert(candiate2.clone());
+                    if let Some(cast) = context.get_implicit_cast(candidate1, candidate2) {
+                        if cast.is_no_conversion() || cast.is_implicit_preferred() {
+                            final_candidates.insert(candidate2.clone());
                         }
-                    } else if let Some(cast) = context.get_implicit_cast(candiate2, candiate1) {
-                        if cast.is_no_coversion() || cast.is_implicit_preferred() {
-                            final_candiates.insert(candiate1.clone());
+                    } else if let Some(cast) = context.get_implicit_cast(candidate2, candidate1) {
+                        if cast.is_no_conversion() || cast.is_implicit_preferred() {
+                            final_candidates.insert(candidate1.clone());
                         }
                     } else {
-                        AnalysisError::raise_unexpected_none("cast candiate lookup")?;
+                        AnalysisError::raise_unexpected_none("cast candidate lookup")?;
                     }
                 }
             }
-            let choose = final_candiates.iter().next();
-            if final_candiates.len() > 1 {
+            let choose = final_candidates.iter().next();
+            if final_candidates.len() > 1 {
                 context.report_problem(AnalysisProblem::coalesce_expr_type_ambiguous(
                     &arg_exprs,
-                    &final_candiates,
+                    &final_candidates,
                     choose,
                 ))?;
             }

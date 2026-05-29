@@ -1,7 +1,7 @@
 use crate::CheckArgs;
 use sql_fun_core::InitializeArgs;
 
-/// deamon control args
+/// daemon control args
 #[derive(clap::Parser, Debug, Clone, serde::Serialize, serde::Deserialize)]
 pub struct DaemonControlArgs {
     /// daemon extension name
@@ -47,9 +47,9 @@ Repeated runs are idempotent: existing files are preserved unless you confirm ov
     /// Check application SQL statements
     #[command(
         name = "check",
-        about = "Check application embeded SQL statements",
-        long_about = r#"Check application embeded SQL statements
-This command validates application embeded SQL statement syntax and semantics.
+        about = "Check application embedded SQL statements",
+        long_about = r#"Check application embedded SQL statements
+This command validates application embedded SQL statement syntax and semantics.
 Inference query parameter types, result set column types"#,
         next_line_help = true
     )]
@@ -68,7 +68,7 @@ impl CliSubCommand {
     /// binary name expects
     #[must_use]
     pub fn binary_names(&self) -> Vec<String> {
-        let (only_deamon, name) = match self {
+        let (only_daemon, name) = match self {
             Self::Start(daemon_control_args)
             | Self::Stop(daemon_control_args)
             | Self::Status(daemon_control_args)
@@ -83,7 +83,7 @@ impl CliSubCommand {
             Self::Check(_) => (false, "check".to_string()),
             Self::Versions => (false, "versions".to_string()),
         };
-        if only_deamon {
+        if only_daemon {
             vec![Self::daemon_binary_name(&name)]
         } else {
             vec![

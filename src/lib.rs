@@ -1,5 +1,5 @@
 #![deny(missing_docs)]
-//! procedual macro `sql-fun`
+//! procedural macro `sql-fun`
 //!
 mod connector;
 mod errors;

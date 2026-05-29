@@ -111,3 +111,6 @@ cargo +nightly update -Z unstable-options --dry-run --breaking
 
 echo "== Document build"
 cargo doc --workspace --no-deps
+
+echo "== Check typos"
+typos --config .local/config/typos.toml

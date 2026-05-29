@@ -49,7 +49,7 @@ impl AliasSpec {
         }
     }
 
-    /// analize Alias syn node
+    /// analyze Alias syn node
     pub fn analyze<TParseContext>(
         context: TParseContext,
         rel_fullname: &FullName,
@@ -81,7 +81,7 @@ impl AliasSpec {
         ))
     }
 
-    /// analize Alias syn node without default alias name
+    /// analyze Alias syn node without default alias name
     pub fn analyze_without_relname<TParseContext>(
         context: TParseContext,
         alias: &crate::syn::Alias,

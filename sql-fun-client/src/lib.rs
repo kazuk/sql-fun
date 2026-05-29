@@ -78,13 +78,13 @@ pub enum JsonRpcVersion {
 }
 
 #[derive(Debug)]
-pub struct TcpJsonRpcClinet {
+pub struct TcpJsonRpcClient {
     stream: std::net::TcpStream,
     buff_read: std::io::BufReader<TcpStream>,
     id: u64,
 }
 
-impl TcpJsonRpcClinet {
+impl TcpJsonRpcClient {
     /// # Errors
     ///
     /// - `std::io::Error`
@@ -130,7 +130,7 @@ impl TcpJsonRpcClinet {
     }
 }
 
-pub use async_tokio::{TcpJsonRpcClinetAsync, TcpJsonRpcClinetAsyncError};
+pub use async_tokio::{TcpJsonRpcClientAsync, TcpJsonRpcClientAsyncError};
 
 mod async_tokio;
 

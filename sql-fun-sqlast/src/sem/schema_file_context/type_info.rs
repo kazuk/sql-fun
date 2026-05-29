@@ -1,7 +1,7 @@
 use crate::{
     TrieMap,
     sem::{
-        BaseParseContext, CreateCompositType, CreateDomain, CreateEnum, FullName, TableName,
+        BaseParseContext, CreateCompositeType, CreateDomain, CreateEnum, FullName, TableName,
         TypeDefinition, TypeInfoRead, TypeInfoWrite, TypeReference,
     },
 };
@@ -36,10 +36,10 @@ where
     fn insert_create_composite_type(
         &mut self,
         name: &FullName,
-        create_comp_type: &CreateCompositType,
+        create_comp_type: &CreateCompositeType,
     ) {
         self.types
-            .insert_create_composit_type(name, create_comp_type);
+            .insert_create_composite_type(name, create_comp_type);
     }
 
     fn insert_create_domain(&mut self, name: &FullName, create_domain: &CreateDomain) {
@@ -80,10 +80,10 @@ impl TypeDefinitionCollection {
             .insert(&name.to_string(), TypeDefinition::from(create_enum));
     }
 
-    pub(super) fn insert_create_composit_type(
+    pub(super) fn insert_create_composite_type(
         &mut self,
         name: &FullName,
-        create_comp_type: &CreateCompositType,
+        create_comp_type: &CreateCompositeType,
     ) {
         self.0
             .insert(&name.to_string(), TypeDefinition::from(create_comp_type));

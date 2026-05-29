@@ -5,6 +5,7 @@ mod alter_seq;
 mod alter_table;
 mod base_context;
 mod cast;
+mod column_constraints;
 mod comment;
 mod constraint;
 mod create_comp_type;
@@ -48,6 +49,7 @@ pub use self::{
     alter_table::{AlterTable, AlterView},
     base_context::BaseContext,
     cast::{CastContext, CastDefinition},
+    column_constraints::ColumnConstraint,
     comment::{Comment, analyze_comment},
     constraint::{AnalizeConstraint, Constraint, PrimaryKeyConstraint},
     create_comp_type::{CreateCompositType, analyze_create_comp_type},
@@ -100,6 +102,7 @@ pub use self::{
     variable_set::{VariableSet, analyze_variable_set},
     view_like::ViewLike,
 };
+
 pub use crate::AstAndContextPair;
 
 use crate::StringSpan;

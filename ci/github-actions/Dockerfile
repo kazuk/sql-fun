@@ -29,6 +29,9 @@ RUN curl -fsSL https://sh.rustup.rs \
 RUN cargo install --locked --force --root /opt/tools \
     cargo-llvm-cov mdbook cargo-deny tera-cli taplo-cli cargo-nextest sccache cargo-sort
 
+RUN cargo install --locked --force --root /opt/tools \
+    cargo-binstall typos-cli
+
 # https://github.com/oraios/serena/archive/refs/tags/v0.1.4.tar.gz
 RUN curl -fsSL -o /opt/serena.tar.gz \
     "${SERENA_DOWNLOAD_BASE}${SERENA_TAG}.tar.gz"

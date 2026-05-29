@@ -217,6 +217,24 @@ pub enum Stmt {
     Pragma(PragmaStatement),
 }
 
+impl Stmt {
+    /// get CreateTable variant
+    pub fn as_create_table(&self) -> Option<&CreateTableStatement> {
+        match self {
+            Self::CreateTable(create_table) => Some(create_table),
+            _ => None,
+        }
+    }
+
+    /// convert into CreateTableStatemnt
+    pub fn into_create_table(self) -> Option<CreateTableStatement> {
+        match self {
+            Self::CreateTable(create_table) => Some(create_table),
+            _ => None,
+        }
+    }
+}
+
 impl From<StmtIn> for Stmt {
     fn from(value: StmtIn) -> Self {
         match value {

@@ -32,6 +32,21 @@ pub enum SqlValueExpr {
     CurrentCatalog,
 }
 
+/// Unexpected variant
+#[derive(thiserror::Error, Debug)]
+#[error("unexpected variant")]
+pub struct UnexpecedVariant;
+
+impl SqlValueExpr {
+    /// get CurrentTimestamp variant
+    pub fn as_current_timestamp(&self) -> Result<&Option<TimePrecision>, UnexpecedVariant> {
+        match self {
+            Self::CurrentTimestamp(c) => Ok(c),
+            _ => Err(UnexpecedVariant),
+        }
+    }
+}
+
 /// time precision typmod value
 #[derive(Debug, Clone, Eq, Hash, PartialEq, serde::Serialize, serde::Deserialize)]
 pub struct TimePrecision(i32);

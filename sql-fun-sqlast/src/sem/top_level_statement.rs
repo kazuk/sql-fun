@@ -6,7 +6,7 @@ use crate::{
         AlterOwner, AlterSequence, AlterTable, AnalysisError, Comment, CreateCompositType,
         CreateDomain, CreateEnum, CreateExtension, CreateFunction, CreateIndex, CreateSchema,
         CreateSequence, CreateTable, CreateTableAs, CreateView, ParseContext, SelectStatement,
-        SemAst, VariableSet,
+        SemAst, VariableSet, create_table::DropTable,
     },
     syn::{ListOpt, Opt, ParseResult},
 };
@@ -40,6 +40,31 @@ where
 }
 
 impl SemAst {
+    /// analyze drop object statement
+    pub fn analyze_drop_statement<TParseContext>(
+        context: TParseContext,
+        statement: crate::syn::DropStmt,
+        tokens: &IVec<crate::syn::ScanToken>,
+    ) -> Result<AstAndContextPair<TParseContext>, AnalysisError>
+    where
+        TParseContext: ParseContext,
+    {
+        let Some(drop_type) = statement.get_remove_type().as_inner() else {
+            AnalysisError::raise_unexpected_none("DropStmt.remove_type")?;
+            AnalysisError::never()
+        };
+
+        match drop_type {
+            crate::syn::ObjectType::ObjectTable => {
+                DropTable::analyze_drop_stmt(context, statement, tokens)
+            }
+            _ => {
+                AnalysisError::raise_unexpected_input(&format!("{drop_type:?}"))?;
+                AnalysisError::never()
+            }
+        }
+    }
+
     /// analyze node
     #[tracing::instrument(skip(context))]
     pub fn analyze_node<TParseContext: ParseContext>(
@@ -48,8 +73,23 @@ impl SemAst {
         statement: crate::syn::Node,
         tokens: &IVec<crate::syn::ScanToken>,
     ) -> Result<AstAndContextPair<TParseContext>, AnalysisError> {
+        let Some(source_span) = context.get_source_path_with_span().cloned() else {
+            AnalysisError::raise_unexpected_none("context get_source_path_with_span")?;
+            AnalysisError::never();
+        };
+
         if let Some(create) = statement.as_create_stmt().as_inner() {
-            return CreateTable::analyze_create_stmt(context, parent_schema, create, tokens);
+            return CreateTable::analyze_create_stmt(
+                context,
+                parent_schema,
+                create,
+                tokens,
+                &source_span,
+            );
+        }
+
+        if let Some(drop) = statement.as_drop_stmt().as_inner() {
+            return Self::analyze_drop_statement(context, drop, tokens);
         }
 
         if let Some(create) = statement.as_create_enum_stmt().as_inner() {
@@ -107,6 +147,7 @@ impl SemAst {
                 parent_schema,
                 alter_table,
                 tokens,
+                &source_span,
             );
         }
 
@@ -128,6 +169,7 @@ impl SemAst {
                 parent_schema,
                 create_table_as,
                 tokens,
+                &source_span,
             );
         }
 
@@ -154,7 +196,8 @@ pub fn analyze_node<TParseContext: ParseContext>(
 mod tests {
     use crate::{
         AstAndContextPair, PostgresDialect,
-        sem::{BaseContext, SchemaFileContext},
+        sem::{BaseContext, MutSourcePathWithSpan, SchemaFileContext, SourcePathWithSpan},
+        test_helpers::source_span,
         tests::context_args,
     };
 
@@ -178,6 +221,7 @@ LANGUAGE C STRICT IMMUTABLE PARALLEL SAFE;"#
     fn test_schema_file_context_accept_ddl(
         #[case] sql: &str,
         context_args: SqlFunArgs,
+        source_span: SourcePathWithSpan,
     ) -> TestResult {
         use crate::sem::SemAst;
 
@@ -188,7 +232,8 @@ LANGUAGE C STRICT IMMUTABLE PARALLEL SAFE;"#
 
         let base_context = BaseContext::new(context_args)?;
         let path = Path::new("test.sql");
-        let file_context = SchemaFileContext::new(&path, base_context);
+        let mut file_context = SchemaFileContext::new(&path, base_context);
+        file_context.set_source_path_with_span(&source_span);
         let AstAndContextPair(_ast, _context) =
             SemAst::semantic_analysis(file_context, parsed, &tokens)?;
 

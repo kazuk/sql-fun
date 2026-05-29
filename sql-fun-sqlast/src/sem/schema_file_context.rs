@@ -19,12 +19,15 @@ use crate::{
     StringSpan, TrieMap,
     sem::{
         AnalysisError, AnalysisProblem, BaseParseContext, CastDefinition, Comment, CreateExtension,
-        CreateIndex, CreateSchema, ImplicitChange, OperatorDefinition, OperatorInfoRead,
-        OperatorName, ParseContext, SchemaName, SemScalarExpr, SourceAccessService, VariableSet,
+        CreateIndex, CreateSchema, GetSourcePathWithSpanOpt, ImplicitChange, MutSourcePathWithSpan,
+        OperatorDefinition, OperatorInfoRead, OperatorName, ParseContext, SchemaName,
+        SemScalarExpr, SourceAccessService, VariableSet,
         parse_context::{IndexInfoRead, SearchPathRead},
     },
     syn::ObjectType,
 };
+
+use super::SourcePathWithSpan;
 
 /// schema file based context
 #[derive(Debug)]
@@ -51,6 +54,7 @@ where
     sql_source_path: PathBuf,
     source_access_service: Option<Box<dyn SourceAccessService>>,
     reports: Vec<String>,
+    source: Option<SourcePathWithSpan>,
 }
 
 impl<TBaseContext> SchemaFileContext<TBaseContext>
@@ -79,6 +83,7 @@ where
             indexes: TrieMap::default(),
             source_access_service: None,
             reports: Default::default(),
+            source: None,
         }
     }
 
@@ -90,6 +95,24 @@ where
         match implicit_change {
             ImplicitChange::CreateIndex(create_index) => self.apply_create_index(&create_index),
         }
+    }
+}
+
+impl<TBaseContext> GetSourcePathWithSpanOpt for SchemaFileContext<TBaseContext>
+where
+    TBaseContext: BaseParseContext + std::fmt::Debug,
+{
+    fn get_source_path_with_span(&self) -> Option<&SourcePathWithSpan> {
+        self.source.as_ref()
+    }
+}
+
+impl<TBaseContext> MutSourcePathWithSpan for SchemaFileContext<TBaseContext>
+where
+    TBaseContext: BaseParseContext + std::fmt::Debug,
+{
+    fn set_source_path_with_span(&mut self, value: &SourcePathWithSpan) {
+        self.source = Some(value.clone())
     }
 }
 

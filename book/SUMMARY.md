@@ -3,6 +3,7 @@
 - [Introduction](./introduction.md)
 - [Installation](./installation.md)
 - [SQL Functions](./sql_functions.md)
+- [Reuseable CTE](./reuseable_cte.md)
 - [Database Performance Management](./database-performance-management.md)
 - [Design philosophies](./design-philosophies.md)
 

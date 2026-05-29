@@ -59,16 +59,19 @@ mod test_data_source_analyze_range_var_node {
     use crate::{
         sem::{
             ColumnName, CreateTable, CreateView, FromClause, FullName, ScalarConstExpr, SchemaName,
-            SelectStatement, SemScalarExpr, TableName, ViewLike, WithClause,
+            SelectStatement, SemScalarExpr, SourcePathWithSpan, TableName, ViewLike, WithClause,
             select_statement::{ResultColumnCollection, SelectStatementNode},
         },
-        test_helpers::{SynBuilder, TestParseContext, test_context},
+        test_helpers::{SynBuilder, TestParseContext, source_span, test_context},
     };
 
     use super::DataSource;
 
     #[rstest::rstest]
-    fn test_analyze_range_var_node_table(mut test_context: TestParseContext) -> TestResult {
+    fn test_analyze_range_var_node_table(
+        mut test_context: TestParseContext,
+        source_span: SourcePathWithSpan,
+    ) -> TestResult {
         let with_clause = WithClause::default();
         let builder = SynBuilder::new();
         let name = FullName::from_local_name("table1");
@@ -79,12 +82,14 @@ mod test_data_source_analyze_range_var_node {
             SchemaName::from("public"),
             SchemaName::from("pg_catalog"),
         ]);
+
         let table_full_name = FullName::with_schema("public", "table1");
         let table_definition = CreateTable::new(
             &TableName::from(table_full_name.clone()),
             vec![],
             crate::sem::CreateTableMode::Default,
             false,
+            &source_span,
         );
         test_context.set_get_table_impl_result(&table_full_name, &Some(table_definition));
 

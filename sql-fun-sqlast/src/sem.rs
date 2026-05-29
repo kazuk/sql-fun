@@ -5,6 +5,7 @@ mod alter_seq;
 mod alter_table;
 mod base_context;
 mod cast;
+mod column_constraints;
 mod comment;
 mod constraint;
 mod create_comp_type;
@@ -45,9 +46,10 @@ pub mod problem;
 pub use self::{
     alter_owner::AlterOwner,
     alter_seq::AlterSequence,
-    alter_table::{AlterTable, AlterView, analyze_alter_statement},
+    alter_table::{AlterTable, AlterView},
     base_context::BaseContext,
     cast::{CastContext, CastDefinition},
+    column_constraints::ColumnConstraint,
     comment::{Comment, analyze_comment},
     constraint::{AnalizeConstraint, Constraint, PrimaryKeyConstraint},
     create_comp_type::{CreateCompositType, analyze_create_comp_type},
@@ -61,10 +63,10 @@ pub use self::{
     create_schema::{CreateSchema, analyze_create_schema},
     create_seq::{CreateSequence, analyze_create_seq},
     create_table::{
-        ColumnCollection, ColumnDefinition, ColumnName, CreateTable, CreateTableMode, TableName,
-        ViewName, analyze_create_stmt,
+        ColumnCollection, ColumnDefinition, ColumnName, CreateTable, CreateTableMode, DropTable,
+        TableName, ViewName,
     },
-    create_table_as::{CreateTableAs, analyze_create_table_as},
+    create_table_as::CreateTableAs,
     create_view::{CreateView, analyze_create_view},
     cte::{CteName, CteStatement, WithClause},
     data_source::{
@@ -100,9 +102,83 @@ pub use self::{
     variable_set::{VariableSet, analyze_variable_set},
     view_like::ViewLike,
 };
+
 pub use crate::AstAndContextPair;
 
-use std::fmt::Debug;
+use crate::StringSpan;
+
+use std::{
+    fmt::Debug,
+    path::{Path, PathBuf},
+};
+
+/// source path and span pair
+#[derive(Debug, Clone)]
+pub struct SourcePathWithSpan {
+    source_path: PathBuf,
+    span: StringSpan,
+}
+
+impl SourcePathWithSpan {
+    /// create instance
+    pub fn new<P>(path: P, span: &StringSpan) -> Self
+    where
+        P: AsRef<Path>,
+    {
+        Self {
+            source_path: path.as_ref().to_path_buf(),
+            span: *span,
+        }
+    }
+
+    /// get a source path
+    pub fn source_path(&self) -> &Path {
+        &self.source_path
+    }
+
+    /// get a source span
+    pub fn span(&self) -> &StringSpan {
+        &self.span
+    }
+}
+
+/// can get source path with span
+pub trait GetSourcePathWithSpan {
+    /// get source path with span
+    fn get_source_path_with_span(&self) -> &SourcePathWithSpan;
+
+    /// get source path
+    fn get_source_path(&self) -> &Path {
+        self.get_source_path_with_span().source_path()
+    }
+
+    /// get source span
+    fn get_span(&self) -> &StringSpan {
+        self.get_source_path_with_span().span()
+    }
+}
+
+/// support mutate source path with span
+pub trait MutSourcePathWithSpan {
+    /// set source path with span
+    fn set_source_path_with_span(&mut self, value: &SourcePathWithSpan);
+}
+
+/// cant get optional source path with span
+pub trait GetSourcePathWithSpanOpt {
+    /// get source path with span
+    fn get_source_path_with_span(&self) -> Option<&SourcePathWithSpan>;
+
+    /// get source path
+    fn get_source_path(&self) -> Option<&Path> {
+        self.get_source_path_with_span().map(|v| v.source_path())
+    }
+
+    /// get source span
+    fn get_span(&self) -> Option<&StringSpan> {
+        self.get_source_path_with_span().map(|v| v.span())
+    }
+}
 
 /// constraint related schema change
 #[derive(Debug, Clone)]
@@ -158,6 +234,9 @@ pub enum SemAst {
 
     /// `create materialized view` etc.
     CreateTableAs(CreateTableAs),
+
+    /// `drop table` statement
+    DropTable(DropTable),
 
     /// `create view` statement
     CreateView(CreateView),

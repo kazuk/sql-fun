@@ -5,10 +5,10 @@ use crate::{
     sem::{
         AnalysisError, AnalysisProblem, BaseParseContext, CastDefinition, CastInfoRead,
         CreateIndex, CreateSequence, CreateTable, FullName, FunctionInfoRead,
-        FunctionOverloadCollection, IndexInfoRead, OperatorDefinition, OperatorInfoRead,
-        OperatorName, SchemaFileContext, SchemaName, SearchPathRead, SemAst, SequenceInfoRead,
-        SourceAccessService, TableInfoRead, TypeDefinition, TypeInfoRead, TypeReference,
-        ViewInfoRead, ViewLike,
+        FunctionOverloadCollection, GetSourcePathWithSpanOpt, IndexInfoRead, MutSourcePathWithSpan,
+        OperatorDefinition, OperatorInfoRead, OperatorName, SchemaFileContext, SchemaName,
+        SearchPathRead, SemAst, SequenceInfoRead, SourceAccessService, SourcePathWithSpan,
+        TableInfoRead, TypeDefinition, TypeInfoRead, TypeReference, ViewInfoRead, ViewLike,
     },
 };
 /// Error for reading schema dump
@@ -183,6 +183,24 @@ where
 
     fn get_search_path(&self) -> &[SchemaName] {
         self.1.get_search_path()
+    }
+}
+
+impl<TContext> GetSourcePathWithSpanOpt for ParsedSchemaDump<TContext>
+where
+    TContext: BaseParseContext + std::fmt::Debug,
+{
+    fn get_source_path_with_span(&self) -> Option<&SourcePathWithSpan> {
+        self.1.get_source_path_with_span()
+    }
+}
+
+impl<TContext> MutSourcePathWithSpan for ParsedSchemaDump<TContext>
+where
+    TContext: BaseParseContext + std::fmt::Debug,
+{
+    fn set_source_path_with_span(&mut self, value: &SourcePathWithSpan) {
+        self.1.set_source_path_with_span(value);
     }
 }
 

@@ -22,9 +22,9 @@ use crate::{
     sem::{
         AliasSpec, AnalysisError, AnalysisProblem, Comment, CreateCompositType, CreateDomain,
         CreateEnum, CreateExtension, CreateFunction, CreateIndex, CreateSchema, CreateSequence,
-        CreateTable, DataSource, FullName, FunctionOverloadCollection, OperatorDefinition,
-        OperatorName, SchemaName, SemScalarExpr, TableName, TypeDefinition, TypeReference,
-        VariableSet, ViewLike, ViewName,
+        CreateTable, DataSource, FullName, FunctionOverloadCollection, GetSourcePathWithSpanOpt,
+        MutSourcePathWithSpan, OperatorDefinition, OperatorName, SchemaName, SemScalarExpr,
+        TableName, TypeDefinition, TypeReference, VariableSet, ViewLike, ViewName,
         search_path::{expand_search_path, expand_search_path_inst},
         type_system::ArgumentBindingCollection,
     },
@@ -143,6 +143,8 @@ pub trait BaseParseContext:
     + TableInfoRead
     + ViewInfoRead
     + SearchPathRead
+    + GetSourcePathWithSpanOpt
+    + MutSourcePathWithSpan
     + std::fmt::Debug
 {
     /// get context args

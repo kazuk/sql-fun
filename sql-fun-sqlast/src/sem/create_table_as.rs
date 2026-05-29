@@ -2,7 +2,7 @@ use sql_fun_core::IVec;
 
 use crate::{
     sem::{
-        AstAndContextPair, CreateTableMode, alter_table::AlterObjSubCommand,
+        AstAndContextPair, CreateTableMode, SourcePathWithSpan, alter_table::AlterObjSubCommand,
         create_table::ColumnDefinition,
     },
     syn::{ObjectType, Opt, ScanToken},
@@ -65,6 +65,7 @@ impl CreateTableAs {
         parent_schema: &Option<String>,
         syn: crate::syn::CreateTableAsStmt,
         tokens: &IVec<ScanToken>,
+        source_span: &SourcePathWithSpan,
     ) -> Result<AstAndContextPair<TParseContext>, AnalysisError>
     where
         TParseContext: ParseContext,
@@ -94,6 +95,7 @@ impl CreateTableAs {
                     columns,
                     CreateTableMode::Default,
                     false,
+                    source_span,
                 );
                 context.apply_create_table(&create_table)?
             }
@@ -112,18 +114,4 @@ impl CreateTableAs {
             result_context,
         ))
     }
-}
-
-/// analyze [`crate::syn::CreateTableAsStmt`]
-#[deprecated = "use CreateTableAs::analyze_create_table_as"]
-pub fn analyze_create_table_as<TParseContext>(
-    context: TParseContext,
-    parent_schema: &Option<String>,
-    syn: crate::syn::CreateTableAsStmt,
-    tokens: &IVec<ScanToken>,
-) -> Result<AstAndContextPair<TParseContext>, AnalysisError>
-where
-    TParseContext: ParseContext,
-{
-    CreateTableAs::analyze_create_table_as(context, parent_schema, syn, tokens)
 }

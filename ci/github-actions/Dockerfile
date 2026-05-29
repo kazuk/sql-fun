@@ -31,6 +31,9 @@ RUN cargo install --locked --force \
 RUN cargo binstall --locked --force --root /opt/tools \
     cargo-llvm-cov mdbook cargo-deny tera-cli taplo-cli cargo-nextest sccache cargo-sort
 
+RUN cargo install --locked --force --root /opt/tools \
+    cargo-binstall typos-cli
+
 # https://github.com/oraios/serena/archive/refs/tags/v0.1.4.tar.gz
 RUN curl -fsSL -o /opt/serena.tar.gz \
     "${SERENA_DOWNLOAD_BASE}${SERENA_TAG}.tar.gz"
@@ -95,6 +98,8 @@ COPY --from=builder /opt/tools/bin /usr/local/cargo/bin
 COPY --from=builder /opt/serena.tar.gz /opt/serena.tar.gz
 
 COPY resources/serena-wrapper.sh /usr/local/bin/serena
+COPY resources/codex-config.toml /usr/local/config-template/codex-config.toml
+
 RUN chmod +x /usr/local/bin/serena
 
 RUN rustup component add rust-analyzer rust-src

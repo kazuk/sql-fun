@@ -130,7 +130,7 @@ impl From<ForeignKeyClauseIn> for ForeignKeyClause {
     }
 }
 
-use turso_parser::ast::InitDeferredPred as InitDefferPredIn;
+use turso_parser::ast::InitDeferredPred as InitDeferredPredIn;
 
 /// init deferred predicate
 #[derive(Debug)]
@@ -141,11 +141,11 @@ pub enum InitDeferredPred {
     InitiallyImmediate,
 }
 
-impl From<InitDefferPredIn> for InitDeferredPred {
-    fn from(value: InitDefferPredIn) -> Self {
+impl From<InitDeferredPredIn> for InitDeferredPred {
+    fn from(value: InitDeferredPredIn) -> Self {
         match value {
-            InitDefferPredIn::InitiallyDeferred => Self::InitiallyDeferred,
-            InitDefferPredIn::InitiallyImmediate => Self::InitiallyImmediate,
+            InitDeferredPredIn::InitiallyDeferred => Self::InitiallyDeferred,
+            InitDeferredPredIn::InitiallyImmediate => Self::InitiallyImmediate,
         }
     }
 }

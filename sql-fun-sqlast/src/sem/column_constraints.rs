@@ -809,14 +809,14 @@ impl ColumnConstraint {
                 ))
             }
             ColumnConstraint::Check(check_column_constraint) => {
-                let (c, new_conext) = CheckColumnConstraint::analyze_constraint_sqlite(
+                let (c, new_context) = CheckColumnConstraint::analyze_constraint_sqlite(
                     context,
                     table_name,
                     column_name,
                     check_column_constraint,
                     tokens,
                 )?;
-                context = new_conext;
+                context = new_context;
                 Self::Check(c)
             }
             ColumnConstraint::Default(default_column_constraint) => {

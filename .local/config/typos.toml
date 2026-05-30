@@ -13,3 +13,4 @@ locale = "en"
 [default.extend-words]
 inh="inh"
 larg="larg"
+deferred="deferred"

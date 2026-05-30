@@ -160,7 +160,7 @@ impl From<ExprIn> for Expr {
                 end,
             } => Self::between(lhs, not, start, end),
             ExprIn::Binary(left, operator, right) => Self::binary(left, operator, right),
-            ExprIn::Register(siz) => Self::register(siz),
+            ExprIn::Register(size) => Self::register(size),
             ExprIn::Case {
                 base,
                 when_then_pairs,

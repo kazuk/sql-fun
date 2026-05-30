@@ -226,7 +226,7 @@ impl Stmt {
         }
     }
 
-    /// convert into CreateTableStatemnt
+    /// convert into CreateTableStatement
     pub fn into_create_table(self) -> Option<CreateTableStatement> {
         match self {
             Self::CreateTable(create_table) => Some(create_table),

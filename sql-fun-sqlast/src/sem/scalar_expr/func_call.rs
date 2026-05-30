@@ -136,7 +136,7 @@ impl FuncCallExpr {
                     && let Some(target_type) = t.type_reference()
                     && let Some(cast) = context.get_implicit_cast(source_type, target_type)
                 {
-                    if !cast.is_no_coversion() {
+                    if !cast.is_no_conversion() {
                         arg = SemScalarExpr::wrap_implicit_cast(target_type, &arg);
                     }
                 } else {

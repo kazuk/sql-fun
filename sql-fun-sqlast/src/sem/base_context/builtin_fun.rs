@@ -2,7 +2,7 @@ mod parse_util;
 
 use self::parse_util::{deserialize_braced_list, deserialize_braced_list_opt};
 use crate::sem::{
-    AnalysisError, ColumnCollection, ColumnDefinition, ColumnName, CreateCompositType,
+    AnalysisError, ColumnCollection, ColumnDefinition, ColumnName, CreateCompositeType,
     CreateFunction, FullName, FunctionOverloadCollection, FunctionParam, OverloadVariant,
     TypeDefinition, TypeReference, create_comp_type::CompositeFieldCollection,
 };
@@ -182,8 +182,8 @@ impl PgBuiltInFunctions {
                     composite_fields.push(field_def);
                 }
             }
-            let create_comp_type = CreateCompositType::from_fields(&composite_fields);
-            let type_def = TypeDefinition::CompositType(create_comp_type);
+            let create_comp_type = CreateCompositeType::from_fields(&composite_fields);
+            let type_def = TypeDefinition::CompositeType(create_comp_type);
             let ret_type = TypeReference::dynamic(&type_def);
 
             variants.push(&OverloadVariant::new(&Some(ret_type), &args, true, false));

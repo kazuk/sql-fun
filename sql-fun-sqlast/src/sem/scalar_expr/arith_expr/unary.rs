@@ -3,13 +3,13 @@ use crate::sem::{
     SemScalarExpr, TypeReference, UnaryOperatorDefinition,
 };
 
-struct UnaryCastCandiate {
+struct UnaryCastCandidate {
     arg: CastContext,
     priority: i32,
     operator: UnaryOperatorDefinition,
 }
 
-impl UnaryCastCandiate {
+impl UnaryCastCandidate {
     fn new(arg: CastContext, priority: i32, operator: UnaryOperatorDefinition) -> Self {
         Self {
             arg,
@@ -26,14 +26,14 @@ impl UnaryCastCandiate {
     where
         TParseContext: ParseContext,
     {
-        let mut candiates = Vec::new();
+        let mut candidates = Vec::new();
         for overload in overloads {
             if let Some(arg_cast) = context.get_implicit_cast(arg_type, overload.arg_type()) {
                 let priority = arg_cast.context().overload_priority_score();
-                candiates.push(Self::new(arg_cast.context(), priority, overload.clone()));
+                candidates.push(Self::new(arg_cast.context(), priority, overload.clone()));
             }
         }
-        candiates
+        candidates
     }
 
     fn wrap_implicit_cast(&self, arg_expr: SemScalarExpr) -> SemScalarExpr {
@@ -44,13 +44,13 @@ impl UnaryCastCandiate {
         }
     }
 
-    fn filter_best_candiate(candiates: Vec<Self>) -> Vec<Self> {
-        let priority = candiates
+    fn filter_best_candidate(candidates: Vec<Self>) -> Vec<Self> {
+        let priority = candidates
             .iter()
             .map(|v| v.priority)
             .max()
             .expect("get max priority");
-        candiates
+        candidates
             .into_iter()
             .filter(|v| v.priority == priority)
             .collect()
@@ -70,7 +70,7 @@ impl ResolvedUnaryOperator {
         }
     }
 
-    pub(super) fn into_left_unary_calll_site_expr<TParseContext>(
+    pub(super) fn into_left_unary_call_site_expr<TParseContext>(
         self,
         context: TParseContext,
         name: &OperatorName,
@@ -127,9 +127,9 @@ impl super::ArithExpr {
         };
 
         if let Some(arg_type) = input.get_type() {
-            let candiates =
-                UnaryCastCandiate::enumerate_from_context(context, overloads, &arg_type);
-            if candiates.is_empty() {
+            let candidates =
+                UnaryCastCandidate::enumerate_from_context(context, overloads, &arg_type);
+            if candidates.is_empty() {
                 context.report_problem(
                     AnalysisProblem::unary_operator_overload_resolution_failed(
                         &operator_def,
@@ -138,17 +138,17 @@ impl super::ArithExpr {
                 )?;
                 return Ok(ResolvedUnaryOperator::new(None, input));
             }
-            let filtered = UnaryCastCandiate::filter_best_candiate(candiates);
+            let filtered = UnaryCastCandidate::filter_best_candidate(candidates);
             if filtered.len() > 1 {
                 context.report_problem(AnalysisProblem::unary_operator_overload_ambiguous(
                     &operator_def,
                     &arg_type,
                 ))?;
             }
-            let candiate = &filtered[0];
-            let arg_expr = candiate.wrap_implicit_cast(input);
+            let candidate = &filtered[0];
+            let arg_expr = candidate.wrap_implicit_cast(input);
             Ok(ResolvedUnaryOperator::new(
-                Some(candiate.operator.clone()),
+                Some(candidate.operator.clone()),
                 arg_expr,
             ))
         } else {

@@ -39,7 +39,7 @@ impl TokioPostgresCodeGenerator {
                     let statement = #client_arg_name.prepare(#sql_str).await?;
                     let columns = statement.columns();
                     if columns.len() != #result_field_count {
-                        Err(std::io::Error::new(std::io::ErrorKind::InvalidData, "result set column count missmatch"))?;
+                        Err(std::io::Error::new(std::io::ErrorKind::InvalidData, "result set column count mismatch"))?;
                     }
                     #(#check_column_names)*;
                     CHECKED.store(true, Ordering::Relaxed);

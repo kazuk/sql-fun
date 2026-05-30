@@ -43,7 +43,7 @@ pub enum SqlFunArgsError {
 
     /// Parse error in `PostgreSQL` extensions
     #[error("parse error {0} : {1}")]
-    PgExtenstionsParse(String, String),
+    PgExtensionsParse(String, String),
 
     /// `PostgreSQL` extension related errors
     #[error(transparent)]
@@ -57,7 +57,7 @@ pub enum SqlFunArgsError {
     #[error(transparent)]
     Highlighter(#[from] HighlighterThemeError),
 
-    /// Argument or environment valiable parse error
+    /// Argument or environment variable parse error
     #[error(transparent)]
     Clap(#[from] clap::Error),
 }
@@ -111,7 +111,7 @@ impl SqlFunArgsError {
     /// # Errors
     ///
     /// Always returns [`SqlFunArgsError::NotSupported`].
-    pub fn not_suppoted<T>(value: &str, category: &str) -> Result<T, Self> {
+    pub fn not_supported<T>(value: &str, category: &str) -> Result<T, Self> {
         log::error!("Not supported value {value} for {category}.");
         Err(Self::NotSupported(category.to_string(), value.to_string()))
     }
@@ -141,9 +141,9 @@ impl SqlFunArgsError {
     ///
     /// # Errors
     ///
-    /// Always returns [`SqlFunArgsError::PgExtenstionsParse`].
+    /// Always returns [`SqlFunArgsError::PgExtensionsParse`].
     pub fn parsing_postgres_extensions<T>(message: &str, source: &str) -> Result<T, Self> {
-        Err(Self::PgExtenstionsParse(
+        Err(Self::PgExtensionsParse(
             message.to_string(),
             source.to_string(),
         ))

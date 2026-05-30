@@ -15,7 +15,7 @@ pub enum SqlFunCodegenError {
     SynError(#[from] syn::Error),
 }
 
-/// common sql-fun Attribute argment AST
+/// common sql-fun Attribute argument AST
 #[derive(Debug, darling::FromMeta)]
 #[darling(derive_syn_parse)]
 pub struct SqlFunOptions {
@@ -30,7 +30,7 @@ pub struct SqlFunOptions {
 }
 
 impl SqlFunOptions {
-    /// Source code embeded literal sql
+    /// Source code embedded literal sql
     #[must_use]
     pub fn sql(&self) -> Option<&str> {
         self.sql.as_deref()
@@ -213,7 +213,7 @@ impl SQLStatement {
     const QUERY_INFO_FUN_NAME: &str = "__sql_fun_query_info";
 }
 
-/// Source embeded SQL Statement
+/// Source embedded SQL Statement
 #[derive(Debug)]
 pub struct EncodedSQLStatement {
     sql_text: LitStr,
@@ -228,7 +228,7 @@ impl EncodedSQLStatement {
         &self.sql_text
     }
 
-    /// embeded location file
+    /// embedded location file
     #[must_use]
     pub fn file(&self) -> &LitStr {
         &self.file
@@ -252,7 +252,7 @@ pub struct SQLQueryInfoVisitor {
 }
 
 impl SQLQueryInfoVisitor {
-    /// get SQL statements embeded in source code
+    /// get SQL statements embedded in source code
     #[must_use]
     pub fn sql_statements(file: &syn::File) -> Vec<EncodedSQLStatement> {
         let mut visitor = Self::default();

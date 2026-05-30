@@ -2,14 +2,14 @@ use crate::sem::{
     BinaryOperatorDefinition, CastContext, ParseContext, SemScalarExpr, TypeReference,
 };
 
-pub struct BinaryCastCandiate {
+pub struct BinaryCastCandidate {
     left: CastContext,
     right: CastContext,
     priority: i32,
     operator: BinaryOperatorDefinition,
 }
 
-impl BinaryCastCandiate {
+impl BinaryCastCandidate {
     fn new(
         left: CastContext,
         right: CastContext,
@@ -71,14 +71,14 @@ impl BinaryCastCandiate {
         (lexpr, rexpr)
     }
 
-    pub fn filter_best_candiate(candiates: Vec<Self>) -> Vec<Self> {
-        let priority = candiates
+    pub fn filter_best_candidate(candidates: Vec<Self>) -> Vec<Self> {
+        let priority = candidates
             .iter()
             .map(|v| v.priority)
             .max()
             .expect("get max priority");
 
-        candiates
+        candidates
             .into_iter()
             .filter(|v| v.priority == priority)
             .collect()

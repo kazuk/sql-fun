@@ -71,7 +71,7 @@ impl ColumnDefinition {
         self.default = Some(Box::new(scalar_expr.clone()));
     }
 
-    /// apply not null constrant to column
+    /// apply not null constraint to column
     pub fn set_not_null(&mut self, not_null: Option<bool>) {
         self.is_not_null = not_null;
     }

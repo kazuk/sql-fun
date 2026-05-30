@@ -1,10 +1,10 @@
-# Reuseable Query
+# Reusable Query
 
 `sql-fun` enables query reuse via CTE.
 
-## Reuseable query
+## Reusable query
 
-Reuseable query written in bellow.
+Reusable query written in bellow.
 
 - CTE Catalog
 - SQL Function
@@ -17,7 +17,7 @@ CTE catalog file must have extension `json`, `toml`, `yaml`.
 
 CTE catalog file must have key `sql_fun_cte_catalog_format_version` and `sql_dialect`, See [CTE Catalog file format](.#cte_catalog_file_format).
 
-All CTE catalog file combind in single CTE catalog, you can reuse CTE catalog entry in CTE files.
+All CTE catalog file combined in single CTE catalog, you can reuse CTE catalog entry in CTE files.
 
 ### CTE Catalog file format
 
@@ -58,18 +58,18 @@ select o.* from orders o where o.deliver_at is not null
 
 ```
 
-### Field specfications
+### Field specifications
 
 - `sql_fun_cte_catalog_format_version` string : valid value is "1".
 - `sql_dialect` string: valid value is "PostgreSQL" or "SQLite".
   - PostgreSQL can accept DML as a CTE, then `insert`, `update`, `delete` are valid CTE catalog entry.
-  - SQLite can not accept DML as a CTE, then only `select` are valid CTE catlog entry.
+  - SQLite can not accept DML as a CTE, then only `select` are valid CTE catalog entry.
 - `datasource` optional string: CTE catalog activate in specified database. 
-  - When ommited: CTE catalog activate in default datasource.
+  - When omitted: CTE catalog activate in default datasource.
 - `cte` hash: CTE name to CTE object hash
   - `query` string: `sql-fun` s SQL text. Place-holders like a `${name}`.
   - `recursive` optional bool: Require `with recurcive` to use this CTE catalog entry.
-  - `with` optinal hash string to string: reuse other query from CTE catalogs.
+  - `with` optional hash string to string: reuse other query from CTE catalogs.
     - key is a CTE name. value is a alias name using in query. See [Nested CTE catalog expansion](.#nested_cte_catalog_expansion)
   - `renames`: optional hash string to rename target.
     - key is a new name. value is array of rename target place holder.
@@ -104,11 +104,11 @@ select ...
   from prior_users pu
 ```
 
-When conflict alias, `sql-fun` automaticaly rename alias with `_NN` postfix and resolve conflicts.
+When conflict alias, `sql-fun` automatically rename alias with `_NN` postfix and resolve conflicts.
 
-### Renameing named place holder in CTE
+### Renaming named place holder in CTE
 
-CTE query can containes `sql-fun` named place holder like `${name}` syntax.
+CTE query can contains `sql-fun` named place holder like `${name}` syntax.
 
 Named place holder shown in final query in default. `renames` override this behavior.
 

@@ -351,7 +351,7 @@ mod test_analyze_alter_obj_column_default {
             &tokens,
         )?;
         let AlterObjSubCommand::SetColumnDefault(col_name, expr) = res else {
-            panic!("unexpected respose {res:#?}");
+            panic!("unexpected response {res:#?}");
         };
         assert_eq!(col_name.as_str(), "value");
         let SemScalarExpr::Const(ScalarConstExpr::Integer(val)) = *expr else {

@@ -41,7 +41,7 @@ impl AnalysisProblem {
         Self::NameResolution(NameResolution::column_not_found_in_view(view_name, column))
     }
 
-    /// specfied column not found in sub query
+    /// specified column not found in sub query
     #[tracing::instrument()]
     pub fn column_not_found_in_subquery(alias: &AliasName, column: &ColumnName) -> Self {
         Self::NameResolution(NameResolution::column_not_found_in_subquery(alias, column))

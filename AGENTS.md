@@ -34,7 +34,7 @@ Before submitting a pull request, update statistics by running the `update-stats
 
 # Reviews
 
-- Coding guidlines exists in `docs/internal-rules/rust-coding-guidline.md`
+- Coding guidelines exists in `docs/internal-rules/rust-coding-guidline.md`
 
 # Lookup dependency documentation
 

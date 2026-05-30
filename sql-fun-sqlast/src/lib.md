@@ -1,4 +1,4 @@
 # `sql-fun-sqlast`
 
-Semantic Analizer for `PostgreSQL` AST.
+Semantic Analyzer for `PostgreSQL` AST.
 

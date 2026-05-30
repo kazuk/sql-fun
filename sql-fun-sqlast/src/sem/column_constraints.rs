@@ -209,7 +209,7 @@ impl UniqueColumnConstraint {
         TParseContext: ParseContext,
     {
         let Some(contype) = syn.get_contype().as_inner() else {
-            AnalysisError::raise_unexpected_none("contraint.contype")?;
+            AnalysisError::raise_unexpected_none("constraint.contype")?;
             AnalysisError::never()
         };
         if !matches!(contype, ConstrType::ConstrUnique) {

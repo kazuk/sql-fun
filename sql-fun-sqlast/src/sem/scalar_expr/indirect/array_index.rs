@@ -58,13 +58,13 @@ impl ArrayIndex {
         with_clause: &WithClause,
         from_clause: &FromClause,
         arg: SemScalarExpr,
-        indicies: &crate::syn::AIndices,
+        indices: &crate::syn::AIndices,
         tokens: &IVec<ScanToken>,
     ) -> Result<(IndirectionExpr, TParseContext), AnalysisError>
     where
         TParseContext: ParseContext,
     {
-        let Some(uidx) = indicies.get_uidx().as_inner() else {
+        let Some(uidx) = indices.get_uidx().as_inner() else {
             AnalysisError::raise_unexpected_none("aindicies.uidx")?
         };
         let (rexpr, new_context) =

@@ -14,7 +14,7 @@ use std::process::ExitCode;
 pub use self::{
     check::CheckArgs,
     cli_sub_command::CliSubCommand,
-    runnable::{RunableCommand, StdStream},
+    runnable::{RunnableCommand, StdStream},
 };
 
 mod check;

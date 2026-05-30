@@ -141,7 +141,7 @@ fn parse_terminal_color(value: &str) -> Result<TerminalColor, SqlFunArgsError> {
         "auto" => Ok(TerminalColor::Auto),
         "ansi" => Ok(TerminalColor::Ansi),
         "never" => Ok(TerminalColor::Never),
-        _ => SqlFunArgsError::not_suppoted(value, "Terminal Color"),
+        _ => SqlFunArgsError::not_supported(value, "Terminal Color"),
     }
 }
 
@@ -149,7 +149,7 @@ fn parse_bool_env(value: &str) -> Result<bool, SqlFunArgsError> {
     match value.to_lowercase().as_str() {
         "1" | "true" | "yes" | "on" => Ok(true),
         "0" | "false" | "no" | "off" => Ok(false),
-        _ => SqlFunArgsError::not_suppoted(value, "Boolean"),
+        _ => SqlFunArgsError::not_supported(value, "Boolean"),
     }
 }
 
@@ -258,7 +258,7 @@ impl SqlFunArgs {
     const SQL_FUN_TERM_COLOR: &str = "SQL_FUN_TERM_COLOR";
     const SQL_FUN_HIGHLIGHTER_THEME: &str = "SQL_FUN_HIGHLIGHTER_THEME";
 
-    /// get environemnts for child process
+    /// get environments for child process
     ///
     /// # Errors
     ///
@@ -298,7 +298,7 @@ impl SqlFunArgs {
     ///
     /// # Errors
     ///
-    /// Returns [`SqlFunArgsError`] if faild load theme.
+    /// Returns [`SqlFunArgsError`] if failed load theme.
     ///
     pub fn highlighter_theme(&self) -> Result<HighlighterTheme, SqlFunArgsError> {
         let term_color = self.term_color();

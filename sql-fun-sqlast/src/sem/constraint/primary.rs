@@ -8,7 +8,7 @@ use crate::{
     syn::ListOpt,
 };
 
-use super::AnalizeConstraint;
+use super::AnalyzeConstraint;
 
 /// analyzed primary key constraint
 #[derive(Debug, Clone)]
@@ -46,7 +46,7 @@ impl PrimaryKeyConstraint {
     }
 }
 
-impl<TParseContext> AnalizeConstraint<TParseContext> for PrimaryKeyConstraint
+impl<TParseContext> AnalyzeConstraint<TParseContext> for PrimaryKeyConstraint
 where
     TParseContext: ParseContext,
 {

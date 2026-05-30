@@ -6,7 +6,7 @@ use crate::TextSpan;
 #[cfg_attr(feature = "openrpc-schema", derive(schemars::JsonSchema))]
 #[derive(serde::Serialize, serde::Deserialize)]
 pub enum StringPred {
-    /// exact matchs string
+    /// exact matches string
     Exact(String),
     /// match prefix
     StartsWith(String),
@@ -66,7 +66,7 @@ pub enum ObjectQuery {
     Not(Box<Self>),
 }
 
-/// specify optional field to retuns API result
+/// specify optional field to returns API result
 #[cfg_attr(feature = "openrpc-schema", derive(schemars::JsonSchema))]
 #[derive(serde::Serialize, serde::Deserialize)]
 pub enum ObjectSummaryField {

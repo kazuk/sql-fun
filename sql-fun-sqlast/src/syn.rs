@@ -15,7 +15,7 @@ pub use self::{
 };
 
 impl ScanToken {
-    /// return true when self is identifiter
+    /// return true when self is identifier
     pub fn is_ident(&self) -> bool {
         if let Some(tok) = self.get_token().as_inner() {
             matches!(tok, crate::syn::Token::Ident)

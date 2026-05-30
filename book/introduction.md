@@ -53,7 +53,7 @@ SQL_FUN_SCHEMA=prod sql-fun check
 
 will use schema.prod.sql instead.
 
-## Reuseable CTE
+## Reusable CTE
 
 `sql-fun` support query reuse as CTE.
 
@@ -80,7 +80,7 @@ async fn select_all_active_users(client: &Client, collector: Collector, handler:
 async fn select_active_user_by_id( ... ) -> Result<User, Error>
 ```
 
-### Reuseable query definition in CTE catalog
+### Reusable query definition in CTE catalog
 
 CTE catalog is a TOML file, CTE definition is a toml table `[cte."key"]`. with `query` value.
 

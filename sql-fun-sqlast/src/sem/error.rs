@@ -9,7 +9,7 @@ use crate::sem::{AnalysisProblem, ParseContext, TypeReference};
 /// error
 #[derive(Debug, thiserror::Error)]
 pub enum AnalysisError {
-    /// unknown errror
+    /// unknown error
     #[error("{0}")]
     GenericError(#[source] Box<dyn std::error::Error>),
 
@@ -25,7 +25,7 @@ pub enum AnalysisError {
     #[error("unexpected None with {0}")]
     UnexpectedNone(String),
 
-    /// Unexpeced input value
+    /// Unexpected input value
     #[error("unexpected input :{0}")]
     UnexpectedInput(String),
 
@@ -96,9 +96,9 @@ impl AnalysisError {
         todo!()
     }
 
-    /// regitering dynamic type to context
+    /// registering dynamic type to context
     pub fn raise_register_dynamic_type(
-        _create_comp_type: &super::CreateCompositType,
+        _create_comp_type: &super::CreateCompositeType,
     ) -> Result<Infallible, Self> {
         todo!()
     }
@@ -113,7 +113,7 @@ impl AnalysisError {
 
     /// never returns from this
     pub fn never() -> ! {
-        unreachable!("this function calls with Ok(Infallble) instanciated")
+        unreachable!("this function calls with Ok(Infallble) instantiated")
     }
 
     /// unexpected eof error

@@ -268,7 +268,7 @@ mod tests {
     }
 
     #[test]
-    fn test_create_composit_type() -> TestResult {
+    fn test_create_composite_type() -> TestResult {
         let result = PostgresDialect::parse("CREATE TYPE compfoo AS (f1 int, f2 text);")?;
         let stmt = result.get_stmts().get(0).get_stmt();
 

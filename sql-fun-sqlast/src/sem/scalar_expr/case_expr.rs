@@ -385,20 +385,20 @@ impl CaseExprAnalysisContext<'_> {
             return Ok(self.result_types.iter().next().cloned());
         }
 
-        let cast_candiates = self.enumerate_cast_candiates(context);
-        if cast_candiates.is_empty() {
+        let cast_candidates = self.enumerate_cast_candidates(context);
+        if cast_candidates.is_empty() {
             context.report_problem(AnalysisProblem::incompatible_case_values(
                 self.result_types.clone(),
             ))?;
             Ok(None)
-        } else if cast_candiates.len() == 1 {
-            let Some((result_type, _casts)) = cast_candiates.into_iter().next() else {
-                AnalysisError::raise_unexpected_none("cast candiates")?
+        } else if cast_candidates.len() == 1 {
+            let Some((result_type, _casts)) = cast_candidates.into_iter().next() else {
+                AnalysisError::raise_unexpected_none("cast candidates")?
             };
             Ok(self.cast_args(context, &result_type)?)
         } else {
             let mut implicit_castable = Vec::new();
-            for (ty, _casts) in cast_candiates {
+            for (ty, _casts) in cast_candidates {
                 if self
                     .result_types
                     .iter()
@@ -495,14 +495,14 @@ mod test_case_expr_analysis_context_type_fixup {
 }
 
 impl CaseExprAnalysisContext<'_> {
-    fn enumerate_cast_candiates<TParseContext>(
+    fn enumerate_cast_candidates<TParseContext>(
         &mut self,
         context: &mut TParseContext,
     ) -> HashMap<TypeReference, Vec<crate::sem::CastDefinition>>
     where
         TParseContext: ParseContext,
     {
-        let mut cast_candiates = HashMap::new();
+        let mut cast_candidates = HashMap::new();
         for ty1 in self.result_types.clone() {
             for ty2 in self.result_types.clone() {
                 if ty1 == ty2 {
@@ -511,18 +511,18 @@ impl CaseExprAnalysisContext<'_> {
                 let Some(cast) = context.get_implicit_cast(&ty1, &ty2) else {
                     continue;
                 };
-                cast_candiates
+                cast_candidates
                     .entry(ty2)
                     .and_modify(|v: &mut Vec<_>| v.push(cast.clone()))
                     .or_insert(vec![cast.clone()]);
             }
         }
-        cast_candiates
+        cast_candidates
     }
 }
 
 #[cfg(test)]
-mod test_case_expr_analysis_context_enumerate_cast_candiates {
+mod test_case_expr_analysis_context_enumerate_cast_candidates {
     use testresult::TestResult;
 
     use crate::{
@@ -531,7 +531,7 @@ mod test_case_expr_analysis_context_enumerate_cast_candiates {
     };
 
     #[rstest::rstest]
-    fn test_enumerate_cast_candiates_single(mut test_context: TestParseContext) -> TestResult {
+    fn test_enumerate_cast_candidates_single(mut test_context: TestParseContext) -> TestResult {
         let int4 = PgBuiltInType::int4();
         let text = PgBuiltInType::text();
         test_context.setup_type(int4.clone());
@@ -548,7 +548,7 @@ mod test_case_expr_analysis_context_enumerate_cast_candiates {
         acontext.result_types.insert(int4);
         acontext.result_types.insert(text.clone());
 
-        let cast_candidates = acontext.enumerate_cast_candiates(&mut test_context);
+        let cast_candidates = acontext.enumerate_cast_candidates(&mut test_context);
         let Some(casts) = cast_candidates.get(&text) else {
             panic!("expected cast candidates for text");
         };
@@ -687,15 +687,15 @@ where
         syn: crate::syn::CaseExpr,
         tokens: &IVec<ScanToken>,
     ) -> Result<(SemScalarExpr, TParseContext), AnalysisError> {
-        let mut analisys_context = CaseExprAnalysisContext::new(with_clause, from_clause);
+        let mut analysis_context = CaseExprAnalysisContext::new(with_clause, from_clause);
 
-        context = analisys_context.analyze_case_arg(context, &syn, tokens)?;
+        context = analysis_context.analyze_case_arg(context, &syn, tokens)?;
         let Some(args) = syn.get_args().map(|v| v.as_case_when()) else {
             AnalysisError::raise_unexpected_none("caseexpr.args")?
         };
-        context = analisys_context.analyze_case_when_list(context, args, tokens)?;
-        context = analisys_context.analyze_default_expr(context, syn, tokens)?;
-        let case = analisys_context.into_case_expr(&mut context)?;
+        context = analysis_context.analyze_case_when_list(context, args, tokens)?;
+        context = analysis_context.analyze_default_expr(context, syn, tokens)?;
+        let case = analysis_context.into_case_expr(&mut context)?;
         Ok((SemScalarExpr::Case(case), context))
     }
 }

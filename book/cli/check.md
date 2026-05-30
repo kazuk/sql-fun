@@ -1,6 +1,6 @@
 # `check` sub command for `sql-fun` CLI utility
 
-Check the application embeded queries and prepare to build.
+Check the application embedded queries and prepare to build.
 
 `check` sub command is core of application development workflow.
 
@@ -50,7 +50,7 @@ Default : Cargo default package to check.
 ### Feature selection options
 
 - `--features FEATURE-LIST`: space or comma separated list of features
-- `--all-features`: Activate all avaiable features
+- `--all-features`: Activate all available features
 - `--no-default-features`: Do not activate the `default` features
 
 ### Schema cache control options

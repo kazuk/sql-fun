@@ -128,7 +128,7 @@ impl TokioPostgresCodeGenerator {
 
 impl TokioPostgresCodeGenerator {
     fn generate_check_column_existing(index: usize, column: &String) -> proc_macro2::TokenStream {
-        let error_message = format!("column name missmatch: expected {column} but ");
+        let error_message = format!("column name mismatch: expected {column} but ");
         let check_column_name = quote! {
             if #column != columns[#index].name() {
                 let mut msg = String::from(#error_message);

@@ -7,14 +7,14 @@ use crate::{
     sem::{
         AlterSequence, AlterTable, AlterView, AnalysisError, AnalysisProblem, BaseParseContext,
         BinaryOperatorDefinition, CastContext, CastDefinition, ColumnDefinition, Comment,
-        CreateCompositType, CreateDomain, CreateEnum, CreateExtension, CreateFunction, CreateIndex,
-        CreateSchema, CreateSequence, CreateTable, CreateTableAs, CreateTableMode, CreateView,
-        DropTable, FullName, FunctionInfoRead, FunctionInfoWrite, FunctionOverloadCollection,
-        GetSourcePathWithSpanOpt, IndexInfoRead, MutSourcePathWithSpan, OperatorDefinition,
-        OperatorInfoRead, OperatorName, OverloadVariant, ParseContext, SchemaName, SearchPathRead,
-        SequenceInfoRead, SequenceInfoWrite, SourcePathWithSpan, TableInfoRead, TableInfoWrite,
-        TableName, TypeDefinition, TypeInfoRead, TypeInfoWrite, TypeReference, ValidOperatorName,
-        VariableSet, ViewInfoRead, ViewInfoWrite, ViewLike,
+        CreateCompositeType, CreateDomain, CreateEnum, CreateExtension, CreateFunction,
+        CreateIndex, CreateSchema, CreateSequence, CreateTable, CreateTableAs, CreateTableMode,
+        CreateView, DropTable, FullName, FunctionInfoRead, FunctionInfoWrite,
+        FunctionOverloadCollection, GetSourcePathWithSpanOpt, IndexInfoRead, MutSourcePathWithSpan,
+        OperatorDefinition, OperatorInfoRead, OperatorName, OverloadVariant, ParseContext,
+        SchemaName, SearchPathRead, SequenceInfoRead, SequenceInfoWrite, SourcePathWithSpan,
+        TableInfoRead, TableInfoWrite, TableName, TypeDefinition, TypeInfoRead, TypeInfoWrite,
+        TypeReference, ValidOperatorName, VariableSet, ViewInfoRead, ViewInfoWrite, ViewLike,
     },
 };
 
@@ -145,7 +145,7 @@ impl TestParseContext {
             .insert(table_name.clone(), table_definition.clone());
     }
 
-    /// setup [TableInfoRead::get_table_impl] resut
+    /// setup [TableInfoRead::get_table_impl] result
     pub fn setup_table(
         &mut self,
         table_name: &str,
@@ -305,7 +305,10 @@ impl BaseParseContext for TestParseContext {
         todo!()
     }
 
-    fn set_source_file(&mut self, _source_acess_service: Box<dyn crate::sem::SourceAccessService>) {
+    fn set_source_file(
+        &mut self,
+        _source_access_service: Box<dyn crate::sem::SourceAccessService>,
+    ) {
         todo!()
     }
 }
@@ -318,7 +321,7 @@ impl TypeInfoWrite for TestParseContext {
     fn insert_create_composite_type(
         &mut self,
         _name: &FullName,
-        _create_comp_type: &CreateCompositType,
+        _create_comp_type: &CreateCompositeType,
     ) {
         todo!()
     }

@@ -107,7 +107,7 @@ pub enum SqlFunServerApiError {
     ///
     /// server keeping to many collections for client, release collection for new listing/analyse request.
     #[error("require release collection {0:?}")]
-    RequireReleseCollection(Vec<CollectionHandle>),
+    RequireReleaseCollection(Vec<CollectionHandle>),
 
     /// Generic unexpected error
     #[error("unexpected {0}")]

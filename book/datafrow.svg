@@ -31,7 +31,7 @@
         <mxCell id="ueywehbDhC6qGltQKW0E-8" parent="ueywehbDhC6qGltQKW0E-7" style="text;html=1;whiteSpace=wrap;strokeColor=none;fillColor=none;align=center;verticalAlign=middle;rounded=0;autosize=1;resizable=0;" value="Rust Compiler (cargo-expand)" vertex="1">
           <mxGeometry height="30" width="180" as="geometry" />
         </mxCell>
-        <mxCell id="ueywehbDhC6qGltQKW0E-9" parent="ueywehbDhC6qGltQKW0E-7" style="shape=document;whiteSpace=wrap;html=1;boundedLbl=1;" value="Intermidiate&lt;div&gt;Rust code&lt;/div&gt;" vertex="1">
+        <mxCell id="ueywehbDhC6qGltQKW0E-9" parent="ueywehbDhC6qGltQKW0E-7" style="shape=document;whiteSpace=wrap;html=1;boundedLbl=1;" value="Intermediate&lt;div&gt;Rust code&lt;/div&gt;" vertex="1">
           <mxGeometry height="80" width="120" x="214" y="80" as="geometry" />
         </mxCell>
         <mxCell id="ueywehbDhC6qGltQKW0E-10" edge="1" parent="ueywehbDhC6qGltQKW0E-7" source="ueywehbDhC6qGltQKW0E-3" style="endArrow=classic;html=1;rounded=0;" target="ueywehbDhC6qGltQKW0E-9" value="">
@@ -85,7 +85,7 @@
         <mxCell id="ueywehbDhC6qGltQKW0E-21" parent="ueywehbDhC6qGltQKW0E-19" style="text;html=1;whiteSpace=wrap;strokeColor=none;fillColor=none;align=center;verticalAlign=middle;rounded=0;autosize=1;resizable=0;" value="Rust Compiler (cargo build)" vertex="1">
           <mxGeometry height="30" width="170" x="5" as="geometry" />
         </mxCell>
-        <mxCell id="ueywehbDhC6qGltQKW0E-22" parent="ueywehbDhC6qGltQKW0E-19" style="shape=document;whiteSpace=wrap;html=1;boundedLbl=1;" value="Intermidiate&lt;div&gt;Rust code&lt;/div&gt;" vertex="1">
+        <mxCell id="ueywehbDhC6qGltQKW0E-22" parent="ueywehbDhC6qGltQKW0E-19" style="shape=document;whiteSpace=wrap;html=1;boundedLbl=1;" value="Intermediate&lt;div&gt;Rust code&lt;/div&gt;" vertex="1">
           <mxGeometry height="80" width="120" x="200" y="120" as="geometry" />
         </mxCell>
         <mxCell id="ueywehbDhC6qGltQKW0E-23" edge="1" parent="ueywehbDhC6qGltQKW0E-19" source="ueywehbDhC6qGltQKW0E-20" style="endArrow=classic;html=1;rounded=0;" target="ueywehbDhC6qGltQKW0E-22" value="">
@@ -94,7 +94,7 @@
             <mxPoint x="360" y="380" as="targetPoint" />
           </mxGeometry>
         </mxCell>
-        <mxCell id="ueywehbDhC6qGltQKW0E-26" parent="ueywehbDhC6qGltQKW0E-19" style="rounded=0;whiteSpace=wrap;html=1;" value="Compilter backend" vertex="1">
+        <mxCell id="ueywehbDhC6qGltQKW0E-26" parent="ueywehbDhC6qGltQKW0E-19" style="rounded=0;whiteSpace=wrap;html=1;" value="Compiler backend" vertex="1">
           <mxGeometry height="60" width="120" x="40" y="210" as="geometry" />
         </mxCell>
         <mxCell id="ueywehbDhC6qGltQKW0E-27" edge="1" parent="ueywehbDhC6qGltQKW0E-19" source="ueywehbDhC6qGltQKW0E-22" style="endArrow=classic;html=1;rounded=0;exitX=0.017;exitY=0.888;exitDx=0;exitDy=0;exitPerimeter=0;" target="ueywehbDhC6qGltQKW0E-26" value="">

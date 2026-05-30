@@ -1,4 +1,4 @@
-use super::{BoxedKeyFragment, KeyFragment, TrieLeafIter, TrieLeafs};
+use super::{BoxedKeyFragment, KeyFragment, TrieLeafIter, TrieLeaves};
 
 #[derive(Debug)]
 pub(super) struct TrieNode<TValue> {
@@ -7,7 +7,7 @@ pub(super) struct TrieNode<TValue> {
     /// value of full match of `key_bytes`
     pub(super) value: Option<TValue>,
     /// values for continuing the key
-    pub(super) children: TrieLeafs<TValue>,
+    pub(super) children: TrieLeaves<TValue>,
 }
 
 impl<TValue> TrieNode<TValue> {
@@ -15,7 +15,7 @@ impl<TValue> TrieNode<TValue> {
         Self {
             key: BoxedKeyFragment::from(key),
             value: Some(value),
-            children: TrieLeafs::with_capacity(0),
+            children: TrieLeaves::with_capacity(0),
         }
     }
 
@@ -34,7 +34,7 @@ impl<TValue> TrieNode<TValue> {
         if common_prefix_len == new_key.len() && common_prefix_len < self_key.len() {
             // Split existing node: promote input key as this node, child holds remainder of existing key
             let (common_key, other_key, _) = self_key.split_key(new_key, common_prefix_len);
-            let mut old_children = TrieLeafs::new();
+            let mut old_children = TrieLeaves::new();
             std::mem::swap(&mut self.children, &mut old_children);
             let child = Self {
                 key: BoxedKeyFragment::from(other_key),
@@ -70,7 +70,7 @@ impl<TValue> TrieNode<TValue> {
             // Partial match between self.key and input key
             let (common_key, other_key, least_key) = self_key.split_key(new_key, common_prefix_len);
 
-            let mut children = TrieLeafs::with_capacity(2);
+            let mut children = TrieLeaves::with_capacity(2);
             std::mem::swap(&mut self.children, &mut children);
             let new_self = Self {
                 key: BoxedKeyFragment::from(other_key),
@@ -80,7 +80,7 @@ impl<TValue> TrieNode<TValue> {
             let new_other = Self {
                 key: BoxedKeyFragment::from(least_key),
                 value: Some(value),
-                children: TrieLeafs::new(),
+                children: TrieLeaves::new(),
             };
             self.key = BoxedKeyFragment::from(common_key);
             self.children.insert(new_self);

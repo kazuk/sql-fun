@@ -11,7 +11,7 @@ use crate::{
 /// Index item sort order
 #[derive(Debug, Clone, Copy, serde::Serialize, serde::Deserialize, PartialEq, Eq, Hash)]
 pub enum SortOrder {
-    /// assending
+    /// ascending
     Asc,
     /// dessending
     Desc,

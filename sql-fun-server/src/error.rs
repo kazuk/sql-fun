@@ -20,7 +20,7 @@ pub enum SqlFunServerError {
     InvalidArgument(#[from] SqlFunArgsError),
 
     #[error("semantic analysis failed {0}")]
-    Analisys(#[from] AnalysisError),
+    Analysis(#[from] AnalysisError),
 
     #[error("parse dump file failed {0}")]
     ParseDump(#[from] ParseDumpFileError),
@@ -40,7 +40,7 @@ impl From<PostgresExtensionsParseError> for SqlFunServerError {
 
 impl SqlFunServerError {
     fn is_unexpected(&self) -> bool {
-        matches!(self, Self::Analisys(_) | Self::ArgsBuild(_))
+        matches!(self, Self::Analysis(_) | Self::ArgsBuild(_))
     }
 
     fn is_context_initialize(&self) -> bool {

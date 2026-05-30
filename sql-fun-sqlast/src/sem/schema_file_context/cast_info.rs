@@ -43,7 +43,7 @@ where
             }
         }
 
-        // source_type -> source_type is always avaiable with no conversion
+        // source_type -> source_type is always available with no conversion
         if !castable.contains(source_type) {
             castable.insert(source_type.clone());
         }

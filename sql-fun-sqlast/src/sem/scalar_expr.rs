@@ -99,7 +99,7 @@ pub enum SemScalarExpr {
     SqlValue(SqlValueExpr),
     /// parameter reference expression
     Param(ParamRef),
-    /// named argment expression
+    /// named argument expression
     NamedArg(NamedArgExpr),
     /// indirectrion expression
     Indirection(IndirectionExpr),
@@ -109,7 +109,7 @@ pub enum SemScalarExpr {
     ///
     /// `ImplicitCast` is not in Syntax level AST.
     ///
-    /// `sql-fun` inserts implicit cast at a implicit coversion as needed.
+    /// `sql-fun` inserts implicit cast at a implicit conversion as needed.
     ///
     ImplicitCast(ImplicitCastExpr),
 
@@ -147,7 +147,7 @@ impl SemScalarExpr {
         ))
     }
 
-    /// determine expresion value type
+    /// determine expression value type
     #[must_use]
     pub fn get_type(&self) -> Option<TypeReference> {
         match self {
@@ -292,8 +292,8 @@ mod test_get_column_def_and_name {
 impl SemScalarExpr {
     /// convert `value_expr` with implicit casting
     #[must_use]
-    pub fn wrap_implicit_cast(taget_type: &TypeReference, value_expr: &Self) -> Self {
-        Self::ImplicitCast(ImplicitCastExpr::new(value_expr, taget_type))
+    pub fn wrap_implicit_cast(target_type: &TypeReference, value_expr: &Self) -> Self {
+        Self::ImplicitCast(ImplicitCastExpr::new(value_expr, target_type))
     }
 }
 
@@ -338,7 +338,7 @@ impl SemScalarExpr {
             context.report_problem(AnalysisProblem::implicit_cast_not_found(&ty, result_type))?;
             return Ok(());
         };
-        if !cast.is_no_coversion() {
+        if !cast.is_no_conversion() {
             *expr = Self::wrap_implicit_cast(result_type, expr);
         }
         Ok(())
@@ -464,7 +464,7 @@ impl SemScalarExpr {
                 .get_implicit_cast(&ty, &PgBuiltInType::int8())
                 .is_none()
         {
-            context.report_problem(AnalysisProblem::array_index_type_missmatch(self, &ty))?;
+            context.report_problem(AnalysisProblem::array_index_type_mismatch(self, &ty))?;
         }
         Ok(())
     }

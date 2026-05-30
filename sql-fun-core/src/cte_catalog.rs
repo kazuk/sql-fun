@@ -350,7 +350,7 @@ sql_dialect="PostgreSQL"
     #[rstest::rstest]
     #[case("PostgreSQL", true)]
     #[case("SQLite", true)]
-    #[case("Unknwon", false)]
+    #[case("Unknown", false)]
     fn dialect_values(#[case] dialect: &str, #[case] expected: bool) -> TestResult {
         let toml = format!(
             r#"
@@ -602,7 +602,7 @@ impl CteCatalog<'_> {
 
         let cyclic_dependencies = self.list_cyclic_dependencies();
         for (cte_name, with_item) in cyclic_dependencies {
-            let entry = self.entries.get_mut(&cte_name).expect("shoud exist");
+            let entry = self.entries.get_mut(&cte_name).expect("should exist");
             let mut entry = entry.borrow_mut();
             entry.push_cyclic_dependency(&with_item);
         }

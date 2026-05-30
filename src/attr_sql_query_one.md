@@ -1,5 +1,5 @@
 
-This macro attribute is used to ad-hoc query returing a single row from the database
+This macro attribute is used to ad-hoc query returning a single row from the database
 
 # Example
 

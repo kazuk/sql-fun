@@ -23,7 +23,7 @@ impl ArithExpr {
                 (None, None) => AnalysisError::raise_unexpected_input("lexpr, rexpr both None")?,
                 (Some(a), None) => {
                     let resolved = Self::resolve_overload_unary(&mut context, operator_def, a)?;
-                    resolved.into_left_unary_calll_site_expr(context, name)
+                    resolved.into_left_unary_call_site_expr(context, name)
                 }
                 (None, Some(a)) => {
                     let resolved = Self::resolve_overload_unary(&mut context, operator_def, a)?;

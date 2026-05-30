@@ -51,8 +51,8 @@ pub use self::{
     cast::{CastContext, CastDefinition},
     column_constraints::ColumnConstraint,
     comment::{Comment, analyze_comment},
-    constraint::{AnalizeConstraint, Constraint, PrimaryKeyConstraint},
-    create_comp_type::{CreateCompositType, analyze_create_comp_type},
+    constraint::{AnalyzeConstraint, Constraint, PrimaryKeyConstraint},
+    create_comp_type::{CreateCompositeType, analyze_create_comp_type},
     create_domain::{CreateDomain, analyze_create_domain},
     create_enum_type::{CreateEnum, analyze_create_enum_type},
     create_extension::{CreateExtension, analyze_create_extension},
@@ -212,7 +212,7 @@ pub enum SemAst {
     Comment(Comment),
 
     /// `create type` (composite type variant) statement
-    CreateCompType(CreateCompositType),
+    CreateCompType(CreateCompositeType),
 
     /// `create type` (enum type variant) statement
     CreateEnum(CreateEnum),
@@ -226,7 +226,7 @@ pub enum SemAst {
     /// `create schema` statement
     CreateSchema(CreateSchema),
 
-    /// `create sequence` statemnt
+    /// `create sequence` statement
     CreateSequence(CreateSequence),
 
     /// `create table` statement

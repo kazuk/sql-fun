@@ -86,8 +86,8 @@ pub struct ParameterDescribe {
     name: String,
     /// parameter usage in SQL text
     spans: Vec<TextSpan>,
-    /// type candiates for this parameter
-    type_candiate: Vec<TypeReference>,
+    /// type candidates for this parameter
+    type_candidate: Vec<TypeReference>,
     /// parameter nullability
     nullability: Nullability,
 }

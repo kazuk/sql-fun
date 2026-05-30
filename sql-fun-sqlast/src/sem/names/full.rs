@@ -1,4 +1,4 @@
-mod impl_coversion_traits;
+mod impl_conversion_traits;
 
 use std::fmt::Display;
 

@@ -68,8 +68,8 @@ pub enum AnalysisProblem {
     /// can not to guess nullablity
     NullabilityUnknown(String),
 
-    /// Argument type missmatch
-    ArgumentTypeMissmatch(FullName, usize),
+    /// Argument type mismatch
+    ArgumentTypeMismatch(FullName, usize),
 
     /// duplicate def elem key
     DuplicateDefElemKey(DefElemKey),
@@ -103,8 +103,8 @@ pub enum AnalysisProblem {
     /// case when expr type unknown
     CaseWhenExprTypeUnknown(SemScalarExpr),
 
-    /// array type missmatch
-    ArrayIndexTypeMissmatch(SemScalarExpr, TypeReference),
+    /// array type mismatch
+    ArrayIndexTypeMismatch(SemScalarExpr, TypeReference),
 
     /// member access requires composite type
     MemberAccessRequiresCompositeType(FullName, String),
@@ -145,10 +145,10 @@ impl AnalysisProblem {
         Self::NullabilityUnknown(String::from(item_name))
     }
 
-    /// function argument type missmatch
+    /// function argument type mismatch
     #[tracing::instrument()]
-    pub fn argument_type_missmatch(func_name: &FullName, index: usize) -> Self {
-        Self::ArgumentTypeMissmatch(func_name.clone(), index)
+    pub fn argument_type_mismatch(func_name: &FullName, index: usize) -> Self {
+        Self::ArgumentTypeMismatch(func_name.clone(), index)
     }
 
     /// duplicate name in definition element
@@ -157,7 +157,7 @@ impl AnalysisProblem {
         Self::DuplicateDefElemKey(key.clone())
     }
 
-    /// doing explicit cast coversion , but not allowed
+    /// doing explicit cast conversion , but not allowed
     #[tracing::instrument()]
     pub fn explicit_cast_not_defined(source: &TypeReference, target: &TypeReference) -> Self {
         Self::ExplicitCastNotDefined(source.clone(), target.clone())
@@ -171,11 +171,8 @@ impl AnalysisProblem {
 
     /// array index type not integer
     #[tracing::instrument()]
-    pub fn array_index_type_missmatch(
-        expr: &SemScalarExpr,
-        type_inspected: &TypeReference,
-    ) -> Self {
-        Self::ArrayIndexTypeMissmatch(expr.clone(), type_inspected.clone())
+    pub fn array_index_type_mismatch(expr: &SemScalarExpr, type_inspected: &TypeReference) -> Self {
+        Self::ArrayIndexTypeMismatch(expr.clone(), type_inspected.clone())
     }
 
     /// member accessing to non-composite type
@@ -198,7 +195,7 @@ impl AnalysisProblem {
 
     /// parameter type can not cast to function argument
     #[tracing::instrument()]
-    pub fn parameter_type_missmatch_for_table_function(
+    pub fn parameter_type_mismatch_for_table_function(
         call: &crate::syn::FuncCall,
         arg_types: ArgumentBindingCollection,
     ) -> Self {
@@ -231,7 +228,7 @@ impl AnalysisProblem {
     #[tracing::instrument()]
     pub fn coalesce_expr_type_ambiguous(
         arg_exprs: &Vec<SemScalarExpr>,
-        candiates: &HashSet<TypeReference>,
+        candidates: &HashSet<TypeReference>,
         choose: Option<&TypeReference>,
     ) -> Self {
         todo!()

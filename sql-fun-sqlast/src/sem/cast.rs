@@ -52,8 +52,8 @@ impl CastDefinition {
 
     /// is no conversion
     #[must_use]
-    pub fn is_no_coversion(&self) -> bool {
-        self.cast_context.is_no_coversion()
+    pub fn is_no_conversion(&self) -> bool {
+        self.cast_context.is_no_conversion()
     }
 }
 
@@ -108,7 +108,7 @@ impl CastContext {
 
     /// test cast is non-conversion
     #[must_use]
-    pub fn is_no_coversion(&self) -> bool {
+    pub fn is_no_conversion(&self) -> bool {
         matches!(self, Self::NoConversion)
     }
 }

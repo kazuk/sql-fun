@@ -38,7 +38,7 @@ impl CreateFunction {
         &self.overloads
     }
 
-    /// resolve overload with funtion argument types
+    /// resolve overload with function argument types
     pub fn resolve_overload<TParseContext>(
         &self,
         arg_types: &ArgumentBindingCollection,
@@ -84,7 +84,7 @@ impl CreateFunction {
         };
 
         let Some(ret_type) = syn.get_return_type().as_inner() else {
-            AnalysisError::raise_unexpected_none("create_function_stmt.retrun_type")?
+            AnalysisError::raise_unexpected_none("create_function_stmt.return_type")?
         };
 
         let returning_col_def = if ret_type.get_setof() {
@@ -92,8 +92,8 @@ impl CreateFunction {
             if ret_type.name().as_str() == "record" {
                 FunctionParam::collect_output_params_as_columns(&params)?
             } else if let Some(result_set_type) = context.get_type(&ret_type) {
-                if result_set_type.is_composit_type() {
-                    Some(result_set_type.get_composit_type_columns())
+                if result_set_type.is_composite_type() {
+                    Some(result_set_type.get_composite_type_columns())
                 } else if let Some(result_type) = result_set_type.type_reference() {
                     // returning record type
                     let columns = vec![ColumnDefinition::new(&None, Some(result_type), None, &[])];

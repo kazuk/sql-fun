@@ -14,7 +14,7 @@ impl TokioPostgresCodeGenerator {
             handler_arg,
         } = self;
         let collector_arg = collector_arg.expect("query many must have collector");
-        let handler_arg = handler_arg.expect("query many must have handelr");
+        let handler_arg = handler_arg.expect("query many must have handler");
         let mut parameters = Vec::new();
         for placeholder in &placeholders {
             let ident = syn::Ident::new(placeholder, proc_macro::Span::call_site().into());
@@ -40,7 +40,7 @@ impl TokioPostgresCodeGenerator {
                     let statement = #client_arg_name.prepare(#sql_str).await?;
                     let columns = statement.columns();
                     if columns.len() != #result_field_count {
-                        Err(std::io::Error::new(std::io::ErrorKind::InvalidData, "result set column count missmatch"))?;
+                        Err(std::io::Error::new(std::io::ErrorKind::InvalidData, "result set column count mismatch"))?;
                     }
                     #(#check_column_names)*;
                     CHECKED.store(true, Ordering::Relaxed);

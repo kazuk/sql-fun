@@ -1,5 +1,5 @@
 use crate::sem::{
-    CreateCompositType, CreateDomain, CreateEnum, FullName, TableName, TypeDefinition,
+    CreateCompositeType, CreateDomain, CreateEnum, FullName, TableName, TypeDefinition,
     TypeReference,
 };
 
@@ -24,7 +24,7 @@ where
     fn insert_create_composite_type(
         &mut self,
         name: &FullName,
-        create_comp_type: &CreateCompositType,
+        create_comp_type: &CreateCompositeType,
     );
 
     /// insert create domain statement

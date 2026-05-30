@@ -6,7 +6,7 @@ mod infer;
 use std::collections::VecDeque;
 
 use crate::sem::{
-    ColumnCollection, ColumnDefinition, ColumnName, CreateCompositType, SemScalarExpr,
+    ColumnCollection, ColumnDefinition, ColumnName, CreateCompositeType, SemScalarExpr,
     TypeDefinition, TypeReference, create_comp_type::CompositeFieldCollection,
 };
 
@@ -105,8 +105,8 @@ impl OverloadVariant {
                     composite_type_fields.push(field_def);
                 }
             }
-            let composite = CreateCompositType::from_fields(&composite_type_fields);
-            let composite_type_def = TypeDefinition::CompositType(composite);
+            let composite = CreateCompositeType::from_fields(&composite_type_fields);
+            let composite_type_def = TypeDefinition::CompositeType(composite);
             Some(TypeReference::dynamic(&composite_type_def))
         } else {
             self.ret_type.clone()
@@ -119,7 +119,7 @@ impl OverloadVariant {
             .is_some_and(super::pg_type::TypeReference::is_record)
     }
 
-    /// get argment by zero based index
+    /// get argument by zero based index
     #[must_use]
     pub fn get_arg_def_at(&self, index: usize) -> Option<&FunctionParam> {
         self.params.get(index)
@@ -144,7 +144,7 @@ impl OverloadVariant {
         self.params.len()
     }
 
-    /// table fuction result set definitions
+    /// table function result set definitions
     #[must_use]
     pub fn returning_table(&self) -> ColumnCollection {
         let mut column_collection = ColumnCollection::default();
@@ -155,7 +155,7 @@ impl OverloadVariant {
         column_collection
     }
 
-    /// Get column from funtion result set
+    /// Get column from function result set
     #[must_use]
     pub fn get_result_column_def(&self, column: &ColumnName) -> Option<ColumnDefinition> {
         let retuning_table = self.returning_table();

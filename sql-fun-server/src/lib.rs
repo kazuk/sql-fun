@@ -49,9 +49,9 @@ pub struct Args {
 pub async fn service() -> Result<(), ServerError> {
     let args = Args::parse();
 
-    let listner = TcpListener::bind("127.0.0.1:0").await?;
+    let listener = TcpListener::bind("127.0.0.1:0").await?;
 
-    let local_addr = listner.local_addr()?;
+    let local_addr = listener.local_addr()?;
     let port = local_addr.port();
     let Some(_pid_file) = PidFile::try_register_primary_server(&args, port)? else {
         return Ok(());
@@ -60,7 +60,7 @@ pub async fn service() -> Result<(), ServerError> {
     loop {
         eprintln!("Server started at {local_addr}");
 
-        let (accepted_socker, remote_addr) = listner.accept().await?;
+        let (accepted_socker, remote_addr) = listener.accept().await?;
 
         tokio::task::spawn(async move { serve_client(accepted_socker, remote_addr).await });
     }
@@ -212,7 +212,7 @@ async fn serve_client(stream: TcpStream, addr: SocketAddr) -> Result<(), ServerE
     loop {
         let mut line = String::new();
         buf_read.read_line(&mut line).await?;
-        tracing::info!("{addr}: recieved {line}");
+        tracing::info!("{addr}: received {line}");
         let request_message: JsonRpcRequest = serde_json::from_str(&line)?;
         let response = process_request(&request_message).await;
         let response = match response {

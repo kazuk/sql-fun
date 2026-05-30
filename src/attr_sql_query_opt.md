@@ -1,4 +1,4 @@
-This macro attribute is used to ad-hoc query returing a optional single row from the database
+This macro attribute is used to ad-hoc query returning a optional single row from the database
 
 # Example
 

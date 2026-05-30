@@ -9,7 +9,7 @@ use cargo_metadata::MetadataCommand;
 use sql_fun_core::SqlFunArgs;
 use syn::{File, visit::Visit};
 
-/// Checks application embeded SQL statements
+/// Checks application embedded SQL statements
 #[derive(clap::Parser, Debug, Clone)]
 #[expect(clippy::struct_excessive_bools)]
 pub struct CheckArgs {
@@ -59,20 +59,20 @@ pub struct CheckArgs {
 
     /// Force rebuild schema cache
     ///
-    /// When specified, Clean schema dump cache before chcking, force parse schema dump and rebuild schema information
-    #[clap(long, help_heading = Self::SCHEMA_CACHE_CONTROLE_HEADING, conflicts_with = "validate_only")]
+    /// When specified, Clean schema dump cache before checking, force parse schema dump and rebuild schema information
+    #[clap(long, help_heading = Self::SCHEMA_CACHE_CONTROL_HEADING, conflicts_with = "validate_only")]
     force_rebuild: bool,
 
     /// Validate only
     ///
     /// When specified, Fail if schema dump or SQL statement change.
-    #[clap(long, help_heading = Self::SCHEMA_CACHE_CONTROLE_HEADING, conflicts_with = "force_rebuild")]
+    #[clap(long, help_heading = Self::SCHEMA_CACHE_CONTROL_HEADING, conflicts_with = "force_rebuild")]
     validate_only: bool,
 
     /// Expect Schema dump not changed
     ///
     /// When specified, Fail if schema dump changed
-    #[clap(long, help_heading = Self::SCHEMA_CACHE_CONTROLE_HEADING, conflicts_with = "force_rebuild")]
+    #[clap(long, help_heading = Self::SCHEMA_CACHE_CONTROL_HEADING, conflicts_with = "force_rebuild")]
     expect_schema_dump_valid: bool,
 
     /// Number of parallel jobs, default to # of CPUs
@@ -115,7 +115,7 @@ impl CheckArgs {
     const PACKAGE_SELECTION_HEADING: &str = "Package Selection";
     const TARGET_SELECTION_HEADING: &str = "Target Selection";
     const FEATURE_SELECTION_HEADING: &str = "Feature Selection";
-    const SCHEMA_CACHE_CONTROLE_HEADING: &str = "Schema Cache Controle";
+    const SCHEMA_CACHE_CONTROL_HEADING: &str = "Schema Cache Control";
     const COMPILATION_OPTIONS_HEADERS: &str = "Compilation Options";
     const MANIFEST_OPTIONS_HEADERS: &str = "Manifest Options";
 

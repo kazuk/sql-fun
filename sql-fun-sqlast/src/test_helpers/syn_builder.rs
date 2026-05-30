@@ -573,7 +573,7 @@ impl SynBuilder {
         NodeInner::FuncCall(func_call.into()).into()
     }
 
-    /// buid [crate::syn::RangeFunction]
+    /// build [crate::syn::RangeFunction]
     pub fn build_range_function(
         &self,
         func_call_node: Node,

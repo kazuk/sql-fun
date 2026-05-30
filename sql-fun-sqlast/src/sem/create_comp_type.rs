@@ -37,15 +37,15 @@ impl CompositeFieldCollection {
 
 /// analyzed [`crate::syn::CompositeTypeStmt`]
 #[derive(Debug, Clone, Eq, Hash, PartialEq, serde::Serialize, serde::Deserialize)]
-pub struct CreateCompositType {
+pub struct CreateCompositeType {
     type_ref: Option<TypeReference>,
     fields: CompositeFieldCollection,
 }
 
-impl CreateCompositType {
+impl CreateCompositeType {
     /// name of composite type,
     ///
-    /// When instanse is dynamic type and no-name , returns None
+    /// When instance is dynamic type and no-name , returns None
     #[must_use]
     pub fn name(&self) -> Option<&FullName> {
         self.type_ref.as_ref().map(|f| f.full_name())
@@ -164,7 +164,7 @@ impl TryFrom<&ColumnDef> for CompositeFieldDefinition {
 }
 
 /// analyze [`crate::syn::CompositeTypeStmt`]
-#[deprecated = "use CreateCompositType::analyze_create_comp_type"]
+#[deprecated = "use CreateCompositeType::analyze_create_comp_type"]
 pub fn analyze_create_comp_type<TParseContext>(
     context: TParseContext,
     parent_schema: &Option<String>,
@@ -173,5 +173,5 @@ pub fn analyze_create_comp_type<TParseContext>(
 where
     TParseContext: ParseContext,
 {
-    CreateCompositType::analyze_create_comp_type(context, parent_schema, syn)
+    CreateCompositeType::analyze_create_comp_type(context, parent_schema, syn)
 }

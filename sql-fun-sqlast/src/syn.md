@@ -7,14 +7,14 @@
 - AST query simplify as `as_variant().get_field().as_variant().get_field()`
   - finally `as_inner()` returns `Option<TFinalFieldValue>` 
 
-## sturct wrapping
+## struct wrapping
 
 - `Struct` : [`std::rc::Rc`] wrapping struct value
-  - expose fiels getter `get_field_name` returns field value.
+  - expose field getter `get_field_name` returns field value.
 - `StructOpt` : new-type wrapping `Option<Struct>`
   - expose field getter `get_field_name` returns Option value.
 - `StructList` : new-type wrapping of `Vec<Struct>`
-- `StructListOpt` : new-type wraping of `Oprion<Vec<Struct>>`
+- `StructListOpt` : new-type wrapping of `Option<Vec<Struct>>`
 
 ## enum wrapping
 
@@ -29,4 +29,4 @@
 
 - `Opt` trait supports `as_inner`, `unwrap`, `ok_or_else`, `map`
 - `ListOpt` trait supports `as_inner`, `get(index)`, `map`  
-  - `map` works implicitly `filter_map` (None value dissmissed)
+  - `map` works implicitly `filter_map` (None value dismissed)

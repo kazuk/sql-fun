@@ -26,7 +26,7 @@ pub enum ParseDumpFileError {
     ///
     /// # Note
     ///
-    /// Semantic analysis normaly continues semantic error and reports to [`crate::sem::ParseContext`].
+    /// Semantic analysis normally continues semantic error and reports to [`crate::sem::ParseContext`].
     ///
     /// Semantic Analysis Error indicates Analyzer Bug.(Unexpected syntax AST structure)
     ///
@@ -229,7 +229,7 @@ where
         self.1.get_source_file_path()
     }
 
-    fn set_source_file(&mut self, source_acess_service: Box<dyn SourceAccessService>) {
-        self.1.set_source_file(source_acess_service);
+    fn set_source_file(&mut self, source_access_service: Box<dyn SourceAccessService>) {
+        self.1.set_source_file(source_access_service);
     }
 }

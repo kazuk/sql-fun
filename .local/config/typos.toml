@@ -1,0 +1,14 @@
+[files]
+extend-exclude = [
+    "postgres",
+    "examples/adventure-works/schema.develop.sql",
+    "sql-fun-sqlast/src/syn/generated.rs",
+    "**/*.svg"
+]
+
+[default]
+locale = "en"
+
+[default.extend-words]
+inh="inh"
+larg="larg"

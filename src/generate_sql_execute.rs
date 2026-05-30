@@ -5,7 +5,7 @@ use syn::ItemFn;
 
 use crate::{Connector, SqlFunError, TokioPostgresCodeGenerator};
 
-/// generate for `sql_execture`
+/// generate for `sql_execute`
 pub fn generate_sql_execute(sql_str: &str, item: TokenStream) -> Result<TokenStream, SqlFunError> {
     let args = SqlFunArgs::try_from_env()?;
     let metadata = SqlFunMetadata::load_from(args.metadata_file()?)?;

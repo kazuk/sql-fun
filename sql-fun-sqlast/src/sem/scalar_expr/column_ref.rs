@@ -57,7 +57,7 @@ pub enum ColumnReferenceExpr {
     UndefinedFunction(UnknownTableFuncColumnRef),
     /// column not found
     UndefinedColumn(ColumnName),
-    /// column name ambigous
+    /// column name ambiguous
     AmbiguousColumnRef(ColumnName),
 }
 
@@ -154,7 +154,7 @@ impl ColumnReferenceExpr {
         )))
     }
 
-    /// create ambigous column reference instance
+    /// create ambiguous column reference instance
     pub fn ambiguous_column_with_report<TParseContext>(
         context: &mut TParseContext,
         column: &ColumnName,

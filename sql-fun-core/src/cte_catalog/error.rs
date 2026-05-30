@@ -47,7 +47,7 @@ pub enum CteCatalogError {
     FileIsNotCteCatalog(PathBuf),
 
     /// Named cte not found
-    #[error("{0} is not defiend in CTE catalog.")]
+    #[error("{0} is not defined in CTE catalog.")]
     CteNotFound(CteName),
 
     /// Parameter collection not exist

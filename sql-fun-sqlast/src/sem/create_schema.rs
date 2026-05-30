@@ -37,16 +37,16 @@ impl CreateSchema {
             AnalysisError::raise_unexpected_none("create_schema_stmt.schema_elts")?
         };
 
-        let mut sems = Vec::new();
+        let mut sem_items = Vec::new();
         for elt in elts {
             let AstAndContextPair(sem, new_context) =
                 SemAst::analyze_node(context, &schema_name, elt, tokens)?;
             context = new_context;
-            sems.push(sem);
+            sem_items.push(sem);
         }
         let schema = Self {
             name: name.clone(),
-            elements: sems,
+            elements: sem_items,
         };
         let context = context.apply_create_schema(&schema)?;
         Ok(AstAndContextPair::new(

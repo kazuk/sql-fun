@@ -180,7 +180,7 @@ impl MetadataArgs {
         }
         if let Some(value) = envs.get(Self::SQL_FUN_DIALECT) {
             let Ok(dialect) = SqlDialect::from_str(value) else {
-                return SqlFunArgsError::not_suppoted(value, "SQL Dialect");
+                return SqlFunArgsError::not_supported(value, "SQL Dialect");
             };
             builder.sql_dialect(dialect);
         }
@@ -500,7 +500,7 @@ impl MetadataArgs {
             return Ok(metadata.sql_dialect());
         };
         let Ok(dialect) = SqlDialect::from_str(dialect) else {
-            SqlFunArgsError::not_suppoted(dialect, "SQL Dialect")?
+            SqlFunArgsError::not_supported(dialect, "SQL Dialect")?
         };
         Ok(dialect)
     }

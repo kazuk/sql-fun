@@ -25,9 +25,14 @@ RUN sudo apt-get update \
 RUN curl -fsSL https://sh.rustup.rs \
     | sh -s -- -y --profile minimal --default-toolchain stable \
     && rustc -V && cargo -V
+RUN cargo install --locked --force \
+    cargo-binstall
+
+RUN cargo binstall --locked --force --root /opt/tools \
+    cargo-llvm-cov mdbook cargo-deny tera-cli taplo-cli cargo-nextest sccache cargo-sort
 
 RUN cargo install --locked --force --root /opt/tools \
-    cargo-llvm-cov mdbook cargo-deny tera-cli taplo-cli cargo-nextest sccache cargo-sort
+    cargo-binstall typos-cli
 
 # https://github.com/oraios/serena/archive/refs/tags/v0.1.4.tar.gz
 RUN curl -fsSL -o /opt/serena.tar.gz \

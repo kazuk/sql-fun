@@ -35,14 +35,14 @@ pub enum SqlValueExpr {
 /// Unexpected variant
 #[derive(thiserror::Error, Debug)]
 #[error("unexpected variant")]
-pub struct UnexpecedVariant;
+pub struct UnexpectedVariant;
 
 impl SqlValueExpr {
     /// get CurrentTimestamp variant
-    pub fn as_current_timestamp(&self) -> Result<&Option<TimePrecision>, UnexpecedVariant> {
+    pub fn as_current_timestamp(&self) -> Result<&Option<TimePrecision>, UnexpectedVariant> {
         match self {
             Self::CurrentTimestamp(c) => Ok(c),
-            _ => Err(UnexpecedVariant),
+            _ => Err(UnexpectedVariant),
         }
     }
 }

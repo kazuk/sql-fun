@@ -12,7 +12,7 @@ pub struct SubQueryColumnRef {
 impl super::ColumnReference for SubQueryColumnRef {
     fn get_type(&self) -> Option<TypeReference> {
         if let Some(col_def) = &self.column_def {
-            col_def.get_type()
+            col_def.get_type_cloned()
         } else {
             None
         }

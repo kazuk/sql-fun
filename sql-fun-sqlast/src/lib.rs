@@ -182,7 +182,6 @@ impl StringSpan {
     }
 }
 
-#[cfg(test)]
 pub mod test_helpers;
 
 #[cfg(test)]

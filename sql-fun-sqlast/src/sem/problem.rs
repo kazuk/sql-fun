@@ -12,8 +12,9 @@ use sql_fun_core::HighlighterTheme;
 use crate::{
     StringSpan,
     sem::{
-        AnalysisError, DefElemKey, FullName, OperatorName, SemScalarExpr, TypeDefinition,
-        TypeReference, create_table::ViewName, type_system::ArgumentBindingCollection,
+        AnalysisError, ColumnName, DefElemKey, FullName, OperatorName, SemScalarExpr, TableName,
+        TypeDefinition, TypeReference, create_table::ViewName,
+        type_system::ArgumentBindingCollection,
     },
 };
 
@@ -310,5 +311,16 @@ impl AnalysisProblem {
     #[tracing::instrument()]
     pub fn subquery_not_have_column_for_derived_column_name() -> Self {
         Self::SubQueryNotHaveColumnForDerivedColumnName()
+    }
+
+    pub(crate) fn foreign_key_column_type_missmatch(
+        _fk_table_name: &TableName,
+        _fk_column_name: &ColumnName,
+        _fk_column_type: &TypeReference,
+        _pk_table_name: &TableName,
+        _pk_column_name: &ColumnName,
+        _pk_column_type: &TypeReference,
+    ) -> Self {
+        todo!()
     }
 }

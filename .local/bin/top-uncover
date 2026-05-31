@@ -12,6 +12,8 @@ set -euo pipefail
 
 TOPN="${TOPN:-20}"
 
+OPEN="${OPEN:-0}"
+
 cargo llvm-cov nextest --workspace
 
 if ! command -v jq >/dev/null 2>&1; then
@@ -49,3 +51,7 @@ def fs:
 | .[]
 | "\(.uncovered)\t\(.total)\t\(.percent)\t\(.filename)"
 ' <<<"$json" | column -t
+
+if (( OPEN==1 )); then
+    cargo llvm-cov report --html --open
+fi

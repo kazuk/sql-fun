@@ -2,15 +2,15 @@ use crate::{
     sem::FullName,
     syn::{
         AConst, AConstInner, AExprKind, Alias, AliasBuilder, AliasOpt, AlterTableCmd,
-        AlterTableCmdBuilder, AlterTableStmt, AlterTableStmtBuilder, AlterTableType, CaseExpr,
-        CaseWhen, CoercionFormOpt, ConstrType, Constraint, ConstraintBuilder, DropBehaviorOpt,
-        FuncCallBuilder, FunctionParameter, FunctionParameterBuilder, FunctionParameterMode,
-        IndexElemBuilder, IndexStmtBuilder, IntegerBuilder, IntoClauseOpt, JoinExpr, JoinTypeOpt,
-        LimitOptionOpt, ListBuilder, Node, NodeInner, NodeList, NodeOpt, ObjectType, RangeFunction,
-        RangeFunctionBuilder, RangeSubselect, RangeSubselectBuilder, RangeTableFunc,
-        RangeTableFuncBuilder, RangeVarOpt, ResTarget, RoleSpecOpt, SelectStmt, SelectStmtOpt,
-        SetOperation, SortByDirOpt, SortByNullsOpt, StringBuilder, TypeName, TypeNameOpt,
-        WindowDefOpt, WithClauseOpt,
+        AlterTableCmdBuilder, AlterTableStmt, AlterTableStmtBuilder, AlterTableType,
+        BooleanBuilder, CaseExpr, CaseWhen, CoercionFormOpt, ConstrType, Constraint,
+        ConstraintBuilder, DropBehaviorOpt, FuncCallBuilder, FunctionParameter,
+        FunctionParameterBuilder, FunctionParameterMode, IndexElemBuilder, IndexStmtBuilder,
+        IntegerBuilder, IntoClauseOpt, JoinExpr, JoinTypeOpt, LimitOptionOpt, ListBuilder, Node,
+        NodeInner, NodeList, NodeOpt, ObjectType, RangeFunction, RangeFunctionBuilder,
+        RangeSubselect, RangeSubselectBuilder, RangeTableFunc, RangeTableFuncBuilder, RangeVarOpt,
+        ResTarget, RoleSpecOpt, SelectStmt, SelectStmtOpt, SetOperation, SortByDirOpt,
+        SortByNullsOpt, StringBuilder, TypeName, TypeNameOpt, WindowDefOpt, WithClauseOpt,
     },
 };
 
@@ -214,10 +214,10 @@ impl SynBuilder {
             .into()
     }
 
-    /// create [crate::syn::Constraint] primary key variant
-    pub fn constraint_primary_key(&self) -> Constraint {
-        ConstraintBuilder::default()
-            .contype(ConstrType::ConstrPrimary.into())
+    fn constraint_builder(contype: crate::syn::ConstrTypeOpt) -> ConstraintBuilder {
+        let mut builder = ConstraintBuilder::default();
+        builder
+            .contype(contype)
             .conname(String::default())
             .deferrable(false)
             .initdeferred(false)
@@ -247,7 +247,143 @@ impl SynBuilder {
             .fk_del_set_cols(NodeList::default())
             .old_conpfeqop(NodeList::default())
             .old_pktable_oid(0)
-            .location(0)
+            .location(0);
+        builder
+    }
+
+    /// create [crate::syn::Constraint] primary key variant
+    pub fn constraint_primary_key(&self) -> Constraint {
+        Self::constraint_builder(ConstrType::ConstrPrimary.into())
+            .build()
+            .unwrap()
+            .into()
+    }
+
+    /// create [crate::syn::Constraint] not null variant
+    pub fn constraint_not_null(&self) -> Constraint {
+        Self::constraint_builder(ConstrType::ConstrNotnull.into())
+            .build()
+            .unwrap()
+            .into()
+    }
+
+    /// create [crate::syn::Constraint] null variant
+    pub fn constraint_null(&self) -> Constraint {
+        Self::constraint_builder(ConstrType::ConstrNull.into())
+            .build()
+            .unwrap()
+            .into()
+    }
+
+    /// crate [crate::syn::Constraint] default variant
+    pub fn constraint_default(&self) -> Constraint {
+        let expr = NodeInner::AConst(self.const_int4(0)).into();
+        Self::constraint_builder(ConstrType::ConstrDefault.into())
+            .raw_expr(expr)
+            .build()
+            .unwrap()
+            .into()
+    }
+
+    /// crate [crate::syn::Constraint] identity variant
+    pub fn constraint_identity(&self, generated_when: &str) -> Constraint {
+        Self::constraint_builder(ConstrType::ConstrIdentity.into())
+            .generated_when(String::from(generated_when))
+            .build()
+            .unwrap()
+            .into()
+    }
+
+    /// crate [crate::syn::Constraint] generated variant
+    pub fn constraint_generated(&self, generated_when: &str) -> Constraint {
+        let expr = NodeInner::AConst(self.const_int4(0)).into();
+        Self::constraint_builder(ConstrType::ConstrGenerated.into())
+            .generated_when(String::from(generated_when))
+            .raw_expr(expr)
+            .build()
+            .unwrap()
+            .into()
+    }
+
+    /// crate [crate::syn::Constraint] unique variant
+    pub fn constraint_unique(&self) -> Constraint {
+        Self::constraint_builder(ConstrType::ConstrUnique.into())
+            .build()
+            .unwrap()
+            .into()
+    }
+
+    /// crate [crate::syn::Constraint] identity variant
+    pub fn constraint_check(&self) -> Constraint {
+        let expr = NodeInner::AConst(
+            AConstInner::Boolval(
+                BooleanBuilder::default()
+                    .boolval(false)
+                    .build()
+                    .unwrap()
+                    .into(),
+            )
+            .into(),
+        )
+        .into();
+        Self::constraint_builder(ConstrType::ConstrCheck.into())
+            .raw_expr(expr)
+            .build()
+            .unwrap()
+            .into()
+    }
+
+    /// crate [crate::syn::Constraint] exclusion variant
+    pub fn constraint_exclusion(&self) -> Constraint {
+        Self::constraint_builder(ConstrType::ConstrExclusion.into())
+            .build()
+            .unwrap()
+            .into()
+    }
+
+    /// crate [crate::syn::Constraint] foreign variant
+    pub fn constraint_foreign(&self) -> Constraint {
+        Self::constraint_builder(ConstrType::ConstrForeign.into())
+            .pktable(
+                self.range_var(&FullName::from_local_name("pktable"), &AliasOpt::none())
+                    .into(),
+            )
+            .pk_attrs(
+                self.as_node_list(&[self.as_string_node(self.string("pkcol"))])
+                    .into(),
+            )
+            .build()
+            .unwrap()
+            .into()
+    }
+
+    /// crate [crate::syn::Constraint] attr deferrable variant
+    pub fn constraint_attr_deferrable(&self) -> Constraint {
+        Self::constraint_builder(ConstrType::ConstrAttrDeferrable.into())
+            .build()
+            .unwrap()
+            .into()
+    }
+
+    /// crate [crate::syn::Constraint] attr not deferrable variant
+    pub fn constraint_attr_not_deferrable(&self) -> Constraint {
+        Self::constraint_builder(ConstrType::ConstrAttrNotDeferrable.into())
+            .build()
+            .unwrap()
+            .into()
+    }
+
+    /// crate [crate::syn::Constraint] attr deferred variant
+    pub fn constraint_attr_deferred(&self) -> Constraint {
+        Self::constraint_builder(ConstrType::ConstrAttrDeferred.into())
+            .build()
+            .unwrap()
+            .into()
+    }
+
+    /// crate [crate::syn::Constraint] attr immediate variant
+    pub fn constraint_attr_immediate(&self) -> Constraint {
+        Self::constraint_builder(ConstrType::ConstrAttrImmediate.into())
             .build()
             .unwrap()
             .into()

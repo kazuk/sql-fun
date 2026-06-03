@@ -1742,7 +1742,7 @@ impl ForeignKeyColumnConstraint {
 
         let primary_key_column_type = if let Some(pk_table) = context.get_table(&primary_key_table)
         {
-            if let Some(pk_col_def) = pk_table.get_column_def(column_name) {
+            if let Some(pk_col_def) = pk_table.get_column_def(&primary_key_column) {
                 pk_col_def.get_type()
             } else {
                 context.report_problem(AnalysisProblem::column_not_found_in_table(

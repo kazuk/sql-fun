@@ -284,7 +284,7 @@ mod test_get_column_def_and_name {
         let expr = make_table_column_expr("col", &col_type, Some(true));
 
         let col_def = expr.get_column_def().expect("column definition");
-        assert_eq!(col_def.get_type(), Some(col_type));
+        assert_eq!(col_def.get_type_cloned(), Some(col_type));
         assert_eq!(expr.get_column_name(), "col");
     }
 }

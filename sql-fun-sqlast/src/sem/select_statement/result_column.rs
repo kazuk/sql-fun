@@ -72,7 +72,7 @@ mod test_result_column_create_column_definition {
         let col = ResultColumn::new(&None, &None, &None);
         let column_definition = col.create_column_definition();
         assert_eq!(column_definition.name(), &None);
-        assert_eq!(column_definition.get_type(), None);
+        assert_eq!(column_definition.get_type_cloned(), None);
     }
 }
 

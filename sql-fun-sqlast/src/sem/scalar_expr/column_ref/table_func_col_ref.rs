@@ -21,7 +21,7 @@ pub struct TableFunctionColumnRef {
 impl ColumnReference for TableFunctionColumnRef {
     fn get_type(&self) -> Option<TypeReference> {
         if let Some(col_def) = &self.column_def {
-            col_def.get_type()
+            col_def.get_type_cloned()
         } else {
             None
         }

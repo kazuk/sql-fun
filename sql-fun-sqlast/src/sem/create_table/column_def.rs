@@ -56,8 +56,14 @@ impl ColumnDefinition {
 
     /// get [`TypeReference`]
     #[must_use]
-    pub fn get_type(&self) -> Option<TypeReference> {
+    pub fn get_type_cloned(&self) -> Option<TypeReference> {
         self.type_ref.clone()
+    }
+
+    /// get [`TypeReference`]
+    #[must_use]
+    pub fn get_type(&self) -> Option<&TypeReference> {
+        self.type_ref.as_ref()
     }
 
     /// column nullability
@@ -124,9 +130,30 @@ impl ColumnDefinition {
         {
             let mut constraints = Vec::new();
             for constraint in constraint_list {
-                let (c, new_context) =
-                    ColumnConstraint::analyze_constraint(context, table_name, &constraint, tokens)?;
+                let (c, new_context) = ColumnConstraint::analyze_constraint(
+                    context,
+                    table_name,
+                    &colname,
+                    &constraint,
+                    tokens,
+                )?;
                 context = new_context;
+
+                if let Some(fk) = c.as_foreign_key()
+                    && let Some(col_type) = &type_ref
+                    && let Some(pk_col_type) = fk.primary_key_column_type()
+                    && col_type != pk_col_type
+                {
+                    context.report_problem(AnalysisProblem::foreign_key_column_type_mismatch(
+                        table_name,
+                        &colname,
+                        col_type,
+                        fk.primary_key_table(),
+                        fk.primary_key_column(),
+                        pk_col_type,
+                    ))?;
+                }
+
                 constraints.push(c)
             }
             constraints

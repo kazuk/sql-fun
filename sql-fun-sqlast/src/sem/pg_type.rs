@@ -129,10 +129,10 @@ impl TypeDefinition {
             Self::TableRef(table_name, _type_reference) => context
                 .get_table(table_name)?
                 .get_column_def(&ColumnName::from(member))?
-                .get_type(),
+                .get_type_cloned(),
             Self::ImplicitComposite(cols) => {
                 let cd = cols.get_column_def(&ColumnName::from(member))?;
-                cd.get_type()
+                cd.get_type_cloned()
             }
         }
     }

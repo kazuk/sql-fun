@@ -313,7 +313,7 @@ impl AnalysisProblem {
         Self::SubQueryNotHaveColumnForDerivedColumnName()
     }
 
-    pub(crate) fn foreign_key_column_type_missmatch(
+    pub(crate) fn foreign_key_column_type_mismatch(
         _fk_table_name: &TableName,
         _fk_column_name: &ColumnName,
         _fk_column_type: &TypeReference,

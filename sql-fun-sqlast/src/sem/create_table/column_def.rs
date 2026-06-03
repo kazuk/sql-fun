@@ -144,7 +144,7 @@ impl ColumnDefinition {
                     && let Some(pk_col_type) = fk.primary_key_column_type()
                     && col_type != pk_col_type
                 {
-                    context.report_problem(AnalysisProblem::foreign_key_column_type_missmatch(
+                    context.report_problem(AnalysisProblem::foreign_key_column_type_mismatch(
                         table_name,
                         &colname,
                         col_type,

@@ -55,7 +55,7 @@ impl SemValueBuilder {
         ColumnName::from(column_name)
     }
 
-    /// create constaint int expression
+    /// create constraint int expression
     pub fn const_int_expr(&self, value: i32) -> SemScalarExpr {
         SemScalarExpr::Const(ScalarConstExpr::Integer(value))
     }

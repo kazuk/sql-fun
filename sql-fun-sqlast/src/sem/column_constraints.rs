@@ -43,10 +43,10 @@ pub enum ColumnConstraint {
     ForeignKey(ForeignKeyColumnConstraint),
     /// attr deferrability
     AttrDeferrability(AttrDeferrabilityColumnConstraint),
-    /// attr Defferred
+    /// attr Deferred
     AttrDeferred(AttrDeferredColumnConstraint),
-    /// attr Immidiate
-    AttrImmidiate(AttrImmidiateColumnConstraint),
+    /// attr Immediate
+    AttrImmediate(AttrImmediateColumnConstraint),
     /// collate column constraint
     Collate(CollateColumnConstraint),
 }
@@ -76,8 +76,8 @@ pub enum ColumnConstraintKind {
     AttrDeferrability,
     /// deferred constraint
     AttrDeferred,
-    /// immidiate constraint
-    AttrImmidiate,
+    /// immediate constraint
+    AttrImmediate,
     /// collate constraint
     Collate,
 }
@@ -96,7 +96,7 @@ impl ColumnConstraintTrait for ColumnConstraint {
             Self::ForeignKey(_) => ColumnConstraintKind::ForeignKey,
             Self::AttrDeferrability(_) => ColumnConstraintKind::AttrDeferrability,
             Self::AttrDeferred(_) => ColumnConstraintKind::AttrDeferred,
-            Self::AttrImmidiate(_) => ColumnConstraintKind::AttrImmidiate,
+            Self::AttrImmediate(_) => ColumnConstraintKind::AttrImmediate,
             Self::Collate(_) => ColumnConstraintKind::Collate,
         }
     }
@@ -114,7 +114,7 @@ impl ColumnConstraintTrait for ColumnConstraint {
             Self::ForeignKey(c) => c.table_name(),
             Self::AttrDeferrability(c) => c.table_name(),
             Self::AttrDeferred(c) => c.table_name(),
-            Self::AttrImmidiate(c) => c.table_name(),
+            Self::AttrImmediate(c) => c.table_name(),
             Self::Collate(c) => c.table_name(),
         }
     }
@@ -132,7 +132,7 @@ impl ColumnConstraintTrait for ColumnConstraint {
             Self::ForeignKey(c) => c.column_name(),
             Self::AttrDeferrability(c) => c.column_name(),
             Self::AttrDeferred(c) => c.column_name(),
-            Self::AttrImmidiate(c) => c.column_name(),
+            Self::AttrImmediate(c) => c.column_name(),
             Self::Collate(c) => c.column_name(),
         }
     }
@@ -144,7 +144,7 @@ mod test_column_constraint_trait_for_column_constraint {
     use crate::{
         sem::{
             AttrDeferrabilityColumnConstraint, AttrDeferredColumnConstraint,
-            AttrImmidiateColumnConstraint, CheckColumnConstraint, CollateColumnConstraint,
+            AttrImmediateColumnConstraint, CheckColumnConstraint, CollateColumnConstraint,
             ColumnConstraint, ColumnConstraintKind, ColumnConstraintTrait, DefaultColumnConstraint,
             ExclusionColumnConstraint, ForeignKeyColumnConstraint, GeneratedColumnConstraint,
             GeneratedColumnMode, IdentityColumnConstraint, IdentityColumnMode,
@@ -415,16 +415,16 @@ mod test_column_constraint_trait_for_column_constraint {
     }
 
     #[rstest::rstest]
-    fn test_kind_attr_immidiate(sem_builder: SemValueBuilder) -> TestResult {
-        let c = AttrImmidiateColumnConstraint::new(
+    fn test_kind_attr_immediate(sem_builder: SemValueBuilder) -> TestResult {
+        let c = AttrImmediateColumnConstraint::new(
             &sem_builder.table_name("table_one"),
             &sem_builder.column_name("column_one"),
         );
-        assert_eq!(c.kind(), ColumnConstraintKind::AttrImmidiate);
-        let column_constraint = ColumnConstraint::attr_immidiate(c);
+        assert_eq!(c.kind(), ColumnConstraintKind::AttrImmediate);
+        let column_constraint = ColumnConstraint::attr_immediate(c);
         assert_eq!(
             column_constraint.kind(),
-            ColumnConstraintKind::AttrImmidiate
+            ColumnConstraintKind::AttrImmediate
         );
         assert_eq!(
             "table_one",
@@ -435,7 +435,7 @@ mod test_column_constraint_trait_for_column_constraint {
                 .as_str()
         );
         assert_eq!("column_one", column_constraint.column_name().as_str());
-        assert!(column_constraint.as_attr_immidiate().is_some());
+        assert!(column_constraint.as_attr_immediate().is_some());
         Ok(())
     }
 
@@ -595,14 +595,14 @@ impl ColumnConstraint {
                 Self::attr_deferred(c)
             }
             ConstrType::ConstrAttrImmediate => {
-                let (c, new_context) = AttrImmidiateColumnConstraint::analyze_constraint(
+                let (c, new_context) = AttrImmediateColumnConstraint::analyze_constraint(
                     context,
                     table_name,
                     column_name,
                     syn,
                 )?;
                 context = new_context;
-                Self::attr_immidiate(c)
+                Self::attr_immediate(c)
             }
             ConstrType::OptionNone | ConstrType::Undefined => {
                 AnalysisError::raise_unexpected_input("constraint.contype")?;
@@ -699,7 +699,7 @@ mod column_constraint_analyze_constraint_tests {
         ColumnConstraintKind::AttrDeferrability
     )]
     #[case::constr_deferred(constr_attr_deferred(), ColumnConstraintKind::AttrDeferred)]
-    #[case::constr_immediate(constr_attr_immediate(), ColumnConstraintKind::AttrImmidiate)]
+    #[case::constr_immediate(constr_attr_immediate(), ColumnConstraintKind::AttrImmediate)]
     fn test_analyze_constraint(
         test_context: TestParseContext,
         #[case] syn: Constraint,
@@ -1461,7 +1461,7 @@ mod test_generated_column_mode_from_pg {
     #[rstest::rstest]
     #[case("s", GeneratedColumnMode::Stored)]
     #[case("v", GeneratedColumnMode::Virtual)]
-    fn test_generated_colum_mode(
+    fn test_generated_column_mode(
         #[case] value: &str,
         #[case] expected: GeneratedColumnMode,
     ) -> TestResult {
@@ -1561,7 +1561,7 @@ impl GeneratedColumnConstraint {
 }
 
 impl ColumnConstraint {
-    /// create Genereted variant
+    /// create Generated variant
     pub fn generated(value: GeneratedColumnConstraint) -> Self {
         Self::Generated(value)
     }
@@ -1933,12 +1933,12 @@ impl ColumnConstraint {
 
 /// immediate constraint
 #[derive(Debug, Eq, Hash, PartialEq, serde::Serialize, serde::Deserialize, Clone)]
-pub struct AttrImmidiateColumnConstraint {
+pub struct AttrImmediateColumnConstraint {
     table_name: TableName,
     column_name: ColumnName,
 }
 
-impl AttrImmidiateColumnConstraint {
+impl AttrImmediateColumnConstraint {
     /// create instance
     pub fn new(table_name: &TableName, column_name: &ColumnName) -> Self {
         Self {
@@ -1948,9 +1948,9 @@ impl AttrImmidiateColumnConstraint {
     }
 }
 
-impl ColumnConstraintTrait for AttrImmidiateColumnConstraint {
+impl ColumnConstraintTrait for AttrImmediateColumnConstraint {
     fn kind(&self) -> ColumnConstraintKind {
-        ColumnConstraintKind::AttrImmidiate
+        ColumnConstraintKind::AttrImmediate
     }
 
     fn table_name(&self) -> &TableName {
@@ -1962,7 +1962,7 @@ impl ColumnConstraintTrait for AttrImmidiateColumnConstraint {
     }
 }
 
-impl AttrImmidiateColumnConstraint {
+impl AttrImmediateColumnConstraint {
     /// analyze [`crate::syn::Constraint`]
     pub fn analyze_constraint<TParseContext>(
         context: TParseContext,
@@ -1986,14 +1986,14 @@ impl AttrImmidiateColumnConstraint {
 }
 
 impl ColumnConstraint {
-    /// create AttrImmidiate variant
-    pub fn attr_immidiate(value: AttrImmidiateColumnConstraint) -> Self {
-        Self::AttrImmidiate(value)
+    /// create AttrImmediate variant
+    pub fn attr_immediate(value: AttrImmediateColumnConstraint) -> Self {
+        Self::AttrImmediate(value)
     }
 
-    /// get AttrImmidiate variant
-    pub fn as_attr_immidiate(&self) -> Option<&AttrImmidiateColumnConstraint> {
-        if let Self::AttrImmidiate(c) = self {
+    /// get AttrImmediate variant
+    pub fn as_attr_immediate(&self) -> Option<&AttrImmediateColumnConstraint> {
+        if let Self::AttrImmediate(c) = self {
             Some(c)
         } else {
             None

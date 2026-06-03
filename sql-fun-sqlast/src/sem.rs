@@ -51,7 +51,7 @@ pub use self::{
     cast::{CastContext, CastDefinition},
     column_constraints::{
         AttrDeferrabilityColumnConstraint, AttrDeferredColumnConstraint,
-        AttrImmidiateColumnConstraint, CheckColumnConstraint, CollateColumnConstraint,
+        AttrImmediateColumnConstraint, CheckColumnConstraint, CollateColumnConstraint,
         ColumnConstraint, ColumnConstraintKind, ColumnConstraintTrait, ColumnNullabilityConstraint,
         ConflictClause, DefaultColumnConstraint, Deferrable, ExclusionColumnConstraint,
         ForeignKeyColumnConstraint, GeneratedColumnConstraint, GeneratedColumnMode,

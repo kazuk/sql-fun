@@ -34,6 +34,7 @@ pub struct TestParseContext {
     create_indexes: Vec<CreateIndex>,
     problems: Vec<AnalysisProblem>,
     source: Option<SourcePathWithSpan>,
+    table_ref_types: Vec<TableName>,
 }
 
 /// get [TestParseContext]
@@ -91,7 +92,7 @@ impl SearchPathRead for TestParseContext {
     }
 
     fn get_default_schema(&self) -> Option<SchemaName> {
-        todo!()
+        self.search_path.get(0).cloned()
     }
 }
 
@@ -200,8 +201,9 @@ impl TableInfoWrite for TestParseContext {
         Ok(self)
     }
 
-    fn insert_create_table(&mut self, _name: &FullName, _create_table: &CreateTable) {
-        todo!()
+    fn insert_create_table(&mut self, table_name: &FullName, create_table: &CreateTable) {
+        self.table_definitions
+            .insert(table_name.clone(), Some(create_table.clone()));
     }
 }
 
@@ -314,8 +316,8 @@ impl BaseParseContext for TestParseContext {
 }
 
 impl TypeInfoWrite for TestParseContext {
-    fn insert_table_ref_type(&mut self, _name: &TableName) {
-        todo!()
+    fn insert_table_ref_type(&mut self, name: &TableName) {
+        self.table_ref_types.push(name.clone());
     }
 
     fn insert_create_composite_type(

@@ -35,9 +35,12 @@ impl TableDefinitionCollection {
         Ok(implicit_changes)
     }
 
-    fn push_drop_statement(&mut self, drop_table: &DropTable) -> Result<bool, AnalysisError> {
-        let name = drop_table.table_name();
-        if let Some(table) = self.get_mut(name.full_name()) {
+    fn push_drop_statement(
+        &mut self,
+        table_name: &TableName,
+        drop_table: &DropTable,
+    ) -> Result<bool, AnalysisError> {
+        if let Some(table) = self.get_mut(table_name.full_name()) {
             table.push_drop_statement(drop_table);
             Ok(true)
         } else {
@@ -83,10 +86,11 @@ where
         mut self,
         drop_table: &crate::sem::DropTable,
     ) -> Result<Self, AnalysisError> {
-        let table_name = drop_table.table_name();
-        if !self.tables.push_drop_statement(drop_table)? {
-            self.report_problem(AnalysisProblem::table_not_found(table_name))?;
-            return Ok(self);
+        let table_names = drop_table.table_names();
+        for table_name in table_names {
+            if !self.tables.push_drop_statement(table_name, drop_table)? {
+                self.report_problem(AnalysisProblem::table_not_found(table_name))?;
+            }
         }
         Ok(self)
     }

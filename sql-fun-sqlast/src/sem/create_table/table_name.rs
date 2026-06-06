@@ -36,3 +36,11 @@ impl TryFrom<RangeVar> for TableName {
         Ok(Self(FullName::try_from(value)?))
     }
 }
+
+#[cfg(test)]
+impl TableName {
+    /// assert table name is expected value
+    pub fn assert_table_name(&self, expected: &str) {
+        assert_eq!(self.full_name().name().as_str(), expected)
+    }
+}

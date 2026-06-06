@@ -5,7 +5,7 @@ use crate::{
 };
 
 /// create view statement
-#[derive(derive_getters::Getters)]
+#[derive(derive_getters::Getters, Debug)]
 pub struct CreateView {
     temporary: bool,
     if_not_exists: bool,
@@ -38,7 +38,7 @@ impl CreateView {
 /// This AST is turso experimental feature
 /// accessing `view_name` reports notify `engine_specific::TursoMaterializedViewFeature`
 ///
-#[derive(derive_getters::Getters)]
+#[derive(derive_getters::Getters, Debug)]
 pub struct CreateMaterializedView {
     if_not_exists: bool,
     #[getter(skip)]
@@ -74,7 +74,7 @@ impl CreateMaterializedView {
 }
 
 /// drop view statement
-#[derive(derive_getters::Getters)]
+#[derive(derive_getters::Getters, Debug)]
 pub struct DropView {
     if_exists: bool,
     view_name: QualifiedName,

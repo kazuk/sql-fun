@@ -1,7 +1,7 @@
 use crate::syn::sqlite::{Name, QualifiedName, ResolveType, ResultColumn, Select, Upsert, With};
 
 /// insert statement
-#[derive(derive_getters::Getters)]
+#[derive(derive_getters::Getters, Debug)]
 pub struct InsertStatement {
     with: Option<With>,
     or_conflict: Option<ResolveType>,
@@ -35,6 +35,7 @@ impl InsertStatement {
 use turso_parser::ast::InsertBody as InsertBodyIn;
 
 /// insert statement body
+#[derive(Debug)]
 pub enum InsertBody {
     /// select
     Select(Box<InsertBodySelect>),
@@ -55,7 +56,7 @@ impl From<InsertBodyIn> for InsertBody {
 }
 
 /// select for insert
-#[derive(derive_getters::Getters)]
+#[derive(derive_getters::Getters, Debug)]
 pub struct InsertBodySelect {
     select: Select,
     upsert: Option<Box<Upsert>>,

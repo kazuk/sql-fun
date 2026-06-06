@@ -1,7 +1,7 @@
 use crate::syn::sqlite::Expr;
 
 /// attach statement
-#[derive(derive_getters::Getters)]
+#[derive(derive_getters::Getters, Debug)]
 pub struct AttachStatement {
     expr: Box<Expr>,
     db_name: Box<Expr>,
@@ -20,7 +20,7 @@ impl AttachStatement {
 }
 
 /// detach statement
-#[derive(derive_getters::Getters)]
+#[derive(derive_getters::Getters, Debug)]
 pub struct DetachStatement {
     db_name: Box<Expr>,
 }

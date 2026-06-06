@@ -3,7 +3,7 @@ use crate::sem::AnalysisError;
 use crate::syn::sqlite::{Expr, Name, Type};
 
 /// create type statement
-#[derive(derive_getters::Getters)]
+#[derive(derive_getters::Getters, Debug)]
 pub struct CreateTypeStatement {
     if_not_exists: bool,
     #[getter(skip)]
@@ -33,7 +33,7 @@ impl CreateTypeStatement {
 
 use turso_parser::ast::CreateTypeBody as CreateTypeBodyIn;
 
-#[derive(derive_getters::Getters)]
+#[derive(derive_getters::Getters, Debug)]
 pub struct CreateCustomType {
     params: Vec<TypeParam>,
     base: String,
@@ -64,6 +64,7 @@ impl CreateCustomType {
 }
 
 /// create type statement body
+#[derive(Debug)]
 pub enum CreateTypeBody {
     /// create a custom type
     CustomType(CreateCustomType),
@@ -103,7 +104,7 @@ impl From<CreateTypeBodyIn> for CreateTypeBody {
 
 use turso_parser::ast::TypeField as TypeFieldIn;
 
-#[derive(derive_getters::Getters)]
+#[derive(derive_getters::Getters, Debug)]
 pub struct TypeField {
     name: Name,
     field_type: Type,
@@ -121,7 +122,7 @@ impl From<TypeFieldIn> for TypeField {
 use turso_parser::ast::TypeParam as TypeParamIn;
 
 /// type parameter
-#[derive(derive_getters::Getters)]
+#[derive(derive_getters::Getters, Debug)]
 pub struct TypeParam {
     name: String,
     ty: Option<String>,
@@ -139,7 +140,7 @@ impl From<TypeParamIn> for TypeParam {
 use turso_parser::ast::TypeOperator as TypeOperatorIn;
 
 /// type operator
-#[derive(derive_getters::Getters)]
+#[derive(derive_getters::Getters, Debug)]
 pub struct TypeOperator {
     op: String,
     func_name: Option<String>,
@@ -155,7 +156,7 @@ impl From<TypeOperatorIn> for TypeOperator {
 }
 
 /// drop type statement
-#[derive(derive_getters::Getters)]
+#[derive(derive_getters::Getters, Debug)]
 pub struct DropTypeStatement {
     if_exists: bool,
     #[getter(skip)]

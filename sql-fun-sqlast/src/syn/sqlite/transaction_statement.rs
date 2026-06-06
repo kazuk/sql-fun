@@ -1,7 +1,7 @@
 use crate::syn::sqlite::Name;
 
 /// begin transaction statement
-#[derive(derive_getters::Getters)]
+#[derive(derive_getters::Getters, Debug)]
 pub struct BeginStatement {
     transaction_type: Option<TransactionType>,
     name: Option<Name>,
@@ -18,7 +18,7 @@ impl BeginStatement {
 }
 
 /// commit statement
-#[derive(derive_getters::Getters)]
+#[derive(derive_getters::Getters, Debug)]
 pub struct CommitStatement {
     name: Option<Name>,
 }
@@ -31,7 +31,7 @@ impl CommitStatement {
 }
 
 /// rollback statement
-#[derive(derive_getters::Getters)]
+#[derive(derive_getters::Getters, Debug)]
 pub struct RollbackStatement {
     tx_name: Option<Name>,
     savepoint_name: Option<Name>,
@@ -48,7 +48,7 @@ impl RollbackStatement {
 }
 
 /// savepoint statement
-#[derive(derive_getters::Getters)]
+#[derive(derive_getters::Getters, Debug)]
 pub struct SavepointStatement {
     name: Name,
 }
@@ -61,7 +61,7 @@ impl SavepointStatement {
 }
 
 /// release transaction statement
-#[derive(derive_getters::Getters)]
+#[derive(derive_getters::Getters, Debug)]
 pub struct ReleaseStatement {
     name: Name,
 }
@@ -76,6 +76,7 @@ impl ReleaseStatement {
 use turso_parser::ast::TransactionType as TransactionTypeIn;
 
 /// transaction type
+#[derive(Debug)]
 pub enum TransactionType {
     /// deferred
     Deferred,

@@ -117,6 +117,11 @@ pub use self::{
     with::{CommonTableExpr, Materialized, With},
 };
 
+#[cfg(test)]
+pub use self::names::{
+    NameBuilder, NameBuilderError, QualifiedNameBuilder, QualifiedNameBuilderError,
+};
+
 use turso_parser::ast::As as AsIn;
 
 /// as clause
@@ -142,6 +147,7 @@ impl From<AsIn> for As {
 
 use turso_parser::ast::Stmt as StmtIn;
 
+#[derive(Debug)]
 /// statements
 pub enum Stmt {
     /// alter table

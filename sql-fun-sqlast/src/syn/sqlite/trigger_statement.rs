@@ -5,6 +5,7 @@ use crate::syn::sqlite::{
 use turso_parser::ast::TriggerTime as TriggerTimeIn;
 
 /// trigger time option
+#[derive(Debug)]
 pub enum TriggerTime {
     /// before
     Before,
@@ -27,6 +28,7 @@ impl From<TriggerTimeIn> for TriggerTime {
 use turso_parser::ast::TriggerEvent as TriggerEventIn;
 
 /// trigger event value
+#[derive(Debug)]
 pub enum TriggerEvent {
     /// delete
     Delete,
@@ -52,7 +54,7 @@ impl From<TriggerEventIn> for TriggerEvent {
 }
 
 /// trigger command update option
-#[derive(derive_getters::Getters)]
+#[derive(derive_getters::Getters, Debug)]
 pub struct TriggerCmdUpdate {
     or_conflict: Option<ResolveType>,
     table_name: Name,
@@ -81,7 +83,7 @@ impl TriggerCmdUpdate {
 }
 
 /// trigger command insert option
-#[derive(derive_getters::Getters)]
+#[derive(derive_getters::Getters, Debug)]
 pub struct TriggerCmdInsert {
     or_conflict: Option<ResolveType>,
     table_name: Name,
@@ -113,7 +115,7 @@ impl TriggerCmdInsert {
 }
 
 /// trigger command delete option
-#[derive(derive_getters::Getters)]
+#[derive(derive_getters::Getters, Debug)]
 pub struct TriggerCmdDelete {
     table_name: Name,
     where_clause: Option<Box<Expr>>,
@@ -132,6 +134,7 @@ impl TriggerCmdDelete {
 use turso_parser::ast::TriggerCmd as TriggerCmdIn;
 
 /// trigger command
+#[derive(Debug)]
 pub enum TriggerCmd {
     /// update
     Update(TriggerCmdUpdate),
@@ -187,7 +190,7 @@ impl From<TriggerCmdIn> for TriggerCmd {
 }
 
 /// create trigger statement
-#[derive(derive_getters::Getters)]
+#[derive(derive_getters::Getters, Debug)]
 pub struct CreateTriggerStatement {
     temporary: bool,
     if_not_exists: bool,
@@ -229,7 +232,7 @@ impl CreateTriggerStatement {
 }
 
 /// drop trigger statement
-#[derive(derive_getters::Getters)]
+#[derive(derive_getters::Getters, Debug)]
 pub struct DropTriggerStatement {
     if_exists: bool,
     trigger_name: QualifiedName,

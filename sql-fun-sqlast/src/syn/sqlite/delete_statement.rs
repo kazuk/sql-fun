@@ -1,7 +1,7 @@
 use crate::syn::sqlite::{Expr, Indexed, Limit, QualifiedName, ResultColumn, SortedColumn, With};
 
 /// delete statement
-#[derive(derive_getters::Getters)]
+#[derive(derive_getters::Getters, Debug)]
 pub struct DeleteStatement {
     with: Option<With>,
     table_name: QualifiedName,

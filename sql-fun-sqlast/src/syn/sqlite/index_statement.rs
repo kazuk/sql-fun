@@ -5,7 +5,7 @@ use crate::{
 };
 
 /// create index statement
-#[derive(derive_getters::Getters)]
+#[derive(derive_getters::Getters, Debug)]
 pub struct CreateIndexStatement {
     unique: bool,
     if_not_exists: bool,
@@ -47,7 +47,7 @@ impl CreateIndexStatement {
 }
 
 /// drop index statement
-#[derive(derive_getters::Getters)]
+#[derive(derive_getters::Getters, Debug)]
 pub struct DropIndexStatement {
     if_exists: bool,
     idx_name: QualifiedName,
@@ -64,7 +64,7 @@ impl DropIndexStatement {
 }
 
 /// reindex statement
-#[derive(derive_getters::Getters)]
+#[derive(derive_getters::Getters, Debug)]
 pub struct ReindexStatement {
     idx_name: Option<QualifiedName>,
 }
@@ -77,6 +77,7 @@ impl ReindexStatement {
 }
 
 /// optimize statement
+#[derive(Debug)]
 pub struct OptimizeStatement {
     idx_name: Option<QualifiedName>,
 }

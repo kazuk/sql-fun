@@ -1,7 +1,7 @@
 use crate::syn::sqlite::{Expr, Name};
 
 /// vacuum statement
-#[derive(derive_getters::Getters)]
+#[derive(derive_getters::Getters, Debug)]
 pub struct VacuumStatement {
     db_name: Option<Name>,
     into: Option<Box<Expr>>,

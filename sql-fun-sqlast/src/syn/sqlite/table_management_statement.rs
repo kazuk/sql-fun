@@ -5,6 +5,7 @@ use crate::syn::sqlite::{
 use turso_parser::ast::AlterTableBody as AlterTableBodyIn;
 
 /// alter table commands
+#[derive(Debug)]
 pub enum AlterTableBody {
     /// rename table
     RenameTo(Name),
@@ -39,6 +40,7 @@ impl From<AlterTableBodyIn> for AlterTableBody {
 use turso_parser::ast::AlterTable as AlterTableIn;
 
 /// alter table statement
+#[derive(Debug)]
 pub struct AlterTable {
     name: QualifiedName,
     body: AlterTableBody,
@@ -238,7 +240,7 @@ impl DropTableStatement {
 use turso_parser::ast::CreateVirtualTable as CreateVirtualTableIn;
 
 /// create virtual table statement
-#[derive(derive_getters::Getters)]
+#[derive(derive_getters::Getters, Debug)]
 pub struct CreateVirtualTable {
     if_not_exists: bool,
     table_name: QualifiedName,

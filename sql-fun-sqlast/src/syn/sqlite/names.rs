@@ -2,11 +2,18 @@ use turso_parser::ast::QualifiedName as QualifiedNameIn;
 
 /// qualified name
 #[derive(Clone, Debug, derive_getters::Getters)]
+#[cfg_attr(test, derive(derive_builder::Builder))]
 pub struct QualifiedName {
+    /// db name
     #[getter(skip)]
+    #[cfg_attr(test, builder(setter(into, strip_option), default))]
     db_name: Option<Name>,
+    /// name
     #[getter(skip)]
+    #[cfg_attr(test, builder(setter(into)))]
     name: Name,
+    /// alias
+    #[cfg_attr(test, builder(setter(into, strip_option), default))]
     alias: Option<Name>,
 }
 
@@ -36,9 +43,14 @@ use turso_parser::ast::Name as NameIn;
 
 /// name value
 #[derive(Clone, Debug, derive_getters::Getters)]
+#[cfg_attr(test, derive(derive_builder::Builder))]
 pub struct Name {
+    /// quote
+    #[cfg_attr(test, builder(setter(into, strip_option), default))]
     quote: Option<char>,
+    /// value
     #[getter(skip)]
+    #[cfg_attr(test, builder(setter(into)))]
     value: String,
 }
 

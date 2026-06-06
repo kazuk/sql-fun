@@ -3,7 +3,7 @@ use crate::syn::sqlite::{Expr, Set, SortedColumn};
 use turso_parser::ast::Upsert as UpsertIn;
 
 /// upsert statement
-#[derive(derive_getters::Getters)]
+#[derive(derive_getters::Getters, Debug)]
 pub struct Upsert {
     index: Option<UpsertIndex>,
     do_clause: UpsertDo,
@@ -23,7 +23,7 @@ impl From<UpsertIn> for Upsert {
 use turso_parser::ast::UpsertIndex as UpsertIndexIn;
 
 /// upsert index clause
-#[derive(derive_getters::Getters)]
+#[derive(derive_getters::Getters, Debug)]
 pub struct UpsertIndex {
     targets: Vec<SortedColumn>,
     where_clause: Option<Box<Expr>>,
@@ -41,6 +41,7 @@ impl From<UpsertIndexIn> for UpsertIndex {
 use turso_parser::ast::UpsertDo as UpsertDoIn;
 
 /// do clause
+#[derive(Debug)]
 pub enum UpsertDo {
     /// set sub-clause
     Set(UpsertDoSet),
@@ -61,7 +62,7 @@ impl From<UpsertDoIn> for UpsertDo {
 }
 
 /// set clause for upsert
-#[derive(derive_getters::Getters)]
+#[derive(derive_getters::Getters, Debug)]
 pub struct UpsertDoSet {
     sets: Vec<Set>,
     where_clause: Option<Box<Expr>>,

@@ -3,7 +3,7 @@ use turso_parser::ast::Update as UpdateIn;
 use crate::syn::sqlite::{Expr, Indexed, Name, QualifiedName, ResolveType, With};
 
 /// update statement
-#[derive(derive_getters::Getters)]
+#[derive(derive_getters::Getters, Debug)]
 pub struct Update {
     with: Option<With>,
     or_conflict: Option<ResolveType>,
@@ -46,7 +46,7 @@ impl From<UpdateIn> for Update {
 use turso_parser::ast::Set as SetIn;
 
 /// set clause of update statement
-#[derive(derive_getters::Getters)]
+#[derive(derive_getters::Getters, Debug)]
 pub struct Set {
     col_names: Vec<Name>,
     expr: Box<Expr>,

@@ -1,7 +1,7 @@
 use crate::syn::sqlite::{Expr, QualifiedName};
 
 /// pragma statement
-#[derive(derive_getters::Getters)]
+#[derive(derive_getters::Getters, Debug)]
 pub struct PragmaStatement {
     name: QualifiedName,
     body: Option<PragmaBody>,
@@ -17,6 +17,7 @@ impl PragmaStatement {
 use turso_parser::ast::PragmaBody as PragmaBodyIn;
 
 /// pragma statement body
+#[derive(Debug)]
 pub enum PragmaBody {
     /// equals
     Equals(Box<Expr>),

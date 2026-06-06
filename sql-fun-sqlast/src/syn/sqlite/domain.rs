@@ -1,6 +1,6 @@
 use crate::syn::sqlite::Expr;
 
-#[derive(Clone, derive_getters::Getters)]
+#[derive(Clone, derive_getters::Getters, Debug)]
 pub struct DomainConstraint {
     name: Option<String>,
     check: Box<Expr>,
@@ -18,7 +18,7 @@ impl From<DomainConstraintIn> for DomainConstraint {
 }
 
 /// create domain statement
-#[derive(derive_getters::Getters)]
+#[derive(derive_getters::Getters, Debug)]
 pub struct CreateDomainStatement {
     /// `IF NOT EXISTS`
     if_not_exists: bool,
@@ -61,7 +61,7 @@ impl CreateDomainStatement {
 }
 
 /// drop domain statement
-#[derive(derive_getters::Getters)]
+#[derive(derive_getters::Getters, Debug)]
 pub struct DropDomainStatement {
     if_exists: bool,
 

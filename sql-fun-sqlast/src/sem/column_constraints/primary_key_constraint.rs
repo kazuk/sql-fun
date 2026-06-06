@@ -78,6 +78,28 @@ impl PrimaryKeyColumnConstraint {
     }
 }
 
+#[cfg(feature = "sqlite")]
+impl PrimaryKeyColumnConstraint {
+    /// analyze [`crate::syn::sqlite::PrimaryKeyColumnConstraint`]
+    pub fn analyze_constraint_sqlite<TParseContext>(
+        context: TParseContext,
+        table_name: &TableName,
+        column_name: &ColumnName,
+        syn: &crate::syn::sqlite::PrimaryKeyColumnConstraint,
+    ) -> Result<(ColumnConstraint, TParseContext), AnalysisError>
+    where
+        TParseContext: ParseContext,
+    {
+        let constraint = Self::new(
+            table_name,
+            column_name,
+            syn.conflict_clause().map(ConflictClause::from),
+            None,
+        );
+        Ok((ColumnConstraint::primary_key(constraint), context))
+    }
+}
+
 impl ColumnConstraint {
     /// create PrimaryKey variant
     pub const fn primary_key(value: PrimaryKeyColumnConstraint) -> Self {

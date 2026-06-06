@@ -67,6 +67,29 @@ impl UniqueColumnConstraint {
     }
 }
 
+#[cfg(feature = "sqlite")]
+impl UniqueColumnConstraint {
+    /// analyze [`crate::syn::sqlite::UniqueColumnConstraint`]
+    pub fn analyze_constraint_sqlite<TParseContext>(
+        context: TParseContext,
+        table_name: &TableName,
+        column_name: &ColumnName,
+        syn: &crate::syn::sqlite::UniqueColumnConstraint,
+    ) -> Result<(ColumnConstraint, TParseContext), AnalysisError>
+    where
+        TParseContext: ParseContext,
+    {
+        Ok((
+            ColumnConstraint::unique(Self::new(
+                table_name,
+                column_name,
+                syn.conflict_clause().map(ConflictClause::from),
+            )),
+            context,
+        ))
+    }
+}
+
 impl ColumnConstraint {
     /// create Unique variant
     pub const fn unique(value: UniqueColumnConstraint) -> Self {

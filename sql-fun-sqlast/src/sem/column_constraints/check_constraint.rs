@@ -1,5 +1,7 @@
 use sql_fun_core::IVec;
 
+#[cfg(feature = "sqlite")]
+use crate::SqliteToken;
 use crate::{
     sem::{
         AnalysisError, ColumnConstraint, ColumnConstraintKind, ColumnConstraintTrait, ColumnName,
@@ -78,6 +80,32 @@ impl CheckColumnConstraint {
             tokens,
         )?;
         Ok((Self::new(table_name, column_name, expr), new_context))
+    }
+
+    /// analyze [`crate::syn::sqlite::CheckColumnConstraint`]
+    #[cfg(feature = "sqlite")]
+    pub fn analyze_constraint_sqlite<TParseContext>(
+        mut context: TParseContext,
+        table_name: &TableName,
+        column_name: &ColumnName,
+        syn: &crate::syn::sqlite::CheckColumnConstraint,
+        tokens: &IVec<SqliteToken<'_>>,
+    ) -> Result<(ColumnConstraint, TParseContext), AnalysisError>
+    where
+        TParseContext: ParseContext,
+    {
+        let (expr, new_context) = SemScalarExpr::analyze_sqlite_scaler_expr(
+            context,
+            &WithClause::default(),
+            &FromClause::default(),
+            syn.expr(),
+            tokens,
+        )?;
+        context = new_context;
+        Ok((
+            ColumnConstraint::check(Self::new(table_name, column_name, expr)),
+            context,
+        ))
     }
 }
 

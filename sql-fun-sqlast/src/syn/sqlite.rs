@@ -55,9 +55,9 @@ pub use self::{
     constraints::{
         CheckColumnConstraint, CheckConstraint, CollateColumnConstraint, ColumnConstraint,
         DefaultColumnConstraint, DeferSubclause, ForeignKeyClause, ForeignKeyColumnConstraint,
-        ForeignKeyConstraint, GeneratedColumnConstraint, InitDeferredPred, NotNullColumnConstraint,
-        PrimaryKeyColumnConstraint, PrimaryKeyConstraint, RefAct, RefArg, TableConstraint,
-        UniqueColumnConstraint, UniqueConstraint,
+        ForeignKeyConstraint, GeneratedColumnConstraint, GeneratedColumnType, InitDeferredPred,
+        NotNullColumnConstraint, PrimaryKeyColumnConstraint, PrimaryKeyConstraint, RefAct, RefArg,
+        TableConstraint, UniqueColumnConstraint, UniqueConstraint,
     },
     delete_statement::DeleteStatement,
     domain::{CreateDomainStatement, DropDomainStatement},

@@ -133,12 +133,20 @@ impl From<ForeignKeyClauseIn> for ForeignKeyClause {
 use turso_parser::ast::InitDeferredPred as InitDeferredPredIn;
 
 /// init deferred predicate
-#[derive(Debug)]
+#[derive(Debug, Default, Clone, Copy)]
 pub enum InitDeferredPred {
     /// initially deferred
     InitiallyDeferred,
     /// initialiy immediate
+    #[default]
     InitiallyImmediate,
+}
+
+impl InitDeferredPred {
+    /// return true when InitiallyDeferred
+    pub fn init_deferred(&self) -> bool {
+        matches!(self, Self::InitiallyDeferred)
+    }
 }
 
 impl From<InitDeferredPredIn> for InitDeferredPred {
@@ -414,9 +422,12 @@ impl GeneratedColumnConstraint {
     }
 }
 
+/// generated column type
 #[derive(Debug)]
 pub enum GeneratedColumnType {
+    /// store value in database file
     Stored,
+    /// compute value at record read
     Virtual,
 }
 

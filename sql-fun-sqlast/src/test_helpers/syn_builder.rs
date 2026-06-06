@@ -4,13 +4,14 @@ use crate::{
         AConst, AConstInner, AExprKind, Alias, AliasBuilder, AliasOpt, AlterTableCmd,
         AlterTableCmdBuilder, AlterTableStmt, AlterTableStmtBuilder, AlterTableType,
         BooleanBuilder, CaseExpr, CaseWhen, CoercionFormOpt, ConstrType, Constraint,
-        ConstraintBuilder, DropBehaviorOpt, FuncCallBuilder, FunctionParameter,
-        FunctionParameterBuilder, FunctionParameterMode, IndexElemBuilder, IndexStmtBuilder,
-        IntegerBuilder, IntoClauseOpt, JoinExpr, JoinTypeOpt, LimitOptionOpt, ListBuilder, Node,
-        NodeInner, NodeList, NodeOpt, ObjectType, RangeFunction, RangeFunctionBuilder,
-        RangeSubselect, RangeSubselectBuilder, RangeTableFunc, RangeTableFuncBuilder, RangeVarOpt,
-        ResTarget, RoleSpecOpt, SelectStmt, SelectStmtOpt, SetOperation, SortByDirOpt,
-        SortByNullsOpt, StringBuilder, TypeName, TypeNameOpt, WindowDefOpt, WithClauseOpt,
+        ConstraintBuilder, DropBehavior, DropBehaviorOpt, DropStmt, DropStmtBuilder,
+        FuncCallBuilder, FunctionParameter, FunctionParameterBuilder, FunctionParameterMode,
+        IndexElemBuilder, IndexStmtBuilder, IntegerBuilder, IntoClauseOpt, JoinExpr, JoinTypeOpt,
+        LimitOptionOpt, ListBuilder, ListOpt, Node, NodeInner, NodeList, NodeOpt, ObjectType,
+        ParseResult, RangeFunction, RangeFunctionBuilder, RangeSubselect, RangeSubselectBuilder,
+        RangeTableFunc, RangeTableFuncBuilder, RangeVarOpt, ResTarget, RoleSpecOpt, SelectStmt,
+        SelectStmtOpt, SetOperation, SortByDirOpt, SortByNullsOpt, StringBuilder, TypeName,
+        TypeNameOpt, WindowDefOpt, WithClauseOpt,
     },
 };
 
@@ -750,5 +751,25 @@ impl SynBuilder {
             .build()
             .unwrap()
             .into()
+    }
+
+    /// build [crate::syn::DropStmt]
+    pub fn drop_stmt(&self, missing_ok: bool) -> DropStmt {
+        DropStmtBuilder::default()
+            .behavior(DropBehavior::DropRestrict.into())
+            .remove_type(ObjectType::ObjectTable.into())
+            .missing_ok(missing_ok)
+            .objects(self.string_node_list(&["table_one"]))
+            .build()
+            .unwrap()
+            .into()
+    }
+
+    /// parse sql to statement node
+    pub fn parse(&self, sql: &str) -> crate::syn::Node {
+        let parse_result = pg_query::parse(sql).unwrap();
+        let parse_result = ParseResult::from(parse_result.protobuf);
+        let statement = parse_result.get_stmts().get(0).get_stmt();
+        statement
     }
 }

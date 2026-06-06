@@ -84,7 +84,7 @@ impl ColumnCollection {
 }
 
 /// mode of `CREATE TABLE` statement
-#[derive(Debug, Clone, Copy)]
+#[derive(Debug, Clone, Copy, PartialEq)]
 pub enum CreateTableMode {
     /// create table mode default
     Default,
@@ -175,6 +175,16 @@ impl CreateTable {
     #[must_use]
     pub fn name(&self) -> &TableName {
         &self.name
+    }
+
+    /// get [`CreateTableMode`]
+    pub fn mode(&self) -> &CreateTableMode {
+        &self.mode
+    }
+
+    /// is temporary table
+    pub fn temporary(&self) -> bool {
+        self.temporary
     }
 
     /// get column definition by column name
@@ -326,7 +336,8 @@ impl CreateTable {
 #[derive(Debug, Clone)]
 pub struct DropTable {
     if_exists: bool,
-    table_name: TableName,
+    table_names: Vec<TableName>,
+    cascade: bool,
 }
 
 impl DropTable {
@@ -336,8 +347,18 @@ impl DropTable {
     }
 
     /// get target table name.
-    pub fn table_name(&self) -> &TableName {
-        &self.table_name
+    pub fn table_names(&self) -> &[TableName] {
+        &self.table_names
+    }
+
+    /// get cascade
+    pub fn cascade(&self) -> bool {
+        self.cascade
+    }
+
+    /// get restrict
+    pub fn restrict(&self) -> bool {
+        !self.cascade
     }
 }
 
@@ -362,17 +383,72 @@ impl DropTable {
             Some(crate::syn::ObjectType::ObjectTable)
         ));
 
-        let objects = FullName::try_from(syn.get_objects())?;
-        let table_name = TableName::from(objects);
-        if context.get_table(&table_name).is_none() {
-            context.report_problem(AnalysisProblem::table_not_found(&table_name))?;
+        let Some(objects) = syn.get_objects().as_inner() else {
+            AnalysisError::raise_unexpected_none("DropStmt.objects")?;
+            AnalysisError::never();
+        };
+        let cascade = matches!(
+            syn.get_behavior().as_inner(),
+            Some(crate::syn::DropBehavior::DropCascade)
+        );
+
+        let mut table_names = Vec::new();
+        for object in objects {
+            let full_name = FullName::try_from(object.as_list().get_items())?;
+            let table_name = TableName::from(full_name);
+            if context.get_table(&table_name).is_none() {
+                context.report_problem(AnalysisProblem::table_not_found(&table_name))?;
+            }
+            table_names.push(table_name);
         }
 
         let result = Self {
             if_exists: syn.get_missing_ok(),
-            table_name,
+            table_names,
+            cascade,
         };
         context = context.apply_drop_table(&result)?;
         Ok(AstAndContextPair::new(SemAst::DropTable(result), context))
+    }
+}
+
+#[cfg(test)]
+mod test_drop_table_analyze_drop_stmt {
+    use testresult::TestResult;
+
+    use crate::{
+        AstAndContextPair,
+        sem::DropTable,
+        syn::Opt,
+        test_helpers::{SynBuilder, TestParseContext, test_context},
+    };
+
+    #[rstest::rstest]
+    #[case("drop table table_one", false, false)]
+    #[case("drop table if exists table_one", true, false)]
+    #[case("drop table table_one cascade", false, true)]
+    #[case("drop table table_one restrict", false, false)]
+    fn test_analyze_drop_stmt(
+        test_context: TestParseContext,
+        #[case] sql: &str,
+        #[case] if_exists: bool,
+        #[case] cascade: bool,
+    ) -> TestResult {
+        let builder = SynBuilder::new();
+        let Some(node) = builder.parse(sql).as_drop_stmt().as_inner() else {
+            panic!("expect DropStmt");
+        };
+        let tokens = Vec::default().into();
+        let AstAndContextPair(ast, _result_context) =
+            DropTable::analyze_drop_stmt(test_context, node, &tokens)?;
+        let Some(drop_table) = ast.as_drop_table() else {
+            panic!("{ast:?} is not DropTable");
+        };
+        assert_eq!(drop_table.if_exists(), if_exists);
+        assert_eq!(drop_table.cascade(), cascade);
+        let table_name = drop_table.table_names.first().unwrap();
+        table_name.assert_table_name("table_one");
+
+        Ok(())
     }
 }

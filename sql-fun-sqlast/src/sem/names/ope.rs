@@ -95,4 +95,10 @@ impl OperatorName {
             _ => panic!("invalid name"),
         }
     }
+
+    /// create instance for test
+    #[cfg(test)]
+    pub fn new(name: &str) -> OperatorName {
+        Self::Valid(ValidOperatorName::new(name))
+    }
 }

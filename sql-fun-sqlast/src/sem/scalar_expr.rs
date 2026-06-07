@@ -45,7 +45,7 @@ use crate::{
         AnalysisError, AnalysisProblem, FromClause, ParseContext, PgBuiltInType, TypeReference,
         WithClause, create_table::ColumnDefinition,
     },
-    syn::ScanToken,
+    syn::{ListOpt, ScanToken},
 };
 
 trait AnalyzeScalarExpr<TParseContext, TNode>
@@ -64,6 +64,55 @@ where
 trait SemScalarExprNode {
     fn get_type(&self) -> Option<TypeReference>;
     fn is_not_null(&self) -> Option<bool>;
+}
+
+#[derive(Debug, Clone, Eq, Hash, PartialEq, serde::Serialize, serde::Deserialize)]
+pub struct ListExpr(Vec<SemScalarExpr>);
+
+impl<TParseContext> AnalyzeScalarExpr<TParseContext, crate::syn::List> for ListExpr
+where
+    TParseContext: ParseContext,
+{
+    fn analyze_scalar_expr(
+        mut context: TParseContext,
+        with_clause: &WithClause,
+        from_clause: &FromClause,
+        syn: crate::syn::List,
+        tokens: &IVec<ScanToken>,
+    ) -> Result<(SemScalarExpr, TParseContext), AnalysisError> {
+        let mut results = Vec::default();
+        let Some(items) = syn.get_items().as_inner() else {
+            AnalysisError::raise_unexpected_none("List.items")?;
+            AnalysisError::never();
+        };
+        for item in items {
+            let (item_expr, new_context) = SemScalarExpr::analyze_scaler_expr(
+                context,
+                with_clause,
+                from_clause,
+                item,
+                tokens,
+            )?;
+            context = new_context;
+            results.push(item_expr);
+        }
+
+        Ok((SemScalarExpr::List(Self(results)), context))
+    }
+}
+
+impl ListExpr {
+    pub fn len(&self) -> usize {
+        self.0.len()
+    }
+
+    pub fn get(&self, index: usize) -> Option<&SemScalarExpr> {
+        self.0.get(index)
+    }
+
+    pub fn into_inner(self) -> Vec<SemScalarExpr> {
+        self.0
+    }
 }
 
 /// scalar explation in semantic ast
@@ -112,6 +161,9 @@ pub enum SemScalarExpr {
     /// `sql-fun` inserts implicit cast at a implicit conversion as needed.
     ///
     ImplicitCast(ImplicitCastExpr),
+
+    /// expression list
+    List(ListExpr),
 
     /// Unexpected syntax node in expression
     Unexpected(String),
@@ -170,6 +222,7 @@ impl SemScalarExpr {
             Self::Array(arr) => arr.get_type(),
             Self::Unexpected(_node) => None,
             Self::ColumnRef(cr) => cr.get_type(),
+            Self::List(_list) => todo!(),
         }
     }
 
@@ -196,6 +249,7 @@ impl SemScalarExpr {
             Self::Array(arr) => arr.is_not_null(),
             Self::Unexpected(_node) => None,
             Self::ColumnRef(cr) => cr.is_not_null(),
+            Self::List(_list) => todo!(),
         }
     }
 }
@@ -251,6 +305,7 @@ impl SemScalarExpr {
             Self::ImplicitCast(_implicit_cast_expr) => todo!(),
             Self::Array(_arr) => todo!(),
             Self::Unexpected(_node) => todo!(),
+            Self::List(_list) => todo!(),
         }
     }
 }

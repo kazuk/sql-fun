@@ -47,9 +47,43 @@ pub enum ArithExpr {
 
     /// null-if  expression
     NullIfExpr(Box<NullIfExpr>),
+
+    /// Between
+    Between(Box<BetweenExpr>),
+}
+
+#[derive(Debug, Clone, Eq, Hash, PartialEq, serde::Serialize, serde::Deserialize)]
+pub struct BetweenExpr {
+    left: SemScalarExpr,
+    start: SemScalarExpr,
+    end: SemScalarExpr,
+    not: bool,
 }
 
 impl ArithExpr {
+    /// build between expression node
+    pub fn between(left: SemScalarExpr, range: (SemScalarExpr, SemScalarExpr)) -> SemScalarExpr {
+        SemScalarExpr::Arith(Self::Between(Box::new(BetweenExpr {
+            left,
+            start: range.0,
+            end: range.1,
+            not: false,
+        })))
+    }
+
+    /// build not between expression node
+    pub fn not_between(
+        left: SemScalarExpr,
+        range: (SemScalarExpr, SemScalarExpr),
+    ) -> SemScalarExpr {
+        SemScalarExpr::Arith(Self::Between(Box::new(BetweenExpr {
+            left,
+            start: range.0,
+            end: range.1,
+            not: true,
+        })))
+    }
+
     fn build_distinct<TParseContext>(
         _context: TParseContext,
         _lexpr: Option<SemScalarExpr>,
@@ -99,19 +133,77 @@ impl ArithExpr {
     }
 
     fn build_between<TParseContext>(
-        _context: TParseContext,
-        _lexpr: Option<SemScalarExpr>,
-        _rexpr: Option<SemScalarExpr>,
+        context: TParseContext,
+        lexpr: Option<SemScalarExpr>,
+        rexpr: Option<SemScalarExpr>,
     ) -> Result<(SemScalarExpr, TParseContext), AnalysisError> {
-        todo!()
+        let Some(lexpr) = lexpr else {
+            AnalysisError::raise_unexpected_none("lexpr")?;
+            AnalysisError::never()
+        };
+
+        let Some(SemScalarExpr::List(list_expr)) = rexpr else {
+            AnalysisError::raise_unexpected_input("rexpr")?;
+            AnalysisError::never();
+        };
+        if list_expr.len() != 2 {
+            AnalysisError::raise_unexpected_input("rexpr len!=2")?;
+            AnalysisError::never();
+        };
+        let mut iter = list_expr.into_inner().into_iter();
+        let Some(start) = iter.next() else {
+            AnalysisError::raise_unexpected_none("rexpr start")?;
+            AnalysisError::never();
+        };
+        let Some(end) = iter.next() else {
+            AnalysisError::raise_unexpected_none("rexpr end")?;
+            AnalysisError::never();
+        };
+
+        let body = BetweenExpr {
+            left: lexpr,
+            start,
+            end,
+            not: false,
+        };
+        Ok((SemScalarExpr::Arith(Self::Between(Box::new(body))), context))
     }
 
     fn build_not_between<TParseContext>(
-        _context: TParseContext,
-        _lexpr: Option<SemScalarExpr>,
-        _rexpr: Option<SemScalarExpr>,
+        context: TParseContext,
+        lexpr: Option<SemScalarExpr>,
+        rexpr: Option<SemScalarExpr>,
     ) -> Result<(SemScalarExpr, TParseContext), AnalysisError> {
-        todo!()
+        let Some(lexpr) = lexpr else {
+            AnalysisError::raise_unexpected_none("lexpr")?;
+            AnalysisError::never()
+        };
+
+        let Some(SemScalarExpr::List(list_expr)) = rexpr else {
+            AnalysisError::raise_unexpected_input("rexpr")?;
+            AnalysisError::never();
+        };
+        if list_expr.len() != 2 {
+            AnalysisError::raise_unexpected_input("rexpr len!=2")?;
+            AnalysisError::never();
+        };
+        let mut iter = list_expr.into_inner().into_iter();
+        let Some(start) = iter.next() else {
+            AnalysisError::raise_unexpected_none("rexpr start")?;
+            AnalysisError::never();
+        };
+        let Some(end) = iter.next() else {
+            AnalysisError::raise_unexpected_none("rexpr end")?;
+            AnalysisError::never();
+        };
+
+        let body = BetweenExpr {
+            left: lexpr,
+            start,
+            end,
+            not: true,
+        };
+        Ok((SemScalarExpr::Arith(Self::Between(Box::new(body))), context))
     }
 
     fn build_between_sym<TParseContext>(
@@ -141,6 +233,7 @@ impl ArithExpr {
             Self::UndefinedOperatorAny(call_site) => call_site.is_not_null(),
             Self::UndefinedOperatorAll(call_site) => call_site.is_not_null(),
             Self::NullIfExpr(null_if) => null_if.is_not_null(),
+            Self::Between(_) => todo!(),
         }
     }
 
@@ -179,6 +272,7 @@ impl SemScalarExprNode for ArithExpr {
             Self::UndefinedOperator(_)
             | Self::UndefinedOperatorAny(_)
             | Self::UndefinedOperatorAll(_) => None,
+            Self::Between(_) => todo!(),
         }
     }
 
@@ -193,6 +287,7 @@ impl SemScalarExprNode for ArithExpr {
             Self::UndefinedOperator(_)
             | Self::UndefinedOperatorAny(_)
             | Self::UndefinedOperatorAll(_) => return None,
+            Self::Between(_) => todo!(),
         };
         if is_strict {
             if matches!(self.inputs_is_not_null(), Some(true)) {

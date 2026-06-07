@@ -176,7 +176,7 @@ impl GeneratedColumnConstraint {
     where
         TParseContext: ParseContext,
     {
-        let (expr, new_context) = SemScalarExpr::analyze_sqlite_scaler_expr(
+        let (expr, new_context) = SemScalarExpr::analyze_sqlite_scalar_expr(
             context,
             &WithClause::default(),
             &FromClause::default(),

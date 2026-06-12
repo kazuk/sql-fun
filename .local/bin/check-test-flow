@@ -3,8 +3,68 @@ set -euo pipefail
 
 function usage() {
   cat <<USAGE
-usage: check-test-flow [--all-features] [--since=<rev>|<rev1>..<rev2>] [--workspace-only] [--changed-only] [--nextest-extra="..."]
+usage: check-test-flow [options]
+
+Options:
+  --all-features
+  --since=<rev>|<rev1>..<rev2>
+  --workspace-only
+  --changed-only
+  --nextest-extra="..."
+  --fmt-check           Check formatting without rewriting files.
+  --step=<name>          Run only the selected step. Can be repeated.
+  --list-steps           Print available step names.
+  -h, --help
+
+Steps:
+  affected
+  workspace
+  fmt
+  lint
+  server-api-spec
+  deny
+  dependency-updates
+  doc
+  typos
 USAGE
+}
+
+ALL_STEPS=(
+  affected
+  workspace
+  fmt
+  lint
+  server-api-spec
+  deny
+  dependency-updates
+  doc
+  typos
+)
+
+function list_steps() {
+  printf '%s\n' "${ALL_STEPS[@]}"
+}
+
+function normalize_step() {
+  case "$1" in
+    affected|workspace|fmt|lint|server-api-spec|deny|dependency-updates|doc|typos)
+      printf '%s\n' "$1"
+      ;;
+    format)
+      printf '%s\n' fmt
+      ;;
+    server-api|openrpc-spec)
+      printf '%s\n' server-api-spec
+      ;;
+    dependency-update)
+      printf '%s\n' dependency-updates
+      ;;
+    *)
+      echo "unknown step: $1" >&2
+      list_steps >&2
+      exit 1
+      ;;
+  esac
 }
 
 ALL_FEATURES=0
@@ -12,6 +72,8 @@ SINCE=""
 WORKSPACE_ONLY=0
 CHANGED_ONLY=0
 NEXTEST_EXTRA=""
+FMT_CHECK=0
+SELECTED_STEPS=()
 
 for a in "$@"; do
   case "$a" in
@@ -20,21 +82,38 @@ for a in "$@"; do
     --workspace-only) WORKSPACE_ONLY=1 ;;
     --changed-only)   CHANGED_ONLY=1 ;;
     --nextest-extra=*) NEXTEST_EXTRA="${a#*=}" ;;
+    --fmt-check) FMT_CHECK=1 ;;
+    --step=*) SELECTED_STEPS+=("$(normalize_step "${a#*=}")") ;;
+    --list-steps) list_steps; exit 0 ;;
     -h|--help) usage; exit 0 ;;
     *) echo "unknown arg: $a" >&2; usage; exit 1 ;;
   esac
 done
 
 cd "$(git rev-parse --show-toplevel)"
+GIT_ROOT="$(pwd)"
 
-command -v jq >/dev/null || { echo "jq required"; exit 1; }
-command -v cargo-nextest >/dev/null || { echo "cargo-nextest required"; exit 1; }
+declare -A STEP_SELECTED=()
+if (( ${#SELECTED_STEPS[@]} > 0 )); then
+  for step in "${SELECTED_STEPS[@]}"; do
+    STEP_SELECTED["$step"]=1
+  done
+else
+  for step in "${ALL_STEPS[@]}"; do
+    STEP_SELECTED["$step"]=1
+  done
+fi
 
-META_JSON="$(cargo metadata --no-deps --format-version=1)"
-declare -A PKG_BY_MANIFEST=()
-while read -r manifest name; do
-  PKG_BY_MANIFEST["$manifest"]="$name"
-done < <(jq -r '.packages[] | "\(.manifest_path)\t\(.name)"' <<<"$META_JSON")
+function step_enabled() {
+  [[ -n "${STEP_SELECTED[$1]+x}" ]]
+}
+
+function require_command() {
+  command -v "$1" >/dev/null || { echo "$1 required"; exit 1; }
+}
+
+FEATURES=()
+[[ "$ALL_FEATURES" == "1" ]] && FEATURES+=(--all-features)
 
 
 function collect_changed() {
@@ -47,32 +126,43 @@ function collect_changed() {
   fi
 }
 
-mapfile -t CHANGED < <(collect_changed | grep -v '^target/' | grep -E '\.(rs|toml)$' | sort -u)
-
-declare -A AFFECTED=()
-for f in "${CHANGED[@]:-}"; do
-  [[ -f "$f" ]] || continue
-  p="$(realpath -m "$f")"
-  d="$(dirname "$p")"
-  while [[ "$d" != "/" ]]; do
-    cand="$d/Cargo.toml"
-    if [[ -f "$cand" ]]; then
-      if [[ -n "${PKG_BY_MANIFEST[$cand]+x}" ]]; then
-        AFFECTED["${PKG_BY_MANIFEST[$cand]}"]=1
-      fi
-      break
-    fi
-    d="$(dirname "$d")"
-  done
-done
-
-FEATURES=()
-[[ "$ALL_FEATURES" == "1" ]] && FEATURES+=(--all-features)
-
 function run_check()   { echo ">> cargo check $*";   cargo check   "$@"; }
 function run_nextest() { echo ">> cargo nextest run $*"; cargo nextest run "$@"; }
 
-if (( WORKSPACE_ONLY == 0 )); then
+function run_affected() {
+  if (( WORKSPACE_ONLY == 1 )); then
+    echo "== Skipping affected crates because --workspace-only is set."
+    return
+  fi
+
+  require_command jq
+  require_command cargo-nextest
+
+  META_JSON="$(cargo metadata --no-deps --format-version=1)"
+  declare -A PKG_BY_MANIFEST=()
+  while read -r manifest name; do
+    PKG_BY_MANIFEST["$manifest"]="$name"
+  done < <(jq -r '.packages[] | "\(.manifest_path)\t\(.name)"' <<<"$META_JSON")
+
+  mapfile -t CHANGED < <(collect_changed | grep -v '^target/' | grep -E '\.(rs|toml)$' | sort -u)
+
+  declare -A AFFECTED=()
+  for f in "${CHANGED[@]:-}"; do
+    [[ -f "$f" ]] || continue
+    p="$(realpath -m "$f")"
+    d="$(dirname "$p")"
+    while [[ "$d" != "/" ]]; do
+      cand="$d/Cargo.toml"
+      if [[ -f "$cand" ]]; then
+        if [[ -n "${PKG_BY_MANIFEST[$cand]+x}" ]]; then
+          AFFECTED["${PKG_BY_MANIFEST[$cand]}"]=1
+        fi
+        break
+      fi
+      d="$(dirname "$d")"
+    done
+  done
+
   if (( ${#AFFECTED[@]} > 0 )); then
     echo "== Affected crates: ${!AFFECTED[*]}"
     for pkg in "${!AFFECTED[@]}"; do
@@ -83,34 +173,73 @@ if (( WORKSPACE_ONLY == 0 )); then
     echo "== No affected crates detected."
     (( CHANGED_ONLY == 1 )) && exit 0
   fi
-fi
+}
 
-echo "== Workspace verification"
-run_check   --workspace "${FEATURES[@]}"
-run_nextest --workspace "${FEATURES[@]}" "${FAILFAST_FLAGS[@]}" ${NEXTEST_EXTRA} --no-tests pass
+function run_workspace() {
+  require_command cargo-nextest
+  echo "== Workspace verification"
+  run_check   --workspace "${FEATURES[@]}"
+  run_nextest --workspace "${FEATURES[@]}" ${NEXTEST_EXTRA} --no-tests pass
+}
 
-echo "== Formatting sources"
-cargo fmt
-cargo sort --workspace
+function run_fmt() {
+  if (( FMT_CHECK == 1 )); then
+    echo "== Checking formatting"
+    cargo fmt --check
+    cargo sort --workspace --check --check-format
+  else
+    echo "== Formatting sources"
+    cargo fmt
+    cargo sort --workspace
+  fi
+}
 
-echo "== Linting"
-cargo clippy --no-deps --workspace "${FEATURES[@]}"
-RUST_LOG=error taplo lint
+function run_lint() {
+  echo "== Linting"
+  cargo clippy --no-deps --workspace "${FEATURES[@]}"
+  RUST_LOG=error taplo lint
+}
 
-echo "== Generate server API spec document"
-cargo run -p sql-fun-server-api --features openrpc-schema,bin-deps \
-  --bin openrpc-spec -- \
-  --output-path "${GIT_ROOT}/server_api_spec.json" \
-  --force
+function run_server_api_spec() {
+  echo "== Generate server API spec document"
+  cargo run -p sql-fun-server-api --features openrpc-schema,bin-deps \
+    --bin openrpc-spec -- \
+    --output-path "${GIT_ROOT}/server_api_spec.json" \
+    --force
+}
 
-echo "== check dependencies"
-cargo deny check
+function run_deny() {
+  echo "== check dependencies"
+  cargo deny check
+}
 
-echo "== check dependency updates"
-cargo +nightly update -Z unstable-options --dry-run --breaking
+function run_dependency_updates() {
+  echo "== check dependency updates"
+  cargo +nightly update -Z unstable-options --dry-run --breaking
+}
 
-echo "== Document build"
-cargo doc --workspace --no-deps
+function run_doc() {
+  echo "== Document build"
+  cargo doc --workspace --no-deps
+}
 
-echo "== Check typos"
-typos --config .local/config/typos.toml
+function run_typos() {
+  echo "== Check typos"
+  typos --config .local/config/typos.toml
+}
+
+for step in "${ALL_STEPS[@]}"; do
+  if step_enabled "$step"; then
+    case "$step" in
+      affected) run_affected ;;
+      workspace) run_workspace ;;
+      fmt) run_fmt ;;
+      lint) run_lint ;;
+      server-api-spec) run_server_api_spec ;;
+      deny) run_deny ;;
+      dependency-updates) run_dependency_updates ;;
+      doc) run_doc ;;
+      typos) run_typos ;;
+    esac
+  fi
+done

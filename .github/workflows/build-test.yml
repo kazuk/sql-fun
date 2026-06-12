@@ -13,17 +13,17 @@ env:
   USER: runner
 
 jobs:
-  build:
+  workspace:
     runs-on: ubuntu-24.04
-    container:
+    container: &ci-builder-container
       image: ghcr.io/kazuk/ci-builder@sha256:2bf5e88440df19456505e687f828f75f063932a8544a7e4e4211a3e9e02bf8e0
       credentials:
         username: ${{ github.actor }}
         password: ${{ secrets.GITHUB_TOKEN }}
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v5
 
-      - uses: actions/cache@v4
+      - uses: actions/cache@v5
         with:
           path: |
             /usr/local/cargo/registry
@@ -32,34 +32,187 @@ jobs:
           restore-keys: |
             cargo-${{ runner.os }}-
 
-      - uses: actions/cache@v4
+      - uses: actions/cache@v5
         with:
           path: /github/home/.cache/sccache
           key: sccache-${{ runner.os }}-${{ hashFiles('**/Cargo.lock') }}
           restore-keys: |
             sccache-${{ runner.os }}-
 
-      - name: check dependencies
+      - name: Build and test
         run: |
-          cargo deny check
-
-      - name: buil and test
-        run: |
-          export GIT_ROOT="$(git rev-parse --show-toplevel)"
+          GIT_ROOT="$(git rev-parse --show-toplevel)"
+          export GIT_ROOT
           export SQL_FUN_HOME="${GIT_ROOT}/sql-fun-home"
           sccache --start-server
           export RUSTC_WRAPPER=sccache
           export SCCACHE_DIR=/github/home/.cache/sccache
-          .local/bin/check-test-flow --nextest-extra="
+          .local/bin/check-test-flow --step=workspace --nextest-extra="
             --config-file ./ci/nextest/config.toml
             --profile ci
             --show-progress none"
           sccache --show-stats
 
       - name: Test Report
-        uses: dorny/test-reporter@v2
+        uses: dorny/test-reporter@v3
         if: ${{ !cancelled() }}
         with:
           name: nextest tests
           path: target/nextest/ci/junit.xml
           reporter: java-junit
+
+  fmt:
+    runs-on: ubuntu-24.04
+    container: *ci-builder-container
+    steps:
+      - uses: actions/checkout@v5
+
+      - name: Check formatting
+        run: .local/bin/check-test-flow --step=fmt --fmt-check
+
+  lint:
+    runs-on: ubuntu-24.04
+    container: *ci-builder-container
+    steps:
+      - uses: actions/checkout@v5
+
+      - uses: actions/cache@v5
+        with:
+          path: |
+            /usr/local/cargo/registry
+            /usr/local/cargo/git
+          key: cargo-${{ runner.os }}-${{ hashFiles('**/Cargo.lock') }}
+          restore-keys: |
+            cargo-${{ runner.os }}-
+
+      - uses: actions/cache@v5
+        with:
+          path: /github/home/.cache/sccache
+          key: sccache-${{ runner.os }}-${{ hashFiles('**/Cargo.lock') }}
+          restore-keys: |
+            sccache-${{ runner.os }}-
+
+      - name: Lint
+        run: |
+          GIT_ROOT="$(git rev-parse --show-toplevel)"
+          export GIT_ROOT
+          export SQL_FUN_HOME="${GIT_ROOT}/sql-fun-home"
+          sccache --start-server
+          export RUSTC_WRAPPER=sccache
+          export SCCACHE_DIR=/github/home/.cache/sccache
+          .local/bin/check-test-flow --step=lint
+          sccache --show-stats
+
+  server-api-spec:
+    runs-on: ubuntu-24.04
+    container: *ci-builder-container
+    steps:
+      - uses: actions/checkout@v5
+
+      - uses: actions/cache@v5
+        with:
+          path: |
+            /usr/local/cargo/registry
+            /usr/local/cargo/git
+          key: cargo-${{ runner.os }}-${{ hashFiles('**/Cargo.lock') }}
+          restore-keys: |
+            cargo-${{ runner.os }}-
+
+      - uses: actions/cache@v5
+        with:
+          path: /github/home/.cache/sccache
+          key: sccache-${{ runner.os }}-${{ hashFiles('**/Cargo.lock') }}
+          restore-keys: |
+            sccache-${{ runner.os }}-
+
+      - name: Generate server API spec
+        run: |
+          GIT_ROOT="$(git rev-parse --show-toplevel)"
+          export GIT_ROOT
+          export SQL_FUN_HOME="${GIT_ROOT}/sql-fun-home"
+          sccache --start-server
+          export RUSTC_WRAPPER=sccache
+          export SCCACHE_DIR=/github/home/.cache/sccache
+          .local/bin/check-test-flow --step=server-api-spec
+          sccache --show-stats
+
+  deny:
+    runs-on: ubuntu-24.04
+    container: *ci-builder-container
+    steps:
+      - uses: actions/checkout@v5
+
+      - name: Check dependencies
+        run: .local/bin/check-test-flow --step=deny
+
+  dependency-updates:
+    runs-on: ubuntu-24.04
+    container: *ci-builder-container
+    steps:
+      - uses: actions/checkout@v5
+
+      - uses: actions/cache@v5
+        with:
+          path: |
+            /usr/local/cargo/registry
+            /usr/local/cargo/git
+          key: cargo-${{ runner.os }}-${{ hashFiles('**/Cargo.lock') }}
+          restore-keys: |
+            cargo-${{ runner.os }}-
+
+      - name: Check dependency updates
+        run: .local/bin/check-test-flow --step=dependency-updates
+
+  doc:
+    runs-on: ubuntu-24.04
+    container: *ci-builder-container
+    steps:
+      - uses: actions/checkout@v5
+
+      - uses: actions/cache@v5
+        with:
+          path: |
+            /usr/local/cargo/registry
+            /usr/local/cargo/git
+          key: cargo-${{ runner.os }}-${{ hashFiles('**/Cargo.lock') }}
+          restore-keys: |
+            cargo-${{ runner.os }}-
+
+      - uses: actions/cache@v5
+        with:
+          path: /github/home/.cache/sccache
+          key: sccache-${{ runner.os }}-${{ hashFiles('**/Cargo.lock') }}
+          restore-keys: |
+            sccache-${{ runner.os }}-
+
+      - name: Build docs
+        run: |
+          sccache --start-server
+          export RUSTC_WRAPPER=sccache
+          export SCCACHE_DIR=/github/home/.cache/sccache
+          .local/bin/check-test-flow --step=doc
+          sccache --show-stats
+
+  typos:
+    runs-on: ubuntu-24.04
+    container: *ci-builder-container
+    steps:
+      - uses: actions/checkout@v5
+
+      - name: Check typos
+        run: .local/bin/check-test-flow --step=typos
+
+  build:
+    runs-on: ubuntu-24.04
+    needs:
+      - workspace
+      - fmt
+      - lint
+      - server-api-spec
+      - deny
+      - dependency-updates
+      - doc
+      - typos
+    steps:
+      - name: Complete
+        run: true

@@ -21,9 +21,9 @@ jobs:
         username: ${{ github.actor }}
         password: ${{ secrets.GITHUB_TOKEN }}
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v5
 
-      - uses: actions/cache@v4
+      - uses: actions/cache@v5
         with:
           path: |
             /usr/local/cargo/registry
@@ -32,7 +32,7 @@ jobs:
           restore-keys: |
             cargo-${{ runner.os }}-
 
-      - uses: actions/cache@v4
+      - uses: actions/cache@v5
         with:
           path: /github/home/.cache/sccache
           key: sccache-${{ runner.os }}-${{ hashFiles('**/Cargo.lock') }}
@@ -54,7 +54,7 @@ jobs:
           sccache --show-stats
 
       - name: Test Report
-        uses: dorny/test-reporter@v2
+        uses: dorny/test-reporter@v3
         if: ${{ !cancelled() }}
         with:
           name: nextest tests
@@ -65,7 +65,7 @@ jobs:
     runs-on: ubuntu-24.04
     container: *ci-builder-container
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v5
 
       - name: Check formatting
         run: .local/bin/check-test-flow --step=fmt --fmt-check
@@ -74,9 +74,9 @@ jobs:
     runs-on: ubuntu-24.04
     container: *ci-builder-container
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v5
 
-      - uses: actions/cache@v4
+      - uses: actions/cache@v5
         with:
           path: |
             /usr/local/cargo/registry
@@ -85,7 +85,7 @@ jobs:
           restore-keys: |
             cargo-${{ runner.os }}-
 
-      - uses: actions/cache@v4
+      - uses: actions/cache@v5
         with:
           path: /github/home/.cache/sccache
           key: sccache-${{ runner.os }}-${{ hashFiles('**/Cargo.lock') }}
@@ -107,9 +107,9 @@ jobs:
     runs-on: ubuntu-24.04
     container: *ci-builder-container
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v5
 
-      - uses: actions/cache@v4
+      - uses: actions/cache@v5
         with:
           path: |
             /usr/local/cargo/registry
@@ -118,7 +118,7 @@ jobs:
           restore-keys: |
             cargo-${{ runner.os }}-
 
-      - uses: actions/cache@v4
+      - uses: actions/cache@v5
         with:
           path: /github/home/.cache/sccache
           key: sccache-${{ runner.os }}-${{ hashFiles('**/Cargo.lock') }}
@@ -140,7 +140,7 @@ jobs:
     runs-on: ubuntu-24.04
     container: *ci-builder-container
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v5
 
       - name: Check dependencies
         run: .local/bin/check-test-flow --step=deny
@@ -149,9 +149,9 @@ jobs:
     runs-on: ubuntu-24.04
     container: *ci-builder-container
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v5
 
-      - uses: actions/cache@v4
+      - uses: actions/cache@v5
         with:
           path: |
             /usr/local/cargo/registry
@@ -167,9 +167,9 @@ jobs:
     runs-on: ubuntu-24.04
     container: *ci-builder-container
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v5
 
-      - uses: actions/cache@v4
+      - uses: actions/cache@v5
         with:
           path: |
             /usr/local/cargo/registry
@@ -178,7 +178,7 @@ jobs:
           restore-keys: |
             cargo-${{ runner.os }}-
 
-      - uses: actions/cache@v4
+      - uses: actions/cache@v5
         with:
           path: /github/home/.cache/sccache
           key: sccache-${{ runner.os }}-${{ hashFiles('**/Cargo.lock') }}
@@ -197,7 +197,7 @@ jobs:
     runs-on: ubuntu-24.04
     container: *ci-builder-container
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v5
 
       - name: Check typos
         run: .local/bin/check-test-flow --step=typos

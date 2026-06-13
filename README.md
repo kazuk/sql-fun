@@ -93,3 +93,6 @@ For example:
 
 If it's useful to you, it might be useful to others.  
 You can share it in a PR, an issue, or just drop a link in a discussion thread.
+
+For setup, development workflow, and pull request guidelines, see
+[CONTRIBUTING.md](CONTRIBUTING.md).

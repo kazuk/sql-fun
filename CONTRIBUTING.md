@@ -31,17 +31,13 @@ If you use another environment loader, make sure it applies the same
 Docker is required for workflows that extract built-in function and extension
 definitions from official PostgreSQL images.
 
-The workspace currently uses the Rust version declared in [Cargo.toml](Cargo.toml).
-With `rustup`, install the workspace toolchain with the following command, which
-requires `cargo` and `jq`:
+A recent stable Rust toolchain is usually sufficient for local development. The
+workspace `rust-version` in [Cargo.toml](Cargo.toml) defines the minimum
+supported Rust version checked by CI.
 
 ```sh
-rustup toolchain install "$(cargo metadata --no-deps --format-version=1 \
-  | jq -r '.packages[] | select(.name == "sql-fun") | .rust_version')"
+rustup toolchain install stable
 ```
-
-Your local Rust toolchain does not need to match CI exactly, but it must be new
-enough to build the workspace.
 
 The standard check flow also uses nightly Cargo for dependency update checks:
 
@@ -56,6 +52,9 @@ cargo install --locked --force \
   cargo-llvm-cov mdbook cargo-deny tera-cli taplo-cli cargo-nextest \
   sccache cargo-sort cargo-binstall typos-cli
 ```
+
+Some tools, especially `cargo-deny`, may require a recent stable Rust toolchain
+to install. If installation fails, update stable first and try again.
 
 Some Rust dependencies may require additional native build dependencies. Package
 names vary by operating system and distribution, so install the missing packages

@@ -32,12 +32,21 @@ Docker is required for workflows that extract built-in function and extension
 definitions from official PostgreSQL images.
 
 The workspace currently uses the Rust version declared in [Cargo.toml](Cargo.toml).
-With `rustup`, install it with the following command, which requires `cargo` and
-`jq`:
+With `rustup`, install the workspace toolchain with the following command, which
+requires `cargo` and `jq`:
 
 ```sh
 rustup toolchain install "$(cargo metadata --no-deps --format-version=1 \
   | jq -r '.packages[] | select(.name == "sql-fun") | .rust_version')"
+```
+
+Your local Rust toolchain does not need to match CI exactly, but it must be new
+enough to build the workspace.
+
+The standard check flow also uses nightly Cargo for dependency update checks:
+
+```sh
+rustup toolchain install nightly
 ```
 
 Install the Rust tools used by project scripts:

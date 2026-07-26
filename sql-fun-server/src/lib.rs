@@ -76,7 +76,6 @@ impl Api {
         &API_IMPL
     }
 
-    #[expect(clippy::unused_async)]
     async fn initialize_schema_context_impl(
         &self,
         args: InitializeSchemaArgs,

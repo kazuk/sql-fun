@@ -253,13 +253,13 @@ impl ChildProcess {
                     let Some(line) = line? else {
                         continue;
                     };
-                    eprint!("{}", &line);
+                    eprint!("{line}");
                     StdStream::Stderr(line)
                 },
                 line = Self::read_from_buffer(&mut self.stdout), if !self.stdout.eof
                 => {
                     let Some(line) = line? else { continue; };
-                    print!("{}",&line);
+                    print!("{line}");
                     StdStream::Stdout(line)
                 },
                 status = self.child.wait() => {

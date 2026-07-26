@@ -118,7 +118,7 @@ sql-fun-codegen = { path = "./sql-fun-codegen", version = "0.1.0" }
 sql-fun-core = { path = "./sql-fun-core", version = "0.1.1" }
 sql-fun-server-api = { path = "sql-fun-server-api", version = "0.1.0" }
 sql-fun-sqlast = { path = "./sql-fun-sqlast", version = "0.1.0", features = [] }
-syn = { version = "3.0", features = ["full", "visit"] }
+syn = { version = "3.0", features = ["extra-traits", "full", "visit"] }
 sysinfo = "0.39"
 tempfile = "3.27.0"
 testresult = "0.4"

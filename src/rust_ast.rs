@@ -115,7 +115,7 @@ pub fn get_last_parameter_type_from_fn_trait(
         let PathArguments::Parenthesized(pga) = &seg.arguments else {
             return None;
         };
-        let Type::Path(p) = pga.inputs.last()? else {
+        let Type::Path(p) = &pga.inputs.last()?.ty else {
             return None;
         };
         Some(p.path.clone())

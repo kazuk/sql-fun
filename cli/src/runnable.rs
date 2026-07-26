@@ -143,13 +143,13 @@ impl RunnableCommand {
                     let Some(line) = line? else {
                         continue;
                     };
-                    eprint!("{}", &line);
+                    eprint!("{line}");
                     StdStream::Stderr(line)
                 },
                 line = Self::read_line_from( &mut stdout,&mut stdout_line_buf, &mut stdout_eof ), if !stdout_eof
                 => {
                     let Some(line) = line? else { continue; };
-                    print!("{}",&line);
+                    print!("{line}");
                     StdStream::Stdout(line)
                 },
                 status = child.wait() => {
@@ -179,14 +179,14 @@ impl RunnableCommand {
         };
         if !stderr_eof {
             while stderr.read_line(&mut stderr_line_buf).await? != 0 {
-                eprint!("{}", &stderr_line_buf);
+                eprint!("{stderr_line_buf}");
                 stream_items.push(StdStream::Stderr(stderr_line_buf.clone()));
                 stderr_line_buf.clear();
             }
         }
         if !stdout_eof {
             while stdout.read_line(&mut stdout_line_buf).await? != 0 {
-                print!("{}", &stdout_line_buf);
+                print!("{stdout_line_buf}");
                 stream_items.push(StdStream::Stdout(stdout_line_buf.clone()));
                 stdout_line_buf.clear();
             }

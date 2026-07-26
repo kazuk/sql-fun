@@ -5,7 +5,7 @@
 //!
 
 use proc_macro2::{Span, TokenStream};
-use syn::{LitStr, visit::Visit};
+use syn::{LitStr, parse::Parse, visit::Visit};
 
 /// Error related Syn IO
 #[derive(Debug, thiserror::Error)]
@@ -16,8 +16,7 @@ pub enum SqlFunCodegenError {
 }
 
 /// common sql-fun Attribute argument AST
-#[derive(Debug, darling::FromMeta)]
-#[darling(derive_syn_parse)]
+#[derive(Debug)]
 pub struct SqlFunOptions {
     /// SQL statement literal
     sql: Option<String>,
@@ -27,6 +26,44 @@ pub struct SqlFunOptions {
 
     /// data source name
     datasource: Option<String>,
+}
+
+impl Parse for SqlFunOptions {
+    fn parse(input: syn::parse::ParseStream<'_>) -> syn::Result<Self> {
+        let mut options = Self {
+            sql: None,
+            sql_file: None,
+            datasource: None,
+        };
+
+        let arguments = input.parse_terminated(syn::MetaNameValue::parse, syn::Token![,])?;
+        for argument in arguments {
+            let value = match argument.value {
+                syn::Expr::Lit(syn::ExprLit {
+                    lit: syn::Lit::Str(value),
+                    ..
+                }) => value.value(),
+                expression => {
+                    return Err(syn::Error::new_spanned(
+                        expression,
+                        "expected string literal",
+                    ));
+                }
+            };
+
+            if argument.path.is_ident("sql") {
+                options.sql = Some(value);
+            } else if argument.path.is_ident("sql_file") {
+                options.sql_file = Some(value);
+            } else if argument.path.is_ident("datasource") {
+                options.datasource = Some(value);
+            } else {
+                return Err(syn::Error::new_spanned(argument.path, "unknown field"));
+            }
+        }
+
+        Ok(options)
+    }
 }
 
 impl SqlFunOptions {
@@ -51,7 +88,6 @@ impl SqlFunOptions {
 
 #[cfg(test)]
 mod test_sql_fun_options {
-    use darling::FromMeta;
     use syn::ItemFn;
 
     #[rstest::rstest]
@@ -85,7 +121,7 @@ pub async fn select_user_by_id(client: Client, id: u64) -> Result<User, tokio_po
         #[case] datasource: Option<&str>,
     ) -> testresult::TestResult {
         let item_fn: ItemFn = syn::parse_str(sql)?;
-        let sql_fun_options = super::SqlFunOptions::from_meta(&item_fn.attrs[0].meta)?;
+        let sql_fun_options = item_fn.attrs[0].parse_args::<super::SqlFunOptions>()?;
         assert_eq!(sql_fun_options.sql(), expect_sql);
         assert_eq!(sql_fun_options.sql_file(), expect_sql_file);
         assert_eq!(sql_fun_options.datasource(), datasource);
@@ -94,10 +130,46 @@ pub async fn select_user_by_id(client: Client, id: u64) -> Result<User, tokio_po
 }
 
 /// CTE reference
-#[derive(Debug, darling::FromMeta)]
+#[derive(Debug)]
 pub struct CteReference {
     cte_name: String,
     alias: String,
+}
+
+impl Parse for CteReference {
+    fn parse(input: syn::parse::ParseStream<'_>) -> syn::Result<Self> {
+        let mut cte_name = None;
+        let mut alias = None;
+
+        let arguments = input.parse_terminated(syn::MetaNameValue::parse, syn::Token![,])?;
+        for argument in arguments {
+            let value = match argument.value {
+                syn::Expr::Lit(syn::ExprLit {
+                    lit: syn::Lit::Str(value),
+                    ..
+                }) => value.value(),
+                expression => {
+                    return Err(syn::Error::new_spanned(
+                        expression,
+                        "expected string literal",
+                    ));
+                }
+            };
+
+            if argument.path.is_ident("cte_name") {
+                cte_name = Some(value);
+            } else if argument.path.is_ident("alias") {
+                alias = Some(value);
+            } else {
+                return Err(syn::Error::new_spanned(argument.path, "unknown field"));
+            }
+        }
+
+        Ok(Self {
+            cte_name: cte_name.ok_or_else(|| input.error("missing field `cte_name`"))?,
+            alias: alias.ok_or_else(|| input.error("missing field `alias`"))?,
+        })
+    }
 }
 
 impl CteReference {
@@ -121,9 +193,7 @@ impl CteReference {
     ///
     pub fn from_attr(attr: &syn::Attribute) -> Result<Option<Self>, syn::Error> {
         if attr.meta.path().is_ident("with") {
-            use darling::FromMeta;
-
-            Ok(Some(Self::from_meta(&attr.meta)?))
+            Ok(Some(attr.parse_args()?))
         } else {
             Ok(None)
         }

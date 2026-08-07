@@ -1,3 +1,5 @@
 
 Cargo.lock merge=ours
 stats/** merge=ours
+
+graphify-out/** linguist-generated=true

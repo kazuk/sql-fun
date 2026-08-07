@@ -94,6 +94,12 @@ RUN apt-get update && apt-get install -y autoconf automake libtool libtool-bin b
 RUN curl -LsSf https://astral.sh/uv/install.sh \
     | env UV_UNMANAGED_INSTALL="/usr/local/bin" sh
 
+# install graphify
+RUN UV_TOOL_DIR=/opt/uv-tools \
+    UV_TOOL_BIN_DIR=/usr/local/bin \
+    uv tool install graphifyy \
+    && graphify --version
+
 COPY --from=builder /opt/tools/bin /usr/local/cargo/bin
 COPY --from=builder /opt/serena.tar.gz /opt/serena.tar.gz
 

@@ -26,6 +26,7 @@ Steps:
   dependency-updates
   doc
   typos
+  graphify
 USAGE
 }
 
@@ -39,6 +40,7 @@ ALL_STEPS=(
   dependency-updates
   doc
   typos
+  graphify
 )
 
 function list_steps() {
@@ -47,7 +49,7 @@ function list_steps() {
 
 function normalize_step() {
   case "$1" in
-    affected|workspace|fmt|lint|server-api-spec|deny|dependency-updates|doc|typos)
+    affected|workspace|fmt|lint|server-api-spec|deny|dependency-updates|doc|typos|graphify)
       printf '%s\n' "$1"
       ;;
     format)
@@ -228,6 +230,12 @@ function run_typos() {
   typos --config .local/config/typos.toml
 }
 
+function run_graphify() {
+  require_command graphify
+  echo "== Update graph index"
+  graphify update .
+}
+
 for step in "${ALL_STEPS[@]}"; do
   if step_enabled "$step"; then
     case "$step" in
@@ -240,6 +248,7 @@ for step in "${ALL_STEPS[@]}"; do
       dependency-updates) run_dependency_updates ;;
       doc) run_doc ;;
       typos) run_typos ;;
+      graphify) run_graphify ;;
     esac
   fi
 done

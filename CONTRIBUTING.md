@@ -56,6 +56,18 @@ cargo install --locked --force \
 Some tools, especially `cargo-deny`, may require a recent stable Rust toolchain
 to install. If installation fails, update stable first and try again.
 
+Install `graphify` for the graph-index update performed by the standard check
+flow. The package name has two trailing `y` characters, while the installed
+command is `graphify`:
+
+```sh
+uv tool install graphifyy
+```
+
+Make sure the tool's executable directory is available on `PATH`. See the
+[Graphify installation instructions](https://github.com/Graphify-Labs/graphify#install)
+for platform-specific setup.
+
 Some Rust dependencies may require additional native build dependencies. Package
 names vary by operating system and distribution, so install the missing packages
 reported by the build errors for your environment.
@@ -136,7 +148,8 @@ The standard local verification flow is:
 ```
 
 The script runs the workspace checks, tests, formatting, linting, documentation
-build, dependency checks, API spec generation, and typo checks.
+build, dependency checks, API spec generation, and typo checks. After all other
+steps pass, it updates the repository graph index with `graphify update .`.
 
 For faster iteration, run only selected steps:
 
@@ -145,6 +158,7 @@ For faster iteration, run only selected steps:
 .local/bin/check-test-flow --step=workspace
 .local/bin/check-test-flow --step=lint
 .local/bin/check-test-flow --step=doc
+.local/bin/check-test-flow --step=graphify
 ```
 
 List available steps with:
@@ -154,7 +168,7 @@ List available steps with:
 ```
 
 Some checks require extra tools, such as `cargo-nextest`, `cargo-deny`,
-`cargo-sort`, `cargo-llvm-cov`, `taplo`, `typos`, and `jq`.
+`cargo-sort`, `cargo-llvm-cov`, `taplo`, `typos`, `jq`, and `graphify`.
 
 ## Updating Statistics
 

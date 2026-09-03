@@ -1,0 +1,29 @@
+#!/bin/bash
+set -euo pipefail
+
+COMMIT_SHA=$(git -C "$GIT_ROOT" rev-parse HEAD)
+
+git -C "$GIT_ROOT" --no-pager log -1 --stat --decorate --format=fuller
+read -r -p "Cherry-pick this commit and create a PR? [y/N] " answer
+
+case "$answer" in
+    y|Y|yes|Yes|YES) ;;
+    *)
+        echo "Aborted."
+        exit 0
+        ;;
+esac
+
+BRANCH_NAME="cherry-pick/${COMMIT_SHA}"
+WORKTREE_PATH="${GIT_ROOT}/.worktrees/${COMMIT_SHA}"
+
+mkdir -p "${GIT_ROOT}/.worktrees"
+git -C "$GIT_ROOT" fetch origin main
+git -C "$GIT_ROOT" worktree add -b "$BRANCH_NAME" "$WORKTREE_PATH" origin/main
+git -C "$WORKTREE_PATH" cherry-pick "$COMMIT_SHA"
+git -C "$WORKTREE_PATH" push -u origin "$BRANCH_NAME"
+cd "$WORKTREE_PATH"
+gh pr create --base main --fill
+
+cd "$GIT_ROOT"
+git worktree remove "$WORKTREE_PATH"

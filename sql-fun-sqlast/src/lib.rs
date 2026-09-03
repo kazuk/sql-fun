@@ -113,6 +113,7 @@ pub fn scan(sql: &str) -> Result<IVec<crate::syn::ScanToken>, pg_query::Error> {
     PostgresDialect::scan(sql)
 }
 
+// TODO(msrv >= 1.98): replace with str::substr_range
 fn offset_in_string(haystack: &StdString, needle: &str) -> Option<usize> {
     let base = haystack.as_ptr() as usize;
     let ptr = needle.as_ptr() as usize;
@@ -120,7 +121,7 @@ fn offset_in_string(haystack: &StdString, needle: &str) -> Option<usize> {
     if ptr >= base && ptr <= base + haystack.len() {
         Some(ptr - base)
     } else {
-        None // needleがhaystack由来ではない
+        None // needle not in haystack
     }
 }
 
@@ -139,6 +140,7 @@ impl StringSpan {
     /// content not in container range
     #[must_use]
     pub fn from_str_in_str(container: &StdString, content: &str) -> Self {
+        // TODO(msrv >= 1.98): replace with str::substr_range
         let offset = offset_in_string(container, content).expect("content in container");
         let len = content.len();
         Self { offset, len }

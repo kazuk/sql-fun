@@ -111,9 +111,11 @@ impl UserDto {
 State determined by the database can be received from `RETURNING` and passed directly to the receiver.
 
 ```rust
-let user_id = insert_user(client, &user).await?;
-user.on_insert(user_id, created_at, updated_at);
+let inserted = insert_user(client, &user).await?;
+user.on_insert(inserted.id, inserted.created_at, inserted.updated_at);
 ```
+
+Here, `insert_user` returns the values produced by `RETURNING`; every receiver argument therefore has an explicit source.
 
 Boilerplate receiver implementations may be generated with a derive macro.
 

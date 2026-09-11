@@ -178,7 +178,7 @@ In this variant, the receiver method is not an in-place mutation through `&mut s
 Even for DTOs with parent-child relationships, the persistence layer does not need to understand the object graph.
 
 ```rust
-let user_id = insert_user(client, user_dto).await?;
+let user_id = insert_user(client, &user_dto).await?;
 user_dto.on_insert(user_id);
 
 insert_user_address(
@@ -188,6 +188,8 @@ insert_user_address(
 )
 .await?;
 ```
+
+The insert query only borrows `user_dto`, because the same DTO remains the state owner that receives the resulting state change and is reused by the subsequent child insert.
 
 If `UserDto::on_insert` propagates `user_id` to its child `UserAddressDto` values, the next query can obtain the required values through ordinary getters.
 

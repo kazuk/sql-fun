@@ -105,7 +105,7 @@ pg_query = "6.1"
 proc-macro2 = { version = "1.0", features = ["span-locations"] }
 quote = "1.0"
 rand = "0.10"
-rstest = "0.26"
+rstest = "0.27"
 schemars = { version = "1.2.1", features = ["url2"] }
 serde = { version = "1.0", features = ["derive"] }
 serde_json = "1.0"

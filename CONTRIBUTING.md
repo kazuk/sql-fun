@@ -39,18 +39,12 @@ supported Rust version checked by CI.
 rustup toolchain install stable
 ```
 
-The standard check flow also uses nightly Cargo for dependency update checks:
-
-```sh
-rustup toolchain install nightly
-```
-
 Install the Rust tools used by project scripts:
 
 ```sh
 cargo install --locked --force \
   cargo-llvm-cov mdbook cargo-deny tera-cli taplo-cli cargo-nextest \
-  sccache cargo-sort cargo-binstall typos-cli
+  sccache cargo-sort cargo-edit cargo-binstall typos-cli
 ```
 
 Some tools, especially `cargo-deny`, may require a recent stable Rust toolchain
@@ -168,7 +162,7 @@ List available steps with:
 ```
 
 Some checks require extra tools, such as `cargo-nextest`, `cargo-deny`,
-`cargo-sort`, `cargo-llvm-cov`, `taplo`, `typos`, `jq`, and `graphify`.
+`cargo-sort`, `cargo-llvm-cov`, `cargo-edit`, `taplo`, `typos`, `jq`, and `graphify`.
 
 ## Updating Statistics
 
@@ -191,7 +185,7 @@ Examples:
 
 ```text
 fix(sqlast): handle quoted identifiers in column lookup
-feat(cli): add schema inspection output option
+feat(cli): add schema inspection output
 docs: clarify contribution workflow
 test(core): cover virtual foreign key resolution
 ```

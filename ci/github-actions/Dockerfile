@@ -29,7 +29,7 @@ RUN cargo install --locked --force \
     cargo-binstall
 
 RUN cargo binstall --locked --force --root /opt/tools \
-    cargo-llvm-cov mdbook cargo-deny tera-cli taplo-cli cargo-nextest sccache cargo-sort
+    cargo-llvm-cov mdbook cargo-deny tera-cli taplo-cli cargo-nextest sccache cargo-sort cargo-edit
 
 RUN cargo install --locked --force --root /opt/tools \
     cargo-binstall typos-cli

@@ -217,7 +217,7 @@ function run_deny() {
 
 function run_dependency_updates() {
   echo "== check dependency updates"
-  cargo +nightly update -Z unstable-options --dry-run --breaking
+  cargo upgrade --dry-run --compatible ignore --incompatible allow
 }
 
 function run_doc() {

@@ -130,7 +130,7 @@ impl<TValue> TrieMap<TValue> {
     }
 
     /// returns true if empty
-    pub fn is_empty(&self) -> bool {
+    pub const fn is_empty(&self) -> bool {
         self.empty_node.is_none() && self.nodes.is_empty()
     }
 }

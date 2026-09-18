@@ -1,6 +1,6 @@
 use proc_macro2::TokenStream;
 use quote::quote;
-use sql_fun_core::{SqlFunArgs, SqlFunMetadata};
+use sql_fun_core::{SqlFunArgs, SqlFunMetadataCollection};
 use syn::ItemFn;
 
 use crate::{Connector, SqlFunError, TokioPostgresCodeGenerator};
@@ -8,8 +8,9 @@ use crate::{Connector, SqlFunError, TokioPostgresCodeGenerator};
 /// generate for `sql_execute`
 pub fn generate_sql_execute(sql_str: &str, item: TokenStream) -> Result<TokenStream, SqlFunError> {
     let args = SqlFunArgs::try_from_env()?;
-    let metadata = SqlFunMetadata::load_from(args.metadata_file()?)?;
-    let _connector = Connector::get_connector(&metadata)?;
+    let metadata_collection = SqlFunMetadataCollection::load_from(args.metadata_file()?)?;
+    let metadata = metadata_collection.get("default").unwrap();
+    let _connector = Connector::get_connector(metadata)?;
 
     let mut code_generator_builder = TokioPostgresCodeGenerator::builder();
     let mut function_ast: ItemFn = syn::parse2(item)?;

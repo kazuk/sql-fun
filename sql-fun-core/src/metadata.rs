@@ -1,11 +1,96 @@
 use std::{
+    collections::HashMap,
     path::{Path, PathBuf},
     str::FromStr,
 };
 
 use either::Either;
 
-use crate::{PostgresExtensionsCollection, PostgresVersion, SqlDialect};
+use crate::{
+    PostgresExtensionsCollection, PostgresVersion, SqlDialect, SqlFunArgs, SqlFunArgsError,
+};
+
+/// Metadata collection
+#[derive(Default)]
+pub struct SqlFunMetadataCollection(HashMap<String, SqlFunMetadata>);
+
+impl SqlFunMetadataCollection {
+    /// insert metadata to collection
+    pub fn insert(&mut self, value: SqlFunMetadata) -> Option<SqlFunMetadata> {
+        self.0.insert(String::from(value.name()), value)
+    }
+
+    /// get named metadata
+    #[must_use]
+    pub fn get(&self, datasource_name: &str) -> Option<&SqlFunMetadata> {
+        self.0.get(datasource_name)
+    }
+
+    /// remove and return named metadata
+    pub fn remove(&mut self, datasource_name: &str) -> Option<SqlFunMetadata> {
+        self.0.remove(datasource_name)
+    }
+
+    /// load form TOML.
+    ///
+    /// - source toml requires Cargo.toml like structure.
+    /// - this function retrieves package.metadata.database and deserialize metadata
+    ///
+    /// # Errors
+    ///
+    /// Returns [`MetadataError`] if the file cannot be read or parsed.
+    #[tracing::instrument(err)]
+    pub fn load_from<P: AsRef<Path> + std::fmt::Debug>(path: P) -> Result<Self, MetadataError> {
+        tracing::info!("loading metadata from {path:?}");
+        let file_text = std::fs::read_to_string(&path)?;
+
+        Self::from_str(&file_text, path)
+    }
+
+    /// load from `Cargo.toml` like text
+    pub(crate) fn from_str<P: AsRef<Path> + std::fmt::Debug>(
+        source: &str,
+        path_hint: P,
+    ) -> Result<Self, MetadataError> {
+        use MetadataError as Error;
+        let cargo_metadata: toml::Value = toml::from_str(source)?;
+        let Some(package) = cargo_metadata.get("package") else {
+            Error::metadata_load_from_file(
+                &path_hint,
+                &format!("package not defined in {path_hint:?}"),
+            )?
+        };
+        let Some(metadata) = package.get("metadata") else {
+            Error::metadata_load_from_file(
+                &path_hint,
+                &format!("package.metadata not defined in {path_hint:?}"),
+            )?
+        };
+        let Some(database) = metadata.get("database") else {
+            Error::metadata_load_from_file(
+                &path_hint,
+                &format!("package.metadata.database not defined in {path_hint:?}"),
+            )?
+        };
+
+        let Some(datasources) = database.as_table() else {
+            Error::metadata_load_from_file(
+                &path_hint,
+                &format!("package.metadata.database requires table {path_hint:?}"),
+            )?
+        };
+        let mut result = Self::default();
+        for (key, value) in datasources {
+            if let Some(_existing) = result.insert(SqlFunMetadata::from_value(key, value)?) {
+                Error::metadata_load_from_file(
+                    &path_hint,
+                    &format!("duplicate datasource name {key}"),
+                )?;
+            }
+        }
+        Ok(result)
+    }
+}
 
 /// engine version for `PostgreSQL`
 #[derive(Debug, Clone, PartialEq)]
@@ -114,7 +199,7 @@ impl DatabaseEngine {
     }
 
     #[must_use]
-    pub fn as_wellknown(&self) -> Option<&WellKnownDbEngine> {
+    pub const fn as_wellknown(&self) -> Option<&WellKnownDbEngine> {
         match &self.0 {
             Either::Left(l) => Some(l),
             Either::Right(_) => None,
@@ -122,7 +207,7 @@ impl DatabaseEngine {
     }
 
     #[must_use]
-    pub fn as_custom(&self) -> Option<&String> {
+    pub const fn as_custom(&self) -> Option<&String> {
         match &self.0 {
             Either::Right(r) => Some(r),
             Either::Left(_) => None,
@@ -134,19 +219,29 @@ impl DatabaseEngine {
 ///
 #[derive(Debug, serde::Deserialize)]
 pub struct SqlFunMetadata {
+    /// Datasource name
+    #[serde(skip)]
+    name: Option<String>,
+
     /// Database Engine
     engine: DatabaseEngine,
+
     /// SQL dialect
     dialect: SqlDialect,
+
     /// Database engine version
     #[serde(rename = "version")]
     engine_version: Option<PostgresEngineVersion>,
+
     /// Database extensions
     extensions: Option<PostgresExtensionsCollection>,
+
     /// Schema search path
     search_path: Option<Vec<String>>,
+
     /// CTE catalog directory path
     cte_catalog: Option<PathBuf>,
+
     /// Database connection dirver/midle-ware
     connector: Option<String>,
 }
@@ -195,57 +290,25 @@ impl MetadataError {
 }
 
 impl SqlFunMetadata {
-    /// load form TOML.
-    ///
-    /// - source toml requires Cargo.toml like structure.
-    /// - this function retrieves package.metadata.database and deserialize metadata
-    ///
-    /// # Errors
-    ///
-    /// Returns [`MetadataError`] if the file cannot be read or parsed.
-    pub fn load_from<P: AsRef<Path> + std::fmt::Debug>(path: P) -> Result<Self, MetadataError> {
-        let file_text = std::fs::read_to_string(&path)?;
-
-        Self::from_str(&file_text, path)
-    }
-
-    /// load from `Cargo.toml` like text
-    pub(crate) fn from_str<P: AsRef<Path> + std::fmt::Debug>(
-        source: &str,
-        path_hint: P,
-    ) -> Result<Self, MetadataError> {
-        use MetadataError as Error;
-        let cargo_metadata: toml::Value = toml::from_str(source)?;
-        let Some(package) = cargo_metadata.get("package") else {
-            Error::metadata_load_from_file(
-                &path_hint,
-                &format!("package not defined in {path_hint:?}"),
-            )?
-        };
-        let Some(metadata) = package.get("metadata") else {
-            Error::metadata_load_from_file(
-                &path_hint,
-                &format!("package.metadata not defined in {path_hint:?}"),
-            )?
-        };
-        let Some(database) = metadata.get("database") else {
-            Error::metadata_load_from_file(
-                &path_hint,
-                &format!("package.metadata.database not defined in {path_hint:?}"),
-            )?
-        };
-
-        Self::from_value(database)
-    }
-
     /// deserialize form TOML Value
     ///
     /// # Errors
     ///
     /// Returns [`MetadataError`] when TOML conversion fails.
-    pub(crate) fn from_value(database: &toml::Value) -> Result<Self, MetadataError> {
-        let db_metadata: Self = database.clone().try_into()?;
+    pub(crate) fn from_value(name: &str, database: &toml::Value) -> Result<Self, MetadataError> {
+        let mut db_metadata: Self = database.clone().try_into()?;
+        db_metadata.name = Some(String::from(name));
         Ok(db_metadata)
+    }
+
+    /// get datasource name
+    #[must_use]
+    pub const fn name(&self) -> &str {
+        if let Some(name) = &self.name {
+            name.as_str()
+        } else {
+            "default"
+        }
     }
 
     /// get CTE catalog directory path
@@ -264,15 +327,30 @@ impl SqlFunMetadata {
         }
     }
 
+    /// get lockfile path
+    ///
+    /// # Errors
+    ///
+    /// Returns [`SqlFunArgsError`] if the context error.
+    pub fn lockfile_path(&self, context: &SqlFunArgs) -> Result<PathBuf, SqlFunArgsError> {
+        let name = self.name();
+        let schema = context.schema();
+        // get metadata file path
+        let mut project_dir = context.metadata_file()?;
+        project_dir.pop();
+        project_dir.push(format!("{name}.{schema}.lock"));
+        Ok(project_dir)
+    }
+
     /// get SQL dialect
     #[must_use]
-    pub fn sql_dialect(&self) -> SqlDialect {
+    pub const fn sql_dialect(&self) -> SqlDialect {
         self.dialect
     }
 
     /// get db engine
     #[must_use]
-    pub fn engine(&self) -> &DatabaseEngine {
+    pub const fn engine(&self) -> &DatabaseEngine {
         &self.engine
     }
 
@@ -283,7 +361,7 @@ impl SqlFunMetadata {
     /// See [`crate::SqlFunArgs::postgres_version`] for argument precedence.
     ///
     #[must_use]
-    pub fn engine_version(&self) -> &Option<PostgresEngineVersion> {
+    pub const fn engine_version(&self) -> &Option<PostgresEngineVersion> {
         &self.engine_version
     }
 
@@ -294,19 +372,19 @@ impl SqlFunMetadata {
     /// See [`crate::SqlFunArgs::postgres_search_path`] for argument precedence.
     ///
     #[must_use]
-    pub fn search_path(&self) -> &Option<Vec<String>> {
+    pub const fn search_path(&self) -> &Option<Vec<String>> {
         &self.search_path
     }
 
     /// get `PostgreSQL` extensions allowed
     #[must_use]
-    pub fn postgres_extensions(&self) -> &Option<PostgresExtensionsCollection> {
+    pub const fn postgres_extensions(&self) -> &Option<PostgresExtensionsCollection> {
         &self.extensions
     }
 
     /// get database connection driver / middle-ware
     #[must_use]
-    pub fn connector(&self) -> &Option<String> {
+    pub const fn connector(&self) -> &Option<String> {
         &self.connector
     }
 }

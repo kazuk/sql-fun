@@ -97,7 +97,7 @@ impl TcpJsonRpcClient {
         })
     }
 
-    fn get_id(&mut self) -> u64 {
+    const fn get_id(&mut self) -> u64 {
         let result = self.id;
         self.id += 1;
         result

@@ -83,7 +83,7 @@ pub(super) struct ResolvedBinaryOperator {
 }
 
 impl ResolvedBinaryOperator {
-    fn new(
+    const fn new(
         operator_def: Option<BinaryOperatorDefinition>,
         lexpr: SemScalarExpr,
         rexpr: SemScalarExpr,

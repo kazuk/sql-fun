@@ -83,7 +83,7 @@ impl SqlFunError {
         Self(SqlFunErrorInner::Custom(message.to_string()))
     }
 
-    pub fn unnamed_column_in_result_rowset() -> Self {
+    pub const fn unnamed_column_in_result_rowset() -> Self {
         Self(SqlFunErrorInner::UnnamedColumnInResultSet)
     }
 }

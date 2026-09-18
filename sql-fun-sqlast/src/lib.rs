@@ -35,7 +35,7 @@ where
     TParseContext: ParseContext,
 {
     /// create instance
-    pub fn new(ast: SemAst, context: TParseContext) -> Self {
+    pub const fn new(ast: SemAst, context: TParseContext) -> Self {
         Self(ast, context)
     }
 }
@@ -147,17 +147,17 @@ impl StringSpan {
     }
 
     /// seek position for this string span
-    pub fn seek_pos(&self) -> SeekFrom {
+    pub const fn seek_pos(&self) -> SeekFrom {
         SeekFrom::Start(self.offset as u64)
     }
 
     /// get length of this span
-    pub fn len(&self) -> usize {
+    pub const fn len(&self) -> usize {
         self.len
     }
 
     /// Return true when len equals 0
-    pub fn is_empty(&self) -> bool {
+    pub const fn is_empty(&self) -> bool {
         self.len == 0
     }
 
@@ -173,7 +173,7 @@ impl StringSpan {
     }
 
     /// get end position
-    pub fn end_pos(&self) -> usize {
+    pub const fn end_pos(&self) -> usize {
         self.offset + self.len
     }
 

@@ -16,13 +16,13 @@ pub struct CteParameterRename {
 impl CteParameterRename {
     /// CTE name
     #[must_use]
-    pub fn cte_name(&self) -> &CteName {
+    pub const fn cte_name(&self) -> &CteName {
         &self.cte_name
     }
 
     /// target parameter name
     #[must_use]
-    pub fn parameter_name(&self) -> &ParameterName {
+    pub const fn parameter_name(&self) -> &ParameterName {
         &self.parameter_name
     }
 }
@@ -47,19 +47,19 @@ pub struct CteParameterBinding {
 impl CteParameterBinding {
     /// CTE name for parameter target
     #[must_use]
-    pub fn cte_name(&self) -> &CteName {
+    pub const fn cte_name(&self) -> &CteName {
         &self.cte_name
     }
 
     /// parameter name
     #[must_use]
-    pub fn parameter_name(&self) -> &ParameterName {
+    pub const fn parameter_name(&self) -> &ParameterName {
         &self.parameter_name
     }
 
     /// parameter definition name in query
     #[must_use]
-    pub fn name_in_query(&self) -> &ParameterName {
+    pub const fn name_in_query(&self) -> &ParameterName {
         &self.name_in_query
     }
 
@@ -104,7 +104,7 @@ impl CteParameterBinding {
 }
 
 /// collection of parameter binding
-#[derive(Debug, Default, Clone)]
+#[derive(Debug, Default, Clone, serde::Serialize)]
 pub struct CteParameterBindingCollection(Vec<(CteName, Vec<PlaceholderTypeHint>)>);
 
 impl CteParameterBindingCollection {
@@ -122,7 +122,7 @@ impl CteParameterBindingCollection {
 }
 
 /// parameter collection for CTE
-#[derive(Debug, Default)]
+#[derive(Debug, Default, Clone, serde::Serialize)]
 pub struct CteParameterCollection {
     parameters: HashMap<ParameterName, CteParameterBindingCollection>,
 }
@@ -183,6 +183,21 @@ impl CteParameterCollection {
     /// get parameter names
     pub fn parameter_names(&self) -> impl Iterator<Item = &ParameterName> {
         self.parameters.keys()
+    }
+
+    /// marge parameter collection
+    pub fn marge(&mut self, mut other: Self) {
+        for (param_name, input_bindings) in &mut other.parameters {
+            match self.parameters.entry(param_name.clone()) {
+                Entry::Occupied(mut o) => {
+                    let bindings = o.get_mut();
+                    bindings.append(input_bindings);
+                }
+                Entry::Vacant(v) => {
+                    v.insert(input_bindings.clone());
+                }
+            }
+        }
     }
 
     fn iter(

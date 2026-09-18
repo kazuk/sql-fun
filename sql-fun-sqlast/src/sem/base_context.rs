@@ -21,7 +21,7 @@ use crate::{
     },
 };
 use serde::de::DeserializeOwned;
-use sql_fun_core::{PostgresBuiltinPaths, SqlFunArgs, SqlFunMetadata};
+use sql_fun_core::{PostgresBuiltinPaths, SqlFunArgs, SqlFunMetadata, SqlFunMetadataCollection};
 
 /// schema information for Builtin and extensions
 #[derive(Debug)]
@@ -49,12 +49,14 @@ struct BuiltinTypeInfo {
 impl BaseContext {
     /// initialize base context
     pub fn new(context_args: SqlFunArgs) -> Result<Self, AnalysisError> {
-        let metadata = SqlFunMetadata::load_from(context_args.metadata_file()?)?;
-        let paths = PostgresBuiltinPaths::try_from_args(&context_args, &metadata)?;
+        let metadata_collection =
+            SqlFunMetadataCollection::load_from(context_args.metadata_file()?)?;
+        let metadata = metadata_collection.get("default").unwrap();
+        let paths = PostgresBuiltinPaths::try_from_args(&context_args, metadata)?;
         let builtin_functions = paths.functions()?;
         let function_details = paths.function_details()?;
         let builtin_type_data = Self::load_builtin_types(&paths)?;
-        let search_path = Self::setup_search_path(&context_args, &metadata)?;
+        let search_path = Self::setup_search_path(&context_args, metadata)?;
         let functions = PgBuiltInFunctions::load_from(builtin_functions, function_details)?;
         let binary_operators = PgBuiltinOperators::load_binary(paths.binary_operators()?)?;
         let left_unary_operators =

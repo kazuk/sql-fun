@@ -81,7 +81,7 @@ impl SqlHighlighterState {
         }
     }
 
-    fn to_slice_range(token_start: i32, token_end: i32) -> Range<usize> {
+    const fn to_slice_range(token_start: i32, token_end: i32) -> Range<usize> {
         (token_start as usize)..(token_end as usize)
     }
 

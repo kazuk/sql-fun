@@ -26,7 +26,7 @@ impl CreateSequence {
 
     /// get sequence name
     #[must_use]
-    pub fn name(&self) -> &FullName {
+    pub const fn name(&self) -> &FullName {
         &self.name
     }
 

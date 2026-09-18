@@ -35,19 +35,19 @@ impl FullName {
 
     /// get catalog part
     #[must_use]
-    pub fn catalog(&self) -> Option<&CatalogName> {
+    pub const fn catalog(&self) -> Option<&CatalogName> {
         self.catalog.as_ref()
     }
 
     /// get schema part
     #[must_use]
-    pub fn schema(&self) -> Option<&SchemaName> {
+    pub const fn schema(&self) -> Option<&SchemaName> {
         self.schema.as_ref()
     }
 
     /// get local-name as [`LocalName`]
     #[must_use]
-    pub fn name(&self) -> &LocalName {
+    pub const fn name(&self) -> &LocalName {
         &self.name
     }
 

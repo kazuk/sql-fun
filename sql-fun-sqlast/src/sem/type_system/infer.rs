@@ -95,11 +95,11 @@ impl SimpleInferContext {
         Ok(self.element_types.iter().next().unwrap().clone())
     }
 
-    pub fn set_require_infer(&mut self) {
+    pub const fn set_require_infer(&mut self) {
         self.require_infer = true;
     }
 
-    pub fn is_require_infer(&self) -> bool {
+    pub const fn is_require_infer(&self) -> bool {
         self.require_infer
     }
 
@@ -308,11 +308,11 @@ impl CommonInferContext {
         Ok(results[0].1.clone())
     }
 
-    pub fn set_require_infer(&mut self) {
+    pub const fn set_require_infer(&mut self) {
         self.require_infer = true;
     }
 
-    pub fn is_require_infer(&self) -> bool {
+    pub const fn is_require_infer(&self) -> bool {
         self.require_infer
     }
 

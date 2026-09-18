@@ -97,7 +97,7 @@ impl TypeDefinition {
 
     /// test a type is composite type
     #[must_use]
-    pub fn is_composite_type(&self) -> bool {
+    pub const fn is_composite_type(&self) -> bool {
         matches!(&self, Self::CompositeType(_))
     }
 

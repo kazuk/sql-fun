@@ -16,6 +16,10 @@ defined_type: Concept Type Definition
   - `command`: REQUIRED Text, command line used to invoke the tool.
   - `link`: OPTIONAL Text, link to detailed documentation for the tool.
 
+When a concept imports or derives content from outside the repository, the `sources` frontmatter field is REQUIRED.
+
+See: [5. Provenance, trust, and lifecycle](https://github.com/GoogleCloudPlatform/open-knowledge-format/blob/main/SPEC.md#5-provenance-trust-and-lifecycle)
+
 ## Markdown Content
 
 - `Type Description` heading: REQUIRED, describes the concept type.

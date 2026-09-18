@@ -37,13 +37,13 @@ impl FunctionOverloadCollection {
 
     /// number of items
     #[must_use]
-    pub fn len(&self) -> usize {
+    pub const fn len(&self) -> usize {
         self.overloads.len()
     }
 
     /// Returns true if empty
     #[must_use]
-    pub fn is_empty(&self) -> bool {
+    pub const fn is_empty(&self) -> bool {
         self.overloads.is_empty()
     }
 

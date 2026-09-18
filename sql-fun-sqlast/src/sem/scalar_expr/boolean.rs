@@ -39,7 +39,7 @@ pub struct BooleanExpr {
 
 impl BooleanExpr {
     /// create boolean expression from body
-    pub fn new(body: BooleanExprBody) -> Self {
+    pub const fn new(body: BooleanExprBody) -> Self {
         Self { body }
     }
 

@@ -3,9 +3,10 @@ use std::{
     path::{Path, PathBuf},
 };
 
-use crate::{CteParameterRename, placehlodered_sql::ParameterName};
-
-use super::{CatalogFileIndex, CteCatalogReference, CteName};
+use crate::{
+    CatalogFileIndex, CteCatalog, CteCatalogReference, CteName, CteParameterRename,
+    placehlodered_sql::ParameterName,
+};
 
 /// Errors for [`super::CteCatalog`]
 #[derive(thiserror::Error, Debug)]
@@ -26,9 +27,9 @@ pub enum CteCatalogError {
     #[error(transparent)]
     TomlError(#[from] toml::de::Error),
 
-    /// [`yaml_serde::Error`]
+    /// [`serde_yaml_ng::Error`]
     #[error(transparent)]
-    YamlError(#[from] yaml_serde::Error),
+    YamlError(#[from] serde_yaml_ng::Error),
 
     /// specified path not exist
     #[error("Specified path not exist {0}")]
@@ -53,6 +54,10 @@ pub enum CteCatalogError {
     /// Parameter collection not exist
     #[error("[Unexpected internal error / BUG] Parameter collection not exist.")]
     ParameterCollectionNotExist(),
+
+    /// Validation error
+    #[error("CTE catalog validation failed")]
+    Validation(Vec<CteCatalogValidationError>),
 }
 
 impl CteCatalogError {
@@ -88,8 +93,14 @@ impl CteCatalogError {
         Err(Self::CteNotFound(cte_name.clone()))
     }
 
-    pub(super) fn unexpected_parameter_collection_not_exist() -> Result<Infallible, Self> {
+    pub(super) const fn unexpected_parameter_collection_not_exist() -> Result<Infallible, Self> {
         Err(Self::ParameterCollectionNotExist())
+    }
+
+    pub(super) const fn validation_error(
+        validation_errors: Vec<CteCatalogValidationError>,
+    ) -> Result<Infallible, Self> {
+        Err(Self::Validation(validation_errors))
     }
 
     pub(super) fn never() -> ! {
@@ -117,7 +128,7 @@ pub enum CteCatalogCheckError<'a> {
 impl<'a> CteCatalogCheckError<'a> {
     /// multiple CTE has a same name
     #[must_use]
-    pub(super) fn duplicate_definition(other_definition_in: CatalogFileIndex<'a>) -> Self {
+    pub(super) const fn duplicate_definition(other_definition_in: CatalogFileIndex<'a>) -> Self {
         Self::DuplicateDefinition(other_definition_in)
     }
 
@@ -129,13 +140,13 @@ impl<'a> CteCatalogCheckError<'a> {
 
     /// CTE defined but not used
     #[must_use]
-    pub(super) fn unused_cte_entry() -> Self {
+    pub(super) const fn unused_cte_entry() -> Self {
         Self::UnusedCteEntry
     }
 
     /// fragment syntax used in CTE definition
     #[must_use]
-    pub(super) fn fragment_embedding_not_supported() -> Self {
+    pub(super) const fn fragment_embedding_not_supported() -> Self {
         Self::FragmentEmbeddingNotSupported
     }
 
@@ -152,6 +163,60 @@ impl<'a> CteCatalogCheckError<'a> {
     #[must_use]
     pub(super) fn parameter_not_found_for_rename(rename_def: &CteParameterRename) -> Self {
         Self::parameter_not_found(rename_def.cte_name(), rename_def.parameter_name())
+    }
+}
+
+/// CTE catalog validation error
+///
+/// # Note
+///
+/// non-lifetime bound version [`CteCatalogCheckError`]
+#[derive(Debug)]
+pub enum CteCatalogValidationError {
+    /// Duplicate definition
+    DuplicateDefinition(CteName, PathBuf),
+
+    /// reference entry not found
+    UndefinedEntryReference(CteName, CteName),
+
+    /// CTE entry not used
+    UnusedCteEntry(CteName),
+
+    /// fragment embedding not supported
+    FragmentEmbeddingNotSupported(CteName),
+
+    /// Cyclic dependency detected
+    CyclicDependency(CteName, CteName),
+
+    /// parameter not found
+    ParameterNotFound(CteName, CteName, ParameterName),
+}
+
+impl CteCatalogValidationError {
+    fn from_check_error<'a>(
+        cte_catalog: &CteCatalog<'a>,
+        cte_name: &CteName,
+        check_error: &CteCatalogCheckError<'a>,
+    ) -> Self {
+        match check_error {
+            CteCatalogCheckError::DuplicateDefinition(file_index) => {
+                let file_path = cte_catalog.get_file_path(*file_index).clone();
+                Self::DuplicateDefinition(cte_name.clone(), file_path)
+            }
+            CteCatalogCheckError::UndefinedEntryReference(ref_name) => {
+                Self::UndefinedEntryReference(cte_name.clone(), ref_name.clone())
+            }
+            CteCatalogCheckError::UnusedCteEntry => Self::UnusedCteEntry(cte_name.clone()),
+            CteCatalogCheckError::FragmentEmbeddingNotSupported => {
+                Self::FragmentEmbeddingNotSupported(cte_name.clone())
+            }
+            CteCatalogCheckError::CyclicDependency(ref_cte, _) => {
+                Self::CyclicDependency(cte_name.clone(), ref_cte.clone())
+            }
+            CteCatalogCheckError::ParameterNotFound(ref_cte, param) => {
+                Self::ParameterNotFound(cte_name.clone(), ref_cte.clone(), param.clone())
+            }
+        }
     }
 }
 
@@ -194,8 +259,19 @@ impl<'a> CteCatalogCheckErrorCollection<'a> {
         self.0.append(&mut source.0);
     }
 
-    pub fn is_empty(&self) -> bool {
+    pub const fn is_empty(&self) -> bool {
         self.0.is_empty()
+    }
+
+    pub fn validation_errors(
+        &self,
+        cte_catalog: &CteCatalog<'a>,
+        cte_name: &CteName,
+    ) -> Vec<CteCatalogValidationError> {
+        self.0
+            .iter()
+            .map(|item| CteCatalogValidationError::from_check_error(cte_catalog, cte_name, item))
+            .collect()
     }
 
     #[cfg(test)]

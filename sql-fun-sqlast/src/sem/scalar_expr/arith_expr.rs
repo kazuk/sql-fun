@@ -237,7 +237,7 @@ impl ArithExpr {
         }
     }
 
-    fn operator_returns_null(&self) -> Option<bool> {
+    const fn operator_returns_null(&self) -> Option<bool> {
         None
     }
 

@@ -19,12 +19,12 @@ pub enum GeneratedColumnMode {
 
 impl GeneratedColumnMode {
     /// create Stored variant
-    pub fn stored() -> Self {
+    pub const fn stored() -> Self {
         Self::Stored
     }
 
     /// create Virtual variant
-    pub fn r#virtual() -> Self {
+    pub const fn r#virtual() -> Self {
         Self::Virtual
     }
 
@@ -154,12 +154,12 @@ impl GeneratedColumnConstraint {
 
 impl ColumnConstraint {
     /// create Generated variant
-    pub fn generated(value: GeneratedColumnConstraint) -> Self {
+    pub const fn generated(value: GeneratedColumnConstraint) -> Self {
         Self::Generated(value)
     }
 
     /// get Generated variant
-    pub fn as_generated(&self) -> Option<&GeneratedColumnConstraint> {
+    pub const fn as_generated(&self) -> Option<&GeneratedColumnConstraint> {
         if let Self::Generated(c) = self {
             Some(c)
         } else {

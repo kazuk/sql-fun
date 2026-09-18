@@ -1,4 +1,4 @@
-[package.metadata.database]
+[package.metadata.database.default]
 dialect = "postgres"
 engine = "postgres"
 version = "17"

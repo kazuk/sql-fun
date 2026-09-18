@@ -76,13 +76,13 @@ pub struct InitializeArgs {
 impl InitializeArgs {
     /// returns `assume_yes` value
     #[must_use]
-    pub fn assume_yes(&self) -> bool {
+    pub const fn assume_yes(&self) -> bool {
         self.assume_yes
     }
 
     /// returns `sql_fun_home` value
     #[must_use]
-    pub fn sql_fun_home(&self) -> &Option<PathBuf> {
+    pub const fn sql_fun_home(&self) -> &Option<PathBuf> {
         &self.sql_fun_home
     }
 

@@ -19,12 +19,12 @@ impl std::fmt::Display for ConcreteTypeReference {
 
 impl ConcreteTypeReference {
     /// type full name
-    pub fn full_name(&self) -> &FullName {
+    pub const fn full_name(&self) -> &FullName {
         &self.base
     }
 
     /// is array type?
-    pub fn is_array(&self) -> bool {
+    pub const fn is_array(&self) -> bool {
         self.is_array
     }
 

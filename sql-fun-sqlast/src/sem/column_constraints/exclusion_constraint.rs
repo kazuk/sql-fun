@@ -63,12 +63,12 @@ impl ExclusionColumnConstraint {
 
 impl ColumnConstraint {
     /// create Exclusion variant
-    pub fn exclusion(value: ExclusionColumnConstraint) -> Self {
+    pub const fn exclusion(value: ExclusionColumnConstraint) -> Self {
         Self::Exclusion(value)
     }
 
     /// get Exclusion variant
-    pub fn as_exclusion(&self) -> Option<&ExclusionColumnConstraint> {
+    pub const fn as_exclusion(&self) -> Option<&ExclusionColumnConstraint> {
         if let Self::Exclusion(c) = self {
             Some(c)
         } else {

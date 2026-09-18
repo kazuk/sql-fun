@@ -41,7 +41,7 @@ impl PrimaryKeyConstraint {
 
     /// list of primary key columns
     #[must_use]
-    pub fn keys(&self) -> &IVec<ColumnName> {
+    pub const fn keys(&self) -> &IVec<ColumnName> {
         &self.keys
     }
 }

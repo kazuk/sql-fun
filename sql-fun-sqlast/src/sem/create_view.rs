@@ -42,7 +42,7 @@ impl CreateView {
 
     /// name of view
     #[must_use]
-    pub fn name(&self) -> &FullName {
+    pub const fn name(&self) -> &FullName {
         &self.name
     }
 
@@ -74,7 +74,7 @@ impl CreateView {
 
     /// view is materialized
     #[must_use]
-    pub fn is_materialized(&self) -> bool {
+    pub const fn is_materialized(&self) -> bool {
         self.materialized
     }
 

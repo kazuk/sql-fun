@@ -91,7 +91,7 @@ impl OverloadVariant {
 
     /// type of return value
     #[must_use]
-    pub fn ret_type(&self) -> &Option<TypeReference> {
+    pub const fn ret_type(&self) -> &Option<TypeReference> {
         &self.ret_type
     }
 
@@ -127,19 +127,19 @@ impl OverloadVariant {
 
     /// function is strict
     #[must_use]
-    pub fn is_strict(&self) -> bool {
+    pub const fn is_strict(&self) -> bool {
         self.is_strict
     }
 
     /// function returns not null
     #[must_use]
-    pub fn returns_not_null(&self) -> bool {
+    pub const fn returns_not_null(&self) -> bool {
         self.returns_not_null
     }
 
     /// required parameter count
     #[must_use]
-    pub fn required_param_count(&self) -> usize {
+    pub const fn required_param_count(&self) -> usize {
         // TODO: support optional / variadic params
         self.params.len()
     }
@@ -164,7 +164,7 @@ impl OverloadVariant {
 
     /// get parameter list
     #[must_use]
-    pub fn params(&self) -> &Vec<FunctionParam> {
+    pub const fn params(&self) -> &Vec<FunctionParam> {
         &self.params
     }
 

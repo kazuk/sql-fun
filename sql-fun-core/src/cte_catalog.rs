@@ -11,19 +11,30 @@ use std::{
 };
 
 use crate::PlaceholderedSql;
+use indexmap::IndexMap;
 use petgraph::graph::NodeIndex;
+use sha2::{Digest, Sha256};
 use walkdir::WalkDir;
 
-pub use self::error::{CteCatalogCheckError, CteCatalogCheckErrorCollection, CteCatalogError};
+pub use self::error::{
+    CteCatalogCheckError, CteCatalogCheckErrorCollection, CteCatalogError,
+    CteCatalogValidationError,
+};
 pub use self::params::{
     CteParameter, CteParameterBinding, CteParameterBindingCollection, CteParameterCollection,
     CteParameterRename, ParameterRenameCollection,
 };
 
 /// CTE definition name
-#[derive(Debug, serde::Deserialize, Clone, Eq, Hash, PartialEq)]
+#[derive(Debug, serde::Serialize, serde::Deserialize, Clone, Eq, Hash, PartialEq)]
 #[serde(transparent)]
 pub struct CteName(String);
+
+impl PartialEq<str> for CteName {
+    fn eq(&self, other: &str) -> bool {
+        self.0.eq(other)
+    }
+}
 
 impl CteName {
     /// create instance
@@ -39,14 +50,36 @@ impl Display for CteName {
     }
 }
 
+impl<S> PartialEq<S> for CteName
+where
+    S: AsRef<str>,
+{
+    fn eq(&self, other: &S) -> bool {
+        &self.0 == other.as_ref()
+    }
+}
+
 /// CTE alias name
-#[derive(Debug, serde::Deserialize, Clone)]
+#[derive(Debug, serde::Serialize, serde::Deserialize, Clone, Eq, Hash, PartialEq)]
 #[serde(transparent)]
 pub struct CteAlias(String);
+
+impl PartialEq<str> for CteAlias {
+    fn eq(&self, other: &str) -> bool {
+        self.0.eq(other)
+    }
+}
 
 impl Display for CteAlias {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         f.write_str(&self.0)
+    }
+}
+
+impl CteAlias {
+    /// create instance
+    pub fn new(alias: &str) -> Self {
+        Self(String::from(alias))
     }
 }
 
@@ -58,6 +91,14 @@ pub struct CteCatalogReference {
 }
 
 impl CteCatalogReference {
+    /// create instance
+    pub fn new(cte_name: &CteName, alias: &CteAlias) -> Self {
+        Self {
+            cte_name: cte_name.clone(),
+            alias: alias.clone(),
+        }
+    }
+
     /// get a CTE name
     #[must_use]
     pub fn cte_name(&self) -> &CteName {
@@ -251,10 +292,34 @@ impl<'a> CteCatalogEntry<'a> {
         Ok(parameters)
     }
 
-    /// get validation errors on entry
+    /// get check errors on entry
     #[must_use]
     pub fn errors(&self) -> &CteCatalogCheckErrorCollection<'_> {
         &self.errors
+    }
+
+    /// get validation errors on entry
+    #[must_use]
+    pub fn validation_errors(&self, catalog: &CteCatalog<'a>) -> Vec<CteCatalogValidationError> {
+        self.errors.validation_errors(catalog, &self.cte_name)
+    }
+
+    /// expand CTE with dependencies
+    pub fn expand(
+        &self,
+        catalog: &CteCatalog<'a>,
+        alias: &CteAlias,
+        cte_queries: &mut IndexMap<CteAlias, PlaceholderedSql>,
+    ) -> Result<(), CteCatalogError> {
+        for cte in &self.with {
+            let Some(entry) = catalog.get_cte(cte.cte_name()) else {
+                CteCatalogError::raise_cte_not_found(cte.cte_name())?;
+                CteCatalogError::never()
+            };
+            entry.expand(catalog, cte.alias(), cte_queries)?;
+        }
+        cte_queries.insert(alias.clone(), self.query.clone());
+        Ok(())
     }
 }
 
@@ -442,7 +507,7 @@ impl CteCatalog<'_> {
             let value: serde_json::Value = toml::from_str(&content)?;
             value
         } else if extension == "yaml" {
-            let value: serde_json::Value = yaml_serde::from_str(&content)?;
+            let value: serde_json::Value = serde_yaml_ng::from_str(&content)?;
             value
         } else {
             unreachable!();
@@ -567,13 +632,15 @@ query = \"select * from users\"
     }
 }
 
-impl CteCatalog<'_> {
+impl<'a> CteCatalog<'a> {
     /// get cte by name
     #[must_use]
-    pub fn get_cte(&self, cte_name: &CteName) -> Option<Ref<'_, CteCatalogEntry<'_>>> {
+    pub fn get_cte(&self, cte_name: &CteName) -> Option<Ref<'_, CteCatalogEntry<'a>>> {
         self.entries.get(cte_name).map(|e| e.borrow())
     }
+}
 
+impl CteCatalog<'_> {
     fn get_node_id(&self, cte_name: &CteName) -> Option<NodeIndex> {
         self.entries.get(cte_name).map(|e| e.borrow().node_id())
     }
@@ -908,7 +975,7 @@ impl CteCatalog<'_> {
             CteCatalogError::raise_path_is_not_directory(cte_catalog_dir)?;
         }
 
-        let catalog = {
+        let mut catalog = {
             let mut catalog = Self::default();
 
             let walk_dir = WalkDir::new(cte_catalog_dir).follow_links(true).into_iter();
@@ -923,8 +990,36 @@ impl CteCatalog<'_> {
             }
             catalog
         };
-
+        catalog.validate()?;
         Ok(catalog)
+    }
+
+    /// validate catalog
+    ///
+    /// # Errors
+    ///
+    /// - [`CteCatalogError`]: when some errors
+    ///
+    pub fn validate(&mut self) -> Result<&mut Self, CteCatalogError> {
+        self.check_dependencies_exist();
+        self.build_dependency_graph();
+        self.fixup_parameters();
+
+        let mut errors = Vec::new();
+        for (_name, entry) in &self.entries {
+            let entry = entry.borrow();
+            if !entry.has_error() {
+                continue;
+            }
+            let mut entry_errors = entry.validation_errors(self);
+            errors.append(&mut entry_errors);
+        }
+        if errors.is_empty() {
+            Ok(self)
+        } else {
+            CteCatalogError::validation_error(errors)?;
+            CteCatalogError::never()
+        }
     }
 }
 
@@ -1007,5 +1102,68 @@ impl CteCatalog<'_> {
     #[must_use]
     pub fn get_file_of(&self, entry: &CteCatalogEntry<'_>) -> &PathBuf {
         self.get_file_path(entry.source_file)
+    }
+}
+
+impl CteCatalog<'_> {
+    /// resolve CTE references
+    pub fn resolve(
+        &self,
+        base_query: &PlaceholderedSql,
+        references: &[CteCatalogReference],
+    ) -> Result<ResolvedCteCatalog, CteCatalogError> {
+        let mut parameters = CteParameterCollection::default();
+        let mut cte_queries = IndexMap::default();
+
+        for reference in references {
+            let cte_name = &reference.cte_name();
+            let Some(cte) = self.get_cte(&cte_name) else {
+                CteCatalogError::raise_cte_not_found(cte_name)?;
+                CteCatalogError::never()
+            };
+            let params = cte.try_get_parameters()?;
+            parameters.marge(params.clone());
+            cte.expand(self, reference.alias(), &mut cte_queries)?;
+        }
+
+        Ok(ResolvedCteCatalog {
+            parameters,
+            base_query: base_query.clone(),
+            cte_queries,
+        })
+    }
+}
+
+/// resolved CTE catalog
+#[derive(Debug)]
+pub struct ResolvedCteCatalog {
+    parameters: CteParameterCollection,
+    base_query: PlaceholderedSql,
+    cte_queries: IndexMap<CteAlias, PlaceholderedSql>,
+}
+
+impl From<&PlaceholderedSql> for ResolvedCteCatalog {
+    fn from(value: &PlaceholderedSql) -> Self {
+        Self {
+            parameters: CteParameterCollection::default(),
+            base_query: value.clone(),
+            cte_queries: IndexMap::default(),
+        }
+    }
+}
+
+impl ResolvedCteCatalog {
+    /// compute query finger print
+    pub fn finger_print(&self) -> Result<String, CteCatalogError> {
+        let mut hasher = Sha256::new();
+        let parameters_json = serde_json::to_string(&self.parameters)?;
+        hasher.update(parameters_json.as_bytes());
+        let base_quesy = serde_json::to_string(&self.base_query)?;
+        hasher.update(base_quesy.as_bytes());
+        let cte_queries = serde_json::to_string(&self.cte_queries)?;
+        hasher.update(cte_queries.as_bytes());
+        let digest = hasher.finalize();
+        let finger_print = hex::encode(digest);
+        Ok(finger_print)
     }
 }

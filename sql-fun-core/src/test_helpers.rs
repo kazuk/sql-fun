@@ -155,7 +155,12 @@ pub fn parse_metadata<P: AsRef<Path> + std::fmt::Debug>(
     source: &str,
     path_hint: P,
 ) -> Result<SqlFunMetadata, MetadataError> {
-    SqlFunMetadata::from_str(source, path_hint)
+    let mut metadata = crate::SqlFunMetadataCollection::from_str(source, &path_hint)?;
+    if let Some(metadata) = metadata.remove("default") {
+        Ok(metadata)
+    } else {
+        MetadataError::metadata_load_from_file(path_hint, "default datasource not defined")
+    }
 }
 
 /// Parse PostgreSQL metadata without a CTE catalog.
@@ -168,7 +173,7 @@ pub fn parse_postgres_metadata<P: AsRef<Path> + std::fmt::Debug>(
 name = "fixture"
 version = "0.1.0"
 
-[package.metadata.database]
+[package.metadata.database.default]
 engine = "PostgreSQL"
 dialect = "postgres"
 "#,
@@ -192,7 +197,7 @@ where
 name = "fixture"
 version = "0.1.0"
 
-[package.metadata.database]
+[package.metadata.database.default]
 engine = "PostgreSQL"
 dialect = "postgres"
 cte_catalog = "{}"

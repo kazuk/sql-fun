@@ -67,7 +67,9 @@ impl LoggingArgs {
         envs.insert(Self::SQL_FUN_LOG_LEVEL.to_string(), self.log_level.clone());
     }
 
+    #[tracing::instrument(skip(self))]
     pub fn set_log_level(&mut self, log_level: &str) {
+        tracing::info!("set log level {log_level}");
         self.log_level = log_level.to_string();
     }
 }

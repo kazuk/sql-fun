@@ -104,7 +104,7 @@ impl CteParameterBinding {
 }
 
 /// collection of parameter binding
-#[derive(Debug, Default, Clone)]
+#[derive(Debug, Default, Clone, serde::Serialize)]
 pub struct CteParameterBindingCollection(Vec<(CteName, Vec<PlaceholderTypeHint>)>);
 
 impl CteParameterBindingCollection {
@@ -122,7 +122,7 @@ impl CteParameterBindingCollection {
 }
 
 /// parameter collection for CTE
-#[derive(Debug, Default)]
+#[derive(Debug, Default, Clone, serde::Serialize)]
 pub struct CteParameterCollection {
     parameters: HashMap<ParameterName, CteParameterBindingCollection>,
 }
@@ -183,6 +183,21 @@ impl CteParameterCollection {
     /// get parameter names
     pub fn parameter_names(&self) -> impl Iterator<Item = &ParameterName> {
         self.parameters.keys()
+    }
+
+    /// marge parameter collection
+    pub fn marge(&mut self, mut other: Self) {
+        for (param_name, input_bindings) in other.parameters.iter_mut() {
+            match self.parameters.entry(param_name.clone()) {
+                Entry::Occupied(mut o) => {
+                    let bindings = o.get_mut();
+                    bindings.append(input_bindings);
+                }
+                Entry::Vacant(v) => {
+                    v.insert(input_bindings.clone());
+                }
+            }
+        }
     }
 
     fn iter(

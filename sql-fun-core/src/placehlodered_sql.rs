@@ -10,7 +10,7 @@ use combine::{
 };
 use indexmap::IndexMap;
 
-#[derive(Debug, Hash, Eq, PartialEq, Clone, serde::Deserialize)]
+#[derive(Debug, Hash, Eq, PartialEq, Clone, serde::Serialize, serde::Deserialize)]
 #[serde(transparent)]
 pub struct ParameterName(String);
 
@@ -23,7 +23,7 @@ where
     }
 }
 
-#[derive(Debug, Clone)]
+#[derive(Debug, Clone, serde::Serialize)]
 pub struct PlaceholderTypeHint(String);
 
 impl PlaceholderTypeHint {
@@ -41,10 +41,20 @@ fn ident<'a>() -> impl combine::Parser<&'a str, Output = String> {
     })
 }
 
-#[derive(Debug, Hash, Eq, PartialEq, Clone)]
+/// fragment embedding placeholder name
+#[derive(Debug, Hash, Eq, PartialEq, Clone, serde::Serialize)]
+#[serde(transparent)]
 pub struct FragmentName(String);
 
 impl FragmentName {
+    /// create instance
+    pub fn new<S>(name: S) -> Self
+    where
+        S: AsRef<str>,
+    {
+        Self(String::from(name.as_ref()))
+    }
+
     /// get perser accepts `#[ fragment_name ]`
     pub fn parser<'a>() -> impl combine::Parser<&'a str, Output = Self> {
         let ident = ident().map(FragmentName);
@@ -55,9 +65,20 @@ impl FragmentName {
             ident,
         ))
     }
+
+    /// get `&str` value
+    pub fn as_str(&self) -> &str {
+        self.0.as_str()
+    }
 }
 
-#[derive(Debug)]
+impl std::fmt::Display for FragmentName {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        write!(f, "{}", self.0)
+    }
+}
+
+#[derive(Debug, Clone, serde::Serialize)]
 pub struct NamedParameterPlaceholder {
     name: ParameterName,
     type_hint: Option<PlaceholderTypeHint>,
@@ -88,7 +109,8 @@ impl NamedParameterPlaceholder {
     }
 }
 
-#[derive(Debug)]
+#[derive(Debug, Clone, serde::Serialize)]
+#[serde(transparent)]
 pub struct SqlLiteralText(String);
 
 impl SqlLiteralText {
@@ -111,7 +133,8 @@ impl SqlLiteralText {
     }
 }
 
-#[derive(Debug)]
+#[derive(Debug, Clone, serde::Serialize)]
+#[serde(transparent)]
 pub struct RawSqlText(String);
 
 impl RawSqlText {
@@ -120,7 +143,7 @@ impl RawSqlText {
     }
 }
 
-#[derive(Debug)]
+#[derive(Debug, Clone, serde::Serialize)]
 pub enum PlaceholderedSqlToken {
     ParameterPlaceholder(NamedParameterPlaceholder),
     FragmentPlaceholder(FragmentName),
@@ -181,9 +204,23 @@ impl PlaceholderedSqlToken {
         }
         results
     }
+
+    pub fn as_fragment_placeholder(&self) -> Option<&FragmentName> {
+        match self {
+            Self::FragmentPlaceholder(v) => Some(v),
+            _ => None,
+        }
+    }
+
+    fn is_fragment_place_holder(&self, fragment_name: &FragmentName) -> bool {
+        match self {
+            Self::FragmentPlaceholder(v) => v == fragment_name,
+            _ => false,
+        }
+    }
 }
 
-#[derive(Debug)]
+#[derive(Debug, Clone, serde::Serialize)]
 /// SQL text contains `sql-fun` named parameter syntax and fragment embedding marker
 pub struct PlaceholderedSql {
     tokens: Vec<PlaceholderedSqlToken>,
@@ -191,11 +228,25 @@ pub struct PlaceholderedSql {
     fragments: HashSet<FragmentName>,
 }
 
+/// Placeholder processing errors
+#[derive(thiserror::Error, Debug)]
+pub enum PlaceholderedSqlError {
+    /// fragment placeholder not found
+    #[error("fragment placeholder {0} not found")]
+    FragmentPlaceholderNotFound(FragmentName),
+}
+
 impl PlaceholderedSql {
     /// build from query text string
     #[must_use]
     pub fn from_query(query: &str) -> Self {
         let tokens = PlaceholderedSqlToken::scan(query);
+        Self::from_tokens(tokens)
+    }
+
+    /// build from tokens
+    #[must_use]
+    pub fn from_tokens(tokens: Vec<PlaceholderedSqlToken>) -> PlaceholderedSql {
         let mut parameters: IndexMap<ParameterName, Vec<PlaceholderTypeHint>> = IndexMap::new();
         let mut fragments: HashSet<FragmentName> = HashSet::new();
 
@@ -235,6 +286,13 @@ impl PlaceholderedSql {
         self.fragments.is_empty()
     }
 
+    /// enumerate fragment by usage order
+    pub fn fragment_names_by_usage_order(&self) -> impl Iterator<Item = &FragmentName> {
+        self.tokens
+            .iter()
+            .filter_map(|t| t.as_fragment_placeholder())
+    }
+
     /// get parameter placeholders
     pub fn parameters(&self) -> impl Iterator<Item = (&ParameterName, &Vec<PlaceholderTypeHint>)> {
         self.parameters.iter()
@@ -243,5 +301,25 @@ impl PlaceholderedSql {
     /// get tokens in sql
     pub fn tokens(&self) -> impl Iterator<Item = &PlaceholderedSqlToken> {
         self.tokens.iter()
+    }
+
+    /// embed fragment SQL text
+    pub fn embed_fragment(
+        &self,
+        fragment_name: &FragmentName,
+        sql_fragment: &str,
+    ) -> Result<Self, PlaceholderedSqlError> {
+        let embedding = PlaceholderedSqlToken::scan(sql_fragment);
+        let mut rebuilded_tokens: Vec<PlaceholderedSqlToken> = Vec::new();
+        for item in self.tokens() {
+            if item.is_fragment_place_holder(fragment_name) {
+                for token in embedding.iter().cloned() {
+                    rebuilded_tokens.push(token);
+                }
+            } else {
+                rebuilded_tokens.push(item.clone());
+            }
+        }
+        Ok(Self::from_tokens(rebuilded_tokens))
     }
 }

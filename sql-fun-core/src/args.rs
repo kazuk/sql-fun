@@ -20,7 +20,7 @@ pub use self::{
 
 use crate::{
     HighlighterTheme, PostgresExtensionsCollection, SqlDialect, SqlFunMetadata, TerminalColor,
-    metadata::PostgresEngineVersion,
+    metadata::{PostgresEngineVersion, SqlFunMetadataCollection},
 };
 
 #[derive(Debug)]
@@ -98,6 +98,11 @@ pub struct SqlFunArgs {
     #[clap(long, env = Self::SQL_FUN_NO_BUILTIN)]
     #[builder(default)]
     no_builtin_tables: bool,
+
+    /// datasource name
+    #[clap(long, env = Self::SQL_FUN_DATASOURCE)]
+    #[builder(default)]
+    datasource: Option<String>,
 }
 
 impl SqlFunArgsBuilder {
@@ -154,15 +159,21 @@ fn parse_bool_env(value: &str) -> Result<bool, SqlFunArgsError> {
 }
 
 impl SqlFunArgs {
+    /// get current schema
+    pub fn schema(&self) -> &str {
+        self.metadata_args.schema()
+    }
+
     /// load metadata
     ///
     /// # Errors
     ///
     /// [`SqlFunArgsError`] when metadata configuration or IO error
     ///
-    pub fn load_metadata(&self) -> Result<SqlFunMetadata, SqlFunArgsError> {
+    #[tracing::instrument(skip(self))]
+    pub fn load_metadata(&self) -> Result<SqlFunMetadataCollection, SqlFunArgsError> {
         let metadata_file = self.metadata_file()?;
-        Ok(SqlFunMetadata::load_from(metadata_file)?)
+        Ok(SqlFunMetadataCollection::load_from(metadata_file)?)
     }
 
     /// get SQL dialect
@@ -257,6 +268,12 @@ impl SqlFunArgs {
     const SQL_FUN_NO_BUILTIN: &str = "SQL_FUN_NO_BUILTIN";
     const SQL_FUN_TERM_COLOR: &str = "SQL_FUN_TERM_COLOR";
     const SQL_FUN_HIGHLIGHTER_THEME: &str = "SQL_FUN_HIGHLIGHTER_THEME";
+    const SQL_FUN_DATASOURCE: &str = "SQL_FUN_DATASOURCE";
+
+    /// selected datasource name
+    pub fn datasource(&self) -> Option<&str> {
+        self.datasource.as_ref().map(|v| v.as_ref())
+    }
 
     /// get environments for child process
     ///
@@ -267,12 +284,18 @@ impl SqlFunArgs {
     pub fn environments(&self) -> Result<HashMap<String, String>, SqlFunArgsError> {
         let mut result = HashMap::new();
         let metadata_file = self.metadata_file()?;
-        let metadata = SqlFunMetadata::load_from(&metadata_file)?;
+        let metadatas = SqlFunMetadataCollection::load_from(&metadata_file)?;
+        if let Some(datasource) = &self.datasource {
+            let Some(metadata) = metadatas.get(datasource) else {
+                return SqlFunArgsError::datasource_not_found(datasource);
+            };
+            self.metadata_args.get_envs(&mut result, &metadata)?;
+            self.postgres_args.get_envs(&mut result, self, &metadata)?;
 
-        self.metadata_args.get_envs(&mut result, &metadata)?;
-        self.postgres_args.get_envs(&mut result, self, &metadata)?;
+            result.insert(Self::SQL_FUN_DATASOURCE.to_string(), datasource.clone());
+        }
+
         self.log_args.get_envs(&mut result);
-
         result.insert(
             Self::SQL_FUN_OUTPUT_FORMAT.to_string(),
             self.output_format.clone(),
@@ -340,8 +363,10 @@ impl SqlFunArgs {
     /// # Errors
     ///
     /// Returns [`SqlFunArgsError`] if failed
+    #[tracing::instrument]
     pub fn try_from_env() -> Result<Self, SqlFunArgsError> {
         let mut args = Self::try_parse_from(Vec::<String>::default())?;
+        tracing::info!("argument loaded");
         if args.verbose {
             args.log_args.set_log_level("debug");
         }

@@ -13,14 +13,17 @@ mod highlighter;
 mod metadata;
 mod placehlodered_sql;
 
+/// `sql-fun` code generator lockfile
+pub mod lockfile;
+
 pub use self::{
     cte_catalog::{
         CatalogFileIndex, CteAlias, CteCatalog, CteCatalogCheckError, CteCatalogEntry,
         CteCatalogError, CteCatalogReference, CteName, CteParameter, CteParameterBinding,
         CteParameterBindingCollection, CteParameterCollection, CteParameterRename,
-        ParameterRenameCollection,
+        ParameterRenameCollection, ResolvedCteCatalog,
     },
-    placehlodered_sql::PlaceholderedSql,
+    placehlodered_sql::{FragmentName, PlaceholderedSql, PlaceholderedSqlError},
 };
 
 #[cfg(test)]
@@ -40,7 +43,7 @@ pub use self::{
         PostgresExtensionsCollection, PostgresExtensionsParseError,
     },
     highlighter::{HighlighterStyle, HighlighterTheme, HighlighterThemeError, TerminalColor},
-    metadata::{MetadataError, PostgresEngineVersion, SqlFunMetadata},
+    metadata::{MetadataError, PostgresEngineVersion, SqlFunMetadata, SqlFunMetadataCollection},
 };
 
 /// Supporting `PostgreSQL` Database engine versions
@@ -69,7 +72,6 @@ impl FromStr for PostgresVersion {
             "15" => Ok(Self::Ver15),
             "16" => Ok(Self::Ver16),
             "17" => Ok(Self::Ver17),
-            #[cfg(feature = "beta_postgres_versions")]
             "18" => Ok(Self::Ver18),
             _ => Err(s.to_string()),
         }
@@ -94,6 +96,11 @@ pub enum SqlDialect {
     /// postgres using a `pg_query` crate for parsing a syntax.
     #[serde(rename = "postgres")]
     PostgreSQL,
+
+    /// sqlite using a `turso_parser` crate for parsing a syntax.
+    #[cfg(feature = "sqlite")]
+    #[serde(rename = "sqlite")]
+    SQLite,
 }
 
 impl FromStr for SqlDialect {
@@ -103,6 +110,10 @@ impl FromStr for SqlDialect {
         if s.to_lowercase() == "postgresql" {
             return Ok(Self::PostgreSQL);
         }
+        #[cfg(feature = "sqlite")]
+        if s.to_lowercase() == "sqlite" {
+            return Ok(Self::SQLite);
+        }
         Err(s.to_string())
     }
 }
@@ -111,6 +122,69 @@ impl Display for SqlDialect {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         match self {
             Self::PostgreSQL => write!(f, "postgresql"),
+            #[cfg(feature = "sqlite")]
+            Self::SQLite => write!(f, "sqlite"),
+        }
+    }
+}
+
+/// lint diagnostics configurations
+pub mod diagnostics {
+    use indexmap::IndexMap;
+
+    /// diagnostics level
+    #[derive(Debug, serde::Deserialize, Clone, Copy, PartialEq)]
+    pub enum DiagnosticsLevel {
+        /// hide always
+        Suppress,
+        /// show only verbose flaged
+        OnlyVerbose,
+        /// show warning
+        Warning,
+        /// show as error, require fail
+        Error,
+    }
+
+    /// diagnostics kind
+    #[derive(Debug, serde::Deserialize, Clone, Copy, Eq, PartialEq, Hash)]
+    pub enum DiagnosticsKind {
+        /// table not found
+        TableNotFound,
+        /// column not found
+        ColumnNotFound,
+        /// type not found
+        TypeNotFound,
+    }
+
+    impl DiagnosticsKind {
+        const fn get_diagnostics_level_default(&self) -> DiagnosticsLevel {
+            match self {
+                DiagnosticsKind::TableNotFound => DiagnosticsLevel::Warning,
+                DiagnosticsKind::ColumnNotFound => DiagnosticsLevel::Warning,
+                DiagnosticsKind::TypeNotFound => DiagnosticsLevel::Warning,
+            }
+        }
+    }
+
+    /// diagnostics configurations
+    pub struct DiagnosticsConfigurations {
+        defaults: Option<Box<Self>>,
+
+        configurations: IndexMap<DiagnosticsKind, DiagnosticsLevel>,
+    }
+
+    impl DiagnosticsConfigurations {
+        /// get diagnostics level for kind
+        pub fn get_diagnostics_lebel(&self, kind: DiagnosticsKind) -> DiagnosticsLevel {
+            if let Some(level) = self.configurations.get(&kind).cloned() {
+                level
+            } else {
+                if let Some(defaults) = &self.defaults {
+                    defaults.get_diagnostics_lebel(kind)
+                } else {
+                    kind.get_diagnostics_level_default()
+                }
+            }
         }
     }
 }

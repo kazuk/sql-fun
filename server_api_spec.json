@@ -1,26 +1,75 @@
 {
+  "openrpc": "1.2.6",
   "info": {
-    "description": "# `sql-fun` server api\n\n `sql-fun` server provides database schema cache for `sql-fun` and schema aware SQL semantics analysis.\n",
     "title": "sql-fun-server JSON-RPC api",
-    "version": "0.1.0"
+    "version": "0.1.0",
+    "description": "# `sql-fun` server api\n\n `sql-fun` server provides database schema cache for `sql-fun` and schema aware SQL semantics analysis.\n"
   },
   "methods": [
     {
-      "deprecated": null,
       "name": "initialize_schema_context",
+      "summary": "load schema dump file for semantic analysis",
+      "deprecated": null,
+      "tags": [],
       "params": [
         {
           "name": "params",
-          "required": true,
           "schema": {
+            "$schema": "https://json-schema.org/draft/2020-12/schema",
+            "title": "InitializeSchemaArgs",
+            "description": "Load schema dump and initialize semantic analysis context",
+            "type": "object",
+            "properties": {
+              "engine_dialect": {
+                "description": "SQL dialect for schema",
+                "$ref": "#/$defs/EngineDialect"
+              },
+              "engine_version": {
+                "description": "Used for loading builtin schema objects",
+                "$ref": "#/$defs/EngineVersion"
+              },
+              "extensions": {
+                "description": "Enabled extensions",
+                "type": "array",
+                "items": {
+                  "$ref": "#/$defs/ExtensionSpec"
+                }
+              },
+              "search_path": {
+                "description": "Search path",
+                "type": "array",
+                "items": {
+                  "type": "string"
+                }
+              },
+              "schema_dump": {
+                "description": "schema dump file",
+                "type": "string"
+              },
+              "environments": {
+                "description": "environment variables for initialization",
+                "type": "object",
+                "additionalProperties": {
+                  "type": "string"
+                }
+              }
+            },
+            "required": [
+              "engine_dialect",
+              "engine_version",
+              "extensions",
+              "search_path",
+              "schema_dump",
+              "environments"
+            ],
             "$defs": {
               "EngineDialect": {
                 "description": "Engine dialect selecting SQL syntax perser.",
                 "oneOf": [
                   {
-                    "const": "PostgreSQL",
                     "description": "`PostgreSQL` valiant, selects parser as `pg_query`",
-                    "type": "string"
+                    "type": "string",
+                    "const": "PostgreSQL"
                   }
                 ]
               },
@@ -28,8 +77,8 @@
                 "description": "Selecting database builtin objects",
                 "oneOf": [
                   {
-                    "additionalProperties": false,
                     "description": "`PostgreSQL` and version string.",
+                    "type": "object",
                     "properties": {
                       "PostgreSQL": {
                         "type": "string"
@@ -38,12 +87,13 @@
                     "required": [
                       "PostgreSQL"
                     ],
-                    "type": "object"
+                    "additionalProperties": false
                   }
                 ]
               },
               "ExtensionSpec": {
                 "description": "`PostgreSQL` extension",
+                "type": "object",
                 "properties": {
                   "extension_name": {
                     "description": "Name for extension",
@@ -57,126 +107,85 @@
                 "required": [
                   "extension_name",
                   "extension_version"
-                ],
-                "type": "object"
+                ]
               }
-            },
-            "$schema": "https://json-schema.org/draft/2020-12/schema",
-            "description": "Load schema dump and initialize semantic analysis context",
-            "properties": {
-              "engine_dialect": {
-                "$ref": "#/$defs/EngineDialect",
-                "description": "SQL dialect for schema"
-              },
-              "engine_version": {
-                "$ref": "#/$defs/EngineVersion",
-                "description": "Used for loading builtin schema objects"
-              },
-              "environments": {
-                "additionalProperties": {
-                  "type": "string"
-                },
-                "description": "environment variables for initialization",
-                "type": "object"
-              },
-              "extensions": {
-                "description": "Enabled extensions",
-                "items": {
-                  "$ref": "#/$defs/ExtensionSpec"
-                },
-                "type": "array"
-              },
-              "schema_dump": {
-                "description": "schema dump file",
-                "type": "string"
-              },
-              "search_path": {
-                "description": "Search path",
-                "items": {
-                  "type": "string"
-                },
-                "type": "array"
-              }
-            },
-            "required": [
-              "engine_dialect",
-              "engine_version",
-              "extensions",
-              "search_path",
-              "schema_dump",
-              "environments"
-            ],
-            "title": "InitializeSchemaArgs",
-            "type": "object"
-          }
+            }
+          },
+          "required": true
         }
       ],
       "result": {
         "name": "result",
         "schema": {
-          "$defs": {
-            "AnalysisProbrem": {
-              "description": "semantic analysis probrem",
-              "properties": {
-                "code": {
-                  "description": "error code",
-                  "type": "string"
+          "$schema": "https://json-schema.org/draft/2020-12/schema",
+          "title": "SchemaContext",
+          "description": "schema context",
+          "type": "object",
+          "properties": {
+            "context_handle": {
+              "description": "context handle",
+              "anyOf": [
+                {
+                  "$ref": "#/$defs/ContextHandle"
                 },
-                "file_path": {
-                  "description": "file path",
-                  "type": "string"
-                },
-                "probrem_span": {
-                  "$ref": "#/$defs/TextSpan",
-                  "description": "probrem span"
-                },
-                "statement_span": {
-                  "$ref": "#/$defs/TextSpan",
-                  "description": "statement span"
+                {
+                  "type": "null"
                 }
-              },
-              "required": [
-                "code",
-                "file_path",
-                "statement_span",
-                "probrem_span"
-              ],
-              "type": "object"
+              ]
+            },
+            "schema_dump_hash": {
+              "description": "SHA 256 hash for schema dump",
+              "type": "string"
+            },
+            "problems": {
+              "description": "schema analysis problems",
+              "$ref": "#/$defs/Collection"
+            }
+          },
+          "required": [
+            "schema_dump_hash",
+            "problems"
+          ],
+          "$defs": {
+            "ContextHandle": {
+              "description": "semantic analysis context handle",
+              "type": "string"
             },
             "Collection": {
               "description": "collection",
+              "type": "object",
               "properties": {
-                "expire_at": {
-                  "description": "expiration time",
-                  "format": "date-time",
-                  "type": "string"
-                },
                 "handle": {
-                  "$ref": "#/$defs/CollectionHandle",
-                  "description": "handle for collecttion"
+                  "description": "handle for collecttion",
+                  "$ref": "#/$defs/CollectionHandle"
                 },
-                "items": {
-                  "description": "collection items",
-                  "items": {
-                    "$ref": "#/$defs/AnalysisProbrem"
-                  },
-                  "type": "array"
+                "total_length": {
+                  "description": "length of collection",
+                  "type": "integer",
+                  "format": "uint",
+                  "minimum": 0
                 },
                 "offset": {
                   "description": "offset of items",
+                  "type": "integer",
                   "format": "uint",
-                  "minimum": 0,
-                  "type": "integer"
+                  "minimum": 0
                 },
                 "require_release": {
                   "description": "When true, client must be call `SqlFunServerApi::release_collection`",
                   "type": "boolean"
                 },
-                "total_length": {
-                  "description": "length of collection",
-                  "format": "uint",
-                  "minimum": 0,
-                  "type": "integer"
+                "expire_at": {
+                  "description": "expiration time",
+                  "type": "string",
+                  "format": "date-time"
+                },
+                "items": {
+                  "description": "collection items",
+                  "type": "array",
+                  "items": {
+                    "$ref": "#/$defs/AnalysisProbrem"
+                  }
                 }
               },
               "required": [
@@ -186,186 +195,176 @@
                 "require_release",
                 "expire_at",
                 "items"
-              ],
-              "type": "object"
+              ]
             },
             "CollectionHandle": {
               "description": "collection handle",
               "type": "string"
             },
-            "ContextHandle": {
-              "description": "semantic analysis context handle",
-              "type": "string"
+            "AnalysisProbrem": {
+              "description": "semantic analysis probrem",
+              "type": "object",
+              "properties": {
+                "code": {
+                  "description": "error code",
+                  "type": "string"
+                },
+                "file_path": {
+                  "description": "file path",
+                  "type": "string"
+                },
+                "statement_span": {
+                  "description": "statement span",
+                  "$ref": "#/$defs/TextSpan"
+                },
+                "probrem_span": {
+                  "description": "probrem span",
+                  "$ref": "#/$defs/TextSpan"
+                }
+              },
+              "required": [
+                "code",
+                "file_path",
+                "statement_span",
+                "probrem_span"
+              ]
+            },
+            "TextSpan": {
+              "description": "span in SQL text",
+              "type": "object",
+              "properties": {
+                "from": {
+                  "description": "span start position",
+                  "$ref": "#/$defs/TextPosition"
+                },
+                "to": {
+                  "description": "span end position",
+                  "$ref": "#/$defs/TextPosition"
+                }
+              },
+              "required": [
+                "from",
+                "to"
+              ]
             },
             "TextPosition": {
               "description": "position in SQL text",
+              "type": "object",
               "properties": {
-                "col": {
-                  "description": "column number",
-                  "format": "uint32",
-                  "minimum": 0,
-                  "type": "integer"
+                "offset": {
+                  "description": "seek offset from file start",
+                  "type": "integer",
+                  "format": "uint",
+                  "minimum": 0
                 },
                 "line": {
                   "description": "line number",
+                  "type": "integer",
                   "format": "uint32",
-                  "minimum": 0,
-                  "type": "integer"
+                  "minimum": 0
                 },
-                "offset": {
-                  "description": "seek offset from file start",
-                  "format": "uint",
-                  "minimum": 0,
-                  "type": "integer"
+                "col": {
+                  "description": "column number",
+                  "type": "integer",
+                  "format": "uint32",
+                  "minimum": 0
                 }
               },
               "required": [
                 "offset",
                 "line",
                 "col"
-              ],
-              "type": "object"
-            },
-            "TextSpan": {
-              "description": "span in SQL text",
-              "properties": {
-                "from": {
-                  "$ref": "#/$defs/TextPosition",
-                  "description": "span start position"
-                },
-                "to": {
-                  "$ref": "#/$defs/TextPosition",
-                  "description": "span end position"
-                }
-              },
-              "required": [
-                "from",
-                "to"
-              ],
-              "type": "object"
+              ]
             }
-          },
-          "$schema": "https://json-schema.org/draft/2020-12/schema",
-          "description": "schema context",
-          "properties": {
-            "context_handle": {
-              "anyOf": [
-                {
-                  "$ref": "#/$defs/ContextHandle"
-                },
-                {
-                  "type": "null"
-                }
-              ],
-              "description": "context handle"
-            },
-            "problems": {
-              "$ref": "#/$defs/Collection",
-              "description": "schema analysis problems"
-            },
-            "schema_dump_hash": {
-              "description": "SHA 256 hash for schema dump",
-              "type": "string"
-            }
-          },
-          "required": [
-            "schema_dump_hash",
-            "problems"
-          ],
-          "title": "SchemaContext",
-          "type": "object"
+          }
         }
-      },
-      "summary": "load schema dump file for semantic analysis",
-      "tags": []
+      }
     },
     {
-      "deprecated": null,
       "name": "read_collection",
+      "summary": "read a collection",
+      "deprecated": null,
+      "tags": [],
       "params": [
         {
           "name": "params",
-          "required": true,
           "schema": {
-            "$defs": {
-              "CollectionHandle": {
-                "description": "collection handle",
-                "type": "string"
-              }
-            },
             "$schema": "https://json-schema.org/draft/2020-12/schema",
+            "title": "ReadCollectionArgs",
             "description": "argument for [`crate::SqlFunServerApi::read_collection`]\n\nThe item type returned by `read_collection` is identical to the element type\nof the original `Collection<T>` that produced the handle, and never changes.\nThis method only reads the continuation of that collection; no type conversion\nis performed.",
+            "type": "object",
             "properties": {
               "collection_handle": {
-                "$ref": "#/$defs/CollectionHandle",
-                "description": "collection"
-              },
-              "count": {
-                "description": "read count\n\nwhen None, client requests read to end, but server implementation has a hard limit",
-                "format": "uint",
-                "minimum": 0,
-                "type": [
-                  "integer",
-                  "null"
-                ]
+                "description": "collection",
+                "$ref": "#/$defs/CollectionHandle"
               },
               "start_offset": {
                 "description": "start offset",
+                "type": "integer",
                 "format": "uint",
-                "minimum": 0,
-                "type": "integer"
+                "minimum": 0
+              },
+              "count": {
+                "description": "read count\n\nwhen None, client requests read to end, but server implementation has a hard limit",
+                "type": [
+                  "integer",
+                  "null"
+                ],
+                "format": "uint",
+                "minimum": 0
               }
             },
             "required": [
               "collection_handle",
               "start_offset"
             ],
-            "title": "ReadCollectionArgs",
-            "type": "object"
-          }
+            "$defs": {
+              "CollectionHandle": {
+                "description": "collection handle",
+                "type": "string"
+              }
+            }
+          },
+          "required": true
         }
       ],
       "result": {
         "name": "result",
         "schema": {
-          "$defs": {
-            "CollectionHandle": {
-              "description": "collection handle",
-              "type": "string"
-            }
-          },
           "$schema": "https://json-schema.org/draft/2020-12/schema",
+          "title": "Collection",
           "description": "collection",
+          "type": "object",
           "properties": {
-            "expire_at": {
-              "description": "expiration time",
-              "format": "date-time",
-              "type": "string"
-            },
             "handle": {
-              "$ref": "#/$defs/CollectionHandle",
-              "description": "handle for collecttion"
+              "description": "handle for collecttion",
+              "$ref": "#/$defs/CollectionHandle"
             },
-            "items": {
-              "description": "collection items",
-              "items": true,
-              "type": "array"
+            "total_length": {
+              "description": "length of collection",
+              "type": "integer",
+              "format": "uint",
+              "minimum": 0
             },
             "offset": {
               "description": "offset of items",
+              "type": "integer",
               "format": "uint",
-              "minimum": 0,
-              "type": "integer"
+              "minimum": 0
             },
             "require_release": {
               "description": "When true, client must be call `SqlFunServerApi::release_collection`",
               "type": "boolean"
             },
-            "total_length": {
-              "description": "length of collection",
-              "format": "uint",
-              "minimum": 0,
-              "type": "integer"
+            "expire_at": {
+              "description": "expiration time",
+              "type": "string",
+              "format": "date-time"
+            },
+            "items": {
+              "description": "collection items",
+              "type": "array",
+              "items": true
             }
           },
           "required": [
@@ -376,41 +375,45 @@
             "expire_at",
             "items"
           ],
-          "title": "Collection",
-          "type": "object"
+          "$defs": {
+            "CollectionHandle": {
+              "description": "collection handle",
+              "type": "string"
+            }
+          }
         }
-      },
-      "summary": "read a collection",
-      "tags": []
+      }
     },
     {
-      "deprecated": null,
       "name": "release_collection",
+      "summary": "release a collection",
+      "deprecated": null,
+      "tags": [],
       "params": [
         {
           "name": "params",
-          "required": true,
           "schema": {
-            "$defs": {
-              "CollectionHandle": {
-                "description": "collection handle",
-                "type": "string"
-              }
-            },
             "$schema": "https://json-schema.org/draft/2020-12/schema",
+            "title": "ReleaseCollectionArgs",
             "description": "argument for [`crate::SqlFunServerApi::release_collection`]",
+            "type": "object",
             "properties": {
               "collection_handle": {
-                "$ref": "#/$defs/CollectionHandle",
-                "description": "releasing collection handle"
+                "description": "releasing collection handle",
+                "$ref": "#/$defs/CollectionHandle"
               }
             },
             "required": [
               "collection_handle"
             ],
-            "title": "ReleaseCollectionArgs",
-            "type": "object"
-          }
+            "$defs": {
+              "CollectionHandle": {
+                "description": "collection handle",
+                "type": "string"
+              }
+            }
+          },
+          "required": true
         }
       ],
       "result": {
@@ -420,25 +423,46 @@
           "title": "null",
           "type": "null"
         }
-      },
-      "summary": "release a collection",
-      "tags": []
+      }
     },
     {
-      "deprecated": null,
       "name": "analyze_query",
+      "summary": "analyze a query",
+      "deprecated": null,
+      "tags": [],
       "params": [
         {
           "name": "params",
-          "required": true,
           "schema": {
+            "$schema": "https://json-schema.org/draft/2020-12/schema",
+            "title": "AnalyzeQueryArgs",
+            "description": "[`crate::SqlFunServerApi::analyze_query`] request arguments",
+            "type": "object",
+            "properties": {
+              "context_handle": {
+                "description": "specify semantic analysis context",
+                "$ref": "#/$defs/ContextHandle"
+              },
+              "query": {
+                "description": "Query input source",
+                "$ref": "#/$defs/AnalyzeQueryInput"
+              }
+            },
+            "required": [
+              "context_handle",
+              "query"
+            ],
             "$defs": {
+              "ContextHandle": {
+                "description": "semantic analysis context handle",
+                "type": "string"
+              },
               "AnalyzeQueryInput": {
                 "description": "SQL file input source",
                 "oneOf": [
                   {
-                    "additionalProperties": false,
                     "description": "actual text",
+                    "type": "object",
                     "properties": {
                       "Text": {
                         "type": "string"
@@ -447,11 +471,11 @@
                     "required": [
                       "Text"
                     ],
-                    "type": "object"
+                    "additionalProperties": false
                   },
                   {
-                    "additionalProperties": false,
                     "description": "local file",
+                    "type": "object",
                     "properties": {
                       "File": {
                         "type": "string"
@@ -460,112 +484,126 @@
                     "required": [
                       "File"
                     ],
-                    "type": "object"
+                    "additionalProperties": false
                   },
                   {
-                    "additionalProperties": false,
                     "description": "remote file",
+                    "type": "object",
                     "properties": {
                       "Url": {
-                        "format": "uri",
-                        "type": "string"
+                        "type": "string",
+                        "format": "uri"
                       }
                     },
                     "required": [
                       "Url"
                     ],
-                    "type": "object"
+                    "additionalProperties": false
                   }
                 ]
-              },
-              "ContextHandle": {
-                "description": "semantic analysis context handle",
-                "type": "string"
               }
-            },
-            "$schema": "https://json-schema.org/draft/2020-12/schema",
-            "description": "[`crate::SqlFunServerApi::analyze_query`] request arguments",
-            "properties": {
-              "context_handle": {
-                "$ref": "#/$defs/ContextHandle",
-                "description": "specify semantic analysis context"
-              },
-              "query": {
-                "$ref": "#/$defs/AnalyzeQueryInput",
-                "description": "Query input source"
-              }
-            },
-            "required": [
-              "context_handle",
-              "query"
-            ],
-            "title": "AnalyzeQueryArgs",
-            "type": "object"
-          }
+            }
+          },
+          "required": true
         }
       ],
       "result": {
         "name": "result",
         "schema": {
+          "$schema": "https://json-schema.org/draft/2020-12/schema",
+          "title": "AnalyzeQueryResponse",
+          "description": "response for [`crate::SqlFunServerApi::analyze_query`]",
+          "type": "object",
+          "properties": {
+            "queries": {
+              "$ref": "#/$defs/Collection"
+            }
+          },
+          "required": [
+            "queries"
+          ],
           "$defs": {
-            "AnalysisProbrem": {
-              "description": "semantic analysis probrem",
+            "Collection": {
+              "description": "collection",
+              "type": "object",
               "properties": {
-                "code": {
-                  "description": "error code",
-                  "type": "string"
+                "handle": {
+                  "description": "handle for collecttion",
+                  "$ref": "#/$defs/CollectionHandle"
                 },
-                "file_path": {
-                  "description": "file path",
-                  "type": "string"
+                "total_length": {
+                  "description": "length of collection",
+                  "type": "integer",
+                  "format": "uint",
+                  "minimum": 0
                 },
-                "probrem_span": {
-                  "$ref": "#/$defs/TextSpan",
-                  "description": "probrem span"
+                "offset": {
+                  "description": "offset of items",
+                  "type": "integer",
+                  "format": "uint",
+                  "minimum": 0
                 },
-                "statement_span": {
-                  "$ref": "#/$defs/TextSpan",
-                  "description": "statement span"
+                "require_release": {
+                  "description": "When true, client must be call `SqlFunServerApi::release_collection`",
+                  "type": "boolean"
+                },
+                "expire_at": {
+                  "description": "expiration time",
+                  "type": "string",
+                  "format": "date-time"
+                },
+                "items": {
+                  "description": "collection items",
+                  "type": "array",
+                  "items": {
+                    "$ref": "#/$defs/AnalyzeQueryItem"
+                  }
                 }
               },
               "required": [
-                "code",
-                "file_path",
-                "statement_span",
-                "probrem_span"
-              ],
-              "type": "object"
+                "handle",
+                "total_length",
+                "offset",
+                "require_release",
+                "expire_at",
+                "items"
+              ]
+            },
+            "CollectionHandle": {
+              "description": "collection handle",
+              "type": "string"
             },
             "AnalyzeQueryItem": {
               "description": "analyzed single query",
+              "type": "object",
               "properties": {
-                "accessing_relations": {
-                  "$ref": "#/$defs/Collection3",
-                  "description": "query accessing relations"
-                },
-                "column_access": {
-                  "$ref": "#/$defs/Collection4",
-                  "description": "column access collection"
-                },
-                "parameters": {
-                  "$ref": "#/$defs/Collection5",
-                  "description": "query parameters"
-                },
-                "probrems": {
-                  "$ref": "#/$defs/Collection2",
-                  "description": "semantic probrems"
+                "query_span": {
+                  "description": "query span in input",
+                  "$ref": "#/$defs/TextSpan"
                 },
                 "query_kind": {
-                  "$ref": "#/$defs/QueryKind",
-                  "description": "query statement kind"
+                  "description": "query statement kind",
+                  "$ref": "#/$defs/QueryKind"
                 },
-                "query_span": {
-                  "$ref": "#/$defs/TextSpan",
-                  "description": "query span in input"
+                "probrems": {
+                  "description": "semantic probrems",
+                  "$ref": "#/$defs/Collection2"
+                },
+                "accessing_relations": {
+                  "description": "query accessing relations",
+                  "$ref": "#/$defs/Collection3"
+                },
+                "column_access": {
+                  "description": "column access collection",
+                  "$ref": "#/$defs/Collection4"
+                },
+                "parameters": {
+                  "description": "query parameters",
+                  "$ref": "#/$defs/Collection5"
                 },
                 "result_columns": {
-                  "$ref": "#/$defs/Collection6",
-                  "description": "query result sets"
+                  "description": "query result sets",
+                  "$ref": "#/$defs/Collection6"
                 }
               },
               "required": [
@@ -576,89 +614,120 @@
                 "column_access",
                 "parameters",
                 "result_columns"
-              ],
-              "type": "object"
+              ]
             },
-            "Collection": {
-              "description": "collection",
+            "TextSpan": {
+              "description": "span in SQL text",
+              "type": "object",
               "properties": {
-                "expire_at": {
-                  "description": "expiration time",
-                  "format": "date-time",
-                  "type": "string"
+                "from": {
+                  "description": "span start position",
+                  "$ref": "#/$defs/TextPosition"
                 },
-                "handle": {
-                  "$ref": "#/$defs/CollectionHandle",
-                  "description": "handle for collecttion"
-                },
-                "items": {
-                  "description": "collection items",
-                  "items": {
-                    "$ref": "#/$defs/AnalyzeQueryItem"
-                  },
-                  "type": "array"
-                },
-                "offset": {
-                  "description": "offset of items",
-                  "format": "uint",
-                  "minimum": 0,
-                  "type": "integer"
-                },
-                "require_release": {
-                  "description": "When true, client must be call `SqlFunServerApi::release_collection`",
-                  "type": "boolean"
-                },
-                "total_length": {
-                  "description": "length of collection",
-                  "format": "uint",
-                  "minimum": 0,
-                  "type": "integer"
+                "to": {
+                  "description": "span end position",
+                  "$ref": "#/$defs/TextPosition"
                 }
               },
               "required": [
-                "handle",
-                "total_length",
+                "from",
+                "to"
+              ]
+            },
+            "TextPosition": {
+              "description": "position in SQL text",
+              "type": "object",
+              "properties": {
+                "offset": {
+                  "description": "seek offset from file start",
+                  "type": "integer",
+                  "format": "uint",
+                  "minimum": 0
+                },
+                "line": {
+                  "description": "line number",
+                  "type": "integer",
+                  "format": "uint32",
+                  "minimum": 0
+                },
+                "col": {
+                  "description": "column number",
+                  "type": "integer",
+                  "format": "uint32",
+                  "minimum": 0
+                }
+              },
+              "required": [
                 "offset",
-                "require_release",
-                "expire_at",
-                "items"
-              ],
-              "type": "object"
+                "line",
+                "col"
+              ]
+            },
+            "QueryKind": {
+              "description": "kind of semantic analyzed query",
+              "oneOf": [
+                {
+                  "description": "select statement",
+                  "type": "string",
+                  "const": "Select"
+                },
+                {
+                  "description": "insert statement",
+                  "type": "string",
+                  "const": "Insert"
+                },
+                {
+                  "description": "update statement",
+                  "type": "string",
+                  "const": "Update"
+                },
+                {
+                  "description": "delete statement",
+                  "type": "string",
+                  "const": "Delete"
+                },
+                {
+                  "description": "truncate statement",
+                  "type": "string",
+                  "const": "Truncate"
+                }
+              ]
             },
             "Collection2": {
               "description": "collection",
+              "type": "object",
               "properties": {
-                "expire_at": {
-                  "description": "expiration time",
-                  "format": "date-time",
-                  "type": "string"
-                },
                 "handle": {
-                  "$ref": "#/$defs/CollectionHandle",
-                  "description": "handle for collecttion"
+                  "description": "handle for collecttion",
+                  "$ref": "#/$defs/CollectionHandle"
                 },
-                "items": {
-                  "description": "collection items",
-                  "items": {
-                    "$ref": "#/$defs/AnalysisProbrem"
-                  },
-                  "type": "array"
+                "total_length": {
+                  "description": "length of collection",
+                  "type": "integer",
+                  "format": "uint",
+                  "minimum": 0
                 },
                 "offset": {
                   "description": "offset of items",
+                  "type": "integer",
                   "format": "uint",
-                  "minimum": 0,
-                  "type": "integer"
+                  "minimum": 0
                 },
                 "require_release": {
                   "description": "When true, client must be call `SqlFunServerApi::release_collection`",
                   "type": "boolean"
                 },
-                "total_length": {
-                  "description": "length of collection",
-                  "format": "uint",
-                  "minimum": 0,
-                  "type": "integer"
+                "expire_at": {
+                  "description": "expiration time",
+                  "type": "string",
+                  "format": "date-time"
+                },
+                "items": {
+                  "description": "collection items",
+                  "type": "array",
+                  "items": {
+                    "$ref": "#/$defs/AnalysisProbrem"
+                  }
                 }
               },
               "required": [
@@ -668,43 +737,71 @@
                 "require_release",
                 "expire_at",
                 "items"
-              ],
-              "type": "object"
+              ]
+            },
+            "AnalysisProbrem": {
+              "description": "semantic analysis probrem",
+              "type": "object",
+              "properties": {
+                "code": {
+                  "description": "error code",
+                  "type": "string"
+                },
+                "file_path": {
+                  "description": "file path",
+                  "type": "string"
+                },
+                "statement_span": {
+                  "description": "statement span",
+                  "$ref": "#/$defs/TextSpan"
+                },
+                "probrem_span": {
+                  "description": "probrem span",
+                  "$ref": "#/$defs/TextSpan"
+                }
+              },
+              "required": [
+                "code",
+                "file_path",
+                "statement_span",
+                "probrem_span"
+              ]
             },
             "Collection3": {
               "description": "collection",
+              "type": "object",
               "properties": {
-                "expire_at": {
-                  "description": "expiration time",
-                  "format": "date-time",
-                  "type": "string"
-                },
                 "handle": {
-                  "$ref": "#/$defs/CollectionHandle",
-                  "description": "handle for collecttion"
+                  "description": "handle for collecttion",
+                  "$ref": "#/$defs/CollectionHandle"
                 },
-                "items": {
-                  "description": "collection items",
-                  "items": {
-                    "$ref": "#/$defs/ObjectSummary"
-                  },
-                  "type": "array"
+                "total_length": {
+                  "description": "length of collection",
+                  "type": "integer",
+                  "format": "uint",
+                  "minimum": 0
                 },
                 "offset": {
                   "description": "offset of items",
+                  "type": "integer",
                   "format": "uint",
-                  "minimum": 0,
-                  "type": "integer"
+                  "minimum": 0
                 },
                 "require_release": {
                   "description": "When true, client must be call `SqlFunServerApi::release_collection`",
                   "type": "boolean"
                 },
-                "total_length": {
-                  "description": "length of collection",
-                  "format": "uint",
-                  "minimum": 0,
-                  "type": "integer"
+                "expire_at": {
+                  "description": "expiration time",
+                  "type": "string",
+                  "format": "date-time"
+                },
+                "items": {
+                  "description": "collection items",
+                  "type": "array",
+                  "items": {
+                    "$ref": "#/$defs/ObjectSummary"
+                  }
                 }
               },
               "required": [
@@ -714,43 +811,134 @@
                 "require_release",
                 "expire_at",
                 "items"
-              ],
-              "type": "object"
+              ]
+            },
+            "ObjectSummary": {
+              "description": "database object summary",
+              "type": "object",
+              "properties": {
+                "schema_name": {
+                  "description": "schema name",
+                  "type": "string"
+                },
+                "local_name": {
+                  "description": "local name",
+                  "type": "string"
+                },
+                "kind": {
+                  "description": "object kind",
+                  "$ref": "#/$defs/ObjectKind"
+                },
+                "definition_file": {
+                  "description": "definition SQL file",
+                  "type": [
+                    "string",
+                    "null"
+                  ]
+                },
+                "definition_span": {
+                  "description": "definition statement span",
+                  "anyOf": [
+                    {
+                      "$ref": "#/$defs/TextSpan"
+                    },
+                    {
+                      "type": "null"
+                    }
+                  ]
+                }
+              },
+              "required": [
+                "schema_name",
+                "local_name",
+                "kind"
+              ]
+            },
+            "ObjectKind": {
+              "description": "object kind.",
+              "oneOf": [
+                {
+                  "description": "All object kind\n\nUsed only in object query predicate.",
+                  "type": "string",
+                  "const": "All"
+                },
+                {
+                  "description": "table",
+                  "type": "string",
+                  "const": "Table"
+                },
+                {
+                  "description": "view",
+                  "type": "string",
+                  "const": "View"
+                },
+                {
+                  "description": "type",
+                  "type": "string",
+                  "const": "Type"
+                },
+                {
+                  "description": "function",
+                  "type": "string",
+                  "const": "Function"
+                },
+                {
+                  "description": "materialized view",
+                  "type": "string",
+                  "const": "MaterializedView"
+                },
+                {
+                  "description": "sequence",
+                  "type": "string",
+                  "const": "Sequence"
+                },
+                {
+                  "description": "trigger",
+                  "type": "string",
+                  "const": "Trigger"
+                },
+                {
+                  "description": "index",
+                  "type": "string",
+                  "const": "Index"
+                }
+              ]
             },
             "Collection4": {
               "description": "collection",
+              "type": "object",
               "properties": {
+                "handle": {
+                  "description": "handle for collecttion",
+                  "$ref": "#/$defs/CollectionHandle"
+                },
+                "total_length": {
+                  "description": "length of collection",
+                  "type": "integer",
+                  "format": "uint",
+                  "minimum": 0
+                },
+                "offset": {
+                  "description": "offset of items",
+                  "type": "integer",
+                  "format": "uint",
+                  "minimum": 0
+                },
+                "require_release": {
+                  "description": "When true, client must be call `SqlFunServerApi::release_collection`",
+                  "type": "boolean"
+                },
                 "expire_at": {
                   "description": "expiration time",
-                  "format": "date-time",
-                  "type": "string"
-                },
-                "handle": {
-                  "$ref": "#/$defs/CollectionHandle",
-                  "description": "handle for collecttion"
+                  "type": "string",
+                  "format": "date-time"
                 },
                 "items": {
                   "description": "collection items",
+                  "type": "array",
                   "items": {
                     "$ref": "#/$defs/ColumnAccess"
-                  },
-                  "type": "array"
-                },
-                "offset": {
-                  "description": "offset of items",
-                  "format": "uint",
-                  "minimum": 0,
-                  "type": "integer"
-                },
-                "require_release": {
-                  "description": "When true, client must be call `SqlFunServerApi::release_collection`",
-                  "type": "boolean"
-                },
-                "total_length": {
-                  "description": "length of collection",
-                  "format": "uint",
-                  "minimum": 0,
-                  "type": "integer"
+                  }
                 }
               },
               "required": [
@@ -760,115 +948,27 @@
                 "require_release",
                 "expire_at",
                 "items"
-              ],
-              "type": "object"
-            },
-            "Collection5": {
-              "description": "collection",
-              "properties": {
-                "expire_at": {
-                  "description": "expiration time",
-                  "format": "date-time",
-                  "type": "string"
-                },
-                "handle": {
-                  "$ref": "#/$defs/CollectionHandle",
-                  "description": "handle for collecttion"
-                },
-                "items": {
-                  "description": "collection items",
-                  "items": {
-                    "$ref": "#/$defs/ParameterDescribe"
-                  },
-                  "type": "array"
-                },
-                "offset": {
-                  "description": "offset of items",
-                  "format": "uint",
-                  "minimum": 0,
-                  "type": "integer"
-                },
-                "require_release": {
-                  "description": "When true, client must be call `SqlFunServerApi::release_collection`",
-                  "type": "boolean"
-                },
-                "total_length": {
-                  "description": "length of collection",
-                  "format": "uint",
-                  "minimum": 0,
-                  "type": "integer"
-                }
-              },
-              "required": [
-                "handle",
-                "total_length",
-                "offset",
-                "require_release",
-                "expire_at",
-                "items"
-              ],
-              "type": "object"
-            },
-            "Collection6": {
-              "description": "collection",
-              "properties": {
-                "expire_at": {
-                  "description": "expiration time",
-                  "format": "date-time",
-                  "type": "string"
-                },
-                "handle": {
-                  "$ref": "#/$defs/CollectionHandle",
-                  "description": "handle for collecttion"
-                },
-                "items": {
-                  "description": "collection items",
-                  "items": {
-                    "$ref": "#/$defs/ResultSetColumn"
-                  },
-                  "type": "array"
-                },
-                "offset": {
-                  "description": "offset of items",
-                  "format": "uint",
-                  "minimum": 0,
-                  "type": "integer"
-                },
-                "require_release": {
-                  "description": "When true, client must be call `SqlFunServerApi::release_collection`",
-                  "type": "boolean"
-                },
-                "total_length": {
-                  "description": "length of collection",
-                  "format": "uint",
-                  "minimum": 0,
-                  "type": "integer"
-                }
-              },
-              "required": [
-                "handle",
-                "total_length",
-                "offset",
-                "require_release",
-                "expire_at",
-                "items"
-              ],
-              "type": "object"
-            },
-            "CollectionHandle": {
-              "description": "collection handle",
-              "type": "string"
+              ]
             },
             "ColumnAccess": {
               "description": "column access",
+              "type": "object",
               "properties": {
-                "access_kind": {
-                  "$ref": "#/$defs/ColumnAccessKind",
-                  "description": "kind of column access"
-                },
                 "accessing_span": {
-                  "$ref": "#/$defs/TextSpan",
-                  "description": "accessing span"
+                  "description": "accessing span",
+                  "$ref": "#/$defs/TextSpan"
+                },
+                "relation_schema": {
+                  "description": "relation schema name",
+                  "type": "string"
+                },
+                "relation_local_name": {
+                  "description": "relation local name",
+                  "type": "string"
+                },
+                "relation_kind": {
+                  "description": "relation kind",
+                  "$ref": "#/$defs/ObjectKind"
                 },
                 "column_name": {
                   "description": "column name",
@@ -876,21 +976,13 @@
                 },
                 "column_ordinal": {
                   "description": "column ordinal in relation",
+                  "type": "integer",
                   "format": "uint",
-                  "minimum": 0,
-                  "type": "integer"
+                  "minimum": 0
                 },
-                "relation_kind": {
-                  "$ref": "#/$defs/ObjectKind",
-                  "description": "relation kind"
-                },
-                "relation_local_name": {
-                  "description": "relation local name",
-                  "type": "string"
-                },
-                "relation_schema": {
-                  "description": "relation schema name",
-                  "type": "string"
+                "access_kind": {
+                  "description": "kind of column access",
+                  "$ref": "#/$defs/ColumnAccessKind"
                 }
               },
               "required": [
@@ -901,209 +993,144 @@
                 "column_name",
                 "column_ordinal",
                 "access_kind"
-              ],
-              "type": "object"
+              ]
             },
             "ColumnAccessKind": {
               "description": "column access kind",
               "oneOf": [
                 {
-                  "const": "SelectResTarget",
                   "description": "Column accessed in select statement column list.",
-                  "type": "string"
+                  "type": "string",
+                  "const": "SelectResTarget"
                 },
                 {
-                  "const": "SelectFrom",
                   "description": "Column accessed in select statement from clause",
-                  "type": "string"
+                  "type": "string",
+                  "const": "SelectFrom"
                 },
                 {
-                  "const": "SelectWhere",
                   "description": "Column accessed in select statement where clause.",
-                  "type": "string"
+                  "type": "string",
+                  "const": "SelectWhere"
                 },
                 {
-                  "const": "SelectOrderBy",
                   "description": "column accessed in select statement order by clause",
-                  "type": "string"
+                  "type": "string",
+                  "const": "SelectOrderBy"
                 },
                 {
-                  "const": "SelectGroupBy",
                   "description": "column accessed in select statement group by clause",
-                  "type": "string"
+                  "type": "string",
+                  "const": "SelectGroupBy"
                 },
                 {
-                  "const": "SelectHaving",
                   "description": "column accessed in select statement having clause",
-                  "type": "string"
+                  "type": "string",
+                  "const": "SelectHaving"
                 },
                 {
-                  "const": "UpdateSet",
                   "description": "column accessed in update statement set left value",
-                  "type": "string"
+                  "type": "string",
+                  "const": "UpdateSet"
                 },
                 {
-                  "const": "UpdateSetValue",
                   "description": "column accessed in update statement set right value",
-                  "type": "string"
+                  "type": "string",
+                  "const": "UpdateSetValue"
                 },
                 {
-                  "const": "UpdateFrom",
                   "description": "column accessed in update statement from clause",
-                  "type": "string"
+                  "type": "string",
+                  "const": "UpdateFrom"
                 },
                 {
-                  "const": "UpdateWhere",
                   "description": "column accessed in update statement where clause",
-                  "type": "string"
+                  "type": "string",
+                  "const": "UpdateWhere"
                 },
                 {
-                  "const": "InsertInto",
                   "description": "column accessed in insert statement",
-                  "type": "string"
+                  "type": "string",
+                  "const": "InsertInto"
                 },
                 {
-                  "const": "Delete",
                   "description": "column accessed in delete statement",
-                  "type": "string"
+                  "type": "string",
+                  "const": "Delete"
                 }
               ]
             },
-            "Nullability": {
-              "description": "nullability",
-              "oneOf": [
-                {
-                  "const": "NotNull",
-                  "description": "not null",
-                  "type": "string"
-                },
-                {
-                  "const": "Nullable",
-                  "description": "can be null",
-                  "type": "string"
-                },
-                {
-                  "const": "Unknown",
-                  "description": "unknown",
-                  "type": "string"
-                }
-              ]
-            },
-            "ObjectKind": {
-              "description": "object kind.",
-              "oneOf": [
-                {
-                  "const": "All",
-                  "description": "All object kind\n\nUsed only in object query predicate.",
-                  "type": "string"
-                },
-                {
-                  "const": "Table",
-                  "description": "table",
-                  "type": "string"
-                },
-                {
-                  "const": "View",
-                  "description": "view",
-                  "type": "string"
-                },
-                {
-                  "const": "Type",
-                  "description": "type",
-                  "type": "string"
-                },
-                {
-                  "const": "Function",
-                  "description": "function",
-                  "type": "string"
-                },
-                {
-                  "const": "MaterializedView",
-                  "description": "materialized view",
-                  "type": "string"
-                },
-                {
-                  "const": "Sequence",
-                  "description": "sequence",
-                  "type": "string"
-                },
-                {
-                  "const": "Trigger",
-                  "description": "trigger",
-                  "type": "string"
-                },
-                {
-                  "const": "Index",
-                  "description": "index",
-                  "type": "string"
-                }
-              ]
-            },
-            "ObjectSummary": {
-              "description": "database object summary",
+            "Collection5": {
+              "description": "collection",
+              "type": "object",
               "properties": {
-                "definition_file": {
-                  "description": "definition SQL file",
-                  "type": [
-                    "string",
-                    "null"
-                  ]
+                "handle": {
+                  "description": "handle for collecttion",
+                  "$ref": "#/$defs/CollectionHandle"
                 },
-                "definition_span": {
-                  "anyOf": [
-                    {
-                      "$ref": "#/$defs/TextSpan"
-                    },
-                    {
-                      "type": "null"
-                    }
-                  ],
-                  "description": "definition statement span"
+                "total_length": {
+                  "description": "length of collection",
+                  "type": "integer",
+                  "format": "uint",
+                  "minimum": 0
                 },
-                "kind": {
-                  "$ref": "#/$defs/ObjectKind",
-                  "description": "object kind"
+                "offset": {
+                  "description": "offset of items",
+                  "type": "integer",
+                  "format": "uint",
+                  "minimum": 0
                 },
-                "local_name": {
-                  "description": "local name",
-                  "type": "string"
+                "require_release": {
+                  "description": "When true, client must be call `SqlFunServerApi::release_collection`",
+                  "type": "boolean"
                 },
-                "schema_name": {
-                  "description": "schema name",
-                  "type": "string"
+                "expire_at": {
+                  "description": "expiration time",
+                  "type": "string",
+                  "format": "date-time"
+                },
+                "items": {
+                  "description": "collection items",
+                  "type": "array",
+                  "items": {
+                    "$ref": "#/$defs/ParameterDescribe"
+                  }
                 }
               },
               "required": [
-                "schema_name",
-                "local_name",
-                "kind"
-              ],
-              "type": "object"
+                "handle",
+                "total_length",
+                "offset",
+                "require_release",
+                "expire_at",
+                "items"
+              ]
             },
             "ParameterDescribe": {
               "description": "parameter spec",
+              "type": "object",
               "properties": {
                 "name": {
                   "description": "name for parameter",
                   "type": "string"
                 },
-                "nullability": {
-                  "$ref": "#/$defs/Nullability",
-                  "description": "parameter nullability"
-                },
                 "spans": {
                   "description": "parameter usage in SQL text",
+                  "type": "array",
                   "items": {
                     "$ref": "#/$defs/TextSpan"
-                  },
-                  "type": "array"
+                  }
                 },
                 "type_candidate": {
                   "description": "type candidates for this parameter",
+                  "type": "array",
                   "items": {
                     "$ref": "#/$defs/TypeReference"
-                  },
-                  "type": "array"
+                  }
+                },
+                "nullability": {
+                  "description": "parameter nullability",
+                  "$ref": "#/$defs/Nullability"
                 }
               },
               "required": [
@@ -1111,43 +1138,108 @@
                 "spans",
                 "type_candidate",
                 "nullability"
-              ],
-              "type": "object"
+              ]
             },
-            "QueryKind": {
-              "description": "kind of semantic analyzed query",
-              "oneOf": [
-                {
-                  "const": "Select",
-                  "description": "select statement",
+            "TypeReference": {
+              "description": "database type reference",
+              "type": "object",
+              "properties": {
+                "schema_name": {
+                  "description": "schema name",
                   "type": "string"
                 },
-                {
-                  "const": "Insert",
-                  "description": "insert statement",
-                  "type": "string"
-                },
-                {
-                  "const": "Update",
-                  "description": "update statement",
-                  "type": "string"
-                },
-                {
-                  "const": "Delete",
-                  "description": "delete statement",
-                  "type": "string"
-                },
-                {
-                  "const": "Truncate",
-                  "description": "truncate statement",
+                "local_name": {
+                  "description": "local name",
                   "type": "string"
                 }
+              },
+              "required": [
+                "schema_name",
+                "local_name"
+              ]
+            },
+            "Nullability": {
+              "description": "nullability",
+              "oneOf": [
+                {
+                  "description": "not null",
+                  "type": "string",
+                  "const": "NotNull"
+                },
+                {
+                  "description": "can be null",
+                  "type": "string",
+                  "const": "Nullable"
+                },
+                {
+                  "description": "unknown",
+                  "type": "string",
+                  "const": "Unknown"
+                }
+              ]
+            },
+            "Collection6": {
+              "description": "collection",
+              "type": "object",
+              "properties": {
+                "handle": {
+                  "description": "handle for collecttion",
+                  "$ref": "#/$defs/CollectionHandle"
+                },
+                "total_length": {
+                  "description": "length of collection",
+                  "type": "integer",
+                  "format": "uint",
+                  "minimum": 0
+                },
+                "offset": {
+                  "description": "offset of items",
+                  "type": "integer",
+                  "format": "uint",
+                  "minimum": 0
+                },
+                "require_release": {
+                  "description": "When true, client must be call `SqlFunServerApi::release_collection`",
+                  "type": "boolean"
+                },
+                "expire_at": {
+                  "description": "expiration time",
+                  "type": "string",
+                  "format": "date-time"
+                },
+                "items": {
+                  "description": "collection items",
+                  "type": "array",
+                  "items": {
+                    "$ref": "#/$defs/ResultSetColumn"
+                  }
+                }
+              },
+              "required": [
+                "handle",
+                "total_length",
+                "offset",
+                "require_release",
+                "expire_at",
+                "items"
               ]
             },
             "ResultSetColumn": {
               "description": "result set column description item",
+              "type": "object",
               "properties": {
+                "ordinal": {
+                  "description": "column ordinal",
+                  "type": "integer",
+                  "format": "uint32",
+                  "minimum": 0
+                },
+                "name": {
+                  "description": "column name",
+                  "type": "string"
+                },
                 "column_type": {
+                  "description": "column type",
                   "anyOf": [
                     {
                       "$ref": "#/$defs/TypeReference"
@@ -1155,210 +1247,60 @@
                     {
                       "type": "null"
                     }
-                  ],
-                  "description": "column type"
-                },
-                "name": {
-                  "description": "column name",
-                  "type": "string"
+                  ]
                 },
                 "nullability": {
-                  "$ref": "#/$defs/Nullability",
-                  "description": "nullability"
-                },
-                "ordinal": {
-                  "description": "column ordinal",
-                  "format": "uint32",
-                  "minimum": 0,
-                  "type": "integer"
+                  "description": "nullability",
+                  "$ref": "#/$defs/Nullability"
                 }
               },
               "required": [
                 "ordinal",
                 "name",
                 "nullability"
-              ],
-              "type": "object"
-            },
-            "TextPosition": {
-              "description": "position in SQL text",
-              "properties": {
-                "col": {
-                  "description": "column number",
-                  "format": "uint32",
-                  "minimum": 0,
-                  "type": "integer"
-                },
-                "line": {
-                  "description": "line number",
-                  "format": "uint32",
-                  "minimum": 0,
-                  "type": "integer"
-                },
-                "offset": {
-                  "description": "seek offset from file start",
-                  "format": "uint",
-                  "minimum": 0,
-                  "type": "integer"
-                }
-              },
-              "required": [
-                "offset",
-                "line",
-                "col"
-              ],
-              "type": "object"
-            },
-            "TextSpan": {
-              "description": "span in SQL text",
-              "properties": {
-                "from": {
-                  "$ref": "#/$defs/TextPosition",
-                  "description": "span start position"
-                },
-                "to": {
-                  "$ref": "#/$defs/TextPosition",
-                  "description": "span end position"
-                }
-              },
-              "required": [
-                "from",
-                "to"
-              ],
-              "type": "object"
-            },
-            "TypeReference": {
-              "description": "database type reference",
-              "properties": {
-                "local_name": {
-                  "description": "local name",
-                  "type": "string"
-                },
-                "schema_name": {
-                  "description": "schema name",
-                  "type": "string"
-                }
-              },
-              "required": [
-                "schema_name",
-                "local_name"
-              ],
-              "type": "object"
+              ]
             }
-          },
-          "$schema": "https://json-schema.org/draft/2020-12/schema",
-          "description": "response for [`crate::SqlFunServerApi::analyze_query`]",
-          "properties": {
-            "queries": {
-              "$ref": "#/$defs/Collection"
-            }
-          },
-          "required": [
-            "queries"
-          ],
-          "title": "AnalyzeQueryResponse",
-          "type": "object"
+          }
         }
-      },
-      "summary": "analyze a query",
-      "tags": []
+      }
     },
     {
-      "deprecated": null,
       "name": "list_object",
+      "summary": "list schema objects",
+      "deprecated": null,
+      "tags": [],
       "params": [
         {
           "name": "params",
-          "required": true,
           "schema": {
+            "$schema": "https://json-schema.org/draft/2020-12/schema",
+            "title": "ListObjectArgs",
+            "description": "argument for [`crate::SqlFunServerApi::list_objects`]",
+            "type": "object",
+            "properties": {
+              "predicate": {
+                "description": "predicate",
+                "$ref": "#/$defs/ObjectQuery"
+              },
+              "extra_fields": {
+                "description": "extra field",
+                "type": "array",
+                "items": {
+                  "$ref": "#/$defs/ObjectSummaryField"
+                }
+              }
+            },
+            "required": [
+              "predicate",
+              "extra_fields"
+            ],
             "$defs": {
-              "NameQuery": {
-                "description": "filter condition for object name",
-                "oneOf": [
-                  {
-                    "additionalProperties": false,
-                    "description": "local name",
-                    "properties": {
-                      "LocalName": {
-                        "$ref": "#/$defs/StringPred"
-                      }
-                    },
-                    "required": [
-                      "LocalName"
-                    ],
-                    "type": "object"
-                  },
-                  {
-                    "additionalProperties": false,
-                    "description": "shcema name",
-                    "properties": {
-                      "SchemaName": {
-                        "$ref": "#/$defs/StringPred"
-                      }
-                    },
-                    "required": [
-                      "SchemaName"
-                    ],
-                    "type": "object"
-                  }
-                ]
-              },
-              "ObjectKind": {
-                "description": "object kind.",
-                "oneOf": [
-                  {
-                    "const": "All",
-                    "description": "All object kind\n\nUsed only in object query predicate.",
-                    "type": "string"
-                  },
-                  {
-                    "const": "Table",
-                    "description": "table",
-                    "type": "string"
-                  },
-                  {
-                    "const": "View",
-                    "description": "view",
-                    "type": "string"
-                  },
-                  {
-                    "const": "Type",
-                    "description": "type",
-                    "type": "string"
-                  },
-                  {
-                    "const": "Function",
-                    "description": "function",
-                    "type": "string"
-                  },
-                  {
-                    "const": "MaterializedView",
-                    "description": "materialized view",
-                    "type": "string"
-                  },
-                  {
-                    "const": "Sequence",
-                    "description": "sequence",
-                    "type": "string"
-                  },
-                  {
-                    "const": "Trigger",
-                    "description": "trigger",
-                    "type": "string"
-                  },
-                  {
-                    "const": "Index",
-                    "description": "index",
-                    "type": "string"
-                  }
-                ]
-              },
               "ObjectQuery": {
                 "description": "filter conditions",
                 "oneOf": [
                   {
-                    "additionalProperties": false,
                     "description": "object kind",
+                    "type": "object",
                     "properties": {
                       "Kind": {
                         "$ref": "#/$defs/ObjectKind"
@@ -1367,11 +1309,11 @@
                     "required": [
                       "Kind"
                     ],
-                    "type": "object"
+                    "additionalProperties": false
                   },
                   {
-                    "additionalProperties": false,
                     "description": "object schema name, local name predicate",
+                    "type": "object",
                     "properties": {
                       "Name": {
                         "$ref": "#/$defs/NameQuery"
@@ -1380,43 +1322,43 @@
                     "required": [
                       "Name"
                     ],
-                    "type": "object"
+                    "additionalProperties": false
                   },
                   {
-                    "additionalProperties": false,
                     "description": "filter any condition",
+                    "type": "object",
                     "properties": {
                       "Or": {
+                        "type": "array",
                         "items": {
                           "$ref": "#/$defs/ObjectQuery"
-                        },
-                        "type": "array"
+                        }
                       }
                     },
                     "required": [
                       "Or"
                     ],
-                    "type": "object"
+                    "additionalProperties": false
                   },
                   {
-                    "additionalProperties": false,
                     "description": "filter all condition",
+                    "type": "object",
                     "properties": {
                       "And": {
+                        "type": "array",
                         "items": {
                           "$ref": "#/$defs/ObjectQuery"
-                        },
-                        "type": "array"
+                        }
                       }
                     },
                     "required": [
                       "And"
                     ],
-                    "type": "object"
+                    "additionalProperties": false
                   },
                   {
-                    "additionalProperties": false,
                     "description": "negate condition",
+                    "type": "object",
                     "properties": {
                       "Not": {
                         "$ref": "#/$defs/ObjectQuery"
@@ -1425,22 +1367,88 @@
                     "required": [
                       "Not"
                     ],
-                    "type": "object"
+                    "additionalProperties": false
                   }
                 ]
               },
-              "ObjectSummaryField": {
-                "description": "specify optional field to returns API result",
+              "ObjectKind": {
+                "description": "object kind.",
                 "oneOf": [
                   {
-                    "const": "DefinitionFile",
-                    "description": "returns `definition_file` field",
-                    "type": "string"
+                    "description": "All object kind\n\nUsed only in object query predicate.",
+                    "type": "string",
+                    "const": "All"
                   },
                   {
-                    "const": "DefinitionSpan",
-                    "description": "returns `definition_span` field",
-                    "type": "string"
+                    "description": "table",
+                    "type": "string",
+                    "const": "Table"
+                  },
+                  {
+                    "description": "view",
+                    "type": "string",
+                    "const": "View"
+                  },
+                  {
+                    "description": "type",
+                    "type": "string",
+                    "const": "Type"
+                  },
+                  {
+                    "description": "function",
+                    "type": "string",
+                    "const": "Function"
+                  },
+                  {
+                    "description": "materialized view",
+                    "type": "string",
+                    "const": "MaterializedView"
+                  },
+                  {
+                    "description": "sequence",
+                    "type": "string",
+                    "const": "Sequence"
+                  },
+                  {
+                    "description": "trigger",
+                    "type": "string",
+                    "const": "Trigger"
+                  },
+                  {
+                    "description": "index",
+                    "type": "string",
+                    "const": "Index"
+                  }
+                ]
+              },
+              "NameQuery": {
+                "description": "filter condition for object name",
+                "oneOf": [
+                  {
+                    "description": "local name",
+                    "type": "object",
+                    "properties": {
+                      "LocalName": {
+                        "$ref": "#/$defs/StringPred"
+                      }
+                    },
+                    "required": [
+                      "LocalName"
+                    ],
+                    "additionalProperties": false
+                  },
+                  {
+                    "description": "shcema name",
+                    "type": "object",
+                    "properties": {
+                      "SchemaName": {
+                        "$ref": "#/$defs/StringPred"
+                      }
+                    },
+                    "required": [
+                      "SchemaName"
+                    ],
+                    "additionalProperties": false
                   }
                 ]
               },
@@ -1448,8 +1456,8 @@
                 "description": "filter condition for string",
                 "oneOf": [
                   {
-                    "additionalProperties": false,
                     "description": "exact matches string",
+                    "type": "object",
                     "properties": {
                       "Exact": {
                         "type": "string"
@@ -1458,11 +1466,11 @@
                     "required": [
                       "Exact"
                     ],
-                    "type": "object"
+                    "additionalProperties": false
                   },
                   {
-                    "additionalProperties": false,
                     "description": "match prefix",
+                    "type": "object",
                     "properties": {
                       "StartsWith": {
                         "type": "string"
@@ -1471,11 +1479,11 @@
                     "required": [
                       "StartsWith"
                     ],
-                    "type": "object"
+                    "additionalProperties": false
                   },
                   {
-                    "additionalProperties": false,
                     "description": "match postfix",
+                    "type": "object",
                     "properties": {
                       "EndsWith": {
                         "type": "string"
@@ -1484,216 +1492,69 @@
                     "required": [
                       "EndsWith"
                     ],
-                    "type": "object"
+                    "additionalProperties": false
+                  }
+                ]
+              },
+              "ObjectSummaryField": {
+                "description": "specify optional field to returns API result",
+                "oneOf": [
+                  {
+                    "description": "returns `definition_file` field",
+                    "type": "string",
+                    "const": "DefinitionFile"
+                  },
+                  {
+                    "description": "returns `definition_span` field",
+                    "type": "string",
+                    "const": "DefinitionSpan"
                   }
                 ]
               }
-            },
-            "$schema": "https://json-schema.org/draft/2020-12/schema",
-            "description": "argument for [`crate::SqlFunServerApi::list_objects`]",
-            "properties": {
-              "extra_fields": {
-                "description": "extra field",
-                "items": {
-                  "$ref": "#/$defs/ObjectSummaryField"
-                },
-                "type": "array"
-              },
-              "predicate": {
-                "$ref": "#/$defs/ObjectQuery",
-                "description": "predicate"
-              }
-            },
-            "required": [
-              "predicate",
-              "extra_fields"
-            ],
-            "title": "ListObjectArgs",
-            "type": "object"
-          }
+            }
+          },
+          "required": true
         }
       ],
       "result": {
         "name": "result",
         "schema": {
-          "$defs": {
-            "CollectionHandle": {
-              "description": "collection handle",
-              "type": "string"
-            },
-            "ObjectKind": {
-              "description": "object kind.",
-              "oneOf": [
-                {
-                  "const": "All",
-                  "description": "All object kind\n\nUsed only in object query predicate.",
-                  "type": "string"
-                },
-                {
-                  "const": "Table",
-                  "description": "table",
-                  "type": "string"
-                },
-                {
-                  "const": "View",
-                  "description": "view",
-                  "type": "string"
-                },
-                {
-                  "const": "Type",
-                  "description": "type",
-                  "type": "string"
-                },
-                {
-                  "const": "Function",
-                  "description": "function",
-                  "type": "string"
-                },
-                {
-                  "const": "MaterializedView",
-                  "description": "materialized view",
-                  "type": "string"
-                },
-                {
-                  "const": "Sequence",
-                  "description": "sequence",
-                  "type": "string"
-                },
-                {
-                  "const": "Trigger",
-                  "description": "trigger",
-                  "type": "string"
-                },
-                {
-                  "const": "Index",
-                  "description": "index",
-                  "type": "string"
-                }
-              ]
-            },
-            "ObjectSummary": {
-              "description": "database object summary",
-              "properties": {
-                "definition_file": {
-                  "description": "definition SQL file",
-                  "type": [
-                    "string",
-                    "null"
-                  ]
-                },
-                "definition_span": {
-                  "anyOf": [
-                    {
-                      "$ref": "#/$defs/TextSpan"
-                    },
-                    {
-                      "type": "null"
-                    }
-                  ],
-                  "description": "definition statement span"
-                },
-                "kind": {
-                  "$ref": "#/$defs/ObjectKind",
-                  "description": "object kind"
-                },
-                "local_name": {
-                  "description": "local name",
-                  "type": "string"
-                },
-                "schema_name": {
-                  "description": "schema name",
-                  "type": "string"
-                }
-              },
-              "required": [
-                "schema_name",
-                "local_name",
-                "kind"
-              ],
-              "type": "object"
-            },
-            "TextPosition": {
-              "description": "position in SQL text",
-              "properties": {
-                "col": {
-                  "description": "column number",
-                  "format": "uint32",
-                  "minimum": 0,
-                  "type": "integer"
-                },
-                "line": {
-                  "description": "line number",
-                  "format": "uint32",
-                  "minimum": 0,
-                  "type": "integer"
-                },
-                "offset": {
-                  "description": "seek offset from file start",
-                  "format": "uint",
-                  "minimum": 0,
-                  "type": "integer"
-                }
-              },
-              "required": [
-                "offset",
-                "line",
-                "col"
-              ],
-              "type": "object"
-            },
-            "TextSpan": {
-              "description": "span in SQL text",
-              "properties": {
-                "from": {
-                  "$ref": "#/$defs/TextPosition",
-                  "description": "span start position"
-                },
-                "to": {
-                  "$ref": "#/$defs/TextPosition",
-                  "description": "span end position"
-                }
-              },
-              "required": [
-                "from",
-                "to"
-              ],
-              "type": "object"
-            }
-          },
           "$schema": "https://json-schema.org/draft/2020-12/schema",
+          "title": "Collection",
           "description": "collection",
+          "type": "object",
           "properties": {
-            "expire_at": {
-              "description": "expiration time",
-              "format": "date-time",
-              "type": "string"
-            },
             "handle": {
-              "$ref": "#/$defs/CollectionHandle",
-              "description": "handle for collecttion"
+              "description": "handle for collecttion",
+              "$ref": "#/$defs/CollectionHandle"
             },
-            "items": {
-              "description": "collection items",
-              "items": {
-                "$ref": "#/$defs/ObjectSummary"
-              },
-              "type": "array"
+            "total_length": {
+              "description": "length of collection",
+              "type": "integer",
+              "format": "uint",
+              "minimum": 0
             },
             "offset": {
               "description": "offset of items",
+              "type": "integer",
               "format": "uint",
-              "minimum": 0,
-              "type": "integer"
+              "minimum": 0
             },
             "require_release": {
               "description": "When true, client must be call `SqlFunServerApi::release_collection`",
               "type": "boolean"
             },
-            "total_length": {
-              "description": "length of collection",
-              "format": "uint",
-              "minimum": 0,
-              "type": "integer"
+            "expire_at": {
+              "description": "expiration time",
+              "type": "string",
+              "format": "date-time"
+            },
+            "items": {
+              "description": "collection items",
+              "type": "array",
+              "items": {
+                "$ref": "#/$defs/ObjectSummary"
+              }
             }
           },
           "required": [
@@ -1704,13 +1565,152 @@
             "expire_at",
             "items"
           ],
-          "title": "Collection",
-          "type": "object"
+          "$defs": {
+            "CollectionHandle": {
+              "description": "collection handle",
+              "type": "string"
+            },
+            "ObjectSummary": {
+              "description": "database object summary",
+              "type": "object",
+              "properties": {
+                "schema_name": {
+                  "description": "schema name",
+                  "type": "string"
+                },
+                "local_name": {
+                  "description": "local name",
+                  "type": "string"
+                },
+                "kind": {
+                  "description": "object kind",
+                  "$ref": "#/$defs/ObjectKind"
+                },
+                "definition_file": {
+                  "description": "definition SQL file",
+                  "type": [
+                    "string",
+                    "null"
+                  ]
+                },
+                "definition_span": {
+                  "description": "definition statement span",
+                  "anyOf": [
+                    {
+                      "$ref": "#/$defs/TextSpan"
+                    },
+                    {
+                      "type": "null"
+                    }
+                  ]
+                }
+              },
+              "required": [
+                "schema_name",
+                "local_name",
+                "kind"
+              ]
+            },
+            "ObjectKind": {
+              "description": "object kind.",
+              "oneOf": [
+                {
+                  "description": "All object kind\n\nUsed only in object query predicate.",
+                  "type": "string",
+                  "const": "All"
+                },
+                {
+                  "description": "table",
+                  "type": "string",
+                  "const": "Table"
+                },
+                {
+                  "description": "view",
+                  "type": "string",
+                  "const": "View"
+                },
+                {
+                  "description": "type",
+                  "type": "string",
+                  "const": "Type"
+                },
+                {
+                  "description": "function",
+                  "type": "string",
+                  "const": "Function"
+                },
+                {
+                  "description": "materialized view",
+                  "type": "string",
+                  "const": "MaterializedView"
+                },
+                {
+                  "description": "sequence",
+                  "type": "string",
+                  "const": "Sequence"
+                },
+                {
+                  "description": "trigger",
+                  "type": "string",
+                  "const": "Trigger"
+                },
+                {
+                  "description": "index",
+                  "type": "string",
+                  "const": "Index"
+                }
+              ]
+            },
+            "TextSpan": {
+              "description": "span in SQL text",
+              "type": "object",
+              "properties": {
+                "from": {
+                  "description": "span start position",
+                  "$ref": "#/$defs/TextPosition"
+                },
+                "to": {
+                  "description": "span end position",
+                  "$ref": "#/$defs/TextPosition"
+                }
+              },
+              "required": [
+                "from",
+                "to"
+              ]
+            },
+            "TextPosition": {
+              "description": "position in SQL text",
+              "type": "object",
+              "properties": {
+                "offset": {
+                  "description": "seek offset from file start",
+                  "type": "integer",
+                  "format": "uint",
+                  "minimum": 0
+                },
+                "line": {
+                  "description": "line number",
+                  "type": "integer",
+                  "format": "uint32",
+                  "minimum": 0
+                },
+                "col": {
+                  "description": "column number",
+                  "type": "integer",
+                  "format": "uint32",
+                  "minimum": 0
+                }
+              },
+              "required": [
+                "offset",
+                "line",
+                "col"
+              ]
+            }
+          }
         }
-      },
-      "summary": "list schema objects",
-      "tags": []
+      }
     }
-  ],
-  "openrpc": "1.2.6"
+  ]
 }

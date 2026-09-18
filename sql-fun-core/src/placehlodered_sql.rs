@@ -67,6 +67,7 @@ impl FragmentName {
     }
 
     /// get `&str` value
+    #[must_use]
     pub fn as_str(&self) -> &str {
         self.0.as_str()
     }
@@ -246,7 +247,7 @@ impl PlaceholderedSql {
 
     /// build from tokens
     #[must_use]
-    pub fn from_tokens(tokens: Vec<PlaceholderedSqlToken>) -> PlaceholderedSql {
+    pub fn from_tokens(tokens: Vec<PlaceholderedSqlToken>) -> Self {
         let mut parameters: IndexMap<ParameterName, Vec<PlaceholderTypeHint>> = IndexMap::new();
         let mut fragments: HashSet<FragmentName> = HashSet::new();
 
@@ -304,22 +305,26 @@ impl PlaceholderedSql {
     }
 
     /// embed fragment SQL text
+    ///
+    /// # Errors
+    ///
+    /// [`PlaceholderedSqlError`]
     pub fn embed_fragment(
         &self,
         fragment_name: &FragmentName,
         sql_fragment: &str,
     ) -> Result<Self, PlaceholderedSqlError> {
         let embedding = PlaceholderedSqlToken::scan(sql_fragment);
-        let mut rebuilded_tokens: Vec<PlaceholderedSqlToken> = Vec::new();
+        let mut rebuilt_tokens: Vec<PlaceholderedSqlToken> = Vec::new();
         for item in self.tokens() {
             if item.is_fragment_place_holder(fragment_name) {
                 for token in embedding.iter().cloned() {
-                    rebuilded_tokens.push(token);
+                    rebuilt_tokens.push(token);
                 }
             } else {
-                rebuilded_tokens.push(item.clone());
+                rebuilt_tokens.push(item.clone());
             }
         }
-        Ok(Self::from_tokens(rebuilded_tokens))
+        Ok(Self::from_tokens(rebuilt_tokens))
     }
 }

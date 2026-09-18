@@ -27,7 +27,7 @@ pub enum CteCatalogError {
     #[error(transparent)]
     TomlError(#[from] toml::de::Error),
 
-    /// [`yaml_serde::Error`]
+    /// [`serde_yaml_ng::Error`]
     #[error(transparent)]
     YamlError(#[from] serde_yaml_ng::Error),
 

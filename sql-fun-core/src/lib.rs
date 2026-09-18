@@ -96,11 +96,6 @@ pub enum SqlDialect {
     /// postgres using a `pg_query` crate for parsing a syntax.
     #[serde(rename = "postgres")]
     PostgreSQL,
-
-    /// sqlite using a `turso_parser` crate for parsing a syntax.
-    #[cfg(feature = "sqlite")]
-    #[serde(rename = "sqlite")]
-    SQLite,
 }
 
 impl FromStr for SqlDialect {
@@ -110,10 +105,6 @@ impl FromStr for SqlDialect {
         if s.to_lowercase() == "postgresql" {
             return Ok(Self::PostgreSQL);
         }
-        #[cfg(feature = "sqlite")]
-        if s.to_lowercase() == "sqlite" {
-            return Ok(Self::SQLite);
-        }
         Err(s.to_string())
     }
 }
@@ -122,8 +113,6 @@ impl Display for SqlDialect {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         match self {
             Self::PostgreSQL => write!(f, "postgresql"),
-            #[cfg(feature = "sqlite")]
-            Self::SQLite => write!(f, "sqlite"),
         }
     }
 }
@@ -137,7 +126,7 @@ pub mod diagnostics {
     pub enum DiagnosticsLevel {
         /// hide always
         Suppress,
-        /// show only verbose flaged
+        /// show only verbose flagged
         OnlyVerbose,
         /// show warning
         Warning,
@@ -157,11 +146,12 @@ pub mod diagnostics {
     }
 
     impl DiagnosticsKind {
-        const fn get_diagnostics_level_default(&self) -> DiagnosticsLevel {
+        const fn get_diagnostics_level_default(self) -> DiagnosticsLevel {
+            #[expect(clippy::match_same_arms)]
             match self {
-                DiagnosticsKind::TableNotFound => DiagnosticsLevel::Warning,
-                DiagnosticsKind::ColumnNotFound => DiagnosticsLevel::Warning,
-                DiagnosticsKind::TypeNotFound => DiagnosticsLevel::Warning,
+                Self::TableNotFound => DiagnosticsLevel::Warning,
+                Self::ColumnNotFound => DiagnosticsLevel::Warning,
+                Self::TypeNotFound => DiagnosticsLevel::Warning,
             }
         }
     }
@@ -175,15 +165,14 @@ pub mod diagnostics {
 
     impl DiagnosticsConfigurations {
         /// get diagnostics level for kind
+        #[must_use]
         pub fn get_diagnostics_lebel(&self, kind: DiagnosticsKind) -> DiagnosticsLevel {
-            if let Some(level) = self.configurations.get(&kind).cloned() {
+            if let Some(level) = self.configurations.get(&kind).copied() {
                 level
+            } else if let Some(defaults) = &self.defaults {
+                defaults.get_diagnostics_lebel(kind)
             } else {
-                if let Some(defaults) = &self.defaults {
-                    defaults.get_diagnostics_lebel(kind)
-                } else {
-                    kind.get_diagnostics_level_default()
-                }
+                kind.get_diagnostics_level_default()
             }
         }
     }

@@ -21,6 +21,7 @@ impl SqlFunMetadataCollection {
     }
 
     /// get named metadata
+    #[must_use]
     pub fn get(&self, datasource_name: &str) -> Option<&SqlFunMetadata> {
         self.0.get(datasource_name)
     }
@@ -84,7 +85,7 @@ impl SqlFunMetadataCollection {
                 Error::metadata_load_from_file(
                     &path_hint,
                     &format!("duplicate datasource name {key}"),
-                )?
+                )?;
             }
         }
         Ok(result)

@@ -74,12 +74,19 @@ impl Lockfile {
     }
 
     /// load and checks lockfile integrity
+    ///
+    /// # Errors
+    ///
+    /// [`LockfileError`]
     #[tracing::instrument(err, skip(path))]
     pub fn from_file<P: AsRef<Path>>(path: P) -> Result<Self, LockfileError> {
         let content = fs_err::read_to_string(&path)?;
         let spanned: SpannedLockfile = toml::from_str(&content)?;
         tracing::info!("lockfile loaded: {} entries", spanned.entries.len());
         let mut index = IndexMap::new();
+
+        // Spanned<T> for array-of-tables only covers the table header
+        // https://github.com/toml-rs/toml/issues/1206
 
         let mut entries = spanned.entries.iter().peekable();
         while let Some(entry) = entries.next() {
@@ -114,6 +121,10 @@ impl Lockfile {
     }
 
     /// read specified lockfile entry
+    ///
+    /// # Errors
+    ///
+    /// - [`LockfileError`]
     #[tracing::instrument(ret, err, skip(self))]
     pub fn get_entry(
         &self,

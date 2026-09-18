@@ -3,7 +3,7 @@ use quote::quote;
 use syn::ItemFn;
 
 use crate::{Connector, SqlFunError, TokioPostgresCodeGenerator, get_result_type_args};
-use sql_fun_core::{SqlFunArgs, SqlFunMetadata};
+use sql_fun_core::{SqlFunArgs, SqlFunMetadataCollection};
 
 /// generate `sql_query_one`
 pub fn generate_sql_query_one(
@@ -11,8 +11,9 @@ pub fn generate_sql_query_one(
     item: TokenStream,
 ) -> Result<TokenStream, SqlFunError> {
     let args = SqlFunArgs::try_from_env()?;
-    let metadata = SqlFunMetadata::load_from(args.metadata_file()?)?;
-    let _connector = Connector::get_connector(&metadata)?;
+    let metadata_collection = SqlFunMetadataCollection::load_from(args.metadata_file()?)?;
+    let metadata = metadata_collection.get("default").unwrap();
+    let _connector = Connector::get_connector(metadata)?;
 
     let mut code_generator_builder = TokioPostgresCodeGenerator::builder();
     let mut function_ast: ItemFn = syn::parse2(item)?;

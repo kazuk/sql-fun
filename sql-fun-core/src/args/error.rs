@@ -154,6 +154,11 @@ impl SqlFunArgsError {
     }
 
     /// Datasource not found
+    ///
+    /// # Errors
+    ///
+    /// Always returns [`SqlFunArgsError::DatasourceNotFound`]
+    ///
     pub fn datasource_not_found<T>(datasource_name: &str) -> Result<T, Self> {
         Err(Self::DatasourceNotFound(String::from(datasource_name)))
     }

@@ -160,6 +160,7 @@ fn parse_bool_env(value: &str) -> Result<bool, SqlFunArgsError> {
 
 impl SqlFunArgs {
     /// get current schema
+    #[must_use]
     pub fn schema(&self) -> &str {
         self.metadata_args.schema()
     }
@@ -271,8 +272,9 @@ impl SqlFunArgs {
     const SQL_FUN_DATASOURCE: &str = "SQL_FUN_DATASOURCE";
 
     /// selected datasource name
+    #[must_use]
     pub fn datasource(&self) -> Option<&str> {
-        self.datasource.as_ref().map(|v| v.as_ref())
+        self.datasource.as_ref().map(std::convert::AsRef::as_ref)
     }
 
     /// get environments for child process
@@ -289,8 +291,8 @@ impl SqlFunArgs {
             let Some(metadata) = metadatas.get(datasource) else {
                 return SqlFunArgsError::datasource_not_found(datasource);
             };
-            self.metadata_args.get_envs(&mut result, &metadata)?;
-            self.postgres_args.get_envs(&mut result, self, &metadata)?;
+            self.metadata_args.get_envs(&mut result, metadata)?;
+            self.postgres_args.get_envs(&mut result, self, metadata)?;
 
             result.insert(Self::SQL_FUN_DATASOURCE.to_string(), datasource.clone());
         }

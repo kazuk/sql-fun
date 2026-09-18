@@ -55,7 +55,7 @@ where
     S: AsRef<str>,
 {
     fn eq(&self, other: &S) -> bool {
-        &self.0 == other.as_ref()
+        self.0 == other.as_ref()
     }
 }
 
@@ -78,6 +78,7 @@ impl Display for CteAlias {
 
 impl CteAlias {
     /// create instance
+    #[must_use]
     pub fn new(alias: &str) -> Self {
         Self(String::from(alias))
     }
@@ -92,6 +93,7 @@ pub struct CteCatalogReference {
 
 impl CteCatalogReference {
     /// create instance
+    #[must_use]
     pub fn new(cte_name: &CteName, alias: &CteAlias) -> Self {
         Self {
             cte_name: cte_name.clone(),
@@ -305,6 +307,10 @@ impl<'a> CteCatalogEntry<'a> {
     }
 
     /// expand CTE with dependencies
+    ///
+    /// # Errors
+    ///
+    /// [`CteCatalogError`]
     pub fn expand(
         &self,
         catalog: &CteCatalog<'a>,
@@ -1006,7 +1012,7 @@ impl CteCatalog<'_> {
         self.fixup_parameters();
 
         let mut errors = Vec::new();
-        for (_name, entry) in &self.entries {
+        for entry in self.entries.values() {
             let entry = entry.borrow();
             if !entry.has_error() {
                 continue;
@@ -1107,6 +1113,11 @@ impl CteCatalog<'_> {
 
 impl CteCatalog<'_> {
     /// resolve CTE references
+    ///
+    /// # Errors
+    ///
+    /// [`CteCatalogError`]
+    ///
     pub fn resolve(
         &self,
         base_query: &PlaceholderedSql,
@@ -1117,7 +1128,7 @@ impl CteCatalog<'_> {
 
         for reference in references {
             let cte_name = &reference.cte_name();
-            let Some(cte) = self.get_cte(&cte_name) else {
+            let Some(cte) = self.get_cte(cte_name) else {
                 CteCatalogError::raise_cte_not_found(cte_name)?;
                 CteCatalogError::never()
             };
@@ -1154,6 +1165,10 @@ impl From<&PlaceholderedSql> for ResolvedCteCatalog {
 
 impl ResolvedCteCatalog {
     /// compute query finger print
+    ///
+    /// # Errors
+    ///
+    /// [`CteCatalogError`]
     pub fn finger_print(&self) -> Result<String, CteCatalogError> {
         let mut hasher = Sha256::new();
         let parameters_json = serde_json::to_string(&self.parameters)?;

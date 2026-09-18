@@ -187,7 +187,7 @@ impl CteParameterCollection {
 
     /// marge parameter collection
     pub fn marge(&mut self, mut other: Self) {
-        for (param_name, input_bindings) in other.parameters.iter_mut() {
+        for (param_name, input_bindings) in &mut other.parameters {
             match self.parameters.entry(param_name.clone()) {
                 Entry::Occupied(mut o) => {
                     let bindings = o.get_mut();

@@ -1,4 +1,4 @@
-[package.metadata.database]
+[package.metadata.database.default]
 connector = "tokio-postgres"
 engine = "PostgreSQL"
 version = "17"

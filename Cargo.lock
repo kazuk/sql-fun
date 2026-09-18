@@ -2537,9 +2537,11 @@ dependencies = [
  "proc-macro2",
  "quote",
  "rstest",
+ "scopeguard",
  "sha2",
  "smallvec",
  "sql-fun-client",
+ "sql-fun-codegen",
  "sql-fun-core",
  "syn 3.0.5",
  "thiserror 2.0.20",
@@ -2547,6 +2549,7 @@ dependencies = [
  "tokio-postgres",
  "toml",
  "tracing",
+ "tracing-subscriber",
  "trybuild",
 ]
 
@@ -2602,6 +2605,13 @@ dependencies = [
  "rstest",
  "syn 3.0.5",
  "testresult",
+ "thiserror 2.0.20",
+]
+
+[[package]]
+name = "sql-fun-collector"
+version = "0.1.0"
+dependencies = [
  "thiserror 2.0.20",
 ]
 

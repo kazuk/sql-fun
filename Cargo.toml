@@ -53,6 +53,7 @@ sql-fun-sqlast = "patch"
 [workspace.lints]
 
 [workspace.lints.rust]
+missing_docs = "deny"
 unsafe_code = "deny"
 rust_2018_idioms = { level = "warn", priority = -1 }
 rust_2021_compatibility = { level = "warn", priority = -1 }
@@ -146,13 +147,17 @@ typed-openrpc = "0.1.1"
 url = { version = "2.5", features = ["serde"] }
 walkdir = "2.3"
 which = "8.0"
-yaml_serde = "0.10.4"
 
 [lib]
 proc-macro = true
 
 [features]
-sqlite = ["sql-fun-core/sqlite", "sql-fun-client/sqlite"]
+sqlite = [
+    "sql-fun-client/sqlite",
+    "sql-fun-core/sqlite",
+    "sql-fun-codegen/sqlite",
+]
+nightly-unstable = ["sql-fun-codegen/nightly-unstable"]
 
 [dependencies]
 compact_str = { workspace = true }

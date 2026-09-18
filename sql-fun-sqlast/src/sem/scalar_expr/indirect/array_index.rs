@@ -14,7 +14,7 @@ pub struct ArrayIndex {
 }
 
 impl ArrayIndex {
-    pub fn new(
+    pub const fn new(
         array: SemScalarExpr,
         index: SemScalarExpr,
         item_type: Option<TypeReference>,
@@ -26,11 +26,11 @@ impl ArrayIndex {
         }
     }
 
-    pub fn array(&self) -> &SemScalarExpr {
+    pub const fn array(&self) -> &SemScalarExpr {
         &self.array
     }
 
-    pub fn item_type(&self) -> &Option<TypeReference> {
+    pub const fn item_type(&self) -> &Option<TypeReference> {
         &self.item_type
     }
 

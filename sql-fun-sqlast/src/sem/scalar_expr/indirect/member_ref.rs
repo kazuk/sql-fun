@@ -14,7 +14,11 @@ pub struct MemberRef {
 }
 
 impl MemberRef {
-    pub fn new(base: SemScalarExpr, member: String, member_type: Option<TypeReference>) -> Self {
+    pub const fn new(
+        base: SemScalarExpr,
+        member: String,
+        member_type: Option<TypeReference>,
+    ) -> Self {
         Self {
             base,
             member,
@@ -25,7 +29,7 @@ impl MemberRef {
         self.base.is_not_null()
     }
 
-    pub fn member_type(&self) -> &Option<TypeReference> {
+    pub const fn member_type(&self) -> &Option<TypeReference> {
         &self.member_type
     }
 

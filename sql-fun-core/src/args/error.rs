@@ -135,7 +135,7 @@ impl SqlFunArgsError {
     /// # Errors
     ///
     /// Always returns [`SqlFunArgsError::InsufficientConfiguration`].
-    pub fn no_postgres_engine_version_specified<T>() -> Result<T, Self> {
+    pub const fn no_postgres_engine_version_specified<T>() -> Result<T, Self> {
         Err(Self::InsufficientConfiguration(
             ConfigurationKind::EngineVersion,
         ))

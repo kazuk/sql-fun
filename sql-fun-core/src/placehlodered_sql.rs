@@ -27,7 +27,7 @@ where
 pub struct PlaceholderTypeHint(String);
 
 impl PlaceholderTypeHint {
-    pub fn hint_value(&self) -> &str {
+    pub const fn hint_value(&self) -> &str {
         self.0.as_str()
     }
 }
@@ -68,7 +68,7 @@ impl FragmentName {
 
     /// get `&str` value
     #[must_use]
-    pub fn as_str(&self) -> &str {
+    pub const fn as_str(&self) -> &str {
         self.0.as_str()
     }
 }
@@ -100,12 +100,12 @@ impl NamedParameterPlaceholder {
     }
 
     /// get a parameter name
-    pub fn name(&self) -> &ParameterName {
+    pub const fn name(&self) -> &ParameterName {
         &self.name
     }
 
     /// get a type hint
-    pub fn type_hint(&self) -> Option<&PlaceholderTypeHint> {
+    pub const fn type_hint(&self) -> Option<&PlaceholderTypeHint> {
         self.type_hint.as_ref()
     }
 }
@@ -115,7 +115,7 @@ impl NamedParameterPlaceholder {
 pub struct SqlLiteralText(String);
 
 impl SqlLiteralText {
-    pub fn text(&self) -> &str {
+    pub const fn text(&self) -> &str {
         self.0.as_str()
     }
 }
@@ -139,7 +139,7 @@ impl SqlLiteralText {
 pub struct RawSqlText(String);
 
 impl RawSqlText {
-    pub fn text(&self) -> &str {
+    pub const fn text(&self) -> &str {
         self.0.as_str()
     }
 }
@@ -206,7 +206,7 @@ impl PlaceholderedSqlToken {
         results
     }
 
-    pub fn as_fragment_placeholder(&self) -> Option<&FragmentName> {
+    pub const fn as_fragment_placeholder(&self) -> Option<&FragmentName> {
         match self {
             Self::FragmentPlaceholder(v) => Some(v),
             _ => None,

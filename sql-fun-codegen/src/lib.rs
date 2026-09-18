@@ -175,13 +175,13 @@ impl Parse for CteReference {
 impl CteReference {
     /// name of catalog item
     #[must_use]
-    pub fn cte_name(&self) -> &str {
+    pub const fn cte_name(&self) -> &str {
         self.cte_name.as_str()
     }
 
     /// alias name for query
     #[must_use]
-    pub fn alias(&self) -> &str {
+    pub const fn alias(&self) -> &str {
         self.alias.as_str()
     }
 
@@ -294,19 +294,19 @@ pub struct EncodedSQLStatement {
 impl EncodedSQLStatement {
     /// SQL text literal
     #[must_use]
-    pub fn sql_text(&self) -> &LitStr {
+    pub const fn sql_text(&self) -> &LitStr {
         &self.sql_text
     }
 
     /// embedded location file
     #[must_use]
-    pub fn file(&self) -> &LitStr {
+    pub const fn file(&self) -> &LitStr {
         &self.file
     }
 
     /// specified datasource
     #[must_use]
-    pub fn datasource(&self) -> &LitStr {
+    pub const fn datasource(&self) -> &LitStr {
         &self.datasource
     }
 }

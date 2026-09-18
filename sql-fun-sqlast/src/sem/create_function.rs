@@ -34,7 +34,7 @@ impl CreateFunction {
 
     /// list function overload (Using in builtin / extensions only)
     #[must_use]
-    pub fn overloads(&self) -> &FunctionOverloadCollection {
+    pub const fn overloads(&self) -> &FunctionOverloadCollection {
         &self.overloads
     }
 
@@ -56,7 +56,7 @@ impl CreateFunction {
 
     /// return trure if function is returns set
     #[must_use]
-    pub fn is_table_function(&self) -> bool {
+    pub const fn is_table_function(&self) -> bool {
         self.returning_columdef.is_some()
     }
 }
@@ -64,7 +64,7 @@ impl CreateFunction {
 impl CreateFunction {
     /// get function name
     #[must_use]
-    pub fn name(&self) -> &FullName {
+    pub const fn name(&self) -> &FullName {
         &self.name
     }
 

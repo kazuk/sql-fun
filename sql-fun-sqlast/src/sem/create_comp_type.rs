@@ -55,7 +55,7 @@ impl CreateCompositeType {
     ///
     /// When instance is dynamic type and no-named returns Name
     #[must_use]
-    pub fn type_ref(&self) -> &Option<TypeReference> {
+    pub const fn type_ref(&self) -> &Option<TypeReference> {
         &self.type_ref
     }
 

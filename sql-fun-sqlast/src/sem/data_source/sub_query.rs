@@ -49,7 +49,7 @@ impl SubQueryDataSource {
         }
     }
 
-    pub fn select_statement(&self) -> &SelectStatement {
+    pub const fn select_statement(&self) -> &SelectStatement {
         &self.select_statement
     }
 

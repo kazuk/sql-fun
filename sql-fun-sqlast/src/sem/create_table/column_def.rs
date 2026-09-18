@@ -50,7 +50,7 @@ impl ColumnDefinition {
 
     /// get name of column
     #[must_use]
-    pub fn name(&self) -> &Option<ColumnName> {
+    pub const fn name(&self) -> &Option<ColumnName> {
         &self.name
     }
 
@@ -62,13 +62,13 @@ impl ColumnDefinition {
 
     /// get [`TypeReference`]
     #[must_use]
-    pub fn get_type(&self) -> Option<&TypeReference> {
+    pub const fn get_type(&self) -> Option<&TypeReference> {
         self.type_ref.as_ref()
     }
 
     /// column nullability
     #[must_use]
-    pub fn is_not_null(&self) -> Option<bool> {
+    pub const fn is_not_null(&self) -> Option<bool> {
         self.is_not_null
     }
 
@@ -78,13 +78,13 @@ impl ColumnDefinition {
     }
 
     /// apply not null constraint to column
-    pub fn set_not_null(&mut self, not_null: Option<bool>) {
+    pub const fn set_not_null(&mut self, not_null: Option<bool>) {
         self.is_not_null = not_null;
     }
 
     /// get column constraints
     #[must_use]
-    pub fn constraints(&self) -> &[ColumnConstraint] {
+    pub const fn constraints(&self) -> &[ColumnConstraint] {
         self.constraints.as_slice()
     }
 

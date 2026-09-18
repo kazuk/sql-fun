@@ -17,12 +17,12 @@ pub enum IdentityColumnMode {
 
 impl IdentityColumnMode {
     /// create Always variant
-    pub fn always() -> Self {
+    pub const fn always() -> Self {
         Self::Always
     }
 
     /// create ByDefault variant
-    pub fn by_default() -> Self {
+    pub const fn by_default() -> Self {
         Self::ByDefault
     }
 
@@ -131,12 +131,12 @@ impl IdentityColumnConstraint {
 
 impl ColumnConstraint {
     /// create identity variant
-    pub fn identity(value: IdentityColumnConstraint) -> Self {
+    pub const fn identity(value: IdentityColumnConstraint) -> Self {
         Self::Identity(value)
     }
 
     /// get identity variant
-    pub fn as_identity(&self) -> Option<&IdentityColumnConstraint> {
+    pub const fn as_identity(&self) -> Option<&IdentityColumnConstraint> {
         if let Self::Identity(c) = self {
             Some(c)
         } else {

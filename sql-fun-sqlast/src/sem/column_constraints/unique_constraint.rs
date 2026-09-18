@@ -69,12 +69,12 @@ impl UniqueColumnConstraint {
 
 impl ColumnConstraint {
     /// create Unique variant
-    pub fn unique(value: UniqueColumnConstraint) -> Self {
+    pub const fn unique(value: UniqueColumnConstraint) -> Self {
         Self::Unique(value)
     }
 
     /// get Unique variant
-    pub fn as_unique(&self) -> Option<&UniqueColumnConstraint> {
+    pub const fn as_unique(&self) -> Option<&UniqueColumnConstraint> {
         if let Self::Unique(c) = self {
             Some(c)
         } else {

@@ -68,12 +68,12 @@ impl AttrDeferrabilityColumnConstraint {
 
 impl ColumnConstraint {
     /// create AttrDeferrability variant
-    pub fn attr_deferrability(value: AttrDeferrabilityColumnConstraint) -> Self {
+    pub const fn attr_deferrability(value: AttrDeferrabilityColumnConstraint) -> Self {
         Self::AttrDeferrability(value)
     }
 
     /// get AttrDeferrability variant
-    pub fn as_attr_deferrability(&self) -> Option<&AttrDeferrabilityColumnConstraint> {
+    pub const fn as_attr_deferrability(&self) -> Option<&AttrDeferrabilityColumnConstraint> {
         if let Self::AttrDeferrability(c) = self {
             Some(c)
         } else {
@@ -138,12 +138,12 @@ impl AttrDeferredColumnConstraint {
 
 impl ColumnConstraint {
     /// create AttrDeferred variant
-    pub fn attr_deferred(value: AttrDeferredColumnConstraint) -> Self {
+    pub const fn attr_deferred(value: AttrDeferredColumnConstraint) -> Self {
         Self::AttrDeferred(value)
     }
 
     /// get AttrDeferred variant
-    pub fn as_attr_deferred(&self) -> Option<&AttrDeferredColumnConstraint> {
+    pub const fn as_attr_deferred(&self) -> Option<&AttrDeferredColumnConstraint> {
         if let Self::AttrDeferred(c) = self {
             Some(c)
         } else {
@@ -208,12 +208,12 @@ impl AttrImmediateColumnConstraint {
 
 impl ColumnConstraint {
     /// create AttrImmediate variant
-    pub fn attr_immediate(value: AttrImmediateColumnConstraint) -> Self {
+    pub const fn attr_immediate(value: AttrImmediateColumnConstraint) -> Self {
         Self::AttrImmediate(value)
     }
 
     /// get AttrImmediate variant
-    pub fn as_attr_immediate(&self) -> Option<&AttrImmediateColumnConstraint> {
+    pub const fn as_attr_immediate(&self) -> Option<&AttrImmediateColumnConstraint> {
         if let Self::AttrImmediate(c) = self {
             Some(c)
         } else {

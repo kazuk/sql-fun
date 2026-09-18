@@ -24,11 +24,11 @@ impl super::DataSource {
 }
 
 impl TableFunctionDataSource {
-    pub fn function(&self) -> &OverloadVariant {
+    pub const fn function(&self) -> &OverloadVariant {
         &self.function
     }
 
-    pub fn arguments(&self) -> &IVec<SemScalarExpr> {
+    pub const fn arguments(&self) -> &IVec<SemScalarExpr> {
         &self.args
     }
 

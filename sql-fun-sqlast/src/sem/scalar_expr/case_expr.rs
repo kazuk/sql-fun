@@ -631,7 +631,7 @@ pub struct CaseWhen {
 }
 
 impl CaseWhen {
-    pub fn new(when_value: SemScalarExpr, result: SemScalarExpr) -> Self {
+    pub const fn new(when_value: SemScalarExpr, result: SemScalarExpr) -> Self {
         Self { when_value, result }
     }
 }
@@ -649,7 +649,7 @@ pub struct CaseExpr {
 impl CaseExpr {
     /// create a instance
     #[must_use]
-    pub fn new(
+    pub const fn new(
         arg_expr: Box<Option<SemScalarExpr>>,
         when_exprs: Vec<CaseWhen>,
         default_expr: Box<Option<SemScalarExpr>>,

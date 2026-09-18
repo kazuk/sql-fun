@@ -39,11 +39,11 @@ impl From<PostgresExtensionsParseError> for SqlFunServerError {
 }
 
 impl SqlFunServerError {
-    fn is_unexpected(&self) -> bool {
+    const fn is_unexpected(&self) -> bool {
         matches!(self, Self::Analysis(_) | Self::ArgsBuild(_))
     }
 
-    fn is_context_initialize(&self) -> bool {
+    const fn is_context_initialize(&self) -> bool {
         matches!(
             self,
             Self::InvalidArgument(_) | Self::InvalidEngineVersion(_) | Self::ExtensionListParse(_)

@@ -22,11 +22,11 @@ impl BinaryOpCallSite {
         super::binary_is_not_null(&self.left_arg, &self.right_arg)
     }
 
-    pub fn get_return_type(&self) -> &TypeReference {
+    pub const fn get_return_type(&self) -> &TypeReference {
         &self.return_type
     }
 
-    pub fn is_strict(&self) -> bool {
+    pub const fn is_strict(&self) -> bool {
         self.strict
     }
 

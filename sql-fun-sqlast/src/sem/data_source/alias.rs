@@ -21,7 +21,7 @@ impl From<&str> for AliasName {
 }
 
 impl AliasName {
-    pub fn as_str(&self) -> &str {
+    pub const fn as_str(&self) -> &str {
         self.0.as_str()
     }
 }
@@ -36,7 +36,7 @@ pub struct AliasSpec {
 impl AliasSpec {
     /// get alias name
     #[must_use]
-    pub fn name(&self) -> &AliasName {
+    pub const fn name(&self) -> &AliasName {
         &self.alias_name
     }
 
@@ -126,7 +126,7 @@ impl AliasSpec {
 
     /// get length of derived column list
     #[must_use]
-    pub fn len_derived_column(&self) -> usize {
+    pub const fn len_derived_column(&self) -> usize {
         self.derived_column_names.len()
     }
 }

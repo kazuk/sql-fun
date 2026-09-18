@@ -59,13 +59,13 @@ impl Constraint {
 
     /// return true if constraint is primary key
     #[must_use]
-    pub fn is_primary_key_constraint(&self) -> bool {
+    pub const fn is_primary_key_constraint(&self) -> bool {
         matches!(self, Self::PrimaryKey(_))
     }
 
     /// get primary key reference
     #[must_use]
-    pub fn as_primary_key_constraint(&self) -> Option<&PrimaryKeyConstraint> {
+    pub const fn as_primary_key_constraint(&self) -> Option<&PrimaryKeyConstraint> {
         match self {
             Self::PrimaryKey(p) => Some(p),
             _ => None,

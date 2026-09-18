@@ -35,7 +35,7 @@ impl DomainBaseTypeNameNotFound {
     }
 
     /// domain type name
-    pub fn domain_type_name(&self) -> &FullName {
+    pub const fn domain_type_name(&self) -> &FullName {
         &self.domain_type_name
     }
 
@@ -74,12 +74,12 @@ impl FunctionNotFound {
     }
 
     /// specified function name
-    pub fn function_name(&self) -> &FullName {
+    pub const fn function_name(&self) -> &FullName {
         &self.function_name
     }
 
     /// span of function name
-    pub fn function_span(&self) -> &StringSpan {
+    pub const fn function_span(&self) -> &StringSpan {
         &self.function_span
     }
 }

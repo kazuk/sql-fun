@@ -134,7 +134,7 @@ pub enum ProblemLikeError {
 }
 
 impl ProblemLikeError {
-    pub fn invalid_operator_name(value: Vec<String>) -> Self {
+    pub const fn invalid_operator_name(value: Vec<String>) -> Self {
         Self::InvalidOperatorName(value)
     }
 

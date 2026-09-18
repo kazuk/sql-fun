@@ -83,7 +83,7 @@ impl OperatorName {
 
     /// operator name is valid
     #[must_use]
-    pub fn is_valid(&self) -> bool {
+    pub const fn is_valid(&self) -> bool {
         matches!(self, Self::Valid(_))
     }
 

@@ -29,7 +29,7 @@ pub enum ScalarConstExpr {
 
 impl ScalarConstExpr {
     /// get string variant value
-    pub fn as_string(&self) -> Option<&str> {
+    pub const fn as_string(&self) -> Option<&str> {
         match self {
             Self::String(s) => Some(s.as_str()),
             _ => None,
@@ -38,13 +38,13 @@ impl ScalarConstExpr {
 
     /// create a NULL
     #[must_use]
-    pub fn null() -> SemScalarExpr {
+    pub const fn null() -> SemScalarExpr {
         SemScalarExpr::Const(Self::Null)
     }
 
     /// create integer constant value
     #[must_use]
-    pub fn new_integer(value: i32) -> Self {
+    pub const fn new_integer(value: i32) -> Self {
         Self::Integer(value)
     }
 }

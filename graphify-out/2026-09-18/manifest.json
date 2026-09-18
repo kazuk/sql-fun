@@ -180,17 +180,17 @@
     "semantic_hash": ""
   },
   "sql-fun-core/src/args.rs": {
-    "mtime": 1789713884.7266166,
+    "mtime": 1789714463.0930676,
     "ast_hash": "ac4e10f62de56dc801351050d624407a",
     "semantic_hash": ""
   },
   "sql-fun-core/src/args/error.rs": {
-    "mtime": 1789713930.0128648,
+    "mtime": 1789714463.0930676,
     "ast_hash": "b52d73f1ba486016462a9413d9ac7be9",
     "semantic_hash": ""
   },
   "sql-fun-core/src/args/impl_metadata.rs": {
-    "mtime": 1788213758.980622,
+    "mtime": 1789714462.9400637,
     "ast_hash": "b582cb8ca7f7d7bda7bb8d314d12b578",
     "semantic_hash": ""
   },
@@ -205,12 +205,12 @@
     "semantic_hash": ""
   },
   "sql-fun-core/src/args/log_args.rs": {
-    "mtime": 1788213456.6286964,
+    "mtime": 1789714462.9400637,
     "ast_hash": "fffffe8dbbfdc6b5ce23b8f5647853ce",
     "semantic_hash": ""
   },
   "sql-fun-core/src/args/metadata_args.rs": {
-    "mtime": 1786123032.9592006,
+    "mtime": 1789714462.9400637,
     "ast_hash": "0e741b07761af7a4940d48796665b58b",
     "semantic_hash": ""
   },
@@ -230,17 +230,17 @@
     "semantic_hash": ""
   },
   "sql-fun-core/src/cte_catalog.rs": {
-    "mtime": 1789713884.7266166,
+    "mtime": 1789714463.0930676,
     "ast_hash": "b018432a75f2a2a4ea1d60961326b55d",
     "semantic_hash": ""
   },
   "sql-fun-core/src/cte_catalog/error.rs": {
-    "mtime": 1789712794.61748,
+    "mtime": 1789714463.0930676,
     "ast_hash": "189ad9a71c90dd3f10c2ad011f1cad65",
     "semantic_hash": ""
   },
   "sql-fun-core/src/cte_catalog/params.rs": {
-    "mtime": 1789713884.7266166,
+    "mtime": 1789714463.0930676,
     "ast_hash": "146a51702334391deb5cfd8e835dc659",
     "semantic_hash": ""
   },
@@ -270,22 +270,22 @@
     "semantic_hash": ""
   },
   "sql-fun-core/src/lib.rs": {
-    "mtime": 1789713186.7511666,
+    "mtime": 1789714463.0930676,
     "ast_hash": "f2dac47121ad50e0b45451c7f92fedae",
     "semantic_hash": ""
   },
   "sql-fun-core/src/metadata.rs": {
-    "mtime": 1789713456.709207,
+    "mtime": 1789714463.0940676,
     "ast_hash": "71838d601770066a148d4026d29eee74",
     "semantic_hash": ""
   },
   "sql-fun-core/src/placehlodered_sql.rs": {
-    "mtime": 1789713421.411115,
+    "mtime": 1789714463.0940676,
     "ast_hash": "aefbebfbc39dad132d85d183b74735ea",
     "semantic_hash": ""
   },
   "sql-fun-core/src/test_helpers.rs": {
-    "mtime": 1786123032.9602005,
+    "mtime": 1789714462.9400637,
     "ast_hash": "1d90e985a81c8ce1f63a41065a30e4e9",
     "semantic_hash": ""
   },
@@ -350,7 +350,7 @@
     "semantic_hash": ""
   },
   "sql-fun-server/src/lib.rs": {
-    "mtime": 1789712597.2695804,
+    "mtime": 1789714463.0940676,
     "ast_hash": "e5443e8ed4b7a667bb9ca60afb56c3b7",
     "semantic_hash": ""
   },
@@ -410,7 +410,7 @@
     "semantic_hash": ""
   },
   "sql-fun-sqlast/src/sem/base_context.rs": {
-    "mtime": 1789712830.3663654,
+    "mtime": 1789714463.0940676,
     "ast_hash": "f4d10512318cb0126b3966524f249b38",
     "semantic_hash": ""
   },
@@ -1225,17 +1225,17 @@
     "semantic_hash": ""
   },
   "src/generate_sql_execute.rs": {
-    "mtime": 1789712812.38192,
+    "mtime": 1789714463.0940676,
     "ast_hash": "8d2ed7a6801affd5b97119805c4be34b",
     "semantic_hash": ""
   },
   "src/generate_sql_query_opt.rs": {
-    "mtime": 1789712758.5675867,
+    "mtime": 1789714463.0940676,
     "ast_hash": "df1fedd0db109cae65457809c9ed2acc",
     "semantic_hash": ""
   },
   "src/generate_sqy_query_many.rs": {
-    "mtime": 1789712612.039948,
+    "mtime": 1789714463.0940676,
     "ast_hash": "fd5bd2c031ae15c5c4f8d67aecb564da",
     "semantic_hash": ""
   },
@@ -1605,8 +1605,8 @@
     "semantic_hash": ""
   },
   "stats/coverage.txt": {
-    "mtime": 1781295256.8084524,
-    "ast_hash": "ce5ecf331afc17d37871dc6eb2c0510e",
+    "mtime": 1789714463.0940676,
+    "ast_hash": "91ea6f3c59791ad01fd20a1f34c86b71",
     "semantic_hash": ""
   },
   "book/datafrow.svg": {
@@ -1620,7 +1620,7 @@
     "semantic_hash": ""
   },
   "src/generate_sql_query_one.rs": {
-    "mtime": 1789712804.4917247,
+    "mtime": 1789714463.0940676,
     "ast_hash": "82cb7c948ca1b0909870625cb41fc2fa",
     "semantic_hash": ""
   },
@@ -1640,12 +1640,12 @@
     "semantic_hash": ""
   },
   "sql-fun-core/src/lockfile.rs": {
-    "mtime": 1789713313.2642832,
+    "mtime": 1789714463.0930676,
     "ast_hash": "42c002a78d46153eebe7455e4a30caa2",
     "semantic_hash": ""
   },
   ".local/okf_types/concept_type_definition.md": {
-    "mtime": 1789711068.70931,
+    "mtime": 1789714463.027066,
     "ast_hash": "7e7c1decbc22bbe073ed36cae7c3d7b2",
     "semantic_hash": ""
   },
@@ -1662,6 +1662,26 @@
   "docs/patterns/state-change-event-receiver.md": {
     "mtime": 1789710150.5730388,
     "ast_hash": "39ae97a7c16fe3ec761b9c95ea950ec9",
+    "semantic_hash": ""
+  },
+  "sql-fun-collector/src/lib.rs": {
+    "mtime": 1789714462.9320633,
+    "ast_hash": "b0d6aa19ffdf88dcab2aec568ac67b73",
+    "semantic_hash": ""
+  },
+  "sql-fun-collector/src/sorted.rs": {
+    "mtime": 1789714462.9320633,
+    "ast_hash": "d327045880a512bc11c5ae1b881875ff",
+    "semantic_hash": ""
+  },
+  "sql-fun-collector/tests/arena.rs": {
+    "mtime": 1789714462.9320633,
+    "ast_hash": "21315a35a39fa92a0b591a9fdb4191d4",
+    "semantic_hash": ""
+  },
+  "sql-fun-collector/README.md": {
+    "mtime": 1789714462.9320633,
+    "ast_hash": "c311c74068083a59ffdddb95142a435f",
     "semantic_hash": ""
   }
 }

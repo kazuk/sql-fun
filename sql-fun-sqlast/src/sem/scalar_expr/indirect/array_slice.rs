@@ -17,7 +17,7 @@ pub struct ArraySlice {
 }
 
 impl ArraySlice {
-    pub fn new(
+    pub const fn new(
         array: SemScalarExpr,
         lower: Option<SemScalarExpr>,
         upper: Option<SemScalarExpr>,

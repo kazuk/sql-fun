@@ -12,13 +12,13 @@ pub struct CreateEnum {
 impl CreateEnum {
     /// get name
     #[must_use]
-    pub fn name(&self) -> &FullName {
+    pub const fn name(&self) -> &FullName {
         &self.name
     }
 
     /// get values
     #[must_use]
-    pub fn values(&self) -> &Vec<EnumValueDefinition> {
+    pub const fn values(&self) -> &Vec<EnumValueDefinition> {
         &self.values
     }
 

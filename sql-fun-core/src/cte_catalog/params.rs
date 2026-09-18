@@ -16,13 +16,13 @@ pub struct CteParameterRename {
 impl CteParameterRename {
     /// CTE name
     #[must_use]
-    pub fn cte_name(&self) -> &CteName {
+    pub const fn cte_name(&self) -> &CteName {
         &self.cte_name
     }
 
     /// target parameter name
     #[must_use]
-    pub fn parameter_name(&self) -> &ParameterName {
+    pub const fn parameter_name(&self) -> &ParameterName {
         &self.parameter_name
     }
 }
@@ -47,19 +47,19 @@ pub struct CteParameterBinding {
 impl CteParameterBinding {
     /// CTE name for parameter target
     #[must_use]
-    pub fn cte_name(&self) -> &CteName {
+    pub const fn cte_name(&self) -> &CteName {
         &self.cte_name
     }
 
     /// parameter name
     #[must_use]
-    pub fn parameter_name(&self) -> &ParameterName {
+    pub const fn parameter_name(&self) -> &ParameterName {
         &self.parameter_name
     }
 
     /// parameter definition name in query
     #[must_use]
-    pub fn name_in_query(&self) -> &ParameterName {
+    pub const fn name_in_query(&self) -> &ParameterName {
         &self.name_in_query
     }
 

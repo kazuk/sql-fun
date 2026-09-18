@@ -48,7 +48,7 @@ mod implementation {
     impl FuncCallExpr {
         /// resolved calling overload
         #[must_use]
-        pub fn overload(&self) -> &Option<OverloadVariant> {
+        pub const fn overload(&self) -> &Option<OverloadVariant> {
             &self.overload
         }
     }
@@ -56,7 +56,7 @@ mod implementation {
     impl FuncCallExpr {
         /// argument expression and definitions
         #[must_use]
-        pub fn args(&self) -> &IVec<FuncCallArgs> {
+        pub const fn args(&self) -> &IVec<FuncCallArgs> {
             &self.args
         }
     }
@@ -71,13 +71,13 @@ mod implementation {
     }
 
     impl FuncCallArgs {
-        pub fn arg_expr(&self) -> &SemScalarExpr {
+        pub const fn arg_expr(&self) -> &SemScalarExpr {
             &self.arg_expr
         }
     }
 
     impl FuncCallArgs {
-        pub fn arg_definition(&self) -> &Option<FunctionParam> {
+        pub const fn arg_definition(&self) -> &Option<FunctionParam> {
             &self.arg_definition
         }
     }

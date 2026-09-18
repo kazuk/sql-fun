@@ -27,7 +27,7 @@ impl CheckColumnConstraint {
     }
 
     /// get constraint expression
-    pub fn expr(&self) -> &SemScalarExpr {
+    pub const fn expr(&self) -> &SemScalarExpr {
         &self.expr
     }
 }
@@ -84,12 +84,12 @@ impl CheckColumnConstraint {
 
 impl ColumnConstraint {
     /// create Check variant
-    pub fn check(value: CheckColumnConstraint) -> Self {
+    pub const fn check(value: CheckColumnConstraint) -> Self {
         Self::Check(value)
     }
 
     /// get check variant
-    pub fn as_check(&self) -> Option<&CheckColumnConstraint> {
+    pub const fn as_check(&self) -> Option<&CheckColumnConstraint> {
         if let Self::Check(c) = self {
             Some(c)
         } else {

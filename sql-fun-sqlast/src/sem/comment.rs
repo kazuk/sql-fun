@@ -24,7 +24,7 @@ impl Comment {
 
     /// get comment target object type
     #[must_use]
-    pub fn object_type(&self) -> &ObjectType {
+    pub const fn object_type(&self) -> &ObjectType {
         &self.object_type
     }
 

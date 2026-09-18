@@ -34,7 +34,7 @@ pub struct ColumnCollection(Vec<ColumnDefinition>);
 impl ColumnCollection {
     /// add column
     #[must_use]
-    pub fn new(columns: Vec<ColumnDefinition>) -> Self {
+    pub const fn new(columns: Vec<ColumnDefinition>) -> Self {
         Self(columns)
     }
 
@@ -100,7 +100,7 @@ pub enum CreateTableMode {
 
 impl CreateTableMode {
     /// create instance for if not exists
-    pub fn from_if_not_exists(if_not_exists: bool) -> Self {
+    pub const fn from_if_not_exists(if_not_exists: bool) -> Self {
         if if_not_exists {
             Self::IfNotExists
         } else {
@@ -173,17 +173,17 @@ impl CreateTable {
 
     /// get table name
     #[must_use]
-    pub fn name(&self) -> &TableName {
+    pub const fn name(&self) -> &TableName {
         &self.name
     }
 
     /// get [`CreateTableMode`]
-    pub fn mode(&self) -> &CreateTableMode {
+    pub const fn mode(&self) -> &CreateTableMode {
         &self.mode
     }
 
     /// is temporary table
-    pub fn temporary(&self) -> bool {
+    pub const fn temporary(&self) -> bool {
         self.temporary
     }
 
@@ -342,7 +342,7 @@ pub struct DropTable {
 
 impl DropTable {
     /// True when `IF EXISTS` or same meaning specified.
-    pub fn if_exists(&self) -> bool {
+    pub const fn if_exists(&self) -> bool {
         self.if_exists
     }
 
@@ -352,12 +352,12 @@ impl DropTable {
     }
 
     /// get cascade
-    pub fn cascade(&self) -> bool {
+    pub const fn cascade(&self) -> bool {
         self.cascade
     }
 
     /// get restrict
-    pub fn restrict(&self) -> bool {
+    pub const fn restrict(&self) -> bool {
         !self.cascade
     }
 }

@@ -24,7 +24,7 @@ impl ForeignKeyConstraint {
         &self.name
     }
 
-    pub fn implicit_changes(&self) -> Result<Vec<ImplicitChange>, AnalysisError> {
+    pub const fn implicit_changes(&self) -> Result<Vec<ImplicitChange>, AnalysisError> {
         Ok(Vec::new())
     }
 }

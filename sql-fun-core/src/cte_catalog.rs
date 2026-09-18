@@ -103,13 +103,13 @@ impl CteCatalogReference {
 
     /// get a CTE name
     #[must_use]
-    pub fn cte_name(&self) -> &CteName {
+    pub const fn cte_name(&self) -> &CteName {
         &self.cte_name
     }
 
     /// alias
     #[must_use]
-    pub fn alias(&self) -> &CteAlias {
+    pub const fn alias(&self) -> &CteAlias {
         &self.alias
     }
 }
@@ -178,12 +178,12 @@ impl<'a> CteCatalogEntry<'a> {
         self.errors.merge(check_errors);
     }
 
-    fn set_node_id(&mut self, node_id: NodeIndex) {
+    const fn set_node_id(&mut self, node_id: NodeIndex) {
         self.node_id = Some(node_id);
     }
 
     #[track_caller]
-    fn node_id(&self) -> NodeIndex {
+    const fn node_id(&self) -> NodeIndex {
         self.node_id.expect("must call set_node_id")
     }
 
@@ -206,7 +206,7 @@ impl<'a> CteCatalogEntry<'a> {
 
     /// True when have error
     #[must_use]
-    pub fn has_error(&self) -> bool {
+    pub const fn has_error(&self) -> bool {
         !self.errors.is_empty()
     }
 
@@ -276,7 +276,7 @@ impl<'a> CteCatalogEntry<'a> {
 
     /// get parameters
     #[must_use]
-    pub fn get_parameters(&self) -> Option<&CteParameterCollection> {
+    pub const fn get_parameters(&self) -> Option<&CteParameterCollection> {
         self.aggregated_cte_parameter.as_ref()
     }
 
@@ -296,7 +296,7 @@ impl<'a> CteCatalogEntry<'a> {
 
     /// get check errors on entry
     #[must_use]
-    pub fn errors(&self) -> &CteCatalogCheckErrorCollection<'_> {
+    pub const fn errors(&self) -> &CteCatalogCheckErrorCollection<'_> {
         &self.errors
     }
 

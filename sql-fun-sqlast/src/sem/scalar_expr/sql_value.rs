@@ -39,7 +39,7 @@ pub struct UnexpectedVariant;
 
 impl SqlValueExpr {
     /// get CurrentTimestamp variant
-    pub fn as_current_timestamp(&self) -> Result<&Option<TimePrecision>, UnexpectedVariant> {
+    pub const fn as_current_timestamp(&self) -> Result<&Option<TimePrecision>, UnexpectedVariant> {
         match self {
             Self::CurrentTimestamp(c) => Ok(c),
             _ => Err(UnexpectedVariant),
@@ -52,7 +52,7 @@ impl SqlValueExpr {
 pub struct TimePrecision(i32);
 
 impl TimePrecision {
-    fn from_typmod(typmod: i32) -> Self {
+    const fn from_typmod(typmod: i32) -> Self {
         Self(typmod)
     }
 }

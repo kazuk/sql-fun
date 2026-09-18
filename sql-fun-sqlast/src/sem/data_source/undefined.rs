@@ -23,7 +23,7 @@ impl super::DataSource {
 }
 
 impl UndefinedTableFuncDataSource {
-    pub fn alias(&self) -> &AliasSpec {
+    pub const fn alias(&self) -> &AliasSpec {
         &self.alias
     }
 

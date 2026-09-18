@@ -10,7 +10,7 @@ struct UnaryCastCandidate {
 }
 
 impl UnaryCastCandidate {
-    fn new(arg: CastContext, priority: i32, operator: UnaryOperatorDefinition) -> Self {
+    const fn new(arg: CastContext, priority: i32, operator: UnaryOperatorDefinition) -> Self {
         Self {
             arg,
             priority,
@@ -63,7 +63,7 @@ pub(super) struct ResolvedUnaryOperator {
 }
 
 impl ResolvedUnaryOperator {
-    fn new(operator_def: Option<UnaryOperatorDefinition>, arg_expr: SemScalarExpr) -> Self {
+    const fn new(operator_def: Option<UnaryOperatorDefinition>, arg_expr: SemScalarExpr) -> Self {
         Self {
             operator_def,
             arg_expr,

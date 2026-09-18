@@ -199,7 +199,7 @@ impl DatabaseEngine {
     }
 
     #[must_use]
-    pub fn as_wellknown(&self) -> Option<&WellKnownDbEngine> {
+    pub const fn as_wellknown(&self) -> Option<&WellKnownDbEngine> {
         match &self.0 {
             Either::Left(l) => Some(l),
             Either::Right(_) => None,
@@ -207,7 +207,7 @@ impl DatabaseEngine {
     }
 
     #[must_use]
-    pub fn as_custom(&self) -> Option<&String> {
+    pub const fn as_custom(&self) -> Option<&String> {
         match &self.0 {
             Either::Right(r) => Some(r),
             Either::Left(_) => None,
@@ -303,7 +303,7 @@ impl SqlFunMetadata {
 
     /// get datasource name
     #[must_use]
-    pub fn name(&self) -> &str {
+    pub const fn name(&self) -> &str {
         if let Some(name) = &self.name {
             name.as_str()
         } else {
@@ -344,13 +344,13 @@ impl SqlFunMetadata {
 
     /// get SQL dialect
     #[must_use]
-    pub fn sql_dialect(&self) -> SqlDialect {
+    pub const fn sql_dialect(&self) -> SqlDialect {
         self.dialect
     }
 
     /// get db engine
     #[must_use]
-    pub fn engine(&self) -> &DatabaseEngine {
+    pub const fn engine(&self) -> &DatabaseEngine {
         &self.engine
     }
 
@@ -361,7 +361,7 @@ impl SqlFunMetadata {
     /// See [`crate::SqlFunArgs::postgres_version`] for argument precedence.
     ///
     #[must_use]
-    pub fn engine_version(&self) -> &Option<PostgresEngineVersion> {
+    pub const fn engine_version(&self) -> &Option<PostgresEngineVersion> {
         &self.engine_version
     }
 
@@ -372,19 +372,19 @@ impl SqlFunMetadata {
     /// See [`crate::SqlFunArgs::postgres_search_path`] for argument precedence.
     ///
     #[must_use]
-    pub fn search_path(&self) -> &Option<Vec<String>> {
+    pub const fn search_path(&self) -> &Option<Vec<String>> {
         &self.search_path
     }
 
     /// get `PostgreSQL` extensions allowed
     #[must_use]
-    pub fn postgres_extensions(&self) -> &Option<PostgresExtensionsCollection> {
+    pub const fn postgres_extensions(&self) -> &Option<PostgresExtensionsCollection> {
         &self.extensions
     }
 
     /// get database connection driver / middle-ware
     #[must_use]
-    pub fn connector(&self) -> &Option<String> {
+    pub const fn connector(&self) -> &Option<String> {
         &self.connector
     }
 }

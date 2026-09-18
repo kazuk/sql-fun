@@ -60,7 +60,7 @@ impl<TValue> TrieLeaves<TValue> {
         self.0.iter().map(TrieNode::len).sum()
     }
 
-    pub(super) fn is_empty(&self) -> bool {
+    pub(super) const fn is_empty(&self) -> bool {
         self.0.is_empty()
     }
 }

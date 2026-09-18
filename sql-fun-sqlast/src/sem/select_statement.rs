@@ -212,7 +212,7 @@ impl SelectStatementNode {
         }
     }
     /// enumerate result set columns
-    pub fn result_columns(&self) -> &ResultColumnCollection {
+    pub const fn result_columns(&self) -> &ResultColumnCollection {
         &self.result_columns
     }
 

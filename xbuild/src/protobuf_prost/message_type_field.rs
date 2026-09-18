@@ -200,7 +200,7 @@ impl MessageTypeField {
         }
     }
 
-    pub fn struct_field_is_primitive(&self) -> bool {
+    pub const fn struct_field_is_primitive(&self) -> bool {
         self.type_name.is_none()
     }
 

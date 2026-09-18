@@ -89,7 +89,7 @@ where
         }
     }
 
-    pub fn last_used(&self) -> Option<Instant> {
+    pub const fn last_used(&self) -> Option<Instant> {
         match self {
             Self::Pending(_) | Self::Starting => None,
             Self::Occupied(_, lu) | Self::Error(_, lu) => Some(*lu),

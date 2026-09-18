@@ -9,7 +9,7 @@ pub struct ViewDataSource {
 }
 
 impl ViewDataSource {
-    pub fn view_name(&self) -> &ViewName {
+    pub const fn view_name(&self) -> &ViewName {
         &self.view
     }
 

@@ -93,11 +93,11 @@ impl CteCatalogError {
         Err(Self::CteNotFound(cte_name.clone()))
     }
 
-    pub(super) fn unexpected_parameter_collection_not_exist() -> Result<Infallible, Self> {
+    pub(super) const fn unexpected_parameter_collection_not_exist() -> Result<Infallible, Self> {
         Err(Self::ParameterCollectionNotExist())
     }
 
-    pub(super) fn validation_error(
+    pub(super) const fn validation_error(
         validation_errors: Vec<CteCatalogValidationError>,
     ) -> Result<Infallible, Self> {
         Err(Self::Validation(validation_errors))
@@ -128,7 +128,7 @@ pub enum CteCatalogCheckError<'a> {
 impl<'a> CteCatalogCheckError<'a> {
     /// multiple CTE has a same name
     #[must_use]
-    pub(super) fn duplicate_definition(other_definition_in: CatalogFileIndex<'a>) -> Self {
+    pub(super) const fn duplicate_definition(other_definition_in: CatalogFileIndex<'a>) -> Self {
         Self::DuplicateDefinition(other_definition_in)
     }
 
@@ -140,13 +140,13 @@ impl<'a> CteCatalogCheckError<'a> {
 
     /// CTE defined but not used
     #[must_use]
-    pub(super) fn unused_cte_entry() -> Self {
+    pub(super) const fn unused_cte_entry() -> Self {
         Self::UnusedCteEntry
     }
 
     /// fragment syntax used in CTE definition
     #[must_use]
-    pub(super) fn fragment_embedding_not_supported() -> Self {
+    pub(super) const fn fragment_embedding_not_supported() -> Self {
         Self::FragmentEmbeddingNotSupported
     }
 
@@ -259,7 +259,7 @@ impl<'a> CteCatalogCheckErrorCollection<'a> {
         self.0.append(&mut source.0);
     }
 
-    pub fn is_empty(&self) -> bool {
+    pub const fn is_empty(&self) -> bool {
         self.0.is_empty()
     }
 

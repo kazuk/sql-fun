@@ -33,7 +33,7 @@ pub struct SqlFunCliArgs {
 impl SqlFunCliArgs {
     /// returns true for builtin subcommand
     #[must_use]
-    pub fn is_builtin(&self) -> bool {
+    pub const fn is_builtin(&self) -> bool {
         matches!(
             self.command,
             Some(CliSubCommand::Initialize(_) | CliSubCommand::Check(_))
@@ -42,7 +42,7 @@ impl SqlFunCliArgs {
 
     /// get command
     #[must_use]
-    pub fn command(&self) -> &Option<CliSubCommand> {
+    pub const fn command(&self) -> &Option<CliSubCommand> {
         &self.command
     }
 }

@@ -42,11 +42,11 @@ impl AnyBinaryCallSite {
         super::binary_is_not_null(&self.left_arg, &self.right_arg)
     }
 
-    pub fn get_return_type(&self) -> &TypeReference {
+    pub const fn get_return_type(&self) -> &TypeReference {
         self.operator_def.get_return_type()
     }
 
-    pub fn is_strict(&self) -> bool {
+    pub const fn is_strict(&self) -> bool {
         self.operator_def.is_strict()
     }
 }
@@ -59,7 +59,7 @@ pub struct UndefinedOperatorAnyCallSite {
 }
 
 impl UndefinedOperatorAnyCallSite {
-    pub fn is_not_null(&self) -> Option<bool> {
+    pub const fn is_not_null(&self) -> Option<bool> {
         None
     }
 

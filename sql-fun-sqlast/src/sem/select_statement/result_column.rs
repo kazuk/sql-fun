@@ -39,15 +39,15 @@ mod test_result_column_new {
 }
 
 impl ResultColumn {
-    pub fn column_name(&self) -> &Option<ColumnName> {
+    pub const fn column_name(&self) -> &Option<ColumnName> {
         &self.col_name
     }
 
-    pub fn col_type(&self) -> &Option<TypeReference> {
+    pub const fn col_type(&self) -> &Option<TypeReference> {
         &self.col_type
     }
 
-    pub fn is_not_null(&self) -> &Option<bool> {
+    pub const fn is_not_null(&self) -> &Option<bool> {
         &self.is_not_null
     }
 }

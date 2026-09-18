@@ -18,7 +18,7 @@ pub struct DefaultColumnConstraint {
 
 impl DefaultColumnConstraint {
     /// get default value expression
-    pub fn expr(&self) -> &SemScalarExpr {
+    pub const fn expr(&self) -> &SemScalarExpr {
         &self.expr
     }
 }
@@ -88,12 +88,12 @@ impl DefaultColumnConstraint {
 
 impl ColumnConstraint {
     /// create Default variant
-    pub fn default(value: DefaultColumnConstraint) -> Self {
+    pub const fn default(value: DefaultColumnConstraint) -> Self {
         Self::Default(value)
     }
 
     /// get Default variant
-    pub fn as_default(&self) -> Option<&DefaultColumnConstraint> {
+    pub const fn as_default(&self) -> Option<&DefaultColumnConstraint> {
         if let Self::Default(c) = self {
             Some(c)
         } else {

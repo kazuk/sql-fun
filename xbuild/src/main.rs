@@ -1,3 +1,5 @@
+//! xbuild
+//!
 use clap::Parser;
 use xbuild::Args;
 

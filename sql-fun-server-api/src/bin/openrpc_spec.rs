@@ -1,3 +1,5 @@
+//! server API for `sql-fun`
+
 use clap::Parser;
 use std::path::PathBuf;
 use typed_openrpc::{OpenRpcInfo, Registry};

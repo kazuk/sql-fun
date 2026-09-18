@@ -9,6 +9,7 @@ use tokio::sync::RwLock;
 
 use crate::PendingFut;
 
+/// cache loader
 pub struct Loader<K, V, E, F, FutureResult>
 where
     K: std::hash::Hash + std::cmp::Eq,
@@ -29,6 +30,7 @@ where
     F: Fn(K) -> FutureResult,
     FutureResult: Future<Output = Result<V, E>> + Send + 'static,
 {
+    /// create instance
     pub fn new(fun: F) -> Self {
         Self {
             func: Box::new(fun),
@@ -37,6 +39,7 @@ where
         }
     }
 
+    /// load from future
     pub fn load(&self, key: K) -> PendingFut<V, E> {
         PendingFut::new((self.func)(key))
     }
@@ -97,6 +100,7 @@ where
     }
 }
 
+/// cache object
 pub struct Cache<Key, Value, Error, LoaderFun, FutureResult, S = RandomState>
 where
     Key: std::hash::Hash + std::cmp::Eq + Clone + Copy,
@@ -118,6 +122,7 @@ where
     LoaderFun: Fn(Key) -> FutureResult,
     FutureResult: Future<Output = Result<Value, Error>> + Send + 'static,
 {
+    /// create cache instance
     pub fn new(loader: LoaderFun, expilation_timeout: Duration) -> Self {
         Self {
             load_fn: Loader::new(loader),
@@ -223,6 +228,7 @@ where
         }
     }
 
+    /// evict cache entries
     pub async fn evict_entries(&self) {
         let mut entries = self.entries.write().await;
 

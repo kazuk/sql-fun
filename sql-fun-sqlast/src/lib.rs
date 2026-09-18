@@ -141,7 +141,7 @@ pub struct StringSpan {
 
 impl StringSpan {
     /// create a new instance
-    pub fn new(offset: usize, len: usize) -> Self {
+    pub const fn new(offset: usize, len: usize) -> Self {
         Self { offset, len }
     }
 

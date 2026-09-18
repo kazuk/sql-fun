@@ -50,6 +50,7 @@ impl JsonRpcResponse {
     }
 }
 
+/// JSON RPC Errors
 #[derive(serde::Serialize, Clone)]
 pub struct JsonRpcError {
     code: i32,
@@ -87,6 +88,7 @@ impl JsonRpcError {
     // TODO: Fixme value
     const CODE_INTERNAL_SERVER_ERROR: i32 = 0;
 
+    /// parameter required
     #[must_use]
     pub fn parameter_required(method: &str) -> Self {
         Self {
@@ -96,6 +98,7 @@ impl JsonRpcError {
         }
     }
 
+    /// unknown method
     #[must_use]
     pub fn unknown_method(method: &str) -> Self {
         Self {
@@ -105,6 +108,7 @@ impl JsonRpcError {
         }
     }
 
+    /// JSON deserialize
     #[must_use]
     pub fn json_deserialize_error() -> Self {
         Self {
@@ -114,6 +118,7 @@ impl JsonRpcError {
         }
     }
 
+    /// API execution error
     #[must_use]
     pub fn server_api_execution_error(_err: SqlFunServerApiError) -> Self {
         Self {

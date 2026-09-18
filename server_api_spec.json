@@ -20,6 +20,10 @@
             "description": "Load schema dump and initialize semantic analysis context",
             "type": "object",
             "properties": {
+              "datasource": {
+                "description": "datasource name",
+                "type": "string"
+              },
               "engine_dialect": {
                 "description": "SQL dialect for schema",
                 "$ref": "#/$defs/EngineDialect"
@@ -55,6 +59,7 @@
               }
             },
             "required": [
+              "datasource",
               "engine_dialect",
               "engine_version",
               "extensions",

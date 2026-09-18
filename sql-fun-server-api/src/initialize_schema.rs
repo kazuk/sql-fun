@@ -32,6 +32,9 @@ pub struct ExtensionSpec {
 #[cfg_attr(feature = "openrpc-schema", derive(schemars::JsonSchema))]
 #[derive(serde::Serialize, serde::Deserialize, derive_getters::Getters)]
 pub struct InitializeSchemaArgs {
+    /// datasource name
+    datasource: String,
+
     /// SQL dialect for schema
     engine_dialect: EngineDialect,
 

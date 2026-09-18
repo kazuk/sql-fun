@@ -1,5 +1,6 @@
 use tokio::io::AsyncBufReadExt;
 
+/// JSON RPC TCP Stream buffer
 pub struct ReadableBuffer {
     buffer_rx: tokio::sync::mpsc::Receiver<Vec<u8>>,
     return_tx: tokio::sync::mpsc::Sender<Vec<u8>>,
@@ -48,6 +49,7 @@ impl std::io::Read for ReadableBuffer {
     }
 }
 
+/// Pipe buffer
 pub struct PipeBuffer {
     buffer_tx: tokio::sync::mpsc::Sender<Vec<u8>>,
     return_rx: tokio::sync::mpsc::Receiver<Vec<u8>>,

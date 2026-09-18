@@ -1,3 +1,5 @@
+//! parse postgres dat file
+//!
 use clap::Parser;
 
 fn main() -> Result<(), parse_dat::ParseDatError> {

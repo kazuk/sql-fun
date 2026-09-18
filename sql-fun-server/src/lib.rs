@@ -1,3 +1,5 @@
+//! `sql-fun` schema caching server
+
 #![allow(dead_code)]
 
 mod buffers;
@@ -35,6 +37,7 @@ use tokio::{
     net::{TcpListener, TcpStream},
 };
 
+/// service for user
 #[derive(clap::Parser, Clone)]
 pub struct Args {
     #[arg(short, long, env = "USER")]
@@ -66,11 +69,13 @@ pub async fn service() -> Result<(), ServerError> {
     }
 }
 
+/// API implementation
 pub struct Api {}
 
 static API_IMPL: LazyLock<Api> = LazyLock::new(|| Api {});
 
 impl Api {
+    /// get static instance
     #[must_use]
     pub fn api_impl() -> &'static Self {
         &API_IMPL
@@ -101,10 +106,7 @@ impl Api {
             .build()?;
 
         let metadata_collection = context_args.load_metadata()?;
-
-        let metadata = metadata_collection
-            .get(context_args.datasource().unwrap_or("default"))
-            .unwrap();
+        let metadata = metadata_collection.get(args.datasource()).unwrap();
         let version = context_args.postgres_version(metadata)?;
         let mut builtin_schema = version.definition_base_path(context_args.sql_fun_home()?);
         builtin_schema.push("schema.sql");
@@ -230,14 +232,18 @@ async fn serve_client(stream: TcpStream, addr: SocketAddr) -> Result<(), ServerE
     }
 }
 
+/// server error
 #[derive(thiserror::Error, Debug)]
 pub enum ServerError {
+    /// IO
     #[error(transparent)]
     Io(#[from] std::io::Error),
 
+    /// Serde
     #[error(transparent)]
     Serde(#[from] serde_json::Error),
 
+    /// unexpected BUG
     #[error("logic bug {0}")]
     Bug(String),
 }

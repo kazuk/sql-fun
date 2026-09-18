@@ -1,5 +1,8 @@
+//! internal build utilities for `sql-fun`
+
 mod protobuf_prost;
 
+/// command line args
 #[derive(clap::Parser)]
 pub struct Args {
     #[command(subcommand)]

@@ -1,0 +1,21 @@
+#!/bin/bash
+
+set -euo pipefail
+
+# cargo-download as a lazy dependency.
+if ! command -v cargo-download >/dev/null 2>&1; then
+    echo "cargo-download is required for this command." >&2
+    echo "Install it with: cargo install cargo-download" >&2
+    exit 127
+fi
+
+if [[ "${1-}" == "vcs-info" ]]; then
+    shift
+fi
+
+CRATE=${1}
+VERSION=${2}
+
+cargo download "${CRATE}=${VERSION}" \
+  | tar -xOzf - "${CRATE}-${VERSION}/.cargo_vcs_info.json" \
+  | jq -r '.git.sha1'

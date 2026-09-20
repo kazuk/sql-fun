@@ -42,6 +42,16 @@ if "$OPEN_EDITOR"; then
     PR_CREATE_ARGS+=(--editor)
 fi
 
+TEMP_GH_CONFIG_DIR=""
+
+cleanup() {
+    if [[ -n "$TEMP_GH_CONFIG_DIR" ]]; then
+        rm -rf -- "$TEMP_GH_CONFIG_DIR"
+    fi
+}
+
+trap cleanup EXIT
+
 COMMIT_SHA=$(git -C "$GIT_ROOT" rev-parse HEAD)
 
 git -C "$GIT_ROOT" --no-pager log -1 --stat --decorate --format=fuller
@@ -64,7 +74,15 @@ git -C "$GIT_ROOT" worktree add -b "$BRANCH_NAME" "$WORKTREE_PATH" origin/main
 git -C "$WORKTREE_PATH" cherry-pick "$COMMIT_SHA"
 git -C "$WORKTREE_PATH" push -u origin "$BRANCH_NAME"
 cd "$WORKTREE_PATH"
-gh pr create "${PR_CREATE_ARGS[@]}"
+if "$OPEN_EDITOR"; then
+    gh pr create "${PR_CREATE_ARGS[@]}"
+else
+    GH_CONFIG_SOURCE_DIR=$(gh config dir)
+    TEMP_GH_CONFIG_DIR=$(mktemp -d)
+    cp -a "$GH_CONFIG_SOURCE_DIR/." "$TEMP_GH_CONFIG_DIR"
+    GH_CONFIG_DIR="$TEMP_GH_CONFIG_DIR" gh config set prefer_editor_prompt disabled
+    GH_CONFIG_DIR="$TEMP_GH_CONFIG_DIR" gh pr create "${PR_CREATE_ARGS[@]}"
+fi
 
 cd "$GIT_ROOT"
 git worktree remove "$WORKTREE_PATH"

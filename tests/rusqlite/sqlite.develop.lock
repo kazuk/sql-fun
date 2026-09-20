@@ -1,0 +1,33 @@
+sql_fun_lockfile_version = "1"
+schema_dump_hash_code = "3e59ed6826c4ff11d93f855aa18246c6ab7e27004b3b6040b85c059e9a7992e8"
+
+[[entries]]
+query_finger_print = "a882ae058f69c55d01db21d96ce4fc8ec8db89bf1837703132b5d2088ffa12a1"
+query_name = "find_user"
+execute_sql = "select id, name from users where id = ?1"
+bind_parameters = [
+    { name = "id", parameter_index = 0 },
+]
+result_set_shape = [
+    { field_index = 0, field_name = "id", sql_type = "integer" },
+    { field_index = 1, field_name = "name", sql_type = "text" },
+]
+
+[[entries]]
+query_finger_print = "2f0fbb8c359be0d72da2ec4c1a5e36346e08c527348321b03492346d55476bb3"
+query_name = "find_users"
+execute_sql = "select id, name from users"
+bind_parameters = []
+result_set_shape = [
+    { field_index = 0, field_name = "id", sql_type = "integer" },
+    { field_index = 1, field_name = "name", sql_type = "text" },
+]
+
+[[entries]]
+query_finger_print = "79e65df9999ad0f5f2ea689f8d126032722af7697afca0e578076f004ed5ad6c"
+query_name = "delete_user"
+execute_sql = "delete from users where id = ?1"
+bind_parameters = [
+    { name = "id", parameter_index = 0 },
+]
+result_set_shape = []

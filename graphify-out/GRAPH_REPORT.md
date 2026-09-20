@@ -1,44 +1,44 @@
-# Graph Report - sql-fun  (2026-09-20)
+# Graph Report - sql-fun  (2026-09-21)
 
 ## Corpus Check
-- 327 files · ~362,338 words
+- 336 files · ~369,249 words
 - Verdict: corpus is large enough that graph structure adds value.
 
 ## Summary
-- 12263 nodes · 38166 edges · 528 communities (369 shown, 159 thin omitted)
+- 12571 nodes · 38979 edges · 558 communities (379 shown, 179 thin omitted)
 - Extraction: 100% EXTRACTED · 0% INFERRED · 0% AMBIGUOUS · INFERRED: 54 edges (avg confidence: 0.8)
 - Token cost: 0 input · 0 output
 
 ## Graph Freshness
-- Built from commit: `d9460f07`
+- Built from commit: `4c06ad0c`
 - Run `git rev-parse HEAD` and compare to check if the graph is stale.
 - Run `graphify update .` after code changes (no API cost).
 
 ## Community Hubs (Navigation)
 - Vec
-- .none
+- .from
 - ListOpt
-- GroupingFunc
-- ArrayCoerceExpr
+- ItemFunction
+- .get_arg
 - Option
-- AlterForeignServerStmt
-- NodeOpt
+- sql-fun-codegen/src/lib.rs
+- .none
 - OrderArena
 - Node
 - String
 - CreateOpClassStmt
-- .from
+- WithClauseOpt
 - Query
-- TableName
+- ColumnConstraint
 - SubPlan
 - CreateStmt
-- TableFunc
+- RangeTableFunc
 - TestParseContext
-- XmlExprOpt
-- FuncExpr
+- .get_op
+- QueryFunctionSpec
 - DropBehaviorOpt
 - OperatorName
-- Constraint
+- IndexStmt
 - BaseContext
 - ColumnDef
 - JsonConstructorExpr
@@ -47,102 +47,102 @@
 - ViewName
 - RangeTblEntry
 - FuncCallExpr
-- InlineCodeBlockOpt
-- ParameterBindResult
-- JoinExpr
+- InlineCodeBlock
+- FunctionParam
+- SchemaFileContext
 - RangeVarOpt
-- DefineStmt
+- DefineStmtListOpt
 - ScanToken
-- CreateOpClassItem
+- CreateOpClassItemOpt
 - SubscriptingRef
 - GeneratedColumnConstraint
 - ColumnDefinition
 - WindowFunc
-- ColumnReferenceExpr
+- AliasName
 - CreateTableAs
-- SourcePathWithSpan
+- AlterTableCmd
 - TypeNameOpt
 - ResultColumnCollection
 - TypeDefinition
-- XmlExpr
-- cte_catalog.rs
-- RangeTableSample
-- RowCompareExpr
+- XmlSerialize
+- sql-fun-core/src/cte_catalog.rs
+- SemScalarExprNode
+- RowCompareExprListOpt
 - OnConflictExpr
 - CompositeFieldDefinition
 - FunctionParamTable
 - SinglePartitionSpec
-- RangeSubselectOpt
+- SqlFunCodegenError
 - TableFunctionColumnRef
-- SelectStmtOpt
-- WithCheckOption
+- SetOperationStmt
+- SchemaFileContext<TBaseContext>
 - CreateSequence
 - FunctionParamVariadic
 - CteCycleClause
 - ChildProcess
-- DropdbStmt
-- CaseExpr
+- Opt
+- .get_args
 - ForeignKeyColumnConstraint
 - FunctionParamInOut
 - TableDataSource
-- OperatorDefinition
+- BinaryOperatorDefinition
 - AnalysisError
-- .get_kind
+- AExpr
 - SortGroupClause
 - CaseWhenListOpt
 - RtePermissionInfo
 - ObjectTypeOpt
 - TypeError
 - RuleStmt
-- NameResolution
+- TableName
 - DiscardStmt
 - CreateForeignServerStmt
-- CopyStmt
-- .get_expr
-- CreateTrigStmt
+- AstAndContextPair
+- InferenceElem
+- ParsedSchemaDump<TContext>
 - Var
 - CreateIndex
-- AlterTableCmd
-- MinMaxExpr
+- FromClause
+- SourcePathWithSpan
 - SqlHighlighterState
-- PartitionStrategyOpt
-- AliasName
+- PartitionSpec
+- AliasSpec
 - RangeTblFunction
 - ParseResult
 - ArithExpr
-- CreateRangeStmt
-- LockfileEntry
-- From
-- JsonIsPredicate
+- PartitionElem
+- Lockfile
+- AlterTsDictionaryStmt
+- JsonIsPredicateListOpt
 - AlterEnumStmt
 - RoleSpecOpt
 - TargetEntry
-- Box
-- ScanResult
-- TriggerTransition
+- BoolExpr
+- From
+- .get_name
 - JsonExpr
 - TransactionStmt
 - CheckColumnConstraint
 - AIndices
-- OverridingKindOpt
-- CreateTrigStmtListOpt
-- CreateTableSpaceStmt
+- ViewLike
+- SubLink
+- CreateTableSpaceStmtListOpt
 - .resolve_overload_unary
 - JsonTablePathSpecOpt
 - CreateCastStmt
 - DefaultColumnConstraint
-- PublicationTable
-- RangeFunctionOpt
+- IdentityColumnConstraint
+- RangeFunction
 - SemScalarExpr
 - .build_op
-- TableFunctionDataSource
+- IVec
 - CreateFunctionStmt
-- SqlFunArgsError
-- CreateTransformStmt
-- .get_args
-- Opt
-- AlterDomainStmtOpt
-- MergeWhenClause
+- PostgresBuiltinPaths
+- ObjectWithArgsOpt
+- DistinctExpr
+- Box
+- AlterDomainStmt
+- RowCompareExpr
 - AArrayExpr
 - State Change Event Receiver
 - RefreshMatViewStmt
@@ -150,256 +150,256 @@
 - CliSubCommand
 - ExtensionNameVersionPair
 - ColumnNullabilityConstraint
-- ImportForeignSchemaStmt
+- ImportForeignSchemaStmtListOpt
 - MultiAssignRef
-- ReindexStmtOpt
+- .apply_alter
 - CoalesceExpr
 - .analyze_range_var_node
-- AlternativeSubPlanListOpt
+- AlternativeSubPlan
 - AlterExtensionContentsStmt
 - AlterExtensionStmtListOpt
 - column_constraints.rs
 - .get_options
-- ObjectWithArgsOpt
+- ObjectWithArgs
 - CurrentOfExpr
 - PrepareStmt
 - AlterStatsStmt
 - JsonReturningOpt
-- MemberRef
+- AlterEventTrigStmt
 - AlterTsConfigurationStmt
-- DefElem
-- JsonFormatOpt
+- DefElemActionOpt
+- JsonValueExprOpt
 - AlterOpFamilyStmt
-- AlterCollationStmt
+- OperatorDefinition
 - FuncCall
-- TypeReference
+- AllBinaryCallSite
 - SqlValueExpr
 - JsonAggConstructorListOpt
 - ClusterStmt
-- CreateOpClassStmtOpt
+- PartitionBoundSpecOpt
 - JsonTableSiblingJoin
 - read_sql_file
-- JsonTable
+- JsonTableListOpt
 - SqlFunError
-- DropTableSpaceStmt
+- .build_op_all
 - generated.rs
 - CommonTableExpr
 - VariableSetStmtOpt
 - AlterTableMoveAllStmt
 - RawStmtOpt
-- ReplicaIdentityStmt
+- ReplicaIdentityStmtListOpt
 - ArrayExpr
 - CheckPointStmt
 - sql-fun-server-api/src/lib.rs
 - StatsElem
-- CreatePublicationStmt
+- CreatePublicationStmtListOpt
 - CompositeTypeStmt
 - CastDefinition
 - NodeList
-- JsonFuncExpr
-- WithClause
-- NamedArgExpr
+- JsonBehaviorOpt
+- WithClauseListOpt
+- JsonObjectAgg
 - CoalesceExpr
-- CreateEventTrigStmtOpt
-- JsonArrayQueryConstructor
-- DefineStmtOpt
+- BinaryOpCallSite
+- ColumnReferenceExpr
+- ParameterBindResult
 - CreatePLangStmt
-- JoinTypeOpt
+- WindowDef
 - IntoClause
-- OpExprOpt
+- ImportForeignSchemaStmt
 - OverloadVariant
 - CteCatalog
 - CreateSeqStmt
 - list_objects.rs
-- InlineCodeBlock
-- RenameStmt
-- GrantTargetTypeOpt
-- JsonQuotesOpt
+- CallContext
+- .resolve
+- GrantStmt
+- CteCatalogReference
 - CreateTable
-- DefElemKey
+- CreatedbStmt
 - WindowClause
 - CreateRoleStmt
-- FunctionOverloadCollection
+- CreateFunction
 - ConvertRowtypeExprListOpt
 - GroupingSet
-- sql-fun-sqlast/src/lib.rs
+- StringSpan
 - Self
-- CoercionFormOpt
+- RowExpr
 - ReassignOwnedStmt
-- SqlFunArgs
+- SqlFunArgsError
 - FullName
-- AlterDomainStmt
+- FieldStore
 - CollateExpr
-- AlterPolicyStmtOpt
+- XmlExprOpt
 - AlterDatabaseRefreshCollStmt
-- JsonParseExprOpt
+- .analyze
 - ColumnName
 - LoadStmt
-- FunctionParameter
+- LockStmt
 - .build_binary_op
-- CteCatalogError
-- .analyze_index
-- SemScalarExprNode
-- AlterFdwStmt
+- CteName
+- CreateRoleStmtOpt
+- AnalyzeScalarExpr
+- AlterFdwStmtListOpt
 - CreateStatsStmt
 - ExtensionVersion
 - SelectStmt
 - AlterOperatorStmt
 - AlterOwnerStmt
-- CreateAmStmt
+- CreateAmStmtListOpt
 - CreateConversionStmt
 - SubQueryColumnRef
 - TableColumnRef
-- MergeSupportFunc
+- .get_location
 - SecLabelStmt
 - DeclareCursorStmt
 - .build_op_any
-- ParamRef
-- AExprOpt
+- JsonValueCache
+- Self
 - SQLQueryInfoVisitor
 - AnalysisProblem
 - AlterRoleStmt
 - Query Performance Management
 - AlterSubscriptionStmt
-- AlterObjectSchemaStmt
+- AlterObjectSchemaStmtListOpt
 - initialize.md
 - Usage
 - Just a Tool Philosophy
 - Example: Fetching an aggregate with multiple child tables
 - Batch query support
-- JsonArrayConstructor
+- JsonArrayConstructorListOpt
 - JsonObjectConstructor
 - `sql-fun` User manual
-- AlterPolicyStmt
+- AlterPolicyStmtListOpt
 - SUMMARY.md
-- ReindexStmt
+- LeftUnaryCallSite
 - JsonSerializeExpr
-- get_result_type_args
-- LockingClause
+- AlterFdwStmt
+- RowMarkClause
 - SqlFunMetadata
-- VariableSetStmt
-- CmdTypeOpt
-- CteMaterializeOpt
-- DistinctExprListOpt
-- CaseTestExpr
+- CreatePublicationStmt
+- SqlFunOptions
+- SubLinkExpr
+- AlterSystemStmt
+- SortByDirOpt
 - StringOpt
-- CreateExtensionStmtOpt
+- prepare_home
 - AlterFunctionStmt
 - ColumnDefinition
-- AlterObjectDependsStmtOpt
-- RangeTableFuncCol
+- ValidOperatorName
+- .analyze_scalar_expr
 - FromExpr
 - CreateUserMappingStmt
 - SqlFunServerApiError
 - TcpJsonRpcClientAsync
 - deserialize_braced_list_opt
 - FetchStmt
-- AlterObjectDependsStmt
+- AlterObjectDependsStmtListOpt
 - CreateEventTrigStmt
-- InsertStmt
-- DropSubscriptionStmt
-- ConstraintsSetStmt
-- IntList
+- GrantStmtOpt
+- .analyze_scalar_expr
+- PartitionCmd
 - PrimaryKeyConstraint
-- CreateTableAsStmt
-- CreateTableAsStmtOpt
+- RightUnaryCallSite
+- .build_null_if
 - .new
 - DropStmt
-- ClosePortalStmt
-- TableLikeClause
+- VacuumStmt
+- TableLikeClauseListOpt
 - PlaceholderedSql
-- JsonWrapperOpt
-- DoStmt
-- PlAssignStmtOpt
+- JsonFuncExpr
+- .from
+- AlterExtensionStmt
 - .poll
 - metadata_args.rs
-- NotifyStmt
+- AlterTsConfigTypeOpt
 - CteSearchClause
-- RoleSpecTypeOpt
-- AlterTypeStmtListOpt
+- ConstrTypeOpt
+- AlterTypeStmt
 - TruncateStmt
-- JsonSerializeExprOpt
-- TruncateStmtOpt
+- JsonValueExpr
+- ColumnRef
 - .list_of_pair_eof_parser
 - Cache
+- BooleanTest
 - .get_xpr
-- CoerceToDomainValue
-- CallStmt
-- RangeFunction
+- CreateEnumStmt
+- CreateSubscriptionStmt
 - RangeSubselect
-- PublicationObjSpecListOpt
+- PublicationObjSpec
 - UnlistenStmt
-- IntoClauseOpt
+- CreateTableAsStmt
+- DropSubscriptionStmt
 - HighlighterTheme
-- NullTestTypeOpt
+- SortBy
 - concept_type_definition.md
-- .get_arg
-- AliasListOpt
-- AlterPublicationStmtListOpt
+- AIndirection
+- Infallible
+- AlterPublicationStmt
 - AStar
-- CollateClauseListOpt
+- CollateClauseOpt
 - CommentStmt
-- CteName
-- AlterSeqStmtListOpt
+- SemAst
+- AlterSeqStmt
 - AlterTableStmtListOpt
 - Aggref
 - NullTest
-- OnCommitActionOpt
+- CreateOpClassItem
 - src/lib.rs
-- BooleanTestListOpt
+- CreateOpFamilyStmt
 - InferClause
-- CreateExtensionStmt
+- CreatePolicyStmt
 - ConstraintListOpt
-- JsonArrayQueryConstructorListOpt
-- CaseExprListOpt
+- DropUserMappingStmt
+- FunctionParameter
 - CoerceToDomainValueListOpt
-- CoerceViaIoListOpt
-- CreateDomainStmtListOpt
+- ListenStmt
+- CreateDomainStmt
 - CreateSchemaStmt
-- DeallocateStmtListOpt
+- LockingClause
 - DeallocateStmt
 - ParameterName
-- DefElemListOpt
-- AlterUserMappingStmtListOpt
+- AExprListOpt
+- AggrefListOpt
 - CreateForeignTableStmt
-- DropdbStmtListOpt
+- DropdbStmt
 - PgFunctionDetail
 - ExecuteStmt
-- DropOwnedStmtListOpt
+- AlterDatabaseStmtListOpt
 - BoolExprListOpt
 - FuncCallListOpt
 - FieldStoreListOpt
 - name_version_pair.rs
 - JsonTablePathScan
 - AConst
-- JoinExprListOpt
+- AlterDefaultPrivilegesStmtListOpt
 - JsonArgument
 - JsonFormat
-- InferenceElemListOpt
-- CreatePolicyStmt
+- AlterPublicationActionOpt
+- CreatePolicyStmtOpt
 - OnConflictClauseListOpt
-- JsonOutputListOpt
-- CreateSubscriptionStmtOpt
-- JsonParseExpr
+- JsonOutput
+- AlterTsConfigurationStmtListOpt
+- JsonParseExprListOpt
 - VariableShowStmt
 - Contributing to `sql-fun`
-- JsonBehaviorListOpt
+- JsonBehavior
 - Rust Semantic Artifact for Cross-Domain Static Analysis
-- JsonKeyValueListOpt
-- ExplainStmtListOpt
+- JsonKeyValue
+- ExplainStmt
 - LockTupleMode
 - IndexElem
-- MergeMatchKindOpt
+- AlterTsDictionaryStmtOpt
 - Param
 - MergeAction
-- RangeTblRef
-- ObjectType
+- RangeTblRefListOpt
+- ArrayCoerceExprListOpt
 - PartitionRangeDatum
 - AlterTableSpaceOptionsStmt
 - OnConflictActionOpt
-- .from
-- OpExprListOpt
-- generate_sql_execute
+- JsonAggConstructor
+- CoalesceExprListOpt
+- CoercionContextOpt
 - TransactionStmtListOpt
 - ParamListOpt
 - RenameStmtListOpt
@@ -408,39 +408,71 @@
 - JsonTableColumn
 - TypeReference
 - TableFuncTypeOpt
-- RangeTableFunc
-- TableLikeOption
-- TriggerTransitionListOpt
+- RangeTableFuncListOpt
+- CreateCastStmtListOpt
+- CreateForeignServerStmtListOpt
 - SqlValueFunctionListOpt
 - rust_ast.rs
 - WindowFuncRunConditionListOpt
-- TargetEntryListOpt
-- WindowDefListOpt
-- DropRoleStmt
+- CreateRangeStmtListOpt
+- CreateStatsStmtListOpt
+- CteSearchClauseListOpt
 - XmlExprListOpt
 - XmlSerializeListOpt
+- CurrentOfExprListOpt
 - PlAssignStmt
-- RelabelType
+- DeleteStmtListOpt
 - cargo-vcs-info
+- DoStmtListOpt
+- FetchStmtListOpt
+- FuncExprListOpt
 - ConcreteTypeReference
 - sql-fun-collector/README.md
 - ReturnStmt
-- JsonBehaviorTypeOpt
-- NullIfExprListOpt
+- GroupingSetListOpt
+- SortByNullsOpt
+- JsonConstructorExprListOpt
+- JsonEncodingOpt
 - IVec<T>
 - parse_dat/src/lib.rs
-- RoleSpec
+- JsonFuncExprListOpt
+- JsonObjectAggListOpt
+- LockStmtListOpt
 - ExtensionConfigError
-- IVec
+- IndirectionExpr
+- MinMaxExprListOpt
 - TableSampleClause
+- PartitionBoundSpecListOpt
 - CheckArgs
+- RangeTableFuncColListOpt
+- RangeTableSampleListOpt
+- RangeTblFunctionListOpt
+- RangeVarListOpt
+- RowCompareTypeOpt
+- RowExprListOpt
+- RteKindOpt
+- SelectStmtListOpt
 - .into_iter
+- SetOpCmd
+- SetOperationStmtListOpt
 - PostgresExtensionsCollection
-- VacuumRelation
-- ViewStmtListOpt
+- SetQuantifier
+- SetToDefaultListOpt
+- TableFuncListOpt
+- TokenOpt
+- TypeCastListOpt
+- VacuumStmtListOpt
+- ViewStmt
 - FunctionParamOut
+- VarListOpt
+- WindowFuncListOpt
+- .into_iter
+- main
+- .fmt
+- .new
+- .fmt
 - FunctionParamIn
-- SchemaFileContext
+- .new
 - cherry-pick-pr
 - Api
 - PostgresArgs
@@ -453,8 +485,7 @@
 - sql-fun-core/src/lib.rs
 - JsonRpcError
 - analyze_query.rs
-- PartitionElemListOpt
-- postgres_engine_selection_validator
+- find_user_by_id_with_interrupt
 - PidFile
 - TestMetadataEnvs
 - sql-fun-core/src/test_helpers.rs
@@ -465,11 +496,10 @@
 - LoggingArgs
 - Collection
 - impl_metadata.rs
-- InitializeArgs
 - AGENTS.md
 - Options
 - CTE Catalog
-- RangeVar
+- .try_from
 - TokioPostgresCodeGenerator
 - select_user_id_with_names
 - Introduction
@@ -558,6 +588,7 @@
   cli/src/check.rs → xbuild/src/lib.rs
 
 ## Import Cycles
+- 1-file cycle: `sql-fun-codegen/src/rust_syn.rs -> sql-fun-codegen/src/rust_syn.rs`
 - 1-file cycle: `sql-fun-core/src/cte_catalog.rs -> sql-fun-core/src/cte_catalog.rs`
 - 1-file cycle: `sql-fun-core/src/extensions/name_version_pair.rs -> sql-fun-core/src/extensions/name_version_pair.rs`
 - 1-file cycle: `sql-fun-sqlast/src/syn/generated.rs -> sql-fun-sqlast/src/syn/generated.rs`
@@ -565,143 +596,143 @@
 - 1-file cycle: `sql-fun-sqlast/src/sem/scalar_expr/arith_expr/call_sites/left_unary.rs -> sql-fun-sqlast/src/sem/scalar_expr/arith_expr/call_sites/left_unary.rs`
 - 2-file cycle: `sql-fun-core/src/cte_catalog.rs -> sql-fun-core/src/cte_catalog/params.rs -> sql-fun-core/src/cte_catalog.rs`
 
-## Communities (528 total, 159 thin omitted)
+## Communities (558 total, 179 thin omitted)
 
 ### Community 0 - "Vec"
 Cohesion: 0.01
-Nodes (92): AlterDatabaseStmtList, AlterDatabaseStmtListOpt, AlterDefaultPrivilegesStmtList, AlterDefaultPrivilegesStmtListOpt, AlterSystemStmtList, AlterSystemStmtListOpt, AlterTableTypeList, AlterTsConfigTypeList (+84 more)
+Nodes (93): AExprKindList, AggSplitList, AggStrategyList, AlterDatabaseSetStmtList, AlterDatabaseSetStmtListOpt, AlterForeignServerStmtList, AlterForeignServerStmtListOpt, AlterPublicationActionList (+85 more)
 
-### Community 1 - ".none"
+### Community 1 - ".from"
 Cohesion: 0.01
-Nodes (3): JsonOutputOpt, NodeListOpt, RowCompareExprOpt
+Nodes (8): CreateEnumStmtOpt, CreateRangeStmt, CreateRangeStmtOpt, IntListOpt, NodeListOpt, OidList, OidListOpt, XmlExpr
 
 ### Community 2 - "ListOpt"
 Cohesion: 0.04
-Nodes (22): ArrayExprList, ArrayExprListOpt, ColumnRefList, ColumnRefListOpt, List, ListList, ListListOpt, ListOpt (+14 more)
+Nodes (22): AliasList, AliasListOpt, ArrayExprList, ArrayExprListOpt, CreateExtensionStmtList, CreateExtensionStmtListOpt, CreateTrigStmtList, CreateTrigStmtListOpt (+14 more)
 
-### Community 3 - "GroupingFunc"
-Cohesion: 0.12
-Nodes (4): GroupingFunc, GroupingFuncList, GroupingFuncListOpt, GroupingFuncOpt
+### Community 3 - "ItemFunction"
+Cohesion: 0.05
+Nodes (35): Arm, Attribute, Block, Meta, Pat, PatType, CteReferenceAttr, FragmentArm (+27 more)
 
-### Community 4 - "ArrayCoerceExpr"
-Cohesion: 0.04
-Nodes (6): ArrayCoerceExpr, ArrayCoerceExprOpt, CoerceToDomain, CoerceToDomainOpt, FieldSelect, FieldSelectOpt
+### Community 4 - ".get_arg"
+Cohesion: 0.02
+Nodes (19): ArrayCoerceExpr, ArrayCoerceExprOpt, CoerceToDomain, CoerceToDomainOpt, CoerceViaIo, CoerceViaIoOpt, CoercionForm, CoercionFormOpt (+11 more)
 
 ### Community 5 - "Option"
+Cohesion: 0.01
+Nodes (42): AlterExtensionContentsStmtOpt, AlterTableCmdOpt, BoolExprType, CmdType, ColumnRefOpt, Constraint, ConstraintOpt, CreateOpClassStmtOpt (+34 more)
+
+### Community 6 - "sql-fun-codegen/src/lib.rs"
+Cohesion: 0.08
+Nodes (32): DiagnosticResult, CteCatalogSupport, ConditionalQuery, FragmentExpandQueueItem, FragmentMatcher, InnerFunction, QueryFunctionBase, QueryFunctionForGenerate (+24 more)
+
+### Community 7 - ".none"
 Cohesion: 0.02
-Nodes (26): AArrayExprOpt, AExprKind, AlterExtensionContentsStmtOpt, CaseTestExprOpt, ColumnRefOpt, ConstraintOpt, CreateOpFamilyStmtOpt, CreatePublicationStmtOpt (+18 more)
-
-### Community 6 - "AlterForeignServerStmt"
-Cohesion: 0.12
-Nodes (4): AlterForeignServerStmt, AlterForeignServerStmtList, AlterForeignServerStmtListOpt, AlterForeignServerStmtOpt
-
-### Community 7 - "NodeOpt"
-Cohesion: 0.04
-Nodes (5): CaseWhen, CaseWhenOpt, NodeOpt, SubLink, SubLinkOpt
+Nodes (7): AConstOpt, CaseWhen, CaseWhenOpt, JsonOutputOpt, JsonTableSiblingJoinOpt, NodeOpt, SelectStmtOpt
 
 ### Community 8 - "OrderArena"
-Cohesion: 0.07
-Nodes (46): HeadOrder, LeastOrder, O, ParentOrder, ExtractKey, ExtractKeyWithContext, (O1, O2), order_lines() (+38 more)
+Cohesion: 0.06
+Nodes (47): HeadOrder, LeastOrder, O, ParentOrder, ExtractKey, ExtractKeyWithContext, (O1, O2), order_lines() (+39 more)
 
 ### Community 10 - "String"
-Cohesion: 0.02
+Cohesion: 0.03
 Nodes (9): MetadataArgsBuilder, BinaryOperatorTypeDecl, UnaryOperatorTypeDecl, String, MessageTypeField, Option, MessageType, MessageTypeOneofDecl (+1 more)
 
 ### Community 11 - "CreateOpClassStmt"
 Cohesion: 0.39
 Nodes (3): CreateOpClassStmt, CreateOpClassStmtList, CreateOpClassStmtListOpt
 
-### Community 12 - ".from"
+### Community 12 - "WithClauseOpt"
 Cohesion: 0.03
-Nodes (13): AConstOpt, DeleteStmt, DeleteStmtOpt, ExplainStmt, ExplainStmtOpt, MergeStmt, MergeStmtOpt, PublicationTableOpt (+5 more)
+Nodes (16): DeleteStmt, DeleteStmtOpt, InsertStmt, InsertStmtList, InsertStmtListOpt, InsertStmtOpt, MergeStmt, MergeStmtList (+8 more)
 
 ### Community 13 - "Query"
-Cohesion: 0.03
-Nodes (9): FromExprOpt, LimitOption, LimitOptionOpt, Query, QueryList, QueryListOpt, QueryOpt, QuerySource (+1 more)
-
-### Community 14 - "TableName"
 Cohesion: 0.04
-Nodes (36): AttrDeferrabilityColumnConstraint, AttrDeferredColumnConstraint, AttrImmediateColumnConstraint, ColumnConstraint, Constraint, Option, Result, Self (+28 more)
+Nodes (5): FromExprOpt, LimitOptionOpt, Query, QueryOpt, QuerySourceOpt
+
+### Community 14 - "ColumnConstraint"
+Cohesion: 0.07
+Nodes (16): AttrDeferrabilityColumnConstraint, AttrDeferredColumnConstraint, AttrImmediateColumnConstraint, ColumnConstraint, Constraint, Option, Result, Self (+8 more)
 
 ### Community 15 - "SubPlan"
-Cohesion: 0.06
-Nodes (6): SubLinkType, SubLinkTypeOpt, SubPlan, SubPlanList, SubPlanListOpt, SubPlanOpt
+Cohesion: 0.08
+Nodes (4): SubPlan, SubPlanList, SubPlanListOpt, SubPlanOpt
 
 ### Community 16 - "CreateStmt"
-Cohesion: 0.04
-Nodes (9): CreateForeignTableStmtOpt, CreateStmt, CreateStmtOpt, PartitionBoundSpec, PartitionBoundSpecOpt, PartitionCmd, PartitionCmdOpt, PartitionSpec (+1 more)
+Cohesion: 0.09
+Nodes (5): CreateStmt, CreateStmtList, CreateStmtListOpt, CreateStmtOpt, PartitionSpecOpt
 
-### Community 17 - "TableFunc"
-Cohesion: 0.04
-Nodes (3): RangeTableFuncOpt, TableFunc, TableFuncOpt
+### Community 17 - "RangeTableFunc"
+Cohesion: 0.09
+Nodes (4): PublicationTable, PublicationTableOpt, RangeTableFunc, RangeTableFuncOpt
 
 ### Community 18 - "TestParseContext"
 Cohesion: 0.08
-Nodes (13): AnalysisProblem, Box, ColumnDefinition, FullName, HashMap, HashSet, Option, Path (+5 more)
+Nodes (12): AnalysisProblem, ColumnDefinition, FullName, HashMap, HashSet, Option, Path, SqlFunArgs (+4 more)
 
-### Community 19 - "XmlExprOpt"
-Cohesion: 0.05
-Nodes (11): JsonExprOp, JsonExprOpList, JsonExprOpOpt, SetOperation, SetOperationOpt, SqlValueFunctionOp, SqlValueFunctionOpOpt, SqlValueFunctionOpt (+3 more)
+### Community 19 - ".get_op"
+Cohesion: 0.19
+Nodes (3): JsonExprOp, JsonExprOpOpt, SetOperationOpt
+
+### Community 20 - "QueryFunctionSpec"
+Cohesion: 0.11
+Nodes (23): ConnectorCodeGenerator, ConnectorKind, ConnectorSpec, Box, Debug, Err, FromStr, Ident (+15 more)
 
 ### Community 21 - "DropBehaviorOpt"
-Cohesion: 0.04
-Nodes (8): AlterDefaultPrivilegesStmt, AlterDefaultPrivilegesStmtOpt, DropBehaviorOpt, DropOwnedStmt, DropOwnedStmtOpt, GrantRoleStmtOpt, GrantStmt, GrantStmtOpt
+Cohesion: 0.05
+Nodes (6): DropBehaviorOpt, DropOwnedStmtOpt, GrantRoleStmt, GrantRoleStmtOpt, RenameStmt, RenameStmtOpt
 
 ### Community 22 - "OperatorName"
-Cohesion: 0.04
-Nodes (51): OperatorName, Display, Formatter, Option, Result, Self, TParseContext, ValidOperatorName (+43 more)
-
-### Community 23 - "Constraint"
-Cohesion: 0.03
-Nodes (6): Constraint, ConstrTypeOpt, IndexStmt, IndexStmtList, IndexStmtListOpt, IndexStmtOpt
+Cohesion: 0.17
+Nodes (8): OperatorName, AnyBinaryCallSite, Option, Result, SemScalarExpr, TParseContext, TypeReference, UndefinedOperatorAnyCallSite
 
 ### Community 24 - "BaseContext"
-Cohesion: 0.03
-Nodes (53): Debug, ParsedSchemaDump<TContext>, Box, FullName, HashSet, Option, SqlFunArgs, TypeReference (+45 more)
+Cohesion: 0.07
+Nodes (20): BaseContext, BuiltinTypeInfo, deserialize_from_path(), AnalysisProblem, Box, FullName, Option, P (+12 more)
 
 ### Community 26 - "JsonConstructorExpr"
-Cohesion: 0.08
-Nodes (5): JsonConstructorExpr, JsonConstructorExprList, JsonConstructorExprListOpt, JsonConstructorExprOpt, JsonConstructorTypeOpt
+Cohesion: 0.06
+Nodes (8): JsonConstructorExpr, JsonConstructorExprOpt, JsonConstructorType, JsonConstructorTypeOpt, SqlValueFunction, SqlValueFunctionOp, SqlValueFunctionOpOpt, SqlValueFunctionOpt
 
 ### Community 27 - "ResTarget"
-Cohesion: 0.16
-Nodes (15): NodeRef, ResTarget, ResTargetOpt, get_column_ref_from_res_target(), get_field_name_from_res_target(), get_res_target_column_name(), get_result_columns(), get_result_set_column_names() (+7 more)
+Cohesion: 0.23
+Nodes (14): NodeRef, ResTarget, get_column_ref_from_res_target(), get_field_name_from_res_target(), get_res_target_column_name(), get_result_columns(), get_result_set_column_names(), get_returning_res_target() (+6 more)
 
 ### Community 28 - "PrimaryKeyColumnConstraint"
-Cohesion: 0.10
+Cohesion: 0.09
 Nodes (15): ConflictClause, ColumnConstraint, PrimaryKeyColumnConstraint, Constraint, Option, Result, Self, TParseContext (+7 more)
 
 ### Community 29 - "ViewName"
-Cohesion: 0.08
-Nodes (22): Display, Formatter, From, FullName, Result, ViewName, DataSource, Nullable (+14 more)
+Cohesion: 0.11
+Nodes (18): Display, Formatter, From, FullName, Option, Result, Self, ViewName (+10 more)
 
 ### Community 30 - "RangeTblEntry"
-Cohesion: 0.03
-Nodes (5): AliasOpt, RangeTblEntry, RangeTblEntryOpt, RteKindOpt, TableSampleClauseOpt
+Cohesion: 0.02
+Nodes (8): AliasOpt, JoinExpr, JoinExprOpt, JoinTypeOpt, RangeTblEntry, RangeTblEntryOpt, TableFunc, TableFuncOpt
 
 ### Community 31 - "FuncCallExpr"
 Cohesion: 0.15
 Nodes (24): func_name_tokens(), FuncCallArgs, FuncCallExpr, FullName, FuncCall, FunctionParam, Option, Result (+16 more)
 
-### Community 33 - "ParameterBindResult"
-Cohesion: 0.10
-Nodes (18): ParameterBindResult, FunctionParam, Option, Self, TypeReference, Vec, test_one_in(), test_one_in_out() (+10 more)
+### Community 32 - "InlineCodeBlock"
+Cohesion: 0.11
+Nodes (3): CallContextOpt, InlineCodeBlock, InlineCodeBlockOpt
+
+### Community 33 - "FunctionParam"
+Cohesion: 0.20
+Nodes (7): FunctionParam, Formatter, Option, Result, TParseContext, TypeReference, Vec
+
+### Community 34 - "SchemaFileContext"
+Cohesion: 0.06
+Nodes (26): PgBuiltinOperators, P, Result, CreateDomain, FullName, Option, TypeReference, TypeInfoRead (+18 more)
 
 ### Community 35 - "RangeVarOpt"
-Cohesion: 0.03
-Nodes (7): AlterSeqStmt, AlterSeqStmtOpt, AlterTableStmtOpt, RangeVarOpt, VacuumRelationOpt, ViewStmt, ViewStmtOpt
+Cohesion: 0.02
+Nodes (19): AlterObjectDependsStmt, AlterObjectDependsStmtOpt, AlterObjectSchemaStmt, AlterObjectSchemaStmtOpt, AlterPolicyStmt, AlterPolicyStmtOpt, ClusterStmtOpt, CopyStmt (+11 more)
 
-### Community 36 - "DefineStmt"
-Cohesion: 0.33
-Nodes (3): DefineStmt, DefineStmtList, DefineStmtListOpt
-
-### Community 37 - "ScanToken"
-Cohesion: 0.12
-Nodes (6): KeywordKind, KeywordKindOpt, ScanToken, ScanTokenOpt, Token, TokenOpt
-
-### Community 38 - "CreateOpClassItem"
-Cohesion: 0.14
-Nodes (4): CreateOpClassItem, CreateOpClassItemList, CreateOpClassItemListOpt, CreateOpClassItemOpt
+### Community 38 - "CreateOpClassItemOpt"
+Cohesion: 0.10
+Nodes (3): CreateOpClassItemOpt, ParamRef, ParamRefOpt
 
 ### Community 40 - "GeneratedColumnConstraint"
 Cohesion: 0.17
@@ -711,89 +742,85 @@ Nodes (13): ColumnConstraint, GeneratedColumnConstraint, GeneratedColumnMode, Co
 Cohesion: 0.16
 Nodes (12): ColumnDefinition, Box, Clone, ColumnConstraint, Option, Result, ScanToken, Self (+4 more)
 
-### Community 42 - "WindowFunc"
-Cohesion: 0.09
-Nodes (4): WindowFunc, WindowFuncList, WindowFuncListOpt, WindowFuncOpt
-
-### Community 43 - "ColumnReferenceExpr"
-Cohesion: 0.07
-Nodes (23): ColumnReference, ColumnReferenceExpr, CteColumnRef, ColumnDefinition, Nullable, Option, Self, TypeReference (+15 more)
+### Community 43 - "AliasName"
+Cohesion: 0.06
+Nodes (28): AliasName, Display, Formatter, From, FullName, Result, Self, TParseContext (+20 more)
 
 ### Community 44 - "CreateTableAs"
-Cohesion: 0.05
-Nodes (34): AlterView, Vec, CreateTableAs, Box, ColumnDefinition, FullName, Option, Result (+26 more)
+Cohesion: 0.08
+Nodes (21): CreateTableAs, Box, ColumnDefinition, FullName, Option, Result, ScanToken, SemAst (+13 more)
 
-### Community 45 - "SourcePathWithSpan"
-Cohesion: 0.12
-Nodes (25): AlterObjSubCommand, AlterTable, analyze_alter_obj_change_owner(), analyze_alter_seq_statement(), analyze_alter_table_cmd(), analyze_alter_view_statement(), report_missing_column_in_table(), Box (+17 more)
-
-### Community 46 - "TypeNameOpt"
-Cohesion: 0.04
-Nodes (8): CollateClauseOpt, CreateDomainStmt, CreateDomainStmtOpt, CreateEnumStmt, CreateEnumStmtOpt, JsonOutput, TypeName, TypeNameOpt
+### Community 45 - "AlterTableCmd"
+Cohesion: 0.14
+Nodes (26): AlterObjSubCommand, AlterTable, AlterView, analyze_alter_obj_change_owner(), analyze_alter_seq_statement(), analyze_alter_table_cmd(), analyze_alter_view_statement(), report_missing_column_in_table() (+18 more)
 
 ### Community 47 - "ResultColumnCollection"
 Cohesion: 0.15
 Nodes (14): ResultColumn, ResultColumnCollection, ColumnDefinition, Option, Result, Self, SemScalarExpr, TestResult (+6 more)
 
 ### Community 48 - "TypeDefinition"
-Cohesion: 0.12
-Nodes (10): DynamicTypeReference, Box, Option, Self, From, FullName, Option, Self (+2 more)
-
-### Community 49 - "XmlExpr"
 Cohesion: 0.08
-Nodes (6): XmlExpr, XmlOptionType, XmlOptionTypeList, XmlOptionTypeOpt, XmlSerialize, XmlSerializeOpt
+Nodes (19): CreateEnum, EnumValueDefinition, FullName, Vec, build_string_node_list_opt(), DynamicTypeReference, Box, Option (+11 more)
 
-### Community 50 - "cte_catalog.rs"
-Cohesion: 0.12
-Nodes (27): build_dependency_graph_marks_cycles(), check_dependencies_exist_marks_missing_references(), check_unused_definition_only_flags_entries_without_dependents(), deserialize_file_to_value_json(), deserialize_file_to_value_toml(), deserialize_file_to_value_yaml(), dialect_values(), fixup_parameters_cascades_dependency_parameters() (+19 more)
+### Community 49 - "XmlSerialize"
+Cohesion: 0.11
+Nodes (5): XmlOptionType, XmlOptionTypeList, XmlOptionTypeOpt, XmlSerialize, XmlSerializeOpt
 
-### Community 52 - "RowCompareExpr"
-Cohesion: 0.16
-Nodes (6): RowCompareExpr, RowCompareExprList, RowCompareExprListOpt, RowCompareType, RowCompareTypeList, RowCompareTypeOpt
+### Community 50 - "sql-fun-core/src/cte_catalog.rs"
+Cohesion: 0.13
+Nodes (25): Ref, build_dependency_graph_marks_cycles(), check_dependencies_exist_marks_missing_references(), check_unused_definition_only_flags_entries_without_dependents(), CteCatalog<'a>, deserialize_file_to_value_json(), deserialize_file_to_value_toml(), deserialize_file_to_value_yaml() (+17 more)
+
+### Community 51 - "SemScalarExprNode"
+Cohesion: 0.07
+Nodes (29): ImplicitCastExpr, Box, Option, Result, ScanToken, Self, SemScalarExpr, TParseContext (+21 more)
 
 ### Community 53 - "OnConflictExpr"
-Cohesion: 0.05
-Nodes (7): AlterPublicationActionOpt, AlterPublicationStmt, AlterPublicationStmtOpt, OnConflictExpr, OnConflictExprList, OnConflictExprListOpt, OnConflictExprOpt
+Cohesion: 0.10
+Nodes (4): OnConflictExpr, OnConflictExprList, OnConflictExprListOpt, OnConflictExprOpt
 
 ### Community 54 - "CompositeFieldDefinition"
-Cohesion: 0.05
-Nodes (37): analyze_create_comp_type(), CompositeFieldCollection, CompositeFieldDefinition, CreateCompositeType, Error, FullName, Nullable, Option (+29 more)
+Cohesion: 0.15
+Nodes (14): analyze_create_comp_type(), CompositeFieldCollection, CompositeFieldDefinition, CreateCompositeType, Error, FullName, Nullable, Option (+6 more)
 
 ### Community 55 - "FunctionParamTable"
-Cohesion: 0.13
-Nodes (12): FunctionParam, FunctionParamTable, Display, Formatter, From, Option, Result, ScanToken (+4 more)
+Cohesion: 0.11
+Nodes (14): FunctionParameterTrait, Display, FunctionParam, FunctionParamTable, Display, Formatter, From, Option (+6 more)
 
 ### Community 56 - "SinglePartitionSpec"
 Cohesion: 0.23
 Nodes (4): SinglePartitionSpec, SinglePartitionSpecList, SinglePartitionSpecListOpt, SinglePartitionSpecOpt
 
+### Community 57 - "SqlFunCodegenError"
+Cohesion: 0.13
+Nodes (17): ExactlyOneError, ParseError, ConfigurationKind, ConfigurationKind, Display, Error, Formatter, Ident (+9 more)
+
 ### Community 58 - "TableFunctionColumnRef"
 Cohesion: 0.22
 Nodes (10): ColumnReferenceExpr, ColumnDefinition, Nullable, Option, Result, Self, SemScalarExpr, TParseContext (+2 more)
 
-### Community 59 - "SelectStmtOpt"
-Cohesion: 0.05
-Nodes (5): SelectStmtOpt, SetOperationStmt, SetOperationStmtList, SetOperationStmtListOpt, SetOperationStmtOpt
-
-### Community 60 - "WithCheckOption"
-Cohesion: 0.11
-Nodes (7): WcoKind, WcoKindList, WcoKindOpt, WithCheckOption, WithCheckOptionList, WithCheckOptionListOpt, WithCheckOptionOpt
+### Community 60 - "SchemaFileContext<TBaseContext>"
+Cohesion: 0.08
+Nodes (26): GetSourcePathWithSpan, GetSourcePathWithSpanOpt, MutSourcePathWithSpan, BaseParseContext, DefaultSourceAccessService, FunctionInfoRead, FunctionInfoWrite, IndexInfoRead (+18 more)
 
 ### Community 61 - "CreateSequence"
-Cohesion: 0.09
-Nodes (23): AlterSequence, analyze_alter_seq(), FullName, Option, Result, Self, TParseContext, Vec (+15 more)
+Cohesion: 0.10
+Nodes (22): AlterSequence, analyze_alter_seq(), FullName, Option, Result, Self, TParseContext, Vec (+14 more)
 
 ### Community 62 - "FunctionParamVariadic"
 Cohesion: 0.14
 Nodes (13): FunctionParam, FunctionParamVariadic, Display, Formatter, From, Option, Result, ScanToken (+5 more)
 
-### Community 63 - "CteCycleClause"
-Cohesion: 0.09
-Nodes (4): CteCycleClause, CteCycleClauseList, CteCycleClauseListOpt, CteCycleClauseOpt
-
 ### Community 64 - "ChildProcess"
-Cohesion: 0.12
-Nodes (27): ChildStderr, ChildStdout, ChildProcess, collects_remaining_lines(), collects_stdout_and_stderr(), LinesBufReader, LinesBufReader<Read>, reads_lines_and_tracks_eof() (+19 more)
+Cohesion: 0.11
+Nodes (28): ChildStderr, ChildStdout, ChildProcess, collects_remaining_lines(), collects_stdout_and_stderr(), LinesBufReader, LinesBufReader<Read>, reads_lines_and_tracks_eof() (+20 more)
+
+### Community 65 - "Opt"
+Cohesion: 0.03
+Nodes (14): AggStrategy, AggStrategyOpt, AlterOpFamilyStmtOpt, AlterTableSpaceOptionsStmtOpt, AlterTableStmtOpt, ConstraintsSetStmtOpt, CreateForeignTableStmtOpt, CreateOpFamilyStmtOpt (+6 more)
+
+### Community 66 - ".get_args"
+Cohesion: 0.03
+Nodes (11): CaseExpr, CaseExprList, CaseExprListOpt, CaseExprOpt, GroupingFunc, GroupingFuncOpt, MinMaxExpr, MinMaxExprOpt (+3 more)
 
 ### Community 67 - "ForeignKeyColumnConstraint"
 Cohesion: 0.17
@@ -804,195 +831,203 @@ Cohesion: 0.15
 Nodes (12): FunctionParam, FunctionParamInOut, Display, Formatter, From, Option, Result, ScanToken (+4 more)
 
 ### Community 69 - "TableDataSource"
-Cohesion: 0.19
-Nodes (8): ColumnReferenceExpr, DataSource, Nullable, Option, Result, TParseContext, Vec, TableDataSource
+Cohesion: 0.10
+Nodes (14): JoinKind, Error, Nullable, Result, Self, TryFrom, ColumnReferenceExpr, DataSource (+6 more)
 
-### Community 70 - "OperatorDefinition"
-Cohesion: 0.09
-Nodes (17): BinaryOperatorDefinition, OperatorDefinition, Self, TypeReference, Vec, UnaryOperatorDefinition, OverloadResolution, FullName (+9 more)
+### Community 70 - "BinaryOperatorDefinition"
+Cohesion: 0.12
+Nodes (10): BinaryOperatorDefinition, Self, TypeReference, UnaryOperatorDefinition, BinaryCastCandidate, Self, SemScalarExpr, TParseContext (+2 more)
 
 ### Community 71 - "AnalysisError"
-Cohesion: 0.03
-Nodes (71): AstAndContextPair, AIndirection, analyze_a_indirection(), Option, Result, TParseContext, AlterOwner, analyze_alter_owner() (+63 more)
-
-### Community 72 - ".get_kind"
 Cohesion: 0.05
-Nodes (10): AlterSubscriptionStmtOpt, AlterSubscriptionTypeOpt, AlterTsConfigType, AlterTsConfigTypeOpt, GroupingSetOpt, PartitionRangeDatumKind, PartitionRangeDatumKindOpt, PartitionRangeDatumOpt (+2 more)
+Nodes (34): analyze_comment(), Comment, Result, TParseContext, analyze_create_extension(), CreateExtension, Option, Result (+26 more)
+
+### Community 72 - "AExpr"
+Cohesion: 0.03
+Nodes (18): AExpr, AExprKindOpt, AExprOpt, AlterSubscriptionStmtOpt, AlterSubscriptionType, AlterSubscriptionTypeOpt, PartitionRangeDatumKind, PartitionRangeDatumKindOpt (+10 more)
 
 ### Community 73 - "SortGroupClause"
 Cohesion: 0.13
 Nodes (4): SortGroupClause, SortGroupClauseList, SortGroupClauseListOpt, SortGroupClauseOpt
 
-### Community 77 - "TypeError"
+### Community 75 - "RtePermissionInfo"
 Cohesion: 0.10
-Nodes (23): Box, FunctionParam, Infallible, Result, Self, TypeReference, Vec, TypeError (+15 more)
+Nodes (4): RtePermissionInfo, RtePermissionInfoList, RtePermissionInfoListOpt, RtePermissionInfoOpt
+
+### Community 77 - "TypeError"
+Cohesion: 0.13
+Nodes (20): Box, FunctionParam, TypeReference, Vec, TypeError, Result, TParseContext, CommonInferContext (+12 more)
 
 ### Community 78 - "RuleStmt"
-Cohesion: 0.13
-Nodes (4): RuleStmt, RuleStmtList, RuleStmtListOpt, RuleStmtOpt
+Cohesion: 0.04
+Nodes (12): CmdTypeOpt, MergeActionOpt, MergeMatchKindOpt, MergeWhenClause, MergeWhenClauseList, MergeWhenClauseListOpt, MergeWhenClauseOpt, OverridingKindOpt (+4 more)
 
-### Community 79 - "NameResolution"
-Cohesion: 0.08
-Nodes (14): GraphicalReportHandler, SeekFrom, StringSpan, AnalysisProblem, DomainBaseTypeNameNotFound, FunctionNotFound, NameResolution, FullName (+6 more)
+### Community 79 - "TableName"
+Cohesion: 0.07
+Nodes (21): GraphicalReportHandler, Display, Error, Formatter, From, FullName, Result, Self (+13 more)
 
 ### Community 80 - "DiscardStmt"
-Cohesion: 0.18
-Nodes (4): DiscardMode, DiscardModeOpt, DiscardStmt, DiscardStmtOpt
+Cohesion: 0.13
+Nodes (7): DiscardMode, DiscardModeList, DiscardModeOpt, DiscardStmt, DiscardStmtList, DiscardStmtListOpt, DiscardStmtOpt
 
-### Community 81 - "CreateForeignServerStmt"
-Cohesion: 0.11
-Nodes (4): CreateForeignServerStmt, CreateForeignServerStmtList, CreateForeignServerStmtListOpt, CreateForeignServerStmtOpt
+### Community 82 - "AstAndContextPair"
+Cohesion: 0.10
+Nodes (29): AstAndContextPair, AIndirection, analyze_a_indirection(), Option, Result, TParseContext, AlterOwner, analyze_alter_owner() (+21 more)
 
-### Community 82 - "CopyStmt"
-Cohesion: 0.12
-Nodes (4): CopyStmt, CopyStmtList, CopyStmtListOpt, CopyStmtOpt
+### Community 83 - "InferenceElem"
+Cohesion: 0.13
+Nodes (4): InferenceElem, InferenceElemList, InferenceElemListOpt, InferenceElemOpt
 
-### Community 83 - ".get_expr"
-Cohesion: 0.05
-Nodes (8): InferenceElem, InferenceElemOpt, JsonScalarExpr, JsonScalarExprList, JsonScalarExprListOpt, JsonScalarExprOpt, PartitionElem, PartitionElemOpt
+### Community 84 - "ParsedSchemaDump<TContext>"
+Cohesion: 0.09
+Nodes (18): parse_schema_file(), ParsedSchemaDump, ParsedSchemaDump<TContext>, ParseDumpFileError, AnalysisProblem, Box, Error, FullName (+10 more)
 
 ### Community 86 - "CreateIndex"
 Cohesion: 0.16
 Nodes (22): analyze_index_elem_collects_column_order_and_alias(), analyze_index_elem_collects_expression(), analyze_index_stmt(), analyze_index_stmt_collects_keys_including_order_and_includes(), CreateIndex, from_column_names_uses_asc_order_and_no_alias(), IndexElement, IndexElementCollection (+14 more)
 
-### Community 87 - "AlterTableCmd"
-Cohesion: 0.13
-Nodes (4): AlterTableCmd, AlterTableCmdList, AlterTableCmdListOpt, AlterTableCmdOpt
+### Community 87 - "FromClause"
+Cohesion: 0.18
+Nodes (17): DataSource, Option, Result, ScanToken, Self, TParseContext, WithClause, FromClause (+9 more)
 
-### Community 88 - "MinMaxExpr"
-Cohesion: 0.05
-Nodes (7): MinMaxExpr, MinMaxExprOpt, MinMaxOp, MinMaxOpList, MinMaxOpOpt, WindowFuncRunCondition, WindowFuncRunConditionOpt
+### Community 88 - "SourcePathWithSpan"
+Cohesion: 0.12
+Nodes (14): TestParseContext, TestResult, test_analyze_join_expr(), test_analyze_range_func(), test_analyze_range_func_rows_from(), test_analyze_range_subselect(), test_analyze_range_table_func(), P (+6 more)
 
 ### Community 89 - "SqlHighlighterState"
 Cohesion: 0.16
 Nodes (13): Highlighter, HighlighterState, SpanContents, Box, Range, Result, ScanToken, Self (+5 more)
 
-### Community 91 - "AliasName"
+### Community 90 - "PartitionSpec"
+Cohesion: 0.16
+Nodes (6): PartitionSpec, PartitionSpecList, PartitionSpecListOpt, PartitionStrategy, PartitionStrategyList, PartitionStrategyOpt
+
+### Community 91 - "AliasSpec"
 Cohesion: 0.03
-Nodes (66): AliasName, AliasSpec, Display, Formatter, From, FullName, Option, Result (+58 more)
+Nodes (63): AliasSpec, Option, Vec, CteDataSource, ColumnReferenceExpr, DataSource, Nullable, Option (+55 more)
 
 ### Community 93 - "ParseResult"
 Cohesion: 0.14
 Nodes (7): ParseResult, ParseResultList, ParseResultListOpt, ParseResultOpt, RawStmt, RawStmtList, RawStmtListOpt
 
 ### Community 94 - "ArithExpr"
-Cohesion: 0.11
-Nodes (20): ArithExpr, BetweenExpr, LeftUnaryCallSite, Option, Result, SemScalarExpr, TestParseContext, TestResult (+12 more)
+Cohesion: 0.20
+Nodes (11): ArithExpr, BetweenExpr, Box, NullIfExpr, Option, Result, ScanToken, SemScalarExpr (+3 more)
 
-### Community 95 - "CreateRangeStmt"
-Cohesion: 0.10
-Nodes (3): ClusterStmtOpt, CreateRangeStmt, CreateRangeStmtOpt
+### Community 96 - "Lockfile"
+Cohesion: 0.09
+Nodes (24): Spanned, LockfileProvider, Arc, HashMap, PathBuf, Result, SqlFunArgs, EntryFragment (+16 more)
 
-### Community 96 - "LockfileEntry"
-Cohesion: 0.12
-Nodes (19): Spanned, EntryFragment, Lockfile, LockfileEntry, LockfileError, QueryParameter, ResultSetField, Error (+11 more)
-
-### Community 97 - "From"
-Cohesion: 0.04
-Nodes (33): AccessPriv, AccessPrivList, AccessPrivListOpt, AggSplit, AggSplitList, AggSplitOpt, AlterEventTrigStmt, AlterEventTrigStmtList (+25 more)
-
-### Community 98 - "JsonIsPredicate"
-Cohesion: 0.16
-Nodes (6): JsonIsPredicate, JsonIsPredicateList, JsonIsPredicateListOpt, JsonValueType, JsonValueTypeList, JsonValueTypeOpt
+### Community 97 - "AlterTsDictionaryStmt"
+Cohesion: 0.33
+Nodes (3): AlterTsDictionaryStmt, AlterTsDictionaryStmtList, AlterTsDictionaryStmtListOpt
 
 ### Community 99 - "AlterEnumStmt"
 Cohesion: 0.12
 Nodes (4): AlterEnumStmt, AlterEnumStmtList, AlterEnumStmtListOpt, AlterEnumStmtOpt
 
 ### Community 100 - "RoleSpecOpt"
-Cohesion: 0.07
-Nodes (4): AlterOwnerStmtOpt, AlterUserMappingStmt, AlterUserMappingStmtOpt, RoleSpecOpt
-
-### Community 102 - "Box"
 Cohesion: 0.05
-Nodes (11): BoolExpr, BoolExprOpt, CollateClause, DistinctExpr, JsonBehavior, PublicationObjSpec, PublicationObjSpecOpt, Box (+3 more)
+Nodes (7): AlterUserMappingStmt, AlterUserMappingStmtOpt, CreateTableSpaceStmt, CreateTableSpaceStmtOpt, RoleSpec, RoleSpecOpt, RoleSpecTypeOpt
 
-### Community 103 - "ScanResult"
-Cohesion: 0.16
-Nodes (6): ScanResult, ScanResultList, ScanResultListOpt, ScanResultOpt, ScanTokenList, ScanTokenListOpt
+### Community 102 - "BoolExpr"
+Cohesion: 0.15
+Nodes (3): BoolExpr, BoolExprOpt, BoolExprTypeOpt
+
+### Community 103 - "From"
+Cohesion: 0.04
+Nodes (32): AccessPriv, AccessPrivList, AccessPrivListOpt, AlterCollationStmt, AlterCollationStmtList, AlterCollationStmtListOpt, AlterTableType, AlterTableTypeList (+24 more)
+
+### Community 104 - ".get_name"
+Cohesion: 0.08
+Nodes (4): ReplicaIdentityStmt, ReplicaIdentityStmtOpt, TriggerTransition, TriggerTransitionOpt
 
 ### Community 106 - "TransactionStmt"
-Cohesion: 0.10
-Nodes (5): TransactionStmt, TransactionStmtKind, TransactionStmtKindList, TransactionStmtKindOpt, TransactionStmtOpt
+Cohesion: 0.12
+Nodes (3): TransactionStmt, TransactionStmtKindOpt, TransactionStmtOpt
 
 ### Community 107 - "CheckColumnConstraint"
-Cohesion: 0.15
+Cohesion: 0.16
 Nodes (9): CheckColumnConstraint, ColumnConstraint, Constraint, Option, Result, ScanToken, Self, SemScalarExpr (+1 more)
 
 ### Community 108 - "AIndices"
 Cohesion: 0.16
 Nodes (4): AIndices, AIndicesList, AIndicesListOpt, AIndicesOpt
 
-### Community 111 - "CreateTableSpaceStmt"
-Cohesion: 0.14
-Nodes (4): CreateTableSpaceStmt, CreateTableSpaceStmtList, CreateTableSpaceStmtListOpt, CreateTableSpaceStmtOpt
+### Community 109 - "ViewLike"
+Cohesion: 0.13
+Nodes (12): ViewInfoRead, ViewInfoWrite, FullName, Option, Result, Self, SchemaFileContext<TBaseContext>, Box (+4 more)
+
+### Community 110 - "SubLink"
+Cohesion: 0.13
+Nodes (4): SubLink, SubLinkOpt, SubLinkType, SubLinkTypeOpt
 
 ### Community 112 - ".resolve_overload_unary"
 Cohesion: 0.22
 Nodes (10): ResolvedUnaryOperator, Option, Result, Self, SemScalarExpr, TParseContext, TypeReference, Vec (+2 more)
 
-### Community 114 - "CreateCastStmt"
-Cohesion: 0.19
-Nodes (3): CoercionContextOpt, CreateCastStmt, CreateCastStmtOpt
+### Community 113 - "JsonTablePathSpecOpt"
+Cohesion: 0.11
+Nodes (4): JsonTablePathSpec, JsonTablePathSpecList, JsonTablePathSpecListOpt, JsonTablePathSpecOpt
 
 ### Community 115 - "DefaultColumnConstraint"
 Cohesion: 0.16
 Nodes (9): ColumnConstraint, DefaultColumnConstraint, Constraint, Option, Result, ScanToken, Self, SemScalarExpr (+1 more)
 
-### Community 116 - "PublicationTable"
-Cohesion: 0.33
-Nodes (3): PublicationTable, PublicationTableList, PublicationTableListOpt
+### Community 116 - "IdentityColumnConstraint"
+Cohesion: 0.16
+Nodes (11): ColumnConstraint, IdentityColumnConstraint, IdentityColumnMode, Constraint, Option, Result, Self, TestResult (+3 more)
+
+### Community 117 - "RangeFunction"
+Cohesion: 0.16
+Nodes (4): RangeFunction, RangeFunctionList, RangeFunctionListOpt, RangeFunctionOpt
 
 ### Community 118 - "SemScalarExpr"
-Cohesion: 0.04
-Nodes (51): ImplicitCastExpr, Box, Option, Result, ScanToken, Self, SemScalarExpr, TParseContext (+43 more)
+Cohesion: 0.06
+Nodes (39): Option, Result, ScanToken, Self, SemScalarExpr, TParseContext, TypeReference, WithClause (+31 more)
 
 ### Community 119 - ".build_op"
-Cohesion: 0.10
-Nodes (16): ArithExpr, ArithExpr, Option, Result, SemScalarExpr, TestParseContext, TestResult, TParseContext (+8 more)
+Cohesion: 0.18
+Nodes (9): ArithExpr, ArithExpr, Option, Result, SemScalarExpr, TestParseContext, TestResult, TParseContext (+1 more)
 
-### Community 120 - "TableFunctionDataSource"
-Cohesion: 0.14
-Nodes (10): DataSource, Nullable, Option, Self, SemScalarExpr, TParseContext, Vec, WithClause (+2 more)
+### Community 120 - "IVec"
+Cohesion: 0.06
+Nodes (41): IVec, Box, analyze_create_domain(), Result, ScanToken, TParseContext, analyze_create_schema(), CreateSchema (+33 more)
 
 ### Community 121 - "CreateFunctionStmt"
-Cohesion: 0.12
-Nodes (3): CreateFunctionStmt, CreateFunctionStmtListOpt, CreateFunctionStmtOpt
-
-### Community 122 - "SqlFunArgsError"
-Cohesion: 0.16
-Nodes (14): Error, From, P, PathBuf, Result, Self, T, SqlFunArgsError (+6 more)
-
-### Community 123 - "CreateTransformStmt"
-Cohesion: 0.16
-Nodes (4): CreateTransformStmt, CreateTransformStmtList, CreateTransformStmtListOpt, CreateTransformStmtOpt
-
-### Community 124 - ".get_args"
-Cohesion: 0.04
-Nodes (5): NullIfExpr, NullIfExprOpt, OpExpr, ScalarArrayOpExpr, ScalarArrayOpExprOpt
-
-### Community 125 - "Opt"
-Cohesion: 0.03
-Nodes (14): AccessPrivOpt, AlterDatabaseRefreshCollStmtOpt, AlterEventTrigStmtOpt, AlterFunctionStmtOpt, AlterRoleSetStmtOpt, AlterRoleStmtOpt, ClosePortalStmtOpt, CreateRoleStmtOpt (+6 more)
-
-### Community 126 - "AlterDomainStmtOpt"
 Cohesion: 0.13
-Nodes (3): AlterDomainStmtOpt, AlterTableType, AlterTableTypeOpt
+Nodes (4): CreateFunctionStmt, CreateFunctionStmtList, CreateFunctionStmtListOpt, CreateFunctionStmtOpt
 
-### Community 127 - "MergeWhenClause"
-Cohesion: 0.20
-Nodes (4): MergeWhenClause, MergeWhenClauseList, MergeWhenClauseListOpt, MergeWhenClauseOpt
+### Community 122 - "PostgresBuiltinPaths"
+Cohesion: 0.36
+Nodes (5): PostgresBuiltinPaths, PathBuf, Result, Self, SqlFunArgs
+
+### Community 123 - "ObjectWithArgsOpt"
+Cohesion: 0.08
+Nodes (5): CreateTransformStmt, CreateTransformStmtList, CreateTransformStmtListOpt, CreateTransformStmtOpt, ObjectWithArgsOpt
+
+### Community 124 - "DistinctExpr"
+Cohesion: 0.02
+Nodes (10): DistinctExpr, DistinctExprList, DistinctExprListOpt, DistinctExprOpt, NullIfExpr, NullIfExprOpt, OpExpr, OpExprOpt (+2 more)
+
+### Community 125 - "Box"
+Cohesion: 0.02
+Nodes (25): AccessPrivOpt, AExprKind, AlterCollationStmtOpt, AlterDatabaseRefreshCollStmtOpt, AlterOwnerStmtOpt, AlterStatsStmtOpt, ClosePortalStmt, ClosePortalStmtOpt (+17 more)
+
+### Community 126 - "AlterDomainStmt"
+Cohesion: 0.11
+Nodes (4): AlterDomainStmt, AlterDomainStmtList, AlterDomainStmtListOpt, AlterDomainStmtOpt
 
 ### Community 128 - "AArrayExpr"
-Cohesion: 0.33
-Nodes (3): AArrayExpr, AArrayExprList, AArrayExprListOpt
+Cohesion: 0.19
+Nodes (4): AArrayExpr, AArrayExprList, AArrayExprListOpt, AArrayExprOpt
 
 ### Community 129 - "State Change Event Receiver"
 Cohesion: 0.12
 Nodes (16): Applicability, Benefits, Composition with an Event Router, Consequences, Costs, Distinction from External Change Tracking, Distinction from Observer, Forces (+8 more)
 
 ### Community 130 - "RefreshMatViewStmt"
-Cohesion: 0.14
+Cohesion: 0.12
 Nodes (4): RefreshMatViewStmt, RefreshMatViewStmtList, RefreshMatViewStmtListOpt, RefreshMatViewStmtOpt
 
 ### Community 131 - "ArrayExpr"
@@ -1000,32 +1035,28 @@ Cohesion: 0.19
 Nodes (9): ArrayExpr, Option, Result, ScanToken, SemScalarExpr, TParseContext, TypeReference, Vec (+1 more)
 
 ### Community 132 - "CliSubCommand"
-Cohesion: 0.10
-Nodes (22): CliSubCommand, DaemonControlArgs, Vec, Error, ExitCode, Option, Result, SqlFunArgs (+14 more)
+Cohesion: 0.06
+Nodes (33): CliSubCommand, DaemonControlArgs, Vec, initialize(), Error, ExitCode, Result, SqlFunArgs (+25 more)
 
 ### Community 133 - "ExtensionNameVersionPair"
-Cohesion: 0.18
-Nodes (13): ExtensionNameVersionPair, Display, Formatter, Input, Option, Output, P, Parser (+5 more)
+Cohesion: 0.30
+Nodes (7): ExtensionNameVersionPair, Display, Formatter, Input, Output, Parser, Result
 
 ### Community 134 - "ColumnNullabilityConstraint"
 Cohesion: 0.18
 Nodes (7): ColumnConstraint, ColumnNullabilityConstraint, Constraint, Option, Result, Self, TParseContext
 
-### Community 135 - "ImportForeignSchemaStmt"
-Cohesion: 0.17
-Nodes (6): ImportForeignSchemaStmt, ImportForeignSchemaStmtList, ImportForeignSchemaStmtListOpt, ImportForeignSchemaType, ImportForeignSchemaTypeList, ImportForeignSchemaTypeOpt
-
-### Community 136 - "MultiAssignRef"
-Cohesion: 0.16
-Nodes (4): MultiAssignRef, MultiAssignRefList, MultiAssignRefListOpt, MultiAssignRefOpt
-
-### Community 137 - "ReindexStmtOpt"
-Cohesion: 0.14
-Nodes (4): ReindexObjectType, ReindexObjectTypeList, ReindexObjectTypeOpt, ReindexStmtOpt
+### Community 137 - ".apply_alter"
+Cohesion: 0.18
+Nodes (9): TableInfoRead, TableInfoWrite, FullName, Option, Result, Self, Vec, SchemaFileContext<TBaseContext> (+1 more)
 
 ### Community 139 - ".analyze_range_var_node"
 Cohesion: 0.25
 Nodes (9): DataSource, Result, Self, TestParseContext, TestResult, TParseContext, WithClause, test_analyze_range_var_node_table() (+1 more)
+
+### Community 140 - "AlternativeSubPlan"
+Cohesion: 0.33
+Nodes (3): AlternativeSubPlan, AlternativeSubPlanList, AlternativeSubPlanListOpt
 
 ### Community 141 - "AlterExtensionContentsStmt"
 Cohesion: 0.39
@@ -1036,52 +1067,48 @@ Cohesion: 0.12
 Nodes (41): constr_attr_deferrable(), constr_attr_deferred(), constr_attr_immediate(), constr_attr_not_deferrable(), constr_check(), constr_default(), constr_exclusion(), constr_foreign() (+33 more)
 
 ### Community 144 - ".get_options"
-Cohesion: 0.03
-Nodes (15): AlterDatabaseStmt, AlterDatabaseStmtOpt, AlterExtensionStmt, AlterExtensionStmtOpt, AlterFdwStmtOpt, AlterTsDictionaryStmtOpt, AlterTypeStmt, AlterTypeStmtOpt (+7 more)
+Cohesion: 0.05
+Nodes (8): AlterDatabaseStmt, AlterDatabaseStmtOpt, AlterForeignServerStmt, AlterForeignServerStmtOpt, CreateExtensionStmt, CreateExtensionStmtOpt, CreateFdwStmt, CreateFdwStmtOpt
 
-### Community 146 - "CurrentOfExpr"
-Cohesion: 0.14
-Nodes (4): CurrentOfExpr, CurrentOfExprList, CurrentOfExprListOpt, CurrentOfExprOpt
+### Community 145 - "ObjectWithArgs"
+Cohesion: 0.39
+Nodes (3): ObjectWithArgs, ObjectWithArgsList, ObjectWithArgsListOpt
 
 ### Community 147 - "PrepareStmt"
-Cohesion: 0.19
-Nodes (4): PrepareStmt, PrepareStmtList, PrepareStmtListOpt, PrepareStmtOpt
+Cohesion: 0.33
+Nodes (3): PrepareStmt, PrepareStmtList, PrepareStmtListOpt
 
 ### Community 148 - "AlterStatsStmt"
-Cohesion: 0.18
-Nodes (4): AlterStatsStmt, AlterStatsStmtList, AlterStatsStmtListOpt, AlterStatsStmtOpt
+Cohesion: 0.39
+Nodes (3): AlterStatsStmt, AlterStatsStmtList, AlterStatsStmtListOpt
 
 ### Community 149 - "JsonReturningOpt"
 Cohesion: 0.12
 Nodes (4): JsonReturning, JsonReturningList, JsonReturningListOpt, JsonReturningOpt
 
-### Community 150 - "MemberRef"
-Cohesion: 0.32
-Nodes (7): MemberRef, Option, Result, Self, SemScalarExpr, TParseContext, TypeReference
+### Community 150 - "AlterEventTrigStmt"
+Cohesion: 0.15
+Nodes (4): AlterEventTrigStmt, AlterEventTrigStmtList, AlterEventTrigStmtListOpt, AlterEventTrigStmtOpt
 
-### Community 151 - "AlterTsConfigurationStmt"
-Cohesion: 0.17
-Nodes (4): AlterTsConfigurationStmt, AlterTsConfigurationStmtList, AlterTsConfigurationStmtListOpt, AlterTsConfigurationStmtOpt
-
-### Community 152 - "DefElem"
-Cohesion: 0.12
-Nodes (4): DefElem, DefElemAction, DefElemActionOpt, DefElemOpt
+### Community 153 - "JsonValueExprOpt"
+Cohesion: 0.03
+Nodes (9): JsonFormatOpt, JsonIsPredicate, JsonIsPredicateOpt, JsonParseExpr, JsonParseExprOpt, JsonTable, JsonTableOpt, JsonValueExprOpt (+1 more)
 
 ### Community 154 - "AlterOpFamilyStmt"
-Cohesion: 0.20
-Nodes (4): AlterOpFamilyStmt, AlterOpFamilyStmtList, AlterOpFamilyStmtListOpt, AlterOpFamilyStmtOpt
+Cohesion: 0.39
+Nodes (3): AlterOpFamilyStmt, AlterOpFamilyStmtList, AlterOpFamilyStmtListOpt
 
-### Community 155 - "AlterCollationStmt"
-Cohesion: 0.23
-Nodes (4): AlterCollationStmt, AlterCollationStmtList, AlterCollationStmtListOpt, AlterCollationStmtOpt
+### Community 155 - "OperatorDefinition"
+Cohesion: 0.31
+Nodes (7): OperatorDefinition, Vec, OverloadResolution, FullName, Self, TypeReference, super::AnalysisProblem
 
 ### Community 156 - "FuncCall"
-Cohesion: 0.08
-Nodes (4): FuncCall, FuncCallOpt, WindowDef, WindowDefOpt
+Cohesion: 0.10
+Nodes (3): CallStmtOpt, FuncCall, FuncCallOpt
 
-### Community 157 - "TypeReference"
-Cohesion: 0.33
-Nodes (5): build_string_node_list_opt(), PgBuiltInType, TypeReference, test_try_from_nodelistopt_three_elements(), test_try_from_nodelistopt_two_elements()
+### Community 157 - "AllBinaryCallSite"
+Cohesion: 0.16
+Nodes (10): AllBinaryCallSite, Option, Result, SemScalarExpr, TParseContext, TypeReference, UndefinedOperatorAllCallSite, binary_is_not_null() (+2 more)
 
 ### Community 158 - "SqlValueExpr"
 Cohesion: 0.18
@@ -1091,49 +1118,37 @@ Nodes (11): Option, Result, ScanToken, Self, SemScalarExpr, TParseContext, TypeR
 Cohesion: 0.33
 Nodes (3): ClusterStmt, ClusterStmtList, ClusterStmtListOpt
 
-### Community 161 - "CreateOpClassStmtOpt"
-Cohesion: 0.09
-Nodes (3): CreateOpClassStmtOpt, OidList, OidListOpt
-
 ### Community 162 - "JsonTableSiblingJoin"
-Cohesion: 0.18
-Nodes (4): JsonTableSiblingJoin, JsonTableSiblingJoinList, JsonTableSiblingJoinListOpt, JsonTableSiblingJoinOpt
+Cohesion: 0.48
+Nodes (3): JsonTableSiblingJoin, JsonTableSiblingJoinList, JsonTableSiblingJoinListOpt
 
 ### Community 163 - "read_sql_file"
 Cohesion: 0.21
 Nodes (12): comment_psql_meta_command(), file_lines(), LineWithLfIter, read_sql_file(), BufReader, Error, File, Item (+4 more)
 
-### Community 164 - "JsonTable"
-Cohesion: 0.33
-Nodes (3): JsonTable, JsonTableList, JsonTableListOpt
-
 ### Community 165 - "SqlFunError"
-Cohesion: 0.18
-Nodes (10): Connector, Result, Self, Error, From, Self, TokenStream, SqlFunError (+2 more)
+Cohesion: 0.14
+Nodes (13): Connector, Result, Self, Error, From, Self, TokenStream, SqlFunError (+5 more)
 
-### Community 166 - "DropTableSpaceStmt"
-Cohesion: 0.39
-Nodes (3): DropTableSpaceStmt, DropTableSpaceStmtList, DropTableSpaceStmtListOpt
+### Community 166 - ".build_op_all"
+Cohesion: 0.28
+Nodes (10): ArithExpr, ResolvedBinaryOperator, Option, Result, Self, SemScalarExpr, TestParseContext, TestResult (+2 more)
 
 ### Community 167 - "generated.rs"
 Cohesion: 0.04
-Nodes (33): AExpr, AExprList, AExprListOpt, AggStrategy, AggStrategyList, AggStrategyOpt, AlterRoleSetStmt, AlterRoleSetStmtList (+25 more)
+Nodes (31): AlterOperatorStmtList, AlterOperatorStmtListOpt, CallStmt, CallStmtList, CallStmtListOpt, ConstraintsSetStmt, ConstraintsSetStmtList, ConstraintsSetStmtListOpt (+23 more)
 
 ### Community 168 - "CommonTableExpr"
-Cohesion: 0.14
+Cohesion: 0.12
 Nodes (4): CommonTableExpr, CommonTableExprList, CommonTableExprListOpt, CommonTableExprOpt
 
 ### Community 169 - "VariableSetStmtOpt"
-Cohesion: 0.09
-Nodes (7): AlterDatabaseSetStmt, AlterDatabaseSetStmtList, AlterDatabaseSetStmtListOpt, AlterDatabaseSetStmtOpt, AlterSystemStmt, AlterSystemStmtOpt, VariableSetStmtOpt
+Cohesion: 0.06
+Nodes (10): AlterDatabaseSetStmt, AlterDatabaseSetStmtOpt, AlterRoleSetStmt, AlterRoleSetStmtList, AlterRoleSetStmtListOpt, AlterRoleSetStmtOpt, VariableSetStmt, VariableSetStmtList (+2 more)
 
 ### Community 170 - "AlterTableMoveAllStmt"
 Cohesion: 0.15
 Nodes (4): AlterTableMoveAllStmt, AlterTableMoveAllStmtList, AlterTableMoveAllStmtListOpt, AlterTableMoveAllStmtOpt
-
-### Community 172 - "ReplicaIdentityStmt"
-Cohesion: 0.18
-Nodes (4): ReplicaIdentityStmt, ReplicaIdentityStmtList, ReplicaIdentityStmtListOpt, ReplicaIdentityStmtOpt
 
 ### Community 174 - "CheckPointStmt"
 Cohesion: 0.23
@@ -1147,181 +1162,181 @@ Nodes (16): Registry, RpcMethod, AnalysisProbrem, AnalyzeQueryMethod, Initialize
 Cohesion: 0.33
 Nodes (3): StatsElem, StatsElemList, StatsElemListOpt
 
-### Community 177 - "CreatePublicationStmt"
-Cohesion: 0.33
-Nodes (3): CreatePublicationStmt, CreatePublicationStmtList, CreatePublicationStmtListOpt
-
 ### Community 178 - "CompositeTypeStmt"
-Cohesion: 0.23
-Nodes (4): CompositeTypeStmt, CompositeTypeStmtList, CompositeTypeStmtListOpt, CompositeTypeStmtOpt
+Cohesion: 0.39
+Nodes (3): CompositeTypeStmt, CompositeTypeStmtList, CompositeTypeStmtListOpt
 
 ### Community 179 - "CastDefinition"
-Cohesion: 0.08
-Nodes (16): HashSet, Option, TypeReference, super::BaseContext, CastContext, CastDefinition, Self, CastInfoRead (+8 more)
+Cohesion: 0.06
+Nodes (20): CastInfo, PgBuiltinCasts, HashSet, Option, P, Result, TypeReference, super::BaseContext (+12 more)
 
 ### Community 180 - "NodeList"
 Cohesion: 0.07
 Nodes (13): ConstraintBuilder, Alias, NodeList, CaseExpr, CaseWhen, Constraint, FullName, FuncCall (+5 more)
 
-### Community 181 - "JsonFuncExpr"
-Cohesion: 0.10
-Nodes (3): JsonBehaviorOpt, JsonFuncExpr, JsonFuncExprOpt
-
-### Community 182 - "WithClause"
-Cohesion: 0.21
-Nodes (3): WithClause, WithClauseList, WithClauseListOpt
+### Community 183 - "JsonObjectAgg"
+Cohesion: 0.08
+Nodes (5): JsonKeyValueOpt, JsonObjectAgg, JsonObjectAggOpt, NamedArgExpr, NamedArgExprOpt
 
 ### Community 184 - "CoalesceExpr"
 Cohesion: 0.24
 Nodes (9): CoalesceExpr, Option, Result, ScanToken, SemScalarExpr, TParseContext, TypeReference, Vec (+1 more)
 
-### Community 189 - "JoinTypeOpt"
-Cohesion: 0.14
-Nodes (8): JoinKind, Error, Nullable, Result, Self, TryFrom, JoinType, JoinTypeOpt
+### Community 185 - "BinaryOpCallSite"
+Cohesion: 0.23
+Nodes (10): BinaryOpCallSite, Option, Result, SemScalarExpr, TestParseContext, TestResult, TParseContext, TypeReference (+2 more)
+
+### Community 186 - "ColumnReferenceExpr"
+Cohesion: 0.24
+Nodes (9): ColumnReferenceExpr, ColumnDefinition, Option, Result, ScanToken, SemScalarExpr, TParseContext, TypeReference (+1 more)
+
+### Community 187 - "ParameterBindResult"
+Cohesion: 0.22
+Nodes (9): ParameterBindResult, FunctionParam, Option, Self, TypeReference, Vec, test_one_in(), test_one_in_out() (+1 more)
+
+### Community 188 - "CreatePLangStmt"
+Cohesion: 0.16
+Nodes (4): CreatePLangStmt, CreatePLangStmtList, CreatePLangStmtListOpt, CreatePLangStmtOpt
 
 ### Community 190 - "IntoClause"
-Cohesion: 0.25
-Nodes (3): IntoClause, IntoClauseList, IntoClauseListOpt
+Cohesion: 0.09
+Nodes (5): IntoClause, IntoClauseList, IntoClauseListOpt, IntoClauseOpt, OnCommitActionOpt
 
 ### Community 192 - "OverloadVariant"
-Cohesion: 0.13
-Nodes (12): ArgumentBindingCollection, Iter, OverloadVariant, ColumnDefinition, FunctionParam, Option, Result, Self (+4 more)
+Cohesion: 0.09
+Nodes (18): ArgumentBindingCollection, FunctionOverloadCollection, Iter, Option, Result, Self, TParseContext, Vec (+10 more)
 
 ### Community 193 - "CteCatalog"
-Cohesion: 0.10
-Nodes (18): CteDependencyGraph, NodeIndex, Ref, RefCell, CatalogFileIndex, CteAlias, CteCatalog, CteCatalog<'a> (+10 more)
+Cohesion: 0.11
+Nodes (13): CteDependencyGraph, NodeIndex, RefCell, CatalogFileIndex, CteCatalog, CteCatalogEntry, CteCatalogEntry<'a>, Option (+5 more)
 
 ### Community 194 - "CreateSeqStmt"
-Cohesion: 0.15
-Nodes (4): CreateSeqStmt, CreateSeqStmtList, CreateSeqStmtListOpt, CreateSeqStmtOpt
+Cohesion: 0.33
+Nodes (3): CreateSeqStmt, CreateSeqStmtList, CreateSeqStmtListOpt
 
 ### Community 195 - "list_objects.rs"
 Cohesion: 0.26
-Nodes (12): ListObjectArgs, NameQuery, ObjectKind, ObjectQuery, ObjectSummary, ObjectSummaryField, Box, Option (+4 more)
+Nodes (11): ListObjectArgs, NameQuery, ObjectQuery, ObjectSummary, ObjectSummaryField, Box, Option, PathBuf (+3 more)
 
-### Community 196 - "InlineCodeBlock"
-Cohesion: 0.12
-Nodes (7): CallContext, CallContextList, CallContextListOpt, CallContextOpt, InlineCodeBlock, InlineCodeBlockList, InlineCodeBlockListOpt
+### Community 196 - "CallContext"
+Cohesion: 0.39
+Nodes (3): CallContext, CallContextList, CallContextListOpt
 
-### Community 199 - "JsonQuotesOpt"
-Cohesion: 0.26
-Nodes (3): JsonQuotes, JsonQuotesList, JsonQuotesOpt
+### Community 197 - ".resolve"
+Cohesion: 0.17
+Nodes (11): CteCatalogCache, CteReferenceCollection, F, From, HashMap, P, PathBuf, Result (+3 more)
+
+### Community 198 - "GrantStmt"
+Cohesion: 0.17
+Nodes (6): GrantStmt, GrantStmtList, GrantStmtListOpt, GrantTargetType, GrantTargetTypeList, GrantTargetTypeOpt
+
+### Community 199 - "CteCatalogReference"
+Cohesion: 0.23
+Nodes (9): CteAlias, CteCatalogReference, ResolvedCteCatalog, Display, Formatter, From, IndexMap, PartialEq (+1 more)
 
 ### Community 200 - "CreateTable"
-Cohesion: 0.07
-Nodes (28): ColumnCollection, CreateTable, CreateTableMode, DropTable, Clone, ColumnDefinition, Constraint, HashMap (+20 more)
+Cohesion: 0.11
+Nodes (17): ColumnCollection, CreateTable, CreateTableMode, DropTable, Clone, ColumnDefinition, Constraint, HashMap (+9 more)
 
-### Community 201 - "DefElemKey"
-Cohesion: 0.23
-Nodes (9): analyze_def_elem_list(), DefElemKey, DefElemList, From, HashMap, Option, Result, Self (+1 more)
+### Community 201 - "CreatedbStmt"
+Cohesion: 0.17
+Nodes (4): CreatedbStmt, CreatedbStmtList, CreatedbStmtListOpt, CreatedbStmtOpt
 
 ### Community 202 - "WindowClause"
-Cohesion: 0.09
+Cohesion: 0.08
 Nodes (4): WindowClause, WindowClauseList, WindowClauseListOpt, WindowClauseOpt
 
 ### Community 203 - "CreateRoleStmt"
-Cohesion: 0.16
-Nodes (6): CreateRoleStmt, CreateRoleStmtList, CreateRoleStmtListOpt, RoleStmtType, RoleStmtTypeList, RoleStmtTypeOpt
+Cohesion: 0.33
+Nodes (3): CreateRoleStmt, CreateRoleStmtList, CreateRoleStmtListOpt
 
-### Community 204 - "FunctionOverloadCollection"
-Cohesion: 0.08
-Nodes (22): analyze_create_function(), CreateFunction, FullName, Option, Result, ScanToken, Self, TParseContext (+14 more)
+### Community 204 - "CreateFunction"
+Cohesion: 0.27
+Nodes (8): analyze_create_function(), CreateFunction, FullName, Option, Result, ScanToken, Self, TParseContext
 
 ### Community 206 - "GroupingSet"
 Cohesion: 0.16
-Nodes (6): GroupingSet, GroupingSetKind, GroupingSetKindList, GroupingSetKindOpt, GroupingSetList, GroupingSetListOpt
+Nodes (4): GroupingSet, GroupingSetKind, GroupingSetKindOpt, GroupingSetOpt
 
-### Community 207 - "sql-fun-sqlast/src/lib.rs"
+### Community 207 - "StringSpan"
 Cohesion: 0.07
-Nodes (38): LabeledSpan, AstAndContextPair<TParseContext>, context_args(), enable_stack_overflow_backtrace(), EnableStackOverflowBacktrace, init_tracing(), offset_in_string(), parse() (+30 more)
+Nodes (33): LabeledSpan, SeekFrom, AstAndContextPair<TParseContext>, context_args(), enable_stack_overflow_backtrace(), EnableStackOverflowBacktrace, init_tracing(), offset_in_string() (+25 more)
 
 ### Community 208 - "Self"
 Cohesion: 0.02
-Nodes (44): AggrefList, AggrefListOpt, AlterOperatorStmtList, AlterOperatorStmtListOpt, ColumnDefList, ColumnDefListOpt, CreatedbStmtList, CreatedbStmtListOpt (+36 more)
-
-### Community 209 - "CoercionFormOpt"
-Cohesion: 0.04
-Nodes (8): CoerceViaIo, CoerceViaIoOpt, CoercionForm, CoercionFormOpt, ConvertRowtypeExpr, ConvertRowtypeExprOpt, RowExpr, RowExprOpt
+Nodes (48): CaseTestExprList, CaseTestExprListOpt, CoerceToDomainList, CoerceToDomainListOpt, CommentStmtList, CommentStmtListOpt, CreateFdwStmtList, CreateFdwStmtListOpt (+40 more)
 
 ### Community 210 - "ReassignOwnedStmt"
 Cohesion: 0.20
 Nodes (4): ReassignOwnedStmt, ReassignOwnedStmtList, ReassignOwnedStmtListOpt, ReassignOwnedStmtOpt
 
-### Community 211 - "SqlFunArgs"
-Cohesion: 0.09
-Nodes (22): ConfigurationKind, parse_bool_env(), parse_terminal_color(), Display, Formatter, HashMap, Option, P (+14 more)
+### Community 211 - "SqlFunArgsError"
+Cohesion: 0.10
+Nodes (24): ConfigurationKind, ConfigurationKind, From, PathBuf, SqlFunArgsError, parse_bool_env(), parse_terminal_color(), Display (+16 more)
 
 ### Community 212 - "FullName"
 Cohesion: 0.06
 Nodes (19): CatalogName, Display, Formatter, PartialEq, Result, Self, FullName, Display (+11 more)
 
-### Community 213 - "AlterDomainStmt"
-Cohesion: 0.29
-Nodes (3): AlterDomainStmt, AlterDomainStmtList, AlterDomainStmtListOpt
-
 ### Community 214 - "CollateExpr"
-Cohesion: 0.13
-Nodes (4): CollateExpr, CollateExprList, CollateExprListOpt, CollateExprOpt
+Cohesion: 0.25
+Nodes (3): CollateExpr, CollateExprList, CollateExprListOpt
 
 ### Community 216 - "AlterDatabaseRefreshCollStmt"
 Cohesion: 0.33
 Nodes (3): AlterDatabaseRefreshCollStmt, AlterDatabaseRefreshCollStmtList, AlterDatabaseRefreshCollStmtListOpt
 
+### Community 217 - ".analyze"
+Cohesion: 0.18
+Nodes (11): FunctionParam, ColumnDefinition, Result, ScanToken, Self, TestParseContext, TestResult, TParseContext (+3 more)
+
 ### Community 218 - "ColumnName"
-Cohesion: 0.07
-Nodes (20): ColumnConstraint, ExclusionColumnConstraint, Constraint, Option, Result, Self, TParseContext, ColumnName (+12 more)
+Cohesion: 0.08
+Nodes (18): ColumnConstraint, ExclusionColumnConstraint, Constraint, Option, Result, Self, TParseContext, ColumnName (+10 more)
 
 ### Community 219 - "LoadStmt"
 Cohesion: 0.23
 Nodes (4): LoadStmt, LoadStmtList, LoadStmtListOpt, LoadStmtOpt
 
-### Community 220 - "FunctionParameter"
-Cohesion: 0.05
-Nodes (21): FunctionParam, ColumnDefinition, Result, ScanToken, Self, TestParseContext, TestResult, TParseContext (+13 more)
+### Community 220 - "LockStmt"
+Cohesion: 0.09
+Nodes (5): FunctionParameterMode, FunctionParameterModeOpt, FunctionParameterOpt, LockStmt, LockStmtOpt
 
 ### Community 221 - ".build_binary_op"
 Cohesion: 0.25
 Nodes (7): Result, SemScalarExpr, TestParseContext, TestResult, TParseContext, super::ArithExpr, test_arith_expr_build_binary_op()
 
-### Community 222 - "CteCatalogError"
+### Community 222 - "CteName"
+Cohesion: 0.08
+Nodes (20): CteReferenceResolveResult, CteReferenceResolveResultCollection, CteName, CteCatalogCheckError, CteCatalogCheckError<'a>, CteCatalogCheckErrorCollection, CteCatalogCheckErrorCollection<'a>, CteCatalogError (+12 more)
+
+### Community 223 - "CreateRoleStmtOpt"
+Cohesion: 0.16
+Nodes (3): CreateRoleStmtOpt, RoleStmtType, RoleStmtTypeOpt
+
+### Community 224 - "AnalyzeScalarExpr"
 Cohesion: 0.10
-Nodes (14): CteCatalogCheckError, CteCatalogCheckError<'a>, CteCatalogCheckErrorCollection, CteCatalogCheckErrorCollection<'a>, CteCatalogError, CteCatalogValidationError, Error, Fn (+6 more)
-
-### Community 223 - ".analyze_index"
-Cohesion: 0.27
-Nodes (9): ArrayIndex, Option, Result, ScanToken, Self, SemScalarExpr, TParseContext, TypeReference (+1 more)
-
-### Community 224 - "SemScalarExprNode"
-Cohesion: 0.04
-Nodes (60): AnalyzeScalarExpr, BooleanExpr, BooleanExprBody, NullTestExpr, NullTestType, Box, Error, NullTestType (+52 more)
-
-### Community 225 - "AlterFdwStmt"
-Cohesion: 0.33
-Nodes (3): AlterFdwStmt, AlterFdwStmtList, AlterFdwStmtListOpt
+Nodes (25): AnalyzeScalarExpr, AExprKind, ArithExpr, Result, ScanToken, SemScalarExpr, TParseContext, WithClause (+17 more)
 
 ### Community 226 - "CreateStatsStmt"
-Cohesion: 0.15
-Nodes (4): CreateStatsStmt, CreateStatsStmtList, CreateStatsStmtListOpt, CreateStatsStmtOpt
+Cohesion: 0.06
+Nodes (4): CreateStatsStmt, CreateStatsStmtOpt, DefineStmt, DefineStmtOpt
 
 ### Community 227 - "ExtensionVersion"
 Cohesion: 0.25
 Nodes (7): ExtensionVersion, Display, Error, Formatter, Result, Self, TryFrom
 
 ### Community 228 - "SelectStmt"
-Cohesion: 0.18
+Cohesion: 0.20
 Nodes (14): analyze_select(), Box, ColumnDefinition, Option, Result, ScanToken, Self, SemScalarExpr (+6 more)
 
 ### Community 230 - "AlterOwnerStmt"
 Cohesion: 0.33
 Nodes (3): AlterOwnerStmt, AlterOwnerStmtList, AlterOwnerStmtListOpt
 
-### Community 231 - "CreateAmStmt"
-Cohesion: 0.18
-Nodes (4): CreateAmStmt, CreateAmStmtList, CreateAmStmtListOpt, CreateAmStmtOpt
-
 ### Community 232 - "CreateConversionStmt"
-Cohesion: 0.18
-Nodes (4): CreateConversionStmt, CreateConversionStmtList, CreateConversionStmtListOpt, CreateConversionStmtOpt
+Cohesion: 0.39
+Nodes (3): CreateConversionStmt, CreateConversionStmtList, CreateConversionStmtListOpt
 
 ### Community 233 - "SubQueryColumnRef"
 Cohesion: 0.27
@@ -1331,9 +1346,9 @@ Nodes (6): ColumnDefinition, Nullable, Option, Self, TypeReference, SubQueryColu
 Cohesion: 0.27
 Nodes (6): ColumnDefinition, Nullable, Option, Self, TypeReference, TableColumnRef
 
-### Community 235 - "MergeSupportFunc"
-Cohesion: 0.13
-Nodes (4): MergeSupportFunc, MergeSupportFuncList, MergeSupportFuncListOpt, MergeSupportFuncOpt
+### Community 235 - ".get_location"
+Cohesion: 0.04
+Nodes (9): JsonArrayConstructor, JsonArrayConstructorOpt, MergeSupportFunc, MergeSupportFuncOpt, PublicationObjSpecOpt, PublicationObjSpecType, PublicationObjSpecTypeOpt, RangeTableFuncCol (+1 more)
 
 ### Community 236 - "SecLabelStmt"
 Cohesion: 0.39
@@ -1347,21 +1362,25 @@ Nodes (4): DeclareCursorStmt, DeclareCursorStmtList, DeclareCursorStmtListOpt, D
 Cohesion: 0.22
 Nodes (8): Option, Result, SemScalarExpr, TestParseContext, TestResult, TParseContext, super::ArithExpr, test_build_op_any()
 
-### Community 240 - "AExprOpt"
-Cohesion: 0.15
-Nodes (4): AExprKindList, AExprKindOpt, AExprOpt, AExprKind
+### Community 239 - "JsonValueCache"
+Cohesion: 0.18
+Nodes (10): JsonValueCache, F, HashMap, P, Path, PathBuf, Result, Self (+2 more)
+
+### Community 240 - "Self"
+Cohesion: 0.32
+Nodes (5): Error, P, Result, Self, T
 
 ### Community 241 - "SQLQueryInfoVisitor"
-Cohesion: 0.09
-Nodes (24): Attribute, ItemConst, LitStr, Parse, ParseStream, Span, CteReference, EncodedSQLStatement (+16 more)
+Cohesion: 0.21
+Nodes (7): ItemConst, EncodedSQLStatement, File, ItemFn, LitStr, Visit, SQLQueryInfoVisitor
 
 ### Community 242 - "AnalysisProblem"
-Cohesion: 0.12
-Nodes (11): NameResolution, AnalysisProblem, AExprKind, FullName, FuncCall, HashSet, Option, Self (+3 more)
+Cohesion: 0.05
+Nodes (24): NameResolution, analyze_def_elem_list(), DefElemKey, DefElemList, From, HashMap, Option, Result (+16 more)
 
 ### Community 243 - "AlterRoleStmt"
-Cohesion: 0.33
-Nodes (3): AlterRoleStmt, AlterRoleStmtList, AlterRoleStmtListOpt
+Cohesion: 0.16
+Nodes (4): AlterRoleStmt, AlterRoleStmtList, AlterRoleStmtListOpt, AlterRoleStmtOpt
 
 ### Community 244 - "Query Performance Management"
 Cohesion: 0.22
@@ -1370,10 +1389,6 @@ Nodes (8): Application execution logs, Database Performance Management, Database
 ### Community 245 - "AlterSubscriptionStmt"
 Cohesion: 0.33
 Nodes (3): AlterSubscriptionStmt, AlterSubscriptionStmtList, AlterSubscriptionStmtListOpt
-
-### Community 246 - "AlterObjectSchemaStmt"
-Cohesion: 0.16
-Nodes (4): AlterObjectSchemaStmt, AlterObjectSchemaStmtList, AlterObjectSchemaStmtListOpt, AlterObjectSchemaStmtOpt
 
 ### Community 247 - "initialize.md"
 Cohesion: 0.25
@@ -1395,69 +1410,77 @@ Nodes (7): Aggregate entity fetch example for sql-fun, Child queries: reuse the 
 Cohesion: 0.29
 Nodes (6): Actual temporary table used by `sql-fun`, Batch query support, Comparison with `tokio-postgres` pipeline, `PostgreSQL simple query protocol` advantages and disadvantages, Receiving results, `sql-fun` batch query rewriting support basics
 
-### Community 252 - "JsonArrayConstructor"
-Cohesion: 0.33
-Nodes (3): JsonArrayConstructor, JsonArrayConstructorList, JsonArrayConstructorListOpt
-
 ### Community 253 - "JsonObjectConstructor"
-Cohesion: 0.33
+Cohesion: 0.29
 Nodes (3): JsonObjectConstructor, JsonObjectConstructorList, JsonObjectConstructorListOpt
 
 ### Community 254 - "`sql-fun` User manual"
 Cohesion: 0.33
 Nodes (6): methods, `sql-fun` command line reference, `sql-fun` server api reference, `sql-fun` User manual, SQL re-write features, Subcommands
 
-### Community 255 - "AlterPolicyStmt"
-Cohesion: 0.39
-Nodes (3): AlterPolicyStmt, AlterPolicyStmtList, AlterPolicyStmtListOpt
-
 ### Community 256 - "SUMMARY.md"
 Cohesion: 0.22
 Nodes (5): initialized notification, Installation, Managing Your Schema, Providing a schema dump (optional, for schema-aware validation), Setting environment variables
 
-### Community 257 - "ReindexStmt"
-Cohesion: 0.29
-Nodes (3): ReindexStmt, ReindexStmtList, ReindexStmtListOpt
+### Community 257 - "LeftUnaryCallSite"
+Cohesion: 0.18
+Nodes (9): LeftUnaryCallSite, Option, Result, SemScalarExpr, TestParseContext, TestResult, TParseContext, TypeReference (+1 more)
 
 ### Community 258 - "JsonSerializeExpr"
 Cohesion: 0.33
 Nodes (3): JsonSerializeExpr, JsonSerializeExprList, JsonSerializeExprListOpt
 
-### Community 259 - "get_result_type_args"
-Cohesion: 0.24
-Nodes (8): generate_sql_query_one(), Result, TokenStream, generate_sql_query_opt(), Result, TokenStream, get_result_type_args(), Path
-
-### Community 260 - "LockingClause"
+### Community 260 - "RowMarkClause"
 Cohesion: 0.07
-Nodes (12): LockClauseStrength, LockClauseStrengthList, LockClauseStrengthOpt, LockingClause, LockingClauseList, LockingClauseListOpt, LockingClauseOpt, LockWaitPolicy (+4 more)
+Nodes (9): LockClauseStrength, LockClauseStrengthOpt, LockingClauseOpt, LockWaitPolicy, LockWaitPolicyOpt, RowMarkClause, RowMarkClauseList, RowMarkClauseListOpt (+1 more)
 
 ### Community 261 - "SqlFunMetadata"
 Cohesion: 0.09
 Nodes (25): Deserialize, Either, DatabaseEngine, MetadataError, PostgresEngineVersion, D, Display, Err (+17 more)
 
-### Community 262 - "VariableSetStmt"
-Cohesion: 0.33
-Nodes (3): VariableSetStmt, VariableSetStmtList, VariableSetStmtListOpt
+### Community 263 - "SqlFunOptions"
+Cohesion: 0.26
+Nodes (6): MetaNameValue, Option, Result, TestResult, SqlFunOptions, test_parse_sql_fun_options_sql()
 
-### Community 266 - "CaseTestExpr"
-Cohesion: 0.33
-Nodes (3): CaseTestExpr, CaseTestExprList, CaseTestExprListOpt
+### Community 264 - "SubLinkExpr"
+Cohesion: 0.19
+Nodes (9): Box, Option, Result, ScanToken, SemScalarExpr, TParseContext, TypeReference, WithClause (+1 more)
+
+### Community 265 - "AlterSystemStmt"
+Cohesion: 0.23
+Nodes (4): AlterSystemStmt, AlterSystemStmtList, AlterSystemStmtListOpt, AlterSystemStmtOpt
+
+### Community 266 - "SortByDirOpt"
+Cohesion: 0.22
+Nodes (3): SortByDir, SortByDirOpt, Option
+
+### Community 268 - "prepare_home"
+Cohesion: 0.29
+Nodes (11): create_confirm(), edit_home_path(), new_absolute_path_validator(), prepare_home(), Error, Option, Path, PathBuf (+3 more)
 
 ### Community 269 - "AlterFunctionStmt"
-Cohesion: 0.39
-Nodes (3): AlterFunctionStmt, AlterFunctionStmtList, AlterFunctionStmtListOpt
+Cohesion: 0.23
+Nodes (4): AlterFunctionStmt, AlterFunctionStmtList, AlterFunctionStmtListOpt, AlterFunctionStmtOpt
 
 ### Community 270 - "ColumnDefinition"
 Cohesion: 0.27
 Nodes (9): ColumnConstraint, ColumnDefinition, DescribeTableArgs, DescribeTableResponse, ColumnConstraint, PathBuf, TypeReference, Vec (+1 more)
+
+### Community 271 - "ValidOperatorName"
+Cohesion: 0.27
+Nodes (7): Display, Formatter, Option, Result, Self, TParseContext, ValidOperatorName
+
+### Community 272 - ".analyze_scalar_expr"
+Cohesion: 0.20
+Nodes (8): CollateExpr, Option, Result, ScanToken, SemScalarExpr, TParseContext, TypeReference, WithClause
 
 ### Community 273 - "FromExpr"
 Cohesion: 0.39
 Nodes (3): FromExpr, FromExprList, FromExprListOpt
 
 ### Community 275 - "CreateUserMappingStmt"
-Cohesion: 0.33
-Nodes (3): CreateUserMappingStmt, CreateUserMappingStmtList, CreateUserMappingStmtListOpt
+Cohesion: 0.16
+Nodes (4): CreateUserMappingStmt, CreateUserMappingStmtList, CreateUserMappingStmtListOpt, CreateUserMappingStmtOpt
 
 ### Community 276 - "SqlFunServerApiError"
 Cohesion: 0.38
@@ -1472,36 +1495,32 @@ Cohesion: 0.40
 Nodes (9): deserialize_braced_list(), deserialize_braced_list_opt(), parse_braced_list_tokens(), D, Error, Option, Result, T (+1 more)
 
 ### Community 279 - "FetchStmt"
-Cohesion: 0.12
-Nodes (6): FetchDirection, FetchDirectionOpt, FetchStmt, FetchStmtList, FetchStmtListOpt, FetchStmtOpt
-
-### Community 280 - "AlterObjectDependsStmt"
-Cohesion: 0.33
-Nodes (3): AlterObjectDependsStmt, AlterObjectDependsStmtList, AlterObjectDependsStmtListOpt
+Cohesion: 0.18
+Nodes (3): FetchDirectionOpt, FetchStmt, FetchStmtOpt
 
 ### Community 281 - "CreateEventTrigStmt"
-Cohesion: 0.39
-Nodes (3): CreateEventTrigStmt, CreateEventTrigStmtList, CreateEventTrigStmtListOpt
+Cohesion: 0.17
+Nodes (4): CreateEventTrigStmt, CreateEventTrigStmtList, CreateEventTrigStmtListOpt, CreateEventTrigStmtOpt
 
-### Community 282 - "InsertStmt"
+### Community 282 - "GrantStmtOpt"
 Cohesion: 0.05
-Nodes (7): InferClauseOpt, InsertStmt, InsertStmtList, InsertStmtListOpt, InsertStmtOpt, OnConflictClause, OnConflictClauseOpt
+Nodes (7): AlterDefaultPrivilegesStmt, AlterDefaultPrivilegesStmtOpt, AlterPublicationStmtOpt, GrantStmtOpt, InferClauseOpt, OnConflictClause, OnConflictClauseOpt
 
-### Community 283 - "DropSubscriptionStmt"
-Cohesion: 0.10
-Nodes (4): DropSubscriptionStmt, DropSubscriptionStmtList, DropSubscriptionStmtListOpt, DropSubscriptionStmtOpt
-
-### Community 285 - "IntList"
-Cohesion: 0.23
-Nodes (4): IntList, IntListList, IntListListOpt, IntListOpt
+### Community 284 - ".analyze_scalar_expr"
+Cohesion: 0.20
+Nodes (8): ParamRef, Option, Result, ScanToken, SemScalarExpr, TParseContext, TypeReference, WithClause
 
 ### Community 286 - "PrimaryKeyConstraint"
 Cohesion: 0.06
-Nodes (31): AnalyzeConstraint, Constraint, ForeignKeyConstraint, Constraint, Option, Result, TParseContext, Vec (+23 more)
+Nodes (29): AnalyzeConstraint, Constraint, ForeignKeyConstraint, Constraint, Option, Result, TParseContext, Vec (+21 more)
 
-### Community 287 - "CreateTableAsStmt"
-Cohesion: 0.39
-Nodes (3): CreateTableAsStmt, CreateTableAsStmtList, CreateTableAsStmtListOpt
+### Community 287 - "RightUnaryCallSite"
+Cohesion: 0.20
+Nodes (6): RightUnaryCallSite, Option, Result, SemScalarExpr, TParseContext, TypeReference
+
+### Community 288 - ".build_null_if"
+Cohesion: 0.24
+Nodes (7): ArithExpr, NullIfExpr, Option, Result, SemScalarExpr, TParseContext, TypeReference
 
 ### Community 289 - ".new"
 Cohesion: 0.14
@@ -1511,117 +1530,181 @@ Nodes (33): CaseExpr, CaseExprAnalysisContext, CaseExprAnalysisContext<'a>, Case
 Cohesion: 0.39
 Nodes (3): DropStmt, DropStmtList, DropStmtListOpt
 
-### Community 291 - "ClosePortalStmt"
-Cohesion: 0.39
-Nodes (3): ClosePortalStmt, ClosePortalStmtList, ClosePortalStmtListOpt
-
-### Community 292 - "TableLikeClause"
-Cohesion: 0.15
-Nodes (4): TableLikeClause, TableLikeClauseList, TableLikeClauseListOpt, TableLikeClauseOpt
-
 ### Community 293 - "PlaceholderedSql"
 Cohesion: 0.09
 Nodes (21): FragmentName, ident(), NamedParameterPlaceholder, PlaceholderedSql, PlaceholderedSqlError, PlaceholderedSqlToken, RawSqlText, Display (+13 more)
 
-### Community 295 - "DoStmt"
-Cohesion: 0.23
-Nodes (4): DoStmt, DoStmtList, DoStmtListOpt, DoStmtOpt
+### Community 294 - "JsonFuncExpr"
+Cohesion: 0.18
+Nodes (3): JsonFuncExpr, JsonFuncExprOpt, JsonWrapperOpt
+
+### Community 295 - ".from"
+Cohesion: 0.09
+Nodes (18): NodeInner, DoStmt, DoStmtOpt, AIndirection, ArrayExpr, CaseExpr, CaseWhen, CoalesceExpr (+10 more)
 
 ### Community 297 - ".poll"
 Cohesion: 0.28
 Nodes (7): Future, Pin, Poll, PendingFut<V, E>, F, Output, Self
 
 ### Community 298 - "metadata_args.rs"
-Cohesion: 0.11
-Nodes (30): Q, applies_metadata_related_environment_values(), derives_schema_file_from_metadata_file_parent(), falls_back_to_metadata_cte_catalog_dir(), falls_back_to_metadata_sql_dialect(), MetadataArgs, path_owner(), populates_env_map_with_resolved_metadata_values() (+22 more)
+Cohesion: 0.13
+Nodes (23): applies_metadata_related_environment_values(), derives_schema_file_from_metadata_file_parent(), falls_back_to_metadata_cte_catalog_dir(), MetadataArgs, path_owner(), populates_env_map_with_resolved_metadata_values(), prefers_argument_cte_catalog_dir_over_metadata_value(), rejects_default_metadata_file_for_unsupported_format() (+15 more)
 
-### Community 299 - "NotifyStmt"
-Cohesion: 0.39
-Nodes (3): NotifyStmt, NotifyStmtList, NotifyStmtListOpt
+### Community 299 - "AlterTsConfigTypeOpt"
+Cohesion: 0.27
+Nodes (3): AlterTsConfigType, AlterTsConfigTypeList, AlterTsConfigTypeOpt
 
-### Community 300 - "CteSearchClause"
-Cohesion: 0.14
-Nodes (4): CteSearchClause, CteSearchClauseList, CteSearchClauseListOpt, CteSearchClauseOpt
+### Community 301 - "ConstrTypeOpt"
+Cohesion: 0.29
+Nodes (3): ConstrType, ConstrTypeList, ConstrTypeOpt
+
+### Community 302 - "AlterTypeStmt"
+Cohesion: 0.16
+Nodes (4): AlterTypeStmt, AlterTypeStmtList, AlterTypeStmtListOpt, AlterTypeStmtOpt
 
 ### Community 303 - "TruncateStmt"
 Cohesion: 0.39
 Nodes (3): TruncateStmt, TruncateStmtList, TruncateStmtListOpt
+
+### Community 304 - "JsonValueExpr"
+Cohesion: 0.29
+Nodes (3): JsonValueExpr, JsonValueExprList, JsonValueExprListOpt
+
+### Community 305 - "ColumnRef"
+Cohesion: 0.33
+Nodes (3): ColumnRef, ColumnRefList, ColumnRefListOpt
 
 ### Community 306 - ".list_of_pair_eof_parser"
 Cohesion: 0.60
 Nodes (4): Input, Output, Parser, Vec
 
 ### Community 307 - "Cache"
-Cohesion: 0.09
-Nodes (31): BoxFuture, Duration, FutureResult, Instant, K, Key, LoaderFun, RwLock (+23 more)
+Cohesion: 0.06
+Nodes (46): BoxFuture, C, Duration, Fut, FutureResult, Instant, K, Key (+38 more)
 
-### Community 308 - ".get_xpr"
-Cohesion: 0.07
-Nodes (6): AlternativeSubPlan, AlternativeSubPlanOpt, BooleanTest, BooleanTestOpt, FieldStore, FieldStoreOpt
+### Community 308 - "BooleanTest"
+Cohesion: 0.11
+Nodes (6): BooleanTest, BooleanTestList, BooleanTestListOpt, BooleanTestOpt, BoolTestType, BoolTestTypeOpt
 
-### Community 309 - "CoerceToDomainValue"
-Cohesion: 0.05
-Nodes (8): CoerceToDomainValue, CoerceToDomainValueOpt, NextValueExpr, NextValueExprList, NextValueExprListOpt, NextValueExprOpt, SetToDefault, SetToDefaultOpt
+### Community 309 - ".get_xpr"
+Cohesion: 0.03
+Nodes (11): AlternativeSubPlanOpt, CaseTestExpr, CaseTestExprOpt, CoerceToDomainValue, CoerceToDomainValueOpt, NextValueExpr, NextValueExprOpt, SetToDefault (+3 more)
 
-### Community 310 - "CallStmt"
-Cohesion: 0.20
-Nodes (4): CallStmt, CallStmtList, CallStmtListOpt, CallStmtOpt
+### Community 310 - "CreateEnumStmt"
+Cohesion: 0.33
+Nodes (3): CreateEnumStmt, CreateEnumStmtList, CreateEnumStmtListOpt
 
-### Community 311 - "RangeFunction"
-Cohesion: 0.39
-Nodes (3): RangeFunction, RangeFunctionList, RangeFunctionListOpt
+### Community 311 - "CreateSubscriptionStmt"
+Cohesion: 0.33
+Nodes (3): CreateSubscriptionStmt, CreateSubscriptionStmtList, CreateSubscriptionStmtListOpt
 
 ### Community 312 - "RangeSubselect"
-Cohesion: 0.39
-Nodes (3): RangeSubselect, RangeSubselectList, RangeSubselectListOpt
+Cohesion: 0.21
+Nodes (4): RangeSubselect, RangeSubselectList, RangeSubselectListOpt, RangeSubselectOpt
+
+### Community 313 - "PublicationObjSpec"
+Cohesion: 0.29
+Nodes (3): PublicationObjSpec, PublicationObjSpecList, PublicationObjSpecListOpt
 
 ### Community 314 - "UnlistenStmt"
-Cohesion: 0.23
-Nodes (4): UnlistenStmt, UnlistenStmtList, UnlistenStmtListOpt, UnlistenStmtOpt
+Cohesion: 0.39
+Nodes (3): UnlistenStmt, UnlistenStmtList, UnlistenStmtListOpt
 
 ### Community 317 - "HighlighterTheme"
 Cohesion: 0.13
 Nodes (12): HighlighterStyle, HighlighterTheme, HighlighterThemeError, Error, Option, P, Result, Self (+4 more)
 
-### Community 318 - "NullTestTypeOpt"
-Cohesion: 0.43
-Nodes (3): NullTestTypeList, NullTestTypeOpt, NullTestType
+### Community 318 - "SortBy"
+Cohesion: 0.33
+Nodes (3): SortBy, SortByList, SortByListOpt
 
 ### Community 319 - "concept_type_definition.md"
 Cohesion: 0.22
 Nodes (7): Examples, Frontmatter Fields, Markdown Content, Naming, Placement, Type Description, `sql-fun` Open Knowledge Format Concept Type Definitions
 
-### Community 320 - ".get_arg"
-Cohesion: 0.06
-Nodes (10): AIndirection, AIndirectionList, AIndirectionListOpt, AIndirectionOpt, JsonKeyValue, JsonKeyValueOpt, JsonValueExpr, JsonValueExprList (+2 more)
+### Community 320 - "AIndirection"
+Cohesion: 0.19
+Nodes (4): AIndirection, AIndirectionList, AIndirectionListOpt, AIndirectionOpt
+
+### Community 321 - "Infallible"
+Cohesion: 0.46
+Nodes (3): Infallible, Result, Self
+
+### Community 322 - "AlterPublicationStmt"
+Cohesion: 0.33
+Nodes (3): AlterPublicationStmt, AlterPublicationStmtList, AlterPublicationStmtListOpt
 
 ### Community 323 - "AStar"
-Cohesion: 0.26
+Cohesion: 0.23
 Nodes (4): AStar, AStarList, AStarListOpt, AStarOpt
 
-### Community 325 - "CommentStmt"
-Cohesion: 0.20
-Nodes (4): CommentStmt, CommentStmtList, CommentStmtListOpt, CommentStmtOpt
+### Community 324 - "CollateClauseOpt"
+Cohesion: 0.14
+Nodes (4): CollateClause, CollateClauseList, CollateClauseListOpt, CollateClauseOpt
 
-### Community 326 - "CteName"
-Cohesion: 0.06
-Nodes (34): H, Hash, CteName, Display, PartialEq, S, CteStatement, Box (+26 more)
+### Community 326 - "SemAst"
+Cohesion: 0.07
+Nodes (32): H, Hash, CteStatement, Box, ColumnDefinition, HashMap, Option, Result (+24 more)
+
+### Community 327 - "AlterSeqStmt"
+Cohesion: 0.15
+Nodes (4): AlterSeqStmt, AlterSeqStmtList, AlterSeqStmtListOpt, AlterSeqStmtOpt
+
+### Community 329 - "Aggref"
+Cohesion: 0.07
+Nodes (4): Aggref, AggrefOpt, AggSplit, AggSplitOpt
+
+### Community 330 - "NullTest"
+Cohesion: 0.10
+Nodes (6): NullTest, NullTestList, NullTestListOpt, NullTestOpt, NullTestTypeOpt, NullTestType
+
+### Community 331 - "CreateOpClassItem"
+Cohesion: 0.39
+Nodes (3): CreateOpClassItem, CreateOpClassItemList, CreateOpClassItemListOpt
 
 ### Community 332 - "src/lib.rs"
-Cohesion: 0.22
-Nodes (16): generate_sql_query_many(), Result, TokenStream, collector_arg_name(), from_table(), generate_table_struct(), handler_arg_name(), handler_type_name() (+8 more)
+Cohesion: 0.13
+Nodes (24): generate_sql_query_one(), Result, TokenStream, generate_sql_query_opt(), Result, TokenStream, generate_sql_query_many(), Result (+16 more)
+
+### Community 333 - "CreateOpFamilyStmt"
+Cohesion: 0.39
+Nodes (3): CreateOpFamilyStmt, CreateOpFamilyStmtList, CreateOpFamilyStmtListOpt
 
 ### Community 334 - "InferClause"
-Cohesion: 0.25
+Cohesion: 0.23
 Nodes (3): InferClause, InferClauseList, InferClauseListOpt
 
-### Community 335 - "CreateExtensionStmt"
-Cohesion: 0.25
-Nodes (3): CreateExtensionStmt, CreateExtensionStmtList, CreateExtensionStmtListOpt
+### Community 335 - "CreatePolicyStmt"
+Cohesion: 0.39
+Nodes (3): CreatePolicyStmt, CreatePolicyStmtList, CreatePolicyStmtListOpt
+
+### Community 337 - "DropUserMappingStmt"
+Cohesion: 0.39
+Nodes (3): DropUserMappingStmt, DropUserMappingStmtList, DropUserMappingStmtListOpt
+
+### Community 338 - "FunctionParameter"
+Cohesion: 0.39
+Nodes (3): FunctionParameter, FunctionParameterList, FunctionParameterListOpt
+
+### Community 340 - "ListenStmt"
+Cohesion: 0.39
+Nodes (3): ListenStmt, ListenStmtList, ListenStmtListOpt
+
+### Community 341 - "CreateDomainStmt"
+Cohesion: 0.23
+Nodes (4): CreateDomainStmt, CreateDomainStmtList, CreateDomainStmtListOpt, CreateDomainStmtOpt
 
 ### Community 342 - "CreateSchemaStmt"
 Cohesion: 0.39
 Nodes (3): CreateSchemaStmt, CreateSchemaStmtList, CreateSchemaStmtListOpt
+
+### Community 343 - "LockingClause"
+Cohesion: 0.39
+Nodes (3): LockingClause, LockingClauseList, LockingClauseListOpt
+
+### Community 344 - "DeallocateStmt"
+Cohesion: 0.15
+Nodes (4): DeallocateStmt, DeallocateStmtList, DeallocateStmtListOpt, DeallocateStmtOpt
 
 ### Community 345 - "ParameterName"
 Cohesion: 0.11
@@ -1630,6 +1713,10 @@ Nodes (18): CteParameter, CteParameterBinding, CteParameterBindingCollection, Ct
 ### Community 348 - "CreateForeignTableStmt"
 Cohesion: 0.33
 Nodes (3): CreateForeignTableStmt, CreateForeignTableStmtList, CreateForeignTableStmtListOpt
+
+### Community 349 - "DropdbStmt"
+Cohesion: 0.33
+Nodes (3): DropdbStmt, DropdbStmtList, DropdbStmtListOpt
 
 ### Community 350 - "PgFunctionDetail"
 Cohesion: 0.12
@@ -1640,8 +1727,8 @@ Cohesion: 0.19
 Nodes (4): ExecuteStmt, ExecuteStmtList, ExecuteStmtListOpt, ExecuteStmtOpt
 
 ### Community 356 - "name_version_pair.rs"
-Cohesion: 0.20
-Nodes (12): TestResult, test_name_parser(), test_parser_with_version(), test_parser_without_version(), test_resolve_version_from_extension_files_missing(), test_resolve_version_from_extension_files_multiple(), test_resolve_version_from_extension_files_single(), test_resolve_version_missing_file() (+4 more)
+Cohesion: 0.14
+Nodes (18): Option, P, PathBuf, Self, TestResult, test_name_parser(), test_parse_name_ok(), test_parse_version_ok() (+10 more)
 
 ### Community 357 - "JsonTablePathScan"
 Cohesion: 0.08
@@ -1652,20 +1739,16 @@ Cohesion: 0.04
 Nodes (24): AConstInner, ListOpt, AConst, AConstList, AConstListOpt, BitString, BitStringList, BitStringListOpt (+16 more)
 
 ### Community 360 - "JsonArgument"
-Cohesion: 0.17
-Nodes (4): JsonArgument, JsonArgumentList, JsonArgumentListOpt, JsonArgumentOpt
+Cohesion: 0.33
+Nodes (3): JsonArgument, JsonArgumentList, JsonArgumentListOpt
 
 ### Community 361 - "JsonFormat"
-Cohesion: 0.09
-Nodes (9): JsonEncoding, JsonEncodingList, JsonEncodingOpt, JsonFormat, JsonFormatList, JsonFormatListOpt, JsonFormatType, JsonFormatTypeList (+1 more)
+Cohesion: 0.15
+Nodes (6): JsonFormat, JsonFormatList, JsonFormatListOpt, JsonFormatType, JsonFormatTypeList, JsonFormatTypeOpt
 
-### Community 363 - "CreatePolicyStmt"
-Cohesion: 0.16
-Nodes (4): CreatePolicyStmt, CreatePolicyStmtList, CreatePolicyStmtListOpt, CreatePolicyStmtOpt
-
-### Community 367 - "JsonParseExpr"
-Cohesion: 0.33
-Nodes (3): JsonParseExpr, JsonParseExprList, JsonParseExprListOpt
+### Community 365 - "JsonOutput"
+Cohesion: 0.29
+Nodes (3): JsonOutput, JsonOutputList, JsonOutputListOpt
 
 ### Community 368 - "VariableShowStmt"
 Cohesion: 0.33
@@ -1675,80 +1758,68 @@ Nodes (3): VariableShowStmt, VariableShowStmtList, VariableShowStmtListOpt
 Cohesion: 0.06
 Nodes (32): AI-assisted Contributions, Code Style, Commit Messages, Contributing to `sql-fun`, Dependency Documentation, Development Workflow, Generated Files, Getting Help (+24 more)
 
+### Community 370 - "JsonBehavior"
+Cohesion: 0.19
+Nodes (3): JsonBehavior, JsonBehaviorList, JsonBehaviorListOpt
+
 ### Community 371 - "Rust Semantic Artifact for Cross-Domain Static Analysis"
 Cohesion: 0.33
 Nodes (5): Idea, Motivation, Rust Semantic Artifact for Cross-Domain Static Analysis, Scope, sql-fun Integration
 
-### Community 375 - "IndexElem"
-Cohesion: 0.06
-Nodes (13): IndexElem, IndexElemList, IndexElemListOpt, IndexElemOpt, SortBy, SortByDir, SortByDirOpt, SortByList (+5 more)
+### Community 372 - "JsonKeyValue"
+Cohesion: 0.29
+Nodes (3): JsonKeyValue, JsonKeyValueList, JsonKeyValueListOpt
 
-### Community 376 - "MergeMatchKindOpt"
-Cohesion: 0.26
-Nodes (3): MergeMatchKind, MergeMatchKindList, MergeMatchKindOpt
+### Community 373 - "ExplainStmt"
+Cohesion: 0.16
+Nodes (4): ExplainStmt, ExplainStmtList, ExplainStmtListOpt, ExplainStmtOpt
+
+### Community 375 - "IndexElem"
+Cohesion: 0.16
+Nodes (4): IndexElem, IndexElemList, IndexElemListOpt, IndexElemOpt
 
 ### Community 377 - "Param"
-Cohesion: 0.11
-Nodes (4): Param, ParamKind, ParamKindOpt, ParamOpt
+Cohesion: 0.12
+Nodes (3): Param, ParamKindOpt, ParamOpt
 
 ### Community 378 - "MergeAction"
-Cohesion: 0.23
-Nodes (4): MergeAction, MergeActionList, MergeActionListOpt, MergeActionOpt
-
-### Community 379 - "RangeTblRef"
-Cohesion: 0.21
-Nodes (4): RangeTblRef, RangeTblRefList, RangeTblRefListOpt, RangeTblRefOpt
+Cohesion: 0.39
+Nodes (3): MergeAction, MergeActionList, MergeActionListOpt
 
 ### Community 381 - "PartitionRangeDatum"
 Cohesion: 0.33
 Nodes (3): PartitionRangeDatum, PartitionRangeDatumList, PartitionRangeDatumListOpt
 
 ### Community 382 - "AlterTableSpaceOptionsStmt"
-Cohesion: 0.17
-Nodes (4): AlterTableSpaceOptionsStmt, AlterTableSpaceOptionsStmtList, AlterTableSpaceOptionsStmtListOpt, AlterTableSpaceOptionsStmtOpt
+Cohesion: 0.33
+Nodes (3): AlterTableSpaceOptionsStmt, AlterTableSpaceOptionsStmtList, AlterTableSpaceOptionsStmtListOpt
 
-### Community 384 - ".from"
-Cohesion: 0.05
-Nodes (24): NodeInner, JsonAggConstructor, JsonAggConstructorOpt, JsonArrayAgg, JsonArrayAggList, JsonArrayAggListOpt, JsonArrayAggOpt, JsonObjectAgg (+16 more)
-
-### Community 386 - "generate_sql_execute"
-Cohesion: 0.67
-Nodes (3): generate_sql_execute(), Result, TokenStream
+### Community 384 - "JsonAggConstructor"
+Cohesion: 0.06
+Nodes (10): JsonAggConstructor, JsonAggConstructorOpt, JsonArrayAgg, JsonArrayAggList, JsonArrayAggListOpt, JsonArrayAggOpt, JsonArrayQueryConstructor, JsonArrayQueryConstructorList (+2 more)
 
 ### Community 392 - "JsonTableColumn"
-Cohesion: 0.13
-Nodes (3): JsonTableColumn, JsonTableColumnOpt, JsonTableColumnTypeOpt
+Cohesion: 0.16
+Nodes (3): JsonQuotesOpt, JsonTableColumn, JsonTableColumnOpt
 
 ### Community 393 - "TypeReference"
-Cohesion: 0.07
-Nodes (7): Display, Formatter, FullName, Option, Result, Self, TypeReference
-
-### Community 396 - "RangeTableFunc"
-Cohesion: 0.33
-Nodes (3): RangeTableFunc, RangeTableFuncList, RangeTableFuncListOpt
+Cohesion: 0.08
+Nodes (5): Display, FullName, Option, Self, TypeReference
 
 ### Community 400 - "rust_ast.rs"
 Cohesion: 0.14
-Nodes (28): FnArg, Plus, Punctuated, extracts_path(), falls_back_to_where_clause(), get_arg_name(), get_function_output_type(), get_generic_param_bounds() (+20 more)
-
-### Community 404 - "DropRoleStmt"
-Cohesion: 0.17
-Nodes (4): DropRoleStmt, DropRoleStmtList, DropRoleStmtListOpt, DropRoleStmtOpt
+Nodes (28): Plus, extracts_path(), falls_back_to_where_clause(), get_arg_name(), get_function_output_type(), get_generic_param_bounds(), get_generic_type_bounds(), get_generic_where_bounds() (+20 more)
 
 ### Community 408 - "PlAssignStmt"
-Cohesion: 0.25
+Cohesion: 0.29
 Nodes (3): PlAssignStmt, PlAssignStmtList, PlAssignStmtListOpt
 
-### Community 409 - "RelabelType"
-Cohesion: 0.12
-Nodes (4): RelabelType, RelabelTypeList, RelabelTypeListOpt, RelabelTypeOpt
-
 ### Community 414 - "ConcreteTypeReference"
-Cohesion: 0.10
-Nodes (7): ConcreteTypeReference, Display, Formatter, FullName, Result, Self, TypeReference
+Cohesion: 0.12
+Nodes (4): ConcreteTypeReference, Display, FullName, TypeReference
 
 ### Community 416 - "ReturnStmt"
-Cohesion: 0.26
+Cohesion: 0.20
 Nodes (4): ReturnStmt, ReturnStmtList, ReturnStmtListOpt, ReturnStmtOpt
 
 ### Community 421 - "IVec<T>"
@@ -1759,21 +1830,17 @@ Nodes (16): FromIterator, I, IterMut, &'a IVec<T>, &'a mut IVec<T>, IVec<T>, Def
 Cohesion: 0.20
 Nodes (28): dat_parser(), just_ws(), just_ws_str(), parse_null(), parse_pair(), parse_record(), parse_string(), parse_value() (+20 more)
 
-### Community 425 - "RoleSpec"
-Cohesion: 0.25
-Nodes (3): RoleSpec, RoleSpecList, RoleSpecListOpt
-
 ### Community 427 - "ExtensionConfigError"
-Cohesion: 0.20
+Cohesion: 0.21
 Nodes (14): ExtensionConfigError, Error, P, PathBuf, Result, Self, T, TestResult (+6 more)
 
-### Community 428 - "IVec"
-Cohesion: 0.04
-Nodes (76): IVec, Box, DataSource, Option, Result, ScanToken, Self, TestParseContext (+68 more)
+### Community 428 - "IndirectionExpr"
+Cohesion: 0.07
+Nodes (36): ArrayIndex, Option, Result, ScanToken, Self, SemScalarExpr, TParseContext, TypeReference (+28 more)
 
 ### Community 430 - "TableSampleClause"
-Cohesion: 0.33
-Nodes (3): TableSampleClause, TableSampleClauseList, TableSampleClauseListOpt
+Cohesion: 0.15
+Nodes (4): TableSampleClause, TableSampleClauseList, TableSampleClauseListOpt, TableSampleClauseOpt
 
 ### Community 432 - "CheckArgs"
 Cohesion: 0.16
@@ -1784,24 +1851,32 @@ Cohesion: 0.50
 Nodes (3): &'a CteParameterCollection, IntoIter, IntoIterator
 
 ### Community 444 - "PostgresExtensionsCollection"
-Cohesion: 0.18
+Cohesion: 0.17
 Nodes (12): PostgresExtensionsCollection, PostgresExtensionsParseError, Display, Err, Error, Formatter, FromStr, P (+4 more)
 
-### Community 450 - "VacuumRelation"
-Cohesion: 0.33
-Nodes (3): VacuumRelation, VacuumRelationList, VacuumRelationListOpt
+### Community 451 - "ViewStmt"
+Cohesion: 0.12
+Nodes (4): ViewStmt, ViewStmtList, ViewStmtListOpt, ViewStmtOpt
 
 ### Community 452 - "FunctionParamOut"
 Cohesion: 0.13
 Nodes (13): FunctionParam, FunctionParamOut, Display, Formatter, From, Option, Result, ScanToken (+5 more)
 
+### Community 455 - ".into_iter"
+Cohesion: 0.50
+Nodes (3): &'a FunctionOverloadCollection, IntoIter, IntoIterator
+
+### Community 456 - "main"
+Cohesion: 0.50
+Nodes (3): main(), Error, Result
+
 ### Community 460 - "FunctionParamIn"
 Cohesion: 0.15
 Nodes (13): FunctionParam, FunctionParamIn, Display, Formatter, From, Option, Result, ScanToken (+5 more)
 
-### Community 462 - "SchemaFileContext"
-Cohesion: 0.08
-Nodes (29): CastInfo, PgBuiltinCasts, P, Result, PgBuiltinOperators, P, Result, PathBuf (+21 more)
+### Community 462 - ".new"
+Cohesion: 0.17
+Nodes (15): Default, Item, Iterator, Option, Self, TValue, test_empty_key(), test_get_common_prefix_loop() (+7 more)
 
 ### Community 471 - "Api"
 Cohesion: 0.13
@@ -1844,24 +1919,24 @@ Cohesion: 0.23
 Nodes (10): JsonRpcError, JsonRpcRequest, JsonRpcResponse, Error, From, JsonRpcError, Option, Self (+2 more)
 
 ### Community 533 - "analyze_query.rs"
-Cohesion: 0.20
-Nodes (16): AnalyzeQueryArgs, AnalyzeQueryInput, AnalyzeQueryItem, AnalyzeQueryResponse, ColumnAccess, ColumnAccessKind, ParameterDescribe, QueryKind (+8 more)
+Cohesion: 0.18
+Nodes (17): AnalyzeQueryArgs, AnalyzeQueryInput, AnalyzeQueryItem, AnalyzeQueryResponse, ColumnAccess, ColumnAccessKind, ParameterDescribe, QueryKind (+9 more)
 
-### Community 546 - "postgres_engine_selection_validator"
-Cohesion: 0.08
-Nodes (32): postgres_engine_selection_validator(), PostgresVersions, Box, Display, Err, Error, Formatter, FromStr (+24 more)
+### Community 546 - "find_user_by_id_with_interrupt"
+Cohesion: 0.09
+Nodes (30): postgres_engine_selection_validator(), PostgresVersions, Box, Display, Err, Error, Formatter, FromStr (+22 more)
 
 ### Community 548 - "PidFile"
 Cohesion: 0.20
 Nodes (11): Drop, PidFile, Args, File, Option, Path, PathBuf, Result (+3 more)
 
 ### Community 550 - "TestMetadataEnvs"
-Cohesion: 0.27
-Nodes (7): Into, cte_catalog_has_error(), Fn, HashMap, Path, Self, TestMetadataEnvs
+Cohesion: 0.33
+Nodes (5): Into, HashMap, Path, Self, TestMetadataEnvs
 
 ### Community 570 - "sql-fun-core/src/test_helpers.rs"
-Cohesion: 0.38
-Nodes (13): Error, PathBuf, Result, TestMetadataProject, TestMetadataProjectWithCte, TestProjectDir, write_cte_catalog_toml(), write_metadata_project() (+5 more)
+Cohesion: 0.24
+Nodes (20): Q, falls_back_to_metadata_sql_dialect(), rejects_unsupported_explicit_sql_dialect(), parse_metadata(), parse_postgres_metadata(), parse_postgres_metadata_with_cte_catalog(), Error, P (+12 more)
 
 ### Community 572 - "📦 Setting Up the AdventureWorks Database"
 Cohesion: 0.13
@@ -1891,10 +1966,6 @@ Nodes (11): Schema, SchemaGenerator, Collection, CollectionHandle, ReadCollectio
 Cohesion: 0.26
 Nodes (9): Path, PathBuf, Result, TestResult, super::SqlFunArgs, test_metadata_file(), test_metadata_file_load(), test_metadata_file_raw() (+1 more)
 
-### Community 644 - "InitializeArgs"
-Cohesion: 0.24
-Nodes (7): InitializeArgs, Error, Option, PathBuf, Result, Url, Vec
-
 ### Community 647 - "AGENTS.md"
 Cohesion: 0.20
 Nodes (9): Build and Test, Commits, Generated Code, graphify, Lookup dependency documentation, Pull Requests, Reviews, Scripts (+1 more)
@@ -1907,9 +1978,9 @@ Nodes (9): Application development stage, `check` sub command for `sql-fun` CLI 
 Cohesion: 0.20
 Nodes (9): CTE Catalog, CTE catalog expansion in CLI, CTE Catalog file format, Field specifications, Nested CTE catalog expansion, Positional place holder in CTE, Renaming named place holder in CTE, Reusable Query (+1 more)
 
-### Community 660 - "RangeVar"
-Cohesion: 0.11
-Nodes (11): Option, Self, FullName, Err, Error, FromStr, Result, Self (+3 more)
+### Community 660 - ".try_from"
+Cohesion: 0.29
+Nodes (8): FullName, Err, Error, FromStr, Result, Self, TryFrom, TypeName
 
 ### Community 661 - "TokioPostgresCodeGenerator"
 Cohesion: 0.18
@@ -1917,7 +1988,7 @@ Nodes (12): extract_placeholders(), Ident, ItemFn, Option, Path, Result, Self, T
 
 ### Community 663 - "select_user_id_with_names"
 Cohesion: 0.31
-Nodes (7): Client, IdWithNameBuilder, connect_exec(), IdWithName, Error, Result, select_user_id_with_names()
+Nodes (7): IdWithNameBuilder, connect_exec(), IdWithName, Client, Error, Result, select_user_id_with_names()
 
 ### Community 681 - "Introduction"
 Cohesion: 0.25
@@ -2002,22 +2073,22 @@ Nodes (3): Function not found : SF00002, Situation, Why
 ## Knowledge Gaps
 - **250 isolated node(s):** `LinesBufReader<Read>`, `IndividualCustomer`, `OrderError<O>`, `SqlFunArgsBuilder`, `SqlFunArgs` (+245 more)
   These have ≤1 connection - possible missing edges or undocumented components.
-- **159 thin communities (<3 nodes) omitted from report** — run `graphify query` to explore isolated nodes.
+- **179 thin communities (<3 nodes) omitted from report** — run `graphify query` to explore isolated nodes.
 
 ## Suggested Questions
 _Questions this graph is uniquely positioned to answer:_
 
-- **Why does `String` connect `String` to `Option`, `AlterForeignServerStmt`, `Node`, `sql-fun-core/src/lib.rs`, `JsonRpcError`, `CreateOpClassStmt`, `TableName`, `SubPlan`, `CreateStmt`, `XmlExprOpt`, `analyze_query.rs`, `OperatorName`, `Constraint`, `BaseContext`, `ColumnDef`, `ResTarget`, `RangeTblEntry`, `postgres_engine_selection_validator`, `RangeVarOpt`, `PidFile`, `TestMetadataEnvs`, `CreateTableAs`, `SourcePathWithSpan`, `XmlExpr`, `cte_catalog.rs`, `OnConflictExpr`, `CompositeFieldDefinition`, `FunctionParamTable`, `WithCheckOption`, `CreateSequence`, `FunctionParamVariadic`, `CteCycleClause`, `ChildProcess`, `DropdbStmt`, `FunctionParamInOut`, `AnalysisError`, `.get_kind`, `EnumType`, `TypeError`, `RuleStmt`, `NameResolution`, `CreateForeignServerStmt`, `CopyStmt`, `.get_expr`, `SqlFunServerError`, `CreateTrigStmt`, `CreateIndex`, `AlterTableCmd`, `SqlHighlighterState`, `AliasName`, `LockfileEntry`, `From`, `LoggingArgs`, `AlterEnumStmt`, `RoleSpecOpt`, `Box`, `TargetEntry`, `TriggerTransition`, `JsonExpr`, `TransactionStmt`, `CreateTableSpaceStmt`, `JsonTablePathSpecOpt`, `Collection`, `SemScalarExpr`, `SqlFunArgsError`, `CreateTransformStmt`, `Opt`, `AlterDomainStmtOpt`, `CliSubCommand`, `InitializeArgs`, `ExtensionNameVersionPair`, `ImportForeignSchemaStmt`, `ReindexStmtOpt`, `AlterExtensionContentsStmt`, `.get_options`, `CurrentOfExpr`, `PrepareStmt`, `RangeVar`, `TokioPostgresCodeGenerator`, `MemberRef`, `select_user_id_with_names`, `DefElem`, `AlterOpFamilyStmt`, `FuncCall`, `ClusterStmt`, `CreateOpClassStmtOpt`, `read_sql_file`, `SqlFunError`, `DropTableSpaceStmt`, `generated.rs`, `CommonTableExpr`, `VariableSetStmtOpt`, `AlterTableMoveAllStmt`, `ReplicaIdentityStmt`, `sql-fun-server-api/src/lib.rs`, `StatsElem`, `CreatePublicationStmt`, `NodeList`, `JsonFuncExpr`, `NamedArgExpr`, `CreateEventTrigStmtOpt`, `CreatePLangStmt`, `IntoClause`, `CteCatalog`, `list_objects.rs`, `InlineCodeBlock`, `RenameStmt`, `CreateTable`, `DefElemKey`, `WindowClause`, `CreateRoleStmt`, `FunctionOverloadCollection`, `SqlFunArgs`, `FullName`, `AlterDomainStmt`, `AlterDatabaseRefreshCollStmt`, `ColumnName`, `LoadStmt`, `FunctionParameter`, `CteCatalogError`, `AlterFdwStmt`, `CreateStatsStmt`, `ExtensionVersion`, `CreateAmStmt`, `CreateConversionStmt`, `SecLabelStmt`, `DeclareCursorStmt`, `SQLQueryInfoVisitor`, `AnalysisProblem`, `AlterSubscriptionStmt`, `AlterObjectSchemaStmt`, `AlterPolicyStmt`, `ReindexStmt`, `SqlFunMetadata`, `VariableSetStmt`, `StringOpt`, `CreateExtensionStmtOpt`, `ColumnDefinition`, `RangeTableFuncCol`, `CreateUserMappingStmt`, `SqlFunServerApiError`, `TcpJsonRpcClientAsync`, `deserialize_braced_list_opt`, `FetchStmt`, `CreateEventTrigStmt`, `InsertStmt`, `DropSubscriptionStmt`, `PrimaryKeyConstraint`, `ClosePortalStmt`, `PlaceholderedSql`, `PlAssignStmtOpt`, `metadata_args.rs`, `NotifyStmt`, `CteSearchClause`, `UnlistenStmt`, `IntoClauseOpt`, `HighlighterTheme`, `CommentStmt`, `CteName`, `Aggref`, `src/lib.rs`, `InferClause`, `CreateExtensionStmt`, `CreateSchemaStmt`, `DeallocateStmt`, `ParameterName`, `CreateForeignTableStmt`, `PgFunctionDetail`, `ExecuteStmt`, `JsonTablePathScan`, `AConst`, `JsonArgument`, `CreatePolicyStmt`, `CreateSubscriptionStmtOpt`, `VariableShowStmt`, `IndexElem`, `AlterTableSpaceOptionsStmt`, `.from`, `JsonTableColumn`, `PlAssignStmt`, `parse_dat/src/lib.rs`, `RoleSpec`, `ExtensionConfigError`, `IVec`, `CheckArgs`, `PostgresExtensionsCollection`, `FunctionParamOut`, `FunctionParamIn`, `SchemaFileContext`, `Api`, `PostgresArgs`, `InitializeSchemaArgs`, `KeyFragment`, `DockerClient`?**
-  _High betweenness centrality (0.349) - this node is a cross-community bridge._
-- **Why does `Node` connect `Node` to `.none`, `ListOpt`, `GroupingFunc`, `ArrayCoerceExpr`, `Option`, `AlterForeignServerStmt`, `NodeOpt`, `String`, `CreateOpClassStmt`, `.from`, `Query`, `SubPlan`, `CreateStmt`, `TableFunc`, `XmlExprOpt`, `FuncExpr`, `DropBehaviorOpt`, `Constraint`, `ColumnDef`, `JsonConstructorExpr`, `ResTarget`, `RangeTblEntry`, `InlineCodeBlockOpt`, `JoinExpr`, `RangeVarOpt`, `DefineStmt`, `CreateOpClassItem`, `SubscriptingRef`, `WindowFunc`, `ColumnReferenceExpr`, `SourcePathWithSpan`, `TypeNameOpt`, `XmlExpr`, `RangeTableSample`, `RowCompareExpr`, `OnConflictExpr`, `SinglePartitionSpec`, `RangeSubselectOpt`, `SelectStmtOpt`, `WithCheckOption`, `CteCycleClause`, `DropdbStmt`, `CaseExpr`, `AnalysisError`, `.get_kind`, `SortGroupClause`, `RtePermissionInfo`, `RuleStmt`, `DiscardStmt`, `CreateForeignServerStmt`, `CopyStmt`, `.get_expr`, `CreateTrigStmt`, `Var`, `AlterTableCmd`, `MinMaxExpr`, `RangeTblFunction`, `ParseResult`, `ArithExpr`, `CreateRangeStmt`, `From`, `JsonIsPredicate`, `AlterEnumStmt`, `RoleSpecOpt`, `TargetEntry`, `Box`, `TriggerTransition`, `JsonExpr`, `TransactionStmt`, `AIndices`, `CreateTableSpaceStmt`, `JsonTablePathSpecOpt`, `CreateCastStmt`, `PublicationTable`, `RangeFunctionOpt`, `CreateFunctionStmt`, `CreateTransformStmt`, `.get_args`, `Opt`, `AlterDomainStmtOpt`, `MergeWhenClause`, `AArrayExpr`, `RefreshMatViewStmt`, `ImportForeignSchemaStmt`, `MultiAssignRef`, `ReindexStmtOpt`, `CoalesceExpr`, `AlterExtensionContentsStmt`, `.get_options`, `ObjectWithArgsOpt`, `CurrentOfExpr`, `PrepareStmt`, `AlterStatsStmt`, `JsonReturningOpt`, `RangeVar`, `AlterTsConfigurationStmt`, `DefElem`, `JsonFormatOpt`, `AlterOpFamilyStmt`, `AlterCollationStmt`, `FuncCall`, `ClusterStmt`, `CreateOpClassStmtOpt`, `JsonTableSiblingJoin`, `JsonTable`, `DropTableSpaceStmt`, `generated.rs`, `CommonTableExpr`, `VariableSetStmtOpt`, `AlterTableMoveAllStmt`, `RawStmtOpt`, `ReplicaIdentityStmt`, `ArrayExpr`, `CheckPointStmt`, `StatsElem`, `CreatePublicationStmt`, `CompositeTypeStmt`, `NodeList`, `JsonFuncExpr`, `NamedArgExpr`, `CreateEventTrigStmtOpt`, `JsonArrayQueryConstructor`, `DefineStmtOpt`, `CreatePLangStmt`, `IntoClause`, `OpExprOpt`, `CreateSeqStmt`, `InlineCodeBlock`, `RenameStmt`, `DefElemKey`, `WindowClause`, `CreateRoleStmt`, `GroupingSet`, `CoercionFormOpt`, `ReassignOwnedStmt`, `AlterDomainStmt`, `CollateExpr`, `AlterPolicyStmtOpt`, `AlterDatabaseRefreshCollStmt`, `JsonParseExprOpt`, `ColumnName`, `LoadStmt`, `FunctionParameter`, `SemScalarExprNode`, `AlterFdwStmt`, `CreateStatsStmt`, `SelectStmt`, `AlterOperatorStmt`, `AlterOwnerStmt`, `CreateAmStmt`, `CreateConversionStmt`, `MergeSupportFunc`, `SecLabelStmt`, `DeclareCursorStmt`, `ParamRef`, `AExprOpt`, `AlterRoleStmt`, `AlterSubscriptionStmt`, `AlterObjectSchemaStmt`, `JsonArrayConstructor`, `JsonObjectConstructor`, `AlterPolicyStmt`, `ReindexStmt`, `JsonSerializeExpr`, `LockingClause`, `VariableSetStmt`, `CaseTestExpr`, `StringOpt`, `CreateExtensionStmtOpt`, `AlterFunctionStmt`, `AlterObjectDependsStmtOpt`, `RangeTableFuncCol`, `FromExpr`, `CreateUserMappingStmt`, `FetchStmt`, `AlterObjectDependsStmt`, `CreateEventTrigStmt`, `InsertStmt`, `DropSubscriptionStmt`, `ConstraintsSetStmt`, `IntList`, `CreateTableAsStmt`, `CreateTableAsStmtOpt`, `DropStmt`, `ClosePortalStmt`, `TableLikeClause`, `DoStmt`, `PlAssignStmtOpt`, `NotifyStmt`, `CteSearchClause`, `TruncateStmt`, `JsonSerializeExprOpt`, `TruncateStmtOpt`, `.get_xpr`, `CoerceToDomainValue`, `CallStmt`, `RangeFunction`, `RangeSubselect`, `UnlistenStmt`, `IntoClauseOpt`, `.get_arg`, `AStar`, `CommentStmt`, `Aggref`, `NullTest`, `InferClause`, `CreateExtensionStmt`, `CreateSchemaStmt`, `DeallocateStmt`, `CreateForeignTableStmt`, `ExecuteStmt`, `JsonTablePathScan`, `AConst`, `JsonArgument`, `JsonFormat`, `CreatePolicyStmt`, `CreateSubscriptionStmtOpt`, `JsonParseExpr`, `VariableShowStmt`, `IndexElem`, `Param`, `MergeAction`, `RangeTblRef`, `PartitionRangeDatum`, `AlterTableSpaceOptionsStmt`, `.from`, `JsonTableColumn`, `RangeTableFunc`, `DropRoleStmt`, `PlAssignStmt`, `RelabelType`, `ReturnStmt`, `RoleSpec`, `IVec`, `TableSampleClause`, `VacuumRelation`?**
-  _High betweenness centrality (0.148) - this node is a cross-community bridge._
-- **Why does `AnalysisError` connect `AnalysisError` to `ArrayExpr`, `SqlFunMetadata`, `ColumnNullabilityConstraint`, `String`, `.analyze_range_var_node`, `TableName`, `column_constraints.rs`, `TestParseContext`, `OperatorName`, `MemberRef`, `BaseContext`, `PrimaryKeyColumnConstraint`, `ViewName`, `PrimaryKeyConstraint`, `FuncCallExpr`, `SqlValueExpr`, `.new`, `ParameterBindResult`, `GeneratedColumnConstraint`, `ColumnDefinition`, `ColumnReferenceExpr`, `CreateTableAs`, `SourcePathWithSpan`, `IVec`, `ResultColumnCollection`, `CompositeFieldDefinition`, `FunctionParamTable`, `CoalesceExpr`, `TableFunctionColumnRef`, `CreateSequence`, `HighlighterTheme`, `FunctionParamVariadic`, `ForeignKeyColumnConstraint`, `FunctionParamInOut`, `TableDataSource`, `CteName`, `FunctionParamOut`, `CreateTable`, `DefElemKey`, `FunctionOverloadCollection`, `FunctionParamIn`, `SchemaFileContext`, `sql-fun-sqlast/src/lib.rs`, `NameResolution`, `SqlFunServerError`, `CreateIndex`, `SqlHighlighterState`, `ColumnName`, `AliasName`, `FunctionParameter`, `.build_binary_op`, `PgFunctionDetail`, `ArithExpr`, `SemScalarExprNode`, `.analyze_index`, `SelectStmt`, `CheckColumnConstraint`, `.build_op_any`, `.resolve_overload_unary`, `DefaultColumnConstraint`, `SemScalarExpr`, `.build_op`, `SqlFunArgsError`?**
-  _High betweenness centrality (0.073) - this node is a cross-community bridge._
+- **Why does `String` connect `String` to `.from`, `ItemFunction`, `Option`, `sql-fun-codegen/src/lib.rs`, `Node`, `sql-fun-core/src/lib.rs`, `JsonRpcError`, `CreateOpClassStmt`, `ColumnConstraint`, `SubPlan`, `CreateStmt`, `QueryFunctionSpec`, `analyze_query.rs`, `OperatorName`, `IndexStmt`, `BaseContext`, `ColumnDef`, `DropBehaviorOpt`, `ResTarget`, `ViewName`, `RangeTblEntry`, `InlineCodeBlock`, `find_user_by_id_with_interrupt`, `SchemaFileContext`, `PidFile`, `RangeVarOpt`, `TestMetadataEnvs`, `AliasName`, `CreateTableAs`, `AlterTableCmd`, `TypeDefinition`, `sql-fun-core/src/cte_catalog.rs`, `CompositeFieldDefinition`, `FunctionParamTable`, `SqlFunCodegenError`, `CreateSequence`, `FunctionParamVariadic`, `CteCycleClause`, `ChildProcess`, `Opt`, `FunctionParamInOut`, `AnalysisError`, `AExpr`, `EnumType`, `TypeError`, `RuleStmt`, `TableName`, `CreateForeignServerStmt`, `AstAndContextPair`, `SqlFunServerError`, `CreateIndex`, `SqlHighlighterState`, `AliasSpec`, `PartitionElem`, `Lockfile`, `LoggingArgs`, `AlterEnumStmt`, `RoleSpecOpt`, `TargetEntry`, `From`, `.get_name`, `JsonExpr`, `TransactionStmt`, `JsonTablePathSpecOpt`, `Collection`, `SemScalarExpr`, `IVec`, `ObjectWithArgsOpt`, `Box`, `AlterDomainStmt`, `CliSubCommand`, `ExtensionNameVersionPair`, `AlterExtensionContentsStmt`, `.get_options`, `CurrentOfExpr`, `PrepareStmt`, `TokioPostgresCodeGenerator`, `AlterEventTrigStmt`, `select_user_id_with_names`, `AlterOpFamilyStmt`, `ClusterStmt`, `PartitionBoundSpecOpt`, `read_sql_file`, `SqlFunError`, `generated.rs`, `CommonTableExpr`, `VariableSetStmtOpt`, `AlterTableMoveAllStmt`, `sql-fun-server-api/src/lib.rs`, `StatsElem`, `CastDefinition`, `NodeList`, `JsonObjectAgg`, `CreatePLangStmt`, `WindowDef`, `IntoClause`, `ImportForeignSchemaStmt`, `list_objects.rs`, `CteCatalogReference`, `CreateTable`, `CreatedbStmt`, `WindowClause`, `CreateRoleStmt`, `CreateFunction`, `StringSpan`, `Self`, `SqlFunArgsError`, `FullName`, `XmlExprOpt`, `AlterDatabaseRefreshCollStmt`, `ColumnName`, `LoadStmt`, `LockStmt`, `CteName`, `CreateRoleStmtOpt`, `CreateStatsStmt`, `ExtensionVersion`, `CreateConversionStmt`, `.get_location`, `SecLabelStmt`, `DeclareCursorStmt`, `AnalysisProblem`, `AlterSubscriptionStmt`, `AlterFdwStmt`, `SqlFunMetadata`, `CreatePublicationStmt`, `SqlFunOptions`, `StringOpt`, `ColumnDefinition`, `ValidOperatorName`, `CreateUserMappingStmt`, `SqlFunServerApiError`, `TcpJsonRpcClientAsync`, `deserialize_braced_list_opt`, `FetchStmt`, `CreateEventTrigStmt`, `GrantStmtOpt`, `PrimaryKeyConstraint`, `PlaceholderedSql`, `JsonFuncExpr`, `.from`, `AlterExtensionStmt`, `metadata_args.rs`, `CteSearchClause`, `Cache`, `CreateSubscriptionStmt`, `PublicationObjSpec`, `UnlistenStmt`, `DropSubscriptionStmt`, `HighlighterTheme`, `AlterPublicationStmt`, `CommentStmt`, `SemAst`, `Aggref`, `src/lib.rs`, `CreateOpFamilyStmt`, `InferClause`, `CreatePolicyStmt`, `DropUserMappingStmt`, `FunctionParameter`, `ListenStmt`, `CreateSchemaStmt`, `DeallocateStmt`, `ParameterName`, `CreateForeignTableStmt`, `DropdbStmt`, `PgFunctionDetail`, `ExecuteStmt`, `JsonTablePathScan`, `AConst`, `JsonArgument`, `CreatePolicyStmtOpt`, `VariableShowStmt`, `IndexElem`, `AlterTableSpaceOptionsStmt`, `JsonTableColumn`, `PlAssignStmt`, `parse_dat/src/lib.rs`, `ExtensionConfigError`, `IndirectionExpr`, `CheckArgs`, `PostgresExtensionsCollection`, `FunctionParamOut`, `FunctionParamIn`, `.new`, `Api`, `PostgresArgs`, `InitializeSchemaArgs`, `KeyFragment`, `DockerClient`?**
+  _High betweenness centrality (0.448) - this node is a cross-community bridge._
+- **Why does `Node` connect `Node` to `.from`, `ListOpt`, `.get_arg`, `Option`, `.none`, `String`, `CreateOpClassStmt`, `WithClauseOpt`, `Query`, `SubPlan`, `CreateStmt`, `RangeTableFunc`, `DropBehaviorOpt`, `IndexStmt`, `ColumnDef`, `JsonConstructorExpr`, `ResTarget`, `RangeTblEntry`, `InlineCodeBlock`, `RangeVarOpt`, `CreateOpClassItemOpt`, `SubscriptingRef`, `WindowFunc`, `AlterTableCmd`, `TypeNameOpt`, `XmlSerialize`, `OnConflictExpr`, `SinglePartitionSpec`, `SetOperationStmt`, `CteCycleClause`, `Opt`, `.get_args`, `AExpr`, `SortGroupClause`, `RtePermissionInfo`, `RuleStmt`, `DiscardStmt`, `CreateForeignServerStmt`, `AstAndContextPair`, `InferenceElem`, `Var`, `FromClause`, `PartitionSpec`, `RangeTblFunction`, `ParseResult`, `ArithExpr`, `PartitionElem`, `AlterTsDictionaryStmt`, `AlterEnumStmt`, `RoleSpecOpt`, `TargetEntry`, `BoolExpr`, `From`, `.get_name`, `JsonExpr`, `TransactionStmt`, `AIndices`, `SubLink`, `JsonTablePathSpecOpt`, `CreateCastStmt`, `RangeFunction`, `IVec`, `CreateFunctionStmt`, `ObjectWithArgsOpt`, `DistinctExpr`, `Box`, `AlterDomainStmt`, `RowCompareExpr`, `AArrayExpr`, `RefreshMatViewStmt`, `MultiAssignRef`, `CoalesceExpr`, `AlternativeSubPlan`, `AlterExtensionContentsStmt`, `.get_options`, `ObjectWithArgs`, `CurrentOfExpr`, `PrepareStmt`, `AlterStatsStmt`, `JsonReturningOpt`, `AlterEventTrigStmt`, `AlterTsConfigurationStmt`, `JsonValueExprOpt`, `AlterOpFamilyStmt`, `FuncCall`, `ClusterStmt`, `PartitionBoundSpecOpt`, `JsonTableSiblingJoin`, `generated.rs`, `CommonTableExpr`, `VariableSetStmtOpt`, `AlterTableMoveAllStmt`, `RawStmtOpt`, `ArrayExpr`, `CheckPointStmt`, `StatsElem`, `CompositeTypeStmt`, `NodeList`, `JsonBehaviorOpt`, `JsonObjectAgg`, `CreatePLangStmt`, `WindowDef`, `IntoClause`, `ImportForeignSchemaStmt`, `CreateSeqStmt`, `CallContext`, `GrantStmt`, `CreatedbStmt`, `WindowClause`, `CreateRoleStmt`, `GroupingSet`, `Self`, `RowExpr`, `ReassignOwnedStmt`, `FieldStore`, `XmlExprOpt`, `AlterDatabaseRefreshCollStmt`, `ColumnName`, `LoadStmt`, `LockStmt`, `CreateRoleStmtOpt`, `AnalyzeScalarExpr`, `CreateStatsStmt`, `SelectStmt`, `AlterOperatorStmt`, `AlterOwnerStmt`, `CreateConversionStmt`, `.get_location`, `SecLabelStmt`, `DeclareCursorStmt`, `AnalysisProblem`, `AlterRoleStmt`, `AlterSubscriptionStmt`, `JsonObjectConstructor`, `JsonSerializeExpr`, `AlterFdwStmt`, `RowMarkClause`, `CreatePublicationStmt`, `AlterSystemStmt`, `SortByDirOpt`, `StringOpt`, `AlterFunctionStmt`, `FromExpr`, `CreateUserMappingStmt`, `FetchStmt`, `CreateEventTrigStmt`, `GrantStmtOpt`, `PartitionCmd`, `DropStmt`, `VacuumStmt`, `JsonFuncExpr`, `.from`, `AlterExtensionStmt`, `CteSearchClause`, `AlterTypeStmt`, `TruncateStmt`, `JsonValueExpr`, `ColumnRef`, `BooleanTest`, `.get_xpr`, `CreateEnumStmt`, `CreateSubscriptionStmt`, `RangeSubselect`, `PublicationObjSpec`, `UnlistenStmt`, `CreateTableAsStmt`, `DropSubscriptionStmt`, `SortBy`, `AIndirection`, `AlterPublicationStmt`, `AStar`, `CollateClauseOpt`, `CommentStmt`, `AlterSeqStmt`, `Aggref`, `NullTest`, `CreateOpClassItem`, `CreateOpFamilyStmt`, `InferClause`, `CreatePolicyStmt`, `DropUserMappingStmt`, `FunctionParameter`, `ListenStmt`, `CreateDomainStmt`, `CreateSchemaStmt`, `LockingClause`, `DeallocateStmt`, `CreateForeignTableStmt`, `DropdbStmt`, `ExecuteStmt`, `JsonTablePathScan`, `AConst`, `JsonArgument`, `JsonFormat`, `CreatePolicyStmtOpt`, `JsonOutput`, `VariableShowStmt`, `JsonBehavior`, `JsonKeyValue`, `ExplainStmt`, `IndexElem`, `AlterTsDictionaryStmtOpt`, `Param`, `MergeAction`, `PartitionRangeDatum`, `AlterTableSpaceOptionsStmt`, `JsonAggConstructor`, `JsonTableColumn`, `PlAssignStmt`, `ReturnStmt`, `IndirectionExpr`, `TableSampleClause`, `ViewStmt`?**
+  _High betweenness centrality (0.103) - this node is a cross-community bridge._
+- **Why does `AnalysisError` connect `AnalysisError` to `String`, `ColumnConstraint`, `TestParseContext`, `OperatorName`, `BaseContext`, `PrimaryKeyColumnConstraint`, `ViewName`, `FuncCallExpr`, `FunctionParam`, `SchemaFileContext`, `GeneratedColumnConstraint`, `ColumnDefinition`, `AliasName`, `CreateTableAs`, `AlterTableCmd`, `ResultColumnCollection`, `SemScalarExprNode`, `CompositeFieldDefinition`, `FunctionParamTable`, `TableFunctionColumnRef`, `SchemaFileContext<TBaseContext>`, `CreateSequence`, `FunctionParamVariadic`, `ForeignKeyColumnConstraint`, `FunctionParamInOut`, `TableDataSource`, `TableName`, `AstAndContextPair`, `SqlFunServerError`, `ParsedSchemaDump<TContext>`, `CreateIndex`, `FromClause`, `SqlHighlighterState`, `AliasSpec`, `ArithExpr`, `CheckColumnConstraint`, `ViewLike`, `.resolve_overload_unary`, `DefaultColumnConstraint`, `IdentityColumnConstraint`, `SemScalarExpr`, `.build_op`, `IVec`, `ArrayExpr`, `ColumnNullabilityConstraint`, `.apply_alter`, `.analyze_range_var_node`, `column_constraints.rs`, `AllBinaryCallSite`, `SqlValueExpr`, `.build_op_all`, `CastDefinition`, `CoalesceExpr`, `BinaryOpCallSite`, `ColumnReferenceExpr`, `CreateTable`, `CreateFunction`, `SqlFunArgsError`, `.analyze`, `ColumnName`, `.build_binary_op`, `AnalyzeScalarExpr`, `SelectStmt`, `.build_op_any`, `AnalysisProblem`, `LeftUnaryCallSite`, `SqlFunMetadata`, `SubLinkExpr`, `ValidOperatorName`, `.analyze_scalar_expr`, `.analyze_scalar_expr`, `PrimaryKeyConstraint`, `RightUnaryCallSite`, `.build_null_if`, `.new`, `HighlighterTheme`, `SemAst`, `PgFunctionDetail`, `IndirectionExpr`, `FunctionParamOut`, `FunctionParamIn`?**
+  _High betweenness centrality (0.079) - this node is a cross-community bridge._
 - **What connects `LinesBufReader<Read>`, `IndividualCustomer`, `OrderError<O>` to the rest of the system?**
   _250 weakly-connected nodes found - possible documentation gaps or missing edges._
 - **Should `Vec` be split into smaller, more focused modules?**
-  _Cohesion score 0.013703570140641904 - nodes in this community are weakly interconnected._
-- **Should `.none` be split into smaller, more focused modules?**
-  _Cohesion score 0.01405554425688654 - nodes in this community are weakly interconnected._
+  _Cohesion score 0.014213645099295324 - nodes in this community are weakly interconnected._
+- **Should `.from` be split into smaller, more focused modules?**
+  _Cohesion score 0.012810472141418661 - nodes in this community are weakly interconnected._
 - **Should `ListOpt` be split into smaller, more focused modules?**
   _Cohesion score 0.03776223776223776 - nodes in this community are weakly interconnected._

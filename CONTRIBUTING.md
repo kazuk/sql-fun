@@ -165,6 +165,7 @@ For faster iteration, run only selected steps:
 ```sh
 .local/bin/check-test-flow --step=affected
 .local/bin/check-test-flow --step=workspace
+.local/bin/check-test-flow --step=proc-macro-tests
 .local/bin/check-test-flow --step=lint
 .local/bin/check-test-flow --step=doc
 .local/bin/check-test-flow --step=graphify

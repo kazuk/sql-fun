@@ -1,38 +1,44 @@
-//! compilation test
+//! Compilation tests for all SQL function macros.
 
 use std::path::{Path, PathBuf};
 
 use scopeguard::ScopeGuard;
 
-/// test [`sql_fun::sql_query_many`]
 #[test]
-fn test_sql_query_many() {
-    validate_test_env();
-
-    let dir = setup_working_dir();
-    setup_metadata(&dir);
-    setup_lockfile(&dir);
-    setup_schema_dump(&dir);
-    let logfile = dir.join("sql-fun.log");
-    let _trace_dump = setup_trace_dump(&logfile);
-    setup_env(&dir, &logfile, false);
-    let t = trybuild::TestCases::new();
-    t.pass("tests/sql_query_many/pass.rs");
+fn test_sql_functions() {
+    run_test(false);
 }
 
-/// test [`sql_fun::sql_query_many`] for SQL_FUN_MODE = CHECK
 #[test]
-fn test_sql_query_many_check() {
+fn test_sql_functions_check() {
+    run_test(true);
+}
+
+fn run_test(for_check: bool) {
     validate_test_env();
 
     let dir = setup_working_dir();
-    setup_metadata(&dir);
-    setup_schema_dump(&dir);
+    setup_file(
+        &dir,
+        "Metadata.toml",
+        include_str!("./sql_functions/Metadata.toml"),
+    );
+    setup_file(
+        &dir,
+        "default.develop.sql",
+        include_str!("./sql_functions/default.develop.sql"),
+    );
+    if !for_check {
+        setup_file(
+            &dir,
+            "default.develop.lock",
+            include_str!("./sql_functions/default.develop.lock"),
+        );
+    }
     let logfile = dir.join("sql-fun.log");
     let _trace_dump = setup_trace_dump(&logfile);
-    setup_env(&dir, &logfile, true);
-    let t = trybuild::TestCases::new();
-    t.pass("tests/sql_query_many/pass.rs");
+    setup_env(&dir, &logfile, for_check);
+    trybuild::TestCases::new().pass("tests/sql_functions/pass.rs");
 }
 
 fn validate_test_env() {
@@ -45,8 +51,7 @@ fn setup_working_dir() -> PathBuf {
     let test_name = std::env::var("NEXTEST_TEST_NAME")
         .unwrap_or_else(|_| "unknown_test".to_string())
         .replace("::", "/");
-
-    let dir = std::path::PathBuf::from(env!("CARGO_MANIFEST_DIR"))
+    let dir = PathBuf::from(env!("CARGO_MANIFEST_DIR"))
         .join("target")
         .join("trybuild-nextest")
         .join(test_name);
@@ -54,37 +59,12 @@ fn setup_working_dir() -> PathBuf {
     dir
 }
 
-fn setup_metadata(dir: &PathBuf) {
-    setup_file(
-        dir,
-        "Metadata.toml",
-        include_str!("./sql_query_many/Metadata.toml"),
-    );
-}
-
-fn setup_lockfile(dir: &PathBuf) {
-    setup_file(
-        dir,
-        "default.develop.lock",
-        include_str!("./sql_query_many/default.develop.lock"),
-    );
-}
-
-fn setup_schema_dump(dir: &PathBuf) {
-    setup_file(
-        dir,
-        "default.develop.sql",
-        include_str!("./sql_query_many/default.develop.sql"),
-    );
-}
-
 fn setup_trace_dump(logfile: &PathBuf) -> ScopeGuard<PathBuf, impl FnOnce(PathBuf)> {
     scopeguard::guard(logfile.clone(), |path| {
         if let Ok(trace) = std::fs::read_to_string(path)
             && !trace.is_empty()
         {
-            eprintln!("\nTRACE RECORDS");
-            eprintln!("\n{trace}");
+            eprintln!("\nTRACE RECORDS\n\n{trace}");
         }
     })
 }
@@ -99,6 +79,8 @@ fn setup_env(dir: &PathBuf, logfile: &PathBuf, for_check: bool) {
         std::env::set_var("SQL_FUN_TRACE_FILE", logfile);
         if for_check {
             std::env::set_var("SQL_FUN_MODE", "CHECK");
+        } else {
+            std::env::remove_var("SQL_FUN_MODE");
         }
     }
 }

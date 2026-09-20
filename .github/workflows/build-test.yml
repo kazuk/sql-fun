@@ -33,14 +33,14 @@ jobs:
           path: |
             /usr/local/cargo/registry
             /usr/local/cargo/git
-          key: cargo-${{ runner.os }}-${{ hashFiles('**/Cargo.lock') }}
+          key: cargo-${{ runner.os }}-workspace-${{ hashFiles('**/Cargo.lock') }}
           restore-keys: |
             cargo-${{ runner.os }}-
 
       - uses: actions/cache@v5
         with:
           path: /github/home/.cache/sccache
-          key: sccache-${{ runner.os }}-${{ hashFiles('**/Cargo.lock') }}
+          key: sccache-${{ runner.os }}-workspace-${{ hashFiles('**/Cargo.lock') }}
           restore-keys: |
             sccache-${{ runner.os }}-
 
@@ -74,6 +74,61 @@ jobs:
         if: ${{ !cancelled() }}
         with:
           name: nextest tests
+          path: target/nextest/ci/junit.xml
+          reporter: java-junit
+
+  proc-macro-tests:
+    runs-on: ubuntu-24.04
+    container: *ci-builder-container
+    steps:
+      - uses: actions/checkout@v5
+
+      - uses: actions/cache@v5
+        with:
+          path: |
+            /usr/local/cargo/registry
+            /usr/local/cargo/git
+          key: cargo-${{ runner.os }}-proc-macro-tests-${{ hashFiles('**/Cargo.lock') }}
+          restore-keys: |
+            cargo-${{ runner.os }}-
+
+      - uses: actions/cache@v5
+        with:
+          path: /github/home/.cache/sccache
+          key: sccache-${{ runner.os }}-proc-macro-tests-${{ hashFiles('**/Cargo.lock') }}
+          restore-keys: |
+            sccache-${{ runner.os }}-
+
+      - name: Proc-macro compilation tests
+        run: |
+          GIT_ROOT="$(git rev-parse --show-toplevel)"
+          export GIT_ROOT
+          export SQL_FUN_HOME="${GIT_ROOT}/sql-fun-home"
+          sccache --start-server
+          export RUSTC_WRAPPER=sccache
+          export SCCACHE_DIR=/github/home/.cache/sccache
+          .local/bin/check-test-flow --step=proc-macro-tests --nextest-extra="
+            --config-file ./ci/nextest/config.toml
+            --profile ci
+            --show-progress none"
+          sccache --show-stats
+
+      - name: Disk usage after proc-macro compilation tests
+        if: ${{ always() }}
+        run: |
+          df -h . /usr/local/cargo /github/home
+          df -i . /usr/local/cargo /github/home
+          for path in target /usr/local/cargo/registry /usr/local/cargo/git /github/home/.cache/sccache; do
+            if [ -d "$path" ]; then
+              du -sh "$path"
+            fi
+          done
+
+      - name: Test Report
+        uses: dorny/test-reporter@v3
+        if: ${{ !cancelled() }}
+        with:
+          name: proc-macro compilation tests
           path: target/nextest/ci/junit.xml
           reporter: java-junit
 
@@ -222,6 +277,7 @@ jobs:
     runs-on: ubuntu-24.04
     needs:
       - workspace
+      - proc-macro-tests
       - fmt
       - lint
       - server-api-spec

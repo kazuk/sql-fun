@@ -19,6 +19,7 @@ Options:
 Steps:
   affected
   workspace
+  proc-macro-tests
   fmt
   lint
   server-api-spec
@@ -33,6 +34,7 @@ USAGE
 ALL_STEPS=(
   affected
   workspace
+  proc-macro-tests
   fmt
   lint
   server-api-spec
@@ -49,7 +51,7 @@ function list_steps() {
 
 function normalize_step() {
   case "$1" in
-    affected|workspace|fmt|lint|server-api-spec|deny|dependency-updates|doc|typos|graphify)
+    affected|workspace|proc-macro-tests|fmt|lint|server-api-spec|deny|dependency-updates|doc|typos|graphify)
       printf '%s\n' "$1"
       ;;
     format)
@@ -181,7 +183,13 @@ function run_workspace() {
   require_command cargo-nextest
   echo "== Workspace verification"
   run_check   --workspace "${FEATURES[@]}"
-  run_nextest --workspace "${FEATURES[@]}" ${NEXTEST_EXTRA} --no-tests pass
+  run_nextest --workspace --exclude sql-fun "${FEATURES[@]}" ${NEXTEST_EXTRA} --no-tests pass
+}
+
+function run_proc_macro_tests() {
+  require_command cargo-nextest
+  echo "== Proc-macro compilation tests"
+  run_nextest -p sql-fun "${FEATURES[@]}" ${NEXTEST_EXTRA} --no-tests pass
 }
 
 function run_fmt() {
@@ -241,6 +249,7 @@ for step in "${ALL_STEPS[@]}"; do
     case "$step" in
       affected) run_affected ;;
       workspace) run_workspace ;;
+      proc-macro-tests) run_proc_macro_tests ;;
       fmt) run_fmt ;;
       lint) run_lint ;;
       server-api-spec) run_server_api_spec ;;

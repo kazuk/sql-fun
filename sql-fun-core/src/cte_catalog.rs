@@ -13,7 +13,6 @@ use std::{
 use crate::PlaceholderedSql;
 use indexmap::IndexMap;
 use petgraph::graph::NodeIndex;
-use sha2::{Digest, Sha256};
 use walkdir::WalkDir;
 
 pub use self::error::{
@@ -1146,7 +1145,7 @@ impl CteCatalog<'_> {
 }
 
 /// resolved CTE catalog
-#[derive(Debug)]
+#[derive(Debug, serde::Serialize, serde::Deserialize)]
 pub struct ResolvedCteCatalog {
     parameters: CteParameterCollection,
     base_query: PlaceholderedSql,
@@ -1169,16 +1168,12 @@ impl ResolvedCteCatalog {
     /// # Errors
     ///
     /// [`CteCatalogError`]
+    #[tracing::instrument(ret, err, skip(self))]
     pub fn finger_print(&self) -> Result<String, CteCatalogError> {
-        let mut hasher = Sha256::new();
-        let parameters_json = serde_json::to_string(&self.parameters)?;
-        hasher.update(parameters_json.as_bytes());
-        let base_quesy = serde_json::to_string(&self.base_query)?;
-        hasher.update(base_quesy.as_bytes());
-        let cte_queries = serde_json::to_string(&self.cte_queries)?;
-        hasher.update(cte_queries.as_bytes());
-        let digest = hasher.finalize();
-        let finger_print = hex::encode(digest);
-        Ok(finger_print)
+        let mut hasher = crate::Hasher::new();
+        hasher.append_str(&serde_json::to_string(&self.parameters)?);
+        hasher.append_str(&serde_json::to_string(&self.base_query)?);
+        hasher.append_str(&serde_json::to_string(&self.cte_queries)?);
+        Ok(hasher.finish())
     }
 }

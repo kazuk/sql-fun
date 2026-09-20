@@ -1,0 +1,1687 @@
+{
+  ".local/bin/big-source": {
+    "mtime": 1766208688.4278812,
+    "ast_hash": "00e41f9f7aab4986ed2a40f93bb648df",
+    "semantic_hash": ""
+  },
+  ".local/bin/bump-version": {
+    "mtime": 1779226591.0657935,
+    "ast_hash": "b4fd123bf7b6d95bb0226bd9eb67e70c",
+    "semantic_hash": ""
+  },
+  ".local/bin/cargo-bb": {
+    "mtime": 1743830868.564762,
+    "ast_hash": "c0e49fd07fe7c68bd2bcc6b7c89a0cc2",
+    "semantic_hash": ""
+  },
+  ".local/bin/check-deny-skip": {
+    "mtime": 1779226591.0657935,
+    "ast_hash": "c269d0818704a0ba0f213c1431c9857e",
+    "semantic_hash": ""
+  },
+  ".local/bin/check-test-flow": {
+    "mtime": 1789710150.572039,
+    "ast_hash": "18f9b7dddf0e380a9e4d6c1455be39ae",
+    "semantic_hash": ""
+  },
+  ".local/bin/codex-implement-unit-tests": {
+    "mtime": 1780100239.2199616,
+    "ast_hash": "b7b6d529f403d73cf76ef450bee99064",
+    "semantic_hash": ""
+  },
+  ".local/bin/extract-from-dat": {
+    "mtime": 1779226591.0657935,
+    "ast_hash": "257c24527b5454f26349849f3784bf4f",
+    "semantic_hash": ""
+  },
+  ".local/bin/extract-from-image": {
+    "mtime": 1779226591.0667937,
+    "ast_hash": "9f6e4b7f40d465b6561ea7bdb155f8ad",
+    "semantic_hash": ""
+  },
+  ".local/bin/extract_pg_sysschema": {
+    "mtime": 1779226591.0667937,
+    "ast_hash": "35c5addb4080105d6a1eea529d8a4771",
+    "semantic_hash": ""
+  },
+  ".local/bin/git-user-config": {
+    "mtime": 1779226591.0667937,
+    "ast_hash": "15c7cef0af0a97f88a2bb4a405101e7f",
+    "semantic_hash": ""
+  },
+  ".local/bin/github-token-config": {
+    "mtime": 1767258846.2412205,
+    "ast_hash": "0ebc93c503744d6431cbeff05d888906",
+    "semantic_hash": ""
+  },
+  ".local/bin/publish-crates": {
+    "mtime": 1779226591.0667937,
+    "ast_hash": "0daf02d7e687a838e5b77fe97b1e6c7d",
+    "semantic_hash": ""
+  },
+  ".local/bin/test-packaging": {
+    "mtime": 1779226591.0667937,
+    "ast_hash": "1dbc830ac0d8976d383dd671c4387f6d",
+    "semantic_hash": ""
+  },
+  ".local/bin/top-uncover": {
+    "mtime": 1789710150.572039,
+    "ast_hash": "c19c842905df39b35692e2a1549bd40a",
+    "semantic_hash": ""
+  },
+  ".local/bin/update-stats": {
+    "mtime": 1789710150.572039,
+    "ast_hash": "c16658dbe0f271c2bbee6133e31e44db",
+    "semantic_hash": ""
+  },
+  ".local/git/hooks/commit-msg": {
+    "mtime": 1767148262.4163952,
+    "ast_hash": "c657c32dd974fe098bdcbdcdcb22a503",
+    "semantic_hash": ""
+  },
+  ".local/git/hooks/pre-commit": {
+    "mtime": 1767155214.2280061,
+    "ast_hash": "2a8dc5873a511fdc74f25864cc41da9e",
+    "semantic_hash": ""
+  },
+  "ci/github-actions/check": {
+    "mtime": 1780100239.2209618,
+    "ast_hash": "7c2b14994327e1715360058f161816a1",
+    "semantic_hash": ""
+  },
+  "ci/github-actions/resources/serena-wrapper.sh": {
+    "mtime": 1779226591.0687935,
+    "ast_hash": "72ee35774e14a3feeddf84c51e81f85d",
+    "semantic_hash": ""
+  },
+  "cli/src/check.rs": {
+    "mtime": 1789715097.9774082,
+    "ast_hash": "ab63af6d2618c0fca1fa97d606ba1313",
+    "semantic_hash": ""
+  },
+  "cli/src/child_proc.rs": {
+    "mtime": 1786119658.7973754,
+    "ast_hash": "e13f79453a2731e0693545bee6511668",
+    "semantic_hash": ""
+  },
+  "cli/src/cli_sub_command.rs": {
+    "mtime": 1780527129.1313763,
+    "ast_hash": "f65c0e4425087abc8f32973b17137bed",
+    "semantic_hash": ""
+  },
+  "cli/src/docker.rs": {
+    "mtime": 1789715097.9854083,
+    "ast_hash": "ec22a86d788fe944d1a117695c4e116e",
+    "semantic_hash": ""
+  },
+  "cli/src/init.rs": {
+    "mtime": 1779226591.0697937,
+    "ast_hash": "bde65dd953aaf054705dd1e2b39792ff",
+    "semantic_hash": ""
+  },
+  "cli/src/init/database_engine_versions.rs": {
+    "mtime": 1779226591.0697937,
+    "ast_hash": "f5d1d5a9571a7540810469052dfd7cb6",
+    "semantic_hash": ""
+  },
+  "cli/src/init/prepare_home.rs": {
+    "mtime": 1779226591.0707936,
+    "ast_hash": "55179a5d54085fb1f53c7a50f8906bda",
+    "semantic_hash": ""
+  },
+  "cli/src/lib.rs": {
+    "mtime": 1789715097.9774082,
+    "ast_hash": "07d2d6d1465708cbbd73724becaf7bc3",
+    "semantic_hash": ""
+  },
+  "cli/src/main.rs": {
+    "mtime": 1780527129.1313763,
+    "ast_hash": "e3578afb2fa5b708b8cdbed1262542c7",
+    "semantic_hash": ""
+  },
+  "cli/src/runnable.rs": {
+    "mtime": 1788122197.451742,
+    "ast_hash": "ead7f3edb75bf0af126b18ffd915db62",
+    "semantic_hash": ""
+  },
+  "cli/src/test_helpers.rs": {
+    "mtime": 1779226591.0707936,
+    "ast_hash": "588239a3e023ac7591491219b2e179fc",
+    "semantic_hash": ""
+  },
+  "examples/adventure-works/src/main.rs": {
+    "mtime": 1744391642.593086,
+    "ast_hash": "1299d18d5cf99038f72998ffc309722b",
+    "semantic_hash": ""
+  },
+  "parse_dat/src/lib.rs": {
+    "mtime": 1779226591.0717938,
+    "ast_hash": "a7850c56b8eb579298b1aa0a8abf384b",
+    "semantic_hash": ""
+  },
+  "parse_dat/src/main.rs": {
+    "mtime": 1746323444.712685,
+    "ast_hash": "9dc7336ce0d9d6e4615dab8e531f2659",
+    "semantic_hash": ""
+  },
+  "sql-fun-client/src/async_tokio.rs": {
+    "mtime": 1789715513.2362542,
+    "ast_hash": "3547cf3e69be0b3efd5b420a05a5ecf9",
+    "semantic_hash": ""
+  },
+  "sql-fun-client/src/lib.rs": {
+    "mtime": 1789715513.2362542,
+    "ast_hash": "b464fe4b58436ba6d95314023a08c142",
+    "semantic_hash": ""
+  },
+  "sql-fun-codegen/src/lib.rs": {
+    "mtime": 1789715524.9325957,
+    "ast_hash": "4e441e8b18eb618a99986544df2db7ed",
+    "semantic_hash": ""
+  },
+  "sql-fun-core/src/args.rs": {
+    "mtime": 1789714463.0930676,
+    "ast_hash": "ac4e10f62de56dc801351050d624407a",
+    "semantic_hash": ""
+  },
+  "sql-fun-core/src/args/error.rs": {
+    "mtime": 1789715381.0566182,
+    "ast_hash": "cde6d53d2e2c20ad3fa1411c3ecea1b5",
+    "semantic_hash": ""
+  },
+  "sql-fun-core/src/args/impl_metadata.rs": {
+    "mtime": 1789714462.9400637,
+    "ast_hash": "b582cb8ca7f7d7bda7bb8d314d12b578",
+    "semantic_hash": ""
+  },
+  "sql-fun-core/src/args/impl_sql_fun_home.rs": {
+    "mtime": 1779226591.0737936,
+    "ast_hash": "908faeb5dc0ade470509fe89bc3d0ebf",
+    "semantic_hash": ""
+  },
+  "sql-fun-core/src/args/init_args.rs": {
+    "mtime": 1789715381.0566182,
+    "ast_hash": "49cada2f8cd3fc66cd49e0de869e52c4",
+    "semantic_hash": ""
+  },
+  "sql-fun-core/src/args/log_args.rs": {
+    "mtime": 1789714462.9400637,
+    "ast_hash": "fffffe8dbbfdc6b5ce23b8f5647853ce",
+    "semantic_hash": ""
+  },
+  "sql-fun-core/src/args/metadata_args.rs": {
+    "mtime": 1789714462.9400637,
+    "ast_hash": "0e741b07761af7a4940d48796665b58b",
+    "semantic_hash": ""
+  },
+  "sql-fun-core/src/args/postgres.rs": {
+    "mtime": 1789715381.0566182,
+    "ast_hash": "cc9539e222bb5bfe3566cd9a15a19f72",
+    "semantic_hash": ""
+  },
+  "sql-fun-core/src/builtin.rs": {
+    "mtime": 1779226591.0747938,
+    "ast_hash": "e4ae9b82d2742226764e372945b446fa",
+    "semantic_hash": ""
+  },
+  "sql-fun-core/src/coll.rs": {
+    "mtime": 1779226591.0747938,
+    "ast_hash": "f3afe37e5bb4e9dd799b5602d36b71cf",
+    "semantic_hash": ""
+  },
+  "sql-fun-core/src/cte_catalog.rs": {
+    "mtime": 1789715399.9961,
+    "ast_hash": "352d1160593e7face39fe7c0744e0cdc",
+    "semantic_hash": ""
+  },
+  "sql-fun-core/src/cte_catalog/error.rs": {
+    "mtime": 1789715381.0566182,
+    "ast_hash": "90692fbc1d88ce3ff5eb736ec7e8fbf6",
+    "semantic_hash": ""
+  },
+  "sql-fun-core/src/cte_catalog/params.rs": {
+    "mtime": 1789715381.0566182,
+    "ast_hash": "056408028c4669afb31bb21fcb6025dd",
+    "semantic_hash": ""
+  },
+  "sql-fun-core/src/extensions.rs": {
+    "mtime": 1780527129.1333764,
+    "ast_hash": "bb3c3356e37aee379eeae4e7cf48859e",
+    "semantic_hash": ""
+  },
+  "sql-fun-core/src/extensions/config_error.rs": {
+    "mtime": 1779226591.0747938,
+    "ast_hash": "9a0255fa92035e16149b8d79bc7659a3",
+    "semantic_hash": ""
+  },
+  "sql-fun-core/src/extensions/extension_collection.rs": {
+    "mtime": 1779226591.0747938,
+    "ast_hash": "ad9d8d9609dba7541442fbd336283cfe",
+    "semantic_hash": ""
+  },
+  "sql-fun-core/src/extensions/name_version_pair.rs": {
+    "mtime": 1779226591.0757937,
+    "ast_hash": "1f0184f548b1eddfc199251df2431913",
+    "semantic_hash": ""
+  },
+  "sql-fun-core/src/highlighter.rs": {
+    "mtime": 1789715381.0566182,
+    "ast_hash": "16bdcfe59bc8a765b1d7fcf0799a8dc2",
+    "semantic_hash": ""
+  },
+  "sql-fun-core/src/lib.rs": {
+    "mtime": 1789714463.0930676,
+    "ast_hash": "f2dac47121ad50e0b45451c7f92fedae",
+    "semantic_hash": ""
+  },
+  "sql-fun-core/src/metadata.rs": {
+    "mtime": 1789715381.0566182,
+    "ast_hash": "739e1cc511f2442fba8d29894e1d81c2",
+    "semantic_hash": ""
+  },
+  "sql-fun-core/src/placehlodered_sql.rs": {
+    "mtime": 1789715381.0566182,
+    "ast_hash": "04523cf8ebd8dd5e9d59855b4cc3e20d",
+    "semantic_hash": ""
+  },
+  "sql-fun-core/src/test_helpers.rs": {
+    "mtime": 1789714462.9400637,
+    "ast_hash": "1d90e985a81c8ce1f63a41065a30e4e9",
+    "semantic_hash": ""
+  },
+  "sql-fun-server-api/src/analyze_query.rs": {
+    "mtime": 1780527129.1333764,
+    "ast_hash": "f45a20583cacabc9c15b3bb62665642c",
+    "semantic_hash": ""
+  },
+  "sql-fun-server-api/src/bin/openrpc_spec.rs": {
+    "mtime": 1779226591.1107945,
+    "ast_hash": "5ba1e05fd3283a91e3acb1807595f811",
+    "semantic_hash": ""
+  },
+  "sql-fun-server-api/src/collection_management.rs": {
+    "mtime": 1779226591.1107945,
+    "ast_hash": "b4e1faba5855d36e3b3525e3998a80c8",
+    "semantic_hash": ""
+  },
+  "sql-fun-server-api/src/describe_table.rs": {
+    "mtime": 1780527129.1333764,
+    "ast_hash": "1b966cdbc76c2d4e129934ca9be62f8f",
+    "semantic_hash": ""
+  },
+  "sql-fun-server-api/src/initialize_schema.rs": {
+    "mtime": 1779226591.1117947,
+    "ast_hash": "afb254b8628a498b9910ea25f6cbb6d2",
+    "semantic_hash": ""
+  },
+  "sql-fun-server-api/src/lib.rs": {
+    "mtime": 1780527129.1343763,
+    "ast_hash": "9759e599ac38d0f2eb1fcb341d62a08e",
+    "semantic_hash": ""
+  },
+  "sql-fun-server-api/src/list_objects.rs": {
+    "mtime": 1780527129.1343763,
+    "ast_hash": "cf778db0b0c0a1ea7239bfa7ecc6707b",
+    "semantic_hash": ""
+  },
+  "sql-fun-server/src/buffers.rs": {
+    "mtime": 1779226591.1117947,
+    "ast_hash": "c058cfb99a7807949ee7afae6498cfba",
+    "semantic_hash": ""
+  },
+  "sql-fun-server/src/cache.rs": {
+    "mtime": 1789714920.888881,
+    "ast_hash": "85ed83af99a1488444382591347a7b8b",
+    "semantic_hash": ""
+  },
+  "sql-fun-server/src/core_wrapping.rs": {
+    "mtime": 1779226591.1127946,
+    "ast_hash": "de935f15ec284fa57a69a495fa325930",
+    "semantic_hash": ""
+  },
+  "sql-fun-server/src/error.rs": {
+    "mtime": 1789714920.889881,
+    "ast_hash": "2b0e202bda16927d91e6745305fea031",
+    "semantic_hash": ""
+  },
+  "sql-fun-server/src/json_rpc.rs": {
+    "mtime": 1789714920.888881,
+    "ast_hash": "1177e85bbb8a2db2dd40ded134357d35",
+    "semantic_hash": ""
+  },
+  "sql-fun-server/src/lib.rs": {
+    "mtime": 1789714463.0940676,
+    "ast_hash": "e5443e8ed4b7a667bb9ca60afb56c3b7",
+    "semantic_hash": ""
+  },
+  "sql-fun-server/src/main.rs": {
+    "mtime": 1745630387.3686047,
+    "ast_hash": "f7bc22067c21aadff562347f69e7d27c",
+    "semantic_hash": ""
+  },
+  "sql-fun-server/src/pending_future.rs": {
+    "mtime": 1779226591.1127946,
+    "ast_hash": "e6961cbf9d8a999a5bae854ee2bcf3f3",
+    "semantic_hash": ""
+  },
+  "sql-fun-server/src/pid_file.rs": {
+    "mtime": 1779226591.1127946,
+    "ast_hash": "17c633015fd42599754179ba9746ab47",
+    "semantic_hash": ""
+  },
+  "sql-fun-sqlast/generate": {
+    "mtime": 1757343584.6299427,
+    "ast_hash": "9b59c8716074e3d40e712e26c14239f4",
+    "semantic_hash": ""
+  },
+  "sql-fun-sqlast/src/lib.rs": {
+    "mtime": 1789714956.7147982,
+    "ast_hash": "93840f7434d69aa56708bd763f948cac",
+    "semantic_hash": ""
+  },
+  "sql-fun-sqlast/src/schema_dump_file.rs": {
+    "mtime": 1789714956.7357986,
+    "ast_hash": "dcc60fc2811a7b177385bdcf8969a3cc",
+    "semantic_hash": ""
+  },
+  "sql-fun-sqlast/src/sem.rs": {
+    "mtime": 1789714956.7157981,
+    "ast_hash": "017cb4b4428f0decb1006d0d35f77b29",
+    "semantic_hash": ""
+  },
+  "sql-fun-sqlast/src/sem/a_indirection.rs": {
+    "mtime": 1779226591.1137948,
+    "ast_hash": "f9d71f735f4bba41df9a5286bc42ee3b",
+    "semantic_hash": ""
+  },
+  "sql-fun-sqlast/src/sem/alter_owner.rs": {
+    "mtime": 1779226591.1137948,
+    "ast_hash": "8d169a77beb178ac75d4165df42ce5e2",
+    "semantic_hash": ""
+  },
+  "sql-fun-sqlast/src/sem/alter_seq.rs": {
+    "mtime": 1780527129.1343763,
+    "ast_hash": "21d6ee6e8a94b572f7a2285eb605a69e",
+    "semantic_hash": ""
+  },
+  "sql-fun-sqlast/src/sem/alter_table.rs": {
+    "mtime": 1789710150.6460407,
+    "ast_hash": "8664872607fee5842c8b67f423e3fd3b",
+    "semantic_hash": ""
+  },
+  "sql-fun-sqlast/src/sem/base_context.rs": {
+    "mtime": 1789714463.0940676,
+    "ast_hash": "f4d10512318cb0126b3966524f249b38",
+    "semantic_hash": ""
+  },
+  "sql-fun-sqlast/src/sem/base_context/builtin_casts.rs": {
+    "mtime": 1779226591.1137948,
+    "ast_hash": "8b4bdf16d413f901eb549517cfbe8b1d",
+    "semantic_hash": ""
+  },
+  "sql-fun-sqlast/src/sem/base_context/builtin_fun.rs": {
+    "mtime": 1789714956.7177982,
+    "ast_hash": "05a1cbf4f1109aa3d261847902735f10",
+    "semantic_hash": ""
+  },
+  "sql-fun-sqlast/src/sem/base_context/builtin_fun/parse_util.rs": {
+    "mtime": 1766999887.6428597,
+    "ast_hash": "fe134a832d8ce690ef89676fa5e766b8",
+    "semantic_hash": ""
+  },
+  "sql-fun-sqlast/src/sem/base_context/builtin_ope.rs": {
+    "mtime": 1779226591.1147947,
+    "ast_hash": "79bb01b0af586b1517622aaf2bc587b8",
+    "semantic_hash": ""
+  },
+  "sql-fun-sqlast/src/sem/cast.rs": {
+    "mtime": 1789714992.1777053,
+    "ast_hash": "da7e58b58d4e0021bf0a7d0693dfeef9",
+    "semantic_hash": ""
+  },
+  "sql-fun-sqlast/src/sem/column_constraints.rs": {
+    "mtime": 1789714956.716798,
+    "ast_hash": "d6582741b9ce98c6063e8010796893bc",
+    "semantic_hash": ""
+  },
+  "sql-fun-sqlast/src/sem/column_constraints/attr_constraint.rs": {
+    "mtime": 1789714956.7367988,
+    "ast_hash": "f0719e91225b9c86eb087f1dfb001067",
+    "semantic_hash": ""
+  },
+  "sql-fun-sqlast/src/sem/column_constraints/check_constraint.rs": {
+    "mtime": 1789714956.7177982,
+    "ast_hash": "aeb964f8da105a322e5e8c0b9b2f83e6",
+    "semantic_hash": ""
+  },
+  "sql-fun-sqlast/src/sem/column_constraints/collate_constraint.rs": {
+    "mtime": 1789714956.716798,
+    "ast_hash": "e2ed39c754d39bfeb405a2cf87997565",
+    "semantic_hash": ""
+  },
+  "sql-fun-sqlast/src/sem/column_constraints/default_constraint.rs": {
+    "mtime": 1789714956.7197983,
+    "ast_hash": "fc2673617a7fa84727ca546f426d1a8e",
+    "semantic_hash": ""
+  },
+  "sql-fun-sqlast/src/sem/column_constraints/exclusion_constraint.rs": {
+    "mtime": 1789714956.7147982,
+    "ast_hash": "d93e317797fa18ff4d93943d8cd63de2",
+    "semantic_hash": ""
+  },
+  "sql-fun-sqlast/src/sem/column_constraints/foreign_key_constraint.rs": {
+    "mtime": 1789714956.7357986,
+    "ast_hash": "aa99d18a208b67cccfe6292d37ed7c98",
+    "semantic_hash": ""
+  },
+  "sql-fun-sqlast/src/sem/column_constraints/generated_constraint.rs": {
+    "mtime": 1789714956.7197983,
+    "ast_hash": "3d137593af92aee638bf739cb79bb7ff",
+    "semantic_hash": ""
+  },
+  "sql-fun-sqlast/src/sem/column_constraints/identity_constraint.rs": {
+    "mtime": 1789714956.7357986,
+    "ast_hash": "7f5e307ec9bc8bee62766818565bfb2b",
+    "semantic_hash": ""
+  },
+  "sql-fun-sqlast/src/sem/column_constraints/nullability_constraint.rs": {
+    "mtime": 1789714956.716798,
+    "ast_hash": "c687aa0a96ebed742a4e940e9fa370e7",
+    "semantic_hash": ""
+  },
+  "sql-fun-sqlast/src/sem/column_constraints/primary_key_constraint.rs": {
+    "mtime": 1789714956.716798,
+    "ast_hash": "d439cb9cc06cdeb76f4285c2aa390dc0",
+    "semantic_hash": ""
+  },
+  "sql-fun-sqlast/src/sem/column_constraints/unique_constraint.rs": {
+    "mtime": 1789714956.7187982,
+    "ast_hash": "50da72c4d524fed50f70e8a5887a3591",
+    "semantic_hash": ""
+  },
+  "sql-fun-sqlast/src/sem/comment.rs": {
+    "mtime": 1789714956.7147982,
+    "ast_hash": "5ac70d771a8e4b524421c9cfacd79a17",
+    "semantic_hash": ""
+  },
+  "sql-fun-sqlast/src/sem/constraint.rs": {
+    "mtime": 1789714956.7147982,
+    "ast_hash": "a29d64fc06c6bb484420a7d284ece220",
+    "semantic_hash": ""
+  },
+  "sql-fun-sqlast/src/sem/constraint/foreign.rs": {
+    "mtime": 1789714956.7187982,
+    "ast_hash": "75bafd8f24d8c05c1e617bf858fcdbb9",
+    "semantic_hash": ""
+  },
+  "sql-fun-sqlast/src/sem/constraint/primary.rs": {
+    "mtime": 1789714956.7357986,
+    "ast_hash": "e27eb0c86f2756287977d986a4c2493a",
+    "semantic_hash": ""
+  },
+  "sql-fun-sqlast/src/sem/constraint/unique.rs": {
+    "mtime": 1780527129.1353762,
+    "ast_hash": "28fd67bb16f5a355473ab1b62ed51bea",
+    "semantic_hash": ""
+  },
+  "sql-fun-sqlast/src/sem/create_comp_type.rs": {
+    "mtime": 1789714956.7177982,
+    "ast_hash": "888e63e52b8c3f542c442075b637c7c6",
+    "semantic_hash": ""
+  },
+  "sql-fun-sqlast/src/sem/create_domain.rs": {
+    "mtime": 1789714956.7067978,
+    "ast_hash": "0354c4a86fe9fb2fa3817176116a1f81",
+    "semantic_hash": ""
+  },
+  "sql-fun-sqlast/src/sem/create_enum_type.rs": {
+    "mtime": 1789714956.7177982,
+    "ast_hash": "77d689d1745363f2a41c6a2b4fd5d8a5",
+    "semantic_hash": ""
+  },
+  "sql-fun-sqlast/src/sem/create_extension.rs": {
+    "mtime": 1779226591.1157947,
+    "ast_hash": "114ca6089cebf88bdfee215ce9b75273",
+    "semantic_hash": ""
+  },
+  "sql-fun-sqlast/src/sem/create_function.rs": {
+    "mtime": 1789714956.7357986,
+    "ast_hash": "e0de6979655a84ea0245d0096a5d0ea6",
+    "semantic_hash": ""
+  },
+  "sql-fun-sqlast/src/sem/create_index.rs": {
+    "mtime": 1789710150.6460407,
+    "ast_hash": "763dd28c2962b3e3b83dca1932b9e62f",
+    "semantic_hash": ""
+  },
+  "sql-fun-sqlast/src/sem/create_schema.rs": {
+    "mtime": 1780527129.1353762,
+    "ast_hash": "f40502575d54c12bd5928746ba5acce4",
+    "semantic_hash": ""
+  },
+  "sql-fun-sqlast/src/sem/create_seq.rs": {
+    "mtime": 1789714956.7367988,
+    "ast_hash": "6f81da42fae0529e5001f5f74a553deb",
+    "semantic_hash": ""
+  },
+  "sql-fun-sqlast/src/sem/create_table.rs": {
+    "mtime": 1789714956.7067978,
+    "ast_hash": "029b3dc6fc964f6f09ed76721c11b98b",
+    "semantic_hash": ""
+  },
+  "sql-fun-sqlast/src/sem/create_table/column_def.rs": {
+    "mtime": 1789714956.7357986,
+    "ast_hash": "9b1c064e59cbc22b99175b7a175a3f3b",
+    "semantic_hash": ""
+  },
+  "sql-fun-sqlast/src/sem/create_table/column_name.rs": {
+    "mtime": 1789714956.7357986,
+    "ast_hash": "fb1ed4fa66f73f1386796dab5769b2ca",
+    "semantic_hash": ""
+  },
+  "sql-fun-sqlast/src/sem/create_table/table_name.rs": {
+    "mtime": 1789714956.716798,
+    "ast_hash": "9fd252313cb667ad10b402bf98a98fdb",
+    "semantic_hash": ""
+  },
+  "sql-fun-sqlast/src/sem/create_table/view_name.rs": {
+    "mtime": 1789714956.7187982,
+    "ast_hash": "9b8156377314bdecfe18e0a16aac7cd1",
+    "semantic_hash": ""
+  },
+  "sql-fun-sqlast/src/sem/create_table_as.rs": {
+    "mtime": 1789714956.716798,
+    "ast_hash": "662cd1b1e6928fbd41a3e9f18123491f",
+    "semantic_hash": ""
+  },
+  "sql-fun-sqlast/src/sem/create_view.rs": {
+    "mtime": 1789714956.7157981,
+    "ast_hash": "f58dce2bf501c5a4d5980290cd4da3ed",
+    "semantic_hash": ""
+  },
+  "sql-fun-sqlast/src/sem/cte.rs": {
+    "mtime": 1779226591.1167948,
+    "ast_hash": "a94eca676cd6db8ce5e1718b8e559454",
+    "semantic_hash": ""
+  },
+  "sql-fun-sqlast/src/sem/data_source.rs": {
+    "mtime": 1779226591.1167948,
+    "ast_hash": "457f789ad807910a91549a6a2b2e7d00",
+    "semantic_hash": ""
+  },
+  "sql-fun-sqlast/src/sem/data_source/alias.rs": {
+    "mtime": 1789714956.7187982,
+    "ast_hash": "584f3f628b5db554edb3809308ba4227",
+    "semantic_hash": ""
+  },
+  "sql-fun-sqlast/src/sem/data_source/analyze.rs": {
+    "mtime": 1780100239.2239618,
+    "ast_hash": "1e37879aa4b39c1186fdcb8b272923a5",
+    "semantic_hash": ""
+  },
+  "sql-fun-sqlast/src/sem/data_source/analyze/impl_analyze_range_var_node.rs": {
+    "mtime": 1780100239.2239618,
+    "ast_hash": "11e333efb44b8c8088ab1aecde0ba9ac",
+    "semantic_hash": ""
+  },
+  "sql-fun-sqlast/src/sem/data_source/cte.rs": {
+    "mtime": 1789714956.7357986,
+    "ast_hash": "188c2267255e82a5ff11f01098466541",
+    "semantic_hash": ""
+  },
+  "sql-fun-sqlast/src/sem/data_source/join_expr.rs": {
+    "mtime": 1779226591.1177948,
+    "ast_hash": "7ddd4337ec55096a300af1bbbca55f54",
+    "semantic_hash": ""
+  },
+  "sql-fun-sqlast/src/sem/data_source/join_kind.rs": {
+    "mtime": 1789714956.7357986,
+    "ast_hash": "7d3a464bc0d5e7e6c84cb3821815ae76",
+    "semantic_hash": ""
+  },
+  "sql-fun-sqlast/src/sem/data_source/rows_fun.rs": {
+    "mtime": 1779226591.118795,
+    "ast_hash": "60b8bb6037982b167cdc75b1de586094",
+    "semantic_hash": ""
+  },
+  "sql-fun-sqlast/src/sem/data_source/sub_query.rs": {
+    "mtime": 1789714956.7157981,
+    "ast_hash": "9abce79e5f63d7d1c7b023a06e77361f",
+    "semantic_hash": ""
+  },
+  "sql-fun-sqlast/src/sem/data_source/table.rs": {
+    "mtime": 1789714956.7367988,
+    "ast_hash": "5fbcca2d4b09e254896d054343c0516b",
+    "semantic_hash": ""
+  },
+  "sql-fun-sqlast/src/sem/data_source/table_fun.rs": {
+    "mtime": 1789714956.7187982,
+    "ast_hash": "5b222ac48ce14e8bb38946b3d9c21077",
+    "semantic_hash": ""
+  },
+  "sql-fun-sqlast/src/sem/data_source/undefined.rs": {
+    "mtime": 1789714956.7157981,
+    "ast_hash": "3c54600b306e6d73a288a9a3696cc73c",
+    "semantic_hash": ""
+  },
+  "sql-fun-sqlast/src/sem/data_source/view.rs": {
+    "mtime": 1789714956.7187982,
+    "ast_hash": "e0f06b6d6ed1c1fd7fafbfe734d0a3fd",
+    "semantic_hash": ""
+  },
+  "sql-fun-sqlast/src/sem/def_elem.rs": {
+    "mtime": 1779226591.1197948,
+    "ast_hash": "d8d178bc869228ec613966192e1992c4",
+    "semantic_hash": ""
+  },
+  "sql-fun-sqlast/src/sem/delete_statement.rs": {
+    "mtime": 1779226591.1197948,
+    "ast_hash": "bb69ff30d2ddb32f287f2acae129cfa0",
+    "semantic_hash": ""
+  },
+  "sql-fun-sqlast/src/sem/error.rs": {
+    "mtime": 1789714956.7367988,
+    "ast_hash": "0ab5fb7408703c04f2b9182df5247d56",
+    "semantic_hash": ""
+  },
+  "sql-fun-sqlast/src/sem/from_clause.rs": {
+    "mtime": 1779226591.1197948,
+    "ast_hash": "ef823645d29034998a8bbcc8074dd050",
+    "semantic_hash": ""
+  },
+  "sql-fun-sqlast/src/sem/insert_statement.rs": {
+    "mtime": 1779226591.1197948,
+    "ast_hash": "5803dc81c511026384f61332f6310abf",
+    "semantic_hash": ""
+  },
+  "sql-fun-sqlast/src/sem/macros.rs": {
+    "mtime": 1756856167.799735,
+    "ast_hash": "de4fe9c3a1e7a5afbf88d4a63df7657c",
+    "semantic_hash": ""
+  },
+  "sql-fun-sqlast/src/sem/names.rs": {
+    "mtime": 1766948800.0136385,
+    "ast_hash": "c9b7e851808983080c593ef62f34ec40",
+    "semantic_hash": ""
+  },
+  "sql-fun-sqlast/src/sem/names/catalog.rs": {
+    "mtime": 1789710150.6470408,
+    "ast_hash": "81b53354c2ffb2d9acc17ce1dddbcf32",
+    "semantic_hash": ""
+  },
+  "sql-fun-sqlast/src/sem/names/full.rs": {
+    "mtime": 1789714956.7197983,
+    "ast_hash": "dfafcaab9feb8b01897baabc35a7d0a9",
+    "semantic_hash": ""
+  },
+  "sql-fun-sqlast/src/sem/names/full/impl_conversion_traits.rs": {
+    "mtime": 1780527129.1363764,
+    "ast_hash": "5a0ae1ad34e643e4b30934250ac90e70",
+    "semantic_hash": ""
+  },
+  "sql-fun-sqlast/src/sem/names/local.rs": {
+    "mtime": 1789710150.6470408,
+    "ast_hash": "c86604034fc8fcbaf71543d3acb89152",
+    "semantic_hash": ""
+  },
+  "sql-fun-sqlast/src/sem/names/ope.rs": {
+    "mtime": 1789714956.7147982,
+    "ast_hash": "51b1204acf059c94764bafa92f068deb",
+    "semantic_hash": ""
+  },
+  "sql-fun-sqlast/src/sem/names/schema.rs": {
+    "mtime": 1789710150.6470408,
+    "ast_hash": "67f340c65865c69647f6e43146e3c533",
+    "semantic_hash": ""
+  },
+  "sql-fun-sqlast/src/sem/operators.rs": {
+    "mtime": 1789714956.7187982,
+    "ast_hash": "52ec0ee28e99d312cd52fb1647597918",
+    "semantic_hash": ""
+  },
+  "sql-fun-sqlast/src/sem/parse_context.rs": {
+    "mtime": 1780527129.1363764,
+    "ast_hash": "218d358c5d8ce76a7680145ef91f494f",
+    "semantic_hash": ""
+  },
+  "sql-fun-sqlast/src/sem/parse_context/cast_info.rs": {
+    "mtime": 1779226591.121795,
+    "ast_hash": "a23e4be7b5844a2e258c4e7dfd8412bc",
+    "semantic_hash": ""
+  },
+  "sql-fun-sqlast/src/sem/parse_context/seq_info.rs": {
+    "mtime": 1767001915.0601525,
+    "ast_hash": "102a43f497a4345a121d5263486f23ba",
+    "semantic_hash": ""
+  },
+  "sql-fun-sqlast/src/sem/parse_context/table_info.rs": {
+    "mtime": 1780100239.2239618,
+    "ast_hash": "6855450ad24a5d63b48e707c84c015cb",
+    "semantic_hash": ""
+  },
+  "sql-fun-sqlast/src/sem/parse_context/type_info.rs": {
+    "mtime": 1780527129.1363764,
+    "ast_hash": "d0979e25858d00822ce5393131d5e96c",
+    "semantic_hash": ""
+  },
+  "sql-fun-sqlast/src/sem/parse_context/view_info.rs": {
+    "mtime": 1766973396.77378,
+    "ast_hash": "8a95ee98a918f5e794a89139a4538b95",
+    "semantic_hash": ""
+  },
+  "sql-fun-sqlast/src/sem/pg_type.rs": {
+    "mtime": 1789714956.7157981,
+    "ast_hash": "866f5113b7481deb610b72646c7e9f65",
+    "semantic_hash": ""
+  },
+  "sql-fun-sqlast/src/sem/pg_type/concrete_type.rs": {
+    "mtime": 1789714956.7177982,
+    "ast_hash": "e812a7d2e5b8ec713d018e3fdf83e421",
+    "semantic_hash": ""
+  },
+  "sql-fun-sqlast/src/sem/pg_type/dynamic_type.rs": {
+    "mtime": 1767057929.443279,
+    "ast_hash": "7f4731abb5dc1b49111545e38b089148",
+    "semantic_hash": ""
+  },
+  "sql-fun-sqlast/src/sem/pg_type/type_ref.rs": {
+    "mtime": 1789714956.7147982,
+    "ast_hash": "c2fa421588a7a1f0d0989da33da744e4",
+    "semantic_hash": ""
+  },
+  "sql-fun-sqlast/src/sem/problem.rs": {
+    "mtime": 1789710150.6470408,
+    "ast_hash": "40667468d69c8e8319a7b9866ac9b3b5",
+    "semantic_hash": ""
+  },
+  "sql-fun-sqlast/src/sem/problem/name_resolution.rs": {
+    "mtime": 1789714956.7177982,
+    "ast_hash": "29ea1194b072e72b2b2b9ef25c33505e",
+    "semantic_hash": ""
+  },
+  "sql-fun-sqlast/src/sem/problem/name_resolution/column_not_found.rs": {
+    "mtime": 1780527129.1373763,
+    "ast_hash": "9e4ced5950b2ba1f41d9c0cb98989c5c",
+    "semantic_hash": ""
+  },
+  "sql-fun-sqlast/src/sem/problem/overload_resolution.rs": {
+    "mtime": 1780527129.1373763,
+    "ast_hash": "911342455a75fd5b7398aae2bba530f7",
+    "semantic_hash": ""
+  },
+  "sql-fun-sqlast/src/sem/problem/sql_highlighter.rs": {
+    "mtime": 1789714956.7147982,
+    "ast_hash": "00c784d779cfa0a48939c7b35eef3f09",
+    "semantic_hash": ""
+  },
+  "sql-fun-sqlast/src/sem/scalar_expr.rs": {
+    "mtime": 1789714956.7177982,
+    "ast_hash": "ebe0ff99d056cf31d62a0b7439734513",
+    "semantic_hash": ""
+  },
+  "sql-fun-sqlast/src/sem/scalar_expr/analyze.rs": {
+    "mtime": 1789710150.6470408,
+    "ast_hash": "ea8959622cbbbba8e3e1630c7b8241db",
+    "semantic_hash": ""
+  },
+  "sql-fun-sqlast/src/sem/scalar_expr/arith_expr.rs": {
+    "mtime": 1789714956.7177982,
+    "ast_hash": "de396a1a1a87828f882aa1a904a80e05",
+    "semantic_hash": ""
+  },
+  "sql-fun-sqlast/src/sem/scalar_expr/arith_expr/binary.rs": {
+    "mtime": 1789714956.7197983,
+    "ast_hash": "9b079323f5aafa744c1d4e35690c4798",
+    "semantic_hash": ""
+  },
+  "sql-fun-sqlast/src/sem/scalar_expr/arith_expr/binary/bin_cast_candidate.rs": {
+    "mtime": 1789714956.7187982,
+    "ast_hash": "72a64ba7843483e22adf4cdc3f58afb5",
+    "semantic_hash": ""
+  },
+  "sql-fun-sqlast/src/sem/scalar_expr/arith_expr/binary/impl_build_binary_op.rs": {
+    "mtime": 1766961408.402162,
+    "ast_hash": "012a205d6f71aa1af56cfeebc15fa59e",
+    "semantic_hash": ""
+  },
+  "sql-fun-sqlast/src/sem/scalar_expr/arith_expr/binary/impl_build_op_any.rs": {
+    "mtime": 1767000094.9132264,
+    "ast_hash": "250787f4f0ca9026f9fea9a80707ddfd",
+    "semantic_hash": ""
+  },
+  "sql-fun-sqlast/src/sem/scalar_expr/arith_expr/call_sites.rs": {
+    "mtime": 1779226591.124795,
+    "ast_hash": "b87a14fc8ccdb408e2b232ec9ede1548",
+    "semantic_hash": ""
+  },
+  "sql-fun-sqlast/src/sem/scalar_expr/arith_expr/call_sites/binary.rs": {
+    "mtime": 1789714956.716798,
+    "ast_hash": "959423a776447540eef09b5284fb8b31",
+    "semantic_hash": ""
+  },
+  "sql-fun-sqlast/src/sem/scalar_expr/arith_expr/call_sites/binary_all.rs": {
+    "mtime": 1789714992.1777053,
+    "ast_hash": "3e47426617cf00ec741b69706587564f",
+    "semantic_hash": ""
+  },
+  "sql-fun-sqlast/src/sem/scalar_expr/arith_expr/call_sites/binary_any.rs": {
+    "mtime": 1789714992.1767054,
+    "ast_hash": "32686082b135ac6dad231b1fe15f60a2",
+    "semantic_hash": ""
+  },
+  "sql-fun-sqlast/src/sem/scalar_expr/arith_expr/call_sites/left_unary.rs": {
+    "mtime": 1789714992.1777053,
+    "ast_hash": "05726368341e6d8fd2b10283adb68025",
+    "semantic_hash": ""
+  },
+  "sql-fun-sqlast/src/sem/scalar_expr/arith_expr/call_sites/right_unary.rs": {
+    "mtime": 1789714992.1777053,
+    "ast_hash": "b9a2cb73bf5859bec26a2391962b06b2",
+    "semantic_hash": ""
+  },
+  "sql-fun-sqlast/src/sem/scalar_expr/arith_expr/impl_analyze.rs": {
+    "mtime": 1779226591.125795,
+    "ast_hash": "5841044fbecfada82c7ff437310798f9",
+    "semantic_hash": ""
+  },
+  "sql-fun-sqlast/src/sem/scalar_expr/arith_expr/impl_build_op.rs": {
+    "mtime": 1780527129.1373763,
+    "ast_hash": "b3f7501272316e68b487ddee01040a7f",
+    "semantic_hash": ""
+  },
+  "sql-fun-sqlast/src/sem/scalar_expr/arith_expr/null_if.rs": {
+    "mtime": 1789714956.7157981,
+    "ast_hash": "8ab664072471b2973cf8f265bf328e67",
+    "semantic_hash": ""
+  },
+  "sql-fun-sqlast/src/sem/scalar_expr/arith_expr/unary.rs": {
+    "mtime": 1789714956.7067978,
+    "ast_hash": "e8815a74f21e62c8b4a025fd4bd9b0a0",
+    "semantic_hash": ""
+  },
+  "sql-fun-sqlast/src/sem/scalar_expr/array.rs": {
+    "mtime": 1779226591.125795,
+    "ast_hash": "24df1725d29226df843587bcaedb91cf",
+    "semantic_hash": ""
+  },
+  "sql-fun-sqlast/src/sem/scalar_expr/boolean.rs": {
+    "mtime": 1789714956.7177982,
+    "ast_hash": "e250f370be0c1b83285e27b474ec873a",
+    "semantic_hash": ""
+  },
+  "sql-fun-sqlast/src/sem/scalar_expr/case_expr.rs": {
+    "mtime": 1789714956.7067978,
+    "ast_hash": "8aa0c635fb66ef018f5fcf265651cd38",
+    "semantic_hash": ""
+  },
+  "sql-fun-sqlast/src/sem/scalar_expr/cast_expr.rs": {
+    "mtime": 1789710150.6470408,
+    "ast_hash": "d2e2953793635162429a7ade1dec4885",
+    "semantic_hash": ""
+  },
+  "sql-fun-sqlast/src/sem/scalar_expr/coalesce.rs": {
+    "mtime": 1780527129.1383765,
+    "ast_hash": "d98e04b61af86bb3bed1539e3caf33de",
+    "semantic_hash": ""
+  },
+  "sql-fun-sqlast/src/sem/scalar_expr/collate.rs": {
+    "mtime": 1779226591.126795,
+    "ast_hash": "2c02158327e3c2e687f5bc109ab22fe5",
+    "semantic_hash": ""
+  },
+  "sql-fun-sqlast/src/sem/scalar_expr/column_ref.rs": {
+    "mtime": 1780527129.1383765,
+    "ast_hash": "642f8bf1deb52b3afddca6d4d8f5c929",
+    "semantic_hash": ""
+  },
+  "sql-fun-sqlast/src/sem/scalar_expr/column_ref/cte_column_ref.rs": {
+    "mtime": 1780529183.8443925,
+    "ast_hash": "db7c5701684c9ce32e003b56c25d9e16",
+    "semantic_hash": ""
+  },
+  "sql-fun-sqlast/src/sem/scalar_expr/column_ref/invalid_column_ref.rs": {
+    "mtime": 1779226591.127795,
+    "ast_hash": "0db1713192703207385b9971643dd005",
+    "semantic_hash": ""
+  },
+  "sql-fun-sqlast/src/sem/scalar_expr/column_ref/subquery_column_ref.rs": {
+    "mtime": 1780529183.8443925,
+    "ast_hash": "4f9d14fd6e70ce0c908d37403e6faab9",
+    "semantic_hash": ""
+  },
+  "sql-fun-sqlast/src/sem/scalar_expr/column_ref/table_column_ref.rs": {
+    "mtime": 1780529183.8443925,
+    "ast_hash": "84d4ad969a5506fbd75aa7cd6713ce2c",
+    "semantic_hash": ""
+  },
+  "sql-fun-sqlast/src/sem/scalar_expr/column_ref/table_func_col_ref.rs": {
+    "mtime": 1780529183.8443925,
+    "ast_hash": "17dd247b502b11647cf686a1cf614506",
+    "semantic_hash": ""
+  },
+  "sql-fun-sqlast/src/sem/scalar_expr/column_ref/view_column_ref.rs": {
+    "mtime": 1780529183.8443925,
+    "ast_hash": "124d53c06aec0ec1fb74f750c91a6adb",
+    "semantic_hash": ""
+  },
+  "sql-fun-sqlast/src/sem/scalar_expr/const_expr.rs": {
+    "mtime": 1789714956.7357986,
+    "ast_hash": "7986513e385dcf7c5f8485013d024270",
+    "semantic_hash": ""
+  },
+  "sql-fun-sqlast/src/sem/scalar_expr/func_call.rs": {
+    "mtime": 1789714956.7157981,
+    "ast_hash": "7df6eac67433cbd45a3804227c528574",
+    "semantic_hash": ""
+  },
+  "sql-fun-sqlast/src/sem/scalar_expr/indirect.rs": {
+    "mtime": 1780527129.1383765,
+    "ast_hash": "5c20b5f2d78d913a6ee1c8cc2004a709",
+    "semantic_hash": ""
+  },
+  "sql-fun-sqlast/src/sem/scalar_expr/indirect/array_index.rs": {
+    "mtime": 1789714956.7067978,
+    "ast_hash": "8610d9526586a3c705f3198b1230efd3",
+    "semantic_hash": ""
+  },
+  "sql-fun-sqlast/src/sem/scalar_expr/indirect/array_slice.rs": {
+    "mtime": 1789714956.7177982,
+    "ast_hash": "879111edd9377b88db5c3e483decbfea",
+    "semantic_hash": ""
+  },
+  "sql-fun-sqlast/src/sem/scalar_expr/indirect/member_ref.rs": {
+    "mtime": 1789715104.949586,
+    "ast_hash": "e7d0eebaec08f4e586be8994ae0be0d2",
+    "semantic_hash": ""
+  },
+  "sql-fun-sqlast/src/sem/scalar_expr/min_max.rs": {
+    "mtime": 1779226591.1287951,
+    "ast_hash": "988c661f7b0d13177d4b967069711d9f",
+    "semantic_hash": ""
+  },
+  "sql-fun-sqlast/src/sem/scalar_expr/named_arg.rs": {
+    "mtime": 1779226591.1287951,
+    "ast_hash": "6bc99fce4398c72a5e670d44529e9424",
+    "semantic_hash": ""
+  },
+  "sql-fun-sqlast/src/sem/scalar_expr/param_ref.rs": {
+    "mtime": 1779226591.129795,
+    "ast_hash": "a01f379f6465ded1ef8eff1e9e4dfbc6",
+    "semantic_hash": ""
+  },
+  "sql-fun-sqlast/src/sem/scalar_expr/sql_value.rs": {
+    "mtime": 1789714956.7157981,
+    "ast_hash": "e77faaeeb7fe6d9ab87ce3812b8d5669",
+    "semantic_hash": ""
+  },
+  "sql-fun-sqlast/src/sem/scalar_expr/sub_link.rs": {
+    "mtime": 1780527129.1383765,
+    "ast_hash": "38ee81ee41e73bf22c7761902065714b",
+    "semantic_hash": ""
+  },
+  "sql-fun-sqlast/src/sem/schema_file_context.rs": {
+    "mtime": 1780100239.2239618,
+    "ast_hash": "bace93b3bc2d229bcd547212fca7d6a1",
+    "semantic_hash": ""
+  },
+  "sql-fun-sqlast/src/sem/schema_file_context/cast_info.rs": {
+    "mtime": 1780527129.1383765,
+    "ast_hash": "a2c30b26eccc01d800450f2fe02fd2bb",
+    "semantic_hash": ""
+  },
+  "sql-fun-sqlast/src/sem/schema_file_context/func_info.rs": {
+    "mtime": 1766960864.5630987,
+    "ast_hash": "519333fb8fa324870c3084fc38a04c3a",
+    "semantic_hash": ""
+  },
+  "sql-fun-sqlast/src/sem/schema_file_context/sequence_info.rs": {
+    "mtime": 1779226591.129795,
+    "ast_hash": "ef0303ef6a664e3685efbbd2f014cc8a",
+    "semantic_hash": ""
+  },
+  "sql-fun-sqlast/src/sem/schema_file_context/table_info.rs": {
+    "mtime": 1780825109.8908417,
+    "ast_hash": "1ee2584f2779ee786948af5b9ba85002",
+    "semantic_hash": ""
+  },
+  "sql-fun-sqlast/src/sem/schema_file_context/type_info.rs": {
+    "mtime": 1780527129.1383765,
+    "ast_hash": "1a5f67d454be83ece0b07d5b6508c569",
+    "semantic_hash": ""
+  },
+  "sql-fun-sqlast/src/sem/schema_file_context/view_info.rs": {
+    "mtime": 1779226591.130795,
+    "ast_hash": "ee128cdfe6e23f72001a3c4df918ca16",
+    "semantic_hash": ""
+  },
+  "sql-fun-sqlast/src/sem/search_path.rs": {
+    "mtime": 1766533141.590802,
+    "ast_hash": "f330a8b729535076e48b4c60302899b6",
+    "semantic_hash": ""
+  },
+  "sql-fun-sqlast/src/sem/select_statement.rs": {
+    "mtime": 1789714956.7197983,
+    "ast_hash": "4dd8f5a555fe8710b8eae6708a6b4298",
+    "semantic_hash": ""
+  },
+  "sql-fun-sqlast/src/sem/select_statement/result_column.rs": {
+    "mtime": 1789714956.716798,
+    "ast_hash": "4ec6d25f70e4c6a770ba5e2e3fc23107",
+    "semantic_hash": ""
+  },
+  "sql-fun-sqlast/src/sem/top_level_statement.rs": {
+    "mtime": 1789710150.6470408,
+    "ast_hash": "1cfe8164e34a82705bb665a98100a02d",
+    "semantic_hash": ""
+  },
+  "sql-fun-sqlast/src/sem/type_cast.rs": {
+    "mtime": 1757335455.904947,
+    "ast_hash": "6c4b066284fc6b619cbf8cf635599f86",
+    "semantic_hash": ""
+  },
+  "sql-fun-sqlast/src/sem/type_system.rs": {
+    "mtime": 1789714956.7197983,
+    "ast_hash": "ef99fa7f80151e80ea7f16e252a5ee49",
+    "semantic_hash": ""
+  },
+  "sql-fun-sqlast/src/sem/type_system/err.rs": {
+    "mtime": 1789714956.7067978,
+    "ast_hash": "1da3d8f5e18400d320f91ea8f7610aff",
+    "semantic_hash": ""
+  },
+  "sql-fun-sqlast/src/sem/type_system/func_params.rs": {
+    "mtime": 1780527129.1393764,
+    "ast_hash": "3e8524933fcc27133ac977a029b325ff",
+    "semantic_hash": ""
+  },
+  "sql-fun-sqlast/src/sem/type_system/func_params/analyze.rs": {
+    "mtime": 1780527129.1393764,
+    "ast_hash": "4674c287de889b94856aae2b2a3ace8d",
+    "semantic_hash": ""
+  },
+  "sql-fun-sqlast/src/sem/type_system/func_params/bind_result.rs": {
+    "mtime": 1779226591.1317952,
+    "ast_hash": "4d842391b094d388770df84a6103dbc4",
+    "semantic_hash": ""
+  },
+  "sql-fun-sqlast/src/sem/type_system/func_params/in_out_param.rs": {
+    "mtime": 1780527129.1393764,
+    "ast_hash": "a7fd03aefe67b9e99d6dea45c5beb36e",
+    "semantic_hash": ""
+  },
+  "sql-fun-sqlast/src/sem/type_system/func_params/in_param.rs": {
+    "mtime": 1779226591.1317952,
+    "ast_hash": "690fcc99fb7cbf3cb88266506f4bf43b",
+    "semantic_hash": ""
+  },
+  "sql-fun-sqlast/src/sem/type_system/func_params/out_param.rs": {
+    "mtime": 1779226591.1317952,
+    "ast_hash": "2be7ede0052bd7f4ea70447cc12fbcf4",
+    "semantic_hash": ""
+  },
+  "sql-fun-sqlast/src/sem/type_system/func_params/table_param.rs": {
+    "mtime": 1779226591.1317952,
+    "ast_hash": "264fd3fd9ec43faee0440a63bcc22e0b",
+    "semantic_hash": ""
+  },
+  "sql-fun-sqlast/src/sem/type_system/func_params/variadic_param.rs": {
+    "mtime": 1779226591.132795,
+    "ast_hash": "13fa8016c9371aa887eea0dc193529eb",
+    "semantic_hash": ""
+  },
+  "sql-fun-sqlast/src/sem/type_system/function_overload_collection.rs": {
+    "mtime": 1789714956.7067978,
+    "ast_hash": "f7e2c489ad2df86489380464f8308e01",
+    "semantic_hash": ""
+  },
+  "sql-fun-sqlast/src/sem/type_system/infer.rs": {
+    "mtime": 1789714956.7187982,
+    "ast_hash": "e873f2b28ea502bf528a9cd1215e0ceb",
+    "semantic_hash": ""
+  },
+  "sql-fun-sqlast/src/sem/update_statement.rs": {
+    "mtime": 1779226591.132795,
+    "ast_hash": "8acfd39e07782215e862c01390817a12",
+    "semantic_hash": ""
+  },
+  "sql-fun-sqlast/src/sem/variable_set.rs": {
+    "mtime": 1789714956.7187982,
+    "ast_hash": "d77e01e5350b3659b04a5970d8b82ae2",
+    "semantic_hash": ""
+  },
+  "sql-fun-sqlast/src/sem/view_like.rs": {
+    "mtime": 1789714956.7157981,
+    "ast_hash": "954752ebb221946686b5419923ba96e3",
+    "semantic_hash": ""
+  },
+  "sql-fun-sqlast/src/sql_file.rs": {
+    "mtime": 1779226591.1337953,
+    "ast_hash": "46514cee8026bca3ece609c0cc45c594",
+    "semantic_hash": ""
+  },
+  "sql-fun-sqlast/src/syn.rs": {
+    "mtime": 1789710150.6470408,
+    "ast_hash": "6d477aa3e87e00d84c93d4c2049092b8",
+    "semantic_hash": ""
+  },
+  "sql-fun-sqlast/src/syn/generated.rs": {
+    "mtime": 1789714956.7307985,
+    "ast_hash": "9a8e2ab4b123996baf4fcd17e272f6e6",
+    "semantic_hash": ""
+  },
+  "sql-fun-sqlast/src/syn/syn_ext.rs": {
+    "mtime": 1779226591.1417954,
+    "ast_hash": "5dbbc1c00de6f9dabcbd93945d1e5490",
+    "semantic_hash": ""
+  },
+  "sql-fun-sqlast/src/test_helpers.rs": {
+    "mtime": 1789710150.6470408,
+    "ast_hash": "6461af2c8174feb102a72b97fcacd6b8",
+    "semantic_hash": ""
+  },
+  "sql-fun-sqlast/src/test_helpers/syn_builder.rs": {
+    "mtime": 1780825109.8908417,
+    "ast_hash": "d159ea8d65125916f53b225a9d697139",
+    "semantic_hash": ""
+  },
+  "sql-fun-sqlast/src/test_helpers/test_parse_context.rs": {
+    "mtime": 1780825109.8908417,
+    "ast_hash": "3a23c5c25ed138991c83d89c38fae1c0",
+    "semantic_hash": ""
+  },
+  "sql-fun-sqlast/src/test_helpers/test_parse_context/cast_info.rs": {
+    "mtime": 1779226591.1427953,
+    "ast_hash": "f6c5f467e8d61cb37b6ffa57eec69275",
+    "semantic_hash": ""
+  },
+  "sql-fun-sqlast/src/trie_map.rs": {
+    "mtime": 1789714992.1777053,
+    "ast_hash": "c07ea896f89d578dc0e020ee274756fc",
+    "semantic_hash": ""
+  },
+  "sql-fun-sqlast/src/trie_map/key_fragment.rs": {
+    "mtime": 1789714956.7067978,
+    "ast_hash": "6621bd98d94516a0a35e82ba98eba2f1",
+    "semantic_hash": ""
+  },
+  "sql-fun-sqlast/src/trie_map/leaf.rs": {
+    "mtime": 1789714956.7177982,
+    "ast_hash": "71621942a4abeaf367ea47fd4383f767",
+    "semantic_hash": ""
+  },
+  "sql-fun-sqlast/src/trie_map/node.rs": {
+    "mtime": 1780527129.1403763,
+    "ast_hash": "958545c5881888255c92e30799241378",
+    "semantic_hash": ""
+  },
+  "src/connector.rs": {
+    "mtime": 1789710121.1203163,
+    "ast_hash": "2a09a7eb775bcde25bd1cae8f0fe7155",
+    "semantic_hash": ""
+  },
+  "src/errors.rs": {
+    "mtime": 1789715370.9683619,
+    "ast_hash": "3ae7e5234b0f7be68c6400da8c76b295",
+    "semantic_hash": ""
+  },
+  "src/generate_sql_execute.rs": {
+    "mtime": 1789714463.0940676,
+    "ast_hash": "8d2ed7a6801affd5b97119805c4be34b",
+    "semantic_hash": ""
+  },
+  "src/generate_sql_query_opt.rs": {
+    "mtime": 1789714463.0940676,
+    "ast_hash": "df1fedd0db109cae65457809c9ed2acc",
+    "semantic_hash": ""
+  },
+  "src/generate_sqy_query_many.rs": {
+    "mtime": 1789714463.0940676,
+    "ast_hash": "fd5bd2c031ae15c5c4f8d67aecb564da",
+    "semantic_hash": ""
+  },
+  "src/lib.rs": {
+    "mtime": 1789710121.1203163,
+    "ast_hash": "c0bae40bc1def41bc793304c89068c0c",
+    "semantic_hash": ""
+  },
+  "src/rust_ast.rs": {
+    "mtime": 1789710121.1203163,
+    "ast_hash": "852365b392032bad0f906a78d31076f7",
+    "semantic_hash": ""
+  },
+  "src/tokio_postgres_generator.rs": {
+    "mtime": 1789710121.1203163,
+    "ast_hash": "e6503ff4f6870850b7f067fcf4842f5a",
+    "semantic_hash": ""
+  },
+  "src/tokio_postgres_generator/execute.rs": {
+    "mtime": 1789710121.1213164,
+    "ast_hash": "9af0e239f9c7370be4031331cc106330",
+    "semantic_hash": ""
+  },
+  "src/tokio_postgres_generator/query_many.rs": {
+    "mtime": 1789710121.1213164,
+    "ast_hash": "e0eaa6f5af4f522e2120e952001eccea",
+    "semantic_hash": ""
+  },
+  "src/tokio_postgres_generator/query_opt.rs": {
+    "mtime": 1789710121.1213164,
+    "ast_hash": "2fd6e1df3f654b958fdc593c25d1eaa4",
+    "semantic_hash": ""
+  },
+  "tests/sql_query_one.rs": {
+    "mtime": 1789710121.1213164,
+    "ast_hash": "a41ef7e899bfe9674225732859243022",
+    "semantic_hash": ""
+  },
+  "tests/sql_query_one/pass.rs": {
+    "mtime": 1789710121.1213164,
+    "ast_hash": "c37112c9df5d1ff86bb61a86dfed5b59",
+    "semantic_hash": ""
+  },
+  "xbuild/src/lib.rs": {
+    "mtime": 1779226591.1457953,
+    "ast_hash": "ee10ab761d8a360b815050e943b557a1",
+    "semantic_hash": ""
+  },
+  "xbuild/src/main.rs": {
+    "mtime": 1745001511.5052297,
+    "ast_hash": "b065dd4de795a560decdd1f2d1a9c156",
+    "semantic_hash": ""
+  },
+  "xbuild/src/protobuf_prost.rs": {
+    "mtime": 1779226591.1457953,
+    "ast_hash": "e272f6a625ba75ecb4d5dad1cd546a61",
+    "semantic_hash": ""
+  },
+  "xbuild/src/protobuf_prost/enum_type.rs": {
+    "mtime": 1779226591.1457953,
+    "ast_hash": "faa85dd6428c9f6f71d1eda46b919643",
+    "semantic_hash": ""
+  },
+  "xbuild/src/protobuf_prost/enum_type_value.rs": {
+    "mtime": 1789715074.2468023,
+    "ast_hash": "c9bd3b2c1c646f634b3d2d8fabc9ebae",
+    "semantic_hash": ""
+  },
+  "xbuild/src/protobuf_prost/message_type.rs": {
+    "mtime": 1789715074.2478023,
+    "ast_hash": "30bb7073f416131455c2ce272cc3e246",
+    "semantic_hash": ""
+  },
+  "xbuild/src/protobuf_prost/message_type_field.rs": {
+    "mtime": 1789715074.2468023,
+    "ast_hash": "838149cf319f0ad5f5ce96e18bf6ebad",
+    "semantic_hash": ""
+  },
+  ".codex/skills/implement-unit-test/SKILL.md": {
+    "mtime": 1779226591.0637934,
+    "ast_hash": "2dd062a84f20d61c3f0055bc5e105c90",
+    "semantic_hash": ""
+  },
+  ".github/ISSUE_TEMPLATE/bug_report.md": {
+    "mtime": 1779226591.0647936,
+    "ast_hash": "2a382ca65b2f47657f20074f15337342",
+    "semantic_hash": ""
+  },
+  ".github/ISSUE_TEMPLATE/feature_request.md": {
+    "mtime": 1779226591.0647936,
+    "ast_hash": "d1166b5e8d75890d982400586622935b",
+    "semantic_hash": ""
+  },
+  ".github/PULL_REQUEST_TEMPLATE.md": {
+    "mtime": 1779226591.0647936,
+    "ast_hash": "7ebc99665cbf9e561d2fd9a3472bbeb5",
+    "semantic_hash": ""
+  },
+  ".github/dependabot.yml": {
+    "mtime": 1779226591.0647936,
+    "ast_hash": "a7eee355483566644d172ccdbf7d02ab",
+    "semantic_hash": ""
+  },
+  ".github/workflows/build-test.yml": {
+    "mtime": 1789710150.5630386,
+    "ast_hash": "0174f4d36e64a6f24c39e81e99909bb2",
+    "semantic_hash": ""
+  },
+  ".github/workflows/ci-image-publish.yml": {
+    "mtime": 1781305863.3633862,
+    "ast_hash": "9a8073d24a6d29e3e5e22c12abe2829f",
+    "semantic_hash": ""
+  },
+  ".local/bin/README.md": {
+    "mtime": 1757213068.6961467,
+    "ast_hash": "b0d28afb5477fa51ffc2b94c92cfff13",
+    "semantic_hash": ""
+  },
+  "AGENTS.md": {
+    "mtime": 1786122521.1770723,
+    "ast_hash": "95d4c343d15f250a7b89a108da54119b",
+    "semantic_hash": ""
+  },
+  "CONTRIBUTING.md": {
+    "mtime": 1789710150.572039,
+    "ast_hash": "41e62957b42589042976a960f554cc26",
+    "semantic_hash": ""
+  },
+  "README.md": {
+    "mtime": 1789710150.5730388,
+    "ast_hash": "a8d7a40f13e866ec0b15d9cae144f431",
+    "semantic_hash": ""
+  },
+  "book/SUMMARY.md": {
+    "mtime": 1789710121.020314,
+    "ast_hash": "7dfc9ed2b67dc1b25a2cc24399b517e9",
+    "semantic_hash": ""
+  },
+  "book/api/initialize.md": {
+    "mtime": 1772143075.6712177,
+    "ast_hash": "ed7fcb872eb962c94e03998b5a0f6fcf",
+    "semantic_hash": ""
+  },
+  "book/api/initialized.md": {
+    "mtime": 1745581566.8293624,
+    "ast_hash": "698809fce2022db542a1b95ea9b33d71",
+    "semantic_hash": ""
+  },
+  "book/api/list-tables.md": {
+    "mtime": 1745581566.8293624,
+    "ast_hash": "8bfe14e6d11b17fce16463ffec9eb092",
+    "semantic_hash": ""
+  },
+  "book/cli/check.md": {
+    "mtime": 1780527129.130376,
+    "ast_hash": "0b743435d4b5f1937371b3f69d104425",
+    "semantic_hash": ""
+  },
+  "book/cli/cte/expand.md": {
+    "mtime": 1780100239.2209618,
+    "ast_hash": "5be8fa15604cc385028f084e729a968c",
+    "semantic_hash": ""
+  },
+  "book/cli/init.md": {
+    "mtime": 1780527129.130376,
+    "ast_hash": "c62ec6dfdd71fcd9ce40a0092552764e",
+    "semantic_hash": ""
+  },
+  "book/database-performance-management.md": {
+    "mtime": 1745418279.624695,
+    "ast_hash": "623499838f291cc69cf50a7002e2b8e4",
+    "semantic_hash": ""
+  },
+  "book/design-philosophies.md": {
+    "mtime": 1744728051.3059313,
+    "ast_hash": "ef6dade7613b0d443c3084142c3498a0",
+    "semantic_hash": ""
+  },
+  "book/installation.md": {
+    "mtime": 1789710121.020314,
+    "ast_hash": "ef3c31d6ab436224a6e4ae9aaea7875c",
+    "semantic_hash": ""
+  },
+  "book/introduction.md": {
+    "mtime": 1780527129.1313763,
+    "ast_hash": "b484b7d388b20b1408081dcfc63ccf56",
+    "semantic_hash": ""
+  },
+  "book/reusable_cte.md": {
+    "mtime": 1780527129.1313763,
+    "ast_hash": "33b9c3a72dabf4d1253062c0d9b9ce83",
+    "semantic_hash": ""
+  },
+  "book/sql-rewrite/batching.md": {
+    "mtime": 1779226591.0687935,
+    "ast_hash": "8f17486f831f68a05e567e382a4ba6c3",
+    "semantic_hash": ""
+  },
+  "book/sql_functions.md": {
+    "mtime": 1789710121.020314,
+    "ast_hash": "45e95b379d03fc4fb58d28cbc7fb2e73",
+    "semantic_hash": ""
+  },
+  "book/tech-rationale/engine-compatibility.md": {
+    "mtime": 1775321132.64831,
+    "ast_hash": "b711ff2d4beafece5541dc0345b734e5",
+    "semantic_hash": ""
+  },
+  "ci/github-actions/README.md": {
+    "mtime": 1767345415.03684,
+    "ast_hash": "c8372b211d5dcf8b2a5d7cfc9b9fa170",
+    "semantic_hash": ""
+  },
+  "cli/README.md": {
+    "mtime": 1780527129.1313763,
+    "ast_hash": "171b49083576ecd41ecfbd46b61e1838",
+    "semantic_hash": ""
+  },
+  "cli/src/init/banner.txt": {
+    "mtime": 1779226591.0697937,
+    "ast_hash": "f72af34adb1dfbe9ecf11816b552b6a4",
+    "semantic_hash": ""
+  },
+  "cli/src/init/builtin_object_data.txt": {
+    "mtime": 1779226591.0697937,
+    "ast_hash": "1d3035a069c34048785426f47003c1ec",
+    "semantic_hash": ""
+  },
+  "cli/src/init/create_home_dir.txt": {
+    "mtime": 1757120077.2266672,
+    "ast_hash": "dba0557d11a9e706f9c058e3451cf998",
+    "semantic_hash": ""
+  },
+  "cli/src/init/database_engine_versions.txt": {
+    "mtime": 1779226591.0697937,
+    "ast_hash": "c564d6799dff03e6fb9ebb82b8cce638",
+    "semantic_hash": ""
+  },
+  "docs/design-docs/json-rpc-mcp.md": {
+    "mtime": 1745247590.942117,
+    "ast_hash": "c6d13e4a47f41966dba9b2789fd11473",
+    "semantic_hash": ""
+  },
+  "docs/design-docs/jsonrpc-error-codes.md": {
+    "mtime": 1745252148.5436704,
+    "ast_hash": "31ec082c3e02d78188a14677ab3d9d2e",
+    "semantic_hash": ""
+  },
+  "docs/feature-planing/README.md": {
+    "mtime": 1745330821.1567838,
+    "ast_hash": "af659378e5ab11e6ec497e9f56e89ed4",
+    "semantic_hash": ""
+  },
+  "docs/feature-planing/alter-impact-diff.md": {
+    "mtime": 1745428009.0007145,
+    "ast_hash": "503301e7bda382d31b8480759439ea85",
+    "semantic_hash": ""
+  },
+  "docs/feature-planing/legacy-migration-from-query-log.md": {
+    "mtime": 1745328440.1623197,
+    "ast_hash": "4f7a3e7488778a908e60fc97ce10ae7b",
+    "semantic_hash": ""
+  },
+  "docs/feature-planing/virtual-foreign-key.md": {
+    "mtime": 1780527129.1313763,
+    "ast_hash": "83df770ef879b6c604caea0b59ac92e5",
+    "semantic_hash": ""
+  },
+  "docs/internal-rules/rust-coding-guideline.md": {
+    "mtime": 1780527129.1323762,
+    "ast_hash": "e8334e51282909e55ea989fd0493d131",
+    "semantic_hash": ""
+  },
+  "examples/adventure-works/README.md": {
+    "mtime": 1780527129.1323762,
+    "ast_hash": "66df2be284d2364a28e069b194f322fe",
+    "semantic_hash": ""
+  },
+  "sql-fun-client/README.md": {
+    "mtime": 1779226591.0717938,
+    "ast_hash": "e3e961af61ce3400574399b84321ba5a",
+    "semantic_hash": ""
+  },
+  "sql-fun-codegen/README.md": {
+    "mtime": 1779226591.0727937,
+    "ast_hash": "4ca76418e765e511e26fafe6d1008432",
+    "semantic_hash": ""
+  },
+  "sql-fun-core/README.md": {
+    "mtime": 1779226591.0727937,
+    "ast_hash": "4ffc116e82ae4b69ce75dbd585a1556a",
+    "semantic_hash": ""
+  },
+  "sql-fun-home/README.md": {
+    "mtime": 1757812235.383761,
+    "ast_hash": "7d61c682bf9db1674f9425a29791bd62",
+    "semantic_hash": ""
+  },
+  "sql-fun-server-api/README.md": {
+    "mtime": 1779226591.1107945,
+    "ast_hash": "7d04b010432213165533ae7ef1343799",
+    "semantic_hash": ""
+  },
+  "sql-fun-server-api/src/api_description.md": {
+    "mtime": 1779226591.1107945,
+    "ast_hash": "368e5f6d773cf90ed16b3dfd722d6f7d",
+    "semantic_hash": ""
+  },
+  "sql-fun-server-api/src/lib.md": {
+    "mtime": 1779226591.1117947,
+    "ast_hash": "6da684d72e0ecf624fb92ee7af99915b",
+    "semantic_hash": ""
+  },
+  "sql-fun-server/README.md": {
+    "mtime": 1745640865.3772311,
+    "ast_hash": "d33144bf6bd3c76a980b8c2e14476090",
+    "semantic_hash": ""
+  },
+  "sql-fun-sqlast/buf.yaml": {
+    "mtime": 1744760427.2148879,
+    "ast_hash": "bada2a177d65f99ecfcc8d3e7408fb48",
+    "semantic_hash": ""
+  },
+  "sql-fun-sqlast/src/lib.md": {
+    "mtime": 1780527129.1343763,
+    "ast_hash": "0eebb8fb0e526c675d2cc81632ce296d",
+    "semantic_hash": ""
+  },
+  "sql-fun-sqlast/src/sem.md": {
+    "mtime": 1757292651.077886,
+    "ast_hash": "7406d7f6c9fe6c3ccfaf784433495c10",
+    "semantic_hash": ""
+  },
+  "sql-fun-sqlast/src/sem/problem.md": {
+    "mtime": 1779226591.1227949,
+    "ast_hash": "9999e4082cd00a1f9230d156ccc9e595",
+    "semantic_hash": ""
+  },
+  "sql-fun-sqlast/src/sem/problem/domain_type_name_not_found.md": {
+    "mtime": 1779226591.1227949,
+    "ast_hash": "4ee8ab168068237e443ad960b6b15c4f",
+    "semantic_hash": ""
+  },
+  "sql-fun-sqlast/src/sem/problem/function_not_found.md": {
+    "mtime": 1780527129.1373763,
+    "ast_hash": "768282028e54c49dd72ce82e7166ed98",
+    "semantic_hash": ""
+  },
+  "sql-fun-sqlast/src/syn.md": {
+    "mtime": 1780527129.1393764,
+    "ast_hash": "8000e6da07245d5277835b0e39183050",
+    "semantic_hash": ""
+  },
+  "src/attr_sql_query_many.md": {
+    "mtime": 1763262591.175956,
+    "ast_hash": "b2b8c8d0b997b72a238bc4c46e9bfafe",
+    "semantic_hash": ""
+  },
+  "src/attr_sql_query_one.md": {
+    "mtime": 1780527129.1403763,
+    "ast_hash": "ebb426d268a6bf3ce01ed15e8cc10c37",
+    "semantic_hash": ""
+  },
+  "src/attr_sql_query_opt.md": {
+    "mtime": 1780527129.1403763,
+    "ast_hash": "a66ae97fb27bf97eb1a9818902c7513f",
+    "semantic_hash": ""
+  },
+  "stats/coverage.txt": {
+    "mtime": 1789714463.0940676,
+    "ast_hash": "91ea6f3c59791ad01fd20a1f34c86b71",
+    "semantic_hash": ""
+  },
+  "book/datafrow.svg": {
+    "mtime": 1780527129.130376,
+    "ast_hash": "eb507a5cb446213bad60825ce9b904aa",
+    "semantic_hash": ""
+  },
+  "docs/feature-planing/legacy-migration-from-query-log/schema_and_query_log_from_db.drawio.svg": {
+    "mtime": 1780527129.1313763,
+    "ast_hash": "8d63069654cc08ead95d832e397e42c8",
+    "semantic_hash": ""
+  },
+  "src/generate_sql_query_one.rs": {
+    "mtime": 1789714463.0940676,
+    "ast_hash": "82cb7c948ca1b0909870625cb41fc2fa",
+    "semantic_hash": ""
+  },
+  "src/sql_ast.rs": {
+    "mtime": 1789710121.1203163,
+    "ast_hash": "76b8d04e241b28a160da6f01a389c4cb",
+    "semantic_hash": ""
+  },
+  "src/tokio_postgres_generator/query_one.rs": {
+    "mtime": 1789710121.1213164,
+    "ast_hash": "f4ec6a57985dcab043deaa37a2666b11",
+    "semantic_hash": ""
+  },
+  ".local/bin/cherry-pick-pr": {
+    "mtime": 1788469879.0440753,
+    "ast_hash": "7cc84dfc06b832d981886b3d490c5df2",
+    "semantic_hash": ""
+  },
+  "sql-fun-core/src/lockfile.rs": {
+    "mtime": 1789714463.0930676,
+    "ast_hash": "42c002a78d46153eebe7455e4a30caa2",
+    "semantic_hash": ""
+  },
+  ".local/okf_types/concept_type_definition.md": {
+    "mtime": 1789714463.027066,
+    "ast_hash": "7e7c1decbc22bbe073ed36cae7c3d7b2",
+    "semantic_hash": ""
+  },
+  ".local/okf_types/index.md": {
+    "mtime": 1789698422.0700572,
+    "ast_hash": "d4949b8c2ddd317f2c4c3cc9623b125f",
+    "semantic_hash": ""
+  },
+  "docs/feature-planing/rust-semantic-artifact.md": {
+    "mtime": 1789710150.5730388,
+    "ast_hash": "0e975eb496b2c372bc44d918e093d158",
+    "semantic_hash": ""
+  },
+  "docs/patterns/state-change-event-receiver.md": {
+    "mtime": 1789710150.5730388,
+    "ast_hash": "39ae97a7c16fe3ec761b9c95ea950ec9",
+    "semantic_hash": ""
+  },
+  "sql-fun-collector/src/lib.rs": {
+    "mtime": 1789714462.9320633,
+    "ast_hash": "b0d6aa19ffdf88dcab2aec568ac67b73",
+    "semantic_hash": ""
+  },
+  "sql-fun-collector/src/sorted.rs": {
+    "mtime": 1789714462.9320633,
+    "ast_hash": "d327045880a512bc11c5ae1b881875ff",
+    "semantic_hash": ""
+  },
+  "sql-fun-collector/tests/arena.rs": {
+    "mtime": 1789714462.9320633,
+    "ast_hash": "21315a35a39fa92a0b591a9fdb4191d4",
+    "semantic_hash": ""
+  },
+  "sql-fun-collector/README.md": {
+    "mtime": 1789714462.9320633,
+    "ast_hash": "c311c74068083a59ffdddb95142a435f",
+    "semantic_hash": ""
+  }
+}

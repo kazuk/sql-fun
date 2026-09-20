@@ -16,6 +16,8 @@ mod placehlodered_sql;
 /// `sql-fun` code generator lockfile
 pub mod lockfile;
 
+use sha2::{Digest, Sha256};
+
 pub use self::{
     cte_catalog::{
         CatalogFileIndex, CteAlias, CteCatalog, CteCatalogCheckError, CteCatalogEntry,
@@ -30,7 +32,7 @@ pub use self::{
 /// Shared helpers for crate unit tests.
 pub mod test_helpers;
 
-use std::{fmt::Display, str::FromStr};
+use std::{fmt::Display, path::Path, str::FromStr};
 
 pub use self::{
     args::{
@@ -175,5 +177,41 @@ pub mod diagnostics {
                 kind.get_diagnostics_level_default()
             }
         }
+    }
+}
+
+/// Compute Sha256 with hex encode
+#[derive(Default)]
+pub struct Hasher(Sha256);
+
+impl Hasher {
+    /// create new
+    #[must_use]
+    pub fn new() -> Self {
+        Self(Sha256::new())
+    }
+
+    /// append hash text
+    pub fn append_str(&mut self, str: &str) {
+        self.0.update(str.as_bytes());
+    }
+
+    /// compute hash code
+    #[must_use]
+    pub fn finish(self) -> String {
+        let digest = self.0.finalize();
+        hex::encode(digest)
+    }
+
+    /// hash the file
+    ///
+    /// # Errors
+    ///
+    /// Returns an error if the file cannot be read as UTF-8 text.
+    pub fn hash_file<P: AsRef<Path>>(path: P) -> Result<String, std::io::Error> {
+        let content = fs_err::read_to_string(path)?;
+        let mut hasher = Self::new();
+        hasher.append_str(&content);
+        Ok(hasher.finish())
     }
 }

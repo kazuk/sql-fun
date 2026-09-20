@@ -6,7 +6,11 @@ mod log_args;
 mod metadata_args;
 mod postgres;
 
-use std::{collections::HashMap, fmt::Display, path::PathBuf};
+use std::{
+    collections::HashMap,
+    fmt::Display,
+    path::{Path, PathBuf},
+};
 
 use clap::Parser;
 
@@ -103,6 +107,11 @@ pub struct SqlFunArgs {
     #[clap(long, env = Self::SQL_FUN_DATASOURCE)]
     #[builder(default)]
     datasource: Option<String>,
+
+    /// proc-macro mode
+    #[clap(long, env = Self::SQL_FUN_MODE)]
+    #[builder(default)]
+    mode: Option<String>,
 }
 
 impl SqlFunArgsBuilder {
@@ -163,6 +172,15 @@ impl SqlFunArgs {
     #[must_use]
     pub fn schema(&self) -> &str {
         self.metadata_args.schema()
+    }
+
+    /// return true when check mode
+    #[must_use]
+    pub fn is_check_mode(&self) -> bool {
+        let Some(mode) = &self.mode else {
+            return false;
+        };
+        mode == "CHECK"
     }
 
     /// load metadata
@@ -270,6 +288,7 @@ impl SqlFunArgs {
     const SQL_FUN_TERM_COLOR: &str = "SQL_FUN_TERM_COLOR";
     const SQL_FUN_HIGHLIGHTER_THEME: &str = "SQL_FUN_HIGHLIGHTER_THEME";
     const SQL_FUN_DATASOURCE: &str = "SQL_FUN_DATASOURCE";
+    const SQL_FUN_MODE: &str = "SQL_FUN_MODE";
 
     /// selected datasource name
     #[must_use]
@@ -346,6 +365,48 @@ impl SqlFunArgs {
             };
             Ok(HighlighterTheme::from_toml(theme_path)?)
         }
+    }
+
+    /// get project dir
+    ///
+    /// # Errors
+    ///
+    /// Returns an error if the metadata file cannot be located.
+    pub fn project_dir(&self) -> Result<PathBuf, SqlFunArgsError> {
+        let mut project_dir = self.metadata_file()?;
+        project_dir.pop();
+        Ok(project_dir)
+    }
+
+    fn with_file_name<P: AsRef<Path>>(mut dir_path: PathBuf, file_name: P) -> PathBuf {
+        dir_path.push(file_name);
+        dir_path
+    }
+
+    /// get lockfile path
+    ///
+    /// # Errors
+    ///
+    /// Returns an error if the metadata file cannot be located.
+    pub fn lockfile_path(&self, datasource_name: &str) -> Result<PathBuf, SqlFunArgsError> {
+        let schema = self.schema();
+        Ok(Self::with_file_name(
+            self.project_dir()?,
+            format!("{datasource_name}.{schema}.lock"),
+        ))
+    }
+
+    /// get schema dump path
+    ///
+    /// # Errors
+    ///
+    /// Returns an error if the metadata file cannot be located.
+    pub fn schema_dump_path(&self, datasource_name: &str) -> Result<PathBuf, SqlFunArgsError> {
+        let schema = self.schema();
+        Ok(Self::with_file_name(
+            self.project_dir()?,
+            format!("{datasource_name}.{schema}.sql"),
+        ))
     }
 }
 

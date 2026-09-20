@@ -17,6 +17,24 @@ pub enum LockfileError {
     /// toml encode decode error
     #[error("TOML Error:\n\t{0}")]
     Toml(#[from] toml::de::Error),
+
+    /// Schema dump hash code mismatch
+    #[error("Schema Dump Mismatch: {0} expected={1}. actual={2}")]
+    SchemaDumpMismatch(PathBuf, String, String),
+}
+
+impl LockfileError {
+    fn raise_schema_dump_mismatch<P: AsRef<Path>, T>(
+        path: P,
+        expect_hash_code: &str,
+        actual_hash_code: &str,
+    ) -> Result<T, Self> {
+        Err(Self::SchemaDumpMismatch(
+            path.as_ref().to_path_buf(),
+            String::from(expect_hash_code),
+            String::from(actual_hash_code),
+        ))
+    }
 }
 
 /// Lockfile access service
@@ -35,6 +53,25 @@ pub struct LockfileEntry {
     bind_parameters: Vec<QueryParameter>,
     result_set_shape: Vec<ResultSetField>,
 }
+impl LockfileEntry {
+    /// get execution sql
+    #[must_use]
+    pub fn execute_sql(&self) -> &str {
+        self.execute_sql.as_ref()
+    }
+
+    /// get query parameters
+    #[must_use]
+    pub fn bind_parameters(&self) -> &[QueryParameter] {
+        &self.bind_parameters
+    }
+
+    /// get result set fields
+    #[must_use]
+    pub fn result_set_shape(&self) -> &[ResultSetField] {
+        &self.result_set_shape
+    }
+}
 
 /// parameter for query
 #[derive(Debug, serde::Serialize, serde::Deserialize)]
@@ -43,12 +80,34 @@ pub struct QueryParameter {
     parameter_index: u16,
 }
 
+impl QueryParameter {
+    /// get name for query parameter
+    #[must_use]
+    pub fn name(&self) -> &str {
+        &self.name
+    }
+}
+
 /// field in result set
 #[derive(Debug, serde::Serialize, serde::Deserialize)]
 pub struct ResultSetField {
     field_index: u16,
     field_name: String,
     sql_type: String,
+}
+
+impl ResultSetField {
+    /// field name
+    #[must_use]
+    pub fn field_name(&self) -> &str {
+        &self.field_name
+    }
+
+    /// field index
+    #[must_use]
+    pub const fn field_index(&self) -> u16 {
+        self.field_index
+    }
 }
 
 #[derive(Debug, serde::Serialize, serde::Deserialize)]
@@ -79,10 +138,21 @@ impl Lockfile {
     ///
     /// [`LockfileError`]
     #[tracing::instrument(err, skip(path))]
-    pub fn from_file<P: AsRef<Path>>(path: P) -> Result<Self, LockfileError> {
+    pub fn from_file<P: AsRef<Path>>(
+        path: P,
+        schema_dump_hash_code: &str,
+    ) -> Result<Self, LockfileError> {
         let content = fs_err::read_to_string(&path)?;
         let spanned: SpannedLockfile = toml::from_str(&content)?;
         tracing::info!("lockfile loaded: {} entries", spanned.entries.len());
+
+        if spanned.schema_dump_hash_code != schema_dump_hash_code {
+            LockfileError::raise_schema_dump_mismatch(
+                &path,
+                &spanned.schema_dump_hash_code,
+                schema_dump_hash_code,
+            )?;
+        }
         let mut index = IndexMap::new();
 
         // Spanned<T> for array-of-tables only covers the table header

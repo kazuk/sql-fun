@@ -2866,7 +2866,6 @@ dependencies = [
  "compact_str",
  "derive_builder",
  "futures-util",
- "pg_query",
  "proc-macro2",
  "quote",
  "rstest",

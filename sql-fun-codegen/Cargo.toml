@@ -33,7 +33,7 @@ tracing.workspace = true
 [dev-dependencies]
 derive_builder.workspace = true
 rstest.workspace = true
-rusqlite = { version = "0.40.2", features = ["hooks"] }
+rusqlite = { version = "0.40.2", features = ["bundled", "hooks"] }
 testresult.workspace = true
 tokio.workspace = true
 tokio-postgres.workspace = true

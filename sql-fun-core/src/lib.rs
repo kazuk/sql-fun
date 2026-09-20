@@ -100,6 +100,10 @@ pub enum SqlDialect {
     /// postgres using a `pg_query` crate for parsing a syntax.
     #[serde(rename = "postgres")]
     PostgreSQL,
+
+    /// `SQLite` using a `turso_parser` crate for parsing a syntax
+    #[cfg(feature = "sqlite")]
+    SQLite,
 }
 
 impl FromStr for SqlDialect {
@@ -117,6 +121,8 @@ impl Display for SqlDialect {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         match self {
             Self::PostgreSQL => write!(f, "postgresql"),
+            #[cfg(feature = "sqlite")]
+            Self::SQLite => write!(f, "sqlite"),
         }
     }
 }

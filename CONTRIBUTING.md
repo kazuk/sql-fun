@@ -145,6 +145,21 @@ The script runs the workspace checks, tests, formatting, linting, documentation
 build, dependency checks, API spec generation, and typo checks. After all other
 steps pass, it updates the repository graph index with `graphify update .`.
 
+`check-test-flow` prioritizes consistent behavior between CI and local runs.
+Both use the shared defaults in [`.cargo/config.toml`](.cargo/config.toml):
+incremental compilation is disabled, and the `dev` and `test` profiles use
+`debug = "line-tables-only"` to reduce disk usage while retaining file and line
+information in backtraces.
+
+When local debugging requires full debug information, edit `.cargo/config.toml`
+and set `debug = "full"` in both `[profile.dev]` and `[profile.test]`. Restore
+these shared defaults before running final checks or committing.
+
+If you prefer incremental builds locally, set `CARGO_INCREMENTAL=1` in your
+personal shell environment (for example, `export CARGO_INCREMENTAL=1` in your
+shell startup file). This overrides the shared default without changing
+`.cargo/config.toml`. Unset it when verifying with the same settings as CI.
+
 For faster iteration, run only selected steps:
 
 ```sh

@@ -16,7 +16,7 @@ jobs:
   workspace:
     runs-on: ubuntu-24.04
     container: &ci-builder-container
-      image: ghcr.io/kazuk/ci-builder@sha256:51014173b84e60fcdc231b627bfce9a5597788e86671530773e6059b11c12a3c
+      image: ghcr.io/kazuk/ci-builder@sha256:ea6ec7eb1de813cc738996ba2ebc42d6b9a02ad9e8d0c81e2141e097887410fa
       credentials:
         username: ${{ github.actor }}
         password: ${{ secrets.GITHUB_TOKEN }}

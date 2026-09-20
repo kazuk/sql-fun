@@ -1,0 +1,410 @@
+use std::path::{Path, PathBuf};
+
+use proc_macro2::TokenStream;
+use sql_fun_core::{
+    FragmentName, PlaceholderedSqlError, SqlDialect, SqlFunArgsError, lockfile::LockfileError,
+};
+use syn::Ident;
+
+/// Error related Syn IO
+#[derive(Debug, thiserror::Error)]
+pub enum SqlFunCodegenError {
+    /// represents [`syn::Error`]
+    #[error(transparent)]
+    Syn(#[from] syn::Error),
+
+    /// represents [`SqlFunArgsError`]
+    #[error(transparent)]
+    Args(#[from] SqlFunArgsError),
+
+    /// lockfile error
+    #[error("Lockfile Error:\n\t{0}")]
+    Lockfile(#[from] LockfileError),
+
+    /// represents [`serde_json_path::ParseError`]
+    #[error(transparent)]
+    JsonPath(#[from] serde_json_path::ParseError),
+
+    /// JSON Path resolved multiple items
+    #[error(transparent)]
+    ExsactlyOne(#[from] serde_json_path::ExactlyOneError),
+
+    /// represents [`serde_json::Error`]
+    #[error(transparent)]
+    Json(#[from] serde_json::Error),
+
+    /// represents [`toml::de::Error`]
+    #[error(transparent)]
+    Toml(#[from] toml::de::Error),
+
+    /// represents [`serde_yaml_ng::Error`]
+    #[error(transparent)]
+    Yaml(#[from] serde_yaml_ng::Error),
+
+    /// represents [`std::io::Error`]
+    #[error(transparent)]
+    Io(#[from] std::io::Error),
+
+    /// represents [`sql_fun_core::MetadataError`]
+    #[error(transparent)]
+    Metadata(#[from] sql_fun_core::MetadataError),
+
+    /// represents [`sql_fun_core::CteCatalogError`]
+    #[error(transparent)]
+    CteCatalog(#[from] sql_fun_core::CteCatalogError),
+
+    /// `JsonValueCache` mutex poisoned
+    #[error("internal error: json value cache poisoned")]
+    JsonValueCachePoisoned(),
+
+    /// `CteCatalogCache` mutex poisoned
+    #[error("internal error: CTE catalog cache poisoned")]
+    CteCatalogPoisoned(),
+
+    /// datasource not found
+    #[error("datasource {0} not found")]
+    DatasourceNotFound(String),
+
+    /// connector not specified on datasource
+    #[error("connector not specified in datasource {0}")]
+    ConnectorNotSpecified(String),
+
+    /// connector not supported
+    #[error("connector {0} not supported")]
+    ConnectorNotSupported(String),
+
+    /// dialect incompatible with connector
+    #[error("connector {1} not compatible with {0}")]
+    DialectIncomapibleWithConnecotor(SqlDialect, String),
+
+    /// incompatible async mode
+    #[error("incompatible async mode")]
+    IncompatibleAsyncMode(),
+
+    /// require identifier
+    #[error("require identifier")]
+    RequireIdentifier(),
+
+    /// require typed argument
+    #[error("require typed argument")]
+    RequireTypedArg(),
+
+    /// require connection arg
+    #[error("require connection arg")]
+    RequireConnectionArg(),
+
+    /// require return type
+    #[error("require row_type attribution")]
+    RequireRowType(),
+
+    /// require return type
+    #[error("require error_type attribution")]
+    RequireErrorType(),
+
+    /// file not found
+    #[error("file not found : {0}")]
+    FileNotFound(PathBuf),
+
+    /// Can not get file extension from path
+    #[error("Can not get file extension from path : {0}")]
+    FileExtensionNotFound(PathBuf),
+
+    /// file type not supported
+    #[error("File type not supported : currently supports JSON, TOML YAML : {0}")]
+    FileTypeNotSupported(PathBuf),
+
+    /// JSON Path not resolved
+    #[error("JSON Path {1} resolved not string value : {0}")]
+    RequireStringValue(PathBuf, String),
+
+    /// require `sql` or `sql_file` parameter
+    #[error("Require sql or sql_file")]
+    RequireSqlOrSqlFile(),
+
+    /// fragment not found
+    #[error("fragment named {0} not found")]
+    FragmentSpecNotFound(FragmentName),
+
+    /// fragment syntax error
+    #[error("syntax error in sql_fragment attribute")]
+    FragmentSyntaxError(),
+
+    /// specified fragment not used
+    #[error("sql_fragment not used in query: {0:?}")]
+    UnusedFragmentSpec(Vec<Ident>),
+
+    /// SQL syntax error
+    #[error(transparent)]
+    Placeholder(#[from] PlaceholderedSqlError),
+
+    /// configuration not found
+    #[error("configuration missing {0}")]
+    ConfigurationMissing(ConfigurationKind),
+
+    /// lockfile mutex poisoned
+    #[error("Unexpected Error: Lockfile mutex poisoned")]
+    UnexpectedLockfileMutexPoisoned(),
+
+    /// missing lockfile entry
+    #[error("Missing lockfile entry, please run `sql-fun check` again")]
+    MissingLockfileEntry(),
+
+    /// schema dump file not exist
+    #[error("Schema Dump file not exist in {0}")]
+    SchemaDumpNotExist(PathBuf),
+}
+
+#[derive(Debug, Clone, Copy)]
+pub enum ConfigurationKind {
+    MetadataCteCatalog,
+}
+
+impl std::fmt::Display for ConfigurationKind {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        match self {
+            Self::MetadataCteCatalog => f.write_str("metadata CTE catalog"),
+        }
+    }
+}
+
+impl SqlFunCodegenError {
+    /// convert to compile error `TokenStream`
+    #[must_use]
+    pub fn into_compile_error(self) -> TokenStream {
+        let message = format!("{self}");
+        quote::quote! { compile_error!( #message ); }
+    }
+
+    /// create [`Self::DatasourceNotFound`] variant
+    ///
+    /// # Errors
+    ///
+    /// [`Self::DatasourceNotFound`]
+    ///
+    pub fn datasource_not_found<T>(datasource_name: &str) -> Result<T, Self> {
+        Err(Self::DatasourceNotFound(String::from(datasource_name)))
+    }
+
+    /// create [`Self::ConnectorNotSpecified`] variant
+    ///
+    /// # Errors
+    ///
+    /// [`Self::ConnectorNotSpecified`]
+    ///
+    pub fn connector_not_specified<T>(datasource_name: &str) -> Result<T, Self> {
+        Err(Self::ConnectorNotSpecified(String::from(datasource_name)))
+    }
+
+    /// create [`Self::ConnectorNotSupported`] variant
+    ///
+    /// # Errors
+    ///
+    /// [`Self::ConnectorNotSupported`]
+    ///
+    pub fn connector_not_supported<T>(connector_name: &str) -> Result<T, Self> {
+        Err(Self::ConnectorNotSupported(String::from(connector_name)))
+    }
+
+    /// create [`Self::DialectIncomapibleWithConnecotor`] variant
+    ///
+    /// # Errors
+    ///
+    /// [`Self::DialectIncomapibleWithConnecotor`]
+    ///
+    pub fn dialect_incompatible_with_connector<T>(
+        dialect: SqlDialect,
+        connector: &str,
+    ) -> Result<T, Self> {
+        Err(Self::DialectIncomapibleWithConnecotor(
+            dialect,
+            String::from(connector),
+        ))
+    }
+
+    /// create [`Self::IncompatibleAsyncMode`] variant
+    ///
+    /// # Errors
+    ///
+    /// [`Self::IncompatibleAsyncMode`]
+    ///
+    pub const fn incompatible_async_mode<T>() -> Result<T, Self> {
+        Err(Self::IncompatibleAsyncMode())
+    }
+
+    /// create [`Self::RequireIdentifier`] variant
+    ///
+    /// # Errors
+    ///
+    /// [`Self::RequireIdentifier`]
+    ///
+    pub const fn require_identifier<T>() -> Result<T, Self> {
+        Err(Self::RequireIdentifier())
+    }
+
+    /// create [`Self::RequireConnectionArg`]
+    ///
+    /// # Errors
+    ///
+    /// [`Self::RequireConnectionArg`]
+    ///
+    pub const fn require_connection_arg<T>() -> Result<T, Self> {
+        Err(Self::RequireConnectionArg())
+    }
+
+    /// create [`Self::RequireTypedArg`]
+    ///
+    /// # Errors
+    ///
+    /// [`Self::RequireTypedArg`]
+    ///
+    pub const fn require_typed_arg<T>() -> Result<T, Self> {
+        Err(Self::RequireTypedArg())
+    }
+
+    /// create [`Self::RequireRowType`]
+    ///
+    /// # Errors
+    ///
+    /// [`Self::RequireRowType`]
+    ///
+    pub const fn require_row_type<T>() -> Result<T, Self> {
+        Err(Self::RequireRowType())
+    }
+
+    /// create [`Self::RequireErrorType`]
+    ///
+    /// # Errors
+    ///
+    /// [`Self::RequireErrorType`]
+    ///
+    pub const fn require_error_type<T>() -> Result<T, Self> {
+        Err(Self::RequireErrorType())
+    }
+
+    /// create [`Self::FileNotFound`] variant
+    ///
+    /// # Errors
+    ///
+    /// [`Self::FileNotFound`]
+    ///
+    pub fn file_not_found<T, P>(path: P) -> Result<T, Self>
+    where
+        P: AsRef<Path>,
+    {
+        Err(Self::FileNotFound(path.as_ref().to_path_buf()))
+    }
+
+    /// create [`Self::FileExtensionNotFound`] variant
+    ///
+    /// # Errors
+    ///
+    /// [`Self::FileExtensionNotFound`]
+    ///
+    pub fn file_extension_not_found<T, P>(path: P) -> Result<T, Self>
+    where
+        P: AsRef<Path>,
+    {
+        Err(Self::FileExtensionNotFound(path.as_ref().to_path_buf()))
+    }
+
+    /// create [`Self::FileTypeNotSupported`] variant
+    ///
+    /// # Errors
+    ///
+    /// [`Self::FileTypeNotSupported`]
+    ///
+    pub fn file_type_not_supported<T, P>(path: P) -> Result<T, Self>
+    where
+        P: AsRef<Path>,
+    {
+        Err(Self::FileTypeNotSupported(path.as_ref().to_path_buf()))
+    }
+
+    /// create [`Self::RequireSqlOrSqlFile`] variant
+    ///
+    /// # Errors
+    ///
+    /// [`Self::RequireSqlOrSqlFile`]
+    ///
+    pub const fn require_sql_or_sql_file<T>() -> Result<T, Self> {
+        Err(Self::RequireSqlOrSqlFile())
+    }
+
+    /// require string value
+    ///
+    /// # Errors
+    ///
+    /// [`Self::RequireStringValue`]
+    ///
+    pub fn require_string_value<T, P>(file_path: P, json_path: &str) -> Result<T, Self>
+    where
+        P: AsRef<Path>,
+    {
+        Err(Self::RequireStringValue(
+            file_path.as_ref().to_path_buf(),
+            String::from(json_path),
+        ))
+    }
+
+    /// fragment spec not found
+    ///
+    /// # Errors
+    ///
+    /// [`Self::FragmentSpecNotFound`]
+    ///
+    pub fn fragment_spec_not_found<T>(fragment_name: &FragmentName) -> Result<T, Self> {
+        Err(Self::FragmentSpecNotFound(fragment_name.clone()))
+    }
+
+    /// conditional query syntax error
+    ///
+    /// # Errors
+    ///
+    /// [`Self::FragmentSyntaxError`]
+    ///
+    pub const fn sql_fragment_syntax_error<T>() -> Result<T, Self> {
+        Err(Self::FragmentSyntaxError())
+    }
+
+    pub(crate) const fn fragment_spect_unused<T>(
+        fragment_idents: Vec<syn::Ident>,
+    ) -> Result<T, Self> {
+        Err(Self::UnusedFragmentSpec(fragment_idents))
+    }
+
+    /// never guard
+    pub fn never() -> ! {
+        unreachable!()
+    }
+
+    /// configuration missing
+    ///
+    /// # Errors
+    ///
+    /// [`Self::ConfigurationMissing`]
+    ///
+    pub const fn configuration_missing_error<T>(kind: ConfigurationKind) -> Result<T, Self> {
+        Err(Self::ConfigurationMissing(kind))
+    }
+
+    pub(crate) const fn unexpected_lockfile_mutex_poisoned() -> Self {
+        Self::UnexpectedLockfileMutexPoisoned()
+    }
+
+    /// lockfile entry not found
+    ///
+    /// # Errors
+    ///
+    /// [`Self::MissingLockfileEntry`]
+    pub const fn missing_lockfile_entry<T>() -> Result<T, Self> {
+        Err(Self::MissingLockfileEntry())
+    }
+
+    pub(crate) fn raise_schema_dump_not_exist<T, P: AsRef<Path>>(
+        schema_dump_path: P,
+    ) -> Result<T, Self> {
+        Err(Self::SchemaDumpNotExist(
+            schema_dump_path.as_ref().to_path_buf(),
+        ))
+    }
+}

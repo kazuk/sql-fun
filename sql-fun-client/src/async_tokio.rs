@@ -25,11 +25,11 @@ pub enum InflightRequests {
 pub enum TcpJsonRpcClientAsyncError {
     /// channel sending error
     #[error(transparent)]
-    ChannelError(#[from] tokio::sync::mpsc::error::SendError<InflightRequests>),
+    Channel(#[from] tokio::sync::mpsc::error::SendError<InflightRequests>),
 
     /// tx channel sending error
     #[error(transparent)]
-    TxChannelError(#[from] tokio::sync::mpsc::error::SendError<JsonRpcRequest>),
+    TxChannel(#[from] tokio::sync::mpsc::error::SendError<JsonRpcRequest>),
 
     /// rx error
     #[error(transparent)]
@@ -45,7 +45,7 @@ pub enum TcpJsonRpcClientAsyncError {
 
     /// JSON-RPC error
     #[error(transparent)]
-    JsonRpcError(#[from] JsonRpcError),
+    JsonRpc(#[from] JsonRpcError),
 }
 
 /// JSON-RPC Client

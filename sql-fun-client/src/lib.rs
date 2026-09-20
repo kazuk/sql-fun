@@ -14,7 +14,7 @@ pub enum JsonRpcClientError {
 
     /// JSON RPC error
     #[error(transparent)]
-    JsonRpcError(#[from] JsonRpcError),
+    JsonRpc(#[from] JsonRpcError),
 
     /// serde error
     #[error(transparent)]

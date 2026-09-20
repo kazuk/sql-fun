@@ -175,7 +175,7 @@
     "semantic_hash": ""
   },
   "sql-fun-codegen/src/lib.rs": {
-    "mtime": 1789917363.5088093,
+    "mtime": 1789919958.512497,
     "ast_hash": "ae93996e161b8098c58c4a8da0fa64e1",
     "semantic_hash": ""
   },
@@ -1214,69 +1214,24 @@
     "ast_hash": "958545c5881888255c92e30799241378",
     "semantic_hash": ""
   },
-  "src/connector.rs": {
-    "mtime": 1789912996.7136395,
-    "ast_hash": "2a09a7eb775bcde25bd1cae8f0fe7155",
-    "semantic_hash": ""
-  },
   "src/errors.rs": {
-    "mtime": 1789913006.2968905,
-    "ast_hash": "3ae7e5234b0f7be68c6400da8c76b295",
-    "semantic_hash": ""
-  },
-  "src/generate_sql_execute.rs": {
-    "mtime": 1789913006.2968905,
-    "ast_hash": "8d2ed7a6801affd5b97119805c4be34b",
-    "semantic_hash": ""
-  },
-  "src/generate_sql_query_opt.rs": {
-    "mtime": 1789913006.2968905,
-    "ast_hash": "df1fedd0db109cae65457809c9ed2acc",
-    "semantic_hash": ""
-  },
-  "src/generate_sqy_query_many.rs": {
-    "mtime": 1789913006.2978904,
-    "ast_hash": "fd5bd2c031ae15c5c4f8d67aecb564da",
+    "mtime": 1789919991.003328,
+    "ast_hash": "53b143fcbd55cde37017c5b6e27eb3e9",
     "semantic_hash": ""
   },
   "src/lib.rs": {
-    "mtime": 1789912996.7136395,
-    "ast_hash": "c0bae40bc1def41bc793304c89068c0c",
-    "semantic_hash": ""
-  },
-  "src/rust_ast.rs": {
-    "mtime": 1789912996.7136395,
-    "ast_hash": "852365b392032bad0f906a78d31076f7",
-    "semantic_hash": ""
-  },
-  "src/tokio_postgres_generator.rs": {
-    "mtime": 1789912996.7136395,
-    "ast_hash": "e6503ff4f6870850b7f067fcf4842f5a",
-    "semantic_hash": ""
-  },
-  "src/tokio_postgres_generator/execute.rs": {
-    "mtime": 1789912996.7136395,
-    "ast_hash": "9af0e239f9c7370be4031331cc106330",
-    "semantic_hash": ""
-  },
-  "src/tokio_postgres_generator/query_many.rs": {
-    "mtime": 1789912996.7136395,
-    "ast_hash": "e0eaa6f5af4f522e2120e952001eccea",
-    "semantic_hash": ""
-  },
-  "src/tokio_postgres_generator/query_opt.rs": {
-    "mtime": 1789912996.7136395,
-    "ast_hash": "2fd6e1df3f654b958fdc593c25d1eaa4",
+    "mtime": 1789919991.003328,
+    "ast_hash": "04a6bf67f11b076d66eeccd455d78a45",
     "semantic_hash": ""
   },
   "tests/sql_query_one.rs": {
-    "mtime": 1789912996.7146394,
-    "ast_hash": "a41ef7e899bfe9674225732859243022",
+    "mtime": 1789920303.937351,
+    "ast_hash": "0b45c6ddf22aae6420a6809a365e1c73",
     "semantic_hash": ""
   },
   "tests/sql_query_one/pass.rs": {
-    "mtime": 1789912996.7146394,
-    "ast_hash": "c37112c9df5d1ff86bb61a86dfed5b59",
+    "mtime": 1789920278.4016802,
+    "ast_hash": "717c5757f6408bfb0fb9fa6af2cd8f30",
     "semantic_hash": ""
   },
   "xbuild/src/lib.rs": {
@@ -1605,8 +1560,8 @@
     "semantic_hash": ""
   },
   "stats/coverage.txt": {
-    "mtime": 1789915251.4793417,
-    "ast_hash": "817a2dfbdb390527c1476ceef7deae85",
+    "mtime": 1789919958.512497,
+    "ast_hash": "70765f4fe5c4c2bc72b9bc98a440209d",
     "semantic_hash": ""
   },
   "book/datafrow.svg": {
@@ -1617,21 +1572,6 @@
   "docs/feature-planing/legacy-migration-from-query-log/schema_and_query_log_from_db.drawio.svg": {
     "mtime": 1780527129.1313763,
     "ast_hash": "8d63069654cc08ead95d832e397e42c8",
-    "semantic_hash": ""
-  },
-  "src/generate_sql_query_one.rs": {
-    "mtime": 1789913006.2968905,
-    "ast_hash": "82cb7c948ca1b0909870625cb41fc2fa",
-    "semantic_hash": ""
-  },
-  "src/sql_ast.rs": {
-    "mtime": 1789912996.7136395,
-    "ast_hash": "76b8d04e241b28a160da6f01a389c4cb",
-    "semantic_hash": ""
-  },
-  "src/tokio_postgres_generator/query_one.rs": {
-    "mtime": 1789912996.7136395,
-    "ast_hash": "f4ec6a57985dcab043deaa37a2666b11",
     "semantic_hash": ""
   },
   ".local/bin/cherry-pick-pr": {
@@ -1695,48 +1635,78 @@
     "semantic_hash": ""
   },
   "sql-fun-codegen/src/common_options.rs": {
-    "mtime": 1789917363.5078094,
+    "mtime": 1789919958.511497,
     "ast_hash": "3b61387bfba109dd10169732aeb1a2c1",
     "semantic_hash": ""
   },
   "sql-fun-codegen/src/connectors.rs": {
-    "mtime": 1789917694.1729376,
+    "mtime": 1789919958.511497,
     "ast_hash": "a3c896b325eb6f2fd057ceac182b18e2",
     "semantic_hash": ""
   },
   "sql-fun-codegen/src/cte_catalog.rs": {
-    "mtime": 1789917363.5088093,
+    "mtime": 1789919958.511497,
     "ast_hash": "0c6166119861f4043941cd7e43716ac4",
     "semantic_hash": ""
   },
   "sql-fun-codegen/src/error.rs": {
-    "mtime": 1789917363.5088093,
+    "mtime": 1789919958.511497,
     "ast_hash": "ab8e4060f3b355bc91578c0a65290d96",
     "semantic_hash": ""
   },
   "sql-fun-codegen/src/json_value_cache.rs": {
-    "mtime": 1789917363.5088093,
+    "mtime": 1789919958.511497,
     "ast_hash": "f8baa6246c1d69b008b02b66c9ead75d",
     "semantic_hash": ""
   },
   "sql-fun-codegen/src/lockfile.rs": {
-    "mtime": 1789917363.5088093,
+    "mtime": 1789919958.512497,
     "ast_hash": "c47330205883a6af84221b4d4a41a24f",
     "semantic_hash": ""
   },
   "sql-fun-codegen/src/rust_syn.rs": {
-    "mtime": 1789917363.5088093,
+    "mtime": 1789919958.512497,
     "ast_hash": "7e3ed16760c6265eaca8ddf3b82dd4b6",
     "semantic_hash": ""
   },
   "sql-fun-codegen/tests/rusqlite.rs": {
-    "mtime": 1789917363.5088093,
+    "mtime": 1789919958.512497,
     "ast_hash": "340bab6b25cfad7cc8058a5a6a9a1c2f",
     "semantic_hash": ""
   },
   "sql-fun-codegen/tests/tokio_postgres.rs": {
-    "mtime": 1789917363.5088093,
+    "mtime": 1789919958.512497,
     "ast_hash": "5a6d02fbb876dc3de0b86865eddea155",
+    "semantic_hash": ""
+  },
+  "tests/sql_query_many.rs": {
+    "mtime": 1789920278.4016802,
+    "ast_hash": "70c5d61c52e25abc6e5a45470522af78",
+    "semantic_hash": ""
+  },
+  "tests/sql_query_many/pass.rs": {
+    "mtime": 1789920278.4016802,
+    "ast_hash": "78c649576a948a408a9891dc11ae6760",
+    "semantic_hash": ""
+  },
+  "tests/sql_query_opt.rs": {
+    "mtime": 1789920278.4016802,
+    "ast_hash": "2457d99fb0482bb1941dfddfad13793f",
+    "semantic_hash": ""
+  },
+  "tests/sql_query_opt/pass.rs": {
+    "mtime": 1789920278.4016802,
+    "ast_hash": "08b07cb161696e2b29847f2c29c7b4c4",
+    "semantic_hash": ""
+  },
+  "tests/sql_statement.rs": {
+    "mtime": 1789920278.4016802,
+    "ast_hash": "6742e29ee9ebb5303a489399be29a2cc",
+    "semantic_hash": ""
+  },
+  "tests/sql_statement/pass.rs": {
+    "mtime": 1789920278.4026802,
+    "ast_hash": "06c391913c639fcf00b21253db116dd8",
     "semantic_hash": ""
   }
 }

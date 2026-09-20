@@ -1,0 +1,12 @@
+sql_fun_lockfile_version = "1"
+schema_dump_hash_code = "2e70f506065392cc5647a7cadd04b5e492a31a53cdcee3f7bab80e7855137c9c"
+
+[[entries]]
+query_finger_print = "db8f247e27700cb6499731ab1cc1981f3f4295765c92705c09caf86e6ca9c7fe"
+query_name = "select_user_id_with_names"
+execute_sql = "select u.id, u.name from users"
+bind_parameters = []
+result_set_shape = [
+    { field_index = 0, field_name="id", sql_type="bigint" },
+    { field_index = 1, field_name="name", sql_type="text" },
+]

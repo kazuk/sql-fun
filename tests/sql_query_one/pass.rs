@@ -12,7 +12,7 @@ impl IdWithName {
     }
 }
 
-#[sql_fun::sql_query_one("select u.id, u.name from users")]
+#[sql_fun::sql_query_one(sql = "select u.id, u.name from users")]
 async fn select_user_id_with_names(client: Client) -> Result<IdWithName, anyhow::Error> {}
 
 async fn connect_exec() -> Result<(), anyhow::Error> {

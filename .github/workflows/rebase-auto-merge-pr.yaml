@@ -1,0 +1,56 @@
+name: Rebase auto-merge pull requests
+
+on:
+  schedule:
+    - cron: '17 * * * *'
+  workflow_dispatch:
+
+permissions:
+  contents: write
+  pull-requests: write
+
+jobs:
+  rebase-auto-merge-prs:
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Rebase outdated auto-merge pull requests
+        env:
+          GH_TOKEN: ${{ github.token }}
+          GH_REPO: ${{ github.repository }}
+        shell: bash
+        run: |
+          set -uo pipefail
+
+          gh pr list \
+            --repo "$GH_REPO" \
+            --state open \
+            --json number,autoMergeRequest,mergeStateStatus \
+            --jq '
+              .[]
+              | select(
+                  .autoMergeRequest != null
+                  and .mergeStateStatus == "BEHIND"
+                )
+              | .number
+            ' |
+          while read -r pr; do
+            echo "Rebasing PR #${pr}"
+
+            if gh pr update-branch "$pr" \
+              --repo "$GH_REPO" \
+              --rebase
+            then
+              echo "PR #${pr} updated"
+            else
+              echo "::warning::Failed to rebase PR #${pr}; disabling auto-merge"
+
+              if ! gh pr merge "$pr" \
+                --repo "$GH_REPO" \
+                --disable-auto
+              then
+                echo "::error::Failed to disable auto-merge for PR #${pr}"
+              fi
+            fi
+          done
+  

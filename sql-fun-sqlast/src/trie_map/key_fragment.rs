@@ -16,7 +16,7 @@ impl KeyFragment<'_> {
         self.0.is_empty()
     }
 
-    pub(super) fn start_byte(&self) -> u8 {
+    pub(super) const fn start_byte(&self) -> u8 {
         self.0[0]
     }
 

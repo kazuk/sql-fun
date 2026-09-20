@@ -6,7 +6,7 @@ pub struct Parenthesized(Vec<Expr>);
 
 impl Parenthesized {
     /// create instance
-    pub fn new(items: Vec<Expr>) -> Self {
+    pub const fn new(items: Vec<Expr>) -> Self {
         Self(items)
     }
 

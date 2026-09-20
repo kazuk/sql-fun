@@ -6,7 +6,7 @@ pub struct NumericLiteral(String);
 
 impl NumericLiteral {
     /// literal value as text
-    pub fn value_text(&self) -> &str {
+    pub const fn value_text(&self) -> &str {
         self.0.as_str()
     }
 }
@@ -17,7 +17,7 @@ pub struct StringLiteral(String);
 
 impl StringLiteral {
     /// literal value
-    pub fn value(&self) -> &str {
+    pub const fn value(&self) -> &str {
         self.0.as_str()
     }
 }
@@ -27,7 +27,7 @@ pub struct BlobLiteral(String);
 
 impl BlobLiteral {
     /// value
-    pub fn value(&self) -> &str {
+    pub const fn value(&self) -> &str {
         self.0.as_str()
     }
 }
@@ -38,7 +38,7 @@ pub struct KeywordLiteral(String);
 
 impl KeywordLiteral {
     /// value
-    pub fn value(&self) -> &str {
+    pub const fn value(&self) -> &str {
         self.0.as_str()
     }
 }
@@ -53,7 +53,7 @@ pub struct BooleanLiteral(bool);
 
 impl BooleanLiteral {
     /// literal value
-    pub fn value(&self) -> bool {
+    pub const fn value(&self) -> bool {
         self.0
     }
 }
@@ -64,7 +64,7 @@ pub struct TimestampLiteral(TimestampKind);
 
 impl TimestampLiteral {
     /// get [`TimestampKind`]
-    pub fn kind(&self) -> &TimestampKind {
+    pub const fn kind(&self) -> &TimestampKind {
         &self.0
     }
 }

@@ -14,7 +14,7 @@ pub struct Update {
 
 impl Update {
     /// create instance
-    pub fn new(
+    pub const fn new(
         with: Option<With>,
         or_conflict: Option<ResolveType>,
         table_name: QualifiedName,

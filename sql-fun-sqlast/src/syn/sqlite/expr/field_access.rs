@@ -14,7 +14,7 @@ pub enum FieldAccessResolution {
 
 impl FieldAccessResolution {
     /// get field index
-    pub fn struct_field_index(&self) -> Option<usize> {
+    pub const fn struct_field_index(&self) -> Option<usize> {
         match self {
             Self::StructField(v) => Some(*v),
             _ => None,
@@ -22,7 +22,7 @@ impl FieldAccessResolution {
     }
 
     /// get tag index
-    pub fn union_tag_index(&self) -> Option<u8> {
+    pub const fn union_tag_index(&self) -> Option<u8> {
         match self {
             Self::UnionVariant(v) => Some(*v),
             _ => None,

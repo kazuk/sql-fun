@@ -13,7 +13,7 @@ pub struct CreateTypeStatement {
 
 impl CreateTypeStatement {
     /// create instance
-    pub fn new(if_not_exists: bool, type_name: String, body: CreateTypeBody) -> Self {
+    pub const fn new(if_not_exists: bool, type_name: String, body: CreateTypeBody) -> Self {
         Self {
             if_not_exists,
             type_name,
@@ -165,7 +165,7 @@ pub struct DropTypeStatement {
 
 impl DropTypeStatement {
     /// create instance
-    pub fn new(if_exists: bool, type_name: String) -> Self {
+    pub const fn new(if_exists: bool, type_name: String) -> Self {
         Self {
             if_exists,
             type_name,

@@ -8,7 +8,7 @@ pub struct Array(Vec<Expr>);
 
 impl Array {
     /// create instance
-    pub fn new(elements: Vec<Expr>) -> Self {
+    pub const fn new(elements: Vec<Expr>) -> Self {
         Self(elements)
     }
 

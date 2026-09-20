@@ -18,12 +18,12 @@ impl From<TypeIn> for Type {
 
 impl Type {
     /// get a name
-    pub fn name(&self) -> &str {
+    pub const fn name(&self) -> &str {
         self.name.as_str()
     }
 
     /// get size
-    pub fn size(&self) -> Option<&TypeSize> {
+    pub const fn size(&self) -> Option<&TypeSize> {
         self.size.as_ref()
     }
 }

@@ -13,7 +13,7 @@ pub struct Window {
 
 impl Window {
     /// create new Window
-    pub fn new(
+    pub const fn new(
         base: Option<Name>,
         partition_by: Vec<Expr>,
         order_by: Vec<SortedColumn>,

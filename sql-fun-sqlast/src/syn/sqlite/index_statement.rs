@@ -55,7 +55,7 @@ pub struct DropIndexStatement {
 
 impl DropIndexStatement {
     /// create instance
-    pub fn new(if_exists: bool, idx_name: QualifiedName) -> Self {
+    pub const fn new(if_exists: bool, idx_name: QualifiedName) -> Self {
         Self {
             if_exists,
             idx_name,
@@ -71,7 +71,7 @@ pub struct ReindexStatement {
 
 impl ReindexStatement {
     /// create instance
-    pub fn new(idx_name: Option<QualifiedName>) -> Self {
+    pub const fn new(idx_name: Option<QualifiedName>) -> Self {
         Self { idx_name }
     }
 }
@@ -84,7 +84,7 @@ pub struct OptimizeStatement {
 
 impl OptimizeStatement {
     /// create instance
-    pub fn new(idx_name: Option<QualifiedName>) -> Self {
+    pub const fn new(idx_name: Option<QualifiedName>) -> Self {
         Self { idx_name }
     }
 

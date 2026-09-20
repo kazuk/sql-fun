@@ -32,7 +32,11 @@ pub struct SelectTableTable {
 
 impl SelectTableTable {
     /// create instance
-    pub fn new(qualified_name: QualifiedName, as_: Option<As>, indexed: Option<Indexed>) -> Self {
+    pub const fn new(
+        qualified_name: QualifiedName,
+        as_: Option<As>,
+        indexed: Option<Indexed>,
+    ) -> Self {
         Self {
             qualified_name,
             as_,
@@ -51,7 +55,7 @@ pub struct SelectTableTableCell {
 
 impl SelectTableTableCell {
     /// create instance
-    pub fn new(qualified_name: QualifiedName, exprs: Vec<Expr>, as_: Option<As>) -> Self {
+    pub const fn new(qualified_name: QualifiedName, exprs: Vec<Expr>, as_: Option<As>) -> Self {
         Self {
             qualified_name,
             exprs,
@@ -69,7 +73,7 @@ pub struct SelectTableSelect {
 
 impl SelectTableSelect {
     /// create instance
-    pub fn new(select: Select, as_: Option<As>) -> Self {
+    pub const fn new(select: Select, as_: Option<As>) -> Self {
         Self { select, as_ }
     }
 }
@@ -83,7 +87,7 @@ pub struct SelectTableSub {
 
 impl SelectTableSub {
     /// create instance
-    pub fn new(from_clause: FromClause, as_: Option<As>) -> Self {
+    pub const fn new(from_clause: FromClause, as_: Option<As>) -> Self {
         Self { from_clause, as_ }
     }
 }

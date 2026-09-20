@@ -9,7 +9,7 @@ pub struct BeginStatement {
 
 impl BeginStatement {
     /// create instance
-    pub fn new(transaction_type: Option<TransactionType>, name: Option<Name>) -> Self {
+    pub const fn new(transaction_type: Option<TransactionType>, name: Option<Name>) -> Self {
         Self {
             transaction_type,
             name,
@@ -25,7 +25,7 @@ pub struct CommitStatement {
 
 impl CommitStatement {
     /// create instance
-    pub fn new(name: Option<Name>) -> Self {
+    pub const fn new(name: Option<Name>) -> Self {
         Self { name }
     }
 }
@@ -39,7 +39,7 @@ pub struct RollbackStatement {
 
 impl RollbackStatement {
     /// create instance
-    pub fn new(tx_name: Option<Name>, savepoint_name: Option<Name>) -> Self {
+    pub const fn new(tx_name: Option<Name>, savepoint_name: Option<Name>) -> Self {
         Self {
             tx_name,
             savepoint_name,
@@ -55,7 +55,7 @@ pub struct SavepointStatement {
 
 impl SavepointStatement {
     /// create instance
-    pub fn new(name: Name) -> Self {
+    pub const fn new(name: Name) -> Self {
         Self { name }
     }
 }
@@ -68,7 +68,7 @@ pub struct ReleaseStatement {
 
 impl ReleaseStatement {
     /// create instance
-    pub fn new(name: Name) -> Self {
+    pub const fn new(name: Name) -> Self {
         Self { name }
     }
 }

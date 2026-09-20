@@ -26,17 +26,17 @@ impl From<ColumnDefinitionIn> for ColumnDefinition {
 
 impl ColumnDefinition {
     /// column name
-    pub fn column_name(&self) -> &Name {
+    pub const fn column_name(&self) -> &Name {
         &self.col_name
     }
 
     /// column type
-    pub fn column_type(&self) -> Option<&Type> {
+    pub const fn column_type(&self) -> Option<&Type> {
         self.col_type.as_ref()
     }
 
     /// constraints
-    pub fn constraints(&self) -> &[NamedColumnConstraint] {
+    pub const fn constraints(&self) -> &[NamedColumnConstraint] {
         self.constraints.as_slice()
     }
 }

@@ -16,7 +16,7 @@ pub struct CreateView {
 
 impl CreateView {
     /// create instance
-    pub fn new(
+    pub const fn new(
         temporary: bool,
         if_not_exists: bool,
         view_name: QualifiedName,
@@ -49,7 +49,7 @@ pub struct CreateMaterializedView {
 
 impl CreateMaterializedView {
     /// create instance
-    pub fn new(
+    pub const fn new(
         if_not_exists: bool,
         view_name: QualifiedName,
         columns: Vec<IndexedColumn>,
@@ -82,7 +82,7 @@ pub struct DropView {
 
 impl DropView {
     /// create instance
-    pub fn new(if_exists: bool, view_name: QualifiedName) -> Self {
+    pub const fn new(if_exists: bool, view_name: QualifiedName) -> Self {
         Self {
             if_exists,
             view_name,

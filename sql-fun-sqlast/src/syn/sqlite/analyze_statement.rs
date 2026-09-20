@@ -8,7 +8,7 @@ pub struct AnalyzeStatement {
 
 impl AnalyzeStatement {
     /// create instance
-    pub fn new(name: Option<QualifiedName>) -> Self {
+    pub const fn new(name: Option<QualifiedName>) -> Self {
         Self { name }
     }
 }

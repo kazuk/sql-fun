@@ -13,7 +13,7 @@ pub struct ExprColumn {
 
 impl ExprColumn {
     /// create instance
-    pub fn new(
+    pub const fn new(
         database: Option<usize>,
         table: TableInternalId,
         column: usize,
@@ -57,7 +57,7 @@ pub struct ExprRowId {
 
 impl ExprRowId {
     /// create instance
-    pub fn new(database: Option<usize>, table: TableInternalId) -> Self {
+    pub const fn new(database: Option<usize>, table: TableInternalId) -> Self {
         Self { database, table }
     }
 }

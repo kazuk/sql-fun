@@ -113,7 +113,7 @@ pub enum Expr {
 
 impl Expr {
     /// create Register variant
-    pub fn register(size: usize) -> Self {
+    pub const fn register(size: usize) -> Self {
         Self::Register(size)
     }
 

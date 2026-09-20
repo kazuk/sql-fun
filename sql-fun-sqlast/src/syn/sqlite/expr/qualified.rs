@@ -10,7 +10,7 @@ pub struct Qualified {
 
 impl Qualified {
     /// create instance
-    pub fn new(table: Name, column: Name) -> Self {
+    pub const fn new(table: Name, column: Name) -> Self {
         Self { table, column }
     }
 }
@@ -36,7 +36,7 @@ pub struct ExprDoublyQualified {
 
 impl ExprDoublyQualified {
     /// create instance
-    pub fn new(schema: Name, table: Name, column: Name) -> Self {
+    pub const fn new(schema: Name, table: Name, column: Name) -> Self {
         Self {
             schema,
             table,

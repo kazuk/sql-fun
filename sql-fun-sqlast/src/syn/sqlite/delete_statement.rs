@@ -14,7 +14,7 @@ pub struct DeleteStatement {
 
 impl DeleteStatement {
     /// create instance
-    pub fn new(
+    pub const fn new(
         with: Option<With>,
         table_name: QualifiedName,
         indexed: Option<Indexed>,

@@ -91,7 +91,7 @@ impl ForeignKeyAction {
 
     /// convert from [`crate::syn::sqlite::RefAct`]
     #[cfg(feature = "sqlite")]
-    pub fn from_ref_act(value: &crate::syn::sqlite::RefAct) -> Self {
+    pub const fn from_ref_act(value: &crate::syn::sqlite::RefAct) -> Self {
         match value {
             crate::syn::sqlite::RefAct::SetNull => Self::SetNull,
             crate::syn::sqlite::RefAct::SetDefault => Self::SetDefault,

@@ -29,12 +29,12 @@ impl From<QualifiedNameIn> for QualifiedName {
 
 impl QualifiedName {
     /// database name
-    pub fn db_name(&self) -> Option<&Name> {
+    pub const fn db_name(&self) -> Option<&Name> {
         self.db_name.as_ref()
     }
 
     /// local name
-    pub fn name(&self) -> &Name {
+    pub const fn name(&self) -> &Name {
         &self.name
     }
 }
@@ -75,7 +75,7 @@ impl From<NameIn> for Name {
 
 impl Name {
     /// name text value
-    pub fn value(&self) -> &str {
+    pub const fn value(&self) -> &str {
         self.value.as_str()
     }
 }

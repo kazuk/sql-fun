@@ -13,7 +13,7 @@ pub struct ExprFunctionCall {
 
 impl ExprFunctionCall {
     /// create instance
-    pub fn new(
+    pub const fn new(
         name: Name,
         distinctness: Option<Distinctness>,
         args: Vec<Expr>,
@@ -65,7 +65,7 @@ pub struct ExprFunctionCallStar {
 
 impl ExprFunctionCallStar {
     /// create instance
-    pub fn new(name: Name, filter_over: FunctionTail) -> Self {
+    pub const fn new(name: Name, filter_over: FunctionTail) -> Self {
         Self { name, filter_over }
     }
 }

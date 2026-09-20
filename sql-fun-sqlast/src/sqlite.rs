@@ -29,7 +29,7 @@ pub struct SqliteToken<'a> {
 
 impl<'a> SqliteToken<'a> {
     /// new instance
-    pub fn new(token: Token<'a>, span: std::ops::Range<usize>) -> Self {
+    pub const fn new(token: Token<'a>, span: std::ops::Range<usize>) -> Self {
         Self { token, span }
     }
 
@@ -39,12 +39,12 @@ impl<'a> SqliteToken<'a> {
     }
 
     /// token type
-    pub fn token_type(&self) -> turso_parser::token::TokenType {
+    pub const fn token_type(&self) -> turso_parser::token::TokenType {
         self.token.token_type
     }
 
     /// token span
-    pub fn span(&self) -> &Range<usize> {
+    pub const fn span(&self) -> &Range<usize> {
         &self.span
     }
 }
@@ -58,7 +58,7 @@ pub struct SqliteLexer<'a> {
 #[cfg(feature = "sqlite")]
 impl<'a> SqliteLexer<'a> {
     /// initlialize lexer with input string
-    pub fn new(input: &'a str) -> Self {
+    pub const fn new(input: &'a str) -> Self {
         Self {
             lexer: turso_parser::lexer::Lexer::new(input.as_bytes()),
             input,
@@ -105,7 +105,7 @@ pub struct SqliteStatement {
 }
 
 impl SqliteStatement {
-    pub fn new(cmd: turso_parser::ast::Cmd, offset: usize, len: usize) -> Self {
+    pub const fn new(cmd: turso_parser::ast::Cmd, offset: usize, len: usize) -> Self {
         Self { cmd, offset, len }
     }
 }

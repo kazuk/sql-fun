@@ -240,7 +240,7 @@ pub struct DropTriggerStatement {
 
 impl DropTriggerStatement {
     /// create instance
-    pub fn new(if_exists: bool, trigger_name: QualifiedName) -> Self {
+    pub const fn new(if_exists: bool, trigger_name: QualifiedName) -> Self {
         Self {
             if_exists,
             trigger_name,

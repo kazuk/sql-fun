@@ -225,7 +225,7 @@ pub enum Stmt {
 
 impl Stmt {
     /// get CreateTable variant
-    pub fn as_create_table(&self) -> Option<&CreateTableStatement> {
+    pub const fn as_create_table(&self) -> Option<&CreateTableStatement> {
         match self {
             Self::CreateTable(create_table) => Some(create_table),
             _ => None,

@@ -9,7 +9,7 @@ pub struct PragmaStatement {
 
 impl PragmaStatement {
     /// create instance
-    pub fn new(name: QualifiedName, body: Option<PragmaBody>) -> Self {
+    pub const fn new(name: QualifiedName, body: Option<PragmaBody>) -> Self {
         Self { name, body }
     }
 }

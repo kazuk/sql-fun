@@ -10,7 +10,7 @@ pub struct PrimaryKeyConstraint {
 
 impl PrimaryKeyConstraint {
     /// create instance
-    pub fn new(
+    pub const fn new(
         columns: Vec<SortedColumn>,
         auto_increment: bool,
         conflict_clause: Option<ResolveType>,
@@ -32,7 +32,7 @@ pub struct UniqueConstraint {
 
 impl UniqueConstraint {
     /// create instance
-    pub fn new(columns: Vec<SortedColumn>, conflict_clause: Option<ResolveType>) -> Self {
+    pub const fn new(columns: Vec<SortedColumn>, conflict_clause: Option<ResolveType>) -> Self {
         Self {
             columns,
             conflict_clause,
@@ -144,7 +144,7 @@ pub enum InitDeferredPred {
 
 impl InitDeferredPred {
     /// return true when InitiallyDeferred
-    pub fn init_deferred(&self) -> bool {
+    pub const fn init_deferred(&self) -> bool {
         matches!(self, Self::InitiallyDeferred)
     }
 }
@@ -186,7 +186,7 @@ pub struct ForeignKeyConstraint {
 
 impl ForeignKeyConstraint {
     /// create instance
-    pub fn new(
+    pub const fn new(
         columns: Vec<IndexedColumn>,
         clause: ForeignKeyClause,
         defer_clause: Option<DeferSubclause>,
@@ -257,7 +257,7 @@ pub struct PrimaryKeyColumnConstraint {
 
 impl PrimaryKeyColumnConstraint {
     /// create instance
-    pub fn new(
+    pub const fn new(
         order: Option<SortOrder>,
         conflict_clause: Option<ResolveType>,
         auto_increment: bool,
@@ -270,17 +270,17 @@ impl PrimaryKeyColumnConstraint {
     }
 
     /// get order
-    pub fn order(&self) -> Option<SortOrder> {
+    pub const fn order(&self) -> Option<SortOrder> {
         self.order
     }
 
     /// get auto increment value
-    pub fn auto_increment(&self) -> bool {
+    pub const fn auto_increment(&self) -> bool {
         self.auto_increment
     }
 
     /// conflict clause
-    pub fn conflict_clause(&self) -> Option<&ResolveType> {
+    pub const fn conflict_clause(&self) -> Option<&ResolveType> {
         self.conflict_clause.as_ref()
     }
 }
@@ -294,7 +294,7 @@ pub struct NotNullColumnConstraint {
 
 impl NotNullColumnConstraint {
     /// create instance
-    pub fn new(nullable: bool, conflict_clause: Option<ResolveType>) -> Self {
+    pub const fn new(nullable: bool, conflict_clause: Option<ResolveType>) -> Self {
         Self {
             nullable,
             conflict_clause,
@@ -302,12 +302,12 @@ impl NotNullColumnConstraint {
     }
 
     /// nullable
-    pub fn nullable(&self) -> bool {
+    pub const fn nullable(&self) -> bool {
         self.nullable
     }
 
     /// conflict clause
-    pub fn conflict_clause(&self) -> Option<&ResolveType> {
+    pub const fn conflict_clause(&self) -> Option<&ResolveType> {
         self.conflict_clause.as_ref()
     }
 }
@@ -320,12 +320,12 @@ pub struct UniqueColumnConstraint {
 
 impl UniqueColumnConstraint {
     /// create instance
-    pub fn new(conflict_clause: Option<ResolveType>) -> Self {
+    pub const fn new(conflict_clause: Option<ResolveType>) -> Self {
         Self { conflict_clause }
     }
 
     /// conflict clause
-    pub fn conflict_clause(&self) -> Option<&ResolveType> {
+    pub const fn conflict_clause(&self) -> Option<&ResolveType> {
         self.conflict_clause.as_ref()
     }
 }
@@ -378,12 +378,12 @@ pub struct CollateColumnConstraint {
 
 impl CollateColumnConstraint {
     /// create instance
-    pub fn new(collation_name: Name) -> Self {
+    pub const fn new(collation_name: Name) -> Self {
         Self { collation_name }
     }
 
     /// collation name
-    pub fn collation_name(&self) -> &Name {
+    pub const fn collation_name(&self) -> &Name {
         &self.collation_name
     }
 }
@@ -397,7 +397,7 @@ pub struct ForeignKeyColumnConstraint {
 
 impl ForeignKeyColumnConstraint {
     /// create instance
-    pub fn new(clause: ForeignKeyClause, defer_clause: Option<DeferSubclause>) -> Self {
+    pub const fn new(clause: ForeignKeyClause, defer_clause: Option<DeferSubclause>) -> Self {
         Self {
             clause,
             defer_clause,

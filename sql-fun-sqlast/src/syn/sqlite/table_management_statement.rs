@@ -48,12 +48,12 @@ pub struct AlterTable {
 
 impl AlterTable {
     /// create instance
-    pub fn name(&self) -> &QualifiedName {
+    pub const fn name(&self) -> &QualifiedName {
         &self.name
     }
 
     /// get body
-    pub fn body(&self) -> &AlterTableBody {
+    pub const fn body(&self) -> &AlterTableBody {
         &self.body
     }
 }
@@ -78,7 +78,7 @@ pub struct CreateTableStatement {
 
 impl CreateTableStatement {
     /// create instance
-    pub fn new(
+    pub const fn new(
         temporary: bool,
         if_not_exists: bool,
         table_name: QualifiedName,
@@ -106,7 +106,7 @@ pub enum CreateTableBody {
 
 impl CreateTableBody {
     /// get ColumnsAndConstraint valiant
-    pub fn as_columns_and_constraint(&self) -> Option<&ColumnsAndConstraint> {
+    pub const fn as_columns_and_constraint(&self) -> Option<&ColumnsAndConstraint> {
         match self {
             Self::ColumnsAndConstraint(v) => Some(v),
             _ => None,
@@ -144,7 +144,7 @@ pub struct ColumnsAndConstraint {
 
 impl ColumnsAndConstraint {
     /// create instance
-    pub fn new(
+    pub const fn new(
         columns: Vec<ColumnDefinition>,
         constraints: Vec<NamedTableConstraint>,
         options: TableOptions,
@@ -195,12 +195,12 @@ impl From<NamedColumnConstraintIn> for NamedColumnConstraint {
 
 impl NamedColumnConstraint {
     /// name
-    pub fn name(&self) -> Option<&Name> {
+    pub const fn name(&self) -> Option<&Name> {
         self.name.as_ref()
     }
 
     /// constraint
-    pub fn constraint(&self) -> &ColumnConstraint {
+    pub const fn constraint(&self) -> &ColumnConstraint {
         &self.constraint
     }
 }
@@ -232,7 +232,7 @@ pub struct DropTableStatement {
 
 impl DropTableStatement {
     /// create instance
-    pub fn new(if_exists: bool, name: QualifiedName) -> Self {
+    pub const fn new(if_exists: bool, name: QualifiedName) -> Self {
         Self { if_exists, name }
     }
 }

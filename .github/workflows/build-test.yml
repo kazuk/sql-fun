@@ -23,6 +23,11 @@ jobs:
     steps:
       - uses: actions/checkout@v5
 
+      - name: Disk usage before cache restore
+        run: |
+          df -h . /usr/local/cargo /github/home
+          df -i . /usr/local/cargo /github/home
+
       - uses: actions/cache@v5
         with:
           path: |
@@ -52,6 +57,17 @@ jobs:
             --profile ci
             --show-progress none"
           sccache --show-stats
+
+      - name: Disk usage after build and test
+        if: ${{ always() }}
+        run: |
+          df -h . /usr/local/cargo /github/home
+          df -i . /usr/local/cargo /github/home
+          for path in target /usr/local/cargo/registry /usr/local/cargo/git /github/home/.cache/sccache; do
+            if [ -d "$path" ]; then
+              du -sh "$path"
+            fi
+          done
 
       - name: Test Report
         uses: dorny/test-reporter@v3

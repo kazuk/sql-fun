@@ -3,26 +3,43 @@ set -eu
 
 CLEAN_TARGET=0
 REBUILD=0
+BUILD_ONLY=0
 
 for a in "$@"; do
     case "$a" in
       --clean) CLEAN_TARGET=1 ;;
       --rebuild) REBUILD=1 ;;
+      --build-only) BUILD_ONLY=1 ;;
     esac
 done
 
 if (( REBUILD ==1 )); then
-    REBUILD_ARGS="--pull --no-cache"
+    REBUILD_ARGS=(--pull --no-cache)
 else
-    REBUILD_ARGS=""
+    REBUILD_ARGS=()
 fi
+
+IMAGE=ci-builder:local
+previous_size=$(docker image inspect --format '{{.Size}}' "$IMAGE" 2>/dev/null || true)
 
 # GIT_ROOT setup in our repostitory .envrc
 docker build \
-  ${REBUILD_ARGS} \
-  ${GIT_ROOT}/ci/github-actions/. \
-  -t ci-builder:local \
+  "${REBUILD_ARGS[@]}" \
+  "${GIT_ROOT}/ci/github-actions/." \
+  -t "$IMAGE" \
   --build-arg "SERENA_TAG=v0.1.4"
+
+image_size=$(docker image inspect --format '{{.Size}}' "$IMAGE")
+awk -v image="$IMAGE" -v size="$image_size" -v previous="$previous_size" 'BEGIN {
+    printf "Image %s: %.1f MiB (%s bytes, uncompressed)\n", image, size / 1048576, size
+    if (previous != "") {
+        printf "Change from previous local image: %+.1f MiB\n", (size - previous) / 1048576
+    }
+}'
+
+if (( BUILD_ONLY == 1 )); then
+    exit 0
+fi
 
 if (( CLEAN_TARGET == 1 )); then
     docker volume rm -f ci_target 2>/dev/null || true

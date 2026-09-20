@@ -1,6 +1,15 @@
-
 [alias]
 x = "run -p xbuild --"
+
+[build]
+incremental = false
+
+# Keep build artifacts small while retaining file/line information in backtraces.
+[profile.dev]
+debug = "line-tables-only"
+
+[profile.test]
+debug = "line-tables-only"
 
 [env]
 SQL_FUN_HOME = "./sql-fun-home"

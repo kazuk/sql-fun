@@ -20,7 +20,7 @@ impl EnumTypeValue {
         }
     }
 
-    pub fn variant_value(&self) -> i32 {
+    pub const fn variant_value(&self) -> i32 {
         self.number
     }
 }

@@ -16,12 +16,17 @@ jobs:
   workspace:
     runs-on: ubuntu-24.04
     container: &ci-builder-container
-      image: ghcr.io/kazuk/ci-builder@sha256:2bf5e88440df19456505e687f828f75f063932a8544a7e4e4211a3e9e02bf8e0
+      image: ghcr.io/kazuk/ci-builder@sha256:51014173b84e60fcdc231b627bfce9a5597788e86671530773e6059b11c12a3c
       credentials:
         username: ${{ github.actor }}
         password: ${{ secrets.GITHUB_TOKEN }}
     steps:
       - uses: actions/checkout@v5
+
+      - name: Disk usage before cache restore
+        run: |
+          df -h . /usr/local/cargo /github/home
+          df -i . /usr/local/cargo /github/home
 
       - uses: actions/cache@v5
         with:
@@ -52,6 +57,17 @@ jobs:
             --profile ci
             --show-progress none"
           sccache --show-stats
+
+      - name: Disk usage after build and test
+        if: ${{ always() }}
+        run: |
+          df -h . /usr/local/cargo /github/home
+          df -i . /usr/local/cargo /github/home
+          for path in target /usr/local/cargo/registry /usr/local/cargo/git /github/home/.cache/sccache; do
+            if [ -d "$path" ]; then
+              du -sh "$path"
+            fi
+          done
 
       - name: Test Report
         uses: dorny/test-reporter@v3

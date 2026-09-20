@@ -777,7 +777,7 @@ pub struct Validity {
 
 impl Validity {
     /// create instance
-    pub fn new(skip_validation: bool, initially_valid: bool) -> Self {
+    pub const fn new(skip_validation: bool, initially_valid: bool) -> Self {
         Self {
             skip_validation,
             initially_valid,
@@ -798,7 +798,7 @@ pub struct Deferrable {
 
 impl Deferrable {
     /// create instance
-    pub fn new(init_deferred: bool) -> Self {
+    pub const fn new(init_deferred: bool) -> Self {
         Self { init_deferred }
     }
 

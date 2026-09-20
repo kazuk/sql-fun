@@ -182,11 +182,11 @@ impl PostgresArgs {
         }
     }
 
-    pub fn builtin_schema_dir(&self) -> Option<&PathBuf> {
+    pub const fn builtin_schema_dir(&self) -> Option<&PathBuf> {
         self.builtin_schema_dir.as_ref()
     }
 
-    pub fn postgres_extensions_dir(&self) -> Option<&PathBuf> {
+    pub const fn postgres_extensions_dir(&self) -> Option<&PathBuf> {
         self.postgres_extensions_dir.as_ref()
     }
 

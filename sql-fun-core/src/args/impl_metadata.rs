@@ -23,6 +23,7 @@ impl super::SqlFunArgs {
     /// # Errors
     ///
     /// Propagates errors when current directory or metadata path resolution fails.
+    #[tracing::instrument(err, skip(self))]
     pub fn metadata_file(&self) -> Result<PathBuf, SqlFunArgsError> {
         self.metadata_args.metadata_file()
     }
@@ -44,7 +45,7 @@ mod test_metadata {
     use clap::{Parser, builder::OsStr};
     use testresult::TestResult;
 
-    use crate::{PostgresEngineVersion, SqlDialect, SqlFunArgs, SqlFunMetadata};
+    use crate::{PostgresEngineVersion, SqlDialect, SqlFunArgs, SqlFunMetadataCollection};
 
     #[test]
     pub fn test_metadata_format() -> TestResult {
@@ -83,7 +84,8 @@ mod test_metadata {
             "test-assets/metadata.toml",
         ])?;
         let metadata_file = args.metadata_file()?;
-        let metadata = SqlFunMetadata::load_from(metadata_file)?;
+        let metadata_collection = SqlFunMetadataCollection::load_from(metadata_file)?;
+        let metadata = metadata_collection.get("default").unwrap();
         let sql_dialect = metadata.sql_dialect();
         assert_eq!(sql_dialect, SqlDialect::PostgreSQL);
         let engine_version = metadata.engine_version();

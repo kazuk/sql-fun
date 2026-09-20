@@ -102,7 +102,7 @@ where
 }
 
 impl ListExpr {
-    pub fn len(&self) -> usize {
+    pub const fn len(&self) -> usize {
         self.0.len()
     }
 
@@ -171,7 +171,7 @@ pub enum SemScalarExpr {
 
 impl SemScalarExpr {
     /// get Const variant
-    pub fn as_const(&self) -> Option<&ScalarConstExpr> {
+    pub const fn as_const(&self) -> Option<&ScalarConstExpr> {
         match self {
             Self::Const(c) => Some(c),
             _ => None,
@@ -179,7 +179,7 @@ impl SemScalarExpr {
     }
 
     /// get SqlValue variant
-    pub fn as_sql_value(&self) -> Option<&SqlValueExpr> {
+    pub const fn as_sql_value(&self) -> Option<&SqlValueExpr> {
         match self {
             Self::SqlValue(v) => Some(v),
             _ => None,

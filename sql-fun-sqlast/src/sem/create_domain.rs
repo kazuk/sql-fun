@@ -23,7 +23,7 @@ impl CreateDomain {
 
     /// get base type reference
     #[must_use]
-    pub fn type_ref(&self) -> &TypeReference {
+    pub const fn type_ref(&self) -> &TypeReference {
         &self.type_ref
     }
 

@@ -51,7 +51,7 @@ impl MessageType {
         })
     }
 
-    pub fn field(&self) -> &Vec<MessageTypeField> {
+    pub const fn field(&self) -> &Vec<MessageTypeField> {
         &self.field
     }
 }

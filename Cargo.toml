@@ -25,6 +25,7 @@ members = [
     "parse_dat",
     "sql-fun-client",
     "sql-fun-codegen",
+    "sql-fun-collector",
     "sql-fun-core",
     "sql-fun-server",
     "sql-fun-server-api",
@@ -67,6 +68,7 @@ pedantic = { level = "warn", priority = -1 }
 cargo = { level = "warn", priority = -1 }
 use_self = { level = "warn" }
 multiple_crate_versions = { level = "allow" }
+missing_const_for_fn = "warn"
 
 [workspace.dependencies]
 anyhow = { version = "1.0", features = ["backtrace"] }
@@ -82,6 +84,7 @@ combine = "4.6"
 compact_str = "0.10"
 convert_case = "0.12"
 ctor = "1.0"
+darling = "0.23.0"
 derive-getters = "0.5"
 derive_builder = "0.20"
 directories = "6.0"
@@ -92,7 +95,8 @@ fs2 = "0.4"
 futures-core = "0.3"
 futures-util = "0.3"
 glob = "0.3"
-indexmap = "2.14.0"
+hex = "0.4.3"
+indexmap = { version = "2.14.0", features = ["serde"] }
 inquire = "0.9"
 itertools = "0.15"
 j9 = "0.1"
@@ -103,13 +107,18 @@ owo-colors = "4.2.3"
 petgraph = "0.8.3"
 pg_query = "6.1"
 proc-macro2 = { version = "1.0", features = ["span-locations"] }
+proc_macro2_diagnostic = "0.6.3"
 quote = "1.0"
 rand = "0.10"
 rstest = "0.27"
 schemars = { version = "1.2.1", features = ["url2"] }
 serde = { version = "1.0", features = ["derive"] }
-serde_json = "1.0"
+serde_json = { version = "1.0", features = ["preserve_order"] }
+serde_json_path = "0.7.2"
+serde_spanned = "1.1.1"
+serde_yaml_ng = "0.10.0"
 sha2 = "0.11"
+sha256 = "1.6.0"
 shellexpand = "3.1"
 smallvec = "1.15"
 sql-fun = { path = ".", version = "0.1.0" }
@@ -127,6 +136,7 @@ time = { version = "0.3.45", features = ["serde"] }
 tokio = { version = "1.52", features = ["full"] }
 tokio-postgres = "0.7"
 toml = "1.0.6"
+toml_parser = "1.1.3"
 tracing = "0.1"
 tracing-subscriber = { version = "0.3", features = ["fmt", "env-filter"] }
 trybuild = { version = "1.0.114", features = ["diff"] }
@@ -148,15 +158,19 @@ quote = { workspace = true }
 sha2 = { workspace = true }
 smallvec = { workspace = true }
 sql-fun-client = { workspace = true }
+sql-fun-codegen = { workspace = true }
 sql-fun-core = { workspace = true }
 syn = { workspace = true }
 thiserror = { workspace = true }
 toml = { workspace = true }
+tracing.workspace = true
+tracing-subscriber.workspace = true
 
 [dev-dependencies]
 anyhow = { workspace = true }
 derive_builder = { workspace = true }
 rstest = { workspace = true }
+scopeguard = "1.2.0"
 tokio = { workspace = true }
 tokio-postgres = { workspace = true }
 tracing = { workspace = true }

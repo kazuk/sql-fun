@@ -153,22 +153,22 @@ impl ForeignKeyColumnConstraint {
     }
 
     /// get primary key table name
-    pub fn primary_key_table(&self) -> &TableName {
+    pub const fn primary_key_table(&self) -> &TableName {
         &self.primary_key_table
     }
 
     /// get primary key column name
-    pub fn primary_key_column(&self) -> &ColumnName {
+    pub const fn primary_key_column(&self) -> &ColumnName {
         &self.primary_key_column
     }
 
     /// get primary key column type
-    pub fn primary_key_column_type(&self) -> Option<&TypeReference> {
+    pub const fn primary_key_column_type(&self) -> Option<&TypeReference> {
         self.primary_key_column_type.as_ref()
     }
 
     /// get match type
-    pub fn match_type(&self) -> Option<&ForeignKeyMatchType> {
+    pub const fn match_type(&self) -> Option<&ForeignKeyMatchType> {
         self.match_type.as_ref()
     }
 }
@@ -266,12 +266,12 @@ impl ForeignKeyColumnConstraint {
 
 impl ColumnConstraint {
     /// create ForeignKey variant
-    pub fn foreign_key(value: ForeignKeyColumnConstraint) -> Self {
+    pub const fn foreign_key(value: ForeignKeyColumnConstraint) -> Self {
         Self::ForeignKey(value)
     }
 
     /// get ForeignKey variant
-    pub fn as_foreign_key(&self) -> Option<&ForeignKeyColumnConstraint> {
+    pub const fn as_foreign_key(&self) -> Option<&ForeignKeyColumnConstraint> {
         if let Self::ForeignKey(c) = self {
             Some(c)
         } else {

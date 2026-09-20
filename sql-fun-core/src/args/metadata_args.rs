@@ -243,9 +243,7 @@ mod test_apply_envs {
 
     #[test]
     fn rejects_unsupported_sql_dialect_env_value() {
-        let envs = TestMetadataEnvs::new()
-            .with_sql_dialect("sqlite")
-            .into_map();
+        let envs = TestMetadataEnvs::new().with_sql_dialect("mysql").into_map();
 
         let err = MetadataArgs::apply_envs(&mut SqlFunArgsBuilder::default(), &envs)
             .expect_err("expected invalid dialect to fail");
@@ -253,7 +251,7 @@ mod test_apply_envs {
         assert!(matches!(
             err,
             SqlFunArgsError::NotSupported(category, value)
-            if category == "SQL Dialect" && value == "sqlite"
+            if category == "SQL Dialect" && value == "mysql"
         ));
     }
 }
@@ -291,6 +289,11 @@ impl MetadataArgs {
     /// gets metadata format value in args
     pub fn metadata_format(&self) -> &str {
         &self.metadata_format
+    }
+
+    /// get current schema
+    pub fn schema(&self) -> &str {
+        &self.schema
     }
 }
 
@@ -528,7 +531,7 @@ mod test_sql_dialect {
     fn rejects_unsupported_explicit_sql_dialect() {
         let metadata = parse_postgres_metadata("Cargo.toml").expect("metadata fixture");
         let args = MetadataArgsBuilder::default()
-            .sql_dialect("sqlite")
+            .sql_dialect("mysql")
             .build()
             .expect("metadata args with explicit dialect");
 
@@ -539,7 +542,7 @@ mod test_sql_dialect {
         assert!(matches!(
             err,
             SqlFunArgsError::NotSupported(category, value)
-            if category == "SQL Dialect" && value == "sqlite"
+            if category == "SQL Dialect" && value == "mysql"
         ));
     }
 }

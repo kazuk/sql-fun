@@ -42,12 +42,12 @@ impl ColumnConstraintTrait for CollateColumnConstraint {
 
 impl ColumnConstraint {
     /// create Collate variant
-    pub fn collate(value: CollateColumnConstraint) -> Self {
+    pub const fn collate(value: CollateColumnConstraint) -> Self {
         Self::Collate(value)
     }
 
     /// get Collate variant
-    pub fn as_collate(&self) -> Option<&CollateColumnConstraint> {
+    pub const fn as_collate(&self) -> Option<&CollateColumnConstraint> {
         if let Self::Collate(c) = self {
             Some(c)
         } else {

@@ -48,7 +48,7 @@ impl CteDataSource {
         names.push(self.alias.clone());
     }
 
-    pub fn name(&self) -> &CteName {
+    pub const fn name(&self) -> &CteName {
         &self.name
     }
 

@@ -50,7 +50,7 @@ impl ContainerClient {
         Ok(Self::new(docker, id))
     }
 
-    pub fn new(docker: DockerClient, id: ContainerId) -> Self {
+    pub const fn new(docker: DockerClient, id: ContainerId) -> Self {
         Self { docker, id }
     }
 

@@ -24,13 +24,13 @@ pub struct CreateTableAs {
 impl CreateTableAs {
     /// object name
     #[must_use]
-    pub fn name(&self) -> &FullName {
+    pub const fn name(&self) -> &FullName {
         &self.name
     }
 
     /// object type
     #[must_use]
-    pub fn obj_type(&self) -> ObjectType {
+    pub const fn obj_type(&self) -> ObjectType {
         self.obj_type
     }
 

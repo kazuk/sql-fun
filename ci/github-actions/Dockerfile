@@ -19,8 +19,9 @@ RUN apt-get update \
     postgresql-client libpq-dev \
     && rm -rf /var/lib/apt/lists/*
 
-RUN sudo apt-get update \
-    && sudo apt-get install -y automake autoconf libtool make pkg-config
+RUN apt-get update \
+    && apt-get install -y --no-install-recommends automake autoconf libtool make pkg-config \
+    && rm -rf /var/lib/apt/lists/*
 
 RUN curl -fsSL https://sh.rustup.rs \
     | sh -s -- -y --profile minimal --default-toolchain stable \
@@ -46,7 +47,8 @@ ENV DEBIAN_FRONTEND=noninteractive \
     PATH=/usr/local/cargo/bin:/usr/local/rustup/bin:/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin
 
 RUN apt-get update && apt-get install -y --no-install-recommends \
-    ca-certificates curl sudo
+    ca-certificates curl sudo \
+    && rm -rf /var/lib/apt/lists/*
 
 RUN curl -fsSL https://cli.github.com/packages/githubcli-archive-keyring.gpg \
     | sudo dd of=/usr/share/keyrings/githubcli-archive-keyring.gpg
@@ -61,14 +63,14 @@ RUN apt-get update && apt-get install -y --no-install-recommends \
     unzip zip xz-utils sudo \
     libssl-dev clang jq \
     postgresql-client libpq-dev \
+    autoconf automake libtool libtool-bin bsdextrautils \
     && rm -rf /var/lib/apt/lists/*
 
 # Rust (stable)
 RUN curl -fsSL https://sh.rustup.rs | sh -s -- -y --profile minimal --default-toolchain stable \
+    && rustup toolchain install nightly --profile minimal \
+    && rustup component add --toolchain stable rustfmt clippy llvm-tools-preview rust-analyzer rust-src \
     && rustc -V && cargo -V
-RUN rustup toolchain install nightly
-RUN rustup component add rustfmt clippy
-RUN rustup component add llvm-tools-preview --toolchain stable-x86_64-unknown-linux-gnu
 
 # Node.js 22 (for Codex CLI + other MCP tools)
 RUN apt-get update && apt-get install -y --no-install-recommends ca-certificates curl gnupg \
@@ -84,11 +86,10 @@ RUN apt-get update && apt-get install -y --no-install-recommends ca-certificates
 
 # Codex CLI
 RUN npm i -g @openai/codex@latest \
-    && codex --version
+    && codex --version \
+    && npm cache clean --force
 
 RUN git config --system --add safe.directory '*'
-
-RUN apt-get update && apt-get install -y autoconf automake libtool libtool-bin bsdextrautils
 
 # install uv
 RUN curl -LsSf https://astral.sh/uv/install.sh \
@@ -97,7 +98,7 @@ RUN curl -LsSf https://astral.sh/uv/install.sh \
 # install graphify
 RUN UV_TOOL_DIR=/opt/uv-tools \
     UV_TOOL_BIN_DIR=/usr/local/bin \
-    uv tool install graphifyy \
+    uv --no-cache tool install graphifyy \
     && graphify --version
 
 COPY --from=builder /opt/tools/bin /usr/local/cargo/bin
@@ -107,5 +108,3 @@ COPY resources/serena-wrapper.sh /usr/local/bin/serena
 COPY resources/codex-config.toml /usr/local/config-template/codex-config.toml
 
 RUN chmod +x /usr/local/bin/serena
-
-RUN rustup component add rust-analyzer rust-src

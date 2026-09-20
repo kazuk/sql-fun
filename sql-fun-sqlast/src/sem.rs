@@ -146,7 +146,7 @@ impl SourcePathWithSpan {
     }
 
     /// get a source span
-    pub fn span(&self) -> &StringSpan {
+    pub const fn span(&self) -> &StringSpan {
         &self.span
     }
 }
@@ -293,7 +293,7 @@ impl SemAst {
     }
 
     /// cast as [`DropTable`]
-    pub fn as_drop_table(&self) -> Option<&DropTable> {
+    pub const fn as_drop_table(&self) -> Option<&DropTable> {
         if let Self::DropTable(t) = self {
             Some(t)
         } else {
@@ -302,7 +302,7 @@ impl SemAst {
     }
 
     /// cast as [`CreateTable`]
-    pub fn as_create_table(&self) -> Option<&CreateTable> {
+    pub const fn as_create_table(&self) -> Option<&CreateTable> {
         if let Self::CreateTable(t) = self {
             Some(t)
         } else {

@@ -80,7 +80,7 @@ mod node {
     impl NodeListOpt {
         /// returns Some(None) valiant
         #[must_use]
-        pub fn none() -> Self {
+        pub const fn none() -> Self {
             Self(None)
         }
     }
@@ -118,7 +118,7 @@ mod node {
     impl Node {
         /// returns None variant
         #[must_use]
-        pub fn none() -> Self {
+        pub const fn none() -> Self {
             Self(self::inner::Node::None)
         }
     }
@@ -4742,7 +4742,7 @@ mod node {
 
         /// test variant kind
         #[must_use]
-        pub fn is_alias(&self) -> bool {
+        pub const fn is_alias(&self) -> bool {
             matches!(self, Self(self::inner::Node::Alias(_)))
         }
     }
@@ -4759,7 +4759,7 @@ mod node {
 
         /// test variant kind
         #[must_use]
-        pub fn is_range_var(&self) -> bool {
+        pub const fn is_range_var(&self) -> bool {
             matches!(self, Self(self::inner::Node::RangeVar(_)))
         }
     }
@@ -4776,7 +4776,7 @@ mod node {
 
         /// test variant kind
         #[must_use]
-        pub fn is_table_func(&self) -> bool {
+        pub const fn is_table_func(&self) -> bool {
             matches!(self, Self(self::inner::Node::TableFunc(_)))
         }
     }
@@ -4793,7 +4793,7 @@ mod node {
 
         /// test variant kind
         #[must_use]
-        pub fn is_into_clause(&self) -> bool {
+        pub const fn is_into_clause(&self) -> bool {
             matches!(self, Self(self::inner::Node::IntoClause(_)))
         }
     }
@@ -4810,7 +4810,7 @@ mod node {
 
         /// test variant kind
         #[must_use]
-        pub fn is_var(&self) -> bool {
+        pub const fn is_var(&self) -> bool {
             matches!(self, Self(self::inner::Node::Var(_)))
         }
     }
@@ -4827,7 +4827,7 @@ mod node {
 
         /// test variant kind
         #[must_use]
-        pub fn is_param(&self) -> bool {
+        pub const fn is_param(&self) -> bool {
             matches!(self, Self(self::inner::Node::Param(_)))
         }
     }
@@ -4844,7 +4844,7 @@ mod node {
 
         /// test variant kind
         #[must_use]
-        pub fn is_aggref(&self) -> bool {
+        pub const fn is_aggref(&self) -> bool {
             matches!(self, Self(self::inner::Node::Aggref(_)))
         }
     }
@@ -4861,7 +4861,7 @@ mod node {
 
         /// test variant kind
         #[must_use]
-        pub fn is_grouping_func(&self) -> bool {
+        pub const fn is_grouping_func(&self) -> bool {
             matches!(self, Self(self::inner::Node::GroupingFunc(_)))
         }
     }
@@ -4878,7 +4878,7 @@ mod node {
 
         /// test variant kind
         #[must_use]
-        pub fn is_window_func(&self) -> bool {
+        pub const fn is_window_func(&self) -> bool {
             matches!(self, Self(self::inner::Node::WindowFunc(_)))
         }
     }
@@ -4897,7 +4897,7 @@ mod node {
 
         /// test variant kind
         #[must_use]
-        pub fn is_window_func_run_condition(&self) -> bool {
+        pub const fn is_window_func_run_condition(&self) -> bool {
             matches!(self, Self(self::inner::Node::WindowFuncRunCondition(_)))
         }
     }
@@ -4914,7 +4914,7 @@ mod node {
 
         /// test variant kind
         #[must_use]
-        pub fn is_merge_support_func(&self) -> bool {
+        pub const fn is_merge_support_func(&self) -> bool {
             matches!(self, Self(self::inner::Node::MergeSupportFunc(_)))
         }
     }
@@ -4931,7 +4931,7 @@ mod node {
 
         /// test variant kind
         #[must_use]
-        pub fn is_subscripting_ref(&self) -> bool {
+        pub const fn is_subscripting_ref(&self) -> bool {
             matches!(self, Self(self::inner::Node::SubscriptingRef(_)))
         }
     }
@@ -4948,7 +4948,7 @@ mod node {
 
         /// test variant kind
         #[must_use]
-        pub fn is_func_expr(&self) -> bool {
+        pub const fn is_func_expr(&self) -> bool {
             matches!(self, Self(self::inner::Node::FuncExpr(_)))
         }
     }
@@ -4965,7 +4965,7 @@ mod node {
 
         /// test variant kind
         #[must_use]
-        pub fn is_named_arg_expr(&self) -> bool {
+        pub const fn is_named_arg_expr(&self) -> bool {
             matches!(self, Self(self::inner::Node::NamedArgExpr(_)))
         }
     }
@@ -4982,7 +4982,7 @@ mod node {
 
         /// test variant kind
         #[must_use]
-        pub fn is_op_expr(&self) -> bool {
+        pub const fn is_op_expr(&self) -> bool {
             matches!(self, Self(self::inner::Node::OpExpr(_)))
         }
     }
@@ -4999,7 +4999,7 @@ mod node {
 
         /// test variant kind
         #[must_use]
-        pub fn is_distinct_expr(&self) -> bool {
+        pub const fn is_distinct_expr(&self) -> bool {
             matches!(self, Self(self::inner::Node::DistinctExpr(_)))
         }
     }
@@ -5016,7 +5016,7 @@ mod node {
 
         /// test variant kind
         #[must_use]
-        pub fn is_null_if_expr(&self) -> bool {
+        pub const fn is_null_if_expr(&self) -> bool {
             matches!(self, Self(self::inner::Node::NullIfExpr(_)))
         }
     }
@@ -5033,7 +5033,7 @@ mod node {
 
         /// test variant kind
         #[must_use]
-        pub fn is_scalar_array_op_expr(&self) -> bool {
+        pub const fn is_scalar_array_op_expr(&self) -> bool {
             matches!(self, Self(self::inner::Node::ScalarArrayOpExpr(_)))
         }
     }
@@ -5050,7 +5050,7 @@ mod node {
 
         /// test variant kind
         #[must_use]
-        pub fn is_bool_expr(&self) -> bool {
+        pub const fn is_bool_expr(&self) -> bool {
             matches!(self, Self(self::inner::Node::BoolExpr(_)))
         }
     }
@@ -5067,7 +5067,7 @@ mod node {
 
         /// test variant kind
         #[must_use]
-        pub fn is_sub_link(&self) -> bool {
+        pub const fn is_sub_link(&self) -> bool {
             matches!(self, Self(self::inner::Node::SubLink(_)))
         }
     }
@@ -5084,7 +5084,7 @@ mod node {
 
         /// test variant kind
         #[must_use]
-        pub fn is_sub_plan(&self) -> bool {
+        pub const fn is_sub_plan(&self) -> bool {
             matches!(self, Self(self::inner::Node::SubPlan(_)))
         }
     }
@@ -5101,7 +5101,7 @@ mod node {
 
         /// test variant kind
         #[must_use]
-        pub fn is_alternative_sub_plan(&self) -> bool {
+        pub const fn is_alternative_sub_plan(&self) -> bool {
             matches!(self, Self(self::inner::Node::AlternativeSubPlan(_)))
         }
     }
@@ -5118,7 +5118,7 @@ mod node {
 
         /// test variant kind
         #[must_use]
-        pub fn is_field_select(&self) -> bool {
+        pub const fn is_field_select(&self) -> bool {
             matches!(self, Self(self::inner::Node::FieldSelect(_)))
         }
     }
@@ -5135,7 +5135,7 @@ mod node {
 
         /// test variant kind
         #[must_use]
-        pub fn is_field_store(&self) -> bool {
+        pub const fn is_field_store(&self) -> bool {
             matches!(self, Self(self::inner::Node::FieldStore(_)))
         }
     }
@@ -5152,7 +5152,7 @@ mod node {
 
         /// test variant kind
         #[must_use]
-        pub fn is_relabel_type(&self) -> bool {
+        pub const fn is_relabel_type(&self) -> bool {
             matches!(self, Self(self::inner::Node::RelabelType(_)))
         }
     }
@@ -5169,7 +5169,7 @@ mod node {
 
         /// test variant kind
         #[must_use]
-        pub fn is_coerce_via_io(&self) -> bool {
+        pub const fn is_coerce_via_io(&self) -> bool {
             matches!(self, Self(self::inner::Node::CoerceViaIo(_)))
         }
     }
@@ -5186,7 +5186,7 @@ mod node {
 
         /// test variant kind
         #[must_use]
-        pub fn is_array_coerce_expr(&self) -> bool {
+        pub const fn is_array_coerce_expr(&self) -> bool {
             matches!(self, Self(self::inner::Node::ArrayCoerceExpr(_)))
         }
     }
@@ -5203,7 +5203,7 @@ mod node {
 
         /// test variant kind
         #[must_use]
-        pub fn is_convert_rowtype_expr(&self) -> bool {
+        pub const fn is_convert_rowtype_expr(&self) -> bool {
             matches!(self, Self(self::inner::Node::ConvertRowtypeExpr(_)))
         }
     }
@@ -5220,7 +5220,7 @@ mod node {
 
         /// test variant kind
         #[must_use]
-        pub fn is_collate_expr(&self) -> bool {
+        pub const fn is_collate_expr(&self) -> bool {
             matches!(self, Self(self::inner::Node::CollateExpr(_)))
         }
     }
@@ -5237,7 +5237,7 @@ mod node {
 
         /// test variant kind
         #[must_use]
-        pub fn is_case_expr(&self) -> bool {
+        pub const fn is_case_expr(&self) -> bool {
             matches!(self, Self(self::inner::Node::CaseExpr(_)))
         }
     }
@@ -5254,7 +5254,7 @@ mod node {
 
         /// test variant kind
         #[must_use]
-        pub fn is_case_when(&self) -> bool {
+        pub const fn is_case_when(&self) -> bool {
             matches!(self, Self(self::inner::Node::CaseWhen(_)))
         }
     }
@@ -5271,7 +5271,7 @@ mod node {
 
         /// test variant kind
         #[must_use]
-        pub fn is_case_test_expr(&self) -> bool {
+        pub const fn is_case_test_expr(&self) -> bool {
             matches!(self, Self(self::inner::Node::CaseTestExpr(_)))
         }
     }
@@ -5288,7 +5288,7 @@ mod node {
 
         /// test variant kind
         #[must_use]
-        pub fn is_array_expr(&self) -> bool {
+        pub const fn is_array_expr(&self) -> bool {
             matches!(self, Self(self::inner::Node::ArrayExpr(_)))
         }
     }
@@ -5305,7 +5305,7 @@ mod node {
 
         /// test variant kind
         #[must_use]
-        pub fn is_row_expr(&self) -> bool {
+        pub const fn is_row_expr(&self) -> bool {
             matches!(self, Self(self::inner::Node::RowExpr(_)))
         }
     }
@@ -5322,7 +5322,7 @@ mod node {
 
         /// test variant kind
         #[must_use]
-        pub fn is_row_compare_expr(&self) -> bool {
+        pub const fn is_row_compare_expr(&self) -> bool {
             matches!(self, Self(self::inner::Node::RowCompareExpr(_)))
         }
     }
@@ -5339,7 +5339,7 @@ mod node {
 
         /// test variant kind
         #[must_use]
-        pub fn is_coalesce_expr(&self) -> bool {
+        pub const fn is_coalesce_expr(&self) -> bool {
             matches!(self, Self(self::inner::Node::CoalesceExpr(_)))
         }
     }
@@ -5356,7 +5356,7 @@ mod node {
 
         /// test variant kind
         #[must_use]
-        pub fn is_min_max_expr(&self) -> bool {
+        pub const fn is_min_max_expr(&self) -> bool {
             matches!(self, Self(self::inner::Node::MinMaxExpr(_)))
         }
     }
@@ -5373,7 +5373,7 @@ mod node {
 
         /// test variant kind
         #[must_use]
-        pub fn is_sqlvalue_function(&self) -> bool {
+        pub const fn is_sqlvalue_function(&self) -> bool {
             matches!(self, Self(self::inner::Node::SqlvalueFunction(_)))
         }
     }
@@ -5390,7 +5390,7 @@ mod node {
 
         /// test variant kind
         #[must_use]
-        pub fn is_xml_expr(&self) -> bool {
+        pub const fn is_xml_expr(&self) -> bool {
             matches!(self, Self(self::inner::Node::XmlExpr(_)))
         }
     }
@@ -5407,7 +5407,7 @@ mod node {
 
         /// test variant kind
         #[must_use]
-        pub fn is_json_format(&self) -> bool {
+        pub const fn is_json_format(&self) -> bool {
             matches!(self, Self(self::inner::Node::JsonFormat(_)))
         }
     }
@@ -5424,7 +5424,7 @@ mod node {
 
         /// test variant kind
         #[must_use]
-        pub fn is_json_returning(&self) -> bool {
+        pub const fn is_json_returning(&self) -> bool {
             matches!(self, Self(self::inner::Node::JsonReturning(_)))
         }
     }
@@ -5441,7 +5441,7 @@ mod node {
 
         /// test variant kind
         #[must_use]
-        pub fn is_json_value_expr(&self) -> bool {
+        pub const fn is_json_value_expr(&self) -> bool {
             matches!(self, Self(self::inner::Node::JsonValueExpr(_)))
         }
     }
@@ -5458,7 +5458,7 @@ mod node {
 
         /// test variant kind
         #[must_use]
-        pub fn is_json_constructor_expr(&self) -> bool {
+        pub const fn is_json_constructor_expr(&self) -> bool {
             matches!(self, Self(self::inner::Node::JsonConstructorExpr(_)))
         }
     }
@@ -5475,7 +5475,7 @@ mod node {
 
         /// test variant kind
         #[must_use]
-        pub fn is_json_is_predicate(&self) -> bool {
+        pub const fn is_json_is_predicate(&self) -> bool {
             matches!(self, Self(self::inner::Node::JsonIsPredicate(_)))
         }
     }
@@ -5492,7 +5492,7 @@ mod node {
 
         /// test variant kind
         #[must_use]
-        pub fn is_json_behavior(&self) -> bool {
+        pub const fn is_json_behavior(&self) -> bool {
             matches!(self, Self(self::inner::Node::JsonBehavior(_)))
         }
     }
@@ -5509,7 +5509,7 @@ mod node {
 
         /// test variant kind
         #[must_use]
-        pub fn is_json_expr(&self) -> bool {
+        pub const fn is_json_expr(&self) -> bool {
             matches!(self, Self(self::inner::Node::JsonExpr(_)))
         }
     }
@@ -5526,7 +5526,7 @@ mod node {
 
         /// test variant kind
         #[must_use]
-        pub fn is_json_table_path(&self) -> bool {
+        pub const fn is_json_table_path(&self) -> bool {
             matches!(self, Self(self::inner::Node::JsonTablePath(_)))
         }
     }
@@ -5543,7 +5543,7 @@ mod node {
 
         /// test variant kind
         #[must_use]
-        pub fn is_json_table_path_scan(&self) -> bool {
+        pub const fn is_json_table_path_scan(&self) -> bool {
             matches!(self, Self(self::inner::Node::JsonTablePathScan(_)))
         }
     }
@@ -5562,7 +5562,7 @@ mod node {
 
         /// test variant kind
         #[must_use]
-        pub fn is_json_table_sibling_join(&self) -> bool {
+        pub const fn is_json_table_sibling_join(&self) -> bool {
             matches!(self, Self(self::inner::Node::JsonTableSiblingJoin(_)))
         }
     }
@@ -5579,7 +5579,7 @@ mod node {
 
         /// test variant kind
         #[must_use]
-        pub fn is_null_test(&self) -> bool {
+        pub const fn is_null_test(&self) -> bool {
             matches!(self, Self(self::inner::Node::NullTest(_)))
         }
     }
@@ -5596,7 +5596,7 @@ mod node {
 
         /// test variant kind
         #[must_use]
-        pub fn is_boolean_test(&self) -> bool {
+        pub const fn is_boolean_test(&self) -> bool {
             matches!(self, Self(self::inner::Node::BooleanTest(_)))
         }
     }
@@ -5613,7 +5613,7 @@ mod node {
 
         /// test variant kind
         #[must_use]
-        pub fn is_merge_action(&self) -> bool {
+        pub const fn is_merge_action(&self) -> bool {
             matches!(self, Self(self::inner::Node::MergeAction(_)))
         }
     }
@@ -5630,7 +5630,7 @@ mod node {
 
         /// test variant kind
         #[must_use]
-        pub fn is_coerce_to_domain(&self) -> bool {
+        pub const fn is_coerce_to_domain(&self) -> bool {
             matches!(self, Self(self::inner::Node::CoerceToDomain(_)))
         }
     }
@@ -5647,7 +5647,7 @@ mod node {
 
         /// test variant kind
         #[must_use]
-        pub fn is_coerce_to_domain_value(&self) -> bool {
+        pub const fn is_coerce_to_domain_value(&self) -> bool {
             matches!(self, Self(self::inner::Node::CoerceToDomainValue(_)))
         }
     }
@@ -5664,7 +5664,7 @@ mod node {
 
         /// test variant kind
         #[must_use]
-        pub fn is_set_to_default(&self) -> bool {
+        pub const fn is_set_to_default(&self) -> bool {
             matches!(self, Self(self::inner::Node::SetToDefault(_)))
         }
     }
@@ -5681,7 +5681,7 @@ mod node {
 
         /// test variant kind
         #[must_use]
-        pub fn is_current_of_expr(&self) -> bool {
+        pub const fn is_current_of_expr(&self) -> bool {
             matches!(self, Self(self::inner::Node::CurrentOfExpr(_)))
         }
     }
@@ -5698,7 +5698,7 @@ mod node {
 
         /// test variant kind
         #[must_use]
-        pub fn is_next_value_expr(&self) -> bool {
+        pub const fn is_next_value_expr(&self) -> bool {
             matches!(self, Self(self::inner::Node::NextValueExpr(_)))
         }
     }
@@ -5715,7 +5715,7 @@ mod node {
 
         /// test variant kind
         #[must_use]
-        pub fn is_inference_elem(&self) -> bool {
+        pub const fn is_inference_elem(&self) -> bool {
             matches!(self, Self(self::inner::Node::InferenceElem(_)))
         }
     }
@@ -5732,7 +5732,7 @@ mod node {
 
         /// test variant kind
         #[must_use]
-        pub fn is_target_entry(&self) -> bool {
+        pub const fn is_target_entry(&self) -> bool {
             matches!(self, Self(self::inner::Node::TargetEntry(_)))
         }
     }
@@ -5749,7 +5749,7 @@ mod node {
 
         /// test variant kind
         #[must_use]
-        pub fn is_range_tbl_ref(&self) -> bool {
+        pub const fn is_range_tbl_ref(&self) -> bool {
             matches!(self, Self(self::inner::Node::RangeTblRef(_)))
         }
     }
@@ -5766,7 +5766,7 @@ mod node {
 
         /// test variant kind
         #[must_use]
-        pub fn is_join_expr(&self) -> bool {
+        pub const fn is_join_expr(&self) -> bool {
             matches!(self, Self(self::inner::Node::JoinExpr(_)))
         }
     }
@@ -5783,7 +5783,7 @@ mod node {
 
         /// test variant kind
         #[must_use]
-        pub fn is_from_expr(&self) -> bool {
+        pub const fn is_from_expr(&self) -> bool {
             matches!(self, Self(self::inner::Node::FromExpr(_)))
         }
     }
@@ -5800,7 +5800,7 @@ mod node {
 
         /// test variant kind
         #[must_use]
-        pub fn is_on_conflict_expr(&self) -> bool {
+        pub const fn is_on_conflict_expr(&self) -> bool {
             matches!(self, Self(self::inner::Node::OnConflictExpr(_)))
         }
     }
@@ -5817,7 +5817,7 @@ mod node {
 
         /// test variant kind
         #[must_use]
-        pub fn is_query(&self) -> bool {
+        pub const fn is_query(&self) -> bool {
             matches!(self, Self(self::inner::Node::Query(_)))
         }
     }
@@ -5834,7 +5834,7 @@ mod node {
 
         /// test variant kind
         #[must_use]
-        pub fn is_type_name(&self) -> bool {
+        pub const fn is_type_name(&self) -> bool {
             matches!(self, Self(self::inner::Node::TypeName(_)))
         }
     }
@@ -5851,7 +5851,7 @@ mod node {
 
         /// test variant kind
         #[must_use]
-        pub fn is_column_ref(&self) -> bool {
+        pub const fn is_column_ref(&self) -> bool {
             matches!(self, Self(self::inner::Node::ColumnRef(_)))
         }
     }
@@ -5868,7 +5868,7 @@ mod node {
 
         /// test variant kind
         #[must_use]
-        pub fn is_param_ref(&self) -> bool {
+        pub const fn is_param_ref(&self) -> bool {
             matches!(self, Self(self::inner::Node::ParamRef(_)))
         }
     }
@@ -5885,7 +5885,7 @@ mod node {
 
         /// test variant kind
         #[must_use]
-        pub fn is_a_expr(&self) -> bool {
+        pub const fn is_a_expr(&self) -> bool {
             matches!(self, Self(self::inner::Node::AExpr(_)))
         }
     }
@@ -5902,7 +5902,7 @@ mod node {
 
         /// test variant kind
         #[must_use]
-        pub fn is_type_cast(&self) -> bool {
+        pub const fn is_type_cast(&self) -> bool {
             matches!(self, Self(self::inner::Node::TypeCast(_)))
         }
     }
@@ -5919,7 +5919,7 @@ mod node {
 
         /// test variant kind
         #[must_use]
-        pub fn is_collate_clause(&self) -> bool {
+        pub const fn is_collate_clause(&self) -> bool {
             matches!(self, Self(self::inner::Node::CollateClause(_)))
         }
     }
@@ -5936,7 +5936,7 @@ mod node {
 
         /// test variant kind
         #[must_use]
-        pub fn is_role_spec(&self) -> bool {
+        pub const fn is_role_spec(&self) -> bool {
             matches!(self, Self(self::inner::Node::RoleSpec(_)))
         }
     }
@@ -5953,7 +5953,7 @@ mod node {
 
         /// test variant kind
         #[must_use]
-        pub fn is_func_call(&self) -> bool {
+        pub const fn is_func_call(&self) -> bool {
             matches!(self, Self(self::inner::Node::FuncCall(_)))
         }
     }
@@ -5970,7 +5970,7 @@ mod node {
 
         /// test variant kind
         #[must_use]
-        pub fn is_a_star(&self) -> bool {
+        pub const fn is_a_star(&self) -> bool {
             matches!(self, Self(self::inner::Node::AStar(_)))
         }
     }
@@ -5987,7 +5987,7 @@ mod node {
 
         /// test variant kind
         #[must_use]
-        pub fn is_a_indices(&self) -> bool {
+        pub const fn is_a_indices(&self) -> bool {
             matches!(self, Self(self::inner::Node::AIndices(_)))
         }
     }
@@ -6004,7 +6004,7 @@ mod node {
 
         /// test variant kind
         #[must_use]
-        pub fn is_a_indirection(&self) -> bool {
+        pub const fn is_a_indirection(&self) -> bool {
             matches!(self, Self(self::inner::Node::AIndirection(_)))
         }
     }
@@ -6021,7 +6021,7 @@ mod node {
 
         /// test variant kind
         #[must_use]
-        pub fn is_a_array_expr(&self) -> bool {
+        pub const fn is_a_array_expr(&self) -> bool {
             matches!(self, Self(self::inner::Node::AArrayExpr(_)))
         }
     }
@@ -6038,7 +6038,7 @@ mod node {
 
         /// test variant kind
         #[must_use]
-        pub fn is_res_target(&self) -> bool {
+        pub const fn is_res_target(&self) -> bool {
             matches!(self, Self(self::inner::Node::ResTarget(_)))
         }
     }
@@ -6055,7 +6055,7 @@ mod node {
 
         /// test variant kind
         #[must_use]
-        pub fn is_multi_assign_ref(&self) -> bool {
+        pub const fn is_multi_assign_ref(&self) -> bool {
             matches!(self, Self(self::inner::Node::MultiAssignRef(_)))
         }
     }
@@ -6072,7 +6072,7 @@ mod node {
 
         /// test variant kind
         #[must_use]
-        pub fn is_sort_by(&self) -> bool {
+        pub const fn is_sort_by(&self) -> bool {
             matches!(self, Self(self::inner::Node::SortBy(_)))
         }
     }
@@ -6089,7 +6089,7 @@ mod node {
 
         /// test variant kind
         #[must_use]
-        pub fn is_window_def(&self) -> bool {
+        pub const fn is_window_def(&self) -> bool {
             matches!(self, Self(self::inner::Node::WindowDef(_)))
         }
     }
@@ -6106,7 +6106,7 @@ mod node {
 
         /// test variant kind
         #[must_use]
-        pub fn is_range_subselect(&self) -> bool {
+        pub const fn is_range_subselect(&self) -> bool {
             matches!(self, Self(self::inner::Node::RangeSubselect(_)))
         }
     }
@@ -6123,7 +6123,7 @@ mod node {
 
         /// test variant kind
         #[must_use]
-        pub fn is_range_function(&self) -> bool {
+        pub const fn is_range_function(&self) -> bool {
             matches!(self, Self(self::inner::Node::RangeFunction(_)))
         }
     }
@@ -6140,7 +6140,7 @@ mod node {
 
         /// test variant kind
         #[must_use]
-        pub fn is_range_table_func(&self) -> bool {
+        pub const fn is_range_table_func(&self) -> bool {
             matches!(self, Self(self::inner::Node::RangeTableFunc(_)))
         }
     }
@@ -6157,7 +6157,7 @@ mod node {
 
         /// test variant kind
         #[must_use]
-        pub fn is_range_table_func_col(&self) -> bool {
+        pub const fn is_range_table_func_col(&self) -> bool {
             matches!(self, Self(self::inner::Node::RangeTableFuncCol(_)))
         }
     }
@@ -6174,7 +6174,7 @@ mod node {
 
         /// test variant kind
         #[must_use]
-        pub fn is_range_table_sample(&self) -> bool {
+        pub const fn is_range_table_sample(&self) -> bool {
             matches!(self, Self(self::inner::Node::RangeTableSample(_)))
         }
     }
@@ -6191,7 +6191,7 @@ mod node {
 
         /// test variant kind
         #[must_use]
-        pub fn is_column_def(&self) -> bool {
+        pub const fn is_column_def(&self) -> bool {
             matches!(self, Self(self::inner::Node::ColumnDef(_)))
         }
     }
@@ -6208,7 +6208,7 @@ mod node {
 
         /// test variant kind
         #[must_use]
-        pub fn is_table_like_clause(&self) -> bool {
+        pub const fn is_table_like_clause(&self) -> bool {
             matches!(self, Self(self::inner::Node::TableLikeClause(_)))
         }
     }
@@ -6225,7 +6225,7 @@ mod node {
 
         /// test variant kind
         #[must_use]
-        pub fn is_index_elem(&self) -> bool {
+        pub const fn is_index_elem(&self) -> bool {
             matches!(self, Self(self::inner::Node::IndexElem(_)))
         }
     }
@@ -6242,7 +6242,7 @@ mod node {
 
         /// test variant kind
         #[must_use]
-        pub fn is_def_elem(&self) -> bool {
+        pub const fn is_def_elem(&self) -> bool {
             matches!(self, Self(self::inner::Node::DefElem(_)))
         }
     }
@@ -6259,7 +6259,7 @@ mod node {
 
         /// test variant kind
         #[must_use]
-        pub fn is_locking_clause(&self) -> bool {
+        pub const fn is_locking_clause(&self) -> bool {
             matches!(self, Self(self::inner::Node::LockingClause(_)))
         }
     }
@@ -6276,7 +6276,7 @@ mod node {
 
         /// test variant kind
         #[must_use]
-        pub fn is_xml_serialize(&self) -> bool {
+        pub const fn is_xml_serialize(&self) -> bool {
             matches!(self, Self(self::inner::Node::XmlSerialize(_)))
         }
     }
@@ -6293,7 +6293,7 @@ mod node {
 
         /// test variant kind
         #[must_use]
-        pub fn is_partition_elem(&self) -> bool {
+        pub const fn is_partition_elem(&self) -> bool {
             matches!(self, Self(self::inner::Node::PartitionElem(_)))
         }
     }
@@ -6310,7 +6310,7 @@ mod node {
 
         /// test variant kind
         #[must_use]
-        pub fn is_partition_spec(&self) -> bool {
+        pub const fn is_partition_spec(&self) -> bool {
             matches!(self, Self(self::inner::Node::PartitionSpec(_)))
         }
     }
@@ -6327,7 +6327,7 @@ mod node {
 
         /// test variant kind
         #[must_use]
-        pub fn is_partition_bound_spec(&self) -> bool {
+        pub const fn is_partition_bound_spec(&self) -> bool {
             matches!(self, Self(self::inner::Node::PartitionBoundSpec(_)))
         }
     }
@@ -6344,7 +6344,7 @@ mod node {
 
         /// test variant kind
         #[must_use]
-        pub fn is_partition_range_datum(&self) -> bool {
+        pub const fn is_partition_range_datum(&self) -> bool {
             matches!(self, Self(self::inner::Node::PartitionRangeDatum(_)))
         }
     }
@@ -6361,7 +6361,7 @@ mod node {
 
         /// test variant kind
         #[must_use]
-        pub fn is_single_partition_spec(&self) -> bool {
+        pub const fn is_single_partition_spec(&self) -> bool {
             matches!(self, Self(self::inner::Node::SinglePartitionSpec(_)))
         }
     }
@@ -6378,7 +6378,7 @@ mod node {
 
         /// test variant kind
         #[must_use]
-        pub fn is_partition_cmd(&self) -> bool {
+        pub const fn is_partition_cmd(&self) -> bool {
             matches!(self, Self(self::inner::Node::PartitionCmd(_)))
         }
     }
@@ -6395,7 +6395,7 @@ mod node {
 
         /// test variant kind
         #[must_use]
-        pub fn is_range_tbl_entry(&self) -> bool {
+        pub const fn is_range_tbl_entry(&self) -> bool {
             matches!(self, Self(self::inner::Node::RangeTblEntry(_)))
         }
     }
@@ -6412,7 +6412,7 @@ mod node {
 
         /// test variant kind
         #[must_use]
-        pub fn is_rtepermission_info(&self) -> bool {
+        pub const fn is_rtepermission_info(&self) -> bool {
             matches!(self, Self(self::inner::Node::RtepermissionInfo(_)))
         }
     }
@@ -6429,7 +6429,7 @@ mod node {
 
         /// test variant kind
         #[must_use]
-        pub fn is_range_tbl_function(&self) -> bool {
+        pub const fn is_range_tbl_function(&self) -> bool {
             matches!(self, Self(self::inner::Node::RangeTblFunction(_)))
         }
     }
@@ -6446,7 +6446,7 @@ mod node {
 
         /// test variant kind
         #[must_use]
-        pub fn is_table_sample_clause(&self) -> bool {
+        pub const fn is_table_sample_clause(&self) -> bool {
             matches!(self, Self(self::inner::Node::TableSampleClause(_)))
         }
     }
@@ -6463,7 +6463,7 @@ mod node {
 
         /// test variant kind
         #[must_use]
-        pub fn is_with_check_option(&self) -> bool {
+        pub const fn is_with_check_option(&self) -> bool {
             matches!(self, Self(self::inner::Node::WithCheckOption(_)))
         }
     }
@@ -6480,7 +6480,7 @@ mod node {
 
         /// test variant kind
         #[must_use]
-        pub fn is_sort_group_clause(&self) -> bool {
+        pub const fn is_sort_group_clause(&self) -> bool {
             matches!(self, Self(self::inner::Node::SortGroupClause(_)))
         }
     }
@@ -6497,7 +6497,7 @@ mod node {
 
         /// test variant kind
         #[must_use]
-        pub fn is_grouping_set(&self) -> bool {
+        pub const fn is_grouping_set(&self) -> bool {
             matches!(self, Self(self::inner::Node::GroupingSet(_)))
         }
     }
@@ -6514,7 +6514,7 @@ mod node {
 
         /// test variant kind
         #[must_use]
-        pub fn is_window_clause(&self) -> bool {
+        pub const fn is_window_clause(&self) -> bool {
             matches!(self, Self(self::inner::Node::WindowClause(_)))
         }
     }
@@ -6531,7 +6531,7 @@ mod node {
 
         /// test variant kind
         #[must_use]
-        pub fn is_row_mark_clause(&self) -> bool {
+        pub const fn is_row_mark_clause(&self) -> bool {
             matches!(self, Self(self::inner::Node::RowMarkClause(_)))
         }
     }
@@ -6548,7 +6548,7 @@ mod node {
 
         /// test variant kind
         #[must_use]
-        pub fn is_with_clause(&self) -> bool {
+        pub const fn is_with_clause(&self) -> bool {
             matches!(self, Self(self::inner::Node::WithClause(_)))
         }
     }
@@ -6565,7 +6565,7 @@ mod node {
 
         /// test variant kind
         #[must_use]
-        pub fn is_infer_clause(&self) -> bool {
+        pub const fn is_infer_clause(&self) -> bool {
             matches!(self, Self(self::inner::Node::InferClause(_)))
         }
     }
@@ -6582,7 +6582,7 @@ mod node {
 
         /// test variant kind
         #[must_use]
-        pub fn is_on_conflict_clause(&self) -> bool {
+        pub const fn is_on_conflict_clause(&self) -> bool {
             matches!(self, Self(self::inner::Node::OnConflictClause(_)))
         }
     }
@@ -6599,7 +6599,7 @@ mod node {
 
         /// test variant kind
         #[must_use]
-        pub fn is_ctesearch_clause(&self) -> bool {
+        pub const fn is_ctesearch_clause(&self) -> bool {
             matches!(self, Self(self::inner::Node::CtesearchClause(_)))
         }
     }
@@ -6616,7 +6616,7 @@ mod node {
 
         /// test variant kind
         #[must_use]
-        pub fn is_ctecycle_clause(&self) -> bool {
+        pub const fn is_ctecycle_clause(&self) -> bool {
             matches!(self, Self(self::inner::Node::CtecycleClause(_)))
         }
     }
@@ -6633,7 +6633,7 @@ mod node {
 
         /// test variant kind
         #[must_use]
-        pub fn is_common_table_expr(&self) -> bool {
+        pub const fn is_common_table_expr(&self) -> bool {
             matches!(self, Self(self::inner::Node::CommonTableExpr(_)))
         }
     }
@@ -6650,7 +6650,7 @@ mod node {
 
         /// test variant kind
         #[must_use]
-        pub fn is_merge_when_clause(&self) -> bool {
+        pub const fn is_merge_when_clause(&self) -> bool {
             matches!(self, Self(self::inner::Node::MergeWhenClause(_)))
         }
     }
@@ -6667,7 +6667,7 @@ mod node {
 
         /// test variant kind
         #[must_use]
-        pub fn is_trigger_transition(&self) -> bool {
+        pub const fn is_trigger_transition(&self) -> bool {
             matches!(self, Self(self::inner::Node::TriggerTransition(_)))
         }
     }
@@ -6684,7 +6684,7 @@ mod node {
 
         /// test variant kind
         #[must_use]
-        pub fn is_json_output(&self) -> bool {
+        pub const fn is_json_output(&self) -> bool {
             matches!(self, Self(self::inner::Node::JsonOutput(_)))
         }
     }
@@ -6701,7 +6701,7 @@ mod node {
 
         /// test variant kind
         #[must_use]
-        pub fn is_json_argument(&self) -> bool {
+        pub const fn is_json_argument(&self) -> bool {
             matches!(self, Self(self::inner::Node::JsonArgument(_)))
         }
     }
@@ -6718,7 +6718,7 @@ mod node {
 
         /// test variant kind
         #[must_use]
-        pub fn is_json_func_expr(&self) -> bool {
+        pub const fn is_json_func_expr(&self) -> bool {
             matches!(self, Self(self::inner::Node::JsonFuncExpr(_)))
         }
     }
@@ -6735,7 +6735,7 @@ mod node {
 
         /// test variant kind
         #[must_use]
-        pub fn is_json_table_path_spec(&self) -> bool {
+        pub const fn is_json_table_path_spec(&self) -> bool {
             matches!(self, Self(self::inner::Node::JsonTablePathSpec(_)))
         }
     }
@@ -6752,7 +6752,7 @@ mod node {
 
         /// test variant kind
         #[must_use]
-        pub fn is_json_table(&self) -> bool {
+        pub const fn is_json_table(&self) -> bool {
             matches!(self, Self(self::inner::Node::JsonTable(_)))
         }
     }
@@ -6769,7 +6769,7 @@ mod node {
 
         /// test variant kind
         #[must_use]
-        pub fn is_json_table_column(&self) -> bool {
+        pub const fn is_json_table_column(&self) -> bool {
             matches!(self, Self(self::inner::Node::JsonTableColumn(_)))
         }
     }
@@ -6786,7 +6786,7 @@ mod node {
 
         /// test variant kind
         #[must_use]
-        pub fn is_json_key_value(&self) -> bool {
+        pub const fn is_json_key_value(&self) -> bool {
             matches!(self, Self(self::inner::Node::JsonKeyValue(_)))
         }
     }
@@ -6803,7 +6803,7 @@ mod node {
 
         /// test variant kind
         #[must_use]
-        pub fn is_json_parse_expr(&self) -> bool {
+        pub const fn is_json_parse_expr(&self) -> bool {
             matches!(self, Self(self::inner::Node::JsonParseExpr(_)))
         }
     }
@@ -6820,7 +6820,7 @@ mod node {
 
         /// test variant kind
         #[must_use]
-        pub fn is_json_scalar_expr(&self) -> bool {
+        pub const fn is_json_scalar_expr(&self) -> bool {
             matches!(self, Self(self::inner::Node::JsonScalarExpr(_)))
         }
     }
@@ -6837,7 +6837,7 @@ mod node {
 
         /// test variant kind
         #[must_use]
-        pub fn is_json_serialize_expr(&self) -> bool {
+        pub const fn is_json_serialize_expr(&self) -> bool {
             matches!(self, Self(self::inner::Node::JsonSerializeExpr(_)))
         }
     }
@@ -6856,7 +6856,7 @@ mod node {
 
         /// test variant kind
         #[must_use]
-        pub fn is_json_object_constructor(&self) -> bool {
+        pub const fn is_json_object_constructor(&self) -> bool {
             matches!(self, Self(self::inner::Node::JsonObjectConstructor(_)))
         }
     }
@@ -6875,7 +6875,7 @@ mod node {
 
         /// test variant kind
         #[must_use]
-        pub fn is_json_array_constructor(&self) -> bool {
+        pub const fn is_json_array_constructor(&self) -> bool {
             matches!(self, Self(self::inner::Node::JsonArrayConstructor(_)))
         }
     }
@@ -6894,7 +6894,7 @@ mod node {
 
         /// test variant kind
         #[must_use]
-        pub fn is_json_array_query_constructor(&self) -> bool {
+        pub const fn is_json_array_query_constructor(&self) -> bool {
             matches!(self, Self(self::inner::Node::JsonArrayQueryConstructor(_)))
         }
     }
@@ -6911,7 +6911,7 @@ mod node {
 
         /// test variant kind
         #[must_use]
-        pub fn is_json_agg_constructor(&self) -> bool {
+        pub const fn is_json_agg_constructor(&self) -> bool {
             matches!(self, Self(self::inner::Node::JsonAggConstructor(_)))
         }
     }
@@ -6928,7 +6928,7 @@ mod node {
 
         /// test variant kind
         #[must_use]
-        pub fn is_json_object_agg(&self) -> bool {
+        pub const fn is_json_object_agg(&self) -> bool {
             matches!(self, Self(self::inner::Node::JsonObjectAgg(_)))
         }
     }
@@ -6945,7 +6945,7 @@ mod node {
 
         /// test variant kind
         #[must_use]
-        pub fn is_json_array_agg(&self) -> bool {
+        pub const fn is_json_array_agg(&self) -> bool {
             matches!(self, Self(self::inner::Node::JsonArrayAgg(_)))
         }
     }
@@ -6962,7 +6962,7 @@ mod node {
 
         /// test variant kind
         #[must_use]
-        pub fn is_raw_stmt(&self) -> bool {
+        pub const fn is_raw_stmt(&self) -> bool {
             matches!(self, Self(self::inner::Node::RawStmt(_)))
         }
     }
@@ -6979,7 +6979,7 @@ mod node {
 
         /// test variant kind
         #[must_use]
-        pub fn is_insert_stmt(&self) -> bool {
+        pub const fn is_insert_stmt(&self) -> bool {
             matches!(self, Self(self::inner::Node::InsertStmt(_)))
         }
     }
@@ -6996,7 +6996,7 @@ mod node {
 
         /// test variant kind
         #[must_use]
-        pub fn is_delete_stmt(&self) -> bool {
+        pub const fn is_delete_stmt(&self) -> bool {
             matches!(self, Self(self::inner::Node::DeleteStmt(_)))
         }
     }
@@ -7013,7 +7013,7 @@ mod node {
 
         /// test variant kind
         #[must_use]
-        pub fn is_update_stmt(&self) -> bool {
+        pub const fn is_update_stmt(&self) -> bool {
             matches!(self, Self(self::inner::Node::UpdateStmt(_)))
         }
     }
@@ -7030,7 +7030,7 @@ mod node {
 
         /// test variant kind
         #[must_use]
-        pub fn is_merge_stmt(&self) -> bool {
+        pub const fn is_merge_stmt(&self) -> bool {
             matches!(self, Self(self::inner::Node::MergeStmt(_)))
         }
     }
@@ -7047,7 +7047,7 @@ mod node {
 
         /// test variant kind
         #[must_use]
-        pub fn is_select_stmt(&self) -> bool {
+        pub const fn is_select_stmt(&self) -> bool {
             matches!(self, Self(self::inner::Node::SelectStmt(_)))
         }
     }
@@ -7064,7 +7064,7 @@ mod node {
 
         /// test variant kind
         #[must_use]
-        pub fn is_set_operation_stmt(&self) -> bool {
+        pub const fn is_set_operation_stmt(&self) -> bool {
             matches!(self, Self(self::inner::Node::SetOperationStmt(_)))
         }
     }
@@ -7081,7 +7081,7 @@ mod node {
 
         /// test variant kind
         #[must_use]
-        pub fn is_return_stmt(&self) -> bool {
+        pub const fn is_return_stmt(&self) -> bool {
             matches!(self, Self(self::inner::Node::ReturnStmt(_)))
         }
     }
@@ -7098,7 +7098,7 @@ mod node {
 
         /// test variant kind
         #[must_use]
-        pub fn is_plassign_stmt(&self) -> bool {
+        pub const fn is_plassign_stmt(&self) -> bool {
             matches!(self, Self(self::inner::Node::PlassignStmt(_)))
         }
     }
@@ -7115,7 +7115,7 @@ mod node {
 
         /// test variant kind
         #[must_use]
-        pub fn is_create_schema_stmt(&self) -> bool {
+        pub const fn is_create_schema_stmt(&self) -> bool {
             matches!(self, Self(self::inner::Node::CreateSchemaStmt(_)))
         }
     }
@@ -7132,7 +7132,7 @@ mod node {
 
         /// test variant kind
         #[must_use]
-        pub fn is_alter_table_stmt(&self) -> bool {
+        pub const fn is_alter_table_stmt(&self) -> bool {
             matches!(self, Self(self::inner::Node::AlterTableStmt(_)))
         }
     }
@@ -7149,7 +7149,7 @@ mod node {
 
         /// test variant kind
         #[must_use]
-        pub fn is_replica_identity_stmt(&self) -> bool {
+        pub const fn is_replica_identity_stmt(&self) -> bool {
             matches!(self, Self(self::inner::Node::ReplicaIdentityStmt(_)))
         }
     }
@@ -7166,7 +7166,7 @@ mod node {
 
         /// test variant kind
         #[must_use]
-        pub fn is_alter_table_cmd(&self) -> bool {
+        pub const fn is_alter_table_cmd(&self) -> bool {
             matches!(self, Self(self::inner::Node::AlterTableCmd(_)))
         }
     }
@@ -7183,7 +7183,7 @@ mod node {
 
         /// test variant kind
         #[must_use]
-        pub fn is_alter_collation_stmt(&self) -> bool {
+        pub const fn is_alter_collation_stmt(&self) -> bool {
             matches!(self, Self(self::inner::Node::AlterCollationStmt(_)))
         }
     }
@@ -7200,7 +7200,7 @@ mod node {
 
         /// test variant kind
         #[must_use]
-        pub fn is_alter_domain_stmt(&self) -> bool {
+        pub const fn is_alter_domain_stmt(&self) -> bool {
             matches!(self, Self(self::inner::Node::AlterDomainStmt(_)))
         }
     }
@@ -7217,7 +7217,7 @@ mod node {
 
         /// test variant kind
         #[must_use]
-        pub fn is_grant_stmt(&self) -> bool {
+        pub const fn is_grant_stmt(&self) -> bool {
             matches!(self, Self(self::inner::Node::GrantStmt(_)))
         }
     }
@@ -7234,7 +7234,7 @@ mod node {
 
         /// test variant kind
         #[must_use]
-        pub fn is_object_with_args(&self) -> bool {
+        pub const fn is_object_with_args(&self) -> bool {
             matches!(self, Self(self::inner::Node::ObjectWithArgs(_)))
         }
     }
@@ -7251,7 +7251,7 @@ mod node {
 
         /// test variant kind
         #[must_use]
-        pub fn is_access_priv(&self) -> bool {
+        pub const fn is_access_priv(&self) -> bool {
             matches!(self, Self(self::inner::Node::AccessPriv(_)))
         }
     }
@@ -7268,7 +7268,7 @@ mod node {
 
         /// test variant kind
         #[must_use]
-        pub fn is_grant_role_stmt(&self) -> bool {
+        pub const fn is_grant_role_stmt(&self) -> bool {
             matches!(self, Self(self::inner::Node::GrantRoleStmt(_)))
         }
     }
@@ -7287,7 +7287,7 @@ mod node {
 
         /// test variant kind
         #[must_use]
-        pub fn is_alter_default_privileges_stmt(&self) -> bool {
+        pub const fn is_alter_default_privileges_stmt(&self) -> bool {
             matches!(self, Self(self::inner::Node::AlterDefaultPrivilegesStmt(_)))
         }
     }
@@ -7304,7 +7304,7 @@ mod node {
 
         /// test variant kind
         #[must_use]
-        pub fn is_copy_stmt(&self) -> bool {
+        pub const fn is_copy_stmt(&self) -> bool {
             matches!(self, Self(self::inner::Node::CopyStmt(_)))
         }
     }
@@ -7321,7 +7321,7 @@ mod node {
 
         /// test variant kind
         #[must_use]
-        pub fn is_variable_set_stmt(&self) -> bool {
+        pub const fn is_variable_set_stmt(&self) -> bool {
             matches!(self, Self(self::inner::Node::VariableSetStmt(_)))
         }
     }
@@ -7338,7 +7338,7 @@ mod node {
 
         /// test variant kind
         #[must_use]
-        pub fn is_variable_show_stmt(&self) -> bool {
+        pub const fn is_variable_show_stmt(&self) -> bool {
             matches!(self, Self(self::inner::Node::VariableShowStmt(_)))
         }
     }
@@ -7355,7 +7355,7 @@ mod node {
 
         /// test variant kind
         #[must_use]
-        pub fn is_create_stmt(&self) -> bool {
+        pub const fn is_create_stmt(&self) -> bool {
             matches!(self, Self(self::inner::Node::CreateStmt(_)))
         }
     }
@@ -7372,7 +7372,7 @@ mod node {
 
         /// test variant kind
         #[must_use]
-        pub fn is_constraint(&self) -> bool {
+        pub const fn is_constraint(&self) -> bool {
             matches!(self, Self(self::inner::Node::Constraint(_)))
         }
     }
@@ -7391,7 +7391,7 @@ mod node {
 
         /// test variant kind
         #[must_use]
-        pub fn is_create_table_space_stmt(&self) -> bool {
+        pub const fn is_create_table_space_stmt(&self) -> bool {
             matches!(self, Self(self::inner::Node::CreateTableSpaceStmt(_)))
         }
     }
@@ -7408,7 +7408,7 @@ mod node {
 
         /// test variant kind
         #[must_use]
-        pub fn is_drop_table_space_stmt(&self) -> bool {
+        pub const fn is_drop_table_space_stmt(&self) -> bool {
             matches!(self, Self(self::inner::Node::DropTableSpaceStmt(_)))
         }
     }
@@ -7427,7 +7427,7 @@ mod node {
 
         /// test variant kind
         #[must_use]
-        pub fn is_alter_table_space_options_stmt(&self) -> bool {
+        pub const fn is_alter_table_space_options_stmt(&self) -> bool {
             matches!(self, Self(self::inner::Node::AlterTableSpaceOptionsStmt(_)))
         }
     }
@@ -7446,7 +7446,7 @@ mod node {
 
         /// test variant kind
         #[must_use]
-        pub fn is_alter_table_move_all_stmt(&self) -> bool {
+        pub const fn is_alter_table_move_all_stmt(&self) -> bool {
             matches!(self, Self(self::inner::Node::AlterTableMoveAllStmt(_)))
         }
     }
@@ -7463,7 +7463,7 @@ mod node {
 
         /// test variant kind
         #[must_use]
-        pub fn is_create_extension_stmt(&self) -> bool {
+        pub const fn is_create_extension_stmt(&self) -> bool {
             matches!(self, Self(self::inner::Node::CreateExtensionStmt(_)))
         }
     }
@@ -7480,7 +7480,7 @@ mod node {
 
         /// test variant kind
         #[must_use]
-        pub fn is_alter_extension_stmt(&self) -> bool {
+        pub const fn is_alter_extension_stmt(&self) -> bool {
             matches!(self, Self(self::inner::Node::AlterExtensionStmt(_)))
         }
     }
@@ -7499,7 +7499,7 @@ mod node {
 
         /// test variant kind
         #[must_use]
-        pub fn is_alter_extension_contents_stmt(&self) -> bool {
+        pub const fn is_alter_extension_contents_stmt(&self) -> bool {
             matches!(self, Self(self::inner::Node::AlterExtensionContentsStmt(_)))
         }
     }
@@ -7516,7 +7516,7 @@ mod node {
 
         /// test variant kind
         #[must_use]
-        pub fn is_create_fdw_stmt(&self) -> bool {
+        pub const fn is_create_fdw_stmt(&self) -> bool {
             matches!(self, Self(self::inner::Node::CreateFdwStmt(_)))
         }
     }
@@ -7533,7 +7533,7 @@ mod node {
 
         /// test variant kind
         #[must_use]
-        pub fn is_alter_fdw_stmt(&self) -> bool {
+        pub const fn is_alter_fdw_stmt(&self) -> bool {
             matches!(self, Self(self::inner::Node::AlterFdwStmt(_)))
         }
     }
@@ -7552,7 +7552,7 @@ mod node {
 
         /// test variant kind
         #[must_use]
-        pub fn is_create_foreign_server_stmt(&self) -> bool {
+        pub const fn is_create_foreign_server_stmt(&self) -> bool {
             matches!(self, Self(self::inner::Node::CreateForeignServerStmt(_)))
         }
     }
@@ -7571,7 +7571,7 @@ mod node {
 
         /// test variant kind
         #[must_use]
-        pub fn is_alter_foreign_server_stmt(&self) -> bool {
+        pub const fn is_alter_foreign_server_stmt(&self) -> bool {
             matches!(self, Self(self::inner::Node::AlterForeignServerStmt(_)))
         }
     }
@@ -7590,7 +7590,7 @@ mod node {
 
         /// test variant kind
         #[must_use]
-        pub fn is_create_foreign_table_stmt(&self) -> bool {
+        pub const fn is_create_foreign_table_stmt(&self) -> bool {
             matches!(self, Self(self::inner::Node::CreateForeignTableStmt(_)))
         }
     }
@@ -7609,7 +7609,7 @@ mod node {
 
         /// test variant kind
         #[must_use]
-        pub fn is_create_user_mapping_stmt(&self) -> bool {
+        pub const fn is_create_user_mapping_stmt(&self) -> bool {
             matches!(self, Self(self::inner::Node::CreateUserMappingStmt(_)))
         }
     }
@@ -7628,7 +7628,7 @@ mod node {
 
         /// test variant kind
         #[must_use]
-        pub fn is_alter_user_mapping_stmt(&self) -> bool {
+        pub const fn is_alter_user_mapping_stmt(&self) -> bool {
             matches!(self, Self(self::inner::Node::AlterUserMappingStmt(_)))
         }
     }
@@ -7645,7 +7645,7 @@ mod node {
 
         /// test variant kind
         #[must_use]
-        pub fn is_drop_user_mapping_stmt(&self) -> bool {
+        pub const fn is_drop_user_mapping_stmt(&self) -> bool {
             matches!(self, Self(self::inner::Node::DropUserMappingStmt(_)))
         }
     }
@@ -7664,7 +7664,7 @@ mod node {
 
         /// test variant kind
         #[must_use]
-        pub fn is_import_foreign_schema_stmt(&self) -> bool {
+        pub const fn is_import_foreign_schema_stmt(&self) -> bool {
             matches!(self, Self(self::inner::Node::ImportForeignSchemaStmt(_)))
         }
     }
@@ -7681,7 +7681,7 @@ mod node {
 
         /// test variant kind
         #[must_use]
-        pub fn is_create_policy_stmt(&self) -> bool {
+        pub const fn is_create_policy_stmt(&self) -> bool {
             matches!(self, Self(self::inner::Node::CreatePolicyStmt(_)))
         }
     }
@@ -7698,7 +7698,7 @@ mod node {
 
         /// test variant kind
         #[must_use]
-        pub fn is_alter_policy_stmt(&self) -> bool {
+        pub const fn is_alter_policy_stmt(&self) -> bool {
             matches!(self, Self(self::inner::Node::AlterPolicyStmt(_)))
         }
     }
@@ -7715,7 +7715,7 @@ mod node {
 
         /// test variant kind
         #[must_use]
-        pub fn is_create_am_stmt(&self) -> bool {
+        pub const fn is_create_am_stmt(&self) -> bool {
             matches!(self, Self(self::inner::Node::CreateAmStmt(_)))
         }
     }
@@ -7732,7 +7732,7 @@ mod node {
 
         /// test variant kind
         #[must_use]
-        pub fn is_create_trig_stmt(&self) -> bool {
+        pub const fn is_create_trig_stmt(&self) -> bool {
             matches!(self, Self(self::inner::Node::CreateTrigStmt(_)))
         }
     }
@@ -7749,7 +7749,7 @@ mod node {
 
         /// test variant kind
         #[must_use]
-        pub fn is_create_event_trig_stmt(&self) -> bool {
+        pub const fn is_create_event_trig_stmt(&self) -> bool {
             matches!(self, Self(self::inner::Node::CreateEventTrigStmt(_)))
         }
     }
@@ -7766,7 +7766,7 @@ mod node {
 
         /// test variant kind
         #[must_use]
-        pub fn is_alter_event_trig_stmt(&self) -> bool {
+        pub const fn is_alter_event_trig_stmt(&self) -> bool {
             matches!(self, Self(self::inner::Node::AlterEventTrigStmt(_)))
         }
     }
@@ -7783,7 +7783,7 @@ mod node {
 
         /// test variant kind
         #[must_use]
-        pub fn is_create_plang_stmt(&self) -> bool {
+        pub const fn is_create_plang_stmt(&self) -> bool {
             matches!(self, Self(self::inner::Node::CreatePlangStmt(_)))
         }
     }
@@ -7800,7 +7800,7 @@ mod node {
 
         /// test variant kind
         #[must_use]
-        pub fn is_create_role_stmt(&self) -> bool {
+        pub const fn is_create_role_stmt(&self) -> bool {
             matches!(self, Self(self::inner::Node::CreateRoleStmt(_)))
         }
     }
@@ -7817,7 +7817,7 @@ mod node {
 
         /// test variant kind
         #[must_use]
-        pub fn is_alter_role_stmt(&self) -> bool {
+        pub const fn is_alter_role_stmt(&self) -> bool {
             matches!(self, Self(self::inner::Node::AlterRoleStmt(_)))
         }
     }
@@ -7834,7 +7834,7 @@ mod node {
 
         /// test variant kind
         #[must_use]
-        pub fn is_alter_role_set_stmt(&self) -> bool {
+        pub const fn is_alter_role_set_stmt(&self) -> bool {
             matches!(self, Self(self::inner::Node::AlterRoleSetStmt(_)))
         }
     }
@@ -7851,7 +7851,7 @@ mod node {
 
         /// test variant kind
         #[must_use]
-        pub fn is_drop_role_stmt(&self) -> bool {
+        pub const fn is_drop_role_stmt(&self) -> bool {
             matches!(self, Self(self::inner::Node::DropRoleStmt(_)))
         }
     }
@@ -7868,7 +7868,7 @@ mod node {
 
         /// test variant kind
         #[must_use]
-        pub fn is_create_seq_stmt(&self) -> bool {
+        pub const fn is_create_seq_stmt(&self) -> bool {
             matches!(self, Self(self::inner::Node::CreateSeqStmt(_)))
         }
     }
@@ -7885,7 +7885,7 @@ mod node {
 
         /// test variant kind
         #[must_use]
-        pub fn is_alter_seq_stmt(&self) -> bool {
+        pub const fn is_alter_seq_stmt(&self) -> bool {
             matches!(self, Self(self::inner::Node::AlterSeqStmt(_)))
         }
     }
@@ -7902,7 +7902,7 @@ mod node {
 
         /// test variant kind
         #[must_use]
-        pub fn is_define_stmt(&self) -> bool {
+        pub const fn is_define_stmt(&self) -> bool {
             matches!(self, Self(self::inner::Node::DefineStmt(_)))
         }
     }
@@ -7919,7 +7919,7 @@ mod node {
 
         /// test variant kind
         #[must_use]
-        pub fn is_create_domain_stmt(&self) -> bool {
+        pub const fn is_create_domain_stmt(&self) -> bool {
             matches!(self, Self(self::inner::Node::CreateDomainStmt(_)))
         }
     }
@@ -7936,7 +7936,7 @@ mod node {
 
         /// test variant kind
         #[must_use]
-        pub fn is_create_op_class_stmt(&self) -> bool {
+        pub const fn is_create_op_class_stmt(&self) -> bool {
             matches!(self, Self(self::inner::Node::CreateOpClassStmt(_)))
         }
     }
@@ -7953,7 +7953,7 @@ mod node {
 
         /// test variant kind
         #[must_use]
-        pub fn is_create_op_class_item(&self) -> bool {
+        pub const fn is_create_op_class_item(&self) -> bool {
             matches!(self, Self(self::inner::Node::CreateOpClassItem(_)))
         }
     }
@@ -7970,7 +7970,7 @@ mod node {
 
         /// test variant kind
         #[must_use]
-        pub fn is_create_op_family_stmt(&self) -> bool {
+        pub const fn is_create_op_family_stmt(&self) -> bool {
             matches!(self, Self(self::inner::Node::CreateOpFamilyStmt(_)))
         }
     }
@@ -7987,7 +7987,7 @@ mod node {
 
         /// test variant kind
         #[must_use]
-        pub fn is_alter_op_family_stmt(&self) -> bool {
+        pub const fn is_alter_op_family_stmt(&self) -> bool {
             matches!(self, Self(self::inner::Node::AlterOpFamilyStmt(_)))
         }
     }
@@ -8004,7 +8004,7 @@ mod node {
 
         /// test variant kind
         #[must_use]
-        pub fn is_drop_stmt(&self) -> bool {
+        pub const fn is_drop_stmt(&self) -> bool {
             matches!(self, Self(self::inner::Node::DropStmt(_)))
         }
     }
@@ -8021,7 +8021,7 @@ mod node {
 
         /// test variant kind
         #[must_use]
-        pub fn is_truncate_stmt(&self) -> bool {
+        pub const fn is_truncate_stmt(&self) -> bool {
             matches!(self, Self(self::inner::Node::TruncateStmt(_)))
         }
     }
@@ -8038,7 +8038,7 @@ mod node {
 
         /// test variant kind
         #[must_use]
-        pub fn is_comment_stmt(&self) -> bool {
+        pub const fn is_comment_stmt(&self) -> bool {
             matches!(self, Self(self::inner::Node::CommentStmt(_)))
         }
     }
@@ -8055,7 +8055,7 @@ mod node {
 
         /// test variant kind
         #[must_use]
-        pub fn is_sec_label_stmt(&self) -> bool {
+        pub const fn is_sec_label_stmt(&self) -> bool {
             matches!(self, Self(self::inner::Node::SecLabelStmt(_)))
         }
     }
@@ -8072,7 +8072,7 @@ mod node {
 
         /// test variant kind
         #[must_use]
-        pub fn is_declare_cursor_stmt(&self) -> bool {
+        pub const fn is_declare_cursor_stmt(&self) -> bool {
             matches!(self, Self(self::inner::Node::DeclareCursorStmt(_)))
         }
     }
@@ -8089,7 +8089,7 @@ mod node {
 
         /// test variant kind
         #[must_use]
-        pub fn is_close_portal_stmt(&self) -> bool {
+        pub const fn is_close_portal_stmt(&self) -> bool {
             matches!(self, Self(self::inner::Node::ClosePortalStmt(_)))
         }
     }
@@ -8106,7 +8106,7 @@ mod node {
 
         /// test variant kind
         #[must_use]
-        pub fn is_fetch_stmt(&self) -> bool {
+        pub const fn is_fetch_stmt(&self) -> bool {
             matches!(self, Self(self::inner::Node::FetchStmt(_)))
         }
     }
@@ -8123,7 +8123,7 @@ mod node {
 
         /// test variant kind
         #[must_use]
-        pub fn is_index_stmt(&self) -> bool {
+        pub const fn is_index_stmt(&self) -> bool {
             matches!(self, Self(self::inner::Node::IndexStmt(_)))
         }
     }
@@ -8140,7 +8140,7 @@ mod node {
 
         /// test variant kind
         #[must_use]
-        pub fn is_create_stats_stmt(&self) -> bool {
+        pub const fn is_create_stats_stmt(&self) -> bool {
             matches!(self, Self(self::inner::Node::CreateStatsStmt(_)))
         }
     }
@@ -8157,7 +8157,7 @@ mod node {
 
         /// test variant kind
         #[must_use]
-        pub fn is_stats_elem(&self) -> bool {
+        pub const fn is_stats_elem(&self) -> bool {
             matches!(self, Self(self::inner::Node::StatsElem(_)))
         }
     }
@@ -8174,7 +8174,7 @@ mod node {
 
         /// test variant kind
         #[must_use]
-        pub fn is_alter_stats_stmt(&self) -> bool {
+        pub const fn is_alter_stats_stmt(&self) -> bool {
             matches!(self, Self(self::inner::Node::AlterStatsStmt(_)))
         }
     }
@@ -8191,7 +8191,7 @@ mod node {
 
         /// test variant kind
         #[must_use]
-        pub fn is_create_function_stmt(&self) -> bool {
+        pub const fn is_create_function_stmt(&self) -> bool {
             matches!(self, Self(self::inner::Node::CreateFunctionStmt(_)))
         }
     }
@@ -8208,7 +8208,7 @@ mod node {
 
         /// test variant kind
         #[must_use]
-        pub fn is_function_parameter(&self) -> bool {
+        pub const fn is_function_parameter(&self) -> bool {
             matches!(self, Self(self::inner::Node::FunctionParameter(_)))
         }
     }
@@ -8225,7 +8225,7 @@ mod node {
 
         /// test variant kind
         #[must_use]
-        pub fn is_alter_function_stmt(&self) -> bool {
+        pub const fn is_alter_function_stmt(&self) -> bool {
             matches!(self, Self(self::inner::Node::AlterFunctionStmt(_)))
         }
     }
@@ -8242,7 +8242,7 @@ mod node {
 
         /// test variant kind
         #[must_use]
-        pub fn is_do_stmt(&self) -> bool {
+        pub const fn is_do_stmt(&self) -> bool {
             matches!(self, Self(self::inner::Node::DoStmt(_)))
         }
     }
@@ -8259,7 +8259,7 @@ mod node {
 
         /// test variant kind
         #[must_use]
-        pub fn is_inline_code_block(&self) -> bool {
+        pub const fn is_inline_code_block(&self) -> bool {
             matches!(self, Self(self::inner::Node::InlineCodeBlock(_)))
         }
     }
@@ -8276,7 +8276,7 @@ mod node {
 
         /// test variant kind
         #[must_use]
-        pub fn is_call_stmt(&self) -> bool {
+        pub const fn is_call_stmt(&self) -> bool {
             matches!(self, Self(self::inner::Node::CallStmt(_)))
         }
     }
@@ -8293,7 +8293,7 @@ mod node {
 
         /// test variant kind
         #[must_use]
-        pub fn is_call_context(&self) -> bool {
+        pub const fn is_call_context(&self) -> bool {
             matches!(self, Self(self::inner::Node::CallContext(_)))
         }
     }
@@ -8310,7 +8310,7 @@ mod node {
 
         /// test variant kind
         #[must_use]
-        pub fn is_rename_stmt(&self) -> bool {
+        pub const fn is_rename_stmt(&self) -> bool {
             matches!(self, Self(self::inner::Node::RenameStmt(_)))
         }
     }
@@ -8329,7 +8329,7 @@ mod node {
 
         /// test variant kind
         #[must_use]
-        pub fn is_alter_object_depends_stmt(&self) -> bool {
+        pub const fn is_alter_object_depends_stmt(&self) -> bool {
             matches!(self, Self(self::inner::Node::AlterObjectDependsStmt(_)))
         }
     }
@@ -8348,7 +8348,7 @@ mod node {
 
         /// test variant kind
         #[must_use]
-        pub fn is_alter_object_schema_stmt(&self) -> bool {
+        pub const fn is_alter_object_schema_stmt(&self) -> bool {
             matches!(self, Self(self::inner::Node::AlterObjectSchemaStmt(_)))
         }
     }
@@ -8365,7 +8365,7 @@ mod node {
 
         /// test variant kind
         #[must_use]
-        pub fn is_alter_owner_stmt(&self) -> bool {
+        pub const fn is_alter_owner_stmt(&self) -> bool {
             matches!(self, Self(self::inner::Node::AlterOwnerStmt(_)))
         }
     }
@@ -8382,7 +8382,7 @@ mod node {
 
         /// test variant kind
         #[must_use]
-        pub fn is_alter_operator_stmt(&self) -> bool {
+        pub const fn is_alter_operator_stmt(&self) -> bool {
             matches!(self, Self(self::inner::Node::AlterOperatorStmt(_)))
         }
     }
@@ -8399,7 +8399,7 @@ mod node {
 
         /// test variant kind
         #[must_use]
-        pub fn is_alter_type_stmt(&self) -> bool {
+        pub const fn is_alter_type_stmt(&self) -> bool {
             matches!(self, Self(self::inner::Node::AlterTypeStmt(_)))
         }
     }
@@ -8416,7 +8416,7 @@ mod node {
 
         /// test variant kind
         #[must_use]
-        pub fn is_rule_stmt(&self) -> bool {
+        pub const fn is_rule_stmt(&self) -> bool {
             matches!(self, Self(self::inner::Node::RuleStmt(_)))
         }
     }
@@ -8433,7 +8433,7 @@ mod node {
 
         /// test variant kind
         #[must_use]
-        pub fn is_notify_stmt(&self) -> bool {
+        pub const fn is_notify_stmt(&self) -> bool {
             matches!(self, Self(self::inner::Node::NotifyStmt(_)))
         }
     }
@@ -8450,7 +8450,7 @@ mod node {
 
         /// test variant kind
         #[must_use]
-        pub fn is_listen_stmt(&self) -> bool {
+        pub const fn is_listen_stmt(&self) -> bool {
             matches!(self, Self(self::inner::Node::ListenStmt(_)))
         }
     }
@@ -8467,7 +8467,7 @@ mod node {
 
         /// test variant kind
         #[must_use]
-        pub fn is_unlisten_stmt(&self) -> bool {
+        pub const fn is_unlisten_stmt(&self) -> bool {
             matches!(self, Self(self::inner::Node::UnlistenStmt(_)))
         }
     }
@@ -8484,7 +8484,7 @@ mod node {
 
         /// test variant kind
         #[must_use]
-        pub fn is_transaction_stmt(&self) -> bool {
+        pub const fn is_transaction_stmt(&self) -> bool {
             matches!(self, Self(self::inner::Node::TransactionStmt(_)))
         }
     }
@@ -8501,7 +8501,7 @@ mod node {
 
         /// test variant kind
         #[must_use]
-        pub fn is_composite_type_stmt(&self) -> bool {
+        pub const fn is_composite_type_stmt(&self) -> bool {
             matches!(self, Self(self::inner::Node::CompositeTypeStmt(_)))
         }
     }
@@ -8518,7 +8518,7 @@ mod node {
 
         /// test variant kind
         #[must_use]
-        pub fn is_create_enum_stmt(&self) -> bool {
+        pub const fn is_create_enum_stmt(&self) -> bool {
             matches!(self, Self(self::inner::Node::CreateEnumStmt(_)))
         }
     }
@@ -8535,7 +8535,7 @@ mod node {
 
         /// test variant kind
         #[must_use]
-        pub fn is_create_range_stmt(&self) -> bool {
+        pub const fn is_create_range_stmt(&self) -> bool {
             matches!(self, Self(self::inner::Node::CreateRangeStmt(_)))
         }
     }
@@ -8552,7 +8552,7 @@ mod node {
 
         /// test variant kind
         #[must_use]
-        pub fn is_alter_enum_stmt(&self) -> bool {
+        pub const fn is_alter_enum_stmt(&self) -> bool {
             matches!(self, Self(self::inner::Node::AlterEnumStmt(_)))
         }
     }
@@ -8569,7 +8569,7 @@ mod node {
 
         /// test variant kind
         #[must_use]
-        pub fn is_view_stmt(&self) -> bool {
+        pub const fn is_view_stmt(&self) -> bool {
             matches!(self, Self(self::inner::Node::ViewStmt(_)))
         }
     }
@@ -8586,7 +8586,7 @@ mod node {
 
         /// test variant kind
         #[must_use]
-        pub fn is_load_stmt(&self) -> bool {
+        pub const fn is_load_stmt(&self) -> bool {
             matches!(self, Self(self::inner::Node::LoadStmt(_)))
         }
     }
@@ -8603,7 +8603,7 @@ mod node {
 
         /// test variant kind
         #[must_use]
-        pub fn is_createdb_stmt(&self) -> bool {
+        pub const fn is_createdb_stmt(&self) -> bool {
             matches!(self, Self(self::inner::Node::CreatedbStmt(_)))
         }
     }
@@ -8620,7 +8620,7 @@ mod node {
 
         /// test variant kind
         #[must_use]
-        pub fn is_alter_database_stmt(&self) -> bool {
+        pub const fn is_alter_database_stmt(&self) -> bool {
             matches!(self, Self(self::inner::Node::AlterDatabaseStmt(_)))
         }
     }
@@ -8639,7 +8639,7 @@ mod node {
 
         /// test variant kind
         #[must_use]
-        pub fn is_alter_database_refresh_coll_stmt(&self) -> bool {
+        pub const fn is_alter_database_refresh_coll_stmt(&self) -> bool {
             matches!(
                 self,
                 Self(self::inner::Node::AlterDatabaseRefreshCollStmt(_))
@@ -8661,7 +8661,7 @@ mod node {
 
         /// test variant kind
         #[must_use]
-        pub fn is_alter_database_set_stmt(&self) -> bool {
+        pub const fn is_alter_database_set_stmt(&self) -> bool {
             matches!(self, Self(self::inner::Node::AlterDatabaseSetStmt(_)))
         }
     }
@@ -8678,7 +8678,7 @@ mod node {
 
         /// test variant kind
         #[must_use]
-        pub fn is_dropdb_stmt(&self) -> bool {
+        pub const fn is_dropdb_stmt(&self) -> bool {
             matches!(self, Self(self::inner::Node::DropdbStmt(_)))
         }
     }
@@ -8695,7 +8695,7 @@ mod node {
 
         /// test variant kind
         #[must_use]
-        pub fn is_alter_system_stmt(&self) -> bool {
+        pub const fn is_alter_system_stmt(&self) -> bool {
             matches!(self, Self(self::inner::Node::AlterSystemStmt(_)))
         }
     }
@@ -8712,7 +8712,7 @@ mod node {
 
         /// test variant kind
         #[must_use]
-        pub fn is_cluster_stmt(&self) -> bool {
+        pub const fn is_cluster_stmt(&self) -> bool {
             matches!(self, Self(self::inner::Node::ClusterStmt(_)))
         }
     }
@@ -8729,7 +8729,7 @@ mod node {
 
         /// test variant kind
         #[must_use]
-        pub fn is_vacuum_stmt(&self) -> bool {
+        pub const fn is_vacuum_stmt(&self) -> bool {
             matches!(self, Self(self::inner::Node::VacuumStmt(_)))
         }
     }
@@ -8746,7 +8746,7 @@ mod node {
 
         /// test variant kind
         #[must_use]
-        pub fn is_vacuum_relation(&self) -> bool {
+        pub const fn is_vacuum_relation(&self) -> bool {
             matches!(self, Self(self::inner::Node::VacuumRelation(_)))
         }
     }
@@ -8763,7 +8763,7 @@ mod node {
 
         /// test variant kind
         #[must_use]
-        pub fn is_explain_stmt(&self) -> bool {
+        pub const fn is_explain_stmt(&self) -> bool {
             matches!(self, Self(self::inner::Node::ExplainStmt(_)))
         }
     }
@@ -8780,7 +8780,7 @@ mod node {
 
         /// test variant kind
         #[must_use]
-        pub fn is_create_table_as_stmt(&self) -> bool {
+        pub const fn is_create_table_as_stmt(&self) -> bool {
             matches!(self, Self(self::inner::Node::CreateTableAsStmt(_)))
         }
     }
@@ -8797,7 +8797,7 @@ mod node {
 
         /// test variant kind
         #[must_use]
-        pub fn is_refresh_mat_view_stmt(&self) -> bool {
+        pub const fn is_refresh_mat_view_stmt(&self) -> bool {
             matches!(self, Self(self::inner::Node::RefreshMatViewStmt(_)))
         }
     }
@@ -8814,7 +8814,7 @@ mod node {
 
         /// test variant kind
         #[must_use]
-        pub fn is_check_point_stmt(&self) -> bool {
+        pub const fn is_check_point_stmt(&self) -> bool {
             matches!(self, Self(self::inner::Node::CheckPointStmt(_)))
         }
     }
@@ -8831,7 +8831,7 @@ mod node {
 
         /// test variant kind
         #[must_use]
-        pub fn is_discard_stmt(&self) -> bool {
+        pub const fn is_discard_stmt(&self) -> bool {
             matches!(self, Self(self::inner::Node::DiscardStmt(_)))
         }
     }
@@ -8848,7 +8848,7 @@ mod node {
 
         /// test variant kind
         #[must_use]
-        pub fn is_lock_stmt(&self) -> bool {
+        pub const fn is_lock_stmt(&self) -> bool {
             matches!(self, Self(self::inner::Node::LockStmt(_)))
         }
     }
@@ -8865,7 +8865,7 @@ mod node {
 
         /// test variant kind
         #[must_use]
-        pub fn is_constraints_set_stmt(&self) -> bool {
+        pub const fn is_constraints_set_stmt(&self) -> bool {
             matches!(self, Self(self::inner::Node::ConstraintsSetStmt(_)))
         }
     }
@@ -8882,7 +8882,7 @@ mod node {
 
         /// test variant kind
         #[must_use]
-        pub fn is_reindex_stmt(&self) -> bool {
+        pub const fn is_reindex_stmt(&self) -> bool {
             matches!(self, Self(self::inner::Node::ReindexStmt(_)))
         }
     }
@@ -8901,7 +8901,7 @@ mod node {
 
         /// test variant kind
         #[must_use]
-        pub fn is_create_conversion_stmt(&self) -> bool {
+        pub const fn is_create_conversion_stmt(&self) -> bool {
             matches!(self, Self(self::inner::Node::CreateConversionStmt(_)))
         }
     }
@@ -8918,7 +8918,7 @@ mod node {
 
         /// test variant kind
         #[must_use]
-        pub fn is_create_cast_stmt(&self) -> bool {
+        pub const fn is_create_cast_stmt(&self) -> bool {
             matches!(self, Self(self::inner::Node::CreateCastStmt(_)))
         }
     }
@@ -8935,7 +8935,7 @@ mod node {
 
         /// test variant kind
         #[must_use]
-        pub fn is_create_transform_stmt(&self) -> bool {
+        pub const fn is_create_transform_stmt(&self) -> bool {
             matches!(self, Self(self::inner::Node::CreateTransformStmt(_)))
         }
     }
@@ -8952,7 +8952,7 @@ mod node {
 
         /// test variant kind
         #[must_use]
-        pub fn is_prepare_stmt(&self) -> bool {
+        pub const fn is_prepare_stmt(&self) -> bool {
             matches!(self, Self(self::inner::Node::PrepareStmt(_)))
         }
     }
@@ -8969,7 +8969,7 @@ mod node {
 
         /// test variant kind
         #[must_use]
-        pub fn is_execute_stmt(&self) -> bool {
+        pub const fn is_execute_stmt(&self) -> bool {
             matches!(self, Self(self::inner::Node::ExecuteStmt(_)))
         }
     }
@@ -8986,7 +8986,7 @@ mod node {
 
         /// test variant kind
         #[must_use]
-        pub fn is_deallocate_stmt(&self) -> bool {
+        pub const fn is_deallocate_stmt(&self) -> bool {
             matches!(self, Self(self::inner::Node::DeallocateStmt(_)))
         }
     }
@@ -9003,7 +9003,7 @@ mod node {
 
         /// test variant kind
         #[must_use]
-        pub fn is_drop_owned_stmt(&self) -> bool {
+        pub const fn is_drop_owned_stmt(&self) -> bool {
             matches!(self, Self(self::inner::Node::DropOwnedStmt(_)))
         }
     }
@@ -9020,7 +9020,7 @@ mod node {
 
         /// test variant kind
         #[must_use]
-        pub fn is_reassign_owned_stmt(&self) -> bool {
+        pub const fn is_reassign_owned_stmt(&self) -> bool {
             matches!(self, Self(self::inner::Node::ReassignOwnedStmt(_)))
         }
     }
@@ -9039,7 +9039,7 @@ mod node {
 
         /// test variant kind
         #[must_use]
-        pub fn is_alter_tsdictionary_stmt(&self) -> bool {
+        pub const fn is_alter_tsdictionary_stmt(&self) -> bool {
             matches!(self, Self(self::inner::Node::AlterTsdictionaryStmt(_)))
         }
     }
@@ -9058,7 +9058,7 @@ mod node {
 
         /// test variant kind
         #[must_use]
-        pub fn is_alter_tsconfiguration_stmt(&self) -> bool {
+        pub const fn is_alter_tsconfiguration_stmt(&self) -> bool {
             matches!(self, Self(self::inner::Node::AlterTsconfigurationStmt(_)))
         }
     }
@@ -9075,7 +9075,7 @@ mod node {
 
         /// test variant kind
         #[must_use]
-        pub fn is_publication_table(&self) -> bool {
+        pub const fn is_publication_table(&self) -> bool {
             matches!(self, Self(self::inner::Node::PublicationTable(_)))
         }
     }
@@ -9092,7 +9092,7 @@ mod node {
 
         /// test variant kind
         #[must_use]
-        pub fn is_publication_obj_spec(&self) -> bool {
+        pub const fn is_publication_obj_spec(&self) -> bool {
             matches!(self, Self(self::inner::Node::PublicationObjSpec(_)))
         }
     }
@@ -9111,7 +9111,7 @@ mod node {
 
         /// test variant kind
         #[must_use]
-        pub fn is_create_publication_stmt(&self) -> bool {
+        pub const fn is_create_publication_stmt(&self) -> bool {
             matches!(self, Self(self::inner::Node::CreatePublicationStmt(_)))
         }
     }
@@ -9130,7 +9130,7 @@ mod node {
 
         /// test variant kind
         #[must_use]
-        pub fn is_alter_publication_stmt(&self) -> bool {
+        pub const fn is_alter_publication_stmt(&self) -> bool {
             matches!(self, Self(self::inner::Node::AlterPublicationStmt(_)))
         }
     }
@@ -9149,7 +9149,7 @@ mod node {
 
         /// test variant kind
         #[must_use]
-        pub fn is_create_subscription_stmt(&self) -> bool {
+        pub const fn is_create_subscription_stmt(&self) -> bool {
             matches!(self, Self(self::inner::Node::CreateSubscriptionStmt(_)))
         }
     }
@@ -9168,7 +9168,7 @@ mod node {
 
         /// test variant kind
         #[must_use]
-        pub fn is_alter_subscription_stmt(&self) -> bool {
+        pub const fn is_alter_subscription_stmt(&self) -> bool {
             matches!(self, Self(self::inner::Node::AlterSubscriptionStmt(_)))
         }
     }
@@ -9187,7 +9187,7 @@ mod node {
 
         /// test variant kind
         #[must_use]
-        pub fn is_drop_subscription_stmt(&self) -> bool {
+        pub const fn is_drop_subscription_stmt(&self) -> bool {
             matches!(self, Self(self::inner::Node::DropSubscriptionStmt(_)))
         }
     }
@@ -9204,7 +9204,7 @@ mod node {
 
         /// test variant kind
         #[must_use]
-        pub fn is_integer(&self) -> bool {
+        pub const fn is_integer(&self) -> bool {
             matches!(self, Self(self::inner::Node::Integer(_)))
         }
     }
@@ -9221,7 +9221,7 @@ mod node {
 
         /// test variant kind
         #[must_use]
-        pub fn is_float(&self) -> bool {
+        pub const fn is_float(&self) -> bool {
             matches!(self, Self(self::inner::Node::Float(_)))
         }
     }
@@ -9238,7 +9238,7 @@ mod node {
 
         /// test variant kind
         #[must_use]
-        pub fn is_boolean(&self) -> bool {
+        pub const fn is_boolean(&self) -> bool {
             matches!(self, Self(self::inner::Node::Boolean(_)))
         }
     }
@@ -9255,7 +9255,7 @@ mod node {
 
         /// test variant kind
         #[must_use]
-        pub fn is_string(&self) -> bool {
+        pub const fn is_string(&self) -> bool {
             matches!(self, Self(self::inner::Node::String(_)))
         }
     }
@@ -9272,7 +9272,7 @@ mod node {
 
         /// test variant kind
         #[must_use]
-        pub fn is_bit_string(&self) -> bool {
+        pub const fn is_bit_string(&self) -> bool {
             matches!(self, Self(self::inner::Node::BitString(_)))
         }
     }
@@ -9289,7 +9289,7 @@ mod node {
 
         /// test variant kind
         #[must_use]
-        pub fn is_list(&self) -> bool {
+        pub const fn is_list(&self) -> bool {
             matches!(self, Self(self::inner::Node::List(_)))
         }
     }
@@ -9306,7 +9306,7 @@ mod node {
 
         /// test variant kind
         #[must_use]
-        pub fn is_int_list(&self) -> bool {
+        pub const fn is_int_list(&self) -> bool {
             matches!(self, Self(self::inner::Node::IntList(_)))
         }
     }
@@ -9323,7 +9323,7 @@ mod node {
 
         /// test variant kind
         #[must_use]
-        pub fn is_oid_list(&self) -> bool {
+        pub const fn is_oid_list(&self) -> bool {
             matches!(self, Self(self::inner::Node::OidList(_)))
         }
     }
@@ -9340,7 +9340,7 @@ mod node {
 
         /// test variant kind
         #[must_use]
-        pub fn is_a_const(&self) -> bool {
+        pub const fn is_a_const(&self) -> bool {
             matches!(self, Self(self::inner::Node::AConst(_)))
         }
     }
@@ -9992,7 +9992,7 @@ mod a_const {
     impl AConstListOpt {
         /// returns Some(None) valiant
         #[must_use]
-        pub fn none() -> Self {
+        pub const fn none() -> Self {
             Self(None)
         }
     }
@@ -10030,7 +10030,7 @@ mod a_const {
     impl AConst {
         /// returns None variant
         #[must_use]
-        pub fn none() -> Self {
+        pub const fn none() -> Self {
             Self(self::inner::AConst::None)
         }
     }
@@ -10181,7 +10181,7 @@ mod a_const {
 
         /// test variant kind
         #[must_use]
-        pub fn is_ival(&self) -> bool {
+        pub const fn is_ival(&self) -> bool {
             matches!(self, Self(self::inner::AConst::Ival(_)))
         }
     }
@@ -10198,7 +10198,7 @@ mod a_const {
 
         /// test variant kind
         #[must_use]
-        pub fn is_fval(&self) -> bool {
+        pub const fn is_fval(&self) -> bool {
             matches!(self, Self(self::inner::AConst::Fval(_)))
         }
     }
@@ -10215,7 +10215,7 @@ mod a_const {
 
         /// test variant kind
         #[must_use]
-        pub fn is_boolval(&self) -> bool {
+        pub const fn is_boolval(&self) -> bool {
             matches!(self, Self(self::inner::AConst::Boolval(_)))
         }
     }
@@ -10232,7 +10232,7 @@ mod a_const {
 
         /// test variant kind
         #[must_use]
-        pub fn is_sval(&self) -> bool {
+        pub const fn is_sval(&self) -> bool {
             matches!(self, Self(self::inner::AConst::Sval(_)))
         }
     }
@@ -10249,7 +10249,7 @@ mod a_const {
 
         /// test variant kind
         #[must_use]
-        pub fn is_bsval(&self) -> bool {
+        pub const fn is_bsval(&self) -> bool {
             matches!(self, Self(self::inner::AConst::Bsval(_)))
         }
     }
@@ -10338,7 +10338,7 @@ mod query_source {
     impl QuerySourceOpt {
         /// returns None variant
         #[must_use]
-        pub fn none() -> Self {
+        pub const fn none() -> Self {
             Self(None)
         }
     }
@@ -10493,7 +10493,7 @@ mod sort_by_dir {
     impl SortByDirOpt {
         /// returns None variant
         #[must_use]
-        pub fn none() -> Self {
+        pub const fn none() -> Self {
             Self(None)
         }
     }
@@ -10641,7 +10641,7 @@ mod sort_by_nulls {
     impl SortByNullsOpt {
         /// returns None variant
         #[must_use]
-        pub fn none() -> Self {
+        pub const fn none() -> Self {
             Self(None)
         }
     }
@@ -10782,7 +10782,7 @@ mod set_quantifier {
     impl SetQuantifierOpt {
         /// returns None variant
         #[must_use]
-        pub fn none() -> Self {
+        pub const fn none() -> Self {
             Self(None)
         }
     }
@@ -10923,7 +10923,7 @@ mod a_expr_kind {
     impl AExprKindOpt {
         /// returns None variant
         #[must_use]
-        pub fn none() -> Self {
+        pub const fn none() -> Self {
             Self(None)
         }
     }
@@ -11141,7 +11141,7 @@ mod role_spec_type {
     impl RoleSpecTypeOpt {
         /// returns None variant
         #[must_use]
-        pub fn none() -> Self {
+        pub const fn none() -> Self {
             Self(None)
         }
     }
@@ -11296,7 +11296,7 @@ mod table_like_option {
     impl TableLikeOptionOpt {
         /// returns None variant
         #[must_use]
-        pub fn none() -> Self {
+        pub const fn none() -> Self {
             Self(None)
         }
     }
@@ -11486,7 +11486,7 @@ mod def_elem_action {
     impl DefElemActionOpt {
         /// returns None variant
         #[must_use]
-        pub fn none() -> Self {
+        pub const fn none() -> Self {
             Self(None)
         }
     }
@@ -11634,7 +11634,7 @@ mod partition_strategy {
     impl PartitionStrategyOpt {
         /// returns None variant
         #[must_use]
-        pub fn none() -> Self {
+        pub const fn none() -> Self {
             Self(None)
         }
     }
@@ -11780,7 +11780,7 @@ mod partition_range_datum_kind {
     impl PartitionRangeDatumKindOpt {
         /// returns None variant
         #[must_use]
-        pub fn none() -> Self {
+        pub const fn none() -> Self {
             Self(None)
         }
     }
@@ -11923,7 +11923,7 @@ mod rte_kind {
     impl RteKindOpt {
         /// returns None variant
         #[must_use]
-        pub fn none() -> Self {
+        pub const fn none() -> Self {
             Self(None)
         }
     }
@@ -12106,7 +12106,7 @@ mod wco_kind {
     impl WcoKindOpt {
         /// returns None variant
         #[must_use]
-        pub fn none() -> Self {
+        pub const fn none() -> Self {
             Self(None)
         }
     }
@@ -12268,7 +12268,7 @@ mod grouping_set_kind {
     impl GroupingSetKindOpt {
         /// returns None variant
         #[must_use]
-        pub fn none() -> Self {
+        pub const fn none() -> Self {
             Self(None)
         }
     }
@@ -12423,7 +12423,7 @@ mod cte_materialize {
     impl CteMaterializeOpt {
         /// returns None variant
         #[must_use]
-        pub fn none() -> Self {
+        pub const fn none() -> Self {
             Self(None)
         }
     }
@@ -12564,7 +12564,7 @@ mod json_quotes {
     impl JsonQuotesOpt {
         /// returns None variant
         #[must_use]
-        pub fn none() -> Self {
+        pub const fn none() -> Self {
             Self(None)
         }
     }
@@ -12705,7 +12705,7 @@ mod json_table_column_type {
     impl JsonTableColumnTypeOpt {
         /// returns None variant
         #[must_use]
-        pub fn none() -> Self {
+        pub const fn none() -> Self {
             Self(None)
         }
     }
@@ -12862,7 +12862,7 @@ mod set_operation {
     impl SetOperationOpt {
         /// returns None variant
         #[must_use]
-        pub fn none() -> Self {
+        pub const fn none() -> Self {
             Self(None)
         }
     }
@@ -13010,7 +13010,7 @@ mod object_type {
     impl ObjectTypeOpt {
         /// returns None variant
         #[must_use]
-        pub fn none() -> Self {
+        pub const fn none() -> Self {
             Self(None)
         }
     }
@@ -13494,7 +13494,7 @@ mod drop_behavior {
     impl DropBehaviorOpt {
         /// returns None variant
         #[must_use]
-        pub fn none() -> Self {
+        pub const fn none() -> Self {
             Self(None)
         }
     }
@@ -13628,7 +13628,7 @@ mod alter_table_type {
     impl AlterTableTypeOpt {
         /// returns None variant
         #[must_use]
-        pub fn none() -> Self {
+        pub const fn none() -> Self {
             Self(None)
         }
     }
@@ -14217,7 +14217,7 @@ mod grant_target_type {
     impl GrantTargetTypeOpt {
         /// returns None variant
         #[must_use]
-        pub fn none() -> Self {
+        pub const fn none() -> Self {
             Self(None)
         }
     }
@@ -14358,7 +14358,7 @@ mod variable_set_kind {
     impl VariableSetKindOpt {
         /// returns None variant
         #[must_use]
-        pub fn none() -> Self {
+        pub const fn none() -> Self {
             Self(None)
         }
     }
@@ -14520,7 +14520,7 @@ mod constr_type {
     impl ConstrTypeOpt {
         /// returns None variant
         #[must_use]
-        pub fn none() -> Self {
+        pub const fn none() -> Self {
             Self(None)
         }
     }
@@ -14743,7 +14743,7 @@ mod import_foreign_schema_type {
     impl ImportForeignSchemaTypeOpt {
         /// returns None variant
         #[must_use]
-        pub fn none() -> Self {
+        pub const fn none() -> Self {
             Self(None)
         }
     }
@@ -14886,7 +14886,7 @@ mod role_stmt_type {
     impl RoleStmtTypeOpt {
         /// returns None variant
         #[must_use]
-        pub fn none() -> Self {
+        pub const fn none() -> Self {
             Self(None)
         }
     }
@@ -15027,7 +15027,7 @@ mod fetch_direction {
     impl FetchDirectionOpt {
         /// returns None variant
         #[must_use]
-        pub fn none() -> Self {
+        pub const fn none() -> Self {
             Self(None)
         }
     }
@@ -15175,7 +15175,7 @@ mod function_parameter_mode {
     impl FunctionParameterModeOpt {
         /// returns None variant
         #[must_use]
-        pub fn none() -> Self {
+        pub const fn none() -> Self {
             Self(None)
         }
     }
@@ -15339,7 +15339,7 @@ mod transaction_stmt_kind {
     impl TransactionStmtKindOpt {
         /// returns None variant
         #[must_use]
-        pub fn none() -> Self {
+        pub const fn none() -> Self {
             Self(None)
         }
     }
@@ -15531,7 +15531,7 @@ mod view_check_option {
     impl ViewCheckOptionOpt {
         /// returns None variant
         #[must_use]
-        pub fn none() -> Self {
+        pub const fn none() -> Self {
             Self(None)
         }
     }
@@ -15672,7 +15672,7 @@ mod discard_mode {
     impl DiscardModeOpt {
         /// returns None variant
         #[must_use]
-        pub fn none() -> Self {
+        pub const fn none() -> Self {
             Self(None)
         }
     }
@@ -15820,7 +15820,7 @@ mod reindex_object_type {
     impl ReindexObjectTypeOpt {
         /// returns None variant
         #[must_use]
-        pub fn none() -> Self {
+        pub const fn none() -> Self {
             Self(None)
         }
     }
@@ -15975,7 +15975,7 @@ mod alter_ts_config_type {
     impl AlterTsConfigTypeOpt {
         /// returns None variant
         #[must_use]
-        pub fn none() -> Self {
+        pub const fn none() -> Self {
             Self(None)
         }
     }
@@ -16135,7 +16135,7 @@ mod publication_obj_spec_type {
     impl PublicationObjSpecTypeOpt {
         /// returns None variant
         #[must_use]
-        pub fn none() -> Self {
+        pub const fn none() -> Self {
             Self(None)
         }
     }
@@ -16290,7 +16290,7 @@ mod alter_publication_action {
     impl AlterPublicationActionOpt {
         /// returns None variant
         #[must_use]
-        pub fn none() -> Self {
+        pub const fn none() -> Self {
             Self(None)
         }
     }
@@ -16433,7 +16433,7 @@ mod alter_subscription_type {
     impl AlterSubscriptionTypeOpt {
         /// returns None variant
         #[must_use]
-        pub fn none() -> Self {
+        pub const fn none() -> Self {
             Self(None)
         }
     }
@@ -16611,7 +16611,7 @@ mod overriding_kind {
     impl OverridingKindOpt {
         /// returns None variant
         #[must_use]
-        pub fn none() -> Self {
+        pub const fn none() -> Self {
             Self(None)
         }
     }
@@ -16752,7 +16752,7 @@ mod on_commit_action {
     impl OnCommitActionOpt {
         /// returns None variant
         #[must_use]
-        pub fn none() -> Self {
+        pub const fn none() -> Self {
             Self(None)
         }
     }
@@ -16900,7 +16900,7 @@ mod table_func_type {
     impl TableFuncTypeOpt {
         /// returns None variant
         #[must_use]
-        pub fn none() -> Self {
+        pub const fn none() -> Self {
             Self(None)
         }
     }
@@ -17034,7 +17034,7 @@ mod param_kind {
     impl ParamKindOpt {
         /// returns None variant
         #[must_use]
-        pub fn none() -> Self {
+        pub const fn none() -> Self {
             Self(None)
         }
     }
@@ -17182,7 +17182,7 @@ mod coercion_context {
     impl CoercionContextOpt {
         /// returns None variant
         #[must_use]
-        pub fn none() -> Self {
+        pub const fn none() -> Self {
             Self(None)
         }
     }
@@ -17330,7 +17330,7 @@ mod coercion_form {
     impl CoercionFormOpt {
         /// returns None variant
         #[must_use]
-        pub fn none() -> Self {
+        pub const fn none() -> Self {
             Self(None)
         }
     }
@@ -17478,7 +17478,7 @@ mod bool_expr_type {
     impl BoolExprTypeOpt {
         /// returns None variant
         #[must_use]
-        pub fn none() -> Self {
+        pub const fn none() -> Self {
             Self(None)
         }
     }
@@ -17619,7 +17619,7 @@ mod sub_link_type {
     impl SubLinkTypeOpt {
         /// returns None variant
         #[must_use]
-        pub fn none() -> Self {
+        pub const fn none() -> Self {
             Self(None)
         }
     }
@@ -17795,7 +17795,7 @@ mod row_compare_type {
     impl RowCompareTypeOpt {
         /// returns None variant
         #[must_use]
-        pub fn none() -> Self {
+        pub const fn none() -> Self {
             Self(None)
         }
     }
@@ -17957,7 +17957,7 @@ mod min_max_op {
     impl MinMaxOpOpt {
         /// returns None variant
         #[must_use]
-        pub fn none() -> Self {
+        pub const fn none() -> Self {
             Self(None)
         }
     }
@@ -18091,7 +18091,7 @@ mod sql_value_function_op {
     impl SqlValueFunctionOpOpt {
         /// returns None variant
         #[must_use]
-        pub fn none() -> Self {
+        pub const fn none() -> Self {
             Self(None)
         }
     }
@@ -18318,7 +18318,7 @@ mod xml_expr_op {
     impl XmlExprOpOpt {
         /// returns None variant
         #[must_use]
-        pub fn none() -> Self {
+        pub const fn none() -> Self {
             Self(None)
         }
     }
@@ -18494,7 +18494,7 @@ mod xml_option_type {
     impl XmlOptionTypeOpt {
         /// returns None variant
         #[must_use]
-        pub fn none() -> Self {
+        pub const fn none() -> Self {
             Self(None)
         }
     }
@@ -18628,7 +18628,7 @@ mod json_encoding {
     impl JsonEncodingOpt {
         /// returns None variant
         #[must_use]
-        pub fn none() -> Self {
+        pub const fn none() -> Self {
             Self(None)
         }
     }
@@ -18776,7 +18776,7 @@ mod json_format_type {
     impl JsonFormatTypeOpt {
         /// returns None variant
         #[must_use]
-        pub fn none() -> Self {
+        pub const fn none() -> Self {
             Self(None)
         }
     }
@@ -18917,7 +18917,7 @@ mod json_constructor_type {
     impl JsonConstructorTypeOpt {
         /// returns None variant
         #[must_use]
-        pub fn none() -> Self {
+        pub const fn none() -> Self {
             Self(None)
         }
     }
@@ -19088,7 +19088,7 @@ mod json_value_type {
     impl JsonValueTypeOpt {
         /// returns None variant
         #[must_use]
-        pub fn none() -> Self {
+        pub const fn none() -> Self {
             Self(None)
         }
     }
@@ -19236,7 +19236,7 @@ mod json_wrapper {
     impl JsonWrapperOpt {
         /// returns None variant
         #[must_use]
-        pub fn none() -> Self {
+        pub const fn none() -> Self {
             Self(None)
         }
     }
@@ -19384,7 +19384,7 @@ mod json_behavior_type {
     impl JsonBehaviorTypeOpt {
         /// returns None variant
         #[must_use]
-        pub fn none() -> Self {
+        pub const fn none() -> Self {
             Self(None)
         }
     }
@@ -19567,7 +19567,7 @@ mod json_expr_op {
     impl JsonExprOpOpt {
         /// returns None variant
         #[must_use]
-        pub fn none() -> Self {
+        pub const fn none() -> Self {
             Self(None)
         }
     }
@@ -19715,7 +19715,7 @@ mod null_test_type {
     impl NullTestTypeOpt {
         /// returns None variant
         #[must_use]
-        pub fn none() -> Self {
+        pub const fn none() -> Self {
             Self(None)
         }
     }
@@ -19849,7 +19849,7 @@ mod bool_test_type {
     impl BoolTestTypeOpt {
         /// returns None variant
         #[must_use]
-        pub fn none() -> Self {
+        pub const fn none() -> Self {
             Self(None)
         }
     }
@@ -20011,7 +20011,7 @@ mod merge_match_kind {
     impl MergeMatchKindOpt {
         /// returns None variant
         #[must_use]
-        pub fn none() -> Self {
+        pub const fn none() -> Self {
             Self(None)
         }
     }
@@ -20152,7 +20152,7 @@ mod cmd_type {
     impl CmdTypeOpt {
         /// returns None variant
         #[must_use]
-        pub fn none() -> Self {
+        pub const fn none() -> Self {
             Self(None)
         }
     }
@@ -20328,7 +20328,7 @@ mod join_type {
     impl JoinTypeOpt {
         /// returns None variant
         #[must_use]
-        pub fn none() -> Self {
+        pub const fn none() -> Self {
             Self(None)
         }
     }
@@ -20511,7 +20511,7 @@ mod agg_strategy {
     impl AggStrategyOpt {
         /// returns None variant
         #[must_use]
-        pub fn none() -> Self {
+        pub const fn none() -> Self {
             Self(None)
         }
     }
@@ -20659,7 +20659,7 @@ mod agg_split {
     impl AggSplitOpt {
         /// returns None variant
         #[must_use]
-        pub fn none() -> Self {
+        pub const fn none() -> Self {
             Self(None)
         }
     }
@@ -20800,7 +20800,7 @@ mod set_op_cmd {
     impl SetOpCmdOpt {
         /// returns None variant
         #[must_use]
-        pub fn none() -> Self {
+        pub const fn none() -> Self {
             Self(None)
         }
     }
@@ -20948,7 +20948,7 @@ mod set_op_strategy {
     impl SetOpStrategyOpt {
         /// returns None variant
         #[must_use]
-        pub fn none() -> Self {
+        pub const fn none() -> Self {
             Self(None)
         }
     }
@@ -21082,7 +21082,7 @@ mod on_conflict_action {
     impl OnConflictActionOpt {
         /// returns None variant
         #[must_use]
-        pub fn none() -> Self {
+        pub const fn none() -> Self {
             Self(None)
         }
     }
@@ -21223,7 +21223,7 @@ mod limit_option {
     impl LimitOptionOpt {
         /// returns None variant
         #[must_use]
-        pub fn none() -> Self {
+        pub const fn none() -> Self {
             Self(None)
         }
     }
@@ -21364,7 +21364,7 @@ mod lock_clause_strength {
     impl LockClauseStrengthOpt {
         /// returns None variant
         #[must_use]
-        pub fn none() -> Self {
+        pub const fn none() -> Self {
             Self(None)
         }
     }
@@ -21519,7 +21519,7 @@ mod lock_wait_policy {
     impl LockWaitPolicyOpt {
         /// returns None variant
         #[must_use]
-        pub fn none() -> Self {
+        pub const fn none() -> Self {
             Self(None)
         }
     }
@@ -21660,7 +21660,7 @@ mod lock_tuple_mode {
     impl LockTupleModeOpt {
         /// returns None variant
         #[must_use]
-        pub fn none() -> Self {
+        pub const fn none() -> Self {
             Self(None)
         }
     }
@@ -21808,7 +21808,7 @@ mod keyword_kind {
     impl KeywordKindOpt {
         /// returns None variant
         #[must_use]
-        pub fn none() -> Self {
+        pub const fn none() -> Self {
             Self(None)
         }
     }
@@ -21956,7 +21956,7 @@ mod token {
     impl TokenOpt {
         /// returns None variant
         #[must_use]
-        pub fn none() -> Self {
+        pub const fn none() -> Self {
             Self(None)
         }
     }
@@ -25872,7 +25872,7 @@ mod parse_result {
     impl ParseResultOpt {
         /// returns None Value
         #[must_use]
-        pub fn none() -> Self {
+        pub const fn none() -> Self {
             Self(None)
         }
     }
@@ -25910,7 +25910,7 @@ mod parse_result {
     impl ParseResultListOpt {
         /// returns None value
         #[must_use]
-        pub fn none() -> Self {
+        pub const fn none() -> Self {
             Self(None)
         }
     }
@@ -25965,7 +25965,7 @@ mod parse_result {
         impl ParseResult {
             /// get `version`
             #[must_use]
-            pub fn get_version(&self) -> i32 {
+            pub const fn get_version(&self) -> i32 {
                 self.version
             }
         }
@@ -26094,7 +26094,7 @@ mod scan_result {
     impl ScanResultOpt {
         /// returns None Value
         #[must_use]
-        pub fn none() -> Self {
+        pub const fn none() -> Self {
             Self(None)
         }
     }
@@ -26132,7 +26132,7 @@ mod scan_result {
     impl ScanResultListOpt {
         /// returns None value
         #[must_use]
-        pub fn none() -> Self {
+        pub const fn none() -> Self {
             Self(None)
         }
     }
@@ -26187,7 +26187,7 @@ mod scan_result {
         impl ScanResult {
             /// get `version`
             #[must_use]
-            pub fn get_version(&self) -> i32 {
+            pub const fn get_version(&self) -> i32 {
                 self.version
             }
         }
@@ -26316,7 +26316,7 @@ mod integer {
     impl IntegerOpt {
         /// returns None Value
         #[must_use]
-        pub fn none() -> Self {
+        pub const fn none() -> Self {
             Self(None)
         }
     }
@@ -26354,7 +26354,7 @@ mod integer {
     impl IntegerListOpt {
         /// returns None value
         #[must_use]
-        pub fn none() -> Self {
+        pub const fn none() -> Self {
             Self(None)
         }
     }
@@ -26404,7 +26404,7 @@ mod integer {
         impl Integer {
             /// get `ival`
             #[must_use]
-            pub fn get_ival(&self) -> i32 {
+            pub const fn get_ival(&self) -> i32 {
                 self.ival
             }
         }
@@ -26506,7 +26506,7 @@ mod float {
     impl FloatOpt {
         /// returns None Value
         #[must_use]
-        pub fn none() -> Self {
+        pub const fn none() -> Self {
             Self(None)
         }
     }
@@ -26544,7 +26544,7 @@ mod float {
     impl FloatListOpt {
         /// returns None value
         #[must_use]
-        pub fn none() -> Self {
+        pub const fn none() -> Self {
             Self(None)
         }
     }
@@ -26696,7 +26696,7 @@ mod boolean {
     impl BooleanOpt {
         /// returns None Value
         #[must_use]
-        pub fn none() -> Self {
+        pub const fn none() -> Self {
             Self(None)
         }
     }
@@ -26734,7 +26734,7 @@ mod boolean {
     impl BooleanListOpt {
         /// returns None value
         #[must_use]
-        pub fn none() -> Self {
+        pub const fn none() -> Self {
             Self(None)
         }
     }
@@ -26784,7 +26784,7 @@ mod boolean {
         impl Boolean {
             /// get `boolval`
             #[must_use]
-            pub fn get_boolval(&self) -> bool {
+            pub const fn get_boolval(&self) -> bool {
                 self.boolval
             }
         }
@@ -26886,7 +26886,7 @@ mod string {
     impl StringOpt {
         /// returns None Value
         #[must_use]
-        pub fn none() -> Self {
+        pub const fn none() -> Self {
             Self(None)
         }
     }
@@ -26924,7 +26924,7 @@ mod string {
     impl StringListOpt {
         /// returns None value
         #[must_use]
-        pub fn none() -> Self {
+        pub const fn none() -> Self {
             Self(None)
         }
     }
@@ -27076,7 +27076,7 @@ mod bit_string {
     impl BitStringOpt {
         /// returns None Value
         #[must_use]
-        pub fn none() -> Self {
+        pub const fn none() -> Self {
             Self(None)
         }
     }
@@ -27114,7 +27114,7 @@ mod bit_string {
     impl BitStringListOpt {
         /// returns None value
         #[must_use]
-        pub fn none() -> Self {
+        pub const fn none() -> Self {
             Self(None)
         }
     }
@@ -27266,7 +27266,7 @@ mod list {
     impl ListOpt {
         /// returns None Value
         #[must_use]
-        pub fn none() -> Self {
+        pub const fn none() -> Self {
             Self(None)
         }
     }
@@ -27304,7 +27304,7 @@ mod list {
     impl ListListOpt {
         /// returns None value
         #[must_use]
-        pub fn none() -> Self {
+        pub const fn none() -> Self {
             Self(None)
         }
     }
@@ -27459,7 +27459,7 @@ mod oid_list {
     impl OidListOpt {
         /// returns None Value
         #[must_use]
-        pub fn none() -> Self {
+        pub const fn none() -> Self {
             Self(None)
         }
     }
@@ -27497,7 +27497,7 @@ mod oid_list {
     impl OidListListOpt {
         /// returns None value
         #[must_use]
-        pub fn none() -> Self {
+        pub const fn none() -> Self {
             Self(None)
         }
     }
@@ -27652,7 +27652,7 @@ mod int_list {
     impl IntListOpt {
         /// returns None Value
         #[must_use]
-        pub fn none() -> Self {
+        pub const fn none() -> Self {
             Self(None)
         }
     }
@@ -27690,7 +27690,7 @@ mod int_list {
     impl IntListListOpt {
         /// returns None value
         #[must_use]
-        pub fn none() -> Self {
+        pub const fn none() -> Self {
             Self(None)
         }
     }
@@ -27845,7 +27845,7 @@ mod alias {
     impl AliasOpt {
         /// returns None Value
         #[must_use]
-        pub fn none() -> Self {
+        pub const fn none() -> Self {
             Self(None)
         }
     }
@@ -27883,7 +27883,7 @@ mod alias {
     impl AliasListOpt {
         /// returns None value
         #[must_use]
-        pub fn none() -> Self {
+        pub const fn none() -> Self {
             Self(None)
         }
     }
@@ -28071,7 +28071,7 @@ mod range_var {
     impl RangeVarOpt {
         /// returns None Value
         #[must_use]
-        pub fn none() -> Self {
+        pub const fn none() -> Self {
             Self(None)
         }
     }
@@ -28109,7 +28109,7 @@ mod range_var {
     impl RangeVarListOpt {
         /// returns None value
         #[must_use]
-        pub fn none() -> Self {
+        pub const fn none() -> Self {
             Self(None)
         }
     }
@@ -28227,7 +28227,7 @@ mod range_var {
         impl RangeVar {
             /// get `inh`
             #[must_use]
-            pub fn get_inh(&self) -> bool {
+            pub const fn get_inh(&self) -> bool {
                 self.inh
             }
         }
@@ -28251,7 +28251,7 @@ mod range_var {
         impl RangeVar {
             /// get `location`
             #[must_use]
-            pub fn get_location(&self) -> i32 {
+            pub const fn get_location(&self) -> i32 {
                 self.location
             }
         }
@@ -28452,7 +28452,7 @@ mod table_func {
     impl TableFuncOpt {
         /// returns None Value
         #[must_use]
-        pub fn none() -> Self {
+        pub const fn none() -> Self {
             Self(None)
         }
     }
@@ -28490,7 +28490,7 @@ mod table_func {
     impl TableFuncListOpt {
         /// returns None value
         #[must_use]
-        pub fn none() -> Self {
+        pub const fn none() -> Self {
             Self(None)
         }
     }
@@ -28774,7 +28774,7 @@ mod table_func {
         impl TableFunc {
             /// get `ordinalitycol`
             #[must_use]
-            pub fn get_ordinalitycol(&self) -> i32 {
+            pub const fn get_ordinalitycol(&self) -> i32 {
                 self.ordinalitycol
             }
         }
@@ -28782,7 +28782,7 @@ mod table_func {
         impl TableFunc {
             /// get `location`
             #[must_use]
-            pub fn get_location(&self) -> i32 {
+            pub const fn get_location(&self) -> i32 {
                 self.location
             }
         }
@@ -29182,7 +29182,7 @@ mod into_clause {
     impl IntoClauseOpt {
         /// returns None Value
         #[must_use]
-        pub fn none() -> Self {
+        pub const fn none() -> Self {
             Self(None)
         }
     }
@@ -29220,7 +29220,7 @@ mod into_clause {
     impl IntoClauseListOpt {
         /// returns None value
         #[must_use]
-        pub fn none() -> Self {
+        pub const fn none() -> Self {
             Self(None)
         }
     }
@@ -29377,7 +29377,7 @@ mod into_clause {
         impl IntoClause {
             /// get `skip_data`
             #[must_use]
-            pub fn get_skip_data(&self) -> bool {
+            pub const fn get_skip_data(&self) -> bool {
                 self.skip_data
             }
         }
@@ -29606,7 +29606,7 @@ mod var {
     impl VarOpt {
         /// returns None Value
         #[must_use]
-        pub fn none() -> Self {
+        pub const fn none() -> Self {
             Self(None)
         }
     }
@@ -29644,7 +29644,7 @@ mod var {
     impl VarListOpt {
         /// returns None value
         #[must_use]
-        pub fn none() -> Self {
+        pub const fn none() -> Self {
             Self(None)
         }
     }
@@ -29760,7 +29760,7 @@ mod var {
         impl Var {
             /// get `varno`
             #[must_use]
-            pub fn get_varno(&self) -> i32 {
+            pub const fn get_varno(&self) -> i32 {
                 self.varno
             }
         }
@@ -29768,7 +29768,7 @@ mod var {
         impl Var {
             /// get `varattno`
             #[must_use]
-            pub fn get_varattno(&self) -> i32 {
+            pub const fn get_varattno(&self) -> i32 {
                 self.varattno
             }
         }
@@ -29776,7 +29776,7 @@ mod var {
         impl Var {
             /// get `vartype`
             #[must_use]
-            pub fn get_vartype(&self) -> u32 {
+            pub const fn get_vartype(&self) -> u32 {
                 self.vartype
             }
         }
@@ -29784,7 +29784,7 @@ mod var {
         impl Var {
             /// get `vartypmod`
             #[must_use]
-            pub fn get_vartypmod(&self) -> i32 {
+            pub const fn get_vartypmod(&self) -> i32 {
                 self.vartypmod
             }
         }
@@ -29792,7 +29792,7 @@ mod var {
         impl Var {
             /// get `varcollid`
             #[must_use]
-            pub fn get_varcollid(&self) -> u32 {
+            pub const fn get_varcollid(&self) -> u32 {
                 self.varcollid
             }
         }
@@ -29808,7 +29808,7 @@ mod var {
         impl Var {
             /// get `varlevelsup`
             #[must_use]
-            pub fn get_varlevelsup(&self) -> u32 {
+            pub const fn get_varlevelsup(&self) -> u32 {
                 self.varlevelsup
             }
         }
@@ -29816,7 +29816,7 @@ mod var {
         impl Var {
             /// get `location`
             #[must_use]
-            pub fn get_location(&self) -> i32 {
+            pub const fn get_location(&self) -> i32 {
                 self.location
             }
         }
@@ -30049,7 +30049,7 @@ mod param {
     impl ParamOpt {
         /// returns None Value
         #[must_use]
-        pub fn none() -> Self {
+        pub const fn none() -> Self {
             Self(None)
         }
     }
@@ -30087,7 +30087,7 @@ mod param {
     impl ParamListOpt {
         /// returns None value
         #[must_use]
-        pub fn none() -> Self {
+        pub const fn none() -> Self {
             Self(None)
         }
     }
@@ -30197,7 +30197,7 @@ mod param {
         impl Param {
             /// get `paramid`
             #[must_use]
-            pub fn get_paramid(&self) -> i32 {
+            pub const fn get_paramid(&self) -> i32 {
                 self.paramid
             }
         }
@@ -30205,7 +30205,7 @@ mod param {
         impl Param {
             /// get `paramtype`
             #[must_use]
-            pub fn get_paramtype(&self) -> u32 {
+            pub const fn get_paramtype(&self) -> u32 {
                 self.paramtype
             }
         }
@@ -30213,7 +30213,7 @@ mod param {
         impl Param {
             /// get `paramtypmod`
             #[must_use]
-            pub fn get_paramtypmod(&self) -> i32 {
+            pub const fn get_paramtypmod(&self) -> i32 {
                 self.paramtypmod
             }
         }
@@ -30221,7 +30221,7 @@ mod param {
         impl Param {
             /// get `paramcollid`
             #[must_use]
-            pub fn get_paramcollid(&self) -> u32 {
+            pub const fn get_paramcollid(&self) -> u32 {
                 self.paramcollid
             }
         }
@@ -30229,7 +30229,7 @@ mod param {
         impl Param {
             /// get `location`
             #[must_use]
-            pub fn get_location(&self) -> i32 {
+            pub const fn get_location(&self) -> i32 {
                 self.location
             }
         }
@@ -30433,7 +30433,7 @@ mod aggref {
     impl AggrefOpt {
         /// returns None Value
         #[must_use]
-        pub fn none() -> Self {
+        pub const fn none() -> Self {
             Self(None)
         }
     }
@@ -30471,7 +30471,7 @@ mod aggref {
     impl AggrefListOpt {
         /// returns None value
         #[must_use]
-        pub fn none() -> Self {
+        pub const fn none() -> Self {
             Self(None)
         }
     }
@@ -30657,7 +30657,7 @@ mod aggref {
         impl Aggref {
             /// get `aggfnoid`
             #[must_use]
-            pub fn get_aggfnoid(&self) -> u32 {
+            pub const fn get_aggfnoid(&self) -> u32 {
                 self.aggfnoid
             }
         }
@@ -30665,7 +30665,7 @@ mod aggref {
         impl Aggref {
             /// get `aggtype`
             #[must_use]
-            pub fn get_aggtype(&self) -> u32 {
+            pub const fn get_aggtype(&self) -> u32 {
                 self.aggtype
             }
         }
@@ -30673,7 +30673,7 @@ mod aggref {
         impl Aggref {
             /// get `aggcollid`
             #[must_use]
-            pub fn get_aggcollid(&self) -> u32 {
+            pub const fn get_aggcollid(&self) -> u32 {
                 self.aggcollid
             }
         }
@@ -30681,7 +30681,7 @@ mod aggref {
         impl Aggref {
             /// get `inputcollid`
             #[must_use]
-            pub fn get_inputcollid(&self) -> u32 {
+            pub const fn get_inputcollid(&self) -> u32 {
                 self.inputcollid
             }
         }
@@ -30737,7 +30737,7 @@ mod aggref {
         impl Aggref {
             /// get `aggstar`
             #[must_use]
-            pub fn get_aggstar(&self) -> bool {
+            pub const fn get_aggstar(&self) -> bool {
                 self.aggstar
             }
         }
@@ -30745,7 +30745,7 @@ mod aggref {
         impl Aggref {
             /// get `aggvariadic`
             #[must_use]
-            pub fn get_aggvariadic(&self) -> bool {
+            pub const fn get_aggvariadic(&self) -> bool {
                 self.aggvariadic
             }
         }
@@ -30761,7 +30761,7 @@ mod aggref {
         impl Aggref {
             /// get `agglevelsup`
             #[must_use]
-            pub fn get_agglevelsup(&self) -> u32 {
+            pub const fn get_agglevelsup(&self) -> u32 {
                 self.agglevelsup
             }
         }
@@ -30777,7 +30777,7 @@ mod aggref {
         impl Aggref {
             /// get `aggno`
             #[must_use]
-            pub fn get_aggno(&self) -> i32 {
+            pub const fn get_aggno(&self) -> i32 {
                 self.aggno
             }
         }
@@ -30785,7 +30785,7 @@ mod aggref {
         impl Aggref {
             /// get `aggtransno`
             #[must_use]
-            pub fn get_aggtransno(&self) -> i32 {
+            pub const fn get_aggtransno(&self) -> i32 {
                 self.aggtransno
             }
         }
@@ -30793,7 +30793,7 @@ mod aggref {
         impl Aggref {
             /// get `location`
             #[must_use]
-            pub fn get_location(&self) -> i32 {
+            pub const fn get_location(&self) -> i32 {
                 self.location
             }
         }
@@ -31207,7 +31207,7 @@ mod grouping_func {
     impl GroupingFuncOpt {
         /// returns None Value
         #[must_use]
-        pub fn none() -> Self {
+        pub const fn none() -> Self {
             Self(None)
         }
     }
@@ -31245,7 +31245,7 @@ mod grouping_func {
     impl GroupingFuncListOpt {
         /// returns None value
         #[must_use]
-        pub fn none() -> Self {
+        pub const fn none() -> Self {
             Self(None)
         }
     }
@@ -31349,7 +31349,7 @@ mod grouping_func {
         impl GroupingFunc {
             /// get `agglevelsup`
             #[must_use]
-            pub fn get_agglevelsup(&self) -> u32 {
+            pub const fn get_agglevelsup(&self) -> u32 {
                 self.agglevelsup
             }
         }
@@ -31357,7 +31357,7 @@ mod grouping_func {
         impl GroupingFunc {
             /// get `location`
             #[must_use]
-            pub fn get_location(&self) -> i32 {
+            pub const fn get_location(&self) -> i32 {
                 self.location
             }
         }
@@ -31534,7 +31534,7 @@ mod window_func {
     impl WindowFuncOpt {
         /// returns None Value
         #[must_use]
-        pub fn none() -> Self {
+        pub const fn none() -> Self {
             Self(None)
         }
     }
@@ -31572,7 +31572,7 @@ mod window_func {
     impl WindowFuncListOpt {
         /// returns None value
         #[must_use]
-        pub fn none() -> Self {
+        pub const fn none() -> Self {
             Self(None)
         }
     }
@@ -31709,7 +31709,7 @@ mod window_func {
         impl WindowFunc {
             /// get `winfnoid`
             #[must_use]
-            pub fn get_winfnoid(&self) -> u32 {
+            pub const fn get_winfnoid(&self) -> u32 {
                 self.winfnoid
             }
         }
@@ -31717,7 +31717,7 @@ mod window_func {
         impl WindowFunc {
             /// get `wintype`
             #[must_use]
-            pub fn get_wintype(&self) -> u32 {
+            pub const fn get_wintype(&self) -> u32 {
                 self.wintype
             }
         }
@@ -31725,7 +31725,7 @@ mod window_func {
         impl WindowFunc {
             /// get `wincollid`
             #[must_use]
-            pub fn get_wincollid(&self) -> u32 {
+            pub const fn get_wincollid(&self) -> u32 {
                 self.wincollid
             }
         }
@@ -31733,7 +31733,7 @@ mod window_func {
         impl WindowFunc {
             /// get `inputcollid`
             #[must_use]
-            pub fn get_inputcollid(&self) -> u32 {
+            pub const fn get_inputcollid(&self) -> u32 {
                 self.inputcollid
             }
         }
@@ -31765,7 +31765,7 @@ mod window_func {
         impl WindowFunc {
             /// get `winref`
             #[must_use]
-            pub fn get_winref(&self) -> u32 {
+            pub const fn get_winref(&self) -> u32 {
                 self.winref
             }
         }
@@ -31773,7 +31773,7 @@ mod window_func {
         impl WindowFunc {
             /// get `winstar`
             #[must_use]
-            pub fn get_winstar(&self) -> bool {
+            pub const fn get_winstar(&self) -> bool {
                 self.winstar
             }
         }
@@ -31781,7 +31781,7 @@ mod window_func {
         impl WindowFunc {
             /// get `winagg`
             #[must_use]
-            pub fn get_winagg(&self) -> bool {
+            pub const fn get_winagg(&self) -> bool {
                 self.winagg
             }
         }
@@ -31789,7 +31789,7 @@ mod window_func {
         impl WindowFunc {
             /// get `location`
             #[must_use]
-            pub fn get_location(&self) -> i32 {
+            pub const fn get_location(&self) -> i32 {
                 self.location
             }
         }
@@ -32079,7 +32079,7 @@ mod window_func_run_condition {
     impl WindowFuncRunConditionOpt {
         /// returns None Value
         #[must_use]
-        pub fn none() -> Self {
+        pub const fn none() -> Self {
             Self(None)
         }
     }
@@ -32117,7 +32117,7 @@ mod window_func_run_condition {
     impl WindowFuncRunConditionListOpt {
         /// returns None value
         #[must_use]
-        pub fn none() -> Self {
+        pub const fn none() -> Self {
             Self(None)
         }
     }
@@ -32210,7 +32210,7 @@ mod window_func_run_condition {
         impl WindowFuncRunCondition {
             /// get `opno`
             #[must_use]
-            pub fn get_opno(&self) -> u32 {
+            pub const fn get_opno(&self) -> u32 {
                 self.opno
             }
         }
@@ -32218,7 +32218,7 @@ mod window_func_run_condition {
         impl WindowFuncRunCondition {
             /// get `inputcollid`
             #[must_use]
-            pub fn get_inputcollid(&self) -> u32 {
+            pub const fn get_inputcollid(&self) -> u32 {
                 self.inputcollid
             }
         }
@@ -32226,7 +32226,7 @@ mod window_func_run_condition {
         impl WindowFuncRunCondition {
             /// get `wfunc_left`
             #[must_use]
-            pub fn get_wfunc_left(&self) -> bool {
+            pub const fn get_wfunc_left(&self) -> bool {
                 self.wfunc_left
             }
         }
@@ -32409,7 +32409,7 @@ mod merge_support_func {
     impl MergeSupportFuncOpt {
         /// returns None Value
         #[must_use]
-        pub fn none() -> Self {
+        pub const fn none() -> Self {
             Self(None)
         }
     }
@@ -32447,7 +32447,7 @@ mod merge_support_func {
     impl MergeSupportFuncListOpt {
         /// returns None value
         #[must_use]
-        pub fn none() -> Self {
+        pub const fn none() -> Self {
             Self(None)
         }
     }
@@ -32528,7 +32528,7 @@ mod merge_support_func {
         impl MergeSupportFunc {
             /// get `msftype`
             #[must_use]
-            pub fn get_msftype(&self) -> u32 {
+            pub const fn get_msftype(&self) -> u32 {
                 self.msftype
             }
         }
@@ -32536,7 +32536,7 @@ mod merge_support_func {
         impl MergeSupportFunc {
             /// get `msfcollid`
             #[must_use]
-            pub fn get_msfcollid(&self) -> u32 {
+            pub const fn get_msfcollid(&self) -> u32 {
                 self.msfcollid
             }
         }
@@ -32544,7 +32544,7 @@ mod merge_support_func {
         impl MergeSupportFunc {
             /// get `location`
             #[must_use]
-            pub fn get_location(&self) -> i32 {
+            pub const fn get_location(&self) -> i32 {
                 self.location
             }
         }
@@ -32699,7 +32699,7 @@ mod subscripting_ref {
     impl SubscriptingRefOpt {
         /// returns None Value
         #[must_use]
-        pub fn none() -> Self {
+        pub const fn none() -> Self {
             Self(None)
         }
     }
@@ -32737,7 +32737,7 @@ mod subscripting_ref {
     impl SubscriptingRefListOpt {
         /// returns None value
         #[must_use]
-        pub fn none() -> Self {
+        pub const fn none() -> Self {
             Self(None)
         }
     }
@@ -32860,7 +32860,7 @@ mod subscripting_ref {
         impl SubscriptingRef {
             /// get `refcontainertype`
             #[must_use]
-            pub fn get_refcontainertype(&self) -> u32 {
+            pub const fn get_refcontainertype(&self) -> u32 {
                 self.refcontainertype
             }
         }
@@ -32868,7 +32868,7 @@ mod subscripting_ref {
         impl SubscriptingRef {
             /// get `refelemtype`
             #[must_use]
-            pub fn get_refelemtype(&self) -> u32 {
+            pub const fn get_refelemtype(&self) -> u32 {
                 self.refelemtype
             }
         }
@@ -32876,7 +32876,7 @@ mod subscripting_ref {
         impl SubscriptingRef {
             /// get `refrestype`
             #[must_use]
-            pub fn get_refrestype(&self) -> u32 {
+            pub const fn get_refrestype(&self) -> u32 {
                 self.refrestype
             }
         }
@@ -32884,7 +32884,7 @@ mod subscripting_ref {
         impl SubscriptingRef {
             /// get `reftypmod`
             #[must_use]
-            pub fn get_reftypmod(&self) -> i32 {
+            pub const fn get_reftypmod(&self) -> i32 {
                 self.reftypmod
             }
         }
@@ -32892,7 +32892,7 @@ mod subscripting_ref {
         impl SubscriptingRef {
             /// get `refcollid`
             #[must_use]
-            pub fn get_refcollid(&self) -> u32 {
+            pub const fn get_refcollid(&self) -> u32 {
                 self.refcollid
             }
         }
@@ -33187,7 +33187,7 @@ mod func_expr {
     impl FuncExprOpt {
         /// returns None Value
         #[must_use]
-        pub fn none() -> Self {
+        pub const fn none() -> Self {
             Self(None)
         }
     }
@@ -33225,7 +33225,7 @@ mod func_expr {
     impl FuncExprListOpt {
         /// returns None value
         #[must_use]
-        pub fn none() -> Self {
+        pub const fn none() -> Self {
             Self(None)
         }
     }
@@ -33348,7 +33348,7 @@ mod func_expr {
         impl FuncExpr {
             /// get `funcid`
             #[must_use]
-            pub fn get_funcid(&self) -> u32 {
+            pub const fn get_funcid(&self) -> u32 {
                 self.funcid
             }
         }
@@ -33356,7 +33356,7 @@ mod func_expr {
         impl FuncExpr {
             /// get `funcresulttype`
             #[must_use]
-            pub fn get_funcresulttype(&self) -> u32 {
+            pub const fn get_funcresulttype(&self) -> u32 {
                 self.funcresulttype
             }
         }
@@ -33364,7 +33364,7 @@ mod func_expr {
         impl FuncExpr {
             /// get `funcretset`
             #[must_use]
-            pub fn get_funcretset(&self) -> bool {
+            pub const fn get_funcretset(&self) -> bool {
                 self.funcretset
             }
         }
@@ -33372,7 +33372,7 @@ mod func_expr {
         impl FuncExpr {
             /// get `funcvariadic`
             #[must_use]
-            pub fn get_funcvariadic(&self) -> bool {
+            pub const fn get_funcvariadic(&self) -> bool {
                 self.funcvariadic
             }
         }
@@ -33388,7 +33388,7 @@ mod func_expr {
         impl FuncExpr {
             /// get `funccollid`
             #[must_use]
-            pub fn get_funccollid(&self) -> u32 {
+            pub const fn get_funccollid(&self) -> u32 {
                 self.funccollid
             }
         }
@@ -33396,7 +33396,7 @@ mod func_expr {
         impl FuncExpr {
             /// get `inputcollid`
             #[must_use]
-            pub fn get_inputcollid(&self) -> u32 {
+            pub const fn get_inputcollid(&self) -> u32 {
                 self.inputcollid
             }
         }
@@ -33412,7 +33412,7 @@ mod func_expr {
         impl FuncExpr {
             /// get `location`
             #[must_use]
-            pub fn get_location(&self) -> i32 {
+            pub const fn get_location(&self) -> i32 {
                 self.location
             }
         }
@@ -33667,7 +33667,7 @@ mod named_arg_expr {
     impl NamedArgExprOpt {
         /// returns None Value
         #[must_use]
-        pub fn none() -> Self {
+        pub const fn none() -> Self {
             Self(None)
         }
     }
@@ -33705,7 +33705,7 @@ mod named_arg_expr {
     impl NamedArgExprListOpt {
         /// returns None value
         #[must_use]
-        pub fn none() -> Self {
+        pub const fn none() -> Self {
             Self(None)
         }
     }
@@ -33809,7 +33809,7 @@ mod named_arg_expr {
         impl NamedArgExpr {
             /// get `argnumber`
             #[must_use]
-            pub fn get_argnumber(&self) -> i32 {
+            pub const fn get_argnumber(&self) -> i32 {
                 self.argnumber
             }
         }
@@ -33817,7 +33817,7 @@ mod named_arg_expr {
         impl NamedArgExpr {
             /// get `location`
             #[must_use]
-            pub fn get_location(&self) -> i32 {
+            pub const fn get_location(&self) -> i32 {
                 self.location
             }
         }
@@ -33991,7 +33991,7 @@ mod op_expr {
     impl OpExprOpt {
         /// returns None Value
         #[must_use]
-        pub fn none() -> Self {
+        pub const fn none() -> Self {
             Self(None)
         }
     }
@@ -34029,7 +34029,7 @@ mod op_expr {
     impl OpExprListOpt {
         /// returns None value
         #[must_use]
-        pub fn none() -> Self {
+        pub const fn none() -> Self {
             Self(None)
         }
     }
@@ -34138,7 +34138,7 @@ mod op_expr {
         impl OpExpr {
             /// get `opno`
             #[must_use]
-            pub fn get_opno(&self) -> u32 {
+            pub const fn get_opno(&self) -> u32 {
                 self.opno
             }
         }
@@ -34146,7 +34146,7 @@ mod op_expr {
         impl OpExpr {
             /// get `opresulttype`
             #[must_use]
-            pub fn get_opresulttype(&self) -> u32 {
+            pub const fn get_opresulttype(&self) -> u32 {
                 self.opresulttype
             }
         }
@@ -34154,7 +34154,7 @@ mod op_expr {
         impl OpExpr {
             /// get `opretset`
             #[must_use]
-            pub fn get_opretset(&self) -> bool {
+            pub const fn get_opretset(&self) -> bool {
                 self.opretset
             }
         }
@@ -34162,7 +34162,7 @@ mod op_expr {
         impl OpExpr {
             /// get `opcollid`
             #[must_use]
-            pub fn get_opcollid(&self) -> u32 {
+            pub const fn get_opcollid(&self) -> u32 {
                 self.opcollid
             }
         }
@@ -34170,7 +34170,7 @@ mod op_expr {
         impl OpExpr {
             /// get `inputcollid`
             #[must_use]
-            pub fn get_inputcollid(&self) -> u32 {
+            pub const fn get_inputcollid(&self) -> u32 {
                 self.inputcollid
             }
         }
@@ -34186,7 +34186,7 @@ mod op_expr {
         impl OpExpr {
             /// get `location`
             #[must_use]
-            pub fn get_location(&self) -> i32 {
+            pub const fn get_location(&self) -> i32 {
                 self.location
             }
         }
@@ -34406,7 +34406,7 @@ mod distinct_expr {
     impl DistinctExprOpt {
         /// returns None Value
         #[must_use]
-        pub fn none() -> Self {
+        pub const fn none() -> Self {
             Self(None)
         }
     }
@@ -34444,7 +34444,7 @@ mod distinct_expr {
     impl DistinctExprListOpt {
         /// returns None value
         #[must_use]
-        pub fn none() -> Self {
+        pub const fn none() -> Self {
             Self(None)
         }
     }
@@ -34553,7 +34553,7 @@ mod distinct_expr {
         impl DistinctExpr {
             /// get `opno`
             #[must_use]
-            pub fn get_opno(&self) -> u32 {
+            pub const fn get_opno(&self) -> u32 {
                 self.opno
             }
         }
@@ -34561,7 +34561,7 @@ mod distinct_expr {
         impl DistinctExpr {
             /// get `opresulttype`
             #[must_use]
-            pub fn get_opresulttype(&self) -> u32 {
+            pub const fn get_opresulttype(&self) -> u32 {
                 self.opresulttype
             }
         }
@@ -34569,7 +34569,7 @@ mod distinct_expr {
         impl DistinctExpr {
             /// get `opretset`
             #[must_use]
-            pub fn get_opretset(&self) -> bool {
+            pub const fn get_opretset(&self) -> bool {
                 self.opretset
             }
         }
@@ -34577,7 +34577,7 @@ mod distinct_expr {
         impl DistinctExpr {
             /// get `opcollid`
             #[must_use]
-            pub fn get_opcollid(&self) -> u32 {
+            pub const fn get_opcollid(&self) -> u32 {
                 self.opcollid
             }
         }
@@ -34585,7 +34585,7 @@ mod distinct_expr {
         impl DistinctExpr {
             /// get `inputcollid`
             #[must_use]
-            pub fn get_inputcollid(&self) -> u32 {
+            pub const fn get_inputcollid(&self) -> u32 {
                 self.inputcollid
             }
         }
@@ -34601,7 +34601,7 @@ mod distinct_expr {
         impl DistinctExpr {
             /// get `location`
             #[must_use]
-            pub fn get_location(&self) -> i32 {
+            pub const fn get_location(&self) -> i32 {
                 self.location
             }
         }
@@ -34823,7 +34823,7 @@ mod null_if_expr {
     impl NullIfExprOpt {
         /// returns None Value
         #[must_use]
-        pub fn none() -> Self {
+        pub const fn none() -> Self {
             Self(None)
         }
     }
@@ -34861,7 +34861,7 @@ mod null_if_expr {
     impl NullIfExprListOpt {
         /// returns None value
         #[must_use]
-        pub fn none() -> Self {
+        pub const fn none() -> Self {
             Self(None)
         }
     }
@@ -34970,7 +34970,7 @@ mod null_if_expr {
         impl NullIfExpr {
             /// get `opno`
             #[must_use]
-            pub fn get_opno(&self) -> u32 {
+            pub const fn get_opno(&self) -> u32 {
                 self.opno
             }
         }
@@ -34978,7 +34978,7 @@ mod null_if_expr {
         impl NullIfExpr {
             /// get `opresulttype`
             #[must_use]
-            pub fn get_opresulttype(&self) -> u32 {
+            pub const fn get_opresulttype(&self) -> u32 {
                 self.opresulttype
             }
         }
@@ -34986,7 +34986,7 @@ mod null_if_expr {
         impl NullIfExpr {
             /// get `opretset`
             #[must_use]
-            pub fn get_opretset(&self) -> bool {
+            pub const fn get_opretset(&self) -> bool {
                 self.opretset
             }
         }
@@ -34994,7 +34994,7 @@ mod null_if_expr {
         impl NullIfExpr {
             /// get `opcollid`
             #[must_use]
-            pub fn get_opcollid(&self) -> u32 {
+            pub const fn get_opcollid(&self) -> u32 {
                 self.opcollid
             }
         }
@@ -35002,7 +35002,7 @@ mod null_if_expr {
         impl NullIfExpr {
             /// get `inputcollid`
             #[must_use]
-            pub fn get_inputcollid(&self) -> u32 {
+            pub const fn get_inputcollid(&self) -> u32 {
                 self.inputcollid
             }
         }
@@ -35018,7 +35018,7 @@ mod null_if_expr {
         impl NullIfExpr {
             /// get `location`
             #[must_use]
-            pub fn get_location(&self) -> i32 {
+            pub const fn get_location(&self) -> i32 {
                 self.location
             }
         }
@@ -35238,7 +35238,7 @@ mod scalar_array_op_expr {
     impl ScalarArrayOpExprOpt {
         /// returns None Value
         #[must_use]
-        pub fn none() -> Self {
+        pub const fn none() -> Self {
             Self(None)
         }
     }
@@ -35276,7 +35276,7 @@ mod scalar_array_op_expr {
     impl ScalarArrayOpExprListOpt {
         /// returns None value
         #[must_use]
-        pub fn none() -> Self {
+        pub const fn none() -> Self {
             Self(None)
         }
     }
@@ -35371,7 +35371,7 @@ mod scalar_array_op_expr {
         impl ScalarArrayOpExpr {
             /// get `opno`
             #[must_use]
-            pub fn get_opno(&self) -> u32 {
+            pub const fn get_opno(&self) -> u32 {
                 self.opno
             }
         }
@@ -35379,7 +35379,7 @@ mod scalar_array_op_expr {
         impl ScalarArrayOpExpr {
             /// get `use_or`
             #[must_use]
-            pub fn get_use_or(&self) -> bool {
+            pub const fn get_use_or(&self) -> bool {
                 self.use_or
             }
         }
@@ -35387,7 +35387,7 @@ mod scalar_array_op_expr {
         impl ScalarArrayOpExpr {
             /// get `inputcollid`
             #[must_use]
-            pub fn get_inputcollid(&self) -> u32 {
+            pub const fn get_inputcollid(&self) -> u32 {
                 self.inputcollid
             }
         }
@@ -35403,7 +35403,7 @@ mod scalar_array_op_expr {
         impl ScalarArrayOpExpr {
             /// get `location`
             #[must_use]
-            pub fn get_location(&self) -> i32 {
+            pub const fn get_location(&self) -> i32 {
                 self.location
             }
         }
@@ -35593,7 +35593,7 @@ mod bool_expr {
     impl BoolExprOpt {
         /// returns None Value
         #[must_use]
-        pub fn none() -> Self {
+        pub const fn none() -> Self {
             Self(None)
         }
     }
@@ -35631,7 +35631,7 @@ mod bool_expr {
     impl BoolExprListOpt {
         /// returns None value
         #[must_use]
-        pub fn none() -> Self {
+        pub const fn none() -> Self {
             Self(None)
         }
     }
@@ -35728,7 +35728,7 @@ mod bool_expr {
         impl BoolExpr {
             /// get `location`
             #[must_use]
-            pub fn get_location(&self) -> i32 {
+            pub const fn get_location(&self) -> i32 {
                 self.location
             }
         }
@@ -35887,7 +35887,7 @@ mod sub_link {
     impl SubLinkOpt {
         /// returns None Value
         #[must_use]
-        pub fn none() -> Self {
+        pub const fn none() -> Self {
             Self(None)
         }
     }
@@ -35925,7 +35925,7 @@ mod sub_link {
     impl SubLinkListOpt {
         /// returns None value
         #[must_use]
-        pub fn none() -> Self {
+        pub const fn none() -> Self {
             Self(None)
         }
     }
@@ -36035,7 +36035,7 @@ mod sub_link {
         impl SubLink {
             /// get `sub_link_id`
             #[must_use]
-            pub fn get_sub_link_id(&self) -> i32 {
+            pub const fn get_sub_link_id(&self) -> i32 {
                 self.sub_link_id
             }
         }
@@ -36067,7 +36067,7 @@ mod sub_link {
         impl SubLink {
             /// get `location`
             #[must_use]
-            pub fn get_location(&self) -> i32 {
+            pub const fn get_location(&self) -> i32 {
                 self.location
             }
         }
@@ -36280,7 +36280,7 @@ mod sub_plan {
     impl SubPlanOpt {
         /// returns None Value
         #[must_use]
-        pub fn none() -> Self {
+        pub const fn none() -> Self {
             Self(None)
         }
     }
@@ -36318,7 +36318,7 @@ mod sub_plan {
     impl SubPlanListOpt {
         /// returns None value
         #[must_use]
-        pub fn none() -> Self {
+        pub const fn none() -> Self {
             Self(None)
         }
     }
@@ -36514,7 +36514,7 @@ mod sub_plan {
         impl SubPlan {
             /// get `plan_id`
             #[must_use]
-            pub fn get_plan_id(&self) -> i32 {
+            pub const fn get_plan_id(&self) -> i32 {
                 self.plan_id
             }
         }
@@ -36530,7 +36530,7 @@ mod sub_plan {
         impl SubPlan {
             /// get `first_col_type`
             #[must_use]
-            pub fn get_first_col_type(&self) -> u32 {
+            pub const fn get_first_col_type(&self) -> u32 {
                 self.first_col_type
             }
         }
@@ -36538,7 +36538,7 @@ mod sub_plan {
         impl SubPlan {
             /// get `first_col_typmod`
             #[must_use]
-            pub fn get_first_col_typmod(&self) -> i32 {
+            pub const fn get_first_col_typmod(&self) -> i32 {
                 self.first_col_typmod
             }
         }
@@ -36546,7 +36546,7 @@ mod sub_plan {
         impl SubPlan {
             /// get `first_col_collation`
             #[must_use]
-            pub fn get_first_col_collation(&self) -> u32 {
+            pub const fn get_first_col_collation(&self) -> u32 {
                 self.first_col_collation
             }
         }
@@ -36554,7 +36554,7 @@ mod sub_plan {
         impl SubPlan {
             /// get `use_hash_table`
             #[must_use]
-            pub fn get_use_hash_table(&self) -> bool {
+            pub const fn get_use_hash_table(&self) -> bool {
                 self.use_hash_table
             }
         }
@@ -36562,7 +36562,7 @@ mod sub_plan {
         impl SubPlan {
             /// get `unknown_eq_false`
             #[must_use]
-            pub fn get_unknown_eq_false(&self) -> bool {
+            pub const fn get_unknown_eq_false(&self) -> bool {
                 self.unknown_eq_false
             }
         }
@@ -36570,7 +36570,7 @@ mod sub_plan {
         impl SubPlan {
             /// get `parallel_safe`
             #[must_use]
-            pub fn get_parallel_safe(&self) -> bool {
+            pub const fn get_parallel_safe(&self) -> bool {
                 self.parallel_safe
             }
         }
@@ -36602,7 +36602,7 @@ mod sub_plan {
         impl SubPlan {
             /// get `startup_cost`
             #[must_use]
-            pub fn get_startup_cost(&self) -> f64 {
+            pub const fn get_startup_cost(&self) -> f64 {
                 self.startup_cost
             }
         }
@@ -36610,7 +36610,7 @@ mod sub_plan {
         impl SubPlan {
             /// get `per_call_cost`
             #[must_use]
-            pub fn get_per_call_cost(&self) -> f64 {
+            pub const fn get_per_call_cost(&self) -> f64 {
                 self.per_call_cost
             }
         }
@@ -36989,7 +36989,7 @@ mod alternative_sub_plan {
     impl AlternativeSubPlanOpt {
         /// returns None Value
         #[must_use]
-        pub fn none() -> Self {
+        pub const fn none() -> Self {
             Self(None)
         }
     }
@@ -37027,7 +37027,7 @@ mod alternative_sub_plan {
     impl AlternativeSubPlanListOpt {
         /// returns None value
         #[must_use]
-        pub fn none() -> Self {
+        pub const fn none() -> Self {
             Self(None)
         }
     }
@@ -37216,7 +37216,7 @@ mod field_select {
     impl FieldSelectOpt {
         /// returns None Value
         #[must_use]
-        pub fn none() -> Self {
+        pub const fn none() -> Self {
             Self(None)
         }
     }
@@ -37254,7 +37254,7 @@ mod field_select {
     impl FieldSelectListOpt {
         /// returns None value
         #[must_use]
-        pub fn none() -> Self {
+        pub const fn none() -> Self {
             Self(None)
         }
     }
@@ -37357,7 +37357,7 @@ mod field_select {
         impl FieldSelect {
             /// get `fieldnum`
             #[must_use]
-            pub fn get_fieldnum(&self) -> i32 {
+            pub const fn get_fieldnum(&self) -> i32 {
                 self.fieldnum
             }
         }
@@ -37365,7 +37365,7 @@ mod field_select {
         impl FieldSelect {
             /// get `resulttype`
             #[must_use]
-            pub fn get_resulttype(&self) -> u32 {
+            pub const fn get_resulttype(&self) -> u32 {
                 self.resulttype
             }
         }
@@ -37373,7 +37373,7 @@ mod field_select {
         impl FieldSelect {
             /// get `resulttypmod`
             #[must_use]
-            pub fn get_resulttypmod(&self) -> i32 {
+            pub const fn get_resulttypmod(&self) -> i32 {
                 self.resulttypmod
             }
         }
@@ -37381,7 +37381,7 @@ mod field_select {
         impl FieldSelect {
             /// get `resultcollid`
             #[must_use]
-            pub fn get_resultcollid(&self) -> u32 {
+            pub const fn get_resultcollid(&self) -> u32 {
                 self.resultcollid
             }
         }
@@ -37569,7 +37569,7 @@ mod field_store {
     impl FieldStoreOpt {
         /// returns None Value
         #[must_use]
-        pub fn none() -> Self {
+        pub const fn none() -> Self {
             Self(None)
         }
     }
@@ -37607,7 +37607,7 @@ mod field_store {
     impl FieldStoreListOpt {
         /// returns None value
         #[must_use]
-        pub fn none() -> Self {
+        pub const fn none() -> Self {
             Self(None)
         }
     }
@@ -37719,7 +37719,7 @@ mod field_store {
         impl FieldStore {
             /// get `resulttype`
             #[must_use]
-            pub fn get_resulttype(&self) -> u32 {
+            pub const fn get_resulttype(&self) -> u32 {
                 self.resulttype
             }
         }
@@ -37897,7 +37897,7 @@ mod relabel_type {
     impl RelabelTypeOpt {
         /// returns None Value
         #[must_use]
-        pub fn none() -> Self {
+        pub const fn none() -> Self {
             Self(None)
         }
     }
@@ -37935,7 +37935,7 @@ mod relabel_type {
     impl RelabelTypeListOpt {
         /// returns None value
         #[must_use]
-        pub fn none() -> Self {
+        pub const fn none() -> Self {
             Self(None)
         }
     }
@@ -38045,7 +38045,7 @@ mod relabel_type {
         impl RelabelType {
             /// get `resulttype`
             #[must_use]
-            pub fn get_resulttype(&self) -> u32 {
+            pub const fn get_resulttype(&self) -> u32 {
                 self.resulttype
             }
         }
@@ -38053,7 +38053,7 @@ mod relabel_type {
         impl RelabelType {
             /// get `resulttypmod`
             #[must_use]
-            pub fn get_resulttypmod(&self) -> i32 {
+            pub const fn get_resulttypmod(&self) -> i32 {
                 self.resulttypmod
             }
         }
@@ -38061,7 +38061,7 @@ mod relabel_type {
         impl RelabelType {
             /// get `resultcollid`
             #[must_use]
-            pub fn get_resultcollid(&self) -> u32 {
+            pub const fn get_resultcollid(&self) -> u32 {
                 self.resultcollid
             }
         }
@@ -38077,7 +38077,7 @@ mod relabel_type {
         impl RelabelType {
             /// get `location`
             #[must_use]
-            pub fn get_location(&self) -> i32 {
+            pub const fn get_location(&self) -> i32 {
                 self.location
             }
         }
@@ -38284,7 +38284,7 @@ mod coerce_via_io {
     impl CoerceViaIoOpt {
         /// returns None Value
         #[must_use]
-        pub fn none() -> Self {
+        pub const fn none() -> Self {
             Self(None)
         }
     }
@@ -38322,7 +38322,7 @@ mod coerce_via_io {
     impl CoerceViaIoListOpt {
         /// returns None value
         #[must_use]
-        pub fn none() -> Self {
+        pub const fn none() -> Self {
             Self(None)
         }
     }
@@ -38425,7 +38425,7 @@ mod coerce_via_io {
         impl CoerceViaIo {
             /// get `resulttype`
             #[must_use]
-            pub fn get_resulttype(&self) -> u32 {
+            pub const fn get_resulttype(&self) -> u32 {
                 self.resulttype
             }
         }
@@ -38433,7 +38433,7 @@ mod coerce_via_io {
         impl CoerceViaIo {
             /// get `resultcollid`
             #[must_use]
-            pub fn get_resultcollid(&self) -> u32 {
+            pub const fn get_resultcollid(&self) -> u32 {
                 self.resultcollid
             }
         }
@@ -38449,7 +38449,7 @@ mod coerce_via_io {
         impl CoerceViaIo {
             /// get `location`
             #[must_use]
-            pub fn get_location(&self) -> i32 {
+            pub const fn get_location(&self) -> i32 {
                 self.location
             }
         }
@@ -38640,7 +38640,7 @@ mod array_coerce_expr {
     impl ArrayCoerceExprOpt {
         /// returns None Value
         #[must_use]
-        pub fn none() -> Self {
+        pub const fn none() -> Self {
             Self(None)
         }
     }
@@ -38678,7 +38678,7 @@ mod array_coerce_expr {
     impl ArrayCoerceExprListOpt {
         /// returns None value
         #[must_use]
-        pub fn none() -> Self {
+        pub const fn none() -> Self {
             Self(None)
         }
     }
@@ -38803,7 +38803,7 @@ mod array_coerce_expr {
         impl ArrayCoerceExpr {
             /// get `resulttype`
             #[must_use]
-            pub fn get_resulttype(&self) -> u32 {
+            pub const fn get_resulttype(&self) -> u32 {
                 self.resulttype
             }
         }
@@ -38811,7 +38811,7 @@ mod array_coerce_expr {
         impl ArrayCoerceExpr {
             /// get `resulttypmod`
             #[must_use]
-            pub fn get_resulttypmod(&self) -> i32 {
+            pub const fn get_resulttypmod(&self) -> i32 {
                 self.resulttypmod
             }
         }
@@ -38819,7 +38819,7 @@ mod array_coerce_expr {
         impl ArrayCoerceExpr {
             /// get `resultcollid`
             #[must_use]
-            pub fn get_resultcollid(&self) -> u32 {
+            pub const fn get_resultcollid(&self) -> u32 {
                 self.resultcollid
             }
         }
@@ -38835,7 +38835,7 @@ mod array_coerce_expr {
         impl ArrayCoerceExpr {
             /// get `location`
             #[must_use]
-            pub fn get_location(&self) -> i32 {
+            pub const fn get_location(&self) -> i32 {
                 self.location
             }
         }
@@ -39063,7 +39063,7 @@ mod convert_rowtype_expr {
     impl ConvertRowtypeExprOpt {
         /// returns None Value
         #[must_use]
-        pub fn none() -> Self {
+        pub const fn none() -> Self {
             Self(None)
         }
     }
@@ -39101,7 +39101,7 @@ mod convert_rowtype_expr {
     impl ConvertRowtypeExprListOpt {
         /// returns None value
         #[must_use]
-        pub fn none() -> Self {
+        pub const fn none() -> Self {
             Self(None)
         }
     }
@@ -39197,7 +39197,7 @@ mod convert_rowtype_expr {
         impl ConvertRowtypeExpr {
             /// get `resulttype`
             #[must_use]
-            pub fn get_resulttype(&self) -> u32 {
+            pub const fn get_resulttype(&self) -> u32 {
                 self.resulttype
             }
         }
@@ -39213,7 +39213,7 @@ mod convert_rowtype_expr {
         impl ConvertRowtypeExpr {
             /// get `location`
             #[must_use]
-            pub fn get_location(&self) -> i32 {
+            pub const fn get_location(&self) -> i32 {
                 self.location
             }
         }
@@ -39390,7 +39390,7 @@ mod collate_expr {
     impl CollateExprOpt {
         /// returns None Value
         #[must_use]
-        pub fn none() -> Self {
+        pub const fn none() -> Self {
             Self(None)
         }
     }
@@ -39428,7 +39428,7 @@ mod collate_expr {
     impl CollateExprListOpt {
         /// returns None value
         #[must_use]
-        pub fn none() -> Self {
+        pub const fn none() -> Self {
             Self(None)
         }
     }
@@ -39517,7 +39517,7 @@ mod collate_expr {
         impl CollateExpr {
             /// get `coll_oid`
             #[must_use]
-            pub fn get_coll_oid(&self) -> u32 {
+            pub const fn get_coll_oid(&self) -> u32 {
                 self.coll_oid
             }
         }
@@ -39525,7 +39525,7 @@ mod collate_expr {
         impl CollateExpr {
             /// get `location`
             #[must_use]
-            pub fn get_location(&self) -> i32 {
+            pub const fn get_location(&self) -> i32 {
                 self.location
             }
         }
@@ -39681,7 +39681,7 @@ mod case_expr {
     impl CaseExprOpt {
         /// returns None Value
         #[must_use]
-        pub fn none() -> Self {
+        pub const fn none() -> Self {
             Self(None)
         }
     }
@@ -39719,7 +39719,7 @@ mod case_expr {
     impl CaseExprListOpt {
         /// returns None value
         #[must_use]
-        pub fn none() -> Self {
+        pub const fn none() -> Self {
             Self(None)
         }
     }
@@ -39821,7 +39821,7 @@ mod case_expr {
         impl CaseExpr {
             /// get `casetype`
             #[must_use]
-            pub fn get_casetype(&self) -> u32 {
+            pub const fn get_casetype(&self) -> u32 {
                 self.casetype
             }
         }
@@ -39829,7 +39829,7 @@ mod case_expr {
         impl CaseExpr {
             /// get `casecollid`
             #[must_use]
-            pub fn get_casecollid(&self) -> u32 {
+            pub const fn get_casecollid(&self) -> u32 {
                 self.casecollid
             }
         }
@@ -39861,7 +39861,7 @@ mod case_expr {
         impl CaseExpr {
             /// get `location`
             #[must_use]
-            pub fn get_location(&self) -> i32 {
+            pub const fn get_location(&self) -> i32 {
                 self.location
             }
         }
@@ -40071,7 +40071,7 @@ mod case_when {
     impl CaseWhenOpt {
         /// returns None Value
         #[must_use]
-        pub fn none() -> Self {
+        pub const fn none() -> Self {
             Self(None)
         }
     }
@@ -40109,7 +40109,7 @@ mod case_when {
     impl CaseWhenListOpt {
         /// returns None value
         #[must_use]
-        pub fn none() -> Self {
+        pub const fn none() -> Self {
             Self(None)
         }
     }
@@ -40206,7 +40206,7 @@ mod case_when {
         impl CaseWhen {
             /// get `location`
             #[must_use]
-            pub fn get_location(&self) -> i32 {
+            pub const fn get_location(&self) -> i32 {
                 self.location
             }
         }
@@ -40365,7 +40365,7 @@ mod case_test_expr {
     impl CaseTestExprOpt {
         /// returns None Value
         #[must_use]
-        pub fn none() -> Self {
+        pub const fn none() -> Self {
             Self(None)
         }
     }
@@ -40403,7 +40403,7 @@ mod case_test_expr {
     impl CaseTestExprListOpt {
         /// returns None value
         #[must_use]
-        pub fn none() -> Self {
+        pub const fn none() -> Self {
             Self(None)
         }
     }
@@ -40484,7 +40484,7 @@ mod case_test_expr {
         impl CaseTestExpr {
             /// get `type_id`
             #[must_use]
-            pub fn get_type_id(&self) -> u32 {
+            pub const fn get_type_id(&self) -> u32 {
                 self.type_id
             }
         }
@@ -40492,7 +40492,7 @@ mod case_test_expr {
         impl CaseTestExpr {
             /// get `type_mod`
             #[must_use]
-            pub fn get_type_mod(&self) -> i32 {
+            pub const fn get_type_mod(&self) -> i32 {
                 self.type_mod
             }
         }
@@ -40500,7 +40500,7 @@ mod case_test_expr {
         impl CaseTestExpr {
             /// get `collation`
             #[must_use]
-            pub fn get_collation(&self) -> u32 {
+            pub const fn get_collation(&self) -> u32 {
                 self.collation
             }
         }
@@ -40655,7 +40655,7 @@ mod array_expr {
     impl ArrayExprOpt {
         /// returns None Value
         #[must_use]
-        pub fn none() -> Self {
+        pub const fn none() -> Self {
             Self(None)
         }
     }
@@ -40693,7 +40693,7 @@ mod array_expr {
     impl ArrayExprListOpt {
         /// returns None value
         #[must_use]
-        pub fn none() -> Self {
+        pub const fn none() -> Self {
             Self(None)
         }
     }
@@ -40795,7 +40795,7 @@ mod array_expr {
         impl ArrayExpr {
             /// get `array_typeid`
             #[must_use]
-            pub fn get_array_typeid(&self) -> u32 {
+            pub const fn get_array_typeid(&self) -> u32 {
                 self.array_typeid
             }
         }
@@ -40803,7 +40803,7 @@ mod array_expr {
         impl ArrayExpr {
             /// get `array_collid`
             #[must_use]
-            pub fn get_array_collid(&self) -> u32 {
+            pub const fn get_array_collid(&self) -> u32 {
                 self.array_collid
             }
         }
@@ -40811,7 +40811,7 @@ mod array_expr {
         impl ArrayExpr {
             /// get `element_typeid`
             #[must_use]
-            pub fn get_element_typeid(&self) -> u32 {
+            pub const fn get_element_typeid(&self) -> u32 {
                 self.element_typeid
             }
         }
@@ -40827,7 +40827,7 @@ mod array_expr {
         impl ArrayExpr {
             /// get `multidims`
             #[must_use]
-            pub fn get_multidims(&self) -> bool {
+            pub const fn get_multidims(&self) -> bool {
                 self.multidims
             }
         }
@@ -40835,7 +40835,7 @@ mod array_expr {
         impl ArrayExpr {
             /// get `location`
             #[must_use]
-            pub fn get_location(&self) -> i32 {
+            pub const fn get_location(&self) -> i32 {
                 self.location
             }
         }
@@ -41039,7 +41039,7 @@ mod row_expr {
     impl RowExprOpt {
         /// returns None Value
         #[must_use]
-        pub fn none() -> Self {
+        pub const fn none() -> Self {
             Self(None)
         }
     }
@@ -41077,7 +41077,7 @@ mod row_expr {
     impl RowExprListOpt {
         /// returns None value
         #[must_use]
-        pub fn none() -> Self {
+        pub const fn none() -> Self {
             Self(None)
         }
     }
@@ -41180,7 +41180,7 @@ mod row_expr {
         impl RowExpr {
             /// get `row_typeid`
             #[must_use]
-            pub fn get_row_typeid(&self) -> u32 {
+            pub const fn get_row_typeid(&self) -> u32 {
                 self.row_typeid
             }
         }
@@ -41204,7 +41204,7 @@ mod row_expr {
         impl RowExpr {
             /// get `location`
             #[must_use]
-            pub fn get_location(&self) -> i32 {
+            pub const fn get_location(&self) -> i32 {
                 self.location
             }
         }
@@ -41398,7 +41398,7 @@ mod row_compare_expr {
     impl RowCompareExprOpt {
         /// returns None Value
         #[must_use]
-        pub fn none() -> Self {
+        pub const fn none() -> Self {
             Self(None)
         }
     }
@@ -41436,7 +41436,7 @@ mod row_compare_expr {
     impl RowCompareExprListOpt {
         /// returns None value
         #[must_use]
-        pub fn none() -> Self {
+        pub const fn none() -> Self {
             Self(None)
         }
     }
@@ -41799,7 +41799,7 @@ mod coalesce_expr {
     impl CoalesceExprOpt {
         /// returns None Value
         #[must_use]
-        pub fn none() -> Self {
+        pub const fn none() -> Self {
             Self(None)
         }
     }
@@ -41837,7 +41837,7 @@ mod coalesce_expr {
     impl CoalesceExprListOpt {
         /// returns None value
         #[must_use]
-        pub fn none() -> Self {
+        pub const fn none() -> Self {
             Self(None)
         }
     }
@@ -41925,7 +41925,7 @@ mod coalesce_expr {
         impl CoalesceExpr {
             /// get `coalescetype`
             #[must_use]
-            pub fn get_coalescetype(&self) -> u32 {
+            pub const fn get_coalescetype(&self) -> u32 {
                 self.coalescetype
             }
         }
@@ -41933,7 +41933,7 @@ mod coalesce_expr {
         impl CoalesceExpr {
             /// get `coalescecollid`
             #[must_use]
-            pub fn get_coalescecollid(&self) -> u32 {
+            pub const fn get_coalescecollid(&self) -> u32 {
                 self.coalescecollid
             }
         }
@@ -41949,7 +41949,7 @@ mod coalesce_expr {
         impl CoalesceExpr {
             /// get `location`
             #[must_use]
-            pub fn get_location(&self) -> i32 {
+            pub const fn get_location(&self) -> i32 {
                 self.location
             }
         }
@@ -42123,7 +42123,7 @@ mod min_max_expr {
     impl MinMaxExprOpt {
         /// returns None Value
         #[must_use]
-        pub fn none() -> Self {
+        pub const fn none() -> Self {
             Self(None)
         }
     }
@@ -42161,7 +42161,7 @@ mod min_max_expr {
     impl MinMaxExprListOpt {
         /// returns None value
         #[must_use]
-        pub fn none() -> Self {
+        pub const fn none() -> Self {
             Self(None)
         }
     }
@@ -42263,7 +42263,7 @@ mod min_max_expr {
         impl MinMaxExpr {
             /// get `minmaxtype`
             #[must_use]
-            pub fn get_minmaxtype(&self) -> u32 {
+            pub const fn get_minmaxtype(&self) -> u32 {
                 self.minmaxtype
             }
         }
@@ -42271,7 +42271,7 @@ mod min_max_expr {
         impl MinMaxExpr {
             /// get `minmaxcollid`
             #[must_use]
-            pub fn get_minmaxcollid(&self) -> u32 {
+            pub const fn get_minmaxcollid(&self) -> u32 {
                 self.minmaxcollid
             }
         }
@@ -42279,7 +42279,7 @@ mod min_max_expr {
         impl MinMaxExpr {
             /// get `inputcollid`
             #[must_use]
-            pub fn get_inputcollid(&self) -> u32 {
+            pub const fn get_inputcollid(&self) -> u32 {
                 self.inputcollid
             }
         }
@@ -42303,7 +42303,7 @@ mod min_max_expr {
         impl MinMaxExpr {
             /// get `location`
             #[must_use]
-            pub fn get_location(&self) -> i32 {
+            pub const fn get_location(&self) -> i32 {
                 self.location
             }
         }
@@ -42510,7 +42510,7 @@ mod sql_value_function {
     impl SqlValueFunctionOpt {
         /// returns None Value
         #[must_use]
-        pub fn none() -> Self {
+        pub const fn none() -> Self {
             Self(None)
         }
     }
@@ -42548,7 +42548,7 @@ mod sql_value_function {
     impl SqlValueFunctionListOpt {
         /// returns None value
         #[must_use]
-        pub fn none() -> Self {
+        pub const fn none() -> Self {
             Self(None)
         }
     }
@@ -42644,7 +42644,7 @@ mod sql_value_function {
         impl SqlValueFunction {
             /// get `r#type`
             #[must_use]
-            pub fn get_type(&self) -> u32 {
+            pub const fn get_type(&self) -> u32 {
                 self.r#type
             }
         }
@@ -42652,7 +42652,7 @@ mod sql_value_function {
         impl SqlValueFunction {
             /// get `typmod`
             #[must_use]
-            pub fn get_typmod(&self) -> i32 {
+            pub const fn get_typmod(&self) -> i32 {
                 self.typmod
             }
         }
@@ -42660,7 +42660,7 @@ mod sql_value_function {
         impl SqlValueFunction {
             /// get `location`
             #[must_use]
-            pub fn get_location(&self) -> i32 {
+            pub const fn get_location(&self) -> i32 {
                 self.location
             }
         }
@@ -42834,7 +42834,7 @@ mod xml_expr {
     impl XmlExprOpt {
         /// returns None Value
         #[must_use]
-        pub fn none() -> Self {
+        pub const fn none() -> Self {
             Self(None)
         }
     }
@@ -42872,7 +42872,7 @@ mod xml_expr {
     impl XmlExprListOpt {
         /// returns None value
         #[must_use]
-        pub fn none() -> Self {
+        pub const fn none() -> Self {
             Self(None)
         }
     }
@@ -43050,7 +43050,7 @@ mod xml_expr {
         impl XmlExpr {
             /// get `indent`
             #[must_use]
-            pub fn get_indent(&self) -> bool {
+            pub const fn get_indent(&self) -> bool {
                 self.indent
             }
         }
@@ -43058,7 +43058,7 @@ mod xml_expr {
         impl XmlExpr {
             /// get `r#type`
             #[must_use]
-            pub fn get_type(&self) -> u32 {
+            pub const fn get_type(&self) -> u32 {
                 self.r#type
             }
         }
@@ -43066,7 +43066,7 @@ mod xml_expr {
         impl XmlExpr {
             /// get `typmod`
             #[must_use]
-            pub fn get_typmod(&self) -> i32 {
+            pub const fn get_typmod(&self) -> i32 {
                 self.typmod
             }
         }
@@ -43074,7 +43074,7 @@ mod xml_expr {
         impl XmlExpr {
             /// get `location`
             #[must_use]
-            pub fn get_location(&self) -> i32 {
+            pub const fn get_location(&self) -> i32 {
                 self.location
             }
         }
@@ -43354,7 +43354,7 @@ mod json_format {
     impl JsonFormatOpt {
         /// returns None Value
         #[must_use]
-        pub fn none() -> Self {
+        pub const fn none() -> Self {
             Self(None)
         }
     }
@@ -43392,7 +43392,7 @@ mod json_format {
     impl JsonFormatListOpt {
         /// returns None value
         #[must_use]
-        pub fn none() -> Self {
+        pub const fn none() -> Self {
             Self(None)
         }
     }
@@ -43474,7 +43474,7 @@ mod json_format {
         impl JsonFormat {
             /// get `location`
             #[must_use]
-            pub fn get_location(&self) -> i32 {
+            pub const fn get_location(&self) -> i32 {
                 self.location
             }
         }
@@ -43614,7 +43614,7 @@ mod json_returning {
     impl JsonReturningOpt {
         /// returns None Value
         #[must_use]
-        pub fn none() -> Self {
+        pub const fn none() -> Self {
             Self(None)
         }
     }
@@ -43652,7 +43652,7 @@ mod json_returning {
     impl JsonReturningListOpt {
         /// returns None value
         #[must_use]
-        pub fn none() -> Self {
+        pub const fn none() -> Self {
             Self(None)
         }
     }
@@ -43726,7 +43726,7 @@ mod json_returning {
         impl JsonReturning {
             /// get `typid`
             #[must_use]
-            pub fn get_typid(&self) -> u32 {
+            pub const fn get_typid(&self) -> u32 {
                 self.typid
             }
         }
@@ -43734,7 +43734,7 @@ mod json_returning {
         impl JsonReturning {
             /// get `typmod`
             #[must_use]
-            pub fn get_typmod(&self) -> i32 {
+            pub const fn get_typmod(&self) -> i32 {
                 self.typmod
             }
         }
@@ -43873,7 +43873,7 @@ mod json_value_expr {
     impl JsonValueExprOpt {
         /// returns None Value
         #[must_use]
-        pub fn none() -> Self {
+        pub const fn none() -> Self {
             Self(None)
         }
     }
@@ -43911,7 +43911,7 @@ mod json_value_expr {
     impl JsonValueExprListOpt {
         /// returns None value
         #[must_use]
-        pub fn none() -> Self {
+        pub const fn none() -> Self {
             Self(None)
         }
     }
@@ -44138,7 +44138,7 @@ mod json_constructor_expr {
     impl JsonConstructorExprOpt {
         /// returns None Value
         #[must_use]
-        pub fn none() -> Self {
+        pub const fn none() -> Self {
             Self(None)
         }
     }
@@ -44176,7 +44176,7 @@ mod json_constructor_expr {
     impl JsonConstructorExprListOpt {
         /// returns None value
         #[must_use]
-        pub fn none() -> Self {
+        pub const fn none() -> Self {
             Self(None)
         }
     }
@@ -44332,7 +44332,7 @@ mod json_constructor_expr {
         impl JsonConstructorExpr {
             /// get `absent_on_null`
             #[must_use]
-            pub fn get_absent_on_null(&self) -> bool {
+            pub const fn get_absent_on_null(&self) -> bool {
                 self.absent_on_null
             }
         }
@@ -44340,7 +44340,7 @@ mod json_constructor_expr {
         impl JsonConstructorExpr {
             /// get `unique`
             #[must_use]
-            pub fn get_unique(&self) -> bool {
+            pub const fn get_unique(&self) -> bool {
                 self.unique
             }
         }
@@ -44348,7 +44348,7 @@ mod json_constructor_expr {
         impl JsonConstructorExpr {
             /// get `location`
             #[must_use]
-            pub fn get_location(&self) -> i32 {
+            pub const fn get_location(&self) -> i32 {
                 self.location
             }
         }
@@ -44599,7 +44599,7 @@ mod json_is_predicate {
     impl JsonIsPredicateOpt {
         /// returns None Value
         #[must_use]
-        pub fn none() -> Self {
+        pub const fn none() -> Self {
             Self(None)
         }
     }
@@ -44637,7 +44637,7 @@ mod json_is_predicate {
     impl JsonIsPredicateListOpt {
         /// returns None value
         #[must_use]
-        pub fn none() -> Self {
+        pub const fn none() -> Self {
             Self(None)
         }
     }
@@ -44741,7 +44741,7 @@ mod json_is_predicate {
         impl JsonIsPredicate {
             /// get `unique_keys`
             #[must_use]
-            pub fn get_unique_keys(&self) -> bool {
+            pub const fn get_unique_keys(&self) -> bool {
                 self.unique_keys
             }
         }
@@ -44749,7 +44749,7 @@ mod json_is_predicate {
         impl JsonIsPredicate {
             /// get `location`
             #[must_use]
-            pub fn get_location(&self) -> i32 {
+            pub const fn get_location(&self) -> i32 {
                 self.location
             }
         }
@@ -44926,7 +44926,7 @@ mod json_behavior {
     impl JsonBehaviorOpt {
         /// returns None Value
         #[must_use]
-        pub fn none() -> Self {
+        pub const fn none() -> Self {
             Self(None)
         }
     }
@@ -44964,7 +44964,7 @@ mod json_behavior {
     impl JsonBehaviorListOpt {
         /// returns None value
         #[must_use]
-        pub fn none() -> Self {
+        pub const fn none() -> Self {
             Self(None)
         }
     }
@@ -45053,7 +45053,7 @@ mod json_behavior {
         impl JsonBehavior {
             /// get `coerce`
             #[must_use]
-            pub fn get_coerce(&self) -> bool {
+            pub const fn get_coerce(&self) -> bool {
                 self.coerce
             }
         }
@@ -45061,7 +45061,7 @@ mod json_behavior {
         impl JsonBehavior {
             /// get `location`
             #[must_use]
-            pub fn get_location(&self) -> i32 {
+            pub const fn get_location(&self) -> i32 {
                 self.location
             }
         }
@@ -45219,7 +45219,7 @@ mod json_expr {
     impl JsonExprOpt {
         /// returns None Value
         #[must_use]
-        pub fn none() -> Self {
+        pub const fn none() -> Self {
             Self(None)
         }
     }
@@ -45257,7 +45257,7 @@ mod json_expr {
     impl JsonExprListOpt {
         /// returns None value
         #[must_use]
-        pub fn none() -> Self {
+        pub const fn none() -> Self {
             Self(None)
         }
     }
@@ -45509,7 +45509,7 @@ mod json_expr {
         impl JsonExpr {
             /// get `use_io_coercion`
             #[must_use]
-            pub fn get_use_io_coercion(&self) -> bool {
+            pub const fn get_use_io_coercion(&self) -> bool {
                 self.use_io_coercion
             }
         }
@@ -45517,7 +45517,7 @@ mod json_expr {
         impl JsonExpr {
             /// get `use_json_coercion`
             #[must_use]
-            pub fn get_use_json_coercion(&self) -> bool {
+            pub const fn get_use_json_coercion(&self) -> bool {
                 self.use_json_coercion
             }
         }
@@ -45533,7 +45533,7 @@ mod json_expr {
         impl JsonExpr {
             /// get `omit_quotes`
             #[must_use]
-            pub fn get_omit_quotes(&self) -> bool {
+            pub const fn get_omit_quotes(&self) -> bool {
                 self.omit_quotes
             }
         }
@@ -45541,7 +45541,7 @@ mod json_expr {
         impl JsonExpr {
             /// get `collation`
             #[must_use]
-            pub fn get_collation(&self) -> u32 {
+            pub const fn get_collation(&self) -> u32 {
                 self.collation
             }
         }
@@ -45549,7 +45549,7 @@ mod json_expr {
         impl JsonExpr {
             /// get `location`
             #[must_use]
-            pub fn get_location(&self) -> i32 {
+            pub const fn get_location(&self) -> i32 {
                 self.location
             }
         }
@@ -45940,7 +45940,7 @@ mod json_table_path {
     impl JsonTablePathOpt {
         /// returns None Value
         #[must_use]
-        pub fn none() -> Self {
+        pub const fn none() -> Self {
             Self(None)
         }
     }
@@ -45978,7 +45978,7 @@ mod json_table_path {
     impl JsonTablePathListOpt {
         /// returns None value
         #[must_use]
-        pub fn none() -> Self {
+        pub const fn none() -> Self {
             Self(None)
         }
     }
@@ -46132,7 +46132,7 @@ mod json_table_path_scan {
     impl JsonTablePathScanOpt {
         /// returns None Value
         #[must_use]
-        pub fn none() -> Self {
+        pub const fn none() -> Self {
             Self(None)
         }
     }
@@ -46170,7 +46170,7 @@ mod json_table_path_scan {
     impl JsonTablePathScanListOpt {
         /// returns None value
         #[must_use]
-        pub fn none() -> Self {
+        pub const fn none() -> Self {
             Self(None)
         }
     }
@@ -46273,7 +46273,7 @@ mod json_table_path_scan {
         impl JsonTablePathScan {
             /// get `error_on_error`
             #[must_use]
-            pub fn get_error_on_error(&self) -> bool {
+            pub const fn get_error_on_error(&self) -> bool {
                 self.error_on_error
             }
         }
@@ -46289,7 +46289,7 @@ mod json_table_path_scan {
         impl JsonTablePathScan {
             /// get `col_min`
             #[must_use]
-            pub fn get_col_min(&self) -> i32 {
+            pub const fn get_col_min(&self) -> i32 {
                 self.col_min
             }
         }
@@ -46297,7 +46297,7 @@ mod json_table_path_scan {
         impl JsonTablePathScan {
             /// get `col_max`
             #[must_use]
-            pub fn get_col_max(&self) -> i32 {
+            pub const fn get_col_max(&self) -> i32 {
                 self.col_max
             }
         }
@@ -46490,7 +46490,7 @@ mod json_table_sibling_join {
     impl JsonTableSiblingJoinOpt {
         /// returns None Value
         #[must_use]
-        pub fn none() -> Self {
+        pub const fn none() -> Self {
             Self(None)
         }
     }
@@ -46528,7 +46528,7 @@ mod json_table_sibling_join {
     impl JsonTableSiblingJoinListOpt {
         /// returns None value
         #[must_use]
-        pub fn none() -> Self {
+        pub const fn none() -> Self {
             Self(None)
         }
     }
@@ -46750,7 +46750,7 @@ mod null_test {
     impl NullTestOpt {
         /// returns None Value
         #[must_use]
-        pub fn none() -> Self {
+        pub const fn none() -> Self {
             Self(None)
         }
     }
@@ -46788,7 +46788,7 @@ mod null_test {
     impl NullTestListOpt {
         /// returns None value
         #[must_use]
-        pub fn none() -> Self {
+        pub const fn none() -> Self {
             Self(None)
         }
     }
@@ -46892,7 +46892,7 @@ mod null_test {
         impl NullTest {
             /// get `argisrow`
             #[must_use]
-            pub fn get_argisrow(&self) -> bool {
+            pub const fn get_argisrow(&self) -> bool {
                 self.argisrow
             }
         }
@@ -46900,7 +46900,7 @@ mod null_test {
         impl NullTest {
             /// get `location`
             #[must_use]
-            pub fn get_location(&self) -> i32 {
+            pub const fn get_location(&self) -> i32 {
                 self.location
             }
         }
@@ -47075,7 +47075,7 @@ mod boolean_test {
     impl BooleanTestOpt {
         /// returns None Value
         #[must_use]
-        pub fn none() -> Self {
+        pub const fn none() -> Self {
             Self(None)
         }
     }
@@ -47113,7 +47113,7 @@ mod boolean_test {
     impl BooleanTestListOpt {
         /// returns None value
         #[must_use]
-        pub fn none() -> Self {
+        pub const fn none() -> Self {
             Self(None)
         }
     }
@@ -47210,7 +47210,7 @@ mod boolean_test {
         impl BooleanTest {
             /// get `location`
             #[must_use]
-            pub fn get_location(&self) -> i32 {
+            pub const fn get_location(&self) -> i32 {
                 self.location
             }
         }
@@ -47369,7 +47369,7 @@ mod merge_action {
     impl MergeActionOpt {
         /// returns None Value
         #[must_use]
-        pub fn none() -> Self {
+        pub const fn none() -> Self {
             Self(None)
         }
     }
@@ -47407,7 +47407,7 @@ mod merge_action {
     impl MergeActionListOpt {
         /// returns None value
         #[must_use]
-        pub fn none() -> Self {
+        pub const fn none() -> Self {
             Self(None)
         }
     }
@@ -47734,7 +47734,7 @@ mod coerce_to_domain {
     impl CoerceToDomainOpt {
         /// returns None Value
         #[must_use]
-        pub fn none() -> Self {
+        pub const fn none() -> Self {
             Self(None)
         }
     }
@@ -47772,7 +47772,7 @@ mod coerce_to_domain {
     impl CoerceToDomainListOpt {
         /// returns None value
         #[must_use]
-        pub fn none() -> Self {
+        pub const fn none() -> Self {
             Self(None)
         }
     }
@@ -47882,7 +47882,7 @@ mod coerce_to_domain {
         impl CoerceToDomain {
             /// get `resulttype`
             #[must_use]
-            pub fn get_resulttype(&self) -> u32 {
+            pub const fn get_resulttype(&self) -> u32 {
                 self.resulttype
             }
         }
@@ -47890,7 +47890,7 @@ mod coerce_to_domain {
         impl CoerceToDomain {
             /// get `resulttypmod`
             #[must_use]
-            pub fn get_resulttypmod(&self) -> i32 {
+            pub const fn get_resulttypmod(&self) -> i32 {
                 self.resulttypmod
             }
         }
@@ -47898,7 +47898,7 @@ mod coerce_to_domain {
         impl CoerceToDomain {
             /// get `resultcollid`
             #[must_use]
-            pub fn get_resultcollid(&self) -> u32 {
+            pub const fn get_resultcollid(&self) -> u32 {
                 self.resultcollid
             }
         }
@@ -47914,7 +47914,7 @@ mod coerce_to_domain {
         impl CoerceToDomain {
             /// get `location`
             #[must_use]
-            pub fn get_location(&self) -> i32 {
+            pub const fn get_location(&self) -> i32 {
                 self.location
             }
         }
@@ -48123,7 +48123,7 @@ mod coerce_to_domain_value {
     impl CoerceToDomainValueOpt {
         /// returns None Value
         #[must_use]
-        pub fn none() -> Self {
+        pub const fn none() -> Self {
             Self(None)
         }
     }
@@ -48161,7 +48161,7 @@ mod coerce_to_domain_value {
     impl CoerceToDomainValueListOpt {
         /// returns None value
         #[must_use]
-        pub fn none() -> Self {
+        pub const fn none() -> Self {
             Self(None)
         }
     }
@@ -48249,7 +48249,7 @@ mod coerce_to_domain_value {
         impl CoerceToDomainValue {
             /// get `type_id`
             #[must_use]
-            pub fn get_type_id(&self) -> u32 {
+            pub const fn get_type_id(&self) -> u32 {
                 self.type_id
             }
         }
@@ -48257,7 +48257,7 @@ mod coerce_to_domain_value {
         impl CoerceToDomainValue {
             /// get `type_mod`
             #[must_use]
-            pub fn get_type_mod(&self) -> i32 {
+            pub const fn get_type_mod(&self) -> i32 {
                 self.type_mod
             }
         }
@@ -48265,7 +48265,7 @@ mod coerce_to_domain_value {
         impl CoerceToDomainValue {
             /// get `collation`
             #[must_use]
-            pub fn get_collation(&self) -> u32 {
+            pub const fn get_collation(&self) -> u32 {
                 self.collation
             }
         }
@@ -48273,7 +48273,7 @@ mod coerce_to_domain_value {
         impl CoerceToDomainValue {
             /// get `location`
             #[must_use]
-            pub fn get_location(&self) -> i32 {
+            pub const fn get_location(&self) -> i32 {
                 self.location
             }
         }
@@ -48445,7 +48445,7 @@ mod set_to_default {
     impl SetToDefaultOpt {
         /// returns None Value
         #[must_use]
-        pub fn none() -> Self {
+        pub const fn none() -> Self {
             Self(None)
         }
     }
@@ -48483,7 +48483,7 @@ mod set_to_default {
     impl SetToDefaultListOpt {
         /// returns None value
         #[must_use]
-        pub fn none() -> Self {
+        pub const fn none() -> Self {
             Self(None)
         }
     }
@@ -48571,7 +48571,7 @@ mod set_to_default {
         impl SetToDefault {
             /// get `type_id`
             #[must_use]
-            pub fn get_type_id(&self) -> u32 {
+            pub const fn get_type_id(&self) -> u32 {
                 self.type_id
             }
         }
@@ -48579,7 +48579,7 @@ mod set_to_default {
         impl SetToDefault {
             /// get `type_mod`
             #[must_use]
-            pub fn get_type_mod(&self) -> i32 {
+            pub const fn get_type_mod(&self) -> i32 {
                 self.type_mod
             }
         }
@@ -48587,7 +48587,7 @@ mod set_to_default {
         impl SetToDefault {
             /// get `collation`
             #[must_use]
-            pub fn get_collation(&self) -> u32 {
+            pub const fn get_collation(&self) -> u32 {
                 self.collation
             }
         }
@@ -48595,7 +48595,7 @@ mod set_to_default {
         impl SetToDefault {
             /// get `location`
             #[must_use]
-            pub fn get_location(&self) -> i32 {
+            pub const fn get_location(&self) -> i32 {
                 self.location
             }
         }
@@ -48766,7 +48766,7 @@ mod current_of_expr {
     impl CurrentOfExprOpt {
         /// returns None Value
         #[must_use]
-        pub fn none() -> Self {
+        pub const fn none() -> Self {
             Self(None)
         }
     }
@@ -48804,7 +48804,7 @@ mod current_of_expr {
     impl CurrentOfExprListOpt {
         /// returns None value
         #[must_use]
-        pub fn none() -> Self {
+        pub const fn none() -> Self {
             Self(None)
         }
     }
@@ -48885,7 +48885,7 @@ mod current_of_expr {
         impl CurrentOfExpr {
             /// get `cvarno`
             #[must_use]
-            pub fn get_cvarno(&self) -> u32 {
+            pub const fn get_cvarno(&self) -> u32 {
                 self.cvarno
             }
         }
@@ -48901,7 +48901,7 @@ mod current_of_expr {
         impl CurrentOfExpr {
             /// get `cursor_param`
             #[must_use]
-            pub fn get_cursor_param(&self) -> i32 {
+            pub const fn get_cursor_param(&self) -> i32 {
                 self.cursor_param
             }
         }
@@ -49056,7 +49056,7 @@ mod next_value_expr {
     impl NextValueExprOpt {
         /// returns None Value
         #[must_use]
-        pub fn none() -> Self {
+        pub const fn none() -> Self {
             Self(None)
         }
     }
@@ -49094,7 +49094,7 @@ mod next_value_expr {
     impl NextValueExprListOpt {
         /// returns None value
         #[must_use]
-        pub fn none() -> Self {
+        pub const fn none() -> Self {
             Self(None)
         }
     }
@@ -49168,7 +49168,7 @@ mod next_value_expr {
         impl NextValueExpr {
             /// get `seqid`
             #[must_use]
-            pub fn get_seqid(&self) -> u32 {
+            pub const fn get_seqid(&self) -> u32 {
                 self.seqid
             }
         }
@@ -49176,7 +49176,7 @@ mod next_value_expr {
         impl NextValueExpr {
             /// get `type_id`
             #[must_use]
-            pub fn get_type_id(&self) -> u32 {
+            pub const fn get_type_id(&self) -> u32 {
                 self.type_id
             }
         }
@@ -49315,7 +49315,7 @@ mod inference_elem {
     impl InferenceElemOpt {
         /// returns None Value
         #[must_use]
-        pub fn none() -> Self {
+        pub const fn none() -> Self {
             Self(None)
         }
     }
@@ -49353,7 +49353,7 @@ mod inference_elem {
     impl InferenceElemListOpt {
         /// returns None value
         #[must_use]
-        pub fn none() -> Self {
+        pub const fn none() -> Self {
             Self(None)
         }
     }
@@ -49442,7 +49442,7 @@ mod inference_elem {
         impl InferenceElem {
             /// get `infercollid`
             #[must_use]
-            pub fn get_infercollid(&self) -> u32 {
+            pub const fn get_infercollid(&self) -> u32 {
                 self.infercollid
             }
         }
@@ -49450,7 +49450,7 @@ mod inference_elem {
         impl InferenceElem {
             /// get `inferopclass`
             #[must_use]
-            pub fn get_inferopclass(&self) -> u32 {
+            pub const fn get_inferopclass(&self) -> u32 {
                 self.inferopclass
             }
         }
@@ -49608,7 +49608,7 @@ mod target_entry {
     impl TargetEntryOpt {
         /// returns None Value
         #[must_use]
-        pub fn none() -> Self {
+        pub const fn none() -> Self {
             Self(None)
         }
     }
@@ -49646,7 +49646,7 @@ mod target_entry {
     impl TargetEntryListOpt {
         /// returns None value
         #[must_use]
-        pub fn none() -> Self {
+        pub const fn none() -> Self {
             Self(None)
         }
     }
@@ -49763,7 +49763,7 @@ mod target_entry {
         impl TargetEntry {
             /// get `resno`
             #[must_use]
-            pub fn get_resno(&self) -> i32 {
+            pub const fn get_resno(&self) -> i32 {
                 self.resno
             }
         }
@@ -49779,7 +49779,7 @@ mod target_entry {
         impl TargetEntry {
             /// get `ressortgroupref`
             #[must_use]
-            pub fn get_ressortgroupref(&self) -> u32 {
+            pub const fn get_ressortgroupref(&self) -> u32 {
                 self.ressortgroupref
             }
         }
@@ -49787,7 +49787,7 @@ mod target_entry {
         impl TargetEntry {
             /// get `resorigtbl`
             #[must_use]
-            pub fn get_resorigtbl(&self) -> u32 {
+            pub const fn get_resorigtbl(&self) -> u32 {
                 self.resorigtbl
             }
         }
@@ -49795,7 +49795,7 @@ mod target_entry {
         impl TargetEntry {
             /// get `resorigcol`
             #[must_use]
-            pub fn get_resorigcol(&self) -> i32 {
+            pub const fn get_resorigcol(&self) -> i32 {
                 self.resorigcol
             }
         }
@@ -49803,7 +49803,7 @@ mod target_entry {
         impl TargetEntry {
             /// get `resjunk`
             #[must_use]
-            pub fn get_resjunk(&self) -> bool {
+            pub const fn get_resjunk(&self) -> bool {
                 self.resjunk
             }
         }
@@ -50023,7 +50023,7 @@ mod range_tbl_ref {
     impl RangeTblRefOpt {
         /// returns None Value
         #[must_use]
-        pub fn none() -> Self {
+        pub const fn none() -> Self {
             Self(None)
         }
     }
@@ -50061,7 +50061,7 @@ mod range_tbl_ref {
     impl RangeTblRefListOpt {
         /// returns None value
         #[must_use]
-        pub fn none() -> Self {
+        pub const fn none() -> Self {
             Self(None)
         }
     }
@@ -50111,7 +50111,7 @@ mod range_tbl_ref {
         impl RangeTblRef {
             /// get `rtindex`
             #[must_use]
-            pub fn get_rtindex(&self) -> i32 {
+            pub const fn get_rtindex(&self) -> i32 {
                 self.rtindex
             }
         }
@@ -50213,7 +50213,7 @@ mod join_expr {
     impl JoinExprOpt {
         /// returns None Value
         #[must_use]
-        pub fn none() -> Self {
+        pub const fn none() -> Self {
             Self(None)
         }
     }
@@ -50251,7 +50251,7 @@ mod join_expr {
     impl JoinExprListOpt {
         /// returns None value
         #[must_use]
-        pub fn none() -> Self {
+        pub const fn none() -> Self {
             Self(None)
         }
     }
@@ -50367,7 +50367,7 @@ mod join_expr {
         impl JoinExpr {
             /// get `is_natural`
             #[must_use]
-            pub fn get_is_natural(&self) -> bool {
+            pub const fn get_is_natural(&self) -> bool {
                 self.is_natural
             }
         }
@@ -50423,7 +50423,7 @@ mod join_expr {
         impl JoinExpr {
             /// get `rtindex`
             #[must_use]
-            pub fn get_rtindex(&self) -> i32 {
+            pub const fn get_rtindex(&self) -> i32 {
                 self.rtindex
             }
         }
@@ -50674,7 +50674,7 @@ mod from_expr {
     impl FromExprOpt {
         /// returns None Value
         #[must_use]
-        pub fn none() -> Self {
+        pub const fn none() -> Self {
             Self(None)
         }
     }
@@ -50712,7 +50712,7 @@ mod from_expr {
     impl FromExprListOpt {
         /// returns None value
         #[must_use]
-        pub fn none() -> Self {
+        pub const fn none() -> Self {
             Self(None)
         }
     }
@@ -50899,7 +50899,7 @@ mod on_conflict_expr {
     impl OnConflictExprOpt {
         /// returns None Value
         #[must_use]
-        pub fn none() -> Self {
+        pub const fn none() -> Self {
             Self(None)
         }
     }
@@ -50937,7 +50937,7 @@ mod on_conflict_expr {
     impl OnConflictExprListOpt {
         /// returns None value
         #[must_use]
-        pub fn none() -> Self {
+        pub const fn none() -> Self {
             Self(None)
         }
     }
@@ -51062,7 +51062,7 @@ mod on_conflict_expr {
         impl OnConflictExpr {
             /// get `constraint`
             #[must_use]
-            pub fn get_constraint(&self) -> u32 {
+            pub const fn get_constraint(&self) -> u32 {
                 self.constraint
             }
         }
@@ -51086,7 +51086,7 @@ mod on_conflict_expr {
         impl OnConflictExpr {
             /// get `excl_rel_index`
             #[must_use]
-            pub fn get_excl_rel_index(&self) -> i32 {
+            pub const fn get_excl_rel_index(&self) -> i32 {
                 self.excl_rel_index
             }
         }
@@ -51328,7 +51328,7 @@ mod query {
     impl QueryOpt {
         /// returns None Value
         #[must_use]
-        pub fn none() -> Self {
+        pub const fn none() -> Self {
             Self(None)
         }
     }
@@ -51366,7 +51366,7 @@ mod query {
     impl QueryListOpt {
         /// returns None value
         #[must_use]
-        pub fn none() -> Self {
+        pub const fn none() -> Self {
             Self(None)
         }
     }
@@ -51721,7 +51721,7 @@ mod query {
         impl Query {
             /// get `can_set_tag`
             #[must_use]
-            pub fn get_can_set_tag(&self) -> bool {
+            pub const fn get_can_set_tag(&self) -> bool {
                 self.can_set_tag
             }
         }
@@ -51737,7 +51737,7 @@ mod query {
         impl Query {
             /// get `result_relation`
             #[must_use]
-            pub fn get_result_relation(&self) -> i32 {
+            pub const fn get_result_relation(&self) -> i32 {
                 self.result_relation
             }
         }
@@ -51745,7 +51745,7 @@ mod query {
         impl Query {
             /// get `has_aggs`
             #[must_use]
-            pub fn get_has_aggs(&self) -> bool {
+            pub const fn get_has_aggs(&self) -> bool {
                 self.has_aggs
             }
         }
@@ -51753,7 +51753,7 @@ mod query {
         impl Query {
             /// get `has_window_funcs`
             #[must_use]
-            pub fn get_has_window_funcs(&self) -> bool {
+            pub const fn get_has_window_funcs(&self) -> bool {
                 self.has_window_funcs
             }
         }
@@ -51761,7 +51761,7 @@ mod query {
         impl Query {
             /// get `has_target_srfs`
             #[must_use]
-            pub fn get_has_target_srfs(&self) -> bool {
+            pub const fn get_has_target_srfs(&self) -> bool {
                 self.has_target_srfs
             }
         }
@@ -51769,7 +51769,7 @@ mod query {
         impl Query {
             /// get `has_sub_links`
             #[must_use]
-            pub fn get_has_sub_links(&self) -> bool {
+            pub const fn get_has_sub_links(&self) -> bool {
                 self.has_sub_links
             }
         }
@@ -51777,7 +51777,7 @@ mod query {
         impl Query {
             /// get `has_distinct_on`
             #[must_use]
-            pub fn get_has_distinct_on(&self) -> bool {
+            pub const fn get_has_distinct_on(&self) -> bool {
                 self.has_distinct_on
             }
         }
@@ -51785,7 +51785,7 @@ mod query {
         impl Query {
             /// get `has_recursive`
             #[must_use]
-            pub fn get_has_recursive(&self) -> bool {
+            pub const fn get_has_recursive(&self) -> bool {
                 self.has_recursive
             }
         }
@@ -51793,7 +51793,7 @@ mod query {
         impl Query {
             /// get `has_modifying_cte`
             #[must_use]
-            pub fn get_has_modifying_cte(&self) -> bool {
+            pub const fn get_has_modifying_cte(&self) -> bool {
                 self.has_modifying_cte
             }
         }
@@ -51801,7 +51801,7 @@ mod query {
         impl Query {
             /// get `has_for_update`
             #[must_use]
-            pub fn get_has_for_update(&self) -> bool {
+            pub const fn get_has_for_update(&self) -> bool {
                 self.has_for_update
             }
         }
@@ -51809,7 +51809,7 @@ mod query {
         impl Query {
             /// get `has_row_security`
             #[must_use]
-            pub fn get_has_row_security(&self) -> bool {
+            pub const fn get_has_row_security(&self) -> bool {
                 self.has_row_security
             }
         }
@@ -51817,7 +51817,7 @@ mod query {
         impl Query {
             /// get `is_return`
             #[must_use]
-            pub fn get_is_return(&self) -> bool {
+            pub const fn get_is_return(&self) -> bool {
                 self.is_return
             }
         }
@@ -51865,7 +51865,7 @@ mod query {
         impl Query {
             /// get `merge_target_relation`
             #[must_use]
-            pub fn get_merge_target_relation(&self) -> i32 {
+            pub const fn get_merge_target_relation(&self) -> i32 {
                 self.merge_target_relation
             }
         }
@@ -51921,7 +51921,7 @@ mod query {
         impl Query {
             /// get `group_distinct`
             #[must_use]
-            pub fn get_group_distinct(&self) -> bool {
+            pub const fn get_group_distinct(&self) -> bool {
                 self.group_distinct
             }
         }
@@ -52025,7 +52025,7 @@ mod query {
         impl Query {
             /// get `stmt_location`
             #[must_use]
-            pub fn get_stmt_location(&self) -> i32 {
+            pub const fn get_stmt_location(&self) -> i32 {
                 self.stmt_location
             }
         }
@@ -52033,7 +52033,7 @@ mod query {
         impl Query {
             /// get `stmt_len`
             #[must_use]
-            pub fn get_stmt_len(&self) -> i32 {
+            pub const fn get_stmt_len(&self) -> i32 {
                 self.stmt_len
             }
         }
@@ -52869,7 +52869,7 @@ mod type_name {
     impl TypeNameOpt {
         /// returns None Value
         #[must_use]
-        pub fn none() -> Self {
+        pub const fn none() -> Self {
             Self(None)
         }
     }
@@ -52907,7 +52907,7 @@ mod type_name {
     impl TypeNameListOpt {
         /// returns None value
         #[must_use]
-        pub fn none() -> Self {
+        pub const fn none() -> Self {
             Self(None)
         }
     }
@@ -53016,7 +53016,7 @@ mod type_name {
         impl TypeName {
             /// get `type_oid`
             #[must_use]
-            pub fn get_type_oid(&self) -> u32 {
+            pub const fn get_type_oid(&self) -> u32 {
                 self.type_oid
             }
         }
@@ -53024,7 +53024,7 @@ mod type_name {
         impl TypeName {
             /// get `setof`
             #[must_use]
-            pub fn get_setof(&self) -> bool {
+            pub const fn get_setof(&self) -> bool {
                 self.setof
             }
         }
@@ -53032,7 +53032,7 @@ mod type_name {
         impl TypeName {
             /// get `pct_type`
             #[must_use]
-            pub fn get_pct_type(&self) -> bool {
+            pub const fn get_pct_type(&self) -> bool {
                 self.pct_type
             }
         }
@@ -53048,7 +53048,7 @@ mod type_name {
         impl TypeName {
             /// get `typemod`
             #[must_use]
-            pub fn get_typemod(&self) -> i32 {
+            pub const fn get_typemod(&self) -> i32 {
                 self.typemod
             }
         }
@@ -53064,7 +53064,7 @@ mod type_name {
         impl TypeName {
             /// get `location`
             #[must_use]
-            pub fn get_location(&self) -> i32 {
+            pub const fn get_location(&self) -> i32 {
                 self.location
             }
         }
@@ -53287,7 +53287,7 @@ mod column_ref {
     impl ColumnRefOpt {
         /// returns None Value
         #[must_use]
-        pub fn none() -> Self {
+        pub const fn none() -> Self {
             Self(None)
         }
     }
@@ -53325,7 +53325,7 @@ mod column_ref {
     impl ColumnRefListOpt {
         /// returns None value
         #[must_use]
-        pub fn none() -> Self {
+        pub const fn none() -> Self {
             Self(None)
         }
     }
@@ -53388,7 +53388,7 @@ mod column_ref {
         impl ColumnRef {
             /// get `location`
             #[must_use]
-            pub fn get_location(&self) -> i32 {
+            pub const fn get_location(&self) -> i32 {
                 self.location
             }
         }
@@ -53509,7 +53509,7 @@ mod param_ref {
     impl ParamRefOpt {
         /// returns None Value
         #[must_use]
-        pub fn none() -> Self {
+        pub const fn none() -> Self {
             Self(None)
         }
     }
@@ -53547,7 +53547,7 @@ mod param_ref {
     impl ParamRefListOpt {
         /// returns None value
         #[must_use]
-        pub fn none() -> Self {
+        pub const fn none() -> Self {
             Self(None)
         }
     }
@@ -53602,7 +53602,7 @@ mod param_ref {
         impl ParamRef {
             /// get `number`
             #[must_use]
-            pub fn get_number(&self) -> i32 {
+            pub const fn get_number(&self) -> i32 {
                 self.number
             }
         }
@@ -53610,7 +53610,7 @@ mod param_ref {
         impl ParamRef {
             /// get `location`
             #[must_use]
-            pub fn get_location(&self) -> i32 {
+            pub const fn get_location(&self) -> i32 {
                 self.location
             }
         }
@@ -53728,7 +53728,7 @@ mod a_expr {
     impl AExprOpt {
         /// returns None Value
         #[must_use]
-        pub fn none() -> Self {
+        pub const fn none() -> Self {
             Self(None)
         }
     }
@@ -53766,7 +53766,7 @@ mod a_expr {
     impl AExprListOpt {
         /// returns None value
         #[must_use]
-        pub fn none() -> Self {
+        pub const fn none() -> Self {
             Self(None)
         }
     }
@@ -53878,7 +53878,7 @@ mod a_expr {
         impl AExpr {
             /// get `location`
             #[must_use]
-            pub fn get_location(&self) -> i32 {
+            pub const fn get_location(&self) -> i32 {
                 self.location
             }
         }
@@ -54056,7 +54056,7 @@ mod type_cast {
     impl TypeCastOpt {
         /// returns None Value
         #[must_use]
-        pub fn none() -> Self {
+        pub const fn none() -> Self {
             Self(None)
         }
     }
@@ -54094,7 +54094,7 @@ mod type_cast {
     impl TypeCastListOpt {
         /// returns None value
         #[must_use]
-        pub fn none() -> Self {
+        pub const fn none() -> Self {
             Self(None)
         }
     }
@@ -54176,7 +54176,7 @@ mod type_cast {
         impl TypeCast {
             /// get `location`
             #[must_use]
-            pub fn get_location(&self) -> i32 {
+            pub const fn get_location(&self) -> i32 {
                 self.location
             }
         }
@@ -54316,7 +54316,7 @@ mod collate_clause {
     impl CollateClauseOpt {
         /// returns None Value
         #[must_use]
-        pub fn none() -> Self {
+        pub const fn none() -> Self {
             Self(None)
         }
     }
@@ -54354,7 +54354,7 @@ mod collate_clause {
     impl CollateClauseListOpt {
         /// returns None value
         #[must_use]
-        pub fn none() -> Self {
+        pub const fn none() -> Self {
             Self(None)
         }
     }
@@ -54436,7 +54436,7 @@ mod collate_clause {
         impl CollateClause {
             /// get `location`
             #[must_use]
-            pub fn get_location(&self) -> i32 {
+            pub const fn get_location(&self) -> i32 {
                 self.location
             }
         }
@@ -54578,7 +54578,7 @@ mod role_spec {
     impl RoleSpecOpt {
         /// returns None Value
         #[must_use]
-        pub fn none() -> Self {
+        pub const fn none() -> Self {
             Self(None)
         }
     }
@@ -54616,7 +54616,7 @@ mod role_spec {
     impl RoleSpecListOpt {
         /// returns None value
         #[must_use]
-        pub fn none() -> Self {
+        pub const fn none() -> Self {
             Self(None)
         }
     }
@@ -54698,7 +54698,7 @@ mod role_spec {
         impl RoleSpec {
             /// get `location`
             #[must_use]
-            pub fn get_location(&self) -> i32 {
+            pub const fn get_location(&self) -> i32 {
                 self.location
             }
         }
@@ -54835,7 +54835,7 @@ mod func_call {
     impl FuncCallOpt {
         /// returns None Value
         #[must_use]
-        pub fn none() -> Self {
+        pub const fn none() -> Self {
             Self(None)
         }
     }
@@ -54873,7 +54873,7 @@ mod func_call {
     impl FuncCallListOpt {
         /// returns None value
         #[must_use]
-        pub fn none() -> Self {
+        pub const fn none() -> Self {
             Self(None)
         }
     }
@@ -55035,7 +55035,7 @@ mod func_call {
         impl FuncCall {
             /// get `agg_within_group`
             #[must_use]
-            pub fn get_agg_within_group(&self) -> bool {
+            pub const fn get_agg_within_group(&self) -> bool {
                 self.agg_within_group
             }
         }
@@ -55043,7 +55043,7 @@ mod func_call {
         impl FuncCall {
             /// get `agg_star`
             #[must_use]
-            pub fn get_agg_star(&self) -> bool {
+            pub const fn get_agg_star(&self) -> bool {
                 self.agg_star
             }
         }
@@ -55051,7 +55051,7 @@ mod func_call {
         impl FuncCall {
             /// get `agg_distinct`
             #[must_use]
-            pub fn get_agg_distinct(&self) -> bool {
+            pub const fn get_agg_distinct(&self) -> bool {
                 self.agg_distinct
             }
         }
@@ -55059,7 +55059,7 @@ mod func_call {
         impl FuncCall {
             /// get `func_variadic`
             #[must_use]
-            pub fn get_func_variadic(&self) -> bool {
+            pub const fn get_func_variadic(&self) -> bool {
                 self.func_variadic
             }
         }
@@ -55075,7 +55075,7 @@ mod func_call {
         impl FuncCall {
             /// get `location`
             #[must_use]
-            pub fn get_location(&self) -> i32 {
+            pub const fn get_location(&self) -> i32 {
                 self.location
             }
         }
@@ -55355,7 +55355,7 @@ mod a_star {
     impl AStarOpt {
         /// returns None Value
         #[must_use]
-        pub fn none() -> Self {
+        pub const fn none() -> Self {
             Self(None)
         }
     }
@@ -55393,7 +55393,7 @@ mod a_star {
     impl AStarListOpt {
         /// returns None value
         #[must_use]
-        pub fn none() -> Self {
+        pub const fn none() -> Self {
             Self(None)
         }
     }
@@ -55516,7 +55516,7 @@ mod a_indices {
     impl AIndicesOpt {
         /// returns None Value
         #[must_use]
-        pub fn none() -> Self {
+        pub const fn none() -> Self {
             Self(None)
         }
     }
@@ -55554,7 +55554,7 @@ mod a_indices {
     impl AIndicesListOpt {
         /// returns None value
         #[must_use]
-        pub fn none() -> Self {
+        pub const fn none() -> Self {
             Self(None)
         }
     }
@@ -55620,7 +55620,7 @@ mod a_indices {
         impl AIndices {
             /// get `is_slice`
             #[must_use]
-            pub fn get_is_slice(&self) -> bool {
+            pub const fn get_is_slice(&self) -> bool {
                 self.is_slice
             }
         }
@@ -55776,7 +55776,7 @@ mod a_indirection {
     impl AIndirectionOpt {
         /// returns None Value
         #[must_use]
-        pub fn none() -> Self {
+        pub const fn none() -> Self {
             Self(None)
         }
     }
@@ -55814,7 +55814,7 @@ mod a_indirection {
     impl AIndirectionListOpt {
         /// returns None value
         #[must_use]
-        pub fn none() -> Self {
+        pub const fn none() -> Self {
             Self(None)
         }
     }
@@ -56003,7 +56003,7 @@ mod a_array_expr {
     impl AArrayExprOpt {
         /// returns None Value
         #[must_use]
-        pub fn none() -> Self {
+        pub const fn none() -> Self {
             Self(None)
         }
     }
@@ -56041,7 +56041,7 @@ mod a_array_expr {
     impl AArrayExprListOpt {
         /// returns None value
         #[must_use]
-        pub fn none() -> Self {
+        pub const fn none() -> Self {
             Self(None)
         }
     }
@@ -56104,7 +56104,7 @@ mod a_array_expr {
         impl AArrayExpr {
             /// get `location`
             #[must_use]
-            pub fn get_location(&self) -> i32 {
+            pub const fn get_location(&self) -> i32 {
                 self.location
             }
         }
@@ -56225,7 +56225,7 @@ mod res_target {
     impl ResTargetOpt {
         /// returns None Value
         #[must_use]
-        pub fn none() -> Self {
+        pub const fn none() -> Self {
             Self(None)
         }
     }
@@ -56263,7 +56263,7 @@ mod res_target {
     impl ResTargetListOpt {
         /// returns None value
         #[must_use]
-        pub fn none() -> Self {
+        pub const fn none() -> Self {
             Self(None)
         }
     }
@@ -56360,7 +56360,7 @@ mod res_target {
         impl ResTarget {
             /// get `location`
             #[must_use]
-            pub fn get_location(&self) -> i32 {
+            pub const fn get_location(&self) -> i32 {
                 self.location
             }
         }
@@ -56516,7 +56516,7 @@ mod multi_assign_ref {
     impl MultiAssignRefOpt {
         /// returns None Value
         #[must_use]
-        pub fn none() -> Self {
+        pub const fn none() -> Self {
             Self(None)
         }
     }
@@ -56554,7 +56554,7 @@ mod multi_assign_ref {
     impl MultiAssignRefListOpt {
         /// returns None value
         #[must_use]
-        pub fn none() -> Self {
+        pub const fn none() -> Self {
             Self(None)
         }
     }
@@ -56628,7 +56628,7 @@ mod multi_assign_ref {
         impl MultiAssignRef {
             /// get `colno`
             #[must_use]
-            pub fn get_colno(&self) -> i32 {
+            pub const fn get_colno(&self) -> i32 {
                 self.colno
             }
         }
@@ -56636,7 +56636,7 @@ mod multi_assign_ref {
         impl MultiAssignRef {
             /// get `ncolumns`
             #[must_use]
-            pub fn get_ncolumns(&self) -> i32 {
+            pub const fn get_ncolumns(&self) -> i32 {
                 self.ncolumns
             }
         }
@@ -56775,7 +56775,7 @@ mod sort_by {
     impl SortByOpt {
         /// returns None Value
         #[must_use]
-        pub fn none() -> Self {
+        pub const fn none() -> Self {
             Self(None)
         }
     }
@@ -56813,7 +56813,7 @@ mod sort_by {
     impl SortByListOpt {
         /// returns None value
         #[must_use]
-        pub fn none() -> Self {
+        pub const fn none() -> Self {
             Self(None)
         }
     }
@@ -56925,7 +56925,7 @@ mod sort_by {
         impl SortBy {
             /// get `location`
             #[must_use]
-            pub fn get_location(&self) -> i32 {
+            pub const fn get_location(&self) -> i32 {
                 self.location
             }
         }
@@ -57103,7 +57103,7 @@ mod window_def {
     impl WindowDefOpt {
         /// returns None Value
         #[must_use]
-        pub fn none() -> Self {
+        pub const fn none() -> Self {
             Self(None)
         }
     }
@@ -57141,7 +57141,7 @@ mod window_def {
     impl WindowDefListOpt {
         /// returns None value
         #[must_use]
-        pub fn none() -> Self {
+        pub const fn none() -> Self {
             Self(None)
         }
     }
@@ -57274,7 +57274,7 @@ mod window_def {
         impl WindowDef {
             /// get `frame_options`
             #[must_use]
-            pub fn get_frame_options(&self) -> i32 {
+            pub const fn get_frame_options(&self) -> i32 {
                 self.frame_options
             }
         }
@@ -57298,7 +57298,7 @@ mod window_def {
         impl WindowDef {
             /// get `location`
             #[must_use]
-            pub fn get_location(&self) -> i32 {
+            pub const fn get_location(&self) -> i32 {
                 self.location
             }
         }
@@ -57524,7 +57524,7 @@ mod range_subselect {
     impl RangeSubselectOpt {
         /// returns None Value
         #[must_use]
-        pub fn none() -> Self {
+        pub const fn none() -> Self {
             Self(None)
         }
     }
@@ -57562,7 +57562,7 @@ mod range_subselect {
     impl RangeSubselectListOpt {
         /// returns None value
         #[must_use]
-        pub fn none() -> Self {
+        pub const fn none() -> Self {
             Self(None)
         }
     }
@@ -57628,7 +57628,7 @@ mod range_subselect {
         impl RangeSubselect {
             /// get `lateral`
             #[must_use]
-            pub fn get_lateral(&self) -> bool {
+            pub const fn get_lateral(&self) -> bool {
                 self.lateral
             }
         }
@@ -57786,7 +57786,7 @@ mod range_function {
     impl RangeFunctionOpt {
         /// returns None Value
         #[must_use]
-        pub fn none() -> Self {
+        pub const fn none() -> Self {
             Self(None)
         }
     }
@@ -57824,7 +57824,7 @@ mod range_function {
     impl RangeFunctionListOpt {
         /// returns None value
         #[must_use]
-        pub fn none() -> Self {
+        pub const fn none() -> Self {
             Self(None)
         }
     }
@@ -57911,7 +57911,7 @@ mod range_function {
         impl RangeFunction {
             /// get `lateral`
             #[must_use]
-            pub fn get_lateral(&self) -> bool {
+            pub const fn get_lateral(&self) -> bool {
                 self.lateral
             }
         }
@@ -57919,7 +57919,7 @@ mod range_function {
         impl RangeFunction {
             /// get `ordinality`
             #[must_use]
-            pub fn get_ordinality(&self) -> bool {
+            pub const fn get_ordinality(&self) -> bool {
                 self.ordinality
             }
         }
@@ -57927,7 +57927,7 @@ mod range_function {
         impl RangeFunction {
             /// get `is_rowsfrom`
             #[must_use]
-            pub fn get_is_rowsfrom(&self) -> bool {
+            pub const fn get_is_rowsfrom(&self) -> bool {
                 self.is_rowsfrom
             }
         }
@@ -58144,7 +58144,7 @@ mod range_table_func {
     impl RangeTableFuncOpt {
         /// returns None Value
         #[must_use]
-        pub fn none() -> Self {
+        pub const fn none() -> Self {
             Self(None)
         }
     }
@@ -58182,7 +58182,7 @@ mod range_table_func {
     impl RangeTableFuncListOpt {
         /// returns None value
         #[must_use]
-        pub fn none() -> Self {
+        pub const fn none() -> Self {
             Self(None)
         }
     }
@@ -58276,7 +58276,7 @@ mod range_table_func {
         impl RangeTableFunc {
             /// get `lateral`
             #[must_use]
-            pub fn get_lateral(&self) -> bool {
+            pub const fn get_lateral(&self) -> bool {
                 self.lateral
             }
         }
@@ -58324,7 +58324,7 @@ mod range_table_func {
         impl RangeTableFunc {
             /// get `location`
             #[must_use]
-            pub fn get_location(&self) -> i32 {
+            pub const fn get_location(&self) -> i32 {
                 self.location
             }
         }
@@ -58539,7 +58539,7 @@ mod range_table_func_col {
     impl RangeTableFuncColOpt {
         /// returns None Value
         #[must_use]
-        pub fn none() -> Self {
+        pub const fn none() -> Self {
             Self(None)
         }
     }
@@ -58577,7 +58577,7 @@ mod range_table_func_col {
     impl RangeTableFuncColListOpt {
         /// returns None value
         #[must_use]
-        pub fn none() -> Self {
+        pub const fn none() -> Self {
             Self(None)
         }
     }
@@ -58687,7 +58687,7 @@ mod range_table_func_col {
         impl RangeTableFuncCol {
             /// get `for_ordinality`
             #[must_use]
-            pub fn get_for_ordinality(&self) -> bool {
+            pub const fn get_for_ordinality(&self) -> bool {
                 self.for_ordinality
             }
         }
@@ -58695,7 +58695,7 @@ mod range_table_func_col {
         impl RangeTableFuncCol {
             /// get `is_not_null`
             #[must_use]
-            pub fn get_is_not_null(&self) -> bool {
+            pub const fn get_is_not_null(&self) -> bool {
                 self.is_not_null
             }
         }
@@ -58719,7 +58719,7 @@ mod range_table_func_col {
         impl RangeTableFuncCol {
             /// get `location`
             #[must_use]
-            pub fn get_location(&self) -> i32 {
+            pub const fn get_location(&self) -> i32 {
                 self.location
             }
         }
@@ -58928,7 +58928,7 @@ mod range_table_sample {
     impl RangeTableSampleOpt {
         /// returns None Value
         #[must_use]
-        pub fn none() -> Self {
+        pub const fn none() -> Self {
             Self(None)
         }
     }
@@ -58966,7 +58966,7 @@ mod range_table_sample {
     impl RangeTableSampleListOpt {
         /// returns None value
         #[must_use]
-        pub fn none() -> Self {
+        pub const fn none() -> Self {
             Self(None)
         }
     }
@@ -59078,7 +59078,7 @@ mod range_table_sample {
         impl RangeTableSample {
             /// get `location`
             #[must_use]
-            pub fn get_location(&self) -> i32 {
+            pub const fn get_location(&self) -> i32 {
                 self.location
             }
         }
@@ -59258,7 +59258,7 @@ mod column_def {
     impl ColumnDefOpt {
         /// returns None Value
         #[must_use]
-        pub fn none() -> Self {
+        pub const fn none() -> Self {
             Self(None)
         }
     }
@@ -59296,7 +59296,7 @@ mod column_def {
     impl ColumnDefListOpt {
         /// returns None value
         #[must_use]
-        pub fn none() -> Self {
+        pub const fn none() -> Self {
             Self(None)
         }
     }
@@ -59498,7 +59498,7 @@ mod column_def {
         impl ColumnDef {
             /// get `inhcount`
             #[must_use]
-            pub fn get_inhcount(&self) -> i32 {
+            pub const fn get_inhcount(&self) -> i32 {
                 self.inhcount
             }
         }
@@ -59506,7 +59506,7 @@ mod column_def {
         impl ColumnDef {
             /// get `is_local`
             #[must_use]
-            pub fn get_is_local(&self) -> bool {
+            pub const fn get_is_local(&self) -> bool {
                 self.is_local
             }
         }
@@ -59514,7 +59514,7 @@ mod column_def {
         impl ColumnDef {
             /// get `is_not_null`
             #[must_use]
-            pub fn get_is_not_null(&self) -> bool {
+            pub const fn get_is_not_null(&self) -> bool {
                 self.is_not_null
             }
         }
@@ -59522,7 +59522,7 @@ mod column_def {
         impl ColumnDef {
             /// get `is_from_type`
             #[must_use]
-            pub fn get_is_from_type(&self) -> bool {
+            pub const fn get_is_from_type(&self) -> bool {
                 self.is_from_type
             }
         }
@@ -59594,7 +59594,7 @@ mod column_def {
         impl ColumnDef {
             /// get `coll_oid`
             #[must_use]
-            pub fn get_coll_oid(&self) -> u32 {
+            pub const fn get_coll_oid(&self) -> u32 {
                 self.coll_oid
             }
         }
@@ -59618,7 +59618,7 @@ mod column_def {
         impl ColumnDef {
             /// get `location`
             #[must_use]
-            pub fn get_location(&self) -> i32 {
+            pub const fn get_location(&self) -> i32 {
                 self.location
             }
         }
@@ -60029,7 +60029,7 @@ mod table_like_clause {
     impl TableLikeClauseOpt {
         /// returns None Value
         #[must_use]
-        pub fn none() -> Self {
+        pub const fn none() -> Self {
             Self(None)
         }
     }
@@ -60067,7 +60067,7 @@ mod table_like_clause {
     impl TableLikeClauseListOpt {
         /// returns None value
         #[must_use]
-        pub fn none() -> Self {
+        pub const fn none() -> Self {
             Self(None)
         }
     }
@@ -60141,7 +60141,7 @@ mod table_like_clause {
         impl TableLikeClause {
             /// get `options`
             #[must_use]
-            pub fn get_options(&self) -> u32 {
+            pub const fn get_options(&self) -> u32 {
                 self.options
             }
         }
@@ -60149,7 +60149,7 @@ mod table_like_clause {
         impl TableLikeClause {
             /// get `relation_oid`
             #[must_use]
-            pub fn get_relation_oid(&self) -> u32 {
+            pub const fn get_relation_oid(&self) -> u32 {
                 self.relation_oid
             }
         }
@@ -60288,7 +60288,7 @@ mod index_elem {
     impl IndexElemOpt {
         /// returns None Value
         #[must_use]
-        pub fn none() -> Self {
+        pub const fn none() -> Self {
             Self(None)
         }
     }
@@ -60326,7 +60326,7 @@ mod index_elem {
     impl IndexElemListOpt {
         /// returns None value
         #[must_use]
-        pub fn none() -> Self {
+        pub const fn none() -> Self {
             Self(None)
         }
     }
@@ -60715,7 +60715,7 @@ mod def_elem {
     impl DefElemOpt {
         /// returns None Value
         #[must_use]
-        pub fn none() -> Self {
+        pub const fn none() -> Self {
             Self(None)
         }
     }
@@ -60753,7 +60753,7 @@ mod def_elem {
     impl DefElemListOpt {
         /// returns None value
         #[must_use]
-        pub fn none() -> Self {
+        pub const fn none() -> Self {
             Self(None)
         }
     }
@@ -60865,7 +60865,7 @@ mod def_elem {
         impl DefElem {
             /// get `location`
             #[must_use]
-            pub fn get_location(&self) -> i32 {
+            pub const fn get_location(&self) -> i32 {
                 self.location
             }
         }
@@ -61037,7 +61037,7 @@ mod locking_clause {
     impl LockingClauseOpt {
         /// returns None Value
         #[must_use]
-        pub fn none() -> Self {
+        pub const fn none() -> Self {
             Self(None)
         }
     }
@@ -61075,7 +61075,7 @@ mod locking_clause {
     impl LockingClauseListOpt {
         /// returns None value
         #[must_use]
-        pub fn none() -> Self {
+        pub const fn none() -> Self {
             Self(None)
         }
     }
@@ -61302,7 +61302,7 @@ mod xml_serialize {
     impl XmlSerializeOpt {
         /// returns None Value
         #[must_use]
-        pub fn none() -> Self {
+        pub const fn none() -> Self {
             Self(None)
         }
     }
@@ -61340,7 +61340,7 @@ mod xml_serialize {
     impl XmlSerializeListOpt {
         /// returns None value
         #[must_use]
-        pub fn none() -> Self {
+        pub const fn none() -> Self {
             Self(None)
         }
     }
@@ -61444,7 +61444,7 @@ mod xml_serialize {
         impl XmlSerialize {
             /// get `indent`
             #[must_use]
-            pub fn get_indent(&self) -> bool {
+            pub const fn get_indent(&self) -> bool {
                 self.indent
             }
         }
@@ -61452,7 +61452,7 @@ mod xml_serialize {
         impl XmlSerialize {
             /// get `location`
             #[must_use]
-            pub fn get_location(&self) -> i32 {
+            pub const fn get_location(&self) -> i32 {
                 self.location
             }
         }
@@ -61629,7 +61629,7 @@ mod partition_elem {
     impl PartitionElemOpt {
         /// returns None Value
         #[must_use]
-        pub fn none() -> Self {
+        pub const fn none() -> Self {
             Self(None)
         }
     }
@@ -61667,7 +61667,7 @@ mod partition_elem {
     impl PartitionElemListOpt {
         /// returns None value
         #[must_use]
-        pub fn none() -> Self {
+        pub const fn none() -> Self {
             Self(None)
         }
     }
@@ -61779,7 +61779,7 @@ mod partition_elem {
         impl PartitionElem {
             /// get `location`
             #[must_use]
-            pub fn get_location(&self) -> i32 {
+            pub const fn get_location(&self) -> i32 {
                 self.location
             }
         }
@@ -61956,7 +61956,7 @@ mod partition_spec {
     impl PartitionSpecOpt {
         /// returns None Value
         #[must_use]
-        pub fn none() -> Self {
+        pub const fn none() -> Self {
             Self(None)
         }
     }
@@ -61994,7 +61994,7 @@ mod partition_spec {
     impl PartitionSpecListOpt {
         /// returns None value
         #[must_use]
-        pub fn none() -> Self {
+        pub const fn none() -> Self {
             Self(None)
         }
     }
@@ -62076,7 +62076,7 @@ mod partition_spec {
         impl PartitionSpec {
             /// get `location`
             #[must_use]
-            pub fn get_location(&self) -> i32 {
+            pub const fn get_location(&self) -> i32 {
                 self.location
             }
         }
@@ -62218,7 +62218,7 @@ mod partition_bound_spec {
     impl PartitionBoundSpecOpt {
         /// returns None Value
         #[must_use]
-        pub fn none() -> Self {
+        pub const fn none() -> Self {
             Self(None)
         }
     }
@@ -62256,7 +62256,7 @@ mod partition_bound_spec {
     impl PartitionBoundSpecListOpt {
         /// returns None value
         #[must_use]
-        pub fn none() -> Self {
+        pub const fn none() -> Self {
             Self(None)
         }
     }
@@ -62365,7 +62365,7 @@ mod partition_bound_spec {
         impl PartitionBoundSpec {
             /// get `is_default`
             #[must_use]
-            pub fn get_is_default(&self) -> bool {
+            pub const fn get_is_default(&self) -> bool {
                 self.is_default
             }
         }
@@ -62373,7 +62373,7 @@ mod partition_bound_spec {
         impl PartitionBoundSpec {
             /// get `modulus`
             #[must_use]
-            pub fn get_modulus(&self) -> i32 {
+            pub const fn get_modulus(&self) -> i32 {
                 self.modulus
             }
         }
@@ -62381,7 +62381,7 @@ mod partition_bound_spec {
         impl PartitionBoundSpec {
             /// get `remainder`
             #[must_use]
-            pub fn get_remainder(&self) -> i32 {
+            pub const fn get_remainder(&self) -> i32 {
                 self.remainder
             }
         }
@@ -62413,7 +62413,7 @@ mod partition_bound_spec {
         impl PartitionBoundSpec {
             /// get `location`
             #[must_use]
-            pub fn get_location(&self) -> i32 {
+            pub const fn get_location(&self) -> i32 {
                 self.location
             }
         }
@@ -62638,7 +62638,7 @@ mod partition_range_datum {
     impl PartitionRangeDatumOpt {
         /// returns None Value
         #[must_use]
-        pub fn none() -> Self {
+        pub const fn none() -> Self {
             Self(None)
         }
     }
@@ -62676,7 +62676,7 @@ mod partition_range_datum {
     impl PartitionRangeDatumListOpt {
         /// returns None value
         #[must_use]
-        pub fn none() -> Self {
+        pub const fn none() -> Self {
             Self(None)
         }
     }
@@ -62758,7 +62758,7 @@ mod partition_range_datum {
         impl PartitionRangeDatum {
             /// get `location`
             #[must_use]
-            pub fn get_location(&self) -> i32 {
+            pub const fn get_location(&self) -> i32 {
                 self.location
             }
         }
@@ -62901,7 +62901,7 @@ mod single_partition_spec {
     impl SinglePartitionSpecOpt {
         /// returns None Value
         #[must_use]
-        pub fn none() -> Self {
+        pub const fn none() -> Self {
             Self(None)
         }
     }
@@ -62939,7 +62939,7 @@ mod single_partition_spec {
     impl SinglePartitionSpecListOpt {
         /// returns None value
         #[must_use]
-        pub fn none() -> Self {
+        pub const fn none() -> Self {
             Self(None)
         }
     }
@@ -63065,7 +63065,7 @@ mod partition_cmd {
     impl PartitionCmdOpt {
         /// returns None Value
         #[must_use]
-        pub fn none() -> Self {
+        pub const fn none() -> Self {
             Self(None)
         }
     }
@@ -63103,7 +63103,7 @@ mod partition_cmd {
     impl PartitionCmdListOpt {
         /// returns None value
         #[must_use]
-        pub fn none() -> Self {
+        pub const fn none() -> Self {
             Self(None)
         }
     }
@@ -63185,7 +63185,7 @@ mod partition_cmd {
         impl PartitionCmd {
             /// get `concurrent`
             #[must_use]
-            pub fn get_concurrent(&self) -> bool {
+            pub const fn get_concurrent(&self) -> bool {
                 self.concurrent
             }
         }
@@ -63327,7 +63327,7 @@ mod range_tbl_entry {
     impl RangeTblEntryOpt {
         /// returns None Value
         #[must_use]
-        pub fn none() -> Self {
+        pub const fn none() -> Self {
             Self(None)
         }
     }
@@ -63365,7 +63365,7 @@ mod range_tbl_entry {
     impl RangeTblEntryListOpt {
         /// returns None value
         #[must_use]
-        pub fn none() -> Self {
+        pub const fn none() -> Self {
             Self(None)
         }
     }
@@ -63658,7 +63658,7 @@ mod range_tbl_entry {
         impl RangeTblEntry {
             /// get `relid`
             #[must_use]
-            pub fn get_relid(&self) -> u32 {
+            pub const fn get_relid(&self) -> u32 {
                 self.relid
             }
         }
@@ -63666,7 +63666,7 @@ mod range_tbl_entry {
         impl RangeTblEntry {
             /// get `inh`
             #[must_use]
-            pub fn get_inh(&self) -> bool {
+            pub const fn get_inh(&self) -> bool {
                 self.inh
             }
         }
@@ -63682,7 +63682,7 @@ mod range_tbl_entry {
         impl RangeTblEntry {
             /// get `rellockmode`
             #[must_use]
-            pub fn get_rellockmode(&self) -> i32 {
+            pub const fn get_rellockmode(&self) -> i32 {
                 self.rellockmode
             }
         }
@@ -63690,7 +63690,7 @@ mod range_tbl_entry {
         impl RangeTblEntry {
             /// get `perminfoindex`
             #[must_use]
-            pub fn get_perminfoindex(&self) -> u32 {
+            pub const fn get_perminfoindex(&self) -> u32 {
                 self.perminfoindex
             }
         }
@@ -63714,7 +63714,7 @@ mod range_tbl_entry {
         impl RangeTblEntry {
             /// get `security_barrier`
             #[must_use]
-            pub fn get_security_barrier(&self) -> bool {
+            pub const fn get_security_barrier(&self) -> bool {
                 self.security_barrier
             }
         }
@@ -63730,7 +63730,7 @@ mod range_tbl_entry {
         impl RangeTblEntry {
             /// get `joinmergedcols`
             #[must_use]
-            pub fn get_joinmergedcols(&self) -> i32 {
+            pub const fn get_joinmergedcols(&self) -> i32 {
                 self.joinmergedcols
             }
         }
@@ -63778,7 +63778,7 @@ mod range_tbl_entry {
         impl RangeTblEntry {
             /// get `funcordinality`
             #[must_use]
-            pub fn get_funcordinality(&self) -> bool {
+            pub const fn get_funcordinality(&self) -> bool {
                 self.funcordinality
             }
         }
@@ -63810,7 +63810,7 @@ mod range_tbl_entry {
         impl RangeTblEntry {
             /// get `ctelevelsup`
             #[must_use]
-            pub fn get_ctelevelsup(&self) -> u32 {
+            pub const fn get_ctelevelsup(&self) -> u32 {
                 self.ctelevelsup
             }
         }
@@ -63818,7 +63818,7 @@ mod range_tbl_entry {
         impl RangeTblEntry {
             /// get `self_reference`
             #[must_use]
-            pub fn get_self_reference(&self) -> bool {
+            pub const fn get_self_reference(&self) -> bool {
                 self.self_reference
             }
         }
@@ -63858,7 +63858,7 @@ mod range_tbl_entry {
         impl RangeTblEntry {
             /// get `enrtuples`
             #[must_use]
-            pub fn get_enrtuples(&self) -> f64 {
+            pub const fn get_enrtuples(&self) -> f64 {
                 self.enrtuples
             }
         }
@@ -63866,7 +63866,7 @@ mod range_tbl_entry {
         impl RangeTblEntry {
             /// get `lateral`
             #[must_use]
-            pub fn get_lateral(&self) -> bool {
+            pub const fn get_lateral(&self) -> bool {
                 self.lateral
             }
         }
@@ -63874,7 +63874,7 @@ mod range_tbl_entry {
         impl RangeTblEntry {
             /// get `in_from_cl`
             #[must_use]
-            pub fn get_in_from_cl(&self) -> bool {
+            pub const fn get_in_from_cl(&self) -> bool {
                 self.in_from_cl
             }
         }
@@ -64533,7 +64533,7 @@ mod rte_permission_info {
     impl RtePermissionInfoOpt {
         /// returns None Value
         #[must_use]
-        pub fn none() -> Self {
+        pub const fn none() -> Self {
             Self(None)
         }
     }
@@ -64571,7 +64571,7 @@ mod rte_permission_info {
     impl RtePermissionInfoListOpt {
         /// returns None value
         #[must_use]
-        pub fn none() -> Self {
+        pub const fn none() -> Self {
             Self(None)
         }
     }
@@ -64665,7 +64665,7 @@ mod rte_permission_info {
         impl RtePermissionInfo {
             /// get `relid`
             #[must_use]
-            pub fn get_relid(&self) -> u32 {
+            pub const fn get_relid(&self) -> u32 {
                 self.relid
             }
         }
@@ -64673,7 +64673,7 @@ mod rte_permission_info {
         impl RtePermissionInfo {
             /// get `inh`
             #[must_use]
-            pub fn get_inh(&self) -> bool {
+            pub const fn get_inh(&self) -> bool {
                 self.inh
             }
         }
@@ -64681,7 +64681,7 @@ mod rte_permission_info {
         impl RtePermissionInfo {
             /// get `required_perms`
             #[must_use]
-            pub fn get_required_perms(&self) -> u64 {
+            pub const fn get_required_perms(&self) -> u64 {
                 self.required_perms
             }
         }
@@ -64689,7 +64689,7 @@ mod rte_permission_info {
         impl RtePermissionInfo {
             /// get `check_as_user`
             #[must_use]
-            pub fn get_check_as_user(&self) -> u32 {
+            pub const fn get_check_as_user(&self) -> u32 {
                 self.check_as_user
             }
         }
@@ -64913,7 +64913,7 @@ mod range_tbl_function {
     impl RangeTblFunctionOpt {
         /// returns None Value
         #[must_use]
-        pub fn none() -> Self {
+        pub const fn none() -> Self {
             Self(None)
         }
     }
@@ -64951,7 +64951,7 @@ mod range_tbl_function {
     impl RangeTblFunctionListOpt {
         /// returns None value
         #[must_use]
-        pub fn none() -> Self {
+        pub const fn none() -> Self {
             Self(None)
         }
     }
@@ -65053,7 +65053,7 @@ mod range_tbl_function {
         impl RangeTblFunction {
             /// get `funccolcount`
             #[must_use]
-            pub fn get_funccolcount(&self) -> i32 {
+            pub const fn get_funccolcount(&self) -> i32 {
                 self.funccolcount
             }
         }
@@ -65308,7 +65308,7 @@ mod table_sample_clause {
     impl TableSampleClauseOpt {
         /// returns None Value
         #[must_use]
-        pub fn none() -> Self {
+        pub const fn none() -> Self {
             Self(None)
         }
     }
@@ -65346,7 +65346,7 @@ mod table_sample_clause {
     impl TableSampleClauseListOpt {
         /// returns None value
         #[must_use]
-        pub fn none() -> Self {
+        pub const fn none() -> Self {
             Self(None)
         }
     }
@@ -65412,7 +65412,7 @@ mod table_sample_clause {
         impl TableSampleClause {
             /// get `tsmhandler`
             #[must_use]
-            pub fn get_tsmhandler(&self) -> u32 {
+            pub const fn get_tsmhandler(&self) -> u32 {
                 self.tsmhandler
             }
         }
@@ -65570,7 +65570,7 @@ mod with_check_option {
     impl WithCheckOptionOpt {
         /// returns None Value
         #[must_use]
-        pub fn none() -> Self {
+        pub const fn none() -> Self {
             Self(None)
         }
     }
@@ -65608,7 +65608,7 @@ mod with_check_option {
     impl WithCheckOptionListOpt {
         /// returns None value
         #[must_use]
-        pub fn none() -> Self {
+        pub const fn none() -> Self {
             Self(None)
         }
     }
@@ -65720,7 +65720,7 @@ mod with_check_option {
         impl WithCheckOption {
             /// get `cascaded`
             #[must_use]
-            pub fn get_cascaded(&self) -> bool {
+            pub const fn get_cascaded(&self) -> bool {
                 self.cascaded
             }
         }
@@ -65894,7 +65894,7 @@ mod sort_group_clause {
     impl SortGroupClauseOpt {
         /// returns None Value
         #[must_use]
-        pub fn none() -> Self {
+        pub const fn none() -> Self {
             Self(None)
         }
     }
@@ -65932,7 +65932,7 @@ mod sort_group_clause {
     impl SortGroupClauseListOpt {
         /// returns None value
         #[must_use]
-        pub fn none() -> Self {
+        pub const fn none() -> Self {
             Self(None)
         }
     }
@@ -66012,7 +66012,7 @@ mod sort_group_clause {
         impl SortGroupClause {
             /// get `tle_sort_group_ref`
             #[must_use]
-            pub fn get_tle_sort_group_ref(&self) -> u32 {
+            pub const fn get_tle_sort_group_ref(&self) -> u32 {
                 self.tle_sort_group_ref
             }
         }
@@ -66020,7 +66020,7 @@ mod sort_group_clause {
         impl SortGroupClause {
             /// get `eqop`
             #[must_use]
-            pub fn get_eqop(&self) -> u32 {
+            pub const fn get_eqop(&self) -> u32 {
                 self.eqop
             }
         }
@@ -66028,7 +66028,7 @@ mod sort_group_clause {
         impl SortGroupClause {
             /// get `sortop`
             #[must_use]
-            pub fn get_sortop(&self) -> u32 {
+            pub const fn get_sortop(&self) -> u32 {
                 self.sortop
             }
         }
@@ -66036,7 +66036,7 @@ mod sort_group_clause {
         impl SortGroupClause {
             /// get `nulls_first`
             #[must_use]
-            pub fn get_nulls_first(&self) -> bool {
+            pub const fn get_nulls_first(&self) -> bool {
                 self.nulls_first
             }
         }
@@ -66044,7 +66044,7 @@ mod sort_group_clause {
         impl SortGroupClause {
             /// get `hashable`
             #[must_use]
-            pub fn get_hashable(&self) -> bool {
+            pub const fn get_hashable(&self) -> bool {
                 self.hashable
             }
         }
@@ -66212,7 +66212,7 @@ mod grouping_set {
     impl GroupingSetOpt {
         /// returns None Value
         #[must_use]
-        pub fn none() -> Self {
+        pub const fn none() -> Self {
             Self(None)
         }
     }
@@ -66250,7 +66250,7 @@ mod grouping_set {
     impl GroupingSetListOpt {
         /// returns None value
         #[must_use]
-        pub fn none() -> Self {
+        pub const fn none() -> Self {
             Self(None)
         }
     }
@@ -66332,7 +66332,7 @@ mod grouping_set {
         impl GroupingSet {
             /// get `location`
             #[must_use]
-            pub fn get_location(&self) -> i32 {
+            pub const fn get_location(&self) -> i32 {
                 self.location
             }
         }
@@ -66472,7 +66472,7 @@ mod window_clause {
     impl WindowClauseOpt {
         /// returns None Value
         #[must_use]
-        pub fn none() -> Self {
+        pub const fn none() -> Self {
             Self(None)
         }
     }
@@ -66510,7 +66510,7 @@ mod window_clause {
     impl WindowClauseListOpt {
         /// returns None value
         #[must_use]
-        pub fn none() -> Self {
+        pub const fn none() -> Self {
             Self(None)
         }
     }
@@ -66685,7 +66685,7 @@ mod window_clause {
         impl WindowClause {
             /// get `frame_options`
             #[must_use]
-            pub fn get_frame_options(&self) -> i32 {
+            pub const fn get_frame_options(&self) -> i32 {
                 self.frame_options
             }
         }
@@ -66709,7 +66709,7 @@ mod window_clause {
         impl WindowClause {
             /// get `start_in_range_func`
             #[must_use]
-            pub fn get_start_in_range_func(&self) -> u32 {
+            pub const fn get_start_in_range_func(&self) -> u32 {
                 self.start_in_range_func
             }
         }
@@ -66717,7 +66717,7 @@ mod window_clause {
         impl WindowClause {
             /// get `end_in_range_func`
             #[must_use]
-            pub fn get_end_in_range_func(&self) -> u32 {
+            pub const fn get_end_in_range_func(&self) -> u32 {
                 self.end_in_range_func
             }
         }
@@ -66725,7 +66725,7 @@ mod window_clause {
         impl WindowClause {
             /// get `in_range_coll`
             #[must_use]
-            pub fn get_in_range_coll(&self) -> u32 {
+            pub const fn get_in_range_coll(&self) -> u32 {
                 self.in_range_coll
             }
         }
@@ -66733,7 +66733,7 @@ mod window_clause {
         impl WindowClause {
             /// get `in_range_asc`
             #[must_use]
-            pub fn get_in_range_asc(&self) -> bool {
+            pub const fn get_in_range_asc(&self) -> bool {
                 self.in_range_asc
             }
         }
@@ -66741,7 +66741,7 @@ mod window_clause {
         impl WindowClause {
             /// get `in_range_nulls_first`
             #[must_use]
-            pub fn get_in_range_nulls_first(&self) -> bool {
+            pub const fn get_in_range_nulls_first(&self) -> bool {
                 self.in_range_nulls_first
             }
         }
@@ -66749,7 +66749,7 @@ mod window_clause {
         impl WindowClause {
             /// get `winref`
             #[must_use]
-            pub fn get_winref(&self) -> u32 {
+            pub const fn get_winref(&self) -> u32 {
                 self.winref
             }
         }
@@ -66757,7 +66757,7 @@ mod window_clause {
         impl WindowClause {
             /// get `copied_order`
             #[must_use]
-            pub fn get_copied_order(&self) -> bool {
+            pub const fn get_copied_order(&self) -> bool {
                 self.copied_order
             }
         }
@@ -67081,7 +67081,7 @@ mod row_mark_clause {
     impl RowMarkClauseOpt {
         /// returns None Value
         #[must_use]
-        pub fn none() -> Self {
+        pub const fn none() -> Self {
             Self(None)
         }
     }
@@ -67119,7 +67119,7 @@ mod row_mark_clause {
     impl RowMarkClauseListOpt {
         /// returns None value
         #[must_use]
-        pub fn none() -> Self {
+        pub const fn none() -> Self {
             Self(None)
         }
     }
@@ -67192,7 +67192,7 @@ mod row_mark_clause {
         impl RowMarkClause {
             /// get `rti`
             #[must_use]
-            pub fn get_rti(&self) -> u32 {
+            pub const fn get_rti(&self) -> u32 {
                 self.rti
             }
         }
@@ -67216,7 +67216,7 @@ mod row_mark_clause {
         impl RowMarkClause {
             /// get `pushed_down`
             #[must_use]
-            pub fn get_pushed_down(&self) -> bool {
+            pub const fn get_pushed_down(&self) -> bool {
                 self.pushed_down
             }
         }
@@ -67374,7 +67374,7 @@ mod with_clause {
     impl WithClauseOpt {
         /// returns None Value
         #[must_use]
-        pub fn none() -> Self {
+        pub const fn none() -> Self {
             Self(None)
         }
     }
@@ -67412,7 +67412,7 @@ mod with_clause {
     impl WithClauseListOpt {
         /// returns None value
         #[must_use]
-        pub fn none() -> Self {
+        pub const fn none() -> Self {
             Self(None)
         }
     }
@@ -67486,7 +67486,7 @@ mod with_clause {
         impl WithClause {
             /// get `recursive`
             #[must_use]
-            pub fn get_recursive(&self) -> bool {
+            pub const fn get_recursive(&self) -> bool {
                 self.recursive
             }
         }
@@ -67494,7 +67494,7 @@ mod with_clause {
         impl WithClause {
             /// get `location`
             #[must_use]
-            pub fn get_location(&self) -> i32 {
+            pub const fn get_location(&self) -> i32 {
                 self.location
             }
         }
@@ -67631,7 +67631,7 @@ mod infer_clause {
     impl InferClauseOpt {
         /// returns None Value
         #[must_use]
-        pub fn none() -> Self {
+        pub const fn none() -> Self {
             Self(None)
         }
     }
@@ -67669,7 +67669,7 @@ mod infer_clause {
     impl InferClauseListOpt {
         /// returns None value
         #[must_use]
-        pub fn none() -> Self {
+        pub const fn none() -> Self {
             Self(None)
         }
     }
@@ -67766,7 +67766,7 @@ mod infer_clause {
         impl InferClause {
             /// get `location`
             #[must_use]
-            pub fn get_location(&self) -> i32 {
+            pub const fn get_location(&self) -> i32 {
                 self.location
             }
         }
@@ -67922,7 +67922,7 @@ mod on_conflict_clause {
     impl OnConflictClauseOpt {
         /// returns None Value
         #[must_use]
-        pub fn none() -> Self {
+        pub const fn none() -> Self {
             Self(None)
         }
     }
@@ -67960,7 +67960,7 @@ mod on_conflict_clause {
     impl OnConflictClauseListOpt {
         /// returns None value
         #[must_use]
-        pub fn none() -> Self {
+        pub const fn none() -> Self {
             Self(None)
         }
     }
@@ -68072,7 +68072,7 @@ mod on_conflict_clause {
         impl OnConflictClause {
             /// get `location`
             #[must_use]
-            pub fn get_location(&self) -> i32 {
+            pub const fn get_location(&self) -> i32 {
                 self.location
             }
         }
@@ -68252,7 +68252,7 @@ mod cte_search_clause {
     impl CteSearchClauseOpt {
         /// returns None Value
         #[must_use]
-        pub fn none() -> Self {
+        pub const fn none() -> Self {
             Self(None)
         }
     }
@@ -68290,7 +68290,7 @@ mod cte_search_clause {
     impl CteSearchClauseListOpt {
         /// returns None value
         #[must_use]
-        pub fn none() -> Self {
+        pub const fn none() -> Self {
             Self(None)
         }
     }
@@ -68371,7 +68371,7 @@ mod cte_search_clause {
         impl CteSearchClause {
             /// get `search_breadth_first`
             #[must_use]
-            pub fn get_search_breadth_first(&self) -> bool {
+            pub const fn get_search_breadth_first(&self) -> bool {
                 self.search_breadth_first
             }
         }
@@ -68387,7 +68387,7 @@ mod cte_search_clause {
         impl CteSearchClause {
             /// get `location`
             #[must_use]
-            pub fn get_location(&self) -> i32 {
+            pub const fn get_location(&self) -> i32 {
                 self.location
             }
         }
@@ -68544,7 +68544,7 @@ mod cte_cycle_clause {
     impl CteCycleClauseOpt {
         /// returns None Value
         #[must_use]
-        pub fn none() -> Self {
+        pub const fn none() -> Self {
             Self(None)
         }
     }
@@ -68582,7 +68582,7 @@ mod cte_cycle_clause {
     impl CteCycleClauseListOpt {
         /// returns None value
         #[must_use]
-        pub fn none() -> Self {
+        pub const fn none() -> Self {
             Self(None)
         }
     }
@@ -68737,7 +68737,7 @@ mod cte_cycle_clause {
         impl CteCycleClause {
             /// get `location`
             #[must_use]
-            pub fn get_location(&self) -> i32 {
+            pub const fn get_location(&self) -> i32 {
                 self.location
             }
         }
@@ -68745,7 +68745,7 @@ mod cte_cycle_clause {
         impl CteCycleClause {
             /// get `cycle_mark_type`
             #[must_use]
-            pub fn get_cycle_mark_type(&self) -> u32 {
+            pub const fn get_cycle_mark_type(&self) -> u32 {
                 self.cycle_mark_type
             }
         }
@@ -68753,7 +68753,7 @@ mod cte_cycle_clause {
         impl CteCycleClause {
             /// get `cycle_mark_typmod`
             #[must_use]
-            pub fn get_cycle_mark_typmod(&self) -> i32 {
+            pub const fn get_cycle_mark_typmod(&self) -> i32 {
                 self.cycle_mark_typmod
             }
         }
@@ -68761,7 +68761,7 @@ mod cte_cycle_clause {
         impl CteCycleClause {
             /// get `cycle_mark_collation`
             #[must_use]
-            pub fn get_cycle_mark_collation(&self) -> u32 {
+            pub const fn get_cycle_mark_collation(&self) -> u32 {
                 self.cycle_mark_collation
             }
         }
@@ -68769,7 +68769,7 @@ mod cte_cycle_clause {
         impl CteCycleClause {
             /// get `cycle_mark_neop`
             #[must_use]
-            pub fn get_cycle_mark_neop(&self) -> u32 {
+            pub const fn get_cycle_mark_neop(&self) -> u32 {
                 self.cycle_mark_neop
             }
         }
@@ -69028,7 +69028,7 @@ mod common_table_expr {
     impl CommonTableExprOpt {
         /// returns None Value
         #[must_use]
-        pub fn none() -> Self {
+        pub const fn none() -> Self {
             Self(None)
         }
     }
@@ -69066,7 +69066,7 @@ mod common_table_expr {
     impl CommonTableExprListOpt {
         /// returns None value
         #[must_use]
-        pub fn none() -> Self {
+        pub const fn none() -> Self {
             Self(None)
         }
     }
@@ -69250,7 +69250,7 @@ mod common_table_expr {
         impl CommonTableExpr {
             /// get `location`
             #[must_use]
-            pub fn get_location(&self) -> i32 {
+            pub const fn get_location(&self) -> i32 {
                 self.location
             }
         }
@@ -69258,7 +69258,7 @@ mod common_table_expr {
         impl CommonTableExpr {
             /// get `cterecursive`
             #[must_use]
-            pub fn get_cterecursive(&self) -> bool {
+            pub const fn get_cterecursive(&self) -> bool {
                 self.cterecursive
             }
         }
@@ -69266,7 +69266,7 @@ mod common_table_expr {
         impl CommonTableExpr {
             /// get `cterefcount`
             #[must_use]
-            pub fn get_cterefcount(&self) -> i32 {
+            pub const fn get_cterefcount(&self) -> i32 {
                 self.cterefcount
             }
         }
@@ -69621,7 +69621,7 @@ mod merge_when_clause {
     impl MergeWhenClauseOpt {
         /// returns None Value
         #[must_use]
-        pub fn none() -> Self {
+        pub const fn none() -> Self {
             Self(None)
         }
     }
@@ -69659,7 +69659,7 @@ mod merge_when_clause {
     impl MergeWhenClauseListOpt {
         /// returns None value
         #[must_use]
-        pub fn none() -> Self {
+        pub const fn none() -> Self {
             Self(None)
         }
     }
@@ -69988,7 +69988,7 @@ mod trigger_transition {
     impl TriggerTransitionOpt {
         /// returns None Value
         #[must_use]
-        pub fn none() -> Self {
+        pub const fn none() -> Self {
             Self(None)
         }
     }
@@ -70026,7 +70026,7 @@ mod trigger_transition {
     impl TriggerTransitionListOpt {
         /// returns None value
         #[must_use]
-        pub fn none() -> Self {
+        pub const fn none() -> Self {
             Self(None)
         }
     }
@@ -70100,7 +70100,7 @@ mod trigger_transition {
         impl TriggerTransition {
             /// get `is_new`
             #[must_use]
-            pub fn get_is_new(&self) -> bool {
+            pub const fn get_is_new(&self) -> bool {
                 self.is_new
             }
         }
@@ -70108,7 +70108,7 @@ mod trigger_transition {
         impl TriggerTransition {
             /// get `is_table`
             #[must_use]
-            pub fn get_is_table(&self) -> bool {
+            pub const fn get_is_table(&self) -> bool {
                 self.is_table
             }
         }
@@ -70244,7 +70244,7 @@ mod json_output {
     impl JsonOutputOpt {
         /// returns None Value
         #[must_use]
-        pub fn none() -> Self {
+        pub const fn none() -> Self {
             Self(None)
         }
     }
@@ -70282,7 +70282,7 @@ mod json_output {
     impl JsonOutputListOpt {
         /// returns None value
         #[must_use]
-        pub fn none() -> Self {
+        pub const fn none() -> Self {
             Self(None)
         }
     }
@@ -70473,7 +70473,7 @@ mod json_argument {
     impl JsonArgumentOpt {
         /// returns None Value
         #[must_use]
-        pub fn none() -> Self {
+        pub const fn none() -> Self {
             Self(None)
         }
     }
@@ -70511,7 +70511,7 @@ mod json_argument {
     impl JsonArgumentListOpt {
         /// returns None value
         #[must_use]
-        pub fn none() -> Self {
+        pub const fn none() -> Self {
             Self(None)
         }
     }
@@ -70697,7 +70697,7 @@ mod json_func_expr {
     impl JsonFuncExprOpt {
         /// returns None Value
         #[must_use]
-        pub fn none() -> Self {
+        pub const fn none() -> Self {
             Self(None)
         }
     }
@@ -70735,7 +70735,7 @@ mod json_func_expr {
     impl JsonFuncExprListOpt {
         /// returns None value
         #[must_use]
-        pub fn none() -> Self {
+        pub const fn none() -> Self {
             Self(None)
         }
     }
@@ -70937,7 +70937,7 @@ mod json_func_expr {
         impl JsonFuncExpr {
             /// get `location`
             #[must_use]
-            pub fn get_location(&self) -> i32 {
+            pub const fn get_location(&self) -> i32 {
                 self.location
             }
         }
@@ -71228,7 +71228,7 @@ mod json_table_path_spec {
     impl JsonTablePathSpecOpt {
         /// returns None Value
         #[must_use]
-        pub fn none() -> Self {
+        pub const fn none() -> Self {
             Self(None)
         }
     }
@@ -71266,7 +71266,7 @@ mod json_table_path_spec {
     impl JsonTablePathSpecListOpt {
         /// returns None value
         #[must_use]
-        pub fn none() -> Self {
+        pub const fn none() -> Self {
             Self(None)
         }
     }
@@ -71355,7 +71355,7 @@ mod json_table_path_spec {
         impl JsonTablePathSpec {
             /// get `name_location`
             #[must_use]
-            pub fn get_name_location(&self) -> i32 {
+            pub const fn get_name_location(&self) -> i32 {
                 self.name_location
             }
         }
@@ -71363,7 +71363,7 @@ mod json_table_path_spec {
         impl JsonTablePathSpec {
             /// get `location`
             #[must_use]
-            pub fn get_location(&self) -> i32 {
+            pub const fn get_location(&self) -> i32 {
                 self.location
             }
         }
@@ -71518,7 +71518,7 @@ mod json_table {
     impl JsonTableOpt {
         /// returns None Value
         #[must_use]
-        pub fn none() -> Self {
+        pub const fn none() -> Self {
             Self(None)
         }
     }
@@ -71556,7 +71556,7 @@ mod json_table {
     impl JsonTableListOpt {
         /// returns None value
         #[must_use]
-        pub fn none() -> Self {
+        pub const fn none() -> Self {
             Self(None)
         }
     }
@@ -71705,7 +71705,7 @@ mod json_table {
         impl JsonTable {
             /// get `lateral`
             #[must_use]
-            pub fn get_lateral(&self) -> bool {
+            pub const fn get_lateral(&self) -> bool {
                 self.lateral
             }
         }
@@ -71713,7 +71713,7 @@ mod json_table {
         impl JsonTable {
             /// get `location`
             #[must_use]
-            pub fn get_location(&self) -> i32 {
+            pub const fn get_location(&self) -> i32 {
                 self.location
             }
         }
@@ -71945,7 +71945,7 @@ mod json_table_column {
     impl JsonTableColumnOpt {
         /// returns None Value
         #[must_use]
-        pub fn none() -> Self {
+        pub const fn none() -> Self {
             Self(None)
         }
     }
@@ -71983,7 +71983,7 @@ mod json_table_column {
     impl JsonTableColumnListOpt {
         /// returns None value
         #[must_use]
-        pub fn none() -> Self {
+        pub const fn none() -> Self {
             Self(None)
         }
     }
@@ -72185,7 +72185,7 @@ mod json_table_column {
         impl JsonTableColumn {
             /// get `location`
             #[must_use]
-            pub fn get_location(&self) -> i32 {
+            pub const fn get_location(&self) -> i32 {
                 self.location
             }
         }
@@ -72476,7 +72476,7 @@ mod json_key_value {
     impl JsonKeyValueOpt {
         /// returns None Value
         #[must_use]
-        pub fn none() -> Self {
+        pub const fn none() -> Self {
             Self(None)
         }
     }
@@ -72514,7 +72514,7 @@ mod json_key_value {
     impl JsonKeyValueListOpt {
         /// returns None value
         #[must_use]
-        pub fn none() -> Self {
+        pub const fn none() -> Self {
             Self(None)
         }
     }
@@ -72703,7 +72703,7 @@ mod json_parse_expr {
     impl JsonParseExprOpt {
         /// returns None Value
         #[must_use]
-        pub fn none() -> Self {
+        pub const fn none() -> Self {
             Self(None)
         }
     }
@@ -72741,7 +72741,7 @@ mod json_parse_expr {
     impl JsonParseExprListOpt {
         /// returns None value
         #[must_use]
-        pub fn none() -> Self {
+        pub const fn none() -> Self {
             Self(None)
         }
     }
@@ -72830,7 +72830,7 @@ mod json_parse_expr {
         impl JsonParseExpr {
             /// get `unique_keys`
             #[must_use]
-            pub fn get_unique_keys(&self) -> bool {
+            pub const fn get_unique_keys(&self) -> bool {
                 self.unique_keys
             }
         }
@@ -72838,7 +72838,7 @@ mod json_parse_expr {
         impl JsonParseExpr {
             /// get `location`
             #[must_use]
-            pub fn get_location(&self) -> i32 {
+            pub const fn get_location(&self) -> i32 {
                 self.location
             }
         }
@@ -72996,7 +72996,7 @@ mod json_scalar_expr {
     impl JsonScalarExprOpt {
         /// returns None Value
         #[must_use]
-        pub fn none() -> Self {
+        pub const fn none() -> Self {
             Self(None)
         }
     }
@@ -73034,7 +73034,7 @@ mod json_scalar_expr {
     impl JsonScalarExprListOpt {
         /// returns None value
         #[must_use]
-        pub fn none() -> Self {
+        pub const fn none() -> Self {
             Self(None)
         }
     }
@@ -73116,7 +73116,7 @@ mod json_scalar_expr {
         impl JsonScalarExpr {
             /// get `location`
             #[must_use]
-            pub fn get_location(&self) -> i32 {
+            pub const fn get_location(&self) -> i32 {
                 self.location
             }
         }
@@ -73258,7 +73258,7 @@ mod json_serialize_expr {
     impl JsonSerializeExprOpt {
         /// returns None Value
         #[must_use]
-        pub fn none() -> Self {
+        pub const fn none() -> Self {
             Self(None)
         }
     }
@@ -73296,7 +73296,7 @@ mod json_serialize_expr {
     impl JsonSerializeExprListOpt {
         /// returns None value
         #[must_use]
-        pub fn none() -> Self {
+        pub const fn none() -> Self {
             Self(None)
         }
     }
@@ -73378,7 +73378,7 @@ mod json_serialize_expr {
         impl JsonSerializeExpr {
             /// get `location`
             #[must_use]
-            pub fn get_location(&self) -> i32 {
+            pub const fn get_location(&self) -> i32 {
                 self.location
             }
         }
@@ -73520,7 +73520,7 @@ mod json_object_constructor {
     impl JsonObjectConstructorOpt {
         /// returns None Value
         #[must_use]
-        pub fn none() -> Self {
+        pub const fn none() -> Self {
             Self(None)
         }
     }
@@ -73558,7 +73558,7 @@ mod json_object_constructor {
     impl JsonObjectConstructorListOpt {
         /// returns None value
         #[must_use]
-        pub fn none() -> Self {
+        pub const fn none() -> Self {
             Self(None)
         }
     }
@@ -73654,7 +73654,7 @@ mod json_object_constructor {
         impl JsonObjectConstructor {
             /// get `absent_on_null`
             #[must_use]
-            pub fn get_absent_on_null(&self) -> bool {
+            pub const fn get_absent_on_null(&self) -> bool {
                 self.absent_on_null
             }
         }
@@ -73662,7 +73662,7 @@ mod json_object_constructor {
         impl JsonObjectConstructor {
             /// get `unique`
             #[must_use]
-            pub fn get_unique(&self) -> bool {
+            pub const fn get_unique(&self) -> bool {
                 self.unique
             }
         }
@@ -73670,7 +73670,7 @@ mod json_object_constructor {
         impl JsonObjectConstructor {
             /// get `location`
             #[must_use]
-            pub fn get_location(&self) -> i32 {
+            pub const fn get_location(&self) -> i32 {
                 self.location
             }
         }
@@ -73847,7 +73847,7 @@ mod json_array_constructor {
     impl JsonArrayConstructorOpt {
         /// returns None Value
         #[must_use]
-        pub fn none() -> Self {
+        pub const fn none() -> Self {
             Self(None)
         }
     }
@@ -73885,7 +73885,7 @@ mod json_array_constructor {
     impl JsonArrayConstructorListOpt {
         /// returns None value
         #[must_use]
-        pub fn none() -> Self {
+        pub const fn none() -> Self {
             Self(None)
         }
     }
@@ -73974,7 +73974,7 @@ mod json_array_constructor {
         impl JsonArrayConstructor {
             /// get `absent_on_null`
             #[must_use]
-            pub fn get_absent_on_null(&self) -> bool {
+            pub const fn get_absent_on_null(&self) -> bool {
                 self.absent_on_null
             }
         }
@@ -73982,7 +73982,7 @@ mod json_array_constructor {
         impl JsonArrayConstructor {
             /// get `location`
             #[must_use]
-            pub fn get_location(&self) -> i32 {
+            pub const fn get_location(&self) -> i32 {
                 self.location
             }
         }
@@ -74147,7 +74147,7 @@ mod json_array_query_constructor {
     impl JsonArrayQueryConstructorOpt {
         /// returns None Value
         #[must_use]
-        pub fn none() -> Self {
+        pub const fn none() -> Self {
             Self(None)
         }
     }
@@ -74189,7 +74189,7 @@ mod json_array_query_constructor {
     impl JsonArrayQueryConstructorListOpt {
         /// returns None value
         #[must_use]
-        pub fn none() -> Self {
+        pub const fn none() -> Self {
             Self(None)
         }
     }
@@ -74298,7 +74298,7 @@ mod json_array_query_constructor {
         impl JsonArrayQueryConstructor {
             /// get `absent_on_null`
             #[must_use]
-            pub fn get_absent_on_null(&self) -> bool {
+            pub const fn get_absent_on_null(&self) -> bool {
                 self.absent_on_null
             }
         }
@@ -74306,7 +74306,7 @@ mod json_array_query_constructor {
         impl JsonArrayQueryConstructor {
             /// get `location`
             #[must_use]
-            pub fn get_location(&self) -> i32 {
+            pub const fn get_location(&self) -> i32 {
                 self.location
             }
         }
@@ -74486,7 +74486,7 @@ mod json_agg_constructor {
     impl JsonAggConstructorOpt {
         /// returns None Value
         #[must_use]
-        pub fn none() -> Self {
+        pub const fn none() -> Self {
             Self(None)
         }
     }
@@ -74524,7 +74524,7 @@ mod json_agg_constructor {
     impl JsonAggConstructorListOpt {
         /// returns None value
         #[must_use]
-        pub fn none() -> Self {
+        pub const fn none() -> Self {
             Self(None)
         }
     }
@@ -74636,7 +74636,7 @@ mod json_agg_constructor {
         impl JsonAggConstructor {
             /// get `location`
             #[must_use]
-            pub fn get_location(&self) -> i32 {
+            pub const fn get_location(&self) -> i32 {
                 self.location
             }
         }
@@ -74816,7 +74816,7 @@ mod json_object_agg {
     impl JsonObjectAggOpt {
         /// returns None Value
         #[must_use]
-        pub fn none() -> Self {
+        pub const fn none() -> Self {
             Self(None)
         }
     }
@@ -74854,7 +74854,7 @@ mod json_object_agg {
     impl JsonObjectAggListOpt {
         /// returns None value
         #[must_use]
-        pub fn none() -> Self {
+        pub const fn none() -> Self {
             Self(None)
         }
     }
@@ -74943,7 +74943,7 @@ mod json_object_agg {
         impl JsonObjectAgg {
             /// get `absent_on_null`
             #[must_use]
-            pub fn get_absent_on_null(&self) -> bool {
+            pub const fn get_absent_on_null(&self) -> bool {
                 self.absent_on_null
             }
         }
@@ -74951,7 +74951,7 @@ mod json_object_agg {
         impl JsonObjectAgg {
             /// get `unique`
             #[must_use]
-            pub fn get_unique(&self) -> bool {
+            pub const fn get_unique(&self) -> bool {
                 self.unique
             }
         }
@@ -75109,7 +75109,7 @@ mod json_array_agg {
     impl JsonArrayAggOpt {
         /// returns None Value
         #[must_use]
-        pub fn none() -> Self {
+        pub const fn none() -> Self {
             Self(None)
         }
     }
@@ -75147,7 +75147,7 @@ mod json_array_agg {
     impl JsonArrayAggListOpt {
         /// returns None value
         #[must_use]
-        pub fn none() -> Self {
+        pub const fn none() -> Self {
             Self(None)
         }
     }
@@ -75229,7 +75229,7 @@ mod json_array_agg {
         impl JsonArrayAgg {
             /// get `absent_on_null`
             #[must_use]
-            pub fn get_absent_on_null(&self) -> bool {
+            pub const fn get_absent_on_null(&self) -> bool {
                 self.absent_on_null
             }
         }
@@ -75371,7 +75371,7 @@ mod raw_stmt {
     impl RawStmtOpt {
         /// returns None Value
         #[must_use]
-        pub fn none() -> Self {
+        pub const fn none() -> Self {
             Self(None)
         }
     }
@@ -75409,7 +75409,7 @@ mod raw_stmt {
     impl RawStmtListOpt {
         /// returns None value
         #[must_use]
-        pub fn none() -> Self {
+        pub const fn none() -> Self {
             Self(None)
         }
     }
@@ -75483,7 +75483,7 @@ mod raw_stmt {
         impl RawStmt {
             /// get `stmt_location`
             #[must_use]
-            pub fn get_stmt_location(&self) -> i32 {
+            pub const fn get_stmt_location(&self) -> i32 {
                 self.stmt_location
             }
         }
@@ -75491,7 +75491,7 @@ mod raw_stmt {
         impl RawStmt {
             /// get `stmt_len`
             #[must_use]
-            pub fn get_stmt_len(&self) -> i32 {
+            pub const fn get_stmt_len(&self) -> i32 {
                 self.stmt_len
             }
         }
@@ -75628,7 +75628,7 @@ mod insert_stmt {
     impl InsertStmtOpt {
         /// returns None Value
         #[must_use]
-        pub fn none() -> Self {
+        pub const fn none() -> Self {
             Self(None)
         }
     }
@@ -75666,7 +75666,7 @@ mod insert_stmt {
     impl InsertStmtListOpt {
         /// returns None value
         #[must_use]
-        pub fn none() -> Self {
+        pub const fn none() -> Self {
             Self(None)
         }
     }
@@ -76027,7 +76027,7 @@ mod delete_stmt {
     impl DeleteStmtOpt {
         /// returns None Value
         #[must_use]
-        pub fn none() -> Self {
+        pub const fn none() -> Self {
             Self(None)
         }
     }
@@ -76065,7 +76065,7 @@ mod delete_stmt {
     impl DeleteStmtListOpt {
         /// returns None value
         #[must_use]
-        pub fn none() -> Self {
+        pub const fn none() -> Self {
             Self(None)
         }
     }
@@ -76358,7 +76358,7 @@ mod update_stmt {
     impl UpdateStmtOpt {
         /// returns None Value
         #[must_use]
-        pub fn none() -> Self {
+        pub const fn none() -> Self {
             Self(None)
         }
     }
@@ -76396,7 +76396,7 @@ mod update_stmt {
     impl UpdateStmtListOpt {
         /// returns None value
         #[must_use]
-        pub fn none() -> Self {
+        pub const fn none() -> Self {
             Self(None)
         }
     }
@@ -76723,7 +76723,7 @@ mod merge_stmt {
     impl MergeStmtOpt {
         /// returns None Value
         #[must_use]
-        pub fn none() -> Self {
+        pub const fn none() -> Self {
             Self(None)
         }
     }
@@ -76761,7 +76761,7 @@ mod merge_stmt {
     impl MergeStmtListOpt {
         /// returns None value
         #[must_use]
-        pub fn none() -> Self {
+        pub const fn none() -> Self {
             Self(None)
         }
     }
@@ -77088,7 +77088,7 @@ mod select_stmt {
     impl SelectStmtOpt {
         /// returns None Value
         #[must_use]
-        pub fn none() -> Self {
+        pub const fn none() -> Self {
             Self(None)
         }
     }
@@ -77126,7 +77126,7 @@ mod select_stmt {
     impl SelectStmtListOpt {
         /// returns None value
         #[must_use]
-        pub fn none() -> Self {
+        pub const fn none() -> Self {
             Self(None)
         }
     }
@@ -77359,7 +77359,7 @@ mod select_stmt {
         impl SelectStmt {
             /// get `group_distinct`
             #[must_use]
-            pub fn get_group_distinct(&self) -> bool {
+            pub const fn get_group_distinct(&self) -> bool {
                 self.group_distinct
             }
         }
@@ -77447,7 +77447,7 @@ mod select_stmt {
         impl SelectStmt {
             /// get `all`
             #[must_use]
-            pub fn get_all(&self) -> bool {
+            pub const fn get_all(&self) -> bool {
                 self.all
             }
         }
@@ -77923,7 +77923,7 @@ mod set_operation_stmt {
     impl SetOperationStmtOpt {
         /// returns None Value
         #[must_use]
-        pub fn none() -> Self {
+        pub const fn none() -> Self {
             Self(None)
         }
     }
@@ -77961,7 +77961,7 @@ mod set_operation_stmt {
     impl SetOperationStmtListOpt {
         /// returns None value
         #[must_use]
-        pub fn none() -> Self {
+        pub const fn none() -> Self {
             Self(None)
         }
     }
@@ -78070,7 +78070,7 @@ mod set_operation_stmt {
         impl SetOperationStmt {
             /// get `all`
             #[must_use]
-            pub fn get_all(&self) -> bool {
+            pub const fn get_all(&self) -> bool {
                 self.all
             }
         }
@@ -78355,7 +78355,7 @@ mod return_stmt {
     impl ReturnStmtOpt {
         /// returns None Value
         #[must_use]
-        pub fn none() -> Self {
+        pub const fn none() -> Self {
             Self(None)
         }
     }
@@ -78393,7 +78393,7 @@ mod return_stmt {
     impl ReturnStmtListOpt {
         /// returns None value
         #[must_use]
-        pub fn none() -> Self {
+        pub const fn none() -> Self {
             Self(None)
         }
     }
@@ -78548,7 +78548,7 @@ mod pl_assign_stmt {
     impl PlAssignStmtOpt {
         /// returns None Value
         #[must_use]
-        pub fn none() -> Self {
+        pub const fn none() -> Self {
             Self(None)
         }
     }
@@ -78586,7 +78586,7 @@ mod pl_assign_stmt {
     impl PlAssignStmtListOpt {
         /// returns None value
         #[must_use]
-        pub fn none() -> Self {
+        pub const fn none() -> Self {
             Self(None)
         }
     }
@@ -78682,7 +78682,7 @@ mod pl_assign_stmt {
         impl PlAssignStmt {
             /// get `nnames`
             #[must_use]
-            pub fn get_nnames(&self) -> i32 {
+            pub const fn get_nnames(&self) -> i32 {
                 self.nnames
             }
         }
@@ -78698,7 +78698,7 @@ mod pl_assign_stmt {
         impl PlAssignStmt {
             /// get `location`
             #[must_use]
-            pub fn get_location(&self) -> i32 {
+            pub const fn get_location(&self) -> i32 {
                 self.location
             }
         }
@@ -78872,7 +78872,7 @@ mod create_schema_stmt {
     impl CreateSchemaStmtOpt {
         /// returns None Value
         #[must_use]
-        pub fn none() -> Self {
+        pub const fn none() -> Self {
             Self(None)
         }
     }
@@ -78910,7 +78910,7 @@ mod create_schema_stmt {
     impl CreateSchemaStmtListOpt {
         /// returns None value
         #[must_use]
-        pub fn none() -> Self {
+        pub const fn none() -> Self {
             Self(None)
         }
     }
@@ -79007,7 +79007,7 @@ mod create_schema_stmt {
         impl CreateSchemaStmt {
             /// get `if_not_exists`
             #[must_use]
-            pub fn get_if_not_exists(&self) -> bool {
+            pub const fn get_if_not_exists(&self) -> bool {
                 self.if_not_exists
             }
         }
@@ -79165,7 +79165,7 @@ mod alter_table_stmt {
     impl AlterTableStmtOpt {
         /// returns None Value
         #[must_use]
-        pub fn none() -> Self {
+        pub const fn none() -> Self {
             Self(None)
         }
     }
@@ -79203,7 +79203,7 @@ mod alter_table_stmt {
     impl AlterTableStmtListOpt {
         /// returns None value
         #[must_use]
-        pub fn none() -> Self {
+        pub const fn none() -> Self {
             Self(None)
         }
     }
@@ -79300,7 +79300,7 @@ mod alter_table_stmt {
         impl AlterTableStmt {
             /// get `missing_ok`
             #[must_use]
-            pub fn get_missing_ok(&self) -> bool {
+            pub const fn get_missing_ok(&self) -> bool {
                 self.missing_ok
             }
         }
@@ -79461,7 +79461,7 @@ mod replica_identity_stmt {
     impl ReplicaIdentityStmtOpt {
         /// returns None Value
         #[must_use]
-        pub fn none() -> Self {
+        pub const fn none() -> Self {
             Self(None)
         }
     }
@@ -79499,7 +79499,7 @@ mod replica_identity_stmt {
     impl ReplicaIdentityStmtListOpt {
         /// returns None value
         #[must_use]
-        pub fn none() -> Self {
+        pub const fn none() -> Self {
             Self(None)
         }
     }
@@ -79687,7 +79687,7 @@ mod alter_table_cmd {
     impl AlterTableCmdOpt {
         /// returns None Value
         #[must_use]
-        pub fn none() -> Self {
+        pub const fn none() -> Self {
             Self(None)
         }
     }
@@ -79725,7 +79725,7 @@ mod alter_table_cmd {
     impl AlterTableCmdListOpt {
         /// returns None value
         #[must_use]
-        pub fn none() -> Self {
+        pub const fn none() -> Self {
             Self(None)
         }
     }
@@ -79842,7 +79842,7 @@ mod alter_table_cmd {
         impl AlterTableCmd {
             /// get `num`
             #[must_use]
-            pub fn get_num(&self) -> i32 {
+            pub const fn get_num(&self) -> i32 {
                 self.num
             }
         }
@@ -79874,7 +79874,7 @@ mod alter_table_cmd {
         impl AlterTableCmd {
             /// get `missing_ok`
             #[must_use]
-            pub fn get_missing_ok(&self) -> bool {
+            pub const fn get_missing_ok(&self) -> bool {
                 self.missing_ok
             }
         }
@@ -79882,7 +79882,7 @@ mod alter_table_cmd {
         impl AlterTableCmd {
             /// get `recurse`
             #[must_use]
-            pub fn get_recurse(&self) -> bool {
+            pub const fn get_recurse(&self) -> bool {
                 self.recurse
             }
         }
@@ -80110,7 +80110,7 @@ mod alter_collation_stmt {
     impl AlterCollationStmtOpt {
         /// returns None Value
         #[must_use]
-        pub fn none() -> Self {
+        pub const fn none() -> Self {
             Self(None)
         }
     }
@@ -80148,7 +80148,7 @@ mod alter_collation_stmt {
     impl AlterCollationStmtListOpt {
         /// returns None value
         #[must_use]
-        pub fn none() -> Self {
+        pub const fn none() -> Self {
             Self(None)
         }
     }
@@ -80305,7 +80305,7 @@ mod alter_domain_stmt {
     impl AlterDomainStmtOpt {
         /// returns None Value
         #[must_use]
-        pub fn none() -> Self {
+        pub const fn none() -> Self {
             Self(None)
         }
     }
@@ -80343,7 +80343,7 @@ mod alter_domain_stmt {
     impl AlterDomainStmtListOpt {
         /// returns None value
         #[must_use]
-        pub fn none() -> Self {
+        pub const fn none() -> Self {
             Self(None)
         }
     }
@@ -80470,7 +80470,7 @@ mod alter_domain_stmt {
         impl AlterDomainStmt {
             /// get `missing_ok`
             #[must_use]
-            pub fn get_missing_ok(&self) -> bool {
+            pub const fn get_missing_ok(&self) -> bool {
                 self.missing_ok
             }
         }
@@ -80663,7 +80663,7 @@ mod grant_stmt {
     impl GrantStmtOpt {
         /// returns None Value
         #[must_use]
-        pub fn none() -> Self {
+        pub const fn none() -> Self {
             Self(None)
         }
     }
@@ -80701,7 +80701,7 @@ mod grant_stmt {
     impl GrantStmtListOpt {
         /// returns None value
         #[must_use]
-        pub fn none() -> Self {
+        pub const fn none() -> Self {
             Self(None)
         }
     }
@@ -80809,7 +80809,7 @@ mod grant_stmt {
         impl GrantStmt {
             /// get `is_grant`
             #[must_use]
-            pub fn get_is_grant(&self) -> bool {
+            pub const fn get_is_grant(&self) -> bool {
                 self.is_grant
             }
         }
@@ -80857,7 +80857,7 @@ mod grant_stmt {
         impl GrantStmt {
             /// get `grant_option`
             #[must_use]
-            pub fn get_grant_option(&self) -> bool {
+            pub const fn get_grant_option(&self) -> bool {
                 self.grant_option
             }
         }
@@ -81124,7 +81124,7 @@ mod object_with_args {
     impl ObjectWithArgsOpt {
         /// returns None Value
         #[must_use]
-        pub fn none() -> Self {
+        pub const fn none() -> Self {
             Self(None)
         }
     }
@@ -81162,7 +81162,7 @@ mod object_with_args {
     impl ObjectWithArgsListOpt {
         /// returns None value
         #[must_use]
-        pub fn none() -> Self {
+        pub const fn none() -> Self {
             Self(None)
         }
     }
@@ -81259,7 +81259,7 @@ mod object_with_args {
         impl ObjectWithArgs {
             /// get `args_unspecified`
             #[must_use]
-            pub fn get_args_unspecified(&self) -> bool {
+            pub const fn get_args_unspecified(&self) -> bool {
                 self.args_unspecified
             }
         }
@@ -81420,7 +81420,7 @@ mod access_priv {
     impl AccessPrivOpt {
         /// returns None Value
         #[must_use]
-        pub fn none() -> Self {
+        pub const fn none() -> Self {
             Self(None)
         }
     }
@@ -81458,7 +81458,7 @@ mod access_priv {
     impl AccessPrivListOpt {
         /// returns None value
         #[must_use]
-        pub fn none() -> Self {
+        pub const fn none() -> Self {
             Self(None)
         }
     }
@@ -81642,7 +81642,7 @@ mod grant_role_stmt {
     impl GrantRoleStmtOpt {
         /// returns None Value
         #[must_use]
-        pub fn none() -> Self {
+        pub const fn none() -> Self {
             Self(None)
         }
     }
@@ -81680,7 +81680,7 @@ mod grant_role_stmt {
     impl GrantRoleStmtListOpt {
         /// returns None value
         #[must_use]
-        pub fn none() -> Self {
+        pub const fn none() -> Self {
             Self(None)
         }
     }
@@ -81783,7 +81783,7 @@ mod grant_role_stmt {
         impl GrantRoleStmt {
             /// get `is_grant`
             #[must_use]
-            pub fn get_is_grant(&self) -> bool {
+            pub const fn get_is_grant(&self) -> bool {
                 self.is_grant
             }
         }
@@ -82010,7 +82010,7 @@ mod alter_default_privileges_stmt {
     impl AlterDefaultPrivilegesStmtOpt {
         /// returns None Value
         #[must_use]
-        pub fn none() -> Self {
+        pub const fn none() -> Self {
             Self(None)
         }
     }
@@ -82052,7 +82052,7 @@ mod alter_default_privileges_stmt {
     impl AlterDefaultPrivilegesStmtListOpt {
         /// returns None value
         #[must_use]
-        pub fn none() -> Self {
+        pub const fn none() -> Self {
             Self(None)
         }
     }
@@ -82249,7 +82249,7 @@ mod copy_stmt {
     impl CopyStmtOpt {
         /// returns None Value
         #[must_use]
-        pub fn none() -> Self {
+        pub const fn none() -> Self {
             Self(None)
         }
     }
@@ -82287,7 +82287,7 @@ mod copy_stmt {
     impl CopyStmtListOpt {
         /// returns None value
         #[must_use]
-        pub fn none() -> Self {
+        pub const fn none() -> Self {
             Self(None)
         }
     }
@@ -82412,7 +82412,7 @@ mod copy_stmt {
         impl CopyStmt {
             /// get `is_from`
             #[must_use]
-            pub fn get_is_from(&self) -> bool {
+            pub const fn get_is_from(&self) -> bool {
                 self.is_from
             }
         }
@@ -82420,7 +82420,7 @@ mod copy_stmt {
         impl CopyStmt {
             /// get `is_program`
             #[must_use]
-            pub fn get_is_program(&self) -> bool {
+            pub const fn get_is_program(&self) -> bool {
                 self.is_program
             }
         }
@@ -82673,7 +82673,7 @@ mod variable_set_stmt {
     impl VariableSetStmtOpt {
         /// returns None Value
         #[must_use]
-        pub fn none() -> Self {
+        pub const fn none() -> Self {
             Self(None)
         }
     }
@@ -82711,7 +82711,7 @@ mod variable_set_stmt {
     impl VariableSetStmtListOpt {
         /// returns None value
         #[must_use]
-        pub fn none() -> Self {
+        pub const fn none() -> Self {
             Self(None)
         }
     }
@@ -82808,7 +82808,7 @@ mod variable_set_stmt {
         impl VariableSetStmt {
             /// get `is_local`
             #[must_use]
-            pub fn get_is_local(&self) -> bool {
+            pub const fn get_is_local(&self) -> bool {
                 self.is_local
             }
         }
@@ -82966,7 +82966,7 @@ mod variable_show_stmt {
     impl VariableShowStmtOpt {
         /// returns None Value
         #[must_use]
-        pub fn none() -> Self {
+        pub const fn none() -> Self {
             Self(None)
         }
     }
@@ -83004,7 +83004,7 @@ mod variable_show_stmt {
     impl VariableShowStmtListOpt {
         /// returns None value
         #[must_use]
-        pub fn none() -> Self {
+        pub const fn none() -> Self {
             Self(None)
         }
     }
@@ -83158,7 +83158,7 @@ mod create_stmt {
     impl CreateStmtOpt {
         /// returns None Value
         #[must_use]
-        pub fn none() -> Self {
+        pub const fn none() -> Self {
             Self(None)
         }
     }
@@ -83196,7 +83196,7 @@ mod create_stmt {
     impl CreateStmtListOpt {
         /// returns None value
         #[must_use]
-        pub fn none() -> Self {
+        pub const fn none() -> Self {
             Self(None)
         }
     }
@@ -83413,7 +83413,7 @@ mod create_stmt {
         impl CreateStmt {
             /// get `if_not_exists`
             #[must_use]
-            pub fn get_if_not_exists(&self) -> bool {
+            pub const fn get_if_not_exists(&self) -> bool {
                 self.if_not_exists
             }
         }
@@ -83718,7 +83718,7 @@ mod constraint {
     impl ConstraintOpt {
         /// returns None Value
         #[must_use]
-        pub fn none() -> Self {
+        pub const fn none() -> Self {
             Self(None)
         }
     }
@@ -83756,7 +83756,7 @@ mod constraint {
     impl ConstraintListOpt {
         /// returns None value
         #[must_use]
-        pub fn none() -> Self {
+        pub const fn none() -> Self {
             Self(None)
         }
     }
@@ -84034,7 +84034,7 @@ mod constraint {
         impl Constraint {
             /// get `deferrable`
             #[must_use]
-            pub fn get_deferrable(&self) -> bool {
+            pub const fn get_deferrable(&self) -> bool {
                 self.deferrable
             }
         }
@@ -84042,7 +84042,7 @@ mod constraint {
         impl Constraint {
             /// get `initdeferred`
             #[must_use]
-            pub fn get_initdeferred(&self) -> bool {
+            pub const fn get_initdeferred(&self) -> bool {
                 self.initdeferred
             }
         }
@@ -84050,7 +84050,7 @@ mod constraint {
         impl Constraint {
             /// get `skip_validation`
             #[must_use]
-            pub fn get_skip_validation(&self) -> bool {
+            pub const fn get_skip_validation(&self) -> bool {
                 self.skip_validation
             }
         }
@@ -84058,7 +84058,7 @@ mod constraint {
         impl Constraint {
             /// get `initially_valid`
             #[must_use]
-            pub fn get_initially_valid(&self) -> bool {
+            pub const fn get_initially_valid(&self) -> bool {
                 self.initially_valid
             }
         }
@@ -84066,7 +84066,7 @@ mod constraint {
         impl Constraint {
             /// get `is_no_inherit`
             #[must_use]
-            pub fn get_is_no_inherit(&self) -> bool {
+            pub const fn get_is_no_inherit(&self) -> bool {
                 self.is_no_inherit
             }
         }
@@ -84098,7 +84098,7 @@ mod constraint {
         impl Constraint {
             /// get `inhcount`
             #[must_use]
-            pub fn get_inhcount(&self) -> i32 {
+            pub const fn get_inhcount(&self) -> i32 {
                 self.inhcount
             }
         }
@@ -84106,7 +84106,7 @@ mod constraint {
         impl Constraint {
             /// get `nulls_not_distinct`
             #[must_use]
-            pub fn get_nulls_not_distinct(&self) -> bool {
+            pub const fn get_nulls_not_distinct(&self) -> bool {
                 self.nulls_not_distinct
             }
         }
@@ -84162,7 +84162,7 @@ mod constraint {
         impl Constraint {
             /// get `reset_default_tblspc`
             #[must_use]
-            pub fn get_reset_default_tblspc(&self) -> bool {
+            pub const fn get_reset_default_tblspc(&self) -> bool {
                 self.reset_default_tblspc
             }
         }
@@ -84250,7 +84250,7 @@ mod constraint {
         impl Constraint {
             /// get `old_pktable_oid`
             #[must_use]
-            pub fn get_old_pktable_oid(&self) -> u32 {
+            pub const fn get_old_pktable_oid(&self) -> u32 {
                 self.old_pktable_oid
             }
         }
@@ -84258,7 +84258,7 @@ mod constraint {
         impl Constraint {
             /// get `location`
             #[must_use]
-            pub fn get_location(&self) -> i32 {
+            pub const fn get_location(&self) -> i32 {
                 self.location
             }
         }
@@ -84876,7 +84876,7 @@ mod create_table_space_stmt {
     impl CreateTableSpaceStmtOpt {
         /// returns None Value
         #[must_use]
-        pub fn none() -> Self {
+        pub const fn none() -> Self {
             Self(None)
         }
     }
@@ -84914,7 +84914,7 @@ mod create_table_space_stmt {
     impl CreateTableSpaceStmtListOpt {
         /// returns None value
         #[must_use]
-        pub fn none() -> Self {
+        pub const fn none() -> Self {
             Self(None)
         }
     }
@@ -85172,7 +85172,7 @@ mod drop_table_space_stmt {
     impl DropTableSpaceStmtOpt {
         /// returns None Value
         #[must_use]
-        pub fn none() -> Self {
+        pub const fn none() -> Self {
             Self(None)
         }
     }
@@ -85210,7 +85210,7 @@ mod drop_table_space_stmt {
     impl DropTableSpaceStmtListOpt {
         /// returns None value
         #[must_use]
-        pub fn none() -> Self {
+        pub const fn none() -> Self {
             Self(None)
         }
     }
@@ -85277,7 +85277,7 @@ mod drop_table_space_stmt {
         impl DropTableSpaceStmt {
             /// get `missing_ok`
             #[must_use]
-            pub fn get_missing_ok(&self) -> bool {
+            pub const fn get_missing_ok(&self) -> bool {
                 self.missing_ok
             }
         }
@@ -85401,7 +85401,7 @@ mod alter_table_space_options_stmt {
     impl AlterTableSpaceOptionsStmtOpt {
         /// returns None Value
         #[must_use]
-        pub fn none() -> Self {
+        pub const fn none() -> Self {
             Self(None)
         }
     }
@@ -85443,7 +85443,7 @@ mod alter_table_space_options_stmt {
     impl AlterTableSpaceOptionsStmtListOpt {
         /// returns None value
         #[must_use]
-        pub fn none() -> Self {
+        pub const fn none() -> Self {
             Self(None)
         }
     }
@@ -85532,7 +85532,7 @@ mod alter_table_space_options_stmt {
         impl AlterTableSpaceOptionsStmt {
             /// get `is_reset`
             #[must_use]
-            pub fn get_is_reset(&self) -> bool {
+            pub const fn get_is_reset(&self) -> bool {
                 self.is_reset
             }
         }
@@ -85676,7 +85676,7 @@ mod alter_table_move_all_stmt {
     impl AlterTableMoveAllStmtOpt {
         /// returns None Value
         #[must_use]
-        pub fn none() -> Self {
+        pub const fn none() -> Self {
             Self(None)
         }
     }
@@ -85714,7 +85714,7 @@ mod alter_table_move_all_stmt {
     impl AlterTableMoveAllStmtListOpt {
         /// returns None value
         #[must_use]
-        pub fn none() -> Self {
+        pub const fn none() -> Self {
             Self(None)
         }
     }
@@ -85826,7 +85826,7 @@ mod alter_table_move_all_stmt {
         impl AlterTableMoveAllStmt {
             /// get `nowait`
             #[must_use]
-            pub fn get_nowait(&self) -> bool {
+            pub const fn get_nowait(&self) -> bool {
                 self.nowait
             }
         }
@@ -86005,7 +86005,7 @@ mod create_extension_stmt {
     impl CreateExtensionStmtOpt {
         /// returns None Value
         #[must_use]
-        pub fn none() -> Self {
+        pub const fn none() -> Self {
             Self(None)
         }
     }
@@ -86043,7 +86043,7 @@ mod create_extension_stmt {
     impl CreateExtensionStmtListOpt {
         /// returns None value
         #[must_use]
-        pub fn none() -> Self {
+        pub const fn none() -> Self {
             Self(None)
         }
     }
@@ -86117,7 +86117,7 @@ mod create_extension_stmt {
         impl CreateExtensionStmt {
             /// get `if_not_exists`
             #[must_use]
-            pub fn get_if_not_exists(&self) -> bool {
+            pub const fn get_if_not_exists(&self) -> bool {
                 self.if_not_exists
             }
         }
@@ -86265,7 +86265,7 @@ mod alter_extension_stmt {
     impl AlterExtensionStmtOpt {
         /// returns None Value
         #[must_use]
-        pub fn none() -> Self {
+        pub const fn none() -> Self {
             Self(None)
         }
     }
@@ -86303,7 +86303,7 @@ mod alter_extension_stmt {
     impl AlterExtensionStmtListOpt {
         /// returns None value
         #[must_use]
-        pub fn none() -> Self {
+        pub const fn none() -> Self {
             Self(None)
         }
     }
@@ -86493,7 +86493,7 @@ mod alter_extension_contents_stmt {
     impl AlterExtensionContentsStmtOpt {
         /// returns None Value
         #[must_use]
-        pub fn none() -> Self {
+        pub const fn none() -> Self {
             Self(None)
         }
     }
@@ -86535,7 +86535,7 @@ mod alter_extension_contents_stmt {
     impl AlterExtensionContentsStmtListOpt {
         /// returns None value
         #[must_use]
-        pub fn none() -> Self {
+        pub const fn none() -> Self {
             Self(None)
         }
     }
@@ -86623,7 +86623,7 @@ mod alter_extension_contents_stmt {
         impl AlterExtensionContentsStmt {
             /// get `action`
             #[must_use]
-            pub fn get_action(&self) -> i32 {
+            pub const fn get_action(&self) -> i32 {
                 self.action
             }
         }
@@ -86798,7 +86798,7 @@ mod create_fdw_stmt {
     impl CreateFdwStmtOpt {
         /// returns None Value
         #[must_use]
-        pub fn none() -> Self {
+        pub const fn none() -> Self {
             Self(None)
         }
     }
@@ -86836,7 +86836,7 @@ mod create_fdw_stmt {
     impl CreateFdwStmtListOpt {
         /// returns None value
         #[must_use]
-        pub fn none() -> Self {
+        pub const fn none() -> Self {
             Self(None)
         }
     }
@@ -87060,7 +87060,7 @@ mod alter_fdw_stmt {
     impl AlterFdwStmtOpt {
         /// returns None Value
         #[must_use]
-        pub fn none() -> Self {
+        pub const fn none() -> Self {
             Self(None)
         }
     }
@@ -87098,7 +87098,7 @@ mod alter_fdw_stmt {
     impl AlterFdwStmtListOpt {
         /// returns None value
         #[must_use]
-        pub fn none() -> Self {
+        pub const fn none() -> Self {
             Self(None)
         }
     }
@@ -87322,7 +87322,7 @@ mod create_foreign_server_stmt {
     impl CreateForeignServerStmtOpt {
         /// returns None Value
         #[must_use]
-        pub fn none() -> Self {
+        pub const fn none() -> Self {
             Self(None)
         }
     }
@@ -87362,7 +87362,7 @@ mod create_foreign_server_stmt {
     impl CreateForeignServerStmtListOpt {
         /// returns None value
         #[must_use]
-        pub fn none() -> Self {
+        pub const fn none() -> Self {
             Self(None)
         }
     }
@@ -87486,7 +87486,7 @@ mod create_foreign_server_stmt {
         impl CreateForeignServerStmt {
             /// get `if_not_exists`
             #[must_use]
-            pub fn get_if_not_exists(&self) -> bool {
+            pub const fn get_if_not_exists(&self) -> bool {
                 self.if_not_exists
             }
         }
@@ -87684,7 +87684,7 @@ mod alter_foreign_server_stmt {
     impl AlterForeignServerStmtOpt {
         /// returns None Value
         #[must_use]
-        pub fn none() -> Self {
+        pub const fn none() -> Self {
             Self(None)
         }
     }
@@ -87722,7 +87722,7 @@ mod alter_foreign_server_stmt {
     impl AlterForeignServerStmtListOpt {
         /// returns None value
         #[must_use]
-        pub fn none() -> Self {
+        pub const fn none() -> Self {
             Self(None)
         }
     }
@@ -87824,7 +87824,7 @@ mod alter_foreign_server_stmt {
         impl AlterForeignServerStmt {
             /// get `has_version`
             #[must_use]
-            pub fn get_has_version(&self) -> bool {
+            pub const fn get_has_version(&self) -> bool {
                 self.has_version
             }
         }
@@ -87980,7 +87980,7 @@ mod create_foreign_table_stmt {
     impl CreateForeignTableStmtOpt {
         /// returns None Value
         #[must_use]
-        pub fn none() -> Self {
+        pub const fn none() -> Self {
             Self(None)
         }
     }
@@ -88018,7 +88018,7 @@ mod create_foreign_table_stmt {
     impl CreateForeignTableStmtListOpt {
         /// returns None value
         #[must_use]
-        pub fn none() -> Self {
+        pub const fn none() -> Self {
             Self(None)
         }
     }
@@ -88248,7 +88248,7 @@ mod create_user_mapping_stmt {
     impl CreateUserMappingStmtOpt {
         /// returns None Value
         #[must_use]
-        pub fn none() -> Self {
+        pub const fn none() -> Self {
             Self(None)
         }
     }
@@ -88286,7 +88286,7 @@ mod create_user_mapping_stmt {
     impl CreateUserMappingStmtListOpt {
         /// returns None value
         #[must_use]
-        pub fn none() -> Self {
+        pub const fn none() -> Self {
             Self(None)
         }
     }
@@ -88375,7 +88375,7 @@ mod create_user_mapping_stmt {
         impl CreateUserMappingStmt {
             /// get `if_not_exists`
             #[must_use]
-            pub fn get_if_not_exists(&self) -> bool {
+            pub const fn get_if_not_exists(&self) -> bool {
                 self.if_not_exists
             }
         }
@@ -88544,7 +88544,7 @@ mod alter_user_mapping_stmt {
     impl AlterUserMappingStmtOpt {
         /// returns None Value
         #[must_use]
-        pub fn none() -> Self {
+        pub const fn none() -> Self {
             Self(None)
         }
     }
@@ -88582,7 +88582,7 @@ mod alter_user_mapping_stmt {
     impl AlterUserMappingStmtListOpt {
         /// returns None value
         #[must_use]
-        pub fn none() -> Self {
+        pub const fn none() -> Self {
             Self(None)
         }
     }
@@ -88807,7 +88807,7 @@ mod drop_user_mapping_stmt {
     impl DropUserMappingStmtOpt {
         /// returns None Value
         #[must_use]
-        pub fn none() -> Self {
+        pub const fn none() -> Self {
             Self(None)
         }
     }
@@ -88845,7 +88845,7 @@ mod drop_user_mapping_stmt {
     impl DropUserMappingStmtListOpt {
         /// returns None value
         #[must_use]
-        pub fn none() -> Self {
+        pub const fn none() -> Self {
             Self(None)
         }
     }
@@ -88927,7 +88927,7 @@ mod drop_user_mapping_stmt {
         impl DropUserMappingStmt {
             /// get `missing_ok`
             #[must_use]
-            pub fn get_missing_ok(&self) -> bool {
+            pub const fn get_missing_ok(&self) -> bool {
                 self.missing_ok
             }
         }
@@ -89067,7 +89067,7 @@ mod import_foreign_schema_stmt {
     impl ImportForeignSchemaStmtOpt {
         /// returns None Value
         #[must_use]
-        pub fn none() -> Self {
+        pub const fn none() -> Self {
             Self(None)
         }
     }
@@ -89107,7 +89107,7 @@ mod import_foreign_schema_stmt {
     impl ImportForeignSchemaStmtListOpt {
         /// returns None value
         #[must_use]
-        pub fn none() -> Self {
+        pub const fn none() -> Self {
             Self(None)
         }
     }
@@ -89439,7 +89439,7 @@ mod create_policy_stmt {
     impl CreatePolicyStmtOpt {
         /// returns None Value
         #[must_use]
-        pub fn none() -> Self {
+        pub const fn none() -> Self {
             Self(None)
         }
     }
@@ -89477,7 +89477,7 @@ mod create_policy_stmt {
     impl CreatePolicyStmtListOpt {
         /// returns None value
         #[must_use]
-        pub fn none() -> Self {
+        pub const fn none() -> Self {
             Self(None)
         }
     }
@@ -89595,7 +89595,7 @@ mod create_policy_stmt {
         impl CreatePolicyStmt {
             /// get `permissive`
             #[must_use]
-            pub fn get_permissive(&self) -> bool {
+            pub const fn get_permissive(&self) -> bool {
                 self.permissive
             }
         }
@@ -89831,7 +89831,7 @@ mod alter_policy_stmt {
     impl AlterPolicyStmtOpt {
         /// returns None Value
         #[must_use]
-        pub fn none() -> Self {
+        pub const fn none() -> Self {
             Self(None)
         }
     }
@@ -89869,7 +89869,7 @@ mod alter_policy_stmt {
     impl AlterPolicyStmtListOpt {
         /// returns None value
         #[must_use]
-        pub fn none() -> Self {
+        pub const fn none() -> Self {
             Self(None)
         }
     }
@@ -90161,7 +90161,7 @@ mod create_am_stmt {
     impl CreateAmStmtOpt {
         /// returns None Value
         #[must_use]
-        pub fn none() -> Self {
+        pub const fn none() -> Self {
             Self(None)
         }
     }
@@ -90199,7 +90199,7 @@ mod create_am_stmt {
     impl CreateAmStmtListOpt {
         /// returns None value
         #[must_use]
-        pub fn none() -> Self {
+        pub const fn none() -> Self {
             Self(None)
         }
     }
@@ -90420,7 +90420,7 @@ mod create_trig_stmt {
     impl CreateTrigStmtOpt {
         /// returns None Value
         #[must_use]
-        pub fn none() -> Self {
+        pub const fn none() -> Self {
             Self(None)
         }
     }
@@ -90458,7 +90458,7 @@ mod create_trig_stmt {
     impl CreateTrigStmtListOpt {
         /// returns None value
         #[must_use]
-        pub fn none() -> Self {
+        pub const fn none() -> Self {
             Self(None)
         }
     }
@@ -90608,7 +90608,7 @@ mod create_trig_stmt {
         impl CreateTrigStmt {
             /// get `replace`
             #[must_use]
-            pub fn get_replace(&self) -> bool {
+            pub const fn get_replace(&self) -> bool {
                 self.replace
             }
         }
@@ -90616,7 +90616,7 @@ mod create_trig_stmt {
         impl CreateTrigStmt {
             /// get `isconstraint`
             #[must_use]
-            pub fn get_isconstraint(&self) -> bool {
+            pub const fn get_isconstraint(&self) -> bool {
                 self.isconstraint
             }
         }
@@ -90656,7 +90656,7 @@ mod create_trig_stmt {
         impl CreateTrigStmt {
             /// get `row`
             #[must_use]
-            pub fn get_row(&self) -> bool {
+            pub const fn get_row(&self) -> bool {
                 self.row
             }
         }
@@ -90664,7 +90664,7 @@ mod create_trig_stmt {
         impl CreateTrigStmt {
             /// get `timing`
             #[must_use]
-            pub fn get_timing(&self) -> i32 {
+            pub const fn get_timing(&self) -> i32 {
                 self.timing
             }
         }
@@ -90672,7 +90672,7 @@ mod create_trig_stmt {
         impl CreateTrigStmt {
             /// get `events`
             #[must_use]
-            pub fn get_events(&self) -> i32 {
+            pub const fn get_events(&self) -> i32 {
                 self.events
             }
         }
@@ -90704,7 +90704,7 @@ mod create_trig_stmt {
         impl CreateTrigStmt {
             /// get `deferrable`
             #[must_use]
-            pub fn get_deferrable(&self) -> bool {
+            pub const fn get_deferrable(&self) -> bool {
                 self.deferrable
             }
         }
@@ -90712,7 +90712,7 @@ mod create_trig_stmt {
         impl CreateTrigStmt {
             /// get `initdeferred`
             #[must_use]
-            pub fn get_initdeferred(&self) -> bool {
+            pub const fn get_initdeferred(&self) -> bool {
                 self.initdeferred
             }
         }
@@ -91069,7 +91069,7 @@ mod create_event_trig_stmt {
     impl CreateEventTrigStmtOpt {
         /// returns None Value
         #[must_use]
-        pub fn none() -> Self {
+        pub const fn none() -> Self {
             Self(None)
         }
     }
@@ -91107,7 +91107,7 @@ mod create_event_trig_stmt {
     impl CreateEventTrigStmtListOpt {
         /// returns None value
         #[must_use]
-        pub fn none() -> Self {
+        pub const fn none() -> Self {
             Self(None)
         }
     }
@@ -91363,7 +91363,7 @@ mod alter_event_trig_stmt {
     impl AlterEventTrigStmtOpt {
         /// returns None Value
         #[must_use]
-        pub fn none() -> Self {
+        pub const fn none() -> Self {
             Self(None)
         }
     }
@@ -91401,7 +91401,7 @@ mod alter_event_trig_stmt {
     impl AlterEventTrigStmtListOpt {
         /// returns None value
         #[must_use]
-        pub fn none() -> Self {
+        pub const fn none() -> Self {
             Self(None)
         }
     }
@@ -91588,7 +91588,7 @@ mod create_p_lang_stmt {
     impl CreatePLangStmtOpt {
         /// returns None Value
         #[must_use]
-        pub fn none() -> Self {
+        pub const fn none() -> Self {
             Self(None)
         }
     }
@@ -91626,7 +91626,7 @@ mod create_p_lang_stmt {
     impl CreatePLangStmtListOpt {
         /// returns None value
         #[must_use]
-        pub fn none() -> Self {
+        pub const fn none() -> Self {
             Self(None)
         }
     }
@@ -91713,7 +91713,7 @@ mod create_p_lang_stmt {
         impl CreatePLangStmt {
             /// get `replace`
             #[must_use]
-            pub fn get_replace(&self) -> bool {
+            pub const fn get_replace(&self) -> bool {
                 self.replace
             }
         }
@@ -91753,7 +91753,7 @@ mod create_p_lang_stmt {
         impl CreatePLangStmt {
             /// get `pltrusted`
             #[must_use]
-            pub fn get_pltrusted(&self) -> bool {
+            pub const fn get_pltrusted(&self) -> bool {
                 self.pltrusted
             }
         }
@@ -91946,7 +91946,7 @@ mod create_role_stmt {
     impl CreateRoleStmtOpt {
         /// returns None Value
         #[must_use]
-        pub fn none() -> Self {
+        pub const fn none() -> Self {
             Self(None)
         }
     }
@@ -91984,7 +91984,7 @@ mod create_role_stmt {
     impl CreateRoleStmtListOpt {
         /// returns None value
         #[must_use]
-        pub fn none() -> Self {
+        pub const fn none() -> Self {
             Self(None)
         }
     }
@@ -92208,7 +92208,7 @@ mod alter_role_stmt {
     impl AlterRoleStmtOpt {
         /// returns None Value
         #[must_use]
-        pub fn none() -> Self {
+        pub const fn none() -> Self {
             Self(None)
         }
     }
@@ -92246,7 +92246,7 @@ mod alter_role_stmt {
     impl AlterRoleStmtListOpt {
         /// returns None value
         #[must_use]
-        pub fn none() -> Self {
+        pub const fn none() -> Self {
             Self(None)
         }
     }
@@ -92328,7 +92328,7 @@ mod alter_role_stmt {
         impl AlterRoleStmt {
             /// get `action`
             #[must_use]
-            pub fn get_action(&self) -> i32 {
+            pub const fn get_action(&self) -> i32 {
                 self.action
             }
         }
@@ -92470,7 +92470,7 @@ mod alter_role_set_stmt {
     impl AlterRoleSetStmtOpt {
         /// returns None Value
         #[must_use]
-        pub fn none() -> Self {
+        pub const fn none() -> Self {
             Self(None)
         }
     }
@@ -92508,7 +92508,7 @@ mod alter_role_set_stmt {
     impl AlterRoleSetStmtListOpt {
         /// returns None value
         #[must_use]
-        pub fn none() -> Self {
+        pub const fn none() -> Self {
             Self(None)
         }
     }
@@ -92732,7 +92732,7 @@ mod drop_role_stmt {
     impl DropRoleStmtOpt {
         /// returns None Value
         #[must_use]
-        pub fn none() -> Self {
+        pub const fn none() -> Self {
             Self(None)
         }
     }
@@ -92770,7 +92770,7 @@ mod drop_role_stmt {
     impl DropRoleStmtListOpt {
         /// returns None value
         #[must_use]
-        pub fn none() -> Self {
+        pub const fn none() -> Self {
             Self(None)
         }
     }
@@ -92833,7 +92833,7 @@ mod drop_role_stmt {
         impl DropRoleStmt {
             /// get `missing_ok`
             #[must_use]
-            pub fn get_missing_ok(&self) -> bool {
+            pub const fn get_missing_ok(&self) -> bool {
                 self.missing_ok
             }
         }
@@ -92956,7 +92956,7 @@ mod create_seq_stmt {
     impl CreateSeqStmtOpt {
         /// returns None Value
         #[must_use]
-        pub fn none() -> Self {
+        pub const fn none() -> Self {
             Self(None)
         }
     }
@@ -92994,7 +92994,7 @@ mod create_seq_stmt {
     impl CreateSeqStmtListOpt {
         /// returns None value
         #[must_use]
-        pub fn none() -> Self {
+        pub const fn none() -> Self {
             Self(None)
         }
     }
@@ -93090,7 +93090,7 @@ mod create_seq_stmt {
         impl CreateSeqStmt {
             /// get `owner_id`
             #[must_use]
-            pub fn get_owner_id(&self) -> u32 {
+            pub const fn get_owner_id(&self) -> u32 {
                 self.owner_id
             }
         }
@@ -93098,7 +93098,7 @@ mod create_seq_stmt {
         impl CreateSeqStmt {
             /// get `for_identity`
             #[must_use]
-            pub fn get_for_identity(&self) -> bool {
+            pub const fn get_for_identity(&self) -> bool {
                 self.for_identity
             }
         }
@@ -93106,7 +93106,7 @@ mod create_seq_stmt {
         impl CreateSeqStmt {
             /// get `if_not_exists`
             #[must_use]
-            pub fn get_if_not_exists(&self) -> bool {
+            pub const fn get_if_not_exists(&self) -> bool {
                 self.if_not_exists
             }
         }
@@ -93280,7 +93280,7 @@ mod alter_seq_stmt {
     impl AlterSeqStmtOpt {
         /// returns None Value
         #[must_use]
-        pub fn none() -> Self {
+        pub const fn none() -> Self {
             Self(None)
         }
     }
@@ -93318,7 +93318,7 @@ mod alter_seq_stmt {
     impl AlterSeqStmtListOpt {
         /// returns None value
         #[must_use]
-        pub fn none() -> Self {
+        pub const fn none() -> Self {
             Self(None)
         }
     }
@@ -93407,7 +93407,7 @@ mod alter_seq_stmt {
         impl AlterSeqStmt {
             /// get `for_identity`
             #[must_use]
-            pub fn get_for_identity(&self) -> bool {
+            pub const fn get_for_identity(&self) -> bool {
                 self.for_identity
             }
         }
@@ -93415,7 +93415,7 @@ mod alter_seq_stmt {
         impl AlterSeqStmt {
             /// get `missing_ok`
             #[must_use]
-            pub fn get_missing_ok(&self) -> bool {
+            pub const fn get_missing_ok(&self) -> bool {
                 self.missing_ok
             }
         }
@@ -93573,7 +93573,7 @@ mod define_stmt {
     impl DefineStmtOpt {
         /// returns None Value
         #[must_use]
-        pub fn none() -> Self {
+        pub const fn none() -> Self {
             Self(None)
         }
     }
@@ -93611,7 +93611,7 @@ mod define_stmt {
     impl DefineStmtListOpt {
         /// returns None value
         #[must_use]
-        pub fn none() -> Self {
+        pub const fn none() -> Self {
             Self(None)
         }
     }
@@ -93713,7 +93713,7 @@ mod define_stmt {
         impl DefineStmt {
             /// get `oldstyle`
             #[must_use]
-            pub fn get_oldstyle(&self) -> bool {
+            pub const fn get_oldstyle(&self) -> bool {
                 self.oldstyle
             }
         }
@@ -93745,7 +93745,7 @@ mod define_stmt {
         impl DefineStmt {
             /// get `if_not_exists`
             #[must_use]
-            pub fn get_if_not_exists(&self) -> bool {
+            pub const fn get_if_not_exists(&self) -> bool {
                 self.if_not_exists
             }
         }
@@ -93753,7 +93753,7 @@ mod define_stmt {
         impl DefineStmt {
             /// get `replace`
             #[must_use]
-            pub fn get_replace(&self) -> bool {
+            pub const fn get_replace(&self) -> bool {
                 self.replace
             }
         }
@@ -93963,7 +93963,7 @@ mod create_domain_stmt {
     impl CreateDomainStmtOpt {
         /// returns None Value
         #[must_use]
-        pub fn none() -> Self {
+        pub const fn none() -> Self {
             Self(None)
         }
     }
@@ -94001,7 +94001,7 @@ mod create_domain_stmt {
     impl CreateDomainStmtListOpt {
         /// returns None value
         #[must_use]
-        pub fn none() -> Self {
+        pub const fn none() -> Self {
             Self(None)
         }
     }
@@ -94262,7 +94262,7 @@ mod create_op_class_stmt {
     impl CreateOpClassStmtOpt {
         /// returns None Value
         #[must_use]
-        pub fn none() -> Self {
+        pub const fn none() -> Self {
             Self(None)
         }
     }
@@ -94300,7 +94300,7 @@ mod create_op_class_stmt {
     impl CreateOpClassStmtListOpt {
         /// returns None value
         #[must_use]
-        pub fn none() -> Self {
+        pub const fn none() -> Self {
             Self(None)
         }
     }
@@ -94427,7 +94427,7 @@ mod create_op_class_stmt {
         impl CreateOpClassStmt {
             /// get `is_default`
             #[must_use]
-            pub fn get_is_default(&self) -> bool {
+            pub const fn get_is_default(&self) -> bool {
                 self.is_default
             }
         }
@@ -94623,7 +94623,7 @@ mod create_op_class_item {
     impl CreateOpClassItemOpt {
         /// returns None Value
         #[must_use]
-        pub fn none() -> Self {
+        pub const fn none() -> Self {
             Self(None)
         }
     }
@@ -94661,7 +94661,7 @@ mod create_op_class_item {
     impl CreateOpClassItemListOpt {
         /// returns None value
         #[must_use]
-        pub fn none() -> Self {
+        pub const fn none() -> Self {
             Self(None)
         }
     }
@@ -94748,7 +94748,7 @@ mod create_op_class_item {
         impl CreateOpClassItem {
             /// get `itemtype`
             #[must_use]
-            pub fn get_itemtype(&self) -> i32 {
+            pub const fn get_itemtype(&self) -> i32 {
                 self.itemtype
             }
         }
@@ -94764,7 +94764,7 @@ mod create_op_class_item {
         impl CreateOpClassItem {
             /// get `number`
             #[must_use]
-            pub fn get_number(&self) -> i32 {
+            pub const fn get_number(&self) -> i32 {
                 self.number
             }
         }
@@ -94984,7 +94984,7 @@ mod create_op_family_stmt {
     impl CreateOpFamilyStmtOpt {
         /// returns None Value
         #[must_use]
-        pub fn none() -> Self {
+        pub const fn none() -> Self {
             Self(None)
         }
     }
@@ -95022,7 +95022,7 @@ mod create_op_family_stmt {
     impl CreateOpFamilyStmtListOpt {
         /// returns None value
         #[must_use]
-        pub fn none() -> Self {
+        pub const fn none() -> Self {
             Self(None)
         }
     }
@@ -95212,7 +95212,7 @@ mod alter_op_family_stmt {
     impl AlterOpFamilyStmtOpt {
         /// returns None Value
         #[must_use]
-        pub fn none() -> Self {
+        pub const fn none() -> Self {
             Self(None)
         }
     }
@@ -95250,7 +95250,7 @@ mod alter_op_family_stmt {
     impl AlterOpFamilyStmtListOpt {
         /// returns None value
         #[must_use]
-        pub fn none() -> Self {
+        pub const fn none() -> Self {
             Self(None)
         }
     }
@@ -95339,7 +95339,7 @@ mod alter_op_family_stmt {
         impl AlterOpFamilyStmt {
             /// get `is_drop`
             #[must_use]
-            pub fn get_is_drop(&self) -> bool {
+            pub const fn get_is_drop(&self) -> bool {
                 self.is_drop
             }
         }
@@ -95505,7 +95505,7 @@ mod drop_stmt {
     impl DropStmtOpt {
         /// returns None Value
         #[must_use]
-        pub fn none() -> Self {
+        pub const fn none() -> Self {
             Self(None)
         }
     }
@@ -95543,7 +95543,7 @@ mod drop_stmt {
     impl DropStmtListOpt {
         /// returns None value
         #[must_use]
-        pub fn none() -> Self {
+        pub const fn none() -> Self {
             Self(None)
         }
     }
@@ -95647,7 +95647,7 @@ mod drop_stmt {
         impl DropStmt {
             /// get `missing_ok`
             #[must_use]
-            pub fn get_missing_ok(&self) -> bool {
+            pub const fn get_missing_ok(&self) -> bool {
                 self.missing_ok
             }
         }
@@ -95655,7 +95655,7 @@ mod drop_stmt {
         impl DropStmt {
             /// get `concurrent`
             #[must_use]
-            pub fn get_concurrent(&self) -> bool {
+            pub const fn get_concurrent(&self) -> bool {
                 self.concurrent
             }
         }
@@ -95830,7 +95830,7 @@ mod truncate_stmt {
     impl TruncateStmtOpt {
         /// returns None Value
         #[must_use]
-        pub fn none() -> Self {
+        pub const fn none() -> Self {
             Self(None)
         }
     }
@@ -95868,7 +95868,7 @@ mod truncate_stmt {
     impl TruncateStmtListOpt {
         /// returns None value
         #[must_use]
-        pub fn none() -> Self {
+        pub const fn none() -> Self {
             Self(None)
         }
     }
@@ -95942,7 +95942,7 @@ mod truncate_stmt {
         impl TruncateStmt {
             /// get `restart_seqs`
             #[must_use]
-            pub fn get_restart_seqs(&self) -> bool {
+            pub const fn get_restart_seqs(&self) -> bool {
                 self.restart_seqs
             }
         }
@@ -96092,7 +96092,7 @@ mod comment_stmt {
     impl CommentStmtOpt {
         /// returns None Value
         #[must_use]
-        pub fn none() -> Self {
+        pub const fn none() -> Self {
             Self(None)
         }
     }
@@ -96130,7 +96130,7 @@ mod comment_stmt {
     impl CommentStmtListOpt {
         /// returns None value
         #[must_use]
-        pub fn none() -> Self {
+        pub const fn none() -> Self {
             Self(None)
         }
     }
@@ -96352,7 +96352,7 @@ mod sec_label_stmt {
     impl SecLabelStmtOpt {
         /// returns None Value
         #[must_use]
-        pub fn none() -> Self {
+        pub const fn none() -> Self {
             Self(None)
         }
     }
@@ -96390,7 +96390,7 @@ mod sec_label_stmt {
     impl SecLabelStmtListOpt {
         /// returns None value
         #[must_use]
-        pub fn none() -> Self {
+        pub const fn none() -> Self {
             Self(None)
         }
     }
@@ -96645,7 +96645,7 @@ mod declare_cursor_stmt {
     impl DeclareCursorStmtOpt {
         /// returns None Value
         #[must_use]
-        pub fn none() -> Self {
+        pub const fn none() -> Self {
             Self(None)
         }
     }
@@ -96683,7 +96683,7 @@ mod declare_cursor_stmt {
     impl DeclareCursorStmtListOpt {
         /// returns None value
         #[must_use]
-        pub fn none() -> Self {
+        pub const fn none() -> Self {
             Self(None)
         }
     }
@@ -96757,7 +96757,7 @@ mod declare_cursor_stmt {
         impl DeclareCursorStmt {
             /// get `options`
             #[must_use]
-            pub fn get_options(&self) -> i32 {
+            pub const fn get_options(&self) -> i32 {
                 self.options
             }
         }
@@ -96904,7 +96904,7 @@ mod close_portal_stmt {
     impl ClosePortalStmtOpt {
         /// returns None Value
         #[must_use]
-        pub fn none() -> Self {
+        pub const fn none() -> Self {
             Self(None)
         }
     }
@@ -96942,7 +96942,7 @@ mod close_portal_stmt {
     impl ClosePortalStmtListOpt {
         /// returns None value
         #[must_use]
-        pub fn none() -> Self {
+        pub const fn none() -> Self {
             Self(None)
         }
     }
@@ -97096,7 +97096,7 @@ mod fetch_stmt {
     impl FetchStmtOpt {
         /// returns None Value
         #[must_use]
-        pub fn none() -> Self {
+        pub const fn none() -> Self {
             Self(None)
         }
     }
@@ -97134,7 +97134,7 @@ mod fetch_stmt {
     impl FetchStmtListOpt {
         /// returns None value
         #[must_use]
-        pub fn none() -> Self {
+        pub const fn none() -> Self {
             Self(None)
         }
     }
@@ -97215,7 +97215,7 @@ mod fetch_stmt {
         impl FetchStmt {
             /// get `how_many`
             #[must_use]
-            pub fn get_how_many(&self) -> i64 {
+            pub const fn get_how_many(&self) -> i64 {
                 self.how_many
             }
         }
@@ -97231,7 +97231,7 @@ mod fetch_stmt {
         impl FetchStmt {
             /// get `ismove`
             #[must_use]
-            pub fn get_ismove(&self) -> bool {
+            pub const fn get_ismove(&self) -> bool {
                 self.ismove
             }
         }
@@ -97384,7 +97384,7 @@ mod index_stmt {
     impl IndexStmtOpt {
         /// returns None Value
         #[must_use]
-        pub fn none() -> Self {
+        pub const fn none() -> Self {
             Self(None)
         }
     }
@@ -97422,7 +97422,7 @@ mod index_stmt {
     impl IndexStmtListOpt {
         /// returns None value
         #[must_use]
-        pub fn none() -> Self {
+        pub const fn none() -> Self {
             Self(None)
         }
     }
@@ -97715,7 +97715,7 @@ mod index_stmt {
         impl IndexStmt {
             /// get `index_oid`
             #[must_use]
-            pub fn get_index_oid(&self) -> u32 {
+            pub const fn get_index_oid(&self) -> u32 {
                 self.index_oid
             }
         }
@@ -97723,7 +97723,7 @@ mod index_stmt {
         impl IndexStmt {
             /// get `old_number`
             #[must_use]
-            pub fn get_old_number(&self) -> u32 {
+            pub const fn get_old_number(&self) -> u32 {
                 self.old_number
             }
         }
@@ -97731,7 +97731,7 @@ mod index_stmt {
         impl IndexStmt {
             /// get `old_create_subid`
             #[must_use]
-            pub fn get_old_create_subid(&self) -> u32 {
+            pub const fn get_old_create_subid(&self) -> u32 {
                 self.old_create_subid
             }
         }
@@ -97739,7 +97739,7 @@ mod index_stmt {
         impl IndexStmt {
             /// get `old_first_relfilelocator_subid`
             #[must_use]
-            pub fn get_old_first_relfilelocator_subid(&self) -> u32 {
+            pub const fn get_old_first_relfilelocator_subid(&self) -> u32 {
                 self.old_first_relfilelocator_subid
             }
         }
@@ -97747,7 +97747,7 @@ mod index_stmt {
         impl IndexStmt {
             /// get `unique`
             #[must_use]
-            pub fn get_unique(&self) -> bool {
+            pub const fn get_unique(&self) -> bool {
                 self.unique
             }
         }
@@ -97755,7 +97755,7 @@ mod index_stmt {
         impl IndexStmt {
             /// get `nulls_not_distinct`
             #[must_use]
-            pub fn get_nulls_not_distinct(&self) -> bool {
+            pub const fn get_nulls_not_distinct(&self) -> bool {
                 self.nulls_not_distinct
             }
         }
@@ -97763,7 +97763,7 @@ mod index_stmt {
         impl IndexStmt {
             /// get `primary`
             #[must_use]
-            pub fn get_primary(&self) -> bool {
+            pub const fn get_primary(&self) -> bool {
                 self.primary
             }
         }
@@ -97771,7 +97771,7 @@ mod index_stmt {
         impl IndexStmt {
             /// get `isconstraint`
             #[must_use]
-            pub fn get_isconstraint(&self) -> bool {
+            pub const fn get_isconstraint(&self) -> bool {
                 self.isconstraint
             }
         }
@@ -97779,7 +97779,7 @@ mod index_stmt {
         impl IndexStmt {
             /// get `deferrable`
             #[must_use]
-            pub fn get_deferrable(&self) -> bool {
+            pub const fn get_deferrable(&self) -> bool {
                 self.deferrable
             }
         }
@@ -97787,7 +97787,7 @@ mod index_stmt {
         impl IndexStmt {
             /// get `initdeferred`
             #[must_use]
-            pub fn get_initdeferred(&self) -> bool {
+            pub const fn get_initdeferred(&self) -> bool {
                 self.initdeferred
             }
         }
@@ -97795,7 +97795,7 @@ mod index_stmt {
         impl IndexStmt {
             /// get `transformed`
             #[must_use]
-            pub fn get_transformed(&self) -> bool {
+            pub const fn get_transformed(&self) -> bool {
                 self.transformed
             }
         }
@@ -97803,7 +97803,7 @@ mod index_stmt {
         impl IndexStmt {
             /// get `concurrent`
             #[must_use]
-            pub fn get_concurrent(&self) -> bool {
+            pub const fn get_concurrent(&self) -> bool {
                 self.concurrent
             }
         }
@@ -97811,7 +97811,7 @@ mod index_stmt {
         impl IndexStmt {
             /// get `if_not_exists`
             #[must_use]
-            pub fn get_if_not_exists(&self) -> bool {
+            pub const fn get_if_not_exists(&self) -> bool {
                 self.if_not_exists
             }
         }
@@ -97819,7 +97819,7 @@ mod index_stmt {
         impl IndexStmt {
             /// get `reset_default_tblspc`
             #[must_use]
-            pub fn get_reset_default_tblspc(&self) -> bool {
+            pub const fn get_reset_default_tblspc(&self) -> bool {
                 self.reset_default_tblspc
             }
         }
@@ -98309,7 +98309,7 @@ mod create_stats_stmt {
     impl CreateStatsStmtOpt {
         /// returns None Value
         #[must_use]
-        pub fn none() -> Self {
+        pub const fn none() -> Self {
             Self(None)
         }
     }
@@ -98347,7 +98347,7 @@ mod create_stats_stmt {
     impl CreateStatsStmtListOpt {
         /// returns None value
         #[must_use]
-        pub fn none() -> Self {
+        pub const fn none() -> Self {
             Self(None)
         }
     }
@@ -98481,7 +98481,7 @@ mod create_stats_stmt {
         impl CreateStatsStmt {
             /// get `transformed`
             #[must_use]
-            pub fn get_transformed(&self) -> bool {
+            pub const fn get_transformed(&self) -> bool {
                 self.transformed
             }
         }
@@ -98489,7 +98489,7 @@ mod create_stats_stmt {
         impl CreateStatsStmt {
             /// get `if_not_exists`
             #[must_use]
-            pub fn get_if_not_exists(&self) -> bool {
+            pub const fn get_if_not_exists(&self) -> bool {
                 self.if_not_exists
             }
         }
@@ -98701,7 +98701,7 @@ mod stats_elem {
     impl StatsElemOpt {
         /// returns None Value
         #[must_use]
-        pub fn none() -> Self {
+        pub const fn none() -> Self {
             Self(None)
         }
     }
@@ -98739,7 +98739,7 @@ mod stats_elem {
     impl StatsElemListOpt {
         /// returns None value
         #[must_use]
-        pub fn none() -> Self {
+        pub const fn none() -> Self {
             Self(None)
         }
     }
@@ -98923,7 +98923,7 @@ mod alter_stats_stmt {
     impl AlterStatsStmtOpt {
         /// returns None Value
         #[must_use]
-        pub fn none() -> Self {
+        pub const fn none() -> Self {
             Self(None)
         }
     }
@@ -98961,7 +98961,7 @@ mod alter_stats_stmt {
     impl AlterStatsStmtListOpt {
         /// returns None value
         #[must_use]
-        pub fn none() -> Self {
+        pub const fn none() -> Self {
             Self(None)
         }
     }
@@ -99043,7 +99043,7 @@ mod alter_stats_stmt {
         impl AlterStatsStmt {
             /// get `missing_ok`
             #[must_use]
-            pub fn get_missing_ok(&self) -> bool {
+            pub const fn get_missing_ok(&self) -> bool {
                 self.missing_ok
             }
         }
@@ -99185,7 +99185,7 @@ mod create_function_stmt {
     impl CreateFunctionStmtOpt {
         /// returns None Value
         #[must_use]
-        pub fn none() -> Self {
+        pub const fn none() -> Self {
             Self(None)
         }
     }
@@ -99223,7 +99223,7 @@ mod create_function_stmt {
     impl CreateFunctionStmtListOpt {
         /// returns None value
         #[must_use]
-        pub fn none() -> Self {
+        pub const fn none() -> Self {
             Self(None)
         }
     }
@@ -99317,7 +99317,7 @@ mod create_function_stmt {
         impl CreateFunctionStmt {
             /// get `is_procedure`
             #[must_use]
-            pub fn get_is_procedure(&self) -> bool {
+            pub const fn get_is_procedure(&self) -> bool {
                 self.is_procedure
             }
         }
@@ -99325,7 +99325,7 @@ mod create_function_stmt {
         impl CreateFunctionStmt {
             /// get `replace`
             #[must_use]
-            pub fn get_replace(&self) -> bool {
+            pub const fn get_replace(&self) -> bool {
                 self.replace
             }
         }
@@ -99580,7 +99580,7 @@ mod function_parameter {
     impl FunctionParameterOpt {
         /// returns None Value
         #[must_use]
-        pub fn none() -> Self {
+        pub const fn none() -> Self {
             Self(None)
         }
     }
@@ -99618,7 +99618,7 @@ mod function_parameter {
     impl FunctionParameterListOpt {
         /// returns None value
         #[must_use]
-        pub fn none() -> Self {
+        pub const fn none() -> Self {
             Self(None)
         }
     }
@@ -99876,7 +99876,7 @@ mod alter_function_stmt {
     impl AlterFunctionStmtOpt {
         /// returns None Value
         #[must_use]
-        pub fn none() -> Self {
+        pub const fn none() -> Self {
             Self(None)
         }
     }
@@ -99914,7 +99914,7 @@ mod alter_function_stmt {
     impl AlterFunctionStmtListOpt {
         /// returns None value
         #[must_use]
-        pub fn none() -> Self {
+        pub const fn none() -> Self {
             Self(None)
         }
     }
@@ -100141,7 +100141,7 @@ mod do_stmt {
     impl DoStmtOpt {
         /// returns None Value
         #[must_use]
-        pub fn none() -> Self {
+        pub const fn none() -> Self {
             Self(None)
         }
     }
@@ -100179,7 +100179,7 @@ mod do_stmt {
     impl DoStmtListOpt {
         /// returns None value
         #[must_use]
-        pub fn none() -> Self {
+        pub const fn none() -> Self {
             Self(None)
         }
     }
@@ -100334,7 +100334,7 @@ mod inline_code_block {
     impl InlineCodeBlockOpt {
         /// returns None Value
         #[must_use]
-        pub fn none() -> Self {
+        pub const fn none() -> Self {
             Self(None)
         }
     }
@@ -100372,7 +100372,7 @@ mod inline_code_block {
     impl InlineCodeBlockListOpt {
         /// returns None value
         #[must_use]
-        pub fn none() -> Self {
+        pub const fn none() -> Self {
             Self(None)
         }
     }
@@ -100453,7 +100453,7 @@ mod inline_code_block {
         impl InlineCodeBlock {
             /// get `lang_oid`
             #[must_use]
-            pub fn get_lang_oid(&self) -> u32 {
+            pub const fn get_lang_oid(&self) -> u32 {
                 self.lang_oid
             }
         }
@@ -100461,7 +100461,7 @@ mod inline_code_block {
         impl InlineCodeBlock {
             /// get `lang_is_trusted`
             #[must_use]
-            pub fn get_lang_is_trusted(&self) -> bool {
+            pub const fn get_lang_is_trusted(&self) -> bool {
                 self.lang_is_trusted
             }
         }
@@ -100469,7 +100469,7 @@ mod inline_code_block {
         impl InlineCodeBlock {
             /// get `atomic`
             #[must_use]
-            pub fn get_atomic(&self) -> bool {
+            pub const fn get_atomic(&self) -> bool {
                 self.atomic
             }
         }
@@ -100621,7 +100621,7 @@ mod call_stmt {
     impl CallStmtOpt {
         /// returns None Value
         #[must_use]
-        pub fn none() -> Self {
+        pub const fn none() -> Self {
             Self(None)
         }
     }
@@ -100659,7 +100659,7 @@ mod call_stmt {
     impl CallStmtListOpt {
         /// returns None value
         #[must_use]
-        pub fn none() -> Self {
+        pub const fn none() -> Self {
             Self(None)
         }
     }
@@ -100884,7 +100884,7 @@ mod call_context {
     impl CallContextOpt {
         /// returns None Value
         #[must_use]
-        pub fn none() -> Self {
+        pub const fn none() -> Self {
             Self(None)
         }
     }
@@ -100922,7 +100922,7 @@ mod call_context {
     impl CallContextListOpt {
         /// returns None value
         #[must_use]
-        pub fn none() -> Self {
+        pub const fn none() -> Self {
             Self(None)
         }
     }
@@ -100972,7 +100972,7 @@ mod call_context {
         impl CallContext {
             /// get `atomic`
             #[must_use]
-            pub fn get_atomic(&self) -> bool {
+            pub const fn get_atomic(&self) -> bool {
                 self.atomic
             }
         }
@@ -101074,7 +101074,7 @@ mod rename_stmt {
     impl RenameStmtOpt {
         /// returns None Value
         #[must_use]
-        pub fn none() -> Self {
+        pub const fn none() -> Self {
             Self(None)
         }
     }
@@ -101112,7 +101112,7 @@ mod rename_stmt {
     impl RenameStmtListOpt {
         /// returns None value
         #[must_use]
-        pub fn none() -> Self {
+        pub const fn none() -> Self {
             Self(None)
         }
     }
@@ -101269,7 +101269,7 @@ mod rename_stmt {
         impl RenameStmt {
             /// get `missing_ok`
             #[must_use]
-            pub fn get_missing_ok(&self) -> bool {
+            pub const fn get_missing_ok(&self) -> bool {
                 self.missing_ok
             }
         }
@@ -101498,7 +101498,7 @@ mod alter_object_depends_stmt {
     impl AlterObjectDependsStmtOpt {
         /// returns None Value
         #[must_use]
-        pub fn none() -> Self {
+        pub const fn none() -> Self {
             Self(None)
         }
     }
@@ -101536,7 +101536,7 @@ mod alter_object_depends_stmt {
     impl AlterObjectDependsStmtListOpt {
         /// returns None value
         #[must_use]
-        pub fn none() -> Self {
+        pub const fn none() -> Self {
             Self(None)
         }
     }
@@ -101653,7 +101653,7 @@ mod alter_object_depends_stmt {
         impl AlterObjectDependsStmt {
             /// get `remove`
             #[must_use]
-            pub fn get_remove(&self) -> bool {
+            pub const fn get_remove(&self) -> bool {
                 self.remove
             }
         }
@@ -101834,7 +101834,7 @@ mod alter_object_schema_stmt {
     impl AlterObjectSchemaStmtOpt {
         /// returns None Value
         #[must_use]
-        pub fn none() -> Self {
+        pub const fn none() -> Self {
             Self(None)
         }
     }
@@ -101872,7 +101872,7 @@ mod alter_object_schema_stmt {
     impl AlterObjectSchemaStmtListOpt {
         /// returns None value
         #[must_use]
-        pub fn none() -> Self {
+        pub const fn none() -> Self {
             Self(None)
         }
     }
@@ -101984,7 +101984,7 @@ mod alter_object_schema_stmt {
         impl AlterObjectSchemaStmt {
             /// get `missing_ok`
             #[must_use]
-            pub fn get_missing_ok(&self) -> bool {
+            pub const fn get_missing_ok(&self) -> bool {
                 self.missing_ok
             }
         }
@@ -102162,7 +102162,7 @@ mod alter_owner_stmt {
     impl AlterOwnerStmtOpt {
         /// returns None Value
         #[must_use]
-        pub fn none() -> Self {
+        pub const fn none() -> Self {
             Self(None)
         }
     }
@@ -102200,7 +102200,7 @@ mod alter_owner_stmt {
     impl AlterOwnerStmtListOpt {
         /// returns None value
         #[must_use]
-        pub fn none() -> Self {
+        pub const fn none() -> Self {
             Self(None)
         }
     }
@@ -102461,7 +102461,7 @@ mod alter_operator_stmt {
     impl AlterOperatorStmtOpt {
         /// returns None Value
         #[must_use]
-        pub fn none() -> Self {
+        pub const fn none() -> Self {
             Self(None)
         }
     }
@@ -102499,7 +102499,7 @@ mod alter_operator_stmt {
     impl AlterOperatorStmtListOpt {
         /// returns None value
         #[must_use]
-        pub fn none() -> Self {
+        pub const fn none() -> Self {
             Self(None)
         }
     }
@@ -102688,7 +102688,7 @@ mod alter_type_stmt {
     impl AlterTypeStmtOpt {
         /// returns None Value
         #[must_use]
-        pub fn none() -> Self {
+        pub const fn none() -> Self {
             Self(None)
         }
     }
@@ -102726,7 +102726,7 @@ mod alter_type_stmt {
     impl AlterTypeStmtListOpt {
         /// returns None value
         #[must_use]
-        pub fn none() -> Self {
+        pub const fn none() -> Self {
             Self(None)
         }
     }
@@ -102915,7 +102915,7 @@ mod rule_stmt {
     impl RuleStmtOpt {
         /// returns None Value
         #[must_use]
-        pub fn none() -> Self {
+        pub const fn none() -> Self {
             Self(None)
         }
     }
@@ -102953,7 +102953,7 @@ mod rule_stmt {
     impl RuleStmtListOpt {
         /// returns None value
         #[must_use]
-        pub fn none() -> Self {
+        pub const fn none() -> Self {
             Self(None)
         }
     }
@@ -103079,7 +103079,7 @@ mod rule_stmt {
         impl RuleStmt {
             /// get `instead`
             #[must_use]
-            pub fn get_instead(&self) -> bool {
+            pub const fn get_instead(&self) -> bool {
                 self.instead
             }
         }
@@ -103095,7 +103095,7 @@ mod rule_stmt {
         impl RuleStmt {
             /// get `replace`
             #[must_use]
-            pub fn get_replace(&self) -> bool {
+            pub const fn get_replace(&self) -> bool {
                 self.replace
             }
         }
@@ -103305,7 +103305,7 @@ mod notify_stmt {
     impl NotifyStmtOpt {
         /// returns None Value
         #[must_use]
-        pub fn none() -> Self {
+        pub const fn none() -> Self {
             Self(None)
         }
     }
@@ -103343,7 +103343,7 @@ mod notify_stmt {
     impl NotifyStmtListOpt {
         /// returns None value
         #[must_use]
-        pub fn none() -> Self {
+        pub const fn none() -> Self {
             Self(None)
         }
     }
@@ -103528,7 +103528,7 @@ mod listen_stmt {
     impl ListenStmtOpt {
         /// returns None Value
         #[must_use]
-        pub fn none() -> Self {
+        pub const fn none() -> Self {
             Self(None)
         }
     }
@@ -103566,7 +103566,7 @@ mod listen_stmt {
     impl ListenStmtListOpt {
         /// returns None value
         #[must_use]
-        pub fn none() -> Self {
+        pub const fn none() -> Self {
             Self(None)
         }
     }
@@ -103718,7 +103718,7 @@ mod unlisten_stmt {
     impl UnlistenStmtOpt {
         /// returns None Value
         #[must_use]
-        pub fn none() -> Self {
+        pub const fn none() -> Self {
             Self(None)
         }
     }
@@ -103756,7 +103756,7 @@ mod unlisten_stmt {
     impl UnlistenStmtListOpt {
         /// returns None value
         #[must_use]
-        pub fn none() -> Self {
+        pub const fn none() -> Self {
             Self(None)
         }
     }
@@ -103910,7 +103910,7 @@ mod transaction_stmt {
     impl TransactionStmtOpt {
         /// returns None Value
         #[must_use]
-        pub fn none() -> Self {
+        pub const fn none() -> Self {
             Self(None)
         }
     }
@@ -103948,7 +103948,7 @@ mod transaction_stmt {
     impl TransactionStmtListOpt {
         /// returns None value
         #[must_use]
-        pub fn none() -> Self {
+        pub const fn none() -> Self {
             Self(None)
         }
     }
@@ -104067,7 +104067,7 @@ mod transaction_stmt {
         impl TransactionStmt {
             /// get `chain`
             #[must_use]
-            pub fn get_chain(&self) -> bool {
+            pub const fn get_chain(&self) -> bool {
                 self.chain
             }
         }
@@ -104075,7 +104075,7 @@ mod transaction_stmt {
         impl TransactionStmt {
             /// get `location`
             #[must_use]
-            pub fn get_location(&self) -> i32 {
+            pub const fn get_location(&self) -> i32 {
                 self.location
             }
         }
@@ -104265,7 +104265,7 @@ mod composite_type_stmt {
     impl CompositeTypeStmtOpt {
         /// returns None Value
         #[must_use]
-        pub fn none() -> Self {
+        pub const fn none() -> Self {
             Self(None)
         }
     }
@@ -104303,7 +104303,7 @@ mod composite_type_stmt {
     impl CompositeTypeStmtListOpt {
         /// returns None value
         #[must_use]
-        pub fn none() -> Self {
+        pub const fn none() -> Self {
             Self(None)
         }
     }
@@ -104496,7 +104496,7 @@ mod create_enum_stmt {
     impl CreateEnumStmtOpt {
         /// returns None Value
         #[must_use]
-        pub fn none() -> Self {
+        pub const fn none() -> Self {
             Self(None)
         }
     }
@@ -104534,7 +104534,7 @@ mod create_enum_stmt {
     impl CreateEnumStmtListOpt {
         /// returns None value
         #[must_use]
-        pub fn none() -> Self {
+        pub const fn none() -> Self {
             Self(None)
         }
     }
@@ -104723,7 +104723,7 @@ mod create_range_stmt {
     impl CreateRangeStmtOpt {
         /// returns None Value
         #[must_use]
-        pub fn none() -> Self {
+        pub const fn none() -> Self {
             Self(None)
         }
     }
@@ -104761,7 +104761,7 @@ mod create_range_stmt {
     impl CreateRangeStmtListOpt {
         /// returns None value
         #[must_use]
-        pub fn none() -> Self {
+        pub const fn none() -> Self {
             Self(None)
         }
     }
@@ -104950,7 +104950,7 @@ mod alter_enum_stmt {
     impl AlterEnumStmtOpt {
         /// returns None Value
         #[must_use]
-        pub fn none() -> Self {
+        pub const fn none() -> Self {
             Self(None)
         }
     }
@@ -104988,7 +104988,7 @@ mod alter_enum_stmt {
     impl AlterEnumStmtListOpt {
         /// returns None value
         #[must_use]
-        pub fn none() -> Self {
+        pub const fn none() -> Self {
             Self(None)
         }
     }
@@ -105107,7 +105107,7 @@ mod alter_enum_stmt {
         impl AlterEnumStmt {
             /// get `new_val_is_after`
             #[must_use]
-            pub fn get_new_val_is_after(&self) -> bool {
+            pub const fn get_new_val_is_after(&self) -> bool {
                 self.new_val_is_after
             }
         }
@@ -105115,7 +105115,7 @@ mod alter_enum_stmt {
         impl AlterEnumStmt {
             /// get `skip_if_new_val_exists`
             #[must_use]
-            pub fn get_skip_if_new_val_exists(&self) -> bool {
+            pub const fn get_skip_if_new_val_exists(&self) -> bool {
                 self.skip_if_new_val_exists
             }
         }
@@ -105304,7 +105304,7 @@ mod view_stmt {
     impl ViewStmtOpt {
         /// returns None Value
         #[must_use]
-        pub fn none() -> Self {
+        pub const fn none() -> Self {
             Self(None)
         }
     }
@@ -105342,7 +105342,7 @@ mod view_stmt {
     impl ViewStmtListOpt {
         /// returns None value
         #[must_use]
-        pub fn none() -> Self {
+        pub const fn none() -> Self {
             Self(None)
         }
     }
@@ -105453,7 +105453,7 @@ mod view_stmt {
         impl ViewStmt {
             /// get `replace`
             #[must_use]
-            pub fn get_replace(&self) -> bool {
+            pub const fn get_replace(&self) -> bool {
                 self.replace
             }
         }
@@ -105666,7 +105666,7 @@ mod load_stmt {
     impl LoadStmtOpt {
         /// returns None Value
         #[must_use]
-        pub fn none() -> Self {
+        pub const fn none() -> Self {
             Self(None)
         }
     }
@@ -105704,7 +105704,7 @@ mod load_stmt {
     impl LoadStmtListOpt {
         /// returns None value
         #[must_use]
-        pub fn none() -> Self {
+        pub const fn none() -> Self {
             Self(None)
         }
     }
@@ -105856,7 +105856,7 @@ mod createdb_stmt {
     impl CreatedbStmtOpt {
         /// returns None Value
         #[must_use]
-        pub fn none() -> Self {
+        pub const fn none() -> Self {
             Self(None)
         }
     }
@@ -105894,7 +105894,7 @@ mod createdb_stmt {
     impl CreatedbStmtListOpt {
         /// returns None value
         #[must_use]
-        pub fn none() -> Self {
+        pub const fn none() -> Self {
             Self(None)
         }
     }
@@ -106080,7 +106080,7 @@ mod alter_database_stmt {
     impl AlterDatabaseStmtOpt {
         /// returns None Value
         #[must_use]
-        pub fn none() -> Self {
+        pub const fn none() -> Self {
             Self(None)
         }
     }
@@ -106118,7 +106118,7 @@ mod alter_database_stmt {
     impl AlterDatabaseStmtListOpt {
         /// returns None value
         #[must_use]
-        pub fn none() -> Self {
+        pub const fn none() -> Self {
             Self(None)
         }
     }
@@ -106310,7 +106310,7 @@ mod alter_database_refresh_coll_stmt {
     impl AlterDatabaseRefreshCollStmtOpt {
         /// returns None Value
         #[must_use]
-        pub fn none() -> Self {
+        pub const fn none() -> Self {
             Self(None)
         }
     }
@@ -106352,7 +106352,7 @@ mod alter_database_refresh_coll_stmt {
     impl AlterDatabaseRefreshCollStmtListOpt {
         /// returns None value
         #[must_use]
-        pub fn none() -> Self {
+        pub const fn none() -> Self {
             Self(None)
         }
     }
@@ -106516,7 +106516,7 @@ mod alter_database_set_stmt {
     impl AlterDatabaseSetStmtOpt {
         /// returns None Value
         #[must_use]
-        pub fn none() -> Self {
+        pub const fn none() -> Self {
             Self(None)
         }
     }
@@ -106554,7 +106554,7 @@ mod alter_database_set_stmt {
     impl AlterDatabaseSetStmtListOpt {
         /// returns None value
         #[must_use]
-        pub fn none() -> Self {
+        pub const fn none() -> Self {
             Self(None)
         }
     }
@@ -106741,7 +106741,7 @@ mod dropdb_stmt {
     impl DropdbStmtOpt {
         /// returns None Value
         #[must_use]
-        pub fn none() -> Self {
+        pub const fn none() -> Self {
             Self(None)
         }
     }
@@ -106779,7 +106779,7 @@ mod dropdb_stmt {
     impl DropdbStmtListOpt {
         /// returns None value
         #[must_use]
-        pub fn none() -> Self {
+        pub const fn none() -> Self {
             Self(None)
         }
     }
@@ -106853,7 +106853,7 @@ mod dropdb_stmt {
         impl DropdbStmt {
             /// get `missing_ok`
             #[must_use]
-            pub fn get_missing_ok(&self) -> bool {
+            pub const fn get_missing_ok(&self) -> bool {
                 self.missing_ok
             }
         }
@@ -106998,7 +106998,7 @@ mod alter_system_stmt {
     impl AlterSystemStmtOpt {
         /// returns None Value
         #[must_use]
-        pub fn none() -> Self {
+        pub const fn none() -> Self {
             Self(None)
         }
     }
@@ -107036,7 +107036,7 @@ mod alter_system_stmt {
     impl AlterSystemStmtListOpt {
         /// returns None value
         #[must_use]
-        pub fn none() -> Self {
+        pub const fn none() -> Self {
             Self(None)
         }
     }
@@ -107193,7 +107193,7 @@ mod cluster_stmt {
     impl ClusterStmtOpt {
         /// returns None Value
         #[must_use]
-        pub fn none() -> Self {
+        pub const fn none() -> Self {
             Self(None)
         }
     }
@@ -107231,7 +107231,7 @@ mod cluster_stmt {
     impl ClusterStmtListOpt {
         /// returns None value
         #[must_use]
-        pub fn none() -> Self {
+        pub const fn none() -> Self {
             Self(None)
         }
     }
@@ -107453,7 +107453,7 @@ mod vacuum_stmt {
     impl VacuumStmtOpt {
         /// returns None Value
         #[must_use]
-        pub fn none() -> Self {
+        pub const fn none() -> Self {
             Self(None)
         }
     }
@@ -107491,7 +107491,7 @@ mod vacuum_stmt {
     impl VacuumStmtListOpt {
         /// returns None value
         #[must_use]
-        pub fn none() -> Self {
+        pub const fn none() -> Self {
             Self(None)
         }
     }
@@ -107573,7 +107573,7 @@ mod vacuum_stmt {
         impl VacuumStmt {
             /// get `is_vacuumcmd`
             #[must_use]
-            pub fn get_is_vacuumcmd(&self) -> bool {
+            pub const fn get_is_vacuumcmd(&self) -> bool {
                 self.is_vacuumcmd
             }
         }
@@ -107713,7 +107713,7 @@ mod vacuum_relation {
     impl VacuumRelationOpt {
         /// returns None Value
         #[must_use]
-        pub fn none() -> Self {
+        pub const fn none() -> Self {
             Self(None)
         }
     }
@@ -107751,7 +107751,7 @@ mod vacuum_relation {
     impl VacuumRelationListOpt {
         /// returns None value
         #[must_use]
-        pub fn none() -> Self {
+        pub const fn none() -> Self {
             Self(None)
         }
     }
@@ -107825,7 +107825,7 @@ mod vacuum_relation {
         impl VacuumRelation {
             /// get `oid`
             #[must_use]
-            pub fn get_oid(&self) -> u32 {
+            pub const fn get_oid(&self) -> u32 {
                 self.oid
             }
         }
@@ -107975,7 +107975,7 @@ mod explain_stmt {
     impl ExplainStmtOpt {
         /// returns None Value
         #[must_use]
-        pub fn none() -> Self {
+        pub const fn none() -> Self {
             Self(None)
         }
     }
@@ -108013,7 +108013,7 @@ mod explain_stmt {
     impl ExplainStmtListOpt {
         /// returns None value
         #[must_use]
-        pub fn none() -> Self {
+        pub const fn none() -> Self {
             Self(None)
         }
     }
@@ -108200,7 +108200,7 @@ mod create_table_as_stmt {
     impl CreateTableAsStmtOpt {
         /// returns None Value
         #[must_use]
-        pub fn none() -> Self {
+        pub const fn none() -> Self {
             Self(None)
         }
     }
@@ -108238,7 +108238,7 @@ mod create_table_as_stmt {
     impl CreateTableAsStmtListOpt {
         /// returns None value
         #[must_use]
-        pub fn none() -> Self {
+        pub const fn none() -> Self {
             Self(None)
         }
     }
@@ -108342,7 +108342,7 @@ mod create_table_as_stmt {
         impl CreateTableAsStmt {
             /// get `is_select_into`
             #[must_use]
-            pub fn get_is_select_into(&self) -> bool {
+            pub const fn get_is_select_into(&self) -> bool {
                 self.is_select_into
             }
         }
@@ -108350,7 +108350,7 @@ mod create_table_as_stmt {
         impl CreateTableAsStmt {
             /// get `if_not_exists`
             #[must_use]
-            pub fn get_if_not_exists(&self) -> bool {
+            pub const fn get_if_not_exists(&self) -> bool {
                 self.if_not_exists
             }
         }
@@ -108527,7 +108527,7 @@ mod refresh_mat_view_stmt {
     impl RefreshMatViewStmtOpt {
         /// returns None Value
         #[must_use]
-        pub fn none() -> Self {
+        pub const fn none() -> Self {
             Self(None)
         }
     }
@@ -108565,7 +108565,7 @@ mod refresh_mat_view_stmt {
     impl RefreshMatViewStmtListOpt {
         /// returns None value
         #[must_use]
-        pub fn none() -> Self {
+        pub const fn none() -> Self {
             Self(None)
         }
     }
@@ -108631,7 +108631,7 @@ mod refresh_mat_view_stmt {
         impl RefreshMatViewStmt {
             /// get `concurrent`
             #[must_use]
-            pub fn get_concurrent(&self) -> bool {
+            pub const fn get_concurrent(&self) -> bool {
                 self.concurrent
             }
         }
@@ -108639,7 +108639,7 @@ mod refresh_mat_view_stmt {
         impl RefreshMatViewStmt {
             /// get `skip_data`
             #[must_use]
-            pub fn get_skip_data(&self) -> bool {
+            pub const fn get_skip_data(&self) -> bool {
                 self.skip_data
             }
         }
@@ -108786,7 +108786,7 @@ mod check_point_stmt {
     impl CheckPointStmtOpt {
         /// returns None Value
         #[must_use]
-        pub fn none() -> Self {
+        pub const fn none() -> Self {
             Self(None)
         }
     }
@@ -108824,7 +108824,7 @@ mod check_point_stmt {
     impl CheckPointStmtListOpt {
         /// returns None value
         #[must_use]
-        pub fn none() -> Self {
+        pub const fn none() -> Self {
             Self(None)
         }
     }
@@ -108949,7 +108949,7 @@ mod discard_stmt {
     impl DiscardStmtOpt {
         /// returns None Value
         #[must_use]
-        pub fn none() -> Self {
+        pub const fn none() -> Self {
             Self(None)
         }
     }
@@ -108987,7 +108987,7 @@ mod discard_stmt {
     impl DiscardStmtListOpt {
         /// returns None value
         #[must_use]
-        pub fn none() -> Self {
+        pub const fn none() -> Self {
             Self(None)
         }
     }
@@ -109142,7 +109142,7 @@ mod lock_stmt {
     impl LockStmtOpt {
         /// returns None Value
         #[must_use]
-        pub fn none() -> Self {
+        pub const fn none() -> Self {
             Self(None)
         }
     }
@@ -109180,7 +109180,7 @@ mod lock_stmt {
     impl LockStmtListOpt {
         /// returns None value
         #[must_use]
-        pub fn none() -> Self {
+        pub const fn none() -> Self {
             Self(None)
         }
     }
@@ -109254,7 +109254,7 @@ mod lock_stmt {
         impl LockStmt {
             /// get `mode`
             #[must_use]
-            pub fn get_mode(&self) -> i32 {
+            pub const fn get_mode(&self) -> i32 {
                 self.mode
             }
         }
@@ -109262,7 +109262,7 @@ mod lock_stmt {
         impl LockStmt {
             /// get `nowait`
             #[must_use]
-            pub fn get_nowait(&self) -> bool {
+            pub const fn get_nowait(&self) -> bool {
                 self.nowait
             }
         }
@@ -109399,7 +109399,7 @@ mod constraints_set_stmt {
     impl ConstraintsSetStmtOpt {
         /// returns None Value
         #[must_use]
-        pub fn none() -> Self {
+        pub const fn none() -> Self {
             Self(None)
         }
     }
@@ -109437,7 +109437,7 @@ mod constraints_set_stmt {
     impl ConstraintsSetStmtListOpt {
         /// returns None value
         #[must_use]
-        pub fn none() -> Self {
+        pub const fn none() -> Self {
             Self(None)
         }
     }
@@ -109504,7 +109504,7 @@ mod constraints_set_stmt {
         impl ConstraintsSetStmt {
             /// get `deferred`
             #[must_use]
-            pub fn get_deferred(&self) -> bool {
+            pub const fn get_deferred(&self) -> bool {
                 self.deferred
             }
         }
@@ -109627,7 +109627,7 @@ mod reindex_stmt {
     impl ReindexStmtOpt {
         /// returns None Value
         #[must_use]
-        pub fn none() -> Self {
+        pub const fn none() -> Self {
             Self(None)
         }
     }
@@ -109665,7 +109665,7 @@ mod reindex_stmt {
     impl ReindexStmtListOpt {
         /// returns None value
         #[must_use]
-        pub fn none() -> Self {
+        pub const fn none() -> Self {
             Self(None)
         }
     }
@@ -109921,7 +109921,7 @@ mod create_conversion_stmt {
     impl CreateConversionStmtOpt {
         /// returns None Value
         #[must_use]
-        pub fn none() -> Self {
+        pub const fn none() -> Self {
             Self(None)
         }
     }
@@ -109959,7 +109959,7 @@ mod create_conversion_stmt {
     impl CreateConversionStmtListOpt {
         /// returns None value
         #[must_use]
-        pub fn none() -> Self {
+        pub const fn none() -> Self {
             Self(None)
         }
     }
@@ -110071,7 +110071,7 @@ mod create_conversion_stmt {
         impl CreateConversionStmt {
             /// get `def`
             #[must_use]
-            pub fn get_def(&self) -> bool {
+            pub const fn get_def(&self) -> bool {
                 self.def
             }
         }
@@ -110250,7 +110250,7 @@ mod create_cast_stmt {
     impl CreateCastStmtOpt {
         /// returns None Value
         #[must_use]
-        pub fn none() -> Self {
+        pub const fn none() -> Self {
             Self(None)
         }
     }
@@ -110288,7 +110288,7 @@ mod create_cast_stmt {
     impl CreateCastStmtListOpt {
         /// returns None value
         #[must_use]
-        pub fn none() -> Self {
+        pub const fn none() -> Self {
             Self(None)
         }
     }
@@ -110400,7 +110400,7 @@ mod create_cast_stmt {
         impl CreateCastStmt {
             /// get `inout`
             #[must_use]
-            pub fn get_inout(&self) -> bool {
+            pub const fn get_inout(&self) -> bool {
                 self.inout
             }
         }
@@ -110580,7 +110580,7 @@ mod create_transform_stmt {
     impl CreateTransformStmtOpt {
         /// returns None Value
         #[must_use]
-        pub fn none() -> Self {
+        pub const fn none() -> Self {
             Self(None)
         }
     }
@@ -110618,7 +110618,7 @@ mod create_transform_stmt {
     impl CreateTransformStmtListOpt {
         /// returns None value
         #[must_use]
-        pub fn none() -> Self {
+        pub const fn none() -> Self {
             Self(None)
         }
     }
@@ -110698,7 +110698,7 @@ mod create_transform_stmt {
         impl CreateTransformStmt {
             /// get `replace`
             #[must_use]
-            pub fn get_replace(&self) -> bool {
+            pub const fn get_replace(&self) -> bool {
                 self.replace
             }
         }
@@ -110908,7 +110908,7 @@ mod prepare_stmt {
     impl PrepareStmtOpt {
         /// returns None Value
         #[must_use]
-        pub fn none() -> Self {
+        pub const fn none() -> Self {
             Self(None)
         }
     }
@@ -110946,7 +110946,7 @@ mod prepare_stmt {
     impl PrepareStmtListOpt {
         /// returns None value
         #[must_use]
-        pub fn none() -> Self {
+        pub const fn none() -> Self {
             Self(None)
         }
     }
@@ -111168,7 +111168,7 @@ mod execute_stmt {
     impl ExecuteStmtOpt {
         /// returns None Value
         #[must_use]
-        pub fn none() -> Self {
+        pub const fn none() -> Self {
             Self(None)
         }
     }
@@ -111206,7 +111206,7 @@ mod execute_stmt {
     impl ExecuteStmtListOpt {
         /// returns None value
         #[must_use]
-        pub fn none() -> Self {
+        pub const fn none() -> Self {
             Self(None)
         }
     }
@@ -111390,7 +111390,7 @@ mod deallocate_stmt {
     impl DeallocateStmtOpt {
         /// returns None Value
         #[must_use]
-        pub fn none() -> Self {
+        pub const fn none() -> Self {
             Self(None)
         }
     }
@@ -111428,7 +111428,7 @@ mod deallocate_stmt {
     impl DeallocateStmtListOpt {
         /// returns None value
         #[must_use]
-        pub fn none() -> Self {
+        pub const fn none() -> Self {
             Self(None)
         }
     }
@@ -111502,7 +111502,7 @@ mod deallocate_stmt {
         impl DeallocateStmt {
             /// get `isall`
             #[must_use]
-            pub fn get_isall(&self) -> bool {
+            pub const fn get_isall(&self) -> bool {
                 self.isall
             }
         }
@@ -111510,7 +111510,7 @@ mod deallocate_stmt {
         impl DeallocateStmt {
             /// get `location`
             #[must_use]
-            pub fn get_location(&self) -> i32 {
+            pub const fn get_location(&self) -> i32 {
                 self.location
             }
         }
@@ -111646,7 +111646,7 @@ mod drop_owned_stmt {
     impl DropOwnedStmtOpt {
         /// returns None Value
         #[must_use]
-        pub fn none() -> Self {
+        pub const fn none() -> Self {
             Self(None)
         }
     }
@@ -111684,7 +111684,7 @@ mod drop_owned_stmt {
     impl DropOwnedStmtListOpt {
         /// returns None value
         #[must_use]
-        pub fn none() -> Self {
+        pub const fn none() -> Self {
             Self(None)
         }
     }
@@ -111873,7 +111873,7 @@ mod reassign_owned_stmt {
     impl ReassignOwnedStmtOpt {
         /// returns None Value
         #[must_use]
-        pub fn none() -> Self {
+        pub const fn none() -> Self {
             Self(None)
         }
     }
@@ -111911,7 +111911,7 @@ mod reassign_owned_stmt {
     impl ReassignOwnedStmtListOpt {
         /// returns None value
         #[must_use]
-        pub fn none() -> Self {
+        pub const fn none() -> Self {
             Self(None)
         }
     }
@@ -112100,7 +112100,7 @@ mod alter_ts_dictionary_stmt {
     impl AlterTsDictionaryStmtOpt {
         /// returns None Value
         #[must_use]
-        pub fn none() -> Self {
+        pub const fn none() -> Self {
             Self(None)
         }
     }
@@ -112138,7 +112138,7 @@ mod alter_ts_dictionary_stmt {
     impl AlterTsDictionaryStmtListOpt {
         /// returns None value
         #[must_use]
-        pub fn none() -> Self {
+        pub const fn none() -> Self {
             Self(None)
         }
     }
@@ -112330,7 +112330,7 @@ mod alter_ts_configuration_stmt {
     impl AlterTsConfigurationStmtOpt {
         /// returns None Value
         #[must_use]
-        pub fn none() -> Self {
+        pub const fn none() -> Self {
             Self(None)
         }
     }
@@ -112370,7 +112370,7 @@ mod alter_ts_configuration_stmt {
     impl AlterTsConfigurationStmtListOpt {
         /// returns None value
         #[must_use]
-        pub fn none() -> Self {
+        pub const fn none() -> Self {
             Self(None)
         }
     }
@@ -112501,7 +112501,7 @@ mod alter_ts_configuration_stmt {
         impl AlterTsConfigurationStmt {
             /// get `r#override`
             #[must_use]
-            pub fn get_override(&self) -> bool {
+            pub const fn get_override(&self) -> bool {
                 self.r#override
             }
         }
@@ -112509,7 +112509,7 @@ mod alter_ts_configuration_stmt {
         impl AlterTsConfigurationStmt {
             /// get `replace`
             #[must_use]
-            pub fn get_replace(&self) -> bool {
+            pub const fn get_replace(&self) -> bool {
                 self.replace
             }
         }
@@ -112517,7 +112517,7 @@ mod alter_ts_configuration_stmt {
         impl AlterTsConfigurationStmt {
             /// get `missing_ok`
             #[must_use]
-            pub fn get_missing_ok(&self) -> bool {
+            pub const fn get_missing_ok(&self) -> bool {
                 self.missing_ok
             }
         }
@@ -112732,7 +112732,7 @@ mod publication_table {
     impl PublicationTableOpt {
         /// returns None Value
         #[must_use]
-        pub fn none() -> Self {
+        pub const fn none() -> Self {
             Self(None)
         }
     }
@@ -112770,7 +112770,7 @@ mod publication_table {
     impl PublicationTableListOpt {
         /// returns None value
         #[must_use]
-        pub fn none() -> Self {
+        pub const fn none() -> Self {
             Self(None)
         }
     }
@@ -112997,7 +112997,7 @@ mod publication_obj_spec {
     impl PublicationObjSpecOpt {
         /// returns None Value
         #[must_use]
-        pub fn none() -> Self {
+        pub const fn none() -> Self {
             Self(None)
         }
     }
@@ -113035,7 +113035,7 @@ mod publication_obj_spec {
     impl PublicationObjSpecListOpt {
         /// returns None value
         #[must_use]
-        pub fn none() -> Self {
+        pub const fn none() -> Self {
             Self(None)
         }
     }
@@ -113132,7 +113132,7 @@ mod publication_obj_spec {
         impl PublicationObjSpec {
             /// get `location`
             #[must_use]
-            pub fn get_location(&self) -> i32 {
+            pub const fn get_location(&self) -> i32 {
                 self.location
             }
         }
@@ -113290,7 +113290,7 @@ mod create_publication_stmt {
     impl CreatePublicationStmtOpt {
         /// returns None Value
         #[must_use]
-        pub fn none() -> Self {
+        pub const fn none() -> Self {
             Self(None)
         }
     }
@@ -113328,7 +113328,7 @@ mod create_publication_stmt {
     impl CreatePublicationStmtListOpt {
         /// returns None value
         #[must_use]
-        pub fn none() -> Self {
+        pub const fn none() -> Self {
             Self(None)
         }
     }
@@ -113425,7 +113425,7 @@ mod create_publication_stmt {
         impl CreatePublicationStmt {
             /// get `for_all_tables`
             #[must_use]
-            pub fn get_for_all_tables(&self) -> bool {
+            pub const fn get_for_all_tables(&self) -> bool {
                 self.for_all_tables
             }
         }
@@ -113586,7 +113586,7 @@ mod alter_publication_stmt {
     impl AlterPublicationStmtOpt {
         /// returns None Value
         #[must_use]
-        pub fn none() -> Self {
+        pub const fn none() -> Self {
             Self(None)
         }
     }
@@ -113624,7 +113624,7 @@ mod alter_publication_stmt {
     impl AlterPublicationStmtListOpt {
         /// returns None value
         #[must_use]
-        pub fn none() -> Self {
+        pub const fn none() -> Self {
             Self(None)
         }
     }
@@ -113728,7 +113728,7 @@ mod alter_publication_stmt {
         impl AlterPublicationStmt {
             /// get `for_all_tables`
             #[must_use]
-            pub fn get_for_all_tables(&self) -> bool {
+            pub const fn get_for_all_tables(&self) -> bool {
                 self.for_all_tables
             }
         }
@@ -113916,7 +113916,7 @@ mod create_subscription_stmt {
     impl CreateSubscriptionStmtOpt {
         /// returns None Value
         #[must_use]
-        pub fn none() -> Self {
+        pub const fn none() -> Self {
             Self(None)
         }
     }
@@ -113954,7 +113954,7 @@ mod create_subscription_stmt {
     impl CreateSubscriptionStmtListOpt {
         /// returns None value
         #[must_use]
-        pub fn none() -> Self {
+        pub const fn none() -> Self {
             Self(None)
         }
     }
@@ -114215,7 +114215,7 @@ mod alter_subscription_stmt {
     impl AlterSubscriptionStmtOpt {
         /// returns None Value
         #[must_use]
-        pub fn none() -> Self {
+        pub const fn none() -> Self {
             Self(None)
         }
     }
@@ -114253,7 +114253,7 @@ mod alter_subscription_stmt {
     impl AlterSubscriptionStmtListOpt {
         /// returns None value
         #[must_use]
-        pub fn none() -> Self {
+        pub const fn none() -> Self {
             Self(None)
         }
     }
@@ -114543,7 +114543,7 @@ mod drop_subscription_stmt {
     impl DropSubscriptionStmtOpt {
         /// returns None Value
         #[must_use]
-        pub fn none() -> Self {
+        pub const fn none() -> Self {
             Self(None)
         }
     }
@@ -114581,7 +114581,7 @@ mod drop_subscription_stmt {
     impl DropSubscriptionStmtListOpt {
         /// returns None value
         #[must_use]
-        pub fn none() -> Self {
+        pub const fn none() -> Self {
             Self(None)
         }
     }
@@ -114655,7 +114655,7 @@ mod drop_subscription_stmt {
         impl DropSubscriptionStmt {
             /// get `missing_ok`
             #[must_use]
-            pub fn get_missing_ok(&self) -> bool {
+            pub const fn get_missing_ok(&self) -> bool {
                 self.missing_ok
             }
         }
@@ -114803,7 +114803,7 @@ mod scan_token {
     impl ScanTokenOpt {
         /// returns None Value
         #[must_use]
-        pub fn none() -> Self {
+        pub const fn none() -> Self {
             Self(None)
         }
     }
@@ -114841,7 +114841,7 @@ mod scan_token {
     impl ScanTokenListOpt {
         /// returns None value
         #[must_use]
-        pub fn none() -> Self {
+        pub const fn none() -> Self {
             Self(None)
         }
     }
@@ -114914,7 +114914,7 @@ mod scan_token {
         impl ScanToken {
             /// get `start`
             #[must_use]
-            pub fn get_start(&self) -> i32 {
+            pub const fn get_start(&self) -> i32 {
                 self.start
             }
         }
@@ -114922,7 +114922,7 @@ mod scan_token {
         impl ScanToken {
             /// get `end`
             #[must_use]
-            pub fn get_end(&self) -> i32 {
+            pub const fn get_end(&self) -> i32 {
                 self.end
             }
         }

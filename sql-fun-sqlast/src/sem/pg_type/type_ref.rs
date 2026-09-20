@@ -269,7 +269,7 @@ impl TypeReference {
 
     /// type is dynamic
     #[must_use]
-    pub fn is_dynamic(&self) -> bool {
+    pub const fn is_dynamic(&self) -> bool {
         matches!(self, Self::Dynamic(_))
     }
 }

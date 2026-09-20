@@ -14,7 +14,7 @@ impl JsonRpcRequest {
         &self.method
     }
 
-    pub fn params(&self) -> Option<&serde_json::Value> {
+    pub const fn params(&self) -> Option<&serde_json::Value> {
         self.params.as_ref()
     }
 }

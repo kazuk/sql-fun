@@ -64,7 +64,7 @@ where
     TContext: BaseParseContext + std::fmt::Debug,
 {
     /// create instance
-    pub fn new(sem_results: Vec<SemAst>, context: SchemaFileContext<TContext>) -> Self {
+    pub const fn new(sem_results: Vec<SemAst>, context: SchemaFileContext<TContext>) -> Self {
         Self(sem_results, context)
     }
 }

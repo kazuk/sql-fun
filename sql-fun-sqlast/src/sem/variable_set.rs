@@ -23,7 +23,7 @@ impl VariableSet {
 
     /// value of variable
     #[must_use]
-    pub fn value(&self) -> &SemScalarExpr {
+    pub const fn value(&self) -> &SemScalarExpr {
         &self.value
     }
 

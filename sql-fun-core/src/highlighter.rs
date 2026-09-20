@@ -42,7 +42,7 @@ impl TerminalColor {
 
     /// return true when self is never
     #[must_use]
-    pub fn is_never(&self) -> bool {
+    pub const fn is_never(&self) -> bool {
         matches!(self, Self::Never)
     }
 }
@@ -107,37 +107,37 @@ impl HighlighterTheme {
 
     /// get identifier style
     #[must_use]
-    pub fn identifier(&self) -> &HighlighterStyle {
+    pub const fn identifier(&self) -> &HighlighterStyle {
         &self.identifier
     }
 
     /// get constant style
     #[must_use]
-    pub fn constant(&self) -> &HighlighterStyle {
+    pub const fn constant(&self) -> &HighlighterStyle {
         &self.constant
     }
 
     /// get operator style
     #[must_use]
-    pub fn operator(&self) -> &HighlighterStyle {
+    pub const fn operator(&self) -> &HighlighterStyle {
         &self.operator
     }
 
     /// get keyword style
     #[must_use]
-    pub fn keyword(&self) -> &HighlighterStyle {
+    pub const fn keyword(&self) -> &HighlighterStyle {
         &self.keyword
     }
 
     /// get comment style
     #[must_use]
-    pub fn comment(&self) -> &HighlighterStyle {
+    pub const fn comment(&self) -> &HighlighterStyle {
         &self.comment
     }
 
     /// get delimiter style
     #[must_use]
-    pub fn delimiter(&self) -> &HighlighterStyle {
+    pub const fn delimiter(&self) -> &HighlighterStyle {
         &self.delimiter
     }
 }

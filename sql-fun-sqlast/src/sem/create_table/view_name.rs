@@ -25,7 +25,7 @@ impl ViewName {
         }
     }
 
-    pub(crate) fn full_name(&self) -> &FullName {
+    pub(crate) const fn full_name(&self) -> &FullName {
         &self.0
     }
 }

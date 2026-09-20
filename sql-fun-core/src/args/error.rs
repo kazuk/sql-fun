@@ -60,6 +60,10 @@ pub enum SqlFunArgsError {
     /// Argument or environment variable parse error
     #[error(transparent)]
     Clap(#[from] clap::Error),
+
+    /// specified datasource not found
+    #[error("Specified datasource not found {0}")]
+    DatasourceNotFound(String),
 }
 
 impl From<std::io::Error> for SqlFunArgsError {
@@ -131,7 +135,7 @@ impl SqlFunArgsError {
     /// # Errors
     ///
     /// Always returns [`SqlFunArgsError::InsufficientConfiguration`].
-    pub fn no_postgres_engine_version_specified<T>() -> Result<T, Self> {
+    pub const fn no_postgres_engine_version_specified<T>() -> Result<T, Self> {
         Err(Self::InsufficientConfiguration(
             ConfigurationKind::EngineVersion,
         ))
@@ -147,5 +151,15 @@ impl SqlFunArgsError {
             message.to_string(),
             source.to_string(),
         ))
+    }
+
+    /// Datasource not found
+    ///
+    /// # Errors
+    ///
+    /// Always returns [`SqlFunArgsError::DatasourceNotFound`]
+    ///
+    pub fn datasource_not_found<T>(datasource_name: &str) -> Result<T, Self> {
+        Err(Self::DatasourceNotFound(String::from(datasource_name)))
     }
 }

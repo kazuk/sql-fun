@@ -100,8 +100,12 @@ impl Api {
             .schema_file(schema_dump)
             .build()?;
 
-        let metadata = context_args.load_metadata()?;
-        let version = context_args.postgres_version(&metadata)?;
+        let metadata_collection = context_args.load_metadata()?;
+
+        let metadata = metadata_collection
+            .get(context_args.datasource().unwrap_or("default"))
+            .unwrap();
+        let version = context_args.postgres_version(metadata)?;
         let mut builtin_schema = version.definition_base_path(context_args.sql_fun_home()?);
         builtin_schema.push("schema.sql");
 

@@ -50,7 +50,7 @@ impl TableDataSource {
         }
     }
 
-    pub fn name(&self) -> &TableName {
+    pub const fn name(&self) -> &TableName {
         &self.name
     }
 

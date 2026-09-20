@@ -80,12 +80,12 @@ impl PrimaryKeyColumnConstraint {
 
 impl ColumnConstraint {
     /// create PrimaryKey variant
-    pub fn primary_key(value: PrimaryKeyColumnConstraint) -> Self {
+    pub const fn primary_key(value: PrimaryKeyColumnConstraint) -> Self {
         Self::PrimaryKey(value)
     }
 
     /// get PrimaryKey variant
-    pub fn as_primary_key(&self) -> Option<&PrimaryKeyColumnConstraint> {
+    pub const fn as_primary_key(&self) -> Option<&PrimaryKeyColumnConstraint> {
         if let Self::PrimaryKey(c) = self {
             Some(c)
         } else {

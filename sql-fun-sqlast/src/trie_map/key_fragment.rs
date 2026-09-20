@@ -8,11 +8,11 @@ impl<'a> From<&'a [u8]> for KeyFragment<'a> {
 }
 
 impl KeyFragment<'_> {
-    pub(super) fn len(&self) -> usize {
+    pub(super) const fn len(&self) -> usize {
         self.0.len()
     }
 
-    pub(super) fn is_empty(&self) -> bool {
+    pub(super) const fn is_empty(&self) -> bool {
         self.0.is_empty()
     }
 

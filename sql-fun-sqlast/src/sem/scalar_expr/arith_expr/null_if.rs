@@ -9,11 +9,11 @@ pub struct NullIfExpr {
 }
 
 impl NullIfExpr {
-    pub fn is_not_null(&self) -> Option<bool> {
+    pub const fn is_not_null(&self) -> Option<bool> {
         Some(false)
     }
 
-    pub fn is_strict(&self) -> bool {
+    pub const fn is_strict(&self) -> bool {
         false
     }
 }

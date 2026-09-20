@@ -28,25 +28,25 @@ impl BinaryOperatorDefinition {
 
     /// operator return type
     #[must_use]
-    pub fn get_return_type(&self) -> &TypeReference {
+    pub const fn get_return_type(&self) -> &TypeReference {
         &self.result_type
     }
 
     /// strict
     #[must_use]
-    pub fn is_strict(&self) -> bool {
+    pub const fn is_strict(&self) -> bool {
         self.strict
     }
 
     /// left argument type
     #[must_use]
-    pub fn left_arg_type(&self) -> &TypeReference {
+    pub const fn left_arg_type(&self) -> &TypeReference {
         &self.left_arg_type
     }
 
     /// right argument type
     #[must_use]
-    pub fn right_arg_type(&self) -> &TypeReference {
+    pub const fn right_arg_type(&self) -> &TypeReference {
         &self.right_arg_type
     }
 }
@@ -72,19 +72,19 @@ impl UnaryOperatorDefinition {
 
     /// return type of operator
     #[must_use]
-    pub fn get_return_type(&self) -> &TypeReference {
+    pub const fn get_return_type(&self) -> &TypeReference {
         &self.result_type
     }
 
     /// strict
     #[must_use]
-    pub fn is_strict(&self) -> bool {
+    pub const fn is_strict(&self) -> bool {
         self.strict
     }
 
     /// argument type
     #[must_use]
-    pub fn arg_type(&self) -> &TypeReference {
+    pub const fn arg_type(&self) -> &TypeReference {
         &self.arg_type
     }
 }

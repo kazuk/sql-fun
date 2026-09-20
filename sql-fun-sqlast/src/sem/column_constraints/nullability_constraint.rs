@@ -35,7 +35,7 @@ impl ColumnNullabilityConstraint {
     }
 
     /// get nullability
-    pub fn is_not_null(&self) -> bool {
+    pub const fn is_not_null(&self) -> bool {
         self.is_not_null
     }
 }
@@ -100,12 +100,12 @@ impl ColumnNullabilityConstraint {
 
 impl ColumnConstraint {
     /// create Nullability variant
-    pub fn nullability(value: ColumnNullabilityConstraint) -> Self {
+    pub const fn nullability(value: ColumnNullabilityConstraint) -> Self {
         Self::Nullability(value)
     }
 
     /// get Nullability variant
-    pub fn as_nullability(&self) -> Option<&ColumnNullabilityConstraint> {
+    pub const fn as_nullability(&self) -> Option<&ColumnNullabilityConstraint> {
         if let Self::Nullability(c) = self {
             Some(c)
         } else {

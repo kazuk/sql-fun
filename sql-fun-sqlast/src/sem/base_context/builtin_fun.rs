@@ -87,7 +87,7 @@ impl PgFunctionDetail {
         })
     }
 
-    pub fn arg_iter(&self) -> PgFunctionArgIter<'_> {
+    pub const fn arg_iter(&self) -> PgFunctionArgIter<'_> {
         PgFunctionArgIter {
             source: self,
             index: 0,

@@ -10,7 +10,7 @@ pub struct BinaryCastCandidate {
 }
 
 impl BinaryCastCandidate {
-    fn new(
+    const fn new(
         left: CastContext,
         right: CastContext,
         priority: i32,
@@ -84,7 +84,7 @@ impl BinaryCastCandidate {
             .collect()
     }
 
-    pub fn operator(&self) -> &BinaryOperatorDefinition {
+    pub const fn operator(&self) -> &BinaryOperatorDefinition {
         &self.operator
     }
 }

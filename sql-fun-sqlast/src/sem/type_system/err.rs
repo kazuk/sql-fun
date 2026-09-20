@@ -39,15 +39,15 @@ pub enum TypeError {
 }
 
 impl TypeError {
-    pub fn common_infer_no_implicit_castable() -> Result<Infallible, Self> {
+    pub const fn common_infer_no_implicit_castable() -> Result<Infallible, Self> {
         Err(Self::CommonInferNoImplicitCastable())
     }
 
-    pub fn unexpected_cast_not_found() -> Result<Infallible, Self> {
+    pub const fn unexpected_cast_not_found() -> Result<Infallible, Self> {
         Err(Self::UnexpectedCastNotFound)
     }
 
-    pub fn common_infer_ambiguous() -> Result<Infallible, Self> {
+    pub const fn common_infer_ambiguous() -> Result<Infallible, Self> {
         Err(Self::CommonInferAmbiguous())
     }
 

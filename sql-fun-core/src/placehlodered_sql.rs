@@ -9,6 +9,7 @@ use combine::{
     satisfy,
 };
 use indexmap::IndexMap;
+use toml_parser::decoder::StringBuilder;
 
 #[derive(Debug, Hash, Eq, PartialEq, Clone, serde::Serialize, serde::Deserialize)]
 #[serde(transparent)]
@@ -23,12 +24,23 @@ where
     }
 }
 
-#[derive(Debug, Clone, serde::Serialize)]
+impl ParameterName {
+    fn encode(&self, buffer: &mut String) {
+        buffer.push_str(&self.0);
+    }
+}
+
+#[derive(Debug, Clone, serde::Serialize, serde::Deserialize)]
+#[serde(transparent)]
 pub struct PlaceholderTypeHint(String);
 
 impl PlaceholderTypeHint {
     pub const fn hint_value(&self) -> &str {
         self.0.as_str()
+    }
+
+    fn encode(&self, buffer: &mut String) {
+        buffer.push_str(&self.0);
     }
 }
 
@@ -42,7 +54,7 @@ fn ident<'a>() -> impl combine::Parser<&'a str, Output = String> {
 }
 
 /// fragment embedding placeholder name
-#[derive(Debug, Hash, Eq, PartialEq, Clone, serde::Serialize)]
+#[derive(Debug, Hash, Eq, PartialEq, Clone, serde::Serialize, serde::Deserialize)]
 #[serde(transparent)]
 pub struct FragmentName(String);
 
@@ -71,6 +83,12 @@ impl FragmentName {
     pub const fn as_str(&self) -> &str {
         self.0.as_str()
     }
+
+    fn encode(&self, buffer: &mut String) {
+        let () = buffer.push_str("#[");
+        let () = buffer.push_str(&self.0);
+        let _ = buffer.push_char(']');
+    }
 }
 
 impl std::fmt::Display for FragmentName {
@@ -79,7 +97,7 @@ impl std::fmt::Display for FragmentName {
     }
 }
 
-#[derive(Debug, Clone, serde::Serialize)]
+#[derive(Debug, Clone, serde::Serialize, serde::Deserialize)]
 pub struct NamedParameterPlaceholder {
     name: ParameterName,
     type_hint: Option<PlaceholderTypeHint>,
@@ -108,9 +126,19 @@ impl NamedParameterPlaceholder {
     pub const fn type_hint(&self) -> Option<&PlaceholderTypeHint> {
         self.type_hint.as_ref()
     }
+
+    fn encode(&self, buffer: &mut String) {
+        buffer.push_str("${");
+        self.name.encode(buffer);
+        if let Some(type_hint) = &self.type_hint {
+            buffer.push(':');
+            type_hint.encode(buffer);
+        }
+        buffer.push('}');
+    }
 }
 
-#[derive(Debug, Clone, serde::Serialize)]
+#[derive(Debug, Clone, serde::Serialize, serde::Deserialize)]
 #[serde(transparent)]
 pub struct SqlLiteralText(String);
 
@@ -132,9 +160,15 @@ impl SqlLiteralText {
         ))
         .map(|s| Self(String::from(s)))
     }
+
+    fn encode(&self, buffer: &mut String) {
+        let _ = buffer.push_char('\'');
+        let () = buffer.push_str(&self.0.replace('\'', r"''"));
+        let _ = buffer.push_char('\'');
+    }
 }
 
-#[derive(Debug, Clone, serde::Serialize)]
+#[derive(Debug, Clone, serde::Serialize, serde::Deserialize)]
 #[serde(transparent)]
 pub struct RawSqlText(String);
 
@@ -142,9 +176,13 @@ impl RawSqlText {
     pub const fn text(&self) -> &str {
         self.0.as_str()
     }
+
+    fn encode(&self, buffer: &mut String) {
+        buffer.push_str(&self.0);
+    }
 }
 
-#[derive(Debug, Clone, serde::Serialize)]
+#[derive(Debug, Clone, serde::Serialize, serde::Deserialize)]
 pub enum PlaceholderedSqlToken {
     ParameterPlaceholder(NamedParameterPlaceholder),
     FragmentPlaceholder(FragmentName),
@@ -219,9 +257,20 @@ impl PlaceholderedSqlToken {
             _ => false,
         }
     }
+
+    fn encode(&self, buffer: &mut String) {
+        match self {
+            Self::ParameterPlaceholder(named_parameter_placeholder) => {
+                named_parameter_placeholder.encode(buffer);
+            }
+            Self::FragmentPlaceholder(fragment_name) => fragment_name.encode(buffer),
+            Self::LiteralText(sql_literal_text) => sql_literal_text.encode(buffer),
+            Self::RawSqlText(raw_sql_text) => raw_sql_text.encode(buffer),
+        }
+    }
 }
 
-#[derive(Debug, Clone, serde::Serialize)]
+#[derive(Debug, Clone, serde::Serialize, serde::Deserialize)]
 /// SQL text contains `sql-fun` named parameter syntax and fragment embedding marker
 pub struct PlaceholderedSql {
     tokens: Vec<PlaceholderedSqlToken>,
@@ -326,5 +375,15 @@ impl PlaceholderedSql {
             }
         }
         Ok(Self::from_tokens(rebuilt_tokens))
+    }
+
+    /// encode into string
+    #[must_use]
+    pub fn encode(&self) -> String {
+        let mut buffer = String::new();
+        for token in &self.tokens {
+            token.encode(&mut buffer);
+        }
+        buffer
     }
 }

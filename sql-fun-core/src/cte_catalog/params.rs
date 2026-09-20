@@ -104,7 +104,7 @@ impl CteParameterBinding {
 }
 
 /// collection of parameter binding
-#[derive(Debug, Default, Clone, serde::Serialize)]
+#[derive(Debug, Default, Clone, serde::Serialize, serde::Deserialize)]
 pub struct CteParameterBindingCollection(Vec<(CteName, Vec<PlaceholderTypeHint>)>);
 
 impl CteParameterBindingCollection {
@@ -122,7 +122,7 @@ impl CteParameterBindingCollection {
 }
 
 /// parameter collection for CTE
-#[derive(Debug, Default, Clone, serde::Serialize)]
+#[derive(Debug, Default, Clone, serde::Serialize, serde::Deserialize)]
 pub struct CteParameterCollection {
     parameters: HashMap<ParameterName, CteParameterBindingCollection>,
 }

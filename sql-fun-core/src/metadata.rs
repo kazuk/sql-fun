@@ -333,13 +333,16 @@ impl SqlFunMetadata {
     ///
     /// Returns [`SqlFunArgsError`] if the context error.
     pub fn lockfile_path(&self, context: &SqlFunArgs) -> Result<PathBuf, SqlFunArgsError> {
-        let name = self.name();
-        let schema = context.schema();
-        // get metadata file path
-        let mut project_dir = context.metadata_file()?;
-        project_dir.pop();
-        project_dir.push(format!("{name}.{schema}.lock"));
-        Ok(project_dir)
+        context.lockfile_path(self.name())
+    }
+
+    /// get schema dump path
+    ///
+    /// # Errors
+    ///
+    /// Returns an error if the metadata file cannot be located.
+    pub fn schema_dump_path(&self, context: &SqlFunArgs) -> Result<PathBuf, SqlFunArgsError> {
+        context.schema_dump_path(self.name())
     }
 
     /// get SQL dialect

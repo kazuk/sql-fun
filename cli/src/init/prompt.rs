@@ -7,6 +7,20 @@ pub(super) enum PromptResponse {
     MultiSelect(Vec<usize>),
 }
 
+impl PromptResponse {
+    pub(super) const fn confirm(confirmed: bool) -> Self {
+        Self::Confirm(confirmed)
+    }
+
+    pub(super) fn text(input: &str) -> Self {
+        Self::Text(input.to_owned())
+    }
+
+    pub(super) fn multi_select(indices: &[usize]) -> Self {
+        Self::MultiSelect(indices.to_vec())
+    }
+}
+
 #[derive(Clone, Debug, PartialEq, Eq)]
 enum Input {
     Confirm,
@@ -85,22 +99,22 @@ impl PromptRequest {
             return Ok(response.clone());
         }
         match &self.input {
-            Input::Confirm => Ok(PromptResponse::Confirm(
+            Input::Confirm => Ok(PromptResponse::confirm(
                 inquire::Confirm::new(&self.title).prompt()?,
             )),
-            Input::Text(input) => Ok(PromptResponse::Text(
-                inquire::Text::new(&self.title)
+            Input::Text(input) => Ok(PromptResponse::text(
+                &inquire::Text::new(&self.title)
                     .with_default(&input.default)
                     .with_initial_value(&input.initial)
                     .prompt()?,
             )),
-            Input::MultiSelect(selection) => Ok(PromptResponse::MultiSelect(
-                inquire::MultiSelect::new(&self.title, selection.options.clone())
+            Input::MultiSelect(selection) => Ok(PromptResponse::multi_select(
+                &inquire::MultiSelect::new(&self.title, selection.options.clone())
                     .with_default(&selection.defaults)
                     .raw_prompt()?
                     .into_iter()
                     .map(|item| item.index)
-                    .collect(),
+                    .collect::<Vec<_>>(),
             )),
         }
     }
@@ -111,14 +125,14 @@ mod tests {
     use super::{PromptRequest, PromptResponse};
 
     #[rstest::rstest]
-    #[case::confirm(PromptRequest::confirm("confirm"), PromptResponse::Confirm(true))]
+    #[case::confirm(PromptRequest::confirm("confirm"), PromptResponse::confirm(true))]
     #[case::text(
         PromptRequest::text("text", "default"),
-        PromptResponse::Text("supplied".to_owned()),
+        PromptResponse::text("supplied")
     )]
     #[case::multi_select(
         PromptRequest::multi_select("select", &["first".to_owned(), "second".to_owned()], &[0]),
-        PromptResponse::MultiSelect(vec![1]),
+        PromptResponse::multi_select(&[1]),
     )]
     fn supplied_responses_bypass_the_terminal(
         #[case] request: PromptRequest,

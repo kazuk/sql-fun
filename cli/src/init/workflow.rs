@@ -294,7 +294,7 @@ impl State {
 impl State {
     fn confirm_install_request(context: &Initialization) -> Request {
         let automatic = if context.yes {
-            Some(PromptResponse::Confirm(true))
+            Some(PromptResponse::confirm(true))
         } else {
             None
         };
@@ -312,7 +312,7 @@ mod test_confirm_install_request {
 
     #[rstest::rstest]
     #[case::interactive(false, None)]
-    #[case::assume_yes(true, Some(PromptResponse::Confirm(true)))]
+    #[case::assume_yes(true, Some(PromptResponse::confirm(true)))]
     fn requests_confirmation(#[case] yes: bool, #[case] automatic: Option<PromptResponse>) {
         assert_eq!(
             State::confirm_install_request(&initialization(yes)),
@@ -343,7 +343,7 @@ mod test_prepare_home_request {
 impl State {
     fn confirm_create_request(context: &Initialization) -> Request {
         let automatic = if context.yes {
-            Some(PromptResponse::Confirm(true))
+            Some(PromptResponse::confirm(true))
         } else {
             None
         };
@@ -367,7 +367,7 @@ mod test_confirm_create_request {
 
     #[rstest::rstest]
     #[case::interactive(false, None)]
-    #[case::assume_yes(true, Some(PromptResponse::Confirm(true)))]
+    #[case::assume_yes(true, Some(PromptResponse::confirm(true)))]
     fn requests_confirmation(#[case] yes: bool, #[case] automatic: Option<PromptResponse>) {
         assert_eq!(
             State::confirm_create_request(&initialization(yes)),
@@ -477,8 +477,8 @@ impl State {
             })
             .collect();
         let automatic = if context.yes {
-            Some(PromptResponse::MultiSelect(
-                context
+            Some(PromptResponse::multi_select(
+                &context
                     .versions
                     .iter()
                     .filter_map(|version| {
@@ -486,7 +486,7 @@ impl State {
                             .iter()
                             .position(|option| option == version)
                     })
-                    .collect(),
+                    .collect::<Vec<_>>(),
             ))
         } else {
             None
@@ -547,7 +547,7 @@ mod test_select_versions_request {
             State::select_versions_request(&context),
             Request::Prompt(
                 version_prompt(&[0, 2])
-                    .with_automatic(Some(PromptResponse::MultiSelect(vec![2, 0, 2]))),
+                    .with_automatic(Some(PromptResponse::multi_select(&[2, 0, 2]))),
             ),
         );
     }

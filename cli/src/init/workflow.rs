@@ -1,3 +1,6 @@
+#[cfg(test)]
+mod tests;
+
 use super::{
     database_engine_versions::PostgresVersions,
     presentation::{HomePathError, Notice},
@@ -14,6 +17,7 @@ pub(super) struct Initialization {
     supplied_home: bool,
     home: PathBuf,
     default_home: String,
+    home_input: String,
     version_args: Vec<String>,
     versions: Vec<PostgresVersions>,
     notices: Vec<Notice>,
@@ -30,6 +34,7 @@ impl From<&InitializeArgs> for Initialization {
             yes: args.assume_yes(),
             supplied_home: args.sql_fun_home().is_some(),
             default_home: home.to_string_lossy().into_owned(),
+            home_input: String::new(),
             home,
             version_args: args.engine_versions(),
             versions: Vec::new(),
@@ -170,9 +175,11 @@ impl Workflow {
             Some(HomePathError::ParentUnavailable)
         };
         if let Some(error) = error {
+            context.home_input.clone_from(input);
             context.notices.push(Notice::InvalidHome(error));
             return Outcome::Handled;
         }
+        context.home_input.clear();
         context.home = path;
         Outcome::Transition(State::create_edited_home())
     }
@@ -225,6 +232,7 @@ impl Workflow {
             return Outcome::Handled;
         };
         if indices.is_empty() && !context.yes {
+            context.versions.clear();
             context.notices.push(Notice::VersionRequired);
             return Outcome::Handled;
         }
@@ -273,7 +281,8 @@ impl State {
             Self::EditHome {} => PromptRequest::text(
                 include_str!("home_prompt.txt").trim_end(),
                 &context.default_home,
-            ),
+            )
+            .with_initial_text(&context.home_input),
             Self::SelectVersions {} => {
                 let options: Vec<_> = PostgresVersions::ALL
                     .iter()
@@ -317,160 +326,5 @@ impl State {
 
     pub(super) const fn is_cancelled(&self) -> bool {
         matches!(self, Self::Cancelled {})
-    }
-}
-
-#[cfg(test)]
-mod tests {
-    use super::{
-        Event, Initialization, PostgresVersions, PromptResponse, Request, State, Workflow,
-    };
-    use ::clap::Parser;
-    use ::statig::blocking::{IntoStateMachineExt, StateMachine};
-    use std::path::Path;
-
-    struct Scenario {
-        machine: StateMachine<Workflow>,
-        context: Initialization,
-    }
-
-    impl Scenario {
-        fn new(args: &[&str]) -> Self {
-            let args = sql_fun_core::InitializeArgs::try_parse_from(
-                std::iter::once("init").chain(args.iter().copied()),
-            )
-            .unwrap();
-            Self {
-                machine: Workflow.state_machine(),
-                context: Initialization::from(&args),
-            }
-        }
-
-        fn with_home(path: &Path, yes: bool) -> Self {
-            let mut args = vec!["--sql-fun-home", path.to_str().unwrap()];
-            if yes {
-                args.push("--yes");
-            }
-            Self::new(&args)
-        }
-
-        fn send(&mut self, event: &Event) {
-            self.machine.handle_with_context(event, &mut self.context);
-        }
-
-        fn advance(&mut self) {
-            self.send(&Event::Advance);
-        }
-
-        fn answer(&mut self, response: PromptResponse) {
-            self.send(&Event::Answer(response));
-        }
-
-        fn state(&self) -> &State {
-            self.machine.state()
-        }
-
-        fn request(&self) -> Option<Request> {
-            self.state().request(&self.context)
-        }
-
-        fn accept_install(&mut self) {
-            self.answer(PromptResponse::Confirm(true));
-            assert_eq!(self.state(), &State::prepare_home());
-            self.advance();
-        }
-
-        fn run_automatic(&mut self) {
-            // Never execute a terminal prompt, even if a regression removes an automatic answer.
-            for _ in 0..16 {
-                let Some(request) = self.request() else {
-                    return;
-                };
-                let event = match request {
-                    Request::Advance => Event::Advance,
-                    Request::Prompt(prompt) => Event::Answer(
-                        prompt
-                            .automatic_response()
-                            .expect("non-interactive answer")
-                            .clone(),
-                    ),
-                };
-                self.send(&event);
-            }
-            panic!("initialization did not terminate");
-        }
-    }
-
-    #[test]
-    fn accepts_existing_cli_path_even_when_it_is_a_file() {
-        let file = tempfile::NamedTempFile::new().unwrap();
-        let mut scenario = Scenario::with_home(file.path(), false);
-        scenario.accept_install();
-        assert_eq!(scenario.state(), &State::prepare_versions());
-        assert_eq!(scenario.context.home, file.path());
-        scenario.advance();
-        assert_eq!(scenario.state(), &State::select_versions());
-    }
-
-    #[test]
-    fn assumed_yes_creates_missing_parents() {
-        let root = tempfile::tempdir().unwrap();
-        let home = root.path().join("parent/home");
-        let mut scenario = Scenario::with_home(&home, true);
-        scenario.run_automatic();
-        assert_eq!(scenario.state(), &State::versions_selected());
-        assert!(home.is_dir());
-    }
-
-    #[test]
-    fn assumed_yes_returns_creation_failure() {
-        let file = tempfile::NamedTempFile::new().unwrap();
-        let mut scenario = Scenario::with_home(&file.path().join("home"), true);
-        scenario.run_automatic();
-        assert_eq!(scenario.state(), &State::failed());
-        assert!(
-            scenario
-                .context
-                .finish()
-                .unwrap_err()
-                .downcast_ref::<std::io::Error>()
-                .is_some()
-        );
-    }
-
-    #[test]
-    fn assumed_yes_preserves_order_and_duplicates() {
-        let home = tempfile::tempdir().unwrap();
-        let mut scenario = Scenario::new(&[
-            "--yes",
-            "--sql-fun-home",
-            home.path().to_str().unwrap(),
-            "--engine-versions",
-            "18,16,18",
-        ]);
-        scenario.run_automatic();
-        assert_eq!(scenario.state(), &State::versions_selected());
-        assert_eq!(
-            scenario.context.versions,
-            vec![
-                PostgresVersions::Postgres18,
-                PostgresVersions::Postgres16,
-                PostgresVersions::Postgres18
-            ]
-        );
-    }
-
-    #[test]
-    fn rejects_unknown_versions_before_prompting() {
-        let home = tempfile::tempdir().unwrap();
-        for yes in [false, true] {
-            let mut scenario = Scenario::with_home(home.path(), yes);
-            scenario.context.version_args = vec!["19".to_owned()];
-            scenario.accept_install();
-            scenario.advance();
-            assert_eq!(scenario.state(), &State::failed());
-            assert!(scenario.context.finish().is_err());
-            assert_eq!(scenario.request(), None);
-        }
     }
 }

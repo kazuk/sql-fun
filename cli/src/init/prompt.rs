@@ -90,6 +90,24 @@ struct Selection {
 }
 
 impl Input {
+    const fn confirm() -> Self {
+        Self::Confirm
+    }
+
+    fn text(default: &str) -> Self {
+        Self::Text(TextInput {
+            default: default.to_owned(),
+            initial: String::new(),
+        })
+    }
+
+    fn multi_select(options: &[String], defaults: &[usize]) -> Self {
+        Self::MultiSelect(Selection {
+            options: options.to_vec(),
+            defaults: defaults.to_vec(),
+        })
+    }
+
     fn set_initial_text(&mut self, initial: &str) {
         if let Self::Text(input) = self {
             initial.clone_into(&mut input.initial);
@@ -130,7 +148,7 @@ impl PromptRequest {
     pub(super) fn confirm(title: &str) -> Self {
         Self {
             title: title.to_owned(),
-            input: Input::Confirm,
+            input: Input::confirm(),
             automatic: None,
         }
     }
@@ -138,10 +156,7 @@ impl PromptRequest {
     pub(super) fn text(title: &str, default: &str) -> Self {
         Self {
             title: title.to_owned(),
-            input: Input::Text(TextInput {
-                default: default.to_owned(),
-                initial: String::new(),
-            }),
+            input: Input::text(default),
             automatic: None,
         }
     }
@@ -154,10 +169,7 @@ impl PromptRequest {
     pub(super) fn multi_select(title: &str, options: &[String], defaults: &[usize]) -> Self {
         Self {
             title: title.to_owned(),
-            input: Input::MultiSelect(Selection {
-                options: options.to_vec(),
-                defaults: defaults.to_vec(),
-            }),
+            input: Input::multi_select(options, defaults),
             automatic: None,
         }
     }

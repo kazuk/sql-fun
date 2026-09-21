@@ -16,6 +16,11 @@ Statistics are stored in the stats directory. During reviews, we check the impac
 
 You can build and run tests using the `check-test-flow` script.
 
+# Branches
+
+- Run `git fetch origin` before branch operations to refresh remote-tracking references. If fetching fails, resolve the failure before proceeding.
+- Create new branches from `origin/<base-branch>` (for example, `origin/main`) rather than a potentially stale local base branch. This also applies when creating branches with `git worktree add`.
+
 # Commits
 
 - Commits must follow the Conventional Commits specification.

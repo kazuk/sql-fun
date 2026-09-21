@@ -2902,6 +2902,7 @@ dependencies = [
  "inquire",
  "log",
  "nix 0.31.3",
+ "rstest",
  "serde",
  "serde_json",
  "shellexpand",

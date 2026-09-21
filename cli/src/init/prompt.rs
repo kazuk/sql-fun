@@ -110,34 +110,26 @@ impl PromptRequest {
 mod tests {
     use super::{PromptRequest, PromptResponse};
 
-    #[test]
-    fn supplied_responses_bypass_the_terminal_for_every_primitive() {
-        let cases = [
-            (
-                PromptRequest::confirm("confirm"),
-                PromptResponse::Confirm(true),
-            ),
-            (
-                PromptRequest::text("text", "default"),
-                PromptResponse::Text("supplied".to_owned()),
-            ),
-            (
-                PromptRequest::multi_select(
-                    "select",
-                    &["first".to_owned(), "second".to_owned()],
-                    &[0],
-                ),
-                PromptResponse::MultiSelect(vec![1]),
-            ),
-        ];
-        for (request, response) in cases {
-            assert_eq!(
-                request
-                    .with_automatic(Some(response.clone()))
-                    .run()
-                    .unwrap(),
-                response
-            );
-        }
+    #[rstest::rstest]
+    #[case::confirm(PromptRequest::confirm("confirm"), PromptResponse::Confirm(true))]
+    #[case::text(
+        PromptRequest::text("text", "default"),
+        PromptResponse::Text("supplied".to_owned()),
+    )]
+    #[case::multi_select(
+        PromptRequest::multi_select("select", &["first".to_owned(), "second".to_owned()], &[0]),
+        PromptResponse::MultiSelect(vec![1]),
+    )]
+    fn supplied_responses_bypass_the_terminal(
+        #[case] request: PromptRequest,
+        #[case] response: PromptResponse,
+    ) {
+        assert_eq!(
+            request
+                .with_automatic(Some(response.clone()))
+                .run()
+                .unwrap(),
+            response,
+        );
     }
 }

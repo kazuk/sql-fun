@@ -301,23 +301,15 @@ mod test_confirm_install_request {
     use super::test_helpers::initialization;
     use super::{PromptRequest, PromptResponse, Request, State};
 
-    #[test]
-    fn confirm_install_requests_interactive_confirmation() {
+    #[rstest::rstest]
+    #[case::interactive(false, None)]
+    #[case::assume_yes(true, Some(PromptResponse::Confirm(true)))]
+    fn requests_confirmation(#[case] yes: bool, #[case] automatic: Option<PromptResponse>) {
         assert_eq!(
-            State::confirm_install_request(&initialization(false)),
-            Request::Prompt(PromptRequest::confirm(
-                include_str!("confirm_install.txt").trim_end()
-            )),
-        );
-    }
-
-    #[test]
-    fn confirm_install_assumes_yes_without_terminal_input() {
-        assert_eq!(
-            State::confirm_install_request(&initialization(true)),
+            State::confirm_install_request(&initialization(yes)),
             Request::Prompt(
                 PromptRequest::confirm(include_str!("confirm_install.txt").trim_end())
-                    .with_automatic(Some(PromptResponse::Confirm(true))),
+                    .with_automatic(automatic)
             ),
         );
     }
@@ -359,22 +351,14 @@ mod test_confirm_create_request {
     use super::test_helpers::initialization;
     use super::{PromptRequest, PromptResponse, Request, State};
 
-    #[test]
-    fn confirm_create_requests_confirmation_for_current_home() {
-        let context = initialization(false);
+    #[rstest::rstest]
+    #[case::interactive(false, None)]
+    #[case::assume_yes(true, Some(PromptResponse::Confirm(true)))]
+    fn requests_confirmation(#[case] yes: bool, #[case] automatic: Option<PromptResponse>) {
         assert_eq!(
-            State::confirm_create_request(&context),
-            Request::Prompt(PromptRequest::confirm("Create the chosen/home?")),
-        );
-    }
-
-    #[test]
-    fn confirm_create_assumes_yes_for_current_home() {
-        assert_eq!(
-            State::confirm_create_request(&initialization(true)),
+            State::confirm_create_request(&initialization(yes)),
             Request::Prompt(
-                PromptRequest::confirm("Create the chosen/home?")
-                    .with_automatic(Some(PromptResponse::Confirm(true))),
+                PromptRequest::confirm("Create the chosen/home?").with_automatic(automatic)
             ),
         );
     }
@@ -413,26 +397,17 @@ mod test_edit_home_request {
     use super::test_helpers::initialization;
     use super::{PromptRequest, Request, State};
 
-    #[test]
-    fn edit_home_uses_original_default_instead_of_current_home() {
-        assert_eq!(
-            State::edit_home_request(&initialization(false)),
-            Request::Prompt(PromptRequest::text(
-                include_str!("home_prompt.txt").trim_end(),
-                "original/home",
-            )),
-        );
-    }
-
-    #[test]
-    fn edit_home_retains_invalid_input_and_original_default() {
+    #[rstest::rstest]
+    #[case::first_attempt("")]
+    #[case::invalid_input("invalid input")]
+    fn retains_input_and_original_default(#[case] input: &str) {
         let mut context = initialization(false);
-        "invalid input".clone_into(&mut context.home_input);
+        input.clone_into(&mut context.home_input);
         assert_eq!(
             State::edit_home_request(&context),
             Request::Prompt(
                 PromptRequest::text(include_str!("home_prompt.txt").trim_end(), "original/home")
-                    .with_initial_text("invalid input"),
+                    .with_initial_text(input),
             ),
         );
     }
@@ -522,25 +497,19 @@ mod test_select_versions_request {
         )
     }
 
-    #[test]
-    fn select_versions_offers_all_supported_versions_selected() {
-        assert_eq!(
-            State::select_versions_request(&initialization(false)),
-            Request::Prompt(version_prompt(&[0, 1, 2])),
-        );
-    }
-
-    #[test]
-    fn select_versions_interactive_defaults_follow_option_order_without_duplicates() {
+    #[rstest::rstest]
+    #[case::all_supported(&PostgresVersions::ALL, &[0, 1, 2])]
+    #[case::option_order_without_duplicates(
+        &[PostgresVersions::Postgres18, PostgresVersions::Postgres16, PostgresVersions::Postgres18],
+        &[0, 2],
+    )]
+    #[case::empty_selection_when_reprompting(&[], &[])]
+    fn interactive_defaults(#[case] versions: &[PostgresVersions], #[case] defaults: &[usize]) {
         let mut context = initialization(false);
-        context.versions = vec![
-            PostgresVersions::Postgres18,
-            PostgresVersions::Postgres16,
-            PostgresVersions::Postgres18,
-        ];
+        versions.clone_into(&mut context.versions);
         assert_eq!(
             State::select_versions_request(&context),
-            Request::Prompt(version_prompt(&[0, 2])),
+            Request::Prompt(version_prompt(defaults)),
         );
     }
 
@@ -558,16 +527,6 @@ mod test_select_versions_request {
                 version_prompt(&[0, 2])
                     .with_automatic(Some(PromptResponse::MultiSelect(vec![2, 0, 2]))),
             ),
-        );
-    }
-
-    #[test]
-    fn select_versions_keeps_empty_selection_when_reprompting() {
-        let mut context = initialization(false);
-        context.versions.clear();
-        assert_eq!(
-            State::select_versions_request(&context),
-            Request::Prompt(version_prompt(&[])),
         );
     }
 }

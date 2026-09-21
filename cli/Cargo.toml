@@ -43,5 +43,8 @@ url.workspace = true
 walkdir.workspace = true
 which.workspace = true
 
+[dev-dependencies]
+rstest.workspace = true
+
 [lints]
 workspace = true

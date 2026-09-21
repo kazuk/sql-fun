@@ -265,12 +265,35 @@ impl Workflow {
 
 impl State {
     pub(super) fn request(&self, context: &Initialization) -> Option<Request> {
-        let prompt = match self {
-            Self::ConfirmInstall {} => {
-                PromptRequest::confirm(include_str!("confirm_install.txt").trim_end())
-                    .with_automatic(context.yes.then_some(PromptResponse::Confirm(true)))
-            }
-            Self::ConfirmCreate {} => PromptRequest::confirm(
+        match self {
+            Self::ConfirmInstall {} => Some(Self::confirm_install_request(context)),
+            Self::PrepareHome {} => Some(Self::prepare_home_request()),
+            Self::ConfirmCreate {} => Some(Self::confirm_create_request(context)),
+            Self::CreateHome {} => Some(Self::create_home_request()),
+            Self::EditHome {} => Some(Self::edit_home_request(context)),
+            Self::CreateEditedHome {} => Some(Self::create_edited_home_request()),
+            Self::PrepareVersions {} => Some(Self::prepare_versions_request()),
+            Self::SelectVersions {} => Some(Self::select_versions_request(context)),
+            Self::VersionsSelected {} => Self::versions_selected_request(),
+            Self::Cancelled {} => Self::cancelled_request(),
+            Self::Failed {} => Self::failed_request(),
+        }
+    }
+
+    fn confirm_install_request(context: &Initialization) -> Request {
+        Request::Prompt(
+            PromptRequest::confirm(include_str!("confirm_install.txt").trim_end())
+                .with_automatic(context.yes.then_some(PromptResponse::Confirm(true))),
+        )
+    }
+
+    const fn prepare_home_request() -> Request {
+        Request::Advance
+    }
+
+    fn confirm_create_request(context: &Initialization) -> Request {
+        Request::Prompt(
+            PromptRequest::confirm(
                 format!(
                     include_str!("confirm_create.txt"),
                     path = context.home.display()
@@ -278,50 +301,74 @@ impl State {
                 .trim_end(),
             )
             .with_automatic(context.yes.then_some(PromptResponse::Confirm(true))),
-            Self::EditHome {} => PromptRequest::text(
+        )
+    }
+
+    const fn create_home_request() -> Request {
+        Request::Advance
+    }
+
+    fn edit_home_request(context: &Initialization) -> Request {
+        Request::Prompt(
+            PromptRequest::text(
                 include_str!("home_prompt.txt").trim_end(),
                 &context.default_home,
             )
             .with_initial_text(&context.home_input),
-            Self::SelectVersions {} => {
-                let options: Vec<_> = PostgresVersions::ALL
+        )
+    }
+
+    const fn create_edited_home_request() -> Request {
+        Request::Advance
+    }
+
+    const fn prepare_versions_request() -> Request {
+        Request::Advance
+    }
+
+    fn select_versions_request(context: &Initialization) -> Request {
+        let options: Vec<_> = PostgresVersions::ALL
+            .iter()
+            .map(ToString::to_string)
+            .collect();
+        let defaults: Vec<_> = PostgresVersions::ALL
+            .iter()
+            .enumerate()
+            .filter_map(|(index, version)| context.versions.contains(version).then_some(index))
+            .collect();
+        let automatic = context.yes.then(|| {
+            PromptResponse::MultiSelect(
+                context
+                    .versions
                     .iter()
-                    .map(ToString::to_string)
-                    .collect();
-                let defaults: Vec<_> = PostgresVersions::ALL
-                    .iter()
-                    .enumerate()
-                    .filter_map(|(index, version)| {
-                        context.versions.contains(version).then_some(index)
-                    })
-                    .collect();
-                let automatic = context.yes.then(|| {
-                    PromptResponse::MultiSelect(
-                        context
-                            .versions
+                    .filter_map(|version| {
+                        PostgresVersions::ALL
                             .iter()
-                            .filter_map(|version| {
-                                PostgresVersions::ALL
-                                    .iter()
-                                    .position(|option| option == version)
-                            })
-                            .collect(),
-                    )
-                });
-                PromptRequest::multi_select(
-                    include_str!("versions_prompt.txt").trim_end(),
-                    &options,
-                    &defaults,
-                )
-                .with_automatic(automatic)
-            }
-            Self::PrepareHome {}
-            | Self::CreateHome {}
-            | Self::CreateEditedHome {}
-            | Self::PrepareVersions {} => return Some(Request::Advance),
-            Self::VersionsSelected {} | Self::Cancelled {} | Self::Failed {} => return None,
-        };
-        Some(Request::Prompt(prompt))
+                            .position(|option| option == version)
+                    })
+                    .collect(),
+            )
+        });
+        Request::Prompt(
+            PromptRequest::multi_select(
+                include_str!("versions_prompt.txt").trim_end(),
+                &options,
+                &defaults,
+            )
+            .with_automatic(automatic),
+        )
+    }
+
+    const fn versions_selected_request() -> Option<Request> {
+        None
+    }
+
+    const fn cancelled_request() -> Option<Request> {
+        None
+    }
+
+    const fn failed_request() -> Option<Request> {
+        None
     }
 
     pub(super) const fn is_cancelled(&self) -> bool {

@@ -183,5 +183,9 @@ tokio-postgres = { workspace = true }
 tracing = { workspace = true }
 trybuild = { workspace = true }
 
+[[test]]
+name = "rusqlite"
+required-features = ["sqlite"]
+
 [lints]
 workspace = true

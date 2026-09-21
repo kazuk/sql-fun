@@ -2,7 +2,7 @@ use sql_fun_core::IVec;
 
 use crate::{
     sem::{
-        AnalysisError, FromClause, OperatorName, ParseContext, SemScalarExpr, WithClause,
+        AnalysisError, OperatorName, ParseContext, ScalarAnalysisContext, SemScalarExpr,
         scalar_expr::AnalyzeScalarExpr,
     },
     syn::{AExprKind, Opt, ScanToken},
@@ -38,8 +38,7 @@ where
 {
     fn analyze_scalar_expr(
         mut context: TParseContext,
-        with_clause: &WithClause,
-        from_clause: &FromClause,
+        scalar_context: &ScalarAnalysisContext<'_>,
         syn: crate::syn::AExpr,
         tokens: &IVec<ScanToken>,
     ) -> Result<(SemScalarExpr, TParseContext), AnalysisError> {
@@ -49,16 +48,14 @@ where
 
         let (lexpr, new_context) = Self::analyze_optional_expr(
             context,
-            with_clause,
-            from_clause,
+            scalar_context,
             syn.get_lexpr().as_inner(),
             tokens,
         )?;
         context = new_context;
         let (rexpr, new_context) = Self::analyze_optional_expr(
             context,
-            with_clause,
-            from_clause,
+            scalar_context,
             syn.get_rexpr().as_inner(),
             tokens,
         )?;

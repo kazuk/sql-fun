@@ -3,8 +3,8 @@ use sql_fun_core::IVec;
 use crate::{
     sem::{
         AliasSpec, AnalysisError, AnalysisProblem, ColumnCollection, DataSource, FromClause,
-        FullName, Nullable, ParseContext, SemScalarExpr, WithClause, data_source::AliasName,
-        type_system::ArgumentBindingCollection,
+        FullName, Nullable, ParseContext, ScalarAnalysisContext, SemScalarExpr, WithClause,
+        data_source::AliasName, type_system::ArgumentBindingCollection,
     },
     syn::{ListOpt, Opt, ScanToken},
 };
@@ -71,8 +71,12 @@ impl DataSourceRowsFromFunc {
         let mut arg_exprs = Vec::new();
         let mut arg_types = ArgumentBindingCollection::default();
         for arg in args {
-            let (arg, new_context) =
-                SemScalarExpr::analyze_scaler_expr(context, with_clause, from_clause, arg, tokens)?;
+            let (arg, new_context) = SemScalarExpr::analyze_scaler_expr(
+                context,
+                &ScalarAnalysisContext::new(with_clause, from_clause),
+                arg,
+                tokens,
+            )?;
             context = new_context;
             arg_types.push(arg.get_type());
             arg_exprs.push(arg);

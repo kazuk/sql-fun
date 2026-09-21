@@ -3,7 +3,8 @@ use sql_fun_core::IVec;
 use crate::{
     sem::{
         AlterSequence, AstAndContextPair, ColumnDefinition, ColumnName, Constraint, FromClause,
-        GetSourcePathWithSpan, SemScalarExpr, SourcePathWithSpan, ViewName, WithClause,
+        GetSourcePathWithSpan, ScalarAnalysisContext, SemScalarExpr, SourcePathWithSpan, ViewName,
+        WithClause,
     },
     syn::{AlterTableType, ListOpt, ObjectType, Opt, ScanToken},
 };
@@ -293,8 +294,7 @@ impl AlterObjSubCommand {
         let from_clause = FromClause::default();
         let (expr, new_context) = SemScalarExpr::analyze_scaler_expr(
             context,
-            &with_clause,
-            &from_clause,
+            &ScalarAnalysisContext::new(&with_clause, &from_clause),
             cmd.get_def(),
             tokens,
         )?;

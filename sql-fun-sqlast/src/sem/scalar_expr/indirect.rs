@@ -5,7 +5,7 @@ mod member_ref;
 use sql_fun_core::IVec;
 
 use crate::{
-    sem::{AnalysisError, FromClause, ParseContext, SemScalarExpr, TypeReference, WithClause},
+    sem::{AnalysisError, ParseContext, ScalarAnalysisContext, SemScalarExpr, TypeReference},
     syn::{ListOpt, Opt, ScanToken},
 };
 
@@ -26,8 +26,7 @@ pub enum IndirectionExpr {
 impl IndirectionExpr {
     fn analyze_indices<TParseContext>(
         context: TParseContext,
-        with_clause: &WithClause,
-        from_clause: &FromClause,
+        scalar_context: &ScalarAnalysisContext<'_>,
         arg: SemScalarExpr,
         indices: crate::syn::AIndices,
         tokens: &IVec<ScanToken>,
@@ -36,9 +35,9 @@ impl IndirectionExpr {
         TParseContext: ParseContext,
     {
         if indices.get_is_slice() {
-            ArraySlice::analyze_slice(context, with_clause, from_clause, arg, indices, tokens)
+            ArraySlice::analyze_slice(context, scalar_context, arg, indices, tokens)
         } else {
-            ArrayIndex::analyze_index(context, with_clause, from_clause, arg, &indices, tokens)
+            ArrayIndex::analyze_index(context, scalar_context, arg, &indices, tokens)
         }
     }
 }
@@ -67,8 +66,7 @@ where
 {
     fn analyze_scalar_expr(
         mut context: TParseContext,
-        with_clause: &WithClause,
-        from_clause: &FromClause,
+        scalar_context: &ScalarAnalysisContext<'_>,
         syn: crate::syn::AIndirection,
         tokens: &IVec<ScanToken>,
     ) -> Result<(SemScalarExpr, TParseContext), AnalysisError> {
@@ -80,13 +78,13 @@ where
             AnalysisError::raise_unexpected_none("aindirection.indirection")?
         };
         let (mut arg, new_context) =
-            SemScalarExpr::analyze_scaler_expr(context, with_clause, from_clause, arg, tokens)?;
+            SemScalarExpr::analyze_scaler_expr(context, scalar_context, arg, tokens)?;
         context = new_context;
 
         for item in indirection {
             if let Some(indices) = item.as_a_indices().as_inner() {
                 let (new_arg, new_context) =
-                    Self::analyze_indices(context, with_clause, from_clause, arg, indices, tokens)?;
+                    Self::analyze_indices(context, scalar_context, arg, indices, tokens)?;
                 context = new_context;
                 arg = SemScalarExpr::Indirection(new_arg);
             } else if let Some(member) = item.as_string().get_sval() {

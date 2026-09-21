@@ -44,8 +44,8 @@ pub use self::{
 
 use crate::{
     sem::{
-        AnalysisError, AnalysisProblem, FromClause, ParseContext, PgBuiltInType, TypeReference,
-        WithClause, create_table::ColumnDefinition,
+        AnalysisError, AnalysisProblem, ParseContext, PgBuiltInType, TypeReference,
+        create_table::ColumnDefinition,
     },
     syn::{ListOpt, ScanToken},
 };
@@ -56,8 +56,7 @@ where
 {
     fn analyze_scalar_expr(
         context: TParseContext,
-        with_clause: &WithClause,
-        from_clause: &FromClause,
+        scalar_context: &ScalarAnalysisContext<'_>,
         syn: TNode,
         tokens: &IVec<ScanToken>,
     ) -> Result<(SemScalarExpr, TParseContext), AnalysisError>;
@@ -77,8 +76,7 @@ where
 {
     fn analyze_scalar_expr(
         mut context: TParseContext,
-        with_clause: &WithClause,
-        from_clause: &FromClause,
+        scalar_context: &ScalarAnalysisContext<'_>,
         syn: crate::syn::List,
         tokens: &IVec<ScanToken>,
     ) -> Result<(SemScalarExpr, TParseContext), AnalysisError> {
@@ -88,13 +86,8 @@ where
             AnalysisError::never();
         };
         for item in items {
-            let (item_expr, new_context) = SemScalarExpr::analyze_scaler_expr(
-                context,
-                with_clause,
-                from_clause,
-                item,
-                tokens,
-            )?;
+            let (item_expr, new_context) =
+                SemScalarExpr::analyze_scaler_expr(context, scalar_context, item, tokens)?;
             context = new_context;
             results.push(item_expr);
         }

@@ -2,8 +2,9 @@ use sql_fun_core::IVec;
 
 use crate::{
     sem::{
-        AnalysisError, AnalysisProblem, FromClause, FullName, OverloadVariant, ParseContext,
-        SemScalarExpr, TypeReference, WithClause, type_system::ArgumentBindingCollection,
+        AnalysisError, AnalysisProblem, FullName, OverloadVariant, ParseContext,
+        ScalarAnalysisContext, SemScalarExpr, TypeReference,
+        type_system::ArgumentBindingCollection,
     },
     syn::{ListOpt, ScanToken},
 };
@@ -187,8 +188,7 @@ where
 {
     fn analyze_scalar_expr(
         mut context: TParseContext,
-        with_clause: &WithClause,
-        from_clause: &FromClause,
+        scalar_context: &ScalarAnalysisContext<'_>,
         syn: crate::syn::FuncCall,
         tokens: &IVec<ScanToken>,
     ) -> Result<(SemScalarExpr, TParseContext), AnalysisError> {
@@ -201,7 +201,7 @@ where
         let mut arg_exprs = Vec::new();
         for arg in args {
             let (sem_arg, new_context) =
-                SemScalarExpr::analyze_scaler_expr(context, with_clause, from_clause, arg, tokens)?;
+                SemScalarExpr::analyze_scaler_expr(context, scalar_context, arg, tokens)?;
             context = new_context;
             arg_exprs.push(sem_arg);
         }
@@ -234,6 +234,7 @@ where
 
 #[cfg(test)]
 mod test_func_call_expr_analyze_scalar_expr {
+    use crate::sem::ScalarAnalysisContext;
     use sql_fun_core::IVec;
     use testresult::TestResult;
 
@@ -279,8 +280,7 @@ mod test_func_call_expr_analyze_scalar_expr {
         let from_clause = FromClause::default();
         let (expr, context) = super::FuncCallExpr::analyze_scalar_expr(
             test_context,
-            &with_clause,
-            &from_clause,
+            &ScalarAnalysisContext::new(&with_clause, &from_clause),
             func_call,
             &tokens,
         )?;
@@ -327,8 +327,7 @@ mod test_func_call_expr_analyze_scalar_expr {
         let from_clause = FromClause::default();
         let (expr, context) = super::FuncCallExpr::analyze_scalar_expr(
             test_context,
-            &with_clause,
-            &from_clause,
+            &ScalarAnalysisContext::new(&with_clause, &from_clause),
             func_call,
             &tokens,
         )?;

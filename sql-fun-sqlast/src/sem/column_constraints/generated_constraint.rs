@@ -3,7 +3,7 @@ use sql_fun_core::IVec;
 use crate::{
     sem::{
         AnalysisError, ColumnConstraint, ColumnConstraintKind, ColumnConstraintTrait, ColumnName,
-        FromClause, ParseContext, SemScalarExpr, TableName, WithClause,
+        ParseContext, ScalarAnalysisContext, SemScalarExpr, TableName,
     },
     syn::{ConstrType, Opt, ScanToken},
 };
@@ -139,8 +139,7 @@ impl GeneratedColumnConstraint {
             GeneratedColumnMode::from_postgres_generated_column_mode(&syn.get_generated_when())?;
         let (expr, new_context) = SemScalarExpr::analyze_scaler_expr(
             context,
-            &WithClause::default(),
-            &FromClause::default(),
+            &ScalarAnalysisContext::default(),
             raw_expr,
             tokens,
         )?;

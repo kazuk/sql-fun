@@ -3,7 +3,7 @@ use sql_fun_core::IVec;
 use crate::{
     sem::{
         AnalysisError, ColumnConstraint, ColumnConstraintKind, ColumnConstraintTrait, ColumnName,
-        FromClause, ParseContext, SemScalarExpr, TableName, WithClause,
+        ParseContext, ScalarAnalysisContext, SemScalarExpr, TableName,
     },
     syn::{ConstrType, Opt, ScanToken},
 };
@@ -76,8 +76,7 @@ impl DefaultColumnConstraint {
         };
         let (expr, new_context) = SemScalarExpr::analyze_scaler_expr(
             context,
-            &WithClause::default(),
-            &FromClause::default(),
+            &ScalarAnalysisContext::default(),
             default_expr,
             tokens,
         )?;

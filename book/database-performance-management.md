@@ -77,7 +77,7 @@ To obtain information on query usage in actual workloads, it is necessary to use
 `sql-fun` is a generator for application SQL execution code, but it does not have a built-in feature to automatically output logs. However, it does provide hooks where logging can be implemented. In fact, under the example directory, there is code like the following:
 
 ```rust
-#[sql_fun::sql_query_many("select id, name from users where users.name like ${name_like}")]
+#[sql_fun::sql_query_many(sql = "select id, name from users where users.name like ${name_like}")]
 async fn select_users_by_name_like<F, Fut>(
     client: &Client,
     name_like: &str,
@@ -108,4 +108,3 @@ Since the way application logs are collected and managed is unique to each case,
 To reiterate:
 
 In this context, "manage" means to measure, compare, and take action based on the results.
-

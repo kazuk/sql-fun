@@ -193,7 +193,7 @@ pub fn sql_query_many(
 /// ```no_run
 /// use tokio_postgres::{Client as PgClient, Error as PgError};
 ///
-/// #[sql_fun::sql_statement("create table users(id serial primary key, name text);")]
+/// #[sql_fun::sql_statement(sql = "create table users(id serial primary key, name text);")]
 /// async fn create_table_users(client: &PgClient) -> Result<u64, PgError> {}
 /// ```
 ///

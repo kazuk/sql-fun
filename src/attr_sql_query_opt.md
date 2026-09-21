@@ -4,7 +4,7 @@ This macro attribute is used to ad-hoc query returning a optional single row fro
 
 ```no_run
 use tokio_postgres::Client;
-#[sql_fun::sql_query_opt("select id, name from users where id=${id}")]
+#[sql_fun::sql_query_opt(sql = "select id, name from users where id=${id}")]
 async fn select_user_by_id(client: &Client, id: i64) -> Result<Option<UserRow>, anyhow::Error> {}
 #[derive(Debug, derive_builder::Builder)]
 struct UserRow {

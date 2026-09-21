@@ -75,7 +75,7 @@ async fn select_all_active_users(client: &Client, collector: Collector, handler:
 ///     as select u.id, u.name from users u where u.is_active=TRUE
 /// select ... from active_users au where au.id=$1
 /// 
-#[sql_fun::sql_query_one("select from active_users au where au.id=${id}")]
+#[sql_fun::sql_query_one(sql = "select from active_users au where au.id=${id}")]
 #[with( cte_name="select_all_active_users", alias="active_users" )]
 async fn select_active_user_by_id( ... ) -> Result<User, Error>
 ```

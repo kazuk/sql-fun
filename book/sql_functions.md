@@ -219,7 +219,7 @@ Each arm should returns:
 For example:
 
 ```rust
-#[sql_fun::sql_query_many("select id, name from users #{where_clause}")]
+#[sql_fun::sql_query_many(sql = "select id, name from users #{where_clause}")]
 #[sql_fragment(
     where_clause,
     name,
@@ -302,10 +302,10 @@ async fn find_user(...) -> Result<...> {
         None => find_user_none(client, collector, handler),
     }
 
-    #[sql_fun::sql_query_many("select id, name from users where name=${n}")]
+    #[sql_fun::sql_query_many(sql = "select id, name from users where name=${n}")]
     async fn find_user_some_n(...) -> Result<...> {}
 
-    #[sql_fun::sql_query_many("select id, name from users")]
+    #[sql_fun::sql_query_many(sql = "select id, name from users")]
     async fn find_user_none(...) -> Result<...> {}
 }
 ```

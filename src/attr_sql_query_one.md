@@ -5,7 +5,7 @@ This macro attribute is used to ad-hoc query returning a single row from the dat
 
 ```no_run
 use tokio_postgres::Client;
-#[sql_fun::sql_query_one("insert into users(name) values(${name}) returning id")]
+#[sql_fun::sql_query_one(sql = "insert into users(name) values(${name}) returning id")]
 async fn insert_user(client: &Client, name: &str) -> Result<IdRow, anyhow::Error> {}
 
 #[derive(Debug, derive_builder::Builder)]

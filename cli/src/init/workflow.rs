@@ -72,6 +72,28 @@ pub(super) enum Event {
     Answer(PromptResponse),
 }
 
+impl Event {
+    const fn response(&self) -> Option<&PromptResponse> {
+        if let Self::Answer(response) = self {
+            Some(response)
+        } else {
+            None
+        }
+    }
+
+    fn confirmation(&self) -> Option<bool> {
+        self.response().and_then(PromptResponse::confirmation)
+    }
+
+    fn text_input(&self) -> Option<&str> {
+        self.response().and_then(PromptResponse::text_input)
+    }
+
+    fn selected_indices(&self) -> Option<&[usize]> {
+        self.response().and_then(PromptResponse::selected_indices)
+    }
+}
+
 #[derive(Debug, PartialEq, Eq)]
 pub(super) enum Request {
     Advance,
@@ -96,13 +118,9 @@ pub(super) struct Workflow;
 impl Workflow {
     #[state]
     fn confirm_install(event: &Event) -> Outcome<State> {
-        match event {
-            Event::Answer(PromptResponse::Confirm(true)) => {
-                Outcome::Transition(State::prepare_home())
-            }
-            Event::Answer(PromptResponse::Confirm(false)) => {
-                Outcome::Transition(State::cancelled())
-            }
+        match event.confirmation() {
+            Some(true) => Outcome::Transition(State::prepare_home()),
+            Some(false) => Outcome::Transition(State::cancelled()),
             _ => Outcome::Handled,
         }
     }
@@ -136,13 +154,9 @@ impl Workflow {
 
     #[state]
     fn confirm_create(event: &Event) -> Outcome<State> {
-        match event {
-            Event::Answer(PromptResponse::Confirm(true)) => {
-                Outcome::Transition(State::create_home())
-            }
-            Event::Answer(PromptResponse::Confirm(false)) => {
-                Outcome::Transition(State::edit_home())
-            }
+        match event.confirmation() {
+            Some(true) => Outcome::Transition(State::create_home()),
+            Some(false) => Outcome::Transition(State::edit_home()),
             _ => Outcome::Handled,
         }
     }
@@ -163,7 +177,7 @@ impl Workflow {
 
     #[state]
     fn edit_home(event: &Event, context: &mut Initialization) -> Outcome<State> {
-        let Event::Answer(PromptResponse::Text(input)) = event else {
+        let Some(input) = event.text_input() else {
             return Outcome::Handled;
         };
         let path = PathBuf::from(input);
@@ -181,7 +195,7 @@ impl Workflow {
             Some(HomePathError::ParentUnavailable)
         };
         if let Some(error) = error {
-            context.home_input.clone_from(input);
+            input.clone_into(&mut context.home_input);
             context.notices.push(Notice::InvalidHome(error));
             return Outcome::Handled;
         }
@@ -234,7 +248,7 @@ impl Workflow {
 
     #[state]
     fn select_versions(event: &Event, context: &mut Initialization) -> Outcome<State> {
-        let Event::Answer(PromptResponse::MultiSelect(indices)) = event else {
+        let Some(indices) = event.selected_indices() else {
             return Outcome::Handled;
         };
         if indices.is_empty() && !context.yes {

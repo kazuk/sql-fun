@@ -1,4 +1,4 @@
-use super::{Initialization, PostgresVersions};
+use super::{Event, Initialization, PostgresVersions, Request};
 use std::path::PathBuf;
 
 pub(super) fn initialization(yes: bool) -> Initialization {
@@ -12,5 +12,20 @@ pub(super) fn initialization(yes: bool) -> Initialization {
         versions: PostgresVersions::ALL.to_vec(),
         notices: Vec::new(),
         error: None,
+    }
+}
+
+impl Request {
+    /// Resolve test inputs without ever invoking a terminal prompt.
+    pub(super) fn automatic_event(&self) -> Event {
+        match self {
+            Self::Advance => Event::Advance,
+            Self::Prompt(prompt) => Event::Answer(
+                prompt
+                    .automatic_response()
+                    .expect("non-interactive answer")
+                    .clone(),
+            ),
+        }
     }
 }

@@ -7,6 +7,22 @@ pub(super) enum HomePathError {
     ParentNotFound(PathBuf),
 }
 
+impl HomePathError {
+    fn show(&self) {
+        match self {
+            Self::NotAbsolute => {
+                eprint!("{}", include_str!("absolute_path_required.txt"));
+            }
+            Self::ParentUnavailable => {
+                eprint!("{}", include_str!("parent_unavailable.txt"));
+            }
+            Self::ParentNotFound(path) => {
+                eprint!(include_str!("parent_not_found.txt"), path = path.display());
+            }
+        }
+    }
+}
+
 #[derive(Debug)]
 pub(super) enum Notice {
     HomeDescription,
@@ -39,17 +55,7 @@ impl Notice {
                 path = path.display(),
                 error = error
             ),
-            Self::InvalidHome(error) => match error {
-                HomePathError::NotAbsolute => {
-                    eprint!("{}", include_str!("absolute_path_required.txt"));
-                }
-                HomePathError::ParentUnavailable => {
-                    eprint!("{}", include_str!("parent_unavailable.txt"));
-                }
-                HomePathError::ParentNotFound(path) => {
-                    eprint!(include_str!("parent_not_found.txt"), path = path.display());
-                }
-            },
+            Self::InvalidHome(error) => error.show(),
             Self::VersionsDescription => {
                 println!("{}", include_str!("database_engine_versions.txt"));
             }

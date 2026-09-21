@@ -21,6 +21,55 @@ impl PromptResponse {
     }
 }
 
+impl PromptResponse {
+    pub(super) const fn confirmation(&self) -> Option<bool> {
+        if let Self::Confirm(confirmed) = self {
+            Some(*confirmed)
+        } else {
+            None
+        }
+    }
+
+    pub(super) fn text_input(&self) -> Option<&str> {
+        if let Self::Text(input) = self {
+            Some(input)
+        } else {
+            None
+        }
+    }
+
+    pub(super) fn selected_indices(&self) -> Option<&[usize]> {
+        if let Self::MultiSelect(indices) = self {
+            Some(indices)
+        } else {
+            None
+        }
+    }
+}
+
+#[cfg(test)]
+mod test_prompt_response_values {
+    use super::PromptResponse;
+
+    #[rstest::rstest]
+    #[case::confirmed(&PromptResponse::confirm(true), Some(true), None, None)]
+    #[case::declined(&PromptResponse::confirm(false), Some(false), None, None)]
+    #[case::text(&PromptResponse::text("home"), None, Some("home"), None)]
+    #[case::empty_text(&PromptResponse::text(""), None, Some(""), None)]
+    #[case::selection(&PromptResponse::multi_select(&[2, 0, 2]), None, None, Some(&[2, 0, 2][..]))]
+    #[case::empty_selection(&PromptResponse::multi_select(&[]), None, None, Some(&[][..]))]
+    fn exposes_only_the_matching_value(
+        #[case] response: &PromptResponse,
+        #[case] confirmation: Option<bool>,
+        #[case] text: Option<&str>,
+        #[case] indices: Option<&[usize]>,
+    ) {
+        assert_eq!(response.confirmation(), confirmation);
+        assert_eq!(response.text_input(), text);
+        assert_eq!(response.selected_indices(), indices);
+    }
+}
+
 #[derive(Clone, Debug, PartialEq, Eq)]
 enum Input {
     Confirm,
@@ -38,6 +87,36 @@ struct TextInput {
 struct Selection {
     options: Vec<String>,
     defaults: Vec<usize>,
+}
+
+impl Input {
+    fn set_initial_text(&mut self, initial: &str) {
+        if let Self::Text(input) = self {
+            initial.clone_into(&mut input.initial);
+        }
+    }
+
+    fn run(&self, title: &str) -> Result<PromptResponse, anyhow::Error> {
+        match self {
+            Self::Confirm => Ok(PromptResponse::confirm(
+                inquire::Confirm::new(title).prompt()?,
+            )),
+            Self::Text(input) => Ok(PromptResponse::text(
+                &inquire::Text::new(title)
+                    .with_default(&input.default)
+                    .with_initial_value(&input.initial)
+                    .prompt()?,
+            )),
+            Self::MultiSelect(selection) => Ok(PromptResponse::multi_select(
+                &inquire::MultiSelect::new(title, selection.options.clone())
+                    .with_default(&selection.defaults)
+                    .raw_prompt()?
+                    .into_iter()
+                    .map(|item| item.index)
+                    .collect::<Vec<_>>(),
+            )),
+        }
+    }
 }
 
 #[derive(Clone, Debug, PartialEq, Eq)]
@@ -68,9 +147,7 @@ impl PromptRequest {
     }
 
     pub(super) fn with_initial_text(mut self, initial: &str) -> Self {
-        if let Input::Text(input) = &mut self.input {
-            initial.clone_into(&mut input.initial);
-        }
+        self.input.set_initial_text(initial);
         self
     }
 
@@ -98,25 +175,7 @@ impl PromptRequest {
         if let Some(response) = self.automatic_response() {
             return Ok(response.clone());
         }
-        match &self.input {
-            Input::Confirm => Ok(PromptResponse::confirm(
-                inquire::Confirm::new(&self.title).prompt()?,
-            )),
-            Input::Text(input) => Ok(PromptResponse::text(
-                &inquire::Text::new(&self.title)
-                    .with_default(&input.default)
-                    .with_initial_value(&input.initial)
-                    .prompt()?,
-            )),
-            Input::MultiSelect(selection) => Ok(PromptResponse::multi_select(
-                &inquire::MultiSelect::new(&self.title, selection.options.clone())
-                    .with_default(&selection.defaults)
-                    .raw_prompt()?
-                    .into_iter()
-                    .map(|item| item.index)
-                    .collect::<Vec<_>>(),
-            )),
-        }
+        self.input.run(&self.title)
     }
 }
 

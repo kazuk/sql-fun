@@ -60,15 +60,7 @@ impl Scenario {
             let Some(request) = self.request() else {
                 return;
             };
-            let event = match request {
-                Request::Advance => Event::Advance,
-                Request::Prompt(prompt) => Event::Answer(
-                    prompt
-                        .automatic_response()
-                        .expect("non-interactive answer")
-                        .clone(),
-                ),
-            };
+            let event = request.automatic_event();
             self.send(&event);
         }
         panic!("initialization did not terminate");

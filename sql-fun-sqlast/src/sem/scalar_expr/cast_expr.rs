@@ -110,8 +110,7 @@ impl TypeCastExpr {
     /// analyze [`crate::syn::sqlite::ExprCast`]
     pub fn analyze_sqlite_cast<TParseContext>(
         mut context: TParseContext,
-        with_clause: &WithClause,
-        from_clause: &FromClause,
+        scalar_context: &ScalarAnalysisContext<'_>,
         syn: &crate::syn::sqlite::ExprCast,
         tokens: &IVec<SqliteToken<'_>>,
     ) -> Result<(SemScalarExpr, TParseContext), AnalysisError>
@@ -127,13 +126,8 @@ impl TypeCastExpr {
             context.report_problem(AnalysisProblem::type_not_found(&target_type_name))?;
         };
 
-        let (expr, new_context) = SemScalarExpr::analyze_sqlite_scalar_expr(
-            context,
-            with_clause,
-            from_clause,
-            syn.expr(),
-            tokens,
-        )?;
+        let (expr, new_context) =
+            SemScalarExpr::analyze_sqlite_scalar_expr(context, scalar_context, syn.expr(), tokens)?;
         context = new_context;
 
         let target_type = TypeReference::from_full_name(target_type_name);

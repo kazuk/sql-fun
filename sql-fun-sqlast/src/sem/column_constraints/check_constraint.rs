@@ -96,8 +96,7 @@ impl CheckColumnConstraint {
     {
         let (expr, new_context) = SemScalarExpr::analyze_sqlite_scalar_expr(
             context,
-            &WithClause::default(),
-            &FromClause::default(),
+            &ScalarAnalysisContext::default(),
             syn.expr(),
             tokens,
         )?;

@@ -1,14 +1,14 @@
 use std::str::FromStr;
 
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
-pub(super) enum PostgresVersions {
+pub enum PostgresVersions {
     Postgres16,
     Postgres17,
     Postgres18,
 }
 
 impl PostgresVersions {
-    pub(super) const ALL: [Self; 3] = [Self::Postgres16, Self::Postgres17, Self::Postgres18];
+    pub const ALL: [Self; 3] = [Self::Postgres16, Self::Postgres17, Self::Postgres18];
 }
 
 impl std::fmt::Display for PostgresVersions {

@@ -1,7 +1,7 @@
 use std::path::PathBuf;
 
 #[derive(Debug)]
-pub(super) enum HomePathError {
+pub enum HomePathError {
     NotAbsolute,
     ParentUnavailable,
     ParentNotFound(PathBuf),
@@ -24,7 +24,7 @@ impl HomePathError {
 }
 
 #[derive(Debug)]
-pub(super) enum Notice {
+pub enum Notice {
     HomeDescription,
     HomeExists(PathBuf),
     HomeCreating(PathBuf),
@@ -37,7 +37,7 @@ pub(super) enum Notice {
 }
 
 impl Notice {
-    pub(super) fn show(&self) {
+    pub fn show(&self) {
         match self {
             Self::HomeDescription => println!("{}", include_str!("create_home_dir.txt")),
             Self::HomeExists(path) => {

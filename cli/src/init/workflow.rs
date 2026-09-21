@@ -14,7 +14,7 @@ use std::path::PathBuf;
 use ::sql_fun_core::InitializeArgs;
 use ::statig::Outcome;
 
-pub(super) struct Initialization {
+pub struct Initialization {
     yes: bool,
     supplied_home: bool,
     home: PathBuf,
@@ -47,13 +47,13 @@ impl From<&InitializeArgs> for Initialization {
 }
 
 impl Initialization {
-    pub(super) fn present(&mut self) {
+    pub fn present(&mut self) {
         for notice in self.notices.drain(..) {
             notice.show();
         }
     }
 
-    pub(super) fn finish(&mut self) -> Result<(), anyhow::Error> {
+    pub fn finish(&mut self) -> Result<(), anyhow::Error> {
         match self.error.take() {
             Some(error) => Err(error),
             None => Ok(()),
@@ -67,7 +67,7 @@ impl Initialization {
 }
 
 #[derive(Debug, PartialEq, Eq)]
-pub(super) enum Event {
+pub enum Event {
     Advance,
     Answer(PromptResponse),
 }
@@ -95,13 +95,13 @@ impl Event {
 }
 
 #[derive(Debug, PartialEq, Eq)]
-pub(super) enum Request {
+pub enum Request {
     Advance,
     Prompt(PromptRequest),
 }
 
 impl Request {
-    pub(super) fn run(&self) -> Result<Event, anyhow::Error> {
+    pub fn run(&self) -> Result<Event, anyhow::Error> {
         match self {
             Self::Advance => Ok(Event::Advance),
             Self::Prompt(prompt) => Ok(Event::Answer(prompt.run()?)),
@@ -109,7 +109,7 @@ impl Request {
     }
 }
 
-pub(super) struct Workflow;
+pub struct Workflow;
 
 #[statig::state_machine(
     initial = "State::confirm_install()",
@@ -284,7 +284,7 @@ impl Workflow {
 }
 
 impl State {
-    pub(super) fn request(&self, context: &Initialization) -> Option<Request> {
+    pub fn request(&self, context: &Initialization) -> Option<Request> {
         match self {
             Self::ConfirmInstall {} => Some(Self::confirm_install_request(context)),
             Self::PrepareHome {} => Some(Self::prepare_home_request()),
@@ -300,7 +300,7 @@ impl State {
         }
     }
 
-    pub(super) const fn is_cancelled(&self) -> bool {
+    pub const fn is_cancelled(&self) -> bool {
         matches!(self, Self::Cancelled {})
     }
 }

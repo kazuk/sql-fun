@@ -1,28 +1,28 @@
 //! The terminal boundary depends only on input primitives, never workflow states.
 
 #[derive(Clone, Debug, PartialEq, Eq)]
-pub(super) enum PromptResponse {
+pub enum PromptResponse {
     Confirm(bool),
     Text(String),
     MultiSelect(Vec<usize>),
 }
 
 impl PromptResponse {
-    pub(super) const fn confirm(confirmed: bool) -> Self {
+    pub const fn confirm(confirmed: bool) -> Self {
         Self::Confirm(confirmed)
     }
 
-    pub(super) fn text(input: &str) -> Self {
+    pub fn text(input: &str) -> Self {
         Self::Text(input.to_owned())
     }
 
-    pub(super) fn multi_select(indices: &[usize]) -> Self {
+    pub fn multi_select(indices: &[usize]) -> Self {
         Self::MultiSelect(indices.to_vec())
     }
 }
 
 impl PromptResponse {
-    pub(super) const fn confirmation(&self) -> Option<bool> {
+    pub const fn confirmation(&self) -> Option<bool> {
         if let Self::Confirm(confirmed) = self {
             Some(*confirmed)
         } else {
@@ -30,7 +30,7 @@ impl PromptResponse {
         }
     }
 
-    pub(super) fn text_input(&self) -> Option<&str> {
+    pub fn text_input(&self) -> Option<&str> {
         if let Self::Text(input) = self {
             Some(input)
         } else {
@@ -38,7 +38,7 @@ impl PromptResponse {
         }
     }
 
-    pub(super) fn selected_indices(&self) -> Option<&[usize]> {
+    pub fn selected_indices(&self) -> Option<&[usize]> {
         if let Self::MultiSelect(indices) = self {
             Some(indices)
         } else {
@@ -138,14 +138,14 @@ impl Input {
 }
 
 #[derive(Clone, Debug, PartialEq, Eq)]
-pub(super) struct PromptRequest {
+pub struct PromptRequest {
     title: String,
     input: Input,
     automatic: Option<PromptResponse>,
 }
 
 impl PromptRequest {
-    pub(super) fn confirm(title: &str) -> Self {
+    pub fn confirm(title: &str) -> Self {
         Self {
             title: title.to_owned(),
             input: Input::confirm(),
@@ -153,7 +153,7 @@ impl PromptRequest {
         }
     }
 
-    pub(super) fn text(title: &str, default: &str) -> Self {
+    pub fn text(title: &str, default: &str) -> Self {
         Self {
             title: title.to_owned(),
             input: Input::text(default),
@@ -161,12 +161,12 @@ impl PromptRequest {
         }
     }
 
-    pub(super) fn with_initial_text(mut self, initial: &str) -> Self {
+    pub fn with_initial_text(mut self, initial: &str) -> Self {
         self.input.set_initial_text(initial);
         self
     }
 
-    pub(super) fn multi_select(title: &str, options: &[String], defaults: &[usize]) -> Self {
+    pub fn multi_select(title: &str, options: &[String], defaults: &[usize]) -> Self {
         Self {
             title: title.to_owned(),
             input: Input::multi_select(options, defaults),
@@ -174,16 +174,16 @@ impl PromptRequest {
         }
     }
 
-    pub(super) fn with_automatic(mut self, response: Option<PromptResponse>) -> Self {
+    pub fn with_automatic(mut self, response: Option<PromptResponse>) -> Self {
         self.automatic = response;
         self
     }
 
-    pub(super) const fn automatic_response(&self) -> Option<&PromptResponse> {
+    pub const fn automatic_response(&self) -> Option<&PromptResponse> {
         self.automatic.as_ref()
     }
 
-    pub(super) fn run(&self) -> Result<PromptResponse, anyhow::Error> {
+    pub fn run(&self) -> Result<PromptResponse, anyhow::Error> {
         if let Some(response) = self.automatic_response() {
             return Ok(response.clone());
         }

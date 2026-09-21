@@ -1,7 +1,7 @@
 use super::{Event, Initialization, PostgresVersions, Request};
 use std::path::PathBuf;
 
-pub(super) fn initialization(yes: bool) -> Initialization {
+pub fn initialization(yes: bool) -> Initialization {
     Initialization {
         yes,
         supplied_home: true,
@@ -17,7 +17,7 @@ pub(super) fn initialization(yes: bool) -> Initialization {
 
 impl Request {
     /// Resolve test inputs without ever invoking a terminal prompt.
-    pub(super) fn automatic_event(&self) -> Event {
+    pub fn automatic_event(&self) -> Event {
         match self {
             Self::Advance => Event::Advance,
             Self::Prompt(prompt) => Event::Answer(

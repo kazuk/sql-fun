@@ -1,9 +1,10 @@
 #!/bin/bash
 
-if [ "${GIT_ROOT}" == "" ] ; then
-    export GIT_ROOT="$(git rev-parse --show-toplevel)"
-fi
+set -euo pipefail
+
+worktree_root="$(git rev-parse --show-toplevel)"
+cd "${worktree_root}"
 
 # update stats/coverage.txt
 cargo llvm-cov --all --no-fail-fast --summary-only nextest \
-    > "${GIT_ROOT}/stats/coverage.txt"
+    > stats/coverage.txt

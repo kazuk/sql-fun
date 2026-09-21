@@ -8,7 +8,7 @@ use tracing::trace;
 use tokio_postgres::Client;
 use futures_util::stream::try_stream::TryStreamExt;
 
-#[sql_fun::sql_query_many("select id, name from users where users.name like ${name_like}")]
+#[sql_fun::sql_query_many(sql = "select id, name from users where users.name like ${name_like}")]
 async fn select_users_by_name_like<F, Fut>(
     client: &Client,
     name_like: &str,

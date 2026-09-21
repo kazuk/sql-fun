@@ -77,14 +77,19 @@ edge = {
   - `sql_fun::sql_query_one`: Expects a single row; return type must be `Result<RowType, E>`.
   - `sql_fun::sql_query_opt`: Expects zero or one row; return type must be `Result<Option<RowType>, E>`.
   - `sql_fun::sql_query_many`: Expects multiple rows (possibly zero); return type must be `Result<Collector, E>`.
-  - `sql_fun::sql_statement`: Executes a statement that returns no rows; return type must be `Result<i64, E>`, where the value is the number of affected rows.
+  - `sql_fun::sql_statement`: Executes a statement that returns no rows; return type must use the connector's affected-row count type (`u64` for `tokio-postgres`, `usize` for `rusqlite`).
 - When async connector is used, function requires `async`.
   - `tokio-postgres` is a async connector , `rusqlite` is not a async connector.
 - The first argument represents the database connection.
   - This may be any type, such as `Client`, `Transaction`, or a user-defined wrapper type.
     - It must support the methods `prepare`, `query_one`, `query_opt`, `query_raw`, or `execute` with compatible signatures.
-- All other parameters are used for SQL parameter binding.
+- A parameter with `#[interrupt_future]` or `#[interrupt_channel]` is used to interrupt query execution.
+  - `#[interrupt_future]` combined for async connector.
+    - When future completed, stop query execution.
+  - `#[interrupt_channel]` is combined with a sync connector.
+    - `rusqlite` uses `Connection::progress_handler`; a received message requests query interruption.
 
+- All other parameters are used for SQL parameter binding.
 
 ## Additional Requirements for sql_query_many
   - The last two parameters must be the `collector` and the `handler`, in that order.
@@ -95,9 +100,10 @@ edge = {
       - Any type may be used; `sql_query_many` does not directly call it.
       - The generated function only owns and passes it along.
       - The final value is returned by the function.
-  - The `handler` must be a generic `Fn` or closure with the form `Fn(C, R) -> Fut`.
+  - The `handler` must be a generic `Fn` or closure.
     - `R` is the row type, inferred from the handler's parameter.
-    - `Fut` must be an async future returning `Result<C, E>`.
+    - With `tokio-postgres`, its form is `Fn(C, R) -> Fut`, where `Fut` is an async future returning `Result<C, E>`.
+    - With `rusqlite`, its form is `Fn(C, R) -> Result<C, E>`.
 
 
 ## RowType Requirements
@@ -134,6 +140,9 @@ The Function returns `Result<IdRow, E>`, where `E` must:
 
 
 ## Collector Type
+
+For an optional library that accepts ordered query rows and exposes immutable row sets,
+see [Collecting ordered rows with sql-fun-collector](./sql_fun_collector.md).
 
 The `collector` is used with `sql_query_many` to accumulate rows. It is passed to and returned from the `handler`; the generated function does not call any methods on it directly.
 
@@ -210,7 +219,7 @@ Each arm should returns:
 For example:
 
 ```rust
-#[sql_fun::sql_query_many("select id, name from users #{where_clause}")]
+#[sql_fun::sql_query_many(sql = "select id, name from users #{where_clause}")]
 #[sql_fragment(
     where_clause,
     name,
@@ -293,10 +302,10 @@ async fn find_user(...) -> Result<...> {
         None => find_user_none(client, collector, handler),
     }
 
-    #[sql_fun::sql_query_many("select id, name from users where name=${n}")]
+    #[sql_fun::sql_query_many(sql = "select id, name from users where name=${n}")]
     async fn find_user_some_n(...) -> Result<...> {}
 
-    #[sql_fun::sql_query_many("select id, name from users")]
+    #[sql_fun::sql_query_many(sql = "select id, name from users")]
     async fn find_user_none(...) -> Result<...> {}
 }
 ```

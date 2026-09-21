@@ -27,11 +27,54 @@ default = {
     connector = "tokio-postgres"
 }
 ```
-
+- `default`: default database for this application
 - `engine`: Can be "postgres" or "sqlite".
 - `connector`: specify database connector library.
   - When `engine` is "postgres": Can be "tokio-postgres".
   - When `engine` is "sqlite": Can be "rusqlite".
+
+You can use multiple database in application like a bellow.
+
+```toml
+[package.metadata.database]
+main = {
+    engine = "postgres",
+    connector = "tokio-postgres"
+}
+edge = {
+    engine = "sqlite",
+    connector = "rusqlite"
+}
+```
+
+`main` and `edge` using in query.
+
+```rust
+#[sql_fun::sql_query_one(
+    datasource="main", // query to postgres
+    sql=#"
+      select u.name
+        from users u
+        where u.id={id}
+    "#
+)]
+pub async fn select_user_name_by_user_id(
+    client: pg::Client,
+    id: u64
+) -> Result<String, QueryError> {}
+
+#[sql_fun::sql_statement(
+    datasource= "edge", // execute statement to sqlite
+    sql=#"insert into profile (name) values(${name})"#
+)]
+pub fn insert_profile(
+    client: rusqlite::Connection,
+    name: &str
+) -> Result<usize, rusqlite::Error> {}
+```
+
+When `datasource` attribute not specified in code, default value is "default".
+
 
 If you're starting a new project, you may also need to install the required dependencies:
 
@@ -72,9 +115,11 @@ To disable this warning, you can set `schema_checking = false` in your `Cargo.to
 
 ```toml
 [package.metadata.database]
-schema_checking = false
-engine="postgres"
-connector = "tokio-postgres"
+default = {
+    schema_checking = false
+    engine="postgres"
+    connector = "tokio-postgres"
+}
 ```
 
 ## Managing Your Schema

@@ -172,7 +172,11 @@ impl Workflow {
         } else if path.exists() {
             None
         } else if let Some(parent) = path.parent() {
-            (!parent.exists()).then(|| HomePathError::ParentNotFound(parent.to_path_buf()))
+            if parent.exists() {
+                None
+            } else {
+                Some(HomePathError::ParentNotFound(parent.to_path_buf()))
+            }
         } else {
             Some(HomePathError::ParentUnavailable)
         };
@@ -289,9 +293,14 @@ impl State {
 
 impl State {
     fn confirm_install_request(context: &Initialization) -> Request {
+        let automatic = if context.yes {
+            Some(PromptResponse::Confirm(true))
+        } else {
+            None
+        };
         Request::Prompt(
             PromptRequest::confirm(include_str!("confirm_install.txt").trim_end())
-                .with_automatic(context.yes.then_some(PromptResponse::Confirm(true))),
+                .with_automatic(automatic),
         )
     }
 }
@@ -333,6 +342,11 @@ mod test_prepare_home_request {
 
 impl State {
     fn confirm_create_request(context: &Initialization) -> Request {
+        let automatic = if context.yes {
+            Some(PromptResponse::Confirm(true))
+        } else {
+            None
+        };
         Request::Prompt(
             PromptRequest::confirm(
                 format!(
@@ -341,7 +355,7 @@ impl State {
                 )
                 .trim_end(),
             )
-            .with_automatic(context.yes.then_some(PromptResponse::Confirm(true))),
+            .with_automatic(automatic),
         )
     }
 }
@@ -454,10 +468,16 @@ impl State {
         let defaults: Vec<_> = PostgresVersions::ALL
             .iter()
             .enumerate()
-            .filter_map(|(index, version)| context.versions.contains(version).then_some(index))
+            .filter_map(|(index, version)| {
+                if context.versions.contains(version) {
+                    Some(index)
+                } else {
+                    None
+                }
+            })
             .collect();
-        let automatic = context.yes.then(|| {
-            PromptResponse::MultiSelect(
+        let automatic = if context.yes {
+            Some(PromptResponse::MultiSelect(
                 context
                     .versions
                     .iter()
@@ -467,8 +487,10 @@ impl State {
                             .position(|option| option == version)
                     })
                     .collect(),
-            )
-        });
+            ))
+        } else {
+            None
+        };
         Request::Prompt(
             PromptRequest::multi_select(
                 include_str!("versions_prompt.txt").trim_end(),

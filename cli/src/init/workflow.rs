@@ -1,4 +1,6 @@
 #[cfg(test)]
+mod test_helpers;
+#[cfg(test)]
 mod tests;
 
 use super::{
@@ -280,17 +282,64 @@ impl State {
         }
     }
 
+    pub(super) const fn is_cancelled(&self) -> bool {
+        matches!(self, Self::Cancelled {})
+    }
+}
+
+impl State {
     fn confirm_install_request(context: &Initialization) -> Request {
         Request::Prompt(
             PromptRequest::confirm(include_str!("confirm_install.txt").trim_end())
                 .with_automatic(context.yes.then_some(PromptResponse::Confirm(true))),
         )
     }
+}
 
+#[cfg(test)]
+mod test_confirm_install_request {
+    use super::test_helpers::initialization;
+    use super::{PromptRequest, PromptResponse, Request, State};
+
+    #[test]
+    fn confirm_install_requests_interactive_confirmation() {
+        assert_eq!(
+            State::confirm_install_request(&initialization(false)),
+            Request::Prompt(PromptRequest::confirm(
+                include_str!("confirm_install.txt").trim_end()
+            )),
+        );
+    }
+
+    #[test]
+    fn confirm_install_assumes_yes_without_terminal_input() {
+        assert_eq!(
+            State::confirm_install_request(&initialization(true)),
+            Request::Prompt(
+                PromptRequest::confirm(include_str!("confirm_install.txt").trim_end())
+                    .with_automatic(Some(PromptResponse::Confirm(true))),
+            ),
+        );
+    }
+}
+
+impl State {
     const fn prepare_home_request() -> Request {
         Request::Advance
     }
+}
 
+#[cfg(test)]
+mod test_prepare_home_request {
+    use super::{Request, State};
+
+    #[test]
+    fn prepare_home_requests_advance() {
+        assert_eq!(State::prepare_home_request(), Request::Advance);
+    }
+}
+
+impl State {
     fn confirm_create_request(context: &Initialization) -> Request {
         Request::Prompt(
             PromptRequest::confirm(
@@ -303,11 +352,51 @@ impl State {
             .with_automatic(context.yes.then_some(PromptResponse::Confirm(true))),
         )
     }
+}
 
+#[cfg(test)]
+mod test_confirm_create_request {
+    use super::test_helpers::initialization;
+    use super::{PromptRequest, PromptResponse, Request, State};
+
+    #[test]
+    fn confirm_create_requests_confirmation_for_current_home() {
+        let context = initialization(false);
+        assert_eq!(
+            State::confirm_create_request(&context),
+            Request::Prompt(PromptRequest::confirm("Create the chosen/home?")),
+        );
+    }
+
+    #[test]
+    fn confirm_create_assumes_yes_for_current_home() {
+        assert_eq!(
+            State::confirm_create_request(&initialization(true)),
+            Request::Prompt(
+                PromptRequest::confirm("Create the chosen/home?")
+                    .with_automatic(Some(PromptResponse::Confirm(true))),
+            ),
+        );
+    }
+}
+
+impl State {
     const fn create_home_request() -> Request {
         Request::Advance
     }
+}
 
+#[cfg(test)]
+mod test_create_home_request {
+    use super::{Request, State};
+
+    #[test]
+    fn create_home_requests_advance() {
+        assert_eq!(State::create_home_request(), Request::Advance);
+    }
+}
+
+impl State {
     fn edit_home_request(context: &Initialization) -> Request {
         Request::Prompt(
             PromptRequest::text(
@@ -317,15 +406,71 @@ impl State {
             .with_initial_text(&context.home_input),
         )
     }
+}
 
+#[cfg(test)]
+mod test_edit_home_request {
+    use super::test_helpers::initialization;
+    use super::{PromptRequest, Request, State};
+
+    #[test]
+    fn edit_home_uses_original_default_instead_of_current_home() {
+        assert_eq!(
+            State::edit_home_request(&initialization(false)),
+            Request::Prompt(PromptRequest::text(
+                include_str!("home_prompt.txt").trim_end(),
+                "original/home",
+            )),
+        );
+    }
+
+    #[test]
+    fn edit_home_retains_invalid_input_and_original_default() {
+        let mut context = initialization(false);
+        "invalid input".clone_into(&mut context.home_input);
+        assert_eq!(
+            State::edit_home_request(&context),
+            Request::Prompt(
+                PromptRequest::text(include_str!("home_prompt.txt").trim_end(), "original/home")
+                    .with_initial_text("invalid input"),
+            ),
+        );
+    }
+}
+
+impl State {
     const fn create_edited_home_request() -> Request {
         Request::Advance
     }
+}
 
+#[cfg(test)]
+mod test_create_edited_home_request {
+    use super::{Request, State};
+
+    #[test]
+    fn create_edited_home_requests_advance() {
+        assert_eq!(State::create_edited_home_request(), Request::Advance);
+    }
+}
+
+impl State {
     const fn prepare_versions_request() -> Request {
         Request::Advance
     }
+}
 
+#[cfg(test)]
+mod test_prepare_versions_request {
+    use super::{Request, State};
+
+    #[test]
+    fn prepare_versions_requests_advance() {
+        assert_eq!(State::prepare_versions_request(), Request::Advance);
+    }
+}
+
+impl State {
     fn select_versions_request(context: &Initialization) -> Request {
         let options: Vec<_> = PostgresVersions::ALL
             .iter()
@@ -358,42 +503,12 @@ impl State {
             .with_automatic(automatic),
         )
     }
-
-    const fn versions_selected_request() -> Option<Request> {
-        None
-    }
-
-    const fn cancelled_request() -> Option<Request> {
-        None
-    }
-
-    const fn failed_request() -> Option<Request> {
-        None
-    }
-
-    pub(super) const fn is_cancelled(&self) -> bool {
-        matches!(self, Self::Cancelled {})
-    }
 }
 
 #[cfg(test)]
-mod test_state_requests {
-    use super::{Initialization, PostgresVersions, PromptRequest, PromptResponse, Request, State};
-    use std::path::PathBuf;
-
-    fn initialization(yes: bool) -> Initialization {
-        Initialization {
-            yes,
-            supplied_home: true,
-            home: PathBuf::from("chosen/home"),
-            default_home: "original/home".to_owned(),
-            home_input: String::new(),
-            version_args: Vec::new(),
-            versions: PostgresVersions::ALL.to_vec(),
-            notices: Vec::new(),
-            error: None,
-        }
-    }
+mod test_select_versions_request {
+    use super::test_helpers::initialization;
+    use super::{PostgresVersions, PromptRequest, PromptResponse, Request, State};
 
     fn version_prompt(defaults: &[usize]) -> PromptRequest {
         PromptRequest::multi_select(
@@ -405,91 +520,6 @@ mod test_state_requests {
             ],
             defaults,
         )
-    }
-
-    #[test]
-    fn confirm_install_requests_interactive_confirmation() {
-        assert_eq!(
-            State::confirm_install_request(&initialization(false)),
-            Request::Prompt(PromptRequest::confirm(
-                include_str!("confirm_install.txt").trim_end()
-            )),
-        );
-    }
-
-    #[test]
-    fn confirm_install_assumes_yes_without_terminal_input() {
-        assert_eq!(
-            State::confirm_install_request(&initialization(true)),
-            Request::Prompt(
-                PromptRequest::confirm(include_str!("confirm_install.txt").trim_end())
-                    .with_automatic(Some(PromptResponse::Confirm(true))),
-            ),
-        );
-    }
-
-    #[test]
-    fn prepare_home_requests_advance() {
-        assert_eq!(State::prepare_home_request(), Request::Advance);
-    }
-
-    #[test]
-    fn confirm_create_requests_confirmation_for_current_home() {
-        let context = initialization(false);
-        assert_eq!(
-            State::confirm_create_request(&context),
-            Request::Prompt(PromptRequest::confirm("Create the chosen/home?")),
-        );
-    }
-
-    #[test]
-    fn confirm_create_assumes_yes_for_current_home() {
-        assert_eq!(
-            State::confirm_create_request(&initialization(true)),
-            Request::Prompt(
-                PromptRequest::confirm("Create the chosen/home?")
-                    .with_automatic(Some(PromptResponse::Confirm(true))),
-            ),
-        );
-    }
-
-    #[test]
-    fn create_home_requests_advance() {
-        assert_eq!(State::create_home_request(), Request::Advance);
-    }
-
-    #[test]
-    fn edit_home_uses_original_default_instead_of_current_home() {
-        assert_eq!(
-            State::edit_home_request(&initialization(false)),
-            Request::Prompt(PromptRequest::text(
-                include_str!("home_prompt.txt").trim_end(),
-                "original/home",
-            )),
-        );
-    }
-
-    #[test]
-    fn edit_home_retains_invalid_input_and_original_default() {
-        let mut context = initialization(false);
-        "invalid input".clone_into(&mut context.home_input);
-        assert_eq!(
-            State::edit_home_request(&context),
-            Request::Prompt(
-                PromptRequest::text(include_str!("home_prompt.txt").trim_end(), "original/home")
-                    .with_initial_text("invalid input"),
-            ),
-        );
-    }
-
-    #[test]
-    fn create_edited_home_requests_advance() {
-        assert_eq!(State::create_edited_home_request(), Request::Advance);
-    }
-
-    #[test]
-    fn prepare_versions_requests_advance() {
-        assert_eq!(State::prepare_versions_request(), Request::Advance);
     }
 
     #[test]
@@ -540,16 +570,49 @@ mod test_state_requests {
             Request::Prompt(version_prompt(&[])),
         );
     }
+}
+
+impl State {
+    const fn versions_selected_request() -> Option<Request> {
+        None
+    }
+}
+
+#[cfg(test)]
+mod test_versions_selected_request {
+    use super::State;
 
     #[test]
     fn versions_selected_requests_no_further_work() {
         assert_eq!(State::versions_selected_request(), None);
     }
+}
+
+impl State {
+    const fn cancelled_request() -> Option<Request> {
+        None
+    }
+}
+
+#[cfg(test)]
+mod test_cancelled_request {
+    use super::State;
 
     #[test]
     fn cancelled_requests_no_further_work() {
         assert_eq!(State::cancelled_request(), None);
     }
+}
+
+impl State {
+    const fn failed_request() -> Option<Request> {
+        None
+    }
+}
+
+#[cfg(test)]
+mod test_failed_request {
+    use super::State;
 
     #[test]
     fn failed_requests_no_further_work() {

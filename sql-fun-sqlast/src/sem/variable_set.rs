@@ -1,7 +1,7 @@
 use sql_fun_core::IVec;
 
 use crate::{
-    sem::{AstAndContextPair, FromClause, SemScalarExpr, WithClause},
+    sem::{AstAndContextPair, ScalarAnalysisContext, SemScalarExpr},
     syn::{ListOpt, ScanToken},
 };
 
@@ -50,8 +50,7 @@ impl VariableSet {
 
         let (value, new_context) = SemScalarExpr::analyze_scaler_expr(
             context,
-            &WithClause::default(),
-            &FromClause::default(),
+            &ScalarAnalysisContext::default(),
             args[0].clone(),
             tokens,
         )?;

@@ -2,8 +2,8 @@ use sql_fun_core::IVec;
 
 use crate::{
     sem::{
-        AnalysisError, FromClause, FullName, ParseContext, SemScalarExpr, TypeReference,
-        WithClause,
+        AnalysisError, FromClause, FullName, ParseContext, ScalarAnalysisContext, SemScalarExpr,
+        TypeReference, WithClause,
         type_system::{ArgumentBindingCollection, TypeError},
     },
     syn::{Opt, ScanToken},
@@ -110,8 +110,7 @@ impl FunctionParameterTrait for FunctionParamIn {
             let from_clause = FromClause::default();
             let (ex, new_context) = SemScalarExpr::analyze_scaler_expr(
                 context,
-                &with_clause,
-                &from_clause,
+                &ScalarAnalysisContext::new(&with_clause, &from_clause),
                 def_expr,
                 tokens,
             )?;

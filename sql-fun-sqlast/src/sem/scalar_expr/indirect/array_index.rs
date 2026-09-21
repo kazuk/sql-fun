@@ -2,7 +2,7 @@ use sql_fun_core::IVec;
 
 use super::IndirectionExpr;
 use crate::{
-    sem::{AnalysisError, FromClause, ParseContext, SemScalarExpr, TypeReference, WithClause},
+    sem::{AnalysisError, ParseContext, ScalarAnalysisContext, SemScalarExpr, TypeReference},
     syn::{Opt, ScanToken},
 };
 
@@ -55,8 +55,7 @@ impl ArrayIndex {
 
     pub fn analyze_index<TParseContext>(
         mut context: TParseContext,
-        with_clause: &WithClause,
-        from_clause: &FromClause,
+        scalar_context: &ScalarAnalysisContext<'_>,
         arg: SemScalarExpr,
         indices: &crate::syn::AIndices,
         tokens: &IVec<ScanToken>,
@@ -68,7 +67,7 @@ impl ArrayIndex {
             AnalysisError::raise_unexpected_none("aindicies.uidx")?
         };
         let (rexpr, new_context) =
-            SemScalarExpr::analyze_scaler_expr(context, with_clause, from_clause, uidx, tokens)?;
+            SemScalarExpr::analyze_scaler_expr(context, scalar_context, uidx, tokens)?;
         context = new_context;
         let arg = Self::array_index(arg, rexpr, &mut context)?;
         Ok((arg, context))

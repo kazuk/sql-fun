@@ -3018,6 +3018,7 @@ dependencies = [
 name = "sql-fun-sqlast"
 version = "0.1.0"
 dependencies = [
+ "assert_matches",
  "backtrace-on-stack-overflow",
  "clap",
  "combine",

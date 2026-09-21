@@ -2,8 +2,8 @@ use sql_fun_core::IVec;
 
 use crate::{
     sem::{
-        AnalysisError, AstAndContextPair, ColumnName, FromClause, ParseContext, SemAst,
-        SemScalarExpr, TableName, WithClause,
+        AnalysisError, AstAndContextPair, ColumnName, ParseContext, ScalarAnalysisContext, SemAst,
+        SemScalarExpr, TableName,
     },
     syn::{ListOpt, Opt, ScanToken, SortByDir},
 };
@@ -242,8 +242,7 @@ impl CreateIndex {
             let element = if let Some(expr) = key.get_expr().as_inner() {
                 let (scaler_expr, new_context) = SemScalarExpr::analyze_scaler_expr(
                     context,
-                    &WithClause::default(),
-                    &FromClause::default(),
+                    &ScalarAnalysisContext::default(),
                     expr,
                     tokens,
                 )?;

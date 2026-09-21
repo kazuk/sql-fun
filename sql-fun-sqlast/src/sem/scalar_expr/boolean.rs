@@ -2,8 +2,8 @@ use sql_fun_core::IVec;
 
 use crate::{
     sem::{
-        AnalysisError, FromClause, ParseContext, PgBuiltInType, SemScalarExpr, TypeReference,
-        WithClause,
+        AnalysisError, ParseContext, PgBuiltInType, ScalarAnalysisContext, SemScalarExpr,
+        TypeReference,
     },
     syn::{BoolExprType, ListOpt, Opt, ScanToken},
 };
@@ -45,8 +45,7 @@ impl BooleanExpr {
 
     fn analyze_args<TParseContext>(
         mut context: TParseContext,
-        with_clause: &WithClause,
-        from_clause: &FromClause,
+        scalar_context: &ScalarAnalysisContext<'_>,
         nodes: Vec<crate::syn::Node>,
         tokens: &IVec<ScanToken>,
     ) -> Result<(Vec<SemScalarExpr>, TParseContext), AnalysisError>
@@ -55,13 +54,8 @@ impl BooleanExpr {
     {
         let mut results = Vec::new();
         for node in nodes {
-            let (arg_expr, new_context) = SemScalarExpr::analyze_scaler_expr(
-                context,
-                with_clause,
-                from_clause,
-                node,
-                tokens,
-            )?;
+            let (arg_expr, new_context) =
+                SemScalarExpr::analyze_scaler_expr(context, scalar_context, node, tokens)?;
             context = new_context;
             results.push(arg_expr);
         }
@@ -105,8 +99,7 @@ where
 {
     fn analyze_scalar_expr(
         mut context: TParseContext,
-        with_clause: &WithClause,
-        from_clause: &FromClause,
+        scalar_context: &ScalarAnalysisContext<'_>,
         syn: crate::syn::BoolExpr,
         tokens: &IVec<ScanToken>,
     ) -> Result<(SemScalarExpr, TParseContext), AnalysisError> {
@@ -116,8 +109,7 @@ where
         let Some(args) = syn.get_args().as_inner() else {
             AnalysisError::raise_unexpected_none("boolexpr.args")?
         };
-        let (args, new_context) =
-            Self::analyze_args(context, with_clause, from_clause, args, tokens)?;
+        let (args, new_context) = Self::analyze_args(context, scalar_context, args, tokens)?;
         context = new_context;
 
         let body = match boolop {
@@ -189,8 +181,7 @@ where
 {
     fn analyze_scalar_expr(
         mut context: TParseContext,
-        with_clause: &WithClause,
-        from_clause: &FromClause,
+        scalar_context: &ScalarAnalysisContext<'_>,
         syn: crate::syn::NullTest,
         tokens: &IVec<ScanToken>,
     ) -> Result<(SemScalarExpr, TParseContext), AnalysisError> {
@@ -201,7 +192,7 @@ where
             AnalysisError::raise_unexpected_none("NullTest.arg")?
         };
         let (arg_expr, new_context) =
-            SemScalarExpr::analyze_scaler_expr(context, with_clause, from_clause, arg, tokens)?;
+            SemScalarExpr::analyze_scaler_expr(context, scalar_context, arg, tokens)?;
         context = new_context;
         Ok((
             SemScalarExpr::NullTest(Self {

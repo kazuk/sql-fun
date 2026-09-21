@@ -2,7 +2,7 @@ use sql_fun_core::IVec;
 
 use crate::{
     sem::{
-        AnalysisError, ParseContext, SemScalarExpr, TypeReference,
+        AnalysisError, ParseContext, ScalarAnalysisContext, SemScalarExpr, TypeReference,
         scalar_expr::{AnalyzeScalarExpr, SemScalarExprNode},
     },
     syn::{ListOpt, ScanToken},
@@ -29,8 +29,7 @@ where
 {
     fn analyze_scalar_expr(
         mut context: TParseContext,
-        with_clause: &crate::sem::WithClause,
-        from_clause: &crate::sem::FromClause,
+        scalar_context: &ScalarAnalysisContext<'_>,
         syn: crate::syn::AArrayExpr,
         tokens: &IVec<ScanToken>,
     ) -> Result<(SemScalarExpr, TParseContext), AnalysisError> {
@@ -40,13 +39,8 @@ where
 
         let mut exprs = Vec::new();
         for element in elements {
-            let (sem_elm, new_context) = SemScalarExpr::analyze_scaler_expr(
-                context,
-                with_clause,
-                from_clause,
-                element,
-                tokens,
-            )?;
+            let (sem_elm, new_context) =
+                SemScalarExpr::analyze_scaler_expr(context, scalar_context, element, tokens)?;
             context = new_context;
             exprs.push(sem_elm);
         }

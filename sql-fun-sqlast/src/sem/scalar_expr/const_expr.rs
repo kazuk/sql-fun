@@ -2,8 +2,8 @@ use sql_fun_core::IVec;
 
 use crate::{
     sem::{
-        AnalysisError, FromClause, ParseContext, PgBuiltInType, SemScalarExpr, TypeReference,
-        WithClause,
+        AnalysisError, ParseContext, PgBuiltInType, ScalarAnalysisContext, SemScalarExpr,
+        TypeReference,
     },
     syn::ScanToken,
 };
@@ -55,8 +55,7 @@ where
 {
     fn analyze_scalar_expr(
         context: TParseContext,
-        _with_clause: &WithClause,
-        _from_clause: &FromClause,
+        _scalar_context: &ScalarAnalysisContext<'_>,
         syn: crate::syn::AConst,
         _tokens: &IVec<ScanToken>,
     ) -> Result<(SemScalarExpr, TParseContext), AnalysisError> {

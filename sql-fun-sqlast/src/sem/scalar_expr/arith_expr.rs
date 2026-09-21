@@ -9,7 +9,7 @@ use sql_fun_core::IVec;
 
 use crate::{
     sem::{
-        AnalysisError, FromClause, ParseContext, SemScalarExpr, TypeReference, WithClause,
+        AnalysisError, ParseContext, ScalarAnalysisContext, SemScalarExpr, TypeReference,
         scalar_expr::SemScalarExprNode,
     },
     syn::ScanToken,
@@ -243,8 +243,7 @@ impl ArithExpr {
 
     fn analyze_optional_expr<TParseContext>(
         context: TParseContext,
-        with_clause: &WithClause,
-        from_clause: &FromClause,
+        scalar_context: &ScalarAnalysisContext<'_>,
         expr: Option<crate::syn::Node>,
         tokens: &IVec<ScanToken>,
     ) -> Result<(Option<SemScalarExpr>, TParseContext), AnalysisError>
@@ -255,7 +254,7 @@ impl ArithExpr {
             return Ok((None, context));
         };
         let (sem_expr, new_context) =
-            SemScalarExpr::analyze_scaler_expr(context, with_clause, from_clause, expr, tokens)?;
+            SemScalarExpr::analyze_scaler_expr(context, scalar_context, expr, tokens)?;
         Ok((Some(sem_expr), new_context))
     }
 }

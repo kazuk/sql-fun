@@ -4,8 +4,8 @@ use sql_fun_core::IVec;
 
 use crate::{
     sem::{
-        AnalysisError, AnalysisProblem, FromClause, ParseContext, SemScalarExpr, TypeReference,
-        WithClause,
+        AnalysisError, AnalysisProblem, ParseContext, ScalarAnalysisContext, SemScalarExpr,
+        TypeReference,
     },
     syn::{ListOpt, ScanToken},
 };
@@ -35,8 +35,7 @@ where
 {
     fn analyze_scalar_expr(
         mut context: TParseContext,
-        with_clause: &WithClause,
-        from_clause: &FromClause,
+        scalar_context: &ScalarAnalysisContext<'_>,
         syn: crate::syn::CoalesceExpr,
         tokens: &IVec<ScanToken>,
     ) -> Result<(SemScalarExpr, TParseContext), AnalysisError> {
@@ -50,7 +49,7 @@ where
 
         for arg in args {
             let (arg_expr, new_context) =
-                SemScalarExpr::analyze_scaler_expr(context, with_clause, from_clause, arg, tokens)?;
+                SemScalarExpr::analyze_scaler_expr(context, scalar_context, arg, tokens)?;
             context = new_context;
 
             if let Some(fnn) = &first_non_null {

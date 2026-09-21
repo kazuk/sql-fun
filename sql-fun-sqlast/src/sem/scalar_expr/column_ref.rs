@@ -20,8 +20,8 @@ pub use self::{
 
 use crate::{
     sem::{
-        AnalysisError, AnalysisProblem, ColumnDefinition, ColumnName, FromClause, ParseContext,
-        SemScalarExpr, TypeReference, WithClause,
+        AnalysisError, AnalysisProblem, ColumnDefinition, ColumnName, ParseContext,
+        ScalarAnalysisContext, SemScalarExpr, TypeReference,
         data_source::AliasName,
         scalar_expr::{AnalyzeScalarExpr, SemScalarExprNode},
     },
@@ -167,24 +167,6 @@ impl ColumnReferenceExpr {
             column.clone(),
         )))
     }
-
-    fn source_ref<TParseContext>(
-        mut context: TParseContext,
-        with_clause: &WithClause,
-        from_clause: &FromClause,
-        alias: &AliasName,
-        column: &ColumnName,
-    ) -> Result<(SemScalarExpr, TParseContext), AnalysisError>
-    where
-        TParseContext: ParseContext,
-    {
-        let Some((from_def, nullability)) = from_clause.resolve_alias(alias) else {
-            let scalar_expr =
-                UndefinedAliasColumnRef::new_with_report(&mut context, alias, column)?;
-            return Ok((scalar_expr, context));
-        };
-        from_def.create_column_ref(context, with_clause, alias, column, nullability)
-    }
 }
 
 impl<TParseContext> AnalyzeScalarExpr<TParseContext, crate::syn::ColumnRef> for ColumnReferenceExpr
@@ -192,9 +174,8 @@ where
     TParseContext: ParseContext,
 {
     fn analyze_scalar_expr(
-        mut context: TParseContext,
-        with_clause: &WithClause,
-        from_clause: &FromClause,
+        context: TParseContext,
+        scalar_context: &ScalarAnalysisContext<'_>,
         syn: crate::syn::ColumnRef,
         _tokens: &IVec<ScanToken>,
     ) -> Result<(SemScalarExpr, TParseContext), AnalysisError> {
@@ -213,25 +194,13 @@ where
         if fields.len() == 1 {
             let column = ColumnName::from(fields[0].clone());
 
-            let Ok(find_alias_result) =
-                from_clause.find_alias_for_column(&column, &context, with_clause)
-            else {
-                let scalar_expr = Self::ambiguous_column_with_report(&mut context, &column)?;
-                return Ok((scalar_expr, context));
-            };
-            let Some(alias) = find_alias_result else {
-                let scalar_expr = Self::undefined_column_with_report(&mut context, &column)?;
-                return Ok((scalar_expr, context));
-            };
-            Self::source_ref(context, with_clause, from_clause, alias.name(), &column)
+            scalar_context.resolve_column_ref(context, None, &column)
         } else if fields.len() == 2 {
             let alias = &fields[0];
             let column = ColumnName::from(fields[1].clone());
-            Self::source_ref(
+            scalar_context.resolve_column_ref(
                 context,
-                with_clause,
-                from_clause,
-                &AliasName::from(alias.as_str()),
+                Some(&AliasName::from(alias.as_str())),
                 &column,
             )
         } else {

@@ -6,7 +6,8 @@ use crate::{
     AstAndContextPair,
     sem::{
         AliasSpec, AnalysisError, ColumnName, DataSourceRowFunctions, DataSourceRowsFromFunc,
-        FromClause, FullName, JoinKind, ParseContext, SemAst, SemScalarExpr, WithClause,
+        FromClause, FullName, JoinKind, ParseContext, ScalarAnalysisContext, SemAst, SemScalarExpr,
+        WithClause,
         data_source::{JoinExprDataSource, join_expr::JoinUsingClause},
     },
     syn::{ListOpt, Opt, ScanToken},
@@ -147,8 +148,7 @@ impl DataSource {
         let qualifications = if let Some(qualifications) = join_expr.get_quals().as_inner() {
             let (quals, new_context) = SemScalarExpr::analyze_scaler_expr(
                 context,
-                with_clause,
-                &from_clause,
+                &ScalarAnalysisContext::new(with_clause, &from_clause),
                 qualifications,
                 tokens,
             )?;

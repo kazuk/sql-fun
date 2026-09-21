@@ -27,8 +27,9 @@ pub use self::{
 
 use crate::{
     sem::{
-        AnalysisError, ColumnName, FromClause, FullName, ParseContext, SemScalarExpr, WithClause,
-        scalar_expr::ColumnReferenceExpr, type_system::ArgumentBindingCollection,
+        AnalysisError, ColumnName, FromClause, FullName, ParseContext, ScalarAnalysisContext,
+        SemScalarExpr, WithClause, scalar_expr::ColumnReferenceExpr,
+        type_system::ArgumentBindingCollection,
     },
     syn::{ListOpt, ScanToken},
 };
@@ -230,8 +231,7 @@ impl DataSource {
             for arg in args {
                 let (sarg, new_context) = SemScalarExpr::analyze_scaler_expr(
                     context,
-                    with_clause,
-                    from_clause,
+                    &ScalarAnalysisContext::new(with_clause, from_clause),
                     arg,
                     tokens,
                 )?;

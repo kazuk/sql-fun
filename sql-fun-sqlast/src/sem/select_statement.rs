@@ -2,8 +2,8 @@ use sql_fun_core::IVec;
 
 use crate::{
     sem::{
-        AnalysisError, AstAndContextPair, CreateCompositeType, FromClause, ParseContext, SemAst,
-        SemScalarExpr, TypeDefinition, TypeReference, WithClause,
+        AnalysisError, AstAndContextPair, CreateCompositeType, FromClause, ParseContext,
+        ScalarAnalysisContext, SemAst, SemScalarExpr, TypeDefinition, TypeReference, WithClause,
         create_table::{ColumnDefinition, ColumnName},
     },
     syn::{ListOpt, Opt, ScanToken, SetOperation},
@@ -249,14 +249,10 @@ impl SelectStatementNode {
             FromClause::analyze(context, &with_clause, syn.get_from_clause(), tokens)?;
         context = new_context;
 
+        let scalar_context = ScalarAnalysisContext::new(&with_clause, &from_clause);
         let where_clause = if let Some(where_clause) = syn.get_where_clause().as_inner() {
-            let (where_expr, new_context) = SemScalarExpr::analyze_scaler_expr(
-                context,
-                &with_clause,
-                &from_clause,
-                where_clause,
-                tokens,
-            )?;
+            let (where_expr, new_context) =
+                SemScalarExpr::analyze_scaler_expr(context, &scalar_context, where_clause, tokens)?;
             context = new_context;
             Some(where_expr)
         } else {
@@ -271,13 +267,8 @@ impl SelectStatementNode {
             let Some(val) = res_target.get_val().as_inner() else {
                 AnalysisError::raise_unexpected_none("restarget.val")?
             };
-            let (val_sem, new_context) = SemScalarExpr::analyze_scaler_expr(
-                context,
-                &with_clause,
-                &from_clause,
-                val,
-                tokens,
-            )?;
+            let (val_sem, new_context) =
+                SemScalarExpr::analyze_scaler_expr(context, &scalar_context, val, tokens)?;
             context = new_context;
 
             let mut name = res_target.get_name();
@@ -304,4 +295,67 @@ where
     TParseContext: ParseContext,
 {
     SelectStatement::analyze_select(context, syn, tokens)
+}
+
+#[cfg(test)]
+mod test_scalar_scope {
+    use sql_fun_core::IVec;
+
+    use crate::{
+        sem::{ColumnName, MutSourcePathWithSpan, PgBuiltInType, SourcePathWithSpan},
+        syn::Opt,
+        test_helpers::{SynBuilder, TestParseContext, source_span},
+    };
+
+    #[rstest::rstest]
+    fn source_columns_remain_visible_in_nested_scalar_expressions(
+        source_span: SourcePathWithSpan,
+    ) -> testresult::TestResult {
+        let mut context = TestParseContext::default();
+        context.set_source_path_with_span(&source_span);
+        context.setup_type(PgBuiltInType::int4());
+        context.setup_type(PgBuiltInType::bool());
+        let syn = SynBuilder::new().parse(
+            "select case when true then coalesce(s.n) else n end as result \
+             from (select 42 as n) s where s.n is not null",
+        );
+        let (select, context) = super::SelectStatementNode::analyze_select_node(
+            context,
+            syn.as_select_stmt().as_inner().expect("select statement"),
+            &IVec::default(),
+        )?;
+        let column = select
+            .get_result_column_def(&ColumnName::from("result"))
+            .expect("result column");
+        assert_eq!(column.get_type_cloned(), Some(PgBuiltInType::int4()));
+        assert_eq!(context.reported_problem_count(), 0);
+        Ok(())
+    }
+
+    #[rstest::rstest]
+    #[case("n")]
+    #[case("missing")]
+    #[case("unknown.n")]
+    #[case("a.missing")]
+    fn unresolved_column_reports_a_problem(
+        source_span: SourcePathWithSpan,
+        #[case] expression: &str,
+    ) -> testresult::TestResult {
+        let mut context = TestParseContext::default();
+        context.set_source_path_with_span(&source_span);
+        let syn = SynBuilder::new().parse(&format!(
+            "select {expression} as result from (select 42 as n) a, (select 43 as n) b"
+        ));
+        let (select, context) = super::SelectStatementNode::analyze_select_node(
+            context,
+            syn.as_select_stmt().as_inner().expect("select statement"),
+            &IVec::default(),
+        )?;
+        let column = select
+            .get_result_column_def(&ColumnName::from("result"))
+            .expect("result column");
+        assert_eq!(column.get_type_cloned(), None);
+        assert_eq!(context.reported_problem_count(), 1);
+        Ok(())
+    }
 }

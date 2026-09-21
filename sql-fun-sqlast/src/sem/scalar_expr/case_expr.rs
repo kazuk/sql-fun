@@ -4,16 +4,15 @@ use sql_fun_core::IVec;
 
 use crate::{
     sem::{
-        AnalysisError, AnalysisProblem, FromClause, ParseContext, SemScalarExpr, TypeReference,
-        WithClause,
+        AnalysisError, AnalysisProblem, ParseContext, ScalarAnalysisContext, SemScalarExpr,
+        TypeReference,
         scalar_expr::{AnalyzeScalarExpr, SemScalarExprNode},
     },
     syn::{ListOpt as _, Opt, ScanToken},
 };
 
 pub struct CaseExprAnalysisContext<'a> {
-    with_clause: &'a WithClause,
-    from_clause: &'a FromClause,
+    scalar_context: &'a ScalarAnalysisContext<'a>,
     case_arg: Option<SemScalarExpr>,
     nullabilities: Vec<Option<bool>>,
     when_exprs: Vec<CaseWhen>,
@@ -22,10 +21,9 @@ pub struct CaseExprAnalysisContext<'a> {
 }
 
 impl<'a> CaseExprAnalysisContext<'a> {
-    fn new(with_clause: &'a WithClause, from_clause: &'a FromClause) -> Self {
+    fn new(scalar_context: &'a ScalarAnalysisContext<'a>) -> Self {
         Self {
-            with_clause,
-            from_clause,
+            scalar_context,
             case_arg: None,
             nullabilities: Default::default(),
             when_exprs: Default::default(),
@@ -37,13 +35,14 @@ impl<'a> CaseExprAnalysisContext<'a> {
 
 #[cfg(test)]
 mod test_case_expr_analysis_context_new {
-    use crate::sem::{FromClause, WithClause};
+    use crate::sem::{FromClause, ScalarAnalysisContext, WithClause};
 
     #[test]
     pub fn test_case_expr_analysis_context_new() {
         let with_clause = WithClause::default();
         let from_clause = FromClause::default();
-        let _ = super::CaseExprAnalysisContext::new(&with_clause, &from_clause);
+        let scalar_context = ScalarAnalysisContext::new(&with_clause, &from_clause);
+        let _ = super::CaseExprAnalysisContext::new(&scalar_context);
     }
 }
 
@@ -58,13 +57,8 @@ impl CaseExprAnalysisContext<'_> {
         TParseContext: ParseContext,
     {
         if let Some(arg) = syn.get_arg().as_inner() {
-            let (arg_expr, new_context) = SemScalarExpr::analyze_scaler_expr(
-                context,
-                self.with_clause,
-                self.from_clause,
-                arg,
-                tokens,
-            )?;
+            let (arg_expr, new_context) =
+                SemScalarExpr::analyze_scaler_expr(context, self.scalar_context, arg, tokens)?;
             self.case_arg = Some(arg_expr);
             Ok(new_context)
         } else {
@@ -79,7 +73,7 @@ mod test_case_expr_analysis_context_analyze_case_arg {
     use testresult::TestResult;
 
     use crate::{
-        sem::{FromClause, WithClause},
+        sem::{FromClause, ScalarAnalysisContext, WithClause},
         syn::{Node, NodeInner, NodeList},
         test_helpers::{SynBuilder, TestParseContext, test_context},
     };
@@ -88,7 +82,8 @@ mod test_case_expr_analysis_context_analyze_case_arg {
     fn test_analyze_case_arg_none(test_context: TestParseContext) -> TestResult {
         let with_clause = WithClause::default();
         let from_clause = FromClause::default();
-        let mut acontext = super::CaseExprAnalysisContext::new(&with_clause, &from_clause);
+        let scalar_context = ScalarAnalysisContext::new(&with_clause, &from_clause);
+        let mut acontext = super::CaseExprAnalysisContext::new(&scalar_context);
 
         let builder = SynBuilder::new();
         let case_expr = builder.case_expr(Node::none(), NodeList::default(), Node::none());
@@ -102,7 +97,8 @@ mod test_case_expr_analysis_context_analyze_case_arg {
     fn test_analyze_case_arg_some(test_context: TestParseContext) -> TestResult {
         let with_clause = WithClause::default();
         let from_clause = FromClause::default();
-        let mut acontext = super::CaseExprAnalysisContext::new(&with_clause, &from_clause);
+        let scalar_context = ScalarAnalysisContext::new(&with_clause, &from_clause);
+        let mut acontext = super::CaseExprAnalysisContext::new(&scalar_context);
 
         let builder = SynBuilder::new();
         let arg_expr = NodeInner::AConst(builder.const_int4(10));
@@ -130,21 +126,11 @@ impl CaseExprAnalysisContext<'_> {
         let Some(result) = syn.get_result().as_inner() else {
             AnalysisError::raise_unexpected_none("casewhen.result")?
         };
-        let (when_value, new_context) = SemScalarExpr::analyze_scaler_expr(
-            context,
-            self.with_clause,
-            self.from_clause,
-            when_value,
-            tokens,
-        )?;
+        let (when_value, new_context) =
+            SemScalarExpr::analyze_scaler_expr(context, self.scalar_context, when_value, tokens)?;
         context = new_context;
-        let (result, new_context) = SemScalarExpr::analyze_scaler_expr(
-            context,
-            self.with_clause,
-            self.from_clause,
-            result,
-            tokens,
-        )?;
+        let (result, new_context) =
+            SemScalarExpr::analyze_scaler_expr(context, self.scalar_context, result, tokens)?;
         context = new_context;
         Ok((CaseWhen::new(when_value, result), context))
     }
@@ -152,6 +138,7 @@ impl CaseExprAnalysisContext<'_> {
 
 #[cfg(test)]
 mod test_case_expr_analysis_context_analyze_case_when {
+    use crate::sem::ScalarAnalysisContext;
     use sql_fun_core::IVec;
     use testresult::TestResult;
 
@@ -165,7 +152,8 @@ mod test_case_expr_analysis_context_analyze_case_when {
     fn test_analyze_case_when(test_context: TestParseContext) -> TestResult {
         let with_clause = WithClause::default();
         let from_clause = FromClause::default();
-        let acontext = super::CaseExprAnalysisContext::new(&with_clause, &from_clause);
+        let scalar_context = ScalarAnalysisContext::new(&with_clause, &from_clause);
+        let acontext = super::CaseExprAnalysisContext::new(&scalar_context);
 
         let builder = SynBuilder::new();
         let expr = NodeInner::AConst(builder.const_int4(10));
@@ -226,6 +214,7 @@ impl CaseExprAnalysisContext<'_> {
 
 #[cfg(test)]
 mod test_case_expr_analysis_context_analyze_case_when_list {
+    use crate::sem::ScalarAnalysisContext;
     use crate::{
         sem::{FromClause, PgBuiltInType, WithClause},
         syn::NodeInner,
@@ -241,7 +230,8 @@ mod test_case_expr_analysis_context_analyze_case_when_list {
 
         let with_clause = WithClause::default();
         let from_clause = FromClause::default();
-        let mut acontext = super::CaseExprAnalysisContext::new(&with_clause, &from_clause);
+        let scalar_context = ScalarAnalysisContext::new(&with_clause, &from_clause);
+        let mut acontext = super::CaseExprAnalysisContext::new(&scalar_context);
 
         let builder = SynBuilder::new();
 
@@ -278,13 +268,8 @@ impl CaseExprAnalysisContext<'_> {
             return Ok(context);
         };
 
-        let (default_expr, new_context) = SemScalarExpr::analyze_scaler_expr(
-            context,
-            self.with_clause,
-            self.from_clause,
-            def_result,
-            tokens,
-        )?;
+        let (default_expr, new_context) =
+            SemScalarExpr::analyze_scaler_expr(context, self.scalar_context, def_result, tokens)?;
         context = new_context;
 
         if let Some(default_result_type) = default_expr.get_type() {
@@ -311,6 +296,7 @@ impl CaseExprAnalysisContext<'_> {
 
 #[cfg(test)]
 mod test_case_expr_analysis_context_analyze_default_expr {
+    use crate::sem::ScalarAnalysisContext;
     use crate::{
         sem::{FromClause, PgBuiltInType, WithClause},
         syn::{Node, NodeInner, NodeList},
@@ -323,7 +309,8 @@ mod test_case_expr_analysis_context_analyze_default_expr {
     fn test_analyze_default_expr_none(test_context: TestParseContext) -> TestResult {
         let with_clause = WithClause::default();
         let from_clause = FromClause::default();
-        let mut acontext = super::CaseExprAnalysisContext::new(&with_clause, &from_clause);
+        let scalar_context = ScalarAnalysisContext::new(&with_clause, &from_clause);
+        let mut acontext = super::CaseExprAnalysisContext::new(&scalar_context);
 
         let builder = SynBuilder::new();
         let case_expr = builder.case_expr(Node::none(), NodeList::default(), Node::none());
@@ -338,7 +325,8 @@ mod test_case_expr_analysis_context_analyze_default_expr {
         test_context.setup_type(PgBuiltInType::int4());
         let with_clause = WithClause::default();
         let from_clause = FromClause::default();
-        let mut acontext = super::CaseExprAnalysisContext::new(&with_clause, &from_clause);
+        let scalar_context = ScalarAnalysisContext::new(&with_clause, &from_clause);
+        let mut acontext = super::CaseExprAnalysisContext::new(&scalar_context);
         let builder = SynBuilder::new();
         let expr = NodeInner::AConst(builder.const_int4(10));
         let case_expr = builder.case_expr(Node::none(), NodeList::default(), expr.into());
@@ -419,6 +407,7 @@ impl CaseExprAnalysisContext<'_> {
 
 #[cfg(test)]
 mod test_case_expr_analysis_context_type_fixup {
+    use crate::sem::ScalarAnalysisContext;
     use sql_fun_core::IVec;
     use testresult::TestResult;
 
@@ -443,7 +432,8 @@ mod test_case_expr_analysis_context_type_fixup {
 
         let with_clause = WithClause::default();
         let from_clause = FromClause::default();
-        let mut acontext = super::CaseExprAnalysisContext::new(&with_clause, &from_clause);
+        let scalar_context = ScalarAnalysisContext::new(&with_clause, &from_clause);
+        let mut acontext = super::CaseExprAnalysisContext::new(&scalar_context);
 
         let builder = SynBuilder::new();
         let expr = NodeInner::AConst(builder.const_int4(1));
@@ -483,7 +473,8 @@ mod test_case_expr_analysis_context_type_fixup {
 
         let with_clause = WithClause::default();
         let from_clause = FromClause::default();
-        let mut acontext = super::CaseExprAnalysisContext::new(&with_clause, &from_clause);
+        let scalar_context = ScalarAnalysisContext::new(&with_clause, &from_clause);
+        let mut acontext = super::CaseExprAnalysisContext::new(&scalar_context);
         acontext.result_types.insert(int4);
         acontext.result_types.insert(text);
 
@@ -523,6 +514,7 @@ impl CaseExprAnalysisContext<'_> {
 
 #[cfg(test)]
 mod test_case_expr_analysis_context_enumerate_cast_candidates {
+    use crate::sem::ScalarAnalysisContext;
     use testresult::TestResult;
 
     use crate::{
@@ -544,7 +536,8 @@ mod test_case_expr_analysis_context_enumerate_cast_candidates {
 
         let with_clause = WithClause::default();
         let from_clause = FromClause::default();
-        let mut acontext = super::CaseExprAnalysisContext::new(&with_clause, &from_clause);
+        let scalar_context = ScalarAnalysisContext::new(&with_clause, &from_clause);
+        let mut acontext = super::CaseExprAnalysisContext::new(&scalar_context);
         acontext.result_types.insert(int4);
         acontext.result_types.insert(text.clone());
 
@@ -571,13 +564,14 @@ impl CaseExprAnalysisContext<'_> {
 
 #[cfg(test)]
 mod test_case_expr_analysis_context_is_not_null {
-    use crate::sem::{FromClause, WithClause};
+    use crate::sem::{FromClause, ScalarAnalysisContext, WithClause};
 
     #[test]
     fn test_is_not_null_any_false() {
         let with_clause = WithClause::default();
         let from_clause = FromClause::default();
-        let mut acontext = super::CaseExprAnalysisContext::new(&with_clause, &from_clause);
+        let scalar_context = ScalarAnalysisContext::new(&with_clause, &from_clause);
+        let mut acontext = super::CaseExprAnalysisContext::new(&scalar_context);
 
         acontext.nullabilities = vec![Some(true), Some(false)];
         assert_eq!(Some(false), acontext.is_not_null());
@@ -587,7 +581,8 @@ mod test_case_expr_analysis_context_is_not_null {
     fn test_is_not_null_all_some() {
         let with_clause = WithClause::default();
         let from_clause = FromClause::default();
-        let mut acontext = super::CaseExprAnalysisContext::new(&with_clause, &from_clause);
+        let scalar_context = ScalarAnalysisContext::new(&with_clause, &from_clause);
+        let mut acontext = super::CaseExprAnalysisContext::new(&scalar_context);
 
         acontext.nullabilities = vec![Some(true), Some(true)];
         assert_eq!(Some(true), acontext.is_not_null());
@@ -597,7 +592,8 @@ mod test_case_expr_analysis_context_is_not_null {
     fn test_is_not_null_with_unknown() {
         let with_clause = WithClause::default();
         let from_clause = FromClause::default();
-        let mut acontext = super::CaseExprAnalysisContext::new(&with_clause, &from_clause);
+        let scalar_context = ScalarAnalysisContext::new(&with_clause, &from_clause);
+        let mut acontext = super::CaseExprAnalysisContext::new(&scalar_context);
 
         acontext.nullabilities = vec![Some(true), None];
         assert_eq!(None, acontext.is_not_null());
@@ -682,12 +678,11 @@ where
 {
     fn analyze_scalar_expr(
         mut context: TParseContext,
-        with_clause: &WithClause,
-        from_clause: &FromClause,
+        scalar_context: &ScalarAnalysisContext<'_>,
         syn: crate::syn::CaseExpr,
         tokens: &IVec<ScanToken>,
     ) -> Result<(SemScalarExpr, TParseContext), AnalysisError> {
-        let mut analysis_context = CaseExprAnalysisContext::new(with_clause, from_clause);
+        let mut analysis_context = CaseExprAnalysisContext::new(scalar_context);
 
         context = analysis_context.analyze_case_arg(context, &syn, tokens)?;
         let Some(args) = syn.get_args().map(|v| v.as_case_when()) else {

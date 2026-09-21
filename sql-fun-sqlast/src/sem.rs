@@ -99,8 +99,8 @@ pub use self::{
     scalar_expr::{
         ArithExpr, ArrayExpr, BooleanExpr, CaseExpr, CoalesceExpr, CollateExpr,
         ColumnReferenceExpr, CteColumnRef, FuncCallExpr, ImplicitCastExpr, IndirectionExpr,
-        MinMaxExpr, NamedArgExpr, NullTestExpr, ParamRef, ScalarConstExpr, SemScalarExpr,
-        SqlValueExpr, SubLinkExpr, SubQueryColumnRef, TableColumnRef, TypeCastExpr,
+        MinMaxExpr, NamedArgExpr, NullTestExpr, ParamRef, ScalarAnalysisContext, ScalarConstExpr,
+        SemScalarExpr, SqlValueExpr, SubLinkExpr, SubQueryColumnRef, TableColumnRef, TypeCastExpr,
         analyze_scaler_expr,
     },
     schema_file_context::SchemaFileContext,

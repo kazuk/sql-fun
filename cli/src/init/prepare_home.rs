@@ -109,3 +109,30 @@ fn create_confirm(home: &Path, assume_yes: bool) -> Result<bool, anyhow::Error> 
 
     Ok(confirmed)
 }
+
+#[cfg(test)]
+mod test_prepare_home {
+    use super::prepare_home;
+
+    #[test]
+    fn accepts_existing_cli_path_even_when_it_is_a_file() {
+        let file = tempfile::NamedTempFile::new().unwrap();
+        let path = file.path().to_path_buf();
+        assert_eq!(prepare_home(false, Some(&path)).unwrap(), path);
+    }
+
+    #[test]
+    fn assumed_yes_creates_missing_parents() {
+        let root = tempfile::tempdir().unwrap();
+        let path = root.path().join("parent/home");
+        assert_eq!(prepare_home(true, Some(&path)).unwrap(), path);
+        assert!(path.is_dir());
+    }
+
+    #[test]
+    fn assumed_yes_returns_creation_failure() {
+        let file = tempfile::NamedTempFile::new().unwrap();
+        let path = file.path().join("home");
+        assert!(prepare_home(true, Some(&path)).is_err());
+    }
+}

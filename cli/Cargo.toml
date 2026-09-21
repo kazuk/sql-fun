@@ -33,6 +33,7 @@ serde_json.workspace = true
 shellexpand.workspace = true
 sql-fun-codegen.workspace = true
 sql-fun-core.workspace = true
+statig.workspace = true
 syn.workspace = true
 tempfile.workspace = true
 thiserror.workspace = true

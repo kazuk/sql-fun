@@ -80,3 +80,32 @@ pub fn select_engine_version(
 
     Ok(versions)
 }
+
+#[cfg(test)]
+mod test_select_engine_version {
+    use super::{PostgresVersions, select_engine_version};
+
+    #[test]
+    fn assumed_yes_preserves_order_and_duplicates() {
+        let selected = select_engine_version(
+            true,
+            vec!["18".to_owned(), "16".to_owned(), "18".to_owned()],
+        )
+        .unwrap();
+        assert!(
+            selected
+                == vec![
+                    PostgresVersions::Postgres18,
+                    PostgresVersions::Postgres16,
+                    PostgresVersions::Postgres18,
+                ]
+        );
+    }
+
+    #[test]
+    fn rejects_unknown_versions_before_prompting() {
+        for yes in [false, true] {
+            assert!(select_engine_version(yes, vec!["19".to_owned()]).is_err());
+        }
+    }
+}

@@ -375,3 +375,184 @@ impl State {
         matches!(self, Self::Cancelled {})
     }
 }
+
+#[cfg(test)]
+mod test_state_requests {
+    use super::{Initialization, PostgresVersions, PromptRequest, PromptResponse, Request, State};
+    use std::path::PathBuf;
+
+    fn initialization(yes: bool) -> Initialization {
+        Initialization {
+            yes,
+            supplied_home: true,
+            home: PathBuf::from("chosen/home"),
+            default_home: "original/home".to_owned(),
+            home_input: String::new(),
+            version_args: Vec::new(),
+            versions: PostgresVersions::ALL.to_vec(),
+            notices: Vec::new(),
+            error: None,
+        }
+    }
+
+    fn version_prompt(defaults: &[usize]) -> PromptRequest {
+        PromptRequest::multi_select(
+            include_str!("versions_prompt.txt").trim_end(),
+            &[
+                "PostgreSQL Version 16".to_owned(),
+                "PostgreSQL Version 17".to_owned(),
+                "PostgreSQL Version 18".to_owned(),
+            ],
+            defaults,
+        )
+    }
+
+    #[test]
+    fn confirm_install_requests_interactive_confirmation() {
+        assert_eq!(
+            State::confirm_install_request(&initialization(false)),
+            Request::Prompt(PromptRequest::confirm(
+                include_str!("confirm_install.txt").trim_end()
+            )),
+        );
+    }
+
+    #[test]
+    fn confirm_install_assumes_yes_without_terminal_input() {
+        assert_eq!(
+            State::confirm_install_request(&initialization(true)),
+            Request::Prompt(
+                PromptRequest::confirm(include_str!("confirm_install.txt").trim_end())
+                    .with_automatic(Some(PromptResponse::Confirm(true))),
+            ),
+        );
+    }
+
+    #[test]
+    fn prepare_home_requests_advance() {
+        assert_eq!(State::prepare_home_request(), Request::Advance);
+    }
+
+    #[test]
+    fn confirm_create_requests_confirmation_for_current_home() {
+        let context = initialization(false);
+        assert_eq!(
+            State::confirm_create_request(&context),
+            Request::Prompt(PromptRequest::confirm("Create the chosen/home?")),
+        );
+    }
+
+    #[test]
+    fn confirm_create_assumes_yes_for_current_home() {
+        assert_eq!(
+            State::confirm_create_request(&initialization(true)),
+            Request::Prompt(
+                PromptRequest::confirm("Create the chosen/home?")
+                    .with_automatic(Some(PromptResponse::Confirm(true))),
+            ),
+        );
+    }
+
+    #[test]
+    fn create_home_requests_advance() {
+        assert_eq!(State::create_home_request(), Request::Advance);
+    }
+
+    #[test]
+    fn edit_home_uses_original_default_instead_of_current_home() {
+        assert_eq!(
+            State::edit_home_request(&initialization(false)),
+            Request::Prompt(PromptRequest::text(
+                include_str!("home_prompt.txt").trim_end(),
+                "original/home",
+            )),
+        );
+    }
+
+    #[test]
+    fn edit_home_retains_invalid_input_and_original_default() {
+        let mut context = initialization(false);
+        "invalid input".clone_into(&mut context.home_input);
+        assert_eq!(
+            State::edit_home_request(&context),
+            Request::Prompt(
+                PromptRequest::text(include_str!("home_prompt.txt").trim_end(), "original/home")
+                    .with_initial_text("invalid input"),
+            ),
+        );
+    }
+
+    #[test]
+    fn create_edited_home_requests_advance() {
+        assert_eq!(State::create_edited_home_request(), Request::Advance);
+    }
+
+    #[test]
+    fn prepare_versions_requests_advance() {
+        assert_eq!(State::prepare_versions_request(), Request::Advance);
+    }
+
+    #[test]
+    fn select_versions_offers_all_supported_versions_selected() {
+        assert_eq!(
+            State::select_versions_request(&initialization(false)),
+            Request::Prompt(version_prompt(&[0, 1, 2])),
+        );
+    }
+
+    #[test]
+    fn select_versions_interactive_defaults_follow_option_order_without_duplicates() {
+        let mut context = initialization(false);
+        context.versions = vec![
+            PostgresVersions::Postgres18,
+            PostgresVersions::Postgres16,
+            PostgresVersions::Postgres18,
+        ];
+        assert_eq!(
+            State::select_versions_request(&context),
+            Request::Prompt(version_prompt(&[0, 2])),
+        );
+    }
+
+    #[test]
+    fn select_versions_automatic_answer_preserves_order_and_duplicates() {
+        let mut context = initialization(true);
+        context.versions = vec![
+            PostgresVersions::Postgres18,
+            PostgresVersions::Postgres16,
+            PostgresVersions::Postgres18,
+        ];
+        assert_eq!(
+            State::select_versions_request(&context),
+            Request::Prompt(
+                version_prompt(&[0, 2])
+                    .with_automatic(Some(PromptResponse::MultiSelect(vec![2, 0, 2]))),
+            ),
+        );
+    }
+
+    #[test]
+    fn select_versions_keeps_empty_selection_when_reprompting() {
+        let mut context = initialization(false);
+        context.versions.clear();
+        assert_eq!(
+            State::select_versions_request(&context),
+            Request::Prompt(version_prompt(&[])),
+        );
+    }
+
+    #[test]
+    fn versions_selected_requests_no_further_work() {
+        assert_eq!(State::versions_selected_request(), None);
+    }
+
+    #[test]
+    fn cancelled_requests_no_further_work() {
+        assert_eq!(State::cancelled_request(), None);
+    }
+
+    #[test]
+    fn failed_requests_no_further_work() {
+        assert_eq!(State::failed_request(), None);
+    }
+}

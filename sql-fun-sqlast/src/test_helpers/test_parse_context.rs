@@ -9,13 +9,15 @@ use crate::{
         BinaryOperatorDefinition, CastContext, CastDefinition, ColumnDefinition, Comment,
         CreateCompositeType, CreateDomain, CreateEnum, CreateExtension, CreateFunction,
         CreateIndex, CreateSchema, CreateSequence, CreateTable, CreateTableAs, CreateTableMode,
-        CreateView, DropTable, FullName, FunctionInfoRead, FunctionInfoWrite,
+        CreateView, DropTable, FromClause, FullName, FunctionInfoRead, FunctionInfoWrite,
         FunctionOverloadCollection, GetSourcePathWithSpanOpt, IndexInfoRead, MutSourcePathWithSpan,
         OperatorDefinition, OperatorInfoRead, OperatorName, OverloadVariant, ParseContext,
         SchemaName, SearchPathRead, SequenceInfoRead, SequenceInfoWrite, SourcePathWithSpan,
         TableInfoRead, TableInfoWrite, TableName, TypeDefinition, TypeInfoRead, TypeInfoWrite,
         TypeReference, ValidOperatorName, VariableSet, ViewInfoRead, ViewInfoWrite, ViewLike,
+        WithClause,
     },
+    test_helpers::{SynBuilder, source_span},
 };
 
 /// ParseContext implementation for tests
@@ -410,5 +412,20 @@ impl TestParseContext {
     #[must_use]
     pub fn reported_problem_count(&self) -> usize {
         self.problems.len()
+    }
+}
+
+impl TestParseContext {
+    /// Build a scalar expression's data-source scope from a SQL FROM body.
+    pub fn scalar_scope_from_sql(from_sql: &str) -> Result<(FromClause, Self), AnalysisError> {
+        let mut context = Self::default();
+        context.set_source_path_with_span(&source_span());
+        let syn = SynBuilder::new().parse(&format!("select 1 from {from_sql}"));
+        FromClause::analyze(
+            context,
+            &WithClause::default(),
+            syn.as_select_stmt().get_from_clause(),
+            &sql_fun_core::IVec::default(),
+        )
     }
 }

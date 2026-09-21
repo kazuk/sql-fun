@@ -8,6 +8,7 @@ mod coalesce;
 mod collate;
 mod column_ref;
 mod const_expr;
+mod context;
 mod func_call;
 mod indirect;
 mod min_max;
@@ -31,6 +32,7 @@ pub use self::{
     collate::CollateExpr,
     column_ref::{ColumnReferenceExpr, CteColumnRef, SubQueryColumnRef, TableColumnRef},
     const_expr::ScalarConstExpr,
+    context::ScalarAnalysisContext,
     func_call::FuncCallExpr,
     indirect::IndirectionExpr,
     min_max::MinMaxExpr,

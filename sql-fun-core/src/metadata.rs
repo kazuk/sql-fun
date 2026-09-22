@@ -219,6 +219,9 @@ impl DatabaseEngine {
 ///
 #[derive(Debug, serde::Deserialize)]
 pub struct SqlFunMetadata {
+    #[serde(flatten)]
+    codegen_options: crate::CodegenOptions,
+
     /// Datasource name
     #[serde(skip)]
     name: Option<String>,
@@ -290,6 +293,12 @@ impl MetadataError {
 }
 
 impl SqlFunMetadata {
+    /// Default code generation options for this datasource.
+    #[must_use]
+    pub const fn codegen_options(&self) -> &crate::CodegenOptions {
+        &self.codegen_options
+    }
+
     /// deserialize form TOML Value
     ///
     /// # Errors
@@ -389,5 +398,53 @@ impl SqlFunMetadata {
     #[must_use]
     pub const fn connector(&self) -> &Option<String> {
         &self.connector
+    }
+}
+
+#[cfg(test)]
+mod test_codegen_metadata {
+    use crate::test_helpers::metadata_with_codegen_options;
+
+    #[test]
+    fn flat_metadata_supports_all_contracts() {
+        for setter in ["mutable", "consuming"] {
+            for fallible in [false, true] {
+                let metadata = metadata_with_codegen_options(&format!(
+                    "builder_setter = {setter:?}\nbuilder_build_fallible = {fallible}"
+                ))
+                .unwrap();
+                let options = metadata.get("default").unwrap().codegen_options();
+                assert_eq!(options.builder_setter().is_mutable(), setter == "mutable");
+                assert_eq!(options.builder_build_fallible(), fallible);
+            }
+        }
+    }
+
+    #[test]
+    fn omitted_fields_keep_independent_defaults() {
+        for input in [
+            "",
+            "builder_setter = \"consuming\"",
+            "builder_build_fallible = false",
+        ] {
+            let metadata = metadata_with_codegen_options(input).unwrap();
+            let options = metadata.get("default").unwrap().codegen_options();
+            assert_eq!(
+                options.builder_setter().is_mutable(),
+                !input.contains("consuming")
+            );
+            assert_eq!(options.builder_build_fallible(), !input.contains("false"));
+        }
+    }
+
+    #[test]
+    fn invalid_contracts_are_rejected() {
+        for input in [
+            "builder_setter = \"unknown\"",
+            "builder_setter = false",
+            "builder_build_fallible = \"false\"",
+        ] {
+            assert!(metadata_with_codegen_options(input).is_err());
+        }
     }
 }

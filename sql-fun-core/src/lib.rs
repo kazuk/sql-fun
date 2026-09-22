@@ -6,6 +6,7 @@
 
 mod args;
 mod builtin;
+mod codegen_options;
 mod coll;
 mod cte_catalog;
 mod extensions;
@@ -39,6 +40,7 @@ pub use self::{
         InitializeArgs, SqlFunArgs, SqlFunArgsBuilder, SqlFunArgsBuilderError, SqlFunArgsError,
     },
     builtin::PostgresBuiltinPaths,
+    codegen_options::{BuilderSetter, CodegenOptions},
     coll::IVec,
     extensions::{
         ExtensionConfigError, ExtensionNameVersionPair, ExtensionVersion,

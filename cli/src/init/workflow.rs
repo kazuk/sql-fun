@@ -166,8 +166,8 @@ impl Workflow {
         }
         if !context.supplied_home && context.home.exists() {
             context.notices.push(Notice::home_already_exists());
-        } else if let Err(error) = std::fs::create_dir_all(&context.home) {
-            return context.fail(InitError::io(error));
+        } else if let Err(error) = std::fs::create_dir_all(&context.home).or_else(InitError::io) {
+            return context.fail(error);
         }
         Outcome::Transition(State::prepare_versions())
     }

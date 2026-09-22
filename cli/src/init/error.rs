@@ -9,8 +9,9 @@ pub enum InitError {
 }
 
 impl InitError {
-    pub const fn io(error: std::io::Error) -> Self {
-        Self::Io(error)
+    #[track_caller]
+    pub const fn io<T>(error: std::io::Error) -> Result<T, Self> {
+        Err(Self::Io(error))
     }
 }
 
@@ -24,7 +25,7 @@ mod test_io {
     #[case::permission_denied(ErrorKind::PermissionDenied)]
     #[case::not_a_directory(ErrorKind::NotADirectory)]
     fn preserves_io_source_and_message(#[case] kind: ErrorKind) {
-        let error = InitError::io(std::io::Error::new(kind, "create failed"));
+        let error = InitError::io::<()>(std::io::Error::new(kind, "create failed")).unwrap_err();
         assert_eq!(error.to_string(), "create failed");
         let source = error
             .source()
@@ -36,8 +37,9 @@ mod test_io {
 }
 
 impl InitError {
-    pub const fn prompt(error: inquire::InquireError) -> Self {
-        Self::Prompt(error)
+    #[track_caller]
+    pub const fn prompt<T>(error: inquire::InquireError) -> Result<T, Self> {
+        Err(Self::Prompt(error))
     }
 }
 
@@ -51,15 +53,16 @@ mod test_prompt {
     #[case::interrupted(inquire::InquireError::OperationInterrupted)]
     fn preserves_prompt_source_and_message(#[case] source: inquire::InquireError) {
         let message = source.to_string();
-        let error = InitError::prompt(source);
+        let error = InitError::prompt::<()>(source).unwrap_err();
         assert_eq!(error.to_string(), message);
         assert!(error.source().unwrap().is::<inquire::InquireError>());
     }
 }
 
 impl InitError {
-    pub fn unexpected_version(version: &str) -> Self {
-        Self::UnexpectedVersion(version.to_owned())
+    #[track_caller]
+    pub fn unexpected_version<T>(version: &str) -> Result<T, Self> {
+        Err(Self::UnexpectedVersion(version.to_owned()))
     }
 
     fn unexpected_version_message(version: &str) -> String {
@@ -78,7 +81,7 @@ mod test_unexpected_version {
     #[case::unsupported("19", "unexpected version 19")]
     #[case::invalid("invalid", "unexpected version invalid")]
     fn reports_the_supplied_version(#[case] version: &str, #[case] message: &str) {
-        let error = InitError::unexpected_version(version);
+        let error = InitError::unexpected_version::<()>(version).unwrap_err();
         assert_eq!(error.to_string(), message);
         assert!(error.source().is_none());
     }

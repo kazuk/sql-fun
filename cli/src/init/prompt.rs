@@ -128,7 +128,7 @@ impl Input {
         Ok(PromptResponse::confirm(
             inquire::Confirm::new(title)
                 .prompt()
-                .map_err(InitError::prompt)?,
+                .or_else(InitError::prompt)?,
         ))
     }
 
@@ -138,7 +138,7 @@ impl Input {
                 .with_default(&input.default)
                 .with_initial_value(&input.initial)
                 .prompt()
-                .map_err(InitError::prompt)?,
+                .or_else(InitError::prompt)?,
         ))
     }
 
@@ -147,7 +147,7 @@ impl Input {
             &inquire::MultiSelect::new(title, selection.options.clone())
                 .with_default(&selection.defaults)
                 .raw_prompt()
-                .map_err(InitError::prompt)?
+                .or_else(InitError::prompt)?
                 .into_iter()
                 .map(|item| item.index)
                 .collect::<Vec<_>>(),

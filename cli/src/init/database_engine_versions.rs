@@ -36,7 +36,7 @@ impl FromStr for PostgresVersions {
             "16" => Ok(Self::Postgres16),
             "17" => Ok(Self::Postgres17),
             "18" => Ok(Self::Postgres18),
-            _ => Err(InitError::unexpected_version(version)),
+            _ => InitError::unexpected_version(version),
         }
     }
 }

@@ -131,21 +131,17 @@ impl Workflow {
             return Outcome::Handled;
         }
         if !context.yes {
-            context.notices.push(Notice::HomeDescription);
+            context.notices.push(Notice::home_description());
         }
         if context.supplied_home {
             if context.home.exists() {
-                context
-                    .notices
-                    .push(Notice::HomeExists(context.home.clone()));
+                context.notices.push(Notice::home_exists(&context.home));
                 Outcome::Transition(State::prepare_versions())
             } else {
                 Outcome::Transition(State::confirm_create())
             }
         } else if context.yes {
-            context
-                .notices
-                .push(Notice::HomeCreating(context.home.clone()));
+            context.notices.push(Notice::home_creating(&context.home));
             Outcome::Transition(State::create_home())
         } else {
             Outcome::Transition(State::edit_home())
@@ -168,7 +164,7 @@ impl Workflow {
             return Outcome::Handled;
         }
         if !context.supplied_home && context.home.exists() {
-            context.notices.push(Notice::HomeAlreadyExists);
+            context.notices.push(Notice::home_already_exists());
         } else if let Err(error) = std::fs::create_dir_all(&context.home) {
             return context.fail(error.into());
         }
@@ -196,7 +192,7 @@ impl Workflow {
         };
         if let Some(error) = error {
             input.clone_into(&mut context.home_input);
-            context.notices.push(Notice::InvalidHome(error));
+            context.notices.push(Notice::invalid_home(error));
             return Outcome::Handled;
         }
         context.home_input.clear();
@@ -212,15 +208,13 @@ impl Workflow {
         }
         match std::fs::create_dir_all(&context.home) {
             Ok(()) => {
-                context
-                    .notices
-                    .push(Notice::HomeCreated(context.home.clone()));
+                context.notices.push(Notice::home_created(&context.home));
                 Outcome::Transition(State::prepare_versions())
             }
             Err(error) => {
                 context
                     .notices
-                    .push(Notice::HomeCreateFailed(context.home.clone(), error));
+                    .push(Notice::home_create_failed(&context.home, error));
                 Outcome::Transition(State::edit_home())
             }
         }
@@ -231,7 +225,7 @@ impl Workflow {
         if *event != Event::Advance {
             return Outcome::Handled;
         }
-        context.notices.push(Notice::VersionsDescription);
+        context.notices.push(Notice::versions_description());
         match context
             .version_args
             .iter()
@@ -253,7 +247,7 @@ impl Workflow {
         };
         if indices.is_empty() && !context.yes {
             context.versions.clear();
-            context.notices.push(Notice::VersionRequired);
+            context.notices.push(Notice::version_required());
             return Outcome::Handled;
         }
         let Some(versions) = indices

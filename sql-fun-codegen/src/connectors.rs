@@ -297,7 +297,11 @@ impl TokioPostgresCodeGenerator {
             let syn::GenericParam::Type(parameter) = parameter else {
                 return None;
             };
-            (parameter.ident == *handler_type).then_some(parameter)
+            if parameter.ident == *handler_type {
+                Some(parameter)
+            } else {
+                None
+            }
         }) else {
             return Err(syn::Error::new_spanned(
                 &handler_arg.ty,
@@ -319,9 +323,11 @@ impl TokioPostgresCodeGenerator {
                         let syn::Type::Path(bounded_type) = &predicate.bounded_ty else {
                             return None;
                         };
-                        (bounded_type.path.get_ident() == Some(handler_type))
-                            .then(|| Self::row_type_from_fn_bounds(&predicate.bounds))
-                            .flatten()
+                        if bounded_type.path.get_ident() == Some(handler_type) {
+                            Self::row_type_from_fn_bounds(&predicate.bounds)
+                        } else {
+                            None
+                        }
                     })
                 })
         });

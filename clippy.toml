@@ -1,0 +1,4 @@
+disallowed-methods = [
+    { path = "bool::then", reason = "Use explicit if/else for readability." },
+    { path = "bool::then_some", reason = "Use explicit if/else for readability." },
+]

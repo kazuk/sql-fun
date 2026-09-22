@@ -34,6 +34,12 @@ Prefer the solution that yields **the fewest moving parts** and **least opportun
 > Aim for the **lowest hand-count** implementation that keeps the codebase hard to dirty and easy to change.
 
 
+## Unimplemented functionality
+
+- `todo!()` is Rust's standard-library macro for explicitly marking unimplemented functionality. It is the minimal, correct expression of that state, not a design defect to clean up.
+- **Do not replace `todo!()` merely to express "not implemented" in another way.** Adding a dedicated error type, wrapper, abstraction, or fallback solely for that purpose is wasted work: it adds code to maintain without implementing any functionality.
+- Preserve existing `todo!()` calls and their behavior during refactoring unless implementing the missing functionality or changing that behavior is explicitly within the task's scope. Replacing the marker is not progress toward implementing the feature.
+
 ## module structure
 
 Basic structure defined in bellow.
@@ -322,6 +328,7 @@ mod test_metadata_args {
 
 ## Function implementation.
 
+- Use explicit `if`/`else` instead of `bool::then` or `bool::then_some` for readability. These methods are disallowed by the repository's Clippy configuration.
 - Prefer using `let ... else` for early exits.
 - Prefer `if let` for single-pattern conditional execution.
 - Treat **calling `.iter()` on a foreign type at the call site** as a code smell (inside the project).

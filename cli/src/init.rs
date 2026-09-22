@@ -1,32 +1,37 @@
 mod database_engine_versions;
-mod prepare_home;
+mod error;
+mod presentation;
+mod prompt;
+mod workflow;
 
-use self::{database_engine_versions::select_engine_version, prepare_home::prepare_home};
+use self::{
+    error::InitError,
+    workflow::{Initialization, Workflow},
+};
 
-use sql_fun_core::{InitializeArgs, SqlFunArgs};
 use std::process::ExitCode;
+
+use ::sql_fun_core::{InitializeArgs, SqlFunArgs};
+use ::statig::blocking::IntoStateMachineExt;
 
 /// `sqlfun init` sub command routine
 pub async fn initialize(
     _args: &SqlFunArgs,
     init_args: &InitializeArgs,
-) -> Result<ExitCode, anyhow::Error> {
-    let yes = init_args.assume_yes();
-
-    if !yes {
-        let banner = include_str!("init/banner.txt");
-        println!("{banner}");
-
-        let message = "Install `sql-fun`?";
-        let install = inquire::Confirm::new(message).prompt()?;
-        if !install {
-            return Ok(ExitCode::FAILURE);
-        }
+) -> Result<ExitCode, InitError> {
+    let mut context = Initialization::from(init_args);
+    let mut machine = Workflow.state_machine();
+    if !init_args.assume_yes() {
+        println!("{}", include_str!("init/banner.txt"));
     }
-    let home_arg = init_args.sql_fun_home();
-    let _home = prepare_home(yes, home_arg.as_ref())?;
-
-    let versions = init_args.engine_versions();
-    let _versions = select_engine_version(yes, versions)?;
+    while let Some(request) = machine.state().request(&context) {
+        let event = request.run()?;
+        machine.handle_with_context(&event, &mut context);
+        context.present();
+    }
+    context.finish()?;
+    if machine.state().is_cancelled() {
+        return Ok(ExitCode::FAILURE);
+    }
     todo!();
 }

@@ -876,7 +876,7 @@ impl ConnectorCodeGenerator for RusqliteCodeGenerator {
             tracing::info!("generated source \n{}", function.to_string());
             Ok(function)
         } else {
-            let function = crate::query_requirements::stub_function(
+            let function = crate::QueryRequirement::emit_stub_function(
                 spec,
                 sig,
                 &TokioPostgresCodeGenerator::source_file(),
@@ -898,7 +898,7 @@ impl ConnectorCodeGenerator for RusqliteCodeGenerator {
             tracing::info!("generated source \n{}", function.to_string());
             Ok(function)
         } else {
-            let function = crate::query_requirements::stub_function(
+            let function = crate::QueryRequirement::emit_stub_function(
                 spec,
                 sig,
                 &TokioPostgresCodeGenerator::source_file(),
@@ -920,7 +920,7 @@ impl ConnectorCodeGenerator for RusqliteCodeGenerator {
             tracing::info!("generated source \n{}", function.to_string());
             Ok(function)
         } else {
-            let function = crate::query_requirements::stub_function(
+            let function = crate::QueryRequirement::emit_stub_function(
                 spec,
                 sig,
                 &TokioPostgresCodeGenerator::source_file(),
@@ -939,7 +939,7 @@ impl ConnectorCodeGenerator for RusqliteCodeGenerator {
             tracing::info!("generated source \n{}", function.to_string());
             Ok(function)
         } else {
-            let function = crate::query_requirements::stub_function(
+            let function = crate::QueryRequirement::emit_stub_function(
                 spec,
                 sig,
                 &TokioPostgresCodeGenerator::source_file(),

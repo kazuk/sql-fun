@@ -108,6 +108,7 @@ pub struct CheckArgs {
     locked: bool,
 
     /// Run without accessing the network
+    #[clap(long, help_heading = Self::MANIFEST_OPTIONS_HEADERS)]
     offline: bool,
 }
 
@@ -221,6 +222,18 @@ impl CheckArgs {
             .iter()
             .find(|d| d.name == "sql-fun")
             .is_some()
+    }
+}
+
+#[cfg(test)]
+mod test_check_args {
+    use super::CheckArgs;
+    use ::clap::Parser;
+
+    #[test]
+    fn offline_is_a_flag_and_check_arguments_are_valid() {
+        let args = CheckArgs::try_parse_from(["check", "--offline"]).unwrap();
+        assert!(args.offline);
     }
 }
 

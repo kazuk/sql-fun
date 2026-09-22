@@ -44,8 +44,12 @@ Install the Rust tools used by project scripts:
 ```sh
 cargo install --locked --force \
   cargo-llvm-cov mdbook cargo-deny tera-cli taplo-cli cargo-nextest \
-  sccache cargo-sort cargo-edit cargo-binstall typos-cli
+  sccache cargo-sort cargo-edit cargo-expand cargo-binstall typos-cli
 ```
+
+`cargo-expand` is a runtime prerequisite of `sql-fun check`, which invokes
+`cargo expand` to read the generated query stubs. Install it before using the
+command and ensure it is available on `PATH`.
 
 Some tools, especially `cargo-deny`, may require a recent stable Rust toolchain
 to install. If installation fails, update stable first and try again.
@@ -178,7 +182,8 @@ List available steps with:
 ```
 
 Some checks require extra tools, such as `cargo-nextest`, `cargo-deny`,
-`cargo-sort`, `cargo-llvm-cov`, `cargo-edit`, `taplo`, `typos`, `jq`, and `graphify`.
+`cargo-sort`, `cargo-llvm-cov`, `cargo-edit`, `cargo-expand`, `taplo`, `typos`,
+`jq`, and `graphify`.
 
 ## Updating Statistics
 

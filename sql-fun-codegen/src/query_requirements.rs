@@ -120,13 +120,13 @@ impl QueryRequirements {
 
     /// Number of unresolved queries.
     #[must_use]
-    pub fn len(&self) -> usize {
+    pub const fn len(&self) -> usize {
         self.0.len()
     }
 
     /// Whether the expanded source contains no unresolved queries.
     #[must_use]
-    pub fn is_empty(&self) -> bool {
+    pub const fn is_empty(&self) -> bool {
         self.0.is_empty()
     }
 
@@ -337,10 +337,10 @@ mod tests {
                 &syn::parse_quote!("src/queries.rs"),
             )
             .unwrap();
-            expand_line(generated).block.as_ref().clone()
+            expand_line(&generated).block.as_ref().clone()
         }
 
-        pub(super) fn expand_line(generated: TokenStream) -> syn::ItemFn {
+        pub(super) fn expand_line(generated: &TokenStream) -> syn::ItemFn {
             // Model the expanded line! literal; panic expansion does not carry
             // protocol data and is deliberately irrelevant to the reader.
             syn::parse_str(&generated.to_string().replace("line ! ()", "42u32")).unwrap()
@@ -624,7 +624,7 @@ mod tests {
             spec.connector_spec.render_query_many(&spec),
             spec.connector_spec.render_execute(&spec),
         ] {
-            let function = test_helpers::expand_line(generated.unwrap());
+            let function = test_helpers::expand_line(&generated.unwrap());
             let requirements = QueryRequirements::extract(&syn::parse_quote!(#function)).unwrap();
             assert_eq!(requirements.len(), 1);
         }

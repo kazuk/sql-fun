@@ -191,7 +191,11 @@ mod test_resolve_column_ref {
         ))?;
         let with = WithClause::default();
         let scope = ScalarAnalysisContext::new(&with, &from);
-        let alias = qualified.then(|| AliasName::from(alias));
+        let alias = if qualified {
+            Some(AliasName::from(alias))
+        } else {
+            None
+        };
         let (expr, context) =
             scope.resolve_column_ref(context, alias.as_ref(), &ColumnName::from(column))?;
         assert_eq!(expr.get_type(), Some(PgBuiltInType::int4()));

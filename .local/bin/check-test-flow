@@ -208,7 +208,7 @@ function run_fmt() {
 
 function run_lint() {
   echo "== Linting"
-  cargo clippy --no-deps --workspace "${FEATURES[@]}"
+  cargo clippy --no-deps --workspace --all-targets "${FEATURES[@]}"
   RUST_LOG=error taplo lint
 }
 

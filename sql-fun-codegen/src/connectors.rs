@@ -185,18 +185,6 @@ impl TokioPostgresCodeGenerator {
         LitStr::new(source_file, proc_macro2::Span::call_site())
     }
 
-    fn parameters(lockfile_entry: &LockfileEntry) -> Vec<TokenStream> {
-        let parameters: Vec<_> = lockfile_entry
-            .bind_parameters()
-            .iter()
-            .map(|p| {
-                let name = Ident::new(p.name(), Span::call_site());
-                quote::quote! { &#name }
-            })
-            .collect();
-        parameters
-    }
-
     fn builder_setter_calls(
         lockfile_entry: &LockfileEntry,
         builder: &crate::row_builder::RowBuilder<'_>,
@@ -351,7 +339,7 @@ impl TokioPostgresCodeGenerator {
         lockfile_entry: &LockfileEntry,
     ) -> TokenStream {
         let query = LitStr::new(lockfile_entry.execute_sql(), Span::call_site());
-        let parameters = Self::parameters(lockfile_entry);
+        let parameters = parameters(&spec.parameter_bindings, lockfile_entry);
         let row_type = spec.row_type();
         let builder = crate::row_builder::RowBuilder::new(&spec.codegen_options);
         let initialize_builder = builder.initialize(row_type);
@@ -367,7 +355,7 @@ impl TokioPostgresCodeGenerator {
                     #[expect(dead_code)]
                     const __SQL_FUN_SOURCE_LINE: u32 = line!();
 
-                    let params = &[#(#parameters),*];
+                    let params: &[&(dyn tokio_postgres::types::ToSql + Sync)] = &[#(#parameters),*];
                     let result = tokio::select! {
                         res = #connection.query_one( #query, params ) => res,
                         interrupt_result = &mut *#interrupt => return Err(interrupt_result)
@@ -389,7 +377,7 @@ impl TokioPostgresCodeGenerator {
                     #[expect(dead_code)]
                     const __SQL_FUN_SOURCE_LINE: u32 = line!();
 
-                    let params = &[#(#parameters),*];
+                    let params: &[&(dyn tokio_postgres::types::ToSql + Sync)] = &[#(#parameters),*];
                     let result = #connection.query_one( #query, params ).await?;
                     #initialize_builder
 
@@ -408,7 +396,7 @@ impl TokioPostgresCodeGenerator {
         lockfile_entry: &LockfileEntry,
     ) -> TokenStream {
         let query = LitStr::new(lockfile_entry.execute_sql(), Span::call_site());
-        let parameters = Self::parameters(lockfile_entry);
+        let parameters = parameters(&spec.parameter_bindings, lockfile_entry);
         let row_type = Self::option_row_type(spec);
         let builder = crate::row_builder::RowBuilder::new(&spec.codegen_options);
         let initialize_builder = builder.initialize(row_type);
@@ -424,7 +412,7 @@ impl TokioPostgresCodeGenerator {
                     #[expect(dead_code)]
                     const __SQL_FUN_SOURCE_LINE: u32 = line!();
 
-                    let params = &[#(#parameters),*];
+                    let params: &[&(dyn tokio_postgres::types::ToSql + Sync)] = &[#(#parameters),*];
                     let result = tokio::select! {
                         res = #connection.query_opt( #query, params ) => res,
                         interrupt_result = &mut *#interrupt => return Err(interrupt_result)
@@ -448,7 +436,7 @@ impl TokioPostgresCodeGenerator {
                     #[expect(dead_code)]
                     const __SQL_FUN_SOURCE_LINE: u32 = line!();
 
-                    let params = &[#(#parameters),*];
+                    let params: &[&(dyn tokio_postgres::types::ToSql + Sync)] = &[#(#parameters),*];
                     let result = #connection.query_opt( #query, params ).await?;
                     let Some(result) = result else {
                         return Ok(None);
@@ -470,7 +458,7 @@ impl TokioPostgresCodeGenerator {
         lockfile_entry: &LockfileEntry,
     ) -> Result<TokenStream, SqlFunCodegenError> {
         let query = LitStr::new(lockfile_entry.execute_sql(), Span::call_site());
-        let parameters = Self::parameters(lockfile_entry);
+        let parameters = parameters(&spec.parameter_bindings, lockfile_entry);
         let (collector, handler, row_type) = Self::query_many_arguments(spec)?;
         let row_type = &row_type;
         let builder = crate::row_builder::RowBuilder::new(&spec.codegen_options);
@@ -545,7 +533,7 @@ impl TokioPostgresCodeGenerator {
         lockfile_entry: &LockfileEntry,
     ) -> TokenStream {
         let query = LitStr::new(lockfile_entry.execute_sql(), Span::call_site());
-        let parameters = Self::parameters(lockfile_entry);
+        let parameters = parameters(&spec.parameter_bindings, lockfile_entry);
         let source_file = Self::source_file();
         if let Some(interrupt) = &spec.interrupt_handler {
             quote::quote! {
@@ -656,5 +644,50 @@ impl ConnectorCodeGenerator for TokioPostgresCodeGenerator {
             tracing::info!("generated source \n{}", function.to_string());
             Ok(function)
         }
+    }
+}
+
+// Rust connector codegen must not parse, rewrite, inspect, or derive bind parameters
+// from SQL text or placeholder syntax. Identity and order come from the lockfile
+// contract, so SQL/query expansion can evolve independently of Rust value sources.
+// execute_sql is only the final SQL literal; bind_parameters is the binding contract.
+fn parameters(
+    bindings: &crate::rust_syn::ParameterBindings,
+    lockfile_entry: &LockfileEntry,
+) -> Vec<TokenStream> {
+    lockfile_entry
+        .bind_parameters()
+        .iter()
+        .map(|parameter| bindings.expression(parameter.name()))
+        .collect()
+}
+
+#[cfg(test)]
+mod test_parameters {
+    use super::parameters;
+    use crate::rust_syn::ItemFunction;
+    use ::sql_fun_core::lockfile::LockfileEntry;
+
+    #[test]
+    fn follows_lockfile_order_without_inspecting_sql() {
+        let function = ItemFunction::new(syn::parse_quote! {
+            fn query(#[parameter_source] dto: Dto, id: i64) {}
+        });
+        let entry: LockfileEntry = toml::from_str(
+            r#"
+            query_finger_print = "fixture"
+            query_name = "query"
+            execute_sql = "opaque SQL with no Rust placeholder syntax"
+            bind_parameters = [
+                { name = "name", parameter_index = 0 },
+                { name = "id", parameter_index = 1 },
+            ]
+            result_set_shape = []
+        "#,
+        )
+        .unwrap();
+        let expressions = parameters(&function.parameter_bindings().unwrap(), &entry);
+        assert_eq!(expressions[0].to_string(), "& dto . name ()");
+        assert_eq!(expressions[1].to_string(), "& id");
     }
 }

@@ -24,7 +24,7 @@ use self::{
     common_options::SqlFunOptions,
     json_value_cache::JsonValueCache,
     lockfile::LockfileProvider,
-    rust_syn::{FunctionArg, ItemFunction},
+    rust_syn::{FunctionArg, ItemFunction, ParameterBindings},
 };
 
 pub use self::error::SqlFunCodegenError;
@@ -249,6 +249,7 @@ impl QueryFunctionKind {
 
 /// query function specifications
 pub struct QueryFunctionSpec {
+    parameter_bindings: ParameterBindings,
     function_kind: QueryFunctionKind,
     connector_spec: ConnectorSpec,
     query: PlaceholderedSql,
@@ -596,6 +597,7 @@ impl FragmentExpandQueueItem {
             };
 
             Ok(InnerFunction::from(QueryFunctionSpec {
+                parameter_bindings: item_fn.parameter_bindings()?,
                 function_kind,
                 query,
                 item_fn,
@@ -727,6 +729,7 @@ where
         kind: QueryFunctionKind,
     ) -> Result<Self, SqlFunCodegenError> {
         let item_fn = ItemFunction::new(item_fn);
+        item_fn.parameter_bindings()?;
         let query_function_name = item_fn.sig_ident();
         tracing::info!("query function name : {query_function_name}");
 

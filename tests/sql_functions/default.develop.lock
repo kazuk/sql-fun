@@ -19,3 +19,23 @@ bind_parameters = [
     { name = "id", parameter_index = 0 },
 ]
 result_set_shape = []
+
+[[entries]]
+query_finger_print = "a882ae058f69c55d01db21d96ce4fc8ec8db89bf1837703132b5d2088ffa12a1"
+query_name = "source_lookup"
+execute_sql = "select id, name from users where id = $1"
+bind_parameters = [{ name = "id", parameter_index = 0 }]
+result_set_shape = [
+    { field_index = 0, field_name = "id", sql_type = "bigint" },
+    { field_index = 1, field_name = "name", sql_type = "text" },
+]
+
+[[entries]]
+query_finger_print = "47285e8e1064caa0fa37f2cf5e707bd08fda49fee297d6be7c78f9b29affe875"
+query_name = "source_insert"
+execute_sql = "insert into users (id, name) values ($1, $2)"
+bind_parameters = [
+    { name = "id", parameter_index = 0 },
+    { name = "name", parameter_index = 1 },
+]
+result_set_shape = []

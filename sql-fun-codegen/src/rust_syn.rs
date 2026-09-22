@@ -1,3 +1,7 @@
+mod parameter_bindings;
+
+pub(crate) use self::parameter_bindings::ParameterBindings;
+
 use proc_macro2::Span;
 use quote::ToTokens;
 use sql_fun_core::{CteAlias, CteCatalogReference, CteName, FragmentName};
@@ -51,10 +55,15 @@ impl ItemFunction {
                     !attr.path().is_ident("interrupt_future")
                         && !attr.path().is_ident("interrupt_channel")
                         && !attr.path().is_ident("cond")
+                        && !attr.path().is_ident("parameter_source")
                 });
             }
         }
         sig
+    }
+
+    pub(crate) fn parameter_bindings(&self) -> Result<ParameterBindings, syn::Error> {
+        ParameterBindings::try_from(&self.0.sig)
     }
 
     pub const fn sig(&self) -> &Signature {
@@ -229,6 +238,57 @@ impl ItemFunction {
 
     pub fn append_arg(&mut self, arg: &FnArg) {
         self.0.sig.inputs.push(arg.clone());
+    }
+}
+
+#[cfg(test)]
+mod test_parameter_sources {
+    use super::ItemFunction;
+
+    #[test]
+    fn retains_attributes_until_emission_and_resolves_final_arguments() {
+        let original = ItemFunction::new(syn::parse_quote! {
+            async fn query(#[parameter_source] dto: Dto, #[allow(unused)] other: bool) {}
+        });
+        let mut child = original.clone();
+        assert_eq!(
+            child
+                .parameter_bindings()
+                .unwrap()
+                .expression("id")
+                .to_string(),
+            "& dto . id ()"
+        );
+        child.append_arg(&syn::parse_quote!(id: i64));
+        assert_eq!(
+            child
+                .parameter_bindings()
+                .unwrap()
+                .expression("id")
+                .to_string(),
+            "& id"
+        );
+        child.remove_arg_by_name(&syn::parse_quote!(dto));
+        assert_eq!(
+            child
+                .parameter_bindings()
+                .unwrap()
+                .expression("name")
+                .to_string(),
+            "& name"
+        );
+        let emitted = original.clone().into_inner();
+        let emitted = quote::quote!(#emitted).to_string();
+        assert!(!emitted.contains("parameter_source"));
+        assert!(emitted.contains("allow"));
+        assert_eq!(
+            original
+                .parameter_bindings()
+                .unwrap()
+                .expression("id")
+                .to_string(),
+            "& dto . id ()"
+        );
     }
 }
 

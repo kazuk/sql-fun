@@ -169,6 +169,7 @@ tracing-subscriber.workspace = true
 
 [dev-dependencies]
 anyhow = { workspace = true }
+bon = "3.10.1"
 derive_builder = { workspace = true }
 futures-util = { workspace = true }
 rstest = { workspace = true }

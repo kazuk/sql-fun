@@ -109,9 +109,9 @@ edge = {
 ## RowType Requirements
 
 - Implement a **`builder` function** that returns a builder instance.
-- Have a builder type that provides **setter methods** for all columns.
-- Implement **`build()`** to construct the final instance.
-- Ensure that the builder type’s error type is compatible with the function’s return error type `E`.
+- Have a builder type that provides **setter methods** for all columns, either mutable or consuming.
+- Implement **`build()`** to construct the final instance, returning either a row or a `Result`.
+- For fallible builders, ensure that the builder error converts into the function’s error type `E`.
 
 The `derive_builder::Builder` crate satisfies most of these requirements. You only need to add a `builder()` method:
 
@@ -130,13 +130,49 @@ impl RowType {
 }
 ```
 
+The default contract is mutable setters and a fallible build. Configure the two
+characteristics independently in datasource metadata:
+
+```toml
+[package.metadata.database.default]
+builder_setter = "consuming"
+builder_build_fallible = false
+```
+
+The accepted setter values are `"mutable"` (the default) and `"consuming"`.
+Mutable setters generate `builder.field(value);` after `let mut builder = Row::builder();`.
+Consuming setters generate `let builder = builder.field(value);` after
+`let builder = Row::builder();`, allowing each setter to change the builder's type.
+The build option independently selects `builder.build()?` (the default, `true`)
+or `builder.build()` (`false`). All four combinations are supported.
+
+Each SQL query function may override either option; omitted options retain the
+selected datasource's values:
+
+```rust
+#[sql_fun::sql_query_one(
+    sql = "select id, name from users",
+    builder_setter = "consuming",
+    builder_build_fallible = false
+)]
+async fn find_user(client: Client) -> Result<User, QueryError> {}
+```
+
+These options apply to `sql_query_one`, `sql_query_opt`, and `sql_query_many`,
+including conditional SQL and interrupt paths. They do not affect `sql_execute`.
+A typical `derive_builder` builder uses mutable/fallible behavior; a typical
+`bon` builder uses consuming/infallible behavior. Generation follows the
+configured contracts, without detecting either library. Setters must accept
+the corresponding SQL column values; configure library-specific setter behavior
+on your row type as needed.
+
 ## Error Type Requirements
 
 The Function returns `Result<IdRow, E>`, where `E` must:
 
 - Implement `From<tokio_postgres::Error>` (for query execution failures).
 - Implement `From<std::io::Error>` (for unexpected column mismatches in the prepare check statement).
-- Be capable of handling any errors returned by the builder type.
+- Be capable of handling errors returned by the builder when `builder_build_fallible = true`.
 
 
 ## Collector Type

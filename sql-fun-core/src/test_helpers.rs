@@ -294,3 +294,14 @@ pub fn write_test_manifest(
         &format!("[package]\nname = '{package_name}'\nversion = '0.1.0'\n"),
     )
 }
+
+pub(crate) fn metadata_with_codegen_options(
+    options: &str,
+) -> Result<crate::SqlFunMetadataCollection, crate::MetadataError> {
+    crate::SqlFunMetadataCollection::from_str(
+        &format!(
+            "[package.metadata.database.default]\nengine = \"PostgreSQL\"\ndialect = \"postgres\"\n{options}"
+        ),
+        "Metadata.toml",
+    )
+}

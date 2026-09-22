@@ -136,6 +136,29 @@ mod test_query_requirement {
             assert_eq!(requirements.len(), 1);
         }
     }
+
+    #[cfg(feature = "sqlite")]
+    #[test]
+    fn rusqlite_query_modes_emit_readable_stubs() {
+        let spec = test_helpers::sqlite_specification();
+        for generated in [
+            spec.connector_spec.render_query_one(&spec),
+            spec.connector_spec.render_query_opt(&spec),
+            spec.connector_spec.render_query_many(&spec),
+            spec.connector_spec.render_execute(&spec),
+        ] {
+            let function = test_helpers::expand_line(&generated.unwrap());
+            let requirements = QueryRequirements::extract(&syn::parse_quote!(#function)).unwrap();
+            assert_eq!(requirements.len(), 1);
+            let requirement = requirements.iter().next().unwrap();
+            assert_eq!(requirement.datasource(), "reporting");
+            assert_eq!(requirement.query(), spec.query.encode());
+            assert_eq!(
+                requirement.cte_catalog().finger_print().unwrap(),
+                spec.resolved_cte_catalog.finger_print().unwrap()
+            );
+        }
+    }
 }
 
 /// Query requirements found in expanded Rust source, in traversal order.

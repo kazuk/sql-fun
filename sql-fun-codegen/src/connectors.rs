@@ -876,7 +876,11 @@ impl ConnectorCodeGenerator for RusqliteCodeGenerator {
             tracing::info!("generated source \n{}", function.to_string());
             Ok(function)
         } else {
-            let function = TokioPostgresCodeGenerator::stub_function(spec, sig)?;
+            let function = crate::query_requirements::stub_function(
+                spec,
+                sig,
+                &TokioPostgresCodeGenerator::source_file(),
+            )?;
             tracing::info!("generated source \n{}", function.to_string());
             Ok(function)
         }
@@ -894,7 +898,11 @@ impl ConnectorCodeGenerator for RusqliteCodeGenerator {
             tracing::info!("generated source \n{}", function.to_string());
             Ok(function)
         } else {
-            let function = TokioPostgresCodeGenerator::stub_function(spec, sig)?;
+            let function = crate::query_requirements::stub_function(
+                spec,
+                sig,
+                &TokioPostgresCodeGenerator::source_file(),
+            )?;
             tracing::info!("generated source \n{}", function.to_string());
             Ok(function)
         }
@@ -912,7 +920,11 @@ impl ConnectorCodeGenerator for RusqliteCodeGenerator {
             tracing::info!("generated source \n{}", function.to_string());
             Ok(function)
         } else {
-            let function = TokioPostgresCodeGenerator::stub_function(spec, sig)?;
+            let function = crate::query_requirements::stub_function(
+                spec,
+                sig,
+                &TokioPostgresCodeGenerator::source_file(),
+            )?;
             tracing::info!("generated source \n{}", function.to_string());
             Ok(function)
         }
@@ -927,7 +939,11 @@ impl ConnectorCodeGenerator for RusqliteCodeGenerator {
             tracing::info!("generated source \n{}", function.to_string());
             Ok(function)
         } else {
-            let function = TokioPostgresCodeGenerator::stub_function(spec, sig)?;
+            let function = crate::query_requirements::stub_function(
+                spec,
+                sig,
+                &TokioPostgresCodeGenerator::source_file(),
+            )?;
             tracing::info!("generated source \n{}", function.to_string());
             Ok(function)
         }

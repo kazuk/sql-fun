@@ -1,9 +1,13 @@
 mod database_engine_versions;
+mod error;
 mod presentation;
 mod prompt;
 mod workflow;
 
-use self::workflow::{Initialization, Workflow};
+use self::{
+    error::InitError,
+    workflow::{Initialization, Workflow},
+};
 
 use std::process::ExitCode;
 
@@ -14,7 +18,7 @@ use ::statig::blocking::IntoStateMachineExt;
 pub async fn initialize(
     _args: &SqlFunArgs,
     init_args: &InitializeArgs,
-) -> Result<ExitCode, anyhow::Error> {
+) -> Result<ExitCode, InitError> {
     let mut context = Initialization::from(init_args);
     let mut machine = Workflow.state_machine();
     if !init_args.assume_yes() {

@@ -94,13 +94,11 @@ fn assumed_yes_returns_creation_failure() {
     let mut scenario = Scenario::with_home(&file.path().join("home"), true);
     scenario.run_automatic();
     assert_eq!(scenario.state(), &State::failed());
+    let error = scenario.context.finish().unwrap_err();
     assert!(
-        scenario
-            .context
-            .finish()
-            .unwrap_err()
-            .downcast_ref::<std::io::Error>()
-            .is_some()
+        std::error::Error::source(&error)
+            .unwrap()
+            .is::<std::io::Error>()
     );
 }
 
@@ -135,7 +133,10 @@ fn rejects_unknown_versions_before_prompting() {
         scenario.accept_install();
         scenario.advance();
         assert_eq!(scenario.state(), &State::failed());
-        assert!(scenario.context.finish().is_err());
+        assert_eq!(
+            scenario.context.finish().unwrap_err().to_string(),
+            "unexpected version 19"
+        );
         assert_eq!(scenario.request(), None);
     }
 }

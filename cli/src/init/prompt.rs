@@ -1,5 +1,7 @@
 //! The terminal boundary depends only on input primitives, never workflow states.
 
+use super::error::InitError;
+
 #[derive(Clone, Debug, PartialEq, Eq)]
 pub enum PromptResponse {
     Confirm(bool),
@@ -114,7 +116,7 @@ impl Input {
         }
     }
 
-    fn run(&self, title: &str) -> Result<PromptResponse, anyhow::Error> {
+    fn run(&self, title: &str) -> Result<PromptResponse, InitError> {
         match self {
             Self::Confirm => Self::run_confirm(title),
             Self::Text(input) => Self::run_text(title, input),
@@ -122,29 +124,30 @@ impl Input {
         }
     }
 
-    fn run_confirm(title: &str) -> Result<PromptResponse, anyhow::Error> {
+    fn run_confirm(title: &str) -> Result<PromptResponse, InitError> {
         Ok(PromptResponse::confirm(
-            inquire::Confirm::new(title).prompt()?,
+            inquire::Confirm::new(title)
+                .prompt()
+                .map_err(InitError::prompt)?,
         ))
     }
 
-    fn run_text(title: &str, input: &TextInput) -> Result<PromptResponse, anyhow::Error> {
+    fn run_text(title: &str, input: &TextInput) -> Result<PromptResponse, InitError> {
         Ok(PromptResponse::text(
             &inquire::Text::new(title)
                 .with_default(&input.default)
                 .with_initial_value(&input.initial)
-                .prompt()?,
+                .prompt()
+                .map_err(InitError::prompt)?,
         ))
     }
 
-    fn run_multi_select(
-        title: &str,
-        selection: &Selection,
-    ) -> Result<PromptResponse, anyhow::Error> {
+    fn run_multi_select(title: &str, selection: &Selection) -> Result<PromptResponse, InitError> {
         Ok(PromptResponse::multi_select(
             &inquire::MultiSelect::new(title, selection.options.clone())
                 .with_default(&selection.defaults)
-                .raw_prompt()?
+                .raw_prompt()
+                .map_err(InitError::prompt)?
                 .into_iter()
                 .map(|item| item.index)
                 .collect::<Vec<_>>(),
@@ -198,7 +201,7 @@ impl PromptRequest {
         self.automatic.as_ref()
     }
 
-    pub fn run(&self) -> Result<PromptResponse, anyhow::Error> {
+    pub fn run(&self) -> Result<PromptResponse, InitError> {
         if let Some(response) = self.automatic_response() {
             return Ok(response.clone());
         }

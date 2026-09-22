@@ -5,6 +5,7 @@ mod tests;
 
 use super::{
     database_engine_versions::PostgresVersions,
+    error::InitError,
     presentation::{HomePathError, Notice},
     prompt::{PromptRequest, PromptResponse},
 };
@@ -23,7 +24,7 @@ pub struct Initialization {
     version_args: Vec<String>,
     versions: Vec<PostgresVersions>,
     notices: Vec<Notice>,
-    error: Option<anyhow::Error>,
+    error: Option<InitError>,
 }
 
 impl From<&InitializeArgs> for Initialization {
@@ -53,14 +54,14 @@ impl Initialization {
         }
     }
 
-    pub fn finish(&mut self) -> Result<(), anyhow::Error> {
+    pub fn finish(&mut self) -> Result<(), InitError> {
         match self.error.take() {
             Some(error) => Err(error),
             None => Ok(()),
         }
     }
 
-    fn fail(&mut self, error: anyhow::Error) -> Outcome<State> {
+    fn fail(&mut self, error: InitError) -> Outcome<State> {
         self.error = Some(error);
         Outcome::Transition(State::failed())
     }
@@ -101,7 +102,7 @@ pub enum Request {
 }
 
 impl Request {
-    pub fn run(&self) -> Result<Event, anyhow::Error> {
+    pub fn run(&self) -> Result<Event, InitError> {
         match self {
             Self::Advance => Ok(Event::Advance),
             Self::Prompt(prompt) => Ok(Event::Answer(prompt.run()?)),
@@ -166,7 +167,7 @@ impl Workflow {
         if !context.supplied_home && context.home.exists() {
             context.notices.push(Notice::home_already_exists());
         } else if let Err(error) = std::fs::create_dir_all(&context.home) {
-            return context.fail(error.into());
+            return context.fail(InitError::io(error));
         }
         Outcome::Transition(State::prepare_versions())
     }

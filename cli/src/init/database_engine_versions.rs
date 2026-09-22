@@ -1,3 +1,5 @@
+use super::error::InitError;
+
 use std::str::FromStr;
 
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
@@ -27,18 +29,14 @@ impl std::fmt::Display for PostgresVersions {
 }
 
 impl FromStr for PostgresVersions {
-    type Err = anyhow::Error;
+    type Err = InitError;
 
     fn from_str(version: &str) -> Result<Self, Self::Err> {
         match version {
             "16" => Ok(Self::Postgres16),
             "17" => Ok(Self::Postgres17),
             "18" => Ok(Self::Postgres18),
-            _ => anyhow::bail!(
-                format!(include_str!("unexpected_version.txt"), version = version)
-                    .trim_end()
-                    .to_owned()
-            ),
+            _ => Err(InitError::unexpected_version(version)),
         }
     }
 }

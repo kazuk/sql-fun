@@ -293,7 +293,7 @@ impl MetadataError {
 }
 
 impl SqlFunMetadata {
-    /// Default code generation options for this datasource.
+    /// Code generation options configured for this datasource.
     #[must_use]
     pub const fn codegen_options(&self) -> &crate::CodegenOptions {
         &self.codegen_options

@@ -277,9 +277,6 @@ visibility, types, and borrowing. If neither a normal argument nor a source is
 available, codegen emits the ordinary `&name` reference as before; rustc reports
 an undefined identifier if necessary.
 
-`#[parameter_source]` is an sql-fun internal parameter attribute. It does not
-remain on the generated Rust function signature, including check-mode stubs.
-
 For conditional SQL, a source remains available whenever its argument remains
 in the generated child function. Match-arm introduced normal arguments take
 precedence over the source. `#[cond]` and `#[parameter_source]` have separate

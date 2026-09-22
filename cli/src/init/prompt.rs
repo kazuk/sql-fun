@@ -116,24 +116,39 @@ impl Input {
 
     fn run(&self, title: &str) -> Result<PromptResponse, anyhow::Error> {
         match self {
-            Self::Confirm => Ok(PromptResponse::confirm(
-                inquire::Confirm::new(title).prompt()?,
-            )),
-            Self::Text(input) => Ok(PromptResponse::text(
-                &inquire::Text::new(title)
-                    .with_default(&input.default)
-                    .with_initial_value(&input.initial)
-                    .prompt()?,
-            )),
-            Self::MultiSelect(selection) => Ok(PromptResponse::multi_select(
-                &inquire::MultiSelect::new(title, selection.options.clone())
-                    .with_default(&selection.defaults)
-                    .raw_prompt()?
-                    .into_iter()
-                    .map(|item| item.index)
-                    .collect::<Vec<_>>(),
-            )),
+            Self::Confirm => Self::run_confirm(title),
+            Self::Text(input) => Self::run_text(title, input),
+            Self::MultiSelect(selection) => Self::run_multi_select(title, selection),
         }
+    }
+
+    fn run_confirm(title: &str) -> Result<PromptResponse, anyhow::Error> {
+        Ok(PromptResponse::confirm(
+            inquire::Confirm::new(title).prompt()?,
+        ))
+    }
+
+    fn run_text(title: &str, input: &TextInput) -> Result<PromptResponse, anyhow::Error> {
+        Ok(PromptResponse::text(
+            &inquire::Text::new(title)
+                .with_default(&input.default)
+                .with_initial_value(&input.initial)
+                .prompt()?,
+        ))
+    }
+
+    fn run_multi_select(
+        title: &str,
+        selection: &Selection,
+    ) -> Result<PromptResponse, anyhow::Error> {
+        Ok(PromptResponse::multi_select(
+            &inquire::MultiSelect::new(title, selection.options.clone())
+                .with_default(&selection.defaults)
+                .raw_prompt()?
+                .into_iter()
+                .map(|item| item.index)
+                .collect::<Vec<_>>(),
+        ))
     }
 }
 

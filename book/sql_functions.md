@@ -258,6 +258,15 @@ Here, `UserDto` provides `id()` and `name()` getters. A normal argument named
 | `#[parameter_source(field_bind = true)]` | `source.name` |
 | `#[parameter_source(field_bind = false)]` | `source.name()` |
 
+Keyword-shaped bind names map to valid Rust members: `${type}` uses
+`source.r#type()` (or `source.r#type` with field binding). Only the four names
+`self`, `Self`, `super`, and `crate` receive a trailing underscore (`_`) for
+both getter and field binding: `self_`, `Self_`, `super_`, and `crate_`.
+For example, `${self}` uses `source.self_()` or `source.self_`, respectively.
+Other names do not receive this suffix. For getter prefixes, this mapping
+is applied after concatenation: `get_` plus `self` calls `source.get_self()`.
+Normal direct arguments retain their original Rust identifiers.
+
 `field_bind = false` is the default and can be combined with `getter_prefix`.
 `field_bind = true` and `getter_prefix` are mutually exclusive, even when the
 prefix is empty. Initially, only one parameter source is supported per query

@@ -1,5 +1,30 @@
-use ::proc_macro2::TokenStream;
+use ::proc_macro2::{Span, TokenStream};
 use ::syn::{Attribute, FnArg, Ident, LitBool, LitStr, Meta, Pat, Signature, ext::IdentExt};
+
+// Lockfile bind names are identifier-shaped. Rust's path keywords cannot be raw identifiers.
+fn rust_member_ident(name: &str, span: Span) -> Ident {
+    match name {
+        "self" | "Self" | "super" | "crate" => Ident::new(&format!("{name}_"), span),
+        _ if syn::parse_str::<Ident>(name).is_ok() => Ident::new(name, span),
+        _ => Ident::new_raw(name, span),
+    }
+}
+
+#[cfg(test)]
+#[rstest::rstest]
+#[case("name", "name")]
+#[case("type", "r#type")]
+#[case("match", "r#match")]
+#[case("self", "self_")]
+#[case("Self", "Self_")]
+#[case("super", "super_")]
+#[case("crate", "crate_")]
+#[case("get_self", "get_self")]
+fn test_rust_member_ident(#[case] name: &str, #[case] expected: &str) {
+    let ident = rust_member_ident(name, Span::call_site());
+    assert_eq!(ident.to_string(), expected);
+    syn::parse2::<syn::Expr>(quote::quote!(dto.#ident)).unwrap();
+}
 
 struct ParameterSource {
     ident: Ident,
@@ -62,9 +87,11 @@ impl ParameterSource {
     fn expression(&self, name: &Ident) -> TokenStream {
         let source = &self.ident;
         if self.field_bind {
-            quote::quote! { &#source.#name }
+            let member = rust_member_ident(&name.unraw().to_string(), name.span());
+            quote::quote! { &#source.#member }
         } else {
-            let getter = quote::format_ident!("{}{}", self.getter_prefix, name);
+            let getter_name = format!("{}{}", self.getter_prefix, name.unraw());
+            let getter = rust_member_ident(&getter_name, name.span());
             quote::quote! { &#source.#getter() }
         }
     }
@@ -138,6 +165,43 @@ impl ParameterBindings {
 #[cfg(test)]
 mod tests {
     use super::ParameterBindings;
+
+    #[rstest::rstest]
+    #[case("type", "r#type")]
+    #[case("match", "r#match")]
+    #[case("self", "self_")]
+    #[case("Self", "Self_")]
+    #[case("super", "super_")]
+    #[case("crate", "crate_")]
+    fn selects_keyword_members(#[case] name: &str, #[case] member: &str) {
+        for (attribute, expected) in [
+            ("parameter_source", format!("& dto . {member} ()")),
+            (
+                "parameter_source(field_bind = true)",
+                format!("& dto . {member}"),
+            ),
+            (
+                "parameter_source(getter_prefix = \"get_\")",
+                format!("& dto . get_{name} ()"),
+            ),
+        ] {
+            let signature =
+                syn::parse_str::<syn::Signature>(&format!("fn query(#[{attribute}] dto: Dto)"))
+                    .unwrap();
+            let expression = ParameterBindings::try_from(&signature)
+                .unwrap()
+                .expression(name);
+            assert_eq!(expression.to_string(), expected);
+            syn::parse2::<syn::Expr>(expression).unwrap();
+        }
+    }
+
+    #[test]
+    fn preserves_direct_raw_argument_precedence() {
+        let signature = syn::parse_quote!(fn query(#[parameter_source] dto: Dto, r#type: i64));
+        let bindings = ParameterBindings::try_from(&signature).unwrap();
+        assert_eq!(bindings.expression("type").to_string(), "& r#type");
+    }
 
     #[rstest::rstest]
     #[case("fn query(name: &str)", "& name")]

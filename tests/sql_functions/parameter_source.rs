@@ -60,3 +60,25 @@ async fn introduced_argument(client: &Client, #[parameter_source] dto: &Dto, #[c
     id => "delete from users where id = ${id}"
 })]
 async fn consumed_source(client: &Client, #[cond] #[parameter_source] dto: i64) -> Result<u64, anyhow::Error> {}
+
+struct KeywordDto {
+    r#type: i64,
+    self_: i64,
+}
+
+impl KeywordDto {
+    fn r#type(&self) -> i64 { self.r#type }
+    fn self_(&self) -> i64 { self.self_ }
+    // Exercise a configured prefix before keyword conversion.
+    fn get_type(&self) -> i64 { self.r#type }
+    fn get_self(&self) -> i64 { self.self_ }
+}
+
+#[sql_fun::sql_statement(sql = "delete from users where id = ${type} + ${self}")]
+async fn keyword_getters(client: &Client, #[parameter_source] dto: &KeywordDto) -> Result<u64, anyhow::Error> {}
+
+#[sql_fun::sql_statement(sql = "delete from users where id = ${type} + ${self}")]
+async fn keyword_fields(client: &Client, #[parameter_source(field_bind = true)] dto: &KeywordDto) -> Result<u64, anyhow::Error> {}
+
+#[sql_fun::sql_statement(sql = "delete from users where id = ${type} + ${self}")]
+async fn keyword_prefix(client: &Client, #[parameter_source(getter_prefix = "get_")] dto: &KeywordDto) -> Result<u64, anyhow::Error> {}

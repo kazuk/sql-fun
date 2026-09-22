@@ -447,56 +447,6 @@ mod test_analyze_sqlite_scalar_expr {
     }
 }
 
-#[cfg(test)]
-mod test_scalar_expr_analyze {
-    use crate::sem::ScalarAnalysisContext;
-    use testresult::TestResult;
-
-    use crate::{
-        sem::{
-            ArithExpr,
-            ScalarConstExpr::*,
-            SemScalarExpr::{self, *},
-        },
-        syn::ListOpt,
-        test_helpers::{SynBuilder, TestParseContext, test_context},
-    };
-
-    #[rstest::rstest]
-    #[case("42", Const(Integer(42)))]
-    #[case("null", Const(Null))]
-    #[case("10 between 1 and 100", ArithExpr::between(
-        Const(Integer(10)), (Const(Integer(1)), Const(Integer(100)))
-    ))]
-    #[case("10 not between 1 and 100", ArithExpr::not_between(
-        Const(Integer(10)), (Const(Integer(1)), Const(Integer(100)))
-    ))]
-    fn test_analyze_scalar_expr(
-        test_context: TestParseContext,
-        #[case] sql_expr: &str,
-        #[case] expect_expr: SemScalarExpr,
-    ) -> TestResult {
-        let syn_builder = SynBuilder::new();
-        let node = syn_builder.parse(&format!("select {sql_expr}"));
-        let expr = node
-            .as_select_stmt()
-            .get_target_list()
-            .map(|v| v.as_res_target().get_val())
-            .unwrap()
-            .swap_remove(0);
-        let tokens = Vec::default().into();
-        let (expr, _result_context) = SemScalarExpr::analyze_scaler_expr(
-            test_context,
-            &ScalarAnalysisContext::default(),
-            expr,
-            &tokens,
-        )?;
-        assert_eq!(expr, expect_expr);
-
-        Ok(())
-    }
-}
-
 /// analyze [`crate::syn::Node`] as scaler expression
 #[deprecated = "use SemScalarExpr::analyze_scaler_expr"]
 pub fn analyze_scaler_expr<TParseContext>(

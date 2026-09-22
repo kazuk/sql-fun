@@ -1,5 +1,20 @@
 # sql-fun Command Line Interface
 
+## Installation
+
+```console
+cargo install sql-fun-cli
+cargo install --locked cargo-expand
+cargo expand --version
+```
+
+`sql-fun check` requires `cargo-expand`. Installing `sql-fun-cli` does not
+install this tool automatically. Ensure Cargo's binary directory is on `PATH`
+in local and CI environments.
+
+See the [installation guide](../book/installation.md) for server installation,
+SQLite feature flags, and project configuration.
+
 
 
 ## `sql-fun` CLI Common arguments and environment variables

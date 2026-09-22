@@ -10,6 +10,7 @@ mod cte_catalog;
 mod error;
 mod json_value_cache;
 mod lockfile;
+mod query_requirements;
 mod row_builder;
 mod rust_syn;
 
@@ -27,6 +28,7 @@ use self::{
 };
 
 pub use self::error::SqlFunCodegenError;
+pub use self::query_requirements::{QueryRequirement, QueryRequirements};
 
 use std::{collections::VecDeque, sync::Arc};
 
@@ -38,7 +40,7 @@ use ::sql_fun_core::{
 use proc_macro2::{Span, TokenStream};
 use proc_macro2_diagnostic::DiagnosticResult;
 use quote::{ToTokens, quote};
-use syn::{Expr, FnArg, Ident, ItemFn, LitStr, Type, visit::Visit};
+use syn::{Expr, FnArg, Ident, ItemFn, Type};
 
 /// diagnostics
 #[derive(Debug)]
@@ -923,135 +925,5 @@ impl QueryFunctionForGenerate {
         tracing::info!("final generated source \n{}", result.to_string());
 
         Ok(result)
-    }
-}
-
-/// Source embeddable SQL Statement string
-#[derive(Debug)]
-pub struct SQLStatement {
-    span: Span,
-    sql_text: String,
-    datasource: String,
-}
-
-impl SQLStatement {
-    /// create instance
-    #[must_use]
-    pub fn new(sql_text: &str, span: &Span, datasource: &str) -> Self {
-        Self {
-            span: *span,
-            sql_text: String::from(sql_text),
-            datasource: String::from(datasource),
-        }
-    }
-
-    /// convert to [`TokenStream`]
-    #[must_use]
-    pub fn into_quote(self) -> TokenStream {
-        let sql_text = LitStr::new(&self.sql_text, self.span);
-        let source_path = LitStr::new(&self.span.file(), self.span);
-        let datasource = LitStr::new(&self.datasource, self.span);
-
-        quote::quote! {
-            #[expect(dead_code)]
-            fn __sql_fun_query_info() {
-                const SQL_TEXT: &str = #sql_text;
-                const SOURCE: &str = #source_path;
-                const DATASOURCE: &str = #datasource;
-            }
-        }
-    }
-
-    const QUERY_INFO_FUN_NAME: &str = "__sql_fun_query_info";
-}
-
-/// Source embedded SQL Statement
-#[derive(Debug)]
-pub struct EncodedSQLStatement {
-    sql_text: LitStr,
-    file: LitStr,
-    datasource: LitStr,
-}
-
-impl EncodedSQLStatement {
-    /// SQL text literal
-    #[must_use]
-    pub const fn sql_text(&self) -> &LitStr {
-        &self.sql_text
-    }
-
-    /// embedded location file
-    #[must_use]
-    pub const fn file(&self) -> &LitStr {
-        &self.file
-    }
-
-    /// specified datasource
-    #[must_use]
-    pub const fn datasource(&self) -> &LitStr {
-        &self.datasource
-    }
-}
-
-/// collect `EncodedSQLStatement` from `syn::File`
-#[derive(Debug, Default)]
-pub struct SQLQueryInfoVisitor {
-    last_lit_str: Option<LitStr>,
-    sql_text: Option<LitStr>,
-    file: Option<LitStr>,
-    datasource: Option<LitStr>,
-    results: Vec<EncodedSQLStatement>,
-}
-
-impl SQLQueryInfoVisitor {
-    /// get SQL statements embedded in source code
-    #[must_use]
-    pub fn sql_statements(file: &syn::File) -> Vec<EncodedSQLStatement> {
-        let mut visitor = Self::default();
-        visitor.visit_file(file);
-        visitor.results
-    }
-}
-
-impl<'ast> Visit<'ast> for SQLQueryInfoVisitor {
-    fn visit_item_fn(&mut self, i: &'ast syn::ItemFn) {
-        if i.sig.ident == SQLStatement::QUERY_INFO_FUN_NAME {
-            self.visit_block(&i.block);
-            if let Some(sql_text) = self.sql_text.clone()
-                && let Some(file) = self.file.clone()
-                && let Some(datasource) = self.datasource.clone()
-            {
-                self.sql_text = None;
-                self.file = None;
-                self.results.push(EncodedSQLStatement {
-                    sql_text,
-                    file,
-                    datasource,
-                });
-            }
-        } else {
-            syn::visit::visit_item_fn(self, i);
-        }
-    }
-
-    fn visit_item_const(&mut self, i: &'ast syn::ItemConst) {
-        if i.ident == "SQL_TEXT" {
-            self.visit_expr(&i.expr);
-            self.sql_text = self.last_lit_str.clone();
-        }
-
-        if i.ident == "SOURCE" {
-            self.visit_expr(&i.expr);
-            self.file = self.last_lit_str.clone();
-        }
-
-        if i.ident == "DATASOUCE" {
-            self.visit_expr(&i.expr);
-            self.datasource = self.last_lit_str.clone();
-        }
-    }
-
-    fn visit_lit_str(&mut self, i: &'ast syn::LitStr) {
-        self.last_lit_str = Some(i.clone());
     }
 }

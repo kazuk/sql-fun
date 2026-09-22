@@ -40,6 +40,12 @@ For other ecosystems, `sql-fun` can be used as a **stand-alone SQL semantic vali
   - Requires **no runtime dependencies** in your application.
   - Compatible with `tokio-postgres`, the primary runtime `sql-fun` targets.
 
+## Installation
+
+See the [installation guide](book/installation.md) for the proc-macro, CLI, and
+server setup. `sql-fun check` also requires `cargo-expand` on `PATH`; it is not
+installed automatically with the CLI.
+
 ## Directory structure
 
 - `src` :

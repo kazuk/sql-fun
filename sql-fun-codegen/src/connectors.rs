@@ -582,35 +582,6 @@ impl TokioPostgresCodeGenerator {
             }
         }
     }
-
-    fn stub_function(
-        spec: &QueryFunctionSpec,
-        sig: &syn::Signature,
-    ) -> Result<TokenStream, SqlFunCodegenError> {
-        let source_file = Self::source_file();
-        let datasource_name = LitStr::new(&spec.datasource_name, Span::call_site());
-        let query = LitStr::new(&spec.query.encode(), Span::call_site());
-        let cte_resolved = serde_json::to_string(&spec.resolved_cte_catalog)?;
-        let cte_resolved = LitStr::new(&cte_resolved, Span::call_site());
-        let function = quote::quote! {
-            #sig
-            {
-                #[expect(dead_code)]
-                const __SQL_FUN_SOURCE_FILE: &str = #source_file;
-                #[expect(dead_code)]
-                const __SQL_FUN_SOURCE_LINE: u32 = line!();
-                #[expect(dead_code)]
-                const __SQL_FUN_DATASOURCE: &str = #datasource_name;
-                #[expect(dead_code)]
-                const __SQL_FUN_QUERY: &str = #query;
-                #[expect(dead_code)]
-                const __SQL_FUN_USING_CTE: &str = #cte_resolved;
-
-                todo!("please re run `sql-fun check`");
-            }
-        };
-        Ok(function)
-    }
 }
 
 impl ConnectorCodeGenerator for TokioPostgresCodeGenerator {
@@ -626,7 +597,8 @@ impl ConnectorCodeGenerator for TokioPostgresCodeGenerator {
             tracing::info!("generated source \n{}", function.to_string());
             Ok(function)
         } else {
-            let function = Self::stub_function(spec, sig)?;
+            let function =
+                crate::QueryRequirement::emit_stub_function(spec, sig, &Self::source_file())?;
             tracing::info!("generated source \n{}", function.to_string());
             Ok(function)
         }
@@ -644,7 +616,8 @@ impl ConnectorCodeGenerator for TokioPostgresCodeGenerator {
             tracing::info!("generated source \n{}", function.to_string());
             Ok(function)
         } else {
-            let function = Self::stub_function(spec, sig)?;
+            let function =
+                crate::QueryRequirement::emit_stub_function(spec, sig, &Self::source_file())?;
             tracing::info!("generated source \n{}", function.to_string());
             Ok(function)
         }
@@ -662,7 +635,8 @@ impl ConnectorCodeGenerator for TokioPostgresCodeGenerator {
             tracing::info!("generated source \n{}", function.to_string());
             Ok(function)
         } else {
-            let function = Self::stub_function(spec, sig)?;
+            let function =
+                crate::QueryRequirement::emit_stub_function(spec, sig, &Self::source_file())?;
             tracing::info!("generated source \n{}", function.to_string());
             Ok(function)
         }
@@ -677,7 +651,8 @@ impl ConnectorCodeGenerator for TokioPostgresCodeGenerator {
             tracing::info!("generated source \n{}", function.to_string());
             Ok(function)
         } else {
-            let function = Self::stub_function(spec, sig)?;
+            let function =
+                crate::QueryRequirement::emit_stub_function(spec, sig, &Self::source_file())?;
             tracing::info!("generated source \n{}", function.to_string());
             Ok(function)
         }

@@ -7,7 +7,7 @@ use std::{
 
 use cargo_metadata::MetadataCommand;
 use sql_fun_core::SqlFunArgs;
-use syn::{File, visit::Visit};
+use syn::File;
 
 /// Checks application embedded SQL statements
 #[derive(clap::Parser, Debug, Clone)]
@@ -108,6 +108,7 @@ pub struct CheckArgs {
     locked: bool,
 
     /// Run without accessing the network
+    #[clap(long, help_heading = Self::MANIFEST_OPTIONS_HEADERS)]
     offline: bool,
 }
 
@@ -181,8 +182,13 @@ impl CheckArgs {
                 .transpose()?,
         );
         let file = cargo_expand_command.exec().await?;
-        let mut visitor = SqlFunVisitor::new();
-        visitor.visit_file(&file);
+        let requirements = sql_fun_codegen::QueryRequirements::extract(&file).map_err(|error| {
+            anyhow::anyhow!("failed to read query requirements for {member}: {error}")
+        })?;
+        log::debug!(
+            "extracted {} query requirements from {member}",
+            requirements.len()
+        );
         Ok(())
     }
 
@@ -219,15 +225,21 @@ impl CheckArgs {
     }
 }
 
-struct SqlFunVisitor {}
+#[cfg(test)]
+#[expect(
+    clippy::items_after_test_module,
+    reason = "Keep tests next to their implementation."
+)]
+mod test_check_args {
+    use super::CheckArgs;
+    use ::clap::Parser;
 
-impl SqlFunVisitor {
-    pub const fn new() -> Self {
-        Self {}
+    #[test]
+    fn offline_is_a_flag_and_check_arguments_are_valid() {
+        let args = CheckArgs::try_parse_from(["check", "--offline"]).unwrap();
+        assert!(args.offline);
     }
 }
-
-impl Visit<'_> for SqlFunVisitor {}
 
 pub struct CargoExpand(tokio::process::Command, std::fs::File);
 
@@ -239,6 +251,7 @@ impl CargoExpand {
         command.stdin(Stdio::null());
         command.stdout(Stdio::from(temp.try_clone()?));
         command.arg("expand");
+        command.env("SQL_FUN_MODE", "CHECK");
         command.args(["--package", package]);
 
         Ok(Self(command, temp))

@@ -8,18 +8,39 @@ pub enum HomePathError {
 }
 
 impl HomePathError {
+    #[track_caller]
+    pub const fn not_absolute<T>() -> Result<T, Self> {
+        Err(Self::NotAbsolute)
+    }
+
+    #[track_caller]
+    pub const fn parent_unavailable<T>() -> Result<T, Self> {
+        Err(Self::ParentUnavailable)
+    }
+
+    #[track_caller]
+    pub fn parent_not_found<T>(path: &Path) -> Result<T, Self> {
+        Err(Self::ParentNotFound(path.to_path_buf()))
+    }
+
     fn show(&self) {
         match self {
-            Self::NotAbsolute => {
-                eprint!("{}", include_str!("absolute_path_required.txt"));
-            }
-            Self::ParentUnavailable => {
-                eprint!("{}", include_str!("parent_unavailable.txt"));
-            }
-            Self::ParentNotFound(path) => {
-                eprint!(include_str!("parent_not_found.txt"), path = path.display());
-            }
+            Self::NotAbsolute => Self::show_not_absolute(),
+            Self::ParentUnavailable => Self::show_parent_unavailable(),
+            Self::ParentNotFound(path) => Self::show_parent_not_found(path),
         }
+    }
+
+    fn show_not_absolute() {
+        eprint!("{}", include_str!("absolute_path_required.txt"));
+    }
+
+    fn show_parent_unavailable() {
+        eprint!("{}", include_str!("parent_unavailable.txt"));
+    }
+
+    fn show_parent_not_found(path: &Path) {
+        eprint!(include_str!("parent_not_found.txt"), path = path.display());
     }
 }
 

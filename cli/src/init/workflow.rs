@@ -178,20 +178,20 @@ impl Workflow {
             return Outcome::Handled;
         };
         let path = PathBuf::from(input);
-        let error = if !path.is_absolute() {
-            Some(HomePathError::NotAbsolute)
+        let validation = if !path.is_absolute() {
+            HomePathError::not_absolute()
         } else if path.exists() {
-            None
+            Ok(())
         } else if let Some(parent) = path.parent() {
             if parent.exists() {
-                None
+                Ok(())
             } else {
-                Some(HomePathError::ParentNotFound(parent.to_path_buf()))
+                HomePathError::parent_not_found(parent)
             }
         } else {
-            Some(HomePathError::ParentUnavailable)
+            HomePathError::parent_unavailable()
         };
-        if let Some(error) = error {
+        if let Err(error) = validation {
             input.clone_into(&mut context.home_input);
             context.notices.push(Notice::invalid_home(error));
             return Outcome::Handled;

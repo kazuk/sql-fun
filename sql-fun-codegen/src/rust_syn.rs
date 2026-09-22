@@ -35,8 +35,26 @@ impl ItemFunction {
         Self(item_fn)
     }
 
-    pub fn into_inner(self) -> ItemFn {
+    pub fn into_inner(mut self) -> ItemFn {
+        self.0.sig = self.codegen_signature();
         self.0
+            .attrs
+            .retain(|attr| !attr.path().is_ident(Self::SQL_FRAGMENT_ATTR));
+        self.0
+    }
+
+    pub fn codegen_signature(&self) -> Signature {
+        let mut sig = self.0.sig.clone();
+        for input in &mut sig.inputs {
+            if let FnArg::Typed(arg) = input {
+                arg.attrs.retain(|attr| {
+                    !attr.path().is_ident("interrupt_future")
+                        && !attr.path().is_ident("interrupt_channel")
+                        && !attr.path().is_ident("cond")
+                });
+            }
+        }
+        sig
     }
 
     pub const fn sig(&self) -> &Signature {
@@ -167,20 +185,13 @@ impl ItemFunction {
             .filter(|a| a.path().is_ident(Self::SQL_FRAGMENT_ATTR))
     }
 
-    pub(crate) fn get_fragment_idents(&self) -> Vec<Ident> {
-        self.0
-            .attrs
-            .iter()
-            .filter_map(|a| {
-                if let Ok(ident) = a.path().require_ident()
-                    && ident == Self::SQL_FRAGMENT_ATTR
-                {
-                    Some(ident.clone())
-                } else {
-                    None
-                }
-            })
-            .collect()
+    pub(crate) fn fragment_idents(&self) -> Result<Vec<Ident>, SqlFunCodegenError> {
+        let mut names = Vec::new();
+        for attr in self.sql_fragment_attrs() {
+            let args: SqlFragmentArgs = attr.parse_args()?;
+            names.push(Ident::new(args.fragment_name().as_str(), attr.span()));
+        }
+        Ok(names)
     }
 
     pub fn get_fragment_spec_attr(

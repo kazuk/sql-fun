@@ -197,19 +197,17 @@ impl TokioPostgresCodeGenerator {
         parameters
     }
 
-    fn builder_setter_calls(lockfile_entry: &LockfileEntry) -> Vec<TokenStream> {
-        let builder_setter_calls: Vec<_> = lockfile_entry
-            .result_set_shape()
-            .iter()
-            .map(|field| {
-                let field_name = Ident::new(field.field_name(), Span::call_site());
-                let field_index = LitInt::new(&field.field_index().to_string(), Span::call_site());
-                quote::quote! {
-                    builder.#field_name( result.try_get(#field_index)? );
-                }
-            })
-            .collect();
-        builder_setter_calls
+    fn builder_setter_calls(
+        lockfile_entry: &LockfileEntry,
+        builder: &crate::row_builder::RowBuilder<'_>,
+    ) -> Vec<TokenStream> {
+        let mut calls = Vec::new();
+        for field in lockfile_entry.result_set_shape() {
+            let name = Ident::new(field.field_name(), Span::call_site());
+            let index = LitInt::new(&field.field_index().to_string(), Span::call_site());
+            calls.push(builder.setter(&name, &quote::quote! { result.try_get(#index)? }));
+        }
+        calls
     }
 
     fn option_row_type(spec: &QueryFunctionSpec) -> &syn::Type {
@@ -355,7 +353,10 @@ impl TokioPostgresCodeGenerator {
         let query = LitStr::new(lockfile_entry.execute_sql(), Span::call_site());
         let parameters = Self::parameters(lockfile_entry);
         let row_type = spec.row_type();
-        let builder_setter_calls = Self::builder_setter_calls(lockfile_entry);
+        let builder = crate::row_builder::RowBuilder::new(&spec.codegen_options);
+        let initialize_builder = builder.initialize(row_type);
+        let build_row = builder.build();
+        let builder_setter_calls = Self::builder_setter_calls(lockfile_entry, &builder);
         let source_file = Self::source_file();
         if let Some(interrupt) = &spec.interrupt_handler {
             quote::quote! {
@@ -369,14 +370,14 @@ impl TokioPostgresCodeGenerator {
                     let params = &[#(#parameters),*];
                     let result = tokio::select! {
                         res = #connection.query_one( #query, params ) => res,
-                        interrupt_result = #interrupt => Err(interrupt_result)
-                    }
+                        interrupt_result = &mut *#interrupt => return Err(interrupt_result)
+                    };
                     let result = result?;
-                    let mut builder = #row_type::builder();
+                    #initialize_builder
 
                     #(#builder_setter_calls)*
 
-                    Ok( builder.build()? )
+                    Ok( #build_row )
                 }
             }
         } else {
@@ -390,11 +391,11 @@ impl TokioPostgresCodeGenerator {
 
                     let params = &[#(#parameters),*];
                     let result = #connection.query_one( #query, params ).await?;
-                    let mut builder = #row_type::builder();
+                    #initialize_builder
 
                     #(#builder_setter_calls)*
 
-                    Ok( builder.build()? )
+                    Ok( #build_row )
                 }
             }
         }
@@ -409,7 +410,10 @@ impl TokioPostgresCodeGenerator {
         let query = LitStr::new(lockfile_entry.execute_sql(), Span::call_site());
         let parameters = Self::parameters(lockfile_entry);
         let row_type = Self::option_row_type(spec);
-        let builder_setter_calls = Self::builder_setter_calls(lockfile_entry);
+        let builder = crate::row_builder::RowBuilder::new(&spec.codegen_options);
+        let initialize_builder = builder.initialize(row_type);
+        let build_row = builder.build();
+        let builder_setter_calls = Self::builder_setter_calls(lockfile_entry, &builder);
         let source_file = Self::source_file();
         if let Some(interrupt) = &spec.interrupt_handler {
             quote::quote! {
@@ -423,16 +427,16 @@ impl TokioPostgresCodeGenerator {
                     let params = &[#(#parameters),*];
                     let result = tokio::select! {
                         res = #connection.query_opt( #query, params ) => res,
-                        interrupt_result = #interrupt => Err(interrupt_result)
+                        interrupt_result = &mut *#interrupt => return Err(interrupt_result)
                     };
                     let Some(result) = result? else {
                         return Ok(None);
                     };
-                    let mut builder = #row_type::builder();
+                    #initialize_builder
 
                     #(#builder_setter_calls)*
 
-                    Ok(Some(builder.build()?))
+                    Ok(Some(#build_row))
                 }
             }
         } else {
@@ -449,11 +453,11 @@ impl TokioPostgresCodeGenerator {
                     let Some(result) = result else {
                         return Ok(None);
                     };
-                    let mut builder = #row_type::builder();
+                    #initialize_builder
 
                     #(#builder_setter_calls)*
 
-                    Ok(Some(builder.build()?))
+                    Ok(Some(#build_row))
                 }
             }
         }
@@ -468,7 +472,11 @@ impl TokioPostgresCodeGenerator {
         let query = LitStr::new(lockfile_entry.execute_sql(), Span::call_site());
         let parameters = Self::parameters(lockfile_entry);
         let (collector, handler, row_type) = Self::query_many_arguments(spec)?;
-        let builder_setter_calls = Self::builder_setter_calls(lockfile_entry);
+        let row_type = &row_type;
+        let builder = crate::row_builder::RowBuilder::new(&spec.codegen_options);
+        let initialize_builder = builder.initialize(row_type);
+        let build_row = builder.build();
+        let builder_setter_calls = Self::builder_setter_calls(lockfile_entry, &builder);
         let source_file = Self::source_file();
         let function = if let Some(interrupt) = &spec.interrupt_handler {
             quote::quote! {
@@ -484,18 +492,18 @@ impl TokioPostgresCodeGenerator {
                     let params: &[&(dyn tokio_postgres::types::ToSql + Sync)] = &[#(#parameters),*];
                     let rows = tokio::select! {
                         res = #connection.query_raw( #query, params.iter().copied() ) => res,
-                        interrupt_result = #interrupt => return Err(interrupt_result)
+                        interrupt_result = &mut *#interrupt => return Err(interrupt_result)
                     }?;
                     let mut rows = std::pin::pin!(rows);
                     while let Some(result) = tokio::select! {
                         res = rows.try_next() => res?,
-                        interrupt_result = #interrupt => return Err(interrupt_result)
+                        interrupt_result = &mut *#interrupt => return Err(interrupt_result)
                     } {
-                        let mut builder = #row_type::builder();
+                        #initialize_builder
 
                         #(#builder_setter_calls)*
 
-                        #collector = #handler(#collector, builder.build()?).await?;
+                        #collector = #handler(#collector, #build_row).await?;
                     }
 
                     Ok(#collector)
@@ -516,11 +524,11 @@ impl TokioPostgresCodeGenerator {
                     let rows = #connection.query_raw( #query, params.iter().copied() ).await?;
                     let mut rows = std::pin::pin!(rows);
                     while let Some(result) = rows.try_next().await? {
-                        let mut builder = #row_type::builder();
+                        #initialize_builder
 
                         #(#builder_setter_calls)*
 
-                        #collector = #handler(#collector, builder.build()?).await?;
+                        #collector = #handler(#collector, #build_row).await?;
                     }
 
                     Ok(#collector)
@@ -611,7 +619,7 @@ impl ConnectorCodeGenerator for TokioPostgresCodeGenerator {
         spec: &QueryFunctionSpec,
     ) -> Result<TokenStream, SqlFunCodegenError> {
         let item_fn = spec.item_fn();
-        let sig = item_fn.sig();
+        let sig = &item_fn.codegen_signature();
         let connection = spec.connection_ident();
         if let Some(lockfile_entry) = spec.lockfile_entry() {
             let function = Self::query_one_function(spec, sig, connection, lockfile_entry);
@@ -629,7 +637,7 @@ impl ConnectorCodeGenerator for TokioPostgresCodeGenerator {
         spec: &QueryFunctionSpec,
     ) -> Result<TokenStream, SqlFunCodegenError> {
         let item_fn = spec.item_fn();
-        let sig = item_fn.sig();
+        let sig = &item_fn.codegen_signature();
         let connection = spec.connection_ident();
         if let Some(lockfile_entry) = spec.lockfile_entry() {
             let function = Self::query_opt_function(spec, sig, connection, lockfile_entry);
@@ -647,7 +655,7 @@ impl ConnectorCodeGenerator for TokioPostgresCodeGenerator {
         spec: &QueryFunctionSpec,
     ) -> Result<TokenStream, SqlFunCodegenError> {
         let item_fn = spec.item_fn();
-        let sig = item_fn.sig();
+        let sig = &item_fn.codegen_signature();
         let connection = spec.connection_ident();
         if let Some(lockfile_entry) = spec.lockfile_entry() {
             let function = Self::query_many_function(spec, sig, connection, lockfile_entry)?;
@@ -662,7 +670,7 @@ impl ConnectorCodeGenerator for TokioPostgresCodeGenerator {
 
     fn render_execute(&self, spec: &QueryFunctionSpec) -> Result<TokenStream, SqlFunCodegenError> {
         let item_fn = spec.item_fn();
-        let sig = item_fn.sig();
+        let sig = &item_fn.codegen_signature();
         let connection = spec.connection_ident();
         if let Some(lockfile_entry) = spec.lockfile_entry() {
             let function = Self::execute_function(spec, sig, connection, lockfile_entry);

@@ -2862,6 +2862,7 @@ name = "sql-fun"
 version = "0.1.0"
 dependencies = [
  "anyhow",
+ "bon",
  "compact_str",
  "derive_builder",
  "futures-util",

@@ -10,6 +10,7 @@ mod cte_catalog;
 mod error;
 mod json_value_cache;
 mod lockfile;
+mod row_builder;
 mod rust_syn;
 
 use crate::{
@@ -29,13 +30,14 @@ pub use self::error::SqlFunCodegenError;
 
 use std::{collections::VecDeque, sync::Arc};
 
+use ::sql_fun_core::{
+    BuilderSetter, CodegenOptions, CteName, PlaceholderedSql, ResolvedCteCatalog, SqlFunArgs,
+    SqlFunMetadata,
+    lockfile::{Lockfile, LockfileEntry},
+};
 use proc_macro2::{Span, TokenStream};
 use proc_macro2_diagnostic::DiagnosticResult;
 use quote::{ToTokens, quote};
-use sql_fun_core::{
-    CteName, PlaceholderedSql, ResolvedCteCatalog, SqlFunArgs, SqlFunMetadata,
-    lockfile::{Lockfile, LockfileEntry},
-};
 use syn::{Expr, FnArg, Ident, ItemFn, LitStr, Type, visit::Visit};
 
 /// diagnostics
@@ -82,9 +84,20 @@ pub struct SqlQueryOptions {
     row_type: Option<Type>,
 
     error_type: Option<Type>,
+    builder_setter: Option<BuilderSetter>,
+    builder_build_fallible: Option<bool>,
 }
 
 impl SqlQueryOptions {
+    const fn apply_codegen_overrides(&self, options: &mut CodegenOptions) {
+        if let Some(setter) = self.builder_setter {
+            options.set_builder_setter(setter);
+        }
+        if let Some(fallible) = self.builder_build_fallible {
+            options.set_builder_build_fallible(fallible);
+        }
+    }
+
     fn parse_macro_attr(input: TokenStream) -> Result<Self, SqlFunCodegenError> {
         Ok(syn::parse2(input)?)
     }
@@ -109,21 +122,102 @@ impl syn::parse::Parse for SqlQueryOptions {
             common_options: SqlFunOptions::default(),
             row_type: None,
             error_type: None,
+            builder_setter: None,
+            builder_build_fallible: None,
         };
         for argument in arguments {
             if options.common_options.set_name_value(&argument) {
                 continue;
             }
-            let ty = syn::parse2(quote::quote!(#argument.value))?;
-            if argument.path.is_ident("row_type") {
-                options.row_type = Some(ty);
+            if argument.path.is_ident("builder_setter") {
+                let value: syn::LitStr = syn::parse2(argument.value.to_token_stream())?;
+                options.builder_setter = Some(value.value().parse().map_err(|error| {
+                    syn::Error::new_spanned(&value, format!("invalid builder_setter: {error}"))
+                })?);
+            } else if argument.path.is_ident("builder_build_fallible") {
+                let value: syn::LitBool = syn::parse2(argument.value.to_token_stream())?;
+                options.builder_build_fallible = Some(value.value());
+            } else if argument.path.is_ident("row_type") {
+                options.row_type = Some(syn::parse2(argument.value.to_token_stream())?);
             } else if argument.path.is_ident("error_type") {
-                options.error_type = Some(ty);
+                options.error_type = Some(syn::parse2(argument.value.to_token_stream())?);
             } else {
                 return Err(syn::Error::new_spanned(argument.path, "unknown field"));
             }
         }
         Ok(options)
+    }
+}
+
+#[cfg(test)]
+mod test_codegen_overrides {
+    use super::SqlQueryOptions;
+    use ::sql_fun_core::CodegenOptions;
+
+    fn resolve(metadata: &CodegenOptions, attrs: &str) -> CodegenOptions {
+        let query: SqlQueryOptions = syn::parse_str(attrs).unwrap();
+        let mut resolved = metadata.clone();
+        query.apply_codegen_overrides(&mut resolved);
+        resolved
+    }
+
+    #[test]
+    fn attributes_support_all_contracts_without_mutating_defaults() {
+        let defaults = CodegenOptions::default();
+        for setter in ["mutable", "consuming"] {
+            for fallible in [true, false] {
+                let resolved = resolve(
+                    &defaults,
+                    &format!("builder_setter = {setter:?}, builder_build_fallible = {fallible}"),
+                );
+                assert_eq!(resolved.builder_setter().is_mutable(), setter == "mutable");
+                assert_eq!(resolved.builder_build_fallible(), fallible);
+            }
+        }
+        let next_function = resolve(&defaults, "");
+        assert!(next_function.builder_setter().is_mutable());
+        assert!(next_function.builder_build_fallible());
+    }
+
+    #[test]
+    fn partial_overrides_preserve_the_other_metadata_value() {
+        for setter in ["mutable", "consuming"] {
+            for fallible in [true, false] {
+                let defaults = resolve(
+                    &CodegenOptions::default(),
+                    &format!("builder_setter = {setter:?}, builder_build_fallible = {fallible}"),
+                );
+                let resolved = resolve(
+                    &defaults,
+                    &format!("builder_build_fallible = {}", !fallible),
+                );
+                assert_eq!(resolved.builder_setter().is_mutable(), setter == "mutable");
+                assert_eq!(resolved.builder_build_fallible(), !fallible);
+                let opposite = if setter == "mutable" {
+                    "consuming"
+                } else {
+                    "mutable"
+                };
+                let resolved = resolve(&defaults, &format!("builder_setter = {opposite:?}"));
+                assert_eq!(
+                    resolved.builder_setter().is_mutable(),
+                    opposite == "mutable"
+                );
+                assert_eq!(resolved.builder_build_fallible(), fallible);
+            }
+        }
+    }
+
+    #[test]
+    fn invalid_attribute_values_are_diagnosed() {
+        for attrs in [
+            r#"builder_setter = "unknown""#,
+            "builder_setter = false",
+            r#"builder_build_fallible = "false""#,
+            "builder_build_fallible = 1",
+        ] {
+            assert!(syn::parse_str::<SqlQueryOptions>(attrs).is_err());
+        }
     }
 }
 
@@ -143,6 +237,14 @@ pub enum QueryFunctionKind {
     Execute,
 }
 
+impl QueryFunctionKind {
+    /// Generate a query returning exactly one row.
+    #[must_use]
+    pub const fn query_one() -> Self {
+        Self::QueryOne
+    }
+}
+
 /// query function specifications
 pub struct QueryFunctionSpec {
     function_kind: QueryFunctionKind,
@@ -155,6 +257,7 @@ pub struct QueryFunctionSpec {
     interrupt_handler: Option<Ident>,
     lockfile_entry: Option<LockfileEntry>,
     datasource_name: String,
+    codegen_options: CodegenOptions,
 }
 
 impl QueryFunctionSpec {
@@ -200,6 +303,7 @@ pub struct FragmentMatcher {
     function_kind: QueryFunctionKind,
     item_fn: ItemFunction,
     match_expr: Expr,
+    child_fn: ItemFunction,
     arms: Vec<FragmentArm>,
 }
 
@@ -222,7 +326,7 @@ impl FragmentMatcher {
     ///
     pub fn render_code(&self) -> Result<TokenStream, SqlFunCodegenError> {
         let is_async = self.item_fn.is_async();
-        let inputs: Vec<_> = self.item_fn.argument_name_idents().cloned().collect();
+        let inputs: Vec<_> = self.child_fn.argument_name_idents().cloned().collect();
 
         let expr = self.match_expr();
         let arms = self.match_arms();
@@ -265,7 +369,7 @@ impl FragmentMatcher {
     ///
     #[tracing::instrument(skip(self))]
     pub fn code_fn(&self) -> Result<TokenStream, SqlFunCodegenError> {
-        let sig = self.item_fn.sig();
+        let sig = self.item_fn.codegen_signature();
         let body = self.render_code()?;
 
         Ok(quote! {
@@ -297,6 +401,25 @@ impl From<FragmentMatcher> for InnerFunction {
 }
 
 impl InnerFunction {
+    #[cfg(test)]
+    fn assert_codegen_options(&self, expected: &CodegenOptions) -> usize {
+        match self {
+            Self::QueryFunction(spec) => {
+                assert_eq!(
+                    spec.codegen_options.builder_setter().is_mutable(),
+                    expected.builder_setter().is_mutable()
+                );
+                assert_eq!(
+                    spec.codegen_options.builder_build_fallible(),
+                    expected.builder_build_fallible()
+                );
+                assert!(spec.lockfile_entry.is_none());
+                1
+            }
+            Self::FragmentMatcher(_) => 0,
+        }
+    }
+
     /// generate code
     ///
     /// # Errors
@@ -307,7 +430,7 @@ impl InnerFunction {
     pub fn render_code(&self) -> Result<TokenStream, SqlFunCodegenError> {
         match self {
             Self::QueryFunction(q) => q.render_code(),
-            Self::FragmentMatcher(f) => f.render_code(),
+            Self::FragmentMatcher(f) => f.code_fn(),
         }
     }
 }
@@ -325,7 +448,7 @@ pub trait ConditionalQuery {
         decoded_query: &PlaceholderedSql,
     ) -> Result<Vec<SqlFragmentArgs>, SqlFunCodegenError> {
         let mut fragment_specs = Vec::new();
-        let mut fragment_idents = item_fn.get_fragment_idents();
+        let mut fragment_idents = item_fn.fragment_idents()?;
         for fragment_name in decoded_query.fragment_names_by_usage_order() {
             let Some(fragment_attr) = item_fn.get_fragment_spec_attr(fragment_name)? else {
                 return SqlFunCodegenError::fragment_spec_not_found(fragment_name);
@@ -381,6 +504,7 @@ pub struct FragmentExpandQueueItem {
     result_type: ResultType,
     lockfile: Option<Arc<Lockfile>>,
     datasource_name: String,
+    codegen_options: CodegenOptions,
 }
 
 impl FragmentExpandQueueItem {
@@ -406,6 +530,7 @@ impl FragmentExpandQueueItem {
         let connection = self.connection;
         let lockfile = self.lockfile;
         let datasource_name = self.datasource_name;
+        let codegen_options = self.codegen_options;
 
         if let Some(fragment) = fragment_specs.pop_front() {
             tracing::info!("processing {fragment:?}");
@@ -439,6 +564,7 @@ impl FragmentExpandQueueItem {
                     result_type: result_type.clone(),
                     lockfile: lockfile.clone(),
                     datasource_name: datasource_name.clone(),
+                    codegen_options: codegen_options.clone(),
                 });
             }
             let match_expr = fragment.match_expr();
@@ -447,6 +573,7 @@ impl FragmentExpandQueueItem {
                 item_fn,
                 arms,
                 match_expr: match_expr.clone(),
+                child_fn,
             };
             Ok(InnerFunction::from(matcher))
         } else {
@@ -477,6 +604,7 @@ impl FragmentExpandQueueItem {
                 lockfile_entry,
                 connector_spec: connector_spec.clone(),
                 datasource_name,
+                codegen_options,
             }))
         }
     }
@@ -506,6 +634,74 @@ impl<T> VecExt<T> for Vec<T> {
 
 impl ConditionalQuery for QueryFunctionForGenerate {}
 impl CteCatalogSupport for QueryFunctionForGenerate {}
+
+#[cfg(test)]
+mod test_codegen_propagation {
+    use ::sql_fun_core::CodegenOptions;
+
+    mod test_helpers {
+        use crate::{
+            ConditionalQuery, FragmentExpandQueueItem, QueryFunctionForGenerate, QueryFunctionKind,
+            ResultType, connectors::ConnectorSpec, cte_catalog::CteCatalogSupport,
+            rust_syn::ItemFunction,
+        };
+        use ::sql_fun_core::{CodegenOptions, PlaceholderedSql, SqlFunMetadata};
+
+        pub(super) fn conditional_query(options: &CodegenOptions) -> Vec<crate::InnerFunction> {
+            let metadata: SqlFunMetadata = toml::from_str(
+                r#"engine = "PostgreSQL"
+dialect = "postgres"
+connector = "tokio-postgres""#,
+            )
+            .unwrap();
+            let item_fn = ItemFunction::new(syn::parse_quote! {
+                #[sql_fragment(choice, choice, (choice), {
+                    true => "select id from users",
+                    false => "select id from users"
+                })]
+                async fn conditional(client: Client, #[cond] choice: bool) -> Result<Row, QueryError> {}
+            });
+            let query = PlaceholderedSql::from_query("#[choice]");
+            let fragments = QueryFunctionForGenerate::fragment_specs(&item_fn, &query).unwrap();
+            let references = QueryFunctionForGenerate::cte_references(&item_fn, &metadata).unwrap();
+            let item = FragmentExpandQueueItem::builder()
+                .function_kind(QueryFunctionKind::query_one())
+                .query(query)
+                .fragment_specs(fragments.into())
+                .item_fn(item_fn)
+                .cte_references(references)
+                .connector_spec(
+                    ConnectorSpec::realize(metadata.sql_dialect(), "tokio-postgres").unwrap(),
+                )
+                .connection(syn::parse_quote!(client))
+                .result_type(ResultType {
+                    return_type: syn::parse_quote!(Row),
+                    error_type: syn::parse_quote!(QueryError),
+                })
+                .datasource_name("default".to_owned())
+                .codegen_options(options.clone())
+                .build();
+            QueryFunctionForGenerate::expand_conditional_query(&metadata, item).unwrap()
+        }
+    }
+
+    #[test]
+    fn conditional_children_keep_resolved_options_in_check_mode() {
+        for setter in ["mutable", "consuming"] {
+            for fallible in [true, false] {
+                let mut options = CodegenOptions::default();
+                options.set_builder_setter(setter.parse().unwrap());
+                options.set_builder_build_fallible(fallible);
+                let children = test_helpers::conditional_query(&options);
+                let mut query_count = 0;
+                for child in children {
+                    query_count += child.assert_codegen_options(&options);
+                }
+                assert_eq!(query_count, 2);
+            }
+        }
+    }
+}
 
 /// code generator macro implementation
 pub trait QueryFunctionBase: CteCatalogSupport + ConditionalQuery
@@ -541,6 +737,8 @@ where
         let Some(metadata) = metadata_collection.get(&datasource_name) else {
             return SqlFunCodegenError::datasource_not_found(&datasource_name);
         };
+        let mut codegen_options = metadata.codegen_options().clone();
+        options.apply_codegen_overrides(&mut codegen_options);
         let connector_spec = Self::connector_spec(metadata, &datasource_name)?;
         item_fn.validate_async(connector_spec.require_async())?;
         let decoded_query = options.common_options.query()?;
@@ -551,6 +749,7 @@ where
 
         let item = if args.is_check_mode() {
             FragmentExpandQueueItem::builder()
+                .codegen_options(codegen_options)
                 .function_kind(kind)
                 .query(decoded_query)
                 .fragment_specs(fragment_specs.into())
@@ -565,6 +764,7 @@ where
             let lockfile = LockfileProvider::load_datasource(args, &datasource_name)?;
             FragmentExpandQueueItem::builder()
                 .lockfile(lockfile)
+                .codegen_options(codegen_options)
                 .function_kind(kind)
                 .query(decoded_query)
                 .fragment_specs(fragment_specs.into())

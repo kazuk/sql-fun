@@ -1,5 +1,8 @@
 //! The private protocol shared by connector stubs and the expanded-source reader.
 
+#[cfg(test)]
+mod test_helpers;
+
 use crate::{QueryFunctionSpec, SqlFunCodegenError};
 
 use ::proc_macro2::{Span, TokenStream};
@@ -14,39 +17,6 @@ const DATASOURCE: &str = "__SQL_FUN_DATASOURCE";
 const QUERY: &str = "__SQL_FUN_QUERY";
 const USING_CTE: &str = "__SQL_FUN_USING_CTE";
 
-pub(crate) fn stub_function(
-    spec: &QueryFunctionSpec,
-    sig: &Signature,
-    source_file: &LitStr,
-) -> Result<TokenStream, SqlFunCodegenError> {
-    let version_marker = Ident::new(VERSION, Span::call_site());
-    let file_marker = Ident::new(SOURCE_FILE, Span::call_site());
-    let line_marker = Ident::new(SOURCE_LINE, Span::call_site());
-    let datasource_marker = Ident::new(DATASOURCE, Span::call_site());
-    let query_marker = Ident::new(QUERY, Span::call_site());
-    let cte_marker = Ident::new(USING_CTE, Span::call_site());
-    let datasource = &spec.datasource_name;
-    let query = spec.query.encode();
-    let cte = serde_json::to_string(&spec.resolved_cte_catalog)?;
-    Ok(quote::quote! {
-        #sig {
-            #[expect(dead_code)]
-            const #version_marker: &str = #CODEGEN_VERSION;
-            #[expect(dead_code)]
-            const #file_marker: &str = #source_file;
-            #[expect(dead_code)]
-            const #line_marker: u32 = line!();
-            #[expect(dead_code)]
-            const #datasource_marker: &str = #datasource;
-            #[expect(dead_code)]
-            const #query_marker: &str = #query;
-            #[expect(dead_code)]
-            const #cte_marker: &str = #cte;
-            todo!("please re run `sql-fun check`");
-        }
-    })
-}
-
 /// A query recovered from an unresolved connector stub.
 #[derive(Debug)]
 pub struct QueryRequirement {
@@ -59,6 +29,39 @@ pub struct QueryRequirement {
 }
 
 impl QueryRequirement {
+    pub(crate) fn emit_stub_function(
+        spec: &QueryFunctionSpec,
+        sig: &Signature,
+        source_file: &LitStr,
+    ) -> Result<TokenStream, SqlFunCodegenError> {
+        let version_marker = Ident::new(VERSION, Span::call_site());
+        let file_marker = Ident::new(SOURCE_FILE, Span::call_site());
+        let line_marker = Ident::new(SOURCE_LINE, Span::call_site());
+        let datasource_marker = Ident::new(DATASOURCE, Span::call_site());
+        let query_marker = Ident::new(QUERY, Span::call_site());
+        let cte_marker = Ident::new(USING_CTE, Span::call_site());
+        let datasource = &spec.datasource_name;
+        let query = spec.query.encode();
+        let cte = serde_json::to_string(&spec.resolved_cte_catalog)?;
+        Ok(quote::quote! {
+            #sig {
+                #[expect(dead_code)]
+                const #version_marker: &str = #CODEGEN_VERSION;
+                #[expect(dead_code)]
+                const #file_marker: &str = #source_file;
+                #[expect(dead_code)]
+                const #line_marker: u32 = line!();
+                #[expect(dead_code)]
+                const #datasource_marker: &str = #datasource;
+                #[expect(dead_code)]
+                const #query_marker: &str = #query;
+                #[expect(dead_code)]
+                const #cte_marker: &str = #cte;
+                todo!("please re run `sql-fun check`");
+            }
+        })
+    }
+
     /// Name of the generated function containing this requirement.
     #[must_use]
     pub fn function_name(&self) -> &str {
@@ -93,6 +96,45 @@ impl QueryRequirement {
     #[must_use]
     pub const fn cte_catalog(&self) -> &ResolvedCteCatalog {
         &self.cte_catalog
+    }
+}
+
+#[cfg(test)]
+mod test_query_requirement {
+    use super::{QueryRequirements, test_helpers};
+
+    #[test]
+    fn generator_round_trip_restores_typed_cte_and_source() {
+        let requirements =
+            QueryRequirements::extract(&test_helpers::source(&test_helpers::expanded_body()))
+                .unwrap();
+        assert_eq!(requirements.len(), 1);
+        let requirement = requirements.iter().next().unwrap();
+        assert_eq!(requirement.function_name(), "lookup");
+        assert_eq!(requirement.source_file(), "src/queries.rs");
+        assert_eq!(requirement.source_line(), 42);
+        assert_eq!(requirement.datasource(), "reporting");
+        let spec = test_helpers::specification();
+        assert_eq!(requirement.query(), spec.query.encode());
+        assert_eq!(
+            requirement.cte_catalog().finger_print().unwrap(),
+            spec.resolved_cte_catalog.finger_print().unwrap()
+        );
+    }
+
+    #[test]
+    fn postgres_query_modes_emit_readable_stubs() {
+        let spec = test_helpers::specification();
+        for generated in [
+            spec.connector_spec.render_query_one(&spec),
+            spec.connector_spec.render_query_opt(&spec),
+            spec.connector_spec.render_query_many(&spec),
+            spec.connector_spec.render_execute(&spec),
+        ] {
+            let function = test_helpers::expand_line(&generated.unwrap());
+            let requirements = QueryRequirements::extract(&syn::parse_quote!(#function)).unwrap();
+            assert_eq!(requirements.len(), 1);
+        }
     }
 }
 
@@ -133,6 +175,51 @@ impl QueryRequirements {
     /// Visit the extracted requirements.
     pub fn iter(&self) -> impl Iterator<Item = &QueryRequirement> {
         self.0.iter()
+    }
+}
+
+#[cfg(test)]
+mod test_query_requirements {
+    use super::{QueryRequirements, test_helpers};
+
+    #[test]
+    fn separate_stubs_keep_their_own_fields() {
+        let first = test_helpers::expanded_body();
+        let mut second = first.clone();
+        test_helpers::replace_marker(
+            &mut second,
+            super::DATASOURCE,
+            quote::quote!(
+                const __SQL_FUN_DATASOURCE: &str = "second";
+            ),
+        );
+        let requirements = QueryRequirements::extract(&syn::parse_quote! {
+            fn first() #first
+            fn second() #second
+        })
+        .unwrap();
+        let datasources: Vec<_> = requirements
+            .iter()
+            .map(super::QueryRequirement::datasource)
+            .collect();
+        assert_eq!(datasources, ["reporting", "second"]);
+    }
+
+    #[test]
+    fn nested_fields_cannot_complete_a_stub_and_partial_results_are_not_returned() {
+        let valid = test_helpers::expanded_body();
+        let mut invalid = valid.clone();
+        test_helpers::replace_marker(&mut invalid, super::DATASOURCE, quote::quote!());
+        invalid.stmts.push(syn::parse_quote!({
+            const __SQL_FUN_DATASOURCE: &str = "nested";
+        }));
+        let file = syn::parse_quote! { fn valid() #valid fn invalid() #invalid };
+        assert!(
+            QueryRequirements::extract(&file)
+                .unwrap_err()
+                .to_string()
+                .contains("missing __SQL_FUN_DATASOURCE")
+        );
     }
 }
 
@@ -234,251 +321,9 @@ impl<'a> StubConstants<'a> {
     }
 }
 
-#[derive(Default)]
-struct RequirementVisitor {
-    requirements: QueryRequirements,
-    error: Option<SqlFunCodegenError>,
-}
-
-impl RequirementVisitor {
-    // A recognized stub cannot contain another generated stub. Stop descending
-    // after reading it, or after any error, but recurse into ordinary functions.
-    fn inspect(&mut self, name: &Ident, block: &Block) -> bool {
-        if self.error.is_some() {
-            return true;
-        }
-        let constants = StubConstants::new(name, block);
-        if !constants.is_stub() {
-            return false;
-        }
-        match constants.read() {
-            Ok(requirement) => self.requirements.0.push(requirement),
-            Err(error) => self.error = Some(error),
-        }
-        true
-    }
-}
-
-impl<'ast> Visit<'ast> for RequirementVisitor {
-    fn visit_item_fn(&mut self, item: &'ast syn::ItemFn) {
-        if !self.inspect(&item.sig.ident, &item.block) {
-            syn::visit::visit_item_fn(self, item);
-        }
-    }
-
-    fn visit_impl_item_fn(&mut self, item: &'ast syn::ImplItemFn) {
-        if !self.inspect(&item.sig.ident, &item.block) {
-            syn::visit::visit_impl_item_fn(self, item);
-        }
-    }
-
-    fn visit_trait_item_fn(&mut self, item: &'ast syn::TraitItemFn) {
-        if let Some(block) = &item.default
-            && self.inspect(&item.sig.ident, block)
-        {
-            return;
-        }
-        syn::visit::visit_trait_item_fn(self, item);
-    }
-}
-
 #[cfg(test)]
-mod tests {
-    use super::{CODEGEN_VERSION, QueryRequirements};
-
-    mod test_helpers {
-        use crate::{
-            QueryFunctionKind, QueryFunctionSpec, ResultType, connectors::ConnectorSpec,
-            rust_syn::ItemFunction,
-        };
-        use ::proc_macro2::TokenStream;
-        use ::sql_fun_core::{CodegenOptions, PlaceholderedSql, ResolvedCteCatalog};
-
-        pub(super) fn specification() -> QueryFunctionSpec {
-            let query = PlaceholderedSql::from_query("select ${id} from users");
-            QueryFunctionSpec {
-                function_kind: QueryFunctionKind::query_one(),
-                connector_spec: ConnectorSpec::realize(
-                    "postgresql".parse().unwrap(),
-                    "tokio-postgres",
-                )
-                .unwrap(),
-                resolved_cte_catalog: resolved_cte(&query),
-                query,
-                item_fn: ItemFunction::new(syn::parse_quote!(
-                    async fn lookup() {}
-                )),
-                connection: syn::parse_quote!(connection),
-                result_type: ResultType {
-                    return_type: syn::parse_quote!(Row),
-                    error_type: syn::parse_quote!(QueryError),
-                },
-                interrupt_handler: None,
-                lockfile_entry: None,
-                datasource_name: "reporting".to_owned(),
-                codegen_options: CodegenOptions::default(),
-            }
-        }
-
-        fn resolved_cte(query: &PlaceholderedSql) -> ResolvedCteCatalog {
-            let mut value = serde_json::to_value(ResolvedCteCatalog::from(query)).unwrap();
-            value["cte_queries"]["active_users"] = serde_json::to_value(
-                PlaceholderedSql::from_query("select id from users where active = true"),
-            )
-            .unwrap();
-            serde_json::from_value(value).unwrap()
-        }
-
-        pub(super) fn expanded_body() -> syn::Block {
-            let spec = specification();
-            let generated = super::super::stub_function(
-                &spec,
-                &syn::parse_quote!(fn lookup()),
-                &syn::parse_quote!("src/queries.rs"),
-            )
-            .unwrap();
-            expand_line(&generated).block.as_ref().clone()
-        }
-
-        pub(super) fn expand_line(generated: &TokenStream) -> syn::ItemFn {
-            // Model the expanded line! literal; panic expansion does not carry
-            // protocol data and is deliberately irrelevant to the reader.
-            syn::parse_str(&generated.to_string().replace("line ! ()", "42u32")).unwrap()
-        }
-
-        pub(super) fn source(body: &syn::Block) -> syn::File {
-            syn::parse_quote!(fn lookup() #body)
-        }
-
-        pub(super) fn replace_marker(body: &mut syn::Block, name: &str, replacement: TokenStream) {
-            let position = body.stmts.iter().position(|statement| {
-                matches!(statement, syn::Stmt::Item(syn::Item::Const(item)) if item.ident == name)
-            }).unwrap();
-            body.stmts.remove(position);
-            if !replacement.is_empty() {
-                body.stmts
-                    .insert(position, syn::parse2(replacement).unwrap());
-            }
-        }
-    }
-
-    #[test]
-    fn generator_round_trip_restores_typed_cte_and_source() {
-        let requirements =
-            QueryRequirements::extract(&test_helpers::source(&test_helpers::expanded_body()))
-                .unwrap();
-        assert_eq!(requirements.len(), 1);
-        let requirement = requirements.iter().next().unwrap();
-        assert_eq!(requirement.function_name(), "lookup");
-        assert_eq!(requirement.source_file(), "src/queries.rs");
-        assert_eq!(requirement.source_line(), 42);
-        assert_eq!(requirement.datasource(), "reporting");
-        let spec = test_helpers::specification();
-        assert_eq!(requirement.query(), spec.query.encode());
-        assert_eq!(
-            requirement.cte_catalog().finger_print().unwrap(),
-            spec.resolved_cte_catalog.finger_print().unwrap()
-        );
-    }
-
-    #[test]
-    fn traverses_all_function_kinds_and_nested_blocks() {
-        let body = test_helpers::expanded_body();
-        let file = syn::parse_quote! {
-            mod outer { mod inner { fn module_query() #body } }
-            fn free_query() #body
-            impl Queries {
-                fn method_query(&self) #body
-                fn ordinary_method(&self) { fn inside_method() #body }
-            }
-            trait QueriesTrait {
-                fn declaration();
-                fn default_query(&self) #body
-                fn ordinary_default(&self) { fn inside_default() #body }
-            }
-            fn outer_function() {
-                fn nested_query() #body
-                let closure = || { if true { fn block_query() #body } };
-                const VALUE: () = { fn const_query() #body };
-            }
-        };
-        let requirements = QueryRequirements::extract(&file).unwrap();
-        let names: Vec<_> = requirements
-            .iter()
-            .map(super::QueryRequirement::function_name)
-            .collect();
-        assert_eq!(
-            names,
-            [
-                "module_query",
-                "free_query",
-                "method_query",
-                "inside_method",
-                "default_query",
-                "inside_default",
-                "nested_query",
-                "block_query",
-                "const_query"
-            ]
-        );
-    }
-
-    #[test]
-    fn partial_markers_without_version_do_not_identify_a_stub() {
-        let body = test_helpers::expanded_body();
-        let file = syn::parse_quote! {
-            fn ordinary() {
-                const __SQL_FUN_QUERY: bool = false;
-                const __SQL_FUN_USING_CTE: &str = "invalid JSON";
-                fn actual_stub() #body
-            }
-            fn resolved() {
-                const __SQL_FUN_SOURCE_FILE: &str = "src/resolved.rs";
-                const __SQL_FUN_SOURCE_LINE: u32 = 1;
-            }
-            fn __sql_fun_query_info() {
-                const SQL_TEXT: &str = "old protocol";
-            }
-        };
-        let requirements = QueryRequirements::extract(&file).unwrap();
-        assert_eq!(requirements.len(), 1);
-        assert_eq!(
-            requirements.iter().next().unwrap().function_name(),
-            "actual_stub"
-        );
-    }
-
-    #[test]
-    fn block_marker_does_not_identify_the_enclosing_function() {
-        let version = CODEGEN_VERSION;
-        let file = syn::parse_quote! {
-            fn ordinary() { { const __SQL_FUN_CODEGEN_VERSION: &str = #version; } }
-        };
-        assert!(QueryRequirements::extract(&file).unwrap().is_empty());
-    }
-
-    #[test]
-    fn separate_stubs_keep_their_own_fields() {
-        let first = test_helpers::expanded_body();
-        let mut second = first.clone();
-        test_helpers::replace_marker(
-            &mut second,
-            super::DATASOURCE,
-            quote::quote!(
-                const __SQL_FUN_DATASOURCE: &str = "second";
-            ),
-        );
-        let requirements = QueryRequirements::extract(&syn::parse_quote! {
-            fn first() #first
-            fn second() #second
-        })
-        .unwrap();
-        let datasources: Vec<_> = requirements
-            .iter()
-            .map(super::QueryRequirement::datasource)
-            .collect();
-        assert_eq!(datasources, ["reporting", "second"]);
-    }
+mod test_stub_constants {
+    use super::{CODEGEN_VERSION, QueryRequirements, test_helpers};
 
     #[test]
     fn missing_and_duplicate_fields_are_errors_after_identification() {
@@ -597,36 +442,133 @@ mod tests {
             assert!(error.contains("incompatible"), "{error}");
         }
     }
+}
+
+#[derive(Default)]
+struct RequirementVisitor {
+    requirements: QueryRequirements,
+    error: Option<SqlFunCodegenError>,
+}
+
+impl RequirementVisitor {
+    // A recognized stub cannot contain another generated stub. Stop descending
+    // after reading it, or after any error, but recurse into ordinary functions.
+    fn inspect(&mut self, name: &Ident, block: &Block) -> bool {
+        if self.error.is_some() {
+            return true;
+        }
+        let constants = StubConstants::new(name, block);
+        if !constants.is_stub() {
+            return false;
+        }
+        match constants.read() {
+            Ok(requirement) => self.requirements.0.push(requirement),
+            Err(error) => self.error = Some(error),
+        }
+        true
+    }
+}
+
+impl<'ast> Visit<'ast> for RequirementVisitor {
+    fn visit_item_fn(&mut self, item: &'ast syn::ItemFn) {
+        if !self.inspect(&item.sig.ident, &item.block) {
+            syn::visit::visit_item_fn(self, item);
+        }
+    }
+
+    fn visit_impl_item_fn(&mut self, item: &'ast syn::ImplItemFn) {
+        if !self.inspect(&item.sig.ident, &item.block) {
+            syn::visit::visit_impl_item_fn(self, item);
+        }
+    }
+
+    fn visit_trait_item_fn(&mut self, item: &'ast syn::TraitItemFn) {
+        if let Some(block) = &item.default
+            && self.inspect(&item.sig.ident, block)
+        {
+            return;
+        }
+        syn::visit::visit_trait_item_fn(self, item);
+    }
+}
+
+#[cfg(test)]
+mod test_requirement_visitor {
+    use super::{CODEGEN_VERSION, QueryRequirements, test_helpers};
 
     #[test]
-    fn nested_fields_cannot_complete_a_stub_and_partial_results_are_not_returned() {
-        let valid = test_helpers::expanded_body();
-        let mut invalid = valid.clone();
-        test_helpers::replace_marker(&mut invalid, super::DATASOURCE, quote::quote!());
-        invalid.stmts.push(syn::parse_quote!({
-            const __SQL_FUN_DATASOURCE: &str = "nested";
-        }));
-        let file = syn::parse_quote! { fn valid() #valid fn invalid() #invalid };
-        assert!(
-            QueryRequirements::extract(&file)
-                .unwrap_err()
-                .to_string()
-                .contains("missing __SQL_FUN_DATASOURCE")
+    fn traverses_all_function_kinds_and_nested_blocks() {
+        let body = test_helpers::expanded_body();
+        let file = syn::parse_quote! {
+            mod outer { mod inner { fn module_query() #body } }
+            fn free_query() #body
+            impl Queries {
+                fn method_query(&self) #body
+                fn ordinary_method(&self) { fn inside_method() #body }
+            }
+            trait QueriesTrait {
+                fn declaration();
+                fn default_query(&self) #body
+                fn ordinary_default(&self) { fn inside_default() #body }
+            }
+            fn outer_function() {
+                fn nested_query() #body
+                let closure = || { if true { fn block_query() #body } };
+                const VALUE: () = { fn const_query() #body };
+            }
+        };
+        let requirements = QueryRequirements::extract(&file).unwrap();
+        let names: Vec<_> = requirements
+            .iter()
+            .map(super::QueryRequirement::function_name)
+            .collect();
+        assert_eq!(
+            names,
+            [
+                "module_query",
+                "free_query",
+                "method_query",
+                "inside_method",
+                "default_query",
+                "inside_default",
+                "nested_query",
+                "block_query",
+                "const_query"
+            ]
         );
     }
 
     #[test]
-    fn postgres_query_modes_emit_readable_stubs() {
-        let spec = test_helpers::specification();
-        for generated in [
-            spec.connector_spec.render_query_one(&spec),
-            spec.connector_spec.render_query_opt(&spec),
-            spec.connector_spec.render_query_many(&spec),
-            spec.connector_spec.render_execute(&spec),
-        ] {
-            let function = test_helpers::expand_line(&generated.unwrap());
-            let requirements = QueryRequirements::extract(&syn::parse_quote!(#function)).unwrap();
-            assert_eq!(requirements.len(), 1);
-        }
+    fn partial_markers_without_version_do_not_identify_a_stub() {
+        let body = test_helpers::expanded_body();
+        let file = syn::parse_quote! {
+            fn ordinary() {
+                const __SQL_FUN_QUERY: bool = false;
+                const __SQL_FUN_USING_CTE: &str = "invalid JSON";
+                fn actual_stub() #body
+            }
+            fn resolved() {
+                const __SQL_FUN_SOURCE_FILE: &str = "src/resolved.rs";
+                const __SQL_FUN_SOURCE_LINE: u32 = 1;
+            }
+            fn __sql_fun_query_info() {
+                const SQL_TEXT: &str = "old protocol";
+            }
+        };
+        let requirements = QueryRequirements::extract(&file).unwrap();
+        assert_eq!(requirements.len(), 1);
+        assert_eq!(
+            requirements.iter().next().unwrap().function_name(),
+            "actual_stub"
+        );
+    }
+
+    #[test]
+    fn block_marker_does_not_identify_the_enclosing_function() {
+        let version = CODEGEN_VERSION;
+        let file = syn::parse_quote! {
+            fn ordinary() { { const __SQL_FUN_CODEGEN_VERSION: &str = #version; } }
+        };
+        assert!(QueryRequirements::extract(&file).unwrap().is_empty());
     }
 }

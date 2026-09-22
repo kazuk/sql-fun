@@ -598,7 +598,7 @@ impl ConnectorCodeGenerator for TokioPostgresCodeGenerator {
             Ok(function)
         } else {
             let function =
-                crate::query_requirements::stub_function(spec, sig, &Self::source_file())?;
+                crate::QueryRequirement::emit_stub_function(spec, sig, &Self::source_file())?;
             tracing::info!("generated source \n{}", function.to_string());
             Ok(function)
         }
@@ -617,7 +617,7 @@ impl ConnectorCodeGenerator for TokioPostgresCodeGenerator {
             Ok(function)
         } else {
             let function =
-                crate::query_requirements::stub_function(spec, sig, &Self::source_file())?;
+                crate::QueryRequirement::emit_stub_function(spec, sig, &Self::source_file())?;
             tracing::info!("generated source \n{}", function.to_string());
             Ok(function)
         }
@@ -636,7 +636,7 @@ impl ConnectorCodeGenerator for TokioPostgresCodeGenerator {
             Ok(function)
         } else {
             let function =
-                crate::query_requirements::stub_function(spec, sig, &Self::source_file())?;
+                crate::QueryRequirement::emit_stub_function(spec, sig, &Self::source_file())?;
             tracing::info!("generated source \n{}", function.to_string());
             Ok(function)
         }
@@ -652,7 +652,7 @@ impl ConnectorCodeGenerator for TokioPostgresCodeGenerator {
             Ok(function)
         } else {
             let function =
-                crate::query_requirements::stub_function(spec, sig, &Self::source_file())?;
+                crate::QueryRequirement::emit_stub_function(spec, sig, &Self::source_file())?;
             tracing::info!("generated source \n{}", function.to_string());
             Ok(function)
         }

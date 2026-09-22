@@ -226,6 +226,10 @@ impl CheckArgs {
 }
 
 #[cfg(test)]
+#[expect(
+    clippy::items_after_test_module,
+    reason = "Keep tests next to their implementation."
+)]
 mod test_check_args {
     use super::CheckArgs;
     use ::clap::Parser;

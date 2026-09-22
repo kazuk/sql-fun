@@ -13,6 +13,13 @@ Check the application embedded queries and prepare to build.
     - When schema cache not found or invalid:
       - uses `sql-fun-server` and schema aware validation in on-demand.
 
+## Prerequisites
+
+Install `cargo-expand` before running `sql-fun check`; the command invokes
+`cargo expand` to read generated query stubs. This is a required runtime tool
+for both PostgreSQL and SQLite. See the [installation guide](../installation.md)
+for installation commands and the `PATH` check.
+
 ## Usage
 
 ### Application development stage

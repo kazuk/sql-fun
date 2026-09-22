@@ -9,14 +9,25 @@
 ```console
 cargo add sql-fun
 cargo install sql-fun-cli sql-fun-server
+cargo install --locked cargo-expand
 ```
 
 ```console
 cargo add sql-fun --features "sqlite"
 cargo install sql-fun-cli sql-fun-server --features "sqlite"
+cargo install --locked cargo-expand
 ```
 
 `sql-fun-cli` for CLI tool for `sql-fun`. `sql-fun-server` provides cache for schema objects.
+
+`sql-fun check` requires `cargo-expand` at runtime to extract queries from expanded
+Rust source. It is required for both PostgreSQL and SQLite and is not installed
+automatically with `sql-fun-cli`. Ensure Cargo's binary directory is on `PATH`
+and verify the installation before running `sql-fun check`:
+
+```console
+cargo expand --version
+```
 
 Specify this in your Cargo.toml as follows:
 

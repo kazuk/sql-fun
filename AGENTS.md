@@ -18,6 +18,11 @@ You can build and run tests using the `check-test-flow` script.
 
 - Run `check-test-flow` and `update-stats` sequentially, never concurrently. Their tests share temporary build directories and can interfere with each other's cleanup.
 
+# External Tool Prerequisites
+
+- When planning work that invokes or depends on an external tool, verify its availability in the development/CI Dockerfile (`ci/github-actions/Dockerfile`), contributor setup instructions (`CONTRIBUTING.md`), user installation documentation, and the current environment.
+- Include any missing tool installation or setup documentation in the implementation plan. Clearly document required runtime tools as prerequisites for the affected CLI feature.
+
 # Language
 
 - English is the official language of the `sql-fun` repository. Use English when creating or updating issues, pull requests, discussions, review comments, and other repository communications, including their titles and bodies.
@@ -32,6 +37,13 @@ You can build and run tests using the `check-test-flow` script.
 # Commits
 
 - Commits must follow the Conventional Commits specification.
+
+# Versioning and Compatibility
+
+- This project does not yet guarantee SemVer compatibility. Packages currently published on crates.io serve primarily as name reservations.
+- During this phase, breaking API changes do not require compatibility shims, deprecated aliases, or version bumps solely for SemVer compliance. Do not request those changes in reviews solely on SemVer grounds.
+- Package version bumps are handled during release operations; do not include them in feature or refactoring pull requests unless explicitly requested.
+- Preserve explicit compatibility checks required by a feature, such as exact codegen version matching.
 
 # Generated Code
 
@@ -57,6 +69,7 @@ Before submitting a pull request, update statistics by running the `update-stats
 # Coding Guidelines and Reviews
 
 - Before implementing or modifying Rust code, including tests, read `docs/internal-rules/rust-coding-guideline.md` and identify the rules that apply to the change.
+- In particular, test placement follows a repository-specific convention. Before adding or moving tests, read and apply the "Test placement" section of that guideline.
 - Before committing or requesting user review, review the diff against those rules and fix any violations. Include test code, constructors, and callers in this review. A successful build or test run does not establish guideline compliance.
 - Existing code is not a justification for repeating a pattern that conflicts with the guidelines. Keep corrections within the scope of the task rather than expanding into unrelated cleanup.
 - Explicit user instructions take precedence over the guidelines. Explain any necessary departure from the guidelines and its reason; do not silently treat a task-specific decision as a repository-wide rule.

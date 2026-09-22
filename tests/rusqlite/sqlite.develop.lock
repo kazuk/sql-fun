@@ -41,3 +41,13 @@ bind_parameters = [
     { name = "name", parameter_index = 1 },
 ]
 result_set_shape = []
+
+[[entries]]
+query_finger_print = "e6c80e1bb658cdf0c7def901b564f964ea2e9612e2052cd9750736ad8721f458"
+query_name = "keyword_members"
+execute_sql = "delete from users where id = ?1 + ?2"
+bind_parameters = [
+    { name = "type", parameter_index = 0 },
+    { name = "self", parameter_index = 1 },
+]
+result_set_shape = []

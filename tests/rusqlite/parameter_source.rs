@@ -71,6 +71,13 @@ pub(super) fn verify() {
     }
     let connection = Connection::open_in_memory().unwrap();
     connection.execute_batch("CREATE TABLE users (id INTEGER, name TEXT);").unwrap();
+    let keyword_dto = KeywordDto { r#type: 1, self_: 2 };
+    insert(&connection, &Dto::new(&3, "keyword getter")).unwrap();
+    assert_eq!(keyword_getters(&connection, &keyword_dto).unwrap(), 1);
+    insert(&connection, &Dto::new(&3, "keyword field")).unwrap();
+    assert_eq!(keyword_fields(&connection, &keyword_dto).unwrap(), 1);
+    insert(&connection, &Dto::new(&3, "keyword prefix")).unwrap();
+    assert_eq!(keyword_prefix(&connection, &keyword_dto).unwrap(), 1);
     let dto = Dto::new(&1, "first");
     assert_eq!(insert(&connection, &dto).unwrap(), 1);
     assert_eq!(lookup(&connection, &dto).unwrap().name, "first");
@@ -98,3 +105,25 @@ pub(super) fn verify() {
     let (_sender, receiver) = mpsc::channel();
     assert_eq!(interrupted(&connection, &dto, Arc::new(Mutex::new(receiver))).unwrap(), 1);
 }
+
+struct KeywordDto {
+    r#type: i64,
+    self_: i64,
+}
+
+impl KeywordDto {
+    fn r#type(&self) -> i64 { self.r#type }
+    fn self_(&self) -> i64 { self.self_ }
+    // Exercise a configured prefix before keyword conversion.
+    fn get_type(&self) -> i64 { self.r#type }
+    fn get_self(&self) -> i64 { self.self_ }
+}
+
+#[sql_fun::sql_statement(datasource = "sqlite", sql = "delete from users where id = ${type} + ${self}")]
+fn keyword_getters(connection: &Connection, #[parameter_source] dto: &KeywordDto) -> Result<usize, anyhow::Error> {}
+
+#[sql_fun::sql_statement(datasource = "sqlite", sql = "delete from users where id = ${type} + ${self}")]
+fn keyword_fields(connection: &Connection, #[parameter_source(field_bind = true)] dto: &KeywordDto) -> Result<usize, anyhow::Error> {}
+
+#[sql_fun::sql_statement(datasource = "sqlite", sql = "delete from users where id = ${type} + ${self}")]
+fn keyword_prefix(connection: &Connection, #[parameter_source(getter_prefix = "get_")] dto: &KeywordDto) -> Result<usize, anyhow::Error> {}

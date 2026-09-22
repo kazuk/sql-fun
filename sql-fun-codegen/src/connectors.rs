@@ -671,17 +671,6 @@ impl RusqliteCodeGenerator {
         Self {}
     }
 
-    fn parameters(lockfile_entry: &LockfileEntry) -> Vec<TokenStream> {
-        lockfile_entry
-            .bind_parameters()
-            .iter()
-            .map(|parameter| {
-                let name = Ident::new(parameter.name(), Span::call_site());
-                quote::quote! { &#name }
-            })
-            .collect()
-    }
-
     fn builder_setter_calls(
         lockfile_entry: &LockfileEntry,
         builder: &crate::row_builder::RowBuilder<'_>,
@@ -760,7 +749,7 @@ impl RusqliteCodeGenerator {
         lockfile_entry: &LockfileEntry,
     ) -> TokenStream {
         let query = LitStr::new(lockfile_entry.execute_sql(), Span::call_site());
-        let parameters = Self::parameters(lockfile_entry);
+        let parameters = parameters(&spec.parameter_bindings, lockfile_entry);
         let row_type = spec.row_type();
         let builder = crate::row_builder::RowBuilder::new(&spec.codegen_options);
         let initialize_builder = builder.initialize(row_type);
@@ -791,7 +780,7 @@ impl RusqliteCodeGenerator {
         lockfile_entry: &LockfileEntry,
     ) -> TokenStream {
         let query = LitStr::new(lockfile_entry.execute_sql(), Span::call_site());
-        let parameters = Self::parameters(lockfile_entry);
+        let parameters = parameters(&spec.parameter_bindings, lockfile_entry);
         let row_type = TokioPostgresCodeGenerator::option_row_type(spec);
         let builder = crate::row_builder::RowBuilder::new(&spec.codegen_options);
         let initialize_builder = builder.initialize(row_type);
@@ -823,7 +812,7 @@ impl RusqliteCodeGenerator {
         lockfile_entry: &LockfileEntry,
     ) -> Result<TokenStream, SqlFunCodegenError> {
         let query = LitStr::new(lockfile_entry.execute_sql(), Span::call_site());
-        let parameters = Self::parameters(lockfile_entry);
+        let parameters = parameters(&spec.parameter_bindings, lockfile_entry);
         let (collector, handler, row_type) =
             TokioPostgresCodeGenerator::query_many_arguments(spec)?;
         let row_type = &row_type;
@@ -852,7 +841,7 @@ impl RusqliteCodeGenerator {
         lockfile_entry: &LockfileEntry,
     ) -> TokenStream {
         let query = LitStr::new(lockfile_entry.execute_sql(), Span::call_site());
-        let parameters = Self::parameters(lockfile_entry);
+        let parameters = parameters(&spec.parameter_bindings, lockfile_entry);
         let query_body = quote::quote! {
             let params: &[&dyn ::rusqlite::ToSql] = &[#(#parameters),*];
             let result = #connection.execute(#query, params)?;

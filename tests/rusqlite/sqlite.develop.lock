@@ -31,3 +31,13 @@ bind_parameters = [
     { name = "id", parameter_index = 0 },
 ]
 result_set_shape = []
+
+[[entries]]
+query_finger_print = "47285e8e1064caa0fa37f2cf5e707bd08fda49fee297d6be7c78f9b29affe875"
+query_name = "source_insert"
+execute_sql = "insert into users (id, name) values (?1, ?2)"
+bind_parameters = [
+    { name = "id", parameter_index = 0 },
+    { name = "name", parameter_index = 1 },
+]
+result_set_shape = []

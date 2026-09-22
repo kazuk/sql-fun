@@ -196,9 +196,18 @@ mod test_metadata_args {
 
 ## Enum definitions
 
+- **Provide per-variant constructors**, and use them to create values outside the type's implementation
+  instead of constructing variants directly. Keep constructor signatures focused on semantic inputs,
+  rather than requiring callers to construct internal payload types.
+  - The purpose is to keep callers independent of the internal representation, not merely to
+    standardize construction syntax. For example, changing `enum SomeWhat` into
+    `struct SomeWhat(SomeWhatPayload)` should not require rewriting callers if its constructors
+    and methods retain the same interface.
 - Having a `match` on an `enum` outside of the `enum` itself is a **code smell**.  
-  Whenever possible, logic depending on enum variants should be encapsulated within methods 
-  or trait implementations defined for the enum.
+  Whenever possible, logic depending on enum variants should be encapsulated within methods
+  or trait implementations defined for the enum. This also applies to variant destructuring with
+  `if let`, `let ... else`, and `matches!`: constructors alone do not isolate callers if they still
+  depend on variants when reading values. Prefer methods that express the caller's intent.
 - Variant definition
   - `struct` variant is prohibited. replace with tuple struct variant.  
     Do NOT!
@@ -217,9 +226,10 @@ mod test_metadata_args {
     - Rationale: struct variants tend to make **consumer-side `match` blocks messy**.  
         They expose field names and layout at every call site, encourage ad-hoc
         deconstruction across the codebase, and turn minor field changes into
-        widespread, breaking edits. Using a newtype variant keeps the enum concise,
-        centralizes behavior on a dedicated struct, and lets consumers match only on
-        the variant **name** (not its internal shape).
+        widespread, breaking edits. Using a newtype variant keeps the enum concise
+        and centralizes payload behavior on a dedicated struct. It simplifies dispatch
+        inside the enum's implementation; it is not a reason to expose variant matching
+        to callers. Use constructors and methods at the call site.
 
         Messy with a struct variant:
         ```rust
@@ -234,7 +244,7 @@ mod test_metadata_args {
         }
         ```
 
-        Cleaner with a newtype variant:
+        Keep construction and variant dispatch inside the type:
         ```rust
         struct NameAndVersion { name: String, version: String }
 
@@ -247,12 +257,30 @@ mod test_metadata_args {
             NameAndVersion(NameAndVersion),
         }
 
-        match v {
-            SomeWhat::NameAndVersion(nv) => {
-                // call methods, internal layout stays encapsulated
-                let _ = (nv.name(), nv.version());
+        impl SomeWhat {
+            pub fn name_and_version(name: &str, version: &str) -> Self {
+                Self::NameAndVersion(NameAndVersion {
+                    name: name.to_owned(),
+                    version: version.to_owned(),
+                })
+            }
+
+            pub fn name(&self) -> &str {
+                match self {
+                    Self::NameAndVersion(value) => value.name(),
+                }
+            }
+
+            pub fn version(&self) -> &str {
+                match self {
+                    Self::NameAndVersion(value) => value.version(),
+                }
             }
         }
+
+        // Callers depend on the interface, not the variants or payload layout.
+        let value = SomeWhat::name_and_version("example", "1.0");
+        let _ = (value.name(), value.version());
         ```
 - Error enums
   - SHOULD take parameters by reference.  

@@ -8,10 +8,9 @@ cargo install --locked cargo-expand
 cargo expand --version
 ```
 
-`cargo-expand` is a required runtime dependency of `sql-fun check`. The CLI
-invokes `cargo expand` to extract queries from generated Rust source; installing
-`sql-fun-cli` does not install this tool automatically. Ensure Cargo's binary
-directory is on `PATH` in local and CI environments.
+`sql-fun check` requires `cargo-expand`. Installing `sql-fun-cli` does not
+install this tool automatically. Ensure Cargo's binary directory is on `PATH`
+in local and CI environments.
 
 See the [installation guide](../book/installation.md) for server installation,
 SQLite feature flags, and project configuration.

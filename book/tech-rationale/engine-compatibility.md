@@ -2,10 +2,25 @@
 
 ## Context and Rationale
 
-`sql-fun` supports only PostgreSQL because `pg_query` is, as of today, the only available library that offers a 100% engine-compatible SQL parser — one that reflects the engine's actual understanding of SQL, down to every operator and clause.
+`sql-fun` requires a 100% engine-compatible SQL parser as a prerequisite for
+supporting a database engine. Applications must be able to use the engine's SQL
+syntax, including its extensions, rather than a subset chosen by a generic parser.
 
-This is not an endorsement of PostgreSQL; it is simply a practical constraint.  
-Should another database vendor provide a similarly complete and accurate parser as a library, `sql-fun` would support it — by analyzing its AST and generating code targeting that engine’s standard connector.
+The parser choices are:
+
+- **PostgreSQL:** [`pg_query`](https://docs.rs/crate/pg_query/6.2.0) uses the actual
+  PostgreSQL server source and returns its parse tree. This preserves full syntax
+  acceptance for the PostgreSQL version represented by the parser, including
+  engine-specific tuning options.
+- **SQLite:** [`turso_parser`](https://github.com/tursodatabase/turso/tree/v0.6.1/parser)
+  is the parser used by Turso. We select it for SQLite under the same requirement
+  of full engine compatibility; valid SQLite syntax is not out of scope merely
+  because an application rarely uses it.
+
+Parser compatibility and `sql-fun`'s own analysis are separate concerns. An
+engine-compatible parser does not mean that every analysis or code generation
+feature in `sql-fun` is already implemented. SQLite support is under development
+and requires the `sqlite` feature.
 
 This design choice is rooted in a simple but unavoidable reality:  
 in production environments, performance tuning and operational control almost always require engine-specific syntax.  
@@ -25,8 +40,9 @@ The SQL extensions introduced by database engines — often viewed as deviations
 
 ## Design Commitment and Practical Conclusions
 
-Moreover, because the SQL parser is derived directly from the database engine itself,  
-`sql-fun` is, by design, capable of accepting all engine-specific tuning options — not just in theory, but by construction.
+For PostgreSQL, the parser is derived directly from the database engine itself,
+so full syntax acceptance includes engine-specific tuning options by construction.
+For SQLite, full engine compatibility is likewise the parser selection requirement.
 
 Rather than resisting these extensions, `sql-fun` accepts them as an unavoidable part of working with production-grade systems.
 

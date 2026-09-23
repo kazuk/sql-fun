@@ -240,12 +240,10 @@ jobs:
         run: .local/bin/check-test-flow --step=typos
 
       - name: Validate skills
-        run: |
-          skill-validator check --strict --emit-annotations .codex
+        run: .local/bin/check-test-flow --step=skill-lint
 
       - name: Lint Markdown
-        run: |
-          rumdl check .
+        run: .local/bin/check-test-flow --step=markdown-lint
 
   server-api-spec:
     runs-on: ubuntu-24.04

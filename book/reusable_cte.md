@@ -15,13 +15,16 @@ Multiple CTE catalog file in CTE catalog directory are combined the CTE Catalog.
 
 CTE catalog file must have extension `json`, `toml`, `yaml`.
 
-CTE catalog file must have key `sql_fun_cte_catalog_format_version` and `sql_dialect`, See [CTE Catalog file format](.#cte_catalog_file_format).
+CTE catalog file must have key `sql_fun_cte_catalog_format_version` and
+`sql_dialect`, See [CTE Catalog file format](#cte-catalog-file-format).
 
-All CTE catalog file combined in single CTE catalog, you can reuse CTE catalog entry in CTE files.
+All CTE catalog file combined in single CTE catalog, you can reuse CTE catalog
+entry in CTE files.
 
 ### CTE Catalog file format
 
-CTE catalog file is a JSON like file format. JSON, TOML, YAML are valid CTE catalog file.
+CTE catalog file is a JSON like file format. JSON, TOML, YAML are valid CTE
+catalog file.
 
 Can be mix a JSON, TOML, YAML in CTE catalog.
 
@@ -62,15 +65,19 @@ select o.* from orders o where o.deliver_at is not null
 
 - `sql_fun_cte_catalog_format_version` string : valid value is "1".
 - `sql_dialect` string: valid value is "PostgreSQL" or "SQLite".
-  - PostgreSQL can accept DML as a CTE, then `insert`, `update`, `delete` are valid CTE catalog entry.
-  - SQLite can not accept DML as a CTE, then only `select` are valid CTE catalog entry.
-- `datasource` optional string: CTE catalog activate in specified database. 
+  - PostgreSQL can accept DML as a CTE, then `insert`, `update`, `delete` are
+    valid CTE catalog entry.
+  - SQLite can not accept DML as a CTE, then only `select` are valid CTE catalog
+    entry.
+- `datasource` optional string: CTE catalog activate in specified database.
   - When omitted: CTE catalog activate in default datasource.
 - `cte` hash: CTE name to CTE object hash
   - `query` string: `sql-fun` s SQL text. Place-holders like a `${name}`.
-  - `recursive` optional bool: Require `with recurcive` to use this CTE catalog entry.
+  - `recursive` optional bool: Require `with recurcive` to use this CTE catalog
+    entry.
   - `with` optional hash string to string: reuse other query from CTE catalogs.
-    - key is a CTE name. value is a alias name using in query. See [Nested CTE catalog expansion](.#nested_cte_catalog_expansion)
+    - key is a CTE name. value is a alias name using in query. See
+      [Nested CTE catalog expansion](#nested-cte-catalog-expansion)
   - `renames`: optional hash string to rename target.
     - key is a new name. value is array of rename target place holder.
 
@@ -104,13 +111,15 @@ select ...
   from prior_users pu
 ```
 
-When conflict alias, `sql-fun` automatically rename alias with `_NN` postfix and resolve conflicts.
+When conflict alias, `sql-fun` automatically rename alias with `_NN` postfix and
+resolve conflicts.
 
 ### Renaming named place holder in CTE
 
 CTE query can contains `sql-fun` named place holder like `${name}` syntax.
 
-Named place holder shown in final query in default. `renames` override this behavior.
+Named place holder shown in final query in default. `renames` override this
+behavior.
 
 Example: rename `id` place holder in select_user_by_id with `user_id`.
 
@@ -138,7 +147,8 @@ renames = {
 }
 ```
 
-when renames has multiple place-holder target, all target place holder renamed in one place holder name.
+when renames has multiple place-holder target, all target place holder renamed
+in one place holder name.
 
 `renames` must not conflict in all CTE entry in CTE expansion.
 
@@ -160,6 +170,8 @@ Example: Using CTE catalog entry `select_active_users`
 $ sql-fun cte expand \
   --with select_active_users active_users \
   `select id, name from active_users`
-with active_users as (select u.id, u.name from users u where u.deleted_at is not null)
+with active_users as (
+  select u.id, u.name from users u where u.deleted_at is not null
+)
 select id, name from active_users
 ```

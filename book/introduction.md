@@ -4,12 +4,12 @@
 
 It assumes that you **can write SQL and want to write SQL**.
 
-It doesn't try to hide SQL behind abstractions or pretend it knows better than your database.
-It just makes **Rust and SQL fit together**, cleanly, safely, and enjoyably.
+It doesn't try to hide SQL behind abstractions or pretend it knows better than
+your database. It just makes **Rust and SQL fit together**, cleanly, safely, and
+enjoyably.
 
 If you're looking for an ORM: this isn't it.  
 If you're writing raw SQL and wish Rust could help more: this is it.
-
 
 ## What is `sql-fun`
 
@@ -25,25 +25,30 @@ If you're writing raw SQL and wish Rust could help more: this is it.
   - `SQLite` dialect
     - SQL is parsed using `turso_parser`, a full `SQLite` parser.
 - It does not try to model your entire database schema.
-  - Instead, it focuses only on what your application actually *does*—the SQL queries it runs.
+  - Instead, it focuses only on what your application actually *does*—the SQL
+    queries it runs.
   - This keeps the tool lightweight, focused, and reliable.
-- It generates code compatible with `tokio-postgres` or `rusqlite`, the primary runtime `sql-fun` targets.
+- It generates code compatible with `tokio-postgres` or `rusqlite`, the primary
+  runtime `sql-fun` targets.
 
-![sql-fun dataflow](./dataflow.svg)
+![sql-fun dataflow](./datafrow.svg)
 
 ## Schema-aware validation
 
-Just place a schema dump file (e.g., `schema.develop.sql`) in the same folder as your Cargo.toml.
+Just place a schema dump file (e.g., `schema.develop.sql`) in the same folder as
+your Cargo.toml.
 
 ```console
 pg_dump ... -s > schema.develop.sql
 ```
 
-`sql-fun` will validate your SQL against the schema—ensuring all referenced tables and columns actually exist.
+`sql-fun` will validate your SQL against the schema—ensuring all referenced
+tables and columns actually exist.
 
 If you use multiple schemas (e.g., dev vs prod),
 
-you can switch between them by setting the `SQL_FUN_SCHEMA` environment variable.
+you can switch between them by setting the `SQL_FUN_SCHEMA` environment
+variable.
 
 For example:
 
@@ -57,14 +62,18 @@ will use schema.prod.sql instead.
 
 `sql-fun` support query reuse as CTE.
 
-### Reuse a query function as CTE.
- 
+### Reuse a query function as CTE
+
 When `cte_name` references function name, function's query copies as CTE.
 
 ```rust
 /// example query function definition
-#[sql_fun::sql_query_many(sql="select u.id, u.name from users u where u.is_active=TRUE ")]
-async fn select_all_active_users(client: &Client, collector: Collector, handler: Handler) 
+#[sql_fun::sql_query_many(
+    sql="select u.id, u.name from users u where u.is_active=TRUE "
+)]
+async fn select_all_active_users(
+    client: &Client, collector: Collector, handler: Handler,
+)
   -> Result<Vec<User>,Error>
 {
 }
@@ -82,7 +91,8 @@ async fn select_active_user_by_id( ... ) -> Result<User, Error>
 
 ### Reusable query definition in CTE catalog
 
-CTE catalog is a TOML file, CTE definition is a toml table `[cte."key"]`. with `query` value.
+CTE catalog is a TOML file, CTE definition is a toml table `[cte."key"]`. with
+`query` value.
 
 ```toml
 sql_fun_cte_catalog_format_version="1"
@@ -101,7 +111,9 @@ select u.id, u.name from users u where u.is_active=TRUE
 Given this example Rust code:
 
 ```rust
-#[sql_fun::sql_query_one(sql="insert into users (name) values (${name}) returning id")]
+#[sql_fun::sql_query_one(
+    sql="insert into users (name) values (${name}) returning id"
+)]
 async fn insert_user(client: &Client, name: &str ) 
   -> Result<IdRow, ApplicationError> {};
 
@@ -113,14 +125,17 @@ async fn select_user_by_id(client: &Client, id: i64 )
 async fn find_user_by_name(client: &Client, name: &str ) 
   -> Result<Option<UserRow>, ApplicationError> {};
 
-#[sql_fun::sql_query_opt(sql="delete from users u where id=${name} returning u.id")]
+#[sql_fun::sql_query_opt(
+    sql="delete from users u where id=${name} returning u.id"
+)]
 async fn delete_user_by_id(client: &Client, id: i64 ) 
   -> Result<Option<IdRow>, ApplicationError> {};
 ```
 
 `sql-fun` will generate a `sql-fun.develop.toml` file like this:
 
-(The `develop` part of the filename is determined by the `SQL_FUN_SCHEMA` environment variable.)
+(The `develop` part of the filename is determined by the `SQL_FUN_SCHEMA`
+environment variable.)
 
 ```toml
 [table.users]
@@ -167,12 +182,17 @@ deletes=["users"]
 
 ```
 
-You can convert this TOML to JSON and process it with `jq` or other tools to generate documentation or reports for your SQL usage automatically.
+You can convert this TOML to JSON and process it with `jq` or other tools to
+generate documentation or reports for your SQL usage automatically.
 
-Each `[queries.*]` section includes the exact SQL string that will be sent to PostgreSQL.
+Each `[queries.*]` section includes the exact SQL string that will be sent to
+PostgreSQL.
 
-Unlike many ORMs, `sql-fun` makes it clear exactly what SQL will be executed—no hidden queries, no surprises.
+Unlike many ORMs, `sql-fun` makes it clear exactly what SQL will be executed—no
+hidden queries, no surprises.
 
-This means your carefully written SQL is preserved—not buried in macros or lost to code generation.
+This means your carefully written SQL is preserved—not buried in macros or lost
+to code generation.
 
-Even if you switch to another tool in the future, you’ll always have a clear, structured record of your queries.
+Even if you switch to another tool in the future, you’ll always have a clear,
+structured record of your queries.

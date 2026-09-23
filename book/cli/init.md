@@ -48,13 +48,19 @@ sql-fun init --yes --docker-image-tag "postgres:latest"
 - `--yes`, `-y` : Disable prompts (assume yes)
 - `--sql-fun-home`: Home directory path. (optional)
   - default is `${HOME}/.sql-fun`
-- `--database-url`:  Extract DB Engine built-in object information from actual database instance. (optional)
-- `--docker-image-tag`: Extract DB Engine built-in object information from container.  (optional)
-- `--github-repo`: Download source for DB Engine built-in object information. (optional)
+- `--database-url`: Extract DB Engine built-in object information from actual
+  database instance. (optional)
+- `--docker-image-tag`: Extract DB Engine built-in object information from
+  container. (optional)
+- `--github-repo`: Download source for DB Engine built-in object information.
+  (optional)
   - default is `kazuk/sql-fun`
-- `--sql-fun-version`: `sql-fun` version to use when downloading artifacts (semver)
+- `--sql-fun-version`: `sql-fun` version to use when downloading artifacts
+  (semver)
   - default is latest stable release
-- `--engine-version`: Limit initialization to the specified database engine versions.
+- `--engine-version`: Limit initialization to the specified database engine
+  versions.
   - default: install ALL engine versions in artifact
-- `--postgres-extensions`: Limit initialization to the specified `PostgreSQL` extensions
+- `--postgres-extensions`: Limit initialization to the specified `PostgreSQL`
+  extensions
   - default: install ALL extensions

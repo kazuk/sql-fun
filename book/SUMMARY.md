@@ -18,8 +18,11 @@
 
 - [init](./cli/init.md) sub command
 - [check](./cli/check.md) sub command
-- [api](./cli/api-subcommand.md)
-- [api-help](./cli/api-help-subcommand.md)
+<!-- Empty links mark draft chapters in mdBook. -->
+<!-- rumdl-disable MD042 -->
+- [api]()
+- [api-help]()
+<!-- rumdl-enable MD042 -->
 
 ## `sql-fun` server api reference
 
@@ -27,6 +30,9 @@
 
 - [initialize method](./api/initialize.md)
 - [initialized notification](./api/initialized.md)
-- [list-object method](./api/list-object.md)
-- [describe-table method](./api/describe-table.md)
-- [validate-sql method](./api/validate-sql.md)
+- [list-tables method](./api/list-tables.md)
+<!-- Empty links mark draft chapters in mdBook. -->
+<!-- rumdl-disable MD042 -->
+- [describe-table method]()
+- [validate-sql method]()
+<!-- rumdl-enable MD042 -->

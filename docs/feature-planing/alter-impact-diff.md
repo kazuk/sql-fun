@@ -1,18 +1,24 @@
 # ALTER TABLE Impact Diff Generator and Patch Series Proposal
 
-*This is a planning document outlining a potential future feature of `sql-fun`.  
-It has not been implemented, and no timeline or commitment has been established.*
+*This is a planning document outlining a potential future feature of
+`sql-fun`.  
+It has not been implemented, and no timeline or commitment has been
+established.*
 
 ## Overview
 
-This feature proposes a toolchain extension for `sql-fun` that analyzes the effect of a given migration file (`up.sql`) on both the schema and the Rust codebase using `sql-fun`-annotated functions.
+This feature proposes a toolchain extension for `sql-fun` that analyzes the
+effect of a given migration file (`up.sql`) on both the schema and the Rust
+codebase using `sql-fun`-annotated functions.
 
 The tool will **not apply schema changes or fix code**, but instead:
 
 - Parse `ALTER TABLE` statements from an input migration file
 - Determine schema-level impacts
-- Cross-reference with `sql-fun.develop.toml` to find affected queries and fields
-- Generate a `patch series` — one patch per ALTER — representing the required diffs
+- Cross-reference with `sql-fun.develop.toml` to find affected queries and
+  fields
+- Generate a `patch series` — one patch per ALTER — representing the required
+  diffs
 - Leave all application decisions (apply, reject, fix, push PR) to the user
 
 ## Process
@@ -38,7 +44,8 @@ The tool will **not apply schema changes or fix code**, but instead:
 - 🛠️ This tool **does not modify source files or apply patches**
 - 🚦 CI breaks or PR flows caused by the patch are **intentional and external**
 
-> It is the responsibility of the user to review, apply, and integrate suggested changes.
+> It is the responsibility of the user to review, apply, and integrate suggested
+> changes.
 
 ## Example Usage
 
@@ -58,7 +65,8 @@ git commit -am "Rename name to full_name per migration step 1"
 Or:
 
 ```bash
-gh pr create --base main --head sqlfun/migration-123 --title "SQL-Fun Migration Response Patches"
+gh pr create --base main --head sqlfun/migration-123 \
+  --title "SQL-Fun Migration Response Patches"
 ```
 
 ## Why It's in Feature Planning

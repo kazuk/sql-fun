@@ -1,12 +1,13 @@
 # JSON-RPC Error Code Policy for sql-fun
 
-This document defines the structured error code policy used in `sql-fun-server`'s JSON-RPC interface.
+This document defines the structured error code policy used in
+`sql-fun-server`'s JSON-RPC interface.
 
 ## Error Code Format
 
 All error codes follow the format:
 
-```
+```text
 -320XY
 ```
 
@@ -32,8 +33,10 @@ This pattern allows structured interpretation while minimizing boilerplate.
 ## Design Principles
 
 - `Y=0` errors use `data.target` and `data.name` to describe context.
-- Specific codes (`Y=1..9`) are assigned when client/UI logic benefits from clearer discrimination.
-- All codes fall within the `-32000` to `-32099` range reserved by JSON-RPC for implementation-defined errors.
+- Specific codes (`Y=1..9`) are assigned when client/UI logic benefits from
+  clearer discrimination.
+- All codes fall within the `-32000` to `-32099` range reserved by JSON-RPC for
+  implementation-defined errors.
 
 ## Examples
 
@@ -50,5 +53,5 @@ This pattern allows structured interpretation while minimizing boilerplate.
 | -32052   | Not Found | Column not found                        | `SELECT email FROM users` with no `email`   |
 | -32053   | Not Found | Schema not found                        | `select_schema("preview")`                |
 
-This structure offers a consistent and maintainable foundation for future JSON-RPC error expansion in `sql-fun`.
-
+This structure offers a consistent and maintainable foundation for future
+JSON-RPC error expansion in `sql-fun`.

@@ -24,7 +24,6 @@ This server supports both MCP and LSP clients.
 
 ### MCP Client
 
-
 ```json
 {
   "jsonrpc": "2.0",
@@ -46,9 +45,8 @@ This server supports both MCP and LSP clients.
 
 The server returns combined capabilities for both `LSP` and `MCP`.
 
-The `methods` key lists `sql-fun` specific JSON-RPC methods.
-To inspect each method’s request and response schema, use the `sql-fun/help-method`.
-
+The `methods` key lists `sql-fun` specific JSON-RPC methods. To inspect each
+method’s request and response schema, use the `sql-fun/help-method`.
 
 ```json
 {
@@ -80,29 +78,34 @@ Each entry in the methods array contains:
 
 - name: The full method name, including version.
 - version: Semantic version (semver) of the method implementation.
-- experimental (optional): Whether the method is experimental. Defaults to false.
+- experimental (optional): Whether the method is experimental. Defaults to
+  false.
 
-Methods marked with "experimental": true are provided for evaluation and feedback purposes only.
-These methods are subject to change or removal at any time without prior notice.
-Stability, compatibility, and long-term support are not guaranteed.
+Methods marked with "experimental": true are provided for evaluation and
+feedback purposes only. These methods are subject to change or removal at any
+time without prior notice. Stability, compatibility, and long-term support are
+not guaranteed.
 
-You are welcome to explore and test these methods, but use them at your own risk.
-We recommend not relying on experimental methods in production environments.
+You are welcome to explore and test these methods, but use them at your own
+risk. We recommend not relying on experimental methods in production
+environments.
 
 ### Method Naming Convention
 
 Method names follow this format:
 
-```
+```text
 sql-fun/{method-name}/{major}[Experimental suffix]
 ```
 
 - `sql-fun` is the namespace prefix.
 - `{method-name}` is the logical name of the method.
 - `{major}` is the major version number.
-- `[suffix]` *(optional)*: Variant identifier for experimental or pre-release versions (e.g., `-exp`, `-rc1`, `-beta3`).
+- `[suffix]` *(optional)*: Variant identifier for experimental or pre-release
+  versions (e.g., `-exp`, `-rc1`, `-beta3`).
 
-Suffixes are used for unstable variants and **must be marked with `"experimental": true`** in the method entry.
+Suffixes are used for unstable variants and
+**must be marked with `"experimental": true`** in the method entry.
 
 Example:
 
@@ -117,4 +120,3 @@ In this case:
 - `sql-fun/describe/2-exp` refers to the experimental 2.1.0 implementation.
 
 Use `sql-fun/help-method/1` to obtain the schema of any listed method.
-

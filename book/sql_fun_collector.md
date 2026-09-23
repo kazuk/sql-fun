@@ -7,13 +7,13 @@ not require you to adopt a runtime framework or a particular collection type.
 For `sql_query_many`, you choose the collector and the handler that receives
 each row.
 
-`sql-fun-collector` is an **optional library** for implementing those collectors.
-Use it to collect ordered SQL results, finish collection as immutable row
-sets, and navigate related rows through borrowed views. You can also use your
-own containers and collection logic without adding this dependency. The
-library adds ordinary collection and lookup operations when you choose to use
-it; it does not change the zero-runtime foundation of `sql-fun`. It can also
-be used independently of generated query functions.
+`sql-fun-collector` is an **optional library** for implementing those
+collectors. Use it to collect ordered SQL results, finish collection as
+immutable row sets, and navigate related rows through borrowed views. You can
+also use your own containers and collection logic without adding this
+dependency. The library adds ordinary collection and lookup operations when you
+choose to use it; it does not change the zero-runtime foundation of `sql-fun`.
+It can also be used independently of generated query functions.
 
 ## From a result set to an immutable row set
 
@@ -45,8 +45,9 @@ SortedSliceView: borrowed view of part of the row set
 vector's excess capacity. Spare capacity reserved while accumulating rows is
 therefore released rather than retained in the finished row set.
 
-The resulting row set is immutable: its collection API exposes no operations
-to append, reorder, or mutate rows. Views borrow the stored rows, so selecting a view does not copy them.
+The resulting row set is immutable: its collection API exposes no operations to
+append, reorder, or mutate rows. Views borrow the stored rows, so selecting a
+view does not copy them.
 
 As with other shared Rust references, row types with interior mutability still
 control their own internal state. Ordering keys must remain stable while you
@@ -120,19 +121,20 @@ the collection how to obtain a key from a row. A row can implement it for more
 than one key type, as above.
 
 Prefer newtypes for IDs so each key identifies its relationship in the type
-system. With `i64` aliases, `(UserId, OrderId)` and `(OrderId, OrderLineId)` both
-become `(i64, i64)`: an `ExtractKey<(i64, i64)>` bound cannot distinguish them,
-and a row cannot implement the trait separately for those two meanings.
+system. With `i64` aliases, `(UserId, OrderId)` and `(OrderId, OrderLineId)`
+both become `(i64, i64)`: an `ExtractKey<(i64, i64)>` bound cannot distinguish
+them, and a row cannot implement the trait separately for those two meanings.
 Distinct newtypes allow both implementations and make navigation requirements
 explicit. Deriving `Ord` preserves the underlying integer order; `Copy` makes
 these small IDs convenient to return by value.
 
-In a `sql_query_many` handler, the append step is the same: receive the collector
-and a row, call `push(row)?` on its `SortedVec`, and return the collector. Once
-the query completes, convert the accumulated rows with `into_sorted_slice`.
-Your error type must be able to propagate `OrderError` along with query and
-row-construction errors. See [SQL Functions](./sql_functions.md#collector-type)
-for the collector and handler contract.
+In a `sql_query_many` handler, the append step is the same: receive the
+collector and a row, call `push(row)?` on its `SortedVec`, and return the
+collector. Once the query completes, convert the accumulated rows with
+`into_sorted_slice`. Your error type must be able to propagate `OrderError`
+along with query and row-construction errors. See
+[SQL Functions](./sql_functions.md#collector-type) for the collector and handler
+contract.
 
 ## Keep SQL ordering and Rust keys aligned
 
@@ -207,10 +209,11 @@ fn descending_orders() -> Result<(), OrderError<(UserId, Reverse<OrderId>)>> {
 ```
 
 Wrap only the components corresponding to descending columns. The key here is
-`(UserId, Reverse<OrderId>)`, so the user's ordering stays ascending. Lookups must use
-the same key types: `orders.get_by((UserId(1), Reverse(OrderId(11))))` searches the full key,
-while `user_orders.get_by(Reverse(OrderId(11)))` searches the tail after selecting a user.
-The stored row values remain unchanged, and no additional sorting takes place.
+`(UserId, Reverse<OrderId>)`, so the user's ordering stays ascending. Lookups
+must use the same key types: `orders.get_by((UserId(1), Reverse(OrderId(11))))`
+searches the full key, while `user_orders.get_by(Reverse(OrderId(11)))` searches
+the tail after selecting a user. The stored row values remain unchanged, and no
+additional sorting takes place.
 
 ## Composite keys and related rows
 
@@ -351,7 +354,8 @@ return borrowed rows or views. Once collection is complete, these methods
 work within existing storage without additional queries, allocations for
 selected rows, or row copies.
 
-See the [aggregate fetch example](./sql_functions.md#aggregate-entity-fetch-example-for-sql-fun)
+See the
+[aggregate fetch example](./sql_functions.md#aggregate-entity-fetch-example-for-sql-fun)
 for collecting related data from multiple queries.
 
 ### Composing read models with capability traits
@@ -376,7 +380,9 @@ trait HasUsers {
 trait HasOrders {
     fn orders(&self) -> &SortedSlice<OrderRow, (UserId, OrderId)>;
 
-    fn orders_for_user(&self, id: UserId) -> SortedSliceView<'_, OrderRow, OrderId> {
+    fn orders_for_user(
+        &self, id: UserId,
+    ) -> SortedSliceView<'_, OrderRow, OrderId> {
         self.orders().head(id)
     }
 }

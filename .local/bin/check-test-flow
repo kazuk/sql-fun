@@ -28,6 +28,8 @@ Steps:
   doc
   typos
   graphify
+  skill-lint
+  markdown-lint
 USAGE
 }
 
@@ -43,6 +45,8 @@ ALL_STEPS=(
   doc
   typos
   graphify
+  skill-lint
+  markdown-lint
 )
 
 function list_steps() {
@@ -51,7 +55,7 @@ function list_steps() {
 
 function normalize_step() {
   case "$1" in
-    affected|workspace|proc-macro-tests|fmt|lint|server-api-spec|deny|dependency-updates|doc|typos|graphify)
+    affected|workspace|proc-macro-tests|fmt|lint|server-api-spec|deny|dependency-updates|doc|typos|graphify|skill-lint|markdown-lint)
       printf '%s\n' "$1"
       ;;
     format)
@@ -246,6 +250,18 @@ function run_graphify() {
   graphify update .
 }
 
+function run_skill_validator() {
+  require_command skill-validator
+  echo "== Linting skills"
+  skill-validator check --strict --emit-annotations .codex/skills
+}
+
+function run_rumdl() {
+  require_command rumdl
+  echo "== Linting Markdown"
+  rumdl check .
+}
+
 for step in "${ALL_STEPS[@]}"; do
   if step_enabled "$step"; then
     case "$step" in
@@ -260,6 +276,8 @@ for step in "${ALL_STEPS[@]}"; do
       doc) run_doc ;;
       typos) run_typos ;;
       graphify) run_graphify ;;
+      skill-lint) run_skill_validator ;;
+      markdown-lint) run_rumdl ;;
     esac
   fi
 done

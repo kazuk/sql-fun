@@ -1,23 +1,31 @@
+//! client for sql-fun-server
+
 use std::{
     io::{BufReader, Write},
     net::TcpStream,
 };
 
+/// JSON RPC Client errors
 #[derive(Debug, thiserror::Error)]
 pub enum JsonRpcClientError {
+    /// IO error
     #[error(transparent)]
     Io(#[from] std::io::Error),
 
+    /// JSON RPC error
     #[error(transparent)]
-    JsonRpcError(#[from] JsonRpcError),
+    JsonRpc(#[from] JsonRpcError),
 
+    /// serde error
     #[error(transparent)]
     Serde(#[from] serde_json::Error),
 
+    /// unexpected response
     #[error("protocol sequence error")]
     UnexpectedResponse(),
 }
 
+/// JSON RPC Protocol error
 #[derive(Debug, thiserror::Error, serde::Deserialize)]
 pub struct JsonRpcError {
     code: i16,
@@ -35,6 +43,7 @@ impl std::fmt::Display for JsonRpcError {
     }
 }
 
+/// JSON RPC request
 #[derive(Debug, serde::Serialize)]
 pub struct JsonRpcRequest {
     jsonrpc: JsonRpcVersion,
@@ -43,6 +52,7 @@ pub struct JsonRpcRequest {
     params: Vec<serde_json::Value>,
 }
 
+/// JSON RPC response
 #[derive(Debug, serde::Deserialize)]
 pub struct JsonRpcResponse {
     #[expect(dead_code)]
@@ -52,10 +62,13 @@ pub struct JsonRpcResponse {
     body: JsonRpcResponseBody,
 }
 
+/// JSON RPC Response body
 #[derive(Debug, serde::Deserialize)]
 #[serde(rename_all = "snake_case")]
 pub enum JsonRpcResponseBody {
+    /// normal response
     Response(serde_json::Value),
+    /// error response
     Error(JsonRpcError),
 }
 
@@ -70,13 +83,16 @@ impl JsonRpcRequest {
     }
 }
 
+/// JSON RPC version tag
 #[derive(Debug, serde::Serialize, serde::Deserialize, Default)]
 pub enum JsonRpcVersion {
+    /// version value for "2.0"
     #[default]
     #[serde(rename = "2.0")]
     Version2,
 }
 
+/// JSON RPC Client for TCP
 #[derive(Debug)]
 pub struct TcpJsonRpcClient {
     stream: std::net::TcpStream,

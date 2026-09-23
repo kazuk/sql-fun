@@ -6,6 +6,7 @@ use std::{
 use futures_core::future::BoxFuture;
 use futures_util::{FutureExt, future::Shared};
 
+/// pending future
 #[derive(Clone, Debug)]
 pub struct PendingFut<V, E>(Shared<BoxFuture<'static, Result<V, E>>>);
 
@@ -25,6 +26,7 @@ where
     V: Clone,
     E: Clone,
 {
+    /// create instance
     pub fn new<F>(fut: F) -> Self
     where
         F: Future<Output = Result<V, E>> + Send + 'static,

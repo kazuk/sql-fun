@@ -1,5 +1,13 @@
+#[cfg(feature = "sqlite")]
+use sql_fun_core::IVec;
+
 use crate::sem::{
     ColumnConstraint, ColumnConstraintKind, ColumnConstraintTrait, ColumnName, TableName,
+};
+#[cfg(feature = "sqlite")]
+use crate::{
+    SqliteToken,
+    sem::{AnalysisError, AnalysisProblem, ParseContext},
 };
 
 /// collate constraint
@@ -37,6 +45,32 @@ impl ColumnConstraintTrait for CollateColumnConstraint {
 
     fn column_name(&self) -> &ColumnName {
         &self.column_name
+    }
+}
+
+#[cfg(feature = "sqlite")]
+impl CollateColumnConstraint {
+    const COLLATION_NAMES: [&'static str; 3] = ["BINARY", "NOCASE", "RTRIM"];
+
+    /// analyze [`crate::syn::sqlite::CollateColumnConstraint`]
+    pub fn analyze_constraint_sqlite<TParseContext>(
+        mut context: TParseContext,
+        table_name: &TableName,
+        column_name: &ColumnName,
+        syn: &crate::syn::sqlite::CollateColumnConstraint,
+        _tokens: &IVec<SqliteToken<'_>>,
+    ) -> Result<(ColumnConstraint, TParseContext), AnalysisError>
+    where
+        TParseContext: ParseContext,
+    {
+        let collation_name = syn.collation_name().value();
+        if !Self::COLLATION_NAMES.contains(&collation_name.to_uppercase().as_str()) {
+            context.report_problem(AnalysisProblem::collation_name_not_found(collation_name))?;
+        }
+        Ok((
+            ColumnConstraint::collate(Self::new(table_name, column_name, collation_name)),
+            context,
+        ))
     }
 }
 

@@ -48,6 +48,9 @@ pub trait ColumnConstraintTrait {
     fn column_name(&self) -> &ColumnName;
 }
 
+#[cfg(feature = "sqlite")]
+use crate::{SqliteToken, syn::sqlite::ResolveType};
+
 /// column constraints
 #[derive(Debug, Eq, Hash, PartialEq, serde::Serialize, serde::Deserialize, Clone)]
 pub enum ColumnConstraint {
@@ -753,6 +756,94 @@ mod column_constraint_analyze_constraint_tests {
     }
 }
 
+impl ColumnConstraint {
+    /// analyze [`crate::syn::sqllite::ColumnConstraint`]
+    #[cfg(feature = "sqlite")]
+    pub fn analyze_sqlite_column_constraint<TParseContext>(
+        context: TParseContext,
+        table_name: &TableName,
+        column_name: &ColumnName,
+        syn: &crate::syn::sqlite::ColumnConstraint,
+        tokens: &IVec<SqliteToken<'_>>,
+    ) -> Result<(Self, TParseContext), AnalysisError>
+    where
+        TParseContext: ParseContext,
+    {
+        use crate::syn::sqlite::ColumnConstraint;
+
+        match syn {
+            ColumnConstraint::PrimaryKey(primary_key_column_constraint) => {
+                PrimaryKeyColumnConstraint::analyze_constraint_sqlite(
+                    context,
+                    table_name,
+                    column_name,
+                    primary_key_column_constraint,
+                )
+            }
+            ColumnConstraint::NotNull(not_null_column_constraint) => {
+                ColumnNullabilityConstraint::analyze_constraint_sqlite(
+                    context,
+                    table_name,
+                    column_name,
+                    not_null_column_constraint,
+                )
+            }
+            ColumnConstraint::Unique(unique_column_constraint) => {
+                UniqueColumnConstraint::analyze_constraint_sqlite(
+                    context,
+                    table_name,
+                    column_name,
+                    unique_column_constraint,
+                )
+            }
+            ColumnConstraint::Check(check_column_constraint) => {
+                CheckColumnConstraint::analyze_constraint_sqlite(
+                    context,
+                    table_name,
+                    column_name,
+                    check_column_constraint,
+                    tokens,
+                )
+            }
+            ColumnConstraint::Default(default_column_constraint) => {
+                DefaultColumnConstraint::analyze_constraint_sqlite(
+                    context,
+                    table_name,
+                    column_name,
+                    default_column_constraint,
+                    tokens,
+                )
+            }
+            ColumnConstraint::Collate(collate_column_constraint) => {
+                CollateColumnConstraint::analyze_constraint_sqlite(
+                    context,
+                    table_name,
+                    column_name,
+                    collate_column_constraint,
+                    tokens,
+                )
+            }
+            ColumnConstraint::ForeignKey(foreign_key_column_constraint) => {
+                ForeignKeyColumnConstraint::analyze_constraint_sqlite(
+                    context,
+                    table_name,
+                    column_name,
+                    foreign_key_column_constraint,
+                )
+            }
+            ColumnConstraint::Generated(_generated_column_constraint) => {
+                GeneratedColumnConstraint::analyze_constraint_sqlite(
+                    context,
+                    table_name,
+                    column_name,
+                    _generated_column_constraint,
+                    tokens,
+                )
+            }
+        }
+    }
+}
+
 /// Conflict clause
 #[derive(Debug, Eq, Hash, PartialEq, serde::Serialize, serde::Deserialize, Clone)]
 pub enum ConflictClause {
@@ -769,6 +860,20 @@ pub enum ConflictClause {
 }
 
 /// Validity clause
+#[cfg(feature = "sqlite")]
+impl From<&ResolveType> for ConflictClause {
+    fn from(value: &ResolveType) -> Self {
+        match value {
+            ResolveType::Rollback => Self::Rollback,
+            ResolveType::Abort => Self::Abort,
+            ResolveType::Fail => Self::Fail,
+            ResolveType::Ignore => Self::Ignore,
+            ResolveType::Replace => Self::Replace,
+        }
+    }
+}
+
+/// validity value
 #[derive(Debug, Eq, Hash, PartialEq, serde::Serialize, serde::Deserialize, Clone)]
 pub struct Validity {
     skip_validation: bool,

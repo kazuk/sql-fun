@@ -2,17 +2,24 @@
 #![allow(clippy::pedantic)]
 #![doc = include_str!("lib.md")]
 
+pub mod engine_specific;
 pub mod sem;
 pub mod syn;
 
 mod schema_dump_file;
 mod sql_file;
+#[cfg(feature = "sqlite")]
+mod sqlite;
 mod trie_map;
 
 use miette::LabeledSpan;
 use sql_fun_core::IVec;
 
 use self::sql_file::read_sql_file;
+
+#[cfg(feature = "sqlite")]
+pub use self::sqlite::{SqliteDialect, SqliteLexer, SqliteToken};
+
 pub use self::trie_map::TrieMap;
 
 use std::{io::SeekFrom, path::Path, string::String as StdString};
@@ -133,6 +140,20 @@ pub struct StringSpan {
 }
 
 impl StringSpan {
+    /// create a new instance
+    pub const fn new(offset: usize, len: usize) -> Self {
+        Self { offset, len }
+    }
+
+    /// get span text from source
+    pub fn get_from<'a>(&self, source: &'a str) -> Option<&'a str> {
+        if source.len() < self.offset + self.len {
+            None
+        } else {
+            Some(&source[self.offset..][..self.len])
+        }
+    }
+
     /// get content span
     ///
     /// # Panics

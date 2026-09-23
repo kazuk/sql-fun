@@ -248,6 +248,9 @@ async fn insert_user(
 ) -> Result<u64, tokio_postgres::Error> {}
 ```
 
+The same parameter-source settings also work with synchronous `rusqlite`
+functions when the `sqlite` feature is enabled.
+
 Here, `UserDto` provides `id()` and `name()` getters. A normal argument named
 `id` would take precedence over `dto.id()`.
 

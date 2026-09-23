@@ -1,8 +1,11 @@
+//! sql-fun Command line interface
+
 use clap::Parser;
 use std::process::ExitCode;
 
 use sql_fun_cli::{RunnableCommand, SqlFunCliArgs};
 
+/// execution entry
 #[tokio::main]
 pub async fn main() -> Result<ExitCode, anyhow::Error> {
     let args = SqlFunCliArgs::parse();

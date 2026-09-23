@@ -1,8 +1,7 @@
 # Installation
 
-`sql-fun` supports `PostgreSQL`, `SQLite` and is designed to work with the `tokio-postgres` or `rusqlite` connector.
-
- SQLite support needs feature flag `sqlite`
+`sql-fun` uses `tokio-postgres` for PostgreSQL and `rusqlite` for SQLite.
+SQLite support is under development and requires the `sqlite` feature.
 
 `sql-fun` is a procedural macro crate. You can install it using `cargo add`:
 
@@ -11,6 +10,8 @@ cargo add sql-fun
 cargo install sql-fun-cli sql-fun-server
 cargo install --locked cargo-expand
 ```
+
+For SQLite, enable the feature on the proc-macro, CLI, and server:
 
 ```console
 cargo add sql-fun --features "sqlite"

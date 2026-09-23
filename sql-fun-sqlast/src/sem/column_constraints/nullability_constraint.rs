@@ -98,6 +98,31 @@ impl ColumnNullabilityConstraint {
     }
 }
 
+#[cfg(feature = "sqlite")]
+impl ColumnNullabilityConstraint {
+    /// analyze [`crate::syn::sqlite::NotNullColumnConstraint`]
+    pub fn analyze_constraint_sqlite<TParseContext>(
+        context: TParseContext,
+        table_name: &TableName,
+        column_name: &ColumnName,
+        syn: &crate::syn::sqlite::NotNullColumnConstraint,
+    ) -> Result<(ColumnConstraint, TParseContext), AnalysisError>
+    where
+        TParseContext: ParseContext,
+    {
+        Ok((
+            ColumnConstraint::nullability(Self::new(
+                table_name,
+                column_name,
+                !syn.nullable(),
+                syn.conflict_clause().map(ConflictClause::from),
+                None,
+            )),
+            context,
+        ))
+    }
+}
+
 impl ColumnConstraint {
     /// create Nullability variant
     pub const fn nullability(value: ColumnNullabilityConstraint) -> Self {

@@ -32,6 +32,22 @@ pub(super) fn specification() -> QueryFunctionSpec {
     }
 }
 
+#[cfg(feature = "sqlite")]
+pub(super) fn sqlite_specification() -> QueryFunctionSpec {
+    let metadata: sql_fun_core::SqlFunMetadata = toml::from_str(
+        r#"engine = "SQLite"
+dialect = "SQLite"
+connector = "rusqlite""#,
+    )
+    .unwrap();
+    let mut spec = specification();
+    spec.connector_spec = ConnectorSpec::realize(metadata.sql_dialect(), "rusqlite").unwrap();
+    spec.item_fn = ItemFunction::new(syn::parse_quote!(
+        fn lookup() {}
+    ));
+    spec
+}
+
 fn resolved_cte(query: &PlaceholderedSql) -> ResolvedCteCatalog {
     let mut value = serde_json::to_value(ResolvedCteCatalog::from(query)).unwrap();
     value["cte_queries"]["active_users"] = serde_json::to_value(PlaceholderedSql::from_query(

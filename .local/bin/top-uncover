@@ -1,20 +1,11 @@
 #!/bin/bash
 set -euo pipefail
 
-# 未カバー行数(= total - covered)が多い順に上位N件を表示する
-# 例:
-#   TOPN=10 ./cov-top-uncovered.sh
-#   TOPN=20 ./cov-top-uncovered.sh --workspace --all-features
-#
-# NOTE:
-# - cargo-llvm-cov の --json は llvm-cov export の JSON を吐きます（files[].summary.lines.* を利用）
-# - 重複ファイルが出た場合は「total/uncovered は max、percent は min(最悪値)」で集約します
-
 TOPN="${TOPN:-20}"
 
 OPEN="${OPEN:-0}"
 
-cargo llvm-cov nextest --workspace
+cargo llvm-cov nextest --workspace --all-features
 
 if ! command -v jq >/dev/null 2>&1; then
   echo "jq not found" >&2

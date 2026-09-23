@@ -1,5 +1,7 @@
 use sql_fun_core::IVec;
 
+#[cfg(feature = "sqlite")]
+use crate::SqliteToken;
 use crate::{
     sem::{
         AnalysisError, AnalysisProblem, FullName, ParseContext, ScalarAnalysisContext,
@@ -98,6 +100,39 @@ where
 
         Ok((
             SemScalarExpr::TypeCast(Self::new(target_type, arg)),
+            context,
+        ))
+    }
+}
+
+#[cfg(feature = "sqlite")]
+impl TypeCastExpr {
+    /// analyze [`crate::syn::sqlite::ExprCast`]
+    pub fn analyze_sqlite_cast<TParseContext>(
+        mut context: TParseContext,
+        scalar_context: &ScalarAnalysisContext<'_>,
+        syn: &crate::syn::sqlite::ExprCast,
+        tokens: &IVec<SqliteToken<'_>>,
+    ) -> Result<(SemScalarExpr, TParseContext), AnalysisError>
+    where
+        TParseContext: ParseContext,
+    {
+        let Some(ty) = syn.type_name() else {
+            AnalysisError::raise_unexpected_none("ExprCast.type_name")?;
+            AnalysisError::never();
+        };
+        let target_type_name = FullName::from_local_name(ty.name());
+        if context.get_type(&target_type_name).is_none() {
+            context.report_problem(AnalysisProblem::type_not_found(&target_type_name))?;
+        };
+
+        let (expr, new_context) =
+            SemScalarExpr::analyze_sqlite_scalar_expr(context, scalar_context, syn.expr(), tokens)?;
+        context = new_context;
+
+        let target_type = TypeReference::from_full_name(target_type_name);
+        Ok((
+            SemScalarExpr::TypeCast(Self::new(target_type, expr)),
             context,
         ))
     }

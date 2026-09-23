@@ -11,6 +11,7 @@ readme = "README.md"
 rust-version.workspace = true
 
 [features]
+sqlite = ["sql-fun-core/sqlite"]
 nightly-unstable = ["proc_macro_diagnostic"]
 proc_macro_diagnostic = []
 

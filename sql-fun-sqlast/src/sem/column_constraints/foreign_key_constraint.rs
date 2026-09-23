@@ -88,6 +88,18 @@ impl ForeignKeyAction {
             Ok(Some(Self::try_from_value(&upd_action, "fk_upd_action")?))
         }
     }
+
+    /// convert from [`crate::syn::sqlite::RefAct`]
+    #[cfg(feature = "sqlite")]
+    pub const fn from_ref_act(value: &crate::syn::sqlite::RefAct) -> Self {
+        match value {
+            crate::syn::sqlite::RefAct::SetNull => Self::SetNull,
+            crate::syn::sqlite::RefAct::SetDefault => Self::SetDefault,
+            crate::syn::sqlite::RefAct::Cascade => Self::Cascade,
+            crate::syn::sqlite::RefAct::Restrict => Self::Restrict,
+            crate::syn::sqlite::RefAct::NoAction => Self::NoAction,
+        }
+    }
 }
 
 /// deferrable / not deferrable, initially deferred
@@ -101,6 +113,16 @@ impl Deferrability {
     fn from_postgres_constraint(syn: &crate::syn::Constraint) -> Self {
         let deferrable = syn.get_deferrable();
         let init_deferred = syn.get_initdeferred();
+        Self {
+            deferrable,
+            init_deferred,
+        }
+    }
+
+    #[cfg(feature = "sqlite")]
+    fn from_defer_subclause(syn: &crate::syn::sqlite::DeferSubclause) -> Self {
+        let deferrable = *syn.deferrable();
+        let init_deferred = syn.init_deferred().unwrap_or_default().init_deferred();
         Self {
             deferrable,
             init_deferred,
@@ -261,6 +283,83 @@ impl ForeignKeyColumnConstraint {
             ),
             context,
         ))
+    }
+}
+
+#[cfg(feature = "sqlite")]
+impl ForeignKeyColumnConstraint {
+    /// analyze [`crate::syn::sqlite::ForeignKeyColumnConstrraint`]
+    pub fn analyze_constraint_sqlite<TParseContext>(
+        mut context: TParseContext,
+        table_name: &TableName,
+        column_name: &ColumnName,
+        syn: &crate::syn::sqlite::ForeignKeyColumnConstraint,
+    ) -> Result<(ColumnConstraint, TParseContext), AnalysisError>
+    where
+        TParseContext: ParseContext,
+    {
+        let clause = syn.clause();
+        let mut del_action = None;
+        let mut upd_action = None;
+        for arg in clause.args() {
+            use crate::syn::sqlite::RefArg;
+
+            match arg {
+                RefArg::OnDelete(del) => del_action = Some(ForeignKeyAction::from_ref_act(del)),
+                RefArg::OnUpdate(upd) => upd_action = Some(ForeignKeyAction::from_ref_act(upd)),
+                RefArg::OnInsert(_) => {
+                    AnalysisError::raise_unexpected_input("RefArg::OnInsert in FK args")?;
+                }
+                RefArg::Match(name) => context.report_problem(
+                    AnalysisProblem::sqlite_ignores_match_option_in_fk_constraint(
+                        table_name,
+                        column_name,
+                        name,
+                    ),
+                )?,
+            }
+        }
+
+        let pk_columns = clause.columns();
+        if pk_columns.len() != 1 {
+            AnalysisError::raise_unexpected_input("clause.columns.len!=1")?;
+            AnalysisError::never()
+        }
+        let pk_column = ColumnName::from(pk_columns[0].column_name());
+        let pk_table = TableName::try_from(clause.table_name())?;
+
+        let pk_column_type = if let Some(pk_table_def) = context.get_table(&pk_table) {
+            if let Some(pk_col_def) = pk_table_def.get_column_def(&pk_column) {
+                pk_col_def.get_type()
+            } else {
+                context.report_problem(AnalysisProblem::column_not_found_in_table(
+                    &pk_table, &pk_column,
+                ))?;
+                None
+            }
+        } else {
+            context.report_problem(AnalysisProblem::table_not_found(&pk_table))?;
+            None
+        };
+        let deferrability = syn
+            .defer_clause()
+            .as_ref()
+            .map(Deferrability::from_defer_subclause);
+
+        let fk = Self::new(
+            table_name,
+            column_name,
+            &pk_table,
+            &pk_column,
+            pk_column_type,
+            None,
+            del_action,
+            upd_action,
+            deferrability,
+            None,
+        );
+
+        Ok((ColumnConstraint::foreign_key(fk), context))
     }
 }
 

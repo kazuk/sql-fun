@@ -1,0 +1,5 @@
+[package.metadata.database.sqlite]
+connector = "rusqlite"
+engine = "SQLite"
+version = "3"
+dialect = "SQLite"

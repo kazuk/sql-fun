@@ -1,5 +1,8 @@
 use std::fmt::Display;
 
+#[cfg(feature = "sqlite")]
+use crate::sem::AnalysisError;
+
 /// part of name specifies catalog
 #[derive(Debug, Clone, Eq, PartialEq, Hash, serde::Serialize, serde::Deserialize)]
 #[serde(transparent)]
@@ -15,6 +18,15 @@ impl CatalogName {
     #[must_use]
     pub fn as_str(&self) -> &str {
         &self.0
+    }
+}
+
+#[cfg(feature = "sqlite")]
+impl TryFrom<&crate::syn::sqlite::Name> for CatalogName {
+    type Error = AnalysisError;
+
+    fn try_from(value: &crate::syn::sqlite::Name) -> Result<Self, Self::Error> {
+        Ok(Self(String::from(value.value())))
     }
 }
 

@@ -103,6 +103,10 @@ impl ConnectorSpec {
 pub enum ConnectorKind {
     /// use `tokio-postgres` connector
     TokioPostgres,
+
+    /// use `rusqlite`
+    #[cfg(feature = "sqlite")]
+    Rusqlite,
 }
 
 impl ConnectorKind {
@@ -111,6 +115,8 @@ impl ConnectorKind {
     pub const fn compatible_with(self, dialect: SqlDialect) -> bool {
         match (self, dialect) {
             (Self::TokioPostgres, SqlDialect::PostgreSQL) => true,
+            #[cfg(feature = "sqlite")]
+            (Self::Rusqlite, SqlDialect::SQLite) => true,
             #[allow(unreachable_patterns)]
             // TODO: change to expect, rust 1.97.1 unfulfilled warning
             _ => false,
@@ -130,6 +136,8 @@ impl ConnectorKind {
     pub const fn require_async(self) -> Option<bool> {
         match self {
             Self::TokioPostgres => Some(true),
+            #[cfg(feature = "sqlite")]
+            Self::Rusqlite => Some(false),
         }
     }
 
@@ -138,12 +146,16 @@ impl ConnectorKind {
     pub const fn interrupt_arg_attr_name(self) -> &'static str {
         match self {
             Self::TokioPostgres => "interrupt_future",
+            #[cfg(feature = "sqlite")]
+            Self::Rusqlite => "interrupt_channel",
         }
     }
 
     pub fn code_generator(self) -> Box<dyn ConnectorCodeGenerator> {
         match self {
             Self::TokioPostgres => Box::new(TokioPostgresCodeGenerator::new()),
+            #[cfg(feature = "sqlite")]
+            Self::Rusqlite => Box::new(RusqliteCodeGenerator::new()),
         }
     }
 }
@@ -154,6 +166,8 @@ impl FromStr for ConnectorKind {
     fn from_str(s: &str) -> Result<Self, Self::Err> {
         match s {
             "tokio-postgres" => Ok(Self::TokioPostgres),
+            #[cfg(feature = "sqlite")]
+            "rusqlite" => Ok(Self::Rusqlite),
             _ => {
                 SqlFunCodegenError::connector_not_supported(s)?;
                 SqlFunCodegenError::never()
@@ -641,6 +655,284 @@ impl ConnectorCodeGenerator for TokioPostgresCodeGenerator {
         } else {
             let function =
                 crate::QueryRequirement::emit_stub_function(spec, sig, &Self::source_file())?;
+            tracing::info!("generated source \n{}", function.to_string());
+            Ok(function)
+        }
+    }
+}
+
+#[cfg(feature = "sqlite")]
+#[derive(Clone, Debug)]
+struct RusqliteCodeGenerator {}
+
+#[cfg(feature = "sqlite")]
+impl RusqliteCodeGenerator {
+    pub const fn new() -> Self {
+        Self {}
+    }
+
+    fn builder_setter_calls(
+        lockfile_entry: &LockfileEntry,
+        builder: &crate::row_builder::RowBuilder<'_>,
+    ) -> Vec<TokenStream> {
+        let mut calls = Vec::new();
+        for field in lockfile_entry.result_set_shape() {
+            let name = Ident::new(field.field_name(), Span::call_site());
+            let index = LitInt::new(&field.field_index().to_string(), Span::call_site());
+            calls.push(builder.setter(&name, &quote::quote! { result.get(#index)? }));
+        }
+        calls
+    }
+
+    fn function(
+        spec: &QueryFunctionSpec,
+        sig: &syn::Signature,
+        connection: &Ident,
+        query_body: &TokenStream,
+    ) -> TokenStream {
+        let source_file = TokioPostgresCodeGenerator::source_file();
+        if let Some(interrupt) = &spec.interrupt_handler {
+            let error_type = spec.error_type();
+            quote::quote! {
+                #sig
+                {
+                    #[expect(dead_code)]
+                    const __SQL_FUN_SOURCE_FILE: &str = #source_file;
+                    #[expect(dead_code)]
+                    const __SQL_FUN_SOURCE_LINE: u32 = line!();
+
+                    let interrupt_message = ::std::sync::Arc::new(::std::sync::Mutex::new(None));
+                    let read_message = ::std::sync::Arc::clone(&interrupt_message);
+                    #connection.progress_handler(1000, Some(move || {
+                        match #interrupt.lock().expect("interrupt channel mutex lockable").try_recv() {
+                            Ok(message) => {
+                                *interrupt_message.lock().expect("interrupt message mutex lockable") = Some(message);
+                                true
+                            }
+                            Err(::std::sync::mpsc::TryRecvError::Empty) => false,
+                            Err(::std::sync::mpsc::TryRecvError::Disconnected) => {
+                                *interrupt_message.lock().expect("interrupt message mutex lockable") = Some(#error_type::interrupt_disconnected());
+                                true
+                            }
+                        }
+                    }))?;
+
+                    let query_result: Result<_, #error_type> = (|| { #query_body })();
+                    match #connection.progress_handler(1000, None::<fn() -> bool>) {
+                        Ok(()) => match read_message.lock().expect("interrupt message mutex lockable").take() {
+                            Some(interrupt_error) => Err(interrupt_error),
+                            None => query_result,
+                        },
+                        Err(error) => #error_type::interrupt_handler_cleanup_error(error, query_result),
+                    }
+                }
+            }
+        } else {
+            quote::quote! {
+                #sig
+                {
+                    #[expect(dead_code)]
+                    const __SQL_FUN_SOURCE_FILE: &str = #source_file;
+                    #[expect(dead_code)]
+                    const __SQL_FUN_SOURCE_LINE: u32 = line!();
+
+                    #query_body
+                }
+            }
+        }
+    }
+
+    fn query_one_function(
+        spec: &QueryFunctionSpec,
+        sig: &syn::Signature,
+        connection: &Ident,
+        lockfile_entry: &LockfileEntry,
+    ) -> TokenStream {
+        let query = LitStr::new(lockfile_entry.execute_sql(), Span::call_site());
+        let parameters = parameters(&spec.parameter_bindings, lockfile_entry);
+        let row_type = spec.row_type();
+        let builder = crate::row_builder::RowBuilder::new(&spec.codegen_options);
+        let initialize_builder = builder.initialize(row_type);
+        let build_row = builder.build();
+        let setters = Self::builder_setter_calls(lockfile_entry, &builder);
+        let query_body = quote::quote! {
+            let params: &[&dyn ::rusqlite::ToSql] = &[#(#parameters),*];
+            let mut statement = #connection.prepare(#query)?;
+            let mut rows = statement.query(params)?;
+            let Some(result) = rows.next()? else {
+                return Err(::rusqlite::Error::QueryReturnedNoRows.into());
+            };
+            #initialize_builder
+            #(#setters)*
+            if rows.next()?.is_some() {
+                Err(::rusqlite::Error::QueryReturnedMoreThanOneRow.into())
+            } else {
+                Ok(#build_row)
+            }
+        };
+        Self::function(spec, sig, connection, &query_body)
+    }
+
+    fn query_opt_function(
+        spec: &QueryFunctionSpec,
+        sig: &syn::Signature,
+        connection: &Ident,
+        lockfile_entry: &LockfileEntry,
+    ) -> TokenStream {
+        let query = LitStr::new(lockfile_entry.execute_sql(), Span::call_site());
+        let parameters = parameters(&spec.parameter_bindings, lockfile_entry);
+        let row_type = TokioPostgresCodeGenerator::option_row_type(spec);
+        let builder = crate::row_builder::RowBuilder::new(&spec.codegen_options);
+        let initialize_builder = builder.initialize(row_type);
+        let build_row = builder.build();
+        let setters = Self::builder_setter_calls(lockfile_entry, &builder);
+        let query_body = quote::quote! {
+            let params: &[&dyn ::rusqlite::ToSql] = &[#(#parameters),*];
+            let mut statement = #connection.prepare(#query)?;
+            let mut rows = statement.query(params)?;
+            if let Some(result) = rows.next()? {
+                #initialize_builder
+                #(#setters)*
+                if rows.next()?.is_some() {
+                    Err(::rusqlite::Error::QueryReturnedMoreThanOneRow.into())
+                } else {
+                    Ok(Some(#build_row))
+                }
+            } else {
+                Ok(None)
+            }
+        };
+        Self::function(spec, sig, connection, &query_body)
+    }
+
+    fn query_many_function(
+        spec: &QueryFunctionSpec,
+        sig: &syn::Signature,
+        connection: &Ident,
+        lockfile_entry: &LockfileEntry,
+    ) -> Result<TokenStream, SqlFunCodegenError> {
+        let query = LitStr::new(lockfile_entry.execute_sql(), Span::call_site());
+        let parameters = parameters(&spec.parameter_bindings, lockfile_entry);
+        let (collector, handler, row_type) =
+            TokioPostgresCodeGenerator::query_many_arguments(spec)?;
+        let row_type = &row_type;
+        let builder = crate::row_builder::RowBuilder::new(&spec.codegen_options);
+        let initialize_builder = builder.initialize(row_type);
+        let build_row = builder.build();
+        let setters = Self::builder_setter_calls(lockfile_entry, &builder);
+        let query_body = quote::quote! {
+            let params: &[&dyn ::rusqlite::ToSql] = &[#(#parameters),*];
+            let mut statement = #connection.prepare(#query)?;
+            let mut rows = statement.query(params)?;
+            while let Some(result) = rows.next()? {
+                #initialize_builder
+                #(#setters)*
+                #collector = #handler(#collector, #build_row)?;
+            }
+            Ok(#collector)
+        };
+        Ok(Self::function(spec, sig, connection, &query_body))
+    }
+
+    fn execute_function(
+        spec: &QueryFunctionSpec,
+        sig: &syn::Signature,
+        connection: &Ident,
+        lockfile_entry: &LockfileEntry,
+    ) -> TokenStream {
+        let query = LitStr::new(lockfile_entry.execute_sql(), Span::call_site());
+        let parameters = parameters(&spec.parameter_bindings, lockfile_entry);
+        let query_body = quote::quote! {
+            let params: &[&dyn ::rusqlite::ToSql] = &[#(#parameters),*];
+            let result = #connection.execute(#query, params)?;
+            Ok(result)
+        };
+        Self::function(spec, sig, connection, &query_body)
+    }
+}
+
+#[cfg(feature = "sqlite")]
+impl ConnectorCodeGenerator for RusqliteCodeGenerator {
+    fn render_query_one(
+        &self,
+        spec: &QueryFunctionSpec,
+    ) -> Result<TokenStream, SqlFunCodegenError> {
+        let item_fn = spec.item_fn();
+        let sig = &item_fn.codegen_signature();
+        let connection = spec.connection_ident();
+        if let Some(lockfile_entry) = spec.lockfile_entry() {
+            let function = Self::query_one_function(spec, sig, connection, lockfile_entry);
+            tracing::info!("generated source \n{}", function.to_string());
+            Ok(function)
+        } else {
+            let function = crate::QueryRequirement::emit_stub_function(
+                spec,
+                sig,
+                &TokioPostgresCodeGenerator::source_file(),
+            )?;
+            tracing::info!("generated source \n{}", function.to_string());
+            Ok(function)
+        }
+    }
+
+    fn render_query_opt(
+        &self,
+        spec: &QueryFunctionSpec,
+    ) -> Result<TokenStream, SqlFunCodegenError> {
+        let item_fn = spec.item_fn();
+        let sig = &item_fn.codegen_signature();
+        let connection = spec.connection_ident();
+        if let Some(lockfile_entry) = spec.lockfile_entry() {
+            let function = Self::query_opt_function(spec, sig, connection, lockfile_entry);
+            tracing::info!("generated source \n{}", function.to_string());
+            Ok(function)
+        } else {
+            let function = crate::QueryRequirement::emit_stub_function(
+                spec,
+                sig,
+                &TokioPostgresCodeGenerator::source_file(),
+            )?;
+            tracing::info!("generated source \n{}", function.to_string());
+            Ok(function)
+        }
+    }
+
+    fn render_query_many(
+        &self,
+        spec: &QueryFunctionSpec,
+    ) -> Result<TokenStream, SqlFunCodegenError> {
+        let item_fn = spec.item_fn();
+        let sig = &item_fn.codegen_signature();
+        let connection = spec.connection_ident();
+        if let Some(lockfile_entry) = spec.lockfile_entry() {
+            let function = Self::query_many_function(spec, sig, connection, lockfile_entry)?;
+            tracing::info!("generated source \n{}", function.to_string());
+            Ok(function)
+        } else {
+            let function = crate::QueryRequirement::emit_stub_function(
+                spec,
+                sig,
+                &TokioPostgresCodeGenerator::source_file(),
+            )?;
+            tracing::info!("generated source \n{}", function.to_string());
+            Ok(function)
+        }
+    }
+
+    fn render_execute(&self, spec: &QueryFunctionSpec) -> Result<TokenStream, SqlFunCodegenError> {
+        let item_fn = spec.item_fn();
+        let sig = &item_fn.codegen_signature();
+        let connection = spec.connection_ident();
+        if let Some(lockfile_entry) = spec.lockfile_entry() {
+            let function = Self::execute_function(spec, sig, connection, lockfile_entry);
+            tracing::info!("generated source \n{}", function.to_string());
+            Ok(function)
+        } else {
+            let function = crate::QueryRequirement::emit_stub_function(
+                spec,
+                sig,
+                &TokioPostgresCodeGenerator::source_file(),
+            )?;
             tracing::info!("generated source \n{}", function.to_string());
             Ok(function)
         }

@@ -19,6 +19,55 @@ pub use self::{
     test_parse_context::{TestParseContext, test_context},
 };
 
+#[cfg(feature = "sqlite")]
+#[expect(missing_docs)]
+mod sqlite_syn_builder {
+    use turso_parser::parser::Parser as TursoParser;
+
+    use crate::syn::sqlite::{Name, QualifiedName, Stmt};
+
+    #[derive(Default)]
+    pub struct SqliteSynBuilder;
+
+    #[rstest::fixture]
+    pub fn sqlite_syn() -> SqliteSynBuilder {
+        SqliteSynBuilder::default()
+    }
+
+    impl SqliteSynBuilder {
+        pub fn parse_as_stmt(&self, sql: &str) -> Stmt {
+            let mut parser = TursoParser::new(sql.as_bytes());
+            let Some(cmd) = parser.next().transpose().unwrap() else {
+                panic!("expect command")
+            };
+            let turso_parser::ast::Cmd::Stmt(stmt) = cmd else {
+                panic!("expect command is statement")
+            };
+            Stmt::from(stmt)
+        }
+
+        pub fn name(&self, value: &str) -> Name {
+            use crate::syn::sqlite::NameBuilder;
+            NameBuilder::default()
+                .value(String::from(value))
+                .build()
+                .unwrap()
+        }
+
+        pub fn qualified_name(&self, name: &str) -> QualifiedName {
+            use crate::syn::sqlite::QualifiedNameBuilder;
+
+            QualifiedNameBuilder::default()
+                .name(self.name(name))
+                .build()
+                .unwrap()
+        }
+    }
+}
+
+#[cfg(feature = "sqlite")]
+pub use self::sqlite_syn_builder::{SqliteSynBuilder, sqlite_syn};
+
 /// setup default function overload for test
 pub fn setup_function_overload() -> (TypeReference, OverloadVariant) {
     let int4 = TypeReference::from_master_type_name("int4");
@@ -32,7 +81,7 @@ pub fn setup_function_overload() -> (TypeReference, OverloadVariant) {
 #[rstest::fixture]
 pub fn source_span() -> SourcePathWithSpan {
     let source_one = PathBuf::from("source_one.sql");
-    SourcePathWithSpan::new(&source_one, &StringSpan::default())
+    SourcePathWithSpan::new(&source_one, &StringSpan::new(0, 0))
 }
 
 /// semantic value builder for unit tests

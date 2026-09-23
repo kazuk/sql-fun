@@ -77,6 +77,67 @@ jobs:
           path: target/nextest/ci/junit.xml
           reporter: java-junit
 
+
+  workspace-all-features:
+    runs-on: ubuntu-24.04
+    container: *ci-builder-container
+    steps:
+      - uses: actions/checkout@v5
+
+      - name: Disk usage before cache restore
+        run: |
+          df -h . /usr/local/cargo /github/home
+          df -i . /usr/local/cargo /github/home
+
+      - uses: actions/cache@v5
+        with:
+          path: |
+            /usr/local/cargo/registry
+            /usr/local/cargo/git
+          key: cargo-${{ runner.os }}-workspace-all-features-${{ hashFiles('**/Cargo.lock') }}
+          restore-keys: |
+            cargo-${{ runner.os }}-
+
+      - uses: actions/cache@v5
+        with:
+          path: /github/home/.cache/sccache
+          key: sccache-${{ runner.os }}-workspace-all-features-${{ hashFiles('**/Cargo.lock') }}
+          restore-keys: |
+            sccache-${{ runner.os }}-
+
+      - name: Build and test with all features
+        run: |
+          GIT_ROOT="$(git rev-parse --show-toplevel)"
+          export GIT_ROOT
+          export SQL_FUN_HOME="${GIT_ROOT}/sql-fun-home"
+          sccache --start-server
+          export RUSTC_WRAPPER=sccache
+          export SCCACHE_DIR=/github/home/.cache/sccache
+          .local/bin/check-test-flow --all-features --step=workspace --nextest-extra="
+            --config-file ./ci/nextest/config.toml
+            --profile ci
+            --show-progress none"
+          sccache --show-stats
+
+      - name: Disk usage after build and test
+        if: ${{ always() }}
+        run: |
+          df -h . /usr/local/cargo /github/home
+          df -i . /usr/local/cargo /github/home
+          for path in target /usr/local/cargo/registry /usr/local/cargo/git /github/home/.cache/sccache; do
+            if [ -d "$path" ]; then
+              du -sh "$path"
+            fi
+          done
+
+      - name: Test Report
+        uses: dorny/test-reporter@v3
+        if: ${{ !cancelled() }}
+        with:
+          name: nextest tests (all features)
+          path: target/nextest/ci/junit.xml
+          reporter: java-junit
+
   proc-macro-tests:
     runs-on: ubuntu-24.04
     container: *ci-builder-container
@@ -107,9 +168,10 @@ jobs:
           sccache --start-server
           export RUSTC_WRAPPER=sccache
           export SCCACHE_DIR=/github/home/.cache/sccache
-          .local/bin/check-test-flow --step=proc-macro-tests --nextest-extra="
+          .local/bin/check-test-flow --step=proc-macro-tests --all-features --nextest-extra="
             --config-file ./ci/nextest/config.toml
             --profile ci
+            --test-threads=1
             --show-progress none"
           sccache --show-stats
 
@@ -277,6 +339,7 @@ jobs:
     runs-on: ubuntu-24.04
     needs:
       - workspace
+      - workspace-all-features
       - proc-macro-tests
       - fmt
       - lint

@@ -11,6 +11,7 @@ readme = "README.md"
 rust-version.workspace = true
 
 [features]
+sqlite = ["sql-fun-server-api/sqlite"]
 
 [dependencies]
 serde.workspace = true

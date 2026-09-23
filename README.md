@@ -20,12 +20,15 @@ For other ecosystems, `sql-fun` can be used as a **stand-alone SQL semantic vali
 
 `sql-fun` is a toolchain for executing and validating SQL queries and statements.
 
-- It is designed for **PostgreSQL**:
-  - SQL is parsed using `pg_query`, a full PostgreSQL parser.
-    - You can use the full range of PostgreSQL syntax with no limitations.
-  - All SQL statements are validated statically:
-    - SQL syntax validation
-    - Schema-aware validation (optional)
+- It is designed for **PostgreSQL** and **SQLite**:
+  - for PostgreSQL
+    - SQL is parsed using `pg_query`, 'official engine extracted' full PostgreSQL parser.
+      - You can use the full range of PostgreSQL syntax with no limitations.
+  - for SQLite
+    - SQL is parsed using `turso_parser`.
+      - Compatible with SQLite: see [`turso`](https://github.com/tursodatabase/turso).
+  - `sql-fun` makes SQL embedded in applications statically verifiable, including
+    syntax checks and optional schema-aware analysis.
 - It provides a command-line tool for schema inspection and query analysis:
   - Explore tables, columns, views, etc.
     - Describe objects in your schema without a live database connection.
@@ -39,6 +42,8 @@ For other ecosystems, `sql-fun` can be used as a **stand-alone SQL semantic vali
   - Generates strongly typed functions at **compile time**.
   - Requires **no runtime dependencies** in your application.
   - Compatible with `tokio-postgres`, the primary runtime `sql-fun` targets.
+
+SQLite support is under development and requires the `sqlite` feature.
 
 ## Installation
 
@@ -68,6 +73,9 @@ installed automatically with the CLI.
 
 - `sql-fun-server/` :
   `sql-fun` Backend JSON RPC Server.
+
+- `sql-fun-server-api/` :
+  Protocol definitions for `sql-fun-server`
 
 - `sql-fun-client/` :
   Client crate for `sql-fun-server`

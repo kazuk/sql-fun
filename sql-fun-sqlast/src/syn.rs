@@ -4,6 +4,9 @@
 mod generated;
 mod syn_ext;
 
+#[cfg(feature = "sqlite")]
+pub mod sqlite;
+
 use itertools::Itertools;
 use sql_fun_core::IVec;
 

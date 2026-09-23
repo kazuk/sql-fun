@@ -17,6 +17,18 @@ pub enum SortOrder {
     Desc,
 }
 
+#[cfg(feature = "sqlite")]
+impl From<crate::syn::sqlite::SortOrder> for SortOrder {
+    fn from(value: crate::syn::sqlite::SortOrder) -> Self {
+        use crate::syn::sqlite::SortOrder;
+
+        match value {
+            SortOrder::Asc => Self::Asc,
+            SortOrder::Desc => Self::Desc,
+        }
+    }
+}
+
 /// `IndexElement` has column or expression
 #[derive(Debug, Clone)]
 pub enum IndexElement {

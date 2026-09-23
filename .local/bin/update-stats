@@ -6,5 +6,5 @@ worktree_root="$(git rev-parse --show-toplevel)"
 cd "${worktree_root}"
 
 # update stats/coverage.txt
-cargo llvm-cov --all --no-fail-fast --summary-only nextest \
+cargo llvm-cov --all-features --all --no-fail-fast --summary-only nextest \
     > stats/coverage.txt

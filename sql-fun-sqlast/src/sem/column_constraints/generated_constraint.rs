@@ -1,5 +1,7 @@
 use sql_fun_core::IVec;
 
+#[cfg(feature = "sqlite")]
+use crate::SqliteToken;
 use crate::{
     sem::{
         AnalysisError, ColumnConstraint, ColumnConstraintKind, ColumnConstraintTrait, ColumnName,
@@ -40,6 +42,16 @@ impl GeneratedColumnMode {
         } else {
             AnalysisError::raise_unexpected_input("generated_when")?;
             AnalysisError::never()
+        }
+    }
+}
+
+#[cfg(feature = "sqlite")]
+impl From<&crate::syn::sqlite::GeneratedColumnType> for GeneratedColumnMode {
+    fn from(value: &crate::syn::sqlite::GeneratedColumnType) -> Self {
+        match value {
+            crate::syn::sqlite::GeneratedColumnType::Stored => Self::Stored,
+            crate::syn::sqlite::GeneratedColumnType::Virtual => Self::Virtual,
         }
     }
 }
@@ -146,6 +158,34 @@ impl GeneratedColumnConstraint {
         context = new_context;
         Ok((
             Self::new(table_name, column_name, expr, Some(generated_when)),
+            context,
+        ))
+    }
+}
+
+#[cfg(feature = "sqlite")]
+impl GeneratedColumnConstraint {
+    /// analyze [`crate::syn::sqlite::GeneratedColumnConstraint`]
+    pub fn analyze_constraint_sqlite<TParseContext>(
+        mut context: TParseContext,
+        table_name: &TableName,
+        column_name: &ColumnName,
+        syn: &crate::syn::sqlite::GeneratedColumnConstraint,
+        tokens: &IVec<SqliteToken<'_>>,
+    ) -> Result<(ColumnConstraint, TParseContext), AnalysisError>
+    where
+        TParseContext: ParseContext,
+    {
+        let (expr, new_context) = SemScalarExpr::analyze_sqlite_scalar_expr(
+            context,
+            &ScalarAnalysisContext::default(),
+            syn.expr(),
+            tokens,
+        )?;
+        context = new_context;
+        let generated_when = syn.typ().as_ref().map(GeneratedColumnMode::from);
+        Ok((
+            ColumnConstraint::generated(Self::new(table_name, column_name, expr, generated_when)),
             context,
         ))
     }

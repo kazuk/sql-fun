@@ -49,3 +49,10 @@ impl TryFrom<&Node> for ColumnName {
         Ok(Self::from(name))
     }
 }
+
+#[cfg(feature = "sqlite")]
+impl From<&crate::syn::sqlite::Name> for ColumnName {
+    fn from(value: &crate::syn::sqlite::Name) -> Self {
+        Self::new(value.value())
+    }
+}

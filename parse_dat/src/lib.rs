@@ -27,6 +27,7 @@ fn pos_to_line_col(source: &str, pos: usize) -> (usize, usize) {
     (line, col)
 }
 
+/// CLI argument for `parse_dat`
 #[derive(ClapParser)]
 pub struct ParseDatArgs {
     /// Input .dat file path
@@ -35,12 +36,16 @@ pub struct ParseDatArgs {
     output_file: Option<PathBuf>,
 }
 
+/// parse errors
 #[derive(Error, Debug)]
 pub enum ParseDatError {
+    /// IO
     #[error(transparent)]
     Io(#[from] std::io::Error),
+    /// serialize
     #[error(transparent)]
     Serde(#[from] serde_json::Error),
+    /// parse string
     #[error("Parse error:\n{0}")]
     Parse(String),
 }

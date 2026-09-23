@@ -2,6 +2,8 @@ mod impl_conversion_traits;
 
 use std::fmt::Display;
 
+#[cfg(feature = "sqlite")]
+use crate::sem::AnalysisError;
 use crate::sem::{CatalogName, LocalName, SchemaName};
 
 /// full name parts.
@@ -10,6 +12,19 @@ pub struct FullName {
     catalog: Option<CatalogName>,
     schema: Option<SchemaName>,
     name: LocalName,
+}
+
+#[cfg(feature = "sqlite")]
+impl TryFrom<&crate::syn::sqlite::QualifiedName> for FullName {
+    type Error = AnalysisError;
+
+    fn try_from(value: &crate::syn::sqlite::QualifiedName) -> Result<Self, Self::Error> {
+        Ok(Self {
+            catalog: None,
+            schema: value.db_name().map(SchemaName::try_from).transpose()?,
+            name: LocalName::try_from(value.name())?,
+        })
+    }
 }
 
 impl FullName {

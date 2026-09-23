@@ -19,6 +19,9 @@ use crate::{
     syn::{ListOpt, Opt, ScanToken},
 };
 
+#[cfg(feature = "sqlite")]
+use crate::{SqliteToken, syn::sqlite::CreateTableBody};
+
 #[macro_use]
 #[path = "./macros.rs"]
 mod macros;
@@ -332,6 +335,189 @@ impl CreateTable {
     }
 }
 
+#[cfg(feature = "sqlite")]
+impl CreateTable {
+    /// analyze [`crate::syn::sqlite::ColumnAndConstraint`]
+    #[expect(clippy::too_many_arguments)]
+    pub fn analyze_columns_and_constraint<TParseContext>(
+        mut context: TParseContext,
+        _parent_schema: &Option<String>,
+        table_name: &TableName,
+        mode: &CreateTableMode,
+        temporary: bool,
+        syn: crate::syn::sqlite::ColumnsAndConstraint,
+        tokens: &IVec<SqliteToken<'_>>,
+        source_span: &SourcePathWithSpan,
+    ) -> Result<(Self, TParseContext), AnalysisError>
+    where
+        TParseContext: ParseContext,
+    {
+        let mut cols = Vec::new();
+        for col_def in syn.columns() {
+            let (col, new_context) =
+                ColumnDefinition::analyze_column_definition(context, table_name, col_def, tokens)?;
+            context = new_context;
+            cols.push(col);
+        }
+
+        let table_def = Self::new(table_name, cols, *mode, temporary, source_span);
+        Ok((table_def, context))
+    }
+}
+
+#[cfg(feature = "sqlite")]
+impl CreateTable {
+    /// analyze [`crate::syn::sqlite::CreateTableBody`]
+    #[expect(clippy::too_many_arguments)]
+    pub fn analyze_create_table_body<TParseContext>(
+        context: TParseContext,
+        parent_schema: &Option<String>,
+        table_name: &TableName,
+        mode: &CreateTableMode,
+        temporary: bool,
+        syn: CreateTableBody,
+        tokens: &IVec<SqliteToken<'_>>,
+        source_span: &SourcePathWithSpan,
+    ) -> Result<AstAndContextPair<TParseContext>, AnalysisError>
+    where
+        TParseContext: ParseContext,
+    {
+        use crate::syn::sqlite::CreateTableBody;
+
+        match syn {
+            CreateTableBody::ColumnsAndConstraint(columns_and_constraint) => {
+                let (result, context) = Self::analyze_columns_and_constraint(
+                    context,
+                    parent_schema,
+                    table_name,
+                    mode,
+                    temporary,
+                    columns_and_constraint,
+                    tokens,
+                    source_span,
+                )?;
+                let new_context = context.apply_create_table(&result)?;
+                Ok(AstAndContextPair::new(
+                    SemAst::CreateTable(result),
+                    new_context,
+                ))
+            }
+            CreateTableBody::AsSelect(_select) => todo!(),
+        }
+    }
+}
+
+#[cfg(feature = "sqlite")]
+impl CreateTable {
+    /// analyze [`crate::syn::sqlite::CreateTableStatement`]
+    #[tracing::instrument(skip(context))]
+    pub fn analyze_create_table<TParseContext>(
+        context: TParseContext,
+        parent_schema: &Option<String>,
+        syn: crate::syn::sqlite::CreateTableStatement,
+        tokens: &IVec<SqliteToken<'_>>,
+        source_span: &SourcePathWithSpan,
+    ) -> Result<AstAndContextPair<TParseContext>, AnalysisError>
+    where
+        TParseContext: ParseContext,
+    {
+        let (temporary, if_not_exists, table_name, body) = syn.dissolve();
+        let table_name = TableName::try_from(&table_name)?;
+        let mode = CreateTableMode::from_if_not_exists(if_not_exists);
+
+        Self::analyze_create_table_body(
+            context,
+            parent_schema,
+            &table_name,
+            &mode,
+            temporary,
+            body,
+            tokens,
+            source_span,
+        )
+    }
+}
+
+#[cfg(all(test, feature = "sqlite"))]
+mod test_analyze_create_table {
+    use assert_matches::assert_matches;
+    use testresult::TestResult;
+
+    use crate::{
+        AstAndContextPair,
+        sem::{BaseParseContext, CreateTableMode, SchemaName, SemAst, SourcePathWithSpan},
+        syn::sqlite::Stmt,
+        test_helpers::{
+            SemValueBuilder, SqliteSynBuilder, TestParseContext, sem_builder, source_span,
+            sqlite_syn, test_context,
+        },
+    };
+
+    #[rstest::rstest]
+    #[case(
+        "create table users(id integer, name text)",
+        "users",
+        CreateTableMode::Default,
+        false
+    )]
+    #[case(
+        "create table if not exists users(id integer, name text)",
+        "users",
+        CreateTableMode::IfNotExists,
+        false
+    )]
+    #[case(
+        "create temp table if not exists temp_test(id integer, name text)",
+        "temp_test",
+        CreateTableMode::IfNotExists,
+        true
+    )]
+    fn test_analyze_create_table(
+        mut test_context: TestParseContext,
+        sqlite_syn: SqliteSynBuilder,
+        source_span: SourcePathWithSpan,
+        sem_builder: SemValueBuilder,
+        #[case] sql: &str,
+        #[case] table_name: &str,
+        #[case] table_mode: CreateTableMode,
+        #[case] temporary: bool,
+    ) -> TestResult {
+        // FIXME: PostgreSQL specific config require in SQLite tests
+        test_context.set_get_search_path_result(&vec![
+            SchemaName::from("public"),
+            SchemaName::from("pg_catalog"),
+        ]);
+
+        let stmt = sqlite_syn.parse_as_stmt(sql);
+
+        let Stmt::CreateTable(ct) = stmt else {
+            panic!("expect CreateTable: {stmt:?}");
+        };
+        let tokens = Vec::default().into();
+        let AstAndContextPair(sem_ast, result_context) = super::CreateTable::analyze_create_table(
+            test_context,
+            &None,
+            ct,
+            &tokens,
+            &source_span,
+        )?;
+        assert_matches!(sem_ast, SemAst::CreateTable(_));
+        let Some(create_table) = sem_ast.as_create_table() else {
+            panic!("expect CreateTable")
+        };
+        assert_eq!(create_table.name(), &sem_builder.table_name(table_name));
+        assert_eq!(create_table.mode(), &table_mode);
+        assert_eq!(create_table.temporary(), temporary);
+
+        let Some(_table_in_context) = result_context.get_table(&sem_builder.table_name(table_name))
+        else {
+            panic!("table not found in context")
+        };
+
+        Ok(())
+    }
+}
+
 /// `DROP TABLE` statement
 #[derive(Debug, Clone)]
 pub struct DropTable {
@@ -448,6 +634,65 @@ mod test_drop_table_analyze_drop_stmt {
         assert_eq!(drop_table.cascade(), cascade);
         let table_name = drop_table.table_names.first().unwrap();
         table_name.assert_table_name("table_one");
+
+        Ok(())
+    }
+}
+
+impl DropTable {
+    ///
+    /// analyze DropTableStatemtn for SQLite dialect
+    ///
+    #[cfg(feature = "sqlite")]
+    pub fn analyze_drop_table<TParseContext>(
+        mut context: TParseContext,
+        syn: crate::syn::sqlite::DropTableStatement,
+        _tokens: &IVec<SqliteToken<'_>>,
+    ) -> Result<AstAndContextPair<TParseContext>, AnalysisError>
+    where
+        TParseContext: ParseContext,
+    {
+        let if_exists = syn.if_exists();
+        let table_name = TableName::try_from(syn.name())?;
+        if context.get_table(&table_name).is_none() {
+            context.report_problem(AnalysisProblem::table_not_found(&table_name))?;
+        }
+        let result = Self {
+            if_exists: *if_exists,
+            table_names: vec![table_name.to_owned()],
+            cascade: false,
+        };
+        context = context.apply_drop_table(&result)?;
+        Ok(AstAndContextPair::new(SemAst::DropTable(result), context))
+    }
+}
+
+#[cfg(all(test, feature = "sqlite"))]
+mod test_drop_table_analyze_drop_table {
+    use crate::{
+        AstAndContextPair,
+        syn::sqlite::DropTableStatement,
+        test_helpers::{SqliteSynBuilder, TestParseContext, sqlite_syn, test_context},
+    };
+    use testresult::TestResult;
+
+    #[rstest::rstest]
+    fn test_analyze_drop_table(
+        test_context: TestParseContext,
+        sqlite_syn: SqliteSynBuilder,
+    ) -> TestResult {
+        let table_name = sqlite_syn.qualified_name("table_one");
+        let statement = DropTableStatement::new(true, table_name);
+        let tokens = Vec::default().into();
+        let AstAndContextPair(ast, result_context) =
+            super::DropTable::analyze_drop_table(test_context, statement, &tokens)?;
+        let Some(drop_table) = ast.as_drop_table() else {
+            panic!("{ast:?} is not DropTable")
+        };
+        assert_eq!(drop_table.if_exists(), true);
+        let table_name = drop_table.table_names().first().unwrap();
+        table_name.assert_table_name("table_one");
+        assert_eq!(result_context.reported_problem_count(), 1);
 
         Ok(())
     }

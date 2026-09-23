@@ -42,6 +42,11 @@ mod view_like;
 
 pub mod problem;
 
+#[cfg(feature = "sqlite")]
+use sql_fun_core::IVec;
+#[cfg(feature = "sqlite")]
+use turso_parser::ast::Cmd;
+
 #[expect(deprecated)]
 pub use self::{
     alter_owner::AlterOwner,
@@ -115,6 +120,9 @@ pub use self::{
 pub use crate::AstAndContextPair;
 
 use crate::StringSpan;
+
+#[cfg(feature = "sqlite")]
+use crate::{SqliteToken, syn::sqlite::Stmt};
 
 use std::{
     fmt::Debug,
@@ -307,6 +315,29 @@ impl SemAst {
             Some(t)
         } else {
             None
+        }
+    }
+
+    /// analyze [`Cmd`]
+    #[cfg(feature = "sqlite")]
+    pub fn semantic_analysis_sqlite<TContext>(
+        context: TContext,
+        syn: Cmd,
+        tokens: &IVec<SqliteToken<'_>>,
+    ) -> Result<AstAndContextPair<TContext>, AnalysisError>
+    where
+        TContext: ParseContext,
+    {
+        match syn {
+            Cmd::Explain(stmt) => {
+                Self::semantic_analysis_sqlite_stmt(context, Stmt::from(stmt), tokens)
+            }
+            Cmd::ExplainQueryPlan(stmt) => {
+                Self::semantic_analysis_sqlite_stmt(context, Stmt::from(stmt), tokens)
+            }
+            Cmd::Stmt(stmt) => {
+                Self::semantic_analysis_sqlite_stmt(context, Stmt::from(stmt), tokens)
+            }
         }
     }
 }

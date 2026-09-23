@@ -105,7 +105,7 @@ RUN UV_TOOL_DIR=/opt/uv-tools \
     && graphify --version
 
 RUN curl -LsSf https://github.com/rvben/rumdl/releases/download/v0.2.76/rumdl-v0.2.76-x86_64-unknown-linux-gnu.tar.gz \
-  | tar xzf - -C /usr/local/bin　\
+    | tar xzf - -C /usr/local/bin \
     && rumdl --version
 
 COPY --from=builder /opt/tools/bin /usr/local/cargo/bin

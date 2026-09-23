@@ -18,7 +18,12 @@ The GitHub Actions CI environment is built from `ci/github-actions/Dockerfile` a
 
    Review the intent of the Dockerfile change and verify that the implementation is correct. Merge the pull request into `main` after review.
 
-4. Create a new branch from the updated `main`, then open a pull request targeting the `ci-image` branch.
+4. Refresh remote-tracking references, create a new branch from `origin/main`, then open a pull request targeting the `ci-image` branch.
+
+   ```sh
+   git fetch origin
+   git switch -c <branch-name> origin/main
+   ```
 
    This pull request is the explicit review point for deciding whether the updated Dockerfile should be published as the CI image. Merge it into `ci-image` after review.
 
@@ -28,7 +33,12 @@ The GitHub Actions CI environment is built from `ci/github-actions/Dockerfile` a
 
    After the workflow completes, copy the published image digest from the `Show digest` step.
 
-6. Create a new branch from `ci-image`.
+6. Refresh remote-tracking references and create a new branch from `origin/ci-image`.
+
+   ```sh
+   git fetch origin
+   git switch -c <branch-name> origin/ci-image
+   ```
 
    Update the `image` value of the `ci-builder-container` anchor in `.github/workflows/build-test.yml` to use the digest produced in the previous step.
 

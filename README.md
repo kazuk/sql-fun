@@ -4,31 +4,38 @@
 
 It assumes that you **can write SQL and want to write SQL**.
 
-It doesn't try to hide SQL behind abstractions or pretend it knows better than your database.
-It just makes **SQL fit cleanly into your development workflow** — statically validated, safe, and enjoyable.
+It doesn't try to hide SQL behind abstractions or pretend it knows better than
+your database. It just makes **SQL fit cleanly into your development workflow**
+— statically validated, safe, and enjoyable.
 
 If you're looking for an ORM: this isn't it.  
 If you're writing raw SQL and want your tools to help more: this is it.
 
 ---
 
-✨ For Rust developers, `sql-fun` provides the **best developer experience** by integrating directly with proc-macros to generate strongly typed async functions at compile time.  
-For other ecosystems, `sql-fun` can be used as a **stand-alone SQL semantic validator** and linter, and may serve as a backend for language-specific code generators (Go, Python, TypeScript, …).
-
+✨ For Rust developers, `sql-fun` provides the **best developer experience** by
+integrating directly with proc-macros to generate strongly typed async functions
+at compile time.  
+For other ecosystems, `sql-fun` can be used as a
+**stand-alone SQL semantic validator** and linter, and may serve as a backend
+for language-specific code generators (Go, Python, TypeScript, …).
 
 ## What is `sql-fun`
 
-`sql-fun` is a toolchain for executing and validating SQL queries and statements.
+`sql-fun` is a toolchain for executing and validating SQL queries and
+statements.
 
 - It is designed for **PostgreSQL** and **SQLite**:
   - for PostgreSQL
-    - SQL is parsed using `pg_query`, 'official engine extracted' full PostgreSQL parser.
+    - SQL is parsed using `pg_query`, 'official engine extracted' full
+      PostgreSQL parser.
       - You can use the full range of PostgreSQL syntax with no limitations.
   - for SQLite
     - SQL is parsed using `turso_parser`.
-      - Compatible with SQLite: see [`turso`](https://github.com/tursodatabase/turso).
-  - `sql-fun` makes SQL embedded in applications statically verifiable, including
-    syntax checks and optional schema-aware analysis.
+      - Compatible with SQLite: see
+        [`turso`](https://github.com/tursodatabase/turso).
+  - `sql-fun` makes SQL embedded in applications statically verifiable,
+    including syntax checks and optional schema-aware analysis.
 - It provides a command-line tool for schema inspection and query analysis:
   - Explore tables, columns, views, etc.
     - Describe objects in your schema without a live database connection.
@@ -36,7 +43,8 @@ For other ecosystems, `sql-fun` can be used as a **stand-alone SQL semantic vali
     - More reliable than plain text grep.
   - Run SQL syntax and schema-aware checks on standalone SQL files.
 - It does not try to model your entire database schema.
-  - Instead, it focuses only on what your application actually *does*—the SQL queries it runs.
+  - Instead, it focuses only on what your application actually *does*—the SQL
+    queries it runs.
   - This keeps the tool lightweight, focused, and reliable.
 - For Rust developers, `sql-fun` integrates with proc-macros:
   - Generates strongly typed functions at **compile time**.
@@ -57,7 +65,7 @@ installed automatically with the CLI.
   Procedural macro implementations
 
 - `sql-fun-sqlast/` :
-  `sql-fun` semantic SQL parser 
+  `sql-fun` semantic SQL parser
 
 - `xbuild/` : (private crate)
   Project internal utility
@@ -89,11 +97,10 @@ installed automatically with the CLI.
 - `docs` :
   Internal documentations for `sql-fun`
 
-
 ## License
 
-`sql-fun` is primarily distributed under the terms of the MIT license, with portions covered by various BSD-like licenses.
-
+`sql-fun` is primarily distributed under the terms of the MIT license, with
+portions covered by various BSD-like licenses.
 
 ## Small Contributions Are Welcome
 

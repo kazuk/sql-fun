@@ -1,6 +1,7 @@
 # Design Philosophies
 
-`sql-fun` is built on the belief that tools should help — not control — the developer.
+`sql-fun` is built on the belief that tools should help — not control — the
+developer.
 
 - It assumes you know SQL and prefer to write it directly.
 - It does not attempt to abstract over SQL or model your database schema.
@@ -17,7 +18,8 @@ Every query is statically defined, statically parsed, and statically validated.
 
 ## No-lockin Philosophy
 
-Among many possible design philosophies, `sql-fun` adopts one — but does not enforce it.
+Among many possible design philosophies, `sql-fun` adopts one — but does not
+enforce it.
 
 While it embraces compile-time validation and zero-runtime constraints,  
 it deliberately avoids locking users into this way of thinking.
@@ -40,7 +42,8 @@ It doesn’t offer advice or fill in gaps. Because that’s not what tools do.
 
 > Like a hammer or a saw,  
 > it will never start working without you.  
-> It never makes assumptions, never overrides intent, and never moves on its own.
+> It never makes assumptions, never overrides intent, and never moves on its
+> own.
 
 In a world where many systems try to automate, predict, or control,  
 `sql-fun` insists on being a tool — and only a tool.
@@ -76,7 +79,8 @@ Not in configuration, not in code generation, not in philosophy.
 
 ### Tools, Not Taxis
 
-Some tools are like taxis — you don't own them, but they take you to a destination.  
+Some tools are like taxis — you don't own them, but they take you to a
+destination.  
 They decide the route, and sometimes even drive themselves.
 
 That’s fine — for taxis.
@@ -98,7 +102,8 @@ It does nothing unless you hold the wheel.
 build pipelines, test suites, code generation workflows, and developer tooling.
 
 If such a tool started making its own decisions —  
-even well-intentioned ones — it could introduce inconsistencies, confusion, or worse.
+even well-intentioned ones — it could introduce inconsistencies, confusion, or
+worse.
 
 Silent assumptions become invisible bugs.  
 Helpful guesses become unintentional lock-in.  
@@ -114,4 +119,3 @@ It behaves as a tool — and only as a tool.
 It simply does what you asked, and nothing more.  
 And in complex systems — that's not a limitation.  
 That’s a virtue.
-

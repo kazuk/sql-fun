@@ -125,6 +125,23 @@ To check formatting without rewriting files:
 .local/bin/check-test-flow --step=fmt --fmt-check
 ```
 
+## Markdown linting
+
+Install the same rumdl version used by the development/CI image:
+
+```sh
+cargo install --locked rumdl --version 0.2.76
+```
+
+Run the Markdown checks from the repository root:
+
+```sh
+rumdl check .
+```
+
+Use `rumdl fmt .` to apply automatic fixes, then review the diff and rerun the
+check.
+
 ## Generated Files
 
 Do not edit generated files directly.

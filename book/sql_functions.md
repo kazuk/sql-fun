@@ -9,7 +9,8 @@ Attribute arguments specifies SQL statement and datasource.
 - `sql`: SQL statement literal, conflicts with `sql_file`
 - `sql_file`: SQL statement from file, conflicts with `sql`
   - SQL statement embedding in structured file
-    - When `sql_file` contains `#`, file can be JSON/TOML/YAML formatted structured file.
+    - When `sql_file` contains `#`, file can be JSON/TOML/YAML formatted
+      structured file.
     - After `#` for JSON-Path to SQL string.
   - relative path from source file.
 - `datasource`: specify datasource name
@@ -70,51 +71,64 @@ edge = {
 ...
 ```
 
-
 ## Function signature requirements
 
 - Functions must be annotated with one of the following:
-  - `sql_fun::sql_query_one`: Expects a single row; return type must be `Result<RowType, E>`.
-  - `sql_fun::sql_query_opt`: Expects zero or one row; return type must be `Result<Option<RowType>, E>`.
-  - `sql_fun::sql_query_many`: Expects multiple rows (possibly zero); return type must be `Result<Collector, E>`.
-  - `sql_fun::sql_statement`: Executes a statement that returns no rows; return type must use the connector's affected-row count type (`u64` for `tokio-postgres`, `usize` for `rusqlite`).
+  - `sql_fun::sql_query_one`: Expects a single row; return type must be
+    `Result<RowType, E>`.
+  - `sql_fun::sql_query_opt`: Expects zero or one row; return type must be
+    `Result<Option<RowType>, E>`.
+  - `sql_fun::sql_query_many`: Expects multiple rows (possibly zero); return
+    type must be `Result<Collector, E>`.
+  - `sql_fun::sql_statement`: Executes a statement that returns no rows; return
+    type must use the connector's affected-row count type (`u64` for
+    `tokio-postgres`, `usize` for `rusqlite`).
 - When async connector is used, function requires `async`.
   - `tokio-postgres` is a async connector , `rusqlite` is not a async connector.
 - The first argument represents the database connection.
-  - This may be any type, such as `Client`, `Transaction`, or a user-defined wrapper type.
-    - It must support the methods `prepare`, `query_one`, `query_opt`, `query_raw`, or `execute` with compatible signatures.
-- A parameter with `#[interrupt_future]` or `#[interrupt_channel]` is used to interrupt query execution.
+  - This may be any type, such as `Client`, `Transaction`, or a user-defined
+    wrapper type.
+    - It must support the methods `prepare`, `query_one`, `query_opt`,
+      `query_raw`, or `execute` with compatible signatures.
+- A parameter with `#[interrupt_future]` or `#[interrupt_channel]` is used to
+  interrupt query execution.
   - `#[interrupt_future]` combined for async connector.
     - When future completed, stop query execution.
   - `#[interrupt_channel]` is combined with a sync connector.
-    - `rusqlite` uses `Connection::progress_handler`; a received message requests query interruption.
-
+    - `rusqlite` uses `Connection::progress_handler`; a received message
+      requests query interruption.
 - All other parameters are used for SQL parameter binding.
 
 ## Additional Requirements for sql_query_many
-  - The last two parameters must be the `collector` and the `handler`, in that order.
-    - Their names do not matter; only their position is used.
-    - The `handler` is called for each row in the result set. It consumes the `collector` and returns an updated one.
-    - The `collector` holds query execution state:
-      - It must be declared `mut`.
-      - Any type may be used; `sql_query_many` does not directly call it.
-      - The generated function only owns and passes it along.
-      - The final value is returned by the function.
-  - The `handler` must be a generic `Fn` or closure.
-    - `R` is the row type, inferred from the handler's parameter.
-    - With `tokio-postgres`, its form is `Fn(C, R) -> Fut`, where `Fut` is an async future returning `Result<C, E>`.
-    - With `rusqlite`, its form is `Fn(C, R) -> Result<C, E>`.
 
+- The last two parameters must be the `collector` and the `handler`, in that
+  order.
+  - Their names do not matter; only their position is used.
+  - The `handler` is called for each row in the result set. It consumes the
+    `collector` and returns an updated one.
+  - The `collector` holds query execution state:
+    - It must be declared `mut`.
+    - Any type may be used; `sql_query_many` does not directly call it.
+    - The generated function only owns and passes it along.
+    - The final value is returned by the function.
+- The `handler` must be a generic `Fn` or closure.
+  - `R` is the row type, inferred from the handler's parameter.
+  - With `tokio-postgres`, its form is `Fn(C, R) -> Fut`, where `Fut` is an
+    async future returning `Result<C, E>`.
+  - With `rusqlite`, its form is `Fn(C, R) -> Result<C, E>`.
 
 ## RowType Requirements
 
 - Implement a **`builder` function** that returns a builder instance.
-- Have a builder type that provides **setter methods** for all columns, either mutable or consuming.
-- Implement **`build()`** to construct the final instance, returning either a row or a `Result`.
-- For fallible builders, ensure that the builder error converts into the function’s error type `E`.
+- Have a builder type that provides **setter methods** for all columns, either
+  mutable or consuming.
+- Implement **`build()`** to construct the final instance, returning either a
+  row or a `Result`.
+- For fallible builders, ensure that the builder error converts into the
+  function’s error type `E`.
 
-The `derive_builder::Builder` crate satisfies most of these requirements. You only need to add a `builder()` method:
-
+The `derive_builder::Builder` crate satisfies most of these requirements. You
+only need to add a `builder()` method:
 
 ```rust
 #[derive(derive_builder::Builder)]
@@ -140,11 +154,12 @@ builder_build_fallible = false
 ```
 
 The accepted setter values are `"mutable"` (the default) and `"consuming"`.
-Mutable setters generate `builder.field(value);` after `let mut builder = Row::builder();`.
-Consuming setters generate `let builder = builder.field(value);` after
-`let builder = Row::builder();`, allowing each setter to change the builder's type.
-The build option independently selects `builder.build()?` (the default, `true`)
-or `builder.build()` (`false`). All four combinations are supported.
+Mutable setters generate `builder.field(value);` after
+`let mut builder = Row::builder();`. Consuming setters generate
+`let builder = builder.field(value);` after `let builder = Row::builder();`,
+allowing each setter to change the builder's type. The build option
+independently selects `builder.build()?` (the default, `true`) or
+`builder.build()` (`false`). All four combinations are supported.
 
 Each SQL query function may override either option; omitted options retain the
 selected datasource's values:
@@ -171,16 +186,20 @@ on your row type as needed.
 The Function returns `Result<IdRow, E>`, where `E` must:
 
 - Implement `From<tokio_postgres::Error>` (for query execution failures).
-- Implement `From<std::io::Error>` (for unexpected column mismatches in the prepare check statement).
-- Be capable of handling errors returned by the builder when `builder_build_fallible = true`.
-
+- Implement `From<std::io::Error>` (for unexpected column mismatches in the
+  prepare check statement).
+- Be capable of handling errors returned by the builder when
+  `builder_build_fallible = true`.
 
 ## Collector Type
 
-For an optional library that accepts ordered query rows and exposes immutable row sets,
-see [Collecting ordered rows with sql-fun-collector](./sql_fun_collector.md).
+For an optional library that accepts ordered query rows and exposes immutable
+row sets, see
+[Collecting ordered rows with sql-fun-collector](./sql_fun_collector.md).
 
-The `collector` is used with `sql_query_many` to accumulate rows. It is passed to and returned from the `handler`; the generated function does not call any methods on it directly.
+The `collector` is used with `sql_query_many` to accumulate rows. It is passed
+to and returned from the `handler`; the generated function does not call any
+methods on it directly.
 
 A simple example is `VecCollector`, which collects rows into a `Vec<T>`:
 
@@ -218,20 +237,22 @@ async fn execute_select_users_by_name_like(
     let collector = VecCollector::new();
 
     let collector =
-        select_users_by_name_like(client, name_like, collector, async move |collector, row| {
-            Ok(collector.collect(row).await?)
-        })
+        select_users_by_name_like(
+            client, name_like, collector, async move |collector, row| {
+                Ok(collector.collect(row).await?)
+            },
+        )
         .await?;
 
     Ok(collector.into_inner())
 }
 ```
 
-
 ## Parameter binding
 
 - In the SQL string, bind parameters using `${...}` syntax.
-- Named parameters like `${name}` are converted to positional placeholders like `$1`, `$2`, etc.
+- Named parameters like `${name}` are converted to positional placeholders like
+  `$1`, `$2`, etc.
 
 ### Binding from a DTO
 
@@ -295,17 +316,19 @@ while preserving it for child-function bindings.
 
 The attribute takes three parameters:
 
- 1. The name of the fragment.
- 1. The match argument.
- 1. The match arms.
+1. The name of the fragment.
+1. The match argument.
+1. The match arms.
 
 ### Match Arms
 
-The third argument to #[sql_fragment(...)] is a Rust-style match block that defines how to expand the fragment based on the input values.
+The third argument to #[sql_fragment(...)] is a Rust-style match block that
+defines how to expand the fragment based on the input values.
 
 Each arm should returns:
- - literal string representing the SQL fragment to inject.
- - the `INVALID_QUERY` causes a runtime error
+
+- literal string representing the SQL fragment to inject.
+- the `INVALID_QUERY` causes a runtime error
 
 For example:
 
@@ -323,26 +346,33 @@ For example:
 
 This means:
 
- - If `name` is `Some(n)`, the SQL becomes: `select ... where name=$1`
- - If `name` is `None`, the fragment is empty, so no WHERE clause is added
+- If `name` is `Some(n)`, the SQL becomes: `select ... where name=$1`
+- If `name` is `None`, the fragment is empty, so no WHERE clause is added
 
-Each match arm is expanded into a separate internal function (see below), so naming is important.
+Each match arm is expanded into a separate internal function (see below), so
+naming is important.
 
 ### The `#[cond]` Attribute
 
-Parameters marked with `#[cond]` are *used only for fragment expansion* and are *not passed* to the internal function generated for each match arm.
+Parameters marked with `#[cond]` are *used only for fragment expansion* and are
+*not passed* to the internal function generated for each match arm.
 
-This attribute tells `sql-fun` that the parameter is *consumed in the match expression* defined in `#[sql_fragment(...)]`. Since its value is already matched and handled in the outer function, it does not need to be passed down to the branch functions.
+This attribute tells `sql-fun` that the parameter is
+*consumed in the match expression* defined in `#[sql_fragment(...)]`. Since its
+value is already matched and handled in the outer function, it does not need to
+be passed down to the branch functions.
 
-Without `#[cond]`, all parameters are assumed to be forwarded to the generated internal function.
+Without `#[cond]`, all parameters are assumed to be forwarded to the generated
+internal function.
 
 ### Internal Function Naming
 
-The function name is derived by combining the original function name with the match arm's pattern:
+The function name is derived by combining the original function name with the
+match arm's pattern:
 
 Match arms with `_` are expanded as function names ending in `_`.
 
-```
+```text
 Original function name: find_user
 
 Match:         Some(n)
@@ -355,12 +385,13 @@ Match:         _
 Generated fn:  find_user_
 ```
 
-These names also appear as query identifiers in the generated `sql-fun.{schema}.toml`.
+These names also appear as query identifiers in the generated
+`sql-fun.{schema}.toml`.
 
-    💡 Use meaningful pattern variable names to keep generated function and query names readable.
+💡 Use meaningful pattern variable names to keep generated function and query
+names readable.
 
-
-### Conditional SQL Example:
+### Conditional SQL Example
 
 ```rust
 #[sql_fun::sql_query_many(sql = "select id, name from users #{where_clause}")]
@@ -403,7 +434,6 @@ async fn find_user(...) -> Result<...> {
 
 This expansion is recursive — each case is its own `sql_query_many`.
 
-
 You can also match on a tuple:
 
 ```rust
@@ -412,9 +442,11 @@ You can also match on a tuple:
     where_clause,
     (name, age_min, age_max),
     {
-        (Some(n), Some(age_min), Some(age_max)) => "where name=${n} and age between ${age_min} and ${age_max}",
+        (Some(n), Some(age_min), Some(age_max)) =>
+            "where name=${n} and age between ${age_min} and ${age_max}",
         (Some(n), None, None) => "where name=${n}",
-        (None, Some(age_min), Some(age_max)) => "where age between ${age_min} and ${age_max}",
+        (None, Some(age_min), Some(age_max)) =>
+            "where age between ${age_min} and ${age_max}",
         (None, None, None) => "",
         _ => INVALID_QUERY
     }
@@ -423,15 +455,17 @@ async fn find_user(...) -> Result<...> {}
 
 ```
 
-The special value `INVALID_QUERY` triggers a runtime error with `std::io::ErrorKind::InvalidData`.
-This indicates that no matching SQL clause is available for the input.
+The special value `INVALID_QUERY` triggers a runtime error with
+`std::io::ErrorKind::InvalidData`. This indicates that no matching SQL clause is
+available for the input.
 
-You can also avoid `INVALID_QUERY` by passing more strongly-typed inputs, like `Option<(T1, T2)>`.
+You can also avoid `INVALID_QUERY` by passing more strongly-typed inputs, like
+`Option<(T1, T2)>`.
 
 You choose:
+
 - Use stricter types and guarantee compile-time safety
 - Or allow looser input and handle invalid combinations at runtime
-
 
 ## Aggregate entity fetch example for sql-fun
 
@@ -719,7 +753,9 @@ impl AggregateCollector {
 
             while i < parents.len() && j < children.len() {
                 use std::cmp::Ordering::*;
-                match parent_key(&parents[i]).cmp(child_parent_key(&children[j])) {
+                match parent_key(&parents[i])
+                    .cmp(child_parent_key(&children[j]))
+                {
                     Less => i += 1,
                     Greater => j += 1,
                     Equal => {

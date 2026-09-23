@@ -171,6 +171,7 @@ jobs:
           .local/bin/check-test-flow --step=proc-macro-tests --all-features --nextest-extra="
             --config-file ./ci/nextest/config.toml
             --profile ci
+            --test-threads=1
             --show-progress none"
           sccache --show-stats
 

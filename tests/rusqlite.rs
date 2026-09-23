@@ -22,6 +22,7 @@ fn run_test(for_check: bool) {
     validate_test_env();
 
     let dir = setup_working_dir();
+    let _working_dir_cleanup = setup_working_dir_cleanup(&dir);
     setup_file(
         &dir,
         "Metadata.toml",
@@ -61,6 +62,12 @@ fn setup_working_dir() -> PathBuf {
         .join(test_name);
     std::fs::create_dir_all(&dir).unwrap();
     dir
+}
+
+fn setup_working_dir_cleanup(dir: &Path) -> ScopeGuard<PathBuf, impl FnOnce(PathBuf)> {
+    ::scopeguard::guard(dir.to_path_buf(), |path| {
+        std::fs::remove_dir_all(path).unwrap();
+    })
 }
 
 fn setup_trace_dump(logfile: &PathBuf) -> ScopeGuard<PathBuf, impl FnOnce(PathBuf)> {

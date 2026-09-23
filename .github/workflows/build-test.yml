@@ -168,7 +168,7 @@ jobs:
           sccache --start-server
           export RUSTC_WRAPPER=sccache
           export SCCACHE_DIR=/github/home/.cache/sccache
-          .local/bin/check-test-flow --step=proc-macro-tests --nextest-extra="
+          .local/bin/check-test-flow --step=proc-macro-tests --all-features --nextest-extra="
             --config-file ./ci/nextest/config.toml
             --profile ci
             --show-progress none"

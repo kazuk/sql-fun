@@ -89,6 +89,9 @@ RUN npm i -g @openai/codex@latest \
     && codex --version \
     && npm cache clean --force
 
+RUN curl -fsSL https://github.com/agent-ecosystem/skill-validator/releases/download/v1.6.2/skill-validator_1.6.2_linux_amd64.tar.gz \
+  | tar -xz -C /usr/local/bin skill-validator
+
 RUN git config --system --add safe.directory '*'
 
 # install uv

@@ -69,6 +69,10 @@ Before submitting a pull request, update statistics by running the `update-stats
 - Before creating or updating a pull request, read `.github/PULL_REQUEST_TEMPLATE.md` and include all of its sections in the description.
 - Check only items that have actually been completed. Explain items that were not performed or are not applicable, and disclose any remaining validation gaps.
 
+# Review Guidelines
+
+- When reviewing scripts under this repository, assume the contributor environment described in `CONTRIBUTING.md#Getting-Started` is already active. Do not report missing setup for environment values or tools established by that prerequisite unless the script is intended to run outside the repository development environment.
+
 # User-Facing Documentation Planning and Review
 
 - When planning user-facing documentation changes, identify the intended reader, the task or decision the information supports, and the appropriate document for it.

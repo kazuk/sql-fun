@@ -7,6 +7,27 @@ queried without reconstructing intent from individual conversations.
 Labels in this document describe workflow state or dependency relationships.
 They are independent from priority unless explicitly stated otherwise.
 
+## `bug`
+
+Use `bug` for an issue that describes behavior which is incorrect relative to
+the intended or documented behavior of the repository.
+
+Typical cases include:
+
+- a valid input is rejected or handled incorrectly;
+- generated code is invalid or behaves incorrectly;
+- behavior differs from the documented contract;
+- a regression breaks behavior that previously worked;
+- implementation details cause observable failures such as identifier
+  collisions, incorrect type constraints, or invalid semantic analysis.
+
+Do not use `bug` merely because functionality is not implemented yet. Missing
+or planned functionality should be tracked as feature or implementation work
+unless existing behavior claims that functionality should already work.
+
+`bug` is orthogonal to workflow-state labels such as `not-ready`,
+`blocked`, and `blocker`, and is also independent from priority.
+
 ## `not-ready`
 
 Use `not-ready` when work must not start yet because the task is still being

@@ -30,7 +30,7 @@ RUN cargo install --locked --force \
     cargo-binstall
 
 RUN cargo binstall --locked --force --root /opt/tools \
-    cargo-llvm-cov mdbook cargo-deny tera-cli taplo-cli cargo-nextest sccache cargo-sort cargo-edit cargo-expand
+    cargo-llvm-cov mdbook cargo-deny tera-cli taplo-cli cargo-nextest sccache cargo-sort cargo-edit cargo-expand cargo-deb
 
 RUN cargo install --locked --force --root /opt/tools \
     cargo-binstall typos-cli
@@ -109,6 +109,9 @@ RUN curl -LsSf https://github.com/rvben/rumdl/releases/download/v0.2.76/rumdl-v0
     && rumdl --version
 
 COPY --from=builder /opt/tools/bin /usr/local/cargo/bin
+
+RUN cargo deb --version
+
 COPY --from=builder /opt/serena.tar.gz /opt/serena.tar.gz
 
 COPY resources/serena-wrapper.sh /usr/local/bin/serena

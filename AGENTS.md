@@ -8,6 +8,15 @@ Various utility scripts are located under `.local/bin/`.
 - `big-source`: Lists large source files based on their size (line count).
 - `update-stats`: Updates project statistics.
 
+## Repository skills
+
+Repository-local skills are stored under `.codex/skills/`. Read the relevant
+skill's `SKILL.md` for its requirements and detailed workflow before using it.
+
+- [implement-unit-test](.codex/skills/implement-unit-test/SKILL.md): Implement
+  Rust unit tests for a specified source file when working on coverage-driven
+  test targets.
+
 ## Statistics
 
 Statistics are stored in the stats directory.

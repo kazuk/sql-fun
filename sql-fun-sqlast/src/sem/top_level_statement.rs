@@ -235,6 +235,8 @@ impl SemAst {
             Stmt::DropView(_drop_view) => todo!(),
             Stmt::CreateType(_create_type_statement) => todo!(),
             Stmt::DropType(_drop_type_statement) => todo!(),
+            Stmt::CreateSequence(_create_sequence_statement) => todo!(),
+            Stmt::DropSequence(_drop_sequence_statement) => todo!(),
             Stmt::Select(_select) => todo!(),
             Stmt::Update(_update) => todo!(),
             Stmt::Delete(_delete_statement) => todo!(),

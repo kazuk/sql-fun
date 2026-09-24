@@ -35,6 +35,23 @@ mod sqlite_syn_builder {
     }
 
     impl SqliteSynBuilder {
+        pub fn parse_expression(&self, sql: &str) -> crate::syn::sqlite::Expr {
+            let mut parser = TursoParser::new(sql.as_bytes());
+            let Some(Ok(turso_parser::ast::Cmd::Stmt(turso_parser::ast::Stmt::Select(select)))) =
+                parser.next()
+            else {
+                panic!("expected SELECT: {sql}");
+            };
+            let turso_parser::ast::OneSelect::Select { mut columns, .. } = select.body.select
+            else {
+                panic!("expected expression SELECT");
+            };
+            let turso_parser::ast::ResultColumn::Expr(expr, _) = columns.remove(0) else {
+                panic!("expected expression column");
+            };
+            crate::syn::sqlite::Expr::from(*expr)
+        }
+
         pub fn parse_as_stmt(&self, sql: &str) -> Stmt {
             let mut parser = TursoParser::new(sql.as_bytes());
             let Some(cmd) = parser.next().transpose().unwrap() else {

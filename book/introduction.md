@@ -23,7 +23,8 @@ If you're writing raw SQL and wish Rust could help more: this is it.
       - You can use the full range of `PostgreSQL` syntax with no limitations.
     - All SQL statements are validated at compile time.
   - `SQLite` dialect
-    - SQL is parsed using `turso_parser`, a full `SQLite` parser.
+    - SQL is parsed using `turso_parser`. SQLite support is under development
+      and inherits [parser limitations](installation.md#sqlite-parser-limitations).
 - It does not try to model your entire database schema.
   - Instead, it focuses only on what your application actually *does*—the SQL
     queries it runs.

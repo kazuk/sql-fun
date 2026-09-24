@@ -47,8 +47,8 @@ pub fn test_context() -> TestParseContext {
 
 impl TestParseContext {
     /// setup [SearchPathRead::get_search_path] result
-    pub fn set_get_search_path_result(&mut self, search_path: &Vec<SchemaName>) {
-        self.search_path = search_path.clone()
+    pub fn set_get_search_path_result(&mut self, search_path: &[SchemaName]) {
+        self.search_path = search_path.to_owned()
     }
 
     /// setup [TypeInfoRead::get_type_impl] result
@@ -94,7 +94,7 @@ impl SearchPathRead for TestParseContext {
     }
 
     fn get_default_schema(&self) -> Option<SchemaName> {
-        self.search_path.get(0).cloned()
+        self.search_path.first().cloned()
     }
 }
 

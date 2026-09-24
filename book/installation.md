@@ -97,6 +97,18 @@ cargo add tokio --futures full
 cargo add tokio-postgres futures-util
 ```
 
+## SQLite parser limitations
+
+SQLite support is under development. SQL parsing inherits the limitations of
+`turso_parser`; the current parser limits expression depth to 100
+(`MAX_EXPR_DEPTH`). Consequently, some SQL accepted by SQLite itself may be
+rejected during sql-fun parsing. This limit applies to expression trees, including
+long chains of operators, not just nested parentheses. There is currently no
+sql-fun setting to increase it.
+
+The parser also recognizes Turso extensions. Successful syntax parsing does not
+imply that stock SQLite or `rusqlite` can execute those extensions.
+
 ## Setting environment variables
 
 - `SQL_FUN_SCHEMA` : optional and default is `develop`

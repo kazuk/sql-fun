@@ -1,5 +1,12 @@
 #![deny(missing_docs)]
 #![allow(clippy::pedantic)]
+#![cfg_attr(
+    test,
+    allow(
+        clippy::items_after_test_module,
+        reason = "The repository coding guideline requires tests immediately after the implementation they cover"
+    )
+)]
 #![doc = include_str!("lib.md")]
 
 pub mod engine_specific;

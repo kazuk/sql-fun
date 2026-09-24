@@ -12,6 +12,9 @@
 //! As a secondary benefit, it also acts as a boundary layer so changes in
 //! `turso_parser` do not leak directly into the semantic layer.
 
+#[cfg(test)]
+mod upgrade_tests;
+
 mod analyze_statement;
 mod column_definition;
 mod connection_context_statement;
@@ -32,6 +35,7 @@ mod over;
 mod pragma;
 mod resolve_type;
 mod select;
+mod sequence_statements;
 mod sorted_column;
 mod subquery_type;
 mod table_internal_id;
@@ -92,6 +96,7 @@ pub use self::{
         CompoundOperator, CompoundSelect, Distinctness, IndexedColumn, Limit, OneSelect,
         OneSelectItem, ResultColumn, ResultColumnExpr, Select, SelectBody,
     },
+    sequence_statements::{CreateSequenceStatement, DropSequenceStatement},
     sorted_column::{NullsOrder, SortOrder, SortedColumn},
     subquery_type::{SubqueryType, SubqueryTypeExists, SubqueryTypeIn, SubqueryTypeRowValue},
     table_internal_id::TableInternalId,
@@ -205,6 +210,11 @@ pub enum Stmt {
     /// drop type
     DropType(DropTypeStatement),
 
+    /// Create a Turso sequence.
+    CreateSequence(CreateSequenceStatement),
+    /// Drop a Turso sequence.
+    DropSequence(DropSequenceStatement),
+
     /// create domain
     CreateDomain(CreateDomainStatement),
     /// drop domain
@@ -244,6 +254,27 @@ impl Stmt {
 impl From<StmtIn> for Stmt {
     fn from(value: StmtIn) -> Self {
         match value {
+            StmtIn::CreateSequence {
+                if_not_exists,
+                seq_name,
+                start,
+                increment,
+                min_value,
+                max_value,
+                cycle,
+            } => Self::create_sequence(
+                if_not_exists,
+                &QualifiedName::from(seq_name),
+                start,
+                increment,
+                min_value,
+                max_value,
+                cycle,
+            ),
+            StmtIn::DropSequence {
+                if_exists,
+                seq_name,
+            } => Self::drop_sequence(if_exists, &QualifiedName::from(seq_name)),
             StmtIn::AlterTable(alter_table) => Self::AlterTable(AlterTable::from(alter_table)),
             StmtIn::Analyze { name } => {
                 Self::Analyze(AnalyzeStatement::new(name.map(QualifiedName::from)))

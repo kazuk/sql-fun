@@ -333,6 +333,7 @@ impl AnalysisProblem {
         todo!()
     }
 
+    #[cfg(feature = "sqlite")]
     pub(crate) fn type_not_found(_type_name: &FullName) -> Self {
         todo!()
     }

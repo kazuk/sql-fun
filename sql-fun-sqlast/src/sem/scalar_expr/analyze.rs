@@ -431,7 +431,7 @@ mod test_analyze_sqlite_scalar_expr {
         let OneSelect::Select(select_item) = select.body().select() else {
             panic!("{select:?}")
         };
-        let Some(ResultColumn::Expr(result_column_expr)) = select_item.columns().get(0) else {
+        let Some(ResultColumn::Expr(result_column_expr)) = select_item.columns().first() else {
             panic!("{select_item:?}")
         };
         let expr = result_column_expr.expr().as_ref();

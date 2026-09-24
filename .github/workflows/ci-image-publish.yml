@@ -24,6 +24,7 @@ jobs:
           private-key: ${{ secrets.MAINTENANCE_BOT_PRIVATE_KEY }}
           permission-contents: write
           permission-pull-requests: write
+          permission-workflows: write
 
       - uses: actions/checkout@v5
         with:

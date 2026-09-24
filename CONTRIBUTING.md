@@ -51,6 +51,15 @@ cargo install --locked --force \
 `cargo expand` to read the generated query stubs. Install it before using the
 command and ensure it is available on `PATH`.
 
+Contributors working on Debian packaging also need `cargo-deb`. The standard
+CI/development image includes it. When developing outside that image, install
+it and ensure Cargo's binary directory is on `PATH`:
+
+```sh
+cargo install --locked cargo-deb
+cargo deb --version
+```
+
 Some tools, especially `cargo-deny`, may require a recent stable Rust toolchain
 to install. If installation fails, update stable first and try again.
 

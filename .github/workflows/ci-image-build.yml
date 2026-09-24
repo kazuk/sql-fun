@@ -1,0 +1,52 @@
+name: github actions custom image builder
+
+on:
+  pull_request:
+    branches: ["ci-image"]
+
+permissions:
+  contents: read
+
+jobs:
+  build:
+    runs-on: ubuntu-24.04
+    env:
+      IMAGE_CONTEXT: "./ci/github-actions/"
+      DOCKER_FILE: "./ci/github-actions/Dockerfile"
+      LOCAL_IMAGE_TAG: "ci-builder:local"
+    steps:
+      - name: Require single commit
+        env:
+          PR_COMMITS: ${{ github.event.pull_request.commits }}
+        run: |
+          if [ "$PR_COMMITS" -ne 1 ]; then
+            echo "ci-image pull requests must contain exactly one commit"
+            exit 1
+          fi
+
+      - uses: actions/checkout@v5
+
+      - name: Set up Buildx
+        id: buildx
+        uses: docker/setup-buildx-action@v4
+        with:
+          driver: docker-container
+
+      - name: Build (load only)
+        uses: docker/build-push-action@v7
+        with:
+          builder: ${{ steps.buildx.outputs.name }}
+          context: ${{ env.IMAGE_CONTEXT }}
+          file: ${{ env.DOCKER_FILE }}
+          load: true
+          tags: ${{ env.LOCAL_IMAGE_TAG }}
+          cache-from: type=gha
+          cache-to: type=gha,mode=max
+          build-args: |
+            SERENA_TAG=v0.1.4
+
+      - name: Smoke test
+        run: |
+          docker run --rm "${LOCAL_IMAGE_TAG}" cargo --version
+          docker run --rm "${LOCAL_IMAGE_TAG}" cargo deny --version
+          docker run --rm "${LOCAL_IMAGE_TAG}" mdbook --help >/dev/null

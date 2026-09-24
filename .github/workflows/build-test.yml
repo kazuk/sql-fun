@@ -18,12 +18,15 @@ jobs:
   workspace:
     runs-on: ubuntu-24.04
     container: &ci-builder-container
-      image: ghcr.io/kazuk/ci-builder@sha256:52907a6c7cbc06b1c763ef319cacc5523a9039a22250fbd336d4bf47ad75d248
+      image: ghcr.io/kazuk/ci-builder@sha256:1e8a6a618d5f37c7eaf588650999b53dd39220323ea475a66a52987d1479ebf3
       credentials:
         username: ${{ github.actor }}
         password: ${{ secrets.GITHUB_TOKEN }}
     steps:
       - uses: actions/checkout@v5
+
+      - name: Verify packaging tool
+        run: cargo deb --version
 
       - name: Disk usage before cache restore
         run: |

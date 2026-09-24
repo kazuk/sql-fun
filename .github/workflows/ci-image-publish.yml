@@ -16,7 +16,19 @@ jobs:
       DOCKER_FILE: "./ci/github-actions/Dockerfile"
       LOCAL_IMAGE_TAG: "ci-builder:local"
     steps:
+      - name: Create maintenance bot token
+        id: maintenance-bot-token
+        uses: actions/create-github-app-token@v3
+        with:
+          client-id: ${{ vars.MAINTENANCE_BOT_CLIENT_ID }}
+          private-key: ${{ secrets.MAINTENANCE_BOT_PRIVATE_KEY }}
+          permission-contents: write
+          permission-pull-requests: write
+
       - uses: actions/checkout@v5
+        with:
+          fetch-depth: 0
+          token: ${{ steps.maintenance-bot-token.outputs.token }}
 
       - uses: docker/login-action@v4
         with:
@@ -66,3 +78,43 @@ jobs:
 
       - name: Show digest
         run: echo "digest=${{ steps.build.outputs.digest }}"
+
+      - name: Create pull request
+        env:
+          DIGEST: ${{ steps.build.outputs.digest }}
+          MESSAGE: ${{ github.event.head_commit.message }}
+          GH_TOKEN: ${{ steps.maintenance-bot-token.outputs.token }}
+          GH_REPO: ${{ github.repository }}
+        shell: bash
+        run: |
+          set -euo pipefail
+
+          digest_hex="${DIGEST#sha256:}"
+          short_digest="${digest_hex:0:8}"
+          branch="ci-image-${short_digest}"
+          title="${MESSAGE%%$'\n'*}"
+          pr_title="ci: image update for ${title}"
+
+          git config user.name "sql-fun-support-bot"
+          git config user.email "sql-fun-support-bot@users.noreply.github.com"
+
+          git fetch origin main ci-image
+          git switch -c "$branch" origin/main
+
+          git cherry-pick "$GITHUB_SHA"
+
+          sed -i \
+            -E "s|ghcr.io/kazuk/ci-builder@sha256:[0-9a-f]+|ghcr.io/kazuk/ci-builder@${DIGEST}|" \
+            .github/workflows/build-test.yml
+
+          git add .github/workflows/build-test.yml
+          git commit -m "$pr_title"
+
+          git push origin "HEAD:$branch"
+
+          gh pr create \
+            --repo "$GH_REPO" \
+            --base main \
+            --head "$branch" \
+            --title "$pr_title" \
+            --body "Adopt CI image \`${DIGEST}\` published from \`${GITHUB_SHA}\`."

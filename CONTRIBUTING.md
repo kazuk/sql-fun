@@ -282,6 +282,15 @@ Good pull requests explain:
 - How it was tested.
 - Any limitations, follow-up work, or compatibility concerns.
 
+## CI Image Changes
+
+Changes to `ci/github-actions/Dockerfile` and related CI image tooling use a
+dedicated review and publication workflow.
+
+Before changing the CI image, read
+[ci/README.md](ci/README.md) and follow the documented `ci-image` branch and
+image adoption procedure.
+
 ## Dependency Documentation
 
 When checking Rust dependency documentation, use the resolved version from

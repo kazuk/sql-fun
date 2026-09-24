@@ -1,62 +1,154 @@
 # CI Image Maintenance
 
-The GitHub Actions CI environment is built from `ci/github-actions/Dockerfile`
-and published to GHCR. Updates to the CI image are intentionally reviewed in
-three stages: the Dockerfile change, the image publication, and the final digest
-switch used by the main CI workflow.
+The GitHub Actions CI environment is built from
+`ci/github-actions/Dockerfile` and published to GHCR.
 
-## Update Procedure
+CI image changes use a dedicated `ci-image` branch. Changes to the image are
+reviewed before publication, and the published image is adopted by `main`
+through a separate pull request.
 
-1. Update `ci/github-actions/Dockerfile`.
+This keeps image publication and image adoption as distinct reviewable steps.
 
-2. Run the local CI image check:
+## Update Flow
+
+```text
+Dockerfile change
+    |
+    v
+pull request -> ci-image
+    |
+    | CI image build and smoke test
+    | exactly one commit required
+    v
+merge into ci-image
+    |
+    v
+build and publish image to GHCR
+    |
+    v
+create main-based adoption branch
+    |
+    | cherry-pick the ci-image commit
+    | update the pinned image digest
+    v
+pull request -> main
+    |
+    | optional workflow changes using the new image
+    | normal CI and human review
+    v
+merge into main
+```
+
+## Updating the CI Image
+
+1. Create a branch for the CI image change.
+
+2. Update `ci/github-actions/Dockerfile` and any files required to build the
+   image.
+
+3. Optionally run the local CI image check while developing:
 
    ```sh
    ci/github-actions/check
    ```
 
-   This builds the image locally. Verify that the tools or dependencies
-   introduced by the Dockerfile change are available and work as intended inside
-   the image.
+4. Keep the change as exactly one commit.
 
-3. Open a pull request targeting `main`.
+   Pull requests targeting `ci-image` are required to contain exactly one
+   commit. The commit is later cherry-picked into the `main` adoption pull
+   request, so one commit represents one CI image update.
 
-   Review the intent of the Dockerfile change and verify that the implementation
-   is correct. Merge the pull request into `main` after review.
+5. Open a pull request targeting `ci-image`.
 
-4. Refresh remote-tracking references, create a new branch from `origin/main`,
-   then open a pull request targeting the `ci-image` branch.
+   The `ci-image` branch is protected and requires pull requests.
 
-   ```sh
-   git fetch origin
-   git switch -c <branch-name> origin/main
-   ```
+   `.github/workflows/ci-image-build.yml` runs for pull requests targeting
+   `ci-image`. It verifies that:
 
-   This pull request is the explicit review point for deciding whether the
-   updated Dockerfile should be published as the CI image. Merge it into
-   `ci-image` after review.
+   * the pull request contains exactly one commit;
+   * the Docker image builds successfully; and
+   * the image passes its smoke tests.
 
-5. A push to `ci-image` triggers `.github/workflows/ci-image-publish.yml`.
+   The image build check is a required check for merging into `ci-image`.
 
-   The workflow builds the Docker image and publishes it to GHCR.
+6. Review and merge the pull request into `ci-image`.
 
-   After the workflow completes, copy the published image digest from the
-   `Show digest` step.
+   CI image changes affect the software supply chain used by all subsequent CI
+   jobs. Review changes to downloaded tools, versions, checksums, package
+   sources, build commands, and other executable content accordingly.
 
-6. Refresh remote-tracking references and create a new branch from
-   `origin/ci-image`.
+   The `ci-image` branch uses rebase merging so that the reviewed single commit
+   becomes the commit published from `ci-image` without introducing a merge
+   commit.
 
-   ```sh
-   git fetch origin
-   git switch -c <branch-name> origin/ci-image
-   ```
+## Publishing the Image
 
-   Update the `image` value of the `ci-builder-container` anchor in
-   `.github/workflows/build-test.yml` to use the digest produced in the previous
-   step.
+A push to `ci-image` triggers
+`.github/workflows/ci-image-publish.yml`.
 
-   Open a pull request targeting `main`. This pull request is the final review
-   point before switching the repository CI to the new image.
+The workflow:
 
-   Merge the pull request after confirming that the new image should become the
-   active CI image.
+1. builds the CI image;
+2. runs the image smoke tests;
+3. publishes the image to GHCR;
+4. obtains the immutable image digest;
+5. creates a new branch from `main`;
+6. cherry-picks the `ci-image` commit onto that branch;
+7. updates the pinned `ci-builder` digest in
+   `.github/workflows/build-test.yml`; and
+8. opens a pull request targeting `main`.
+
+The generated branch name includes the first eight hexadecimal characters of
+the published image digest:
+
+```text
+ci-image-<digest>
+```
+
+For example:
+
+```text
+ci-image-52907a6c
+```
+
+The generated pull request title is derived from the `ci-image` commit title:
+
+```text
+ci: image update for <original commit title>
+```
+
+## Adopting the Published Image
+
+The automatically created pull request targeting `main` is the adoption point
+for the newly published CI image.
+
+The pull request contains both:
+
+* the source change that produced the image, cherry-picked from `ci-image`; and
+* the immutable GHCR digest that makes the main CI workflow use that image.
+
+If the new image requires corresponding workflow changes, add those changes as
+additional commits to the generated pull request branch before merging.
+
+For example, adding a tool to the CI image and then using that tool from a
+GitHub Actions workflow should normally be handled as:
+
+```text
+ci-image pull request
+    Add the tool to the image.
+
+main adoption pull request
+    Cherry-picked image source change.
+    Update the pinned image digest.
+    Add or update the workflow that uses the tool.
+```
+
+Do not automatically merge the adoption pull request.
+
+Switching the CI image changes the executable environment used by repository
+CI and is therefore a supply-chain change. The final pull request must receive
+normal human review before it is merged into `main`.
+
+After the adoption pull request is merged, `main` contains both the source
+needed to reproduce the active CI image and the immutable digest identifying
+the exact image used by CI.

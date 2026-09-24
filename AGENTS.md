@@ -57,6 +57,12 @@ You can build and run tests using the `check-test-flow` script.
   implementation plan. Clearly document required runtime tools as prerequisites
   for the affected CLI feature.
 
+## CI Image Maintenance
+
+- Before modifying `ci/github-actions/Dockerfile`, CI image dependencies, or
+  workflows that depend on the CI image, read [ci/README.md](ci/README.md).
+- Follow the CI image update and adoption workflow documented there.
+
 ## Language
 
 - English is the official language of the `sql-fun` repository. Use English when

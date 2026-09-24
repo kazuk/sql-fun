@@ -5,15 +5,15 @@ description: |
   Use when the user provides coverage-driven target files.
 ---
 
-# Implement unit test
+# Implement unit tests
 
- Add unit tests to specified source, and run.
+Add unit tests to the specified source file and run them.
 
 ## Required parameters
 
 The user must provide parameters in one line:
 
-- source=<path>
+- `source=<path>`
 
 ## Missing parameters
 
@@ -22,17 +22,17 @@ The user must provide parameters in one line:
 ## Procedure
 
 1. Open `source` and identify testable units.
-2. Design test input and design helper function.
+2. Design test inputs and helper functions.
 3. Implement unit tests.
-4. MUST Run `check-test-flow` script for test verification.
+4. Run the required `check-test-flow` script to verify the tests.
 5. If `check-test-flow` fails, fix and re-run until it passes.
-6. Finaly run `update-stats` for update coverage statistics.
+6. Finally, run `update-stats` to update coverage statistics.
 
 ## Execution rules
 
-- If you modify somewhat MUST run tests with `check-test-flow`.
-- If struct or enum `impl` block contains multiple `fn`. separete to per-item
-  `impl` blocks
+- If you make any changes, you MUST run tests with `check-test-flow`.
+- If a struct or enum `impl` block contains multiple functions, separate them
+  into per-item `impl` blocks:
 
   ```rust
   impl SomeWhat {
@@ -42,7 +42,7 @@ The user must provide parameters in one line:
   }
   ```
 
-  to be
+  becomes:
 
   ```rust
   impl SomeWhat {
@@ -57,8 +57,9 @@ The user must provide parameters in one line:
   ```
 
 - Place tests immediately after the implementation block or function they cover.
-  - See `docs/internal-rules/rust-coding-guidline.md#test-placement`
-- Use crate-level `test_helpers` module for helper functions/types.
+  - See `docs/internal-rules/rust-coding-guideline.md#test-placement`
+    (relative to the repository root).
+- Use a crate-level `test_helpers` module for helper functions/types.
   - If `src/test_helpers.rs` does not exist, create it.
   - Ensure `src/lib.rs` contains:
 
@@ -78,9 +79,9 @@ The user must provide parameters in one line:
     - Keep them inline in each test, or
     - Use table-driven tests in the test module (arrays/vec of cases) and pass
       each case into helpers.
-- When function seems low-testability.
-  - plan refactor for testability and Add TODO comment like bellow.
-    `// TODO: TESTABILITY: extact for loop inner to function`
-- Use `check-test-flow` script for test compilation and run.
+- When a function is difficult to test:
+  - Plan a refactoring for testability and add a TODO comment such as:
+    `// TODO: TESTABILITY: extract the loop body into a function`
+- Use the `check-test-flow` script to compile and run tests.
 - After tests pass, run `./.local/bin/update-stats` to update coverage
   statistics.

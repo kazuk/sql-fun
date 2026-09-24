@@ -66,6 +66,12 @@ Make sure the tool's executable directory is available on `PATH`. See the
 [Graphify installation instructions](https://github.com/Graphify-Labs/graphify#install)
 for platform-specific setup.
 
+The full `check-test-flow` includes a `skill-lint` step that validates repository
+skills with `skill-validator`. Contributors running this flow outside the project
+CI image need the tool available on `PATH`; see the upstream
+[installation instructions](https://github.com/agent-ecosystem/skill-validator#install).
+The CI image currently pins version 1.6.2 for reproducibility.
+
 Some Rust dependencies may require additional native build dependencies. Package
 names vary by operating system and distribution, so install the missing packages
 reported by the build errors for your environment.

@@ -67,8 +67,10 @@ Typical reasons include:
 - another platform limitation prevents the mechanical step from being
   completed automatically.
 
-The issue or pull request body must state the specific human action required and
-why automation cannot currently perform it.
+Record the specific human action required and why automation cannot currently
+perform it in a comment. Prefer a new comment when the required action changes,
+so the history of automation boundaries remains visible without repeatedly
+editing the issue or pull request body.
 
 Do not use `require-human-work` merely because human review is desirable or
 because a task is difficult. It marks a concrete automation boundary.
@@ -77,7 +79,11 @@ because a task is difficult. It marks a concrete automation boundary.
 action is the blocker preventing an otherwise ready task from proceeding.
 
 Remove `require-human-work` as soon as the human-only action has been
-completed or the automation limitation no longer applies.
+completed or the automation limitation no longer applies. Removal does not need
+to be performed by the human who completed the action: an agent or automation
+should remove the label when it can verify that work can proceed again. Prefer
+clearing stale labels opportunistically during continued work rather than
+waiting for a human to remember to remove them.
 
 ## `blocked`
 

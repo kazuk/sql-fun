@@ -259,7 +259,21 @@ function run_skill_validator() {
 function run_rumdl() {
   require_command rumdl
   echo "== Linting Markdown"
-  rumdl check .
+
+  # Gitlinks identify submodules even when they have not been initialized.
+  local entry
+  local -a excludes=()
+  while IFS= read -r -d '' entry; do
+    [[ "$entry" == "160000 "* ]] || continue
+    excludes+=("${entry#*$'\t'}/**")
+  done < <(git ls-files --stage -z)
+
+  local -a options=()
+  if (( ${#excludes[@]} > 0 )); then
+    local IFS=,
+    options=(--exclude "${excludes[*]}")
+  fi
+  rumdl check "${options[@]}" .
 }
 
 for step in "${ALL_STEPS[@]}"; do

@@ -98,7 +98,7 @@ impl OperatorName {
 
     /// create instance for test
     #[cfg(test)]
-    pub fn new(name: &str) -> OperatorName {
+    pub fn new(name: &str) -> Self {
         Self::Valid(ValidOperatorName::new(name))
     }
 }

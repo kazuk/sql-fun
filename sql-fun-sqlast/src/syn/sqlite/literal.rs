@@ -123,3 +123,26 @@ impl From<LiteralIn> for Literal {
         }
     }
 }
+
+#[cfg(test)]
+mod test_parser_blob_payload {
+    use super::Literal;
+    use crate::syn::sqlite::Expr;
+    use crate::test_helpers::SqliteSynBuilder;
+
+    #[test]
+    fn published_parser_returns_hex_payload() {
+        for (sql, expected) in [
+            ("SELECT x'ab'", "ab"),
+            ("SELECT X'AB'", "AB"),
+            ("SELECT x'aBcD'", "aBcD"),
+            ("SELECT x''", ""),
+            ("SELECT X''", ""),
+        ] {
+            let Expr::Literal(Literal::Blob(blob)) = SqliteSynBuilder.parse_expression(sql) else {
+                panic!("expected BLOB: {sql}");
+            };
+            assert_eq!(blob.value(), expected);
+        }
+    }
+}

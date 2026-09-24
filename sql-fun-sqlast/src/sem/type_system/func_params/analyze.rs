@@ -76,7 +76,7 @@ mod test_function_param_analyze {
         mut test_context: TestParseContext,
         #[case] mode: FunctionParameterMode,
     ) -> TestResult {
-        test_context.set_get_search_path_result(&vec![
+        test_context.set_get_search_path_result(&[
             SchemaName::from("public"),
             SchemaName::from("pg_catalog"),
         ]);
@@ -90,7 +90,7 @@ mod test_function_param_analyze {
         let builder = SynBuilder::new();
         let arg_type = builder.type_name(&["int4"]);
 
-        let func_param = builder.function_parameter("param", arg_type.into(), mode.into());
+        let func_param = builder.function_parameter("param", arg_type.into(), mode);
         let tokens = IVec::default();
 
         FunctionParam::analyze(test_context, func_param, &tokens)?;
@@ -145,7 +145,7 @@ mod test_function_param_analyze_as_column_definition {
 
     #[rstest::rstest]
     fn test_analyze_as_column_definition(mut test_context: TestParseContext) -> TestResult {
-        test_context.set_get_search_path_result(&vec![
+        test_context.set_get_search_path_result(&[
             SchemaName::from("public"),
             SchemaName::from("pg_catalog"),
         ]);

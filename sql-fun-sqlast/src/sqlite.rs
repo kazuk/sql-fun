@@ -167,3 +167,35 @@ impl SqliteDialect {
         Ok(ParsedSchemaDump::new(sem_results, context))
     }
 }
+
+#[cfg(test)]
+mod test_expression_depth {
+    use super::SqliteDialect;
+    use ::turso_parser::MAX_EXPR_DEPTH;
+
+    #[test]
+    fn propagates_tree_height_limit_for_left_associative_expressions() {
+        assert_eq!(MAX_EXPR_DEPTH, 100);
+        let accepted = format!("SELECT {}", vec!["1"; MAX_EXPR_DEPTH].join(" + "));
+        assert!(SqliteDialect::parse(&accepted).unwrap().is_some());
+        let rejected = format!("{accepted} + 1");
+        let error = SqliteDialect::parse(&rejected).unwrap_err();
+        assert!(error.to_string().contains("maximum depth 100"));
+    }
+
+    #[test]
+    fn propagates_nested_expression_limit() {
+        // Combine nesting and a long tree without exhausting the debug test thread's stack.
+        let accepted = format!(
+            "SELECT abs(abs({}))",
+            vec!["1"; MAX_EXPR_DEPTH - 2].join(" + ")
+        );
+        assert!(SqliteDialect::parse(&accepted).unwrap().is_some());
+        let rejected = format!(
+            "SELECT abs(abs({}))",
+            vec!["1"; MAX_EXPR_DEPTH - 1].join(" + ")
+        );
+        let error = SqliteDialect::parse(&rejected).unwrap_err();
+        assert!(error.to_string().contains("maximum depth 100"));
+    }
+}

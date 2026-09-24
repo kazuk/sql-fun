@@ -50,3 +50,38 @@ pub trait TursoOptimizeIndexFeature {
         optimize: &OptimizeStatement,
     ) -> Result<(), AnalysisError>;
 }
+
+/// Turso sequence syntax notifications after syntax recognition.
+#[cfg(feature = "sqlite")]
+pub trait TursoSequenceFeature {
+    /// Notify that a sequence is created.
+    fn create_sequence_used(
+        &mut self,
+        statement: &crate::syn::sqlite::CreateSequenceStatement,
+    ) -> Result<(), AnalysisError>;
+    /// Notify that a sequence is dropped.
+    fn drop_sequence_used(
+        &mut self,
+        statement: &crate::syn::sqlite::DropSequenceStatement,
+    ) -> Result<(), AnalysisError>;
+}
+
+/// Turso ordered-set aggregate syntax notification after syntax recognition.
+#[cfg(feature = "sqlite")]
+pub trait TursoOrderedSetAggregateFeature {
+    /// Notify that a function uses WITHIN GROUP ordering.
+    fn ordered_set_aggregate_used(
+        &mut self,
+        expression: &crate::syn::sqlite::ExprFunctionCall,
+    ) -> Result<(), AnalysisError>;
+}
+
+/// Turso MVCC garbage-collection pragma notification after syntax recognition.
+#[cfg(feature = "sqlite")]
+pub trait TursoMvccGcFeature {
+    /// Notify that the MVCC garbage-collection threshold pragma is used.
+    fn mvcc_gc_threshold_used(
+        &mut self,
+        pragma: &crate::syn::sqlite::PragmaStatement,
+    ) -> Result<(), AnalysisError>;
+}

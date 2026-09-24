@@ -6,7 +6,7 @@ use crate::{
         BooleanBuilder, CaseExpr, CaseWhen, CoercionFormOpt, ConstrType, Constraint,
         ConstraintBuilder, DropBehavior, DropBehaviorOpt, DropStmt, DropStmtBuilder,
         FuncCallBuilder, FunctionParameter, FunctionParameterBuilder, FunctionParameterMode,
-        IndexElemBuilder, IndexStmtBuilder, IntegerBuilder, IntoClauseOpt, JoinExpr, JoinTypeOpt,
+        IndexElemBuilder, IndexStmtBuilder, IntegerBuilder, IntoClauseOpt, JoinExpr,
         LimitOptionOpt, ListBuilder, ListOpt, Node, NodeInner, NodeList, NodeOpt, ObjectType,
         ParseResult, RangeFunction, RangeFunctionBuilder, RangeSubselect, RangeSubselectBuilder,
         RangeTableFunc, RangeTableFuncBuilder, RangeVarOpt, ResTarget, RoleSpecOpt, SelectStmt,
@@ -16,11 +16,12 @@ use crate::{
 };
 
 /// syntax node builder
+#[derive(Default)]
 pub struct SynBuilder {}
 
 impl SynBuilder {
     /// create builder instance
-    pub fn new() -> Self {
+    pub const fn new() -> Self {
         Self {}
     }
 
@@ -349,10 +350,7 @@ impl SynBuilder {
                 self.range_var(&FullName::from_local_name("pktable"), &AliasOpt::none())
                     .into(),
             )
-            .pk_attrs(
-                self.as_node_list(&[self.as_string_node(self.string("pkcol"))])
-                    .into(),
-            )
+            .pk_attrs(self.as_node_list(&[self.as_string_node(self.string("pkcol"))]))
             .build()
             .unwrap()
             .into()
@@ -511,7 +509,7 @@ impl SynBuilder {
         let node = Node::from(NodeInner::SelectStmt(query));
         RangeSubselectBuilder::default()
             .alias(alias.into())
-            .subquery(node.into())
+            .subquery(node)
             .lateral(false)
             .build()
             .unwrap()
@@ -620,28 +618,22 @@ impl SynBuilder {
             .into()
     }
 
-    /// create [crate::syn::JoinExpr]
-    pub fn join_expr(
+    /// Create an inner join with an ON qualification.
+    pub fn inner_join(
         &self,
-        join_type: JoinTypeOpt,
-        left: NodeOpt,
-        right: NodeOpt,
-        qualifications: NodeOpt,
-        alias: AliasOpt,
-        using_clause: &[&str],
-        join_using_alias: AliasOpt,
-        is_natural: bool,
+        left: &NodeOpt,
+        right: &NodeOpt,
+        qualifications: &NodeOpt,
     ) -> JoinExpr {
-        let using_items = self.string_node_list(using_clause);
         crate::syn::JoinExprBuilder::default()
-            .jointype(join_type)
-            .is_natural(is_natural)
-            .larg(left)
-            .rarg(right)
-            .quals(qualifications)
-            .alias(alias)
-            .using_clause(using_items)
-            .join_using_alias(join_using_alias)
+            .jointype(crate::syn::JoinType::JoinInner.into())
+            .is_natural(false)
+            .larg(left.clone())
+            .rarg(right.clone())
+            .quals(qualifications.clone())
+            .alias(AliasOpt::none())
+            .using_clause(NodeList::default())
+            .join_using_alias(AliasOpt::none())
             .rtindex(0)
             .build()
             .unwrap()
@@ -672,7 +664,7 @@ impl SynBuilder {
     pub fn string_node_list(&self, items: &[&str]) -> crate::syn::NodeList {
         let mut nodes = Vec::new();
         for item in items {
-            let item = self.string(&item);
+            let item = self.string(item);
             nodes.push(self.as_string_node(item))
         }
         self.as_node_list(&nodes)
@@ -680,7 +672,7 @@ impl SynBuilder {
 
     /// create [crate::syn::ColumnRef]
     pub fn column_ref(&self, rel_name: &str, col_name: &str) -> crate::syn::ColumnRef {
-        let fields = self.string_node_list(&vec![rel_name, col_name]);
+        let fields = self.string_node_list(&[rel_name, col_name]);
         crate::syn::ColumnRefBuilder::default()
             .fields(fields)
             .location(0)
@@ -769,7 +761,6 @@ impl SynBuilder {
     pub fn parse(&self, sql: &str) -> crate::syn::Node {
         let parse_result = pg_query::parse(sql).unwrap();
         let parse_result = ParseResult::from(parse_result.protobuf);
-        let statement = parse_result.get_stmts().get(0).get_stmt();
-        statement
+        parse_result.get_stmts().get(0).get_stmt()
     }
 }

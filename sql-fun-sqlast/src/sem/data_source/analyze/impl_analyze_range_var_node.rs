@@ -78,7 +78,7 @@ mod test_data_source_analyze_range_var_node {
         let alias = builder.alias("t1", &[]);
         let syn = builder.range_var(&name, &alias.into());
 
-        test_context.set_get_search_path_result(&vec![
+        test_context.set_get_search_path_result(&[
             SchemaName::from("public"),
             SchemaName::from("pg_catalog"),
         ]);
@@ -105,7 +105,7 @@ mod test_data_source_analyze_range_var_node {
         let alias = builder.alias("v1", &[]);
         let syn = builder.range_var(&name, &alias.into());
 
-        test_context.set_get_search_path_result(&vec![
+        test_context.set_get_search_path_result(&[
             SchemaName::from("public"),
             SchemaName::from("pg_catalog"),
         ]);
@@ -120,7 +120,7 @@ mod test_data_source_analyze_range_var_node {
         let simple_query =
             SelectStatementNode::new(&result_columns, &with_clause, &from_clause, &None);
         let query = SelectStatement::simple(&simple_query);
-        let create_view = CreateView::new(&table_full_name, &query, &vec![], &None, false);
+        let create_view = CreateView::new(&table_full_name, &query, &[], &None, false);
         let view_def = ViewLike::from(&create_view);
         test_context.set_get_table_impl_result(&table_full_name, &None);
         test_context.set_get_view_impl_result(&table_full_name, &Some(view_def));

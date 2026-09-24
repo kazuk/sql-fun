@@ -183,7 +183,7 @@ impl SemScalarExpr {
 
     /// create new const expr
     #[cfg(test)]
-    pub fn new_const(value: ScalarConstExpr) -> Self {
+    pub const fn new_const(value: ScalarConstExpr) -> Self {
         Self::Const(value)
     }
 

@@ -177,8 +177,16 @@ impl From<ExprIn> for Expr {
                 distinctness,
                 args,
                 order_by,
+                within_group,
                 filter_over,
-            } => Self::function_call(name, distinctness, args, order_by, filter_over),
+            } => Self::function_call(
+                name,
+                distinctness,
+                args,
+                order_by,
+                within_group,
+                filter_over,
+            ),
             ExprIn::FunctionCallStar { name, filter_over } => {
                 Self::function_call_star(name, filter_over)
             }

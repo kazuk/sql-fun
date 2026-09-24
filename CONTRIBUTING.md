@@ -136,11 +136,15 @@ cargo install --locked rumdl --version 0.2.76
 Run the Markdown checks from the repository root:
 
 ```sh
-rumdl check .
+.local/bin/check-test-flow --step=markdown-lint
 ```
 
-Use `rumdl fmt .` to apply automatic fixes, then review the diff and rerun the
-check.
+This excludes Git submodules, whose Markdown is maintained externally, while
+checking this repository's Markdown files. The standard check flow uses the same
+exclusions.
+
+Use `rumdl fmt <path>` to apply automatic fixes to your Markdown files, then
+review the diff and rerun the check.
 
 ## Generated Files
 

@@ -50,6 +50,35 @@ additional product or design decisions.
 Do not use `blocked` merely because a task is still being designed.
 `not-ready` means the task itself is not prepared for implementation.
 
+## `require-human-work`
+
+Use `require-human-work` when progress is currently stopped because the
+remaining operation cannot be completed by the repository's available agents
+or automation.
+
+Typical reasons include:
+
+- a required API or connector operation is unavailable;
+- repository or service permissions prevent an agent from performing the
+  operation;
+- a required action is available only through a human-operated UI;
+- authentication, approval, billing, or account-level settings require a human
+  owner;
+- another platform limitation prevents the mechanical step from being
+  completed automatically.
+
+The issue or pull request body must state the specific human action required and
+why automation cannot currently perform it.
+
+Do not use `require-human-work` merely because human review is desirable or
+because a task is difficult. It marks a concrete automation boundary.
+
+`require-human-work` may be combined with `blocked` when the missing human
+action is the blocker preventing an otherwise ready task from proceeding.
+
+Remove `require-human-work` as soon as the human-only action has been
+completed or the automation limitation no longer applies.
+
 ## `blocked`
 
 Use `blocked` when the task is otherwise ready to proceed but a concrete

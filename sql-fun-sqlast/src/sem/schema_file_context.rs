@@ -128,7 +128,7 @@ mod test_schema_file_context {
     #[rstest::rstest]
     fn test_new(test_context: TestParseContext) {
         let path = Path::new("hoge.sql");
-        let _context = SchemaFileContext::new(&path, test_context);
+        let _context = SchemaFileContext::new(path, test_context);
     }
 }
 

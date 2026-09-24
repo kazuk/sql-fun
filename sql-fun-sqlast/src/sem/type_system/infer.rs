@@ -164,7 +164,7 @@ mod test_simple_infer_context {
 
         context.push_input_param(&param_type, &arg_type)?;
         assert!(context.is_require_infer());
-        assert_eq!(context.element_types.iter().count(), 1);
+        assert_eq!(context.element_types.len(), 1);
         assert!(context.get_inference_result().is_ok());
 
         let param_type =
@@ -173,7 +173,7 @@ mod test_simple_infer_context {
         assert!(param_type.is_any_element());
         let arg_type = TypeReference::from_full_name(FullName::with_schema("pg_catalog", "int8"));
         context.push_input_param(&param_type, &arg_type)?;
-        assert_eq!(context.element_types.iter().count(), 2);
+        assert_eq!(context.element_types.len(), 2);
         assert!(matches!(
             context.get_inference_result(),
             Err(TypeError::SimpleInferAmbiguous(_))

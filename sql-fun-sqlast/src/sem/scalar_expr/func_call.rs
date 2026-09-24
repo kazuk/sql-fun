@@ -266,7 +266,7 @@ mod test_func_call_expr_analyze_scalar_expr {
     fn test_analyze_scalar_expr_reports_missing_function(
         mut test_context: TestParseContext,
     ) -> TestResult {
-        test_context.set_get_search_path_result(&vec![SchemaName::from("public")]);
+        test_context.set_get_search_path_result(&[SchemaName::from("public")]);
 
         let builder = SynBuilder::new();
         let arg_expr = Node::from(NodeInner::AConst(builder.const_int4(1)));
@@ -303,7 +303,7 @@ mod test_func_call_expr_analyze_scalar_expr {
     fn test_analyze_scalar_expr_resolves_overload(
         mut test_context: TestParseContext,
     ) -> TestResult {
-        test_context.set_get_search_path_result(&vec![SchemaName::from("public")]);
+        test_context.set_get_search_path_result(&[SchemaName::from("public")]);
         let int4 = PgBuiltInType::int4();
         test_context.setup_type(int4.clone());
 
@@ -313,7 +313,7 @@ mod test_func_call_expr_analyze_scalar_expr {
             &None,
         )];
         let overload = OverloadVariant::new(&Some(int4.clone()), &params, false, false);
-        test_context.setup_function("test_func", &[overload.clone()]);
+        test_context.setup_function("test_func", std::slice::from_ref(&overload));
 
         let builder = SynBuilder::new();
         let arg_expr = Node::from(NodeInner::AConst(builder.const_int4(1)));

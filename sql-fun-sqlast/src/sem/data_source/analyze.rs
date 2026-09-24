@@ -194,7 +194,7 @@ mod test_analyze_join_expr {
             ColumnDefinition, ColumnName, FromClause, FullName, SchemaName, SourcePathWithSpan,
             TypeReference, WithClause,
         },
-        syn::{AliasOpt, JoinType, NodeInner},
+        syn::NodeInner,
         test_helpers::{SynBuilder, TestParseContext, source_span, test_context},
     };
     use sql_fun_core::IVec;
@@ -205,7 +205,7 @@ mod test_analyze_join_expr {
         mut test_context: TestParseContext,
         source_span: SourcePathWithSpan,
     ) -> TestResult {
-        test_context.set_get_search_path_result(&vec![
+        test_context.set_get_search_path_result(&[
             SchemaName::from("public"),
             SchemaName::from("pg_catalog"),
         ]);
@@ -236,16 +236,7 @@ mod test_analyze_join_expr {
             NodeInner::ColumnRef(right).into(),
         );
 
-        let join_expr = builder.join_expr(
-            JoinType::JoinInner.into(),
-            table1.into(),
-            table2.into(),
-            qual,
-            AliasOpt::none(),
-            &[],
-            AliasOpt::none(),
-            false,
-        );
+        let join_expr = builder.inner_join(&table1.into(), &table2.into(), &qual);
 
         let with_clause = WithClause::default();
         let from_clause = FromClause::default();
@@ -305,10 +296,10 @@ mod test_data_source_analyze_range_table_func {
 
     #[rstest::rstest]
     fn test_analyze_range_table_func(mut test_context: TestParseContext) -> TestResult {
-        test_context.set_get_search_path_result(&vec![SchemaName::from("public")]);
+        test_context.set_get_search_path_result(&[SchemaName::from("public")]);
         let (int4, overload) = setup_function_overload();
         test_context.setup_type(int4);
-        test_context.setup_function("table_func", &[overload.clone()]);
+        test_context.setup_function("table_func", std::slice::from_ref(&overload));
 
         let builder = SynBuilder::new();
         let func_call_node = builder.build_func_call_node("table_func");
@@ -391,10 +382,10 @@ mod test_data_source_analyze_range_func_rows_from {
 
     #[rstest::rstest]
     fn test_analyze_range_func_rows_from(mut test_context: TestParseContext) -> TestResult {
-        test_context.set_get_search_path_result(&vec![SchemaName::from("public")]);
+        test_context.set_get_search_path_result(&[SchemaName::from("public")]);
         let (int4, overload) = setup_function_overload();
         test_context.setup_type(int4);
-        let func_name = test_context.setup_function("rows_func", &[overload.clone()]);
+        let func_name = test_context.setup_function("rows_func", std::slice::from_ref(&overload));
 
         let builder = SynBuilder::new();
         let func_call_node = builder.build_func_call_node(func_name.local_name().as_str());
@@ -494,10 +485,10 @@ mod test_data_source_analyze_range_functions {
 
     #[rstest::rstest]
     fn test_analyze_range_func(mut test_context: TestParseContext) -> TestResult {
-        test_context.set_get_search_path_result(&vec![SchemaName::from("public")]);
+        test_context.set_get_search_path_result(&[SchemaName::from("public")]);
         let (int4, overload) = setup_function_overload();
         test_context.setup_type(int4);
-        test_context.setup_function("set_func", &[overload.clone()]);
+        test_context.setup_function("set_func", std::slice::from_ref(&overload));
 
         let builder = SynBuilder::new();
         let func_call_node = builder.build_func_call_node("set_func");

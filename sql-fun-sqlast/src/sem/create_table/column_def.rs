@@ -273,7 +273,7 @@ mod test_sqlite_column_definition {
 
     fn setup_context() -> TestParseContext {
         let mut context = TestParseContext::default();
-        context.set_get_search_path_result(&vec![SchemaName::from("public")]);
+        context.set_get_search_path_result(&[SchemaName::from("public")]);
         context.setup_type(TypeReference::concrete_type_ref(
             &FullName::with_schema("public", "integer"),
             false,

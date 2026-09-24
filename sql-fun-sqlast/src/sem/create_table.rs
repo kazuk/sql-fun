@@ -448,8 +448,7 @@ mod test_analyze_create_table {
         sem::{BaseParseContext, CreateTableMode, SchemaName, SemAst, SourcePathWithSpan},
         syn::sqlite::Stmt,
         test_helpers::{
-            SemValueBuilder, SqliteSynBuilder, TestParseContext, sem_builder, source_span,
-            sqlite_syn, test_context,
+            SqliteSynBuilder, TestParseContext, sem_builder, source_span, sqlite_syn, test_context,
         },
     };
 
@@ -476,14 +475,14 @@ mod test_analyze_create_table {
         mut test_context: TestParseContext,
         sqlite_syn: SqliteSynBuilder,
         source_span: SourcePathWithSpan,
-        sem_builder: SemValueBuilder,
         #[case] sql: &str,
         #[case] table_name: &str,
         #[case] table_mode: CreateTableMode,
         #[case] temporary: bool,
     ) -> TestResult {
+        let sem_builder = sem_builder();
         // FIXME: PostgreSQL specific config require in SQLite tests
-        test_context.set_get_search_path_result(&vec![
+        test_context.set_get_search_path_result(&[
             SchemaName::from("public"),
             SchemaName::from("pg_catalog"),
         ]);
@@ -689,7 +688,7 @@ mod test_drop_table_analyze_drop_table {
         let Some(drop_table) = ast.as_drop_table() else {
             panic!("{ast:?} is not DropTable")
         };
-        assert_eq!(drop_table.if_exists(), true);
+        assert!(drop_table.if_exists());
         let table_name = drop_table.table_names().first().unwrap();
         table_name.assert_table_name("table_one");
         assert_eq!(result_context.reported_problem_count(), 1);

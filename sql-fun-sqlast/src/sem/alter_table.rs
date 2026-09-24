@@ -185,7 +185,7 @@ mod test_analyze_alter_table_statement {
         );
         let cmds = builder.as_node_list(&[NodeInner::AlterTableCmd(cmd).into()]);
         let alter_table_stmt =
-            builder.alter_table_stmt(relation.into(), cmds, ObjectType::ObjectTable.into());
+            builder.alter_table_stmt(relation.into(), cmds, ObjectType::ObjectTable);
         let tokens = IVec::default();
         let AstAndContextPair(res, ctx) = AlterTable::analyze_alter_table_statement(
             test_context,
@@ -246,7 +246,7 @@ mod test_analyze_alter_table_statement {
     #[cfg(feature = "sqlite")]
     fn sqlite_context() -> TestParseContext {
         let mut context = TestParseContext::default();
-        context.set_get_search_path_result(&vec![SchemaName::from("public")]);
+        context.set_get_search_path_result(&[SchemaName::from("public")]);
         context.setup_type(TypeReference::concrete_type_ref(
             &FullName::with_schema("public", "text"),
             false,

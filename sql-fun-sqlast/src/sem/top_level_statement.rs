@@ -299,7 +299,7 @@ LANGUAGE C STRICT IMMUTABLE PARALLEL SAFE;"#
 
         let base_context = BaseContext::new(context_args)?;
         let path = Path::new("test.sql");
-        let mut file_context = SchemaFileContext::new(&path, base_context);
+        let mut file_context = SchemaFileContext::new(path, base_context);
         file_context.set_source_path_with_span(&source_span);
         let AstAndContextPair(_ast, _context) =
             SemAst::semantic_analysis(file_context, parsed, &tokens)?;

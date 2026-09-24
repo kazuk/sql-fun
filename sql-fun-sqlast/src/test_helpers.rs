@@ -31,7 +31,7 @@ mod sqlite_syn_builder {
 
     #[rstest::fixture]
     pub fn sqlite_syn() -> SqliteSynBuilder {
-        SqliteSynBuilder::default()
+        SqliteSynBuilder
     }
 
     impl SqliteSynBuilder {

@@ -264,6 +264,16 @@ provenance, licensing issues, broken tests, or low-quality code.
 If a contributor cannot take responsibility for the change as their own work,
 they should not submit it.
 
+## Issue and Pull Request Labels
+
+Repository labels have defined workflow semantics. Before creating or updating
+an issue or pull request, read
+[docs/internal-rules/issue-pull-request-labels.md](docs/internal-rules/issue-pull-request-labels.md).
+
+In particular, distinguish preparation state (`not-ready`), concrete dependency
+state (`blocked` / `blocker`), and work that currently requires a human-only
+operation (`require-human-work`).
+
 ## Pull Requests
 
 Before opening a pull request:

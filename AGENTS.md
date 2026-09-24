@@ -107,6 +107,9 @@ directly:
 
 ## Issues
 
+- Before creating or updating issues or pull requests, read
+  [docs/internal-rules/issue-pull-request-labels.md](docs/internal-rules/issue-pull-request-labels.md)
+  and apply its label semantics.
 - Before creating an issue, read the templates in `.github/ISSUE_TEMPLATE/` and
   use the one that matches the issue: `bug_report.md` for bugs,
   `feature_request.md` for feature requests, or `maintenance.md` for refactoring
@@ -117,6 +120,19 @@ directly:
   inventing details.
 - When updating an issue, preserve the applicable template structure and
   existing relevant information.
+
+## Human-only work
+
+- If progress stops because a required operation cannot be performed with the
+  available agent, connector, API, permissions, or automation, follow the
+  `require-human-work` rule in
+  [docs/internal-rules/issue-pull-request-labels.md](docs/internal-rules/issue-pull-request-labels.md).
+- Record the exact human action required and the automation limitation in a
+  comment on the affected issue or pull request.
+- After the human action is completed, continue the work when possible and
+  remove `require-human-work` once continued work verifies that the automation
+  boundary no longer blocks progress. Do not wait for the human to remove the
+  label.
 
 ## Pull Requests
 

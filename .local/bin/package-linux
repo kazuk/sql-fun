@@ -1,0 +1,53 @@
+#!/usr/bin/env bash
+# Build one pair of release executables and package them in both formats.
+set -euo pipefail
+
+if (( $# > 1 )); then
+    echo "usage: package-linux [x86_64-unknown-linux-gnu]" >&2
+    exit 2
+fi
+package_target=${1:-x86_64-unknown-linux-gnu}
+case "$package_target" in
+    x86_64-unknown-linux-gnu) deb_arch=amd64 ;;
+    *) echo "unsupported packaging target: $package_target" >&2; exit 2 ;;
+esac
+for tool in cargo cargo-deb jq dpkg-deb dpkg-shlibdeps readelf tar gzip sha256sum cmp; do
+    command -v "$tool" >/dev/null || { echo "$tool is required for packaging" >&2; exit 1; }
+done
+
+cd "$(git rev-parse --show-toplevel)"
+metadata=$(cargo metadata --locked --no-deps --format-version 1)
+package_version=$(jq -er '.packages[] | select(.name == "sql-fun-cli") | .version' <<< "$metadata")
+build_dir=$(jq -er '.target_directory' <<< "$metadata")
+release_dir="$build_dir/$package_target/release"
+output_dir="$build_dir/distributions/$package_target"
+# Debian sorts prereleases before the final version using ~.
+deb_version=${package_version/-/~}
+mkdir -p "$output_dir"
+staging=$(mktemp -d "$output_dir/.package.XXXXXX")
+trap 'rm -rf "$staging"' EXIT
+
+# Strip once at build time; cargo-deb must not alter the shared inputs.
+CARGO_PROFILE_RELEASE_STRIP=symbols cargo build --locked --release \
+    --target "$package_target" -p sql-fun-cli -p sql-fun-server --bins
+mkdir "$staging/tar"
+for binary in sql-fun sql-fun-server; do
+    install -m 0755 "$release_dir/$binary" "$staging/tar/$binary"
+done
+install -m 0644 LICENSE "$staging/tar/LICENSE"
+deb_name="sql-fun_${deb_version}_${deb_arch}.deb"
+tar_name="sql-fun-${package_version}-${package_target}.tar.gz"
+cargo deb --locked -p sql-fun-cli --target "$package_target" \
+    --no-build --no-strip --deb-version "$deb_version" --output "$staging/$deb_name"
+tar -czf "$staging/$tar_name" -C "$staging/tar" sql-fun sql-fun-server LICENSE
+(
+    cd "$staging"
+    sha256sum "$deb_name" "$tar_name" > SHA256SUMS
+)
+.local/bin/check-linux-artifacts "$staging" "$package_target" "$package_version" "$release_dir"
+# Publish only the validated files from this invocation.
+for artifact in "$deb_name" "$tar_name" SHA256SUMS; do
+    mv "$staging/$artifact" "$output_dir/$artifact"
+done
+printf 'Packaged version %s for %s from commit %s\nArtifacts: %s\n' \
+    "$package_version" "$package_target" "$(git rev-parse HEAD)" "$output_dir"

@@ -1,0 +1,51 @@
+#!/usr/bin/env bash
+# Inspect generated packages without installing or starting either executable.
+set -euo pipefail
+
+if (( $# != 4 )); then
+    echo "usage: check-linux-artifacts OUTPUT_DIR TARGET VERSION RELEASE_DIR" >&2
+    exit 2
+fi
+output_dir=$(realpath "$1")
+package_target=$2
+package_version=$3
+release_dir=$(realpath "$4")
+case "$package_target" in
+    x86_64-unknown-linux-gnu) deb_arch=amd64; elf_machine='Advanced Micro Devices X86-64' ;;
+    *) echo "unsupported packaging target: $package_target" >&2; exit 2 ;;
+esac
+deb_version=${package_version/-/~}
+deb="$output_dir/sql-fun_${deb_version}_${deb_arch}.deb"
+tarball="$output_dir/sql-fun-${package_version}-${package_target}.tar.gz"
+extracted=$(mktemp -d)
+trap 'rm -rf "$extracted"' EXIT
+(
+    cd "$output_dir"
+    sha256sum "$(basename "$deb")" "$(basename "$tarball")" | cmp - SHA256SUMS
+)
+[[ $(dpkg-deb -f "$deb" Package) == sql-fun ]]
+[[ $(dpkg-deb -f "$deb" Version) == "$deb_version" ]]
+[[ $(dpkg-deb -f "$deb" Architecture) == "$deb_arch" ]]
+[[ $(dpkg-deb -f "$deb" Maintainer) == 'kazuk <kazuk.dll@gmail.com>' ]]
+dependencies=$(dpkg-deb -f "$deb" Depends)
+[[ -n "$dependencies" && "$dependencies" != *cargo-expand* ]]
+[[ "$dependencies" == *libgcc-s1* ]]
+printf 'Debian runtime dependencies: %s\n' "$dependencies"
+mkdir "$extracted/deb" "$extracted/tar"
+dpkg-deb -x "$deb" "$extracted/deb"
+tar -xzf "$tarball" -C "$extracted/tar"
+for binary in sql-fun sql-fun-server; do
+    deb_binary="$extracted/deb/usr/bin/$binary"
+    tar_binary="$extracted/tar/$binary"
+    [[ $(stat -c %a "$deb_binary") == 755 ]]
+    [[ $(stat -c %a "$tar_binary") == 755 ]]
+    cmp "$deb_binary" "$tar_binary"
+    cmp "$deb_binary" "$release_dir/$binary"
+    LC_ALL=C readelf -h "$deb_binary" | grep -F "$elf_machine" >/dev/null
+done
+[[ $(find "$extracted/tar" -type f | wc -l) == 3 ]]
+[[ $(find "$extracted/deb/usr/bin" -type f | wc -l) == 2 ]]
+cmp "$extracted/tar/LICENSE" "$(git rev-parse --show-toplevel)/LICENSE"
+[[ -f "$extracted/deb/usr/share/doc/sql-fun/copyright" ]]
+grep -F 'kazuk.dll@gmail.com' "$extracted/deb/usr/share/doc/sql-fun/copyright" >/dev/null
+printf 'Validated package layout, metadata, checksums and identical executables.\n'

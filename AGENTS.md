@@ -45,6 +45,9 @@ You can build and run tests using the `check-test-flow` script.
 - Run `check-test-flow` and `update-stats` sequentially, never concurrently.
   Their tests share temporary build directories and can interfere with each
   other's cleanup.
+- When adding or modifying a CI job, do not declare the task complete until the
+  corresponding job has finished on the final PR head and its result has been
+  verified.
 
 ## External Tool Prerequisites
 

@@ -105,12 +105,14 @@ cargo add tokio-postgres futures-util
 ## PostgreSQL extraction prerequisites
 
 [`sql-fun extract`](cli/extract.md) includes its catalog queries, SQL templates,
-and extension export script in the installed CLI. Connection extraction needs
-network access and, for TLS, the appropriate CA certificates in the platform
-trust store. Docker extraction additionally requires Docker CLI and daemon access.
-Extension export runs on the database host and requires the matching `pg_config`,
-POSIX shell utilities, and GNU tar. No `hbs`, `psql`, SSH integration, or sql-fun
-installation on the database host is required.
+and extension export script in the installed CLI. Both connection and Docker
+extraction require the PostgreSQL client tools (`psql`) on `PATH`. Connection
+extraction needs network access and appropriate libpq authentication/TLS settings
+(for example, `sslrootcert` and `sslmode=verify-full` for CA and hostname checking).
+Docker extraction additionally requires Docker CLI and daemon access.
+The server administrator's extension export requires that installation's `pg_config`,
+POSIX shell utilities, and GNU tar. No `hbs`, SSH integration, or sql-fun
+installation is required on the database host.
 
 ## SQLite parser limitations
 

@@ -3,33 +3,57 @@ use crate::extract::render::{Renderer, fragment, identifier};
 use std::{collections::BTreeMap, path::Path, time::Duration};
 
 use ::serde_json::Value;
-use ::tokio_postgres::{Client, Transaction};
+use ::tokio::io::AsyncWriteExt;
 
-struct ConnectionTask(tokio::task::JoinHandle<()>);
-impl Drop for ConnectionTask {
-    fn drop(&mut self) {
-        self.0.abort();
-    }
-}
-
-async fn connect(configuration: &str) -> Result<(Client, ConnectionTask), anyhow::Error> {
-    let config: tokio_postgres::Config = configuration.parse().map_err(|_| {
-        anyhow::anyhow!("invalid PostgreSQL connection configuration (details redacted)")
-    })?;
-    let tls = native_tls::TlsConnector::builder().build()?;
-    let (client, connection) = config.connect(postgres_native_tls::MakeTlsConnector::new(tls)).await
-        .map_err(|_| anyhow::anyhow!("PostgreSQL connection failed; check endpoint, authentication, TLS trust, and permissions (details redacted)"))?;
-    let task = ConnectionTask(tokio::spawn(async move {
-        let _ = connection.await;
-    }));
-    Ok((client, task))
+async fn run_psql(configuration: &str, sql: &str) -> Result<String, anyhow::Error> {
+    let mut child = tokio::process::Command::new("psql")
+        .args([
+            "-X",
+            "--quiet",
+            "--no-align",
+            "--tuples-only",
+            "--record-separator-zero",
+            "--no-password",
+            "--set=ON_ERROR_STOP=1",
+        ])
+        .arg("--dbname")
+        .arg(configuration)
+        .env("PGCLIENTENCODING", "UTF8")
+        .stdin(std::process::Stdio::piped())
+        .stdout(std::process::Stdio::piped())
+        .stderr(std::process::Stdio::null())
+        .kill_on_drop(true)
+        .spawn()
+        .map_err(|_| {
+            anyhow::anyhow!("could not start psql; install the PostgreSQL client tools")
+        })?;
+    let mut stdin = child
+        .stdin
+        .take()
+        .ok_or_else(|| anyhow::anyhow!("psql stdin unavailable"))?;
+    // Drain output while writing so large queries/results cannot deadlock the pipes.
+    let write = async {
+        stdin.write_all(sql.as_bytes()).await?;
+        drop(stdin);
+        Ok::<(), std::io::Error>(())
+    };
+    let (written, output) = tokio::join!(write, child.wait_with_output());
+    written?;
+    let output = output?;
+    anyhow::ensure!(
+        output.status.success(),
+        "psql extraction failed; check connection, libpq TLS configuration, server version, and catalog permissions (details redacted)"
+    );
+    Ok(String::from_utf8(output.stdout)?)
 }
 
 pub(super) async fn wait_ready(configuration: &str) -> Result<(), anyhow::Error> {
     loop {
-        if let Ok(Ok((client, _task))) =
-            tokio::time::timeout(Duration::from_secs(2), connect(configuration)).await
-            && client.simple_query("SELECT 1").await.is_ok()
+        if let Ok(Ok(_)) = tokio::time::timeout(
+            Duration::from_secs(2),
+            run_psql(configuration, "SELECT 1;\n"),
+        )
+        .await
         {
             return Ok(());
         }
@@ -37,24 +61,12 @@ pub(super) async fn wait_ready(configuration: &str) -> Result<(), anyhow::Error>
     }
 }
 
-fn query_error(error: &tokio_postgres::Error) -> anyhow::Error {
-    // Server messages may contain user-controlled SQL and secrets. Expose only SQLSTATE.
-    anyhow::anyhow!(
-        "catalog query failed (SQLSTATE {}); verify server version and catalog permissions",
-        error
-            .code()
-            .map_or("unavailable", tokio_postgres::error::SqlState::code)
-    )
-}
-
-async fn query(transaction: &Transaction<'_>, sql: &str) -> Result<Value, anyhow::Error> {
-    let sql = format!("SELECT ({})::text", sql.trim().trim_end_matches(';'));
-    let row = transaction
-        .query_one(&sql, &[])
-        .await
-        .map_err(|e| query_error(&e))?;
-    let text: String = row.try_get(0)?;
-    let mut value: Value = serde_json::from_str(&text)?;
+fn next_catalog(lines: &mut std::str::SplitTerminator<'_, char>) -> Result<Value, anyhow::Error> {
+    let mut value: Value = serde_json::from_str(
+        lines
+            .next()
+            .ok_or_else(|| anyhow::anyhow!("missing psql catalog result"))?,
+    )?;
     value.sort_all_objects();
     Ok(value)
 }
@@ -64,52 +76,57 @@ pub(super) async fn extract(
     output: &Path,
     provenance: &Value,
 ) -> Result<(), anyhow::Error> {
-    let (mut client, _task) = connect(configuration).await?;
-    let transaction = client
-        .build_transaction()
-        .read_only(true)
-        .isolation_level(tokio_postgres::IsolationLevel::RepeatableRead)
-        .start()
-        .await
-        .map_err(|e| query_error(&e))?;
-    transaction.batch_execute("SET LOCAL search_path = pg_catalog; SET LOCAL standard_conforming_strings = on; SET LOCAL extra_float_digits = 3; SET LOCAL timezone = 'UTC'; SET LOCAL statement_timeout = '60s';").await.map_err(|e| query_error(&e))?;
-    let version: String = transaction
-        .query_one("SHOW server_version_num", &[])
-        .await
-        .map_err(|e| query_error(&e))?
-        .get(0);
-    let version: u32 = version.parse()?;
+    let queries = [
+        include_str!("sql/builtin_types.sql"),
+        include_str!("sql/builtin_funcs.sql"),
+        include_str!("sql/builtin_func_detail.sql"),
+        include_str!("sql/builtin_binary_ops.sql"),
+        include_str!("sql/builtin_left_unary_ops.sql"),
+        include_str!("sql/builtin_right_unary_ops.sql"),
+        include_str!("sql/builtin_casts.sql"),
+        include_str!("sql/domains.sql"),
+        include_str!("sql/builtin_columns.sql"),
+        include_str!("sql/schema_functions.sql"),
+        include_str!("sql/views.sql"),
+    ];
+    let mut sql = String::from(
+        "BEGIN ISOLATION LEVEL REPEATABLE READ READ ONLY;\nSET LOCAL search_path = pg_catalog; SET LOCAL standard_conforming_strings = on; SET LOCAL extra_float_digits = 3; SET LOCAL timezone = 'UTC'; SET LOCAL statement_timeout = '60s';\nSHOW server_version_num;\n",
+    );
+    for query in queries {
+        sql.push_str(&format!(
+            "SELECT ({})::text;\n",
+            query.trim().trim_end_matches(';')
+        ));
+    }
+    sql.push_str("COMMIT;\n");
+    let results = run_psql(configuration, &sql).await?;
+    let mut lines = results.split_terminator('\0');
+    let version: u32 = lines
+        .next()
+        .ok_or_else(|| anyhow::anyhow!("missing server version"))?
+        .parse()?;
     anyhow::ensure!(
         (170_000..190_000).contains(&version),
         "catalog format 1 supports PostgreSQL 17 and 18"
     );
-    for (filename, sql) in [
-        ("pg_type.json", include_str!("sql/builtin_types.sql")),
-        ("functions.json", include_str!("sql/builtin_funcs.sql")),
-        (
-            "func_detail.json",
-            include_str!("sql/builtin_func_detail.sql"),
-        ),
-        ("binary_op.json", include_str!("sql/builtin_binary_ops.sql")),
-        (
-            "left_unary_op.json",
-            include_str!("sql/builtin_left_unary_ops.sql"),
-        ),
-        (
-            "right_unary_op.json",
-            include_str!("sql/builtin_right_unary_ops.sql"),
-        ),
-        ("casts.json", include_str!("sql/builtin_casts.sql")),
+    for filename in [
+        "pg_type.json",
+        "functions.json",
+        "func_detail.json",
+        "binary_op.json",
+        "left_unary_op.json",
+        "right_unary_op.json",
+        "casts.json",
     ] {
-        write_json(&output.join(filename), &query(&transaction, sql).await?)?;
+        write_json(&output.join(filename), &next_catalog(&mut lines)?)?;
     }
     let renderer = Renderer::new()?;
     let mut schema =
         String::from("-- PostgreSQL builtin schema; generated by sql-fun extract, format 1.\n");
-    let mut domains = query(&transaction, include_str!("sql/domains.sql")).await?;
+    let mut domains = next_catalog(&mut lines)?;
     type_fields(&mut domains, &["schema", "name"], &["definition"])?;
     schema.push_str(&renderer.render("domains", &domains)?);
-    let columns = query(&transaction, include_str!("sql/builtin_columns.sql")).await?;
+    let columns = next_catalog(&mut lines)?;
     let mut tables = BTreeMap::<(String, String), Vec<Value>>::new();
     for mut column in columns
         .as_array()
@@ -126,18 +143,18 @@ pub(super) async fn extract(
         table_rows.push(serde_json::json!({"schema": identifier(&schema), "table": identifier(&table), "columns": columns}));
     }
     schema.push_str(&renderer.render("tables", &Value::Array(table_rows))?);
-    let mut functions = query(&transaction, include_str!("sql/schema_functions.sql")).await?;
+    let mut functions = next_catalog(&mut lines)?;
     type_fields(
         &mut functions,
         &["schema", "name"],
         &["arguments", "result"],
     )?;
     schema.push_str(&renderer.render("functions", &functions)?);
-    let mut views = query(&transaction, include_str!("sql/views.sql")).await?;
+    let mut views = next_catalog(&mut lines)?;
     type_fields(&mut views, &["schema", "view"], &["definition"])?;
     schema.push_str(&renderer.render("views", &views)?);
     std::fs::write(output.join("schema.sql"), schema)?;
-    transaction.commit().await.map_err(|e| query_error(&e))?;
+    anyhow::ensure!(lines.next().is_none(), "unexpected psql catalog result");
     write_json(
         &output.join("metadata.json"),
         &serde_json::json!({

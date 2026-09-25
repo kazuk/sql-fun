@@ -63,7 +63,10 @@ struct ImportArgs {
     /// Uncompressed tar bundle produced by export-script.
     #[arg(long)]
     bundle: PathBuf,
-    /// Previously extracted catalog directory.
+    /// Previously extracted catalog directory, read without modification.
+    #[arg(long)]
+    catalog: PathBuf,
+    /// New or empty directory for the candidate generation.
     #[arg(long)]
     output: PathBuf,
 }
@@ -88,7 +91,7 @@ impl Operation {
             }
             Self::ImportExtensions(args) => {
                 let stage = Publication::new(&args.output)?;
-                stage.copy_catalog()?;
+                stage.copy_catalog(&args.catalog)?;
                 bundle::import(&args.bundle, stage.path())?;
                 stage.publish()
             }
@@ -98,6 +101,11 @@ impl Operation {
 
 impl CatalogArgs {
     async fn execute(&self) -> Result<(), anyhow::Error> {
+        which::which("psql").map_err(|_| {
+            anyhow::anyhow!(
+                "psql is required for catalog extraction; install the PostgreSQL client tools"
+            )
+        })?;
         let stage = Publication::new(&self.output)?;
         let duration = Duration::from_secs(self.timeout_seconds);
         // On interruption, finish bounded provisioning so any created resource can be removed.
@@ -130,9 +138,8 @@ impl CatalogArgs {
             };
             catalog::extract(&connection, stage.path(), &provenance).await?;
             if let Some(instance) = &container {
-                let exported = instance.export().await?;
                 let bundle_path = stage.path().join("export.tar");
-                std::fs::write(&bundle_path, exported)?;
+                instance.export(&bundle_path).await?;
                 bundle::import(&bundle_path, stage.path())?;
                 std::fs::remove_file(bundle_path)?;
             }

@@ -5,13 +5,19 @@ It writes `schema.sql`, catalog JSON files, and `metadata.json` to the directory
 you specify. Docker extraction also exports and imports the server installation's
 extension SQL and control files.
 
+These commands produce candidate generations in a working directory.
+`$SQL_FUN_HOME` contains installed state; it is not an extraction workspace.
+Installing or upgrading a generation is a separate operation.
+Install the PostgreSQL client tools (`psql`) on the machine running sql-fun
+for both connection sources.
+
 ## From a Docker image
 
 Install Docker CLI and provide access to a Docker daemon:
 
 ```sh
 sql-fun extract catalog --docker-image postgres:17 \
-  --output "$SQL_FUN_HOME/postgres/17"
+  --output ./work/postgres-17
 ```
 
 Use an image digest instead of a mutable tag when repeatability matters.
@@ -31,24 +37,28 @@ access.
 ## From an existing server
 
 Supply a PostgreSQL connection URL or connection parameters understood by
-`tokio-postgres`. Prefer the environment variable to putting credentials in
-command history:
+`psql`/libpq. Prefer the environment variable to putting credentials in
+command history. The string is passed to the `psql` subprocess; keep passwords
+out of the string and use libpq password files or a service definition:
 
 ```sh
 export SQL_FUN_DATABASE_URL='host=db.example.org user=catalog_reader'
-SQL_FUN_DATABASE_URL="$SQL_FUN_DATABASE_URL dbname=postgres sslmode=require"
-sql-fun extract catalog --output "$SQL_FUN_HOME/postgres/17"
+SQL_FUN_DATABASE_URL="$SQL_FUN_DATABASE_URL dbname=postgres"
+SQL_FUN_DATABASE_URL="$SQL_FUN_DATABASE_URL sslmode=verify-full"
+SQL_FUN_DATABASE_URL="$SQL_FUN_DATABASE_URL sslrootcert=/path/to/ca.pem"
+sql-fun extract catalog --output ./work/postgres-17
 unset SQL_FUN_DATABASE_URL
 ```
 
 The account needs connection and catalog-read permissions. Extraction performs
 read-only queries; it does not create extensions or change the source database.
-TLS uses the platform certificate store and validates the server certificate and
-hostname. Install your organization's CA into that store when necessary.
-`sslmode=disable` explicitly permits unencrypted connections; `sslmode=prefer`
-may fall back to an unencrypted connection. Use `require` for remote connections
-that must use TLS. Unsupported connection options are reported as configuration
-errors. Neither `psql` nor Docker is needed for this operation.
+Authentication, TLS, CA certificates, password files, and service definitions use
+[libpq connection settings](https://www.postgresql.org/docs/17/libpq-ssl.html).
+Use `sslmode=verify-full` and the appropriate `sslrootcert` to verify both the CA
+and server hostname. `sslmode=require` requires encryption but does not by itself
+guarantee hostname verification. `sslmode=disable` explicitly permits unencrypted
+connections. Password prompts are disabled; configure credentials before running
+extraction. This source needs `psql`, but does not need Docker.
 
 `--timeout-seconds` bounds readiness and extraction (default: 120 seconds).
 Docker image retrieval/creation and cleanup have separate bounded operations.
@@ -86,7 +96,7 @@ then import it locally:
 
 ```sh
 sql-fun extract import-extensions --bundle extensions.tar \
-  --output "$SQL_FUN_HOME/postgres/17"
+  --catalog ./work/postgres-17 --output ./work/postgres-17-with-extensions
 ```
 
 The bundle's PostgreSQL major and minor release must exactly match the extracted
@@ -94,24 +104,31 @@ catalog. The administrator must select the same PostgreSQL installation used by
 the server, particularly when several installations or vendor builds coexist.
 Version matching cannot prove two vendor builds have identical extension files.
 The importer rejects unsupported formats, duplicate paths, links, special files,
-unsafe paths, and bundles larger than 256 MiB. Importing copies files; it does
-not execute extension SQL or install extensions in PostgreSQL.
+and unsafe paths. There is no fixed archive-size ceiling; provide enough disk
+space for the bundle, staging files, and candidate output. Importing copies files;
+it does not execute extension SQL or install extensions in PostgreSQL.
 
 When configuring an extension for subsequent SQL analysis, specify its installation
 version explicitly (for example, `uuid-ossp@1.1`). Automatic version inference
 currently also counts upgrade scripts; this separate loader limitation is tracked
 in [#270](https://github.com/kazuk/sql-fun/issues/270).
 
-## Replace or recover output
+## Candidate output and failures
 
-Successful extraction replaces the complete output directory. Connection-only
-extraction does not retain extension files from a previous extraction; import a
-matching bundle afterward. Extension import retains the existing catalog files
-and replaces the complete `extension/` directory.
+For both extraction and import, `--output` must be absent or an empty real
+directory. Nonempty directories, files, and symlinks are rejected without
+modifying their contents. Import reads `--catalog` without modifying it and
+copies its catalog files with the new bundle into the separate output candidate.
+It does not retain extensions from the input catalog.
 
-Failures before publication preserve the previous output. Concurrent writers to
-the same output are rejected. Output must be a real directory, not a symlink.
-Replacing an existing directory atomically currently requires Linux and a
-filesystem supporting rename exchange. If unsupported, choose a new output
-path. Keep the adjacent `.sql-fun.lock` file; deleting it can defeat writer
-coordination. The temporary and final output reside on the same filesystem.
+Extraction and bundle validation complete in a private staging directory before
+writing the candidate. Validation failures leave the output unchanged. An I/O
+failure or forced termination during the final copy can leave a partial candidate;
+inspect it and choose a new empty output for retry. Existing files are never
+overwritten. These commands do not install, merge, delete, or exchange installed
+generations.
+
+Concurrent sql-fun writers to the same output are rejected. Keep the adjacent
+`.sql-fun.lock` file; deleting it can defeat writer coordination. Avoid modifying
+the output while extraction is running. No atomic directory-exchange support is
+required.

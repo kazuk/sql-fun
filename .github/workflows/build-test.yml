@@ -354,6 +354,44 @@ jobs:
           path: target/distributions/x86_64-unknown-linux-gnu/*
           if-no-files-found: error
 
+  install-validation:
+    runs-on: ubuntu-24.04
+    needs: packaging
+    steps:
+      - uses: actions/checkout@v5
+
+      - uses: actions/download-artifact@v7
+        with:
+          name: sql-fun-x86_64-unknown-linux-gnu
+          path: ${{ runner.temp }}/sql-fun-artifact
+
+      - name: Validate the installed CLI contract
+        env:
+          DOTSLASH_VERSION: v0.5.9
+          SCRUT_VERSION: v0.4.3
+        run: |
+          validation_root="$RUNNER_TEMP/sql-fun-install-validation"
+          mkdir -p "$validation_root/contracts"
+          cp -R cli/contracts/. "$validation_root/contracts/"
+          cp "$RUNNER_TEMP/sql-fun-artifact"/sql-fun_*.deb "$validation_root/"
+          curl -fsSL -o "$validation_root/dotslash.tar.gz" \
+            "https://github.com/facebook/dotslash/releases/download/${DOTSLASH_VERSION}/dotslash-linux-musl.x86_64.${DOTSLASH_VERSION}.tar.gz"
+          tar -xzf "$validation_root/dotslash.tar.gz" -C "$validation_root"
+          curl -fsSL -o "$validation_root/scrut" \
+            "https://github.com/facebookincubator/scrut/releases/download/${SCRUT_VERSION}/scrut"
+          chmod +x "$validation_root/scrut"
+          "$validation_root/dotslash" --version
+          docker run --rm \
+            --mount "type=bind,source=$validation_root,target=/validation,readonly" \
+            ubuntu:24.04 bash -ceu '
+              apt-get update
+              apt-get install -y --no-install-recommends ca-certificates /validation/sql-fun_*.deb
+              PATH="/validation:$PATH" \
+                BASH_ENV=/validation/contracts/setup.sh \
+                SQL_FUN_BIN=/usr/bin/sql-fun \
+                /validation/scrut test /validation/contracts
+            '
+
   build:
     runs-on: ubuntu-24.04
     needs:
@@ -367,6 +405,7 @@ jobs:
       - dependency-updates
       - doc
       - packaging
+      - install-validation
     steps:
       - name: Complete
         run: true

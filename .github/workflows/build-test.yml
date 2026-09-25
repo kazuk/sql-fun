@@ -368,7 +368,9 @@ jobs:
       - name: Validate the installed CLI contract
         env:
           DOTSLASH_VERSION: v0.5.9
+          DOTSLASH_SHA256: 4c75c6eb7890ae35993b962073f6d9bbe78b42b81a5691303ad70f63bfbf7196
           SCRUT_VERSION: v0.4.3
+          SCRUT_DOTSLASH_SHA256: d2e4d5d36198f889dd7f827c29cc1b8cb2a362df98e47cdf84b5ee0e207151fc
         run: |
           validation_root="$RUNNER_TEMP/sql-fun-install-validation"
           mkdir -p "$validation_root/contracts"
@@ -376,18 +378,19 @@ jobs:
           cp "$RUNNER_TEMP/sql-fun-artifact"/sql-fun_*.deb "$validation_root/"
           curl -fsSL -o "$validation_root/dotslash.tar.gz" \
             "https://github.com/facebook/dotslash/releases/download/${DOTSLASH_VERSION}/dotslash-linux-musl.x86_64.${DOTSLASH_VERSION}.tar.gz"
+          printf '%s  %s\n' "$DOTSLASH_SHA256" "$validation_root/dotslash.tar.gz" | sha256sum --check --status
           tar -xzf "$validation_root/dotslash.tar.gz" -C "$validation_root"
-          curl -fsSL -o "$validation_root/scrut" \
+          curl -fsSL -o "$validation_root/scrut.dotslash" \
             "https://github.com/facebookincubator/scrut/releases/download/${SCRUT_VERSION}/scrut"
-          chmod +x "$validation_root/scrut"
-          "$validation_root/dotslash" --version
+          printf '%s  %s\n' "$SCRUT_DOTSLASH_SHA256" "$validation_root/scrut.dotslash" | sha256sum --check --status
+          scrut_binary=$("$validation_root/dotslash" -- fetch "$validation_root/scrut.dotslash")
+          install -m 0755 "$scrut_binary" "$validation_root/scrut"
           docker run --rm \
             --mount "type=bind,source=$validation_root,target=/validation,readonly" \
             ubuntu:24.04 bash -ceu '
               apt-get update
-              apt-get install -y --no-install-recommends ca-certificates curl /validation/sql-fun_*.deb
-              PATH="/validation:$PATH" \
-                BASH_ENV=/validation/contracts/setup.sh \
+              apt-get install -y --no-install-recommends /validation/sql-fun_*.deb
+              BASH_ENV=/validation/contracts/setup.sh \
                 SQL_FUN_BIN=/usr/bin/sql-fun \
                 /validation/scrut test /validation/contracts
             '

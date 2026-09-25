@@ -319,7 +319,7 @@ where
 
         let Some(calling_overload) = overloads.resolve_overload(self, &arg_types) else {
             self.report_problem(AnalysisProblem::parameter_type_mismatch_for_table_function(
-                call, arg_types,
+                &func_name, &arg_types,
             ))?;
             return DataSource::undefined_table_function(call, arg_exprs, alias_name);
         };

@@ -224,6 +224,10 @@ where
 
     fn set_statement_span(&mut self, statement_span: StringSpan) {
         self.statement_span = statement_span;
+        self.source = Some(SourcePathWithSpan::new(
+            &self.sql_source_path,
+            &statement_span,
+        ));
     }
 
     fn set_source_file(&mut self, source_access_service: Box<dyn super::SourceAccessService>) {

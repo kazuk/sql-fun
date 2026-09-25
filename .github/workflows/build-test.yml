@@ -385,7 +385,7 @@ jobs:
             --mount "type=bind,source=$validation_root,target=/validation,readonly" \
             ubuntu:24.04 bash -ceu '
               apt-get update
-              apt-get install -y --no-install-recommends ca-certificates /validation/sql-fun_*.deb
+              apt-get install -y --no-install-recommends ca-certificates curl /validation/sql-fun_*.deb
               PATH="/validation:$PATH" \
                 BASH_ENV=/validation/contracts/setup.sh \
                 SQL_FUN_BIN=/usr/bin/sql-fun \

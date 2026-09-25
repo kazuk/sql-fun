@@ -31,6 +31,9 @@ where
     }
 
     fn get_implicit_castable(&self, source_type: &TypeReference) -> HashSet<TypeReference> {
+        if source_type.is_dynamic() {
+            return HashSet::from([source_type.clone()]);
+        }
         let mut castable = self.base.get_implicit_castable(source_type);
 
         if let Some(s) = self.casts.get(&source_type.to_string()) {
@@ -69,7 +72,7 @@ where
                 None
             }
         } else {
-            self.base.get_explicit_cast(source_type, target_type)
+            self.base.get_implicit_cast(source_type, target_type)
         }
     }
 }

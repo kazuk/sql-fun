@@ -52,11 +52,13 @@ impl CastInfoRead for super::BaseContext {
         source_type: &TypeReference,
         target_type: &TypeReference,
     ) -> Option<super::CastDefinition> {
-        // TODO: normalize / fix search path
-        let source_local_name = source_type.full_name().local_name().clone();
-        let target_local_name = target_type.full_name().local_name().clone();
-        if source_local_name == target_local_name {
+        let (source_local_name, source_array) = self.builtin_cast_type(source_type)?;
+        let (target_local_name, target_array) = self.builtin_cast_type(target_type)?;
+        if source_local_name == target_local_name && source_array == target_array {
             return Some(CastDefinition::new(CastContext::NoConversion));
+        }
+        if source_array || target_array {
+            return None;
         }
 
         let from_source = self.casts.get(&source_local_name)?;
@@ -73,11 +75,13 @@ impl CastInfoRead for super::BaseContext {
         source_type: &TypeReference,
         target_type: &TypeReference,
     ) -> Option<super::CastDefinition> {
-        // TODO: normalize / fix search path
-        let source_local_name = source_type.full_name().local_name().clone();
-        let target_local_name = target_type.full_name().local_name().clone();
-        if source_local_name == target_local_name {
+        let (source_local_name, source_array) = self.builtin_cast_type(source_type)?;
+        let (target_local_name, target_array) = self.builtin_cast_type(target_type)?;
+        if source_local_name == target_local_name && source_array == target_array {
             return Some(CastDefinition::new(CastContext::NoConversion));
+        }
+        if source_array || target_array {
+            return None;
         }
 
         let from_source = self.casts.get(&source_local_name)?;
@@ -91,20 +95,82 @@ impl CastInfoRead for super::BaseContext {
     }
 
     fn get_implicit_castable(&self, source_type: &TypeReference) -> HashSet<TypeReference> {
-        use std::str::FromStr;
-
-        let source_local_name = source_type.full_name().local_name().clone();
-        let Some(from_source) = &self.casts.get(&source_local_name) else {
-            return HashSet::default();
-        };
         let mut results = HashSet::new();
-        results.insert(source_type.clone()); // source_type -> source_type : NoConversion is always ok
-
-        for (k, _) in from_source.iter() {
-            results.insert(TypeReference::from_full_name(
-                FullName::from_str(k.as_str()).expect("FullName from_str for builtin type"),
-            ));
+        let Some((source_local_name, source_array)) = self.builtin_cast_type(source_type) else {
+            return results;
+        };
+        results.insert(TypeReference::concrete_type_ref(
+            &FullName::with_schema("pg_catalog", source_local_name),
+            source_array,
+        ));
+        if !source_array && let Some(from_source) = self.casts.get(source_local_name) {
+            for (target, cast) in from_source.iter() {
+                if cast.use_in_implicit() {
+                    results.insert(TypeReference::from_master_type_name(&target));
+                }
+            }
         }
         results
+    }
+}
+
+impl super::BaseContext {
+    fn builtin_cast_type<'a>(&self, ty: &'a TypeReference) -> Option<(&'a str, bool)> {
+        if ty.is_dynamic() {
+            return None;
+        }
+        let name = ty.full_name();
+        if name.catalog().is_some()
+            || name
+                .schema()
+                .is_some_and(|schema| schema.as_str() != "pg_catalog")
+        {
+            return None;
+        }
+        let builtin_name = FullName::with_schema("pg_catalog", name.name().as_str());
+        self.types.get(&builtin_name.to_string())?;
+        Some((name.name().as_str(), ty.is_array()?))
+    }
+}
+
+#[cfg(test)]
+mod test_builtin_cast_identity {
+    use std::path::{Path, PathBuf};
+
+    use ::clap::Parser;
+    use ::sql_fun_core::SqlFunArgs;
+
+    use crate::sem::{BaseContext, CastInfoRead, FullName, SchemaFileContext, TypeReference};
+
+    #[test]
+    fn keeps_array_and_schema_identity_and_cast_context() {
+        let metadata = PathBuf::from(env!("CARGO_MANIFEST_DIR")).join("sql_fun.metadata.toml");
+        let args = SqlFunArgs::try_parse_from([
+            "sqlfun",
+            "--metadata-file",
+            metadata.to_str().expect("metadata path is UTF-8"),
+            "--sql-fun-home",
+            env!("SQL_FUN_HOME"),
+        ])
+        .expect("test arguments");
+        let context = BaseContext::new(args).expect("builtin context");
+        let text = TypeReference::from_master_type_name("text");
+        let text_array = TypeReference::from_master_type_name("_text");
+        let public_text = TypeReference::from_full_name(FullName::with_schema("public", "text"));
+        let oid = TypeReference::from_master_type_name("oid");
+        let regclass = TypeReference::from_master_type_name("regclass");
+        let xml = TypeReference::from_master_type_name("xml");
+
+        assert!(context.get_implicit_cast(&text, &text).is_some());
+        assert!(context.get_implicit_cast(&text, &text_array).is_none());
+        assert!(context.get_explicit_cast(&text_array, &text).is_none());
+        assert!(context.get_implicit_cast(&public_text, &text).is_none());
+        assert!(context.get_implicit_cast(&oid, &regclass).is_some());
+        assert!(context.get_implicit_castable(&text).contains(&regclass));
+        assert!(!context.get_implicit_castable(&text).contains(&xml));
+
+        let schema_context = SchemaFileContext::new(Path::new("fixture.sql"), context);
+        assert!(schema_context.get_explicit_cast(&text, &xml).is_some());
+        assert!(schema_context.get_implicit_cast(&text, &xml).is_none());
     }
 }

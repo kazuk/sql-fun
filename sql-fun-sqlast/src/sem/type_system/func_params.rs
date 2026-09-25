@@ -250,8 +250,8 @@ impl FunctionParam {
                 Ok(cast.context().overload_priority_score())
             } else {
                 TypeError::implicit_cast_not_found(
-                    &format!("{source_type}"),
-                    &format!("{target_type}"),
+                    &format!("{source_type:?}"),
+                    &format!("{target_type:?}"),
                 )?;
                 TypeError::never()
             }

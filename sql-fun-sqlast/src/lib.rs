@@ -221,7 +221,7 @@ mod tests {
 
     use crate::{
         PostgresDialect,
-        sem::{BaseContext, BaseParseContext},
+        sem::BaseContext,
         syn::{ListOpt, Opt},
     };
 
@@ -346,27 +346,20 @@ mod tests {
         Ok(())
     }
 
-    #[ignore]
     #[rstest::rstest]
     fn parse_adventure_works_schema(
         context_args: SqlFunArgs,
         _enable_stack_overflow_backtrace: EnableStackOverflowBacktrace,
     ) -> TestResult {
-        let mut analyze_context = BaseContext::new(context_args.clone())?;
-
-        let builtin_context = BaseContext::new(context_args.clone())?;
         let home_path = PathBuf::from(env!("SQL_FUN_HOME"));
         let builtin = home_path.join("postgres/17/schema.sql");
-        let builtin = PostgresDialect::parse_schema_file(&builtin, builtin_context)?;
-        analyze_context.extend(Box::new(builtin));
+        let builtin =
+            PostgresDialect::parse_schema_file(&builtin, BaseContext::new(context_args)?)?;
 
         let tablefunc_ext = home_path.join("postgres/17/extension/tablefunc--1.0.sql");
-        let input_context = BaseContext::new(context_args.clone())?;
-        let tablefunc_ext = PostgresDialect::parse_schema_file(&tablefunc_ext, input_context)?;
-
-        analyze_context.extend(Box::new(tablefunc_ext));
+        let tablefunc_ext = PostgresDialect::parse_schema_file(&tablefunc_ext, builtin)?;
         let file = PathBuf::from("../examples/adventure-works/schema.develop.sql");
-        let _dump = PostgresDialect::parse_schema_file(&file, analyze_context)?;
+        let _dump = PostgresDialect::parse_schema_file(&file, tablefunc_ext)?;
         Ok(())
     }
 }

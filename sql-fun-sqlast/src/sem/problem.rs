@@ -115,6 +115,9 @@ pub enum AnalysisProblem {
 
     /// implicit cast not found
     ImplicitCastNotFound(TypeReference, TypeReference),
+
+    /// no compatible table-function overload
+    ParameterTypeMismatchForTableFunction(FullName, ArgumentBindingCollection),
 }
 
 impl AnalysisProblem {
@@ -197,10 +200,10 @@ impl AnalysisProblem {
     /// parameter type can not cast to function argument
     #[tracing::instrument()]
     pub fn parameter_type_mismatch_for_table_function(
-        call: &crate::syn::FuncCall,
-        arg_types: ArgumentBindingCollection,
+        name: &FullName,
+        arg_types: &ArgumentBindingCollection,
     ) -> Self {
-        todo!()
+        Self::ParameterTypeMismatchForTableFunction(name.clone(), arg_types.clone())
     }
 
     /// specified function result set type not found

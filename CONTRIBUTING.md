@@ -212,7 +212,12 @@ For faster iteration, run only selected steps:
 .local/bin/check-test-flow --step=lint
 .local/bin/check-test-flow --step=doc
 .local/bin/check-test-flow --step=graphify
+.local/bin/check-test-flow --step=packaging
 ```
+
+`packaging` is an opt-in step and is not part of the default check flow. It
+builds Linux distributions and always validates them before publishing outputs.
+See [Linux packaging](docs/internal-rules/linux-packaging.md) for prerequisites.
 
 List available steps with:
 

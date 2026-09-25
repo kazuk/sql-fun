@@ -16,7 +16,7 @@ Options:
   --list-steps           Print available step names.
   -h, --help
 
-Steps:
+Default steps:
   affected
   workspace
   proc-macro-tests
@@ -30,10 +30,13 @@ Steps:
   graphify
   skill-lint
   markdown-lint
+
+Optional steps (explicit --step required):
+  packaging
 USAGE
 }
 
-ALL_STEPS=(
+DEFAULT_STEPS=(
   affected
   workspace
   proc-macro-tests
@@ -49,13 +52,15 @@ ALL_STEPS=(
   markdown-lint
 )
 
+ALL_STEPS=("${DEFAULT_STEPS[@]}" packaging)
+
 function list_steps() {
   printf '%s\n' "${ALL_STEPS[@]}"
 }
 
 function normalize_step() {
   case "$1" in
-    affected|workspace|proc-macro-tests|fmt|lint|server-api-spec|deny|dependency-updates|doc|typos|graphify|skill-lint|markdown-lint)
+    affected|workspace|proc-macro-tests|fmt|lint|server-api-spec|deny|dependency-updates|doc|typos|graphify|skill-lint|markdown-lint|packaging)
       printf '%s\n' "$1"
       ;;
     format)
@@ -107,7 +112,7 @@ if (( ${#SELECTED_STEPS[@]} > 0 )); then
     STEP_SELECTED["$step"]=1
   done
 else
-  for step in "${ALL_STEPS[@]}"; do
+  for step in "${DEFAULT_STEPS[@]}"; do
     STEP_SELECTED["$step"]=1
   done
 fi
@@ -244,6 +249,11 @@ function run_typos() {
   typos --config .local/config/typos.toml
 }
 
+function run_packaging() {
+  echo "== Build and validate Linux distributions"
+  "${GIT_ROOT}/.local/bin/package-linux" x86_64-unknown-linux-gnu
+}
+
 function run_graphify() {
   require_command graphify
   echo "== Update graph index"
@@ -292,6 +302,7 @@ for step in "${ALL_STEPS[@]}"; do
       graphify) run_graphify ;;
       skill-lint) run_skill_validator ;;
       markdown-lint) run_rumdl ;;
+      packaging) run_packaging ;;
     esac
   fi
 done

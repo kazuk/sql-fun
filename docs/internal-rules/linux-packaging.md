@@ -26,8 +26,13 @@ and `sha256sum`. Docker access and root privileges are not needed to build packa
 From the repository, run:
 
 ```sh
-.local/bin/package-linux x86_64-unknown-linux-gnu
+.local/bin/check-test-flow --step=packaging
 ```
+
+This optional step is listed by `check-test-flow --list-steps` and `--help`, but
+is excluded from the default check flow. It calls `package-linux` for
+`x86_64-unknown-linux-gnu`, which always validates the generated artifacts before
+moving them to the output directory. There is no separate validation opt-in.
 
 The only supported target is currently `x86_64-unknown-linux-gnu` (`amd64` in
 Debian). Unsupported targets fail explicitly. Both executables are built together
@@ -67,7 +72,8 @@ Build-image libraries are not automatically product dependencies. Rust/Cargo and
 
 ## CI and support boundary
 
-The `packaging` job in `build-test.yml` runs the same script and uploads the two
+The `packaging` job in `build-test.yml` uses the same
+`check-test-flow --step=packaging` entry point and uploads the two
 archives and checksum manifest as `sql-fun-x86_64-unknown-linux-gnu`. Download that
 workflow artifact for later installation tests; no GitHub Release is published.
 The job logs the source commit, product version, target, and resolved dependencies.

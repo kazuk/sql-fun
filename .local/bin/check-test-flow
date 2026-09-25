@@ -33,6 +33,7 @@ Default steps:
 
 Optional steps (explicit --step required):
   packaging
+  cli-contract
 USAGE
 }
 
@@ -52,7 +53,7 @@ DEFAULT_STEPS=(
   markdown-lint
 )
 
-ALL_STEPS=("${DEFAULT_STEPS[@]}" packaging)
+ALL_STEPS=("${DEFAULT_STEPS[@]}" packaging cli-contract)
 
 function list_steps() {
   printf '%s\n' "${ALL_STEPS[@]}"
@@ -60,7 +61,7 @@ function list_steps() {
 
 function normalize_step() {
   case "$1" in
-    affected|workspace|proc-macro-tests|fmt|lint|server-api-spec|deny|dependency-updates|doc|typos|graphify|skill-lint|markdown-lint|packaging)
+    affected|workspace|proc-macro-tests|fmt|lint|server-api-spec|deny|dependency-updates|doc|typos|graphify|skill-lint|markdown-lint|packaging|cli-contract)
       printf '%s\n' "$1"
       ;;
     format)
@@ -254,6 +255,17 @@ function run_packaging() {
   "${GIT_ROOT}/.local/bin/package-linux" x86_64-unknown-linux-gnu
 }
 
+function run_cli_contract() {
+  require_command jq
+  require_command scrut
+  echo "== CLI contracts"
+  cargo build --locked -p sql-fun-cli --bin sql-fun
+  target_dir=$(cargo metadata --locked --no-deps --format-version 1 | jq -er '.target_directory')
+  BASH_ENV="${GIT_ROOT}/cli/contracts/setup.sh" \
+    SQL_FUN_BIN="${target_dir}/debug/sql-fun" \
+    scrut test "${GIT_ROOT}/cli/contracts"
+}
+
 function run_graphify() {
   require_command graphify
   echo "== Update graph index"
@@ -303,6 +315,7 @@ for step in "${ALL_STEPS[@]}"; do
       skill-lint) run_skill_validator ;;
       markdown-lint) run_rumdl ;;
       packaging) run_packaging ;;
+      cli-contract) run_cli_contract ;;
     esac
   fi
 done

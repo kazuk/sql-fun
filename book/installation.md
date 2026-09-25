@@ -31,6 +31,11 @@ and verify the installation before running `sql-fun check`:
 cargo expand --version
 ```
 
+`sql-fun check` reports a missing prerequisite and exits with an error when
+`cargo-expand` is not executable on `PATH`. Install it with the command above
+and add Cargo's binary directory to `PATH` before retrying. It is a prerequisite
+of this command, not a Debian package installation dependency.
+
 Specify this in your Cargo.toml as follows:
 
 ```toml

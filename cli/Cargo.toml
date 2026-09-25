@@ -9,6 +9,21 @@ keywords.workspace = true
 repository.workspace = true
 rust-version.workspace = true
 
+[package.metadata.deb]
+name = "sql-fun"
+maintainer = "kazuk <kazuk.dll@gmail.com>"
+copyright = "2025 kazuk <kazuk.dll@gmail.com>"
+license-file = ["../LICENSE", "0"]
+# cargo-deb excludes libgcc from $auto; dpkg-shlibdeps on both binaries requires it.
+depends = "$auto, libgcc-s1 (>= 4.2)"
+revision = ""
+section = "devel"
+priority = "optional"
+assets = [
+    ["target/release/sql-fun", "usr/bin/sql-fun", "755"],
+    ["target/release/sql-fun-server", "usr/bin/sql-fun-server", "755"],
+]
+
 [[bin]]
 name = "sql-fun"
 path = "src/main.rs"

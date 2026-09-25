@@ -127,6 +127,12 @@ impl CheckArgs {
     /// [`anyhow::Error`] for runtime error
     ///
     pub async fn execute(&self, _common_args: &SqlFunArgs) -> Result<ExitCode, anyhow::Error> {
+        ::which::which("cargo-expand").map_err(|_| {
+            anyhow::anyhow!(
+                "sql-fun check requires cargo-expand on PATH; install it with \"cargo install --locked cargo-expand\" and ensure Cargo's binary directory is on PATH"
+            )
+        })?;
+
         if self.workspace {
             let deps_members = Self::dependent_members()?;
             for member in deps_members {

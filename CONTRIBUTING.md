@@ -60,6 +60,9 @@ cargo install --locked cargo-deb
 cargo deb --version
 ```
 
+For the Linux distribution build command, native packaging prerequisites, and
+artifact validation, see [Linux packaging](docs/internal-rules/linux-packaging.md).
+
 Some tools, especially `cargo-deny`, may require a recent stable Rust toolchain
 to install. If installation fails, update stable first and try again.
 

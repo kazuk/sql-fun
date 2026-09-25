@@ -354,6 +354,47 @@ jobs:
           path: target/distributions/x86_64-unknown-linux-gnu/*
           if-no-files-found: error
 
+  install-validation:
+    runs-on: ubuntu-24.04
+    needs: packaging
+    steps:
+      - uses: actions/checkout@v5
+
+      - uses: actions/download-artifact@v7
+        with:
+          name: sql-fun-x86_64-unknown-linux-gnu
+          path: ${{ runner.temp }}/sql-fun-artifact
+
+      - name: Validate the installed CLI contract
+        env:
+          DOTSLASH_VERSION: v0.5.9
+          DOTSLASH_SHA256: 4c75c6eb7890ae35993b962073f6d9bbe78b42b81a5691303ad70f63bfbf7196
+          SCRUT_VERSION: v0.4.3
+          SCRUT_DOTSLASH_SHA256: d2e4d5d36198f889dd7f827c29cc1b8cb2a362df98e47cdf84b5ee0e207151fc
+        run: |
+          validation_root="$RUNNER_TEMP/sql-fun-install-validation"
+          mkdir -p "$validation_root/contracts"
+          cp -R cli/contracts/. "$validation_root/contracts/"
+          cp "$RUNNER_TEMP/sql-fun-artifact"/sql-fun_*.deb "$validation_root/"
+          curl -fsSL -o "$validation_root/dotslash.tar.gz" \
+            "https://github.com/facebook/dotslash/releases/download/${DOTSLASH_VERSION}/dotslash-linux-musl.x86_64.${DOTSLASH_VERSION}.tar.gz"
+          printf '%s  %s\n' "$DOTSLASH_SHA256" "$validation_root/dotslash.tar.gz" | sha256sum --check --status
+          tar -xzf "$validation_root/dotslash.tar.gz" -C "$validation_root"
+          curl -fsSL -o "$validation_root/scrut.dotslash" \
+            "https://github.com/facebookincubator/scrut/releases/download/${SCRUT_VERSION}/scrut"
+          printf '%s  %s\n' "$SCRUT_DOTSLASH_SHA256" "$validation_root/scrut.dotslash" | sha256sum --check --status
+          scrut_binary=$("$validation_root/dotslash" -- fetch "$validation_root/scrut.dotslash")
+          install -m 0755 "$scrut_binary" "$validation_root/scrut"
+          docker run --rm \
+            --mount "type=bind,source=$validation_root,target=/validation,readonly" \
+            ubuntu:24.04 bash -ceu '
+              apt-get update
+              apt-get install -y --no-install-recommends /validation/sql-fun_*.deb
+              BASH_ENV=/validation/contracts/setup.sh \
+                SQL_FUN_BIN=/usr/bin/sql-fun \
+                /validation/scrut test /validation/contracts
+            '
+
   build:
     runs-on: ubuntu-24.04
     needs:
@@ -367,6 +408,7 @@ jobs:
       - dependency-updates
       - doc
       - packaging
+      - install-validation
     steps:
       - name: Complete
         run: true

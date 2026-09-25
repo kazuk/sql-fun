@@ -29,11 +29,29 @@ struct PgFunctionProto {
     is_strict: bool,
 }
 
-#[derive(Debug, serde::Deserialize, PartialEq)]
+#[derive(Debug, serde::Deserialize)]
 enum PgArgMode {
     In,
     Out,
     Variadic,
+}
+
+impl PgArgMode {
+    fn is_output(&self) -> bool {
+        matches!(self, Self::Out)
+    }
+
+    fn function_param(
+        &self,
+        name: &Option<String>,
+        param_type: &Option<TypeReference>,
+    ) -> FunctionParam {
+        match self {
+            Self::In => FunctionParam::new_input_param(name, param_type, &None),
+            Self::Out => FunctionParam::new_output_param(name, param_type),
+            Self::Variadic => FunctionParam::new_variadig_param(name, param_type),
+        }
+    }
 }
 
 impl std::str::FromStr for PgArgMode {
@@ -69,7 +87,7 @@ struct PgFunctionArgRef<'a> {
 impl PgFunctionDetail {
     fn matches_args(&self, args: &[String]) -> bool {
         self.arg_iter()
-            .filter(|arg| arg.arg_mode != &PgArgMode::Out)
+            .filter(|arg| !arg.arg_mode.is_output())
             .map(|arg| arg.arg_type)
             .eq(args.iter())
     }
@@ -102,7 +120,7 @@ impl PgFunctionDetail {
     }
 
     pub fn out_args(&self) -> impl Iterator<Item = PgFunctionArgRef<'_>> {
-        self.arg_iter().filter(|a| a.arg_mode == &PgArgMode::Out)
+        self.arg_iter().filter(|a| a.arg_mode.is_output())
     }
 }
 
@@ -173,15 +191,7 @@ impl PgBuiltInFunctions {
                 for arg in details.arg_iter() {
                     let arg_name = arg.arg_name.cloned();
                     let arg_type = Some(TypeReference::from_master_type_name(arg.arg_type));
-                    args.push(match arg.arg_mode {
-                        PgArgMode::In => {
-                            FunctionParam::new_input_param(&arg_name, &arg_type, &None)
-                        }
-                        PgArgMode::Out => FunctionParam::new_output_param(&arg_name, &arg_type),
-                        PgArgMode::Variadic => {
-                            FunctionParam::new_variadig_param(&arg_name, &arg_type)
-                        }
-                    });
+                    args.push(arg.arg_mode.function_param(&arg_name, &arg_type));
                 }
 
                 let mut composite_fields = CompositeFieldCollection::default();

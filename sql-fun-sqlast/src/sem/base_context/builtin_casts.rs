@@ -52,12 +52,15 @@ impl CastInfoRead for super::BaseContext {
         source_type: &TypeReference,
         target_type: &TypeReference,
     ) -> Option<super::CastDefinition> {
+        if !source_type.is_dynamic() && source_type == target_type {
+            return Some(CastDefinition::new(CastContext::NoConversion));
+        }
         let (source_local_name, source_array) = self.builtin_cast_type(source_type)?;
         let (target_local_name, target_array) = self.builtin_cast_type(target_type)?;
         if source_local_name == target_local_name && source_array == target_array {
             return Some(CastDefinition::new(CastContext::NoConversion));
         }
-        if source_array || target_array {
+        if source_array != target_array {
             return None;
         }
 
@@ -75,12 +78,15 @@ impl CastInfoRead for super::BaseContext {
         source_type: &TypeReference,
         target_type: &TypeReference,
     ) -> Option<super::CastDefinition> {
+        if !source_type.is_dynamic() && source_type == target_type {
+            return Some(CastDefinition::new(CastContext::NoConversion));
+        }
         let (source_local_name, source_array) = self.builtin_cast_type(source_type)?;
         let (target_local_name, target_array) = self.builtin_cast_type(target_type)?;
         if source_local_name == target_local_name && source_array == target_array {
             return Some(CastDefinition::new(CastContext::NoConversion));
         }
-        if source_array || target_array {
+        if source_array != target_array {
             return None;
         }
 
@@ -103,10 +109,13 @@ impl CastInfoRead for super::BaseContext {
             &FullName::with_schema("pg_catalog", source_local_name),
             source_array,
         ));
-        if !source_array && let Some(from_source) = self.casts.get(source_local_name) {
+        if let Some(from_source) = self.casts.get(source_local_name) {
             for (target, cast) in from_source.iter() {
                 if cast.use_in_implicit() {
-                    results.insert(TypeReference::from_master_type_name(&target));
+                    results.insert(TypeReference::concrete_type_ref(
+                        &FullName::with_schema("pg_catalog", &target),
+                        source_array,
+                    ));
                 }
             }
         }
@@ -160,16 +169,66 @@ mod test_builtin_cast_identity {
         let oid = TypeReference::from_master_type_name("oid");
         let regclass = TypeReference::from_master_type_name("regclass");
         let xml = TypeReference::from_master_type_name("xml");
+        let mood = TypeReference::from_full_name(FullName::with_schema("public", "mood"));
+        let smallint_array = TypeReference::from_master_type_name("_int2");
+        let integer_array = TypeReference::from_master_type_name("_int4");
 
         assert!(context.get_implicit_cast(&text, &text).is_some());
+        assert!(
+            context
+                .get_implicit_cast(&mood, &mood)
+                .is_some_and(|cast| cast.is_no_conversion())
+        );
+        assert!(
+            context
+                .get_explicit_cast(&mood, &mood)
+                .is_some_and(|cast| cast.is_no_conversion())
+        );
         assert!(context.get_implicit_cast(&text, &text_array).is_none());
         assert!(context.get_explicit_cast(&text_array, &text).is_none());
         assert!(context.get_implicit_cast(&public_text, &text).is_none());
+        assert!(
+            context
+                .get_implicit_cast(&smallint_array, &integer_array)
+                .is_some()
+        );
+        assert!(
+            context
+                .get_explicit_cast(&integer_array, &smallint_array)
+                .is_some()
+        );
+        assert!(
+            context
+                .get_implicit_cast(&integer_array, &smallint_array)
+                .is_none()
+        );
+        assert!(
+            context
+                .get_implicit_castable(&smallint_array)
+                .contains(&integer_array)
+        );
+        assert!(
+            !context
+                .get_implicit_castable(&smallint_array)
+                .contains(&TypeReference::from_master_type_name("int4"))
+        );
         assert!(context.get_implicit_cast(&oid, &regclass).is_some());
         assert!(context.get_implicit_castable(&text).contains(&regclass));
         assert!(!context.get_implicit_castable(&text).contains(&xml));
 
         let schema_context = SchemaFileContext::new(Path::new("fixture.sql"), context);
+        assert!(schema_context.get_implicit_cast(&mood, &mood).is_some());
+        assert!(schema_context.get_explicit_cast(&mood, &mood).is_some());
+        assert!(
+            schema_context
+                .get_implicit_cast(&smallint_array, &integer_array)
+                .is_some()
+        );
+        assert!(
+            schema_context
+                .get_implicit_castable(&smallint_array)
+                .contains(&integer_array)
+        );
         assert!(schema_context.get_explicit_cast(&text, &xml).is_some());
         assert!(schema_context.get_implicit_cast(&text, &xml).is_none());
     }

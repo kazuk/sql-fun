@@ -38,11 +38,16 @@ derive_builder.workspace = true
 directories.workspace = true
 either.workspace = true
 env_logger.workspace = true
+fs2.workspace = true
 futures-util.workspace = true
 glob.workspace = true
+handlebars.workspace = true
 inquire.workspace = true
 log.workspace = true
+native-tls.workspace = true
 nix.workspace = true
+postgres-native-tls.workspace = true
+rustix.workspace = true
 serde.workspace = true
 serde_json.workspace = true
 shellexpand.workspace = true
@@ -50,16 +55,20 @@ sql-fun-codegen.workspace = true
 sql-fun-core.workspace = true
 statig.workspace = true
 syn.workspace = true
+tar.workspace = true
 tempfile.workspace = true
 thiserror.workspace = true
 tokio.workspace = true
+tokio-postgres.workspace = true
 toml.workspace = true
 url.workspace = true
 walkdir.workspace = true
 which.workspace = true
 
 [dev-dependencies]
+pg_query.workspace = true
 rstest.workspace = true
+sql-fun-sqlast.workspace = true
 
 [lints]
 workspace = true

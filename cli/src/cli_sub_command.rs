@@ -1,4 +1,4 @@
-use crate::CheckArgs;
+use crate::{CheckArgs, ExtractArgs};
 use sql_fun_core::InitializeArgs;
 
 /// daemon control args
@@ -13,6 +13,9 @@ pub struct DaemonControlArgs {
 /// CLI Subcommand args
 #[derive(clap::Subcommand, Debug, Clone, Default)]
 pub enum CliSubCommand {
+    /// Extract PostgreSQL catalogs or import extension files
+    Extract(ExtractArgs),
+
     /// Get versions
     #[default]
     Versions,
@@ -57,6 +60,53 @@ Inference query parameter types, result set column types"#,
 }
 
 impl CliSubCommand {
+    /// Construct a builtin extraction command.
+    #[must_use]
+    pub fn extract(args: &ExtractArgs) -> Self {
+        Self::Extract(args.clone())
+    }
+
+    pub(crate) const fn is_builtin(&self) -> bool {
+        matches!(
+            self,
+            Self::Initialize(_) | Self::Check(_) | Self::Extract(_)
+        )
+    }
+
+    pub(crate) async fn run_builtin(
+        &self,
+        common: &sql_fun_core::SqlFunArgs,
+    ) -> Result<std::process::ExitCode, anyhow::Error> {
+        match self {
+            Self::Initialize(args) => Ok(crate::init::initialize(common, args).await?),
+            Self::Check(args) => Ok(args.execute(common).await?),
+            Self::Extract(args) => args.execute().await,
+            _ => unreachable!("expected builtin command"),
+        }
+    }
+
+    pub(crate) async fn execute_external(
+        &self,
+        runnable: &crate::RunnableCommand,
+        args: &crate::SqlFunCliArgs,
+    ) -> Result<std::process::ExitCode, anyhow::Error> {
+        match self {
+            Self::External(external_args) => {
+                let exit_code = runnable.run_external(args, external_args).await?;
+                Ok(std::process::ExitCode::from(
+                    u8::try_from(exit_code).unwrap_or(u8::MAX),
+                ))
+            }
+            Self::Start(_daemon_control_args) => todo!(),
+            Self::Stop(_daemon_control_args) => todo!(),
+            Self::Status(_daemon_control_args) => todo!(),
+            Self::Restart(_daemon_control_args) => todo!(),
+            Self::Initialize(_initialize_args) => todo!(),
+            Self::Check(_check_args) => todo!(),
+            Self::Versions => todo!(),
+            Self::Extract(_) => unreachable!("builtin extraction"),
+        }
+    }
     fn daemon_binary_name(name: &str) -> String {
         format!("sqlfun-{name}-daemon")
     }
@@ -81,6 +131,7 @@ impl CliSubCommand {
             }
             Self::Initialize(_) => (false, "init".to_string()),
             Self::Check(_) => (false, "check".to_string()),
+            Self::Extract(_) => (false, "extract".to_string()),
             Self::Versions => (false, "versions".to_string()),
         };
         if only_daemon {

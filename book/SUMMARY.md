@@ -17,6 +17,7 @@
 ### Subcommands
 
 - [init](./cli/init.md) sub command
+- [Extract PostgreSQL metadata](cli/extract.md)
 - [check](./cli/check.md) sub command
 <!-- Empty links mark draft chapters in mdBook. -->
 <!-- rumdl-disable MD042 -->

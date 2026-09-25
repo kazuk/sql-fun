@@ -3,10 +3,9 @@
 mod child_proc;
 mod cli_sub_command;
 mod docker;
+mod extract;
 mod init;
 mod runnable;
-
-use self::init::initialize;
 
 use ::sql_fun_core::SqlFunArgs;
 use std::process::ExitCode;
@@ -14,6 +13,7 @@ use std::process::ExitCode;
 pub use self::{
     check::CheckArgs,
     cli_sub_command::CliSubCommand,
+    extract::ExtractArgs,
     runnable::{RunnableCommand, StdStream},
 };
 
@@ -34,10 +34,10 @@ impl SqlFunCliArgs {
     /// returns true for builtin subcommand
     #[must_use]
     pub const fn is_builtin(&self) -> bool {
-        matches!(
-            self.command,
-            Some(CliSubCommand::Initialize(_) | CliSubCommand::Check(_))
-        )
+        match &self.command {
+            Some(command) => command.is_builtin(),
+            None => false,
+        }
     }
 
     /// get command
@@ -61,9 +61,5 @@ pub async fn run_builtin(args: &SqlFunCliArgs) -> Result<ExitCode, anyhow::Error
         eprintln!("no sub-command specified");
         return Ok(ExitCode::SUCCESS);
     };
-    match sub_command {
-        CliSubCommand::Initialize(init_args) => Ok(initialize(&args.common_args, init_args).await?),
-        CliSubCommand::Check(check_args) => Ok(check_args.execute(&args.common_args).await?),
-        _ => unreachable!(),
-    }
+    sub_command.run_builtin(&args.common_args).await
 }

@@ -233,6 +233,26 @@ Some checks require extra tools, such as `cargo-nextest`, `cargo-deny`,
 `cargo-sort`, `cargo-llvm-cov`, `cargo-edit`, `cargo-expand`, `taplo`, `typos`,
 `jq`, and `graphify`.
 
+## PostgreSQL extraction integration
+
+`.local/bin/test-postgres-extraction` requires Python 3, Docker CLI, and access
+to a Docker daemon. It creates its own PostgreSQL 17 and 18 containers from pinned
+images and cleans up only those resources. Run it against a built or installed CLI:
+
+```sh
+.local/bin/test-postgres-extraction --binary target/debug/sql-fun \
+  --output /tmp/sql-fun-extraction-validation
+```
+
+Use `--host` and `--bind` when the Docker host is reached through a specific
+interface instead of loopback. CI installs Python 3 in the dedicated Ubuntu
+runner job and exercises the packaged CLI. The normal CI/development image
+does not install Docker CLI; use a dedicated Docker-capable environment for this
+integration check. This check does not require changing
+the normal development image or granting it permanent Docker-socket access.
+The legacy extraction scripts delegate to `sql-fun extract`; they no longer
+require `hbs`.
+
 ## Updating Statistics
 
 Before submitting a pull request, update project statistics:

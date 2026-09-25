@@ -99,6 +99,7 @@ fs2 = "0.4"
 futures-core = "0.3"
 futures-util = "0.3"
 glob = "0.3"
+handlebars = "6.4"
 hex = "0.4.3"
 indexmap = { version = "2.14.0", features = ["serde"] }
 inquire = "0.9"
@@ -106,15 +107,18 @@ itertools = "0.15"
 j9 = "0.1"
 log = "0.4"
 miette = { version = "7.6.0", features = ["fancy"] }
+native-tls = "0.2"
 nix = { version = "0.31", features = ["process", "signal"] }
 owo-colors = "4.2.3"
 petgraph = "0.8.3"
 pg_query = "6.1"
+postgres-native-tls = "0.5"
 proc-macro2 = { version = "1.0", features = ["span-locations"] }
 proc_macro2_diagnostic = "0.6.3"
 quote = "1.0"
 rand = "0.10"
 rstest = "0.27"
+rustix = { version = "1.1", features = ["fs"] }
 schemars = { version = "1.2.1", features = ["url2"] }
 serde = { version = "1.0", features = ["derive"] }
 serde_json = { version = "1.0", features = ["preserve_order"] }
@@ -134,6 +138,7 @@ sql-fun-sqlast = { path = "./sql-fun-sqlast", version = "0.1.0", features = [] }
 statig = "0.4.1"
 syn = { version = "3.0", features = ["extra-traits", "full", "visit"] }
 sysinfo = "0.39"
+tar = "0.4"
 tempfile = "3.27.0"
 testresult = "0.4"
 thiserror = "2.0"

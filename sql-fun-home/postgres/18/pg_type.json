@@ -45,16 +45,7 @@
     "name": "oidvector"
   },
   {
-    "name": "pg_type"
-  },
-  {
-    "name": "pg_attribute"
-  },
-  {
-    "name": "pg_proc"
-  },
-  {
-    "name": "pg_class"
+    "name": "pg_ddl_command"
   },
   {
     "name": "json"
@@ -66,19 +57,10 @@
     "name": "pg_node_tree"
   },
   {
-    "name": "pg_ndistinct"
+    "name": "table_am_handler"
   },
   {
-    "name": "pg_dependencies"
-  },
-  {
-    "name": "pg_mcv_list"
-  },
-  {
-    "name": "pg_ddl_command"
-  },
-  {
-    "name": "xid8"
+    "name": "index_am_handler"
   },
   {
     "name": "point"
@@ -99,6 +81,9 @@
     "name": "line"
   },
   {
+    "name": "cidr"
+  },
+  {
     "name": "float4"
   },
   {
@@ -111,6 +96,9 @@
     "name": "circle"
   },
   {
+    "name": "macaddr8"
+  },
+  {
     "name": "money"
   },
   {
@@ -118,12 +106,6 @@
   },
   {
     "name": "inet"
-  },
-  {
-    "name": "cidr"
-  },
-  {
-    "name": "macaddr8"
   },
   {
     "name": "aclitem"
@@ -177,31 +159,73 @@
     "name": "regclass"
   },
   {
-    "name": "regcollation"
-  },
-  {
     "name": "regtype"
   },
   {
-    "name": "regrole"
+    "name": "record"
   },
   {
-    "name": "regnamespace"
+    "name": "cstring"
+  },
+  {
+    "name": "any"
+  },
+  {
+    "name": "anyarray"
+  },
+  {
+    "name": "void"
+  },
+  {
+    "name": "trigger"
+  },
+  {
+    "name": "language_handler"
+  },
+  {
+    "name": "internal"
+  },
+  {
+    "name": "anyelement"
+  },
+  {
+    "name": "_record"
+  },
+  {
+    "name": "anynonarray"
   },
   {
     "name": "uuid"
   },
   {
+    "name": "txid_snapshot"
+  },
+  {
+    "name": "fdw_handler"
+  },
+  {
     "name": "pg_lsn"
+  },
+  {
+    "name": "tsm_handler"
+  },
+  {
+    "name": "pg_ndistinct"
+  },
+  {
+    "name": "pg_dependencies"
+  },
+  {
+    "name": "anyenum"
   },
   {
     "name": "tsvector"
   },
   {
-    "name": "gtsvector"
+    "name": "tsquery"
   },
   {
-    "name": "tsquery"
+    "name": "gtsvector"
   },
   {
     "name": "regconfig"
@@ -213,13 +237,10 @@
     "name": "jsonb"
   },
   {
-    "name": "jsonpath"
+    "name": "anyrange"
   },
   {
-    "name": "txid_snapshot"
-  },
-  {
-    "name": "pg_snapshot"
+    "name": "event_trigger"
   },
   {
     "name": "int4range"
@@ -240,6 +261,18 @@
     "name": "int8range"
   },
   {
+    "name": "jsonpath"
+  },
+  {
+    "name": "regnamespace"
+  },
+  {
+    "name": "regrole"
+  },
+  {
+    "name": "regcollation"
+  },
+  {
     "name": "int4multirange"
   },
   {
@@ -258,58 +291,25 @@
     "name": "int8multirange"
   },
   {
-    "name": "record"
+    "name": "anymultirange"
   },
   {
-    "name": "_record"
+    "name": "anycompatiblemultirange"
   },
   {
-    "name": "cstring"
+    "name": "pg_brin_bloom_summary"
   },
   {
-    "name": "any"
+    "name": "pg_brin_minmax_multi_summary"
   },
   {
-    "name": "anyarray"
+    "name": "pg_mcv_list"
   },
   {
-    "name": "void"
+    "name": "pg_snapshot"
   },
   {
-    "name": "trigger"
-  },
-  {
-    "name": "event_trigger"
-  },
-  {
-    "name": "language_handler"
-  },
-  {
-    "name": "internal"
-  },
-  {
-    "name": "anyelement"
-  },
-  {
-    "name": "anynonarray"
-  },
-  {
-    "name": "anyenum"
-  },
-  {
-    "name": "fdw_handler"
-  },
-  {
-    "name": "index_am_handler"
-  },
-  {
-    "name": "tsm_handler"
-  },
-  {
-    "name": "table_am_handler"
-  },
-  {
-    "name": "anyrange"
+    "name": "xid8"
   },
   {
     "name": "anycompatible"
@@ -322,17 +322,5 @@
   },
   {
     "name": "anycompatiblerange"
-  },
-  {
-    "name": "anymultirange"
-  },
-  {
-    "name": "anycompatiblemultirange"
-  },
-  {
-    "name": "pg_brin_bloom_summary"
-  },
-  {
-    "name": "pg_brin_minmax_multi_summary"
   }
 ]

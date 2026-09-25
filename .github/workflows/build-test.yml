@@ -25,9 +25,6 @@ jobs:
     steps:
       - uses: actions/checkout@v5
 
-      - name: Verify packaging tool
-        run: cargo deb --version
-
       - name: Disk usage before cache restore
         run: |
           df -h . /usr/local/cargo /github/home

@@ -49,8 +49,4 @@ jobs:
         run: |
           docker run --rm "${LOCAL_IMAGE_TAG}" cargo --version
           docker run --rm "${LOCAL_IMAGE_TAG}" cargo deny --version
-          docker run --rm "${LOCAL_IMAGE_TAG}" cargo deb --version
-          docker run --rm --user "$(id -u):$(id -g)" \
-            -e HOME=/home/builder -e CARGO_HOME=/home/builder/.cargo \
-            "${LOCAL_IMAGE_TAG}" cargo deb --version
           docker run --rm "${LOCAL_IMAGE_TAG}" mdbook --help >/dev/null

@@ -1,4 +1,4 @@
-use super::bundle::EXPORT_SCRIPT;
+use crate::extract::bundle::EXPORT_SCRIPT;
 
 use std::{process::Stdio, time::Duration};
 

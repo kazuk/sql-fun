@@ -1,4 +1,4 @@
-use super::render::{Renderer, fragment, identifier};
+use crate::extract::render::{Renderer, fragment, identifier};
 
 use std::{collections::BTreeMap, path::Path, time::Duration};
 

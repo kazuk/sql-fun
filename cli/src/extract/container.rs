@@ -113,12 +113,28 @@ impl Container {
         Ok(serde_json::json!({"source": "docker", "image_id": String::from_utf8(image)?.trim()}))
     }
 
-    pub(super) async fn export(&self) -> Result<Vec<u8>, anyhow::Error> {
-        command(
-            &["exec", "-i", &self.id, "sh", "-s"],
-            Some(EXPORT_SCRIPT.as_bytes()),
-        )
-        .await
+    pub(super) async fn export(&self, output: &std::path::Path) -> Result<(), anyhow::Error> {
+        let file = std::fs::File::create(output)?;
+        let mut child = Command::new("docker")
+            .args(["exec", "-i", &self.id, "sh", "-s"])
+            .stdin(Stdio::piped())
+            .stdout(file)
+            .stderr(Stdio::null())
+            .kill_on_drop(true)
+            .spawn()
+            .context("Docker CLI is required for extension export")?;
+        child
+            .stdin
+            .take()
+            .context("Docker stdin")?
+            .write_all(EXPORT_SCRIPT.as_bytes())
+            .await?;
+        let status = child.wait().await?;
+        anyhow::ensure!(
+            status.success(),
+            "Docker extension export failed (details redacted)"
+        );
+        Ok(())
     }
 
     pub(super) async fn remove(&mut self) -> Result<(), anyhow::Error> {

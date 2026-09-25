@@ -2,7 +2,7 @@
 
 The installed CLI owns queries, templates, the administrator export script, and
 bundle import. `extract catalog` is a source adapter around one PostgreSQL
-protocol extractor. `init` integration and broader semantic bootstrap are
+psql extractor. `init` integration and broader semantic bootstrap are
 separate work.
 
 ## Catalog contract
@@ -50,8 +50,9 @@ Archive ordering, timestamps, owner/group IDs, modes, and PAX header names are
 normalized. Export follows packaging symlinks into copied regular files. Export
 must run against a stable installation; it is not a filesystem snapshot.
 
-The importer limits the archive and summed logical payload sizes to 256 MiB,
-requires an exact PostgreSQL release match, and rejects missing/unsupported
+The importer streams regular-file contents without a fixed size ceiling, checks
+logical-size arithmetic for overflow, requires an exact PostgreSQL release match,
+and rejects missing/unsupported
 versions, duplicate paths, traversal, unexpected paths/suffixes, symlink/hardlink
 entries, and special files. It creates new files in a private staging directory
 rather than invoking a general tar unpack operation. Compatibility checks do not
@@ -60,15 +61,26 @@ the corresponding installation remains an administrator responsibility.
 
 ## Publication and resource ownership
 
-An adjacent persistent lock coordinates writers to the same output. Staging is
-on the destination filesystem. Files and directories are synchronized before
-publication; Linux rename exchange replaces an existing directory atomically.
-Fresh output uses rename. Unsupported exchange operations fail while retaining
-the previous directory. Import stages the catalog and new extension contents as
-one generation; failed validation never publishes partial output. A crash before
-publication can leave an unreferenced staging directory. A failure synchronizing
-the parent after rename can report an error after the new generation is visible.
+An adjacent persistent standard-library file lock coordinates writers to the same
+output. Only absent or empty real directories are accepted; nonempty outputs are
+rejected before extraction and checked again before publication. Staging is on
+the destination filesystem. Publication creates directories and exclusively creates
+files, synchronizing written files and the destination directory. It never deletes,
+exchanges, or overwrites existing entries. An I/O failure or crash during the final
+copy may leave a partial candidate; this operation is not an installed-generation
+transaction. Installation/replacement is outside extraction's responsibility.
+Import reads `--catalog` and stages its catalog files with the new bundle before
+writing a separate candidate. Input extension files are not copied. Failed
+validation never publishes partial output. A crash can leave a staging directory.
 
+Both source adapters invoke host `psql` with a libpq connection string.
+Use libpq password files rather than connection-string passwords. A single
+session owns the read-only,
+repeatable-read transaction and all fixed session settings. `-X` disables startup
+scripts, `ON_ERROR_STOP` aborts on query errors, and password prompting is disabled.
+Libpq owns authentication, transport, and certificate configuration. Diagnostics
+omit subprocess server messages because they may contain credentials. Docker
+extension export streams its archive directly to a staging file.
 Docker uses a random task name, records the created ID, assigns an ephemeral
 published port, and removes only that ID and its anonymous volumes. Each Docker
 operation is bounded. Handled interrupts during provisioning wait for the bounded

@@ -1,4 +1,7 @@
-use std::path::Path;
+use std::{
+    io::{Seek, Write},
+    path::Path,
+};
 
 pub(super) struct BundleFixture {
     root: tempfile::TempDir,
@@ -17,6 +20,30 @@ impl BundleFixture {
 
     pub(super) fn path(&self) -> &Path {
         self.root.path()
+    }
+
+    pub(super) fn import_large_extension(&self, size: u64) -> Result<(), anyhow::Error> {
+        let bundle = self.path().join("large.tar");
+        let mut file = std::fs::File::create(&bundle)?;
+        let mut archive = tar::Builder::new(&mut file);
+        let mut version = tar::Header::new_gnu();
+        version.set_path("VERSION")?;
+        version.set_size(7);
+        version.set_mode(0o644);
+        version.set_cksum();
+        archive.append(&version, b"1\n17.9\n".as_slice())?;
+        archive.into_inner()?;
+        // Replace the end marker with a sparse regular-file entry, avoiding a large buffer.
+        file.seek(std::io::SeekFrom::Start(1024))?;
+        let mut header = tar::Header::new_gnu();
+        header.set_path("extension/large.sql")?;
+        header.set_size(size);
+        header.set_mode(0o644);
+        header.set_cksum();
+        file.write_all(header.as_bytes())?;
+        file.seek(std::io::SeekFrom::Current(i64::try_from(size)?))?;
+        file.write_all(&[0; 1024])?;
+        super::bundle::import(&bundle, self.path())
     }
 
     pub(super) fn import_entries(
@@ -58,6 +85,15 @@ impl PublicationFixture {
         let stage = super::publication::Publication::new(&self.root.path().join("catalog"))?;
         std::fs::write(stage.path().join(revision), revision)?;
         Ok(stage)
+    }
+
+    pub(super) fn create_empty_output(&self) {
+        std::fs::create_dir(self.root.path().join("catalog")).unwrap();
+    }
+
+    pub(super) fn add_existing_revision(&self, revision: &str) {
+        self.create_empty_output();
+        std::fs::write(self.root.path().join("catalog").join(revision), revision).unwrap();
     }
 
     pub(super) fn has_revision(&self, revision: &str) -> bool {

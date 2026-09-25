@@ -8,7 +8,6 @@ use std::{
 use ::anyhow::Context;
 
 pub(super) const EXPORT_SCRIPT: &str = include_str!("export-extensions.sh");
-const MAX_BUNDLE_SIZE: u64 = 256 * 1024 * 1024;
 
 pub(super) fn import(bundle: &Path, output: &Path) -> Result<(), anyhow::Error> {
     let metadata: serde_json::Value =
@@ -25,10 +24,6 @@ pub(super) fn import(bundle: &Path, output: &Path) -> Result<(), anyhow::Error> 
         "extension bundle must be a regular file"
     );
     let file = File::open(bundle)?;
-    anyhow::ensure!(
-        file.metadata()?.len() <= MAX_BUNDLE_SIZE,
-        "extension bundle exceeds 256 MiB"
-    );
     let mut archive = tar::Archive::new(file);
     let mut seen = HashSet::new();
     let mut version = None;
@@ -50,10 +45,6 @@ pub(super) fn import(bundle: &Path, output: &Path) -> Result<(), anyhow::Error> 
         total = total
             .checked_add(entry.size())
             .context("bundle size overflow")?;
-        anyhow::ensure!(
-            total <= MAX_BUNDLE_SIZE,
-            "extension bundle expands beyond 256 MiB"
-        );
         if path == Path::new("extension") && entry.header().entry_type().is_dir() {
             continue;
         }
@@ -94,6 +85,19 @@ pub(super) fn import(bundle: &Path, output: &Path) -> Result<(), anyhow::Error> 
 #[cfg(test)]
 mod import_tests {
     use super::super::test_helpers::BundleFixture;
+
+    #[test]
+    fn accepts_streamed_payload_larger_than_previous_fixed_ceiling() {
+        let fixture = BundleFixture::new();
+        let size = 257 * 1024 * 1024;
+        fixture.import_large_extension(size).unwrap();
+        assert_eq!(
+            std::fs::metadata(fixture.path().join("extension/large.sql"))
+                .unwrap()
+                .len(),
+            size
+        );
+    }
 
     #[test]
     fn preserves_extension_bytes() {

@@ -67,15 +67,20 @@ def validate(binary, major, image, destination, host, bind):
         port = ports["5432/tcp"][0]["HostPort"]
         connection_env = dict(os.environ, SQL_FUN_DATABASE_URL=f"postgresql://postgres:{password}@{host}:{port}/postgres?sslmode=disable",
                               DOCKER_HOST="unix:///nonexistent-sql-fun-test.sock")
+        # Type I/O functions with cstring signatures are SQL-callable with unknown literals.
+        result = run("psql", "-X", "-qAtw", "--dbname", connection_env["SQL_FUN_DATABASE_URL"],
+                     "--set=ON_ERROR_STOP=1", data=b"SELECT boolin('true'), int4in('42'), int4out(42);\n")
+        assert result.stdout.strip() == b"t|42|42"
         existing = destination / f"{major}-connection"
+        existing.mkdir()  # Existing empty output is supported.
         run(binary, "extract", "catalog", "--output", str(existing), env=connection_env)
         script = run(binary, "extract", "export-script").stdout
         bundle = run("docker", "exec", "-i", identifier, "sh", "-s", data=script).stdout
         assert bundle == run("docker", "exec", "-i", identifier, "sh", "-s", data=script).stdout
         bundle_file = destination / f"{major}.tar"
         bundle_file.write_bytes(bundle)
-        run(binary, "extract", "import-extensions", "--bundle", str(bundle_file), "--output", str(existing), env=connection_env)
-        assert payload(existing) == first, "Docker and supplied-connection payloads differ"
+        run(binary, "extract", "import-extensions", "--bundle", str(bundle_file), "--catalog", str(existing), "--output", str(destination / f"{major}-imported"), env=connection_env)
+        assert payload(destination / f"{major}-imported") == first, "Docker and supplied-connection payloads differ"
         # Installed extensions and user-defined objects must not become builtins.
         run("docker", "exec", "-i", identifier, "psql", "-X", "-U", "postgres", "-v", "ON_ERROR_STOP=1",
             data=b'''CREATE EXTENSION "uuid-ossp";
@@ -86,29 +91,34 @@ CREATE ROLE extractor LOGIN PASSWORD 'extractor-test';
 GRANT CONNECT ON DATABASE postgres TO extractor;
 ''')
         limited_env = dict(connection_env, SQL_FUN_DATABASE_URL=f"postgresql://extractor:extractor-test@{host}:{port}/postgres?sslmode=disable")
+        existing = destination / f"{major}-restricted"
         run(binary, "extract", "catalog", "--output", str(existing), env=limited_env)
         assert not (existing / "extension").exists(), "catalog-only extraction must not retain stale extension files"
-        run(binary, "extract", "import-extensions", "--bundle", str(bundle_file), "--output", str(existing), env=limited_env)
-        assert payload(existing) == first, "user or extension objects contaminated builtin metadata"
+        run(binary, "extract", "import-extensions", "--bundle", str(bundle_file), "--catalog", str(existing), "--output", str(destination / f"{major}-restricted-imported"), env=limited_env)
+        assert payload(destination / f"{major}-restricted-imported") == first, "user or extension objects contaminated builtin metadata"
         previous = payload(existing)
         failed = run(binary, "extract", "catalog", "--database-url", "postgresql://secret-user:secret-password@127.0.0.1:1/postgres",
-                     "--timeout-seconds", "2", "--output", str(existing), success=False)
+                     "--timeout-seconds", "2", "--output", str(destination / f"{major}-failed-connection"), success=False)
         assert b"secret-password" not in failed.stderr and b"secret-user" not in failed.stderr
         assert payload(existing) == previous
+        run(binary, "extract", "catalog", "--output", str(existing), env=limited_env, success=False)
+        run(binary, "extract", "import-extensions", "--catalog", str(existing), "--bundle", str(bundle_file),
+            "--output", str(existing), success=False)
+        assert payload(existing) == previous
         bundle_file.write_bytes(b"invalid tar")
-        run(binary, "extract", "import-extensions", "--bundle", str(bundle_file), "--output", str(existing), success=False)
+        run(binary, "extract", "import-extensions", "--catalog", str(existing), "--bundle", str(bundle_file), "--output", str(destination / f"{major}-invalid-bundle"), success=False)
         assert payload(existing) == previous
     finally:
         run("docker", "rm", "-f", "-v", identifier)
     before = owned()
     run(binary, "extract", "catalog", "--docker-image", image,
         "--docker-host-address", "192.0.2.1", "--docker-bind-address", bind,
-        "--timeout-seconds", "1", "--output", str(output), success=False)
+        "--timeout-seconds", "1", "--output", str(destination / f"{major}-timeout"), success=False)
     assert owned() == before, "timeout leaked a task-owned container"
     assert payload(output) == first
     interrupted = subprocess.Popen([binary, "extract", "catalog", "--docker-image", image,
                                     "--docker-host-address", "192.0.2.1", "--docker-bind-address", bind,
-                                    "--output", str(output)], stdout=subprocess.PIPE, stderr=subprocess.PIPE)
+                                    "--output", str(destination / f"{major}-interrupted")], stdout=subprocess.PIPE, stderr=subprocess.PIPE)
     deadline = time.monotonic() + 30
     while owned() == before and interrupted.poll() is None:
         assert time.monotonic() < deadline, "interrupt fixture did not start"
@@ -145,10 +155,9 @@ def validate_export_contract(binary, destination):
         assert member.isfile(), "packaging symlink must become a regular file"
         assert bundle.extractfile(member).read() == content
     catalog = fixture / "catalog"
-    shutil.copytree(destination / "17", catalog)
     bundle_file = fixture / "extensions.tar"
     bundle_file.write_bytes(archive)
-    run(binary, "extract", "import-extensions", "--bundle", str(bundle_file), "--output", str(catalog))
+    run(binary, "extract", "import-extensions", "--bundle", str(bundle_file), "--catalog", str(destination / "17"), "--output", str(catalog))
     assert (catalog / "extension" / name).read_bytes() == content
     (extension / "dangling.sql").symlink_to(fixture / "missing")
     run("sh", "-s", data=script, env=environment, success=False)

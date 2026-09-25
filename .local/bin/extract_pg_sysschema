@@ -4,4 +4,4 @@ set -euo pipefail
 version="${1:-17}"
 exec "${SQL_FUN_BIN:-sql-fun}" extract catalog \
   --docker-image "postgres:${version}" \
-  --output "${SQL_FUN_HOME:?Enable the repository environment}/postgres/${version}"
+  --output "${2:-./work/postgres-${version}}"

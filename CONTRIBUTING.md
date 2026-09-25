@@ -235,9 +235,10 @@ Some checks require extra tools, such as `cargo-nextest`, `cargo-deny`,
 
 ## PostgreSQL extraction integration
 
-`.local/bin/test-postgres-extraction` requires Python 3, Docker CLI, and access
-to a Docker daemon. It creates its own PostgreSQL 17 and 18 containers from pinned
-images and cleans up only those resources. Run it against a built or installed CLI:
+`.local/bin/test-postgres-extraction` requires Python 3, `psql` (PostgreSQL client
+tools), Docker CLI, and access to a Docker daemon. It creates its own PostgreSQL
+17 and 18 containers from pinned images and cleans up only those resources.
+Run it against a built or installed CLI:
 
 ```sh
 .local/bin/test-postgres-extraction --binary target/debug/sql-fun \
@@ -251,7 +252,9 @@ does not install Docker CLI; use a dedicated Docker-capable environment for this
 integration check. This check does not require changing
 the normal development image or granting it permanent Docker-socket access.
 The legacy extraction scripts delegate to `sql-fun extract`; they no longer
-require `hbs`.
+require `hbs`. They write to `./work/postgres-<version>` by default, or to
+the empty/new directory supplied as their second argument, never directly to
+installed `$SQL_FUN_HOME` state.
 
 ## Updating Statistics
 

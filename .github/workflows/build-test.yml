@@ -409,7 +409,7 @@ jobs:
       - name: Install packaged extraction tooling
         run: |
           sudo apt-get update
-          sudo apt-get install -y python3 "$RUNNER_TEMP/sql-fun-artifact"/sql-fun_*.deb
+          sudo apt-get install -y python3 postgresql-client "$RUNNER_TEMP/sql-fun-artifact"/sql-fun_*.deb
 
       - name: Validate installed PostgreSQL extraction and import
         run: |

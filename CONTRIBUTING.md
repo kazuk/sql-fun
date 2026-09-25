@@ -85,24 +85,8 @@ CI image need the tool available on `PATH`; see the upstream
 The CI image currently pins version 1.6.2 for reproducibility.
 
 The optional `cli-contract` check-flow step evaluates source-owned Scrut CLI
-contracts against the locally built `sql-fun` executable. During the Scrut
-trial, download the pinned DotSlash wrapper locally without committing it, then
-make a temporary DotSlash executable available on `PATH`:
-
-```sh
-curl -fsSL -o .local/bin/scrut \
-  https://github.com/facebookincubator/scrut/releases/download/v0.4.3/scrut
-chmod +x .local/bin/scrut
-DOTSLASH_DIR=$(mktemp -d)
-curl -fsSL -o "$DOTSLASH_DIR/dotslash.tar.gz" \
-  https://github.com/facebook/dotslash/releases/download/v0.5.9/dotslash-linux-musl.x86_64.v0.5.9.tar.gz
-tar -xzf "$DOTSLASH_DIR/dotslash.tar.gz" -C "$DOTSLASH_DIR"
-PATH="$DOTSLASH_DIR:$PATH" .local/bin/check-test-flow --step=cli-contract
-```
-
-The `scrut` file selects the platform-specific Scrut binary and verifies its
-configured hash. Keep this trial provisioning local and temporary; do not
-commit `.local/bin/scrut` or add an ignore rule for it.
+contracts against the locally built `sql-fun` executable. It requires the
+`scrut` DotSlash wrapper and `dotslash` executable to be available on `PATH`.
 
 Some Rust dependencies may require additional native build dependencies. Package
 names vary by operating system and distribution, so install the missing packages

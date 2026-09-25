@@ -1,5 +1,10 @@
 # `init` sub command for `sql-fun` CLI utility
 
+The initialization workflow below is planned and is not fully implemented.
+To extract usable PostgreSQL catalog and extension artifacts now, use
+[`sql-fun extract`](extract.md). The proposed `--docker-image-tag` option below
+is not currently accepted by `init`.
+
 `init` sub command prepare and configures `sql-fun`.
 
 1. Create `sql-fun` home directory.

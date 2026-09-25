@@ -1,0 +1,3 @@
+{{#each this}}
+CREATE FUNCTION {{ident schema}}.{{ident name}}({{sql arguments}}) RETURNS {{sql result}} LANGUAGE sql AS '';
+{{/each}}

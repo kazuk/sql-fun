@@ -1,9 +1,0 @@
-{{#each this}}
-create function {{schema}}.{{name}}({{args_decl}}) 
-  returns setof {{return.type}} 
-  language sql as 
-$$
--- 
-$$;
-
-{{/each}}

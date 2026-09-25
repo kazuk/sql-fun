@@ -1,0 +1,176 @@
+#!/usr/bin/env python3
+"""Exercise installed extraction contracts using exclusively task-owned PostgreSQL containers."""
+import argparse
+import hashlib
+import io
+import json
+import os
+from pathlib import Path
+import secrets
+import shutil
+import subprocess
+import time
+import tarfile
+
+IMAGES = {
+    "17": "postgres@sha256:29e0bb09c8e7e7fc265ea9f4367de9622e55bae6b0b97e7cce740c2d63c2ebc0",
+    "18": "postgres@sha256:5773fe724c49c42a7a9ca70202e11e1dff21fb7235b335a73f39297d200b73a2",
+}
+
+
+def run(*args, data=None, env=None, success=True):
+    result = subprocess.run(args, input=data, stdout=subprocess.PIPE, stderr=subprocess.PIPE,
+                            env=env, timeout=180, check=False)
+    if success and result.returncode:
+        raise RuntimeError(f"{args[0]} failed: {result.stderr.decode(errors='replace')}")
+    if not success:
+        assert result.returncode != 0, "expected failure"
+    return result
+
+
+def payload(directory):
+    return {str(p.relative_to(directory)): hashlib.sha256(p.read_bytes()).hexdigest()
+            for p in directory.rglob("*") if p.is_file() and p.name != "metadata.json"}
+
+
+def owned():
+    return set(run("docker", "ps", "-aq", "--filter", "label=io.sql-fun.extraction=owned").stdout.split())
+
+
+def validate(binary, major, image, destination, host, bind):
+    output = destination / major
+    run(binary, "extract", "catalog", "--docker-image", image,
+        "--docker-host-address", host, "--docker-bind-address", bind, "--output", str(output))
+    functions = json.loads((output / "functions.json").read_text())
+    clock = next(f for f in functions if f["name"] == "clock_timestamp")
+    assert clock["overloads"][0]["args"] == [], "zero-argument functions must not have a null argument"
+    first = payload(output)
+    assert "extension/uuid-ossp.control" in first
+    assert json.loads((output / "metadata.json").read_text())["server_version_num"] // 10000 == int(major)
+    password = secrets.token_hex(24)
+    # Only this newly created container is used as the externally supplied server.
+    identifier = run("docker", "create", "--label", "io.sql-fun.extraction=owned",
+                     "-e", f"POSTGRES_PASSWORD={password}", "-p", f"{bind}::5432", image).stdout.decode().strip()
+    try:
+        run("docker", "start", identifier)
+        deadline = time.monotonic() + 60
+        while True:
+            ready = subprocess.run(["docker", "exec", identifier, "pg_isready", "-U", "postgres"],
+                                   stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL, timeout=5)
+            if ready.returncode == 0:
+                break
+            assert time.monotonic() < deadline, "PostgreSQL readiness timed out"
+            time.sleep(0.25)
+        ports = json.loads(run("docker", "inspect", "--format", "{{json .NetworkSettings.Ports}}", identifier).stdout)
+        port = ports["5432/tcp"][0]["HostPort"]
+        connection_env = dict(os.environ, SQL_FUN_DATABASE_URL=f"postgresql://postgres:{password}@{host}:{port}/postgres?sslmode=disable",
+                              DOCKER_HOST="unix:///nonexistent-sql-fun-test.sock")
+        existing = destination / f"{major}-connection"
+        run(binary, "extract", "catalog", "--output", str(existing), env=connection_env)
+        script = run(binary, "extract", "export-script").stdout
+        bundle = run("docker", "exec", "-i", identifier, "sh", "-s", data=script).stdout
+        assert bundle == run("docker", "exec", "-i", identifier, "sh", "-s", data=script).stdout
+        bundle_file = destination / f"{major}.tar"
+        bundle_file.write_bytes(bundle)
+        run(binary, "extract", "import-extensions", "--bundle", str(bundle_file), "--output", str(existing), env=connection_env)
+        assert payload(existing) == first, "Docker and supplied-connection payloads differ"
+        # Installed extensions and user-defined objects must not become builtins.
+        run("docker", "exec", "-i", identifier, "psql", "-X", "-U", "postgres", "-v", "ON_ERROR_STOP=1",
+            data=b'''CREATE EXTENSION "uuid-ossp";
+CREATE SCHEMA "odd schema";
+CREATE DOMAIN "odd schema"."a""b" AS text;
+CREATE FUNCTION pg_catalog."Unusual Function"(text) RETURNS text LANGUAGE sql AS 'SELECT $1';
+CREATE ROLE extractor LOGIN PASSWORD 'extractor-test';
+GRANT CONNECT ON DATABASE postgres TO extractor;
+''')
+        limited_env = dict(connection_env, SQL_FUN_DATABASE_URL=f"postgresql://extractor:extractor-test@{host}:{port}/postgres?sslmode=disable")
+        run(binary, "extract", "catalog", "--output", str(existing), env=limited_env)
+        assert not (existing / "extension").exists(), "catalog-only extraction must not retain stale extension files"
+        run(binary, "extract", "import-extensions", "--bundle", str(bundle_file), "--output", str(existing), env=limited_env)
+        assert payload(existing) == first, "user or extension objects contaminated builtin metadata"
+        previous = payload(existing)
+        failed = run(binary, "extract", "catalog", "--database-url", "postgresql://secret-user:secret-password@127.0.0.1:1/postgres",
+                     "--timeout-seconds", "2", "--output", str(existing), success=False)
+        assert b"secret-password" not in failed.stderr and b"secret-user" not in failed.stderr
+        assert payload(existing) == previous
+        bundle_file.write_bytes(b"invalid tar")
+        run(binary, "extract", "import-extensions", "--bundle", str(bundle_file), "--output", str(existing), success=False)
+        assert payload(existing) == previous
+    finally:
+        run("docker", "rm", "-f", "-v", identifier)
+    before = owned()
+    run(binary, "extract", "catalog", "--docker-image", image,
+        "--docker-host-address", "192.0.2.1", "--docker-bind-address", bind,
+        "--timeout-seconds", "1", "--output", str(output), success=False)
+    assert owned() == before, "timeout leaked a task-owned container"
+    assert payload(output) == first
+    interrupted = subprocess.Popen([binary, "extract", "catalog", "--docker-image", image,
+                                    "--docker-host-address", "192.0.2.1", "--docker-bind-address", bind,
+                                    "--output", str(output)], stdout=subprocess.PIPE, stderr=subprocess.PIPE)
+    deadline = time.monotonic() + 30
+    while owned() == before and interrupted.poll() is None:
+        assert time.monotonic() < deadline, "interrupt fixture did not start"
+        time.sleep(0.1)
+    interrupted.terminate()
+    interrupted.communicate(timeout=180)
+    assert interrupted.returncode != 0
+    assert owned() == before, "interrupt leaked a task-owned container"
+    assert payload(output) == first
+    print(f"PostgreSQL {major}: Docker, supplied connection, deterministic export/import, failure preservation and cleanup passed", flush=True)
+
+
+def validate_export_contract(binary, destination):
+    fixture = destination / "export-fixture"
+    if fixture.exists():
+        shutil.rmtree(fixture)
+    extension = fixture / "share" / "extension"
+    extension.mkdir(parents=True)
+    content = b"SELECT '<&>';\n"
+    target = fixture / "packaged-file"
+    target.write_bytes(content)
+    name = "odd name-" + "x" * 110 + ".sql"
+    (extension / name).symlink_to(target)
+    (extension / "odd name.control").write_bytes(b"default_version = '1.0'\n")
+    pg_config = fixture / "pg_config"
+    pg_config.write_text('#!/bin/sh\ncase "$1" in\n--sharedir) printf "%s\\n" "$EXPORT_TEST_SHARE" ;;\n--version) echo "PostgreSQL 17.6" ;;\nesac\n')
+    pg_config.chmod(0o755)
+    environment = dict(os.environ, PG_CONFIG=str(pg_config), EXPORT_TEST_SHARE=str(extension.parent))
+    script = run(binary, "extract", "export-script").stdout
+    archive = run("sh", "-s", data=script, env=environment).stdout
+    assert archive == run("sh", "-s", data=script, env=environment).stdout
+    with tarfile.open(fileobj=io.BytesIO(archive)) as bundle:
+        member = bundle.getmember("extension/" + name)
+        assert member.isfile(), "packaging symlink must become a regular file"
+        assert bundle.extractfile(member).read() == content
+    catalog = fixture / "catalog"
+    shutil.copytree(destination / "17", catalog)
+    bundle_file = fixture / "extensions.tar"
+    bundle_file.write_bytes(archive)
+    run(binary, "extract", "import-extensions", "--bundle", str(bundle_file), "--output", str(catalog))
+    assert (catalog / "extension" / name).read_bytes() == content
+    (extension / "dangling.sql").symlink_to(fixture / "missing")
+    run("sh", "-s", data=script, env=environment, success=False)
+    print("Extension export: deterministic PAX, long names, packaging symlink and dangling-link rejection passed", flush=True)
+
+
+def main():
+    parser = argparse.ArgumentParser(description=__doc__)
+    parser.add_argument("--binary", required=True)
+    parser.add_argument("--output", required=True)
+    parser.add_argument("--host", default="127.0.0.1")
+    parser.add_argument("--bind", default="127.0.0.1")
+    args = parser.parse_args()
+    destination = Path(args.output).resolve()
+    destination.mkdir(parents=True, exist_ok=True)
+    args.binary = str(Path(args.binary).resolve())
+    # Run the packaged CLI outside the checkout: all runtime resources must be embedded.
+    os.chdir(destination)
+    before = owned()
+    for major, image in IMAGES.items():
+        validate(str(Path(args.binary).resolve()), major, image, destination, args.host, args.bind)
+    validate_export_contract(str(Path(args.binary).resolve()), destination)
+    assert owned() == before
+
+
+if __name__ == "__main__":
+    main()

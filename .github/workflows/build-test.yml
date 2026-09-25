@@ -395,6 +395,39 @@ jobs:
                 /validation/scrut test /validation/contracts
             '
 
+  postgres-extraction:
+    runs-on: ubuntu-24.04
+    needs: packaging
+    steps:
+      - uses: actions/checkout@v5
+
+      - uses: actions/download-artifact@v7
+        with:
+          name: sql-fun-x86_64-unknown-linux-gnu
+          path: ${{ runner.temp }}/sql-fun-artifact
+
+      - name: Install packaged extraction tooling
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y python3 "$RUNNER_TEMP/sql-fun-artifact"/sql-fun_*.deb
+
+      - name: Validate installed PostgreSQL extraction and import
+        run: |
+          .local/bin/test-postgres-extraction \
+            --binary /usr/bin/sql-fun \
+            --output "$RUNNER_TEMP/sql-fun-postgres"
+          for version in 17 18; do
+            diff -r "sql-fun-home/postgres/$version" "$RUNNER_TEMP/sql-fun-postgres/$version"
+          done
+
+      - uses: actions/upload-artifact@v7
+        with:
+          name: sql-fun-postgres-extracted
+          path: |
+            ${{ runner.temp }}/sql-fun-postgres/17/**
+            ${{ runner.temp }}/sql-fun-postgres/18/**
+          if-no-files-found: error
+
   build:
     runs-on: ubuntu-24.04
     needs:
@@ -409,6 +442,7 @@ jobs:
       - doc
       - packaging
       - install-validation
+      - postgres-extraction
     steps:
       - name: Complete
         run: true

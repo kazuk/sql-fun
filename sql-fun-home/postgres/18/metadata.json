@@ -1,0 +1,10 @@
+{
+  "format_version": 1,
+  "server_version_num": 180001,
+  "extractor_version": "0.1.0",
+  "provenance": {
+    "source": "docker",
+    "image_id": "sha256:019965b818886838ec718d2a6b91d84537d3830f083c4347b044ccb05c49d342"
+  },
+  "scope": "bootstrap-pg_catalog-and-information_schema"
+}

@@ -6,7 +6,7 @@ source "${script_dir}/../lib/agent-git.sh"
 
 reject_worktree_add() {
     cat >&2 <<'EOF'
-Direct `git worktree add` is disabled in the Codex agent environment.
+Direct `git worktree add` is disabled in the agent environment.
 Use the `agent-worktree` repository skill or `agent-worktree-add` so the
 worktree is created below $GIT_ROOT/.worktrees/.
 EOF

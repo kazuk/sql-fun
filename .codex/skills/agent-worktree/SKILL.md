@@ -1,6 +1,6 @@
 ---
 name: agent-worktree
-description: Create a linked Git worktree for this repository from a Codex agent session. Use when work must occur in a separate worktree; do not use for ordinary branch changes in the current workspace.
+description: Create a linked Git worktree for this repository from an agent session. Use when work must occur in a separate worktree; do not use for ordinary branch changes in the current workspace.
 ---
 
 # Agent worktree

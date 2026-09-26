@@ -7,6 +7,10 @@
           {
             "type": "command",
             "command": "graphify hook-check"
+          },
+          {
+            "type": "command",
+            "command": "bash \"$(git rev-parse --show-toplevel)/.codex/hooks/pre-tool-use-git-policy\""
           }
         ]
       }

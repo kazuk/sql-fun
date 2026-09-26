@@ -78,6 +78,10 @@ Make sure the tool's executable directory is available on `PATH`. See the
 [Graphify installation instructions](https://github.com/Graphify-Labs/graphify#install)
 for platform-specific setup.
 
+Codex contributors also need [`jq`](https://jqlang.org/download/) on `PATH`.
+The repository's Codex pre-tool-use policy uses it to read hook input. The
+standard CI/development image already includes `jq`.
+
 The full `check-test-flow` includes a `skill-lint` step that validates repository
 skills with `skill-validator`. Contributors running this flow outside the project
 CI image need the tool available on `PATH`; see the upstream

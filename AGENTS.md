@@ -82,6 +82,9 @@ You can build and run tests using the `check-test-flow` script.
 - Create new branches from `origin/<base-branch>` (for example, `origin/main`)
   rather than a potentially stale local base branch. This also applies when
   creating branches with `git worktree add`.
+- In a Codex agent environment, do not invoke `git worktree add` directly.
+  Use the `agent-worktree` repository skill and its `agent-worktree-add`
+  helper, which creates linked worktrees below `$GIT_ROOT/.worktrees/`.
 
 ## Commits
 

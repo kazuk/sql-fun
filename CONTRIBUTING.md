@@ -47,6 +47,9 @@ cargo install --locked --force \
   sccache cargo-sort cargo-edit cargo-expand cargo-binstall typos-cli
 ```
 
+`mdbook` is required by the documentation build. The `doc` check-flow step
+builds both the Rust API documentation and the user manual.
+
 `cargo-expand` is a runtime prerequisite of `sql-fun check`, which invokes
 `cargo expand` to read the generated query stubs. Install it before using the
 command and ensure it is available on `PATH`.

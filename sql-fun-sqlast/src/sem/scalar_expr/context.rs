@@ -1,9 +1,9 @@
-use std::borrow::Cow;
-
 use crate::sem::{
     AnalysisError, ColumnName, ColumnReferenceExpr, FromClause, ParseContext, SemScalarExpr,
     WithClause, data_source::AliasName, scalar_expr::column_ref::UndefinedAliasColumnRef,
 };
+
+use std::borrow::Cow;
 
 /// Expression-local scope used during scalar semantic analysis.
 ///
@@ -15,15 +15,44 @@ use crate::sem::{
 pub struct ScalarAnalysisContext<'a> {
     with_clause: Cow<'a, WithClause>,
     from_clause: Cow<'a, FromClause>,
+    parent: Option<Box<Self>>,
 }
 
 impl<'a> ScalarAnalysisContext<'a> {
+    fn clone_scope(&self) -> Self {
+        Self {
+            with_clause: self.with_clause.clone(),
+            from_clause: self.from_clause.clone(),
+            parent: self
+                .parent
+                .as_deref()
+                .map(|parent| Box::new(parent.clone_scope())),
+        }
+    }
+
     /// Borrow the CTE and data-source scopes visible to an expression.
     pub const fn new(with_clause: &'a WithClause, from_clause: &'a FromClause) -> Self {
         Self {
             with_clause: Cow::Borrowed(with_clause),
             from_clause: Cow::Borrowed(from_clause),
+            parent: None,
         }
+    }
+
+    pub(crate) fn nested(
+        with_clause: &'a WithClause,
+        from_clause: &'a FromClause,
+        parent: Option<&Self>,
+    ) -> Self {
+        Self {
+            with_clause: Cow::Borrowed(with_clause),
+            from_clause: Cow::Borrowed(from_clause),
+            parent: parent.map(|parent| Box::new(parent.clone_scope())),
+        }
+    }
+
+    pub(crate) fn inherited_ctes(&self) -> WithClause {
+        self.with_clause.as_ref().clone()
     }
 }
 
@@ -35,26 +64,43 @@ impl ScalarAnalysisContext<'_> {
     /// resulting expression.
     pub fn resolve_column_ref<TParseContext>(
         &self,
-        mut context: TParseContext,
+        context: TParseContext,
         alias: Option<&AliasName>,
         column: &ColumnName,
     ) -> Result<(SemScalarExpr, TParseContext), AnalysisError>
     where
         TParseContext: ParseContext,
     {
+        self.resolve_column(context, alias, column)
+    }
+
+    pub(crate) fn resolve_column<TContext: crate::sem::resolution::ResolutionContext>(
+        &self,
+        mut context: TContext,
+        alias: Option<&AliasName>,
+        column: &ColumnName,
+    ) -> Result<(SemScalarExpr, TContext), AnalysisError> {
         if let Some(alias) = alias {
+            if self.from_clause.resolve_alias(alias).is_none()
+                && let Some(parent) = &self.parent
+            {
+                return parent.resolve_column(context, Some(alias), column);
+            }
             return self.resolve_source_column_ref(context, alias, column);
         }
 
         let Ok(find_alias_result) =
             self.from_clause
-                .find_alias_for_column(column, &context, &self.with_clause)
+                .find_alias_resolved(column, &context, &self.with_clause)
         else {
-            let expr = ColumnReferenceExpr::ambiguous_column_with_report(&mut context, column)?;
+            let expr = ColumnReferenceExpr::ambiguous_column_resolved(&mut context, column)?;
             return Ok((expr, context));
         };
         let Some(alias) = find_alias_result else {
-            let expr = ColumnReferenceExpr::undefined_column_with_report(&mut context, column)?;
+            if let Some(parent) = &self.parent {
+                return parent.resolve_column(context, None, column);
+            }
+            let expr = ColumnReferenceExpr::undefined_column_resolved(&mut context, column)?;
             return Ok((expr, context));
         };
         self.resolve_source_column_ref(context, alias.name(), column)
@@ -63,6 +109,7 @@ impl ScalarAnalysisContext<'_> {
 
 #[cfg(test)]
 mod test_resolve_column_ref {
+    use crate::sem::scalar_expr::context::ScalarAnalysisContext;
     use crate::{
         sem::{
             ColumnDefinition, ColumnName, ColumnReferenceExpr, PgBuiltInType, SemScalarExpr,
@@ -70,8 +117,6 @@ mod test_resolve_column_ref {
         },
         test_helpers::TestParseContext,
     };
-
-    use super::ScalarAnalysisContext;
 
     #[rstest::rstest]
     #[case(None)]
@@ -213,7 +258,7 @@ impl ScalarAnalysisContext<'_> {
         column: &ColumnName,
     ) -> Result<(SemScalarExpr, TParseContext), AnalysisError>
     where
-        TParseContext: ParseContext,
+        TParseContext: crate::sem::resolution::ResolutionContext,
     {
         let Some((source, nullability)) = self.from_clause.resolve_alias(alias) else {
             let expr = UndefinedAliasColumnRef::new_with_report(&mut context, alias, column)?;

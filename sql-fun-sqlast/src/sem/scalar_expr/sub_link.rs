@@ -1,21 +1,20 @@
-use sql_fun_core::IVec;
-
-use crate::{
-    AstAndContextPair,
-    sem::{
-        AnalysisError, ParseContext, ScalarAnalysisContext, SelectStatement, SemScalarExpr,
-        TypeReference,
-    },
-    syn::{Opt, ScanToken},
-};
-
-use super::{AnalyzeScalarExpr, SemScalarExprNode};
+use crate::sem::scalar_expr::SemScalarExprNode;
+use crate::sem::{AnalysisError, SelectStatement, TypeReference};
 
 /// Sub-query expression
 #[derive(Debug, Clone, Eq, Hash, PartialEq, serde::Serialize, serde::Deserialize)]
 pub struct SubLinkExpr {
     subselect: Box<SelectStatement>,
     type_ref: TypeReference,
+}
+
+impl SubLinkExpr {
+    pub(super) fn from_resolved(query: &SelectStatement) -> Result<Self, AnalysisError> {
+        Ok(Self {
+            subselect: Box::new(query.clone()),
+            type_ref: query.returning_composite_type()?,
+        })
+    }
 }
 
 impl SemScalarExprNode for SubLinkExpr {
@@ -25,37 +24,5 @@ impl SemScalarExprNode for SubLinkExpr {
 
     fn is_not_null(&self) -> Option<bool> {
         Some(false)
-    }
-}
-
-impl<TParseContext> AnalyzeScalarExpr<TParseContext, crate::syn::SubLink> for SubLinkExpr
-where
-    TParseContext: ParseContext,
-{
-    fn analyze_scalar_expr(
-        mut context: TParseContext,
-        _scalar_context: &ScalarAnalysisContext<'_>,
-        syn: crate::syn::SubLink,
-        tokens: &IVec<ScanToken>,
-    ) -> Result<(SemScalarExpr, TParseContext), AnalysisError> {
-        let Some(subselect) = syn.get_subselect().as_select_stmt().as_inner() else {
-            AnalysisError::raise_unexpected_none("sublink.subselect")?
-        };
-        let AstAndContextPair(select_stmt, new_context) =
-            SelectStatement::analyze_select(context, subselect, tokens)?;
-        context = new_context;
-        let Some(select_stmt) = select_stmt.into_select_statemtnt() else {
-            AnalysisError::raise_unexpected_none("select_statement")?
-        };
-
-        let type_ref = select_stmt.returning_composite_type()?;
-
-        Ok((
-            SemScalarExpr::SubLink(Self {
-                subselect: Box::new(select_stmt),
-                type_ref,
-            }),
-            context,
-        ))
     }
 }

@@ -1,16 +1,14 @@
-use sql_fun_core::IVec;
-
-use crate::{
-    sem::{
-        AnalysisError, ParseContext, ScalarAnalysisContext, SemScalarExpr, TypeReference,
-        scalar_expr::{AnalyzeScalarExpr, SemScalarExprNode},
-    },
-    syn::{ListOpt, ScanToken},
-};
+use crate::sem::{SemScalarExpr, TypeReference, scalar_expr::SemScalarExprNode};
 
 /// array expression
 #[derive(Debug, Clone, Eq, Hash, PartialEq, serde::Serialize, serde::Deserialize)]
 pub struct ArrayExpr(Vec<SemScalarExpr>);
+
+impl ArrayExpr {
+    pub(super) fn from_values(values: &[SemScalarExpr]) -> Self {
+        Self(values.to_vec())
+    }
+}
 
 impl SemScalarExprNode for ArrayExpr {
     fn get_type(&self) -> Option<crate::sem::TypeReference> {
@@ -20,31 +18,5 @@ impl SemScalarExprNode for ArrayExpr {
 
     fn is_not_null(&self) -> Option<bool> {
         todo!()
-    }
-}
-
-impl<TParseContext> AnalyzeScalarExpr<TParseContext, crate::syn::AArrayExpr> for ArrayExpr
-where
-    TParseContext: ParseContext,
-{
-    fn analyze_scalar_expr(
-        mut context: TParseContext,
-        scalar_context: &ScalarAnalysisContext<'_>,
-        syn: crate::syn::AArrayExpr,
-        tokens: &IVec<ScanToken>,
-    ) -> Result<(SemScalarExpr, TParseContext), AnalysisError> {
-        let Some(elements) = syn.get_elements().as_inner() else {
-            AnalysisError::raise_unexpected_none("a_array_expr.elements")?
-        };
-
-        let mut exprs = Vec::new();
-        for element in elements {
-            let (sem_elm, new_context) =
-                SemScalarExpr::analyze_scaler_expr(context, scalar_context, element, tokens)?;
-            context = new_context;
-            exprs.push(sem_elm);
-        }
-
-        Ok((SemScalarExpr::Array(Self(exprs)), context))
     }
 }

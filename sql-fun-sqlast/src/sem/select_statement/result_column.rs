@@ -26,7 +26,7 @@ impl ResultColumn {
 
 #[cfg(test)]
 mod test_result_column_new {
-    use super::ResultColumn;
+    use crate::sem::select_statement::result_column::ResultColumn;
 
     #[test]
     fn test_result_column_new() {
@@ -65,7 +65,7 @@ impl ResultColumn {
 
 #[cfg(test)]
 mod test_result_column_create_column_definition {
-    use super::ResultColumn;
+    use crate::sem::select_statement::result_column::ResultColumn;
 
     #[test]
     fn test_result_column_create_column_definition() {
@@ -93,11 +93,10 @@ impl ResultColumn {
 
 #[cfg(test)]
 mod test_result_column_composite_field_definition {
-    use testresult::TestResult;
-
+    use crate::sem::select_statement::result_column::ResultColumn;
     use crate::sem::{ColumnName, TypeReference};
 
-    use super::ResultColumn;
+    use ::testresult::TestResult;
 
     #[test]
     fn test_composite_field_definition_err() {
@@ -124,6 +123,12 @@ mod test_result_column_composite_field_definition {
 pub struct ResultColumnCollection(Vec<ResultColumn>);
 
 impl ResultColumnCollection {
+    pub(crate) fn rename(&mut self, names: &[String]) {
+        for (column, name) in self.0.iter_mut().zip(names) {
+            column.col_name = Some(ColumnName::from(name.as_str()));
+        }
+    }
+
     pub fn get_result_column_def(&self, column_name: &ColumnName) -> Option<ColumnDefinition> {
         self.0.iter().find_map(|c| {
             if c.col_name.as_ref() == Some(column_name) {

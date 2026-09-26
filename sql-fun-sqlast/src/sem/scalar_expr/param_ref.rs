@@ -1,11 +1,5 @@
-use sql_fun_core::IVec;
-
-use crate::{
-    sem::{AnalysisError, ParseContext, ScalarAnalysisContext, TypeReference},
-    syn::ScanToken,
-};
-
-use super::{AnalyzeScalarExpr, SemScalarExpr, SemScalarExprNode};
+use crate::sem::TypeReference;
+use crate::sem::scalar_expr::SemScalarExprNode;
 
 /// parameter reference expression
 #[derive(Debug, Clone, Eq, Hash, PartialEq, serde::Serialize, serde::Deserialize)]
@@ -17,20 +11,6 @@ impl SemScalarExprNode for ParamRef {
     }
 
     fn is_not_null(&self) -> Option<bool> {
-        todo!()
-    }
-}
-
-impl<TParseContext> AnalyzeScalarExpr<TParseContext, crate::syn::ParamRef> for ParamRef
-where
-    TParseContext: ParseContext,
-{
-    fn analyze_scalar_expr(
-        _context: TParseContext,
-        _scalar_context: &ScalarAnalysisContext<'_>,
-        _syn: crate::syn::ParamRef,
-        _tokens: &IVec<ScanToken>,
-    ) -> Result<(SemScalarExpr, TParseContext), AnalysisError> {
         todo!()
     }
 }

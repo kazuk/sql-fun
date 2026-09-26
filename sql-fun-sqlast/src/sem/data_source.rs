@@ -3,6 +3,7 @@ mod analyze;
 mod cte;
 mod join_expr;
 mod join_kind;
+mod resolved;
 mod rows_fun;
 mod sub_query;
 mod table;
@@ -10,8 +11,7 @@ mod table_fun;
 mod undefined;
 mod view;
 
-use sql_fun_core::IVec;
-
+pub(crate) use self::join_expr::JoinUsingClause;
 pub use self::{
     alias::{AliasName, AliasSpec},
     cte::CteDataSource,
@@ -25,13 +25,9 @@ pub use self::{
     view::ViewDataSource,
 };
 
-use crate::{
-    sem::{
-        AnalysisError, ColumnName, FromClause, FullName, ParseContext, ScalarAnalysisContext,
-        SemScalarExpr, WithClause, scalar_expr::ColumnReferenceExpr,
-        type_system::ArgumentBindingCollection,
-    },
-    syn::{ListOpt, ScanToken},
+use crate::sem::{
+    AnalysisError, ColumnName, ParseContext, SemScalarExpr, WithClause,
+    scalar_expr::ColumnReferenceExpr,
 };
 
 /// source nullability type
@@ -72,7 +68,7 @@ impl DataSource {
         nullability: bool,
     ) -> Result<(SemScalarExpr, TParseContext), AnalysisError>
     where
-        TParseContext: ParseContext,
+        TParseContext: crate::sem::resolution::ResolutionContext,
     {
         match self {
             Self::CteQuery(cteds) => {
@@ -182,6 +178,17 @@ impl DataSource {
     where
         TParseContext: ParseContext,
     {
+        self.aliases_for_column_resolved(column, context, with_clause)
+    }
+
+    pub(crate) fn aliases_for_column_resolved<
+        TContext: crate::sem::resolution::ResolutionContext,
+    >(
+        &self,
+        column: &ColumnName,
+        context: &TContext,
+        with_clause: &WithClause,
+    ) -> Vec<AliasSpec> {
         let mut result = Vec::new();
         match self {
             Self::CteQuery(d) => d.get_aliases_for_column(column, with_clause, &mut result),
@@ -202,53 +209,5 @@ impl DataSource {
             Self::RowFunctions(_) => todo!(),
         }
         result
-    }
-
-    fn call_table_func<TParseContext>(
-        mut context: TParseContext,
-        with_clause: &WithClause,
-        from_clause: &FromClause,
-        call: crate::syn::FuncCall,
-        alias: Option<crate::syn::Alias>,
-        tokens: &IVec<ScanToken>,
-    ) -> Result<(Self, TParseContext), AnalysisError>
-    where
-        TParseContext: ParseContext,
-    {
-        let func_name = FullName::try_from(call.get_funcname())?;
-
-        let alias_name = if let Some(alias) = alias {
-            let (alias, new_context) = AliasSpec::analyze(context, &func_name, &alias)?;
-            context = new_context;
-            alias
-        } else {
-            AliasSpec::from_local_name(&func_name.local_name())
-        };
-
-        let mut arg_exprs = Vec::new();
-        let mut arg_types = ArgumentBindingCollection::default();
-        if let Some(args) = call.get_args().as_inner() {
-            for arg in args {
-                let (sarg, new_context) = SemScalarExpr::analyze_scaler_expr(
-                    context,
-                    &ScalarAnalysisContext::new(with_clause, from_clause),
-                    arg,
-                    tokens,
-                )?;
-                context = new_context;
-                arg_types.push(sarg.get_type());
-                arg_exprs.push(sarg);
-            }
-        }
-
-        let ds = context.resolve_table_function(
-            &call,
-            func_name,
-            &alias_name,
-            arg_exprs.into(),
-            arg_types,
-        )?;
-
-        Ok((ds, context))
     }
 }

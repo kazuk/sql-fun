@@ -1,10 +1,10 @@
-use sql_fun_core::IVec;
-
-use super::IndirectionExpr;
+use crate::sem::scalar_expr::indirect::IndirectionExpr;
 use crate::{
     sem::{AnalysisError, ParseContext, ScalarAnalysisContext, SemScalarExpr, TypeReference},
     syn::{Opt, ScanToken},
 };
+
+use ::sql_fun_core::IVec;
 
 #[derive(Debug, Clone, Eq, Hash, PartialEq, serde::Serialize, serde::Deserialize)]
 pub struct ArrayIndex {
@@ -42,8 +42,16 @@ impl ArrayIndex {
     where
         TParseContext: ParseContext,
     {
-        array.require_array(context)?;
-        index.fits_array_index(context)?;
+        Self::index_resolved(array, index, context)
+    }
+
+    pub(super) fn index_resolved<TContext: crate::sem::resolution::ResolutionContext>(
+        array: SemScalarExpr,
+        index: SemScalarExpr,
+        context: &mut TContext,
+    ) -> Result<IndirectionExpr, AnalysisError> {
+        array.require_array_resolved(context)?;
+        index.fits_array_index_resolved(context)?;
         let item_type = array
             .get_type()
             .and_then(|v| context.get_array_item_type(&v));

@@ -1,11 +1,5 @@
-use sql_fun_core::IVec;
-
-use crate::{
-    sem::{AnalysisError, ParseContext, ScalarAnalysisContext, SemScalarExpr, TypeReference},
-    syn::ScanToken,
-};
-
-use super::{AnalyzeScalarExpr, SemScalarExprNode};
+use crate::sem::TypeReference;
+use crate::sem::scalar_expr::SemScalarExprNode;
 
 /// Collate expression
 #[derive(Debug, Clone, Eq, Hash, PartialEq, serde::Serialize, serde::Deserialize)]
@@ -17,20 +11,6 @@ impl SemScalarExprNode for CollateExpr {
     }
 
     fn is_not_null(&self) -> Option<bool> {
-        todo!()
-    }
-}
-
-impl<TParseContext> AnalyzeScalarExpr<TParseContext, crate::syn::CollateExpr> for CollateExpr
-where
-    TParseContext: ParseContext,
-{
-    fn analyze_scalar_expr(
-        _context: TParseContext,
-        _scalar_context: &ScalarAnalysisContext<'_>,
-        _syn: crate::syn::CollateExpr,
-        _tokens: &IVec<ScanToken>,
-    ) -> Result<(SemScalarExpr, TParseContext), AnalysisError> {
         todo!()
     }
 }

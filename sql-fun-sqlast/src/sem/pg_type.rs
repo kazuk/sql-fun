@@ -2,12 +2,12 @@ mod concrete_type;
 mod dynamic_type;
 mod type_ref;
 
+pub use self::type_ref::TypeReference;
+
 use crate::sem::{
     ColumnCollection, ColumnName, CreateCompositeType, CreateDomain, CreateEnum, FullName,
     LocalName, ParseContext, SchemaName, TableName,
 };
-
-pub use self::type_ref::TypeReference;
 
 /// type definitions
 #[derive(Debug, Clone, Eq, Hash, PartialEq, serde::Serialize, serde::Deserialize)]
@@ -119,6 +119,14 @@ impl TypeDefinition {
     where
         TParseContext: ParseContext,
     {
+        self.member_type_from_catalog(context, member)
+    }
+
+    pub(crate) fn member_type_from_catalog<TCatalog: crate::sem::resolution::Catalog>(
+        &self,
+        context: &TCatalog,
+        member: &str,
+    ) -> Option<TypeReference> {
         match self {
             Self::Enum(_create_enum) => todo!(),
             Self::CompositeType(create_composite_type) => {
@@ -213,9 +221,8 @@ impl PgBuiltInType {
 
 #[cfg(test)]
 mod tests {
+    use crate::sem::FullName;
     use crate::syn::NodeListOpt;
-
-    use super::*;
 
     fn build_string_node_list_opt(strings: &[&str]) -> NodeListOpt {
         use crate::syn::StringBuilder;

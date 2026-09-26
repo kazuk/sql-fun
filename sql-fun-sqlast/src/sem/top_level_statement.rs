@@ -1,5 +1,3 @@
-use sql_fun_core::IVec;
-
 use crate::{
     AstAndContextPair,
     sem::{
@@ -10,9 +8,10 @@ use crate::{
     },
     syn::{ListOpt, Opt, ParseResult},
 };
-
 #[cfg(feature = "sqlite")]
 use crate::{SqliteToken, syn::sqlite::Stmt};
+
+use ::sql_fun_core::IVec;
 
 impl SemAst {
     /// analyze top-level SQL statement
@@ -237,7 +236,16 @@ impl SemAst {
             Stmt::DropType(_drop_type_statement) => todo!(),
             Stmt::CreateSequence(_create_sequence_statement) => todo!(),
             Stmt::DropSequence(_drop_sequence_statement) => todo!(),
-            Stmt::Select(_select) => todo!(),
+            Stmt::Select(select) => {
+                let syntax = crate::sem::unresolved::Query::sqlite(&select)?;
+                let outcome = syntax.resolve(&context, crate::sem::unresolved::Dialect::sqlite());
+                let mut context = context;
+                let query = outcome.report(&mut context)?;
+                Ok(AstAndContextPair::new(
+                    Self::SelectStatement(query),
+                    context,
+                ))
+            }
             Stmt::Update(_update) => todo!(),
             Stmt::Delete(_delete_statement) => todo!(),
             Stmt::Insert(_insert_statement) => todo!(),
@@ -268,9 +276,10 @@ mod tests {
         tests::context_args,
     };
 
-    use sql_fun_core::SqlFunArgs;
     use std::path::Path;
-    use testresult::TestResult;
+
+    use ::sql_fun_core::SqlFunArgs;
+    use ::testresult::TestResult;
 
     #[rstest::rstest]
     #[case(r#"create table users ( id bigserial not null primary key, name varchar )"#)]

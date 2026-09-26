@@ -1,16 +1,15 @@
-use std::collections::HashMap;
-
-use sql_fun_core::IVec;
-
 use crate::{
     sem::{
-        AnalysisError, AstAndContextPair, DeleteStatement, InsertStatement, ParseContext,
-        SelectStatement, SemAst, UpdateStatement, analyze_delete_statement,
-        analyze_insert_statement, analyze_update_statement,
+        AnalysisError, DeleteStatement, InsertStatement, ParseContext, SelectStatement,
+        UpdateStatement,
         create_table::{ColumnDefinition, ColumnName},
     },
-    syn::{ListOpt, Opt, ScanToken},
+    syn::ScanToken,
 };
+
+use std::collections::HashMap;
+
+use ::sql_fun_core::IVec;
 
 /// CTE name
 pub type CteName = String;
@@ -29,44 +28,14 @@ pub enum CteStatement {
 }
 
 impl CteStatement {
-    fn analyze_syn<TParseContext>(
-        context: TParseContext,
-        syn: crate::syn::CommonTableExpr,
-        tokens: &IVec<ScanToken>,
-    ) -> Result<(Self, TParseContext), AnalysisError>
-    where
-        TParseContext: ParseContext,
-    {
-        let query = syn.get_ctequery();
-
-        if let Some(select) = query.as_select_stmt().as_inner() {
-            let AstAndContextPair(sem, new_context) =
-                SelectStatement::analyze_select(context, select, tokens)?;
-            let SemAst::SelectStatement(s) = sem else {
-                AnalysisError::raise_unexpected_none("SemAst::SelectStatement")?
-            };
-            Ok((Self::Select(Box::new(s)), new_context))
-        } else if let Some(insert) = query.as_insert_stmt().as_inner() {
-            let (sem, new_context) = analyze_insert_statement(context, &None, insert)?;
-            let SemAst::InsertStatement(s) = sem else {
-                AnalysisError::raise_unexpected_none("SemAst::InsertStatement")?
-            };
-            Ok((Self::Insert(s), new_context))
-        } else if let Some(update) = query.as_update_stmt().as_inner() {
-            let (sem, new_context) = analyze_update_statement(context, &None, update)?;
-            let SemAst::UpdateStatement(s) = sem else {
-                AnalysisError::raise_unexpected_none("SemAst::UpdateStatement")?
-            };
-            Ok((Self::Update(s), new_context))
-        } else if let Some(delete) = query.as_delete_stmt().as_inner() {
-            let (sem, new_context) = analyze_delete_statement(context, &None, delete)?;
-            let SemAst::DeleteStatement(s) = sem else {
-                AnalysisError::raise_unexpected_none("SemAst::DeleteStatement")?
-            };
-            Ok((Self::Delete(s), new_context))
-        } else {
-            AnalysisError::raise_unexpected_none("common_table_expr.query")?
-        }
+    pub(crate) const fn insert() -> Self {
+        Self::Insert(InsertStatement::empty())
+    }
+    pub(crate) const fn update() -> Self {
+        Self::Update(UpdateStatement::empty())
+    }
+    pub(crate) const fn delete() -> Self {
+        Self::Delete(DeleteStatement::empty())
     }
 
     /// get column from result set
@@ -107,8 +76,35 @@ impl CteStatement {
     }
 
     /// test column existing
-    pub(crate) fn has_column(&self, _column: &ColumnName) -> bool {
-        todo!()
+    pub(crate) fn has_column(&self, column: &ColumnName) -> bool {
+        match self {
+            Self::Select(query) => query.has_column(column),
+            Self::Insert(_) | Self::Update(_) | Self::Delete(_) => false,
+        }
+    }
+
+    pub(crate) fn from_query(query: &SelectStatement) -> Self {
+        Self::Select(Box::new(query.clone()))
+    }
+
+    pub(crate) fn resolved_column(
+        &self,
+        column: &ColumnName,
+        index: Option<usize>,
+        skip: usize,
+    ) -> Option<ColumnDefinition> {
+        match self {
+            Self::Select(query) => {
+                let columns = query.result_columns();
+                let result = if let Some(index) = index {
+                    columns.get_column_at(index)
+                } else {
+                    columns.get_column_with_skip_count(column, skip)
+                };
+                result.map(|column| column.create_column_definition())
+            }
+            Self::Insert(_) | Self::Update(_) | Self::Delete(_) => None,
+        }
     }
 }
 
@@ -146,20 +142,8 @@ impl WithClause {
     where
         TParseContext: ParseContext,
     {
-        let mut with = Self::default();
-        let Some(ctes) = syn.get_ctes().as_inner() else {
-            return Ok((with, context));
-        };
-
-        for cte in ctes {
-            let Some(table_expr) = cte.as_common_table_expr().as_inner() else {
-                AnalysisError::raise_unexpected_none("cte.as_common_table_expr")?
-            };
-            let name = table_expr.get_ctename();
-            let (cte, new_context) = CteStatement::analyze_syn(context, table_expr, tokens)?;
-            with.insert(&name, cte);
-            context = new_context;
-        }
-        Ok((with, context))
+        let syntax = crate::sem::unresolved::With::postgres(syn, tokens)?;
+        let result = syntax.resolve_with(&context, crate::sem::unresolved::Dialect::postgres());
+        Ok((result.report(&mut context)?, context))
     }
 }

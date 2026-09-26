@@ -1,5 +1,3 @@
-use sql_fun_core::IVec;
-
 use crate::sem::{
     FunctionParam, ParseContext, TypeReference,
     type_system::{
@@ -10,6 +8,8 @@ use crate::sem::{
         },
     },
 };
+
+use ::sql_fun_core::IVec;
 
 pub enum ParameterBindResult {
     One(Option<TypeReference>, FunctionParam),
@@ -77,18 +77,24 @@ impl ParameterBindResult {
     where
         TParseContext: ParseContext,
     {
+        self.test_catalog_castability(context)
+    }
+
+    pub(crate) fn test_catalog_castability<TCatalog: crate::sem::resolution::Catalog>(
+        &self,
+        context: &TCatalog,
+    ) -> Result<i32, TypeError> {
         match self {
-            Self::One(arg, p) => Ok(p.test_castability_one(context, arg)?),
+            Self::One(arg, p) => Ok(p.castability_one_from_catalog(context, arg)?),
             Self::NoInputParam(_) => Ok(0),
-            Self::VariadicParam(args, p) => Ok(p.test_castability_variadic(context, args)?),
+            Self::VariadicParam(args, p) => Ok(p.castability_variadic_from_catalog(context, args)?),
         }
     }
 }
 
 #[cfg(test)]
 mod test_parameter_bind_result {
-    use sql_fun_core::IVec;
-
+    use crate::sem::type_system::func_params::bind_result::ParameterBindResult;
     use crate::sem::{
         SemScalarExpr, TypeReference,
         type_system::func_params::{
@@ -97,7 +103,7 @@ mod test_parameter_bind_result {
         },
     };
 
-    use super::ParameterBindResult;
+    use ::sql_fun_core::IVec;
 
     #[test]
     fn test_one_in() {

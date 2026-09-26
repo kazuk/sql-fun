@@ -1,9 +1,9 @@
-use std::fmt::Display;
-
 use crate::{
     sem::{CatalogName, FullName, LocalName, SchemaName},
     syn::RangeVar,
 };
+
+use std::fmt::Display;
 
 /// view name type
 #[derive(Debug, Clone, Eq, Hash, PartialEq, serde::Serialize, serde::Deserialize)]
@@ -17,6 +17,10 @@ impl Display for ViewName {
 }
 
 impl ViewName {
+    pub(crate) fn from_full_name(name: &FullName) -> Self {
+        Self(name.clone())
+    }
+
     fn to_option(string: String) -> Option<String> {
         if string.is_empty() {
             None

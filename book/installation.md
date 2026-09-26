@@ -126,6 +126,21 @@ sql-fun setting to increase it.
 The parser also recognizes Turso extensions. Successful syntax parsing does not
 imply that stock SQLite or `rusqlite` can execute those extensions.
 
+### SQLite analysis coverage
+
+With the `sqlite` feature enabled, SELECT analysis supports literal projections,
+column references from derived queries and nonrecursive CTEs, join nullability,
+compound queries, and CASE expressions whose result branches have the same type.
+Use explicit `AS` names when stable result-column names matter.
+
+This is not complete SQLite query validation. Arithmetic and comparison operators,
+function type affinity, case-insensitive identifier binding,
+parameter analysis, star expansion, recursive CTE binding, and full compound
+type checking remain incomplete. Parsing grouping, ordering, or window clauses
+does not mean those clauses have been semantically validated. Different CASE
+result types are not unified using PostgreSQL implicit casts.
+Use matching identifier spelling when referring to derived-query or CTE columns.
+
 ## Setting environment variables
 
 - `SQL_FUN_SCHEMA` : optional and default is `develop`

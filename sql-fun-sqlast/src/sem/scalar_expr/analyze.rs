@@ -1,61 +1,11 @@
-use sql_fun_core::IVec;
-
 #[cfg(feature = "sqlite")]
+use crate::SqliteToken;
 use crate::{
-    SqliteToken,
-    syn::sqlite::{Operator, UnaryOperator},
-};
-use crate::{
-    sem::{
-        AnalysisError, ArithExpr, ArrayExpr, BooleanExpr, CaseExpr, CoalesceExpr, CollateExpr,
-        ColumnReferenceExpr, FuncCallExpr, IndirectionExpr, MinMaxExpr, NamedArgExpr, NullTestExpr,
-        ParamRef, ParseContext, ScalarAnalysisContext, ScalarConstExpr, SemScalarExpr,
-        SqlValueExpr, SubLinkExpr, TypeCastExpr,
-        scalar_expr::{AnalyzeScalarExpr, ListExpr},
-    },
-    syn::{Opt, ScanToken},
+    sem::{AnalysisError, ParseContext, ScalarAnalysisContext, SemScalarExpr},
+    syn::ScanToken,
 };
 
-#[cfg(feature = "sqlite")]
-use super::boolean::{BooleanExprBody, NullTestType};
-
-#[cfg(feature = "sqlite")]
-fn normalize_sqlite_string_literal(value: &str) -> String {
-    if value.len() >= 2 && value.starts_with('\'') && value.ends_with('\'') {
-        value[1..value.len() - 1].replace("''", "'")
-    } else {
-        String::from(value)
-    }
-}
-
-#[cfg(feature = "sqlite")]
-fn analyze_sqlite_literal(literal: &crate::syn::sqlite::Literal) -> SemScalarExpr {
-    use crate::syn::sqlite::Literal;
-
-    match literal {
-        Literal::Numeric(value) => {
-            if let Ok(integer) = value.value_text().parse::<i32>() {
-                SemScalarExpr::Const(ScalarConstExpr::Integer(integer))
-            } else {
-                SemScalarExpr::Const(ScalarConstExpr::Float(String::from(value.value_text())))
-            }
-        }
-        Literal::String(value) => SemScalarExpr::Const(ScalarConstExpr::String(
-            normalize_sqlite_string_literal(value.value()),
-        )),
-        Literal::Null(_) => ScalarConstExpr::null(),
-        Literal::True(value) | Literal::False(value) => {
-            SemScalarExpr::Const(ScalarConstExpr::Bool(value.value()))
-        }
-        Literal::CurrentDate(_) => SemScalarExpr::SqlValue(SqlValueExpr::CurrentDate),
-        Literal::CurrentTime(_) => SemScalarExpr::SqlValue(SqlValueExpr::CurrentTime(None)),
-        Literal::CurrentTimestamp(_) => {
-            SemScalarExpr::SqlValue(SqlValueExpr::CurrentTimestamp(None))
-        }
-        Literal::Blob(_) => todo!(),
-        Literal::Keyword(_) => todo!(),
-    }
-}
+use ::sql_fun_core::IVec;
 
 impl SemScalarExpr {
     /// analyze [`crate::syn::Node`] as scaler expression
@@ -68,59 +18,21 @@ impl SemScalarExpr {
     where
         TParseContext: ParseContext,
     {
-        if syn.is_a_const() {
-            if let Some(aconst) = syn.as_a_const().as_inner() {
-                ScalarConstExpr::analyze_scalar_expr(context, scalar_context, aconst, tokens)
-            } else {
-                Ok((ScalarConstExpr::null(), context))
-            }
-        } else if let Some(col_ref) = syn.as_column_ref().as_inner() {
-            ColumnReferenceExpr::analyze_scalar_expr(context, scalar_context, col_ref, tokens)
-        } else if let Some(fun_call) = syn.as_func_call().as_inner() {
-            FuncCallExpr::analyze_scalar_expr(context, scalar_context, fun_call, tokens)
-        } else if let Some(a_expr) = syn.as_a_expr().as_inner() {
-            ArithExpr::analyze_scalar_expr(context, scalar_context, a_expr, tokens)
-        } else if let Some(cast) = syn.as_type_cast().as_inner() {
-            TypeCastExpr::analyze_scalar_expr(context, scalar_context, cast, tokens)
-        } else if let Some(case) = syn.as_case_expr().as_inner() {
-            CaseExpr::analyze_scalar_expr(context, scalar_context, case, tokens)
-        } else if let Some(bexpr) = syn.as_bool_expr().as_inner() {
-            BooleanExpr::analyze_scalar_expr(context, scalar_context, bexpr, tokens)
-        } else if let Some(nt) = syn.as_null_test().as_inner() {
-            NullTestExpr::analyze_scalar_expr(context, scalar_context, nt, tokens)
-        } else if let Some(sl) = syn.as_sub_link().as_inner() {
-            SubLinkExpr::analyze_scalar_expr(context, scalar_context, sl, tokens)
-        } else if let Some(ce) = syn.as_coalesce_expr().as_inner() {
-            CoalesceExpr::analyze_scalar_expr(context, scalar_context, ce, tokens)
-        } else if let Some(mme) = syn.as_min_max_expr().as_inner() {
-            MinMaxExpr::analyze_scalar_expr(context, scalar_context, mme, tokens)
-        } else if let Some(ce) = syn.as_collate_expr().as_inner() {
-            CollateExpr::analyze_scalar_expr(context, scalar_context, ce, tokens)
-        } else if let Some(svf) = syn.as_sqlvalue_function().as_inner() {
-            SqlValueExpr::analyze_scalar_expr(context, scalar_context, svf, tokens)
-        } else if let Some(pr) = syn.as_param_ref().as_inner() {
-            ParamRef::analyze_scalar_expr(context, scalar_context, pr, tokens)
-        } else if let Some(nae) = syn.as_named_arg_expr().as_inner() {
-            NamedArgExpr::analyze_scalar_expr(context, scalar_context, nae, tokens)
-        } else if let Some(ind) = syn.as_a_indirection().as_inner() {
-            IndirectionExpr::analyze_scalar_expr(context, scalar_context, ind, tokens)
-        } else if let Some(arr) = syn.as_a_array_expr().as_inner() {
-            ArrayExpr::analyze_scalar_expr(context, scalar_context, arr, tokens)
-        } else if let Some(list) = syn.as_list().as_inner() {
-            ListExpr::analyze_scalar_expr(context, scalar_context, list, tokens)
-        } else {
-            AnalysisError::raise_unexpected_input(&format!(
-                "analyze_scaler_expr unexpected node :{syn:?} "
-            ))
-        }
+        let syntax = crate::sem::unresolved::Expr::postgres(&syn, tokens)?;
+        let outcome = syntax.resolve(
+            &context,
+            crate::sem::unresolved::Dialect::postgres(),
+            scalar_context,
+        );
+        let mut context = context;
+        let expression = outcome.report(&mut context)?;
+        Ok((expression, context))
     }
 }
 
 #[cfg(test)]
 mod test_scalar_expr_analyze {
     use crate::sem::ScalarAnalysisContext;
-    use testresult::TestResult;
-
     use crate::{
         sem::{
             ArithExpr,
@@ -130,6 +42,8 @@ mod test_scalar_expr_analyze {
         syn::ListOpt,
         test_helpers::{SynBuilder, TestParseContext, test_context},
     };
+
+    use ::testresult::TestResult;
 
     #[rstest::rstest]
     #[case("42", Const(Integer(42)))]
@@ -173,20 +87,19 @@ impl SemScalarExpr {
         mut context: TParseContext,
         scalar_context: &ScalarAnalysisContext<'_>,
         syn: &crate::syn::sqlite::Parenthesized,
-        tokens: &IVec<SqliteToken<'_>>,
+        _tokens: &IVec<SqliteToken<'_>>,
     ) -> Result<(Self, TParseContext), AnalysisError>
     where
         TParseContext: ParseContext,
     {
-        let expr = if let [expr] = syn.expr() {
-            let (expr, new_context) =
-                Self::analyze_sqlite_scalar_expr(context, scalar_context, expr, tokens)?;
-            context = new_context;
-            expr
-        } else {
-            todo!()
-        };
-        Ok((expr, context))
+        let syntax = crate::sem::unresolved::Expr::sqlite_parenthesized(syn)?;
+        let outcome = syntax.resolve(
+            &context,
+            crate::sem::unresolved::Dialect::sqlite(),
+            scalar_context,
+        );
+        let expression = outcome.report(&mut context)?;
+        Ok((expression, context))
     }
 
     /// analyze #[`crate::syn::sqlite::ExprUnary`]
@@ -194,30 +107,19 @@ impl SemScalarExpr {
         mut context: TParseContext,
         scalar_context: &ScalarAnalysisContext<'_>,
         expr_unary: &crate::syn::sqlite::ExprUnary,
-        tokens: &IVec<SqliteToken<'_>>,
+        _tokens: &IVec<SqliteToken<'_>>,
     ) -> Result<(Self, TParseContext), AnalysisError>
     where
         TParseContext: ParseContext,
     {
-        let (expr, new_context) =
-            Self::analyze_sqlite_scalar_expr(context, scalar_context, expr_unary.expr(), tokens)?;
-        context = new_context;
-
-        let expr = match expr_unary.unary_operator() {
-            UnaryOperator::Positive => expr,
-            UnaryOperator::Negative => match expr {
-                Self::Const(ScalarConstExpr::Integer(value)) => {
-                    Self::Const(ScalarConstExpr::Integer(-value))
-                }
-                Self::Const(ScalarConstExpr::Float(value)) => {
-                    Self::Const(ScalarConstExpr::Float(format!("-{value}")))
-                }
-                _ => todo!(),
-            },
-            UnaryOperator::Not => Self::Boolean(BooleanExpr::new(BooleanExprBody::not(&expr))),
-            UnaryOperator::BitwiseNot => todo!(),
-        };
-        Ok((expr, context))
+        let syntax = crate::sem::unresolved::Expr::sqlite_unary(expr_unary)?;
+        let outcome = syntax.resolve(
+            &context,
+            crate::sem::unresolved::Dialect::sqlite(),
+            scalar_context,
+        );
+        let expression = outcome.report(&mut context)?;
+        Ok((expression, context))
     }
 
     /// analyze #[`crate::syn::sqlite::ExprIsNull`]
@@ -225,16 +127,19 @@ impl SemScalarExpr {
         mut context: TParseContext,
         scalar_context: &ScalarAnalysisContext<'_>,
         expr_is_null: &crate::syn::sqlite::ExprIsNull,
-        tokens: &IVec<SqliteToken<'_>>,
+        _tokens: &IVec<SqliteToken<'_>>,
     ) -> Result<(Self, TParseContext), AnalysisError>
     where
         TParseContext: ParseContext,
     {
-        let (expr, new_context) =
-            Self::analyze_sqlite_scalar_expr(context, scalar_context, expr_is_null.expr(), tokens)?;
-        context = new_context;
-        let expr = Self::NullTest(NullTestExpr::new(NullTestType::IsNull, expr));
-        Ok((expr, context))
+        let syntax = crate::sem::unresolved::Expr::sqlite_is_null(expr_is_null)?;
+        let outcome = syntax.resolve(
+            &context,
+            crate::sem::unresolved::Dialect::sqlite(),
+            scalar_context,
+        );
+        let expression = outcome.report(&mut context)?;
+        Ok((expression, context))
     }
 
     /// analyze #[`crate::syn::sqlite::ExprNotNull`]
@@ -242,20 +147,19 @@ impl SemScalarExpr {
         mut context: TParseContext,
         scalar_context: &ScalarAnalysisContext<'_>,
         expr_not_null: &crate::syn::sqlite::ExprNotNull,
-        tokens: &IVec<SqliteToken<'_>>,
+        _tokens: &IVec<SqliteToken<'_>>,
     ) -> Result<(Self, TParseContext), AnalysisError>
     where
         TParseContext: ParseContext,
     {
-        let (expr, new_context) = Self::analyze_sqlite_scalar_expr(
-            context,
+        let syntax = crate::sem::unresolved::Expr::sqlite_not_null(expr_not_null)?;
+        let outcome = syntax.resolve(
+            &context,
+            crate::sem::unresolved::Dialect::sqlite(),
             scalar_context,
-            expr_not_null.expr(),
-            tokens,
-        )?;
-        context = new_context;
-        let expr = Self::NullTest(NullTestExpr::new(NullTestType::IsNotNull, expr));
-        Ok((expr, context))
+        );
+        let expression = outcome.report(&mut context)?;
+        Ok((expression, context))
     }
 
     /// analyze #[`crate::syn::sqlite::ExprBinary`]
@@ -263,24 +167,19 @@ impl SemScalarExpr {
         mut context: TParseContext,
         scalar_context: &ScalarAnalysisContext<'_>,
         expr_binary: &crate::syn::sqlite::ExprBinary,
-        tokens: &IVec<SqliteToken<'_>>,
+        _tokens: &IVec<SqliteToken<'_>>,
     ) -> Result<(Self, TParseContext), AnalysisError>
     where
         TParseContext: ParseContext,
     {
-        let (left, new_context) =
-            Self::analyze_sqlite_scalar_expr(context, scalar_context, expr_binary.left(), tokens)?;
-        context = new_context;
-        let (right, new_context) =
-            Self::analyze_sqlite_scalar_expr(context, scalar_context, expr_binary.right(), tokens)?;
-        context = new_context;
-
-        let expr = match expr_binary.operator() {
-            Operator::And => Self::Boolean(BooleanExpr::new(BooleanExprBody::and(&[left, right]))),
-            Operator::Or => Self::Boolean(BooleanExpr::new(BooleanExprBody::or(&[left, right]))),
-            _ => todo!(),
-        };
-        Ok((expr, context))
+        let syntax = crate::sem::unresolved::Expr::sqlite_binary(expr_binary)?;
+        let outcome = syntax.resolve(
+            &context,
+            crate::sem::unresolved::Dialect::sqlite(),
+            scalar_context,
+        );
+        let expression = outcome.report(&mut context)?;
+        Ok((expression, context))
     }
 
     /// analyze #[`crate::syn::sqlite::ExprCollate`]
@@ -288,15 +187,19 @@ impl SemScalarExpr {
         mut context: TParseContext,
         scalar_context: &ScalarAnalysisContext<'_>,
         expr_collate: &crate::syn::sqlite::ExprCollate,
-        tokens: &IVec<SqliteToken<'_>>,
+        _tokens: &IVec<SqliteToken<'_>>,
     ) -> Result<(Self, TParseContext), AnalysisError>
     where
         TParseContext: ParseContext,
     {
-        let (expr, new_context) =
-            Self::analyze_sqlite_scalar_expr(context, scalar_context, expr_collate.expr(), tokens)?;
-        context = new_context;
-        Ok((expr, context))
+        let syntax = crate::sem::unresolved::Expr::sqlite_collate(expr_collate)?;
+        let outcome = syntax.resolve(
+            &context,
+            crate::sem::unresolved::Dialect::sqlite(),
+            scalar_context,
+        );
+        let expression = outcome.report(&mut context)?;
+        Ok((expression, context))
     }
 
     /// analyze #[`crate::syn::sqlite::ExprBetween`]
@@ -304,29 +207,19 @@ impl SemScalarExpr {
         mut context: TParseContext,
         scalar_context: &ScalarAnalysisContext<'_>,
         expr_between: &crate::syn::sqlite::ExprBetween,
-        tokens: &IVec<SqliteToken<'_>>,
+        _tokens: &IVec<SqliteToken<'_>>,
     ) -> Result<(Self, TParseContext), AnalysisError>
     where
         TParseContext: ParseContext,
     {
-        let (lhs, new_context) =
-            Self::analyze_sqlite_scalar_expr(context, scalar_context, expr_between.lhs(), tokens)?;
-        context = new_context;
-        let (start, new_context) = Self::analyze_sqlite_scalar_expr(
-            context,
+        let syntax = crate::sem::unresolved::Expr::sqlite_between(expr_between)?;
+        let outcome = syntax.resolve(
+            &context,
+            crate::sem::unresolved::Dialect::sqlite(),
             scalar_context,
-            expr_between.start(),
-            tokens,
-        )?;
-        context = new_context;
-        let (end, new_context) =
-            Self::analyze_sqlite_scalar_expr(context, scalar_context, expr_between.end(), tokens)?;
-        context = new_context;
-        if *expr_between.not() {
-            Ok((ArithExpr::not_between(lhs, (start, end)), context))
-        } else {
-            Ok((ArithExpr::between(lhs, (start, end)), context))
-        }
+        );
+        let expression = outcome.report(&mut context)?;
+        Ok((expression, context))
     }
 
     /// analyze sqlite expression
@@ -334,71 +227,26 @@ impl SemScalarExpr {
         context: TParseContext,
         scalar_context: &ScalarAnalysisContext<'_>,
         syn: &crate::syn::sqlite::Expr,
-        tokens: &IVec<SqliteToken<'_>>,
+        _tokens: &IVec<SqliteToken<'_>>,
     ) -> Result<(Self, TParseContext), AnalysisError>
     where
         TParseContext: ParseContext,
     {
-        use crate::syn::sqlite::Expr;
-
-        match syn {
-            Expr::Literal(literal) => Ok((analyze_sqlite_literal(literal), context)),
-            Expr::Parenthesized(parenthesized) => {
-                Self::analyze_sqlite_parenthesized(context, scalar_context, parenthesized, tokens)
-            }
-            Expr::Unary(expr_unary) => {
-                Self::analyze_sqlite_unary(context, scalar_context, expr_unary, tokens)
-            }
-            Expr::IsNull(expr_is_null) => {
-                Self::analyze_sqlite_is_null(context, scalar_context, expr_is_null, tokens)
-            }
-            Expr::NotNull(expr_not_null) => {
-                Self::analyze_sqlite_not_null(context, scalar_context, expr_not_null, tokens)
-            }
-            Expr::Binary(expr_binary) => {
-                Self::analyze_sqlite_binary(context, scalar_context, expr_binary, tokens)
-            }
-            Expr::Collate(expr_collate) => {
-                Self::analyze_sqlite_collate(context, scalar_context, expr_collate, tokens)
-            }
-            Expr::Between(expr_between) => {
-                Self::analyze_sqlite_between(context, scalar_context, expr_between, tokens)
-            }
-            Expr::Register(_) => todo!(),
-            Expr::Case(_) => todo!(),
-            Expr::Cast(expr_cast) => {
-                TypeCastExpr::analyze_sqlite_cast(context, scalar_context, expr_cast, tokens)
-            }
-            Expr::DoublyQualified(_) => todo!(),
-            Expr::Exists(_) => todo!(),
-            Expr::FunctionCall(_) => todo!(),
-            Expr::FunctionCallStar(_) => todo!(),
-            Expr::Id(_) => todo!(),
-            Expr::Column(_) => todo!(),
-            Expr::RowId(_) => todo!(),
-            Expr::InList(_) => todo!(),
-            Expr::InSelect(_) => todo!(),
-            Expr::InTable(_) => todo!(),
-            Expr::Like(_) => todo!(),
-            Expr::Name(_) => todo!(),
-            Expr::Qualified(_) => todo!(),
-            Expr::Raise(_) => todo!(),
-            Expr::Subquery(_) => todo!(),
-            Expr::Variable(_) => todo!(),
-            Expr::SubqueryResult(_) => todo!(),
-            Expr::FieldAccess(_) => todo!(),
-            Expr::Default => todo!(),
-            Expr::Array(_) => todo!(),
-            Expr::Subscript(_) => todo!(),
-        }
+        let syntax = crate::sem::unresolved::Expr::sqlite(syn)?;
+        let outcome = syntax.resolve(
+            &context,
+            crate::sem::unresolved::Dialect::sqlite(),
+            scalar_context,
+        );
+        let mut context = context;
+        let expression = outcome.report(&mut context)?;
+        Ok((expression, context))
     }
 }
 
 #[cfg(all(test, feature = "sqlite"))]
 mod test_analyze_sqlite_scalar_expr {
     use crate::sem::ScalarAnalysisContext;
-    use testresult::TestResult;
-
     use crate::{
         sem::{
             ArithExpr,
@@ -408,6 +256,8 @@ mod test_analyze_sqlite_scalar_expr {
         syn::sqlite::{OneSelect, ResultColumn, Stmt},
         test_helpers::{SqliteSynBuilder, TestParseContext, sqlite_syn, test_context},
     };
+
+    use ::testresult::TestResult;
 
     #[rstest::rstest]
     #[case("42", Const(Integer(42)))]

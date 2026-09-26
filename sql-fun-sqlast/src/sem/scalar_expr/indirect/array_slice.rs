@@ -1,10 +1,10 @@
-use sql_fun_core::IVec;
-
-use super::IndirectionExpr;
+use crate::sem::scalar_expr::indirect::IndirectionExpr;
 use crate::{
     sem::{AnalysisError, ParseContext, ScalarAnalysisContext, SemScalarExpr, TypeReference},
     syn::{Opt, ScanToken},
 };
+
+use ::sql_fun_core::IVec;
 
 #[derive(Debug, Clone, Eq, Hash, PartialEq, serde::Serialize, serde::Deserialize)]
 pub struct ArraySlice {
@@ -46,12 +46,21 @@ impl ArraySlice {
     where
         TParseContext: ParseContext,
     {
-        array.require_array(context)?;
+        Self::slice_resolved(array, lower, upper, context)
+    }
+
+    pub(super) fn slice_resolved<TContext: crate::sem::resolution::ResolutionContext>(
+        array: SemScalarExpr,
+        lower: Option<SemScalarExpr>,
+        upper: Option<SemScalarExpr>,
+        context: &mut TContext,
+    ) -> Result<IndirectionExpr, AnalysisError> {
+        array.require_array_resolved(context)?;
         if let Some(lower_index) = &lower {
-            lower_index.fits_array_index(context)?;
+            lower_index.fits_array_index_resolved(context)?;
         }
         if let Some(upper_index) = &upper {
-            upper_index.fits_array_index(context)?;
+            upper_index.fits_array_index_resolved(context)?;
         }
 
         Ok(IndirectionExpr::ArraySlice(Box::new(Self::new(

@@ -1,5 +1,5 @@
 use crate::sem::{
-    AliasSpec, ColumnName, DataSource, JoinKind, Nullable, ParseContext, SemScalarExpr, WithClause,
+    AliasSpec, ColumnName, DataSource, JoinKind, Nullable, SemScalarExpr, WithClause,
     data_source::AliasName,
 };
 
@@ -10,7 +10,7 @@ pub struct JoinUsingClause {
 }
 
 impl JoinUsingClause {
-    pub(super) fn new(using_columns: &[ColumnName], alias: &Option<AliasSpec>) -> Self {
+    pub(crate) fn new(using_columns: &[ColumnName], alias: &Option<AliasSpec>) -> Self {
         Self {
             using_columns: using_columns.to_owned(),
             alias: alias.clone(),
@@ -74,14 +74,14 @@ impl JoinExprDataSource {
         with_clause: &WithClause,
         names: &mut Vec<AliasSpec>,
     ) where
-        TParseContext: ParseContext,
+        TParseContext: crate::sem::resolution::ResolutionContext,
     {
         let mut left_aliases = self
             .left
-            .get_aliases_for_column(column, context, with_clause);
-        let mut right_aliases = self
-            .right
-            .get_aliases_for_column(column, context, with_clause);
+            .aliases_for_column_resolved(column, context, with_clause);
+        let mut right_aliases =
+            self.right
+                .aliases_for_column_resolved(column, context, with_clause);
         names.append(&mut left_aliases);
         names.append(&mut right_aliases);
     }

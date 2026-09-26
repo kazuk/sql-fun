@@ -20,9 +20,17 @@ required attribution for a third-party resource vendored into this repository.
 - `content_sha256`: REQUIRED Text, SHA-256 hash of the vendored resource.
 - `detected_license`: REQUIRED Text, mechanically detected license information,
   or `none` when no information was found. This field is unreviewed input.
-- `review_status`: REQUIRED Text, `pending` until a reviewer has checked the
-  applicable primary license and notice material, then `reviewed`.
-- `reviewed_license`: OPTIONAL Text, license conclusion after review.
+- `automated_verification`: REQUIRED Object, records the result of the
+  automated workflow.
+  - `status`: REQUIRED Text, `pending` until the workflow has checked its
+    collected information against the recorded source and license material, then
+    `completed`.
+  - `license`: REQUIRED Text, license information established by that automated
+    verification, or `unknown` while pending.
+
+Automated verification is not legal review or approval by the repository owner
+or maintainers. It records only the outcome of this workflow and does not make
+an assertion about legal sufficiency.
 
 ## Markdown Content
 
@@ -38,9 +46,9 @@ Place each concept adjacent to its vendored resource and name it
 
 ## Lifecycle
 
-The generated scaffold is pending until the primary license and notice sources
-are reviewed. Only a reviewed concept may supply text for
-`THIRD_PARTY_NOTICES.md`.
+The generated scaffold is pending until automated verification records a
+completed result. Only a concept with completed automated verification may
+supply text for `THIRD_PARTY_NOTICES.md`.
 
 ## Agent Skills
 

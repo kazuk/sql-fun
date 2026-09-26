@@ -6,21 +6,25 @@ sources:
 resource_path: .github/problem-matchers/rust.json
 content_sha256: 6a0bf092dae690853f898679995b1e50e66b7810b28501356774f3d64350d447
 detected_license: none
-review_status: reviewed
-reviewed_license: MIT
+automated_verification:
+  status: completed
+  license: MIT
 ---
 
 # .github/problem-matchers/rust.json license notice
 
-## Review
+## Automated verification
 
-Reviewed `rust.json` and the upstream
+The automated workflow checked `rust.json` and the upstream
 [LICENSE](https://github.com/actions-rust-lang/setup-rust-toolchain/blob/c8ff772090ab9d00f7f7bd7b388f3c3032282e3b/LICENSE).
 The file has no SPDX header; the repository license text is MIT and requires
 the copyright and permission notice below to accompany substantial copies.
+This result is automated verification, not legal review or approval by the
+repository owner or maintainers.
 
 ## Notice Text
 
+```text
 <!-- BEGIN THIRD PARTY NOTICE -->
 Rust problem matcher from actions-rust-lang/setup-rust-toolchain
 
@@ -44,3 +48,4 @@ LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM,
 OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
 SOFTWARE.
 <!-- END THIRD PARTY NOTICE -->
+```

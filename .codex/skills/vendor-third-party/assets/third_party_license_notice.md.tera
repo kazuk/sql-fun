@@ -6,19 +6,25 @@ sources:
 resource_path: {{ RESOURCE_PATH }}
 content_sha256: {{ CONTENT_SHA256 }}
 detected_license: {{ DETECTED_LICENSE }}
-review_status: pending
+automated_verification:
+  status: pending
+  license: unknown
 ---
 
 # {{ RESOURCE_PATH }} license notice
 
-## Review
+## Automated verification
 
-Review the source file and the applicable primary license, notice, and
-copyright material. Record the reviewed license and sources here, and replace
-the placeholder notice text before setting `review_status: reviewed`.
+Automated verification collects the source metadata, content hash, detected
+license data, and any license information supplied to this record. It does not
+constitute legal review or approval by the repository owner or maintainers.
+Set `automated_verification.status` to `completed` only after the workflow has
+verified the recorded information against the source and license material.
 
 ## Notice Text
 
+```text
 <!-- BEGIN THIRD PARTY NOTICE -->
-Replace this placeholder with the reviewed notice text.
+Replace this placeholder with the required notice text.
 <!-- END THIRD PARTY NOTICE -->
+```

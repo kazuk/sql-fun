@@ -87,6 +87,8 @@ skills with `skill-validator`. Contributors running this flow outside the projec
 CI image need the tool available on `PATH`; see the upstream
 [installation instructions](https://github.com/agent-ecosystem/skill-validator#install).
 The CI image currently pins version 1.6.2 for reproducibility.
+The validation accepts a skill-root README when `SKILL.md` links to it, so skills
+can include maintainer-facing guidance without producing a structural warning.
 
 The optional `cli-contract` check-flow step evaluates source-owned Scrut CLI
 contracts against the locally built `sql-fun` executable. It requires the

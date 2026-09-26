@@ -275,7 +275,9 @@ function run_graphify() {
 function run_skill_validator() {
   require_command skill-validator
   echo "== Linting skills"
-  skill-validator check --strict --emit-annotations .codex/skills
+  # Repository skills may include a maintainer-facing README.md when SKILL.md
+  # links to it, such as the third-party vendoring workflow.
+  skill-validator check --strict --allow-flat-layouts --emit-annotations .codex/skills
 }
 
 function run_rumdl() {

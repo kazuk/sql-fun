@@ -7,8 +7,9 @@ defined_type: Third Party License Notice
 
 ## Type Description
 
-`Third Party License Notice` records the provenance, license review, and
-required attribution for a third-party resource vendored into this repository.
+`Third Party License Notice` records the provenance, automated license
+verification and required attribution for a third-party resource vendored into
+this repository.
 
 ## Frontmatter Fields
 
@@ -34,8 +35,9 @@ an assertion about legal sufficiency.
 
 ## Markdown Content
 
-- `Review` heading: REQUIRED, records the primary license/notice sources that
-  were reviewed and any corrections to mechanically collected data.
+- `Automated verification` heading: REQUIRED, records the primary
+  license/notice sources checked by the workflow and any corrections to
+  mechanically collected data.
 - `Notice Text` heading: REQUIRED, contains the finalized text to append to
   `THIRD_PARTY_NOTICES.md`.
 

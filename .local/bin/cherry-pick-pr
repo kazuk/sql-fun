@@ -60,11 +60,9 @@ case "$answer" in
 esac
 
 BRANCH_NAME="cherry-pick/${COMMIT_SHA}"
-WORKTREE_PATH="${GIT_ROOT}/.worktrees/${COMMIT_SHA}"
 
-mkdir -p "${GIT_ROOT}/.worktrees"
 git -C "$GIT_ROOT" fetch origin main
-git -C "$GIT_ROOT" worktree add -b "$BRANCH_NAME" "$WORKTREE_PATH" origin/main
+WORKTREE_PATH=$(agent-worktree-add "$BRANCH_NAME" origin/main)
 git -C "$WORKTREE_PATH" cherry-pick "$COMMIT_SHA"
 git -C "$WORKTREE_PATH" push -u origin "$BRANCH_NAME"
 cd "$WORKTREE_PATH"

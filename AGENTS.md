@@ -37,6 +37,9 @@ Statistics are stored in the stats directory.
   with the same toolchain, features, and test commands. Run measurements
   sequentially to distinguish a stale baseline from a code change or measurement
   variability.
+- `update-stats` runs the coverage test suite and is a long-running job that
+  normally takes several minutes. Set a generous timeout from the start; its
+  ordinary test-duration is not evidence that it has stalled.
 
 ## Build and Test
 

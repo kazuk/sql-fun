@@ -1,0 +1,6 @@
+#!/bin/bash
+set -euo pipefail
+
+git apply --check ${GIT_ROOT}/ci/github-actions/with-docker.patch
+git apply ${GIT_ROOT}/ci/github-actions/with-docker.patch
+ci/github-actions/check --rebuild

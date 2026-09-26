@@ -51,6 +51,10 @@ You can build and run tests using the `check-test-flow` script.
 
 ## External Tool Prerequisites
 
+- When planning validation work, inspect the repository's standard checks with
+  `check-test-flow --list-steps` before selecting a standalone validator or
+  tool. When an existing check step covers the changed artifact or workflow,
+  prefer that repository-standard step.
 - When planning work that invokes or depends on an external tool, verify its
   availability in the development/CI Dockerfile
   (`ci/github-actions/Dockerfile`), contributor setup instructions

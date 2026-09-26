@@ -201,6 +201,20 @@ Before submitting a pull request, update statistics by running the
 - Existing code is not a justification for repeating a pattern that conflicts
   with the guidelines. Keep corrections within the scope of the task rather than
   expanding into unrelated cleanup.
+- Refactoring is not required to preserve known-bad behavior. Do not
+  intentionally reintroduce a bug solely to match pre-refactoring behavior. If
+  the corrected behavior can be verified against the relevant specification or
+  another authoritative source, prefer the fix, add regression coverage, and
+  report the behavioral change. When the bug fix can be separated cheaply,
+  prefer fixing it first in a focused branch or pull request and continue the
+  refactoring from that corrected baseline. If correctness cannot be established
+  within the task scope, surface the behavior change for review instead of
+  silently choosing either behavior.
+- Regression tests for bugs discovered during refactoring should target an
+  enduring public or semantic behavior boundary. Do not add characterization
+  tests that unnecessarily freeze parser-specific traversal, temporary migration
+  scaffolding, or other implementation boundaries the refactoring is intended
+  to remove.
 - Explicit user instructions take precedence over the guidelines. Explain any
   necessary departure from the guidelines and its reason; do not silently treat
   a task-specific decision as a repository-wide rule.

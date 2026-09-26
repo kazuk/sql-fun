@@ -1,5 +1,6 @@
 /target
 /user_manual
+/.worktrees/
 
 .serena
 .zed

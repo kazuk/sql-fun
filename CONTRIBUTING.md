@@ -290,6 +290,22 @@ Common types include:
 
 ## AI-assisted Contributions
 
+### Optional agent harness
+
+This repository may enable an agent-only harness from [`.envrc`](.envrc) when
+it detects a supported agent environment marker. The harness is an optional
+repository-provided guardrail for maintainer and operator observability; it is
+not a requirement for contributors to use a particular AI tool or setup.
+
+Contributors who do not want their local agent to receive the harness may
+locally comment out or disable the relevant agent-detection and `PATH` setup in
+`.envrc`. This is a personal environment change and must not be included in a
+pull request.
+
+Support for additional agent runtimes is welcome. A contribution may add a
+positive environment-marker detection path so the same harness applies to that
+runtime, provided it does not weaken or broaden the existing Codex detection.
+
 AI-assisted contributions are allowed, but AI tools are not accepted as authors
 or co-authors.
 

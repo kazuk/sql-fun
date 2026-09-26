@@ -1,7 +1,10 @@
 # Third-party notices
 
+<!-- BEGIN THIRD PARTY NOTICE RECORD: .github/problem-matchers/rust.json.license-notice.md -->
+
 ## rust.json
 
+```text
 Rust problem matcher from actions-rust-lang/setup-rust-toolchain
 
 Copyright (c) 2022 actions-rust-lang
@@ -23,5 +26,7 @@ AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER
 LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM,
 OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
 SOFTWARE.
+```
 
 Source record: [.github/problem-matchers/rust.json.license-notice.md](.github/problem-matchers/rust.json.license-notice.md)
+<!-- END THIRD PARTY NOTICE RECORD: .github/problem-matchers/rust.json.license-notice.md -->

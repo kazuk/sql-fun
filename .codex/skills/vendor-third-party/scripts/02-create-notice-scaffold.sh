@@ -1,8 +1,14 @@
 #!/usr/bin/env bash
 set -euo pipefail
 
+refresh=false
+if [[ "${1:-}" == "--refresh" ]]; then
+  refresh=true
+  shift
+fi
+
 if (( $# < 2 || $# > 3 )); then
-  echo "usage: $0 <https-source-url> <repository-relative-destination> [source-revision]" >&2
+  echo "usage: $0 [--refresh] <https-source-url> <repository-relative-destination> [source-revision]" >&2
   exit 2
 fi
 
@@ -36,7 +42,10 @@ esac
 [[ -f "$resource_path" ]] || { echo "vendored resource does not exist: $destination" >&2; exit 1; }
 
 notice_path="${resource_path}.license-notice.md"
-[[ ! -e "$notice_path" ]] || { echo "notice scaffold already exists: ${notice_path#$repo_root/}" >&2; exit 1; }
+if [[ -e "$notice_path" && "$refresh" != true ]]; then
+  echo "notice scaffold already exists: ${notice_path#$repo_root/}; use --refresh to replace it" >&2
+  exit 1
+fi
 
 detected_license="$(sed -n '1,80{s/^[[:space:]]*\(\/\/\|#\|\/\*\|\*\)[[:space:]]*SPDX-License-Identifier:[[:space:]]*//p}' "$resource_path" | head -n 1)"
 detected_license="${detected_license:-none}"

@@ -25,6 +25,9 @@ jobs:
     steps:
       - uses: actions/checkout@v5
 
+      - name: Install Rust problem matcher
+        run: echo "::add-matcher::.github/problem-matchers/rust.json"
+
       - name: Disk usage before cache restore
         run: |
           df -h . /usr/local/cargo /github/home
@@ -86,6 +89,9 @@ jobs:
     steps:
       - uses: actions/checkout@v5
 
+      - name: Install Rust problem matcher
+        run: echo "::add-matcher::.github/problem-matchers/rust.json"
+
       - name: Disk usage before cache restore
         run: |
           df -h . /usr/local/cargo /github/home
@@ -146,6 +152,9 @@ jobs:
     steps:
       - uses: actions/checkout@v5
 
+      - name: Install Rust problem matcher
+        run: echo "::add-matcher::.github/problem-matchers/rust.json"
+
       - uses: actions/cache@v5
         with:
           path: |
@@ -202,6 +211,9 @@ jobs:
     steps:
       - uses: actions/checkout@v5
 
+      - name: Install Rust problem matcher
+        run: echo "::add-matcher::.github/problem-matchers/rust.json"
+
       - name: Check formatting
         run: .local/bin/check-test-flow --step=fmt --fmt-check
 
@@ -210,6 +222,9 @@ jobs:
     container: *ci-builder-container
     steps:
       - uses: actions/checkout@v5
+
+      - name: Install Rust problem matcher
+        run: echo "::add-matcher::.github/problem-matchers/rust.json"
 
       - uses: actions/cache@v5
         with:
@@ -253,6 +268,9 @@ jobs:
     steps:
       - uses: actions/checkout@v5
 
+      - name: Install Rust problem matcher
+        run: echo "::add-matcher::.github/problem-matchers/rust.json"
+
       - uses: actions/cache@v5
         with:
           path: |
@@ -286,6 +304,9 @@ jobs:
     steps:
       - uses: actions/checkout@v5
 
+      - name: Install Rust problem matcher
+        run: echo "::add-matcher::.github/problem-matchers/rust.json"
+
       - name: Check dependencies
         run: .local/bin/check-test-flow --step=deny
 
@@ -294,6 +315,9 @@ jobs:
     container: *ci-builder-container
     steps:
       - uses: actions/checkout@v5
+
+      - name: Install Rust problem matcher
+        run: echo "::add-matcher::.github/problem-matchers/rust.json"
 
       - uses: actions/cache@v5
         with:
@@ -312,6 +336,9 @@ jobs:
     container: *ci-builder-container
     steps:
       - uses: actions/checkout@v5
+
+      - name: Install Rust problem matcher
+        run: echo "::add-matcher::.github/problem-matchers/rust.json"
 
       - uses: actions/cache@v5
         with:
@@ -344,6 +371,9 @@ jobs:
       CARGO_TARGET_DIR: target
     steps:
       - uses: actions/checkout@v5
+
+      - name: Install Rust problem matcher
+        run: echo "::add-matcher::.github/problem-matchers/rust.json"
 
       - name: Build and validate Linux distributions
         run: .local/bin/check-test-flow --step=packaging

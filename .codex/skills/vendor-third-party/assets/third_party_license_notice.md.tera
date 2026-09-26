@@ -1,0 +1,24 @@
+---
+type: Third Party License Notice
+sources:
+  - url: {{ SOURCE_URL }}
+    revision: {{ SOURCE_REVISION | default(value="unknown") }}
+resource_path: {{ RESOURCE_PATH }}
+content_sha256: {{ CONTENT_SHA256 }}
+detected_license: {{ DETECTED_LICENSE }}
+review_status: pending
+---
+
+# {{ RESOURCE_PATH }} license notice
+
+## Review
+
+Review the source file and the applicable primary license, notice, and
+copyright material. Record the reviewed license and sources here, and replace
+the placeholder notice text before setting `review_status: reviewed`.
+
+## Notice Text
+
+<!-- BEGIN THIRD PARTY NOTICE -->
+Replace this placeholder with the reviewed notice text.
+<!-- END THIRD PARTY NOTICE -->

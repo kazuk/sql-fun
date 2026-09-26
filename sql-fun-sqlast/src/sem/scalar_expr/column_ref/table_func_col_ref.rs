@@ -1,12 +1,10 @@
-use sql_fun_core::IVec;
-
+use crate::sem::scalar_expr::column_ref::ColumnReference;
 use crate::sem::{
     AnalysisError, AnalysisProblem, ColumnDefinition, ColumnName, Nullable, OverloadVariant,
-    ParseContext, SemScalarExpr, TypeReference, data_source::AliasName,
-    scalar_expr::ColumnReferenceExpr,
+    SemScalarExpr, TypeReference, data_source::AliasName, scalar_expr::ColumnReferenceExpr,
 };
 
-use super::ColumnReference;
+use ::sql_fun_core::IVec;
 
 #[derive(Debug, Clone, Eq, Hash, PartialEq, serde::Serialize, serde::Deserialize)]
 pub struct TableFunctionColumnRef {
@@ -74,7 +72,7 @@ impl TableFunctionColumnRef {
         nullability: Nullable,
     ) -> Result<(SemScalarExpr, TParseContext), AnalysisError>
     where
-        TParseContext: ParseContext,
+        TParseContext: crate::sem::resolution::ResolutionContext,
     {
         let column_def = calling_func.get_result_column_def(column);
         if column_def.is_none() {
@@ -107,7 +105,7 @@ impl ColumnReferenceExpr {
         nullability: Nullable,
     ) -> Result<(SemScalarExpr, TParseContext), AnalysisError>
     where
-        TParseContext: ParseContext,
+        TParseContext: crate::sem::resolution::ResolutionContext,
     {
         TableFunctionColumnRef::function_source_ref(
             context,

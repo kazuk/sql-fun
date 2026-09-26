@@ -1,6 +1,4 @@
-use crate::sem::{
-    AliasSpec, ColumnName, DataSource, Nullable, ParseContext, ViewName, data_source::AliasName,
-};
+use crate::sem::{AliasSpec, ColumnName, DataSource, Nullable, ViewName, data_source::AliasName};
 
 #[derive(Debug, Clone, Eq, Hash, PartialEq, serde::Serialize, serde::Deserialize)]
 pub struct ViewDataSource {
@@ -9,6 +7,13 @@ pub struct ViewDataSource {
 }
 
 impl ViewDataSource {
+    pub(super) fn from_name(view: &ViewName, alias: &AliasSpec) -> Self {
+        Self {
+            view: view.clone(),
+            alias: alias.clone(),
+        }
+    }
+
     pub const fn view_name(&self) -> &ViewName {
         &self.view
     }
@@ -35,22 +40,12 @@ impl ViewDataSource {
         context: &TParseContext,
         names: &mut Vec<AliasSpec>,
     ) where
-        TParseContext: ParseContext,
+        TParseContext: crate::sem::resolution::ResolutionContext,
     {
         if let Some(view) = context.get_view(&self.view)
             && view.has_column(column)
         {
             names.push(self.alias.clone());
         }
-    }
-
-    pub(super) fn new_data_source(
-        range_var: &crate::syn::RangeVar,
-        alias_name: &AliasSpec,
-    ) -> DataSource {
-        DataSource::View(Self {
-            view: ViewName::from(range_var),
-            alias: alias_name.clone(),
-        })
     }
 }

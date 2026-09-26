@@ -1,8 +1,14 @@
-use super::{AnalysisError, ParseContext, SemAst};
+use crate::sem::{AnalysisError, ParseContext, SemAst};
 
 /// `update` statement sem AST
 #[derive(Debug, Clone, Eq, Hash, PartialEq, serde::Serialize, serde::Deserialize)]
 pub struct UpdateStatement {}
+
+impl UpdateStatement {
+    pub(crate) const fn empty() -> Self {
+        Self {}
+    }
+}
 
 /// analyze `update` statement
 ///

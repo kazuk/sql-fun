@@ -1,4 +1,4 @@
-use super::IndirectionExpr;
+use crate::sem::scalar_expr::indirect::IndirectionExpr;
 use crate::sem::{
     AnalysisError, AnalysisProblem, ParseContext, SemScalarExpr, TypeDefinition, TypeReference,
 };
@@ -40,9 +40,9 @@ impl MemberRef {
         ty: &TypeReference,
     ) -> Result<Option<TypeReference>, AnalysisError>
     where
-        TParseContext: ParseContext,
+        TParseContext: crate::sem::resolution::ResolutionContext,
     {
-        if let Some(member_type) = td.get_member_type(context, member) {
+        if let Some(member_type) = td.member_type_from_catalog(context, member) {
             Ok(Some(member_type))
         } else {
             context.report_problem(AnalysisProblem::composite_type_field_not_found(ty, member))?;
@@ -58,6 +58,14 @@ impl MemberRef {
     where
         TParseContext: ParseContext,
     {
+        Self::member_resolved(source, member, context)
+    }
+
+    pub(super) fn member_resolved<TContext: crate::sem::resolution::ResolutionContext>(
+        source: SemScalarExpr,
+        member: String,
+        context: &mut TContext,
+    ) -> Result<IndirectionExpr, AnalysisError> {
         let member_type = if let Some(ty) = &source.get_type() {
             if let Some(td) = ty.type_definition().cloned() {
                 Self::test_member_exist(&member, context, &td, ty)?

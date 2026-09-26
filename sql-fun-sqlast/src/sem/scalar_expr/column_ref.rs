@@ -5,8 +5,6 @@ mod table_column_ref;
 mod table_func_col_ref;
 mod view_column_ref;
 
-use sql_fun_core::IVec;
-
 pub use self::{
     cte_column_ref::CteColumnRef,
     invalid_column_ref::{
@@ -18,14 +16,9 @@ pub use self::{
     view_column_ref::ViewColumnRef,
 };
 
-use crate::{
-    sem::{
-        AnalysisError, AnalysisProblem, ColumnDefinition, ColumnName, ParseContext,
-        ScalarAnalysisContext, SemScalarExpr, TypeReference,
-        data_source::AliasName,
-        scalar_expr::{AnalyzeScalarExpr, SemScalarExprNode},
-    },
-    syn::{ListOpt, ScanToken},
+use crate::sem::{
+    AnalysisError, AnalysisProblem, ColumnDefinition, ColumnName, ParseContext, SemScalarExpr,
+    TypeReference, scalar_expr::SemScalarExprNode,
 };
 
 trait ColumnReference {
@@ -72,6 +65,22 @@ impl SemScalarExprNode for ColumnReferenceExpr {
 }
 
 impl ColumnReferenceExpr {
+    pub(crate) fn cte_column(
+        alias: &crate::sem::data_source::AliasName,
+        cte_name: &crate::sem::CteName,
+        column_name: &ColumnName,
+        column_def: Option<&ColumnDefinition>,
+        source_nullable: bool,
+    ) -> Self {
+        Self::CteColumn(CteColumnRef::new(
+            alias,
+            cte_name,
+            column_name,
+            column_def,
+            source_nullable,
+        ))
+    }
+
     /// get column type
     #[must_use]
     pub fn get_type(&self) -> Option<TypeReference> {
@@ -148,6 +157,13 @@ impl ColumnReferenceExpr {
     where
         TParseContext: ParseContext,
     {
+        Self::undefined_column_resolved(context, column)
+    }
+
+    pub(crate) fn undefined_column_resolved<TContext: crate::sem::resolution::ResolutionContext>(
+        context: &mut TContext,
+        column: &ColumnName,
+    ) -> Result<SemScalarExpr, AnalysisError> {
         context.report_problem(AnalysisProblem::column_not_found_in_source(column))?;
         Ok(SemScalarExpr::ColumnRef(Self::UndefinedColumn(
             column.clone(),
@@ -162,49 +178,16 @@ impl ColumnReferenceExpr {
     where
         TParseContext: ParseContext,
     {
+        Self::ambiguous_column_resolved(context, column)
+    }
+
+    pub(crate) fn ambiguous_column_resolved<TContext: crate::sem::resolution::ResolutionContext>(
+        context: &mut TContext,
+        column: &ColumnName,
+    ) -> Result<SemScalarExpr, AnalysisError> {
         context.report_problem(AnalysisProblem::ambiguous_column(column))?;
         Ok(SemScalarExpr::ColumnRef(Self::AmbiguousColumnRef(
             column.clone(),
         )))
-    }
-}
-
-impl<TParseContext> AnalyzeScalarExpr<TParseContext, crate::syn::ColumnRef> for ColumnReferenceExpr
-where
-    TParseContext: ParseContext,
-{
-    fn analyze_scalar_expr(
-        context: TParseContext,
-        scalar_context: &ScalarAnalysisContext<'_>,
-        syn: crate::syn::ColumnRef,
-        _tokens: &IVec<ScanToken>,
-    ) -> Result<(SemScalarExpr, TParseContext), AnalysisError> {
-        let Some(fields) = syn.get_fields().map(|v| v.as_string()) else {
-            AnalysisError::raise_unexpected_none("column_ref.fields")?
-        };
-
-        let fields: Vec<String> = fields.iter().map(crate::syn::String::get_sval).collect();
-        if fields.len() > 2 {
-            AnalysisError::raise_unexpected_input(&format!(
-                "unexpected len column_ref.fields {}",
-                fields.len()
-            ))?;
-        }
-
-        if fields.len() == 1 {
-            let column = ColumnName::from(fields[0].clone());
-
-            scalar_context.resolve_column_ref(context, None, &column)
-        } else if fields.len() == 2 {
-            let alias = &fields[0];
-            let column = ColumnName::from(fields[1].clone());
-            scalar_context.resolve_column_ref(
-                context,
-                Some(&AliasName::from(alias.as_str())),
-                &column,
-            )
-        } else {
-            unreachable!()
-        }
     }
 }

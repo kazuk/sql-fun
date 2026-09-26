@@ -1,8 +1,14 @@
-use super::{AnalysisError, ParseContext, SemAst};
+use crate::sem::{AnalysisError, ParseContext, SemAst};
 
 /// `DELETE` statement
 #[derive(Debug, Clone, Eq, Hash, PartialEq, serde::Serialize, serde::Deserialize)]
 pub struct DeleteStatement {}
+
+impl DeleteStatement {
+    pub(crate) const fn empty() -> Self {
+        Self {}
+    }
+}
 
 /// analyze [`crate::syn::DeleteStmt`]
 pub fn analyze_delete_statement<TParseContext>(

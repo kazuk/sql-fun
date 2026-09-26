@@ -30,22 +30,18 @@ mod names;
 mod operators;
 mod parse_context;
 mod pg_type;
+pub mod problem;
+mod resolution;
 mod scalar_expr;
 mod schema_file_context;
 mod search_path;
 mod select_statement;
 mod top_level_statement;
 mod type_system;
+mod unresolved;
 mod update_statement;
 mod variable_set;
 mod view_like;
-
-pub mod problem;
-
-#[cfg(feature = "sqlite")]
-use sql_fun_core::IVec;
-#[cfg(feature = "sqlite")]
-use turso_parser::ast::Cmd;
 
 #[expect(deprecated)]
 pub use self::{
@@ -116,11 +112,9 @@ pub use self::{
     variable_set::{VariableSet, analyze_variable_set},
     view_like::ViewLike,
 };
-
 pub use crate::AstAndContextPair;
 
 use crate::StringSpan;
-
 #[cfg(feature = "sqlite")]
 use crate::{SqliteToken, syn::sqlite::Stmt};
 
@@ -128,6 +122,11 @@ use std::{
     fmt::Debug,
     path::{Path, PathBuf},
 };
+
+#[cfg(feature = "sqlite")]
+use ::sql_fun_core::IVec;
+#[cfg(feature = "sqlite")]
+use ::turso_parser::ast::Cmd;
 
 /// source path and span pair
 #[derive(Debug, Clone)]
@@ -281,6 +280,10 @@ pub enum SemAst {
 }
 
 impl SemAst {
+    pub(crate) fn select(query: &SelectStatement) -> Self {
+        Self::SelectStatement(query.clone())
+    }
+
     /// unwrap node as `SelectStatement`
     #[must_use]
     pub fn into_select_statemtnt(self) -> Option<SelectStatement> {

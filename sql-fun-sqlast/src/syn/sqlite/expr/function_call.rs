@@ -1,4 +1,4 @@
-use super::Expr;
+use crate::syn::sqlite::expr::Expr;
 use crate::syn::sqlite::{Distinctness, FunctionTail, Name, SortedColumn};
 use crate::{engine_specific::TursoOrderedSetAggregateFeature, sem::AnalysisError};
 
@@ -15,6 +15,10 @@ pub struct ExprFunctionCall {
 }
 
 impl ExprFunctionCall {
+    pub(crate) fn syntax_within_group(&self) -> &[SortedColumn] {
+        &self.within_group
+    }
+
     /// create instance
     pub fn new(
         name: &Name,
@@ -48,7 +52,7 @@ impl ExprFunctionCall {
 
 #[cfg(test)]
 mod test_within_group {
-    use super::Expr;
+    use crate::syn::sqlite::expr::function_call::Expr;
     use crate::syn::sqlite::{ExprFunctionCall, NullsOrder, SortOrder};
     use crate::test_helpers::SqliteSynBuilder;
     use crate::{engine_specific::TursoOrderedSetAggregateFeature, sem::AnalysisError};

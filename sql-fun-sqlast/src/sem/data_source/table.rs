@@ -1,6 +1,5 @@
 use crate::sem::{
-    AliasSpec, AnalysisError, AnalysisProblem, ColumnName, DataSource, Nullable, ParseContext,
-    TableName,
+    AliasSpec, AnalysisError, AnalysisProblem, ColumnName, DataSource, Nullable, TableName,
     data_source::AliasName,
     scalar_expr::{ColumnReferenceExpr, TableColumnRef},
 };
@@ -41,7 +40,7 @@ impl TableDataSource {
         context: &TParseContext,
         names: &mut Vec<AliasSpec>,
     ) where
-        TParseContext: ParseContext,
+        TParseContext: crate::sem::resolution::ResolutionContext,
     {
         if let Some(table) = context.get_table(&self.name)
             && table.has_column(column)
@@ -61,7 +60,7 @@ impl TableDataSource {
         nullability: Nullable,
     ) -> Result<ColumnReferenceExpr, AnalysisError>
     where
-        TParseContext: ParseContext,
+        TParseContext: crate::sem::resolution::ResolutionContext,
     {
         let Some(table) = context.get_table(&self.name) else {
             AnalysisError::raise_unexpected_input(&format!(

@@ -7,11 +7,11 @@ mod table_param;
 mod variadic_param;
 
 pub use self::bind_result::ParameterBindResult;
+
 use self::{
     in_out_param::FunctionParamInOut, in_param::FunctionParamIn, out_param::FunctionParamOut,
     table_param::FunctionParamTable, variadic_param::FunctionParamVariadic,
 };
-use sql_fun_core::IVec;
 
 use crate::{
     sem::{
@@ -23,6 +23,8 @@ use crate::{
     },
     syn::ScanToken,
 };
+
+use ::sql_fun_core::IVec;
 
 pub trait FunctionParameterTrait: std::fmt::Display
 where
@@ -243,6 +245,14 @@ impl FunctionParam {
     where
         TParseContext: ParseContext,
     {
+        self.castability_one_from_catalog(context, source_type)
+    }
+
+    pub(crate) fn castability_one_from_catalog<TCatalog: crate::sem::resolution::Catalog>(
+        &self,
+        context: &TCatalog,
+        source_type: &Option<TypeReference>,
+    ) -> Result<i32, TypeError> {
         if let Some(source_type) = source_type
             && let Some(target_type) = self.get_type()
         {
@@ -274,6 +284,14 @@ impl FunctionParam {
     where
         TParseContext: ParseContext,
     {
+        self.castability_variadic_from_catalog(context, source_types)
+    }
+
+    pub(crate) fn castability_variadic_from_catalog<TCatalog: crate::sem::resolution::Catalog>(
+        &self,
+        context: &TCatalog,
+        source_types: &IVec<Option<TypeReference>>,
+    ) -> Result<i32, TypeError> {
         if let Some(target_type) = self.get_type() {
             let mut scores: Vec<i32> = Vec::new();
             #[expect(clippy::manual_flatten)]

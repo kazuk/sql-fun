@@ -1,9 +1,8 @@
+use crate::sem::scalar_expr::column_ref::ColumnReference;
 use crate::sem::{
-    AnalysisError, AnalysisProblem, ColumnDefinition, ColumnName, ParseContext, SemScalarExpr,
-    TypeReference, data_source::AliasName, scalar_expr::ColumnReferenceExpr,
+    AnalysisError, AnalysisProblem, ColumnDefinition, ColumnName, SemScalarExpr, TypeReference,
+    data_source::AliasName, scalar_expr::ColumnReferenceExpr,
 };
-
-use super::ColumnReference;
 
 #[derive(Debug, Clone, Eq, Hash, PartialEq, serde::Serialize, serde::Deserialize)]
 pub struct UndefinedAliasColumnRef {
@@ -36,7 +35,7 @@ impl UndefinedAliasColumnRef {
         column: &ColumnName,
     ) -> Result<SemScalarExpr, AnalysisError>
     where
-        TParseContext: ParseContext,
+        TParseContext: crate::sem::resolution::ResolutionContext,
     {
         context.report_problem(AnalysisProblem::undefined_alias(alias.to_string()))?;
 

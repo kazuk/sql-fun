@@ -1,7 +1,5 @@
 mod cast_info;
 
-use std::collections::{HashMap, HashSet};
-
 use crate::{
     StringSpan,
     sem::{
@@ -20,6 +18,8 @@ use crate::{
     test_helpers::{SynBuilder, source_span},
 };
 
+use std::collections::{HashMap, HashSet};
+
 /// ParseContext implementation for tests
 #[derive(Debug, Default)]
 pub struct TestParseContext {
@@ -35,6 +35,7 @@ pub struct TestParseContext {
     drop_tables: Vec<DropTable>,
     create_indexes: Vec<CreateIndex>,
     problems: Vec<AnalysisProblem>,
+    report_failure_after: Option<usize>,
     source: Option<SourcePathWithSpan>,
     table_ref_types: Vec<TableName>,
 }
@@ -46,6 +47,13 @@ pub fn test_context() -> TestParseContext {
 }
 
 impl TestParseContext {
+    pub(crate) fn reject_diagnostics_after(&mut self, count: usize) {
+        self.report_failure_after = Some(count);
+    }
+
+    pub(crate) fn reported_problems(&self) -> &[AnalysisProblem] {
+        &self.problems
+    }
     /// setup [SearchPathRead::get_search_path] result
     pub fn set_get_search_path_result(&mut self, search_path: &[SchemaName]) {
         self.search_path = search_path.to_owned()
@@ -289,6 +297,9 @@ impl IndexInfoRead for TestParseContext {
 impl BaseParseContext for TestParseContext {
     #[track_caller]
     fn report_problem(&mut self, problem: AnalysisProblem) -> Result<(), AnalysisError> {
+        if self.report_failure_after == Some(self.problems.len()) {
+            return Err(std::io::Error::other("diagnostic sink rejected a problem").into());
+        }
         self.problems.push(problem);
         Ok(())
     }

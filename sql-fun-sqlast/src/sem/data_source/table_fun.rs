@@ -1,9 +1,9 @@
-use sql_fun_core::IVec;
-
 use crate::sem::{
-    AliasSpec, ColumnName, DataSource, Nullable, OverloadVariant, ParseContext, SemScalarExpr,
-    WithClause, data_source::AliasName,
+    AliasSpec, ColumnName, DataSource, Nullable, OverloadVariant, SemScalarExpr, WithClause,
+    data_source::AliasName,
 };
+
+use ::sql_fun_core::IVec;
 
 #[derive(Debug, Clone, Eq, Hash, PartialEq, serde::Serialize, serde::Deserialize)]
 pub struct TableFunctionDataSource {
@@ -67,7 +67,7 @@ impl TableFunctionDataSource {
         _with_clause: &WithClause,
         names: &mut Vec<AliasSpec>,
     ) where
-        TParseContext: ParseContext,
+        TParseContext: crate::sem::resolution::ResolutionContext,
     {
         let returning_table = &self.function.returning_table();
         if returning_table.has_column(column) {

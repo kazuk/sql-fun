@@ -14,14 +14,14 @@ mod indirect;
 mod min_max;
 mod named_arg;
 mod param_ref;
+mod resolved;
 mod sql_value;
 mod sub_link;
 
-use sql_fun_core::IVec;
-
 #[expect(deprecated)]
 pub use self::analyze::analyze_scaler_expr;
-
+pub(crate) use self::case_expr::CaseExprAnalysisContext;
+pub(crate) use self::coalesce::CoalesceAnalysis;
 pub use self::{
     arith_expr::ArithExpr,
     array::ArrayExpr,
@@ -42,25 +42,10 @@ pub use self::{
     sub_link::SubLinkExpr,
 };
 
-use crate::{
-    sem::{
-        AnalysisError, AnalysisProblem, ParseContext, PgBuiltInType, TypeReference,
-        create_table::ColumnDefinition,
-    },
-    syn::{ListOpt, ScanToken},
+use crate::sem::{
+    AnalysisError, AnalysisProblem, ParseContext, PgBuiltInType, TypeReference,
+    create_table::ColumnDefinition,
 };
-
-trait AnalyzeScalarExpr<TParseContext, TNode>
-where
-    TParseContext: ParseContext,
-{
-    fn analyze_scalar_expr(
-        context: TParseContext,
-        scalar_context: &ScalarAnalysisContext<'_>,
-        syn: TNode,
-        tokens: &IVec<ScanToken>,
-    ) -> Result<(SemScalarExpr, TParseContext), AnalysisError>;
-}
 
 trait SemScalarExprNode {
     fn get_type(&self) -> Option<TypeReference>;
@@ -69,32 +54,6 @@ trait SemScalarExprNode {
 
 #[derive(Debug, Clone, Eq, Hash, PartialEq, serde::Serialize, serde::Deserialize)]
 pub struct ListExpr(Vec<SemScalarExpr>);
-
-impl<TParseContext> AnalyzeScalarExpr<TParseContext, crate::syn::List> for ListExpr
-where
-    TParseContext: ParseContext,
-{
-    fn analyze_scalar_expr(
-        mut context: TParseContext,
-        scalar_context: &ScalarAnalysisContext<'_>,
-        syn: crate::syn::List,
-        tokens: &IVec<ScanToken>,
-    ) -> Result<(SemScalarExpr, TParseContext), AnalysisError> {
-        let mut results = Vec::default();
-        let Some(items) = syn.get_items().as_inner() else {
-            AnalysisError::raise_unexpected_none("List.items")?;
-            AnalysisError::never();
-        };
-        for item in items {
-            let (item_expr, new_context) =
-                SemScalarExpr::analyze_scaler_expr(context, scalar_context, item, tokens)?;
-            context = new_context;
-            results.push(item_expr);
-        }
-
-        Ok((SemScalarExpr::List(Self(results)), context))
-    }
-}
 
 impl ListExpr {
     pub const fn len(&self) -> usize {
@@ -251,8 +210,8 @@ impl SemScalarExpr {
 
 #[cfg(test)]
 mod test_get_type_and_is_not_null {
-    use super::{ScalarConstExpr, SemScalarExpr};
     use crate::sem::PgBuiltInType;
+    use crate::sem::scalar_expr::{ScalarConstExpr, SemScalarExpr};
 
     #[test]
     fn get_type_and_is_not_null_for_const() {
@@ -307,7 +266,9 @@ impl SemScalarExpr {
 
 #[cfg(test)]
 mod test_get_column_def_and_name {
-    use super::{ColumnReferenceExpr, SemScalarExpr, TableColumnRef, TypeReference};
+    use crate::sem::scalar_expr::{
+        ColumnReferenceExpr, SemScalarExpr, TableColumnRef, TypeReference,
+    };
     use crate::sem::{
         FullName, PgBuiltInType,
         create_table::{ColumnDefinition, ColumnName, TableName},
@@ -349,8 +310,8 @@ impl SemScalarExpr {
 
 #[cfg(test)]
 mod test_wrap_implicit_cast {
-    use super::{ScalarConstExpr, SemScalarExpr};
     use crate::sem::PgBuiltInType;
+    use crate::sem::scalar_expr::{ScalarConstExpr, SemScalarExpr};
 
     #[test]
     fn wrap_implicit_cast_sets_type() {
@@ -377,6 +338,14 @@ impl SemScalarExpr {
     where
         TParseContext: ParseContext,
     {
+        Self::implicit_cast_resolved(context, result_type, expr)
+    }
+
+    pub(crate) fn implicit_cast_resolved<TContext: crate::sem::resolution::ResolutionContext>(
+        context: &mut TContext,
+        result_type: &TypeReference,
+        expr: &mut Self,
+    ) -> Result<(), AnalysisError> {
         let Some(ty) = expr.get_type() else {
             return Ok(());
         };
@@ -397,7 +366,7 @@ impl SemScalarExpr {
 
 #[cfg(test)]
 mod test_implicit_cast_if_require {
-    use super::{ScalarConstExpr, SemScalarExpr};
+    use crate::sem::scalar_expr::{ScalarConstExpr, SemScalarExpr};
     use crate::sem::{CastContext, CastDefinition, PgBuiltInType};
     use crate::test_helpers::TestParseContext;
 
@@ -457,6 +426,13 @@ impl SemScalarExpr {
     where
         TParseContext: ParseContext,
     {
+        self.require_array_resolved(context)
+    }
+
+    pub(crate) fn require_array_resolved<TContext: crate::sem::resolution::ResolutionContext>(
+        &self,
+        context: &mut TContext,
+    ) -> Result<(), AnalysisError> {
         if let Some(ty) = self.get_type()
             && let Some(is_array) = ty.is_array()
             && !is_array
@@ -469,8 +445,10 @@ impl SemScalarExpr {
 
 #[cfg(test)]
 mod test_require_array {
-    use super::{ImplicitCastExpr, ScalarConstExpr, SemScalarExpr, TypeReference};
     use crate::sem::PgBuiltInType;
+    use crate::sem::scalar_expr::{
+        ImplicitCastExpr, ScalarConstExpr, SemScalarExpr, TypeReference,
+    };
     use crate::test_helpers::TestParseContext;
 
     #[test]
@@ -503,6 +481,13 @@ impl SemScalarExpr {
     where
         TParseContext: ParseContext,
     {
+        self.fits_array_index_resolved(context)
+    }
+
+    pub(crate) fn fits_array_index_resolved<TContext: crate::sem::resolution::ResolutionContext>(
+        &self,
+        context: &mut TContext,
+    ) -> Result<(), AnalysisError> {
         if let Some(ty) = self.get_type()
             && context
                 .get_implicit_cast(&ty, &PgBuiltInType::int2())
@@ -522,7 +507,7 @@ impl SemScalarExpr {
 
 #[cfg(test)]
 mod test_fits_array_index {
-    use super::{ScalarConstExpr, SemScalarExpr};
+    use crate::sem::scalar_expr::{ScalarConstExpr, SemScalarExpr};
     use crate::sem::{CastContext, CastDefinition, PgBuiltInType};
     use crate::test_helpers::TestParseContext;
 

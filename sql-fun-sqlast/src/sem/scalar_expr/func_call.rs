@@ -1,20 +1,15 @@
-use sql_fun_core::IVec;
-
-use crate::{
-    sem::{
-        AnalysisError, AnalysisProblem, FullName, OverloadVariant, ParseContext,
-        ScalarAnalysisContext, SemScalarExpr, TypeReference,
-        type_system::ArgumentBindingCollection,
-    },
-    syn::{ListOpt, ScanToken},
+use crate::sem::scalar_expr::SemScalarExprNode;
+use crate::sem::{
+    AnalysisError, AnalysisProblem, FullName, OverloadVariant, SemScalarExpr, TypeReference,
+    type_system::ArgumentBindingCollection,
 };
 
-use super::SemScalarExprNode;
+use ::sql_fun_core::IVec;
 
 mod implementation {
-    use sql_fun_core::IVec;
-
     use crate::sem::{FullName, FunctionParam, OverloadVariant, SemScalarExpr};
+
+    use ::sql_fun_core::IVec;
 
     /// function call expression
     #[derive(Debug, Clone, Eq, Hash, PartialEq, serde::Serialize, serde::Deserialize)]
@@ -87,24 +82,6 @@ mod implementation {
 pub use self::implementation::{FuncCallArgs, FuncCallExpr};
 
 impl FuncCallExpr {
-    fn partial_response<TParseContext>(
-        context: TParseContext,
-        func_name: FullName,
-        arg_exprs: Vec<SemScalarExpr>,
-    ) -> Result<(SemScalarExpr, TParseContext), AnalysisError>
-    where
-        TParseContext: ParseContext,
-    {
-        let args = arg_exprs
-            .iter()
-            .map(|a| FuncCallArgs::new(a, &None))
-            .collect();
-        let fc = Self::new(&func_name, &None, &args);
-        Ok((SemScalarExpr::FuncCall(fc), context))
-    }
-}
-
-impl FuncCallExpr {
     fn cast_operand_expression<TParseContext>(
         context: &mut TParseContext,
         func_name: &FullName,
@@ -112,7 +89,7 @@ impl FuncCallExpr {
         overload: &OverloadVariant,
     ) -> Result<IVec<FuncCallArgs>, AnalysisError>
     where
-        TParseContext: ParseContext,
+        TParseContext: crate::sem::resolution::ResolutionContext,
     {
         let mut args = Vec::new();
         for (index, arg) in arg_exprs.iter().enumerate() {
@@ -155,6 +132,46 @@ impl FuncCallExpr {
     }
 }
 
+impl FuncCallExpr {
+    pub(crate) fn resolve_common<TContext: crate::sem::resolution::ResolutionContext>(
+        context: &mut TContext,
+        name: &FullName,
+        arguments: &[SemScalarExpr],
+        span: &crate::StringSpan,
+    ) -> Result<SemScalarExpr, AnalysisError> {
+        let arg_types = ArgumentBindingCollection::from_expr_list(arguments);
+        if let Some(overloads) = context.get_function_by_name(name) {
+            if let Some(overload) = overloads.resolve_from_catalog(context, &arg_types) {
+                let args = Self::cast_operand_expression(
+                    context,
+                    name,
+                    &arguments.to_vec().into(),
+                    &overload,
+                )?;
+                return Ok(SemScalarExpr::function_call(&Self::new(
+                    name,
+                    &Some(overload),
+                    &args,
+                )));
+            }
+            context.report_problem(AnalysisProblem::function_overload_resolution_failed(
+                name, &arg_types,
+            ))?;
+        } else {
+            context.report_problem(AnalysisProblem::function_not_found(name, span))?;
+        }
+        let mut args = Vec::new();
+        for argument in arguments {
+            args.push(FuncCallArgs::new(argument, &None));
+        }
+        Ok(SemScalarExpr::function_call(&Self::new(
+            name,
+            &None,
+            &args.into(),
+        )))
+    }
+}
+
 impl SemScalarExprNode for FuncCallExpr {
     fn get_type(&self) -> Option<TypeReference> {
         let Some(overload) = &self.overload() else {
@@ -182,62 +199,9 @@ impl SemScalarExprNode for FuncCallExpr {
     }
 }
 
-impl<TParseContext> super::AnalyzeScalarExpr<TParseContext, crate::syn::FuncCall> for FuncCallExpr
-where
-    TParseContext: ParseContext,
-{
-    fn analyze_scalar_expr(
-        mut context: TParseContext,
-        scalar_context: &ScalarAnalysisContext<'_>,
-        syn: crate::syn::FuncCall,
-        tokens: &IVec<ScanToken>,
-    ) -> Result<(SemScalarExpr, TParseContext), AnalysisError> {
-        let func_name = FullName::try_from(syn.get_funcname())?;
-
-        let Some(args) = syn.get_args().as_inner() else {
-            AnalysisError::raise_unexpected_none("funccall.args")?
-        };
-
-        let mut arg_exprs = Vec::new();
-        for arg in args {
-            let (sem_arg, new_context) =
-                SemScalarExpr::analyze_scaler_expr(context, scalar_context, arg, tokens)?;
-            context = new_context;
-            arg_exprs.push(sem_arg);
-        }
-
-        if let Some(overloads) = context.get_function_by_name(&func_name) {
-            let arg_types = ArgumentBindingCollection::from_expr_list(&arg_exprs);
-            if let Some(overload) = overloads.resolve_overload(&mut context, &arg_types) {
-                let args = Self::cast_operand_expression(
-                    &mut context,
-                    &func_name,
-                    &arg_exprs.into(),
-                    &overload,
-                )?;
-                let fc = Self::new(&func_name, &Some(overload.clone()), &args);
-                Ok((SemScalarExpr::FuncCall(fc), context))
-            } else {
-                context.report_problem(AnalysisProblem::function_overload_resolution_failed(
-                    &func_name, &arg_types,
-                ))?;
-                Self::partial_response(context, func_name, arg_exprs)
-            }
-        } else {
-            let span = syn.get_funcname_span(tokens);
-
-            context.report_problem(AnalysisProblem::function_not_found(&func_name, &span))?;
-            Self::partial_response(context, func_name, arg_exprs)
-        }
-    }
-}
-
 #[cfg(test)]
 mod test_func_call_expr_analyze_scalar_expr {
     use crate::sem::ScalarAnalysisContext;
-    use sql_fun_core::IVec;
-    use testresult::TestResult;
-
     use crate::{
         sem::{
             FromClause, FunctionParam, OverloadVariant, PgBuiltInType, SchemaName, SemScalarExpr,
@@ -249,7 +213,8 @@ mod test_func_call_expr_analyze_scalar_expr {
         test_helpers::{SynBuilder, TestParseContext, test_context},
     };
 
-    use crate::sem::scalar_expr::AnalyzeScalarExpr;
+    use ::sql_fun_core::IVec;
+    use ::testresult::TestResult;
 
     fn func_name_tokens() -> IVec<ScanToken> {
         let token = ScanTokenBuilder::default()
@@ -278,10 +243,10 @@ mod test_func_call_expr_analyze_scalar_expr {
         let tokens = func_name_tokens();
         let with_clause = WithClause::default();
         let from_clause = FromClause::default();
-        let (expr, context) = super::FuncCallExpr::analyze_scalar_expr(
+        let (expr, context) = SemScalarExpr::analyze_scaler_expr(
             test_context,
             &ScalarAnalysisContext::new(&with_clause, &from_clause),
-            func_call,
+            Node::from(NodeInner::from(func_call)),
             &tokens,
         )?;
 
@@ -325,10 +290,10 @@ mod test_func_call_expr_analyze_scalar_expr {
         let tokens = func_name_tokens();
         let with_clause = WithClause::default();
         let from_clause = FromClause::default();
-        let (expr, context) = super::FuncCallExpr::analyze_scalar_expr(
+        let (expr, context) = SemScalarExpr::analyze_scaler_expr(
             test_context,
             &ScalarAnalysisContext::new(&with_clause, &from_clause),
-            func_call,
+            Node::from(NodeInner::from(func_call)),
             &tokens,
         )?;
 
@@ -348,9 +313,6 @@ mod test_func_call_expr_analyze_scalar_expr {
 
 #[cfg(test)]
 mod test_func_call_expr_cast_operand_expression {
-    use sql_fun_core::IVec;
-    use testresult::TestResult;
-
     use crate::{
         sem::{
             CastContext, CastDefinition, FullName, FunctionParam, OverloadVariant, PgBuiltInType,
@@ -358,6 +320,9 @@ mod test_func_call_expr_cast_operand_expression {
         },
         test_helpers::{TestParseContext, test_context},
     };
+
+    use ::sql_fun_core::IVec;
+    use ::testresult::TestResult;
 
     #[rstest::rstest]
     fn test_cast_operand_expression_inserts_implicit_cast(
@@ -428,11 +393,11 @@ mod test_func_call_expr_cast_operand_expression {
 
 #[cfg(test)]
 mod test_func_call_expr_is_not_null {
-    use sql_fun_core::IVec;
-
-    use super::{FuncCallArgs, FuncCallExpr};
     use crate::sem::scalar_expr::SemScalarExprNode;
+    use crate::sem::scalar_expr::func_call::{FuncCallArgs, FuncCallExpr};
     use crate::sem::{FullName, OverloadVariant, PgBuiltInType, ScalarConstExpr, SemScalarExpr};
+
+    use ::sql_fun_core::IVec;
 
     #[test]
     fn test_is_not_null_strict_with_nullable_arg_returns_false() {

@@ -1,9 +1,8 @@
+use crate::sem::scalar_expr::column_ref::{ColumnReference, ColumnReferenceExpr};
 use crate::sem::{
-    AnalysisError, AnalysisProblem, ColumnDefinition, ColumnName, Nullable, ParseContext,
-    SemScalarExpr, TypeReference, ViewName, data_source::AliasName,
+    AnalysisError, AnalysisProblem, ColumnDefinition, ColumnName, Nullable, SemScalarExpr,
+    TypeReference, ViewName, data_source::AliasName,
 };
-
-use super::{ColumnReference, ColumnReferenceExpr};
 
 #[derive(Debug, Clone, Eq, Hash, PartialEq, serde::Serialize, serde::Deserialize)]
 pub struct ViewColumnRef {
@@ -69,7 +68,7 @@ impl ViewColumnRef {
         nullability: Nullable,
     ) -> Result<(SemScalarExpr, TParseContext), AnalysisError>
     where
-        TParseContext: ParseContext,
+        TParseContext: crate::sem::resolution::ResolutionContext,
     {
         let Some(view) = context.get_view(view_name) else {
             AnalysisError::raise_unexpected_input(&format!(
@@ -98,7 +97,7 @@ impl ColumnReferenceExpr {
         nullability: Nullable,
     ) -> Result<(SemScalarExpr, TParseContext), AnalysisError>
     where
-        TParseContext: ParseContext,
+        TParseContext: crate::sem::resolution::ResolutionContext,
     {
         ViewColumnRef::view_source_ref(context, alias, column, view_name, nullability)
     }

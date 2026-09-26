@@ -2,15 +2,10 @@ mod array_index;
 mod array_slice;
 mod member_ref;
 
-use sql_fun_core::IVec;
-
-use crate::{
-    sem::{AnalysisError, ParseContext, ScalarAnalysisContext, SemScalarExpr, TypeReference},
-    syn::{ListOpt, Opt, ScanToken},
-};
-
 use self::{array_index::ArrayIndex, array_slice::ArraySlice, member_ref::MemberRef};
-use super::{AnalyzeScalarExpr, SemScalarExprNode};
+
+use crate::sem::scalar_expr::SemScalarExprNode;
+use crate::sem::{AnalysisError, SemScalarExpr, TypeReference};
 
 /// Indirect expression
 #[derive(Debug, Clone, Eq, Hash, PartialEq, serde::Serialize, serde::Deserialize)]
@@ -24,21 +19,37 @@ pub enum IndirectionExpr {
 }
 
 impl IndirectionExpr {
-    fn analyze_indices<TParseContext>(
-        context: TParseContext,
-        scalar_context: &ScalarAnalysisContext<'_>,
-        arg: SemScalarExpr,
-        indices: crate::syn::AIndices,
-        tokens: &IVec<ScanToken>,
-    ) -> Result<(Self, TParseContext), AnalysisError>
-    where
-        TParseContext: ParseContext,
-    {
-        if indices.get_is_slice() {
-            ArraySlice::analyze_slice(context, scalar_context, arg, indices, tokens)
-        } else {
-            ArrayIndex::analyze_index(context, scalar_context, arg, &indices, tokens)
-        }
+    pub(crate) fn resolved_index<TContext: crate::sem::resolution::ResolutionContext>(
+        context: &mut TContext,
+        base: SemScalarExpr,
+        index: SemScalarExpr,
+    ) -> Result<SemScalarExpr, AnalysisError> {
+        Ok(SemScalarExpr::indirection(&ArrayIndex::index_resolved(
+            base, index, context,
+        )?))
+    }
+
+    pub(crate) fn resolved_slice<TContext: crate::sem::resolution::ResolutionContext>(
+        context: &mut TContext,
+        base: SemScalarExpr,
+        lower: Option<SemScalarExpr>,
+        upper: Option<SemScalarExpr>,
+    ) -> Result<SemScalarExpr, AnalysisError> {
+        Ok(SemScalarExpr::indirection(&ArraySlice::slice_resolved(
+            base, lower, upper, context,
+        )?))
+    }
+
+    pub(crate) fn resolved_member<TContext: crate::sem::resolution::ResolutionContext>(
+        context: &mut TContext,
+        base: SemScalarExpr,
+        name: &str,
+    ) -> Result<SemScalarExpr, AnalysisError> {
+        Ok(SemScalarExpr::indirection(&MemberRef::member_resolved(
+            base,
+            name.to_owned(),
+            context,
+        )?))
     }
 }
 
@@ -57,46 +68,5 @@ impl SemScalarExprNode for IndirectionExpr {
             Self::ArraySlice(slice) => slice.array_is_not_null(),
             Self::MemberRef(mem_ref) => mem_ref.base_is_not_null(),
         }
-    }
-}
-
-impl<TParseContext> AnalyzeScalarExpr<TParseContext, crate::syn::AIndirection> for IndirectionExpr
-where
-    TParseContext: ParseContext,
-{
-    fn analyze_scalar_expr(
-        mut context: TParseContext,
-        scalar_context: &ScalarAnalysisContext<'_>,
-        syn: crate::syn::AIndirection,
-        tokens: &IVec<ScanToken>,
-    ) -> Result<(SemScalarExpr, TParseContext), AnalysisError> {
-        let Some(arg) = syn.get_arg().as_inner() else {
-            AnalysisError::raise_unexpected_none("aindirection.arg")?
-        };
-
-        let Some(indirection) = syn.get_indirection().as_inner() else {
-            AnalysisError::raise_unexpected_none("aindirection.indirection")?
-        };
-        let (mut arg, new_context) =
-            SemScalarExpr::analyze_scaler_expr(context, scalar_context, arg, tokens)?;
-        context = new_context;
-
-        for item in indirection {
-            if let Some(indices) = item.as_a_indices().as_inner() {
-                let (new_arg, new_context) =
-                    Self::analyze_indices(context, scalar_context, arg, indices, tokens)?;
-                context = new_context;
-                arg = SemScalarExpr::Indirection(new_arg);
-            } else if let Some(member) = item.as_string().get_sval() {
-                arg = SemScalarExpr::Indirection(MemberRef::member_reference(
-                    arg,
-                    member,
-                    &mut context,
-                )?);
-            } else {
-                AnalysisError::raise_unexpected_input(&format!("indirection item: {item:?}"))?;
-            }
-        }
-        Ok((arg, context))
     }
 }

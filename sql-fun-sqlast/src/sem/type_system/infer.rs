@@ -1,7 +1,3 @@
-use std::collections::HashSet;
-
-use sql_fun_core::IVec;
-
 use crate::sem::{
     ParseContext, TypeReference,
     type_system::{
@@ -9,6 +5,10 @@ use crate::sem::{
         func_params::{FunctionParameterTrait, ParameterBindResult},
     },
 };
+
+use std::collections::HashSet;
+
+use ::sql_fun_core::IVec;
 
 #[derive(Default)]
 pub struct SimpleInferContext {
@@ -125,11 +125,10 @@ impl SimpleInferContext {
 
 #[cfg(test)]
 mod test_simple_infer_context {
-    use testresult::TestResult;
-
+    use crate::sem::type_system::infer::SimpleInferContext;
     use crate::sem::{FullName, TypeReference, type_system::TypeError};
 
-    use super::SimpleInferContext;
+    use ::testresult::TestResult;
 
     #[test]
     fn test_simple_infer_minimum() -> TestResult {
@@ -271,6 +270,13 @@ impl CommonInferContext {
     where
         TParseContext: ParseContext,
     {
+        self.infer_from_catalog(context)
+    }
+
+    pub(crate) fn infer_from_catalog<TCatalog: crate::sem::resolution::Catalog>(
+        &self,
+        context: &TCatalog,
+    ) -> Result<TypeReference, TypeError> {
         let mut castables: Vec<HashSet<TypeReference>> = Vec::new();
 
         // enumerate cast definitions
@@ -340,16 +346,15 @@ impl CommonInferContext {
 
 #[cfg(test)]
 mod test_common_infer_context {
-    use std::collections::HashSet;
-
-    use testresult::TestResult;
-
+    use crate::sem::type_system::infer::CommonInferContext;
     use crate::sem::{
         CastContext, CastDefinition, FullName, TypeReference, type_system::TypeError,
     };
     use crate::test_helpers::TestParseContext;
 
-    use super::CommonInferContext;
+    use std::collections::HashSet;
+
+    use ::testresult::TestResult;
 
     #[test]
     fn push_input_param_requires_array_argument() -> TestResult {

@@ -1,8 +1,6 @@
 use crate::sem::{
     AliasSpec, AnalysisError, AnalysisProblem, ColumnName, CteName, DataSource, Nullable,
-    ParseContext, WithClause,
-    data_source::AliasName,
-    scalar_expr::{ColumnReferenceExpr, CteColumnRef},
+    WithClause, data_source::AliasName, scalar_expr::ColumnReferenceExpr,
 };
 
 #[derive(Debug, Clone, Eq, Hash, PartialEq, serde::Serialize, serde::Deserialize)]
@@ -60,7 +58,7 @@ impl CteDataSource {
         nullability: Nullable,
     ) -> Result<ColumnReferenceExpr, AnalysisError>
     where
-        TParseContext: ParseContext,
+        TParseContext: crate::sem::resolution::ResolutionContext,
     {
         let Some(cte) = with_clause.get(&self.name) else {
             AnalysisError::raise_unexpected_input(&format!(
@@ -70,29 +68,24 @@ impl CteDataSource {
             AnalysisError::never()
         };
 
-        let column_def = if let Some(index) = self.alias.derived_column_index(column) {
-            if let Some(column_def) = cte.get_column_at(context, index) {
-                Some(column_def)
-            } else {
+        let index = self.alias.derived_column_index(column);
+        let column_def = cte.resolved_column(column, index, self.alias.len_derived_column());
+        if column_def.is_none() {
+            if index.is_some() {
                 context.report_problem(
                     AnalysisProblem::cte_not_have_column_for_derived_column_name(),
                 )?;
-                None
+            } else {
+                context
+                    .report_problem(AnalysisProblem::column_not_found_in_cte(&self.name, column))?;
             }
-        } else if let Some(column_def) =
-            cte.get_column_def_with_skip_count(context, column, self.alias.len_derived_column())
-        {
-            Some(column_def)
-        } else {
-            context.report_problem(AnalysisProblem::column_not_found_in_cte(&self.name, column))?;
-            None
-        };
-        Ok(ColumnReferenceExpr::CteColumn(CteColumnRef::new(
+        }
+        Ok(ColumnReferenceExpr::cte_column(
             self.alias.name(),
             &self.name,
             column,
-            column_def,
+            column_def.as_ref(),
             nullability,
-        )))
+        ))
     }
 }

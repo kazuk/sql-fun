@@ -1,12 +1,15 @@
+use crate::syn::sqlite::expr::Expr;
 use crate::{engine_specific::TursoArrayFeature, sem::AnalysisError};
-
-use super::Expr;
 
 /// array expression
 #[derive(Clone, Debug)]
 pub struct Array(Vec<Expr>);
 
 impl Array {
+    pub(crate) fn syntax_elements(&self) -> &[Expr] {
+        &self.0
+    }
+
     /// create instance
     pub const fn new(elements: Vec<Expr>) -> Self {
         Self(elements)
@@ -43,6 +46,14 @@ pub struct Subscript {
 }
 
 impl Subscript {
+    pub(crate) fn syntax_base(&self) -> &Expr {
+        &self.base
+    }
+
+    pub(crate) fn syntax_index(&self) -> &Expr {
+        &self.index
+    }
+
     /// create instance
     pub fn new(base: Expr, index: Expr) -> Self {
         Self {

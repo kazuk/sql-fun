@@ -20,6 +20,18 @@ impl LeftUnaryCallSite {
     where
         TParseContext: ParseContext,
     {
+        Self::op_left_unary_resolved(context, name, operator_def, lexpr)
+    }
+
+    pub(crate) fn op_left_unary_resolved<TParseContext>(
+        context: TParseContext,
+        name: &OperatorName,
+        operator_def: UnaryOperatorDefinition,
+        lexpr: SemScalarExpr,
+    ) -> Result<(SemScalarExpr, TParseContext), AnalysisError>
+    where
+        TParseContext: crate::sem::resolution::ResolutionContext,
+    {
         let call_site = Self {
             operator_name: name.clone(),
             operator_def,
@@ -46,8 +58,7 @@ impl LeftUnaryCallSite {
 
 #[cfg(test)]
 mod test_left_unary_call_site {
-    use testresult::TestResult;
-
+    use crate::sem::scalar_expr::arith_expr::call_sites::left_unary::LeftUnaryCallSite;
     use crate::{
         sem::{
             OperatorName, SemScalarExpr, TypeReference, UnaryOperatorDefinition,
@@ -56,7 +67,7 @@ mod test_left_unary_call_site {
         test_helpers::{TestParseContext, test_context},
     };
 
-    use super::LeftUnaryCallSite;
+    use ::testresult::TestResult;
 
     #[rstest::rstest]
     fn test_op_left_unary(test_context: TestParseContext) -> TestResult {
@@ -65,7 +76,7 @@ mod test_left_unary_call_site {
         let operator_def = UnaryOperatorDefinition::new(&type_ref, &type_ref, true);
         let expr = SemScalarExpr::new_const(ScalarConstExpr::new_integer(10));
 
-        LeftUnaryCallSite::op_left_unary(
+        LeftUnaryCallSite::op_left_unary_resolved(
             test_context,
             &OperatorName::Valid(ValidOperatorName::new("+")),
             operator_def,

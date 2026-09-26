@@ -25,6 +25,19 @@ impl AnyBinaryCallSite {
     where
         TParseContext: ParseContext,
     {
+        Self::from_operator_definition_resolved(context, name, operator_def, lexpr, rexpr)
+    }
+
+    pub(crate) fn from_operator_definition_resolved<TParseContext>(
+        context: TParseContext,
+        name: &OperatorName,
+        operator_def: BinaryOperatorDefinition,
+        lexpr: SemScalarExpr,
+        rexpr: SemScalarExpr,
+    ) -> Result<(SemScalarExpr, TParseContext), AnalysisError>
+    where
+        TParseContext: crate::sem::resolution::ResolutionContext,
+    {
         let call_site = Self {
             operator_name: name.clone(),
             operator_def,
@@ -64,13 +77,25 @@ impl UndefinedOperatorAnyCallSite {
     }
 
     pub fn undefined_operator_any<TParseContext>(
-        mut context: TParseContext,
+        context: TParseContext,
         name: &OperatorName,
         lexpr: SemScalarExpr,
         rexpr: SemScalarExpr,
     ) -> Result<(SemScalarExpr, TParseContext), AnalysisError>
     where
         TParseContext: ParseContext,
+    {
+        Self::undefined_operator_any_resolved(context, name, lexpr, rexpr)
+    }
+
+    pub(crate) fn undefined_operator_any_resolved<TParseContext>(
+        mut context: TParseContext,
+        name: &OperatorName,
+        lexpr: SemScalarExpr,
+        rexpr: SemScalarExpr,
+    ) -> Result<(SemScalarExpr, TParseContext), AnalysisError>
+    where
+        TParseContext: crate::sem::resolution::ResolutionContext,
     {
         context.report_problem(AnalysisProblem::undefined_operator(
             AExprKind::AexprOp,

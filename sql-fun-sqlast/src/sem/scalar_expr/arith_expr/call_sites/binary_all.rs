@@ -1,3 +1,4 @@
+use crate::sem::scalar_expr::arith_expr::call_sites::binary_is_not_null;
 use crate::{
     sem::{
         AnalysisError, AnalysisProblem, BinaryOperatorDefinition, OperatorName, ParseContext,
@@ -5,8 +6,6 @@ use crate::{
     },
     syn::AExprKind,
 };
-
-use super::binary_is_not_null;
 
 #[derive(Debug, Clone, Eq, Hash, PartialEq, serde::Serialize, serde::Deserialize)]
 pub struct AllBinaryCallSite {
@@ -26,6 +25,19 @@ impl AllBinaryCallSite {
     ) -> Result<(SemScalarExpr, TParseContext), AnalysisError>
     where
         TParseContext: ParseContext,
+    {
+        Self::from_operator_definition_resolved(context, name, operator_def, lexpr, rexpr)
+    }
+
+    pub(crate) fn from_operator_definition_resolved<TParseContext>(
+        context: TParseContext,
+        name: &OperatorName,
+        operator_def: BinaryOperatorDefinition,
+        lexpr: SemScalarExpr,
+        rexpr: SemScalarExpr,
+    ) -> Result<(SemScalarExpr, TParseContext), AnalysisError>
+    where
+        TParseContext: crate::sem::resolution::ResolutionContext,
     {
         let call_site = Self {
             operator_name: name.clone(),
@@ -66,13 +78,25 @@ impl UndefinedOperatorAllCallSite {
     }
 
     pub fn undefined_operator_all<TParseContext>(
-        mut context: TParseContext,
+        context: TParseContext,
         name: &OperatorName,
         lexpr: SemScalarExpr,
         rexpr: SemScalarExpr,
     ) -> Result<(SemScalarExpr, TParseContext), AnalysisError>
     where
         TParseContext: ParseContext,
+    {
+        Self::undefined_operator_all_resolved(context, name, lexpr, rexpr)
+    }
+
+    pub(crate) fn undefined_operator_all_resolved<TParseContext>(
+        mut context: TParseContext,
+        name: &OperatorName,
+        lexpr: SemScalarExpr,
+        rexpr: SemScalarExpr,
+    ) -> Result<(SemScalarExpr, TParseContext), AnalysisError>
+    where
+        TParseContext: crate::sem::resolution::ResolutionContext,
     {
         context.report_problem(AnalysisProblem::undefined_operator(
             AExprKind::AexprOp,

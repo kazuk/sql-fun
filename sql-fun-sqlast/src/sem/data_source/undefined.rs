@@ -1,8 +1,8 @@
-use sql_fun_core::IVec;
-
 use crate::sem::{
     AliasSpec, AnalysisError, DataSource, FullName, Nullable, SemScalarExpr, data_source::AliasName,
 };
+
+use ::sql_fun_core::IVec;
 
 #[derive(Debug, Clone, Eq, Hash, PartialEq, serde::Serialize, serde::Deserialize)]
 pub struct UndefinedTableFuncDataSource {
@@ -23,6 +23,14 @@ impl super::DataSource {
 }
 
 impl UndefinedTableFuncDataSource {
+    pub(super) fn from_name(name: &FullName, args: &[SemScalarExpr], alias: &AliasSpec) -> Self {
+        Self {
+            func_name: name.clone(),
+            args: args.to_vec().into(),
+            alias: alias.clone(),
+        }
+    }
+
     pub const fn alias(&self) -> &AliasSpec {
         &self.alias
     }

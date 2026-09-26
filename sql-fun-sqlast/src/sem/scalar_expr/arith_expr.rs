@@ -1,19 +1,8 @@
 mod binary;
 mod call_sites;
-mod impl_analyze;
 mod impl_build_op;
 mod null_if;
 mod unary;
-
-use sql_fun_core::IVec;
-
-use crate::{
-    sem::{
-        AnalysisError, ParseContext, ScalarAnalysisContext, SemScalarExpr, TypeReference,
-        scalar_expr::SemScalarExprNode,
-    },
-    syn::ScanToken,
-};
 
 pub use self::{
     call_sites::{
@@ -23,6 +12,8 @@ pub use self::{
     },
     null_if::NullIfExpr,
 };
+
+use crate::sem::{SemScalarExpr, TypeReference, scalar_expr::SemScalarExprNode};
 
 /// arith expression
 #[derive(Debug, Clone, Eq, Hash, PartialEq, serde::Serialize, serde::Deserialize)]
@@ -84,144 +75,6 @@ impl ArithExpr {
         })))
     }
 
-    fn build_distinct<TParseContext>(
-        _context: TParseContext,
-        _lexpr: Option<SemScalarExpr>,
-        _rexpr: Option<SemScalarExpr>,
-    ) -> Result<(SemScalarExpr, TParseContext), AnalysisError> {
-        todo!()
-    }
-
-    fn build_not_distinct<TParseContext>(
-        _context: TParseContext,
-        _lexpr: Option<SemScalarExpr>,
-        _rexpr: Option<SemScalarExpr>,
-    ) -> Result<(SemScalarExpr, TParseContext), AnalysisError> {
-        todo!()
-    }
-
-    fn build_in<TParseContext>(
-        _context: TParseContext,
-        _lexpr: Option<SemScalarExpr>,
-        _rexpr: Option<SemScalarExpr>,
-    ) -> Result<(SemScalarExpr, TParseContext), AnalysisError> {
-        todo!()
-    }
-
-    fn build_like<TParseContext>(
-        _context: TParseContext,
-        _lexpr: Option<SemScalarExpr>,
-        _rexpr: Option<SemScalarExpr>,
-    ) -> Result<(SemScalarExpr, TParseContext), AnalysisError> {
-        todo!()
-    }
-
-    fn build_ilike<TParseContext>(
-        _context: TParseContext,
-        _lexpr: Option<SemScalarExpr>,
-        _rexpr: Option<SemScalarExpr>,
-    ) -> Result<(SemScalarExpr, TParseContext), AnalysisError> {
-        todo!()
-    }
-
-    fn build_similar<TParseContext>(
-        _context: TParseContext,
-        _lexpr: Option<SemScalarExpr>,
-        _rexpr: Option<SemScalarExpr>,
-    ) -> Result<(SemScalarExpr, TParseContext), AnalysisError> {
-        todo!()
-    }
-
-    fn build_between<TParseContext>(
-        context: TParseContext,
-        lexpr: Option<SemScalarExpr>,
-        rexpr: Option<SemScalarExpr>,
-    ) -> Result<(SemScalarExpr, TParseContext), AnalysisError> {
-        let Some(lexpr) = lexpr else {
-            AnalysisError::raise_unexpected_none("lexpr")?;
-            AnalysisError::never()
-        };
-
-        let Some(SemScalarExpr::List(list_expr)) = rexpr else {
-            AnalysisError::raise_unexpected_input("rexpr")?;
-            AnalysisError::never();
-        };
-        if list_expr.len() != 2 {
-            AnalysisError::raise_unexpected_input("rexpr len!=2")?;
-            AnalysisError::never();
-        };
-        let mut iter = list_expr.into_inner().into_iter();
-        let Some(start) = iter.next() else {
-            AnalysisError::raise_unexpected_none("rexpr start")?;
-            AnalysisError::never();
-        };
-        let Some(end) = iter.next() else {
-            AnalysisError::raise_unexpected_none("rexpr end")?;
-            AnalysisError::never();
-        };
-
-        let body = BetweenExpr {
-            left: lexpr,
-            start,
-            end,
-            not: false,
-        };
-        Ok((SemScalarExpr::Arith(Self::Between(Box::new(body))), context))
-    }
-
-    fn build_not_between<TParseContext>(
-        context: TParseContext,
-        lexpr: Option<SemScalarExpr>,
-        rexpr: Option<SemScalarExpr>,
-    ) -> Result<(SemScalarExpr, TParseContext), AnalysisError> {
-        let Some(lexpr) = lexpr else {
-            AnalysisError::raise_unexpected_none("lexpr")?;
-            AnalysisError::never()
-        };
-
-        let Some(SemScalarExpr::List(list_expr)) = rexpr else {
-            AnalysisError::raise_unexpected_input("rexpr")?;
-            AnalysisError::never();
-        };
-        if list_expr.len() != 2 {
-            AnalysisError::raise_unexpected_input("rexpr len!=2")?;
-            AnalysisError::never();
-        };
-        let mut iter = list_expr.into_inner().into_iter();
-        let Some(start) = iter.next() else {
-            AnalysisError::raise_unexpected_none("rexpr start")?;
-            AnalysisError::never();
-        };
-        let Some(end) = iter.next() else {
-            AnalysisError::raise_unexpected_none("rexpr end")?;
-            AnalysisError::never();
-        };
-
-        let body = BetweenExpr {
-            left: lexpr,
-            start,
-            end,
-            not: true,
-        };
-        Ok((SemScalarExpr::Arith(Self::Between(Box::new(body))), context))
-    }
-
-    fn build_between_sym<TParseContext>(
-        _context: TParseContext,
-        _lexpr: Option<SemScalarExpr>,
-        _rexpr: Option<SemScalarExpr>,
-    ) -> Result<(SemScalarExpr, TParseContext), AnalysisError> {
-        todo!()
-    }
-
-    fn build_not_between_sym<TParseContext>(
-        _context: TParseContext,
-        _lexpr: Option<SemScalarExpr>,
-        _rexpr: Option<SemScalarExpr>,
-    ) -> Result<(SemScalarExpr, TParseContext), AnalysisError> {
-        todo!()
-    }
-
     fn inputs_is_not_null(&self) -> Option<bool> {
         match &self {
             Self::OpLeftUnary(call_site) => call_site.is_not_null(),
@@ -239,23 +92,6 @@ impl ArithExpr {
 
     const fn operator_returns_null(&self) -> Option<bool> {
         None
-    }
-
-    fn analyze_optional_expr<TParseContext>(
-        context: TParseContext,
-        scalar_context: &ScalarAnalysisContext<'_>,
-        expr: Option<crate::syn::Node>,
-        tokens: &IVec<ScanToken>,
-    ) -> Result<(Option<SemScalarExpr>, TParseContext), AnalysisError>
-    where
-        TParseContext: ParseContext,
-    {
-        let Some(expr) = expr else {
-            return Ok((None, context));
-        };
-        let (sem_expr, new_context) =
-            SemScalarExpr::analyze_scaler_expr(context, scalar_context, expr, tokens)?;
-        Ok((Some(sem_expr), new_context))
     }
 }
 

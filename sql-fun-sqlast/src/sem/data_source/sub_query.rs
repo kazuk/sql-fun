@@ -1,6 +1,6 @@
 use crate::sem::{
-    AliasSpec, AnalysisError, AnalysisProblem, ColumnName, DataSource, Nullable, ParseContext,
-    SelectStatement, WithClause,
+    AliasSpec, AnalysisError, AnalysisProblem, ColumnName, DataSource, Nullable, SelectStatement,
+    WithClause,
     data_source::AliasName,
     scalar_expr::{ColumnReferenceExpr, SubQueryColumnRef},
 };
@@ -42,7 +42,7 @@ impl SubQueryDataSource {
         _with_clause: &WithClause,
         names: &mut Vec<AliasSpec>,
     ) where
-        TParseContext: ParseContext,
+        TParseContext: crate::sem::resolution::ResolutionContext,
     {
         if self.select_statement.has_column(column) {
             names.push(self.alias.clone());
@@ -60,7 +60,7 @@ impl SubQueryDataSource {
         nullability: Nullable,
     ) -> Result<ColumnReferenceExpr, AnalysisError>
     where
-        TParseContext: ParseContext,
+        TParseContext: crate::sem::resolution::ResolutionContext,
     {
         let result_columns = self.select_statement.result_columns();
         let column_def = if let Some(index) = self.alias.derived_column_index(column) {

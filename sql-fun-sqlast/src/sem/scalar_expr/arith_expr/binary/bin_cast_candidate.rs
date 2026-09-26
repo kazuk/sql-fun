@@ -1,6 +1,4 @@
-use crate::sem::{
-    BinaryOperatorDefinition, CastContext, ParseContext, SemScalarExpr, TypeReference,
-};
+use crate::sem::{BinaryOperatorDefinition, CastContext, SemScalarExpr, TypeReference};
 
 pub struct BinaryCastCandidate {
     left: CastContext,
@@ -24,14 +22,14 @@ impl BinaryCastCandidate {
         }
     }
 
-    pub fn enumerate_from_context<TParseContext>(
+    pub(crate) fn enumerate_from_context_resolved<TParseContext>(
         context: &TParseContext,
         overloads: &[BinaryOperatorDefinition],
         left_type: &TypeReference,
         right_type: &TypeReference,
     ) -> Vec<Self>
     where
-        TParseContext: ParseContext,
+        TParseContext: crate::sem::resolution::ResolutionContext,
     {
         let mut candidates = Vec::new();
         for overload in overloads {

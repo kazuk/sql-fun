@@ -58,6 +58,11 @@ impl CastDefinition {
 }
 
 impl CastContext {
+    #[cfg(all(test, feature = "sqlite"))]
+    pub(crate) const fn implicit() -> Self {
+        Self::Implicit
+    }
+
     /// cast is defined, always use explicit
     #[must_use]
     pub const fn use_in_explicit(&self) -> bool {

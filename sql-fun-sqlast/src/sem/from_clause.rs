@@ -1,12 +1,12 @@
-use sql_fun_core::IVec;
-
 use crate::{
     sem::{
-        AliasSpec, AnalysisError, AnalysisProblem, DataSource, Nullable, ParseContext, WithClause,
+        AliasSpec, AnalysisError, DataSource, Nullable, ParseContext, WithClause,
         create_table::ColumnName, data_source::AliasName,
     },
-    syn::{ListOpt, ScanToken},
+    syn::ScanToken,
 };
+
+use ::sql_fun_core::IVec;
 
 /// semantic representation for `FROM` clause
 #[derive(Debug, Clone, Default, Eq, Hash, PartialEq, serde::Serialize, serde::Deserialize)]
@@ -28,32 +28,14 @@ impl FromClause {
     where
         TParseContext: ParseContext,
     {
-        let Some(nodes) = syn.as_inner() else {
-            AnalysisError::raise_unexpected_none("from_clause.as_inner")?
-        };
-        let mut from_clause = Self::default();
-        let mut existing_aliases = Vec::new();
-
-        for node in nodes {
-            let (source, new_context) = DataSource::analyze_from_clause_node(
-                context,
-                with_clause,
-                &from_clause,
-                node,
-                tokens,
-            )?;
-            context = new_context;
-
-            let aliases = source.get_aliases();
-            for alias in aliases {
-                if existing_aliases.contains(&alias) {
-                    context.report_problem(AnalysisProblem::duplicate_alias(alias.name()))?;
-                }
-                existing_aliases.push(alias);
-            }
-            from_clause.push(source);
-        }
-        Ok((from_clause, context))
+        let syntax = crate::sem::unresolved::FromItem::postgres_list(syn, tokens)?;
+        let result = crate::sem::unresolved::FromItem::resolve_list(
+            &syntax,
+            &context,
+            crate::sem::unresolved::Dialect::postgres(),
+            with_clause,
+        );
+        Ok((result.report(&mut context)?, context))
     }
 
     /// get data-source by alias name
@@ -77,10 +59,19 @@ impl FromClause {
     where
         TParseContext: ParseContext,
     {
+        self.find_alias_resolved(column, context, with_clause)
+    }
+
+    pub(crate) fn find_alias_resolved<TContext: crate::sem::resolution::ResolutionContext>(
+        &self,
+        column: &ColumnName,
+        context: &TContext,
+        with_clause: &WithClause,
+    ) -> Result<Option<AliasSpec>, Vec<AliasSpec>> {
         let mut aliases = Vec::new();
 
         for source in &self.0 {
-            let mut results = source.get_aliases_for_column(column, context, with_clause);
+            let mut results = source.aliases_for_column_resolved(column, context, with_clause);
             aliases.append(&mut results);
         }
 

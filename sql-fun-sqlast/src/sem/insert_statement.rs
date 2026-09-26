@@ -1,8 +1,14 @@
-use super::{AnalysisError, ParseContext, SemAst};
+use crate::sem::{AnalysisError, ParseContext, SemAst};
 
 /// semantic AST for `insert` statement
 #[derive(Debug, Clone, Eq, Hash, PartialEq, serde::Serialize, serde::Deserialize)]
 pub struct InsertStatement {}
+
+impl InsertStatement {
+    pub(crate) const fn empty() -> Self {
+        Self {}
+    }
+}
 
 /// analyze [`crate::syn::InsertStmt`]
 pub fn analyze_insert_statement<TParseContext>(

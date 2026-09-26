@@ -1,9 +1,9 @@
-use itertools::Itertools;
-
 use crate::{
     sem::{AnalysisError, ColumnName, FullName, ParseContext},
     syn::ListOpt,
 };
+
+use ::itertools::Itertools;
 
 #[derive(Debug, Clone, Eq, Hash, PartialEq, serde::Serialize, serde::Deserialize)]
 pub struct AliasName(String);
@@ -34,6 +34,17 @@ pub struct AliasSpec {
 }
 
 impl AliasSpec {
+    pub(crate) fn from_names(name: &str, columns: &[String]) -> Self {
+        let mut derived_column_names = Vec::new();
+        for column in columns {
+            derived_column_names.push(ColumnName::from(column.as_str()));
+        }
+        Self {
+            alias_name: AliasName::from(name),
+            derived_column_names,
+        }
+    }
+
     /// get alias name
     #[must_use]
     pub const fn name(&self) -> &AliasName {

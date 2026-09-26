@@ -1,61 +1,33 @@
-use crate::{
-    sem::{
-        AliasSpec, AnalysisError, AnalysisProblem, FullName, ParseContext, TableName, ViewName,
-        WithClause,
-        data_source::{CteDataSource, TableDataSource, ViewDataSource},
-    },
-    syn::Opt,
-};
-
-use super::DataSource;
+use crate::sem::DataSource;
+use crate::sem::{AnalysisError, ParseContext, WithClause};
 
 impl DataSource {
     pub(super) fn analyze_range_var_node<TParseContext>(
-        mut context: TParseContext,
+        context: TParseContext,
         with_clause: &WithClause,
         range_var: crate::syn::RangeVar,
     ) -> Result<(Self, TParseContext), AnalysisError>
     where
         TParseContext: ParseContext,
     {
-        let rel_fullname = FullName::try_from(range_var.clone())?;
-        let relname = rel_fullname.to_string();
-        let alias_name = if let Some(alias) = range_var.get_alias().as_inner() {
-            let (alias, new_context) = AliasSpec::analyze(context, &rel_fullname, &alias)?;
-            context = new_context;
-            alias
-        } else {
-            AliasSpec::from_local_name(&rel_fullname.local_name())
-        };
-
-        if let Some(_cte) = with_clause.get(&relname) {
-            Ok((
-                CteDataSource::new_data_source(&relname, &alias_name),
-                context,
-            ))
-        } else if let Some(_table) = context.get_table(&TableName::try_from(range_var.clone())?) {
-            Ok((
-                TableDataSource::new_data_source(&TableName::try_from(range_var)?, &alias_name),
-                context,
-            ))
-        } else if let Some(_view) = context.get_view(&ViewName::from(range_var.clone())) {
-            Ok((
-                ViewDataSource::new_data_source(&range_var, &alias_name),
-                context,
-            ))
-        } else {
-            context.report_problem(AnalysisProblem::relation_not_found(&TableName::try_from(
-                range_var,
-            )?))?;
-            Ok((Self::unknown(&relname, &alias_name), context))
-        }
+        let syntax = crate::sem::unresolved::FromItem::postgres_range_var(
+            &range_var,
+            &::sql_fun_core::IVec::default(),
+        )?;
+        let outcome = syntax.resolve_source(
+            &context,
+            crate::sem::unresolved::Dialect::postgres(),
+            with_clause,
+            &crate::sem::FromClause::default(),
+        );
+        let mut context = context;
+        Ok((outcome.report(&mut context)?, context))
     }
 }
 
 #[cfg(test)]
 mod test_data_source_analyze_range_var_node {
-    use testresult::TestResult;
-
+    use crate::sem::data_source::analyze::impl_analyze_range_var_node::DataSource;
     use crate::{
         sem::{
             ColumnName, CreateTable, CreateView, FromClause, FullName, ScalarConstExpr, SchemaName,
@@ -65,7 +37,7 @@ mod test_data_source_analyze_range_var_node {
         test_helpers::{SynBuilder, TestParseContext, source_span, test_context},
     };
 
-    use super::DataSource;
+    use ::testresult::TestResult;
 
     #[rstest::rstest]
     fn test_analyze_range_var_node_table(

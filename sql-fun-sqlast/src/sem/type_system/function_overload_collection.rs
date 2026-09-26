@@ -100,14 +100,14 @@ impl FunctionOverloadCollection {
         context: &TParseContext,
     ) -> Result<(), TypeError>
     where
-        TParseContext: ParseContext,
+        TParseContext: crate::sem::resolution::Catalog,
     {
         let mut common_infer_context = CommonInferContext::default();
         for param in bind_result {
             param.collect_common(&mut common_infer_context)?;
         }
         if common_infer_context.is_require_infer() {
-            let inferred_type = common_infer_context.get_inference_result(context)?;
+            let inferred_type = common_infer_context.infer_from_catalog(context)?;
             overload.apply_common_infer_result(&inferred_type);
         }
         Ok(())
@@ -118,11 +118,11 @@ impl FunctionOverloadCollection {
         context: &TParseContext,
     ) -> Result<i32, TypeError>
     where
-        TParseContext: ParseContext,
+        TParseContext: crate::sem::resolution::Catalog,
     {
         let mut total_score = 0i32;
         for param in bind_result {
-            total_score += param.test_castability(context)?;
+            total_score += param.test_catalog_castability(context)?;
         }
         Ok(total_score)
     }
@@ -136,6 +136,14 @@ impl FunctionOverloadCollection {
     where
         TParseContext: ParseContext,
     {
+        self.resolve_from_catalog(context, arg_types)
+    }
+
+    pub(crate) fn resolve_from_catalog<TCatalog: crate::sem::resolution::Catalog>(
+        &self,
+        context: &TCatalog,
+        arg_types: &ArgumentBindingCollection,
+    ) -> Option<OverloadVariant> {
         let mut candidates = Vec::new();
 
         'overload: for overload in &self.overloads {

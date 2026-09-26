@@ -1,16 +1,7 @@
+use crate::sem::scalar_expr::SemScalarExprNode;
+use crate::sem::{AnalysisError, AnalysisProblem, SemScalarExpr, TypeReference};
+
 use std::collections::HashSet;
-
-use sql_fun_core::IVec;
-
-use crate::{
-    sem::{
-        AnalysisError, AnalysisProblem, ParseContext, ScalarAnalysisContext, SemScalarExpr,
-        TypeReference,
-    },
-    syn::{ListOpt, ScanToken},
-};
-
-use super::{AnalyzeScalarExpr, SemScalarExprNode};
 
 /// COALASCE expression
 #[derive(Debug, Clone, Eq, Hash, PartialEq, serde::Serialize, serde::Deserialize)]
@@ -29,57 +20,56 @@ impl SemScalarExprNode for CoalesceExpr {
     }
 }
 
-impl<TParseContext> AnalyzeScalarExpr<TParseContext, crate::syn::CoalesceExpr> for CoalesceExpr
-where
-    TParseContext: ParseContext,
-{
-    fn analyze_scalar_expr(
-        mut context: TParseContext,
-        scalar_context: &ScalarAnalysisContext<'_>,
-        syn: crate::syn::CoalesceExpr,
-        tokens: &IVec<ScanToken>,
-    ) -> Result<(SemScalarExpr, TParseContext), AnalysisError> {
-        let Some(args) = syn.get_args().as_inner() else {
-            AnalysisError::raise_unexpected_none("CoalesceExpr.args")?
-        };
+pub(crate) struct CoalesceAnalysis {
+    arg_exprs: Vec<SemScalarExpr>,
+    expr_types: HashSet<TypeReference>,
+    first_non_null: Option<SemScalarExpr>,
+}
 
-        let mut arg_exprs = Vec::with_capacity(args.len());
-        let mut expr_types = HashSet::new();
-        let mut first_non_null: Option<SemScalarExpr> = None;
-
-        for arg in args {
-            let (arg_expr, new_context) =
-                SemScalarExpr::analyze_scaler_expr(context, scalar_context, arg, tokens)?;
-            context = new_context;
-
-            if let Some(fnn) = &first_non_null {
-                context.report_problem(AnalysisProblem::unreachable_coalesce_argument(
-                    &arg_expr, fnn,
-                ))?;
-            } else if let Some(nn) = &arg_expr.is_not_null()
-                && *nn
-            {
-                first_non_null = Some(arg_expr.clone());
-            }
-
-            if let Some(expr_type) = arg_expr.get_type() {
-                let Some(type_ref) = context.canonicalize_type_ref(&expr_type) else {
-                    Err(AnalysisError::type_canonicalize_failed(&expr_type))?
-                };
-                expr_types.insert(type_ref);
-            } else {
-                context
-                    .report_problem(AnalysisProblem::unknown_type_in_coalesce_expr(&arg_expr))?;
-            }
-            arg_exprs.push(arg_expr);
+impl CoalesceAnalysis {
+    pub(crate) fn new() -> Self {
+        Self {
+            arg_exprs: Vec::new(),
+            expr_types: HashSet::new(),
+            first_non_null: None,
+        }
+    }
+    pub(crate) fn push<C: crate::sem::resolution::ResolutionContext>(
+        &mut self,
+        context: &mut C,
+        arg_expr: &SemScalarExpr,
+    ) -> Result<(), AnalysisError> {
+        if let Some(fnn) = &self.first_non_null {
+            context.report_problem(AnalysisProblem::unreachable_coalesce_argument(
+                arg_expr, fnn,
+            ))?;
+        } else if let Some(nn) = &arg_expr.is_not_null()
+            && *nn
+        {
+            self.first_non_null = Some(arg_expr.clone());
         }
 
-        if expr_types.len() == 1 {
+        if let Some(expr_type) = arg_expr.get_type() {
+            let Some(type_ref) = context.canonicalize_type_ref(&expr_type) else {
+                Err(AnalysisError::type_canonicalize_failed(&expr_type))?
+            };
+            self.expr_types.insert(type_ref);
+        } else {
+            context.report_problem(AnalysisProblem::unknown_type_in_coalesce_expr(arg_expr))?;
+        }
+        self.arg_exprs.push(arg_expr.clone());
+        Ok(())
+    }
+    pub(crate) fn finish<C: crate::sem::resolution::ResolutionContext>(
+        self,
+        mut context: C,
+    ) -> Result<(SemScalarExpr, C), AnalysisError> {
+        if self.expr_types.len() == 1 {
             // ALL expressions returns same type no cast required
-            let coalesce_type = expr_types.iter().next().cloned().unwrap();
+            let coalesce_type = self.expr_types.iter().next().cloned().unwrap();
             return Ok((
-                SemScalarExpr::Coalesce(Self {
-                    arg_exprs,
+                SemScalarExpr::coalesce(&CoalesceExpr {
+                    arg_exprs: self.arg_exprs,
                     coalesce_type: Some(coalesce_type),
                 }),
                 context,
@@ -87,7 +77,7 @@ where
         }
 
         let mut candidates: Option<HashSet<TypeReference>> = None;
-        for expr_type in &expr_types {
+        for expr_type in &self.expr_types {
             if let Some(can) = candidates {
                 candidates = Some(
                     can.intersection(&context.get_implicit_castable(expr_type))
@@ -124,20 +114,20 @@ where
             let choose = final_candidates.iter().next();
             if final_candidates.len() > 1 {
                 context.report_problem(AnalysisProblem::coalesce_expr_type_ambiguous(
-                    &arg_exprs,
+                    &self.arg_exprs,
                     &final_candidates,
                     choose,
                 ))?;
             }
             choose
         } else {
-            context.report_problem(AnalysisProblem::coalesce_expr_type_unknown(&arg_exprs))?;
+            context.report_problem(AnalysisProblem::coalesce_expr_type_unknown(&self.arg_exprs))?;
             None
         };
 
         Ok((
-            SemScalarExpr::Coalesce(Self {
-                arg_exprs,
+            SemScalarExpr::coalesce(&CoalesceExpr {
+                arg_exprs: self.arg_exprs,
                 coalesce_type: coalesce_type.cloned(),
             }),
             context,

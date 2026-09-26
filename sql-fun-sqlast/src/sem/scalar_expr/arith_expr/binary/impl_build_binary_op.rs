@@ -3,7 +3,7 @@ use crate::sem::{AnalysisError, OperatorDefinition, OperatorName, ParseContext, 
 impl super::ArithExpr {
     /// create a instance
     pub fn build_binary_op<TParseContext>(
-        mut context: TParseContext,
+        context: TParseContext,
         name: &OperatorName,
         lexpr: SemScalarExpr,
         rexpr: SemScalarExpr,
@@ -11,6 +11,19 @@ impl super::ArithExpr {
     ) -> Result<(SemScalarExpr, TParseContext), AnalysisError>
     where
         TParseContext: ParseContext,
+    {
+        Self::build_binary_op_resolved(context, name, lexpr, rexpr, operator_def)
+    }
+
+    pub(crate) fn build_binary_op_resolved<TParseContext>(
+        mut context: TParseContext,
+        name: &OperatorName,
+        lexpr: SemScalarExpr,
+        rexpr: SemScalarExpr,
+        operator_def: OperatorDefinition,
+    ) -> Result<(SemScalarExpr, TParseContext), AnalysisError>
+    where
+        TParseContext: crate::sem::resolution::ResolutionContext,
     {
         let resolved_bin_op =
             Self::resolve_overload_binary(&mut context, operator_def, lexpr, rexpr)?;
@@ -20,8 +33,6 @@ impl super::ArithExpr {
 
 #[cfg(test)]
 mod test_arith_expr_build_binary_op {
-    use testresult::TestResult;
-
     use crate::{
         sem::{
             BinaryOperatorDefinition, CastContext, CastDefinition, OperatorDefinition,
@@ -31,6 +42,8 @@ mod test_arith_expr_build_binary_op {
         },
         test_helpers::{TestParseContext, test_context},
     };
+
+    use ::testresult::TestResult;
 
     #[rstest::rstest]
     fn test_arith_expr_build_binary_op(mut test_context: TestParseContext) -> TestResult {
@@ -45,7 +58,7 @@ mod test_arith_expr_build_binary_op {
         let operator_def = BinaryOperatorDefinition::new(&type_ref, &type_ref, &type_ref, true);
         let operator_def = OperatorDefinition::Binary(vec![operator_def]);
 
-        let (_expr, _context) = ArithExpr::build_binary_op(
+        let (_expr, _context) = ArithExpr::build_binary_op_resolved(
             test_context,
             &name,
             expr.clone(),

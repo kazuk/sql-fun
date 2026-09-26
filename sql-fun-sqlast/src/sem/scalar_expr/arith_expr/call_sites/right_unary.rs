@@ -20,6 +20,18 @@ impl RightUnaryCallSite {
     where
         TParseContext: ParseContext,
     {
+        Self::op_right_unary_resolved(context, name, operator_def, rexpr)
+    }
+
+    pub(crate) fn op_right_unary_resolved<TParseContext>(
+        context: TParseContext,
+        name: &OperatorName,
+        operator_def: UnaryOperatorDefinition,
+        rexpr: SemScalarExpr,
+    ) -> Result<(SemScalarExpr, TParseContext), AnalysisError>
+    where
+        TParseContext: crate::sem::resolution::ResolutionContext,
+    {
         let call_site = Self {
             operator_name: name.clone(),
             operator_def,

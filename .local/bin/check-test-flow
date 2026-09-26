@@ -25,11 +25,11 @@ Default steps:
   server-api-spec
   deny
   dependency-updates
+  markdown-lint
   doc
   typos
   graphify
   skill-lint
-  markdown-lint
 
 Optional steps (explicit --step required):
   packaging
@@ -46,11 +46,11 @@ DEFAULT_STEPS=(
   server-api-spec
   deny
   dependency-updates
+  markdown-lint
   doc
   typos
   graphify
   skill-lint
-  markdown-lint
 )
 
 ALL_STEPS=("${DEFAULT_STEPS[@]}" packaging cli-contract)
@@ -241,8 +241,10 @@ function run_dependency_updates() {
 }
 
 function run_doc() {
+  require_command mdbook
   echo "== Document build"
   cargo doc --workspace --no-deps
+  mdbook build
 }
 
 function run_typos() {

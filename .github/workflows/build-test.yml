@@ -364,6 +364,12 @@ jobs:
           .local/bin/check-test-flow --step=doc
           sccache --show-stats
 
+      - uses: actions/upload-artifact@v7
+        with:
+          name: sql-fun-user-manual
+          path: user_manual/
+          if-no-files-found: error
+
   packaging:
     runs-on: ubuntu-24.04
     container: *ci-builder-container

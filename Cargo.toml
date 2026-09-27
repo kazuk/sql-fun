@@ -112,7 +112,7 @@ owo-colors = "4.2.3"
 petgraph = "0.8.3"
 pg_query = "6.1"
 proc-macro2 = { version = "1.0", features = ["span-locations"] }
-proc_macro2_diagnostic = "0.6.3"
+proc_macro2_diagnostic = "0.8.0"
 quote = "1.0"
 rand = "0.10"
 rstest = "0.27"

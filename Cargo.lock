@@ -394,6 +394,17 @@ dependencies = [
 ]
 
 [[package]]
+name = "build_safely"
+version = "0.5.4"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "ec4aa79039c986a2c080fcd86f6c71b3524f15d9479a0102225d7a94d3b4486a"
+dependencies = [
+ "autocfg",
+ "derive_more",
+ "indexmap",
+]
+
+[[package]]
 name = "bumpalo"
 version = "3.20.2"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -842,6 +853,7 @@ dependencies = [
  "quote",
  "rustc_version",
  "syn 2.0.119",
+ "unicode-xid",
 ]
 
 [[package]]
@@ -1862,15 +1874,6 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "1d87ecb2933e8aeadb3e3a02b828fed80a7528047e68b4f424523a0981a3a084"
 
 [[package]]
-name = "ninja-build_rs"
-version = "0.2.1"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "491f61b6bc2e8ff020582967a4e7241869c73bcc6d9d84ae6a7cbcb8228a73e4"
-dependencies = [
- "autocfg",
-]
-
-[[package]]
 name = "nix"
 version = "0.23.2"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -2322,14 +2325,13 @@ dependencies = [
 
 [[package]]
 name = "proc_macro2_diagnostic"
-version = "0.6.6"
+version = "0.8.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "09381e39ed7a26d59b191fb4466f0ee8c458603b4d92dceb177079c1a9dd22a1"
+checksum = "8b835c85056f71b95da5f5c415059b59251976e228559983b628ef7374c0967e"
 dependencies = [
- "autocfg",
- "ninja-build_rs",
+ "build_safely",
  "proc-macro2",
- "syn 2.0.119",
+ "syn 3.0.6",
  "try_v2_traits",
 ]
 
@@ -3702,12 +3704,12 @@ checksum = "e421abadd41a4225275504ea4d6566923418b7f05506fbc9c0fe86ba7396114b"
 
 [[package]]
 name = "try_v2_traits"
-version = "0.9.3"
+version = "0.10.1"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "8eabf8e03f61b267750fdc70e9db431aa8ed83bfc5368016c020b141d46beab8"
+checksum = "625990d998c1436aeb59720750929fe4efaebc940b5f802b0da0efeed4167a17"
 dependencies = [
  "autocfg",
- "ninja-build_rs",
+ "build_safely",
 ]
 
 [[package]]

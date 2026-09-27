@@ -1,6 +1,9 @@
 #!/bin/bash
 
-find . -type f -iname '*.rs' -not -path './target/*' -print0  \
+find . -type f -iname '*.rs' \
+ -not -path './target/*' \
+ -not -path './.worktrees/*' \
+ -print0  \
  | wc -l --files0-from=- \
  | sort -nr \
  | head -n 20

@@ -129,8 +129,8 @@ retain the match information.
 ## Semantic Matches
 
 A resolved Sem node can therefore retain the lint configurations that matched
-during resolution together with their per-match context. Sem nodes should expose these matches through a common
-API conceptually similar to:
+during resolution together with their per-match context. Sem nodes should
+expose these matches through a common API conceptually similar to:
 
 ```rust
 trait SemNode {
@@ -324,7 +324,8 @@ this behavior can be expressed by normal lint configuration.
 This proposal is about attaching lint knowledge to semantic resolution and
 consuming the resulting matches. It does not propose:
 
-- Rejecting SQL that is legal according to the selected SQL engine/specification.
+- Rejecting SQL that is legal according to the selected SQL
+  engine/specification.
 - Inferring application deployment or migration ordering.
 - Treating a zero project reference count as proof that arbitrary external
   database clients cannot reference an object.

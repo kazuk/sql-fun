@@ -77,6 +77,55 @@ responsibility is to resolve the semantic entity, retrieve rules keyed to that
 entity, capture the resolution-time context, and attach the resulting matches
 to the Sem node. Diagnostic interpretation remains a downstream concern.
 
+## Expected Implementation Shape
+
+This proposal does not fix the implementation plan in advance; the actual work
+should begin with a fresh plan against the codebase at that time. Based on the
+current architecture, however, the expected implementation shape has two
+parts.
+
+First, `ParseContext` is currently also the schema context and is expected to
+be the primary observation point. Semantic construction asks it to resolve
+schema objects such as tables, columns, functions, operators, types, and casts.
+The resolve request can perform the corresponding lint lookup and increment the
+loaded lint node's match counter. This should cover implicit casts as well:
+although the cast expression is created implicitly, semantic analysis still
+asks the schema context to resolve whether the required cast exists.
+
+Second, the change cannot be contained entirely inside `ParseContext`.
+Individual SemAST nodes need storage for the resulting lint match/context, and
+their construction paths need to carry that information from resolution into
+the SemAST. Diagnostics, rewrites, and artifact generation can then consume the
+stored semantic match without repeating name resolution.
+
+Conceptually:
+
+```text
+                    ParseContext
+               (current schema context)
+                         |
+              resolve schema object
+                         |
+              +----------+----------+
+              |                     |
+        catalog resolve         lint lookup
+                                      |
+                                match_count += 1
+              |                     |
+              +----------+----------+
+                         |
+                         v
+                    SemAST node
+                resolved semantics
+                + lint match/context
+```
+
+Therefore the expected implementation is not a separate lint modification in
+every name-resolution algorithm. Resolution-time matching is expected to be
+concentrated mainly in `ParseContext`, while the structural change propagates
+through SemAST types and construction paths because each relevant node must
+retain the match information.
+
 ## Semantic Matches
 
 A resolved Sem node can therefore retain the lint configurations that matched

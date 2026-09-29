@@ -168,6 +168,55 @@ numeric counter is sufficient. Any future parallel verification design should
 reconsider runtime aggregation together with the broader SemAST/schema
 concurrency model rather than introducing synchronization only for lint counts.
 
+## Lint Analysis Artifacts and Cross-Project Aggregation
+
+The aggregate result of a lint analysis can also be emitted as an artifact.
+This allows the same semantic observations to be combined outside a single
+project or repository.
+
+This is useful when multiple independently built applications share one
+enterprise database:
+
+```text
+project A --lint--> artifact A --+
+project B --lint--> artifact B --+--> aggregate --> shared schema policy
+project C --lint--> artifact C --+
+```
+
+An artifact can identify the lint rule, datasource/schema identity, resolved
+schema object identity, and observed match count. The exact artifact format is
+left for future design; the important property is that it records semantic
+observations rather than requiring the aggregator to re-analyze source SQL.
+
+For example, deprecation of a shared column may produce:
+
+```text
+public.users.legacy_name
+
+project-a: 0 matches
+project-b: 0 matches
+project-c: 4 matches
+--------------------
+aggregate: 4 matches
+```
+
+Once every artifact in an explicitly defined consumer set reports zero matches,
+an enterprise-level policy can report that the known consumers no longer use
+the deprecated schema object.
+
+A zero count from one artifact is not proof of global non-use. Even an
+aggregated zero is meaningful only for the set of consumers whose artifacts
+were intentionally included. Unknown applications, ad-hoc SQL, database-side
+objects, BI tools, or other clients remain outside that observation unless they
+are represented in the declared ownership/consumer set.
+
+This keeps the producer simple: each `sql-fun` project reports what its own
+semantic analysis observed. An external consumer or aggregation step owns the
+knowledge of which projects constitute the required coverage for a shared
+database. `sql-fun` therefore does not need to infer repository topology,
+deployment topology, or application ownership in order to support
+cross-project schema-object deprecation.
+
 ## Rewrite Metadata
 
 A lint rule may optionally carry rewrite metadata. A matched rule with enough

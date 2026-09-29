@@ -39,10 +39,48 @@ semantic lookup can make lint lookup a companion operation to resolution.
 Engine-provided rules and project-local rules can then be overlaid without
 embedding individual lint cases in the resolver.
 
+## Resolution-Time Attachment
+
+Lint lookup should happen as part of semantic name resolution, not as a later
+textual or SemAST re-matching pass. When the resolver looks up a schema object,
+function, operator, or cast using its canonical semantic key, it can use the
+same key to look up configured lint rules.
+
+Conceptually:
+
+```text
+syntax node
+    |
+    v
+semantic/name resolution
+    |-- catalog lookup -----> resolved entity
+    |-- lint trie lookup ---> matching configurations
+    |
+    v
+Sem node {
+    resolved entity,
+    lint matches: [
+        configuration + resolution/match context
+    ]
+}
+```
+
+The context captured at this point should contain the information that made the
+match meaningful: the resolved identity, relevant argument/type bindings,
+source span, and other semantic facts needed by diagnostics or rewrites. This
+avoids reconstructing resolution decisions later and also allows generated
+semantic nodes, such as implicit casts, to carry lint matches when they are
+created.
+
+The resolver does not need to understand the policy expressed by each lint. Its
+responsibility is to resolve the semantic entity, retrieve rules keyed to that
+entity, capture the resolution-time context, and attach the resulting matches
+to the Sem node. Diagnostic interpretation remains a downstream concern.
+
 ## Semantic Matches
 
-Resolving an entity can return the lint configurations that match it together
-with per-match context. Sem nodes should expose these matches through a common
+A resolved Sem node can therefore retain the lint configurations that matched
+during resolution together with their per-match context. Sem nodes should expose these matches through a common
 API conceptually similar to:
 
 ```rust

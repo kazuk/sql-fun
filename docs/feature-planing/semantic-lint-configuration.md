@@ -104,11 +104,44 @@ can match that resolved cast without attempting to infer it from source text.
 
 ## Match Counts and Negative Conditions
 
-Loaded lint configuration may keep runtime-only state such as a match count.
-The count does not need to exist in the configuration file.
+Each loaded lint node can keep a runtime-only match counter that is not present
+in the configuration file. Whenever semantic resolution attaches a match for
+that lint node to a Sem node, the same operation increments the loaded lint
+node's counter.
 
-A rule may optionally define behavior for the case where it receives no
-matches, conceptually:
+Conceptually:
+
+```text
+loaded lint node
+    match_count = 0
+          |
+          | semantic resolution matches
+          v
+Sem node <- LintMatch(configuration + context)
+          |
+          +--> loaded lint node.match_count += 1
+```
+
+This makes the loaded lint configuration both the rule definition used during
+resolution and the natural aggregation point for the current analysis run.
+After all queries have been analyzed, lint reporting can enumerate the loaded
+lint nodes directly and report the detection count for every rule without a
+second traversal of the SemAST.
+
+A count greater than zero gives the number of detected occurrences. A zero
+count is equally useful: rules that define behavior for an unmet condition can
+emit that diagnostic directly from the same aggregate state.
+
+For example, a report could naturally contain information equivalent to:
+
+```text
+project.deprecated-users-old-name: 3 matches
+project.require-explicit-cast-x: 0 matches
+postgres.pg-trgm-word-similarity-index: 7 matches
+```
+
+A rule may optionally define behavior for the case where its final match count
+is zero, conceptually:
 
 ```toml
 condition_not_met = "warn"

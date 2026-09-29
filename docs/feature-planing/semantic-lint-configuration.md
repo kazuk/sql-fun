@@ -39,6 +39,22 @@ semantic lookup can make lint lookup a companion operation to resolution.
 Engine-provided rules and project-local rules can then be overlaid without
 embedding individual lint cases in the resolver.
 
+### Lint Groups
+
+Lint configuration should not be constrained to a single configuration file.
+It should be possible to organize rules into multiple lint groups and select
+which groups are enabled for a project.
+
+For example, PostgreSQL-specific knowledge could be grouped by extension so
+that lint rules for an extension such as `pg_trgm` can be enabled or disabled
+as a group. A lint group should also be able to have its own configuration
+file, allowing built-in knowledge and project-specific rule sets to remain
+separately maintainable.
+
+The exact file layout, loading rules, and enable/disable configuration are
+implementation-planning details. The proposal only requires that the loading
+model does not unnecessarily prevent this grouping and selection.
+
 ## Resolution-Time Attachment
 
 Lint lookup should happen as part of semantic name resolution, not as a later

@@ -155,7 +155,7 @@ the `sql-fun` query/codegen model itself.
 
 ## Rust 1.99 and a Possible Proc-Macro Surface
 
-Rust 1.99 stabilizes custom attribute and derive macros around outlined modules
+Rust 1.99 stabilizes custom attribute procedural macros on outlined modules
 such as:
 
 ```rust

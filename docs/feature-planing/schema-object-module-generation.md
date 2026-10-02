@@ -131,7 +131,7 @@ The example generator can exist independently of a proc-macro implementation.
 
 ## Rust 1.99 and a Possible Proc-Macro Surface
 
-Rust 1.99 stabilizes custom attribute and derive macros around outlined modules
+Rust 1.99 stabilizes custom attribute procedural macros on outlined modules
 such as:
 
 ```rust

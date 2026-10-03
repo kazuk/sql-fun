@@ -46,6 +46,10 @@ fn run_test(for_check: bool) {
     trybuild::TestCases::new().pass("tests/rusqlite/pass.rs");
 }
 
+#[expect(
+    clippy::manual_assert,
+    reason = "Preserve the existing explicit nextest environment guard in this focused fix."
+)]
 fn validate_test_env() {
     if std::env::var_os("NEXTEST").is_none() {
         panic!("This test must be run with cargo-nextest (NEXTEST env var is not set).");
@@ -70,6 +74,10 @@ fn setup_working_dir_cleanup(dir: &Path) -> ScopeGuard<PathBuf, impl FnOnce(Path
     })
 }
 
+#[expect(
+    clippy::ptr_arg,
+    reason = "Preserve the existing fixture helper interface in this codegen fix."
+)]
 fn setup_trace_dump(logfile: &PathBuf) -> ScopeGuard<PathBuf, impl FnOnce(PathBuf)> {
     scopeguard::guard(logfile.clone(), |path| {
         if let Ok(trace) = std::fs::read_to_string(path)
@@ -95,6 +103,10 @@ fn setup_env(dir: &PathBuf, logfile: &PathBuf, for_check: bool) {
     }
 }
 
+#[expect(
+    clippy::ptr_arg,
+    reason = "Preserve the existing fixture helper interface in this codegen fix."
+)]
 fn setup_file<P: AsRef<Path>>(dir: &PathBuf, file_name: P, content: &str) {
     std::fs::write(dir.join(file_name), content).unwrap();
 }

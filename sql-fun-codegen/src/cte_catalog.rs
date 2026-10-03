@@ -87,10 +87,22 @@ impl CteCatalogCache<'_> {
 /// CTE catalog resolve result
 pub enum CteReferenceResolveResult {
     /// success fully resolved
+    #[expect(
+        dead_code,
+        reason = "Resolved names are stored, but resolution-result consumers are not yet implemented."
+    )]
     Success(CteName),
     /// resolved but definition error
+    #[expect(
+        dead_code,
+        reason = "Resolved names are stored, but resolution-result consumers are not yet implemented."
+    )]
     HasError(CteName),
     /// undefined CTE name
+    #[expect(
+        dead_code,
+        reason = "Resolved names are stored, but resolution-result consumers are not yet implemented."
+    )]
     Missing(CteName),
 }
 

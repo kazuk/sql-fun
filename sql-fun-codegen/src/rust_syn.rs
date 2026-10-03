@@ -322,6 +322,10 @@ impl SqlFragmentArgs {
 
 #[derive(Debug, Clone)]
 pub struct FragmentArm {
+    #[expect(
+        dead_code,
+        reason = "The parsed arm name is retained while function naming uses the pattern."
+    )]
     name: String,
     pat: Pat,
     guard: Option<Box<Expr>>,

@@ -84,9 +84,9 @@ while (( ${#remaining[@]} > 0 )); do
       case "$crate_status" in
         200) ;;
         404)
-          if [[ -z "${CRATES_IO_BOOTSTRAP_TOKEN:-}" || -z "${CRATES_IO_BOOTSTRAP_KEY:-}" ]]; then
-            echo "unpublished crate requires bootstrap credentials: $selected" >&2
-            echo "set both CRATES_IO_BOOTSTRAP_TOKEN and CRATES_IO_BOOTSTRAP_KEY for this one-time publish" >&2
+          if [[ -z "${CRATES_IO_BOOTSTRAP_TOKEN:-}" ]]; then
+            echo "unpublished crate requires a bootstrap token: $selected" >&2
+            echo "set CRATES_IO_BOOTSTRAP_TOKEN for this one-time publish" >&2
             exit 1
           fi
           publish_token="$CRATES_IO_BOOTSTRAP_TOKEN"

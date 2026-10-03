@@ -2,10 +2,10 @@ mod query;
 
 use crate::sem::unresolved::{
     Access, BooleanExpr, BooleanOperator, Call, CallKind, Case, CaseArm, Cast, Collate, Delete,
-    Expr, Extension, Indirection, Insert, Literal, Name, NamedArgument, NullTest, OperatorExpr,
-    OperatorKind, Order, Parameter, Query, Slice, SqlValue, Statement, Subquery, SubqueryKind,
-    SyntaxOption, TruthTest, TryCollectFromWithTokens, TryFromWithTokens, TryFromWithTokensOpt,
-    TypeName, Update, VariableSet, View, ViewCheckOption, Window,
+    EnumType, Expr, Extension, Indirection, Insert, Literal, Name, NamedArgument, NullTest,
+    OperatorExpr, OperatorKind, Order, Parameter, Query, Slice, SqlValue, Statement, Subquery,
+    SubqueryKind, SyntaxOption, TruthTest, TryCollectFromWithTokens, TryFromWithTokens,
+    TryFromWithTokensOpt, TypeName, Update, VariableSet, View, ViewCheckOption, Window,
 };
 use crate::syn::{ListOpt, Opt};
 use crate::{StringSpan, sem::AnalysisError, syn};
@@ -69,7 +69,24 @@ impl TryFromWithTokens<&syn::Node> for Statement {
                 tokens,
             )?));
         }
+        if let Some(enum_type) = value.as_create_enum_stmt().as_inner() {
+            return Ok(Self::enum_type(EnumType::try_from(&enum_type)?));
+        }
         AnalysisError::raise_unexpected_input("top-level PostgreSQL statement")
+    }
+}
+
+impl TryFrom<&syn::CreateEnumStmt> for EnumType {
+    type Error = AnalysisError;
+
+    fn try_from(value: &syn::CreateEnumStmt) -> Result<Self, Self::Error> {
+        let Some(values) = value.get_vals().map(|values| values.as_string()) else {
+            return AnalysisError::raise_unexpected_none("create_enum_stmt.vals");
+        };
+        Ok(Self::new(
+            Name::try_from(value.get_type_name())?,
+            values.iter().map(|value| value.get_sval()).collect(),
+        ))
     }
 }
 

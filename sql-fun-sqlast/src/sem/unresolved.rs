@@ -47,6 +47,7 @@ pub(crate) enum Statement {
     View(View),
     Extension(Extension),
     VariableSet(VariableSet),
+    EnumType(EnumType),
 }
 
 impl Statement {
@@ -76,6 +77,10 @@ impl Statement {
 
     const fn variable_set(value: VariableSet) -> Self {
         Self::VariableSet(value)
+    }
+
+    const fn enum_type(value: EnumType) -> Self {
+        Self::EnumType(value)
     }
 
     pub(crate) fn resolve(
@@ -114,6 +119,11 @@ impl Statement {
                     "variable set requires catalog application",
                 ),
             ),
+            Self::EnumType(_) => crate::sem::resolution::Resolution::new(catalog).finish(
+                crate::sem::AnalysisError::raise_unexpected_input(
+                    "enum type requires catalog application",
+                ),
+            ),
         }
     }
 
@@ -129,6 +139,7 @@ impl Statement {
             Self::View(view) => view.resolve_and_apply(context, dialect),
             Self::Extension(extension) => extension.apply(context),
             Self::VariableSet(variable_set) => variable_set.resolve_and_apply(context, dialect),
+            Self::EnumType(enum_type) => enum_type.apply(context),
             _ => {
                 let outcome = self.resolve(&context, dialect);
                 let mut context = context;
@@ -136,6 +147,33 @@ impl Statement {
                 Ok(crate::AstAndContextPair::new(statement, context))
             }
         }
+    }
+}
+
+#[derive(Clone, Debug)]
+pub(crate) struct EnumType {
+    name: Name,
+    values: Vec<String>,
+}
+
+impl EnumType {
+    fn new(name: Name, values: Vec<String>) -> Self {
+        Self { name, values }
+    }
+
+    fn apply<TContext>(
+        &self,
+        context: TContext,
+    ) -> Result<crate::AstAndContextPair<TContext>, crate::sem::AnalysisError>
+    where
+        TContext: crate::sem::ParseContext,
+    {
+        let enum_type = crate::sem::CreateEnum::new(&self.name.full_name()?, &self.values);
+        let context = context.apply_create_enum(&enum_type)?;
+        Ok(crate::AstAndContextPair::new(
+            crate::sem::SemAst::CreateEnum(enum_type),
+            context,
+        ))
     }
 }
 

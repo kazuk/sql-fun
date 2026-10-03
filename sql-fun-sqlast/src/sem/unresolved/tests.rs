@@ -17,6 +17,7 @@ use ::sql_fun_core::IVec;
 #[case("delete from users")]
 #[case("create extension hstore")]
 #[case("set statement_timeout = 0")]
+#[case("create type user_kind as enum ('member', 'guest')")]
 #[case(
     "create or replace view public.users_view (id) with (security_barrier = true) as select 1 as id"
 )]

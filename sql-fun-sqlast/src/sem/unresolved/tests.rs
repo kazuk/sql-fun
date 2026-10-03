@@ -4,9 +4,24 @@ mod test_helpers;
 
 use self::test_helpers::postgres;
 
-use crate::sem::unresolved::Dialect;
+use crate::sem::unresolved::{Dialect, Statement, TryFromWithTokens};
 use crate::sem::{ColumnName, PgBuiltInType};
-use crate::test_helpers::TestParseContext;
+use crate::test_helpers::{SynBuilder, TestParseContext};
+
+use ::sql_fun_core::IVec;
+
+#[rstest::rstest]
+#[case("select 1")]
+#[case("insert into users (id) values (1)")]
+#[case("update users set id = 1")]
+#[case("delete from users")]
+fn postgres_top_level_statement_construction_is_context_free(
+    #[case] sql: &str,
+) -> testresult::TestResult {
+    let statement = SynBuilder::new().parse(sql);
+    Statement::try_from_with_tokens(&statement, &IVec::default())?;
+    Ok(())
+}
 
 #[rstest::rstest]
 #[case(

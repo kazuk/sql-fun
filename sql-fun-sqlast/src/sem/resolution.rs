@@ -123,6 +123,13 @@ pub(crate) struct ResolutionOutcome<T> {
 }
 
 impl<T> ResolutionOutcome<T> {
+    pub(crate) fn map<U>(self, f: impl FnOnce(T) -> U) -> ResolutionOutcome<U> {
+        ResolutionOutcome {
+            result: self.result.map(f),
+            problems: self.problems,
+        }
+    }
+
     pub(crate) fn report<C: ParseContext>(self, context: &mut C) -> Result<T, AnalysisError> {
         for problem in self.problems {
             context.report_problem(problem)?;

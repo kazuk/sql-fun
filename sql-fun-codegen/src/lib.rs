@@ -76,7 +76,13 @@ impl SqlFunDiagnostic {
 
 /// diagnostics
 #[derive(Debug)]
-pub struct SqlFunDiagnosticCollection(Vec<SqlFunDiagnostic>);
+pub struct SqlFunDiagnosticCollection(
+    #[expect(
+        dead_code,
+        reason = "Diagnostic storage is retained until collection consumers are implemented."
+    )]
+    Vec<SqlFunDiagnostic>,
+);
 
 /// attributes for `sql_fun::sql_query_one`
 #[derive(Debug)]
@@ -296,6 +302,13 @@ impl QueryFunctionSpec {
         &self.result_type.return_type
     }
 
+    #[cfg_attr(
+        not(feature = "sqlite"),
+        expect(
+            dead_code,
+            reason = "Only SQLite interrupt wrappers use this accessor."
+        )
+    )]
     const fn error_type(&self) -> &Type {
         &self.result_type.error_type
     }
@@ -303,6 +316,10 @@ impl QueryFunctionSpec {
 
 /// conditional query match function
 pub struct FragmentMatcher {
+    #[expect(
+        dead_code,
+        reason = "The matcher retains the query kind while fragment dispatch does not read it."
+    )]
     function_kind: QueryFunctionKind,
     item_fn: ItemFunction,
     match_expr: Expr,
@@ -491,6 +508,13 @@ pub trait ConditionalQuery {
 #[derive(Debug, Clone)]
 pub struct ResultType {
     return_type: Type,
+    #[cfg_attr(
+        not(feature = "sqlite"),
+        expect(
+            dead_code,
+            reason = "Only SQLite interrupt wrappers read the stored error type."
+        )
+    )]
     error_type: Type,
 }
 

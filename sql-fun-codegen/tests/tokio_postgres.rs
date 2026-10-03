@@ -30,6 +30,10 @@ enum QueryError {
     Timeout(),
 }
 impl QueryError {
+    #[expect(
+        clippy::missing_const_for_fn,
+        reason = "Fixture helper constness is outside the identifier-hygiene fix."
+    )]
     fn timeout() -> Self {
         Self::Timeout()
     }

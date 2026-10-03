@@ -510,26 +510,32 @@ mod sqlite {
 }
 
 #[cfg(feature = "sqlite")]
-#[test]
-fn sqlite_upgrade_preserves_complete_parameter_names_and_reuse() -> testresult::TestResult {
+#[rstest::rstest]
+#[case::namespace("$ns::name")]
+#[case::suffix("$name(element)")]
+#[case::namespace_and_suffix("$ns::name(element)")]
+#[case::colon(":name")]
+#[case::at("@name")]
+fn sqlite_upgrade_preserves_complete_parameter_names(#[case] name: &str) -> testresult::TestResult {
     use crate::sem::unresolved::Expr;
     use crate::test_helpers::SqliteSynBuilder;
 
-    for name in [
-        "$ns::name",
-        "$name(element)",
-        "$ns::name(element)",
-        ":name",
-        "@name",
-    ] {
-        let parsed = SqliteSynBuilder.parse_expression(&format!("SELECT {name}"));
-        let Expr::Parameter(parameter) = Expr::try_from(&parsed)? else {
-            panic!("parameter");
-        };
-        assert_eq!(parameter.name.as_deref(), Some(name));
-        assert_eq!(parameter.position, 1);
-        assert!(parameter.type_name.is_none());
-    }
+    let parsed = SqliteSynBuilder.parse_expression(&format!("SELECT {name}"));
+    let Expr::Parameter(parameter) = Expr::try_from(&parsed)? else {
+        panic!("parameter");
+    };
+    assert_eq!(parameter.name.as_deref(), Some(name));
+    assert_eq!(parameter.position, 1);
+    assert!(parameter.type_name.is_none());
+    Ok(())
+}
+
+#[cfg(feature = "sqlite")]
+#[test]
+fn sqlite_upgrade_preserves_parameter_reuse() -> testresult::TestResult {
+    use crate::sem::unresolved::Expr;
+    use crate::test_helpers::SqliteSynBuilder;
+
     let parsed =
         SqliteSynBuilder.parse_expression("SELECT $ns::name(element) + $ns::name(element)");
     let Expr::Operator(operator) = Expr::try_from(&parsed)? else {
@@ -549,37 +555,46 @@ fn sqlite_upgrade_preserves_complete_parameter_names_and_reuse() -> testresult::
 }
 
 #[cfg(feature = "sqlite")]
-#[test]
-fn sqlite_parenthesized_in_subqueries_keep_membership_semantics() -> testresult::TestResult {
+#[rstest::rstest]
+fn sqlite_parenthesized_in_subqueries_keep_membership_semantics(
+    #[values("(SELECT 2)", "((SELECT 2))", "(((SELECT 2)))")] rhs: &str,
+) -> testresult::TestResult {
     use crate::sem::unresolved::{BooleanOperator, Expr, Literal, SubqueryKind};
     use crate::test_helpers::SqliteSynBuilder;
 
-    for rhs in ["(SELECT 2)", "((SELECT 2))", "(((SELECT 2)))"] {
-        let parsed = SqliteSynBuilder.parse_expression(&format!("SELECT 1 IN {rhs}"));
-        let Expr::Subquery(query) = Expr::try_from(&parsed)? else {
-            panic!("membership subquery");
-        };
-        assert!(matches!(query.kind, SubqueryKind::Any));
-        assert!(matches!(
-            query.test,
-            Some(Expr::Literal(Literal::Integer(1)))
-        ));
-        assert_eq!(query.operator.full_name()?.name().as_str(), "=");
-        let parsed = SqliteSynBuilder.parse_expression(&format!("SELECT 1 NOT IN {rhs}"));
-        let Expr::Boolean(negation) = Expr::try_from(&parsed)? else {
-            panic!("negated membership");
-        };
-        assert!(matches!(negation.operator, BooleanOperator::Not));
-        assert_eq!(negation.arguments.len(), 1);
-        let Expr::Subquery(query) = &negation.arguments[0] else {
-            panic!("membership subquery");
-        };
-        assert!(matches!(query.kind, SubqueryKind::Any));
-        assert!(matches!(
-            query.test,
-            Some(Expr::Literal(Literal::Integer(1)))
-        ));
-    }
+    let parsed = SqliteSynBuilder.parse_expression(&format!("SELECT 1 IN {rhs}"));
+    let Expr::Subquery(query) = Expr::try_from(&parsed)? else {
+        panic!("membership subquery");
+    };
+    assert!(matches!(query.kind, SubqueryKind::Any));
+    assert!(matches!(
+        query.test,
+        Some(Expr::Literal(Literal::Integer(1)))
+    ));
+    assert_eq!(query.operator.full_name()?.name().as_str(), "=");
+    let parsed = SqliteSynBuilder.parse_expression(&format!("SELECT 1 NOT IN {rhs}"));
+    let Expr::Boolean(negation) = Expr::try_from(&parsed)? else {
+        panic!("negated membership");
+    };
+    assert!(matches!(negation.operator, BooleanOperator::Not));
+    assert_eq!(negation.arguments.len(), 1);
+    let Expr::Subquery(query) = &negation.arguments[0] else {
+        panic!("membership subquery");
+    };
+    assert!(matches!(query.kind, SubqueryKind::Any));
+    assert!(matches!(
+        query.test,
+        Some(Expr::Literal(Literal::Integer(1)))
+    ));
+    Ok(())
+}
+
+#[cfg(feature = "sqlite")]
+#[test]
+fn sqlite_scalar_subquery_keeps_scalar_semantics() -> testresult::TestResult {
+    use crate::sem::unresolved::{Expr, SubqueryKind};
+    use crate::test_helpers::SqliteSynBuilder;
+
     let parsed = SqliteSynBuilder.parse_expression("SELECT (SELECT 2)");
     let Expr::Subquery(query) = Expr::try_from(&parsed)? else {
         panic!("scalar subquery");
@@ -590,22 +605,22 @@ fn sqlite_parenthesized_in_subqueries_keep_membership_semantics() -> testresult:
 }
 
 #[cfg(feature = "sqlite")]
-#[test]
-fn sqlite_blob_semantics_keep_hex_payload_after_spelling_upgrade() -> testresult::TestResult {
+#[rstest::rstest]
+#[case::lowercase("SELECT x'ab'", "ab")]
+#[case::uppercase("SELECT X'AB'", "AB")]
+#[case::mixed_case("SELECT x'aBcD'", "aBcD")]
+#[case::empty("SELECT x''", "")]
+fn sqlite_blob_semantics_keep_hex_payload_after_spelling_upgrade(
+    #[case] sql: &str,
+    #[case] payload: &str,
+) -> testresult::TestResult {
     use crate::sem::unresolved::{Expr, Literal};
     use crate::test_helpers::SqliteSynBuilder;
 
-    for (sql, payload) in [
-        ("SELECT x'ab'", "ab"),
-        ("SELECT X'AB'", "AB"),
-        ("SELECT x'aBcD'", "aBcD"),
-        ("SELECT x''", ""),
-    ] {
-        let parsed = SqliteSynBuilder.parse_expression(sql);
-        let Expr::Literal(Literal::Blob(value)) = Expr::try_from(&parsed)? else {
-            panic!("blob literal");
-        };
-        assert_eq!(value, payload);
-    }
+    let parsed = SqliteSynBuilder.parse_expression(sql);
+    let Expr::Literal(Literal::Blob(value)) = Expr::try_from(&parsed)? else {
+        panic!("blob literal");
+    };
+    assert_eq!(value, payload);
     Ok(())
 }

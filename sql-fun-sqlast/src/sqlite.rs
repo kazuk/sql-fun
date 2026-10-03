@@ -177,41 +177,38 @@ mod test_parser_upgrade_boundary {
     use super::{SqliteDialect, SqliteLexer};
     use ::turso_parser::parser::Parser;
 
-    #[test]
-    fn propagates_upstream_rejections_without_replacing_diagnostics() {
-        for sql in [
-            "UPDATE items SET value = 1 ORDER BY value",
-            "UPDATE items SET value = 1 LIMIT 1",
-            "UPDATE items SET value = 1 ORDER BY value LIMIT 1",
-            "DELETE FROM items ORDER BY value",
-            "DELETE FROM items LIMIT 1",
-            "DELETE FROM items ORDER BY value LIMIT 1",
-            "CREATE TABLE items (base INT, derived INT AS (base) DEFAULT 1)",
-            "CREATE TABLE items (derived INT AS (1))",
-            "SELECT 1 ORDER BY 1 UNION SELECT 2",
-            "SELECT 1 LIMIT 1 UNION SELECT 2",
-        ] {
-            let expected = Parser::new(sql.as_bytes())
-                .next_cmd()
-                .expect_err("upstream rejection");
-            let actual = SqliteDialect::parse(sql).expect_err("inherited rejection");
-            assert_eq!(actual.to_string(), expected.to_string(), "{sql}");
-        }
+    #[rstest::rstest]
+    #[case::update_order_by("UPDATE items SET value = 1 ORDER BY value")]
+    #[case::update_limit("UPDATE items SET value = 1 LIMIT 1")]
+    #[case::update_order_by_limit("UPDATE items SET value = 1 ORDER BY value LIMIT 1")]
+    #[case::delete_order_by("DELETE FROM items ORDER BY value")]
+    #[case::delete_limit("DELETE FROM items LIMIT 1")]
+    #[case::delete_order_by_limit("DELETE FROM items ORDER BY value LIMIT 1")]
+    #[case::generated_default("CREATE TABLE items (base INT, derived INT AS (base) DEFAULT 1)")]
+    #[case::only_generated_column("CREATE TABLE items (derived INT AS (1))")]
+    #[case::compound_order_by("SELECT 1 ORDER BY 1 UNION SELECT 2")]
+    #[case::compound_limit("SELECT 1 LIMIT 1 UNION SELECT 2")]
+    fn propagates_upstream_rejections_without_replacing_diagnostics(#[case] sql: &str) {
+        let expected = Parser::new(sql.as_bytes())
+            .next_cmd()
+            .expect_err("upstream rejection");
+        let actual = SqliteDialect::parse(sql).expect_err("inherited rejection");
+        assert_eq!(actual.to_string(), expected.to_string(), "{sql}");
     }
 
-    #[test]
-    fn blob_tokens_retain_complete_text_and_source_span() {
-        for literal in ["x'ab'", "X'AB'", "x'aBcD'", "x''"] {
-            let sql = format!("  {literal}");
-            let mut lexer = SqliteLexer::new(&sql);
-            let whitespace = lexer.next().unwrap().unwrap();
-            assert_eq!(whitespace.text(), "  ");
-            assert_eq!(*whitespace.span(), 0..2);
-            let token = lexer.next().unwrap().unwrap();
-            assert_eq!(token.text(), literal);
-            assert_eq!(*token.span(), 2..sql.len());
-            assert!(lexer.next().unwrap().is_none());
-        }
+    #[rstest::rstest]
+    fn blob_tokens_retain_complete_text_and_source_span(
+        #[values("x'ab'", "X'AB'", "x'aBcD'", "x''")] literal: &str,
+    ) {
+        let sql = format!("  {literal}");
+        let mut lexer = SqliteLexer::new(&sql);
+        let whitespace = lexer.next().unwrap().unwrap();
+        assert_eq!(whitespace.text(), "  ");
+        assert_eq!(*whitespace.span(), 0..2);
+        let token = lexer.next().unwrap().unwrap();
+        assert_eq!(token.text(), literal);
+        assert_eq!(*token.span(), 2..sql.len());
+        assert!(lexer.next().unwrap().is_none());
     }
 }
 

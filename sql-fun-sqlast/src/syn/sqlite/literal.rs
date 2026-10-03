@@ -146,20 +146,17 @@ mod test_parser_blob_payload {
     use crate::syn::sqlite::Expr;
     use crate::test_helpers::SqliteSynBuilder;
 
-    #[test]
-    fn preserves_parser_spelling_and_hex_payload() {
-        for (sql, expected) in [
-            ("SELECT x'ab'", "ab"),
-            ("SELECT X'AB'", "AB"),
-            ("SELECT x'aBcD'", "aBcD"),
-            ("SELECT x''", ""),
-            ("SELECT X''", ""),
-        ] {
-            let Expr::Literal(Literal::Blob(blob)) = SqliteSynBuilder.parse_expression(sql) else {
-                panic!("expected BLOB: {sql}");
-            };
-            assert_eq!(blob.value(), expected);
-            assert_eq!(blob.spelling(), &sql[7..]);
-        }
+    #[rstest::rstest]
+    #[case::lowercase("SELECT x'ab'", "ab")]
+    #[case::uppercase("SELECT X'AB'", "AB")]
+    #[case::mixed_case("SELECT x'aBcD'", "aBcD")]
+    #[case::empty_lowercase("SELECT x''", "")]
+    #[case::empty_uppercase("SELECT X''", "")]
+    fn preserves_parser_spelling_and_hex_payload(#[case] sql: &str, #[case] expected: &str) {
+        let Expr::Literal(Literal::Blob(blob)) = SqliteSynBuilder.parse_expression(sql) else {
+            panic!("expected BLOB: {sql}");
+        };
+        assert_eq!(blob.value(), expected);
+        assert_eq!(blob.spelling(), &sql[7..]);
     }
 }

@@ -1,5 +1,7 @@
+mod generated_identifiers;
 mod parameter_bindings;
 
+pub(crate) use self::generated_identifiers::GeneratedIdentifiers;
 pub(crate) use self::parameter_bindings::ParameterBindings;
 
 use proc_macro2::Span;

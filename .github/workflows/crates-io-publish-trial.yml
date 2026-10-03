@@ -39,11 +39,11 @@ jobs:
         id: crates_io_auth
 
       - name: Publish or resume each crate
+        shell: bash
         env:
           CARGO_REGISTRY_TOKEN: ${{ steps.crates_io_auth.outputs.token }}
           CRATES_IO_BOOTSTRAP_TOKEN: ${{ secrets.CRATES_IO_BOOTSTRAP_TOKEN }}
           CRATES_IO_BOOTSTRAP_KEY: ${{ secrets.CRATES_IO_BOOTSTRAP_KEY }}
-          RUSTC_WRAPPER: "false"
         run: |
           args=(--manifest="$RUNNER_TEMP/crates.tsv")
           if [[ -n "${{ inputs.stop_after }}" ]]; then
@@ -58,5 +58,5 @@ jobs:
             echo '## crates.io publish trial'
             echo
             echo "Snapshot: \`${{ inputs.snapshot }}\`"
-            echo 'Each crate payload is prepared, Cargo outputs are cleaned, and only `target/package` is restored before `cargo publish --no-verify` runs with `RUSTC_WRAPPER=false`.'
+            echo 'Each crate is packaged and published from the materialized source revision with Cargo verbose output retained as trial evidence.'
           } >> "$GITHUB_STEP_SUMMARY"

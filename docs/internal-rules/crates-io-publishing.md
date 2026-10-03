@@ -40,14 +40,11 @@ crate/version pairs are skipped and unpublished pairs continue in workspace
 dependency order.
 
 The publication job materializes versions with
-`.local/bin/materialize-release-versions`. For each crate in dependency order,
-it builds a `.crate` archive with `cargo package --no-verify`, preserves
-`target/package`, cleans Cargo outputs, restores only that payload, then runs
-`cargo publish --no-verify` with `RUSTC_WRAPPER=false`. A successful job
-demonstrates that Cargo did not compile crate code during the restored-payload
-publication path.
-Cargo still constructs an upload archive, so this does not assume that Cargo
-uploads the restored `.crate` unchanged.
+`.local/bin/materialize-release-versions`, then publishes each crate from that
+source revision in dependency order. Cargo creates the `.crate` source package
+and may verify it by compiling unpacked source. The workflow uses `-vv` to
+retain that observed behavior in its log; it does not parse the log or block
+compiler probes.
 
 The workflow summary records the snapshot used and the no-compilation guard.
 Record the run URL, resulting crate versions, resume result, and any Cargo

@@ -2,9 +2,8 @@ use crate::{
     AstAndContextPair,
     sem::{
         AlterOwner, AlterSequence, AlterTable, AnalysisError, Comment, CreateCompositeType,
-        CreateDomain, CreateFunction, CreateIndex, CreateSchema, CreateSequence, CreateTable,
-        CreateTableAs, CreateView, ParseContext, SemAst, create_table::DropTable,
-        unresolved::TryFromWithTokens,
+        CreateDomain, CreateFunction, CreateIndex, CreateSchema, CreateTable, CreateTableAs,
+        ParseContext, SemAst, create_table::DropTable, unresolved::TryFromWithTokens,
     },
     syn::{ListOpt, Opt, ParseResult},
 };
@@ -106,6 +105,7 @@ impl SemAst {
             || statement.as_create_extension_stmt().as_inner().is_some()
             || statement.as_variable_set_stmt().as_inner().is_some()
             || statement.as_create_enum_stmt().as_inner().is_some()
+            || statement.as_create_seq_stmt().as_inner().is_some()
         {
             let syntax =
                 crate::sem::unresolved::Statement::try_from_with_tokens(&statement, tokens)?;
@@ -136,14 +136,6 @@ impl SemAst {
                 tokens,
                 &source_span,
             );
-        }
-
-        if let Some(create_view) = statement.as_view_stmt().as_inner() {
-            return CreateView::analyze_create_view(context, parent_schema, create_view, tokens);
-        }
-
-        if let Some(create_seq) = statement.as_create_seq_stmt().as_inner() {
-            return CreateSequence::analyze_create_seq(context, parent_schema, create_seq);
         }
 
         if let Some(alter_seq) = statement.as_alter_seq_stmt().as_inner() {

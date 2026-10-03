@@ -46,6 +46,7 @@ pub(crate) enum Statement {
     Delete(Delete),
     View(View),
     Extension(Extension),
+    VariableSet(VariableSet),
 }
 
 impl Statement {
@@ -71,6 +72,10 @@ impl Statement {
 
     const fn extension(value: Extension) -> Self {
         Self::Extension(value)
+    }
+
+    const fn variable_set(value: VariableSet) -> Self {
+        Self::VariableSet(value)
     }
 
     pub(crate) fn resolve(
@@ -104,6 +109,11 @@ impl Statement {
                     "extension requires catalog application",
                 ),
             ),
+            Self::VariableSet(_) => crate::sem::resolution::Resolution::new(catalog).finish(
+                crate::sem::AnalysisError::raise_unexpected_input(
+                    "variable set requires catalog application",
+                ),
+            ),
         }
     }
 
@@ -118,6 +128,7 @@ impl Statement {
         match self {
             Self::View(view) => view.resolve_and_apply(context, dialect),
             Self::Extension(extension) => extension.apply(context),
+            Self::VariableSet(variable_set) => variable_set.resolve_and_apply(context, dialect),
             _ => {
                 let outcome = self.resolve(&context, dialect);
                 let mut context = context;
@@ -125,6 +136,49 @@ impl Statement {
                 Ok(crate::AstAndContextPair::new(statement, context))
             }
         }
+    }
+}
+
+#[derive(Clone, Debug)]
+pub(crate) struct VariableSet {
+    name: String,
+    arguments: Vec<Expr>,
+}
+
+impl VariableSet {
+    fn new(name: &str, arguments: Vec<Expr>) -> Self {
+        Self {
+            name: name.to_owned(),
+            arguments,
+        }
+    }
+
+    fn resolve_and_apply<TContext>(
+        &self,
+        context: TContext,
+        dialect: Dialect,
+    ) -> Result<crate::AstAndContextPair<TContext>, crate::sem::AnalysisError>
+    where
+        TContext: crate::sem::ParseContext,
+    {
+        let [argument] = self.arguments.as_slice() else {
+            return crate::sem::AnalysisError::raise_unexpected_input(
+                "VariableSetStmt.args len!=1",
+            );
+        };
+        let outcome = argument.resolve(
+            &context,
+            dialect,
+            &crate::sem::ScalarAnalysisContext::default(),
+        );
+        let mut context = context;
+        let value = outcome.report(&mut context)?;
+        let variable_set = crate::sem::VariableSet::new(&self.name, &value);
+        let context = context.apply_variable_set(&variable_set)?;
+        Ok(crate::AstAndContextPair::new(
+            crate::sem::SemAst::VariableSet(variable_set),
+            context,
+        ))
     }
 }
 

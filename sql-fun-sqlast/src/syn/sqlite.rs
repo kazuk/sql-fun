@@ -234,6 +234,15 @@ pub enum Stmt {
 }
 
 impl Stmt {
+    /// Borrow the UPDATE syntax, if this statement is an UPDATE.
+    pub const fn as_update(&self) -> Option<&Update> {
+        if let Self::Update(value) = self {
+            Some(value)
+        } else {
+            None
+        }
+    }
+
     /// get CreateTable variant
     pub const fn as_create_table(&self) -> Option<&CreateTableStatement> {
         match self {

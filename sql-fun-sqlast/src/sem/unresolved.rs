@@ -10,8 +10,8 @@
 // Construction tests cover these fields even when resolution does not consume them.
 #![allow(dead_code)]
 
-mod document;
 mod ddl;
+mod document;
 mod postgres;
 mod resolve;
 #[cfg(feature = "sqlite")]
@@ -33,7 +33,6 @@ use self::document::{
 pub(crate) use self::document::{JsonTable, XmlTable};
 
 pub(crate) use self::ddl::{Domain, Function, FunctionParameter, Index, Schema, TableAs};
-
 use crate::StringSpan;
 
 #[derive(Clone, Debug)]
@@ -131,7 +130,6 @@ pub(crate) enum AlterCommand {
     Unsupported(String),
 }
 
-
 /// A context-free top-level SQL statement.
 ///
 /// This is deliberately private while statement-family coverage is incomplete.
@@ -153,92 +151,16 @@ pub(crate) enum Statement {
     Comment(Comment),
     AlterOwner(AlterOwner),
     CompositeType(crate::sem::CreateCompositeType),
-    Table(Table),
-    Function(Function),
     Domain(Domain),
-    TableAs(TableAs),
-    Index(Index),
+    Function(Function),
     Schema(Schema),
-    LegacyPostgres(LegacyPostgres),
-}
-
-/// PostgreSQL statement families that still reuse their established semantic
-/// resolver while their payload nodes are being promoted into common syntax.
-///
-/// Construction owns parser output and scan tokens only; it has no catalog or
-/// parse context.  Keeping this transitional representation at the unresolved
-/// boundary ensures every supported top-level PostgreSQL statement follows the
-/// same construction-then-application flow.
-#[derive(Clone, Debug)]
-pub(crate) struct LegacyPostgres {
-    statement: LegacyPostgresStatement,
-    tokens: IVec<crate::syn::ScanToken>,
-}
-
-#[derive(Clone, Debug)]
-enum LegacyPostgresStatement {
-    AlterTable(crate::syn::AlterTableStmt),
-}
-
-impl LegacyPostgres {
-    fn new(statement: LegacyPostgresStatement, tokens: &IVec<crate::syn::ScanToken>) -> Self {
-        Self {
-            statement,
-            tokens: tokens.clone(),
-        }
-    }
-
-    fn resolve_and_apply<TContext>(
-        &self,
-        context: TContext,
-    ) -> Result<crate::AstAndContextPair<TContext>, crate::sem::AnalysisError>
-    where
-        TContext: crate::sem::ParseContext,
-    {
-        let Some(source_span) = context.get_source_path_with_span().cloned() else {
-            crate::sem::AnalysisError::raise_unexpected_none("context get_source_path_with_span")?;
-            crate::sem::AnalysisError::never()
-        };
-
-        match &self.statement {
-            LegacyPostgresStatement::AlterTable(statement) => {
-                crate::sem::AlterTable::analyze_alter_statement(
-                    context,
-                    &None,
-                    statement.clone(),
-                    &self.tokens,
-                    &source_span,
-                )
-            }
-        }
-    }
+    Index(Index),
+    TableAs(TableAs),
+    Table(Table),
+    AlterRelation(AlterRelation),
 }
 
 impl Statement {
-    const fn schema(value: Schema) -> Self {
-        Self::Schema(value)
-    }
-
-    const fn index(value: Index) -> Self {
-        Self::Index(value)
-    }
-
-    const fn table_as(value: TableAs) -> Self {
-        Self::TableAs(value)
-    }
-
-    const fn domain(value: Domain) -> Self {
-        Self::Domain(value)
-    }
-
-    const fn function(value: Function) -> Self {
-        Self::Function(value)
-    }
-
-    const fn table(value: Table) -> Self {
-        Self::Table(value)
-    }
-
     const fn query(value: Query) -> Self {
         Self::Query(value)
     }
@@ -295,8 +217,29 @@ impl Statement {
         Self::CompositeType(value)
     }
 
-    const fn legacy_postgres(value: LegacyPostgres) -> Self {
-        Self::LegacyPostgres(value)
+    const fn alter_relation(value: AlterRelation) -> Self {
+        Self::AlterRelation(value)
+    }
+
+    const fn domain(value: Domain) -> Self {
+        Self::Domain(value)
+    }
+
+    const fn function(value: Function) -> Self {
+        Self::Function(value)
+    }
+    const fn schema(value: Schema) -> Self {
+        Self::Schema(value)
+    }
+    const fn index(value: Index) -> Self {
+        Self::Index(value)
+    }
+    const fn table_as(value: TableAs) -> Self {
+        Self::TableAs(value)
+    }
+
+    const fn table(value: Table) -> Self {
+        Self::Table(value)
     }
 
     pub(crate) fn resolve(
@@ -367,33 +310,33 @@ impl Statement {
                 .finish(Ok(crate::sem::SemAst::CreateCompType(
                     composite_type.clone(),
                 ))),
-            Self::Table(_) => crate::sem::resolution::Resolution::new(catalog).finish(
-                crate::sem::AnalysisError::raise_unexpected_input("table requires source metadata"),
+            Self::AlterRelation(_) => crate::sem::resolution::Resolution::new(catalog).finish(
+                crate::sem::AnalysisError::raise_unexpected_input(
+                    "statement requires catalog application",
+                ),
             ),
             Self::Function(function) => function
                 .resolve(catalog, dialect)
                 .map(crate::sem::SemAst::CreateFunction),
-            Self::Domain(domain) => domain
-                .resolve(catalog)
-                .map(crate::sem::SemAst::CreateDomain),
+            Self::Index(index) => index
+                .resolve(catalog, dialect)
+                .map(crate::sem::SemAst::CreateIndex),
             Self::TableAs(_) => crate::sem::resolution::Resolution::new(catalog).finish(
                 crate::sem::AnalysisError::raise_unexpected_input(
                     "table as requires catalog application",
                 ),
             ),
-            Self::Index(index) => index
-                .resolve(catalog, dialect)
-                .map(crate::sem::SemAst::CreateIndex),
+            Self::Table(_) => crate::sem::resolution::Resolution::new(catalog).finish(
+                crate::sem::AnalysisError::raise_unexpected_input("table requires source metadata"),
+            ),
             Self::Schema(_) => crate::sem::resolution::Resolution::new(catalog).finish(
                 crate::sem::AnalysisError::raise_unexpected_input(
                     "schema requires catalog application",
                 ),
             ),
-            Self::LegacyPostgres(_) => crate::sem::resolution::Resolution::new(catalog).finish(
-                crate::sem::AnalysisError::raise_unexpected_input(
-                    "statement requires catalog application",
-                ),
-            ),
+            Self::Domain(domain) => domain
+                .resolve(catalog)
+                .map(crate::sem::SemAst::CreateDomain),
         }
     }
 
@@ -425,13 +368,13 @@ impl Statement {
                     context,
                 ))
             }
-            Self::Table(table) => table.resolve_and_apply(context, dialect),
-            Self::Function(function) => function.resolve_and_apply(context, dialect),
+            Self::AlterRelation(statement) => statement.resolve_and_apply(context, dialect),
             Self::Domain(domain) => domain.resolve_and_apply(context),
-            Self::TableAs(table_as) => table_as.resolve_and_apply(context, dialect),
-            Self::Index(index) => index.resolve_and_apply(context, dialect),
+            Self::Function(function) => function.resolve_and_apply(context, dialect),
             Self::Schema(schema) => schema.resolve_and_apply(context, dialect),
-            Self::LegacyPostgres(statement) => statement.resolve_and_apply(context),
+            Self::Index(index) => index.resolve_and_apply(context, dialect),
+            Self::TableAs(table_as) => table_as.resolve_and_apply(context, dialect),
+            Self::Table(table) => table.resolve_and_apply(context, dialect),
             _ => {
                 let outcome = self.resolve(&context, dialect);
                 let mut context = context;
@@ -457,7 +400,7 @@ pub(crate) struct Role {
 }
 
 impl AlterOwner {
-    fn new(
+    const fn new(
         object_kind: Option<crate::sem::ObjectKind>,
         relation: Option<Name>,
         object: Vec<String>,
@@ -523,7 +466,12 @@ pub(crate) struct AlterSequence {
 }
 
 impl AlterSequence {
-    fn new(name: Name, options: Vec<SyntaxOption>, for_identity: bool, missing_ok: bool) -> Self {
+    const fn new(
+        name: Name,
+        options: Vec<SyntaxOption>,
+        for_identity: bool,
+        missing_ok: bool,
+    ) -> Self {
         Self {
             name,
             options,
@@ -557,7 +505,7 @@ pub(crate) struct DropTable {
 }
 
 impl DropTable {
-    fn new(names: Vec<Name>, if_exists: bool, cascade: bool, concurrent: bool) -> Self {
+    const fn new(names: Vec<Name>, if_exists: bool, cascade: bool, concurrent: bool) -> Self {
         Self {
             names,
             if_exists,
@@ -601,7 +549,7 @@ pub(crate) struct Sequence {
 }
 
 impl Sequence {
-    fn new(
+    const fn new(
         name: Name,
         options: Vec<SyntaxOption>,
         owner_id: u32,
@@ -640,7 +588,7 @@ pub(crate) struct EnumType {
 }
 
 impl EnumType {
-    fn new(name: Name, values: Vec<String>) -> Self {
+    const fn new(name: Name, values: Vec<String>) -> Self {
         Self { name, values }
     }
 
@@ -745,6 +693,7 @@ pub(crate) struct View {
 }
 
 impl View {
+    #[expect(clippy::too_many_arguments)]
     const fn new(
         name: Name,
         aliases: Vec<String>,
@@ -1359,7 +1308,7 @@ pub(crate) enum FromItem {
 }
 
 impl FromItem {
-    pub(crate) fn relation(relation: Relation) -> Self {
+    pub(crate) const fn relation(relation: Relation) -> Self {
         Self::Relation(relation)
     }
 
@@ -1371,7 +1320,7 @@ impl FromItem {
         Self::Join(Box::new(join))
     }
 
-    pub(crate) fn functions(functions: TableFunctions) -> Self {
+    pub(crate) const fn functions(functions: TableFunctions) -> Self {
         Self::Functions(functions)
     }
 

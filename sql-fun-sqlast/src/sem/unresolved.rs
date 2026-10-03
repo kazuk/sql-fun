@@ -157,6 +157,7 @@ pub(crate) enum Statement {
     Function(Function),
     Domain(Domain),
     TableAs(TableAs),
+    Index(Index),
     LegacyPostgres(LegacyPostgres),
 }
 
@@ -177,7 +178,6 @@ pub(crate) struct LegacyPostgres {
 enum LegacyPostgresStatement {
     CreateSchema(crate::syn::CreateSchemaStmt),
     AlterTable(crate::syn::AlterTableStmt),
-    CreateIndex(crate::syn::IndexStmt),
 }
 
 impl LegacyPostgres {
@@ -217,19 +217,15 @@ impl LegacyPostgres {
                     &source_span,
                 )
             }
-            LegacyPostgresStatement::CreateIndex(statement) => {
-                crate::sem::CreateIndex::analyze_index_stmt(
-                    context,
-                    &None,
-                    statement.clone(),
-                    &self.tokens,
-                )
-            }
         }
     }
 }
 
 impl Statement {
+    const fn index(value: Index) -> Self {
+        Self::Index(value)
+    }
+
     const fn table_as(value: TableAs) -> Self {
         Self::TableAs(value)
     }
@@ -388,6 +384,9 @@ impl Statement {
                     "table as requires catalog application",
                 ),
             ),
+            Self::Index(index) => index
+                .resolve(catalog, dialect)
+                .map(crate::sem::SemAst::CreateIndex),
             Self::LegacyPostgres(_) => crate::sem::resolution::Resolution::new(catalog).finish(
                 crate::sem::AnalysisError::raise_unexpected_input(
                     "statement requires catalog application",
@@ -428,6 +427,7 @@ impl Statement {
             Self::Function(function) => function.resolve_and_apply(context, dialect),
             Self::Domain(domain) => domain.resolve_and_apply(context),
             Self::TableAs(table_as) => table_as.resolve_and_apply(context, dialect),
+            Self::Index(index) => index.resolve_and_apply(context, dialect),
             Self::LegacyPostgres(statement) => statement.resolve_and_apply(context),
             _ => {
                 let outcome = self.resolve(&context, dialect);

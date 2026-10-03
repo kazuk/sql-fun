@@ -1,11 +1,9 @@
 use sql_fun_core::IVec;
 
 use crate::{
-    sem::{
-        AnalysisError, AstAndContextPair, ColumnName, ParseContext, ScalarAnalysisContext, SemAst,
-        SemScalarExpr, TableName,
-    },
-    syn::{ListOpt, Opt, ScanToken, SortByDir},
+    sem::unresolved::TryFromWithTokens,
+    sem::{AnalysisError, AstAndContextPair, ColumnName, ParseContext, SemScalarExpr, TableName},
+    syn::ScanToken,
 };
 
 /// Index item sort order
@@ -96,7 +94,9 @@ impl IndexElementCollection {
 
 #[cfg(test)]
 mod index_element_collection_tests {
-    use super::*;
+    use super::{IndexElement, IndexElementCollection, IndexElementWithOrder, SortOrder};
+    use crate::sem::ColumnName;
+    use ::sql_fun_core::IVec;
 
     #[test]
     fn from_column_names_uses_asc_order_and_no_alias() {
@@ -163,7 +163,6 @@ impl CreateIndex {
             unique,
         }
     }
-
     /// create a instance
     #[must_use]
     pub fn new(name: &str, table: &TableName, key_columns: &IndexElementCollection) -> Self {
@@ -202,8 +201,8 @@ impl CreateIndex {
 
 #[cfg(test)]
 mod create_index_tests {
-    use super::*;
-    use crate::sem::FullName;
+    use super::{CreateIndex, IndexElementCollection};
+    use crate::sem::{ColumnName, FullName, TableName};
 
     #[test]
     fn new_sets_defaults_and_clones_fields() {
@@ -241,66 +240,34 @@ mod create_index_tests {
     }
 }
 
+#[cfg(test)]
 impl CreateIndex {
-    fn sort_order(key: &crate::syn::IndexElem) -> Result<SortOrder, AnalysisError> {
-        let order = if let Some(order) = key.get_ordering().as_inner() {
-            match order {
-                SortByDir::SortbyUsing => {
-                    AnalysisError::raise_unexpected_input("SortbyUsing in IndexElem")?
-                }
-                SortByDir::SortbyDesc => SortOrder::Desc,
-                _ => SortOrder::Asc,
-            }
-        } else {
-            SortOrder::Asc
-        };
-        Ok(order)
-    }
-
-    fn analyze_index_elem<TParseContext>(
-        mut context: TParseContext,
+    fn analyze_index_elem<TContext: ParseContext>(
+        mut context: TContext,
         keys: Vec<crate::syn::IndexElem>,
         tokens: &IVec<ScanToken>,
-    ) -> Result<(IndexElementCollection, TParseContext), AnalysisError>
-    where
-        TParseContext: ParseContext,
-    {
-        let mut key_columns = IndexElementCollection::default();
-        for key in keys {
-            let element = if let Some(expr) = key.get_expr().as_inner() {
-                let (scaler_expr, new_context) = SemScalarExpr::analyze_scaler_expr(
-                    context,
-                    &ScalarAnalysisContext::default(),
-                    expr,
-                    tokens,
-                )?;
-                context = new_context;
-                IndexElement::from(&scaler_expr)
-            } else {
-                let name = key.get_name();
-                IndexElement::from(&ColumnName::from(name))
-            };
-
-            let order = Self::sort_order(&key)?;
-            let col_name = key.get_indexcolname();
-            let col_name = if col_name.is_empty() {
-                None
-            } else {
-                Some(col_name)
-            };
-
-            key_columns.push(IndexElementWithOrder::new(&element, order, &col_name));
-        }
-        Ok((key_columns, context))
+    ) -> Result<(IndexElementCollection, TContext), AnalysisError> {
+        use crate::sem::{
+            resolution::Resolution,
+            unresolved::{Dialect, Index, IndexExpression},
+        };
+        let keys = keys
+            .iter()
+            .map(|key| IndexExpression::try_from_with_tokens(key, tokens))
+            .collect::<Result<Vec<_>, _>>()?;
+        let mut resolution = Resolution::new(&context);
+        let result = Index::resolve_elements(&keys, &mut resolution, Dialect::postgres());
+        let elements = resolution.finish(result).report(&mut context)?;
+        Ok((elements, context))
     }
 }
 
 #[cfg(test)]
 mod analyze_index_elem_tests {
-    use super::*;
+    use super::{CreateIndex, IndexElement, SortOrder};
     use crate::{
-        sem::ScalarConstExpr,
-        syn::{Node, NodeInner, SortByDir},
+        sem::{ColumnName, ScalarConstExpr, SemScalarExpr},
+        syn::{Node, NodeInner, ScanToken, SortByDir},
         test_helpers::{SynBuilder, TestParseContext},
     };
     use sql_fun_core::IVec;
@@ -366,7 +333,7 @@ mod analyze_index_elem_tests {
 impl CreateIndex {
     /// analyze [`crate::syn::IndexStmt`]
     pub fn analyze_index_stmt<TParseContext>(
-        mut context: TParseContext,
+        context: TParseContext,
         _parent_schema: &Option<String>,
         syn: crate::syn::IndexStmt,
         tokens: &IVec<ScanToken>,
@@ -374,58 +341,23 @@ impl CreateIndex {
     where
         TParseContext: ParseContext,
     {
-        let Some(table) = syn.get_relation().as_inner() else {
-            AnalysisError::raise_unexpected_none("indexstmt.relation")?
-        };
-        let Some(keys) = syn.get_index_params().map(|v| v.as_index_elem()) else {
-            AnalysisError::raise_unexpected_none("indexstmt.index_params")?
-        };
-
-        let name = syn.get_idxname();
-        let table = TableName::try_from(table)?;
-        let unique = syn.get_unique();
-
-        let (key_columns, new_context) = Self::analyze_index_elem(context, keys, tokens)?;
-        context = new_context;
-
-        let include_columns =
-            if let Some(includes) = syn.get_index_including_params().map(|v| v.as_index_elem()) {
-                let (cols, new_context) = Self::analyze_index_elem(context, includes, tokens)?;
-                context = new_context;
-                cols
-            } else {
-                IndexElementCollection::default()
-            };
-
-        let create_index = Self {
-            name,
-            table,
-            key_columns,
-            include_columns,
-            unique,
-        };
-
-        context = context.apply_create_index(&create_index)?;
-
-        Ok(AstAndContextPair::new(
-            SemAst::CreateIndex(create_index),
-            context,
-        ))
+        crate::sem::unresolved::Index::try_from_with_tokens(&syn, tokens)?
+            .resolve_and_apply(context, crate::sem::unresolved::Dialect::postgres())
     }
 }
 
 #[cfg(test)]
 mod analyze_index_stmt_tests {
-    use super::*;
+    use super::{CreateIndex, IndexElement, SortOrder};
+    use crate::sem::SemAst;
     use crate::{
-        sem::FullName,
-        syn::{AliasOpt, RangeVarOpt, SortByDir},
+        sem::{AstAndContextPair, ColumnName, FullName},
+        syn::{AliasOpt, RangeVarOpt, ScanToken, SortByDir},
         test_helpers::{SynBuilder, TestParseContext, test_context},
     };
-    use rstest::rstest;
     use sql_fun_core::IVec;
 
-    #[rstest]
+    #[rstest::rstest]
     fn analyze_index_stmt_collects_keys_including_order_and_includes(
         test_context: TestParseContext,
     ) {

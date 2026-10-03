@@ -1,54 +1,22 @@
-#!/bin/bash
+#!/usr/bin/env bash
+set -euo pipefail
 
-set -eu
+repo_root="$(git rev-parse --show-toplevel)"
+cd "$repo_root"
 
-MEMBER_PACKAGES=$(
-  cargo metadata --format-version 1 \
-  | jq -r '
-      .packages[]
-      | select(.source==null)
-      | select(.publish !=[])
-      | .name
-    '
-)
+metadata="$(cargo metadata --no-deps --format-version=1)"
+baseline_revision="$(taplo get --file-path Cargo.toml 'workspace.metadata.baseline')"
 
-PUBLISH_EXCLUDE=$(
-  cargo metadata --format-version 1 \
-  | jq -r '
-      .packages[]
-      | select(.publish ==[])
-      | "--exclude " + .name
-    '
-)
-
-function crate-release-level {
-  tomato get 'workspace.metadata.next-release' Cargo.toml \
-  | jq --arg name ${1} -r '.[$name]'
-}
-
-BASELINE_REV=$(tomato get 'workspace.metadata.baseline' Cargo.toml)
-
-function crate-kind {
-  cargo metadata --format-version 1 \
-  | jq \
-    --arg name ${1} \
-    -r '
-      .packages[]
-      | select(.name==$name)
-      | .targets[].kind[] '
-}
-
-echo "${MEMBER_PACKAGES}" | while IFS= read -r crate_name; do
-  echo "checking ${crate_name}"
-  RELEASE_LEVEL=$(crate-release-level ${crate_name})
-  if crate-kind ${crate_name} | grep -q "lib"; then
-    cargo semver-checks --baseline-rev ${BASELINE_REV} --package ${crate_name} --release-type ${RELEASE_LEVEL}
+while IFS= read -r package; do
+  release_level="$(taplo get --file-path Cargo.toml "workspace.metadata.next-release.$package")"
+  crate_kinds="$(jq -r --arg package "$package" '
+    .packages[] | select(.name == $package) | .targets[].kind[]
+  ' <<<"$metadata")"
+  if grep -Fxq lib <<<"$crate_kinds"; then
+    cargo semver-checks --baseline-rev "$baseline_revision" --package "$package" --release-type "$release_level"
   fi
-done
+done < <(jq -r '.packages[] | select(.source == null and .publish != []) | .name' <<<"$metadata")
 
-echo "${MEMBER_PACKAGES}" | while IFS= read -r crate_name; do
-  RELEASE_LEVEL=$(crate-release-level ${crate_name})
-  BUMPED_VERSION=$(bump-version ${crate_name} ${RELEASE_LEVEL})
-  echo "${crate_name} set version to ${BUMPED_VERSION}"
-  cargo set-version -p ${crate_name} ${BUMPED_VERSION}
-done
+# This exploratory helper remains until #259 adopts the canonical release
+# workflow. Version mutation is delegated to the reusable implementation.
+"$repo_root/.local/bin/materialize-release-versions" --release

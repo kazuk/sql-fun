@@ -1,30 +1,38 @@
-#!/bin/bash
+#!/usr/bin/env bash
+set -euo pipefail
 
-# [semver](https://github.com/masa213f/semver)
+package="${1:?package is required}"
+mode="${2:?release level is required}"
 
-PACKAGE=${1}
-MODE=${2}
+case "$mode" in
+  major|minor|patch) ;;
+  *) echo "unsupported release level: $mode" >&2; exit 1 ;;
+esac
 
-CURRENT_VERSION=$(
-    cargo metadata --format-version 1 \
-    | jq --arg name ${PACKAGE}  -r '
-        .packages[]
-        | select(.name==$name)
-        | .version')
-CURRENT_MAJOR=$(semver --json ${CURRENT_VERSION} | jq '.major')
+current_version="$(cargo metadata --no-deps --format-version=1 | jq -er --arg package "$package" '
+  .packages[] | select(.name == $package) | .version
+')"
+if ! [[ "$current_version" =~ ^([0-9]+)\.([0-9]+)\.([0-9]+)$ ]]; then
+  echo "a stable SemVer version is required for $package: $current_version" >&2
+  exit 1
+fi
 
-if [ $CURRENT_MAJOR -eq 0 ] ; then
-    case "${MODE}" in
-      "major")
-        echo ${CURRENT_VERSION} | semver-bump minor
-        ;;
-      "minor")
-        echo ${CURRENT_VERSION} | semver-bump patch
-        ;;
-      "patch")
-        echo ${CURRENT_VERSION} | semver-bump patch
-        ;;
-    esac
+major="$((10#${BASH_REMATCH[1]}))"
+minor="$((10#${BASH_REMATCH[2]}))"
+patch="$((10#${BASH_REMATCH[3]}))"
+
+# Cargo's conventional pre-1.0 compatibility rule treats a `minor` bump as a
+# breaking change and a `patch` bump as compatible. Compatible release levels
+# therefore map to a patch increment.
+if (( major == 0 )); then
+  case "$mode" in
+    major) printf '0.%d.0\n' "$((minor + 1))" ;;
+    minor|patch) printf '0.%d.%d\n' "$minor" "$((patch + 1))" ;;
+  esac
 else
-    echo ${CURRENT_VERSION} | semver-bump ${MODE}
+  case "$mode" in
+    major) printf '%d.0.0\n' "$((major + 1))" ;;
+    minor) printf '%d.%d.0\n' "$major" "$((minor + 1))" ;;
+    patch) printf '%d.%d.%d\n' "$major" "$minor" "$((patch + 1))" ;;
+  esac
 fi

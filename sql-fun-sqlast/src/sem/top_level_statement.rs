@@ -6,11 +6,7 @@ use crate::{
     syn::{ListOpt, Opt, ParseResult},
 };
 #[cfg(feature = "sqlite")]
-use crate::{
-    SqliteToken,
-    sem::{AlterTable, CreateTable},
-    syn::sqlite::Stmt,
-};
+use crate::{SqliteToken, syn::sqlite::Stmt};
 
 use ::sql_fun_core::IVec;
 
@@ -77,19 +73,21 @@ impl SemAst {
     pub fn semantic_analysis_sqlite_stmt<TContext>(
         context: TContext,
         syn: Stmt,
-        tokens: &IVec<SqliteToken<'_>>,
+        _tokens: &IVec<SqliteToken<'_>>,
     ) -> Result<AstAndContextPair<TContext>, AnalysisError>
     where
         TContext: ParseContext,
     {
-        let Some(source_span) = context.get_source_path_with_span().cloned() else {
+        let Some(_source_span) = context.get_source_path_with_span().cloned() else {
             AnalysisError::raise_unexpected_none("context get_source_path_with_span")?;
             AnalysisError::never();
         };
 
         match syn {
             Stmt::AlterTable(alter_table) => {
-                AlterTable::analyze_alter_table(context, alter_table, tokens, &source_span)
+                let syntax =
+                    crate::sem::unresolved::Statement::try_from(&Stmt::AlterTable(alter_table))?;
+                syntax.resolve_and_apply(context, crate::sem::unresolved::Dialect::sqlite())
             }
             Stmt::CreateTable(create_table_statement) => {
                 let syntax = crate::sem::unresolved::Statement::try_from(&Stmt::CreateTable(
@@ -97,13 +95,6 @@ impl SemAst {
                 ))?;
                 syntax.resolve_and_apply(context, crate::sem::unresolved::Dialect::sqlite())
             }
-            Stmt::DropTable(drop_table_statement) => {
-                let syntax = crate::sem::unresolved::Statement::try_from(&Stmt::DropTable(
-                    drop_table_statement,
-                ))?;
-                syntax.resolve_and_apply(context, crate::sem::unresolved::Dialect::sqlite())
-            }
-            Stmt::Analyze(_analyze_statement) => todo!(),
             Stmt::DropTable(drop_table_statement) => {
                 let syntax = crate::sem::unresolved::Statement::try_from(&Stmt::DropTable(
                     drop_table_statement,

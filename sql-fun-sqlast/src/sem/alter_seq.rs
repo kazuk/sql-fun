@@ -1,6 +1,7 @@
 use crate::{
-    sem::{AnalysisProblem, AstAndContextPair, FullName, alter_table::AlterObjSubCommand},
-    syn::{AlterTableType, ListOpt, Opt},
+    sem::unresolved::TryFromWithTokens,
+    sem::{AstAndContextPair, FullName, alter_table::AlterObjSubCommand},
+    syn::Opt,
 };
 
 use super::{AnalysisError, ParseContext, SemAst};
@@ -49,45 +50,17 @@ impl AlterSequence {
 
     /// analyze [`crate::syn::AlterTableStmt`]
     pub fn analyze_alter_seq_statement<TParseContext>(
-        mut context: TParseContext,
+        context: TParseContext,
         _parent_schema: &Option<String>,
         syn: crate::syn::AlterTableStmt,
     ) -> Result<AstAndContextPair<TParseContext>, AnalysisError>
     where
         TParseContext: ParseContext,
     {
-        let Some(rel) = syn.get_relation().as_inner() else {
-            AnalysisError::raise_unexpected_none("alter_table_stmt.relation")?
-        };
-        let seq_name = FullName::try_from(rel)?;
-        if context.get_sequence(&seq_name).is_none() {
-            context.report_problem(AnalysisProblem::sequence_not_found(&seq_name))?;
-        }
-        let Some(cmds) = syn.get_cmds().map(|c| c.as_alter_table_cmd()) else {
-            AnalysisError::raise_unexpected_none("alter_table_stmt.cmds")?
-        };
-        let mut sub_cmds = Vec::new();
-
-        for cmd in cmds {
-            let Some(subtyp) = cmd.get_subtype().as_inner() else {
-                AnalysisError::raise_unexpected_none("alter_table_cmd.subtype")?
-            };
-            let sub_cmd = match subtyp {
-                AlterTableType::AtChangeOwner => {
-                    crate::sem::alter_table::analyze_alter_obj_change_owner(&context, cmd)?
-                }
-
-                _ => todo!("{subtyp:?}"),
-            };
-            sub_cmds.push(sub_cmd);
-        }
-
-        let alter_seq = Self::new(&seq_name, &sub_cmds);
-
-        context = context.apply_alter_sequence(&alter_seq)?;
-        Ok(AstAndContextPair::new(
-            SemAst::AlterSequence(alter_seq),
-            context,
-        ))
+        crate::sem::unresolved::AlterRelation::try_from_with_tokens(
+            &syn,
+            &sql_fun_core::IVec::default(),
+        )?
+        .resolve_and_apply(context, crate::sem::unresolved::Dialect::postgres())
     }
 }

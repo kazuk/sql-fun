@@ -1,5 +1,5 @@
-mod query;
 mod ddl;
+mod query;
 
 use crate::sem::unresolved::{
     Access, BooleanExpr, BooleanOperator, Call, CallKind, Case, CaseArm, Cast, Collate, DropTable,
@@ -25,8 +25,11 @@ impl TryFrom<&syn::Stmt> for Statement {
 
     fn try_from(value: &syn::Stmt) -> Result<Self, Self::Error> {
         match value {
-            syn::Stmt::CreateTable(table) => Ok(Self::table(super::Table::try_from(table)?)),
             syn::Stmt::Select(query) => Ok(Self::query(Query::try_from(query)?)),
+            syn::Stmt::CreateTable(table) => Ok(Self::table(super::Table::try_from(table)?)),
+            syn::Stmt::AlterTable(table) => {
+                Ok(Self::alter_relation(super::AlterRelation::try_from(table)?))
+            }
             syn::Stmt::CreateView(view) => Ok(Self::view(View::new(
                 Name::from(view.view_name()),
                 view.columns()

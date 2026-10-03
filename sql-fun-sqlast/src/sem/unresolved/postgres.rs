@@ -1,16 +1,15 @@
-mod query;
 mod ddl;
+mod query;
 
 use crate::sem::{
     create_comp_type::{CompositeFieldCollection, CompositeFieldDefinition},
     unresolved::{
         Access, AlterOwner, AlterSequence, BooleanExpr, BooleanOperator, Call, CallKind, Case,
         CaseArm, Cast, Collate, Comment, Delete, DropTable, EnumType, Expr, Extension, Indirection,
-        Insert, LegacyPostgres, LegacyPostgresStatement, Literal, Name, NamedArgument, NullTest,
-        OperatorExpr, OperatorKind, Order, Parameter, Query, Role, Sequence, Slice, SqlValue,
-        Statement, Subquery, SubqueryKind, SyntaxOption, TruthTest, TryCollectFromWithTokens,
-        TryFromWithTokens, TryFromWithTokensOpt, TypeName, Update, VariableSet, View,
-        ViewCheckOption, Window,
+        Insert, Literal, Name, NamedArgument, NullTest, OperatorExpr, OperatorKind, Order,
+        Parameter, Query, Role, Sequence, Slice, SqlValue, Statement, Subquery, SubqueryKind,
+        SyntaxOption, TruthTest, TryCollectFromWithTokens, TryFromWithTokens, TryFromWithTokensOpt,
+        TypeName, Update, VariableSet, View, ViewCheckOption, Window,
     },
 };
 use crate::syn::{ListOpt, Opt};
@@ -128,10 +127,9 @@ impl TryFromWithTokens<&syn::Node> for Statement {
             )?));
         }
         if let Some(alter_table) = value.as_alter_table_stmt().as_inner() {
-            return Ok(Self::legacy_postgres(LegacyPostgres::new(
-                LegacyPostgresStatement::AlterTable(alter_table),
-                tokens,
-            )));
+            return Ok(Self::alter_relation(
+                super::AlterRelation::try_from_with_tokens(&alter_table, tokens)?,
+            ));
         }
         if let Some(create_table_as) = value.as_create_table_as_stmt().as_inner() {
             return Ok(Self::table_as(super::ddl::TableAs::try_from_with_tokens(
@@ -146,6 +144,35 @@ impl TryFromWithTokens<&syn::Node> for Statement {
             )?));
         }
         AnalysisError::raise_unexpected_input("top-level PostgreSQL statement")
+    }
+}
+
+impl TryFromWithTokens<&syn::CreateDomainStmt> for super::ddl::Domain {
+    type Error = AnalysisError;
+
+    fn try_from_with_tokens(
+        value: &syn::CreateDomainStmt,
+        tokens: &IVec<syn::ScanToken>,
+    ) -> Result<Self, Self::Error> {
+        let base = required(value.get_type_name().as_inner(), "create_domain.type_name")?;
+        let mut constraints = Vec::new();
+        for constraint in value
+            .get_constraints()
+            .map(|constraints| constraints.as_constraint())
+            .unwrap_or_default()
+        {
+            constraints.push(super::TableConstraint::try_from_with_tokens(
+                &constraint,
+                tokens,
+            )?);
+        }
+        Ok(Self::new(
+            Name::try_from(value.get_domainname())?,
+            TypeName::try_from_with_tokens(&base, tokens)?,
+            source_span(base.get_location(), tokens).unwrap_or_else(|| StringSpan::new(0, 0)),
+            constraints,
+            Name::try_from(value.get_coll_clause().get_collname())?,
+        ))
     }
 }
 
@@ -1390,34 +1417,5 @@ impl Expr {
         tokens: &IVec<syn::ScanToken>,
     ) -> Result<Self, AnalysisError> {
         Self::try_from_with_tokens(value, tokens)
-    }
-}
-
-impl TryFromWithTokens<&syn::CreateDomainStmt> for super::ddl::Domain {
-    type Error = AnalysisError;
-
-    fn try_from_with_tokens(
-        value: &syn::CreateDomainStmt,
-        tokens: &IVec<syn::ScanToken>,
-    ) -> Result<Self, Self::Error> {
-        let base = required(value.get_type_name().as_inner(), "create_domain.type_name")?;
-        let mut constraints = Vec::new();
-        for constraint in value
-            .get_constraints()
-            .map(|constraints| constraints.as_constraint())
-            .unwrap_or_default()
-        {
-            constraints.push(super::TableConstraint::try_from_with_tokens(
-                &constraint,
-                tokens,
-            )?);
-        }
-        Ok(Self::new(
-            Name::try_from(value.get_domainname())?,
-            TypeName::try_from_with_tokens(&base, tokens)?,
-            source_span(base.get_location(), tokens).unwrap_or_else(|| StringSpan::new(0, 0)),
-            constraints,
-            Name::try_from(value.get_coll_clause().get_collname())?,
-        ))
     }
 }

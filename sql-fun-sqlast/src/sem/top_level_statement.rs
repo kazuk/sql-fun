@@ -3,8 +3,8 @@ use crate::{
     sem::{
         AlterOwner, AlterSequence, AlterTable, AnalysisError, Comment, CreateCompositeType,
         CreateDomain, CreateEnum, CreateExtension, CreateFunction, CreateIndex, CreateSchema,
-        CreateSequence, CreateTable, CreateTableAs, CreateView, ParseContext, SelectStatement,
-        SemAst, VariableSet, create_table::DropTable,
+        CreateSequence, CreateTable, CreateTableAs, CreateView, ParseContext, SemAst, VariableSet,
+        create_table::DropTable, unresolved::TryFromWithTokens,
     },
     syn::{ListOpt, Opt, ParseResult},
 };
@@ -114,8 +114,17 @@ impl SemAst {
             return VariableSet::analyze_variable_set(context, &variable_set, tokens);
         }
 
-        if let Some(select) = statement.as_select_stmt().as_inner() {
-            return SelectStatement::analyze_select(context, select, tokens);
+        if statement.as_select_stmt().as_inner().is_some()
+            || statement.as_insert_stmt().as_inner().is_some()
+            || statement.as_update_stmt().as_inner().is_some()
+            || statement.as_delete_stmt().as_inner().is_some()
+        {
+            let syntax =
+                crate::sem::unresolved::Statement::try_from_with_tokens(&statement, tokens)?;
+            let outcome = syntax.resolve(&context, crate::sem::unresolved::Dialect::postgres());
+            let mut context = context;
+            let statement = outcome.report(&mut context)?;
+            return Ok(AstAndContextPair::new(statement, context));
         }
 
         if let Some(create_schema) = statement.as_create_schema_stmt().as_inner() {
@@ -224,14 +233,11 @@ impl SemAst {
             Stmt::CreateSequence(_create_sequence_statement) => todo!(),
             Stmt::DropSequence(_drop_sequence_statement) => todo!(),
             Stmt::Select(select) => {
-                let syntax = crate::sem::unresolved::Query::try_from(&select)?;
+                let syntax = crate::sem::unresolved::Statement::try_from(&Stmt::Select(select))?;
                 let outcome = syntax.resolve(&context, crate::sem::unresolved::Dialect::sqlite());
                 let mut context = context;
-                let query = outcome.report(&mut context)?;
-                Ok(AstAndContextPair::new(
-                    Self::SelectStatement(query),
-                    context,
-                ))
+                let statement = outcome.report(&mut context)?;
+                Ok(AstAndContextPair::new(statement, context))
             }
             Stmt::Update(_update) => todo!(),
             Stmt::Delete(_delete_statement) => todo!(),
@@ -270,7 +276,11 @@ LANGUAGE C STRICT IMMUTABLE PARALLEL SAFE;"#
     )]
     #[case("SET statement_timeout = 0;")]
     #[case(r#"CREATE DOMAIN public."AccountNumber" AS character varying(15);"#)]
-    fn test_schema_file_context_accept_ddl(
+    #[case("insert into users (id) values (1)")]
+    #[case("update users set id = 1")]
+    #[case("delete from users")]
+    #[case("with changed as (delete from users returning id) select 1")]
+    fn test_schema_file_context_accepts_top_level_statements(
         #[case] sql: &str,
         context_args: SqlFunArgs,
         source_span: SourcePathWithSpan,

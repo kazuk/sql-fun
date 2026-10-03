@@ -33,6 +33,61 @@ pub(crate) use self::document::{JsonTable, XmlTable};
 
 use crate::StringSpan;
 
+/// A context-free top-level SQL statement.
+///
+/// This is deliberately private while statement-family coverage is incomplete.
+/// Parser frontends construct it without catalog access; semantic resolution is
+/// performed only after construction has completed.
+#[derive(Clone, Debug)]
+pub(crate) enum Statement {
+    Query(Query),
+    Insert(Insert),
+    Update(Update),
+    Delete(Delete),
+}
+
+impl Statement {
+    const fn query(value: Query) -> Self {
+        Self::Query(value)
+    }
+
+    const fn insert(value: Insert) -> Self {
+        Self::Insert(value)
+    }
+
+    const fn update(value: Update) -> Self {
+        Self::Update(value)
+    }
+
+    const fn delete(value: Delete) -> Self {
+        Self::Delete(value)
+    }
+
+    pub(crate) fn resolve(
+        &self,
+        catalog: &dyn crate::sem::resolution::Catalog,
+        dialect: Dialect,
+    ) -> crate::sem::resolution::ResolutionOutcome<crate::sem::SemAst> {
+        match self {
+            Self::Query(query) => query
+                .resolve(catalog, dialect)
+                .map(|query| crate::sem::SemAst::select(&query)),
+            // DML semantic analysis currently has no catalog-dependent result.
+            // Keep construction at the common boundary so that its eventual
+            // resolver can replace these markers without changing frontends.
+            Self::Insert(_) => crate::sem::resolution::Resolution::new(catalog).finish(Ok(
+                crate::sem::SemAst::InsertStatement(crate::sem::InsertStatement::empty()),
+            )),
+            Self::Update(_) => crate::sem::resolution::Resolution::new(catalog).finish(Ok(
+                crate::sem::SemAst::UpdateStatement(crate::sem::UpdateStatement::empty()),
+            )),
+            Self::Delete(_) => crate::sem::resolution::Resolution::new(catalog).finish(Ok(
+                crate::sem::SemAst::DeleteStatement(crate::sem::DeleteStatement::empty()),
+            )),
+        }
+    }
+}
+
 pub trait TryFromWithTokens<T>
 where
     Self: Sized,

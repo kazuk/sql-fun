@@ -1,10 +1,10 @@
 mod query;
 
 use crate::sem::unresolved::{
-    Access, BooleanExpr, BooleanOperator, Call, CallKind, Case, CaseArm, Cast, Collate, Expr,
-    Indirection, Literal, Name, NamedArgument, NullTest, OperatorExpr, OperatorKind, Order,
-    Parameter, Query, Slice, SqlValue, Subquery, SubqueryKind, TruthTest, TryCollectFromWithTokens,
-    TryFromWithTokens, TryFromWithTokensOpt, TypeName, Window,
+    Access, BooleanExpr, BooleanOperator, Call, CallKind, Case, CaseArm, Cast, Collate, Delete,
+    Expr, Indirection, Insert, Literal, Name, NamedArgument, NullTest, OperatorExpr, OperatorKind,
+    Order, Parameter, Query, Slice, SqlValue, Statement, Subquery, SubqueryKind, TruthTest,
+    TryCollectFromWithTokens, TryFromWithTokens, TryFromWithTokensOpt, TypeName, Update, Window,
 };
 use crate::syn::{ListOpt, Opt};
 use crate::{StringSpan, sem::AnalysisError, syn};
@@ -34,6 +34,29 @@ impl TryFrom<syn::NodeListOpt> for Name {
             parts.push(required(node.as_string().get_sval(), "name component")?);
         }
         Ok(Self::from_parts(&parts))
+    }
+}
+
+impl TryFromWithTokens<&syn::Node> for Statement {
+    type Error = AnalysisError;
+
+    fn try_from_with_tokens(
+        value: &syn::Node,
+        tokens: &IVec<crate::syn::ScanToken>,
+    ) -> Result<Self, Self::Error> {
+        if let Some(query) = value.as_select_stmt().as_inner() {
+            return Ok(Self::query(Query::try_from_with_tokens(&query, tokens)?));
+        }
+        if let Some(insert) = value.as_insert_stmt().as_inner() {
+            return Ok(Self::insert(Insert::try_from_with_tokens(&insert, tokens)?));
+        }
+        if let Some(update) = value.as_update_stmt().as_inner() {
+            return Ok(Self::update(Update::try_from_with_tokens(&update, tokens)?));
+        }
+        if let Some(delete) = value.as_delete_stmt().as_inner() {
+            return Ok(Self::delete(Delete::try_from_with_tokens(&delete, tokens)?));
+        }
+        AnalysisError::raise_unexpected_input("top-level PostgreSQL statement")
     }
 }
 

@@ -3,7 +3,8 @@ mod query;
 use crate::sem::unresolved::{
     Access, BooleanExpr, BooleanOperator, Call, CallKind, Case, CaseArm, Cast, Collate, Expr,
     InTable, Indirection, Literal, Name, NullTest, OperatorExpr, OperatorKind, Order, Parameter,
-    Query, Raise, SqlValue, Subquery, SubqueryKind, TryFromList, TryFromOpt, TypeName, Window,
+    Query, Raise, SqlValue, Statement, Subquery, SubqueryKind, TryFromList, TryFromOpt, TypeName,
+    Window,
 };
 use crate::{sem::AnalysisError, syn::sqlite as syn};
 
@@ -15,6 +16,17 @@ impl From<&syn::QualifiedName> for Name {
         }
         parts.push(value.name().value().to_owned());
         Self::from_parts(&parts)
+    }
+}
+
+impl TryFrom<&syn::Stmt> for Statement {
+    type Error = AnalysisError;
+
+    fn try_from(value: &syn::Stmt) -> Result<Self, Self::Error> {
+        match value {
+            syn::Stmt::Select(query) => Ok(Self::query(Query::try_from(query)?)),
+            _ => AnalysisError::raise_unexpected_input("top-level SQLite statement"),
+        }
     }
 }
 

@@ -97,50 +97,74 @@ impl super::AlterRelationKind {
         syntax_commands: &[super::AlterCommand],
         source: Option<&crate::sem::SourcePathWithSpan>,
     ) -> Result<SemAst, AnalysisError> {
-        use crate::sem::{AlterSequence, AlterTable, AlterView, TableName, ViewName};
         match self {
-            Self::Table => {
-                let Some(source) = source else {
-                    return AnalysisError::raise_unexpected_none("source span");
-                };
-                let table = TableName::from(name.clone());
-                if context.get_table(&table).is_none() {
-                    context.report_problem(AnalysisProblem::relation_not_found(&table))?;
-                }
-                let mut commands = Vec::new();
-                for command in syntax_commands {
-                    commands.push(command.resolve(context, dialect, &table)?);
-                }
-                Ok(SemAst::alter_table(&AlterTable::new(
-                    &table, &commands, source,
-                )))
-            }
-            Self::View | Self::MaterializedView => {
-                let view = ViewName::from_full_name(name);
-                if let Some(definition) = context.get_view(&view) {
-                    if matches!(self, Self::MaterializedView) && !definition.is_materialized() {
-                        context.report_problem(AnalysisProblem::view_not_matview(&view))?;
-                    }
-                } else {
-                    context.report_problem(AnalysisProblem::view_not_found(&view))?;
-                }
-                let commands = syntax_commands
-                    .iter()
-                    .map(super::AlterCommand::resolve_owner)
-                    .collect::<Vec<_>>();
-                Ok(SemAst::alter_view(&AlterView::new(&view, &commands)))
-            }
-            Self::Sequence => {
-                if !context.has_sequence(name) {
-                    context.report_problem(AnalysisProblem::sequence_not_found(name))?;
-                }
-                let commands = syntax_commands
-                    .iter()
-                    .map(super::AlterCommand::resolve_owner)
-                    .collect::<Vec<_>>();
-                Ok(SemAst::alter_sequence(&AlterSequence::new(name, &commands)))
-            }
+            Self::Table => Self::resolve_table(context, dialect, name, syntax_commands, source),
+            Self::View => Self::resolve_view(context, name, syntax_commands, false),
+            Self::MaterializedView => Self::resolve_view(context, name, syntax_commands, true),
+            Self::Sequence => Self::resolve_sequence(context, name, syntax_commands),
         }
+    }
+
+    fn resolve_table(
+        context: &mut Resolution<'_>,
+        dialect: Dialect,
+        name: &crate::sem::FullName,
+        syntax_commands: &[super::AlterCommand],
+        source: Option<&crate::sem::SourcePathWithSpan>,
+    ) -> Result<SemAst, AnalysisError> {
+        use crate::sem::{AlterTable, TableName};
+        let Some(source) = source else {
+            return AnalysisError::raise_unexpected_none("source span");
+        };
+        let table = TableName::from(name.clone());
+        if context.get_table(&table).is_none() {
+            context.report_problem(AnalysisProblem::relation_not_found(&table))?;
+        }
+        let mut commands = Vec::new();
+        for command in syntax_commands {
+            commands.push(command.resolve(context, dialect, &table)?);
+        }
+        Ok(SemAst::alter_table(&AlterTable::new(
+            &table, &commands, source,
+        )))
+    }
+
+    fn resolve_view(
+        context: &mut Resolution<'_>,
+        name: &crate::sem::FullName,
+        syntax_commands: &[super::AlterCommand],
+        materialized: bool,
+    ) -> Result<SemAst, AnalysisError> {
+        use crate::sem::{AlterView, ViewName};
+        let view = ViewName::from_full_name(name);
+        if let Some(definition) = context.get_view(&view) {
+            if materialized && !definition.is_materialized() {
+                context.report_problem(AnalysisProblem::view_not_matview(&view))?;
+            }
+        } else {
+            context.report_problem(AnalysisProblem::view_not_found(&view))?;
+        }
+        let commands = syntax_commands
+            .iter()
+            .map(super::AlterCommand::resolve_owner)
+            .collect::<Vec<_>>();
+        Ok(SemAst::alter_view(&AlterView::new(&view, &commands)))
+    }
+
+    fn resolve_sequence(
+        context: &mut Resolution<'_>,
+        name: &crate::sem::FullName,
+        syntax_commands: &[super::AlterCommand],
+    ) -> Result<SemAst, AnalysisError> {
+        use crate::sem::AlterSequence;
+        if !context.has_sequence(name) {
+            context.report_problem(AnalysisProblem::sequence_not_found(name))?;
+        }
+        let commands = syntax_commands
+            .iter()
+            .map(super::AlterCommand::resolve_owner)
+            .collect::<Vec<_>>();
+        Ok(SemAst::alter_sequence(&AlterSequence::new(name, &commands)))
     }
 }
 
@@ -195,61 +219,129 @@ impl super::AlterCommand {
         dialect: Dialect,
         table: &crate::sem::TableName,
     ) -> Result<crate::sem::alter_table::AlterObjSubCommand, AnalysisError> {
-        use crate::sem::{
-            ColumnName, ScalarAnalysisContext, TableName, alter_table::AlterObjSubCommand,
-        };
-        Ok(match self {
-            Self::Owner(_) => self.resolve_owner(),
-            Self::Default(name, expr) => {
-                let name = ColumnName::from(name.as_str());
-                let expr = expr.resolve_in(context, dialect, &ScalarAnalysisContext::default())?;
-                Self::missing_column(context, table, &name)?;
-                AlterObjSubCommand::column_default(&name, &expr)
-            }
-            Self::Constraint(constraint) => {
-                AlterObjSubCommand::add_constraint(&constraint.resolve(context, table)?)
-            }
-            Self::Cluster(name) => {
-                if !context.has_index(name) {
-                    context.report_problem(AnalysisProblem::index_not_found(name))?;
-                }
-                AlterObjSubCommand::cluster_on(name)
-            }
-            Self::Rename(name) => {
-                let name = TableName::from(name.full_name()?);
-                if context.get_table(&name).is_some() {
-                    context.report_problem(AnalysisProblem::relation_already_exists(&name))?;
-                }
-                AlterObjSubCommand::rename_to(&name)
-            }
+        match self {
+            Self::Owner(_) => Ok(self.resolve_owner()),
+            Self::Default(name, expr) => Self::resolve_default(context, dialect, table, name, expr),
+            Self::Constraint(constraint) => Self::resolve_constraint(context, table, constraint),
+            Self::Cluster(name) => Self::resolve_cluster(context, name),
+            Self::Rename(name) => Self::resolve_rename(context, name),
             Self::AddColumn(column) if dialect == Dialect::sqlite() => {
-                let column = column.resolve(context, dialect, table)?;
-                if let Some(name) = column.name() {
-                    Self::existing_column(context, table, name)?;
-                }
-                AlterObjSubCommand::add_column(&column)
+                Self::resolve_add_column(context, dialect, table, column)
             }
             Self::AlterColumn(name, column) if dialect == Dialect::sqlite() => {
-                let name = ColumnName::from(name.as_str());
-                Self::missing_column(context, table, &name)?;
-                AlterObjSubCommand::alter_column(&name, &column.resolve(context, dialect, table)?)
+                Self::resolve_alter_column(context, dialect, table, name, column)
             }
-            Self::RenameColumn(from, to) => {
-                let from = ColumnName::from(from.as_str());
-                let to = ColumnName::from(to.as_str());
-                Self::missing_column(context, table, &from)?;
-                if from != to {
-                    Self::existing_column(context, table, &to)?;
-                }
-                AlterObjSubCommand::rename_column(&from, &to)
-            }
+            Self::RenameColumn(from, to) => Self::resolve_rename_column(context, table, from, to),
             Self::DropColumn(name) if dialect == Dialect::sqlite() => {
-                let name = ColumnName::from(name.as_str());
-                Self::missing_column(context, table, &name)?;
-                AlterObjSubCommand::drop_column(&name)
+                Self::resolve_drop_column(context, table, name)
             }
             _ => todo!(),
-        })
+        }
+    }
+
+    fn resolve_default(
+        context: &mut Resolution<'_>,
+        dialect: Dialect,
+        table: &crate::sem::TableName,
+        name: &str,
+        expr: &Expr,
+    ) -> Result<crate::sem::alter_table::AlterObjSubCommand, AnalysisError> {
+        use crate::sem::{ColumnName, ScalarAnalysisContext, alter_table::AlterObjSubCommand};
+        let name = ColumnName::from(name);
+        let expr = expr.resolve_in(context, dialect, &ScalarAnalysisContext::default())?;
+        Self::missing_column(context, table, &name)?;
+        Ok(AlterObjSubCommand::column_default(&name, &expr))
+    }
+
+    fn resolve_constraint(
+        context: &mut Resolution<'_>,
+        table: &crate::sem::TableName,
+        constraint: &super::TableConstraint,
+    ) -> Result<crate::sem::alter_table::AlterObjSubCommand, AnalysisError> {
+        use crate::sem::alter_table::AlterObjSubCommand;
+        Ok(AlterObjSubCommand::add_constraint(
+            &constraint.resolve(context, table)?,
+        ))
+    }
+
+    fn resolve_cluster(
+        context: &mut Resolution<'_>,
+        name: &str,
+    ) -> Result<crate::sem::alter_table::AlterObjSubCommand, AnalysisError> {
+        use crate::sem::alter_table::AlterObjSubCommand;
+        if !context.has_index(name) {
+            context.report_problem(AnalysisProblem::index_not_found(name))?;
+        }
+        Ok(AlterObjSubCommand::cluster_on(name))
+    }
+
+    fn resolve_rename(
+        context: &mut Resolution<'_>,
+        name: &Name,
+    ) -> Result<crate::sem::alter_table::AlterObjSubCommand, AnalysisError> {
+        use crate::sem::{TableName, alter_table::AlterObjSubCommand};
+        let name = TableName::from(name.full_name()?);
+        if context.get_table(&name).is_some() {
+            context.report_problem(AnalysisProblem::relation_already_exists(&name))?;
+        }
+        Ok(AlterObjSubCommand::rename_to(&name))
+    }
+
+    fn resolve_add_column(
+        context: &mut Resolution<'_>,
+        dialect: Dialect,
+        table: &crate::sem::TableName,
+        column: &super::Column,
+    ) -> Result<crate::sem::alter_table::AlterObjSubCommand, AnalysisError> {
+        use crate::sem::alter_table::AlterObjSubCommand;
+        let column = column.resolve(context, dialect, table)?;
+        if let Some(name) = column.name() {
+            Self::existing_column(context, table, name)?;
+        }
+        Ok(AlterObjSubCommand::add_column(&column))
+    }
+
+    fn resolve_alter_column(
+        context: &mut Resolution<'_>,
+        dialect: Dialect,
+        table: &crate::sem::TableName,
+        name: &str,
+        column: &super::Column,
+    ) -> Result<crate::sem::alter_table::AlterObjSubCommand, AnalysisError> {
+        use crate::sem::{ColumnName, alter_table::AlterObjSubCommand};
+        let name = ColumnName::from(name);
+        Self::missing_column(context, table, &name)?;
+        Ok(AlterObjSubCommand::alter_column(
+            &name,
+            &column.resolve(context, dialect, table)?,
+        ))
+    }
+
+    fn resolve_rename_column(
+        context: &mut Resolution<'_>,
+        table: &crate::sem::TableName,
+        from: &str,
+        to: &str,
+    ) -> Result<crate::sem::alter_table::AlterObjSubCommand, AnalysisError> {
+        use crate::sem::{ColumnName, alter_table::AlterObjSubCommand};
+        let from = ColumnName::from(from);
+        let to = ColumnName::from(to);
+        Self::missing_column(context, table, &from)?;
+        if from != to {
+            Self::existing_column(context, table, &to)?;
+        }
+        Ok(AlterObjSubCommand::rename_column(&from, &to))
+    }
+
+    fn resolve_drop_column(
+        context: &mut Resolution<'_>,
+        table: &crate::sem::TableName,
+        name: &str,
+    ) -> Result<crate::sem::alter_table::AlterObjSubCommand, AnalysisError> {
+        use crate::sem::{ColumnName, alter_table::AlterObjSubCommand};
+        let name = ColumnName::from(name);
+        Self::missing_column(context, table, &name)?;
+        Ok(AlterObjSubCommand::drop_column(&name))
     }
 }
 
@@ -283,50 +375,70 @@ impl super::ColumnConstraint {
         name: &str,
         keys: &[crate::sem::ColumnName],
     ) -> Result<crate::sem::Constraint, AnalysisError> {
-        use crate::sem::{
-            ColumnName, Constraint, PrimaryKeyConstraint, TableName,
-            constraint::{ForeignKeyConstraint, UniqueConstraint},
-        };
         match self {
-            Self::PrimaryKey(_, _) => Ok(Constraint::primary_key(&PrimaryKeyConstraint::new(
-                name, table, keys,
-            ))),
-            Self::Unique(_) => Ok(Constraint::unique(&UniqueConstraint::new(
-                name, table, keys,
-            ))),
-            Self::ForeignKey(reference) => {
-                let target = TableName::from(reference.table.full_name()?);
-                if context.get_table(&target).is_none() {
-                    context.report_problem(AnalysisProblem::relation_not_found(&target))?;
-                }
-                let target_keys = if reference.columns.is_empty() {
-                    context
-                        .get_table(&target)
-                        .map(|table| table.primary_key_columns().into_iter().cloned().collect())
-                } else {
-                    Some(
-                        reference
-                            .columns
-                            .iter()
-                            .map(|key| ColumnName::from(key.as_str()))
-                            .collect::<Vec<_>>(),
-                    )
-                };
-                if let Some(keys) = &target_keys {
-                    for key in keys {
-                        super::AlterCommand::missing_column(context, &target, key)?;
-                    }
-                }
-                Ok(Constraint::foreign(&ForeignKeyConstraint::new(
-                    name,
-                    table,
-                    &target,
-                    keys,
-                    &target_keys,
-                )))
-            }
+            Self::PrimaryKey(_, _) => Ok(Self::resolve_table_primary_key(table, name, keys)),
+            Self::Unique(_) => Ok(Self::resolve_table_unique(table, name, keys)),
+            Self::ForeignKey(reference) => reference.resolve_table(context, table, name, keys),
             _ => todo!(),
         }
+    }
+
+    fn resolve_table_primary_key(
+        table: &crate::sem::TableName,
+        name: &str,
+        keys: &[crate::sem::ColumnName],
+    ) -> crate::sem::Constraint {
+        use crate::sem::{Constraint, PrimaryKeyConstraint};
+        Constraint::primary_key(&PrimaryKeyConstraint::new(name, table, keys))
+    }
+
+    fn resolve_table_unique(
+        table: &crate::sem::TableName,
+        name: &str,
+        keys: &[crate::sem::ColumnName],
+    ) -> crate::sem::Constraint {
+        use crate::sem::{Constraint, constraint::UniqueConstraint};
+        Constraint::unique(&UniqueConstraint::new(name, table, keys))
+    }
+}
+
+impl super::ForeignReference {
+    fn resolve_table(
+        &self,
+        context: &mut Resolution<'_>,
+        table: &crate::sem::TableName,
+        name: &str,
+        keys: &[crate::sem::ColumnName],
+    ) -> Result<crate::sem::Constraint, AnalysisError> {
+        use crate::sem::{ColumnName, Constraint, TableName, constraint::ForeignKeyConstraint};
+        let target = TableName::from(self.table.full_name()?);
+        if context.get_table(&target).is_none() {
+            context.report_problem(AnalysisProblem::relation_not_found(&target))?;
+        }
+        let target_keys = if self.columns.is_empty() {
+            context
+                .get_table(&target)
+                .map(|table| table.primary_key_columns().into_iter().cloned().collect())
+        } else {
+            Some(
+                self.columns
+                    .iter()
+                    .map(|key| ColumnName::from(key.as_str()))
+                    .collect::<Vec<_>>(),
+            )
+        };
+        if let Some(keys) = &target_keys {
+            for key in keys {
+                super::AlterCommand::missing_column(context, &target, key)?;
+            }
+        }
+        Ok(Constraint::foreign(&ForeignKeyConstraint::new(
+            name,
+            table,
+            &target,
+            keys,
+            &target_keys,
+        )))
     }
 }
 

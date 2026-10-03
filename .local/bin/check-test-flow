@@ -28,6 +28,7 @@ Default steps:
   markdown-lint
   doc
   typos
+  version-materialization
   graphify
   skill-lint
 
@@ -49,6 +50,7 @@ DEFAULT_STEPS=(
   markdown-lint
   doc
   typos
+  version-materialization
   graphify
   skill-lint
 )
@@ -61,7 +63,7 @@ function list_steps() {
 
 function normalize_step() {
   case "$1" in
-    affected|workspace|proc-macro-tests|fmt|lint|server-api-spec|deny|dependency-updates|doc|typos|graphify|skill-lint|markdown-lint|packaging|cli-contract)
+    affected|workspace|proc-macro-tests|fmt|lint|server-api-spec|deny|dependency-updates|doc|typos|version-materialization|graphify|skill-lint|markdown-lint|packaging|cli-contract)
       printf '%s\n' "$1"
       ;;
     format)
@@ -252,6 +254,11 @@ function run_typos() {
   typos --config .local/config/typos.toml
 }
 
+function run_version_materialization() {
+  echo "== Verify release version materialization"
+  "${GIT_ROOT}/.local/bin/test-materialize-release-versions"
+}
+
 function run_packaging() {
   echo "== Build and validate Linux distributions"
   "${GIT_ROOT}/.local/bin/package-linux" x86_64-unknown-linux-gnu
@@ -315,6 +322,7 @@ for step in "${ALL_STEPS[@]}"; do
       dependency-updates) run_dependency_updates ;;
       doc) run_doc ;;
       typos) run_typos ;;
+      version-materialization) run_version_materialization ;;
       graphify) run_graphify ;;
       skill-lint) run_skill_validator ;;
       markdown-lint) run_rumdl ;;

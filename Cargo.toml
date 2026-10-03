@@ -49,6 +49,8 @@ sql-fun-server-api = "patch"
 sql-fun-core = "patch"
 sql-fun-client = "patch"
 sql-fun-sqlast = "patch"
+sql-fun-codegen = "patch"
+sql-fun-collector = "patch"
 
 [workspace.lints]
 

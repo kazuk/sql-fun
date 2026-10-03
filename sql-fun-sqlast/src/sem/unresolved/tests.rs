@@ -6,7 +6,7 @@ use self::test_helpers::postgres;
 
 use crate::sem::unresolved::{Dialect, Statement, TryFromWithTokens};
 use crate::sem::{ColumnName, PgBuiltInType};
-use crate::test_helpers::{SynBuilder, TestParseContext};
+use crate::test_helpers::{SynBuilder, TestParseContext, source_span};
 
 use ::sql_fun_core::IVec;
 
@@ -39,6 +39,136 @@ fn postgres_top_level_statement_construction_is_context_free(
 ) -> testresult::TestResult {
     let statement = SynBuilder::new().parse(sql);
     Statement::try_from_with_tokens(&statement, &IVec::default())?;
+    Ok(())
+}
+
+#[rstest::rstest]
+#[case("create procedure missing(x absent) language sql as 'select 1'")]
+#[case("create table missing (id absent, constraint pk primary key (id))")]
+#[case("create domain email as absent default 'unknown' check (true)")]
+#[case(
+    "create schema app create table missing (id absent) create view missing_view as select id from missing"
+)]
+#[case(
+    "create function missing(x absent default unknown()) returns absent language sql as 'select 1'"
+)]
+#[case("create index missing_idx on missing (unknown(id)) include (extra) where id > 0")]
+fn ddl_construction_does_not_require_referenced_objects(
+    #[case] sql: &str,
+) -> testresult::TestResult {
+    let syntax = Statement::try_from_with_tokens(&SynBuilder::new().parse(sql), &IVec::default())?;
+    assert!(matches!(
+        syntax,
+        Statement::Table(_)
+            | Statement::Domain(_)
+            | Statement::Schema(_)
+            | Statement::Function(_)
+            | Statement::Index(_)
+    ));
+    Ok(())
+}
+
+#[rstest::rstest]
+fn table_resolves_with_read_only_catalog(
+    source_span: crate::sem::SourcePathWithSpan,
+) -> testresult::TestResult {
+    let syntax = Statement::try_from_with_tokens(
+        &SynBuilder::new().parse("create table items (id integer default 1)"),
+        &IVec::default(),
+    )?;
+    let Statement::Table(table) = syntax else {
+        panic!("table syntax");
+    };
+    let catalog = test_helpers::ReadOnlyCatalog::new();
+    let mut diagnostics = TestParseContext::default();
+    let table = table
+        .resolve(&catalog, Dialect::postgres(), &source_span)
+        .report(&mut diagnostics)?;
+    let id = table.get_column_def(&ColumnName::from("id")).expect("id");
+    assert_eq!(id.get_type(), Some(&crate::sem::PgBuiltInType::int4()));
+    assert!(id.constraints()[0].as_default().is_some());
+    assert_eq!(diagnostics.reported_problem_count(), 0);
+    Ok(())
+}
+
+#[rstest::rstest]
+#[case("create domain label as text")]
+#[case(
+    "create function answer(x integer default 1) returns integer language sql strict as 'select x'"
+)]
+#[case("create index items_idx on items (id desc) include (extra)")]
+fn ddl_resolution_needs_no_catalog_write_interface(#[case] sql: &str) -> testresult::TestResult {
+    let syntax = Statement::try_from_with_tokens(&SynBuilder::new().parse(sql), &IVec::default())?;
+    let catalog = test_helpers::ReadOnlyCatalog::new();
+    let mut diagnostics = TestParseContext::default();
+    syntax
+        .resolve(&catalog, Dialect::postgres())
+        .report(&mut diagnostics)?;
+    assert_eq!(diagnostics.reported_problem_count(), 0);
+    Ok(())
+}
+
+#[cfg(feature = "sqlite")]
+#[rstest::rstest]
+#[case("create table items (id integer default 1, label text not null)", true)]
+#[case("alter table items add column label text default 'new'", false)]
+#[case("alter table items drop column label", false)]
+#[case("alter table items rename column label to title", false)]
+#[case("alter table items rename to renamed", false)]
+fn sqlite_ddl_owns_syntax_after_parser_input_is_dropped(
+    #[case] sql: &str,
+    #[case] is_create: bool,
+) -> testresult::TestResult {
+    let syntax = {
+        let parsed = crate::test_helpers::SqliteSynBuilder.parse_as_stmt(sql);
+        Statement::try_from(&parsed)?
+    };
+    assert_eq!(matches!(syntax, Statement::Table(_)), is_create);
+    assert_eq!(matches!(syntax, Statement::AlterRelation(_)), !is_create);
+    Ok(())
+}
+
+#[cfg(feature = "sqlite")]
+#[test]
+fn sqlite_table_retains_named_constraints_order_and_options() -> testresult::TestResult {
+    let parsed = crate::test_helpers::SqliteSynBuilder.parse_as_stmt(
+        "create table items (id integer, label text, constraint pk primary key (id desc)) without rowid, strict",
+    );
+    let Statement::Table(table) = Statement::try_from(&parsed)? else {
+        panic!("table syntax");
+    };
+    assert_eq!(table.constraints[0].name.as_deref(), Some("pk"));
+    assert_eq!(table.constraints[0].order[0].descending, Some(true));
+    assert_eq!(table.options.len(), 2);
+    Ok(())
+}
+
+#[cfg(feature = "sqlite")]
+#[rstest::rstest]
+fn public_sqlite_table_dispatch_preserves_column_semantics(
+    source_span: crate::sem::SourcePathWithSpan,
+) -> testresult::TestResult {
+    use crate::sem::{MutSourcePathWithSpan, SemAst};
+    let parsed = crate::test_helpers::SqliteSynBuilder
+        .parse_as_stmt("create table items (label text not null default 'one')");
+    let mut context = TestParseContext::default();
+    context.set_get_search_path_result(&[
+        crate::sem::SchemaName::from("public"),
+        crate::sem::SchemaName::from("pg_catalog"),
+    ]);
+    context.setup_type(crate::sem::PgBuiltInType::text());
+    context.set_source_path_with_span(&source_span);
+    let crate::AstAndContextPair(statement, context) =
+        SemAst::semantic_analysis_sqlite_stmt(context, parsed, &IVec::default())?;
+    let SemAst::CreateTable(table) = statement else {
+        panic!("semantic table");
+    };
+    let column = table
+        .get_column_def(&ColumnName::from("label"))
+        .expect("label");
+    assert_eq!(column.is_not_null(), Some(true));
+    assert!(column.constraints()[1].as_default().is_some());
+    assert_eq!(context.reported_problem_count(), 0);
     Ok(())
 }
 

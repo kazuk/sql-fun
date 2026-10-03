@@ -350,6 +350,54 @@ impl CreateTable {
     }
 }
 
+#[cfg(all(test, feature = "sqlite"))]
+mod test_analyze_columns_and_constraint {
+    use crate::{
+        sem::{CreateTableMode, SchemaName, SourcePathWithSpan},
+        syn::sqlite::{CreateTableBody, Stmt},
+        test_helpers::{
+            SqliteSynBuilder, TestParseContext, sem_builder, source_span, sqlite_syn, test_context,
+        },
+    };
+
+    #[rstest::rstest]
+    #[case(CreateTableMode::Default)]
+    #[case(CreateTableMode::IfNotExists)]
+    #[case(CreateTableMode::OrReplace)]
+    fn preserves_explicit_creation_mode(
+        mut test_context: TestParseContext,
+        sqlite_syn: SqliteSynBuilder,
+        source_span: SourcePathWithSpan,
+        #[case] mode: CreateTableMode,
+    ) -> testresult::TestResult {
+        test_context.set_get_search_path_result(&[
+            SchemaName::from("public"),
+            SchemaName::from("pg_catalog"),
+        ]);
+        let Stmt::CreateTable(table) = sqlite_syn.parse_as_stmt("create table users(id integer)")
+        else {
+            panic!("expected CREATE TABLE");
+        };
+        let (_, _, _, body) = table.dissolve();
+        let CreateTableBody::ColumnsAndConstraint(body) = body else {
+            panic!("expected column definitions");
+        };
+        let (table, _) = super::CreateTable::analyze_columns_and_constraint(
+            test_context,
+            &None,
+            &sem_builder().table_name("users"),
+            &mode,
+            true,
+            body,
+            &Vec::new().into(),
+            &source_span,
+        )?;
+        assert_eq!(table.mode(), &mode);
+        assert!(table.temporary());
+        Ok(())
+    }
+}
+
 #[cfg(feature = "sqlite")]
 impl CreateTable {
     /// analyze [`crate::syn::sqlite::CreateTableBody`]

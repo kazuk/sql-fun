@@ -276,6 +276,46 @@ pub enum SemAst {
 }
 
 impl SemAst {
+    pub(crate) fn create_table(table: &CreateTable) -> Self {
+        Self::CreateTable(table.clone())
+    }
+    pub(crate) fn create_function(function: &CreateFunction) -> Self {
+        Self::CreateFunction(function.clone())
+    }
+    pub(crate) fn create_schema(schema: &CreateSchema) -> Self {
+        Self::CreateSchema(schema.clone())
+    }
+    pub(crate) fn create_domain(domain: &CreateDomain) -> Self {
+        Self::CreateDomain(domain.clone())
+    }
+    pub(crate) fn create_table_as(table: &CreateTableAs) -> Self {
+        Self::CreateTableAs(table.clone())
+    }
+    pub(crate) fn create_index(index: &CreateIndex) -> Self {
+        Self::CreateIndex(index.clone())
+    }
+    pub(crate) fn alter_table(table: &AlterTable) -> Self {
+        Self::AlterTable(table.clone())
+    }
+    pub(crate) fn alter_view(view: &AlterView) -> Self {
+        Self::AlterView(view.clone())
+    }
+    pub(crate) fn alter_sequence(sequence: &AlterSequence) -> Self {
+        Self::AlterSequence(sequence.clone())
+    }
+
+    pub(crate) fn apply_relation_alter<TContext: ParseContext>(
+        &self,
+        context: TContext,
+    ) -> Result<TContext, AnalysisError> {
+        match self {
+            Self::AlterTable(table) => context.apply_alter_table(table),
+            Self::AlterView(view) => context.apply_alter_view(view),
+            Self::AlterSequence(sequence) => context.apply_alter_sequence(sequence),
+            _ => AnalysisError::raise_unexpected_input("alter relation result"),
+        }
+    }
+
     pub(crate) fn select(query: &SelectStatement) -> Self {
         Self::SelectStatement(query.clone())
     }

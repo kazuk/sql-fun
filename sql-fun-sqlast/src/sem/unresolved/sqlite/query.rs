@@ -59,7 +59,7 @@ impl TryFrom<&syn::OneSelectItem> for Select {
         } else {
             (Vec::new(), None)
         };
-        Ok(Select {
+        Ok(Self {
             into: None,
             distinct: if matches!(value.distinctness(), Some(syn::Distinctness::Distinct)) {
                 Some(Vec::new())
@@ -79,7 +79,7 @@ impl TryFrom<&syn::OneSelectItem> for Select {
 
 impl SetQuery {
     fn new_compound(operator: &syn::CompoundOperator, left: Query, right: Query) -> Self {
-        SetQuery {
+        Self {
             operation: SetOperation::from(operator),
             all: matches!(operator, syn::CompoundOperator::UnionAll),
             left,

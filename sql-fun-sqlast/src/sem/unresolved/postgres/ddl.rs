@@ -107,7 +107,7 @@ impl TryFromWithTokens<&syn::CreateStmt> for crate::sem::unresolved::Table {
             columns,
             constraints,
             temporary: relation.persistence == "t",
-            if_not_exists: value.get_if_not_exists(),
+            mode: crate::sem::CreateTableMode::from_if_not_exists(value.get_if_not_exists()),
             query: None,
             options: SyntaxOption::try_collect_from_with_tokens(value.get_options(), tokens)?,
         })
@@ -156,6 +156,8 @@ impl TryFromWithTokens<&syn::Constraint> for crate::sem::unresolved::TableConstr
         Ok(Self {
             name: super::nonempty(value.get_conname()),
             keys: Name::try_from(keys)?.0,
+            order: Vec::new(),
+            auto_increment: false,
             constraint: crate::sem::unresolved::ColumnConstraint::try_from_with_tokens(
                 value, tokens,
             )?,

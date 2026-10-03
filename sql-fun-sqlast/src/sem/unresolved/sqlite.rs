@@ -30,28 +30,42 @@ impl TryFrom<&syn::Stmt> for Statement {
             syn::Stmt::AlterTable(table) => {
                 Ok(Self::alter_relation(super::AlterRelation::try_from(table)?))
             }
-            syn::Stmt::CreateView(view) => Ok(Self::view(View::new(
-                Name::from(view.view_name()),
-                view.columns()
-                    .iter()
-                    .map(|column| column.column_name().value().to_owned())
-                    .collect(),
-                Query::try_from(view.select())?,
-                false,
-                Vec::new(),
-                ViewCheckOption::None,
-                *view.temporary(),
-                *view.if_not_exists(),
-                false,
-            ))),
-            syn::Stmt::DropTable(drop_table) => Ok(Self::drop_table(DropTable::new(
-                vec![Name::from(drop_table.name())],
-                *drop_table.if_exists(),
-                false,
-                false,
-            ))),
+            syn::Stmt::CreateView(view) => Ok(Self::view(View::try_from(view)?)),
+            syn::Stmt::DropTable(drop_table) => Ok(Self::drop_table(DropTable::from(drop_table))),
             _ => AnalysisError::raise_unexpected_input("top-level SQLite statement"),
         }
+    }
+}
+
+impl From<&syn::DropTableStatement> for DropTable {
+    fn from(value: &syn::DropTableStatement) -> Self {
+        Self::new(
+            vec![Name::from(value.name())],
+            *value.if_exists(),
+            false,
+            false,
+        )
+    }
+}
+
+impl TryFrom<&syn::CreateView> for View {
+    type Error = AnalysisError;
+    fn try_from(value: &syn::CreateView) -> Result<Self, Self::Error> {
+        Ok(Self::new(
+            Name::from(value.view_name()),
+            value
+                .columns()
+                .iter()
+                .map(|column| column.column_name().value().to_owned())
+                .collect(),
+            Query::try_from(value.select())?,
+            false,
+            Vec::new(),
+            ViewCheckOption::None,
+            *value.temporary(),
+            *value.if_not_exists(),
+            false,
+        ))
     }
 }
 

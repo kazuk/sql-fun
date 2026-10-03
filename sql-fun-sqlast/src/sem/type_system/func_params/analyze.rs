@@ -1,14 +1,10 @@
 use sql_fun_core::IVec;
 
 use crate::{
+    sem::unresolved::TryFromWithTokens,
     sem::{
         AnalysisError, ColumnDefinition, ColumnName, FullName, FunctionParam, ParseContext,
         TypeReference,
-        type_system::func_params::{
-            FunctionParameterTrait, in_out_param::FunctionParamInOut, in_param::FunctionParamIn,
-            out_param::FunctionParamOut, table_param::FunctionParamTable,
-            variadic_param::FunctionParamVariadic,
-        },
     },
     syn::{FunctionParameterMode, Opt, ScanToken},
 };
@@ -20,38 +16,15 @@ impl FunctionParam {
     ///
     /// Returns [`AnalysisError`] when the function parameter mode or type is missing or invalid.
     pub fn analyze<TParseContext>(
-        mut context: TParseContext,
+        context: TParseContext,
         param: crate::syn::FunctionParameter,
         tokens: &IVec<ScanToken>,
     ) -> Result<(Self, TParseContext), AnalysisError>
     where
         TParseContext: ParseContext,
     {
-        let Some(param_mode) = param.get_mode().as_inner() else {
-            AnalysisError::raise_unexpected_none("function_parameter.mode")?
-        };
-
-        let (function_param, new_context) = match param_mode {
-            FunctionParameterMode::FuncParamIn | FunctionParameterMode::FuncParamDefault => {
-                FunctionParamIn::from_syn(context, param, tokens)?
-            }
-            FunctionParameterMode::FuncParamOut => {
-                FunctionParamOut::from_syn(context, param, tokens)?
-            }
-            FunctionParameterMode::FuncParamInout => {
-                FunctionParamInOut::from_syn(context, param, tokens)?
-            }
-            FunctionParameterMode::FuncParamVariadic => {
-                FunctionParamVariadic::from_syn(context, param, tokens)?
-            }
-            FunctionParameterMode::FuncParamTable => {
-                FunctionParamTable::from_syn(context, param, tokens)?
-            }
-            _ => AnalysisError::raise_unexpected_input("function_parameter.mode")?,
-        };
-        context = new_context;
-
-        Ok((function_param, context))
+        crate::sem::unresolved::FunctionParameter::try_from_with_tokens(&param, tokens)?
+            .resolve_and_report(context, crate::sem::unresolved::Dialect::postgres())
     }
 }
 

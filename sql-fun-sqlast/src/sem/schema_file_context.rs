@@ -20,11 +20,10 @@ use crate::{
     sem::{
         AnalysisError, AnalysisProblem, BaseParseContext, CastDefinition, Comment, CreateExtension,
         CreateIndex, CreateSchema, GetSourcePathWithSpanOpt, ImplicitChange, MutSourcePathWithSpan,
-        OperatorDefinition, OperatorInfoRead, OperatorName, ParseContext, SchemaName,
+        ObjectKind, OperatorDefinition, OperatorInfoRead, OperatorName, ParseContext, SchemaName,
         SemScalarExpr, SourceAccessService, VariableSet,
         parse_context::{IndexInfoRead, SearchPathRead},
     },
-    syn::ObjectType,
 };
 
 use super::SourcePathWithSpan;
@@ -43,7 +42,7 @@ where
     variables: TrieMap<SemScalarExpr>,
     schemas: TrieMap<CreateSchema>,
     sequences: SequenceInfoCollection,
-    comments: TrieMap<(ObjectType, String)>,
+    comments: TrieMap<(ObjectKind, String)>,
     views: ViewInformationCollection,
     casts: TrieMap<TrieMap<CastDefinition>>,
     binary_operators: TrieMap<OperatorDefinition>,

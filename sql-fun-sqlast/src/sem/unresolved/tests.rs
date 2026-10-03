@@ -21,6 +21,7 @@ use ::sql_fun_core::IVec;
 #[case("create sequence if not exists public.user_id_seq increment by 1")]
 #[case("drop table if exists public.users cascade")]
 #[case("alter sequence if exists public.user_id_seq restart with 1")]
+#[case("comment on table public.users is 'application users'")]
 #[case(
     "create or replace view public.users_view (id) with (security_barrier = true) as select 1 as id"
 )]

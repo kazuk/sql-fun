@@ -2,11 +2,11 @@ mod query;
 
 use crate::sem::unresolved::{
     Access, AlterSequence, BooleanExpr, BooleanOperator, Call, CallKind, Case, CaseArm, Cast,
-    Collate, Delete, DropTable, EnumType, Expr, Extension, Indirection, Insert, Literal, Name,
-    NamedArgument, NullTest, OperatorExpr, OperatorKind, Order, Parameter, Query, Sequence, Slice,
-    SqlValue, Statement, Subquery, SubqueryKind, SyntaxOption, TruthTest, TryCollectFromWithTokens,
-    TryFromWithTokens, TryFromWithTokensOpt, TypeName, Update, VariableSet, View, ViewCheckOption,
-    Window,
+    Collate, Comment, Delete, DropTable, EnumType, Expr, Extension, Indirection, Insert, Literal,
+    Name, NamedArgument, NullTest, OperatorExpr, OperatorKind, Order, Parameter, Query, Sequence,
+    Slice, SqlValue, Statement, Subquery, SubqueryKind, SyntaxOption, TruthTest,
+    TryCollectFromWithTokens, TryFromWithTokens, TryFromWithTokensOpt, TypeName, Update,
+    VariableSet, View, ViewCheckOption, Window,
 };
 use crate::syn::{ListOpt, Opt};
 use crate::{StringSpan, sem::AnalysisError, syn};
@@ -87,7 +87,32 @@ impl TryFromWithTokens<&syn::Node> for Statement {
                 tokens,
             )?));
         }
+        if let Some(comment) = value.as_comment_stmt().as_inner() {
+            return Ok(Self::comment(Comment::try_from(&comment)?));
+        }
         AnalysisError::raise_unexpected_input("top-level PostgreSQL statement")
+    }
+}
+
+impl TryFrom<&syn::CommentStmt> for Comment {
+    type Error = AnalysisError;
+
+    fn try_from(value: &syn::CommentStmt) -> Result<Self, Self::Error> {
+        let object_kind = required(value.get_objtype().as_inner(), "comment_stmt.objtype")?;
+        let object = required(value.get_object().as_inner(), "comment_stmt.object")?;
+        let target =
+            if let Some(items) = object.as_list().get_items().map(|items| items.as_string()) {
+                items.iter().map(|item| item.get_sval()).collect()
+            } else if let Some(item) = object.as_string().get_sval() {
+                vec![item]
+            } else {
+                return AnalysisError::raise_unexpected_input("comment statement object");
+            };
+        Ok(Self::new(
+            target,
+            crate::sem::ObjectKind::from(object_kind as u32),
+            &value.get_comment(),
+        ))
     }
 }
 

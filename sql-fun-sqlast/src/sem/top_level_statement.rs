@@ -1,9 +1,9 @@
 use crate::{
     AstAndContextPair,
     sem::{
-        AlterOwner, AlterTable, AnalysisError, Comment, CreateCompositeType, CreateDomain,
-        CreateFunction, CreateIndex, CreateSchema, CreateTable, CreateTableAs, ParseContext,
-        SemAst, create_table::DropTable, unresolved::TryFromWithTokens,
+        AlterOwner, AlterTable, AnalysisError, CreateCompositeType, CreateDomain, CreateFunction,
+        CreateIndex, CreateSchema, CreateTable, CreateTableAs, ParseContext, SemAst,
+        create_table::DropTable, unresolved::TryFromWithTokens,
     },
     syn::{ListOpt, Opt, ParseResult},
 };
@@ -104,6 +104,7 @@ impl SemAst {
             || statement.as_create_seq_stmt().as_inner().is_some()
             || statement.as_drop_stmt().as_inner().is_some()
             || statement.as_alter_seq_stmt().as_inner().is_some()
+            || statement.as_comment_stmt().as_inner().is_some()
         {
             let syntax =
                 crate::sem::unresolved::Statement::try_from_with_tokens(&statement, tokens)?;
@@ -116,10 +117,6 @@ impl SemAst {
 
         if let Some(alter_owner) = statement.as_alter_owner_stmt().as_inner() {
             return AlterOwner::analyze_alter_owner(context, alter_owner);
-        }
-
-        if let Some(comment) = statement.as_comment_stmt().as_inner() {
-            return Comment::analyze_comment(context, comment);
         }
 
         if let Some(domain) = statement.as_create_domain_stmt().as_inner() {

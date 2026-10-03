@@ -51,6 +51,7 @@ pub(crate) enum Statement {
     Sequence(Sequence),
     DropTable(DropTable),
     AlterSequence(AlterSequence),
+    Comment(Comment),
 }
 
 impl Statement {
@@ -96,6 +97,10 @@ impl Statement {
 
     const fn alter_sequence(value: AlterSequence) -> Self {
         Self::AlterSequence(value)
+    }
+
+    const fn comment(value: Comment) -> Self {
+        Self::Comment(value)
     }
 
     pub(crate) fn resolve(
@@ -154,6 +159,11 @@ impl Statement {
                     "alter sequence requires catalog application",
                 ),
             ),
+            Self::Comment(_) => crate::sem::resolution::Resolution::new(catalog).finish(
+                crate::sem::AnalysisError::raise_unexpected_input(
+                    "comment requires catalog application",
+                ),
+            ),
         }
     }
 
@@ -173,6 +183,7 @@ impl Statement {
             Self::Sequence(sequence) => sequence.apply(context),
             Self::DropTable(drop_table) => drop_table.apply(context),
             Self::AlterSequence(alter_sequence) => alter_sequence.apply(context),
+            Self::Comment(comment) => comment.apply(context),
             _ => {
                 let outcome = self.resolve(&context, dialect);
                 let mut context = context;
@@ -180,6 +191,39 @@ impl Statement {
                 Ok(crate::AstAndContextPair::new(statement, context))
             }
         }
+    }
+}
+
+#[derive(Clone, Debug)]
+pub(crate) struct Comment {
+    target: Vec<String>,
+    object_kind: crate::sem::ObjectKind,
+    text: String,
+}
+
+impl Comment {
+    fn new(target: Vec<String>, object_kind: crate::sem::ObjectKind, text: &str) -> Self {
+        Self {
+            target,
+            object_kind,
+            text: text.to_owned(),
+        }
+    }
+
+    fn apply<TContext>(
+        &self,
+        context: TContext,
+    ) -> Result<crate::AstAndContextPair<TContext>, crate::sem::AnalysisError>
+    where
+        TContext: crate::sem::ParseContext,
+    {
+        let comment =
+            crate::sem::Comment::new(&self.target.join("."), self.object_kind, &self.text);
+        let context = context.apply_comment(&comment)?;
+        Ok(crate::AstAndContextPair::new(
+            crate::sem::SemAst::Comment(comment),
+            context,
+        ))
     }
 }
 

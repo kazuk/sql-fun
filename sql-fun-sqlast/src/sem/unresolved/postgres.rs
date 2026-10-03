@@ -2,10 +2,11 @@ mod query;
 
 use crate::sem::unresolved::{
     Access, BooleanExpr, BooleanOperator, Call, CallKind, Case, CaseArm, Cast, Collate, Delete,
-    EnumType, Expr, Extension, Indirection, Insert, Literal, Name, NamedArgument, NullTest,
-    OperatorExpr, OperatorKind, Order, Parameter, Query, Sequence, Slice, SqlValue, Statement,
-    Subquery, SubqueryKind, SyntaxOption, TruthTest, TryCollectFromWithTokens, TryFromWithTokens,
-    TryFromWithTokensOpt, TypeName, Update, VariableSet, View, ViewCheckOption, Window,
+    DropTable, EnumType, Expr, Extension, Indirection, Insert, Literal, Name, NamedArgument,
+    NullTest, OperatorExpr, OperatorKind, Order, Parameter, Query, Sequence, Slice, SqlValue,
+    Statement, Subquery, SubqueryKind, SyntaxOption, TruthTest, TryCollectFromWithTokens,
+    TryFromWithTokens, TryFromWithTokensOpt, TypeName, Update, VariableSet, View, ViewCheckOption,
+    Window,
 };
 use crate::syn::{ListOpt, Opt};
 use crate::{StringSpan, sem::AnalysisError, syn};
@@ -77,7 +78,37 @@ impl TryFromWithTokens<&syn::Node> for Statement {
                 &sequence, tokens,
             )?));
         }
+        if let Some(drop_table) = value.as_drop_stmt().as_inner() {
+            return Ok(Self::drop_table(DropTable::try_from(&drop_table)?));
+        }
         AnalysisError::raise_unexpected_input("top-level PostgreSQL statement")
+    }
+}
+
+impl TryFrom<&syn::DropStmt> for DropTable {
+    type Error = AnalysisError;
+
+    fn try_from(value: &syn::DropStmt) -> Result<Self, Self::Error> {
+        if !matches!(
+            value.get_remove_type().as_inner(),
+            Some(syn::ObjectType::ObjectTable)
+        ) {
+            return AnalysisError::raise_unexpected_input("drop statement object type");
+        }
+        let objects = required(value.get_objects().as_inner(), "drop_stmt.objects")?;
+        let names = objects
+            .iter()
+            .map(|object| Name::try_from(object.as_list().get_items()))
+            .collect::<Result<Vec<_>, _>>()?;
+        Ok(Self::new(
+            names,
+            value.get_missing_ok(),
+            matches!(
+                value.get_behavior().as_inner(),
+                Some(syn::DropBehavior::DropCascade)
+            ),
+            value.get_concurrent(),
+        ))
     }
 }
 

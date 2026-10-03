@@ -76,10 +76,6 @@ impl SemAst {
             );
         }
 
-        if let Some(drop) = statement.as_drop_stmt().as_inner() {
-            return Self::analyze_drop_statement(context, drop, tokens);
-        }
-
         if let Some(comp_type) = statement.as_composite_type_stmt().as_inner() {
             return CreateCompositeType::analyze_create_comp_type(
                 context,
@@ -106,6 +102,7 @@ impl SemAst {
             || statement.as_variable_set_stmt().as_inner().is_some()
             || statement.as_create_enum_stmt().as_inner().is_some()
             || statement.as_create_seq_stmt().as_inner().is_some()
+            || statement.as_drop_stmt().as_inner().is_some()
         {
             let syntax =
                 crate::sem::unresolved::Statement::try_from_with_tokens(&statement, tokens)?;
@@ -185,7 +182,12 @@ impl SemAst {
                 tokens,
                 &source_span,
             ),
-            Stmt::DropTable(_drop_table_statement) => todo!(),
+            Stmt::DropTable(drop_table_statement) => {
+                let syntax = crate::sem::unresolved::Statement::try_from(&Stmt::DropTable(
+                    drop_table_statement,
+                ))?;
+                syntax.resolve_and_apply(context, crate::sem::unresolved::Dialect::sqlite())
+            }
             Stmt::Analyze(_analyze_statement) => todo!(),
             Stmt::Attach(_attach_statement) => todo!(),
             Stmt::Detach(_detach_statement) => todo!(),

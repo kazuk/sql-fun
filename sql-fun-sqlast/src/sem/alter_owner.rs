@@ -3,7 +3,7 @@ use crate::sem::AstAndContextPair;
 use super::{AnalysisError, ParseContext, SemAst};
 
 /// analyzed [`crate::syn::AlterOwnerStmt`]
-#[derive(Debug, Clone)]
+#[derive(Debug, Clone, Default)]
 pub struct AlterOwner {}
 
 impl AlterOwner {

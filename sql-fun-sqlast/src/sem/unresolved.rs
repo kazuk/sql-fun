@@ -41,7 +41,7 @@ pub(crate) struct Table {
     columns: Vec<Column>,
     constraints: Vec<TableConstraint>,
     temporary: bool,
-    if_not_exists: bool,
+    mode: crate::sem::CreateTableMode,
     query: Option<Query>,
     options: Vec<SyntaxOption>,
 }
@@ -59,6 +59,8 @@ pub(crate) struct TableConstraint {
     name: Option<String>,
     keys: Vec<String>,
     constraint: ColumnConstraint,
+    order: Vec<Order>,
+    auto_increment: bool,
 }
 
 #[derive(Clone, Debug)]
@@ -317,10 +319,10 @@ impl Statement {
             ),
             Self::Function(function) => function
                 .resolve(catalog, dialect)
-                .map(crate::sem::SemAst::CreateFunction),
+                .map(|function| crate::sem::SemAst::create_function(&function)),
             Self::Index(index) => index
                 .resolve(catalog, dialect)
-                .map(crate::sem::SemAst::CreateIndex),
+                .map(|index| crate::sem::SemAst::create_index(&index)),
             Self::TableAs(_) => crate::sem::resolution::Resolution::new(catalog).finish(
                 crate::sem::AnalysisError::raise_unexpected_input(
                     "table as requires catalog application",
@@ -336,7 +338,7 @@ impl Statement {
             ),
             Self::Domain(domain) => domain
                 .resolve(catalog)
-                .map(crate::sem::SemAst::CreateDomain),
+                .map(|domain| crate::sem::SemAst::create_domain(&domain)),
         }
     }
 

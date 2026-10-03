@@ -328,6 +328,36 @@ pub enum AlterObjSubCommand {
     DropColumn(ColumnName),
 }
 
+impl AlterObjSubCommand {
+    pub(crate) fn change_owner(owner: &str) -> Self {
+        Self::ChangeOwner(owner.to_owned())
+    }
+    pub(crate) fn column_default(column: &ColumnName, expression: &SemScalarExpr) -> Self {
+        Self::SetColumnDefault(column.clone(), Box::new(expression.clone()))
+    }
+    pub(crate) fn add_constraint(constraint: &Constraint) -> Self {
+        Self::AddConstraint(constraint.clone())
+    }
+    pub(crate) fn cluster_on(index: &str) -> Self {
+        Self::ClusterOn(index.to_owned())
+    }
+    pub(crate) fn rename_to(table: &TableName) -> Self {
+        Self::RenameTo(table.clone())
+    }
+    pub(crate) fn add_column(column: &ColumnDefinition) -> Self {
+        Self::AddColumn(column.clone())
+    }
+    pub(crate) fn alter_column(name: &ColumnName, column: &ColumnDefinition) -> Self {
+        Self::AlterColumn(name.clone(), column.clone())
+    }
+    pub(crate) fn rename_column(from: &ColumnName, to: &ColumnName) -> Self {
+        Self::RenameColumn(from.clone(), to.clone())
+    }
+    pub(crate) fn drop_column(column: &ColumnName) -> Self {
+        Self::DropColumn(column.clone())
+    }
+}
+
 #[cfg(test)]
 pub fn analyze_alter_obj_change_owner<TParseContext>(
     _context: &TParseContext,

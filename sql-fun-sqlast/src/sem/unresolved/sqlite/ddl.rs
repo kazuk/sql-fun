@@ -14,7 +14,7 @@ impl TryFrom<&syn::AlterTable> for crate::sem::unresolved::AlterRelation {
     fn try_from(value: &syn::AlterTable) -> Result<Self, Self::Error> {
         Ok(Self {
             name: Name::from(value.name()),
-            kind: crate::sem::unresolved::AlterRelationKind::Table,
+            kind: crate::sem::unresolved::AlterRelationKind::table(),
             commands: vec![crate::sem::unresolved::AlterCommand::try_from(
                 value.body(),
             )?],
@@ -48,7 +48,7 @@ impl TryFrom<&syn::CreateTableStatement> for Table {
         let mut result = Self::try_from(value.body())?;
         result.name = Name::from(value.table_name());
         result.temporary = *value.temporary();
-        result.if_not_exists = *value.if_not_exists();
+        result.mode = crate::sem::CreateTableMode::from_if_not_exists(*value.if_not_exists());
         Ok(result)
     }
 }
@@ -56,6 +56,21 @@ impl TryFrom<&syn::CreateTableStatement> for Table {
 impl TryFrom<&syn::ColumnsAndConstraint> for Table {
     type Error = AnalysisError;
     fn try_from(value: &syn::ColumnsAndConstraint) -> Result<Self, Self::Error> {
+        let mut options = Vec::new();
+        if value.options().without_rowid_text().is_some() {
+            options.push(crate::sem::unresolved::SyntaxOption {
+                namespace: None,
+                name: "without_rowid".to_owned(),
+                value: None,
+            });
+        }
+        if value.options().strict_text().is_some() {
+            options.push(crate::sem::unresolved::SyntaxOption {
+                namespace: None,
+                name: "strict".to_owned(),
+                value: None,
+            });
+        }
         Ok(Self {
             name: Name::from_parts(&[]),
             columns: value
@@ -70,8 +85,8 @@ impl TryFrom<&syn::ColumnsAndConstraint> for Table {
                 .collect::<Result<Vec<_>, _>>()?,
             query: None,
             temporary: false,
-            if_not_exists: false,
-            options: Vec::new(),
+            mode: crate::sem::CreateTableMode::Default,
+            options,
         })
     }
 }
@@ -87,7 +102,7 @@ impl TryFrom<&syn::CreateTableBody> for Table {
                 constraints: Vec::new(),
                 query: Some(Query::try_from(query)?),
                 temporary: false,
-                if_not_exists: false,
+                mode: crate::sem::CreateTableMode::Default,
                 options: Vec::new(),
             }),
         }
@@ -118,6 +133,8 @@ impl TryFrom<&syn::NamedColumnConstraint> for TableConstraint {
             name: value.name().map(|name| name.value().to_owned()),
             keys: Vec::new(),
             constraint: ColumnConstraint::try_from(value.constraint())?,
+            order: Vec::new(),
+            auto_increment: matches!(value.constraint(), syn::ColumnConstraint::PrimaryKey(primary) if primary.auto_increment()),
         })
     }
 }
@@ -209,6 +226,19 @@ impl ForeignReference {
 impl TryFrom<&syn::NamedTableConstraint> for TableConstraint {
     type Error = AnalysisError;
     fn try_from(value: &syn::NamedTableConstraint) -> Result<Self, Self::Error> {
+        let order = match value.constraint() {
+            syn::TableConstraint::PrimaryKey(primary) => primary
+                .columns()
+                .iter()
+                .map(crate::sem::unresolved::Order::try_from)
+                .collect::<Result<Vec<_>, _>>()?,
+            syn::TableConstraint::Unique(unique) => unique
+                .columns()
+                .iter()
+                .map(crate::sem::unresolved::Order::try_from)
+                .collect::<Result<Vec<_>, _>>()?,
+            _ => Vec::new(),
+        };
         let (keys, constraint) = match value.constraint() {
             syn::TableConstraint::PrimaryKey(value) => (
                 Vec::new(),
@@ -243,6 +273,8 @@ impl TryFrom<&syn::NamedTableConstraint> for TableConstraint {
             name: value.name().as_ref().map(|name| name.value().to_owned()),
             keys,
             constraint,
+            order,
+            auto_increment: matches!(value.constraint(), syn::TableConstraint::PrimaryKey(primary) if *primary.auto_increment()),
         })
     }
 }

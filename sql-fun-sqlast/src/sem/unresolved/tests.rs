@@ -24,6 +24,13 @@ use ::sql_fun_core::IVec;
 #[case("comment on table public.users is 'application users'")]
 #[case("alter type public.user_kind owner to application_owner")]
 #[case("create type public.address as (street text, zip integer)")]
+#[case("create table public.users (id integer primary key)")]
+#[case("create function public.answer() returns integer language sql as 'select 42'")]
+#[case("create schema app create table app.users (id integer)")]
+#[case("create domain public.email as text")]
+#[case("alter table public.users add column email text")]
+#[case("create table public.user_ids as select 1 as id")]
+#[case("create index users_id_idx on public.users (id)")]
 #[case(
     "create or replace view public.users_view (id) with (security_barrier = true) as select 1 as id"
 )]

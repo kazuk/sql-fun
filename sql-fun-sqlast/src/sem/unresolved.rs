@@ -54,6 +54,113 @@ pub(crate) enum Statement {
     Comment(Comment),
     AlterOwner(AlterOwner),
     CompositeType(crate::sem::CreateCompositeType),
+    LegacyPostgres(LegacyPostgres),
+}
+
+/// PostgreSQL statement families that still reuse their established semantic
+/// resolver while their payload nodes are being promoted into common syntax.
+///
+/// Construction owns parser output and scan tokens only; it has no catalog or
+/// parse context.  Keeping this transitional representation at the unresolved
+/// boundary ensures every supported top-level PostgreSQL statement follows the
+/// same construction-then-application flow.
+#[derive(Clone, Debug)]
+pub(crate) struct LegacyPostgres {
+    statement: LegacyPostgresStatement,
+    tokens: IVec<crate::syn::ScanToken>,
+}
+
+#[derive(Clone, Debug)]
+enum LegacyPostgresStatement {
+    CreateTable(crate::syn::CreateStmt),
+    CreateFunction(crate::syn::CreateFunctionStmt),
+    CreateSchema(crate::syn::CreateSchemaStmt),
+    CreateDomain(crate::syn::CreateDomainStmt),
+    AlterTable(crate::syn::AlterTableStmt),
+    CreateTableAs(crate::syn::CreateTableAsStmt),
+    CreateIndex(crate::syn::IndexStmt),
+}
+
+impl LegacyPostgres {
+    fn new(statement: LegacyPostgresStatement, tokens: &IVec<crate::syn::ScanToken>) -> Self {
+        Self {
+            statement,
+            tokens: tokens.clone(),
+        }
+    }
+
+    fn resolve_and_apply<TContext>(
+        &self,
+        context: TContext,
+    ) -> Result<crate::AstAndContextPair<TContext>, crate::sem::AnalysisError>
+    where
+        TContext: crate::sem::ParseContext,
+    {
+        let Some(source_span) = context.get_source_path_with_span().cloned() else {
+            crate::sem::AnalysisError::raise_unexpected_none("context get_source_path_with_span")?;
+            crate::sem::AnalysisError::never()
+        };
+
+        match &self.statement {
+            LegacyPostgresStatement::CreateTable(statement) => {
+                crate::sem::CreateTable::analyze_create_stmt(
+                    context,
+                    &None,
+                    statement.clone(),
+                    &self.tokens,
+                    &source_span,
+                )
+            }
+            LegacyPostgresStatement::CreateFunction(statement) => {
+                crate::sem::CreateFunction::analyze_create_function(
+                    context,
+                    &None,
+                    statement.clone(),
+                    &self.tokens,
+                )
+            }
+            LegacyPostgresStatement::CreateSchema(statement) => {
+                crate::sem::CreateSchema::analyze_create_schema(
+                    context,
+                    statement.clone(),
+                    &self.tokens,
+                )
+            }
+            LegacyPostgresStatement::CreateDomain(statement) => {
+                crate::sem::CreateDomain::analyze_create_domain(
+                    context,
+                    statement.clone(),
+                    &self.tokens,
+                )
+            }
+            LegacyPostgresStatement::AlterTable(statement) => {
+                crate::sem::AlterTable::analyze_alter_statement(
+                    context,
+                    &None,
+                    statement.clone(),
+                    &self.tokens,
+                    &source_span,
+                )
+            }
+            LegacyPostgresStatement::CreateTableAs(statement) => {
+                crate::sem::CreateTableAs::analyze_create_table_as(
+                    context,
+                    &None,
+                    statement.clone(),
+                    &self.tokens,
+                    &source_span,
+                )
+            }
+            LegacyPostgresStatement::CreateIndex(statement) => {
+                crate::sem::CreateIndex::analyze_index_stmt(
+                    context,
+                    &None,
+                    statement.clone(),
+                    &self.tokens,
+                )
+            }
+        }
+    }
 }
 
 impl Statement {
@@ -111,6 +218,10 @@ impl Statement {
 
     const fn composite_type(value: crate::sem::CreateCompositeType) -> Self {
         Self::CompositeType(value)
+    }
+
+    const fn legacy_postgres(value: LegacyPostgres) -> Self {
+        Self::LegacyPostgres(value)
     }
 
     pub(crate) fn resolve(
@@ -181,6 +292,11 @@ impl Statement {
                 .finish(Ok(crate::sem::SemAst::CreateCompType(
                     composite_type.clone(),
                 ))),
+            Self::LegacyPostgres(_) => crate::sem::resolution::Resolution::new(catalog).finish(
+                crate::sem::AnalysisError::raise_unexpected_input(
+                    "statement requires catalog application",
+                ),
+            ),
         }
     }
 
@@ -212,6 +328,7 @@ impl Statement {
                     context,
                 ))
             }
+            Self::LegacyPostgres(statement) => statement.resolve_and_apply(context),
             _ => {
                 let outcome = self.resolve(&context, dialect);
                 let mut context = context;

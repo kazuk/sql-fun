@@ -140,10 +140,10 @@ impl TryFromWithTokens<&syn::Node> for Statement {
             )?));
         }
         if let Some(create_index) = value.as_index_stmt().as_inner() {
-            return Ok(Self::legacy_postgres(LegacyPostgres::new(
-                LegacyPostgresStatement::CreateIndex(create_index),
+            return Ok(Self::index(super::ddl::Index::try_from_with_tokens(
+                &create_index,
                 tokens,
-            )));
+            )?));
         }
         AnalysisError::raise_unexpected_input("top-level PostgreSQL statement")
     }

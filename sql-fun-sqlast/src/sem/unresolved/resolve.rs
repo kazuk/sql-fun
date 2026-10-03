@@ -66,7 +66,7 @@ impl Expr {
         context.finish(result)
     }
 
-    fn resolve_in(
+    pub(super) fn resolve_in(
         &self,
         context: &mut Resolution<'_>,
         dialect: Dialect,

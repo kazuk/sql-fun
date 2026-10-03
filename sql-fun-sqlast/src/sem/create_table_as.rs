@@ -22,6 +22,20 @@ pub struct CreateTableAs {
 }
 
 impl CreateTableAs {
+    pub(crate) fn new(name: &FullName, query: &SemAst, materialized: bool) -> Self {
+        Self {
+            name: name.clone(),
+            query: Box::new(query.clone()),
+            obj_type: if materialized {
+                ObjectType::ObjectMatview
+            } else {
+                ObjectType::ObjectTable
+            },
+            owner: None,
+            alter_statements: Vec::new(),
+        }
+    }
+
     /// object name
     #[must_use]
     pub const fn name(&self) -> &FullName {

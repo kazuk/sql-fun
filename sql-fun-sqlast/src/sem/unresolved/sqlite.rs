@@ -1,4 +1,5 @@
 mod query;
+mod ddl;
 
 use crate::sem::unresolved::{
     Access, BooleanExpr, BooleanOperator, Call, CallKind, Case, CaseArm, Cast, Collate, DropTable,

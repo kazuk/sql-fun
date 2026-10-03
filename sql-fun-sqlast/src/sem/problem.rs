@@ -331,7 +331,7 @@ impl AnalysisProblem {
     pub(crate) fn sqlite_ignores_match_option_in_fk_constraint(
         _table_name: &TableName,
         _column_name: &ColumnName,
-        _name: &crate::syn::sqlite::Name,
+        _name: &str,
     ) -> Self {
         todo!()
     }

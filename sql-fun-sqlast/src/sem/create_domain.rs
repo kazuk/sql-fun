@@ -15,6 +15,13 @@ pub struct CreateDomain {
 }
 
 impl CreateDomain {
+    pub(crate) fn new(type_ref: &TypeReference, base_type: &Option<FullName>) -> Self {
+        Self {
+            type_ref: type_ref.clone(),
+            base_type: base_type.clone(),
+        }
+    }
+
     /// get name
     #[must_use]
     pub fn name(&self) -> &FullName {

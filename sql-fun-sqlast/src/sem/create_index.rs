@@ -89,7 +89,7 @@ impl IndexElementCollection {
         )
     }
 
-    fn push(&mut self, item: IndexElementWithOrder) {
+    pub(crate) fn push(&mut self, item: IndexElementWithOrder) {
         self.0.push(item);
     }
 }
@@ -148,6 +148,22 @@ pub struct CreateIndex {
 }
 
 impl CreateIndex {
+    pub(crate) fn from_resolved(
+        name: &str,
+        table: &TableName,
+        keys: &IndexElementCollection,
+        includes: &IndexElementCollection,
+        unique: bool,
+    ) -> Self {
+        Self {
+            name: name.to_owned(),
+            table: table.clone(),
+            key_columns: keys.clone(),
+            include_columns: includes.clone(),
+            unique,
+        }
+    }
+
     /// create a instance
     #[must_use]
     pub fn new(name: &str, table: &TableName, key_columns: &IndexElementCollection) -> Self {

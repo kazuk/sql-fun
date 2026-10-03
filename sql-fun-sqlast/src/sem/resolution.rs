@@ -10,6 +10,8 @@ use std::collections::HashSet;
 
 /// The resolver cannot obtain a mutable catalog through this interface.
 pub(crate) trait Catalog {
+    fn has_index(&self, name: &str) -> bool;
+    fn has_sequence(&self, name: &FullName) -> bool;
     fn resolve_function_name(&self, name: &FullName) -> FullName;
     fn get_type(&self, name: &FullName) -> Option<&TypeDefinition>;
     fn get_table(&self, name: &TableName) -> Option<&CreateTable>;
@@ -37,6 +39,12 @@ pub(crate) trait Catalog {
 }
 
 impl<T: BaseParseContext> Catalog for T {
+    fn has_index(&self, name: &str) -> bool {
+        crate::sem::parse_context::IndexInfoRead::get_index(self, name).is_some()
+    }
+    fn has_sequence(&self, name: &FullName) -> bool {
+        BaseParseContext::get_sequence(self, name).is_some()
+    }
     fn resolve_function_name(&self, name: &FullName) -> FullName {
         BaseParseContext::resolve_function_name_with_search_path(self, name)
     }
@@ -197,6 +205,12 @@ mod test_resolution_outcome {
 }
 
 impl Catalog for Resolution<'_> {
+    fn has_index(&self, name: &str) -> bool {
+        self.catalog.has_index(name)
+    }
+    fn has_sequence(&self, name: &FullName) -> bool {
+        self.catalog.has_sequence(name)
+    }
     fn resolve_function_name(&self, name: &FullName) -> FullName {
         self.catalog.resolve_function_name(name)
     }
@@ -253,6 +267,12 @@ impl ResolutionContext for Resolution<'_> {
 }
 
 impl Catalog for &mut Resolution<'_> {
+    fn has_index(&self, name: &str) -> bool {
+        Catalog::has_index(&**self, name)
+    }
+    fn has_sequence(&self, name: &FullName) -> bool {
+        Catalog::has_sequence(&**self, name)
+    }
     fn resolve_function_name(&self, name: &FullName) -> FullName {
         self.catalog.resolve_function_name(name)
     }

@@ -16,6 +16,13 @@ pub struct CreateSchema {
 }
 
 impl CreateSchema {
+    pub(crate) fn new(name: &str, elements: &[SemAst]) -> Self {
+        Self {
+            name: name.to_owned(),
+            elements: elements.to_vec(),
+        }
+    }
+
     /// new instance
     #[must_use]
     pub fn name(&self) -> &str {

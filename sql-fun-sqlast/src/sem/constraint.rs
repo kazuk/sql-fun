@@ -38,6 +38,15 @@ pub enum Constraint {
 }
 
 impl Constraint {
+    pub(crate) fn primary_key(value: &PrimaryKeyConstraint) -> Self {
+        Self::PrimaryKey(value.clone())
+    }
+    pub(crate) fn unique(value: &UniqueConstraint) -> Self {
+        Self::Unique(value.clone())
+    }
+    pub(crate) fn foreign(value: &ForeignKeyConstraint) -> Self {
+        Self::Foreign(value.clone())
+    }
     /// get constraint name
     #[must_use]
     pub fn name(&self) -> &str {

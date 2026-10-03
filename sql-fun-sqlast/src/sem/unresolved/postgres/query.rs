@@ -803,11 +803,16 @@ impl TryFromWithTokens<&syn::IndexElem> for IndexExpression {
     ) -> Result<Self, Self::Error> {
         Ok(Self {
             name: nonempty(value.get_name()),
+            alias: nonempty(value.get_indexcolname()),
             expression: Expr::try_from_with_tokens_opt(value.get_expr(), tokens)?,
             collation: Name::try_from(value.get_collation())?,
             operator_class: Name::try_from(value.get_opclass())?,
             options: SyntaxOption::try_collect_from_with_tokens(value.get_opclassopts(), tokens)?,
             descending: sort_direction(value.get_ordering().as_inner()),
+            using_order: matches!(
+                value.get_ordering().as_inner(),
+                Some(syn::SortByDir::SortbyUsing)
+            ),
             nulls_first: null_order(value.get_nulls_ordering().as_inner()),
         })
     }

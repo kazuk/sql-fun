@@ -11,6 +11,7 @@
 #![allow(dead_code)]
 
 mod document;
+mod ddl;
 mod postgres;
 mod resolve;
 #[cfg(feature = "sqlite")]
@@ -31,7 +32,105 @@ use self::document::{
 
 pub(crate) use self::document::{JsonTable, XmlTable};
 
+pub(crate) use self::ddl::{Domain, Function, FunctionParameter, Index, Schema, TableAs};
+
 use crate::StringSpan;
+
+#[derive(Clone, Debug)]
+pub(crate) struct Table {
+    name: Name,
+    columns: Vec<Column>,
+    constraints: Vec<TableConstraint>,
+    temporary: bool,
+    if_not_exists: bool,
+    query: Option<Query>,
+    options: Vec<SyntaxOption>,
+}
+
+#[derive(Clone, Debug)]
+pub(crate) struct Column {
+    name: String,
+    type_name: Option<TypeName>,
+    constraints: Vec<TableConstraint>,
+    not_null: Option<bool>,
+}
+
+#[derive(Clone, Debug)]
+pub(crate) struct TableConstraint {
+    name: Option<String>,
+    keys: Vec<String>,
+    constraint: ColumnConstraint,
+}
+
+#[derive(Clone, Debug)]
+pub(crate) enum ColumnConstraint {
+    Nullability(
+        bool,
+        Option<crate::sem::ConflictClause>,
+        Option<crate::sem::Validity>,
+    ),
+    Default(Expr),
+    Check(Expr),
+    PrimaryKey(
+        Option<crate::sem::ConflictClause>,
+        Option<crate::sem::Deferrable>,
+    ),
+    Unique(Option<crate::sem::ConflictClause>),
+    Identity(crate::sem::column_constraints::IdentityColumnMode),
+    Generated(
+        Expr,
+        Option<crate::sem::column_constraints::GeneratedColumnMode>,
+    ),
+    ForeignKey(ForeignReference),
+    Exclusion,
+    Deferrability(bool),
+    Deferred,
+    Immediate,
+    Collate(String),
+}
+
+#[derive(Clone, Debug)]
+pub(crate) struct ForeignReference {
+    table: Name,
+    columns: Vec<String>,
+    match_type: Option<crate::sem::column_constraints::ForeignKeyMatchType>,
+    delete_action: Option<crate::sem::column_constraints::ForeignKeyAction>,
+    update_action: Option<crate::sem::column_constraints::ForeignKeyAction>,
+    deferrability: Option<crate::sem::column_constraints::Deferrability>,
+    validity: Option<crate::sem::Validity>,
+    ignored_matches: Vec<String>,
+}
+
+#[derive(Clone, Debug)]
+pub(crate) struct AlterRelation {
+    name: Name,
+    kind: AlterRelationKind,
+    commands: Vec<AlterCommand>,
+    if_exists: bool,
+}
+
+#[derive(Clone, Copy, Debug)]
+pub(crate) enum AlterRelationKind {
+    Table,
+    View,
+    MaterializedView,
+    Sequence,
+}
+
+#[derive(Clone, Debug)]
+pub(crate) enum AlterCommand {
+    Owner(String),
+    Default(String, Expr),
+    Constraint(TableConstraint),
+    Cluster(String),
+    Rename(Name),
+    AddColumn(Column),
+    AlterColumn(String, Column),
+    RenameColumn(String, String),
+    DropColumn(String),
+    Unsupported(String),
+}
+
 
 /// A context-free top-level SQL statement.
 ///
@@ -1456,11 +1555,13 @@ pub(crate) struct Conflict {
 #[derive(Clone, Debug)]
 pub(crate) struct IndexExpression {
     name: Option<String>,
+    alias: Option<String>,
     expression: Option<Expr>,
     collation: Name,
     operator_class: Name,
     options: Vec<SyntaxOption>,
     descending: Option<bool>,
+    using_order: bool,
     nulls_first: Option<bool>,
 }
 

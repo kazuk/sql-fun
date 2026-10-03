@@ -1,4 +1,5 @@
 mod query;
+mod ddl;
 
 use crate::sem::{
     create_comp_type::{CompositeFieldCollection, CompositeFieldDefinition},
@@ -1389,5 +1390,34 @@ impl Expr {
         tokens: &IVec<syn::ScanToken>,
     ) -> Result<Self, AnalysisError> {
         Self::try_from_with_tokens(value, tokens)
+    }
+}
+
+impl TryFromWithTokens<&syn::CreateDomainStmt> for super::ddl::Domain {
+    type Error = AnalysisError;
+
+    fn try_from_with_tokens(
+        value: &syn::CreateDomainStmt,
+        tokens: &IVec<syn::ScanToken>,
+    ) -> Result<Self, Self::Error> {
+        let base = required(value.get_type_name().as_inner(), "create_domain.type_name")?;
+        let mut constraints = Vec::new();
+        for constraint in value
+            .get_constraints()
+            .map(|constraints| constraints.as_constraint())
+            .unwrap_or_default()
+        {
+            constraints.push(super::TableConstraint::try_from_with_tokens(
+                &constraint,
+                tokens,
+            )?);
+        }
+        Ok(Self::new(
+            Name::try_from(value.get_domainname())?,
+            TypeName::try_from_with_tokens(&base, tokens)?,
+            source_span(base.get_location(), tokens).unwrap_or_else(|| StringSpan::new(0, 0)),
+            constraints,
+            Name::try_from(value.get_coll_clause().get_collname())?,
+        ))
     }
 }

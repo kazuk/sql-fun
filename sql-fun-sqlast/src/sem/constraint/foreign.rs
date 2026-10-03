@@ -20,6 +20,21 @@ pub struct ForeignKeyConstraint {
 }
 
 impl ForeignKeyConstraint {
+    pub(crate) fn new(
+        name: &str,
+        source_table: &TableName,
+        target_table: &TableName,
+        source_columns: &[ColumnName],
+        target_columns: &Option<Vec<ColumnName>>,
+    ) -> Self {
+        Self {
+            name: name.to_owned(),
+            source_table: Some(source_table.clone()),
+            target_table: target_table.clone(),
+            source_columns: source_columns.to_vec(),
+            target_columns: target_columns.clone(),
+        }
+    }
     pub fn name(&self) -> &str {
         &self.name
     }

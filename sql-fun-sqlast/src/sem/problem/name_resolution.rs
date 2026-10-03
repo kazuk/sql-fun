@@ -346,6 +346,16 @@ impl AnalysisProblem {
         ))
     }
 
+    pub(crate) fn domain_base_type_not_found(
+        domain_name: &FullName,
+        base_name: &str,
+        span: &StringSpan,
+    ) -> Self {
+        Self::NameResolution(NameResolution::DomainTypeNameNotFound(
+            DomainBaseTypeNameNotFound::new(domain_name, base_name, span),
+        ))
+    }
+
     /// specified table not found
     #[tracing::instrument()]
     pub fn relation_not_found(table_name: &TableName) -> Self {

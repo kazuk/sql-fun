@@ -44,6 +44,6 @@ grep -Fqx "sql-fun-core$(printf '\\t')0.1.2" "$test_root/release.tsv"
 grep -Fqx "sql-fun-codegen$(printf '\\t')0.1.1" "$test_root/release.tsv"
 
 git -C "$fixture" reset --hard HEAD --quiet
-(cd "$fixture" && .local/bin/materialize-release-versions --snapshot=1 --output="$test_root/snapshot.tsv")
+(cd "$fixture" && .local/bin/materialize-release-versions --snapshot=snapshot1 --output="$test_root/snapshot.tsv")
 grep -Fqx "sql-fun-core$(printf '\\t')0.1.2-snapshot1" "$test_root/snapshot.tsv"
 grep -Fqx "sql-fun-codegen$(printf '\\t')0.1.1-snapshot1" "$test_root/snapshot.tsv"

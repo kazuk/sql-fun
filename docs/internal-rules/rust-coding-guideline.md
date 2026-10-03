@@ -370,6 +370,70 @@ mod test_metadata_args {
 
     ```
 
+## Syntax and AST conversion
+
+Keep syntax-to-semantic conversion code declarative at its entry points. A
+reader should be able to see which source shape becomes which semantic shape
+without tracing parsing details through the dispatch site.
+
+- Use `From` for infallible one-to-one conversions and `TryFrom` for fallible
+  one-to-one conversions. Put the conversion implementation on the semantic
+  type being constructed.
+- A `match` over a syntax enum MUST dispatch only. If an arm does more than
+  select a conversion, extract that work into an individual `From`/`TryFrom`
+  implementation, or into a named type-local operation when the source types
+  cannot distinguish the semantic result.
+- When a conversion first constructs a semantic payload and then wraps it in
+  an enum variant, perform those as separate steps: convert the payload on its
+  own type, then call the destination enum's per-variant constructor. The
+  enum constructor owns boxing and variant representation details.
+- Do not construct another semantic AST type's fields directly from an
+  `Expr`/query conversion merely because that type is a variant payload. Move
+  the syntax conversion to the payload type instead. For example, convert a
+  syntax null test into `NullTest`, then construct `Expr::null_test(...)`.
+- Use collection and optional conversion helpers only for their mechanical
+  cases. `FromList`/`TryFromList` may collect element-wise `From`/`TryFrom`
+  conversions; `FromOpt`/`TryFromOpt` may delegate optional values to the
+  corresponding single-value conversion. Keep source-specific collection
+  structure, ordering rules, context, or error enrichment in a type-local
+  function rather than extending a generic helper.
+- Do not hide a conversion rule in a `map` closure at the call site. Prefer a
+  conversion trait, a `*Opt`/`*List` helper, or a named local conversion
+  function. A closure is acceptable only when it performs local control flow
+  rather than translating one domain type into another.
+
+For example, keep the enum dispatch shallow and make the payload and variant
+boundaries explicit:
+
+```rust
+impl TryFrom<&syn::Expression> for Expr {
+    type Error = AnalysisError;
+
+    fn try_from(value: &syn::Expression) -> Result<Self, Self::Error> {
+        match value {
+            syn::Expression::NullTest(value) => Self::try_from(value),
+            syn::Expression::Cast(value) => Self::try_from(value),
+        }
+    }
+}
+
+impl TryFrom<&syn::NullTest> for NullTest {
+    type Error = AnalysisError;
+
+    fn try_from(value: &syn::NullTest) -> Result<Self, Self::Error> {
+        // construct NullTest here
+    }
+}
+
+impl TryFrom<&syn::NullTest> for Expr {
+    type Error = AnalysisError;
+
+    fn try_from(value: &syn::NullTest) -> Result<Self, Self::Error> {
+        Ok(Self::null_test(NullTest::try_from(value)?))
+    }
+}
+```
+
 ## Tuple
 
 - MUST use tuple struct in public API, anonymous tuple can be use in short and

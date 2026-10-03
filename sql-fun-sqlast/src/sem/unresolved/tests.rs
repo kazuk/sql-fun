@@ -15,6 +15,9 @@ use ::sql_fun_core::IVec;
 #[case("insert into users (id) values (1)")]
 #[case("update users set id = 1")]
 #[case("delete from users")]
+#[case(
+    "create or replace view public.users_view (id) with (security_barrier = true) as select 1 as id"
+)]
 fn postgres_top_level_statement_construction_is_context_free(
     #[case] sql: &str,
 ) -> testresult::TestResult {

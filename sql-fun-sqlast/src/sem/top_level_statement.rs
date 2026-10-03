@@ -118,13 +118,11 @@ impl SemAst {
             || statement.as_insert_stmt().as_inner().is_some()
             || statement.as_update_stmt().as_inner().is_some()
             || statement.as_delete_stmt().as_inner().is_some()
+            || statement.as_view_stmt().as_inner().is_some()
         {
             let syntax =
                 crate::sem::unresolved::Statement::try_from_with_tokens(&statement, tokens)?;
-            let outcome = syntax.resolve(&context, crate::sem::unresolved::Dialect::postgres());
-            let mut context = context;
-            let statement = outcome.report(&mut context)?;
-            return Ok(AstAndContextPair::new(statement, context));
+            return syntax.resolve_and_apply(context, crate::sem::unresolved::Dialect::postgres());
         }
 
         if let Some(create_schema) = statement.as_create_schema_stmt().as_inner() {
@@ -225,7 +223,10 @@ impl SemAst {
             Stmt::CreateVirtualTable(_create_virtual_table) => todo!(),
             Stmt::CreateTrigger(_create_trigger_statement) => todo!(),
             Stmt::DropTrigger(_drop_trigger_statement) => todo!(),
-            Stmt::CreateView(_create_view) => todo!(),
+            Stmt::CreateView(view) => {
+                let syntax = crate::sem::unresolved::Statement::try_from(&Stmt::CreateView(view))?;
+                syntax.resolve_and_apply(context, crate::sem::unresolved::Dialect::sqlite())
+            }
             Stmt::CreateMaterializedView(_create_materialized_view) => todo!(),
             Stmt::DropView(_drop_view) => todo!(),
             Stmt::CreateType(_create_type_statement) => todo!(),
@@ -234,10 +235,7 @@ impl SemAst {
             Stmt::DropSequence(_drop_sequence_statement) => todo!(),
             Stmt::Select(select) => {
                 let syntax = crate::sem::unresolved::Statement::try_from(&Stmt::Select(select))?;
-                let outcome = syntax.resolve(&context, crate::sem::unresolved::Dialect::sqlite());
-                let mut context = context;
-                let statement = outcome.report(&mut context)?;
-                Ok(AstAndContextPair::new(statement, context))
+                syntax.resolve_and_apply(context, crate::sem::unresolved::Dialect::sqlite())
             }
             Stmt::Update(_update) => todo!(),
             Stmt::Delete(_delete_statement) => todo!(),
@@ -276,6 +274,7 @@ LANGUAGE C STRICT IMMUTABLE PARALLEL SAFE;"#
     )]
     #[case("SET statement_timeout = 0;")]
     #[case(r#"CREATE DOMAIN public."AccountNumber" AS character varying(15);"#)]
+    #[case("CREATE VIEW users_view AS SELECT 1 AS id;")]
     #[case("insert into users (id) values (1)")]
     #[case("update users set id = 1")]
     #[case("delete from users")]

@@ -29,6 +29,18 @@ impl GetSourcePathWithSpan for AlterTable {
 }
 
 impl AlterTable {
+    pub(crate) fn new(
+        table: &TableName,
+        commands: &[AlterObjSubCommand],
+        source_span: &SourcePathWithSpan,
+    ) -> Self {
+        Self {
+            table: table.clone(),
+            commands: commands.to_vec(),
+            source_span: source_span.clone(),
+        }
+    }
+
     /// analyze [`crate::syn::AlterTableStmt`]
     pub fn analyze_alter_table_statement<TParseContext>(
         mut context: TParseContext,
@@ -341,6 +353,13 @@ pub struct AlterView {
 }
 
 impl AlterView {
+    pub(crate) fn new(view: &ViewName, commands: &[AlterObjSubCommand]) -> Self {
+        Self {
+            view: view.clone(),
+            commands: commands.to_vec(),
+        }
+    }
+
     /// analyze [`crate::syn::AlterTableStmt`]
     #[tracing::instrument(skip(context, _parent_schema, syn))]
     pub fn analyze_alter_view_statement<TParseContext>(

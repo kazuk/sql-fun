@@ -25,6 +25,12 @@ pub struct FunctionParamTable {
 }
 
 impl FunctionParamTable {
+    pub(crate) fn new(name: Option<&String>, param_type: Option<&TypeReference>) -> Self {
+        Self {
+            name: name.cloned(),
+            param_type: param_type.cloned(),
+        }
+    }
     pub fn composite_field_definition(&self) -> Option<CompositeFieldDefinition> {
         todo!()
     }

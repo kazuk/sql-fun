@@ -19,6 +19,13 @@ pub struct PrimaryKeyConstraint {
 }
 
 impl PrimaryKeyConstraint {
+    pub(crate) fn new(name: &str, table: &TableName, keys: &[ColumnName]) -> Self {
+        Self {
+            name: name.to_owned(),
+            table: Some(table.clone()),
+            keys: keys.to_vec().into(),
+        }
+    }
     /// primary key name
     #[must_use]
     pub fn name(&self) -> &str {

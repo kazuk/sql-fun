@@ -99,6 +99,24 @@ mod test_function_param_display {
 }
 
 impl FunctionParam {
+    pub(crate) fn new_in_out_param(
+        name: &Option<String>,
+        param_type: &Option<TypeReference>,
+        default: &Option<SemScalarExpr>,
+    ) -> Self {
+        Self::InOut(FunctionParamInOut::new(
+            name.as_ref(),
+            param_type.as_ref(),
+            default.as_ref(),
+        ))
+    }
+
+    pub(crate) fn new_table_param(
+        name: &Option<String>,
+        param_type: &Option<TypeReference>,
+    ) -> Self {
+        Self::Table(FunctionParamTable::new(name.as_ref(), param_type.as_ref()))
+    }
     /// get a type
     #[must_use]
     pub fn get_type(&self) -> Option<&TypeReference> {

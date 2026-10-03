@@ -69,6 +69,12 @@ impl ReadOnlyCatalog {
 }
 
 impl Catalog for ReadOnlyCatalog {
+    fn has_index(&self, name: &str) -> bool {
+        Catalog::has_index(&self.0, name)
+    }
+    fn has_sequence(&self, name: &FullName) -> bool {
+        Catalog::has_sequence(&self.0, name)
+    }
     fn resolve_function_name(&self, name: &FullName) -> FullName {
         Catalog::resolve_function_name(&self.0, name)
     }

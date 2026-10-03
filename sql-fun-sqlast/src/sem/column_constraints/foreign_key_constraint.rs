@@ -110,6 +110,12 @@ pub struct Deferrability {
 }
 
 impl Deferrability {
+    pub(crate) const fn new(deferrable: bool, init_deferred: bool) -> Self {
+        Self {
+            deferrable,
+            init_deferred,
+        }
+    }
     fn from_postgres_constraint(syn: &crate::syn::Constraint) -> Self {
         let deferrable = syn.get_deferrable();
         let init_deferred = syn.get_initdeferred();
@@ -314,7 +320,7 @@ impl ForeignKeyColumnConstraint {
                     AnalysisProblem::sqlite_ignores_match_option_in_fk_constraint(
                         table_name,
                         column_name,
-                        name,
+                        name.value(),
                     ),
                 )?,
             }

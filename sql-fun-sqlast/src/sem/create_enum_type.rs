@@ -10,6 +10,18 @@ pub struct CreateEnum {
 }
 
 impl CreateEnum {
+    pub(crate) fn new(name: &FullName, values: &[String]) -> Self {
+        Self {
+            name: name.clone(),
+            values: values
+                .iter()
+                .map(|value| EnumValueDefinition {
+                    name: value.clone(),
+                })
+                .collect(),
+        }
+    }
+
     /// get name
     #[must_use]
     pub const fn name(&self) -> &FullName {
@@ -35,15 +47,11 @@ impl CreateEnum {
         let Some(enum_values) = create.get_vals().map(|v| v.as_string()) else {
             AnalysisError::raise_unexpected_none("create_enum_stmt.vals")?
         };
-        let enum_values = enum_values
+        let values = enum_values
             .iter()
-            .map(|v| EnumValueDefinition { name: v.get_sval() })
-            .collect();
-
-        let enum_def = Self {
-            name,
-            values: enum_values,
-        };
+            .map(|value| value.get_sval())
+            .collect::<Vec<_>>();
+        let enum_def = Self::new(&name, &values);
         let result_context = context.apply_create_enum(&enum_def)?;
         Ok(AstAndContextPair::new(
             SemAst::CreateEnum(enum_def),

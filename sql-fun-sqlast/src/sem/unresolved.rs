@@ -49,6 +49,7 @@ pub(crate) enum Statement {
     VariableSet(VariableSet),
     EnumType(EnumType),
     Sequence(Sequence),
+    DropTable(DropTable),
 }
 
 impl Statement {
@@ -86,6 +87,10 @@ impl Statement {
 
     const fn sequence(value: Sequence) -> Self {
         Self::Sequence(value)
+    }
+
+    const fn drop_table(value: DropTable) -> Self {
+        Self::DropTable(value)
     }
 
     pub(crate) fn resolve(
@@ -134,6 +139,11 @@ impl Statement {
                     "sequence requires catalog application",
                 ),
             ),
+            Self::DropTable(_) => crate::sem::resolution::Resolution::new(catalog).finish(
+                crate::sem::AnalysisError::raise_unexpected_input(
+                    "drop table requires catalog application",
+                ),
+            ),
         }
     }
 
@@ -151,6 +161,7 @@ impl Statement {
             Self::VariableSet(variable_set) => variable_set.resolve_and_apply(context, dialect),
             Self::EnumType(enum_type) => enum_type.apply(context),
             Self::Sequence(sequence) => sequence.apply(context),
+            Self::DropTable(drop_table) => drop_table.apply(context),
             _ => {
                 let outcome = self.resolve(&context, dialect);
                 let mut context = context;
@@ -158,6 +169,49 @@ impl Statement {
                 Ok(crate::AstAndContextPair::new(statement, context))
             }
         }
+    }
+}
+
+#[derive(Clone, Debug)]
+pub(crate) struct DropTable {
+    names: Vec<Name>,
+    if_exists: bool,
+    cascade: bool,
+    concurrent: bool,
+}
+
+impl DropTable {
+    fn new(names: Vec<Name>, if_exists: bool, cascade: bool, concurrent: bool) -> Self {
+        Self {
+            names,
+            if_exists,
+            cascade,
+            concurrent,
+        }
+    }
+
+    fn apply<TContext>(
+        &self,
+        mut context: TContext,
+    ) -> Result<crate::AstAndContextPair<TContext>, crate::sem::AnalysisError>
+    where
+        TContext: crate::sem::ParseContext,
+    {
+        let mut names = Vec::new();
+        for name in &self.names {
+            let table_name = crate::sem::TableName::from(name.full_name()?);
+            if context.get_table(&table_name).is_none() {
+                context
+                    .report_problem(crate::sem::AnalysisProblem::table_not_found(&table_name))?;
+            }
+            names.push(table_name);
+        }
+        let drop_table = crate::sem::DropTable::new(&names, self.if_exists, self.cascade);
+        context = context.apply_drop_table(&drop_table)?;
+        Ok(crate::AstAndContextPair::new(
+            crate::sem::SemAst::DropTable(drop_table),
+            context,
+        ))
     }
 }
 

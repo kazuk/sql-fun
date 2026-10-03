@@ -526,6 +526,16 @@ pub struct DropTable {
 }
 
 impl DropTable {
+    /// Create a `DROP TABLE` statement.
+    #[must_use]
+    pub fn new(table_names: &[TableName], if_exists: bool, cascade: bool) -> Self {
+        Self {
+            if_exists,
+            table_names: table_names.to_vec(),
+            cascade,
+        }
+    }
+
     /// True when `IF EXISTS` or same meaning specified.
     pub const fn if_exists(&self) -> bool {
         self.if_exists
@@ -587,11 +597,7 @@ impl DropTable {
             table_names.push(table_name);
         }
 
-        let result = Self {
-            if_exists: syn.get_missing_ok(),
-            table_names,
-            cascade,
-        };
+        let result = Self::new(&table_names, syn.get_missing_ok(), cascade);
         context = context.apply_drop_table(&result)?;
         Ok(AstAndContextPair::new(SemAst::DropTable(result), context))
     }
@@ -656,11 +662,7 @@ impl DropTable {
         if context.get_table(&table_name).is_none() {
             context.report_problem(AnalysisProblem::table_not_found(&table_name))?;
         }
-        let result = Self {
-            if_exists: *if_exists,
-            table_names: vec![table_name.to_owned()],
-            cascade: false,
-        };
+        let result = Self::new(&[table_name.to_owned()], *if_exists, false);
         context = context.apply_drop_table(&result)?;
         Ok(AstAndContextPair::new(SemAst::DropTable(result), context))
     }

@@ -1,10 +1,10 @@
 mod query;
 
 use crate::sem::unresolved::{
-    Access, BooleanExpr, BooleanOperator, Call, CallKind, Case, CaseArm, Cast, Collate, Expr,
-    InTable, Indirection, Literal, Name, NullTest, OperatorExpr, OperatorKind, Order, Parameter,
-    Query, Raise, SqlValue, Statement, Subquery, SubqueryKind, TryFromList, TryFromOpt, TypeName,
-    View, ViewCheckOption, Window,
+    Access, BooleanExpr, BooleanOperator, Call, CallKind, Case, CaseArm, Cast, Collate, DropTable,
+    Expr, InTable, Indirection, Literal, Name, NullTest, OperatorExpr, OperatorKind, Order,
+    Parameter, Query, Raise, SqlValue, Statement, Subquery, SubqueryKind, TryFromList, TryFromOpt,
+    TypeName, View, ViewCheckOption, Window,
 };
 use crate::{sem::AnalysisError, syn::sqlite as syn};
 
@@ -37,6 +37,12 @@ impl TryFrom<&syn::Stmt> for Statement {
                 ViewCheckOption::None,
                 *view.temporary(),
                 *view.if_not_exists(),
+                false,
+            ))),
+            syn::Stmt::DropTable(drop_table) => Ok(Self::drop_table(DropTable::new(
+                vec![Name::from(drop_table.name())],
+                *drop_table.if_exists(),
+                false,
                 false,
             ))),
             _ => AnalysisError::raise_unexpected_input("top-level SQLite statement"),

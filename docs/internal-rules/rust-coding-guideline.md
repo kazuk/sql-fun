@@ -379,10 +379,12 @@ without tracing parsing details through the dispatch site.
 - Use `From` for infallible one-to-one conversions and `TryFrom` for fallible
   one-to-one conversions. Put the conversion implementation on the semantic
   type being constructed.
-- A `match` over a syntax enum MUST dispatch only. If an arm does more than
-  select a conversion, extract that work into an individual `From`/`TryFrom`
-  implementation, or into a named type-local operation when the source types
-  cannot distinguish the semantic result.
+- A `match` over a syntax enum MUST dispatch only. An arm may directly compose
+  a payload conversion with the destination's variant constructor, such as
+  `Self::null_test(NullTest::try_from(value)?)`, but MUST NOT construct the
+  payload's fields or contain conversion-specific logic. Extract that work into
+  an individual `From`/`TryFrom` implementation, or into a named type-local
+  operation when the source types cannot distinguish the semantic result.
 - When a conversion first constructs a semantic payload and then wraps it in
   an enum variant, perform those as separate steps: convert the payload on its
   own type, then call the destination enum's per-variant constructor. The
@@ -411,8 +413,10 @@ impl TryFrom<&syn::Expression> for Expr {
 
     fn try_from(value: &syn::Expression) -> Result<Self, Self::Error> {
         match value {
-            syn::Expression::NullTest(value) => Self::try_from(value),
-            syn::Expression::Cast(value) => Self::try_from(value),
+            syn::Expression::NullTest(value) => {
+                Ok(Self::null_test(NullTest::try_from(value)?))
+            }
+            syn::Expression::Cast(value) => Ok(Self::cast(Cast::try_from(value)?)),
         }
     }
 }
@@ -425,13 +429,6 @@ impl TryFrom<&syn::NullTest> for NullTest {
     }
 }
 
-impl TryFrom<&syn::NullTest> for Expr {
-    type Error = AnalysisError;
-
-    fn try_from(value: &syn::NullTest) -> Result<Self, Self::Error> {
-        Ok(Self::null_test(NullTest::try_from(value)?))
-    }
-}
 ```
 
 ## Tuple

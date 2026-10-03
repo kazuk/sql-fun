@@ -154,6 +154,7 @@ pub(crate) enum Statement {
     AlterOwner(AlterOwner),
     CompositeType(crate::sem::CreateCompositeType),
     Table(Table),
+    Function(Function),
     LegacyPostgres(LegacyPostgres),
 }
 
@@ -172,7 +173,6 @@ pub(crate) struct LegacyPostgres {
 
 #[derive(Clone, Debug)]
 enum LegacyPostgresStatement {
-    CreateFunction(crate::syn::CreateFunctionStmt),
     CreateSchema(crate::syn::CreateSchemaStmt),
     CreateDomain(crate::syn::CreateDomainStmt),
     AlterTable(crate::syn::AlterTableStmt),
@@ -201,14 +201,6 @@ impl LegacyPostgres {
         };
 
         match &self.statement {
-            LegacyPostgresStatement::CreateFunction(statement) => {
-                crate::sem::CreateFunction::analyze_create_function(
-                    context,
-                    &None,
-                    statement.clone(),
-                    &self.tokens,
-                )
-            }
             LegacyPostgresStatement::CreateSchema(statement) => {
                 crate::sem::CreateSchema::analyze_create_schema(
                     context,
@@ -254,6 +246,10 @@ impl LegacyPostgres {
 }
 
 impl Statement {
+    const fn function(value: Function) -> Self {
+        Self::Function(value)
+    }
+
     const fn table(value: Table) -> Self {
         Self::Table(value)
     }
@@ -389,6 +385,9 @@ impl Statement {
             Self::Table(_) => crate::sem::resolution::Resolution::new(catalog).finish(
                 crate::sem::AnalysisError::raise_unexpected_input("table requires source metadata"),
             ),
+            Self::Function(function) => function
+                .resolve(catalog, dialect)
+                .map(crate::sem::SemAst::CreateFunction),
             Self::LegacyPostgres(_) => crate::sem::resolution::Resolution::new(catalog).finish(
                 crate::sem::AnalysisError::raise_unexpected_input(
                     "statement requires catalog application",
@@ -426,6 +425,7 @@ impl Statement {
                 ))
             }
             Self::Table(table) => table.resolve_and_apply(context, dialect),
+            Self::Function(function) => function.resolve_and_apply(context, dialect),
             Self::LegacyPostgres(statement) => statement.resolve_and_apply(context),
             _ => {
                 let outcome = self.resolve(&context, dialect);

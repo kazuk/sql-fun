@@ -30,20 +30,28 @@ impl From<TypeIn> for Type {
 mod test_type_conversion {
     use crate::test_helpers::{SqliteArrayTypeGate, SqliteSynBuilder};
 
+    #[rstest::rstest]
+    #[case::scalar("TEXT", 0)]
+    #[case::one_dimension("TEXT[]", 1)]
+    #[case::two_dimensions("TEXT[][]", 2)]
+    fn preserves_array_dimensions_without_type_size(
+        #[case] sql_type: &str,
+        #[case] dimensions: u32,
+    ) {
+        let statement =
+            SqliteSynBuilder.parse_as_stmt(&format!("CREATE TABLE items (value {sql_type})"));
+        let table = statement.as_create_table().unwrap();
+        let columns = table.body().as_columns_and_constraint().unwrap();
+        let ty = columns.columns()[0].column_type().unwrap();
+        assert_eq!(ty.name(), "TEXT");
+        let mut gate = SqliteArrayTypeGate::default();
+        assert_eq!(ty.array_dimensions(&mut gate).unwrap(), dimensions);
+        assert_eq!(gate.uses(), usize::from(dimensions > 0));
+        assert!(ty.size().is_none());
+    }
+
     #[test]
-    fn preserves_array_dimensions_and_type_size() {
-        for (sql_type, dimensions) in [("TEXT", 0), ("TEXT[]", 1), ("TEXT[][]", 2)] {
-            let statement =
-                SqliteSynBuilder.parse_as_stmt(&format!("CREATE TABLE items (value {sql_type})"));
-            let table = statement.as_create_table().unwrap();
-            let columns = table.body().as_columns_and_constraint().unwrap();
-            let ty = columns.columns()[0].column_type().unwrap();
-            assert_eq!(ty.name(), "TEXT");
-            let mut gate = SqliteArrayTypeGate::default();
-            assert_eq!(ty.array_dimensions(&mut gate).unwrap(), dimensions);
-            assert_eq!(gate.uses(), usize::from(dimensions > 0));
-            assert!(ty.size().is_none());
-        }
+    fn preserves_array_dimensions_with_type_size() {
         let statement =
             SqliteSynBuilder.parse_as_stmt("CREATE TABLE items (value DECIMAL(8, 2)[][])");
         let table = statement.as_create_table().unwrap();

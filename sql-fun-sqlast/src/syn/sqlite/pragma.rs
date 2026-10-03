@@ -131,9 +131,9 @@ mod test_new_pragmas {
         }
     }
 
-    #[test]
-    fn generic_pragma_preserves_names_and_bodies() {
-        for name in [
+    #[rstest::rstest]
+    fn generic_pragma_preserves_names_and_bodies(
+        #[values(
             "mvcc_gc_threshold",
             "MVCC_GC_THRESHOLD",
             "vdbe_trace",
@@ -141,37 +141,38 @@ mod test_new_pragmas {
             "mvcc_group_commit",
             "MVCC_GROUP_COMMIT",
             "fts_merge_threshold",
-            "FTS_MERGE_THRESHOLD",
-        ] {
-            for (suffix, call) in [("", false), (" = 1", false), ("(1)", true)] {
-                let sql = format!("PRAGMA [main].[{name}]{suffix}");
-                let statement = SqliteSynBuilder.parse_as_stmt(&sql);
-                let pragma = statement.as_pragma().expect("pragma");
-                let mut gate = Gate::default();
-                let qualified = pragma.name(&mut gate).unwrap();
-                assert_eq!(qualified.name().value(), name);
-                assert_eq!(*qualified.name().quote(), Some('['));
-                assert_eq!(qualified.db_name().unwrap().value(), "main");
-                assert_eq!(
-                    gate.gc,
-                    usize::from(name.eq_ignore_ascii_case("mvcc_gc_threshold"))
-                );
-                assert_eq!(
-                    gate.group_commit,
-                    usize::from(name.eq_ignore_ascii_case("mvcc_group_commit"))
-                );
-                assert_eq!(
-                    gate.fts_merge,
-                    usize::from(name.eq_ignore_ascii_case("fts_merge_threshold"))
-                );
-                if suffix.is_empty() {
-                    assert!(pragma.body().is_none());
-                } else {
-                    let body = pragma.body().as_ref().unwrap();
-                    assert_eq!(body.is_call(), call);
-                    assert_eq!(body.expression().numeric_literal_text(), Some("1"));
-                }
-            }
+            "FTS_MERGE_THRESHOLD"
+        )]
+        name: &str,
+        #[values(("", false), (" = 1", false), ("(1)", true))] body_case: (&str, bool),
+    ) {
+        let (suffix, call) = body_case;
+        let sql = format!("PRAGMA [main].[{name}]{suffix}");
+        let statement = SqliteSynBuilder.parse_as_stmt(&sql);
+        let pragma = statement.as_pragma().expect("pragma");
+        let mut gate = Gate::default();
+        let qualified = pragma.name(&mut gate).unwrap();
+        assert_eq!(qualified.name().value(), name);
+        assert_eq!(*qualified.name().quote(), Some('['));
+        assert_eq!(qualified.db_name().unwrap().value(), "main");
+        assert_eq!(
+            gate.gc,
+            usize::from(name.eq_ignore_ascii_case("mvcc_gc_threshold"))
+        );
+        assert_eq!(
+            gate.group_commit,
+            usize::from(name.eq_ignore_ascii_case("mvcc_group_commit"))
+        );
+        assert_eq!(
+            gate.fts_merge,
+            usize::from(name.eq_ignore_ascii_case("fts_merge_threshold"))
+        );
+        if suffix.is_empty() {
+            assert!(pragma.body().is_none());
+        } else {
+            let body = pragma.body().as_ref().unwrap();
+            assert_eq!(body.is_call(), call);
+            assert_eq!(body.expression().numeric_literal_text(), Some("1"));
         }
     }
 }

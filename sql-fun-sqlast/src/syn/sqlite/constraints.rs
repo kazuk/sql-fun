@@ -606,28 +606,27 @@ mod test_constraint_conversion {
         TableConstraint as TableConstraintIn,
     };
 
-    #[test]
-    fn preserves_generated_spelling_and_optional_storage_type() {
-        for (spelling, always) in [("AS", false), ("GENERATED ALWAYS AS", true)] {
-            for (suffix, storage) in [
-                ("", None),
-                (" STORED", Some(GeneratedColumnType::stored())),
-                (" VIRTUAL", Some(GeneratedColumnType::virtual_column())),
-            ] {
-                let sql =
-                    format!("CREATE TABLE items (base INT, derived INT {spelling} (42){suffix})");
-                let stmt = SqliteSynBuilder.parse_as_stmt(&sql);
-                let table = stmt.as_create_table().unwrap();
-                let columns = table.body().as_columns_and_constraint().unwrap();
-                let generated = columns.columns()[1].constraints()[0]
-                    .constraint()
-                    .as_generated()
-                    .unwrap();
-                assert_eq!(generated.generated_always(), always);
-                assert_eq!(generated.typ(), storage);
-                assert_eq!(generated.expr().numeric_literal_text(), Some("42"));
-            }
-        }
+    #[rstest::rstest]
+    #[case::bare("AS", false)]
+    #[case::generated_always("GENERATED ALWAYS AS", true)]
+    fn preserves_generated_spelling_and_optional_storage_type(
+        #[case] spelling: &str,
+        #[case] always: bool,
+        #[values(("", None), (" STORED", Some(GeneratedColumnType::stored())), (" VIRTUAL", Some(GeneratedColumnType::virtual_column())))]
+        storage_case: (&str, Option<GeneratedColumnType>),
+    ) {
+        let (suffix, storage) = storage_case;
+        let sql = format!("CREATE TABLE items (base INT, derived INT {spelling} (42){suffix})");
+        let stmt = SqliteSynBuilder.parse_as_stmt(&sql);
+        let table = stmt.as_create_table().unwrap();
+        let columns = table.body().as_columns_and_constraint().unwrap();
+        let generated = columns.columns()[1].constraints()[0]
+            .constraint()
+            .as_generated()
+            .unwrap();
+        assert_eq!(generated.generated_always(), always);
+        assert_eq!(generated.typ(), storage);
+        assert_eq!(generated.expr().numeric_literal_text(), Some("42"));
     }
 
     #[test]

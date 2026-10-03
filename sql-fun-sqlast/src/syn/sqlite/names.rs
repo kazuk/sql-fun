@@ -77,20 +77,25 @@ impl Name {
 mod test_name_conversion {
     use super::{Name, NameIn};
 
+    #[rstest::rstest]
+    #[case::plain("plain", "plain", None)]
+    #[case::bracket("[items]", "items", Some('['))]
+    #[case::double_quote("\"items\"", "items", Some('"'))]
+    #[case::backtick("`items`", "items", Some('`'))]
+    #[case::single_quote("'items'", "items", Some('\''))]
+    #[case::digit_leading("\"1item\"", "1item", Some('"'))]
+    fn preserves_parser_provided_name_and_quote_kind(
+        #[case] input: &str,
+        #[case] expected: &str,
+        #[case] quote: Option<char>,
+    ) {
+        let owned = Name::from(NameIn::from_string(input));
+        assert_eq!(owned.value(), expected);
+        assert_eq!(*owned.quote(), quote);
+    }
+
     #[test]
-    fn preserves_quote_kind_even_when_rendering_uses_a_fallback() {
-        for (input, expected, quote) in [
-            ("plain", "plain", None),
-            ("[items]", "items", Some('[')),
-            ("\"items\"", "items", Some('"')),
-            ("`items`", "items", Some('`')),
-            ("'items'", "items", Some('\'')),
-            ("\"1item\"", "1item", Some('"')),
-        ] {
-            let owned = Name::from(NameIn::from_string(input));
-            assert_eq!(owned.value(), expected);
-            assert_eq!(*owned.quote(), quote);
-        }
+    fn preserves_original_quote_kind_when_rendering_uses_a_fallback() {
         let upstream = NameIn::bracketed("contains]bracket".to_owned());
         assert!(upstream.as_ident().starts_with('"'));
         let owned = Name::from(upstream);

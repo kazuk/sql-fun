@@ -196,43 +196,47 @@ mod test_command_conversion {
         );
     }
 
-    #[test]
-    fn preserves_command_kind_format_and_statement() {
-        for (prefix, format) in [
-            ("", None),
-            ("EXPLAIN ", None),
-            ("EXPLAIN QUERY PLAN ", Some(EqpFormat::text())),
-            ("EXPLAIN QUERY PLAN FORMAT=TEXT ", Some(EqpFormat::text())),
-            ("EXPLAIN QUERY PLAN FORMAT=JSON ", Some(EqpFormat::json())),
-        ] {
-            let command = {
-                let sql = format!("{prefix}CREATE TABLE items (value TEXT)");
-                SqliteSynBuilder.parse_command(&sql)
-            };
-            assert_eq!(command.is_statement(), prefix.is_empty());
-            assert_eq!(command.is_explain(), prefix == "EXPLAIN ");
-            assert_eq!(
-                command
-                    .statement()
-                    .as_create_table()
-                    .unwrap()
-                    .table_name()
-                    .name()
-                    .value(),
-                "items"
-            );
-            let mut gate = Gate::default();
-            if let Some(expected) = format {
-                let eqp = command.as_explain_query_plan().unwrap();
-                assert_eq!(eqp.format(&mut gate).unwrap(), expected);
-                assert!(eqp.statement().as_create_table().is_some());
-                assert_eq!(gate.0, usize::from(expected.is_json()));
-            } else {
-                assert!(command.as_explain_query_plan().is_none());
-                assert_eq!(gate.0, 0);
-            }
-            assert!(command.into_statement().as_create_table().is_some());
+    #[rstest::rstest]
+    #[case::plain("", None)]
+    #[case::explain("EXPLAIN ", None)]
+    #[case::default_eqp("EXPLAIN QUERY PLAN ", Some(EqpFormat::text()))]
+    #[case::text_eqp("EXPLAIN QUERY PLAN FORMAT=TEXT ", Some(EqpFormat::text()))]
+    #[case::json_eqp("EXPLAIN QUERY PLAN FORMAT=JSON ", Some(EqpFormat::json()))]
+    fn preserves_command_kind_format_and_statement(
+        #[case] prefix: &str,
+        #[case] format: Option<EqpFormat>,
+    ) {
+        let command = {
+            let sql = format!("{prefix}CREATE TABLE items (value TEXT)");
+            SqliteSynBuilder.parse_command(&sql)
+        };
+        assert_eq!(command.is_statement(), prefix.is_empty());
+        assert_eq!(command.is_explain(), prefix == "EXPLAIN ");
+        assert_eq!(
+            command
+                .statement()
+                .as_create_table()
+                .unwrap()
+                .table_name()
+                .name()
+                .value(),
+            "items"
+        );
+        let mut gate = Gate::default();
+        if let Some(expected) = format {
+            let eqp = command.as_explain_query_plan().unwrap();
+            assert_eq!(eqp.format(&mut gate).unwrap(), expected);
+            assert!(eqp.statement().as_create_table().is_some());
+            assert_eq!(gate.0, usize::from(expected.is_json()));
+        } else {
+            assert!(command.as_explain_query_plan().is_none());
+            assert_eq!(gate.0, 0);
         }
+        assert!(command.into_statement().as_create_table().is_some());
+    }
+
+    #[test]
+    fn explain_cannot_be_consumed_as_a_plain_statement() {
         assert!(
             SqliteSynBuilder
                 .parse_command("EXPLAIN SELECT 1")

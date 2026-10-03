@@ -1,3 +1,6 @@
+use crate::engine_specific::TursoArrayTypeFeature;
+use crate::sem::AnalysisError;
+
 use ::turso_parser::ast::Type as TypeIn;
 
 /// type
@@ -10,34 +13,22 @@ pub struct Type {
 
 impl From<TypeIn> for Type {
     fn from(value: TypeIn) -> Self {
+        let TypeIn {
+            name,
+            size,
+            array_dimensions,
+        } = value;
         Self {
-            name: value.name,
-            size: value.size.map(TypeSize::from),
-            array_dimensions: value.array_dimensions,
+            name,
+            size: size.map(TypeSize::from),
+            array_dimensions,
         }
-    }
-}
-
-impl Type {
-    /// Number of array dimensions explicitly supplied by the parser.
-    pub const fn array_dimensions(&self) -> u32 {
-        self.array_dimensions
-    }
-
-    /// get a name
-    pub const fn name(&self) -> &str {
-        self.name.as_str()
-    }
-
-    /// get size
-    pub const fn size(&self) -> Option<&TypeSize> {
-        self.size.as_ref()
     }
 }
 
 #[cfg(test)]
 mod test_type_conversion {
-    use crate::test_helpers::SqliteSynBuilder;
+    use crate::test_helpers::{SqliteArrayTypeGate, SqliteSynBuilder};
 
     #[test]
     fn preserves_array_dimensions_and_type_size() {
@@ -48,7 +39,9 @@ mod test_type_conversion {
             let columns = table.body().as_columns_and_constraint().unwrap();
             let ty = columns.columns()[0].column_type().unwrap();
             assert_eq!(ty.name(), "TEXT");
-            assert_eq!(ty.array_dimensions(), dimensions);
+            let mut gate = SqliteArrayTypeGate::default();
+            assert_eq!(ty.array_dimensions(&mut gate).unwrap(), dimensions);
+            assert_eq!(gate.uses(), usize::from(dimensions > 0));
             assert!(ty.size().is_none());
         }
         let statement =
@@ -57,8 +50,35 @@ mod test_type_conversion {
         let columns = table.body().as_columns_and_constraint().unwrap();
         let ty = columns.columns()[0].column_type().unwrap();
         assert_eq!(ty.name(), "DECIMAL");
-        assert_eq!(ty.array_dimensions(), 2);
+        assert_eq!(
+            ty.array_dimensions(&mut SqliteArrayTypeGate::default())
+                .unwrap(),
+            2
+        );
         assert!(ty.size().is_some());
+    }
+}
+
+impl Type {
+    /// Parser-provided array dimensions, notifying the Turso hook for array types.
+    pub fn array_dimensions<Gate: TursoArrayTypeFeature>(
+        &self,
+        gate: &mut Gate,
+    ) -> Result<u32, AnalysisError> {
+        if self.array_dimensions > 0 {
+            gate.array_type_used(self)?;
+        }
+        Ok(self.array_dimensions)
+    }
+
+    /// get a name
+    pub const fn name(&self) -> &str {
+        self.name.as_str()
+    }
+
+    /// get size
+    pub const fn size(&self) -> Option<&TypeSize> {
+        self.size.as_ref()
     }
 }
 

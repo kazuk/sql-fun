@@ -26,8 +26,13 @@ impl StringLiteral {
 pub struct BlobLiteral(String);
 
 impl BlobLiteral {
-    /// value
-    pub const fn value(&self) -> &str {
+    /// Hexadecimal payload for semantic consumers.
+    pub fn value(&self) -> &str {
+        ::turso_parser::ast::blob_literal_hex(&self.0)
+    }
+
+    /// Complete parser-provided spelling, including prefix and quotes.
+    pub const fn spelling(&self) -> &str {
         self.0.as_str()
     }
 }
@@ -105,6 +110,17 @@ pub enum Literal {
     CurrentTimestamp(TimestampLiteral),
 }
 
+impl Literal {
+    /// Numeric literal spelling, if present.
+    pub const fn numeric_text(&self) -> Option<&str> {
+        if let Self::Numeric(value) = self {
+            Some(value.value_text())
+        } else {
+            None
+        }
+    }
+}
+
 impl From<LiteralIn> for Literal {
     fn from(value: LiteralIn) -> Self {
         match value {
@@ -131,7 +147,7 @@ mod test_parser_blob_payload {
     use crate::test_helpers::SqliteSynBuilder;
 
     #[test]
-    fn published_parser_returns_hex_payload() {
+    fn preserves_parser_spelling_and_hex_payload() {
         for (sql, expected) in [
             ("SELECT x'ab'", "ab"),
             ("SELECT X'AB'", "AB"),
@@ -143,6 +159,7 @@ mod test_parser_blob_payload {
                 panic!("expected BLOB: {sql}");
             };
             assert_eq!(blob.value(), expected);
+            assert_eq!(blob.spelling(), &sql[7..]);
         }
     }
 }

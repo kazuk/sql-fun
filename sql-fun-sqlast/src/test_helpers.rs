@@ -24,7 +24,26 @@ pub use self::{
 mod sqlite_syn_builder {
     use turso_parser::parser::Parser as TursoParser;
 
-    use crate::syn::sqlite::{Name, QualifiedName, Stmt};
+    use crate::syn::sqlite::{Cmd, Name, QualifiedName, Stmt};
+
+    #[derive(Default)]
+    pub struct SqliteArrayTypeGate(usize);
+
+    impl SqliteArrayTypeGate {
+        pub const fn uses(&self) -> usize {
+            self.0
+        }
+    }
+
+    impl crate::engine_specific::TursoArrayTypeFeature for SqliteArrayTypeGate {
+        fn array_type_used(
+            &mut self,
+            _: &crate::syn::sqlite::Type,
+        ) -> Result<(), crate::sem::AnalysisError> {
+            self.0 += 1;
+            Ok(())
+        }
+    }
 
     #[derive(Default)]
     pub struct SqliteSynBuilder;
@@ -52,15 +71,16 @@ mod sqlite_syn_builder {
             crate::syn::sqlite::Expr::from(*expr)
         }
 
+        pub fn parse_command(&self, sql: &str) -> Cmd {
+            crate::SqliteDialect::parse(sql)
+                .expect("valid SQLite command")
+                .expect("command exists")
+        }
+
         pub fn parse_as_stmt(&self, sql: &str) -> Stmt {
-            let mut parser = TursoParser::new(sql.as_bytes());
-            let Some(cmd) = parser.next().transpose().unwrap() else {
-                panic!("expect command")
-            };
-            let turso_parser::ast::Cmd::Stmt(stmt) = cmd else {
-                panic!("expect command is statement")
-            };
-            Stmt::from(stmt)
+            self.parse_command(sql)
+                .into_plain_statement()
+                .expect("plain statement")
         }
 
         pub fn name(&self, value: &str) -> Name {
@@ -83,7 +103,7 @@ mod sqlite_syn_builder {
 }
 
 #[cfg(feature = "sqlite")]
-pub use self::sqlite_syn_builder::{SqliteSynBuilder, sqlite_syn};
+pub use self::sqlite_syn_builder::{SqliteArrayTypeGate, SqliteSynBuilder, sqlite_syn};
 
 /// setup default function overload for test
 pub fn setup_function_overload() -> (TypeReference, OverloadVariant) {

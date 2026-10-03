@@ -123,6 +123,12 @@ rejected during sql-fun parsing. This limit applies to expression trees, includi
 long chains of operators, not just nested parentheses. There is currently no
 sql-fun setting to increase it.
 
+UPDATE and DELETE statements with `ORDER BY` or `LIMIT` clauses are also rejected
+by the inherited parser. SQLite itself supports those clauses only in builds
+with `SQLITE_ENABLE_UPDATE_DELETE_LIMIT`; enabling that option in the database
+does not enable the grammar in sql-fun. There is no sql-fun setting or
+preprocessing workaround for these clauses.
+
 The parser also recognizes Turso extensions. Successful syntax parsing does not
 imply that stock SQLite or `rusqlite` can execute those extensions.
 

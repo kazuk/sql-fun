@@ -7,10 +7,10 @@
 
 use std::{ops::Range, path::Path};
 
-use sql_fun_core::IVec;
-use turso_parser::{
-    ast::Cmd, error::Error as TursoError, lexer::Token, parser::Parser as TursoParser,
-};
+use ::sql_fun_core::IVec;
+use ::turso_parser::{error::Error as TursoError, lexer::Token, parser::Parser as TursoParser};
+
+use crate::syn::sqlite::Cmd;
 
 use crate::{
     AstAndContextPair, ParseDumpFileError, ParsedSchemaDump, StringSpan,
@@ -99,13 +99,13 @@ impl<'a> SqliteLexer<'a> {
 }
 
 pub struct SqliteStatement {
-    cmd: turso_parser::ast::Cmd,
+    cmd: Cmd,
     offset: usize,
     len: usize,
 }
 
 impl SqliteStatement {
-    pub const fn new(cmd: turso_parser::ast::Cmd, offset: usize, len: usize) -> Self {
+    pub const fn new(cmd: Cmd, offset: usize, len: usize) -> Self {
         Self { cmd, offset, len }
     }
 }
@@ -114,7 +114,7 @@ impl SqliteDialect {
     /// parse SQL Statement
     pub fn parse(sql: &str) -> Result<Option<Cmd>, TursoError> {
         let mut parser = TursoParser::new(sql.as_bytes());
-        parser.next_cmd()
+        Ok(parser.next_cmd()?.map(Cmd::from))
     }
 
     /// scan a SQL Statement into lex tokens
@@ -133,7 +133,11 @@ impl SqliteDialect {
             return Ok(None);
         };
         let len = parser.offset() - start_offset;
-        Ok(Some(SqliteStatement::new(cmd, start_offset, len)))
+        Ok(Some(SqliteStatement::new(
+            Cmd::from(cmd),
+            start_offset,
+            len,
+        )))
     }
 
     /// parse schema dump file
@@ -165,6 +169,49 @@ impl SqliteDialect {
         }
 
         Ok(ParsedSchemaDump::new(sem_results, context))
+    }
+}
+
+#[cfg(test)]
+mod test_parser_upgrade_boundary {
+    use super::{SqliteDialect, SqliteLexer};
+    use ::turso_parser::parser::Parser;
+
+    #[test]
+    fn propagates_upstream_rejections_without_replacing_diagnostics() {
+        for sql in [
+            "UPDATE items SET value = 1 ORDER BY value",
+            "UPDATE items SET value = 1 LIMIT 1",
+            "UPDATE items SET value = 1 ORDER BY value LIMIT 1",
+            "DELETE FROM items ORDER BY value",
+            "DELETE FROM items LIMIT 1",
+            "DELETE FROM items ORDER BY value LIMIT 1",
+            "CREATE TABLE items (base INT, derived INT AS (base) DEFAULT 1)",
+            "CREATE TABLE items (derived INT AS (1))",
+            "SELECT 1 ORDER BY 1 UNION SELECT 2",
+            "SELECT 1 LIMIT 1 UNION SELECT 2",
+        ] {
+            let expected = Parser::new(sql.as_bytes())
+                .next_cmd()
+                .expect_err("upstream rejection");
+            let actual = SqliteDialect::parse(sql).expect_err("inherited rejection");
+            assert_eq!(actual.to_string(), expected.to_string(), "{sql}");
+        }
+    }
+
+    #[test]
+    fn blob_tokens_retain_complete_text_and_source_span() {
+        for literal in ["x'ab'", "X'AB'", "x'aBcD'", "x''"] {
+            let sql = format!("  {literal}");
+            let mut lexer = SqliteLexer::new(&sql);
+            let whitespace = lexer.next().unwrap().unwrap();
+            assert_eq!(whitespace.text(), "  ");
+            assert_eq!(*whitespace.span(), 0..2);
+            let token = lexer.next().unwrap().unwrap();
+            assert_eq!(token.text(), literal);
+            assert_eq!(*token.span(), 2..sql.len());
+            assert!(lexer.next().unwrap().is_none());
+        }
     }
 }
 

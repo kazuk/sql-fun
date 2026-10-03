@@ -46,9 +46,10 @@ and may verify it by compiling unpacked source. The workflow uses `-vv` to
 retain that observed behavior in its log; it does not parse the log or block
 compiler probes.
 
-The workflow summary records the snapshot used and the no-compilation guard.
-Record the run URL, resulting crate versions, resume result, and any Cargo
-behavior that requires a different trial-only compiler wrapper in issue #300.
+The workflow summary records the snapshot used. Record the run URL, resulting
+crate versions, and resume result in issue #300. The `-vv` output is
+observational evidence of Cargo's package verification; the workflow does not
+parse it or install a compiler wrapper.
 
 ## Follow-up
 

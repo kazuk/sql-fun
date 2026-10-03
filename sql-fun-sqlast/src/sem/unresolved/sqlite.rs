@@ -4,7 +4,7 @@ use crate::sem::unresolved::{
     Access, BooleanExpr, BooleanOperator, Call, CallKind, Case, CaseArm, Cast, Collate, Expr,
     InTable, Indirection, Literal, Name, NullTest, OperatorExpr, OperatorKind, Order, Parameter,
     Query, Raise, SqlValue, Statement, Subquery, SubqueryKind, TryFromList, TryFromOpt, TypeName,
-    Window,
+    View, ViewCheckOption, Window,
 };
 use crate::{sem::AnalysisError, syn::sqlite as syn};
 
@@ -25,6 +25,20 @@ impl TryFrom<&syn::Stmt> for Statement {
     fn try_from(value: &syn::Stmt) -> Result<Self, Self::Error> {
         match value {
             syn::Stmt::Select(query) => Ok(Self::query(Query::try_from(query)?)),
+            syn::Stmt::CreateView(view) => Ok(Self::view(View::new(
+                Name::from(view.view_name()),
+                view.columns()
+                    .iter()
+                    .map(|column| column.column_name().value().to_owned())
+                    .collect(),
+                Query::try_from(view.select())?,
+                false,
+                Vec::new(),
+                ViewCheckOption::None,
+                *view.temporary(),
+                *view.if_not_exists(),
+                false,
+            ))),
             _ => AnalysisError::raise_unexpected_input("top-level SQLite statement"),
         }
     }

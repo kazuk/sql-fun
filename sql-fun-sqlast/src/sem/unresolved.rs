@@ -44,6 +44,7 @@ pub(crate) enum Statement {
     Insert(Insert),
     Update(Update),
     Delete(Delete),
+    View(View),
 }
 
 impl Statement {
@@ -61,6 +62,10 @@ impl Statement {
 
     const fn delete(value: Delete) -> Self {
         Self::Delete(value)
+    }
+
+    const fn view(value: View) -> Self {
+        Self::View(value)
     }
 
     pub(crate) fn resolve(
@@ -84,8 +89,103 @@ impl Statement {
             Self::Delete(_) => crate::sem::resolution::Resolution::new(catalog).finish(Ok(
                 crate::sem::SemAst::DeleteStatement(crate::sem::DeleteStatement::empty()),
             )),
+            Self::View(_) => crate::sem::resolution::Resolution::new(catalog).finish(
+                crate::sem::AnalysisError::raise_unexpected_input(
+                    "view requires catalog application",
+                ),
+            ),
         }
     }
+
+    pub(crate) fn resolve_and_apply<TContext>(
+        &self,
+        context: TContext,
+        dialect: Dialect,
+    ) -> Result<crate::AstAndContextPair<TContext>, crate::sem::AnalysisError>
+    where
+        TContext: crate::sem::ParseContext,
+    {
+        match self {
+            Self::View(view) => view.resolve_and_apply(context, dialect),
+            _ => {
+                let outcome = self.resolve(&context, dialect);
+                let mut context = context;
+                let statement = outcome.report(&mut context)?;
+                Ok(crate::AstAndContextPair::new(statement, context))
+            }
+        }
+    }
+}
+
+#[derive(Clone, Debug)]
+pub(crate) struct View {
+    name: Name,
+    aliases: Vec<String>,
+    query: Query,
+    replace: bool,
+    options: Vec<SyntaxOption>,
+    check_option: ViewCheckOption,
+    temporary: bool,
+    if_not_exists: bool,
+    materialized: bool,
+}
+
+impl View {
+    const fn new(
+        name: Name,
+        aliases: Vec<String>,
+        query: Query,
+        replace: bool,
+        options: Vec<SyntaxOption>,
+        check_option: ViewCheckOption,
+        temporary: bool,
+        if_not_exists: bool,
+        materialized: bool,
+    ) -> Self {
+        Self {
+            name,
+            aliases,
+            query,
+            replace,
+            options,
+            check_option,
+            temporary,
+            if_not_exists,
+            materialized,
+        }
+    }
+
+    fn resolve_and_apply<TContext>(
+        &self,
+        context: TContext,
+        dialect: Dialect,
+    ) -> Result<crate::AstAndContextPair<TContext>, crate::sem::AnalysisError>
+    where
+        TContext: crate::sem::ParseContext,
+    {
+        let outcome = self.query.resolve(&context, dialect);
+        let mut context = context;
+        let query = outcome.report(&mut context)?;
+        let view = crate::sem::CreateView::new(
+            &self.name.full_name()?,
+            &query,
+            &[],
+            &None,
+            self.materialized,
+        );
+        let context = context.apply_create_view(&view)?;
+        Ok(crate::AstAndContextPair::new(
+            crate::sem::SemAst::CreateView(view),
+            context,
+        ))
+    }
+}
+
+#[derive(Clone, Copy, Debug)]
+pub(crate) enum ViewCheckOption {
+    None,
+    Local,
+    Cascaded,
 }
 
 pub trait TryFromWithTokens<T>

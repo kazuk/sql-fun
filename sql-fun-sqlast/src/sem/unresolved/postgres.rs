@@ -3,8 +3,9 @@ mod query;
 use crate::sem::unresolved::{
     Access, BooleanExpr, BooleanOperator, Call, CallKind, Case, CaseArm, Cast, Collate, Delete,
     Expr, Indirection, Insert, Literal, Name, NamedArgument, NullTest, OperatorExpr, OperatorKind,
-    Order, Parameter, Query, Slice, SqlValue, Statement, Subquery, SubqueryKind, TruthTest,
-    TryCollectFromWithTokens, TryFromWithTokens, TryFromWithTokensOpt, TypeName, Update, Window,
+    Order, Parameter, Query, Slice, SqlValue, Statement, Subquery, SubqueryKind, SyntaxOption,
+    TruthTest, TryCollectFromWithTokens, TryFromWithTokens, TryFromWithTokensOpt, TypeName, Update,
+    View, ViewCheckOption, Window,
 };
 use crate::syn::{ListOpt, Opt};
 use crate::{StringSpan, sem::AnalysisError, syn};
@@ -56,7 +57,61 @@ impl TryFromWithTokens<&syn::Node> for Statement {
         if let Some(delete) = value.as_delete_stmt().as_inner() {
             return Ok(Self::delete(Delete::try_from_with_tokens(&delete, tokens)?));
         }
+        if let Some(view) = value.as_view_stmt().as_inner() {
+            return Ok(Self::view(View::try_from_with_tokens(&view, tokens)?));
+        }
         AnalysisError::raise_unexpected_input("top-level PostgreSQL statement")
+    }
+}
+
+impl TryFromWithTokens<&syn::ViewStmt> for View {
+    type Error = AnalysisError;
+
+    fn try_from_with_tokens(
+        value: &syn::ViewStmt,
+        tokens: &IVec<crate::syn::ScanToken>,
+    ) -> Result<Self, Self::Error> {
+        let view = required(value.get_view().as_inner(), "view_stmt.view")?;
+        let query = required(
+            value.get_query().as_select_stmt().as_inner(),
+            "view_stmt.query",
+        )?;
+        let mut parts = Vec::new();
+        if let Some(catalog) = nonempty(view.get_catalogname()) {
+            parts.push(catalog);
+        }
+        if let Some(schema) = nonempty(view.get_schemaname()) {
+            parts.push(schema);
+        }
+        parts.push(view.get_relname());
+        let mut aliases = Vec::new();
+        for alias in value.get_aliases().as_inner().unwrap_or_default() {
+            aliases.push(required(alias.as_string().get_sval(), "view alias")?);
+        }
+        Ok(Self::new(
+            Name::from_parts(&parts),
+            aliases,
+            Query::try_from_with_tokens(&query, tokens)?,
+            value.get_replace(),
+            SyntaxOption::try_collect_from_with_tokens(value.get_options(), tokens)?,
+            ViewCheckOption::from(value.get_with_check_option().as_inner()),
+            false,
+            false,
+            false,
+        ))
+    }
+}
+
+impl From<Option<syn::ViewCheckOption>> for ViewCheckOption {
+    fn from(value: Option<syn::ViewCheckOption>) -> Self {
+        match value {
+            Some(syn::ViewCheckOption::LocalCheckOption) => Self::Local,
+            Some(syn::ViewCheckOption::CascadedCheckOption) => Self::Cascaded,
+            Some(syn::ViewCheckOption::Undefined)
+            | Some(syn::ViewCheckOption::NoCheckOption)
+            | Some(syn::ViewCheckOption::OptionNone)
+            | None => Self::None,
+        }
     }
 }
 

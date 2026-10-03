@@ -15,7 +15,7 @@ use crate::sem::{
 };
 
 impl Name {
-    fn full_name(&self) -> Result<FullName, AnalysisError> {
+    pub(super) fn full_name(&self) -> Result<FullName, AnalysisError> {
         match self.0.as_slice() {
             [local] => Ok(FullName::from_local_name(local)),
             [schema, local] => Ok(FullName::with_schema(schema, local)),

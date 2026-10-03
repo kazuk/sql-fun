@@ -2,8 +2,8 @@ use crate::{
     AstAndContextPair,
     sem::{
         AlterOwner, AlterSequence, AlterTable, AnalysisError, Comment, CreateCompositeType,
-        CreateDomain, CreateEnum, CreateExtension, CreateFunction, CreateIndex, CreateSchema,
-        CreateSequence, CreateTable, CreateTableAs, CreateView, ParseContext, SemAst, VariableSet,
+        CreateDomain, CreateEnum, CreateFunction, CreateIndex, CreateSchema, CreateSequence,
+        CreateTable, CreateTableAs, CreateView, ParseContext, SemAst, VariableSet,
         create_table::DropTable, unresolved::TryFromWithTokens,
     },
     syn::{ListOpt, Opt, ParseResult},
@@ -93,14 +93,6 @@ impl SemAst {
             );
         }
 
-        if let Some(create_extension) = statement.as_create_extension_stmt().as_inner() {
-            return CreateExtension::analyze_create_extension(
-                context,
-                parent_schema,
-                create_extension,
-            );
-        }
-
         if let Some(create_function) = statement.as_create_function_stmt().as_inner() {
             return CreateFunction::analyze_create_function(
                 context,
@@ -119,6 +111,7 @@ impl SemAst {
             || statement.as_update_stmt().as_inner().is_some()
             || statement.as_delete_stmt().as_inner().is_some()
             || statement.as_view_stmt().as_inner().is_some()
+            || statement.as_create_extension_stmt().as_inner().is_some()
         {
             let syntax =
                 crate::sem::unresolved::Statement::try_from_with_tokens(&statement, tokens)?;

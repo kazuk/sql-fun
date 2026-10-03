@@ -45,6 +45,7 @@ pub(crate) enum Statement {
     Update(Update),
     Delete(Delete),
     View(View),
+    Extension(Extension),
 }
 
 impl Statement {
@@ -66,6 +67,10 @@ impl Statement {
 
     const fn view(value: View) -> Self {
         Self::View(value)
+    }
+
+    const fn extension(value: Extension) -> Self {
+        Self::Extension(value)
     }
 
     pub(crate) fn resolve(
@@ -94,6 +99,11 @@ impl Statement {
                     "view requires catalog application",
                 ),
             ),
+            Self::Extension(_) => crate::sem::resolution::Resolution::new(catalog).finish(
+                crate::sem::AnalysisError::raise_unexpected_input(
+                    "extension requires catalog application",
+                ),
+            ),
         }
     }
 
@@ -107,6 +117,7 @@ impl Statement {
     {
         match self {
             Self::View(view) => view.resolve_and_apply(context, dialect),
+            Self::Extension(extension) => extension.apply(context),
             _ => {
                 let outcome = self.resolve(&context, dialect);
                 let mut context = context;
@@ -114,6 +125,34 @@ impl Statement {
                 Ok(crate::AstAndContextPair::new(statement, context))
             }
         }
+    }
+}
+
+#[derive(Clone, Debug)]
+pub(crate) struct Extension {
+    name: String,
+}
+
+impl Extension {
+    fn new(name: &str) -> Self {
+        Self {
+            name: name.to_owned(),
+        }
+    }
+
+    fn apply<TContext>(
+        &self,
+        context: TContext,
+    ) -> Result<crate::AstAndContextPair<TContext>, crate::sem::AnalysisError>
+    where
+        TContext: crate::sem::ParseContext,
+    {
+        let extension = crate::sem::CreateExtension::from_name(&self.name);
+        let context = context.apply_create_extension(&extension)?;
+        Ok(crate::AstAndContextPair::new(
+            crate::sem::SemAst::CreateExtension(extension),
+            context,
+        ))
     }
 }
 

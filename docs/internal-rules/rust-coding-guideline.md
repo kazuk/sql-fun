@@ -154,6 +154,50 @@ mod test_metadata_args {
 }
 ```
 
+### Parameterized tests with `rstest`
+
+- Prefer `#[rstest::rstest]` when independent input examples exercise the same
+  behavior. Each example should be a separate test case so the test runner can
+  report, filter, and rerun it individually. Avoid hiding independent examples
+  inside a loop in one `#[test]` function.
+- Use `#[case]` for related inputs and expected results. Give cases meaningful
+  names, such as `#[case::empty(...)]`, when they help identify the scenario.
+- Use `#[values(...)]` for independent dimensions whose combinations all need
+  coverage. Multiple value parameters generate a Cartesian product; keep the
+  dimensions focused and use explicit cases when only selected combinations
+  are meaningful.
+- Keep loops when iteration is part of one scenario, such as applying a
+  sequence of state transitions or checking every item in one result. Keep
+  assertions for that scenario together; separate unrelated behaviors into
+  focused tests.
+- Use the qualified macro path rather than importing `rstest`, following the
+  macro import rule below. Parameterization does not change the test placement
+  or domain-oriented setup requirements above.
+
+Related inputs and expectations belong in named cases:
+
+```rust
+#[rstest::rstest]
+#[case::zero("0", 0)]
+#[case::positive("42", 42)]
+fn parses_integer_text(#[case] input: &str, #[case] expected: u32) {
+    assert_eq!(input.parse::<u32>().unwrap(), expected);
+}
+```
+
+Independent dimensions can use values to cover every combination:
+
+```rust
+#[rstest::rstest]
+fn parses_integer_with_surrounding_whitespace(
+    #[values("", " ", "\t")] leading: &str,
+    #[values("", " ", "\t")] trailing: &str,
+) {
+    let input = format!("{leading}42{trailing}");
+    assert_eq!(input.trim().parse::<u32>().unwrap(), 42);
+}
+```
+
 ### Importing items
 
 - `*` import is prohibited. (including `prelude` import)

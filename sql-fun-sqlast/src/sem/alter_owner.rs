@@ -7,6 +7,11 @@ use super::{AnalysisError, ParseContext, SemAst};
 pub struct AlterOwner {}
 
 impl AlterOwner {
+    /// Create an ownership-change semantic marker.
+    #[must_use]
+    pub const fn new() -> Self {
+        Self {}
+    }
     /// analyze [`crate::syn::AlterOwnerStmt`]
     pub fn analyze_alter_owner<TParseContext>(
         context: TParseContext,
@@ -15,6 +20,9 @@ impl AlterOwner {
     where
         TParseContext: ParseContext,
     {
-        Ok(AstAndContextPair::new(SemAst::AlterOwner(Self {}), context))
+        Ok(AstAndContextPair::new(
+            SemAst::AlterOwner(Self::new()),
+            context,
+        ))
     }
 }

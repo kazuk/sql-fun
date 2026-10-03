@@ -52,6 +52,7 @@ pub(crate) enum Statement {
     DropTable(DropTable),
     AlterSequence(AlterSequence),
     Comment(Comment),
+    AlterOwner(AlterOwner),
 }
 
 impl Statement {
@@ -101,6 +102,10 @@ impl Statement {
 
     const fn comment(value: Comment) -> Self {
         Self::Comment(value)
+    }
+
+    const fn alter_owner(value: AlterOwner) -> Self {
+        Self::AlterOwner(value)
     }
 
     pub(crate) fn resolve(
@@ -164,6 +169,9 @@ impl Statement {
                     "comment requires catalog application",
                 ),
             ),
+            Self::AlterOwner(_) => crate::sem::resolution::Resolution::new(catalog).finish(Ok(
+                crate::sem::SemAst::AlterOwner(crate::sem::AlterOwner::new()),
+            )),
         }
     }
 
@@ -184,12 +192,55 @@ impl Statement {
             Self::DropTable(drop_table) => drop_table.apply(context),
             Self::AlterSequence(alter_sequence) => alter_sequence.apply(context),
             Self::Comment(comment) => comment.apply(context),
+            Self::AlterOwner(_) => Ok(crate::AstAndContextPair::new(
+                crate::sem::SemAst::AlterOwner(crate::sem::AlterOwner::new()),
+                context,
+            )),
             _ => {
                 let outcome = self.resolve(&context, dialect);
                 let mut context = context;
                 let statement = outcome.report(&mut context)?;
                 Ok(crate::AstAndContextPair::new(statement, context))
             }
+        }
+    }
+}
+
+#[derive(Clone, Debug)]
+pub(crate) struct AlterOwner {
+    object_kind: Option<crate::sem::ObjectKind>,
+    relation: Option<Name>,
+    object: Vec<String>,
+    owner: Role,
+}
+
+#[derive(Clone, Debug)]
+pub(crate) struct Role {
+    kind: u32,
+    name: String,
+}
+
+impl AlterOwner {
+    fn new(
+        object_kind: Option<crate::sem::ObjectKind>,
+        relation: Option<Name>,
+        object: Vec<String>,
+        owner: Role,
+    ) -> Self {
+        Self {
+            object_kind,
+            relation,
+            object,
+            owner,
+        }
+    }
+}
+
+impl Role {
+    fn new(kind: u32, name: &str) -> Self {
+        Self {
+            kind,
+            name: name.to_owned(),
         }
     }
 }

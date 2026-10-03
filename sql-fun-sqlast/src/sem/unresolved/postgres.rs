@@ -1,10 +1,10 @@
 mod query;
 
 use crate::sem::unresolved::{
-    Access, AlterSequence, BooleanExpr, BooleanOperator, Call, CallKind, Case, CaseArm, Cast,
-    Collate, Comment, Delete, DropTable, EnumType, Expr, Extension, Indirection, Insert, Literal,
-    Name, NamedArgument, NullTest, OperatorExpr, OperatorKind, Order, Parameter, Query, Sequence,
-    Slice, SqlValue, Statement, Subquery, SubqueryKind, SyntaxOption, TruthTest,
+    Access, AlterOwner, AlterSequence, BooleanExpr, BooleanOperator, Call, CallKind, Case, CaseArm,
+    Cast, Collate, Comment, Delete, DropTable, EnumType, Expr, Extension, Indirection, Insert,
+    Literal, Name, NamedArgument, NullTest, OperatorExpr, OperatorKind, Order, Parameter, Query,
+    Role, Sequence, Slice, SqlValue, Statement, Subquery, SubqueryKind, SyntaxOption, TruthTest,
     TryCollectFromWithTokens, TryFromWithTokens, TryFromWithTokensOpt, TypeName, Update,
     VariableSet, View, ViewCheckOption, Window,
 };
@@ -90,7 +90,56 @@ impl TryFromWithTokens<&syn::Node> for Statement {
         if let Some(comment) = value.as_comment_stmt().as_inner() {
             return Ok(Self::comment(Comment::try_from(&comment)?));
         }
+        if let Some(alter_owner) = value.as_alter_owner_stmt().as_inner() {
+            return Ok(Self::alter_owner(AlterOwner::try_from(&alter_owner)?));
+        }
         AnalysisError::raise_unexpected_input("top-level PostgreSQL statement")
+    }
+}
+
+impl TryFrom<&syn::AlterOwnerStmt> for AlterOwner {
+    type Error = AnalysisError;
+
+    fn try_from(value: &syn::AlterOwnerStmt) -> Result<Self, Self::Error> {
+        let relation = value.get_relation().as_inner().map(|relation| {
+            let mut parts = Vec::new();
+            if let Some(catalog) = nonempty(relation.get_catalogname()) {
+                parts.push(catalog);
+            }
+            if let Some(schema) = nonempty(relation.get_schemaname()) {
+                parts.push(schema);
+            }
+            parts.push(relation.get_relname());
+            Name::from_parts(&parts)
+        });
+        let object = if let Some(items) = value
+            .get_object()
+            .as_list()
+            .get_items()
+            .map(|items| items.as_string())
+        {
+            items.iter().map(crate::syn::String::get_sval).collect()
+        } else if let Some(item) = value.get_object().as_string().get_sval() {
+            vec![item]
+        } else {
+            Vec::new()
+        };
+        let owner = required(value.get_newowner().as_inner(), "alter_owner.newowner")?;
+        Ok(Self::new(
+            value
+                .get_object_type()
+                .as_inner()
+                .map(|object_kind| crate::sem::ObjectKind::from(object_kind as u32)),
+            relation,
+            object,
+            Role::new(
+                owner
+                    .get_roletype()
+                    .as_inner()
+                    .map_or(0, |kind| kind as u32),
+                &owner.get_rolename(),
+            ),
+        ))
     }
 }
 

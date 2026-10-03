@@ -1,9 +1,9 @@
 use crate::{
     AstAndContextPair,
     sem::{
-        AlterOwner, AlterTable, AnalysisError, CreateCompositeType, CreateDomain, CreateFunction,
-        CreateIndex, CreateSchema, CreateTable, CreateTableAs, ParseContext, SemAst,
-        create_table::DropTable, unresolved::TryFromWithTokens,
+        AlterTable, AnalysisError, CreateCompositeType, CreateDomain, CreateFunction, CreateIndex,
+        CreateSchema, CreateTable, CreateTableAs, ParseContext, SemAst, create_table::DropTable,
+        unresolved::TryFromWithTokens,
     },
     syn::{ListOpt, Opt, ParseResult},
 };
@@ -105,6 +105,7 @@ impl SemAst {
             || statement.as_drop_stmt().as_inner().is_some()
             || statement.as_alter_seq_stmt().as_inner().is_some()
             || statement.as_comment_stmt().as_inner().is_some()
+            || statement.as_alter_owner_stmt().as_inner().is_some()
         {
             let syntax =
                 crate::sem::unresolved::Statement::try_from_with_tokens(&statement, tokens)?;
@@ -113,10 +114,6 @@ impl SemAst {
 
         if let Some(create_schema) = statement.as_create_schema_stmt().as_inner() {
             return CreateSchema::analyze_create_schema(context, create_schema, tokens);
-        }
-
-        if let Some(alter_owner) = statement.as_alter_owner_stmt().as_inner() {
-            return AlterOwner::analyze_alter_owner(context, alter_owner);
         }
 
         if let Some(domain) = statement.as_create_domain_stmt().as_inner() {
@@ -249,6 +246,7 @@ LANGUAGE C STRICT IMMUTABLE PARALLEL SAFE;"#
     )]
     #[case("SET statement_timeout = 0;")]
     #[case(r#"CREATE DOMAIN public."AccountNumber" AS character varying(15);"#)]
+    #[case("ALTER TYPE public.user_kind OWNER TO application_owner;")]
     #[case("CREATE VIEW users_view AS SELECT 1 AS id;")]
     #[case("insert into users (id) values (1)")]
     #[case("update users set id = 1")]

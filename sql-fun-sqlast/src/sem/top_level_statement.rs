@@ -3,8 +3,8 @@ use crate::{
     sem::{
         AlterOwner, AlterSequence, AlterTable, AnalysisError, Comment, CreateCompositeType,
         CreateDomain, CreateEnum, CreateFunction, CreateIndex, CreateSchema, CreateSequence,
-        CreateTable, CreateTableAs, CreateView, ParseContext, SemAst, VariableSet,
-        create_table::DropTable, unresolved::TryFromWithTokens,
+        CreateTable, CreateTableAs, CreateView, ParseContext, SemAst, create_table::DropTable,
+        unresolved::TryFromWithTokens,
     },
     syn::{ListOpt, Opt, ParseResult},
 };
@@ -102,16 +102,13 @@ impl SemAst {
             );
         }
 
-        if let Some(variable_set) = statement.as_variable_set_stmt().as_inner() {
-            return VariableSet::analyze_variable_set(context, &variable_set, tokens);
-        }
-
         if statement.as_select_stmt().as_inner().is_some()
             || statement.as_insert_stmt().as_inner().is_some()
             || statement.as_update_stmt().as_inner().is_some()
             || statement.as_delete_stmt().as_inner().is_some()
             || statement.as_view_stmt().as_inner().is_some()
             || statement.as_create_extension_stmt().as_inner().is_some()
+            || statement.as_variable_set_stmt().as_inner().is_some()
         {
             let syntax =
                 crate::sem::unresolved::Statement::try_from_with_tokens(&statement, tokens)?;

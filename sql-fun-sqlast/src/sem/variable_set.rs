@@ -15,6 +15,13 @@ pub struct VariableSet {
 }
 
 impl VariableSet {
+    pub(crate) fn new(name: &str, value: &SemScalarExpr) -> Self {
+        Self {
+            name: name.to_owned(),
+            value: value.clone(),
+        }
+    }
+
     /// name of variable
     #[must_use]
     pub fn name(&self) -> &str {
@@ -56,7 +63,7 @@ impl VariableSet {
         )?;
         context = new_context;
 
-        let var_set = Self { name, value };
+        let var_set = Self::new(&name, &value);
         let result_context = context.apply_variable_set(&var_set)?;
         Ok(AstAndContextPair::new(
             SemAst::VariableSet(var_set),

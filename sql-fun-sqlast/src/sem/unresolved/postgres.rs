@@ -5,7 +5,7 @@ use crate::sem::unresolved::{
     Expr, Extension, Indirection, Insert, Literal, Name, NamedArgument, NullTest, OperatorExpr,
     OperatorKind, Order, Parameter, Query, Slice, SqlValue, Statement, Subquery, SubqueryKind,
     SyntaxOption, TruthTest, TryCollectFromWithTokens, TryFromWithTokens, TryFromWithTokensOpt,
-    TypeName, Update, View, ViewCheckOption, Window,
+    TypeName, Update, VariableSet, View, ViewCheckOption, Window,
 };
 use crate::syn::{ListOpt, Opt};
 use crate::{StringSpan, sem::AnalysisError, syn};
@@ -63,7 +63,27 @@ impl TryFromWithTokens<&syn::Node> for Statement {
         if let Some(extension) = value.as_create_extension_stmt().as_inner() {
             return Ok(Self::extension(Extension::from(&extension)));
         }
+        if let Some(variable_set) = value.as_variable_set_stmt().as_inner() {
+            return Ok(Self::variable_set(VariableSet::try_from_with_tokens(
+                &variable_set,
+                tokens,
+            )?));
+        }
         AnalysisError::raise_unexpected_input("top-level PostgreSQL statement")
+    }
+}
+
+impl TryFromWithTokens<&syn::VariableSetStmt> for VariableSet {
+    type Error = AnalysisError;
+
+    fn try_from_with_tokens(
+        value: &syn::VariableSetStmt,
+        tokens: &IVec<crate::syn::ScanToken>,
+    ) -> Result<Self, Self::Error> {
+        Ok(Self::new(
+            &value.get_name(),
+            Expr::try_collect_from_with_tokens(value.get_args(), tokens)?,
+        ))
     }
 }
 

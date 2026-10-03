@@ -104,10 +104,10 @@ impl TryFromWithTokens<&syn::Node> for Statement {
             ));
         }
         if let Some(create_table) = value.as_create_stmt().as_inner() {
-            return Ok(Self::legacy_postgres(LegacyPostgres::new(
-                LegacyPostgresStatement::CreateTable(create_table),
+            return Ok(Self::table(super::Table::try_from_with_tokens(
+                &create_table,
                 tokens,
-            )));
+            )?));
         }
         if let Some(create_function) = value.as_create_function_stmt().as_inner() {
             return Ok(Self::legacy_postgres(LegacyPostgres::new(

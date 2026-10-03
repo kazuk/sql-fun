@@ -145,17 +145,3 @@ impl CreateFunction {
         ))
     }
 }
-
-/// analyze [`crate::syn::CreateFunctionStmt`]
-#[deprecated = "use CreateFunction::analyze_create_function"]
-pub fn analyze_create_function<TParseContext>(
-    context: TParseContext,
-    parent_schema: &Option<String>,
-    syn: crate::syn::CreateFunctionStmt,
-    tokens: &IVec<ScanToken>,
-) -> Result<AstAndContextPair<TParseContext>, AnalysisError>
-where
-    TParseContext: ParseContext,
-{
-    CreateFunction::analyze_create_function(context, parent_schema, syn, tokens)
-}

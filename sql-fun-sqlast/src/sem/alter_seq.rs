@@ -91,17 +91,3 @@ impl AlterSequence {
         ))
     }
 }
-
-/// analyze [`crate::syn::AlterSeqStmt`]
-#[deprecated = "use AlterSequence::analyze_alter_seq"]
-#[expect(dead_code)]
-pub fn analyze_alter_seq<TParseContext>(
-    context: TParseContext,
-    parent_schema: &Option<String>,
-    syn: crate::syn::AlterSeqStmt,
-) -> Result<AstAndContextPair<TParseContext>, AnalysisError>
-where
-    TParseContext: ParseContext,
-{
-    AlterSequence::analyze_alter_seq(context, parent_schema, syn)
-}

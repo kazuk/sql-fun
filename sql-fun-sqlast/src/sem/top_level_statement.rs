@@ -28,19 +28,6 @@ impl SemAst {
     }
 }
 
-/// analyze top-level SQL statement
-#[deprecated = "use SemAst::semantic_analysis"]
-pub fn semantic_analysis<TParseContext>(
-    context: TParseContext,
-    syn: ParseResult,
-    tokens: &IVec<crate::syn::ScanToken>,
-) -> Result<AstAndContextPair<TParseContext>, AnalysisError>
-where
-    TParseContext: ParseContext,
-{
-    SemAst::semantic_analysis(context, syn, tokens)
-}
-
 impl SemAst {
     /// analyze drop object statement
     pub fn analyze_drop_statement<TParseContext>(
@@ -237,7 +224,7 @@ impl SemAst {
             Stmt::CreateSequence(_create_sequence_statement) => todo!(),
             Stmt::DropSequence(_drop_sequence_statement) => todo!(),
             Stmt::Select(select) => {
-                let syntax = crate::sem::unresolved::Query::sqlite(&select)?;
+                let syntax = crate::sem::unresolved::Query::try_from(&select)?;
                 let outcome = syntax.resolve(&context, crate::sem::unresolved::Dialect::sqlite());
                 let mut context = context;
                 let query = outcome.report(&mut context)?;
@@ -254,17 +241,6 @@ impl SemAst {
             Stmt::DropDomain(_drop_domain_statement) => todo!(),
         }
     }
-}
-
-/// analyze node
-#[deprecated = "use SemAst::analyze_node"]
-pub fn analyze_node<TParseContext: ParseContext>(
-    context: TParseContext,
-    parent_schema: &Option<String>,
-    statement: crate::syn::Node,
-    tokens: &IVec<crate::syn::ScanToken>,
-) -> Result<AstAndContextPair<TParseContext>, AnalysisError> {
-    SemAst::analyze_node(context, parent_schema, statement, tokens)
 }
 
 #[cfg(test)]

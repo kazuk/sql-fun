@@ -18,17 +18,110 @@ mod sqlite;
 #[cfg(test)]
 mod tests;
 
+use sql_fun_core::IVec;
+
 use self::document::{
     CmdType, JsonAggregate, JsonArgument, JsonArray, JsonArrayAggregate, JsonArrayQuery,
     JsonBehavior, JsonBehaviorType, JsonColumn, JsonEncoding, JsonExprOp, JsonFormat,
     JsonFormatType, JsonFunction, JsonKeyValue, JsonObject, JsonObjectAggregate, JsonOutput,
     JsonParse, JsonPath, JsonPredicate, JsonQuotes, JsonReturning, JsonScalar, JsonSerialize,
-    JsonTable, JsonTableColumnType, JsonValue, JsonValueType, JsonWrapper, Merge, MergeMatchKind,
-    MergeWhen, MultiAssignment, OverridingKind, Xml, XmlColumn, XmlExprOp, XmlOptionType,
-    XmlSerialize, XmlTable,
+    JsonTableColumnType, JsonValue, JsonValueType, JsonWrapper, Merge, MergeMatchKind, MergeWhen,
+    MultiAssignment, OverridingKind, Xml, XmlColumn, XmlExprOp, XmlOptionType, XmlSerialize,
 };
 
+pub(crate) use self::document::{JsonTable, XmlTable};
+
 use crate::StringSpan;
+
+pub trait TryFromWithTokens<T>
+where
+    Self: Sized,
+{
+    type Error;
+
+    fn try_from_with_tokens(
+        value: T,
+        tokens: &IVec<crate::syn::ScanToken>,
+    ) -> Result<Self, Self::Error>;
+}
+
+pub trait TryFromWithTokensOpt<T>
+where
+    Self: Sized,
+{
+    type Error;
+
+    fn try_from_with_tokens_opt(
+        value: T,
+        tokens: &IVec<crate::syn::ScanToken>,
+    ) -> Result<Option<Self>, Self::Error>;
+}
+
+pub trait TryFromOpt<T>: TryFrom<T> {
+    fn try_from_opt(value: Option<T>) -> Result<Option<Self>, <Self as TryFrom<T>>::Error>
+    where
+        Self: Sized,
+    {
+        value.map(Self::try_from).transpose()
+    }
+}
+
+impl<T, U> TryFromOpt<T> for U where U: TryFrom<T> {}
+
+pub trait TryFromList<T>: Sized {
+    type Error;
+
+    fn try_from_list(values: &[T]) -> Result<Vec<Self>, Self::Error>;
+}
+
+impl<T, U, E> TryFromList<T> for U
+where
+    for<'a> U: TryFrom<&'a T, Error = E>,
+{
+    type Error = E;
+
+    fn try_from_list(values: &[T]) -> Result<Vec<Self>, Self::Error> {
+        values.iter().map(Self::try_from).collect()
+    }
+}
+
+pub trait FromList<T>: Sized {
+    fn from_list(values: &[T]) -> Vec<Self>;
+}
+
+impl<T, U> FromList<T> for U
+where
+    for<'a> U: From<&'a T>,
+{
+    fn from_list(values: &[T]) -> Vec<Self> {
+        values.iter().map(Self::from).collect()
+    }
+}
+
+pub trait FromOpt<T>: Sized {
+    fn from_opt(value: Option<T>) -> Option<Self>;
+}
+
+impl<T, U> FromOpt<T> for U
+where
+    U: From<T>,
+{
+    fn from_opt(value: Option<T>) -> Option<Self> {
+        value.map(Self::from)
+    }
+}
+
+pub trait TryCollectFromWithTokens<T>
+where
+    Self: Sized,
+{
+    type Error;
+
+    fn try_collect_from_with_tokens(
+        nodes: T,
+        tokens: &IVec<crate::syn::ScanToken>,
+    ) -> Result<Vec<Self>, Self::Error>;
+}
 
 #[derive(Clone, Copy, Debug, Eq, PartialEq)]
 pub(crate) enum Dialect {
@@ -440,6 +533,28 @@ pub(crate) enum CteBody {
     Merge(Box<Merge>),
 }
 
+impl CteBody {
+    pub(crate) fn query(query: Query) -> Self {
+        Self::Query(Box::new(query))
+    }
+
+    pub(crate) fn insert(insert: Insert) -> Self {
+        Self::Insert(Box::new(insert))
+    }
+
+    pub(crate) fn update(update: Update) -> Self {
+        Self::Update(Box::new(update))
+    }
+
+    pub(crate) fn delete(delete: Delete) -> Self {
+        Self::Delete(Box::new(delete))
+    }
+
+    pub(crate) fn merge(merge: Merge) -> Self {
+        Self::Merge(Box::new(merge))
+    }
+}
+
 #[derive(Clone, Debug)]
 pub(crate) struct Search {
     columns: Vec<String>,
@@ -472,6 +587,40 @@ pub(crate) enum FromItem {
     Sample(Box<TableSample>),
     Xml(Box<XmlTable>),
     Json(Box<JsonTable>),
+}
+
+impl FromItem {
+    pub(crate) fn relation(relation: Relation) -> Self {
+        Self::Relation(relation)
+    }
+
+    pub(crate) fn query(query: DerivedTable) -> Self {
+        Self::Query(Box::new(query))
+    }
+
+    pub(crate) fn join(join: Join) -> Self {
+        Self::Join(Box::new(join))
+    }
+
+    pub(crate) fn functions(functions: TableFunctions) -> Self {
+        Self::Functions(functions)
+    }
+
+    pub(crate) fn group(group: FromGroup) -> Self {
+        Self::Group(Box::new(group))
+    }
+
+    pub(crate) fn sample(sample: TableSample) -> Self {
+        Self::Sample(Box::new(sample))
+    }
+
+    pub(crate) fn xml(table: XmlTable) -> Self {
+        Self::Xml(Box::new(table))
+    }
+
+    pub(crate) fn json(table: JsonTable) -> Self {
+        Self::Json(Box::new(table))
+    }
 }
 
 #[derive(Clone, Debug)]
@@ -532,6 +681,19 @@ pub(crate) struct TableFunctions {
 pub(crate) struct TableFunction {
     expression: Expr,
     columns: Vec<TypedColumn>,
+}
+
+impl TableFunctions {
+    pub(crate) fn single(call: TableFunction, alias: Option<Alias>) -> Self {
+        Self {
+            calls: vec![call],
+            alias,
+            lateral: false,
+            ordinality: false,
+            rows_from: false,
+            columns: Vec::new(),
+        }
+    }
 }
 
 #[derive(Clone, Debug)]

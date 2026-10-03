@@ -1,7 +1,8 @@
 use crate::sem::unresolved::{
-    Alias, Call, Cte, CteBody, DerivedTable, Expr, Frame, FrameBound, FrameExclusion, FrameMode,
-    FromGroup, FromItem, Grouping, Join, JoinKind, Name, Order, Query, QueryBody, Relation, Select,
-    SetOperation, SetQuery, TableFunction, TableFunctions, Target, Window, With,
+    Alias, Call, Cte, CteBody, CteColumn, DerivedTable, Expr, Frame, FrameBound, FrameExclusion,
+    FrameMode, FromGroup, FromItem, FromList, FromOpt, Grouping, Join, JoinKind, Name, Order,
+    Query, QueryBody, Relation, Select, SetOperation, SetQuery, TableFunction, TableFunctions,
+    Target, TryFromList, TryFromOpt, Window, With,
 };
 use crate::{sem::AnalysisError, syn::sqlite as syn};
 
@@ -19,100 +20,117 @@ impl From<QueryBody> for Query {
     }
 }
 
-impl Query {
-    pub(crate) fn sqlite(value: &syn::Select) -> Result<Self, AnalysisError> {
-        let mut query = Self::from(QueryBody::sqlite(value.body().select())?);
+impl TryFrom<&syn::Select> for Query {
+    type Error = AnalysisError;
+
+    fn try_from(value: &syn::Select) -> Result<Self, Self::Error> {
+        let mut query = Self::from(QueryBody::try_from(value.body().select())?);
         for compound in value.body().compounds() {
-            let right = Self::from(QueryBody::sqlite(compound.select())?);
-            query = Self::from(QueryBody::sqlite_compound(
-                compound.operator(),
-                query,
-                right,
-            ));
+            let right = Self::from(QueryBody::try_from(compound.select())?);
+            query = Self::from(QueryBody::compound(compound.operator(), query, right));
         }
-        query.with = With::sqlite(value.with().as_ref())?;
-        query.order = Order::sqlite_list(value.order_by())?;
+        query.with = With::try_from_opt(value.with().as_ref())?.unwrap_or_default();
+        query.order = Order::try_from_list(value.order_by())?;
         if let Some(limit) = value.limit() {
-            query.limit = Some(Expr::sqlite(limit.expr())?);
-            query.offset = limit.offset().as_deref().map(Expr::sqlite).transpose()?;
+            query.limit = Some(Expr::try_from(limit.expr())?);
+            query.offset = Expr::try_from_opt(limit.offset().as_deref())?;
         }
         Ok(query)
     }
 }
 
-impl QueryBody {
-    fn sqlite(value: &syn::OneSelect) -> Result<Self, AnalysisError> {
-        Ok(match value {
-            syn::OneSelect::Values(rows) => {
-                let mut values = Vec::new();
-                for row in rows {
-                    let mut expressions = Vec::new();
-                    for expression in row {
-                        expressions.push(Expr::sqlite(expression)?);
-                    }
-                    values.push(expressions);
-                }
-                Self::Values(values)
-            }
-            syn::OneSelect::Select(value) => {
-                let mut targets = Vec::new();
-                for target in value.columns() {
-                    targets.push(Target::sqlite(target)?);
-                }
-                let mut windows = Vec::new();
-                for window in value.window_clause() {
-                    let mut common = Window::sqlite(window.window())?;
-                    common.name = Some(window.name().value().to_owned());
-                    windows.push(common);
-                }
-                let (group, having) = if let Some(group) = value.group_by() {
-                    (
-                        Grouping::sqlite_list(group.exprs())?,
-                        group.having().as_deref().map(Expr::sqlite).transpose()?,
-                    )
-                } else {
-                    (Vec::new(), None)
-                };
-                Self::Select(Box::new(Select {
-                    into: None,
-                    distinct: if matches!(value.distinctness(), Some(syn::Distinctness::Distinct)) {
-                        Some(Vec::new())
-                    } else {
-                        None
-                    },
-                    targets,
-                    from: value
-                        .from()
-                        .as_ref()
-                        .map(FromItem::sqlite_from)
-                        .transpose()?
-                        .unwrap_or_default(),
-                    predicate: value
-                        .where_clause()
-                        .as_deref()
-                        .map(Expr::sqlite)
-                        .transpose()?,
-                    group,
-                    group_distinct: false,
-                    having,
-                    windows,
-                }))
-            }
-        })
-    }
+impl TryFrom<&Box<syn::Select>> for Query {
+    type Error = AnalysisError;
 
-    fn sqlite_compound(operator: &syn::CompoundOperator, left: Query, right: Query) -> Self {
-        Self::Set(Box::new(SetQuery {
-            operation: SetOperation::sqlite(operator),
-            all: matches!(operator, syn::CompoundOperator::UnionAll),
-            left,
-            right,
-        }))
+    fn try_from(value: &Box<syn::Select>) -> Result<Self, Self::Error> {
+        Self::try_from(value.as_ref())
     }
 }
 
-impl SetOperation {
-    const fn sqlite(value: &syn::CompoundOperator) -> Self {
+impl TryFrom<&syn::OneSelectItem> for Select {
+    type Error = AnalysisError;
+
+    fn try_from(value: &syn::OneSelectItem) -> Result<Self, Self::Error> {
+        let (group, having) = if let Some(group) = value.group_by() {
+            (
+                Grouping::try_from_list(group.exprs())?,
+                Expr::try_from_opt(group.having().as_deref())?,
+            )
+        } else {
+            (Vec::new(), None)
+        };
+        Ok(Select {
+            into: None,
+            distinct: if matches!(value.distinctness(), Some(syn::Distinctness::Distinct)) {
+                Some(Vec::new())
+            } else {
+                None
+            },
+            targets: Target::try_from_list(value.columns())?,
+            from: FromItem::try_from_clause_opt(value.from().as_ref())?,
+            predicate: Expr::try_from_opt(value.where_clause().as_deref())?,
+            group,
+            group_distinct: false,
+            having,
+            windows: Window::try_from_list(value.window_clause())?,
+        })
+    }
+}
+
+impl SetQuery {
+    fn new_compound(operator: &syn::CompoundOperator, left: Query, right: Query) -> Self {
+        SetQuery {
+            operation: SetOperation::from(operator),
+            all: matches!(operator, syn::CompoundOperator::UnionAll),
+            left,
+            right,
+        }
+    }
+}
+
+impl QueryBody {
+    fn compound(operator: &syn::CompoundOperator, left: Query, right: Query) -> Self {
+        Self::Set(Box::new(SetQuery::new_compound(operator, left, right)))
+    }
+}
+
+impl TryFrom<&Vec<Vec<Box<syn::Expr>>>> for QueryBody {
+    type Error = AnalysisError;
+
+    fn try_from(rows: &Vec<Vec<Box<syn::Expr>>>) -> Result<Self, Self::Error> {
+        let mut values = Vec::new();
+        for row in rows {
+            let mut expressions = Vec::new();
+            for expression in row {
+                expressions.push(Expr::try_from(expression)?);
+            }
+            values.push(expressions);
+        }
+        Ok(Self::Values(values))
+    }
+}
+
+impl TryFrom<&syn::OneSelectItem> for QueryBody {
+    type Error = AnalysisError;
+
+    fn try_from(value: &syn::OneSelectItem) -> Result<Self, Self::Error> {
+        Ok(Self::Select(Box::new(Select::try_from(value)?)))
+    }
+}
+
+impl TryFrom<&syn::OneSelect> for QueryBody {
+    type Error = AnalysisError;
+
+    fn try_from(value: &syn::OneSelect) -> Result<Self, Self::Error> {
+        Ok(match value {
+            syn::OneSelect::Values(rows) => Self::try_from(rows)?,
+            syn::OneSelect::Select(value) => Self::try_from(value)?,
+        })
+    }
+}
+
+impl From<&syn::CompoundOperator> for SetOperation {
+    fn from(value: &syn::CompoundOperator) -> Self {
         match value {
             syn::CompoundOperator::Union | syn::CompoundOperator::UnionAll => Self::Union,
             syn::CompoundOperator::Except => Self::Except,
@@ -121,21 +139,45 @@ impl SetOperation {
     }
 }
 
-impl Target {
-    fn sqlite(value: &syn::ResultColumn) -> Result<Self, AnalysisError> {
+impl TryFrom<&syn::ResultColumnExpr> for Target {
+    type Error = AnalysisError;
+
+    fn try_from(value: &syn::ResultColumnExpr) -> Result<Self, Self::Error> {
+        Ok(Self {
+            expression: Expr::try_from(value.expr())?,
+            alias: value.as_().as_ref().map(alias_name),
+        })
+    }
+}
+
+impl TryFrom<&syn::ResultColumn> for Target {
+    type Error = AnalysisError;
+
+    fn try_from(value: &syn::ResultColumn) -> Result<Self, Self::Error> {
         match value {
-            syn::ResultColumn::Expr(value) => Ok(Self {
-                expression: Expr::sqlite(value.expr())?,
-                alias: value.as_().as_ref().map(alias_name),
-            }),
-            syn::ResultColumn::Star => Ok(Self {
-                expression: Expr::star(&Name::default()),
-                alias: None,
-            }),
-            syn::ResultColumn::TableStar(name) => Ok(Self {
-                expression: Expr::star(&Name::local(name.value())),
-                alias: None,
-            }),
+            syn::ResultColumn::Expr(value) => Self::try_from(value),
+            syn::ResultColumn::Star => Ok(Self::star()),
+            syn::ResultColumn::TableStar(name) => Self::try_from(name),
+        }
+    }
+}
+
+impl TryFrom<&syn::Name> for Target {
+    type Error = AnalysisError;
+
+    fn try_from(value: &syn::Name) -> Result<Self, Self::Error> {
+        Ok(Self {
+            expression: Expr::star(&Name::local(value.value())),
+            alias: None,
+        })
+    }
+}
+
+impl Target {
+    fn star() -> Self {
+        Self {
+            expression: Expr::star(&Name::default()),
+            alias: None,
         }
     }
 }
@@ -145,7 +187,7 @@ impl Expr {
         Self::Star(name.clone())
     }
     fn table_call(name: &Name, arguments: &[Self]) -> Self {
-        let mut call = Call::sqlite_base("");
+        let mut call = Call::base("");
         call.name = name.clone();
         call.arguments = arguments.to_vec();
         Self::Call(Box::new(call))
@@ -160,65 +202,56 @@ fn alias_name(value: &syn::As) -> String {
     }
 }
 
-impl Alias {
-    fn sqlite(value: &Option<syn::As>) -> Option<Self> {
-        value.as_ref().map(|alias| Self {
-            name: alias_name(alias),
+impl From<&syn::As> for Alias {
+    fn from(value: &syn::As) -> Self {
+        Self {
+            name: alias_name(value),
             columns: Vec::new(),
+        }
+    }
+}
+
+impl TryFrom<&syn::Expr> for Grouping {
+    type Error = AnalysisError;
+
+    fn try_from(value: &syn::Expr) -> Result<Self, Self::Error> {
+        Ok(Self::Expression(Expr::try_from(value)?))
+    }
+}
+
+impl TryFrom<&syn::SortedColumn> for Order {
+    type Error = AnalysisError;
+
+    fn try_from(value: &syn::SortedColumn) -> Result<Self, Self::Error> {
+        Ok(Self {
+            expression: Expr::try_from(value.expr())?,
+            descending: value
+                .order()
+                .map(|order| matches!(order, syn::SortOrder::Desc)),
+            nulls_first: value
+                .nulls()
+                .as_ref()
+                .map(|nulls| matches!(nulls, syn::NullsOrder::First)),
+            using: None,
         })
     }
 }
 
-impl Grouping {
-    fn sqlite_list(values: &[syn::Expr]) -> Result<Vec<Self>, AnalysisError> {
-        let mut groups = Vec::new();
-        for value in values {
-            groups.push(Self::Expression(Expr::sqlite(value)?));
-        }
-        Ok(groups)
-    }
-}
+impl TryFrom<&syn::With> for With {
+    type Error = AnalysisError;
 
-impl Order {
-    pub(super) fn sqlite_list(values: &[syn::SortedColumn]) -> Result<Vec<Self>, AnalysisError> {
-        let mut order = Vec::new();
-        for value in values {
-            order.push(Self {
-                expression: Expr::sqlite(value.expr())?,
-                descending: value
-                    .order()
-                    .map(|order| matches!(order, syn::SortOrder::Desc)),
-                nulls_first: value
-                    .nulls()
-                    .as_ref()
-                    .map(|nulls| matches!(nulls, syn::NullsOrder::First)),
-                using: None,
-            });
-        }
-        Ok(order)
-    }
-}
-
-impl With {
-    fn sqlite(value: Option<&syn::With>) -> Result<Self, AnalysisError> {
-        let Some(value) = value else {
-            return Ok(Self::default());
-        };
+    fn try_from(value: &syn::With) -> Result<Self, Self::Error> {
         let mut entries = Vec::new();
         for entry in value.ctes() {
-            let mut columns = Vec::new();
-            for column in entry.columns() {
-                columns.push(crate::sem::unresolved::CteColumn::sqlite(column));
-            }
             entries.push(Cte {
                 name: entry.table_name().value().to_owned(),
-                columns,
+                columns: CteColumn::from_list(entry.columns()),
                 materialized: match entry.materialized() {
                     syn::Materialized::Yes => Some(true),
                     syn::Materialized::No => Some(false),
                     syn::Materialized::Any => None,
                 },
-                body: CteBody::sqlite(entry.select())?,
+                body: CteBody::try_from(entry.select())?,
                 search: None,
                 cycle: None,
             });
@@ -230,14 +263,16 @@ impl With {
     }
 }
 
-impl CteBody {
-    fn sqlite(query: &syn::Select) -> Result<Self, AnalysisError> {
-        Ok(Self::Query(Box::new(Query::sqlite(query)?)))
+impl TryFrom<&syn::Select> for CteBody {
+    type Error = AnalysisError;
+
+    fn try_from(query: &syn::Select) -> Result<Self, Self::Error> {
+        Ok(Self::query(Query::try_from(query)?))
     }
 }
 
-impl crate::sem::unresolved::CteColumn {
-    fn sqlite(value: &syn::IndexedColumn) -> Self {
+impl From<&syn::IndexedColumn> for CteColumn {
+    fn from(value: &syn::IndexedColumn) -> Self {
         Self {
             name: value.column_name().value().to_owned(),
             collation: value
@@ -253,13 +288,20 @@ impl crate::sem::unresolved::CteColumn {
 }
 
 impl FromItem {
-    fn sqlite_from(value: &syn::FromClause) -> Result<Vec<Self>, AnalysisError> {
-        let mut left = Self::sqlite(value.select())?;
+    fn try_from_clause_opt(value: Option<&syn::FromClause>) -> Result<Vec<Self>, AnalysisError> {
+        let Some(value) = value else {
+            return Ok(Vec::new());
+        };
+        Self::from_clause(value)
+    }
+
+    fn from_clause(value: &syn::FromClause) -> Result<Vec<Self>, AnalysisError> {
+        let mut left = Self::try_from(value.select())?;
         for join in value.joins() {
-            let (kind, natural) = JoinKind::sqlite(join.operator());
+            let (kind, natural) = JoinKind::from_sqlite(join.operator());
             let (condition, using) = match join.constraint() {
                 Some(syn::JoinConstraint::On(expression)) => {
-                    (Some(Expr::sqlite(expression)?), Vec::new())
+                    (Some(Expr::try_from(expression)?), Vec::new())
                 }
                 Some(syn::JoinConstraint::Using(columns)) => {
                     let mut names = Vec::new();
@@ -270,66 +312,136 @@ impl FromItem {
                 }
                 None => (None, Vec::new()),
             };
-            left = Self::Join(Box::new(Join {
+            left = Self::join(Join {
                 left,
-                right: Self::sqlite(join.table())?,
+                right: Self::try_from(join.table())?,
                 kind,
                 natural,
                 condition,
                 using,
                 using_alias: None,
                 alias: None,
-            }));
+            });
         }
         Ok(vec![left])
     }
+}
 
-    fn sqlite(value: &syn::SelectTable) -> Result<Self, AnalysisError> {
-        Ok(match value {
-            syn::SelectTable::Table(value) => {
-                let (indexed, not_indexed) = match value.indexed() {
-                    Some(syn::Indexed::IndexedBy(name)) => (Some(name.value().to_owned()), false),
-                    Some(syn::Indexed::NotIndexed) => (None, true),
-                    None => (None, false),
-                };
-                Self::Relation(Relation {
-                    name: Name::sqlite(value.qualified_name()),
-                    alias: Alias::sqlite(value.as_()),
-                    inherit: false,
-                    persistence: String::new(),
-                    indexed,
-                    not_indexed,
-                })
-            }
-            syn::SelectTable::Select(value) => Self::Query(Box::new(DerivedTable {
-                query: Query::sqlite(value.select())?,
-                alias: Alias::sqlite(value.as_()),
-                lateral: false,
-            })),
-            syn::SelectTable::Sub(value) => Self::Group(Box::new(FromGroup {
-                items: Self::sqlite_from(value.from_clause())?,
-                alias: Alias::sqlite(value.as_()),
-            })),
-            syn::SelectTable::TableCell(value) => Self::Functions(TableFunctions {
-                calls: vec![TableFunction {
-                    expression: Expr::table_call(
-                        &Name::sqlite(value.qualified_name()),
-                        &Expr::sqlite_list(value.exprs())?,
-                    ),
-                    columns: Vec::new(),
-                }],
-                alias: Alias::sqlite(value.as_()),
-                lateral: false,
-                ordinality: false,
-                rows_from: false,
-                columns: Vec::new(),
-            }),
+impl TryFrom<&syn::SelectTable> for FromItem {
+    type Error = AnalysisError;
+
+    fn try_from(value: &syn::SelectTable) -> Result<Self, Self::Error> {
+        match value {
+            syn::SelectTable::Table(value) => Self::try_from(value),
+            syn::SelectTable::Select(value) => Self::try_from(value),
+            syn::SelectTable::Sub(value) => Self::try_from(value),
+            syn::SelectTable::TableCell(value) => Self::try_from(value),
+        }
+    }
+}
+
+impl TryFrom<&syn::SelectTableTable> for FromItem {
+    type Error = AnalysisError;
+
+    fn try_from(value: &syn::SelectTableTable) -> Result<Self, Self::Error> {
+        Ok(Self::relation(Relation::try_from(value)?))
+    }
+}
+
+impl TryFrom<&syn::SelectTableTable> for Relation {
+    type Error = AnalysisError;
+
+    fn try_from(value: &syn::SelectTableTable) -> Result<Self, Self::Error> {
+        let (indexed, not_indexed) = match value.indexed() {
+            Some(syn::Indexed::IndexedBy(name)) => (Some(name.value().to_owned()), false),
+            Some(syn::Indexed::NotIndexed) => (None, true),
+            None => (None, false),
+        };
+        Ok(Self {
+            name: Name::from(value.qualified_name()),
+            alias: value.as_().as_ref().map(Alias::from),
+            inherit: false,
+            persistence: String::new(),
+            indexed,
+            not_indexed,
         })
     }
 }
 
+impl TryFrom<&syn::SelectTableSelect> for FromItem {
+    type Error = AnalysisError;
+
+    fn try_from(value: &syn::SelectTableSelect) -> Result<Self, Self::Error> {
+        Ok(Self::query(DerivedTable::try_from(value)?))
+    }
+}
+
+impl TryFrom<&syn::SelectTableSelect> for DerivedTable {
+    type Error = AnalysisError;
+
+    fn try_from(value: &syn::SelectTableSelect) -> Result<Self, Self::Error> {
+        Ok(Self {
+            query: Query::try_from(value.select())?,
+            alias: value.as_().as_ref().map(Alias::from),
+            lateral: false,
+        })
+    }
+}
+
+impl TryFrom<&syn::SelectTableSub> for FromItem {
+    type Error = AnalysisError;
+
+    fn try_from(value: &syn::SelectTableSub) -> Result<Self, Self::Error> {
+        Ok(Self::group(FromGroup::try_from(value)?))
+    }
+}
+
+impl TryFrom<&syn::SelectTableSub> for FromGroup {
+    type Error = AnalysisError;
+
+    fn try_from(value: &syn::SelectTableSub) -> Result<Self, Self::Error> {
+        Ok(Self {
+            items: FromItem::from_clause(value.from_clause())?,
+            alias: value.as_().as_ref().map(Alias::from),
+        })
+    }
+}
+
+impl TryFrom<&syn::SelectTableTableCell> for FromItem {
+    type Error = AnalysisError;
+
+    fn try_from(value: &syn::SelectTableTableCell) -> Result<Self, Self::Error> {
+        Ok(Self::functions(TableFunctions::single(
+            TableFunction::try_from(value)?,
+            value.as_().as_ref().map(Alias::from),
+        )))
+    }
+}
+
+impl TryFrom<&syn::SelectTableTableCell> for TableFunction {
+    type Error = AnalysisError;
+
+    fn try_from(value: &syn::SelectTableTableCell) -> Result<Self, Self::Error> {
+        Ok(Self {
+            expression: Expr::table_call(
+                &Name::from(value.qualified_name()),
+                &Expr::try_from_list(value.exprs())?,
+            ),
+            columns: Vec::new(),
+        })
+    }
+}
+
+impl TryFrom<&Box<syn::SelectTable>> for FromItem {
+    type Error = AnalysisError;
+
+    fn try_from(value: &Box<syn::SelectTable>) -> Result<Self, Self::Error> {
+        Self::try_from(value.as_ref())
+    }
+}
+
 impl JoinKind {
-    fn sqlite(value: &syn::JoinOperator) -> (Self, bool) {
+    fn from_sqlite(value: &syn::JoinOperator) -> (Self, bool) {
         match value {
             syn::JoinOperator::Comma => (Self::Cross, false),
             syn::JoinOperator::TypedJoin(None) => (Self::Inner, false),
@@ -351,48 +463,76 @@ impl JoinKind {
     }
 }
 
-impl Window {
-    pub(super) fn sqlite_over(value: &syn::Over) -> Result<Self, AnalysisError> {
+impl TryFrom<&syn::Over> for Window {
+    type Error = AnalysisError;
+
+    fn try_from(value: &syn::Over) -> Result<Self, Self::Error> {
         match value {
-            syn::Over::Window(window) => Self::sqlite(window),
-            syn::Over::Name(name) => Ok(Self {
-                name: None,
-                reference: Some(name.value().to_owned()),
-                partition: Vec::new(),
-                order: Vec::new(),
-                frame: None,
-            }),
+            syn::Over::Window(window) => Self::try_from(window),
+            syn::Over::Name(name) => Self::try_from(name),
         }
     }
+}
 
-    fn sqlite(value: &syn::Window) -> Result<Self, AnalysisError> {
+impl TryFrom<&syn::Name> for Window {
+    type Error = AnalysisError;
+
+    fn try_from(value: &syn::Name) -> Result<Self, Self::Error> {
         Ok(Self {
             name: None,
-            reference: value.base().as_ref().map(|name| name.value().to_owned()),
-            partition: Expr::sqlite_list(value.partition_by())?,
-            order: Order::sqlite_list(value.order_by())?,
-            frame: value
-                .frame_clause()
-                .as_ref()
-                .map(Frame::sqlite)
-                .transpose()?,
+            reference: Some(value.value().to_owned()),
+            partition: Vec::new(),
+            order: Vec::new(),
+            frame: None,
         })
     }
 }
 
-impl Frame {
-    fn sqlite(value: &syn::FrameClause) -> Result<Self, AnalysisError> {
+impl TryFrom<&syn::Window> for Window {
+    type Error = AnalysisError;
+
+    fn try_from(value: &syn::Window) -> Result<Self, Self::Error> {
         Ok(Self {
-            mode: FrameMode::sqlite(value.mode()),
-            start: FrameBound::sqlite(value.start())?,
-            end: value.end().as_ref().map(FrameBound::sqlite).transpose()?,
-            exclusion: value.exclude().as_ref().map(FrameExclusion::sqlite),
+            name: None,
+            reference: String::from_opt(value.base().as_ref()),
+            partition: Expr::try_from_list(value.partition_by())?,
+            order: Order::try_from_list(value.order_by())?,
+            frame: Frame::try_from_opt(value.frame_clause().as_ref())?,
         })
     }
 }
 
-impl FrameMode {
-    const fn sqlite(value: &syn::FrameMode) -> Self {
+impl TryFrom<&syn::WindowDef> for Window {
+    type Error = AnalysisError;
+
+    fn try_from(value: &syn::WindowDef) -> Result<Self, Self::Error> {
+        let mut window = Self::try_from(value.window())?;
+        window.name = Some(value.name().value().to_owned());
+        Ok(window)
+    }
+}
+
+impl FromOpt<&syn::Name> for String {
+    fn from_opt(value: Option<&syn::Name>) -> Option<Self> {
+        value.map(|name| name.value().to_owned())
+    }
+}
+
+impl TryFrom<&syn::FrameClause> for Frame {
+    type Error = AnalysisError;
+
+    fn try_from(value: &syn::FrameClause) -> Result<Self, Self::Error> {
+        Ok(Self {
+            mode: FrameMode::from(value.mode()),
+            start: FrameBound::try_from(value.start())?,
+            end: FrameBound::try_from_opt(value.end().as_ref())?,
+            exclusion: value.exclude().as_ref().map(FrameExclusion::from),
+        })
+    }
+}
+
+impl From<&syn::FrameMode> for FrameMode {
+    fn from(value: &syn::FrameMode) -> Self {
         match value {
             syn::FrameMode::Rows => Self::Rows,
             syn::FrameMode::Range => Self::Range,
@@ -401,20 +541,22 @@ impl FrameMode {
     }
 }
 
-impl FrameBound {
-    fn sqlite(value: &syn::FrameBound) -> Result<Self, AnalysisError> {
+impl TryFrom<&syn::FrameBound> for FrameBound {
+    type Error = AnalysisError;
+
+    fn try_from(value: &syn::FrameBound) -> Result<Self, Self::Error> {
         Ok(match value {
             syn::FrameBound::CurrentRow => Self::CurrentRow,
             syn::FrameBound::UnboundedPreceding => Self::UnboundedPreceding,
             syn::FrameBound::UnboundedFollowing => Self::UnboundedFollowing,
-            syn::FrameBound::Preceding(expr) => Self::Preceding(Expr::sqlite(expr)?),
-            syn::FrameBound::Following(expr) => Self::Following(Expr::sqlite(expr)?),
+            syn::FrameBound::Preceding(expr) => Self::Preceding(Expr::try_from(expr)?),
+            syn::FrameBound::Following(expr) => Self::Following(Expr::try_from(expr)?),
         })
     }
 }
 
-impl FrameExclusion {
-    const fn sqlite(value: &syn::FrameExclude) -> Self {
+impl From<&syn::FrameExclude> for FrameExclusion {
+    fn from(value: &syn::FrameExclude) -> Self {
         match value {
             syn::FrameExclude::NoOthers => Self::NoOthers,
             syn::FrameExclude::CurrentRow => Self::CurrentRow,

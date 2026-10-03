@@ -3,7 +3,8 @@ mod query;
 use crate::sem::unresolved::{
     Access, BooleanExpr, BooleanOperator, Call, CallKind, Case, CaseArm, Cast, Collate, Expr,
     Indirection, Literal, Name, NamedArgument, NullTest, OperatorExpr, OperatorKind, Order,
-    Parameter, Query, Slice, SqlValue, Subquery, SubqueryKind, TruthTest, TypeName, Window,
+    Parameter, Query, Slice, SqlValue, Subquery, SubqueryKind, TruthTest, TryCollectFromWithTokens,
+    TryFromWithTokens, TryFromWithTokensOpt, TypeName, Window,
 };
 use crate::syn::{ListOpt, Opt};
 use crate::{StringSpan, sem::AnalysisError, syn};
@@ -24,7 +25,20 @@ fn nonempty(value: String) -> Option<String> {
     if value.is_empty() { None } else { Some(value) }
 }
 
+impl TryFrom<syn::NodeListOpt> for Name {
+    type Error = AnalysisError;
+
+    fn try_from(nodes: syn::NodeListOpt) -> Result<Self, Self::Error> {
+        let mut parts = Vec::new();
+        for node in nodes.as_inner().unwrap_or_default() {
+            parts.push(required(node.as_string().get_sval(), "name component")?);
+        }
+        Ok(Self::from_parts(&parts))
+    }
+}
+
 impl Name {
+    #[deprecated = "use try_from"]
     pub(in crate::sem::unresolved) fn postgres(
         nodes: syn::NodeListOpt,
     ) -> Result<Self, AnalysisError> {
@@ -36,167 +50,488 @@ impl Name {
     }
 }
 
-impl Expr {
-    pub(crate) fn postgres_function(
-        value: &syn::FuncCall,
-        tokens: &IVec<syn::ScanToken>,
-    ) -> Result<Self, AnalysisError> {
-        Ok(Self::Call(Box::new(Call::postgres(value, tokens)?)))
+impl TryFromWithTokens<&syn::ColumnRef> for Expr {
+    type Error = AnalysisError;
+
+    fn try_from_with_tokens(
+        column: &syn::ColumnRef,
+        _tokens: &IVec<crate::syn::ScanToken>,
+    ) -> Result<Self, Self::Error> {
+        let mut parts = Vec::new();
+        let mut star = false;
+        for field in column.get_fields().as_inner().unwrap_or_default() {
+            if field.is_a_star() {
+                star = true;
+            } else {
+                parts.push(required(field.as_string().get_sval(), "column name")?);
+            }
+        }
+        let name = Name::from_parts(&parts);
+        Ok(if star {
+            Self::Star(name)
+        } else {
+            Self::Column(name)
+        })
     }
-    pub(crate) fn postgres(
+}
+
+impl TryFromWithTokens<&syn::AExpr> for OperatorExpr {
+    type Error = AnalysisError;
+
+    fn try_from_with_tokens(
+        value: &syn::AExpr,
+        tokens: &IVec<crate::syn::ScanToken>,
+    ) -> Result<Self, Self::Error> {
+        Ok(Self {
+            name: Name::try_from(value.get_name())?,
+            kind: OperatorKind::try_from(required(value.get_kind().as_inner(), "operator kind")?)?,
+            left: Expr::try_from_with_tokens_opt(value.get_lexpr(), tokens)?,
+            right: Expr::try_from_with_tokens_opt(value.get_rexpr(), tokens)?,
+            escape: None,
+        })
+    }
+}
+
+impl TryFromWithTokens<&syn::AExpr> for Expr {
+    type Error = AnalysisError;
+
+    fn try_from_with_tokens(
+        value: &syn::AExpr,
+        tokens: &IVec<crate::syn::ScanToken>,
+    ) -> Result<Self, Self::Error> {
+        Ok(Self::Operator(Box::new(
+            OperatorExpr::try_from_with_tokens(value, tokens)?,
+        )))
+    }
+}
+
+impl TryFromWithTokens<&syn::BoolExpr> for BooleanExpr {
+    type Error = AnalysisError;
+
+    fn try_from_with_tokens(
+        value: &syn::BoolExpr,
+        tokens: &IVec<crate::syn::ScanToken>,
+    ) -> Result<Self, Self::Error> {
+        Ok(Self {
+            operator: BooleanOperator::try_from(required(
+                value.get_boolop().as_inner(),
+                "boolean operator",
+            )?)?,
+            arguments: Expr::try_collect_from_with_tokens(value.get_args(), tokens)?,
+        })
+    }
+}
+
+impl TryFromWithTokens<&syn::BoolExpr> for Expr {
+    type Error = AnalysisError;
+
+    fn try_from_with_tokens(
+        value: &syn::BoolExpr,
+        tokens: &IVec<crate::syn::ScanToken>,
+    ) -> Result<Self, Self::Error> {
+        Ok(Self::Boolean(Box::new(BooleanExpr::try_from_with_tokens(
+            value, tokens,
+        )?)))
+    }
+}
+
+impl TryFromWithTokens<&syn::NullTest> for NullTest {
+    type Error = AnalysisError;
+
+    fn try_from_with_tokens(
+        test: &syn::NullTest,
+        tokens: &IVec<crate::syn::ScanToken>,
+    ) -> Result<Self, Self::Error> {
+        Ok(Self {
+            argument: Expr::try_from_with_tokens(&test.get_arg(), tokens)?,
+            negated: matches!(
+                test.get_nulltesttype().as_inner(),
+                Some(syn::NullTestType::IsNotNull)
+            ),
+            row: test.get_argisrow(),
+        })
+    }
+}
+
+impl TryFromWithTokens<&syn::NullTest> for Expr {
+    type Error = AnalysisError;
+
+    fn try_from_with_tokens(
+        test: &syn::NullTest,
+        tokens: &IVec<crate::syn::ScanToken>,
+    ) -> Result<Self, Self::Error> {
+        Ok(Self::NullTest(Box::new(NullTest::try_from_with_tokens(
+            test, tokens,
+        )?)))
+    }
+}
+
+impl TryFromWithTokens<&syn::BooleanTest> for TruthTest {
+    type Error = AnalysisError;
+
+    fn try_from_with_tokens(
+        test: &syn::BooleanTest,
+        tokens: &IVec<crate::syn::ScanToken>,
+    ) -> Result<Self, Self::Error> {
+        let (value, negated) = match required(test.get_booltesttype().as_inner(), "truth test")? {
+            syn::BoolTestType::IsTrue => (Some(true), false),
+            syn::BoolTestType::IsNotTrue => (Some(true), true),
+            syn::BoolTestType::IsFalse => (Some(false), false),
+            syn::BoolTestType::IsNotFalse => (Some(false), true),
+            syn::BoolTestType::IsUnknown => (None, false),
+            syn::BoolTestType::IsNotUnknown => (None, true),
+            _ => return AnalysisError::raise_unexpected_input("truth test"),
+        };
+        Ok(Self {
+            argument: Expr::try_from_with_tokens(&test.get_arg(), tokens)?,
+            value,
+            negated,
+        })
+    }
+}
+
+impl TryFromWithTokens<&syn::BooleanTest> for Expr {
+    type Error = AnalysisError;
+
+    fn try_from_with_tokens(
+        test: &syn::BooleanTest,
+        tokens: &IVec<crate::syn::ScanToken>,
+    ) -> Result<Self, Self::Error> {
+        Ok(Self::TruthTest(Box::new(TruthTest::try_from_with_tokens(
+            test, tokens,
+        )?)))
+    }
+}
+
+impl TryFromWithTokens<&syn::TypeCast> for Cast {
+    type Error = AnalysisError;
+
+    fn try_from_with_tokens(
+        cast: &syn::TypeCast,
+        tokens: &IVec<crate::syn::ScanToken>,
+    ) -> Result<Self, Self::Error> {
+        Ok(Self {
+            argument: Expr::try_from_with_tokens(&cast.get_arg(), tokens)?,
+            target: TypeName::try_from_with_tokens(
+                &required(cast.get_type_name().as_inner(), "cast type")?,
+                tokens,
+            )?,
+        })
+    }
+}
+
+impl TryFromWithTokens<&syn::TypeCast> for Expr {
+    type Error = AnalysisError;
+
+    fn try_from_with_tokens(
+        cast: &syn::TypeCast,
+        tokens: &IVec<crate::syn::ScanToken>,
+    ) -> Result<Self, Self::Error> {
+        Ok(Self::Cast(Box::new(Cast::try_from_with_tokens(
+            cast, tokens,
+        )?)))
+    }
+}
+
+impl TryFromWithTokens<&syn::CollateClause> for Collate {
+    type Error = AnalysisError;
+
+    fn try_from_with_tokens(
+        collate: &syn::CollateClause,
+        tokens: &IVec<crate::syn::ScanToken>,
+    ) -> Result<Self, Self::Error> {
+        Ok(Self {
+            argument: Expr::try_from_with_tokens(&collate.get_arg(), tokens)?,
+            name: Name::try_from(collate.get_collname())?,
+        })
+    }
+}
+
+impl TryFromWithTokens<&syn::CollateClause> for Expr {
+    type Error = AnalysisError;
+
+    fn try_from_with_tokens(
+        collate: &syn::CollateClause,
+        tokens: &IVec<crate::syn::ScanToken>,
+    ) -> Result<Self, Self::Error> {
+        Ok(Self::Collate(Box::new(Collate::try_from_with_tokens(
+            collate, tokens,
+        )?)))
+    }
+}
+
+impl TryFromWithTokens<&syn::SubLink> for Subquery {
+    type Error = AnalysisError;
+
+    fn try_from_with_tokens(
+        link: &syn::SubLink,
+        tokens: &IVec<crate::syn::ScanToken>,
+    ) -> Result<Self, Self::Error> {
+        Ok(Self {
+            query: Query::try_from_with_tokens(
+                &required(link.get_subselect().as_select_stmt().as_inner(), "subquery")?,
+                tokens,
+            )?,
+            kind: SubqueryKind::try_from(required(
+                link.get_sub_link_type().as_inner(),
+                "subquery kind",
+            )?)?,
+            test: Expr::try_from_with_tokens_opt(link.get_testexpr(), tokens)?,
+            operator: Name::try_from(link.get_oper_name())?,
+        })
+    }
+}
+
+impl TryFromWithTokens<&syn::SubLink> for Expr {
+    type Error = AnalysisError;
+
+    fn try_from_with_tokens(
+        link: &syn::SubLink,
+        tokens: &IVec<crate::syn::ScanToken>,
+    ) -> Result<Self, Self::Error> {
+        Ok(Self::Subquery(Box::new(Subquery::try_from_with_tokens(
+            link, tokens,
+        )?)))
+    }
+}
+
+impl TryFromWithTokens<&syn::AArrayExpr> for Vec<Expr> {
+    type Error = AnalysisError;
+
+    fn try_from_with_tokens(
+        value: &syn::AArrayExpr,
+        tokens: &IVec<crate::syn::ScanToken>,
+    ) -> Result<Self, Self::Error> {
+        Expr::try_collect_from_with_tokens(value.get_elements(), tokens)
+    }
+}
+
+impl TryFromWithTokens<&syn::AArrayExpr> for Expr {
+    type Error = AnalysisError;
+
+    fn try_from_with_tokens(
+        array: &syn::AArrayExpr,
+        tokens: &IVec<crate::syn::ScanToken>,
+    ) -> Result<Self, Self::Error> {
+        Ok(Self::Array(Vec::<Self>::try_from_with_tokens(
+            array, tokens,
+        )?))
+    }
+}
+
+impl TryFromWithTokens<&syn::AIndirection> for Indirection {
+    type Error = AnalysisError;
+
+    fn try_from_with_tokens(
+        indirection: &syn::AIndirection,
+        tokens: &IVec<crate::syn::ScanToken>,
+    ) -> Result<Self, Self::Error> {
+        Ok(Self {
+            argument: Expr::try_from_with_tokens(&indirection.get_arg(), tokens)?,
+            items: Access::try_collect_from_with_tokens(indirection.get_indirection(), tokens)?,
+        })
+    }
+}
+
+impl TryFromWithTokens<&syn::AIndirection> for Expr {
+    type Error = AnalysisError;
+
+    fn try_from_with_tokens(
+        indirection: &syn::AIndirection,
+        tokens: &IVec<crate::syn::ScanToken>,
+    ) -> Result<Self, Self::Error> {
+        Ok(Self::Indirection(Box::new(
+            Indirection::try_from_with_tokens(indirection, tokens)?,
+        )))
+    }
+}
+
+impl TryFromWithTokens<&syn::NamedArgExpr> for NamedArgument {
+    type Error = AnalysisError;
+
+    fn try_from_with_tokens(
+        argument: &syn::NamedArgExpr,
+        tokens: &IVec<crate::syn::ScanToken>,
+    ) -> Result<Self, Self::Error> {
+        Ok(Self {
+            name: argument.get_name(),
+            argument: Expr::try_from_with_tokens(&argument.get_arg(), tokens)?,
+        })
+    }
+}
+
+impl TryFromWithTokens<&syn::NamedArgExpr> for Expr {
+    type Error = AnalysisError;
+
+    fn try_from_with_tokens(
+        argument: &syn::NamedArgExpr,
+        tokens: &IVec<crate::syn::ScanToken>,
+    ) -> Result<Self, Self::Error> {
+        Ok(Self::NamedArgument(Box::new(
+            NamedArgument::try_from_with_tokens(argument, tokens)?,
+        )))
+    }
+}
+
+impl TryFromWithTokens<&syn::ParamRef> for Parameter {
+    type Error = AnalysisError;
+
+    fn try_from_with_tokens(
+        value: &syn::ParamRef,
+        _tokens: &IVec<crate::syn::ScanToken>,
+    ) -> Result<Self, Self::Error> {
+        Ok(Self {
+            position: value.get_number() as u32,
+            name: None,
+            type_name: None,
+        })
+    }
+}
+
+impl TryFromWithTokens<&syn::ParamRef> for Expr {
+    type Error = AnalysisError;
+
+    fn try_from_with_tokens(
+        value: &syn::ParamRef,
+        tokens: &IVec<crate::syn::ScanToken>,
+    ) -> Result<Self, Self::Error> {
+        Ok(Self::Parameter(Parameter::try_from_with_tokens(
+            value, tokens,
+        )?))
+    }
+}
+
+impl TryFromWithTokens<&syn::SqlValueFunction> for Expr {
+    type Error = AnalysisError;
+
+    fn try_from_with_tokens(
+        value: &syn::SqlValueFunction,
+        _tokens: &IVec<crate::syn::ScanToken>,
+    ) -> Result<Self, Self::Error> {
+        Ok(Self::SqlValue(SqlValue::try_from(value)?))
+    }
+}
+
+impl TryFromWithTokens<&syn::MinMaxExpr> for Expr {
+    type Error = AnalysisError;
+
+    fn try_from_with_tokens(
+        minmax: &syn::MinMaxExpr,
+        tokens: &IVec<crate::syn::ScanToken>,
+    ) -> Result<Self, Self::Error> {
+        let name = match minmax.get_op().as_inner() {
+            Some(syn::MinMaxOp::IsGreatest) => "greatest",
+            Some(syn::MinMaxOp::IsLeast) => "least",
+            _ => return AnalysisError::raise_unexpected_input("min/max operation"),
+        };
+        Ok(Self::Call(Box::new(Call::special(
+            name,
+            Self::try_collect_from_with_tokens(minmax.get_args(), tokens)?,
+        ))))
+    }
+}
+
+impl TryFromWithTokens<&syn::GroupingFunc> for Expr {
+    type Error = AnalysisError;
+
+    fn try_from_with_tokens(
+        grouping: &syn::GroupingFunc,
+        tokens: &IVec<crate::syn::ScanToken>,
+    ) -> Result<Self, Self::Error> {
+        Ok(Self::Grouping(Self::try_collect_from_with_tokens(
+            grouping.get_args(),
+            tokens,
+        )?))
+    }
+}
+
+impl TryFromWithTokens<&syn::FuncCall> for Expr {
+    type Error = AnalysisError;
+
+    fn try_from_with_tokens(
+        value: &syn::FuncCall,
+        tokens: &IVec<crate::syn::ScanToken>,
+    ) -> Result<Self, Self::Error> {
+        Ok(Self::Call(Box::new(Call::try_from_with_tokens(
+            value, tokens,
+        )?)))
+    }
+}
+
+impl TryFromWithTokens<&syn::Node> for Expr {
+    type Error = AnalysisError;
+
+    fn try_from_with_tokens(
         node: &syn::Node,
-        tokens: &IVec<syn::ScanToken>,
-    ) -> Result<Self, AnalysisError> {
+        tokens: &IVec<crate::syn::ScanToken>,
+    ) -> Result<Self, Self::Error> {
         if node.is_a_const() {
-            return Ok(Self::Literal(Literal::postgres(&node.as_a_const())));
+            return Ok(Self::Literal(Literal::from(&node.as_a_const())));
         }
         if let Some(column) = node.as_column_ref().as_inner() {
-            let mut parts = Vec::new();
-            let mut star = false;
-            for field in column.get_fields().as_inner().unwrap_or_default() {
-                if field.is_a_star() {
-                    star = true;
-                } else {
-                    parts.push(required(field.as_string().get_sval(), "column name")?);
-                }
-            }
-            let name = Name::from_parts(&parts);
-            return Ok(if star {
-                Self::Star(name)
-            } else {
-                Self::Column(name)
-            });
+            return Self::try_from_with_tokens(&column, tokens);
         }
         if let Some(call) = node.as_func_call().as_inner() {
-            return Ok(Self::Call(Box::new(Call::postgres(&call, tokens)?)));
+            return Ok(Self::Call(Box::new(Call::try_from_with_tokens(
+                &call, tokens,
+            )?)));
         }
         if let Some(operator) = node.as_a_expr().as_inner() {
-            return Ok(Self::Operator(Box::new(OperatorExpr {
-                name: Name::postgres(operator.get_name())?,
-                kind: OperatorKind::postgres(required(
-                    operator.get_kind().as_inner(),
-                    "operator kind",
-                )?)?,
-                left: Self::postgres_optional(operator.get_lexpr(), tokens)?,
-                right: Self::postgres_optional(operator.get_rexpr(), tokens)?,
-                escape: None,
-            })));
+            return Self::try_from_with_tokens(&operator, tokens);
         }
         if let Some(boolean) = node.as_bool_expr().as_inner() {
-            return Ok(Self::Boolean(Box::new(BooleanExpr {
-                operator: BooleanOperator::postgres(required(
-                    boolean.get_boolop().as_inner(),
-                    "boolean operator",
-                )?)?,
-                arguments: Self::postgres_list(boolean.get_args(), tokens)?,
-            })));
+            return Self::try_from_with_tokens(&boolean, tokens);
         }
         if let Some(test) = node.as_null_test().as_inner() {
-            return Ok(Self::NullTest(Box::new(NullTest {
-                argument: Self::postgres(&test.get_arg(), tokens)?,
-                negated: matches!(
-                    test.get_nulltesttype().as_inner(),
-                    Some(syn::NullTestType::IsNotNull)
-                ),
-                row: test.get_argisrow(),
-            })));
+            return Self::try_from_with_tokens(&test, tokens);
         }
         if let Some(test) = node.as_boolean_test().as_inner() {
-            let (value, negated) = match required(test.get_booltesttype().as_inner(), "truth test")?
-            {
-                syn::BoolTestType::IsTrue => (Some(true), false),
-                syn::BoolTestType::IsNotTrue => (Some(true), true),
-                syn::BoolTestType::IsFalse => (Some(false), false),
-                syn::BoolTestType::IsNotFalse => (Some(false), true),
-                syn::BoolTestType::IsUnknown => (None, false),
-                syn::BoolTestType::IsNotUnknown => (None, true),
-                _ => return AnalysisError::raise_unexpected_input("truth test"),
-            };
-            return Ok(Self::TruthTest(Box::new(TruthTest {
-                argument: Self::postgres(&test.get_arg(), tokens)?,
-                value,
-                negated,
-            })));
+            return Self::try_from_with_tokens(&test, tokens);
         }
         if let Some(cast) = node.as_type_cast().as_inner() {
-            return Ok(Self::Cast(Box::new(Cast {
-                argument: Self::postgres(&cast.get_arg(), tokens)?,
-                target: TypeName::postgres(
-                    &required(cast.get_type_name().as_inner(), "cast type")?,
-                    tokens,
-                )?,
-            })));
+            return Self::try_from_with_tokens(&cast, tokens);
         }
         if let Some(collate) = node.as_collate_clause().as_inner() {
-            return Ok(Self::Collate(Box::new(Collate {
-                argument: Self::postgres(&collate.get_arg(), tokens)?,
-                name: Name::postgres(collate.get_collname())?,
-            })));
+            return Self::try_from_with_tokens(&collate, tokens);
         }
         if let Some(case) = node.as_case_expr().as_inner() {
-            return Self::postgres_case(&case, tokens);
+            return Self::try_from_with_tokens(&case, tokens);
         }
         if let Some(link) = node.as_sub_link().as_inner() {
-            return Ok(Self::Subquery(Box::new(Subquery {
-                query: Query::postgres(
-                    &required(link.get_subselect().as_select_stmt().as_inner(), "subquery")?,
-                    tokens,
-                )?,
-                kind: SubqueryKind::postgres(required(
-                    link.get_sub_link_type().as_inner(),
-                    "subquery kind",
-                )?)?,
-                test: Self::postgres_optional(link.get_testexpr(), tokens)?,
-                operator: Name::postgres(link.get_oper_name())?,
-            })));
+            return Self::try_from_with_tokens(&link, tokens);
         }
         if let Some(array) = node.as_a_array_expr().as_inner() {
-            return Ok(Self::Array(Self::postgres_list(
-                array.get_elements(),
+            return Self::try_from_with_tokens(&array, tokens);
+        }
+        if let Some(row) = node.as_row_expr().as_inner() {
+            return Ok(Self::Row(Self::try_collect_from_with_tokens(
+                row.get_args(),
                 tokens,
             )?));
         }
-        if let Some(row) = node.as_row_expr().as_inner() {
-            return Ok(Self::Row(Self::postgres_list(row.get_args(), tokens)?));
-        }
         if let Some(list) = node.as_list().as_inner() {
-            return Ok(Self::List(Self::postgres_list(list.get_items(), tokens)?));
+            return Ok(Self::List(Self::try_collect_from_with_tokens(
+                list.get_items(),
+                tokens,
+            )?));
         }
         if let Some(indirection) = node.as_a_indirection().as_inner() {
-            return Ok(Self::Indirection(Box::new(Indirection {
-                argument: Self::postgres(&indirection.get_arg(), tokens)?,
-                items: Access::postgres_list(indirection.get_indirection(), tokens)?,
-            })));
+            return Self::try_from_with_tokens(&indirection, tokens);
         }
         if let Some(argument) = node.as_named_arg_expr().as_inner() {
-            return Ok(Self::NamedArgument(Box::new(NamedArgument {
-                name: argument.get_name(),
-                argument: Self::postgres(&argument.get_arg(), tokens)?,
-            })));
+            return Self::try_from_with_tokens(&argument, tokens);
         }
         if let Some(parameter) = node.as_param_ref().as_inner() {
-            return Ok(Self::Parameter(Parameter {
-                position: parameter.get_number() as u32,
-                name: None,
-                type_name: None,
-            }));
+            return Self::try_from_with_tokens(&parameter, tokens);
         }
         if let Some(value) = node.as_sqlvalue_function().as_inner() {
-            return Ok(Self::SqlValue(SqlValue::postgres(&value)?));
+            return Self::try_from_with_tokens(&value, tokens);
         }
         if let Some(coalesce) = node.as_coalesce_expr().as_inner() {
-            return Self::postgres_coalesce(&coalesce, tokens);
+            return Self::try_from_with_tokens(&coalesce, tokens);
         }
         if let Some(minmax) = node.as_min_max_expr().as_inner() {
-            let name = match minmax.get_op().as_inner() {
-                Some(syn::MinMaxOp::IsGreatest) => "greatest",
-                Some(syn::MinMaxOp::IsLeast) => "least",
-                _ => return AnalysisError::raise_unexpected_input("min/max operation"),
-            };
-            return Ok(Self::Call(Box::new(Call::special(
-                name,
-                Self::postgres_list(minmax.get_args(), tokens)?,
-            ))));
+            return Self::try_from_with_tokens(&minmax, tokens);
         }
         if node.is_set_to_default() {
             return Ok(Self::Default);
@@ -210,45 +545,88 @@ impl Expr {
         if node.is_merge_support_func() {
             return Ok(Self::MergeAction);
         }
-        if let Some(document) = super::document::DocumentExpr::postgres(node, tokens)? {
+        if let Some(document) =
+            super::document::DocumentExpr::try_from_with_tokens_opt(node, tokens)?
+        {
             return Ok(Self::Document(document));
         }
         if let Some(grouping) = node.as_grouping_func().as_inner() {
-            return Ok(Self::Grouping(Self::postgres_list(
-                grouping.get_args(),
-                tokens,
-            )?));
+            return Self::try_from_with_tokens(&grouping, tokens);
         }
-        if let Some(value) = Literal::postgres_option(node) {
+        if let Some(value) = Option::<Literal>::from(node) {
             return Ok(Self::Literal(value));
         }
         AnalysisError::raise_unexpected_input(&format!("expression syntax: {node:?}"))
     }
+}
 
-    pub(in crate::sem::unresolved) fn postgres_optional(
-        node: syn::Node,
-        tokens: &IVec<syn::ScanToken>,
-    ) -> Result<Option<Self>, AnalysisError> {
-        node.as_inner()
-            .map(|node| Self::postgres(&node, tokens))
-            .transpose()
-    }
+impl TryCollectFromWithTokens<syn::NodeListOpt> for Expr {
+    type Error = AnalysisError;
 
-    pub(in crate::sem::unresolved) fn postgres_list(
+    fn try_collect_from_with_tokens(
         nodes: syn::NodeListOpt,
-        tokens: &IVec<syn::ScanToken>,
-    ) -> Result<Vec<Self>, AnalysisError> {
+        tokens: &IVec<crate::syn::ScanToken>,
+    ) -> Result<Vec<Self>, Self::Error> {
         nodes
             .as_inner()
             .unwrap_or_default()
             .into_iter()
-            .map(|node| Self::postgres(&node, tokens))
+            .map(|node| Self::try_from_with_tokens(&node, tokens))
             .collect()
     }
 }
 
-impl Literal {
-    pub(in crate::sem::unresolved) fn postgres(value: &syn::AConst) -> Self {
+impl TryFromWithTokensOpt<syn::Node> for Expr {
+    type Error = AnalysisError;
+
+    fn try_from_with_tokens_opt(
+        node: syn::Node,
+        tokens: &IVec<crate::syn::ScanToken>,
+    ) -> Result<Option<Self>, Self::Error> {
+        node.as_inner()
+            .map(|node| Self::try_from_with_tokens(&node, tokens))
+            .transpose()
+    }
+}
+
+impl Expr {
+    #[deprecated = "use try_from_with_tokens"]
+    pub(crate) fn postgres_function(
+        value: &syn::FuncCall,
+        tokens: &IVec<syn::ScanToken>,
+    ) -> Result<Self, AnalysisError> {
+        Ok(Self::Call(Box::new(Call::try_from_with_tokens(
+            value, tokens,
+        )?)))
+    }
+
+    #[deprecated = "use try_from_with_tokens"]
+    pub(crate) fn postgres(
+        node: &syn::Node,
+        tokens: &IVec<syn::ScanToken>,
+    ) -> Result<Self, AnalysisError> {
+        Self::try_from_with_tokens(node, tokens)
+    }
+
+    #[deprecated = "use try_from_with_tokens_opt"]
+    pub(in crate::sem::unresolved) fn postgres_optional(
+        node: syn::Node,
+        tokens: &IVec<syn::ScanToken>,
+    ) -> Result<Option<Self>, AnalysisError> {
+        Self::try_from_with_tokens_opt(node, tokens)
+    }
+
+    #[deprecated = "use try_collect_from_with_token"]
+    pub(in crate::sem::unresolved) fn postgres_list(
+        nodes: syn::NodeListOpt,
+        tokens: &IVec<syn::ScanToken>,
+    ) -> Result<Vec<Self>, AnalysisError> {
+        Self::try_collect_from_with_tokens(nodes, tokens)
+    }
+}
+
+impl From<&syn::AConst> for Literal {
+    fn from(value: &syn::AConst) -> Self {
         if let Some(value) = value.as_ival().get_ival() {
             Self::Integer(value)
         } else if let Some(value) = value.as_fval().get_fval() {
@@ -265,10 +643,17 @@ impl Literal {
     }
 }
 
-impl OperatorKind {
-    pub(in crate::sem::unresolved) fn postgres(
-        kind: syn::AExprKind,
-    ) -> Result<Self, AnalysisError> {
+impl Literal {
+    #[deprecated = "use from"]
+    pub(in crate::sem::unresolved) fn postgres(value: &syn::AConst) -> Self {
+        Self::from(value)
+    }
+}
+
+impl TryFrom<syn::AExprKind> for OperatorKind {
+    type Error = AnalysisError;
+
+    fn try_from(kind: syn::AExprKind) -> Result<Self, Self::Error> {
         Ok(match kind {
             syn::AExprKind::AexprOp => Self::Ordinary,
             syn::AExprKind::AexprOpAny => Self::Any,
@@ -289,10 +674,19 @@ impl OperatorKind {
     }
 }
 
-impl BooleanOperator {
+impl OperatorKind {
+    #[deprecated = "use try_from"]
     pub(in crate::sem::unresolved) fn postgres(
-        kind: syn::BoolExprType,
+        kind: syn::AExprKind,
     ) -> Result<Self, AnalysisError> {
+        Self::try_from(kind)
+    }
+}
+
+impl TryFrom<syn::BoolExprType> for BooleanOperator {
+    type Error = AnalysisError;
+
+    fn try_from(kind: syn::BoolExprType) -> Result<Self, Self::Error> {
         match kind {
             syn::BoolExprType::AndExpr => Ok(Self::And),
             syn::BoolExprType::OrExpr => Ok(Self::Or),
@@ -302,11 +696,20 @@ impl BooleanOperator {
     }
 }
 
-impl SubqueryKind {
+impl BooleanOperator {
+    #[deprecated = "use try_from"]
     pub(in crate::sem::unresolved) fn postgres(
-        kind: syn::SubLinkType,
+        kind: syn::BoolExprType,
     ) -> Result<Self, AnalysisError> {
-        match kind {
+        Self::try_from(kind)
+    }
+}
+
+impl TryFrom<syn::SubLinkType> for SubqueryKind {
+    type Error = AnalysisError;
+
+    fn try_from(value: syn::SubLinkType) -> Result<Self, Self::Error> {
+        match value {
             syn::SubLinkType::ExistsSublink => Ok(Self::Exists),
             syn::SubLinkType::AllSublink => Ok(Self::All),
             syn::SubLinkType::AnySublink => Ok(Self::Any),
@@ -319,24 +722,45 @@ impl SubqueryKind {
     }
 }
 
-impl TypeName {
+impl SubqueryKind {
+    #[deprecated = "use try_from"]
     pub(in crate::sem::unresolved) fn postgres(
-        value: &syn::TypeName,
-        tokens: &IVec<syn::ScanToken>,
+        kind: syn::SubLinkType,
     ) -> Result<Self, AnalysisError> {
+        Self::try_from(kind)
+    }
+}
+
+impl TryFromWithTokens<&syn::TypeName> for TypeName {
+    type Error = AnalysisError;
+
+    fn try_from_with_tokens(
+        value: &syn::TypeName,
+        tokens: &IVec<crate::syn::ScanToken>,
+    ) -> Result<Self, Self::Error> {
         let mut bounds = Vec::new();
         for bound in value.get_array_bounds().as_inner().unwrap_or_default() {
             let bound = required(bound.as_integer().get_ival(), "array bound")?;
             bounds.push(if bound < 0 { None } else { Some(bound) });
         }
         Ok(Self {
-            name: Name::postgres(value.get_names())?,
-            modifiers: Expr::postgres_list(value.get_typmods(), tokens)?,
+            name: Name::try_from(value.get_names())?,
+            modifiers: Expr::try_collect_from_with_tokens(value.get_typmods(), tokens)?,
             array_bounds: bounds,
             set_of: value.get_setof(),
             percent_type: value.get_pct_type(),
             location: source_span(value.get_location(), tokens),
         })
+    }
+}
+
+impl TypeName {
+    #[deprecated = "use try_from_with_tokens"]
+    pub(in crate::sem::unresolved) fn postgres(
+        value: &syn::TypeName,
+        tokens: &IVec<syn::ScanToken>,
+    ) -> Result<Self, AnalysisError> {
+        Self::try_from_with_tokens(value, tokens)
     }
 }
 
@@ -392,6 +816,34 @@ mod test_source_span {
     }
 }
 
+impl TryFromWithTokens<&syn::FuncCall> for Call {
+    type Error = AnalysisError;
+
+    fn try_from_with_tokens(
+        value: &syn::FuncCall,
+        tokens: &IVec<crate::syn::ScanToken>,
+    ) -> Result<Self, Self::Error> {
+        Ok(Self {
+            name: Name::try_from(value.get_funcname())?,
+            kind: CallKind::ordinary(),
+            within_order: Vec::new(),
+            arguments: Expr::try_collect_from_with_tokens(value.get_args(), tokens)?,
+            star: value.get_agg_star(),
+            distinct: value.get_agg_distinct(),
+            variadic: value.get_func_variadic(),
+            within_group: value.get_agg_within_group(),
+            order: Order::try_collect_from_with_tokens(value.get_agg_order(), tokens)?,
+            filter: Expr::try_from_with_tokens_opt(value.get_agg_filter(), tokens)?,
+            over: value
+                .get_over()
+                .as_inner()
+                .map(|window| Window::try_from_with_tokens(&window, tokens))
+                .transpose()?,
+            location: source_span(value.get_location(), tokens),
+        })
+    }
+}
+
 impl Call {
     fn special(name: &str, arguments: Vec<Expr>) -> Self {
         Self {
@@ -410,46 +862,31 @@ impl Call {
         }
     }
 
+    #[deprecated = "use try_from_with_tokens"]
     pub(in crate::sem::unresolved) fn postgres(
         value: &syn::FuncCall,
         tokens: &IVec<syn::ScanToken>,
     ) -> Result<Self, AnalysisError> {
-        Ok(Self {
-            name: Name::postgres(value.get_funcname())?,
-            kind: CallKind::ordinary(),
-            within_order: Vec::new(),
-            arguments: Expr::postgres_list(value.get_args(), tokens)?,
-            star: value.get_agg_star(),
-            distinct: value.get_agg_distinct(),
-            variadic: value.get_func_variadic(),
-            within_group: value.get_agg_within_group(),
-            order: Order::postgres_list(value.get_agg_order(), tokens)?,
-            filter: Expr::postgres_optional(value.get_agg_filter(), tokens)?,
-            over: value
-                .get_over()
-                .as_inner()
-                .map(|window| Window::postgres(&window, tokens))
-                .transpose()?,
-            location: source_span(value.get_location(), tokens),
-        })
+        Self::try_from_with_tokens(value, tokens)
     }
 }
 
-impl Access {
-    pub(in crate::sem::unresolved) fn postgres_list(
+impl TryCollectFromWithTokens<syn::NodeListOpt> for Access {
+    type Error = AnalysisError;
+    fn try_collect_from_with_tokens(
         nodes: syn::NodeListOpt,
-        tokens: &IVec<syn::ScanToken>,
-    ) -> Result<Vec<Self>, AnalysisError> {
+        tokens: &IVec<crate::syn::ScanToken>,
+    ) -> Result<Vec<Self>, Self::Error> {
         let mut items = Vec::new();
         for node in nodes.as_inner().unwrap_or_default() {
             items.push(if let Some(indices) = node.as_a_indices().as_inner() {
                 if indices.get_is_slice() {
                     Self::Slice(Slice {
-                        lower: Expr::postgres_optional(indices.get_lidx(), tokens)?,
-                        upper: Expr::postgres_optional(indices.get_uidx(), tokens)?,
+                        lower: Expr::try_from_with_tokens_opt(indices.get_lidx(), tokens)?,
+                        upper: Expr::try_from_with_tokens_opt(indices.get_uidx(), tokens)?,
                     })
                 } else {
-                    Self::Index(Expr::postgres(&indices.get_uidx(), tokens)?)
+                    Self::Index(Expr::try_from_with_tokens(&indices.get_uidx(), tokens)?)
                 }
             } else if node.is_a_star() {
                 Self::Star
@@ -461,10 +898,20 @@ impl Access {
     }
 }
 
-impl SqlValue {
-    pub(in crate::sem::unresolved) fn postgres(
-        value: &syn::SqlValueFunction,
-    ) -> Result<Self, AnalysisError> {
+impl Access {
+    #[deprecated = "use try_collect_from_with_tokens"]
+    pub(in crate::sem::unresolved) fn postgres_list(
+        nodes: syn::NodeListOpt,
+        tokens: &IVec<syn::ScanToken>,
+    ) -> Result<Vec<Self>, AnalysisError> {
+        Self::try_collect_from_with_tokens(nodes, tokens)
+    }
+}
+
+impl TryFrom<&syn::SqlValueFunction> for SqlValue {
+    type Error = AnalysisError;
+
+    fn try_from(value: &syn::SqlValueFunction) -> Result<Self, Self::Error> {
         let (name, precision) = match required(value.get_op().as_inner(), "SQL value")? {
             syn::SqlValueFunctionOp::SvfopCurrentDate => ("current_date", false),
             syn::SqlValueFunctionOp::SvfopCurrentTime => ("current_time", false),
@@ -494,49 +941,88 @@ impl SqlValue {
     }
 }
 
-impl Literal {
-    fn postgres_option(node: &syn::Node) -> Option<Self> {
+impl SqlValue {
+    #[deprecated = "use SqlValue::try_from"]
+    pub(in crate::sem::unresolved) fn postgres(
+        value: &syn::SqlValueFunction,
+    ) -> Result<Self, AnalysisError> {
+        Self::try_from(value)
+    }
+}
+
+impl From<&syn::Node> for Option<Literal> {
+    fn from(node: &syn::Node) -> Self {
         if let Some(value) = node.as_string().get_sval() {
-            Some(Self::String(value))
+            Some(Literal::String(value))
         } else if let Some(value) = node.as_integer().get_ival() {
-            Some(Self::Integer(value))
+            Some(Literal::Integer(value))
         } else if let Some(value) = node.as_float().get_fval() {
-            Some(Self::Numeric(value))
+            Some(Literal::Numeric(value))
         } else {
-            node.as_boolean().get_boolval().map(Self::Boolean)
+            node.as_boolean().get_boolval().map(Literal::Boolean)
         }
     }
 }
 
-impl Expr {
-    pub(crate) fn postgres_case(
+impl Literal {
+    #[deprecated = "use Option::<Literal>::from"]
+    fn postgres_option(node: &syn::Node) -> Option<Self> {
+        Option::<Self>::from(node)
+    }
+}
+
+impl TryFromWithTokens<&syn::CaseExpr> for Expr {
+    type Error = AnalysisError;
+    fn try_from_with_tokens(
         case: &syn::CaseExpr,
-        tokens: &IVec<syn::ScanToken>,
-    ) -> Result<Self, AnalysisError> {
+        tokens: &IVec<crate::syn::ScanToken>,
+    ) -> Result<Self, Self::Error> {
         let mut arms = Vec::new();
         for arm in case.get_args().as_inner().unwrap_or_default() {
             let arm = required(arm.as_case_when().as_inner(), "case arm")?;
             arms.push(CaseArm {
-                condition: Self::postgres(&arm.get_expr(), tokens)?,
-                result: Self::postgres(&arm.get_result(), tokens)?,
+                condition: Self::try_from_with_tokens(&arm.get_expr(), tokens)?,
+                result: Self::try_from_with_tokens(&arm.get_result(), tokens)?,
             });
         }
         Ok(Self::Case(Box::new(Case {
-            argument: Self::postgres_optional(case.get_arg(), tokens)?,
+            argument: Self::try_from_with_tokens_opt(case.get_arg(), tokens)?,
             arms,
-            otherwise: Self::postgres_optional(case.get_defresult(), tokens)?,
+            otherwise: Self::try_from_with_tokens_opt(case.get_defresult(), tokens)?,
         })))
     }
 }
 
 impl Expr {
-    pub(crate) fn postgres_coalesce(
-        coalesce: &syn::CoalesceExpr,
+    #[deprecated = "use try_from_with_tokens"]
+    pub(crate) fn postgres_case(
+        case: &syn::CaseExpr,
         tokens: &IVec<syn::ScanToken>,
     ) -> Result<Self, AnalysisError> {
+        Self::try_from_with_tokens(case, tokens)
+    }
+}
+
+impl TryFromWithTokens<&syn::CoalesceExpr> for Expr {
+    type Error = AnalysisError;
+
+    fn try_from_with_tokens(
+        value: &syn::CoalesceExpr,
+        tokens: &IVec<crate::syn::ScanToken>,
+    ) -> Result<Self, Self::Error> {
         Ok(Self::Call(Box::new(Call::special(
             "coalesce",
-            Self::postgres_list(coalesce.get_args(), tokens)?,
+            Self::try_collect_from_with_tokens(value.get_args(), tokens)?,
         ))))
+    }
+}
+
+impl Expr {
+    #[deprecated = "use try_from_with_tokens"]
+    pub(crate) fn postgres_coalesce(
+        value: &syn::CoalesceExpr,
+        tokens: &IVec<syn::ScanToken>,
+    ) -> Result<Self, AnalysisError> {
+        Self::try_from_with_tokens(value, tokens)
     }
 }

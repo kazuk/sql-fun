@@ -1,7 +1,7 @@
 use std::path::Path;
 
 use crate::{
-    PostgresDialect, StringSpan,
+    StringSpan,
     sem::{
         AnalysisError, AnalysisProblem, BaseParseContext, CastDefinition, CastInfoRead,
         CreateIndex, CreateSequence, CreateTable, FullName, FunctionInfoRead,
@@ -37,24 +37,6 @@ pub enum ParseDumpFileError {
     #[cfg(feature = "sqlite")]
     #[error(transparent)]
     SqliteSyn(#[from] ::turso_parser::error::Error),
-}
-
-/// load schema dump file
-///
-/// # Errors
-///
-/// - [`ParseDumpFileError`]
-///
-#[expect(dead_code)]
-#[deprecated = "use PostgresDialect::parse_schema_file"]
-pub fn parse_schema_file<TContext>(
-    dump_file: &Path,
-    input_context: TContext,
-) -> Result<ParsedSchemaDump<TContext>, ParseDumpFileError>
-where
-    TContext: BaseParseContext + std::fmt::Debug,
-{
-    PostgresDialect::parse_schema_file(dump_file, input_context)
 }
 
 ///  schema dump file context

@@ -74,16 +74,3 @@ impl CreateSequence {
         ))
     }
 }
-
-/// analyze [`crate::syn::CreateSeqStmt`]
-#[deprecated = "use CreateSequence::analyze_create_seq"]
-pub fn analyze_create_seq<TParseContext>(
-    context: TParseContext,
-    parent_schema: &Option<String>,
-    syn: crate::syn::CreateSeqStmt,
-) -> Result<AstAndContextPair<TParseContext>, AnalysisError>
-where
-    TParseContext: ParseContext,
-{
-    CreateSequence::analyze_create_seq(context, parent_schema, syn)
-}

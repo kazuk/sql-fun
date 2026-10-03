@@ -398,20 +398,6 @@ impl CreateIndex {
     }
 }
 
-/// analyze [`crate::syn::IndexStmt`]
-#[deprecated = "use CreateIndex::analyze_index_stmt"]
-pub fn analyze_index_stmt<TParseContext>(
-    context: TParseContext,
-    parent_schema: &Option<String>,
-    syn: crate::syn::IndexStmt,
-    tokens: &IVec<ScanToken>,
-) -> Result<AstAndContextPair<TParseContext>, AnalysisError>
-where
-    TParseContext: ParseContext,
-{
-    CreateIndex::analyze_index_stmt(context, parent_schema, syn, tokens)
-}
-
 #[cfg(test)]
 mod analyze_index_stmt_tests {
     use super::*;

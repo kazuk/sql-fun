@@ -33,16 +33,3 @@ impl CreateExtension {
         ))
     }
 }
-
-/// analyze [`crate::syn::CreateExtensionStmt`]
-#[deprecated = "use CreateExtension::analyze_create_extension"]
-pub fn analyze_create_extension<TParseContext>(
-    context: TParseContext,
-    parent_schema: &Option<String>,
-    syn: crate::syn::CreateExtensionStmt,
-) -> Result<AstAndContextPair<TParseContext>, AnalysisError>
-where
-    TParseContext: ParseContext,
-{
-    CreateExtension::analyze_create_extension(context, parent_schema, syn)
-}

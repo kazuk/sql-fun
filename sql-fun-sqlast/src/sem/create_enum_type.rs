@@ -56,16 +56,3 @@ impl CreateEnum {
 pub struct EnumValueDefinition {
     name: String,
 }
-
-/// analyze [`crate::syn::CreateEnumStmt`]
-#[deprecated = "use CreateEnum::analyze_create_enum_type"]
-pub fn analyze_create_enum_type<TParseContext>(
-    context: TParseContext,
-    parent_schema: &Option<String>,
-    create: crate::syn::CreateEnumStmt,
-) -> Result<AstAndContextPair<TParseContext>, AnalysisError>
-where
-    TParseContext: ParseContext,
-{
-    CreateEnum::analyze_create_enum_type(context, parent_schema, create)
-}

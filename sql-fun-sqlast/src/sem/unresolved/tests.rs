@@ -330,7 +330,7 @@ mod sqlite {
 
     #[test]
     fn sqlite_unary_literal_does_not_use_postgres_operator_catalog() -> testresult::TestResult {
-        let syntax = Expr::sqlite(&SqliteSynBuilder.parse_expression("select -42"))?;
+        let syntax = Expr::try_from(&SqliteSynBuilder.parse_expression("select -42"))?;
         let mut context = TestParseContext::default();
         let result = syntax
             .resolve(

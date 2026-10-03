@@ -10,10 +10,9 @@ impl DataSource {
     where
         TParseContext: ParseContext,
     {
-        let syntax = crate::sem::unresolved::FromItem::postgres_range_var(
-            &range_var,
-            &::sql_fun_core::IVec::default(),
-        )?;
+        let syntax = crate::sem::unresolved::FromItem::relation(
+            crate::sem::unresolved::Relation::try_from(&range_var)?,
+        );
         let outcome = syntax.resolve_source(
             &context,
             crate::sem::unresolved::Dialect::postgres(),

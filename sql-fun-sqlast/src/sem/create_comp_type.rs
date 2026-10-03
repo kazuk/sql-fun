@@ -162,16 +162,3 @@ impl TryFrom<&ColumnDef> for CompositeFieldDefinition {
         })
     }
 }
-
-/// analyze [`crate::syn::CompositeTypeStmt`]
-#[deprecated = "use CreateCompositeType::analyze_create_comp_type"]
-pub fn analyze_create_comp_type<TParseContext>(
-    context: TParseContext,
-    parent_schema: &Option<String>,
-    syn: crate::syn::CompositeTypeStmt,
-) -> Result<AstAndContextPair<TParseContext>, AnalysisError>
-where
-    TParseContext: ParseContext,
-{
-    CreateCompositeType::analyze_create_comp_type(context, parent_schema, syn)
-}

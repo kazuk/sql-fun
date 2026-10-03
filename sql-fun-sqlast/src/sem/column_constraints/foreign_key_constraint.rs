@@ -288,7 +288,7 @@ impl ForeignKeyColumnConstraint {
 
 #[cfg(feature = "sqlite")]
 impl ForeignKeyColumnConstraint {
-    /// analyze [`crate::syn::sqlite::ForeignKeyColumnConstrraint`]
+    /// analyze [`crate::syn::sqlite::ForeignKeyColumnConstraint`]
     pub fn analyze_constraint_sqlite<TParseContext>(
         mut context: TParseContext,
         table_name: &TableName,

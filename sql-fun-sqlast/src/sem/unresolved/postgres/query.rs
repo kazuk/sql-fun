@@ -2,27 +2,30 @@ use crate::sem::unresolved::postgres::{nonempty, required};
 use crate::sem::unresolved::{
     Access, Alias, Assignment, CommitAction, Conflict, ConflictAction, Cte, CteBody, Cycle, Delete,
     DerivedTable, Expr, Frame, FrameBound, FrameExclusion, FrameMode, FromItem, Grouping,
-    IndexExpression, Insert, Into, Join, JoinKind, Lock, LockStrength, LockWait, Name, Order,
-    OverridingKind, Query, QueryBody, Relation, Search, Select, SetOperation, SetQuery,
-    SyntaxOption, SyntaxValue, TableFunction, TableFunctions, TableSample, Target, TypeName,
-    TypedColumn, Update, Window, With,
+    IndexExpression, Insert, Into, Join, JoinKind, JsonTable, Lock, LockStrength, LockWait, Merge,
+    Name, Order, OverridingKind, Query, QueryBody, Relation, Search, Select, SetOperation,
+    SetQuery, SyntaxOption, SyntaxValue, TableFunction, TableFunctions, TableSample, Target,
+    TryCollectFromWithTokens, TryFromOpt, TryFromWithTokens, TryFromWithTokensOpt, TypeName,
+    TypedColumn, Update, Window, With, XmlTable,
 };
 use crate::syn::{ListOpt, Opt};
 use crate::{sem::AnalysisError, syn};
 
 use ::sql_fun_core::IVec;
 
-impl Query {
-    pub(crate) fn postgres(
+impl TryFromWithTokens<&syn::SelectStmt> for Query {
+    type Error = AnalysisError;
+
+    fn try_from_with_tokens(
         value: &syn::SelectStmt,
-        tokens: &IVec<syn::ScanToken>,
-    ) -> Result<Self, AnalysisError> {
+        tokens: &IVec<crate::syn::ScanToken>,
+    ) -> Result<Self, Self::Error> {
         Ok(Self {
-            with: With::postgres(value.get_with_clause(), tokens)?,
-            body: QueryBody::postgres(value, tokens)?,
-            order: Order::postgres_list(value.get_sort_clause(), tokens)?,
-            limit: Expr::postgres_optional(value.get_limit_count(), tokens)?,
-            offset: Expr::postgres_optional(value.get_limit_offset(), tokens)?,
+            with: With::try_from_with_tokens(value.get_with_clause(), tokens)?,
+            body: QueryBody::try_from_with_tokens(value, tokens)?,
+            order: Order::try_collect_from_with_tokens(value.get_sort_clause(), tokens)?,
+            limit: Expr::try_from_with_tokens_opt(value.get_limit_count(), tokens)?,
+            offset: Expr::try_from_with_tokens_opt(value.get_limit_offset(), tokens)?,
             with_ties: matches!(
                 value.get_limit_option().as_inner(),
                 Some(syn::LimitOption::WithTies)
@@ -32,32 +35,81 @@ impl Query {
     }
 }
 
-impl QueryBody {
-    pub(in crate::sem::unresolved) fn postgres(
+impl TryFromWithTokens<(SetOperation, &syn::SelectStmt)> for SetQuery {
+    type Error = AnalysisError;
+    fn try_from_with_tokens(
+        value: (SetOperation, &syn::SelectStmt),
+        tokens: &IVec<crate::syn::ScanToken>,
+    ) -> Result<Self, Self::Error> {
+        let operation = value.0;
+        let value = value.1;
+        Ok(Self {
+            operation,
+            all: value.get_all(),
+            left: Query::try_from_with_tokens(
+                &required(value.get_larg().as_inner(), "set left")?,
+                tokens,
+            )?,
+            right: Query::try_from_with_tokens(
+                &required(value.get_rarg().as_inner(), "set right")?,
+                tokens,
+            )?,
+        })
+    }
+}
+
+impl TryFromWithTokens<Vec<syn::Node>> for QueryBody {
+    type Error = AnalysisError;
+
+    fn try_from_with_tokens(
+        rows: Vec<syn::Node>,
+        tokens: &IVec<crate::syn::ScanToken>,
+    ) -> Result<Self, Self::Error> {
+        let mut values = Vec::new();
+        for row in rows {
+            values.push(Expr::try_collect_from_with_tokens(
+                required(row.as_list().as_inner(), "values row")?.get_items(),
+                tokens,
+            )?);
+        }
+        Ok(Self::Values(values))
+    }
+}
+
+impl TryCollectFromWithTokens<syn::NodeListOpt> for Window {
+    type Error = AnalysisError;
+
+    fn try_collect_from_with_tokens(
+        nodes: syn::NodeListOpt,
+        tokens: &IVec<crate::syn::ScanToken>,
+    ) -> Result<Vec<Self>, Self::Error> {
+        let mut windows = Vec::new();
+        for window in nodes.as_inner().unwrap_or_default() {
+            windows.push(Self::try_from_with_tokens(
+                &required(window.as_window_def().as_inner(), "window")?,
+                tokens,
+            )?);
+        }
+        Ok(windows)
+    }
+}
+
+impl TryFromWithTokens<&syn::SelectStmt> for QueryBody {
+    type Error = AnalysisError;
+
+    fn try_from_with_tokens(
         value: &syn::SelectStmt,
-        tokens: &IVec<syn::ScanToken>,
-    ) -> Result<Self, AnalysisError> {
+        tokens: &IVec<crate::syn::ScanToken>,
+    ) -> Result<Self, Self::Error> {
         if let Some(operation) = SetOperation::postgres(value.get_op().as_inner())? {
-            return Ok(Self::Set(Box::new(SetQuery {
-                operation,
-                all: value.get_all(),
-                left: Query::postgres(&required(value.get_larg().as_inner(), "set left")?, tokens)?,
-                right: Query::postgres(
-                    &required(value.get_rarg().as_inner(), "set right")?,
-                    tokens,
-                )?,
-            })));
+            return Ok(Self::Set(Box::new(SetQuery::try_from_with_tokens(
+                (operation, value),
+                tokens,
+            )?)));
         }
         let rows = value.get_values_lists().as_inner().unwrap_or_default();
         if !rows.is_empty() {
-            let mut values = Vec::new();
-            for row in rows {
-                values.push(Expr::postgres_list(
-                    required(row.as_list().as_inner(), "values row")?.get_items(),
-                    tokens,
-                )?);
-            }
-            return Ok(Self::Values(values));
+            return Self::try_from_with_tokens(rows, tokens);
         }
         let distinct = value.get_distinct_clause().as_inner().unwrap_or_default();
         let distinct = if distinct.is_empty() {
@@ -66,31 +118,26 @@ impl QueryBody {
             let mut expressions = Vec::new();
             for expression in distinct {
                 if expression.as_inner().is_some() {
-                    expressions.push(Expr::postgres(&expression, tokens)?);
+                    expressions.push(Expr::try_from_with_tokens(&expression, tokens)?);
                 }
             }
             Some(expressions)
         };
-        let mut windows = Vec::new();
-        for window in value.get_window_clause().as_inner().unwrap_or_default() {
-            windows.push(Window::postgres(
-                &required(window.as_window_def().as_inner(), "window")?,
-                tokens,
-            )?);
-        }
+
+        let windows = Window::try_collect_from_with_tokens(value.get_window_clause(), tokens)?;
         Ok(Self::Select(Box::new(Select {
             into: value
                 .get_into_clause()
                 .as_inner()
-                .map(|into| Into::postgres(&into, tokens))
+                .map(|into| Into::try_from_with_tokens(&into, tokens))
                 .transpose()?,
             distinct,
-            targets: Target::postgres_list(value.get_target_list(), tokens)?,
-            from: FromItem::postgres_list(value.get_from_clause(), tokens)?,
-            predicate: Expr::postgres_optional(value.get_where_clause(), tokens)?,
-            group: Grouping::postgres_list(value.get_group_clause(), tokens)?,
+            targets: Target::try_collect_from_with_tokens(value.get_target_list(), tokens)?,
+            from: FromItem::try_collect_from_with_tokens(value.get_from_clause(), tokens)?,
+            predicate: Expr::try_from_with_tokens_opt(value.get_where_clause(), tokens)?,
+            group: Grouping::try_collect_from_with_tokens(value.get_group_clause(), tokens)?,
             group_distinct: value.get_group_distinct(),
-            having: Expr::postgres_optional(value.get_having_clause(), tokens)?,
+            having: Expr::try_from_with_tokens_opt(value.get_having_clause(), tokens)?,
             windows,
         })))
     }
@@ -110,16 +157,18 @@ impl SetOperation {
     }
 }
 
-impl Target {
-    pub(in crate::sem::unresolved) fn postgres_list(
+impl TryCollectFromWithTokens<syn::NodeListOpt> for Target {
+    type Error = AnalysisError;
+
+    fn try_collect_from_with_tokens(
         nodes: syn::NodeListOpt,
-        tokens: &IVec<syn::ScanToken>,
-    ) -> Result<Vec<Self>, AnalysisError> {
+        tokens: &IVec<crate::syn::ScanToken>,
+    ) -> Result<Vec<Self>, Self::Error> {
         let mut targets = Vec::new();
         for node in nodes.as_inner().unwrap_or_default() {
             let target = required(node.as_res_target().as_inner(), "query target")?;
             targets.push(Self {
-                expression: Expr::postgres(&target.get_val(), tokens)?,
+                expression: Expr::try_from_with_tokens(&target.get_val(), tokens)?,
                 alias: nonempty(target.get_name()),
             });
         }
@@ -127,17 +176,19 @@ impl Target {
     }
 }
 
-impl Order {
-    pub(in crate::sem::unresolved) fn postgres_list(
+impl TryCollectFromWithTokens<syn::NodeListOpt> for Order {
+    type Error = AnalysisError;
+
+    fn try_collect_from_with_tokens(
         nodes: syn::NodeListOpt,
-        tokens: &IVec<syn::ScanToken>,
-    ) -> Result<Vec<Self>, AnalysisError> {
+        tokens: &IVec<crate::syn::ScanToken>,
+    ) -> Result<Vec<Self>, Self::Error> {
         let mut orders = Vec::new();
         for node in nodes.as_inner().unwrap_or_default() {
             let order = required(node.as_sort_by().as_inner(), "sort expression")?;
-            let using = Name::postgres(order.get_use_op())?;
+            let using = Name::try_from(order.get_use_op())?;
             orders.push(Self {
-                expression: Expr::postgres(&order.get_node(), tokens)?,
+                expression: Expr::try_from_with_tokens(&order.get_node(), tokens)?,
                 descending: sort_direction(order.get_sortby_dir().as_inner()),
                 nulls_first: null_order(order.get_sortby_nulls().as_inner()),
                 using: if using.0.is_empty() {
@@ -167,15 +218,17 @@ const fn null_order(value: Option<syn::SortByNulls>) -> Option<bool> {
     }
 }
 
-impl Grouping {
-    pub(in crate::sem::unresolved) fn postgres_list(
+impl TryCollectFromWithTokens<syn::NodeListOpt> for Grouping {
+    type Error = AnalysisError;
+
+    fn try_collect_from_with_tokens(
         nodes: syn::NodeListOpt,
-        tokens: &IVec<syn::ScanToken>,
-    ) -> Result<Vec<Self>, AnalysisError> {
+        tokens: &IVec<crate::syn::ScanToken>,
+    ) -> Result<Vec<Self>, Self::Error> {
         let mut groups = Vec::new();
         for node in nodes.as_inner().unwrap_or_default() {
             groups.push(if let Some(group) = node.as_grouping_set().as_inner() {
-                let content = Self::postgres_list(group.get_content(), tokens)?;
+                let content = Self::try_collect_from_with_tokens(group.get_content(), tokens)?;
                 match required(group.get_kind().as_inner(), "grouping kind")? {
                     syn::GroupingSetKind::GroupingSetEmpty => Self::Empty,
                     syn::GroupingSetKind::GroupingSetSimple => Self::Simple(content),
@@ -185,24 +238,26 @@ impl Grouping {
                     _ => return AnalysisError::raise_unexpected_input("grouping kind"),
                 }
             } else {
-                Self::Expression(Expr::postgres(&node, tokens)?)
+                Self::Expression(Expr::try_from_with_tokens(&node, tokens)?)
             });
         }
         Ok(groups)
     }
 }
 
-impl With {
-    pub(crate) fn postgres(
+impl TryFromWithTokens<syn::WithClauseOpt> for With {
+    type Error = AnalysisError;
+
+    fn try_from_with_tokens(
         value: syn::WithClauseOpt,
-        tokens: &IVec<syn::ScanToken>,
-    ) -> Result<Self, AnalysisError> {
+        tokens: &IVec<crate::syn::ScanToken>,
+    ) -> Result<Self, Self::Error> {
         let Some(value) = value.as_inner() else {
             return Ok(Self::default());
         };
         let mut entries = Vec::new();
         for entry in value.get_ctes().as_inner().unwrap_or_default() {
-            entries.push(Cte::postgres(
+            entries.push(Cte::try_from_with_tokens(
                 &required(entry.as_common_table_expr().as_inner(), "CTE")?,
                 tokens,
             )?);
@@ -214,15 +269,17 @@ impl With {
     }
 }
 
-impl Cte {
-    pub(in crate::sem::unresolved) fn postgres(
+impl TryFromWithTokens<&syn::CommonTableExpr> for Cte {
+    type Error = AnalysisError;
+
+    fn try_from_with_tokens(
         value: &syn::CommonTableExpr,
-        tokens: &IVec<syn::ScanToken>,
-    ) -> Result<Self, AnalysisError> {
+        tokens: &IVec<crate::syn::ScanToken>,
+    ) -> Result<Self, Self::Error> {
         Ok(Self {
             name: value.get_ctename(),
             columns: crate::sem::unresolved::CteColumn::from_names(
-                &Name::postgres(value.get_aliascolnames())?.0,
+                &Name::try_from(value.get_aliascolnames())?.0,
             ),
             materialized: match value.get_ctematerialized().as_inner() {
                 Some(syn::CteMaterialize::Always) => Some(true),
@@ -230,15 +287,11 @@ impl Cte {
                 _ => None,
             },
             body: CteBody::postgres(&value.get_ctequery(), tokens)?,
-            search: value
-                .get_search_clause()
-                .as_inner()
-                .map(|search| Search::postgres(&search))
-                .transpose()?,
+            search: Search::try_from_opt(value.get_search_clause().as_inner().as_ref())?,
             cycle: value
                 .get_cycle_clause()
                 .as_inner()
-                .map(|cycle| Cycle::postgres(&cycle, tokens))
+                .map(|cycle| Cycle::try_from_with_tokens(&cycle, tokens))
                 .transpose()?,
         })
     }
@@ -250,48 +303,48 @@ impl CteBody {
         tokens: &IVec<syn::ScanToken>,
     ) -> Result<Self, AnalysisError> {
         if let Some(query) = value.as_select_stmt().as_inner() {
-            return Ok(Self::Query(Box::new(Query::postgres(&query, tokens)?)));
+            return Ok(Self::query(Query::try_from_with_tokens(&query, tokens)?));
         }
         if let Some(insert) = value.as_insert_stmt().as_inner() {
-            return Ok(Self::Insert(Box::new(Insert::postgres(&insert, tokens)?)));
+            return Ok(Self::insert(Insert::try_from_with_tokens(&insert, tokens)?));
         }
         if let Some(update) = value.as_update_stmt().as_inner() {
-            return Ok(Self::Update(Box::new(Update::postgres(&update, tokens)?)));
+            return Ok(Self::update(Update::try_from_with_tokens(&update, tokens)?));
         }
         if let Some(delete) = value.as_delete_stmt().as_inner() {
-            return Ok(Self::Delete(Box::new(Delete::postgres(&delete, tokens)?)));
+            return Ok(Self::delete(Delete::try_from_with_tokens(&delete, tokens)?));
         }
         if let Some(merge) = value.as_merge_stmt().as_inner() {
-            return Ok(Self::Merge(Box::new(
-                crate::sem::unresolved::Merge::postgres(&merge, tokens)?,
-            )));
+            return Ok(Self::merge(Merge::try_from_with_tokens(&merge, tokens)?));
         }
         AnalysisError::raise_unexpected_input("CTE body")
     }
 }
 
-impl Search {
-    pub(in crate::sem::unresolved) fn postgres(
-        value: &syn::CteSearchClause,
-    ) -> Result<Self, AnalysisError> {
+impl TryFrom<&syn::CteSearchClause> for Search {
+    type Error = AnalysisError;
+
+    fn try_from(value: &syn::CteSearchClause) -> Result<Self, Self::Error> {
         Ok(Self {
-            columns: Name::postgres(value.get_search_col_list())?.0,
+            columns: Name::try_from(value.get_search_col_list())?.0,
             breadth_first: value.get_search_breadth_first(),
             sequence: value.get_search_seq_column(),
         })
     }
 }
 
-impl Cycle {
-    pub(in crate::sem::unresolved) fn postgres(
+impl TryFromWithTokens<&syn::CteCycleClause> for Cycle {
+    type Error = AnalysisError;
+
+    fn try_from_with_tokens(
         value: &syn::CteCycleClause,
-        tokens: &IVec<syn::ScanToken>,
-    ) -> Result<Self, AnalysisError> {
+        tokens: &IVec<crate::syn::ScanToken>,
+    ) -> Result<Self, Self::Error> {
         Ok(Self {
-            columns: Name::postgres(value.get_cycle_col_list())?.0,
+            columns: Name::try_from(value.get_cycle_col_list())?.0,
             mark: value.get_cycle_mark_column(),
-            value: Expr::postgres_optional(value.get_cycle_mark_value(), tokens)?,
-            default: Expr::postgres_optional(value.get_cycle_mark_default(), tokens)?,
+            value: Expr::try_from_with_tokens_opt(value.get_cycle_mark_value(), tokens)?,
+            default: Expr::try_from_with_tokens_opt(value.get_cycle_mark_default(), tokens)?,
             path: value.get_cycle_path_column(),
         })
     }
@@ -306,17 +359,17 @@ impl Alias {
             .map(|alias| {
                 Ok(Self {
                     name: alias.get_aliasname(),
-                    columns: Name::postgres(alias.get_colnames())?.0,
+                    columns: Name::try_from(alias.get_colnames())?.0,
                 })
             })
             .transpose()
     }
 }
 
-impl Relation {
-    pub(in crate::sem::unresolved) fn postgres(
-        value: &syn::RangeVar,
-    ) -> Result<Self, AnalysisError> {
+impl TryFrom<&syn::RangeVar> for Relation {
+    type Error = AnalysisError;
+
+    fn try_from(value: &syn::RangeVar) -> Result<Self, Self::Error> {
         let mut parts = Vec::new();
         if let Some(catalog) = nonempty(value.get_catalogname()) {
             parts.push(catalog);
@@ -336,59 +389,79 @@ impl Relation {
     }
 }
 
-impl FromItem {
-    pub(crate) fn postgres_list(
+impl TryCollectFromWithTokens<syn::NodeListOpt> for FromItem {
+    type Error = AnalysisError;
+    fn try_collect_from_with_tokens(
         nodes: syn::NodeListOpt,
-        tokens: &IVec<syn::ScanToken>,
-    ) -> Result<Vec<Self>, AnalysisError> {
+        tokens: &IVec<crate::syn::ScanToken>,
+    ) -> Result<Vec<Self>, Self::Error> {
         nodes
             .as_inner()
             .unwrap_or_default()
             .into_iter()
-            .map(|node| Self::postgres(&node, tokens))
+            .map(|node| Self::try_from_with_tokens(&node, tokens))
             .collect()
     }
+}
 
-    pub(crate) fn postgres(
+impl TryFromWithTokens<&syn::RangeTableSample> for TableSample {
+    type Error = AnalysisError;
+
+    fn try_from_with_tokens(
+        sample: &syn::RangeTableSample,
+        tokens: &IVec<crate::syn::ScanToken>,
+    ) -> Result<Self, Self::Error> {
+        Ok(Self {
+            relation: FromItem::try_from_with_tokens(&sample.get_relation(), tokens)?,
+            method: Name::try_from(sample.get_method())?,
+            arguments: Expr::try_collect_from_with_tokens(sample.get_args(), tokens)?,
+            repeatable: Expr::try_from_with_tokens_opt(sample.get_repeatable(), tokens)?,
+        })
+    }
+}
+
+impl TryFromWithTokens<&syn::Node> for FromItem {
+    type Error = AnalysisError;
+
+    fn try_from_with_tokens(
         node: &syn::Node,
-        tokens: &IVec<syn::ScanToken>,
-    ) -> Result<Self, AnalysisError> {
+        tokens: &IVec<crate::syn::ScanToken>,
+    ) -> Result<Self, Self::Error> {
         if let Some(relation) = node.as_range_var().as_inner() {
-            return Self::postgres_range_var(&relation, tokens);
+            return Ok(Self::relation(Relation::try_from(&relation)?));
         }
         if let Some(query) = node.as_range_subselect().as_inner() {
-            return Self::postgres_range_subselect(&query, tokens);
+            return Ok(Self::query(DerivedTable::try_from_with_tokens(
+                &query, tokens,
+            )?));
         }
         if let Some(join) = node.as_join_expr().as_inner() {
-            return Self::postgres_join_expr(&join, tokens);
+            return Ok(Self::join(Join::try_from_with_tokens(&join, tokens)?));
         }
         if let Some(functions) = node.as_range_function().as_inner() {
-            return Self::postgres_range_function(&functions, tokens);
+            return Ok(Self::functions(TableFunctions::try_from_with_tokens(
+                &functions, tokens,
+            )?));
         }
         if let Some(sample) = node.as_range_table_sample().as_inner() {
-            return Ok(Self::Sample(Box::new(TableSample {
-                relation: Self::postgres(&sample.get_relation(), tokens)?,
-                method: Name::postgres(sample.get_method())?,
-                arguments: Expr::postgres_list(sample.get_args(), tokens)?,
-                repeatable: Expr::postgres_optional(sample.get_repeatable(), tokens)?,
-            })));
+            return Ok(Self::sample(TableSample::try_from_with_tokens(
+                &sample, tokens,
+            )?));
         }
         if let Some(value) = node.as_range_table_func().as_inner() {
-            return Self::postgres_range_table_func(&value, tokens);
+            return Ok(Self::xml(XmlTable::try_from_with_tokens(&value, tokens)?));
         }
         if let Some(value) = node.as_json_table().as_inner() {
-            return Ok(Self::Json(Box::new(
-                crate::sem::unresolved::JsonTable::postgres(&value, tokens)?,
-            )));
+            return Ok(Self::json(JsonTable::try_from_with_tokens(&value, tokens)?));
         }
         AnalysisError::raise_unexpected_input(&format!("FROM syntax: {node:?}"))
     }
 }
 
-impl JoinKind {
-    pub(in crate::sem::unresolved) fn postgres(
-        value: syn::JoinType,
-    ) -> Result<Self, AnalysisError> {
+impl TryFrom<syn::JoinType> for JoinKind {
+    type Error = AnalysisError;
+
+    fn try_from(value: syn::JoinType) -> Result<Self, Self::Error> {
         match value {
             syn::JoinType::JoinInner => Ok(Self::Inner),
             syn::JoinType::JoinLeft => Ok(Self::Left),
@@ -399,24 +472,26 @@ impl JoinKind {
     }
 }
 
-impl TableFunctions {
-    pub(in crate::sem::unresolved) fn postgres(
+impl TryFromWithTokens<&syn::RangeFunction> for TableFunctions {
+    type Error = AnalysisError;
+
+    fn try_from_with_tokens(
         value: &syn::RangeFunction,
-        tokens: &IVec<syn::ScanToken>,
-    ) -> Result<Self, AnalysisError> {
+        tokens: &IVec<crate::syn::ScanToken>,
+    ) -> Result<Self, Self::Error> {
         let mut calls = Vec::new();
         for node in value.get_functions().as_inner().unwrap_or_default() {
             if node.is_func_call() || node.is_sqlvalue_function() {
                 calls.push(TableFunction {
-                    expression: Expr::postgres(&node, tokens)?,
+                    expression: Expr::try_from_with_tokens(&node, tokens)?,
                     columns: Vec::new(),
                 });
                 continue;
             }
             let items = required(node.as_list().as_inner(), "table function pair")?.get_items();
-            let expression = Expr::postgres(&items.get(0), tokens)?;
+            let expression = Expr::try_from_with_tokens(&items.get(0), tokens)?;
             let columns = if let Some(columns) = items.get(1).as_list().as_inner() {
-                TypedColumn::postgres_list(columns.get_items(), tokens)?
+                TypedColumn::try_collect_from_with_tokens(columns.get_items(), tokens)?
             } else {
                 Vec::new()
             };
@@ -431,29 +506,31 @@ impl TableFunctions {
             lateral: value.get_lateral(),
             ordinality: value.get_ordinality(),
             rows_from: value.get_is_rowsfrom(),
-            columns: TypedColumn::postgres_list(value.get_coldeflist(), tokens)?,
+            columns: TypedColumn::try_collect_from_with_tokens(value.get_coldeflist(), tokens)?,
         })
     }
 }
 
-impl TypedColumn {
-    pub(in crate::sem::unresolved) fn postgres_list(
+impl TryCollectFromWithTokens<syn::NodeListOpt> for TypedColumn {
+    type Error = AnalysisError;
+
+    fn try_collect_from_with_tokens(
         nodes: syn::NodeListOpt,
-        tokens: &IVec<syn::ScanToken>,
-    ) -> Result<Vec<Self>, AnalysisError> {
+        tokens: &IVec<crate::syn::ScanToken>,
+    ) -> Result<Vec<Self>, Self::Error> {
         let mut columns = Vec::new();
         for node in nodes.as_inner().unwrap_or_default() {
             let column = required(node.as_column_def().as_inner(), "table function column")?;
             columns.push(Self {
                 name: column.get_colname(),
-                type_name: TypeName::postgres(
+                type_name: TypeName::try_from_with_tokens(
                     &required(column.get_type_name().as_inner(), "column type")?,
                     tokens,
                 )?,
                 collation: column
                     .get_coll_clause()
                     .as_inner()
-                    .map(|collation| Name::postgres(collation.get_collname()))
+                    .map(|collation| Name::try_from(collation.get_collname()))
                     .transpose()?,
             });
         }
@@ -461,26 +538,30 @@ impl TypedColumn {
     }
 }
 
-impl Window {
-    pub(in crate::sem::unresolved) fn postgres(
+impl TryFromWithTokens<&syn::WindowDef> for Window {
+    type Error = AnalysisError;
+
+    fn try_from_with_tokens(
         value: &syn::WindowDef,
-        tokens: &IVec<syn::ScanToken>,
-    ) -> Result<Self, AnalysisError> {
+        tokens: &IVec<crate::syn::ScanToken>,
+    ) -> Result<Self, Self::Error> {
         Ok(Self {
             name: nonempty(value.get_name()),
             reference: nonempty(value.get_refname()),
-            partition: Expr::postgres_list(value.get_partition_clause(), tokens)?,
-            order: Order::postgres_list(value.get_order_clause(), tokens)?,
-            frame: Frame::postgres(value, tokens)?,
+            partition: Expr::try_collect_from_with_tokens(value.get_partition_clause(), tokens)?,
+            order: Order::try_collect_from_with_tokens(value.get_order_clause(), tokens)?,
+            frame: Frame::try_from_with_tokens_opt(value, tokens)?,
         })
     }
 }
 
-impl Frame {
-    pub(in crate::sem::unresolved) fn postgres(
+impl TryFromWithTokensOpt<&syn::WindowDef> for Frame {
+    type Error = AnalysisError;
+
+    fn try_from_with_tokens_opt(
         value: &syn::WindowDef,
-        tokens: &IVec<syn::ScanToken>,
-    ) -> Result<Option<Self>, AnalysisError> {
+        tokens: &IVec<crate::syn::ScanToken>,
+    ) -> Result<Option<Self>, Self::Error> {
         // Decode the parser's flags at the boundary; the common AST stores SQL concepts.
         let flags = value.get_frame_options();
         if flags & 0x00001 == 0 {
@@ -490,13 +571,13 @@ impl Frame {
         let start = FrameBound::postgres(
             flags,
             true,
-            Expr::postgres_optional(value.get_start_offset(), tokens)?,
+            Expr::try_from_with_tokens_opt(value.get_start_offset(), tokens)?,
         )?;
         let end = if flags & 0x00010 != 0 {
             Some(FrameBound::postgres(
                 flags,
                 false,
-                Expr::postgres_optional(value.get_end_offset(), tokens)?,
+                Expr::try_from_with_tokens_opt(value.get_end_offset(), tokens)?,
             )?)
         } else {
             None
@@ -569,7 +650,7 @@ impl Lock {
             let mut relations = Vec::new();
             for relation in lock.get_locked_rels().as_inner().unwrap_or_default() {
                 relations.push(
-                    Relation::postgres(&required(
+                    Relation::try_from(&required(
                         relation.as_range_var().as_inner(),
                         "locked relation",
                     )?)?
@@ -578,190 +659,186 @@ impl Lock {
             }
             locks.push(Self {
                 relations,
-                strength: lock
-                    .get_strength()
-                    .as_inner()
-                    .map(LockStrength::postgres)
-                    .transpose()?,
-                wait: lock
-                    .get_wait_policy()
-                    .as_inner()
-                    .map(LockWait::postgres)
-                    .transpose()?,
+                strength: LockStrength::try_from_opt(lock.get_strength().as_inner())?,
+                wait: LockWait::try_from_opt(lock.get_wait_policy().as_inner())?,
             });
         }
         Ok(locks)
     }
 }
 
-impl Assignment {
-    pub(in crate::sem::unresolved) fn postgres_list(
+impl TryCollectFromWithTokens<syn::NodeListOpt> for Assignment {
+    type Error = AnalysisError;
+
+    fn try_collect_from_with_tokens(
         nodes: syn::NodeListOpt,
-        tokens: &IVec<syn::ScanToken>,
-    ) -> Result<Vec<Self>, AnalysisError> {
+        tokens: &IVec<crate::syn::ScanToken>,
+    ) -> Result<Vec<Self>, Self::Error> {
         let mut assignments = Vec::new();
         for node in nodes.as_inner().unwrap_or_default() {
             let value = required(node.as_res_target().as_inner(), "assignment")?;
             assignments.push(Self {
                 name: value.get_name(),
-                indirection: Access::postgres_list(value.get_indirection(), tokens)?,
-                value: Expr::postgres_optional(value.get_val(), tokens)?,
+                indirection: Access::try_collect_from_with_tokens(value.get_indirection(), tokens)?,
+                value: Expr::try_from_with_tokens_opt(value.get_val(), tokens)?,
             });
         }
         Ok(assignments)
     }
 }
 
-impl Insert {
-    pub(in crate::sem::unresolved) fn postgres(
+impl TryFromWithTokens<&syn::InsertStmt> for Insert {
+    type Error = AnalysisError;
+
+    fn try_from_with_tokens(
         value: &syn::InsertStmt,
-        tokens: &IVec<syn::ScanToken>,
-    ) -> Result<Self, AnalysisError> {
+        tokens: &IVec<crate::syn::ScanToken>,
+    ) -> Result<Self, Self::Error> {
         Ok(Self {
-            with: With::postgres(value.get_with_clause(), tokens)?,
-            relation: Relation::postgres(&required(
+            with: With::try_from_with_tokens(value.get_with_clause(), tokens)?,
+            relation: Relation::try_from(&required(
                 value.get_relation().as_inner(),
                 "insert relation",
             )?)?,
-            columns: Assignment::postgres_list(value.get_cols(), tokens)?,
+            columns: Assignment::try_collect_from_with_tokens(value.get_cols(), tokens)?,
             source: value
                 .get_select_stmt()
                 .as_inner()
                 .map(|query| {
-                    Query::postgres(
+                    Query::try_from_with_tokens(
                         &required(query.as_select_stmt().as_inner(), "insert query")?,
                         tokens,
                     )
                 })
                 .transpose()?,
-            overriding: value
-                .get_override()
-                .as_inner()
-                .map(OverridingKind::postgres)
-                .transpose()?,
+            overriding: OverridingKind::try_from_opt(value.get_override().as_inner())?,
             conflict: value
                 .get_on_conflict_clause()
                 .as_inner()
-                .map(|conflict| Conflict::postgres(&conflict, tokens))
+                .map(|conflict| Conflict::try_from_with_tokens(&conflict, tokens))
                 .transpose()?,
-            returning: Target::postgres_list(value.get_returning_list(), tokens)?,
+            returning: Target::try_collect_from_with_tokens(value.get_returning_list(), tokens)?,
         })
     }
 }
 
-impl Update {
-    pub(in crate::sem::unresolved) fn postgres(
+impl TryFromWithTokens<&syn::UpdateStmt> for Update {
+    type Error = AnalysisError;
+
+    fn try_from_with_tokens(
         value: &syn::UpdateStmt,
-        tokens: &IVec<syn::ScanToken>,
-    ) -> Result<Self, AnalysisError> {
+        tokens: &IVec<crate::syn::ScanToken>,
+    ) -> Result<Self, Self::Error> {
         Ok(Self {
-            with: With::postgres(value.get_with_clause(), tokens)?,
-            relation: Relation::postgres(&required(
+            with: With::try_from_with_tokens(value.get_with_clause(), tokens)?,
+            relation: Relation::try_from(&required(
                 value.get_relation().as_inner(),
                 "update relation",
             )?)?,
-            assignments: Assignment::postgres_list(value.get_target_list(), tokens)?,
-            from: FromItem::postgres_list(value.get_from_clause(), tokens)?,
-            predicate: Expr::postgres_optional(value.get_where_clause(), tokens)?,
-            returning: Target::postgres_list(value.get_returning_list(), tokens)?,
+            assignments: Assignment::try_collect_from_with_tokens(value.get_target_list(), tokens)?,
+            from: FromItem::try_collect_from_with_tokens(value.get_from_clause(), tokens)?,
+            predicate: Expr::try_from_with_tokens_opt(value.get_where_clause(), tokens)?,
+            returning: Target::try_collect_from_with_tokens(value.get_returning_list(), tokens)?,
         })
     }
 }
 
-impl Delete {
-    pub(in crate::sem::unresolved) fn postgres(
+impl TryFromWithTokens<&syn::DeleteStmt> for Delete {
+    type Error = AnalysisError;
+
+    fn try_from_with_tokens(
         value: &syn::DeleteStmt,
-        tokens: &IVec<syn::ScanToken>,
-    ) -> Result<Self, AnalysisError> {
+        tokens: &IVec<crate::syn::ScanToken>,
+    ) -> Result<Self, Self::Error> {
         Ok(Self {
-            with: With::postgres(value.get_with_clause(), tokens)?,
-            relation: Relation::postgres(&required(
+            with: With::try_from_with_tokens(value.get_with_clause(), tokens)?,
+            relation: Relation::try_from(&required(
                 value.get_relation().as_inner(),
                 "delete relation",
             )?)?,
-            using: FromItem::postgres_list(value.get_using_clause(), tokens)?,
-            predicate: Expr::postgres_optional(value.get_where_clause(), tokens)?,
-            returning: Target::postgres_list(value.get_returning_list(), tokens)?,
+            using: FromItem::try_collect_from_with_tokens(value.get_using_clause(), tokens)?,
+            predicate: Expr::try_from_with_tokens_opt(value.get_where_clause(), tokens)?,
+            returning: Target::try_collect_from_with_tokens(value.get_returning_list(), tokens)?,
         })
     }
 }
 
-impl Conflict {
-    pub(in crate::sem::unresolved) fn postgres(
+impl TryFromWithTokens<&syn::OnConflictClause> for Conflict {
+    type Error = AnalysisError;
+
+    fn try_from_with_tokens(
         value: &syn::OnConflictClause,
-        tokens: &IVec<syn::ScanToken>,
-    ) -> Result<Self, AnalysisError> {
+        tokens: &IVec<crate::syn::ScanToken>,
+    ) -> Result<Self, Self::Error> {
         let mut inference = Vec::new();
         let mut inference_predicate = None;
         let mut constraint = None;
         if let Some(infer) = value.get_infer().as_inner() {
             for node in infer.get_index_elems().as_inner().unwrap_or_default() {
-                inference.push(IndexExpression::postgres(
+                inference.push(IndexExpression::try_from_with_tokens(
                     &required(node.as_index_elem().as_inner(), "conflict index")?,
                     tokens,
                 )?);
             }
-            inference_predicate = Expr::postgres_optional(infer.get_where_clause(), tokens)?;
+            inference_predicate = Expr::try_from_with_tokens_opt(infer.get_where_clause(), tokens)?;
             constraint = nonempty(infer.get_conname());
         }
         Ok(Self {
-            action: value
-                .get_action()
-                .as_inner()
-                .map(ConflictAction::postgres)
-                .transpose()?,
+            action: ConflictAction::try_from_opt(value.get_action().as_inner())?,
             inference,
             inference_predicate,
             constraint,
-            assignments: Assignment::postgres_list(value.get_target_list(), tokens)?,
-            predicate: Expr::postgres_optional(value.get_where_clause(), tokens)?,
+            assignments: Assignment::try_collect_from_with_tokens(value.get_target_list(), tokens)?,
+            predicate: Expr::try_from_with_tokens_opt(value.get_where_clause(), tokens)?,
         })
     }
 }
 
-impl IndexExpression {
-    pub(in crate::sem::unresolved) fn postgres(
+impl TryFromWithTokens<&syn::IndexElem> for IndexExpression {
+    type Error = AnalysisError;
+
+    fn try_from_with_tokens(
         value: &syn::IndexElem,
-        tokens: &IVec<syn::ScanToken>,
-    ) -> Result<Self, AnalysisError> {
+        tokens: &IVec<crate::syn::ScanToken>,
+    ) -> Result<Self, Self::Error> {
         Ok(Self {
             name: nonempty(value.get_name()),
-            expression: Expr::postgres_optional(value.get_expr(), tokens)?,
-            collation: Name::postgres(value.get_collation())?,
-            operator_class: Name::postgres(value.get_opclass())?,
-            options: SyntaxOption::postgres_list(value.get_opclassopts(), tokens)?,
+            expression: Expr::try_from_with_tokens_opt(value.get_expr(), tokens)?,
+            collation: Name::try_from(value.get_collation())?,
+            operator_class: Name::try_from(value.get_opclass())?,
+            options: SyntaxOption::try_collect_from_with_tokens(value.get_opclassopts(), tokens)?,
             descending: sort_direction(value.get_ordering().as_inner()),
             nulls_first: null_order(value.get_nulls_ordering().as_inner()),
         })
     }
 }
 
-impl Into {
-    pub(in crate::sem::unresolved) fn postgres(
+impl TryFromWithTokens<&syn::IntoClause> for Into {
+    type Error = AnalysisError;
+
+    fn try_from_with_tokens(
         value: &syn::IntoClause,
-        tokens: &IVec<syn::ScanToken>,
-    ) -> Result<Self, AnalysisError> {
+        tokens: &IVec<crate::syn::ScanToken>,
+    ) -> Result<Self, Self::Error> {
         Ok(Self {
-            relation: Relation::postgres(&required(value.get_rel().as_inner(), "INTO relation")?)?,
-            columns: Name::postgres(value.get_col_names())?.0,
+            relation: Relation::try_from(&required(value.get_rel().as_inner(), "INTO relation")?)?,
+            columns: Name::try_from(value.get_col_names())?.0,
             access_method: nonempty(value.get_access_method()),
-            options: SyntaxOption::postgres_list(value.get_options(), tokens)?,
-            on_commit: value
-                .get_on_commit()
-                .as_inner()
-                .map(CommitAction::postgres)
-                .transpose()?,
+            options: SyntaxOption::try_collect_from_with_tokens(value.get_options(), tokens)?,
+            on_commit: CommitAction::try_from_opt(value.get_on_commit().as_inner())?,
             tablespace: nonempty(value.get_table_space_name()),
             skip_data: value.get_skip_data(),
         })
     }
 }
 
-impl SyntaxOption {
-    pub(in crate::sem::unresolved) fn postgres_list(
+impl TryCollectFromWithTokens<syn::NodeListOpt> for SyntaxOption {
+    type Error = AnalysisError;
+
+    fn try_collect_from_with_tokens(
         nodes: syn::NodeListOpt,
-        tokens: &IVec<syn::ScanToken>,
-    ) -> Result<Vec<Self>, AnalysisError> {
+        tokens: &IVec<crate::syn::ScanToken>,
+    ) -> Result<Vec<Self>, Self::Error> {
         let mut options = Vec::new();
         for node in nodes.as_inner().unwrap_or_default() {
             let option = required(node.as_def_elem().as_inner(), "syntax option")?;
@@ -771,7 +848,7 @@ impl SyntaxOption {
                 value: option
                     .get_arg()
                     .as_inner()
-                    .map(|node| SyntaxValue::postgres(&node, tokens))
+                    .map(|node| SyntaxValue::try_from_with_tokens(&node, tokens))
                     .transpose()?,
             });
         }
@@ -779,18 +856,25 @@ impl SyntaxOption {
     }
 }
 
-impl SyntaxValue {
-    fn postgres(node: &syn::Node, tokens: &IVec<syn::ScanToken>) -> Result<Self, AnalysisError> {
+impl TryFromWithTokens<&syn::Node> for SyntaxValue {
+    type Error = AnalysisError;
+
+    fn try_from_with_tokens(
+        node: &syn::Node,
+        tokens: &IVec<crate::syn::ScanToken>,
+    ) -> Result<Self, Self::Error> {
         if let Some(value) = node.as_type_name().as_inner() {
-            Ok(Self::Type(TypeName::postgres(&value, tokens)?))
+            Ok(Self::Type(TypeName::try_from_with_tokens(&value, tokens)?))
         } else {
-            Ok(Self::Expression(Expr::postgres(node, tokens)?))
+            Ok(Self::Expression(Expr::try_from_with_tokens(node, tokens)?))
         }
     }
 }
 
-impl LockStrength {
-    fn postgres(value: syn::LockClauseStrength) -> Result<Self, AnalysisError> {
+impl TryFrom<syn::LockClauseStrength> for LockStrength {
+    type Error = AnalysisError;
+
+    fn try_from(value: syn::LockClauseStrength) -> Result<Self, Self::Error> {
         match value {
             syn::LockClauseStrength::LcsNone => Ok(Self::None),
             syn::LockClauseStrength::LcsForkeyshare => Ok(Self::KeyShare),
@@ -802,8 +886,10 @@ impl LockStrength {
     }
 }
 
-impl LockWait {
-    fn postgres(value: syn::LockWaitPolicy) -> Result<Self, AnalysisError> {
+impl TryFrom<syn::LockWaitPolicy> for LockWait {
+    type Error = AnalysisError;
+
+    fn try_from(value: syn::LockWaitPolicy) -> Result<Self, AnalysisError> {
         match value {
             syn::LockWaitPolicy::LockWaitBlock => Ok(Self::Block),
             syn::LockWaitPolicy::LockWaitSkip => Ok(Self::Skip),
@@ -813,8 +899,10 @@ impl LockWait {
     }
 }
 
-impl ConflictAction {
-    fn postgres(value: syn::OnConflictAction) -> Result<Self, AnalysisError> {
+impl TryFrom<syn::OnConflictAction> for ConflictAction {
+    type Error = AnalysisError;
+
+    fn try_from(value: syn::OnConflictAction) -> Result<Self, Self::Error> {
         match value {
             syn::OnConflictAction::OnconflictNone => Ok(Self::None),
             syn::OnConflictAction::OnconflictNothing => Ok(Self::Nothing),
@@ -824,8 +912,10 @@ impl ConflictAction {
     }
 }
 
-impl CommitAction {
-    fn postgres(value: syn::OnCommitAction) -> Result<Self, AnalysisError> {
+impl TryFrom<syn::OnCommitAction> for CommitAction {
+    type Error = AnalysisError;
+
+    fn try_from(value: syn::OnCommitAction) -> Result<Self, Self::Error> {
         match value {
             syn::OnCommitAction::OncommitNoop => Ok(Self::None),
             syn::OnCommitAction::OncommitPreserveRows => Ok(Self::PreserveRows),
@@ -836,20 +926,15 @@ impl CommitAction {
     }
 }
 
-impl FromItem {
-    pub(crate) fn postgres_range_var(
-        relation: &syn::RangeVar,
-        _tokens: &IVec<syn::ScanToken>,
-    ) -> Result<Self, AnalysisError> {
-        Ok(Self::Relation(Relation::postgres(relation)?))
-    }
+impl TryFromWithTokens<&syn::RangeSubselect> for DerivedTable {
+    type Error = AnalysisError;
 
-    pub(crate) fn postgres_range_subselect(
+    fn try_from_with_tokens(
         query: &syn::RangeSubselect,
-        tokens: &IVec<syn::ScanToken>,
-    ) -> Result<Self, AnalysisError> {
-        Ok(Self::Query(Box::new(DerivedTable {
-            query: Query::postgres(
+        tokens: &IVec<crate::syn::ScanToken>,
+    ) -> Result<Self, Self::Error> {
+        Ok(Self {
+            query: Query::try_from_with_tokens(
                 &required(
                     query.get_subquery().as_select_stmt().as_inner(),
                     "derived query",
@@ -858,40 +943,26 @@ impl FromItem {
             )?,
             alias: Alias::postgres(query.get_alias())?,
             lateral: query.get_lateral(),
-        })))
+        })
     }
+}
 
-    pub(crate) fn postgres_join_expr(
+impl TryFromWithTokens<&syn::JoinExpr> for Join {
+    type Error = AnalysisError;
+
+    fn try_from_with_tokens(
         join: &syn::JoinExpr,
-        tokens: &IVec<syn::ScanToken>,
-    ) -> Result<Self, AnalysisError> {
-        Ok(Self::Join(Box::new(Join {
-            left: Self::postgres(&join.get_larg(), tokens)?,
-            right: Self::postgres(&join.get_rarg(), tokens)?,
-            kind: JoinKind::postgres(required(join.get_jointype().as_inner(), "join kind")?)?,
+        tokens: &IVec<crate::syn::ScanToken>,
+    ) -> Result<Self, Self::Error> {
+        Ok(Self {
+            left: FromItem::try_from_with_tokens(&join.get_larg(), tokens)?,
+            right: FromItem::try_from_with_tokens(&join.get_rarg(), tokens)?,
+            kind: JoinKind::try_from(required(join.get_jointype().as_inner(), "join kind")?)?,
             natural: join.get_is_natural(),
-            condition: Expr::postgres_optional(join.get_quals(), tokens)?,
-            using: Name::postgres(join.get_using_clause())?.0,
+            condition: Expr::try_from_with_tokens_opt(join.get_quals(), tokens)?,
+            using: Name::try_from(join.get_using_clause())?.0,
             using_alias: Alias::postgres(join.get_join_using_alias())?,
             alias: Alias::postgres(join.get_alias())?,
-        })))
-    }
-
-    pub(crate) fn postgres_range_function(
-        functions: &syn::RangeFunction,
-        tokens: &IVec<syn::ScanToken>,
-    ) -> Result<Self, AnalysisError> {
-        Ok(Self::Functions(TableFunctions::postgres(
-            functions, tokens,
-        )?))
-    }
-
-    pub(crate) fn postgres_range_table_func(
-        value: &syn::RangeTableFunc,
-        tokens: &IVec<syn::ScanToken>,
-    ) -> Result<Self, AnalysisError> {
-        Ok(Self::Xml(Box::new(
-            crate::sem::unresolved::XmlTable::postgres(value, tokens)?,
-        )))
+        })
     }
 }

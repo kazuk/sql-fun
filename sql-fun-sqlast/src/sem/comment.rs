@@ -2,7 +2,7 @@ use itertools::Itertools;
 
 use crate::{
     sem::AstAndContextPair,
-    syn::{ListOpt, ObjectType, Opt},
+    syn::{ListOpt, Opt},
 };
 
 use super::{AnalysisError, ParseContext, SemAst};
@@ -11,8 +11,18 @@ use super::{AnalysisError, ParseContext, SemAst};
 #[derive(Debug, Clone)]
 pub struct Comment {
     target: String,
-    object_type: ObjectType,
+    object_type: ObjectKind,
     comment: String,
+}
+
+/// PostgreSQL object-kind identifier used by `COMMENT`.
+#[derive(Debug, Clone, Copy, Eq, Hash, PartialEq)]
+pub struct ObjectKind(u32);
+
+impl From<u32> for ObjectKind {
+    fn from(value: u32) -> Self {
+        Self(value)
+    }
 }
 
 impl Comment {
@@ -24,7 +34,7 @@ impl Comment {
 
     /// get comment target object type
     #[must_use]
-    pub const fn object_type(&self) -> &ObjectType {
+    pub const fn object_type(&self) -> &ObjectKind {
         &self.object_type
     }
 
@@ -32,6 +42,16 @@ impl Comment {
     #[must_use]
     pub fn comment(&self) -> &str {
         &self.comment
+    }
+
+    /// Create a `COMMENT` statement.
+    #[must_use]
+    pub fn new(target: &str, object_type: ObjectKind, comment: &str) -> Self {
+        Self {
+            target: target.to_owned(),
+            object_type,
+            comment: comment.to_owned(),
+        }
     }
 
     /// analyze [`crate::syn::CommentStmt`]
@@ -58,12 +78,11 @@ impl Comment {
             AnalysisError::raise_unexpected_none("comment_stmt.objtype")?
         };
 
-        let comment = syn.get_comment();
-        let comment = Self {
-            target: items,
-            object_type,
-            comment,
-        };
+        let comment = Self::new(
+            &items,
+            ObjectKind::from(object_type as u32),
+            &syn.get_comment(),
+        );
         context = context.apply_comment(&comment)?;
         Ok(AstAndContextPair::new(SemAst::Comment(comment), context))
     }

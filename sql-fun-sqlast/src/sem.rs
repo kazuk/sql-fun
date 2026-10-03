@@ -60,7 +60,7 @@ pub use self::{
         IdentityColumnConstraint, IdentityColumnMode, PrimaryKeyColumnConstraint,
         UniqueColumnConstraint, Validity,
     },
-    comment::Comment,
+    comment::{Comment, ObjectKind},
     constraint::{AnalyzeConstraint, Constraint, PrimaryKeyConstraint},
     create_comp_type::CreateCompositeType,
     create_domain::CreateDomain,

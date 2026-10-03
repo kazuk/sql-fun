@@ -18,14 +18,14 @@ The workflow receives a temporary token through
 `rust-lang/crates-io-auth-action@v1` and `id-token: write`.
 
 Trusted Publishing cannot create a crate that does not yet exist on crates.io.
-For that one-time bootstrap case only, configure both
-`CRATES_IO_BOOTSTRAP_TOKEN` and `CRATES_IO_BOOTSTRAP_KEY` as GitHub Secrets.
+For that one-time bootstrap case only, configure `CRATES_IO_BOOTSTRAP_TOKEN`
+as a GitHub Secret.
 The workflow uses the bootstrap token only after confirming that the crate is
 absent; a crate that exists but lacks the target version always uses OIDC. If
-either secret is missing when an unpublished crate is reached, it fails and
+the secret is missing when an unpublished crate is reached, it fails and
 names the crate that needs bootstrap. After a bootstrap publish, configure its
 Trusted Publisher entry, enable crates.io's Trusted Publishing requirement, and
-remove both secrets. They must be absent during normal operation.
+remove the secret. It must be absent during normal operation.
 
 ## Running the trial
 

@@ -3,7 +3,7 @@ set -euo pipefail
 
 function usage() {
   cat <<'USAGE'
-usage: publish-crates --manifest=PATH [--stop-after=PACKAGE]
+usage: publish-crates --manifest=PATH
 
 Publish the crate/version pairs in PATH. Each line must be a tab-separated
 package name and version produced by materialize-release-versions. Existing
@@ -12,11 +12,9 @@ USAGE
 }
 
 manifest=""
-stop_after=""
 for arg in "$@"; do
   case "$arg" in
     --manifest=*) manifest="${arg#--manifest=}" ;;
-    --stop-after=*) stop_after="${arg#--stop-after=}" ;;
     -h|--help) usage; exit 0 ;;
     *) echo "unsupported argument: $arg" >&2; usage >&2; exit 1 ;;
   esac
@@ -35,10 +33,6 @@ while IFS=$'\t' read -r package version; do
 done < "$manifest"
 
 (( ${#expected_versions[@]} > 0 )) || { echo "manifest is empty" >&2; exit 1; }
-if [[ -n "$stop_after" && -z "${expected_versions[$stop_after]+x}" ]]; then
-  echo "--stop-after package is not in the manifest: $stop_after" >&2
-  exit 1
-fi
 
 metadata="$(cargo metadata --no-deps --format-version=1)"
 for package in "${!expected_versions[@]}"; do
@@ -101,8 +95,4 @@ while (( ${#remaining[@]} > 0 )); do
   esac
 
   unset 'remaining[$selected]'
-  if [[ "$stop_after" == "$selected" ]]; then
-    echo "intentional trial stop after $selected" >&2
-    exit 1
-  fi
 done

@@ -37,7 +37,7 @@ enum PgArgMode {
 }
 
 impl PgArgMode {
-    fn is_output(&self) -> bool {
+    const fn is_output(&self) -> bool {
         matches!(self, Self::Out)
     }
 

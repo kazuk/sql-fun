@@ -18,8 +18,6 @@ mod resolved;
 mod sql_value;
 mod sub_link;
 
-#[expect(deprecated)]
-pub use self::analyze::analyze_scaler_expr;
 pub(crate) use self::case_expr::CaseExprAnalysisContext;
 pub(crate) use self::coalesce::CoalesceAnalysis;
 pub use self::{

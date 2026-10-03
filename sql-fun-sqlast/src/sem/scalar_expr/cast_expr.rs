@@ -74,7 +74,7 @@ impl TypeCastExpr {
     where
         TParseContext: ParseContext,
     {
-        let syntax = crate::sem::unresolved::Expr::sqlite_cast(syn)?;
+        let syntax = crate::sem::unresolved::Expr::try_from(syn)?;
         let result = syntax.resolve(
             &context,
             crate::sem::unresolved::Dialect::sqlite(),

@@ -112,17 +112,3 @@ impl CreateView {
         ))
     }
 }
-
-/// analyze [`crate::syn::ViewStmt`]
-#[deprecated = "use analyze_create_view"]
-pub fn analyze_create_view<TParseContext>(
-    context: TParseContext,
-    parent_schema: &Option<String>,
-    syn: crate::syn::ViewStmt,
-    tokens: &IVec<ScanToken>,
-) -> Result<AstAndContextPair<TParseContext>, AnalysisError>
-where
-    TParseContext: ParseContext,
-{
-    CreateView::analyze_create_view(context, parent_schema, syn, tokens)
-}

@@ -110,23 +110,6 @@ impl PostgresDialect {
     }
 }
 
-/// parse SQL statement
-///
-/// # Errors
-///
-/// - [`pg_query::Error`] : syntax error
-///
-#[deprecated = "use PostgresDialect::parse"]
-pub fn parse(sql: &str) -> Result<ParseResult, pg_query::Error> {
-    PostgresDialect::parse(sql)
-}
-
-/// scan SQL Statement
-#[deprecated = "use PostgresDialect::scan"]
-pub fn scan(sql: &str) -> Result<IVec<crate::syn::ScanToken>, pg_query::Error> {
-    PostgresDialect::scan(sql)
-}
-
 // TODO(msrv >= 1.98): replace with str::substr_range
 fn offset_in_string(haystack: &StdString, needle: &str) -> Option<usize> {
     let base = haystack.as_ptr() as usize;

@@ -757,7 +757,7 @@ mod column_constraint_analyze_constraint_tests {
 }
 
 impl ColumnConstraint {
-    /// analyze [`crate::syn::sqllite::ColumnConstraint`]
+    /// analyze [`crate::syn::sqlite::ColumnConstraint`]
     #[cfg(feature = "sqlite")]
     pub fn analyze_sqlite_column_constraint<TParseContext>(
         context: TParseContext,

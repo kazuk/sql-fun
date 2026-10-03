@@ -2,6 +2,7 @@
 mod impl_analyze_range_var_node;
 
 use crate::sem::data_source::DataSource;
+use crate::sem::unresolved::TryFromWithTokens;
 use crate::{
     sem::{AnalysisError, FromClause, ParseContext, WithClause},
     syn::ScanToken,
@@ -20,8 +21,9 @@ impl DataSource {
     where
         TParseContext: ParseContext,
     {
-        let syntax =
-            crate::sem::unresolved::FromItem::postgres_range_subselect(&range_subsel, tokens)?;
+        let syntax = crate::sem::unresolved::FromItem::query(
+            crate::sem::unresolved::DerivedTable::try_from_with_tokens(&range_subsel, tokens)?,
+        );
         let outcome = syntax.resolve_source(
             &context,
             crate::sem::unresolved::Dialect::postgres(),
@@ -82,7 +84,9 @@ impl DataSource {
     where
         TParseContext: ParseContext,
     {
-        let syntax = crate::sem::unresolved::FromItem::postgres_join_expr(&join_expr, tokens)?;
+        let syntax = crate::sem::unresolved::FromItem::join(
+            crate::sem::unresolved::Join::try_from_with_tokens(&join_expr, tokens)?,
+        );
         let outcome = syntax.resolve_source(
             &context,
             crate::sem::unresolved::Dialect::postgres(),
@@ -174,7 +178,9 @@ impl DataSource {
     where
         TParseContext: ParseContext,
     {
-        let syntax = crate::sem::unresolved::FromItem::postgres_range_table_func(&node, tokens)?;
+        let syntax = crate::sem::unresolved::FromItem::xml(
+            crate::sem::unresolved::XmlTable::try_from_with_tokens(&node, tokens)?,
+        );
         let outcome = syntax.resolve_source(
             &context,
             crate::sem::unresolved::Dialect::postgres(),
@@ -243,7 +249,9 @@ impl DataSource {
     where
         TParseContext: ParseContext,
     {
-        let syntax = crate::sem::unresolved::FromItem::postgres_range_function(&node, tokens)?;
+        let syntax = crate::sem::unresolved::FromItem::functions(
+            crate::sem::unresolved::TableFunctions::try_from_with_tokens(&node, tokens)?,
+        );
         let outcome = syntax.resolve_source(
             &context,
             crate::sem::unresolved::Dialect::postgres(),
@@ -317,7 +325,9 @@ impl DataSource {
     where
         TParseContext: ParseContext,
     {
-        let syntax = crate::sem::unresolved::FromItem::postgres_range_function(&node, tokens)?;
+        let syntax = crate::sem::unresolved::FromItem::functions(
+            crate::sem::unresolved::TableFunctions::try_from_with_tokens(&node, tokens)?,
+        );
         let outcome = syntax.resolve_source(
             &context,
             crate::sem::unresolved::Dialect::postgres(),
@@ -386,7 +396,7 @@ impl DataSource {
     where
         TParseContext: ParseContext,
     {
-        let syntax = crate::sem::unresolved::FromItem::postgres(&node, tokens)?;
+        let syntax = crate::sem::unresolved::FromItem::try_from_with_tokens(&node, tokens)?;
         let result = syntax.resolve_source(
             &context,
             crate::sem::unresolved::Dialect::postgres(),

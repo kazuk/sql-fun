@@ -1,5 +1,5 @@
 use crate::sem::resolution::Catalog;
-use crate::sem::unresolved::Query;
+use crate::sem::unresolved::{Query, TryFromWithTokens};
 use crate::sem::{
     AnalysisError, CastDefinition, CreateTable, FullName, FunctionOverloadCollection,
     OperatorDefinition, OperatorName, PgBuiltInType, TableName, TypeDefinition, TypeReference,
@@ -14,7 +14,7 @@ use ::sql_fun_core::IVec;
 
 pub(super) fn postgres(sql: &str) -> Result<Query, AnalysisError> {
     let statement = SynBuilder::new().parse(sql);
-    Query::postgres(
+    Query::try_from_with_tokens(
         &statement.as_select_stmt().as_inner().expect("SELECT"),
         &IVec::default(),
     )
@@ -27,7 +27,7 @@ pub(super) fn sqlite(sql: &str) -> Result<Query, AnalysisError> {
     else {
         panic!("SELECT fixture");
     };
-    Query::sqlite(&query)
+    Query::try_from(&query)
 }
 
 /// Deliberately implements no ParseContext or catalog-write interface.

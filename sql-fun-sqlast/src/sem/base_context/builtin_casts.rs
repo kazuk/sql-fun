@@ -64,8 +64,8 @@ impl CastInfoRead for super::BaseContext {
             return None;
         }
 
-        let from_source = self.casts.get(&source_local_name)?;
-        let cast_def = from_source.get(&target_local_name)?;
+        let from_source = self.casts.get(source_local_name)?;
+        let cast_def = from_source.get(target_local_name)?;
         if cast_def.use_in_explicit() {
             Some(cast_def.clone())
         } else {
@@ -90,8 +90,8 @@ impl CastInfoRead for super::BaseContext {
             return None;
         }
 
-        let from_source = self.casts.get(&source_local_name)?;
-        let cast_def = from_source.get(&target_local_name)?;
+        let from_source = self.casts.get(source_local_name)?;
+        let cast_def = from_source.get(target_local_name)?;
 
         if cast_def.use_in_implicit() {
             Some(cast_def.clone())

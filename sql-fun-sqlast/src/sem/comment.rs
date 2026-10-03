@@ -68,15 +68,3 @@ impl Comment {
         Ok(AstAndContextPair::new(SemAst::Comment(comment), context))
     }
 }
-
-/// analyze [`crate::syn::CommentStmt`]
-#[deprecated = "use Comment::analyze_comment"]
-pub fn analyze_comment<TParseContext>(
-    context: TParseContext,
-    syn: crate::syn::CommentStmt,
-) -> Result<AstAndContextPair<TParseContext>, AnalysisError>
-where
-    TParseContext: ParseContext,
-{
-    Comment::analyze_comment(context, syn)
-}

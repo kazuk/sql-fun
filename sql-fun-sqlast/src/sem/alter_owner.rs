@@ -18,16 +18,3 @@ impl AlterOwner {
         Ok(AstAndContextPair::new(SemAst::AlterOwner(Self {}), context))
     }
 }
-
-/// analyze [`crate::syn::AlterOwnerStmt`]
-#[deprecated = "use AlterOwner::analyze_alter_owner"]
-#[expect(dead_code)]
-pub fn analyze_alter_owner<TParseContext>(
-    context: TParseContext,
-    syn: crate::syn::AlterOwnerStmt,
-) -> Result<AstAndContextPair<TParseContext>, AnalysisError>
-where
-    TParseContext: ParseContext,
-{
-    AlterOwner::analyze_alter_owner(context, syn)
-}

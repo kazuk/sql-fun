@@ -55,16 +55,3 @@ impl CreateSchema {
         ))
     }
 }
-
-/// analyze [`crate::syn::CreateSchemaStmt`]
-#[deprecated = "use CreateSchema::analyze_create_schema"]
-pub fn analyze_create_schema<TParseContext>(
-    context: TParseContext,
-    syn: crate::syn::CreateSchemaStmt,
-    tokens: &IVec<ScanToken>,
-) -> Result<AstAndContextPair<TParseContext>, AnalysisError>
-where
-    TParseContext: ParseContext,
-{
-    CreateSchema::analyze_create_schema(context, syn, tokens)
-}

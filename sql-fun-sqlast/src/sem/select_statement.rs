@@ -7,6 +7,7 @@ use crate::{
         AnalysisError, AstAndContextPair, CreateCompositeType, FromClause, ParseContext, SemAst,
         SemScalarExpr, TypeDefinition, TypeReference, WithClause,
         create_table::{ColumnDefinition, ColumnName},
+        unresolved::TryFromWithTokens,
     },
     syn::ScanToken,
 };
@@ -113,7 +114,7 @@ impl SelectStatement {
     where
         TParseContext: ParseContext,
     {
-        let syntax = crate::sem::unresolved::Query::postgres(&syn, tokens)?;
+        let syntax = crate::sem::unresolved::Query::try_from_with_tokens(&syn, tokens)?;
         let outcome = syntax.resolve(&context, crate::sem::unresolved::Dialect::postgres());
         let mut context = context;
         let query = outcome.report(&mut context)?;
@@ -175,24 +176,11 @@ impl SelectStatementNode {
     where
         TParseContext: ParseContext,
     {
-        let syntax = crate::sem::unresolved::Query::postgres(&syn, tokens)?;
+        let syntax = crate::sem::unresolved::Query::try_from_with_tokens(&syn, tokens)?;
         let outcome = syntax.resolve(&context, crate::sem::unresolved::Dialect::postgres());
         let query = outcome.report(&mut context)?;
         Ok((query, context))
     }
-}
-
-/// analyze [`crate::syn::SelectStmt`]
-#[deprecated = "use SelectStatement::analyze_select"]
-pub fn analyze_select<TParseContext>(
-    context: TParseContext,
-    syn: crate::syn::SelectStmt,
-    tokens: &IVec<ScanToken>,
-) -> Result<AstAndContextPair<TParseContext>, AnalysisError>
-where
-    TParseContext: ParseContext,
-{
-    SelectStatement::analyze_select(context, syn, tokens)
 }
 
 #[cfg(test)]

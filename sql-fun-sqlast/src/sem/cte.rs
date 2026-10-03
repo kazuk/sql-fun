@@ -3,6 +3,7 @@ use crate::{
         AnalysisError, DeleteStatement, InsertStatement, ParseContext, SelectStatement,
         UpdateStatement,
         create_table::{ColumnDefinition, ColumnName},
+        unresolved::TryFromWithTokens,
     },
     syn::ScanToken,
 };
@@ -142,7 +143,7 @@ impl WithClause {
     where
         TParseContext: ParseContext,
     {
-        let syntax = crate::sem::unresolved::With::postgres(syn, tokens)?;
+        let syntax = crate::sem::unresolved::With::try_from_with_tokens(syn, tokens)?;
         let result = syntax.resolve_with(&context, crate::sem::unresolved::Dialect::postgres());
         Ok((result.report(&mut context)?, context))
     }

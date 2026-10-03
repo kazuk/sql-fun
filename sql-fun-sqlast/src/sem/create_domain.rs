@@ -65,16 +65,3 @@ impl CreateDomain {
         ))
     }
 }
-
-/// analyze [`crate::syn::CreateDomainStmt`]
-#[deprecated = "use CreateDomain::analyze_create_domain"]
-pub fn analyze_create_domain<TParseContext>(
-    context: TParseContext,
-    syn: crate::syn::CreateDomainStmt,
-    tokens: &IVec<ScanToken>,
-) -> Result<AstAndContextPair<TParseContext>, AnalysisError>
-where
-    TParseContext: ParseContext,
-{
-    CreateDomain::analyze_create_domain(context, syn, tokens)
-}

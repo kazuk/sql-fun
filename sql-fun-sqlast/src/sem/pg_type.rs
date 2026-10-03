@@ -48,13 +48,6 @@ impl TypeDefinition {
     }
 
     /// get reference of type
-    #[deprecated = "use type_reference"]
-    #[must_use]
-    pub fn unsafe_type_reference(&self) -> &TypeReference {
-        self.type_reference().unwrap()
-    }
-
-    /// get reference of type
     #[must_use]
     pub fn type_reference(&self) -> Option<&TypeReference> {
         match self {

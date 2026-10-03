@@ -24,16 +24,3 @@ impl AIndirection {
         ))
     }
 }
-
-#[allow(missing_docs)]
-#[deprecated = "use AIndirection::analyze_a_indirection"]
-pub fn analyze_a_indirection<TParseContext>(
-    context: TParseContext,
-    parent_schema: &Option<String>,
-    syn: crate::AIndirection,
-) -> Result<AstAndContextPair<TParseContext>, AnalysisError>
-where
-    TParseContext: ParseContext,
-{
-    AIndirection::analyze_a_indirection(context, parent_schema, syn)
-}

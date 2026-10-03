@@ -337,7 +337,7 @@ impl CreateTable {
 
 #[cfg(feature = "sqlite")]
 impl CreateTable {
-    /// analyze [`crate::syn::sqlite::ColumnAndConstraint`]
+    /// analyze [`crate::syn::sqlite::ColumnsAndConstraint`]
     #[expect(clippy::too_many_arguments)]
     pub fn analyze_columns_and_constraint<TParseContext>(
         mut context: TParseContext,

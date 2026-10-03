@@ -1,7 +1,10 @@
 #[cfg(feature = "sqlite")]
 use crate::SqliteToken;
 use crate::{
-    sem::{AnalysisError, ParseContext, ScalarAnalysisContext, SemScalarExpr},
+    sem::{
+        AnalysisError, ParseContext, ScalarAnalysisContext, SemScalarExpr,
+        unresolved::TryFromWithTokens,
+    },
     syn::ScanToken,
 };
 
@@ -18,7 +21,7 @@ impl SemScalarExpr {
     where
         TParseContext: ParseContext,
     {
-        let syntax = crate::sem::unresolved::Expr::postgres(&syn, tokens)?;
+        let syntax = crate::sem::unresolved::Expr::try_from_with_tokens(&syn, tokens)?;
         let outcome = syntax.resolve(
             &context,
             crate::sem::unresolved::Dialect::postgres(),
@@ -92,7 +95,7 @@ impl SemScalarExpr {
     where
         TParseContext: ParseContext,
     {
-        let syntax = crate::sem::unresolved::Expr::sqlite_parenthesized(syn)?;
+        let syntax = crate::sem::unresolved::Expr::try_from(syn)?;
         let outcome = syntax.resolve(
             &context,
             crate::sem::unresolved::Dialect::sqlite(),
@@ -112,7 +115,7 @@ impl SemScalarExpr {
     where
         TParseContext: ParseContext,
     {
-        let syntax = crate::sem::unresolved::Expr::sqlite_unary(expr_unary)?;
+        let syntax = crate::sem::unresolved::Expr::try_from(expr_unary)?;
         let outcome = syntax.resolve(
             &context,
             crate::sem::unresolved::Dialect::sqlite(),
@@ -132,7 +135,7 @@ impl SemScalarExpr {
     where
         TParseContext: ParseContext,
     {
-        let syntax = crate::sem::unresolved::Expr::sqlite_is_null(expr_is_null)?;
+        let syntax = crate::sem::unresolved::Expr::try_from(expr_is_null)?;
         let outcome = syntax.resolve(
             &context,
             crate::sem::unresolved::Dialect::sqlite(),
@@ -152,7 +155,7 @@ impl SemScalarExpr {
     where
         TParseContext: ParseContext,
     {
-        let syntax = crate::sem::unresolved::Expr::sqlite_not_null(expr_not_null)?;
+        let syntax = crate::sem::unresolved::Expr::try_from(expr_not_null)?;
         let outcome = syntax.resolve(
             &context,
             crate::sem::unresolved::Dialect::sqlite(),
@@ -172,7 +175,7 @@ impl SemScalarExpr {
     where
         TParseContext: ParseContext,
     {
-        let syntax = crate::sem::unresolved::Expr::sqlite_binary(expr_binary)?;
+        let syntax = crate::sem::unresolved::Expr::try_from(expr_binary)?;
         let outcome = syntax.resolve(
             &context,
             crate::sem::unresolved::Dialect::sqlite(),
@@ -192,7 +195,7 @@ impl SemScalarExpr {
     where
         TParseContext: ParseContext,
     {
-        let syntax = crate::sem::unresolved::Expr::sqlite_collate(expr_collate)?;
+        let syntax = crate::sem::unresolved::Expr::try_from(expr_collate)?;
         let outcome = syntax.resolve(
             &context,
             crate::sem::unresolved::Dialect::sqlite(),
@@ -212,7 +215,7 @@ impl SemScalarExpr {
     where
         TParseContext: ParseContext,
     {
-        let syntax = crate::sem::unresolved::Expr::sqlite_between(expr_between)?;
+        let syntax = crate::sem::unresolved::Expr::try_from(expr_between)?;
         let outcome = syntax.resolve(
             &context,
             crate::sem::unresolved::Dialect::sqlite(),
@@ -232,7 +235,7 @@ impl SemScalarExpr {
     where
         TParseContext: ParseContext,
     {
-        let syntax = crate::sem::unresolved::Expr::sqlite(syn)?;
+        let syntax = crate::sem::unresolved::Expr::try_from(syn)?;
         let outcome = syntax.resolve(
             &context,
             crate::sem::unresolved::Dialect::sqlite(),
@@ -295,18 +298,4 @@ mod test_analyze_sqlite_scalar_expr {
         assert_eq!(sem_expr, expect_expr);
         Ok(())
     }
-}
-
-/// analyze [`crate::syn::Node`] as scaler expression
-#[deprecated = "use SemScalarExpr::analyze_scaler_expr"]
-pub fn analyze_scaler_expr<TParseContext>(
-    context: TParseContext,
-    scalar_context: &ScalarAnalysisContext<'_>,
-    syn: crate::syn::Node,
-    tokens: &IVec<ScanToken>,
-) -> Result<(SemScalarExpr, TParseContext), AnalysisError>
-where
-    TParseContext: ParseContext,
-{
-    SemScalarExpr::analyze_scaler_expr(context, scalar_context, syn, tokens)
 }

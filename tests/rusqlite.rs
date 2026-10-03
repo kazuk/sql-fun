@@ -49,6 +49,53 @@ fn bundled_sqlite_group_alias_uses_first_matching_column_and_preserves_outer_joi
     Ok(())
 }
 
+#[rstest::rstest]
+#[case("select q.id from (a right join b using(id)) as q order by b.id", true)]
+#[case("select q.id from (a natural right join b) as q order by b.id", true)]
+#[case(
+    "select q.id from ((a join c using(id)) right join b using(id)) as q order by b.id",
+    true
+)]
+#[case("select q.id from (a left join b using(id)) as q order by a.id", false)]
+#[case("select q.id from (a natural left join b) as q order by a.id", false)]
+fn bundled_sqlite_group_alias_preserves_join_columns(
+    #[case] sql: &str,
+    #[case] right: bool,
+) -> Result<(), ::rusqlite::Error> {
+    let database = parenthesized_alias_database()?;
+    database
+        .execute_batch("insert into a values(2, 8); insert into b values('3', 'unmatched');")?;
+    let values = database
+        .prepare(sql)?
+        .query_map([], |row| row.get::<_, ::rusqlite::types::Value>(0))?
+        .collect::<Result<Vec<_>, _>>()?;
+    let expected = if right {
+        vec![
+            ::rusqlite::types::Value::from("1".to_string()),
+            ::rusqlite::types::Value::from("3".to_string()),
+        ]
+    } else {
+        vec![
+            ::rusqlite::types::Value::from(1),
+            ::rusqlite::types::Value::from(2),
+        ]
+    };
+    assert_eq!(values, expected, "{sql}");
+    Ok(())
+}
+
+#[test]
+fn bundled_sqlite_group_alias_right_join_on_keeps_left_column() -> Result<(), ::rusqlite::Error> {
+    let database = parenthesized_alias_database()?;
+    database.execute_batch("insert into b values('3', 'unmatched');")?;
+    let values = database
+        .prepare("select q.id from (a right join b on a.id = b.id) as q order by b.id")?
+        .query_map([], |row| row.get::<_, Option<i64>>(0))?
+        .collect::<Result<Vec<_>, _>>()?;
+    assert_eq!(values, vec![Some(1), None]);
+    Ok(())
+}
+
 mod test_helpers {
     pub(super) fn parenthesized_alias_database() -> Result<::rusqlite::Connection, ::rusqlite::Error>
     {

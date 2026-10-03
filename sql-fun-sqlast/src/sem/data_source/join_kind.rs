@@ -51,6 +51,10 @@ impl TryFrom<JoinTypeOpt> for JoinKind {
 }
 
 impl JoinKind {
+    pub(super) const fn uses_right_join_column(&self) -> bool {
+        matches!(self, Self::Right)
+    }
+
     pub(crate) const fn inner() -> Self {
         Self::Inner
     }

@@ -16,6 +16,10 @@ impl JoinUsingClause {
             alias: alias.clone(),
         }
     }
+
+    fn contains_column(&self, column: &ColumnName) -> bool {
+        self.using_columns.contains(column)
+    }
 }
 
 #[derive(Debug, Clone, Eq, Hash, PartialEq, serde::Serialize, serde::Deserialize)]
@@ -94,8 +98,21 @@ impl JoinExprDataSource {
         context: &C,
         with: &WithClause,
     ) -> Option<(&'a DataSource, Nullable)> {
-        // SQLite's parenthesized JOIN alias selects the first matching column.
-        if let Some((source, nullable)) = self.left.group_column_source(column, context, with) {
+        let left = self.left.group_column_source(column, context, with);
+        // RIGHT JOIN preserves the right-hand USING or NATURAL column.
+        if self.kind.uses_right_join_column()
+            && left.is_some()
+            && (self.natural
+                || self
+                    .using_clause
+                    .as_ref()
+                    .is_some_and(|using| using.contains_column(column)))
+            && let Some((source, nullable)) = self.right.group_column_source(column, context, with)
+        {
+            return Some((source, self.kind.right_nullable(nullable)));
+        }
+        // Other duplicate column names select the first matching column.
+        if let Some((source, nullable)) = left {
             Some((source, self.kind.left_nullable(nullable)))
         } else {
             let (source, nullable) = self.right.group_column_source(column, context, with)?;

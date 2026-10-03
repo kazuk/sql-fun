@@ -116,10 +116,10 @@ impl TryFromWithTokens<&syn::Node> for Statement {
             )?));
         }
         if let Some(create_schema) = value.as_create_schema_stmt().as_inner() {
-            return Ok(Self::legacy_postgres(LegacyPostgres::new(
-                LegacyPostgresStatement::CreateSchema(create_schema),
+            return Ok(Self::schema(super::ddl::Schema::try_from_with_tokens(
+                &create_schema,
                 tokens,
-            )));
+            )?));
         }
         if let Some(create_domain) = value.as_create_domain_stmt().as_inner() {
             return Ok(Self::domain(super::ddl::Domain::try_from_with_tokens(

@@ -370,16 +370,8 @@ impl TryFrom<&syn::RangeVar> for Relation {
     type Error = AnalysisError;
 
     fn try_from(value: &syn::RangeVar) -> Result<Self, Self::Error> {
-        let mut parts = Vec::new();
-        if let Some(catalog) = nonempty(value.get_catalogname()) {
-            parts.push(catalog);
-        }
-        if let Some(schema) = nonempty(value.get_schemaname()) {
-            parts.push(schema);
-        }
-        parts.push(value.get_relname());
         Ok(Self {
-            name: Name::from_parts(&parts),
+            name: Name::from(value),
             alias: Alias::postgres(value.get_alias())?,
             inherit: value.get_inh(),
             persistence: value.get_relpersistence(),

@@ -5,11 +5,11 @@ use crate::sem::{
     create_comp_type::{CompositeFieldCollection, CompositeFieldDefinition},
     unresolved::{
         Access, AlterOwner, AlterSequence, BooleanExpr, BooleanOperator, Call, CallKind, Case,
-        CaseArm, Cast, Collate, Comment, Delete, DropTable, EnumType, Expr, Extension, Indirection,
-        Insert, Literal, Name, NamedArgument, NullTest, OperatorExpr, OperatorKind, Order,
-        Parameter, Query, Role, Sequence, Slice, SqlValue, Statement, Subquery, SubqueryKind,
-        SyntaxOption, TruthTest, TryCollectFromWithTokens, TryFromWithTokens, TryFromWithTokensOpt,
-        TypeName, Update, VariableSet, View, ViewCheckOption, Window,
+        CaseArm, Cast, Collate, Comment, Delete, DropTable, EnumType, Expr, Extension, FromOpt,
+        Indirection, Insert, Literal, Name, NamedArgument, NullTest, OperatorExpr, OperatorKind,
+        Order, Parameter, Query, Role, Sequence, Slice, SqlValue, Statement, Subquery,
+        SubqueryKind, SyntaxOption, TruthTest, TryCollectFromWithTokens, TryFromWithTokens,
+        TryFromWithTokensOpt, TypeName, Update, VariableSet, View, ViewCheckOption, Window,
     },
 };
 use crate::syn::{ListOpt, Opt};
@@ -40,6 +40,49 @@ impl TryFrom<syn::NodeListOpt> for Name {
             parts.push(required(node.as_string().get_sval(), "name component")?);
         }
         Ok(Self::from_parts(&parts))
+    }
+}
+
+impl From<&syn::RangeVar> for Name {
+    fn from(value: &syn::RangeVar) -> Self {
+        let mut parts = Vec::new();
+        if let Some(catalog) = nonempty(value.get_catalogname()) {
+            parts.push(catalog);
+        }
+        if let Some(schema) = nonempty(value.get_schemaname()) {
+            parts.push(schema);
+        }
+        parts.push(value.get_relname());
+        Self::from_parts(&parts)
+    }
+}
+
+#[cfg(test)]
+mod test_name_from_range_var {
+    use crate::{
+        sem::{
+            FullName, LocalName,
+            unresolved::{FromOpt, Name},
+        },
+        syn::AliasOpt,
+        test_helpers::SynBuilder,
+    };
+
+    #[rstest::rstest]
+    #[case(FullName::new(&None, &None, &LocalName::from("items")))]
+    #[case(FullName::with_schema("app", "items"))]
+    #[case(FullName::with_catalog("catalog", Some("app"), "items"))]
+    fn preserves_relation_qualification(#[case] expected: FullName) -> testresult::TestResult {
+        let source = SynBuilder::new().range_var(&expected, &AliasOpt::none());
+        assert_eq!(Name::from(&source).full_name()?, expected);
+        let optional = Name::from_opt(Some(&source)).expect("present relation");
+        assert_eq!(optional.full_name()?, expected);
+        Ok(())
+    }
+
+    #[test]
+    fn absent_relation_remains_absent() {
+        assert!(Name::from_opt(None::<&crate::syn::RangeVar>).is_none());
     }
 }
 
@@ -203,17 +246,7 @@ impl TryFrom<&syn::AlterOwnerStmt> for AlterOwner {
     type Error = AnalysisError;
 
     fn try_from(value: &syn::AlterOwnerStmt) -> Result<Self, Self::Error> {
-        let relation = value.get_relation().as_inner().map(|relation| {
-            let mut parts = Vec::new();
-            if let Some(catalog) = nonempty(relation.get_catalogname()) {
-                parts.push(catalog);
-            }
-            if let Some(schema) = nonempty(relation.get_schemaname()) {
-                parts.push(schema);
-            }
-            parts.push(relation.get_relname());
-            Name::from_parts(&parts)
-        });
+        let relation = Name::from_opt(value.get_relation().as_inner().as_ref());
         let object = if let Some(items) = value
             .get_object()
             .as_list()

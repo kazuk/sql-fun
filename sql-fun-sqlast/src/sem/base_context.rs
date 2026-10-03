@@ -20,13 +20,14 @@ use crate::{
         },
     },
 };
+use ::sql_fun_core::{PostgresBuiltinPaths, SqlFunArgs, SqlFunMetadata};
 use serde::de::DeserializeOwned;
-use sql_fun_core::{PostgresBuiltinPaths, SqlFunArgs, SqlFunMetadata, SqlFunMetadataCollection};
 
 /// schema information for Builtin and extensions
 #[derive(Debug)]
 pub struct BaseContext {
     context_args: SqlFunArgs,
+    metadata: SqlFunMetadata,
     types: TrieMap<TypeDefinition>,
     casts: TrieMap<TrieMap<CastDefinition>>,
     binary_operators: TrieMap<OperatorDefinition>,
@@ -47,16 +48,23 @@ struct BuiltinTypeInfo {
 }
 
 impl BaseContext {
-    /// initialize base context
-    pub fn new(context_args: SqlFunArgs) -> Result<Self, AnalysisError> {
-        let metadata_collection =
-            SqlFunMetadataCollection::load_from(context_args.metadata_file()?)?;
-        let metadata = metadata_collection.get("default").unwrap();
-        let paths = PostgresBuiltinPaths::try_from_args(&context_args, metadata)?;
+    /// Initialize builtin schema information with the caller's selected metadata.
+    ///
+    /// The metadata is retained for semantic analysis; this constructor does not
+    /// reload the metadata file or select a datasource.
+    ///
+    /// # Errors
+    ///
+    /// Returns an error if builtin definitions or their configuration cannot be loaded.
+    pub fn new(
+        context_args: &SqlFunArgs,
+        metadata: &SqlFunMetadata,
+    ) -> Result<Self, AnalysisError> {
+        let paths = PostgresBuiltinPaths::try_from_args(context_args, metadata)?;
         let builtin_functions = paths.functions()?;
         let function_details = paths.function_details()?;
         let builtin_type_data = Self::load_builtin_types(&paths)?;
-        let search_path = Self::setup_search_path(&context_args, metadata)?;
+        let search_path = Self::setup_search_path(context_args, metadata)?;
         let functions = PgBuiltInFunctions::load_from(builtin_functions, function_details)?;
         let binary_operators = PgBuiltinOperators::load_binary(paths.binary_operators()?)?;
         let left_unary_operators =
@@ -66,7 +74,8 @@ impl BaseContext {
         let casts = PgBuiltinCasts::load(paths.casts()?)?;
 
         Ok(Self {
-            context_args,
+            context_args: context_args.clone(),
+            metadata: metadata.clone(),
             functions,
             types: builtin_type_data,
             casts,
@@ -113,6 +122,9 @@ impl BaseContext {
         Ok(search_path)
     }
 }
+
+#[cfg(test)]
+mod test_metadata;
 
 impl TypeInfoRead for BaseContext {
     fn get_type_impl(&self, key: &FullName) -> Option<&TypeDefinition> {
@@ -209,6 +221,10 @@ impl MutSourcePathWithSpan for BaseContext {
 }
 
 impl BaseParseContext for BaseContext {
+    fn metadata(&self) -> &SqlFunMetadata {
+        &self.metadata
+    }
+
     fn get_args(&self) -> &SqlFunArgs {
         &self.context_args
     }

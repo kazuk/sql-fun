@@ -86,3 +86,20 @@ impl JoinExprDataSource {
         names.append(&mut right_aliases);
     }
 }
+
+impl JoinExprDataSource {
+    pub(super) fn group_column_source<'a, C: crate::sem::resolution::ResolutionContext>(
+        &'a self,
+        column: &ColumnName,
+        context: &C,
+        with: &WithClause,
+    ) -> Option<(&'a DataSource, Nullable)> {
+        // SQLite's parenthesized JOIN alias selects the first matching column.
+        if let Some((source, nullable)) = self.left.group_column_source(column, context, with) {
+            Some((source, self.kind.left_nullable(nullable)))
+        } else {
+            let (source, nullable) = self.right.group_column_source(column, context, with)?;
+            Some((source, self.kind.right_nullable(nullable)))
+        }
+    }
+}

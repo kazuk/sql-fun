@@ -858,6 +858,16 @@ impl Dialect {
     }
 }
 
+impl From<&::sql_fun_core::SqlFunMetadata> for Dialect {
+    fn from(metadata: &::sql_fun_core::SqlFunMetadata) -> Self {
+        match metadata.sql_dialect() {
+            ::sql_fun_core::SqlDialect::PostgreSQL => Self::postgres(),
+            #[cfg(feature = "sqlite")]
+            ::sql_fun_core::SqlDialect::SQLite => Self::sqlite(),
+        }
+    }
+}
+
 #[derive(Clone, Debug, Default)]
 pub(crate) struct Name(Vec<String>);
 

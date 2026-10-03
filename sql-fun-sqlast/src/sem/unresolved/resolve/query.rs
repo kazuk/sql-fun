@@ -232,10 +232,15 @@ impl FromItem {
                         &right,
                         &SemanticJoinKind::inner(),
                         &None,
-                        &group.alias.as_ref().map(Alias::resolve),
+                        &None,
                         &None,
                         false,
                     );
+                }
+                if let Some(alias) = &group.alias
+                    && Dialect::from(context.metadata()) == Dialect::sqlite()
+                {
+                    source = source.with_group_alias(&alias.resolve());
                 }
                 Ok(source)
             }

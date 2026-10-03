@@ -23,6 +23,7 @@ use std::collections::{HashMap, HashSet};
 /// ParseContext implementation for tests
 #[derive(Debug, Default)]
 pub struct TestParseContext {
+    metadata: Option<::sql_fun_core::SqlFunMetadata>,
     implicit_cast_results: HashMap<TypeReference, HashMap<TypeReference, Option<CastDefinition>>>,
     implicit_castable_results: HashMap<TypeReference, HashSet<TypeReference>>,
     operator_op_results: HashMap<(OperatorName, bool, bool), Option<OperatorDefinition>>,
@@ -47,6 +48,12 @@ pub fn test_context() -> TestParseContext {
 }
 
 impl TestParseContext {
+    #[cfg(feature = "sqlite")]
+    pub(crate) fn with_metadata(mut self, metadata: &::sql_fun_core::SqlFunMetadata) -> Self {
+        self.metadata = Some(metadata.clone());
+        self
+    }
+
     pub(crate) fn reject_diagnostics_after(&mut self, count: usize) {
         self.report_failure_after = Some(count);
     }
@@ -295,6 +302,20 @@ impl IndexInfoRead for TestParseContext {
 }
 
 impl BaseParseContext for TestParseContext {
+    fn metadata(&self) -> &::sql_fun_core::SqlFunMetadata {
+        static DEFAULT_METADATA: std::sync::LazyLock<::sql_fun_core::SqlFunMetadata> =
+            std::sync::LazyLock::new(|| {
+                ::sql_fun_core::SqlFunMetadataCollection::load_from(concat!(
+                    env!("CARGO_MANIFEST_DIR"),
+                    "/sql_fun.metadata.toml"
+                ))
+                .expect("default test metadata")
+                .remove("default")
+                .expect("default datasource")
+            });
+        self.metadata.as_ref().unwrap_or(&DEFAULT_METADATA)
+    }
+
     #[track_caller]
     fn report_problem(&mut self, problem: AnalysisProblem) -> Result<(), AnalysisError> {
         if self.report_failure_after == Some(self.problems.len()) {

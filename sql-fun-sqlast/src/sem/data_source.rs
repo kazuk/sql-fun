@@ -1,6 +1,7 @@
 mod alias;
 mod analyze;
 mod cte;
+mod group;
 mod join_expr;
 mod join_kind;
 mod resolved;
@@ -15,6 +16,7 @@ pub(crate) use self::join_expr::JoinUsingClause;
 pub use self::{
     alias::{AliasName, AliasSpec},
     cte::CteDataSource,
+    group::GroupedDataSource,
     join_expr::JoinExprDataSource,
     join_kind::JoinKind,
     rows_fun::{DataSourceRowFunctions, DataSourceRowsFromFunc},
@@ -44,6 +46,8 @@ pub enum DataSource {
     View(ViewDataSource),
     /// join expression
     JoinExpr(Box<JoinExprDataSource>),
+    /// SQLite parenthesized source with a group alias.
+    Group(Box<GroupedDataSource>),
     /// sub-query
     SubQuery(Box<SubQueryDataSource>),
     /// table function
@@ -72,12 +76,18 @@ impl DataSource {
     {
         match self {
             Self::CteQuery(cteds) => {
-                let column_ref =
-                    cteds.create_column_ref(&mut context, with_clause, column, nullability)?;
+                let column_ref = cteds.create_column_ref(
+                    &mut context,
+                    with_clause,
+                    alias,
+                    column,
+                    nullability,
+                )?;
                 Ok((SemScalarExpr::ColumnRef(column_ref), context))
             }
             Self::Table(tableds) => {
-                let column_ref = tableds.create_column_ref(&mut context, column, nullability)?;
+                let column_ref =
+                    tableds.create_column_ref(&mut context, alias, column, nullability)?;
                 Ok((SemScalarExpr::ColumnRef(column_ref), context))
             }
             Self::View(viewds) => ColumnReferenceExpr::view_source_ref(
@@ -88,12 +98,16 @@ impl DataSource {
                 nullability,
             ),
             Self::SubQuery(subqds) => {
-                let column_ref = subqds.create_column_ref(&mut context, column, nullability)?;
+                let column_ref =
+                    subqds.create_column_ref(&mut context, alias, column, nullability)?;
                 Ok((SemScalarExpr::ColumnRef(column_ref), context))
             }
             Self::Unknown(_, _) => {
                 // DataSource::Unknown ready report_problem in from_clause analysis
                 ColumnReferenceExpr::unknown_source_ref(context, alias, column)
+            }
+            Self::Group(group) => {
+                group.create_column_ref(context, with_clause, alias, column, nullability)
             }
             // resolve_alias not returns this variants
             Self::JoinExpr(_) => unreachable!(),
@@ -128,6 +142,7 @@ impl DataSource {
             Self::Table(d) => d.push_alias_names(names),
             Self::View(d) => d.push_alias_names(names),
             Self::JoinExpr(d) => d.push_alias_names(names),
+            Self::Group(d) => d.push_alias_names(names),
             Self::SubQuery(d) => d.push_alias_names(names),
             Self::CallTableFunc(d) => d.push_alias_names(names),
             Self::UndefinedTableFunc(d) => d.push_alias_names(names),
@@ -153,6 +168,7 @@ impl DataSource {
             Self::Table(d) => d.resolve_alias(self, name),
             Self::View(d) => d.resolve_alias(self, name),
             Self::JoinExpr(d) => d.resolve_alias(name),
+            Self::Group(d) => d.resolve_alias(self, name),
             Self::SubQuery(d) => d.resolve_alias(self, name),
             Self::CallTableFunc(d) => d.resolve_alias(self, name),
             Self::UndefinedTableFunc(d) => d.resolve_alias(self, name),
@@ -197,6 +213,7 @@ impl DataSource {
             Self::JoinExpr(d) => {
                 d.get_aliases_for_column(column, context, with_clause, &mut result);
             }
+            Self::Group(d) => d.get_aliases_for_column(column, context, with_clause, &mut result),
             Self::SubQuery(d) => {
                 d.get_aliases_for_column(column, context, with_clause, &mut result);
             }
@@ -209,5 +226,41 @@ impl DataSource {
             Self::RowFunctions(_) => todo!(),
         }
         result
+    }
+}
+
+impl DataSource {
+    pub(crate) fn with_group_alias(&self, alias: &AliasSpec) -> Self {
+        Self::Group(Box::new(GroupedDataSource::new(self, alias)))
+    }
+
+    fn is_joined(&self) -> bool {
+        match self {
+            Self::JoinExpr(_) => true,
+            Self::Group(group) => group.is_joined(),
+            _ => false,
+        }
+    }
+
+    fn group_column_source<'a, C: crate::sem::resolution::ResolutionContext>(
+        &'a self,
+        column: &ColumnName,
+        context: &C,
+        with: &WithClause,
+    ) -> Option<(&'a Self, Nullable)> {
+        match self {
+            Self::JoinExpr(join) => join.group_column_source(column, context, with),
+            Self::Group(group) => group.column_source(column, context, with),
+            _ => {
+                if self
+                    .aliases_for_column_resolved(column, context, with)
+                    .is_empty()
+                {
+                    None
+                } else {
+                    Some((self, false))
+                }
+            }
+        }
     }
 }

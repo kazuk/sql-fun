@@ -1,5 +1,7 @@
 //! End-to-end fixtures for the expression/query recursive component.
 
+#[cfg(feature = "sqlite")]
+mod sqlite_from_groups;
 mod test_helpers;
 
 use self::test_helpers::postgres;

@@ -36,7 +36,7 @@ members = [
 [workspace.package]
 rust-version = "1.93.1"
 repository = "https://github.com/kazuk/sql-fun/"
-keywords = ["PostgreSQL", "SQLite", "SQL", "Semantic validator", "Schema aware validator"]
+keywords = ["postgresql", "sqlite", "sql", "semantic-validation", "schema-validation"]
 
 [workspace.metadata]
 baseline = "v0.1.0-baseline"

@@ -15,6 +15,10 @@ on:
 permissions:
   contents: read
 
+env:
+  CARGO_TERM_COLOR: never
+  USER: runner
+
 jobs:
   publish:
     runs-on: ubuntu-24.04
@@ -26,6 +30,7 @@ jobs:
     permissions:
       contents: read
       id-token: write
+      packages: read
     steps:
       - uses: actions/checkout@v5
 

@@ -112,7 +112,7 @@ pub use crate::AstAndContextPair;
 
 use crate::StringSpan;
 #[cfg(feature = "sqlite")]
-use crate::{SqliteToken, syn::sqlite::Stmt};
+use crate::{SqliteToken, syn::sqlite::Cmd};
 
 use std::{
     fmt::Debug,
@@ -121,8 +121,6 @@ use std::{
 
 #[cfg(feature = "sqlite")]
 use ::sql_fun_core::IVec;
-#[cfg(feature = "sqlite")]
-use ::turso_parser::ast::Cmd;
 
 /// source path and span pair
 #[derive(Debug, Clone)]
@@ -367,16 +365,6 @@ impl SemAst {
     where
         TContext: ParseContext,
     {
-        match syn {
-            Cmd::Explain(stmt) => {
-                Self::semantic_analysis_sqlite_stmt(context, Stmt::from(stmt), tokens)
-            }
-            Cmd::ExplainQueryPlan(stmt) => {
-                Self::semantic_analysis_sqlite_stmt(context, Stmt::from(stmt), tokens)
-            }
-            Cmd::Stmt(stmt) => {
-                Self::semantic_analysis_sqlite_stmt(context, Stmt::from(stmt), tokens)
-            }
-        }
+        Self::semantic_analysis_sqlite_stmt(context, syn.into_statement(), tokens)
     }
 }

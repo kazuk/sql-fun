@@ -1,12 +1,11 @@
-//! Parser-to-owned-AST regression cases for the published 0.7.2 grammar.
+//! Parser-to-owned-AST regression cases for the published 0.8.1 grammar.
 
 use super::{Expr, Name, Stmt};
-use crate::test_helpers::SqliteSynBuilder;
+use crate::test_helpers::{SqliteArrayTypeGate, SqliteSynBuilder};
 
 fn assert_bracket_name(name: &Name, expected: &str) {
     assert_eq!(name.value(), expected);
-    // The published parser normalizes bracket-quoted names with Name::exact.
-    assert_eq!(*name.quote(), None);
+    assert_eq!(*name.quote(), Some('['));
 }
 
 #[test]
@@ -57,4 +56,49 @@ fn bracket_names_in_qualified_expressions_and_types() {
         columns.columns()[0].column_type().unwrap().name(),
         "custom_type"
     );
+}
+
+#[test]
+fn parenthesized_subqueries_retain_membership_and_negation() {
+    for rhs in ["(SELECT 2)", "((SELECT 2))", "(((SELECT 2)))"] {
+        for (op, negated) in [("IN", false), ("NOT IN", true)] {
+            let expr = SqliteSynBuilder.parse_expression(&format!("SELECT 1 {op} {rhs}"));
+            let membership = expr.as_in_select().expect("subquery membership");
+            assert_eq!(*membership.not(), negated);
+            assert_eq!(membership.lhs().numeric_literal_text(), Some("1"));
+            assert!(membership.rhs().with().is_none());
+            assert!(expr.as_in_list().is_none());
+        }
+    }
+    let expr = SqliteSynBuilder.parse_expression("SELECT 1 IN (2, 3)");
+    assert_eq!(expr.as_in_list().unwrap().rhs().len(), 2);
+    assert!(expr.as_in_select().is_none());
+}
+
+#[test]
+fn cast_retains_array_dimensions() {
+    let expr = SqliteSynBuilder.parse_expression("SELECT CAST(1 AS TEXT[][])");
+    let cast = expr.as_cast().unwrap();
+    let ty = cast.type_name().as_ref().unwrap();
+    assert_eq!(ty.name(), "TEXT");
+    assert_eq!(
+        ty.array_dimensions(&mut SqliteArrayTypeGate::default())
+            .unwrap(),
+        2
+    );
+    assert_eq!(cast.expr().numeric_literal_text(), Some("1"));
+}
+
+#[test]
+fn delete_retains_where_and_returning() {
+    let stmt = SqliteSynBuilder.parse_as_stmt(
+        "WITH source AS (SELECT 1) DELETE FROM main.items NOT INDEXED WHERE id = 1 RETURNING id, value AS old_value",
+    );
+    let delete = stmt.as_delete().unwrap();
+    assert_eq!(delete.with().as_ref().unwrap().ctes().len(), 1);
+    assert_eq!(delete.table_name().name().value(), "items");
+    assert_eq!(delete.table_name().db_name().unwrap().value(), "main");
+    assert!(delete.indexed().is_some());
+    assert!(delete.where_clause().is_some());
+    assert_eq!(delete.returning().len(), 2);
 }

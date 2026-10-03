@@ -112,6 +112,47 @@ pub enum Expr {
 }
 
 impl Expr {
+    /// Borrow parameter syntax, if present.
+    pub const fn as_variable(&self) -> Option<&Variable> {
+        if let Self::Variable(value) = self {
+            Some(value)
+        } else {
+            None
+        }
+    }
+    /// Borrow subquery membership syntax, if present.
+    pub const fn as_in_select(&self) -> Option<&ExprInSelect> {
+        if let Self::InSelect(value) = self {
+            Some(value)
+        } else {
+            None
+        }
+    }
+    /// Borrow list membership syntax, if present.
+    pub const fn as_in_list(&self) -> Option<&ExprInList> {
+        if let Self::InList(value) = self {
+            Some(value)
+        } else {
+            None
+        }
+    }
+    /// Borrow CAST syntax, if present.
+    pub const fn as_cast(&self) -> Option<&ExprCast> {
+        if let Self::Cast(value) = self {
+            Some(value)
+        } else {
+            None
+        }
+    }
+    /// Numeric literal spelling, if this is a numeric literal expression.
+    pub const fn numeric_literal_text(&self) -> Option<&str> {
+        if let Self::Literal(value) = self {
+            value.numeric_text()
+        } else {
+            None
+        }
+    }
+
     /// create Register variant
     pub const fn register(size: usize) -> Self {
         Self::Register(size)

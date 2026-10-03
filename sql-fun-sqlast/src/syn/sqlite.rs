@@ -5,6 +5,12 @@
 //! keep type ownership inside this crate so future traits and helper APIs are
 //! not constrained by orphan rules.
 //!
+//! The adapter is information-preserving: it may reshape ownership and serving
+//! shape, but must retain every parser-provided field, variant, and syntax
+//! distinction. Semantic or code-generation support must never determine which
+//! syntax is retained. SQL rejected before the parser produces an AST is an
+//! inherited parser limitation, not an adapter or semantic restriction.
+//!
 //! Together with `crate::sqlite`, it forms the interface boundary to
 //! `turso_parser`, while semantic objects in `crate::sem` remain shared
 //! between PostgreSQL and SQLite.
@@ -17,6 +23,7 @@ mod upgrade_tests;
 
 mod analyze_statement;
 mod column_definition;
+mod command;
 mod connection_context_statement;
 mod constraints;
 mod delete_statement;
@@ -55,6 +62,7 @@ use crate::syn::sqlite::{domain::DomainConstraint, pragma::PragmaBody};
 pub use self::{
     analyze_statement::AnalyzeStatement,
     column_definition::ColumnDefinition,
+    command::{Cmd, EqpFormat, ExplainQueryPlan},
     connection_context_statement::{AttachStatement, DetachStatement},
     constraints::{
         CheckColumnConstraint, CheckConstraint, CollateColumnConstraint, ColumnConstraint,
@@ -234,6 +242,31 @@ pub enum Stmt {
 }
 
 impl Stmt {
+    /// Borrow DELETE syntax, if present.
+    pub const fn as_delete(&self) -> Option<&DeleteStatement> {
+        if let Self::Delete(value) = self {
+            Some(value)
+        } else {
+            None
+        }
+    }
+    /// Borrow PRAGMA syntax, if present.
+    pub const fn as_pragma(&self) -> Option<&PragmaStatement> {
+        if let Self::Pragma(value) = self {
+            Some(value)
+        } else {
+            None
+        }
+    }
+    /// Consume ALTER TABLE syntax, if present.
+    pub fn into_alter_table(self) -> Option<AlterTable> {
+        if let Self::AlterTable(value) = self {
+            Some(value)
+        } else {
+            None
+        }
+    }
+
     /// Borrow the UPDATE syntax, if this statement is an UPDATE.
     pub const fn as_update(&self) -> Option<&Update> {
         if let Self::Update(value) = self {
@@ -394,16 +427,12 @@ impl From<StmtIn> for Stmt {
                 indexed,
                 where_clause,
                 returning,
-                order_by,
-                limit,
             } => Self::Delete(DeleteStatement::new(
                 with.map(With::from),
                 QualifiedName::from(tbl_name),
                 indexed.map(Indexed::from),
                 where_clause.map(|v| Box::new(Expr::from(*v))),
                 returning.into_iter().map(ResultColumn::from).collect(),
-                order_by.into_iter().map(SortedColumn::from).collect(),
-                limit.map(Limit::from),
             )),
             StmtIn::Detach { name } => Self::Detach(DetachStatement::new(Expr::from(*name))),
             StmtIn::DropIndex {

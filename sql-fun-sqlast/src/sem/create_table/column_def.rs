@@ -153,7 +153,7 @@ mod test_sqlite_column_definition {
         SqliteToken,
         sem::{FullName, SchemaName, SemScalarExpr, TableName, TypeReference},
         sqlite::SqliteDialect,
-        syn::sqlite::{CreateTableBody, Stmt},
+        syn::sqlite::CreateTableBody,
         test_helpers::TestParseContext,
     };
 
@@ -167,10 +167,7 @@ mod test_sqlite_column_definition {
             .expect("sqlite parse should succeed")
             .expect("statement should exist");
         let tokens = SqliteDialect::scan(sql).expect("sqlite scan should succeed");
-        let stmt = match cmd {
-            turso_parser::ast::Cmd::Stmt(stmt) => Stmt::from(stmt),
-            _ => panic!("expected sqlite statement command"),
-        };
+        let stmt = cmd.into_plain_statement().expect("plain SQLite statement");
         let Some(create_table) = stmt.into_create_table() else {
             panic!("expected create table statement")
         };
@@ -207,10 +204,7 @@ mod test_sqlite_column_definition {
             .expect("sqlite parse should succeed")
             .expect("statement should exist");
         let tokens = SqliteDialect::scan(sql).expect("sqlite scan should succeed");
-        let stmt = match cmd {
-            turso_parser::ast::Cmd::Stmt(stmt) => Stmt::from(stmt),
-            _ => panic!("expected sqlite statement command"),
-        };
+        let stmt = cmd.into_plain_statement().expect("plain SQLite statement");
         let Some(create_table) = stmt.into_create_table() else {
             panic!("expected create table statement")
         };

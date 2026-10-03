@@ -85,3 +85,40 @@ pub trait TursoMvccGcFeature {
         pragma: &crate::syn::sqlite::PragmaStatement,
     ) -> Result<(), AnalysisError>;
 }
+
+/// Turso JSON EXPLAIN QUERY PLAN syntax notification.
+#[cfg(feature = "sqlite")]
+pub trait TursoEqpFeature {
+    /// Notify that JSON query-plan output is requested.
+    fn json_eqp_used(
+        &mut self,
+        command: &crate::syn::sqlite::ExplainQueryPlan,
+    ) -> Result<(), AnalysisError>;
+}
+
+/// Turso MVCC group-commit pragma notification.
+#[cfg(feature = "sqlite")]
+pub trait TursoMvccGroupCommitFeature {
+    /// Notify that the MVCC group-commit pragma is used.
+    fn mvcc_group_commit_used(
+        &mut self,
+        pragma: &crate::syn::sqlite::PragmaStatement,
+    ) -> Result<(), AnalysisError>;
+}
+
+/// Turso FTS merge-threshold pragma notification.
+#[cfg(feature = "sqlite")]
+pub trait TursoFtsMergeThresholdFeature {
+    /// Notify that the FTS merge-threshold pragma is used.
+    fn fts_merge_threshold_used(
+        &mut self,
+        pragma: &crate::syn::sqlite::PragmaStatement,
+    ) -> Result<(), AnalysisError>;
+}
+
+/// Turso array type syntax notification.
+#[cfg(feature = "sqlite")]
+pub trait TursoArrayTypeFeature {
+    /// Notify that a type has parser-provided array dimensions.
+    fn array_type_used(&mut self, ty: &crate::syn::sqlite::Type) -> Result<(), AnalysisError>;
+}

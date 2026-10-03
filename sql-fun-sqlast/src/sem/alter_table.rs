@@ -161,14 +161,8 @@ mod test_analyze_alter_table_statement {
             .expect("sqlite parse should succeed")
             .expect("statement should exist");
         let tokens = SqliteDialect::scan(sql).expect("sqlite scan should succeed");
-        let stmt = match cmd {
-            turso_parser::ast::Cmd::Stmt(stmt) => crate::syn::sqlite::Stmt::from(stmt),
-            _ => panic!("expected sqlite statement command"),
-        };
-        let alter_table = match stmt {
-            crate::syn::sqlite::Stmt::AlterTable(alter_table) => alter_table,
-            _ => panic!("expected alter table statement"),
-        };
+        let stmt = cmd.into_plain_statement().expect("plain SQLite statement");
+        let alter_table = stmt.into_alter_table().expect("ALTER TABLE statement");
         (alter_table, tokens)
     }
 

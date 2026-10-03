@@ -1,8 +1,7 @@
 use ::turso_parser::ast::Update as UpdateIn;
 
 use crate::syn::sqlite::{
-    Expr, FromClause, Indexed, Limit, Name, QualifiedName, ResolveType, ResultColumn, SortedColumn,
-    With,
+    Expr, FromClause, Indexed, Name, QualifiedName, ResolveType, ResultColumn, With,
 };
 
 /// update statement
@@ -16,8 +15,6 @@ pub struct Update {
     from_clause: Option<FromClause>,
     where_clause: Option<Box<Expr>>,
     returning: Vec<ResultColumn>,
-    order_by: Vec<SortedColumn>,
-    limit: Option<Limit>,
 }
 
 impl From<UpdateIn> for Update {
@@ -31,8 +28,6 @@ impl From<UpdateIn> for Update {
             from,
             where_clause,
             returning,
-            order_by,
-            limit,
         } = value;
         Self {
             with: with.map(With::from),
@@ -43,8 +38,6 @@ impl From<UpdateIn> for Update {
             from_clause: from.map(FromClause::from),
             where_clause: where_clause.map(Expr::from).map(Box::new),
             returning: returning.into_iter().map(ResultColumn::from).collect(),
-            order_by: order_by.into_iter().map(SortedColumn::from).collect(),
-            limit: limit.map(Limit::from),
         }
     }
 }
@@ -60,8 +53,7 @@ mod test_update_conversion {
                 "WITH source AS (SELECT 2 AS v) UPDATE OR FAIL main.items AS target \
                  INDEXED BY item_idx SET value = source.v, label = 'changed' \
                  FROM source JOIN other ON source.v = other.v \
-                 WHERE target.id = other.id RETURNING target.id AS changed_id, value \
-                 ORDER BY value DESC NULLS LAST LIMIT 3 OFFSET 1",
+                 WHERE target.id = other.id RETURNING target.id AS changed_id, value",
             );
             SqliteSynBuilder.parse_as_stmt(&sql)
         };
@@ -80,10 +72,6 @@ mod test_update_conversion {
         assert_eq!(update.from_clause().as_ref().unwrap().joins().len(), 1);
         assert!(update.where_clause().is_some());
         assert_eq!(update.returning().len(), 2);
-        assert_eq!(update.order_by().len(), 1);
-        assert!(update.order_by()[0].order().is_some());
-        assert!(update.order_by()[0].nulls().is_some());
-        assert!(update.limit().as_ref().unwrap().offset().is_some());
     }
 
     #[test]
@@ -96,8 +84,6 @@ mod test_update_conversion {
         assert!(update.from_clause().is_none());
         assert!(update.where_clause().is_none());
         assert!(update.returning().is_empty());
-        assert!(update.order_by().is_empty());
-        assert!(update.limit().is_none());
     }
 }
 

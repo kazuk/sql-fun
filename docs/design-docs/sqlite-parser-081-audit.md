@@ -8,12 +8,13 @@ Published crate sources, rather than upstream main, define this boundary.
 ## Baseline findings
 
 - `Update` dropped `from`, `where_clause`, `returning`, `order_by`, and `limit`.
-  Restore all five before upgrading; `from` is named `from_clause` in the owned
-  IR to avoid a collision with the `From` conversion.
-- `Type` dropped `array_dimensions`. Restore it for column, CAST, and custom
-  type fields; semantic support for array types remains outside this change.
+  All five were restored before upgrading; `from` is named `from_clause` in the
+  owned IR to avoid a collision with the `From` conversion.
+- `Type` dropped `array_dimensions`. It was restored for column, CAST, and custom
+  type fields, with a Turso array-type notification on access; semantic support
+  for array types remains outside this change.
 - The boundary retained upstream `Cmd` until semantic dispatch, which erased
-  command kind. Add an owned command adapter during the upgrade.
+  command kind. The upgrade adds an owned command adapter.
 - All other command-reachable fields and enum payloads have a corresponding
   stored representation. Collections retain order, optional fields retain
   absence, and owned strings retain their parser-provided contents.
@@ -38,7 +39,7 @@ exceptions found in the pre-upgrade representation.
 | Upstream type | Fields or variants | Adapter location |
 | --- | --- | --- |
 | `ParameterInfo` | count, names | `parser metadata (not reachable from Cmd)` |
-| `Cmd` | Explain, ExplainQueryPlan, Stmt | `command.rs (added during upgrade)` |
+| `Cmd` | Explain, ExplainQueryPlan, Stmt | `command.rs` |
 | `CreateVirtualTable` | if_not_exists, tbl_name, module_name, args | `table_management_statement.rs` |
 | `Update` | with, or_conflict, tbl_name, indexed, sets, from, where_clause, returning, order_by, limit | `update_statement.rs` |
 | `AlterTable` | name, body | `table_management_statement.rs` |
@@ -60,7 +61,7 @@ exceptions found in the pre-upgrade representation.
 | `FromClause` | select, joins | `from_clause.rs` |
 | `Distinctness` | Distinct, All | `select.rs` |
 | `ResultColumn` | Expr, Star, TableStar | `select.rs` |
-| `As` | As, Elided, ImplicitColumnName | `payload module (see parent conversion)` |
+| `As` | As, Elided, ImplicitColumnName | `../sqlite.rs` |
 | `JoinedSelectTable` | operator, table, constraint | `from_clause.rs` |
 | `SelectTable` | Table, TableCall, Select, Sub | `from_clause.rs` |
 | `JoinOperator` | Comma, TypedJoin | `from_clause.rs` |
@@ -142,3 +143,100 @@ Final regressions exercise real SQL through the owned boundary. Baseline-only
 UPDATE ORDER BY/LIMIT cases remain visible in the pre-upgrade repair commit;
 the final tree tests their rejection under 0.8.1. No semantic/codegen feature
 is inferred from successful syntax adaptation.
+
+## Structured variant fields in the 0.7.2 baseline
+
+Tuple payloads retain every positional value through their owning payload
+conversion. The following named fields were checked individually against the
+conversion arms and stored fields, including optional flags and nested clauses.
+
+| Variant | Named fields |
+| --- | --- |
+| `Stmt::Analyze` | name |
+| `Stmt::Attach` | expr, db_name, key |
+| `Stmt::Begin` | typ, name |
+| `Stmt::Commit` | name |
+| `Stmt::CreateIndex` | unique, if_not_exists, idx_name, tbl_name, using, columns, with_clause, where_clause |
+| `Stmt::CreateTable` | temporary, if_not_exists, tbl_name, body |
+| `Stmt::CreateTrigger` | temporary, if_not_exists, trigger_name, time, event, tbl_name, for_each_row, when_clause, commands |
+| `Stmt::CreateView` | temporary, if_not_exists, view_name, columns, select |
+| `Stmt::CreateMaterializedView` | if_not_exists, view_name, columns, select |
+| `Stmt::CreateType` | if_not_exists, type_name, body |
+| `Stmt::CreateDomain` | if_not_exists, domain_name, base_type, default, not_null, constraints |
+| `Stmt::Delete` | with, tbl_name, indexed, where_clause, returning, order_by, limit |
+| `Stmt::Detach` | name |
+| `Stmt::DropIndex` | if_exists, idx_name |
+| `Stmt::DropTable` | if_exists, tbl_name |
+| `Stmt::DropTrigger` | if_exists, trigger_name |
+| `Stmt::DropView` | if_exists, view_name |
+| `Stmt::DropType` | if_exists, type_name |
+| `Stmt::DropDomain` | if_exists, domain_name |
+| `Stmt::Insert` | with, or_conflict, tbl_name, columns, body, returning |
+| `Stmt::Pragma` | name, body |
+| `Stmt::Reindex` | name |
+| `Stmt::Release` | name |
+| `Stmt::Rollback` | tx_name, savepoint_name |
+| `Stmt::Savepoint` | name |
+| `Stmt::Vacuum` | name, into |
+| `Stmt::Optimize` | idx_name |
+| `Stmt::CreateSequence` | if_not_exists, seq_name, start, increment, min_value, max_value, cycle |
+| `Stmt::DropSequence` | if_exists, seq_name |
+| `FieldAccessResolution::StructField` |  |
+| `FieldAccessResolution::UnionVariant` |  |
+| `Expr::Between` | lhs, not, start, end |
+| `Expr::Case` | base, when_then_pairs, else_expr |
+| `Expr::Cast` | expr, type_name |
+| `Expr::FieldAccess` | base, field, resolved |
+| `Expr::FunctionCall` | name, distinctness, args, order_by, within_group, filter_over |
+| `Expr::FunctionCallStar` | name, filter_over |
+| `Expr::Column` | database, table, column, is_rowid_alias |
+| `Expr::RowId` | database, table |
+| `Expr::InList` | lhs, not, rhs |
+| `Expr::InSelect` | lhs, not, rhs |
+| `Expr::InTable` | lhs, not, rhs, args |
+| `Expr::Like` | lhs, not, op, rhs, escape |
+| `Expr::SubqueryResult` | subquery_id, lhs, not_in, query_type |
+| `Expr::Array` | elements |
+| `Expr::Subscript` | base, index |
+| `SubqueryType::Exists` |  |
+| `SubqueryType::RowValue` | result_reg_start, num_regs |
+| `SubqueryType::In` | cursor_id, affinity_str |
+| `OneSelect::Select` | distinctness, columns, from, where_clause, group_by, window_clause |
+| `AlterTableBody::AlterColumn` |  |
+| `AlterTableBody::RenameColumn` | old, new |
+| `CreateTypeBody::CustomType` | params, base, encode, decode, operators, default |
+| `CreateTableBody::ColumnsAndConstraints` | columns, constraints, options |
+| `ColumnConstraint::PrimaryKey` | order, conflict_clause, auto_increment |
+| `ColumnConstraint::NotNull` | nullable, conflict_clause |
+| `ColumnConstraint::Collate` | collation_name |
+| `ColumnConstraint::ForeignKey` | clause, defer_clause |
+| `ColumnConstraint::Generated` | expr, typ |
+| `TableConstraint::PrimaryKey` | columns, auto_increment, conflict_clause |
+| `TableConstraint::Unique` | columns, conflict_clause |
+| `TableConstraint::ForeignKey` | columns, clause, defer_clause |
+| `TriggerCmd::Update` | or_conflict, tbl_name, sets, from, where_clause |
+| `TriggerCmd::Insert` | or_conflict, tbl_name, col_names, select, upsert, returning |
+| `TriggerCmd::Delete` | tbl_name, where_clause |
+| `UpsertDo::Set` | sets, where_clause |
+
+## Regression evidence
+
+- The 0.7.2 repair commit ran the two UPDATE cases and the type-dimension
+  case before changing the dependency (three passing tests).
+- `command.rs` tests command kind, format, statement ownership, and JSON hooks.
+- `constraints.rs` tests CHECK text/absence and generated spelling/storage.
+- `expr/variable.rs` tests full names, numbered markers, indices, and type data.
+- `names.rs` tests quote metadata independently of fallback rendering.
+- `literal.rs` tests full BLOB spelling and the existing hex-payload accessor.
+- `upgrade_tests.rs` tests membership classification, CAST dimensions, and
+  DELETE clause retention; UPDATE regressions remain beside its conversion.
+- `sem/unresolved/tests.rs` checks parameter reuse, membership/negation/scalar
+  distinctions, and unchanged BLOB semantic payloads.
+- `sqlite.rs` tests inherited diagnostic propagation and BLOB token spans.
+- `pragma.rs` checks new generic pragma names/bodies and extension hooks.
+- Existing sequence and WITHIN GROUP regressions remain enabled.
+
+The retained command and statement nodes move into their owning constructors
+without cloning the recursive statement tree. This is the same ownership
+boundary used by context-free unresolved conversions; ordinary CHECK payload
+factories borrow their inputs.

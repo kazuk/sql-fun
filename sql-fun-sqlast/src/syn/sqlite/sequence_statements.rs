@@ -122,7 +122,7 @@ mod test_sequence_conversion {
         let name = sequence.seq_name(&mut gate).unwrap();
         assert_eq!(name.name().value(), "counter");
         assert_eq!(name.db_name().unwrap().value(), "main");
-        assert_eq!(*name.name().quote(), None);
+        assert_eq!(*name.name().quote(), Some('['));
         assert_eq!(gate.creates, 1);
         let Stmt::DropSequence(drop) =
             SqliteSynBuilder.parse_as_stmt("DROP SEQUENCE IF EXISTS [main].[counter]")

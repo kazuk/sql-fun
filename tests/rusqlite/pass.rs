@@ -1,3 +1,4 @@
+mod hygiene;
 mod parameter_source;
 
 use rusqlite::Connection;
@@ -124,6 +125,7 @@ fn consuming_false_many_true<F>(connection: &Connection, #[interrupt_channel] in
 fn conditional_bon(connection: &Connection, #[cond] choice: bool) -> Result<BonRow, QueryError> {}
 
 fn main() {
+    hygiene::verify();
     parameter_source::verify();
     if std::env::var("SQL_FUN_MODE").as_deref() == Ok("CHECK") {
         return;

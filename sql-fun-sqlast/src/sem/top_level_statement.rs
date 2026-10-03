@@ -91,13 +91,19 @@ impl SemAst {
             Stmt::AlterTable(alter_table) => {
                 AlterTable::analyze_alter_table(context, alter_table, tokens, &source_span)
             }
-            Stmt::CreateTable(create_table_statement) => CreateTable::analyze_create_table(
-                context,
-                &None,
-                create_table_statement,
-                tokens,
-                &source_span,
-            ),
+            Stmt::CreateTable(create_table_statement) => {
+                let syntax = crate::sem::unresolved::Statement::try_from(&Stmt::CreateTable(
+                    create_table_statement,
+                ))?;
+                syntax.resolve_and_apply(context, crate::sem::unresolved::Dialect::sqlite())
+            }
+            Stmt::DropTable(drop_table_statement) => {
+                let syntax = crate::sem::unresolved::Statement::try_from(&Stmt::DropTable(
+                    drop_table_statement,
+                ))?;
+                syntax.resolve_and_apply(context, crate::sem::unresolved::Dialect::sqlite())
+            }
+            Stmt::Analyze(_analyze_statement) => todo!(),
             Stmt::DropTable(drop_table_statement) => {
                 let syntax = crate::sem::unresolved::Statement::try_from(&Stmt::DropTable(
                     drop_table_statement,

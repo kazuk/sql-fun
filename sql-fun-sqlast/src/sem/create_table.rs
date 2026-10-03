@@ -11,6 +11,7 @@ use sql_fun_core::IVec;
 use std::collections::HashMap;
 
 use crate::{
+    sem::unresolved::TryFromWithTokens,
     sem::{
         AlterTable, AnalysisError, AnalysisProblem, AstAndContextPair, Constraint, FullName,
         GetSourcePathWithSpan, ImplicitChange, ParseContext, SemAst, SourcePathWithSpan,
@@ -295,7 +296,7 @@ impl CreateTable {
     /// analyze [`crate::syn::CreateStmt`]
     #[tracing::instrument(skip(context))]
     pub fn analyze_create_stmt<TParseContext>(
-        mut context: TParseContext,
+        context: TParseContext,
         parent_schema: &Option<String>,
         create: crate::syn::CreateStmt,
         tokens: &IVec<ScanToken>,
@@ -304,30 +305,11 @@ impl CreateTable {
     where
         TParseContext: ParseContext,
     {
-        let table_name = create.get_relation().unwrap();
-        let table_name = TableName::try_from(table_name)?;
-        let Some(column_defs) = create.get_table_elts().map(|f| f.as_column_def()) else {
-            AnalysisError::raise_unexpected_none("create_stmt.get_table_elts")?
-        };
-        let mut cols: Vec<ColumnDefinition> = Vec::new();
-        for column_def in column_defs {
-            let (coldef, new_context) =
-                ColumnDefinition::analyze_column_def(context, &table_name, &column_def, tokens)?;
-            context = new_context;
-            cols.push(coldef);
-        }
-        let table_def = Self::new(
-            &table_name,
-            cols,
-            CreateTableMode::from_if_not_exists(create.get_if_not_exists()),
-            false,
-            source_span,
-        );
-        context = context.apply_create_table(&table_def)?;
-        Ok(AstAndContextPair::new(
-            SemAst::CreateTable(table_def),
+        crate::sem::unresolved::Table::try_from_with_tokens(&create, tokens)?.resolve_and_apply_at(
             context,
-        ))
+            crate::sem::unresolved::Dialect::postgres(),
+            source_span,
+        )
     }
 
     pub(crate) fn push_drop_statement(&mut self, drop_table: &DropTable) {
@@ -346,22 +328,25 @@ impl CreateTable {
         mode: &CreateTableMode,
         temporary: bool,
         syn: crate::syn::sqlite::ColumnsAndConstraint,
-        tokens: &IVec<SqliteToken<'_>>,
+        _tokens: &IVec<SqliteToken<'_>>,
         source_span: &SourcePathWithSpan,
     ) -> Result<(Self, TParseContext), AnalysisError>
     where
         TParseContext: ParseContext,
     {
-        let mut cols = Vec::new();
-        for col_def in syn.columns() {
-            let (col, new_context) =
-                ColumnDefinition::analyze_column_definition(context, table_name, col_def, tokens)?;
-            context = new_context;
-            cols.push(col);
-        }
-
-        let table_def = Self::new(table_name, cols, *mode, temporary, source_span);
-        Ok((table_def, context))
+        let syntax = crate::sem::unresolved::Table::try_from(&syn)?.named(
+            table_name.full_name(),
+            *mode,
+            temporary,
+        );
+        let table = syntax
+            .resolve(
+                &context,
+                crate::sem::unresolved::Dialect::sqlite(),
+                source_span,
+            )
+            .report(&mut context)?;
+        Ok((table, context))
     }
 }
 
@@ -371,39 +356,24 @@ impl CreateTable {
     #[expect(clippy::too_many_arguments)]
     pub fn analyze_create_table_body<TParseContext>(
         context: TParseContext,
-        parent_schema: &Option<String>,
+        _parent_schema: &Option<String>,
         table_name: &TableName,
         mode: &CreateTableMode,
         temporary: bool,
         syn: CreateTableBody,
-        tokens: &IVec<SqliteToken<'_>>,
+        _tokens: &IVec<SqliteToken<'_>>,
         source_span: &SourcePathWithSpan,
     ) -> Result<AstAndContextPair<TParseContext>, AnalysisError>
     where
         TParseContext: ParseContext,
     {
-        use crate::syn::sqlite::CreateTableBody;
-
-        match syn {
-            CreateTableBody::ColumnsAndConstraint(columns_and_constraint) => {
-                let (result, context) = Self::analyze_columns_and_constraint(
-                    context,
-                    parent_schema,
-                    table_name,
-                    mode,
-                    temporary,
-                    columns_and_constraint,
-                    tokens,
-                    source_span,
-                )?;
-                let new_context = context.apply_create_table(&result)?;
-                Ok(AstAndContextPair::new(
-                    SemAst::CreateTable(result),
-                    new_context,
-                ))
-            }
-            CreateTableBody::AsSelect(_select) => todo!(),
-        }
+        crate::sem::unresolved::Table::try_from(&syn)?
+            .named(table_name.full_name(), *mode, temporary)
+            .resolve_and_apply_at(
+                context,
+                crate::sem::unresolved::Dialect::sqlite(),
+                source_span,
+            )
     }
 }
 
@@ -421,18 +391,9 @@ impl CreateTable {
     where
         TParseContext: ParseContext,
     {
-        let (temporary, if_not_exists, table_name, body) = syn.dissolve();
-        let table_name = TableName::try_from(&table_name)?;
-        let mode = CreateTableMode::from_if_not_exists(if_not_exists);
-
-        Self::analyze_create_table_body(
+        crate::sem::unresolved::Table::try_from(&syn)?.resolve_and_apply_at(
             context,
-            parent_schema,
-            &table_name,
-            &mode,
-            temporary,
-            body,
-            tokens,
+            crate::sem::unresolved::Dialect::sqlite(),
             source_span,
         )
     }
@@ -662,7 +623,7 @@ impl DropTable {
         if context.get_table(&table_name).is_none() {
             context.report_problem(AnalysisProblem::table_not_found(&table_name))?;
         }
-        let result = Self::new(&[table_name.to_owned()], *if_exists, false);
+        let result = Self::new(std::slice::from_ref(&table_name), *if_exists, false);
         context = context.apply_drop_table(&result)?;
         Ok(AstAndContextPair::new(SemAst::DropTable(result), context))
     }

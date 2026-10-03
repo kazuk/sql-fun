@@ -1,11 +1,12 @@
 use sql_fun_core::IVec;
 
 use crate::{
+    sem::unresolved::TryFromWithTokens,
     sem::{
-        AnalysisError, AnalysisProblem, ColumnConstraint, ColumnName, FullName, ParseContext,
-        SemScalarExpr, TableName, TypeReference,
+        AnalysisError, ColumnConstraint, ColumnName, ParseContext, SemScalarExpr, TableName,
+        TypeReference,
     },
-    syn::{ListOpt, Opt, ScanToken},
+    syn::ScanToken,
 };
 
 #[cfg(feature = "sqlite")]
@@ -107,7 +108,7 @@ impl ColumnDefinition {
 
     /// analyze [`crate::syn::ColumnDef`]
     pub fn analyze_column_def<TParseContext>(
-        mut context: TParseContext,
+        context: TParseContext,
         table_name: &TableName,
         column_def: &crate::syn::ColumnDef,
         tokens: &IVec<ScanToken>,
@@ -115,125 +116,30 @@ impl ColumnDefinition {
     where
         TParseContext: ParseContext,
     {
-        let colname = column_def.get_colname();
-        let colname = ColumnName::new(&colname);
-        let Some(type_name) = column_def.get_type_name().as_inner() else {
-            AnalysisError::raise_unexpected_none("column_def.get_type_name")?
-        };
-        let is_not_null = column_def.get_is_not_null();
-
-        let key = FullName::try_from(type_name)?;
-        let type_ref = if let Some(sem_type) = context.get_type(&key).cloned() {
-            if let Some(type_ref) = sem_type.type_reference().cloned() {
-                Some(type_ref)
-            } else {
-                context.report_problem(AnalysisProblem::unexpected_dynamic_type(&sem_type))?;
-                None
-            }
-        } else {
-            context.report_problem(AnalysisProblem::column_type_not_found(
-                table_name, &colname, &key,
-            ))?;
-            None
-        };
-
-        let constraints = if let Some(constraint_list) =
-            column_def.get_constraints().map(|v| v.as_constraint())
-        {
-            let mut constraints = Vec::new();
-            for constraint in constraint_list {
-                let (c, new_context) = ColumnConstraint::analyze_constraint(
-                    context,
-                    table_name,
-                    &colname,
-                    &constraint,
-                    tokens,
-                )?;
-                context = new_context;
-
-                if let Some(fk) = c.as_foreign_key()
-                    && let Some(col_type) = &type_ref
-                    && let Some(pk_col_type) = fk.primary_key_column_type()
-                    && col_type != pk_col_type
-                {
-                    context.report_problem(AnalysisProblem::foreign_key_column_type_mismatch(
-                        table_name,
-                        &colname,
-                        col_type,
-                        fk.primary_key_table(),
-                        fk.primary_key_column(),
-                        pk_col_type,
-                    ))?;
-                }
-
-                constraints.push(c)
-            }
-            constraints
-        } else {
-            Vec::default()
-        };
-        let column = Self::new(
-            &Some(colname),
-            type_ref.as_ref(),
-            Some(is_not_null),
-            &constraints,
-        );
-        Ok((column, context))
+        crate::sem::unresolved::Column::try_from_with_tokens(column_def, tokens)?
+            .resolve_and_report(
+                context,
+                crate::sem::unresolved::Dialect::postgres(),
+                table_name,
+            )
     }
 
     /// analyze [`crate::syn::sqlite::ColumnDefinition`]
     #[cfg(feature = "sqlite")]
     pub fn analyze_column_definition<TParseContext>(
-        mut context: TParseContext,
+        context: TParseContext,
         table_name: &TableName,
         syn: &crate::syn::sqlite::ColumnDefinition,
-        tokens: &IVec<SqliteToken<'_>>,
+        _tokens: &IVec<SqliteToken<'_>>,
     ) -> Result<(Self, TParseContext), AnalysisError>
     where
         TParseContext: ParseContext,
     {
-        let colname = ColumnName::from(syn.column_name());
-
-        let col_type = if let Some(ct) = syn.column_type() {
-            let type_name = FullName::from_local_name(ct.name());
-            if let Some(_type_def) = context.get_type(&type_name) {
-                Some(TypeReference::from_full_name(type_name))
-            } else {
-                context.report_problem(AnalysisProblem::column_type_not_found(
-                    table_name, &colname, &type_name,
-                ))?;
-                None
-            }
-        } else {
-            None
-        };
-
-        let mut result = Self::new(&Some(colname.clone()), col_type.as_ref(), None, &[]);
-
-        for constraint in syn.constraints() {
-            let (constraint, new_context) = ColumnConstraint::analyze_sqlite_column_constraint(
-                context,
-                table_name,
-                &colname,
-                constraint.constraint(),
-                tokens,
-            )?;
-            context = new_context;
-
-            match &constraint {
-                ColumnConstraint::Nullability(nullable_constraint) => {
-                    result.set_not_null(Some(nullable_constraint.is_not_null()));
-                }
-                ColumnConstraint::Default(default_constraint) => {
-                    result.set_default(default_constraint.expr());
-                }
-                _ => {}
-            }
-
-            result.push_constraint(constraint);
-        }
-
-        Ok((result, context))
+        crate::sem::unresolved::Column::try_from(syn)?.resolve_and_report(
+            context,
+            crate::sem::unresolved::Dialect::sqlite(),
+            table_name,
+        )
     }
 }
 

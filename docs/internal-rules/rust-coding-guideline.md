@@ -379,6 +379,14 @@ without tracing parsing details through the dispatch site.
 - Use `From` for infallible one-to-one conversions and `TryFrom` for fallible
   one-to-one conversions. Put the conversion implementation on the semantic
   type being constructed.
+- Preserve the diagnostic guarantees supported by each parser. PostgreSQL
+  conversions use `TryFromWithTokens` when `pg_query` supplies an AST location
+  anchor: combine that anchor with the scanned token stream to retain reliable
+  source locations in unresolved-AST diagnostics. `turso_parser`'s SQLite AST
+  does not carry equivalent node locations, so SQLite conversions MUST NOT
+  guess node-level spans from tokens alone. The dialect asymmetry is
+  intentional: SQLite diagnostics have lower source-location fidelity rather
+  than potentially incorrect locations.
 - A `match` over a syntax enum MUST dispatch only. An arm may directly compose
   a payload conversion with the destination's variant constructor, such as
   `Self::null_test(NullTest::try_from(value)?)`, but MUST NOT construct the

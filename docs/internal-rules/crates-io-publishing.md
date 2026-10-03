@@ -30,14 +30,11 @@ remove the secret. It must be absent during normal operation.
 ## Running the trial
 
 The workflow is manual-only. After it is present on the default branch, select
-**Run workflow**, provide a new SemVer-safe snapshot name, and leave
-`stop_after` empty for a complete run.
+**Run workflow** and provide a new SemVer-safe snapshot name.
 
-To exercise resume behavior, run with `stop_after` set to a package name from
-the generated manifest. The workflow intentionally fails after that package is
-published. Run it again with the same snapshot name and no stop point. Existing
-crate/version pairs are skipped and unpublished pairs continue in workspace
-dependency order.
+To resume a partially completed publication, run the workflow again with the
+same snapshot name. Existing crate/version pairs are skipped and unpublished
+pairs continue in workspace dependency order.
 
 The publication job materializes versions with
 `.local/bin/materialize-release-versions`, then publishes each crate from that

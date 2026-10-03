@@ -7,10 +7,6 @@ on:
         description: Snapshot prerelease name; `snapshot1` produces `0.1.1-snapshot1`
         required: true
         type: string
-      stop_after:
-        description: Optional package name after which to stop intentionally
-        required: false
-        type: string
 
 permissions:
   contents: read
@@ -44,16 +40,10 @@ jobs:
         id: crates_io_auth
 
       - name: Publish or resume each crate
-        shell: bash
         env:
           CARGO_REGISTRY_TOKEN: ${{ steps.crates_io_auth.outputs.token }}
           CRATES_IO_BOOTSTRAP_TOKEN: ${{ secrets.CRATES_IO_BOOTSTRAP_TOKEN }}
-        run: |
-          args=(--manifest="$RUNNER_TEMP/crates.tsv")
-          if [[ -n "${{ inputs.stop_after }}" ]]; then
-            args+=(--stop-after="${{ inputs.stop_after }}")
-          fi
-          .local/bin/publish-crates "${args[@]}"
+        run: .local/bin/publish-crates --manifest="$RUNNER_TEMP/crates.tsv"
 
       - name: Record trial result
         if: ${{ always() }}

@@ -5,10 +5,11 @@ use crate::sem::{
     unresolved::{
         Access, AlterOwner, AlterSequence, BooleanExpr, BooleanOperator, Call, CallKind, Case,
         CaseArm, Cast, Collate, Comment, Delete, DropTable, EnumType, Expr, Extension, Indirection,
-        Insert, Literal, Name, NamedArgument, NullTest, OperatorExpr, OperatorKind, Order,
-        Parameter, Query, Role, Sequence, Slice, SqlValue, Statement, Subquery, SubqueryKind,
-        SyntaxOption, TruthTest, TryCollectFromWithTokens, TryFromWithTokens, TryFromWithTokensOpt,
-        TypeName, Update, VariableSet, View, ViewCheckOption, Window,
+        Insert, LegacyPostgres, LegacyPostgresStatement, Literal, Name, NamedArgument, NullTest,
+        OperatorExpr, OperatorKind, Order, Parameter, Query, Role, Sequence, Slice, SqlValue,
+        Statement, Subquery, SubqueryKind, SyntaxOption, TruthTest, TryCollectFromWithTokens,
+        TryFromWithTokens, TryFromWithTokensOpt, TypeName, Update, VariableSet, View,
+        ViewCheckOption, Window,
     },
 };
 use crate::syn::{ListOpt, Opt};
@@ -100,6 +101,48 @@ impl TryFromWithTokens<&syn::Node> for Statement {
             return Ok(Self::composite_type(
                 crate::sem::CreateCompositeType::try_from(&composite_type)?,
             ));
+        }
+        if let Some(create_table) = value.as_create_stmt().as_inner() {
+            return Ok(Self::legacy_postgres(LegacyPostgres::new(
+                LegacyPostgresStatement::CreateTable(create_table),
+                tokens,
+            )));
+        }
+        if let Some(create_function) = value.as_create_function_stmt().as_inner() {
+            return Ok(Self::legacy_postgres(LegacyPostgres::new(
+                LegacyPostgresStatement::CreateFunction(create_function),
+                tokens,
+            )));
+        }
+        if let Some(create_schema) = value.as_create_schema_stmt().as_inner() {
+            return Ok(Self::legacy_postgres(LegacyPostgres::new(
+                LegacyPostgresStatement::CreateSchema(create_schema),
+                tokens,
+            )));
+        }
+        if let Some(create_domain) = value.as_create_domain_stmt().as_inner() {
+            return Ok(Self::legacy_postgres(LegacyPostgres::new(
+                LegacyPostgresStatement::CreateDomain(create_domain),
+                tokens,
+            )));
+        }
+        if let Some(alter_table) = value.as_alter_table_stmt().as_inner() {
+            return Ok(Self::legacy_postgres(LegacyPostgres::new(
+                LegacyPostgresStatement::AlterTable(alter_table),
+                tokens,
+            )));
+        }
+        if let Some(create_table_as) = value.as_create_table_as_stmt().as_inner() {
+            return Ok(Self::legacy_postgres(LegacyPostgres::new(
+                LegacyPostgresStatement::CreateTableAs(create_table_as),
+                tokens,
+            )));
+        }
+        if let Some(create_index) = value.as_index_stmt().as_inner() {
+            return Ok(Self::legacy_postgres(LegacyPostgres::new(
+                LegacyPostgresStatement::CreateIndex(create_index),
+                tokens,
+            )));
         }
         AnalysisError::raise_unexpected_input("top-level PostgreSQL statement")
     }

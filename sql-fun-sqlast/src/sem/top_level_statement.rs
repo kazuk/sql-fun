@@ -1,14 +1,16 @@
 use crate::{
     AstAndContextPair,
     sem::{
-        AlterTable, AnalysisError, CreateDomain, CreateFunction, CreateIndex, CreateSchema,
-        CreateTable, CreateTableAs, ParseContext, SemAst, create_table::DropTable,
-        unresolved::TryFromWithTokens,
+        AnalysisError, ParseContext, SemAst, create_table::DropTable, unresolved::TryFromWithTokens,
     },
     syn::{ListOpt, Opt, ParseResult},
 };
 #[cfg(feature = "sqlite")]
-use crate::{SqliteToken, syn::sqlite::Stmt};
+use crate::{
+    SqliteToken,
+    sem::{AlterTable, CreateTable},
+    syn::sqlite::Stmt,
+};
 
 use ::sql_fun_core::IVec;
 
@@ -57,87 +59,17 @@ impl SemAst {
     #[tracing::instrument(skip(context))]
     pub fn analyze_node<TParseContext: ParseContext>(
         context: TParseContext,
-        parent_schema: &Option<String>,
+        _parent_schema: &Option<String>,
         statement: crate::syn::Node,
         tokens: &IVec<crate::syn::ScanToken>,
     ) -> Result<AstAndContextPair<TParseContext>, AnalysisError> {
-        let Some(source_span) = context.get_source_path_with_span().cloned() else {
+        let Some(_) = context.get_source_path_with_span() else {
             AnalysisError::raise_unexpected_none("context get_source_path_with_span")?;
             AnalysisError::never();
         };
 
-        if let Some(create) = statement.as_create_stmt().as_inner() {
-            return CreateTable::analyze_create_stmt(
-                context,
-                parent_schema,
-                create,
-                tokens,
-                &source_span,
-            );
-        }
-
-        if let Some(create_function) = statement.as_create_function_stmt().as_inner() {
-            return CreateFunction::analyze_create_function(
-                context,
-                parent_schema,
-                create_function,
-                tokens,
-            );
-        }
-
-        if statement.as_select_stmt().as_inner().is_some()
-            || statement.as_insert_stmt().as_inner().is_some()
-            || statement.as_update_stmt().as_inner().is_some()
-            || statement.as_delete_stmt().as_inner().is_some()
-            || statement.as_view_stmt().as_inner().is_some()
-            || statement.as_create_extension_stmt().as_inner().is_some()
-            || statement.as_variable_set_stmt().as_inner().is_some()
-            || statement.as_create_enum_stmt().as_inner().is_some()
-            || statement.as_create_seq_stmt().as_inner().is_some()
-            || statement.as_drop_stmt().as_inner().is_some()
-            || statement.as_alter_seq_stmt().as_inner().is_some()
-            || statement.as_comment_stmt().as_inner().is_some()
-            || statement.as_alter_owner_stmt().as_inner().is_some()
-            || statement.as_composite_type_stmt().as_inner().is_some()
-        {
-            let syntax =
-                crate::sem::unresolved::Statement::try_from_with_tokens(&statement, tokens)?;
-            return syntax.resolve_and_apply(context, crate::sem::unresolved::Dialect::postgres());
-        }
-
-        if let Some(create_schema) = statement.as_create_schema_stmt().as_inner() {
-            return CreateSchema::analyze_create_schema(context, create_schema, tokens);
-        }
-
-        if let Some(domain) = statement.as_create_domain_stmt().as_inner() {
-            return CreateDomain::analyze_create_domain(context, domain, tokens);
-        }
-
-        if let Some(alter_table) = statement.as_alter_table_stmt().as_inner() {
-            return AlterTable::analyze_alter_statement(
-                context,
-                parent_schema,
-                alter_table,
-                tokens,
-                &source_span,
-            );
-        }
-
-        if let Some(create_table_as) = statement.as_create_table_as_stmt().as_inner() {
-            return CreateTableAs::analyze_create_table_as(
-                context,
-                parent_schema,
-                create_table_as,
-                tokens,
-                &source_span,
-            );
-        }
-
-        if let Some(index_stmt) = statement.as_index_stmt().as_inner() {
-            return CreateIndex::analyze_index_stmt(context, parent_schema, index_stmt, tokens);
-        }
-
-        todo!("handle {statement:?}");
+        let syntax = crate::sem::unresolved::Statement::try_from_with_tokens(&statement, tokens)?;
+        syntax.resolve_and_apply(context, crate::sem::unresolved::Dialect::postgres())
     }
 
     /// analyze [`Stmt`]
@@ -241,6 +173,8 @@ LANGUAGE C STRICT IMMUTABLE PARALLEL SAFE;"#
     #[case(r#"CREATE DOMAIN public."AccountNumber" AS character varying(15);"#)]
     #[case("ALTER TYPE public.user_kind OWNER TO application_owner;")]
     #[case("CREATE VIEW users_view AS SELECT 1 AS id;")]
+    #[case("CREATE SCHEMA app CREATE TABLE app.users (id integer);")]
+    #[case("CREATE INDEX users_id_idx ON users (id);")]
     #[case("insert into users (id) values (1)")]
     #[case("update users set id = 1")]
     #[case("delete from users")]

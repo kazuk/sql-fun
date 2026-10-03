@@ -4,7 +4,7 @@ on:
   workflow_dispatch:
     inputs:
       snapshot:
-        description: Snapshot suffix; `1` produces versions such as `0.1.1-snapshot1`
+        description: Snapshot prerelease name; `snapshot1` produces `0.1.1-snapshot1`
         required: true
         type: string
       stop_after:

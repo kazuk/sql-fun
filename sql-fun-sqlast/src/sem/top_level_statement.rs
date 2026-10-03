@@ -188,7 +188,13 @@ LANGUAGE C STRICT IMMUTABLE PARALLEL SAFE;"#
 
         eprintln!("{parsed:?}");
 
-        let base_context = BaseContext::new(context_args)?;
+        let base_context = BaseContext::new(
+            &context_args,
+            context_args
+                .load_metadata()?
+                .get("default")
+                .expect("selected test metadata"),
+        )?;
         let path = Path::new("test.sql");
         let mut file_context = SchemaFileContext::new(path, base_context);
         file_context.set_source_path_with_span(&source_span);

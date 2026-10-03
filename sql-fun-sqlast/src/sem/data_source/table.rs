@@ -56,6 +56,7 @@ impl TableDataSource {
     pub(super) fn create_column_ref<TParseContext>(
         &self,
         context: &mut TParseContext,
+        alias: &AliasName,
         column: &ColumnName,
         nullability: Nullable,
     ) -> Result<ColumnReferenceExpr, AnalysisError>
@@ -90,7 +91,7 @@ impl TableDataSource {
             None
         };
         Ok(ColumnReferenceExpr::TableColumn(TableColumnRef::new(
-            self.alias.name(),
+            alias,
             column,
             &self.name,
             column_def,

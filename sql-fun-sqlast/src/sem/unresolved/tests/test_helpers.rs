@@ -69,6 +69,9 @@ impl ReadOnlyCatalog {
 }
 
 impl Catalog for ReadOnlyCatalog {
+    fn metadata(&self) -> &::sql_fun_core::SqlFunMetadata {
+        crate::sem::BaseParseContext::metadata(&self.0)
+    }
     fn has_index(&self, name: &str) -> bool {
         Catalog::has_index(&self.0, name)
     }

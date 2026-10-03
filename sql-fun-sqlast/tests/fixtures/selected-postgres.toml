@@ -1,0 +1,11 @@
+[package.metadata.database.default]
+engine = "PostgreSQL"
+dialect = "postgres"
+version = "17"
+
+[package.metadata.database.analytics]
+engine = "PostgreSQL"
+dialect = "postgres"
+version = "18"
+search_path = ["analytics"]
+connector = "selected-connector"

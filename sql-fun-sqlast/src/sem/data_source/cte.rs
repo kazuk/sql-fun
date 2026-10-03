@@ -54,6 +54,7 @@ impl CteDataSource {
         &self,
         context: &mut TParseContext,
         with_clause: &WithClause,
+        alias: &AliasName,
         column: &ColumnName,
         nullability: Nullable,
     ) -> Result<ColumnReferenceExpr, AnalysisError>
@@ -81,7 +82,7 @@ impl CteDataSource {
             }
         }
         Ok(ColumnReferenceExpr::cte_column(
-            self.alias.name(),
+            alias,
             &self.name,
             column,
             column_def.as_ref(),

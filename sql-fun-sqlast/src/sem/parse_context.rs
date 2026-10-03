@@ -147,6 +147,9 @@ pub trait BaseParseContext:
     + MutSourcePathWithSpan
     + std::fmt::Debug
 {
+    /// Resolved metadata for the database selected by the caller.
+    fn metadata(&self) -> &::sql_fun_core::SqlFunMetadata;
+
     /// get context args
     fn get_args(&self) -> &SqlFunArgs;
 

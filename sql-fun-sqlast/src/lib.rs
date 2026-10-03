@@ -336,8 +336,16 @@ mod tests {
     ) -> TestResult {
         let home_path = PathBuf::from(env!("SQL_FUN_HOME"));
         let builtin = home_path.join("postgres/17/schema.sql");
-        let builtin =
-            PostgresDialect::parse_schema_file(&builtin, BaseContext::new(context_args)?)?;
+        let builtin = PostgresDialect::parse_schema_file(
+            &builtin,
+            BaseContext::new(
+                &context_args,
+                context_args
+                    .load_metadata()?
+                    .get("default")
+                    .expect("selected test metadata"),
+            )?,
+        )?;
 
         let tablefunc_ext = home_path.join("postgres/17/extension/tablefunc--1.0.sql");
         let tablefunc_ext = PostgresDialect::parse_schema_file(&tablefunc_ext, builtin)?;

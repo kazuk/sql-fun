@@ -24,7 +24,12 @@ fn parses_the_committed_builtin_schemas() -> Result<(), Box<dyn std::error::Erro
             version,
         ])?;
 
-        let context = BaseContext::new(args)?;
+        let context = BaseContext::new(
+            &args,
+            args.load_metadata()?
+                .get("default")
+                .expect("selected test metadata"),
+        )?;
         let schema = home.join(format!("postgres/{version}/schema.sql"));
         let parsed = PostgresDialect::parse_schema_file(&schema, context)?;
         let pg_class = TableName::from(FullName::with_schema("pg_catalog", "pg_class"));

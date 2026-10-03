@@ -192,6 +192,10 @@ impl<TBaseContext> BaseParseContext for SchemaFileContext<TBaseContext>
 where
     TBaseContext: BaseParseContext + std::fmt::Debug,
 {
+    fn metadata(&self) -> &::sql_fun_core::SqlFunMetadata {
+        self.base.metadata()
+    }
+
     fn get_args(&self) -> &SqlFunArgs {
         self.base.get_args()
     }

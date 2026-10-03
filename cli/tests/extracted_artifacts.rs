@@ -13,7 +13,14 @@ fn extracted_catalogs_load_and_schema_is_postgresql_syntax() {
         let catalog = root.join("sql-fun-home/postgres").join(version);
         let fixture = support::CatalogProject::new();
         let args = fixture.arguments(&catalog);
-        sql_fun_sqlast::sem::BaseContext::new(args).unwrap();
+        sql_fun_sqlast::sem::BaseContext::new(
+            &args,
+            args.load_metadata()
+                .expect("fixture metadata")
+                .get("default")
+                .expect("selected test metadata"),
+        )
+        .unwrap();
         let schema = std::fs::read_to_string(catalog.join("schema.sql")).unwrap();
         pg_query::parse(&schema).unwrap();
         let mut extensions: sql_fun_core::PostgresExtensionsCollection =

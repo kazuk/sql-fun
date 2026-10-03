@@ -16,6 +16,18 @@ use crate::sem::{BaseParseContext, ColumnName, PgBuiltInType};
 #[case("select q.ax as n from (a right join b on true) as q", false, false)]
 #[case("select q.bx as n from (a full join b on true) as q", true, false)]
 #[case("select q.id as n from (a join b using(id)) as q", false, true)]
+#[case("select q.id as n from (a right join b using(id)) as q", true, true)]
+#[case("select q.id as n from (a natural right join b) as q", true, true)]
+#[case("select q.id as n from (a left join b using(id)) as q", false, true)]
+#[case("select q.id as n from (a natural left join b) as q", false, true)]
+#[case("select q.ax as n from (a right join b using(id)) as q", false, false)]
+#[case("select q.ax as n from (a natural right join b) as q", false, false)]
+#[case("select q.id as n from (a right join b on true) as q", false, false)]
+#[case(
+    "select q.id as n from ((a join c using(id)) right join b using(id)) as q",
+    true,
+    true
+)]
 #[case("select q.id as n from (a join b) as q", false, true)]
 #[case("select a.ax as n from (a)", false, true)]
 #[case("select b.bx as n from (a join b)", true, true)]

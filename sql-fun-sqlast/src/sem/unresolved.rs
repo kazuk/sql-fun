@@ -53,6 +53,7 @@ pub(crate) enum Statement {
     AlterSequence(AlterSequence),
     Comment(Comment),
     AlterOwner(AlterOwner),
+    CompositeType(crate::sem::CreateCompositeType),
 }
 
 impl Statement {
@@ -106,6 +107,10 @@ impl Statement {
 
     const fn alter_owner(value: AlterOwner) -> Self {
         Self::AlterOwner(value)
+    }
+
+    const fn composite_type(value: crate::sem::CreateCompositeType) -> Self {
+        Self::CompositeType(value)
     }
 
     pub(crate) fn resolve(
@@ -172,6 +177,10 @@ impl Statement {
             Self::AlterOwner(_) => crate::sem::resolution::Resolution::new(catalog).finish(Ok(
                 crate::sem::SemAst::AlterOwner(crate::sem::AlterOwner::new()),
             )),
+            Self::CompositeType(composite_type) => crate::sem::resolution::Resolution::new(catalog)
+                .finish(Ok(crate::sem::SemAst::CreateCompType(
+                    composite_type.clone(),
+                ))),
         }
     }
 
@@ -196,6 +205,13 @@ impl Statement {
                 crate::sem::SemAst::AlterOwner(crate::sem::AlterOwner::new()),
                 context,
             )),
+            Self::CompositeType(composite_type) => {
+                let context = context.apply_create_comp_type(composite_type)?;
+                Ok(crate::AstAndContextPair::new(
+                    crate::sem::SemAst::CreateCompType(composite_type.clone()),
+                    context,
+                ))
+            }
             _ => {
                 let outcome = self.resolve(&context, dialect);
                 let mut context = context;

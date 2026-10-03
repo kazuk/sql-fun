@@ -1,12 +1,15 @@
 mod query;
 
-use crate::sem::unresolved::{
-    Access, AlterOwner, AlterSequence, BooleanExpr, BooleanOperator, Call, CallKind, Case, CaseArm,
-    Cast, Collate, Comment, Delete, DropTable, EnumType, Expr, Extension, Indirection, Insert,
-    Literal, Name, NamedArgument, NullTest, OperatorExpr, OperatorKind, Order, Parameter, Query,
-    Role, Sequence, Slice, SqlValue, Statement, Subquery, SubqueryKind, SyntaxOption, TruthTest,
-    TryCollectFromWithTokens, TryFromWithTokens, TryFromWithTokensOpt, TypeName, Update,
-    VariableSet, View, ViewCheckOption, Window,
+use crate::sem::{
+    create_comp_type::{CompositeFieldCollection, CompositeFieldDefinition},
+    unresolved::{
+        Access, AlterOwner, AlterSequence, BooleanExpr, BooleanOperator, Call, CallKind, Case,
+        CaseArm, Cast, Collate, Comment, Delete, DropTable, EnumType, Expr, Extension, Indirection,
+        Insert, Literal, Name, NamedArgument, NullTest, OperatorExpr, OperatorKind, Order,
+        Parameter, Query, Role, Sequence, Slice, SqlValue, Statement, Subquery, SubqueryKind,
+        SyntaxOption, TruthTest, TryCollectFromWithTokens, TryFromWithTokens, TryFromWithTokensOpt,
+        TypeName, Update, VariableSet, View, ViewCheckOption, Window,
+    },
 };
 use crate::syn::{ListOpt, Opt};
 use crate::{StringSpan, sem::AnalysisError, syn};
@@ -93,7 +96,35 @@ impl TryFromWithTokens<&syn::Node> for Statement {
         if let Some(alter_owner) = value.as_alter_owner_stmt().as_inner() {
             return Ok(Self::alter_owner(AlterOwner::try_from(&alter_owner)?));
         }
+        if let Some(composite_type) = value.as_composite_type_stmt().as_inner() {
+            return Ok(Self::composite_type(
+                crate::sem::CreateCompositeType::try_from(&composite_type)?,
+            ));
+        }
         AnalysisError::raise_unexpected_input("top-level PostgreSQL statement")
+    }
+}
+
+impl TryFrom<&syn::CompositeTypeStmt> for crate::sem::CreateCompositeType {
+    type Error = AnalysisError;
+
+    fn try_from(value: &syn::CompositeTypeStmt) -> Result<Self, Self::Error> {
+        let typevar = required(
+            value.get_typevar().as_inner(),
+            "composite_type_stmt.typevar",
+        )?;
+        let fields = required(
+            value.get_coldeflist().map(|fields| fields.as_column_def()),
+            "composite_type_stmt.coldeflist",
+        )?;
+        let mut composite_fields = CompositeFieldCollection::default();
+        for field in fields {
+            composite_fields.push(CompositeFieldDefinition::try_from(&field)?);
+        }
+        Ok(Self::new(
+            &crate::sem::FullName::try_from(typevar)?,
+            &composite_fields,
+        ))
     }
 }
 

@@ -43,6 +43,13 @@ pub struct CreateCompositeType {
 }
 
 impl CreateCompositeType {
+    pub(crate) fn new(name: &FullName, fields: &CompositeFieldCollection) -> Self {
+        Self {
+            type_ref: Some(TypeReference::from_full_name(name.clone())),
+            fields: fields.clone(),
+        }
+    }
+
     /// name of composite type,
     ///
     /// When instance is dynamic type and no-name , returns None
@@ -102,10 +109,7 @@ impl CreateCompositeType {
         }
 
         let name = FullName::try_from(typevar)?;
-        let comp_def = Self {
-            type_ref: Some(TypeReference::from_full_name(name.clone())),
-            fields,
-        };
+        let comp_def = Self::new(&name, &fields);
         let result_context = context.apply_create_comp_type(&comp_def)?;
 
         Ok(AstAndContextPair::new(

@@ -1,10 +1,10 @@
 mod query;
 
 use crate::sem::unresolved::{
-    Access, BooleanExpr, BooleanOperator, Call, CallKind, Case, CaseArm, Cast, Collate, Delete,
-    DropTable, EnumType, Expr, Extension, Indirection, Insert, Literal, Name, NamedArgument,
-    NullTest, OperatorExpr, OperatorKind, Order, Parameter, Query, Sequence, Slice, SqlValue,
-    Statement, Subquery, SubqueryKind, SyntaxOption, TruthTest, TryCollectFromWithTokens,
+    Access, AlterSequence, BooleanExpr, BooleanOperator, Call, CallKind, Case, CaseArm, Cast,
+    Collate, Delete, DropTable, EnumType, Expr, Extension, Indirection, Insert, Literal, Name,
+    NamedArgument, NullTest, OperatorExpr, OperatorKind, Order, Parameter, Query, Sequence, Slice,
+    SqlValue, Statement, Subquery, SubqueryKind, SyntaxOption, TruthTest, TryCollectFromWithTokens,
     TryFromWithTokens, TryFromWithTokensOpt, TypeName, Update, VariableSet, View, ViewCheckOption,
     Window,
 };
@@ -81,7 +81,38 @@ impl TryFromWithTokens<&syn::Node> for Statement {
         if let Some(drop_table) = value.as_drop_stmt().as_inner() {
             return Ok(Self::drop_table(DropTable::try_from(&drop_table)?));
         }
+        if let Some(alter_sequence) = value.as_alter_seq_stmt().as_inner() {
+            return Ok(Self::alter_sequence(AlterSequence::try_from_with_tokens(
+                &alter_sequence,
+                tokens,
+            )?));
+        }
         AnalysisError::raise_unexpected_input("top-level PostgreSQL statement")
+    }
+}
+
+impl TryFromWithTokens<&syn::AlterSeqStmt> for AlterSequence {
+    type Error = AnalysisError;
+
+    fn try_from_with_tokens(
+        value: &syn::AlterSeqStmt,
+        tokens: &IVec<crate::syn::ScanToken>,
+    ) -> Result<Self, Self::Error> {
+        let sequence = required(value.get_sequence().as_inner(), "alter_seq.sequence")?;
+        let mut parts = Vec::new();
+        if let Some(catalog) = nonempty(sequence.get_catalogname()) {
+            parts.push(catalog);
+        }
+        if let Some(schema) = nonempty(sequence.get_schemaname()) {
+            parts.push(schema);
+        }
+        parts.push(sequence.get_relname());
+        Ok(Self::new(
+            Name::from_parts(&parts),
+            SyntaxOption::try_collect_from_with_tokens(value.get_options(), tokens)?,
+            value.get_for_identity(),
+            value.get_missing_ok(),
+        ))
     }
 }
 

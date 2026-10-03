@@ -50,6 +50,7 @@ pub(crate) enum Statement {
     EnumType(EnumType),
     Sequence(Sequence),
     DropTable(DropTable),
+    AlterSequence(AlterSequence),
 }
 
 impl Statement {
@@ -91,6 +92,10 @@ impl Statement {
 
     const fn drop_table(value: DropTable) -> Self {
         Self::DropTable(value)
+    }
+
+    const fn alter_sequence(value: AlterSequence) -> Self {
+        Self::AlterSequence(value)
     }
 
     pub(crate) fn resolve(
@@ -144,6 +149,11 @@ impl Statement {
                     "drop table requires catalog application",
                 ),
             ),
+            Self::AlterSequence(_) => crate::sem::resolution::Resolution::new(catalog).finish(
+                crate::sem::AnalysisError::raise_unexpected_input(
+                    "alter sequence requires catalog application",
+                ),
+            ),
         }
     }
 
@@ -162,6 +172,7 @@ impl Statement {
             Self::EnumType(enum_type) => enum_type.apply(context),
             Self::Sequence(sequence) => sequence.apply(context),
             Self::DropTable(drop_table) => drop_table.apply(context),
+            Self::AlterSequence(alter_sequence) => alter_sequence.apply(context),
             _ => {
                 let outcome = self.resolve(&context, dialect);
                 let mut context = context;
@@ -169,6 +180,40 @@ impl Statement {
                 Ok(crate::AstAndContextPair::new(statement, context))
             }
         }
+    }
+}
+
+#[derive(Clone, Debug)]
+pub(crate) struct AlterSequence {
+    name: Name,
+    options: Vec<SyntaxOption>,
+    for_identity: bool,
+    missing_ok: bool,
+}
+
+impl AlterSequence {
+    fn new(name: Name, options: Vec<SyntaxOption>, for_identity: bool, missing_ok: bool) -> Self {
+        Self {
+            name,
+            options,
+            for_identity,
+            missing_ok,
+        }
+    }
+
+    fn apply<TContext>(
+        &self,
+        context: TContext,
+    ) -> Result<crate::AstAndContextPair<TContext>, crate::sem::AnalysisError>
+    where
+        TContext: crate::sem::ParseContext,
+    {
+        let alter_sequence = crate::sem::AlterSequence::new(&self.name.full_name()?, &[]);
+        let context = context.apply_alter_sequence(&alter_sequence)?;
+        Ok(crate::AstAndContextPair::new(
+            crate::sem::SemAst::AlterSequence(alter_sequence),
+            context,
+        ))
     }
 }
 

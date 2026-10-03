@@ -7,7 +7,7 @@ usage: materialize-release-versions (--release | --snapshot=NAME) [--output=PATH
 
 Materialize the next release version for every publishable workspace package.
 Exactly one release mode is required. The snapshot mode appends
-`-snapshot.NAME` to each next release version.
+`-snapshotNAME` to each next release version.
 USAGE
 }
 
@@ -58,7 +58,7 @@ for package in "${packages[@]}"; do
 
   next_version="$("$repo_root/.local/bin/bump-version" "$package" "$release_level")"
   if [[ "$mode" == "snapshot" ]]; then
-    next_version+="-snapshot.$snapshot_name"
+    next_version+="-snapshot$snapshot_name"
   fi
   next_versions["$package"]="$next_version"
 done

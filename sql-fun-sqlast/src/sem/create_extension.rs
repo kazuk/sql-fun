@@ -9,6 +9,12 @@ pub struct CreateExtension {
 }
 
 impl CreateExtension {
+    pub(crate) fn from_name(name: &str) -> Self {
+        Self {
+            name: name.to_owned(),
+        }
+    }
+
     /// get extension name
     #[must_use]
     pub fn name(&self) -> &str {
@@ -24,8 +30,7 @@ impl CreateExtension {
     where
         TParseContext: ParseContext,
     {
-        let name = syn.get_extname();
-        let extension = Self { name };
+        let extension = Self::from_name(&syn.get_extname());
         let result_context = context.apply_create_extension(&extension)?;
         Ok(AstAndContextPair::new(
             SemAst::CreateExtension(extension),

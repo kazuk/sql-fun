@@ -2,10 +2,10 @@ mod query;
 
 use crate::sem::unresolved::{
     Access, BooleanExpr, BooleanOperator, Call, CallKind, Case, CaseArm, Cast, Collate, Delete,
-    Expr, Indirection, Insert, Literal, Name, NamedArgument, NullTest, OperatorExpr, OperatorKind,
-    Order, Parameter, Query, Slice, SqlValue, Statement, Subquery, SubqueryKind, SyntaxOption,
-    TruthTest, TryCollectFromWithTokens, TryFromWithTokens, TryFromWithTokensOpt, TypeName, Update,
-    View, ViewCheckOption, Window,
+    Expr, Extension, Indirection, Insert, Literal, Name, NamedArgument, NullTest, OperatorExpr,
+    OperatorKind, Order, Parameter, Query, Slice, SqlValue, Statement, Subquery, SubqueryKind,
+    SyntaxOption, TruthTest, TryCollectFromWithTokens, TryFromWithTokens, TryFromWithTokensOpt,
+    TypeName, Update, View, ViewCheckOption, Window,
 };
 use crate::syn::{ListOpt, Opt};
 use crate::{StringSpan, sem::AnalysisError, syn};
@@ -60,7 +60,16 @@ impl TryFromWithTokens<&syn::Node> for Statement {
         if let Some(view) = value.as_view_stmt().as_inner() {
             return Ok(Self::view(View::try_from_with_tokens(&view, tokens)?));
         }
+        if let Some(extension) = value.as_create_extension_stmt().as_inner() {
+            return Ok(Self::extension(Extension::from(&extension)));
+        }
         AnalysisError::raise_unexpected_input("top-level PostgreSQL statement")
+    }
+}
+
+impl From<&syn::CreateExtensionStmt> for Extension {
+    fn from(value: &syn::CreateExtensionStmt) -> Self {
+        Self::new(&value.get_extname())
     }
 }
 

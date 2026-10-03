@@ -1,8 +1,8 @@
 use crate::{
     AstAndContextPair,
     sem::{
-        AlterTable, AnalysisError, CreateCompositeType, CreateDomain, CreateFunction, CreateIndex,
-        CreateSchema, CreateTable, CreateTableAs, ParseContext, SemAst, create_table::DropTable,
+        AlterTable, AnalysisError, CreateDomain, CreateFunction, CreateIndex, CreateSchema,
+        CreateTable, CreateTableAs, ParseContext, SemAst, create_table::DropTable,
         unresolved::TryFromWithTokens,
     },
     syn::{ListOpt, Opt, ParseResult},
@@ -76,14 +76,6 @@ impl SemAst {
             );
         }
 
-        if let Some(comp_type) = statement.as_composite_type_stmt().as_inner() {
-            return CreateCompositeType::analyze_create_comp_type(
-                context,
-                parent_schema,
-                comp_type,
-            );
-        }
-
         if let Some(create_function) = statement.as_create_function_stmt().as_inner() {
             return CreateFunction::analyze_create_function(
                 context,
@@ -106,6 +98,7 @@ impl SemAst {
             || statement.as_alter_seq_stmt().as_inner().is_some()
             || statement.as_comment_stmt().as_inner().is_some()
             || statement.as_alter_owner_stmt().as_inner().is_some()
+            || statement.as_composite_type_stmt().as_inner().is_some()
         {
             let syntax =
                 crate::sem::unresolved::Statement::try_from_with_tokens(&statement, tokens)?;

@@ -48,6 +48,7 @@ pub(crate) enum Statement {
     Extension(Extension),
     VariableSet(VariableSet),
     EnumType(EnumType),
+    Sequence(Sequence),
 }
 
 impl Statement {
@@ -81,6 +82,10 @@ impl Statement {
 
     const fn enum_type(value: EnumType) -> Self {
         Self::EnumType(value)
+    }
+
+    const fn sequence(value: Sequence) -> Self {
+        Self::Sequence(value)
     }
 
     pub(crate) fn resolve(
@@ -124,6 +129,11 @@ impl Statement {
                     "enum type requires catalog application",
                 ),
             ),
+            Self::Sequence(_) => crate::sem::resolution::Resolution::new(catalog).finish(
+                crate::sem::AnalysisError::raise_unexpected_input(
+                    "sequence requires catalog application",
+                ),
+            ),
         }
     }
 
@@ -140,6 +150,7 @@ impl Statement {
             Self::Extension(extension) => extension.apply(context),
             Self::VariableSet(variable_set) => variable_set.resolve_and_apply(context, dialect),
             Self::EnumType(enum_type) => enum_type.apply(context),
+            Self::Sequence(sequence) => sequence.apply(context),
             _ => {
                 let outcome = self.resolve(&context, dialect);
                 let mut context = context;
@@ -147,6 +158,48 @@ impl Statement {
                 Ok(crate::AstAndContextPair::new(statement, context))
             }
         }
+    }
+}
+
+#[derive(Clone, Debug)]
+pub(crate) struct Sequence {
+    name: Name,
+    options: Vec<SyntaxOption>,
+    owner_id: u32,
+    for_identity: bool,
+    if_not_exists: bool,
+}
+
+impl Sequence {
+    fn new(
+        name: Name,
+        options: Vec<SyntaxOption>,
+        owner_id: u32,
+        for_identity: bool,
+        if_not_exists: bool,
+    ) -> Self {
+        Self {
+            name,
+            options,
+            owner_id,
+            for_identity,
+            if_not_exists,
+        }
+    }
+
+    fn apply<TContext>(
+        &self,
+        context: TContext,
+    ) -> Result<crate::AstAndContextPair<TContext>, crate::sem::AnalysisError>
+    where
+        TContext: crate::sem::ParseContext,
+    {
+        let sequence = crate::sem::CreateSequence::new(&self.name.full_name()?);
+        let context = context.apply_create_sequence(&sequence)?;
+        Ok(crate::AstAndContextPair::new(
+            crate::sem::SemAst::CreateSequence(sequence),
+            context,
+        ))
     }
 }
 

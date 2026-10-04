@@ -266,21 +266,29 @@ impl MetadataArgs {
     ///
     /// Returns [`SqlFunArgsError`] when the directory cannot be determined or does not exist.
     pub fn sql_fun_home(&self) -> Result<PathBuf, SqlFunArgsError> {
-        if let Some(home_arg) = &self.sql_fun_home {
-            let result = if home_arg.is_relative() {
-                std::env::current_dir()?.join(home_arg)
-            } else {
-                home_arg.clone()
-            };
+        let result = self.initialization_home()?;
+        if self.sql_fun_home.is_some() {
             if result.exists() {
                 Ok(result.canonicalize()?)
             } else {
                 SqlFunArgsError::home_not_exist(result)?
             }
+        } else {
+            Ok(result)
+        }
+    }
+
+    pub(crate) fn initialization_home(&self) -> Result<PathBuf, SqlFunArgsError> {
+        if let Some(path) = &self.sql_fun_home {
+            if path.is_absolute() {
+                Ok(path.clone())
+            } else {
+                Ok(std::env::current_dir()?.join(path))
+            }
         } else if let Some(home) = std::env::home_dir() {
             Ok(home.join(".sql-fun"))
         } else {
-            SqlFunArgsError::user_home_not_defined()?
+            SqlFunArgsError::user_home_not_defined()
         }
     }
 }
@@ -353,6 +361,10 @@ mod test_metadata_file_raw {
 }
 
 impl MetadataArgs {
+    pub(super) const fn has_explicit_file(&self) -> bool {
+        self.metadata_file.is_some()
+    }
+
     /// search metadata file with same-owner policy
     ///
     /// # Errors

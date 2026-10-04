@@ -334,6 +334,21 @@ jobs:
       - name: Build and validate Linux distributions
         run: .local/bin/check-test-flow --step=packaging
 
+      - name: Build initialization semantic integration harness
+        run: |
+          cargo test --locked --release --target x86_64-unknown-linux-gnu \
+            -p sql-fun-cli --test initialization --no-run --message-format=json \
+            > "$RUNNER_TEMP/initialization-build.json"
+          test_binary=$(jq -r 'select(.reason == "compiler-artifact" and .target.name == "initialization") | .executable // empty' "$RUNNER_TEMP/initialization-build.json")
+          mkdir -p target/init-integration
+          install -m 0755 "$test_binary" target/init-integration/initialization-test
+
+      - uses: actions/upload-artifact@v7
+        with:
+          name: sql-fun-init-integration
+          path: target/init-integration/initialization-test
+          if-no-files-found: error
+
       - uses: actions/upload-artifact@v7
         with:
           name: sql-fun-x86_64-unknown-linux-gnu
@@ -392,6 +407,11 @@ jobs:
           name: sql-fun-x86_64-unknown-linux-gnu
           path: ${{ runner.temp }}/sql-fun-artifact
 
+      - uses: actions/download-artifact@v7
+        with:
+          name: sql-fun-init-integration
+          path: ${{ runner.temp }}/sql-fun-init-integration
+
       - name: Install packaged extraction tooling
         run: |
           sudo apt-get update
@@ -405,6 +425,13 @@ jobs:
           for version in 17 18; do
             diff -r "sql-fun-home/postgres/$version" "$RUNNER_TEMP/sql-fun-postgres/$version"
           done
+
+      - name: Load initialized metadata through normal semantic bootstrap
+        env:
+          SQL_FUN_TEST_BINARY: /usr/bin/sql-fun
+        run: |
+          chmod +x "$RUNNER_TEMP/sql-fun-init-integration/initialization-test"
+          "$RUNNER_TEMP/sql-fun-init-integration/initialization-test" --ignored --nocapture
 
       - uses: actions/upload-artifact@v7
         with:

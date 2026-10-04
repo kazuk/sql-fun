@@ -13,6 +13,7 @@ mod extensions;
 mod highlighter;
 mod metadata;
 mod placehlodered_sql;
+mod postgres_version;
 
 /// `sql-fun` code generator lockfile
 pub mod lockfile;
@@ -48,51 +49,8 @@ pub use self::{
     },
     highlighter::{HighlighterStyle, HighlighterTheme, HighlighterThemeError, TerminalColor},
     metadata::{MetadataError, PostgresEngineVersion, SqlFunMetadata, SqlFunMetadataCollection},
+    postgres_version::{PostgresVersion, PostgresVersionInventory},
 };
-
-/// Supporting `PostgreSQL` Database engine versions
-#[derive(Debug, serde::Deserialize, serde::Serialize, Clone, Copy, PartialEq)]
-pub enum PostgresVersion {
-    /// `PostgreSQL` version 15
-    #[serde(rename = "15")]
-    Ver15,
-    /// `PostgreSQL` version 16
-    #[serde(rename = "16")]
-    Ver16,
-    /// `PostgreSQL` version 17
-    #[serde(rename = "17")]
-    Ver17,
-
-    /// `PostgreSQL` version 18
-    #[serde(rename = "18")]
-    Ver18,
-}
-
-impl FromStr for PostgresVersion {
-    type Err = String;
-
-    fn from_str(s: &str) -> Result<Self, Self::Err> {
-        match s {
-            "15" => Ok(Self::Ver15),
-            "16" => Ok(Self::Ver16),
-            "17" => Ok(Self::Ver17),
-            "18" => Ok(Self::Ver18),
-            _ => Err(s.to_string()),
-        }
-    }
-}
-
-impl Display for PostgresVersion {
-    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-        let value = match self {
-            Self::Ver15 => "15",
-            Self::Ver16 => "16",
-            Self::Ver17 => "17",
-            Self::Ver18 => "18",
-        };
-        f.write_str(value)
-    }
-}
 
 /// SQL Dialect
 #[derive(Debug, serde::Deserialize, Clone, Copy, PartialEq)]

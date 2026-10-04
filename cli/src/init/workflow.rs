@@ -17,6 +17,7 @@ use ::statig::Outcome;
 
 pub struct Initialization {
     yes: bool,
+    server_source: bool,
     supplied_home: bool,
     home: PathBuf,
     default_home: String,
@@ -32,9 +33,10 @@ impl From<&InitializeArgs> for Initialization {
         let home = args
             .sql_fun_home()
             .clone()
-            .unwrap_or_else(|| PathBuf::from(shellexpand::tilde("~/.sqlfun").as_ref()));
+            .unwrap_or_else(|| PathBuf::from(shellexpand::tilde("~/.sql-fun").as_ref()));
         Self {
             yes: args.assume_yes(),
+            server_source: false,
             supplied_home: args.sql_fun_home().is_some(),
             default_home: home.to_string_lossy().into_owned(),
             home_input: String::new(),
@@ -59,6 +61,25 @@ impl Initialization {
             Some(error) => Err(error),
             None => Ok(()),
         }
+    }
+
+    pub fn set_home(&mut self, home: &std::path::Path) {
+        self.home = home.to_path_buf();
+        self.default_home = home.to_string_lossy().into_owned();
+    }
+    pub fn home(&self) -> &std::path::Path {
+        &self.home
+    }
+    pub fn versions(&self) -> Vec<sql_fun_core::PostgresVersion> {
+        self.versions
+            .iter()
+            .map(PostgresVersions::version)
+            .collect()
+    }
+    pub fn use_server_version(&mut self, version: &sql_fun_core::PostgresVersion) {
+        self.server_source = true;
+        self.version_args = vec![version.to_string()];
+        self.versions = vec![PostgresVersions::from_version(version)];
     }
 
     fn fail(&mut self, error: InitError) -> Outcome<State> {
@@ -235,7 +256,11 @@ impl Workflow {
         {
             Ok(versions) => {
                 context.versions = versions;
-                Outcome::Transition(State::select_versions())
+                if context.server_source {
+                    Outcome::Transition(State::versions_selected())
+                } else {
+                    Outcome::Transition(State::select_versions())
+                }
             }
             Err(error) => context.fail(error),
         }
@@ -253,7 +278,7 @@ impl Workflow {
         }
         let Some(versions) = indices
             .iter()
-            .map(|&index| PostgresVersions::ALL.get(index).copied())
+            .map(|&index| PostgresVersions::all().get(index).copied())
             .collect()
         else {
             return Outcome::Handled;
@@ -470,15 +495,15 @@ mod test_prepare_versions_request {
 
 impl State {
     fn select_versions_request(context: &Initialization) -> Request {
-        let options: Vec<_> = PostgresVersions::ALL
-            .iter()
-            .map(ToString::to_string)
+        let options: Vec<_> = PostgresVersions::all()
+            .into_iter()
+            .map(|version| version.to_string())
             .collect();
-        let defaults: Vec<_> = PostgresVersions::ALL
-            .iter()
+        let defaults: Vec<_> = PostgresVersions::all()
+            .into_iter()
             .enumerate()
             .filter_map(|(index, version)| {
-                if context.versions.contains(version) {
+                if context.versions.contains(&version) {
                     Some(index)
                 } else {
                     None
@@ -491,9 +516,9 @@ impl State {
                     .versions
                     .iter()
                     .filter_map(|version| {
-                        PostgresVersions::ALL
-                            .iter()
-                            .position(|option| option == version)
+                        PostgresVersions::all()
+                            .into_iter()
+                            .position(|option| option == *version)
                     })
                     .collect::<Vec<_>>(),
             ))
@@ -520,7 +545,6 @@ mod test_select_versions_request {
         PromptRequest::multi_select(
             include_str!("versions_prompt.txt").trim_end(),
             &[
-                "PostgreSQL Version 16".to_owned(),
                 "PostgreSQL Version 17".to_owned(),
                 "PostgreSQL Version 18".to_owned(),
             ],
@@ -529,10 +553,10 @@ mod test_select_versions_request {
     }
 
     #[rstest::rstest]
-    #[case::all_supported(&PostgresVersions::ALL, &[0, 1, 2])]
+    #[case::all_supported(&PostgresVersions::all(), &[0, 1])]
     #[case::option_order_without_duplicates(
-        &[PostgresVersions::Postgres18, PostgresVersions::Postgres16, PostgresVersions::Postgres18],
-        &[0, 2],
+        &["18".parse().unwrap(), "17".parse().unwrap(), "18".parse().unwrap()],
+        &[0, 1],
     )]
     #[case::empty_selection_when_reprompting(&[], &[])]
     fn interactive_defaults(#[case] versions: &[PostgresVersions], #[case] defaults: &[usize]) {
@@ -548,15 +572,15 @@ mod test_select_versions_request {
     fn select_versions_automatic_answer_preserves_order_and_duplicates() {
         let mut context = initialization(true);
         context.versions = vec![
-            PostgresVersions::Postgres18,
-            PostgresVersions::Postgres16,
-            PostgresVersions::Postgres18,
+            "18".parse().unwrap(),
+            "17".parse().unwrap(),
+            "18".parse().unwrap(),
         ];
         assert_eq!(
             State::select_versions_request(&context),
             Request::Prompt(
-                version_prompt(&[0, 2])
-                    .with_automatic(Some(PromptResponse::multi_select(&[2, 0, 2]))),
+                version_prompt(&[0, 1])
+                    .with_automatic(Some(PromptResponse::multi_select(&[1, 0, 1]))),
             ),
         );
     }

@@ -2,41 +2,37 @@ use super::error::InitError;
 
 use std::str::FromStr;
 
+use ::sql_fun_core::{PostgresVersion, PostgresVersionInventory};
+
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
-pub enum PostgresVersions {
-    Postgres16,
-    Postgres17,
-    Postgres18,
-}
+pub struct PostgresVersions(PostgresVersion);
 
 impl PostgresVersions {
-    pub const ALL: [Self; 3] = [Self::Postgres16, Self::Postgres17, Self::Postgres18];
-}
-
-impl std::fmt::Display for PostgresVersions {
-    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-        let version = match self {
-            Self::Postgres16 => 16,
-            Self::Postgres17 => 17,
-            Self::Postgres18 => 18,
-        };
-        write!(
-            f,
-            "{}",
-            format!(include_str!("postgres_version.txt"), version = version).trim_end()
-        )
+    pub fn all() -> Vec<Self> {
+        PostgresVersionInventory::builtin()
+            .targets()
+            .into_iter()
+            .map(Self)
+            .collect()
+    }
+    pub const fn version(&self) -> PostgresVersion {
+        self.0
+    }
+    pub const fn from_version(version: &PostgresVersion) -> Self {
+        Self(*version)
     }
 }
-
+impl std::fmt::Display for PostgresVersions {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        write!(f, "PostgreSQL Version {}", self.0)
+    }
+}
 impl FromStr for PostgresVersions {
     type Err = InitError;
-
-    fn from_str(version: &str) -> Result<Self, Self::Err> {
-        match version {
-            "16" => Ok(Self::Postgres16),
-            "17" => Ok(Self::Postgres17),
-            "18" => Ok(Self::Postgres18),
-            _ => InitError::unexpected_version(version),
+    fn from_str(text: &str) -> Result<Self, Self::Err> {
+        match PostgresVersionInventory::builtin().select(&[text.to_owned()]) {
+            Ok(versions) => Ok(Self(versions[0])),
+            Err(_) => InitError::unexpected_version(text),
         }
     }
 }

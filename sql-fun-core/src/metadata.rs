@@ -130,7 +130,9 @@ impl std::fmt::Display for PostgresEngineVersion {
 }
 
 impl PostgresEngineVersion {
-    /// is wellknown version
+    /// Whether this uses canonical PostgreSQL major/prerelease naming.
+    ///
+    /// This does not imply that builtin extraction is supported for the version.
     #[must_use]
     pub fn is_wellknown(&self) -> bool {
         self.0.is_left()
@@ -138,16 +140,28 @@ impl PostgresEngineVersion {
 
     /// get definition base path
     pub fn definition_base_path<P: AsRef<Path>>(&self, home: P) -> PathBuf {
-        if self.is_wellknown() {
-            home.as_ref()
-                .join("postgres")
-                .join(Path::new(&self.to_string()))
-        } else {
-            home.as_ref()
-                .join("postgres")
-                .join("custom")
-                .join(self.to_string())
+        match &self.0 {
+            Either::Left(version) => version.definition_base_path(home.as_ref()),
+            Either::Right(custom) => home.as_ref().join("postgres").join("custom").join(custom),
         }
+    }
+}
+
+#[cfg(test)]
+mod test_postgres_engine_version_paths {
+    use super::PostgresEngineVersion;
+    use std::path::{Path, PathBuf};
+
+    #[rstest::rstest]
+    #[case::future_stable("19", "home/postgres/19")]
+    #[case::prerelease("19beta1", "home/postgres/19beta1")]
+    #[case::custom("fixture", "home/postgres/custom/fixture")]
+    fn resolves_canonical_loader_paths(#[case] text: &str, #[case] expected: &str) {
+        let version: PostgresEngineVersion = text.parse().unwrap();
+        assert_eq!(
+            version.definition_base_path(Path::new("home")),
+            PathBuf::from(expected)
+        );
     }
 }
 

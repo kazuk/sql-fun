@@ -49,17 +49,19 @@ of this command, not a Debian package installation dependency.
 Specify this in your Cargo.toml as follows:
 
 ```toml
-[package.metadata.database]
-default = {
-    engine="postgres",
-    connector = "tokio-postgres"
-}
+[package.metadata.database.default]
+engine = "PostgreSQL"
+dialect = "postgres"
+version = "17"
+connector = "tokio-postgres"
 ```
 
 - `default`: default database for this application
-- `engine`: Can be "postgres" or "sqlite".
+- `engine`: Use "PostgreSQL" for PostgreSQL or "sqlite" for SQLite.
+- `dialect`: Use "postgres" for PostgreSQL or "sqlite" for SQLite.
+- `version`: PostgreSQL target major, matching the installed builtin metadata.
 - `connector`: specify database connector library.
-  - When `engine` is "postgres": Can be "tokio-postgres".
+  - When `engine` is "PostgreSQL": Can be "tokio-postgres".
   - When `engine` is "sqlite": Can be "rusqlite".
 
 You can use multiple database in application like a bellow.
@@ -67,7 +69,9 @@ You can use multiple database in application like a bellow.
 ```toml
 [package.metadata.database]
 main = {
-    engine = "postgres",
+    engine = "PostgreSQL",
+    dialect = "postgres",
+    version = "17",
     connector = "tokio-postgres"
 }
 edge = {
@@ -111,6 +115,37 @@ dependencies:
 cargo add tokio --futures full
 cargo add tokio-postgres futures-util
 ```
+
+## Initialize PostgreSQL builtin metadata
+
+PostgreSQL analysis requires builtin metadata matching your target PostgreSQL
+version, even for ordinary schema definitions using types such as `int`.
+This metadata is required independently of any optional application schema dump.
+
+Install PostgreSQL client tools (`psql`). For the default Docker source, also
+install Docker CLI and provide access to a Docker daemon, then run:
+
+```console
+sql-fun init
+```
+
+Select the PostgreSQL versions you need (currently 17 and 18). For a
+non-interactive initialization of a specific version:
+
+```console
+sql-fun init --yes --engine-versions 17
+```
+
+Set your datasource's `version` to the matching major. Initialization stores
+metadata under `$SQL_FUN_HOME/postgres/<version>/` (default `~/.sql-fun`), which
+normal analysis loads. It preserves valid installations on rerun.
+
+You can also initialize from an existing PostgreSQL server using
+`SQL_FUN_DATABASE_URL` or `--database-url`; this detects the server's version
+and requires no Docker access. See [initialization](cli/init.md) for connection
+settings, selecting multiple versions, custom homes, and retrying failures.
+Detailed catalog and extension extraction workflows are described in
+[extraction](cli/extract.md).
 
 ## PostgreSQL extraction prerequisites
 
@@ -196,7 +231,9 @@ To disable this warning, you can set `schema_checking = false` in your
 [package.metadata.database]
 default = {
     schema_checking = false
-    engine="postgres"
+    engine="PostgreSQL"
+    dialect="postgres"
+    version="17"
     connector = "tokio-postgres"
 }
 ```

@@ -28,6 +28,8 @@ enum Operation {
 
 #[derive(clap::Args, Debug, Clone)]
 struct CatalogArgs {
+    #[arg(skip)]
+    expected_version: Option<sql_fun_core::PostgresVersion>,
     /// PostgreSQL connection string; prefer `SQL_FUN_DATABASE_URL` to avoid shell history.
     #[arg(
         long,
@@ -99,6 +101,41 @@ impl Operation {
     }
 }
 
+pub(crate) async fn detect_server(
+    connection: &str,
+    seconds: u64,
+) -> Result<sql_fun_core::PostgresVersion, anyhow::Error> {
+    tokio::time::timeout(Duration::from_secs(seconds), catalog::detect(connection))
+        .await
+        .map_err(|_| anyhow::anyhow!("PostgreSQL version detection timed out"))?
+}
+
+pub(crate) async fn initialize_catalog(
+    args: &sql_fun_core::InitializeArgs,
+    version: &sql_fun_core::PostgresVersion,
+    output: &std::path::Path,
+) -> Result<(), anyhow::Error> {
+    let source = CatalogArgs {
+        expected_version: Some(*version),
+        database_url: args.database_url().map(str::to_owned),
+        docker_image: if args.database_url().is_none() {
+            Some(
+                version
+                    .extraction_image()
+                    .map_err(anyhow::Error::msg)?
+                    .to_owned(),
+            )
+        } else {
+            None
+        },
+        docker_host_address: args.docker_host_address().to_owned(),
+        docker_bind_address: args.docker_bind_address().to_owned(),
+        output: output.to_path_buf(),
+        timeout_seconds: args.timeout_seconds(),
+    };
+    source.execute().await
+}
+
 impl CatalogArgs {
     async fn execute(&self) -> Result<(), anyhow::Error> {
         which::which("psql").map_err(|_| {
@@ -136,6 +173,13 @@ impl CatalogArgs {
                     serde_json::json!({"source": "connection"}),
                 )
             };
+            if let Some(expected) = self.expected_version {
+                let actual = catalog::detect(&connection).await?;
+                anyhow::ensure!(
+                    actual == expected,
+                    "expected PostgreSQL {expected}, connected server reports {actual}"
+                );
+            }
             catalog::extract(&connection, stage.path(), &provenance).await?;
             if let Some(instance) = &container {
                 let bundle_path = stage.path().join("export.tar");

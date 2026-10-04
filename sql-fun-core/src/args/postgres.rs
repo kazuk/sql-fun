@@ -154,6 +154,18 @@ impl PostgresArgs {
         }
     }
 
+    pub(super) fn version_override(
+        &self,
+    ) -> Result<Option<PostgresEngineVersion>, SqlFunArgsError> {
+        let Some(text) = &self.postgres_version else {
+            return Ok(None);
+        };
+        match PostgresEngineVersion::from_str(text) {
+            Ok(version) => Ok(Some(version)),
+            Err(_) => SqlFunArgsError::invalid_engine_version(text),
+        }
+    }
+
     /// get `PostgreSQL` version
     pub fn postgres_version(
         &self,

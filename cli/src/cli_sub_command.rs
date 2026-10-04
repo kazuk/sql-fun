@@ -41,8 +41,9 @@ pub enum CliSubCommand {
         long_about = r#"Initialize `sql-fun` environments
 
 This command prepares the initial working environment for first-time users.
-It creates the sql-fun home directory, downloads or builds the built-in object catalog and extension metadata, and writes configuration files as needed.
-Repeated runs are idempotent: existing files are preserved unless you confirm overwrites (or use --yes)."#,
+It creates the sql-fun home directory and installs PostgreSQL builtin metadata from Docker or an existing server.
+Docker defaults to all supported stable versions; an existing server selects its detected version.
+Repeated runs preserve valid installations. Incomplete installations must be moved aside before retrying."#,
         next_line_help = true
     )]
     Initialize(InitializeArgs),

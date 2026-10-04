@@ -56,7 +56,25 @@ pub(super) fn import(bundle: &Path, output: &Path) -> Result<(), anyhow::Error> 
             anyhow::ensure!(entry.size() <= 128, "invalid extension version record");
             let mut text = String::new();
             entry.read_to_string(&mut text)?;
-            version = Some(parse_version(&text)?);
+            let number = parse_version(&text)?;
+            let identity = sql_fun_core::PostgresVersionInventory::builtin()
+                .detect(
+                    u32::try_from(number)?,
+                    text.lines().nth(1).context("missing PostgreSQL version")?,
+                )
+                .map_err(anyhow::Error::msg)?;
+            if let Some(expected) = metadata["version_identity"].as_str() {
+                anyhow::ensure!(
+                    identity.to_string() == expected,
+                    "extension bundle PostgreSQL identity must exactly match extracted server identity"
+                );
+            } else {
+                anyhow::ensure!(
+                    identity.is_stable(),
+                    "prerelease catalog metadata must identify its beta/RC version"
+                );
+            }
+            version = Some(number);
         } else {
             anyhow::ensure!(
                 path.parent() == Some(Path::new("extension")),
@@ -152,28 +170,61 @@ fn parse_version(record: &str) -> Result<u64, anyhow::Error> {
         lines.len() == 2 && lines[0] == "1",
         "unsupported extension bundle format"
     );
-    let (major, minor) = lines[1]
-        .split_once('.')
-        .context("invalid PostgreSQL extension version")?;
-    let major: u64 = major.parse()?;
-    let minor: u64 = minor.parse()?;
-    anyhow::ensure!(
-        (17..=18).contains(&major) && minor < 10_000,
-        "unsupported PostgreSQL extension version"
-    );
-    Ok(major * 10_000 + minor)
+    let number = if let Some((major, minor)) = lines[1].split_once('.') {
+        let major: u32 = major.parse()?;
+        let minor: u32 = minor.parse()?;
+        anyhow::ensure!(minor < 10_000, "invalid PostgreSQL minor version");
+        major
+            .checked_mul(10_000)
+            .and_then(|number| number.checked_add(minor))
+            .context("PostgreSQL version number overflow")?
+    } else {
+        let identity: sql_fun_core::PostgresVersion =
+            lines[1].parse().map_err(anyhow::Error::msg)?;
+        anyhow::ensure!(
+            !identity.is_stable(),
+            "stable PostgreSQL extension version requires a minor version"
+        );
+        identity
+            .major()
+            .checked_mul(10_000)
+            .context("PostgreSQL version number overflow")?
+    };
+    sql_fun_core::PostgresVersionInventory::builtin()
+        .detect(number, lines[1])
+        .map_err(anyhow::Error::msg)?;
+    Ok(u64::from(number))
 }
 
 #[cfg(test)]
 mod tests {
     use super::parse_version;
 
+    #[rstest::rstest]
+    #[case::seventeen("1\n17.9\n", 170_009)]
+    #[case::eighteen("1\n18.3\n", 180_003)]
+    fn validates_protocol_and_full_postgresql_version(#[case] text: &str, #[case] expected: u64) {
+        assert_eq!(parse_version(text).unwrap(), expected);
+    }
+
     #[test]
-    fn validates_protocol_and_full_postgresql_version() {
-        assert_eq!(parse_version("1\n17.9\n").unwrap(), 170_009);
-        assert_eq!(parse_version("1\n18.3\n").unwrap(), 180_003);
-        for text in ["2\n17.9\n", "1\n17\n", "1\n18.1\nextra", "1\n17.10000\n"] {
-            assert!(parse_version(text).is_err());
-        }
+    fn diagnoses_unregistered_prereleases_as_unsupported() {
+        assert!(
+            parse_version("1\n19beta1\n")
+                .unwrap_err()
+                .to_string()
+                .contains("not supported")
+        );
+    }
+
+    #[rstest::rstest]
+    #[case::protocol("2\n17.9\n")]
+    #[case::missing_minor("1\n17\n")]
+    #[case::extra_record("1\n18.1\nextra")]
+    #[case::minor_overflow("1\n17.10000\n")]
+    #[case::unsupported_older("1\n16.1\n")]
+    #[case::unsupported_newer("1\n19.1\n")]
+    fn rejects_invalid_or_unsupported_versions(#[case] text: &str) {
+        assert!(parse_version(text).is_err());
     }
 }

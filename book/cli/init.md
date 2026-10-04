@@ -1,85 +1,85 @@
-# `init` sub command for `sql-fun` CLI utility
+# Initialize PostgreSQL support
 
-The initialization workflow below is planned and is not fully implemented.
-To extract usable PostgreSQL catalog and extension artifacts now, use
-[`sql-fun extract`](extract.md). The proposed `--docker-image-tag` option below
-is not currently accepted by `init`.
+`sql-fun init` installs the builtin metadata required for PostgreSQL semantic
+analysis. This includes builtin types, functions, operators, casts, and catalog
+objects. Metadata must match the PostgreSQL version configured for your datasource.
+It is separate from your application schema dump; initialization does not manage
+schemas or migrations.
 
-`init` sub command prepare and configures `sql-fun`.
+## From Docker
 
-1. Create `sql-fun` home directory.
-   - `sql-fun` home directory contains
-     - DB Engine builtin objects information
-       - Extract from `PostgreSQL` docker image
-     - DB Engine extensions information
-     - SQL Syntax highlighter themes
-
-## Usage
-
-### Interactive setup
+Install PostgreSQL client tools (`psql`) and Docker CLI, and provide access to a
+Docker daemon. Docker is the default initialization source:
 
 ```console
 sql-fun init
 ```
 
-### Download release artifact for DB Engine builtin object information
-
-Shorthand
+Select one or more supported PostgreSQL majors in the interactive prompt.
+Currently, builtin extraction supports PostgreSQL 17 and 18. You can select any
+non-empty combination. Non-interactive setup defaults to all supported stable
+versions:
 
 ```console
 sql-fun init --yes
+sql-fun init --yes --engine-versions 17,18
 ```
 
-This command line same as bellow.
+Each version uses its registered PostgreSQL image and a temporary container.
+The extractor removes its own containers and volumes after completion or a
+handled interruption. Image retrieval requires network access unless the image
+is already present.
 
-```console
-sql-fun init --yes --github-repo "kazuk/sql-fun" 
+If sql-fun runs inside a container or uses a remote Docker host, use
+`--docker-host-address` for the reachable host address and
+`--docker-bind-address` for the host interface publishing PostgreSQL ports.
+Both default to `127.0.0.1`. See [extraction](extract.md) for connectivity and
+resource-cleanup details.
+
+## From an existing server
+
+This source requires `psql`, network access, and appropriate PostgreSQL catalog
+permissions. It does not require Docker. Use libpq authentication/TLS settings;
+keep passwords in a password file rather than in command arguments:
+
+```sh
+export SQL_FUN_DATABASE_URL='host=db.example.org dbname=postgres'
+SQL_FUN_DATABASE_URL="$SQL_FUN_DATABASE_URL user=catalog_reader"
+SQL_FUN_DATABASE_URL="$SQL_FUN_DATABASE_URL sslmode=verify-full"
+sql-fun init --yes
 ```
 
-### Extract DB Engine builtin object information from your database
+Alternatively, supply `--database-url` with a libpq connection string or URL.
+Initialization detects the connected server's major and installs that version.
+Unsupported versions produce an error. If you supply `--engine-versions`, it must
+select only the detected version. `--docker` explicitly selects Docker and
+conflicts with an existing-server source.
 
-```console
-sql-fun init --yes --database-url postgres://your-db-host/database
-```
+Existing-server initialization installs builtin metadata only; it does not
+copy the server's extension files. The [extraction documentation](extract.md)
+describes administrator-produced extension bundles separately.
 
-### Extract DB Engine builtin object information from docker image
+## Installation and reruns
 
-```console
-sql-fun init --yes --docker-image-tag "postgres:latest"
-```
+Metadata is installed under `$SQL_FUN_HOME/postgres/<version>/`, with a default
+home of `~/.sql-fun`. Use `--sql-fun-home` to choose another home, and pass the
+same home to subsequent check/server commands. A configured datasource version
+must be included in the selected target set. Standalone home initialization
+also works outside a project.
 
-## Options
+If project metadata has no `default` datasource, select a configured name with
+the global option, for example `sql-fun --datasource main init --yes`.
 
-- `--yes`, `-y` : Disable prompts (assume yes)
-- `--sql-fun-home`: Home directory path. (optional)
-  - default is `${HOME}/.sql-fun`
-- `--database-url`: Extract DB Engine built-in object information from actual
-  database instance. (optional)
-- `--docker-image-tag`: Extract DB Engine built-in object information from
-  container. (optional)
-- `--github-repo`: Download source for DB Engine built-in object information.
-  (optional)
-  - default is `kazuk/sql-fun`
-- `--sql-fun-version`: `sql-fun` version to use when downloading artifacts
-  (semver)
-  - default is latest stable release
-- `--engine-version`: Limit initialization to the specified database engine
-  versions.
-  - default: install ALL engine versions in artifact
-- `--postgres-extensions`: Limit initialization to the specified `PostgreSQL`
-  extensions
-  - default: install ALL extensions
+A complete compatible installation is preserved on rerun. An incomplete or
+incompatible installation is an error: move the affected version directory
+aside before retrying. `--yes` disables prompts; it does not overwrite metadata.
+Only one initializer may install a given version at a time.
 
-Extension selections use `name` or `name@version`, for example `uuid-ossp` or
-`uuid-ossp@1.1`. Version names must be valid UTF-8. An explicit version selects
-its installation script. When the
-version is omitted, sql-fun uses `default_version` from the extension's primary
-control file. A missing script for that default is an error.
+Versions are installed independently. If a later version fails, completed
+versions remain usable and the command reports failure. Correct the reported
+problem and rerun initialization. `--timeout-seconds` sets the extraction timeout
+for each version (default 120).
 
-If the control file is absent or has no default, sql-fun infers a version only
-when exactly one installation script exists. Specify `name@version` when several
-installation versions are available. Update scripts (`name--from--to.sql`) are
-excluded from inference. Resolution requires a direct installation script
-(`name--version.sql`); it does not execute upgrade chains or apply a custom
-control-file `directory` setting. Control-file include directives are unsupported
-and produce an error.
+Release artifact downloading and extension filtering are not implemented by
+this command. The previously planned `--github-repo`, `--sql-fun-version`,
+`--postgres-extensions`, and `--docker-image-tag` options are not accepted.

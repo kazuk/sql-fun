@@ -22,6 +22,16 @@ impl ExtensionFixture {
         Ok(fixture)
     }
 
+    pub(super) fn with_control_bytes(
+        name: &str,
+        versions: &[&str],
+        control: &[u8],
+    ) -> std::io::Result<Self> {
+        let fixture = Self::new(name, versions, None)?;
+        std::fs::write(fixture.path().join(format!("{name}.control")), control)?;
+        Ok(fixture)
+    }
+
     pub(super) fn path(&self) -> &Path {
         self.directory.path()
     }

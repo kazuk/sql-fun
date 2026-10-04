@@ -6,12 +6,12 @@ use std::path::Path;
 // default_version wins. Only lexical validation and default selection belong
 // here: this is not an extension installer or a general GUC/include processor.
 pub(super) fn default_version(
-    contents: &str,
+    contents: &[u8],
     path: &Path,
 ) -> Result<Option<String>, ExtensionConfigError> {
     let mut version = None;
     let mut version_line = 0;
-    for (index, line) in contents.split('\n').enumerate() {
+    for (index, line) in contents.split(|byte| *byte == b'\n').enumerate() {
         let parsed = ControlLine::parse(line);
         let (name, value) = match parsed {
             Ok(Some(pair)) => pair,
@@ -20,9 +20,9 @@ pub(super) fn default_version(
                 return ExtensionConfigError::invalid_control_file(path, index + 1, reason);
             }
         };
-        if name.eq_ignore_ascii_case("include")
-            || name.eq_ignore_ascii_case("include_if_exists")
-            || name.eq_ignore_ascii_case("include_dir")
+        if name.eq_ignore_ascii_case(b"include")
+            || name.eq_ignore_ascii_case(b"include_if_exists")
+            || name.eq_ignore_ascii_case(b"include_dir")
         {
             return ExtensionConfigError::invalid_control_file(
                 path,
@@ -30,7 +30,7 @@ pub(super) fn default_version(
                 "control-file include directives are not supported",
             );
         }
-        if name == "default_version" {
+        if name == b"default_version" {
             version = Some(value);
             version_line = index + 1;
         }
@@ -64,17 +64,17 @@ mod test_default_version {
     fn follows_postgres_assignments_and_last_value() {
         let input = "# comment\ncomment='ignore # and ''quotes'' here'\ndefault_version = 'old'\n\tdefault_version 'release_2' # last\r\n";
         assert_eq!(
-            default_version(input, Path::new("ext.control"))
+            default_version(input.as_bytes(), Path::new("ext.control"))
                 .unwrap()
                 .as_deref(),
             Some("release_2")
         );
         assert_eq!(
-            default_version("comment = 'default_version = 9'", Path::new("ext.control")).unwrap(),
+            default_version(b"comment = 'default_version = 9'", Path::new("ext.control")).unwrap(),
             None
         );
         assert_eq!(
-            default_version(r"comment='\377'", Path::new("ext.control")).unwrap(),
+            default_version(br"comment='\377'", Path::new("ext.control")).unwrap(),
             None
         );
     }
@@ -83,19 +83,19 @@ mod test_default_version {
     fn default_errors_report_the_source_line_and_validate_only_the_last_value() {
         let path = Path::new("ext.control");
         assert!(
-            default_version("# comment\ndefault_version=''", path)
+            default_version(b"# comment\ndefault_version=''", path)
                 .unwrap_err()
                 .to_string()
                 .contains("ext.control:2")
         );
         assert_eq!(
-            default_version("default_version=''\ndefault_version='2'", path)
+            default_version(b"default_version=''\ndefault_version='2'", path)
                 .unwrap()
                 .as_deref(),
             Some("2")
         );
         assert_eq!(
-            default_version(r"default_version='\061.\061'", path)
+            default_version(br"default_version='\061.\061'", path)
                 .unwrap()
                 .as_deref(),
             Some("1.1")
@@ -106,16 +106,43 @@ mod test_default_version {
     fn decodes_only_the_final_default_version() {
         let path = Path::new("ext.control");
         assert!(
-            default_version(r"default_version='\377'", path)
+            default_version(br"default_version='\377'", path)
                 .unwrap_err()
                 .to_string()
                 .contains("not valid UTF-8")
         );
         assert_eq!(
-            default_version("default_version='\\377'\ndefault_version='2'", path)
+            default_version(b"default_version='\\377'\ndefault_version='2'", path)
                 .unwrap()
                 .as_deref(),
             Some("2")
+        );
+    }
+
+    #[test]
+    fn ignores_non_utf8_bytes_outside_the_selected_version() {
+        let path = Path::new("ext.control");
+        for input in [
+            &b"# \xff\ndefault_version='1.1'"[..],
+            &b"comment='\xff'\ndefault_version='1.1'"[..],
+            &b"comment=\xff\ndefault_version='1.1'"[..],
+            &b"\xff='ignored'\ndefault_version='1.1'"[..],
+            &b"default_version='\xff'\ndefault_version='1.1'"[..],
+        ] {
+            assert_eq!(
+                default_version(input, path).unwrap().as_deref(),
+                Some("1.1")
+            );
+        }
+        assert_eq!(
+            default_version(b"# \xff\ncomment='\xff'", path).unwrap(),
+            None
+        );
+        let error = default_version(b"# comment\ndefault_version='\xff'", path).unwrap_err();
+        assert!(
+            error
+                .to_string()
+                .contains("ext.control:2: default_version is not valid UTF-8")
         );
     }
 
@@ -124,7 +151,7 @@ mod test_default_version {
         for directive in ["include", "include_if_exists", "INCLUDE_DIR"] {
             let input = format!("{directive}='other.control'");
             assert!(
-                default_version(&input, Path::new("ext.control"))
+                default_version(input.as_bytes(), Path::new("ext.control"))
                     .unwrap_err()
                     .to_string()
                     .contains("include directives are not supported")
@@ -148,7 +175,7 @@ mod test_default_version {
             "default_version=1e2",
             "default_version=release.beta",
         ] {
-            let error = default_version(input, Path::new("ext.control")).unwrap_err();
+            let error = default_version(input.as_bytes(), Path::new("ext.control")).unwrap_err();
             assert!(
                 error.to_string().contains("ext.control:1"),
                 "{input}: {error}"
@@ -157,15 +184,15 @@ mod test_default_version {
     }
 }
 
+type ControlAssignment<'a> = (&'a [u8], Vec<u8>);
+
 struct ControlLine<'a> {
     rest: &'a [u8],
 }
 
 impl<'a> ControlLine<'a> {
-    fn parse(line: &'a str) -> Result<Option<(&'a str, Vec<u8>)>, &'static str> {
-        let mut cursor = Self {
-            rest: line.as_bytes(),
-        };
+    fn parse(line: &'a [u8]) -> Result<Option<ControlAssignment<'a>>, &'static str> {
+        let mut cursor = Self { rest: line };
         cursor.whitespace();
         if cursor.finished() {
             return Ok(None);
@@ -199,10 +226,7 @@ impl<'a> ControlLine<'a> {
         // PostgreSQL's deescaped values are C strings.
         let mut value = value;
         value.truncate(Self::prefix(&value, |byte| *byte != 0));
-        Ok(Some((
-            std::str::from_utf8(name).map_err(|_| "invalid parameter name")?,
-            value,
-        )))
+        Ok(Some((name, value)))
     }
 
     fn whitespace(&mut self) {
@@ -374,7 +398,7 @@ mod test_control_line {
     fn deescapes_postgres_strings() {
         let input = r"default_version='a''b\'c\141\q\t\b\f\n\r\\'";
         assert_eq!(
-            ControlLine::parse(input).unwrap().unwrap().1,
+            ControlLine::parse(input.as_bytes()).unwrap().unwrap().1,
             "a'b'caq\t\u{8}\u{c}\n\r\\".as_bytes()
         );
     }
@@ -396,7 +420,7 @@ mod test_control_line {
         ] {
             let input = format!("default_version={value}");
             assert_eq!(
-                ControlLine::parse(&input).unwrap().unwrap().1,
+                ControlLine::parse(input.as_bytes()).unwrap().unwrap().1,
                 value.as_bytes()
             );
         }

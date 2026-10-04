@@ -44,16 +44,18 @@ def owned():
     return set(run("docker", "ps", "-aq", "--filter", "label=io.sql-fun.extraction=owned").stdout.split())
 
 
-def validate_interactive_init(binary, destination):
-    """Exercise actual terminal prompts with the repository's connector-only shape."""
-    project = destination / "interactive-init"
+def validate_interactive_init(binary, destination, fixture, declarations, ambient_metadata=False):
+    """Bare init must not inspect project contents or ambient metadata paths."""
+    project = destination / f"interactive-init-{fixture}"
     project.mkdir()
     manifest = project / "Cargo.toml"
-    declarations = "[package.metadata.database]\nconnector = 'tokio-postgres'\n"
     manifest.write_text(declarations)
     home = project / "chosen-home"
     env = dict(os.environ, SQL_FUN_HOME=str(home), TERM="xterm", PATH=str(project / "no-tools"))
     env.pop("SQL_FUN_DATASOURCE", None)
+    env.pop("SQL_FUN_METADATA_FILE", None)
+    if ambient_metadata:
+        env["SQL_FUN_METADATA_FILE"] = str(manifest)
     master, slave = pty.openpty()
     fcntl.ioctl(slave, termios.TIOCSWINSZ, struct.pack("HHHH", 24, 100, 0, 0))
 
@@ -61,7 +63,7 @@ def validate_interactive_init(binary, destination):
         os.setsid()
         fcntl.ioctl(0, termios.TIOCSCTTY, 0)
 
-    process = subprocess.Popen([binary, "--metadata-file", str(manifest), "init"],
+    process = subprocess.Popen([binary, "init"],
                                cwd=project, env=env, stdin=slave, stdout=slave,
                                stderr=slave, preexec_fn=terminal_session)
     os.close(slave)
@@ -97,7 +99,7 @@ def validate_interactive_init(binary, destination):
         wait_for("Space to select, Enter to confirm.")
         wait_for("[ ] postgres")
         wait_for("[ ] sqlite")
-        assert b"Choose datasources" not in rendered(), "connector is a setting, not a datasource"
+        assert b"Choose datasources" not in rendered(), "bare init must not inspect project metadata"
         start = len(transcript)
         os.write(master, b"\r")
         wait_for("Select at least one option explicitly.", start)
@@ -112,7 +114,7 @@ def validate_interactive_init(binary, destination):
             process.terminate()
             process.wait(timeout=5)
         os.close(master)
-    print("Interactive init: home choice, engine candidates, explicit selection and SQLite dispatch passed", flush=True)
+    print(f"Interactive init ({fixture}): no project inspection, home choice and explicit engine selection passed", flush=True)
 
 
 def validate(binary, major, image, destination, host, bind):
@@ -264,7 +266,12 @@ def main():
     args.binary = str(Path(args.binary).resolve())
     # Run the packaged CLI outside the checkout: all runtime resources must be embedded.
     os.chdir(destination)
-    validate_interactive_init(args.binary, destination)
+    validate_interactive_init(args.binary, destination, "connector",
+                              "[package.metadata.database]\nconnector = 'tokio-postgres'\n")
+    validate_interactive_init(args.binary, destination, "named",
+                              "[package.metadata.database.private]\nengine = 'PostgreSQL'\n")
+    validate_interactive_init(args.binary, destination, "malformed", "not valid TOML [")
+    validate_interactive_init(args.binary, destination, "ambient", "not valid TOML [", True)
     before = owned()
     for major, image in IMAGES.items():
         validate(str(Path(args.binary).resolve()), major, image, destination, args.host, args.bind)

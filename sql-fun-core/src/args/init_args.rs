@@ -31,12 +31,13 @@ pub struct InitializeArgs {
     sql_fun_home: Option<PathBuf>,
 
     /// Engines whose development support should be initialized.
-    /// If omitted, ask for datasource or engine selection interactively.
+    /// If omitted, ask for engines interactively unless project access was requested.
     #[arg(long, value_delimiter = ',', num_args = 1.., value_parser = ["postgres", "sqlite"])]
     engines: Option<Vec<String>>,
 
     /// Project datasources explicitly selected for initialization.
-    /// Accepts comma-separated names; does not select from environment defaults.
+    /// Requests project metadata access. Accepts comma-separated names;
+    /// does not select from environment defaults.
     #[arg(long = "datasource", value_delimiter = ',', num_args = 1.., conflicts_with = "engines")]
     datasources: Option<Vec<String>>,
 

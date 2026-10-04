@@ -25,6 +25,7 @@ use ::statig::blocking::IntoStateMachineExt;
 pub async fn initialize(
     args: &SqlFunArgs,
     init_args: &InitializeArgs,
+    metadata_file_from_cli: bool,
 ) -> Result<ExitCode, anyhow::Error> {
     if init_args.assume_yes() {
         anyhow::ensure!(
@@ -48,7 +49,7 @@ pub async fn initialize(
     if !init_args.assume_yes() && !prepare_home(&mut context)? {
         return Ok(ExitCode::FAILURE);
     }
-    let selection = SetupSelection::resolve(args, init_args)?;
+    let selection = SetupSelection::resolve(args, init_args, metadata_file_from_cli)?;
     selection.check_choices(init_args)?;
     let plans = selection.prepare(args, init_args).await?;
     if init_args.assume_yes() && !prepare_home(&mut context)? {
@@ -78,15 +79,16 @@ struct SetupSelection {
     metadata: Option<InitializationDatasources>,
 }
 impl SetupSelection {
-    fn resolve(common: &SqlFunArgs, args: &InitializeArgs) -> Result<Self, anyhow::Error> {
-        let metadata = if common.metadata_file_is_explicit()
-            || (args.engines().is_none() && common.metadata_file().is_ok())
-        {
+    fn resolve(
+        common: &SqlFunArgs,
+        args: &InitializeArgs,
+        metadata_file_from_cli: bool,
+    ) -> Result<Self, anyhow::Error> {
+        let metadata = if metadata_file_from_cli || args.datasources().is_some() {
             Some(InitializationDatasources::load_from(
                 &common.metadata_file()?,
             )?)
         } else {
-            common.metadata_file_raw()?;
             None
         };
         let mut selection = Self {

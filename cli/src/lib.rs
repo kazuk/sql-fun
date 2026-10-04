@@ -25,12 +25,27 @@ pub struct SqlFunCliArgs {
     #[clap(flatten)]
     common_args: SqlFunArgs,
 
+    #[arg(skip)]
+    metadata_file_from_cli: bool,
+
     /// Subcommand to execute (internal or external)
     #[clap(subcommand)]
     command: Option<CliSubCommand>,
 }
 
 impl SqlFunCliArgs {
+    /// Parse CLI arguments while retaining explicit project-access consent.
+    #[must_use]
+    pub fn parse_with_sources() -> Self {
+        use ::clap::{CommandFactory, FromArgMatches, parser::ValueSource};
+
+        let matches = <Self as CommandFactory>::command().get_matches();
+        let mut args = Self::from_arg_matches(&matches).unwrap_or_else(|error| error.exit());
+        args.metadata_file_from_cli =
+            matches.value_source("metadata_file") == Some(ValueSource::CommandLine);
+        args
+    }
+
     /// returns true for builtin subcommand
     #[must_use]
     pub const fn is_builtin(&self) -> bool {
@@ -61,5 +76,7 @@ pub async fn run_builtin(args: &SqlFunCliArgs) -> Result<ExitCode, anyhow::Error
         eprintln!("no sub-command specified");
         return Ok(ExitCode::SUCCESS);
     };
-    sub_command.run_builtin(&args.common_args).await
+    sub_command
+        .run_builtin(&args.common_args, args.metadata_file_from_cli)
+        .await
 }

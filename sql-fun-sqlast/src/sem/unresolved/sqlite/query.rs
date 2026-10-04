@@ -24,6 +24,13 @@ impl TryFrom<&syn::Select> for Query {
     type Error = AnalysisError;
 
     fn try_from(value: &syn::Select) -> Result<Self, Self::Error> {
+        crate::sem::stack::with_stack(|| Self::convert_sqlite(value))
+    }
+}
+
+impl Query {
+    #[inline(never)]
+    fn convert_sqlite(value: &syn::Select) -> Result<Self, AnalysisError> {
         let mut query = Self::from(QueryBody::try_from(value.body().select())?);
         for compound in value.body().compounds() {
             let right = Self::from(QueryBody::try_from(compound.select())?);
@@ -331,6 +338,13 @@ impl TryFrom<&syn::SelectTable> for FromItem {
     type Error = AnalysisError;
 
     fn try_from(value: &syn::SelectTable) -> Result<Self, Self::Error> {
+        crate::sem::stack::with_stack(|| Self::convert_sqlite(value))
+    }
+}
+
+impl FromItem {
+    #[inline(never)]
+    fn convert_sqlite(value: &syn::SelectTable) -> Result<Self, AnalysisError> {
         match value {
             syn::SelectTable::Table(value) => Self::try_from(value),
             syn::SelectTable::Select(value) => Self::try_from(value),

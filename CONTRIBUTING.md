@@ -97,6 +97,12 @@ The optional `cli-contract` check-flow step evaluates source-owned Scrut CLI
 contracts against the locally built `sql-fun` executable. It requires the
 `scrut` DotSlash wrapper and `dotslash` executable to be available on `PATH`.
 
+Source builds of the SQL analyzer require a C compiler and assembler for the
+`stacker`/`psm` stack-growth backend, in addition to the native prerequisites of
+`pg_query`. On Ubuntu, install `build-essential` and `clang`; both are already
+included in the CI/development image. Cross-compilation requires the corresponding
+target toolchain. Stack growth adds no executable prerequisite at CLI runtime.
+
 Some Rust dependencies may require additional native build dependencies. Package
 names vary by operating system and distribution, so install the missing packages
 reported by the build errors for your environment.

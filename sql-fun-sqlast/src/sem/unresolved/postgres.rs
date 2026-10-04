@@ -891,6 +891,16 @@ impl TryFromWithTokens<&syn::Node> for Expr {
         node: &syn::Node,
         tokens: &IVec<crate::syn::ScanToken>,
     ) -> Result<Self, Self::Error> {
+        crate::sem::stack::with_stack(|| Self::convert_postgres(node, tokens))
+    }
+}
+
+impl Expr {
+    #[inline(never)]
+    fn convert_postgres(
+        node: &syn::Node,
+        tokens: &IVec<crate::syn::ScanToken>,
+    ) -> Result<Self, AnalysisError> {
         if node.is_a_const() {
             return Ok(Self::Literal(Literal::from(&node.as_a_const())));
         }

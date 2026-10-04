@@ -27,6 +27,16 @@ impl Query {
         dialect: Dialect,
         outer: Option<&ScalarAnalysisContext<'_>>,
     ) -> Result<SelectStatement, AnalysisError> {
+        crate::sem::stack::with_stack(|| Self::resolve_in_body(self, context, dialect, outer))
+    }
+
+    #[inline(never)]
+    fn resolve_in_body(
+        &self,
+        context: &mut Resolution<'_>,
+        dialect: Dialect,
+        outer: Option<&ScalarAnalysisContext<'_>>,
+    ) -> Result<SelectStatement, AnalysisError> {
         let with = self.with.resolve(context, dialect, outer)?;
         self.body.resolve(context, dialect, &with, outer)
     }
@@ -169,6 +179,20 @@ impl FromItem {
         preceding: &FromClause,
         outer: Option<&ScalarAnalysisContext<'_>>,
     ) -> Result<DataSource, AnalysisError> {
+        crate::sem::stack::with_stack(|| {
+            Self::resolve_body(self, context, dialect, with, preceding, outer)
+        })
+    }
+
+    #[inline(never)]
+    fn resolve_body(
+        &self,
+        context: &mut Resolution<'_>,
+        dialect: Dialect,
+        with: &WithClause,
+        preceding: &FromClause,
+        outer: Option<&ScalarAnalysisContext<'_>>,
+    ) -> Result<DataSource, AnalysisError> {
         match self {
             Self::Relation(relation) => {
                 let name = relation.name.full_name()?;
@@ -220,8 +244,7 @@ impl FromItem {
                 functions.resolve(context, dialect, with, preceding, outer)
             }
             Self::Group(group) => {
-                let mut items = group.items.clone().into_iter();
-                let Some(first) = items.next() else {
+                let Some((first, items)) = group.items.split_first() else {
                     return AnalysisError::raise_unexpected_input("empty FROM group");
                 };
                 let mut source = first.resolve(context, dialect, with, preceding, outer)?;

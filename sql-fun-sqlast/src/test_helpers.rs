@@ -1,6 +1,7 @@
 #![cfg(test)]
 //! test helper types
 
+mod adventure_works;
 mod syn_builder;
 mod test_parse_context;
 
@@ -15,6 +16,7 @@ use crate::{
 };
 
 pub use self::{
+    adventure_works::adventure_works_schema,
     syn_builder::SynBuilder,
     test_parse_context::{TestParseContext, test_context},
 };
@@ -144,5 +146,47 @@ impl SemValueBuilder {
     /// create constraint int expression
     pub fn const_int_expr(&self, value: i32) -> SemScalarExpr {
         SemScalarExpr::Const(ScalarConstExpr::Integer(value))
+    }
+}
+
+/// Run a regression on an explicit default-sized stack, independent of Cargo's
+/// `RUST_MIN_STACK`. Panics retain their original payload on the test thread.
+pub fn on_small_stack<T: Send>(operation: impl FnOnce() -> T + Send) -> T {
+    on_stack(2 * 1024 * 1024, operation)
+}
+
+fn on_stack<T: Send>(stack_size: usize, operation: impl FnOnce() -> T + Send) -> T {
+    std::thread::scope(|scope| {
+        let worker = std::thread::Builder::new()
+            .name("small-stack-analysis".to_owned())
+            .stack_size(stack_size)
+            .spawn_scoped(scope, operation)
+            .expect("small-stack worker");
+        match worker.join() {
+            Ok(value) => value,
+            Err(panic) => std::panic::resume_unwind(panic),
+        }
+    })
+}
+
+/// Isolate an abort-prone regression, then run its body on an explicit stack.
+pub fn small_stack_regression(stack_size: usize, operation: impl FnOnce() + Send) {
+    let thread = std::thread::current();
+    let name = thread.name().expect("named test thread");
+    if std::env::var("SQL_FUN_SMALL_STACK_TEST").as_deref() == Ok(name) {
+        on_stack(stack_size, operation);
+    } else {
+        let output = std::process::Command::new(std::env::current_exe().expect("test executable"))
+            .args(["--exact", name, "--nocapture"])
+            .env("SQL_FUN_SMALL_STACK_TEST", name)
+            .env("RUST_LOG", "error")
+            .output()
+            .expect("isolated small-stack regression");
+        assert!(
+            output.status.success(),
+            "small-stack regression {name} failed: {}\n{}",
+            String::from_utf8_lossy(&output.stdout),
+            String::from_utf8_lossy(&output.stderr),
+        );
     }
 }

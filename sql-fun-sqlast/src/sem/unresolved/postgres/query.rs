@@ -20,6 +20,16 @@ impl TryFromWithTokens<&syn::SelectStmt> for Query {
         value: &syn::SelectStmt,
         tokens: &IVec<crate::syn::ScanToken>,
     ) -> Result<Self, Self::Error> {
+        crate::sem::stack::with_stack(|| Self::convert_postgres(value, tokens))
+    }
+}
+
+impl Query {
+    #[inline(never)]
+    fn convert_postgres(
+        value: &syn::SelectStmt,
+        tokens: &IVec<crate::syn::ScanToken>,
+    ) -> Result<Self, AnalysisError> {
         Ok(Self {
             with: With::try_from_with_tokens(value.get_with_clause(), tokens)?,
             body: QueryBody::try_from_with_tokens(value, tokens)?,
@@ -419,6 +429,16 @@ impl TryFromWithTokens<&syn::Node> for FromItem {
         node: &syn::Node,
         tokens: &IVec<crate::syn::ScanToken>,
     ) -> Result<Self, Self::Error> {
+        crate::sem::stack::with_stack(|| Self::convert_postgres(node, tokens))
+    }
+}
+
+impl FromItem {
+    #[inline(never)]
+    fn convert_postgres(
+        node: &syn::Node,
+        tokens: &IVec<crate::syn::ScanToken>,
+    ) -> Result<Self, AnalysisError> {
         if let Some(relation) = node.as_range_var().as_inner() {
             return Ok(Self::relation(Relation::try_from(&relation)?));
         }

@@ -3138,6 +3138,7 @@ dependencies = [
  "serde",
  "serde_json",
  "sql-fun-core",
+ "stacker",
  "testresult",
  "thiserror 2.0.21",
  "tracing",

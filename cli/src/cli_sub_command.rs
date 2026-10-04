@@ -46,6 +46,15 @@ PostgreSQL setup installs required builtin metadata from a chosen Docker or exis
 SQLite development-support setup is still under development.
 With --yes, supply all required choices through CLI parameters; omitted choices are errors.
 Repeated runs preserve valid installations. Incomplete installations must be moved aside before retrying."#,
+        after_long_help = r#"Examples:
+  Interactive setup (asks for missing choices):
+    sql-fun init
+
+  PostgreSQL setup without prompts (all required choices supplied):
+    sql-fun init --yes --sql-fun-home /absolute/path/to/sql-fun-home --engines postgres --docker --engine-versions 17,18
+
+  Docker setup requires Docker CLI access to a running daemon and psql.
+  --engines and --datasource are alternative selections; do not combine them."#,
         next_line_help = true
     )]
     Initialize(InitializeArgs),

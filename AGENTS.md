@@ -6,7 +6,7 @@ Various utility scripts are located under `.local/bin/`.
 
 - `check-test-flow`: Runs the standard build and test flow.
 - `big-source`: Lists large source files based on their size (line count).
-- `update-stats`: Updates project statistics.
+- `update-stats`: Generates a local coverage summary in `stats/coverage.txt`.
 
 ## Repository skills
 
@@ -16,12 +16,6 @@ skill's `SKILL.md` for its requirements and detailed workflow before using it.
 - [implement-unit-test](.codex/skills/implement-unit-test/SKILL.md): Implement
   Rust unit tests for a specified source file when working on coverage-driven
   test targets.
-
-## Statistics
-
-To inspect coverage, run `.local/bin/update-stats`. It regenerates
-`stats/coverage.txt` using `llvm-cov`. Coverage measurement and statistics
-updates are not required for development, review, or pull request submission.
 
 ## Build and Test
 
@@ -130,9 +124,6 @@ directly:
   label.
 
 ## Pull Requests
-
-Coverage statistics do not need to be regenerated for every pull request.
-Follow the optional measurement guidance in the Statistics section.
 
 - Before creating or updating a pull request, read
   `.github/PULL_REQUEST_TEMPLATE.md` and include all of its sections in the

@@ -188,10 +188,6 @@ jobs:
 
           - [ ] README/book/user_manual updated (if needed): review the cherry-picked documentation; no additional end-user change is required for digest adoption.
 
-          ## Stats
-
-          Coverage measurement and statistics updates are not required. No new measurement was performed for digest adoption.
-
           ## Risk and Rollout
 
           - Risk level: CI executable environment change; requires human review.

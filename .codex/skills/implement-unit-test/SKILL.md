@@ -82,5 +82,3 @@ The user must provide parameters in one line:
   - Plan a refactoring for testability and add a TODO comment such as:
     `// TODO: TESTABILITY: extract the loop body into a function`
 - Use the `check-test-flow` script to compile and run tests.
-- If you want to inspect coverage, `.local/bin/update-stats` is available.
-  Coverage measurement and statistics updates are not required.

@@ -1,5 +1,6 @@
 /target
 /user_manual
+/stats/coverage.txt
 /.worktrees/
 
 .serena

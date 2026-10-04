@@ -1,0 +1,16 @@
+#!/usr/bin/env bash
+set -euo pipefail
+
+# The upstream archive contains the mdBook output at its root.
+tag="${1:?release tag is required}"
+output="${2:?output directory is required}"
+script_dir="$(cd "$(dirname "$0")" && pwd)"
+identity="$("$script_dir/parse-release-version" "$tag")"
+[[ "$identity" == *$'\tstable' ]] || { echo 'snapshot releases do not deploy Pages' >&2; exit 1; }
+mkdir -p "$output"
+archive_dir="$(mktemp -d)"
+trap 'rm -rf "$archive_dir"' EXIT
+gh release download "$tag" --repo "${GITHUB_REPOSITORY:?}" \
+  --pattern "sql-fun_${tag}_user-manual.tar.gz" --dir "$archive_dir"
+tar -xzf "$archive_dir/sql-fun_${tag}_user-manual.tar.gz" -C "$output"
+[[ -f "$output/index.html" ]] || { echo 'manual archive has no root index.html' >&2; exit 1; }

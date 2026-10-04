@@ -1,0 +1,13 @@
+#!/usr/bin/env bash
+set -euo pipefail
+
+# Read materialized versions; never mutate manifests or derive crate versions
+# from the product release identity.
+metadata="$(cargo metadata --locked --no-deps --format-version=1)"
+jq -er '
+  .workspace_members as $members
+  | [.packages[] | select(.id as $id | $members | index($id))
+     | select(.source == null and .publish != [])]
+  | if length == 0 then error("no publishable workspace crates") else . end
+  | sort_by(.name)[] | [.name, .version] | @tsv
+' <<<"$metadata"

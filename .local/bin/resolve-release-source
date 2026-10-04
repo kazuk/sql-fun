@@ -1,0 +1,11 @@
+#!/usr/bin/env bash
+set -euo pipefail
+tag="${1:?release tag is required}"
+script_dir="$(cd "$(dirname "$0")" && pwd)"
+"$script_dir/parse-release-version" "$tag" > /dev/null
+revision="$(git rev-parse --verify "refs/tags/${tag}^{commit}")"
+[[ "$(git rev-parse HEAD)" == "$revision" ]] || {
+  echo 'checkout does not match the immutable release tag' >&2
+  exit 1
+}
+printf '%s\n' "$revision"

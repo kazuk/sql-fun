@@ -257,6 +257,7 @@ function run_typos() {
 function run_version_materialization() {
   echo "== Verify release version materialization"
   "${GIT_ROOT}/.local/bin/test-materialize-release-versions"
+  "${GIT_ROOT}/.local/bin/test-release-publication"
 }
 
 function run_packaging() {

@@ -1,0 +1,19 @@
+#!/usr/bin/env bash
+set -euo pipefail
+
+# Shared product identity grammar for release tags and release branch suffixes.
+# Output: tag, version without v, snapshot suffix, classification (TSV).
+tag="${1:-}"
+number='(0|[1-9][0-9]*)'
+if ! [[ "$tag" =~ ^v${number}\.${number}\.${number}(-snapshot[0-9]*)?$ ]]; then
+  echo "invalid project release tag: $tag" >&2
+  exit 1
+fi
+version="${tag#v}"
+snapshot=""
+classification=stable
+if [[ "$version" == *-snapshot* ]]; then
+  snapshot="${version#*-}"
+  classification=snapshot
+fi
+printf '%s\t%s\t%s\t%s\n' "$tag" "$version" "$snapshot" "$classification"

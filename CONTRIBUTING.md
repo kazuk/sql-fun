@@ -104,6 +104,23 @@ reported by the build errors for your environment.
 Useful local scripts live under [`.local/bin/`](.local/bin/). The repository
 environment adds this directory to `PATH`.
 
+## Release workflow validation
+
+The standard `version-materialization` step includes offline release publication
+contract tests. They require the existing Bash, Git, Cargo, and `jq` development
+setup and do not publish packages or deploy Pages.
+
+For additional local workflow syntax validation, optionally install
+[`actionlint` 1.7.12](https://github.com/rhysd/actionlint/releases/tag/v1.7.12).
+Download the archive for your platform from that release, verify it against the
+published checksums, and put the extracted executable on `PATH`. It is an
+optional contributor tool, not a runtime or standard CI-image prerequisite.
+Validate the release workflow without requiring optional ShellCheck integration:
+
+```sh
+actionlint -shellcheck='' .github/workflows/release-publish.yml
+```
+
 ## Development Workflow
 
 Create a branch for your change:

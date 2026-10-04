@@ -1,0 +1,122 @@
+name: Release distribution
+
+on:
+  release:
+    types: [published]
+
+permissions:
+  contents: read
+
+concurrency:
+  group: release-distribution-${{ github.event.release.tag_name }}
+  cancel-in-progress: false
+
+env:
+  CARGO_TERM_COLOR: never
+  USER: runner
+
+jobs:
+  identity:
+    runs-on: ubuntu-24.04
+    outputs:
+      tag: ${{ steps.identity.outputs.tag }}
+      classification: ${{ steps.identity.outputs.classification }}
+      revision: ${{ steps.identity.outputs.revision }}
+    steps:
+      - uses: actions/checkout@v5
+        with:
+          ref: refs/tags/${{ github.event.release.tag_name }}
+          fetch-depth: 0
+      - name: Resolve product release identity
+        id: identity
+        env:
+          RELEASE_TAG: ${{ github.event.release.tag_name }}
+        run: |
+          identity="$(.local/bin/parse-release-version "$RELEASE_TAG")"
+          classification="${identity##*$'\t'}"
+          revision="$(.local/bin/resolve-release-source "$RELEASE_TAG")"
+          {
+            echo "tag=$RELEASE_TAG"
+            echo "classification=$classification"
+            echo "revision=$revision"
+          } >> "$GITHUB_OUTPUT"
+          {
+            echo "Product release: $RELEASE_TAG ($classification)"
+            echo "Materialized source: $revision"
+          } >> "$GITHUB_STEP_SUMMARY"
+
+  crates:
+    needs: identity
+    runs-on: ubuntu-24.04
+    container:
+      image: ghcr.io/kazuk/ci-builder@sha256:1e8a6a618d5f37c7eaf588650999b53dd39220323ea475a66a52987d1479ebf3
+      credentials:
+        username: ${{ github.actor }}
+        password: ${{ secrets.GITHUB_TOKEN }}
+    permissions:
+      contents: read
+      id-token: write
+      packages: read
+    steps:
+      - uses: actions/checkout@v5
+        with:
+          ref: ${{ needs.identity.outputs.revision }}
+      - name: Read exact materialized crate versions
+        run: .local/bin/release-crate-manifest > "$RUNNER_TEMP/crates.tsv"
+      - uses: rust-lang/crates-io-auth-action@v1
+        id: crates_io_auth
+      - name: Publish or resume workspace crates
+        env:
+          CARGO_REGISTRY_TOKEN: ${{ steps.crates_io_auth.outputs.token }}
+          CRATES_IO_BOOTSTRAP_TOKEN: ${{ secrets.CRATES_IO_BOOTSTRAP_TOKEN }}
+        run: |
+          .local/bin/publish-crates --manifest="$RUNNER_TEMP/crates.tsv"
+          echo 'crates.io distribution completed; existing exact versions were skipped.' >> "$GITHUB_STEP_SUMMARY"
+
+  pages:
+    needs: [identity, crates]
+    if: ${{ needs.identity.outputs.classification == 'stable' }}
+    runs-on: ubuntu-24.04
+    concurrency:
+      group: release-manual-pages
+      cancel-in-progress: false
+    permissions:
+      contents: read
+      pages: write
+      id-token: write
+    environment:
+      name: github-pages
+      url: ${{ steps.deployment.outputs.page_url }}
+    env:
+      GH_TOKEN: ${{ github.token }}
+      RELEASE_TAG: ${{ needs.identity.outputs.tag }}
+    steps:
+      - uses: actions/checkout@v5
+        with:
+          ref: ${{ needs.identity.outputs.revision }}
+      - name: Extract the existing release manual
+        run: .local/bin/prepare-release-manual "$RELEASE_TAG" "$RUNNER_TEMP/manual"
+      - uses: actions/configure-pages@v5
+      - uses: actions/upload-pages-artifact@v4
+        with:
+          name: github-pages-${{ github.run_attempt }}
+          path: ${{ runner.temp }}/manual
+      - name: Check latest stable identity
+        id: current
+        run: |
+          deploy="$(.local/bin/release-pages-current "$RELEASE_TAG")"
+          echo "deploy=$deploy" >> "$GITHUB_OUTPUT"
+      - uses: actions/deploy-pages@v4
+        id: deployment
+        if: ${{ steps.current.outputs.deploy == 'true' }}
+        with:
+          artifact_name: github-pages-${{ github.run_attempt }}
+      - name: Record Pages result
+        env:
+          DEPLOY: ${{ steps.current.outputs.deploy }}
+        run: |
+          if [[ "$DEPLOY" == true ]]; then
+            echo 'Latest stable manual deployed from the existing Release asset.' >> "$GITHUB_STEP_SUMMARY"
+          else
+            echo 'Pages skipped: a newer stable product release exists.' >> "$GITHUB_STEP_SUMMARY"
+          fi

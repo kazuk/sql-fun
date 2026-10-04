@@ -305,3 +305,13 @@ pub(crate) fn metadata_with_codegen_options(
         "Metadata.toml",
     )
 }
+
+pub(crate) fn initialization_choices_project(declarations: &str) -> tempfile::TempDir {
+    let directory = tempfile::tempdir().unwrap();
+    std::fs::write(
+        directory.path().join("Cargo.toml"),
+        format!("[package.metadata.database]\n{declarations}\n"),
+    )
+    .unwrap();
+    directory
+}

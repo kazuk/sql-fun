@@ -41,7 +41,12 @@ impl InitializationDatasources {
     /// Datasource names in deterministic prompt order.
     #[must_use]
     pub fn names(&self) -> Vec<String> {
-        let mut names = self.0.keys().cloned().collect::<Vec<_>>();
+        let mut names = self
+            .0
+            .iter()
+            .filter(|(_, value)| value.is_table())
+            .map(|(name, _)| name.clone())
+            .collect::<Vec<_>>();
         names.sort();
         names
     }
@@ -74,6 +79,23 @@ impl InitializationDatasources {
             return MetadataError::metadata_load_from_file(name, "selected datasource not found");
         };
         SqlFunMetadata::from_value(name, value)
+    }
+}
+
+#[cfg(test)]
+mod test_initialization_candidates {
+    use super::InitializationDatasources;
+    use crate::test_helpers::initialization_choices_project;
+
+    #[rstest::rstest]
+    #[case::connector_only("connector = 'tokio-postgres'", &[])]
+    #[case::scalar_settings("connector = 'tokio-postgres'\nengine = 'PostgreSQL'\nversion = '17'", &[])]
+    #[case::named_with_setting("connector = 'tokio-postgres'\n[package.metadata.database.main]\nengine = 'PostgreSQL'\ndialect = 'postgres'\nversion = '17'", &["main"])]
+    fn settings_are_not_datasource_candidates(#[case] declarations: &str, #[case] names: &[&str]) {
+        let project = initialization_choices_project(declarations);
+        let choices =
+            InitializationDatasources::load_from(&project.path().join("Cargo.toml")).unwrap();
+        assert_eq!(choices.names(), names);
     }
 }
 

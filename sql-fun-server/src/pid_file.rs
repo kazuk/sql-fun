@@ -1,3 +1,6 @@
+#[cfg(test)]
+mod test_helpers;
+
 use std::path::{Path, PathBuf};
 
 #[cfg(not(target_os = "windows"))]
@@ -90,7 +93,7 @@ impl PidFile {
         let mut file = OpenOptions::new().write(true).create_new(true).open(path)?;
 
         file.write_all(content.as_bytes())?;
-        fs2::FileExt::try_lock_shared(&file)?;
+        file.try_lock_shared().map_err(std::io::Error::from)?;
 
         self.pid_file = Some(file);
         self.pid_file_path = Some(path.to_path_buf());
@@ -108,32 +111,127 @@ impl PidFile {
         args: &Args,
         port: u16,
     ) -> Result<Option<Self>, ServerError> {
-        let pid_path = Self::default_path(args);
+        Self::try_register_at_path(&Self::default_path(args), port)
+    }
+
+    fn try_register_at_path(pid_path: &Path, port: u16) -> Result<Option<Self>, ServerError> {
         if pid_path.exists() {
-            let pid_file = Self::from_file(&pid_path)?;
+            let pid_file = Self::from_file(pid_path)?;
             if pid_file.process_exists() {
                 return Ok(None);
             }
-            std::fs::remove_file(&pid_path)?;
+            std::fs::remove_file(pid_path)?;
         }
         let mut pid_file = Self::new(port);
-        pid_file.write_to_path(&pid_path)?;
+        pid_file.write_to_path(pid_path)?;
         Ok(Some(pid_file))
     }
 }
 
 #[cfg(test)]
 mod tests {
-    use clap::Parser;
-
-    use crate::{Args, pid_file::PidFile};
+    use super::test_helpers::PidFileFixture;
 
     #[test]
-    pub fn test_try_register_primary_server() -> testresult::TestResult {
-        let port = 30000;
-        let args = Args::try_parse_from(&vec![""])?;
-        PidFile::try_register_primary_server(&args, port)?;
+    fn registers_and_persists_server_identity() -> ::testresult::TestResult {
+        let fixture = PidFileFixture::new()?;
+        let owner = fixture.register(30000)?.expect("primary registration");
+        let persisted = fixture.read()?;
+        assert_eq!(*persisted.pid(), std::process::id());
+        assert_eq!(*persisted.port(), 30000);
+        assert_eq!(persisted.token(), owner.token());
+        assert_eq!(owner.token().len(), 40);
+        Ok(())
+    }
 
+    #[test]
+    fn rejects_live_primary_without_changing_its_file() -> ::testresult::TestResult {
+        let fixture = PidFileFixture::new()?;
+        let owner = fixture.register(30000)?.expect("primary registration");
+        assert!(fixture.register(30001)?.is_none());
+        let persisted = fixture.read()?;
+        assert_eq!(*persisted.port(), 30000);
+        assert_eq!(persisted.token(), owner.token());
+        Ok(())
+    }
+
+    #[test]
+    fn replaces_stale_primary() -> ::testresult::TestResult {
+        let fixture = PidFileFixture::new()?;
+        let stale = fixture.persist_exited_primary()?;
+        assert!(!stale.process_exists());
+        let owner = fixture.register(30001)?.expect("replacement registration");
+        let persisted = fixture.read()?;
+        assert_eq!(*persisted.pid(), std::process::id());
+        assert_eq!(*persisted.port(), 30001);
+        assert_eq!(persisted.token(), owner.token());
+        Ok(())
+    }
+
+    #[test]
+    fn holds_shared_lock_until_owner_is_dropped() -> ::testresult::TestResult {
+        let fixture = PidFileFixture::new()?;
+        let owner = fixture.register(30000)?.expect("primary registration");
+        let observer = fixture.open_lock_observer()?;
+        observer.try_lock_shared()?;
+        observer.unlock()?;
+        let error = std::io::Error::from(observer.try_lock().expect_err("owner holds lock"));
+        assert_eq!(error.kind(), std::io::ErrorKind::WouldBlock);
+        drop(owner);
+        // Keep the original handle: reopening the path could observe a new inode.
+        observer.try_lock()?;
+        observer.unlock()?;
+        Ok(())
+    }
+
+    #[test]
+    fn removes_owned_file_and_allows_reregistration() -> ::testresult::TestResult {
+        let fixture = PidFileFixture::new()?;
+        let owner = fixture.register(30000)?.expect("primary registration");
+        drop(owner);
+        assert!(!fixture.exists());
+        let replacement = fixture
+            .register(30001)?
+            .expect("registration after cleanup");
+        assert_eq!(*replacement.port(), 30001);
+        Ok(())
+    }
+
+    #[test]
+    fn reader_does_not_remove_owned_file() -> ::testresult::TestResult {
+        let fixture = PidFileFixture::new()?;
+        let owner = fixture.register(30000)?.expect("primary registration");
+        drop(fixture.read()?);
+        assert!(fixture.exists());
+        assert_eq!(fixture.read()?.token(), owner.token());
+        Ok(())
+    }
+
+    #[test]
+    fn malformed_pid_file_is_reported_and_preserved() -> ::testresult::TestResult {
+        let fixture = PidFileFixture::new()?;
+        fixture.persist_malformed_primary()?;
+        assert!(fixture.register(30000).is_err());
+        assert!(fixture.exists());
+        Ok(())
+    }
+
+    #[cfg(unix)]
+    #[test]
+    fn restricts_pid_file_permissions() -> ::testresult::TestResult {
+        use std::os::unix::fs::PermissionsExt;
+
+        let fixture = PidFileFixture::new()?;
+        let _owner = fixture.register(30000)?.expect("primary registration");
+        assert_eq!(
+            fixture
+                .open_lock_observer()?
+                .metadata()?
+                .permissions()
+                .mode()
+                & 0o777,
+            0o600
+        );
         Ok(())
     }
 }

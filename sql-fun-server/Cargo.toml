@@ -22,7 +22,6 @@ async-trait.workspace = true
 clap = { workspace = true }
 derive-getters = { workspace = true }
 either.workspace = true
-fs2 = { workspace = true }
 futures-core.workspace = true
 futures-util.workspace = true
 indexmap = { workspace = true }
@@ -38,6 +37,7 @@ tokio = { workspace = true }
 tracing.workspace = true
 
 [dev-dependencies]
+tempfile.workspace = true
 testresult.workspace = true
 
 [lints]

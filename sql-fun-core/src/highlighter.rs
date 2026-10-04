@@ -197,11 +197,7 @@ impl HighlighterStyle {
             style
         };
 
-        if self.bold {
-            style.bold()
-        } else {
-            style
-        };
+        let style = if self.bold { style.bold() } else { style };
         let style = if self.dimmed { style.dimmed() } else { style };
         let style = if self.italic { style.italic() } else { style };
         let style = if self.strikethrough {
@@ -212,5 +208,36 @@ impl HighlighterStyle {
         let style = if self.hidden { style.hidden() } else { style };
 
         Ok(style)
+    }
+}
+
+#[cfg(test)]
+mod test_highlighter_style_get_style {
+    use testresult::TestResult;
+
+    use super::HighlighterTheme;
+
+    #[test]
+    fn applies_bold_with_other_attributes() -> TestResult {
+        let theme = HighlighterTheme::from_toml_str(
+            r#"keyword = { foreground = "blue", bold = true, italic = true }"#,
+        )?;
+        let actual = theme.keyword().get_style()?;
+        let blue = owo_colors::DynColors::Ansi(owo_colors::AnsiColors::Blue);
+        let expected = owo_colors::Style::default().color(blue).bold().italic();
+
+        assert_eq!(expected, actual);
+        Ok(())
+    }
+
+    #[test]
+    fn leaves_style_unbold_when_bold_is_not_configured() -> TestResult {
+        let theme = HighlighterTheme::from_toml_str(r#"keyword = { foreground = "blue" }"#)?;
+        let actual = theme.keyword().get_style()?;
+        let blue = owo_colors::DynColors::Ansi(owo_colors::AnsiColors::Blue);
+        let expected = owo_colors::Style::default().color(blue);
+
+        assert_eq!(expected, actual);
+        Ok(())
     }
 }

@@ -71,7 +71,8 @@ sql-fun init --yes --docker-image-tag "postgres:latest"
   - default: install ALL extensions
 
 Extension selections use `name` or `name@version`, for example `uuid-ossp` or
-`uuid-ossp@1.1`. An explicit version selects its installation script. When the
+`uuid-ossp@1.1`. Version names must be valid UTF-8. An explicit version selects
+its installation script. When the
 version is omitted, sql-fun uses `default_version` from the extension's primary
 control file. A missing script for that default is an error.
 

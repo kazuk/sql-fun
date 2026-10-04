@@ -152,7 +152,7 @@ impl ExtensionNameVersionPair {
     ) -> Result<PathBuf, ExtensionConfigError> {
         let base_path = base_path.as_ref();
         let control_path = base_path.join(format!("{}.control", self.name));
-        match std::fs::read_to_string(&control_path) {
+        match std::fs::read(&control_path) {
             Ok(contents) => {
                 if let Some(version) = control_file::default_version(&contents, &control_path)? {
                     let version = ExtensionVersion::installation(&version)?;

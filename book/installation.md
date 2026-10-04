@@ -19,6 +19,10 @@ cargo install sql-fun-cli sql-fun-server --features "sqlite"
 cargo install --locked cargo-expand
 ```
 
+For the planned application-runtime extraction workflow, see
+[SQLite project bootstrap](sqlite-bootstrap.md). That page distinguishes current
+setup from the intended helper and project-local engine builtin snapshot.
+
 `sql-fun-cli` for CLI tool for `sql-fun`. `sql-fun-server` provides cache for
 schema objects.
 

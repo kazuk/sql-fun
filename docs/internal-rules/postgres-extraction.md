@@ -98,3 +98,27 @@ identity, deterministic export, restricted database roles, user/extension object
 isolation, invalid connections/bundles, failure preservation, and timeout cleanup.
 Rust tests validate quoting and SQL syntax, adversarial archive entries,
 publication isolation, and existing catalog/extension loaders.
+
+## Initialization integration tests
+
+The extraction script also exercises PostgreSQL initialization from Docker and
+an existing server, reruns, and source/version mismatch diagnostics. To validate
+initialization followed by semantic loading of builtin and user schemas, run:
+
+```sh
+cargo test -p sql-fun-cli --test initialization -- --ignored
+```
+
+This requires `psql`, Docker CLI and daemon access. Set
+`SQL_FUN_TEST_DOCKER_HOST` and `SQL_FUN_TEST_DOCKER_BIND` when connectivity
+requires specific host addresses. Set `SQL_FUN_TEST_BINARY` to an installed CLI
+executable to test that binary instead of the workspace CLI. CI builds the
+integration harness in the builder image and runs it against the installed
+package on the Docker-capable Ubuntu runner.
+
+The generic initialization tests also verify explicit choices and dispatch:
+SQLite-only setup does not run PostgreSQL setup, omitted choices are not filled
+in even for a single configured datasource, and incomplete `--yes` requests fail
+before home creation. PostgreSQL cases supply explicit engines/datasources,
+source, versions and home parameters. A connected server constrains the version
+choice; it is not permission to select that version automatically.

@@ -1,29 +1,67 @@
-# Initialize PostgreSQL support
+# Initialize development support
 
-`sql-fun init` installs the builtin metadata required for PostgreSQL semantic
-analysis. This includes builtin types, functions, operators, casts, and catalog
-objects. Metadata must match the PostgreSQL version configured for your datasource.
-It is separate from your application schema dump; initialization does not manage
-schemas or migrations.
-
-## From Docker
-
-Install PostgreSQL client tools (`psql`) and Docker CLI, and provide access to a
-Docker daemon. Docker is the default initialization source:
+`sql-fun init` is the interactive entry point for initializing engine-specific
+development support. It asks for choices that you have not supplied explicitly,
+even when only one option is available. Project metadata provides selectable
+datasources; it does not automatically select them.
 
 ```console
 sql-fun init
 ```
 
-Select one or more supported PostgreSQL majors in the interactive prompt.
-Currently, builtin extraction supports PostgreSQL 17 and 18. You can select any
-non-empty combination. Non-interactive setup defaults to all supported stable
-versions:
+Select the project datasources you want to initialize, or select engines when
+working outside a project. Use the init option `--datasource <name>` to choose a
+project datasource explicitly. Alternatively, use `--engines postgres`,
+`--engines sqlite`, or `--engines postgres,sqlite` to choose engine setup directly.
+Do not combine `--engines` with `--datasource`.
 
-```console
-sql-fun init --yes
-sql-fun init --yes --engine-versions 17,18
+You also choose the sql-fun home directory. The interactive prompt suggests
+`~/.sql-fun` or the configured common home; accepting the suggestion is an
+explicit choice. Use `init --sql-fun-home <path>` to supply the choice directly.
+Application schemas and migrations remain managed by your own tools.
+
+## Automatic setup
+
+`--yes` completes setup without prompts only when all required choices are
+supplied through CLI parameters. It does not choose omitted values for you.
+An incomplete request reports a missing parameter before setup begins.
+
+For PostgreSQL, supply an engine or datasource selection, the home directory,
+the source (`--docker` or `--database-url`), and `--engine-versions`:
+
+```sh
+sql-fun init --yes --engines postgres --sql-fun-home "$HOME/.sql-fun" \
+  --docker --engine-versions 17,18
 ```
+
+For a configured datasource:
+
+```sh
+sql-fun init --datasource main --yes --sql-fun-home "$HOME/.sql-fun" \
+  --docker --engine-versions 17
+```
+
+SQLite has its own setup path. Its development-support setup is still under
+development; selecting it currently reports that status. This does not imply
+that SQLite will never require initialization. PostgreSQL tooling is not
+required when only SQLite is selected.
+
+## PostgreSQL setup
+
+PostgreSQL semantic analysis requires builtin metadata matching the target
+version. PostgreSQL setup installs builtin types, functions, operators, casts,
+and catalog objects separately from your application schema dump.
+
+Choose a source and a nonempty set of supported versions. Currently extraction
+supports PostgreSQL 17 and 18. Multiple selected datasources share installations
+for the same version; their configured versions must be included in your
+explicit target set. Unselected datasources do not add initialization tasks.
+
+### Docker source
+
+Install PostgreSQL client tools (`psql`) and Docker CLI, and provide access to a
+Docker daemon. Choose Docker interactively or supply `--docker` explicitly.
+No source or version is selected automatically.
 
 Each version uses its registered PostgreSQL image and a temporary container.
 The extractor removes its own containers and volumes after completion or a
@@ -33,47 +71,43 @@ is already present.
 If sql-fun runs inside a container or uses a remote Docker host, use
 `--docker-host-address` for the reachable host address and
 `--docker-bind-address` for the host interface publishing PostgreSQL ports.
-Both default to `127.0.0.1`. See [extraction](extract.md) for connectivity and
-resource-cleanup details.
+Both connectivity settings default to `127.0.0.1`. See [extraction](extract.md)
+for connectivity and resource-cleanup details.
 
-## From an existing server
+### Existing-server source
 
 This source requires `psql`, network access, and appropriate PostgreSQL catalog
-permissions. It does not require Docker. Use libpq authentication/TLS settings;
-keep passwords in a password file rather than in command arguments:
+permissions. It does not require Docker. Supply `--database-url` with a libpq
+connection string or URL, or choose this source and enter the connection string
+interactively. Prefer a password file to inline credentials:
 
 ```sh
-export SQL_FUN_DATABASE_URL='host=db.example.org dbname=postgres'
-SQL_FUN_DATABASE_URL="$SQL_FUN_DATABASE_URL user=catalog_reader"
-SQL_FUN_DATABASE_URL="$SQL_FUN_DATABASE_URL sslmode=verify-full"
-sql-fun init --yes
+sql-fun init --yes --engines postgres --sql-fun-home "$HOME/.sql-fun" \
+  --database-url 'host=db.example.org user=catalog_reader sslmode=verify-full' \
+  --engine-versions 17
 ```
 
-Alternatively, supply `--database-url` with a libpq connection string or URL.
-Initialization detects the connected server's major and installs that version.
-Unsupported versions produce an error. If you supply `--engine-versions`, it must
-select only the detected version. `--docker` explicitly selects Docker and
-conflicts with an existing-server source.
+Detection determines the connected server's actual version and constrains the
+available target. It does not replace an explicit choice: the interactive flow
+asks you to select the detected version when omitted; `--yes` requires
+`--engine-versions`. A supplied version set must contain only the detected
+version. Unsupported versions produce an error. `--docker` conflicts with
+`--database-url`. The extraction command's `SQL_FUN_DATABASE_URL` environment
+variable does not select an init source.
 
-Existing-server initialization installs builtin metadata only; it does not
-copy the server's extension files. The [extraction documentation](extract.md)
-describes administrator-produced extension bundles separately.
+Existing-server initialization installs builtin metadata only; it does not copy
+extension files. The [extraction documentation](extract.md) describes
+administrator-produced extension bundles separately.
 
-## Installation and reruns
+### Installation and reruns
 
-Metadata is installed under `$SQL_FUN_HOME/postgres/<version>/`, with a default
-home of `~/.sql-fun`. Use `--sql-fun-home` to choose another home, and pass the
-same home to subsequent check/server commands. A configured datasource version
-must be included in the selected target set. Standalone home initialization
-also works outside a project.
-
-If project metadata has no `default` datasource, select a configured name with
-the global option, for example `sql-fun --datasource main init --yes`.
+Metadata is installed under `<chosen-home>/postgres/<version>/`. Configure
+subsequent check/server commands with the same home (normally `~/.sql-fun`).
 
 A complete compatible installation is preserved on rerun. An incomplete or
 incompatible installation is an error: move the affected version directory
-aside before retrying. `--yes` disables prompts; it does not overwrite metadata.
-Only one initializer may install a given version at a time.
+aside before retrying. `--yes` does not overwrite metadata. Only one initializer
+may install a given version at a time.
 
 Versions are installed independently. If a later version fails, completed
 versions remain usable and the command reports failure. Correct the reported

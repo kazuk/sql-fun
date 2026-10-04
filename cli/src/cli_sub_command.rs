@@ -41,8 +41,10 @@ pub enum CliSubCommand {
         long_about = r#"Initialize `sql-fun` environments
 
 This command prepares the initial working environment for first-time users.
-It creates the sql-fun home directory and installs PostgreSQL builtin metadata from Docker or an existing server.
-Docker defaults to all supported stable versions; an existing server selects its detected version.
+It asks for missing choices and dispatches to explicitly selected engine setup tasks.
+PostgreSQL setup installs required builtin metadata from a chosen Docker or existing-server source.
+SQLite development-support setup is still under development.
+With --yes, supply all required choices through CLI parameters; omitted choices are errors.
 Repeated runs preserve valid installations. Incomplete installations must be moved aside before retrying."#,
         next_line_help = true
     )]

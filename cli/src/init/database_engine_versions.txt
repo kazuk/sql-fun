@@ -1,5 +1,0 @@
-Database engine versions
-~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
-
-Choose one or more supported PostgreSQL versions.
-Builtin metadata is stored in ${SQL_FUN_HOME}/postgres/[VERSION]/.

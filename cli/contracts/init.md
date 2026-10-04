@@ -15,9 +15,9 @@ $ PATH="$TMPDIR/no-tools" sql-fun init --help > /dev/null
 ## Unsupported extraction targets fail explicitly
 
 ```scrut
-$ sql-fun init --yes --sql-fun-home "$TMPDIR/init-home" --engine-versions 16 2>&1
-* (glob+)
-Error: unexpected version 16
+$ sql-fun init -y -H "$TMPDIR/init-home" --engines postgres --docker \
+> --engine-versions 16 2>&1
+Error: PostgreSQL 16 is not supported for builtin extraction; * (glob)
 [1]
 ```
 

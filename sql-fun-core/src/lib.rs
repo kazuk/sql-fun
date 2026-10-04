@@ -48,7 +48,10 @@ pub use self::{
         PostgresExtensionsCollection, PostgresExtensionsParseError,
     },
     highlighter::{HighlighterStyle, HighlighterTheme, HighlighterThemeError, TerminalColor},
-    metadata::{MetadataError, PostgresEngineVersion, SqlFunMetadata, SqlFunMetadataCollection},
+    metadata::{
+        InitializationDatasources, MetadataError, PostgresEngineVersion, SqlFunMetadata,
+        SqlFunMetadataCollection,
+    },
     postgres_version::{PostgresVersion, PostgresVersionInventory},
 };
 

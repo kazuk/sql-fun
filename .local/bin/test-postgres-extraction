@@ -75,15 +75,15 @@ def validate(binary, major, image, destination, host, bind):
         existing.mkdir()  # Existing empty output is supported.
         run(binary, "extract", "catalog", "--output", str(existing), env=connection_env)
         init_home = destination / f"{major}-initialized-connection"
-        run(binary, "init", "--yes", "--sql-fun-home", str(init_home), env=connection_env)
+        run(binary, "init", "--yes", "--sql-fun-home", str(init_home), "--engines", "postgres", "--database-url", connection_env["SQL_FUN_DATABASE_URL"], "--engine-versions", major, env=connection_env)
         installed = init_home / "postgres" / major
         assert payload(installed) == payload(existing), "init must install the same catalog used by extraction"
         previous_install = payload(installed)
-        run(binary, "init", "--yes", "--sql-fun-home", str(init_home), env=connection_env)
+        run(binary, "init", "--yes", "--sql-fun-home", str(init_home), "--engines", "postgres", "--database-url", connection_env["SQL_FUN_DATABASE_URL"], "--engine-versions", major, env=connection_env)
         assert payload(installed) == previous_install, "rerun modified a valid installation"
         other = "18" if major == "17" else "17"
         run(binary, "init", "--yes", "--sql-fun-home", str(init_home),
-            "--engine-versions", other, env=connection_env, success=False)
+            "--engines", "postgres", "--database-url", connection_env["SQL_FUN_DATABASE_URL"], "--engine-versions", other, env=connection_env, success=False)
         script = run(binary, "extract", "export-script").stdout
         bundle = run("docker", "exec", "-i", identifier, "sh", "-s", data=script).stdout
         assert bundle == run("docker", "exec", "-i", identifier, "sh", "-s", data=script).stdout
@@ -191,6 +191,7 @@ def main():
         validate(str(Path(args.binary).resolve()), major, image, destination, args.host, args.bind)
     init_home = destination / "initialized-docker"
     run(args.binary, "init", "--yes", "--docker", "--sql-fun-home", str(init_home),
+        "--engines", "postgres", "--engine-versions", ",".join(IMAGES),
         "--docker-host-address", args.host, "--docker-bind-address", args.bind)
     for major in IMAGES:
         assert payload(init_home / "postgres" / major) == payload(destination / major)

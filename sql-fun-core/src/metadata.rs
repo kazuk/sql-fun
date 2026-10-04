@@ -10,6 +10,73 @@ use crate::{
     PostgresExtensionsCollection, PostgresVersion, SqlDialect, SqlFunArgs, SqlFunArgsError,
 };
 
+/// Engine choices for initialization, independent of enabled analysis features.
+/// Full analysis metadata is resolved only for selected implemented setup tasks.
+pub struct InitializationDatasources(toml::Table);
+
+impl InitializationDatasources {
+    /// Read datasource declarations without choosing or initializing an engine.
+    ///
+    /// # Errors
+    /// Rejects unreadable or malformed project metadata.
+    pub fn load_from(path: &Path) -> Result<Self, MetadataError> {
+        let text = std::fs::read_to_string(path)?;
+        let document: toml::Value = toml::from_str(&text)?;
+        let Some(database) = document
+            .get("package")
+            .and_then(|value| value.get("metadata"))
+            .and_then(|value| value.get("database"))
+        else {
+            return Ok(Self(toml::Table::new()));
+        };
+        let Some(table) = database.as_table() else {
+            return MetadataError::metadata_load_from_file(
+                path,
+                "package.metadata.database requires a table",
+            );
+        };
+        Ok(Self(table.clone()))
+    }
+
+    /// Datasource names in deterministic prompt order.
+    #[must_use]
+    pub fn names(&self) -> Vec<String> {
+        let mut names = self.0.keys().cloned().collect::<Vec<_>>();
+        names.sort();
+        names
+    }
+
+    /// The explicitly configured engine of a selected datasource.
+    ///
+    /// # Errors
+    /// Rejects missing datasources or omitted engine choices, even for one option.
+    pub fn engine(&self, name: &str) -> Result<&str, MetadataError> {
+        let Some(engine) = self
+            .0
+            .get(name)
+            .and_then(|value| value.get("engine"))
+            .and_then(toml::Value::as_str)
+        else {
+            return MetadataError::metadata_load_from_file(
+                name,
+                "selected datasource not found or engine not specified",
+            );
+        };
+        Ok(engine)
+    }
+
+    /// Resolve normal analysis metadata for a selected implemented setup task.
+    ///
+    /// # Errors
+    /// Rejects missing or invalid selected datasource metadata.
+    pub fn selected_metadata(&self, name: &str) -> Result<SqlFunMetadata, MetadataError> {
+        let Some(value) = self.0.get(name) else {
+            return MetadataError::metadata_load_from_file(name, "selected datasource not found");
+        };
+        SqlFunMetadata::from_value(name, value)
+    }
+}
+
 /// Metadata collection
 #[derive(Default)]
 pub struct SqlFunMetadataCollection(HashMap<String, SqlFunMetadata>);

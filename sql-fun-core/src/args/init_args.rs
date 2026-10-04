@@ -1,5 +1,3 @@
-use crate::PostgresVersionInventory;
-
 use std::path::PathBuf;
 
 use ::clap::{CommandFactory, ValueHint};
@@ -7,10 +5,11 @@ use ::clap::{CommandFactory, ValueHint};
 /// Initialize `sql-fun` environments
 #[derive(clap::Parser, Debug, Clone)]
 pub struct InitializeArgs {
-    /// Disable prompts (assume yes)
+    /// Complete setup without prompts when all required choices are supplied
     ///
-    /// Run non-interactively. Assume "yes" to all prompts, including creating
-    /// directories. Existing builtin installations are never overwritten.
+    /// Required choices must be supplied through CLI parameters. Missing choices
+    /// are errors; this flag does not select defaults. Existing installations
+    /// are never overwritten.
     ///
     ///
     #[arg(long = "yes", short = 'y')]
@@ -21,21 +20,26 @@ pub struct InitializeArgs {
     /// Path to the sql-fun home directory.
     ///
     /// This is where catalogs, extensions, and configuration files are stored.
-    /// If not specified, defaults to "${HOME}/.sql-fun".
+    /// If omitted, ask interactively; ~/.sql-fun is a suggested path.
     ///
-    /// [default: ${HOME}/.sql-fun]
+    /// Required with --yes.
     ///
     #[arg(long, short = 'H', value_hint = ValueHint::DirPath)]
     sql_fun_home: Option<PathBuf>,
 
-    /// Extract builtins from an existing server (otherwise use Docker).
+    /// Engines whose development support should be initialized.
+    /// If omitted, ask for datasource or engine selection interactively.
+    #[arg(long, value_delimiter = ',', num_args = 1.., value_parser = ["postgres", "sqlite"])]
+    engines: Option<Vec<String>>,
+
+    /// Project datasources explicitly selected for initialization.
+    /// Accepts comma-separated names; does not select from environment defaults.
+    #[arg(long = "datasource", value_delimiter = ',', num_args = 1.., conflicts_with = "engines")]
+    datasources: Option<Vec<String>>,
+
+    /// Extract PostgreSQL builtins from an explicitly selected existing server.
     /// Uses libpq connection strings; prefer password files to inline credentials.
-    #[arg(
-        long,
-        env = "SQL_FUN_DATABASE_URL",
-        hide_env_values = true,
-        conflicts_with = "docker"
-    )]
+    #[arg(long, hide_env_values = true, conflicts_with = "docker")]
     database_url: Option<String>,
 
     /// Extract each selected version using its registered PostgreSQL Docker image.
@@ -43,22 +47,22 @@ pub struct InitializeArgs {
     docker: bool,
 
     /// Address used to reach published PostgreSQL ports on the Docker host.
-    #[arg(long, default_value = "127.0.0.1", conflicts_with = "database_url")]
-    docker_host_address: String,
+    #[arg(long, conflicts_with = "database_url")]
+    docker_host_address: Option<String>,
 
     /// Docker host interface on which PostgreSQL ports are published.
-    #[arg(long, default_value = "127.0.0.1", conflicts_with = "database_url")]
-    docker_bind_address: String,
+    #[arg(long, conflicts_with = "database_url")]
+    docker_bind_address: Option<String>,
 
     /// Extraction timeout in seconds for each selected version.
-    #[arg(long, default_value_t = 120, value_parser = clap::value_parser!(u64).range(1..))]
-    timeout_seconds: u64,
+    #[arg(long, value_parser = clap::value_parser!(u64).range(1..))]
+    timeout_seconds: Option<u64>,
 
     /// Limit initialization to the specified database engine versions.
     ///
     /// Accepts multiple values (repeatable) or comma-separated lists.
     ///
-    /// [default: all supported stable versions for Docker; detected version for a server]
+    /// PostgreSQL targets must be selected explicitly, including with --yes.
     ///
     #[arg(long, value_delimiter = ',', num_args = 1..)]
     engine_versions: Option<Vec<String>>,
@@ -77,24 +81,49 @@ impl InitializeArgs {
         &self.sql_fun_home
     }
 
-    /// returns `engine_versions` values
-    #[must_use]
-    pub fn engine_versions(&self) -> Vec<String> {
-        if let Some(versions) = &self.engine_versions {
-            versions.clone()
-        } else {
-            PostgresVersionInventory::builtin()
-                .stable_targets()
-                .into_iter()
-                .map(|version| version.to_string())
-                .collect()
-        }
-    }
-
-    /// Explicit target selection, before applying source-specific defaults.
+    /// Explicit PostgreSQL target selection; omission never selects defaults.
     #[must_use]
     pub fn requested_versions(&self) -> Option<&[String]> {
         self.engine_versions.as_deref()
+    }
+
+    /// Whether any PostgreSQL-specific setup option was supplied.
+    #[must_use]
+    pub const fn has_postgres_options(&self) -> bool {
+        self.docker
+            || self.database_url.is_some()
+            || self.engine_versions.is_some()
+            || self.docker_host_address.is_some()
+            || self.docker_bind_address.is_some()
+            || self.timeout_seconds.is_some()
+    }
+
+    /// Explicit engine selection.
+    #[must_use]
+    pub fn engines(&self) -> Option<&[String]> {
+        self.engines.as_deref()
+    }
+
+    /// Explicit datasource selection for this setup request.
+    #[must_use]
+    pub fn datasources(&self) -> Option<&[String]> {
+        self.datasources.as_deref()
+    }
+
+    /// Whether the Docker source was explicitly selected.
+    #[must_use]
+    pub const fn docker(&self) -> bool {
+        self.docker
+    }
+
+    /// Apply the Docker source chosen interactively.
+    pub const fn select_docker(&mut self) {
+        self.docker = true;
+    }
+
+    /// Apply an existing-server source chosen interactively.
+    pub fn set_database_url(&mut self, connection: &str) {
+        self.database_url = Some(connection.to_owned());
     }
 
     /// Existing-server source, if configured.
@@ -106,19 +135,22 @@ impl InitializeArgs {
     /// Address for connecting to Docker-published ports.
     #[must_use]
     pub fn docker_host_address(&self) -> &str {
-        &self.docker_host_address
+        self.docker_host_address.as_deref().unwrap_or("127.0.0.1")
     }
 
     /// Docker host bind interface.
     #[must_use]
     pub fn docker_bind_address(&self) -> &str {
-        &self.docker_bind_address
+        self.docker_bind_address.as_deref().unwrap_or("127.0.0.1")
     }
 
     /// Per-version extraction timeout.
     #[must_use]
     pub const fn timeout_seconds(&self) -> u64 {
-        self.timeout_seconds
+        match self.timeout_seconds {
+            Some(seconds) => seconds,
+            None => 120,
+        }
     }
 
     /// print long help

@@ -1,4 +1,4 @@
-use super::{Event, Initialization, PostgresVersions, PromptResponse, Request, State, Workflow};
+use super::{Event, Initialization, PromptResponse, Request, State, Workflow};
 use ::clap::Parser;
 use ::statig::blocking::{IntoStateMachineExt, StateMachine};
 use std::path::Path;
@@ -68,14 +68,20 @@ impl Scenario {
 }
 
 #[test]
-fn accepts_existing_cli_path_even_when_it_is_a_file() {
+fn rejects_existing_cli_path_that_is_a_file() {
     let file = tempfile::NamedTempFile::new().unwrap();
     let mut scenario = Scenario::with_home(file.path(), false);
     scenario.accept_install();
-    assert_eq!(scenario.state(), &State::prepare_versions());
-    assert_eq!(scenario.context.home, file.path());
-    scenario.advance();
-    assert_eq!(scenario.state(), &State::select_versions());
+    assert_eq!(scenario.state(), &State::failed());
+    assert!(
+        scenario
+            .context
+            .finish()
+            .unwrap_err()
+            .to_string()
+            .contains("directory")
+    );
+    assert_eq!(scenario.request(), None);
 }
 
 #[test]
@@ -84,7 +90,7 @@ fn assumed_yes_creates_missing_parents() {
     let home = root.path().join("parent/home");
     let mut scenario = Scenario::with_home(&home, true);
     scenario.run_automatic();
-    assert_eq!(scenario.state(), &State::versions_selected());
+    assert_eq!(scenario.state(), &State::home_prepared());
     assert!(home.is_dir());
 }
 
@@ -100,45 +106,6 @@ fn assumed_yes_returns_creation_failure() {
             .unwrap()
             .is::<std::io::Error>()
     );
-}
-
-#[test]
-fn assumed_yes_preserves_order_and_duplicates() {
-    let home = tempfile::tempdir().unwrap();
-    let mut scenario = Scenario::new(&[
-        "--yes",
-        "--sql-fun-home",
-        home.path().to_str().unwrap(),
-        "--engine-versions",
-        "18,17,18",
-    ]);
-    scenario.run_automatic();
-    assert_eq!(scenario.state(), &State::versions_selected());
-    assert_eq!(
-        scenario.context.versions,
-        vec![
-            "18".parse().unwrap(),
-            "17".parse().unwrap(),
-            "18".parse().unwrap()
-        ]
-    );
-}
-
-#[test]
-fn rejects_unknown_versions_before_prompting() {
-    let home = tempfile::tempdir().unwrap();
-    for yes in [false, true] {
-        let mut scenario = Scenario::with_home(home.path(), yes);
-        scenario.context.version_args = vec!["19".to_owned()];
-        scenario.accept_install();
-        scenario.advance();
-        assert_eq!(scenario.state(), &State::failed());
-        assert_eq!(
-            scenario.context.finish().unwrap_err().to_string(),
-            "unexpected version 19"
-        );
-        assert_eq!(scenario.request(), None);
-    }
 }
 
 #[test]
@@ -183,7 +150,7 @@ fn missing_cli_home_requires_confirmation_then_creates_parents() {
     assert_eq!(scenario.state(), &State::create_home());
     assert_eq!(scenario.request(), Some(Request::Advance));
     scenario.advance();
-    assert_eq!(scenario.state(), &State::prepare_versions());
+    assert_eq!(scenario.state(), &State::home_prepared());
     assert!(home.is_dir());
 }
 
@@ -230,7 +197,7 @@ fn default_home_uses_sql_fun_and_opens_editor_interactively() {
 }
 
 #[test]
-fn edited_home_creation_failure_retries_then_succeeds() {
+fn an_existing_file_is_rejected_then_an_edited_directory_is_created() {
     let root = tempfile::tempdir().unwrap();
     let original_home = root.path().join("original");
     let blocked_home = tempfile::NamedTempFile::new().unwrap();
@@ -238,21 +205,15 @@ fn edited_home_creation_failure_retries_then_succeeds() {
     let mut scenario = Scenario::with_home(&original_home, false);
     scenario.accept_install();
     scenario.answer(PromptResponse::confirm(false));
-    let editor_request = scenario.request();
-    // An existing file passes the original path validator but cannot become a directory.
     scenario.answer(PromptResponse::text(blocked_home.path().to_str().unwrap()));
+    assert_eq!(scenario.state(), &State::edit_home());
+    // An existing file is rejected without a filesystem write.
+    assert!(scenario.context.error.is_none());
+    scenario.answer(PromptResponse::text(new_home.to_str().unwrap()));
     assert_eq!(scenario.state(), &State::create_edited_home());
     scenario.advance();
-    assert_eq!(scenario.state(), &State::edit_home());
-    assert_eq!(scenario.request(), editor_request);
-    assert!(scenario.context.error.is_none());
-    assert!(matches!(
-        scenario.context.notices.last(),
-        Some(super::Notice::HomeCreateFailed(_, _))
-    ));
-    scenario.answer(PromptResponse::text(new_home.to_str().unwrap()));
-    scenario.advance();
-    assert_eq!(scenario.state(), &State::prepare_versions());
+
+    assert_eq!(scenario.state(), &State::home_prepared());
     assert!(new_home.is_dir());
     assert!(!original_home.exists());
     assert_eq!(scenario.context.home, new_home);
@@ -297,7 +258,7 @@ fn editor_accepts_existing_directory() {
     scenario.accept_install();
     scenario.answer(PromptResponse::text(root.path().to_str().unwrap()));
     scenario.advance();
-    assert_eq!(scenario.state(), &State::prepare_versions());
+    assert_eq!(scenario.state(), &State::home_prepared());
     assert_eq!(scenario.context.home, root.path());
 }
 
@@ -311,105 +272,8 @@ fn cli_still_accepts_relative_paths() {
     assert!(!relative.is_absolute());
     let mut scenario = Scenario::with_home(relative, true);
     scenario.run_automatic();
-    assert_eq!(scenario.state(), &State::versions_selected());
+    assert_eq!(scenario.state(), &State::home_prepared());
     assert_eq!(scenario.context.home, relative);
-}
-
-#[test]
-fn assumed_yes_default_home_creates_or_reuses_directory() {
-    let root = tempfile::tempdir().unwrap();
-    let home = root.path().join("home");
-    for already_exists in [false, true] {
-        let mut scenario = Scenario::new(&["--yes"]);
-        // Redirect the resolved default into a temporary directory without changing HOME.
-        scenario.context.home.clone_from(&home);
-        scenario.run_automatic();
-        assert_eq!(scenario.state(), &State::versions_selected());
-        assert!(home.is_dir());
-        assert_eq!(
-            scenario
-                .context
-                .notices
-                .iter()
-                .any(|notice| matches!(notice, super::Notice::HomeAlreadyExists)),
-            already_exists
-        );
-    }
-}
-
-#[test]
-fn assumed_yes_default_home_creation_failure_terminates() {
-    let file = tempfile::NamedTempFile::new().unwrap();
-    let mut scenario = Scenario::new(&["--yes"]);
-    scenario.context.home = file.path().join("home");
-    scenario.run_automatic();
-    assert_eq!(scenario.state(), &State::failed());
-    assert_eq!(scenario.request(), None);
-    assert!(scenario.context.finish().is_err());
-}
-
-#[test]
-fn engine_arguments_set_initial_selection_but_interactive_answer_decides() {
-    let root = tempfile::tempdir().unwrap();
-    let mut scenario = Scenario::new(&[
-        "--sql-fun-home",
-        root.path().to_str().unwrap(),
-        "--engine-versions",
-        "18,17,18",
-    ]);
-    scenario.accept_install();
-    scenario.advance();
-    assert_eq!(scenario.state(), &State::select_versions());
-    assert_eq!(
-        scenario.request(),
-        Some(Request::Prompt(super::PromptRequest::multi_select(
-            include_str!("../versions_prompt.txt").trim_end(),
-            &[
-                "PostgreSQL Version 17".to_owned(),
-                "PostgreSQL Version 18".to_owned()
-            ],
-            &[0, 1],
-        )))
-    );
-    scenario.answer(PromptResponse::multi_select(&[0]));
-    assert_eq!(scenario.state(), &State::versions_selected());
-    assert_eq!(scenario.context.versions, vec!["17".parse().unwrap()]);
-    assert_eq!(scenario.request(), None);
-    assert!(scenario.context.finish().is_ok());
-}
-
-#[test]
-fn empty_interactive_engine_selection_retries() {
-    let root = tempfile::tempdir().unwrap();
-    let mut scenario = Scenario::with_home(root.path(), false);
-    scenario.accept_install();
-    scenario.advance();
-    scenario.answer(PromptResponse::multi_select(&[]));
-    assert_eq!(scenario.state(), &State::select_versions());
-    assert_eq!(
-        scenario.request(),
-        Some(Request::Prompt(super::PromptRequest::multi_select(
-            include_str!("../versions_prompt.txt").trim_end(),
-            &[
-                "PostgreSQL Version 17".to_owned(),
-                "PostgreSQL Version 18".to_owned()
-            ],
-            &[],
-        )))
-    );
-    assert!(matches!(
-        scenario.context.notices.last(),
-        Some(super::Notice::VersionRequired)
-    ));
-}
-
-#[test]
-fn defaults_select_all_supported_versions_non_interactively() {
-    let root = tempfile::tempdir().unwrap();
-    let mut scenario = Scenario::with_home(root.path(), true);
-    scenario.run_automatic();
-    assert_eq!(scenario.state(), &State::versions_selected());
-    assert_eq!(scenario.context.versions, PostgresVersions::all());
 }
 
 #[test]
@@ -422,4 +286,19 @@ fn unrelated_answer_does_not_advance_or_touch_home() {
     assert_eq!(scenario.state(), &State::confirm_install());
     assert_eq!(scenario.request(), request);
     assert!(!home.exists());
+}
+
+#[test]
+fn noninteractive_home_requires_explicit_choice() {
+    let mut scenario = Scenario::new(&["--yes"]);
+    scenario.run_automatic();
+    assert_eq!(scenario.state(), &State::failed());
+    assert!(
+        scenario
+            .context
+            .finish()
+            .unwrap_err()
+            .to_string()
+            .contains("--sql-fun-home")
+    );
 }

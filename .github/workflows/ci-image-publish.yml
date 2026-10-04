@@ -190,10 +190,7 @@ jobs:
 
           ## Stats
 
-          Coverage measurement is optional and is not a PR submission requirement.
-
-          - Measurement: not run for digest adoption; any measurements included in the reviewed source change are retained.
-          - Coverage findings (if measured): see the reviewed source change.
+          Coverage measurement and statistics updates are not required. No new measurement was performed for digest adoption.
 
           ## Risk and Rollout
 

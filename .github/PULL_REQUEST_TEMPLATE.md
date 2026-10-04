@@ -17,10 +17,8 @@
 
 ## Stats
 
-Coverage measurement is optional and is not a PR submission requirement.
-
-- Measurement: not run / run with `update-stats` (explain why if run).
-- Coverage findings (if measured):
+To inspect coverage, use `.local/bin/update-stats`. Measurement and statistics
+updates are not required.
 
 ## Risk and Rollout
 

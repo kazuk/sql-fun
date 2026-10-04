@@ -1,5 +1,8 @@
 # CI custom image for GitHub actions for `sql-fun`
 
+See [tool release instructions](tool-releases.md) for prerequisites, direct
+Docker build arguments, integrity checks, and published version review.
+
 Run `ci/github-actions/check` with `GIT_ROOT` set to the repository root to
 build the image and open an interactive container. After building, it prints
 the uncompressed local image size in MiB and bytes, plus the size change when

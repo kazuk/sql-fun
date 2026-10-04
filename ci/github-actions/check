@@ -1,5 +1,5 @@
 #!/bin/bash
-set -eu
+set -euo pipefail
 
 CLEAN_TARGET=0
 REBUILD=0
@@ -19,6 +19,32 @@ else
     REBUILD_ARGS=()
 fi
 
+for tool in CARGO_BINSTALL TYPOS; do
+  case "$tool" in
+    CARGO_BINSTALL) repository=cargo-bins/cargo-binstall ;;
+    TYPOS) repository=crate-ci/typos ;;
+  esac
+  release=$(curl --fail --silent --show-error --location \
+    "https://api.github.com/repos/${repository}/releases/latest")
+  tag=$(jq -er '
+    select(.draft == false and .prerelease == false)
+    | .tag_name | select(test("^v[0-9]+\\.[0-9]+\\.[0-9]+$"))
+  ' <<<"$release") || { echo "Invalid release tag or asset digest for $repository" >&2; exit 1; }
+  case "$tool" in
+    CARGO_BINSTALL) asset=cargo-binstall-x86_64-unknown-linux-musl.tgz ;;
+    TYPOS) asset="typos-${tag}-x86_64-unknown-linux-musl.tar.gz" ;;
+  esac
+  checksum=$(jq -er --arg asset "$asset" '
+    [.assets[] | select(.name == $asset)]
+    | select(length == 1) | .[0].digest
+    | select(type == "string" and test("^sha256:[0-9a-f]{64}$"))
+    | ltrimstr("sha256:")
+  ' <<<"$release") || { echo "Invalid release tag or asset digest for $repository" >&2; exit 1; }
+  printf -v "${tool}_TAG" '%s' "$tag"
+  printf -v "${tool}_SHA256" '%s' "$checksum"
+  printf '%s release: %s\n' "$repository" "$tag"
+done
+
 IMAGE=ci-builder:local
 previous_size=$(docker image inspect --format '{{.Size}}' "$IMAGE" 2>/dev/null || true)
 
@@ -27,7 +53,14 @@ docker build \
   "${REBUILD_ARGS[@]}" \
   "${GIT_ROOT}/ci/github-actions/." \
   -t "$IMAGE" \
-  --build-arg "SERENA_TAG=v0.1.4"
+  --build-arg "SERENA_TAG=v0.1.4" \
+  --build-arg "CARGO_BINSTALL_TAG=$CARGO_BINSTALL_TAG" \
+  --build-arg "CARGO_BINSTALL_SHA256=$CARGO_BINSTALL_SHA256" \
+  --build-arg "TYPOS_TAG=$TYPOS_TAG" \
+  --build-arg "TYPOS_SHA256=$TYPOS_SHA256"
+
+test "$(docker run --rm "$IMAGE" cargo binstall -V)" = "${CARGO_BINSTALL_TAG#v}"
+test "$(docker run --rm "$IMAGE" typos --version)" = "typos-cli ${TYPOS_TAG#v}"
 
 image_size=$(docker image inspect --format '{{.Size}}' "$IMAGE")
 awk -v image="$IMAGE" -v size="$image_size" -v previous="$previous_size" 'BEGIN {

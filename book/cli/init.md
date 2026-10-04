@@ -2,19 +2,25 @@
 
 `sql-fun init` is the interactive entry point for initializing engine-specific
 development support. It asks for choices that you have not supplied explicitly,
-even when only one option is available. Project metadata provides selectable
-datasources; it does not automatically select them.
+even when only one option is available. Bare initialization does not inspect
+Cargo.toml or discover project metadata.
 
 ```console
 sql-fun init
 ```
 
-First choose the sql-fun home directory, then select project datasources or
-engines. Configuration fields such as `connector` are not datasource candidates.
-If no named datasources are declared, the prompt asks you to choose engines.
-Use the init option `--datasource <name>` to choose a
-project datasource explicitly. Alternatively, use `--engines postgres`,
-`--engines sqlite`, or `--engines postgres,sqlite` to choose engine setup directly.
+First choose the sql-fun home directory, then explicitly choose engines.
+Use `--engines postgres`, `--engines sqlite`, or `--engines postgres,sqlite`
+to supply the engine choice directly.
+
+Project-aware initialization requires an explicit request: use the init option
+`--datasource <name>` or the common CLI option `--metadata-file <path>`.
+For example, `sql-fun --metadata-file Cargo.toml init` reads that file and asks
+which named datasources to initialize. Metadata provides candidates; it does not
+select them. Fields such as `connector` are not datasource candidates. If the
+requested project has no named datasources, choose engines instead.
+`--datasource` requests project metadata discovery when no file is supplied.
+An ambient `SQL_FUN_METADATA_FILE` alone does not request project access.
 Do not combine `--engines` with `--datasource`.
 
 You also choose the sql-fun home directory. The interactive prompt suggests

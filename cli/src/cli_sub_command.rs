@@ -42,6 +42,8 @@ pub enum CliSubCommand {
 
 This command prepares the initial working environment for first-time users.
 It asks for missing choices and dispatches to explicitly selected engine setup tasks.
+Project metadata is read only when --datasource or a CLI --metadata-file is supplied.
+Bare init does not inspect Cargo.toml; ambient metadata settings do not request project access.
 PostgreSQL setup installs required builtin metadata from a chosen Docker or existing-server source.
 SQLite development-support setup is still under development.
 With --yes, supply all required choices through CLI parameters; omitted choices are errors.
@@ -88,9 +90,12 @@ impl CliSubCommand {
     pub(crate) async fn run_builtin(
         &self,
         common: &sql_fun_core::SqlFunArgs,
+        metadata_file_from_cli: bool,
     ) -> Result<std::process::ExitCode, anyhow::Error> {
         match self {
-            Self::Initialize(args) => Ok(crate::init::initialize(common, args).await?),
+            Self::Initialize(args) => {
+                Ok(crate::init::initialize(common, args, metadata_file_from_cli).await?)
+            }
             Self::Check(args) => Ok(args.execute(common).await?),
             Self::Extract(args) => args.execute().await,
             _ => unreachable!("expected builtin command"),

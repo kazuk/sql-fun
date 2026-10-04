@@ -4,5 +4,5 @@
 test -x "$SQL_FUN_BIN"
 
 function sql-fun() {
-  "$SQL_FUN_BIN" "$@"
+  PATH="${TMPDIR:?}/sql-fun-no-runtime-tools" "$SQL_FUN_BIN" "$@"
 }

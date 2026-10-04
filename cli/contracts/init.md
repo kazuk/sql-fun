@@ -1,5 +1,10 @@
 # Initialization contracts
 
+The shared setup executes every CLI invocation with an unavailable runtime-tool
+PATH. This suite covers help, argument parsing and preflight only; it must not
+provision Docker or contact runtime services. Actual extraction and initialization
+run in `.local/bin/test-postgres-extraction`, not this default contract directory.
+
 ## Setup
 
 ```scrut

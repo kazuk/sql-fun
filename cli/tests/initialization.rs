@@ -32,7 +32,8 @@ impl InitializedProject {
             .current_dir(self.directory.path())
             .env_remove("SQL_FUN_DATABASE_URL")
             .env_remove("SQL_FUN_HOME")
-            .env_remove("SQL_FUN_DATASOURCE");
+            .env_remove("SQL_FUN_DATASOURCE")
+            .env_remove("SQL_FUN_METADATA_FILE");
         command
     }
     fn init(&self, extra: &[&str]) -> std::process::Output {
@@ -93,6 +94,9 @@ impl InitializedProject {
             .args(["--engine-versions", "17"])
             .output()
             .unwrap()
+    }
+    fn write_project_metadata(&self, declarations: &str) {
+        std::fs::write(self.directory.path().join("Cargo.toml"), declarations).unwrap();
     }
     fn datasource_without_engine(&self) {
         std::fs::write(
@@ -456,4 +460,36 @@ fn an_ambient_datasource_is_not_a_noninteractive_cli_selection() {
     assert!(!result.status.success());
     assert!(String::from_utf8_lossy(&result.stderr).contains("--engines or --datasource"));
     assert!(!project.home().exists());
+}
+
+#[rstest::rstest]
+#[case::named(
+    "[package.metadata.database.private]\nengine = 'PostgreSQL'\ndialect = 'postgres'\nversion = '17'\n"
+)]
+#[case::malformed("not valid TOML [")]
+fn engine_setup_ignores_unrequested_project_metadata(
+    #[case] declarations: &str,
+    #[values(false, true)] ambient_metadata: bool,
+) {
+    let project = InitializedProject::new();
+    project.write_project_metadata(declarations);
+    let mut command = project.command();
+    if ambient_metadata {
+        command.env(
+            "SQL_FUN_METADATA_FILE",
+            project.directory.path().join("Cargo.toml"),
+        );
+    }
+    let result = command
+        .args(["init", "--yes", "--engines", "sqlite", "--sql-fun-home"])
+        .arg(project.home())
+        .env("PATH", project.directory.path().join("no-tools"))
+        .output()
+        .unwrap();
+    assert!(
+        result.status.success(),
+        "{}",
+        String::from_utf8_lossy(&result.stderr)
+    );
+    assert!(String::from_utf8_lossy(&result.stdout).contains("still under development"));
 }

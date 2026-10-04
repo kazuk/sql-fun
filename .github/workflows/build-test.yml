@@ -13,6 +13,7 @@ on:
 concurrency:
   group: build-test
   cancel-in-progress: false
+  queue: max
 
 env:
   CARGO_TERM_COLOR: never

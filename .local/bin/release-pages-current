@@ -1,0 +1,16 @@
+#!/usr/bin/env bash
+set -euo pipefail
+
+# Called inside the serialized Pages job, immediately before deployment.
+# Compare project versions, ignoring GitHub's independently editable flags.
+tag="${1:?release tag is required}"
+script_dir="$(cd "$(dirname "$0")" && pwd)"
+identity="$("$script_dir/parse-release-version" "$tag")"
+[[ "$identity" == *$'\tstable' ]] || { echo false; exit 0; }
+releases="$(gh api --paginate "repos/${GITHUB_REPOSITORY:?}/releases?per_page=100" --jq '.[] | select(.draft == false) | .tag_name')"
+latest="$(while IFS= read -r candidate; do
+  if parsed="$("$script_dir/parse-release-version" "$candidate" 2>/dev/null)" && [[ "$parsed" == *$'\tstable' ]]; then
+    printf '%s\n' "$candidate"
+  fi
+done <<<"$releases" | sort -V | tail -n 1)"
+if [[ "$tag" == "$latest" ]]; then echo true; else echo false; fi

@@ -256,6 +256,9 @@ jobs:
       - name: Check typos
         run: .local/bin/check-test-flow --step=typos
 
+      - name: Verify release version and publication contracts
+        run: .local/bin/check-test-flow --step=version-materialization
+
       - name: Validate skills
         run: .local/bin/check-test-flow --step=skill-lint
 

@@ -26,14 +26,36 @@ RUN apt-get update \
 RUN curl -fsSL https://sh.rustup.rs \
     | sh -s -- -y --profile minimal --default-toolchain stable \
     && rustc -V && cargo -V
-RUN cargo install --locked --force \
-    cargo-binstall
+ARG CARGO_BINSTALL_TAG
+ARG CARGO_BINSTALL_SHA256
+
+RUN test "$(dpkg --print-architecture)" = amd64 \
+    && test -n "${CARGO_BINSTALL_TAG}" && test -n "${CARGO_BINSTALL_SHA256}" \
+    && mkdir -p /tmp/binstall /opt/tools/bin \
+    && curl -fsSL -o /tmp/binstall/archive.tgz \
+    "https://github.com/cargo-bins/cargo-binstall/releases/download/${CARGO_BINSTALL_TAG}/cargo-binstall-x86_64-unknown-linux-musl.tgz" \
+    && printf '%s  %s\n' "${CARGO_BINSTALL_SHA256}" /tmp/binstall/archive.tgz | sha256sum --check --strict - \
+    && tar -xzf /tmp/binstall/archive.tgz -C /tmp/binstall cargo-binstall \
+    && install -m 0755 /tmp/binstall/cargo-binstall /usr/local/cargo/bin/cargo-binstall \
+    && install -m 0755 /tmp/binstall/cargo-binstall /opt/tools/bin/cargo-binstall \
+    && test "$(cargo binstall -V)" = "${CARGO_BINSTALL_TAG#v}" \
+    && rm -rf /tmp/binstall
 
 RUN cargo binstall --locked --force --root /opt/tools \
     cargo-llvm-cov mdbook cargo-deny tera-cli taplo-cli cargo-nextest sccache cargo-sort cargo-edit cargo-expand cargo-deb
 
-RUN cargo install --locked --force --root /opt/tools \
-    cargo-binstall typos-cli
+ARG TYPOS_TAG
+ARG TYPOS_SHA256
+
+RUN test -n "${TYPOS_TAG}" && test -n "${TYPOS_SHA256}" \
+    && mkdir -p /tmp/typos \
+    && curl -fsSL -o /tmp/typos/archive.tar.gz \
+    "https://github.com/crate-ci/typos/releases/download/${TYPOS_TAG}/typos-${TYPOS_TAG}-x86_64-unknown-linux-musl.tar.gz" \
+    && printf '%s  %s\n' "${TYPOS_SHA256}" /tmp/typos/archive.tar.gz | sha256sum --check --strict - \
+    && tar -xzf /tmp/typos/archive.tar.gz -C /tmp/typos ./typos \
+    && install -m 0755 /tmp/typos/typos /opt/tools/bin/typos \
+    && test "$(/opt/tools/bin/typos --version)" = "typos-cli ${TYPOS_TAG#v}" \
+    && rm -rf /tmp/typos
 
 # https://github.com/oraios/serena/archive/refs/tags/v0.1.4.tar.gz
 RUN curl -fsSL -o /opt/serena.tar.gz \

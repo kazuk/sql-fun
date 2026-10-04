@@ -208,6 +208,10 @@ where
         self.1.set_statement_span(statement_span);
     }
 
+    fn metadata(&self) -> &::sql_fun_core::SqlFunMetadata {
+        self.1.metadata()
+    }
+
     fn get_args(&self) -> &sql_fun_core::SqlFunArgs {
         self.1.get_args()
     }

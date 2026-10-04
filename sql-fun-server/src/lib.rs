@@ -111,7 +111,7 @@ impl Api {
         let mut builtin_schema = version.definition_base_path(context_args.sql_fun_home()?);
         builtin_schema.push("schema.sql");
 
-        let base_context = BaseContext::new(context_args.clone())?;
+        let base_context = BaseContext::new(&context_args, metadata)?;
         PostgresDialect::parse_schema_file(&builtin_schema, base_context)?;
 
         todo!();

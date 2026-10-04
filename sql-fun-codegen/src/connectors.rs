@@ -4,6 +4,7 @@ use proc_macro2::{Span, TokenStream};
 use sql_fun_core::{SqlDialect, lockfile::LockfileEntry};
 use syn::{Ident, LitInt, LitStr};
 
+use crate::rust_syn::GeneratedIdentifiers;
 use crate::{QueryFunctionSpec, error::SqlFunCodegenError};
 
 pub trait ConnectorCodeGenerator: std::fmt::Debug {
@@ -202,12 +203,13 @@ impl TokioPostgresCodeGenerator {
     fn builder_setter_calls(
         lockfile_entry: &LockfileEntry,
         builder: &crate::row_builder::RowBuilder<'_>,
+        result: &Ident,
     ) -> Vec<TokenStream> {
         let mut calls = Vec::new();
         for field in lockfile_entry.result_set_shape() {
             let name = Ident::new(field.field_name(), Span::call_site());
             let index = LitInt::new(&field.field_index().to_string(), Span::call_site());
-            calls.push(builder.setter(&name, &quote::quote! { result.try_get(#index)? }));
+            calls.push(builder.setter(&name, &quote::quote! { #result.try_get(#index)? }));
         }
         calls
     }
@@ -352,13 +354,20 @@ impl TokioPostgresCodeGenerator {
         connection: &Ident,
         lockfile_entry: &LockfileEntry,
     ) -> TokenStream {
+        let mut identifiers = GeneratedIdentifiers::from(sig);
+        let params = identifiers.allocate("params");
+        let result = identifiers.allocate("result");
+        let res = identifiers.allocate("res");
+        let interrupt_result = identifiers.allocate("interrupt_result");
+        let builder_ident = identifiers.allocate("builder");
+
         let query = LitStr::new(lockfile_entry.execute_sql(), Span::call_site());
         let parameters = parameters(&spec.parameter_bindings, lockfile_entry);
         let row_type = spec.row_type();
-        let builder = crate::row_builder::RowBuilder::new(&spec.codegen_options);
+        let builder = crate::row_builder::RowBuilder::new(&spec.codegen_options, &builder_ident);
         let initialize_builder = builder.initialize(row_type);
         let build_row = builder.build();
-        let builder_setter_calls = Self::builder_setter_calls(lockfile_entry, &builder);
+        let builder_setter_calls = Self::builder_setter_calls(lockfile_entry, &builder, &result);
         let source_file = Self::source_file();
         if let Some(interrupt) = &spec.interrupt_handler {
             quote::quote! {
@@ -369,12 +378,12 @@ impl TokioPostgresCodeGenerator {
                     #[expect(dead_code)]
                     const __SQL_FUN_SOURCE_LINE: u32 = line!();
 
-                    let params: &[&(dyn tokio_postgres::types::ToSql + Sync)] = &[#(#parameters),*];
-                    let result = tokio::select! {
-                        res = #connection.query_one( #query, params ) => res,
-                        interrupt_result = &mut *#interrupt => return Err(interrupt_result)
+                    let #params: &[&(dyn tokio_postgres::types::ToSql + Sync)] = &[#(#parameters),*];
+                    let #result = tokio::select! {
+                        #res = #connection.query_one( #query, #params ) => #res,
+                        #interrupt_result = &mut *#interrupt => return Err(#interrupt_result)
                     };
-                    let result = result?;
+                    let #result = #result?;
                     #initialize_builder
 
                     #(#builder_setter_calls)*
@@ -391,8 +400,8 @@ impl TokioPostgresCodeGenerator {
                     #[expect(dead_code)]
                     const __SQL_FUN_SOURCE_LINE: u32 = line!();
 
-                    let params: &[&(dyn tokio_postgres::types::ToSql + Sync)] = &[#(#parameters),*];
-                    let result = #connection.query_one( #query, params ).await?;
+                    let #params: &[&(dyn tokio_postgres::types::ToSql + Sync)] = &[#(#parameters),*];
+                    let #result = #connection.query_one( #query, #params ).await?;
                     #initialize_builder
 
                     #(#builder_setter_calls)*
@@ -409,13 +418,20 @@ impl TokioPostgresCodeGenerator {
         connection: &Ident,
         lockfile_entry: &LockfileEntry,
     ) -> TokenStream {
+        let mut identifiers = GeneratedIdentifiers::from(sig);
+        let params = identifiers.allocate("params");
+        let result = identifiers.allocate("result");
+        let res = identifiers.allocate("res");
+        let interrupt_result = identifiers.allocate("interrupt_result");
+        let builder_ident = identifiers.allocate("builder");
+
         let query = LitStr::new(lockfile_entry.execute_sql(), Span::call_site());
         let parameters = parameters(&spec.parameter_bindings, lockfile_entry);
         let row_type = Self::option_row_type(spec);
-        let builder = crate::row_builder::RowBuilder::new(&spec.codegen_options);
+        let builder = crate::row_builder::RowBuilder::new(&spec.codegen_options, &builder_ident);
         let initialize_builder = builder.initialize(row_type);
         let build_row = builder.build();
-        let builder_setter_calls = Self::builder_setter_calls(lockfile_entry, &builder);
+        let builder_setter_calls = Self::builder_setter_calls(lockfile_entry, &builder, &result);
         let source_file = Self::source_file();
         if let Some(interrupt) = &spec.interrupt_handler {
             quote::quote! {
@@ -426,12 +442,12 @@ impl TokioPostgresCodeGenerator {
                     #[expect(dead_code)]
                     const __SQL_FUN_SOURCE_LINE: u32 = line!();
 
-                    let params: &[&(dyn tokio_postgres::types::ToSql + Sync)] = &[#(#parameters),*];
-                    let result = tokio::select! {
-                        res = #connection.query_opt( #query, params ) => res,
-                        interrupt_result = &mut *#interrupt => return Err(interrupt_result)
+                    let #params: &[&(dyn tokio_postgres::types::ToSql + Sync)] = &[#(#parameters),*];
+                    let #result = tokio::select! {
+                        #res = #connection.query_opt( #query, #params ) => #res,
+                        #interrupt_result = &mut *#interrupt => return Err(#interrupt_result)
                     };
-                    let Some(result) = result? else {
+                    let Some(#result) = #result? else {
                         return Ok(None);
                     };
                     #initialize_builder
@@ -450,9 +466,9 @@ impl TokioPostgresCodeGenerator {
                     #[expect(dead_code)]
                     const __SQL_FUN_SOURCE_LINE: u32 = line!();
 
-                    let params: &[&(dyn tokio_postgres::types::ToSql + Sync)] = &[#(#parameters),*];
-                    let result = #connection.query_opt( #query, params ).await?;
-                    let Some(result) = result else {
+                    let #params: &[&(dyn tokio_postgres::types::ToSql + Sync)] = &[#(#parameters),*];
+                    let #result = #connection.query_opt( #query, #params ).await?;
+                    let Some(#result) = #result else {
                         return Ok(None);
                     };
                     #initialize_builder
@@ -471,14 +487,22 @@ impl TokioPostgresCodeGenerator {
         connection: &Ident,
         lockfile_entry: &LockfileEntry,
     ) -> Result<TokenStream, SqlFunCodegenError> {
+        let mut identifiers = GeneratedIdentifiers::from(sig);
+        let params = identifiers.allocate("params");
+        let rows = identifiers.allocate("rows");
+        let result = identifiers.allocate("result");
+        let res = identifiers.allocate("res");
+        let interrupt_result = identifiers.allocate("interrupt_result");
+        let builder_ident = identifiers.allocate("builder");
+
         let query = LitStr::new(lockfile_entry.execute_sql(), Span::call_site());
         let parameters = parameters(&spec.parameter_bindings, lockfile_entry);
         let (collector, handler, row_type) = Self::query_many_arguments(spec)?;
         let row_type = &row_type;
-        let builder = crate::row_builder::RowBuilder::new(&spec.codegen_options);
+        let builder = crate::row_builder::RowBuilder::new(&spec.codegen_options, &builder_ident);
         let initialize_builder = builder.initialize(row_type);
         let build_row = builder.build();
-        let builder_setter_calls = Self::builder_setter_calls(lockfile_entry, &builder);
+        let builder_setter_calls = Self::builder_setter_calls(lockfile_entry, &builder, &result);
         let source_file = Self::source_file();
         let function = if let Some(interrupt) = &spec.interrupt_handler {
             quote::quote! {
@@ -491,15 +515,15 @@ impl TokioPostgresCodeGenerator {
 
                     use futures_util::TryStreamExt as _;
 
-                    let params: &[&(dyn tokio_postgres::types::ToSql + Sync)] = &[#(#parameters),*];
-                    let rows = tokio::select! {
-                        res = #connection.query_raw( #query, params.iter().copied() ) => res,
-                        interrupt_result = &mut *#interrupt => return Err(interrupt_result)
+                    let #params: &[&(dyn tokio_postgres::types::ToSql + Sync)] = &[#(#parameters),*];
+                    let #rows = tokio::select! {
+                        #res = #connection.query_raw( #query, #params.iter().copied() ) => #res,
+                        #interrupt_result = &mut *#interrupt => return Err(#interrupt_result)
                     }?;
-                    let mut rows = std::pin::pin!(rows);
-                    while let Some(result) = tokio::select! {
-                        res = rows.try_next() => res?,
-                        interrupt_result = &mut *#interrupt => return Err(interrupt_result)
+                    let mut #rows = std::pin::pin!(#rows);
+                    while let Some(#result) = tokio::select! {
+                        #res = #rows.try_next() => #res?,
+                        #interrupt_result = &mut *#interrupt => return Err(#interrupt_result)
                     } {
                         #initialize_builder
 
@@ -522,10 +546,10 @@ impl TokioPostgresCodeGenerator {
 
                     use futures_util::TryStreamExt as _;
 
-                    let params: &[&(dyn tokio_postgres::types::ToSql + Sync)] = &[#(#parameters),*];
-                    let rows = #connection.query_raw( #query, params.iter().copied() ).await?;
-                    let mut rows = std::pin::pin!(rows);
-                    while let Some(result) = rows.try_next().await? {
+                    let #params: &[&(dyn tokio_postgres::types::ToSql + Sync)] = &[#(#parameters),*];
+                    let #rows = #connection.query_raw( #query, #params.iter().copied() ).await?;
+                    let mut #rows = std::pin::pin!(#rows);
+                    while let Some(#result) = #rows.try_next().await? {
                         #initialize_builder
 
                         #(#builder_setter_calls)*
@@ -546,6 +570,12 @@ impl TokioPostgresCodeGenerator {
         connection: &Ident,
         lockfile_entry: &LockfileEntry,
     ) -> TokenStream {
+        let mut identifiers = GeneratedIdentifiers::from(sig);
+        let params = identifiers.allocate("params");
+        let result = identifiers.allocate("result");
+        let res = identifiers.allocate("res");
+        let interrupt_result = identifiers.allocate("interrupt_result");
+
         let query = LitStr::new(lockfile_entry.execute_sql(), Span::call_site());
         let parameters = parameters(&spec.parameter_bindings, lockfile_entry);
         let source_file = Self::source_file();
@@ -558,13 +588,13 @@ impl TokioPostgresCodeGenerator {
                     #[expect(dead_code)]
                     const __SQL_FUN_SOURCE_LINE: u32 = line!();
 
-                    let params: &[&(dyn tokio_postgres::types::ToSql + Sync)] = &[#(#parameters),*];
-                    let result = tokio::select! {
-                        res = #connection.execute( #query, params ) => res,
-                        interrupt_result = #interrupt => Err(interrupt_result)
+                    let #params: &[&(dyn tokio_postgres::types::ToSql + Sync)] = &[#(#parameters),*];
+                    let #result = tokio::select! {
+                        #res = #connection.execute( #query, #params ) => #res,
+                        #interrupt_result = #interrupt => Err(#interrupt_result)
                     }?;
 
-                    Ok(result)
+                    Ok(#result)
                 }
             }
         } else {
@@ -576,10 +606,10 @@ impl TokioPostgresCodeGenerator {
                     #[expect(dead_code)]
                     const __SQL_FUN_SOURCE_LINE: u32 = line!();
 
-                    let params: &[&(dyn tokio_postgres::types::ToSql + Sync)] = &[#(#parameters),*];
-                    let result = #connection.execute( #query, params ).await?;
+                    let #params: &[&(dyn tokio_postgres::types::ToSql + Sync)] = &[#(#parameters),*];
+                    let #result = #connection.execute( #query, #params ).await?;
 
-                    Ok(result)
+                    Ok(#result)
                 }
             }
         }
@@ -674,12 +704,13 @@ impl RusqliteCodeGenerator {
     fn builder_setter_calls(
         lockfile_entry: &LockfileEntry,
         builder: &crate::row_builder::RowBuilder<'_>,
+        result: &Ident,
     ) -> Vec<TokenStream> {
         let mut calls = Vec::new();
         for field in lockfile_entry.result_set_shape() {
             let name = Ident::new(field.field_name(), Span::call_site());
             let index = LitInt::new(&field.field_index().to_string(), Span::call_site());
-            calls.push(builder.setter(&name, &quote::quote! { result.get(#index)? }));
+            calls.push(builder.setter(&name, &quote::quote! { #result.get(#index)? }));
         }
         calls
     }
@@ -689,9 +720,16 @@ impl RusqliteCodeGenerator {
         sig: &syn::Signature,
         connection: &Ident,
         query_body: &TokenStream,
+        identifiers: &mut GeneratedIdentifiers,
     ) -> TokenStream {
         let source_file = TokioPostgresCodeGenerator::source_file();
         if let Some(interrupt) = &spec.interrupt_handler {
+            let interrupt_message = identifiers.allocate("interrupt_message");
+            let read_message = identifiers.allocate("read_message");
+            let message = identifiers.allocate("message");
+            let query_result = identifiers.allocate("query_result");
+            let interrupt_error = identifiers.allocate("interrupt_error");
+            let error = identifiers.allocate("error");
             let error_type = spec.error_type();
             quote::quote! {
                 #sig
@@ -701,29 +739,29 @@ impl RusqliteCodeGenerator {
                     #[expect(dead_code)]
                     const __SQL_FUN_SOURCE_LINE: u32 = line!();
 
-                    let interrupt_message = ::std::sync::Arc::new(::std::sync::Mutex::new(None));
-                    let read_message = ::std::sync::Arc::clone(&interrupt_message);
+                    let #interrupt_message = ::std::sync::Arc::new(::std::sync::Mutex::new(None));
+                    let #read_message = ::std::sync::Arc::clone(&#interrupt_message);
                     #connection.progress_handler(1000, Some(move || {
                         match #interrupt.lock().expect("interrupt channel mutex lockable").try_recv() {
-                            Ok(message) => {
-                                *interrupt_message.lock().expect("interrupt message mutex lockable") = Some(message);
+                            Ok(#message) => {
+                                *#interrupt_message.lock().expect("interrupt message mutex lockable") = Some(#message);
                                 true
                             }
                             Err(::std::sync::mpsc::TryRecvError::Empty) => false,
                             Err(::std::sync::mpsc::TryRecvError::Disconnected) => {
-                                *interrupt_message.lock().expect("interrupt message mutex lockable") = Some(#error_type::interrupt_disconnected());
+                                *#interrupt_message.lock().expect("interrupt message mutex lockable") = Some(#error_type::interrupt_disconnected());
                                 true
                             }
                         }
                     }))?;
 
-                    let query_result: Result<_, #error_type> = (|| { #query_body })();
+                    let #query_result: Result<_, #error_type> = (|| { #query_body })();
                     match #connection.progress_handler(1000, None::<fn() -> bool>) {
-                        Ok(()) => match read_message.lock().expect("interrupt message mutex lockable").take() {
-                            Some(interrupt_error) => Err(interrupt_error),
-                            None => query_result,
+                        Ok(()) => match #read_message.lock().expect("interrupt message mutex lockable").take() {
+                            Some(#interrupt_error) => Err(#interrupt_error),
+                            None => #query_result,
                         },
-                        Err(error) => #error_type::interrupt_handler_cleanup_error(error, query_result),
+                        Err(#error) => #error_type::interrupt_handler_cleanup_error(#error, #query_result),
                     }
                 }
             }
@@ -748,29 +786,36 @@ impl RusqliteCodeGenerator {
         connection: &Ident,
         lockfile_entry: &LockfileEntry,
     ) -> TokenStream {
+        let mut identifiers = GeneratedIdentifiers::from(sig);
+        let params = identifiers.allocate("params");
+        let rows = identifiers.allocate("rows");
+        let result = identifiers.allocate("result");
+        let statement = identifiers.allocate("statement");
+        let builder_ident = identifiers.allocate("builder");
+
         let query = LitStr::new(lockfile_entry.execute_sql(), Span::call_site());
         let parameters = parameters(&spec.parameter_bindings, lockfile_entry);
         let row_type = spec.row_type();
-        let builder = crate::row_builder::RowBuilder::new(&spec.codegen_options);
+        let builder = crate::row_builder::RowBuilder::new(&spec.codegen_options, &builder_ident);
         let initialize_builder = builder.initialize(row_type);
         let build_row = builder.build();
-        let setters = Self::builder_setter_calls(lockfile_entry, &builder);
+        let setters = Self::builder_setter_calls(lockfile_entry, &builder, &result);
         let query_body = quote::quote! {
-            let params: &[&dyn ::rusqlite::ToSql] = &[#(#parameters),*];
-            let mut statement = #connection.prepare(#query)?;
-            let mut rows = statement.query(params)?;
-            let Some(result) = rows.next()? else {
+            let #params: &[&dyn ::rusqlite::ToSql] = &[#(#parameters),*];
+            let mut #statement = #connection.prepare(#query)?;
+            let mut #rows = #statement.query(#params)?;
+            let Some(#result) = #rows.next()? else {
                 return Err(::rusqlite::Error::QueryReturnedNoRows.into());
             };
             #initialize_builder
             #(#setters)*
-            if rows.next()?.is_some() {
+            if #rows.next()?.is_some() {
                 Err(::rusqlite::Error::QueryReturnedMoreThanOneRow.into())
             } else {
                 Ok(#build_row)
             }
         };
-        Self::function(spec, sig, connection, &query_body)
+        Self::function(spec, sig, connection, &query_body, &mut identifiers)
     }
 
     fn query_opt_function(
@@ -779,21 +824,28 @@ impl RusqliteCodeGenerator {
         connection: &Ident,
         lockfile_entry: &LockfileEntry,
     ) -> TokenStream {
+        let mut identifiers = GeneratedIdentifiers::from(sig);
+        let params = identifiers.allocate("params");
+        let rows = identifiers.allocate("rows");
+        let result = identifiers.allocate("result");
+        let statement = identifiers.allocate("statement");
+        let builder_ident = identifiers.allocate("builder");
+
         let query = LitStr::new(lockfile_entry.execute_sql(), Span::call_site());
         let parameters = parameters(&spec.parameter_bindings, lockfile_entry);
         let row_type = TokioPostgresCodeGenerator::option_row_type(spec);
-        let builder = crate::row_builder::RowBuilder::new(&spec.codegen_options);
+        let builder = crate::row_builder::RowBuilder::new(&spec.codegen_options, &builder_ident);
         let initialize_builder = builder.initialize(row_type);
         let build_row = builder.build();
-        let setters = Self::builder_setter_calls(lockfile_entry, &builder);
+        let setters = Self::builder_setter_calls(lockfile_entry, &builder, &result);
         let query_body = quote::quote! {
-            let params: &[&dyn ::rusqlite::ToSql] = &[#(#parameters),*];
-            let mut statement = #connection.prepare(#query)?;
-            let mut rows = statement.query(params)?;
-            if let Some(result) = rows.next()? {
+            let #params: &[&dyn ::rusqlite::ToSql] = &[#(#parameters),*];
+            let mut #statement = #connection.prepare(#query)?;
+            let mut #rows = #statement.query(#params)?;
+            if let Some(#result) = #rows.next()? {
                 #initialize_builder
                 #(#setters)*
-                if rows.next()?.is_some() {
+                if #rows.next()?.is_some() {
                     Err(::rusqlite::Error::QueryReturnedMoreThanOneRow.into())
                 } else {
                     Ok(Some(#build_row))
@@ -802,7 +854,7 @@ impl RusqliteCodeGenerator {
                 Ok(None)
             }
         };
-        Self::function(spec, sig, connection, &query_body)
+        Self::function(spec, sig, connection, &query_body, &mut identifiers)
     }
 
     fn query_many_function(
@@ -811,27 +863,40 @@ impl RusqliteCodeGenerator {
         connection: &Ident,
         lockfile_entry: &LockfileEntry,
     ) -> Result<TokenStream, SqlFunCodegenError> {
+        let mut identifiers = GeneratedIdentifiers::from(sig);
+        let params = identifiers.allocate("params");
+        let rows = identifiers.allocate("rows");
+        let result = identifiers.allocate("result");
+        let statement = identifiers.allocate("statement");
+        let builder_ident = identifiers.allocate("builder");
+
         let query = LitStr::new(lockfile_entry.execute_sql(), Span::call_site());
         let parameters = parameters(&spec.parameter_bindings, lockfile_entry);
         let (collector, handler, row_type) =
             TokioPostgresCodeGenerator::query_many_arguments(spec)?;
         let row_type = &row_type;
-        let builder = crate::row_builder::RowBuilder::new(&spec.codegen_options);
+        let builder = crate::row_builder::RowBuilder::new(&spec.codegen_options, &builder_ident);
         let initialize_builder = builder.initialize(row_type);
         let build_row = builder.build();
-        let setters = Self::builder_setter_calls(lockfile_entry, &builder);
+        let setters = Self::builder_setter_calls(lockfile_entry, &builder, &result);
         let query_body = quote::quote! {
-            let params: &[&dyn ::rusqlite::ToSql] = &[#(#parameters),*];
-            let mut statement = #connection.prepare(#query)?;
-            let mut rows = statement.query(params)?;
-            while let Some(result) = rows.next()? {
+            let #params: &[&dyn ::rusqlite::ToSql] = &[#(#parameters),*];
+            let mut #statement = #connection.prepare(#query)?;
+            let mut #rows = #statement.query(#params)?;
+            while let Some(#result) = #rows.next()? {
                 #initialize_builder
                 #(#setters)*
                 #collector = #handler(#collector, #build_row)?;
             }
             Ok(#collector)
         };
-        Ok(Self::function(spec, sig, connection, &query_body))
+        Ok(Self::function(
+            spec,
+            sig,
+            connection,
+            &query_body,
+            &mut identifiers,
+        ))
     }
 
     fn execute_function(
@@ -840,14 +905,18 @@ impl RusqliteCodeGenerator {
         connection: &Ident,
         lockfile_entry: &LockfileEntry,
     ) -> TokenStream {
+        let mut identifiers = GeneratedIdentifiers::from(sig);
+        let params = identifiers.allocate("params");
+        let result = identifiers.allocate("result");
+
         let query = LitStr::new(lockfile_entry.execute_sql(), Span::call_site());
         let parameters = parameters(&spec.parameter_bindings, lockfile_entry);
         let query_body = quote::quote! {
-            let params: &[&dyn ::rusqlite::ToSql] = &[#(#parameters),*];
-            let result = #connection.execute(#query, params)?;
-            Ok(result)
+            let #params: &[&dyn ::rusqlite::ToSql] = &[#(#parameters),*];
+            let #result = #connection.execute(#query, #params)?;
+            Ok(#result)
         };
-        Self::function(spec, sig, connection, &query_body)
+        Self::function(spec, sig, connection, &query_body, &mut identifiers)
     }
 }
 

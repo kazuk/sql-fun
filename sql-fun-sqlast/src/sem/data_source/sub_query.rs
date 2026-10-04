@@ -56,6 +56,7 @@ impl SubQueryDataSource {
     pub(super) fn create_column_ref<TParseContext>(
         &self,
         context: &mut TParseContext,
+        alias: &AliasName,
         column: &ColumnName,
         nullability: Nullable,
     ) -> Result<ColumnReferenceExpr, AnalysisError>
@@ -79,15 +80,12 @@ impl SubQueryDataSource {
             let column_def = result_column_ref.create_column_definition();
             Some(column_def)
         } else {
-            context.report_problem(AnalysisProblem::column_not_found_in_subquery(
-                self.alias.name(),
-                column,
-            ))?;
+            context.report_problem(AnalysisProblem::column_not_found_in_subquery(alias, column))?;
             None
         };
 
         Ok(ColumnReferenceExpr::SubQueryColumn(SubQueryColumnRef::new(
-            self.alias.name(),
+            alias,
             column,
             column_def.as_ref(),
             nullability,

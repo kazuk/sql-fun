@@ -152,7 +152,7 @@ impl PostgresEngineVersion {
 }
 
 /// Well known database engine
-#[derive(serde::Deserialize, Debug)]
+#[derive(serde::Deserialize, Debug, Clone)]
 pub enum WellKnownDbEngine {
     /// `PostgreSQL` Engine
     PostgreSQL,
@@ -171,7 +171,7 @@ impl FromStr for WellKnownDbEngine {
 }
 
 /// Database engine name
-#[derive(Debug)]
+#[derive(Debug, Clone)]
 pub struct DatabaseEngine(Either<WellKnownDbEngine, String>);
 
 impl<'de> serde::Deserialize<'de> for DatabaseEngine {
@@ -217,7 +217,7 @@ impl DatabaseEngine {
 
 /// `sql-fun` metadata structures
 ///
-#[derive(Debug, serde::Deserialize)]
+#[derive(Debug, Clone, serde::Deserialize)]
 pub struct SqlFunMetadata {
     #[serde(flatten)]
     codegen_options: crate::CodegenOptions,

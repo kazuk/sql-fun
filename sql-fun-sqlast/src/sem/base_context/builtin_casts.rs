@@ -162,7 +162,14 @@ mod test_builtin_cast_identity {
             env!("SQL_FUN_HOME"),
         ])
         .expect("test arguments");
-        let context = BaseContext::new(args).expect("builtin context");
+        let context = BaseContext::new(
+            &args,
+            args.load_metadata()
+                .expect("fixture metadata")
+                .get("default")
+                .expect("selected test metadata"),
+        )
+        .expect("builtin context");
         let text = TypeReference::from_master_type_name("text");
         let text_array = TypeReference::from_master_type_name("_text");
         let public_text = TypeReference::from_full_name(FullName::with_schema("public", "text"));

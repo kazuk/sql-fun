@@ -200,11 +200,8 @@ pub mod test_helpers;
 #[cfg(test)]
 mod tests {
 
-    use std::path::PathBuf;
-
     use crate::{
         PostgresDialect,
-        sem::BaseContext,
         syn::{ListOpt, Opt},
     };
 
@@ -334,23 +331,49 @@ mod tests {
         context_args: SqlFunArgs,
         _enable_stack_overflow_backtrace: EnableStackOverflowBacktrace,
     ) -> TestResult {
-        let home_path = PathBuf::from(env!("SQL_FUN_HOME"));
-        let builtin = home_path.join("postgres/17/schema.sql");
-        let builtin = PostgresDialect::parse_schema_file(
-            &builtin,
-            BaseContext::new(
-                &context_args,
-                context_args
-                    .load_metadata()?
-                    .get("default")
-                    .expect("selected test metadata"),
-            )?,
-        )?;
-
-        let tablefunc_ext = home_path.join("postgres/17/extension/tablefunc--1.0.sql");
-        let tablefunc_ext = PostgresDialect::parse_schema_file(&tablefunc_ext, builtin)?;
-        let file = PathBuf::from("../examples/adventure-works/schema.develop.sql");
-        let _dump = PostgresDialect::parse_schema_file(&file, tablefunc_ext)?;
+        crate::test_helpers::small_stack_regression(2 * 1024 * 1024, || {
+            let dump = crate::test_helpers::adventure_works_schema(&context_args)
+                .expect("full AdventureWorks schema on a small stack");
+            let view = crate::sem::BaseParseContext::get_view(
+                &dump,
+                &crate::sem::ViewName::from_full_name(&crate::sem::FullName::with_schema(
+                    "humanresources",
+                    "vemployee",
+                )),
+            )
+            .expect("AdventureWorks employee view");
+            for name in [
+                "businessentityid",
+                "title",
+                "firstname",
+                "middlename",
+                "lastname",
+                "suffix",
+                "jobtitle",
+                "phonenumber",
+                "phonenumbertype",
+                "emailaddress",
+                "emailpromotion",
+                "addressline1",
+                "addressline2",
+                "city",
+                "stateprovincename",
+                "postalcode",
+                "countryregionname",
+                "additionalcontactinfo",
+            ] {
+                assert!(
+                    view.has_column(&crate::sem::ColumnName::from(name)),
+                    "{name}"
+                );
+            }
+            assert_eq!(
+                view.get_column_def(&crate::sem::ColumnName::from("businessentityid"))
+                    .expect("employee id")
+                    .get_type_cloned(),
+                Some(crate::sem::PgBuiltInType::int4())
+            );
+        });
         Ok(())
     }
 }

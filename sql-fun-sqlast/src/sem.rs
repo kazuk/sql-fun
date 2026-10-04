@@ -36,6 +36,7 @@ mod scalar_expr;
 mod schema_file_context;
 mod search_path;
 mod select_statement;
+mod stack;
 mod top_level_statement;
 mod type_system;
 mod unresolved;

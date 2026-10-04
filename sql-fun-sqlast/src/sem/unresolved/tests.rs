@@ -2,6 +2,7 @@
 
 #[cfg(feature = "sqlite")]
 mod sqlite_from_groups;
+mod stack_regressions;
 mod test_helpers;
 
 use self::test_helpers::postgres;

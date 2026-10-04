@@ -11,6 +11,12 @@ cargo install sql-fun-cli sql-fun-server
 cargo install --locked cargo-expand
 ```
 
+Building the analyzer from source requires native compilation tools: a C compiler
+and assembler for stack growth, plus Clang for PostgreSQL parser bindings. On
+Ubuntu, install `build-essential` and `clang` before the Cargo commands above.
+Cross-compilation requires tools for the target platform. These are build
+prerequisites; the installed CLI does not invoke them for stack growth.
+
 For SQLite, enable the feature on the proc-macro, CLI, and server:
 
 ```console

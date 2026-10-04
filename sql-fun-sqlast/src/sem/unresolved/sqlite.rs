@@ -73,6 +73,13 @@ impl TryFrom<&syn::Expr> for Expr {
     type Error = AnalysisError;
 
     fn try_from(value: &syn::Expr) -> Result<Self, Self::Error> {
+        crate::sem::stack::with_stack(|| Self::convert_sqlite(value))
+    }
+}
+
+impl Expr {
+    #[inline(never)]
+    fn convert_sqlite(value: &syn::Expr) -> Result<Self, AnalysisError> {
         Ok(match value {
             syn::Expr::Literal(value) => Self::from(value),
             syn::Expr::Id(name) | syn::Expr::Name(name) => Self::from(name),

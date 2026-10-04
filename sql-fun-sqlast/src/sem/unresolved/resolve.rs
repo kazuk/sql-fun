@@ -72,6 +72,16 @@ impl Expr {
         dialect: Dialect,
         scope: &ScalarAnalysisContext<'_>,
     ) -> Result<SemScalarExpr, AnalysisError> {
+        crate::sem::stack::with_stack(|| Self::resolve_in_body(self, context, dialect, scope))
+    }
+
+    #[inline(never)]
+    fn resolve_in_body(
+        &self,
+        context: &mut Resolution<'_>,
+        dialect: Dialect,
+        scope: &ScalarAnalysisContext<'_>,
+    ) -> Result<SemScalarExpr, AnalysisError> {
         match self {
             Self::Literal(value) => Ok(value.resolve()),
             Self::Column(name) => name.resolve_column(context, scope),

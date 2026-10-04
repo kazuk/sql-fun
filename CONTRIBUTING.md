@@ -277,14 +277,23 @@ interface instead of loopback.
 
 ## Updating Statistics
 
-Before submitting a pull request, update project statistics:
+Coverage measurement is optional. Run it when your change needs coverage
+analysis or a reviewer requests a measurement:
 
 ```sh
 .local/bin/update-stats
 ```
 
-This updates files under [stats/](stats/), including the coverage summary in
-[stats/coverage.txt](stats/coverage.txt).
+This regenerates [stats/coverage.txt](stats/coverage.txt). Running the script
+and committing an updated summary are not required for every pull request.
+Continue to run the standard build and test checks described above.
+
+Run `check-test-flow` and `update-stats` sequentially; their tests share
+temporary build directories. Coverage summaries track long-term trends, and
+committed measurements may lag behind the code. Investigate clear anomalies
+before attributing a difference to your change. When a comparison is needed,
+measure the base and changed code sequentially with the same toolchain,
+features, and test commands.
 
 ## Commit Messages
 
@@ -360,7 +369,8 @@ Before opening a pull request:
 1. Rebase or merge the latest target branch as needed.
 2. Run [`.local/bin/check-test-flow`](.local/bin/check-test-flow) without
    arguments and make sure it passes.
-3. Run [`.local/bin/update-stats`](.local/bin/update-stats).
+3. Decide whether coverage measurement is needed using the
+   [Updating Statistics](#updating-statistics) guidance.
 4. Make sure generated files are updated only through their generator.
 5. Write a clear summary of the change and include test results.
 

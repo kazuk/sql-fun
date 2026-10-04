@@ -150,6 +150,36 @@ directly:
   that prerequisite unless the script is intended to run outside the repository
   development environment.
 
+## Product Design Philosophies
+
+- Before planning, implementing, or reviewing user-facing behavior, read
+  [book/design-philosophies.md](book/design-philosophies.md). In particular,
+  apply the Explicit-choice Philosophy before introducing defaults, inference,
+  automatic selection, fallback behavior, or other behavior that acts on an
+  omitted choice.
+- Omission is not consent. Do not infer or select a value merely because it is
+  available, conventional, recommended, or the only valid option. A candidate
+  may be suggested to the user, but it remains unselected until the user
+  explicitly confirms or supplies it.
+- Non-interactive or assume-yes modes do not authorize missing decisions. They
+  may skip prompts only when all decisions required by that operation have been
+  supplied explicitly through the operation's documented inputs.
+- Inspecting user-owned assets is itself an action covered by explicit choice.
+  Do not discover, open, parse, enumerate, or use project files, metadata,
+  configuration, repositories, or other user-owned inputs merely because they
+  are reachable from the current directory, environment, or another ambient
+  source. The command's documented semantics or an explicit user choice must
+  authorize that access.
+- Treat ambient values as input only where the command contract explicitly says
+  they are inputs. Their presence alone is not consent to inspect related user
+  assets or to change the interaction mode. Likewise, an explicit asset or
+  project selection authorizes the access needed for that selection; it does not
+  implicitly authorize a broader scan of adjacent assets.
+- When reviewing a convenience behavior, distinguish deriving a candidate from
+  choosing it, and distinguish having access to information from having consent
+  to inspect or use it. If either choice is missing, ask or require an explicit
+  input rather than treating availability as agreement.
+
 ## User-Facing Documentation Planning and Review
 
 - When planning user-facing documentation changes, identify the intended reader,

@@ -22,10 +22,10 @@ pub struct InitializeArgs {
     /// Path to the sql-fun home directory.
     ///
     /// This is where catalogs, extensions, and configuration files are stored.
-    /// If omitted, ask interactively. SQL_FUN_HOME supplies a suggested candidate;
+    /// If omitted, ask interactively. `SQL_FUN_HOME` supplies a suggested candidate;
     /// if it is unset, suggest ~/.sql-fun. The user must explicitly confirm the path.
     ///
-    /// With --yes, this CLI argument is required; SQL_FUN_HOME does not replace it.
+    /// With --yes, this CLI argument is required; `SQL_FUN_HOME` does not replace it.
     ///
     #[arg(long, short = 'H', value_hint = ValueHint::DirPath)]
     sql_fun_home: Option<PathBuf>,

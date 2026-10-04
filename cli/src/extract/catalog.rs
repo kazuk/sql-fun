@@ -1,6 +1,6 @@
 use crate::extract::render::{Renderer, fragment, identifier};
 
-use std::{collections::BTreeMap, path::Path, time::Duration};
+use std::{collections::BTreeMap, fmt::Write, path::Path, time::Duration};
 
 use ::serde_json::Value;
 use ::tokio::io::AsyncWriteExt;
@@ -115,10 +115,11 @@ pub(super) async fn extract(
         "BEGIN ISOLATION LEVEL REPEATABLE READ READ ONLY;\nSET LOCAL search_path = pg_catalog; SET LOCAL standard_conforming_strings = on; SET LOCAL extra_float_digits = 3; SET LOCAL timezone = 'UTC'; SET LOCAL statement_timeout = '60s';\nSHOW server_version_num;\n",
     );
     for query in queries {
-        sql.push_str(&format!(
-            "SELECT ({})::text;\n",
+        writeln!(
+            sql,
+            "SELECT ({})::text;",
             query.trim().trim_end_matches(';')
-        ));
+        )?;
     }
     sql.push_str("COMMIT;\n");
     let results = run_psql(configuration, &sql).await?;

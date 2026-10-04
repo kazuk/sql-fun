@@ -17,8 +17,10 @@
 
 ## Stats
 
-- [ ] `update-stats` (if applicable)
-- [ ] Coverage impact reviewed in `stats/coverage.txt` (if applicable)
+Coverage measurement is optional and is not a PR submission requirement.
+
+- Measurement: not run / run with `update-stats` (explain why if run).
+- Coverage findings (if measured):
 
 ## Risk and Rollout
 

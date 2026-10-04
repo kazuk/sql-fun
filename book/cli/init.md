@@ -9,8 +9,10 @@ datasources; it does not automatically select them.
 sql-fun init
 ```
 
-Select the project datasources you want to initialize, or select engines when
-working outside a project. Use the init option `--datasource <name>` to choose a
+First choose the sql-fun home directory, then select project datasources or
+engines. Configuration fields such as `connector` are not datasource candidates.
+If no named datasources are declared, the prompt asks you to choose engines.
+Use the init option `--datasource <name>` to choose a
 project datasource explicitly. Alternatively, use `--engines postgres`,
 `--engines sqlite`, or `--engines postgres,sqlite` to choose engine setup directly.
 Do not combine `--engines` with `--datasource`.

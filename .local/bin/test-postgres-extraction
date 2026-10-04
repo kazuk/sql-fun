@@ -1,6 +1,12 @@
 #!/usr/bin/env python3
 """Exercise installed extraction contracts using exclusively task-owned PostgreSQL containers."""
 import argparse
+import errno
+import fcntl
+import pty
+import select
+import struct
+import termios
 import hashlib
 import io
 import json
@@ -35,6 +41,73 @@ def payload(directory):
 
 def owned():
     return set(run("docker", "ps", "-aq", "--filter", "label=io.sql-fun.extraction=owned").stdout.split())
+
+
+def validate_interactive_init(binary, destination):
+    """Exercise actual terminal prompts with the repository's connector-only shape."""
+    project = destination / "interactive-init"
+    project.mkdir()
+    manifest = project / "Cargo.toml"
+    declarations = "[package.metadata.database]\nconnector = 'tokio-postgres'\n"
+    manifest.write_text(declarations)
+    home = project / "chosen-home"
+    env = dict(os.environ, SQL_FUN_HOME=str(home), TERM="xterm", PATH=str(project / "no-tools"))
+    env.pop("SQL_FUN_DATASOURCE", None)
+    master, slave = pty.openpty()
+    fcntl.ioctl(slave, termios.TIOCSWINSZ, struct.pack("HHHH", 24, 100, 0, 0))
+
+    def terminal_session():
+        os.setsid()
+        fcntl.ioctl(0, termios.TIOCSCTTY, 0)
+
+    process = subprocess.Popen([binary, "--metadata-file", str(manifest), "init"],
+                               cwd=project, env=env, stdin=slave, stdout=slave,
+                               stderr=slave, preexec_fn=terminal_session)
+    os.close(slave)
+    transcript = bytearray()
+
+    def wait_for(marker, since=0):
+        deadline = time.monotonic() + 15
+        while marker.encode() not in transcript[since:]:
+            remaining = deadline - time.monotonic()
+            if remaining <= 0:
+                raise AssertionError(f"terminal did not reach {marker!r}: {transcript!r}")
+            ready, _, _ = select.select([master], [], [], min(remaining, 1))
+            if ready:
+                try:
+                    chunk = os.read(master, 65536)
+                except OSError as error:
+                    if error.errno == errno.EIO:
+                        raise AssertionError(f"terminal exited before {marker!r}: {transcript!r}") from error
+                    raise
+                if not chunk:
+                    raise AssertionError(f"terminal closed before {marker!r}: {transcript!r}")
+                transcript.extend(chunk)
+
+    try:
+        wait_for("Initialize sql-fun development support?")
+        os.write(master, b"y\r")
+        wait_for("sql-fun home directory (SQL_FUN_HOME)?")
+        assert b"Choose engines" not in transcript, "home choice must appear first"
+        os.write(master, b"\r")  # Explicitly accept the SQL_FUN_HOME suggestion.
+        wait_for("Space to select, Enter to confirm.")
+        assert b"[ ] postgres" in transcript and b"[ ] sqlite" in transcript
+        assert b"Choose datasources" not in transcript, "connector is a setting, not a datasource"
+        start = len(transcript)
+        os.write(master, b"\r")
+        wait_for("Select at least one option explicitly.", start)
+        wait_for("Space to select, Enter to confirm.", start)
+        os.write(master, b"\x1b[B \r")  # Move to SQLite, select, and confirm.
+        wait_for("SQLite development-support setup is still under development.")
+        assert process.wait(timeout=15) == 0
+        assert home.is_dir() and not (home / "postgres").exists()
+        assert manifest.read_text() == declarations, "init must not rewrite project metadata"
+    finally:
+        if process.poll() is None:
+            process.terminate()
+            process.wait(timeout=5)
+        os.close(master)
+    print("Interactive init: home choice, engine candidates, explicit selection and SQLite dispatch passed", flush=True)
 
 
 def validate(binary, major, image, destination, host, bind):
@@ -186,6 +259,7 @@ def main():
     args.binary = str(Path(args.binary).resolve())
     # Run the packaged CLI outside the checkout: all runtime resources must be embedded.
     os.chdir(destination)
+    validate_interactive_init(args.binary, destination)
     before = owned()
     for major, image in IMAGES.items():
         validate(str(Path(args.binary).resolve()), major, image, destination, args.host, args.bind)

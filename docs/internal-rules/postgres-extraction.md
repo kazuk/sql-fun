@@ -101,7 +101,10 @@ publication isolation, and existing catalog/extension loaders.
 
 ## Initialization integration tests
 
-The extraction script also exercises PostgreSQL initialization from Docker and
+The extraction script first exercises the actual interactive terminal flow with
+connector-only metadata, an explicit home confirmation, unselected engine
+candidates and SQLite dispatch without PostgreSQL tools. It also exercises
+PostgreSQL initialization from Docker and
 an existing server, reruns, and source/version mismatch diagnostics. To validate
 initialization followed by semantic loading of builtin and user schemas, run:
 

@@ -1,1 +1,1 @@
-Install `sql-fun`?
+Initialize sql-fun development support?

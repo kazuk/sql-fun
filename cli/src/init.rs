@@ -39,28 +39,36 @@ pub async fn initialize(
     if !init_args.assume_yes() {
         println!("{}", include_str!("init/banner.txt"));
     }
-    let selection = SetupSelection::resolve(args, init_args)?;
-    selection.check_choices(init_args)?;
-    // Resolve all engine tasks before creating directories or installing anything.
-    let plans = selection.prepare(args, init_args).await?;
     let mut context = Initialization::from(init_args);
     if init_args.sql_fun_home().is_none() {
         context.set_home(&args.initialization_home().map_err(anyhow::Error::from)?);
     }
-    let mut machine = Workflow.state_machine();
-    while let Some(request) = machine.state().request(&context) {
-        let event = request.run()?;
-        machine.handle_with_context(&event, &mut context);
-        context.present();
+    // Interactive setup starts with the user's home choice; --yes validates all
+    // supplied choices before any filesystem setup.
+    if !init_args.assume_yes() && !prepare_home(&mut context)? {
+        return Ok(ExitCode::FAILURE);
     }
-    context.finish()?;
-    if machine.state().is_cancelled() {
+    let selection = SetupSelection::resolve(args, init_args)?;
+    selection.check_choices(init_args)?;
+    let plans = selection.prepare(args, init_args).await?;
+    if init_args.assume_yes() && !prepare_home(&mut context)? {
         return Ok(ExitCode::FAILURE);
     }
     for plan in plans {
         plan.install(context.home()).await?;
     }
     Ok(ExitCode::SUCCESS)
+}
+
+fn prepare_home(context: &mut Initialization) -> Result<bool, InitError> {
+    let mut machine = Workflow.state_machine();
+    while let Some(request) = machine.state().request(context) {
+        let event = request.run()?;
+        machine.handle_with_context(&event, context);
+        context.present();
+    }
+    context.finish()?;
+    Ok(!machine.state().is_cancelled())
 }
 
 /// Selection is explicit: datasource metadata describes candidates, never consent.

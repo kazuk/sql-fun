@@ -1,10 +1,7 @@
 Welcome to sql-fun
 
-Initialize engine-specific development support:
-
-1. Explicitly choose engines or project datasources.
-2. Choose the setup tasks' required options and the sql-fun home directory.
-3. Run the selected engine-specific setup.
+Follow the prompts to choose the sql-fun home directory and the engines or
+project datasources whose development support you want to initialize.
 
 PostgreSQL setup installs required builtin metadata. SQLite setup is still
 under development. Application schemas and migrations remain managed by your

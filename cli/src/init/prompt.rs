@@ -145,6 +145,7 @@ impl Input {
     fn run_multi_select(title: &str, selection: &Selection) -> Result<PromptResponse, InitError> {
         Ok(PromptResponse::multi_select(
             &inquire::MultiSelect::new(title, selection.options.clone())
+                .with_help_message("Use arrows to move, Space to select, Enter to confirm.")
                 .with_default(&selection.defaults)
                 .raw_prompt()
                 .or_else(InitError::prompt)?

@@ -1,1 +1,1 @@
-`sql-fun` home directory path:
+sql-fun home directory (SQL_FUN_HOME)?

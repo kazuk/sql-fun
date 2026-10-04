@@ -275,7 +275,7 @@ To check an installed CLI, supply its executable path with `--binary`.
 Use `--host` and `--bind` when the Docker host is reached through a specific
 interface instead of loopback.
 
-## Updating Statistics
+## Inspecting Coverage
 
 To inspect coverage, you can run:
 
@@ -283,10 +283,7 @@ To inspect coverage, you can run:
 .local/bin/update-stats
 ```
 
-This regenerates [stats/coverage.txt](stats/coverage.txt). Running the script
-and committing an updated summary are not required for development, review,
-or pull request submission.
-Continue to run the standard build and test checks described above.
+The report is written to `stats/coverage.txt`, which is ignored by Git.
 
 Run `check-test-flow` and `update-stats` sequentially; their tests share
 temporary build directories.

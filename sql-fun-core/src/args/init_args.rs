@@ -9,7 +9,9 @@ pub struct InitializeArgs {
     ///
     /// Required choices must be supplied through CLI parameters. Missing choices
     /// are errors; this flag does not select defaults. Existing installations
-    /// are never overwritten.
+    /// are never overwritten. Supply --sql-fun-home and either --engines or
+    /// --datasource. PostgreSQL also requires --docker or --database-url, and
+    /// --engine-versions.
     ///
     ///
     #[arg(long = "yes", short = 'y')]
@@ -20,9 +22,10 @@ pub struct InitializeArgs {
     /// Path to the sql-fun home directory.
     ///
     /// This is where catalogs, extensions, and configuration files are stored.
-    /// If omitted, ask interactively; ~/.sql-fun is a suggested path.
+    /// If omitted, ask interactively. SQL_FUN_HOME supplies a suggested candidate;
+    /// if it is unset, suggest ~/.sql-fun. The user must explicitly confirm the path.
     ///
-    /// Required with --yes.
+    /// With --yes, this CLI argument is required; SQL_FUN_HOME does not replace it.
     ///
     #[arg(long, short = 'H', value_hint = ValueHint::DirPath)]
     sql_fun_home: Option<PathBuf>,
@@ -47,22 +50,30 @@ pub struct InitializeArgs {
     docker: bool,
 
     /// Address used to reach published PostgreSQL ports on the Docker host.
+    ///
+    /// Default: 127.0.0.1.
     #[arg(long, conflicts_with = "database_url")]
     docker_host_address: Option<String>,
 
     /// Docker host interface on which PostgreSQL ports are published.
+    ///
+    /// Default: 127.0.0.1 (loopback only).
     #[arg(long, conflicts_with = "database_url")]
     docker_bind_address: Option<String>,
 
     /// Extraction timeout in seconds for each selected version.
+    ///
+    /// Default: 120 seconds.
     #[arg(long, value_parser = clap::value_parser!(u64).range(1..))]
     timeout_seconds: Option<u64>,
 
-    /// Limit initialization to the specified database engine versions.
+    /// Explicitly select the database engine versions to initialize.
+    /// Currently applies to PostgreSQL setup only.
     ///
-    /// Accepts multiple values (repeatable) or comma-separated lists.
+    /// Accepts space-separated values, comma-separated lists, or repeated options.
     ///
-    /// PostgreSQL targets must be selected explicitly, including with --yes.
+    /// Supported PostgreSQL targets: 17, 18. If omitted, ask interactively.
+    /// Required with --yes when PostgreSQL setup is selected.
     ///
     #[arg(long, value_delimiter = ',', num_args = 1..)]
     engine_versions: Option<Vec<String>>,
@@ -177,6 +188,17 @@ mod test_initialize_args {
         assert!(
             InitializeArgs::try_parse_from(["init", "--github-repo", "kazuk/sql-fun"]).is_err()
         );
+    }
+
+    #[rstest::rstest]
+    #[case::separate_values(&["--engine-versions", "17", "18"])]
+    #[case::comma_separated(&["--engine-versions", "17,18"])]
+    #[case::repeated_option(&["--engine-versions", "17", "--engine-versions", "18"])]
+    fn explicit_version_formats_preserve_all_targets(#[case] options: &[&str]) {
+        let args =
+            InitializeArgs::try_parse_from(std::iter::once("init").chain(options.iter().copied()))
+                .unwrap();
+        assert_eq!(args.requested_versions().unwrap(), ["17", "18"]);
     }
 
     #[test]

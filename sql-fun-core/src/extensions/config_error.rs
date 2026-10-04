@@ -13,6 +13,10 @@ pub enum ExtensionConfigError {
     #[error("Invalid extension version {0}")]
     InvalidExtensionVersion(String),
 
+    /// Invalid extension control file.
+    #[error("Invalid extension control file {0}:{1}: {2}")]
+    InvalidControlFile(PathBuf, usize, String),
+
     /// IO error
     #[error(transparent)]
     Io(#[from] std::io::Error),
@@ -31,6 +35,18 @@ pub enum ExtensionConfigError {
 }
 
 impl ExtensionConfigError {
+    /// Report invalid extension control syntax or default version.
+    ///
+    /// # Errors
+    /// Always returns an invalid-control-file error.
+    pub fn invalid_control_file<T>(path: &Path, line: usize, reason: &str) -> Result<T, Self> {
+        Err(Self::InvalidControlFile(
+            path.to_path_buf(),
+            line,
+            reason.to_string(),
+        ))
+    }
+
     /// raise `InvalidExtensionName`
     ///
     /// # Errors

@@ -69,3 +69,16 @@ sql-fun init --yes --docker-image-tag "postgres:latest"
 - `--postgres-extensions`: Limit initialization to the specified `PostgreSQL`
   extensions
   - default: install ALL extensions
+
+Extension selections use `name` or `name@version`, for example `uuid-ossp` or
+`uuid-ossp@1.1`. An explicit version selects its installation script. When the
+version is omitted, sql-fun uses `default_version` from the extension's primary
+control file. A missing script for that default is an error.
+
+If the control file is absent or has no default, sql-fun infers a version only
+when exactly one installation script exists. Specify `name@version` when several
+installation versions are available. Update scripts (`name--from--to.sql`) are
+excluded from inference. Resolution requires a direct installation script
+(`name--version.sql`); it does not execute upgrade chains or apply a custom
+control-file `directory` setting. Control-file include directives are unsupported
+and produce an error.

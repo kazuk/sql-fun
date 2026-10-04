@@ -26,7 +26,6 @@ The user must provide parameters in one line:
 3. Implement unit tests.
 4. Run the required `check-test-flow` script to verify the tests.
 5. If `check-test-flow` fails, fix and re-run until it passes.
-6. Finally, run `update-stats` to update coverage statistics.
 
 ## Execution rules
 
@@ -83,5 +82,5 @@ The user must provide parameters in one line:
   - Plan a refactoring for testability and add a TODO comment such as:
     `// TODO: TESTABILITY: extract the loop body into a function`
 - Use the `check-test-flow` script to compile and run tests.
-- After tests pass, run `./.local/bin/update-stats` to update coverage
-  statistics.
+- If you want to inspect coverage, `.local/bin/update-stats` is available.
+  Coverage measurement and statistics updates are not required.

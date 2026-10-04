@@ -182,10 +182,11 @@ pub fn small_stack_regression(stack_size: usize, operation: impl FnOnce() + Send
             .env("RUST_LOG", "error")
             .output()
             .expect("isolated small-stack regression");
+        let stdout = String::from_utf8_lossy(&output.stdout);
         assert!(
-            output.status.success(),
+            output.status.success() && stdout.contains("1 passed"),
             "small-stack regression {name} failed: {}\n{}",
-            String::from_utf8_lossy(&output.stdout),
+            stdout,
             String::from_utf8_lossy(&output.stderr),
         );
     }

@@ -1,11 +1,11 @@
 Welcome to sql-fun
 
-Initialize the PostgreSQL builtin metadata required for SQL analysis:
+Initialize engine-specific development support:
 
-1. Choose or create the sql-fun home directory.
-2. Select supported PostgreSQL versions for Docker, or use the detected version
-   of an existing server.
-3. Install builtin types, functions, operators, casts, and catalog objects.
+1. Explicitly choose engines or project datasources.
+2. Choose the setup tasks' required options and the sql-fun home directory.
+3. Run the selected engine-specific setup.
 
-Existing complete installations are preserved. Application schemas and
-migrations remain managed by your own tools.
+PostgreSQL setup installs required builtin metadata. SQLite setup is still
+under development. Application schemas and migrations remain managed by your
+own tools.

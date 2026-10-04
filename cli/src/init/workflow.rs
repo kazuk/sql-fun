@@ -4,7 +4,6 @@ mod test_helpers;
 mod tests;
 
 use super::{
-    database_engine_versions::PostgresVersions,
     error::InitError,
     presentation::{HomePathError, Notice},
     prompt::{PromptRequest, PromptResponse},
@@ -17,13 +16,10 @@ use ::statig::Outcome;
 
 pub struct Initialization {
     yes: bool,
-    server_source: bool,
     supplied_home: bool,
     home: PathBuf,
     default_home: String,
     home_input: String,
-    version_args: Vec<String>,
-    versions: Vec<PostgresVersions>,
     notices: Vec<Notice>,
     error: Option<InitError>,
 }
@@ -36,13 +32,10 @@ impl From<&InitializeArgs> for Initialization {
             .unwrap_or_else(|| PathBuf::from(shellexpand::tilde("~/.sql-fun").as_ref()));
         Self {
             yes: args.assume_yes(),
-            server_source: false,
             supplied_home: args.sql_fun_home().is_some(),
             default_home: home.to_string_lossy().into_owned(),
             home_input: String::new(),
             home,
-            version_args: args.engine_versions(),
-            versions: Vec::new(),
             notices: Vec::new(),
             error: None,
         }
@@ -70,18 +63,6 @@ impl Initialization {
     pub fn home(&self) -> &std::path::Path {
         &self.home
     }
-    pub fn versions(&self) -> Vec<sql_fun_core::PostgresVersion> {
-        self.versions
-            .iter()
-            .map(PostgresVersions::version)
-            .collect()
-    }
-    pub fn use_server_version(&mut self, version: &sql_fun_core::PostgresVersion) {
-        self.server_source = true;
-        self.version_args = vec![version.to_string()];
-        self.versions = vec![PostgresVersions::from_version(version)];
-    }
-
     fn fail(&mut self, error: InitError) -> Outcome<State> {
         self.error = Some(error);
         Outcome::Transition(State::failed())
@@ -109,10 +90,6 @@ impl Event {
 
     fn text_input(&self) -> Option<&str> {
         self.response().and_then(PromptResponse::text_input)
-    }
-
-    fn selected_indices(&self) -> Option<&[usize]> {
-        self.response().and_then(PromptResponse::selected_indices)
     }
 }
 
@@ -157,14 +134,17 @@ impl Workflow {
         }
         if context.supplied_home {
             if context.home.exists() {
+                if !context.home.is_dir() {
+                    return context
+                        .fail(anyhow::anyhow!("sql-fun home must be a directory").into());
+                }
                 context.notices.push(Notice::home_exists(&context.home));
-                Outcome::Transition(State::prepare_versions())
+                Outcome::Transition(State::home_prepared())
             } else {
                 Outcome::Transition(State::confirm_create())
             }
         } else if context.yes {
-            context.notices.push(Notice::home_creating(&context.home));
-            Outcome::Transition(State::create_home())
+            context.fail(anyhow::anyhow!("--yes requires --sql-fun-home").into())
         } else {
             Outcome::Transition(State::edit_home())
         }
@@ -190,7 +170,7 @@ impl Workflow {
         } else if let Err(error) = std::fs::create_dir_all(&context.home).or_else(InitError::io) {
             return context.fail(error);
         }
-        Outcome::Transition(State::prepare_versions())
+        Outcome::Transition(State::home_prepared())
     }
 
     #[state]
@@ -202,7 +182,11 @@ impl Workflow {
         let validation = if !path.is_absolute() {
             HomePathError::not_absolute()
         } else if path.exists() {
-            Ok(())
+            if path.is_dir() {
+                Ok(())
+            } else {
+                HomePathError::not_directory(&path)
+            }
         } else if let Some(parent) = path.parent() {
             if parent.exists() {
                 Ok(())
@@ -231,7 +215,7 @@ impl Workflow {
         match std::fs::create_dir_all(&context.home) {
             Ok(()) => {
                 context.notices.push(Notice::home_created(&context.home));
-                Outcome::Transition(State::prepare_versions())
+                Outcome::Transition(State::home_prepared())
             }
             Err(error) => {
                 context
@@ -243,52 +227,7 @@ impl Workflow {
     }
 
     #[state]
-    fn prepare_versions(event: &Event, context: &mut Initialization) -> Outcome<State> {
-        if *event != Event::Advance {
-            return Outcome::Handled;
-        }
-        context.notices.push(Notice::versions_description());
-        match context
-            .version_args
-            .iter()
-            .map(|version| version.parse())
-            .collect()
-        {
-            Ok(versions) => {
-                context.versions = versions;
-                if context.server_source {
-                    Outcome::Transition(State::versions_selected())
-                } else {
-                    Outcome::Transition(State::select_versions())
-                }
-            }
-            Err(error) => context.fail(error),
-        }
-    }
-
-    #[state]
-    fn select_versions(event: &Event, context: &mut Initialization) -> Outcome<State> {
-        let Some(indices) = event.selected_indices() else {
-            return Outcome::Handled;
-        };
-        if indices.is_empty() && !context.yes {
-            context.versions.clear();
-            context.notices.push(Notice::version_required());
-            return Outcome::Handled;
-        }
-        let Some(versions) = indices
-            .iter()
-            .map(|&index| PostgresVersions::all().get(index).copied())
-            .collect()
-        else {
-            return Outcome::Handled;
-        };
-        context.versions = versions;
-        Outcome::Transition(State::versions_selected())
-    }
-
-    #[state]
-    const fn versions_selected() -> Outcome<State> {
+    const fn home_prepared() -> Outcome<State> {
         Outcome::Handled
     }
 
@@ -312,9 +251,7 @@ impl State {
             Self::CreateHome {} => Some(Self::create_home_request()),
             Self::EditHome {} => Some(Self::edit_home_request(context)),
             Self::CreateEditedHome {} => Some(Self::create_edited_home_request()),
-            Self::PrepareVersions {} => Some(Self::prepare_versions_request()),
-            Self::SelectVersions {} => Some(Self::select_versions_request(context)),
-            Self::VersionsSelected {} => Self::versions_selected_request(),
+            Self::HomePrepared {} => None,
             Self::Cancelled {} => Self::cancelled_request(),
             Self::Failed {} => Self::failed_request(),
         }
@@ -474,131 +411,6 @@ mod test_create_edited_home_request {
     #[test]
     fn create_edited_home_requests_advance() {
         assert_eq!(State::create_edited_home_request(), Request::Advance);
-    }
-}
-
-impl State {
-    const fn prepare_versions_request() -> Request {
-        Request::Advance
-    }
-}
-
-#[cfg(test)]
-mod test_prepare_versions_request {
-    use super::{Request, State};
-
-    #[test]
-    fn prepare_versions_requests_advance() {
-        assert_eq!(State::prepare_versions_request(), Request::Advance);
-    }
-}
-
-impl State {
-    fn select_versions_request(context: &Initialization) -> Request {
-        let options: Vec<_> = PostgresVersions::all()
-            .into_iter()
-            .map(|version| version.to_string())
-            .collect();
-        let defaults: Vec<_> = PostgresVersions::all()
-            .into_iter()
-            .enumerate()
-            .filter_map(|(index, version)| {
-                if context.versions.contains(&version) {
-                    Some(index)
-                } else {
-                    None
-                }
-            })
-            .collect();
-        let automatic = if context.yes {
-            Some(PromptResponse::multi_select(
-                &context
-                    .versions
-                    .iter()
-                    .filter_map(|version| {
-                        PostgresVersions::all()
-                            .into_iter()
-                            .position(|option| option == *version)
-                    })
-                    .collect::<Vec<_>>(),
-            ))
-        } else {
-            None
-        };
-        Request::Prompt(
-            PromptRequest::multi_select(
-                include_str!("versions_prompt.txt").trim_end(),
-                &options,
-                &defaults,
-            )
-            .with_automatic(automatic),
-        )
-    }
-}
-
-#[cfg(test)]
-mod test_select_versions_request {
-    use super::test_helpers::initialization;
-    use super::{PostgresVersions, PromptRequest, PromptResponse, Request, State};
-
-    fn version_prompt(defaults: &[usize]) -> PromptRequest {
-        PromptRequest::multi_select(
-            include_str!("versions_prompt.txt").trim_end(),
-            &[
-                "PostgreSQL Version 17".to_owned(),
-                "PostgreSQL Version 18".to_owned(),
-            ],
-            defaults,
-        )
-    }
-
-    #[rstest::rstest]
-    #[case::all_supported(&PostgresVersions::all(), &[0, 1])]
-    #[case::option_order_without_duplicates(
-        &["18".parse().unwrap(), "17".parse().unwrap(), "18".parse().unwrap()],
-        &[0, 1],
-    )]
-    #[case::empty_selection_when_reprompting(&[], &[])]
-    fn interactive_defaults(#[case] versions: &[PostgresVersions], #[case] defaults: &[usize]) {
-        let mut context = initialization(false);
-        versions.clone_into(&mut context.versions);
-        assert_eq!(
-            State::select_versions_request(&context),
-            Request::Prompt(version_prompt(defaults)),
-        );
-    }
-
-    #[test]
-    fn select_versions_automatic_answer_preserves_order_and_duplicates() {
-        let mut context = initialization(true);
-        context.versions = vec![
-            "18".parse().unwrap(),
-            "17".parse().unwrap(),
-            "18".parse().unwrap(),
-        ];
-        assert_eq!(
-            State::select_versions_request(&context),
-            Request::Prompt(
-                version_prompt(&[0, 1])
-                    .with_automatic(Some(PromptResponse::multi_select(&[1, 0, 1]))),
-            ),
-        );
-    }
-}
-
-impl State {
-    const fn versions_selected_request() -> Option<Request> {
-        None
-    }
-}
-
-#[cfg(test)]
-mod test_versions_selected_request {
-    use super::State;
-
-    #[test]
-    fn versions_selected_requests_no_further_work() {
-        assert_eq!(State::versions_selected_request(), None);
     }
 }
 

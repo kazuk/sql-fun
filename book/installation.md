@@ -122,26 +122,28 @@ PostgreSQL analysis requires builtin metadata matching your target PostgreSQL
 version, even for ordinary schema definitions using types such as `int`.
 This metadata is required independently of any optional application schema dump.
 
-Install PostgreSQL client tools (`psql`). For the default Docker source, also
+Install PostgreSQL client tools (`psql`). For the Docker source, also
 install Docker CLI and provide access to a Docker daemon, then run:
 
 ```console
 sql-fun init
 ```
 
-Select the PostgreSQL versions you need (currently 17 and 18). For a
+Choose the PostgreSQL engine or a configured PostgreSQL datasource, the home
+directory, a source, and the versions you need (currently 17 and 18). For a
 non-interactive initialization of a specific version:
 
 ```console
-sql-fun init --yes --engine-versions 17
+sql-fun init --yes --engines postgres --sql-fun-home "$HOME/.sql-fun" \
+  --docker --engine-versions 17
 ```
 
 Set your datasource's `version` to the matching major. Initialization stores
-metadata under `$SQL_FUN_HOME/postgres/<version>/` (default `~/.sql-fun`), which
-normal analysis loads. It preserves valid installations on rerun.
+metadata under `<chosen-home>/postgres/<version>/` (suggested home `~/.sql-fun`),
+which normal analysis loads. It preserves valid installations on rerun.
 
 You can also initialize from an existing PostgreSQL server using
-`SQL_FUN_DATABASE_URL` or `--database-url`; this detects the server's version
+`--database-url`; this checks the server's version against your explicit choice
 and requires no Docker access. See [initialization](cli/init.md) for connection
 settings, selecting multiple versions, custom homes, and retrying failures.
 Detailed catalog and extension extraction workflows are described in

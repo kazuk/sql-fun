@@ -36,6 +36,41 @@ jobs:
           registry: ghcr.io
           username: ${{ github.actor }}
           password: ${{ secrets.GITHUB_TOKEN }}
+      - name: Resolve tool releases
+        id: tools
+        env:
+          GH_TOKEN: ${{ github.token }}
+        shell: bash
+        run: |
+          printf '## CI image tool versions\n\n| Tool | Release |\n| --- | --- |\n' >> "$GITHUB_STEP_SUMMARY"
+          set -euo pipefail
+          for tool in CARGO_BINSTALL TYPOS; do
+            case "$tool" in
+              CARGO_BINSTALL) repository=cargo-bins/cargo-binstall ;;
+              TYPOS) repository=crate-ci/typos ;;
+            esac
+            release=$(curl --fail --silent --show-error --location \
+              --header "Authorization: Bearer $GH_TOKEN" \
+              "https://api.github.com/repos/${repository}/releases/latest")
+            tag=$(jq -er '
+              select(.draft == false and .prerelease == false)
+              | .tag_name | select(test("^v[0-9]+\\.[0-9]+\\.[0-9]+$"))
+            ' <<<"$release") || { echo "Invalid release tag or asset digest for $repository" >&2; exit 1; }
+            case "$tool" in
+              CARGO_BINSTALL) asset=cargo-binstall-x86_64-unknown-linux-musl.tgz ;;
+              TYPOS) asset="typos-${tag}-x86_64-unknown-linux-musl.tar.gz" ;;
+            esac
+            checksum=$(jq -er --arg asset "$asset" '
+              [.assets[] | select(.name == $asset)]
+              | select(length == 1) | .[0].digest
+              | select(type == "string" and test("^sha256:[0-9a-f]{64}$"))
+              | ltrimstr("sha256:")
+            ' <<<"$release") || { echo "Invalid release tag or asset digest for $repository" >&2; exit 1; }
+            printf '%s=%s\n' "${tool}_TAG" "$tag" >> "$GITHUB_OUTPUT"
+            printf '%s=%s\n' "${tool}_SHA256" "$checksum" >> "$GITHUB_OUTPUT"
+            printf '| %s | %s |\n' "$repository" "$tag" >> "$GITHUB_STEP_SUMMARY"
+          done
+
       - name: Set up Buildx
         id: buildx
         uses: docker/setup-buildx-action@v4
@@ -54,9 +89,18 @@ jobs:
           cache-to: type=gha,mode=max
           build-args: |
             SERENA_TAG=v0.1.4
+            CARGO_BINSTALL_TAG=${{ steps.tools.outputs.CARGO_BINSTALL_TAG }}
+            CARGO_BINSTALL_SHA256=${{ steps.tools.outputs.CARGO_BINSTALL_SHA256 }}
+            TYPOS_TAG=${{ steps.tools.outputs.TYPOS_TAG }}
+            TYPOS_SHA256=${{ steps.tools.outputs.TYPOS_SHA256 }}
 
       - name: Smoke test
+        env:
+          CARGO_BINSTALL_TAG: ${{ steps.tools.outputs.CARGO_BINSTALL_TAG }}
+          TYPOS_TAG: ${{ steps.tools.outputs.TYPOS_TAG }}
         run: |
+          test "$(docker run --rm "${LOCAL_IMAGE_TAG}" cargo binstall -V)" = "${CARGO_BINSTALL_TAG#v}"
+          test "$(docker run --rm "${LOCAL_IMAGE_TAG}" typos --version)" = "typos-cli ${TYPOS_TAG#v}"
           docker run --rm "${LOCAL_IMAGE_TAG}" cargo --version
           docker run --rm "${LOCAL_IMAGE_TAG}" cargo deny --version
           docker run --rm "${LOCAL_IMAGE_TAG}" mdbook --help >/dev/null
@@ -76,6 +120,10 @@ jobs:
           cache-to: type=gha,mode=max
           build-args: |
             SERENA_TAG=v0.1.4
+            CARGO_BINSTALL_TAG=${{ steps.tools.outputs.CARGO_BINSTALL_TAG }}
+            CARGO_BINSTALL_SHA256=${{ steps.tools.outputs.CARGO_BINSTALL_SHA256 }}
+            TYPOS_TAG=${{ steps.tools.outputs.TYPOS_TAG }}
+            TYPOS_SHA256=${{ steps.tools.outputs.TYPOS_SHA256 }}
 
       - name: Show digest
         run: echo "digest=${{ steps.build.outputs.digest }}"
@@ -83,6 +131,8 @@ jobs:
       - name: Create pull request
         env:
           DIGEST: ${{ steps.build.outputs.digest }}
+          CARGO_BINSTALL_TAG: ${{ steps.tools.outputs.CARGO_BINSTALL_TAG }}
+          TYPOS_TAG: ${{ steps.tools.outputs.TYPOS_TAG }}
           MESSAGE: ${{ github.event.head_commit.message }}
           GH_TOKEN: ${{ steps.maintenance-bot-token.outputs.token }}
           GH_REPO: ${{ github.repository }}
@@ -113,9 +163,45 @@ jobs:
 
           git push origin "HEAD:$branch"
 
+          body_file=$(mktemp)
+          trap 'rm -f "$body_file"' EXIT
+          cat > "$body_file" <<EOF
+          # Pull Request
+
+          ## Summary
+
+          Adopt CI image \`${DIGEST}\` published from \`${GITHUB_SHA}\`.
+
+          ## Changes
+
+          - Cherry-pick the reviewed CI image source change.
+          - Update the immutable image digest.
+          - Included cargo-binstall release: ${CARGO_BINSTALL_TAG}.
+          - Included typos-cli release: ${TYPOS_TAG}.
+
+          ## Testing
+
+          - [ ] \`check-test-flow\`: adoption PR CI remains to be verified.
+          - [x] Other: published image build and smoke tests passed.
+
+          ## Documentation
+
+          - [ ] README/book/user_manual updated (if needed): review the cherry-picked documentation; no additional end-user change is required for digest adoption.
+
+          ## Stats
+
+          - [ ] \`update-stats\` (if applicable): inherited from the reviewed image change; no new measurement for digest adoption.
+          - [ ] Coverage impact reviewed in \`stats/coverage.txt\` (if applicable): review the cherry-picked statistics.
+
+          ## Risk and Rollout
+
+          - Risk level: CI executable environment change; requires human review.
+          - Rollback plan: revert the adoption PR to restore the previous image digest.
+          EOF
+
           gh pr create \
             --repo "$GH_REPO" \
             --base main \
             --head "$branch" \
             --title "$pr_title" \
-            --body "Adopt CI image \`${DIGEST}\` published from \`${GITHUB_SHA}\`."
+            --body-file "$body_file"

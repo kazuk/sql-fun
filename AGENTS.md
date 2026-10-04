@@ -131,6 +131,16 @@ directly:
 - Check only items that have actually been completed. Explain items that were
   not performed or are not applicable, and disclose any remaining validation
   gaps.
+- Before waiting for PR CI, fetch the target branch and check the current
+  PR head for merge conflicts and any requirement to be up to date.
+- If merge conflicts or an up-to-date branch requirement prevent merging,
+  rebase onto the latest target branch, resolve conflicts, run the
+  appropriate local checks, and push the updated head before waiting for CI.
+- Do not rebase merely because the target branch has advanced.
+- Distinguish pending checks and required reviews from merge conflicts
+  and an unmet up-to-date branch requirement.
+- Before reporting a PR as ready to merge, verify mergeability and required
+  CI results for the current PR head.
 
 ## Review Guidelines
 

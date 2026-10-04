@@ -4,6 +4,7 @@ import argparse
 import errno
 import fcntl
 import pty
+import re
 import select
 import struct
 import termios
@@ -66,9 +67,12 @@ def validate_interactive_init(binary, destination):
     os.close(slave)
     transcript = bytearray()
 
+    def rendered(since=0):
+        return re.sub(rb"\x1b\[[0-?]*[ -/]*[@-~]", b"", transcript[since:])
+
     def wait_for(marker, since=0):
         deadline = time.monotonic() + 15
-        while marker.encode() not in transcript[since:]:
+        while marker.encode() not in rendered(since):
             remaining = deadline - time.monotonic()
             if remaining <= 0:
                 raise AssertionError(f"terminal did not reach {marker!r}: {transcript!r}")
@@ -88,11 +92,12 @@ def validate_interactive_init(binary, destination):
         wait_for("Initialize sql-fun development support?")
         os.write(master, b"y\r")
         wait_for("sql-fun home directory (SQL_FUN_HOME)?")
-        assert b"Choose engines" not in transcript, "home choice must appear first"
+        assert b"Choose engines" not in rendered(), "home choice must appear first"
         os.write(master, b"\r")  # Explicitly accept the SQL_FUN_HOME suggestion.
         wait_for("Space to select, Enter to confirm.")
-        assert b"[ ] postgres" in transcript and b"[ ] sqlite" in transcript
-        assert b"Choose datasources" not in transcript, "connector is a setting, not a datasource"
+        wait_for("[ ] postgres")
+        wait_for("[ ] sqlite")
+        assert b"Choose datasources" not in rendered(), "connector is a setting, not a datasource"
         start = len(transcript)
         os.write(master, b"\r")
         wait_for("Select at least one option explicitly.", start)

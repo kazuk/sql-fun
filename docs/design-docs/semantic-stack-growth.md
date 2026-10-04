@@ -55,14 +55,15 @@ explicit worker stacks. This prevents `RUST_MIN_STACK` from masking failures and
 keeps an overflow from aborting the parent suite. The unchanged AdventureWorks
 schema includes PostgreSQL 17 builtin and tablefunc bootstrap and asserts all
 employee-view output columns and the employee-id type. Separate cases cover both
-JOIN directions, nested expressions, scalar/derived subqueries, CTE bodies, set operations
-and a normal unresolved-column diagnostic for both frontends. Parsing/conversion
-uses a separate 2 MiB worker; resolution runs with both 512 KiB and 2 MiB.
-Disabling the policy causes the SQLite left/right-deep JOIN cases to overflow on
-512 KiB; the corresponding 28 cases pass with growth. Additional scalar-subquery cases
-cover the expression-to-query recursion edge. This isolates the improvement from parser
-stack requirements and verifies conversion independently of Cargo's stack default. Forced growth checks
-same-thread execution, normal return, panic propagation and destructor execution.
+JOIN directions, nested expressions, scalar/derived subqueries, CTE bodies, set
+operations and a normal unresolved-column diagnostic for both frontends.
+Parsing/conversion uses a separate 2 MiB worker; resolution runs with both 512
+KiB and 2 MiB. Disabling the policy causes the SQLite left/right-deep JOIN cases
+to overflow on 512 KiB; the corresponding 28 cases pass with growth. Additional
+scalar-subquery cases cover the expression-to-query recursion edge. This
+isolates the improvement from parser stack requirements and verifies conversion
+independently of Cargo's stack default. Forced growth checks same-thread
+execution, normal return, panic propagation and destructor execution.
 
 The baseline after the shared unresolved-AST refactor already analyzes
 AdventureWorks on 2 MiB. This change preserves that behavior and adds stack-growth

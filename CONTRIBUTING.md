@@ -277,6 +277,21 @@ cargo build -p sql-fun-cli --bin sql-fun
   --output /tmp/sql-fun-extraction-validation
 ```
 
+The script also exercises PostgreSQL initialization from Docker and an existing
+server, reruns, and source/version mismatch diagnostics. To validate initialization
+followed by semantic loading of builtin and user schemas, run the Docker integration
+test explicitly:
+
+```sh
+cargo test -p sql-fun-cli --test initialization -- --ignored
+```
+
+Set `SQL_FUN_TEST_DOCKER_HOST` and `SQL_FUN_TEST_DOCKER_BIND` when the Docker host
+requires specific connectivity addresses. Set `SQL_FUN_TEST_BINARY` to an installed
+CLI executable to test that binary instead of the workspace CLI. CI builds this
+test harness in the builder image and runs it against the installed package on
+the Docker-capable Ubuntu runner.
+
 To check an installed CLI, supply its executable path with `--binary`.
 Use `--host` and `--bind` when the Docker host is reached through a specific
 interface instead of loopback.

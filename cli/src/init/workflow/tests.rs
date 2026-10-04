@@ -110,16 +110,16 @@ fn assumed_yes_preserves_order_and_duplicates() {
         "--sql-fun-home",
         home.path().to_str().unwrap(),
         "--engine-versions",
-        "18,16,18",
+        "18,17,18",
     ]);
     scenario.run_automatic();
     assert_eq!(scenario.state(), &State::versions_selected());
     assert_eq!(
         scenario.context.versions,
         vec![
-            PostgresVersions::Postgres18,
-            PostgresVersions::Postgres16,
-            PostgresVersions::Postgres18
+            "18".parse().unwrap(),
+            "17".parse().unwrap(),
+            "18".parse().unwrap()
         ]
     );
 }
@@ -218,11 +218,11 @@ fn declining_creation_requests_editor_with_original_path() {
 }
 
 #[test]
-fn default_home_still_uses_sqlfun_and_opens_editor_interactively() {
+fn default_home_uses_sql_fun_and_opens_editor_interactively() {
     let mut scenario = Scenario::new(&[]);
     assert_eq!(
         scenario.context.home,
-        std::path::PathBuf::from(shellexpand::tilde("~/.sqlfun").as_ref())
+        std::path::PathBuf::from(shellexpand::tilde("~/.sql-fun").as_ref())
     );
     scenario.accept_install();
     assert_eq!(scenario.state(), &State::edit_home());
@@ -355,7 +355,7 @@ fn engine_arguments_set_initial_selection_but_interactive_answer_decides() {
         "--sql-fun-home",
         root.path().to_str().unwrap(),
         "--engine-versions",
-        "18,16,18",
+        "18,17,18",
     ]);
     scenario.accept_install();
     scenario.advance();
@@ -365,19 +365,15 @@ fn engine_arguments_set_initial_selection_but_interactive_answer_decides() {
         Some(Request::Prompt(super::PromptRequest::multi_select(
             include_str!("../versions_prompt.txt").trim_end(),
             &[
-                "PostgreSQL Version 16".to_owned(),
                 "PostgreSQL Version 17".to_owned(),
                 "PostgreSQL Version 18".to_owned()
             ],
-            &[0, 2],
+            &[0, 1],
         )))
     );
-    scenario.answer(PromptResponse::multi_select(&[1]));
+    scenario.answer(PromptResponse::multi_select(&[0]));
     assert_eq!(scenario.state(), &State::versions_selected());
-    assert_eq!(
-        scenario.context.versions,
-        vec![PostgresVersions::Postgres17]
-    );
+    assert_eq!(scenario.context.versions, vec!["17".parse().unwrap()]);
     assert_eq!(scenario.request(), None);
     assert!(scenario.context.finish().is_ok());
 }
@@ -395,7 +391,6 @@ fn empty_interactive_engine_selection_retries() {
         Some(Request::Prompt(super::PromptRequest::multi_select(
             include_str!("../versions_prompt.txt").trim_end(),
             &[
-                "PostgreSQL Version 16".to_owned(),
                 "PostgreSQL Version 17".to_owned(),
                 "PostgreSQL Version 18".to_owned()
             ],
@@ -414,7 +409,7 @@ fn defaults_select_all_supported_versions_non_interactively() {
     let mut scenario = Scenario::with_home(root.path(), true);
     scenario.run_automatic();
     assert_eq!(scenario.state(), &State::versions_selected());
-    assert_eq!(scenario.context.versions, PostgresVersions::ALL);
+    assert_eq!(scenario.context.versions, PostgresVersions::all());
 }
 
 #[test]

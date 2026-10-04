@@ -1,6 +1,8 @@
 #[derive(Debug, thiserror::Error)]
 pub enum InitError {
     #[error("{0}")]
+    Setup(#[from] anyhow::Error),
+    #[error("{0}")]
     Io(#[from] std::io::Error),
     #[error("{0}")]
     Prompt(#[from] inquire::InquireError),

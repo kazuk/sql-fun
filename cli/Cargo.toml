@@ -72,5 +72,8 @@ name = "check_prerequisite"
 [[test]]
 name = "extracted_artifacts"
 
+[[test]]
+name = "initialization"
+
 [lints]
 workspace = true

@@ -216,6 +216,22 @@ impl SqlFunArgs {
         self.metadata_args.cte_catalog_dir(metadata)
     }
 
+    /// PostgreSQL version explicitly selected by CLI or environment, without project metadata.
+    ///
+    /// # Errors
+    /// Returns an error if the configured version cannot be parsed.
+    pub fn postgres_version_override(
+        &self,
+    ) -> Result<Option<PostgresEngineVersion>, SqlFunArgsError> {
+        self.postgres_args.version_override()
+    }
+
+    /// Whether metadata was explicitly configured rather than discovered by default.
+    #[must_use]
+    pub const fn metadata_file_is_explicit(&self) -> bool {
+        self.metadata_args.has_explicit_file()
+    }
+
     /// get `PostgreSQL` version
     ///
     /// # Errors
@@ -244,6 +260,16 @@ impl SqlFunArgs {
     #[must_use]
     pub fn postgres_extensions(&self, metadata: &SqlFunMetadata) -> PostgresExtensionsCollection {
         self.postgres_args.postgres_extensions(metadata)
+    }
+
+    /// Resolve the common home path before initialization creates it.
+    ///
+    /// Uses the same CLI/environment/default precedence as analysis.
+    ///
+    /// # Errors
+    /// Returns an error when the current directory or user home cannot be resolved.
+    pub fn initialization_home(&self) -> Result<PathBuf, SqlFunArgsError> {
+        self.metadata_args.initialization_home()
     }
 
     /// get builtin schema directory path

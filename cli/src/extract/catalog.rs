@@ -71,11 +71,33 @@ fn next_catalog(lines: &mut std::str::SplitTerminator<'_, char>) -> Result<Value
     Ok(value)
 }
 
+pub(crate) async fn detect(
+    configuration: &str,
+) -> Result<sql_fun_core::PostgresVersion, anyhow::Error> {
+    let output = run_psql(
+        configuration,
+        "SHOW server_version_num; SHOW server_version;\n",
+    )
+    .await?;
+    let mut values = output.split_terminator('\0');
+    let number = values
+        .next()
+        .ok_or_else(|| anyhow::anyhow!("missing server version"))?
+        .parse()?;
+    let text = values
+        .next()
+        .ok_or_else(|| anyhow::anyhow!("missing server version identity"))?;
+    sql_fun_core::PostgresVersionInventory::builtin()
+        .detect(number, text)
+        .map_err(anyhow::Error::msg)
+}
+
 pub(super) async fn extract(
     configuration: &str,
     output: &Path,
     provenance: &Value,
 ) -> Result<(), anyhow::Error> {
+    let identity = detect(configuration).await?;
     let queries = [
         include_str!("sql/builtin_types.sql"),
         include_str!("sql/builtin_funcs.sql"),
@@ -106,8 +128,8 @@ pub(super) async fn extract(
         .ok_or_else(|| anyhow::anyhow!("missing server version"))?
         .parse()?;
     anyhow::ensure!(
-        (170_000..190_000).contains(&version),
-        "catalog format 1 supports PostgreSQL 17 and 18"
+        version / 10_000 == identity.major(),
+        "server version changed during extraction"
     );
     for filename in [
         "pg_type.json",
@@ -155,14 +177,15 @@ pub(super) async fn extract(
     schema.push_str(&renderer.render("views", &views)?);
     std::fs::write(output.join("schema.sql"), schema)?;
     anyhow::ensure!(lines.next().is_none(), "unexpected psql catalog result");
-    write_json(
-        &output.join("metadata.json"),
-        &serde_json::json!({
-            "format_version": 1, "server_version_num": version,
-            "extractor_version": env!("CARGO_PKG_VERSION"), "provenance": provenance,
-            "scope": "bootstrap-pg_catalog-and-information_schema"
-        }),
-    )?;
+    let mut metadata = serde_json::json!({
+        "format_version": 1, "server_version_num": version,
+        "extractor_version": env!("CARGO_PKG_VERSION"), "provenance": provenance,
+        "scope": "bootstrap-pg_catalog-and-information_schema"
+    });
+    if !identity.is_stable() {
+        metadata["version_identity"] = identity.to_string().into();
+    }
+    write_json(&output.join("metadata.json"), &metadata)?;
     Ok(())
 }
 

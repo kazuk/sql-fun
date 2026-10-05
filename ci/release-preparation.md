@@ -41,16 +41,44 @@ SHA and adopted inputs. Investigate the named producer/run when an input
 cannot be downloaded, then retry with eligible CI state or a new target.
 
 Binary/package and manual contents are adopted as produced by CI, without
-rebuilding or repeating producer validation. This stage does not publish,
-create tags, materialize crate versions, or require a future SemVer input.
+rebuilding or repeating producer validation. Preparation does not publish,
+create tags, push source changes, or require a future SemVer input.
+
+## Materialized crate versions
+
+After both CI inputs have been adopted, preparation materializes each
+publishable workspace crate's version from its current version and
+`workspace.metadata.next-release`. Ensure that every publishable crate has a
+valid release-intent entry before selecting the release target. Project release
+numbers do not determine crate versions. The parsed project identity selects
+stable materialization or appends its snapshot suffix to each crate's next
+version; no separate classification input is needed.
+
+The job summary reports the materialized package versions. Updated manifests
+and the lockfile remain in the same runner worktree for subsequent release
+steps. Adopted CI inputs and version/path outputs stay outside that worktree;
+this stage does not commit them. See the internal
+[materialized-state handoff contract](../docs/internal-rules/release-materialization.md)
+for integration with later release steps.
+
+A materialization failure stops preparation. If a failure occurs after manifest
+updates begin, discard the partial runner state and rerun from the original
+exact target rather than reuse partial output. Currently, the materializer
+requires stable current crate versions: a target already containing snapshot
+versions fails. That existing limitation is tracked separately in #364.
 
 ## Maintainer tooling and permissions
 
-The workflow uses Bash, Git, GitHub CLI (`gh`), and `jq` on Ubuntu runners.
+The workflow runs on Ubuntu in the adopted pinned CI-builder container. It
+provides Bash, Git, GitHub CLI (`gh`), `jq`, Cargo, `cargo set-version` (cargo-edit),
+Taplo, and GNU `realpath` (coreutils); no separate runner tool installation is
+required. For local contract tests, use the contributor setup linked below.
+
 For live local API diagnostics, install [GitHub CLI](https://cli.github.com/),
 authenticate with `gh auth login`, and provide repository Actions read access.
-The workflow authenticates using its GitHub token with `contents: read`
-and `actions: read`; no write or publication credentials are needed.
+The workflow authenticates using its GitHub token with `contents: read`,
+`actions: read`, and `packages: read`. Package read access authenticates the
+CI-builder image pull from GHCR; no write or publication credentials are needed.
 
 Offline preparation contract tests are included in
 `check-test-flow --step=version-materialization`. See

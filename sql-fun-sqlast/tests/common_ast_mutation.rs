@@ -70,11 +70,22 @@ fn failed_insertions_preserve_order_attributes_and_recursive_choice(
         dialect,
     );
     let mut editor = statement.with_clause_mut().expect("existing WITH");
-    assert!(
-        editor
-            .insert(index, &query_definition(name, dialect))
-            .is_err()
-    );
+    let error = editor
+        .insert(index, &query_definition(name, dialect))
+        .unwrap_err();
+    if index == 0 {
+        assert_eq!(error.duplicate_name(), Some(name));
+        assert_eq!(error.invalid_index(), None);
+    } else {
+        assert_eq!(error.invalid_index(), Some(index));
+        assert_eq!(error.duplicate_name(), None);
+    }
+    assert!(!error.is_unsupported_carrier());
+    assert_eq!(error.invalid_body_dialect(), None);
+    assert!(!error.is_invalid_cte_placement());
+    assert!(!error.is_dialect_mismatch());
+    assert!(!error.is_invalid_identifier());
+    assert!(!error.requires_recursive());
     let view = editor.view();
     assert_eq!(cte_names(view), ["original"]);
     assert!(view.is_recursive());
@@ -88,8 +99,15 @@ fn unsupported_carriers_reject_with_creation() {
     let mut statement = parse_statement("CREATE TABLE items (id integer)", Dialect::postgres());
     assert!(statement.with_clause().is_none());
     assert!(statement.with_clause_mut().is_none());
-    assert!(statement.ensure_with_clause().is_err());
-    assert!(CteDefinition::new("table_cte", &statement).is_err());
+    let error = statement
+        .ensure_with_clause()
+        .err()
+        .expect("unsupported carrier");
+    assert!(error.is_unsupported_carrier());
+    assert_eq!(error.invalid_body_dialect(), None);
+    let error = CteDefinition::new("table_cte", &statement).unwrap_err();
+    assert_eq!(error.invalid_body_dialect(), Some(Dialect::postgres()));
+    assert!(!error.is_unsupported_carrier());
     assert_eq!(statement.kind(), StatementKind::table());
     assert!(statement.with_clause().is_none());
 }
@@ -127,7 +145,8 @@ fn inserts_postgres_modifying_bodies_under_explicit_recursive_spelling(
 #[case::delete_returning("DELETE FROM items RETURNING id")]
 fn rejects_sqlite_modifying_cte_bodies(#[case] body_sql: &str) {
     let body = parse_statement(body_sql, Dialect::sqlite());
-    assert!(CteDefinition::new("changed", &body).is_err());
+    let error = CteDefinition::new("changed", &body).unwrap_err();
+    assert_eq!(error.invalid_body_dialect(), Some(Dialect::sqlite()));
 }
 
 #[rstest::rstest]
@@ -148,14 +167,16 @@ fn rejects_sqlite_modifying_cte_bodies(#[case] body_sql: &str) {
 )]
 fn rejects_data_modifying_with_anywhere_inside_a_new_cte_body(#[case] body_sql: &str) {
     let body = parse_statement(body_sql, Dialect::postgres());
-    assert!(CteDefinition::new("outer_cte", &body).is_err());
+    let error = CteDefinition::new("outer_cte", &body).unwrap_err();
+    assert!(error.is_invalid_cte_placement());
 }
 
 #[test]
 fn top_level_select_into_cannot_become_a_cte_body() {
     let body = parse_statement("SELECT 1 INTO temp_result", Dialect::postgres());
     assert!(body.is_query());
-    assert!(CteDefinition::new("outer_cte", &body).is_err());
+    let error = CteDefinition::new("outer_cte", &body).unwrap_err();
+    assert!(error.is_invalid_cte_placement());
     assert!(body.is_query());
 }
 
@@ -189,7 +210,9 @@ fn rejects_cross_dialect_definitions_even_for_common_query_syntax(
     let definition = query_definition("new_cte", source_dialect);
     let mut destination = parse_statement("WITH original AS (SELECT 1) SELECT 1", target_dialect);
     let mut editor = destination.with_clause_mut().unwrap();
-    assert!(editor.insert(1, &definition).is_err());
+    let error = editor.insert(1, &definition).unwrap_err();
+    assert!(error.is_dialect_mismatch());
+    assert_eq!(error.invalid_body_dialect(), None);
     assert_eq!(cte_names(editor.view()), ["original"]);
 }
 
@@ -258,7 +281,8 @@ fn search_and_cycle_require_an_explicit_recursive_destination(
     let mut destination =
         parse_statement("WITH original AS (SELECT 1) SELECT 1", Dialect::postgres());
     let mut editor = destination.with_clause_mut().unwrap();
-    assert!(editor.insert(1, &definition).is_err());
+    let error = editor.insert(1, &definition).unwrap_err();
+    assert!(error.requires_recursive());
     assert!(!editor.view().is_recursive());
     assert_eq!(cte_names(editor.view()), ["original"]);
 }
@@ -276,7 +300,8 @@ fn search_and_cycle_prevent_disabling_recursive_without_changing_the_clause(
     let mut editor = destination.ensure_with_clause().unwrap();
     editor.set_recursive(true).unwrap();
     editor.insert(0, &definition).unwrap();
-    assert!(editor.set_recursive(false).is_err());
+    let error = editor.set_recursive(false).unwrap_err();
+    assert!(error.requires_recursive());
     let view = editor.view();
     assert!(view.is_recursive());
     assert_eq!(cte_names(view), ["traversed"]);
@@ -340,11 +365,10 @@ fn sqlite_identifier_comparison_rejects_ascii_case_duplicates() {
     let mut statement = parse_statement("WITH \"Mixed\" AS (SELECT 1) SELECT 1", dialect);
     let mut editor = statement.with_clause_mut().unwrap();
     assert!(editor.view().find("mixed").is_some());
-    assert!(
-        editor
-            .insert(1, &query_definition("MIXED", dialect))
-            .is_err()
-    );
+    let error = editor
+        .insert(1, &query_definition("MIXED", dialect))
+        .unwrap_err();
+    assert_eq!(error.duplicate_name(), Some("MIXED"));
     assert_eq!(cte_names(editor.view()), ["Mixed"]);
 }
 
@@ -357,7 +381,11 @@ fn postgres_definition_names_follow_logical_identifier_rules(
     #[case] valid: bool,
 ) {
     let body = parse_statement("SELECT 1", Dialect::postgres());
-    assert_eq!(CteDefinition::new(name, &body).is_ok(), valid);
+    let result = CteDefinition::new(name, &body);
+    assert_eq!(result.is_ok(), valid);
+    if let Err(error) = result {
+        assert!(error.is_invalid_identifier());
+    }
 }
 
 #[cfg(feature = "sqlite")]
@@ -370,7 +398,11 @@ fn sqlite_definition_names_follow_logical_identifier_rules(
     #[case] valid: bool,
 ) {
     let body = parse_statement("SELECT 1", Dialect::sqlite());
-    assert_eq!(CteDefinition::new(name, &body).is_ok(), valid);
+    let result = CteDefinition::new(name, &body);
+    assert_eq!(result.is_ok(), valid);
+    if let Err(error) = result {
+        assert!(error.is_invalid_identifier());
+    }
 }
 
 #[cfg(feature = "sqlite")]
@@ -402,7 +434,8 @@ fn sqlite_definitions_accept_empty_column_aliases() {
 #[test]
 fn postgres_definitions_reject_empty_column_aliases() {
     let mut definition = query_definition("new_cte", Dialect::postgres());
-    assert!(definition.set_columns(&[""]).is_err());
+    let error = definition.set_columns(&[""]).unwrap_err();
+    assert!(error.is_invalid_identifier());
     assert_eq!(definition.view().columns().count(), 0);
 }
 
@@ -410,11 +443,10 @@ fn postgres_definitions_reject_empty_column_aliases() {
 fn invalid_column_edits_leave_existing_aliases_unchanged() {
     let mut definition = query_definition("new_cte", Dialect::postgres());
     definition.set_columns(&["original"]).unwrap();
-    assert!(
-        definition
-            .set_columns(&["replacement", "bad\0name"])
-            .is_err()
-    );
+    let error = definition
+        .set_columns(&["replacement", "bad\0name"])
+        .unwrap_err();
+    assert!(error.is_invalid_identifier());
     assert_eq!(
         definition.view().columns().collect::<Vec<_>>(),
         ["original"]

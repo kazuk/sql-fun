@@ -72,6 +72,8 @@ let mut query = parse_statements("SELECT * FROM active_users", dialect)
     .next().unwrap()?;
 query.ensure_with_clause()?.insert(0, &definition)?;
 assert!(query.with_clause().unwrap().find("active_users").is_some());
+let error = query.ensure_with_clause()?.insert(0, &definition).unwrap_err();
+assert_eq!(error.duplicate_name(), Some("active_users"));
 # Ok(())
 # }
 ```
@@ -96,6 +98,24 @@ PostgreSQL data-modifying CTE bodies remain representable; SQLite
 CTE bodies must be queries. Mutation errors use [`ast::AstMutationError`], and a
 rejected insertion leaves the destination unchanged. Name binding and dependency
 resolution remain separate semantic concerns.
+
+Inspect mutation failures through [`ast::AstMutationError`] methods when deciding
+how to respond. These methods identify the reason without parsing display text:
+
+| Method | Failure identified |
+| --- | --- |
+| `is_unsupported_carrier()` | The destination cannot carry WITH. |
+| `invalid_body_dialect()` | The CTE body kind is not allowed; returns the rejecting dialect. |
+| `is_invalid_cte_placement()` | The body contains SELECT INTO or nested modifying WITH. |
+| `is_dialect_mismatch()` | Definition and destination use different dialects. |
+| `is_invalid_identifier()` | A CTE name or column alias violates identifier rules. |
+| `duplicate_name()` | A name collides; returns the attempted definition's spelling. |
+| `invalid_index()` | The insertion index is out of range; returns that index. |
+| `requires_recursive()` | SEARCH/CYCLE needs the clause to remain RECURSIVE. |
+
+Predicates return false and detail accessors return None for other reasons.
+Display and Debug output remain human-readable diagnostics, not classification
+formats. The API leaves recovery decisions to the caller.
 
 ## Build prerequisites
 

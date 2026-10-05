@@ -7,9 +7,59 @@ use crate::ast::{
 };
 
 /// A rejected common AST edit. The destination remains unchanged on failure.
+///
+/// Inspect the reason through the predicates and optional detail accessors.
+/// Display text is intended for people, not for classifying failures.
 #[derive(Debug, thiserror::Error)]
 #[error(transparent)]
 pub struct AstMutationError(MutationProblem);
+
+impl AstMutationError {
+    /// Whether the destination statement cannot carry a WITH clause.
+    pub const fn is_unsupported_carrier(&self) -> bool {
+        self.0.is_unsupported_carrier()
+    }
+
+    /// Dialect that rejected the CTE body kind, or None for another failure.
+    pub const fn invalid_body_dialect(&self) -> Option<Dialect> {
+        self.0.invalid_body_dialect()
+    }
+
+    /// Whether the body contains SELECT INTO or a nested data-modifying WITH.
+    pub const fn is_invalid_cte_placement(&self) -> bool {
+        self.0.is_invalid_cte_placement()
+    }
+
+    /// Whether the definition and destination have different dialects.
+    pub const fn is_dialect_mismatch(&self) -> bool {
+        self.0.is_dialect_mismatch()
+    }
+
+    /// Whether a CTE name or column alias violates the dialect's identifier rules.
+    pub const fn is_invalid_identifier(&self) -> bool {
+        self.0.is_invalid_identifier()
+    }
+
+    /// Rejected definition's name when it collides with an existing CTE.
+    ///
+    /// Returns None for another failure. The spelling is the attempted name,
+    /// which may differ from the existing name's case in SQLite.
+    pub const fn duplicate_name(&self) -> Option<&str> {
+        self.0.duplicate_name_value()
+    }
+
+    /// Attempted insertion index when it exceeds the collection length.
+    ///
+    /// Returns None for another failure.
+    pub const fn invalid_index(&self) -> Option<usize> {
+        self.0.invalid_index_value()
+    }
+
+    /// Whether SEARCH or CYCLE requires the clause to remain RECURSIVE.
+    pub const fn requires_recursive(&self) -> bool {
+        self.0.has_recursive_requirement()
+    }
+}
 
 #[derive(Debug, thiserror::Error)]
 enum MutationProblem {
@@ -32,6 +82,47 @@ enum MutationProblem {
 }
 
 impl MutationProblem {
+    const fn is_unsupported_carrier(&self) -> bool {
+        matches!(self, Self::UnsupportedCarrier)
+    }
+
+    const fn invalid_body_dialect(&self) -> Option<Dialect> {
+        match self {
+            Self::InvalidBody(dialect) => Some(*dialect),
+            _ => None,
+        }
+    }
+
+    const fn is_invalid_cte_placement(&self) -> bool {
+        matches!(self, Self::NestedModification)
+    }
+
+    const fn is_dialect_mismatch(&self) -> bool {
+        matches!(self, Self::DifferentDialect)
+    }
+
+    const fn is_invalid_identifier(&self) -> bool {
+        matches!(self, Self::InvalidName)
+    }
+
+    const fn duplicate_name_value(&self) -> Option<&str> {
+        match self {
+            Self::DuplicateName(name) => Some(name.as_str()),
+            _ => None,
+        }
+    }
+
+    const fn invalid_index_value(&self) -> Option<usize> {
+        match self {
+            Self::InvalidIndex(index) => Some(*index),
+            _ => None,
+        }
+    }
+
+    const fn has_recursive_requirement(&self) -> bool {
+        matches!(self, Self::RequiresRecursive)
+    }
+
     const fn unsupported_carrier() -> AstMutationError {
         AstMutationError(Self::UnsupportedCarrier)
     }

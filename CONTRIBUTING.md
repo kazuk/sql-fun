@@ -81,6 +81,14 @@ Make sure the tool's executable directory is available on `PATH`. See the
 [Graphify installation instructions](https://github.com/Graphify-Labs/graphify#install)
 for platform-specific setup.
 
+Python 3 is required by the check-flow harness regression tests and by agent
+mode diagnostic extraction. The CI/development image includes it. Outside that
+image, install it and ensure `python3` is on `PATH`; on Ubuntu:
+
+```sh
+sudo apt-get install python3
+```
+
 Codex contributors also need [`jq`](https://jqlang.org/download/) on `PATH`.
 The repository's Codex pre-tool-use policy uses it to read hook input. The
 standard CI/development image already includes `jq`.
@@ -228,6 +236,29 @@ The standard local verification flow is:
 The script runs the workspace checks, tests, formatting, linting, documentation
 build, dependency checks, API spec generation, and typo checks. After all other
 steps pass, it updates the repository graph index with `graphify update .`.
+
+Successful local checks show a brief step status instead of tool progress.
+Each executed step saves its complete combined stdout/stderr to
+`.build_logs/check_test_flow_<step-name>.log` under the repository root. The
+step's log is overwritten when that step starts; other step logs are retained.
+On failure, the script reports the log path on stderr and prints the last 50
+lines on stdout. Inspect the full log when that tail is insufficient:
+
+```sh
+less .build_logs/check_test_flow_lint.log
+```
+
+The harness uses `CI=true` or `GITHUB_ACTIONS=true` to preserve existing CI
+streaming, command ordering, and failure behavior without capturing logs.
+Otherwise, a nonempty `CODEX_VERSION` selects internal agent presentation:
+known diagnostics and failed-step log paths go to stderr, with no automatic
+log dump. CI takes precedence over the agent signal. Without these signals,
+local presentation is used, including in non-interactive shells. These signals
+change presentation only; check selection still follows the command options.
+Unknown diagnostic formats remain available in the raw logs.
+
+The default `harness` step runs offline regression tests of these execution and
+presentation contracts, using fake tools in temporary repositories.
 
 `check-test-flow` prioritizes consistent behavior between CI and local runs.
 Both use the shared defaults in [`.cargo/config.toml`](.cargo/config.toml):

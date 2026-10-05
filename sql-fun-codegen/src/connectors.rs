@@ -591,7 +591,7 @@ impl TokioPostgresCodeGenerator {
                     let #params: &[&(dyn tokio_postgres::types::ToSql + Sync)] = &[#(#parameters),*];
                     let #result = tokio::select! {
                         #res = #connection.execute( #query, #params ) => #res,
-                        #interrupt_result = #interrupt => return Err(#interrupt_result.into())
+                        #interrupt_result = #interrupt => return Err(::core::convert::Into::into(#interrupt_result))
                     }?;
 
                     Ok(#result)

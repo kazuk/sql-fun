@@ -15,15 +15,6 @@ GitHub annotation commands, Rust panic headers, and missing-tool messages.
 Unrecognized formats remain in the raw log. Extend the patterns and fixtures
 when a new tool has actionable diagnostics that should appear on agent stderr.
 
-Maintainers can run the internal regression command from the repository root:
-
-```sh
-.local/bin/test-check-test-flow
-```
-
-The fixtures exercise the command in temporary repositories with fake tools;
-they also verify Python compatibility with the Rust matcher regular expressions.
-For a local comparison with an explicitly supplied pre-change script, set
-`FLOW_TEST_BASELINE` to that script's absolute path. The optional comparison
-checks commands, ordering, streams, and exit codes under `CI=true`; standard
-runs skip this comparison and assert the enduring execution contract directly.
+The helper is required only for agent-mode diagnostic presentation. It must
+remain compatible with the repository's Rust matcher regular expressions and
+must leave the raw step log unchanged.

@@ -124,7 +124,7 @@ class IntentTests(unittest.TestCase):
             (fixture.old / "manifest.json").write_text(json.dumps(fixture.manifest))
             for target, features in (("different-target", fixture.manifest["feature_sets"]), (fixture.manifest["target"], {"sqlite": {"fixture": []}})):
                 with self.subTest(target=target, features=features):
-                    with self.assertRaisesRegex(semver.CheckError, "baseline target|feature-set identities"):
+                    with self.assertRaisesRegex(semver.CheckError, "baseline target|feature sets removed"):
                         packages.validate_manifest(fixture.old, target, features)
             fixture.manifest["schema"] = -1
             (fixture.old / "manifest.json").write_text(json.dumps(fixture.manifest))
@@ -229,6 +229,8 @@ class FeaturePolicyTests(unittest.TestCase):
             with self.assertRaisesRegex(semver.CheckError, "explicit baseline transition"):
                 features.require_matching_coverage(previous, requested)
         features.require_matching_coverage(previous, {"postgres": {"library": [], "new": []}})
+        features.require_matching_coverage(previous, {"postgres": {"library": []},
+                                                      "sqlite": {"library": ["sqlite"]}})
 
     def test_sqlite_only_break_is_checked_with_the_corresponding_baseline(self):
         with tempfile.TemporaryDirectory() as temporary:
@@ -247,6 +249,40 @@ class FeaturePolicyTests(unittest.TestCase):
             self.assertEqual(semver.compare(current, candidate, baseline, previous, intent), 1)
             intent["fixture"] = "major"
             self.assertEqual(semver.compare(current, candidate, baseline, previous, intent), 0)
+
+    def test_new_configuration_has_no_prior_api_until_candidate_adoption(self):
+        with tempfile.TemporaryDirectory() as temporary:
+            fixture = ReleaseFixture(Path(temporary))
+            source_manifest = fixture.source / "Cargo.toml"
+            library = fixture.source / "src/lib.rs"
+            library.write_text('pub fn common() {}')
+            old_root, old_descriptor, _ = fixture.prepare(candidate=True)
+            old_archive = Path(temporary) / "old.tar.gz"
+            storage.write_candidate(old_root, old_archive)
+            source_manifest.write_text(source_manifest.read_text() + '\n[features]\nsqlite = []\n')
+            fixture.feature_sets["sqlite"] = {"fixture": ["sqlite"], "semver-intent-fixture-dependency": []}
+            library.write_text('pub fn common() {}\n#[cfg(feature = "sqlite")] pub fn first_released_api() {}')
+            baseline, previous = packages.baseline_root(old_archive, fixture.cache,
+                                                        old_descriptor["target"], fixture.feature_sets)
+            current, candidate, intent = fixture.prepare()
+            analyzed = semver.detected_level
+            def existing_configuration_only(*arguments, **keywords):
+                self.assertEqual(arguments[4], [])
+                return analyzed(*arguments, **keywords)
+            with patch.object(semver, "detected_level", side_effect=existing_configuration_only):
+                self.assertEqual(semver.compare(current, candidate, baseline, previous, intent), 0)
+            released, descriptor, _ = fixture.prepare(candidate=True)
+            new_archive = Path(temporary) / "stable-candidate.tar.gz"
+            storage.write_candidate(released, new_archive)
+            active = Path(temporary) / "active.tar.gz"
+            subprocess.run([str(ROOT / ".local/bin/adopt-semver-baseline"), "--candidate", str(new_archive),
+                            "--release-tag", "v1.0.0", "--destination", str(active)], check=True)
+            baseline, previous = packages.baseline_root(active, fixture.cache,
+                                                        descriptor["target"], fixture.feature_sets)
+            self.assertIn("sqlite", previous["feature_sets"])
+            library.write_text('pub fn common() {}\n#[cfg(feature = "sqlite")] pub fn changed_after_release() {}')
+            changed, candidate, intent = fixture.prepare()
+            self.assertEqual(semver.compare(changed, candidate, baseline, previous, intent), 1)
 
     def test_feature_contract_round_trip_and_baseline_validation(self):
         with tempfile.TemporaryDirectory() as temporary:

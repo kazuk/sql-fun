@@ -104,15 +104,15 @@ this policy when changing the publishable crate set or supported configurations.
 
 Candidate generation and comparison require `--target`, `--default-features`,
 and an explicitly selected `--feature-sets` file. The baseline records
-configuration
-identities and per-crate mappings. Every configuration is checked against its
-corresponding baseline API; an exceeded intent in any configuration fails the
-gate.
-Changed configuration identities or existing-crate mappings require an explicit
-baseline transition. New crates need complete current mappings and have no
-previous
-API. Invalid baseline mappings/features are rejected using the packaged
-manifests.
+configuration identities and per-crate mappings. Configurations present on both
+sides are compared normally; an exceeded intent in any such configuration fails
+the gate. A configuration present only in the current policy has no previously
+released API and is reported as new without a SemVer violation. Its eventual
+stable-release candidate establishes its first baseline; subsequent checks then
+compare it normally. Removing a baseline configuration or changing an existing
+configuration's per-crate mapping requires an explicit baseline transition.
+New crates need complete current mappings and have no previous API. Invalid
+baseline mappings/features are rejected using the packaged manifests.
 
 The reported requirement is the minimum detected by cargo-semver-checks lints,
 with patch as the floor when no lint requires more. The tool does not detect all
@@ -211,14 +211,14 @@ python3 .local/tests/test_semver_intent.py
 Fixture tests cover actual patch/minor/major lint thresholds, proc macros,
 analysis failures, metadata validation, baseline scope/extraction, and release
 adoption. They also exercise SQLite-only API removal and strict feature-policy
-validation, including baseline feature-set identity and mapping mismatches. They
-are separate from the routine local SemVer path. New CI jobs
-must pass on the final PR head before the implementation is declared complete.
-The aggregate `build` job requires the SemVer job and explicitly rejects any
-failed, cancelled, or skipped dependency, so a failed gate cannot become a
-successful aggregate check. The adopted CI image provides Python and the pinned
-analysis tool; the job checks the required tool version rather than installing
-another copy.
+validation, including new configurations becoming checked after stable adoption,
+removed configurations, and changed existing mappings. They are separate from
+the routine local SemVer path. New CI jobs must pass on the final PR head before
+the implementation is declared complete. The aggregate `build` job requires
+SemVer and explicitly rejects any failed, cancelled, or skipped dependency, so
+a failed gate cannot become a successful aggregate check. The adopted CI image
+provides Python and the pinned analysis tool; the job checks the required tool
+version rather than installing another copy.
 
 The analysis contract follows [cargo-semver-checks
 0.51.0](https://github.com/obi1kenobi/cargo-semver-checks/tree/v0.51.0).

@@ -52,9 +52,10 @@ def validate_baseline_feature_sets(root, manifest):
 
 
 def require_matching_coverage(previous, requested):
-    """New crates have no previous APIs; existing mappings must match exactly."""
-    if previous.keys() != requested.keys():
-        raise CheckError("baseline feature-set identities differ; explicit baseline transition required")
+    """New configurations/crates have no prior API; released scope cannot disappear."""
+    removed = previous.keys() - requested.keys()
+    if removed:
+        raise CheckError(f"baseline feature sets removed: {sorted(removed)}; explicit baseline transition required")
     for name, mapping in previous.items():
         for crate, selected in mapping.items():
             if crate in requested[name] and requested[name][crate] != selected:

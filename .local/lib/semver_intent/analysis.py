@@ -63,6 +63,9 @@ def compare(current, candidate, baseline, previous, intent):
     for configuration, mapping in candidate["feature_sets"].items():
         for name, entry in new.items():
             label = f"{configuration}/{name}"
+            if configuration not in previous["feature_sets"]:
+                print(f"{label}: declared={intent[name]}, new configuration (no previous API)")
+                continue
             if name not in old:
                 print(f"{label}: declared={intent[name]}, new crate (no previous API)")
                 continue

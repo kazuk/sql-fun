@@ -37,7 +37,10 @@ where F: Fn(Vec<IdWithName>, IdWithName) -> Fut, Fut: Future<Output = Result<Vec
 async fn direct_wins(client: &Client, #[parameter_source] dto: &str, id: i64) -> Result<u64, anyhow::Error> {}
 
 #[sql_fun::sql_statement(sql = "delete from users where id = ${id}")]
-async fn interrupted(client: &Client, #[parameter_source] dto: &Dto, #[interrupt_future] interrupt: &mut (impl Future<Output = tokio_postgres::Error> + Unpin)) -> Result<u64, tokio_postgres::Error> {}
+async fn interrupted(client: &Client, #[parameter_source] dto: &Dto, #[interrupt_future] interrupt: &mut (impl Future<Output = anyhow::Error> + Unpin)) -> Result<u64, anyhow::Error> {}
+
+#[sql_fun::sql_statement(sql = "delete from users where id = ${id}")]
+async fn interrupted_native(client: &Client, #[parameter_source] dto: &Dto, #[interrupt_future] interrupt: &mut (impl Future<Output = tokio_postgres::Error> + Unpin)) -> Result<u64, tokio_postgres::Error> {}
 
 #[sql_fun::sql_statement(sql = "#[choice]")]
 #[sql_fragment(choice, dto.mode(), (), {

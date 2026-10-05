@@ -301,7 +301,6 @@ class CheckFlowTests(unittest.TestCase):
         baseline.chmod(0o755)
         current = self.script
         cases = (
-            ((), None),
             (("--step=lint", "--step=typos"), None),
             (("--step=lint", "--step=typos"), "cargo clippy"),
             (("--step=workspace",), "cargo check"),

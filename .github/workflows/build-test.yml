@@ -31,6 +31,8 @@ jobs:
         password: ${{ secrets.GITHUB_TOKEN }}
     steps:
       - uses: actions/checkout@v5
+        with:
+          ref: ${{ github.event.pull_request.head.sha || github.sha }}
 
       # Remove this bootstrap when the separately reviewed CI image adoption
       # provides Python 3.12+ and cargo-semver-checks 0.51.0.

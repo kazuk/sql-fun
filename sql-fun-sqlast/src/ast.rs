@@ -1523,7 +1523,7 @@ pub(crate) struct Conflict {
     constraint: Option<String>,
     assignments: Vec<Assignment>,
     predicate: Option<Expr>,
-    next: Option<Box<Conflict>>,
+    next: Option<Box<Self>>,
 }
 
 #[derive(Clone, Debug)]

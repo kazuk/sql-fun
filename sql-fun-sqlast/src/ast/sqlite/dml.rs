@@ -256,7 +256,7 @@ impl ConflictAction {
 }
 
 impl ConflictUpdate {
-    fn nothing() -> Self {
+    const fn nothing() -> Self {
         Self {
             action: ConflictAction::nothing(),
             assignments: Vec::new(),

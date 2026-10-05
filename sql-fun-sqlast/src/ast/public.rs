@@ -278,7 +278,7 @@ pub struct WithClause<'a> {
 }
 
 impl<'a> WithClause<'a> {
-    pub(super) fn existing(node: &'a With, dialect: Dialect) -> Option<Self> {
+    pub(super) const fn existing(node: &'a With, dialect: Dialect) -> Option<Self> {
         if node.entries.is_empty() {
             None
         } else {
@@ -292,12 +292,12 @@ impl<'a> WithClause<'a> {
     }
 
     /// Number of CTEs in source order.
-    pub fn len(&self) -> usize {
+    pub const fn len(&self) -> usize {
         self.node.entries.len()
     }
 
     /// Whether the clause contains no CTEs.
-    pub fn is_empty(&self) -> bool {
+    pub const fn is_empty(&self) -> bool {
         self.node.entries.is_empty()
     }
 
@@ -374,7 +374,7 @@ impl<'a> CommonTableExpression<'a> {
     }
 
     /// Inspect a WITH clause belonging to the CTE body itself.
-    pub fn with_clause(&self) -> Option<WithClause<'a>> {
+    pub const fn with_clause(&self) -> Option<WithClause<'a>> {
         WithClause::existing(self.node.body.with_node(), self.dialect)
     }
 }

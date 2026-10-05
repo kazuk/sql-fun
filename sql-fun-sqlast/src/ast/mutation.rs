@@ -32,23 +32,23 @@ enum MutationProblem {
 }
 
 impl MutationProblem {
-    fn unsupported_carrier() -> AstMutationError {
+    const fn unsupported_carrier() -> AstMutationError {
         AstMutationError(Self::UnsupportedCarrier)
     }
 
-    fn invalid_body(dialect: Dialect) -> AstMutationError {
+    const fn invalid_body(dialect: Dialect) -> AstMutationError {
         AstMutationError(Self::InvalidBody(dialect))
     }
 
-    fn nested_modification() -> AstMutationError {
+    const fn nested_modification() -> AstMutationError {
         AstMutationError(Self::NestedModification)
     }
 
-    fn different_dialect() -> AstMutationError {
+    const fn different_dialect() -> AstMutationError {
         AstMutationError(Self::DifferentDialect)
     }
 
-    fn invalid_name() -> AstMutationError {
+    const fn invalid_name() -> AstMutationError {
         AstMutationError(Self::InvalidName)
     }
 
@@ -56,11 +56,11 @@ impl MutationProblem {
         AstMutationError(Self::DuplicateName(name.to_owned()))
     }
 
-    fn invalid_index(index: usize) -> AstMutationError {
+    const fn invalid_index(index: usize) -> AstMutationError {
         AstMutationError(Self::InvalidIndex(index))
     }
 
-    fn requires_recursive() -> AstMutationError {
+    const fn requires_recursive() -> AstMutationError {
         AstMutationError(Self::RequiresRecursive)
     }
 }
@@ -128,12 +128,12 @@ impl CteDefinition {
     }
 
     /// Set MATERIALIZED, NOT MATERIALIZED, or remove the explicit hint with None.
-    pub fn set_materialized(&mut self, materialized: Option<bool>) {
+    pub const fn set_materialized(&mut self, materialized: Option<bool>) {
         self.node.materialized = materialized;
     }
 
     /// Inspect the complete declaration before insertion.
-    pub fn view(&self) -> CommonTableExpression<'_> {
+    pub const fn view(&self) -> CommonTableExpression<'_> {
         CommonTableExpression {
             node: &self.node,
             dialect: self.dialect,
@@ -182,7 +182,7 @@ impl StatementNode {
         }
     }
 
-    fn with_node_mut(&mut self) -> Option<&mut With> {
+    const fn with_node_mut(&mut self) -> Option<&mut With> {
         match self {
             Self::Query(node) => Some(&mut node.with),
             Self::Insert(node) => Some(&mut node.with),
@@ -210,7 +210,7 @@ impl CteBody {
 }
 
 impl Cte {
-    fn requires_recursive(&self) -> bool {
+    const fn requires_recursive(&self) -> bool {
         self.search.is_some() || self.cycle.is_some()
     }
 }
@@ -240,7 +240,7 @@ pub trait HaveWithClause {
 
 impl HaveWithClause for Statement {
     fn with_clause(&self) -> Option<WithClause<'_>> {
-        Statement::with_clause(self)
+        Self::with_clause(self)
     }
 
     fn with_clause_mut(&mut self) -> Option<WithClauseMut<'_>> {
@@ -314,7 +314,7 @@ impl WithClauseMut<'_> {
     }
 
     /// Inspect the collection, including an editor's not-yet-populated clause.
-    pub fn view(&self) -> WithClause<'_> {
+    pub const fn view(&self) -> WithClause<'_> {
         WithClause {
             node: self.node,
             dialect: self.dialect,

@@ -69,7 +69,7 @@ fn known_boundaries_allow_iteration_after_conversion_failure(#[case] unsupported
         .expect("unsupported statement")
         .expect_err("conversion error");
     assert!(!error.is_syntax());
-    assert!(!error.message().is_empty());
+    assert_ne!(error.message(), "");
     assert_eq!(
         error.span().get_from(&sql).expect("statement span").trim(),
         unsupported

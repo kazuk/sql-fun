@@ -47,7 +47,7 @@ impl ParseStatementError {
     }
 
     #[cfg(feature = "sqlite")]
-    pub(crate) fn with_position(mut self, position: StringSpan) -> Self {
+    pub(crate) const fn with_position(mut self, position: StringSpan) -> Self {
         self.position = Some(position);
         self
     }

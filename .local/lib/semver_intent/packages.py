@@ -87,10 +87,14 @@ def copy_selected_checkout(source, files, destination):
     destination.mkdir()
     for name in files:
         original = source / name
-        if original.is_file() or original.is_symlink():
+        if original.is_symlink() and not original.is_file():
+            raise CheckError(f"selected source symlink must reference a readable file: {name}")
+        if original.is_file():
             copied = destination / name
             copied.parent.mkdir(parents=True, exist_ok=True)
-            shutil.copy2(original, copied, follow_symlinks=False)
+            # Snapshot file contents: preserving absolute links could let version
+            # materialization write back into the contributor's original checkout.
+            shutil.copy2(original, copied, follow_symlinks=True)
 
 
 def extract_release_packages(packages, archives, destination):

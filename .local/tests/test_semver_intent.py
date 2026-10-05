@@ -311,6 +311,30 @@ class PackagingTests(unittest.TestCase):
             changed, manifest, intent = fixture.prepare()
             self.assertEqual(semver.compare(changed, manifest, baseline, previous, intent), 1)
 
+    def test_linked_manifest_is_materialized_without_modifying_checkout(self):
+        with tempfile.TemporaryDirectory() as temporary:
+            fixture = ReleaseFixture(Path(temporary))
+            manifest = fixture.source / "Cargo.toml"
+            original = manifest.read_bytes()
+            target = fixture.source / "shared-manifest.toml"
+            manifest.rename(target)
+            manifest.symlink_to(target)
+            _, descriptor, _ = fixture.prepare()
+            self.assertEqual(descriptor["crates"][0]["version"], "1.0.1")
+            self.assertEqual(target.read_bytes(), original)
+
+    def test_directory_symlink_is_rejected_before_materialization(self):
+        with tempfile.TemporaryDirectory() as temporary:
+            root = Path(temporary)
+            fixture = ReleaseFixture(root)
+            external = root / "unselected-directory"
+            external.mkdir()
+            (fixture.source / "directory-link").symlink_to(external, target_is_directory=True)
+            original = (fixture.source / "Cargo.toml").read_bytes()
+            with self.assertRaisesRegex(semver.CheckError, "symlink must reference a readable file"):
+                fixture.prepare(candidate=True)
+            self.assertEqual((fixture.source / "Cargo.toml").read_bytes(), original)
+
     def test_embedded_non_markdown_assets_invalidate_analysis(self):
         with tempfile.TemporaryDirectory() as temporary:
             fixture = ReleaseFixture(Path(temporary))

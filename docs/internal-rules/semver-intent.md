@@ -54,7 +54,11 @@ packaged snapshot because normalized package timestamps must not allow stale
 build-script outputs or local dependencies to cross source revisions.
 
 The command reads the selected repository files required to construct its
-packages. Version materialization and package construction occur in a temporary
+packages. Selected symlinks must reference readable files; directory links and
+broken links are rejected. File links are captured as ordinary file contents in
+the isolated checkout, so version materialization cannot write through them into
+the contributor checkout. Version materialization and package construction occur
+in a temporary
 source copy; the API comparison reads the extracted package contents. Workspace
 package dependencies are patched to those extracted packages, rather than to
 unpublished registry versions or the original source tree. This compilation is

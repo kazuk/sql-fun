@@ -42,7 +42,7 @@ RUN test "$(dpkg --print-architecture)" = amd64 \
     && rm -rf /tmp/binstall
 
 RUN cargo binstall --locked --force --root /opt/tools \
-    cargo-llvm-cov mdbook cargo-deny tera-cli taplo-cli cargo-nextest sccache cargo-sort cargo-edit cargo-expand cargo-deb
+    cargo-llvm-cov mdbook cargo-deny tera-cli taplo-cli cargo-nextest sccache cargo-sort cargo-edit cargo-expand cargo-deb cargo-semver-checks@0.51.0
 
 ARG TYPOS_TAG
 ARG TYPOS_SHA256
@@ -83,7 +83,7 @@ RUN apt-get update && apt-get install -y --no-install-recommends \
     ca-certificates curl direnv git gh \
     build-essential pkg-config \
     unzip zip xz-utils sudo \
-    libssl-dev clang jq \
+    libssl-dev clang jq python3 \
     postgresql-client libpq-dev \
     autoconf automake libtool libtool-bin bsdextrautils \
     && rm -rf /var/lib/apt/lists/*
@@ -132,7 +132,8 @@ RUN curl -LsSf https://github.com/rvben/rumdl/releases/download/v0.2.76/rumdl-v0
 
 COPY --from=builder /opt/tools/bin /usr/local/cargo/bin
 
-RUN cargo deb --version
+RUN cargo deb --version \
+    && cargo semver-checks --version
 
 COPY --from=builder /opt/serena.tar.gz /opt/serena.tar.gz
 

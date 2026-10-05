@@ -15,10 +15,10 @@ GitHub annotation commands, Rust panic headers, and missing-tool messages.
 Unrecognized formats remain in the raw log. Extend the patterns and fixtures
 when a new tool has actionable diagnostics that should appear on agent stderr.
 
-Run the supported regression command from the repository root:
+Maintainers can run the internal regression command from the repository root:
 
 ```sh
-.local/bin/check-test-flow --step=harness
+.local/bin/test-check-test-flow
 ```
 
 The fixtures exercise the command in temporary repositories with fake tools;

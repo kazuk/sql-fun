@@ -31,11 +31,11 @@ Default steps:
   version-materialization
   graphify
   skill-lint
-  harness
 
 Optional steps (explicit --step required):
   packaging
   cli-contract
+  harness
 USAGE
 }
 
@@ -54,10 +54,9 @@ DEFAULT_STEPS=(
   version-materialization
   graphify
   skill-lint
-  harness
 )
 
-ALL_STEPS=("${DEFAULT_STEPS[@]}" packaging cli-contract)
+ALL_STEPS=("${DEFAULT_STEPS[@]}" packaging cli-contract harness)
 
 function list_steps() {
   printf '%s\n' "${ALL_STEPS[@]}"

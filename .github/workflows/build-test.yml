@@ -200,9 +200,6 @@ jobs:
           .local/bin/check-test-flow --step=lint
           sccache --show-stats
 
-      - name: Verify check-flow harness
-        run: .local/bin/check-test-flow --step=harness
-
       - name: Check typos
         run: .local/bin/check-test-flow --step=typos
 

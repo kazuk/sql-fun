@@ -166,8 +166,8 @@ adoption. They are separate from the routine local SemVer path. New CI jobs
 must pass on the final PR head before the implementation is declared complete.
 The aggregate `build` job requires the SemVer job and explicitly rejects any
 failed, cancelled, or skipped dependency, so a failed gate cannot become a
-successful aggregate check. The temporary prerequisite-install step in the
-SemVer job can be removed when
-the separately reviewed image adoption provides Python and the pinned tool.
+successful aggregate check. The adopted CI image provides Python and the pinned
+analysis tool; the job checks the required tool version rather than installing
+another copy.
 
 The analysis contract follows [cargo-semver-checks 0.51.0](https://github.com/obi1kenobi/cargo-semver-checks/tree/v0.51.0).

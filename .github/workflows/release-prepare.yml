@@ -8,6 +8,7 @@ on:
 permissions:
   contents: read
   actions: read
+  packages: read
 
 concurrency:
   group: release-preparation-${{ github.ref }}
@@ -16,6 +17,14 @@ concurrency:
 jobs:
   prepare:
     runs-on: ubuntu-24.04
+    container:
+      image: ghcr.io/kazuk/ci-builder@sha256:5a9fb8282de0a11c8291cdc368461e8ed432a528adddc2777e8d9dd744386e8f
+      credentials:
+        username: ${{ github.actor }}
+        password: ${{ secrets.GITHUB_TOKEN }}
+    defaults:
+      run:
+        shell: bash
     outputs:
       tag: ${{ steps.identity.outputs.tag }}
       version: ${{ steps.identity.outputs.version }}
@@ -53,15 +62,32 @@ jobs:
           .local/sbin/adopt-release-ci-inputs "$GITHUB_REPOSITORY" "$CI_RUN_ID" \
             "$RUNNER_TEMP/release-inputs" \
             sql-fun-x86_64-unknown-linux-gnu sql-fun-user-manual
+      - name: Materialize crate versions
+        id: materialize
+        env:
+          RELEASE_CLASSIFICATION: ${{ steps.identity.outputs.classification }}
+          RELEASE_SNAPSHOT: ${{ steps.identity.outputs.snapshot }}
+        run: |
+          state="$RUNNER_TEMP/release-state"
+          .local/sbin/materialize-release-state "$RELEASE_CLASSIFICATION" "$RELEASE_SNAPSHOT" "$state"
+          {
+            echo "versions=$state/crates.tsv"
+            echo "paths=$state/changed-paths.txt"
+          } >> "$GITHUB_OUTPUT"
       - name: Record adopted release inputs
         env:
           CI_RUN_URL: ${{ steps.ci.outputs.run_url }}
           RELEASE_TAG: ${{ steps.identity.outputs.tag }}
           RELEASE_CLASSIFICATION: ${{ steps.identity.outputs.classification }}
+          CRATE_VERSIONS: ${{ steps.materialize.outputs.versions }}
         run: |
           {
             echo "Product release: $RELEASE_TAG ($RELEASE_CLASSIFICATION)"
             echo "Release target: $RELEASE_SHA"
             echo "Normal CI: $CI_RUN_URL"
             echo "Adopted: sql-fun-x86_64-unknown-linux-gnu, sql-fun-user-manual"
+            echo 'Materialized crate versions:'
+            echo '```text'
+            cat "$CRATE_VERSIONS"
+            echo '```'
           } >> "$GITHUB_STEP_SUMMARY"

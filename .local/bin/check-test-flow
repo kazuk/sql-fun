@@ -259,6 +259,7 @@ function run_version_materialization() {
   "${GIT_ROOT}/.local/bin/test-materialize-release-versions"
   "${GIT_ROOT}/.local/bin/test-release-publication"
   "${GIT_ROOT}/.local/bin/test-release-preparation"
+  "${GIT_ROOT}/.local/bin/test-materialize-release-state"
 }
 
 function run_packaging() {

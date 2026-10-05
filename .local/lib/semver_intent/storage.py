@@ -19,7 +19,9 @@ def source_key(source, files, target, features, policy):
         path = source / name
         digest.update(os.fsencode(name) + b"\0")
         if path.is_symlink():
-            digest.update(b"L" + os.fsencode(os.readlink(path)))
+            digest.update(b"L" + os.fsencode(os.readlink(path)) + b"\0")
+            if path.is_file():
+                digest.update(path.read_bytes())
         elif path.is_file():
             digest.update(b"F" + str(path.stat().st_mode & 0o777).encode() + b"\0" + path.read_bytes())
         else:

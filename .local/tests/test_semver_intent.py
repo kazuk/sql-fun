@@ -296,6 +296,21 @@ class PackagingTests(unittest.TestCase):
             changed, manifest, intent = fixture.prepare()
             self.assertEqual(semver.compare(changed, manifest, baseline, previous, intent), 1)
 
+    def test_linked_library_source_tracks_referenced_content(self):
+        with tempfile.TemporaryDirectory() as temporary:
+            fixture = ReleaseFixture(Path(temporary))
+            body = fixture.source / ".local/api-body.txt"
+            body.write_text("pub fn original() {}")
+            library = fixture.source / "src/lib.rs"
+            library.unlink()
+            library.symlink_to("../.local/api-body.txt")
+            baseline, previous, _ = fixture.prepare(candidate=True)
+            current, manifest, intent = fixture.prepare()
+            self.assertEqual(semver.compare(current, manifest, baseline, previous, intent), 0)
+            body.write_text("pub fn renamed() {}")
+            changed, manifest, intent = fixture.prepare()
+            self.assertEqual(semver.compare(changed, manifest, baseline, previous, intent), 1)
+
     def test_embedded_non_markdown_assets_invalidate_analysis(self):
         with tempfile.TemporaryDirectory() as temporary:
             fixture = ReleaseFixture(Path(temporary))

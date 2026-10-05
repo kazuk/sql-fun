@@ -31,7 +31,6 @@ Default steps:
   version-materialization
   graphify
   skill-lint
-  harness
 
 Optional steps (explicit --step required):
   packaging
@@ -54,7 +53,6 @@ DEFAULT_STEPS=(
   version-materialization
   graphify
   skill-lint
-  harness
 )
 
 ALL_STEPS=("${DEFAULT_STEPS[@]}" packaging cli-contract)
@@ -65,7 +63,7 @@ function list_steps() {
 
 function normalize_step() {
   case "$1" in
-    affected|workspace|proc-macro-tests|fmt|lint|server-api-spec|deny|dependency-updates|doc|typos|version-materialization|graphify|skill-lint|markdown-lint|packaging|cli-contract|harness)
+    affected|workspace|proc-macro-tests|fmt|lint|server-api-spec|deny|dependency-updates|doc|typos|version-materialization|graphify|skill-lint|markdown-lint|packaging|cli-contract)
       printf '%s\n' "$1"
       ;;
     format)
@@ -128,54 +126,6 @@ function step_enabled() {
 
 function require_command() {
   command -v "$1" >/dev/null || { echo "$1 required"; exit 1; }
-}
-
-# These environment signals are presentation inputs to the development harness.
-FLOW_MODE=human
-if [[ "${CI:-}" == true || "${GITHUB_ACTIONS:-}" == true ]]; then
-  FLOW_MODE=ci
-elif [[ -n "${CODEX_VERSION:-}" ]]; then
-  FLOW_MODE=agent
-  require_command python3
-fi
-
-function start_step_output() {
-  FLOW_STEP="$1"
-  FLOW_LOG_PATH="${GIT_ROOT}/.build_logs/check_test_flow_${FLOW_STEP}.log"
-  if ! mkdir -p "${GIT_ROOT}/.build_logs"; then
-    echo "error: cannot create check-test-flow log directory" >&2
-    exit 1
-  fi
-  if ! exec {FLOW_LOG}>"$FLOW_LOG_PATH"; then
-    echo "error: cannot open check-test-flow log: $FLOW_LOG_PATH" >&2
-    exit 1
-  fi
-  echo "== Running $FLOW_STEP"
-  exec {FLOW_STDOUT}>&1 {FLOW_STDERR}>&2
-  exec >&"$FLOW_LOG" 2>&1
-  exec {FLOW_LOG}>&-
-  # Keep steps in this shell, outside conditional function calls, to preserve
-  # errexit, pipefail, and whole-flow exits such as --changed-only.
-  trap 'flow_exit=$?; finish_step_output "$flow_exit"; exit "$flow_exit"' EXIT
-}
-
-function finish_step_output() {
-  local status="$1"
-  trap - EXIT
-  exec 1>&"$FLOW_STDOUT" 2>&"$FLOW_STDERR"
-  exec {FLOW_STDOUT}>&- {FLOW_STDERR}>&-
-  if [[ "$FLOW_MODE" == agent ]]; then
-    python3 "${GIT_ROOT}/.local/sbin/check-test-flow-diagnostics.py" \
-      "${GIT_ROOT}/.github/problem-matchers/rust.json" "$FLOW_LOG_PATH" ||
-      echo "warning: diagnostic extraction failed; see $FLOW_LOG_PATH" >&2
-  fi
-  if (( status != 0 )); then
-    echo "error: check-test-flow step '$FLOW_STEP' failed; see $FLOW_LOG_PATH" >&2
-    if [[ "$FLOW_MODE" == human ]]; then
-      tail -n 50 "$FLOW_LOG_PATH" ||
-        echo "warning: cannot read failure tail; see $FLOW_LOG_PATH" >&2
-    fi
-  fi
 }
 
 FEATURES=()
@@ -362,17 +312,8 @@ function run_rumdl() {
   rumdl check "${options[@]}" .
 }
 
-function run_harness() {
-  require_command python3
-  echo "== Verify check-test-flow presentation and execution contracts"
-  "${GIT_ROOT}/.local/bin/test-check-test-flow"
-}
-
 for step in "${ALL_STEPS[@]}"; do
   if step_enabled "$step"; then
-    if [[ "$FLOW_MODE" != ci ]]; then
-      start_step_output "$step"
-    fi
     case "$step" in
       affected) run_affected ;;
       workspace) run_workspace ;;
@@ -390,10 +331,6 @@ for step in "${ALL_STEPS[@]}"; do
       markdown-lint) run_rumdl ;;
       packaging) run_packaging ;;
       cli-contract) run_cli_contract ;;
-      harness) run_harness ;;
     esac
-    if [[ "$FLOW_MODE" != ci ]]; then
-      finish_step_output 0
-    fi
   fi
 done

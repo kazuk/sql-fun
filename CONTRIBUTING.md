@@ -47,6 +47,20 @@ cargo install --locked --force \
   sccache cargo-sort cargo-edit cargo-expand cargo-binstall typos-cli
 ```
 
+SemVer validation requires Python 3.12 or newer and the tested tool version:
+
+```sh
+cargo install --locked cargo-semver-checks --version 0.51.0
+```
+
+The CI/development image update in PR #350 provides these prerequisites.
+`.local/bin/check-test-flow --step=semver` compares packaged release APIs with
+`.local/semver_baseline.tar.gz` and checks the detected impact against release
+intent. It reuses local package and rustdoc caches; it does not produce release
+artifacts, run exhaustive fixtures, or adopt a baseline. See
+[SemVer intent validation](docs/internal-rules/semver-intent.md) for scope,
+initial baseline setup, and the next-major migration specification convention.
+
 `mdbook` is required by the documentation build. The `doc` check-flow step
 builds both the Rust API documentation and the user manual.
 

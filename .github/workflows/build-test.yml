@@ -1,6 +1,8 @@
 name: build and test
 
 on:
+  push:
+    branches: ["main"]
   pull_request:
     branches-ignore:
       - ci-image
@@ -20,6 +22,52 @@ env:
   USER: runner
 
 jobs:
+  semver:
+    runs-on: ubuntu-24.04
+    container:
+      image: ghcr.io/kazuk/ci-builder@sha256:511a659a604cd42828fcecdf4755f3465e50f36019f965e4d1c9acd2f844d5b5
+      credentials:
+        username: ${{ github.actor }}
+        password: ${{ secrets.GITHUB_TOKEN }}
+    steps:
+      - uses: actions/checkout@v5
+
+      # Remove this bootstrap when the separately reviewed CI image adoption
+      # provides Python 3.12+ and cargo-semver-checks 0.51.0.
+      - name: Install SemVer prerequisites
+        run: |
+          apt-get update
+          apt-get install -y --no-install-recommends python3
+          cargo binstall --no-confirm --locked cargo-semver-checks@0.51.0
+
+      - uses: actions/cache@v5
+        with:
+          path: |
+            /usr/local/cargo/registry
+            /usr/local/cargo/git
+          key: cargo-${{ runner.os }}-semver-${{ hashFiles('**/Cargo.lock') }}
+          restore-keys: |
+            cargo-${{ runner.os }}-
+
+      - name: Verify SemVer contracts and real API fixtures
+        run: python3 .local/tests/test_semver_intent.py
+
+      - name: Generate internal baseline candidate
+        run: |
+          .local/bin/semver-intent candidate --source "$PWD" \
+            --target x86_64-unknown-linux-gnu --cache "$PWD/target/semver-intent" \
+            --output "$RUNNER_TEMP/semver_baseline.tar.gz"
+
+      - name: Check release intent against active baseline
+        run: .local/bin/check-test-flow --step=semver
+
+      - uses: actions/upload-artifact@v7
+        if: ${{ always() }}
+        with:
+          name: semver-baseline
+          path: ${{ runner.temp }}/semver_baseline.tar.gz
+          if-no-files-found: error
+
   workspace:
     runs-on: ubuntu-24.04
     container: &ci-builder-container

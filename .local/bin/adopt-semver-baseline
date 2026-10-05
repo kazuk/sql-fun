@@ -1,0 +1,27 @@
+#!/usr/bin/env python3
+"""Copy a trusted normal-CI candidate into the stable release back-commit tree."""
+import argparse
+from pathlib import Path
+import shutil
+import subprocess
+import tempfile
+
+parser = argparse.ArgumentParser(description=__doc__)
+parser.add_argument("--candidate", type=Path, required=True)
+parser.add_argument("--release-tag", required=True)
+parser.add_argument("--destination", type=Path, required=True, help="back-commit checkout's .local/semver_baseline.tar.gz")
+args = parser.parse_args()
+identity = subprocess.check_output([str(Path(__file__).with_name("parse-release-version")), args.release_tag], text=True).strip().split("\t")
+if identity[-1] == "snapshot":
+    print("snapshot: active baseline unchanged")
+else:
+    # The caller selects a successful normal-CI run for the exact release source.
+    # GitHub Actions metadata is the provenance boundary; do not re-prove it here.
+    args.destination.parent.mkdir(parents=True, exist_ok=True)
+    with tempfile.NamedTemporaryFile(dir=args.destination.parent, delete=False) as output:
+        temporary = Path(output.name)
+    try:
+        shutil.copyfile(args.candidate, temporary)
+        temporary.replace(args.destination)
+    finally:
+        temporary.unlink(missing_ok=True)

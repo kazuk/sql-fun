@@ -1,0 +1,62 @@
+#!/usr/bin/env bash
+set -euo pipefail
+
+# Internal workflow adapter: classification and suffix come from the shared
+# release identity parser, never from an independent operator mode selection.
+if [[ $# != 3 ]]; then
+  echo 'usage: materialize-release-state CLASSIFICATION SNAPSHOT_SUFFIX STATE_DIRECTORY' >&2
+  exit 1
+fi
+classification="$1"
+snapshot="$2"
+case "$classification" in
+  stable)
+    [[ -z "$snapshot" ]] || { echo 'Stable identity must have an empty snapshot suffix' >&2; exit 1; }
+    mode=--release
+    ;;
+  snapshot)
+    [[ -n "$snapshot" ]] || { echo 'Snapshot identity must supply its parsed suffix' >&2; exit 1; }
+    mode="--snapshot=$snapshot"
+    ;;
+  *) echo "Invalid parsed release classification: $classification" >&2; exit 1 ;;
+esac
+
+repo_root="$(git rev-parse --show-toplevel)"
+cd "$repo_root"
+state="$(realpath -m "$3")"
+case "$state" in
+  "$repo_root"|"$repo_root"/*)
+    echo 'Release state output must be outside the Git worktree' >&2
+    exit 1
+    ;;
+esac
+[[ ! -e "$state" ]] || { echo "Release state output already exists: $state" >&2; exit 1; }
+# A fresh exact-target checkout is required. Do not mix preexisting tracked
+# edits into the state handed to release finalization.
+git diff --quiet && git diff --cached --quiet || {
+  echo 'Materialization requires a clean tracked worktree and index' >&2
+  exit 1
+}
+metadata="$(cargo metadata --no-deps --format-version=1)"
+mapfile -t manifests < <(jq -r '
+  .workspace_members as $members
+  | .packages[] | select(.id as $id | $members | index($id))
+  | .manifest_path
+' <<<"$metadata")
+declare -A owned_paths=([Cargo.toml]=1 [Cargo.lock]=1)
+for manifest in "${manifests[@]}"; do
+  owned_paths["${manifest#"$repo_root"/}"]=1
+done
+
+mkdir -p "$state"
+"$repo_root/.local/bin/materialize-release-versions" "$mode" --output="$state/crates.tsv"
+# cargo-edit may update dependency requirements in non-publishable members as
+# well as versions in publishable members. Only workspace manifests and the
+# workspace lockfile belong to this step. Nothing is staged or committed here.
+while IFS= read -r -d '' path; do
+  [[ -n "${owned_paths[$path]:-}" ]] || {
+    echo "Unexpected materialization change: $path" >&2
+    exit 1
+  }
+  printf '%s\n' "$path"
+done < <(git diff --name-only -z) > "$state/changed-paths.txt"

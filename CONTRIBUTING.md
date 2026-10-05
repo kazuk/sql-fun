@@ -114,7 +114,11 @@ environment adds this directory to `PATH`.
 
 The standard `version-materialization` step includes offline release publication
 and preparation contract tests. They require the existing Bash, Git, Cargo,
-and `jq` development setup and do not publish packages or deploy Pages.
+`jq`, `taplo` (from `taplo-cli`), and `cargo set-version` (from `cargo-edit`)
+development setup and do not publish packages or deploy Pages. The release-state
+boundary checks also require GNU `realpath` (coreutils), included in the Ubuntu
+CI/development image. Outside that image, install GNU coreutils and put its
+`realpath` on `PATH`.
 
 For additional local workflow syntax validation, optionally install
 [`actionlint` 1.7.12](https://github.com/rhysd/actionlint/releases/tag/v1.7.12).

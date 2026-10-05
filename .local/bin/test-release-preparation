@@ -1,6 +1,6 @@
 #!/usr/bin/env bash
 set -euo pipefail
-scripts="$(cd "$(dirname "$0")" && pwd)"
+scripts="$(cd "$(dirname "$0")/../sbin" && pwd)"
 fixture="$(mktemp -d)"
 trap 'rm -rf "$fixture"' EXIT
 export RELEASE_PREPARATION_FIXTURE="$fixture"

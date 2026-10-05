@@ -42,6 +42,17 @@ class ApiFixture:
 
 
 class IntentTests(unittest.TestCase):
+    def test_feature_scope_must_be_explicit_before_reading_source(self):
+        with tempfile.TemporaryDirectory() as temporary:
+            root = Path(temporary)
+            result = subprocess.run([str(ROOT / ".local/bin/semver-intent"), "check",
+                                     "--source", str(root / "unselected-source"), "--target", "target",
+                                     "--cache", str(root / "cache"), "--baseline", str(root / "baseline")],
+                                    text=True, capture_output=True)
+            self.assertEqual(result.returncode, 2)
+            self.assertIn("--default-features", result.stderr)
+            self.assertFalse((root / "cache").exists())
+
     def test_complete_level_matrix(self):
         with tempfile.TemporaryDirectory() as temporary:
             fixture = ApiFixture(Path(temporary))

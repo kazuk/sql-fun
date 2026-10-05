@@ -241,6 +241,12 @@ directly:
   tests that unnecessarily freeze parser-specific traversal, temporary migration
   scaffolding, or other implementation boundaries the refactoring is intended
   to remove.
+- Before adding a permanent automated test, identify its maintained execution
+  path, such as the standard local flow, CI, or another regularly invoked test
+  suite. A test without a maintained execution path is dead code, not coverage.
+  Temporary test harnesses, fixtures, and comparison scripts are allowed while
+  developing or validating a change, but remove them before marking the pull
+  request ready for review unless they have a long-term execution owner.
 - Explicit user instructions take precedence over the guidelines. Explain any
   necessary departure from the guidelines and its reason; do not silently treat
   a task-specific decision as a repository-wide rule.

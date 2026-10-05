@@ -1,3 +1,6 @@
+// See `./builtin-metadata-format.md` for the rationale and
+// expected replacement of this v1 representation.
+//
 use combine::EasyParser;
 
 pub fn parse_braced_list_tokens(input: &str) -> Result<Vec<String>, String> {

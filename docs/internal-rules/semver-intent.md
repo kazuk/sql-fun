@@ -24,8 +24,8 @@ features. Tracked and nonignored local edits are included. The checkout's
 manifests are not changed. Packages and rustdoc/build results are cached under
 `target/semver-intent`; remove that directory to discard the cache. The first
 check needs dependency downloads and API compilation. Later checks reuse the
-cache, including rustdoc JSON keyed by compiler, environment, and dependency lock state,
-without generating an archive, executing exhaustive fixtures, querying
+cache, including rustdoc JSON keyed by compiler, environment, and dependency
+lock state, without generating an archive, executing exhaustive fixtures, querying
 release provenance, or adopting release state.
 
 The command reads the selected repository files required to construct its

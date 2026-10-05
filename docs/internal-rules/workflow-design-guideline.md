@@ -82,6 +82,39 @@ release workflow. Additional validation must address a concrete failure mode
 or an explicit contract requirement. Record repository-policy assumptions that
 support the trust boundary and revisit them when those policies change.
 
+### Repository-specific PR CI trust boundary
+
+The active `main` ruleset requires branches to be up to date through
+`strict_required_status_checks_policy: true`. A PR head behind the current
+base must be updated or rebased before it can satisfy the required-check merge
+gate. A successful PR CI run by itself does not establish merge eligibility.
+
+GitHub's default checkout for a `pull_request` workflow uses the synthetic
+`refs/pull/<n>/merge` commit. Its commit object can differ from the PR head.
+For an up-to-date, mergeable PR head with successful required normal CI, this
+repository's release contract relies on the synthetic merge commit having the
+same source tree as that head. Commit-object identity and source-tree
+equivalence are distinct; this is a repository-policy invariant, not a general
+guarantee for arbitrary PR runs.
+
+Release preparation deliberately relies on that invariant and GitHub Actions
+metadata. It does not duplicate merge-policy validation inside the workflow
+or add artifact-internal provenance proofs. The exact recorded target-SHA gate
+still applies; tree equivalence does not authorize substituting a CI run
+recorded for a different SHA.
+
+When reviewing this assumption, inspect the current ruleset and checkout
+semantics. Revisit the trust boundary if strict checks, merge eligibility,
+CI events, or checkout behavior change so that the invariant no longer holds.
+Do not assume every successful or historical PR run satisfies the
+release-eligible state.
+
+References:
+
+- [Repository decision in PR #362](https://github.com/kazuk/sql-fun/pull/362#issuecomment-5990385136).
+- [GitHub PR workflow semantics](https://docs.github.com/en/actions/reference/workflows-and-actions/events-that-trigger-workflows#pull_request).
+- [GitHub strict status checks](https://docs.github.com/en/repositories/configuring-branches-and-merges-in-your-repository/managing-protected-branches/about-protected-branches#require-status-checks-before-merging).
+
 ## Choose job boundaries for execution needs
 
 Use separate steps for sequential responsibilities that share release state,

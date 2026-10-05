@@ -93,7 +93,10 @@ Mutation validates CTE body and placement rules, including nested data-modifying
 WITH clauses and SELECT INTO. Explicitly enable RECURSIVE before inserting a
 definition with SEARCH/CYCLE; disabling it while such definitions remain is
 rejected. Creating an editor for an absent clause does not expose an empty SQL
-WITH clause: it becomes observable after a successful insertion.
+WITH clause: the editor holds the pending clause, including its recursive choice,
+until the first successful insertion commits it to the statement. Abandoning an
+empty editor leaves the statement unchanged, including after a failed insertion.
+Edits to an existing clause, and edits after the first insertion, apply immediately.
 PostgreSQL data-modifying CTE bodies remain representable; SQLite
 CTE bodies must be queries. Mutation errors use [`ast::AstMutationError`], and a
 rejected insertion leaves the destination unchanged. Name binding and dependency

@@ -322,10 +322,11 @@ pub trait HaveWithClause {
     fn with_clause(&self) -> Option<WithClause<'_>>;
     /// Edit an existing nonempty WITH clause.
     fn with_clause_mut(&mut self) -> Option<WithClauseMut<'_>>;
-    /// Obtain a WITH editor, creating an initially empty, nonrecursive clause.
+    /// Obtain a WITH editor, preparing an empty, nonrecursive clause if absent.
     ///
-    /// Existing clauses keep their recursive flag. An empty clause is not
-    /// observable as SQL WITH syntax until a CTE is successfully inserted.
+    /// Existing clauses keep their recursive flag and are edited immediately.
+    /// An absent clause is committed only on the first successful insertion.
+    /// Abandoning an empty editor leaves the statement unchanged.
     fn ensure_with_clause(&mut self) -> Result<WithClauseMut<'_>, AstMutationError>;
 }
 
@@ -339,10 +340,7 @@ impl HaveWithClause for Statement {
         if node.entries.is_empty() {
             None
         } else {
-            Some(WithClauseMut {
-                node,
-                dialect: self.dialect,
-            })
+            Some(WithClauseMut::new(node, self.dialect))
         }
     }
 
@@ -351,20 +349,48 @@ impl HaveWithClause for Statement {
             .node
             .with_node_mut()
             .ok_or_else(MutationProblem::unsupported_carrier)?;
-        Ok(WithClauseMut {
-            node,
-            dialect: self.dialect,
-        })
+        Ok(WithClauseMut::new(node, self.dialect))
     }
 }
 
 /// A checked editor bound to one statement's dialect and WITH collection.
+///
+/// For an absent clause, edits are held here until the first successful insertion.
+/// After that insertion, or for an existing clause, changes apply immediately.
 pub struct WithClauseMut<'a> {
     node: &'a mut With,
     dialect: Dialect,
+    pending: Option<With>,
 }
 
-impl WithClauseMut<'_> {
+impl<'a> WithClauseMut<'a> {
+    fn new(node: &'a mut With, dialect: Dialect) -> Self {
+        let pending = if node.entries.is_empty() {
+            Some(With::default())
+        } else {
+            None
+        };
+        Self {
+            node,
+            dialect,
+            pending,
+        }
+    }
+
+    const fn current(&self) -> &With {
+        match &self.pending {
+            Some(pending) => pending,
+            None => self.node,
+        }
+    }
+
+    const fn current_mut(&mut self) -> &mut With {
+        match &mut self.pending {
+            Some(pending) => pending,
+            None => self.node,
+        }
+    }
+
     /// Insert at the explicit zero-based position, preserving surrounding order.
     ///
     /// Use the current length to append. Duplicate names, invalid positions,
@@ -378,17 +404,22 @@ impl WithClauseMut<'_> {
         if definition.dialect != self.dialect {
             return Err(MutationProblem::different_dialect());
         }
-        if index > self.node.entries.len() {
+        if index > self.current().entries.len() {
             return Err(MutationProblem::invalid_index(index));
         }
         if self.view().find(definition.name()).is_some() {
             return Err(MutationProblem::duplicate_name(definition.name()));
         }
-        if definition.node.requires_recursive() && !self.node.recursive {
+        if definition.node.requires_recursive() && !self.current().recursive {
             return Err(MutationProblem::requires_recursive());
         }
         definition.validate()?;
-        self.node.entries.insert(index, definition.node.clone());
+        self.current_mut()
+            .entries
+            .insert(index, definition.node.clone());
+        if let Some(pending) = self.pending.take() {
+            *self.node = pending;
+        }
         Ok(())
     }
 
@@ -396,18 +427,20 @@ impl WithClauseMut<'_> {
     ///
     /// This flag does not resolve self-references or prove recursive semantics.
     /// Disabling it is rejected while any declaration uses SEARCH or CYCLE.
+    /// For an absent clause, this choice is pending until insertion succeeds.
     pub fn set_recursive(&mut self, recursive: bool) -> Result<(), AstMutationError> {
-        if !recursive && self.node.requires_recursive() {
+        let node = self.current_mut();
+        if !recursive && node.requires_recursive() {
             return Err(MutationProblem::requires_recursive());
         }
-        self.node.recursive = recursive;
+        node.recursive = recursive;
         Ok(())
     }
 
     /// Inspect the collection, including an editor's not-yet-populated clause.
     pub const fn view(&self) -> WithClause<'_> {
         WithClause {
-            node: self.node,
+            node: self.current(),
             dialect: self.dialect,
         }
     }

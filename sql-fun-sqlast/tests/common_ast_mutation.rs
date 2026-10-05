@@ -3,8 +3,49 @@
 use ::sql_fun_sqlast::ast::{CteDefinition, Dialect, HaveWithClause, StatementKind};
 
 use self::test_helpers::{
-    cte_names, parse_statement, query_definition, recursive_definition, verify_with_carrier,
+    cte_names, parse_statement, query_definition, recursive_definition,
+    verify_abandoned_empty_editor, verify_with_carrier,
 };
+
+#[rstest::rstest]
+fn abandoning_empty_postgres_editor_preserves_absent_clause(
+    #[values(false, true)] failed_insertion: bool,
+    #[values(false, true)] forget_editor: bool,
+) {
+    verify_abandoned_empty_editor(Dialect::postgres(), failed_insertion, forget_editor);
+}
+
+#[cfg(feature = "sqlite")]
+#[rstest::rstest]
+fn abandoning_empty_sqlite_editor_preserves_absent_clause(
+    #[values(false, true)] failed_insertion: bool,
+    #[values(false, true)] forget_editor: bool,
+) {
+    verify_abandoned_empty_editor(Dialect::sqlite(), failed_insertion, forget_editor);
+}
+
+#[test]
+fn failed_first_insertion_can_be_retried_with_pending_recursive_choice() {
+    let definition = recursive_definition(true, true);
+    let mut statement = parse_statement("SELECT 1", Dialect::postgres());
+    {
+        let mut editor = statement.ensure_with_clause().unwrap();
+        editor.set_recursive(true).unwrap();
+        assert_eq!(
+            editor.insert(1, &definition).unwrap_err().invalid_index(),
+            Some(1)
+        );
+        assert!(editor.view().is_empty());
+        assert!(editor.view().is_recursive());
+        editor.insert(0, &definition).unwrap();
+    }
+    let clause = statement
+        .with_clause()
+        .expect("successful insertion commits the clause");
+    assert!(clause.is_recursive());
+    assert!(clause.find("traversed").unwrap().has_search());
+    assert!(clause.find("traversed").unwrap().has_cycle());
+}
 
 #[rstest::rstest]
 #[case::select("SELECT 1", StatementKind::query())]
@@ -458,6 +499,41 @@ mod test_helpers {
         CteDefinition, Dialect, HaveWithClause, Statement, StatementKind, WithClause,
     };
     use ::sql_fun_sqlast::parse_statements;
+
+    pub(super) fn verify_abandoned_empty_editor(
+        dialect: Dialect,
+        failed_insertion: bool,
+        forget_editor: bool,
+    ) {
+        let mut statement = parse_statement("SELECT 1", dialect);
+        let definition = query_definition("source", dialect);
+        let mut editor = statement.ensure_with_clause().unwrap();
+        editor.set_recursive(true).unwrap();
+        if failed_insertion {
+            assert_eq!(
+                editor.insert(1, &definition).unwrap_err().invalid_index(),
+                Some(1)
+            );
+        }
+        assert!(editor.view().is_empty());
+        assert!(editor.view().is_recursive());
+        if forget_editor {
+            std::mem::forget(editor);
+        } else {
+            drop(editor);
+        }
+        assert!(statement.with_clause().is_none());
+        assert!(statement.with_clause_mut().is_none());
+        {
+            let mut editor = statement.ensure_with_clause().unwrap();
+            assert!(
+                !editor.view().is_recursive(),
+                "abandoned edits must not survive"
+            );
+            editor.insert(0, &definition).unwrap();
+        }
+        assert!(!statement.with_clause().unwrap().is_recursive());
+    }
 
     pub(super) fn parse_statement(sql: &str, dialect: Dialect) -> Statement {
         let mut statements = parse_statements(sql, dialect);

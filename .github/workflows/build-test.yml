@@ -55,7 +55,7 @@ jobs:
       - name: Generate internal baseline candidate
         run: |
           .local/bin/semver-intent candidate --source "$PWD" \
-            --target x86_64-unknown-linux-gnu --cache "$PWD/target/semver-intent" \
+            --target x86_64-unknown-linux-gnu --default-features --cache "$PWD/target/semver-intent" \
             --output "$RUNNER_TEMP/semver_baseline.tar.gz"
 
       - name: Check release intent against active baseline

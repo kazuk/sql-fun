@@ -189,11 +189,25 @@ def api_rustdoc(root, name, target, features, proc_macro=False, lib_name=None, s
         args.extend(["--features", ",".join(features)])
     args.extend(["--", "-Z", "unstable-options", "--output-format", "json", "--document-private-items"])
     environment = dict(os.environ, RUSTC_BOOTSTRAP="1")
-    result = subprocess.run(args, env=environment)
+    compiler = run([environment.get("RUSTC", "rustc"), "-Vv"], capture=True)
+    rustdoc = run([environment.get("RUSTDOC", "rustdoc"), "--version"], capture=True)
+    context = hashlib.sha256(json.dumps(environment, sort_keys=True).encode()).hexdigest()
+
+    def json_path():
+        lock = root / "packages" / "Cargo.lock"
+        lock_digest = hashlib.sha256(lock.read_bytes()).hexdigest() if lock.is_file() else None
+        key = hashlib.sha256(json.dumps([compiler, rustdoc, context, args, lock_digest]).encode()).hexdigest()
+        return root / "api-json" / key / ((lib_name or name.replace("-", "_")) + ".json")
+
+    output = json_path()
+    if output.is_file():
+        return output
+    result = subprocess.run(args, env=environment, cwd=root / "packages")
     if result.returncode:
         raise CheckError(f"rustdoc generation failed for {name}")
-    output = root / "api-json" / ((lib_name or name.replace("-", "_")) + ".json")
-    output.parent.mkdir(exist_ok=True)
+    # Cargo may resolve the packaged dependency patch map on the first build.
+    output = json_path()
+    output.parent.mkdir(parents=True, exist_ok=True)
     doc_root = build / "doc" if proc_macro else build / target / "doc"
     shutil.copy2(doc_root / output.name, output)
     return output
@@ -247,6 +261,7 @@ def main():
     parser.add_argument("operation", choices=("check", "candidate"))
     parser.add_argument("--source", type=Path, required=True, help="selected repository; includes tracked and nonignored local edits")
     parser.add_argument("--target", required=True)
+    parser.add_argument("--default-features", action="store_true", required=True, help="explicitly select default crate features")
     parser.add_argument("--features", action="append", default=[], help="explicit extra feature enabled for every analyzed crate; defaults are always enabled")
     parser.add_argument("--cache", type=Path, required=True)
     parser.add_argument("--baseline", type=Path)

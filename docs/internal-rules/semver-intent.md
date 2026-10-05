@@ -24,7 +24,8 @@ features. Tracked and nonignored local edits are included. The checkout's
 manifests are not changed. Packages and rustdoc/build results are cached under
 `target/semver-intent`; remove that directory to discard the cache. The first
 check needs dependency downloads and API compilation. Later checks reuse the
-cache, without generating an archive, executing exhaustive fixtures, querying
+cache, including rustdoc JSON keyed by compiler, environment, and dependency lock state,
+without generating an archive, executing exhaustive fixtures, querying
 release provenance, or adopting release state.
 
 The command reads the selected repository files required to construct its
@@ -45,7 +46,8 @@ requires an explicit baseline transition rather than silently skipping it.
 
 The supported CI scope is Linux amd64 with default features. Feature-specific
 and other platform APIs are not covered by that check. For a separate explicit
-scope, both candidate generation and comparison accept `--target` and repeated
+scope, both candidate generation and comparison require `--target` and
+`--default-features` and accept repeated
 `--features` inputs; the additional features apply to every analyzed crate and
 must exist there. Baseline scope must match the requested scope.
 
@@ -79,6 +81,7 @@ from the tooling checkout with the selected source and an output outside it:
 ```sh
 /path/to/tooling/.local/bin/semver-intent candidate \
   --source /path/to/approved-source --target x86_64-unknown-linux-gnu \
+  --default-features \
   --cache /path/to/cache --output /path/to/semver_baseline.tar.gz
 ```
 

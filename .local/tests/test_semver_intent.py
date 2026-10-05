@@ -3,6 +3,7 @@ import importlib.machinery
 import importlib.util
 import io
 import json
+import os
 from pathlib import Path
 import subprocess
 import shutil
@@ -188,6 +189,23 @@ class ToolFixtureTests(unittest.TestCase):
             with self.subTest(name=name), tempfile.TemporaryDirectory() as temporary:
                 fixture = ApiFixture(Path(temporary), old, new)
                 self.assertEqual(fixture.level(), expected)
+
+    def test_json_cache_reuse_and_environment_invalidation(self):
+        with tempfile.TemporaryDirectory() as temporary:
+            fixture = ApiFixture(Path(temporary))
+            self.assertEqual(fixture.level(), "patch")
+            real_run = subprocess.run
+            builds = []
+            def track_run(args, **kwargs):
+                if args[:2] == ["cargo", "rustdoc"]:
+                    builds.append(args)
+                return real_run(args, **kwargs)
+            with patch.object(semver.subprocess, "run", side_effect=track_run):
+                self.assertEqual(fixture.level(), "patch")
+                self.assertEqual(builds, [])
+                with patch.dict(os.environ, {"SEMVER_FIXTURE_CONTEXT": "changed"}):
+                    self.assertEqual(fixture.level(), "patch")
+                    self.assertEqual(len(builds), 2)
 
     def test_real_macro_removal(self):
         macro = 'extern crate proc_macro; #[proc_macro] pub fn original(_: proc_macro::TokenStream) -> proc_macro::TokenStream { proc_macro::TokenStream::new() }'

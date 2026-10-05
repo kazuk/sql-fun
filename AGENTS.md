@@ -43,6 +43,14 @@ You can build and run tests using the `check-test-flow` script.
   implementation plan. Clearly document required runtime tools as prerequisites
   for the affected CLI feature.
 
+## CI and Workflow Design
+
+- Before planning, implementing, or reviewing CI workflows, release automation,
+  or their supporting helpers, read
+  [docs/internal-rules/workflow-design-guideline.md](docs/internal-rules/workflow-design-guideline.md).
+- Apply its rules for job boundaries, expected-failure validation, prerequisite
+  gates, producer/provenance contracts, and helper placement.
+
 ## CI Image Maintenance
 
 - Before modifying `ci/github-actions/Dockerfile`, CI image dependencies, or

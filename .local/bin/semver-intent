@@ -1,283 +1,18 @@
 #!/usr/bin/env python3
 """Compare packaged release APIs with an explicitly supplied repository baseline."""
 import argparse
-import fcntl
-import hashlib
-import json
-import os
 from pathlib import Path
-import shutil
 import subprocess
 import sys
 import tarfile
-import tempfile
-import tomllib
 
-LEVELS = ("patch", "minor", "major")
-TOOL_VERSION = "cargo-semver-checks 0.51.0"
-SCHEMA = 3
-
-
-class CheckError(Exception):
-    """An input or analysis failure, distinct from incompatible APIs."""
+sys.dont_write_bytecode = True
+sys.path.insert(0, str(Path(__file__).resolve().parents[1] / "lib"))
+from semver_intent import analysis, commands, packages, storage
+from semver_intent.model import CheckError
 
 
-def run(args, cwd=None, capture=False):
-    result = subprocess.run(args, cwd=cwd, text=True, capture_output=capture)
-    if result.returncode:
-        if capture:
-            print(result.stderr, file=sys.stderr, end="")
-        raise CheckError(f"command failed ({result.returncode}): {' '.join(map(str, args))}")
-    return result.stdout if capture else None
-
-
-def metadata(source):
-    data = json.loads(run(["cargo", "metadata", "--no-deps", "--format-version=1"], source, True))
-    members = set(data["workspace_members"])
-    packages = sorted((p for p in data["packages"] if p["id"] in members
-                       and p["source"] is None and p["publish"] != []), key=lambda p: p["name"])
-    if not packages:
-        raise CheckError("no publishable workspace crates")
-    intent = (data["metadata"] or {}).get("next-release", {})
-    if not isinstance(intent, dict):
-        raise CheckError("workspace.metadata.next-release must be a table")
-    for package in packages:
-        name = package["name"]
-        if intent.get(name) not in LEVELS:
-            raise CheckError(f"missing or invalid workspace.metadata.next-release for {name}")
-    return packages, intent
-
-
-def repository_files(source):
-    # --source authorizes reading the selected repository, including local edits.
-    names = subprocess.check_output(["git", "ls-files", "-z", "--cached", "--others", "--exclude-standard"], cwd=source)
-    return sorted({os.fsdecode(name) for name in names.split(b"\0") if name
-                   and os.fsdecode(name) != ".local/semver_baseline.tar.gz"})
-
-
-def source_key(source, files, target, features):
-    digest = hashlib.sha256(json.dumps([SCHEMA, target, features]).encode())
-    for name in files:
-        path = source / name
-        digest.update(os.fsencode(name) + b"\0")
-        if path.is_symlink():
-            digest.update(b"L" + os.fsencode(os.readlink(path)))
-        elif path.is_file():
-            digest.update(b"F" + str(path.stat().st_mode & 0o777).encode() + b"\0" + path.read_bytes())
-        else:
-            digest.update(b"D")
-        # Deleted files and submodule gitlinks are not package source inputs.
-    return digest.hexdigest()
-
-
-def unpack(archive, destination):
-    with tarfile.open(archive, "r:gz") as bundle:
-        bundle.extractall(destination, filter="data")
-
-
-def prepare(source, cache, target, features):
-    if Path(run(["git", "rev-parse", "--show-toplevel"], source, True).strip()).resolve() != source:
-        raise CheckError("--source must select the repository root")
-    revision = run(["git", "rev-parse", "HEAD"], source, True).strip()
-    packages, intent = metadata(source)
-    files = [name for name in repository_files(source) if not (source / name).is_relative_to(cache)]
-    key = source_key(source, files, target, features)
-    root = cache / ("source-" + key)
-    if (root / "manifest.json").is_file():
-        manifest = json.loads((root / "manifest.json").read_text())
-        if manifest["source_revision"] != revision:
-            manifest["source_revision"] = revision
-            (root / "manifest.json").write_text(json.dumps(manifest, indent=2) + "\n")
-        return root, manifest, intent
-    with tempfile.TemporaryDirectory(dir=cache) as temporary:
-        stage = Path(temporary)
-        checkout = stage / "checkout"
-        checkout.mkdir()
-        for name in files:
-            original = source / name
-            if not original.is_file() and not original.is_symlink():
-                continue
-            destination = checkout / name
-            destination.parent.mkdir(parents=True, exist_ok=True)
-            shutil.copy2(original, destination, follow_symlinks=False)
-        # Existing materialization scripts operate on an explicitly selected Git root.
-        run(["git", "init", "-q"], checkout)
-        run(["bash", str(source / ".local/bin/materialize-release-versions"), "--release"], checkout)
-        materialized, _ = metadata(checkout)
-        package_target = stage / "build"
-        package_args = ["cargo", "package", "--allow-dirty", "--no-verify", "--target-dir", str(package_target)]
-        for package in materialized:
-            package_args.extend(["--package", package["name"]])
-        run(package_args, checkout)
-        packaged = stage / "packages"
-        packaged.mkdir()
-        entries = []
-        for package in materialized:
-            name, version = package["name"], package["version"]
-            unpack(package_target / "package" / f"{name}-{version}.crate", packaged)
-            directory = packaged / f"{name}-{version}"
-            directory.rename(packaged / name)
-            library = any(any(kind in ("lib", "rlib", "dylib", "cdylib", "staticlib", "proc-macro") for kind in t["kind"])
-                          for t in package["targets"])
-            proc_macro = any("proc-macro" in t["kind"] for t in package["targets"])
-            entries.append({"name": name, "version": version, "library": library, "proc_macro": proc_macro,
-                            "lib_name": next((t["name"] for t in package["targets"] if any(k in ("lib", "rlib", "dylib", "cdylib", "staticlib", "proc-macro") for k in t["kind"])), None)})
-        # Cargo normalizes package manifests. Reconnect only published package contents,
-        # never the original workspace sources or registry releases of workspace crates.
-        members = [entry["name"] for entry in entries]
-        patches = "\n".join(f'{json.dumps(name)} = {{ path = {json.dumps(name)} }}' for name in members)
-        (packaged / "Cargo.toml").write_text(
-            '[workspace]\nresolver = "2"\nmembers = ' + json.dumps(members) +
-            '\n\n[patch.crates-io]\n' + patches + '\n')
-        if (checkout / "Cargo.lock").exists():
-            shutil.copy2(checkout / "Cargo.lock", packaged / "Cargo.lock")
-        manifest = {"schema": SCHEMA, "source_revision": revision,
-                    "source_digest": key, "target": target, "features": features, "crates": entries}
-        (stage / "manifest.json").write_text(json.dumps(manifest, indent=2) + "\n")
-        # Only the package tree and descriptor are retained, not build/preflight output.
-        shutil.rmtree(checkout)
-        shutil.rmtree(package_target)
-        stage.rename(root)
-    return root, manifest, intent
-
-
-def baseline_root(archive, cache, target, features):
-    if not archive.is_file():
-        raise CheckError(f"active baseline missing: {archive}; generate from an explicitly approved revision with the candidate command")
-    key = hashlib.sha256(archive.read_bytes()).hexdigest()
-    root = cache / ("baseline-" + key)
-    if not root.is_dir():
-        with tempfile.TemporaryDirectory(dir=cache) as temporary:
-            stage = Path(temporary)
-            unpack(archive, stage)
-            validate_manifest(stage, target, features)
-            stage.rename(root)
-    return root, validate_manifest(root, target, features)
-
-
-def validate_manifest(root, target, features):
-    manifest = json.loads((root / "manifest.json").read_text())
-    if not isinstance(manifest, dict):
-        raise CheckError("baseline descriptor must be an object")
-    if manifest.get("schema") != SCHEMA:
-        raise CheckError("unsupported baseline schema")
-    if manifest.get("target") != target or manifest.get("features") != features:
-        raise CheckError("baseline target/features differ from explicitly requested analysis scope")
-    crates = manifest.get("crates")
-    if not isinstance(crates, list) or not crates:
-        raise CheckError("baseline has no crates")
-    names = set()
-    for entry in crates:
-        if not isinstance(entry, dict) or not isinstance(entry.get("library"), bool) or not isinstance(entry.get("proc_macro"), bool):
-            raise CheckError("invalid baseline crate descriptor")
-        name = entry["name"]
-        if not isinstance(name, str) or not name or any(c not in "abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789_-" for c in name):
-            raise CheckError("invalid baseline crate name")
-        lib_name = entry.get("lib_name")
-        if entry["library"] and (not isinstance(lib_name, str) or not lib_name or any(c not in "abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789_" for c in lib_name)):
-            raise CheckError(f"invalid baseline library target name: {name}")
-        if name in names or not (root / "packages" / name / "Cargo.toml").is_file():
-            raise CheckError(f"duplicate or missing baseline package: {name}")
-        names.add(name)
-    return manifest
-
-
-def cargo_configuration(directory):
-    # These are Cargo's documented configuration inputs for this invocation.
-    directories = [directory, *directory.parents]
-    directories.append(Path(os.environ.get("CARGO_HOME", str(Path.home() / ".cargo"))))
-    digest = hashlib.sha256()
-    reusable = True
-    for index, parent in enumerate(directories):
-        config_directory = parent if index == len(directories) - 1 else parent / ".cargo"
-        for name in ("config", "config.toml"):
-            path = config_directory / name
-            if path.is_file():
-                content = path.read_bytes()
-                digest.update(os.fsencode(path) + b"\0" + content)
-                # Included configurations can have arbitrary transitive inputs.
-                # Let Cargo resolve them each time rather than cache partial inputs.
-                reusable &= "include" not in tomllib.loads(content.decode())
-    return digest.hexdigest(), reusable
-
-
-def api_rustdoc(root, name, target, features, proc_macro=False, lib_name=None, side="current"):
-    build = root.parent / ("api-build-" + side)
-    args = ["cargo", "rustdoc", "--manifest-path", str(root / "packages" / name / "Cargo.toml"),
-            "--package", name, "--lib", "--target", target, "--target-dir", str(build)]
-    if features:
-        args.extend(["--features", ",".join(features)])
-    args.extend(["--", "-Z", "unstable-options", "--output-format", "json", "--document-private-items"])
-    environment = dict(os.environ, RUSTC_BOOTSTRAP="1")
-    compiler = run([environment.get("RUSTC", "rustc"), "-Vv"], cwd=root / "packages", capture=True)
-    rustdoc = run([environment.get("RUSTDOC", "rustdoc"), "--version"], cwd=root / "packages", capture=True)
-    context = hashlib.sha256(json.dumps(environment, sort_keys=True).encode()).hexdigest()
-    configuration, reusable = cargo_configuration(root / "packages")
-
-    def json_path():
-        lock = root / "packages" / "Cargo.lock"
-        lock_digest = hashlib.sha256(lock.read_bytes()).hexdigest() if lock.is_file() else None
-        key = hashlib.sha256(json.dumps([compiler, rustdoc, context, configuration, args, lock_digest]).encode()).hexdigest()
-        return root / "api-json" / key / ((lib_name or name.replace("-", "_")) + ".json")
-
-    output = json_path()
-    if reusable and output.is_file():
-        return output
-    result = subprocess.run(args, env=environment, cwd=root / "packages")
-    if result.returncode:
-        raise CheckError(f"rustdoc generation failed for {name}")
-    # Cargo may resolve the packaged dependency patch map on the first build.
-    output = json_path()
-    output.parent.mkdir(parents=True, exist_ok=True)
-    doc_root = build / "doc" if proc_macro else build / target / "doc"
-    shutil.copy2(doc_root / output.name, output)
-    return output
-
-
-def detected_level(current, baseline, name, target, features, proc_macro=False, lib_name=None, baseline_entry=None):
-    old = baseline_entry or {"proc_macro": proc_macro, "lib_name": lib_name}
-    current_json = api_rustdoc(current, name, target, features, proc_macro, lib_name)
-    baseline_json = api_rustdoc(baseline, name, target, features, old["proc_macro"], old.get("lib_name"), side="baseline")
-    args = ["cargo", "semver-checks", "--current-rustdoc", str(current_json),
-            "--baseline-rustdoc", str(baseline_json), "--color", "never"]
-    # 0.51.0 documents 100 for completed deny-level failures and 101 for errors.
-    # Probe thresholds using cached rustdoc; do not classify by parsing diagnostics.
-    for level in LEVELS[:2]:
-        result = subprocess.run(args + ["--release-type", level])
-        if result.returncode == 0:
-            return level
-        if result.returncode != 100:
-            raise CheckError(f"API analysis failed for {name} (exit {result.returncode})")
-    return "major"
-
-
-def compare(current, candidate, baseline, previous, intent):
-    old = {crate["name"]: crate for crate in previous["crates"]}
-    new = {crate["name"]: crate for crate in candidate["crates"]}
-    removed = sorted(old.keys() - new.keys())
-    if removed:
-        raise CheckError("baseline crates removed from publishable set; explicit baseline transition required: " + ", ".join(removed))
-    failed = False
-    for name, entry in new.items():
-        if name not in old:
-            print(f"{name}: declared={intent[name]}, new crate (no previous API)")
-            continue
-        if entry["library"] and not old[name]["library"]:
-            required = "minor"
-        elif old[name]["library"] and not entry["library"]:
-            required = "major"
-        elif not entry["library"]:
-            print(f"{name}: declared={intent[name]}, binary-only (CLI compatibility outside API analysis scope)")
-            continue
-        else:
-            required = detected_level(current, baseline, name, candidate["target"], candidate["features"], entry["proc_macro"], entry["lib_name"], old[name])
-        exceeds = LEVELS.index(required) > LEVELS.index(intent[name])
-        print(f"{name}: declared={intent[name]}, detected required={required}: {'FAIL (exceeds release intent)' if exceeds else 'PASS'}", flush=True)
-        failed |= exceeds
-    return 1 if failed else 0
-
-
-def main():
+def parse_request():
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument("operation", choices=("check", "candidate"))
     parser.add_argument("--source", type=Path, required=True, help="selected repository; includes tracked and nonignored local edits")
@@ -287,37 +22,33 @@ def main():
     parser.add_argument("--cache", type=Path, required=True)
     parser.add_argument("--baseline", type=Path)
     parser.add_argument("--output", type=Path)
+    parser.add_argument("--require-tool-version", help="CI-only exact tool version requirement")
     args = parser.parse_args()
     if args.operation == "check" and (not args.baseline or args.output):
         parser.error("check requires --baseline and does not accept --output")
     if args.operation == "candidate" and (not args.output or args.baseline):
         parser.error("candidate requires --output and does not accept --baseline")
+    if args.operation == "candidate" and args.require_tool_version:
+        parser.error("--require-tool-version applies only to check")
+    return args
+
+
+def main():
+    args = parse_request()
     source, cache = args.source.resolve(), args.cache.resolve()
     target, features = args.target, sorted(set(args.features))
-    cache.mkdir(parents=True, exist_ok=True)
-    with (cache / "lock").open("w") as lock:
-        fcntl.flock(lock, fcntl.LOCK_EX)
+    with storage.locked_cache(cache):
         if args.operation == "check":
-            version = run(["cargo", "semver-checks", "--version"], capture=True).strip()
-            if version != TOOL_VERSION:
-                raise CheckError(f"expected {TOOL_VERSION}, got {version}; exit-code contract must be verified before upgrading")
-            baseline, previous = baseline_root(args.baseline.resolve(), cache, target, features)
-        current, candidate, intent = prepare(source, cache, target, features)
+            if args.require_tool_version:
+                commands.require_semver_version(args.require_tool_version)
+            baseline, previous = packages.baseline_root(args.baseline.resolve(), cache, target, features)
+        current, candidate, intent = packages.prepare(source, cache, target, features, candidate=args.operation == "candidate")
         if args.operation == "candidate":
             output = args.output.resolve()
-            output.parent.mkdir(parents=True, exist_ok=True)
-            with tempfile.NamedTemporaryFile(dir=output.parent, delete=False) as temporary:
-                temporary_path = Path(temporary.name)
-            try:
-                with tarfile.open(temporary_path, "w:gz") as bundle:
-                    bundle.add(current / "manifest.json", arcname="manifest.json")
-                    bundle.add(current / "packages", arcname="packages")
-                temporary_path.replace(output)
-            finally:
-                temporary_path.unlink(missing_ok=True)
+            storage.write_candidate(current, output)
             print(f"candidate: {output} (source {candidate['source_revision']})")
             return 0
-        return compare(current, candidate, baseline, previous, intent)
+        return analysis.compare(current, candidate, baseline, previous, intent)
 
 
 if __name__ == "__main__":

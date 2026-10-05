@@ -9,10 +9,15 @@ fails the check; maintainers may explicitly raise intent or revise the API.
 
 ## Routine local check
 
-Install Python 3.12+, cargo-semver-checks 0.51.0, and the existing contributor
-tools (`cargo-edit`, `taplo`, Cargo, Git, Bash, and native Rust build dependencies).
-The tool version is checked because its documented exit codes distinguish API
-violations (100) from analysis failures (101). Other exit codes are errors.
+The local step is optional early feedback. Without `cargo-semver-checks`, the
+standard flow reports that it is skipping SemVer and continues. With the tool
+installed, it runs the check; Python 3.12+ and the existing contributor tools
+(`cargo-edit`, `taplo`, Cargo, Git, Bash, and native Rust build dependencies) are
+then required. Local tools are not rejected solely for differing versions.
+Actual analysis failures and intent violations still fail an enabled local check.
+CI pins cargo-semver-checks 0.51.0 and uses `--require-semver` to require installation
+and the exact tested version; local optionality cannot bypass that gate. CI's
+exit-code contract distinguishes API violations (100) from analysis failures (101).
 
 ```sh
 .local/bin/check-test-flow --step=semver
@@ -30,6 +35,21 @@ fixtures, querying release provenance, or adopting release state. Cargo
 configuration inputs follow its normal package-workspace directory hierarchy and
 `CARGO_HOME` (or the default Cargo home). Configurations with `include` disable
 JSON reuse so changes to transitive configuration inputs are not missed.
+
+Local API cache inputs come from Cargo's package file selection plus workspace
+release/build configuration, lockfile, toolchain, and materialization helpers.
+Repository infrastructure (such as workflows, internal tooling, CI setup, and
+manual/report directories) and Markdown content are omitted from the local API
+fingerprint for packages without build scripts; documentation does not affect
+the measured API. Build-script
+packages conservatively track Markdown too because scripts can generate APIs
+from data files. Other packaged assets remain inputs, including embedded SQL,
+templates, and text. Excluded files and files outside packages do not trigger API
+rebuilds. Normal-CI candidate generation uses a separate complete-source cache
+and freshly packages documentation edits; this optimization never makes candidate
+archives omit the current documentation. Compilation outputs are isolated per
+packaged snapshot because normalized package timestamps must not allow stale
+build-script outputs or local dependencies to cross source revisions.
 
 The command reads the selected repository files required to construct its
 packages. Version materialization and package construction occur in a temporary
@@ -144,7 +164,10 @@ Fixture tests cover actual patch/minor/major lint thresholds, proc macros,
 analysis failures, metadata validation, baseline scope/extraction, and release
 adoption. They are separate from the routine local SemVer path. New CI jobs
 must pass on the final PR head before the implementation is declared complete.
-The temporary prerequisite-install step in the SemVer job can be removed when
+The aggregate `build` job requires the SemVer job and explicitly rejects any
+failed, cancelled, or skipped dependency, so a failed gate cannot become a
+successful aggregate check. The temporary prerequisite-install step in the
+SemVer job can be removed when
 the separately reviewed image adoption provides Python and the pinned tool.
 
 The analysis contract follows [cargo-semver-checks 0.51.0](https://github.com/obi1kenobi/cargo-semver-checks/tree/v0.51.0).

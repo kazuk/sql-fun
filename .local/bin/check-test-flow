@@ -14,6 +14,7 @@ Options:
   --fmt-check           Check formatting without rewriting files.
   --step=<name>          Run only the selected step. Can be repeated.
   --list-steps           Print available step names.
+  --require-semver       Require the pinned CI SemVer tool instead of optional local checking.
   -h, --help
 
 Default steps:
@@ -91,6 +92,7 @@ WORKSPACE_ONLY=0
 CHANGED_ONLY=0
 NEXTEST_EXTRA=""
 FMT_CHECK=0
+REQUIRE_SEMVER=0
 SELECTED_STEPS=()
 
 for a in "$@"; do
@@ -101,6 +103,7 @@ for a in "$@"; do
     --changed-only)   CHANGED_ONLY=1 ;;
     --nextest-extra=*) NEXTEST_EXTRA="${a#*=}" ;;
     --fmt-check) FMT_CHECK=1 ;;
+    --require-semver) REQUIRE_SEMVER=1 ;;
     --step=*) SELECTED_STEPS+=("$(normalize_step "${a#*=}")") ;;
     --list-steps) list_steps; exit 0 ;;
     -h|--help) usage; exit 0 ;;
@@ -278,6 +281,23 @@ function run_cli_contract() {
     scrut test "${GIT_ROOT}/cli/contracts"
 }
 
+function run_semver() {
+  local -a tool_requirement=()
+  if (( REQUIRE_SEMVER == 1 )); then
+    require_command cargo-semver-checks
+    tool_requirement=(--require-tool-version 0.51.0)
+  elif ! command -v cargo-semver-checks >/dev/null; then
+    echo "== Skipping optional local SemVer check: cargo-semver-checks is not installed; CI enforces release intent."
+    return
+  fi
+  require_command python3
+  echo "== Validate packaged API release intent"
+  "${GIT_ROOT}/.local/bin/semver-intent" check \
+    --source "$GIT_ROOT" --baseline "$GIT_ROOT/.local/semver_baseline.tar.gz" \
+    --target x86_64-unknown-linux-gnu --default-features \
+    --cache "$GIT_ROOT/target/semver-intent" "${tool_requirement[@]}"
+}
+
 function run_graphify() {
   require_command graphify
   echo "== Update graph index"
@@ -326,11 +346,7 @@ for step in "${ALL_STEPS[@]}"; do
       doc) run_doc ;;
       typos) run_typos ;;
       version-materialization) run_version_materialization ;;
-      semver)
-        "${GIT_ROOT}/.local/bin/semver-intent" check \
-          --source "$GIT_ROOT" --baseline "$GIT_ROOT/.local/semver_baseline.tar.gz" \
-          --target x86_64-unknown-linux-gnu --default-features --cache "$GIT_ROOT/target/semver-intent"
-        ;;
+      semver) run_semver ;;
       graphify) run_graphify ;;
       skill-lint) run_skill_validator ;;
       markdown-lint) run_rumdl ;;

@@ -125,7 +125,7 @@ jobs:
             --output "$RUNNER_TEMP/semver_baseline.tar.gz"
 
       - name: Check release intent against active baseline
-        run: .local/bin/check-test-flow --step=semver
+        run: .local/bin/check-test-flow --step=semver --require-semver
 
       - uses: actions/upload-artifact@v7
         if: ${{ always() }}
@@ -488,10 +488,12 @@ jobs:
           if-no-files-found: error
 
   build:
+    if: ${{ always() }}
     runs-on: ubuntu-24.04
     needs:
       - workspace
       - workspace-all-features
+      - semver
       - fmt
       - lint
       - server-api-spec
@@ -502,5 +504,13 @@ jobs:
       - install-validation
       - postgres-extraction
     steps:
-      - name: Complete
-        run: true
+      - name: Require successful build dependencies
+        env:
+          DEPENDENCY_RESULTS: ${{ join(needs.*.result, ' ') }}
+        run: |
+          for result in $DEPENDENCY_RESULTS; do
+            if [ "$result" != success ]; then
+              echo "::error::Build dependency did not succeed: $result"
+              exit 1
+            fi
+          done

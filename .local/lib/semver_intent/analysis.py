@@ -60,21 +60,23 @@ def compare(current, candidate, baseline, previous, intent):
     if removed:
         raise CheckError("baseline crates removed from publishable set; explicit baseline transition required: " + ", ".join(removed))
     failed = False
-    for name, entry in new.items():
-        if name not in old:
-            print(f"{name}: declared={intent[name]}, new crate (no previous API)")
-            continue
-        if entry["library"] and not old[name]["library"]:
-            required = "minor"
-        elif old[name]["library"] and not entry["library"]:
-            required = "major"
-        elif not entry["library"]:
-            print(f"{name}: declared={intent[name]}, binary-only (CLI compatibility outside API analysis scope)")
-            continue
-        else:
-            required = detected_level(current, baseline, name, candidate["target"], candidate["features"], entry["proc_macro"], entry["lib_name"], old[name])
-        exceeds = exceeds_intent(required, intent[name])
-        result = "FAIL (exceeds release intent)" if exceeds else "PASS"
-        print(f"{name}: declared={intent[name]}, detected required={required}: {result}", flush=True)
-        failed |= exceeds
+    for configuration, mapping in candidate["feature_sets"].items():
+        for name, entry in new.items():
+            label = f"{configuration}/{name}"
+            if name not in old:
+                print(f"{label}: declared={intent[name]}, new crate (no previous API)")
+                continue
+            if entry["library"] and not old[name]["library"]:
+                required = "minor"
+            elif old[name]["library"] and not entry["library"]:
+                required = "major"
+            elif not entry["library"]:
+                print(f"{label}: declared={intent[name]}, binary-only (CLI compatibility outside API analysis scope)")
+                continue
+            else:
+                required = detected_level(current, baseline, name, candidate["target"], mapping[name], entry["proc_macro"], entry["lib_name"], old[name])
+            exceeds = exceeds_intent(required, intent[name])
+            result = "FAIL (exceeds release intent)" if exceeds else "PASS"
+            print(f"{label}: declared={intent[name]}, detected required={required}: {result}", flush=True)
+            failed |= exceeds
     return 1 if failed else 0

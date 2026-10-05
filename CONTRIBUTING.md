@@ -60,7 +60,10 @@ Local checks use the installed tool without requiring an exact version. CI uses
 cargo-semver-checks 0.51.0 and requires the check to run.
 `.local/bin/check-test-flow --step=semver` compares packaged release APIs with
 `.local/semver_baseline.tar.gz` and checks the detected impact against release
-intent. It reuses local package and rustdoc caches; unrelated documentation and
+intent for the named PostgreSQL and SQLite configurations in
+`.local/semver-feature-sets.toml`. Each configuration explicitly maps all publishable
+crates to additional Cargo features; missing or invalid mappings fail the check.
+It reuses local package and rustdoc caches; unrelated documentation and
 workflow edits do not require API rebuilds. It does not produce release artifacts,
 run exhaustive fixtures, or adopt a baseline. See
 [SemVer intent validation](docs/internal-rules/semver-intent.md) for scope,

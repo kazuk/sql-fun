@@ -113,6 +113,7 @@ jobs:
       - name: Generate internal baseline candidate
         run: |
           .local/bin/semver-intent candidate --source "$PWD" \
+            --feature-sets "$PWD/.local/semver-feature-sets.toml" \
             --target x86_64-unknown-linux-gnu --default-features --cache "$PWD/target/semver-intent" \
             --output "$RUNNER_TEMP/semver_baseline.tar.gz"
 

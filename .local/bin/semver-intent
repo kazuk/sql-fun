@@ -8,7 +8,7 @@ import tarfile
 
 sys.dont_write_bytecode = True
 sys.path.insert(0, str(Path(__file__).resolve().parents[1] / "lib"))
-from semver_intent import analysis, commands, packages, storage
+from semver_intent import analysis, commands, features, packages, storage
 from semver_intent.model import CheckError
 
 
@@ -18,7 +18,7 @@ def parse_request():
     parser.add_argument("--source", type=Path, required=True, help="selected repository; includes tracked and nonignored local edits")
     parser.add_argument("--target", required=True)
     parser.add_argument("--default-features", action="store_true", required=True, help="explicitly select default crate features")
-    parser.add_argument("--features", action="append", default=[], help="explicit extra feature enabled for every analyzed crate; defaults are always enabled")
+    parser.add_argument("--feature-sets", type=Path, required=True, help="explicit TOML policy mapping each named configuration to every publishable crate")
     parser.add_argument("--cache", type=Path, required=True)
     parser.add_argument("--baseline", type=Path)
     parser.add_argument("--output", type=Path)
@@ -36,13 +36,15 @@ def parse_request():
 def main():
     args = parse_request()
     source, cache = args.source.resolve(), args.cache.resolve()
-    target, features = args.target, sorted(set(args.features))
+    selected_packages, _ = packages.metadata(source)
+    feature_sets = features.load_feature_sets(args.feature_sets.resolve(), selected_packages)
+    target = args.target
     with storage.locked_cache(cache):
         if args.operation == "check":
             if args.require_tool_version:
                 commands.require_semver_version(args.require_tool_version)
-            baseline, previous = packages.baseline_root(args.baseline.resolve(), cache, target, features)
-        current, candidate, intent = packages.prepare(source, cache, target, features, candidate=args.operation == "candidate")
+            baseline, previous = packages.baseline_root(args.baseline.resolve(), cache, target, feature_sets)
+        current, candidate, intent = packages.prepare(source, cache, target, feature_sets, candidate=args.operation == "candidate")
         if args.operation == "candidate":
             output = args.output.resolve()
             storage.write_candidate(current, output)

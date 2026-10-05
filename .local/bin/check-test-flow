@@ -295,6 +295,7 @@ function run_semver() {
   "${GIT_ROOT}/.local/bin/semver-intent" check \
     --source "$GIT_ROOT" --baseline "$GIT_ROOT/.local/semver_baseline.tar.gz" \
     --target x86_64-unknown-linux-gnu --default-features \
+    --feature-sets "$GIT_ROOT/.local/semver-feature-sets.toml" \
     --cache "$GIT_ROOT/target/semver-intent" "${tool_requirement[@]}"
 }
 

@@ -4,7 +4,7 @@ from pathlib import Path
 import shutil
 import tempfile
 
-from . import commands, storage
+from . import commands, features, storage
 from .model import CheckError, LEVELS, SCHEMA, crate_descriptor, validate_crate_descriptor
 
 
@@ -135,19 +135,20 @@ def build_packaged_snapshot(source, files, cache, destination, descriptor):
         stage.rename(destination)
 
 
-def prepare(source, cache, target, features, *, candidate=False):
+def prepare(source, cache, target, feature_sets, *, candidate=False):
     revision, files = selected_source(source, cache)
     packages, intent = metadata(source)
+    feature_sets = features.validate_feature_sets(feature_sets, {p["name"]: p["features"] for p in packages})
     selected = files
     if not candidate:
         inventory = package_inventory(source, packages, files, cache)
         selected = api_input_files(source, packages, files, inventory)
     policy = "candidate-v1" if candidate else "local-api-v1"
-    key = storage.source_key(source, selected, target, features, policy)
+    key = storage.source_key(source, selected, target, feature_sets, policy)
     root = cache / ("source-" + key)
     if not (root / "manifest.json").is_file():
         descriptor = {"schema": SCHEMA, "source_revision": revision,
-                      "source_digest": key, "target": target, "features": features}
+                      "source_digest": key, "target": target, "default_features": True, "feature_sets": feature_sets}
         build_packaged_snapshot(source, files, cache, root, descriptor)
     manifest = storage.read_manifest(root)
     if manifest["source_revision"] != revision:
@@ -156,7 +157,7 @@ def prepare(source, cache, target, features, *, candidate=False):
     return root, manifest, intent
 
 
-def baseline_root(archive, cache, target, features):
+def baseline_root(archive, cache, target, feature_sets):
     if not archive.is_file():
         raise CheckError(f"active baseline missing: {archive}; generate from an explicitly approved revision with the candidate command")
     key = storage.file_digest(archive)
@@ -165,19 +166,19 @@ def baseline_root(archive, cache, target, features):
         with tempfile.TemporaryDirectory(dir=cache) as temporary:
             stage = Path(temporary)
             storage.unpack(archive, stage)
-            validate_manifest(stage, target, features)
+            validate_manifest(stage, target, feature_sets)
             stage.rename(root)
-    return root, validate_manifest(root, target, features)
+    return root, validate_manifest(root, target, feature_sets)
 
 
-def validate_manifest(root, target, features):
+def validate_manifest(root, target, feature_sets):
     manifest = storage.read_manifest(root)
     if not isinstance(manifest, dict):
         raise CheckError("baseline descriptor must be an object")
     if manifest.get("schema") != SCHEMA:
         raise CheckError("unsupported baseline schema")
-    if manifest.get("target") != target or manifest.get("features") != features:
-        raise CheckError("baseline target/features differ from explicitly requested analysis scope")
+    if manifest.get("target") != target or manifest.get("default_features") is not True:
+        raise CheckError("baseline target/default-features differ from explicitly requested analysis scope")
     crates = manifest.get("crates")
     if not isinstance(crates, list) or not crates:
         raise CheckError("baseline has no crates")
@@ -188,4 +189,6 @@ def validate_manifest(root, target, features):
         if name in names or not (root / "packages" / name / "Cargo.toml").is_file():
             raise CheckError(f"duplicate or missing baseline package: {name}")
         names.add(name)
+    previous = features.validate_baseline_feature_sets(root, manifest)
+    features.require_matching_coverage(previous, feature_sets)
     return manifest

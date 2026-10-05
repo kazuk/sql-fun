@@ -17,7 +17,7 @@ from unittest.mock import patch
 ROOT = Path(__file__).resolve().parents[2]
 sys.path.insert(0, str(ROOT / ".local/lib"))
 from semver_intent import analysis as semver
-from semver_intent import commands, packages, storage
+from semver_intent import commands, features, packages, storage
 from semver_intent.model import SCHEMA
 
 
@@ -34,7 +34,9 @@ class ApiFixture:
                 manifest += '\n[lib]\nproc-macro = true\n'
             (source / "Cargo.toml").write_text(manifest)
             (source / "src/lib.rs").write_text(api)
-        self.manifest = {"schema": SCHEMA, "target": "x86_64-unknown-linux-gnu", "features": [],
+            (directory / "packages/Cargo.toml").write_text(
+                '[workspace]\nmembers = ["fixture"]\nresolver = "2"\n')
+        self.manifest = {"schema": SCHEMA, "target": "x86_64-unknown-linux-gnu", "default_features": True, "feature_sets": {"postgres": {"fixture": []}},
                          "crates": [{"name": "fixture", "version": "1.0.0", "library": True, "proc_macro": proc_macro, "lib_name": "fixture"}]}
 
     def level(self):
@@ -120,14 +122,14 @@ class IntentTests(unittest.TestCase):
         with tempfile.TemporaryDirectory() as temporary:
             fixture = ApiFixture(Path(temporary))
             (fixture.old / "manifest.json").write_text(json.dumps(fixture.manifest))
-            for target, features in (("different-target", []), (fixture.manifest["target"], ["sqlite"])):
+            for target, features in (("different-target", fixture.manifest["feature_sets"]), (fixture.manifest["target"], {"sqlite": {"fixture": []}})):
                 with self.subTest(target=target, features=features):
-                    with self.assertRaisesRegex(semver.CheckError, "target/features"):
+                    with self.assertRaisesRegex(semver.CheckError, "baseline target|feature-set identities"):
                         packages.validate_manifest(fixture.old, target, features)
             fixture.manifest["schema"] = -1
             (fixture.old / "manifest.json").write_text(json.dumps(fixture.manifest))
             with self.assertRaisesRegex(semver.CheckError, "schema"):
-                packages.validate_manifest(fixture.old, fixture.manifest["target"], [])
+                packages.validate_manifest(fixture.old, fixture.manifest["target"], fixture.manifest["feature_sets"])
 
     def test_snapshot_does_not_replace_baseline_and_stable_does(self):
         with tempfile.TemporaryDirectory() as temporary:
@@ -150,6 +152,7 @@ class ReleaseFixture:
     def __init__(self, root):
         self.source, self.cache = root / "source", root / "cache"
         source, cache = self.source, self.cache
+        self.feature_sets = {"postgres": {"fixture": [], "semver-intent-fixture-dependency": []}}
         source.mkdir()
         cache.mkdir()
         helpers = source / ".local/bin"
@@ -176,7 +179,91 @@ class ReleaseFixture:
         subprocess.run(["git", "-C", str(source), "-c", "user.name=Fixture", "-c", "user.email=fixture@example.invalid", "commit", "-qm", "test: fixture"], check=True)
 
     def prepare(self, *, candidate=False):
-        return packages.prepare(self.source, self.cache, "x86_64-unknown-linux-gnu", [], candidate=candidate)
+        return packages.prepare(self.source, self.cache, "x86_64-unknown-linux-gnu", self.feature_sets, candidate=candidate)
+
+
+class FeaturePolicyTests(unittest.TestCase):
+    def test_complete_mapping_and_feature_names_are_required(self):
+        available = {"library": {"sqlite": []}, "cli": {}}
+        invalid = [None, {}, {"postgres": {"library": []}},
+                   {"postgres": {"library": [], "cli": [], "private": []}},
+                   {"postgres": {"library": ["missing"], "cli": []}},
+                   {"postgres": {"library": "sqlite", "cli": []}},
+                   {"postgres": {"library": [1], "cli": []}}]
+        for configuration in invalid:
+            with self.subTest(configuration=configuration), self.assertRaises(semver.CheckError):
+                features.validate_feature_sets(configuration, available)
+        self.assertEqual(features.validate_feature_sets(
+            {"sqlite": {"library": ["sqlite"], "cli": []}}, available),
+            {"sqlite": {"cli": [], "library": ["sqlite"]}})
+
+    def test_invalid_policy_file_is_not_ignored(self):
+        with tempfile.TemporaryDirectory() as temporary:
+            path = Path(temporary) / "policy.toml"
+            for contents in ('[unrecognized]\n', '[feature-set.postgres]\nprivate = []\n'):
+                path.write_text(contents)
+                with self.assertRaises(semver.CheckError):
+                    features.load_feature_sets(path, [{"name": "library", "features": {}}])
+            with self.assertRaises(OSError):
+                features.load_feature_sets(path.with_name("missing"), [])
+
+    def test_baseline_identity_and_per_crate_mapping_cannot_change_silently(self):
+        previous = {"postgres": {"library": []}}
+        for requested in ({"sqlite": {"library": []}},
+                          {"postgres": {"library": ["sqlite"]}}):
+            with self.assertRaisesRegex(semver.CheckError, "explicit baseline transition"):
+                features.require_matching_coverage(previous, requested)
+        features.require_matching_coverage(previous, {"postgres": {"library": [], "new": []}})
+
+    def test_sqlite_only_break_is_checked_with_the_corresponding_baseline(self):
+        with tempfile.TemporaryDirectory() as temporary:
+            fixture = ReleaseFixture(Path(temporary))
+            manifest = fixture.source / "Cargo.toml"
+            manifest.write_text(manifest.read_text() + '\n[features]\nsqlite = []\n')
+            fixture.feature_sets["sqlite"] = {"fixture": ["sqlite"], "semver-intent-fixture-dependency": []}
+            library = fixture.source / "src/lib.rs"
+            library.write_text('pub fn common() {}\n#[cfg(feature = "sqlite")] pub fn sqlite_api() {}')
+            baseline, previous, _ = fixture.prepare(candidate=True)
+            current, candidate, intent = fixture.prepare()
+            self.assertEqual(semver.compare(current, candidate, baseline, previous, intent), 0)
+            library.write_text('pub fn common() {}\n#[cfg(feature = "sqlite")] pub fn renamed_sqlite_api() {}')
+            current, candidate, intent = fixture.prepare()
+            self.assertEqual(semver.detected_level(current, baseline, "fixture", candidate["target"], []), "patch")
+            self.assertEqual(semver.compare(current, candidate, baseline, previous, intent), 1)
+            intent["fixture"] = "major"
+            self.assertEqual(semver.compare(current, candidate, baseline, previous, intent), 0)
+
+    def test_feature_contract_round_trip_and_baseline_validation(self):
+        with tempfile.TemporaryDirectory() as temporary:
+            fixture = ReleaseFixture(Path(temporary))
+            packaged, manifest, _ = fixture.prepare(candidate=True)
+            archive = Path(temporary) / "candidate.tar.gz"
+            storage.write_candidate(packaged, archive)
+            baseline, previous = packages.baseline_root(archive, fixture.cache,
+                                                        manifest["target"], fixture.feature_sets)
+            self.assertEqual(previous["feature_sets"], fixture.feature_sets)
+            del previous["feature_sets"]["postgres"]["fixture"]
+            storage.write_manifest(baseline, previous)
+            with self.assertRaisesRegex(semver.CheckError, "missing crate mappings"):
+                packages.validate_manifest(baseline, manifest["target"], fixture.feature_sets)
+
+    def test_implicit_optional_dependency_feature_is_valid_in_baseline(self):
+        with tempfile.TemporaryDirectory() as temporary:
+            fixture = ReleaseFixture(Path(temporary))
+            manifest = fixture.source / "Cargo.toml"
+            manifest.write_text(manifest.read_text().replace('version = "1.0.0" }',
+                                                            'version = "1.0.0", optional = true }'))
+            fixture.feature_sets["postgres"]["fixture"] = ["semver-intent-fixture-dependency"]
+            packaged, descriptor, _ = fixture.prepare(candidate=True)
+            self.assertEqual(packages.validate_manifest(packaged, descriptor["target"], fixture.feature_sets), descriptor)
+
+    def test_invalid_current_configuration_fails_before_packaging(self):
+        with tempfile.TemporaryDirectory() as temporary:
+            fixture = ReleaseFixture(Path(temporary))
+            fixture.feature_sets["postgres"]["fixture"] = ["unknown"]
+            with patch.object(packages, "build_packaged_snapshot", side_effect=AssertionError("packaged invalid policy")):
+                with self.assertRaisesRegex(semver.CheckError, "unknown features"):
+                    fixture.prepare()
 
 
 class LocalPolicyTests(unittest.TestCase):
@@ -208,9 +295,11 @@ class LocalPolicyTests(unittest.TestCase):
             cli = importlib.util.module_from_spec(importlib.util.spec_from_loader(loader.name, loader))
             loader.exec_module(cli)
             args = ["semver-intent", "check", "--source", str(root), "--cache", str(root / "cache"),
-                    "--baseline", str(root / "baseline"), "--target", fixture.manifest["target"], "--default-features"]
+                    "--baseline", str(root / "baseline"), "--target", fixture.manifest["target"], "--default-features", "--feature-sets", str(root / "policy.toml")]
             environment = {"PATH": str(root) + os.pathsep + os.environ["PATH"]}
             with patch.dict(os.environ, environment), patch.object(sys, "argv", args), \
+                    patch.object(packages, "metadata", return_value=([], {})), \
+                    patch.object(features, "load_feature_sets", return_value=fixture.manifest["feature_sets"]), \
                     patch.object(packages, "baseline_root", return_value=(fixture.old, fixture.manifest)), \
                     patch.object(packages, "prepare", return_value=(fixture.new, fixture.manifest, {"fixture": "patch"})):
                 self.assertEqual(cli.main(), 0)

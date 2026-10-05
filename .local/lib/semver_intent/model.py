@@ -2,7 +2,7 @@
 import re
 
 LEVELS = ("patch", "minor", "major")
-SCHEMA = 3
+SCHEMA = 4
 LIBRARY_KINDS = {"lib", "rlib", "dylib", "cdylib", "staticlib", "proc-macro"}
 
 

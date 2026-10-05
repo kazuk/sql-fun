@@ -41,7 +41,8 @@ release/build configuration, lockfile, toolchain, and materialization helpers.
 Repository infrastructure (such as workflows, internal tooling, CI setup, and
 manual/report directories) and Markdown content are omitted from the local API
 fingerprint for packages without build scripts; documentation does not affect
-the measured API. Build-script
+the measured API. Rust source files and Cargo target entrypoints are always
+tracked, including sources located in support/documentation directories. Build-script
 packages conservatively track Markdown too because scripts can generate APIs
 from data files. Other packaged assets remain inputs, including embedded SQL,
 templates, and text. Excluded files and files outside packages do not trigger API

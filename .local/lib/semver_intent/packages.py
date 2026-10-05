@@ -62,11 +62,13 @@ def api_input_files(source, packages, repository, inventory):
     for package in packages:
         directory = Path(package["manifest_path"]).parent
         has_build_script = any("custom-build" in target["kind"] for target in package["targets"])
+        entrypoints = {Path(target["src_path"]) for target in package["targets"]}
         for name in inventory[package["name"]]:
             path = directory / name
             relative = str(path.relative_to(source))
+            rust_source = path.suffix == ".rs" or path in entrypoints
             documentation = path.suffix.lower() == ".md" or repository_support_file(relative)
-            if path.is_file() and (has_build_script or not documentation):
+            if path.is_file() and (has_build_script or rust_source or not documentation):
                 inputs.add(relative)
     inputs.update(name for name in repository if name.startswith(".cargo/"))
     return sorted(inputs)

@@ -282,6 +282,20 @@ class PackagingTests(unittest.TestCase):
             changed, manifest, intent = fixture.prepare()
             self.assertEqual(semver.compare(changed, manifest, baseline, previous, intent), 1)
 
+    def test_rust_api_source_in_documentation_directory_is_not_skipped(self):
+        with tempfile.TemporaryDirectory() as temporary:
+            fixture = ReleaseFixture(Path(temporary))
+            module = fixture.source / "docs/api.rs"
+            module.parent.mkdir()
+            module.write_text("pub fn original() {}")
+            (fixture.source / "src/lib.rs").write_text('#[path = "../docs/api.rs"] pub mod exposed;')
+            baseline, previous, _ = fixture.prepare(candidate=True)
+            current, manifest, intent = fixture.prepare()
+            self.assertEqual(semver.compare(current, manifest, baseline, previous, intent), 0)
+            module.write_text("pub fn renamed() {}")
+            changed, manifest, intent = fixture.prepare()
+            self.assertEqual(semver.compare(changed, manifest, baseline, previous, intent), 1)
+
     def test_embedded_non_markdown_assets_invalidate_analysis(self):
         with tempfile.TemporaryDirectory() as temporary:
             fixture = ReleaseFixture(Path(temporary))

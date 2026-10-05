@@ -73,6 +73,34 @@ async fn native_interrupt_wrapped_error(
     #[interrupt_future] interrupt: &mut (impl std::future::Future<Output = tokio_postgres::Error> + Unpin),
 ) -> Result<u64, anyhow::Error> {}
 
+struct InterruptError(std::io::Error);
+
+impl From<&str> for InterruptError {
+    fn from(message: &str) -> Self {
+        Self(std::io::Error::other(message))
+    }
+}
+
+impl InterruptError {
+    // The generator must use the conversion trait rather than this user method.
+    fn into(self) {
+        panic!("inherent into must not be called");
+    }
+}
+
+impl From<InterruptError> for anyhow::Error {
+    fn from(error: InterruptError) -> Self {
+        Self::new(error.0)
+    }
+}
+
+#[sql_fun::sql_statement(sql = "delete from users where id = ${id}")]
+async fn interrupted_with_inherent_into(
+    client: &Client,
+    id: i64,
+    #[interrupt_future] interrupt: &mut (impl std::future::Future<Output = InterruptError> + Unpin),
+) -> Result<u64, anyhow::Error> {}
+
 pub(super) fn verify() {
     // Check-mode functions deliberately contain only metadata stubs.
     if std::env::var("SQL_FUN_MODE").as_deref() == Ok("CHECK") {
@@ -85,6 +113,13 @@ pub(super) fn verify() {
         assert_eq!(
             error.downcast_ref::<std::io::Error>().unwrap().to_string(),
             "statement interrupted",
+        );
+
+        let mut interrupt = std::future::ready(InterruptError::from("trait conversion"));
+        let error = interrupted_with_inherent_into(&Client, 1, &mut interrupt).await.unwrap_err();
+        assert_eq!(
+            error.downcast_ref::<std::io::Error>().unwrap().to_string(),
+            "trait conversion",
         );
 
         let error = rejected_row(&Client).await.unwrap_err();

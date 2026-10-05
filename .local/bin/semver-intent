@@ -36,6 +36,7 @@ def parse_request():
 def main():
     args = parse_request()
     source, cache = args.source.resolve(), args.cache.resolve()
+    packages.require_repository_root(source)
     selected_packages, _ = packages.metadata(source)
     feature_sets = features.load_feature_sets(args.feature_sets.resolve(), selected_packages)
     target = args.target

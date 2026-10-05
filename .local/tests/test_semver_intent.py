@@ -183,6 +183,21 @@ class ReleaseFixture:
 
 
 class FeaturePolicyTests(unittest.TestCase):
+    def test_nested_source_is_rejected_before_cargo_workspace_discovery(self):
+        with tempfile.TemporaryDirectory() as temporary:
+            root = Path(temporary)
+            fixture = ReleaseFixture(root)
+            result = subprocess.run([str(ROOT / ".local/bin/semver-intent"), "candidate",
+                                     "--source", str(fixture.source / "dependency"),
+                                     "--target", "x86_64-unknown-linux-gnu", "--default-features",
+                                     "--feature-sets", str(root / "unread-policy"),
+                                     "--cache", str(root / "unused-cache"), "--output", str(root / "output")],
+                                    text=True, capture_output=True)
+            self.assertEqual(result.returncode, 2)
+            self.assertIn("--source must select the repository root", result.stderr)
+            self.assertFalse((root / "unused-cache").exists())
+            self.assertFalse((root / "output").exists())
+
     def test_complete_mapping_and_feature_names_are_required(self):
         available = {"library": {"sqlite": []}, "cli": {}}
         invalid = [None, {}, {"postgres": {"library": []}},
@@ -298,6 +313,7 @@ class LocalPolicyTests(unittest.TestCase):
                     "--baseline", str(root / "baseline"), "--target", fixture.manifest["target"], "--default-features", "--feature-sets", str(root / "policy.toml")]
             environment = {"PATH": str(root) + os.pathsep + os.environ["PATH"]}
             with patch.dict(os.environ, environment), patch.object(sys, "argv", args), \
+                    patch.object(packages, "require_repository_root"), \
                     patch.object(packages, "metadata", return_value=([], {})), \
                     patch.object(features, "load_feature_sets", return_value=fixture.manifest["feature_sets"]), \
                     patch.object(packages, "baseline_root", return_value=(fixture.old, fixture.manifest)), \

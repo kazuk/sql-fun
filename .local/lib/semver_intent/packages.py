@@ -74,9 +74,14 @@ def api_input_files(source, packages, repository, inventory):
     return sorted(inputs)
 
 
-def selected_source(source, cache):
+def require_repository_root(source):
+    """Validate the selected root before Cargo can discover an enclosing workspace."""
     if Path(commands.git(source, "rev-parse", "--show-toplevel").strip()).resolve() != source:
         raise CheckError("--source must select the repository root")
+
+
+def selected_source(source, cache):
+    require_repository_root(source)
     revision = commands.git(source, "rev-parse", "HEAD").strip()
     files = [name for name in repository_files(source)
              if not (source / name).is_relative_to(cache)]

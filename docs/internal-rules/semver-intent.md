@@ -84,6 +84,10 @@ requires an explicit baseline transition rather than silently skipping it.
 
 ## Coverage and limitations
 
+When adding Cargo features, follow the
+[feature set operation rules](semver-feature-set-operations.md) to preserve
+released configurations and introduce coverage before stable baseline adoption.
+
 The supported CI scope is Linux amd64 across the named `postgres` and `sqlite`
 product configurations in `.local/semver-feature-sets.toml`. Both enable default
 Cargo features. `postgres` adds no features; `sqlite` enables each publishable

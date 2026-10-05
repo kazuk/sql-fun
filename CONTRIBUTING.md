@@ -257,14 +257,6 @@ local presentation is used, including in non-interactive shells. These signals
 change presentation only; check selection still follows the command options.
 Unknown diagnostic formats remain available in the raw logs.
 
-Run the optional `harness` step to execute offline regression tests of these
-execution and presentation contracts, using fake tools in temporary
-repositories:
-
-```sh
-.local/bin/check-test-flow --step=harness
-```
-
 `check-test-flow` prioritizes consistent behavior between CI and local runs.
 Both use the shared defaults in [`.cargo/config.toml`](.cargo/config.toml):
 incremental compilation is disabled, and the `dev` and `test` profiles use

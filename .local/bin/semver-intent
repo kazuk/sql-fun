@@ -11,6 +11,7 @@ import subprocess
 import sys
 import tarfile
 import tempfile
+import tomllib
 
 LEVELS = ("patch", "minor", "major")
 TOOL_VERSION = "cargo-semver-checks 0.51.0"
@@ -181,6 +182,25 @@ def validate_manifest(root, target, features):
     return manifest
 
 
+def cargo_configuration(directory):
+    # These are Cargo's documented configuration inputs for this invocation.
+    directories = [directory, *directory.parents]
+    directories.append(Path(os.environ.get("CARGO_HOME", str(Path.home() / ".cargo"))))
+    digest = hashlib.sha256()
+    reusable = True
+    for index, parent in enumerate(directories):
+        config_directory = parent if index == len(directories) - 1 else parent / ".cargo"
+        for name in ("config", "config.toml"):
+            path = config_directory / name
+            if path.is_file():
+                content = path.read_bytes()
+                digest.update(os.fsencode(path) + b"\0" + content)
+                # Included configurations can have arbitrary transitive inputs.
+                # Let Cargo resolve them each time rather than cache partial inputs.
+                reusable &= "include" not in tomllib.loads(content.decode())
+    return digest.hexdigest(), reusable
+
+
 def api_rustdoc(root, name, target, features, proc_macro=False, lib_name=None, side="current"):
     build = root.parent / ("api-build-" + side)
     args = ["cargo", "rustdoc", "--manifest-path", str(root / "packages" / name / "Cargo.toml"),
@@ -189,18 +209,19 @@ def api_rustdoc(root, name, target, features, proc_macro=False, lib_name=None, s
         args.extend(["--features", ",".join(features)])
     args.extend(["--", "-Z", "unstable-options", "--output-format", "json", "--document-private-items"])
     environment = dict(os.environ, RUSTC_BOOTSTRAP="1")
-    compiler = run([environment.get("RUSTC", "rustc"), "-Vv"], capture=True)
-    rustdoc = run([environment.get("RUSTDOC", "rustdoc"), "--version"], capture=True)
+    compiler = run([environment.get("RUSTC", "rustc"), "-Vv"], cwd=root / "packages", capture=True)
+    rustdoc = run([environment.get("RUSTDOC", "rustdoc"), "--version"], cwd=root / "packages", capture=True)
     context = hashlib.sha256(json.dumps(environment, sort_keys=True).encode()).hexdigest()
+    configuration, reusable = cargo_configuration(root / "packages")
 
     def json_path():
         lock = root / "packages" / "Cargo.lock"
         lock_digest = hashlib.sha256(lock.read_bytes()).hexdigest() if lock.is_file() else None
-        key = hashlib.sha256(json.dumps([compiler, rustdoc, context, args, lock_digest]).encode()).hexdigest()
+        key = hashlib.sha256(json.dumps([compiler, rustdoc, context, configuration, args, lock_digest]).encode()).hexdigest()
         return root / "api-json" / key / ((lib_name or name.replace("-", "_")) + ".json")
 
     output = json_path()
-    if output.is_file():
+    if reusable and output.is_file():
         return output
     result = subprocess.run(args, env=environment, cwd=root / "packages")
     if result.returncode:

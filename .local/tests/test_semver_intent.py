@@ -218,6 +218,16 @@ class ToolFixtureTests(unittest.TestCase):
                     self.assertEqual(fixture.level(), "patch")
                     self.assertEqual(len(builds), 2)
 
+    def test_cargo_configuration_invalidates_cached_apis(self):
+        with tempfile.TemporaryDirectory() as temporary:
+            root = Path(temporary)
+            fixture = ApiFixture(root, old_api="pub fn original() {} #[cfg(semver_fixture)] pub fn removed() {}")
+            self.assertEqual(fixture.level(), "patch")
+            config = root / ".cargo/config.toml"
+            config.parent.mkdir()
+            config.write_text('[build]\nrustdocflags = ["--cfg", "semver_fixture"]\n')
+            self.assertEqual(fixture.level(), "major")
+
     def test_pre_one_version_bump_does_not_override_detected_impact(self):
         with tempfile.TemporaryDirectory() as temporary:
             fixture = ApiFixture(Path(temporary), new_api="pub fn renamed() {}")

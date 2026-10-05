@@ -24,9 +24,12 @@ features. Tracked and nonignored local edits are included. The checkout's
 manifests are not changed. Packages and rustdoc/build results are cached under
 `target/semver-intent`; remove that directory to discard the cache. The first
 check needs dependency downloads and API compilation. Later checks reuse the
-cache, including rustdoc JSON keyed by compiler, environment, and dependency
-lock state, without generating an archive, executing exhaustive fixtures, querying
-release provenance, or adopting release state.
+cache, including rustdoc JSON keyed by compiler, environment, Cargo configuration,
+and dependency lock state, without generating an archive, executing exhaustive
+fixtures, querying release provenance, or adopting release state. Cargo
+configuration inputs follow its normal package-workspace directory hierarchy and
+`CARGO_HOME` (or the default Cargo home). Configurations with `include` disable
+JSON reuse so changes to transitive configuration inputs are not missed.
 
 The command reads the selected repository files required to construct its
 packages. Version materialization and package construction occur in a temporary

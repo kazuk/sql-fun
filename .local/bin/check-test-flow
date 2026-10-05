@@ -35,6 +35,7 @@ Default steps:
 Optional steps (explicit --step required):
   packaging
   cli-contract
+  harness
 USAGE
 }
 
@@ -55,7 +56,7 @@ DEFAULT_STEPS=(
   skill-lint
 )
 
-ALL_STEPS=("${DEFAULT_STEPS[@]}" packaging cli-contract)
+ALL_STEPS=("${DEFAULT_STEPS[@]}" packaging cli-contract harness)
 
 function list_steps() {
   printf '%s\n' "${ALL_STEPS[@]}"
@@ -63,7 +64,7 @@ function list_steps() {
 
 function normalize_step() {
   case "$1" in
-    affected|workspace|proc-macro-tests|fmt|lint|server-api-spec|deny|dependency-updates|doc|typos|version-materialization|graphify|skill-lint|markdown-lint|packaging|cli-contract)
+    affected|workspace|proc-macro-tests|fmt|lint|server-api-spec|deny|dependency-updates|doc|typos|version-materialization|graphify|skill-lint|markdown-lint|packaging|cli-contract|harness)
       printf '%s\n' "$1"
       ;;
     format)
@@ -360,6 +361,12 @@ function run_rumdl() {
   rumdl check "${options[@]}" .
 }
 
+function run_harness() {
+  require_command python3
+  echo "== Verify check-test-flow presentation and execution contracts"
+  "${GIT_ROOT}/.local/bin/test-check-test-flow"
+}
+
 for step in "${ALL_STEPS[@]}"; do
   if step_enabled "$step"; then
     if [[ "$FLOW_MODE" != ci ]]; then
@@ -382,6 +389,7 @@ for step in "${ALL_STEPS[@]}"; do
       markdown-lint) run_rumdl ;;
       packaging) run_packaging ;;
       cli-contract) run_cli_contract ;;
+      harness) run_harness ;;
     esac
     if [[ "$FLOW_MODE" != ci ]]; then
       finish_step_output 0

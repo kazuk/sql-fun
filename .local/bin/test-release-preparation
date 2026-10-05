@@ -1,0 +1,103 @@
+#!/usr/bin/env bash
+set -euo pipefail
+scripts="$(cd "$(dirname "$0")/../sbin" && pwd)"
+fixture="$(mktemp -d)"
+trap 'rm -rf "$fixture"' EXIT
+export RELEASE_PREPARATION_FIXTURE="$fixture"
+revision=1111111111111111111111111111111111111111
+other=2222222222222222222222222222222222222222
+repository=fixture/repository
+mkdir "$fixture/bin"
+expect_failure() {
+  if "$@" > "$fixture/stdout" 2> "$fixture/stderr"; then
+    echo "Unexpected success: $*" >&2
+    exit 1
+  fi
+}
+for tag in v0.2.0 v0.2.0-snapshot v0.2.0-snapshot1; do
+  output="$("$scripts/release-branch-identity" "refs/heads/release/$tag" "$revision")"
+  [[ "$output" == *"tag=$tag"* && "$output" == *"revision=$revision"* ]]
+done
+output="$("$scripts/release-branch-identity" refs/heads/release/v0.2.0 "$revision")"
+[[ "$output" == *$'snapshot=\nclassification=stable'* ]]
+for ref in refs/tags/release/v0.2.0 refs/heads/main release/v0.2.0 refs/heads/release/v01.2.0 refs/heads/release/v1.2.3-rc1 refs/heads/release/v1.2.3/extra; do
+  expect_failure "$scripts/release-branch-identity" "$ref" "$revision"
+done
+expect_failure "$scripts/release-branch-identity" refs/heads/release/v0.2.0 main
+cat > "$fixture/bin/gh" <<'MOCK'
+#!/usr/bin/env bash
+set -euo pipefail
+printf '%s\n' "$*" >> "$RELEASE_PREPARATION_FIXTURE/requests"
+[[ "${API_FAILURE:-}" != true ]] || exit 1
+if [[ "$1" == api ]]; then
+  if [[ "$*" == *actions/workflows/build-test.yml/runs* ]]; then
+    [[ "$*" == *'--paginate --slurp'* && "$*" == *'head_sha=1111111111111111111111111111111111111111'* ]]
+    cat "$RELEASE_PREPARATION_FIXTURE/runs.json"
+  else
+    [[ "$*" == *'actions/runs/20/artifacts?per_page=100'* && "$*" == *'--paginate --slurp'* ]]
+    cat "$RELEASE_PREPARATION_FIXTURE/artifacts.json"
+  fi
+else
+  [[ "$1 $2 $3" == 'run download 20' && "$4 $5" == '--repo fixture/repository' ]]
+  [[ "${DOWNLOAD_FAILURE:-}" != true ]] || exit 1
+  [[ "$6" == --name && "$8" == --dir ]]
+  mkdir -p "$9"
+  printf 'producer bytes' > "$9/adopted"
+fi
+MOCK
+chmod +x "$fixture/bin/gh"
+export PATH="$fixture/bin:$PATH"
+jq -n --arg sha "$revision" --arg other "$other" '
+  def run($id; $sha; $event; $status; $conclusion):
+    {id:$id, head_sha:$sha, event:$event, status:$status, conclusion:$conclusion,
+     created_at:"2026-10-05T00:00:00Z", run_number:$id, html_url:("https://example.invalid/runs/" + ($id|tostring))};
+  [{workflow_runs:[
+    run(10;$sha;"pull_request";"completed";"success"),
+    run(30;$other;"pull_request";"completed";"success"),
+    run(40;$sha;"release";"completed";"success"),
+    run(50;$sha;"pull_request";"completed";"failure"),
+    run(60;$sha;"pull_request";"in_progress";null),
+    run(70;$sha;"merge_group";"completed";"cancelled")]},
+   {workflow_runs:[run(20;$sha;"merge_group";"completed";"success")]}]
+' > "$fixture/runs.json"
+selected="$("$scripts/resolve-release-ci-run" "$repository" "$revision")"
+[[ "$(jq -r .id <<<"$selected")" == 20 ]]
+[[ "$(jq -r .head_sha <<<"$selected")" == "$revision" ]]
+cp "$fixture/runs.json" "$fixture/success-runs.json"
+printf '[{"workflow_runs":[]}]' > "$fixture/runs.json"
+expect_failure "$scripts/resolve-release-ci-run" "$repository" "$revision"
+grep -q 'Release target is not eligible' "$fixture/stderr"
+cp "$fixture/success-runs.json" "$fixture/runs.json"
+expect_failure env API_FAILURE=true "$scripts/resolve-release-ci-run" "$repository" "$revision"
+expect_failure "$scripts/resolve-release-ci-run" "$repository" main
+cat > "$fixture/artifacts.json" <<'JSON'
+[{"artifacts":[{"name":"sql-fun-x86_64-unknown-linux-gnu","expired":false}]},
+ {"artifacts":[{"name":"sql-fun-user-manual","expired":false}]}]
+JSON
+"$scripts/adopt-release-ci-inputs" "$repository" 20 "$fixture/adopted" \
+  sql-fun-x86_64-unknown-linux-gnu sql-fun-user-manual
+cmp "$fixture/adopted/sql-fun-x86_64-unknown-linux-gnu/adopted" "$fixture/adopted/sql-fun-user-manual/adopted"
+[[ "$(grep -c '^run download 20' "$fixture/requests")" == 2 ]]
+printf '[{"artifacts":[{"name":"sql-fun-x86_64-unknown-linux-gnu","expired":false}]}]' > "$fixture/artifacts.json"
+expect_failure "$scripts/adopt-release-ci-inputs" "$repository" 20 "$fixture/partial" \
+  sql-fun-x86_64-unknown-linux-gnu sql-fun-user-manual
+[[ ! -d "$fixture/partial" ]]
+[[ "$(grep -c '^run download 20' "$fixture/requests")" == 2 ]]
+for mode in missing expired; do
+  if [[ "$mode" == missing ]]; then
+    printf '[{"artifacts":[]}]' > "$fixture/artifacts.json"
+  else
+    printf '[{"artifacts":[{"name":"sql-fun-user-manual","expired":true}]}]' > "$fixture/artifacts.json"
+  fi
+  expect_failure "$scripts/adopt-release-ci-inputs" "$repository" 20 "$fixture/unused" sql-fun-user-manual
+  grep -q 'Required release input missing or expired: sql-fun-user-manual' "$fixture/stderr"
+  [[ ! -d "$fixture/unused" ]]
+done
+printf '[{"artifacts":[{"name":"sql-fun-user-manual","expired":false}]}]' > "$fixture/artifacts.json"
+expect_failure env DOWNLOAD_FAILURE=true "$scripts/adopt-release-ci-inputs" "$repository" 20 "$fixture/unused" sql-fun-user-manual
+expect_failure env API_FAILURE=true "$scripts/adopt-release-ci-inputs" "$repository" 20 "$fixture/unused" sql-fun-user-manual
+# A later input uses the same adoption path without another run lookup.
+printf '[{"artifacts":[{"name":"future-input","expired":false}]}]' > "$fixture/artifacts.json"
+"$scripts/adopt-release-ci-inputs" "$repository" 20 "$fixture/future" future-input
+[[ -f "$fixture/future/future-input/adopted" ]]
+echo 'Release preparation contracts passed'

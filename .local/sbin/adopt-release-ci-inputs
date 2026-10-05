@@ -1,0 +1,23 @@
+#!/usr/bin/env bash
+set -euo pipefail
+if [[ $# -lt 4 || ! "$1" =~ ^[A-Za-z0-9_.-]+/[A-Za-z0-9_.-]+$ || ! "$2" =~ ^[0-9]+$ ]]; then
+  echo 'usage: adopt-release-ci-inputs OWNER/REPOSITORY RUN_ID OUTPUT_DIRECTORY ARTIFACT_NAME...' >&2
+  exit 1
+fi
+repository="$1"
+run_id="$2"
+destination="$3"
+shift 3
+artifacts="$(gh api --paginate --slurp "repos/$repository/actions/runs/$run_id/artifacts?per_page=100")"
+# Check the entire required set before downloading. Never select another run here.
+for name in "$@"; do
+  [[ "$name" =~ ^[A-Za-z0-9_-]+$ ]] || { echo "Invalid artifact name: $name" >&2; exit 1; }
+  jq -e --arg name "$name" \
+    'any(.[].artifacts[]; .name == $name and .expired == false)' <<<"$artifacts" > /dev/null || {
+    echo "Required release input missing or expired: $name (repository $repository, CI run $run_id)" >&2
+    exit 1
+  }
+done
+for name in "$@"; do
+  gh run download "$run_id" --repo "$repository" --name "$name" --dir "$destination/$name"
+done

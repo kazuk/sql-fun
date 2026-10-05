@@ -1,0 +1,22 @@
+#!/usr/bin/env bash
+set -euo pipefail
+if [[ $# != 2 || ! "$1" =~ ^[A-Za-z0-9_.-]+/[A-Za-z0-9_.-]+$ || ! "$2" =~ ^[0-9a-f]{40}$ ]]; then
+  echo 'usage: resolve-release-ci-run OWNER/REPOSITORY TARGET_SHA' >&2
+  exit 1
+fi
+repository="$1"
+revision="$2"
+runs="$(gh api --method GET --paginate --slurp \
+  "repos/$repository/actions/workflows/build-test.yml/runs" \
+  -f head_sha="$revision" -f status=success -f per_page=100)"
+selected="$(jq -ce --arg revision "$revision" '
+  [.[].workflow_runs[] |
+    select(.head_sha == $revision and .status == "completed" and .conclusion == "success") |
+    select(.event == "pull_request" or .event == "merge_group")] |
+  sort_by(.created_at, .run_number, .id) | last // empty |
+  {id, html_url, head_sha}
+' <<<"$runs")" || {
+  echo "Release target is not eligible: no successful required normal-CI run (build-test.yml) for $repository at $revision" >&2
+  exit 1
+}
+printf '%s\n' "$selected"

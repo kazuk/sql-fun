@@ -109,7 +109,7 @@ mod test_postgres_statements {
     }
 
     #[rstest::rstest]
-    #[case::invalid_statement("SELECT 1; SELCT 2; SELECT 3;")]
+    #[case::invalid_statement("SELECT 1; SELECT FROM; SELECT 3;")]
     #[case::unterminated_string("SELECT 1; SELECT 'unfinished")]
     #[case::nul_byte("SELECT 1; SELECT '\0'; SELECT 3;")]
     fn yields_a_single_error_when_syntax_prevents_splitting(#[case] sql: &str) {

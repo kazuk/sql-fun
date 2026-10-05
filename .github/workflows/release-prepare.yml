@@ -1,0 +1,75 @@
+name: Release preparation
+
+on:
+  push:
+    branches:
+      - 'release/**'
+
+permissions:
+  contents: read
+  actions: read
+
+concurrency:
+  group: release-preparation-${{ github.ref }}
+  cancel-in-progress: false
+
+jobs:
+  identity:
+    runs-on: ubuntu-24.04
+    outputs:
+      tag: ${{ steps.identity.outputs.tag }}
+      version: ${{ steps.identity.outputs.version }}
+      snapshot: ${{ steps.identity.outputs.snapshot }}
+      classification: ${{ steps.identity.outputs.classification }}
+      revision: ${{ steps.identity.outputs.revision }}
+    steps:
+      - uses: actions/checkout@v5
+        with:
+          ref: ${{ github.sha }}
+      - name: Parse release branch identity
+        id: identity
+        env:
+          RELEASE_REF: ${{ github.ref }}
+          RELEASE_SHA: ${{ github.sha }}
+        run: .local/bin/release-branch-identity "$RELEASE_REF" "$RELEASE_SHA" >> "$GITHUB_OUTPUT"
+
+  inputs:
+    needs: identity
+    runs-on: ubuntu-24.04
+    outputs:
+      ci-run-id: ${{ steps.ci.outputs.run_id }}
+      ci-run-url: ${{ steps.ci.outputs.run_url }}
+    env:
+      GH_TOKEN: ${{ github.token }}
+      RELEASE_SHA: ${{ needs.identity.outputs.revision }}
+      RELEASE_TAG: ${{ needs.identity.outputs.tag }}
+      RELEASE_CLASSIFICATION: ${{ needs.identity.outputs.classification }}
+    steps:
+      - uses: actions/checkout@v5
+        with:
+          ref: ${{ needs.identity.outputs.revision }}
+      - name: Require successful exact-SHA normal CI
+        id: ci
+        run: |
+          selected="$(.local/bin/resolve-release-ci-run "$GITHUB_REPOSITORY" "$RELEASE_SHA")"
+          {
+            echo "run_id=$(jq -r '.id' <<<"$selected")"
+            echo "run_url=$(jq -r '.html_url' <<<"$selected")"
+          } >> "$GITHUB_OUTPUT"
+      - name: Adopt required CI release inputs
+        env:
+          CI_RUN_ID: ${{ steps.ci.outputs.run_id }}
+        run: |
+          .local/bin/adopt-release-ci-inputs "$GITHUB_REPOSITORY" "$CI_RUN_ID" \
+            "$RUNNER_TEMP/release-inputs" \
+            sql-fun-x86_64-unknown-linux-gnu sql-fun-user-manual
+      - name: Record adopted release inputs
+        env:
+          CI_RUN_URL: ${{ steps.ci.outputs.run_url }}
+        run: |
+          {
+            echo "Product release: $RELEASE_TAG ($RELEASE_CLASSIFICATION)"
+            echo "Release target: $RELEASE_SHA"
+            echo "Normal CI: $CI_RUN_URL"
+            echo "Adopted: sql-fun-x86_64-unknown-linux-gnu, sql-fun-user-manual"
+          } >> "$GITHUB_STEP_SUMMARY"

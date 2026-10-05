@@ -40,7 +40,7 @@ use ::sql_fun_core::{
 use proc_macro2::{Span, TokenStream};
 use proc_macro2_diagnostic::DiagnosticResult;
 use quote::{ToTokens, quote};
-use syn::{Expr, FnArg, Ident, ItemFn, Type};
+use syn::{Expr, Ident, ItemFn, Type};
 
 /// diagnostics
 #[derive(Debug)]
@@ -246,6 +246,19 @@ pub enum QueryFunctionKind {
 }
 
 impl QueryFunctionKind {
+    fn fragment_argument_index(self, input_count: usize) -> Result<usize, SqlFunCodegenError> {
+        match self {
+            Self::QueryMany => input_count.checked_sub(2).ok_or_else(|| {
+                syn::Error::new(
+                    proc_macro2::Span::call_site(),
+                    "sql_query_many requires collector before its handler",
+                )
+                .into()
+            }),
+            Self::QueryOne | Self::QueryOpt | Self::Execute => Ok(input_count),
+        }
+    }
+
     /// Generate a query returning exactly one row.
     #[must_use]
     pub const fn query_one() -> Self {
@@ -316,10 +329,6 @@ impl QueryFunctionSpec {
 
 /// conditional query match function
 pub struct FragmentMatcher {
-    #[expect(
-        dead_code,
-        reason = "The matcher retains the query kind while fragment dispatch does not read it."
-    )]
     function_kind: QueryFunctionKind,
     item_fn: ItemFunction,
     match_expr: Expr,
@@ -348,14 +357,17 @@ impl FragmentMatcher {
         let is_async = self.item_fn.is_async();
         let inputs: Vec<_> = self.child_fn.argument_name_idents().cloned().collect();
 
+        let insertion_index = self.function_kind.fragment_argument_index(inputs.len())?;
         let expr = self.match_expr();
         let arms = self.match_arms();
         let arms = arms.iter().map(|arm| {
             let pat = arm.pat();
             let name = arm.arm_function_name(&self.item_fn);
-            let mut introduce_args = arm.introduce_arg_idents().to_vec();
             let mut args = inputs.clone();
-            args.append(&mut introduce_args);
+            args.splice(
+                insertion_index..insertion_index,
+                arm.introduce_arg_idents().to_vec(),
+            );
 
             match (is_async, arm.guard()) {
                 (true, Some(guard)) => quote! {
@@ -573,9 +585,9 @@ impl FragmentExpandQueueItem {
                 let mut child_fn = child_fn.clone();
                 child_fn.set_sig_ident(match_arm.arm_function_name(&child_fn));
 
-                for arg in match_arm.introduce_args() {
-                    child_fn.append_arg(&FnArg::Typed(arg.clone()));
-                }
+                let insertion_index =
+                    function_kind.fragment_argument_index(child_fn.sig().inputs.len())?;
+                child_fn.insert_args(insertion_index, match_arm.introduce_args());
 
                 let embedded_query =
                     query.embed_fragment(fragment.fragment_name(), match_arm.sql_fragment())?;

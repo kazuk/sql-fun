@@ -87,6 +87,11 @@ You can build and run tests using the `check-test-flow` script.
 
 ## Generated Code
 
+- Before planning, implementing, or reviewing changes to code generators or
+  templates, read and apply
+  [docs/internal-rules/code-generator-guideline.md](docs/internal-rules/code-generator-guideline.md).
+  Keep the detailed rules and rationale there rather than duplicating them here.
+
 The following source file is generated automatically and must not be edited
 directly:
 

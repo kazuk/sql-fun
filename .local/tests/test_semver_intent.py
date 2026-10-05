@@ -97,6 +97,13 @@ class IntentTests(unittest.TestCase):
                 semver.unpack(archive, root / "output")
             self.assertFalse((root / "escape").exists())
 
+    def test_non_object_baseline_is_invalid_input(self):
+        with tempfile.TemporaryDirectory() as temporary:
+            root = Path(temporary)
+            (root / "manifest.json").write_text("[]")
+            with self.assertRaisesRegex(semver.CheckError, "must be an object"):
+                semver.validate_manifest(root, "target", [])
+
     def test_scope_and_schema_must_match(self):
         with tempfile.TemporaryDirectory() as temporary:
             fixture = ApiFixture(Path(temporary))

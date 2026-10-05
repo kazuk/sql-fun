@@ -37,7 +37,7 @@ def metadata(source):
                        and p["source"] is None and p["publish"] != []), key=lambda p: p["name"])
     if not packages:
         raise CheckError("no publishable workspace crates")
-    intent = data["metadata"].get("next-release", {})
+    intent = (data["metadata"] or {}).get("next-release", {})
     if not isinstance(intent, dict):
         raise CheckError("workspace.metadata.next-release must be a table")
     for package in packages:
@@ -79,7 +79,7 @@ def prepare(source, cache, target, features):
         raise CheckError("--source must select the repository root")
     revision = run(["git", "rev-parse", "HEAD"], source, True).strip()
     packages, intent = metadata(source)
-    files = repository_files(source)
+    files = [name for name in repository_files(source) if not (source / name).is_relative_to(cache)]
     key = source_key(source, files, target, features)
     root = cache / ("source-" + key)
     if (root / "manifest.json").is_file():
@@ -156,6 +156,8 @@ def baseline_root(archive, cache, target, features):
 
 def validate_manifest(root, target, features):
     manifest = json.loads((root / "manifest.json").read_text())
+    if not isinstance(manifest, dict):
+        raise CheckError("baseline descriptor must be an object")
     if manifest.get("schema") != SCHEMA:
         raise CheckError("unsupported baseline schema")
     if manifest.get("target") != target or manifest.get("features") != features:
@@ -273,7 +275,7 @@ def main():
             try:
                 with tarfile.open(temporary_path, "w:gz") as bundle:
                     bundle.add(current / "manifest.json", arcname="manifest.json")
-                    bundle.add(current / "packages", arcname="packages", filter=lambda member: None if member.name == "packages/target" or member.name.startswith("packages/target/") else member)
+                    bundle.add(current / "packages", arcname="packages")
                 temporary_path.replace(output)
             finally:
                 temporary_path.unlink(missing_ok=True)
@@ -285,6 +287,6 @@ def main():
 if __name__ == "__main__":
     try:
         sys.exit(main())
-    except (CheckError, OSError, ValueError, KeyError, tarfile.TarError) as error:
+    except (CheckError, OSError, ValueError, KeyError, tarfile.TarError, subprocess.CalledProcessError) as error:
         print(f"semver-intent: {error}", file=sys.stderr)
         sys.exit(2)

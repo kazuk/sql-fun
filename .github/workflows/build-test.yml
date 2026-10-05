@@ -111,7 +111,7 @@ jobs:
           path: |
             /usr/local/cargo/registry
             /usr/local/cargo/git
-          key: cargo-${{ runner.os }}-semver-${{ hashFiles('**/Cargo.lock') }}
+          key: cargo-${{ runner.os }}-semver-${{ hashFiles('Cargo.lock') }}
           restore-keys: |
             cargo-${{ runner.os }}-
 

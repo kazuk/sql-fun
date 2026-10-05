@@ -1,9 +1,9 @@
-use crate::sem::resolution::Resolution;
-use crate::sem::unresolved::{Dialect, XmlTable};
+use crate::ast::{Dialect, XmlTable};
+use crate::sem::Resolution;
 use crate::sem::{AnalysisError, DataSource, ScalarAnalysisContext};
 
 impl XmlTable {
-    pub(in crate::sem::unresolved) fn resolve(
+    pub(in crate::ast) fn resolve(
         &self,
         context: &mut Resolution<'_>,
         dialect: Dialect,

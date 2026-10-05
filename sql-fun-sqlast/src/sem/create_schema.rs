@@ -1,6 +1,6 @@
 use sql_fun_core::IVec;
 
-use crate::{sem::AstAndContextPair, sem::unresolved::TryFromWithTokens, syn::ScanToken};
+use crate::{ast::TryFromWithTokens, sem::AstAndContextPair, syn::ScanToken};
 
 use super::{AnalysisError, ParseContext, SemAst};
 
@@ -34,7 +34,7 @@ impl CreateSchema {
     where
         TParseContext: ParseContext,
     {
-        crate::sem::unresolved::Schema::try_from_with_tokens(&syn, tokens)?
-            .resolve_and_apply(context, crate::sem::unresolved::Dialect::postgres())
+        crate::ast::Schema::try_from_with_tokens(&syn, tokens)?
+            .resolve_and_apply(context, crate::ast::Dialect::postgres())
     }
 }

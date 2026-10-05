@@ -1,4 +1,4 @@
-use crate::sem::unresolved::{
+use crate::ast::{
     Alias, Call, Cte, CteBody, CteColumn, DerivedTable, Expr, Frame, FrameBound, FrameExclusion,
     FrameMode, FromGroup, FromItem, FromList, FromOpt, Grouping, Join, JoinKind, Name, Order,
     Query, QueryBody, Relation, Select, SetOperation, SetQuery, TableFunction, TableFunctions,
@@ -24,7 +24,7 @@ impl TryFrom<&syn::Select> for Query {
     type Error = AnalysisError;
 
     fn try_from(value: &syn::Select) -> Result<Self, Self::Error> {
-        crate::sem::stack::with_stack(|| Self::convert_sqlite(value))
+        crate::sem::with_stack(|| Self::convert_sqlite(value))
     }
 }
 
@@ -295,7 +295,9 @@ impl From<&syn::IndexedColumn> for CteColumn {
 }
 
 impl FromItem {
-    fn try_from_clause_opt(value: Option<&syn::FromClause>) -> Result<Vec<Self>, AnalysisError> {
+    pub(super) fn try_from_clause_opt(
+        value: Option<&syn::FromClause>,
+    ) -> Result<Vec<Self>, AnalysisError> {
         let Some(value) = value else {
             return Ok(Vec::new());
         };
@@ -338,7 +340,7 @@ impl TryFrom<&syn::SelectTable> for FromItem {
     type Error = AnalysisError;
 
     fn try_from(value: &syn::SelectTable) -> Result<Self, Self::Error> {
-        crate::sem::stack::with_stack(|| Self::convert_sqlite(value))
+        crate::sem::with_stack(|| Self::convert_sqlite(value))
     }
 }
 

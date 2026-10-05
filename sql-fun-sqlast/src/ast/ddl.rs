@@ -3,12 +3,12 @@
 use crate::{
     AstAndContextPair, StringSpan,
     sem::{
-        AnalysisError, AnalysisProblem, CreateDomain, ParseContext, SemAst, TypeReference,
-        resolution::{Catalog, Resolution, ResolutionContext, ResolutionOutcome},
+        AnalysisError, AnalysisProblem, Catalog, CreateDomain, ParseContext, Resolution,
+        ResolutionContext, ResolutionOutcome, SemAst, TypeReference,
     },
 };
 
-use super::{Dialect, Expr, Name, Statement, SyntaxOption, TypeName};
+use super::{Dialect, Expr, Name, StatementNode, SyntaxOption, TypeName};
 
 impl From<&crate::sem::FullName> for Name {
     fn from(value: &crate::sem::FullName) -> Self {
@@ -174,15 +174,15 @@ impl super::AlterCommand {
         mut context: TContext,
         dialect: Dialect,
         table: &crate::sem::TableName,
-    ) -> Result<(crate::sem::alter_table::AlterObjSubCommand, TContext), AnalysisError> {
+    ) -> Result<(crate::sem::AlterObjSubCommand, TContext), AnalysisError> {
         let mut resolution = Resolution::new(&context);
         let result = self.resolve(&mut resolution, dialect, table);
         let command = resolution.finish(result).report(&mut context)?;
         Ok((command, context))
     }
-    fn resolve_owner(&self) -> crate::sem::alter_table::AlterObjSubCommand {
+    fn resolve_owner(&self) -> crate::sem::AlterObjSubCommand {
         match self {
-            Self::Owner(owner) => crate::sem::alter_table::AlterObjSubCommand::change_owner(owner),
+            Self::Owner(owner) => crate::sem::AlterObjSubCommand::change_owner(owner),
             _ => todo!(),
         }
     }
@@ -218,7 +218,7 @@ impl super::AlterCommand {
         context: &mut Resolution<'_>,
         dialect: Dialect,
         table: &crate::sem::TableName,
-    ) -> Result<crate::sem::alter_table::AlterObjSubCommand, AnalysisError> {
+    ) -> Result<crate::sem::AlterObjSubCommand, AnalysisError> {
         match self {
             Self::Owner(_) => Ok(self.resolve_owner()),
             Self::Default(name, expr) => Self::resolve_default(context, dialect, table, name, expr),
@@ -245,8 +245,8 @@ impl super::AlterCommand {
         table: &crate::sem::TableName,
         name: &str,
         expr: &Expr,
-    ) -> Result<crate::sem::alter_table::AlterObjSubCommand, AnalysisError> {
-        use crate::sem::{ColumnName, ScalarAnalysisContext, alter_table::AlterObjSubCommand};
+    ) -> Result<crate::sem::AlterObjSubCommand, AnalysisError> {
+        use crate::sem::{AlterObjSubCommand, ColumnName, ScalarAnalysisContext};
         let name = ColumnName::from(name);
         let expr = expr.resolve_in(context, dialect, &ScalarAnalysisContext::default())?;
         Self::missing_column(context, table, &name)?;
@@ -257,8 +257,8 @@ impl super::AlterCommand {
         context: &mut Resolution<'_>,
         table: &crate::sem::TableName,
         constraint: &super::TableConstraint,
-    ) -> Result<crate::sem::alter_table::AlterObjSubCommand, AnalysisError> {
-        use crate::sem::alter_table::AlterObjSubCommand;
+    ) -> Result<crate::sem::AlterObjSubCommand, AnalysisError> {
+        use crate::sem::AlterObjSubCommand;
         Ok(AlterObjSubCommand::add_constraint(
             &constraint.resolve(context, table)?,
         ))
@@ -267,8 +267,8 @@ impl super::AlterCommand {
     fn resolve_cluster(
         context: &mut Resolution<'_>,
         name: &str,
-    ) -> Result<crate::sem::alter_table::AlterObjSubCommand, AnalysisError> {
-        use crate::sem::alter_table::AlterObjSubCommand;
+    ) -> Result<crate::sem::AlterObjSubCommand, AnalysisError> {
+        use crate::sem::AlterObjSubCommand;
         if !context.has_index(name) {
             context.report_problem(AnalysisProblem::index_not_found(name))?;
         }
@@ -278,8 +278,8 @@ impl super::AlterCommand {
     fn resolve_rename(
         context: &mut Resolution<'_>,
         name: &Name,
-    ) -> Result<crate::sem::alter_table::AlterObjSubCommand, AnalysisError> {
-        use crate::sem::{TableName, alter_table::AlterObjSubCommand};
+    ) -> Result<crate::sem::AlterObjSubCommand, AnalysisError> {
+        use crate::sem::{AlterObjSubCommand, TableName};
         let name = TableName::from(name.full_name()?);
         if context.get_table(&name).is_some() {
             context.report_problem(AnalysisProblem::relation_already_exists(&name))?;
@@ -292,8 +292,8 @@ impl super::AlterCommand {
         dialect: Dialect,
         table: &crate::sem::TableName,
         column: &super::Column,
-    ) -> Result<crate::sem::alter_table::AlterObjSubCommand, AnalysisError> {
-        use crate::sem::alter_table::AlterObjSubCommand;
+    ) -> Result<crate::sem::AlterObjSubCommand, AnalysisError> {
+        use crate::sem::AlterObjSubCommand;
         let column = column.resolve(context, dialect, table)?;
         if let Some(name) = column.name() {
             Self::existing_column(context, table, name)?;
@@ -307,8 +307,8 @@ impl super::AlterCommand {
         table: &crate::sem::TableName,
         name: &str,
         column: &super::Column,
-    ) -> Result<crate::sem::alter_table::AlterObjSubCommand, AnalysisError> {
-        use crate::sem::{ColumnName, alter_table::AlterObjSubCommand};
+    ) -> Result<crate::sem::AlterObjSubCommand, AnalysisError> {
+        use crate::sem::{AlterObjSubCommand, ColumnName};
         let name = ColumnName::from(name);
         Self::missing_column(context, table, &name)?;
         Ok(AlterObjSubCommand::alter_column(
@@ -322,8 +322,8 @@ impl super::AlterCommand {
         table: &crate::sem::TableName,
         from: &str,
         to: &str,
-    ) -> Result<crate::sem::alter_table::AlterObjSubCommand, AnalysisError> {
-        use crate::sem::{ColumnName, alter_table::AlterObjSubCommand};
+    ) -> Result<crate::sem::AlterObjSubCommand, AnalysisError> {
+        use crate::sem::{AlterObjSubCommand, ColumnName};
         let from = ColumnName::from(from);
         let to = ColumnName::from(to);
         Self::missing_column(context, table, &from)?;
@@ -337,8 +337,8 @@ impl super::AlterCommand {
         context: &mut Resolution<'_>,
         table: &crate::sem::TableName,
         name: &str,
-    ) -> Result<crate::sem::alter_table::AlterObjSubCommand, AnalysisError> {
-        use crate::sem::{ColumnName, alter_table::AlterObjSubCommand};
+    ) -> Result<crate::sem::AlterObjSubCommand, AnalysisError> {
+        use crate::sem::{AlterObjSubCommand, ColumnName};
         let name = ColumnName::from(name);
         Self::missing_column(context, table, &name)?;
         Ok(AlterObjSubCommand::drop_column(&name))
@@ -397,7 +397,7 @@ impl super::ColumnConstraint {
         name: &str,
         keys: &[crate::sem::ColumnName],
     ) -> crate::sem::Constraint {
-        use crate::sem::{Constraint, constraint::UniqueConstraint};
+        use crate::sem::{Constraint, UniqueConstraint};
         Constraint::unique(&UniqueConstraint::new(name, table, keys))
     }
 }
@@ -410,7 +410,7 @@ impl super::ForeignReference {
         name: &str,
         keys: &[crate::sem::ColumnName],
     ) -> Result<crate::sem::Constraint, AnalysisError> {
-        use crate::sem::{ColumnName, Constraint, TableName, constraint::ForeignKeyConstraint};
+        use crate::sem::{ColumnName, Constraint, ForeignKeyConstraint, TableName};
         let target = TableName::from(self.table.full_name()?);
         if context.get_table(&target).is_none() {
             context.report_problem(AnalysisProblem::relation_not_found(&target))?;
@@ -612,14 +612,11 @@ impl super::ColumnConstraint {
         column: &crate::sem::ColumnName,
     ) -> Result<crate::sem::ColumnConstraint, AnalysisError> {
         use crate::sem::{
-            ColumnConstraint, ScalarAnalysisContext,
-            column_constraints::{
-                AttrDeferrabilityColumnConstraint, AttrDeferredColumnConstraint,
-                AttrImmediateColumnConstraint, CheckColumnConstraint, CollateColumnConstraint,
-                ColumnNullabilityConstraint, DefaultColumnConstraint, ExclusionColumnConstraint,
-                GeneratedColumnConstraint, IdentityColumnConstraint, PrimaryKeyColumnConstraint,
-                UniqueColumnConstraint,
-            },
+            AttrDeferrabilityColumnConstraint, AttrDeferredColumnConstraint,
+            AttrImmediateColumnConstraint, CheckColumnConstraint, CollateColumnConstraint,
+            ColumnConstraint, ColumnNullabilityConstraint, DefaultColumnConstraint,
+            ExclusionColumnConstraint, GeneratedColumnConstraint, IdentityColumnConstraint,
+            PrimaryKeyColumnConstraint, ScalarAnalysisContext, UniqueColumnConstraint,
         };
         let scope = crate::sem::ScalarAnalysisContext::default();
         Ok(match self {
@@ -698,9 +695,7 @@ impl super::ForeignReference {
         table: &crate::sem::TableName,
         column: &crate::sem::ColumnName,
     ) -> Result<crate::sem::ColumnConstraint, AnalysisError> {
-        use crate::sem::{
-            ColumnConstraint, ColumnName, TableName, column_constraints::ForeignKeyColumnConstraint,
-        };
+        use crate::sem::{ColumnConstraint, ColumnName, ForeignKeyColumnConstraint, TableName};
         let target = TableName::from(self.table.full_name()?);
         #[cfg(feature = "sqlite")]
         for name in &self.ignored_matches {
@@ -844,12 +839,10 @@ impl Index {
         elements: &[super::IndexExpression],
         context: &mut Resolution<'_>,
         dialect: Dialect,
-    ) -> Result<crate::sem::create_index::IndexElementCollection, AnalysisError> {
+    ) -> Result<crate::sem::IndexElementCollection, AnalysisError> {
         use crate::sem::{
-            ColumnName, ScalarAnalysisContext,
-            create_index::{
-                IndexElement, IndexElementCollection, IndexElementWithOrder, SortOrder,
-            },
+            ColumnName, IndexElement, IndexElementCollection, IndexElementWithOrder,
+            ScalarAnalysisContext, SortOrder,
         };
         let mut collection = IndexElementCollection::default();
         for element in elements {
@@ -921,12 +914,12 @@ impl Index {
 #[derive(Clone, Debug)]
 pub(crate) struct Schema {
     name: String,
-    elements: Vec<Statement>,
+    elements: Vec<StatementNode>,
     if_not_exists: bool,
 }
 
 impl Schema {
-    pub(super) fn new(name: &str, elements: Vec<Statement>, if_not_exists: bool) -> Self {
+    pub(super) fn new(name: &str, elements: Vec<StatementNode>, if_not_exists: bool) -> Self {
         Self {
             name: name.to_owned(),
             elements,
@@ -1227,10 +1220,8 @@ impl Domain {
 #[cfg(test)]
 mod domain_tests {
     use crate::{
-        sem::{
-            SemAst,
-            unresolved::{Dialect, Statement, TryFromWithTokens},
-        },
+        ast::{Dialect, StatementNode, TryFromWithTokens},
+        sem::SemAst,
         test_helpers::{SynBuilder, TestParseContext},
     };
     use ::sql_fun_core::IVec;
@@ -1238,7 +1229,7 @@ mod domain_tests {
     #[test]
     fn missing_base_type_is_diagnosed_only_during_resolution() -> testresult::TestResult {
         let parser = SynBuilder::new();
-        let syntax = Statement::try_from_with_tokens(
+        let syntax = StatementNode::try_from_with_tokens(
             &parser.parse("create domain email as absent"),
             &IVec::default(),
         )?;

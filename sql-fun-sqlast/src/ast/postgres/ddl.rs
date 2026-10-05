@@ -1,6 +1,6 @@
 use super::required;
 
-impl TryFrom<syn::ObjectType> for crate::sem::unresolved::AlterRelationKind {
+impl TryFrom<syn::ObjectType> for crate::ast::AlterRelationKind {
     type Error = AnalysisError;
     fn try_from(value: syn::ObjectType) -> Result<Self, Self::Error> {
         Ok(match value {
@@ -13,13 +13,13 @@ impl TryFrom<syn::ObjectType> for crate::sem::unresolved::AlterRelationKind {
     }
 }
 
-impl TryFromWithTokens<&syn::AlterTableStmt> for crate::sem::unresolved::AlterRelation {
+impl TryFromWithTokens<&syn::AlterTableStmt> for crate::ast::AlterRelation {
     type Error = AnalysisError;
     fn try_from_with_tokens(
         value: &syn::AlterTableStmt,
         tokens: &IVec<syn::ScanToken>,
     ) -> Result<Self, Self::Error> {
-        use crate::sem::unresolved::{AlterCommand, AlterRelationKind, Relation};
+        use crate::ast::{AlterCommand, AlterRelationKind, Relation};
         let relation = required(value.get_relation().as_inner(), "alter_table.relation")?;
         let mut commands = Vec::new();
         for command in value
@@ -41,13 +41,13 @@ impl TryFromWithTokens<&syn::AlterTableStmt> for crate::sem::unresolved::AlterRe
     }
 }
 
-impl TryFromWithTokens<&syn::AlterTableCmd> for crate::sem::unresolved::AlterCommand {
+impl TryFromWithTokens<&syn::AlterTableCmd> for crate::ast::AlterCommand {
     type Error = AnalysisError;
     fn try_from_with_tokens(
         value: &syn::AlterTableCmd,
         tokens: &IVec<syn::ScanToken>,
     ) -> Result<Self, Self::Error> {
-        use crate::sem::unresolved::{Column, TableConstraint};
+        use crate::ast::{Column, TableConstraint};
         Ok(
             match required(value.get_subtype().as_inner(), "alter_table_cmd.subtype")? {
                 syn::AlterTableType::AtChangeOwner => Self::Owner(required(
@@ -82,13 +82,13 @@ impl TryFromWithTokens<&syn::AlterTableCmd> for crate::sem::unresolved::AlterCom
     }
 }
 
-impl TryFromWithTokens<&syn::CreateStmt> for crate::sem::unresolved::Table {
+impl TryFromWithTokens<&syn::CreateStmt> for crate::ast::Table {
     type Error = AnalysisError;
     fn try_from_with_tokens(
         value: &syn::CreateStmt,
         tokens: &IVec<syn::ScanToken>,
     ) -> Result<Self, Self::Error> {
-        use crate::sem::unresolved::{Column, Relation, TableConstraint};
+        use crate::ast::{Column, Relation, TableConstraint};
         let relation = required(value.get_relation().as_inner(), "create_table.relation")?;
         let relation = Relation::try_from(&relation)?;
         let mut columns = Vec::new();
@@ -114,13 +114,13 @@ impl TryFromWithTokens<&syn::CreateStmt> for crate::sem::unresolved::Table {
     }
 }
 
-impl TryFromWithTokens<&syn::ColumnDef> for crate::sem::unresolved::Column {
+impl TryFromWithTokens<&syn::ColumnDef> for crate::ast::Column {
     type Error = AnalysisError;
     fn try_from_with_tokens(
         value: &syn::ColumnDef,
         tokens: &IVec<syn::ScanToken>,
     ) -> Result<Self, Self::Error> {
-        use crate::sem::unresolved::TableConstraint;
+        use crate::ast::TableConstraint;
         let type_name = required(value.get_type_name().as_inner(), "column.type_name")?;
         let mut constraints = Vec::new();
         for constraint in value
@@ -139,7 +139,7 @@ impl TryFromWithTokens<&syn::ColumnDef> for crate::sem::unresolved::Column {
     }
 }
 
-impl TryFromWithTokens<&syn::Constraint> for crate::sem::unresolved::TableConstraint {
+impl TryFromWithTokens<&syn::Constraint> for crate::ast::TableConstraint {
     type Error = AnalysisError;
     fn try_from_with_tokens(
         value: &syn::Constraint,
@@ -158,24 +158,19 @@ impl TryFromWithTokens<&syn::Constraint> for crate::sem::unresolved::TableConstr
             keys: Name::try_from(keys)?.0,
             order: Vec::new(),
             auto_increment: false,
-            constraint: crate::sem::unresolved::ColumnConstraint::try_from_with_tokens(
-                value, tokens,
-            )?,
+            constraint: crate::ast::ColumnConstraint::try_from_with_tokens(value, tokens)?,
         })
     }
 }
 
-impl TryFromWithTokens<&syn::Constraint> for crate::sem::unresolved::ColumnConstraint {
+impl TryFromWithTokens<&syn::Constraint> for crate::ast::ColumnConstraint {
     type Error = AnalysisError;
     fn try_from_with_tokens(
         value: &syn::Constraint,
         tokens: &IVec<syn::ScanToken>,
     ) -> Result<Self, Self::Error> {
-        use crate::sem::{
-            Deferrable, Validity,
-            column_constraints::{GeneratedColumnMode, IdentityColumnMode},
-            unresolved::ForeignReference,
-        };
+        use crate::ast::ForeignReference;
+        use crate::sem::{Deferrable, GeneratedColumnMode, IdentityColumnMode, Validity};
         let kind = required(value.get_contype().as_inner(), "constraint.contype")?;
         Ok(match kind {
             syn::ConstrType::ConstrNull => {
@@ -219,14 +214,11 @@ impl TryFromWithTokens<&syn::Constraint> for crate::sem::unresolved::ColumnConst
     }
 }
 
-impl TryFrom<&syn::Constraint> for crate::sem::unresolved::ForeignReference {
+impl TryFrom<&syn::Constraint> for crate::ast::ForeignReference {
     type Error = AnalysisError;
     fn try_from(value: &syn::Constraint) -> Result<Self, Self::Error> {
-        use crate::sem::{
-            Validity,
-            column_constraints::{Deferrability, ForeignKeyAction, ForeignKeyMatchType},
-            unresolved::Relation,
-        };
+        use crate::ast::Relation;
+        use crate::sem::{Deferrability, ForeignKeyAction, ForeignKeyMatchType, Validity};
         let table = required(value.get_pktable().as_inner(), "constraint.pktable")?;
         Ok(Self {
             table: Relation::try_from(&table)?.name,
@@ -244,25 +236,23 @@ impl TryFrom<&syn::Constraint> for crate::sem::unresolved::ForeignReference {
     }
 }
 use crate::{
-    sem::{
-        AnalysisError,
-        unresolved::{
-            Expr, Name, Statement, SyntaxOption, TryCollectFromWithTokens, TryFromWithTokens,
-            TryFromWithTokensOpt, TypeName,
-            ddl::{Function, FunctionParameter, ParameterMode, Schema},
-        },
+    ast::{
+        Expr, Name, StatementNode, SyntaxOption, TryCollectFromWithTokens, TryFromWithTokens,
+        TryFromWithTokensOpt, TypeName,
+        ddl::{Function, FunctionParameter, ParameterMode, Schema},
     },
+    sem::AnalysisError,
     syn::{self, ListOpt, Opt},
 };
 use ::sql_fun_core::IVec;
 
-impl TryFromWithTokens<&syn::CreateTableAsStmt> for crate::sem::unresolved::TableAs {
+impl TryFromWithTokens<&syn::CreateTableAsStmt> for crate::ast::TableAs {
     type Error = AnalysisError;
     fn try_from_with_tokens(
         value: &syn::CreateTableAsStmt,
         tokens: &IVec<syn::ScanToken>,
     ) -> Result<Self, Self::Error> {
-        use crate::sem::unresolved::{Into, Query};
+        use crate::ast::{Into, Query};
         let into = required(value.get_into().as_inner(), "create_table_as.into")?;
         let query = required(
             value.get_query().as_select_stmt().as_inner(),
@@ -278,13 +268,13 @@ impl TryFromWithTokens<&syn::CreateTableAsStmt> for crate::sem::unresolved::Tabl
     }
 }
 
-impl TryFromWithTokens<&syn::IndexStmt> for crate::sem::unresolved::Index {
+impl TryFromWithTokens<&syn::IndexStmt> for crate::ast::Index {
     type Error = AnalysisError;
     fn try_from_with_tokens(
         value: &syn::IndexStmt,
         tokens: &IVec<syn::ScanToken>,
     ) -> Result<Self, Self::Error> {
-        use crate::sem::unresolved::{IndexExpression, Relation};
+        use crate::ast::{IndexExpression, Relation};
         let relation = required(value.get_relation().as_inner(), "index.relation")?;
         let mut keys = Vec::new();
         for key in value
@@ -323,7 +313,7 @@ impl TryFromWithTokens<&syn::CreateSchemaStmt> for Schema {
     ) -> Result<Self, Self::Error> {
         let mut elements = Vec::new();
         for element in value.get_schema_elts().as_inner().unwrap_or_default() {
-            elements.push(Statement::try_from_with_tokens(&element, tokens)?);
+            elements.push(StatementNode::try_from_with_tokens(&element, tokens)?);
         }
         Ok(Self::new(
             &value.get_schemaname(),

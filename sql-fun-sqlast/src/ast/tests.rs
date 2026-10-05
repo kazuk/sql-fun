@@ -7,7 +7,7 @@ mod test_helpers;
 
 use self::test_helpers::postgres;
 
-use crate::sem::unresolved::{Dialect, Statement, TryFromWithTokens};
+use crate::ast::{Dialect, StatementNode, TryFromWithTokens};
 use crate::sem::{ColumnName, PgBuiltInType};
 use crate::test_helpers::{SynBuilder, TestParseContext, source_span};
 
@@ -41,7 +41,7 @@ fn postgres_top_level_statement_construction_is_context_free(
     #[case] sql: &str,
 ) -> testresult::TestResult {
     let statement = SynBuilder::new().parse(sql);
-    Statement::try_from_with_tokens(&statement, &IVec::default())?;
+    StatementNode::try_from_with_tokens(&statement, &IVec::default())?;
     Ok(())
 }
 
@@ -59,14 +59,15 @@ fn postgres_top_level_statement_construction_is_context_free(
 fn ddl_construction_does_not_require_referenced_objects(
     #[case] sql: &str,
 ) -> testresult::TestResult {
-    let syntax = Statement::try_from_with_tokens(&SynBuilder::new().parse(sql), &IVec::default())?;
+    let syntax =
+        StatementNode::try_from_with_tokens(&SynBuilder::new().parse(sql), &IVec::default())?;
     assert!(matches!(
         syntax,
-        Statement::Table(_)
-            | Statement::Domain(_)
-            | Statement::Schema(_)
-            | Statement::Function(_)
-            | Statement::Index(_)
+        StatementNode::Table(_)
+            | StatementNode::Domain(_)
+            | StatementNode::Schema(_)
+            | StatementNode::Function(_)
+            | StatementNode::Index(_)
     ));
     Ok(())
 }
@@ -75,11 +76,11 @@ fn ddl_construction_does_not_require_referenced_objects(
 fn table_resolves_with_read_only_catalog(
     source_span: crate::sem::SourcePathWithSpan,
 ) -> testresult::TestResult {
-    let syntax = Statement::try_from_with_tokens(
+    let syntax = StatementNode::try_from_with_tokens(
         &SynBuilder::new().parse("create table items (id integer default 1)"),
         &IVec::default(),
     )?;
-    let Statement::Table(table) = syntax else {
+    let StatementNode::Table(table) = syntax else {
         panic!("table syntax");
     };
     let catalog = test_helpers::ReadOnlyCatalog::new();
@@ -101,7 +102,8 @@ fn table_resolves_with_read_only_catalog(
 )]
 #[case("create index items_idx on items (id desc) include (extra)")]
 fn ddl_resolution_needs_no_catalog_write_interface(#[case] sql: &str) -> testresult::TestResult {
-    let syntax = Statement::try_from_with_tokens(&SynBuilder::new().parse(sql), &IVec::default())?;
+    let syntax =
+        StatementNode::try_from_with_tokens(&SynBuilder::new().parse(sql), &IVec::default())?;
     let catalog = test_helpers::ReadOnlyCatalog::new();
     let mut diagnostics = TestParseContext::default();
     syntax
@@ -124,10 +126,13 @@ fn sqlite_ddl_owns_syntax_after_parser_input_is_dropped(
 ) -> testresult::TestResult {
     let syntax = {
         let parsed = crate::test_helpers::SqliteSynBuilder.parse_as_stmt(sql);
-        Statement::try_from(&parsed)?
+        StatementNode::try_from(&parsed)?
     };
-    assert_eq!(matches!(syntax, Statement::Table(_)), is_create);
-    assert_eq!(matches!(syntax, Statement::AlterRelation(_)), !is_create);
+    assert_eq!(matches!(syntax, StatementNode::Table(_)), is_create);
+    assert_eq!(
+        matches!(syntax, StatementNode::AlterRelation(_)),
+        !is_create
+    );
     Ok(())
 }
 
@@ -137,7 +142,7 @@ fn sqlite_table_retains_named_constraints_order_and_options() -> testresult::Tes
     let parsed = crate::test_helpers::SqliteSynBuilder.parse_as_stmt(
         "create table items (id integer, label text, constraint pk primary key (id desc)) without rowid, strict",
     );
-    let Statement::Table(table) = Statement::try_from(&parsed)? else {
+    let StatementNode::Table(table) = StatementNode::try_from(&parsed)? else {
         panic!("table syntax");
     };
     assert_eq!(table.constraints[0].name.as_deref(), Some("pk"));
@@ -390,8 +395,8 @@ fn context_free_dml_expression_syntax(#[case] sql: &str) -> testresult::TestResu
 
 #[cfg(feature = "sqlite")]
 mod sqlite {
-    use crate::sem::unresolved::tests::test_helpers::{ReadOnlyCatalog, postgres, sqlite};
-    use crate::sem::unresolved::{Dialect, Expr};
+    use crate::ast::tests::test_helpers::{ReadOnlyCatalog, postgres, sqlite};
+    use crate::ast::{Dialect, Expr};
     use crate::sem::{ColumnName, MutSourcePathWithSpan, PgBuiltInType, SemAst};
     use crate::test_helpers::{SqliteSynBuilder, TestParseContext, source_span};
 
@@ -520,7 +525,7 @@ mod sqlite {
 #[case::colon(":name")]
 #[case::at("@name")]
 fn sqlite_upgrade_preserves_complete_parameter_names(#[case] name: &str) -> testresult::TestResult {
-    use crate::sem::unresolved::Expr;
+    use crate::ast::Expr;
     use crate::test_helpers::SqliteSynBuilder;
 
     let parsed = SqliteSynBuilder.parse_expression(&format!("SELECT {name}"));
@@ -536,7 +541,7 @@ fn sqlite_upgrade_preserves_complete_parameter_names(#[case] name: &str) -> test
 #[cfg(feature = "sqlite")]
 #[test]
 fn sqlite_upgrade_preserves_parameter_reuse() -> testresult::TestResult {
-    use crate::sem::unresolved::Expr;
+    use crate::ast::Expr;
     use crate::test_helpers::SqliteSynBuilder;
 
     let parsed =
@@ -562,7 +567,7 @@ fn sqlite_upgrade_preserves_parameter_reuse() -> testresult::TestResult {
 fn sqlite_parenthesized_in_subqueries_keep_membership_semantics(
     #[values("(SELECT 2)", "((SELECT 2))", "(((SELECT 2)))")] rhs: &str,
 ) -> testresult::TestResult {
-    use crate::sem::unresolved::{BooleanOperator, Expr, Literal, SubqueryKind};
+    use crate::ast::{BooleanOperator, Expr, Literal, SubqueryKind};
     use crate::test_helpers::SqliteSynBuilder;
 
     let parsed = SqliteSynBuilder.parse_expression(&format!("SELECT 1 IN {rhs}"));
@@ -595,7 +600,7 @@ fn sqlite_parenthesized_in_subqueries_keep_membership_semantics(
 #[cfg(feature = "sqlite")]
 #[test]
 fn sqlite_scalar_subquery_keeps_scalar_semantics() -> testresult::TestResult {
-    use crate::sem::unresolved::{Expr, SubqueryKind};
+    use crate::ast::{Expr, SubqueryKind};
     use crate::test_helpers::SqliteSynBuilder;
 
     let parsed = SqliteSynBuilder.parse_expression("SELECT (SELECT 2)");
@@ -617,7 +622,7 @@ fn sqlite_blob_semantics_keep_hex_payload_after_spelling_upgrade(
     #[case] sql: &str,
     #[case] payload: &str,
 ) -> testresult::TestResult {
-    use crate::sem::unresolved::{Expr, Literal};
+    use crate::ast::{Expr, Literal};
     use crate::test_helpers::SqliteSynBuilder;
 
     let parsed = SqliteSynBuilder.parse_expression(sql);

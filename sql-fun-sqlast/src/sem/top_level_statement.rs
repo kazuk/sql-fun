@@ -1,8 +1,7 @@
 use crate::{
     AstAndContextPair,
-    sem::{
-        AnalysisError, ParseContext, SemAst, create_table::DropTable, unresolved::TryFromWithTokens,
-    },
+    ast::TryFromWithTokens,
+    sem::{AnalysisError, ParseContext, SemAst, create_table::DropTable},
     syn::{ListOpt, Opt, ParseResult},
 };
 #[cfg(feature = "sqlite")]
@@ -64,8 +63,8 @@ impl SemAst {
             AnalysisError::never();
         };
 
-        let syntax = crate::sem::unresolved::Statement::try_from_with_tokens(&statement, tokens)?;
-        syntax.resolve_and_apply(context, crate::sem::unresolved::Dialect::postgres())
+        let syntax = crate::ast::StatementNode::try_from_with_tokens(&statement, tokens)?;
+        syntax.resolve_and_apply(context, crate::ast::Dialect::postgres())
     }
 
     /// analyze [`Stmt`]
@@ -85,21 +84,19 @@ impl SemAst {
 
         match syn {
             Stmt::AlterTable(alter_table) => {
-                let syntax =
-                    crate::sem::unresolved::Statement::try_from(&Stmt::AlterTable(alter_table))?;
-                syntax.resolve_and_apply(context, crate::sem::unresolved::Dialect::sqlite())
+                let syntax = crate::ast::StatementNode::try_from(&Stmt::AlterTable(alter_table))?;
+                syntax.resolve_and_apply(context, crate::ast::Dialect::sqlite())
             }
             Stmt::CreateTable(create_table_statement) => {
-                let syntax = crate::sem::unresolved::Statement::try_from(&Stmt::CreateTable(
+                let syntax = crate::ast::StatementNode::try_from(&Stmt::CreateTable(
                     create_table_statement,
                 ))?;
-                syntax.resolve_and_apply(context, crate::sem::unresolved::Dialect::sqlite())
+                syntax.resolve_and_apply(context, crate::ast::Dialect::sqlite())
             }
             Stmt::DropTable(drop_table_statement) => {
-                let syntax = crate::sem::unresolved::Statement::try_from(&Stmt::DropTable(
-                    drop_table_statement,
-                ))?;
-                syntax.resolve_and_apply(context, crate::sem::unresolved::Dialect::sqlite())
+                let syntax =
+                    crate::ast::StatementNode::try_from(&Stmt::DropTable(drop_table_statement))?;
+                syntax.resolve_and_apply(context, crate::ast::Dialect::sqlite())
             }
             Stmt::Analyze(_analyze_statement) => todo!(),
             Stmt::Attach(_attach_statement) => todo!(),
@@ -118,8 +115,8 @@ impl SemAst {
             Stmt::CreateTrigger(_create_trigger_statement) => todo!(),
             Stmt::DropTrigger(_drop_trigger_statement) => todo!(),
             Stmt::CreateView(view) => {
-                let syntax = crate::sem::unresolved::Statement::try_from(&Stmt::CreateView(view))?;
-                syntax.resolve_and_apply(context, crate::sem::unresolved::Dialect::sqlite())
+                let syntax = crate::ast::StatementNode::try_from(&Stmt::CreateView(view))?;
+                syntax.resolve_and_apply(context, crate::ast::Dialect::sqlite())
             }
             Stmt::CreateMaterializedView(_create_materialized_view) => todo!(),
             Stmt::DropView(_drop_view) => todo!(),
@@ -128,8 +125,8 @@ impl SemAst {
             Stmt::CreateSequence(_create_sequence_statement) => todo!(),
             Stmt::DropSequence(_drop_sequence_statement) => todo!(),
             Stmt::Select(select) => {
-                let syntax = crate::sem::unresolved::Statement::try_from(&Stmt::Select(select))?;
-                syntax.resolve_and_apply(context, crate::sem::unresolved::Dialect::sqlite())
+                let syntax = crate::ast::StatementNode::try_from(&Stmt::Select(select))?;
+                syntax.resolve_and_apply(context, crate::ast::Dialect::sqlite())
             }
             Stmt::Update(_update) => todo!(),
             Stmt::Delete(_delete_statement) => todo!(),

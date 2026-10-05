@@ -1,7 +1,7 @@
 use sql_fun_core::IVec;
 
 use crate::{
-    sem::unresolved::TryFromWithTokens,
+    ast::TryFromWithTokens,
     sem::{
         AnalysisError, AstAndContextPair, ColumnCollection, FullName, FunctionOverloadCollection,
         OverloadVariant, ParseContext, type_system::ArgumentBindingCollection,
@@ -78,7 +78,7 @@ impl CreateFunction {
     where
         TParseContext: ParseContext,
     {
-        crate::sem::unresolved::Function::try_from_with_tokens(&syn, tokens)?
-            .resolve_and_apply(context, crate::sem::unresolved::Dialect::postgres())
+        crate::ast::Function::try_from_with_tokens(&syn, tokens)?
+            .resolve_and_apply(context, crate::ast::Dialect::postgres())
     }
 }

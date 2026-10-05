@@ -1,7 +1,8 @@
 use sql_fun_core::IVec;
 
 use crate::{
-    sem::{AstAndContextPair, TypeReference, unresolved::TryFromWithTokens},
+    ast::TryFromWithTokens,
+    sem::{AstAndContextPair, TypeReference},
     syn::ScanToken,
 };
 
@@ -42,7 +43,6 @@ impl CreateDomain {
     where
         TParseContext: ParseContext,
     {
-        crate::sem::unresolved::Domain::try_from_with_tokens(&syn, tokens)?
-            .resolve_and_apply(context)
+        crate::ast::Domain::try_from_with_tokens(&syn, tokens)?.resolve_and_apply(context)
     }
 }

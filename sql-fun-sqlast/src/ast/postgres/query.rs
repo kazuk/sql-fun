@@ -1,5 +1,5 @@
-use crate::sem::unresolved::postgres::{nonempty, required};
-use crate::sem::unresolved::{
+use crate::ast::postgres::{nonempty, required};
+use crate::ast::{
     Access, Alias, Assignment, CommitAction, Conflict, ConflictAction, Cte, CteBody, Cycle, Delete,
     DerivedTable, Expr, Frame, FrameBound, FrameExclusion, FrameMode, FromItem, Grouping,
     IndexExpression, Insert, Into, Join, JoinKind, JsonTable, Lock, LockStrength, LockWait, Merge,
@@ -20,7 +20,7 @@ impl TryFromWithTokens<&syn::SelectStmt> for Query {
         value: &syn::SelectStmt,
         tokens: &IVec<crate::syn::ScanToken>,
     ) -> Result<Self, Self::Error> {
-        crate::sem::stack::with_stack(|| Self::convert_postgres(value, tokens))
+        crate::sem::with_stack(|| Self::convert_postgres(value, tokens))
     }
 }
 
@@ -154,7 +154,7 @@ impl TryFromWithTokens<&syn::SelectStmt> for QueryBody {
 }
 
 impl SetOperation {
-    pub(in crate::sem::unresolved) fn postgres(
+    pub(in crate::ast) fn postgres(
         operation: Option<syn::SetOperation>,
     ) -> Result<Option<Self>, AnalysisError> {
         match operation {
@@ -288,7 +288,7 @@ impl TryFromWithTokens<&syn::CommonTableExpr> for Cte {
     ) -> Result<Self, Self::Error> {
         Ok(Self {
             name: value.get_ctename(),
-            columns: crate::sem::unresolved::CteColumn::from_names(
+            columns: crate::ast::CteColumn::from_names(
                 &Name::try_from(value.get_aliascolnames())?.0,
             ),
             materialized: match value.get_ctematerialized().as_inner() {
@@ -308,7 +308,7 @@ impl TryFromWithTokens<&syn::CommonTableExpr> for Cte {
 }
 
 impl CteBody {
-    pub(in crate::sem::unresolved) fn postgres(
+    pub(in crate::ast) fn postgres(
         value: &syn::Node,
         tokens: &IVec<syn::ScanToken>,
     ) -> Result<Self, AnalysisError> {
@@ -361,9 +361,7 @@ impl TryFromWithTokens<&syn::CteCycleClause> for Cycle {
 }
 
 impl Alias {
-    pub(in crate::sem::unresolved) fn postgres(
-        value: syn::AliasOpt,
-    ) -> Result<Option<Self>, AnalysisError> {
+    pub(in crate::ast) fn postgres(value: syn::AliasOpt) -> Result<Option<Self>, AnalysisError> {
         value
             .as_inner()
             .map(|alias| {
@@ -429,7 +427,7 @@ impl TryFromWithTokens<&syn::Node> for FromItem {
         node: &syn::Node,
         tokens: &IVec<crate::syn::ScanToken>,
     ) -> Result<Self, Self::Error> {
-        crate::sem::stack::with_stack(|| Self::convert_postgres(node, tokens))
+        crate::sem::with_stack(|| Self::convert_postgres(node, tokens))
     }
 }
 
@@ -604,7 +602,7 @@ impl TryFromWithTokensOpt<&syn::WindowDef> for Frame {
 }
 
 impl FrameMode {
-    pub(in crate::sem::unresolved) const fn postgres(flags: i32) -> Self {
+    pub(in crate::ast) const fn postgres(flags: i32) -> Self {
         if flags & 0x00004 != 0 {
             Self::Rows
         } else if flags & 0x00008 != 0 {
@@ -616,7 +614,7 @@ impl FrameMode {
 }
 
 impl FrameBound {
-    pub(in crate::sem::unresolved) fn postgres(
+    pub(in crate::ast) fn postgres(
         flags: i32,
         start: bool,
         offset: Option<Expr>,
@@ -639,7 +637,7 @@ impl FrameBound {
 }
 
 impl FrameExclusion {
-    pub(in crate::sem::unresolved) const fn postgres(flags: i32) -> Option<Self> {
+    pub(in crate::ast) const fn postgres(flags: i32) -> Option<Self> {
         if flags & 0x08000 != 0 {
             Some(Self::CurrentRow)
         } else if flags & 0x10000 != 0 {
@@ -653,7 +651,7 @@ impl FrameExclusion {
 }
 
 impl Lock {
-    pub(in crate::sem::unresolved) fn postgres_list(
+    pub(in crate::ast) fn postgres_list(
         nodes: syn::NodeListOpt,
     ) -> Result<Vec<Self>, AnalysisError> {
         let mut locks = Vec::new();
@@ -707,6 +705,7 @@ impl TryFromWithTokens<&syn::InsertStmt> for Insert {
         tokens: &IVec<crate::syn::ScanToken>,
     ) -> Result<Self, Self::Error> {
         Ok(Self {
+            or_conflict: None,
             with: With::try_from_with_tokens(value.get_with_clause(), tokens)?,
             relation: Relation::try_from(&required(
                 value.get_relation().as_inner(),
@@ -742,6 +741,7 @@ impl TryFromWithTokens<&syn::UpdateStmt> for Update {
         tokens: &IVec<crate::syn::ScanToken>,
     ) -> Result<Self, Self::Error> {
         Ok(Self {
+            or_conflict: None,
             with: With::try_from_with_tokens(value.get_with_clause(), tokens)?,
             relation: Relation::try_from(&required(
                 value.get_relation().as_inner(),
@@ -796,6 +796,7 @@ impl TryFromWithTokens<&syn::OnConflictClause> for Conflict {
             constraint = nonempty(infer.get_conname());
         }
         Ok(Self {
+            next: None,
             action: ConflictAction::try_from_opt(value.get_action().as_inner())?,
             inference,
             inference_predicate,

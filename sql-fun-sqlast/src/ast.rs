@@ -12,12 +12,18 @@
 
 mod ddl;
 mod document;
+mod mutation;
 mod postgres;
+mod public;
 mod resolve;
 #[cfg(feature = "sqlite")]
 mod sqlite;
 #[cfg(test)]
 mod tests;
+mod validation;
+
+pub use self::mutation::{AstMutationError, CteDefinition, HaveWithClause, WithClauseMut};
+pub use self::public::{CommonTableExpression, Statement, StatementKind, WithClause};
 
 use sql_fun_core::IVec;
 
@@ -77,11 +83,8 @@ pub(crate) enum ColumnConstraint {
         Option<crate::sem::Deferrable>,
     ),
     Unique(Option<crate::sem::ConflictClause>),
-    Identity(crate::sem::column_constraints::IdentityColumnMode),
-    Generated(
-        Expr,
-        Option<crate::sem::column_constraints::GeneratedColumnMode>,
-    ),
+    Identity(crate::sem::IdentityColumnMode),
+    Generated(Expr, Option<crate::sem::GeneratedColumnMode>),
     ForeignKey(ForeignReference),
     Exclusion,
     Deferrability(bool),
@@ -94,10 +97,10 @@ pub(crate) enum ColumnConstraint {
 pub(crate) struct ForeignReference {
     table: Name,
     columns: Vec<String>,
-    match_type: Option<crate::sem::column_constraints::ForeignKeyMatchType>,
-    delete_action: Option<crate::sem::column_constraints::ForeignKeyAction>,
-    update_action: Option<crate::sem::column_constraints::ForeignKeyAction>,
-    deferrability: Option<crate::sem::column_constraints::Deferrability>,
+    match_type: Option<crate::sem::ForeignKeyMatchType>,
+    delete_action: Option<crate::sem::ForeignKeyAction>,
+    update_action: Option<crate::sem::ForeignKeyAction>,
+    deferrability: Option<crate::sem::Deferrability>,
     validity: Option<crate::sem::Validity>,
     ignored_matches: Vec<String>,
 }
@@ -138,7 +141,7 @@ pub(crate) enum AlterCommand {
 /// Parser frontends construct it without catalog access; semantic resolution is
 /// performed only after construction has completed.
 #[derive(Clone, Debug)]
-pub(crate) enum Statement {
+pub(crate) enum StatementNode {
     Query(Query),
     Insert(Insert),
     Update(Update),
@@ -162,7 +165,7 @@ pub(crate) enum Statement {
     AlterRelation(AlterRelation),
 }
 
-impl Statement {
+impl StatementNode {
     const fn query(value: Query) -> Self {
         Self::Query(value)
     }
@@ -246,9 +249,9 @@ impl Statement {
 
     pub(crate) fn resolve(
         &self,
-        catalog: &dyn crate::sem::resolution::Catalog,
+        catalog: &dyn crate::sem::Catalog,
         dialect: Dialect,
-    ) -> crate::sem::resolution::ResolutionOutcome<crate::sem::SemAst> {
+    ) -> crate::sem::ResolutionOutcome<crate::sem::SemAst> {
         match self {
             Self::Query(query) => query
                 .resolve(catalog, dialect)
@@ -256,63 +259,62 @@ impl Statement {
             // DML semantic analysis currently has no catalog-dependent result.
             // Keep construction at the common boundary so that its eventual
             // resolver can replace these markers without changing frontends.
-            Self::Insert(_) => crate::sem::resolution::Resolution::new(catalog).finish(Ok(
+            Self::Insert(_) => crate::sem::Resolution::new(catalog).finish(Ok(
                 crate::sem::SemAst::InsertStatement(crate::sem::InsertStatement::empty()),
             )),
-            Self::Update(_) => crate::sem::resolution::Resolution::new(catalog).finish(Ok(
+            Self::Update(_) => crate::sem::Resolution::new(catalog).finish(Ok(
                 crate::sem::SemAst::UpdateStatement(crate::sem::UpdateStatement::empty()),
             )),
-            Self::Delete(_) => crate::sem::resolution::Resolution::new(catalog).finish(Ok(
+            Self::Delete(_) => crate::sem::Resolution::new(catalog).finish(Ok(
                 crate::sem::SemAst::DeleteStatement(crate::sem::DeleteStatement::empty()),
             )),
-            Self::View(_) => crate::sem::resolution::Resolution::new(catalog).finish(
+            Self::View(_) => crate::sem::Resolution::new(catalog).finish(
                 crate::sem::AnalysisError::raise_unexpected_input(
                     "view requires catalog application",
                 ),
             ),
-            Self::Extension(_) => crate::sem::resolution::Resolution::new(catalog).finish(
+            Self::Extension(_) => crate::sem::Resolution::new(catalog).finish(
                 crate::sem::AnalysisError::raise_unexpected_input(
                     "extension requires catalog application",
                 ),
             ),
-            Self::VariableSet(_) => crate::sem::resolution::Resolution::new(catalog).finish(
+            Self::VariableSet(_) => crate::sem::Resolution::new(catalog).finish(
                 crate::sem::AnalysisError::raise_unexpected_input(
                     "variable set requires catalog application",
                 ),
             ),
-            Self::EnumType(_) => crate::sem::resolution::Resolution::new(catalog).finish(
+            Self::EnumType(_) => crate::sem::Resolution::new(catalog).finish(
                 crate::sem::AnalysisError::raise_unexpected_input(
                     "enum type requires catalog application",
                 ),
             ),
-            Self::Sequence(_) => crate::sem::resolution::Resolution::new(catalog).finish(
+            Self::Sequence(_) => crate::sem::Resolution::new(catalog).finish(
                 crate::sem::AnalysisError::raise_unexpected_input(
                     "sequence requires catalog application",
                 ),
             ),
-            Self::DropTable(_) => crate::sem::resolution::Resolution::new(catalog).finish(
+            Self::DropTable(_) => crate::sem::Resolution::new(catalog).finish(
                 crate::sem::AnalysisError::raise_unexpected_input(
                     "drop table requires catalog application",
                 ),
             ),
-            Self::AlterSequence(_) => crate::sem::resolution::Resolution::new(catalog).finish(
+            Self::AlterSequence(_) => crate::sem::Resolution::new(catalog).finish(
                 crate::sem::AnalysisError::raise_unexpected_input(
                     "alter sequence requires catalog application",
                 ),
             ),
-            Self::Comment(_) => crate::sem::resolution::Resolution::new(catalog).finish(
+            Self::Comment(_) => crate::sem::Resolution::new(catalog).finish(
                 crate::sem::AnalysisError::raise_unexpected_input(
                     "comment requires catalog application",
                 ),
             ),
-            Self::AlterOwner(_) => crate::sem::resolution::Resolution::new(catalog).finish(Ok(
+            Self::AlterOwner(_) => crate::sem::Resolution::new(catalog).finish(Ok(
                 crate::sem::SemAst::AlterOwner(crate::sem::AlterOwner::new()),
             )),
-            Self::CompositeType(composite_type) => crate::sem::resolution::Resolution::new(catalog)
-                .finish(Ok(crate::sem::SemAst::CreateCompType(
-                    composite_type.clone(),
-                ))),
-            Self::AlterRelation(_) => crate::sem::resolution::Resolution::new(catalog).finish(
+            Self::CompositeType(composite_type) => crate::sem::Resolution::new(catalog).finish(Ok(
+                crate::sem::SemAst::CreateCompType(composite_type.clone()),
+            )),
+            Self::AlterRelation(_) => crate::sem::Resolution::new(catalog).finish(
                 crate::sem::AnalysisError::raise_unexpected_input(
                     "statement requires catalog application",
                 ),
@@ -323,15 +325,15 @@ impl Statement {
             Self::Index(index) => index
                 .resolve(catalog, dialect)
                 .map(|index| crate::sem::SemAst::create_index(&index)),
-            Self::TableAs(_) => crate::sem::resolution::Resolution::new(catalog).finish(
+            Self::TableAs(_) => crate::sem::Resolution::new(catalog).finish(
                 crate::sem::AnalysisError::raise_unexpected_input(
                     "table as requires catalog application",
                 ),
             ),
-            Self::Table(_) => crate::sem::resolution::Resolution::new(catalog).finish(
+            Self::Table(_) => crate::sem::Resolution::new(catalog).finish(
                 crate::sem::AnalysisError::raise_unexpected_input("table requires source metadata"),
             ),
-            Self::Schema(_) => crate::sem::resolution::Resolution::new(catalog).finish(
+            Self::Schema(_) => crate::sem::Resolution::new(catalog).finish(
                 crate::sem::AnalysisError::raise_unexpected_input(
                     "schema requires catalog application",
                 ),
@@ -753,7 +755,7 @@ pub(crate) enum ViewCheckOption {
     Cascaded,
 }
 
-pub trait TryFromWithTokens<T>
+pub(crate) trait TryFromWithTokens<T>
 where
     Self: Sized,
 {
@@ -765,7 +767,7 @@ where
     ) -> Result<Self, Self::Error>;
 }
 
-pub trait TryFromWithTokensOpt<T>
+pub(crate) trait TryFromWithTokensOpt<T>
 where
     Self: Sized,
 {
@@ -777,7 +779,7 @@ where
     ) -> Result<Option<Self>, Self::Error>;
 }
 
-pub trait TryFromOpt<T>: TryFrom<T> {
+pub(crate) trait TryFromOpt<T>: TryFrom<T> {
     fn try_from_opt(value: Option<T>) -> Result<Option<Self>, <Self as TryFrom<T>>::Error>
     where
         Self: Sized,
@@ -788,7 +790,7 @@ pub trait TryFromOpt<T>: TryFrom<T> {
 
 impl<T, U> TryFromOpt<T> for U where U: TryFrom<T> {}
 
-pub trait TryFromList<T>: Sized {
+pub(crate) trait TryFromList<T>: Sized {
     type Error;
 
     fn try_from_list(values: &[T]) -> Result<Vec<Self>, Self::Error>;
@@ -805,7 +807,7 @@ where
     }
 }
 
-pub trait FromList<T>: Sized {
+pub(crate) trait FromList<T>: Sized {
     fn from_list(values: &[T]) -> Vec<Self>;
 }
 
@@ -818,7 +820,7 @@ where
     }
 }
 
-pub trait FromOpt<T>: Sized {
+pub(crate) trait FromOpt<T>: Sized {
     fn from_opt(value: Option<T>) -> Option<Self>;
 }
 
@@ -831,7 +833,7 @@ where
     }
 }
 
-pub trait TryCollectFromWithTokens<T>
+pub(crate) trait TryCollectFromWithTokens<T>
 where
     Self: Sized,
 {
@@ -843,17 +845,22 @@ where
     ) -> Result<Vec<Self>, Self::Error>;
 }
 
+/// SQL dialect explicitly selected for parsing and AST editing.
 #[derive(Clone, Copy, Debug, Eq, PartialEq)]
-pub(crate) enum Dialect {
+pub enum Dialect {
+    /// PostgreSQL SQL syntax.
     Postgres,
+    /// SQLite SQL syntax; parsing requires the `sqlite` feature.
     Sqlite,
 }
 
 impl Dialect {
-    pub(crate) const fn postgres() -> Self {
+    /// Select PostgreSQL.
+    pub const fn postgres() -> Self {
         Self::Postgres
     }
-    pub(crate) const fn sqlite() -> Self {
+    /// Select SQLite.
+    pub const fn sqlite() -> Self {
         Self::Sqlite
     }
 }
@@ -1504,6 +1511,7 @@ pub(crate) struct Insert {
     source: Option<Query>,
     overriding: Option<OverridingKind>,
     conflict: Option<Conflict>,
+    or_conflict: Option<crate::sem::ConflictClause>,
     returning: Vec<Target>,
 }
 
@@ -1515,6 +1523,7 @@ pub(crate) struct Conflict {
     constraint: Option<String>,
     assignments: Vec<Assignment>,
     predicate: Option<Expr>,
+    next: Option<Box<Conflict>>,
 }
 
 #[derive(Clone, Debug)]
@@ -1562,6 +1571,7 @@ pub(crate) struct Update {
     from: Vec<FromItem>,
     predicate: Option<Expr>,
     returning: Vec<Target>,
+    or_conflict: Option<crate::sem::ConflictClause>,
 }
 
 #[derive(Clone, Debug)]

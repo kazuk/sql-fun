@@ -33,7 +33,7 @@ pub use self::{
 use ::sql_fun_core::IVec;
 
 #[cfg(test)]
-use crate::{sem::unresolved::TryFromWithTokens, syn::ScanToken};
+use crate::{ast::TryFromWithTokens, syn::ScanToken};
 
 #[cfg(any(test, feature = "sqlite"))]
 use crate::sem::ParseContext;
@@ -514,13 +514,12 @@ impl ColumnConstraint {
     where
         TParseContext: ParseContext,
     {
-        crate::sem::unresolved::ColumnConstraint::try_from_with_tokens(syn, tokens)?
-            .resolve_and_report(
-                context,
-                crate::sem::unresolved::Dialect::postgres(),
-                table_name,
-                column_name,
-            )
+        crate::ast::ColumnConstraint::try_from_with_tokens(syn, tokens)?.resolve_and_report(
+            context,
+            crate::ast::Dialect::postgres(),
+            table_name,
+            column_name,
+        )
     }
 }
 
@@ -644,9 +643,9 @@ impl ColumnConstraint {
     where
         TParseContext: ParseContext,
     {
-        crate::sem::unresolved::ColumnConstraint::try_from(syn)?.resolve_and_report(
+        crate::ast::ColumnConstraint::try_from(syn)?.resolve_and_report(
             context,
-            crate::sem::unresolved::Dialect::sqlite(),
+            crate::ast::Dialect::sqlite(),
             table_name,
             column_name,
         )

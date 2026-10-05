@@ -1,13 +1,13 @@
+use crate::ast::{
+    Alias, Call, CallKind, CteBody, Dialect, Expr, FromItem, Join, JoinKind, Query, QueryBody,
+    Select, SetOperation, TableFunctions, With,
+};
 use crate::sem::ColumnName;
 use crate::sem::{
-    AliasSpec, AnalysisError, AnalysisProblem, CteStatement, DataSource, FromClause,
-    JoinKind as SemanticJoinKind, ScalarAnalysisContext, SelectStatement, WithClause,
-    resolution::{Catalog, Resolution, ResolutionContext, ResolutionOutcome},
-    select_statement::{ResultColumnCollection, SelectStatementNode},
-    unresolved::{
-        Alias, Call, CallKind, CteBody, Dialect, Expr, FromItem, Join, JoinKind, Query, QueryBody,
-        Select, SetOperation, TableFunctions, With,
-    },
+    AliasSpec, AnalysisError, AnalysisProblem, Catalog, CteStatement, DataSource, FromClause,
+    JoinKind as SemanticJoinKind, Resolution, ResolutionContext, ResolutionOutcome,
+    ResultColumnCollection, ScalarAnalysisContext, SelectStatement, SelectStatementNode,
+    WithClause,
 };
 
 impl Query {
@@ -27,7 +27,7 @@ impl Query {
         dialect: Dialect,
         outer: Option<&ScalarAnalysisContext<'_>>,
     ) -> Result<SelectStatement, AnalysisError> {
-        crate::sem::stack::with_stack(|| Self::resolve_in_body(self, context, dialect, outer))
+        crate::sem::with_stack(|| Self::resolve_in_body(self, context, dialect, outer))
     }
 
     #[inline(never)]
@@ -179,7 +179,7 @@ impl FromItem {
         preceding: &FromClause,
         outer: Option<&ScalarAnalysisContext<'_>>,
     ) -> Result<DataSource, AnalysisError> {
-        crate::sem::stack::with_stack(|| {
+        crate::sem::with_stack(|| {
             Self::resolve_body(self, context, dialect, with, preceding, outer)
         })
     }
@@ -279,7 +279,7 @@ impl FromItem {
 }
 
 impl Join {
-    fn using_clause(&self) -> Option<crate::sem::data_source::JoinUsingClause> {
+    fn using_clause(&self) -> Option<crate::sem::JoinUsingClause> {
         if self.using.is_empty() {
             return None;
         }
@@ -287,7 +287,7 @@ impl Join {
         for column in &self.using {
             columns.push(ColumnName::from(column.as_str()));
         }
-        Some(crate::sem::data_source::JoinUsingClause::new(
+        Some(crate::sem::JoinUsingClause::new(
             &columns,
             &self.using_alias.as_ref().map(Alias::resolve),
         ))
@@ -359,7 +359,7 @@ impl Expr {
             _ => AnalysisError::raise_unexpected_input("ROWS FROM expression"),
         }
     }
-    pub(in crate::sem::unresolved) fn resolve_table_call(
+    pub(in crate::ast) fn resolve_table_call(
         &self,
         context: &mut Resolution<'_>,
         dialect: Dialect,

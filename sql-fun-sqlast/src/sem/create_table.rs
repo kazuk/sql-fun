@@ -11,7 +11,7 @@ use sql_fun_core::IVec;
 use std::collections::HashMap;
 
 use crate::{
-    sem::unresolved::TryFromWithTokens,
+    ast::TryFromWithTokens,
     sem::{
         AlterTable, AnalysisError, AnalysisProblem, AstAndContextPair, Constraint, FullName,
         GetSourcePathWithSpan, ImplicitChange, ParseContext, SemAst, SourcePathWithSpan,
@@ -305,9 +305,9 @@ impl CreateTable {
     where
         TParseContext: ParseContext,
     {
-        crate::sem::unresolved::Table::try_from_with_tokens(&create, tokens)?.resolve_and_apply_at(
+        crate::ast::Table::try_from_with_tokens(&create, tokens)?.resolve_and_apply_at(
             context,
-            crate::sem::unresolved::Dialect::postgres(),
+            crate::ast::Dialect::postgres(),
             source_span,
         )
     }
@@ -334,17 +334,10 @@ impl CreateTable {
     where
         TParseContext: ParseContext,
     {
-        let syntax = crate::sem::unresolved::Table::try_from(&syn)?.named(
-            table_name.full_name(),
-            *mode,
-            temporary,
-        );
+        let syntax =
+            crate::ast::Table::try_from(&syn)?.named(table_name.full_name(), *mode, temporary);
         let table = syntax
-            .resolve(
-                &context,
-                crate::sem::unresolved::Dialect::sqlite(),
-                source_span,
-            )
+            .resolve(&context, crate::ast::Dialect::sqlite(), source_span)
             .report(&mut context)?;
         Ok((table, context))
     }
@@ -415,13 +408,9 @@ impl CreateTable {
     where
         TParseContext: ParseContext,
     {
-        crate::sem::unresolved::Table::try_from(&syn)?
+        crate::ast::Table::try_from(&syn)?
             .named(table_name.full_name(), *mode, temporary)
-            .resolve_and_apply_at(
-                context,
-                crate::sem::unresolved::Dialect::sqlite(),
-                source_span,
-            )
+            .resolve_and_apply_at(context, crate::ast::Dialect::sqlite(), source_span)
     }
 }
 
@@ -439,9 +428,9 @@ impl CreateTable {
     where
         TParseContext: ParseContext,
     {
-        crate::sem::unresolved::Table::try_from(&syn)?.resolve_and_apply_at(
+        crate::ast::Table::try_from(&syn)?.resolve_and_apply_at(
             context,
-            crate::sem::unresolved::Dialect::sqlite(),
+            crate::ast::Dialect::sqlite(),
             source_span,
         )
     }

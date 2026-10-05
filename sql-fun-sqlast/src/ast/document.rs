@@ -2,9 +2,11 @@
 mod postgres;
 #[path = "resolve/document.rs"]
 mod resolve;
+#[path = "document_validation.rs"]
+mod validation;
 
 use crate::StringSpan;
-use crate::sem::unresolved::{
+use crate::ast::{
     Alias, Assignment, Expr, FromItem, Name, Order, Query, Relation, Target, TypeName, Window, With,
 };
 
@@ -361,6 +363,28 @@ pub(crate) struct MultiAssignment {
     ncolumns: i32,
 }
 
+impl MultiAssignment {
+    fn new(source: &Expr, colno: i32, ncolumns: i32) -> Self {
+        Self {
+            source: source.clone(),
+            colno,
+            ncolumns,
+        }
+    }
+}
+
+impl DocumentExpr {
+    fn multi_assignment(source: &Expr, colno: i32, ncolumns: i32) -> Self {
+        Self::MultiAssignment(Box::new(MultiAssignment::new(source, colno, ncolumns)))
+    }
+}
+
+impl Expr {
+    pub(in crate::ast) fn multi_assignment(source: &Self, colno: i32, ncolumns: i32) -> Self {
+        Self::Document(DocumentExpr::multi_assignment(source, colno, ncolumns))
+    }
+}
+
 #[derive(Clone, Debug)]
 pub(crate) struct Merge {
     relation: Relation,
@@ -369,6 +393,12 @@ pub(crate) struct Merge {
     merge_when_clauses: Vec<MergeWhen>,
     returning_list: Vec<Target>,
     with_clause: With,
+}
+
+impl Merge {
+    pub(super) const fn with_node(&self) -> &With {
+        &self.with_clause
+    }
 }
 
 #[derive(Clone, Debug)]

@@ -81,14 +81,6 @@ Make sure the tool's executable directory is available on `PATH`. See the
 [Graphify installation instructions](https://github.com/Graphify-Labs/graphify#install)
 for platform-specific setup.
 
-Python 3 is required by the check-flow harness regression tests and by agent
-mode diagnostic extraction. The CI/development image includes it. Outside that
-image, install it and ensure `python3` is on `PATH`; on Ubuntu:
-
-```sh
-sudo apt-get install python3
-```
-
 Codex contributors also need [`jq`](https://jqlang.org/download/) on `PATH`.
 The repository's Codex pre-tool-use policy uses it to read hook input. The
 standard CI/development image already includes `jq`.
@@ -256,6 +248,14 @@ log dump. CI takes precedence over the agent signal. Without these signals,
 local presentation is used, including in non-interactive shells. These signals
 change presentation only; check selection still follows the command options.
 Unknown diagnostic formats remain available in the raw logs.
+
+Agent-mode diagnostic extraction requires `python3` on `PATH`. The
+CI/development image includes it. Outside that image, install Python 3 before
+running `check-test-flow` with `CODEX_VERSION` set; on Ubuntu:
+
+```sh
+sudo apt-get install python3
+```
 
 `check-test-flow` prioritizes consistent behavior between CI and local runs.
 Both use the shared defaults in [`.cargo/config.toml`](.cargo/config.toml):

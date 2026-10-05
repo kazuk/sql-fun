@@ -229,6 +229,34 @@ The script runs the workspace checks, tests, formatting, linting, documentation
 build, dependency checks, API spec generation, and typo checks. After all other
 steps pass, it updates the repository graph index with `graphify update .`.
 
+Successful local checks show a brief step status instead of tool progress.
+Each executed step saves its complete combined stdout/stderr to
+`.build_logs/check_test_flow_<step-name>.log` under the repository root. The
+step's log is overwritten when that step starts; other step logs are retained.
+On failure, the script reports the log path on stderr and prints the last 50
+lines on stdout. Inspect the full log when that tail is insufficient:
+
+```sh
+less .build_logs/check_test_flow_lint.log
+```
+
+The harness uses `CI=true` or `GITHUB_ACTIONS=true` to preserve existing CI
+streaming, command ordering, and failure behavior without capturing logs.
+Otherwise, a nonempty `CODEX_VERSION` selects internal agent presentation:
+known diagnostics and failed-step log paths go to stderr, with no automatic
+log dump. CI takes precedence over the agent signal. Without these signals,
+local presentation is used, including in non-interactive shells. These signals
+change presentation only; check selection still follows the command options.
+Unknown diagnostic formats remain available in the raw logs.
+
+Agent-mode diagnostic extraction requires `python3` on `PATH`. The
+CI/development image includes it. Outside that image, install Python 3 before
+running `check-test-flow` with `CODEX_VERSION` set; on Ubuntu:
+
+```sh
+sudo apt-get install python3
+```
+
 `check-test-flow` prioritizes consistent behavior between CI and local runs.
 Both use the shared defaults in [`.cargo/config.toml`](.cargo/config.toml):
 incremental compilation is disabled, and the `dev` and `test` profiles use

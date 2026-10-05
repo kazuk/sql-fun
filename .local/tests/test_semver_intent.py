@@ -218,6 +218,14 @@ class ToolFixtureTests(unittest.TestCase):
                     self.assertEqual(fixture.level(), "patch")
                     self.assertEqual(len(builds), 2)
 
+    def test_pre_one_version_bump_does_not_override_detected_impact(self):
+        with tempfile.TemporaryDirectory() as temporary:
+            fixture = ApiFixture(Path(temporary), new_api="pub fn renamed() {}")
+            for root, version in ((fixture.old, "0.1.0"), (fixture.new, "0.2.0")):
+                manifest = root / "packages/fixture/Cargo.toml"
+                manifest.write_text(manifest.read_text().replace("1.0.0", version))
+            self.assertEqual(fixture.level(), "major")
+
     def test_real_macro_removal(self):
         macro = 'extern crate proc_macro; #[proc_macro] pub fn original(_: proc_macro::TokenStream) -> proc_macro::TokenStream { proc_macro::TokenStream::new() }'
         with tempfile.TemporaryDirectory() as temporary:

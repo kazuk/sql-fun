@@ -10,7 +10,7 @@ use crate::StringSpan;
 use crate::ast::{Dialect, Statement};
 use crate::sem::AnalysisError;
 
-/// A failed statement conversion or a syntax error that ends parsing.
+/// A failed statement conversion, statement syntax error, or terminal boundary failure.
 ///
 /// The span identifies the attempted input, in UTF-8 byte offsets. It need not
 /// identify an individual token: parsers differ in their diagnostic precision.
@@ -19,7 +19,7 @@ use crate::sem::AnalysisError;
 pub struct ParseStatementError {
     message: String,
     span: StringSpan,
-    syntax: bool,
+    kind: FailureKind,
     position: Option<StringSpan>,
 }
 
@@ -28,7 +28,16 @@ impl ParseStatementError {
         Self {
             message: message.to_owned(),
             span,
-            syntax: true,
+            kind: FailureKind::syntax(),
+            position: None,
+        }
+    }
+
+    pub(crate) fn boundary_discovery(span: StringSpan, message: &str) -> Self {
+        Self {
+            message: message.to_owned(),
+            span,
+            kind: FailureKind::boundary_discovery(),
             position: None,
         }
     }
@@ -37,11 +46,21 @@ impl ParseStatementError {
         Self::unsupported(span, &error.to_string())
     }
 
+    #[cfg(not(feature = "sqlite"))]
+    fn unavailable_dialect(span: StringSpan, message: &str) -> Self {
+        Self {
+            message: message.to_owned(),
+            span,
+            kind: FailureKind::unavailable_dialect(),
+            position: None,
+        }
+    }
+
     pub(crate) fn unsupported(span: StringSpan, message: &str) -> Self {
         Self {
             message: message.to_owned(),
             span,
-            syntax: false,
+            kind: FailureKind::conversion(),
             position: None,
         }
     }
@@ -64,9 +83,31 @@ impl ParseStatementError {
         self.position.as_ref()
     }
 
-    /// Whether a parser failure prevented further statement boundary discovery.
+    /// Whether this is a statement syntax or boundary-discovery failure.
+    ///
+    /// This classification does not imply termination; inspect
+    /// [`Self::is_recoverable`] to determine whether iteration can continue.
     pub const fn is_syntax(&self) -> bool {
-        self.syntax
+        self.kind.is_syntax()
+    }
+
+    /// Whether no trustworthy boundary could be established for further parsing.
+    ///
+    /// This error is yielded once and ends iteration. Its span covers unresolved
+    /// input, which may include more than one apparent statement.
+    pub const fn is_boundary_discovery(&self) -> bool {
+        self.kind.is_boundary_discovery()
+    }
+
+    /// Whether the iterator can continue after this failure.
+    ///
+    /// Selecting an unavailable dialect is also terminal, but is not a syntax
+    /// or boundary-discovery error.
+    ///
+    /// A true result means the failed range has a known boundary; it does not
+    /// promise that another statement follows it.
+    pub const fn is_recoverable(&self) -> bool {
+        self.kind.is_recoverable()
     }
 
     /// Diagnostic supplied by the parser or common AST converter.
@@ -75,16 +116,58 @@ impl ParseStatementError {
     }
 }
 
+#[derive(Debug)]
+enum FailureKind {
+    Syntax,
+    Conversion,
+    BoundaryDiscovery,
+    #[cfg(not(feature = "sqlite"))]
+    UnavailableDialect,
+}
+
+impl FailureKind {
+    const fn syntax() -> Self {
+        Self::Syntax
+    }
+
+    const fn conversion() -> Self {
+        Self::Conversion
+    }
+
+    const fn boundary_discovery() -> Self {
+        Self::BoundaryDiscovery
+    }
+
+    #[cfg(not(feature = "sqlite"))]
+    const fn unavailable_dialect() -> Self {
+        Self::UnavailableDialect
+    }
+
+    const fn is_recoverable(&self) -> bool {
+        matches!(self, Self::Syntax | Self::Conversion)
+    }
+
+    const fn is_syntax(&self) -> bool {
+        matches!(self, Self::Syntax | Self::BoundaryDiscovery)
+    }
+
+    const fn is_boundary_discovery(&self) -> bool {
+        matches!(self, Self::BoundaryDiscovery)
+    }
+}
+
 /// Parse SQL in the explicitly selected dialect, yielding each statement's result.
 ///
 /// Names remain unresolved and no catalog, configuration, or files are read.
-/// Conversion errors with known statement boundaries allow iteration to continue.
-/// A syntax error is yielded once and ends iteration. Exhaust the iterator to
-/// check the entire input; an empty input yields no statements.
+/// Conversion errors and PostgreSQL syntax errors with known statement boundaries
+/// allow iteration to continue. Unrecoverable boundary-discovery errors are yielded
+/// once and end iteration. Exhaust the iterator to check the entire input; an
+/// empty input yields no statements.
 ///
-/// PostgreSQL discovers boundaries for the complete input before converting
-/// statements. A syntax failure there yields one error for the input, with no
-/// preceding successes. SQLite discovers boundaries incrementally.
+/// PostgreSQL uses parser-validated boundaries, with scanner candidates and limited
+/// structural recovery for malformed input. A lexical failure can yield one error
+/// covering the entire input when no boundaries have been established. SQLite
+/// discovers boundaries incrementally; its syntax errors end iteration.
 pub fn parse_statements(
     sql: &str,
     dialect: Dialect,
@@ -99,10 +182,12 @@ pub fn parse_statements(
             }
             #[cfg(not(feature = "sqlite"))]
             {
-                Box::new(std::iter::once(Err(ParseStatementError::unsupported(
-                    StringSpan::new(0, sql.len()),
-                    "SQLite support requires the sqlite feature",
-                ))))
+                Box::new(std::iter::once(Err(
+                    ParseStatementError::unavailable_dialect(
+                        StringSpan::new(0, sql.len()),
+                        "SQLite support requires the sqlite feature",
+                    ),
+                )))
             }
         };
     statements

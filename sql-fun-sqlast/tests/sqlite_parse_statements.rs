@@ -45,6 +45,8 @@ fn syntax_failure_is_emitted_once_and_ends_iteration() {
         .expect("failed statement")
         .expect_err("syntax error");
     assert!(error.is_syntax());
+    assert!(error.is_boundary_discovery());
+    assert!(!error.is_recoverable());
     assert_eq!(
         error
             .position()
@@ -69,6 +71,8 @@ fn known_boundaries_allow_iteration_after_conversion_failure(#[case] unsupported
         .expect("unsupported statement")
         .expect_err("conversion error");
     assert!(!error.is_syntax());
+    assert!(error.is_recoverable());
+    assert!(!error.is_boundary_discovery());
     assert_ne!(error.message(), "");
     assert_eq!(
         error.span().get_from(&sql).expect("statement span").trim(),

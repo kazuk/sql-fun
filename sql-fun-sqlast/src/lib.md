@@ -7,10 +7,10 @@ The crate also supplies the semantic analysis used internally by sql-fun.
 ## Parse one or more statements
 
 Choose a dialect explicitly. The iterator discovers statement boundaries using
-that dialect's parser; callers do not split SQL on semicolons. Parsing common AST
-statements does not read configuration or schema files and does not resolve names
-against a catalog. Each successful statement owns its syntax and can outlive the
-SQL string.
+that dialect's parser and boundary discovery; callers do not split SQL on
+semicolons. Parsing common AST statements does not read configuration or schema
+files and does not resolve names against a catalog. Each successful statement owns
+its syntax and can outlive the SQL string.
 
 ```rust
 use sql_fun_sqlast::{ast::Dialect, parse_statements};
@@ -37,17 +37,29 @@ relations, columns, or functions exist.
 
 An empty or comment-only input yields no results. Statement conversion failures
 carry the failed statement's UTF-8 byte range and permit the iterator to continue.
-Syntax failures end iteration; [`ParseStatementError::position`] reports a more
-precise parser-provided location when available. Exhaust the iterator to check
-the entire input. Collecting into `Vec<_>` retains per-statement errors;
-collecting into `Result<Vec<_>, _>` stops at the first error by caller choice.
+PostgreSQL also continues after statement syntax errors when the next boundary
+is trustworthy. For example, `SELECT 1; SELECT FROM; SELECT 3;` yields a successful
+query, a syntax error for the second statement, and another successful query.
+Invalid tokens are reported even when they do not form a recognized statement.
 
-PostgreSQL discovers boundaries for the entire input first. Malformed input
-therefore yields one syntax error covering the input, without preceding successes.
-SQLite discovers boundaries incrementally and can yield earlier statements before
-a later syntax error. These behaviors follow the available parser interfaces.
-PostgreSQL statement ranges omit the separating semicolon; SQLite ranges can
-include separators and intervening whitespace or comments.
+Inspect [`ParseStatementError::is_syntax`] for syntax classification and
+[`ParseStatementError::is_recoverable`] for whether iteration can continue.
+[`ParseStatementError::is_boundary_discovery`] identifies a terminal failure: no
+trustworthy boundary is available for further parsing. Unclosed compound bodies
+or nesting can yield such a failure after earlier statements. Unterminated
+literals/comments and other lexical failures can prevent PostgreSQL from
+establishing any boundaries, yielding one error for the entire input. Unknown
+boundary cases terminate recovery conservatively. SQLite syntax failures remain
+terminal and can follow earlier successful statements.
+
+Errors identify the attempted statement or unresolved input; a terminal error's
+range may cover several apparent statements. [`ParseStatementError::position`]
+reports a more precise parser-provided location when available; PostgreSQL does
+not currently provide one. PostgreSQL statement ranges omit the separating
+semicolon; SQLite ranges can include separators and intervening trivia.
+Exhaust the iterator to check the entire input. Collecting into `Vec<_>` retains
+per-statement errors; collecting into `Result<Vec<_>, _>` stops at the first error
+by caller choice.
 
 SQLite parsing requires the `sqlite` Cargo feature. Selecting SQLite without it
 yields an error. Both dialects support common AST conversion for SELECT/VALUES,

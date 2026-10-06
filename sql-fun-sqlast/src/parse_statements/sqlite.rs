@@ -39,7 +39,7 @@ impl Iterator for SqliteStatements<'_> {
                 self.finished = true;
                 // Turso restores its cursor on a parser error. This span identifies
                 // the attempted input, not a fabricated location for the bad token.
-                let mut failure = ParseStatementError::syntax(
+                let mut failure = ParseStatementError::boundary_discovery(
                     StringSpan::new(start, self.input_len - start),
                     &error.to_string(),
                 );

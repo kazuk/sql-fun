@@ -2,7 +2,7 @@
 //! Parsing/conversion gets 2 MiB; resolution also exercises 512 KiB host threads.
 
 use super::test_helpers::{ReadOnlyCatalog, postgres};
-use crate::sem::unresolved::Dialect;
+use crate::ast::Dialect;
 use crate::sem::{ColumnName, PgBuiltInType};
 use crate::test_helpers::{TestParseContext, on_small_stack, small_stack_regression};
 
@@ -50,7 +50,7 @@ fn sqlite_small_stack(
 
 mod test_helpers {
     use super::{ColumnName, Dialect, PgBuiltInType, ReadOnlyCatalog, TestParseContext};
-    use crate::sem::unresolved::Query;
+    use crate::ast::Query;
 
     pub(super) fn assert_result(syntax: &Query, dialect: Dialect, scenario: &str) {
         let catalog = ReadOnlyCatalog::new();

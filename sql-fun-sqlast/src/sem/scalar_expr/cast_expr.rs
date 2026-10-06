@@ -74,12 +74,8 @@ impl TypeCastExpr {
     where
         TParseContext: ParseContext,
     {
-        let syntax = crate::sem::unresolved::Expr::try_from(syn)?;
-        let result = syntax.resolve(
-            &context,
-            crate::sem::unresolved::Dialect::sqlite(),
-            scalar_context,
-        );
+        let syntax = crate::ast::Expr::try_from(syn)?;
+        let result = syntax.resolve(&context, crate::ast::Dialect::sqlite(), scalar_context);
         Ok((result.report(&mut context)?, context))
     }
 }

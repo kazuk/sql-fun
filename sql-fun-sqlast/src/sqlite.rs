@@ -108,6 +108,14 @@ impl SqliteStatement {
     pub const fn new(cmd: Cmd, offset: usize, len: usize) -> Self {
         Self { cmd, offset, len }
     }
+
+    pub(crate) const fn span(&self) -> StringSpan {
+        StringSpan::new(self.offset, self.len)
+    }
+
+    pub(crate) fn command(self) -> Cmd {
+        self.cmd
+    }
 }
 
 impl SqliteDialect {
@@ -127,7 +135,9 @@ impl SqliteDialect {
         Ok(tokens.into())
     }
 
-    fn next_statement(parser: &mut TursoParser<'_>) -> Result<Option<SqliteStatement>, TursoError> {
+    pub(crate) fn next_statement(
+        parser: &mut TursoParser<'_>,
+    ) -> Result<Option<SqliteStatement>, TursoError> {
         let start_offset = parser.offset();
         let Some(cmd) = parser.next().transpose()? else {
             return Ok(None);

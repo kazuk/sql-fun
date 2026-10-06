@@ -1,9 +1,9 @@
 use crate::{
+    ast::TryFromWithTokens,
     sem::{
         AliasSpec, AnalysisError, AnalysisProblem, ColumnCollection, DataSource, FromClause,
         FullName, Nullable, ParseContext, ScalarAnalysisContext, SemScalarExpr, WithClause,
         data_source::AliasName, type_system::ArgumentBindingCollection,
-        unresolved::TryFromWithTokens,
     },
     syn::ScanToken,
 };
@@ -87,7 +87,7 @@ impl DataSourceRowsFromFunc {
     where
         TParseContext: ParseContext,
     {
-        let syntax = crate::sem::unresolved::Expr::try_from_with_tokens(&func_call, tokens)?;
+        let syntax = crate::ast::Expr::try_from_with_tokens(&func_call, tokens)?;
         let result = syntax.resolve_rows(
             &context,
             &ScalarAnalysisContext::new(with_clause, from_clause),
@@ -106,7 +106,7 @@ impl DataSourceRowsFromFunc {
     where
         TParseContext: ParseContext,
     {
-        let syntax = crate::sem::unresolved::Expr::try_from_with_tokens(&function, tokens)?;
+        let syntax = crate::ast::Expr::try_from_with_tokens(&function, tokens)?;
         let result = syntax.resolve_rows(
             &context,
             &ScalarAnalysisContext::new(with_clause, from_clause),

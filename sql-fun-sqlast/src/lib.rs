@@ -9,10 +9,12 @@
 )]
 #![doc = include_str!("lib.md")]
 
+pub mod ast;
 pub mod engine_specific;
 pub mod sem;
 pub mod syn;
 
+mod parse_statements;
 mod schema_dump_file;
 mod sql_file;
 #[cfg(feature = "sqlite")]
@@ -36,6 +38,7 @@ use crate::{
     syn::ParseResult,
 };
 
+pub use self::parse_statements::{ParseStatementError, parse_statements};
 pub use self::schema_dump_file::{ParseDumpFileError, ParsedSchemaDump};
 pub use sql_fun_core::{SqlFunArgs, SqlFunArgsBuilder, SqlFunArgsError};
 
@@ -94,7 +97,7 @@ impl PostgresDialect {
     {
         let sql_statements = read_sql_file(dump_file)?;
 
-        let statements = ::pg_query::split_with_parser(&sql_statements)?;
+        let statements = self::parse_statements::split_postgres_statements(&sql_statements)?;
         let mut context = SchemaFileContext::new(dump_file, input_context);
         let mut sem_results = Vec::new();
         for statement in statements {

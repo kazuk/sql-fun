@@ -3,11 +3,11 @@ mod result_column;
 pub use self::result_column::ResultColumnCollection;
 
 use crate::{
+    ast::TryFromWithTokens,
     sem::{
         AnalysisError, AstAndContextPair, CreateCompositeType, FromClause, ParseContext, SemAst,
         SemScalarExpr, TypeDefinition, TypeReference, WithClause,
         create_table::{ColumnDefinition, ColumnName},
-        unresolved::TryFromWithTokens,
     },
     syn::ScanToken,
 };
@@ -114,8 +114,8 @@ impl SelectStatement {
     where
         TParseContext: ParseContext,
     {
-        let syntax = crate::sem::unresolved::Query::try_from_with_tokens(&syn, tokens)?;
-        let outcome = syntax.resolve(&context, crate::sem::unresolved::Dialect::postgres());
+        let syntax = crate::ast::Query::try_from_with_tokens(&syn, tokens)?;
+        let outcome = syntax.resolve(&context, crate::ast::Dialect::postgres());
         let mut context = context;
         let query = outcome.report(&mut context)?;
         Ok(AstAndContextPair::new(SemAst::select(&query), context))
@@ -176,8 +176,8 @@ impl SelectStatementNode {
     where
         TParseContext: ParseContext,
     {
-        let syntax = crate::sem::unresolved::Query::try_from_with_tokens(&syn, tokens)?;
-        let outcome = syntax.resolve(&context, crate::sem::unresolved::Dialect::postgres());
+        let syntax = crate::ast::Query::try_from_with_tokens(&syn, tokens)?;
+        let outcome = syntax.resolve(&context, crate::ast::Dialect::postgres());
         let query = outcome.report(&mut context)?;
         Ok((query, context))
     }

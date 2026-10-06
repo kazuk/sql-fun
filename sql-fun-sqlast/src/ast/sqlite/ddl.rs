@@ -1,29 +1,25 @@
 use crate::{
-    sem::{
-        AnalysisError, ConflictClause,
-        unresolved::{
-            Column, ColumnConstraint, Expr, ForeignReference, Name, Query, Table, TableConstraint,
-            TypeName,
-        },
+    ast::{
+        Column, ColumnConstraint, Expr, ForeignReference, Name, Query, Table, TableConstraint,
+        TypeName,
     },
+    sem::{AnalysisError, ConflictClause},
     syn::sqlite as syn,
 };
 
-impl TryFrom<&syn::AlterTable> for crate::sem::unresolved::AlterRelation {
+impl TryFrom<&syn::AlterTable> for crate::ast::AlterRelation {
     type Error = AnalysisError;
     fn try_from(value: &syn::AlterTable) -> Result<Self, Self::Error> {
         Ok(Self {
             name: Name::from(value.name()),
-            kind: crate::sem::unresolved::AlterRelationKind::table(),
-            commands: vec![crate::sem::unresolved::AlterCommand::try_from(
-                value.body(),
-            )?],
+            kind: crate::ast::AlterRelationKind::table(),
+            commands: vec![crate::ast::AlterCommand::try_from(value.body())?],
             if_exists: false,
         })
     }
 }
 
-impl TryFrom<&syn::AlterTableBody> for crate::sem::unresolved::AlterCommand {
+impl TryFrom<&syn::AlterTableBody> for crate::ast::AlterCommand {
     type Error = AnalysisError;
     fn try_from(value: &syn::AlterTableBody) -> Result<Self, Self::Error> {
         Ok(match value {
@@ -58,14 +54,14 @@ impl TryFrom<&syn::ColumnsAndConstraint> for Table {
     fn try_from(value: &syn::ColumnsAndConstraint) -> Result<Self, Self::Error> {
         let mut options = Vec::new();
         if value.options().without_rowid_text().is_some() {
-            options.push(crate::sem::unresolved::SyntaxOption {
+            options.push(crate::ast::SyntaxOption {
                 namespace: None,
                 name: "without_rowid".to_owned(),
                 value: None,
             });
         }
         if value.options().strict_text().is_some() {
-            options.push(crate::sem::unresolved::SyntaxOption {
+            options.push(crate::ast::SyntaxOption {
                 namespace: None,
                 name: "strict".to_owned(),
                 value: None,
@@ -167,7 +163,7 @@ impl TryFrom<&syn::ColumnConstraint> for ColumnConstraint {
                 value
                     .typ()
                     .as_ref()
-                    .map(crate::sem::column_constraints::GeneratedColumnMode::from),
+                    .map(crate::sem::GeneratedColumnMode::from),
             ),
         })
     }
@@ -185,7 +181,7 @@ impl ForeignReference {
         value: &syn::ForeignKeyClause,
         defer: Option<&syn::DeferSubclause>,
     ) -> Result<Self, AnalysisError> {
-        use crate::sem::column_constraints::{Deferrability, ForeignKeyAction};
+        use crate::sem::{Deferrability, ForeignKeyAction};
         let mut result = Self {
             table: Name::from_parts(&[value.table_name().value().to_owned()]),
             columns: value
@@ -230,12 +226,12 @@ impl TryFrom<&syn::NamedTableConstraint> for TableConstraint {
             syn::TableConstraint::PrimaryKey(primary) => primary
                 .columns()
                 .iter()
-                .map(crate::sem::unresolved::Order::try_from)
+                .map(crate::ast::Order::try_from)
                 .collect::<Result<Vec<_>, _>>()?,
             syn::TableConstraint::Unique(unique) => unique
                 .columns()
                 .iter()
-                .map(crate::sem::unresolved::Order::try_from)
+                .map(crate::ast::Order::try_from)
                 .collect::<Result<Vec<_>, _>>()?,
             _ => Vec::new(),
         };

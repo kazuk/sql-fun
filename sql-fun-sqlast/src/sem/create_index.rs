@@ -1,7 +1,7 @@
 use sql_fun_core::IVec;
 
 use crate::{
-    sem::unresolved::TryFromWithTokens,
+    ast::TryFromWithTokens,
     sem::{AnalysisError, AstAndContextPair, ColumnName, ParseContext, SemScalarExpr, TableName},
     syn::ScanToken,
 };
@@ -247,10 +247,8 @@ impl CreateIndex {
         keys: Vec<crate::syn::IndexElem>,
         tokens: &IVec<ScanToken>,
     ) -> Result<(IndexElementCollection, TContext), AnalysisError> {
-        use crate::sem::{
-            resolution::Resolution,
-            unresolved::{Dialect, Index, IndexExpression},
-        };
+        use crate::ast::{Dialect, Index, IndexExpression};
+        use crate::sem::resolution::Resolution;
         let keys = keys
             .iter()
             .map(|key| IndexExpression::try_from_with_tokens(key, tokens))
@@ -341,8 +339,8 @@ impl CreateIndex {
     where
         TParseContext: ParseContext,
     {
-        crate::sem::unresolved::Index::try_from_with_tokens(&syn, tokens)?
-            .resolve_and_apply(context, crate::sem::unresolved::Dialect::postgres())
+        crate::ast::Index::try_from_with_tokens(&syn, tokens)?
+            .resolve_and_apply(context, crate::ast::Dialect::postgres())
     }
 }
 

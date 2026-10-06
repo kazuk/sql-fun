@@ -1,11 +1,12 @@
 mod ddl;
+mod dml;
 mod query;
 
-use crate::sem::unresolved::{
-    Access, BooleanExpr, BooleanOperator, Call, CallKind, Case, CaseArm, Cast, Collate, DropTable,
-    Expr, InTable, Indirection, Literal, Name, NullTest, OperatorExpr, OperatorKind, Order,
-    Parameter, Query, Raise, SqlValue, Statement, Subquery, SubqueryKind, TryFromList, TryFromOpt,
-    TypeName, View, ViewCheckOption, Window,
+use crate::ast::{
+    Access, BooleanExpr, BooleanOperator, Call, CallKind, Case, CaseArm, Cast, Collate, Delete,
+    DropTable, Expr, InTable, Indirection, Insert, Literal, Name, NullTest, OperatorExpr,
+    OperatorKind, Order, Parameter, Query, Raise, SqlValue, StatementNode, Subquery, SubqueryKind,
+    TryFromList, TryFromOpt, TypeName, Update, View, ViewCheckOption, Window,
 };
 use crate::{sem::AnalysisError, syn::sqlite as syn};
 
@@ -20,12 +21,15 @@ impl From<&syn::QualifiedName> for Name {
     }
 }
 
-impl TryFrom<&syn::Stmt> for Statement {
+impl TryFrom<&syn::Stmt> for StatementNode {
     type Error = AnalysisError;
 
     fn try_from(value: &syn::Stmt) -> Result<Self, Self::Error> {
         match value {
             syn::Stmt::Select(query) => Ok(Self::query(Query::try_from(query)?)),
+            syn::Stmt::Insert(insert) => Ok(Self::insert(Insert::try_from(insert)?)),
+            syn::Stmt::Update(update) => Ok(Self::update(Update::try_from(update)?)),
+            syn::Stmt::Delete(delete) => Ok(Self::delete(Delete::try_from(delete)?)),
             syn::Stmt::CreateTable(table) => Ok(Self::table(super::Table::try_from(table)?)),
             syn::Stmt::AlterTable(table) => {
                 Ok(Self::alter_relation(super::AlterRelation::try_from(table)?))
@@ -73,7 +77,7 @@ impl TryFrom<&syn::Expr> for Expr {
     type Error = AnalysisError;
 
     fn try_from(value: &syn::Expr) -> Result<Self, Self::Error> {
-        crate::sem::stack::with_stack(|| Self::convert_sqlite(value))
+        crate::sem::with_stack(|| Self::convert_sqlite(value))
     }
 }
 

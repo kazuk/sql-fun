@@ -1,5 +1,5 @@
-use crate::sem::resolution::Catalog;
-use crate::sem::unresolved::{Query, TryFromWithTokens};
+use crate::ast::{Query, TryFromWithTokens};
+use crate::sem::Catalog;
 use crate::sem::{
     AnalysisError, CastDefinition, CreateTable, FullName, FunctionOverloadCollection,
     OperatorDefinition, OperatorName, PgBuiltInType, TableName, TypeDefinition, TypeReference,

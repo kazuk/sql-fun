@@ -1,10 +1,8 @@
 #[cfg(feature = "sqlite")]
 use crate::SqliteToken;
 use crate::{
-    sem::{
-        AnalysisError, ParseContext, ScalarAnalysisContext, SemScalarExpr,
-        unresolved::TryFromWithTokens,
-    },
+    ast::TryFromWithTokens,
+    sem::{AnalysisError, ParseContext, ScalarAnalysisContext, SemScalarExpr},
     syn::ScanToken,
 };
 
@@ -21,12 +19,8 @@ impl SemScalarExpr {
     where
         TParseContext: ParseContext,
     {
-        let syntax = crate::sem::unresolved::Expr::try_from_with_tokens(&syn, tokens)?;
-        let outcome = syntax.resolve(
-            &context,
-            crate::sem::unresolved::Dialect::postgres(),
-            scalar_context,
-        );
+        let syntax = crate::ast::Expr::try_from_with_tokens(&syn, tokens)?;
+        let outcome = syntax.resolve(&context, crate::ast::Dialect::postgres(), scalar_context);
         let mut context = context;
         let expression = outcome.report(&mut context)?;
         Ok((expression, context))
@@ -95,12 +89,8 @@ impl SemScalarExpr {
     where
         TParseContext: ParseContext,
     {
-        let syntax = crate::sem::unresolved::Expr::try_from(syn)?;
-        let outcome = syntax.resolve(
-            &context,
-            crate::sem::unresolved::Dialect::sqlite(),
-            scalar_context,
-        );
+        let syntax = crate::ast::Expr::try_from(syn)?;
+        let outcome = syntax.resolve(&context, crate::ast::Dialect::sqlite(), scalar_context);
         let expression = outcome.report(&mut context)?;
         Ok((expression, context))
     }
@@ -115,12 +105,8 @@ impl SemScalarExpr {
     where
         TParseContext: ParseContext,
     {
-        let syntax = crate::sem::unresolved::Expr::try_from(expr_unary)?;
-        let outcome = syntax.resolve(
-            &context,
-            crate::sem::unresolved::Dialect::sqlite(),
-            scalar_context,
-        );
+        let syntax = crate::ast::Expr::try_from(expr_unary)?;
+        let outcome = syntax.resolve(&context, crate::ast::Dialect::sqlite(), scalar_context);
         let expression = outcome.report(&mut context)?;
         Ok((expression, context))
     }
@@ -135,12 +121,8 @@ impl SemScalarExpr {
     where
         TParseContext: ParseContext,
     {
-        let syntax = crate::sem::unresolved::Expr::try_from(expr_is_null)?;
-        let outcome = syntax.resolve(
-            &context,
-            crate::sem::unresolved::Dialect::sqlite(),
-            scalar_context,
-        );
+        let syntax = crate::ast::Expr::try_from(expr_is_null)?;
+        let outcome = syntax.resolve(&context, crate::ast::Dialect::sqlite(), scalar_context);
         let expression = outcome.report(&mut context)?;
         Ok((expression, context))
     }
@@ -155,12 +137,8 @@ impl SemScalarExpr {
     where
         TParseContext: ParseContext,
     {
-        let syntax = crate::sem::unresolved::Expr::try_from(expr_not_null)?;
-        let outcome = syntax.resolve(
-            &context,
-            crate::sem::unresolved::Dialect::sqlite(),
-            scalar_context,
-        );
+        let syntax = crate::ast::Expr::try_from(expr_not_null)?;
+        let outcome = syntax.resolve(&context, crate::ast::Dialect::sqlite(), scalar_context);
         let expression = outcome.report(&mut context)?;
         Ok((expression, context))
     }
@@ -175,12 +153,8 @@ impl SemScalarExpr {
     where
         TParseContext: ParseContext,
     {
-        let syntax = crate::sem::unresolved::Expr::try_from(expr_binary)?;
-        let outcome = syntax.resolve(
-            &context,
-            crate::sem::unresolved::Dialect::sqlite(),
-            scalar_context,
-        );
+        let syntax = crate::ast::Expr::try_from(expr_binary)?;
+        let outcome = syntax.resolve(&context, crate::ast::Dialect::sqlite(), scalar_context);
         let expression = outcome.report(&mut context)?;
         Ok((expression, context))
     }
@@ -195,12 +169,8 @@ impl SemScalarExpr {
     where
         TParseContext: ParseContext,
     {
-        let syntax = crate::sem::unresolved::Expr::try_from(expr_collate)?;
-        let outcome = syntax.resolve(
-            &context,
-            crate::sem::unresolved::Dialect::sqlite(),
-            scalar_context,
-        );
+        let syntax = crate::ast::Expr::try_from(expr_collate)?;
+        let outcome = syntax.resolve(&context, crate::ast::Dialect::sqlite(), scalar_context);
         let expression = outcome.report(&mut context)?;
         Ok((expression, context))
     }
@@ -215,12 +185,8 @@ impl SemScalarExpr {
     where
         TParseContext: ParseContext,
     {
-        let syntax = crate::sem::unresolved::Expr::try_from(expr_between)?;
-        let outcome = syntax.resolve(
-            &context,
-            crate::sem::unresolved::Dialect::sqlite(),
-            scalar_context,
-        );
+        let syntax = crate::ast::Expr::try_from(expr_between)?;
+        let outcome = syntax.resolve(&context, crate::ast::Dialect::sqlite(), scalar_context);
         let expression = outcome.report(&mut context)?;
         Ok((expression, context))
     }
@@ -235,12 +201,8 @@ impl SemScalarExpr {
     where
         TParseContext: ParseContext,
     {
-        let syntax = crate::sem::unresolved::Expr::try_from(syn)?;
-        let outcome = syntax.resolve(
-            &context,
-            crate::sem::unresolved::Dialect::sqlite(),
-            scalar_context,
-        );
+        let syntax = crate::ast::Expr::try_from(syn)?;
+        let outcome = syntax.resolve(&context, crate::ast::Dialect::sqlite(), scalar_context);
         let mut context = context;
         let expression = outcome.report(&mut context)?;
         Ok((expression, context))

@@ -39,7 +39,6 @@ mod select_statement;
 mod stack;
 mod top_level_statement;
 mod type_system;
-mod unresolved;
 mod update_statement;
 mod variable_set;
 mod view_like;
@@ -110,6 +109,18 @@ pub use self::{
     view_like::ViewLike,
 };
 pub use crate::AstAndContextPair;
+
+pub(crate) use self::{
+    alter_table::AlterObjSubCommand,
+    constraint::{ForeignKeyConstraint, UniqueConstraint},
+    create_comp_type::{CompositeFieldCollection, CompositeFieldDefinition},
+    create_index::IndexElementCollection,
+    data_source::{AliasName, JoinUsingClause},
+    resolution::{Catalog, Resolution, ResolutionContext, ResolutionOutcome},
+    scalar_expr::{CaseExprAnalysisContext, CoalesceAnalysis},
+    select_statement::{ResultColumnCollection, SelectStatementNode},
+    stack::with_stack,
+};
 
 use crate::StringSpan;
 #[cfg(feature = "sqlite")]

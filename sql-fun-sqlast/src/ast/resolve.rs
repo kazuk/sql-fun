@@ -1,17 +1,15 @@
 mod query;
 
 use crate::StringSpan;
-use crate::sem::unresolved::{
+use crate::ast::{
     Access, BooleanOperator, Call, CallKind, Case, Cast, Dialect, Expr, Indirection, Literal, Name,
     OperatorExpr, OperatorKind, SqlValue, Subquery, TypeName,
 };
 use crate::sem::{
-    AnalysisError, AnalysisProblem, ArithExpr, ColumnName, FullName, FuncCallExpr, IndirectionExpr,
-    OperatorName, ScalarAnalysisContext, ScalarConstExpr, SemScalarExpr, SqlValueExpr,
-    TypeReference,
-    data_source::AliasName,
-    resolution::{Catalog, Resolution, ResolutionContext, ResolutionOutcome},
-    scalar_expr::{CaseExprAnalysisContext, CoalesceAnalysis},
+    AliasName, AnalysisError, AnalysisProblem, ArithExpr, CaseExprAnalysisContext, Catalog,
+    CoalesceAnalysis, ColumnName, FullName, FuncCallExpr, IndirectionExpr, OperatorName,
+    Resolution, ResolutionContext, ResolutionOutcome, ScalarAnalysisContext, ScalarConstExpr,
+    SemScalarExpr, SqlValueExpr, TypeReference,
 };
 
 impl Name {
@@ -72,7 +70,7 @@ impl Expr {
         dialect: Dialect,
         scope: &ScalarAnalysisContext<'_>,
     ) -> Result<SemScalarExpr, AnalysisError> {
-        crate::sem::stack::with_stack(|| Self::resolve_in_body(self, context, dialect, scope))
+        crate::sem::with_stack(|| Self::resolve_in_body(self, context, dialect, scope))
     }
 
     #[inline(never)]

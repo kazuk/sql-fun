@@ -4,7 +4,7 @@ use sql_fun_core::IVec;
 use crate::SqliteToken;
 
 use crate::{
-    sem::unresolved::TryFromWithTokens,
+    ast::TryFromWithTokens,
     sem::{
         AstAndContextPair, ColumnDefinition, ColumnName, Constraint, GetSourcePathWithSpan,
         SemScalarExpr, SourcePathWithSpan, ViewName,
@@ -51,12 +51,11 @@ impl AlterTable {
     where
         TParseContext: ParseContext,
     {
-        crate::sem::unresolved::AlterRelation::try_from_with_tokens(&syn, tokens)?
-            .resolve_and_apply_at(
-                context,
-                crate::sem::unresolved::Dialect::postgres(),
-                source_span,
-            )
+        crate::ast::AlterRelation::try_from_with_tokens(&syn, tokens)?.resolve_and_apply_at(
+            context,
+            crate::ast::Dialect::postgres(),
+            source_span,
+        )
     }
 
     /// analyze [`crate::syn::AlterTableStmt`]
@@ -71,12 +70,11 @@ impl AlterTable {
     where
         TParseContext: ParseContext,
     {
-        crate::sem::unresolved::AlterRelation::try_from_with_tokens(&syn, tokens)?
-            .resolve_and_apply_at(
-                context,
-                crate::sem::unresolved::Dialect::postgres(),
-                source_span,
-            )
+        crate::ast::AlterRelation::try_from_with_tokens(&syn, tokens)?.resolve_and_apply_at(
+            context,
+            crate::ast::Dialect::postgres(),
+            source_span,
+        )
     }
 
     /// analyze [`crate::syn::sqlite::AlterTable`]
@@ -91,9 +89,9 @@ impl AlterTable {
     where
         TParseContext: ParseContext,
     {
-        crate::sem::unresolved::AlterRelation::try_from(&syn)?.resolve_and_apply_at(
+        crate::ast::AlterRelation::try_from(&syn)?.resolve_and_apply_at(
             context,
-            crate::sem::unresolved::Dialect::sqlite(),
+            crate::ast::Dialect::sqlite(),
             source_span,
         )
     }
@@ -302,9 +300,9 @@ impl AlterView {
     where
         TParseContext: ParseContext,
     {
-        crate::sem::unresolved::AlterRelation::try_from_with_tokens(&syn, &IVec::default())?
+        crate::ast::AlterRelation::try_from_with_tokens(&syn, &IVec::default())?
             .with_view_kind(as_matview)
-            .resolve_and_apply(context, crate::sem::unresolved::Dialect::postgres())
+            .resolve_and_apply(context, crate::ast::Dialect::postgres())
     }
 }
 
@@ -390,12 +388,11 @@ impl AlterObjSubCommand {
     where
         TParseContext: ParseContext,
     {
-        crate::sem::unresolved::AlterCommand::try_from_with_tokens(&cmd, tokens)?
-            .resolve_and_report(
-                context,
-                crate::sem::unresolved::Dialect::postgres(),
-                table_name,
-            )
+        crate::ast::AlterCommand::try_from_with_tokens(&cmd, tokens)?.resolve_and_report(
+            context,
+            crate::ast::Dialect::postgres(),
+            table_name,
+        )
     }
 }
 
@@ -468,9 +465,9 @@ impl AlterObjSubCommand {
     where
         TParseContext: ParseContext,
     {
-        crate::sem::unresolved::AlterCommand::try_from(body)?.resolve_and_report(
+        crate::ast::AlterCommand::try_from(body)?.resolve_and_report(
             context,
-            crate::sem::unresolved::Dialect::sqlite(),
+            crate::ast::Dialect::sqlite(),
             table_name,
         )
     }
@@ -487,11 +484,10 @@ impl AlterObjSubCommand {
     where
         TParseContext: ParseContext,
     {
-        crate::sem::unresolved::AlterCommand::try_from_with_tokens(&cmd, tokens)?
-            .resolve_and_report(
-                context,
-                crate::sem::unresolved::Dialect::postgres(),
-                table_name,
-            )
+        crate::ast::AlterCommand::try_from_with_tokens(&cmd, tokens)?.resolve_and_report(
+            context,
+            crate::ast::Dialect::postgres(),
+            table_name,
+        )
     }
 }

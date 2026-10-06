@@ -1,7 +1,7 @@
 use sql_fun_core::IVec;
 
 use crate::{
-    sem::unresolved::TryFromWithTokens,
+    ast::TryFromWithTokens,
     sem::{
         AstAndContextPair, SourcePathWithSpan, alter_table::AlterObjSubCommand,
         create_table::ColumnDefinition,
@@ -84,9 +84,9 @@ impl CreateTableAs {
     where
         TParseContext: ParseContext,
     {
-        crate::sem::unresolved::TableAs::try_from_with_tokens(&syn, tokens)?.resolve_and_apply_at(
+        crate::ast::TableAs::try_from_with_tokens(&syn, tokens)?.resolve_and_apply_at(
             context,
-            crate::sem::unresolved::Dialect::postgres(),
+            crate::ast::Dialect::postgres(),
             source_span,
         )
     }

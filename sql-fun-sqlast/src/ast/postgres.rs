@@ -1,26 +1,21 @@
 mod ddl;
 mod query;
 
-use crate::sem::{
-    create_comp_type::{CompositeFieldCollection, CompositeFieldDefinition},
-    unresolved::{
-        Access, AlterOwner, AlterSequence, BooleanExpr, BooleanOperator, Call, CallKind, Case,
-        CaseArm, Cast, Collate, Comment, Delete, DropTable, EnumType, Expr, Extension, FromOpt,
-        Indirection, Insert, Literal, Name, NamedArgument, NullTest, OperatorExpr, OperatorKind,
-        Order, Parameter, Query, Role, Sequence, Slice, SqlValue, Statement, Subquery,
-        SubqueryKind, SyntaxOption, TruthTest, TryCollectFromWithTokens, TryFromWithTokens,
-        TryFromWithTokensOpt, TypeName, Update, VariableSet, View, ViewCheckOption, Window,
-    },
+use crate::ast::{
+    Access, AlterOwner, AlterSequence, BooleanExpr, BooleanOperator, Call, CallKind, Case, CaseArm,
+    Cast, Collate, Comment, Delete, DropTable, EnumType, Expr, Extension, FromOpt, Indirection,
+    Insert, Literal, Name, NamedArgument, NullTest, OperatorExpr, OperatorKind, Order, Parameter,
+    Query, Role, Sequence, Slice, SqlValue, StatementNode, Subquery, SubqueryKind, SyntaxOption,
+    TruthTest, TryCollectFromWithTokens, TryFromWithTokens, TryFromWithTokensOpt, TypeName, Update,
+    VariableSet, View, ViewCheckOption, Window,
 };
+use crate::sem::{CompositeFieldCollection, CompositeFieldDefinition};
 use crate::syn::{ListOpt, Opt};
 use crate::{StringSpan, sem::AnalysisError, syn};
 
 use ::sql_fun_core::IVec;
 
-pub(in crate::sem::unresolved) fn required<T>(
-    value: Option<T>,
-    field: &str,
-) -> Result<T, AnalysisError> {
+pub(in crate::ast) fn required<T>(value: Option<T>, field: &str) -> Result<T, AnalysisError> {
     match value {
         Some(value) => Ok(value),
         None => AnalysisError::raise_unexpected_none(field),
@@ -60,10 +55,8 @@ impl From<&syn::RangeVar> for Name {
 #[cfg(test)]
 mod test_name_from_range_var {
     use crate::{
-        sem::{
-            FullName, LocalName,
-            unresolved::{FromOpt, Name},
-        },
+        ast::{FromOpt, Name},
+        sem::{FullName, LocalName},
         syn::AliasOpt,
         test_helpers::SynBuilder,
     };
@@ -86,7 +79,7 @@ mod test_name_from_range_var {
     }
 }
 
-impl TryFromWithTokens<&syn::Node> for Statement {
+impl TryFromWithTokens<&syn::Node> for StatementNode {
     type Error = AnalysisError;
 
     fn try_from_with_tokens(
@@ -465,9 +458,7 @@ impl From<Option<syn::ViewCheckOption>> for ViewCheckOption {
 
 impl Name {
     #[deprecated = "use try_from"]
-    pub(in crate::sem::unresolved) fn postgres(
-        nodes: syn::NodeListOpt,
-    ) -> Result<Self, AnalysisError> {
+    pub(in crate::ast) fn postgres(nodes: syn::NodeListOpt) -> Result<Self, AnalysisError> {
         let mut parts = Vec::new();
         for node in nodes.as_inner().unwrap_or_default() {
             parts.push(required(node.as_string().get_sval(), "name component")?);
@@ -891,7 +882,7 @@ impl TryFromWithTokens<&syn::Node> for Expr {
         node: &syn::Node,
         tokens: &IVec<crate::syn::ScanToken>,
     ) -> Result<Self, Self::Error> {
-        crate::sem::stack::with_stack(|| Self::convert_postgres(node, tokens))
+        crate::sem::with_stack(|| Self::convert_postgres(node, tokens))
     }
 }
 
@@ -1045,7 +1036,7 @@ impl Expr {
     }
 
     #[deprecated = "use try_from_with_tokens_opt"]
-    pub(in crate::sem::unresolved) fn postgres_optional(
+    pub(in crate::ast) fn postgres_optional(
         node: syn::Node,
         tokens: &IVec<syn::ScanToken>,
     ) -> Result<Option<Self>, AnalysisError> {
@@ -1053,7 +1044,7 @@ impl Expr {
     }
 
     #[deprecated = "use try_collect_from_with_token"]
-    pub(in crate::sem::unresolved) fn postgres_list(
+    pub(in crate::ast) fn postgres_list(
         nodes: syn::NodeListOpt,
         tokens: &IVec<syn::ScanToken>,
     ) -> Result<Vec<Self>, AnalysisError> {
@@ -1081,7 +1072,7 @@ impl From<&syn::AConst> for Literal {
 
 impl Literal {
     #[deprecated = "use from"]
-    pub(in crate::sem::unresolved) fn postgres(value: &syn::AConst) -> Self {
+    pub(in crate::ast) fn postgres(value: &syn::AConst) -> Self {
         Self::from(value)
     }
 }
@@ -1112,9 +1103,7 @@ impl TryFrom<syn::AExprKind> for OperatorKind {
 
 impl OperatorKind {
     #[deprecated = "use try_from"]
-    pub(in crate::sem::unresolved) fn postgres(
-        kind: syn::AExprKind,
-    ) -> Result<Self, AnalysisError> {
+    pub(in crate::ast) fn postgres(kind: syn::AExprKind) -> Result<Self, AnalysisError> {
         Self::try_from(kind)
     }
 }
@@ -1134,9 +1123,7 @@ impl TryFrom<syn::BoolExprType> for BooleanOperator {
 
 impl BooleanOperator {
     #[deprecated = "use try_from"]
-    pub(in crate::sem::unresolved) fn postgres(
-        kind: syn::BoolExprType,
-    ) -> Result<Self, AnalysisError> {
+    pub(in crate::ast) fn postgres(kind: syn::BoolExprType) -> Result<Self, AnalysisError> {
         Self::try_from(kind)
     }
 }
@@ -1160,9 +1147,7 @@ impl TryFrom<syn::SubLinkType> for SubqueryKind {
 
 impl SubqueryKind {
     #[deprecated = "use try_from"]
-    pub(in crate::sem::unresolved) fn postgres(
-        kind: syn::SubLinkType,
-    ) -> Result<Self, AnalysisError> {
+    pub(in crate::ast) fn postgres(kind: syn::SubLinkType) -> Result<Self, AnalysisError> {
         Self::try_from(kind)
     }
 }
@@ -1192,7 +1177,7 @@ impl TryFromWithTokens<&syn::TypeName> for TypeName {
 
 impl TypeName {
     #[deprecated = "use try_from_with_tokens"]
-    pub(in crate::sem::unresolved) fn postgres(
+    pub(in crate::ast) fn postgres(
         value: &syn::TypeName,
         tokens: &IVec<syn::ScanToken>,
     ) -> Result<Self, AnalysisError> {
@@ -1236,7 +1221,7 @@ fn source_span(location: i32, tokens: &IVec<syn::ScanToken>) -> Option<StringSpa
 #[cfg(test)]
 mod test_source_span {
     use crate::PostgresDialect;
-    use crate::sem::unresolved::postgres::source_span;
+    use crate::ast::postgres::source_span;
 
     #[test]
     fn preserves_quoted_qualified_name_and_intervening_comment() -> testresult::TestResult {
@@ -1299,7 +1284,7 @@ impl Call {
     }
 
     #[deprecated = "use try_from_with_tokens"]
-    pub(in crate::sem::unresolved) fn postgres(
+    pub(in crate::ast) fn postgres(
         value: &syn::FuncCall,
         tokens: &IVec<syn::ScanToken>,
     ) -> Result<Self, AnalysisError> {
@@ -1336,7 +1321,7 @@ impl TryCollectFromWithTokens<syn::NodeListOpt> for Access {
 
 impl Access {
     #[deprecated = "use try_collect_from_with_tokens"]
-    pub(in crate::sem::unresolved) fn postgres_list(
+    pub(in crate::ast) fn postgres_list(
         nodes: syn::NodeListOpt,
         tokens: &IVec<syn::ScanToken>,
     ) -> Result<Vec<Self>, AnalysisError> {
@@ -1379,9 +1364,7 @@ impl TryFrom<&syn::SqlValueFunction> for SqlValue {
 
 impl SqlValue {
     #[deprecated = "use SqlValue::try_from"]
-    pub(in crate::sem::unresolved) fn postgres(
-        value: &syn::SqlValueFunction,
-    ) -> Result<Self, AnalysisError> {
+    pub(in crate::ast) fn postgres(value: &syn::SqlValueFunction) -> Result<Self, AnalysisError> {
         Self::try_from(value)
     }
 }

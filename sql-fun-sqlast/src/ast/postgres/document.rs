@@ -1,6 +1,6 @@
-use crate::sem::unresolved::document::DocumentExpr;
-use crate::sem::unresolved::postgres::required;
-use crate::sem::unresolved::{
+use crate::ast::document::DocumentExpr;
+use crate::ast::postgres::required;
+use crate::ast::{
     Alias, Assignment, CmdType, Expr, FromItem, JsonAggregate, JsonArgument, JsonArray,
     JsonArrayAggregate, JsonArrayQuery, JsonBehavior, JsonBehaviorType, JsonColumn, JsonEncoding,
     JsonExprOp, JsonFormat, JsonFormatType, JsonFunction, JsonKeyValue, JsonObject,

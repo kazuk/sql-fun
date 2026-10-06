@@ -1,7 +1,7 @@
 use sql_fun_core::IVec;
 
 use crate::{
-    sem::unresolved::TryFromWithTokens,
+    ast::TryFromWithTokens,
     sem::{
         AnalysisError, ColumnConstraint, ColumnName, ParseContext, SemScalarExpr, TableName,
         TypeReference,
@@ -116,12 +116,11 @@ impl ColumnDefinition {
     where
         TParseContext: ParseContext,
     {
-        crate::sem::unresolved::Column::try_from_with_tokens(column_def, tokens)?
-            .resolve_and_report(
-                context,
-                crate::sem::unresolved::Dialect::postgres(),
-                table_name,
-            )
+        crate::ast::Column::try_from_with_tokens(column_def, tokens)?.resolve_and_report(
+            context,
+            crate::ast::Dialect::postgres(),
+            table_name,
+        )
     }
 
     /// analyze [`crate::syn::sqlite::ColumnDefinition`]
@@ -135,9 +134,9 @@ impl ColumnDefinition {
     where
         TParseContext: ParseContext,
     {
-        crate::sem::unresolved::Column::try_from(syn)?.resolve_and_report(
+        crate::ast::Column::try_from(syn)?.resolve_and_report(
             context,
-            crate::sem::unresolved::Dialect::sqlite(),
+            crate::ast::Dialect::sqlite(),
             table_name,
         )
     }

@@ -1,7 +1,8 @@
 use crate::{
+    ast::TryCollectFromWithTokens,
     sem::{
         AliasSpec, AnalysisError, DataSource, Nullable, ParseContext, WithClause,
-        create_table::ColumnName, data_source::AliasName, unresolved::TryCollectFromWithTokens,
+        create_table::ColumnName, data_source::AliasName,
     },
     syn::ScanToken,
 };
@@ -28,11 +29,11 @@ impl FromClause {
     where
         TParseContext: ParseContext,
     {
-        let syntax = crate::sem::unresolved::FromItem::try_collect_from_with_tokens(syn, tokens)?;
-        let result = crate::sem::unresolved::FromItem::resolve_list(
+        let syntax = crate::ast::FromItem::try_collect_from_with_tokens(syn, tokens)?;
+        let result = crate::ast::FromItem::resolve_list(
             &syntax,
             &context,
-            crate::sem::unresolved::Dialect::postgres(),
+            crate::ast::Dialect::postgres(),
             with_clause,
         );
         Ok((result.report(&mut context)?, context))

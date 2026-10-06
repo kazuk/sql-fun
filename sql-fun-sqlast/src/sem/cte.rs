@@ -1,9 +1,9 @@
 use crate::{
+    ast::TryFromWithTokens,
     sem::{
         AnalysisError, DeleteStatement, InsertStatement, ParseContext, SelectStatement,
         UpdateStatement,
         create_table::{ColumnDefinition, ColumnName},
-        unresolved::TryFromWithTokens,
     },
     syn::ScanToken,
 };
@@ -143,8 +143,8 @@ impl WithClause {
     where
         TParseContext: ParseContext,
     {
-        let syntax = crate::sem::unresolved::With::try_from_with_tokens(syn, tokens)?;
-        let result = syntax.resolve_with(&context, crate::sem::unresolved::Dialect::postgres());
+        let syntax = crate::ast::With::try_from_with_tokens(syn, tokens)?;
+        let result = syntax.resolve_with(&context, crate::ast::Dialect::postgres());
         Ok((result.report(&mut context)?, context))
     }
 }

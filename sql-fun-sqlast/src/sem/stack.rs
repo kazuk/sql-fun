@@ -7,7 +7,7 @@ const RED_ZONE: usize = 256 * 1024;
 const SEGMENT_SIZE: usize = 2 * 1024 * 1024;
 
 #[inline]
-pub(super) fn with_stack<T>(operation: impl FnOnce() -> T) -> T {
+pub(crate) fn with_stack<T>(operation: impl FnOnce() -> T) -> T {
     ::stacker::maybe_grow(RED_ZONE, SEGMENT_SIZE, operation)
 }
 

@@ -5,7 +5,10 @@ Semantic analysis for PostgreSQL and SQLite used by [sql-fun](https://crates.io/
 Rust applications can also use the crate directly. `parse_statements(sql, dialect)`
 returns an iterator of per-statement results in the public `sql_fun_sqlast::ast`
 namespace. It handles statement boundaries, retains unresolved names, and requires
-no schema or metadata files. Enable the `sqlite` feature for SQLite input.
+no schema or metadata files. PostgreSQL statement syntax errors permit iteration
+to continue when a trustworthy boundary is available. Inspect
+`ParseStatementError::is_recoverable()` to distinguish them from terminal
+boundary-discovery failures. Enable the `sqlite` feature for SQLite input.
 
 The common AST provides read-only WITH/CTE inspection and checked CTE insertion
 for application read/write queries. See the crate API documentation for parsing,

@@ -1,7 +1,9 @@
+mod boundaries;
+
 use crate::ast::{Dialect, Statement, StatementNode, TryFromWithTokens};
 use crate::parse_statements::ParseStatementError;
 use crate::sem::AnalysisError;
-use crate::syn::{ListOpt, Opt};
+use crate::syn::{ListOpt, Opt, ParseResult};
 use crate::{PostgresDialect, StringSpan};
 
 use std::vec::IntoIter;
@@ -13,48 +15,39 @@ pub(crate) fn split_postgres_statements(sql: &str) -> Result<Vec<&str>, ::pg_que
 pub(super) fn parse(
     sql: &str,
 ) -> impl Iterator<Item = Result<Statement, ParseStatementError>> + '_ {
-    let (statements, error) = match split_postgres_statements(sql) {
-        Ok(statements) => (statements, None),
-        Err(error) => (
-            Vec::new(),
-            Some(ParseStatementError::syntax(
-                StringSpan::new(0, sql.len()),
-                &error.to_string(),
-            )),
-        ),
-    };
     PostgresStatements {
         sql,
-        statements: statements.into_iter(),
-        error,
+        ranges: self::boundaries::discover(sql).into_iter(),
     }
 }
 
 struct PostgresStatements<'a> {
     sql: &'a str,
-    statements: IntoIter<&'a str>,
-    error: Option<ParseStatementError>,
+    ranges: IntoIter<Result<StringSpan, ParseStatementError>>,
 }
 
 impl Iterator for PostgresStatements<'_> {
     type Item = Result<Statement, ParseStatementError>;
 
     fn next(&mut self) -> Option<Self::Item> {
-        if let Some(error) = self.error.take() {
-            return Some(Err(error));
-        }
-        let sql = self.statements.next()?;
-        // The splitter returns slices of the original input, including leading trivia.
-        let offset = sql.as_ptr() as usize - self.sql.as_ptr() as usize;
-        let statement = parse_statement(sql, StringSpan::new(offset, sql.len()));
+        let range = match self.ranges.next()? {
+            Ok(range) => range,
+            Err(error) => return Some(Err(error)),
+        };
+        let sql = range
+            .get_from(self.sql)
+            .expect("boundary range in original input");
+        let statement = parse_statement(sql, range);
         if let Err(error) = &statement
-            && error.is_syntax()
+            && !error.is_recoverable()
         {
-            self.statements = Vec::new().into_iter();
+            self.ranges = Vec::new().into_iter();
         }
         Some(statement)
     }
 }
+
+impl std::iter::FusedIterator for PostgresStatements<'_> {}
 
 #[cfg(test)]
 mod test_postgres_statements {
@@ -109,13 +102,14 @@ mod test_postgres_statements {
     }
 
     #[rstest::rstest]
-    #[case::invalid_statement("SELECT 1; SELECT FROM; SELECT 3;")]
     #[case::unterminated_string("SELECT 1; SELECT 'unfinished")]
     #[case::nul_byte("SELECT 1; SELECT '\0'; SELECT 3;")]
     fn yields_a_single_error_when_syntax_prevents_splitting(#[case] sql: &str) {
         let mut statements = super::parse(sql);
         let error = statements.next().expect("syntax error").unwrap_err();
         assert!(error.is_syntax());
+        assert!(error.is_boundary_discovery());
+        assert!(!error.is_recoverable());
         assert_eq!(error.span().get_from(sql), Some(sql));
         assert!(statements.next().is_none());
         assert!(statements.next().is_none());
@@ -132,8 +126,15 @@ mod test_postgres_statements {
 }
 
 fn parse_statement(sql: &str, span: StringSpan) -> Result<Statement, ParseStatementError> {
-    let parsed = PostgresDialect::parse(sql)
+    let parsed = ::pg_query::parse(sql)
         .map_err(|error| ParseStatementError::syntax(span, &error.to_string()))?;
+    if parsed.protobuf.stmts.len() != 1 {
+        return Err(ParseStatementError::boundary_discovery(
+            span,
+            "PostgreSQL candidate does not contain exactly one statement",
+        ));
+    }
+    let parsed = ParseResult::from(parsed.protobuf);
     let tokens = PostgresDialect::scan(sql)
         .map_err(|error| ParseStatementError::syntax(span, &error.to_string()))?;
     let Some(node) = parsed.get_stmts().get(0).get_stmt().as_inner() else {
@@ -143,4 +144,17 @@ fn parse_statement(sql: &str, span: StringSpan) -> Result<Statement, ParseStatem
     let statement = StatementNode::try_from_with_tokens(&node, &tokens)
         .map_err(|error| ParseStatementError::conversion(span, &error))?;
     Ok(Statement::from_node(statement, Dialect::postgres()))
+}
+
+#[cfg(test)]
+mod test_parse_statement {
+    #[rstest::rstest]
+    #[case::multiple("SELECT 1; SELECT 2;")]
+    #[case::no_statement("/* no statement */")]
+    fn rejects_a_range_without_exactly_one_statement(#[case] sql: &str) {
+        let error = super::parse_statement(sql, crate::StringSpan::new(0, sql.len())).unwrap_err();
+        assert!(error.is_boundary_discovery());
+        assert!(!error.is_recoverable());
+        assert_eq!(error.span().get_from(sql), Some(sql));
+    }
 }

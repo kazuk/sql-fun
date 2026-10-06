@@ -156,11 +156,9 @@ discuss the direction.
 
 ## Code Style
 
-Rust code should follow the project coding guidelines:
-
-- [docs/internal-rules/rust-coding-guideline.md](docs/internal-rules/rust-coding-guideline.md)
-- [AST mutation API guidelines](docs/internal-rules/ast-mutation-api-guideline.md)
-  for implementing and reviewing AST edits and editor lifecycles.
+Implementation and review guidelines are maintained in
+[docs/internal-rules/](docs/internal-rules/). Read the documents relevant to your
+change before starting work.
 
 In general:
 

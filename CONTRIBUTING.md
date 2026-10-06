@@ -159,6 +159,8 @@ discuss the direction.
 Rust code should follow the project coding guidelines:
 
 - [docs/internal-rules/rust-coding-guideline.md](docs/internal-rules/rust-coding-guideline.md)
+- [AST mutation API guidelines](docs/internal-rules/ast-mutation-api-guideline.md)
+  for implementing and reviewing AST edits and editor lifecycles.
 
 In general:
 

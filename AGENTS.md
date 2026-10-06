@@ -214,6 +214,10 @@ directly:
 
 ## Coding Guidelines and Reviews
 
+- Before planning, implementing, or reviewing AST mutation APIs, read and apply
+  [docs/internal-rules/ast-mutation-api-guideline.md](docs/internal-rules/ast-mutation-api-guideline.md).
+  Keep the implementation and review guidance there rather than duplicating it
+  in this file.
 - Before implementing or modifying Rust code, including tests, read
   `docs/internal-rules/rust-coding-guideline.md` and identify the rules that
   apply to the change.

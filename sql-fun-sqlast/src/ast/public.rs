@@ -1,5 +1,6 @@
 //! Supported inspection of the owned common AST.
 
+use crate::StringSpan;
 use crate::ast::{Cte, CteBody, Dialect, StatementNode, With};
 
 /// An owned, unresolved statement in an explicitly selected SQL dialect.
@@ -10,11 +11,25 @@ use crate::ast::{Cte, CteBody, Dialect, StatementNode, With};
 pub struct Statement {
     pub(super) node: StatementNode,
     pub(super) dialect: Dialect,
+    span: StringSpan,
 }
 
 impl Statement {
-    pub(crate) const fn from_node(node: StatementNode, dialect: Dialect) -> Self {
-        Self { node, dialect }
+    pub(crate) const fn from_node(node: StatementNode, dialect: Dialect, span: StringSpan) -> Self {
+        Self {
+            node,
+            dialect,
+            span,
+        }
+    }
+
+    /// Range of this statement in the original input, in UTF-8 byte offsets.
+    ///
+    /// The range identifies the input supplied to `parse_statements`. It is
+    /// retained when the statement is cloned or edited; it does not describe
+    /// rendered SQL after AST mutations.
+    pub const fn span(&self) -> &StringSpan {
+        &self.span
     }
 
     /// Dialect explicitly chosen when this statement was parsed.

@@ -123,3 +123,19 @@ fn dml_constructs_are_accepted_without_catalog_resolution(#[case] sql: &str) {
         .expect("common DML");
     assert!(statement.is_insert() || statement.is_update());
 }
+
+#[test]
+fn successful_statements_retain_sqlite_source_ranges() {
+    let sql = "SELECT '日本語'; SELECT 2";
+    let mut statements = parse_statements(sql, Dialect::sqlite());
+    let first = statements.next().unwrap().unwrap();
+    assert_eq!(first.span().get_from(sql), Some("SELECT '日本語'; "));
+    let last = statements.next().unwrap().unwrap();
+    assert_eq!(last.span().get_from(sql), Some("SELECT 2"));
+    assert_eq!(
+        last.span().seek_pos(),
+        std::io::SeekFrom::Start(first.span().end_pos() as u64)
+    );
+    assert_eq!(last.span().end_pos(), sql.len());
+    assert!(statements.next().is_none());
+}

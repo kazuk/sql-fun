@@ -60,7 +60,7 @@ impl Iterator for SqliteStatements<'_> {
         };
         Some(
             StatementNode::try_from(&statement)
-                .map(|node| Statement::from_node(node, Dialect::sqlite()))
+                .map(|node| Statement::from_node(node, Dialect::sqlite(), span))
                 .map_err(|error| ParseStatementError::conversion(span, &error)),
         )
     }

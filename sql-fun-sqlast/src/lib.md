@@ -52,8 +52,10 @@ establishing any boundaries, yielding one error for the entire input. Unknown
 boundary cases terminate recovery conservatively. SQLite syntax failures remain
 terminal and can follow earlier successful statements.
 
-Errors identify the attempted statement or unresolved input; a terminal error's
-range may cover several apparent statements. [`ParseStatementError::position`]
+[`ast::Statement::span`] identifies each successful statement in the original
+input, including after cloning or editing its AST. It does not describe rendered
+SQL after an edit. Errors identify the attempted statement or unresolved input;
+a terminal error's range may cover several apparent statements. [`ParseStatementError::position`]
 reports a more precise parser-provided location when available; PostgreSQL does
 not currently provide one. PostgreSQL statement ranges omit the separating
 semicolon; SQLite ranges can include separators and intervening trivia.

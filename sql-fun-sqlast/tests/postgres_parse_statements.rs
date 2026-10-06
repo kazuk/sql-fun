@@ -255,3 +255,33 @@ fn unavailable_dialect_is_terminal_without_claiming_a_syntax_failure() {
     assert!(!error.is_recoverable());
     assert!(statements.next().is_none());
 }
+
+#[rstest::rstest]
+#[case::repeated("SELECT 1", "SELECT 1")]
+#[case::multibyte("SELECT '日本語'", "SELECT '後続'")]
+fn successful_statements_retain_original_byte_ranges(
+    #[case] first_query: &str,
+    #[case] last_query: &str,
+    #[values(false, true)] recover: bool,
+) {
+    let middle = if recover { "asdf;" } else { "" };
+    let sql = format!("{first_query};{middle}{last_query};");
+    let mut statements = parse_statements(&sql, Dialect::postgres());
+    let first = statements.next().unwrap().unwrap();
+    assert_eq!(first.span().get_from(&sql), Some(first_query));
+    assert_eq!(first.span().seek_pos(), std::io::SeekFrom::Start(0));
+    assert_eq!(first.span().len(), first_query.len());
+    if recover {
+        let error = statements.next().unwrap().unwrap_err();
+        assert_eq!(error.span().get_from(&sql), Some("asdf"));
+    }
+    let last = statements.next().unwrap().unwrap();
+    assert_eq!(last.span().get_from(&sql), Some(last_query));
+    assert_eq!(
+        last.span().seek_pos(),
+        std::io::SeekFrom::Start((first_query.len() + 1 + middle.len()) as u64)
+    );
+    assert_eq!(last.span().end_pos(), sql.len() - 1);
+    assert_eq!(last.clone().span().get_from(&sql), Some(last_query));
+    assert!(statements.next().is_none());
+}

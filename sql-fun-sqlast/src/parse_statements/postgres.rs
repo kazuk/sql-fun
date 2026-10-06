@@ -143,7 +143,7 @@ fn parse_statement(sql: &str, span: StringSpan) -> Result<Statement, ParseStatem
     };
     let statement = StatementNode::try_from_with_tokens(&node, &tokens)
         .map_err(|error| ParseStatementError::conversion(span, &error))?;
-    Ok(Statement::from_node(statement, Dialect::postgres()))
+    Ok(Statement::from_node(statement, Dialect::postgres(), span))
 }
 
 #[cfg(test)]

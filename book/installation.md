@@ -57,10 +57,13 @@ connector = "tokio-postgres"
 ```
 
 - `default`: default database for this application
-- `engine`: Use "PostgreSQL" for PostgreSQL or "sqlite" for SQLite.
-- `dialect`: Use "postgres" for PostgreSQL or "sqlite" for SQLite.
+- `engine`: identifies the database engine. Use "PostgreSQL" for PostgreSQL or
+  "sqlite" for SQLite.
+- `dialect`: explicitly selects the SQL dialect used for parsing and semantic
+  interpretation. This required choice is not inferred from `engine`; use
+  "postgres" for PostgreSQL or "SQLite" for SQLite.
 - `version`: PostgreSQL target major, matching the installed builtin metadata.
-- `connector`: specify database connector library.
+- `connector`: identifies the application database connector library.
   - When `engine` is "PostgreSQL": Can be "tokio-postgres".
   - When `engine` is "sqlite": Can be "rusqlite".
 
@@ -76,6 +79,7 @@ main = {
 }
 edge = {
     engine = "sqlite",
+    dialect = "SQLite",
     connector = "rusqlite"
 }
 ```

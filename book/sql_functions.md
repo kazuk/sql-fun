@@ -50,12 +50,14 @@ select_user_by_id = """
 ```toml:Cargo.toml
 [package.metadata.database]
 default = {
-　　engine="postgres",
-  connector="tokio_postgres"
+  engine = "PostgreSQL",
+  dialect = "postgres",
+  connector = "tokio-postgres"
 }
 edge = {
-  engine="sqlite"
-  connector="rusqlite"
+  engine = "sqlite",
+  dialect = "SQLite",
+  connector = "rusqlite"
 }
 ```
 

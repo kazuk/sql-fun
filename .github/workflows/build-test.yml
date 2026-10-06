@@ -200,6 +200,9 @@ jobs:
           .local/bin/check-test-flow --step=lint
           sccache --show-stats
 
+      - name: Check crate package metadata
+        run: .local/bin/check-test-flow --step=package-metadata
+
       - name: Check typos
         run: .local/bin/check-test-flow --step=typos
 

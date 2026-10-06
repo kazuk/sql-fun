@@ -39,16 +39,26 @@ git -C "$fixture/source" checkout -q --detach v0.2.0
 
 cat > "$fixture/metadata.json" <<'JSON'
 {"workspace_members":["consumer","dependency","private"],"packages":[
-{"id":"consumer","name":"consumer","version":"4.5.6","source":null,"publish":null,"dependencies":[{"path":"/dependency","name":"dependency"}]},
-{"id":"dependency","name":"dependency","version":"1.2.3-snapshot1","source":null,"publish":null,"dependencies":[]},
-{"id":"private","name":"private","version":"0.0.0","source":null,"publish":[],"dependencies":[]},
-{"id":"outside","name":"outside","version":"9.0.0","source":null,"publish":null,"dependencies":[]}]}
+{"id":"consumer","name":"consumer","version":"4.5.6","manifest_path":"/consumer/Cargo.toml","source":null,"publish":null,"dependencies":[{"path":"/dependency","name":"dependency"}]},
+{"id":"dependency","name":"dependency","version":"1.2.3-snapshot1","manifest_path":"/dependency/Cargo.toml","source":null,"publish":null,"dependencies":[]},
+{"id":"private","name":"private","version":"0.0.0","manifest_path":"/private/Cargo.toml","source":null,"publish":[],"dependencies":[]},
+{"id":"outside","name":"outside","version":"9.0.0","manifest_path":"/outside/Cargo.toml","source":null,"publish":null,"dependencies":[]}]}
 JSON
 cat > "$fixture/bin/cargo" <<'MOCK'
 #!/usr/bin/env bash
 set -euo pipefail
 case "$1" in
-  metadata) cat "$RELEASE_TEST_ROOT/metadata.json" ;;
+  metadata)
+    [[ "${FAIL_METADATA:-}" != true ]] || exit 1
+    cat "$RELEASE_TEST_ROOT/metadata.json"
+    ;;
+  package)
+    [[ "$#" == 10 && "$2" == --package && "$4" == --allow-dirty && "$5" == --no-verify && "$6" == --quiet ]]
+    [[ "$7" == --config && "$8" == 'patch.crates-io."consumer".path="/consumer"' ]]
+    [[ "$9" == --config && "${10}" == 'patch.crates-io."dependency".path="/dependency"' ]]
+    printf '%s\n' "$3" >> "$RELEASE_TEST_ROOT/packaged"
+    [[ "${FAIL_PACKAGE:-}" != "$3" ]]
+    ;;
   publish)
     [[ "$2" == --package ]]
     package="$3"
@@ -96,6 +106,23 @@ export PATH="$fixture/bin:$PATH"
 "$scripts/release-crate-manifest" > "$fixture/crates.tsv"
 printf 'consumer\t4.5.6\ndependency\t1.2.3-snapshot1\n' > "$fixture/expected.tsv"
 cmp "$fixture/expected.tsv" "$fixture/crates.tsv"
+"$scripts/release-crate-manifest" --with-paths > "$fixture/crates-with-paths.tsv"
+printf 'consumer\t4.5.6\t/consumer/Cargo.toml\ndependency\t1.2.3-snapshot1\t/dependency/Cargo.toml\n' > "$fixture/expected.tsv"
+cmp "$fixture/expected.tsv" "$fixture/crates-with-paths.tsv"
+"$scripts/check-test-flow" --list-steps | grep -qx package-metadata
+CI=true "$scripts/check-test-flow" --step=package-metadata
+printf 'consumer\ndependency\n' > "$fixture/expected-packaged"
+cmp "$fixture/expected-packaged" "$fixture/packaged"
+rm "$fixture/packaged"
+export FAIL_PACKAGE=consumer
+expect_failure env CI=true "$scripts/check-test-flow" --step=package-metadata
+[[ "$(cat "$fixture/packaged")" == consumer ]]
+unset FAIL_PACKAGE
+rm "$fixture/packaged"
+export FAIL_METADATA=true
+expect_failure env CI=true "$scripts/check-test-flow" --step=package-metadata
+[[ ! -e "$fixture/packaged" ]]
+unset FAIL_METADATA
 export CARGO_REGISTRY_TOKEN=oidc
 export CRATES_IO_BOOTSTRAP_TOKEN=bootstrap
 export FAIL_PACKAGE=consumer

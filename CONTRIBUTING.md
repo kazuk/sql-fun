@@ -251,10 +251,15 @@ For faster iteration, run only selected steps:
 .local/bin/check-test-flow --step=workspace
 .local/bin/check-test-flow --step=proc-macro-tests
 .local/bin/check-test-flow --step=lint
+.local/bin/check-test-flow --step=package-metadata
 .local/bin/check-test-flow --step=doc
 .local/bin/check-test-flow --step=graphify
 .local/bin/check-test-flow --step=packaging
 ```
+
+`package-metadata` checks that every publishable workspace crate can form a
+Cargo source package. It skips verification builds; the generated archives are
+not release artifacts.
 
 `packaging` is an opt-in step and is not part of the default check flow. It
 builds Linux distributions and always validates them before publishing outputs.

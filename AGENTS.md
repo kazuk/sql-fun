@@ -6,6 +6,8 @@ Various utility scripts are located under `.local/bin/`.
 
 - `check-test-flow`: Runs the standard build and test flow.
 - `big-source`: Lists large source files based on their size (line count).
+- `old-source`: Lists the 30 tracked Rust source files with the oldest
+  last-change dates.
 - `update-stats`: Generates a local coverage summary in `stats/coverage.txt`.
 
 ## Repository skills
@@ -16,6 +18,8 @@ skill's `SKILL.md` for its requirements and detailed workflow before using it.
 - [implement-unit-test](.codex/skills/implement-unit-test/SKILL.md): Implement
   Rust unit tests for a specified source file when working on coverage-driven
   test targets.
+- [old-source-review](.codex/skills/old-source-review/SKILL.md): Review one old
+  Rust source file and create a maintenance issue for a maintainer decision.
 
 ## Build and Test
 

@@ -31,7 +31,7 @@ You can build and run tests using the `check-test-flow` script.
 ## Planning
 
 - Before finalizing an implementation plan, identify the technologies and
-  patterns already used by every module or crate the plan proposes to modify.
+  patterns already used by the relevant modules and crates.
   Evaluate whether they can satisfy the new requirement, including the
   relevant dependency or framework contracts, and record the decision in the
   plan. Prefer extending an applicable existing approach over introducing a

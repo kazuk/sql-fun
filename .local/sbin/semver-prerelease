@@ -1,0 +1,12 @@
+#!/usr/bin/env bash
+set -euo pipefail
+
+prerelease="${1:?SemVer prerelease is required}"
+numeric_identifier='(0|[1-9][0-9]*)'
+non_numeric_identifier='[0-9]*[A-Za-z-][0-9A-Za-z-]*'
+identifier="(${numeric_identifier}|${non_numeric_identifier})"
+
+if ! [[ "$prerelease" =~ ^${identifier}(\.${identifier})*$ ]]; then
+  echo "invalid SemVer prerelease: $prerelease" >&2
+  exit 1
+fi

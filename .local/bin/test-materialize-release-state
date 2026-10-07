@@ -6,8 +6,9 @@ helper="$repo_root/.local/sbin/materialize-release-state"
 test_root="$(mktemp -d)"
 trap 'rm -rf "$test_root"' EXIT
 workspace="$test_root/workspace"
-mkdir -p "$workspace/.local/bin" "$test_root/release-inputs"
-cp "$repo_root/.local/bin/"{bump-version,materialize-release-versions,release-crate-manifest} "$workspace/.local/bin/"
+mkdir -p "$workspace/.local/bin" "$workspace/.local/sbin" "$test_root/release-inputs"
+cp "$repo_root/.local/bin/"{materialize-release-versions,release-crate-manifest} "$workspace/.local/bin/"
+cp "$repo_root/.local/sbin/"{bump-version,semver-prerelease} "$workspace/.local/sbin/"
 cat > "$workspace/Cargo.toml" <<'TOML'
 [workspace]
 resolver = "2"
@@ -81,7 +82,7 @@ git -c user.name=Fixture -c user.email=fixture@example.invalid commit --quiet -m
 expect_failure_without_mutation stable '' "$test_root/missing-intent-clean"
 git reset --hard HEAD~1 --quiet
 
-for tag in v9.8.7 v9.8.7-snapshot v9.8.7-snapshot2; do
+for tag in v9.8.7 v9.8.7-snapshot v9.8.7-pre-rc2; do
   identity="$("$repo_root/.local/bin/parse-release-version" "$tag")"
   classification="$(cut -f4 <<<"$identity")"
   snapshot="$(cut -f3 <<<"$identity")"

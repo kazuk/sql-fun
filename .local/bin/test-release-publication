@@ -18,10 +18,10 @@ expect_failure() {
 for tag in v0.2.0 v12.30.400; do
   [[ "$("$scripts/parse-release-version" "$tag")" == *$'\tstable' ]]
 done
-for tag in v0.2.0-snapshot v0.2.0-snapshot1; do
+for tag in v0.2.0-snapshot v0.2.0-snapshot1 v0.2.0-pre-rc2 v0.2.0-alpha.1 v0.2.0-0.3.7; do
   [[ "$("$scripts/parse-release-version" "$tag")" == *$'\tsnapshot' ]]
 done
-for tag in '' main release/v1.2.3 1.2.3 v01.2.3 v1.2 v1.2.3-rc1 'v1.2.3;echo' v1.2.3+build; do
+for tag in '' main release/v1.2.3 1.2.3 v01.2.3 v1.2 v1.2.3-alpha..1 v1.2.3-alpha_1 v1.2.3-alpha.01 'v1.2.3;echo' v1.2.3+build; do
   expect_failure "$scripts/parse-release-version" "$tag"
 done
 

@@ -33,12 +33,11 @@ for arg in "$@"; do
 done
 
 [[ -n "$mode" ]] || { echo "exactly one release mode is required" >&2; usage >&2; exit 1; }
-if [[ "$mode" == "snapshot" ]] && ! [[ "$snapshot_name" =~ ^[0-9A-Za-z-]+(\.[0-9A-Za-z-]+)*$ ]]; then
-  echo "invalid snapshot name: $snapshot_name" >&2
-  exit 1
+repo_root="$(git rev-parse --show-toplevel)"
+if [[ "$mode" == "snapshot" ]]; then
+  "$repo_root/.local/sbin/semver-prerelease" "$snapshot_name"
 fi
 
-repo_root="$(git rev-parse --show-toplevel)"
 cd "$repo_root"
 
 metadata="$(cargo metadata --no-deps --format-version=1)"
@@ -56,7 +55,17 @@ for package in "${packages[@]}"; do
     *) echo "invalid release level for $package: $release_level" >&2; exit 1 ;;
   esac
 
-  next_version="$("$repo_root/.local/bin/bump-version" "$package" "$release_level")"
+  current_version="$(jq -er --arg package "$package" '.packages[] | select(.name == $package) | .version' <<<"$metadata")"
+  if [[ "$current_version" =~ ^(0|[1-9][0-9]*)\.(0|[1-9][0-9]*)\.(0|[1-9][0-9]*)$ ]]; then
+    next_version="$("$repo_root/.local/sbin/bump-version" "$package" "$release_level")"
+  elif [[ "$current_version" =~ ^(0|[1-9][0-9]*)\.(0|[1-9][0-9]*)\.(0|[1-9][0-9]*)-(.+)$ ]]; then
+    core_version="${current_version%%-*}"
+    "$repo_root/.local/sbin/semver-prerelease" "${BASH_REMATCH[4]}"
+    next_version="$core_version"
+  else
+    echo "a stable or supported prerelease SemVer version is required for $package: $current_version" >&2
+    exit 1
+  fi
   if [[ "$mode" == "snapshot" ]]; then
     next_version+="-$snapshot_name"
   fi

@@ -6,9 +6,10 @@ test_root="$(mktemp -d)"
 trap 'rm -rf "$test_root"' EXIT
 fixture="$test_root/workspace"
 
-mkdir -p "$fixture/.local/bin"
+mkdir -p "$fixture/.local/bin" "$fixture/.local/sbin"
 cp "$repo_root/Cargo.toml" "$fixture/Cargo.toml"
-cp "$repo_root/.local/bin/bump-version" "$repo_root/.local/bin/materialize-release-versions" "$fixture/.local/bin/"
+cp "$repo_root/.local/bin/materialize-release-versions" "$fixture/.local/bin/"
+cp "$repo_root/.local/sbin/bump-version" "$repo_root/.local/sbin/semver-prerelease" "$fixture/.local/sbin/"
 
 while IFS= read -r manifest; do
   relative="${manifest#"$repo_root"/}"
@@ -32,6 +33,7 @@ function expect_failure_without_mutation() {
 
 expect_failure_without_mutation .local/bin/materialize-release-versions --release --snapshot=trial
 expect_failure_without_mutation .local/bin/materialize-release-versions --snapshot='invalid name'
+expect_failure_without_mutation .local/bin/materialize-release-versions --snapshot=alpha.01
 
 sed -i '/^sql-fun-codegen = "patch"$/d' "$fixture/Cargo.toml"
 git -C "$fixture" add Cargo.toml
@@ -44,6 +46,26 @@ grep -Fqx "sql-fun-core$(printf '\t')0.1.2" "$test_root/release.tsv"
 grep -Fqx "sql-fun-codegen$(printf '\t')0.1.1" "$test_root/release.tsv"
 
 git -C "$fixture" reset --hard HEAD --quiet
-(cd "$fixture" && .local/bin/materialize-release-versions --snapshot=snapshot1 --output="$test_root/snapshot.tsv")
-grep -Fqx "sql-fun-core$(printf '\t')0.1.2-snapshot1" "$test_root/snapshot.tsv"
-grep -Fqx "sql-fun-codegen$(printf '\t')0.1.1-snapshot1" "$test_root/snapshot.tsv"
+(cd "$fixture" && .local/bin/materialize-release-versions --snapshot=pre-rc2 --output="$test_root/snapshot-one.tsv")
+grep -Fqx "sql-fun-core$(printf '\t')0.1.2-pre-rc2" "$test_root/snapshot-one.tsv"
+grep -Fqx "sql-fun-codegen$(printf '\t')0.1.1-pre-rc2" "$test_root/snapshot-one.tsv"
+(cd "$fixture" && cargo metadata --no-deps --format-version=1 | jq -r '
+  .packages[] | select(.source == null and .publish != []) | [.name, .version] | @tsv
+' | sort > "$test_root/metadata.tsv")
+cmp "$test_root/snapshot-one.tsv" "$test_root/metadata.tsv"
+
+(cd "$fixture" && .local/bin/materialize-release-versions --snapshot=pre-rc3 --output="$test_root/snapshot-two.tsv")
+sed 's/-pre-rc2$/-pre-rc3/' "$test_root/snapshot-one.tsv" > "$test_root/expected-snapshot-two.tsv"
+cmp "$test_root/expected-snapshot-two.tsv" "$test_root/snapshot-two.tsv"
+(cd "$fixture" && cargo metadata --no-deps --format-version=1 | jq -r '
+  .packages[] | select(.source == null and .publish != []) | [.name, .version] | @tsv
+' | sort > "$test_root/metadata.tsv")
+cmp "$test_root/snapshot-two.tsv" "$test_root/metadata.tsv"
+
+(cd "$fixture" && .local/bin/materialize-release-versions --release --output="$test_root/stable.tsv")
+sed 's/-pre-rc3$//' "$test_root/snapshot-two.tsv" > "$test_root/expected-stable.tsv"
+cmp "$test_root/expected-stable.tsv" "$test_root/stable.tsv"
+(cd "$fixture" && cargo metadata --no-deps --format-version=1 | jq -r '
+  .packages[] | select(.source == null and .publish != []) | [.name, .version] | @tsv
+' | sort > "$test_root/metadata.tsv")
+cmp "$test_root/stable.tsv" "$test_root/metadata.tsv"

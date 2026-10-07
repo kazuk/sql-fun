@@ -15,12 +15,13 @@ The GitHub Release can be visible before crates.io or Pages completes.
 ## Release identity and source
 
 `release.tag_name` is authoritative. The shared
-`.local/bin/parse-release-version` parser accepts `vX.Y.Z`,
-`vX.Y.Z-snapshot`, and `vX.Y.Z-snapshotN` (where N is a sequence of digits).
-Numeric version components must not have leading zeros. Other prerelease names,
-build metadata, and invalid tags fail before distribution. The upstream release
-branch suffix must equal this product tag; future branch consumers can use the
-same parser on that suffix.
+`.local/bin/parse-release-version` parser accepts `vX.Y.Z` and
+`vX.Y.Z-NAME`, where `NAME` is a SemVer 2.0.0 pre-release value. It consists of
+one or more non-empty dot-separated identifiers containing ASCII alphanumerics
+or hyphens; digits-only identifiers cannot have leading zeroes. Numeric version
+components cannot have leading zeroes either. Build metadata and invalid tags
+fail before distribution. The upstream release branch suffix must equal this
+product tag; future branch consumers can use the same parser on that suffix.
 
 Classification does not use `release.target_commitish`, `release.prerelease`,
 or a workflow input. Snapshot releases never enter the Pages job.

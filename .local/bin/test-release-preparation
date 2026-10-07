@@ -14,13 +14,13 @@ expect_failure() {
     exit 1
   fi
 }
-for tag in v0.2.0 v0.2.0-snapshot v0.2.0-snapshot1; do
+for tag in v0.2.0 v0.2.0-snapshot v0.2.0-pre-rc2 v0.2.0-alpha.1; do
   output="$("$scripts/release-branch-identity" "refs/heads/release/$tag" "$revision")"
   [[ "$output" == *"tag=$tag"* && "$output" == *"revision=$revision"* ]]
 done
 output="$("$scripts/release-branch-identity" refs/heads/release/v0.2.0 "$revision")"
 [[ "$output" == *$'snapshot=\nclassification=stable'* ]]
-for ref in refs/tags/release/v0.2.0 refs/heads/main release/v0.2.0 refs/heads/release/v01.2.0 refs/heads/release/v1.2.3-rc1 refs/heads/release/v1.2.3/extra; do
+for ref in refs/tags/release/v0.2.0 refs/heads/main release/v0.2.0 refs/heads/release/v01.2.0 refs/heads/release/v1.2.3-alpha.01 refs/heads/release/v1.2.3/extra; do
   expect_failure "$scripts/release-branch-identity" "$ref" "$revision"
 done
 expect_failure "$scripts/release-branch-identity" refs/heads/release/v0.2.0 main

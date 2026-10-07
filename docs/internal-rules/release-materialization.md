@@ -15,9 +15,14 @@ map to `--snapshot=<parsed suffix>`. No second operator mode is introduced.
 
 The existing materializer owns crate version calculations. Each publishable
 crate uses its own current version and `workspace.metadata.next-release`.
-Project tag numbers never select crate versions. Non-publishable package
-versions stay unchanged; their local dependency requirements may be updated.
-This step does not consume/reset release intent or advance a SemVer baseline.
+Project tag numbers never select crate versions. A stable crate version applies
+its release intent to select the next core; a SemVer pre-release retains its
+current core and only changes or removes its suffix. Snapshot suffixes are
+SemVer 2.0.0 pre-release values: dot-separated, non-empty ASCII
+alphanumeric-or-hyphen identifiers, with no leading zero in a digits-only
+identifier. Build metadata is unsupported. Non-publishable package versions
+stay unchanged; their local dependency requirements may be updated. This step
+does not consume/reset release intent or advance a SemVer baseline.
 
 ## State handoff and Git boundary
 
@@ -53,8 +58,5 @@ fails the step and stops later release operations. A failure during manifest
 updates may leave a partial runner-local worktree; discard it and rerun from
 the original exact target. Do not consume partial output as successful state.
 
-The materializer currently requires stable current crate versions. A target
-whose manifests already contain snapshot versions cannot yet be materialized
-again; prerelease-current-version lifecycle support is tracked separately in
-issue #364. Preparation propagates this failure. It does not strip suffixes,
-infer a pending version, or implement a second lifecycle model.
+The materializer accepts stable and SemVer pre-release current crate versions.
+It does not infer a pending version or implement a second lifecycle model.

@@ -1,10 +1,12 @@
 # Release preparation
 
 Push an explicitly chosen source revision to a branch named
-`release/vX.Y.Z`, `release/vX.Y.Z-snapshot`, or
-`release/vX.Y.Z-snapshotN` (for example, `release/v0.2.0-snapshot1`).
-Version components must not have leading zeroes. Normal releases originate
-from an intended `main` revision; a hotfix may explicitly select a
+`release/vX.Y.Z` or `release/vX.Y.Z-NAME` (for example,
+`release/v0.2.0-pre-rc2`). `NAME` is a SemVer 2.0.0 pre-release: one or more
+non-empty dot-separated identifiers containing ASCII alphanumerics or hyphens;
+digits-only identifiers cannot have leading zeroes. Build metadata is not
+supported. Version components must not have leading zeroes. Normal releases
+originate from an intended `main` revision; a hotfix may explicitly select a
 maintenance/fix revision.
 
 The pushed branch tip is the exact release target. The release preparation
@@ -50,9 +52,11 @@ After both CI inputs have been adopted, preparation materializes each
 publishable workspace crate's version from its current version and
 `workspace.metadata.next-release`. Ensure that every publishable crate has a
 valid release-intent entry before selecting the release target. Project release
-numbers do not determine crate versions. The parsed project identity selects
-stable materialization or appends its snapshot suffix to each crate's next
-version; no separate classification input is needed.
+numbers do not determine crate versions. A stable current crate version applies
+its release intent to choose a core; a current SemVer pre-release retains its
+existing core. The parsed project identity then selects stable materialization
+or replaces the crate pre-release suffix; no separate classification input is
+needed.
 
 The job summary reports the materialized package versions. Updated manifests
 and the lockfile remain in the same runner worktree for subsequent release
@@ -63,9 +67,9 @@ for integration with later release steps.
 
 A materialization failure stops preparation. If a failure occurs after manifest
 updates begin, discard the partial runner state and rerun from the original
-exact target rather than reuse partial output. Currently, the materializer
-requires stable current crate versions: a target already containing snapshot
-versions fails. That existing limitation is tracked separately in #364.
+exact target rather than reuse partial output. The materializer accepts stable
+current crate versions and SemVer pre-release current crate versions; the latter
+retain their numeric core through later snapshots and final stabilization.
 
 ## Maintainer tooling and permissions
 

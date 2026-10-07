@@ -1,8 +1,11 @@
 use std::collections::HashSet;
 
 use combine::{
-    Parser, attempt, between, many, optional,
+    Parser, any, attempt, between, many, optional,
     parser::char::{alpha_num, char, letter, spaces, string},
+    parser::{
+        combinator::not_followed_by, range::recognize, repeat::take_until, token::tokens_cmp,
+    },
     satisfy,
 };
 use indexmap::IndexMap;
@@ -64,6 +67,85 @@ fn ident<'a>() -> impl combine::Parser<&'a str, Output = String> {
         s.push_str(&tail);
         s
     })
+}
+
+combine::parser! {
+    fn closed_block_comment[Input]()(Input) -> ()
+    where [
+        Input: combine::stream::RangeStream<Token = char>,
+        Input::Range: combine::stream::Range + PartialEq,
+    ]
+    {
+        string("/*").with(
+            many(
+                attempt(closed_block_comment())
+                    .map(|_| ())
+                    .or(not_followed_by(
+                        attempt(string("/*")).or(attempt(string("*/"))),
+                    )
+                    .with(any())
+                    .map(|_| ())),
+            ),
+        ).skip(string("*/"))
+    }
+}
+
+fn line_comment<'a>() -> impl Parser<&'a str, Output = &'a str> {
+    recognize((
+        string("--"),
+        many::<String, _, _>(satisfy(|character| character != '\n')),
+        optional(char('\n')),
+    ))
+}
+
+fn quoted_identifier<'a>() -> impl Parser<&'a str, Output = &'a str> {
+    recognize(between(
+        char('"'),
+        char('"'),
+        many::<String, _, _>(
+            attempt(string("\"\"").map(|_| '"')).or(satisfy(|character| character != '"')),
+        ),
+    ))
+}
+
+fn dollar_quote_delimiter<'a>() -> impl Parser<&'a str, Output = String> {
+    recognize((
+        char('$'),
+        optional((
+            satisfy(|character: char| character.is_ascii_alphabetic() || character == '_'),
+            many::<String, _, _>(satisfy(|character: char| {
+                character.is_ascii_alphanumeric() || character == '_'
+            })),
+        )),
+        char('$'),
+    ))
+    .map(String::from)
+}
+
+fn dollar_quoted<'a>() -> impl Parser<&'a str, Output = &'a str> {
+    recognize(dollar_quote_delimiter().then(|delimiter| {
+        let closing_delimiter = move || {
+            tokens_cmp(
+                delimiter.chars().collect::<Vec<_>>(),
+                |expected: char, actual: char| expected == actual,
+            )
+        };
+        take_until::<String, _, _>(attempt(closing_delimiter())).skip(closing_delimiter())
+    }))
+}
+
+fn host_sql_region<'a>() -> impl Parser<&'a str, Output = &'a str> {
+    attempt(line_comment())
+        .or(attempt(recognize(closed_block_comment())))
+        .or(attempt(dollar_quoted()))
+        .or(attempt(quoted_identifier()))
+}
+
+fn host_sql_opener<'a>() -> impl Parser<&'a str, Output = ()> {
+    attempt(string("--").map(|_| ()))
+        .or(attempt(string("/*").map(|_| ())))
+        .or(attempt(char('"').map(|_| ())))
+        .or(attempt(dollar_quote_delimiter()).map(|_| ()))
 }
 
 /// fragment embedding placeholder name
@@ -239,143 +321,25 @@ impl PlaceholderedSqlToken {
         Err(source)
     }
 
-    fn take_push_char<'a>(input: &'a str, buffer: &mut String) -> &'a str {
-        assert_ne!(input, "");
-
-        let mut chars = input.char_indices();
-        let (_, first_char) = chars.next().unwrap(); // safe to unwrap, asserted
-        buffer.push(first_char);
-        let Some((rest_start, _)) = chars.next() else {
-            return &input[input.len()..];
-        };
-        &input[rest_start..]
-    }
-
-    /// Consume a lossless host-SQL lexical region that is opaque to sql-fun.
-    ///
-    /// sql-fun special tokens are parsed by the `combine` parsers in
-    /// [`Self::try_take_special_item`]. This stateful lexer deliberately owns
-    /// host-SQL regions instead of treating them as `combine` productions:
-    /// nested comments require an unbounded depth, while a dollar-quoted
-    /// string's closing delimiter is selected by its opening delimiter.
-    ///
-    /// This scanner is not a SQL validator. An unterminated comment, quoted
-    /// identifier, or dollar-quoted string consumes the remaining source as
-    /// raw SQL so sql-fun never substitutes text within it; the dialect parser
-    /// reports the SQL error later. A `combine` parser would need the same
-    /// custom state and raw-input fallback, so keeping it here makes that
-    /// lossless lexical contract explicit and contained.
-    fn take_host_sql_region<'a>(input: &'a str, buffer: &mut String) -> Option<&'a str> {
-        Self::take_comment(input, buffer)
-            .or_else(|| Self::take_dollar_quoted(input, buffer))
-            .or_else(|| Self::take_quoted_identifier(input, buffer))
-    }
-
-    fn take_comment<'a>(input: &'a str, buffer: &mut String) -> Option<&'a str> {
-        if let Some(comment) = input.strip_prefix("--") {
-            let len = comment
-                .find('\n')
-                .map_or(comment.len(), |offset| offset + 1);
-            buffer.push_str(&input[..2 + len]);
-            return Some(&input[2 + len..]);
-        }
-        input.strip_prefix("/*")?;
-        let mut depth = 1;
-        let mut offset = 2;
-        while offset < input.len() {
-            if input[offset..].starts_with("/*") {
-                depth += 1;
-                offset += 2;
-                continue;
-            }
-            if input[offset..].starts_with("*/") {
-                depth -= 1;
-                offset += 2;
-                if depth == 0 {
-                    buffer.push_str(&input[..offset]);
-                    return Some(&input[offset..]);
-                }
-                continue;
-            }
-            let character = input[offset..]
-                .chars()
-                .next()
-                .expect("offset is within input");
-            offset += character.len_utf8();
-        }
-        buffer.push_str(input);
-        Some("")
-    }
-
-    fn take_quoted_identifier<'a>(input: &'a str, buffer: &mut String) -> Option<&'a str> {
-        input.strip_prefix('"')?;
-        let mut offset = 1;
-        while offset < input.len() {
-            if input[offset..].starts_with("\"\"") {
-                offset += 2;
-                continue;
-            }
-            if input[offset..].starts_with('"') {
-                offset += 1;
-                buffer.push_str(&input[..offset]);
-                return Some(&input[offset..]);
-            }
-            let character = input[offset..]
-                .chars()
-                .next()
-                .expect("offset is within input");
-            offset += character.len_utf8();
-        }
-        buffer.push_str(input);
-        Some("")
-    }
-
-    fn take_dollar_quoted<'a>(input: &'a str, buffer: &mut String) -> Option<&'a str> {
-        input.strip_prefix('$')?;
-        let mut offset = 1;
-        if input[offset..].starts_with('$') {
-            offset += 1;
-        } else {
-            let first = input[offset..].chars().next()?;
-            if !(first.is_ascii_alphabetic() || first == '_') {
-                return None;
-            }
-            offset += first.len_utf8();
-            while let Some(character) = input[offset..].chars().next() {
-                if !(character.is_ascii_alphanumeric() || character == '_') {
-                    break;
-                }
-                offset += character.len_utf8();
-            }
-            if !input[offset..].starts_with('$') {
-                return None;
-            }
-            offset += 1;
-        }
-        let delimiter = &input[..offset];
-        let content = &input[offset..];
-        let len = content
-            .find(delimiter)
-            .map_or(input.len(), |end| offset + end + delimiter.len());
-        buffer.push_str(&input[..len]);
-        Some(&input[len..])
-    }
-
     /// Split SQL into placeholder-aware tokens.
     ///
-    /// SQL fragments with delimiters that nest or are selected by the input
-    /// are preserved as raw text before the `combine`-based sql-fun token
-    /// parsers are applied. This keeps placeholders inside host-SQL comments,
-    /// dollar-quoted strings, and quoted identifiers from being substituted.
+    /// The `combine` host-SQL lexer preserves comments, dollar-quoted strings,
+    /// and quoted identifiers as raw text before applying the sql-fun token
+    /// parsers. This keeps placeholders in those regions from being substituted.
     #[must_use]
     pub fn scan(input: &str) -> Vec<Self> {
         let mut results = Vec::new();
         let mut rest = input;
         let mut buffer = String::new();
         while !rest.is_empty() {
-            if let Some(new_rest) = Self::take_host_sql_region(rest, &mut buffer) {
+            if let Ok((region, new_rest)) = host_sql_region().parse(rest) {
+                buffer.push_str(region);
                 rest = new_rest;
                 continue;
+            }
+            if host_sql_opener().parse(rest).is_ok() {
+                buffer.push_str(rest);
+                break;
             }
             match Self::try_take_special_item(rest) {
                 Ok((item, new_rest)) => {
@@ -388,7 +352,9 @@ impl PlaceholderedSqlToken {
                     rest = new_rest;
                 }
                 Err(_) => {
-                    rest = Self::take_push_char(rest, &mut buffer);
+                    let (character, new_rest) = any().parse(rest).expect("rest is not empty");
+                    buffer.push(character);
+                    rest = new_rest;
                 }
             }
         }

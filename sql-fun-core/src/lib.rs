@@ -27,7 +27,9 @@ pub use self::{
         CteParameterBindingCollection, CteParameterCollection, CteParameterRename,
         ParameterRenameCollection, ResolvedCteCatalog,
     },
-    placehlodered_sql::{FragmentName, PlaceholderedSql, PlaceholderedSqlError},
+    placehlodered_sql::{
+        FragmentName, PlaceholderedSql, PlaceholderedSqlError, PlaceholderedSqlToken,
+    },
 };
 
 #[cfg(test)]

@@ -337,21 +337,6 @@ jobs:
       - name: Build and validate Linux distributions
         run: .local/bin/check-test-flow --step=packaging
 
-      - name: Build initialization semantic integration harness
-        run: |
-          cargo test --locked --release --target x86_64-unknown-linux-gnu \
-            -p sql-fun-cli --test initialization --no-run --message-format=json \
-            > "$RUNNER_TEMP/initialization-build.json"
-          test_binary=$(jq -r 'select(.reason == "compiler-artifact" and .target.name == "initialization") | .executable // empty' "$RUNNER_TEMP/initialization-build.json")
-          mkdir -p target/init-integration
-          install -m 0755 "$test_binary" target/init-integration/initialization-test
-
-      - uses: actions/upload-artifact@v7
-        with:
-          name: sql-fun-init-integration
-          path: target/init-integration/initialization-test
-          if-no-files-found: error
-
       - uses: actions/upload-artifact@v7
         with:
           name: sql-fun-x86_64-unknown-linux-gnu
@@ -410,15 +395,38 @@ jobs:
           name: sql-fun-x86_64-unknown-linux-gnu
           path: ${{ runner.temp }}/sql-fun-artifact
 
-      - uses: actions/download-artifact@v7
-        with:
-          name: sql-fun-init-integration
-          path: ${{ runner.temp }}/sql-fun-init-integration
-
       - name: Install packaged extraction tooling
         run: |
           sudo apt-get update
           sudo apt-get install -y python3 postgresql-client "$RUNNER_TEMP/sql-fun-artifact"/sql-fun_*.deb
+
+      - name: Install Scrut
+        env:
+          DOTSLASH_VERSION: v0.5.9
+          DOTSLASH_SHA256: 4c75c6eb7890ae35993b962073f6d9bbe78b42b81a5691303ad70f63bfbf7196
+          SCRUT_VERSION: v0.4.3
+          SCRUT_DOTSLASH_SHA256: d2e4d5d36198f889dd7f827c29cc1b8cb2a362df98e47cdf84b5ee0e207151fc
+        run: |
+          scrut_root="$RUNNER_TEMP/sql-fun-postgres-scrut"
+          mkdir -p "$scrut_root"
+          curl -fsSL -o "$scrut_root/dotslash.tar.gz" \
+            "https://github.com/facebook/dotslash/releases/download/${DOTSLASH_VERSION}/dotslash-linux-musl.x86_64.${DOTSLASH_VERSION}.tar.gz"
+          printf '%s  %s\n' "$DOTSLASH_SHA256" "$scrut_root/dotslash.tar.gz" | sha256sum --check --status
+          tar -xzf "$scrut_root/dotslash.tar.gz" -C "$scrut_root"
+          curl -fsSL -o "$scrut_root/scrut.dotslash" \
+            "https://github.com/facebookincubator/scrut/releases/download/${SCRUT_VERSION}/scrut"
+          printf '%s  %s\n' "$SCRUT_DOTSLASH_SHA256" "$scrut_root/scrut.dotslash" | sha256sum --check --status
+          scrut_binary=$("$scrut_root/dotslash" -- fetch "$scrut_root/scrut.dotslash")
+          install -m 0755 "$scrut_binary" "$scrut_root/scrut"
+
+      - name: Validate installed PostgreSQL initialization contract
+        env:
+          SQL_FUN_BIN: /usr/bin/sql-fun
+          SQL_FUN_TEST_DOCKER_HOST: 127.0.0.1
+          SQL_FUN_TEST_DOCKER_BIND: 127.0.0.1
+        run: |
+          BASH_ENV="$GITHUB_WORKSPACE/cli/postgres-contracts/setup.sh" \
+            "$RUNNER_TEMP/sql-fun-postgres-scrut/scrut" test cli/postgres-contracts
 
       - name: Validate installed PostgreSQL extraction and import
         run: |
@@ -428,13 +436,6 @@ jobs:
           for version in 17 18; do
             diff -r "sql-fun-home/postgres/$version" "$RUNNER_TEMP/sql-fun-postgres/$version"
           done
-
-      - name: Load initialized metadata through normal semantic bootstrap
-        env:
-          SQL_FUN_TEST_BINARY: /usr/bin/sql-fun
-        run: |
-          chmod +x "$RUNNER_TEMP/sql-fun-init-integration/initialization-test"
-          "$RUNNER_TEMP/sql-fun-init-integration/initialization-test" --ignored --nocapture
 
       - uses: actions/upload-artifact@v7
         with:

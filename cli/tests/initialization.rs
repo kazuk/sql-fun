@@ -1,12 +1,9 @@
 //! Generic setup dispatch and initialization followed by normal PostgreSQL bootstrap.
-//! `SQL_FUN_TEST_BINARY` selects an installed CLI for the same behavioral tests.
-//! `SQL_FUN_TEST_DOCKER_HOST` and `SQL_FUN_TEST_DOCKER_BIND` configure connectivity for the ignored real test.
 use std::{
     path::{Path, PathBuf},
     process::Command,
 };
 
-use ::sql_fun_core::PostgresVersionInventory;
 use ::sql_fun_sqlast::{
     PostgresDialect,
     sem::{BaseContext, BaseParseContext, FullName, TableName},
@@ -25,9 +22,7 @@ impl InitializedProject {
         self.directory.path().join("home")
     }
     fn command(&self) -> Command {
-        let executable = std::env::var_os("SQL_FUN_TEST_BINARY")
-            .unwrap_or_else(|| env!("CARGO_BIN_EXE_sql-fun").into());
-        let mut command = Command::new(executable);
+        let mut command = Command::new(env!("CARGO_BIN_EXE_sql-fun"));
         command
             .current_dir(self.directory.path())
             .env_remove("SQL_FUN_DATABASE_URL")
@@ -201,36 +196,6 @@ fn initialization_rejects_incomplete_existing_metadata() {
     assert!(!result.status.success());
     assert!(String::from_utf8_lossy(&result.stderr).contains("incomplete or incompatible"));
     assert_eq!(std::fs::read_to_string(file).unwrap(), "incomplete");
-}
-
-#[test]
-#[ignore = "requires Docker CLI/daemon and PostgreSQL client tools"]
-fn docker_initialization_installs_all_supported_versions_for_semantic_analysis() {
-    let project = InitializedProject::new();
-    let host = std::env::var("SQL_FUN_TEST_DOCKER_HOST").unwrap_or_else(|_| "127.0.0.1".to_owned());
-    let bind = std::env::var("SQL_FUN_TEST_DOCKER_BIND").unwrap_or_else(|_| "127.0.0.1".to_owned());
-    let versions = PostgresVersionInventory::builtin()
-        .stable_targets()
-        .into_iter()
-        .map(|version| version.to_string())
-        .collect::<Vec<_>>()
-        .join(",");
-    let result = project.init(&[
-        "--engine-versions",
-        &versions,
-        "--docker-host-address",
-        &host,
-        "--docker-bind-address",
-        &bind,
-    ]);
-    assert!(
-        result.status.success(),
-        "{}",
-        String::from_utf8_lossy(&result.stderr)
-    );
-    for version in PostgresVersionInventory::builtin().stable_targets() {
-        project.assert_semantics(&version.to_string());
-    }
 }
 
 #[test]

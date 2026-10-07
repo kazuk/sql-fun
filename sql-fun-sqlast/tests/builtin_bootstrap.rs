@@ -1,4 +1,4 @@
-//! Integration coverage for loading the committed PostgreSQL builtin schema.
+//! Integration coverage for loading committed PostgreSQL builtin schemas.
 
 use std::path::PathBuf;
 
@@ -9,7 +9,7 @@ use ::sql_fun_sqlast::{
 };
 
 #[test]
-fn parses_the_committed_builtin_schemas() -> Result<(), Box<dyn std::error::Error>> {
+fn loads_builtin_and_user_schemas() -> Result<(), Box<dyn std::error::Error>> {
     let manifest = PathBuf::from(env!("CARGO_MANIFEST_DIR"));
     let home = PathBuf::from(env!("SQL_FUN_HOME"));
     let metadata = manifest.join("sql_fun.metadata.toml");
@@ -31,10 +31,21 @@ fn parses_the_committed_builtin_schemas() -> Result<(), Box<dyn std::error::Erro
                 .expect("selected test metadata"),
         )?;
         let schema = home.join(format!("postgres/{version}/schema.sql"));
-        let parsed = PostgresDialect::parse_schema_file(&schema, context)?;
+        let builtins = PostgresDialect::parse_schema_file(&schema, context)?;
         let pg_class = TableName::from(FullName::with_schema("pg_catalog", "pg_class"));
         assert!(
-            parsed.get_table(&pg_class).is_some(),
+            builtins.get_table(&pg_class).is_some(),
+            "PostgreSQL {version}"
+        );
+        let user_schema = tempfile::NamedTempFile::new()?;
+        std::fs::write(
+            user_schema.path(),
+            "CREATE TABLE hoge (id int PRIMARY KEY); SELECT abs(id) + 1 AS next_id FROM hoge;",
+        )?;
+        let parsed = PostgresDialect::parse_schema_file(user_schema.path(), builtins)?;
+        let user_table = TableName::from(FullName::with_schema("public", "hoge"));
+        assert!(
+            parsed.get_table(&user_table).is_some(),
             "PostgreSQL {version}"
         );
     }

@@ -251,6 +251,21 @@ impl PlaceholderedSqlToken {
         &input[rest_start..]
     }
 
+    /// Consume a host-SQL lexical region that must remain opaque to sql-fun.
+    ///
+    /// sql-fun special tokens are parsed by the `combine` parsers in
+    /// [`Self::try_take_special_item`]. Host-SQL regions are recognized first
+    /// because nested block comments and dollar-quoted strings require state
+    /// or a delimiter selected by the input, neither of which is a fixed
+    /// sql-fun token grammar. Keeping this boundary here ensures later
+    /// additions choose `combine` for sql-fun syntax and this scanner only for
+    /// opaque host-SQL lexical regions.
+    fn take_host_sql_region<'a>(input: &'a str, buffer: &mut String) -> Option<&'a str> {
+        Self::take_comment(input, buffer)
+            .or_else(|| Self::take_dollar_quoted(input, buffer))
+            .or_else(|| Self::take_quoted_identifier(input, buffer))
+    }
+
     fn take_comment<'a>(input: &'a str, buffer: &mut String) -> Option<&'a str> {
         if let Some(comment) = input.strip_prefix("--") {
             let len = comment
@@ -342,21 +357,18 @@ impl PlaceholderedSqlToken {
     }
 
     /// Split SQL into placeholder-aware tokens.
+    ///
+    /// SQL fragments with delimiters that nest or are selected by the input
+    /// are preserved as raw text before the `combine`-based sql-fun token
+    /// parsers are applied. This keeps placeholders inside host-SQL comments,
+    /// dollar-quoted strings, and quoted identifiers from being substituted.
     #[must_use]
     pub fn scan(input: &str) -> Vec<Self> {
         let mut results = Vec::new();
         let mut rest = input;
         let mut buffer = String::new();
         while !rest.is_empty() {
-            if let Some(new_rest) = Self::take_comment(rest, &mut buffer) {
-                rest = new_rest;
-                continue;
-            }
-            if let Some(new_rest) = Self::take_dollar_quoted(rest, &mut buffer) {
-                rest = new_rest;
-                continue;
-            }
-            if let Some(new_rest) = Self::take_quoted_identifier(rest, &mut buffer) {
+            if let Some(new_rest) = Self::take_host_sql_region(rest, &mut buffer) {
                 rest = new_rest;
                 continue;
             }

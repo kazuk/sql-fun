@@ -30,8 +30,6 @@ use self::sql_file::read_sql_file;
 #[cfg(feature = "sqlite")]
 pub use self::sqlite::{SqliteDialect, SqliteLexer, SqliteToken};
 
-pub use self::trie_map::TrieMap;
-
 use std::{io::SeekFrom, path::Path, string::String as StdString};
 
 use crate::{
@@ -39,9 +37,12 @@ use crate::{
     syn::ParseResult,
 };
 
-pub use self::parse_statements::{ParseStatementError, parse_statements};
-pub use self::placeholdered_sql::PlaceholderedSqlRenderError;
-pub use self::schema_dump_file::{ParseDumpFileError, ParsedSchemaDump};
+pub use self::{
+    parse_statements::{ParseStatementError, parse_statements},
+    placeholdered_sql::PlaceholderedSqlRenderError,
+    schema_dump_file::{ParseDumpFileError, ParsedSchemaDump},
+    trie_map::TrieMap,
+};
 pub use sql_fun_core::{SqlFunArgs, SqlFunArgsBuilder, SqlFunArgsError};
 
 /// Semantic AST and parse context result

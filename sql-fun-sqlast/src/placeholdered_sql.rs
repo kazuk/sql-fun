@@ -116,6 +116,26 @@ mod tests {
         &["value"],
         "select '${ignored}', $1 -- ${comment}\n"
     )]
+    #[case::nested_block_comment_is_preserved(
+        "/* outer ${ignored} /* nested ${also_ignored} */ still ${ignored} */ select ${value}",
+        &["value"],
+        "/* outer ${ignored} /* nested ${also_ignored} */ still ${ignored} */ select $1"
+    )]
+    #[case::untagged_dollar_quote_is_preserved(
+        "select $$ ${not_a_parameter} $$, ${value}",
+        &["value"],
+        "select $$ ${not_a_parameter} $$, $1"
+    )]
+    #[case::tagged_dollar_quote_is_preserved(
+        "select $tag$ ${not_a_parameter} $tag$, ${value}",
+        &["value"],
+        "select $tag$ ${not_a_parameter} $tag$, $1"
+    )]
+    #[case::quoted_identifier_is_preserved(
+        "select \"${not_a_parameter}\", ${value}",
+        &["value"],
+        "select \"${not_a_parameter}\", $1"
+    )]
     fn renders_postgres_placeholders(
         #[case] source: &str,
         #[case] parameter_order: &[&str],
@@ -139,6 +159,20 @@ mod tests {
             error.to_string(),
             "query parameter missing is absent from the supplied parameter ordering"
         );
+    }
+
+    #[test]
+    fn accepts_core_parameter_names_as_the_caller_order() {
+        let sql = PlaceholderedSql::from_query("select ${account_id}, ${user_id}");
+        let parameter_order = [
+            ::sql_fun_core::ParameterName::from("user_id"),
+            ::sql_fun_core::ParameterName::from("account_id"),
+        ];
+
+        let actual = Dialect::postgres()
+            .render_placeholdered_sql(&sql, &parameter_order)
+            .expect("rendered PostgreSQL SQL");
+        assert_eq!(actual, "select $2, $1");
     }
 
     #[test]

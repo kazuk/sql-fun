@@ -28,7 +28,7 @@ pub use self::{
         ParameterRenameCollection, ResolvedCteCatalog,
     },
     placehlodered_sql::{
-        FragmentName, PlaceholderedSql, PlaceholderedSqlError, PlaceholderedSqlToken,
+        FragmentName, ParameterName, PlaceholderedSql, PlaceholderedSqlError, PlaceholderedSqlToken,
     },
 };
 

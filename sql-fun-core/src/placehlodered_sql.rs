@@ -10,14 +10,18 @@ use toml_parser::decoder::StringBuilder;
 
 #[derive(Debug, Hash, Eq, PartialEq, Clone, serde::Serialize, serde::Deserialize)]
 #[serde(transparent)]
+/// A named sql-fun query parameter.
 pub struct ParameterName(String);
 
-impl<T> From<T> for ParameterName
-where
-    T: AsRef<str>,
-{
-    fn from(value: T) -> Self {
-        Self(String::from(value.as_ref()))
+impl From<&str> for ParameterName {
+    fn from(value: &str) -> Self {
+        Self(String::from(value))
+    }
+}
+
+impl From<String> for ParameterName {
+    fn from(value: String) -> Self {
+        Self(value)
     }
 }
 
@@ -30,6 +34,12 @@ impl ParameterName {
 
     fn encode(&self, buffer: &mut String) {
         buffer.push_str(&self.0);
+    }
+}
+
+impl AsRef<str> for ParameterName {
+    fn as_ref(&self) -> &str {
+        self.as_str()
     }
 }
 
@@ -229,42 +239,124 @@ impl PlaceholderedSqlToken {
         Err(source)
     }
 
+    fn take_push_char<'a>(input: &'a str, buffer: &mut String) -> &'a str {
+        assert_ne!(input, "");
+
+        let mut chars = input.char_indices();
+        let (_, first_char) = chars.next().unwrap(); // safe to unwrap, asserted
+        buffer.push(first_char);
+        let Some((rest_start, _)) = chars.next() else {
+            return &input[input.len()..];
+        };
+        &input[rest_start..]
+    }
+
+    fn take_comment<'a>(input: &'a str, buffer: &mut String) -> Option<&'a str> {
+        if let Some(comment) = input.strip_prefix("--") {
+            let len = comment
+                .find('\n')
+                .map_or(comment.len(), |offset| offset + 1);
+            buffer.push_str(&input[..2 + len]);
+            return Some(&input[2 + len..]);
+        }
+        input.strip_prefix("/*")?;
+        let mut depth = 1;
+        let mut offset = 2;
+        while offset < input.len() {
+            if input[offset..].starts_with("/*") {
+                depth += 1;
+                offset += 2;
+                continue;
+            }
+            if input[offset..].starts_with("*/") {
+                depth -= 1;
+                offset += 2;
+                if depth == 0 {
+                    buffer.push_str(&input[..offset]);
+                    return Some(&input[offset..]);
+                }
+                continue;
+            }
+            let character = input[offset..]
+                .chars()
+                .next()
+                .expect("offset is within input");
+            offset += character.len_utf8();
+        }
+        buffer.push_str(input);
+        Some("")
+    }
+
+    fn take_quoted_identifier<'a>(input: &'a str, buffer: &mut String) -> Option<&'a str> {
+        input.strip_prefix('"')?;
+        let mut offset = 1;
+        while offset < input.len() {
+            if input[offset..].starts_with("\"\"") {
+                offset += 2;
+                continue;
+            }
+            if input[offset..].starts_with('"') {
+                offset += 1;
+                buffer.push_str(&input[..offset]);
+                return Some(&input[offset..]);
+            }
+            let character = input[offset..]
+                .chars()
+                .next()
+                .expect("offset is within input");
+            offset += character.len_utf8();
+        }
+        buffer.push_str(input);
+        Some("")
+    }
+
+    fn take_dollar_quoted<'a>(input: &'a str, buffer: &mut String) -> Option<&'a str> {
+        input.strip_prefix('$')?;
+        let mut offset = 1;
+        if input[offset..].starts_with('$') {
+            offset += 1;
+        } else {
+            let first = input[offset..].chars().next()?;
+            if !(first.is_ascii_alphabetic() || first == '_') {
+                return None;
+            }
+            offset += first.len_utf8();
+            while let Some(character) = input[offset..].chars().next() {
+                if !(character.is_ascii_alphanumeric() || character == '_') {
+                    break;
+                }
+                offset += character.len_utf8();
+            }
+            if !input[offset..].starts_with('$') {
+                return None;
+            }
+            offset += 1;
+        }
+        let delimiter = &input[..offset];
+        let content = &input[offset..];
+        let len = content
+            .find(delimiter)
+            .map_or(input.len(), |end| offset + end + delimiter.len());
+        buffer.push_str(&input[..len]);
+        Some(&input[len..])
+    }
+
     /// Split SQL into placeholder-aware tokens.
     #[must_use]
     pub fn scan(input: &str) -> Vec<Self> {
-        fn take_push_char<'a>(input: &'a str, buffer: &mut String) -> &'a str {
-            assert_ne!(input, "");
-
-            let mut chars = input.char_indices();
-            let (_, first_char) = chars.next().unwrap(); // safe to unwrap, asserted
-            buffer.push(first_char);
-            let Some((rest_start, _)) = chars.next() else {
-                return &input[input.len()..];
-            };
-            &input[rest_start..]
-        }
-
-        fn take_comment<'a>(input: &'a str, buffer: &mut String) -> Option<&'a str> {
-            if let Some(comment) = input.strip_prefix("--") {
-                let len = comment
-                    .find('\n')
-                    .map_or(comment.len(), |offset| offset + 1);
-                buffer.push_str(&input[..2 + len]);
-                return Some(&input[2 + len..]);
-            }
-            let comment = input.strip_prefix("/*")?;
-            let len = comment
-                .find("*/")
-                .map_or(comment.len(), |offset| offset + 2);
-            buffer.push_str(&input[..2 + len]);
-            Some(&input[2 + len..])
-        }
-
         let mut results = Vec::new();
         let mut rest = input;
         let mut buffer = String::new();
         while !rest.is_empty() {
-            if let Some(new_rest) = take_comment(rest, &mut buffer) {
+            if let Some(new_rest) = Self::take_comment(rest, &mut buffer) {
+                rest = new_rest;
+                continue;
+            }
+            if let Some(new_rest) = Self::take_dollar_quoted(rest, &mut buffer) {
+                rest = new_rest;
+                continue;
+            }
+            if let Some(new_rest) = Self::take_quoted_identifier(rest, &mut buffer) {
                 rest = new_rest;
                 continue;
             }
@@ -279,7 +371,7 @@ impl PlaceholderedSqlToken {
                     rest = new_rest;
                 }
                 Err(_) => {
-                    rest = take_push_char(rest, &mut buffer);
+                    rest = Self::take_push_char(rest, &mut buffer);
                 }
             }
         }

@@ -226,7 +226,7 @@ impl From<HashMap<String, Vec<CteParameterRename>>> for ParameterRenameCollectio
         Self(
             value
                 .into_iter()
-                .map(|(k, v)| (ParameterName::from(&k), v))
+                .map(|(k, v)| (ParameterName::from(k.as_str()), v))
                 .collect(),
         )
     }

@@ -15,6 +15,7 @@ pub mod sem;
 pub mod syn;
 
 mod parse_statements;
+mod placeholdered_sql;
 mod schema_dump_file;
 mod sql_file;
 #[cfg(feature = "sqlite")]
@@ -39,6 +40,7 @@ use crate::{
 };
 
 pub use self::parse_statements::{ParseStatementError, parse_statements};
+pub use self::placeholdered_sql::PlaceholderedSqlRenderError;
 pub use self::schema_dump_file::{ParseDumpFileError, ParsedSchemaDump};
 pub use sql_fun_core::{SqlFunArgs, SqlFunArgsBuilder, SqlFunArgsError};
 

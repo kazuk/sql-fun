@@ -1,11 +1,8 @@
 use std::collections::HashSet;
 
 use combine::{
-    Parser, between, many, optional,
-    parser::{
-        char::{alpha_num, char, letter, spaces, string},
-        range::recognize,
-    },
+    Parser, attempt, between, many, optional,
+    parser::char::{alpha_num, char, letter, spaces, string},
     satisfy,
 };
 use indexmap::IndexMap;
@@ -25,6 +22,12 @@ where
 }
 
 impl ParameterName {
+    /// get the parameter name text
+    #[must_use]
+    pub const fn as_str(&self) -> &str {
+        self.0.as_str()
+    }
+
     fn encode(&self, buffer: &mut String) {
         buffer.push_str(&self.0);
     }
@@ -106,10 +109,11 @@ pub struct NamedParameterPlaceholder {
 impl NamedParameterPlaceholder {
     /// get parser accepts `${ name:type_hint }` or `${name}`
     pub fn parser<'a>() -> impl combine::Parser<&'a str, Output = Self> {
-        let name_with_type_opt = (ident(), optional(ident())).map(|(name, type_hint)| Self {
-            name: ParameterName(name),
-            type_hint: type_hint.map(PlaceholderTypeHint),
-        });
+        let name_with_type_opt =
+            (ident(), optional(char(':').with(ident()))).map(|(name, type_hint)| Self {
+                name: ParameterName(name),
+                type_hint: type_hint.map(PlaceholderTypeHint),
+            });
         char('$').with(between(
             char('{').skip(spaces()),
             spaces().with(char('}')),
@@ -143,8 +147,17 @@ impl NamedParameterPlaceholder {
 pub struct SqlLiteralText(String);
 
 impl SqlLiteralText {
+    /// get literal contents without SQL quote delimiters
     pub const fn text(&self) -> &str {
         self.0.as_str()
+    }
+
+    /// encode as SQL literal text
+    #[must_use]
+    pub fn sql(&self) -> String {
+        let mut buffer = String::new();
+        self.encode(&mut buffer);
+        buffer
     }
 }
 
@@ -153,12 +166,12 @@ impl SqlLiteralText {
     pub fn parser<'a>() -> impl combine::Parser<&'a str, Output = Self> {
         let escaped_char = string(r"''").map(|_| '\'');
 
-        recognize(between(
+        between(
             char('\''),
             char('\''),
-            many::<Vec<_>, _, _>(escaped_char.or(satisfy(|c| c != '\''))).map(|_| ()),
-        ))
-        .map(|s| Self(String::from(s)))
+            many::<Vec<_>, _, _>(attempt(escaped_char).or(satisfy(|c| c != '\''))),
+        )
+        .map(|text| Self(text.into_iter().collect()))
     }
 
     fn encode(&self, buffer: &mut String) {
@@ -183,14 +196,24 @@ impl RawSqlText {
 }
 
 #[derive(Debug, Clone, serde::Serialize, serde::Deserialize)]
+/// A token in SQL containing sql-fun placeholders.
 pub enum PlaceholderedSqlToken {
+    /// A named parameter placeholder such as `${user_id}`.
     ParameterPlaceholder(NamedParameterPlaceholder),
+    /// A fragment placeholder such as `#[where_clause]`.
     FragmentPlaceholder(FragmentName),
+    /// A SQL string literal.
     LiteralText(SqlLiteralText),
+    /// SQL text that is neither a placeholder nor a string literal.
     RawSqlText(RawSqlText),
 }
 
 impl PlaceholderedSqlToken {
+    /// Parse one special token from the start of `source`.
+    ///
+    /// # Errors
+    ///
+    /// Returns the original source when it does not begin with a special token.
     pub fn try_take_special_item(source: &str) -> Result<(Self, &str), &str> {
         if let Ok((item, rest)) = NamedParameterPlaceholder::parser().parse(source) {
             return Ok((Self::ParameterPlaceholder(item), rest));
@@ -206,9 +229,11 @@ impl PlaceholderedSqlToken {
         Err(source)
     }
 
+    /// Split SQL into placeholder-aware tokens.
+    #[must_use]
     pub fn scan(input: &str) -> Vec<Self> {
         fn take_push_char<'a>(input: &'a str, buffer: &mut String) -> &'a str {
-            assert!(!input.is_empty());
+            assert_ne!(input, "");
 
             let mut chars = input.char_indices();
             let (_, first_char) = chars.next().unwrap(); // safe to unwrap, asserted
@@ -219,10 +244,30 @@ impl PlaceholderedSqlToken {
             &input[rest_start..]
         }
 
+        fn take_comment<'a>(input: &'a str, buffer: &mut String) -> Option<&'a str> {
+            if let Some(comment) = input.strip_prefix("--") {
+                let len = comment
+                    .find('\n')
+                    .map_or(comment.len(), |offset| offset + 1);
+                buffer.push_str(&input[..2 + len]);
+                return Some(&input[2 + len..]);
+            }
+            let comment = input.strip_prefix("/*")?;
+            let len = comment
+                .find("*/")
+                .map_or(comment.len(), |offset| offset + 2);
+            buffer.push_str(&input[..2 + len]);
+            Some(&input[2 + len..])
+        }
+
         let mut results = Vec::new();
         let mut rest = input;
         let mut buffer = String::new();
         while !rest.is_empty() {
+            if let Some(new_rest) = take_comment(rest, &mut buffer) {
+                rest = new_rest;
+                continue;
+            }
             match Self::try_take_special_item(rest) {
                 Ok((item, new_rest)) => {
                     if !buffer.is_empty() {
@@ -244,6 +289,8 @@ impl PlaceholderedSqlToken {
         results
     }
 
+    /// Return the fragment name when this is a fragment placeholder.
+    #[must_use]
     pub const fn as_fragment_placeholder(&self) -> Option<&FragmentName> {
         match self {
             Self::FragmentPlaceholder(v) => Some(v),

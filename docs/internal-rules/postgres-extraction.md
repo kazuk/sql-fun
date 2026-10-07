@@ -107,19 +107,29 @@ path. Bare init must ask for engines without inspecting those files. The tests
 also cover explicit home confirmation, unselected engine candidates and SQLite
 dispatch without PostgreSQL tools. It also exercises
 PostgreSQL initialization from Docker and
-an existing server, reruns, and source/version mismatch diagnostics. To validate
-initialization followed by semantic loading of builtin and user schemas, run:
+an existing server, reruns, and source/version mismatch diagnostics. The
+installed-CLI Docker initialization contract is a Scrut fixture. It verifies
+the supported PostgreSQL target set, the CLI completion messages, and all
+installed builtin metadata files. Run it with an explicit CLI executable and
+Docker connectivity:
 
 ```sh
-cargo test -p sql-fun-cli --test initialization -- --ignored
+SQL_FUN_BIN=/path/to/sql-fun \
+SQL_FUN_TEST_DOCKER_HOST=127.0.0.1 \
+SQL_FUN_TEST_DOCKER_BIND=127.0.0.1 \
+BASH_ENV="$PWD/cli/postgres-contracts/setup.sh" \
+scrut test cli/postgres-contracts
 ```
 
-This requires `psql`, Docker CLI and daemon access. Set
-`SQL_FUN_TEST_DOCKER_HOST` and `SQL_FUN_TEST_DOCKER_BIND` when connectivity
-requires specific host addresses. Set `SQL_FUN_TEST_BINARY` to an installed CLI
-executable to test that binary instead of the workspace CLI. CI builds the
-integration harness in the builder image and runs it against the installed
-package on the Docker-capable Ubuntu runner.
+This requires Scrut, `psql`, Docker CLI, and daemon access. Supply
+`SQL_FUN_TEST_DOCKER_HOST` and `SQL_FUN_TEST_DOCKER_BIND` explicitly when
+connectivity requires specific addresses. CI runs the fixture against the
+Debian-installed package on the Docker-capable Ubuntu runner.
+
+`sql-fun-sqlast/tests/builtin_bootstrap.rs` separately loads each committed
+builtin schema through the normal semantic context, then parses a representative
+user schema that resolves builtin functions and operators. It is an ordinary
+Rust integration test and does not require Docker or an installed CLI.
 
 The generic initialization tests also verify explicit choices and dispatch:
 SQLite-only setup does not run PostgreSQL setup, omitted choices are not filled

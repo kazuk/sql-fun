@@ -1,5 +1,9 @@
 use std::collections::HashSet;
 
+// This module uses combine for lexical analysis and parsing. New lexical or parsing logic should
+// use combine by default. A different parsing strategy is acceptable only when it provides an
+// overwhelming, clearly explainable technical advantage that outweighs the additional maintenance
+// and conceptual cost of introducing another strategy.
 use combine::{
     Parser, any, attempt, between, many, optional,
     parser::char::{alpha_num, char, letter, spaces, string},

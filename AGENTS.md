@@ -28,6 +28,16 @@ You can build and run tests using the `check-test-flow` script.
   corresponding job has finished on the final PR head and its result has been
   verified.
 
+## Planning
+
+- Before finalizing an implementation plan, identify the technologies and
+  patterns already used by every module or crate the plan proposes to modify.
+  Evaluate whether they can satisfy the new requirement, including the
+  relevant dependency or framework contracts, and record the decision in the
+  plan. Prefer extending an applicable existing approach over introducing a
+  second strategy; propose a new strategy only when its technical advantage
+  clearly outweighs its additional maintenance and conceptual cost.
+
 ## External Tool Prerequisites
 
 - When planning validation work, inspect the repository's standard checks with

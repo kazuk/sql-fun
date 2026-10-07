@@ -251,15 +251,20 @@ impl PlaceholderedSqlToken {
         &input[rest_start..]
     }
 
-    /// Consume a host-SQL lexical region that must remain opaque to sql-fun.
+    /// Consume a lossless host-SQL lexical region that is opaque to sql-fun.
     ///
     /// sql-fun special tokens are parsed by the `combine` parsers in
-    /// [`Self::try_take_special_item`]. Host-SQL regions are recognized first
-    /// because nested block comments and dollar-quoted strings require state
-    /// or a delimiter selected by the input, neither of which is a fixed
-    /// sql-fun token grammar. Keeping this boundary here ensures later
-    /// additions choose `combine` for sql-fun syntax and this scanner only for
-    /// opaque host-SQL lexical regions.
+    /// [`Self::try_take_special_item`]. This stateful lexer deliberately owns
+    /// host-SQL regions instead of treating them as `combine` productions:
+    /// nested comments require an unbounded depth, while a dollar-quoted
+    /// string's closing delimiter is selected by its opening delimiter.
+    ///
+    /// This scanner is not a SQL validator. An unterminated comment, quoted
+    /// identifier, or dollar-quoted string consumes the remaining source as
+    /// raw SQL so sql-fun never substitutes text within it; the dialect parser
+    /// reports the SQL error later. A `combine` parser would need the same
+    /// custom state and raw-input fallback, so keeping it here makes that
+    /// lossless lexical contract explicit and contained.
     fn take_host_sql_region<'a>(input: &'a str, buffer: &mut String) -> Option<&'a str> {
         Self::take_comment(input, buffer)
             .or_else(|| Self::take_dollar_quoted(input, buffer))

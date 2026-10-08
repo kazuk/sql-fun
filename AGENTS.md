@@ -51,8 +51,13 @@ You can build and run tests using the `check-test-flow` script.
   privacy alone is not a reason to relocate the implementation.
 - When an implementation needs an API from another crate that is currently
   private, prefer making the existing API public. If that is unsuitable, add
-  the smallest public API needed. Do not restructure existing data models merely
-  to work around visibility restrictions.
+  the smallest public API needed.
+- A consumer implementation MUST NOT modify the source crate's existing data
+  model to accommodate consumer-specific processing needs or bypass private
+  visibility. Keep the source model intact and derive processing-specific
+  representations in the consuming crate. A genuine redesign of the source
+  data model requires an explicitly agreed design scope, not an incidental
+  change made to complete the consumer implementation.
 - Continue the implementation without requiring prior approval for public API
   changes. Explicitly identify each newly exposed API and why it is needed in
   the pull request body; reviewers assess its signature and visibility through

@@ -3096,7 +3096,6 @@ dependencies = [
  "thiserror 2.0.21",
  "tracing",
  "tracing-subscriber",
- "trybuild",
  "turso_parser",
 ]
 

@@ -10,6 +10,46 @@ use std::sync::Arc;
 /// Convert an initialized [`BaseContext`] by value to freeze its builtin catalog.
 /// A frozen context exposes only [`BaseParseContext`] reads; it cannot be thawed
 /// or used to extract or mutably access the underlying catalog.
+///
+/// # Examples
+///
+/// Given a builder over an explicitly selected base, freeze it, read from the
+/// completed catalog, and share that catalog with the next layer:
+///
+/// ```
+/// use std::path::Path;
+/// use ::sql_fun_sqlast::sem::{BaseParseContext, FrozenBaseContext, ParseContext, SchemaFileContext};
+///
+/// fn next_layer(builder: SchemaFileContext) {
+///     let frozen = builder.freeze();
+///     let _metadata = frozen.metadata();
+///     let shared = frozen.clone();
+///     let _next = SchemaFileContext::new(Path::new("schema.sql"), &shared);
+/// }
+///
+/// fn assert_shareable<T: Clone + std::fmt::Debug + Send + Sync>() {}
+/// assert_shareable::<FrozenBaseContext>();
+/// ```
+///
+/// Frozen handles expose no parsing mutators, even when owned uniquely:
+///
+/// ```compile_fail
+/// use ::sql_fun_sqlast::sem::{FrozenBaseContext, ParseContext};
+///
+/// fn mutate_frozen(mut frozen: FrozenBaseContext) {
+///     frozen.set_search_path(&[]);
+/// }
+/// ```
+///
+/// Their inner storage is private and cannot be extracted:
+///
+/// ```compile_fail
+/// use ::sql_fun_sqlast::sem::FrozenBaseContext;
+///
+/// fn extract_storage(frozen: FrozenBaseContext) {
+///     let _inner = frozen.0;
+/// }
+/// ```
 #[derive(Clone, Debug)]
 pub struct FrozenBaseContext(Arc<dyn BaseParseContext + Send + Sync>);
 

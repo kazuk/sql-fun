@@ -229,6 +229,11 @@ The script runs the workspace checks, tests, formatting, linting, documentation
 build, dependency checks, API spec generation, and typo checks. After all other
 steps pass, it updates the repository graph index with `graphify update .`.
 
+The `workspace` step also runs `cargo test --doc -p sql-fun-sqlast` to execute
+the library's documentation examples, including compile-failure API checks.
+`--all-features` applies to these doctests as well. Building documentation with
+the `doc` step alone does not execute them.
+
 `check-test-flow` prioritizes consistent behavior between CI and local runs.
 Both use the shared defaults in [`.cargo/config.toml`](.cargo/config.toml):
 incremental compilation is disabled, and the `dev` and `test` profiles use

@@ -69,6 +69,16 @@ impl SchemaFileContext {
     ///
     /// The initial search path is copied from the supplied base. Later changes
     /// to this context's search path leave the base unchanged.
+    /// A mutable builder cannot be supplied as the base, even by reference:
+    ///
+    /// ```compile_fail
+    /// use std::path::Path;
+    /// use ::sql_fun_sqlast::sem::SchemaFileContext;
+    ///
+    /// fn mutable_base(builder: SchemaFileContext) {
+    ///     let _next = SchemaFileContext::new(Path::new("schema.sql"), &builder);
+    /// }
+    /// ```
     pub fn new(sql_source_path: &Path, base: &FrozenBaseContext) -> Self {
         let search_path = base.get_search_path().to_vec();
         Self {

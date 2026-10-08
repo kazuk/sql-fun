@@ -230,6 +230,17 @@ where
     /// provenance remain readable. Diagnostic collection and source rendering
     /// services are discarded; inspect problems before freezing or use a
     /// schema-file loader to retain them on its parsed result.
+    ///
+    /// Freezing consumes the builder; it cannot be reused afterwards:
+    ///
+    /// ```compile_fail
+    /// use ::sql_fun_sqlast::sem::{ParseContext, SchemaFileContext};
+    ///
+    /// fn reuse_builder(mut builder: SchemaFileContext) {
+    ///     let _frozen = builder.freeze();
+    ///     builder.set_search_path(&[]);
+    /// }
+    /// ```
     fn freeze(self) -> FrozenBaseContext;
 
     /// Replace the search path for this parse context without updating its base.

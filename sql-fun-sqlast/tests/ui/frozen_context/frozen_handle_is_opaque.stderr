@@ -1,5 +1,0 @@
-error[E0616]: field `0` of struct `FrozenBaseContext` is private
- --> tests/ui/frozen_context/frozen_handle_is_opaque.rs:4:26
-  |
-4 |     let _inner = context.0;
-  |                          ^ private field

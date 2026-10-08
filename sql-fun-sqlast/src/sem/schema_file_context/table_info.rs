@@ -3,7 +3,6 @@ use crate::{
     sem::{
         AlterTable, AnalysisError, AnalysisProblem, BaseParseContext, CreateTable,
         DiagnosticContext, DropTable, FullName, ImplicitChange, TableInfoRead, TableInfoWrite,
-        TableName,
     },
 };
 
@@ -21,32 +20,19 @@ impl TableDefinitionCollection {
         self.0.get(&name.to_string())
     }
 
-    fn get_mut(&mut self, name: &FullName) -> Option<&mut CreateTable> {
-        self.0.get_mut(&name.to_string())
-    }
-
     fn apply_alter(
         &mut self,
         alter_table: &AlterTable,
-        table_name: &TableName,
         mut table: CreateTable,
     ) -> Result<Vec<ImplicitChange>, AnalysisError> {
         let implicit_changes = table.apply_alter(alter_table)?;
-        self.insert_create_table(table_name.full_name(), &table);
+        self.insert_create_table(table.name().full_name(), &table);
         Ok(implicit_changes)
     }
 
-    fn push_drop_statement(
-        &mut self,
-        table_name: &TableName,
-        drop_table: &DropTable,
-    ) -> Result<bool, AnalysisError> {
-        if let Some(table) = self.get_mut(table_name.full_name()) {
-            table.push_drop_statement(drop_table);
-            Ok(true)
-        } else {
-            Ok(false)
-        }
+    fn push_drop_statement(&mut self, mut table: CreateTable, drop_table: &DropTable) {
+        table.push_drop_statement(drop_table);
+        self.insert_create_table(table.name().full_name(), &table);
     }
 }
 
@@ -69,10 +55,7 @@ impl TableInfoWrite for SchemaFileContext {
             return Ok(self);
         };
 
-        let implicit_changes = self
-            .catalog
-            .tables
-            .apply_alter(alter_table, table_name, table)?;
+        let implicit_changes = self.catalog.tables.apply_alter(alter_table, table)?;
         let mut context = self;
         for implicit_change in implicit_changes {
             context = context.apply_implicit_change(implicit_change)?;
@@ -86,13 +69,11 @@ impl TableInfoWrite for SchemaFileContext {
     ) -> Result<Self, AnalysisError> {
         let table_names = drop_table.table_names();
         for table_name in table_names {
-            if !self
-                .catalog
-                .tables
-                .push_drop_statement(table_name, drop_table)?
-            {
+            let Some(table) = self.get_table(table_name).cloned() else {
                 self.report_problem(AnalysisProblem::table_not_found(table_name))?;
-            }
+                continue;
+            };
+            self.catalog.tables.push_drop_statement(table, drop_table);
         }
         Ok(self)
     }

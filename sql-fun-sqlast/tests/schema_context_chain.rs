@@ -2,9 +2,8 @@
 
 use self::test_helpers::{
     EXTENSION_A, EXTENSION_B, assert_missing_domain_base, assert_primary_key, assert_query_type,
-    assert_table_exists, assert_type_exists, builtin_root, builtin_schema, chain_prefix,
-    dependent_dump, extension_sources, load_layer, load_schema, parent_with_same_named_tables,
-    query, tablefunc_schema,
+    assert_table_exists, assert_type_exists, builtin_root, chain_prefix, dependent_dump,
+    extension_sources, heavy, load_layer, load_schema, parent_with_same_named_tables, query,
 };
 
 use ::sql_fun_sqlast::sem::{
@@ -61,7 +60,7 @@ fn dependent_file_reports_named_missing_domain_base_before_its_provider()
 #[test]
 fn inherited_catalog_objects_and_merged_overloads_drive_query_analysis()
 -> Result<(), Box<dyn std::error::Error>> {
-    let builtin = builtin_schema()?;
+    let builtin = heavy::builtin_schema()?;
     let first = load_schema(&builtin, EXTENSION_A)?;
     let second = load_schema(first.base_context(), EXTENSION_B)?;
     let dump = load_schema(second.base_context(), dependent_dump(2))?;
@@ -190,7 +189,7 @@ fn array_item_reads_follow_frozen_and_mutable_schema_layers()
 #[test]
 fn tablefunc_crosstab_call_resolves_after_explicit_extension_loading()
 -> Result<(), Box<dyn std::error::Error>> {
-    let extension = tablefunc_schema()?;
+    let extension = heavy::tablefunc_schema()?;
     assert_eq!(
         extension
             .get_function_by_name(&FullName::with_schema("public", "crosstab"))
@@ -457,6 +456,37 @@ fn inherited_drop_records_without_removing_tables_or_changing_other_layers(
 }
 
 mod test_helpers {
+    pub(super) mod heavy {
+        use std::path::Path;
+
+        use ::sql_fun_sqlast::{PostgresDialect, sem::FrozenBaseContext};
+
+        use super::builtin_root;
+
+        /// Parse the complete PostgreSQL 17 builtin schema for catalog integration
+        /// coverage. Every call reloads metadata and parses the schema; results
+        /// are not cached or shared between calls or test processes.
+        pub fn builtin_schema() -> Result<FrozenBaseContext, Box<dyn std::error::Error>> {
+            let root = builtin_root()?;
+            let file = Path::new(env!("SQL_FUN_HOME")).join("postgres/17/schema.sql");
+            Ok(PostgresDialect::parse_schema_file(&file, &root)?
+                .base_context()
+                .clone())
+        }
+
+        /// Parse the complete builtin schema and tablefunc extension for real
+        /// extension integration coverage. Every call repeats both schema loads;
+        /// results are not cached or shared between calls or test processes.
+        pub fn tablefunc_schema() -> Result<FrozenBaseContext, Box<dyn std::error::Error>> {
+            let prefix = builtin_schema()?;
+            let file =
+                Path::new(env!("SQL_FUN_HOME")).join("postgres/17/extension/tablefunc--1.0.sql");
+            Ok(PostgresDialect::parse_schema_file(&file, &prefix)?
+                .base_context()
+                .clone())
+        }
+    }
+
     use std::path::Path;
 
     use ::clap::Parser;
@@ -546,22 +576,6 @@ mod test_helpers {
         let parsed = load_schema(&root, "CREATE TABLE public.base_items (id integer);")?;
         assert!(parsed.problems().is_empty());
         Ok(parsed.base_context().clone())
-    }
-
-    pub(super) fn builtin_schema() -> Result<FrozenBaseContext, Box<dyn std::error::Error>> {
-        let root = builtin_root()?;
-        let file = Path::new(env!("SQL_FUN_HOME")).join("postgres/17/schema.sql");
-        Ok(PostgresDialect::parse_schema_file(&file, &root)?
-            .base_context()
-            .clone())
-    }
-
-    pub(super) fn tablefunc_schema() -> Result<FrozenBaseContext, Box<dyn std::error::Error>> {
-        let prefix = builtin_schema()?;
-        let file = Path::new(env!("SQL_FUN_HOME")).join("postgres/17/extension/tablefunc--1.0.sql");
-        Ok(PostgresDialect::parse_schema_file(&file, &prefix)?
-            .base_context()
-            .clone())
     }
 
     pub(super) fn load_schema(

@@ -119,7 +119,7 @@ mod test_child_process_read_line_from {
             .expect("read first line")
             .expect("first line");
         assert_eq!("one\n", first);
-        assert!(buffer.is_empty());
+        assert_eq!(buffer, "");
         assert!(!eof);
 
         let second = ChildProcess::read_line_from(&mut reader, &mut buffer, &mut eof)
@@ -127,7 +127,7 @@ mod test_child_process_read_line_from {
             .expect("read second line")
             .expect("second line");
         assert_eq!("two\n", second);
-        assert!(buffer.is_empty());
+        assert_eq!(buffer, "");
         assert!(!eof);
 
         let none = ChildProcess::read_line_from(&mut reader, &mut buffer, &mut eof)
@@ -230,7 +230,7 @@ mod test_child_process_read_to_eof_from {
         let write_result = write_task.await.expect("writer task");
 
         assert_eq!(vec!["alpha\n", "beta\n", "gamma\n"], lines);
-        assert!(source.line_buffer.is_empty());
+        assert_eq!(source.line_buffer, "");
         assert!(write_result.is_ok());
     }
 }

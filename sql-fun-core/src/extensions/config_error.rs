@@ -127,7 +127,7 @@ mod test_extension_config_error {
         assert!(matches!(
             err,
             Err(ExtensionConfigError::InvalidExtensionName(_))
-        ))
+        ));
     }
 
     #[test]
@@ -162,7 +162,7 @@ mod test_extension_config_error {
         assert!(matches!(
             err,
             Err(ExtensionConfigError::MultipleExtensionVersion(_, _, _))
-        ))
+        ));
     }
 
     #[test]

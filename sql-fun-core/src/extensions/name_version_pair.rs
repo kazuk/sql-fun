@@ -41,7 +41,7 @@ mod test_extension_name_version_pair_display {
             version: Some(ExtensionVersion::new("1.0")),
         };
         let display_result = item.to_string();
-        assert_eq!("ext@1.0", display_result)
+        assert_eq!("ext@1.0", display_result);
     }
 }
 

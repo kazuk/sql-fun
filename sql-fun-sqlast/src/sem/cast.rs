@@ -58,9 +58,22 @@ impl CastDefinition {
 }
 
 impl CastContext {
-    #[cfg(all(test, feature = "sqlite"))]
+    /// Construct an implicit context for semantic test fixtures.
+    #[cfg(test)]
     pub(crate) const fn implicit() -> Self {
         Self::Implicit
+    }
+
+    /// Construct an explicit context for semantic test fixtures.
+    #[cfg(test)]
+    pub(crate) const fn explicit() -> Self {
+        Self::Explicit
+    }
+
+    /// Construct an assignment context for semantic test fixtures.
+    #[cfg(test)]
+    pub(crate) const fn assignment() -> Self {
+        Self::Assignment
     }
 
     /// cast is defined, always use explicit

@@ -151,6 +151,18 @@ jobs:
           path: target/nextest/ci/junit.xml
           reporter: java-junit
 
+  msrv:
+    runs-on: ubuntu-24.04
+    steps:
+      - uses: actions/checkout@v5
+
+      - name: Check workspace with declared MSRV
+        run: |
+          RUST_VERSION="$(cargo metadata --no-deps --format-version=1 --locked \
+            | jq -er '.packages[] | select(.name == "sql-fun") | .rust_version')"
+          rustup toolchain install "$RUST_VERSION" --profile minimal
+          cargo +"$RUST_VERSION" check --workspace --all-features --locked
+
 
   fmt:
     runs-on: ubuntu-24.04
@@ -450,6 +462,7 @@ jobs:
     needs:
       - workspace
       - workspace-all-features
+      - msrv
       - fmt
       - lint
       - server-api-spec

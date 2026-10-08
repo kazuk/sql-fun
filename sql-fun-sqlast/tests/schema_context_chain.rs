@@ -163,6 +163,17 @@ fn inherited_catalog_objects_and_merged_overloads_drive_query_analysis()
     );
     assert_query_type(&resolved, "builtin_sum", &PgBuiltInType::int4());
     assert_query_type(&resolved, "widened", &PgBuiltInType::int8());
+    Ok(())
+}
+
+#[test]
+fn array_item_reads_follow_frozen_and_mutable_schema_layers()
+-> Result<(), Box<dyn std::error::Error>> {
+    let builtin = builtin_schema()?;
+    let first = load_schema(&builtin, EXTENSION_A)?;
+    let second = load_schema(first.base_context(), EXTENSION_B)?;
+    let dump = load_schema(second.base_context(), dependent_dump(2))?;
+
     let array =
         TypeReference::concrete_type_ref(&FullName::with_schema("pg_catalog", "int4"), true);
     assert_eq!(
@@ -557,7 +568,7 @@ mod test_helpers {
         let mut context = SchemaFileContext::new(file.path(), base);
         let mut schemas = Vec::new();
         for schema in search_path {
-            schemas.push(SchemaName::from(*schema));
+            schemas.push(SchemaName::from(schema));
         }
         context.set_search_path(&schemas);
         Ok(PostgresDialect::parse_schema_file(
@@ -577,7 +588,7 @@ mod test_helpers {
             let expected = ColumnName::from(key);
             assert_eq!(table.primary_key_columns(), vec![&expected]);
         } else {
-            assert!(table.primary_key_columns().is_empty());
+            assert_eq!(table.primary_key_columns(), Vec::<&ColumnName>::new());
         }
     }
 }

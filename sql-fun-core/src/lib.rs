@@ -24,7 +24,7 @@ pub use self::{
     cte_catalog::{
         CatalogFileIndex, CteAlias, CteCatalog, CteCatalogCheckError, CteCatalogEntry,
         CteCatalogError, CteCatalogReference, CteName, CteParameter, CteParameterBinding,
-        CteParameterBindingCollection, CteParameterCollection, CteParameterRename,
+        CteParameterBindingCollection, CteParameterCollection, CteParameterRename, CteQueryBinding,
         ParameterRenameCollection, ResolvedCteCatalog,
     },
     placehlodered_sql::{

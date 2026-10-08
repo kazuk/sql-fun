@@ -58,6 +58,18 @@ where
     pub const fn new(ast: SemAst, context: TParseContext) -> Self {
         Self(ast, context)
     }
+
+    /// Analyzed statement produced by the selected parse context.
+    #[must_use]
+    pub const fn ast(&self) -> &SemAst {
+        &self.0
+    }
+
+    /// Context containing diagnostics and catalog updates from analysis.
+    #[must_use]
+    pub const fn context(&self) -> &TParseContext {
+        &self.1
+    }
 }
 
 /// dialect for PostgreSQL

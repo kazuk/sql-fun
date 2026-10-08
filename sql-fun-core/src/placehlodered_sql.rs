@@ -368,6 +368,13 @@ impl PlaceholderedSqlToken {
         results
     }
 
+    const fn parameter_name(&self) -> Option<&ParameterName> {
+        match self {
+            Self::ParameterPlaceholder(parameter) => Some(parameter.name()),
+            _ => None,
+        }
+    }
+
     /// Return the fragment name when this is a fragment placeholder.
     #[must_use]
     pub const fn as_fragment_placeholder(&self) -> Option<&FragmentName> {
@@ -469,6 +476,40 @@ impl PlaceholderedSql {
             .filter_map(|t| t.as_fragment_placeholder())
     }
 
+    /// Append distinct names in token first-occurrence order to a shared ordering.
+    ///
+    /// Only parameter tokens contribute names; literals and comments are ignored.
+    /// Existing positions remain unchanged across independently scanned pieces.
+    pub fn append_parameter_order(&self, order: &mut Vec<ParameterName>) {
+        for token in &self.tokens {
+            if let Some(name) = token.parameter_name()
+                && !order.contains(name)
+            {
+                order.push(name.clone());
+            }
+        }
+    }
+}
+
+#[cfg(test)]
+mod test_append_parameter_order {
+    use super::{ParameterName, PlaceholderedSql};
+
+    #[test]
+    fn shares_positions_and_ignores_sql_literals_and_comments() {
+        let mut order = Vec::new();
+        PlaceholderedSql::from_query("select ${first}, ${shared}, ${first}")
+            .append_parameter_order(&mut order);
+        PlaceholderedSql::from_query("select '${ignored}', ${shared}, ${second} -- ${comment}\n")
+            .append_parameter_order(&mut order);
+        assert_eq!(
+            order,
+            ["first", "shared", "second"].map(ParameterName::from)
+        );
+    }
+}
+
+impl PlaceholderedSql {
     /// get parameter placeholders
     pub fn parameters(&self) -> impl Iterator<Item = (&ParameterName, &Vec<PlaceholderTypeHint>)> {
         self.parameters.iter()

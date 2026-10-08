@@ -62,11 +62,61 @@ impl Statement {
         self.node.is_delete()
     }
 
+    /// Analyze this common statement directly using the supplied context.
+    ///
+    /// No SQL reparsing or catalog-file discovery occurs. This uses the same
+    /// resolver and diagnostic reporting as the normal semantic-analysis path.
+    ///
+    /// # Errors
+    ///
+    /// Returns the resolver or diagnostic reporting error.
+    pub fn analyze<TContext: crate::sem::ParseContext>(
+        &self,
+        context: TContext,
+    ) -> Result<crate::AstAndContextPair<TContext>, crate::sem::AnalysisError> {
+        self.node.resolve_and_apply(context, self.dialect)
+    }
+
     /// Inspect an existing WITH clause without exposing mutable node storage.
     pub fn with_clause(&self) -> Option<WithClause<'_>> {
         self.node
             .with_node()
             .and_then(|node| WithClause::existing(node, self.dialect))
+    }
+}
+
+#[cfg(test)]
+mod test_statement_analyze {
+    use crate::ast::{CteDefinition, Dialect, HaveWithClause, Statement};
+    use crate::parse_statements;
+    use crate::sem::PgBuiltInType;
+    use crate::test_helpers::TestParseContext;
+
+    fn statement(sql: &str, dialect: Dialect) -> Statement {
+        parse_statements(sql, dialect).next().unwrap().unwrap()
+    }
+
+    #[rstest::rstest]
+    #[case::postgres(Dialect::postgres())]
+    #[cfg_attr(feature = "sqlite", case::sqlite(Dialect::sqlite()))]
+    fn analyzes_structurally_inserted_dependencies(#[case] dialect: Dialect) {
+        let mut base = statement(
+            "with existing as (select id from leaf) select id from existing",
+            dialect,
+        );
+        let first = CteDefinition::new("root", &statement("select 1 as id", dialect)).unwrap();
+        let second =
+            CteDefinition::new("leaf", &statement("select id from root", dialect)).unwrap();
+        let mut with = base.ensure_with_clause().unwrap();
+        with.insert(0, &first).unwrap();
+        with.insert(1, &second).unwrap();
+        let mut context = TestParseContext::default();
+        context.setup_type(PgBuiltInType::int4());
+        let analyzed = base.analyze(context).unwrap();
+        let query = analyzed.ast().clone().into_select_statemtnt().unwrap();
+        let column = query.result_columns().get_column_at(0).unwrap();
+        assert_eq!(column.col_type(), &Some(PgBuiltInType::int4()));
+        assert_eq!(column.is_not_null(), &Some(true));
     }
 }
 

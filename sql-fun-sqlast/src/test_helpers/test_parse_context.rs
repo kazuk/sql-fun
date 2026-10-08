@@ -100,10 +100,6 @@ impl MutSourcePathWithSpan for TestParseContext {
 }
 
 impl SearchPathRead for TestParseContext {
-    fn set_search_path(&mut self, _search_path: Vec<SchemaName>) {
-        todo!()
-    }
-
     fn get_search_path(&self) -> &[SchemaName] {
         self.search_path.as_slice()
     }
@@ -386,6 +382,10 @@ impl FunctionInfoWrite for TestParseContext {
 }
 
 impl ParseContext for TestParseContext {
+    fn set_search_path(&mut self, search_path: &[SchemaName]) {
+        self.search_path = search_path.to_vec();
+    }
+
     fn set_statement_span(&mut self, _statement_span: StringSpan) {
         todo!()
     }
@@ -420,6 +420,26 @@ impl ParseContext for TestParseContext {
         let mut context = self;
         context.create_indexes.push(_create_index.clone());
         Ok(context)
+    }
+}
+
+#[cfg(test)]
+mod test_search_path {
+    use super::TestParseContext;
+    use crate::sem::{ParseContext, SchemaName, SearchPathRead};
+
+    #[test]
+    fn replaces_search_path_and_updates_default_schema() {
+        let mut context = TestParseContext::default();
+        context.set_search_path(&[SchemaName::from("public")]);
+        let replacement = vec![SchemaName::from("app"), SchemaName::from("pg_catalog")];
+        context.set_search_path(&replacement);
+        assert_eq!(context.get_search_path(), replacement);
+        assert_eq!(context.get_default_schema(), Some(SchemaName::from("app")));
+
+        context.set_search_path(&[]);
+        assert!(context.get_search_path().is_empty());
+        assert_eq!(context.get_default_schema(), None);
     }
 }
 

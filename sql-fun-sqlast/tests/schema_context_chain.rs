@@ -1,6 +1,315 @@
 //! Semantic coverage for immutable schema layers and independent descendants.
 
-use self::test_helpers::{assert_primary_key, load_layer, parent_with_same_named_tables};
+use self::test_helpers::{
+    EXTENSION_A, EXTENSION_B, assert_missing_domain_base, assert_primary_key, assert_query_type,
+    assert_type_exists, builtin_schema, dependent_dump, extension_sources, load_layer, load_schema,
+    parent_with_same_named_tables, query, tablefunc_schema,
+};
+
+use ::sql_fun_sqlast::sem::{
+    BaseParseContext, ColumnName, FullName, GetSourcePathWithSpanOpt, IndexInfoRead, PgBuiltInType,
+    SearchPathRead, TableName, TypeInfoRead, TypeReference, ViewInfoRead,
+};
+
+#[rstest::rstest]
+#[case::no_extension(0, TypeReference::from_master_type_name("float8"))]
+#[case::one_extension(1, PgBuiltInType::int4())]
+#[case::two_extensions(2, PgBuiltInType::int4())]
+fn runtime_file_chain_resolves_each_dump_from_its_ordered_prefix(
+    #[case] extension_count: usize,
+    #[case] answer_type: TypeReference,
+) -> Result<(), Box<dyn std::error::Error>> {
+    let mut prefix = builtin_schema()?;
+    for source in extension_sources(extension_count) {
+        let loaded = load_schema(&prefix, source)?;
+        assert!(loaded.problems().is_empty());
+        prefix = loaded.base_context().clone();
+    }
+    let dump = load_schema(&prefix, dependent_dump(extension_count))?;
+
+    assert!(dump.problems().is_empty());
+    assert!(
+        dump.get_table(&TableName::from(FullName::with_schema(
+            "pg_catalog",
+            "pg_class"
+        )))
+        .is_some()
+    );
+    let resolved = query(
+        dump.base_context(),
+        "SELECT answer FROM public.final_answers",
+    )?;
+    assert_query_type(&resolved, "answer", &answer_type);
+    Ok(())
+}
+
+#[test]
+fn dependent_file_reports_named_missing_domain_base_before_its_provider()
+-> Result<(), Box<dyn std::error::Error>> {
+    let prefix = builtin_schema()?;
+    // Reversing all of B also reaches the existing missing-FROM-source TODO.
+    // This dependency isolates the supported recoverable domain-base contract.
+    let dependent = load_schema(
+        &prefix,
+        "CREATE SCHEMA b; CREATE DOMAIN b.state_alias AS a.state;",
+    )?;
+    assert_missing_domain_base(dependent.problems(), "b.state_alias", "a.state");
+
+    let provider = load_schema(dependent.base_context(), EXTENSION_A)?;
+    assert!(provider.problems().is_empty());
+    assert_type_exists(&provider, "a.state");
+    assert_type_exists(&provider, "b.state_alias");
+    assert_missing_domain_base(dependent.problems(), "b.state_alias", "a.state");
+    Ok(())
+}
+
+#[test]
+fn inherited_catalog_objects_and_merged_overloads_drive_query_analysis()
+-> Result<(), Box<dyn std::error::Error>> {
+    let builtin = builtin_schema()?;
+    let first = load_schema(&builtin, EXTENSION_A)?;
+    let second = load_schema(first.base_context(), EXTENSION_B)?;
+    let dump = load_schema(second.base_context(), dependent_dump(2))?;
+
+    assert!(first.problems().is_empty());
+    assert!(second.problems().is_empty());
+    assert!(dump.problems().is_empty());
+    for name in [
+        "a.state",
+        "a.label",
+        "a.pair",
+        "a.items",
+        "b.state_alias",
+        "b.items",
+        "public.final_state",
+    ] {
+        assert_type_exists(&dump, name);
+    }
+    let pair = dump
+        .get_type(&FullName::with_schema("a", "pair"))
+        .expect("composite type");
+    assert!(pair.is_composite_type());
+    assert_eq!(
+        pair.get_composite_type_columns()
+            .get_column_def(&ColumnName::from("key"))
+            .expect("composite member")
+            .get_type(),
+        Some(&PgBuiltInType::int4())
+    );
+    let row_type = dump
+        .get_type(&FullName::with_schema("a", "items"))
+        .expect("table row type");
+    assert_eq!(
+        row_type
+            .type_reference()
+            .expect("named row reference")
+            .full_name(),
+        &FullName::with_schema("a", "items")
+    );
+    assert!(
+        dump.get_table(&TableName::from(FullName::with_schema("a", "items")))
+            .is_some()
+    );
+    assert!(
+        dump.get_table(&TableName::from(FullName::with_schema("b", "items")))
+            .is_some()
+    );
+    let view = dump
+        .get_view_impl(&FullName::with_schema("b", "answers"))
+        .expect("inherited ordinary view");
+    assert!(!view.is_materialized());
+    assert_eq!(
+        view.get_column_def(&ColumnName::from("answer"))
+            .expect("view column")
+            .get_type(),
+        Some(&PgBuiltInType::int4())
+    );
+    assert!(
+        dump.get_view_impl(&FullName::with_schema("b", "cached_answers"))
+            .expect("materialized view")
+            .is_materialized()
+    );
+    assert_eq!(
+        dump.get_sequence(&FullName::with_schema("a", "item_seq"))
+            .expect("sequence")
+            .name(),
+        &FullName::with_schema("a", "item_seq")
+    );
+    assert_eq!(
+        dump.get_index("items_id_idx")
+            .expect("inherited index")
+            .name(),
+        "items_id_idx"
+    );
+    assert_eq!(
+        dump.get_function_by_name(&FullName::with_schema("a", "choose"))
+            .expect("merged overloads")
+            .len(),
+        2
+    );
+
+    let resolved = query(
+        dump.base_context(),
+        "SELECT a.choose(1) AS number, a.choose(CAST('x' AS text)) AS label, \
+         abs(CAST(1 AS double precision)) AS builtin_number, 1 + 1 AS builtin_sum, \
+         CAST(1 AS bigint) AS widened",
+    )?;
+    assert_query_type(&resolved, "number", &PgBuiltInType::int4());
+    assert_query_type(&resolved, "label", &PgBuiltInType::text());
+    assert_query_type(
+        &resolved,
+        "builtin_number",
+        &TypeReference::from_master_type_name("float8"),
+    );
+    assert_query_type(&resolved, "builtin_sum", &PgBuiltInType::int4());
+    assert_query_type(&resolved, "widened", &PgBuiltInType::int8());
+    let array =
+        TypeReference::concrete_type_ref(&FullName::with_schema("pg_catalog", "int4"), true);
+    assert_eq!(
+        dump.base_context().get_array_item_type(&array),
+        Some(PgBuiltInType::int4())
+    );
+    let builder = ::sql_fun_sqlast::sem::SchemaFileContext::new(
+        std::path::Path::new("array.sql"),
+        dump.base_context(),
+    );
+    assert_eq!(
+        builder.get_array_item_type(&array),
+        Some(PgBuiltInType::int4())
+    );
+    Ok(())
+}
+
+#[test]
+fn tablefunc_crosstab_call_resolves_after_explicit_extension_loading()
+-> Result<(), Box<dyn std::error::Error>> {
+    let extension = tablefunc_schema()?;
+    assert_eq!(
+        extension
+            .get_function_by_name(&FullName::with_schema("public", "crosstab"))
+            .expect("loaded crosstab overloads")
+            .len(),
+        3
+    );
+    let resolved = query(
+        &extension,
+        "SELECT 1 AS n FROM public.crosstab('SELECT 1, 2, 3') \
+         AS result(row_name text, value integer)",
+    )?;
+    assert_query_type(&resolved, "n", &PgBuiltInType::int4());
+    let composite_call = query(
+        &extension,
+        "SELECT public.crosstab2('SELECT 1, 2, 3') AS row_value",
+    )?;
+    let composite = extension
+        .get_type(&FullName::with_schema("public", "tablefunc_crosstab_2"))
+        .expect("visible tablefunc composite");
+    assert!(composite.is_composite_type());
+    assert_query_type(
+        &composite_call,
+        "row_value",
+        composite
+            .type_reference()
+            .expect("named composite reference"),
+    );
+    let returned_type = composite_call
+        .get_column_def(&ColumnName::from("row_value"))
+        .expect("composite result column")
+        .get_type_cloned()
+        .expect("composite result type");
+    assert!(
+        extension
+            .get_type(returned_type.full_name())
+            .expect("resolved composite result type")
+            .is_composite_type()
+    );
+    Ok(())
+}
+
+#[test]
+fn cloned_prefix_outlives_its_parse_result_and_supports_shared_thread_reads()
+-> Result<(), Box<dyn std::error::Error>> {
+    let builtin = builtin_schema()?;
+    let parsed = load_schema(&builtin, EXTENSION_A)?;
+    let prefix = parsed.base_context().clone();
+    drop(parsed);
+    let mut readers = Vec::new();
+    for _ in 0..3 {
+        let shared = prefix.clone();
+        readers.push(std::thread::spawn(move || {
+            assert_type_exists(&shared, "a.label");
+            assert!(
+                shared
+                    .get_table(&TableName::from(FullName::with_schema("a", "items")))
+                    .is_some()
+            );
+            assert_eq!(
+                shared
+                    .get_function_by_name(&FullName::with_schema("a", "choose"))
+                    .expect("shared function")
+                    .len(),
+                1
+            );
+        }));
+    }
+    drop(prefix);
+    for reader in readers {
+        reader.join().expect("shared catalog reader");
+    }
+    Ok(())
+}
+
+#[test]
+fn forked_files_keep_definitions_search_paths_provenance_and_problems_local()
+-> Result<(), Box<dyn std::error::Error>> {
+    let builtin = builtin_schema()?;
+    let parent = load_schema(&builtin, EXTENSION_A)?;
+    let left = load_layer(
+        parent.base_context(),
+        &["a"],
+        "CREATE TABLE a.left_only (id integer); CREATE DOMAIN a.broken AS missing.base;",
+    )?;
+    let right = load_layer(
+        parent.base_context(),
+        &["b"],
+        "CREATE SCHEMA b; CREATE TABLE b.right_only (id integer);",
+    )?;
+    let left_name = TableName::from(FullName::with_schema("a", "left_only"));
+    let right_name = TableName::from(FullName::with_schema("b", "right_only"));
+
+    assert!(left.get_table(&left_name).is_some());
+    assert!(left.get_table(&right_name).is_none());
+    assert!(right.get_table(&right_name).is_some());
+    assert!(right.get_table(&left_name).is_none());
+    assert!(parent.get_table(&left_name).is_none());
+    assert!(parent.get_table(&right_name).is_none());
+    assert_missing_domain_base(left.problems(), "a.broken", "missing.base");
+    assert!(right.problems().is_empty());
+    assert!(parent.problems().is_empty());
+    assert_eq!(left.get_default_schema().expect("left path").as_str(), "a");
+    assert_eq!(
+        right.get_default_schema().expect("right path").as_str(),
+        "b"
+    );
+    assert_eq!(
+        parent.get_default_schema().expect("parent path").as_str(),
+        "public"
+    );
+    let left_source = left.get_source_path_with_span().expect("left provenance");
+    let right_source = right.get_source_path_with_span().expect("right provenance");
+    let parent_source = parent
+        .get_source_path_with_span()
+        .expect("parent provenance");
+    assert_ne!(left_source.source_path(), right_source.source_path());
+    assert_ne!(left_source.source_path(), parent_source.source_path());
+    assert_ne!(right_source.source_path(), parent_source.source_path());
+    assert_eq!(left.get_source_file_path(), Some(left_source.source_path()));
+    assert_eq!(
+        right.get_source_file_path(),
+        Some(right_source.source_path())
+    );
+    Ok(())
+}
 
 #[rstest::rstest]
 #[case::unqualified_first("items", &["a", "b"], "a", "b", Some("other_id"))]
@@ -88,27 +397,52 @@ mod test_helpers {
     use ::sql_fun_sqlast::{
         ParsedSchemaDump, PostgresDialect, SqlFunArgs,
         sem::{
-            BaseContext, BaseParseContext, ColumnName, FrozenBaseContext, FullName, ParseContext,
-            SchemaFileContext, SchemaName, TableName,
+            AnalysisProblem, BaseContext, BaseParseContext, ColumnName, FrozenBaseContext,
+            FullName, ParseContext, SchemaFileContext, SchemaName, TableName, TypeReference,
+            ViewInfoRead, ViewLike, problem::NameResolution,
         },
     };
+
+    pub(super) const EXTENSION_A: &str = "CREATE SCHEMA a; CREATE TYPE a.state AS ENUM ('ready'); CREATE DOMAIN a.label AS text; \
+         CREATE TYPE a.pair AS (key integer, value text); \
+         CREATE TABLE a.items (id integer, label a.label); \
+         CREATE FUNCTION a.choose(x integer) RETURNS integer LANGUAGE sql STRICT AS 'SELECT x'; \
+         CREATE VIEW a.answers AS SELECT a.choose(t.id) AS answer, t.label FROM a.items t; \
+         CREATE SEQUENCE a.item_seq; CREATE INDEX items_id_idx ON a.items (id);";
+
+    pub(super) const EXTENSION_B: &str = "CREATE SCHEMA b; CREATE DOMAIN b.state_alias AS a.state; CREATE DOMAIN b.label_alias AS a.label; \
+         CREATE TABLE b.items (id integer, label a.label, state b.state_alias); \
+         CREATE FUNCTION a.choose(x text) RETURNS text LANGUAGE sql STRICT AS 'SELECT x'; \
+         CREATE VIEW b.answers AS SELECT a.choose(t.id) AS answer, t.label FROM a.items t; \
+         CREATE MATERIALIZED VIEW b.cached_answers AS SELECT answer FROM b.answers; \
+         CREATE EXTENSION tablefunc;";
+
+    pub(super) fn extension_sources(count: usize) -> &'static [&'static str] {
+        &[EXTENSION_A, EXTENSION_B][..count]
+    }
+
+    pub(super) fn dependent_dump(count: usize) -> &'static str {
+        match count {
+            0 => {
+                "CREATE TABLE public.final_items (id integer); \
+                  CREATE VIEW public.final_answers AS SELECT abs(CAST(id AS double precision)) AS answer FROM public.final_items;"
+            }
+            1 => {
+                "CREATE DOMAIN public.final_label AS a.label; \
+                  CREATE VIEW public.final_answers AS SELECT answer, label FROM a.answers;"
+            }
+            2 => {
+                "CREATE DOMAIN public.final_state AS b.state_alias; \
+                  CREATE VIEW public.final_answers AS SELECT answer, label FROM b.answers;"
+            }
+            _ => panic!("unsupported fixture extension count"),
+        }
+    }
 
     pub(super) fn parent_with_same_named_tables(
         with_primary_keys: bool,
     ) -> Result<ParsedSchemaDump, Box<dyn std::error::Error>> {
-        let metadata = Path::new(env!("CARGO_MANIFEST_DIR")).join("sql_fun.metadata.toml");
-        let args = SqlFunArgs::try_parse_from([
-            "sqlfun",
-            "--metadata-file",
-            metadata.to_str().expect("fixture metadata path"),
-            "--sql-fun-home",
-            env!("SQL_FUN_HOME"),
-            "--postgres-version",
-            "17",
-        ])?;
-        let metadata = args.load_metadata()?;
-        let selected = metadata.get("default").expect("selected fixture metadata");
-        let root = FrozenBaseContext::from(BaseContext::new(&args, selected)?);
+        let root = builtin_root()?;
         let mut schema = String::from(
             "CREATE SCHEMA a; CREATE SCHEMA b; \
              CREATE TABLE a.items (id INTEGER, other_id INTEGER, sibling_id INTEGER); \
@@ -121,6 +455,96 @@ mod test_helpers {
             );
         }
         load_layer(&root, &["a", "b"], &schema)
+    }
+
+    fn builtin_root() -> Result<FrozenBaseContext, Box<dyn std::error::Error>> {
+        let metadata = Path::new(env!("CARGO_MANIFEST_DIR")).join("sql_fun.metadata.toml");
+        let args = SqlFunArgs::try_parse_from([
+            "sqlfun",
+            "--metadata-file",
+            metadata.to_str().expect("fixture metadata path"),
+            "--sql-fun-home",
+            env!("SQL_FUN_HOME"),
+            "--postgres-version",
+            "17",
+        ])?;
+        let metadata = args.load_metadata()?;
+        let selected = metadata.get("default").expect("selected fixture metadata");
+        Ok(FrozenBaseContext::from(BaseContext::new(&args, selected)?))
+    }
+
+    pub(super) fn builtin_schema() -> Result<FrozenBaseContext, Box<dyn std::error::Error>> {
+        let root = builtin_root()?;
+        let file = Path::new(env!("SQL_FUN_HOME")).join("postgres/17/schema.sql");
+        Ok(PostgresDialect::parse_schema_file(&file, &root)?
+            .base_context()
+            .clone())
+    }
+
+    pub(super) fn tablefunc_schema() -> Result<FrozenBaseContext, Box<dyn std::error::Error>> {
+        let prefix = builtin_schema()?;
+        let file = Path::new(env!("SQL_FUN_HOME")).join("postgres/17/extension/tablefunc--1.0.sql");
+        Ok(PostgresDialect::parse_schema_file(&file, &prefix)?
+            .base_context()
+            .clone())
+    }
+
+    pub(super) fn load_schema(
+        base: &FrozenBaseContext,
+        sql: &str,
+    ) -> Result<ParsedSchemaDump, Box<dyn std::error::Error>> {
+        let file = ::tempfile::NamedTempFile::new()?;
+        std::fs::write(file.path(), sql)?;
+        Ok(PostgresDialect::parse_schema_file(file.path(), base)?)
+    }
+
+    pub(super) fn query(
+        base: &FrozenBaseContext,
+        sql: &str,
+    ) -> Result<ViewLike, Box<dyn std::error::Error>> {
+        let parsed = load_schema(
+            base,
+            &format!("CREATE VIEW public.acceptance_query AS {sql};"),
+        )?;
+        assert!(parsed.problems().is_empty());
+        Ok(parsed
+            .get_view_impl(&FullName::with_schema("public", "acceptance_query"))
+            .expect("analyzed query view")
+            .clone())
+    }
+
+    pub(super) fn assert_query_type(query: &ViewLike, column: &str, expected: &TypeReference) {
+        assert_eq!(
+            query
+                .get_column_def(&ColumnName::from(column))
+                .expect("resolved query column")
+                .get_type(),
+            Some(expected)
+        );
+    }
+
+    pub(super) fn assert_type_exists(context: &impl BaseParseContext, name: &str) {
+        let full_name = name.parse::<FullName>().expect("fixture type name");
+        assert_eq!(
+            context
+                .get_type(&full_name)
+                .expect("visible named type")
+                .full_name(),
+            Some(&full_name)
+        );
+    }
+
+    pub(super) fn assert_missing_domain_base(
+        problems: &[AnalysisProblem],
+        domain: &str,
+        base: &str,
+    ) {
+        let domain_name = domain.parse::<FullName>().expect("fixture domain name");
+        assert!(problems.iter().any(|problem| match problem {
+            AnalysisProblem::NameResolution(NameResolution::DomainTypeNameNotFound(problem)) =>
+                problem.domain_type_name() == &domain_name && problem.base_type_name() == base,
+            _ => false,
+        }));
     }
 
     pub(super) fn load_layer(

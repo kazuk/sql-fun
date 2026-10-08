@@ -192,6 +192,107 @@ impl OperatorInfoRead for SchemaCatalog {
     }
 }
 
+#[cfg(test)]
+mod test_operator_layers {
+    use crate::sem::{OperatorInfoRead, OperatorName, PgBuiltInType};
+
+    #[rstest::rstest]
+    #[case::binary(true, true)]
+    #[case::left_unary(true, false)]
+    #[case::right_unary(false, true)]
+    fn local_operator_shadows_parent_while_other_names_fall_back(
+        #[case] has_left: bool,
+        #[case] has_right: bool,
+    ) {
+        let child = test_helpers::operator_layer(has_left, has_right);
+        let local = child
+            .get_operator_op(&OperatorName::new("+"), has_left, has_right)
+            .expect("local operator");
+        test_helpers::assert_returns(local, &PgBuiltInType::int8());
+        let inherited = child
+            .get_operator_op(&OperatorName::new("-"), has_left, has_right)
+            .expect("inherited operator");
+        test_helpers::assert_returns(inherited, &PgBuiltInType::int4());
+    }
+
+    mod test_helpers {
+        use crate::sem::{
+            BinaryOperatorDefinition, OperatorDefinition, ParseContext, PgBuiltInType,
+            SchemaFileContext, TypeReference, UnaryOperatorDefinition,
+        };
+        use crate::test_helpers::TestParseContext;
+        use std::path::Path;
+
+        pub(super) fn operator_layer(
+            has_left: bool,
+            has_right: bool,
+        ) -> crate::sem::FrozenBaseContext {
+            let root = TestParseContext::default().freeze();
+            let mut parent = SchemaFileContext::new(Path::new("parent.sql"), &root);
+            register(
+                &mut parent,
+                "+",
+                has_left,
+                has_right,
+                &PgBuiltInType::int4(),
+            );
+            register(
+                &mut parent,
+                "-",
+                has_left,
+                has_right,
+                &PgBuiltInType::int4(),
+            );
+            let mut child = SchemaFileContext::new(Path::new("child.sql"), &parent.freeze());
+            register(&mut child, "+", has_left, has_right, &PgBuiltInType::int8());
+            child.freeze()
+        }
+
+        fn register(
+            context: &mut SchemaFileContext,
+            name: &str,
+            left: bool,
+            right: bool,
+            result: &TypeReference,
+        ) {
+            let argument = PgBuiltInType::int4();
+            if left && right {
+                let overload = BinaryOperatorDefinition::new(&argument, &argument, result, true);
+                context
+                    .catalog
+                    .binary_operators
+                    .insert(name, OperatorDefinition::binary(&[overload]));
+            } else if left {
+                let overload = UnaryOperatorDefinition::new(&argument, result, true);
+                context
+                    .catalog
+                    .left_unary_operators
+                    .insert(name, OperatorDefinition::left_unary(&[overload]));
+            } else {
+                let overload = UnaryOperatorDefinition::new(&argument, result, true);
+                context
+                    .catalog
+                    .right_unary_operators
+                    .insert(name, OperatorDefinition::right_unary(&[overload]));
+            }
+        }
+
+        pub(super) fn assert_returns(operator: &OperatorDefinition, expected: &TypeReference) {
+            match operator {
+                OperatorDefinition::Binary(overloads) => {
+                    assert_eq!(overloads.len(), 1);
+                    assert_eq!(overloads[0].get_return_type(), expected);
+                }
+                OperatorDefinition::LeftUnary(overloads)
+                | OperatorDefinition::RightUnary(overloads) => {
+                    assert_eq!(overloads.len(), 1);
+                    assert_eq!(overloads[0].get_return_type(), expected);
+                }
+            }
+        }
+    }
+}
+
 impl SearchPathRead for SchemaCatalog {
     fn get_default_schema(&self) -> Option<SchemaName> {
         self.search_path.first().cloned()
@@ -333,6 +434,34 @@ impl ParseContext for SchemaFileContext {
         let name = create_index.name();
         self.catalog.indexes.insert(name, create_index.clone());
         Ok(self)
+    }
+}
+
+#[cfg(test)]
+mod test_extension_record {
+    use crate::sem::{CreateExtension, ParseContext, SchemaFileContext};
+    use crate::test_helpers::TestParseContext;
+    use std::path::Path;
+
+    #[test]
+    fn create_extension_records_the_name_without_loading_an_extension_file()
+    -> testresult::TestResult {
+        let root = TestParseContext::default().freeze();
+        let extension = CreateExtension::from_name("not_installed_by_this_operation");
+        let context = SchemaFileContext::new(Path::new("extension.sql"), &root)
+            .apply_create_extension(&extension)?;
+
+        assert_eq!(
+            context
+                .catalog
+                .extensions
+                .get(extension.name())
+                .expect("local extension record")
+                .name(),
+            extension.name()
+        );
+        assert!(context.problems().is_empty());
+        Ok(())
     }
 }
 

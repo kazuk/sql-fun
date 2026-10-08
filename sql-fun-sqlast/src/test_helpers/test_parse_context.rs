@@ -331,22 +331,11 @@ impl BaseParseContext for TestParseContext {
         todo!()
     }
 
-    fn set_statement_span(&mut self, _statement_span: StringSpan) {
-        todo!()
-    }
-
     fn get_args(&self) -> &sql_fun_core::SqlFunArgs {
         todo!()
     }
 
     fn get_source_file_path(&self) -> Option<&std::path::Path> {
-        todo!()
-    }
-
-    fn set_source_file(
-        &mut self,
-        _source_access_service: Box<dyn crate::sem::SourceAccessService>,
-    ) {
         todo!()
     }
 }
@@ -397,6 +386,17 @@ impl FunctionInfoWrite for TestParseContext {
 }
 
 impl ParseContext for TestParseContext {
+    fn set_statement_span(&mut self, _statement_span: StringSpan) {
+        todo!()
+    }
+
+    fn set_source_file(
+        &mut self,
+        _source_access_service: Box<dyn crate::sem::SourceAccessService>,
+    ) {
+        todo!()
+    }
+
     fn apply_comment(self, _comment: &Comment) -> Result<Self, AnalysisError> {
         todo!()
     }

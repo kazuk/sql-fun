@@ -262,7 +262,12 @@ where
     fn extend(&mut self, extension: Box<dyn BaseParseContext>) {
         self.base.extend(extension);
     }
+}
 
+impl<TBaseContext> ParseContext for SchemaFileContext<TBaseContext>
+where
+    TBaseContext: BaseParseContext + std::fmt::Debug,
+{
     fn set_statement_span(&mut self, statement_span: StringSpan) {
         self.statement_span = statement_span;
         self.source = Some(SourcePathWithSpan::new(
@@ -271,15 +276,10 @@ where
         ));
     }
 
-    fn set_source_file(&mut self, source_access_service: Box<dyn super::SourceAccessService>) {
+    fn set_source_file(&mut self, source_access_service: Box<dyn SourceAccessService>) {
         self.source_access_service = Some(source_access_service);
     }
-}
 
-impl<TBaseContext> ParseContext for SchemaFileContext<TBaseContext>
-where
-    TBaseContext: BaseParseContext + std::fmt::Debug,
-{
     fn apply_create_extension(
         mut self,
         create_extension: &CreateExtension,

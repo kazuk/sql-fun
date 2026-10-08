@@ -1,15 +1,12 @@
 use std::path::Path;
 
-use crate::{
-    StringSpan,
-    sem::{
-        AnalysisError, AnalysisProblem, BaseParseContext, CastDefinition, CastInfoRead,
-        CreateIndex, CreateSequence, CreateTable, DiagnosticContext, FullName, FunctionInfoRead,
-        FunctionOverloadCollection, GetSourcePathWithSpanOpt, IndexInfoRead, MutSourcePathWithSpan,
-        OperatorDefinition, OperatorInfoRead, OperatorName, SchemaFileContext, SchemaName,
-        SearchPathRead, SemAst, SequenceInfoRead, SourceAccessService, SourcePathWithSpan,
-        TableInfoRead, TypeDefinition, TypeInfoRead, TypeReference, ViewInfoRead, ViewLike,
-    },
+use crate::sem::{
+    AnalysisError, AnalysisProblem, BaseParseContext, CastDefinition, CastInfoRead, CreateIndex,
+    CreateSequence, CreateTable, DiagnosticContext, FullName, FunctionInfoRead,
+    FunctionOverloadCollection, GetSourcePathWithSpanOpt, IndexInfoRead, OperatorDefinition,
+    OperatorInfoRead, OperatorName, SchemaFileContext, SchemaName, SearchPathRead, SemAst,
+    SequenceInfoRead, SourcePathWithSpan, TableInfoRead, TypeDefinition, TypeInfoRead,
+    TypeReference, ViewInfoRead, ViewLike,
 };
 /// Error for reading schema dump
 #[derive(Debug, thiserror::Error)]
@@ -182,15 +179,6 @@ where
     }
 }
 
-impl<TContext> MutSourcePathWithSpan for ParsedSchemaDump<TContext>
-where
-    TContext: BaseParseContext + std::fmt::Debug,
-{
-    fn set_source_path_with_span(&mut self, value: &SourcePathWithSpan) {
-        self.1.set_source_path_with_span(value);
-    }
-}
-
 impl<TContext> DiagnosticContext for ParsedSchemaDump<TContext>
 where
     TContext: BaseParseContext + std::fmt::Debug,
@@ -209,10 +197,6 @@ where
         self.1.extend(extension);
     }
 
-    fn set_statement_span(&mut self, statement_span: StringSpan) {
-        self.1.set_statement_span(statement_span);
-    }
-
     fn metadata(&self) -> &::sql_fun_core::SqlFunMetadata {
         self.1.metadata()
     }
@@ -223,9 +207,5 @@ where
 
     fn get_source_file_path(&self) -> Option<&Path> {
         self.1.get_source_file_path()
-    }
-
-    fn set_source_file(&mut self, source_access_service: Box<dyn SourceAccessService>) {
-        self.1.set_source_file(source_access_service);
     }
 }

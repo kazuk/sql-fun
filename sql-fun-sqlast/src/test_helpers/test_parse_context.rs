@@ -323,10 +323,6 @@ impl BaseParseContext for TestParseContext {
         self.metadata.as_ref().unwrap_or(&DEFAULT_METADATA)
     }
 
-    fn extend(&mut self, _extension: Box<dyn BaseParseContext>) {
-        todo!()
-    }
-
     fn get_args(&self) -> &sql_fun_core::SqlFunArgs {
         todo!()
     }

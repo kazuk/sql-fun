@@ -25,6 +25,7 @@ mod def_elem;
 mod delete_statement;
 mod error;
 mod from_clause;
+mod frozen_base_context;
 mod insert_statement;
 mod names;
 mod operators;
@@ -84,6 +85,7 @@ pub use self::{
     delete_statement::{DeleteStatement, analyze_delete_statement},
     error::AnalysisError,
     from_clause::FromClause,
+    frozen_base_context::FrozenBaseContext,
     insert_statement::{InsertStatement, analyze_insert_statement},
     names::{CatalogName, FullName, LocalName, OperatorName, SchemaName, ValidOperatorName},
     operators::{BinaryOperatorDefinition, OperatorDefinition, UnaryOperatorDefinition},

@@ -10,10 +10,10 @@ use std::{fs::File, io::BufReader, path::Path};
 use crate::{
     TrieMap,
     sem::{
-        AnalysisError, AnalysisProblem, BaseParseContext, CastDefinition, CreateTable,
-        DiagnosticContext, FullName, FunctionInfoRead, FunctionOverloadCollection,
-        GetSourcePathWithSpanOpt, IndexInfoRead, LocalName, OperatorDefinition, SchemaName,
-        SourcePathWithSpan, TypeDefinition, TypeReference, ViewLike,
+        AnalysisError, BaseParseContext, CastDefinition, CreateTable, FullName, FunctionInfoRead,
+        FunctionOverloadCollection, GetSourcePathWithSpanOpt, IndexInfoRead, LocalName,
+        OperatorDefinition, SchemaName, SourcePathWithSpan, TypeDefinition, TypeReference,
+        ViewLike,
         parse_context::{
             OperatorInfoRead, SearchPathRead, SequenceInfoRead, TableInfoRead, TypeInfoRead,
             ViewInfoRead,
@@ -23,7 +23,7 @@ use crate::{
 use ::sql_fun_core::{PostgresBuiltinPaths, SqlFunArgs, SqlFunMetadata};
 use serde::de::DeserializeOwned;
 
-/// schema information for Builtin and extensions
+/// Builtin schema information initialized from the selected metadata.
 #[derive(Debug)]
 pub struct BaseContext {
     context_args: SqlFunArgs,
@@ -33,10 +33,8 @@ pub struct BaseContext {
     binary_operators: TrieMap<OperatorDefinition>,
     left_unary_operators: TrieMap<OperatorDefinition>,
     right_unary_operators: TrieMap<OperatorDefinition>,
-    extensions: Vec<Box<dyn BaseParseContext>>,
     search_path: Vec<SchemaName>,
     functions: PgBuiltInFunctions,
-    problems: Vec<AnalysisProblem>,
 }
 
 #[derive(serde::Deserialize)]
@@ -79,9 +77,7 @@ impl BaseContext {
             binary_operators,
             left_unary_operators,
             right_unary_operators,
-            extensions: Default::default(),
             search_path,
-            problems: Default::default(),
         })
     }
 
@@ -138,12 +134,7 @@ impl TableInfoRead for BaseContext {
 }
 
 impl ViewInfoRead for BaseContext {
-    fn get_view_impl(&self, key: &FullName) -> Option<&ViewLike> {
-        for ext in &self.extensions {
-            if let Some(t) = ext.get_view_impl(key) {
-                return Some(t);
-            }
-        }
+    fn get_view_impl(&self, _key: &FullName) -> Option<&ViewLike> {
         None
     }
 }
@@ -204,13 +195,6 @@ impl GetSourcePathWithSpanOpt for BaseContext {
     }
 }
 
-impl DiagnosticContext for BaseContext {
-    fn report_problem(&mut self, problem: AnalysisProblem) -> Result<(), AnalysisError> {
-        self.problems.push(problem);
-        Ok(())
-    }
-}
-
 impl BaseParseContext for BaseContext {
     fn metadata(&self) -> &SqlFunMetadata {
         &self.metadata
@@ -218,10 +202,6 @@ impl BaseParseContext for BaseContext {
 
     fn get_args(&self) -> &SqlFunArgs {
         &self.context_args
-    }
-
-    fn extend(&mut self, extension: Box<dyn BaseParseContext>) {
-        self.extensions.push(extension);
     }
 
     fn get_source_file_path(&self) -> Option<&Path> {

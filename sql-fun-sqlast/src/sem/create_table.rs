@@ -114,7 +114,7 @@ impl CreateTableMode {
 }
 
 /// `create table` SQL statement
-#[derive(Debug)]
+#[derive(Debug, Clone)]
 pub struct CreateTable {
     name: TableName,
     columns: ColumnCollection,
@@ -128,19 +128,61 @@ pub struct CreateTable {
     source: SourcePathWithSpan,
 }
 
-impl Clone for CreateTable {
-    fn clone(&self) -> Self {
-        Self {
-            name: self.name.clone(),
-            columns: self.columns.clone(),
-            alter_statements: self.alter_statements.clone(),
-            drop_statements: self.drop_statements.clone(),
-            owner: Default::default(),
-            cluster_on: Default::default(),
-            constraints: Default::default(),
-            mode: self.mode,
-            temporary: self.temporary,
-            source: self.source.clone(),
+#[cfg(test)]
+mod test_create_table_clone {
+    use crate::sem::{BaseParseContext, ColumnName, SchemaFileContext, TableInfoWrite};
+    use crate::test_helpers::TestParseContext;
+    use std::path::Path;
+
+    #[test]
+    fn clone_and_catalog_insertion_preserve_primary_key_columns() -> testresult::TestResult {
+        let table = test_helpers::table_with_primary_key()?;
+        let id = ColumnName::from("id");
+        assert_eq!(table.primary_key_columns(), vec![&id]);
+
+        let cloned = table.clone();
+        assert_eq!(cloned.primary_key_columns(), vec![&id]);
+
+        let mut context =
+            SchemaFileContext::new(Path::new("schema.sql"), TestParseContext::default());
+        context.insert_create_table(cloned.name().full_name(), &cloned);
+        let inserted = context.get_table(cloned.name()).expect("inserted table");
+        assert_eq!(inserted.primary_key_columns(), vec![&id]);
+        Ok(())
+    }
+
+    mod test_helpers {
+        use crate::sem::{
+            AlterObjSubCommand, AlterTable, AnalysisError, ColumnDefinition, ColumnName,
+            Constraint, CreateTable, CreateTableMode, FullName, PgBuiltInType,
+            PrimaryKeyConstraint, TableName,
+        };
+
+        pub(super) fn table_with_primary_key() -> Result<CreateTable, AnalysisError> {
+            let name = TableName::from(FullName::with_schema("public", "items"));
+            let id = ColumnName::from("id");
+            let source = crate::test_helpers::source_span();
+            let mut table = CreateTable::new(
+                &name,
+                vec![ColumnDefinition::new(
+                    &Some(id.clone()),
+                    Some(&PgBuiltInType::int4()),
+                    Some(true),
+                    &[],
+                )],
+                CreateTableMode::Default,
+                false,
+                &source,
+            );
+            let primary_key = PrimaryKeyConstraint::new("items_pk", &name, &[id]);
+            let constraint = Constraint::primary_key(&primary_key);
+            let alteration = AlterTable::new(
+                &name,
+                &[AlterObjSubCommand::add_constraint(&constraint)],
+                &source,
+            );
+            table.apply_alter(&alteration)?;
+            Ok(table)
         }
     }
 }

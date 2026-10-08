@@ -1,8 +1,8 @@
 use crate::{
     TrieMap,
     sem::{
-        AlterSequence, AnalysisError, AnalysisProblem, BaseParseContext, CreateSequence, FullName,
-        SequenceInfoRead, SequenceInfoWrite,
+        AlterSequence, AnalysisError, AnalysisProblem, BaseParseContext, CreateSequence,
+        DiagnosticContext, FullName, SequenceInfoRead, SequenceInfoWrite,
     },
 };
 

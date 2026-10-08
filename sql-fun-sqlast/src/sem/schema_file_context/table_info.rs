@@ -1,8 +1,9 @@
 use crate::{
     TrieMap,
     sem::{
-        AlterTable, AnalysisError, AnalysisProblem, BaseParseContext, CreateTable, DropTable,
-        FullName, ImplicitChange, TableInfoRead, TableInfoWrite, TableName,
+        AlterTable, AnalysisError, AnalysisProblem, BaseParseContext, CreateTable,
+        DiagnosticContext, DropTable, FullName, ImplicitChange, TableInfoRead, TableInfoWrite,
+        TableName,
     },
 };
 

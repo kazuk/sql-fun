@@ -4,7 +4,7 @@ use crate::{
     StringSpan,
     sem::{
         AnalysisError, AnalysisProblem, BaseParseContext, CastDefinition, CastInfoRead,
-        CreateIndex, CreateSequence, CreateTable, FullName, FunctionInfoRead,
+        CreateIndex, CreateSequence, CreateTable, DiagnosticContext, FullName, FunctionInfoRead,
         FunctionOverloadCollection, GetSourcePathWithSpanOpt, IndexInfoRead, MutSourcePathWithSpan,
         OperatorDefinition, OperatorInfoRead, OperatorName, SchemaFileContext, SchemaName,
         SearchPathRead, SemAst, SequenceInfoRead, SourceAccessService, SourcePathWithSpan,
@@ -191,7 +191,7 @@ where
     }
 }
 
-impl<TContext> BaseParseContext for ParsedSchemaDump<TContext>
+impl<TContext> DiagnosticContext for ParsedSchemaDump<TContext>
 where
     TContext: BaseParseContext + std::fmt::Debug,
 {
@@ -199,7 +199,12 @@ where
         self.1.report_problem(problem)?;
         Ok(())
     }
+}
 
+impl<TContext> BaseParseContext for ParsedSchemaDump<TContext>
+where
+    TContext: BaseParseContext + std::fmt::Debug,
+{
     fn extend(&mut self, extension: Box<dyn BaseParseContext>) {
         self.1.extend(extension);
     }

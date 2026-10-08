@@ -2,7 +2,7 @@ use crate::{
     TrieMap,
     sem::{
         AlterView, AnalysisError, AnalysisProblem, BaseParseContext, CreateTableAs, CreateView,
-        FullName, ViewInfoRead, ViewInfoWrite, ViewLike,
+        DiagnosticContext, FullName, ViewInfoRead, ViewInfoWrite, ViewLike,
     },
     syn::ObjectType,
 };

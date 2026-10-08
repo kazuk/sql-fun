@@ -21,7 +21,7 @@ pub use self::error::{
 };
 pub use self::params::{
     CteParameter, CteParameterBinding, CteParameterBindingCollection, CteParameterCollection,
-    CteParameterRename, CteQueryBinding, ParameterRenameCollection, RealizedParameterMetadata,
+    CteParameterRename, ParameterRenameCollection,
 };
 
 /// CTE definition name
@@ -1236,9 +1236,7 @@ impl ResolvedCteCatalog {
 
 #[cfg(test)]
 mod test_resolved_cte_catalog {
-    use super::{
-        CteAlias, CteName, CteParameterCollection, RealizedParameterMetadata, ResolvedCteCatalog,
-    };
+    use super::{CteAlias, CteName, CteParameterCollection, ResolvedCteCatalog};
     use crate::{ParameterName, PlaceholderedSql};
     use ::indexmap::IndexMap;
 
@@ -1264,9 +1262,12 @@ mod test_resolved_cte_catalog {
         );
         let name = ParameterName::from("id");
         assert!(catalog.parameters().binding(&name).is_none());
-        let binding = RealizedParameterMetadata::from_sources(&name, None, catalog.base_query());
-        assert_eq!(binding.query_type_hints().len(), 1);
-        assert!(binding.cte_bindings().is_empty());
+        let (_, hints) = catalog
+            .base_query()
+            .parameters()
+            .find(|(parameter_name, _)| *parameter_name == &name)
+            .unwrap();
+        assert_eq!(hints.len(), 1);
     }
 
     #[test]
@@ -1290,17 +1291,11 @@ mod test_resolved_cte_catalog {
             ["shared", "first", "second", "base"].map(ParameterName::from)
         );
         let name = ParameterName::from("shared");
-        let shared = RealizedParameterMetadata::from_sources(
-            &name,
-            catalog.parameters().binding(&name),
-            catalog.base_query(),
-        );
-        assert_eq!(shared.cte_bindings().len(), 1);
-        assert_eq!(
-            shared.cte_bindings()[0].cte_name(),
-            &CteName::new("definition")
-        );
-        assert_eq!(shared.cte_bindings()[0].type_hints().len(), 1);
+        let shared = catalog.parameters().binding(&name).unwrap();
+        let bindings = shared.catalog_bindings().collect::<Vec<_>>();
+        assert_eq!(bindings.len(), 1);
+        assert_eq!(bindings[0].0, &CteName::new("definition"));
+        assert_eq!(bindings[0].1.len(), 1);
         assert_eq!(
             ::serde_json::to_value(catalog.parameters()).unwrap()["parameters"]["shared"],
             ::serde_json::json!([["definition", ["int"]]])
@@ -1317,7 +1312,11 @@ mod test_resolved_cte_catalog {
             .unwrap();
         let name = ParameterName::from("base");
         assert!(catalog.parameters().binding(&name).is_none());
-        let metadata = RealizedParameterMetadata::from_sources(&name, None, catalog.base_query());
-        assert_eq!(metadata.query_type_hints().len(), 1);
+        let (_, hints) = catalog
+            .base_query()
+            .parameters()
+            .find(|(parameter_name, _)| *parameter_name == &name)
+            .unwrap();
+        assert_eq!(hints.len(), 1);
     }
 }

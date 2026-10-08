@@ -24,11 +24,12 @@ pub use self::{
     cte_catalog::{
         CatalogFileIndex, CteAlias, CteCatalog, CteCatalogCheckError, CteCatalogEntry,
         CteCatalogError, CteCatalogReference, CteName, CteParameter, CteParameterBinding,
-        CteParameterBindingCollection, CteParameterCollection, CteParameterRename, CteQueryBinding,
-        ParameterRenameCollection, RealizedParameterMetadata, ResolvedCteCatalog,
+        CteParameterBindingCollection, CteParameterCollection, CteParameterRename,
+        ParameterRenameCollection, ResolvedCteCatalog,
     },
     placehlodered_sql::{
-        FragmentName, ParameterName, PlaceholderedSql, PlaceholderedSqlError, PlaceholderedSqlToken,
+        FragmentName, ParameterName, PlaceholderTypeHint, PlaceholderedSql, PlaceholderedSqlError,
+        PlaceholderedSqlToken,
     },
 };
 

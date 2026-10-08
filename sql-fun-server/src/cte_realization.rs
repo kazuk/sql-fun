@@ -5,7 +5,7 @@
 //! downstream to analysis responses and `LockfileEntry.bind_parameters`.
 
 use ::sql_fun_core::{
-    CteParameterBindingCollection, ParameterName, PlaceholderedSql, RealizedParameterMetadata,
+    CteName, CteParameterBindingCollection, ParameterName, PlaceholderTypeHint, PlaceholderedSql,
     ResolvedCteCatalog,
 };
 use ::sql_fun_sqlast::{
@@ -63,6 +63,71 @@ impl OrderedBindings {
     }
 }
 
+/// A catalog entry's contribution to one realized parameter.
+#[derive(Debug)]
+struct CteQueryBinding {
+    cte_name: CteName,
+    type_hints: Vec<PlaceholderTypeHint>,
+}
+
+impl CteQueryBinding {
+    fn new(cte_name: &CteName, hints: &[PlaceholderTypeHint]) -> Self {
+        Self {
+            cte_name: cte_name.clone(),
+            type_hints: hints.to_owned(),
+        }
+    }
+
+    const fn cte_name(&self) -> &CteName {
+        &self.cte_name
+    }
+
+    fn type_hints(&self) -> &[PlaceholderTypeHint] {
+        &self.type_hints
+    }
+}
+
+/// Binding metadata assembled for this realization only.
+#[derive(Debug)]
+struct RealizedParameterMetadata {
+    cte_bindings: Vec<CteQueryBinding>,
+    query_type_hints: Vec<PlaceholderTypeHint>,
+}
+
+impl RealizedParameterMetadata {
+    fn from_sources(
+        name: &ParameterName,
+        catalog: Option<&CteParameterBindingCollection>,
+        base_query: &PlaceholderedSql,
+    ) -> Self {
+        let cte_bindings = if let Some(catalog) = catalog {
+            catalog
+                .catalog_bindings()
+                .map(|(cte_name, hints)| CteQueryBinding::new(cte_name, hints))
+                .collect()
+        } else {
+            Vec::new()
+        };
+        let query_type_hints = base_query
+            .parameters()
+            .find(|(parameter_name, _)| *parameter_name == name)
+            .map(|(_, hints)| hints.clone())
+            .unwrap_or_default();
+        Self {
+            cte_bindings,
+            query_type_hints,
+        }
+    }
+
+    fn cte_bindings(&self) -> &[CteQueryBinding] {
+        &self.cte_bindings
+    }
+
+    fn query_type_hints(&self) -> &[PlaceholderTypeHint] {
+        &self.query_type_hints
+    }
+}
+
 #[derive(Debug)]
 pub(crate) struct ResolvedBinding {
     name: ParameterName,
@@ -85,7 +150,7 @@ impl ResolvedBinding {
         &self.name
     }
 
-    pub(crate) const fn metadata(&self) -> &RealizedParameterMetadata {
+    const fn metadata(&self) -> &RealizedParameterMetadata {
         &self.metadata
     }
 }

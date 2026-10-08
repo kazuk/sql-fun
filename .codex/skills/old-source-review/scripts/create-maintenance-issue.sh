@@ -9,11 +9,12 @@ readonly KEEP_NOTICE="$SKILL_DIRECTORY/assets/keep-review-notice.md"
 
 title=""
 body_file=""
+repository=""
 print_required_headings=false
 
 usage() {
   printf '%s\n' 'usage: create-maintenance-issue.sh --required-headings'
-  printf '%s\n' '   or: create-maintenance-issue.sh --title <title> --body-file <path>'
+  printf '%s\n' '   or: create-maintenance-issue.sh --repo <owner/repo> --title <title> --body-file <path>'
 }
 
 fail() {
@@ -30,6 +31,11 @@ while (($# > 0)); do
     --title)
       (($# >= 2)) || fail 'missing value for --title'
       title="$2"
+      shift 2
+      ;;
+    --repo)
+      (($# >= 2)) || fail 'missing value for --repo'
+      repository="$2"
       shift 2
       ;;
     --body-file)
@@ -52,7 +58,8 @@ mapfile -t required_headings < <(sed -n 's/^## /## /p' "$ISSUE_TEMPLATE")
 ((${#required_headings[@]} > 0)) || fail 'maintenance issue template has no required headings'
 
 if "$print_required_headings"; then
-  [[ -z "$title" && -z "$body_file" ]] || fail '--required-headings cannot be combined with issue creation arguments'
+  [[ -z "$title" && -z "$body_file" && -z "$repository" ]] \
+    || fail '--required-headings cannot be combined with issue creation arguments'
   printf '%s\n' "${required_headings[@]}"
   printf '%s\n' '## Pending'
   exit 0
@@ -60,6 +67,7 @@ fi
 
 [[ -n "$title" ]] || fail 'missing --title'
 [[ -n "$body_file" ]] || fail 'missing --body-file'
+[[ -n "$repository" ]] || fail 'missing --repo'
 [[ -f "$body_file" ]] || fail "body file does not exist: $body_file"
 
 for heading in "${required_headings[@]}" '## Pending'; do
@@ -84,7 +92,7 @@ trap cleanup EXIT
   printf '\n'
 } > "$temporary_body"
 
-gh issue create --repo "$(git -C "$REPOSITORY_ROOT" remote get-url origin | sed -E 's#(git@github.com:|https://github.com/)##; s#\.git$##')" \
+gh issue create --repo "$repository" \
   --title "$title" \
   --body-file "$temporary_body" \
   --label not-ready

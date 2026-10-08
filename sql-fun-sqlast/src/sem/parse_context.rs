@@ -189,9 +189,6 @@ pub trait BaseParseContext:
         .unwrap_or_else(|| fun_name.clone())
     }
 
-    /// Load extension and bind to this context
-    fn extend(&mut self, extension: Box<dyn BaseParseContext>);
-
     /// canonicalize a type reference
     fn canonicalize_type_ref(&self, type_ref: &TypeReference) -> Option<TypeReference> {
         let type_def = self.get_type(type_ref.full_name())?;

@@ -260,10 +260,6 @@ where
     fn get_source_file_path(&self) -> Option<&Path> {
         Some(self.sql_source_path.as_path())
     }
-
-    fn extend(&mut self, extension: Box<dyn BaseParseContext>) {
-        self.base.extend(extension);
-    }
 }
 
 impl<TBaseContext> ParseContext for SchemaFileContext<TBaseContext>

@@ -189,10 +189,6 @@ impl<TContext> BaseParseContext for ParsedSchemaDump<TContext>
 where
     TContext: BaseParseContext + std::fmt::Debug,
 {
-    fn extend(&mut self, extension: Box<dyn BaseParseContext>) {
-        self.1.extend(extension);
-    }
-
     fn metadata(&self) -> &::sql_fun_core::SqlFunMetadata {
         self.1.metadata()
     }

@@ -157,12 +157,38 @@ jobs:
     steps:
       - uses: actions/checkout@v5
 
-      - name: Check workspace with declared MSRV
+      - name: Read declared Rust version
+        id: msrv
         run: |
           RUST_VERSION="$(cargo metadata --no-deps --format-version=1 --locked \
             | jq -er '.packages[] | select(.name == "sql-fun") | .rust_version')"
+          echo "rust_version=${RUST_VERSION}" >> "$GITHUB_OUTPUT"
+
+      - uses: actions/cache@v5
+        with:
+          path: |
+            /usr/local/cargo/registry
+            /usr/local/cargo/git
+          key: cargo-${{ runner.os }}-msrv-${{ steps.msrv.outputs.rust_version }}-${{ hashFiles('**/Cargo.lock') }}
+          restore-keys: |
+            cargo-${{ runner.os }}-msrv-${{ steps.msrv.outputs.rust_version }}-
+
+      - uses: actions/cache@v5
+        with:
+          path: /github/home/.cache/sccache
+          key: sccache-${{ runner.os }}-msrv-${{ steps.msrv.outputs.rust_version }}-${{ hashFiles('**/Cargo.lock') }}
+          restore-keys: |
+            sccache-${{ runner.os }}-msrv-${{ steps.msrv.outputs.rust_version }}-
+
+      - name: Check workspace with declared MSRV
+        run: |
+          RUST_VERSION="${{ steps.msrv.outputs.rust_version }}"
           rustup toolchain install "$RUST_VERSION" --profile minimal
+          export RUSTC_WRAPPER=sccache
+          export SCCACHE_DIR=/github/home/.cache/sccache
+          sccache --start-server
           cargo +"$RUST_VERSION" check --workspace --all-features --locked
+          sccache --show-stats
 
 
   fmt:

@@ -39,7 +39,7 @@ pub struct ParsedSchemaDump {
 }
 
 impl ParsedSchemaDump {
-    pub(crate) fn new(
+    pub(crate) const fn new(
         sem_results: Vec<SemAst>,
         base: FrozenBaseContext,
         problems: Vec<AnalysisProblem>,

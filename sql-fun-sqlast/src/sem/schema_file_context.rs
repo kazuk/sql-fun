@@ -107,7 +107,7 @@ impl SchemaFileContext {
         &self.problems
     }
 
-    pub(super) fn catalog(&self) -> &SchemaCatalog {
+    pub(super) const fn catalog(&self) -> &SchemaCatalog {
         &self.catalog
     }
 
@@ -715,7 +715,7 @@ mod test_search_path {
         pub(super) fn search_path(schemas: &[&str]) -> Vec<SchemaName> {
             let mut names = Vec::new();
             for schema in schemas {
-                names.push(SchemaName::from(*schema));
+                names.push(SchemaName::from(schema));
             }
             names
         }

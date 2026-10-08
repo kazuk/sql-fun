@@ -154,12 +154,12 @@ mod test_helpers {
         Ok(failure)
     }
 
-    pub(super) fn is_postgres_syntax(error: &ParseDumpFileError) -> bool {
+    pub(super) const fn is_postgres_syntax(error: &ParseDumpFileError) -> bool {
         matches!(error, ParseDumpFileError::Syn(_))
     }
 
     #[cfg(feature = "sqlite")]
-    pub(super) fn is_sqlite_syntax(error: &ParseDumpFileError) -> bool {
+    pub(super) const fn is_sqlite_syntax(error: &ParseDumpFileError) -> bool {
         matches!(error, ParseDumpFileError::SqliteSyn(_))
     }
 }

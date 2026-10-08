@@ -52,9 +52,12 @@ impl AsRef<str> for ParameterName {
 
 #[derive(Debug, Clone, serde::Serialize, serde::Deserialize)]
 #[serde(transparent)]
+/// Type annotation written on a named SQL parameter placeholder.
 pub struct PlaceholderTypeHint(String);
 
 impl PlaceholderTypeHint {
+    /// Return the type annotation text.
+    #[must_use]
     pub const fn hint_value(&self) -> &str {
         self.0.as_str()
     }

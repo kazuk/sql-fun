@@ -101,39 +101,16 @@ impl CteParameterBinding {
     }
 }
 
-/// A catalog entry's contribution to one resolved parameter.
-#[derive(Debug, Clone)]
-pub struct CteQueryBinding {
-    cte_name: CteName,
-    type_hints: Vec<PlaceholderTypeHint>,
-}
-
-impl CteQueryBinding {
-    fn new(cte_name: &CteName, hints: &[PlaceholderTypeHint]) -> Self {
-        Self {
-            cte_name: cte_name.clone(),
-            type_hints: hints.to_owned(),
-        }
-    }
-
-    /// Catalog entry supplying this binding.
-    #[must_use]
-    pub const fn cte_name(&self) -> &CteName {
-        &self.cte_name
-    }
-
-    /// Type hints contributed by the catalog entry.
-    #[must_use]
-    pub fn type_hints(&self) -> &[PlaceholderTypeHint] {
-        &self.type_hints
-    }
-}
-
 /// collection of parameter binding
 #[derive(Debug, Default, Clone, serde::Serialize, serde::Deserialize)]
 pub struct CteParameterBindingCollection(Vec<(CteName, Vec<PlaceholderTypeHint>)>);
 
 impl CteParameterBindingCollection {
+    /// Read catalog contributions without exposing the serialized tuple layout.
+    pub fn catalog_bindings(&self) -> impl Iterator<Item = (&CteName, &[PlaceholderTypeHint])> {
+        self.0.iter().map(|(name, hints)| (name, hints.as_slice()))
+    }
+
     /// add binding to parameter
     pub fn push_binding(&mut self, cte_name: &CteName, hints: &[PlaceholderTypeHint]) {
         self.0.push((cte_name.clone(), hints.to_owned()));
@@ -144,54 +121,6 @@ impl CteParameterBindingCollection {
         for item in &other.0 {
             self.0.push(item.clone());
         }
-    }
-}
-
-/// Binding metadata for a realized query, combining catalog and application hints.
-#[derive(Debug, Clone)]
-pub struct RealizedParameterMetadata {
-    cte_bindings: Vec<CteQueryBinding>,
-    query_type_hints: Vec<PlaceholderTypeHint>,
-}
-
-impl RealizedParameterMetadata {
-    /// Collect catalog contributions and application-query hints for one name.
-    #[must_use]
-    pub fn from_sources(
-        name: &ParameterName,
-        catalog: Option<&CteParameterBindingCollection>,
-        base_query: &crate::PlaceholderedSql,
-    ) -> Self {
-        let cte_bindings = if let Some(catalog) = catalog {
-            catalog
-                .0
-                .iter()
-                .map(|(cte_name, hints)| CteQueryBinding::new(cte_name, hints))
-                .collect()
-        } else {
-            Vec::new()
-        };
-        let query_type_hints = base_query
-            .parameters()
-            .find(|(parameter_name, _)| *parameter_name == name)
-            .map(|(_, hints)| hints.clone())
-            .unwrap_or_default();
-        Self {
-            cte_bindings,
-            query_type_hints,
-        }
-    }
-
-    /// Catalog entry names and their parameter type hints.
-    #[must_use]
-    pub fn cte_bindings(&self) -> &[CteQueryBinding] {
-        &self.cte_bindings
-    }
-
-    /// Type hints supplied by the application query.
-    #[must_use]
-    pub fn query_type_hints(&self) -> &[PlaceholderTypeHint] {
-        &self.query_type_hints
     }
 }
 

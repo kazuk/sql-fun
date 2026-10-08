@@ -42,6 +42,25 @@ You can build and run tests using the `check-test-flow` script.
   second strategy; propose a new strategy only when its technical advantage
   clearly outweighs its additional maintenance and conceptual cost.
 
+## Crate Boundaries and Public APIs
+
+- Define processing-specific data structures in the crate responsible for that
+  processing. Do not move them into another crate solely to access private data.
+- An API may be private simply because it has not had an external consumer yet.
+  It is normal for a new implementation to become its first external consumer;
+  privacy alone is not a reason to relocate the implementation.
+- When an implementation needs an API from another crate that is currently
+  private, prefer making the existing API public. If that is unsuitable, add
+  the smallest public API needed. Do not restructure existing data models merely
+  to work around visibility restrictions.
+- Continue the implementation without requiring prior approval for public API
+  changes. Explicitly identify each newly exposed API and why it is needed in
+  the pull request body; reviewers assess its signature and visibility through
+  normal review.
+- Preserve existing shared data representations and their serialization
+  contracts when introducing processing-specific structures. Define new types
+  for new purposes rather than repurposing existing shared types.
+
 ## External Tool Prerequisites
 
 - When planning validation work, inspect the repository's standard checks with

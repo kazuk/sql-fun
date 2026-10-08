@@ -216,7 +216,10 @@ mod test_view_head {
         let lines = order_lines(&rows);
 
         assert_eq!(lines.iter().map(|row| row.2).collect::<Vec<_>>(), [1, 2]);
-        assert!(std::ptr::eq(&lines.as_slice()[0], &rows.as_slice()[0]));
+        assert!(std::ptr::eq(
+            lines.as_slice().as_ptr(),
+            rows.as_slice().as_ptr()
+        ));
         assert!(rows.head(1).head(99).as_slice().is_empty());
     }
 }

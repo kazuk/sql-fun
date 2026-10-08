@@ -101,6 +101,10 @@ impl SqlFunArgsError {
     /// # Errors
     ///
     /// Always returns [`SqlFunArgsError::FilePathNotFound`] outside of tests.
+    ///
+    /// # Panics
+    ///
+    /// Panics in tests to surface a missing fixture path immediately.
     #[track_caller]
     pub fn file_path_not_found<T, P: AsRef<Path> + std::fmt::Debug>(path: P) -> Result<T, Self> {
         #[cfg(test)]

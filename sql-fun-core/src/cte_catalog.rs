@@ -397,7 +397,7 @@ sql_dialect = "PostgreSQL"
         "#;
         let parsed: JsonValue = toml::from_str(TOML)?;
 
-        assert_eq!(CteCatalog::is_cte_catalog(&parsed), false);
+        assert!(!CteCatalog::is_cte_catalog(&parsed));
         Ok(())
     }
 
@@ -407,7 +407,7 @@ sql_dialect = "PostgreSQL"
 sql_fun_cte_catalog_format_version="1"
         "#;
         let parsed: JsonValue = toml::from_str(TOML)?;
-        assert_eq!(CteCatalog::is_cte_catalog(&parsed), false);
+        assert!(!CteCatalog::is_cte_catalog(&parsed));
         Ok(())
     }
 
@@ -419,7 +419,7 @@ sql_dialect="PostgreSQL"
         "#;
 
         let parsed: JsonValue = toml::from_str(TOML)?;
-        assert_eq!(CteCatalog::is_cte_catalog(&parsed), false);
+        assert!(!CteCatalog::is_cte_catalog(&parsed));
         Ok(())
     }
 
@@ -540,7 +540,7 @@ mod cte_catalog_deserialize_file_to_value_tests {
         let mut temp = NamedTempFile::with_suffix(".json")?;
         assert_eq!(temp.path().extension(), Some(OsStr::new("json")));
         temp.as_file_mut().write_all("{}".as_bytes())?;
-        let value = CteCatalog::deserialize_file_to_value(&temp.path().to_path_buf())?;
+        let value = CteCatalog::deserialize_file_to_value(temp.path())?;
         assert_eq!(value, json!({}));
         Ok(())
     }
@@ -549,7 +549,7 @@ mod cte_catalog_deserialize_file_to_value_tests {
     fn deserialize_file_to_value_toml() -> TestResult {
         let temp = NamedTempFile::with_suffix(".toml")?;
         assert_eq!(temp.path().extension(), Some(OsStr::new("toml")));
-        let value = CteCatalog::deserialize_file_to_value(&temp.path().to_path_buf())?;
+        let value = CteCatalog::deserialize_file_to_value(temp.path())?;
         assert_eq!(value, json!({}));
         Ok(())
     }
@@ -558,7 +558,7 @@ mod cte_catalog_deserialize_file_to_value_tests {
     fn deserialize_file_to_value_yaml() -> TestResult {
         let temp = NamedTempFile::with_suffix(".yaml")?;
         assert_eq!(temp.path().extension(), Some(OsStr::new("yaml")));
-        let value = CteCatalog::deserialize_file_to_value(&temp.path().to_path_buf())?;
+        let value = CteCatalog::deserialize_file_to_value(temp.path())?;
         assert_eq!(value, json!(null));
         Ok(())
     }

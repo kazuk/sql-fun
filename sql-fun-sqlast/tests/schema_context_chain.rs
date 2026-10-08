@@ -368,6 +368,65 @@ fn inherited_alter_updates_only_the_resolved_child_table(
 }
 
 #[rstest::rstest]
+#[case::qualified_a("a.items", &["b", "a"], "a", "b")]
+#[case::qualified_b("b.items", &["a", "b"], "b", "a")]
+#[case::unqualified_first("items", &["a", "b"], "a", "b")]
+#[case::unqualified_reversed("items", &["b", "a"], "b", "a")]
+fn inherited_unqualified_declarations_are_altered_under_the_resolved_key(
+    #[case] target: &str,
+    #[case] search_path: &[&str],
+    #[case] selected_schema: &str,
+    #[case] other_schema: &str,
+) -> Result<(), Box<dyn std::error::Error>> {
+    let root = builtin_schema()?;
+    let first = load_layer(
+        &root,
+        &["a"],
+        "CREATE SCHEMA a; CREATE TABLE items (id integer);",
+    )?;
+    let parent = load_layer(
+        first.base_context(),
+        &["b"],
+        "CREATE SCHEMA b; CREATE TABLE items (id integer);",
+    )?;
+    let child = load_layer(
+        parent.base_context(),
+        search_path,
+        &format!("ALTER TABLE {target} ADD CONSTRAINT items_pk PRIMARY KEY (id);"),
+    )?;
+    let sibling = load_layer(parent.base_context(), search_path, "SELECT 1;")?;
+
+    assert!(child.problems().is_empty());
+    assert_primary_key(&child, &format!("{selected_schema}.items"), Some("id"));
+    assert_primary_key(&child, &format!("{other_schema}.items"), None);
+    assert_primary_key(&parent, "a.items", None);
+    assert_primary_key(&parent, "b.items", None);
+    assert_primary_key(&sibling, "a.items", None);
+    assert_primary_key(&sibling, "b.items", None);
+    Ok(())
+}
+
+#[rstest::rstest]
+#[case::qualified("public.items")]
+#[case::unqualified("items")]
+fn local_unqualified_declaration_retains_its_catalog_key_after_alter(
+    #[case] target: &str,
+) -> Result<(), Box<dyn std::error::Error>> {
+    let root = builtin_schema()?;
+    let parsed = load_schema(
+        &root,
+        &format!(
+            "CREATE TABLE items (id integer); ALTER TABLE {target} ADD CONSTRAINT items_pk PRIMARY KEY (id);"
+        ),
+    )?;
+
+    assert!(parsed.problems().is_empty());
+    assert_primary_key(&parsed, "public.items", Some("id"));
+    assert_primary_key(&parsed, "items", Some("id"));
+    Ok(())
+}
+
+#[rstest::rstest]
 #[case::unqualified_first("items", &["a", "b"], "a")]
 #[case::unqualified_reversed("items", &["b", "a"], "b")]
 #[case::qualified_a("a.items", &["b", "a"], "a")]

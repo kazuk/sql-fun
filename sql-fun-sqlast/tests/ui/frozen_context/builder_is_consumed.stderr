@@ -1,0 +1,15 @@
+error[E0382]: borrow of moved value: `builder`
+ --> tests/ui/frozen_context/builder_is_consumed.rs:5:5
+  |
+3 | fn reuse_after_freeze(mut builder: SchemaFileContext) {
+  |                       ----------- move occurs because `builder` has type `SchemaFileContext`, which does not implement the `Copy` trait
+4 |     let _frozen = builder.freeze();
+  |                           -------- `builder` moved due to this method call
+5 |     builder.set_search_path(&[]);
+  |     ^^^^^^^ value borrowed here after move
+  |
+note: `sql_fun_sqlast::sem::ParseContext::freeze` takes ownership of the receiver `self`, which moves `builder`
+ --> src/sem/parse_context.rs
+  |
+  |     fn freeze(self) -> FrozenBaseContext;
+  |               ^^^^

@@ -213,3 +213,76 @@ impl crate::sem::TypeInfoRead for FrozenBaseContext {
         self.catalog().get_array_item_type(name)
     }
 }
+
+#[cfg(test)]
+mod test_type_lookup_cost {
+    use crate::sem::{BaseParseContext, FullName, ParseContext, SchemaFileContext};
+    use std::{path::Path, sync::atomic::Ordering};
+
+    #[rstest::rstest]
+    #[case::root(0)]
+    #[case::one_layer(1)]
+    #[case::eight_layers(8)]
+    #[case::thirty_two_layers(32)]
+    fn qualified_type_miss_reaches_root_once(#[case] layers: usize) {
+        let (mut base, probes) = test_helpers::counted_root();
+        for _ in 0..layers {
+            base = SchemaFileContext::new(Path::new("layer.sql"), &base).freeze();
+        }
+
+        assert!(
+            base.get_type(&FullName::with_schema("absent", "missing_type"))
+                .is_none()
+        );
+        assert_eq!(probes.load(Ordering::Relaxed), 1);
+    }
+
+    mod test_helpers {
+        use crate::sem::{
+            FrozenBaseContext, FullName, ParseContext, TypeDefinition, TypeInfoRead, TypeReference,
+        };
+        use crate::test_helpers::TestParseContext;
+        use std::sync::{
+            Arc,
+            atomic::{AtomicUsize, Ordering},
+        };
+
+        #[derive(Debug)]
+        struct CountingRoot {
+            base: FrozenBaseContext,
+            probes: Arc<AtomicUsize>,
+        }
+
+        impl CountingRoot {
+            fn base(&self) -> &FrozenBaseContext {
+                &self.base
+            }
+        }
+
+        forward_catalog_reads!(CountingRoot, base);
+
+        impl TypeInfoRead for CountingRoot {
+            fn get_type_impl(&self, name: &FullName) -> Option<&TypeDefinition> {
+                assert_eq!(
+                    self.probes.fetch_add(1, Ordering::Relaxed),
+                    0,
+                    "a qualified lookup must not probe the root twice"
+                );
+                self.base.get_type_impl(name)
+            }
+
+            fn get_array_item_type(&self, name: &TypeReference) -> Option<TypeReference> {
+                self.base.get_array_item_type(name)
+            }
+        }
+
+        pub(super) fn counted_root() -> (FrozenBaseContext, Arc<AtomicUsize>) {
+            let probes = Arc::new(AtomicUsize::new(0));
+            let root = CountingRoot {
+                base: TestParseContext::default().freeze(),
+                probes: Arc::clone(&probes),
+            };
+            (FrozenBaseContext::new(root), probes)
+        }
+    }
+}

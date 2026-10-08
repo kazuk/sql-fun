@@ -10,11 +10,7 @@ use super::{SchemaCatalog, SchemaFileContext};
 
 impl TypeInfoRead for SchemaCatalog {
     fn get_type_impl(&self, key: &FullName) -> Option<&TypeDefinition> {
-        if let Some(v) = self.types.get_type_impl(key, &self.base) {
-            Some(v)
-        } else {
-            self.base.get_type_impl(key)
-        }
+        self.types.get_type_impl(key, &self.base)
     }
 
     fn get_array_item_type(&self, type_name: &TypeReference) -> Option<TypeReference> {

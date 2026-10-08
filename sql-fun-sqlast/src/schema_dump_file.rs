@@ -157,10 +157,6 @@ impl<TContext> SearchPathRead for ParsedSchemaDump<TContext>
 where
     TContext: BaseParseContext + std::fmt::Debug,
 {
-    fn set_search_path(&mut self, search_path: Vec<SchemaName>) {
-        self.1.set_search_path(search_path);
-    }
-
     fn get_default_schema(&self) -> Option<SchemaName> {
         self.1.get_default_schema()
     }

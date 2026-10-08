@@ -189,10 +189,6 @@ impl OperatorInfoRead for BaseContext {
 }
 
 impl SearchPathRead for BaseContext {
-    fn set_search_path(&mut self, search_path: Vec<SchemaName>) {
-        self.search_path = search_path;
-    }
-
     fn get_default_schema(&self) -> Option<SchemaName> {
         self.search_path.first().cloned()
     }

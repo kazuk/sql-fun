@@ -113,9 +113,6 @@ pub trait OperatorInfoRead {
 
 /// search path
 pub trait SearchPathRead {
-    /// set search path
-    fn set_search_path(&mut self, search_path: Vec<SchemaName>);
-
     /// get search path
     fn get_search_path(&self) -> &[SchemaName];
 
@@ -229,6 +226,9 @@ pub trait ParseContext:
 where
     Self: Sized,
 {
+    /// Replace the search path for this parse context without updating its base.
+    fn set_search_path(&mut self, search_path: &[SchemaName]);
+
     /// Update location for the current statement.
     fn set_statement_span(&mut self, statement_span: StringSpan);
 

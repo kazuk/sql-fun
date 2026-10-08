@@ -35,6 +35,7 @@ where
     TBaseContext: BaseParseContext + std::fmt::Debug,
 {
     base: TBaseContext,
+    search_path: Vec<SchemaName>,
     types: TypeDefinitionCollection,
     tables: TableDefinitionCollection,
     functions: FunctionDefinitionCollection,
@@ -62,9 +63,14 @@ where
     TBaseContext: BaseParseContext + std::fmt::Debug,
 {
     /// create context for loading schema file
+    ///
+    /// The initial search path is copied from the supplied base. Later changes
+    /// to this context's search path leave the base unchanged.
     pub fn new(sql_source_path: &Path, base: TBaseContext) -> Self {
+        let search_path = base.get_search_path().to_vec();
         Self {
             base,
+            search_path,
             sql_source_path: sql_source_path.to_path_buf(),
             types: TypeDefinitionCollection::default(),
             tables: TableDefinitionCollection::default(),
@@ -177,16 +183,12 @@ impl<TBaseContext> SearchPathRead for SchemaFileContext<TBaseContext>
 where
     TBaseContext: BaseParseContext + std::fmt::Debug,
 {
-    fn set_search_path(&mut self, search_path: Vec<SchemaName>) {
-        self.base.set_search_path(search_path);
-    }
-
     fn get_default_schema(&self) -> Option<SchemaName> {
-        self.base.get_default_schema()
+        self.search_path.first().cloned()
     }
 
     fn get_search_path(&self) -> &[SchemaName] {
-        self.base.get_search_path()
+        &self.search_path
     }
 }
 
@@ -268,6 +270,10 @@ impl<TBaseContext> ParseContext for SchemaFileContext<TBaseContext>
 where
     TBaseContext: BaseParseContext + std::fmt::Debug,
 {
+    fn set_search_path(&mut self, search_path: &[SchemaName]) {
+        self.search_path = search_path.to_vec();
+    }
+
     fn set_statement_span(&mut self, statement_span: StringSpan) {
         self.statement_span = statement_span;
         self.source = Some(SourcePathWithSpan::new(
@@ -314,5 +320,151 @@ where
         let name = create_index.name();
         self.indexes.insert(name, create_index.clone());
         Ok(self)
+    }
+}
+
+#[cfg(test)]
+mod test_search_path {
+    use crate::sem::{
+        BaseParseContext, FullName, ParseContext, SchemaFileContext, SchemaName, SearchPathRead,
+        TypeDefinition, TypeReference,
+    };
+    use std::path::Path;
+
+    #[rstest::rstest]
+    #[case::implicit_catalog_first(&["public", "app"], None, Some("pg_catalog"))]
+    #[case::explicit_catalog_last(&["app", "pg_catalog"], None, Some("app"))]
+    #[case::explicit_catalog_first(&["pg_catalog", "app"], None, Some("pg_catalog"))]
+    #[case::configured_order(&["app", "public", "pg_catalog"], None, Some("app"))]
+    #[case::qualified_outside_path(&["app"], Some("public"), Some("public"))]
+    #[case::qualified_catalog(&["app"], Some("pg_catalog"), Some("pg_catalog"))]
+    #[case::empty_path(&[], None, Some("pg_catalog"))]
+    #[case::missing_qualified_name(&["public"], Some("missing"), None)]
+    fn search_path_respects_qualification_and_catalog_precedence(
+        #[case] search_path: &[&str],
+        #[case] qualifier: Option<&str>,
+        #[case] expected_schema: Option<&str>,
+    ) {
+        let mut context = SchemaFileContext::new(
+            Path::new("schema.sql"),
+            test_helpers::catalog_with_search_path(&["public"]),
+        );
+        context.set_search_path(&test_helpers::search_path(search_path));
+        let name = if let Some(schema) = qualifier {
+            FullName::with_schema(schema, "item")
+        } else {
+            FullName::from_local_name("item")
+        };
+        let expected_name = expected_schema.map(|schema| FullName::with_schema(schema, "item"));
+
+        assert_eq!(
+            context.get_type(&name).and_then(TypeDefinition::full_name),
+            expected_name.as_ref()
+        );
+        let overloads = context.get_function_by_name(&name);
+        let return_name = overloads
+            .as_ref()
+            .and_then(|overloads| overloads.get_at(0))
+            .and_then(|overload| overload.ret_type().as_ref())
+            .map(TypeReference::full_name);
+        assert_eq!(return_name, expected_name.as_ref());
+        assert_eq!(
+            context.resolve_function_name_with_search_path(&name),
+            expected_name.unwrap_or(name)
+        );
+    }
+
+    #[test]
+    fn nested_contexts_keep_their_own_search_paths() {
+        let parent = SchemaFileContext::new(
+            Path::new("parent.sql"),
+            test_helpers::catalog_with_search_path(&["public", "pg_catalog"]),
+        );
+        let mut child = SchemaFileContext::new(Path::new("child.sql"), parent);
+        assert_eq!(child.get_search_path(), child.base.get_search_path());
+        child.set_search_path(&test_helpers::search_path(&["app", "pg_catalog"]));
+        let mut descendant = SchemaFileContext::new(Path::new("descendant.sql"), child);
+        assert_eq!(
+            descendant.get_search_path(),
+            descendant.base.get_search_path()
+        );
+        descendant.set_search_path(&[]);
+
+        let name = FullName::from_local_name("item");
+        assert!(descendant.get_search_path().is_empty());
+        assert_eq!(descendant.get_default_schema(), None);
+        assert_eq!(
+            descendant
+                .get_type(&name)
+                .and_then(TypeDefinition::full_name),
+            Some(&FullName::with_schema("pg_catalog", "item"))
+        );
+        assert_eq!(
+            descendant.base.get_search_path(),
+            test_helpers::search_path(&["app", "pg_catalog"])
+        );
+        assert_eq!(
+            descendant.base.get_default_schema(),
+            Some(SchemaName::from("app"))
+        );
+        assert_eq!(
+            descendant
+                .base
+                .get_type(&name)
+                .and_then(TypeDefinition::full_name),
+            Some(&FullName::with_schema("app", "item"))
+        );
+        assert_eq!(
+            descendant.base.base.get_search_path(),
+            test_helpers::search_path(&["public", "pg_catalog"])
+        );
+        assert_eq!(
+            descendant.base.base.get_default_schema(),
+            Some(SchemaName::from("public"))
+        );
+        assert_eq!(
+            descendant
+                .base
+                .base
+                .get_type(&name)
+                .and_then(TypeDefinition::full_name),
+            Some(&FullName::with_schema("public", "item"))
+        );
+    }
+
+    mod test_helpers {
+        use crate::sem::{
+            FullName, FunctionOverloadCollection, OverloadVariant, ParseContext, SchemaName,
+            TypeDefinition, TypeReference,
+        };
+        use crate::test_helpers::TestParseContext;
+
+        pub(super) fn search_path(schemas: &[&str]) -> Vec<SchemaName> {
+            let mut names = Vec::new();
+            for schema in schemas {
+                names.push(SchemaName::from(*schema));
+            }
+            names
+        }
+
+        pub(super) fn catalog_with_search_path(schemas: &[&str]) -> TestParseContext {
+            let mut context = TestParseContext::default();
+            context.set_search_path(&search_path(schemas));
+            for schema in ["pg_catalog", "public", "app"] {
+                let name = FullName::with_schema(schema, "item");
+                context.set_get_type_impl_result(&name, &TypeDefinition::builtin(&name));
+                let overload = OverloadVariant::new(
+                    &Some(TypeReference::from_full_name(name.clone())),
+                    &Vec::new(),
+                    true,
+                    true,
+                );
+                context.set_get_function_impl_result(
+                    &name,
+                    &FunctionOverloadCollection::new(&[overload]),
+                );
+            }
+            context
+        }
     }
 }

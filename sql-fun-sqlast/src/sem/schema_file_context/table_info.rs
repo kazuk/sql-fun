@@ -7,7 +7,7 @@ use crate::{
     },
 };
 
-use super::SchemaFileContext;
+use super::{SchemaCatalog, SchemaFileContext};
 
 #[derive(Debug, Default)]
 pub struct TableDefinitionCollection(TrieMap<CreateTable>);
@@ -50,10 +50,7 @@ impl TableDefinitionCollection {
     }
 }
 
-impl<TBaseContext> TableInfoRead for SchemaFileContext<TBaseContext>
-where
-    TBaseContext: BaseParseContext + std::fmt::Debug,
-{
+impl TableInfoRead for SchemaCatalog {
     fn get_table_impl(&self, key: &FullName) -> Option<&CreateTable> {
         if let Some(v) = self.tables.get(key) {
             Some(v)
@@ -63,10 +60,7 @@ where
     }
 }
 
-impl<TBaseContext> TableInfoWrite for SchemaFileContext<TBaseContext>
-where
-    TBaseContext: BaseParseContext + std::fmt::Debug,
-{
+impl TableInfoWrite for SchemaFileContext {
     #[tracing::instrument(skip(self))]
     fn apply_alter_table(mut self, alter_table: &AlterTable) -> Result<Self, AnalysisError> {
         let table_name = alter_table.table();
@@ -75,7 +69,10 @@ where
             return Ok(self);
         };
 
-        let implicit_changes = self.tables.apply_alter(alter_table, table_name, table)?;
+        let implicit_changes = self
+            .catalog
+            .tables
+            .apply_alter(alter_table, table_name, table)?;
         let mut context = self;
         for implicit_change in implicit_changes {
             context = context.apply_implicit_change(implicit_change)?;
@@ -89,7 +86,11 @@ where
     ) -> Result<Self, AnalysisError> {
         let table_names = drop_table.table_names();
         for table_name in table_names {
-            if !self.tables.push_drop_statement(table_name, drop_table)? {
+            if !self
+                .catalog
+                .tables
+                .push_drop_statement(table_name, drop_table)?
+            {
                 self.report_problem(AnalysisProblem::table_not_found(table_name))?;
             }
         }
@@ -97,6 +98,6 @@ where
     }
 
     fn insert_create_table(&mut self, name: &FullName, create_table: &CreateTable) {
-        self.tables.insert_create_table(name, create_table);
+        self.catalog.tables.insert_create_table(name, create_table);
     }
 }

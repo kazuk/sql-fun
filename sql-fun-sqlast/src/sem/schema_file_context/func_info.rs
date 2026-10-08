@@ -1,12 +1,12 @@
 use crate::{
     TrieMap,
     sem::{
-        AnalysisError, BaseParseContext, CreateFunction, FullName, FunctionInfoRead,
-        FunctionInfoWrite, FunctionOverloadCollection,
+        AnalysisError, CreateFunction, FullName, FunctionInfoRead, FunctionInfoWrite,
+        FunctionOverloadCollection,
     },
 };
 
-use super::SchemaFileContext;
+use super::{SchemaCatalog, SchemaFileContext};
 
 #[derive(Debug, Default)]
 pub struct FunctionDefinitionCollection(TrieMap<FunctionOverloadCollection>);
@@ -28,10 +28,7 @@ impl FunctionDefinitionCollection {
     }
 }
 
-impl<TBaseContext> FunctionInfoRead for SchemaFileContext<TBaseContext>
-where
-    TBaseContext: BaseParseContext + std::fmt::Debug,
-{
+impl FunctionInfoRead for SchemaCatalog {
     fn get_function_impl(&self, name: &FullName) -> Option<FunctionOverloadCollection> {
         let self_funcs = self.functions.get(name);
         let base_funcs = self.base.get_function_impl(name);
@@ -45,17 +42,14 @@ where
     }
 }
 
-impl<TBaseContext> FunctionInfoWrite for SchemaFileContext<TBaseContext>
-where
-    TBaseContext: BaseParseContext + std::fmt::Debug,
-{
+impl FunctionInfoWrite for SchemaFileContext {
     #[tracing::instrument(skip(self))]
     fn apply_create_function_impl(
         mut self,
         name: &FullName,
         create_function: &CreateFunction,
     ) -> Result<Self, AnalysisError> {
-        self.functions.insert(name, create_function);
+        self.catalog.functions.insert(name, create_function);
         Ok(self)
     }
 }

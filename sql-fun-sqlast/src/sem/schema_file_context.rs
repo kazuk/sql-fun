@@ -19,22 +19,32 @@ use crate::{
     StringSpan, TrieMap,
     sem::{
         AnalysisError, AnalysisProblem, BaseParseContext, CastDefinition, Comment, CreateExtension,
-        CreateIndex, CreateSchema, DiagnosticContext, GetSourcePathWithSpanOpt, ImplicitChange,
-        MutSourcePathWithSpan, ObjectKind, OperatorDefinition, OperatorInfoRead, OperatorName,
-        ParseContext, SchemaName, SemScalarExpr, SourceAccessService, VariableSet,
+        CreateIndex, CreateSchema, DiagnosticContext, FrozenBaseContext, GetSourcePathWithSpanOpt,
+        ImplicitChange, MutSourcePathWithSpan, ObjectKind, OperatorDefinition, OperatorInfoRead,
+        OperatorName, ParseContext, SchemaName, SemScalarExpr, SourceAccessService, VariableSet,
         parse_context::{IndexInfoRead, SearchPathRead},
     },
 };
 
 use super::SourcePathWithSpan;
 
-/// schema file based context
+/// Mutable schema layer built over an immutable base.
+///
+/// Definitions and search-path changes belong to this layer. Consuming it with
+/// [`ParseContext::freeze`] shares the completed catalog and discards diagnostic
+/// rendering state. Schema-file loaders retain problems on their parsed result.
 #[derive(Debug)]
-pub struct SchemaFileContext<TBaseContext>
-where
-    TBaseContext: BaseParseContext + std::fmt::Debug,
-{
-    base: TBaseContext,
+pub struct SchemaFileContext {
+    catalog: SchemaCatalog,
+    statement_span: StringSpan,
+    source_access_service: Option<Box<dyn SourceAccessService>>,
+    reports: Vec<String>,
+    problems: Vec<AnalysisProblem>,
+}
+
+#[derive(Debug)]
+pub(super) struct SchemaCatalog {
+    base: FrozenBaseContext,
     search_path: Vec<SchemaName>,
     types: TypeDefinitionCollection,
     tables: TableDefinitionCollection,
@@ -50,48 +60,63 @@ where
     left_unary_operators: TrieMap<OperatorDefinition>,
     right_unary_operators: TrieMap<OperatorDefinition>,
     indexes: TrieMap<CreateIndex>,
-    statement_span: StringSpan,
     sql_source_path: PathBuf,
-    source_access_service: Option<Box<dyn SourceAccessService>>,
-    reports: Vec<String>,
-    problems: Vec<AnalysisProblem>,
     source: Option<SourcePathWithSpan>,
 }
 
-impl<TBaseContext> SchemaFileContext<TBaseContext>
-where
-    TBaseContext: BaseParseContext + std::fmt::Debug,
-{
+impl SchemaFileContext {
     /// create context for loading schema file
     ///
     /// The initial search path is copied from the supplied base. Later changes
     /// to this context's search path leave the base unchanged.
-    pub fn new(sql_source_path: &Path, base: TBaseContext) -> Self {
+    pub fn new(sql_source_path: &Path, base: &FrozenBaseContext) -> Self {
         let search_path = base.get_search_path().to_vec();
         Self {
-            base,
-            search_path,
-            sql_source_path: sql_source_path.to_path_buf(),
-            types: TypeDefinitionCollection::default(),
-            tables: TableDefinitionCollection::default(),
-            functions: FunctionDefinitionCollection::default(),
-            extensions: TrieMap::default(),
-            variables: TrieMap::default(),
-            schemas: TrieMap::default(),
-            sequences: SequenceInfoCollection::default(),
-            comments: TrieMap::default(),
-            views: ViewInformationCollection::default(),
-            casts: TrieMap::default(),
-            binary_operators: TrieMap::default(),
-            left_unary_operators: TrieMap::default(),
-            right_unary_operators: TrieMap::default(),
+            catalog: SchemaCatalog {
+                base: base.clone(),
+                search_path,
+                sql_source_path: sql_source_path.to_path_buf(),
+                types: TypeDefinitionCollection::default(),
+                tables: TableDefinitionCollection::default(),
+                functions: FunctionDefinitionCollection::default(),
+                extensions: TrieMap::default(),
+                variables: TrieMap::default(),
+                schemas: TrieMap::default(),
+                sequences: SequenceInfoCollection::default(),
+                comments: TrieMap::default(),
+                views: ViewInformationCollection::default(),
+                casts: TrieMap::default(),
+                binary_operators: TrieMap::default(),
+                left_unary_operators: TrieMap::default(),
+                right_unary_operators: TrieMap::default(),
+                indexes: TrieMap::default(),
+                source: None,
+            },
             statement_span: StringSpan::default(),
-            indexes: TrieMap::default(),
             source_access_service: None,
             reports: Default::default(),
             problems: Vec::new(),
-            source: None,
         }
+    }
+
+    /// Recoverable problems collected by this layer, in reporting order.
+    ///
+    /// A diagnostic rendering failure is returned immediately and the rejected
+    /// problem is not collected. Earlier accepted problems remain available.
+    pub fn problems(&self) -> &[AnalysisProblem] {
+        &self.problems
+    }
+
+    pub(super) fn catalog(&self) -> &SchemaCatalog {
+        &self.catalog
+    }
+
+    pub(crate) fn into_parsed(
+        mut self,
+        sem_results: Vec<crate::sem::SemAst>,
+    ) -> crate::ParsedSchemaDump {
+        let problems = std::mem::take(&mut self.problems);
+        crate::ParsedSchemaDump::new(sem_results, self.freeze(), problems)
     }
 
     /// apply index from constraint
@@ -105,21 +130,15 @@ where
     }
 }
 
-impl<TBaseContext> GetSourcePathWithSpanOpt for SchemaFileContext<TBaseContext>
-where
-    TBaseContext: BaseParseContext + std::fmt::Debug,
-{
+impl GetSourcePathWithSpanOpt for SchemaCatalog {
     fn get_source_path_with_span(&self) -> Option<&SourcePathWithSpan> {
         self.source.as_ref()
     }
 }
 
-impl<TBaseContext> MutSourcePathWithSpan for SchemaFileContext<TBaseContext>
-where
-    TBaseContext: BaseParseContext + std::fmt::Debug,
-{
+impl MutSourcePathWithSpan for SchemaFileContext {
     fn set_source_path_with_span(&mut self, value: &SourcePathWithSpan) {
-        self.source = Some(value.clone())
+        self.catalog.source = Some(value.clone())
     }
 }
 
@@ -128,21 +147,18 @@ mod test_schema_file_context {
     use std::path::Path;
 
     use crate::{
-        sem::SchemaFileContext,
+        sem::{ParseContext, SchemaFileContext},
         test_helpers::{TestParseContext, test_context},
     };
 
     #[rstest::rstest]
     fn test_new(test_context: TestParseContext) {
         let path = Path::new("hoge.sql");
-        let _context = SchemaFileContext::new(path, test_context);
+        let _context = SchemaFileContext::new(path, &test_context.freeze());
     }
 }
 
-impl<TBaseContext> IndexInfoRead for SchemaFileContext<TBaseContext>
-where
-    TBaseContext: BaseParseContext + std::fmt::Debug,
-{
+impl IndexInfoRead for SchemaCatalog {
     fn get_index(&self, index_name: &str) -> Option<&CreateIndex> {
         if let Some(index) = self.indexes.get(index_name) {
             Some(index)
@@ -152,10 +168,7 @@ where
     }
 }
 
-impl<TBaseContext> OperatorInfoRead for SchemaFileContext<TBaseContext>
-where
-    TBaseContext: BaseParseContext + std::fmt::Debug,
-{
+impl OperatorInfoRead for SchemaCatalog {
     fn get_operator_op(
         &self,
         name: &OperatorName,
@@ -179,10 +192,7 @@ where
     }
 }
 
-impl<TBaseContext> SearchPathRead for SchemaFileContext<TBaseContext>
-where
-    TBaseContext: BaseParseContext + std::fmt::Debug,
-{
+impl SearchPathRead for SchemaCatalog {
     fn get_default_schema(&self) -> Option<SchemaName> {
         self.search_path.first().cloned()
     }
@@ -192,18 +202,15 @@ where
     }
 }
 
-impl<TBaseContext> DiagnosticContext for SchemaFileContext<TBaseContext>
-where
-    TBaseContext: BaseParseContext + std::fmt::Debug,
-{
+impl DiagnosticContext for SchemaFileContext {
     fn report_problem(&mut self, problem: AnalysisProblem) -> Result<(), AnalysisError> {
         if let Some(source_provider) = &self.source_access_service {
             let source = source_provider.get_source_span(
                 self.get_args(),
-                self.sql_source_path.as_path(),
+                self.catalog.sql_source_path.as_path(),
                 self.statement_span,
             )?;
-            let theme = self.base.get_args().highlighter_theme()?;
+            let theme = self.get_args().highlighter_theme()?;
 
             let report = problem.render_report(&theme, source)?;
             eprintln!("{report}");
@@ -218,7 +225,9 @@ where
 #[cfg(test)]
 mod test_diagnostic_context {
     use crate::StringSpan;
-    use crate::sem::{AnalysisProblem, DiagnosticContext, FullName, SchemaFileContext};
+    use crate::sem::{
+        AnalysisProblem, DiagnosticContext, FullName, ParseContext, SchemaFileContext,
+    };
     use crate::test_helpers::TestParseContext;
     use std::path::Path;
 
@@ -226,7 +235,8 @@ mod test_diagnostic_context {
     fn collects_problems_without_reporting_to_base() -> testresult::TestResult {
         let mut base = TestParseContext::default();
         base.reject_diagnostics_after(0);
-        let mut context = SchemaFileContext::new(Path::new("schema.sql"), base);
+        let base = base.freeze();
+        let mut context = SchemaFileContext::new(Path::new("schema.sql"), &base);
         let first = AnalysisProblem::function_not_found(
             &FullName::from_local_name("first"),
             &StringSpan::new(0, 5),
@@ -239,16 +249,18 @@ mod test_diagnostic_context {
         context.report_problem(first)?;
         context.report_problem(second)?;
 
-        assert_eq!(context.problems.len(), 2);
-        assert!(context.base.reported_problems().is_empty());
+        assert_eq!(context.problems().len(), 2);
+        let parsed = context.into_parsed(Vec::new());
+        assert_eq!(parsed.problems().len(), 2);
+        let descendant = SchemaFileContext::new(Path::new("descendant.sql"), parsed.base_context());
+        assert!(descendant.problems().is_empty());
+        let sibling = SchemaFileContext::new(Path::new("sibling.sql"), &base);
+        assert!(sibling.problems().is_empty());
         Ok(())
     }
 }
 
-impl<TBaseContext> BaseParseContext for SchemaFileContext<TBaseContext>
-where
-    TBaseContext: BaseParseContext + std::fmt::Debug,
-{
+impl BaseParseContext for SchemaCatalog {
     fn metadata(&self) -> &::sql_fun_core::SqlFunMetadata {
         self.base.metadata()
     }
@@ -262,18 +274,19 @@ where
     }
 }
 
-impl<TBaseContext> ParseContext for SchemaFileContext<TBaseContext>
-where
-    TBaseContext: BaseParseContext + std::fmt::Debug,
-{
+impl ParseContext for SchemaFileContext {
+    fn freeze(self) -> FrozenBaseContext {
+        FrozenBaseContext::new(self.catalog)
+    }
+
     fn set_search_path(&mut self, search_path: &[SchemaName]) {
-        self.search_path = search_path.to_vec();
+        self.catalog.search_path = search_path.to_vec();
     }
 
     fn set_statement_span(&mut self, statement_span: StringSpan) {
         self.statement_span = statement_span;
-        self.source = Some(SourcePathWithSpan::new(
-            &self.sql_source_path,
+        self.catalog.source = Some(SourcePathWithSpan::new(
+            &self.catalog.sql_source_path,
             &statement_span,
         ));
     }
@@ -287,25 +300,29 @@ where
         create_extension: &CreateExtension,
     ) -> Result<Self, AnalysisError> {
         let name = create_extension.name();
-        self.extensions.insert(name, create_extension.clone());
+        self.catalog
+            .extensions
+            .insert(name, create_extension.clone());
         Ok(self)
     }
 
     fn apply_variable_set(mut self, variable_set: &VariableSet) -> Result<Self, AnalysisError> {
         let name = variable_set.name();
-        self.variables.insert(name, variable_set.value().clone());
+        self.catalog
+            .variables
+            .insert(name, variable_set.value().clone());
         Ok(self)
     }
 
     fn apply_create_schema(mut self, create_schema: &CreateSchema) -> Result<Self, AnalysisError> {
         let name = create_schema.name();
-        self.schemas.insert(name, create_schema.clone());
+        self.catalog.schemas.insert(name, create_schema.clone());
         Ok(self)
     }
 
     fn apply_comment(mut self, comment: &Comment) -> Result<Self, AnalysisError> {
         let target = comment.target();
-        self.comments.insert(
+        self.catalog.comments.insert(
             target,
             (*comment.object_type(), String::from(comment.comment())),
         );
@@ -314,8 +331,157 @@ where
 
     fn apply_create_index(mut self, create_index: &CreateIndex) -> Result<Self, AnalysisError> {
         let name = create_index.name();
-        self.indexes.insert(name, create_index.clone());
+        self.catalog.indexes.insert(name, create_index.clone());
         Ok(self)
+    }
+}
+
+#[cfg(test)]
+mod test_freeze {
+    use crate::StringSpan;
+    use crate::sem::{
+        BaseParseContext, ColumnName, GetSourcePathWithSpanOpt, ParseContext, SchemaFileContext,
+        SchemaName, SearchPathRead, TableInfoWrite,
+    };
+    use std::path::Path;
+
+    #[test]
+    fn consuming_freeze_keeps_definitions_and_provenance_and_drops_source_service()
+    -> testresult::TestResult {
+        let base = test_helpers::empty_base();
+        let mut context = SchemaFileContext::new(Path::new("parent.sql"), &base);
+        let statement_span = StringSpan::new(12, 24);
+        context.set_statement_span(statement_span);
+        let table = test_helpers::table_with_id();
+        context = context.apply_create_table(&table)?;
+        let source_lifetime = test_helpers::attach_local_source(&mut context);
+
+        let frozen = context.freeze();
+
+        assert!(source_lifetime.upgrade().is_none());
+        assert!(
+            frozen
+                .get_table(table.name())
+                .expect("frozen table")
+                .has_column(&ColumnName::from("id"))
+        );
+        assert!(base.get_table(table.name()).is_none());
+        assert_eq!(frozen.get_source_file_path(), Some(Path::new("parent.sql")));
+        let source = frozen.get_source_path_with_span().expect("last provenance");
+        assert_eq!(source.source_path(), Path::new("parent.sql"));
+        assert_eq!(source.span().seek_pos(), statement_span.seek_pos());
+        assert_eq!(source.span().len(), statement_span.len());
+        Ok(())
+    }
+
+    #[test]
+    fn sibling_alterations_leave_shared_parent_and_each_other_unchanged() -> testresult::TestResult
+    {
+        let base = test_helpers::empty_base();
+        let table = test_helpers::table_with_key_candidates()?;
+        let parent = SchemaFileContext::new(Path::new("parent.sql"), &base)
+            .apply_create_table(&table)?
+            .freeze();
+        let mut left = SchemaFileContext::new(Path::new("left.sql"), &parent);
+        let right = SchemaFileContext::new(Path::new("right.sql"), &parent);
+        left.set_search_path(&[SchemaName::from("left")]);
+        let left = left
+            .apply_alter_table(&test_helpers::add_primary_key(&table, "other_id"))?
+            .freeze();
+        let right = right
+            .apply_alter_table(&test_helpers::add_primary_key(&table, "id"))?
+            .freeze();
+
+        let left_column = ColumnName::from("other_id");
+        let right_column = ColumnName::from("id");
+        let left_table = left.get_table(table.name()).expect("left table");
+        let right_table = right.get_table(table.name()).expect("right table");
+        let parent_table = parent.get_table(table.name()).expect("parent table");
+        assert_eq!(left_table.primary_key_columns(), vec![&left_column]);
+        assert_eq!(right_table.primary_key_columns(), vec![&right_column]);
+        assert_eq!(parent_table.primary_key_columns(), vec![&right_column]);
+        assert_eq!(left.get_default_schema(), Some(SchemaName::from("left")));
+        assert_eq!(right.get_default_schema(), Some(SchemaName::from("public")));
+        assert_eq!(
+            parent.get_default_schema(),
+            Some(SchemaName::from("public"))
+        );
+        Ok(())
+    }
+
+    mod test_helpers {
+        use crate::sem::{
+            AlterObjSubCommand, AlterTable, AnalysisError, ColumnDefinition, ColumnName,
+            Constraint, CreateTable, CreateTableMode, FrozenBaseContext, FullName, ParseContext,
+            PgBuiltInType, PrimaryKeyConstraint, SchemaFileContext, SchemaName,
+            SourceAccessService, TableName,
+        };
+        use crate::test_helpers::{TestParseContext, source_span};
+        use std::rc::{Rc, Weak};
+
+        pub(super) fn empty_base() -> FrozenBaseContext {
+            let mut context = TestParseContext::default();
+            context.set_search_path(&[SchemaName::from("public")]);
+            context.freeze()
+        }
+
+        fn column(name: &str) -> ColumnDefinition {
+            ColumnDefinition::new(
+                &Some(ColumnName::from(name)),
+                Some(&PgBuiltInType::int4()),
+                Some(true),
+                &[],
+            )
+        }
+
+        pub(super) fn table_with_id() -> CreateTable {
+            CreateTable::new(
+                &TableName::from(FullName::with_schema("public", "items")),
+                vec![column("id")],
+                CreateTableMode::Default,
+                false,
+                &source_span(),
+            )
+        }
+
+        pub(super) fn table_with_key_candidates() -> Result<CreateTable, AnalysisError> {
+            let mut table = CreateTable::new(
+                &TableName::from(FullName::with_schema("public", "items")),
+                vec![column("id"), column("other_id")],
+                CreateTableMode::Default,
+                false,
+                &source_span(),
+            );
+            table.apply_alter(&add_primary_key(&table, "id"))?;
+            Ok(table)
+        }
+
+        pub(super) fn add_primary_key(table: &CreateTable, name: &str) -> AlterTable {
+            let primary_key =
+                PrimaryKeyConstraint::new("items_pk", table.name(), &[ColumnName::from(name)]);
+            let constraint = Constraint::primary_key(&primary_key);
+            AlterTable::new(
+                table.name(),
+                &[AlterObjSubCommand::add_constraint(&constraint)],
+                &source_span(),
+            )
+        }
+
+        #[derive(Debug)]
+        struct LocalSource {
+            _lifetime: Rc<()>,
+        }
+
+        impl SourceAccessService for LocalSource {}
+
+        pub(super) fn attach_local_source(context: &mut SchemaFileContext) -> Weak<()> {
+            let lifetime = Rc::new(());
+            let observer = Rc::downgrade(&lifetime);
+            context.set_source_file(Box::new(LocalSource {
+                _lifetime: lifetime,
+            }));
+            observer
+        }
     }
 }
 
@@ -343,7 +509,7 @@ mod test_search_path {
     ) {
         let mut context = SchemaFileContext::new(
             Path::new("schema.sql"),
-            test_helpers::catalog_with_search_path(&["public"]),
+            &test_helpers::catalog_with_search_path(&["public"]),
         );
         context.set_search_path(&test_helpers::search_path(search_path));
         let name = if let Some(schema) = qualifier {
@@ -374,16 +540,15 @@ mod test_search_path {
     fn nested_contexts_keep_their_own_search_paths() {
         let parent = SchemaFileContext::new(
             Path::new("parent.sql"),
-            test_helpers::catalog_with_search_path(&["public", "pg_catalog"]),
-        );
-        let mut child = SchemaFileContext::new(Path::new("child.sql"), parent);
-        assert_eq!(child.get_search_path(), child.base.get_search_path());
+            &test_helpers::catalog_with_search_path(&["public", "pg_catalog"]),
+        )
+        .freeze();
+        let mut child = SchemaFileContext::new(Path::new("child.sql"), &parent);
+        assert_eq!(child.get_search_path(), parent.get_search_path());
         child.set_search_path(&test_helpers::search_path(&["app", "pg_catalog"]));
-        let mut descendant = SchemaFileContext::new(Path::new("descendant.sql"), child);
-        assert_eq!(
-            descendant.get_search_path(),
-            descendant.base.get_search_path()
-        );
+        let child = child.freeze();
+        let mut descendant = SchemaFileContext::new(Path::new("descendant.sql"), &child);
+        assert_eq!(descendant.get_search_path(), child.get_search_path());
         descendant.set_search_path(&[]);
 
         let name = FullName::from_local_name("item");
@@ -396,42 +561,32 @@ mod test_search_path {
             Some(&FullName::with_schema("pg_catalog", "item"))
         );
         assert_eq!(
-            descendant.base.get_search_path(),
+            child.get_search_path(),
             test_helpers::search_path(&["app", "pg_catalog"])
         );
+        assert_eq!(child.get_default_schema(), Some(SchemaName::from("app")));
         assert_eq!(
-            descendant.base.get_default_schema(),
-            Some(SchemaName::from("app"))
-        );
-        assert_eq!(
-            descendant
-                .base
-                .get_type(&name)
-                .and_then(TypeDefinition::full_name),
+            child.get_type(&name).and_then(TypeDefinition::full_name),
             Some(&FullName::with_schema("app", "item"))
         );
         assert_eq!(
-            descendant.base.base.get_search_path(),
+            parent.get_search_path(),
             test_helpers::search_path(&["public", "pg_catalog"])
         );
         assert_eq!(
-            descendant.base.base.get_default_schema(),
+            parent.get_default_schema(),
             Some(SchemaName::from("public"))
         );
         assert_eq!(
-            descendant
-                .base
-                .base
-                .get_type(&name)
-                .and_then(TypeDefinition::full_name),
+            parent.get_type(&name).and_then(TypeDefinition::full_name),
             Some(&FullName::with_schema("public", "item"))
         );
     }
 
     mod test_helpers {
         use crate::sem::{
-            FullName, FunctionOverloadCollection, OverloadVariant, ParseContext, SchemaName,
-            TypeDefinition, TypeReference,
+            FrozenBaseContext, FullName, FunctionOverloadCollection, OverloadVariant, ParseContext,
+            SchemaName, TypeDefinition, TypeReference,
         };
         use crate::test_helpers::TestParseContext;
 
@@ -443,7 +598,7 @@ mod test_search_path {
             names
         }
 
-        pub(super) fn catalog_with_search_path(schemas: &[&str]) -> TestParseContext {
+        pub(super) fn catalog_with_search_path(schemas: &[&str]) -> FrozenBaseContext {
             let mut context = TestParseContext::default();
             context.set_search_path(&search_path(schemas));
             for schema in ["pg_catalog", "public", "app"] {
@@ -460,7 +615,7 @@ mod test_search_path {
                     &FunctionOverloadCollection::new(&[overload]),
                 );
             }
-            context
+            context.freeze()
         }
     }
 }

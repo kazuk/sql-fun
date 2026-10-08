@@ -142,7 +142,10 @@ impl SemAst {
 mod tests {
     use crate::{
         AstAndContextPair, PostgresDialect,
-        sem::{BaseContext, MutSourcePathWithSpan, SchemaFileContext, SourcePathWithSpan},
+        sem::{
+            BaseContext, FrozenBaseContext, MutSourcePathWithSpan, SchemaFileContext,
+            SourcePathWithSpan,
+        },
         test_helpers::source_span,
         tests::context_args,
     };
@@ -193,7 +196,7 @@ LANGUAGE C STRICT IMMUTABLE PARALLEL SAFE;"#
                 .expect("selected test metadata"),
         )?;
         let path = Path::new("test.sql");
-        let mut file_context = SchemaFileContext::new(path, base_context);
+        let mut file_context = SchemaFileContext::new(path, &FrozenBaseContext::from(base_context));
         file_context.set_source_path_with_span(&source_span);
         let AstAndContextPair(_ast, _context) =
             SemAst::semantic_analysis(file_context, parsed, &tokens)?;

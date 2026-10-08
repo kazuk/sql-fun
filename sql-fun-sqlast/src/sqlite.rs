@@ -14,7 +14,7 @@ use crate::syn::sqlite::Cmd;
 
 use crate::{
     AstAndContextPair, ParseDumpFileError, ParsedSchemaDump, StringSpan,
-    sem::{AnalysisError, BaseParseContext, ParseContext, SchemaFileContext, SemAst},
+    sem::{AnalysisError, FrozenBaseContext, ParseContext, SchemaFileContext, SemAst},
 };
 
 /// dialect for SQLite
@@ -150,14 +150,20 @@ impl SqliteDialect {
         )))
     }
 
-    /// parse schema dump file
-    pub fn parse_schema_file<TContext>(
+    /// Load a schema file as an ordered layer over the supplied frozen base.
+    ///
+    /// The base and its siblings remain unchanged. Successful results retain the
+    /// file's semantic statements and recoverable problems; their frozen base
+    /// can be passed to the next file without retaining those statements.
+    ///
+    /// # Errors
+    ///
+    /// Returns [`ParseDumpFileError`] for file, syntax, or fatal analysis failures.
+    /// Earlier successfully loaded bases remain usable after a failure.
+    pub fn parse_schema_file(
         dump_file: &Path,
-        input_context: TContext,
-    ) -> Result<ParsedSchemaDump<TContext>, ParseDumpFileError>
-    where
-        TContext: BaseParseContext + std::fmt::Debug,
-    {
+        input_context: &FrozenBaseContext,
+    ) -> Result<ParsedSchemaDump, ParseDumpFileError> {
         let sql_statements = std::fs::read_to_string(dump_file)?;
 
         let mut parser = TursoParser::new(sql_statements.as_bytes());
@@ -178,7 +184,7 @@ impl SqliteDialect {
             context = rcontext;
         }
 
-        Ok(ParsedSchemaDump::new(sem_results, context))
+        Ok(context.into_parsed(sem_results))
     }
 }
 

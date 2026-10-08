@@ -6,12 +6,9 @@ use crate::{
     },
 };
 
-use super::SchemaFileContext;
+use super::{SchemaCatalog, SchemaFileContext};
 
-impl<TBaseContext> TypeInfoRead for SchemaFileContext<TBaseContext>
-where
-    TBaseContext: BaseParseContext + std::fmt::Debug,
-{
+impl TypeInfoRead for SchemaCatalog {
     fn get_type_impl(&self, key: &FullName) -> Option<&TypeDefinition> {
         if let Some(v) = self.types.get_type_impl(key, &self.base) {
             Some(v)
@@ -25,12 +22,19 @@ where
     }
 }
 
-impl<TBaseContext> TypeInfoWrite for SchemaFileContext<TBaseContext>
-where
-    TBaseContext: BaseParseContext + std::fmt::Debug,
-{
+impl TypeInfoRead for SchemaFileContext {
+    fn get_type_impl(&self, key: &FullName) -> Option<&TypeDefinition> {
+        self.catalog.get_type_impl(key)
+    }
+
+    fn get_array_item_type(&self, type_name: &TypeReference) -> Option<TypeReference> {
+        self.catalog.get_array_item_type(type_name)
+    }
+}
+
+impl TypeInfoWrite for SchemaFileContext {
     fn insert_table_ref_type(&mut self, name: &TableName) {
-        self.types.insert_table_ref(name);
+        self.catalog.types.insert_table_ref(name);
     }
 
     fn insert_create_composite_type(
@@ -38,16 +42,17 @@ where
         name: &FullName,
         create_comp_type: &CreateCompositeType,
     ) {
-        self.types
+        self.catalog
+            .types
             .insert_create_composite_type(name, create_comp_type);
     }
 
     fn insert_create_domain(&mut self, name: &FullName, create_domain: &CreateDomain) {
-        self.types.insert_create_domain(name, create_domain);
+        self.catalog.types.insert_create_domain(name, create_domain);
     }
 
     fn insert_create_enum(&mut self, name: &FullName, create_enum: &CreateEnum) {
-        self.types.insert_create_enum(name, create_enum);
+        self.catalog.types.insert_create_enum(name, create_enum);
     }
 }
 

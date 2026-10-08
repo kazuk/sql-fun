@@ -22,9 +22,10 @@ use crate::{
     sem::{
         AliasSpec, AnalysisError, AnalysisProblem, Comment, CreateCompositeType, CreateDomain,
         CreateEnum, CreateExtension, CreateFunction, CreateIndex, CreateSchema, CreateSequence,
-        CreateTable, DataSource, FullName, FunctionOverloadCollection, GetSourcePathWithSpanOpt,
-        MutSourcePathWithSpan, OperatorDefinition, OperatorName, SchemaName, SemScalarExpr,
-        TableName, TypeDefinition, TypeReference, VariableSet, ViewLike, ViewName,
+        CreateTable, DataSource, FrozenBaseContext, FullName, FunctionOverloadCollection,
+        GetSourcePathWithSpanOpt, MutSourcePathWithSpan, OperatorDefinition, OperatorName,
+        SchemaName, SemScalarExpr, TableName, TypeDefinition, TypeReference, VariableSet, ViewLike,
+        ViewName,
         search_path::{expand_search_path, expand_search_path_inst},
         type_system::ArgumentBindingCollection,
     },
@@ -223,6 +224,14 @@ pub trait ParseContext:
 where
     Self: Sized,
 {
+    /// Consume this builder and share its completed catalog as an immutable base.
+    ///
+    /// Earlier successful edits, the effective search path, and final source
+    /// provenance remain readable. Diagnostic collection and source rendering
+    /// services are discarded; inspect problems before freezing or use a
+    /// schema-file loader to retain them on its parsed result.
+    fn freeze(self) -> FrozenBaseContext;
+
     /// Replace the search path for this parse context without updating its base.
     fn set_search_path(&mut self, search_path: &[SchemaName]);
 

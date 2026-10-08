@@ -130,7 +130,9 @@ pub struct CreateTable {
 
 #[cfg(test)]
 mod test_create_table_clone {
-    use crate::sem::{BaseParseContext, ColumnName, SchemaFileContext, TableInfoWrite};
+    use crate::sem::{
+        BaseParseContext, ColumnName, ParseContext, SchemaFileContext, TableInfoWrite,
+    };
     use crate::test_helpers::TestParseContext;
     use std::path::Path;
 
@@ -143,8 +145,10 @@ mod test_create_table_clone {
         let cloned = table.clone();
         assert_eq!(cloned.primary_key_columns(), vec![&id]);
 
-        let mut context =
-            SchemaFileContext::new(Path::new("schema.sql"), TestParseContext::default());
+        let mut context = SchemaFileContext::new(
+            Path::new("schema.sql"),
+            &TestParseContext::default().freeze(),
+        );
         context.insert_create_table(cloned.name().full_name(), &cloned);
         let inserted = context.get_table(cloned.name()).expect("inserted table");
         assert_eq!(inserted.primary_key_columns(), vec![&id]);

@@ -37,7 +37,7 @@ mod test_helpers {
 
     use ::sql_fun_sqlast::{
         PostgresDialect, SqlFunArgs,
-        sem::{AnalysisError, BaseContext, SchemaFileContext, SelectStatement},
+        sem::{AnalysisError, BaseContext, FrozenBaseContext, SchemaFileContext, SelectStatement},
         syn::{ListOpt, Opt},
     };
 
@@ -61,7 +61,7 @@ mod test_helpers {
                 .expect("selected test metadata"),
         )
         .expect("builtin catalog fixture");
-        let context = SchemaFileContext::new(&metadata, base);
+        let context = SchemaFileContext::new(&metadata, &FrozenBaseContext::from(base));
         let syntax = PostgresDialect::parse(sql).expect("legal SELECT syntax");
         let tokens = PostgresDialect::scan(sql).expect("SELECT tokens");
         let select = syntax

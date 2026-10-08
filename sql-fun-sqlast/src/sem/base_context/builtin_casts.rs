@@ -149,7 +149,9 @@ mod test_builtin_cast_identity {
     use ::clap::Parser;
     use ::sql_fun_core::SqlFunArgs;
 
-    use crate::sem::{BaseContext, CastInfoRead, FullName, SchemaFileContext, TypeReference};
+    use crate::sem::{
+        BaseContext, CastInfoRead, FrozenBaseContext, FullName, SchemaFileContext, TypeReference,
+    };
 
     #[test]
     fn keeps_array_and_schema_identity_and_cast_context() {
@@ -223,7 +225,8 @@ mod test_builtin_cast_identity {
         assert!(context.get_implicit_castable(&text).contains(&regclass));
         assert!(!context.get_implicit_castable(&text).contains(&xml));
 
-        let schema_context = SchemaFileContext::new(Path::new("fixture.sql"), context);
+        let schema_context =
+            SchemaFileContext::new(Path::new("fixture.sql"), &FrozenBaseContext::from(context));
         assert!(schema_context.get_implicit_cast(&mood, &mood).is_some());
         assert!(schema_context.get_explicit_cast(&mood, &mood).is_some());
         assert!(

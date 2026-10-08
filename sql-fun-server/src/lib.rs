@@ -23,6 +23,10 @@ use self::{
     json_rpc::{JsonRpcRequest, JsonRpcResponse},
 };
 
+use ::sql_fun_sqlast::{
+    PostgresDialect, SqlFunArgs,
+    sem::{BaseContext, FrozenBaseContext},
+};
 use clap::Parser;
 use pid_file::PidFile;
 use sql_fun_server_api::{
@@ -30,7 +34,6 @@ use sql_fun_server_api::{
     InitializeSchemaArgs, ListObjectArgs, ObjectSummary, ReadCollectionArgs, ReleaseCollectionArgs,
     SchemaContext, SqlFunServerApi, SqlFunServerApiError,
 };
-use sql_fun_sqlast::{PostgresDialect, SqlFunArgs, sem::BaseContext};
 use std::{convert::Into, net::SocketAddr, sync::LazyLock};
 use tokio::{
     io::{AsyncBufReadExt, AsyncWriteExt},
@@ -112,7 +115,10 @@ impl Api {
         builtin_schema.push("schema.sql");
 
         let base_context = BaseContext::new(&context_args, metadata)?;
-        PostgresDialect::parse_schema_file(&builtin_schema, base_context)?;
+        PostgresDialect::parse_schema_file(
+            &builtin_schema,
+            &FrozenBaseContext::from(base_context),
+        )?;
 
         todo!();
     }

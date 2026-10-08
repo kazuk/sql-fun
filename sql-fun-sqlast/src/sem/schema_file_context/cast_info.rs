@@ -1,13 +1,10 @@
 use std::{collections::HashSet, str::FromStr};
 
-use crate::sem::{BaseParseContext, CastDefinition, CastInfoRead, FullName, TypeReference};
+use crate::sem::{CastDefinition, CastInfoRead, FullName, TypeReference};
 
-use super::SchemaFileContext;
+use super::SchemaCatalog;
 
-impl<TBaseContext> CastInfoRead for SchemaFileContext<TBaseContext>
-where
-    TBaseContext: BaseParseContext + std::fmt::Debug,
-{
+impl CastInfoRead for SchemaCatalog {
     fn get_explicit_cast(
         &self,
         source_type: &TypeReference,

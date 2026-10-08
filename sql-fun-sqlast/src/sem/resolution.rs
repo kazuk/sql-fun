@@ -1,9 +1,9 @@
 //! Catalog reads and diagnostic collection for expression/query resolution.
 
 use crate::sem::{
-    AnalysisError, AnalysisProblem, BaseParseContext, CastDefinition, CreateTable, FullName,
-    FunctionOverloadCollection, OperatorDefinition, OperatorName, ParseContext, TableName,
-    TypeDefinition, TypeReference, ViewLike, ViewName,
+    AnalysisError, AnalysisProblem, BaseParseContext, CastDefinition, CreateTable,
+    DiagnosticContext, FullName, FunctionOverloadCollection, OperatorDefinition, OperatorName,
+    ParseContext, TableName, TypeDefinition, TypeReference, ViewLike, ViewName,
 };
 
 use std::collections::HashSet;
@@ -104,7 +104,7 @@ pub(crate) trait ResolutionContext: Catalog {
 
 impl<T: ParseContext> ResolutionContext for T {
     fn report_problem(&mut self, problem: AnalysisProblem) -> Result<(), AnalysisError> {
-        BaseParseContext::report_problem(self, problem)
+        DiagnosticContext::report_problem(self, problem)
     }
 }
 
@@ -142,7 +142,7 @@ impl<T> ResolutionOutcome<T> {
         }
     }
 
-    pub(crate) fn report<C: ParseContext>(self, context: &mut C) -> Result<T, AnalysisError> {
+    pub(crate) fn report<C: DiagnosticContext>(self, context: &mut C) -> Result<T, AnalysisError> {
         for problem in self.problems {
             context.report_problem(problem)?;
         }

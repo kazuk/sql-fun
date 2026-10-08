@@ -7,13 +7,13 @@ use crate::{
         BinaryOperatorDefinition, CastContext, CastDefinition, ColumnDefinition, Comment,
         CreateCompositeType, CreateDomain, CreateEnum, CreateExtension, CreateFunction,
         CreateIndex, CreateSchema, CreateSequence, CreateTable, CreateTableAs, CreateTableMode,
-        CreateView, DropTable, FromClause, FullName, FunctionInfoRead, FunctionInfoWrite,
-        FunctionOverloadCollection, GetSourcePathWithSpanOpt, IndexInfoRead, MutSourcePathWithSpan,
-        OperatorDefinition, OperatorInfoRead, OperatorName, OverloadVariant, ParseContext,
-        SchemaName, SearchPathRead, SequenceInfoRead, SequenceInfoWrite, SourcePathWithSpan,
-        TableInfoRead, TableInfoWrite, TableName, TypeDefinition, TypeInfoRead, TypeInfoWrite,
-        TypeReference, ValidOperatorName, VariableSet, ViewInfoRead, ViewInfoWrite, ViewLike,
-        WithClause,
+        CreateView, DiagnosticContext, DropTable, FromClause, FullName, FunctionInfoRead,
+        FunctionInfoWrite, FunctionOverloadCollection, GetSourcePathWithSpanOpt, IndexInfoRead,
+        MutSourcePathWithSpan, OperatorDefinition, OperatorInfoRead, OperatorName, OverloadVariant,
+        ParseContext, SchemaName, SearchPathRead, SequenceInfoRead, SequenceInfoWrite,
+        SourcePathWithSpan, TableInfoRead, TableInfoWrite, TableName, TypeDefinition, TypeInfoRead,
+        TypeInfoWrite, TypeReference, ValidOperatorName, VariableSet, ViewInfoRead, ViewInfoWrite,
+        ViewLike, WithClause,
     },
     test_helpers::{SynBuilder, source_span},
 };
@@ -301,6 +301,17 @@ impl IndexInfoRead for TestParseContext {
     }
 }
 
+impl DiagnosticContext for TestParseContext {
+    #[track_caller]
+    fn report_problem(&mut self, problem: AnalysisProblem) -> Result<(), AnalysisError> {
+        if self.report_failure_after == Some(self.problems.len()) {
+            return Err(std::io::Error::other("diagnostic sink rejected a problem").into());
+        }
+        self.problems.push(problem);
+        Ok(())
+    }
+}
+
 impl BaseParseContext for TestParseContext {
     fn metadata(&self) -> &::sql_fun_core::SqlFunMetadata {
         static DEFAULT_METADATA: std::sync::LazyLock<::sql_fun_core::SqlFunMetadata> =
@@ -314,15 +325,6 @@ impl BaseParseContext for TestParseContext {
                 .expect("default datasource")
             });
         self.metadata.as_ref().unwrap_or(&DEFAULT_METADATA)
-    }
-
-    #[track_caller]
-    fn report_problem(&mut self, problem: AnalysisProblem) -> Result<(), AnalysisError> {
-        if self.report_failure_after == Some(self.problems.len()) {
-            return Err(std::io::Error::other("diagnostic sink rejected a problem").into());
-        }
-        self.problems.push(problem);
-        Ok(())
     }
 
     fn extend(&mut self, _extension: Box<dyn BaseParseContext>) {

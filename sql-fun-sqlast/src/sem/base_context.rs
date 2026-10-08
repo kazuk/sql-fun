@@ -10,10 +10,11 @@ use std::{fs::File, io::BufReader, path::Path};
 use crate::{
     StringSpan, TrieMap,
     sem::{
-        AnalysisError, AnalysisProblem, BaseParseContext, CastDefinition, CreateTable, FullName,
-        FunctionInfoRead, FunctionOverloadCollection, GetSourcePathWithSpanOpt, IndexInfoRead,
-        LocalName, MutSourcePathWithSpan, OperatorDefinition, SchemaName, SourcePathWithSpan,
-        TypeDefinition, TypeReference, ViewLike,
+        AnalysisError, AnalysisProblem, BaseParseContext, CastDefinition, CreateTable,
+        DiagnosticContext, FullName, FunctionInfoRead, FunctionOverloadCollection,
+        GetSourcePathWithSpanOpt, IndexInfoRead, LocalName, MutSourcePathWithSpan,
+        OperatorDefinition, SchemaName, SourcePathWithSpan, TypeDefinition, TypeReference,
+        ViewLike,
         parse_context::{
             OperatorInfoRead, SearchPathRead, SequenceInfoRead, TableInfoRead, TypeInfoRead,
             ViewInfoRead,
@@ -220,6 +221,13 @@ impl MutSourcePathWithSpan for BaseContext {
     }
 }
 
+impl DiagnosticContext for BaseContext {
+    fn report_problem(&mut self, problem: AnalysisProblem) -> Result<(), AnalysisError> {
+        self.problems.push(problem);
+        Ok(())
+    }
+}
+
 impl BaseParseContext for BaseContext {
     fn metadata(&self) -> &SqlFunMetadata {
         &self.metadata
@@ -227,11 +235,6 @@ impl BaseParseContext for BaseContext {
 
     fn get_args(&self) -> &SqlFunArgs {
         &self.context_args
-    }
-
-    fn report_problem(&mut self, problem: AnalysisProblem) -> Result<(), AnalysisError> {
-        self.problems.push(problem);
-        Ok(())
     }
 
     fn extend(&mut self, extension: Box<dyn BaseParseContext>) {

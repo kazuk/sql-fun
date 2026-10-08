@@ -19,9 +19,9 @@ use crate::{
     StringSpan, TrieMap,
     sem::{
         AnalysisError, AnalysisProblem, BaseParseContext, CastDefinition, Comment, CreateExtension,
-        CreateIndex, CreateSchema, GetSourcePathWithSpanOpt, ImplicitChange, MutSourcePathWithSpan,
-        ObjectKind, OperatorDefinition, OperatorInfoRead, OperatorName, ParseContext, SchemaName,
-        SemScalarExpr, SourceAccessService, VariableSet,
+        CreateIndex, CreateSchema, DiagnosticContext, GetSourcePathWithSpanOpt, ImplicitChange,
+        MutSourcePathWithSpan, ObjectKind, OperatorDefinition, OperatorInfoRead, OperatorName,
+        ParseContext, SchemaName, SemScalarExpr, SourceAccessService, VariableSet,
         parse_context::{IndexInfoRead, SearchPathRead},
     },
 };
@@ -53,6 +53,7 @@ where
     sql_source_path: PathBuf,
     source_access_service: Option<Box<dyn SourceAccessService>>,
     reports: Vec<String>,
+    problems: Vec<AnalysisProblem>,
     source: Option<SourcePathWithSpan>,
 }
 
@@ -82,6 +83,7 @@ where
             indexes: TrieMap::default(),
             source_access_service: None,
             reports: Default::default(),
+            problems: Vec::new(),
             source: None,
         }
     }
@@ -188,22 +190,10 @@ where
     }
 }
 
-impl<TBaseContext> BaseParseContext for SchemaFileContext<TBaseContext>
+impl<TBaseContext> DiagnosticContext for SchemaFileContext<TBaseContext>
 where
     TBaseContext: BaseParseContext + std::fmt::Debug,
 {
-    fn metadata(&self) -> &::sql_fun_core::SqlFunMetadata {
-        self.base.metadata()
-    }
-
-    fn get_args(&self) -> &SqlFunArgs {
-        self.base.get_args()
-    }
-
-    fn get_source_file_path(&self) -> Option<&Path> {
-        Some(self.sql_source_path.as_path())
-    }
-
     fn report_problem(&mut self, problem: AnalysisProblem) -> Result<(), AnalysisError> {
         if let Some(source_provider) = &self.source_access_service {
             let source = source_provider.get_source_span(
@@ -218,7 +208,55 @@ where
             self.reports.push(report)
         }
 
-        self.base.report_problem(problem)
+        self.problems.push(problem);
+        Ok(())
+    }
+}
+
+#[cfg(test)]
+mod test_diagnostic_context {
+    use crate::StringSpan;
+    use crate::sem::{AnalysisProblem, DiagnosticContext, FullName, SchemaFileContext};
+    use crate::test_helpers::TestParseContext;
+    use std::path::Path;
+
+    #[test]
+    fn collects_problems_without_reporting_to_base() -> testresult::TestResult {
+        let mut base = TestParseContext::default();
+        base.reject_diagnostics_after(0);
+        let mut context = SchemaFileContext::new(Path::new("schema.sql"), base);
+        let first = AnalysisProblem::function_not_found(
+            &FullName::from_local_name("first"),
+            &StringSpan::new(0, 5),
+        );
+        let second = AnalysisProblem::function_not_found(
+            &FullName::from_local_name("second"),
+            &StringSpan::new(6, 6),
+        );
+
+        context.report_problem(first)?;
+        context.report_problem(second)?;
+
+        assert_eq!(context.problems.len(), 2);
+        assert!(context.base.reported_problems().is_empty());
+        Ok(())
+    }
+}
+
+impl<TBaseContext> BaseParseContext for SchemaFileContext<TBaseContext>
+where
+    TBaseContext: BaseParseContext + std::fmt::Debug,
+{
+    fn metadata(&self) -> &::sql_fun_core::SqlFunMetadata {
+        self.base.metadata()
+    }
+
+    fn get_args(&self) -> &SqlFunArgs {
+        self.base.get_args()
+    }
+
+    fn get_source_file_path(&self) -> Option<&Path> {
+        Some(self.sql_source_path.as_path())
     }
 
     fn extend(&mut self, extension: Box<dyn BaseParseContext>) {

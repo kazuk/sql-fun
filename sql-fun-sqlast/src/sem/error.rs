@@ -4,7 +4,7 @@ use std::{
     path::{Path, PathBuf},
 };
 
-use crate::sem::{AnalysisProblem, ParseContext, TypeReference};
+use crate::sem::{AnalysisProblem, DiagnosticContext, TypeReference};
 
 /// error
 #[derive(Debug, thiserror::Error)]
@@ -144,12 +144,9 @@ impl ProblemLikeError {
         }
     }
 
-    pub fn report_problem_to<TParseContext>(
-        self,
-        context: &mut TParseContext,
-    ) -> Result<(), AnalysisError>
+    pub fn report_problem_to<TContext>(self, context: &mut TContext) -> Result<(), AnalysisError>
     where
-        TParseContext: ParseContext,
+        TContext: DiagnosticContext,
     {
         context.report_problem(self.into_problem())?;
         Ok(())

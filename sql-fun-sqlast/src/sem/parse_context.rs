@@ -193,9 +193,6 @@ pub trait BaseParseContext:
         .unwrap_or_else(|| fun_name.clone())
     }
 
-    /// reporting a analysis errors
-    fn report_problem(&mut self, problem: AnalysisProblem) -> Result<(), AnalysisError>;
-
     /// Load extension and bind to this context
     fn extend(&mut self, extension: Box<dyn BaseParseContext>);
 
@@ -214,6 +211,14 @@ pub trait BaseParseContext:
     }
 }
 
+/// Mutable diagnostic sink for semantic analysis.
+pub trait DiagnosticContext {
+    /// Report a recoverable analysis problem.
+    ///
+    /// Returns an error if the diagnostic cannot be accepted or rendered.
+    fn report_problem(&mut self, problem: AnalysisProblem) -> Result<(), AnalysisError>;
+}
+
 /// modifiable schema
 ///
 /// use in schema loading
@@ -225,6 +230,7 @@ pub trait ParseContext:
     + ViewInfoWrite
     + FunctionInfoWrite
     + BaseParseContext
+    + DiagnosticContext
     + std::fmt::Debug
 where
     Self: Sized,

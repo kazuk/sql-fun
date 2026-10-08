@@ -186,6 +186,31 @@ mod test_metadata_args {
   the cost classification and contract with the helper rather than asking each
   caller to rediscover them.
 
+### Compile-time test cost
+
+- Treat `trybuild` as a high-cost compiler-test harness, not a routine way to
+  assert that an API cannot be misused. Compiling test fixtures and their
+  dependencies can dominate the cost of a small set of negative cases;
+  snapshot maintenance adds further work. Do not introduce or copy a harness
+  merely because another crate already uses one.
+- Prefer [Rustdoc `compile_fail` examples](https://doc.rust-lang.org/rustdoc/write-documentation/documentation-tests.html#compile_fail)
+  for public API boundaries such as ownership, visibility, and unavailable
+  mutation methods when compilation rejection is the required guarantee.
+  Include a positive compiling example and keep negative examples minimal so
+  unrelated setup errors do not satisfy the test. Rustdoc still has compilation
+  costs; it is not a promise of cost-free validation.
+- Use [trybuild](https://docs.rs/trybuild/1.0.121/trybuild/) when its diagnostic
+  snapshots or other harness-specific capabilities are part of the requirement,
+  such as checking a procedural macro's error message and source location.
+  Briefly state why those capabilities are needed; preserve meaningful coverage
+  rather than replacing diagnostic assertions with generic compilation failure.
+- Give compile-time tests a maintained local/CI execution path. Rustdoc examples
+  require an explicit `cargo test --doc` invocation for the relevant crate and
+  feature configurations; `cargo doc` and nextest alone do not execute them.
+  When evaluating cost, distinguish Cargo preparation/dependency compilation
+  from test execution. Do not require per-test timing measurements or assume
+  that changing harnesses eliminates the underlying compilation work.
+
 ### Parameterized tests with `rstest`
 
 - Prefer `#[rstest::rstest]` when independent input examples exercise the same

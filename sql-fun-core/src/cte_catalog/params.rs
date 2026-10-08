@@ -1,8 +1,8 @@
+use super::CteName;
+use crate::placehlodered_sql::{ParameterName, PlaceholderTypeHint};
 use std::collections::{HashMap, hash_map::Entry};
 
-use crate::placehlodered_sql::{ParameterName, PlaceholderTypeHint};
-
-use super::CteName;
+use ::serde::ser::{SerializeMap, SerializeStruct};
 
 /// renaming definition
 #[derive(Debug, serde::Deserialize)]
@@ -103,21 +103,64 @@ impl CteParameterBinding {
     }
 }
 
+/// A catalog entry's contribution to one resolved parameter.
+#[derive(Debug, Clone, serde::Serialize, serde::Deserialize)]
+pub struct CteQueryBinding {
+    cte_name: CteName,
+    type_hints: Vec<PlaceholderTypeHint>,
+}
+
+impl CteQueryBinding {
+    fn new(cte_name: &CteName, hints: &[PlaceholderTypeHint]) -> Self {
+        Self {
+            cte_name: cte_name.clone(),
+            type_hints: hints.to_owned(),
+        }
+    }
+
+    /// Catalog entry supplying this binding.
+    #[must_use]
+    pub const fn cte_name(&self) -> &CteName {
+        &self.cte_name
+    }
+
+    /// Type hints contributed by the catalog entry.
+    #[must_use]
+    pub fn type_hints(&self) -> &[PlaceholderTypeHint] {
+        &self.type_hints
+    }
+}
+
 /// collection of parameter binding
 #[derive(Debug, Default, Clone, serde::Serialize, serde::Deserialize)]
-pub struct CteParameterBindingCollection(Vec<(CteName, Vec<PlaceholderTypeHint>)>);
+pub struct CteParameterBindingCollection {
+    cte_bindings: Vec<CteQueryBinding>,
+    query_type_hints: Vec<PlaceholderTypeHint>,
+}
 
 impl CteParameterBindingCollection {
+    /// Type hints supplied by the application query.
+    #[must_use]
+    pub fn query_type_hints(&self) -> &[PlaceholderTypeHint] {
+        &self.query_type_hints
+    }
+
+    /// Catalog entry names and their parameter type hints.
+    #[must_use]
+    pub fn cte_bindings(&self) -> &[CteQueryBinding] {
+        &self.cte_bindings
+    }
+
     /// add binding to parameter
-    pub fn push_binding(&mut self, cte_name: &CteName, hints: &Vec<PlaceholderTypeHint>) {
-        self.0.push((cte_name.clone(), hints.to_owned()));
+    pub fn push_binding(&mut self, cte_name: &CteName, hints: &[PlaceholderTypeHint]) {
+        self.cte_bindings
+            .push(CteQueryBinding::new(cte_name, hints));
     }
 
     /// append all parameter binding
     pub fn append(&mut self, other: &Self) {
-        for item in &other.0 {
-            self.0.push(item.clone());
-        }
+        self.cte_bindings.extend(other.cte_bindings.clone());
+        self.query_type_hints.extend(other.query_type_hints.clone());
     }
 }
 
@@ -127,7 +170,60 @@ pub struct CteParameterCollection {
     parameters: HashMap<ParameterName, CteParameterBindingCollection>,
 }
 
+// Preserve existing lockfile fingerprints: the base SQL is hashed separately,
+// and only catalog contributions appeared in the previous parameter encoding.
+struct LegacyFingerprint<'a>(&'a CteParameterCollection);
+
+impl ::serde::Serialize for LegacyFingerprint<'_> {
+    fn serialize<S: ::serde::Serializer>(&self, serializer: S) -> Result<S::Ok, S::Error> {
+        let mut outer = serializer.serialize_struct("CteParameterCollection", 1)?;
+        outer.serialize_field("parameters", &LegacyBindingMap(&self.0.parameters))?;
+        outer.end()
+    }
+}
+
+struct LegacyBindingMap<'a>(&'a HashMap<ParameterName, CteParameterBindingCollection>);
+
+impl ::serde::Serialize for LegacyBindingMap<'_> {
+    fn serialize<S: ::serde::Serializer>(&self, serializer: S) -> Result<S::Ok, S::Error> {
+        let mut map = serializer.serialize_map(None)?;
+        for (name, bindings) in self.0 {
+            if bindings.cte_bindings.is_empty() {
+                continue;
+            }
+            let previous_shape: Vec<_> = bindings
+                .cte_bindings
+                .iter()
+                .map(|binding| (&binding.cte_name, &binding.type_hints))
+                .collect();
+            map.serialize_entry(name, &previous_shape)?;
+        }
+        map.end()
+    }
+}
+
 impl CteParameterCollection {
+    pub(super) fn legacy_fingerprint_json(&self) -> Result<String, serde_json::Error> {
+        serde_json::to_string(&LegacyFingerprint(self))
+    }
+
+    /// Include application-query parameters without inventing a catalog entry.
+    pub fn include_base_query(&mut self, query: &crate::PlaceholderedSql) {
+        for (name, hints) in query.parameters() {
+            self.parameters
+                .entry(name.clone())
+                .or_default()
+                .query_type_hints
+                .extend(hints.clone());
+        }
+    }
+
+    /// Binding metadata for one resolved parameter identity.
+    #[must_use]
+    pub fn binding(&self, name: &ParameterName) -> Option<&CteParameterBindingCollection> {
+        self.parameters.get(name)
+    }
+
     /// register parameter
     pub fn push_query_parameter(
         &mut self,

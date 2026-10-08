@@ -3040,6 +3040,7 @@ dependencies = [
  "futures-util",
  "indexmap",
  "rand",
+ "rstest",
  "serde",
  "serde_json",
  "sql-fun-core",

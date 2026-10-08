@@ -5,6 +5,7 @@
 mod buffers;
 mod cache;
 mod core_wrapping;
+mod cte_realization;
 mod error;
 mod json_rpc;
 mod pending_future;

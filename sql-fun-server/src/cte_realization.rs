@@ -5,7 +5,8 @@
 //! downstream to analysis responses and `LockfileEntry.bind_parameters`.
 
 use ::sql_fun_core::{
-    CteParameterBindingCollection, ParameterName, PlaceholderedSql, ResolvedCteCatalog,
+    CteParameterBindingCollection, ParameterName, PlaceholderedSql, RealizedParameterMetadata,
+    ResolvedCteCatalog,
 };
 use ::sql_fun_sqlast::{
     ast::{CteDefinition, Dialect, HaveWithClause, Statement},
@@ -37,15 +38,17 @@ impl OrderedBindings {
         let mut bindings = Vec::new();
         let mut names = Vec::new();
         catalog.append_cte_parameter_order(&mut names);
+        let cte_name_count = names.len();
         catalog.base_query().append_parameter_order(&mut names);
-        for name in names {
-            let Some(metadata) = catalog.parameters().binding(&name) else {
+        for (index, name) in names.into_iter().enumerate() {
+            let metadata = catalog.parameters().binding(&name);
+            if index < cte_name_count && metadata.is_none() {
                 return Err(CteRealizationError::invalid_input(
                     "binding metadata",
                     &format!("required parameter {name:?} is absent from the resolved catalog"),
                 ));
-            };
-            bindings.push(ResolvedBinding::new(&name, metadata));
+            }
+            bindings.push(ResolvedBinding::new(&name, metadata, catalog.base_query()));
         }
         Ok(Self(bindings))
     }
@@ -63,14 +66,18 @@ impl OrderedBindings {
 #[derive(Debug)]
 pub(crate) struct ResolvedBinding {
     name: ParameterName,
-    metadata: CteParameterBindingCollection,
+    metadata: RealizedParameterMetadata,
 }
 
 impl ResolvedBinding {
-    fn new(name: &ParameterName, metadata: &CteParameterBindingCollection) -> Self {
+    fn new(
+        name: &ParameterName,
+        catalog_metadata: Option<&CteParameterBindingCollection>,
+        base_query: &PlaceholderedSql,
+    ) -> Self {
         Self {
             name: name.clone(),
-            metadata: metadata.clone(),
+            metadata: RealizedParameterMetadata::from_sources(name, catalog_metadata, base_query),
         }
     }
 
@@ -78,7 +85,7 @@ impl ResolvedBinding {
         &self.name
     }
 
-    pub(crate) const fn metadata(&self) -> &CteParameterBindingCollection {
+    pub(crate) const fn metadata(&self) -> &RealizedParameterMetadata {
         &self.metadata
     }
 }
@@ -141,7 +148,6 @@ pub(crate) fn realize_cte_catalog(
 }
 
 #[cfg(test)]
-#[path = "cte_realization/tests.rs"]
 mod tests;
 
 fn parse_piece(

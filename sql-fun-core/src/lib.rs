@@ -25,7 +25,7 @@ pub use self::{
         CatalogFileIndex, CteAlias, CteCatalog, CteCatalogCheckError, CteCatalogEntry,
         CteCatalogError, CteCatalogReference, CteName, CteParameter, CteParameterBinding,
         CteParameterBindingCollection, CteParameterCollection, CteParameterRename, CteQueryBinding,
-        ParameterRenameCollection, ResolvedCteCatalog,
+        ParameterRenameCollection, RealizedParameterMetadata, ResolvedCteCatalog,
     },
     placehlodered_sql::{
         FragmentName, ParameterName, PlaceholderedSql, PlaceholderedSqlError, PlaceholderedSqlToken,

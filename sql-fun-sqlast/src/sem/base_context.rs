@@ -8,13 +8,12 @@ pub use self::{
 use std::{fs::File, io::BufReader, path::Path};
 
 use crate::{
-    StringSpan, TrieMap,
+    TrieMap,
     sem::{
         AnalysisError, AnalysisProblem, BaseParseContext, CastDefinition, CreateTable,
         DiagnosticContext, FullName, FunctionInfoRead, FunctionOverloadCollection,
-        GetSourcePathWithSpanOpt, IndexInfoRead, LocalName, MutSourcePathWithSpan,
-        OperatorDefinition, SchemaName, SourcePathWithSpan, TypeDefinition, TypeReference,
-        ViewLike,
+        GetSourcePathWithSpanOpt, IndexInfoRead, LocalName, OperatorDefinition, SchemaName,
+        SourcePathWithSpan, TypeDefinition, TypeReference, ViewLike,
         parse_context::{
             OperatorInfoRead, SearchPathRead, SequenceInfoRead, TableInfoRead, TypeInfoRead,
             ViewInfoRead,
@@ -35,12 +34,9 @@ pub struct BaseContext {
     left_unary_operators: TrieMap<OperatorDefinition>,
     right_unary_operators: TrieMap<OperatorDefinition>,
     extensions: Vec<Box<dyn BaseParseContext>>,
-    statement_span: StringSpan,
     search_path: Vec<SchemaName>,
     functions: PgBuiltInFunctions,
-    source_provider: Option<Box<dyn super::SourceAccessService>>,
     problems: Vec<AnalysisProblem>,
-    source: Option<SourcePathWithSpan>,
 }
 
 #[derive(serde::Deserialize)]
@@ -84,11 +80,8 @@ impl BaseContext {
             left_unary_operators,
             right_unary_operators,
             extensions: Default::default(),
-            statement_span: Default::default(),
-            source_provider: None,
             search_path,
             problems: Default::default(),
-            source: None,
         })
     }
 
@@ -211,13 +204,7 @@ impl SearchPathRead for BaseContext {
 
 impl GetSourcePathWithSpanOpt for BaseContext {
     fn get_source_path_with_span(&self) -> Option<&SourcePathWithSpan> {
-        self.source.as_ref()
-    }
-}
-
-impl MutSourcePathWithSpan for BaseContext {
-    fn set_source_path_with_span(&mut self, value: &SourcePathWithSpan) {
-        self.source = Some(value.clone())
+        None
     }
 }
 
@@ -241,16 +228,8 @@ impl BaseParseContext for BaseContext {
         self.extensions.push(extension);
     }
 
-    fn set_statement_span(&mut self, statement_span: StringSpan) {
-        self.statement_span = statement_span;
-    }
-
     fn get_source_file_path(&self) -> Option<&Path> {
         None // BaseContext contains built-in data item, from Non SQL Source
-    }
-
-    fn set_source_file(&mut self, source_access_service: Box<dyn super::SourceAccessService>) {
-        self.source_provider = Some(source_access_service)
     }
 }
 

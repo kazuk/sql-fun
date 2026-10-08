@@ -144,7 +144,6 @@ pub trait BaseParseContext:
     + ViewInfoRead
     + SearchPathRead
     + GetSourcePathWithSpanOpt
-    + MutSourcePathWithSpan
     + std::fmt::Debug
 {
     /// Resolved metadata for the database selected by the caller.
@@ -196,12 +195,6 @@ pub trait BaseParseContext:
     /// Load extension and bind to this context
     fn extend(&mut self, extension: Box<dyn BaseParseContext>);
 
-    /// update location for current statement.
-    fn set_statement_span(&mut self, statement_span: StringSpan);
-
-    /// setup source access service
-    fn set_source_file(&mut self, source_access_service: Box<dyn SourceAccessService>);
-
     /// canonicalize a type reference
     fn canonicalize_type_ref(&self, type_ref: &TypeReference) -> Option<TypeReference> {
         let type_def = self.get_type(type_ref.full_name())?;
@@ -230,11 +223,18 @@ pub trait ParseContext:
     + ViewInfoWrite
     + FunctionInfoWrite
     + BaseParseContext
+    + MutSourcePathWithSpan
     + DiagnosticContext
     + std::fmt::Debug
 where
     Self: Sized,
 {
+    /// Update location for the current statement.
+    fn set_statement_span(&mut self, statement_span: StringSpan);
+
+    /// Set the source access service used to render diagnostics.
+    fn set_source_file(&mut self, source_access_service: Box<dyn SourceAccessService>);
+
     /// apply `create type` (composite type) to current schema
     fn apply_create_comp_type(
         mut self,

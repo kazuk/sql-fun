@@ -14,7 +14,7 @@ use crate::syn::sqlite::Cmd;
 
 use crate::{
     AstAndContextPair, ParseDumpFileError, ParsedSchemaDump, StringSpan,
-    sem::{AnalysisError, BaseParseContext, SchemaFileContext, SemAst},
+    sem::{AnalysisError, BaseParseContext, ParseContext, SchemaFileContext, SemAst},
 };
 
 /// dialect for SQLite

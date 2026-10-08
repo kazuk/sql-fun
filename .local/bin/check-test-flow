@@ -200,6 +200,8 @@ function run_workspace() {
   echo "== Workspace verification"
   run_check   --workspace "${FEATURES[@]}"
   run_nextest --workspace --exclude sql-fun "${FEATURES[@]}" ${NEXTEST_EXTRA} --no-tests pass
+  echo ">> cargo test --doc -p sql-fun-sqlast ${FEATURES[*]}"
+  cargo test --doc -p sql-fun-sqlast "${FEATURES[@]}"
 }
 
 function run_proc_macro_tests() {

@@ -17,27 +17,35 @@ write permission.
 
 ## Procedure
 
-1. Select the target with the deterministic evidence helper:
+1. Require the caller to choose one target Rust source and the destination
+   repository in `OWNER/REPO` form. To offer a candidate without selecting it,
+   run:
 
    ```bash
-   .codex/skills/old-source-review/scripts/collect-evidence.sh
+   .codex/skills/old-source-review/scripts/collect-evidence.sh --suggest-candidate
    ```
 
-   To review an explicitly selected source instead, pass it exactly:
+   Report the returned candidate and wait for the caller to supply the target.
+   Do not inspect the candidate, search its uses, or create an issue until that
+   selection is explicit.
+
+2. Collect evidence for the explicitly selected source:
 
    ```bash
    .codex/skills/old-source-review/scripts/collect-evidence.sh --target <path>
    ```
 
-   With no target, the helper selects the first result from
-   `.local/bin/old-source`. That command evaluates all tracked Rust sources;
-   do not add a subset filter or substitute a different candidate.
+   The candidate helper evaluates all tracked Rust sources through
+   `.local/bin/old-source`; do not add a subset filter or substitute a
+   different candidate.
 
-2. Use the returned JSON facts for the target, candidate basis, tracked-file
+3. Use the returned JSON facts for the target, tracked-file
    validation, and last-modifying commit. Do not recreate those values in the
-   investigation.
+   investigation. Inspect the selected source at the returned `evidence_commit`
+   with `git show <evidence_commit>:<target>`, so source inspection and literal
+   usage evidence share the same committed snapshot.
 
-3. Inspect the selected source and identify its meaningful definitions. Then
+4. Identify meaningful definitions in that snapshot. Then
    pass every selected definition name to the helper's lookup mode:
 
    ```bash
@@ -50,12 +58,12 @@ write permission.
    indirect use, or ambiguous by inspecting the relevant code. Report
    uncertainty instead of inferring a use from a name match.
 
-4. Investigate adjacent concepts and assess why the definitions have remained
+5. Investigate adjacent concepts and assess why the definitions have remained
    stable. Consider **Keep**, **Consolidate**, **Remove / simplify**, **Expand
    usage**, and **Further investigation**. File age and low use count alone do
    not justify a change.
 
-5. Obtain the current required maintenance headings without manually loading
+6. Obtain the current required maintenance headings without manually loading
    the template:
 
    ```bash
@@ -68,10 +76,11 @@ write permission.
    adjacent concepts, assessment, suggested disposition and rationale,
    uncertainties, and the maintainer decision required in `Pending`.
 
-6. Save that body to a temporary file and create the issue once:
+7. Save that body to a temporary file and create the issue once:
 
    ```bash
    .codex/skills/old-source-review/scripts/create-maintenance-issue.sh \
+     --repo <owner/repo> \
      --title "[Maintenance] <target>: <suggested disposition>" \
      --body-file <path>
    ```

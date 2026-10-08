@@ -174,7 +174,7 @@ mod test_create_table_clone {
                     Some(true),
                     &[],
                 )],
-                CreateTableMode::Default,
+                CreateTableMode::from_if_not_exists(false),
                 false,
                 &source,
             );

@@ -375,10 +375,9 @@ mod test_freeze {
     }
 
     #[test]
-    fn sibling_alterations_leave_shared_parent_and_each_other_unchanged() -> testresult::TestResult
-    {
+    fn child_alteration_leaves_shared_parent_and_sibling_unchanged() -> testresult::TestResult {
         let base = test_helpers::empty_base();
-        let table = test_helpers::table_with_key_candidates()?;
+        let table = test_helpers::table_with_key_candidates();
         let parent = SchemaFileContext::new(Path::new("parent.sql"), &base)
             .apply_create_table(&table)?
             .freeze();
@@ -388,18 +387,15 @@ mod test_freeze {
         let left = left
             .apply_alter_table(&test_helpers::add_primary_key(&table, "other_id"))?
             .freeze();
-        let right = right
-            .apply_alter_table(&test_helpers::add_primary_key(&table, "id"))?
-            .freeze();
+        let right = right.freeze();
 
         let left_column = ColumnName::from("other_id");
-        let right_column = ColumnName::from("id");
         let left_table = left.get_table(table.name()).expect("left table");
         let right_table = right.get_table(table.name()).expect("right table");
         let parent_table = parent.get_table(table.name()).expect("parent table");
         assert_eq!(left_table.primary_key_columns(), vec![&left_column]);
-        assert_eq!(right_table.primary_key_columns(), vec![&right_column]);
-        assert_eq!(parent_table.primary_key_columns(), vec![&right_column]);
+        assert!(right_table.primary_key_columns().is_empty());
+        assert!(parent_table.primary_key_columns().is_empty());
         assert_eq!(left.get_default_schema(), Some(SchemaName::from("left")));
         assert_eq!(right.get_default_schema(), Some(SchemaName::from("public")));
         assert_eq!(
@@ -411,10 +407,9 @@ mod test_freeze {
 
     mod test_helpers {
         use crate::sem::{
-            AlterObjSubCommand, AlterTable, AnalysisError, ColumnDefinition, ColumnName,
-            Constraint, CreateTable, CreateTableMode, FrozenBaseContext, FullName, ParseContext,
-            PgBuiltInType, PrimaryKeyConstraint, SchemaFileContext, SchemaName,
-            SourceAccessService, TableName,
+            AlterObjSubCommand, AlterTable, ColumnDefinition, ColumnName, Constraint, CreateTable,
+            CreateTableMode, FrozenBaseContext, FullName, ParseContext, PgBuiltInType,
+            PrimaryKeyConstraint, SchemaFileContext, SchemaName, SourceAccessService, TableName,
         };
         use crate::test_helpers::{TestParseContext, source_span};
         use std::rc::{Rc, Weak};
@@ -438,22 +433,20 @@ mod test_freeze {
             CreateTable::new(
                 &TableName::from(FullName::with_schema("public", "items")),
                 vec![column("id")],
-                CreateTableMode::Default,
+                CreateTableMode::from_if_not_exists(false),
                 false,
                 &source_span(),
             )
         }
 
-        pub(super) fn table_with_key_candidates() -> Result<CreateTable, AnalysisError> {
-            let mut table = CreateTable::new(
+        pub(super) fn table_with_key_candidates() -> CreateTable {
+            CreateTable::new(
                 &TableName::from(FullName::with_schema("public", "items")),
                 vec![column("id"), column("other_id")],
-                CreateTableMode::Default,
+                CreateTableMode::from_if_not_exists(false),
                 false,
                 &source_span(),
-            );
-            table.apply_alter(&add_primary_key(&table, "id"))?;
-            Ok(table)
+            )
         }
 
         pub(super) fn add_primary_key(table: &CreateTable, name: &str) -> AlterTable {

@@ -2,8 +2,9 @@
 
 use self::test_helpers::{
     EXTENSION_A, EXTENSION_B, assert_missing_domain_base, assert_primary_key, assert_query_type,
-    assert_type_exists, builtin_schema, dependent_dump, extension_sources, load_layer, load_schema,
-    parent_with_same_named_tables, query, tablefunc_schema,
+    assert_table_exists, assert_type_exists, builtin_root, builtin_schema, chain_prefix,
+    dependent_dump, extension_sources, load_layer, load_schema, parent_with_same_named_tables,
+    query, tablefunc_schema,
 };
 
 use ::sql_fun_sqlast::sem::{
@@ -19,7 +20,7 @@ fn runtime_file_chain_resolves_each_dump_from_its_ordered_prefix(
     #[case] extension_count: usize,
     #[case] answer_type: TypeReference,
 ) -> Result<(), Box<dyn std::error::Error>> {
-    let mut prefix = builtin_schema()?;
+    let mut prefix = chain_prefix()?;
     for source in extension_sources(extension_count) {
         let loaded = load_schema(&prefix, source)?;
         assert!(loaded.problems().is_empty());
@@ -28,13 +29,7 @@ fn runtime_file_chain_resolves_each_dump_from_its_ordered_prefix(
     let dump = load_schema(&prefix, dependent_dump(extension_count))?;
 
     assert!(dump.problems().is_empty());
-    assert!(
-        dump.get_table(&TableName::from(FullName::with_schema(
-            "pg_catalog",
-            "pg_class"
-        )))
-        .is_some()
-    );
+    assert_table_exists(&dump, "public.base_items");
     let resolved = query(
         dump.base_context(),
         "SELECT answer FROM public.final_answers",
@@ -46,7 +41,7 @@ fn runtime_file_chain_resolves_each_dump_from_its_ordered_prefix(
 #[test]
 fn dependent_file_reports_named_missing_domain_base_before_its_provider()
 -> Result<(), Box<dyn std::error::Error>> {
-    let prefix = builtin_schema()?;
+    let prefix = builtin_root()?;
     // Reversing all of B also reaches the existing missing-FROM-source TODO.
     // This dependency isolates the supported recoverable domain-base contract.
     let dependent = load_schema(
@@ -74,6 +69,7 @@ fn inherited_catalog_objects_and_merged_overloads_drive_query_analysis()
     assert!(first.problems().is_empty());
     assert!(second.problems().is_empty());
     assert!(dump.problems().is_empty());
+    assert_table_exists(&dump, "pg_catalog.pg_class");
     for name in [
         "a.state",
         "a.label",
@@ -169,7 +165,7 @@ fn inherited_catalog_objects_and_merged_overloads_drive_query_analysis()
 #[test]
 fn array_item_reads_follow_frozen_and_mutable_schema_layers()
 -> Result<(), Box<dyn std::error::Error>> {
-    let builtin = builtin_schema()?;
+    let builtin = builtin_root()?;
     let first = load_schema(&builtin, EXTENSION_A)?;
     let second = load_schema(first.base_context(), EXTENSION_B)?;
     let dump = load_schema(second.base_context(), dependent_dump(2))?;
@@ -240,7 +236,7 @@ fn tablefunc_crosstab_call_resolves_after_explicit_extension_loading()
 #[test]
 fn cloned_prefix_outlives_its_parse_result_and_supports_shared_thread_reads()
 -> Result<(), Box<dyn std::error::Error>> {
-    let builtin = builtin_schema()?;
+    let builtin = builtin_root()?;
     let parsed = load_schema(&builtin, EXTENSION_A)?;
     let prefix = parsed.base_context().clone();
     drop(parsed);
@@ -273,7 +269,7 @@ fn cloned_prefix_outlives_its_parse_result_and_supports_shared_thread_reads()
 #[test]
 fn forked_files_keep_definitions_search_paths_provenance_and_problems_local()
 -> Result<(), Box<dyn std::error::Error>> {
-    let builtin = builtin_schema()?;
+    let builtin = builtin_root()?;
     let parent = load_schema(&builtin, EXTENSION_A)?;
     let left = load_layer(
         parent.base_context(),
@@ -378,7 +374,7 @@ fn inherited_unqualified_declarations_are_altered_under_the_resolved_key(
     #[case] selected_schema: &str,
     #[case] other_schema: &str,
 ) -> Result<(), Box<dyn std::error::Error>> {
-    let root = builtin_schema()?;
+    let root = builtin_root()?;
     let first = load_layer(
         &root,
         &["a"],
@@ -412,7 +408,7 @@ fn inherited_unqualified_declarations_are_altered_under_the_resolved_key(
 fn local_unqualified_declaration_retains_its_catalog_key_after_alter(
     #[case] target: &str,
 ) -> Result<(), Box<dyn std::error::Error>> {
-    let root = builtin_schema()?;
+    let root = builtin_root()?;
     let parsed = load_schema(
         &root,
         &format!(
@@ -527,7 +523,9 @@ mod test_helpers {
         load_layer(&root, &["a", "b"], &schema)
     }
 
-    fn builtin_root() -> Result<FrozenBaseContext, Box<dyn std::error::Error>> {
+    pub(super) fn builtin_root() -> Result<FrozenBaseContext, Box<dyn std::error::Error>> {
+        // Real type/function/operator/cast metadata is sufficient for small fixtures;
+        // only catalog and full-extension tests need the entire builtin schema SQL.
         let metadata = Path::new(env!("CARGO_MANIFEST_DIR")).join("sql_fun.metadata.toml");
         let args = SqlFunArgs::try_parse_from([
             "sqlfun",
@@ -541,6 +539,13 @@ mod test_helpers {
         let metadata = args.load_metadata()?;
         let selected = metadata.get("default").expect("selected fixture metadata");
         Ok(FrozenBaseContext::from(BaseContext::new(&args, selected)?))
+    }
+
+    pub(super) fn chain_prefix() -> Result<FrozenBaseContext, Box<dyn std::error::Error>> {
+        let root = builtin_root()?;
+        let parsed = load_schema(&root, "CREATE TABLE public.base_items (id integer);")?;
+        assert!(parsed.problems().is_empty());
+        Ok(parsed.base_context().clone())
     }
 
     pub(super) fn builtin_schema() -> Result<FrozenBaseContext, Box<dyn std::error::Error>> {
@@ -602,6 +607,11 @@ mod test_helpers {
                 .full_name(),
             Some(&full_name)
         );
+    }
+
+    pub(super) fn assert_table_exists(context: &impl BaseParseContext, name: &str) {
+        let table_name = TableName::from(name.parse::<FullName>().expect("fixture table name"));
+        assert!(context.get_table(&table_name).is_some());
     }
 
     pub(super) fn assert_missing_domain_base(

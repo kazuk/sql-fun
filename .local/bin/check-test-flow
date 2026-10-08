@@ -200,8 +200,6 @@ function run_workspace() {
   echo "== Workspace verification"
   run_check   --workspace "${FEATURES[@]}"
   run_nextest --workspace --exclude sql-fun "${FEATURES[@]}" ${NEXTEST_EXTRA} --no-tests pass
-  echo ">> cargo test --doc -p sql-fun-sqlast ${FEATURES[*]}"
-  cargo test --doc -p sql-fun-sqlast "${FEATURES[@]}"
 }
 
 function run_proc_macro_tests() {
@@ -251,6 +249,9 @@ function run_doc() {
   echo "== Document build"
   cargo doc --workspace --no-deps
   mdbook build
+  echo "== Documentation tests (default and all features)"
+  cargo test --doc -p sql-fun-sqlast
+  cargo test --doc -p sql-fun-sqlast --all-features
 }
 
 function run_typos() {

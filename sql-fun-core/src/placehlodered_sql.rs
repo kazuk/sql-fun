@@ -82,9 +82,7 @@ combine::parser! {
     {
         string("/*").with(
             many(
-                attempt(closed_block_comment())
-                    .map(|_| ())
-                    .or(not_followed_by(
+                attempt(closed_block_comment()).or(not_followed_by(
                         attempt(string("/*")).or(attempt(string("*/"))),
                     )
                     .with(any())
@@ -330,6 +328,10 @@ impl PlaceholderedSqlToken {
     /// The `combine` host-SQL lexer preserves comments, dollar-quoted strings,
     /// and quoted identifiers as raw text before applying the sql-fun token
     /// parsers. This keeps placeholders in those regions from being substituted.
+    ///
+    /// # Panics
+    ///
+    /// Panics if the lexer cannot consume a character from nonempty input.
     #[must_use]
     pub fn scan(input: &str) -> Vec<Self> {
         let mut results = Vec::new();
@@ -345,21 +347,18 @@ impl PlaceholderedSqlToken {
                 buffer.push_str(rest);
                 break;
             }
-            match Self::try_take_special_item(rest) {
-                Ok((item, new_rest)) => {
-                    if !buffer.is_empty() {
-                        buffer.shrink_to_fit();
-                        results.push(Self::RawSqlText(RawSqlText(buffer)));
-                        buffer = String::new();
-                    }
-                    results.push(item);
-                    rest = new_rest;
+            if let Ok((item, new_rest)) = Self::try_take_special_item(rest) {
+                if !buffer.is_empty() {
+                    buffer.shrink_to_fit();
+                    results.push(Self::RawSqlText(RawSqlText(buffer)));
+                    buffer = String::new();
                 }
-                Err(_) => {
-                    let (character, new_rest) = any().parse(rest).expect("rest is not empty");
-                    buffer.push(character);
-                    rest = new_rest;
-                }
+                results.push(item);
+                rest = new_rest;
+            } else {
+                let (character, new_rest) = any().parse(rest).expect("rest is not empty");
+                buffer.push(character);
+                rest = new_rest;
             }
         }
         if !buffer.is_empty() {

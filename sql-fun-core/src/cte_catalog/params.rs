@@ -229,7 +229,7 @@ impl CteParameterCollection {
         &mut self,
         cte_name: &CteName,
         parameter_name: &ParameterName,
-        hints: &Vec<PlaceholderTypeHint>,
+        hints: &[PlaceholderTypeHint],
     ) {
         match self.parameters.entry(parameter_name.clone()) {
             Entry::Occupied(mut o) => {

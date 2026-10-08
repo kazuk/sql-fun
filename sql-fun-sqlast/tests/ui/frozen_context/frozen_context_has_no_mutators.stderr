@@ -1,0 +1,11 @@
+error[E0599]: no method named `set_search_path` found for struct `FrozenBaseContext` in the current scope
+ --> tests/ui/frozen_context/frozen_context_has_no_mutators.rs:4:13
+  |
+4 |     context.set_search_path(&[]);
+  |             ^^^^^^^^^^^^^^^
+  |
+help: there is a method `get_search_path` with a similar name, but with different arguments
+ --> src/sem/parse_context.rs
+  |
+  |     fn get_search_path(&self) -> &[SchemaName];
+  |     ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^

@@ -67,9 +67,7 @@ struct OrderLineRow {
 
 impl OrderArena {
     pub fn get_user_by_order(&self, order_id: OrderId) -> Option<&UserRow> {
-        let Some(user_id) = self.user_orders.resolve_prefix_key(order_id) else {
-            return None;
-        };
+        let user_id = self.user_orders.resolve_prefix_key(order_id)?;
         self.users.get_by(user_id)
     }
 }
@@ -99,9 +97,7 @@ trait HasUserOrderRows {
     where
         Self: HasUserRows,
     {
-        let Some(user_id) = self.user_orders().resolve_prefix_key(order_id) else {
-            return None;
-        };
+        let user_id = self.user_orders().resolve_prefix_key(order_id)?;
         self.users().get_by(user_id)
     }
 }

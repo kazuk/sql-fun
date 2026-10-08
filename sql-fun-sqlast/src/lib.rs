@@ -33,7 +33,7 @@ pub use self::sqlite::{SqliteDialect, SqliteLexer, SqliteToken};
 use std::{io::SeekFrom, path::Path, string::String as StdString};
 
 use crate::{
-    sem::{BaseParseContext, ParseContext, SchemaFileContext, SemAst},
+    sem::{FrozenBaseContext, ParseContext, SchemaFileContext, SemAst},
     syn::ParseResult,
 };
 
@@ -85,19 +85,21 @@ impl PostgresDialect {
         Ok(tokens.into())
     }
 
-    /// load schema dump file
+    /// Load a schema file as an ordered layer over the supplied frozen base.
+    ///
+    /// The base and its siblings remain unchanged. Successful results retain the
+    /// file's semantic statements and recoverable problems; their frozen base
+    /// can be passed to the next file without retaining those statements.
     ///
     /// # Errors
     ///
-    /// - [`ParseDumpFileError`]
+    /// Returns [`ParseDumpFileError`] for file, syntax, or fatal analysis failures.
+    /// Earlier successfully loaded bases remain usable after a failure.
     ///
-    pub fn parse_schema_file<TContext>(
+    pub fn parse_schema_file(
         dump_file: &Path,
-        input_context: TContext,
-    ) -> Result<ParsedSchemaDump<TContext>, ParseDumpFileError>
-    where
-        TContext: BaseParseContext + std::fmt::Debug,
-    {
+        input_context: &FrozenBaseContext,
+    ) -> Result<ParsedSchemaDump, ParseDumpFileError> {
         let sql_statements = read_sql_file(dump_file)?;
 
         let statements = self::parse_statements::split_postgres_statements(&sql_statements)?;
@@ -112,7 +114,7 @@ impl PostgresDialect {
             sem_results.push(sem);
             context = rcontext;
         }
-        Ok(ParsedSchemaDump::new(sem_results, context))
+        Ok(context.into_parsed(sem_results))
     }
 }
 

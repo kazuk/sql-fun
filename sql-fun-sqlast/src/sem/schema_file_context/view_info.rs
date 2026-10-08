@@ -7,7 +7,7 @@ use crate::{
     syn::ObjectType,
 };
 
-use super::SchemaFileContext;
+use super::{SchemaCatalog, SchemaFileContext};
 
 #[derive(Debug, Default)]
 pub struct ViewInformationCollection(TrieMap<ViewLike>);
@@ -22,10 +22,7 @@ impl ViewInformationCollection {
     }
 }
 
-impl<TBaseContext> ViewInfoRead for SchemaFileContext<TBaseContext>
-where
-    TBaseContext: BaseParseContext + std::fmt::Debug,
-{
+impl ViewInfoRead for SchemaCatalog {
     fn get_view_impl(&self, key: &FullName) -> Option<&ViewLike> {
         if let Some(v) = self.views.get(key) {
             Some(v)
@@ -35,10 +32,7 @@ where
     }
 }
 
-impl<TBaseContext> ViewInfoWrite for SchemaFileContext<TBaseContext>
-where
-    TBaseContext: BaseParseContext + std::fmt::Debug,
-{
+impl ViewInfoWrite for SchemaFileContext {
     #[tracing::instrument(skip(self))]
     fn apply_alter_view(mut self, alter_view: &AlterView) -> Result<Self, AnalysisError>
     where
@@ -51,7 +45,7 @@ where
         };
 
         view.apply_alter(alter_view)?;
-        self.views.insert(view_name.full_name(), &view);
+        self.catalog.views.insert(view_name.full_name(), &view);
         Ok(self)
     }
 
@@ -62,7 +56,9 @@ where
         let name = create_table_as.name();
         match create_table_as.obj_type() {
             ObjectType::ObjectMatview => {
-                self.views.insert(name, &ViewLike::from(create_table_as));
+                self.catalog
+                    .views
+                    .insert(name, &ViewLike::from(create_table_as));
                 Ok(self)
             }
             _ => {
@@ -74,7 +70,9 @@ where
     #[tracing::instrument(skip(self))]
     fn apply_create_view(mut self, create_view: &CreateView) -> Result<Self, AnalysisError> {
         let name = create_view.name();
-        self.views.insert(name, &ViewLike::from(create_view));
+        self.catalog
+            .views
+            .insert(name, &ViewLike::from(create_view));
         Ok(self)
     }
 }

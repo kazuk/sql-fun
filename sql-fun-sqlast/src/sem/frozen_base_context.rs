@@ -99,7 +99,7 @@ macro_rules! forward_catalog_reads {
                 source: &crate::sem::TypeReference,
                 target: &crate::sem::TypeReference,
             ) -> Option<crate::sem::CastDefinition> {
-                self.$catalog().get_explicit_cast(source, target)
+                crate::sem::CastInfoRead::get_explicit_cast(self.$catalog(), source, target)
             }
 
             fn get_implicit_cast(
@@ -107,14 +107,14 @@ macro_rules! forward_catalog_reads {
                 source: &crate::sem::TypeReference,
                 target: &crate::sem::TypeReference,
             ) -> Option<crate::sem::CastDefinition> {
-                self.$catalog().get_implicit_cast(source, target)
+                crate::sem::CastInfoRead::get_implicit_cast(self.$catalog(), source, target)
             }
 
             fn get_implicit_castable(
                 &self,
                 source: &crate::sem::TypeReference,
             ) -> std::collections::HashSet<crate::sem::TypeReference> {
-                self.$catalog().get_implicit_castable(source)
+                crate::sem::CastInfoRead::get_implicit_castable(self.$catalog(), source)
             }
         }
 
@@ -123,13 +123,13 @@ macro_rules! forward_catalog_reads {
                 &self,
                 name: &crate::sem::FullName,
             ) -> Option<crate::sem::FunctionOverloadCollection> {
-                self.$catalog().get_function_impl(name)
+                crate::sem::FunctionInfoRead::get_function_impl(self.$catalog(), name)
             }
         }
 
         impl crate::sem::IndexInfoRead for $context {
             fn get_index(&self, name: &str) -> Option<&crate::sem::CreateIndex> {
-                self.$catalog().get_index(name)
+                crate::sem::IndexInfoRead::get_index(self.$catalog(), name)
             }
         }
 
@@ -140,7 +140,7 @@ macro_rules! forward_catalog_reads {
                 left: bool,
                 right: bool,
             ) -> Option<&crate::sem::OperatorDefinition> {
-                self.$catalog().get_operator_op(name, left, right)
+                crate::sem::OperatorInfoRead::get_operator_op(self.$catalog(), name, left, right)
             }
         }
 
@@ -149,7 +149,7 @@ macro_rules! forward_catalog_reads {
                 &self,
                 name: &crate::sem::FullName,
             ) -> Option<&crate::sem::CreateSequence> {
-                self.$catalog().get_sequence_impl(name)
+                crate::sem::SequenceInfoRead::get_sequence_impl(self.$catalog(), name)
             }
         }
 
@@ -158,49 +158,51 @@ macro_rules! forward_catalog_reads {
                 &self,
                 name: &crate::sem::FullName,
             ) -> Option<&crate::sem::CreateTable> {
-                self.$catalog().get_table_impl(name)
+                crate::sem::TableInfoRead::get_table_impl(self.$catalog(), name)
             }
         }
 
         impl crate::sem::ViewInfoRead for $context {
             fn get_view_impl(&self, name: &crate::sem::FullName) -> Option<&crate::sem::ViewLike> {
-                self.$catalog().get_view_impl(name)
+                crate::sem::ViewInfoRead::get_view_impl(self.$catalog(), name)
             }
         }
 
         impl crate::sem::SearchPathRead for $context {
             fn get_search_path(&self) -> &[crate::sem::SchemaName] {
-                self.$catalog().get_search_path()
+                crate::sem::SearchPathRead::get_search_path(self.$catalog())
             }
 
             fn get_default_schema(&self) -> Option<crate::sem::SchemaName> {
-                self.$catalog().get_default_schema()
+                crate::sem::SearchPathRead::get_default_schema(self.$catalog())
             }
         }
 
         impl crate::sem::GetSourcePathWithSpanOpt for $context {
             fn get_source_path_with_span(&self) -> Option<&crate::sem::SourcePathWithSpan> {
-                self.$catalog().get_source_path_with_span()
+                crate::sem::GetSourcePathWithSpanOpt::get_source_path_with_span(self.$catalog())
             }
         }
 
         impl crate::sem::BaseParseContext for $context {
             fn metadata(&self) -> &::sql_fun_core::SqlFunMetadata {
-                self.$catalog().metadata()
+                crate::sem::BaseParseContext::metadata(self.$catalog())
             }
 
             fn get_args(&self) -> &::sql_fun_core::SqlFunArgs {
-                self.$catalog().get_args()
+                crate::sem::BaseParseContext::get_args(self.$catalog())
             }
 
             fn get_source_file_path(&self) -> Option<&std::path::Path> {
-                self.$catalog().get_source_file_path()
+                crate::sem::BaseParseContext::get_source_file_path(self.$catalog())
             }
         }
     };
 }
 
 forward_catalog_reads!(FrozenBaseContext, catalog);
+forward_catalog_reads!(crate::sem::SchemaFileContext, catalog);
+forward_catalog_reads!(crate::ParsedSchemaDump, base_context);
 
 impl crate::sem::TypeInfoRead for FrozenBaseContext {
     fn get_type_impl(&self, name: &FullName) -> Option<&TypeDefinition> {

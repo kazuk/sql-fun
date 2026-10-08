@@ -378,6 +378,12 @@ impl FunctionInfoWrite for TestParseContext {
 }
 
 impl ParseContext for TestParseContext {
+    fn freeze(mut self) -> crate::sem::FrozenBaseContext {
+        self.problems.clear();
+        self.report_failure_after = None;
+        crate::sem::FrozenBaseContext::new(self)
+    }
+
     fn set_search_path(&mut self, search_path: &[SchemaName]) {
         self.search_path = search_path.to_vec();
     }

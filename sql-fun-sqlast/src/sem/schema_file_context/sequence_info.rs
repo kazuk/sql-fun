@@ -6,7 +6,7 @@ use crate::{
     },
 };
 
-use super::SchemaFileContext;
+use super::{SchemaCatalog, SchemaFileContext};
 
 #[derive(Debug, Default)]
 pub struct SequenceInfoCollection(TrieMap<CreateSequence>);
@@ -21,10 +21,7 @@ impl SequenceInfoCollection {
     }
 }
 
-impl<TBaseContext> SequenceInfoRead for SchemaFileContext<TBaseContext>
-where
-    TBaseContext: BaseParseContext + std::fmt::Debug,
-{
+impl SequenceInfoRead for SchemaCatalog {
     fn get_sequence_impl(&self, key: &FullName) -> Option<&CreateSequence> {
         if let Some(s) = self.sequences.get(key) {
             Some(s)
@@ -34,10 +31,7 @@ where
     }
 }
 
-impl<TBaseContext> SequenceInfoWrite for SchemaFileContext<TBaseContext>
-where
-    TBaseContext: BaseParseContext + std::fmt::Debug,
-{
+impl SequenceInfoWrite for SchemaFileContext {
     fn apply_alter_sequence(mut self, alter_seq: &AlterSequence) -> Result<Self, AnalysisError>
     where
         Self: Sized,
@@ -49,7 +43,7 @@ where
         };
 
         seq.apply_alter(alter_seq)?;
-        self.sequences.insert(seq_name, &seq);
+        self.catalog.sequences.insert(seq_name, &seq);
         Ok(self)
     }
 
@@ -58,7 +52,7 @@ where
         create_sequence: &CreateSequence,
     ) -> Result<Self, AnalysisError> {
         let name = create_sequence.name();
-        self.sequences.insert(name, create_sequence);
+        self.catalog.sequences.insert(name, create_sequence);
         Ok(self)
     }
 }

@@ -60,7 +60,8 @@ mod test_helpers {
     use std::path::Path;
 
     use crate::sem::{
-        BaseContext, BaseParseContext, MutSourcePathWithSpan, SchemaFileContext, SourcePathWithSpan,
+        BaseContext, BaseParseContext, FrozenBaseContext, MutSourcePathWithSpan, SchemaFileContext,
+        SourcePathWithSpan,
     };
     use ::sql_fun_core::{SqlFunArgs, SqlFunMetadata, SqlFunMetadataCollection};
 
@@ -76,7 +77,7 @@ mod test_helpers {
 
     pub(super) fn context(
         metadata: &SqlFunMetadata,
-    ) -> Result<SchemaFileContext<BaseContext>, Box<dyn std::error::Error>> {
+    ) -> Result<SchemaFileContext, Box<dyn std::error::Error>> {
         let args = <SqlFunArgs as ::clap::Parser>::try_parse_from([
             "sqlfun",
             "--metadata-file",
@@ -88,7 +89,8 @@ mod test_helpers {
         ])?;
         let base = BaseContext::new(&args, metadata)?;
         assert_selected_metadata(&base, metadata);
-        let mut context = SchemaFileContext::new(Path::new("query.sql"), base);
+        let mut context =
+            SchemaFileContext::new(Path::new("query.sql"), &FrozenBaseContext::from(base));
         context.set_source_path_with_span(&SourcePathWithSpan::new(
             "query.sql",
             &crate::StringSpan::default(),

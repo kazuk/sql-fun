@@ -160,6 +160,7 @@ where
 
     next_buff: Option<BufferChunk>,
     fill_result: Option<Result<DelimitedRangeWithEof, tokio::io::Error>>,
+    eof: bool,
 }
 
 impl<Source> PipeBuffer<Source>
@@ -273,6 +274,7 @@ where
                 Ok((filled, eof)) => {
                     if eof {
                         self.send_buffer(permit);
+                        self.eof = true
                     } else if let Some(delimited) = filled {
                         self.send_delimited(&delimited, permit);
                     } else if self.current_is_full() {
@@ -281,7 +283,7 @@ where
                 }
             }
         }
-        Ok(false)
+        Ok(self.eof)
     }
 
     async fn send_canceled(&mut self) -> Result<(), std::io::Error> {
@@ -358,6 +360,7 @@ where
             idle_timeout,
             fill_result: None,
             next_buff: None,
+            eof: false,
         };
         let readable_buffer = ReadableBuffer {
             buffer_rx: buf_rx,

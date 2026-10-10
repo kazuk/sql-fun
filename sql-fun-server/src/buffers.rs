@@ -1,6 +1,5 @@
 use std::{io::Read, ops::Range, sync::Arc, time::Duration};
 
-use serde::Deserialize;
 use tokio::sync::{Mutex, mpsc::Permit};
 
 pub struct BufferChunk {
@@ -106,13 +105,16 @@ pub struct ReadableBuffer {
 impl ReadableBuffer {
     fn fill_buff(&mut self) {
         if self.current_buffer.is_none() {
-            self.current_buffer = self.buffer_rx.blocking_recv();
+            tokio::task::block_in_place(|| {
+                self.current_buffer = self.buffer_rx.blocking_recv();
+            });
         }
     }
 
     fn return_buff(&mut self, mut buffer: BufferChunk) -> std::io::Result<()> {
         buffer.clear();
-        if self.return_tx.blocking_send(buffer).is_err() {
+        let send_result = tokio::task::block_in_place(|| self.return_tx.blocking_send(buffer));
+        if send_result.is_err() {
             return Err(std::io::Error::other("sender closed"));
         }
         Ok(())
@@ -282,6 +284,19 @@ where
         Ok(false)
     }
 
+    async fn send_canceled(&mut self) -> Result<(), std::io::Error> {
+        let permit = self
+            .buffer_tx
+            .reserve()
+            .await
+            .map_err(|_| std::io::Error::other("No receiver"))?;
+        permit.send(Err(std::io::Error::new(
+            std::io::ErrorKind::ConnectionAborted,
+            "operation canceled",
+        )));
+        Ok(())
+    }
+
     const fn set_request_length_limit(&mut self, new_limit: usize) {
         self.limit_length = new_limit;
     }
@@ -306,7 +321,7 @@ pub struct JsonLinesStreamReader<AR>
 where
     AR: tokio::io::AsyncRead + tokio::io::AsyncReadExt + std::marker::Unpin + Send + Sync,
 {
-    readable_buffer: ReadableBuffer,
+    readable_buffer: Arc<std::sync::Mutex<ReadableBuffer>>,
     pipe_buf: Arc<Mutex<PipeBuffer<AR>>>,
 }
 
@@ -351,7 +366,7 @@ where
         };
 
         Ok(Self {
-            readable_buffer,
+            readable_buffer: Arc::new(std::sync::Mutex::new(readable_buffer)),
             pipe_buf: Arc::new(Mutex::new(pipe_buf)),
         })
     }
@@ -363,8 +378,8 @@ where
 
     pub async fn read_request(&mut self) -> Result<serde_json::Value, ReaderError> {
         let pipe_buf = self.pipe_buf.clone();
-        let readable_buffer = &mut self.readable_buffer;
         let (stop_tx, mut stop_rx) = tokio::sync::oneshot::channel::<()>();
+        let (cancel_tx, mut cancel_rx) = tokio::sync::oneshot::channel::<()>();
 
         let poller = tokio::spawn(async move {
             let mut pipe_buf = pipe_buf.lock().await;
@@ -379,36 +394,55 @@ where
                             }
                         }
                     }
+                    Ok(()) = &mut cancel_rx => {
+                        pipe_buf.send_canceled().await?;
+                        return Ok(false)
+                    }
                     _ = &mut stop_rx => return Ok(false),
                 }
             }
         });
+        let readable_buffer = self.readable_buffer.clone();
 
-        let value = tokio::task::block_in_place(|| -> Result<serde_json::Value, ReaderError> {
-            let mut deserializer = serde_json::Deserializer::from_reader(&mut *readable_buffer);
-            let value = serde_json::Value::deserialize(&mut deserializer)?;
-            let mut buf = [0u8; 1];
-            loop {
-                readable_buffer.read_exact(&mut buf)?;
-                if buf[0] == b' ' || buf[0] == b'\t' || buf[0] == b'\r' {
-                    continue;
+        let join_handle =
+            tokio::task::spawn_blocking(move || -> Result<serde_json::Value, ReaderError> {
+                use serde::Deserialize;
+
+                let mut readable_buffer = readable_buffer.lock().unwrap();
+                let mut deserializer = serde_json::Deserializer::from_reader(&mut *readable_buffer);
+                let value = serde_json::Value::deserialize(&mut deserializer)?;
+                let mut buf = [0u8; 1];
+                loop {
+                    readable_buffer.read_exact(&mut buf)?;
+                    if buf[0] == b' ' || buf[0] == b'\t' || buf[0] == b'\r' {
+                        continue;
+                    }
+                    break;
                 }
-                break;
-            }
-            if buf[0] == b'\n' {
-                Ok(value)
-            } else {
-                Err(
-                    std::io::Error::new(std::io::ErrorKind::InvalidInput, "require new line")
-                        .into(),
-                )
-            }
+                if buf[0] == b'\n' {
+                    Ok(value)
+                } else {
+                    Err(
+                        std::io::Error::new(std::io::ErrorKind::InvalidInput, "require new line")
+                            .into(),
+                    )
+                }
+            });
+
+        let cancel_guard = scopeguard::guard(cancel_tx, |tx| {
+            let _ = tx.send(());
         });
+
+        let value = join_handle.await;
+        let cancel_tx = scopeguard::ScopeGuard::into_inner(cancel_guard);
+        drop(cancel_tx);
+
         let _ = stop_tx.send(());
+
         let poller_result = poller.await?;
         poller_result?;
 
-        value
+        value?
     }
 }
 
@@ -429,10 +463,10 @@ mod read_request_test {
     #[case(6)]
     async fn test_read_request(#[case] count: usize) -> TestResult {
         let input_item = r#"{"field":"value"}"#;
-        let inputs = vec![input_item];
+        let inputs = [input_item];
         let inputs = inputs.repeat(count);
         let mut input = inputs.join("\n");
-        input.push_str("\n");
+        input.push('\n');
 
         let cursor = Cursor::new(input);
         let mut reader =
@@ -452,15 +486,15 @@ mod read_request_test {
     #[tokio::test(flavor = "multi_thread")]
     async fn test_big_json_input() -> TestResult {
         let input_json = include_str!("../../sql-fun-home/postgres/17/pg_type.json");
-        let mut input_json = input_json.replace("\n", " ");
-        input_json.push_str("\n");
+        let mut input_json = input_json.replace('\n', " ");
+        input_json.push('\n');
         let cursor = Cursor::new(input_json);
         let mut reader = JsonLinesStreamReader::new_async(
             cursor,
             4,
             512,
             b'\n',
-            100000000,
+            100_000_000,
             Duration::from_secs(30),
         )
         .await?;

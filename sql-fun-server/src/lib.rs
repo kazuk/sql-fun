@@ -247,9 +247,15 @@ async fn serve_client(args: &Args, stream: TcpStream, addr: SocketAddr) -> Resul
     )
     .await?;
     let auth_timeout = Duration::from_secs(args.auth_timeout);
-    let request = tokio::time::timeout(auth_timeout, request_reader.read_request())
-        .await
-        .map_err(|_| ServerError::authentication_timeout())??;
+    let request = tokio::time::timeout(auth_timeout, request_reader.read_request()).await;
+    let Ok(request) = request else {
+        tracing::warn!("authentication failed: first request is not initialize : source = {addr}");
+        return Err(ServerError::authentication_timeout());
+    };
+    let Ok(request) = request else {
+        tracing::warn!("authentication failed: request not acceptable");
+        return Err(ServerError::authentication_failed_generic_err());
+    };
 
     let request_message: JsonRpcRequest = serde_json::from_value(request)?;
     if request_message.method() != "initialize" {
@@ -328,6 +334,8 @@ pub enum AuthenticationFailed {
     ProtocolFailed,
     /// invalid token
     InvalidToken,
+    /// request receive error
+    RequestReceive,
 }
 
 impl std::fmt::Display for AuthenticationFailed {
@@ -336,6 +344,7 @@ impl std::fmt::Display for AuthenticationFailed {
             Self::Timeout => f.write_str("timeout"),
             Self::ProtocolFailed => f.write_str("protocol failed"),
             Self::InvalidToken => f.write_str("invalid token"),
+            Self::RequestReceive => f.write_str("server can not receive request (IO or JSON)"),
         }
     }
 }
@@ -343,6 +352,10 @@ impl std::fmt::Display for AuthenticationFailed {
 impl ServerError {
     const fn authentication_timeout() -> Self {
         Self::AuthenticationFailed(AuthenticationFailed::Timeout)
+    }
+
+    const fn authentication_failed_generic_err() -> Self {
+        Self::AuthenticationFailed(AuthenticationFailed::RequestReceive)
     }
 
     const fn raise_authentication_failed_non_initialize() -> Result<(), Self> {

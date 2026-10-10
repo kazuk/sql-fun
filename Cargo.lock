@@ -3041,6 +3041,7 @@ dependencies = [
  "indexmap",
  "rand",
  "rstest",
+ "scopeguard",
  "serde",
  "serde_json",
  "sql-fun-core",

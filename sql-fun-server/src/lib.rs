@@ -11,6 +11,8 @@ mod json_rpc;
 mod pending_future;
 mod pid_file;
 
+use crate::buffers::JsonLinesStreamReader;
+
 pub use self::{
     buffers::{PipeBuffer, ReadableBuffer},
     cache::{Cache, Loader},
@@ -30,14 +32,15 @@ use ::sql_fun_sqlast::{
 };
 use clap::Parser;
 use pid_file::PidFile;
+use serde_json::json;
 use sql_fun_server_api::{
     AnalyzeQueryArgs, AnalyzeQueryResponse, Collection, DescribeTableArgs, DescribeTableResponse,
     InitializeSchemaArgs, ListObjectArgs, ObjectSummary, ReadCollectionArgs, ReleaseCollectionArgs,
     SchemaContext, SqlFunServerApi, SqlFunServerApiError,
 };
-use std::{convert::Into, net::SocketAddr, sync::LazyLock};
+use std::{convert::Into, net::SocketAddr, sync::LazyLock, time::Duration};
 use tokio::{
-    io::{AsyncBufReadExt, AsyncWriteExt},
+    io::AsyncWriteExt,
     net::{TcpListener, TcpStream},
 };
 
@@ -46,6 +49,18 @@ use tokio::{
 pub struct Args {
     #[arg(short, long, env = "USER")]
     user: String,
+
+    #[arg(short, long, env = "REQUEST_LENGTH_LIMIT", default_value_t=2*1024*1024)]
+    request_length_limit: usize,
+
+    #[arg(short, long, env = "IDLE_TIMEOUT", default_value_t = 30)]
+    idle_timeout: u64,
+
+    #[arg(short, long, env = "AUTH_TIMEOUT", default_value_t = 5)]
+    auth_timeout: u64,
+
+    #[arg(skip)]
+    token: String,
 }
 
 /// Run the server event loop until interrupted.
@@ -54,22 +69,24 @@ pub struct Args {
 ///
 /// Returns [`ServerError`] when binding or accepting sockets fails.
 pub async fn service() -> Result<(), ServerError> {
-    let args = Args::parse();
+    let mut args = Args::parse();
 
     let listener = TcpListener::bind("127.0.0.1:0").await?;
 
     let local_addr = listener.local_addr()?;
     let port = local_addr.port();
-    let Some(_pid_file) = PidFile::try_register_primary_server(&args, port)? else {
+    let Some(pid_file) = PidFile::try_register_primary_server(&args, port)? else {
         return Ok(());
     };
+    args.token = pid_file.token().to_owned();
 
     loop {
         eprintln!("Server started at {local_addr}");
 
         let (accepted_socker, remote_addr) = listener.accept().await?;
+        let args = args.clone();
 
-        tokio::task::spawn(async move { serve_client(accepted_socker, remote_addr).await });
+        tokio::task::spawn(async move { serve_client(&args, accepted_socker, remote_addr).await });
     }
 }
 
@@ -217,15 +234,54 @@ pub async fn process_request(
     }
 }
 
-async fn serve_client(stream: TcpStream, addr: SocketAddr) -> Result<(), ServerError> {
+async fn serve_client(args: &Args, stream: TcpStream, addr: SocketAddr) -> Result<(), ServerError> {
     let (read_half, mut write_half) = stream.into_split();
-    let mut buf_read = tokio::io::BufReader::new(read_half);
+
+    let mut request_reader = JsonLinesStreamReader::new_async(
+        read_half,
+        8,
+        8192,
+        b'\n',
+        1024,
+        Duration::from_secs(args.idle_timeout),
+    )
+    .await?;
+    let auth_timeout = Duration::from_secs(args.auth_timeout);
+    let request = tokio::time::timeout(auth_timeout, request_reader.read_request())
+        .await
+        .map_err(|_| ServerError::authentication_timeout())??;
+
+    let request_message: JsonRpcRequest = serde_json::from_value(request)?;
+    if request_message.method() != "initialize" {
+        tracing::warn!("authentication failed: first request is not initialize : source = {addr}");
+        return ServerError::raise_authentication_failed_non_initialize();
+    }
+    if let Some(params) = request_message.params()
+        && let Some(token_node) = params.get("sql_fun_token")
+        && let Some(token) = token_node.as_str()
+    {
+        if args.token != token {
+            tracing::warn!("authentication failed: invalid token : source = {addr} ");
+            return ServerError::raise_authentication_failed_invalid_token();
+        }
+    } else {
+        tracing::warn!("authentication failed: invalid token : source = {addr} ");
+        return ServerError::raise_authentication_failed_invalid_token();
+    }
+
+    let response = JsonRpcResponse::success(&request_message, json!("OK"));
+    let mut response_json = serde_json::to_string(&response)?;
+    response_json.push('\n');
+    write_half.write_all(response_json.as_bytes()).await?;
+
+    request_reader
+        .set_request_length_limit(args.request_length_limit)
+        .await;
 
     loop {
-        let mut line = String::new();
-        buf_read.read_line(&mut line).await?;
-        tracing::info!("{addr}: received {line}");
-        let request_message: JsonRpcRequest = serde_json::from_str(&line)?;
+        let request = request_reader.read_request().await?;
+        let request_message: JsonRpcRequest = serde_json::from_value(request)?;
+
         let response = process_request(&request_message).await;
         let response = match response {
             Ok(result) => JsonRpcResponse::success(&request_message, result),
@@ -253,4 +309,51 @@ pub enum ServerError {
     /// unexpected BUG
     #[error("logic bug {0}")]
     Bug(String),
+
+    /// reader error
+    #[error(transparent)]
+    Reader(#[from] crate::buffers::ReaderError),
+
+    /// authentication failed
+    #[error("Authentication Failed: {0}")]
+    AuthenticationFailed(AuthenticationFailed),
+}
+
+/// reason for authentication failed
+#[derive(Debug)]
+pub enum AuthenticationFailed {
+    /// timeout
+    Timeout,
+    /// protocol failed
+    ProtocolFailed,
+    /// invalid token
+    InvalidToken,
+}
+
+impl std::fmt::Display for AuthenticationFailed {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        match self {
+            Self::Timeout => f.write_str("timeout"),
+            Self::ProtocolFailed => f.write_str("protocol failed"),
+            Self::InvalidToken => f.write_str("invalid token"),
+        }
+    }
+}
+
+impl ServerError {
+    const fn authentication_timeout() -> Self {
+        Self::AuthenticationFailed(AuthenticationFailed::Timeout)
+    }
+
+    const fn raise_authentication_failed_non_initialize() -> Result<(), Self> {
+        Err(Self::AuthenticationFailed(
+            AuthenticationFailed::ProtocolFailed,
+        ))
+    }
+
+    const fn raise_authentication_failed_invalid_token() -> Result<(), Self> {
+        Err(Self::AuthenticationFailed(
+            AuthenticationFailed::InvalidToken,
+        ))
+    }
 }

@@ -31,6 +31,6 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
         .build();
     let client = ::sql_fun_client::connect(&options).await?;
     println!("Authenticated server at {}", client.peer_addr()?);
-    drop(client);
+    client.finish().await?;
     Ok(())
 }

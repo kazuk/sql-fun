@@ -34,7 +34,7 @@ pub enum JsonRpcClientError {
 }
 
 /// JSON RPC Protocol error
-#[derive(Debug, thiserror::Error, serde::Deserialize)]
+#[derive(Debug, thiserror::Error, serde::Deserialize, serde::Serialize)]
 pub struct JsonRpcError {
     code: i32,
     message: String,
@@ -62,9 +62,8 @@ pub struct JsonRpcRequest {
 }
 
 /// JSON RPC response
-#[derive(Debug, serde::Deserialize)]
+#[derive(Debug, serde::Deserialize, serde::Serialize)]
 pub struct JsonRpcResponse {
-    #[expect(dead_code)]
     jsonrpc: JsonRpcVersion,
     id: u64,
     #[serde(flatten)]
@@ -72,7 +71,7 @@ pub struct JsonRpcResponse {
 }
 
 /// JSON RPC Response body
-#[derive(Debug, serde::Deserialize)]
+#[derive(Debug, serde::Deserialize, serde::Serialize)]
 #[serde(rename_all = "snake_case")]
 pub enum JsonRpcResponseBody {
     /// normal response
@@ -82,7 +81,36 @@ pub enum JsonRpcResponseBody {
     Error(JsonRpcError),
 }
 
+impl JsonRpcResponse {
+    /// Internally allocated request ID.
+    pub const fn id(&self) -> u64 {
+        self.id
+    }
+
+    /// Consume the response as an API result or server error.
+    ///
+    /// # Errors
+    /// Returns the JSON-RPC error supplied by the server.
+    pub fn into_result(self) -> Result<serde_json::Value, JsonRpcError> {
+        self.body.into_result()
+    }
+
+    fn trace_received(&self) {
+        if let Some(code) = self.body.error_code() {
+            ::tracing::info!(request_id = self.id, error_code = code, "response received");
+        } else {
+            ::tracing::info!(request_id = self.id, "response received");
+        }
+    }
+}
+
 impl JsonRpcResponseBody {
+    fn error_code(&self) -> Option<i32> {
+        match self {
+            Self::Response(_) => None,
+            Self::Error(error) => Some(error.code),
+        }
+    }
     fn into_result(self) -> Result<serde_json::Value, JsonRpcError> {
         match self {
             Self::Response(value) => Ok(value),

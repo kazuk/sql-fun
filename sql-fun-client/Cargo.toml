@@ -22,12 +22,14 @@ serde_json.workspace = true
 sql-fun-server-api.workspace = true
 thiserror.workspace = true
 tokio.workspace = true
+tracing.workspace = true
 
 [dev-dependencies]
 clap.workspace = true
 rstest.workspace = true
 tempfile.workspace = true
 testresult.workspace = true
+tracing-subscriber.workspace = true
 
 [[test]]
 name = "lifecycle"

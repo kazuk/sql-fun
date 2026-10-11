@@ -80,11 +80,52 @@ window can fail with a malformed-record error. This is an accepted MVP limitatio
 it does not prevent normal launch, authentication or reuse once writing completes.
 
 The async low-level `try_from` wraps a socket without authentication; use `connect`
-for the authenticated lifecycle. `invoke_method` accepts JSON object parameters
-and bounds response frames to 2 MiB. Calls after initialization have no implicit
-time deadline; callers can use `tokio::time::timeout`. Cancellation or a
-transport/protocol failure closes the socket to prevent a partial exchange from
-corrupting later calls.
+for the authenticated lifecycle. `invoke_method` accepts protocol-compatible JSON
+parameters and an asynchronous callback receiving a `JsonRpcResponse`. Submission
+returns when the client accepts the request, before its response arrives. The
+client allocates IDs and matches responses to callbacks, including responses
+arriving out of order. Valid JSON-RPC error responses are delivered to callbacks.
+Use `response.into_result()` to handle server errors or serialize the response
+with Serde to retain its JSON-RPC envelope and ID.
+
+```rust,no_run
+# async fn example(mut client: sql_fun_client::TcpJsonRpcClientAsync) -> Result<(), Box<dyn std::error::Error>> {
+client.invoke_method("rpc.discover", &serde_json::json!({}), |response| async move {
+    // Handle application failures here; the client cannot receive callback errors.
+    match response.into_result() {
+        Ok(value) => println!("{value}"),
+        Err(error) => eprintln!("{error}"),
+    }
+    Ok(())
+}).await?;
+client.finish().await?;
+# Ok(())
+# }
+```
+
+Callbacks own their responses, must be `Send + 'static`, and return
+`Result<(), Infallible>`. Up to 32 accepted requests can remain unfinished,
+including callbacks still running. Further submissions wait for capacity.
+Callbacks must not wait for additional submissions to the same saturated client.
+Callback order is unspecified, so applications needing serialized output should
+coordinate it themselves. Application output/storage errors are handled inside
+the callback; the client does not collect or report them.
+
+`finish(self)` flushes accepted requests, half-closes TCP writes, drains responses
+through EOF, and waits for callback completion. EOF with missing responses is an
+error. Transport/protocol failures also surface through subsequent submissions
+and completion. `wait_for_failure()` permits observing terminal failure while
+waiting for further application input. Ordinary response frames are bounded to
+2 MiB; calls after initialization have no implicit deadline. Callers can apply
+`tokio::time::timeout`. Cancelling submission before acceptance leaves no pending
+request; dropping the client or cancelling `finish` closes its socket/tasks.
+Neither completion nor drop stops the shared server.
+
+The client emits `tracing` INFO events after a request is written (`request_id`,
+`method`) and when a response is received (`request_id`, and `error_code` for
+JSON-RPC error responses). Response events omit `method`. Parameters, payloads,
+and authentication tokens are never recorded by the client. The consuming
+application installs/configures its own tracing subscriber.
 
 Integration tests run in the standard workspace nextest suite. Their heavy
 fixtures prebuild the actual server in the dev profile with matching

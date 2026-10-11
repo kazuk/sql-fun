@@ -252,7 +252,7 @@ async fn serve_client(args: &Args, stream: TcpStream, addr: SocketAddr) -> Resul
         tracing::warn!("authentication failed: first request is not initialize : source = {addr}");
         return Err(ServerError::authentication_timeout());
     };
-    let Ok(request) = request else {
+    let Ok(Some(request)) = request else {
         tracing::warn!("authentication failed: request not acceptable");
         return Err(ServerError::authentication_failed_generic_err());
     };
@@ -284,8 +284,7 @@ async fn serve_client(args: &Args, stream: TcpStream, addr: SocketAddr) -> Resul
         .set_request_length_limit(args.request_length_limit)
         .await;
 
-    loop {
-        let request = request_reader.read_request().await?;
+    while let Some(request) = request_reader.read_request().await? {
         let request_message: JsonRpcRequest = serde_json::from_value(request)?;
 
         let response = process_request(&request_message).await;
@@ -299,6 +298,9 @@ async fn serve_client(args: &Args, stream: TcpStream, addr: SocketAddr) -> Resul
         tracing::info!("{addr}: sending {response_json}");
         write_half.write_all(response_json.as_bytes()).await?;
     }
+    write_half.flush().await?;
+    write_half.shutdown().await?;
+    Ok(())
 }
 
 /// server error

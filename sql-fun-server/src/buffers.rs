@@ -6,6 +6,7 @@ pub struct BufferChunk {
     chunk: Box<[u8]>,
     filled: Range<usize>,
     delimited: Option<Range<usize>>,
+    eof: bool,
 }
 
 type DelimitedRangeWithEof = (Option<Range<usize>>, bool);
@@ -17,12 +18,14 @@ impl BufferChunk {
             chunk: vec.into_boxed_slice(),
             filled: 0..0,
             delimited: None,
+            eof: false,
         }
     }
 
     const fn clear(&mut self) {
         self.filled = 0..0;
         self.delimited = None;
+        self.eof = false;
     }
 
     fn filled(&self) -> &[u8] {
@@ -46,6 +49,7 @@ impl BufferChunk {
                 std::io::Error::new(std::io::ErrorKind::TimedOut, "receive idle timeout")
             })??;
         let eof = size == 0;
+        self.eof = eof;
 
         let read_slice = &self.chunk[current_end..current_end + size];
         if let Some(delimiter_pos) = read_slice.iter().position(|b| *b == delimiter) {
@@ -100,6 +104,7 @@ pub struct ReadableBuffer {
     buffer_rx: tokio::sync::mpsc::Receiver<Result<BufferChunk, std::io::Error>>,
     return_tx: tokio::sync::mpsc::Sender<BufferChunk>,
     current_buffer: Option<Result<BufferChunk, std::io::Error>>,
+    eof: bool,
 }
 
 impl ReadableBuffer {
@@ -123,6 +128,9 @@ impl ReadableBuffer {
 
 impl std::io::Read for ReadableBuffer {
     fn read(&mut self, buf: &mut [u8]) -> std::io::Result<usize> {
+        if self.eof || buf.is_empty() {
+            return Ok(0);
+        }
         self.fill_buff();
 
         let Some(current_buff) = self.current_buffer.take() else {
@@ -132,6 +140,7 @@ impl std::io::Read for ReadableBuffer {
             Ok(mut current_buff) => {
                 let len = current_buff.take_filled(buf);
                 if current_buff.is_empty() {
+                    self.eof = current_buff.eof;
                     self.return_buff(current_buff)?;
                 } else {
                     self.current_buffer = Some(Ok(current_buff));
@@ -246,6 +255,9 @@ where
     /// when logic Bug
     ///
     pub async fn poll_source(&mut self) -> Result<bool, std::io::Error> {
+        if self.eof {
+            return Ok(true);
+        }
         self.reserve_next_buff().await?;
         if self.current_buff.is_none() {
             self.current_buff = self.next_buff.take();
@@ -366,6 +378,7 @@ where
             buffer_rx: buf_rx,
             return_tx: ret_tx,
             current_buffer: None,
+            eof: false,
         };
 
         Ok(Self {
@@ -379,7 +392,7 @@ where
         pipe_buf.set_request_length_limit(new_limit);
     }
 
-    pub async fn read_request(&mut self) -> Result<serde_json::Value, ReaderError> {
+    pub async fn read_request(&mut self) -> Result<Option<serde_json::Value>, ReaderError> {
         let pipe_buf = self.pipe_buf.clone();
         let (stop_tx, mut stop_rx) = tokio::sync::oneshot::channel::<()>();
         let (cancel_tx, mut cancel_rx) = tokio::sync::oneshot::channel::<()>();
@@ -397,8 +410,10 @@ where
                             }
                         }
                     }
-                    Ok(()) = &mut cancel_rx => {
-                        pipe_buf.send_canceled().await?;
+                    cancellation = &mut cancel_rx => {
+                        if cancellation.is_ok() {
+                            pipe_buf.send_canceled().await?;
+                        }
                         return Ok(false)
                     }
                     _ = &mut stop_rx => return Ok(false),
@@ -407,13 +422,15 @@ where
         });
         let readable_buffer = self.readable_buffer.clone();
 
-        let join_handle =
-            tokio::task::spawn_blocking(move || -> Result<serde_json::Value, ReaderError> {
-                use serde::Deserialize;
-
+        let join_handle = tokio::task::spawn_blocking(
+            move || -> Result<Option<serde_json::Value>, ReaderError> {
                 let mut readable_buffer = readable_buffer.lock().unwrap();
-                let mut deserializer = serde_json::Deserializer::from_reader(&mut *readable_buffer);
-                let value = serde_json::Value::deserialize(&mut deserializer)?;
+                let mut values = ::serde_json::Deserializer::from_reader(&mut *readable_buffer)
+                    .into_iter::<::serde_json::Value>();
+                let Some(value) = values.next() else {
+                    return Ok(None);
+                };
+                let value = value?;
                 let mut buf = [0u8; 1];
                 loop {
                     readable_buffer.read_exact(&mut buf)?;
@@ -423,14 +440,15 @@ where
                     break;
                 }
                 if buf[0] == b'\n' {
-                    Ok(value)
+                    Ok(Some(value))
                 } else {
                     Err(
                         std::io::Error::new(std::io::ErrorKind::InvalidInput, "require new line")
                             .into(),
                     )
                 }
-            });
+            },
+        );
 
         let cancel_guard = scopeguard::guard(cancel_tx, |tx| {
             let _ = tx.send(());
@@ -446,6 +464,61 @@ where
         poller_result?;
 
         value?
+    }
+}
+
+#[cfg(test)]
+mod eof_tests {
+    #[rstest::rstest]
+    #[case::empty("", 0)]
+    #[case::one("{}\n", 1)]
+    #[case::buffered("{}\n{}\n{}\n", 3)]
+    #[tokio::test(flavor = "multi_thread")]
+    async fn complete_frames_then_persistent_eof(
+        #[case] input: &str,
+        #[case] count: usize,
+    ) -> ::testresult::TestResult {
+        let mut reader = super::JsonLinesStreamReader::new_async(
+            std::io::Cursor::new(input.to_owned()),
+            3,
+            128,
+            b'\n',
+            1024,
+            std::time::Duration::from_secs(1),
+        )
+        .await?;
+        ::tokio::time::timeout(std::time::Duration::from_secs(5), async {
+            for _ in 0..count {
+                assert!(reader.read_request().await?.is_some());
+            }
+            assert!(reader.read_request().await?.is_none());
+            assert!(reader.read_request().await?.is_none());
+            ::testresult::TestResult::Ok(())
+        })
+        .await??;
+        Ok(())
+    }
+
+    #[rstest::rstest]
+    #[case::partial(r#"{"field":"#)]
+    #[case::missing_newline("{}")]
+    #[tokio::test(flavor = "multi_thread")]
+    async fn truncated_frame_remains_error(#[case] input: &str) -> ::testresult::TestResult {
+        let mut reader = super::JsonLinesStreamReader::new_async(
+            std::io::Cursor::new(input.to_owned()),
+            3,
+            128,
+            b'\n',
+            1024,
+            std::time::Duration::from_secs(1),
+        )
+        .await?;
+        assert!(
+            ::tokio::time::timeout(std::time::Duration::from_secs(5), reader.read_request())
+                .await?
+                .is_err()
+        );
+        Ok(())
     }
 }
 
@@ -478,7 +551,8 @@ mod read_request_test {
 
         for _n in 0..count {
             let value = reader.read_request().await?;
-            let obj = value.as_object().unwrap();
+            let obj = value.expect("request");
+            let obj = obj.as_object().unwrap();
 
             assert_eq!(obj.get("field"), Some(&serde_json::json! {"value"}));
         }

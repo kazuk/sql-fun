@@ -286,7 +286,7 @@ where
                 Ok((filled, eof)) => {
                     if eof {
                         self.send_buffer(permit);
-                        self.eof = true
+                        self.eof = true;
                     } else if let Some(delimited) = filled {
                         self.send_delimited(&delimited, permit);
                     } else if self.current_is_full() {

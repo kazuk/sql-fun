@@ -104,7 +104,10 @@ impl TcpJsonRpcClientAsync {
         Fut: std::future::Future<Output = Result<(), std::convert::Infallible>> + Send + 'static,
     {
         self.start_streaming()?;
-        let streaming = self.streaming.as_ref().expect("streaming started");
+        let streaming = self
+            .streaming
+            .as_ref()
+            .ok_or_else(|| std::io::Error::other("connection closed"))?;
         let permit = streaming
             .capacity
             .clone()
@@ -121,7 +124,7 @@ impl TcpJsonRpcClientAsync {
         streaming
             .sender
             .as_ref()
-            .expect("submission open")
+            .ok_or_else(|| streaming.error())?
             .send(Submission {
                 id: self.id,
                 method: method.to_owned(),
@@ -141,7 +144,10 @@ impl TcpJsonRpcClientAsync {
     /// Returns the observed transport/protocol failure or connection closure.
     pub async fn wait_for_failure(&mut self) -> Result<(), TcpJsonRpcClientAsyncError> {
         self.start_streaming()?;
-        let streaming = self.streaming.as_ref().expect("streaming started");
+        let streaming = self
+            .streaming
+            .as_ref()
+            .ok_or_else(|| std::io::Error::other("connection closed"))?;
         let mut status = streaming.status.clone();
         while status.borrow().is_none() {
             if status.changed().await.is_err() {
@@ -160,7 +166,10 @@ impl TcpJsonRpcClientAsync {
     /// Returns transport/protocol failures, including missing responses at EOF.
     pub async fn finish(mut self) -> Result<(), TcpJsonRpcClientAsyncError> {
         self.start_streaming()?;
-        let mut streaming = self.streaming.take().expect("streaming started");
+        let mut streaming = self
+            .streaming
+            .take()
+            .ok_or_else(|| std::io::Error::other("connection closed"))?;
         streaming.sender.take();
         (&mut streaming.worker)
             .await
@@ -174,7 +183,7 @@ impl TcpJsonRpcClientAsync {
                 .reader
                 .take()
                 .ok_or_else(|| std::io::Error::other("connection closed"))?;
-            self.streaming = Some(Streaming::start(reader));
+            self.streaming = Some(Streaming::start(reader)?);
         }
         Ok(())
     }
@@ -376,7 +385,7 @@ mod streaming_tests {
             for _ in 0..3 {
                 delivered.push(received.recv().await.unwrap());
             }
-            delivered.sort();
+            delivered.sort_unstable();
             assert_eq!(delivered, vec![0, 1, 2]);
             ::testresult::TestResult::Ok(())
         })
@@ -582,11 +591,8 @@ impl Streaming {
         )
     }
 
-    fn start(reader: BufReader<TcpStream>) -> Self {
-        let address = reader
-            .get_ref()
-            .peer_addr()
-            .expect("connected socket address");
+    fn start(reader: BufReader<TcpStream>) -> std::io::Result<Self> {
+        let address = reader.get_ref().peer_addr()?;
         let (sender, receiver) = ::tokio::sync::mpsc::channel(32);
         let capacity = std::sync::Arc::new(::tokio::sync::Semaphore::new(32));
         let (status_sender, status) = ::tokio::sync::watch::channel(None);
@@ -600,13 +606,29 @@ impl Streaming {
             }));
             result
         });
-        Self {
+        Ok(Self {
             sender: Some(sender),
             capacity,
             status,
             worker,
             address,
+        })
+    }
+
+    async fn write_requests<W: ::tokio::io::AsyncWrite + Unpin>(
+        mut write: W,
+        mut requests: ::tokio::sync::mpsc::UnboundedReceiver<(u64, String, Vec<u8>)>,
+    ) -> Result<(), String> {
+        let result: Result<(), std::io::Error> = async {
+            while let Some((id, method, frame)) = requests.recv().await {
+                write.write_all(&frame).await?;
+                ::tracing::info!(request_id = id, method, "request written");
+            }
+            write.flush().await?;
+            write.shutdown().await
         }
+        .await;
+        result.map_err(|error| error.to_string())
     }
 
     async fn run(
@@ -615,23 +637,11 @@ impl Streaming {
         status: &::tokio::sync::watch::Sender<Option<String>>,
         capacity: &::tokio::sync::Semaphore,
     ) -> Result<(), String> {
-        let (read, mut write) = ::tokio::io::split(reader);
-        let (outgoing, mut writes) =
-            ::tokio::sync::mpsc::unbounded_channel::<(u64, String, Vec<u8>)>();
+        let (read, write) = ::tokio::io::split(reader);
+        let (outgoing, writes) = ::tokio::sync::mpsc::unbounded_channel::<(u64, String, Vec<u8>)>();
         let (events, mut responses) = ::tokio::sync::mpsc::channel(32);
         let mut transport = ::tokio::task::JoinSet::new();
-        transport.spawn(async move {
-            let result: Result<(), std::io::Error> = async {
-                while let Some((id, method, frame)) = writes.recv().await {
-                    write.write_all(&frame).await?;
-                    ::tracing::info!(request_id = id, method, "request written");
-                }
-                write.flush().await?;
-                write.shutdown().await
-            }
-            .await;
-            result.map_err(|error| error.to_string())
-        });
+        transport.spawn(Self::write_requests(write, writes));
         transport.spawn(async move {
             let mut read = BufReader::new(read);
             loop {

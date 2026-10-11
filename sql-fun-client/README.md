@@ -89,15 +89,23 @@ Use `response.into_result()` to handle server errors or serialize the response
 with Serde to retain its JSON-RPC envelope and ID.
 
 ```rust,no_run
-# async fn example(mut client: sql_fun_client::TcpJsonRpcClientAsync) -> Result<(), Box<dyn std::error::Error>> {
-client.invoke_method("rpc.discover", &serde_json::json!({}), |response| async move {
-    // Handle application failures here; the client cannot receive callback errors.
-    match response.into_result() {
-        Ok(value) => println!("{value}"),
-        Err(error) => eprintln!("{error}"),
-    }
-    Ok(())
-}).await?;
+# async fn example(
+#     mut client: sql_fun_client::TcpJsonRpcClientAsync,
+# ) -> Result<(), Box<dyn std::error::Error>> {
+client
+    .invoke_method(
+        "rpc.discover",
+        &serde_json::json!({}),
+        |response| async move {
+            // Handle application failures here; the client cannot receive them.
+            match response.into_result() {
+                Ok(value) => println!("{value}"),
+                Err(error) => eprintln!("{error}"),
+            }
+            Ok(())
+        },
+    )
+    .await?;
 client.finish().await?;
 # Ok(())
 # }

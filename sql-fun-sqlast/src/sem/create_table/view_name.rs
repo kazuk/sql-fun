@@ -9,6 +9,12 @@ use std::fmt::Display;
 #[derive(Debug, Clone, Eq, Hash, PartialEq, serde::Serialize, serde::Deserialize)]
 pub struct ViewName(FullName);
 
+impl From<&Self> for ViewName {
+    fn from(value: &Self) -> Self {
+        value.clone()
+    }
+}
+
 impl Display for ViewName {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         write!(f, "{}", self.0)?;

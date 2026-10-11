@@ -74,14 +74,15 @@ fi
 [[ -n "$body_file" ]] || fail 'missing --body-file'
 if "$repository_context"; then
   [[ -z "$repository" ]] || fail '--repository-context cannot be combined with --repo'
-  remote="$(git -C "$REPOSITORY_ROOT" remote get-url origin)" \
+  remote="$(git -C "$REPOSITORY_ROOT" remote get-url origin 2>/dev/null)" \
     || fail 'repository context requires an origin remote'
   case "$remote" in
     https://github.com/*) slug="${remote#https://github.com/}" ;;
     git@github.com:*) slug="${remote#git@github.com:}" ;;
     ssh://git@github.com/*) slug="${remote#ssh://git@github.com/}" ;;
-    *) fail "unsupported repository origin: $remote" ;;
+    *) fail 'unsupported repository origin; expected a GitHub HTTPS or SSH URL' ;;
   esac
+  slug="${slug%/}"
   slug="${slug%.git}"
   [[ "$slug" =~ ^[A-Za-z0-9_.-]+/[A-Za-z0-9_.-]+$ ]] \
     || fail 'origin must identify one GitHub owner/repository'

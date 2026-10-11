@@ -11,6 +11,9 @@ cp "$root/.github/ISSUE_TEMPLATE/maintenance.md" "$fixture/repo/.github/ISSUE_TE
 git -C "$fixture/repo" init -q
 git -C "$fixture/repo" config user.name Fixture
 git -C "$fixture/repo" config user.email fixture@example.invalid
+# Fixture commits must work even when signing is enabled and no signer exists.
+git -C "$fixture/repo" config commit.gpgSign true
+git -C "$fixture/repo" config gpg.program false
 printf 'pub fn stable_definition() {}\n' > "$fixture/repo/old source.rs"
 printf 'pub fn other() {}\n' > "$fixture/repo/other.rs"
 cat > "$fixture/repo/.local/bin/old-source" <<'POLICY'
@@ -23,7 +26,7 @@ printf '2000-01-01 %s\n2001-01-01 other.rs\n' "${CANDIDATE:-old source.rs}"
 POLICY
 chmod +x "$fixture/repo/.local/bin/old-source"
 git -C "$fixture/repo" add .
-git -C "$fixture/repo" commit -qm 'test: fixture'
+git -C "$fixture/repo" commit --no-gpg-sign -qm 'test: fixture'
 sha="$(git -C "$fixture/repo" rev-parse HEAD)"
 collect="$fixture/repo/.codex/skills/old-source-review/scripts/collect-evidence.sh"
 create="$fixture/repo/.codex/skills/old-source-review/scripts/create-maintenance-issue.sh"
@@ -51,7 +54,7 @@ printf 'pub fn dirty_definition() {}\n' > "$fixture/repo/old source.rs"
 "$collect" --oldest --definition stable_definition | jq -e '.literal_definition_occurrences[0].literal_occurrences | length == 1' >/dev/null
 "$collect" --target 'old source.rs' --definition dirty_definition | jq -e '.literal_definition_occurrences[0].literal_occurrences | length == 0' >/dev/null
 git -C "$fixture/repo" add 'old source.rs'
-git -C "$fixture/repo" commit -qm 'test: change head'
+git -C "$fixture/repo" commit --no-gpg-sign -qm 'test: change head'
 "$collect" --target 'old source.rs' --evidence-commit "$sha" --definition stable_definition | jq -e --arg sha "$sha" '.evidence_commit == $sha and (.literal_definition_occurrences[0].literal_occurrences | length == 1)' >/dev/null
 cat > "$fixture/bin/gh" <<'MOCK'
 #!/usr/bin/env bash
@@ -77,24 +80,43 @@ export PATH="$fixture/bin:$PATH" GH_REPO=unrelated/repository
 args=(--repository-context --title '[Maintenance] old source.rs: Keep' --body-file "$fixture/body")
 expect_failure "$create" "${args[@]}"
 [[ ! -e "$fixture/requests" ]]
-for remote in https://github.com/fixture/repository.git git@github.com:fixture/repository.git ssh://git@github.com/fixture/repository.git; do
+for remote in \
+  https://github.com/fixture/repository.git \
+  git@github.com:fixture/repository.git \
+  ssh://git@github.com/fixture/repository.git \
+  https://github.com/fixture/repository/ \
+  https://github.com/fixture/repository.git/ \
+  ssh://git@github.com/fixture/repository/; do
   git -C "$fixture/repo" remote remove origin 2>/dev/null || true
   git -C "$fixture/repo" remote add origin "$remote"
   "$create" "${args[@]}" >/dev/null
 done
-[[ "$(wc -l < "$fixture/requests")" -eq 3 ]]
+[[ "$(wc -l < "$fixture/requests")" -eq 6 ]]
 expect_failure "$create" "${args[@]}" --repo other/repository
 expect_failure env RESOLVE_FAILURE=true "$create" "${args[@]}"
 printf 'invalid body\n' > "$fixture/bad-body"
 expect_failure "$create" --repository-context --title test --body-file "$fixture/bad-body"
 git -C "$fixture/repo" remote set-url origin https://example.invalid/fixture/repository
 expect_failure "$create" "${args[@]}"
-[[ "$(wc -l < "$fixture/requests")" -eq 3 ]]
+[[ "$(wc -l < "$fixture/requests")" -eq 6 ]]
+# Never echo credentials, including when rejecting credential-bearing origins.
+for remote in \
+  https://x-access-token:fixture-secret@github.com/fixture/repository.git \
+  https://x-access-token:fixture-secret@example.invalid/fixture/repository.git; do
+  git -C "$fixture/repo" remote set-url origin "$remote"
+  expect_failure "$create" "${args[@]}"
+  if grep -Fq 'fixture-secret' "$fixture/stdout" "$fixture/stderr"; then
+    printf 'Credential leaked in origin diagnostic\n' >&2
+    exit 1
+  fi
+  grep -Fq 'unsupported repository origin' "$fixture/stderr"
+done
+[[ "$(wc -l < "$fixture/requests")" -eq 6 ]]
 git -C "$fixture/repo" remote set-url origin https://github.com/fixture/repository.git
 expect_failure env CREATE_FAILURE=true "$create" "${args[@]}"
-[[ "$(wc -l < "$fixture/requests")" -eq 4 ]]
+[[ "$(wc -l < "$fixture/requests")" -eq 7 ]]
 # Fixture worktrees test Git repository context; production worktrees use agent-worktree-add.
 git -C "$fixture/repo" worktree add -q --detach "$fixture/linked" HEAD
 "$fixture/linked/.codex/skills/old-source-review/scripts/create-maintenance-issue.sh" "${args[@]}" >/dev/null
-[[ "$(wc -l < "$fixture/requests")" -eq 5 ]]
+[[ "$(wc -l < "$fixture/requests")" -eq 8 ]]
 printf 'Old-source-review contracts passed\n'

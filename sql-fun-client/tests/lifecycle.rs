@@ -15,13 +15,19 @@ async fn launches_authenticates_and_reuses_without_executing_override() -> ::tes
     let before = fixture.registration()?;
     fixture.assert_detached()?;
     // Exercise the post-authentication result/error envelope against the server.
-    assert!(
-        first
-            .invoke_method("unknown_method", &::serde_json::json!({}))
-            .await
-            .is_err()
-    );
-    drop(first);
+    let (sent, received) = ::tokio::sync::oneshot::channel();
+    first
+        .invoke_method(
+            "unknown_method",
+            &::serde_json::json!({}),
+            move |response| async move {
+                let _ = sent.send(response.into_result().is_err());
+                Ok(())
+            },
+        )
+        .await?;
+    first.finish().await?;
+    assert!(received.await?);
     let second = connect(&fixture.with_command(Some("exit 97"), Duration::from_secs(3))).await?;
     assert_eq!(address, second.peer_addr()?);
     assert_eq!(before, fixture.registration()?);
@@ -174,5 +180,38 @@ async fn rereads_changed_registration_within_original_deadline() -> ::testresult
     let (client, ()) = ::tokio::join!(connect(&options), restore);
     assert_eq!(client?.peer_addr()?, address);
     assert_eq!(healthy, fixture.registration()?);
+    Ok(())
+}
+
+#[tokio::test]
+async fn streams_multiple_requests_and_drains_actual_server() -> ::testresult::TestResult {
+    // The actual server is required to verify authenticated half-close semantics.
+    let fixture = heavy::ServerFixture::new()?;
+    let mut client = connect(&fixture.options()).await?;
+    let (sent, mut received) = ::tokio::sync::mpsc::unbounded_channel();
+    for number in 0..12 {
+        let sent = sent.clone();
+        client
+            .invoke_method(
+                "unknown_method",
+                &::serde_json::json!({"number":number}),
+                move |response| async move {
+                    let id = response.id();
+                    assert!(response.into_result().is_err());
+                    let _ = sent.send(id);
+                    Ok(())
+                },
+            )
+            .await?;
+    }
+    ::tokio::time::timeout(Duration::from_secs(5), client.finish()).await??;
+    let mut ids = Vec::new();
+    for _ in 0..12 {
+        ids.push(received.recv().await.unwrap());
+    }
+    ids.sort();
+    assert_eq!(ids, (1..=12).collect::<Vec<_>>());
+    let reused = connect(&fixture.options()).await?;
+    reused.finish().await?;
     Ok(())
 }

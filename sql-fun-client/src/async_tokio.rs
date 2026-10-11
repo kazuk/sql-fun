@@ -1,5 +1,9 @@
+mod streaming;
+
 #[cfg(test)]
 mod test_helpers;
+
+use self::streaming::Streaming;
 
 use crate::{JsonRpcError, JsonRpcRequest, JsonRpcResponse};
 
@@ -71,11 +75,7 @@ impl TcpJsonRpcClientAsync {
     /// Returns an error if the socket is closed or its address cannot be read.
     pub fn peer_addr(&self) -> Result<std::net::SocketAddr, std::io::Error> {
         if let Some(streaming) = &self.streaming {
-            return if streaming.status.borrow().is_none() {
-                Ok(streaming.address)
-            } else {
-                Err(std::io::Error::other("connection closed"))
-            };
+            return streaming.peer_addr();
         }
         let Some(reader) = self.reader.as_ref() else {
             return Err(std::io::Error::other("connection closed"));
@@ -104,33 +104,15 @@ impl TcpJsonRpcClientAsync {
     {
         self.start_streaming()?;
         let streaming = self.streaming_connection()?;
-        let permit = streaming
-            .capacity
-            .clone()
-            .acquire_owned()
-            .await
-            .map_err(|_| streaming.error())?;
+        let slot = streaming.reserve_request().await?;
         let Some(next) = self.id.checked_add(1) else {
             return Err(TcpJsonRpcClientAsyncError::connection(
                 "request IDs exhausted",
             ));
         };
-        let request = JsonRpcRequest::build_request(self.id, method, params);
-        let mut frame = ::serde_json::to_vec(&request)?;
-        frame.push(b'\n');
-        let Some(sender) = streaming.sender.as_ref() else {
-            return Err(streaming.error());
-        };
-        sender
-            .send(Submission {
-                id: self.id,
-                method: method.to_owned(),
-                frame,
-                callback: Box::new(move |response| Box::pin(callback(response))),
-                permit,
-            })
-            .await
-            .map_err(|_| streaming.error())?;
+        streaming
+            .submit_request(self.id, method, params, callback, slot)
+            .await?;
         self.id = next;
         Ok(())
     }
@@ -142,13 +124,7 @@ impl TcpJsonRpcClientAsync {
     pub async fn wait_for_failure(&mut self) -> Result<(), TcpJsonRpcClientAsyncError> {
         self.start_streaming()?;
         let streaming = self.streaming_connection()?;
-        let mut status = streaming.status.clone();
-        while status.borrow().is_none() {
-            if status.changed().await.is_err() {
-                break;
-            }
-        }
-        Err(streaming.error())
+        streaming.wait_for_failure().await
     }
 
     /// Flush accepted requests, half-close writes, drain responses and callbacks.
@@ -160,14 +136,10 @@ impl TcpJsonRpcClientAsync {
     /// Returns transport/protocol failures, including missing responses at EOF.
     pub async fn finish(mut self) -> Result<(), TcpJsonRpcClientAsyncError> {
         self.start_streaming()?;
-        let Some(mut streaming) = self.streaming.take() else {
+        let Some(streaming) = self.streaming.take() else {
             return Err(std::io::Error::other("connection closed").into());
         };
-        streaming.sender.take();
-        (&mut streaming.worker)
-            .await
-            .map_err(|error| TcpJsonRpcClientAsyncError::connection(&error.to_string()))?
-            .map_err(|error| TcpJsonRpcClientAsyncError::connection(&error))
+        streaming.finish().await
     }
 
     fn streaming_connection(&self) -> Result<&Streaming, TcpJsonRpcClientAsyncError> {
@@ -543,192 +515,6 @@ mod tests {
             42
         );
         Ok(())
-    }
-}
-
-type CallbackFuture = std::pin::Pin<
-    Box<dyn std::future::Future<Output = Result<(), std::convert::Infallible>> + Send>,
->;
-type Callback = Box<dyn FnOnce(JsonRpcResponse) -> CallbackFuture + Send>;
-
-struct Submission {
-    id: u64,
-    method: String,
-    frame: Vec<u8>,
-    callback: Callback,
-    permit: ::tokio::sync::OwnedSemaphorePermit,
-}
-
-struct Streaming {
-    sender: Option<::tokio::sync::mpsc::Sender<Submission>>,
-    capacity: std::sync::Arc<::tokio::sync::Semaphore>,
-    status: ::tokio::sync::watch::Receiver<Option<String>>,
-    worker: ::tokio::task::JoinHandle<Result<(), String>>,
-    address: std::net::SocketAddr,
-}
-
-impl std::fmt::Debug for Streaming {
-    fn fmt(&self, formatter: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-        formatter
-            .debug_struct("Streaming")
-            .field("address", &self.address)
-            .finish_non_exhaustive()
-    }
-}
-
-impl Drop for Streaming {
-    fn drop(&mut self) {
-        self.worker.abort();
-    }
-}
-
-impl Streaming {
-    fn error(&self) -> TcpJsonRpcClientAsyncError {
-        TcpJsonRpcClientAsyncError::connection(
-            &self
-                .status
-                .borrow()
-                .clone()
-                .unwrap_or_else(|| String::from("connection closed")),
-        )
-    }
-
-    fn start(reader: BufReader<TcpStream>) -> std::io::Result<Self> {
-        let address = reader.get_ref().peer_addr()?;
-        let (sender, receiver) = ::tokio::sync::mpsc::channel(32);
-        let capacity = std::sync::Arc::new(::tokio::sync::Semaphore::new(32));
-        let (status_sender, status) = ::tokio::sync::watch::channel(None);
-        let worker_capacity = capacity.clone();
-        let worker = ::tokio::spawn(async move {
-            let result = Self::run(reader, receiver, &status_sender, &worker_capacity).await;
-            worker_capacity.close();
-            status_sender.send_replace(Some(match &result {
-                Ok(()) => String::from("connection closed"),
-                Err(error) => error.clone(),
-            }));
-            result
-        });
-        Ok(Self {
-            sender: Some(sender),
-            capacity,
-            status,
-            worker,
-            address,
-        })
-    }
-
-    async fn write_requests<W: ::tokio::io::AsyncWrite + Unpin>(
-        mut write: W,
-        mut requests: ::tokio::sync::mpsc::UnboundedReceiver<(u64, String, Vec<u8>)>,
-    ) -> Result<(), String> {
-        let result: Result<(), std::io::Error> = async {
-            while let Some((id, method, frame)) = requests.recv().await {
-                write.write_all(&frame).await?;
-                ::tracing::info!(request_id = id, method, "request written");
-            }
-            write.flush().await?;
-            write.shutdown().await
-        }
-        .await;
-        result.map_err(|error| error.to_string())
-    }
-
-    async fn run(
-        reader: BufReader<TcpStream>,
-        mut submissions: ::tokio::sync::mpsc::Receiver<Submission>,
-        status: &::tokio::sync::watch::Sender<Option<String>>,
-        capacity: &::tokio::sync::Semaphore,
-    ) -> Result<(), String> {
-        let (read, write) = ::tokio::io::split(reader);
-        let (outgoing, writes) = ::tokio::sync::mpsc::unbounded_channel::<(u64, String, Vec<u8>)>();
-        let (events, mut responses) = ::tokio::sync::mpsc::channel(32);
-        let mut transport = ::tokio::task::JoinSet::new();
-        transport.spawn(Self::write_requests(write, writes));
-        transport.spawn(async move {
-            let mut read = BufReader::new(read);
-            loop {
-                match read_response(&mut read, 2 * 1024 * 1024).await {
-                    Ok(response) => {
-                        let eof = response.is_none();
-                        if events.send(Ok(response)).await.is_err() || eof {
-                            break;
-                        }
-                    }
-                    Err(error) => {
-                        let _ = events.send(Err(error.to_string())).await;
-                        break;
-                    }
-                }
-            }
-            Ok(())
-        });
-        let mut outgoing = Some(outgoing);
-        let mut pending = std::collections::HashMap::new();
-        let mut callbacks = ::tokio::task::JoinSet::new();
-        let result = loop {
-            ::tokio::select! {
-                submission = submissions.recv(), if outgoing.is_some() => {
-                    if let Some(submission) = submission {
-                        let Submission { id, method, frame, callback, permit } = submission;
-                        pending.insert(id, (callback, permit));
-                        if outgoing.as_ref().expect("writer open").send((id, method, frame)).is_err() {
-                            break Err(String::from("request writer closed"));
-                        }
-                    } else { outgoing.take(); }
-                }
-                event = responses.recv() => {
-                    match event {
-                        Some(Ok(Some(response))) => {
-                            response.trace_received();
-                            let Some((callback, permit)) = pending.remove(&response.id) else {
-                                break Err(format!("unexpected response ID {}", response.id));
-                            };
-                            callbacks.spawn(async move {
-                                let Ok(()) = callback(response).await;
-                                // Keep admission bounded until the completed task is reaped.
-                                permit
-                            });
-                        }
-                        Some(Ok(None)) => {
-                            if !pending.is_empty() || !submissions.is_empty() {
-                                break Err(String::from("EOF with missing responses"));
-                            }
-                            if outgoing.is_some() { break Err(String::from("unexpected connection EOF")); }
-                            break Ok(());
-                        }
-                        Some(Err(error)) => break Err(error),
-                        None => break Err(String::from("response reader closed")),
-                    }
-                }
-                _ = callbacks.join_next(), if !callbacks.is_empty() => {}
-                completed = transport.join_next(), if !transport.is_empty() => {
-                    match completed {
-                        Some(Ok(Err(error))) => break Err(error),
-                        Some(Err(error)) => break Err(error.to_string()),
-                        _ => {},
-                    }
-                }
-            }
-        };
-        if let Err(error) = &result {
-            status.send_replace(Some(error.clone()));
-            capacity.close();
-            submissions.close();
-        }
-        let mut result = result;
-        if result.is_err() {
-            transport.abort_all();
-        }
-        while let Some(completed) = transport.join_next().await {
-            match completed {
-                Ok(Err(error)) if result.is_ok() => result = Err(error),
-                Err(error) if result.is_ok() => result = Err(error.to_string()),
-                _ => {}
-            }
-        }
-        // Track completion only: application callback failures are outside this contract.
-        while callbacks.join_next().await.is_some() {}
-        result
     }
 }
 

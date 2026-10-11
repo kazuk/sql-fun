@@ -332,6 +332,7 @@ function run_skill_validator() {
   # Repository skills may include a maintainer-facing README.md when SKILL.md
   # links to it, such as the third-party vendoring workflow.
   skill-validator check --strict --allow-flat-layouts --emit-annotations .codex/skills
+  "${GIT_ROOT}/.local/bin/test-old-source-review"
 }
 
 function run_rumdl() {

@@ -626,3 +626,51 @@ impl TryFrom<&syn::NullTest> for NullTest {
         }
     }
     ```
+
+### Express intent above low-level mechanisms
+
+- Write processing and coordination logic in terms of the operations it
+  intends to perform. Readers should not need to reconstruct those intentions
+  from sequences of low-level primitive operations.
+- When channels, synchronization primitives, task handles, or similar
+  mechanisms implement a domain protocol, encapsulate that protocol in an
+  owning type. Prefer private fields and methods named after the intended
+  operations over exposing primitive handles or their operations.
+- Encapsulate the complete operation, including acquisition, ownership
+  transfer, release, closure, and completion handling where applicable.
+  A wrapper is insufficient if callers must still know and perform the
+  underlying protocol in the correct order.
+- Keep lifetime and failure guarantees with the owning type. Briefly document
+  guarantees that affect callers, such as backpressure, cancellation, draining,
+  and completion.
+- Renaming a general-purpose operation to express domain-specific intent is
+  a valid and encouraged abstraction, even when the method only forwards a
+  single call. Its value is the meaning it communicates to readers.
+- Do not require additional logic to justify an intent-revealing method.
+  Evaluate wrappers by the clarity they provide to callers, not by their
+  implementation size or complexity. Whether the compiler inlines or eliminates
+  a method does not determine its readability value.
+- Direct primitive use is appropriate inside these implementations and for
+  simple local operations whose purpose is immediately apparent.
+
+Review the callers as well as the wrapper:
+
+- Can a reader understand what the processing does without knowing the
+  underlying primitive's API?
+- Does the caller express the desired operation, or manually assemble the
+  steps required to achieve it?
+- Can the primitive or protocol change without rewriting the processing logic?
+
+### Keep method chains readable
+
+- Use method chains for value navigation and transformation, not to obscure
+  control flow or error handling.
+- Introduce named intermediate values when a chain requires readers to
+  mentally reconstruct types or execution paths. Choose names that make each
+  value's role apparent.
+- Prefer explicit guards and named operations when a chain combines
+  validation, resource acquisition, side effects, or error handling in a way
+  that hides the processing steps.
+- Evaluate readability rather than imposing a fixed limit on chain length.
+  A short chain can hide intent, while a longer sequence of straightforward
+  transformations can remain clear.

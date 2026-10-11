@@ -2955,9 +2955,14 @@ dependencies = [
 name = "sql-fun-client"
 version = "0.1.0"
 dependencies = [
+ "clap",
+ "nix 0.31.3",
+ "rstest",
  "serde",
  "serde_json",
  "sql-fun-server-api",
+ "tempfile",
+ "testresult",
  "thiserror 2.0.21",
  "tokio",
 ]

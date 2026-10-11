@@ -403,6 +403,8 @@ jobs:
           validation_root="$RUNNER_TEMP/sql-fun-install-validation"
           mkdir -p "$validation_root/contracts"
           cp -R cli/contracts/. "$validation_root/contracts/"
+          mkdir -p "$validation_root/e2e"
+          cp -R cli/tests/scrut/. "$validation_root/e2e/"
           cp "$RUNNER_TEMP/sql-fun-artifact"/sql-fun_*.deb "$validation_root/"
           curl -fsSL -o "$validation_root/dotslash.tar.gz" \
             "https://github.com/facebook/dotslash/releases/download/${DOTSLASH_VERSION}/dotslash-linux-musl.x86_64.${DOTSLASH_VERSION}.tar.gz"
@@ -417,10 +419,14 @@ jobs:
             --mount "type=bind,source=$validation_root,target=/validation,readonly" \
             ubuntu:24.04 bash -ceu '
               apt-get update
-              apt-get install -y --no-install-recommends /validation/sql-fun_*.deb
+              apt-get install -y --no-install-recommends jq /validation/sql-fun_*.deb
               BASH_ENV=/validation/contracts/setup.sh \
                 SQL_FUN_BIN=/usr/bin/sql-fun \
                 /validation/scrut test /validation/contracts
+              SQL_FUN_BIN=/usr/bin/sql-fun \
+                SQL_FUN_TEST_SERVER_BIN=/usr/bin/sql-fun-server \
+                PATH="/validation:$PATH" \
+                /validation/e2e/run.sh /validation/e2e
             '
 
   postgres-extraction:

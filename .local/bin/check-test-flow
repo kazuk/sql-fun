@@ -36,6 +36,7 @@ Default steps:
 Optional steps (explicit --step required):
   packaging
   cli-contract
+  cli-e2e
 USAGE
 }
 
@@ -57,7 +58,7 @@ DEFAULT_STEPS=(
   skill-lint
 )
 
-ALL_STEPS=("${DEFAULT_STEPS[@]}" packaging cli-contract)
+ALL_STEPS=("${DEFAULT_STEPS[@]}" packaging cli-contract cli-e2e)
 
 function list_steps() {
   printf '%s\n' "${ALL_STEPS[@]}"
@@ -65,7 +66,7 @@ function list_steps() {
 
 function normalize_step() {
   case "$1" in
-    affected|workspace|proc-macro-tests|fmt|lint|package-metadata|server-api-spec|deny|dependency-updates|doc|typos|version-materialization|graphify|skill-lint|markdown-lint|packaging|cli-contract)
+    affected|workspace|proc-macro-tests|fmt|lint|package-metadata|server-api-spec|deny|dependency-updates|doc|typos|version-materialization|graphify|skill-lint|markdown-lint|packaging|cli-contract|cli-e2e)
       printf '%s\n' "$1"
       ;;
     format)
@@ -306,6 +307,19 @@ function run_cli_contract() {
     scrut test "${GIT_ROOT}/cli/contracts"
 }
 
+function run_cli_e2e() {
+  require_command jq
+  require_command scrut
+  echo "== Scrut CLI E2E tests"
+  cargo build --locked -p sql-fun-cli --bin sql-fun "${FEATURES[@]}"
+  cargo build --locked -p sql-fun-server --bin sql-fun-server "${FEATURES[@]}"
+  local target_dir
+  target_dir=$(cargo metadata --locked --no-deps --format-version 1 | jq -er '.target_directory')
+  SQL_FUN_BIN="${target_dir}/debug/sql-fun" \
+    SQL_FUN_TEST_SERVER_BIN="${target_dir}/debug/sql-fun-server" \
+    "${GIT_ROOT}/cli/tests/scrut/run.sh" cli/tests/scrut
+}
+
 function run_graphify() {
   require_command graphify
   echo "== Update graph index"
@@ -360,6 +374,7 @@ for step in "${ALL_STEPS[@]}"; do
       markdown-lint) run_rumdl ;;
       packaging) run_packaging ;;
       cli-contract) run_cli_contract ;;
+      cli-e2e) run_cli_e2e ;;
     esac
   fi
 done

@@ -683,7 +683,8 @@ impl Streaming {
                             };
                             callbacks.spawn(async move {
                                 let Ok(()) = callback(response).await;
-                                drop(permit);
+                                // Keep admission bounded until the completed task is reaped.
+                                permit
                             });
                         }
                         Some(Ok(None)) => {

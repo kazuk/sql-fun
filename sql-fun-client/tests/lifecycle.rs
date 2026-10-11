@@ -209,7 +209,7 @@ async fn streams_multiple_requests_and_drains_actual_server() -> ::testresult::T
     for _ in 0..12 {
         ids.push(received.recv().await.unwrap());
     }
-    ids.sort();
+    ids.sort_unstable();
     assert_eq!(ids, (1..=12).collect::<Vec<_>>());
     let reused = connect(&fixture.options()).await?;
     reused.finish().await?;

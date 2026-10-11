@@ -83,6 +83,7 @@ pub enum JsonRpcResponseBody {
 
 impl JsonRpcResponse {
     /// Internally allocated request ID.
+    #[must_use]
     pub const fn id(&self) -> u64 {
         self.id
     }
@@ -105,7 +106,7 @@ impl JsonRpcResponse {
 }
 
 impl JsonRpcResponseBody {
-    fn error_code(&self) -> Option<i32> {
+    const fn error_code(&self) -> Option<i32> {
         match self {
             Self::Response(_) => None,
             Self::Error(error) => Some(error.code),

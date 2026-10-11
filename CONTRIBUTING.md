@@ -101,7 +101,30 @@ can include maintainer-facing guidance without producing a structural warning.
 
 The optional `cli-contract` check-flow step evaluates source-owned Scrut CLI
 contracts against the locally built `sql-fun` executable. It requires the
-`scrut` DotSlash wrapper and `dotslash` executable to be available on `PATH`.
+`scrut` executable on `PATH` (CI pins Scrut v0.4.3). A DotSlash wrapper additionally
+requires `dotslash` on `PATH` (CI pins v0.5.9). See the upstream
+[Scrut installation instructions](https://github.com/facebookincubator/scrut#installation).
+Neither tool is currently bundled in the CI/development image; the existing
+installed-CLI validation job downloads the pinned tools and verifies checksums.
+
+Run `.local/bin/check-test-flow --step=cli-e2e` for the real-server Scrut suite.
+This opt-in step requires Bash, `jq`, and Scrut, prebuilds the CLI and server,
+and invokes `scrut test cli/tests/scrut` so every supported Markdown file under
+that directory is discovered recursively. `--all-features` also applies to
+these source builds. The same suite runs in normal PR CI's `install-validation`
+job against the actual installed distribution, using that job's existing Scrut
+installation. Its fixture creates isolated test-owned `/tmp` user namespaces,
+starts its own server child, and cleans up that child and directory when the
+suite runner exits, including failed assertions. It never uses a developer's
+per-user server.
+
+To invoke Scrut directly, explicitly select both binaries and use the suite runner:
+
+```sh
+SQL_FUN_BIN=/absolute/path/to/sql-fun \
+  SQL_FUN_TEST_SERVER_BIN=/absolute/path/to/sql-fun-server \
+  cli/tests/scrut/run.sh cli/tests/scrut
+```
 
 Source builds of the SQL analyzer require a C compiler and assembler for the
 `stacker`/`psm` stack-growth backend, in addition to the native prerequisites of

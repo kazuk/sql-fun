@@ -154,6 +154,34 @@ mod test_metadata_args {
 }
 ```
 
+### String literals in tests
+
+- Choose string literal syntax to make the behavior under test apparent.
+  When testing structured text such as JSON or SQL, prefer raw string literals
+  (`r#"..."#`) over ordinary strings cluttered with escaped quotes or
+  backslashes. Preserve the text's readability at the call site.
+- Use ordinary string literals with explicit escape sequences (`\n`, `\r`,
+  `\t`, `\0`, etc.) when the control characters themselves affect the test
+  conditions or expected result.
+- When both structured content and control characters matter, keep the content
+  in a raw string literal and express the relevant control characters
+  separately, for example with `concat!`. This makes the framing condition
+  distinguishable from the payload.
+- This is a readability rule, not a requirement to externalize fixtures or
+  rewrite harmless literals. In particular, retain exact bytes and malformed
+  input when their representation is part of the test.
+
+```rust
+// Test the JSON payload as readable text.
+let response = r#"{"jsonrpc":"2.0","id":0,"result":"OK"}"#;
+
+// Test that the same payload ends with a newline.
+let framed_response = concat!(
+    r#"{"jsonrpc":"2.0","id":0,"result":"OK"}"#,
+    "\n",
+);
+```
+
 ### Test helper cost
 
 - Place helpers that perform costly initialization or processing in a

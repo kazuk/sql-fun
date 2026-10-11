@@ -62,6 +62,8 @@ docker build \
 test "$(docker run --rm "$IMAGE" cargo binstall -V)" = "${CARGO_BINSTALL_TAG#v}"
 test "$(docker run --rm "$IMAGE" typos --version)" = "typos-cli ${TYPOS_TAG#v}"
 
+test "$(docker run --rm "$IMAGE" scrut --version)" = "scrut 0.4.3"
+
 image_size=$(docker image inspect --format '{{.Size}}' "$IMAGE")
 awk -v image="$IMAGE" -v size="$image_size" -v previous="$previous_size" 'BEGIN {
     printf "Image %s: %.1f MiB (%s bytes, uncompressed)\n", image, size / 1048576, size

@@ -57,6 +57,24 @@ RUN test -n "${TYPOS_TAG}" && test -n "${TYPOS_SHA256}" \
     && test "$(/opt/tools/bin/typos --version)" = "typos-cli ${TYPOS_TAG#v}" \
     && rm -rf /tmp/typos
 
+# Match the Scrut release used by installed-package contract/E2E jobs.
+RUN mkdir -p /tmp/scrut \
+    && curl -fsSL -o /tmp/scrut/dotslash.tar.gz \
+    "https://github.com/facebook/dotslash/releases/download/v0.5.9/dotslash-linux-musl.x86_64.v0.5.9.tar.gz" \
+    && printf '%s  %s\n' \
+    "4c75c6eb7890ae35993b962073f6d9bbe78b42b81a5691303ad70f63bfbf7196" \
+    /tmp/scrut/dotslash.tar.gz | sha256sum --check --strict - \
+    && tar -xzf /tmp/scrut/dotslash.tar.gz -C /tmp/scrut \
+    && curl -fsSL -o /tmp/scrut/scrut.dotslash \
+    "https://github.com/facebookincubator/scrut/releases/download/v0.4.3/scrut" \
+    && printf '%s  %s\n' \
+    "d2e4d5d36198f889dd7f827c29cc1b8cb2a362df98e47cdf84b5ee0e207151fc" \
+    /tmp/scrut/scrut.dotslash | sha256sum --check --strict - \
+    && scrut_binary=$(/tmp/scrut/dotslash -- fetch /tmp/scrut/scrut.dotslash) \
+    && install -m 0755 "$scrut_binary" /opt/tools/bin/scrut \
+    && test "$(/opt/tools/bin/scrut --version)" = "scrut 0.4.3" \
+    && rm -rf /tmp/scrut /root/.cache/dotslash
+
 # https://github.com/oraios/serena/archive/refs/tags/v0.1.4.tar.gz
 RUN curl -fsSL -o /opt/serena.tar.gz \
     "${SERENA_DOWNLOAD_BASE}${SERENA_TAG}.tar.gz"

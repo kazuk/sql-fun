@@ -7,22 +7,26 @@ is absent, and authenticates before returning a connection. The user must be a
 single nonempty path component; it is also passed as `USER` to launched commands.
 
 ```rust,no_run
-use std::path::Path;
 use sql_fun_client::{ConnectionOptions, connect};
 
 # async fn example() -> Result<(), Box<dyn std::error::Error>> {
-let options = ConnectionOptions::new(
-    Path::new("/opt/sql-fun/bin/sql-fun-server"),
-    "alice",
-    None,
-    None,
-);
+let options = ConnectionOptions::builder()
+    .server_executable("/opt/sql-fun/bin/sql-fun-server")
+    .user("alice")
+    .build();
 let client = connect(&options).await?;
 println!("{}", client.peer_addr()?);
 drop(client);
 # Ok(())
 # }
 ```
+
+The builder requires both executable and user before `.build()`; its path and
+string setters accept borrowed values without manual conversions. Optional
+`.server_command("…")` and `.timeout(Duration::from_secs(10))` setters override
+the launch command and budget. For conditional inputs, use
+`.maybe_server_command(command)` and `.maybe_timeout(timeout)`.
+`ConnectionOptions::new` remains available as a convenience constructor.
 
 A Tokio runtime and a Linux environment with `/bin/sh` for custom commands are
 required. The default command executes the supplied binary directly. The client

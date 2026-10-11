@@ -17,16 +17,46 @@ const REGISTRATION_LIMIT: u16 = 8192;
 ///
 /// The user identifies `/tmp/<user>/sql-fun-server.pid`, and must be one nonempty
 /// path component. No project metadata or executable is inferred.
-#[derive(Clone)]
+///
+/// Prefer the builder: executable and user are required at compile time, while
+/// command and timeout may be omitted. Omitted timeout means 40 seconds.
+///
+/// ```
+/// use sql_fun_client::ConnectionOptions;
+/// let options = ConnectionOptions::builder()
+///     .server_executable("/opt/sql-fun/bin/sql-fun-server")
+///     .user("alice")
+///     .build();
+/// ```
+///
+/// Both choices must be supplied before building:
+///
+/// ```compile_fail
+/// use sql_fun_client::ConnectionOptions;
+/// ConnectionOptions::builder().user("alice").build();
+/// ```
+///
+/// ```compile_fail
+/// use sql_fun_client::ConnectionOptions;
+/// ConnectionOptions::builder().server_executable("/server").build();
+/// ```
+#[derive(Clone, bon::Builder)]
 pub struct ConnectionOptions {
+    /// Required absolute path of the expected server executable.
+    #[builder(into)]
     server_executable: PathBuf,
+    /// Required explicit user namespace under `/tmp`.
+    #[builder(into)]
     user: String,
+    /// Optional launch override, executed by `/bin/sh -c`.
+    #[builder(into)]
     server_command: Option<String>,
+    /// Optional positive total connection budget; omission means 40 seconds.
     timeout: Option<Duration>,
 }
 
 impl ConnectionOptions {
-    /// Choose the executable, user namespace, optional shell command, and deadline.
+    /// Convenience constructor; prefer [`Self::builder`] for named options.
     ///
     /// `None` timeout means 40 seconds. The executable must be absolute. A command
     /// override runs through `/bin/sh -c` in the caller's current directory and
@@ -115,11 +145,33 @@ mod test_options {
     #[test]
     fn default_timeout_is_forty_seconds() {
         assert_eq!(DEFAULT_TIMEOUT, Duration::from_secs(40));
-        let options = ConnectionOptions::new(Path::new("/server"), "test", None, None);
+        let options = ConnectionOptions::builder()
+            .server_executable(Path::new("/server"))
+            .user("test")
+            .build();
         let before = ::tokio::time::Instant::now();
         let deadline = options.deadline().unwrap();
         assert!(deadline >= before + DEFAULT_TIMEOUT);
         assert!(deadline < before + DEFAULT_TIMEOUT + Duration::from_secs(1));
+    }
+
+    #[rstest::rstest]
+    #[case::omitted(None, None)]
+    #[case::overridden(Some("cargo run -p sql-fun-server"), Some(Duration::from_secs(3)))]
+    fn builder_accepts_optional_borrowed_inputs(
+        #[case] command: Option<&str>,
+        #[case] timeout: Option<Duration>,
+    ) {
+        let options = ConnectionOptions::builder()
+            .server_executable(Path::new("/server"))
+            .user("test")
+            .maybe_server_command(command)
+            .maybe_timeout(timeout)
+            .build();
+        assert_eq!(options.server_executable, Path::new("/server"));
+        assert_eq!(options.user, "test");
+        assert_eq!(options.server_command.as_deref(), command);
+        assert_eq!(options.timeout, timeout);
     }
 
     #[rstest::rstest]
@@ -134,8 +186,12 @@ mod test_options {
         #[case] user: &str,
         #[case] timeout: Duration,
     ) {
-        let options =
-            ConnectionOptions::new(Path::new(executable), user, Some("exit 97"), Some(timeout));
+        let options = ConnectionOptions::builder()
+            .server_executable(executable)
+            .user(user)
+            .server_command("exit 97")
+            .timeout(timeout)
+            .build();
         let error = super::connect(&options).await.unwrap_err();
         assert!(error.to_string().starts_with("invalid input:"));
         assert!(!error.is_timeout());

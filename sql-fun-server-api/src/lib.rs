@@ -4,6 +4,7 @@
 mod analyze_query;
 mod collection_management;
 mod describe_table;
+mod echo;
 mod initialize_schema;
 mod list_objects;
 
@@ -21,6 +22,7 @@ pub use self::{
         ColumnConstraint, ColumnDefinition, DescribeTableArgs, DescribeTableResponse,
         TableConstraint,
     },
+    echo::EchoArgs,
     initialize_schema::{
         EngineDialect, EngineVersion, ExtensionSpec, InitializeSchemaArgs, SchemaContext,
     },
@@ -184,6 +186,9 @@ pub enum Nullability {
 /// `sql-fun` Server API functions
 #[async_trait::async_trait]
 pub trait SqlFunServerApi {
+    /// Return object or array parameters unchanged for transport diagnostics.
+    async fn echo(&self, args: EchoArgs) -> Result<serde_json::Value, SqlFunServerApiError>;
+
     /// Initialize schema-aware query analysis context
     async fn initialize_schema_context(
         &self,
@@ -249,6 +254,16 @@ mod rpc_schema {
         type Result = super::SchemaContext;
     }
 
+    pub struct EchoMethod;
+
+    impl RpcMethod for EchoMethod {
+        const NAME: &'static str = "echo";
+        const SUMMARY: &'static str = "return parameters unchanged for diagnostics";
+
+        type Params = super::EchoArgs;
+        type Result = super::EchoArgs;
+    }
+
     pub struct ReadCollectionMethod;
 
     impl RpcMethod for ReadCollectionMethod {
@@ -291,6 +306,7 @@ mod rpc_schema {
 
     /// register all JSON-RPC methods
     pub fn register_methods(registry: &mut typed_openrpc::Registry) {
+        registry.register_method::<EchoMethod>();
         registry.register_method::<InitializeSchemaContextMethod>();
         registry.register_method::<ReadCollectionMethod>();
         registry.register_method::<ReleaseCollectionMethod>();

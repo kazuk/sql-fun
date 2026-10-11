@@ -1,4 +1,4 @@
-use crate::{CheckArgs, ExtractArgs};
+use crate::{ApiArgs, CheckArgs, ExtractArgs};
 use sql_fun_core::InitializeArgs;
 
 /// daemon control args
@@ -13,6 +13,9 @@ pub struct DaemonControlArgs {
 /// CLI Subcommand args
 #[derive(clap::Subcommand, Debug, Clone, Default)]
 pub enum CliSubCommand {
+    /// Stream JSON Lines requests to the authenticated per-user server
+    Api(ApiArgs),
+
     /// Extract PostgreSQL catalogs or import extension files
     Extract(ExtractArgs),
 
@@ -74,6 +77,12 @@ Inference query parameter types, result set column types"#,
 }
 
 impl CliSubCommand {
+    /// Construct a builtin API command.
+    #[must_use]
+    pub fn api(args: &ApiArgs) -> Self {
+        Self::Api(args.clone())
+    }
+
     /// Construct a builtin extraction command.
     #[must_use]
     pub fn extract(args: &ExtractArgs) -> Self {
@@ -83,7 +92,7 @@ impl CliSubCommand {
     pub(crate) const fn is_builtin(&self) -> bool {
         matches!(
             self,
-            Self::Initialize(_) | Self::Check(_) | Self::Extract(_)
+            Self::Api(_) | Self::Initialize(_) | Self::Check(_) | Self::Extract(_)
         )
     }
 
@@ -93,6 +102,7 @@ impl CliSubCommand {
         metadata_file_from_cli: bool,
     ) -> Result<std::process::ExitCode, anyhow::Error> {
         match self {
+            Self::Api(args) => args.execute().await,
             Self::Initialize(args) => {
                 Ok(crate::init::initialize(common, args, metadata_file_from_cli).await?)
             }
@@ -121,6 +131,7 @@ impl CliSubCommand {
             Self::Initialize(_initialize_args) => todo!(),
             Self::Check(_check_args) => todo!(),
             Self::Versions => todo!(),
+            Self::Api(_) => unreachable!("builtin api"),
             Self::Extract(_) => unreachable!("builtin extraction"),
         }
     }
@@ -150,6 +161,7 @@ impl CliSubCommand {
             Self::Check(_) => (false, "check".to_string()),
             Self::Extract(_) => (false, "extract".to_string()),
             Self::Versions => (false, "versions".to_string()),
+            Self::Api(_) => (false, "api".to_string()),
         };
         if only_daemon {
             vec![Self::daemon_binary_name(&name)]

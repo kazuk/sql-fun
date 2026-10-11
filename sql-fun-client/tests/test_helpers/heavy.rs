@@ -54,6 +54,14 @@ impl ServerFixture {
         })
     }
 
+    pub fn executable(&self) -> &Path {
+        &self.executable
+    }
+
+    pub fn user(&self) -> &str {
+        &self.user
+    }
+
     pub fn options(&self) -> ::sql_fun_client::ConnectionOptions {
         self.with_command(None, Duration::from_secs(10))
     }
@@ -64,8 +72,8 @@ impl ServerFixture {
         timeout: Duration,
     ) -> ::sql_fun_client::ConnectionOptions {
         ::sql_fun_client::ConnectionOptions::new(
-            &self.executable,
-            &self.user,
+            self.executable(),
+            self.user(),
             command,
             Some(timeout),
         )

@@ -144,6 +144,13 @@ impl Api {
 
 #[async_trait::async_trait]
 impl sql_fun_server_api::SqlFunServerApi for Api {
+    async fn echo(
+        &self,
+        args: ::sql_fun_server_api::EchoArgs,
+    ) -> Result<serde_json::Value, SqlFunServerApiError> {
+        Ok(args.into_value())
+    }
+
     /// Initialize schema-aware query analysis context
     async fn initialize_schema_context(
         &self,
@@ -218,6 +225,13 @@ pub async fn process_request(
     let method = request_message.method();
 
     match method {
+        "echo" => {
+            let params = request_message
+                .params()
+                .ok_or_else(|| JsonRpcError::parameter_required(method))?;
+            let args = serde_json::from_value::<::sql_fun_server_api::EchoArgs>(params.clone())?;
+            Ok(Api::api_impl().echo(args).await?)
+        }
         "initialize_schema_context" => {
             let Some(params) = request_message.params() else {
                 Err(JsonRpcError::parameter_required(method))?
@@ -231,6 +245,43 @@ pub async fn process_request(
         }
 
         _ => Err(JsonRpcError::unknown_method(method)),
+    }
+}
+
+#[cfg(test)]
+mod test_echo_dispatch {
+    use crate::{json_rpc::JsonRpcRequest, process_request};
+
+    #[rstest::rstest]
+    #[case::object(r#"{"nested":[null,true,{"n":42}]}"#)]
+    #[case::array(r#"[null,{"nested":[1,2]},false]"#)]
+    #[case::empty_object("{}")]
+    #[case::empty_array("[]")]
+    #[tokio::test]
+    async fn echoes_without_schema_setup(#[case] params: &str) {
+        let request: JsonRpcRequest = ::serde_json::from_str(&format!(
+            r#"{{"jsonrpc":"2.0","id":7,"method":"echo","params":{params}}}"#
+        ))
+        .unwrap();
+        assert_eq!(
+            process_request(&request)
+                .await
+                .unwrap_or_else(|_| panic!("valid echo parameters rejected")),
+            ::serde_json::from_str::<::serde_json::Value>(params).unwrap()
+        );
+    }
+
+    #[rstest::rstest]
+    #[case::omitted("")]
+    #[case::null(",\"params\":null")]
+    #[case::scalar(",\"params\":42")]
+    #[tokio::test]
+    async fn rejects_missing_or_scalar_params(#[case] params_field: &str) {
+        let request: JsonRpcRequest = ::serde_json::from_str(&format!(
+            r#"{{"jsonrpc":"2.0","id":7,"method":"echo"{params_field}}}"#
+        ))
+        .unwrap();
+        assert!(process_request(&request).await.is_err());
     }
 }
 

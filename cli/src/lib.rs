@@ -1,5 +1,6 @@
 #![deny(missing_docs)]
 //! sql-fun cli binary louncher
+mod api;
 mod child_proc;
 mod cli_sub_command;
 mod docker;
@@ -11,6 +12,7 @@ use ::sql_fun_core::SqlFunArgs;
 use std::process::ExitCode;
 
 pub use self::{
+    api::ApiArgs,
     check::CheckArgs,
     cli_sub_command::CliSubCommand,
     extract::ExtractArgs,

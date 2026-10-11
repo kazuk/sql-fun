@@ -45,3 +45,22 @@ the versions recorded in the adoption PR.
 
 Follow [the CI image maintenance process](../README.md) for publication and
 separately reviewed digest adoption.
+
+## Scrut for CLI contracts and E2E
+
+The image includes the native Scrut v0.4.3 executable on `PATH`, matching the
+installed-package validation jobs. Contributors can run Scrut-based
+`check-test-flow` steps without installing another tool. Bash and `jq`, needed
+by the CLI E2E runner, are already included in the image.
+
+The Dockerfile verifies the SHA-256 of the pinned DotSlash v0.5.9 archive and
+Scrut v0.4.3 wrapper before executing them. DotSlash verifies the downloaded
+native executable against the wrapper's embedded digest. Only the native Scrut
+binary is copied into the final image; DotSlash and its download cache are
+build-time dependencies. The local check and both image workflows verify
+`scrut --version` against `scrut 0.4.3`.
+
+When changing this pin, review the corresponding official release downloads
+and checksums and keep the image smoke checks aligned. Update the
+installed-package validation jobs in the separately reviewed main adoption PR
+if their Scrut pin needs to change.

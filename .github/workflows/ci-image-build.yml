@@ -91,6 +91,7 @@ jobs:
         run: |
           test "$(docker run --rm "${LOCAL_IMAGE_TAG}" cargo binstall -V)" = "${CARGO_BINSTALL_TAG#v}"
           test "$(docker run --rm "${LOCAL_IMAGE_TAG}" typos --version)" = "typos-cli ${TYPOS_TAG#v}"
+          test "$(docker run --rm "${LOCAL_IMAGE_TAG}" scrut --version)" = "scrut 0.4.3"
           docker run --rm "${LOCAL_IMAGE_TAG}" cargo --version
           docker run --rm "${LOCAL_IMAGE_TAG}" cargo deny --version
           docker run --rm "${LOCAL_IMAGE_TAG}" mdbook --help >/dev/null

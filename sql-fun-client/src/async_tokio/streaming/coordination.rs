@@ -11,7 +11,7 @@ type CallbackFuture = Pin<Box<dyn Future<Output = Result<(), Infallible>> + Send
 pub(super) type Callback = Box<dyn FnOnce(JsonRpcResponse) -> CallbackFuture + Send>;
 
 /// The request owns this admission slot through callback task collection.
-pub(in crate::async_tokio) struct RequestSlot {
+pub(super) struct RequestSlot {
     _permit: ::tokio::sync::OwnedSemaphorePermit,
 }
 

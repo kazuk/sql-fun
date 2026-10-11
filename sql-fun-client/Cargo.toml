@@ -9,12 +9,12 @@ keywords.workspace = true
 repository.workspace = true
 readme = "README.md"
 rust-version.workspace = true
+autotests = false
 
 [features]
 sqlite = ["sql-fun-server-api/sqlite"]
 
 [dependencies]
-clap.workspace = true
 nix.workspace = true
 serde.workspace = true
 serde_json.workspace = true
@@ -23,9 +23,14 @@ thiserror.workspace = true
 tokio.workspace = true
 
 [dev-dependencies]
+clap.workspace = true
 rstest.workspace = true
 tempfile.workspace = true
 testresult.workspace = true
+
+[[test]]
+name = "lifecycle"
+path = "tests/lifecycle.rs"
 
 [lints]
 workspace = true

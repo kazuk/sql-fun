@@ -1,4 +1,12 @@
-//! client for sql-fun-server
+//! Clients for the per-user sql-fun server.
+
+#![deny(missing_docs)]
+
+mod async_tokio;
+mod connection;
+
+pub use self::async_tokio::{TcpJsonRpcClientAsync, TcpJsonRpcClientAsyncError};
+pub use self::connection::{ConnectionError, ConnectionOptions, connect};
 
 use std::{
     io::{BufReader, Write},
@@ -28,8 +36,9 @@ pub enum JsonRpcClientError {
 /// JSON RPC Protocol error
 #[derive(Debug, thiserror::Error, serde::Deserialize)]
 pub struct JsonRpcError {
-    code: i16,
+    code: i32,
     message: String,
+    #[serde(default)]
     data: serde_json::Value,
 }
 
@@ -49,7 +58,7 @@ pub struct JsonRpcRequest {
     jsonrpc: JsonRpcVersion,
     method: String,
     id: u64,
-    params: Vec<serde_json::Value>,
+    params: serde_json::Value,
 }
 
 /// JSON RPC response
@@ -67,18 +76,28 @@ pub struct JsonRpcResponse {
 #[serde(rename_all = "snake_case")]
 pub enum JsonRpcResponseBody {
     /// normal response
+    #[serde(rename = "result")]
     Response(serde_json::Value),
     /// error response
     Error(JsonRpcError),
 }
 
+impl JsonRpcResponseBody {
+    fn into_result(self) -> Result<serde_json::Value, JsonRpcError> {
+        match self {
+            Self::Response(value) => Ok(value),
+            Self::Error(error) => Err(error),
+        }
+    }
+}
+
 impl JsonRpcRequest {
-    fn build_request(id: u64, method: String, params: Vec<serde_json::Value>) -> Self {
+    fn build_request(id: u64, method: &str, params: &serde_json::Value) -> Self {
         Self {
             jsonrpc: JsonRpcVersion::default(),
-            method,
+            method: method.to_owned(),
             id,
-            params,
+            params: params.clone(),
         }
     }
 }
@@ -125,10 +144,10 @@ impl TcpJsonRpcClient {
     pub fn invoke_method(
         &mut self,
         method: &str,
-        params: Vec<serde_json::Value>,
+        params: &serde_json::Value,
     ) -> Result<serde_json::Value, JsonRpcClientError> {
         let id = self.get_id();
-        let request = JsonRpcRequest::build_request(id, String::from(method), params);
+        let request = JsonRpcRequest::build_request(id, method, params);
         let mut json = serde_json::to_string(&request)?;
         json.push('\n');
         self.stream.write_all(json.as_bytes())?;
@@ -139,16 +158,6 @@ impl TcpJsonRpcClient {
             Err(JsonRpcClientError::UnexpectedResponse())?;
         }
 
-        match response.body {
-            JsonRpcResponseBody::Response(value) => Ok(value),
-            JsonRpcResponseBody::Error(err) => Err(JsonRpcClientError::from(err)),
-        }
+        Ok(response.body.into_result()?)
     }
 }
-
-pub use async_tokio::{TcpJsonRpcClientAsync, TcpJsonRpcClientAsyncError};
-
-mod async_tokio;
-
-#[cfg(test)]
-mod tests {}

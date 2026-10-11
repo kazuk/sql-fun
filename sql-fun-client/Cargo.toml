@@ -14,11 +14,18 @@ rust-version.workspace = true
 sqlite = ["sql-fun-server-api/sqlite"]
 
 [dependencies]
+clap.workspace = true
+nix.workspace = true
 serde.workspace = true
 serde_json.workspace = true
 sql-fun-server-api.workspace = true
 thiserror.workspace = true
 tokio.workspace = true
+
+[dev-dependencies]
+rstest.workspace = true
+tempfile.workspace = true
+testresult.workspace = true
 
 [lints]
 workspace = true

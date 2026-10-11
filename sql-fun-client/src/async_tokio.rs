@@ -77,11 +77,10 @@ impl TcpJsonRpcClientAsync {
                 Err(std::io::Error::other("connection closed"))
             };
         }
-        self.reader
-            .as_ref()
-            .ok_or_else(|| std::io::Error::other("connection closed"))?
-            .get_ref()
-            .peer_addr()
+        let Some(reader) = self.reader.as_ref() else {
+            return Err(std::io::Error::other("connection closed"));
+        };
+        reader.get_ref().peer_addr()
     }
 
     /// Submit a request with an infallible asynchronous response callback.
@@ -104,27 +103,25 @@ impl TcpJsonRpcClientAsync {
         Fut: std::future::Future<Output = Result<(), std::convert::Infallible>> + Send + 'static,
     {
         self.start_streaming()?;
-        let streaming = self
-            .streaming
-            .as_ref()
-            .ok_or_else(|| std::io::Error::other("connection closed"))?;
+        let streaming = self.streaming_connection()?;
         let permit = streaming
             .capacity
             .clone()
             .acquire_owned()
             .await
             .map_err(|_| streaming.error())?;
-        let next = self
-            .id
-            .checked_add(1)
-            .ok_or_else(|| TcpJsonRpcClientAsyncError::connection("request IDs exhausted"))?;
+        let Some(next) = self.id.checked_add(1) else {
+            return Err(TcpJsonRpcClientAsyncError::connection(
+                "request IDs exhausted",
+            ));
+        };
         let request = JsonRpcRequest::build_request(self.id, method, params);
         let mut frame = ::serde_json::to_vec(&request)?;
         frame.push(b'\n');
-        streaming
-            .sender
-            .as_ref()
-            .ok_or_else(|| streaming.error())?
+        let Some(sender) = streaming.sender.as_ref() else {
+            return Err(streaming.error());
+        };
+        sender
             .send(Submission {
                 id: self.id,
                 method: method.to_owned(),
@@ -144,10 +141,7 @@ impl TcpJsonRpcClientAsync {
     /// Returns the observed transport/protocol failure or connection closure.
     pub async fn wait_for_failure(&mut self) -> Result<(), TcpJsonRpcClientAsyncError> {
         self.start_streaming()?;
-        let streaming = self
-            .streaming
-            .as_ref()
-            .ok_or_else(|| std::io::Error::other("connection closed"))?;
+        let streaming = self.streaming_connection()?;
         let mut status = streaming.status.clone();
         while status.borrow().is_none() {
             if status.changed().await.is_err() {
@@ -166,10 +160,9 @@ impl TcpJsonRpcClientAsync {
     /// Returns transport/protocol failures, including missing responses at EOF.
     pub async fn finish(mut self) -> Result<(), TcpJsonRpcClientAsyncError> {
         self.start_streaming()?;
-        let mut streaming = self
-            .streaming
-            .take()
-            .ok_or_else(|| std::io::Error::other("connection closed"))?;
+        let Some(mut streaming) = self.streaming.take() else {
+            return Err(std::io::Error::other("connection closed").into());
+        };
         streaming.sender.take();
         (&mut streaming.worker)
             .await
@@ -177,12 +170,18 @@ impl TcpJsonRpcClientAsync {
             .map_err(|error| TcpJsonRpcClientAsyncError::connection(&error))
     }
 
+    fn streaming_connection(&self) -> Result<&Streaming, TcpJsonRpcClientAsyncError> {
+        let Some(streaming) = self.streaming.as_ref() else {
+            return Err(std::io::Error::other("connection closed").into());
+        };
+        Ok(streaming)
+    }
+
     fn start_streaming(&mut self) -> Result<(), TcpJsonRpcClientAsyncError> {
         if self.streaming.is_none() {
-            let reader = self
-                .reader
-                .take()
-                .ok_or_else(|| std::io::Error::other("connection closed"))?;
+            let Some(reader) = self.reader.take() else {
+                return Err(std::io::Error::other("connection closed").into());
+            };
             self.streaming = Some(Streaming::start(reader)?);
         }
         Ok(())
@@ -194,23 +193,26 @@ impl TcpJsonRpcClientAsync {
         params: &serde_json::Value,
         limit: usize,
     ) -> Result<serde_json::Value, TcpJsonRpcClientAsyncError> {
-        let mut reader = self
-            .reader
-            .take()
-            .ok_or_else(|| std::io::Error::other("connection closed"))?;
+        let Some(mut reader) = self.reader.take() else {
+            return Err(std::io::Error::other("connection closed").into());
+        };
         let id = self.id;
-        self.id = self
-            .id
-            .checked_add(1)
-            .ok_or_else(|| TcpJsonRpcClientAsyncError::connection("request IDs exhausted"))?;
+        let Some(next) = self.id.checked_add(1) else {
+            return Err(TcpJsonRpcClientAsyncError::connection(
+                "request IDs exhausted",
+            ));
+        };
+        self.id = next;
         let request = JsonRpcRequest::build_request(id, method, params);
         let mut json = ::serde_json::to_vec(&request)?;
         json.push(b'\n');
         reader.get_mut().write_all(&json).await?;
         ::tracing::info!(request_id = id, method, "request written");
-        let response = read_response(&mut reader, limit).await?.ok_or_else(|| {
-            std::io::Error::new(std::io::ErrorKind::UnexpectedEof, "response EOF")
-        })?;
+        let Some(response) = read_response(&mut reader, limit).await? else {
+            return Err(
+                std::io::Error::new(std::io::ErrorKind::UnexpectedEof, "response EOF").into(),
+            );
+        };
         response.trace_received();
         if response.id != id {
             return Err(std::io::Error::new(

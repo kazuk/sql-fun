@@ -31,6 +31,7 @@
 ### methods
 
 - [initialize method](./api/initialize.md)
+- [Schema context and check analysis API design](./api/check-analysis-design.md)
 - [initialized notification](./api/initialized.md)
 - [list-tables method](./api/list-tables.md)
 <!-- Empty links mark draft chapters in mdBook. -->

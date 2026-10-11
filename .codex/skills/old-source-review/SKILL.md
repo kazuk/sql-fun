@@ -17,27 +17,20 @@ write permission.
 
 ## Procedure
 
-1. Require the caller to choose one target Rust source and the destination
-   repository in `OWNER/REPO` form. To offer a candidate without selecting it,
-   run:
+1. Invoking this repository-local skill selects its containing repository and
+   authorizes inspection under the deterministic `.local/bin/old-source` policy,
+   semantic investigation, and creation of one maintenance issue. No additional
+   repository or target confirmation is required. Collect the first candidate:
 
    ```bash
-   .codex/skills/old-source-review/scripts/collect-evidence.sh --suggest-candidate
+   .codex/skills/old-source-review/scripts/collect-evidence.sh --oldest
    ```
 
-   Report the returned candidate and wait for the caller to supply the target.
-   Do not inspect the candidate, search its uses, or create an issue until that
-   selection is explicit.
-
-2. Collect evidence for the explicitly selected source:
-
-   ```bash
-   .codex/skills/old-source-review/scripts/collect-evidence.sh --target <path>
-   ```
-
-   The candidate helper evaluates all tracked Rust sources through
-   `.local/bin/old-source`; do not add a subset filter or substitute a
-   different candidate.
+2. Adopt the returned `target` and `evidence_commit`. The first result from
+   `.local/bin/old-source` is authoritative. Do not filter, rerank, exclude
+   previously reviewed files, or substitute a replacement candidate. Stop if
+   collection fails. `--suggest-candidate` remains a non-selecting manual mode;
+   the unattended procedure uses `--oldest`.
 
 3. Use the returned JSON facts for the target, tracked-file
    validation, and last-modifying commit. Do not recreate those values in the
@@ -50,7 +43,8 @@ write permission.
 
    ```bash
    .codex/skills/old-source-review/scripts/collect-evidence.sh \
-     --target <path> --definition <name> [--definition <name> ...]
+     --target <path> --evidence-commit <evidence_commit> \
+     --definition <name> [--definition <name> ...]
    ```
 
    The returned literal matches are evidence only. Determine whether they are
@@ -80,10 +74,16 @@ write permission.
 
    ```bash
    .codex/skills/old-source-review/scripts/create-maintenance-issue.sh \
-     --repo <owner/repo> \
+     --repository-context \
      --title "[Maintenance] <target>: <suggested disposition>" \
      --body-file <path>
    ```
+
+   The helper resolves the destination from the containing repository's `origin`
+   remote (GitHub HTTPS or SSH), including a fork's own origin. It never selects
+   an upstream or uses ambient `GH_REPO` or the caller's current directory.
+   Missing, unsupported, or unresolvable origin stops creation without fallback.
+   `--repo` remains available for explicit manual helper use.
 
    The helper validates the template headings, appends the fixed Keep follow-up
    notice, and applies `not-ready`. If creation fails or its result is

@@ -8,11 +8,14 @@ readonly OLD_SOURCE="$REPOSITORY_ROOT/.local/bin/old-source"
 
 target=""
 suggest_candidate=false
+oldest=false
+evidence_commit=""
 declare -a definitions=()
 
 usage() {
-  printf '%s\n' 'usage: collect-evidence.sh --suggest-candidate'
-  printf '%s\n' '   or: collect-evidence.sh --target <tracked-rust-source> [--definition <name>]...'
+  printf '%s\n' 'usage: collect-evidence.sh --oldest [--definition <name>]...'
+  printf '%s\n' '   or: collect-evidence.sh --suggest-candidate'
+  printf '%s\n' '   or: collect-evidence.sh --target <tracked-rust-source> [--definition <name>]... [--evidence-commit <sha>]'
 }
 
 fail() {
@@ -25,6 +28,16 @@ while (($# > 0)); do
     --suggest-candidate)
       suggest_candidate=true
       shift
+      ;;
+    --oldest)
+      oldest=true
+      shift
+      ;;
+    --evidence-commit)
+      (($# >= 2)) || fail 'missing value for --evidence-commit'
+      [[ "$2" =~ ^[0-9a-fA-F]{40}$ ]] || fail 'evidence commit must be a full commit SHA'
+      evidence_commit="$2"
+      shift 2
       ;;
     --target)
       (($# >= 2)) || fail 'missing value for --target'
@@ -48,11 +61,24 @@ while (($# > 0)); do
   esac
 done
 
+if "$oldest" || "$suggest_candidate"; then
+  [[ -z "$target" && -z "$evidence_commit" ]] || fail 'candidate modes cannot be combined with target or evidence commit'
+  if "$oldest"; then
+    ! "$suggest_candidate" || fail '--oldest cannot be combined with --suggest-candidate'
+  fi
+  if "$suggest_candidate"; then
+    ((${#definitions[@]} == 0)) || fail '--suggest-candidate cannot be combined with definitions'
+  fi
+  candidate="$(cd -- "$REPOSITORY_ROOT" && "$OLD_SOURCE" | sed -n '1p')"
+  [[ -n "$candidate" ]] || fail 'old-source returned no candidate'
+  if "$oldest"; then
+    target="${candidate#* }"
+  fi
+fi
+
 if "$suggest_candidate"; then
   [[ -z "$target" && ${#definitions[@]} -eq 0 ]] \
     || fail '--suggest-candidate cannot be combined with target or definition arguments'
-  candidate="$($OLD_SOURCE | sed -n '1p')"
-  [[ -n "$candidate" ]] || fail 'old-source returned no candidate'
   jq -n \
     --arg candidate_date "${candidate%% *}" \
     --arg candidate "${candidate#* }" \
@@ -60,9 +86,13 @@ if "$suggest_candidate"; then
   exit 0
 fi
 
-[[ -n "$target" ]] || fail 'missing --target; run with --suggest-candidate to offer a candidate'
+[[ -n "$target" ]] || fail 'select --oldest or supply --target'
 [[ "$target" == *.rs ]] || fail "target is not a Rust source file: $target"
-evidence_commit="$(git -C "$REPOSITORY_ROOT" rev-parse HEAD)"
+if [[ -z "$evidence_commit" ]]; then
+  evidence_commit="$(git -C "$REPOSITORY_ROOT" rev-parse HEAD)"
+fi
+git -C "$REPOSITORY_ROOT" cat-file -e "$evidence_commit^{commit}" \
+  || fail "invalid evidence commit: $evidence_commit"
 git -C "$REPOSITORY_ROOT" cat-file -e "$evidence_commit:$target" \
   || fail "target is not tracked at the evidence commit: $target"
 

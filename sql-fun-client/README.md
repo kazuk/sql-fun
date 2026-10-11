@@ -75,8 +75,9 @@ atomic server registration publication is a prerequisite tracked in issue #407.
 The async low-level `try_from` wraps a socket without authentication; use `connect`
 for the authenticated lifecycle. `invoke_method` accepts JSON object parameters
 and bounds response frames to 2 MiB. Calls after initialization have no implicit
-time deadline; callers can use `tokio::time::timeout`. Cancellation or a transport/protocol failure
-closes the socket to prevent a partial exchange from corrupting later calls.
+time deadline; callers can use `tokio::time::timeout`. Cancellation or a
+transport/protocol failure closes the socket to prevent a partial exchange from
+corrupting later calls.
 
 Integration tests run in the standard workspace nextest suite. Their heavy
 fixtures prebuild the actual server (and CLI) in the dev profile with matching

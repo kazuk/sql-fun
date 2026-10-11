@@ -96,11 +96,6 @@ skills with `skill-validator`. Contributors running this flow outside the projec
 CI image need the tool available on `PATH`; see the upstream
 [installation instructions](https://github.com/agent-ecosystem/skill-validator#install).
 The CI image currently pins version 1.6.2 for reproducibility.
-The step also runs `.local/bin/test-old-source-review`, offline Bash/Git/jq
-contracts for the maintenance skill with a mocked GitHub client. Running the
-actual review skill additionally requires an authenticated `gh` client with
-repository write access. The standard CI/development image includes `gh`;
-outside that image, install GitHub CLI and authenticate before running the skill.
 The validation accepts a skill-root README when `SKILL.md` links to it, so skills
 can include maintainer-facing guidance without producing a structural warning.
 

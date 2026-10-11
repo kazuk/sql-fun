@@ -250,8 +250,8 @@ function run_doc() {
   cargo doc --workspace --no-deps
   mdbook build
   echo "== Documentation tests (default and all features)"
-  cargo test --doc -p sql-fun-sqlast
-  cargo test --doc -p sql-fun-sqlast --all-features
+  cargo test --doc -p sql-fun-sqlast -p sql-fun-client
+  cargo test --doc -p sql-fun-sqlast -p sql-fun-client --all-features
 }
 
 function run_typos() {

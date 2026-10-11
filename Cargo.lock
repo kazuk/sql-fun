@@ -2955,6 +2955,7 @@ dependencies = [
 name = "sql-fun-client"
 version = "0.1.0"
 dependencies = [
+ "bon",
  "clap",
  "nix 0.31.3",
  "rstest",

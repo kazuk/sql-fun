@@ -6,7 +6,7 @@ mod async_tokio;
 mod connection;
 
 pub use self::async_tokio::{TcpJsonRpcClientAsync, TcpJsonRpcClientAsyncError};
-pub use self::connection::{ConnectionError, ConnectionOptions, connect};
+pub use self::connection::{ConnectionError, ConnectionOptions, ConnectionOptionsBuilder, connect};
 
 use std::{
     io::{BufReader, Write},

@@ -7,6 +7,61 @@
   },
   "methods": [
     {
+      "name": "echo",
+      "summary": "return parameters unchanged for diagnostics",
+      "deprecated": null,
+      "tags": [],
+      "params": [
+        {
+          "name": "params",
+          "schema": {
+            "$schema": "https://json-schema.org/draft/2020-12/schema",
+            "title": "EchoArgs",
+            "description": "Object or array parameters returned unchanged by the diagnostic echo method.",
+            "$ref": "#/$defs/EchoPayload",
+            "$defs": {
+              "EchoPayload": {
+                "anyOf": [
+                  {
+                    "type": "object",
+                    "additionalProperties": true
+                  },
+                  {
+                    "type": "array",
+                    "items": true
+                  }
+                ]
+              }
+            }
+          },
+          "required": true
+        }
+      ],
+      "result": {
+        "name": "result",
+        "schema": {
+          "$schema": "https://json-schema.org/draft/2020-12/schema",
+          "title": "EchoArgs",
+          "description": "Object or array parameters returned unchanged by the diagnostic echo method.",
+          "$ref": "#/$defs/EchoPayload",
+          "$defs": {
+            "EchoPayload": {
+              "anyOf": [
+                {
+                  "type": "object",
+                  "additionalProperties": true
+                },
+                {
+                  "type": "array",
+                  "items": true
+                }
+              ]
+            }
+          }
+        }
+      }
+    },
+    {
       "name": "initialize_schema_context",
       "summary": "load schema dump file for semantic analysis",
       "deprecated": null,

@@ -22,7 +22,7 @@
 - [check](./cli/check.md) sub command
 <!-- Empty links mark draft chapters in mdBook. -->
 <!-- rumdl-disable MD042 -->
-- [api]()
+- [api](./cli/api.md)
 - [api-help]()
 <!-- rumdl-enable MD042 -->
 

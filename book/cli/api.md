@@ -1,0 +1,93 @@
+# `sql-fun api`
+
+Stream JSON Lines requests to the authenticated, shared per-user
+`sql-fun-server`. Install both `sql-fun-cli` and `sql-fun-server` and make the
+server executable available on `PATH`, or set `SQL_FUN_SERVER` to its path.
+
+```sh
+printf '%s\n' '{"method":"echo","params":{"hello":[1,null,true]}}' |
+  sql-fun api --user alice
+```
+
+The diagnostic `echo` method returns its object or array parameters unchanged.
+It needs no datasource or schema setup. For example, stdout contains a response
+like this (the client assigns the ID):
+
+```json
+{"jsonrpc":"2.0","id":1,"result":{"hello":[1,null,true]}}
+```
+
+## Connection and launch choices
+
+`--user` selects the server namespace and overrides `USER`. Supply either;
+a missing or invalid user is an error. The server is shared by commands using
+the same user. A successful existing connection is reused without launching
+another server. Exiting the CLI leaves the shared server running.
+
+`SQL_FUN_SERVER` names an executable path, never a shell command. Relative paths
+are resolved from the caller's current working directory. If it is unset,
+`sql-fun-server` is located on `PATH`. An invalid explicit setting is not replaced
+with a PATH candidate.
+
+`--server-command` overrides `SQL_FUN_SERVER_COMMAND`. This optional launch-only
+command runs through `/bin/sh -c` in the caller's current working directory;
+`/bin/sh` must be available when using it. The executable reference is still
+required. The launch command is not executed when an existing server can be
+reused. Without an override, the selected executable is launched directly.
+
+For repository development, `.envrc` sets:
+
+```sh
+export SQL_FUN_SERVER="${GIT_ROOT}/target/debug/sql-fun-server"
+export SQL_FUN_SERVER_COMMAND='cargo run -p sql-fun-server'
+```
+
+You can also supply the Cargo command explicitly:
+
+```sh
+sql-fun api --user alice --server-command 'cargo run -p sql-fun-server'
+```
+
+This requires Cargo and access to the selected project from the caller's working
+directory. Startup compilation counts toward the default 40-second connection
+budget. Prebuild with `cargo build -p sql-fun-server` when compilation would
+exceed that budget. The Cargo command is a repository development setting;
+installed CLI usage does not require Cargo. The CLI does not search for project
+files or read project metadata to choose a server.
+
+Malformed, stale, unauthenticated, or unresponsive registrations fail without
+stopping the server or deleting its registration. Automatic registration
+recovery is not currently supported.
+
+## Input, output, and completion
+
+Each input line must be a complete JSON object with a string `method` and valid
+`params` for that API method. Do not supply an `id`, even `null`: the client
+allocates IDs. You can omit `jsonrpc`; when supplied, it must be exactly the
+string `"2.0"`. An explicitly invalid version is rejected.
+
+`echo` requires `params` to be an object or array. Both can contain nested JSON
+values, including null. Scalar or null parameters are rejected. Other accepted
+method names are `initialize_schema_context`, `read_collection`,
+`release_collection`, `analyze_query`, `list_object`, and `describe_table`, with
+parameters matching their public API argument types. Currently only `echo` and
+`initialize_schema_context` are dispatched by the server, and schema-context
+initialization remains incomplete. Other declared methods can return a server
+method error; `echo` verifies the transport, not SQL analysis functionality.
+
+Requests can remain outstanding while subsequent lines are submitted. Slow
+output applies backpressure. Stdout contains only complete JSON-RPC response
+objects, one per line, including server error responses. Match responses by ID;
+response order is not guaranteed to match submission order. Diagnostics and
+logs go to stderr. Use `RUST_LOG=info` to enable request/response tracing.
+
+At stdin EOF the CLI drains accepted requests and their output before exiting
+successfully. A malformed or invalid line stops further input, reports its line
+number on stderr, and drains preceding accepted requests before exiting with a
+nonzero status. Input read failures, transport failures, and stdout write or
+flush failures also produce a nonzero status. They are not synthetic server
+responses. A server JSON-RPC error response by itself does not indicate a CLI
+transport failure.
+
+Draining has no implicit timeout. The command waits for outstanding responses
+and output completion; keep the output consumer reading until EOF.

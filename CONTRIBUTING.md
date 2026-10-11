@@ -28,6 +28,12 @@ direnv allow
 If you use another environment loader, make sure it applies the same
 [`.envrc`](.envrc) settings before running build, test, or development scripts.
 
+For `sql-fun api`, `.envrc` supplies an absolute debug server reference and a
+`cargo run -p sql-fun-server` launch command. Run from the repository directory;
+startup compilation counts toward the 40-second connection budget. Prebuild
+with `cargo build -p sql-fun-server` if necessary. See
+[the API command reference](book/cli/api.md) for installed CLI usage.
+
 Docker is required for workflows that extract built-in function and extension
 definitions from official PostgreSQL images.
 

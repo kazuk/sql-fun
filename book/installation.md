@@ -46,6 +46,13 @@ cargo expand --version
 and add Cargo's binary directory to `PATH` before retrying. It is a prerequisite
 of this command, not a Debian package installation dependency.
 
+`sql-fun api` requires the installed `sql-fun-server` executable on `PATH` or an
+explicit `SQL_FUN_SERVER` executable path, and a user selected by `--user` or
+`USER`. A `--server-command`/`SQL_FUN_SERVER_COMMAND` launch override requires
+`/bin/sh`. Cargo is required only when the selected launch command invokes it.
+See [the API command reference](cli/api.md) for streaming examples and connection
+settings.
+
 Specify this in your Cargo.toml as follows:
 
 ```toml

@@ -30,6 +30,14 @@ name = "sql-fun"
 path = "src/main.rs"
 doc = false
 
+[features]
+sqlite = [
+    "sql-fun-client/sqlite",
+    "sql-fun-server-api/sqlite",
+    "sql-fun-core/sqlite",
+    "sql-fun-codegen/sqlite",
+]
+
 [dependencies]
 anyhow.workspace = true
 bollard.workspace = true
@@ -48,8 +56,10 @@ nix.workspace = true
 serde.workspace = true
 serde_json.workspace = true
 shellexpand.workspace = true
+sql-fun-client.workspace = true
 sql-fun-codegen.workspace = true
 sql-fun-core.workspace = true
+sql-fun-server-api.workspace = true
 statig.workspace = true
 syn.workspace = true
 tar.workspace = true
@@ -57,6 +67,7 @@ tempfile.workspace = true
 thiserror.workspace = true
 tokio.workspace = true
 toml.workspace = true
+tracing-subscriber.workspace = true
 url.workspace = true
 walkdir.workspace = true
 which.workspace = true
@@ -65,6 +76,7 @@ which.workspace = true
 pg_query.workspace = true
 rstest.workspace = true
 sql-fun-sqlast.workspace = true
+testresult.workspace = true
 
 [[test]]
 name = "check_prerequisite"
@@ -74,6 +86,9 @@ name = "extracted_artifacts"
 
 [[test]]
 name = "initialization"
+
+[[test]]
+name = "api"
 
 [lints]
 workspace = true

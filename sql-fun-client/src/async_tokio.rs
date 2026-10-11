@@ -28,6 +28,11 @@ pub enum TcpJsonRpcClientAsyncError {
 }
 
 impl TcpJsonRpcClientAsyncError {
+    #[track_caller]
+    fn raise_connection_closed<T>() -> Result<T, Self> {
+        Err(Self::Io(std::io::Error::other("connection closed")))
+    }
+
     fn connection(message: &str) -> Self {
         Self::Connection(message.to_owned())
     }
@@ -104,16 +109,9 @@ impl TcpJsonRpcClientAsync {
     {
         self.start_streaming()?;
         let streaming = self.streaming_connection()?;
-        let slot = streaming.reserve_request().await?;
-        let Some(next) = self.id.checked_add(1) else {
-            return Err(TcpJsonRpcClientAsyncError::connection(
-                "request IDs exhausted",
-            ));
-        };
-        streaming
-            .submit_request(self.id, method, params, callback, slot)
+        self.id = streaming
+            .submit_request(self.id, method, params, callback)
             .await?;
-        self.id = next;
         Ok(())
     }
 
@@ -137,14 +135,14 @@ impl TcpJsonRpcClientAsync {
     pub async fn finish(mut self) -> Result<(), TcpJsonRpcClientAsyncError> {
         self.start_streaming()?;
         let Some(streaming) = self.streaming.take() else {
-            return Err(std::io::Error::other("connection closed").into());
+            return TcpJsonRpcClientAsyncError::raise_connection_closed();
         };
         streaming.finish().await
     }
 
     fn streaming_connection(&self) -> Result<&Streaming, TcpJsonRpcClientAsyncError> {
         let Some(streaming) = self.streaming.as_ref() else {
-            return Err(std::io::Error::other("connection closed").into());
+            return TcpJsonRpcClientAsyncError::raise_connection_closed();
         };
         Ok(streaming)
     }
@@ -152,7 +150,7 @@ impl TcpJsonRpcClientAsync {
     fn start_streaming(&mut self) -> Result<(), TcpJsonRpcClientAsyncError> {
         if self.streaming.is_none() {
             let Some(reader) = self.reader.take() else {
-                return Err(std::io::Error::other("connection closed").into());
+                return TcpJsonRpcClientAsyncError::raise_connection_closed();
             };
             self.streaming = Some(Streaming::start(reader)?);
         }
@@ -166,7 +164,7 @@ impl TcpJsonRpcClientAsync {
         limit: usize,
     ) -> Result<serde_json::Value, TcpJsonRpcClientAsyncError> {
         let Some(mut reader) = self.reader.take() else {
-            return Err(std::io::Error::other("connection closed").into());
+            return TcpJsonRpcClientAsyncError::raise_connection_closed();
         };
         let id = self.id;
         let Some(next) = self.id.checked_add(1) else {

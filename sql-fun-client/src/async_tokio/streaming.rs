@@ -2,8 +2,8 @@ mod coordination;
 
 use self::coordination::{
     AcceptedRequests, CallbackDeliveries, ConnectionReporter, ConnectionStatus, ConnectionTask,
-    IncomingResponses, OutgoingRequests, RequestAdmission, RequestSlot, Submission,
-    SubmissionQueue, TransportTasks, WireRequest,
+    IncomingResponses, OutgoingRequests, RequestAdmission, Submission, SubmissionQueue,
+    TransportTasks, WireRequest,
 };
 use crate::{JsonRpcResponse, TcpJsonRpcClientAsyncError};
 
@@ -65,25 +65,27 @@ impl Streaming {
         })
     }
 
-    pub(super) async fn reserve_request(&self) -> Result<RequestSlot, TcpJsonRpcClientAsyncError> {
-        self.admission
-            .reserve_request()
-            .await
-            .map_err(|_| self.error())
-    }
-
     pub(super) async fn submit_request<F, Fut>(
         &self,
         id: u64,
         method: &str,
         params: &::serde_json::Value,
         callback: F,
-        slot: RequestSlot,
-    ) -> Result<(), TcpJsonRpcClientAsyncError>
+    ) -> Result<u64, TcpJsonRpcClientAsyncError>
     where
         F: FnOnce(JsonRpcResponse) -> Fut + Send + 'static,
         Fut: Future<Output = Result<(), Infallible>> + Send + 'static,
     {
+        let slot = self
+            .admission
+            .reserve_request()
+            .await
+            .map_err(|_| self.error())?;
+        let Some(next) = id.checked_add(1) else {
+            return Err(TcpJsonRpcClientAsyncError::connection(
+                "request IDs exhausted",
+            ));
+        };
         let request = WireRequest::serialize(id, method, params)?;
         let submission = Submission::new(
             request,
@@ -93,7 +95,8 @@ impl Streaming {
         self.submissions
             .enqueue(submission)
             .await
-            .map_err(|_| self.error())
+            .map_err(|_| self.error())?;
+        Ok(next)
     }
 
     pub(super) async fn wait_for_failure(&self) -> Result<(), TcpJsonRpcClientAsyncError> {

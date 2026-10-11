@@ -23,14 +23,6 @@ use crate::{
 #[cfg(feature = "sqlite")]
 use crate::{SqliteToken, syn::sqlite::CreateTableBody};
 
-#[macro_use]
-#[path = "./macros.rs"]
-mod macros;
-
-impl_from_ref!(TableName);
-impl_from_ref!(ColumnName);
-impl_from_ref!(ViewName);
-
 /// columns in table
 #[derive(Debug, Clone, Default, Eq, Hash, PartialEq, serde::Serialize, serde::Deserialize)]
 pub struct ColumnCollection(Vec<ColumnDefinition>);

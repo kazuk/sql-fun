@@ -6,6 +6,12 @@ use crate::{sem::AnalysisError, syn::Node};
 #[derive(Debug, Clone, Eq, Hash, PartialEq, serde::Serialize, serde::Deserialize)]
 pub struct ColumnName(String);
 
+impl From<&Self> for ColumnName {
+    fn from(value: &Self) -> Self {
+        value.clone()
+    }
+}
+
 impl ColumnName {
     /// create from string
     #[must_use]

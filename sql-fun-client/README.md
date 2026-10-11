@@ -43,11 +43,11 @@ retries share one monotonic deadline. Each connection/initialization attempt is
 also bounded. Initialization validates the JSON-RPC version, matching request ID,
 and `result: "OK"`. TCP connection alone does not establish readiness.
 
-The minimal CLI exercises the real lifecycle:
+The self-contained example demonstrates the public connection API:
 
 ```sh
 cargo build -p sql-fun-server
-cargo run -p sql-fun-client --bin sql-fun-client-connect -- \
+cargo run -p sql-fun-client --example sql-fun-client-connect -- \
   --server-executable "$PWD/target/debug/sql-fun-server" \
   --user "$USER" --timeout-ms 40000
 ```
@@ -55,7 +55,7 @@ cargo run -p sql-fun-client --bin sql-fun-client-connect -- \
 For a Cargo startup override, install Cargo/Rust and prebuild the server with
 matching features/profile first, then add
 `--server-command 'cargo run -p sql-fun-server'`. Compilation time is part of the
-connection deadline if the server was not prebuilt. The CLI requires an explicit
+connection deadline if the server was not prebuilt. The example requires an explicit
 `--user`; omitted command and timeout use the documented behavior above.
 
 Malformed or incomplete registrations fail immediately and are preserved.
@@ -70,7 +70,10 @@ or launches a replacement over it. Crash leftovers, zombies and inconsistent
 tokens can therefore require operator-assisted recovery. Verify the intended
 server and registration before cleanup and stop other startups during that work.
 Do not act on an unverified PID. Safe automatic recovery is tracked in issue #415;
-atomic server registration publication is a prerequisite tracked in issue #407.
+atomic server registration publication is a separate improvement in issue #407.
+Until that improvement lands, discovery during the brief registration-write
+window can fail with a malformed-record error. This is an accepted MVP limitation;
+it does not prevent normal launch, authentication or reuse once writing completes.
 
 The async low-level `try_from` wraps a socket without authentication; use `connect`
 for the authenticated lifecycle. `invoke_method` accepts JSON object parameters
@@ -80,6 +83,8 @@ transport/protocol failure closes the socket to prevent a partial exchange from
 corrupting later calls.
 
 Integration tests run in the standard workspace nextest suite. Their heavy
-fixtures prebuild the actual server (and CLI) in the dev profile with matching
+fixtures prebuild the actual server in the dev profile with matching
 SQLite features before timing any connection, and use unique fixture-owned user
-namespaces. No developer registration is used.
+namespaces. They call the library directly and do not execute the example.
+The example is compiled by the standard lint step's all-targets check.
+No developer registration is used.

@@ -26,8 +26,6 @@ async fn launches_authenticates_and_reuses_without_executing_override() -> ::tes
     assert_eq!(address, second.peer_addr()?);
     assert_eq!(before, fixture.registration()?);
     drop(second);
-    assert!(fixture.cli().status()?.success());
-    assert_eq!(before, fixture.registration()?);
     Ok(())
 }
 

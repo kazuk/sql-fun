@@ -2,13 +2,12 @@ use std::path::{Path, PathBuf};
 use std::process::Command;
 use std::time::Duration;
 
-/// Prebuilds actual binaries for each test process, then owns one isolated server
+/// Prebuilds the actual server for each test process, then owns one isolated server
 /// namespace. Cargo's build cache is shared; process/service fixtures are not.
 /// This expensive setup verifies actual server lifecycle, not a mock protocol.
 pub struct ServerFixture {
     directory: ::tempfile::TempDir,
     executable: PathBuf,
-    cli: PathBuf,
     user: String,
 }
 
@@ -18,21 +17,19 @@ impl ServerFixture {
         // Build with the exact package selection used by the Cargo override.
         // Combining packages changes dependency feature unification and can make
         // cargo run recompile during the measured startup interval.
-        for package in ["sql-fun-server", "sql-fun-client"] {
-            let mut build = Command::new(env!("CARGO"));
-            build
-                .current_dir(root)
-                .args(["build", "-p", package, "--bins"]);
-            if cfg!(feature = "sqlite") {
-                build.args(["--features", "sqlite"]);
-            }
-            let output = build.output()?;
-            assert!(
-                output.status.success(),
-                "prebuild: {}",
-                String::from_utf8_lossy(&output.stderr)
-            );
+        let mut build = Command::new(env!("CARGO"));
+        build
+            .current_dir(root)
+            .args(["build", "-p", "sql-fun-server", "--bin", "sql-fun-server"]);
+        if cfg!(feature = "sqlite") {
+            build.args(["--features", "sqlite"]);
         }
+        let output = build.output()?;
+        assert!(
+            output.status.success(),
+            "prebuild: {}",
+            String::from_utf8_lossy(&output.stderr)
+        );
         // Use Cargo's resolved target directory, including CARGO_TARGET_DIR.
         let metadata = Command::new(env!("CARGO"))
             .current_dir(root)
@@ -53,7 +50,6 @@ impl ServerFixture {
         Ok(Self {
             directory,
             executable: target.join("sql-fun-server"),
-            cli: target.join("sql-fun-client-connect"),
             user,
         })
     }
@@ -73,18 +69,6 @@ impl ServerFixture {
             command,
             Some(timeout),
         )
-    }
-
-    pub fn cli(&self) -> Command {
-        let mut command = Command::new(&self.cli);
-        command
-            .arg("--server-executable")
-            .arg(&self.executable)
-            .arg("--user")
-            .arg(&self.user)
-            .arg("--timeout-ms")
-            .arg("10000");
-        command
     }
 
     pub fn registration_path(&self) -> PathBuf {

@@ -82,6 +82,28 @@ the context. A missing handle must not be treated as a successfully initialized
 context. The conditions for publishing a partially built context remain
 unspecified.
 
+The cache service now supports shared builtin and ordered extension prefixes.
+Its RPC integration still depends on connection-scoped session registration.
+The datasource must be explicitly selected; an omitted or unknown selection
+is an error. The server reads only the schema files selected for that request.
+Client and server must see the same local files. Aliases resolving to the same
+canonical path share a file identity; separate canonical paths have separate
+identities even when contents match.
+
+The initialization integration will require an `expected_hash` of the original
+schema-dump file text, calculated by the client using
+`sql_fun_core::Hasher::hash_file`. This field is **not yet present** in the
+historical wire shape above. Server-side hashing happens before psql command
+preprocessing. When expected and actual hashes differ, initialization fails
+with a schema-dump-changed error. Read the current file, recalculate its hash,
+and explicitly retry; a cache hit still checks the expected hash.
+
+Builtin definitions are fixed for the server lifetime. Restart the server after
+updating the selected builtin installation. File-backed extension and application
+layers use local filesystem change notifications and file replacement checks;
+these are an optimization rather than a guarantee for filesystems with missing
+notifications. Schema cache eviction is not yet implemented.
+
 ### 2. Submit a query for analysis
 
 Call `analyze_query` with the handle returned by

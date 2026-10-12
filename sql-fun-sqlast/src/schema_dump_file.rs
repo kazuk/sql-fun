@@ -26,6 +26,13 @@ pub enum ParseDumpFileError {
     SqliteSyn(#[from] ::turso_parser::error::Error),
 }
 
+impl ParseDumpFileError {
+    /// Whether retrying file access may succeed without changing SQL contents.
+    pub const fn is_io(&self) -> bool {
+        matches!(self, Self::Io(_))
+    }
+}
+
 /// A loaded schema file and its immutable catalog.
 ///
 /// The semantic statements and recoverable problems belong to this file's

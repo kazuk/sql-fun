@@ -1,93 +1,70 @@
-use std::{
-    fs::File,
-    io::{BufRead, BufReader},
-    path::Path,
-};
+use std::path::Path;
 
-/// An iterator over the lines of a file, preserving line endings.
-///
-/// # Overview
-/// This iterator reads from a file line-by-line using
-/// [`std::io::BufRead::read_line`], **keeping the trailing `\n` (if present)**
-/// in each returned `String`.
-///
-/// This differs from [`std::io::BufRead::lines`], which strips line endings.
-/// Preserving `\n` is intentional — it allows callers to `push_str` the lines
-/// directly into an output `String` without re-inserting line breaks.
-///
-/// # Common Pitfall
-/// Do **not** treat the returned `String` as if it came from `.lines()`,
-/// or you may end up with duplicated or missing newlines in the output.
-///
-/// ```ignore
-/// // Correct: preserves original line breaks
-/// let mut out = String::new();
-/// for line in file_lines("input.sql")? {
-///     let line = line?;
-///     out.push_str(&line); // `line` already has `\n`
-/// }
-///
-/// // Incorrect: adding your own `\n` will double the newlines
-/// for line in file_lines("input.sql")? {
-///     let line = line?;
-///     out.push_str(&line);
-///     out.push('\n'); // ❌ This will produce two newlines
-/// }
-/// ```
-///
-/// # Error Handling
-/// Each item is `Result<String, std::io::Error>`.
-/// The iterator yields an error if reading the underlying file fails.
-///
-/// # See Also
-/// - [`std::io::BufRead::read_line`] — underlying API used here.
-/// - [`std::io::BufRead::lines`] — strips newlines, unlike this iterator.
-fn file_lines<P: AsRef<Path>>(path: P) -> Result<LineWithLfIter, std::io::Error> {
-    let file = File::open(path)?;
-    let reader = BufReader::new(file);
-    Ok(LineWithLfIter { reader, eof: false })
+/// Read and hash original text before excluding psql commands from SQL analysis.
+pub(super) fn read_sql_file(
+    path: &Path,
+    content_hash: &mut Option<String>,
+) -> Result<String, std::io::Error> {
+    *content_hash = None;
+    let text = std::fs::read_to_string(path)?;
+    let mut hasher = ::sql_fun_core::Hasher::new();
+    hasher.append_str(&text);
+    *content_hash = Some(hasher.finish());
+    Ok(comment_psql_commands(text))
 }
 
-struct LineWithLfIter {
-    reader: BufReader<File>,
-    eof: bool,
-}
-
-impl Iterator for LineWithLfIter {
-    type Item = Result<String, std::io::Error>;
-
-    fn next(&mut self) -> Option<Self::Item> {
-        if self.eof {
-            return None;
-        }
-
-        let mut buf = String::new();
-        match self.reader.read_line(&mut buf) {
-            Ok(read) => {
-                if read == 0 {
-                    self.eof = true;
-                }
-                Some(Ok(buf))
+fn comment_psql_commands(mut text: String) -> String {
+    // Preserve UTF-8 validity and all original byte offsets.
+    let mut offset = 0;
+    let replacements: Vec<_> = text
+        .split_inclusive('\n')
+        .filter_map(|line| {
+            let trimmed = line.trim_start();
+            let start = offset + line.len() - trimmed.len();
+            offset += line.len();
+            if trimmed.starts_with('\\') {
+                Some(start)
+            } else {
+                None
             }
-            Err(e) => Some(Err(e)),
+        })
+        .collect();
+    for start in replacements {
+        // A short command must not consume the newline or a multibyte character.
+        let end = text[start..]
+            .chars()
+            .take(3)
+            .take_while(|c| c.is_ascii() && *c != '\n' && *c != '\r')
+            .count();
+        if end >= 2 {
+            let replacement = if end == 2 { "--" } else { "-- " };
+            text.replace_range(start..start + end, replacement);
+        } else {
+            let line_end = text[start..]
+                .find(['\r', '\n'])
+                .map_or(text.len(), |len| start + len);
+            let length = line_end - start;
+            let replacement = if length >= 2 {
+                format!("--{}", " ".repeat(length - 2))
+            } else {
+                " ".to_owned()
+            };
+            text.replace_range(start..line_end, &replacement);
         }
     }
+    text
 }
 
-fn comment_psql_meta_command(line: String) -> String {
-    if line.trim_start().starts_with('\\') {
-        let line_value = &line[3..]; // preserve line length
-        format!("-- {line_value}")
-    } else {
-        line
+#[cfg(test)]
+mod tests {
+    #[rstest::rstest]
+    #[case::normal("\\restrict abc\nSELECT 1;\n", "-- strict abc\nSELECT 1;\n")]
+    #[case::indented("  \\x\r\nSELECT 1;", "  --\r\nSELECT 1;")]
+    #[case::short("\\", " ")]
+    #[case::unicode("\\é\n", "-- \n")]
+    fn preserves_command_offsets(#[case] input: &str, #[case] expected: &str) {
+        let actual = super::comment_psql_commands(input.to_owned());
+        assert_eq!(actual, expected);
+        assert_eq!(actual.len(), input.len());
     }
-}
-
-pub(super) fn read_sql_file<P: AsRef<Path>>(path: P) -> Result<String, std::io::Error> {
-    let mut result = String::new();
-    for line_res in file_lines(path)? {
-        let line = comment_psql_meta_command(line_res?);
-        result.push_str(&line);
-    }
-    Ok(result)
 }

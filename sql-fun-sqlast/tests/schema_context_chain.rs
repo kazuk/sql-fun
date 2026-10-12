@@ -469,7 +469,7 @@ mod test_helpers {
         pub fn builtin_schema() -> Result<FrozenBaseContext, Box<dyn std::error::Error>> {
             let root = builtin_root()?;
             let file = Path::new(env!("SQL_FUN_HOME")).join("postgres/17/schema.sql");
-            Ok(PostgresDialect::parse_schema_file(&file, &root)?
+            Ok(PostgresDialect::parse_schema_file(&file, &root, &mut None)?
                 .base_context()
                 .clone())
         }
@@ -481,9 +481,11 @@ mod test_helpers {
             let prefix = builtin_schema()?;
             let file =
                 Path::new(env!("SQL_FUN_HOME")).join("postgres/17/extension/tablefunc--1.0.sql");
-            Ok(PostgresDialect::parse_schema_file(&file, &prefix)?
-                .base_context()
-                .clone())
+            Ok(
+                PostgresDialect::parse_schema_file(&file, &prefix, &mut None)?
+                    .base_context()
+                    .clone(),
+            )
         }
     }
 
@@ -584,7 +586,11 @@ mod test_helpers {
     ) -> Result<ParsedSchemaDump, Box<dyn std::error::Error>> {
         let file = ::tempfile::NamedTempFile::new()?;
         std::fs::write(file.path(), sql)?;
-        Ok(PostgresDialect::parse_schema_file(file.path(), base)?)
+        Ok(PostgresDialect::parse_schema_file(
+            file.path(),
+            base,
+            &mut None,
+        )?)
     }
 
     pub(super) fn query(
@@ -657,6 +663,7 @@ mod test_helpers {
         Ok(PostgresDialect::parse_schema_file(
             file.path(),
             &context.freeze(),
+            &mut None,
         )?)
     }
 

@@ -7,6 +7,8 @@ use crate::core_wrapping::InvalidEngneVersion;
 /// Server API internal errors
 #[derive(thiserror::Error, Debug)]
 pub enum SqlFunServerError {
+    #[error("missing or unknown selected datasource: {0}")]
+    InvalidDatasource(String),
     #[error("invalid engine version {0}")]
     InvalidEngineVersion(InvalidEngneVersion),
 
@@ -39,6 +41,10 @@ impl From<PostgresExtensionsParseError> for SqlFunServerError {
 }
 
 impl SqlFunServerError {
+    pub(crate) fn invalid_datasource(datasource: &str) -> Self {
+        Self::InvalidDatasource(datasource.to_owned())
+    }
+
     const fn is_unexpected(&self) -> bool {
         matches!(self, Self::Analysis(_) | Self::ArgsBuild(_))
     }
@@ -46,7 +52,10 @@ impl SqlFunServerError {
     const fn is_context_initialize(&self) -> bool {
         matches!(
             self,
-            Self::InvalidArgument(_) | Self::InvalidEngineVersion(_) | Self::ExtensionListParse(_)
+            Self::InvalidDatasource(_)
+                | Self::InvalidArgument(_)
+                | Self::InvalidEngineVersion(_)
+                | Self::ExtensionListParse(_)
         )
     }
 }

@@ -152,6 +152,11 @@ impl SqliteDialect {
 
     /// Load a schema file as an ordered layer over the supplied frozen base.
     ///
+    /// Clears `content_hash` before reading, then sets the SHA-256 of the
+    /// original UTF-8 file text before parsing (before psql preprocessing for
+    /// PostgreSQL). The hash remains available on syntax/semantic failure;
+    /// failed reads leave it unset. The file is never reopened to hash it.
+    ///
     /// The base and its siblings remain unchanged. Successful results retain the
     /// file's semantic statements and recoverable problems; their frozen base
     /// can be passed to the next file without retaining those statements.
@@ -163,8 +168,13 @@ impl SqliteDialect {
     pub fn parse_schema_file(
         dump_file: &Path,
         input_context: &FrozenBaseContext,
+        content_hash: &mut Option<String>,
     ) -> Result<ParsedSchemaDump, ParseDumpFileError> {
+        *content_hash = None;
         let sql_statements = std::fs::read_to_string(dump_file)?;
+        let mut hasher = ::sql_fun_core::Hasher::new();
+        hasher.append_str(&sql_statements);
+        *content_hash = Some(hasher.finish());
 
         let mut parser = TursoParser::new(sql_statements.as_bytes());
         let mut context = SchemaFileContext::new(dump_file, input_context);
@@ -185,6 +195,56 @@ impl SqliteDialect {
         }
 
         Ok(context.into_parsed(sem_results))
+    }
+}
+
+#[cfg(test)]
+mod test_schema_content_hash {
+    use crate::SqliteDialect;
+
+    #[rstest::rstest]
+    #[case::success("CREATE TABLE hash_test (id);", true)]
+    #[case::failure("CREATE TABLE broken (id", false)]
+    fn preserves_original_hash_even_on_syntax_failure(#[case] sql: &str, #[case] succeeds: bool) {
+        let file = test_helpers::schema_file(sql);
+        let base = test_helpers::base_with_public_schema();
+        let mut hash = None;
+        let result = SqliteDialect::parse_schema_file(file.path(), &base, &mut hash);
+        assert_eq!(result.is_ok(), succeeds, "{result:?}");
+        assert_eq!(
+            hash,
+            Some(::sql_fun_core::Hasher::hash_file(file.path()).unwrap())
+        );
+    }
+
+    #[test]
+    fn read_failure_clears_output_hash() {
+        let directory = ::tempfile::tempdir().unwrap();
+        let base = test_helpers::base_with_public_schema();
+        let mut hash = Some("previous".to_owned());
+        let error = SqliteDialect::parse_schema_file(
+            &directory.path().join("missing.sql"),
+            &base,
+            &mut hash,
+        )
+        .unwrap_err();
+        assert!(error.is_io());
+        assert!(hash.is_none());
+    }
+
+    mod test_helpers {
+        pub(super) fn base_with_public_schema() -> crate::sem::FrozenBaseContext {
+            use crate::sem::{ParseContext, SchemaName};
+            let mut base = crate::test_helpers::TestParseContext::default();
+            base.set_get_search_path_result(&[SchemaName::from("public")]);
+            base.freeze()
+        }
+
+        pub(super) fn schema_file(sql: &str) -> ::tempfile::NamedTempFile {
+            let file = ::tempfile::NamedTempFile::new().unwrap();
+            std::fs::write(file.path(), sql).unwrap();
+            file
+        }
     }
 }
 

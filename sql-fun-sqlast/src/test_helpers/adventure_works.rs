@@ -16,14 +16,17 @@ pub fn adventure_works_schema(
                 .get("default")
                 .expect("selected test metadata"),
         )?),
+        &mut None,
     )?;
     let extension = PostgresDialect::parse_schema_file(
         &home.join("postgres/17/extension/tablefunc--1.0.sql"),
         builtin.base_context(),
+        &mut None,
     )?;
     Ok(PostgresDialect::parse_schema_file(
         &PathBuf::from(env!("CARGO_MANIFEST_DIR"))
             .join("../examples/adventure-works/schema.develop.sql"),
         extension.base_context(),
+        &mut None,
     )?)
 }

@@ -7,17 +7,26 @@ mod cache;
 mod core_wrapping;
 mod cte_realization;
 mod error;
+mod file_hash_cache;
 mod json_rpc;
+mod panic_policy;
 mod pending_future;
 mod pid_file;
+mod schema_cache;
+mod selected_context;
 
 use crate::buffers::JsonLinesStreamReader;
 
 pub use self::{
     buffers::{PipeBuffer, ReadableBuffer},
-    cache::{Cache, Loader},
+    cache::Cache,
     json_rpc::JsonRpcError,
+    panic_policy::install_server_panic_hook,
     pending_future::PendingFut,
+    schema_cache::{
+        CachedSchemaAnalysis, InitializedSchema, LayerDiagnostics, SchemaCacheService,
+        SchemaContextKey, SchemaLoadError, SchemaSelection,
+    },
 };
 
 use self::{
@@ -91,9 +100,13 @@ pub async fn service() -> Result<(), ServerError> {
 }
 
 /// API implementation
-pub struct Api {}
+pub struct Api {
+    schema_cache: std::sync::OnceLock<SchemaCacheService>,
+}
 
-static API_IMPL: LazyLock<Api> = LazyLock::new(|| Api {});
+static API_IMPL: LazyLock<Api> = LazyLock::new(|| Api {
+    schema_cache: std::sync::OnceLock::new(),
+});
 
 impl Api {
     /// get static instance
@@ -102,10 +115,39 @@ impl Api {
         &API_IMPL
     }
 
+    /// Obtain the server-lifetime cache for an explicitly selected installation.
+    ///
+    /// Session infrastructure retains results from this service independently.
+    /// The first explicit installation fixes the service scope until restart.
+    ///
+    /// # Panics
+    /// Panics if the service registration invariant is violated.
+    ///
+    /// # Errors
+    /// Rejects unavailable or conflicting builtin installations.
+    pub fn schema_cache_service(
+        &self,
+        home: &std::path::Path,
+    ) -> Result<&SchemaCacheService, SchemaLoadError> {
+        let canonical = home
+            .canonicalize()
+            .map_err(|error| SchemaLoadError::source(&error))?;
+        if self.schema_cache.get().is_none() {
+            let service = SchemaCacheService::new(&canonical)?;
+            let _ = self.schema_cache.set(service);
+        }
+        let service = self.schema_cache.get().expect("registered service");
+        service.require_installation(&canonical)?;
+        Ok(service)
+    }
+
     async fn initialize_schema_context_impl(
         &self,
         args: InitializeSchemaArgs,
     ) -> Result<SchemaContext, SqlFunServerError> {
+        if args.datasource().is_empty() {
+            return Err(SqlFunServerError::invalid_datasource(args.datasource()));
+        }
         let mut builder = SqlFunArgs::builder(args.environments())?;
         let dialect = CoreDialect::from(args.engine_dialect());
         let engine_version = CorePostgresVersion::try_from(args.engine_version())?;
@@ -127,7 +169,9 @@ impl Api {
             .build()?;
 
         let metadata_collection = context_args.load_metadata()?;
-        let metadata = metadata_collection.get(args.datasource()).unwrap();
+        let metadata = metadata_collection
+            .get(args.datasource())
+            .ok_or_else(|| SqlFunServerError::invalid_datasource(args.datasource()))?;
         let version = context_args.postgres_version(metadata)?;
         let mut builtin_schema = version.definition_base_path(context_args.sql_fun_home()?);
         builtin_schema.push("schema.sql");
@@ -136,6 +180,7 @@ impl Api {
         PostgresDialect::parse_schema_file(
             &builtin_schema,
             &FrozenBaseContext::from(base_context),
+            &mut None,
         )?;
 
         todo!();

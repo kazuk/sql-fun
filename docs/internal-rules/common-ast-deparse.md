@@ -75,9 +75,9 @@ decision in #432. A runtime fix without the required parser API is insufficient.
 Until then, the opt-out path is an upstream evaluation configuration, not an
 equivalent correctness path. Keep correctness tests unchanged on the default path.
 The standard workspace validation also compiles isolated sqlast configurations
-without default features (with no frontend, `sqlite`, and `turso_parser`) and the
-workaround without SQLite, so workspace feature unification cannot hide opt-out
-compilation failures.
+without default features (with no extra features, `sqlite`, and `turso_parser`)
+and the workaround without SQLite, so workspace feature unification cannot hide
+opt-out compilation failures.
 
 The adaptation captures exact grammar-produced type boundaries, including numeric
 modifiers, without changing the native type model. A type-local retention pass

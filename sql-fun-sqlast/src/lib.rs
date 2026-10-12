@@ -27,7 +27,7 @@ mod trie_map;
 use miette::LabeledSpan;
 use sql_fun_core::IVec;
 
-use self::sql_file::read_sql_file;
+pub use self::sql_file::SqlFileSnapshot;
 
 #[cfg(feature = "sqlite")]
 pub use self::sqlite::{SqliteDialect, SqliteLexer, SqliteToken};
@@ -120,7 +120,22 @@ impl PostgresDialect {
         input_context: &FrozenBaseContext,
         content_hash: &mut Option<String>,
     ) -> Result<ParsedSchemaDump, ParseDumpFileError> {
-        let sql_statements = read_sql_file(dump_file, content_hash)?;
+        *content_hash = None;
+        let snapshot = SqlFileSnapshot::read(dump_file)?;
+        *content_hash = Some(snapshot.content_hash().to_owned());
+        Self::parse_schema_snapshot(&snapshot, input_context)
+    }
+
+    /// Analyze exactly the previously read snapshot, without reopening its file.
+    ///
+    /// # Errors
+    /// Returns syntax or fatal semantic analysis failures.
+    pub fn parse_schema_snapshot(
+        snapshot: &SqlFileSnapshot,
+        input_context: &FrozenBaseContext,
+    ) -> Result<ParsedSchemaDump, ParseDumpFileError> {
+        let sql_statements = snapshot.postgres_text();
+        let dump_file = snapshot.path();
 
         let statements = self::parse_statements::split_postgres_statements(&sql_statements)?;
         let mut context = SchemaFileContext::new(dump_file, input_context);

@@ -495,6 +495,7 @@ impl TryFrom<&syn::Name> for Window {
 
     fn try_from(value: &syn::Name) -> Result<Self, Self::Error> {
         Ok(Self {
+            reference_only: true,
             name: None,
             reference: Some(value.value().to_owned()),
             partition: Vec::new(),
@@ -509,6 +510,7 @@ impl TryFrom<&syn::Window> for Window {
 
     fn try_from(value: &syn::Window) -> Result<Self, Self::Error> {
         Ok(Self {
+            reference_only: false,
             name: None,
             reference: String::from_opt(value.base().as_ref()),
             partition: Expr::try_from_list(value.partition_by())?,

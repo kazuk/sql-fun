@@ -5,8 +5,9 @@ mod query;
 use crate::ast::{
     Access, BooleanExpr, BooleanOperator, Call, CallKind, Case, CaseArm, Cast, Collate, Delete,
     DropTable, Expr, InTable, Indirection, Insert, Literal, Name, NullTest, OperatorExpr,
-    OperatorKind, Order, Parameter, Query, Raise, SqlValue, StatementNode, Subquery, SubqueryKind,
-    TryFromList, TryFromOpt, TypeName, Update, View, ViewCheckOption, Window,
+    OperatorKind, Order, Parameter, Query, Raise, SqlValue, SqliteTypeModifier,
+    SqliteTypeModifiers, SqliteTypeNamePart, SqliteTypeNameTrivia, StatementNode, Subquery,
+    SubqueryKind, TryFromList, TryFromOpt, TypeName, Update, View, ViewCheckOption, Window,
 };
 use crate::{sem::AnalysisError, syn::sqlite as syn};
 
@@ -565,6 +566,9 @@ impl TypeName {
             array_bounds: Vec::new(),
             set_of: false,
             percent_type: false,
+            sqlite_name_snapshot: None,
+            sqlite_parts: Vec::new(),
+            sqlite_modifiers: None,
             location: None,
         }
     }
@@ -581,17 +585,405 @@ impl TryFrom<&syn::Type> for TypeName {
             }
             None => Vec::new(),
         };
+        let raw_name = value.name();
+        let (decoded_name, sqlite_parts) = decode_sqlite_type_name_parts(raw_name)
+            .unwrap_or_else(|_| (raw_name.to_owned(), Vec::new()));
+        let name = Name::local(&decoded_name);
         Ok(Self {
-            name: Name::local(value.name()),
+            sqlite_name_snapshot: Some(name.clone()),
+            name,
+            sqlite_parts,
             modifiers,
             ..Self::empty()
         })
     }
 }
 
+impl TypeName {
+    pub(in crate::ast) fn matches_sqlite_frontend_name(
+        &self,
+        frontend_name: &str,
+    ) -> Result<bool, AnalysisError> {
+        match decode_sqlite_type_name_parts(frontend_name) {
+            Ok((decoded_name, _)) => Ok(matches!(
+                self.name.0.as_slice(),
+                [name] if name == &decoded_name
+            )),
+            Err(_) => Ok(matches!(
+                self.name.0.as_slice(),
+                [name] if name == frontend_name
+            )),
+        }
+    }
+
+    pub(in crate::ast) fn retain_sqlite_syntax(
+        &mut self,
+        full_type_text: &str,
+    ) -> Result<(), AnalysisError> {
+        let open = sqlite_type_modifier_opening(full_type_text)?;
+        let (name_text, mut modifiers) = if let Some(open) = open {
+            (
+                &full_type_text[..open],
+                Some(parse_sqlite_type_modifiers(&full_type_text[open..])?),
+            )
+        } else {
+            (full_type_text, None)
+        };
+        let (decoded_name, parts) = decode_sqlite_type_name_parts(name_text)?;
+        if let Some(syntax) = modifiers.as_mut() {
+            if syntax.values.len() != self.modifiers.len() {
+                return AnalysisError::raise_unexpected_input("SQLite type modifier association");
+            }
+            syntax.ast_spellings.clear();
+            for modifier in &self.modifiers {
+                let Some(spelling) = modifier.sqlite_type_modifier_spelling() else {
+                    return AnalysisError::raise_unexpected_input("SQLite type modifier");
+                };
+                syntax.ast_spellings.push(spelling);
+            }
+        }
+        self.name = Name::local(&decoded_name);
+        self.sqlite_name_snapshot = Some(self.name.clone());
+        self.sqlite_parts = parts;
+        self.sqlite_modifiers = modifiers;
+        Ok(())
+    }
+}
+
+fn decode_sqlite_type_name_parts(
+    raw: &str,
+) -> Result<(String, Vec<SqliteTypeNamePart>), AnalysisError> {
+    let bytes = raw.as_bytes();
+    let mut cursor = 0;
+    let mut decoded = String::new();
+    let mut parts: Vec<SqliteTypeNamePart> = Vec::new();
+
+    while cursor < bytes.len() {
+        let leading_trivia = sqlite_type_name_trivia(raw, &mut cursor)?;
+        if cursor == bytes.len() {
+            if let Some(last) = parts.last_mut() {
+                last.trailing_trivia = leading_trivia;
+            }
+            break;
+        }
+
+        let quote = match bytes[cursor] {
+            b'"' => Some('"'),
+            b'\'' => Some('\''),
+            b'`' => Some('`'),
+            b'[' => Some('['),
+            _ => None,
+        };
+        let name = if let Some(quote) = quote {
+            let start = cursor;
+            cursor += 1;
+            let mut closed = false;
+            while cursor < bytes.len() {
+                if quote == '[' {
+                    if bytes[cursor] == b']' {
+                        cursor += 1;
+                        closed = true;
+                        break;
+                    }
+                } else if bytes[cursor] == quote as u8 {
+                    if bytes.get(cursor + 1) == Some(&(quote as u8)) {
+                        cursor += 2;
+                        continue;
+                    }
+                    cursor += 1;
+                    closed = true;
+                    break;
+                }
+                cursor += 1;
+            }
+            if !closed {
+                return AnalysisError::raise_unexpected_input("SQLite type name quoting");
+            }
+            ::turso_parser::ast::Name::from_string(&raw[start..cursor])
+                .as_str()
+                .to_owned()
+        } else {
+            let start = cursor;
+            while cursor < bytes.len()
+                && !bytes[cursor].is_ascii_whitespace()
+                && !matches!(bytes[cursor], b'"' | b'\'' | b'`' | b'[')
+                && bytes.get(cursor..cursor + 2) != Some(b"/*")
+                && bytes.get(cursor..cursor + 2) != Some(b"--")
+            {
+                cursor += 1;
+            }
+            raw[start..cursor].to_owned()
+        };
+
+        for trivia in &leading_trivia {
+            if let SqliteTypeNameTrivia::Whitespace(whitespace) = trivia {
+                decoded.push_str(whitespace);
+            }
+        }
+        decoded.push_str(&name);
+        parts.push(SqliteTypeNamePart {
+            name,
+            quote,
+            leading_trivia,
+            trailing_trivia: Vec::new(),
+        });
+    }
+
+    if parts.is_empty() {
+        return AnalysisError::raise_unexpected_input("empty SQLite type name");
+    }
+    Ok((decoded, parts))
+}
+
+fn sqlite_type_modifier_opening(raw: &str) -> Result<Option<usize>, AnalysisError> {
+    let bytes = raw.as_bytes();
+    let mut cursor = 0;
+    while cursor < bytes.len() {
+        match bytes[cursor] {
+            b'"' | b'\'' | b'`' => {
+                let quote = bytes[cursor];
+                cursor += 1;
+                let mut closed = false;
+                while cursor < bytes.len() {
+                    if bytes[cursor] == quote {
+                        if bytes.get(cursor + 1) == Some(&quote) {
+                            cursor += 2;
+                            continue;
+                        }
+                        cursor += 1;
+                        closed = true;
+                        break;
+                    }
+                    cursor += 1;
+                }
+                if !closed {
+                    return AnalysisError::raise_unexpected_input("SQLite type name quoting");
+                }
+            }
+            b'[' => {
+                cursor += 1;
+                while cursor < bytes.len() && bytes[cursor] != b']' {
+                    cursor += 1;
+                }
+                if cursor == bytes.len() {
+                    return AnalysisError::raise_unexpected_input("SQLite type name quoting");
+                }
+                cursor += 1;
+            }
+            b'/' if bytes.get(cursor + 1) == Some(&b'*') => {
+                cursor += 2;
+                while cursor + 1 < bytes.len() && bytes.get(cursor..cursor + 2) != Some(b"*/") {
+                    cursor += 1;
+                }
+                if cursor + 1 >= bytes.len() {
+                    return AnalysisError::raise_unexpected_input("SQLite type name comment");
+                }
+                cursor += 2;
+            }
+            b'-' if bytes.get(cursor + 1) == Some(&b'-') => {
+                cursor += 2;
+                while cursor < bytes.len() && !matches!(bytes[cursor], b'\r' | b'\n') {
+                    cursor += 1;
+                }
+            }
+            b'(' => return Ok(Some(cursor)),
+            _ => cursor += 1,
+        }
+    }
+    Ok(None)
+}
+
+fn parse_sqlite_type_modifiers(raw: &str) -> Result<SqliteTypeModifiers, AnalysisError> {
+    let bytes = raw.as_bytes();
+    if bytes.first() != Some(&b'(') {
+        return AnalysisError::raise_unexpected_input("SQLite type modifiers");
+    }
+    let mut cursor = 1;
+    let mut values = Vec::new();
+    loop {
+        let leading_trivia = sqlite_type_name_trivia(raw, &mut cursor)?;
+        let sign_start = cursor;
+        if cursor < bytes.len() && matches!(bytes[cursor], b'+' | b'-') {
+            cursor += 1;
+        }
+        let sign = &raw[sign_start..cursor];
+        let sign_trivia = if sign.is_empty() {
+            Vec::new()
+        } else {
+            sqlite_type_name_trivia(raw, &mut cursor)?
+        };
+        let start = cursor;
+        while cursor < bytes.len()
+            && !bytes[cursor].is_ascii_whitespace()
+            && !matches!(bytes[cursor], b',' | b')')
+            && bytes.get(cursor..cursor + 2) != Some(b"/*")
+            && bytes.get(cursor..cursor + 2) != Some(b"--")
+        {
+            cursor += 1;
+        }
+        if start == cursor {
+            return AnalysisError::raise_unexpected_input("SQLite numeric type modifier");
+        }
+        let spelling = format!("{sign}{}", &raw[start..cursor]);
+        if !valid_sqlite_numeric(&spelling) {
+            return AnalysisError::raise_unexpected_input("SQLite numeric type modifier");
+        }
+        let mut trailing_trivia = sign_trivia;
+        trailing_trivia.extend(sqlite_type_name_trivia(raw, &mut cursor)?);
+        if cursor >= bytes.len() {
+            return AnalysisError::raise_unexpected_input("SQLite type modifiers");
+        }
+        match bytes[cursor] {
+            b',' => {
+                values.push(SqliteTypeModifier {
+                    leading_trivia,
+                    spelling,
+                    trailing_trivia,
+                });
+                cursor += 1;
+            }
+            b')' => {
+                values.push(SqliteTypeModifier {
+                    leading_trivia,
+                    spelling,
+                    trailing_trivia,
+                });
+                cursor += 1;
+                let trailing_trivia = sqlite_type_name_trivia(raw, &mut cursor)?;
+                if cursor != bytes.len() || values.is_empty() || values.len() > 2 {
+                    return AnalysisError::raise_unexpected_input("SQLite type modifiers");
+                }
+                return Ok(SqliteTypeModifiers {
+                    values,
+                    ast_spellings: Vec::new(),
+                    trailing_trivia,
+                });
+            }
+            _ => return AnalysisError::raise_unexpected_input("SQLite type modifiers"),
+        }
+    }
+}
+
+fn valid_sqlite_numeric(value: &str) -> bool {
+    fn strip_sign(value: &str) -> &str {
+        value
+            .strip_prefix('+')
+            .or_else(|| value.strip_prefix('-'))
+            .unwrap_or(value)
+    }
+
+    fn valid_digit_run(value: &str, is_digit: impl Fn(u8) -> bool) -> bool {
+        let bytes = value.as_bytes();
+        !bytes.is_empty()
+            && bytes.iter().enumerate().all(|(index, byte)| {
+                if *byte == b'_' {
+                    index > 0
+                        && index + 1 < bytes.len()
+                        && is_digit(bytes[index - 1])
+                        && is_digit(bytes[index + 1])
+                } else {
+                    is_digit(*byte)
+                }
+            })
+    }
+
+    let value = strip_sign(value);
+    if value.is_empty() {
+        return false;
+    }
+    if let Some(hexadecimal) = value
+        .strip_prefix("0x")
+        .or_else(|| value.strip_prefix("0X"))
+    {
+        return valid_digit_run(hexadecimal, |byte| byte.is_ascii_hexdigit());
+    }
+
+    let exponent_at = value.char_indices().find_map(|(index, character)| {
+        if matches!(character, 'e' | 'E') {
+            Some(index)
+        } else {
+            None
+        }
+    });
+    if exponent_at.is_some_and(|index| {
+        value[index + 1..]
+            .bytes()
+            .any(|byte| matches!(byte, b'e' | b'E'))
+    }) {
+        return false;
+    }
+    let (mantissa, exponent) = exponent_at.map_or((value, None), |index| {
+        (&value[..index], Some(&value[index + 1..]))
+    });
+    if let Some(exponent) = exponent {
+        let exponent = strip_sign(exponent);
+        if !valid_digit_run(exponent, |byte| byte.is_ascii_digit()) {
+            return false;
+        }
+    }
+
+    if let Some((integer, fraction)) = mantissa.split_once('.') {
+        (integer.is_empty() || valid_digit_run(integer, |byte| byte.is_ascii_digit()))
+            && (fraction.is_empty() || valid_digit_run(fraction, |byte| byte.is_ascii_digit()))
+            && (!integer.is_empty() || !fraction.is_empty())
+    } else {
+        valid_digit_run(mantissa, |byte| byte.is_ascii_digit())
+    }
+}
+
+fn sqlite_type_name_trivia(
+    raw: &str,
+    cursor: &mut usize,
+) -> Result<Vec<SqliteTypeNameTrivia>, AnalysisError> {
+    let bytes = raw.as_bytes();
+    let mut trivia = Vec::new();
+
+    loop {
+        let start = *cursor;
+        while *cursor < bytes.len() && bytes[*cursor].is_ascii_whitespace() {
+            *cursor += 1;
+        }
+        if *cursor > start {
+            trivia.push(SqliteTypeNameTrivia::Whitespace(
+                raw[start..*cursor].to_owned(),
+            ));
+        }
+        if bytes.get(*cursor..*cursor + 2) == Some(b"/*") {
+            let start = *cursor;
+            *cursor += 2;
+            while *cursor + 1 < bytes.len() && bytes.get(*cursor..*cursor + 2) != Some(b"*/") {
+                *cursor += 1;
+            }
+            if *cursor + 1 >= bytes.len() {
+                return AnalysisError::raise_unexpected_input("SQLite type name comment");
+            }
+            *cursor += 2;
+            trivia.push(SqliteTypeNameTrivia::BlockComment(
+                raw[start..*cursor].to_owned(),
+            ));
+            continue;
+        }
+        if bytes.get(*cursor..*cursor + 2) == Some(b"--") {
+            let start = *cursor;
+            *cursor += 2;
+            while *cursor < bytes.len() && !matches!(bytes[*cursor], b'\r' | b'\n') {
+                *cursor += 1;
+            }
+            trivia.push(SqliteTypeNameTrivia::LineComment(
+                raw[start..*cursor].to_owned(),
+            ));
+            continue;
+        }
+        break;
+    }
+
+    Ok(trivia)
+}
+
 impl Call {
     fn base(name: &str) -> Self {
         Self {
+            sql_syntax: false,
             kind: CallKind::ordinary(),
             name: Name::local(name),
             arguments: Vec::new(),

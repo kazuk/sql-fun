@@ -19,6 +19,12 @@ pub struct Comment {
 #[derive(Debug, Clone, Copy, Eq, Hash, PartialEq)]
 pub struct ObjectKind(u32);
 
+impl ObjectKind {
+    pub(crate) const fn code(&self) -> u32 {
+        self.0
+    }
+}
+
 impl From<u32> for ObjectKind {
     fn from(value: u32) -> Self {
         Self(value)

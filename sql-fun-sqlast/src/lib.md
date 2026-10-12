@@ -67,7 +67,8 @@ SQLite parsing requires the `sqlite` Cargo feature. Selecting SQLite without it
 yields an error. Both dialects support common AST conversion for SELECT/VALUES,
 set operations, INSERT, UPDATE, DELETE, and selected DDL. Unsupported conversions
 return errors. This API does not promise every statement supported by the
-underlying parsers, SQL rendering, or catalog resolution.
+underlying parsers or catalog resolution. Successfully converted legal syntax can
+be rendered with `Statement::deparse_sql` as described below.
 
 ## Insert a catalog CTE
 
@@ -133,6 +134,67 @@ how to respond. These methods identify the reason without parsing display text:
 Predicates return false and detail accessors return None for other reasons.
 Display and Debug output remain human-readable diagnostics, not classification
 formats. The API leaves recovery decisions to the caller.
+
+## Render the current statement
+
+[`ast::Statement::deparse_sql`] renders the entire owned tree, including inserted
+CTEs, into SQL for the explicitly supplied dialect. The dialect must match the
+one used for parsing. Rendering needs neither the original input nor a catalog.
+
+```rust
+use sql_fun_sqlast::{ast::{CteDefinition, Dialect, HaveWithClause}, parse_statements};
+
+# fn main() -> Result<(), Box<dyn std::error::Error>> {
+let dialect = Dialect::postgres();
+let mut statement = parse_statements("SELECT id FROM selected", dialect)
+    .next().unwrap()?;
+let body = parse_statements("SELECT $7 AS id WHERE $7 > $2", dialect)
+    .next().unwrap()?;
+statement.ensure_with_clause()?.insert(0, &CteDefinition::new("selected", &body)?)?;
+let sql = statement.deparse_sql(dialect)?;
+assert!(sql.contains("$7"));
+assert!(sql.contains("$2"));
+# Ok(())
+# }
+```
+
+The result is one deterministic statement with no trailing semicolon. Original
+comments, whitespace, capitalization, and optional equivalent spellings are not
+preserved, except SQLite type spelling and trivia that affect declared types and
+casting affinity. Identifiers and literals are escaped for the selected dialect;
+parentheses preserve expression and query grouping. Rendering does not establish
+that unresolved objects exist or that the database will accept their types.
+The server's query realization and lockfile/code generation integration are
+separate from this Rust API.
+
+Numbered placeholder identities are retained: PostgreSQL `$n` and SQLite `?n`
+keep their stored indices, including repetitions and gaps, across CTE insertion.
+SQLite named and anonymous placeholders are emitted as explicit `?n` using their
+already assigned slots. Bind the result by those numeric slots; original SQLite
+parameter names and optional type hints are metadata, not an output binding-name
+contract. Rendering does not allocate new slots or infer a binding order from
+traversal. Callers combining statements must supply coherent numbering before
+insertion.
+
+SELECT/VALUES/set operations, INSERT/UPDATE/DELETE, and the DDL families accepted
+by common-AST conversion are covered. PostgreSQL also supports its retained
+SQL/JSON and XML expressions/table forms, and MERGE inside a CTE. SQLite output
+requires the `sqlite` feature and uses stock SQLite SQL; parser extensions that
+are not legal SQLite constructs return errors. This is not a cross-dialect
+translator or a source-preserving formatter.
+
+Failures use [`ast::DeparseError`]. Inspect `dialect()`, `node()`, and `message()`
+for context, and the following predicates for classification:
+
+| Method | Failure |
+| --- | --- |
+| `is_dialect_mismatch()` | Output dialect differs from the parsed statement. |
+| `is_unavailable_dialect()` | The selected dialect feature is unavailable. |
+| `is_invalid_syntax()` | Retained syntax or placement is invalid in this dialect. |
+| `is_unsupported()` | A represented variant has no rendering implementation. |
+
+An error returns no partial SQL and leaves the statement unchanged. Human-readable
+error text is diagnostic output; use the methods for programmatic decisions.
 
 ## Build prerequisites
 

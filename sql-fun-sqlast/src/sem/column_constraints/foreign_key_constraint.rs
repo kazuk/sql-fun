@@ -110,6 +110,13 @@ pub struct Deferrability {
 }
 
 impl Deferrability {
+    pub(crate) const fn is_deferrable(&self) -> bool {
+        self.deferrable
+    }
+    pub(crate) const fn is_initially_deferred(&self) -> bool {
+        self.init_deferred
+    }
+
     pub(crate) const fn new(deferrable: bool, init_deferred: bool) -> Self {
         Self {
             deferrable,

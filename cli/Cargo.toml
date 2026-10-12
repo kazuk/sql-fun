@@ -36,6 +36,7 @@ sqlite = [
     "sql-fun-server-api/sqlite",
     "sql-fun-core/sqlite",
     "sql-fun-codegen/sqlite",
+    "sql-fun-sqlast/sqlite",
 ]
 
 [dependencies]

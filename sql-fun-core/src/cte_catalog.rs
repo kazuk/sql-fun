@@ -518,7 +518,7 @@ impl CteCatalog<'_> {
             let value: serde_json::Value = toml::from_str(&content)?;
             value
         } else if extension == "yaml" {
-            let value: serde_json::Value = serde_yaml_ng::from_str(&content)?;
+            let value: serde_json::Value = serde_saphyr::from_str(&content)?;
             value
         } else {
             unreachable!();
@@ -561,6 +561,43 @@ mod cte_catalog_deserialize_file_to_value_tests {
         let value = CteCatalog::deserialize_file_to_value(temp.path())?;
         assert_eq!(value, json!(null));
         Ok(())
+    }
+
+    #[test]
+    fn yaml_preserves_nested_catalog_aliases_and_multiline_queries() -> TestResult {
+        let file = test_helpers::catalog_yaml(false)?;
+        let value = CteCatalog::deserialize_file_to_value(file.path())?;
+        assert_eq!(value["cte"]["users"]["query"], "SELECT id\nFROM users\n");
+        assert_eq!(value["cte"]["users"], value["cte"]["alias"]);
+        Ok(())
+    }
+
+    #[test]
+    fn malformed_yaml_is_rejected() -> TestResult {
+        let file = test_helpers::catalog_yaml(true)?;
+        assert!(CteCatalog::deserialize_file_to_value(file.path()).is_err());
+        Ok(())
+    }
+
+    mod test_helpers {
+        pub(super) fn catalog_yaml(
+            malformed: bool,
+        ) -> testresult::TestResult<::tempfile::NamedTempFile> {
+            let file = ::tempfile::NamedTempFile::with_suffix(".yaml")?;
+            let text = if malformed {
+                "cte: [unfinished"
+            } else {
+                r"cte:
+  users: &users
+    query: |
+      SELECT id
+      FROM users
+  alias: *users
+"
+            };
+            std::fs::write(file.path(), text)?;
+            Ok(file)
+        }
     }
 }
 

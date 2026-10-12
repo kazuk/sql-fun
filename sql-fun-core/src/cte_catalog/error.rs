@@ -27,9 +27,9 @@ pub enum CteCatalogError {
     #[error(transparent)]
     TomlError(#[from] toml::de::Error),
 
-    /// [`serde_yaml_ng::Error`]
+    /// [`serde_saphyr::Error`]
     #[error(transparent)]
-    YamlError(#[from] serde_yaml_ng::Error),
+    YamlError(#[from] serde_saphyr::Error),
 
     /// specified path not exist
     #[error("Specified path not exist {0}")]

@@ -59,11 +59,61 @@ impl JsonValueCache {
             let value: serde_json::Value = toml::from_str(&std::fs::read_to_string(path)?)?;
             Ok(value)
         } else if ext == "yaml" {
-            let value: serde_json::Value =
-                serde_yaml_ng::from_str(&std::fs::read_to_string(path)?)?;
+            let value: serde_json::Value = serde_saphyr::from_str(&std::fs::read_to_string(path)?)?;
             Ok(value)
         } else {
             SqlFunCodegenError::file_type_not_supported(path)
+        }
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::JsonValueCache;
+
+    #[test]
+    fn yaml_cache_preserves_aliases_and_scalar_types() -> testresult::TestResult {
+        let file = test_helpers::yaml_file(false)?;
+        let load = || {
+            JsonValueCache::get_or_fill(file.path(), |value| {
+                Ok::<_, crate::SqlFunCodegenError>(value.clone())
+            })
+        };
+        let value = load()?;
+        assert_eq!(value["original"], value["alias"]);
+        assert_eq!(value["original"]["count"], 3);
+        assert_eq!(value["original"]["enabled"], true);
+        std::fs::remove_file(file.path())?;
+        assert_eq!(load()?, value);
+        Ok(())
+    }
+
+    #[test]
+    fn malformed_yaml_is_rejected() -> testresult::TestResult {
+        let file = test_helpers::yaml_file(true)?;
+        let result = JsonValueCache::get_or_fill(file.path(), |value| {
+            Ok::<_, crate::SqlFunCodegenError>(value.clone())
+        });
+        assert!(result.is_err());
+        Ok(())
+    }
+
+    mod test_helpers {
+        pub(super) fn yaml_file(
+            malformed: bool,
+        ) -> testresult::TestResult<::tempfile::NamedTempFile> {
+            let file = ::tempfile::NamedTempFile::with_suffix(".yaml")?;
+            let text = if malformed {
+                "original: [unfinished"
+            } else {
+                r"original: &original
+  count: 3
+  enabled: true
+alias: *original
+"
+            };
+            std::fs::write(file.path(), text)?;
+            Ok(file)
         }
     }
 }

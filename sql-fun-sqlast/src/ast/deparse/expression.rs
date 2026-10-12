@@ -10,20 +10,7 @@ impl SqlEmit for Expr {
         crate::sem::with_stack(|| match self {
             Self::Literal(value) => value.emit(writer),
             Self::Column(value) => value.emit(writer),
-            Self::Star(value) => {
-                if !writer.is_postgres() && value.0.len() > 1 {
-                    return writer.invalid(
-                        "qualified star",
-                        "SQLite star qualification accepts one table name",
-                    );
-                }
-                if value.last_component().is_some() {
-                    value.emit(writer)?;
-                    writer.sql(".");
-                }
-                writer.sql("*");
-                Ok(())
-            }
+            Self::Star(value) => Self::emit_star(value, writer),
             Self::Parameter(value) => value.emit(writer),
             Self::Operator(value) => value.emit(writer),
             Self::Boolean(value) => value.emit(writer),
@@ -34,40 +21,15 @@ impl SqlEmit for Expr {
             Self::Call(value) => value.emit(writer),
             Self::Case(value) => value.emit(writer),
             Self::Subquery(value) => value.emit(writer),
-            Self::Array(values) => {
-                writer.postgres_only("array expression")?;
-                writer.sql("ARRAY[");
-                writer.list(values, ", ")?;
-                writer.sql("]");
-                Ok(())
-            }
-            Self::Row(values) => {
-                writer.postgres_only("row constructor")?;
-                writer.sql("ROW(");
-                writer.list(values, ", ")?;
-                writer.sql(")");
-                Ok(())
-            }
+            Self::Array(values) => Self::emit_array(values, writer),
+            Self::Row(values) => Self::emit_row(values, writer),
             Self::List(values) => {
                 writer.sql("(");
                 writer.list(values, ", ")?;
                 writer.sql(")");
                 Ok(())
             }
-            Self::Parenthesized(values) => {
-                if let [value] = values.as_slice()
-                    && value.emits_parentheses()
-                {
-                    return value.emit(writer);
-                }
-                if values.is_empty() {
-                    return writer.invalid("parenthesized expression", "expression list is empty");
-                }
-                writer.sql("(");
-                writer.list(values, ", ")?;
-                writer.sql(")");
-                Ok(())
-            }
+            Self::Parenthesized(values) => Self::emit_parenthesized(values, writer),
             Self::Indirection(value) => value.emit(writer),
             Self::NamedArgument(value) => value.emit(writer),
             Self::SqlValue(value) => value.emit(writer),
@@ -82,16 +44,7 @@ impl SqlEmit for Expr {
             ),
             Self::InTable(value) => value.emit(writer),
             Self::Document(value) => value.emit(writer),
-            Self::Grouping(values) => {
-                writer.postgres_only("GROUPING")?;
-                if values.is_empty() {
-                    return writer.invalid("GROUPING", "GROUPING requires an argument");
-                }
-                writer.sql("GROUPING(");
-                writer.list(values, ", ")?;
-                writer.sql(")");
-                Ok(())
-            }
+            Self::Grouping(values) => Self::emit_grouping_arguments(values, writer),
             Self::CurrentOf(value) => value.emit(writer),
             Self::MergeAction => {
                 writer.postgres_only("MERGE_ACTION")?;
@@ -99,6 +52,68 @@ impl SqlEmit for Expr {
                 Ok(())
             }
         })
+    }
+}
+
+impl Expr {
+    fn emit_star(name: &crate::ast::Name, writer: &mut SqlWriter) -> Result<(), DeparseError> {
+        if !writer.is_postgres() && name.0.len() > 1 {
+            return writer.invalid(
+                "qualified star",
+                "SQLite star qualification accepts one table name",
+            );
+        }
+        if name.last_component().is_some() {
+            name.emit(writer)?;
+            writer.sql(".");
+        }
+        writer.sql("*");
+        Ok(())
+    }
+
+    fn emit_array(values: &[Self], writer: &mut SqlWriter) -> Result<(), DeparseError> {
+        writer.postgres_only("array expression")?;
+        writer.sql("ARRAY[");
+        writer.list(values, ", ")?;
+        writer.sql("]");
+        Ok(())
+    }
+
+    fn emit_row(values: &[Self], writer: &mut SqlWriter) -> Result<(), DeparseError> {
+        writer.postgres_only("row constructor")?;
+        writer.sql("ROW(");
+        writer.list(values, ", ")?;
+        writer.sql(")");
+        Ok(())
+    }
+
+    fn emit_parenthesized(values: &[Self], writer: &mut SqlWriter) -> Result<(), DeparseError> {
+        if let [value] = values
+            && value.emits_parentheses()
+        {
+            return value.emit(writer);
+        }
+        if values.is_empty() {
+            return writer.invalid("parenthesized expression", "expression list is empty");
+        }
+        writer.sql("(");
+        writer.list(values, ", ")?;
+        writer.sql(")");
+        Ok(())
+    }
+
+    fn emit_grouping_arguments(
+        values: &[Self],
+        writer: &mut SqlWriter,
+    ) -> Result<(), DeparseError> {
+        writer.postgres_only("GROUPING")?;
+        if values.is_empty() {
+            return writer.invalid("GROUPING", "GROUPING requires an argument");
+        }
+        writer.sql("GROUPING(");
+        writer.list(values, ", ")?;
+        writer.sql(")");
+        Ok(())
     }
 }
 
@@ -229,19 +244,20 @@ impl Expr {
 
     fn emit_between_bounds(&self, writer: &mut SqlWriter) -> Result<(), DeparseError> {
         match self {
-            Self::List(values) => {
-                let [lower, upper] = values.as_slice() else {
-                    return writer.invalid("BETWEEN", "BETWEEN requires exactly two bounds");
-                };
-                // Bounds have restricted grammar: parenthesize them even when they
-                // are Boolean expressions, so their AND cannot become the separator.
-                lower.emit_enclosed(writer)?;
-                writer.sql(" AND ");
-                upper.emit_enclosed(writer)?;
-                Ok(())
-            }
+            Self::List(values) => Self::emit_between_list(values, writer),
             _ => writer.invalid("BETWEEN", "BETWEEN bounds must be an expression list"),
         }
+    }
+
+    fn emit_between_list(values: &[Self], writer: &mut SqlWriter) -> Result<(), DeparseError> {
+        let [lower, upper] = values else {
+            return writer.invalid("BETWEEN", "BETWEEN requires exactly two bounds");
+        };
+        // Parentheses keep a bound's AND from becoming the BETWEEN separator.
+        lower.emit_enclosed(writer)?;
+        writer.sql(" AND ");
+        upper.emit_enclosed(writer)?;
+        Ok(())
     }
 
     fn emit_in_list(&self, writer: &mut SqlWriter) -> Result<(), DeparseError> {
@@ -330,6 +346,16 @@ impl OperatorExpr {
         left.emit(writer)?;
         writer.sql(keyword);
         right.emit(writer)
+    }
+
+    fn emit_nullif(&self, writer: &mut SqlWriter) -> Result<(), DeparseError> {
+        let (left, right) = self.operands(writer)?;
+        writer.sql("NULLIF(");
+        left.emit(writer)?;
+        writer.sql(", ");
+        right.emit(writer)?;
+        writer.sql(")");
+        Ok(())
     }
 
     fn emit_quantified(
@@ -429,15 +455,7 @@ impl OperatorKind {
             Self::All => value.emit_quantified(writer, " ALL ("),
             Self::Distinct => value.emit_predicate(writer, " IS DISTINCT FROM "),
             Self::NotDistinct => value.emit_predicate(writer, " IS NOT DISTINCT FROM "),
-            Self::NullIf => {
-                let (left, right) = value.operands(writer)?;
-                writer.sql("NULLIF(");
-                left.emit(writer)?;
-                writer.sql(", ");
-                right.emit(writer)?;
-                writer.sql(")");
-                Ok(())
-            }
+            Self::NullIf => value.emit_nullif(writer),
             Self::In => value.emit_in(writer, false),
             Self::NotIn => value.emit_in(writer, true),
             Self::Like => value.emit_like(writer, false, false, false),
@@ -466,30 +484,32 @@ impl SqlEmit for BooleanExpr {
 impl BooleanOperator {
     fn emit_arguments(&self, values: &[Expr], writer: &mut SqlWriter) -> Result<(), DeparseError> {
         match self {
-            Self::Not => {
-                let [value] = values else {
-                    return writer.invalid("NOT", "NOT requires exactly one argument");
-                };
-                writer.sql("NOT ");
-                value.emit(writer)
-            }
-            Self::And | Self::Or => {
-                if values.len() < 2 {
-                    return writer.invalid(
-                        "Boolean expression",
-                        "AND and OR require at least two arguments",
-                    );
-                }
-                writer.list(
-                    values,
-                    if matches!(self, Self::And) {
-                        " AND "
-                    } else {
-                        " OR "
-                    },
-                )
-            }
+            Self::Not => Self::emit_not(values, writer),
+            Self::And => Self::emit_chain(values, " AND ", writer),
+            Self::Or => Self::emit_chain(values, " OR ", writer),
         }
+    }
+
+    fn emit_not(values: &[Expr], writer: &mut SqlWriter) -> Result<(), DeparseError> {
+        let [value] = values else {
+            return writer.invalid("NOT", "NOT requires exactly one argument");
+        };
+        writer.sql("NOT ");
+        value.emit(writer)
+    }
+
+    fn emit_chain(
+        values: &[Expr],
+        separator: &str,
+        writer: &mut SqlWriter,
+    ) -> Result<(), DeparseError> {
+        if values.len() < 2 {
+            return writer.invalid(
+                "Boolean expression",
+                "AND and OR require at least two arguments",
+            );
+        }
+        writer.list(values, separator)
     }
 }
 
@@ -552,6 +572,58 @@ impl SqlEmit for Call {
         }
         self.kind.emit_name(&self.name, writer)?;
         writer.sql("(");
+        self.emit_arguments(writer)?;
+        writer.sql(")");
+        self.emit_within_group(writer)?;
+        if let Some(filter) = &self.filter {
+            writer.sql(" FILTER (WHERE ");
+            filter.emit(writer)?;
+            writer.sql(")");
+        }
+        if let Some(over) = &self.over {
+            writer.sql(" OVER ");
+            over.emit(writer)?;
+        }
+        Ok(())
+    }
+}
+
+impl CallKind {
+    fn emit_name(
+        &self,
+        name: &crate::ast::Name,
+        writer: &mut SqlWriter,
+    ) -> Result<(), DeparseError> {
+        match self {
+            Self::Ordinary => name.emit(writer),
+            Self::Coalesce => Self::emit_coalesce(name, writer),
+            Self::MinMax => Self::emit_min_max(name, writer),
+        }
+    }
+
+    fn emit_coalesce(name: &crate::ast::Name, writer: &mut SqlWriter) -> Result<(), DeparseError> {
+        if !name.is_local("coalesce") {
+            return writer.invalid("COALESCE", "special call has an inconsistent name");
+        }
+        writer.sql("COALESCE");
+        Ok(())
+    }
+
+    fn emit_min_max(name: &crate::ast::Name, writer: &mut SqlWriter) -> Result<(), DeparseError> {
+        writer.postgres_only("GREATEST/LEAST")?;
+        if name.is_local("greatest") {
+            writer.sql("GREATEST");
+        } else if name.is_local("least") {
+            writer.sql("LEAST");
+        } else {
+            return writer.invalid("GREATEST/LEAST", "special call has an inconsistent name");
+        }
+        Ok(())
+    }
+}
+
+impl Call {
+    fn emit_arguments(&self, writer: &mut SqlWriter) -> Result<(), DeparseError> {
         if self.star {
             if !self.arguments.is_empty()
                 || self.distinct
@@ -589,7 +661,10 @@ impl SqlEmit for Call {
                 writer.list(&self.order, ", ")?;
             }
         }
-        writer.sql(")");
+        Ok(())
+    }
+
+    fn emit_within_group(&self, writer: &mut SqlWriter) -> Result<(), DeparseError> {
         if self.within_group {
             writer.postgres_only("WITHIN GROUP")?;
             writer.sql(" WITHIN GROUP (ORDER BY ");
@@ -609,51 +684,9 @@ impl SqlEmit for Call {
                 "WITHIN GROUP ordering has no WITHIN GROUP clause",
             );
         }
-        if let Some(filter) = &self.filter {
-            writer.sql(" FILTER (WHERE ");
-            filter.emit(writer)?;
-            writer.sql(")");
-        }
-        if let Some(over) = &self.over {
-            writer.sql(" OVER ");
-            over.emit(writer)?;
-        }
         Ok(())
     }
-}
 
-impl CallKind {
-    fn emit_name(
-        &self,
-        name: &crate::ast::Name,
-        writer: &mut SqlWriter,
-    ) -> Result<(), DeparseError> {
-        match self {
-            Self::Ordinary => name.emit(writer),
-            Self::Coalesce => {
-                if !name.is_local("coalesce") {
-                    return writer.invalid("COALESCE", "special call has an inconsistent name");
-                }
-                writer.sql("COALESCE");
-                Ok(())
-            }
-            Self::MinMax => {
-                writer.postgres_only("GREATEST/LEAST")?;
-                if name.is_local("greatest") {
-                    writer.sql("GREATEST");
-                } else if name.is_local("least") {
-                    writer.sql("LEAST");
-                } else {
-                    return writer
-                        .invalid("GREATEST/LEAST", "special call has an inconsistent name");
-                }
-                Ok(())
-            }
-        }
-    }
-}
-
-impl Call {
     fn emit_pattern(&self, writer: &mut SqlWriter, similar: bool) -> Result<(), DeparseError> {
         let conversion = if similar {
             "similar_to_escape"
@@ -728,124 +761,159 @@ impl Call {
             );
         }
         match name {
-            "system_user" => {
-                self.expect_arity(writer, 0, 0)?;
-                writer.sql("SYSTEM_USER");
-            }
-            "pg_collation_for" => {
-                self.expect_arity(writer, 1, 1)?;
-                writer.sql("COLLATION FOR (");
-                self.arguments[0].emit(writer)?;
-                writer.sql(")");
-            }
-            "timezone" => {
-                self.expect_arity(writer, 1, 2)?;
-                writer.sql("(");
-                if let [zone, argument] = self.arguments.as_slice() {
-                    argument.emit(writer)?;
-                    writer.sql(" AT TIME ZONE ");
-                    zone.emit(writer)?;
-                } else {
-                    self.arguments[0].emit(writer)?;
-                    writer.sql(" AT LOCAL");
-                }
-                writer.sql(")");
-            }
-            "overlaps" => {
-                self.expect_arity(writer, 4, 4)?;
-                writer.sql("((");
-                writer.list(&self.arguments[..2], ", ")?;
-                writer.sql(") OVERLAPS (");
-                writer.list(&self.arguments[2..], ", ")?;
-                writer.sql("))");
-            }
-            "extract" => {
-                self.expect_arity(writer, 2, 2)?;
-                writer.sql("EXTRACT(");
-                self.arguments[0].emit(writer)?;
-                writer.sql(" FROM ");
-                self.arguments[1].emit(writer)?;
-                writer.sql(")");
-            }
-            "position" => {
-                self.expect_arity(writer, 2, 2)?;
-                writer.sql("POSITION(");
-                self.arguments[1].emit(writer)?;
-                writer.sql(" IN ");
-                self.arguments[0].emit(writer)?;
-                writer.sql(")");
-            }
-            "substring" => {
-                self.expect_arity(writer, 2, 3)?;
-                writer.sql("SUBSTRING(");
-                self.arguments[0].emit(writer)?;
-                writer.sql(" FROM ");
-                self.arguments[1].emit(writer)?;
-                if self.arguments.len() == 3 {
-                    writer.sql(" FOR ");
-                    self.arguments[2].emit(writer)?;
-                }
-                writer.sql(")");
-            }
-            "overlay" => {
-                self.expect_arity(writer, 3, 4)?;
-                writer.sql("OVERLAY(");
-                self.arguments[0].emit(writer)?;
-                writer.sql(" PLACING ");
-                self.arguments[1].emit(writer)?;
-                writer.sql(" FROM ");
-                self.arguments[2].emit(writer)?;
-                if self.arguments.len() == 4 {
-                    writer.sql(" FOR ");
-                    self.arguments[3].emit(writer)?;
-                }
-                writer.sql(")");
-            }
-            "btrim" | "ltrim" | "rtrim" => {
-                self.expect_arity(writer, 1, usize::MAX)?;
-                writer.sql(match name {
-                    "ltrim" => "TRIM(LEADING FROM ",
-                    "rtrim" => "TRIM(TRAILING FROM ",
-                    _ => "TRIM(BOTH FROM ",
-                });
-                writer.list(&self.arguments, ", ")?;
-                writer.sql(")");
-            }
-            "normalize" | "is_normalized" => {
-                self.expect_arity(writer, 1, 2)?;
-                if name == "normalize" {
-                    writer.sql("NORMALIZE(");
-                    self.arguments[0].emit(writer)?;
-                    if self.arguments.len() == 2 {
-                        writer.sql(", ");
-                        self.arguments[1].emit_normal_form(writer)?;
-                    }
-                    writer.sql(")");
-                } else {
-                    writer.sql("(");
-                    self.arguments[0].emit(writer)?;
-                    writer.sql(" IS ");
-                    if self.arguments.len() == 2 {
-                        self.arguments[1].emit_normal_form(writer)?;
-                        writer.sql(" ");
-                    }
-                    writer.sql("NORMALIZED)");
-                }
-            }
-            "xmlexists" => {
-                self.expect_arity(writer, 2, 2)?;
-                writer.sql("XMLEXISTS(");
-                self.arguments[0].emit(writer)?;
-                writer.sql(" PASSING ");
-                self.arguments[1].emit(writer)?;
-                writer.sql(")");
-            }
+            "system_user" => self.emit_system_user(writer)?,
+            "pg_collation_for" => self.emit_collation_for(writer)?,
+            "timezone" => self.emit_timezone(writer)?,
+            "overlaps" => self.emit_overlaps(writer)?,
+            "extract" => self.emit_extract(writer)?,
+            "position" => self.emit_position(writer)?,
+            "substring" => self.emit_substring(writer)?,
+            "overlay" => self.emit_overlay(writer)?,
+            "btrim" | "ltrim" | "rtrim" => self.emit_trim(name, writer)?,
+            "normalize" | "is_normalized" => self.emit_normalization(name, writer)?,
+            "xmlexists" => self.emit_xmlexists(writer)?,
             _ => {
                 return writer.invalid(
                     "SQL special function",
                     "unrecognized special SQL function name",
                 );
             }
+        }
+        Ok(())
+    }
+}
+
+impl Call {
+    fn emit_system_user(&self, writer: &mut SqlWriter) -> Result<(), DeparseError> {
+        self.expect_arity(writer, 0, 0)?;
+        writer.sql("SYSTEM_USER");
+        Ok(())
+    }
+
+    fn emit_collation_for(&self, writer: &mut SqlWriter) -> Result<(), DeparseError> {
+        self.expect_arity(writer, 1, 1)?;
+        writer.sql("COLLATION FOR (");
+        self.arguments[0].emit(writer)?;
+        writer.sql(")");
+        Ok(())
+    }
+
+    fn emit_timezone(&self, writer: &mut SqlWriter) -> Result<(), DeparseError> {
+        self.expect_arity(writer, 1, 2)?;
+        writer.sql("(");
+        if let [zone, argument] = self.arguments.as_slice() {
+            argument.emit(writer)?;
+            writer.sql(" AT TIME ZONE ");
+            zone.emit(writer)?;
+        } else {
+            self.arguments[0].emit(writer)?;
+            writer.sql(" AT LOCAL");
+        }
+        writer.sql(")");
+        Ok(())
+    }
+
+    fn emit_overlaps(&self, writer: &mut SqlWriter) -> Result<(), DeparseError> {
+        self.expect_arity(writer, 4, 4)?;
+        writer.sql("((");
+        writer.list(&self.arguments[..2], ", ")?;
+        writer.sql(") OVERLAPS (");
+        writer.list(&self.arguments[2..], ", ")?;
+        writer.sql("))");
+        Ok(())
+    }
+
+    fn emit_extract(&self, writer: &mut SqlWriter) -> Result<(), DeparseError> {
+        self.expect_arity(writer, 2, 2)?;
+        writer.sql("EXTRACT(");
+        self.arguments[0].emit(writer)?;
+        writer.sql(" FROM ");
+        self.arguments[1].emit(writer)?;
+        writer.sql(")");
+        Ok(())
+    }
+
+    fn emit_position(&self, writer: &mut SqlWriter) -> Result<(), DeparseError> {
+        self.expect_arity(writer, 2, 2)?;
+        writer.sql("POSITION(");
+        self.arguments[1].emit(writer)?;
+        writer.sql(" IN ");
+        self.arguments[0].emit(writer)?;
+        writer.sql(")");
+        Ok(())
+    }
+
+    fn emit_substring(&self, writer: &mut SqlWriter) -> Result<(), DeparseError> {
+        self.expect_arity(writer, 2, 3)?;
+        writer.sql("SUBSTRING(");
+        self.arguments[0].emit(writer)?;
+        writer.sql(" FROM ");
+        self.arguments[1].emit(writer)?;
+        if self.arguments.len() == 3 {
+            writer.sql(" FOR ");
+            self.arguments[2].emit(writer)?;
+        }
+        writer.sql(")");
+        Ok(())
+    }
+
+    fn emit_overlay(&self, writer: &mut SqlWriter) -> Result<(), DeparseError> {
+        self.expect_arity(writer, 3, 4)?;
+        writer.sql("OVERLAY(");
+        self.arguments[0].emit(writer)?;
+        writer.sql(" PLACING ");
+        self.arguments[1].emit(writer)?;
+        writer.sql(" FROM ");
+        self.arguments[2].emit(writer)?;
+        if self.arguments.len() == 4 {
+            writer.sql(" FOR ");
+            self.arguments[3].emit(writer)?;
+        }
+        writer.sql(")");
+        Ok(())
+    }
+
+    fn emit_xmlexists(&self, writer: &mut SqlWriter) -> Result<(), DeparseError> {
+        self.expect_arity(writer, 2, 2)?;
+        writer.sql("XMLEXISTS(");
+        self.arguments[0].emit(writer)?;
+        writer.sql(" PASSING ");
+        self.arguments[1].emit(writer)?;
+        writer.sql(")");
+        Ok(())
+    }
+
+    fn emit_trim(&self, name: &str, writer: &mut SqlWriter) -> Result<(), DeparseError> {
+        self.expect_arity(writer, 1, usize::MAX)?;
+        writer.sql(match name {
+            "ltrim" => "TRIM(LEADING FROM ",
+            "rtrim" => "TRIM(TRAILING FROM ",
+            _ => "TRIM(BOTH FROM ",
+        });
+        writer.list(&self.arguments, ", ")?;
+        writer.sql(")");
+        Ok(())
+    }
+
+    fn emit_normalization(&self, name: &str, writer: &mut SqlWriter) -> Result<(), DeparseError> {
+        self.expect_arity(writer, 1, 2)?;
+        if name == "normalize" {
+            writer.sql("NORMALIZE(");
+            self.arguments[0].emit(writer)?;
+            if self.arguments.len() == 2 {
+                writer.sql(", ");
+                self.arguments[1].emit_normal_form(writer)?;
+            }
+            writer.sql(")");
+        } else {
+            writer.sql("(");
+            self.arguments[0].emit(writer)?;
+            writer.sql(" IS ");
+            if self.arguments.len() == 2 {
+                self.arguments[1].emit_normal_form(writer)?;
+                writer.sql(" ");
+            }
+            writer.sql("NORMALIZED)");
         }
         Ok(())
     }
@@ -896,50 +964,64 @@ impl SubqueryKind {
 
     fn emit_subquery(&self, value: &Subquery, writer: &mut SqlWriter) -> Result<(), DeparseError> {
         match self {
-            Self::Scalar | Self::MultiExpression => {
-                writer.sql("(");
-                value.query.emit(writer)?;
-                writer.sql(")");
-            }
-            Self::Exists => {
-                writer.sql("EXISTS (");
-                value.query.emit(writer)?;
-                writer.sql(")");
-            }
-            Self::Array => {
-                writer.postgres_only("array subquery")?;
-                writer.sql("ARRAY(");
-                value.query.emit(writer)?;
-                writer.sql(")");
-            }
-            Self::Any | Self::All | Self::Row => {
-                let Some(test) = &value.test else {
-                    return writer.invalid(
-                        "subquery predicate",
-                        "subquery predicate requires a left operand",
-                    );
-                };
-                writer.sql("(");
-                test.emit(writer)?;
-                if matches!(self, Self::Any)
-                    && (value.operator.last_component().is_none()
-                        || (!writer.is_postgres() && value.operator.is_local("=")))
-                {
-                    writer.sql(" IN (");
-                } else {
-                    writer.postgres_only("quantified subquery")?;
-                    writer.sql(" ");
-                    value.operator.emit_operator(writer)?;
-                    writer.sql(match self {
-                        Self::Any => " ANY (",
-                        Self::All => " ALL (",
-                        _ => " (",
-                    });
-                }
-                value.query.emit(writer)?;
-                writer.sql("))");
-            }
+            Self::Scalar | Self::MultiExpression => value.emit_enclosed_query("(", writer),
+            Self::Exists => value.emit_enclosed_query("EXISTS (", writer),
+            Self::Array => value.emit_array_query(writer),
+            Self::Any | Self::All | Self::Row => value.emit_comparison(writer),
         }
+    }
+
+    fn uses_in(&self, value: &Subquery, writer: &SqlWriter) -> bool {
+        matches!(self, Self::Any)
+            && (value.operator.last_component().is_none()
+                || (!writer.is_postgres() && value.operator.is_local("=")))
+    }
+
+    const fn comparison_suffix(&self) -> &'static str {
+        match self {
+            Self::Any => " ANY (",
+            Self::All => " ALL (",
+            _ => " (",
+        }
+    }
+}
+
+impl Subquery {
+    fn emit_enclosed_query(
+        &self,
+        prefix: &str,
+        writer: &mut SqlWriter,
+    ) -> Result<(), DeparseError> {
+        writer.sql(prefix);
+        self.query.emit(writer)?;
+        writer.sql(")");
+        Ok(())
+    }
+
+    fn emit_array_query(&self, writer: &mut SqlWriter) -> Result<(), DeparseError> {
+        writer.postgres_only("array subquery")?;
+        self.emit_enclosed_query("ARRAY(", writer)
+    }
+
+    fn emit_comparison(&self, writer: &mut SqlWriter) -> Result<(), DeparseError> {
+        let Some(test) = &self.test else {
+            return writer.invalid(
+                "subquery predicate",
+                "subquery predicate requires a left operand",
+            );
+        };
+        writer.sql("(");
+        test.emit(writer)?;
+        if self.kind.uses_in(self, writer) {
+            writer.sql(" IN (");
+        } else {
+            writer.postgres_only("quantified subquery")?;
+            writer.sql(" ");
+            self.operator.emit_operator(writer)?;
+            writer.sql(self.kind.comparison_suffix());
+        }
+        self.query.emit(writer)?;
+        writer.sql("))");
         Ok(())
     }
 }
@@ -1057,27 +1139,33 @@ impl RaiseAction {
         writer: &mut SqlWriter,
     ) -> Result<(), DeparseError> {
         match self {
-            Self::Ignore => {
-                if message.is_some() {
-                    return writer.invalid("RAISE(IGNORE)", "IGNORE cannot have an error message");
-                }
-                writer.sql("IGNORE");
-            }
-            Self::Rollback | Self::Abort | Self::Fail => {
-                writer.sql(match self {
-                    Self::Rollback => "ROLLBACK",
-                    Self::Abort => "ABORT",
-                    _ => "FAIL",
-                });
-                let Some(message) = message else {
-                    return writer.invalid("RAISE", "RAISE action requires an error message");
-                };
-                writer.sql(", ");
-                message.emit(writer)?;
-            }
-            Self::Replace => return writer.invalid("RAISE", "REPLACE is not a legal RAISE action"),
+            Self::Ignore => Self::emit_ignore(message, writer),
+            Self::Rollback => Self::emit_message("ROLLBACK", message, writer),
+            Self::Abort => Self::emit_message("ABORT", message, writer),
+            Self::Fail => Self::emit_message("FAIL", message, writer),
+            Self::Replace => writer.invalid("RAISE", "REPLACE is not a legal RAISE action"),
         }
+    }
+
+    fn emit_ignore(message: &Option<Expr>, writer: &mut SqlWriter) -> Result<(), DeparseError> {
+        if message.is_some() {
+            return writer.invalid("RAISE(IGNORE)", "IGNORE cannot have an error message");
+        }
+        writer.sql("IGNORE");
         Ok(())
+    }
+
+    fn emit_message(
+        keyword: &str,
+        message: &Option<Expr>,
+        writer: &mut SqlWriter,
+    ) -> Result<(), DeparseError> {
+        writer.sql(keyword);
+        let Some(message) = message else {
+            return writer.invalid("RAISE", "RAISE action requires an error message");
+        };
+        writer.sql(", ");
+        message.emit(writer)
     }
 }
 
@@ -1104,27 +1192,32 @@ impl SqlEmit for Grouping {
     fn emit(&self, writer: &mut SqlWriter) -> Result<(), DeparseError> {
         match self {
             Self::Expression(value) => value.emit(writer),
-            Self::Empty => {
-                writer.postgres_only("empty grouping set")?;
-                writer.sql("()");
-                Ok(())
-            }
-            Self::Rollup(values)
-            | Self::Cube(values)
-            | Self::Sets(values)
-            | Self::Simple(values) => {
-                writer.postgres_only("grouping set")?;
-                writer.sql(match self {
-                    Self::Rollup(_) => "ROLLUP(",
-                    Self::Cube(_) => "CUBE(",
-                    Self::Sets(_) => "GROUPING SETS (",
-                    _ => "(",
-                });
-                writer.list(values, ", ")?;
-                writer.sql(")");
-                Ok(())
-            }
+            Self::Empty => Self::emit_empty(writer),
+            Self::Rollup(values) => Self::emit_group(values, "ROLLUP(", writer),
+            Self::Cube(values) => Self::emit_group(values, "CUBE(", writer),
+            Self::Sets(values) => Self::emit_group(values, "GROUPING SETS (", writer),
+            Self::Simple(values) => Self::emit_group(values, "(", writer),
         }
+    }
+}
+
+impl Grouping {
+    fn emit_empty(writer: &mut SqlWriter) -> Result<(), DeparseError> {
+        writer.postgres_only("empty grouping set")?;
+        writer.sql("()");
+        Ok(())
+    }
+
+    fn emit_group(
+        values: &[Self],
+        prefix: &str,
+        writer: &mut SqlWriter,
+    ) -> Result<(), DeparseError> {
+        writer.postgres_only("grouping set")?;
+        writer.sql(prefix);
+        writer.list(values, ", ")?;
+        writer.sql(")");
+        Ok(())
     }
 }
 

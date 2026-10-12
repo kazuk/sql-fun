@@ -1,7 +1,7 @@
 use super::{DeparseError, SqlEmit, SqlWriter};
 use crate::ast::{
-    Dialect, Expr, Literal, Name, OperatorKind, Parameter, SqliteTypeModifiers, SqliteTypeNamePart,
-    SqliteTypeNameTrivia, TypeName,
+    Dialect, Expr, Literal, Name, OperatorKind, Parameter, SqliteTypeModifier, SqliteTypeModifiers,
+    SqliteTypeNamePart, SqliteTypeNameTrivia, TypeName,
 };
 
 impl SqlEmit for Name {
@@ -91,57 +91,82 @@ fn valid_operator(value: &str, dialect: Dialect) -> bool {
 impl SqlEmit for Literal {
     fn emit(&self, writer: &mut SqlWriter) -> Result<(), DeparseError> {
         match self {
-            Self::Null => writer.sql("NULL"),
-            Self::Integer(value) => writer.number(value),
-            Self::Numeric(value) => {
-                if !valid_numeric(value, writer.is_postgres()) {
-                    return writer.invalid("numeric literal", "numeric spelling is invalid");
-                }
-                writer.sql(value);
-            }
-            Self::String(value) => writer.string(value)?,
-            Self::Boolean(value) => writer.sql(if *value { "TRUE" } else { "FALSE" }),
-            Self::BitString(value) => {
-                if !writer.is_postgres() {
-                    return writer.invalid("bit string", "bit strings are not legal SQLite SQL");
-                }
-                let Some((prefix, digits)) = value.split_at_checked(1) else {
-                    return writer.invalid("bit string", "bit string prefix is missing");
-                };
-                let valid_digits = match prefix {
-                    "b" | "B" => digits.bytes().all(|byte| matches!(byte, b'0' | b'1')),
-                    "x" | "X" => digits.bytes().all(|byte| byte.is_ascii_hexdigit()),
-                    _ => false,
-                };
-                if !valid_digits {
-                    return writer.invalid("bit string", "bit string spelling is invalid");
-                }
-                writer.sql(prefix);
-                writer.sql("'");
-                writer.sql(digits);
-                writer.sql("'");
-            }
-            Self::Blob(value) => {
-                if writer.is_postgres() {
-                    return writer
-                        .invalid("blob literal", "blob literals are not legal PostgreSQL SQL");
-                }
-                if value.len() % 2 != 0 || !value.bytes().all(|byte| byte.is_ascii_hexdigit()) {
-                    return writer
-                        .invalid("blob literal", "blob payload must be hexadecimal bytes");
-                }
-                writer.sql("X'");
-                writer.sql(value);
-                writer.sql("'");
-            }
-            Self::Keyword(value) => {
-                if writer.is_postgres() || !valid_sqlite_keyword_constant(value) {
-                    return writer
-                        .invalid("keyword literal", "keyword is not a supported SQL constant");
-                }
-                writer.sql(value);
-            }
+            Self::Null => Self::emit_null(writer),
+            Self::Integer(value) => Self::emit_integer(*value, writer),
+            Self::Numeric(value) => Self::emit_numeric(value, writer),
+            Self::String(value) => writer.string(value),
+            Self::Boolean(value) => Self::emit_boolean(*value, writer),
+            Self::BitString(value) => Self::emit_bit_string(value, writer),
+            Self::Blob(value) => Self::emit_blob(value, writer),
+            Self::Keyword(value) => Self::emit_keyword(value, writer),
         }
+    }
+}
+
+impl Literal {
+    fn emit_null(writer: &mut SqlWriter) -> Result<(), DeparseError> {
+        writer.sql("NULL");
+        Ok(())
+    }
+
+    fn emit_integer(value: i32, writer: &mut SqlWriter) -> Result<(), DeparseError> {
+        writer.number(value);
+        Ok(())
+    }
+
+    fn emit_numeric(value: &str, writer: &mut SqlWriter) -> Result<(), DeparseError> {
+        if !valid_numeric(value, writer.is_postgres()) {
+            return writer.invalid("numeric literal", "numeric spelling is invalid");
+        }
+        writer.sql(value);
+        Ok(())
+    }
+
+    fn emit_boolean(value: bool, writer: &mut SqlWriter) -> Result<(), DeparseError> {
+        writer.sql(if value { "TRUE" } else { "FALSE" });
+        Ok(())
+    }
+
+    fn emit_bit_string(value: &str, writer: &mut SqlWriter) -> Result<(), DeparseError> {
+        if !writer.is_postgres() {
+            return writer.invalid("bit string", "bit strings are not legal SQLite SQL");
+        }
+        let Some((prefix, digits)) = value.split_at_checked(1) else {
+            return writer.invalid("bit string", "bit string prefix is missing");
+        };
+        let valid_digits = match prefix {
+            "b" | "B" => digits.bytes().all(|byte| matches!(byte, b'0' | b'1')),
+            "x" | "X" => digits.bytes().all(|byte| byte.is_ascii_hexdigit()),
+            _ => false,
+        };
+        if !valid_digits {
+            return writer.invalid("bit string", "bit string spelling is invalid");
+        }
+        writer.sql(prefix);
+        writer.sql("'");
+        writer.sql(digits);
+        writer.sql("'");
+        Ok(())
+    }
+
+    fn emit_blob(value: &str, writer: &mut SqlWriter) -> Result<(), DeparseError> {
+        if writer.is_postgres() {
+            return writer.invalid("blob literal", "blob literals are not legal PostgreSQL SQL");
+        }
+        if !value.len().is_multiple_of(2) || !value.bytes().all(|byte| byte.is_ascii_hexdigit()) {
+            return writer.invalid("blob literal", "blob payload must be hexadecimal bytes");
+        }
+        writer.sql("X'");
+        writer.sql(value);
+        writer.sql("'");
+        Ok(())
+    }
+
+    fn emit_keyword(value: &str, writer: &mut SqlWriter) -> Result<(), DeparseError> {
+        if writer.is_postgres() || !valid_sqlite_keyword_constant(value) {
+            return writer.invalid("keyword literal", "keyword is not a supported SQL constant");
+        }
+        writer.sql(value);
         Ok(())
     }
 }
@@ -241,82 +266,177 @@ impl SqlEmit for TypeName {
         if !writer.is_postgres() {
             return self.emit_sqlite(writer);
         }
-
-        if self.set_of {
-            writer.sql("SETOF ");
-        }
-
-        if writer.is_postgres() && self.name.is_system_function("interval") {
-            writer.sql("interval");
-            emit_interval_modifiers(self, writer)?;
-        } else if writer.is_postgres() && writer.is_system_type_name(&self.name, "timetz") {
-            emit_time_zone_type("time", &self.modifiers, writer)?;
-        } else if writer.is_postgres() && writer.is_system_type_name(&self.name, "timestamptz") {
-            emit_time_zone_type("timestamp", &self.modifiers, writer)?;
-        } else if writer.is_postgres() && writer.is_system_type_name(&self.name, "bpchar") {
-            writer.sql("char");
-            emit_type_modifiers(&self.modifiers, writer)?;
-        } else if writer.is_postgres() && writer.is_system_type_name(&self.name, "bool") {
-            writer.sql("boolean");
-            emit_type_modifiers(&self.modifiers, writer)?;
-        } else if writer.is_postgres() && writer.is_system_type_name(&self.name, "int2") {
-            writer.sql("smallint");
-            emit_type_modifiers(&self.modifiers, writer)?;
-        } else if writer.is_postgres() && writer.is_system_type_name(&self.name, "int4") {
-            writer.sql("int");
-            emit_type_modifiers(&self.modifiers, writer)?;
-        } else if writer.is_postgres() && writer.is_system_type_name(&self.name, "int8") {
-            writer.sql("bigint");
-            emit_type_modifiers(&self.modifiers, writer)?;
-        } else if writer.is_postgres()
-            && (writer.is_system_type_name(&self.name, "real")
-                || writer.is_system_type_name(&self.name, "float4"))
-        {
-            writer.sql("real");
-            emit_type_modifiers(&self.modifiers, writer)?;
-        } else if writer.is_postgres() && writer.is_system_type_name(&self.name, "float8") {
-            writer.sql("double precision");
-            emit_type_modifiers(&self.modifiers, writer)?;
-        } else if writer.is_postgres() && writer.is_system_type_name(&self.name, "varchar") {
-            writer.sql("varchar");
-            emit_type_modifiers(&self.modifiers, writer)?;
-        } else if writer.is_postgres() && writer.is_system_type_name(&self.name, "numeric") {
-            writer.sql("numeric");
-            emit_type_modifiers(&self.modifiers, writer)?;
-        } else if writer.is_postgres() && writer.is_system_type_name(&self.name, "time") {
-            writer.sql("time");
-            emit_type_modifiers(&self.modifiers, writer)?;
-        } else if writer.is_postgres() && writer.is_system_type_name(&self.name, "timestamp") {
-            writer.sql("timestamp");
-            emit_type_modifiers(&self.modifiers, writer)?;
-        } else if writer.is_postgres() && writer.is_system_type_name(&self.name, "varbit") {
-            writer.sql("bit varying");
-            emit_type_modifiers(&self.modifiers, writer)?;
-        } else if writer.is_postgres() && writer.is_system_type_name(&self.name, "bit") {
-            writer.sql("bit");
-            emit_type_modifiers(&self.modifiers, writer)?;
-        } else {
-            self.name.emit(writer)?;
-            emit_type_modifiers(&self.modifiers, writer)?;
-        }
-
-        if writer.is_postgres() {
-            for bound in &self.array_bounds {
-                writer.sql("[");
-                if let Some(bound) = bound {
-                    writer.number(bound);
-                }
-                writer.sql("]");
-            }
-            if self.percent_type {
-                writer.sql("%TYPE");
-            }
-        }
-        Ok(())
+        self.emit_postgres(writer)
     }
 }
 
 impl TypeName {
+    fn emit_postgres(&self, writer: &mut SqlWriter) -> Result<(), DeparseError> {
+        if self.set_of {
+            writer.sql("SETOF ");
+        }
+
+        if !self.emit_postgres_builtin(writer)? {
+            self.name.emit(writer)?;
+            self.emit_modifiers(writer)?;
+        }
+
+        for bound in &self.array_bounds {
+            writer.sql("[");
+            if let Some(bound) = bound {
+                writer.number(bound);
+            }
+            writer.sql("]");
+        }
+        if self.percent_type {
+            writer.sql("%TYPE");
+        }
+        Ok(())
+    }
+
+    fn emit_postgres_builtin(&self, writer: &mut SqlWriter) -> Result<bool, DeparseError> {
+        match self.name.last_component() {
+            Some("interval") if self.name.is_system_function("interval") => {
+                writer.sql("interval");
+                self.emit_interval_modifiers(writer)?;
+            }
+            Some("timetz") if self.name.is_system_function("timetz") => {
+                self.emit_time_zone_type("time", writer)?;
+            }
+            Some("timestamptz") if self.name.is_system_function("timestamptz") => {
+                self.emit_time_zone_type("timestamp", writer)?;
+            }
+            Some("bpchar") if self.name.is_system_function("bpchar") => {
+                self.emit_standard_postgres_type("char", writer)?;
+            }
+            Some("bool") if self.name.is_system_function("bool") => {
+                self.emit_standard_postgres_type("boolean", writer)?;
+            }
+            Some("int2") if self.name.is_system_function("int2") => {
+                self.emit_standard_postgres_type("smallint", writer)?;
+            }
+            Some("int4") if self.name.is_system_function("int4") => {
+                self.emit_standard_postgres_type("int", writer)?;
+            }
+            Some("int8") if self.name.is_system_function("int8") => {
+                self.emit_standard_postgres_type("bigint", writer)?;
+            }
+            Some(name @ ("real" | "float4")) if self.name.is_system_function(name) => {
+                self.emit_standard_postgres_type("real", writer)?;
+            }
+            Some("float8") if self.name.is_system_function("float8") => {
+                self.emit_standard_postgres_type("double precision", writer)?;
+            }
+            Some("varchar") if self.name.is_system_function("varchar") => {
+                self.emit_standard_postgres_type("varchar", writer)?;
+            }
+            Some("numeric") if self.name.is_system_function("numeric") => {
+                self.emit_standard_postgres_type("numeric", writer)?;
+            }
+            Some("time") if self.name.is_system_function("time") => {
+                self.emit_standard_postgres_type("time", writer)?;
+            }
+            Some("timestamp") if self.name.is_system_function("timestamp") => {
+                self.emit_standard_postgres_type("timestamp", writer)?;
+            }
+            Some("varbit") if self.name.is_system_function("varbit") => {
+                self.emit_standard_postgres_type("bit varying", writer)?;
+            }
+            Some("bit") if self.name.is_system_function("bit") => {
+                self.emit_standard_postgres_type("bit", writer)?;
+            }
+            _ => return Ok(false),
+        }
+        Ok(true)
+    }
+
+    fn emit_standard_postgres_type(
+        &self,
+        name: &str,
+        writer: &mut SqlWriter,
+    ) -> Result<(), DeparseError> {
+        writer.sql(name);
+        self.emit_modifiers(writer)
+    }
+
+    fn emit_modifiers(&self, writer: &mut SqlWriter) -> Result<(), DeparseError> {
+        if !self.modifiers.is_empty() {
+            writer.sql("(");
+            writer.list(&self.modifiers, ", ")?;
+            writer.sql(")");
+        }
+        Ok(())
+    }
+
+    fn emit_time_zone_type(&self, base: &str, writer: &mut SqlWriter) -> Result<(), DeparseError> {
+        writer.sql(base);
+        self.emit_modifiers(writer)?;
+        writer.sql(" with time zone");
+        Ok(())
+    }
+
+    fn emit_interval_modifiers(&self, writer: &mut SqlWriter) -> Result<(), DeparseError> {
+        match self.modifiers.as_slice() {
+            [] => Ok(()),
+            [mask] => {
+                let Some(mask) = mask.integer_literal() else {
+                    return writer
+                        .invalid("interval type", "interval range mask must be an integer");
+                };
+                Self::emit_interval_range(mask, writer)
+            }
+            [mask, precision] => {
+                let Some(mask) = mask.integer_literal() else {
+                    return writer
+                        .invalid("interval type", "interval range mask must be an integer");
+                };
+                let Some(precision) = precision.integer_literal() else {
+                    return writer
+                        .invalid("interval type", "interval precision must be an integer");
+                };
+                Self::emit_interval_range(mask, writer)?;
+                if precision != 65_535 {
+                    if !(0..=6).contains(&precision) {
+                        return writer.invalid(
+                            "interval type",
+                            "interval precision must be between zero and six",
+                        );
+                    }
+                    writer.sql("(");
+                    writer.number(precision);
+                    writer.sql(")");
+                }
+                Ok(())
+            }
+            _ => writer.invalid(
+                "interval type",
+                "interval type has an unsupported modifier shape",
+            ),
+        }
+    }
+
+    fn emit_interval_range(mask: i32, writer: &mut SqlWriter) -> Result<(), DeparseError> {
+        let range = match mask {
+            4 => " year",
+            2 => " month",
+            8 => " day",
+            1_024 => " hour",
+            2_048 => " minute",
+            4_096 => " second",
+            6 => " year to month",
+            1_032 => " day to hour",
+            3_080 => " day to minute",
+            7_176 => " day to second",
+            3_072 => " hour to minute",
+            7_168 => " hour to second",
+            6_144 => " minute to second",
+            32_767 => "",
+            _ => return writer.invalid("interval type", "interval range mask is unsupported"),
+        };
+        writer.sql(range);
+        Ok(())
+    }
+
     fn emit_sqlite(&self, writer: &mut SqlWriter) -> Result<(), DeparseError> {
         if self.set_of || self.percent_type || !self.array_bounds.is_empty() {
             return writer.invalid(
@@ -337,7 +457,7 @@ impl TypeName {
             Some(modifiers)
                 if retained_name_matches && modifiers.values.len() == self.modifiers.len() =>
             {
-                emit_retained_sqlite_type_modifiers(modifiers, &self.modifiers, writer)
+                modifiers.emit_retained(&self.modifiers, writer)
             }
             _ => emit_sqlite_type_modifiers(&self.modifiers, writer),
         }
@@ -347,8 +467,68 @@ impl TypeName {
 impl SqlEmit for SqliteTypeNamePart {
     fn emit(&self, writer: &mut SqlWriter) -> Result<(), DeparseError> {
         emit_sqlite_type_trivia(&self.leading_trivia, writer)?;
-        emit_sqlite_type_word(&self.name, self.quote, writer)?;
+        self.emit_name(writer)?;
         emit_sqlite_type_trivia(&self.trailing_trivia, writer)
+    }
+}
+
+impl SqliteTypeNamePart {
+    fn emit_name(&self, writer: &mut SqlWriter) -> Result<(), DeparseError> {
+        emit_sqlite_type_word(&self.name, self.quote, writer)
+    }
+}
+
+impl SqliteTypeNameTrivia {
+    fn emit(&self, newline_follows: bool, writer: &mut SqlWriter) -> Result<(), DeparseError> {
+        match self {
+            Self::Whitespace(value) => Self::emit_whitespace(value, writer),
+            Self::BlockComment(value) => Self::emit_block_comment(value, writer),
+            Self::LineComment(value) => Self::emit_line_comment(value, newline_follows, writer),
+        }
+    }
+
+    fn emit_whitespace(value: &str, writer: &mut SqlWriter) -> Result<(), DeparseError> {
+        if value.contains('\0') || !value.bytes().all(|byte| byte.is_ascii_whitespace()) {
+            return writer.invalid("type name", "SQLite type spacing contains invalid bytes");
+        }
+        writer.sql(value);
+        Ok(())
+    }
+
+    fn emit_block_comment(value: &str, writer: &mut SqlWriter) -> Result<(), DeparseError> {
+        if !value.starts_with("/*")
+            || !value.ends_with("*/")
+            || value.contains('\0')
+            || value.len() < 4
+            || value[2..value.len() - 2].contains("*/")
+        {
+            return writer.invalid("type name", "SQLite type comment is malformed");
+        }
+        writer.sql(value);
+        Ok(())
+    }
+
+    fn emit_line_comment(
+        value: &str,
+        newline_follows: bool,
+        writer: &mut SqlWriter,
+    ) -> Result<(), DeparseError> {
+        if !value.starts_with("--")
+            || value.contains('\0')
+            || value.contains('\r')
+            || value.contains('\n')
+        {
+            return writer.invalid("type name", "SQLite type comment is malformed");
+        }
+        writer.sql(value);
+        if !newline_follows {
+            writer.sql("\n");
+        }
+        Ok(())
+    }
+
+    fn has_line_break(&self) -> bool {
+        matches!(self, Self::Whitespace(value) if value.contains('\r') || value.contains('\n'))
     }
 }
 
@@ -357,90 +537,68 @@ fn emit_sqlite_type_trivia(
     writer: &mut SqlWriter,
 ) -> Result<(), DeparseError> {
     for (index, item) in trivia.iter().enumerate() {
-        match item {
-            SqliteTypeNameTrivia::Whitespace(value) => {
-                if value.contains('\0') || !value.bytes().all(|byte| byte.is_ascii_whitespace()) {
-                    return writer
-                        .invalid("type name", "SQLite type spacing contains invalid bytes");
-                }
-                writer.sql(value);
-            }
-            SqliteTypeNameTrivia::BlockComment(value) => {
-                if !value.starts_with("/*")
-                    || !value.ends_with("*/")
-                    || value.contains('\0')
-                    || value.len() < 4
-                    || value[2..value.len() - 2].contains("*/")
-                {
-                    return writer.invalid("type name", "SQLite type comment is malformed");
-                }
-                writer.sql(value);
-            }
-            SqliteTypeNameTrivia::LineComment(value) => {
-                if !value.starts_with("--")
-                    || value.contains('\0')
-                    || value.contains('\r')
-                    || value.contains('\n')
-                {
-                    return writer.invalid("type name", "SQLite type comment is malformed");
-                }
-                writer.sql(value);
-                let newline_follows = trivia.get(index + 1).is_some_and(|next| {
-                    matches!(next, SqliteTypeNameTrivia::Whitespace(whitespace)
-                        if whitespace.contains('\r') || whitespace.contains('\n'))
-                });
-                if !newline_follows {
-                    writer.sql("\n");
-                }
-            }
-        }
+        let newline_follows = trivia
+            .get(index + 1)
+            .is_some_and(SqliteTypeNameTrivia::has_line_break);
+        item.emit(newline_follows, writer)?;
     }
     Ok(())
 }
 
-fn emit_retained_sqlite_type_modifiers(
-    modifiers: &SqliteTypeModifiers,
-    expressions: &[Expr],
-    writer: &mut SqlWriter,
-) -> Result<(), DeparseError> {
-    if modifiers.values.len() != expressions.len()
-        || modifiers.ast_spellings.len() != expressions.len()
-        || modifiers.values.len() > 2
-    {
-        return writer.invalid(
-            "type modifier",
-            "SQLite type modifiers do not match the AST",
-        );
+impl SqliteTypeModifiers {
+    fn emit_retained(
+        &self,
+        expressions: &[Expr],
+        writer: &mut SqlWriter,
+    ) -> Result<(), DeparseError> {
+        if self.values.len() != expressions.len()
+            || self.ast_spellings.len() != expressions.len()
+            || self.values.len() > 2
+        {
+            return writer.invalid(
+                "type modifier",
+                "SQLite type modifiers do not match the AST",
+            );
+        }
+        writer.sql("(");
+        for (index, ((modifier, expression), original_ast_spelling)) in self
+            .values
+            .iter()
+            .zip(expressions)
+            .zip(&self.ast_spellings)
+            .enumerate()
+        {
+            modifier.emit_retained(expression, original_ast_spelling, writer)?;
+            if index + 1 < expressions.len() {
+                writer.sql(",");
+            }
+        }
+        writer.sql(")");
+        emit_sqlite_type_trivia(&self.trailing_trivia, writer)
     }
-    writer.sql("(");
-    for (index, ((modifier, expression), original_ast_spelling)) in modifiers
-        .values
-        .iter()
-        .zip(expressions)
-        .zip(&modifiers.ast_spellings)
-        .enumerate()
-    {
-        emit_sqlite_type_trivia(&modifier.leading_trivia, writer)?;
+}
+
+impl SqliteTypeModifier {
+    fn emit_retained(
+        &self,
+        expression: &Expr,
+        original_ast_spelling: &str,
+        writer: &mut SqlWriter,
+    ) -> Result<(), DeparseError> {
+        emit_sqlite_type_trivia(&self.leading_trivia, writer)?;
         let Some(current_ast_spelling) = expression.sqlite_type_modifier_spelling() else {
             return writer.invalid(
                 "type modifier",
                 "SQLite type modifiers must be signed numeric literals",
             );
         };
-        if &current_ast_spelling == original_ast_spelling
-            && valid_numeric(&modifier.spelling, false)
-        {
-            writer.sql(&modifier.spelling);
+        if current_ast_spelling == original_ast_spelling && valid_numeric(&self.spelling, false) {
+            writer.sql(&self.spelling);
         } else {
             writer.sql(&current_ast_spelling);
         }
-        emit_sqlite_type_trivia(&modifier.trailing_trivia, writer)?;
-        if index + 1 < expressions.len() {
-            writer.sql(",");
-        }
+        emit_sqlite_type_trivia(&self.trailing_trivia, writer)
     }
-    writer.sql(")");
-    emit_sqlite_type_trivia(&modifiers.trailing_trivia, writer)
 }
 
 fn emit_sqlite_type_name_fallback(name: &str, writer: &mut SqlWriter) -> Result<(), DeparseError> {
@@ -514,12 +672,6 @@ fn valid_sqlite_type_word(name: &str) -> bool {
         && bytes[1..].iter().all(|byte| is_continue(*byte))
 }
 
-impl SqlWriter {
-    fn is_system_type_name(&self, name: &Name, value: &str) -> bool {
-        self.is_postgres() && name.is_system_function(value)
-    }
-}
-
 impl Expr {
     pub(in crate::ast) const fn integer_literal(&self) -> Option<i32> {
         match self {
@@ -527,15 +679,6 @@ impl Expr {
             _ => None,
         }
     }
-}
-
-fn emit_type_modifiers(modifiers: &[Expr], writer: &mut SqlWriter) -> Result<(), DeparseError> {
-    if !modifiers.is_empty() {
-        writer.sql("(");
-        writer.list(modifiers, ", ")?;
-        writer.sql(")");
-    }
-    Ok(())
 }
 
 fn emit_sqlite_type_modifiers(
@@ -560,79 +703,6 @@ fn emit_sqlite_type_modifiers(
         modifier.emit_sqlite_type_modifier(writer)?;
     }
     writer.sql(")");
-    Ok(())
-}
-
-fn emit_time_zone_type(
-    base: &str,
-    modifiers: &[Expr],
-    writer: &mut SqlWriter,
-) -> Result<(), DeparseError> {
-    writer.sql(base);
-    emit_type_modifiers(modifiers, writer)?;
-    writer.sql(" with time zone");
-    Ok(())
-}
-
-fn emit_interval_modifiers(
-    type_name: &TypeName,
-    writer: &mut SqlWriter,
-) -> Result<(), DeparseError> {
-    match type_name.modifiers.as_slice() {
-        [] => Ok(()),
-        [mask] => {
-            let Some(mask) = mask.integer_literal() else {
-                return writer.invalid("interval type", "interval range mask must be an integer");
-            };
-            emit_interval_range(mask, writer)
-        }
-        [mask, precision] => {
-            let Some(mask) = mask.integer_literal() else {
-                return writer.invalid("interval type", "interval range mask must be an integer");
-            };
-            let Some(precision) = precision.integer_literal() else {
-                return writer.invalid("interval type", "interval precision must be an integer");
-            };
-            emit_interval_range(mask, writer)?;
-            if precision != 65_535 {
-                if !(0..=6).contains(&precision) {
-                    return writer.invalid(
-                        "interval type",
-                        "interval precision must be between zero and six",
-                    );
-                }
-                writer.sql("(");
-                writer.number(precision);
-                writer.sql(")");
-            }
-            Ok(())
-        }
-        _ => writer.invalid(
-            "interval type",
-            "interval type has an unsupported modifier shape",
-        ),
-    }
-}
-
-fn emit_interval_range(mask: i32, writer: &mut SqlWriter) -> Result<(), DeparseError> {
-    let range = match mask {
-        4 => " year",
-        2 => " month",
-        8 => " day",
-        1_024 => " hour",
-        2_048 => " minute",
-        4_096 => " second",
-        6 => " year to month",
-        1_032 => " day to hour",
-        3_080 => " day to minute",
-        7_176 => " day to second",
-        3_072 => " hour to minute",
-        7_168 => " hour to second",
-        6_144 => " minute to second",
-        32_767 => "",
-        _ => return writer.invalid("interval type", "interval range mask is unsupported"),
-    };
-    writer.sql(range);
     Ok(())
 }
 

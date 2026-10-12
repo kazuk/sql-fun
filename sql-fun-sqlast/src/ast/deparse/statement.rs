@@ -152,28 +152,38 @@ impl SqlEmit for PartitionBound {
         }
         w.sql(" FOR VALUES ");
         match self.strategy.as_str() {
-            "l" => {
-                w.sql("IN (");
-                w.list(&self.list, ", ")?;
-                w.sql(")");
-            }
-            "r" => {
-                w.sql("FROM (");
-                w.list(&self.lower, ", ")?;
-                w.sql(") TO (");
-                w.list(&self.upper, ", ")?;
-                w.sql(")");
-            }
-            "h" => {
-                w.sql("WITH (MODULUS ");
-                w.number(self.modulus);
-                w.sql(", REMAINDER ");
-                w.number(self.remainder);
-                w.sql(")");
-            }
+            "l" => self.emit_list_bound(w)?,
+            "r" => self.emit_range_bound(w)?,
+            "h" => self.emit_hash_bound(w),
             _ => return w.invalid("partition bound", "unknown strategy"),
         }
         Ok(())
+    }
+}
+
+impl PartitionBound {
+    fn emit_list_bound(&self, w: &mut SqlWriter) -> Result<(), DeparseError> {
+        w.sql("IN (");
+        w.list(&self.list, ", ")?;
+        w.sql(")");
+        Ok(())
+    }
+
+    fn emit_range_bound(&self, w: &mut SqlWriter) -> Result<(), DeparseError> {
+        w.sql("FROM (");
+        w.list(&self.lower, ", ")?;
+        w.sql(") TO (");
+        w.list(&self.upper, ", ")?;
+        w.sql(")");
+        Ok(())
+    }
+
+    fn emit_hash_bound(&self, w: &mut SqlWriter) {
+        w.sql("WITH (MODULUS ");
+        w.number(self.modulus);
+        w.sql(", REMAINDER ");
+        w.number(self.remainder);
+        w.sql(")");
     }
 }
 impl SqlEmit for PartitionDatum {

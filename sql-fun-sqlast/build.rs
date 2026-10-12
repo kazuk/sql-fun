@@ -7,6 +7,12 @@ fn replace_once(source: &mut String, before: &str, after: &str) {
 }
 
 fn main() {
+    if env::var_os("CARGO_FEATURE_SQLITE").is_none()
+        || env::var_os("CARGO_FEATURE_TURSO_TYPE_SYNTAX_WORKAROUND").is_none()
+    {
+        return;
+    }
+
     let source_path = "src/sqlite_parser/upstream/parser.rs";
     println!("cargo:rerun-if-changed={source_path}");
     println!("cargo:rerun-if-changed=src/sqlite_parser/type-spans.rs.txt");

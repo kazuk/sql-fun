@@ -2,14 +2,20 @@ use crate::StringSpan;
 use crate::ast::{Dialect, Statement, StatementNode};
 use crate::parse_statements::ParseStatementError;
 use crate::sqlite::SqliteStatement;
+#[cfg(feature = "turso-type-syntax-workaround")]
 use crate::sqlite_parser::Parser;
 use crate::syn::sqlite::Cmd;
+#[cfg(not(feature = "turso-type-syntax-workaround"))]
+use ::turso_parser::parser::Parser;
 
 pub(super) fn parse(
     sql: &str,
 ) -> impl Iterator<Item = Result<Statement, ParseStatementError>> + '_ {
     SqliteStatements {
+        #[cfg(feature = "turso-type-syntax-workaround")]
         parser: Parser::with_type_spans(sql.as_bytes()),
+        #[cfg(not(feature = "turso-type-syntax-workaround"))]
+        parser: Parser::new(sql.as_bytes()),
         input: sql,
         finished: false,
     }
@@ -67,6 +73,7 @@ impl Iterator for SqliteStatements<'_> {
         };
         // Drain per-statement capture even if its common conversion fails or
         // EXPLAIN is rejected, so following statements cannot inherit events.
+        #[cfg(feature = "turso-type-syntax-workaround")]
         let type_spans = self.parser.take_type_spans();
         let span = parsed.span();
         let Some(statement) = parsed.command().into_plain_statement() else {
@@ -78,8 +85,13 @@ impl Iterator for SqliteStatements<'_> {
         Some(
             StatementNode::try_from(&statement)
                 .and_then(|node| {
-                    let mut statement = Statement::from_node(node, Dialect::sqlite(), span);
-                    statement.retain_sqlite_type_syntax(self.input, &type_spans)?;
+                    let statement = Statement::from_node(node, Dialect::sqlite(), span);
+                    #[cfg(feature = "turso-type-syntax-workaround")]
+                    let statement = {
+                        let mut statement = statement;
+                        statement.retain_sqlite_type_syntax(self.input, &type_spans)?;
+                        statement
+                    };
                     Ok(statement)
                 })
                 .map_err(|error| ParseStatementError::conversion(span, &error)),

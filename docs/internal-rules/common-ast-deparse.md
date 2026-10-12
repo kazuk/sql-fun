@@ -55,6 +55,30 @@ error types. Both parser and macro dependencies are pinned to 0.8.1. This privat
 component is packaged in sqlast, so published builds do not rely on a workspace
 Cargo patch. The existing semantic parser remains unchanged.
 
+The temporary adaptation and source-span retention are gated by both `sqlite`
+and the default-enabled `turso-type-syntax-workaround` feature. The workaround
+feature does not imply SQLite. With it disabled, common parsing uses
+`::turso_parser::parser::Parser` directly, and the build script returns before
+reading or transforming copied sources. Native-AST conversion and SQL emission
+remain the same; only lossless source information is unavailable. Features unify
+across Cargo dependents, so a single dependent enabling the workaround selects
+it for all consumers of this crate.
+
+The reason is the confirmed upstream compatibility bug
+[tursodatabase/turso#9791](https://github.com/tursodatabase/turso/issues/9791),
+tracked internally in [#432](https://github.com/kazuk/sql-fun/issues/432).
+Remove the workaround only after a published parser API retains SQLite-compatible
+type semantics or exposes sufficient lossless grammar-produced source information.
+Evaluate the published crate version against the maintained declared-type,
+storage-affinity and CAST regressions, then record the version/results and removal
+decision in #432. A runtime fix without the required parser API is insufficient.
+Until then, the opt-out path is an upstream evaluation configuration, not an
+equivalent correctness path. Keep correctness tests unchanged on the default path.
+The standard workspace validation also compiles isolated sqlast configurations
+without default features (with no frontend, `sqlite`, and `turso_parser`) and the
+workaround without SQLite, so workspace feature unification cannot hide opt-out
+compilation failures.
+
 The adaptation captures exact grammar-produced type boundaries, including numeric
 modifiers, without changing the native type model. A type-local retention pass
 pairs these events with converted common nodes in normalized grammar order,

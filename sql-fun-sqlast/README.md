@@ -19,7 +19,7 @@ structured errors for invalid or unsupported syntax. See the crate API
 documentation for parsing, error handling, mutation, and rendering examples.
 The existing semantic analysis APIs remain available separately.
 
-The default-enabled `turso-type-syntax-workaround` feature preserves SQLite type
+The default-enabled `workaround_turso_9791` feature preserves SQLite type
 spellings that affect declared types and CAST affinity. It takes effect only with
 `sqlite`; it does not enable SQLite itself. To evaluate the upstream parser,
 disable default features and enable `sqlite`. That evaluation path uses the

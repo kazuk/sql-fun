@@ -2,19 +2,19 @@ use crate::StringSpan;
 use crate::ast::{Dialect, Statement, StatementNode};
 use crate::parse_statements::ParseStatementError;
 use crate::sqlite::SqliteStatement;
-#[cfg(feature = "turso-type-syntax-workaround")]
+#[cfg(feature = "workaround_turso_9791")]
 use crate::sqlite_parser::Parser;
 use crate::syn::sqlite::Cmd;
-#[cfg(not(feature = "turso-type-syntax-workaround"))]
+#[cfg(not(feature = "workaround_turso_9791"))]
 use ::turso_parser::parser::Parser;
 
 pub(super) fn parse(
     sql: &str,
 ) -> impl Iterator<Item = Result<Statement, ParseStatementError>> + '_ {
     SqliteStatements {
-        #[cfg(feature = "turso-type-syntax-workaround")]
+        #[cfg(feature = "workaround_turso_9791")]
         parser: Parser::with_type_spans(sql.as_bytes()),
-        #[cfg(not(feature = "turso-type-syntax-workaround"))]
+        #[cfg(not(feature = "workaround_turso_9791"))]
         parser: Parser::new(sql.as_bytes()),
         input: sql,
         finished: false,
@@ -73,7 +73,7 @@ impl Iterator for SqliteStatements<'_> {
         };
         // Drain per-statement capture even if its common conversion fails or
         // EXPLAIN is rejected, so following statements cannot inherit events.
-        #[cfg(feature = "turso-type-syntax-workaround")]
+        #[cfg(feature = "workaround_turso_9791")]
         let type_spans = self.parser.take_type_spans();
         let span = parsed.span();
         let Some(statement) = parsed.command().into_plain_statement() else {
@@ -86,7 +86,7 @@ impl Iterator for SqliteStatements<'_> {
             StatementNode::try_from(&statement)
                 .and_then(|node| {
                     let statement = Statement::from_node(node, Dialect::sqlite(), span);
-                    #[cfg(feature = "turso-type-syntax-workaround")]
+                    #[cfg(feature = "workaround_turso_9791")]
                     let statement = {
                         let mut statement = statement;
                         statement.retain_sqlite_type_syntax(self.input, &type_spans)?;

@@ -19,7 +19,7 @@ mod public;
 mod resolve;
 #[cfg(feature = "sqlite")]
 mod sqlite;
-#[cfg(all(feature = "sqlite", feature = "turso-type-syntax-workaround"))]
+#[cfg(all(feature = "sqlite", feature = "workaround_turso_9791"))]
 mod sqlite_retention;
 #[cfg(test)]
 mod tests;

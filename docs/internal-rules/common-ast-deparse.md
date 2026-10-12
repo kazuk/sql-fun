@@ -56,7 +56,7 @@ component is packaged in sqlast, so published builds do not rely on a workspace
 Cargo patch. The existing semantic parser remains unchanged.
 
 The temporary adaptation and source-span retention are gated by both `sqlite`
-and the default-enabled `turso-type-syntax-workaround` feature. The workaround
+and the default-enabled `workaround_turso_9791` feature. The workaround
 feature does not imply SQLite. With it disabled, common parsing uses
 `::turso_parser::parser::Parser` directly, and the build script returns before
 reading or transforming copied sources. Native-AST conversion and SQL emission

@@ -183,7 +183,7 @@ requires the `sqlite` feature and uses stock SQLite SQL; parser extensions that
 are not legal SQLite constructs return errors. This is not a cross-dialect
 translator or a source-preserving formatter.
 
-SQLite type fidelity requires the default-enabled `turso-type-syntax-workaround`
+SQLite type fidelity requires the default-enabled `workaround_turso_9791`
 feature together with `sqlite`. The workaround does not enable SQLite by itself.
 A dependency configured with `default-features = false, features = ["sqlite"]`
 uses the upstream parser directly, provided no other dependent enables the

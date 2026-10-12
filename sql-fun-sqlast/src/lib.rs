@@ -20,7 +20,7 @@ mod schema_dump_file;
 mod sql_file;
 #[cfg(feature = "sqlite")]
 mod sqlite;
-#[cfg(all(feature = "sqlite", feature = "turso-type-syntax-workaround"))]
+#[cfg(all(feature = "sqlite", feature = "workaround_turso_9791"))]
 mod sqlite_parser;
 mod trie_map;
 

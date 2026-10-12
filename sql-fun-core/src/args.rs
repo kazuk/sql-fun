@@ -244,15 +244,6 @@ impl SqlFunArgs {
         self.postgres_args.postgres_version(metadata)
     }
 
-    /// Whether arguments or the selected metadata explicitly specify a search path.
-    ///
-    /// Consumers requiring explicit choices can reject omission before calling
-    /// `postgres_search_path`, whose historical contract includes a default.
-    #[must_use]
-    pub const fn postgres_search_path_is_explicit(&self, metadata: &SqlFunMetadata) -> bool {
-        self.postgres_args.search_path_is_explicit() || metadata.search_path().is_some()
-    }
-
     /// get `PostgreSQL` search path
     ///
     /// # Errors

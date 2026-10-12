@@ -3,9 +3,11 @@
 The server's `Api::schema_cache_service` owns one `SchemaCacheService` for the
 process lifetime. Its first explicitly supplied builtin installation fixes
 that service's scope. Different installation paths are rejected; restarting
-allows selecting another installation. Builtin catalog JSON and builtin SQL
-files in that installation are immutable for the service lifetime. Restart
-following extraction or replacement of those files.
+allows selecting another installation. Extracted builtin JSON masters
+are fixed for the service lifetime; manually modifying them is unsupported.
+Restart following re-extraction. Builtin `schema.sql` is the first ordinary
+watched SQL file layer after the fileless frozen root, before extensions and
+the application dump. Its edits are observed without restarting.
 
 The initial service supports PostgreSQL. The SQLite file reader exposes the
 same original-content hash contract, without adding SQLite initialization to
@@ -22,9 +24,9 @@ ordered search path using `sql_fun_core::Hasher::append_str`. File layers hash
 parent key, original file-content hash, and canonical UTF-8 absolute path in
 that order. Paths that cannot be represented without loss are rejected.
 
-Search paths must be explicitly supplied by arguments or selected metadata.
-The server uses `SqlFunArgs::postgres_search_path_is_explicit` to avoid the
-historical core helper's implicit public-schema fallback.
+Search paths are resolved through `SqlFunArgs::postgres_search_path`, including
+the selected PostgreSQL engine default (`["public"]`) when unspecified. The
+resolved ordered value enters the root identity regardless of its source.
 
 The service has a single immutable installation scope, so root identities do
 not need an installation or datasource suffix. Extension file identities use
@@ -69,9 +71,11 @@ the optimization is reliable. Native watch events plus inode checks are a
 pragmatic local-filesystem optimization, not perfect coherency. Invalidation
 does not delete or rebuild immutable schema analyses.
 
-Path loads coalesce by parent identity, canonical path, and invalidation
-generation. A cached candidate hash may differ from the later read. Publish
-under the hash reported by the schema reader, never the candidate. A late path
+Path loads coalesce by parent identity, canonical path, invalidation
+generation, and observed content hash. Different observations cannot join an
+older in-flight load even when file watching is unavailable. A cached candidate
+hash may differ from the later read. Publish under the hash reported by the
+schema reader, never the candidate. A late path
 hash population cannot restore data invalidated while reading. The reader
 hashes original text once before in-memory psql preprocessing; preprocessing
 preserves original byte offsets and line endings.

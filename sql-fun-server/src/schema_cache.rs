@@ -105,7 +105,7 @@ type Outcome = Arc<Result<Arc<CachedSchemaAnalysis>, CacheableSchemaError>>;
 #[derive(Clone)]
 struct LoadedLayer {
     key: SchemaContextKey,
-    hash: String,
+    hash: Option<String>,
     outcome: Outcome,
 }
 
@@ -174,11 +174,6 @@ impl SchemaSelection {
                 "schema cache initialization currently supports PostgreSQL",
             ));
         }
-        if !args.postgres_search_path_is_explicit(metadata) {
-            return Err(SchemaLoadError::invalid(
-                "search_path must be explicitly supplied in arguments or selected datasource metadata",
-            ));
-        }
         if expected_hash.len() != 64
             || !expected_hash
                 .bytes()
@@ -239,8 +234,8 @@ impl InitializedSchema {
 
 /// Server-lifetime schema cache for one explicitly selected builtin installation.
 ///
-/// Builtin catalog files under this installation are immutable for the service
-/// lifetime; restart the server after re-extracting/replacing builtin catalogs.
+/// Extracted builtin JSON masters are fixed for the service lifetime; restart
+/// after re-extracting them. Builtin schema.sql uses the ordinary watched file layer.
 /// A fixed installation prevents identical root keys aliasing different catalogs.
 /// File layers are watched and identified by their original content hashes.
 /// No contexts are evicted. Keep an Arc to this service in the server/session host.
@@ -257,6 +252,7 @@ struct LayerLoadKey {
     parent: SchemaContextKey,
     path: PathBuf,
     generation: u64,
+    observed_hash: String,
 }
 
 impl SchemaCacheService {
@@ -317,16 +313,25 @@ impl SchemaCacheService {
                 .expect("builtin loader panicked")
             })
             .await?;
+        let builtin_sql = selection
+            .version
+            .definition_base_path(&self.home)
+            .join("schema.sql");
+        layer = self.load_layer(&layer, &builtin_sql).await?;
+        Self::successful(&layer.outcome)?;
         for extension in &selection.extensions {
             layer = self.load_layer(&layer, extension).await?;
             Self::successful(&layer.outcome)?;
         }
         layer = self.load_layer(&layer, &selection.dump).await?;
         // Mismatch takes precedence even over deterministic SQL failure, after publication.
-        if layer.hash != selection.expected_hash {
+        let actual_hash = layer
+            .hash
+            .expect("application file layer has a content hash");
+        if actual_hash != selection.expected_hash {
             return Err(SchemaLoadError::mismatch(
                 &selection.expected_hash,
-                &layer.hash,
+                &actual_hash,
             ));
         }
         let analysis = Arc::clone(Self::successful(&layer.outcome)?);
@@ -334,7 +339,7 @@ impl SchemaCacheService {
             SelectedContext::freeze(&analysis.base, &selection.args, &selection.metadata);
         Ok(InitializedSchema {
             key: layer.key,
-            actual_hash: layer.hash,
+            actual_hash,
             analysis,
             selected,
         })
@@ -367,18 +372,13 @@ impl SchemaCacheService {
             .build()
             .map_err(|e| SchemaLoadError::source(&e))?;
         let base = BaseContext::new(&args, &metadata).map_err(|e| SchemaLoadError::source(&e))?;
-        let file = version
-            .definition_base_path(home)
-            .join("schema.sql")
-            .canonicalize()
-            .map_err(|e| SchemaLoadError::source(&e))?;
-        let mut hash = None;
-        let parsed = PostgresDialect::parse_schema_file(&file, &base.into(), &mut hash);
-        let outcome = Self::outcome(parsed, &file, &[])?;
         Ok(LoadedLayer {
             key: key.clone(),
-            hash: hash.expect("successful read"),
-            outcome,
+            hash: None,
+            outcome: Arc::new(Ok(Arc::new(CachedSchemaAnalysis {
+                base: base.into(),
+                diagnostics: Vec::new(),
+            }))),
         })
     }
 
@@ -441,7 +441,7 @@ impl SchemaCacheService {
         if let Some(outcome) = self.layers.lookup(&candidate) {
             return Ok(LoadedLayer {
                 key: candidate,
-                hash: hash.to_owned(),
+                hash: Some(hash.to_owned()),
                 outcome,
             });
         }
@@ -449,6 +449,7 @@ impl SchemaCacheService {
             parent: parent.key.clone(),
             path: path.clone(),
             generation: FileHashCache::generation(token),
+            observed_hash: hash.to_owned(),
         };
         let parent = parent.clone();
         let hashes = Arc::clone(&self.hashes);
@@ -468,7 +469,7 @@ impl SchemaCacheService {
                     let _ = hashes.populate(&path, token, &actual);
                     Ok(LoadedLayer {
                         key,
-                        hash: actual,
+                        hash: Some(actual),
                         outcome,
                     })
                 })

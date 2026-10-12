@@ -54,8 +54,8 @@ async fn mismatch_populates_actual_hash_and_retry_reuses_result() {
     let error = service.initialize(&request).await.err().unwrap();
     assert!(error.to_string().contains("schema dump changed"));
     let actual = SchemaProject::hash(&dump);
-    let root_key = SchemaContextKey::root(&"17".parse().unwrap(), &["public".to_owned()]);
-    let key = root_key
+    let key = project
+        .builtin_key()
         .layer(&actual, &dump.canonicalize().unwrap())
         .unwrap();
     let cached = service.layers.lookup(&key).unwrap();
@@ -101,7 +101,7 @@ async fn candidate_hash_never_receives_actual_content_result() {
         .resolve_layer(&root, &path, &old, token)
         .await
         .unwrap();
-    assert_eq!(loaded.hash, actual);
+    assert_eq!(loaded.hash.as_deref(), Some(actual.as_str()));
     assert!(
         service
             .layers
@@ -136,8 +136,7 @@ async fn deterministic_failure_is_retained_and_mismatch_is_separate(#[case] sql:
             .to_string()
             .contains("schema dump changed")
     );
-    let root_key = SchemaContextKey::root(&"17".parse().unwrap(), &["public".to_owned()]);
-    let key = root_key.layer(&actual, &path).unwrap();
+    let key = project.builtin_key().layer(&actual, &path).unwrap();
     let first = service.layers.lookup(&key).unwrap();
     assert!(first.is_err());
     let retry = project.selection("products", &[], &path, &actual);
@@ -318,29 +317,123 @@ async fn io_error_after_canonicalization_is_not_a_negative_entry() {
     );
 }
 
-#[test]
-fn initialization_rejects_omitted_search_path() {
-    let args = ::sql_fun_core::SqlFunArgs::builder(&std::collections::HashMap::new())
-        .unwrap()
-        .build()
-        .unwrap();
-    let metadata = ::serde_json::from_value(
+#[tokio::test]
+async fn unspecified_search_path_shares_effective_default_identity() {
+    let project = SchemaProject::new();
+    let service = project.service();
+    let dump = project.schema("dump.sql", "CREATE TABLE app (id int4);");
+    let explicit = project.selection("products", &[], &dump, &SchemaProject::hash(&dump));
+    let metadata: ::sql_fun_core::SqlFunMetadata = ::serde_json::from_value(
         ::serde_json::json!({"engine":"PostgreSQL", "dialect":"postgres", "version":"17"}),
     )
     .unwrap();
-    let error = SchemaSelection::new(
-        "default",
-        &args,
+    let default = SchemaSelection::new(
+        metadata.name(),
+        &explicit.args,
         &metadata,
         &[],
-        std::path::Path::new("explicit.sql"),
-        &"a".repeat(64),
+        &dump,
+        &explicit.expected_hash,
     )
-    .err()
     .unwrap();
+    assert_eq!(default.search_path, vec!["public"]);
+    let first = service.initialize(&explicit).await.unwrap();
+    let second = service.initialize(&default).await.unwrap();
+    assert_eq!(first.key(), second.key());
+    assert!(std::ptr::eq(first.analysis(), second.analysis()));
+}
+
+#[tokio::test]
+async fn builtin_sql_edits_replace_file_layer_and_preserve_root() {
+    let project = SchemaProject::new();
+    let service = project.service();
+    let dump = project.schema("dump.sql", "-- application");
+    let request = project.selection("products", &[], &dump, &SchemaProject::hash(&dump));
+    let first = service.initialize(&request).await.unwrap();
+    let root_key = SchemaContextKey::root(&request.version, &request.search_path);
+    let root = service.roots.lookup(&root_key).unwrap();
+    assert!(root.hash.is_none());
     assert!(
-        error
-            .to_string()
-            .contains("search_path must be explicitly supplied")
+        SchemaCacheService::successful(&root.outcome)
+            .unwrap()
+            .diagnostics()
+            .is_empty()
     );
+    let builtin = project.schema(
+        "postgres/17/schema.sql",
+        "CREATE TABLE new_builtin (id int4);",
+    );
+    service.hashes.invalidate(&builtin.canonicalize().unwrap());
+    let second = service.initialize(&request).await.unwrap();
+    assert_ne!(first.key(), second.key());
+    let table = TableName::from(FullName::with_schema("public", "new_builtin"));
+    assert!(first.base_context().get_table(&table).is_none());
+    assert!(second.base_context().get_table(&table).is_some());
+    assert!(Arc::ptr_eq(
+        &root.outcome,
+        &service.roots.lookup(&root_key).unwrap().outcome
+    ));
+    let repeated = service.initialize(&request).await.unwrap();
+    assert!(std::ptr::eq(second.analysis(), repeated.analysis()));
+}
+
+#[tokio::test]
+async fn changed_observation_does_not_join_older_pending_extension() {
+    let project = SchemaProject::new();
+    let service = Arc::new(project.service());
+    let root = SchemaCacheService::load_root(
+        project.home(),
+        &"17".parse().unwrap(),
+        &["public".to_owned()],
+        &SchemaContextKey::root(&"17".parse().unwrap(), &["public".to_owned()]),
+    )
+    .unwrap();
+    let path = project
+        .schema("extension.sql", "CREATE TABLE old_extension (id int4);")
+        .canonicalize()
+        .unwrap();
+    let old = SchemaProject::hash(&path);
+    let token = service.hashes.begin(&path).unwrap();
+    let pending = super::LayerLoadKey {
+        parent: root.key.clone(),
+        path: path.clone(),
+        generation: crate::file_hash_cache::FileHashCache::generation(token),
+        observed_hash: old,
+    };
+    let (started, ready) = ::tokio::sync::oneshot::channel();
+    let (release, blocked) = ::tokio::sync::oneshot::channel();
+    let owned = Arc::clone(&service);
+    let old_root = root.clone();
+    let older = ::tokio::spawn(async move {
+        owned
+            .inflight
+            .load(&pending, move || async move {
+                started.send(()).unwrap();
+                blocked.await.unwrap();
+                Ok(old_root)
+            })
+            .await
+            .unwrap()
+    });
+    ready.await.unwrap();
+    project.schema("extension.sql", "CREATE TABLE new_extension (id int4);");
+    let actual = SchemaProject::hash(&path);
+    // Reuse the generation deliberately: absent notifications must not merge observations.
+    let loaded = ::tokio::time::timeout(
+        std::time::Duration::from_secs(5),
+        service.resolve_layer(&root, &path, &actual, token),
+    )
+    .await
+    .unwrap()
+    .unwrap();
+    let table = TableName::from(FullName::with_schema("public", "new_extension"));
+    assert!(
+        SchemaCacheService::successful(&loaded.outcome)
+            .unwrap()
+            .base_context()
+            .get_table(&table)
+            .is_some()
+    );
+    release.send(()).unwrap();
+    older.await.unwrap();
 }

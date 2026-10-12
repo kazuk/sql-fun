@@ -13,7 +13,6 @@ mod panic_policy;
 mod pending_future;
 mod pid_file;
 mod schema_cache;
-mod selected_context;
 
 use crate::buffers::JsonLinesStreamReader;
 

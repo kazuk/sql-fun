@@ -5,7 +5,7 @@ use std::sync::Arc;
 use super::test_helpers::SchemaProject;
 
 #[tokio::test]
-async fn shares_prefix_and_rebinds_datasource_metadata() {
+async fn shares_prefix_and_preserves_analysis_parameter_evidence() {
     let project = SchemaProject::new();
     let service = project.service();
     let extension = project.schema("extension.sql", "CREATE TABLE extension_table (id int4);");
@@ -17,19 +17,30 @@ async fn shares_prefix_and_rebinds_datasource_metadata() {
     let second = service.initialize(&orders).await.unwrap();
     assert_eq!(first.key(), second.key());
     assert!(std::ptr::eq(first.analysis(), second.analysis()));
-    assert_eq!(first.base_context().metadata().name(), "products");
-    assert_eq!(second.base_context().metadata().name(), "orders");
+    assert!(std::ptr::eq(
+        first.base_context(),
+        first.analysis().base_context()
+    ));
+    assert!(std::ptr::eq(
+        second.base_context(),
+        second.analysis().base_context()
+    ));
+    assert!(std::ptr::eq(
+        first.base_context().metadata(),
+        second.base_context().metadata()
+    ));
+    assert!(std::ptr::eq(
+        first.base_context().get_args(),
+        second.base_context().get_args()
+    ));
+    assert_eq!(second.base_context().metadata().connector(), &None);
     assert_eq!(
-        first.base_context().metadata().connector().as_deref(),
-        Some("products-connector")
-    );
-    assert_eq!(
-        second.base_context().metadata().connector().as_deref(),
-        Some("orders-connector")
-    );
-    assert_eq!(
-        second.analysis().base_context().metadata().connector(),
-        &None
+        second
+            .base_context()
+            .get_args()
+            .postgres_search_path(second.base_context().metadata())
+            .unwrap(),
+        vec!["public"]
     );
     drop(service);
     assert!(
@@ -267,11 +278,12 @@ fn selection_never_infers_a_datasource(#[case] datasource: &str) {
     let project = SchemaProject::new();
     let dump = project.schema("dump.sql", "-- application");
     let explicit = project.selection("products", &[], &dump, &SchemaProject::hash(&dump));
+    let (args, metadata) = project.analysis_inputs("products");
     assert!(
         SchemaSelection::new(
             datasource,
-            &explicit.args,
-            &explicit.metadata,
+            &args,
+            &metadata,
             &[],
             &dump,
             &explicit.expected_hash
@@ -320,9 +332,10 @@ async fn unspecified_search_path_shares_effective_default_identity() {
         ::serde_json::json!({"engine":"PostgreSQL", "dialect":"postgres", "version":"17"}),
     )
     .unwrap();
+    let (args, _) = project.analysis_inputs("products");
     let default = SchemaSelection::new(
         metadata.name(),
-        &explicit.args,
+        &args,
         &metadata,
         &[],
         &dump,

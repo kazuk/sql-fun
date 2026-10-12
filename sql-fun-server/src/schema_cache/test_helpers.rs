@@ -1,5 +1,5 @@
 use super::{SchemaCacheService, SchemaSelection};
-use ::sql_fun_core::{Hasher, SqlFunArgs, SqlFunMetadataCollection};
+use ::sql_fun_core::{Hasher, SqlFunArgs, SqlFunMetadata, SqlFunMetadataCollection};
 use std::{
     collections::HashMap,
     path::{Path, PathBuf},
@@ -72,6 +72,10 @@ connector = 'orders-connector'
         dump: &Path,
         expected: &str,
     ) -> SchemaSelection {
+        let (args, metadata) = self.analysis_inputs(datasource);
+        SchemaSelection::new(datasource, &args, &metadata, extensions, dump, expected).unwrap()
+    }
+    pub(super) fn analysis_inputs(&self, datasource: &str) -> (SqlFunArgs, SqlFunMetadata) {
         let metadata_path = self.directory.path().join("Cargo.toml");
         let metadata = SqlFunMetadataCollection::load_from(&metadata_path).unwrap();
         let args = SqlFunArgs::builder(&HashMap::new())
@@ -80,15 +84,7 @@ connector = 'orders-connector'
             .metadata_file(metadata_path.to_str().unwrap())
             .build()
             .unwrap();
-        SchemaSelection::new(
-            datasource,
-            &args,
-            metadata.get(datasource).unwrap(),
-            extensions,
-            dump,
-            expected,
-        )
-        .unwrap()
+        (args, metadata.get(datasource).unwrap().clone())
     }
     pub(super) fn builtin_sql(&self) -> PathBuf {
         self.home().join("postgres/17/schema.sql")

@@ -32,13 +32,14 @@ The service has a single immutable installation scope, so root identities do
 not need an installation or datasource suffix. Extension file identities use
 their canonical paths and original contents. Their supplied order matters.
 
-Roots use deliberately constructed schema-only metadata and arguments, not
-configuration retained from whichever datasource first loaded a prefix.
-`SelectedContext` in the consuming server crate overlays each selected
-request's metadata/arguments while delegating every catalog read. The sqlast
-model is unchanged. Callers obtain that view from `InitializedSchema` and
-create a separate mutable context for each query. Raw shared analyses expose
-schema-only configuration, never another datasource's configuration.
+Roots are analyzed using deliberately constructed schema-only metadata and
+arguments, independent of whichever datasource first requests a shared prefix.
+The frozen context retains exactly those analysis parameters. Its `metadata()`
+and `get_args()` are immutable evidence of how the schema objects were analyzed;
+consumers never replace them with request settings. `InitializedSchema` returns
+the cached frozen context directly, including on historical hash lookups.
+Datasource selection remains request validation, not a rewrite of analysis
+provenance. Query consumers create their own mutable contexts over that base.
 
 Successful analyses retain their frozen catalogs and ordered, file-associated
 recoverable diagnostics. Prefix diagnostic objects use shared ownership. Syntax

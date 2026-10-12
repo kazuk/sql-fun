@@ -1,7 +1,7 @@
 #[cfg(test)]
 mod test_helpers;
 
-use crate::{cache::Cache, file_hash_cache::FileHashCache, selected_context::SelectedContext};
+use crate::{cache::Cache, file_hash_cache::FileHashCache};
 use ::sql_fun_core::{Hasher, PostgresEngineVersion, SqlDialect, SqlFunArgs, SqlFunMetadata};
 use ::sql_fun_sqlast::{
     ParseDumpFileError, PostgresDialect, SqlFileSnapshot,
@@ -137,8 +137,6 @@ impl SchemaLoadError {
 /// The caller resolves the requested datasource in its explicitly selected
 /// metadata. Extension files are supplied in the caller's chosen order.
 pub struct SchemaSelection {
-    args: SqlFunArgs,
-    metadata: SqlFunMetadata,
     version: PostgresEngineVersion,
     search_path: Vec<String>,
     extensions: Vec<PathBuf>,
@@ -184,8 +182,6 @@ impl SchemaSelection {
             ));
         }
         Ok(Self {
-            args: args.clone(),
-            metadata: metadata.clone(),
             version: args
                 .postgres_version(metadata)
                 .map_err(|e| SchemaLoadError::source(&e))?,
@@ -204,7 +200,6 @@ pub struct InitializedSchema {
     key: SchemaContextKey,
     actual_hash: String,
     analysis: Arc<CachedSchemaAnalysis>,
-    selected: FrozenBaseContext,
 }
 
 impl InitializedSchema {
@@ -218,12 +213,12 @@ impl InitializedSchema {
     pub fn actual_hash(&self) -> &str {
         &self.actual_hash
     }
-    /// Request-specific metadata/args over the shared catalog.
+    /// Frozen analysis and its unchanged analysis-time metadata and arguments.
     ///
     /// Query consumers create their own mutable context over this frozen view.
     #[must_use]
-    pub const fn base_context(&self) -> &FrozenBaseContext {
-        &self.selected
+    pub fn base_context(&self) -> &FrozenBaseContext {
+        &self.analysis.base
     }
     /// Successful shared analysis retained independently of the service.
     #[must_use]
@@ -341,13 +336,10 @@ impl SchemaCacheService {
             ));
         }
         let analysis = Arc::clone(Self::successful(&layer.outcome)?);
-        let selected =
-            SelectedContext::freeze(&analysis.base, &selection.args, &selection.metadata);
         Ok(InitializedSchema {
             key: layer.key,
             actual_hash,
             analysis,
-            selected,
         })
     }
 

@@ -98,9 +98,10 @@ preprocessing. When expected and actual hashes differ, initialization fails
 with a schema-dump-changed error. Read the current file, recalculate its hash,
 and explicitly retry; a cache hit still checks the expected hash.
 
-Builtin definitions are fixed for the server lifetime. Restart the server after
-updating the selected builtin installation. File-backed extension and application
-layers use local filesystem change notifications and file replacement checks;
+Extracted builtin JSON masters are fixed for the server lifetime; manually
+modifying them is unsupported. Restart after re-extraction. Builtin `schema.sql`,
+extension, and application layers observe edits without restarting, using local
+filesystem change notifications and file replacement checks;
 these are an optimization rather than a guarantee for filesystems with missing
 notifications. Schema cache eviction is not yet implemented.
 

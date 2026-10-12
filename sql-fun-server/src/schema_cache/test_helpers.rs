@@ -85,6 +85,17 @@ connector = 'orders-connector'
         )
         .unwrap()
     }
+    pub(super) fn builtin_sql(&self) -> PathBuf {
+        self.home().join("postgres/17/schema.sql")
+    }
+    pub(super) fn builtin_key(&self) -> super::SchemaContextKey {
+        super::SchemaContextKey::root(&"17".parse().unwrap(), &["public".to_owned()])
+            .layer(
+                &Self::hash(&self.builtin_sql()),
+                &self.builtin_sql().canonicalize().unwrap(),
+            )
+            .unwrap()
+    }
     pub(super) fn hash(path: &Path) -> String {
         Hasher::hash_file(path).unwrap()
     }

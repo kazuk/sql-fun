@@ -5,10 +5,12 @@ mod query;
 use crate::ast::{
     Access, BooleanExpr, BooleanOperator, Call, CallKind, Case, CaseArm, Cast, Collate, Delete,
     DropTable, Expr, InTable, Indirection, Insert, Literal, Name, NullTest, OperatorExpr,
-    OperatorKind, Order, Parameter, Query, Raise, SqlValue, SqliteTypeModifier,
-    SqliteTypeModifiers, SqliteTypeNamePart, SqliteTypeNameTrivia, StatementNode, Subquery,
-    SubqueryKind, TryFromList, TryFromOpt, TypeName, Update, View, ViewCheckOption, Window,
+    OperatorKind, Order, Parameter, Query, Raise, SqlValue, SqliteTypeNamePart,
+    SqliteTypeNameTrivia, StatementNode, Subquery, SubqueryKind, TryFromList, TryFromOpt, TypeName,
+    Update, View, ViewCheckOption, Window,
 };
+#[cfg(feature = "turso-type-syntax-workaround")]
+use crate::ast::{SqliteTypeModifier, SqliteTypeModifiers};
 use crate::{sem::AnalysisError, syn::sqlite as syn};
 
 impl From<&syn::QualifiedName> for Name {
@@ -599,6 +601,7 @@ impl TryFrom<&syn::Type> for TypeName {
     }
 }
 
+#[cfg(feature = "turso-type-syntax-workaround")]
 impl TypeName {
     pub(in crate::ast) fn matches_sqlite_frontend_name(
         &self,
@@ -735,6 +738,7 @@ fn decode_sqlite_type_name_parts(
     Ok((decoded, parts))
 }
 
+#[cfg(feature = "turso-type-syntax-workaround")]
 fn sqlite_type_modifier_opening(raw: &str) -> Result<Option<usize>, AnalysisError> {
     let bytes = raw.as_bytes();
     let mut cursor = 0;
@@ -793,6 +797,7 @@ fn sqlite_type_modifier_opening(raw: &str) -> Result<Option<usize>, AnalysisErro
     Ok(None)
 }
 
+#[cfg(feature = "turso-type-syntax-workaround")]
 fn parse_sqlite_type_modifiers(raw: &str) -> Result<SqliteTypeModifiers, AnalysisError> {
     let bytes = raw.as_bytes();
     if bytes.first() != Some(&b'(') {

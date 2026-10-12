@@ -183,6 +183,15 @@ requires the `sqlite` feature and uses stock SQLite SQL; parser extensions that
 are not legal SQLite constructs return errors. This is not a cross-dialect
 translator or a source-preserving formatter.
 
+SQLite type fidelity requires the default-enabled `turso-type-syntax-workaround`
+feature together with `sqlite`. The workaround does not enable SQLite by itself.
+A dependency configured with `default-features = false, features = ["sqlite"]`
+uses the upstream parser directly, provided no other dependent enables the
+workaround through Cargo feature unification. This is an upstream-compatibility
+evaluation path: `turso_parser` 0.8.1 loses type spelling that can change declared
+types and CAST affinity ([upstream issue #9791](https://github.com/tursodatabase/turso/issues/9791)).
+Disabling the workaround does not provide equivalent SQLite type fidelity.
+
 Failures use [`ast::DeparseError`]. Inspect `dialect()`, `node()`, and `message()`
 for context, and the following predicates for classification:
 

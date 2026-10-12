@@ -65,7 +65,7 @@ impl AnalysisError {
     }
 
     /// Construct a recoverable unexpected-input error without a test-only panic.
-    #[cfg(feature = "sqlite")]
+    #[cfg(all(feature = "sqlite", feature = "turso-type-syntax-workaround"))]
     pub(crate) fn unexpected_input_error(message: &str) -> Self {
         Self::UnexpectedInput(message.to_owned())
     }

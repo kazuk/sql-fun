@@ -196,9 +196,19 @@ function run_affected() {
   fi
 }
 
+function run_sqlast_feature_boundaries() {
+  echo "== sqlast SQLite workaround feature boundaries"
+  # Separate Cargo invocations avoid workspace feature unification hiding opt-out.
+  run_check -p sql-fun-sqlast --all-targets --no-default-features
+  run_check -p sql-fun-sqlast --all-targets --no-default-features --features sqlite
+  run_check -p sql-fun-sqlast --all-targets --no-default-features --features turso_parser
+  run_check -p sql-fun-sqlast --all-targets --features turso-type-syntax-workaround
+}
+
 function run_workspace() {
   require_command cargo-nextest
   echo "== Workspace verification"
+  run_sqlast_feature_boundaries
   run_check   --workspace "${FEATURES[@]}"
   run_nextest --workspace --exclude sql-fun "${FEATURES[@]}" ${NEXTEST_EXTRA} --no-tests pass
 }

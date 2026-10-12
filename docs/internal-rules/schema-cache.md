@@ -73,12 +73,21 @@ does not delete or rebuild immutable schema analyses.
 
 Path loads coalesce by parent identity, canonical path, invalidation
 generation, and observed content hash. Different observations cannot join an
-older in-flight load even when file watching is unavailable. A cached candidate
-hash may differ from the later read. Publish under the hash reported by the
-schema reader, never the candidate. A late path
-hash population cannot restore data invalidated while reading. The reader
-hashes original text once before in-memory psql preprocessing; preprocessing
-preserves original byte offsets and line endings.
+older in-flight load even when file watching is unavailable. The file-hash cache
+never reads or hashes SQL: it retains only hashes produced by sqlast snapshots.
+A valid retained hash can select an existing analysis without reading SQL again.
+Otherwise sqlast reads the file once into an immutable `SqlFileSnapshot`, hashes
+that exact original text, and uses the snapshot identity for cache lookup and
+in-flight sharing. On a miss, analysis consumes the same snapshot without
+reopening the path. PostgreSQL preprocessing operates on the captured text and
+preserves original byte offsets and line endings. SQLite uses the same snapshot
+reader without PostgreSQL preprocessing.
+
+Edits or deletion after snapshot capture cannot change the hash/analysis pairing.
+Successful analyses and deterministic failures use the captured content identity.
+A late path hash population cannot restore data invalidated while reading.
+Temporary snapshots are dropped after lookup or analysis; their text is not
+retained in the schema cache.
 
 Expected-hash validation is separate from caching. Cache hits still validate
 that request's expected hash. If a client expects A and a load reads X, retain

@@ -78,7 +78,7 @@ async fn mismatch_populates_actual_hash_and_retry_reuses_result() {
 }
 
 #[tokio::test]
-async fn candidate_hash_never_receives_actual_content_result() {
+async fn snapshot_hash_and_analysis_stay_paired_after_file_changes() {
     let project = SchemaProject::new();
     let service = project.service();
     let root = SchemaCacheService::load_root(
@@ -93,28 +93,34 @@ async fn candidate_hash_never_receives_actual_content_result() {
         .canonicalize()
         .unwrap();
     let old = SchemaProject::hash(&path);
+    let snapshot = ::sql_fun_sqlast::SqlFileSnapshot::read(&path).unwrap();
     let token = service.hashes.begin(&path).unwrap();
     project.schema("dump.sql", "CREATE TABLE new_table (id int4);");
     service.hashes.invalidate(&path);
     let actual = SchemaProject::hash(&path);
-    let loaded = service
-        .resolve_layer(&root, &path, &old, token)
-        .await
-        .unwrap();
-    assert_eq!(loaded.hash.as_deref(), Some(actual.as_str()));
+    let loaded = service.resolve_layer(&root, snapshot, token).await.unwrap();
+    assert_eq!(loaded.hash.as_deref(), Some(old.as_str()));
+    let table = TableName::from(FullName::with_schema("public", "old_table"));
+    assert!(
+        SchemaCacheService::successful(&loaded.outcome)
+            .unwrap()
+            .base_context()
+            .get_table(&table)
+            .is_some()
+    );
     assert!(
         service
             .layers
             .lookup(&root.key.layer(&old, &path).unwrap())
-            .is_none()
+            .is_some()
     );
     assert!(
         service
             .layers
             .lookup(&root.key.layer(&actual, &path).unwrap())
-            .is_some()
+            .is_none()
     );
-    assert_eq!(service.hashes.hash(&path).unwrap(), actual);
+    assert!(service.hashes.lookup(&path, token).is_none());
 }
 
 #[rstest::rstest]
@@ -275,46 +281,33 @@ fn selection_never_infers_a_datasource(#[case] datasource: &str) {
 }
 
 #[tokio::test]
-async fn io_error_after_canonicalization_is_not_a_negative_entry() {
+async fn removed_file_does_not_change_an_already_read_snapshot() {
     let project = SchemaProject::new();
     let service = project.service();
-    let root_key = SchemaContextKey::root(&"17".parse().unwrap(), &["public".to_owned()]);
     let root = SchemaCacheService::load_root(
         project.home(),
         &"17".parse().unwrap(),
         &["public".to_owned()],
-        &root_key,
+        &SchemaContextKey::root(&"17".parse().unwrap(), &["public".to_owned()]),
     )
     .unwrap();
     let path = project
-        .schema("dump.sql", "-- application")
+        .schema("dump.sql", "CREATE TABLE retained (id int4);")
         .canonicalize()
         .unwrap();
-    let hash = SchemaProject::hash(&path);
+    let snapshot = ::sql_fun_sqlast::SqlFileSnapshot::read(&path).unwrap();
     let token = service.hashes.begin(&path).unwrap();
     std::fs::remove_file(&path).unwrap();
+    let loaded = service.resolve_layer(&root, snapshot, token).await.unwrap();
+    let table = TableName::from(FullName::with_schema("public", "retained"));
     assert!(
-        service
-            .resolve_layer(&root, &path, &hash, token)
-            .await
-            .is_err()
-    );
-    assert!(
-        service
-            .layers
-            .lookup(&root.key.layer(&hash, &path).unwrap())
-            .is_none()
-    );
-    project.schema("dump.sql", "-- application");
-    let token = service.hashes.begin(&path).unwrap();
-    assert!(
-        service
-            .resolve_layer(&root, &path, &hash, token)
-            .await
+        SchemaCacheService::successful(&loaded.outcome)
             .unwrap()
-            .outcome
-            .is_ok()
+            .base_context()
+            .get_table(&table)
+            .is_some()
     );
+    assert!(service.load_layer(&root, &path).await.is_err());
 }
 
 #[tokio::test]
@@ -417,11 +410,14 @@ async fn changed_observation_does_not_join_older_pending_extension() {
     });
     ready.await.unwrap();
     project.schema("extension.sql", "CREATE TABLE new_extension (id int4);");
-    let actual = SchemaProject::hash(&path);
     // Reuse the generation deliberately: absent notifications must not merge observations.
     let loaded = ::tokio::time::timeout(
         std::time::Duration::from_secs(5),
-        service.resolve_layer(&root, &path, &actual, token),
+        service.resolve_layer(
+            &root,
+            ::sql_fun_sqlast::SqlFileSnapshot::read(&path).unwrap(),
+            token,
+        ),
     )
     .await
     .unwrap()

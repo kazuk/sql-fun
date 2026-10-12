@@ -171,17 +171,28 @@ impl SqliteDialect {
         content_hash: &mut Option<String>,
     ) -> Result<ParsedSchemaDump, ParseDumpFileError> {
         *content_hash = None;
-        let sql_statements = std::fs::read_to_string(dump_file)?;
-        let mut hasher = ::sql_fun_core::Hasher::new();
-        hasher.append_str(&sql_statements);
-        *content_hash = Some(hasher.finish());
+        let snapshot = crate::SqlFileSnapshot::read(dump_file)?;
+        *content_hash = Some(snapshot.content_hash().to_owned());
+        Self::parse_schema_snapshot(&snapshot, input_context)
+    }
+
+    /// Analyze exactly the previously read snapshot, without reopening its file.
+    ///
+    /// # Errors
+    /// Returns syntax or fatal semantic analysis failures.
+    pub fn parse_schema_snapshot(
+        snapshot: &crate::SqlFileSnapshot,
+        input_context: &FrozenBaseContext,
+    ) -> Result<ParsedSchemaDump, ParseDumpFileError> {
+        let sql_statements = snapshot.text();
+        let dump_file = snapshot.path();
 
         let mut parser = TursoParser::new(sql_statements.as_bytes());
         let mut context = SchemaFileContext::new(dump_file, input_context);
         let mut sem_results = Vec::new();
         while let Some(statement) = Self::next_statement(&mut parser)? {
             let statement_span = StringSpan::new(statement.offset, statement.len);
-            let Some(statement_text) = statement_span.get_from(&sql_statements) else {
+            let Some(statement_text) = statement_span.get_from(sql_statements) else {
                 AnalysisError::raise_unexpected_none("statement_span not in sql")?;
                 AnalysisError::never()
             };
@@ -215,6 +226,15 @@ mod test_schema_content_hash {
             hash,
             Some(::sql_fun_core::Hasher::hash_file(file.path()).unwrap())
         );
+    }
+
+    #[test]
+    fn analyzes_snapshot_after_source_is_deleted() {
+        let file = test_helpers::schema_file("CREATE TABLE retained (id);");
+        let snapshot = crate::SqlFileSnapshot::read(file.path()).unwrap();
+        let base = test_helpers::base_with_public_schema();
+        std::fs::remove_file(file.path()).unwrap();
+        assert!(SqliteDialect::parse_schema_snapshot(&snapshot, &base).is_ok());
     }
 
     #[test]

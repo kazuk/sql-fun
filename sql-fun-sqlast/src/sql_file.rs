@@ -1,16 +1,48 @@
-use std::path::Path;
+use std::path::{Path, PathBuf};
 
-/// Read and hash original text before excluding psql commands from SQL analysis.
-pub(super) fn read_sql_file(
-    path: &Path,
-    content_hash: &mut Option<String>,
-) -> Result<String, std::io::Error> {
-    *content_hash = None;
-    let text = std::fs::read_to_string(path)?;
-    let mut hasher = ::sql_fun_core::Hasher::new();
-    hasher.append_str(&text);
-    *content_hash = Some(hasher.finish());
-    Ok(comment_psql_commands(text))
+/// Immutable SQL file snapshot with the hash of its original UTF-8 contents.
+/// Reading and hashing happen once; subsequent analysis never reopens the file.
+#[derive(Debug)]
+pub struct SqlFileSnapshot {
+    path: PathBuf,
+    text: String,
+    hash: String,
+}
+
+impl SqlFileSnapshot {
+    /// Read the explicitly supplied file and hash exactly the bytes read.
+    ///
+    /// # Errors
+    /// Returns file access or UTF-8 decoding errors.
+    pub fn read(path: &Path) -> Result<Self, std::io::Error> {
+        let text = std::fs::read_to_string(path)?;
+        let mut hasher = ::sql_fun_core::Hasher::new();
+        hasher.append_str(&text);
+        Ok(Self {
+            path: path.to_path_buf(),
+            text,
+            hash: hasher.finish(),
+        })
+    }
+
+    /// Original-content hash, before dialect preprocessing.
+    #[must_use]
+    pub fn content_hash(&self) -> &str {
+        &self.hash
+    }
+
+    /// Source path retained for analysis diagnostics and cache identity.
+    #[must_use]
+    pub fn path(&self) -> &Path {
+        &self.path
+    }
+    #[cfg(feature = "sqlite")]
+    pub(crate) fn text(&self) -> &str {
+        &self.text
+    }
+    pub(crate) fn postgres_text(&self) -> String {
+        comment_psql_commands(self.text.clone())
+    }
 }
 
 fn comment_psql_commands(mut text: String) -> String {

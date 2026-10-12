@@ -4,7 +4,7 @@ mod test_helpers;
 use crate::{cache::Cache, file_hash_cache::FileHashCache, selected_context::SelectedContext};
 use ::sql_fun_core::{Hasher, PostgresEngineVersion, SqlDialect, SqlFunArgs, SqlFunMetadata};
 use ::sql_fun_sqlast::{
-    ParseDumpFileError, PostgresDialect,
+    ParseDumpFileError, PostgresDialect, SqlFileSnapshot,
     sem::{AnalysisProblem, BaseContext, FrozenBaseContext},
 };
 use std::{
@@ -412,33 +412,47 @@ impl SchemaCacheService {
         Self::successful(&parent.outcome)?;
         let hashes = Arc::clone(&self.hashes);
         let path = path.to_path_buf();
-        let (path, hash, token) = ::tokio::task::spawn_blocking(move || {
+        let (path, token, cached) = ::tokio::task::spawn_blocking(move || {
             let path = path
                 .canonicalize()
                 .map_err(|e| SchemaLoadError::source(&e))?;
             let token = hashes
                 .begin(&path)
                 .map_err(|e| SchemaLoadError::source(&e))?;
-            let hash = hashes
-                .hash(&path)
-                .map_err(|e| SchemaLoadError::source(&e))?;
-            Ok::<_, SchemaLoadError>((path, hash, token))
+            let cached = hashes.lookup(&path, token);
+            Ok::<_, SchemaLoadError>((path, token, cached))
         })
         .await
-        .expect("file hash task panicked")?;
-        self.resolve_layer(parent, &path, &hash, token).await
+        .expect("file lookup task panicked")?;
+        if let Some(hash) = cached {
+            let key = parent.key.layer(&hash, &path)?;
+            if let Some(outcome) = self.layers.lookup(&key) {
+                return Ok(LoadedLayer {
+                    key,
+                    hash: Some(hash),
+                    outcome,
+                });
+            }
+        }
+        let snapshot = ::tokio::task::spawn_blocking(move || {
+            SqlFileSnapshot::read(&path).map_err(|e| SchemaLoadError::source(&e))
+        })
+        .await
+        .expect("SQL reader panicked")?;
+        self.resolve_layer(parent, snapshot, token).await
     }
 
     async fn resolve_layer(
         &self,
         parent: &LoadedLayer,
-        path: &Path,
-        hash: &str,
+        snapshot: SqlFileSnapshot,
         token: crate::file_hash_cache::ReadToken,
     ) -> Result<LoadedLayer, SchemaLoadError> {
-        let path = path.to_path_buf();
+        let path = snapshot.path().to_path_buf();
+        let hash = snapshot.content_hash();
         let candidate = parent.key.layer(hash, &path)?;
         if let Some(outcome) = self.layers.lookup(&candidate) {
+            let _ = self.hashes.populate(&path, token, hash);
             return Ok(LoadedLayer {
                 key: candidate,
                 hash: Some(hash.to_owned()),
@@ -458,10 +472,9 @@ impl SchemaCacheService {
             .load(&pending, move || async move {
                 ::tokio::task::spawn_blocking(move || {
                     let base = Self::successful(&parent.outcome)?;
-                    let mut actual = None;
-                    let parsed = PostgresDialect::parse_schema_file(&path, &base.base, &mut actual);
+                    let parsed = PostgresDialect::parse_schema_snapshot(&snapshot, &base.base);
                     let outcome = Self::outcome(parsed, &path, &base.diagnostics)?;
-                    let actual = actual.expect("analysis outcome requires successful read");
+                    let actual = snapshot.content_hash().to_owned();
                     let key = parent.key.layer(&actual, &path)?;
                     let outcome = layers.publish(&key, &outcome);
                     // Context publication is valid independently of path invalidation.

@@ -1,5 +1,4 @@
 use ::notify::{RecommendedWatcher, Watcher};
-use ::sql_fun_core::Hasher;
 use std::{
     collections::HashMap,
     os::unix::fs::MetadataExt,
@@ -136,20 +135,14 @@ impl FileHashCache {
         token.generation
     }
 
-    pub(crate) fn hash(&self, path: &Path) -> Result<String, std::io::Error> {
-        let token = self.begin(path)?;
-        {
-            let state = self.state.lock().expect("file hash state");
-            if let Some(entry) = state.paths.get(path)
-                && entry.generation == token.generation
-                && let Some(hash) = &entry.hash
-            {
-                return Ok(hash.clone());
-            }
-        }
-        let hash = Hasher::hash_file(path)?;
-        self.populate(path, token, &hash)?;
-        Ok(hash)
+    /// Only hashes produced by sqlast snapshots are retained here.
+    pub(crate) fn lookup(&self, path: &Path, token: ReadToken) -> Option<String> {
+        let state = self.state.lock().expect("file hash state");
+        state
+            .paths
+            .get(path)
+            .filter(|entry| entry.generation == token.generation)
+            .and_then(|entry| entry.hash.clone())
     }
 
     pub(crate) fn populate(
@@ -179,7 +172,6 @@ impl FileHashCache {
 #[cfg(test)]
 mod tests {
     use super::FileHashCache;
-    use ::sql_fun_core::Hasher;
 
     #[test]
     fn missing_watcher_does_not_split_identical_inflight_loads() {
@@ -190,7 +182,7 @@ mod tests {
         let first = cache.begin(&path).unwrap();
         let second = cache.begin(&path).unwrap();
         assert_eq!(first.generation, second.generation);
-        cache.hash(&path).unwrap();
+        cache.populate(&path, first, "snapshot hash").unwrap();
         assert!(
             cache
                 .state
@@ -211,14 +203,11 @@ mod tests {
         let path = file.path().canonicalize().unwrap();
         let cache = FileHashCache::new();
         let token = cache.begin(&path).unwrap();
-        let old = Hasher::hash_file(&path).unwrap();
+        let old = ::sql_fun_sqlast::SqlFileSnapshot::read(&path).unwrap();
         cache.invalidate(&path);
         std::fs::write(&path, "new").unwrap();
-        cache.populate(&path, token, &old).unwrap();
-        assert_eq!(
-            cache.hash(&path).unwrap(),
-            Hasher::hash_file(&path).unwrap()
-        );
+        cache.populate(&path, token, old.content_hash()).unwrap();
+        assert!(cache.lookup(&path, cache.begin(&path).unwrap()).is_none());
     }
 
     #[test]
@@ -227,15 +216,16 @@ mod tests {
         let path = directory.path().join("dump.sql");
         std::fs::write(&path, "old").unwrap();
         let cache = FileHashCache::new();
-        let old = cache.hash(&path).unwrap();
+        let token = cache.begin(&path).unwrap();
+        cache.populate(&path, token, "old snapshot hash").unwrap();
+        assert_eq!(
+            cache.lookup(&path, token).as_deref(),
+            Some("old snapshot hash")
+        );
         let replacement = directory.path().join("replacement.sql");
         std::fs::write(&replacement, "new").unwrap();
         std::fs::rename(replacement, &path).unwrap();
-        assert_ne!(cache.hash(&path).unwrap(), old);
-        assert_eq!(
-            cache.hash(&path).unwrap(),
-            Hasher::hash_file(&path).unwrap()
-        );
+        assert!(cache.lookup(&path, cache.begin(&path).unwrap()).is_none());
     }
 }
 
@@ -247,7 +237,10 @@ mod test_watch_notifications {
         std::fs::write(file.path(), "original").unwrap();
         let path = file.path().canonicalize().unwrap();
         let cache = super::FileHashCache::new();
-        let original = cache.hash(&path).unwrap();
+        let token = cache.begin(&path).unwrap();
+        cache
+            .populate(&path, token, "original snapshot hash")
+            .unwrap();
         let generation = cache
             .state
             .lock()
@@ -287,10 +280,6 @@ mod test_watch_notifications {
         })
         .await
         .unwrap();
-        assert_ne!(cache.hash(&path).unwrap(), original);
-        assert_eq!(
-            cache.hash(&path).unwrap(),
-            ::sql_fun_core::Hasher::hash_file(&path).unwrap()
-        );
+        assert!(cache.lookup(&path, cache.begin(&path).unwrap()).is_none());
     }
 }

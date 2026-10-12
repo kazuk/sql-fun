@@ -10,7 +10,7 @@ use ::sql_fun_sqlast::{
 use std::{
     collections::HashMap,
     path::{Path, PathBuf},
-    sync::Arc,
+    sync::{Arc, Mutex},
 };
 
 /// Hierarchical SHA-256 identity of a frozen schema, independent of session authority.
@@ -242,6 +242,7 @@ impl InitializedSchema {
 pub struct SchemaCacheService {
     home: PathBuf,
     hashes: Arc<FileHashCache>,
+    known_paths: Mutex<HashMap<PathBuf, PathBuf>>,
     roots: Cache<SchemaContextKey, LoadedLayer, SchemaLoadError>,
     layers: Arc<Cache<SchemaContextKey, Outcome, SchemaLoadError>>,
     inflight: Cache<LayerLoadKey, LoadedLayer, SchemaLoadError>,
@@ -266,6 +267,7 @@ impl SchemaCacheService {
                 .canonicalize()
                 .map_err(|e| SchemaLoadError::source(&e))?,
             hashes: Arc::new(FileHashCache::new()),
+            known_paths: Mutex::new(HashMap::new()),
             roots: Cache::new(true),
             layers: Arc::new(Cache::new(true)),
             inflight: Cache::new(false),
@@ -284,7 +286,9 @@ impl SchemaCacheService {
 
     /// Load explicit builtin/extension/application layers and validate the request.
     ///
-    /// Actual-content outcomes are published before expected-hash validation.
+    /// An expected-hash cache hit returns the retained historical schema without
+    /// reading the dump. On a miss, actual-content outcomes are published before
+    /// expected-hash validation.
     /// Cancellation drops only this caller's receiver, never the server-owned load.
     ///
     /// # Panics
@@ -317,13 +321,15 @@ impl SchemaCacheService {
             .version
             .definition_base_path(&self.home)
             .join("schema.sql");
-        layer = self.load_layer(&layer, &builtin_sql).await?;
+        layer = self.load_layer(&layer, &builtin_sql, None).await?;
         Self::successful(&layer.outcome)?;
         for extension in &selection.extensions {
-            layer = self.load_layer(&layer, extension).await?;
+            layer = self.load_layer(&layer, extension, None).await?;
             Self::successful(&layer.outcome)?;
         }
-        layer = self.load_layer(&layer, &selection.dump).await?;
+        layer = self
+            .load_layer(&layer, &selection.dump, Some(&selection.expected_hash))
+            .await?;
         // Mismatch takes precedence even over deterministic SQL failure, after publication.
         let actual_hash = layer
             .hash
@@ -408,10 +414,29 @@ impl SchemaCacheService {
         &self,
         parent: &LoadedLayer,
         path: &Path,
+        expected_hash: Option<&str>,
     ) -> Result<LoadedLayer, SchemaLoadError> {
         Self::successful(&parent.outcome)?;
+        let requested = std::path::absolute(path).map_err(|e| SchemaLoadError::source(&e))?;
+        if let Some(hash) = expected_hash {
+            let canonical = self
+                .known_paths
+                .lock()
+                .expect("known schema paths")
+                .get(&requested)
+                .cloned()
+                .unwrap_or_else(|| requested.clone());
+            let key = parent.key.layer(hash, &canonical)?;
+            if let Some(outcome) = self.layers.lookup(&key) {
+                return Ok(LoadedLayer {
+                    key,
+                    hash: Some(hash.to_owned()),
+                    outcome,
+                });
+            }
+        }
         let hashes = Arc::clone(&self.hashes);
-        let path = path.to_path_buf();
+        let path = requested.clone();
         let (path, token, cached) = ::tokio::task::spawn_blocking(move || {
             let path = path
                 .canonicalize()
@@ -424,6 +449,20 @@ impl SchemaCacheService {
         })
         .await
         .expect("file lookup task panicked")?;
+        self.known_paths
+            .lock()
+            .expect("known schema paths")
+            .insert(requested, path.clone());
+        if let Some(hash) = expected_hash {
+            let key = parent.key.layer(hash, &path)?;
+            if let Some(outcome) = self.layers.lookup(&key) {
+                return Ok(LoadedLayer {
+                    key,
+                    hash: Some(hash.to_owned()),
+                    outcome,
+                });
+            }
+        }
         if let Some(hash) = cached {
             let key = parent.key.layer(&hash, &path)?;
             if let Some(outcome) = self.layers.lookup(&key) {

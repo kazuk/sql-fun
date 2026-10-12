@@ -93,12 +93,18 @@ identities even when contents match.
 The initialization integration will require an `expected_hash` of the original
 schema-dump file text, calculated by the client using
 `sql_fun_core::Hasher::hash_file`. This field is **not yet present** in the
-historical wire shape above. Server-side hashing happens when sqlast reads the
-original text, before psql command preprocessing. Cache identity and analysis
-use that same captured text, so later edits cannot separate the hash from the
-analyzed contents. When expected and actual hashes differ, initialization
-fails with a schema-dump-changed error. Read the current file, recalculate its
-hash, and explicitly retry; a cache hit still checks the expected hash.
+historical wire shape above. The server first searches its in-memory schema
+cache for that hash under the same parent schema and resolved dump path. A hit
+returns the historical schema without reading the dump, even if the dump has
+changed or been deleted. This also preserves cached syntax or semantic errors.
+Historical entries are available for the server service lifetime; restarting
+loses them. Different builtin or extension layers form a different parent schema.
+
+On a cache miss, sqlast reads and hashes the original text before preprocessing.
+Cache identity and analysis use the same captured text. If the captured hash
+differs from `expected_hash`, initialization fails with a schema-dump-changed
+error after caching the captured result. Recalculate the client hash and retry
+to select that result.
 
 Extracted builtin JSON masters are fixed for the server lifetime; manually
 modifying them is unsupported. Restart after re-extraction. Builtin `schema.sql`,

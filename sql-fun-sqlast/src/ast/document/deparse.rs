@@ -409,56 +409,74 @@ impl SqlEmit for JsonColumn {
 impl JsonTableColumnType {
     fn emit_column(&self, v: &JsonColumn, w: &mut SqlWriter) -> Result<(), DeparseError> {
         match self {
-            Self::Nested => {
-                w.sql("NESTED PATH ");
-                let Some(path) = &v.pathspec else {
-                    return w.invalid("JSON nested column", "path required");
-                };
-                path.emit(w)?;
-                w.sql(" COLUMNS (");
-                w.list(&v.columns, ", ")?;
-                w.sql(")");
-            }
-            Self::ForOrdinality => {
-                w.ident(&v.name)?;
-                w.sql(" FOR ORDINALITY");
-            }
-            Self::Regular | Self::Exists | Self::Formatted => {
-                w.ident(&v.name)?;
-                w.sql(" ");
-                let Some(ty) = &v.type_name else {
-                    return w.invalid("JSON column", "type required");
-                };
-                ty.emit(w)?;
-                if let Some(format) = &v.format {
-                    format.emit(w)?;
-                }
-                if matches!(self, Self::Exists) {
-                    w.sql(" EXISTS");
-                }
-                if let Some(path) = &v.pathspec {
-                    w.sql(" PATH ");
-                    path.emit(w)?;
-                }
-                if !matches!(self, Self::Exists) {
-                    v.wrapper.emit(w)?;
-                    v.quotes.emit(w)?;
-                }
-                if let Some(empty) = &v.on_empty {
-                    w.sql(" ");
-                    empty.emit(w)?;
-                    w.sql(" ON EMPTY");
-                }
-                if let Some(error) = &v.on_error {
-                    w.sql(" ");
-                    error.emit(w)?;
-                    w.sql(" ON ERROR");
-                }
-            }
+            Self::Nested => v.emit_nested(w)?,
+            Self::ForOrdinality => v.emit_ordinality(w)?,
+            Self::Regular | Self::Exists | Self::Formatted => v.emit_typed_column(w)?,
         }
         Ok(())
     }
 }
+
+impl JsonTableColumnType {
+    const fn is_exists(&self) -> bool {
+        matches!(self, Self::Exists)
+    }
+}
+
+impl JsonColumn {
+    fn emit_nested(&self, w: &mut SqlWriter) -> Result<(), DeparseError> {
+        w.sql("NESTED PATH ");
+        let Some(path) = &self.pathspec else {
+            return w.invalid("JSON nested column", "path required");
+        };
+        path.emit(w)?;
+        w.sql(" COLUMNS (");
+        w.list(&self.columns, ", ")?;
+        w.sql(")");
+        Ok(())
+    }
+
+    fn emit_ordinality(&self, w: &mut SqlWriter) -> Result<(), DeparseError> {
+        w.ident(&self.name)?;
+        w.sql(" FOR ORDINALITY");
+        Ok(())
+    }
+
+    fn emit_typed_column(&self, w: &mut SqlWriter) -> Result<(), DeparseError> {
+        w.ident(&self.name)?;
+        w.sql(" ");
+        let Some(ty) = &self.type_name else {
+            return w.invalid("JSON column", "type required");
+        };
+        ty.emit(w)?;
+        if let Some(format) = &self.format {
+            format.emit(w)?;
+        }
+        if self.coltype.is_exists() {
+            w.sql(" EXISTS");
+        }
+        if let Some(path) = &self.pathspec {
+            w.sql(" PATH ");
+            path.emit(w)?;
+        }
+        if !self.coltype.is_exists() {
+            self.wrapper.emit(w)?;
+            self.quotes.emit(w)?;
+        }
+        if let Some(empty) = &self.on_empty {
+            w.sql(" ");
+            empty.emit(w)?;
+            w.sql(" ON EMPTY");
+        }
+        if let Some(error) = &self.on_error {
+            w.sql(" ");
+            error.emit(w)?;
+            w.sql(" ON ERROR");
+        }
+        Ok(())
+    }
+}
+
 impl SqlEmit for XmlOptionType {
     fn emit(&self, w: &mut SqlWriter) -> Result<(), DeparseError> {
         w.sql(match self {
@@ -492,95 +510,13 @@ impl SqlEmit for Xml {
 impl XmlExprOp {
     fn emit_with(&self, v: &Xml, w: &mut SqlWriter) -> Result<(), DeparseError> {
         match self {
-            Self::Xmlconcat => {
-                w.sql("XMLCONCAT(");
-                w.list(&v.args, ", ")?;
-                w.sql(")");
-            }
-            Self::Xmlelement => {
-                w.sql("XMLELEMENT(NAME ");
-                w.ident(&v.name)?;
-                if !v.named_args.is_empty() {
-                    w.sql(", XMLATTRIBUTES(");
-                    w.list(&v.named_args, ", ")?;
-                    w.sql(")");
-                }
-                if !v.args.is_empty() {
-                    w.sql(", ");
-                    w.list(&v.args, ", ")?;
-                }
-                w.sql(")");
-            }
-            Self::Xmlforest => {
-                w.sql("XMLFOREST(");
-                w.list(&v.named_args, ", ")?;
-                if !v.args.is_empty() {
-                    if !v.named_args.is_empty() {
-                        w.sql(", ");
-                    }
-                    w.list(&v.args, ", ")?;
-                }
-                w.sql(")");
-            }
-            Self::Xmlparse => {
-                w.sql("XMLPARSE(");
-                v.xmloption.emit(w)?;
-                w.sql(" ");
-                let Some(expr) = v.args.first() else {
-                    return w.invalid("XMLPARSE", "missing expression");
-                };
-                expr.emit(w)?;
-                let Some(preserve) = v.args.get(1).and_then(crate::ast::Expr::boolean_literal)
-                else {
-                    return w.invalid("XMLPARSE", "whitespace choice must be a boolean literal");
-                };
-                w.sql(if preserve {
-                    " PRESERVE WHITESPACE)"
-                } else {
-                    " STRIP WHITESPACE)"
-                });
-            }
-            Self::Xmlpi => {
-                w.sql("XMLPI(NAME ");
-                w.ident(&v.name)?;
-                if !v.args.is_empty() {
-                    w.sql(", ");
-                    w.list(&v.args, ", ")?;
-                }
-                w.sql(")");
-            }
-            Self::Xmlroot => {
-                let [expr, version, standalone] = v.args.as_slice() else {
-                    return w.invalid("XMLROOT", "expected three arguments");
-                };
-                w.sql("XMLROOT(");
-                expr.emit(w)?;
-                w.sql(", VERSION ");
-                if version.is_null_literal() {
-                    w.sql("NO VALUE");
-                } else {
-                    version.emit(w)?;
-                }
-                let kind = standalone
-                    .integer_literal()
-                    .ok_or_else(|| w.invalid_error("XMLROOT", "invalid standalone option"))?;
-                w.sql(match kind {
-                    0 => ", STANDALONE YES",
-                    1 => ", STANDALONE NO",
-                    2 => ", STANDALONE NO VALUE",
-                    3 => "",
-                    _ => return w.invalid("XMLROOT", "invalid standalone option"),
-                });
-                w.sql(")");
-            }
-            Self::Document => {
-                let Some(expr) = v.args.first() else {
-                    return w.invalid("IS DOCUMENT", "missing expression");
-                };
-                w.sql("(");
-                expr.emit(w)?;
-                w.sql(" IS DOCUMENT)");
-            }
+            Self::Xmlconcat => v.emit_concat(w)?,
+            Self::Xmlelement => v.emit_element(w)?,
+            Self::Xmlforest => v.emit_forest(w)?,
+            Self::Xmlparse => v.emit_parse(w)?,
+            Self::Xmlpi => v.emit_processing_instruction(w)?,
+            Self::Xmlroot => v.emit_root(w)?,
+            Self::Document => v.emit_document_predicate(w)?,
             Self::Xmlserialize => {
                 return w.invalid("XMLSERIALIZE", "expected the syntax XmlSerialize node");
             }
@@ -588,6 +524,111 @@ impl XmlExprOp {
         Ok(())
     }
 }
+
+impl Xml {
+    fn emit_concat(&self, w: &mut SqlWriter) -> Result<(), DeparseError> {
+        w.sql("XMLCONCAT(");
+        w.list(&self.args, ", ")?;
+        w.sql(")");
+        Ok(())
+    }
+
+    fn emit_element(&self, w: &mut SqlWriter) -> Result<(), DeparseError> {
+        w.sql("XMLELEMENT(NAME ");
+        w.ident(&self.name)?;
+        if !self.named_args.is_empty() {
+            w.sql(", XMLATTRIBUTES(");
+            w.list(&self.named_args, ", ")?;
+            w.sql(")");
+        }
+        if !self.args.is_empty() {
+            w.sql(", ");
+            w.list(&self.args, ", ")?;
+        }
+        w.sql(")");
+        Ok(())
+    }
+
+    fn emit_forest(&self, w: &mut SqlWriter) -> Result<(), DeparseError> {
+        w.sql("XMLFOREST(");
+        w.list(&self.named_args, ", ")?;
+        if !self.args.is_empty() {
+            if !self.named_args.is_empty() {
+                w.sql(", ");
+            }
+            w.list(&self.args, ", ")?;
+        }
+        w.sql(")");
+        Ok(())
+    }
+
+    fn emit_parse(&self, w: &mut SqlWriter) -> Result<(), DeparseError> {
+        w.sql("XMLPARSE(");
+        self.xmloption.emit(w)?;
+        w.sql(" ");
+        let Some(expr) = self.args.first() else {
+            return w.invalid("XMLPARSE", "missing expression");
+        };
+        expr.emit(w)?;
+        let Some(preserve) = self.args.get(1).and_then(crate::ast::Expr::boolean_literal) else {
+            return w.invalid("XMLPARSE", "whitespace choice must be a boolean literal");
+        };
+        w.sql(if preserve {
+            " PRESERVE WHITESPACE)"
+        } else {
+            " STRIP WHITESPACE)"
+        });
+        Ok(())
+    }
+
+    fn emit_processing_instruction(&self, w: &mut SqlWriter) -> Result<(), DeparseError> {
+        w.sql("XMLPI(NAME ");
+        w.ident(&self.name)?;
+        if !self.args.is_empty() {
+            w.sql(", ");
+            w.list(&self.args, ", ")?;
+        }
+        w.sql(")");
+        Ok(())
+    }
+
+    fn emit_root(&self, w: &mut SqlWriter) -> Result<(), DeparseError> {
+        let [expr, version, standalone] = self.args.as_slice() else {
+            return w.invalid("XMLROOT", "expected three arguments");
+        };
+        w.sql("XMLROOT(");
+        expr.emit(w)?;
+        w.sql(", VERSION ");
+        if version.is_null_literal() {
+            w.sql("NO VALUE");
+        } else {
+            version.emit(w)?;
+        }
+        let kind = standalone
+            .integer_literal()
+            .ok_or_else(|| w.invalid_error("XMLROOT", "invalid standalone option"))?;
+        w.sql(match kind {
+            0 => ", STANDALONE YES",
+            1 => ", STANDALONE NO",
+            2 => ", STANDALONE NO VALUE",
+            3 => "",
+            _ => return w.invalid("XMLROOT", "invalid standalone option"),
+        });
+        w.sql(")");
+        Ok(())
+    }
+
+    fn emit_document_predicate(&self, w: &mut SqlWriter) -> Result<(), DeparseError> {
+        let Some(expr) = self.args.first() else {
+            return w.invalid("IS DOCUMENT", "missing expression");
+        };
+        w.sql("(");
+        expr.emit(w)?;
+        w.sql(" IS DOCUMENT)");
+        Ok(())
+    }
+}
+
 impl SqlEmit for XmlTable {
     fn emit(&self, w: &mut SqlWriter) -> Result<(), DeparseError> {
         w.postgres_only("XMLTABLE")?;
@@ -692,33 +733,41 @@ impl CmdType {
         match self {
             Self::Nothing => w.sql("DO NOTHING"),
             Self::Delete => w.sql("DELETE"),
-            Self::Update => {
-                w.sql("UPDATE SET ");
-                Assignment::emit_list(w, &v.target_list)?;
-            }
-            Self::Insert => {
-                w.sql("INSERT");
-                if !v.target_list.is_empty() {
-                    w.sql("(");
-                    for (i, a) in v.target_list.iter().enumerate() {
-                        if i > 0 {
-                            w.sql(", ");
-                        }
-                        a.emit_target(w)?;
-                    }
-                    w.sql(")");
-                }
-                v.overriding.emit(w)?;
-                if v.values.is_empty() {
-                    w.sql(" DEFAULT VALUES");
-                } else {
-                    w.sql(" VALUES (");
-                    w.list(&v.values, ", ")?;
-                    w.sql(")");
-                }
-            }
+            Self::Update => v.emit_update_action(w)?,
+            Self::Insert => v.emit_insert_action(w)?,
             _ => return w.invalid("MERGE action", "unsupported command in WHEN"),
         };
+        Ok(())
+    }
+}
+
+impl MergeWhen {
+    fn emit_update_action(&self, w: &mut SqlWriter) -> Result<(), DeparseError> {
+        w.sql("UPDATE SET ");
+        Assignment::emit_list(w, &self.target_list)?;
+        Ok(())
+    }
+
+    fn emit_insert_action(&self, w: &mut SqlWriter) -> Result<(), DeparseError> {
+        w.sql("INSERT");
+        if !self.target_list.is_empty() {
+            w.sql("(");
+            for (i, a) in self.target_list.iter().enumerate() {
+                if i > 0 {
+                    w.sql(", ");
+                }
+                a.emit_target(w)?;
+            }
+            w.sql(")");
+        }
+        self.overriding.emit(w)?;
+        if self.values.is_empty() {
+            w.sql(" DEFAULT VALUES");
+        } else {
+            w.sql(" VALUES (");
+            w.list(&self.values, ", ")?;
+            w.sql(")");
+        }
         Ok(())
     }
 }

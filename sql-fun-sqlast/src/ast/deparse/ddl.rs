@@ -303,43 +303,14 @@ impl SqlEmit for ParameterMode {
 impl SqlEmit for FunctionOption {
     fn emit(&self, writer: &mut SqlWriter) -> Result<(), DeparseError> {
         match self {
-            Self::Body(parts) => {
-                if parts.is_empty() || parts.len() > 2 {
-                    return writer
-                        .invalid("function AS", "function AS requires one or two strings");
-                }
-                writer.sql("AS ");
-                for (index, part) in parts.iter().enumerate() {
-                    if index != 0 {
-                        writer.sql(", ");
-                    }
-                    writer.string(part)?;
-                }
-            }
+            Self::Body(parts) => Self::emit_body_strings(parts, writer)?,
             Self::Language(language) => {
                 writer.sql("LANGUAGE ");
                 writer.string(language)?;
             }
-            Self::Transform(types) => {
-                if types.is_empty() {
-                    return writer.invalid("function TRANSFORM", "TRANSFORM requires a type");
-                }
-                writer.sql("TRANSFORM ");
-                for (index, type_name) in types.iter().enumerate() {
-                    if index != 0 {
-                        writer.sql(", ");
-                    }
-                    writer.sql("FOR TYPE ");
-                    type_name.emit(writer)?;
-                }
-            }
+            Self::Transform(types) => Self::emit_transforms(types, writer)?,
             Self::Window => writer.sql("WINDOW"),
-            Self::Volatility(value) => {
-                if !["immutable", "stable", "volatile"].contains(&value.as_str()) {
-                    return writer.invalid("function volatility", "unknown volatility");
-                }
-                writer.sql(&value.to_ascii_uppercase());
-            }
+            Self::Volatility(value) => Self::emit_volatility(value, writer)?,
             Self::Leakproof(value) => {
                 writer.sql(if *value { "LEAKPROOF" } else { "NOT LEAKPROOF" })
             }
@@ -353,13 +324,7 @@ impl SqlEmit for FunctionOption {
             } else {
                 "SECURITY INVOKER"
             }),
-            Self::Parallel(value) => {
-                if !["safe", "unsafe", "restricted"].contains(&value.as_str()) {
-                    return writer.invalid("function PARALLEL", "unknown parallel mode");
-                }
-                writer.sql("PARALLEL ");
-                writer.sql(&value.to_ascii_uppercase());
-            }
+            Self::Parallel(value) => Self::emit_parallel(value, writer)?,
             Self::Cost(value) => {
                 writer.sql("COST ");
                 value.emit(writer)?;
@@ -378,6 +343,57 @@ impl SqlEmit for FunctionOption {
     }
 }
 
+impl FunctionOption {
+    fn emit_body_strings(parts: &[String], writer: &mut SqlWriter) -> Result<(), DeparseError> {
+        if parts.is_empty() || parts.len() > 2 {
+            return writer.invalid("function AS", "function AS requires one or two strings");
+        }
+        writer.sql("AS ");
+        for (index, part) in parts.iter().enumerate() {
+            if index != 0 {
+                writer.sql(", ");
+            }
+            writer.string(part)?;
+        }
+        Ok(())
+    }
+
+    fn emit_transforms(
+        types: &[crate::ast::TypeName],
+        writer: &mut SqlWriter,
+    ) -> Result<(), DeparseError> {
+        if types.is_empty() {
+            return writer.invalid("function TRANSFORM", "TRANSFORM requires a type");
+        }
+        writer.sql("TRANSFORM ");
+        for (index, type_name) in types.iter().enumerate() {
+            if index != 0 {
+                writer.sql(", ");
+            }
+            writer.sql("FOR TYPE ");
+            type_name.emit(writer)?;
+        }
+        Ok(())
+    }
+
+    fn emit_volatility(value: &str, writer: &mut SqlWriter) -> Result<(), DeparseError> {
+        if !["immutable", "stable", "volatile"].contains(&value) {
+            return writer.invalid("function volatility", "unknown volatility");
+        }
+        writer.sql(&value.to_ascii_uppercase());
+        Ok(())
+    }
+
+    fn emit_parallel(value: &str, writer: &mut SqlWriter) -> Result<(), DeparseError> {
+        if !["safe", "unsafe", "restricted"].contains(&value) {
+            return writer.invalid("function PARALLEL", "unknown parallel mode");
+        }
+        writer.sql("PARALLEL ");
+        writer.sql(&value.to_ascii_uppercase());
+        Ok(())
+    }
+}
+
 impl SqlEmit for FunctionBody {
     fn emit(&self, writer: &mut SqlWriter) -> Result<(), DeparseError> {
         match self {
@@ -385,16 +401,23 @@ impl SqlEmit for FunctionBody {
                 writer.sql("RETURN ");
                 expression.emit(writer)
             }
-            Self::Atomic(statements) => {
-                writer.sql("BEGIN ATOMIC ");
-                for statement in statements {
-                    statement.emit(writer)?;
-                    writer.sql("; ");
-                }
-                writer.sql("END");
-                Ok(())
-            }
+            Self::Atomic(statements) => Self::emit_atomic(statements, writer),
         }
+    }
+}
+
+impl FunctionBody {
+    fn emit_atomic(
+        statements: &[FunctionBodyStatement],
+        writer: &mut SqlWriter,
+    ) -> Result<(), DeparseError> {
+        writer.sql("BEGIN ATOMIC ");
+        for statement in statements {
+            statement.emit(writer)?;
+            writer.sql("; ");
+        }
+        writer.sql("END");
+        Ok(())
     }
 }
 
@@ -530,23 +553,11 @@ impl SqlEmit for AlterCommand {
     fn emit(&self, writer: &mut SqlWriter) -> Result<(), DeparseError> {
         match self {
             Self::Postgres(command) => command.emit(writer),
-            Self::Owner(owner) => {
-                writer.postgres_only("OWNER TO")?;
-                writer.sql("OWNER TO ");
-                writer.ident(owner)
-            }
+            Self::Owner(owner) => Self::emit_owner(owner, writer),
             Self::Default(column, expression) => {
-                writer.postgres_only("ALTER COLUMN DEFAULT")?;
-                writer.sql("ALTER COLUMN ");
-                writer.ident(column)?;
-                writer.sql(" SET DEFAULT ");
-                expression.emit(writer)
+                Self::emit_column_default(column, expression, writer)
             }
-            Self::Constraint(constraint) => {
-                writer.postgres_only("ADD CONSTRAINT")?;
-                writer.sql("ADD ");
-                constraint.emit(writer)
-            }
+            Self::Constraint(constraint) => Self::emit_added_constraint(constraint, writer),
             Self::Cluster(index) => {
                 writer.postgres_only("CLUSTER ON")?;
                 writer.sql("CLUSTER ON ");
@@ -564,18 +575,53 @@ impl SqlEmit for AlterCommand {
                 "ALTER COLUMN",
                 "replacement column definitions are a Turso parser extension",
             ),
-            Self::RenameColumn(from, to) => {
-                writer.sql("RENAME COLUMN ");
-                writer.ident(from)?;
-                writer.sql(" TO ");
-                writer.ident(to)
-            }
+            Self::RenameColumn(from, to) => Self::emit_renamed_column(from, to, writer),
             Self::DropColumn(name) => {
                 writer.sql("DROP COLUMN ");
                 writer.ident(name)
             }
             Self::Unsupported(name) => writer.unsupported(name),
         }
+    }
+}
+
+impl AlterCommand {
+    fn emit_owner(owner: &str, writer: &mut SqlWriter) -> Result<(), DeparseError> {
+        writer.postgres_only("OWNER TO")?;
+        writer.sql("OWNER TO ");
+        writer.ident(owner)
+    }
+
+    fn emit_column_default(
+        column: &str,
+        expression: &crate::ast::Expr,
+        writer: &mut SqlWriter,
+    ) -> Result<(), DeparseError> {
+        writer.postgres_only("ALTER COLUMN DEFAULT")?;
+        writer.sql("ALTER COLUMN ");
+        writer.ident(column)?;
+        writer.sql(" SET DEFAULT ");
+        expression.emit(writer)
+    }
+
+    fn emit_added_constraint(
+        constraint: &crate::ast::TableConstraint,
+        writer: &mut SqlWriter,
+    ) -> Result<(), DeparseError> {
+        writer.postgres_only("ADD CONSTRAINT")?;
+        writer.sql("ADD ");
+        constraint.emit(writer)
+    }
+
+    fn emit_renamed_column(
+        from: &str,
+        to: &str,
+        writer: &mut SqlWriter,
+    ) -> Result<(), DeparseError> {
+        writer.sql("RENAME COLUMN ");
+        writer.ident(from)?;
+        writer.sql(" TO ");
+        writer.ident(to)
     }
 }
 
@@ -636,22 +682,72 @@ impl PostgresAlterCommand {
                 "IF EXISTS "
             });
         }
-        if !self.name.is_empty() {
-            writer.ident(&self.name)?;
-            writer.sql(" ");
-        } else if self.operation.is_access_method() {
-            writer.sql("DEFAULT");
-        }
-        if self.number > 0 {
-            writer.number(self.number);
-            writer.sql(" ");
-        }
+        self.emit_target(writer)?;
         self.operation
             .emit_definition(&self.definition, self.missing_ok, writer)?;
         if self.cascade {
             writer.sql(" CASCADE");
         }
         Ok(())
+    }
+
+    fn emit_target(&self, writer: &mut SqlWriter) -> Result<(), DeparseError> {
+        if !self.name.is_empty() {
+            writer.ident(&self.name)?;
+            writer.sql(" ");
+        } else if self.operation.is_access_method() {
+            writer.sql("DEFAULT");
+        }
+        // PostgreSQL's num field names a column by ordinal. The statistics
+        // target is retained separately in the definition, after SET STATISTICS.
+        if self.number > 0 {
+            writer.number(self.number);
+            writer.sql(" ");
+        }
+        Ok(())
+    }
+}
+
+#[cfg(test)]
+mod test_statistics_emission {
+    use crate::ast::Dialect;
+    use crate::parse_statements;
+
+    #[rstest::rstest]
+    #[case::named_numeric(
+        "ALTER TABLE t ALTER COLUMN a SET STATISTICS 500",
+        r#"ALTER TABLE "t" ALTER COLUMN "a" SET STATISTICS 500"#
+    )]
+    #[case::named_default(
+        "ALTER TABLE t ALTER COLUMN a SET STATISTICS DEFAULT",
+        r#"ALTER TABLE "t" ALTER COLUMN "a" SET STATISTICS DEFAULT"#
+    )]
+    #[case::ordinal_numeric(
+        "ALTER TABLE t ALTER COLUMN 1 SET STATISTICS 500",
+        r#"ALTER TABLE "t" ALTER COLUMN 1 SET STATISTICS 500"#
+    )]
+    #[case::ordinal_default(
+        "ALTER TABLE t ALTER COLUMN 1 SET STATISTICS DEFAULT",
+        r#"ALTER TABLE "t" ALTER COLUMN 1 SET STATISTICS DEFAULT"#
+    )]
+    #[case::zero(
+        "ALTER TABLE t ALTER COLUMN a SET STATISTICS 0",
+        r#"ALTER TABLE "t" ALTER COLUMN "a" SET STATISTICS 0"#
+    )]
+    #[case::negative(
+        "ALTER TABLE t ALTER COLUMN a SET STATISTICS -1",
+        r#"ALTER TABLE "t" ALTER COLUMN "a" SET STATISTICS -1"#
+    )]
+    fn keeps_column_and_statistics_target_distinct(#[case] sql: &str, #[case] expected: &str) {
+        let original = pg_query::parse(sql).unwrap().deparse().unwrap();
+        let statement = parse_statements(sql, Dialect::postgres())
+            .next()
+            .unwrap()
+            .unwrap();
+        let emitted = statement.deparse_sql(Dialect::postgres()).unwrap();
+        assert_eq!(expected, emitted);
+        let reparsed = pg_query::parse(&emitted).unwrap().deparse().unwrap();
+        assert_eq!(original, reparsed, "emitted SQL: {emitted}");
     }
 }
 
@@ -819,50 +915,43 @@ impl AlterOperation {
         writer: &mut SqlWriter,
     ) -> Result<(), DeparseError> {
         match self {
-            Self::ColumnDefault => {
-                if definition.is_none() {
-                    writer.sql("DROP DEFAULT");
-                    return Ok(());
-                }
-                writer.sql("SET DEFAULT ");
-            }
-            Self::DropNotNull => writer.sql("DROP NOT NULL"),
-            Self::SetNotNull => writer.sql("SET NOT NULL"),
-            Self::DropExpression => writer.sql("DROP EXPRESSION"),
-            Self::DropIdentity => writer.sql("DROP IDENTITY"),
-            Self::SetStatistics => {
-                writer.sql("SET STATISTICS ");
-                if definition.is_none() {
-                    writer.sql("DEFAULT");
-                    return Ok(());
-                }
-            }
-            Self::SetOptions => writer.sql("SET "),
-            Self::ResetOptions => writer.sql("RESET "),
-            Self::SetStorage => writer.sql("SET STORAGE "),
-            Self::SetCompression => writer.sql("SET COMPRESSION "),
-            Self::AlterColumnType => writer.sql("TYPE "),
-            Self::AddIdentity => writer.sql("ADD "),
-            Self::SetExpression => {
-                writer.sql("SET EXPRESSION AS (");
-                definition.emit(writer)?;
-                writer.sql(")");
-                return Ok(());
-            }
-            Self::SetAccessMethod if definition.is_none() => {
-                return Ok(());
-            }
-            Self::SetIdentity => return definition.emit_identity_options(writer),
-            _ => (),
+            Self::ColumnDefault => definition.emit_column_default(writer),
+            Self::SetStatistics => definition.emit_statistics(writer),
+            Self::SetExpression => definition.emit_set_expression(writer),
+            Self::SetIdentity => definition.emit_identity_options(writer),
+            Self::SetAccessMethod if definition.is_none() => Ok(()),
+            Self::DetachPartitionFinalize => definition.emit_finalized_partition(writer),
+            _ => self.emit_standard_definition(definition, missing_ok, writer),
         }
+    }
+
+    fn emit_standard_definition(
+        &self,
+        definition: &AlterDefinition,
+        missing_ok: bool,
+        writer: &mut SqlWriter,
+    ) -> Result<(), DeparseError> {
+        writer.sql(self.definition_prefix());
         if missing_ok && self.trailing_missing_ok() {
             writer.sql(" IF EXISTS");
         }
-        definition.emit(writer)?;
-        if matches!(self, Self::DetachPartitionFinalize) {
-            writer.sql(" FINALIZE");
+        definition.emit(writer)
+    }
+
+    const fn definition_prefix(&self) -> &'static str {
+        match self {
+            Self::DropNotNull => "DROP NOT NULL",
+            Self::SetNotNull => "SET NOT NULL",
+            Self::DropExpression => "DROP EXPRESSION",
+            Self::DropIdentity => "DROP IDENTITY",
+            Self::SetOptions => "SET ",
+            Self::ResetOptions => "RESET ",
+            Self::SetStorage => "SET STORAGE ",
+            Self::SetCompression => "SET COMPRESSION ",
+            Self::AlterColumnType => "TYPE ",
+            Self::AddIdentity => "ADD ",
+            _ => "",
         }
-        Ok(())
     }
 }
 
@@ -870,19 +959,57 @@ impl AlterDefinition {
     const fn is_none(&self) -> bool {
         matches!(self, Self::None)
     }
+    fn emit_column_default(&self, writer: &mut SqlWriter) -> Result<(), DeparseError> {
+        if self.is_none() {
+            writer.sql("DROP DEFAULT");
+            Ok(())
+        } else {
+            writer.sql("SET DEFAULT ");
+            self.emit(writer)
+        }
+    }
+
+    fn emit_statistics(&self, writer: &mut SqlWriter) -> Result<(), DeparseError> {
+        writer.sql("SET STATISTICS ");
+        if self.is_none() {
+            writer.sql("DEFAULT");
+            Ok(())
+        } else {
+            self.emit(writer)
+        }
+    }
+
+    fn emit_set_expression(&self, writer: &mut SqlWriter) -> Result<(), DeparseError> {
+        writer.sql("SET EXPRESSION AS (");
+        self.emit(writer)?;
+        writer.sql(")");
+        Ok(())
+    }
+
+    fn emit_finalized_partition(&self, writer: &mut SqlWriter) -> Result<(), DeparseError> {
+        self.emit(writer)?;
+        writer.sql(" FINALIZE");
+        Ok(())
+    }
+
     fn emit_identity_options(&self, writer: &mut SqlWriter) -> Result<(), DeparseError> {
         match self {
-            Self::Options(options) => {
-                for (index, option) in options.iter().enumerate() {
-                    if index != 0 {
-                        writer.sql(" ");
-                    }
-                    option.emit_identity_option(writer)?;
-                }
-                Ok(())
-            }
+            Self::Options(options) => Self::emit_identity_option_list(options, writer),
             _ => writer.invalid("ALTER IDENTITY", "identity options are missing"),
         }
+    }
+
+    fn emit_identity_option_list(
+        options: &[crate::ast::SyntaxOption],
+        writer: &mut SqlWriter,
+    ) -> Result<(), DeparseError> {
+        for (index, option) in options.iter().enumerate() {
+            if index != 0 {
+                writer.sql(" ");
+            }
+            option.emit_alter_identity_option(writer)?;
+        }
+        Ok(())
     }
 }
 
@@ -892,18 +1019,8 @@ impl SqlEmit for AlterDefinition {
             Self::None => Ok(()),
             Self::Expression(value) => value.emit(writer),
             Self::Text(value) => writer.ident(value),
-            Self::Options(options) => {
-                writer.sql("(");
-                writer.list(options, ", ")?;
-                writer.sql(")");
-                Ok(())
-            }
-            Self::GenericOptions(options) => {
-                writer.sql("OPTIONS (");
-                writer.list(options, ", ")?;
-                writer.sql(")");
-                Ok(())
-            }
+            Self::Options(options) => Self::emit_options(options, writer),
+            Self::GenericOptions(options) => Self::emit_generic_options(options, writer),
             Self::Column(value) => value.emit(writer),
             Self::ColumnType(value) => value.emit(writer),
             Self::Constraint(value) => value.emit(writer),
@@ -915,6 +1032,28 @@ impl SqlEmit for AlterDefinition {
             Self::Partition(value) => value.emit(writer),
             Self::Identity(value) => value.emit(writer),
         }
+    }
+}
+
+impl AlterDefinition {
+    fn emit_options(
+        options: &[crate::ast::SyntaxOption],
+        writer: &mut SqlWriter,
+    ) -> Result<(), DeparseError> {
+        writer.sql("(");
+        writer.list(options, ", ")?;
+        writer.sql(")");
+        Ok(())
+    }
+
+    fn emit_generic_options(
+        options: &[GenericOption],
+        writer: &mut SqlWriter,
+    ) -> Result<(), DeparseError> {
+        writer.sql("OPTIONS (");
+        writer.list(options, ", ")?;
+        writer.sql(")");
+        Ok(())
     }
 }
 
@@ -1025,7 +1164,7 @@ impl SqlEmit for AlterIdentity {
 }
 
 impl crate::ast::SyntaxOption {
-    fn emit_identity_option(&self, writer: &mut SqlWriter) -> Result<(), DeparseError> {
+    fn emit_alter_identity_option(&self, writer: &mut SqlWriter) -> Result<(), DeparseError> {
         // RESTART is an identity action in its own right. The other identity
         // options use SET, matching alter_identity_column_option grammar.
         if self.name == "restart" {

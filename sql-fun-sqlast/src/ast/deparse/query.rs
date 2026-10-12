@@ -16,36 +16,47 @@ impl SqlEmit for Query {
                 w.sql(" ORDER BY ");
                 w.list(&self.order, ", ")?;
             }
-            if self.with_ties {
-                w.postgres_only("FETCH WITH TIES")?;
-                if let Some(offset) = &self.offset {
-                    w.sql(" OFFSET ");
-                    offset.emit(w)?;
-                    w.sql(" ROWS");
-                }
-                w.sql(" FETCH FIRST ");
-                let Some(limit) = &self.limit else {
-                    return w.invalid("FETCH", "WITH TIES requires a count");
-                };
-                limit.emit(w)?;
-                w.sql(" ROWS WITH TIES");
-            } else {
-                if let Some(limit) = &self.limit {
-                    w.sql(" LIMIT ");
-                    limit.emit(w)?;
-                } else if self.offset.is_some() && !w.is_postgres() {
-                    w.sql(" LIMIT -1");
-                }
-                if let Some(offset) = &self.offset {
-                    w.sql(" OFFSET ");
-                    offset.emit(w)?;
-                }
-            }
+            self.emit_row_limit(w)?;
             for lock in &self.locks {
                 lock.emit(w)?;
             }
             Ok(())
         })
+    }
+}
+
+impl Query {
+    fn emit_row_limit(&self, w: &mut SqlWriter) -> Result<(), DeparseError> {
+        if self.with_ties {
+            return self.emit_fetch_with_ties(w);
+        }
+        if let Some(limit) = &self.limit {
+            w.sql(" LIMIT ");
+            limit.emit(w)?;
+        } else if self.offset.is_some() && !w.is_postgres() {
+            w.sql(" LIMIT -1");
+        }
+        if let Some(offset) = &self.offset {
+            w.sql(" OFFSET ");
+            offset.emit(w)?;
+        }
+        Ok(())
+    }
+
+    fn emit_fetch_with_ties(&self, w: &mut SqlWriter) -> Result<(), DeparseError> {
+        w.postgres_only("FETCH WITH TIES")?;
+        if let Some(offset) = &self.offset {
+            w.sql(" OFFSET ");
+            offset.emit(w)?;
+            w.sql(" ROWS");
+        }
+        w.sql(" FETCH FIRST ");
+        let Some(limit) = &self.limit else {
+            return w.invalid("FETCH", "WITH TIES requires a count");
+        };
+        limit.emit(w)?;
+        w.sql(" ROWS WITH TIES");
+        Ok(())
     }
 }
 
@@ -130,27 +141,31 @@ impl SqlEmit for QueryBody {
         match self {
             Self::Select(v) => v.emit(w),
             Self::Set(v) => v.emit(w),
-            Self::Values(rows) => {
-                if rows.is_empty() {
-                    return w.invalid("VALUES", "VALUES requires a row");
-                }
-                w.sql("VALUES ");
-                for (i, row) in rows.iter().enumerate() {
-                    if row.is_empty() {
-                        return w.invalid("VALUES", "VALUES rows cannot be empty");
-                    }
-                    if i > 0 {
-                        w.sql(", ");
-                    }
-                    w.sql("(");
-                    w.list(row, ", ")?;
-                    w.sql(")");
-                }
-                Ok(())
-            }
+            Self::Values(rows) => Self::emit_values(rows, w),
         }
     }
 }
+impl QueryBody {
+    fn emit_values(rows: &[Vec<crate::ast::Expr>], w: &mut SqlWriter) -> Result<(), DeparseError> {
+        if rows.is_empty() {
+            return w.invalid("VALUES", "VALUES requires a row");
+        }
+        w.sql("VALUES ");
+        for (i, row) in rows.iter().enumerate() {
+            if row.is_empty() {
+                return w.invalid("VALUES", "VALUES rows cannot be empty");
+            }
+            if i > 0 {
+                w.sql(", ");
+            }
+            w.sql("(");
+            w.list(row, ", ")?;
+            w.sql(")");
+        }
+        Ok(())
+    }
+}
+
 impl SqlEmit for SetQuery {
     fn emit(&self, w: &mut SqlWriter) -> Result<(), DeparseError> {
         if !w.is_postgres() {

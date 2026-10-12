@@ -4,8 +4,8 @@ use crate::ast::{
     SyntaxValue, TableConstraint,
 };
 use crate::sem::{
-    ConflictClause, Deferrability, ForeignKeyAction, ForeignKeyMatchType, GeneratedColumnMode,
-    IdentityColumnMode,
+    ConflictClause, Deferrability, Deferrable, ForeignKeyAction, ForeignKeyMatchType,
+    GeneratedColumnMode, IdentityColumnMode,
 };
 
 impl SqlEmit for Column {
@@ -127,6 +127,35 @@ impl TableConstraint {
         self.extras.emit_for(writer, &self.constraint)?;
         Ok(())
     }
+
+    fn emit_keys(&self, writer: &mut SqlWriter) -> Result<(), DeparseError> {
+        if !self.order.is_empty() {
+            writer.list(&self.order, ", ")
+        } else {
+            writer.names(&self.keys, ", ")
+        }
+    }
+
+    fn emit_inline_primary_order(&self, writer: &mut SqlWriter) -> Result<(), DeparseError> {
+        if self.order.len() > 1 {
+            return writer.invalid(
+                "column PRIMARY KEY",
+                "inline primary key has more than one sort item",
+            );
+        }
+        if let Some(order) = self.order.first() {
+            if order.using.is_some() || order.nulls_first.is_some() {
+                return writer.invalid(
+                    "column PRIMARY KEY",
+                    "inline primary key has unsupported ordering options",
+                );
+            }
+            if let Some(descending) = order.descending {
+                writer.sql(if descending { " DESC" } else { " ASC" });
+            }
+        }
+        Ok(())
+    }
 }
 
 impl ColumnConstraint {
@@ -154,195 +183,282 @@ impl ColumnConstraint {
     ) -> Result<(), DeparseError> {
         match self {
             Self::Nullability(not_null, conflict, _validity) => {
-                if !column_context {
-                    return writer.invalid(
-                        "nullability constraint",
-                        "nullability is a column constraint",
-                    );
-                }
-                writer.sql(if *not_null { "NOT NULL" } else { "NULL" });
-                emit_conflict_clause(conflict.as_ref(), writer)?;
+                Self::emit_nullability(*not_null, conflict.as_ref(), column_context, writer)?;
             }
-            Self::Default(expression) => {
-                if !column_context {
-                    return writer.invalid("DEFAULT constraint", "DEFAULT is a column constraint");
-                }
-                writer.sql("DEFAULT (");
-                expression.emit(writer)?;
-                writer.sql(")");
-            }
-            Self::Check(expression) => {
-                writer.sql("CHECK (");
-                expression.emit(writer)?;
-                writer.sql(")");
-                if owner.extras.no_inherit {
-                    writer.postgres_only("CHECK NO INHERIT")?;
-                    writer.sql(" NO INHERIT");
-                }
-            }
+            Self::Default(expression) => Self::emit_default(expression, column_context, writer)?,
+            Self::Check(expression) => Self::emit_check(expression, owner, writer)?,
             Self::PrimaryKey(conflict, deferrable) => {
-                writer.sql("PRIMARY KEY");
-                if column_context {
-                    if !owner.keys.is_empty() {
-                        return writer.invalid(
-                            "column PRIMARY KEY",
-                            "an inline primary key cannot have a key list",
-                        );
-                    }
-                    emit_inline_primary_order(owner, writer)?;
-                } else if let Some(index_name) = &owner.extras.index_name {
-                    writer.postgres_only("PRIMARY KEY USING INDEX")?;
-                    if !owner.keys.is_empty() || !owner.order.is_empty() {
-                        return writer.invalid(
-                            "PRIMARY KEY USING INDEX",
-                            "an existing index target cannot have a key list",
-                        );
-                    }
-                    writer.sql(" USING INDEX ");
-                    writer.ident(index_name)?;
-                } else if !owner.keys.is_empty() || !owner.order.is_empty() {
-                    writer.sql(" (");
-                    emit_keys(owner, writer)?;
-                    writer.sql(")");
-                } else {
-                    return writer
-                        .invalid("PRIMARY KEY", "table primary key requires at least one key");
-                }
-                emit_conflict_clause(conflict.as_ref(), writer)?;
-                if !owner.extras.deferrable
-                    && !owner.extras.initially_deferred
-                    && let Some(deferrable) = deferrable
-                {
-                    writer.postgres_only("constraint deferrability")?;
-                    writer.sql(" DEFERRABLE");
-                    if deferrable.is_initially_deferred() {
-                        writer.sql(" INITIALLY DEFERRED");
-                    }
-                }
-                if owner.auto_increment {
-                    if !column_context {
-                        return writer.invalid(
-                            "AUTOINCREMENT",
-                            "SQLite AUTOINCREMENT is only valid on a column primary key",
-                        );
-                    }
-                    if writer.is_postgres() {
-                        return writer.invalid("AUTOINCREMENT", "SQLite-only column constraint");
-                    }
-                    writer.sql(" AUTOINCREMENT");
-                }
+                Self::emit_primary_key(
+                    conflict.as_ref(),
+                    deferrable.as_ref(),
+                    owner,
+                    column_context,
+                    writer,
+                )?;
             }
             Self::Unique(conflict) => {
-                writer.sql("UNIQUE");
-                if owner.extras.nulls_not_distinct {
-                    writer.postgres_only("UNIQUE NULLS NOT DISTINCT")?;
-                    writer.sql(" NULLS NOT DISTINCT");
-                }
-                if column_context {
-                    if !owner.keys.is_empty() || !owner.order.is_empty() {
-                        return writer.invalid("UNIQUE", "inline UNIQUE cannot have a key list");
-                    }
-                } else if let Some(index_name) = &owner.extras.index_name {
-                    writer.postgres_only("UNIQUE USING INDEX")?;
-                    if !owner.keys.is_empty() || !owner.order.is_empty() {
-                        return writer.invalid(
-                            "UNIQUE USING INDEX",
-                            "an existing index target cannot have a key list",
-                        );
-                    }
-                    writer.sql(" USING INDEX ");
-                    writer.ident(index_name)?;
-                } else if !owner.keys.is_empty() || !owner.order.is_empty() {
-                    writer.sql(" (");
-                    emit_keys(owner, writer)?;
-                    writer.sql(")");
-                } else {
-                    return writer.invalid(
-                        "UNIQUE",
-                        "table UNIQUE constraint requires at least one key",
-                    );
-                }
-                emit_conflict_clause(conflict.as_ref(), writer)?;
+                Self::emit_unique(conflict.as_ref(), owner, column_context, writer)?;
             }
-            Self::Identity(mode) => {
-                if !column_context {
-                    return writer.invalid("identity column", "identity is a column constraint");
-                }
-                mode.emit(writer)?;
-                emit_identity_options(&owner.extras.options, writer)?;
-            }
+            Self::Identity(mode) => Self::emit_identity(mode, owner, column_context, writer)?,
             Self::Generated(expression, mode) => {
-                if !column_context {
-                    return writer.invalid("generated column", "generated is a column constraint");
-                }
-                if writer.is_postgres() && mode.is_none() {
-                    return writer.invalid(
-                        "generated column",
-                        "PostgreSQL generated columns require a storage mode",
-                    );
-                }
-                writer.sql("GENERATED ALWAYS AS (");
-                expression.emit(writer)?;
-                writer.sql(")");
-                if let Some(mode) = mode {
-                    writer.sql(" ");
-                    mode.emit(writer)?;
-                }
+                Self::emit_generated(expression, mode.as_ref(), column_context, writer)?;
             }
             Self::ForeignKey(reference) => {
                 reference.emit_with(writer, owner, column_context)?;
             }
-            Self::Exclusion => {
-                if column_context {
-                    return writer.invalid("EXCLUDE constraint", "EXCLUDE is a table constraint");
-                }
-                writer.postgres_only("EXCLUDE constraint")?;
-                if owner.extras.index_name.is_some() {
-                    return writer.invalid(
-                        "EXCLUDE constraint",
-                        "exclusion constraints cannot use an existing index",
-                    );
-                }
-                writer.sql("EXCLUDE");
-                if let Some(method) = &owner.extras.access_method {
-                    writer.sql(" USING ");
-                    writer.ident(method)?;
-                }
-                if owner.extras.exclusions.is_empty() {
-                    return writer.invalid(
-                        "EXCLUDE constraint",
-                        "exclusion constraint requires an element",
-                    );
-                }
-                writer.sql(" (");
-                writer.list(&owner.extras.exclusions, ", ")?;
-                writer.sql(")");
-            }
-            Self::Deferrability(deferrable) => {
-                writer.postgres_only("constraint deferrability")?;
-                writer.sql(if *deferrable {
-                    "DEFERRABLE"
-                } else {
-                    "NOT DEFERRABLE"
-                });
-            }
-            Self::Deferred => {
-                writer.postgres_only("constraint deferrability")?;
-                writer.sql("INITIALLY DEFERRED");
-            }
-            Self::Immediate => {
-                writer.postgres_only("constraint deferrability")?;
-                writer.sql("INITIALLY IMMEDIATE");
-            }
-            Self::Collate(name) => {
-                if !column_context {
-                    return writer.invalid("COLLATE constraint", "COLLATE is a column constraint");
-                }
-                writer.sql("COLLATE ");
-                writer.ident(name)?;
-            }
+            Self::Exclusion => Self::emit_exclusion(owner, column_context, writer)?,
+            Self::Deferrability(deferrable) => Self::emit_deferrability(*deferrable, writer)?,
+            Self::Deferred => Self::emit_deferred(writer)?,
+            Self::Immediate => Self::emit_immediate(writer)?,
+            Self::Collate(name) => Self::emit_collation(name, column_context, writer)?,
         }
         Ok(())
+    }
+
+    fn emit_nullability(
+        not_null: bool,
+        conflict: Option<&ConflictClause>,
+        column_context: bool,
+        writer: &mut SqlWriter,
+    ) -> Result<(), DeparseError> {
+        if !column_context {
+            return writer.invalid(
+                "nullability constraint",
+                "nullability is a column constraint",
+            );
+        }
+        writer.sql(if not_null { "NOT NULL" } else { "NULL" });
+        ConflictClause::emit_constraint_clause(conflict, writer)
+    }
+
+    fn emit_default(
+        expression: &crate::ast::Expr,
+        column_context: bool,
+        writer: &mut SqlWriter,
+    ) -> Result<(), DeparseError> {
+        if !column_context {
+            return writer.invalid("DEFAULT constraint", "DEFAULT is a column constraint");
+        }
+        writer.sql("DEFAULT (");
+        expression.emit(writer)?;
+        writer.sql(")");
+        Ok(())
+    }
+
+    fn emit_check(
+        expression: &crate::ast::Expr,
+        owner: &TableConstraint,
+        writer: &mut SqlWriter,
+    ) -> Result<(), DeparseError> {
+        writer.sql("CHECK (");
+        expression.emit(writer)?;
+        writer.sql(")");
+        if owner.extras.no_inherit {
+            writer.postgres_only("CHECK NO INHERIT")?;
+            writer.sql(" NO INHERIT");
+        }
+        Ok(())
+    }
+
+    fn emit_primary_key(
+        conflict: Option<&ConflictClause>,
+        deferrable: Option<&Deferrable>,
+        owner: &TableConstraint,
+        column_context: bool,
+        writer: &mut SqlWriter,
+    ) -> Result<(), DeparseError> {
+        writer.sql("PRIMARY KEY");
+        if column_context {
+            if !owner.keys.is_empty() {
+                return writer.invalid(
+                    "column PRIMARY KEY",
+                    "an inline primary key cannot have a key list",
+                );
+            }
+            owner.emit_inline_primary_order(writer)?;
+        } else if let Some(index_name) = &owner.extras.index_name {
+            writer.postgres_only("PRIMARY KEY USING INDEX")?;
+            if !owner.keys.is_empty() || !owner.order.is_empty() {
+                return writer.invalid(
+                    "PRIMARY KEY USING INDEX",
+                    "an existing index target cannot have a key list",
+                );
+            }
+            writer.sql(" USING INDEX ");
+            writer.ident(index_name)?;
+        } else if !owner.keys.is_empty() || !owner.order.is_empty() {
+            writer.sql(" (");
+            owner.emit_keys(writer)?;
+            writer.sql(")");
+        } else {
+            return writer.invalid("PRIMARY KEY", "table primary key requires at least one key");
+        }
+        ConflictClause::emit_constraint_clause(conflict, writer)?;
+        if !owner.extras.deferrable
+            && !owner.extras.initially_deferred
+            && let Some(deferrable) = deferrable
+        {
+            writer.postgres_only("constraint deferrability")?;
+            writer.sql(" DEFERRABLE");
+            if deferrable.is_initially_deferred() {
+                writer.sql(" INITIALLY DEFERRED");
+            }
+        }
+        if owner.auto_increment {
+            if !column_context {
+                return writer.invalid(
+                    "AUTOINCREMENT",
+                    "SQLite AUTOINCREMENT is only valid on a column primary key",
+                );
+            }
+            if writer.is_postgres() {
+                return writer.invalid("AUTOINCREMENT", "SQLite-only column constraint");
+            }
+            writer.sql(" AUTOINCREMENT");
+        }
+        Ok(())
+    }
+
+    fn emit_unique(
+        conflict: Option<&ConflictClause>,
+        owner: &TableConstraint,
+        column_context: bool,
+        writer: &mut SqlWriter,
+    ) -> Result<(), DeparseError> {
+        writer.sql("UNIQUE");
+        if owner.extras.nulls_not_distinct {
+            writer.postgres_only("UNIQUE NULLS NOT DISTINCT")?;
+            writer.sql(" NULLS NOT DISTINCT");
+        }
+        if column_context {
+            if !owner.keys.is_empty() || !owner.order.is_empty() {
+                return writer.invalid("UNIQUE", "inline UNIQUE cannot have a key list");
+            }
+        } else if let Some(index_name) = &owner.extras.index_name {
+            writer.postgres_only("UNIQUE USING INDEX")?;
+            if !owner.keys.is_empty() || !owner.order.is_empty() {
+                return writer.invalid(
+                    "UNIQUE USING INDEX",
+                    "an existing index target cannot have a key list",
+                );
+            }
+            writer.sql(" USING INDEX ");
+            writer.ident(index_name)?;
+        } else if !owner.keys.is_empty() || !owner.order.is_empty() {
+            writer.sql(" (");
+            owner.emit_keys(writer)?;
+            writer.sql(")");
+        } else {
+            return writer.invalid(
+                "UNIQUE",
+                "table UNIQUE constraint requires at least one key",
+            );
+        }
+        ConflictClause::emit_constraint_clause(conflict, writer)
+    }
+
+    fn emit_identity(
+        mode: &IdentityColumnMode,
+        owner: &TableConstraint,
+        column_context: bool,
+        writer: &mut SqlWriter,
+    ) -> Result<(), DeparseError> {
+        if !column_context {
+            return writer.invalid("identity column", "identity is a column constraint");
+        }
+        mode.emit(writer)?;
+        owner.extras.emit_identity_options(writer)
+    }
+
+    fn emit_generated(
+        expression: &crate::ast::Expr,
+        mode: Option<&GeneratedColumnMode>,
+        column_context: bool,
+        writer: &mut SqlWriter,
+    ) -> Result<(), DeparseError> {
+        if !column_context {
+            return writer.invalid("generated column", "generated is a column constraint");
+        }
+        if writer.is_postgres() && mode.is_none() {
+            return writer.invalid(
+                "generated column",
+                "PostgreSQL generated columns require a storage mode",
+            );
+        }
+        writer.sql("GENERATED ALWAYS AS (");
+        expression.emit(writer)?;
+        writer.sql(")");
+        if let Some(mode) = mode {
+            writer.sql(" ");
+            mode.emit(writer)?;
+        }
+        Ok(())
+    }
+
+    fn emit_exclusion(
+        owner: &TableConstraint,
+        column_context: bool,
+        writer: &mut SqlWriter,
+    ) -> Result<(), DeparseError> {
+        if column_context {
+            return writer.invalid("EXCLUDE constraint", "EXCLUDE is a table constraint");
+        }
+        writer.postgres_only("EXCLUDE constraint")?;
+        if owner.extras.index_name.is_some() {
+            return writer.invalid(
+                "EXCLUDE constraint",
+                "exclusion constraints cannot use an existing index",
+            );
+        }
+        writer.sql("EXCLUDE");
+        if let Some(method) = &owner.extras.access_method {
+            writer.sql(" USING ");
+            writer.ident(method)?;
+        }
+        if owner.extras.exclusions.is_empty() {
+            return writer.invalid(
+                "EXCLUDE constraint",
+                "exclusion constraint requires an element",
+            );
+        }
+        writer.sql(" (");
+        writer.list(&owner.extras.exclusions, ", ")?;
+        writer.sql(")");
+        Ok(())
+    }
+
+    fn emit_deferrability(deferrable: bool, writer: &mut SqlWriter) -> Result<(), DeparseError> {
+        writer.postgres_only("constraint deferrability")?;
+        writer.sql(if deferrable {
+            "DEFERRABLE"
+        } else {
+            "NOT DEFERRABLE"
+        });
+        Ok(())
+    }
+
+    fn emit_deferred(writer: &mut SqlWriter) -> Result<(), DeparseError> {
+        writer.postgres_only("constraint deferrability")?;
+        writer.sql("INITIALLY DEFERRED");
+        Ok(())
+    }
+
+    fn emit_immediate(writer: &mut SqlWriter) -> Result<(), DeparseError> {
+        writer.postgres_only("constraint deferrability")?;
+        writer.sql("INITIALLY IMMEDIATE");
+        Ok(())
+    }
+
+    fn emit_collation(
+        name: &str,
+        column_context: bool,
+        writer: &mut SqlWriter,
+    ) -> Result<(), DeparseError> {
+        if !column_context {
+            return writer.invalid("COLLATE constraint", "COLLATE is a column constraint");
+        }
+        writer.sql("COLLATE ");
+        writer.ident(name)
     }
 }
 
@@ -385,33 +501,46 @@ impl ForeignReference {
             writer.sql(" ON UPDATE ");
             action.emit(writer)?;
         }
-        if let Some(action) = &self.delete_action {
-            writer.sql(" ON DELETE ");
-            action.emit(writer)?;
-            if !owner.extras.delete_columns.is_empty() {
-                writer.postgres_only("ON DELETE SET NULL column list")?;
-                if !matches!(action, ForeignKeyAction::SetNull) {
-                    return writer.invalid(
-                        "ON DELETE column list",
-                        "a column list is valid only with SET NULL",
-                    );
-                }
-                writer.sql(" (");
-                writer.names(&owner.extras.delete_columns, ", ")?;
-                writer.sql(")");
-            }
-        } else if !owner.extras.delete_columns.is_empty() {
-            return writer.invalid(
-                "ON DELETE column list",
-                "a column list requires an ON DELETE SET NULL action",
-            );
-        }
+        self.emit_delete_action(&owner.extras.delete_columns, writer)?;
         if !(owner.extras.deferrable || owner.extras.initially_deferred)
             && let Some(deferrability) = &self.deferrability
         {
             writer.sql(" ");
             deferrability.emit(writer)?;
         }
+        Ok(())
+    }
+
+    fn emit_delete_action(
+        &self,
+        columns: &[String],
+        writer: &mut SqlWriter,
+    ) -> Result<(), DeparseError> {
+        let Some(action) = &self.delete_action else {
+            return if columns.is_empty() {
+                Ok(())
+            } else {
+                writer.invalid(
+                    "ON DELETE column list",
+                    "a column list requires an ON DELETE SET NULL or SET DEFAULT action",
+                )
+            };
+        };
+        writer.sql(" ON DELETE ");
+        action.emit(writer)?;
+        if columns.is_empty() {
+            return Ok(());
+        }
+        writer.postgres_only("ON DELETE SET NULL/DEFAULT column list")?;
+        if !action.supports_delete_column_list() {
+            return writer.invalid(
+                "ON DELETE column list",
+                "a column list is valid only with SET NULL or SET DEFAULT",
+            );
+        }
+        writer.sql(" (");
+        writer.names(columns, ", ")?;
+        writer.sql(")");
         Ok(())
     }
 }
@@ -444,9 +573,18 @@ impl ConstraintExtras {
         writer: &mut SqlWriter,
         constraint: &ColumnConstraint,
     ) -> Result<(), DeparseError> {
+        self.emit_index_options(writer, constraint)?;
+        self.emit_predicate(writer, constraint)?;
+        self.emit_validation_options(writer, constraint)?;
+        self.emit_deferrability(writer, constraint)
+    }
+
+    fn emit_index_options(
+        &self,
+        writer: &mut SqlWriter,
+        constraint: &ColumnConstraint,
+    ) -> Result<(), DeparseError> {
         let is_unique_or_primary = constraint.is_primary_or_unique();
-        let is_foreign = constraint.is_foreign_key();
-        let is_check = constraint.is_check();
         let is_exclusion = constraint.is_exclusion();
 
         if !self.include.is_empty() {
@@ -490,9 +628,17 @@ impl ConstraintExtras {
             writer.sql(" USING INDEX TABLESPACE ");
             writer.ident(self.tablespace.as_deref().unwrap_or_default())?;
         }
+        Ok(())
+    }
+
+    fn emit_predicate(
+        &self,
+        writer: &mut SqlWriter,
+        constraint: &ColumnConstraint,
+    ) -> Result<(), DeparseError> {
         if let Some(predicate) = &self.predicate {
             writer.postgres_only("constraint predicate")?;
-            if !is_exclusion {
+            if !constraint.is_exclusion() {
                 return writer.invalid(
                     "constraint predicate",
                     "only exclusion constraints support a predicate",
@@ -502,7 +648,15 @@ impl ConstraintExtras {
             predicate.emit(writer)?;
             writer.sql(")");
         }
-        if self.no_inherit && !is_check {
+        Ok(())
+    }
+
+    fn emit_validation_options(
+        &self,
+        writer: &mut SqlWriter,
+        constraint: &ColumnConstraint,
+    ) -> Result<(), DeparseError> {
+        if self.no_inherit && !constraint.is_check() {
             return writer.invalid(
                 "NO INHERIT",
                 "NO INHERIT is valid only for CHECK constraints",
@@ -510,7 +664,7 @@ impl ConstraintExtras {
         }
         if self.skip_validation {
             writer.postgres_only("NOT VALID")?;
-            if !is_check && !is_foreign {
+            if !constraint.is_check() && !constraint.is_foreign_key() {
                 return writer.invalid(
                     "NOT VALID",
                     "NOT VALID is valid only for CHECK and FOREIGN KEY constraints",
@@ -518,6 +672,14 @@ impl ConstraintExtras {
             }
             writer.sql(" NOT VALID");
         }
+        Ok(())
+    }
+
+    fn emit_deferrability(
+        &self,
+        writer: &mut SqlWriter,
+        constraint: &ColumnConstraint,
+    ) -> Result<(), DeparseError> {
         if self.initially_deferred && !self.deferrable {
             return writer.invalid(
                 "constraint deferrability",
@@ -545,6 +707,21 @@ impl ConstraintExtras {
         if self.initially_deferred {
             writer.sql(" INITIALLY DEFERRED");
         }
+        Ok(())
+    }
+
+    fn emit_identity_options(&self, writer: &mut SqlWriter) -> Result<(), DeparseError> {
+        if self.options.is_empty() {
+            return Ok(());
+        }
+        writer.sql(" (");
+        for (index, option) in self.options.iter().enumerate() {
+            if index != 0 {
+                writer.sql(" ");
+            }
+            option.emit_identity_option(writer)?;
+        }
+        writer.sql(")");
         Ok(())
     }
 }
@@ -612,6 +789,12 @@ impl SqlEmit for ForeignKeyAction {
     }
 }
 
+impl ForeignKeyAction {
+    const fn supports_delete_column_list(&self) -> bool {
+        matches!(self, Self::SetNull | Self::SetDefault)
+    }
+}
+
 impl SqlEmit for IdentityColumnMode {
     fn emit(&self, writer: &mut SqlWriter) -> Result<(), DeparseError> {
         writer.postgres_only("identity column")?;
@@ -639,165 +822,118 @@ impl SqlEmit for GeneratedColumnMode {
     }
 }
 
-fn emit_identity_option(option: &SyntaxOption, writer: &mut SqlWriter) -> Result<(), DeparseError> {
-    if option.namespace.is_some() {
-        return writer.invalid(
-            "sequence option",
-            "namespaced sequence options are not supported",
-        );
-    }
-    match option.name.as_str() {
-        "as" => emit_required_sequence_type(option, writer),
-        "start" => emit_required_sequence_option(option, writer, "START WITH"),
-        "increment" => emit_required_sequence_option(option, writer, "INCREMENT BY"),
-        "cache" => emit_required_sequence_option(option, writer, "CACHE"),
-        "minvalue" => emit_optional_sequence_option(option, writer, "MINVALUE", "NO MINVALUE"),
-        "maxvalue" => emit_optional_sequence_option(option, writer, "MAXVALUE", "NO MAXVALUE"),
-        "restart" => emit_optional_sequence_option(option, writer, "RESTART WITH", "RESTART"),
-        "cycle" => emit_cycle_option(option, writer),
-        "owned_by" => emit_owned_by_option(option, writer),
-        _ => writer.invalid("sequence option", "unknown identity sequence option"),
-    }
-}
-
-fn emit_identity_options(
-    options: &[SyntaxOption],
-    writer: &mut SqlWriter,
-) -> Result<(), DeparseError> {
-    if options.is_empty() {
-        return Ok(());
-    }
-    writer.sql(" (");
-    for (index, option) in options.iter().enumerate() {
-        if index != 0 {
-            writer.sql(" ");
-        }
-        emit_identity_option(option, writer)?;
-    }
-    writer.sql(")");
-    Ok(())
-}
-
-fn emit_required_sequence_type(
-    option: &SyntaxOption,
-    writer: &mut SqlWriter,
-) -> Result<(), DeparseError> {
-    let Some(SyntaxValue::Type(type_name)) = &option.value else {
-        return writer.invalid("AS sequence type", "a type name is required");
-    };
-    writer.sql("AS ");
-    type_name.emit(writer)
-}
-
-fn emit_required_sequence_option(
-    option: &SyntaxOption,
-    writer: &mut SqlWriter,
-    keyword: &str,
-) -> Result<(), DeparseError> {
-    let Some(value) = &option.value else {
-        return writer.invalid("sequence option", "sequence option requires a value");
-    };
-    writer.sql(keyword);
-    writer.sql(" ");
-    emit_sequence_value(value, writer)
-}
-
-fn emit_optional_sequence_option(
-    option: &SyntaxOption,
-    writer: &mut SqlWriter,
-    with_value: &str,
-    without_value: &str,
-) -> Result<(), DeparseError> {
-    if let Some(value) = &option.value {
-        writer.sql(with_value);
-        writer.sql(" ");
-        emit_sequence_value(value, writer)
-    } else {
-        writer.sql(without_value);
-        Ok(())
-    }
-}
-
-fn emit_cycle_option(option: &SyntaxOption, writer: &mut SqlWriter) -> Result<(), DeparseError> {
-    let cycle = match &option.value {
-        None => true,
-        Some(SyntaxValue::Expression(crate::ast::Expr::Literal(crate::ast::Literal::Boolean(
-            cycle,
-        )))) => *cycle,
-        _ => return writer.invalid("sequence option", "CYCLE option requires a Boolean value"),
-    };
-    writer.sql(if cycle { "CYCLE" } else { "NO CYCLE" });
-    Ok(())
-}
-
-fn emit_owned_by_option(option: &SyntaxOption, writer: &mut SqlWriter) -> Result<(), DeparseError> {
-    let Some(SyntaxValue::Expression(value)) = option.value.as_ref() else {
-        return writer.invalid("OWNED BY", "an ownership target is required");
-    };
-    writer.sql("OWNED BY ");
-    match value {
-        crate::ast::Expr::List(values) => writer.list(values, "."),
-        crate::ast::Expr::Column(name) => name.emit(writer),
-        crate::ast::Expr::Literal(crate::ast::Literal::Keyword(keyword))
-            if keyword.eq_ignore_ascii_case("none") =>
-        {
-            writer.sql("NONE");
-            Ok(())
-        }
-        _ => value.emit(writer),
-    }
-}
-
-fn emit_sequence_value(value: &SyntaxValue, writer: &mut SqlWriter) -> Result<(), DeparseError> {
-    match value {
-        SyntaxValue::Expression(expression) => expression.emit(writer),
-        SyntaxValue::Type(_) => {
-            writer.invalid("sequence option", "sequence option value cannot be a type")
-        }
-    }
-}
-
-fn emit_conflict_clause(
-    conflict: Option<&ConflictClause>,
-    writer: &mut SqlWriter,
-) -> Result<(), DeparseError> {
-    if let Some(conflict) = conflict {
-        writer.sql(" ON CONFLICT ");
-        <ConflictClause as SqlEmit>::emit(conflict, writer)?;
-    }
-    Ok(())
-}
-
-fn emit_keys(owner: &TableConstraint, writer: &mut SqlWriter) -> Result<(), DeparseError> {
-    if !owner.order.is_empty() {
-        writer.list(&owner.order, ", ")
-    } else {
-        writer.names(&owner.keys, ", ")
-    }
-}
-
-fn emit_inline_primary_order(
-    owner: &TableConstraint,
-    writer: &mut SqlWriter,
-) -> Result<(), DeparseError> {
-    if owner.order.len() > 1 {
-        return writer.invalid(
-            "column PRIMARY KEY",
-            "inline primary key has more than one sort item",
-        );
-    }
-    if let Some(order) = owner.order.first() {
-        if order.using.is_some() || order.nulls_first.is_some() {
+impl SyntaxOption {
+    fn emit_identity_option(&self, writer: &mut SqlWriter) -> Result<(), DeparseError> {
+        if self.namespace.is_some() {
             return writer.invalid(
-                "column PRIMARY KEY",
-                "inline primary key has unsupported ordering options",
+                "sequence option",
+                "namespaced sequence options are not supported",
             );
         }
-        if let Some(descending) = order.descending {
-            writer.sql(if descending { " DESC" } else { " ASC" });
+        match self.name.as_str() {
+            "as" => self.emit_identity_type(writer),
+            "start" => self.emit_required_identity_option("START WITH", writer),
+            "increment" => self.emit_required_identity_option("INCREMENT BY", writer),
+            "cache" => self.emit_required_identity_option("CACHE", writer),
+            "minvalue" => self.emit_optional_identity_option("MINVALUE", "NO MINVALUE", writer),
+            "maxvalue" => self.emit_optional_identity_option("MAXVALUE", "NO MAXVALUE", writer),
+            "restart" => self.emit_optional_identity_option("RESTART WITH", "RESTART", writer),
+            "cycle" => self.emit_identity_cycle(writer),
+            "owned_by" => self.emit_identity_owned_by(writer),
+            _ => writer.invalid("sequence option", "unknown identity sequence option"),
         }
     }
-    Ok(())
+
+    fn emit_identity_type(&self, writer: &mut SqlWriter) -> Result<(), DeparseError> {
+        let Some(SyntaxValue::Type(type_name)) = &self.value else {
+            return writer.invalid("AS sequence type", "a type name is required");
+        };
+        writer.sql("AS ");
+        type_name.emit(writer)
+    }
+
+    fn emit_required_identity_option(
+        &self,
+        keyword: &str,
+        writer: &mut SqlWriter,
+    ) -> Result<(), DeparseError> {
+        let Some(value) = &self.value else {
+            return writer.invalid("sequence option", "sequence option requires a value");
+        };
+        writer.sql(keyword);
+        writer.sql(" ");
+        value.emit_identity_sequence_value(writer)
+    }
+
+    fn emit_optional_identity_option(
+        &self,
+        with_value: &str,
+        without_value: &str,
+        writer: &mut SqlWriter,
+    ) -> Result<(), DeparseError> {
+        if let Some(value) = &self.value {
+            writer.sql(with_value);
+            writer.sql(" ");
+            value.emit_identity_sequence_value(writer)
+        } else {
+            writer.sql(without_value);
+            Ok(())
+        }
+    }
+
+    fn emit_identity_cycle(&self, writer: &mut SqlWriter) -> Result<(), DeparseError> {
+        let cycle = match &self.value {
+            None => true,
+            Some(SyntaxValue::Expression(crate::ast::Expr::Literal(
+                crate::ast::Literal::Boolean(cycle),
+            ))) => *cycle,
+            _ => return writer.invalid("sequence option", "CYCLE option requires a Boolean value"),
+        };
+        writer.sql(if cycle { "CYCLE" } else { "NO CYCLE" });
+        Ok(())
+    }
+
+    fn emit_identity_owned_by(&self, writer: &mut SqlWriter) -> Result<(), DeparseError> {
+        let Some(SyntaxValue::Expression(value)) = self.value.as_ref() else {
+            return writer.invalid("OWNED BY", "an ownership target is required");
+        };
+        writer.sql("OWNED BY ");
+        match value {
+            crate::ast::Expr::List(values) => writer.list(values, "."),
+            crate::ast::Expr::Column(name) => name.emit(writer),
+            crate::ast::Expr::Literal(crate::ast::Literal::Keyword(keyword))
+                if keyword.eq_ignore_ascii_case("none") =>
+            {
+                writer.sql("NONE");
+                Ok(())
+            }
+            _ => value.emit(writer),
+        }
+    }
+}
+
+impl SyntaxValue {
+    fn emit_identity_sequence_value(&self, writer: &mut SqlWriter) -> Result<(), DeparseError> {
+        match self {
+            Self::Expression(expression) => expression.emit(writer),
+            Self::Type(_) => {
+                writer.invalid("sequence option", "sequence option value cannot be a type")
+            }
+        }
+    }
+}
+
+impl ConflictClause {
+    fn emit_constraint_clause(
+        conflict: Option<&Self>,
+        writer: &mut SqlWriter,
+    ) -> Result<(), DeparseError> {
+        if let Some(conflict) = conflict {
+            writer.sql(" ON CONFLICT ");
+            conflict.emit(writer)?;
+        }
+        Ok(())
+    }
 }
 
 #[cfg(test)]
@@ -1003,6 +1139,60 @@ mod test_constraint_emit {
             writer.sql,
             "REFERENCES \"public\".\"parent\" (\"id\") ON DELETE CASCADE DEFERRABLE INITIALLY DEFERRED"
         );
+    }
+
+    #[rstest::rstest]
+    #[case::set_null(
+        r#"CREATE TABLE child (a integer, b integer, FOREIGN KEY (a, b) REFERENCES parent (a, b) ON DELETE SET NULL (a, b))"#,
+        r#"ON DELETE SET NULL ("a", "b")"#
+    )]
+    #[case::set_default(
+        r#"CREATE TABLE child (a integer, b integer, FOREIGN KEY (a, b) REFERENCES parent (a, b) ON DELETE SET DEFAULT (a))"#,
+        r#"ON DELETE SET DEFAULT ("a")"#
+    )]
+    fn postgres_frontend_retains_on_delete_column_lists(#[case] sql: &str, #[case] expected: &str) {
+        crate::ast::deparse::tests::assert_postgres_structure(sql);
+        let first = crate::parse_statements(sql, Dialect::postgres())
+            .next()
+            .expect("one statement")
+            .expect(sql)
+            .deparse_sql(Dialect::postgres())
+            .unwrap();
+        assert!(first.contains(expected), "{sql} => {first}");
+
+        let second = crate::parse_statements(&first, Dialect::postgres())
+            .next()
+            .expect("one statement after deparse")
+            .expect(&first)
+            .deparse_sql(Dialect::postgres())
+            .unwrap();
+        assert_eq!(first, second, "{sql} => {first}");
+    }
+
+    #[rstest::rstest]
+    #[case::cascade(Some(ForeignKeyAction::Cascade))]
+    #[case::missing_action(None)]
+    fn rejects_on_delete_column_lists_with_other_actions_as_invalid_syntax(
+        #[case] action: Option<ForeignKeyAction>,
+    ) {
+        let mut statement = crate::parse_statements(
+            "CREATE TABLE child (parent_id integer, FOREIGN KEY (parent_id) REFERENCES parent(id) ON DELETE SET DEFAULT (parent_id))",
+            Dialect::postgres(),
+        )
+        .next()
+        .unwrap()
+        .unwrap();
+        let crate::ast::StatementNode::Table(table) = &mut statement.node else {
+            panic!("table fixture");
+        };
+        let ColumnConstraint::ForeignKey(reference) = &mut table.constraints[0].constraint else {
+            panic!("foreign key fixture");
+        };
+        reference.delete_action = action;
+
+        let error = statement.deparse_sql(Dialect::postgres()).unwrap_err();
+        assert!(error.is_invalid_syntax(), "{error}");
+        assert_eq!(error.node(), "Table/ON DELETE column list", "{error}");
     }
 
     #[test]

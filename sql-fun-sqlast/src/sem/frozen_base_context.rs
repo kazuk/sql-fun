@@ -56,6 +56,10 @@ use std::sync::Arc;
 pub struct FrozenBaseContext(Arc<dyn BaseParseContext + Send + Sync>);
 
 impl FrozenBaseContext {
+    // Freezing ends analysis and seals its results together with the parameter
+    // evidence used to interpret them. This constructor must remain crate-private:
+    // exposing it would let external consumers wrap an analysis result with
+    // substituted metadata or arguments, breaking that sealed evidence.
     pub(crate) fn new<T>(context: T) -> Self
     where
         T: BaseParseContext + Send + Sync + 'static,

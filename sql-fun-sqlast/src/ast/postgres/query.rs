@@ -247,6 +247,13 @@ impl TryCollectFromWithTokens<syn::NodeListOpt> for Grouping {
                     syn::GroupingSetKind::GroupingSetSets => Self::Sets(content),
                     _ => return AnalysisError::raise_unexpected_input("grouping kind"),
                 }
+            } else if let Some(row) = node.as_row_expr().as_inner()
+                && matches!(
+                    row.get_row_format().as_inner(),
+                    Some(syn::CoercionForm::CoerceImplicitCast)
+                )
+            {
+                Self::Simple(Self::try_collect_from_with_tokens(row.get_args(), tokens)?)
             } else {
                 Self::Expression(Expr::try_from_with_tokens(&node, tokens)?)
             });
@@ -556,6 +563,7 @@ impl TryFromWithTokens<&syn::WindowDef> for Window {
         tokens: &IVec<crate::syn::ScanToken>,
     ) -> Result<Self, Self::Error> {
         Ok(Self {
+            reference_only: false,
             name: nonempty(value.get_name()),
             reference: nonempty(value.get_refname()),
             partition: Expr::try_collect_from_with_tokens(value.get_partition_clause(), tokens)?,

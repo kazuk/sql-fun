@@ -1,24 +1,38 @@
 use crate::StringSpan;
 use crate::ast::{Dialect, Statement, StatementNode};
 use crate::parse_statements::ParseStatementError;
-use crate::sqlite::SqliteDialect;
-
-use ::turso_parser::parser::Parser;
+use crate::sqlite::SqliteStatement;
+use crate::sqlite_parser::Parser;
+use crate::syn::sqlite::Cmd;
 
 pub(super) fn parse(
     sql: &str,
 ) -> impl Iterator<Item = Result<Statement, ParseStatementError>> + '_ {
     SqliteStatements {
-        parser: Parser::new(sql.as_bytes()),
-        input_len: sql.len(),
+        parser: Parser::with_type_spans(sql.as_bytes()),
+        input: sql,
         finished: false,
     }
 }
 
 struct SqliteStatements<'a> {
     parser: Parser<'a>,
-    input_len: usize,
+    input: &'a str,
     finished: bool,
+}
+
+impl SqliteStatements<'_> {
+    fn next_statement(&mut self) -> Result<Option<SqliteStatement>, ::turso_parser::error::Error> {
+        let start = self.parser.offset();
+        let Some(command) = self.parser.next().transpose()? else {
+            return Ok(None);
+        };
+        Ok(Some(SqliteStatement::new(
+            Cmd::from(command),
+            start,
+            self.parser.offset() - start,
+        )))
+    }
 }
 
 impl Iterator for SqliteStatements<'_> {
@@ -29,7 +43,7 @@ impl Iterator for SqliteStatements<'_> {
             return None;
         }
         let start = self.parser.offset();
-        let parsed = match SqliteDialect::next_statement(&mut self.parser) {
+        let parsed = match self.next_statement() {
             Ok(Some(statement)) => statement,
             Ok(None) => {
                 self.finished = true;
@@ -40,7 +54,7 @@ impl Iterator for SqliteStatements<'_> {
                 // Turso restores its cursor on a parser error. This span identifies
                 // the attempted input, not a fabricated location for the bad token.
                 let mut failure = ParseStatementError::boundary_discovery(
-                    StringSpan::new(start, self.input_len - start),
+                    StringSpan::new(start, self.input.len() - start),
                     &error.to_string(),
                 );
                 if let Some(label) =
@@ -51,6 +65,9 @@ impl Iterator for SqliteStatements<'_> {
                 return Some(Err(failure));
             }
         };
+        // Drain per-statement capture even if its common conversion fails or
+        // EXPLAIN is rejected, so following statements cannot inherit events.
+        let type_spans = self.parser.take_type_spans();
         let span = parsed.span();
         let Some(statement) = parsed.command().into_plain_statement() else {
             return Some(Err(ParseStatementError::unsupported(
@@ -60,7 +77,11 @@ impl Iterator for SqliteStatements<'_> {
         };
         Some(
             StatementNode::try_from(&statement)
-                .map(|node| Statement::from_node(node, Dialect::sqlite(), span))
+                .and_then(|node| {
+                    let mut statement = Statement::from_node(node, Dialect::sqlite(), span);
+                    statement.retain_sqlite_type_syntax(self.input, &type_spans)?;
+                    Ok(statement)
+                })
                 .map_err(|error| ParseStatementError::conversion(span, &error)),
         )
     }

@@ -64,6 +64,12 @@ impl AnalysisError {
         Err(Self::UnexpectedNone(String::from(message)))
     }
 
+    /// Construct a recoverable unexpected-input error without a test-only panic.
+    #[cfg(feature = "sqlite")]
+    pub(crate) fn unexpected_input_error(message: &str) -> Self {
+        Self::UnexpectedInput(message.to_owned())
+    }
+
     /// raise `UnexpectedInput` error
     #[track_caller]
     pub fn raise_unexpected_input<T>(message: &str) -> Result<T, Self> {

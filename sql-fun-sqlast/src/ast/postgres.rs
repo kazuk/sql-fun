@@ -3,11 +3,12 @@ mod query;
 
 use crate::ast::{
     Access, AlterOwner, AlterSequence, BooleanExpr, BooleanOperator, Call, CallKind, Case, CaseArm,
-    Cast, Collate, Comment, Delete, DropTable, EnumType, Expr, Extension, FromOpt, Indirection,
-    Insert, Literal, Name, NamedArgument, NullTest, OperatorExpr, OperatorKind, Order, Parameter,
-    Query, Role, Sequence, Slice, SqlValue, StatementNode, Subquery, SubqueryKind, SyntaxOption,
-    TruthTest, TryCollectFromWithTokens, TryFromWithTokens, TryFromWithTokensOpt, TypeName, Update,
-    VariableSet, View, ViewCheckOption, Window,
+    Cast, CastTarget, Collate, Comment, Delete, DomainConstraintTarget, DropTable, EnumType, Expr,
+    Extension, FromOpt, Indirection, Insert, Literal, Name, NamedArgument, NullTest,
+    ObjectArgument, ObjectTarget, OperatorExpr, OperatorKind, Order, Parameter, Query, Role,
+    Sequence, Slice, SqlValue, StatementNode, Subquery, SubqueryKind, SyntaxOption,
+    TransformTarget, TruthTest, TryCollectFromWithTokens, TryFromWithTokens, TryFromWithTokensOpt,
+    TypeName, Update, VariableSet, View, ViewCheckOption, Window,
 };
 use crate::sem::{CompositeFieldCollection, CompositeFieldDefinition};
 use crate::syn::{ListOpt, Opt};
@@ -49,6 +50,293 @@ impl From<&syn::RangeVar> for Name {
         }
         parts.push(value.get_relname());
         Self::from_parts(&parts)
+    }
+}
+
+impl ObjectTarget {
+    fn try_from_node(
+        object: &syn::Node,
+        tokens: &IVec<crate::syn::ScanToken>,
+    ) -> Result<Self, AnalysisError> {
+        if let Some(object) = object.as_object_with_args().as_inner() {
+            let name = Name::try_from(object.get_objname())?.0;
+            let argument_types = if object.get_args_unspecified() {
+                None
+            } else {
+                let function_arguments = object.get_objfuncargs().as_inner().unwrap_or_default();
+                let mut types = Vec::new();
+                if function_arguments.is_empty() {
+                    for argument in object.get_objargs().as_inner().unwrap_or_default() {
+                        types.push(ObjectArgument::try_from_node(&argument, tokens)?);
+                    }
+                } else {
+                    for argument in function_arguments {
+                        let argument = required(
+                            argument.as_function_parameter().as_inner(),
+                            "object_with_args.objfuncargs.function_parameter",
+                        )?;
+                        types.push(ObjectArgument::try_from_function_parameter(
+                            &argument, tokens,
+                        )?);
+                    }
+                }
+                Some(types)
+            };
+            Ok(Self::new(&name, argument_types.as_deref()))
+        } else if let Some(items) = object.as_list().get_items().map(|items| items.as_string()) {
+            let name: Vec<_> = items.iter().map(crate::syn::String::get_sval).collect();
+            Ok(Self::new(&name, None))
+        } else if let Some(item) = object.as_string().get_sval() {
+            Ok(Self::new(std::slice::from_ref(&item), None))
+        } else if let Some(item) = object.as_integer().get_ival() {
+            let name = item.to_string();
+            Ok(Self::new(std::slice::from_ref(&name), None))
+        } else if let Some(value) = object.as_a_const().as_inner() {
+            let Literal::Integer(value) = Literal::from(&value) else {
+                return AnalysisError::raise_unexpected_input("numeric database object target");
+            };
+            let name = value.to_string();
+            Ok(Self::new(std::slice::from_ref(&name), None))
+        } else if let Some(type_name) = object.as_type_name().as_inner() {
+            let type_name = TypeName::try_from_with_tokens(&type_name, tokens)?;
+            Ok(Self::with_type_name(&type_name))
+        } else {
+            AnalysisError::raise_unexpected_input("database object target")
+        }
+    }
+
+    fn try_from_cast_node(
+        object: &syn::Node,
+        tokens: &IVec<crate::syn::ScanToken>,
+    ) -> Result<Self, AnalysisError> {
+        let cast = CastTarget::try_from_node(object, tokens)?;
+        Ok(Self::with_cast(&cast))
+    }
+
+    fn try_from_domain_constraint_node(
+        object: &syn::Node,
+        tokens: &IVec<crate::syn::ScanToken>,
+    ) -> Result<Self, AnalysisError> {
+        let target = DomainConstraintTarget::try_from_node(object, tokens)?;
+        Ok(Self::with_domain_constraint(&target))
+    }
+
+    fn try_from_transform_node(
+        object: &syn::Node,
+        tokens: &IVec<crate::syn::ScanToken>,
+    ) -> Result<Self, AnalysisError> {
+        let target = TransformTarget::try_from_node(object, tokens)?;
+        Ok(Self::with_transform(&target))
+    }
+
+    fn new(name: &[String], argument_types: Option<&[ObjectArgument]>) -> Self {
+        Self {
+            name: name.to_vec(),
+            argument_types: argument_types.map(<[ObjectArgument]>::to_vec),
+            cast: None,
+            type_name: None,
+            domain_constraint: None,
+            transform: None,
+        }
+    }
+
+    fn with_type_name(type_name: &TypeName) -> Self {
+        Self {
+            name: type_name.name.0.clone(),
+            argument_types: None,
+            cast: None,
+            type_name: Some(type_name.clone()),
+            domain_constraint: None,
+            transform: None,
+        }
+    }
+
+    fn with_cast(cast: &CastTarget) -> Self {
+        Self {
+            name: Vec::new(),
+            argument_types: None,
+            cast: Some(cast.clone()),
+            type_name: None,
+            domain_constraint: None,
+            transform: None,
+        }
+    }
+
+    fn with_domain_constraint(domain_constraint: &DomainConstraintTarget) -> Self {
+        Self {
+            name: Vec::new(),
+            argument_types: None,
+            cast: None,
+            type_name: None,
+            domain_constraint: Some(domain_constraint.clone()),
+            transform: None,
+        }
+    }
+
+    fn with_transform(transform: &TransformTarget) -> Self {
+        Self {
+            name: Vec::new(),
+            argument_types: None,
+            cast: None,
+            type_name: None,
+            domain_constraint: None,
+            transform: Some(transform.clone()),
+        }
+    }
+}
+
+impl ObjectArgument {
+    fn try_from_node(
+        argument: &syn::Node,
+        tokens: &IVec<crate::syn::ScanToken>,
+    ) -> Result<Self, AnalysisError> {
+        let type_name = if argument.as_inner().is_none() {
+            None
+        } else if let Some(type_name) = argument.as_type_name().as_inner() {
+            Some(TypeName::try_from_with_tokens(&type_name, tokens)?)
+        } else if argument
+            .as_string()
+            .get_sval()
+            .is_some_and(|value| value.eq_ignore_ascii_case("none"))
+        {
+            None
+        } else {
+            return AnalysisError::raise_unexpected_input("object_with_args.objargs.type_name");
+        };
+        Ok(Self::new(None, None, type_name.as_ref()))
+    }
+
+    fn try_from_function_parameter(
+        argument: &syn::FunctionParameter,
+        tokens: &IVec<crate::syn::ScanToken>,
+    ) -> Result<Self, AnalysisError> {
+        let type_name = required(
+            argument.get_arg_type().as_inner(),
+            "object_with_args.objfuncargs.arg_type",
+        )?;
+        let mode = match argument.get_mode().as_inner() {
+            Some(crate::syn::FunctionParameterMode::FuncParamIn) => Some("IN"),
+            Some(crate::syn::FunctionParameterMode::FuncParamOut) => Some("OUT"),
+            Some(crate::syn::FunctionParameterMode::FuncParamInout) => Some("INOUT"),
+            Some(crate::syn::FunctionParameterMode::FuncParamVariadic) => Some("VARIADIC"),
+            _ => None,
+        }
+        .map(str::to_owned);
+        let name = argument.get_name();
+        let type_name = TypeName::try_from_with_tokens(&type_name, tokens)?;
+        Ok(Self::new(
+            mode.as_deref(),
+            if name.is_empty() {
+                None
+            } else {
+                Some(name.as_str())
+            },
+            Some(&type_name),
+        ))
+    }
+
+    fn new(mode: Option<&str>, name: Option<&str>, type_name: Option<&TypeName>) -> Self {
+        Self {
+            mode: mode.map(str::to_owned),
+            name: name.map(str::to_owned),
+            type_name: type_name.cloned(),
+        }
+    }
+}
+
+impl CastTarget {
+    fn try_from_node(
+        object: &syn::Node,
+        tokens: &IVec<crate::syn::ScanToken>,
+    ) -> Result<Self, AnalysisError> {
+        let Some(items) = object.as_list().get_items().as_inner() else {
+            return AnalysisError::raise_unexpected_input("COMMENT ON CAST target");
+        };
+        if items.len() != 2 {
+            return AnalysisError::raise_unexpected_input(
+                "COMMENT ON CAST source and target types",
+            );
+        }
+        let source = required(
+            items[0].as_type_name().as_inner(),
+            "comment_stmt.object.cast.source",
+        )?;
+        let target = required(
+            items[1].as_type_name().as_inner(),
+            "comment_stmt.object.cast.target",
+        )?;
+        let source = TypeName::try_from_with_tokens(&source, tokens)?;
+        let target = TypeName::try_from_with_tokens(&target, tokens)?;
+        Ok(Self::new(&source, &target))
+    }
+
+    fn new(source: &TypeName, target: &TypeName) -> Self {
+        Self {
+            source: source.clone(),
+            target: target.clone(),
+        }
+    }
+}
+
+impl DomainConstraintTarget {
+    fn try_from_node(
+        object: &syn::Node,
+        tokens: &IVec<crate::syn::ScanToken>,
+    ) -> Result<Self, AnalysisError> {
+        let Some(items) = object.as_list().get_items().as_inner() else {
+            return AnalysisError::raise_unexpected_input("COMMENT ON DOMAIN CONSTRAINT target");
+        };
+        if items.len() != 2 {
+            return AnalysisError::raise_unexpected_input("COMMENT ON DOMAIN CONSTRAINT target");
+        }
+        let domain = required(
+            items[0].as_type_name().as_inner(),
+            "comment_stmt.object.domain_constraint.domain",
+        )?;
+        let constraint = required(
+            items[1].as_string().get_sval(),
+            "comment_stmt.object.domain_constraint.constraint",
+        )?;
+        let domain = TypeName::try_from_with_tokens(&domain, tokens)?;
+        Ok(Self::new(&domain, &constraint))
+    }
+
+    fn new(domain: &TypeName, constraint: &str) -> Self {
+        Self {
+            domain: domain.clone(),
+            constraint: constraint.to_owned(),
+        }
+    }
+}
+
+impl TransformTarget {
+    fn try_from_node(
+        object: &syn::Node,
+        tokens: &IVec<crate::syn::ScanToken>,
+    ) -> Result<Self, AnalysisError> {
+        let Some(items) = object.as_list().get_items().as_inner() else {
+            return AnalysisError::raise_unexpected_input("COMMENT ON TRANSFORM target");
+        };
+        if items.len() != 2 {
+            return AnalysisError::raise_unexpected_input("COMMENT ON TRANSFORM target");
+        }
+        let type_name = required(
+            items[0].as_type_name().as_inner(),
+            "comment_stmt.object.transform.type_name",
+        )?;
+        let language = required(
+            items[1].as_string().get_sval(),
+            "comment_stmt.object.transform.language",
+        )?;
+        let type_name = TypeName::try_from_with_tokens(&type_name, tokens)?;
+        Ok(Self::new(&type_name, &language))
+    }
+
+    fn new(type_name: &TypeName, language: &str) -> Self {
+        Self {
+            type_name: type_name.clone(),
+            language: language.to_owned(),
+        }
     }
 }
 
@@ -102,7 +390,9 @@ impl TryFromWithTokens<&syn::Node> for StatementNode {
             return Ok(Self::view(View::try_from_with_tokens(&view, tokens)?));
         }
         if let Some(extension) = value.as_create_extension_stmt().as_inner() {
-            return Ok(Self::extension(Extension::from(&extension)));
+            return Ok(Self::extension(Extension::try_from_with_tokens(
+                &extension, tokens,
+            )?));
         }
         if let Some(variable_set) = value.as_variable_set_stmt().as_inner() {
             return Ok(Self::variable_set(VariableSet::try_from_with_tokens(
@@ -128,14 +418,19 @@ impl TryFromWithTokens<&syn::Node> for StatementNode {
             )?));
         }
         if let Some(comment) = value.as_comment_stmt().as_inner() {
-            return Ok(Self::comment(Comment::try_from(&comment)?));
+            return Ok(Self::comment(Comment::try_from_with_tokens(
+                &comment, tokens,
+            )?));
         }
         if let Some(alter_owner) = value.as_alter_owner_stmt().as_inner() {
-            return Ok(Self::alter_owner(AlterOwner::try_from(&alter_owner)?));
+            return Ok(Self::alter_owner(AlterOwner::try_from_with_tokens(
+                &alter_owner,
+                tokens,
+            )?));
         }
         if let Some(composite_type) = value.as_composite_type_stmt().as_inner() {
             return Ok(Self::composite_type(
-                crate::sem::CreateCompositeType::try_from(&composite_type)?,
+                crate::ast::CompositeType::try_from_with_tokens(&composite_type, tokens)?,
             ));
         }
         if let Some(create_table) = value.as_create_stmt().as_inner() {
@@ -235,23 +530,19 @@ impl TryFrom<&syn::CompositeTypeStmt> for crate::sem::CreateCompositeType {
     }
 }
 
-impl TryFrom<&syn::AlterOwnerStmt> for AlterOwner {
+impl TryFromWithTokens<&syn::AlterOwnerStmt> for AlterOwner {
     type Error = AnalysisError;
 
-    fn try_from(value: &syn::AlterOwnerStmt) -> Result<Self, Self::Error> {
+    fn try_from_with_tokens(
+        value: &syn::AlterOwnerStmt,
+        tokens: &IVec<crate::syn::ScanToken>,
+    ) -> Result<Self, Self::Error> {
         let relation = Name::from_opt(value.get_relation().as_inner().as_ref());
-        let object = if let Some(items) = value
+        let object = value
             .get_object()
-            .as_list()
-            .get_items()
-            .map(|items| items.as_string())
-        {
-            items.iter().map(crate::syn::String::get_sval).collect()
-        } else if let Some(item) = value.get_object().as_string().get_sval() {
-            vec![item]
-        } else {
-            Vec::new()
-        };
+            .as_inner()
+            .map(|object| ObjectTarget::try_from_node(&object, tokens))
+            .transpose()?;
         let owner = required(value.get_newowner().as_inner(), "alter_owner.newowner")?;
         Ok(Self::new(
             value
@@ -271,20 +562,24 @@ impl TryFrom<&syn::AlterOwnerStmt> for AlterOwner {
     }
 }
 
-impl TryFrom<&syn::CommentStmt> for Comment {
+impl TryFromWithTokens<&syn::CommentStmt> for Comment {
     type Error = AnalysisError;
 
-    fn try_from(value: &syn::CommentStmt) -> Result<Self, Self::Error> {
+    fn try_from_with_tokens(
+        value: &syn::CommentStmt,
+        tokens: &IVec<crate::syn::ScanToken>,
+    ) -> Result<Self, Self::Error> {
         let object_kind = required(value.get_objtype().as_inner(), "comment_stmt.objtype")?;
         let object = required(value.get_object().as_inner(), "comment_stmt.object")?;
-        let target =
-            if let Some(items) = object.as_list().get_items().map(|items| items.as_string()) {
-                items.iter().map(|item| item.get_sval()).collect()
-            } else if let Some(item) = object.as_string().get_sval() {
-                vec![item]
-            } else {
-                return AnalysisError::raise_unexpected_input("comment statement object");
-            };
+        let target = if matches!(object_kind, crate::syn::ObjectType::ObjectCast) {
+            ObjectTarget::try_from_cast_node(&object, tokens)?
+        } else if matches!(object_kind, crate::syn::ObjectType::ObjectDomconstraint) {
+            ObjectTarget::try_from_domain_constraint_node(&object, tokens)?
+        } else if matches!(object_kind, crate::syn::ObjectType::ObjectTransform) {
+            ObjectTarget::try_from_transform_node(&object, tokens)?
+        } else {
+            ObjectTarget::try_from_node(&object, tokens)?
+        };
         Ok(Self::new(
             target,
             crate::sem::ObjectKind::from(object_kind as u32),
@@ -392,16 +687,55 @@ impl TryFromWithTokens<&syn::VariableSetStmt> for VariableSet {
         value: &syn::VariableSetStmt,
         tokens: &IVec<crate::syn::ScanToken>,
     ) -> Result<Self, Self::Error> {
-        Ok(Self::new(
-            &value.get_name(),
-            Expr::try_collect_from_with_tokens(value.get_args(), tokens)?,
-        ))
+        let name = value.get_name();
+        let kind =
+            super::VariableSetKind::try_from(required(value.get_kind().as_inner(), "SET kind")?)?;
+        let transaction_modes = matches!(kind, super::VariableSetKind::Multi)
+            && (name.eq_ignore_ascii_case("transaction")
+                || name.eq_ignore_ascii_case("session characteristics"));
+        let arguments = if transaction_modes {
+            Vec::new()
+        } else {
+            Expr::try_collect_from_with_tokens(value.get_args(), tokens)?
+        };
+        let mut statement = Self::new(&name, arguments);
+        statement.kind = kind;
+        statement.is_local = value.get_is_local();
+        if transaction_modes {
+            statement.transaction_options = Some(SyntaxOption::try_collect_from_with_tokens(
+                value.get_args(),
+                tokens,
+            )?);
+        }
+        Ok(statement)
     }
 }
 
-impl From<&syn::CreateExtensionStmt> for Extension {
-    fn from(value: &syn::CreateExtensionStmt) -> Self {
-        Self::new(&value.get_extname())
+impl TryFromWithTokens<&syn::CreateExtensionStmt> for Extension {
+    type Error = AnalysisError;
+    fn try_from_with_tokens(
+        value: &syn::CreateExtensionStmt,
+        tokens: &IVec<syn::ScanToken>,
+    ) -> Result<Self, Self::Error> {
+        let mut statement = Self::new(&value.get_extname());
+        statement.if_not_exists = value.get_if_not_exists();
+        statement.options =
+            SyntaxOption::try_collect_from_with_tokens(value.get_options(), tokens)?;
+        Ok(statement)
+    }
+}
+impl TryFrom<syn::VariableSetKind> for super::VariableSetKind {
+    type Error = AnalysisError;
+    fn try_from(value: syn::VariableSetKind) -> Result<Self, Self::Error> {
+        Ok(match value {
+            syn::VariableSetKind::VarSetValue => Self::Value,
+            syn::VariableSetKind::VarSetDefault => Self::Default,
+            syn::VariableSetKind::VarSetCurrent => Self::Current,
+            syn::VariableSetKind::VarSetMulti => Self::Multi,
+            syn::VariableSetKind::VarReset => Self::Reset,
+            syn::VariableSetKind::VarResetAll => Self::ResetAll,
+            _ => return AnalysisError::raise_unexpected_input("SET kind"),
+        })
     }
 }
 
@@ -436,7 +770,7 @@ impl TryFromWithTokens<&syn::ViewStmt> for View {
             value.get_replace(),
             SyntaxOption::try_collect_from_with_tokens(value.get_options(), tokens)?,
             ViewCheckOption::from(value.get_with_check_option().as_inner()),
-            false,
+            view.get_relpersistence() == "t",
             false,
             false,
         ))
@@ -1170,6 +1504,9 @@ impl TryFromWithTokens<&syn::TypeName> for TypeName {
             array_bounds: bounds,
             set_of: value.get_setof(),
             percent_type: value.get_pct_type(),
+            sqlite_name_snapshot: None,
+            sqlite_parts: Vec::new(),
+            sqlite_modifiers: None,
             location: source_span(value.get_location(), tokens),
         })
     }
@@ -1245,6 +1582,10 @@ impl TryFromWithTokens<&syn::FuncCall> for Call {
         tokens: &IVec<crate::syn::ScanToken>,
     ) -> Result<Self, Self::Error> {
         Ok(Self {
+            sql_syntax: matches!(
+                value.get_funcformat().as_inner(),
+                Some(syn::CoercionForm::CoerceSqlSyntax)
+            ),
             name: Name::try_from(value.get_funcname())?,
             kind: CallKind::ordinary(),
             within_order: Vec::new(),
@@ -1268,6 +1609,7 @@ impl TryFromWithTokens<&syn::FuncCall> for Call {
 impl Call {
     fn special(name: &str, arguments: Vec<Expr>) -> Self {
         Self {
+            sql_syntax: false,
             kind: CallKind::special(name),
             name: Name::local(name),
             arguments,

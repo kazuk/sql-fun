@@ -11,6 +11,7 @@
 #![allow(dead_code)]
 
 mod ddl;
+mod deparse;
 mod document;
 mod mutation;
 mod postgres;
@@ -18,10 +19,13 @@ mod public;
 mod resolve;
 #[cfg(feature = "sqlite")]
 mod sqlite;
+#[cfg(feature = "sqlite")]
+mod sqlite_retention;
 #[cfg(test)]
 mod tests;
 mod validation;
 
+pub use self::deparse::DeparseError;
 pub use self::mutation::{AstMutationError, CteDefinition, HaveWithClause, WithClauseMut};
 pub use self::public::{CommonTableExpression, Statement, StatementKind, WithClause};
 
@@ -38,11 +42,68 @@ use self::document::{
 
 pub(crate) use self::document::{JsonTable, XmlTable};
 
-pub(crate) use self::ddl::{Domain, Function, FunctionParameter, Index, Schema, TableAs};
+pub(crate) use self::ddl::{
+    CompositeType, Domain, Function, FunctionParameter, Index, Schema, TableAs,
+};
 use crate::StringSpan;
+
+#[derive(Clone, Debug, Default)]
+pub(crate) struct TableExtras {
+    unlogged: bool,
+    inherits: Vec<Name>,
+    of_type: Option<TypeName>,
+    on_commit: Option<CommitAction>,
+    tablespace: Option<String>,
+    access_method: Option<String>,
+    partition_spec: Option<PartitionSpec>,
+    partition_bound: Option<PartitionBound>,
+}
+#[derive(Clone, Debug)]
+pub(crate) struct PartitionSpec {
+    strategy: String,
+    keys: Vec<IndexExpression>,
+}
+#[derive(Clone, Debug)]
+pub(crate) struct PartitionBound {
+    strategy: String,
+    is_default: bool,
+    modulus: i32,
+    remainder: i32,
+    list: Vec<Expr>,
+    lower: Vec<PartitionDatum>,
+    upper: Vec<PartitionDatum>,
+}
+#[derive(Clone, Debug)]
+pub(crate) enum PartitionDatum {
+    Min,
+    Max,
+    Value(Expr),
+}
+#[derive(Clone, Debug, Default)]
+pub(crate) struct ConstraintExtras {
+    deferrable: bool,
+    initially_deferred: bool,
+    skip_validation: bool,
+    no_inherit: bool,
+    nulls_not_distinct: bool,
+    include: Vec<String>,
+    options: Vec<SyntaxOption>,
+    index_name: Option<String>,
+    tablespace: Option<String>,
+    access_method: Option<String>,
+    predicate: Option<Expr>,
+    exclusions: Vec<ExclusionElement>,
+    delete_columns: Vec<String>,
+}
+#[derive(Clone, Debug)]
+pub(crate) struct ExclusionElement {
+    expression: IndexExpression,
+    operator: Name,
+}
 
 #[derive(Clone, Debug)]
 pub(crate) struct Table {
+    extras: TableExtras,
     name: Name,
     columns: Vec<Column>,
     constraints: Vec<TableConstraint>,
@@ -54,6 +115,9 @@ pub(crate) struct Table {
 
 #[derive(Clone, Debug)]
 pub(crate) struct Column {
+    collation: Name,
+    compression: Option<String>,
+    storage: Option<String>,
     name: String,
     type_name: Option<TypeName>,
     constraints: Vec<TableConstraint>,
@@ -62,6 +126,7 @@ pub(crate) struct Column {
 
 #[derive(Clone, Debug)]
 pub(crate) struct TableConstraint {
+    extras: ConstraintExtras,
     name: Option<String>,
     keys: Vec<String>,
     constraint: ColumnConstraint,
@@ -111,11 +176,15 @@ pub(crate) struct AlterRelation {
     kind: AlterRelationKind,
     commands: Vec<AlterCommand>,
     if_exists: bool,
+    only: bool,
 }
 
 #[derive(Clone, Copy, Debug)]
 pub(crate) enum AlterRelationKind {
     Table,
+    ForeignTable,
+    Index,
+    CompositeType,
     View,
     MaterializedView,
     Sequence,
@@ -123,6 +192,7 @@ pub(crate) enum AlterRelationKind {
 
 #[derive(Clone, Debug)]
 pub(crate) enum AlterCommand {
+    Postgres(Box<ddl::PostgresAlterCommand>),
     Owner(String),
     Default(String, Expr),
     Constraint(TableConstraint),
@@ -155,7 +225,7 @@ pub(crate) enum StatementNode {
     AlterSequence(AlterSequence),
     Comment(Comment),
     AlterOwner(AlterOwner),
-    CompositeType(crate::sem::CreateCompositeType),
+    CompositeType(CompositeType),
     Domain(Domain),
     Function(Function),
     Schema(Schema),
@@ -218,7 +288,7 @@ impl StatementNode {
         Self::AlterOwner(value)
     }
 
-    const fn composite_type(value: crate::sem::CreateCompositeType) -> Self {
+    const fn composite_type(value: CompositeType) -> Self {
         Self::CompositeType(value)
     }
 
@@ -311,9 +381,11 @@ impl StatementNode {
             Self::AlterOwner(_) => crate::sem::Resolution::new(catalog).finish(Ok(
                 crate::sem::SemAst::AlterOwner(crate::sem::AlterOwner::new()),
             )),
-            Self::CompositeType(composite_type) => crate::sem::Resolution::new(catalog).finish(Ok(
-                crate::sem::SemAst::CreateCompType(composite_type.clone()),
-            )),
+            Self::CompositeType(composite_type) => crate::sem::Resolution::new(catalog).finish(
+                composite_type
+                    .resolve()
+                    .map(crate::sem::SemAst::CreateCompType),
+            ),
             Self::AlterRelation(_) => crate::sem::Resolution::new(catalog).finish(
                 crate::sem::AnalysisError::raise_unexpected_input(
                     "statement requires catalog application",
@@ -365,13 +437,7 @@ impl StatementNode {
                 crate::sem::SemAst::AlterOwner(crate::sem::AlterOwner::new()),
                 context,
             )),
-            Self::CompositeType(composite_type) => {
-                let context = context.apply_create_comp_type(composite_type)?;
-                Ok(crate::AstAndContextPair::new(
-                    crate::sem::SemAst::CreateCompType(composite_type.clone()),
-                    context,
-                ))
-            }
+            Self::CompositeType(composite_type) => composite_type.resolve_and_apply(context),
             Self::AlterRelation(statement) => statement.resolve_and_apply(context, dialect),
             Self::Domain(domain) => domain.resolve_and_apply(context),
             Self::Function(function) => function.resolve_and_apply(context, dialect),
@@ -393,8 +459,45 @@ impl StatementNode {
 pub(crate) struct AlterOwner {
     object_kind: Option<crate::sem::ObjectKind>,
     relation: Option<Name>,
-    object: Vec<String>,
+    object: Option<ObjectTarget>,
     owner: Role,
+}
+
+/// A named database object, optionally identified by its argument type list.
+/// `None` distinguishes an unspecified signature from an explicitly empty `()`.
+#[derive(Clone, Debug)]
+pub(crate) struct ObjectTarget {
+    name: Vec<String>,
+    argument_types: Option<Vec<ObjectArgument>>,
+    cast: Option<CastTarget>,
+    type_name: Option<TypeName>,
+    domain_constraint: Option<DomainConstraintTarget>,
+    transform: Option<TransformTarget>,
+}
+
+#[derive(Clone, Debug)]
+pub(crate) struct CastTarget {
+    source: TypeName,
+    target: TypeName,
+}
+
+#[derive(Clone, Debug)]
+pub(crate) struct DomainConstraintTarget {
+    domain: TypeName,
+    constraint: String,
+}
+
+#[derive(Clone, Debug)]
+pub(crate) struct TransformTarget {
+    type_name: TypeName,
+    language: String,
+}
+
+#[derive(Clone, Debug)]
+pub(crate) struct ObjectArgument {
+    mode: Option<String>,
+    name: Option<String>,
+    type_name: Option<TypeName>,
 }
 
 #[derive(Clone, Debug)]
@@ -407,7 +510,7 @@ impl AlterOwner {
     const fn new(
         object_kind: Option<crate::sem::ObjectKind>,
         relation: Option<Name>,
-        object: Vec<String>,
+        object: Option<ObjectTarget>,
         owner: Role,
     ) -> Self {
         Self {
@@ -430,13 +533,13 @@ impl Role {
 
 #[derive(Clone, Debug)]
 pub(crate) struct Comment {
-    target: Vec<String>,
+    target: ObjectTarget,
     object_kind: crate::sem::ObjectKind,
     text: String,
 }
 
 impl Comment {
-    fn new(target: Vec<String>, object_kind: crate::sem::ObjectKind, text: &str) -> Self {
+    fn new(target: ObjectTarget, object_kind: crate::sem::ObjectKind, text: &str) -> Self {
         Self {
             target,
             object_kind,
@@ -451,13 +554,41 @@ impl Comment {
     where
         TContext: crate::sem::ParseContext,
     {
-        let comment =
-            crate::sem::Comment::new(&self.target.join("."), self.object_kind, &self.text);
+        let target = self.target.semantic_name();
+        let comment = crate::sem::Comment::new(&target, self.object_kind, &self.text);
         let context = context.apply_comment(&comment)?;
         Ok(crate::AstAndContextPair::new(
             crate::sem::SemAst::Comment(comment),
             context,
         ))
+    }
+}
+
+impl ObjectTarget {
+    fn semantic_name(&self) -> String {
+        if let Some(cast) = &self.cast {
+            format!(
+                "{} AS {}",
+                cast.source.name.0.join("."),
+                cast.target.name.0.join(".")
+            )
+        } else if let Some(type_name) = &self.type_name {
+            type_name.name.0.join(".")
+        } else if let Some(target) = &self.domain_constraint {
+            format!(
+                "{} ON DOMAIN {}",
+                target.constraint,
+                target.domain.name.0.join(".")
+            )
+        } else if let Some(target) = &self.transform {
+            format!(
+                "FOR {} LANGUAGE {}",
+                target.type_name.name.0.join("."),
+                target.language
+            )
+        } else {
+            self.name.join(".")
+        }
     }
 }
 
@@ -614,15 +745,31 @@ impl EnumType {
 
 #[derive(Clone, Debug)]
 pub(crate) struct VariableSet {
+    kind: VariableSetKind,
+    is_local: bool,
     name: String,
     arguments: Vec<Expr>,
+    transaction_options: Option<Vec<SyntaxOption>>,
+}
+
+#[derive(Clone, Copy, Debug)]
+pub(crate) enum VariableSetKind {
+    Value,
+    Default,
+    Current,
+    Multi,
+    Reset,
+    ResetAll,
 }
 
 impl VariableSet {
     fn new(name: &str, arguments: Vec<Expr>) -> Self {
         Self {
+            kind: VariableSetKind::Value,
+            is_local: false,
             name: name.to_owned(),
             arguments,
+            transaction_options: None,
         }
     }
 
@@ -657,12 +804,16 @@ impl VariableSet {
 
 #[derive(Clone, Debug)]
 pub(crate) struct Extension {
+    if_not_exists: bool,
+    options: Vec<SyntaxOption>,
     name: String,
 }
 
 impl Extension {
     fn new(name: &str) -> Self {
         Self {
+            if_not_exists: false,
+            options: Vec::new(),
             name: name.to_owned(),
         }
     }
@@ -875,7 +1026,7 @@ impl From<&::sql_fun_core::SqlFunMetadata> for Dialect {
     }
 }
 
-#[derive(Clone, Debug, Default)]
+#[derive(Clone, Debug, Default, Eq, PartialEq)]
 pub(crate) struct Name(Vec<String>);
 
 impl Name {
@@ -895,7 +1046,39 @@ pub(crate) struct TypeName {
     array_bounds: Vec<Option<i32>>,
     set_of: bool,
     percent_type: bool,
+    sqlite_name_snapshot: Option<Name>,
+    sqlite_parts: Vec<SqliteTypeNamePart>,
+    sqlite_modifiers: Option<SqliteTypeModifiers>,
     location: Option<StringSpan>,
+}
+
+#[derive(Clone, Debug)]
+pub(crate) struct SqliteTypeNamePart {
+    name: String,
+    quote: Option<char>,
+    leading_trivia: Vec<SqliteTypeNameTrivia>,
+    trailing_trivia: Vec<SqliteTypeNameTrivia>,
+}
+
+#[derive(Clone, Debug)]
+pub(crate) struct SqliteTypeModifiers {
+    values: Vec<SqliteTypeModifier>,
+    ast_spellings: Vec<String>,
+    trailing_trivia: Vec<SqliteTypeNameTrivia>,
+}
+
+#[derive(Clone, Debug)]
+pub(crate) struct SqliteTypeModifier {
+    leading_trivia: Vec<SqliteTypeNameTrivia>,
+    spelling: String,
+    trailing_trivia: Vec<SqliteTypeNameTrivia>,
+}
+
+#[derive(Clone, Debug)]
+pub(crate) enum SqliteTypeNameTrivia {
+    Whitespace(String),
+    BlockComment(String),
+    LineComment(String),
 }
 
 #[derive(Clone, Debug)]
@@ -939,6 +1122,18 @@ pub(crate) enum Expr {
     Grouping(Vec<Self>),
     CurrentOf(CurrentOf),
     MergeAction,
+}
+
+impl Literal {
+    const fn null() -> Self {
+        Self::Null
+    }
+}
+
+impl Expr {
+    pub(in crate::ast) const fn null() -> Self {
+        Self::Literal(Literal::null())
+    }
 }
 
 #[derive(Clone, Debug)]
@@ -1032,6 +1227,7 @@ pub(crate) struct Collate {
 
 #[derive(Clone, Debug)]
 pub(crate) struct Call {
+    sql_syntax: bool,
     kind: CallKind,
     name: Name,
     arguments: Vec<Expr>,
@@ -1450,6 +1646,7 @@ pub(crate) struct TableSample {
 
 #[derive(Clone, Debug)]
 pub(crate) struct Window {
+    reference_only: bool,
     name: Option<String>,
     reference: Option<String>,
     partition: Vec<Expr>,

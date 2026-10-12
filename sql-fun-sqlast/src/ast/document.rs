@@ -1,3 +1,5 @@
+mod deparse;
+
 #[path = "postgres/document.rs"]
 mod postgres;
 #[path = "resolve/document.rs"]
@@ -409,4 +411,40 @@ pub(crate) struct MergeWhen {
     condition: Option<Expr>,
     target_list: Vec<Assignment>,
     values: Vec<Expr>,
+}
+
+impl Expr {
+    pub(in crate::ast) fn multi_assignment_data(&self) -> Option<(&Self, i32, i32)> {
+        self.document_multi_assignment()
+    }
+    fn document_multi_assignment(&self) -> Option<(&Self, i32, i32)> {
+        match self {
+            Self::Document(document) => document.multi_assignment_data(),
+            _ => None,
+        }
+    }
+
+    #[cfg(feature = "sqlite")]
+    pub(in crate::ast) fn multi_assignment_data_mut(&mut self) -> Option<(&mut Self, i32, i32)> {
+        match self {
+            Self::Document(document) => document.multi_assignment_data_mut(),
+            _ => None,
+        }
+    }
+}
+impl DocumentExpr {
+    fn multi_assignment_data(&self) -> Option<(&Expr, i32, i32)> {
+        match self {
+            Self::MultiAssignment(value) => Some((&value.source, value.colno, value.ncolumns)),
+            _ => None,
+        }
+    }
+
+    #[cfg(feature = "sqlite")]
+    pub(in crate::ast) fn multi_assignment_data_mut(&mut self) -> Option<(&mut Expr, i32, i32)> {
+        match self {
+            Self::MultiAssignment(value) => Some((&mut value.source, value.colno, value.ncolumns)),
+            _ => None,
+        }
+    }
 }

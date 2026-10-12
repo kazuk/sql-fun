@@ -1,5 +1,8 @@
 //! Owned DDL syntax. Catalog bindings are obtained only during resolution.
 
+#[path = "deparse/ddl.rs"]
+mod sql_emission;
+
 use crate::{
     AstAndContextPair, StringSpan,
     sem::{
@@ -89,6 +92,10 @@ impl super::AlterRelationKind {
         }
     }
 
+    pub(super) const fn supports_only(self) -> bool {
+        matches!(self, Self::Table | Self::ForeignTable)
+    }
+
     fn resolve(
         self,
         context: &mut Resolution<'_>,
@@ -102,6 +109,7 @@ impl super::AlterRelationKind {
             Self::View => Self::resolve_view(context, name, syntax_commands, false),
             Self::MaterializedView => Self::resolve_view(context, name, syntax_commands, true),
             Self::Sequence => Self::resolve_sequence(context, name, syntax_commands),
+            Self::ForeignTable | Self::Index | Self::CompositeType => todo!(),
         }
     }
 
@@ -182,6 +190,7 @@ impl super::AlterCommand {
     }
     fn resolve_owner(&self) -> crate::sem::AlterObjSubCommand {
         match self {
+            Self::Postgres(command) => command.resolve_owner(),
             Self::Owner(owner) => crate::sem::AlterObjSubCommand::change_owner(owner),
             _ => todo!(),
         }
@@ -220,6 +229,7 @@ impl super::AlterCommand {
         table: &crate::sem::TableName,
     ) -> Result<crate::sem::AlterObjSubCommand, AnalysisError> {
         match self {
+            Self::Postgres(command) => command.resolve(context, dialect, table),
             Self::Owner(_) => Ok(self.resolve_owner()),
             Self::Default(name, expr) => Self::resolve_default(context, dialect, table, name, expr),
             Self::Constraint(constraint) => Self::resolve_constraint(context, table, constraint),
@@ -342,6 +352,308 @@ impl super::AlterCommand {
         let name = ColumnName::from(name);
         Self::missing_column(context, table, &name)?;
         Ok(AlterObjSubCommand::drop_column(&name))
+    }
+}
+
+#[derive(Clone, Debug)]
+pub(crate) struct PostgresAlterCommand {
+    operation: AlterOperation,
+    name: String,
+    number: i32,
+    definition: AlterDefinition,
+    missing_ok: bool,
+    cascade: bool,
+    legacy: Option<Box<super::AlterCommand>>,
+}
+
+#[derive(Clone, Copy, Debug)]
+pub(crate) enum AlterOperation {
+    AddColumn,
+    ColumnDefault,
+    DropNotNull,
+    SetNotNull,
+    SetExpression,
+    DropExpression,
+    SetStatistics,
+    SetOptions,
+    ResetOptions,
+    SetStorage,
+    SetCompression,
+    DropColumn,
+    AddConstraint,
+    AlterConstraint,
+    ValidateConstraint,
+    DropConstraint,
+    AlterColumnType,
+    AlterColumnGenericOptions,
+    Owner,
+    Cluster,
+    DropCluster,
+    SetLogged,
+    SetUnlogged,
+    DropOids,
+    SetAccessMethod,
+    SetTablespace,
+    SetRelOptions,
+    ResetRelOptions,
+    EnableTrigger,
+    EnableAlwaysTrigger,
+    EnableReplicaTrigger,
+    DisableTrigger,
+    EnableTriggerAll,
+    DisableTriggerAll,
+    EnableTriggerUser,
+    DisableTriggerUser,
+    EnableRule,
+    EnableAlwaysRule,
+    EnableReplicaRule,
+    DisableRule,
+    AddInherit,
+    DropInherit,
+    AddOf,
+    DropOf,
+    ReplicaIdentity,
+    EnableRowSecurity,
+    DisableRowSecurity,
+    ForceRowSecurity,
+    NoForceRowSecurity,
+    GenericOptions,
+    AttachPartition,
+    DetachPartition,
+    DetachPartitionFinalize,
+    AddIdentity,
+    SetIdentity,
+    DropIdentity,
+}
+
+#[derive(Clone, Debug)]
+pub(crate) enum AlterDefinition {
+    None,
+    Expression(Expr),
+    Text(String),
+    Options(Vec<SyntaxOption>),
+    GenericOptions(Vec<GenericOption>),
+    Column(super::Column),
+    ColumnType(AlterColumnType),
+    Constraint(super::TableConstraint),
+    ConstraintFlags(AlterConstraintFlags),
+    Role(super::Role),
+    Relation(Name),
+    Type(TypeName),
+    Replica(ReplicaIdentity),
+    Partition(AlterPartition),
+    Identity(AlterIdentity),
+}
+
+impl AlterDefinition {
+    pub(super) const fn none() -> Self {
+        Self::None
+    }
+
+    pub(super) const fn expression(value: Expr) -> Self {
+        Self::Expression(value)
+    }
+
+    pub(super) fn text(value: &str) -> Self {
+        Self::Text(value.to_owned())
+    }
+
+    pub(super) const fn options(values: Vec<SyntaxOption>) -> Self {
+        Self::Options(values)
+    }
+
+    pub(super) const fn generic_options(values: Vec<GenericOption>) -> Self {
+        Self::GenericOptions(values)
+    }
+
+    pub(super) const fn column(value: super::Column) -> Self {
+        Self::Column(value)
+    }
+
+    pub(super) const fn column_type(value: AlterColumnType) -> Self {
+        Self::ColumnType(value)
+    }
+
+    pub(super) const fn constraint(value: super::TableConstraint) -> Self {
+        Self::Constraint(value)
+    }
+
+    pub(super) const fn constraint_flags(value: AlterConstraintFlags) -> Self {
+        Self::ConstraintFlags(value)
+    }
+
+    pub(super) const fn role(value: super::Role) -> Self {
+        Self::Role(value)
+    }
+
+    pub(super) const fn relation(value: Name) -> Self {
+        Self::Relation(value)
+    }
+
+    pub(super) const fn type_name(value: TypeName) -> Self {
+        Self::Type(value)
+    }
+
+    pub(super) const fn replica(value: ReplicaIdentity) -> Self {
+        Self::Replica(value)
+    }
+
+    pub(super) const fn partition(value: AlterPartition) -> Self {
+        Self::Partition(value)
+    }
+
+    pub(super) const fn identity(value: AlterIdentity) -> Self {
+        Self::Identity(value)
+    }
+}
+
+#[derive(Clone, Debug)]
+pub(crate) struct AlterColumnType {
+    type_name: TypeName,
+    collation: Option<Name>,
+    using: Option<Expr>,
+}
+#[derive(Clone, Debug)]
+pub(crate) struct AlterConstraintFlags {
+    name: String,
+    deferrable: bool,
+    initially_deferred: bool,
+}
+#[derive(Clone, Debug)]
+pub(crate) struct GenericOption {
+    action: GenericAction,
+    name: String,
+    value: Option<String>,
+}
+#[derive(Clone, Copy, Debug)]
+pub(crate) enum GenericAction {
+    Unspecified,
+    Add,
+    Set,
+    Drop,
+}
+#[derive(Clone, Debug)]
+pub(crate) struct ReplicaIdentity {
+    kind: String,
+    index: String,
+}
+#[derive(Clone, Debug)]
+pub(crate) struct AlterPartition {
+    relation: Name,
+    bound: Option<super::PartitionBound>,
+    concurrent: bool,
+}
+#[derive(Clone, Debug)]
+pub(crate) struct AlterIdentity {
+    mode: String,
+    options: Vec<SyntaxOption>,
+}
+
+impl PostgresAlterCommand {
+    pub(super) fn new(
+        operation: AlterOperation,
+        name: &str,
+        number: i32,
+        definition: &AlterDefinition,
+        missing_ok: bool,
+        cascade: bool,
+        legacy: Option<&super::AlterCommand>,
+    ) -> Self {
+        Self {
+            operation,
+            name: name.to_owned(),
+            number,
+            definition: definition.clone(),
+            missing_ok,
+            cascade,
+            legacy: legacy.cloned().map(Box::new),
+        }
+    }
+    fn resolve_owner(&self) -> crate::sem::AlterObjSubCommand {
+        if let Some(legacy) = &self.legacy {
+            legacy.resolve_owner()
+        } else {
+            todo!()
+        }
+    }
+    fn resolve(
+        &self,
+        context: &mut Resolution<'_>,
+        dialect: Dialect,
+        table: &crate::sem::TableName,
+    ) -> Result<crate::sem::AlterObjSubCommand, AnalysisError> {
+        if let Some(legacy) = &self.legacy {
+            legacy.resolve(context, dialect, table)
+        } else {
+            todo!()
+        }
+    }
+}
+
+impl AlterColumnType {
+    pub(super) fn new(
+        type_name: &TypeName,
+        collation: Option<&Name>,
+        using: Option<&Expr>,
+    ) -> Self {
+        Self {
+            type_name: type_name.clone(),
+            collation: collation.cloned(),
+            using: using.cloned(),
+        }
+    }
+}
+impl AlterConstraintFlags {
+    pub(super) fn new(name: &str, deferrable: bool, initially_deferred: bool) -> Self {
+        Self {
+            name: name.to_owned(),
+            deferrable,
+            initially_deferred,
+        }
+    }
+}
+impl GenericOption {
+    pub(super) fn new(action: GenericAction, name: &str, value: Option<&str>) -> Self {
+        Self {
+            action,
+            name: name.to_owned(),
+            value: value.map(str::to_owned),
+        }
+    }
+}
+impl ReplicaIdentity {
+    pub(super) fn new(kind: &str, index: &str) -> Self {
+        Self {
+            kind: kind.to_owned(),
+            index: index.to_owned(),
+        }
+    }
+}
+impl AlterPartition {
+    pub(super) fn new(
+        relation: &Name,
+        bound: Option<&super::PartitionBound>,
+        concurrent: bool,
+    ) -> Self {
+        Self {
+            relation: relation.clone(),
+            bound: bound.cloned(),
+            concurrent,
+        }
+    }
+}
+impl AlterIdentity {
+    pub(super) fn new(mode: &str, options: &[SyntaxOption]) -> Self {
+        Self {
+            mode: mode.to_owned(),
+            options: options.to_vec(),
+        }
+    }
+}
+
+impl super::AlterCommand {
+    pub(super) fn postgres(command: PostgresAlterCommand) -> Self {
+        Self::Postgres(Box::new(command))
     }
 }
 
@@ -744,6 +1056,7 @@ pub(crate) struct TableAs {
     query: super::Query,
     materialized: bool,
     if_not_exists: bool,
+    skip_data: bool,
 }
 
 impl TableAs {
@@ -758,7 +1071,13 @@ impl TableAs {
             query,
             materialized,
             if_not_exists,
+            skip_data: false,
         }
+    }
+
+    pub(super) const fn with_skip_data(mut self, skip_data: bool) -> Self {
+        self.skip_data = skip_data;
+        self
     }
 
     pub(crate) fn resolve_and_apply<TContext: ParseContext>(
@@ -809,6 +1128,10 @@ pub(crate) struct Index {
     predicate: Option<Expr>,
     options: Vec<SyntaxOption>,
     access_method: String,
+    concurrent: bool,
+    if_not_exists: bool,
+    nulls_not_distinct: bool,
+    tablespace: String,
 }
 
 impl Index {
@@ -832,7 +1155,25 @@ impl Index {
             predicate,
             options,
             access_method: access_method.to_owned(),
+            concurrent: false,
+            if_not_exists: false,
+            nulls_not_distinct: false,
+            tablespace: String::new(),
         }
+    }
+
+    pub(super) fn with_syntax_options(
+        mut self,
+        concurrent: bool,
+        if_not_exists: bool,
+        nulls_not_distinct: bool,
+        tablespace: &str,
+    ) -> Self {
+        self.concurrent = concurrent;
+        self.if_not_exists = if_not_exists;
+        self.nulls_not_distinct = nulls_not_distinct;
+        self.tablespace = tablespace.to_owned();
+        self
     }
 
     pub(crate) fn resolve_elements(
@@ -916,6 +1257,7 @@ pub(crate) struct Schema {
     name: String,
     elements: Vec<StatementNode>,
     if_not_exists: bool,
+    authorization: Option<super::Role>,
 }
 
 impl Schema {
@@ -924,7 +1266,13 @@ impl Schema {
             name: name.to_owned(),
             elements,
             if_not_exists,
+            authorization: None,
         }
+    }
+
+    pub(super) fn with_authorization(mut self, authorization: Option<super::Role>) -> Self {
+        self.authorization = authorization;
+        self
     }
 
     pub(crate) fn resolve_and_apply<TContext: ParseContext>(
@@ -952,9 +1300,55 @@ pub(crate) struct Function {
     name: Name,
     parameters: Vec<FunctionParameter>,
     result_type: Option<TypeName>,
-    options: Vec<SyntaxOption>,
+    options: Vec<FunctionOption>,
     replace: bool,
     procedure: bool,
+    body: Option<FunctionBody>,
+}
+
+#[derive(Clone, Debug)]
+pub(crate) enum FunctionOption {
+    Body(Vec<String>),
+    Language(String),
+    Transform(Vec<TypeName>),
+    Window,
+    Volatility(String),
+    Leakproof(bool),
+    Strict(bool),
+    SecurityDefiner(bool),
+    Parallel(String),
+    Cost(Expr),
+    Rows(Expr),
+    Support(Name),
+    Setting(super::VariableSet),
+}
+
+impl FunctionOption {
+    const fn is_strict(&self) -> bool {
+        matches!(self, Self::Strict(true))
+    }
+}
+
+#[derive(Clone, Debug)]
+pub(crate) enum FunctionBody {
+    Return(Expr),
+    Atomic(Vec<FunctionBodyStatement>),
+}
+
+#[derive(Clone, Debug)]
+pub(crate) enum FunctionBodyStatement {
+    Return(Expr),
+    Statement(Box<StatementNode>),
+}
+
+impl FunctionBodyStatement {
+    pub(super) const fn return_expression(expression: Expr) -> Self {
+        Self::Return(expression)
+    }
+
+    pub(super) fn statement(statement: StatementNode) -> Self {
+        Self::Statement(Box::new(statement))
+    }
 }
 
 #[derive(Clone, Debug)]
@@ -1047,7 +1441,7 @@ impl Function {
         name: Name,
         parameters: Vec<FunctionParameter>,
         result_type: Option<TypeName>,
-        options: Vec<SyntaxOption>,
+        options: Vec<FunctionOption>,
         replace: bool,
         procedure: bool,
     ) -> Self {
@@ -1058,7 +1452,13 @@ impl Function {
             options,
             replace,
             procedure,
+            body: None,
         }
+    }
+
+    pub(super) fn with_body(mut self, body: Option<FunctionBody>) -> Self {
+        self.body = body;
+        self
     }
 
     pub(super) fn resolve(
@@ -1130,7 +1530,7 @@ impl Function {
             .get_type(&ret_name)
             .and_then(|ty| ty.type_reference())
             .cloned();
-        let strict = self.options.iter().any(|option| option.name == "strict");
+        let strict = self.options.iter().any(FunctionOption::is_strict);
         let overload = OverloadVariant::new(&ret_type, &params, strict, false);
         Ok(CreateFunction::new(
             &name,
@@ -1153,6 +1553,39 @@ impl Function {
     }
 }
 
+#[cfg(test)]
+mod test_function_null_input_semantics {
+    use super::Function;
+    use crate::ast::{Dialect, TryFromWithTokens};
+    use crate::syn::Opt;
+    use crate::test_helpers::{SynBuilder, TestParseContext};
+    use sql_fun_core::IVec;
+
+    #[rstest::rstest]
+    #[case::called_on_null("CALLED ON NULL INPUT", false)]
+    #[case::returns_null("RETURNS NULL ON NULL INPUT", true)]
+    #[case::strict("STRICT", true)]
+    fn honors_the_explicit_null_input_choice(#[case] option: &str, #[case] expected: bool) {
+        let syntax = SynBuilder::new().parse(&format!(
+            "CREATE FUNCTION f() RETURNS integer LANGUAGE sql {option} AS 'SELECT 1'"
+        ));
+        let function = Function::try_from_with_tokens(
+            &syntax.as_create_function_stmt().as_inner().unwrap(),
+            &IVec::default(),
+        )
+        .unwrap();
+        let mut context = TestParseContext::default();
+        let resolved = function
+            .resolve(&context, Dialect::postgres())
+            .report(&mut context)
+            .unwrap();
+        assert_eq!(
+            expected,
+            resolved.overloads().get_at(0).unwrap().is_strict()
+        );
+    }
+}
+
 #[derive(Clone, Debug)]
 pub(crate) struct Domain {
     name: Name,
@@ -1160,6 +1593,77 @@ pub(crate) struct Domain {
     base_span: StringSpan,
     constraints: Vec<super::TableConstraint>,
     collation: Name,
+}
+
+#[derive(Clone, Debug)]
+pub(crate) struct CompositeType {
+    name: Name,
+    fields: Vec<CompositeField>,
+}
+
+#[derive(Clone, Debug)]
+pub(crate) struct CompositeField {
+    name: String,
+    type_name: TypeName,
+    collation: Option<Name>,
+    is_not_null: bool,
+}
+
+impl CompositeType {
+    pub(super) fn new(name: &Name, fields: &[CompositeField]) -> Self {
+        Self {
+            name: name.clone(),
+            fields: fields.to_vec(),
+        }
+    }
+
+    pub(super) fn resolve(&self) -> Result<crate::sem::CreateCompositeType, AnalysisError> {
+        let mut fields = crate::sem::CompositeFieldCollection::default();
+        for field in &self.fields {
+            fields.push(field.resolve()?);
+        }
+        Ok(crate::sem::CreateCompositeType::new(
+            &self.name.full_name()?,
+            &fields,
+        ))
+    }
+
+    pub(super) fn resolve_and_apply<TContext: ParseContext>(
+        &self,
+        context: TContext,
+    ) -> Result<AstAndContextPair<TContext>, AnalysisError> {
+        let composite = self.resolve()?;
+        let context = context.apply_create_comp_type(&composite)?;
+        Ok(AstAndContextPair::new(
+            SemAst::CreateCompType(composite),
+            context,
+        ))
+    }
+}
+
+impl CompositeField {
+    pub(super) fn new(
+        name: &str,
+        type_name: &TypeName,
+        collation: Option<&Name>,
+        is_not_null: bool,
+    ) -> Self {
+        Self {
+            name: name.to_owned(),
+            type_name: type_name.clone(),
+            collation: collation.cloned(),
+            is_not_null,
+        }
+    }
+
+    fn resolve(&self) -> Result<crate::sem::CompositeFieldDefinition, AnalysisError> {
+        let type_ref = TypeReference::concrete_type_ref(&self.type_name.name.full_name()?, false);
+        Ok(crate::sem::CompositeFieldDefinition::new(
+            &self.name,
+            &Some(type_ref),
+            &Some(self.is_not_null),
+        ))
+    }
 }
 
 impl Domain {

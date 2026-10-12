@@ -3097,10 +3097,12 @@ dependencies = [
  "derive-getters",
  "derive_builder",
  "itertools 0.15.0",
+ "memchr",
  "miette",
  "owo-colors",
  "pg_query",
  "rstest",
+ "rusqlite",
  "serde",
  "serde_json",
  "sql-fun-core",
@@ -3110,6 +3112,7 @@ dependencies = [
  "thiserror 2.0.21",
  "tracing",
  "tracing-subscriber",
+ "turso_macros",
  "turso_parser",
 ]
 

@@ -20,6 +20,8 @@ mod schema_dump_file;
 mod sql_file;
 #[cfg(feature = "sqlite")]
 mod sqlite;
+#[cfg(feature = "sqlite")]
+mod sqlite_parser;
 mod trie_map;
 
 use miette::LabeledSpan;

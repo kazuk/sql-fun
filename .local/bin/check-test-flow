@@ -202,7 +202,7 @@ function run_sqlast_feature_boundaries() {
   run_check -p sql-fun-sqlast --all-targets --no-default-features
   run_check -p sql-fun-sqlast --all-targets --no-default-features --features sqlite
   run_check -p sql-fun-sqlast --all-targets --no-default-features --features turso_parser
-  run_check -p sql-fun-sqlast --all-targets --features turso-type-syntax-workaround
+  run_check -p sql-fun-sqlast --all-targets --features workaround_turso_9791
 }
 
 function run_workspace() {

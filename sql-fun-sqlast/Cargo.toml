@@ -11,9 +11,9 @@ readme = "README.md"
 rust-version.workspace = true
 
 [features]
-default = ["turso-type-syntax-workaround"]
+default = ["workaround_turso_9791"]
 # Temporary SQLite type fidelity repair; does not enable SQLite by itself.
-turso-type-syntax-workaround = []
+workaround_turso_9791 = []
 syn_serde = []
 sqlite = ["turso_parser", "sql-fun-core/sqlite"]
 turso_parser = ["dep:turso_parser", "dep:turso_macros", "dep:memchr"]

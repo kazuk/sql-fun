@@ -8,7 +8,7 @@ fn replace_once(source: &mut String, before: &str, after: &str) {
 
 fn main() {
     if env::var_os("CARGO_FEATURE_SQLITE").is_none()
-        || env::var_os("CARGO_FEATURE_TURSO_TYPE_SYNTAX_WORKAROUND").is_none()
+        || env::var_os("CARGO_FEATURE_WORKAROUND_TURSO_9791").is_none()
     {
         return;
     }

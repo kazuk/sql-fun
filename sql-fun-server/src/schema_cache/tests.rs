@@ -307,7 +307,7 @@ async fn removed_file_does_not_change_an_already_read_snapshot() {
             .get_table(&table)
             .is_some()
     );
-    assert!(service.load_layer(&root, &path).await.is_err());
+    assert!(service.load_layer(&root, &path, None).await.is_err());
 }
 
 #[tokio::test]
@@ -432,4 +432,47 @@ async fn changed_observation_does_not_join_older_pending_extension() {
     );
     release.send(()).unwrap();
     older.await.unwrap();
+}
+
+#[tokio::test]
+async fn expected_hash_selects_historical_schema_after_dump_changes_or_deletion() {
+    let project = SchemaProject::new();
+    let service = project.service();
+    let dump = project.schema("dump.sql", "CREATE TABLE original (id int4);");
+    let alias = project.alias("selected.sql", &dump);
+    let original_hash = SchemaProject::hash(&dump);
+    let original = project.selection("products", &[], &alias, &original_hash);
+    let first = service.initialize(&original).await.unwrap();
+    project.schema("dump.sql", "CREATE TABLE revised (id int4);");
+    service.hashes.invalidate(&dump.canonicalize().unwrap());
+    let revised_hash = SchemaProject::hash(&dump);
+    let revised = project.selection("products", &[], &alias, &revised_hash);
+    let second = service.initialize(&revised).await.unwrap();
+    assert_ne!(first.key(), second.key());
+    std::fs::remove_file(&dump).unwrap();
+    let old = service.initialize(&original).await.unwrap();
+    let new = service.initialize(&revised).await.unwrap();
+    assert!(std::ptr::eq(first.analysis(), old.analysis()));
+    assert!(std::ptr::eq(second.analysis(), new.analysis()));
+    assert_eq!(old.actual_hash(), original_hash);
+    assert_eq!(new.actual_hash(), revised_hash);
+    let table = TableName::from(FullName::with_schema("public", "original"));
+    assert!(old.base_context().get_table(&table).is_some());
+    assert!(new.base_context().get_table(&table).is_none());
+}
+
+#[tokio::test]
+async fn expected_hash_retains_deterministic_error_after_dump_repair() {
+    let project = SchemaProject::new();
+    let service = project.service();
+    let dump = project.schema("dump.sql", "CREATE TABLE broken (id");
+    let failed_hash = SchemaProject::hash(&dump);
+    let failed = project.selection("products", &[], &dump, &failed_hash);
+    let original_error = service.initialize(&failed).await.err().unwrap().to_string();
+    project.schema("dump.sql", "CREATE TABLE repaired (id int4);");
+    std::fs::remove_file(&dump).unwrap();
+    assert_eq!(
+        service.initialize(&failed).await.err().unwrap().to_string(),
+        original_error
+    );
 }

@@ -89,11 +89,21 @@ A late path hash population cannot restore data invalidated while reading.
 Temporary snapshots are dropped after lookup or analysis; their text is not
 retained in the schema cache.
 
-Expected-hash validation is separate from caching. Cache hits still validate
-that request's expected hash. If a client expects A and a load reads X, retain
-X and return a mismatch before successful initialization. Retry expecting X
-reuses the retained success or deterministic failure. A mismatch is never a
-negative schema-cache entry.
+`expected_hash` first selects a retained content-addressed application layer for
+that parent schema and canonical dump identity. A hit supplies the historical
+success or deterministic failure without reading the current dump. Changing or
+deleting the dump does not prevent reuse. Previously resolved absolute input
+paths retain their canonical identities for this lookup; watcher invalidation
+clears path-hash hints, never these identities or content-addressed analyses.
+New aliases must first be resolved to their canonical identity.
+
+On a miss, read and analyze the current snapshot. Publish its actual-content
+outcome before comparing the request hash. If the client expects A and the
+snapshot contains X, retain X and return a mismatch; retry expecting X reuses
+that outcome. Mismatch errors are never negative schema-cache entries. A changed
+parent (builtin SQL, extension order/contents, or root configuration) is a
+different hierarchical identity and does not select an old parent's analysis.
+Historical entries remain in memory only for the service lifetime.
 
 ## Panic policy and validation
 

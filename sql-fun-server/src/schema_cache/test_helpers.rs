@@ -60,6 +60,11 @@ connector = 'orders-connector'
         std::fs::write(&path, sql).unwrap();
         path
     }
+    pub(super) fn alias(&self, name: &str, target: &Path) -> PathBuf {
+        let alias = self.home().join(name);
+        std::os::unix::fs::symlink(target, &alias).unwrap();
+        alias
+    }
     pub(super) fn selection(
         &self,
         datasource: &str,

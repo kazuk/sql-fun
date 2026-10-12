@@ -138,6 +138,10 @@ impl PostgresArgs {
         Ok(())
     }
 
+    pub(super) const fn search_path_is_explicit(&self) -> bool {
+        self.postgres_search_path.is_some()
+    }
+
     /// get `PostgreSQL` search path
     #[allow(clippy::unnecessary_wraps)]
     pub fn postgres_search_path(

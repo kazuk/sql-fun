@@ -34,7 +34,7 @@ mod test_helpers {
         path: &Path,
         base: &FrozenBaseContext,
     ) -> Result<ParsedSchemaDump, ParseDumpFileError> {
-        PostgresDialect::parse_schema_file(path, base)
+        PostgresDialect::parse_schema_file(path, base, &mut None)
     }
 
     #[cfg(feature = "sqlite")]
@@ -42,7 +42,7 @@ mod test_helpers {
         path: &Path,
         base: &FrozenBaseContext,
     ) -> Result<ParsedSchemaDump, ParseDumpFileError> {
-        SqliteDialect::parse_schema_file(path, base)
+        SqliteDialect::parse_schema_file(path, base, &mut None)
     }
 
     pub(super) fn selected_frozen_base(

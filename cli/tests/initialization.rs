@@ -155,6 +155,7 @@ impl InitializedProject {
         let builtins = PostgresDialect::parse_schema_file(
             &self.home().join(format!("postgres/{version}/schema.sql")),
             &::sql_fun_sqlast::sem::FrozenBaseContext::from(context),
+            &mut None,
         )
         .unwrap();
         let pg_class = TableName::from(FullName::with_schema("pg_catalog", "pg_class"));
@@ -163,7 +164,8 @@ impl InitializedProject {
         let sql =
             "CREATE TABLE hoge (id int PRIMARY KEY); SELECT abs(id) + 1 AS next_id FROM hoge;";
         std::fs::write(&user, sql).unwrap();
-        let parsed = PostgresDialect::parse_schema_file(&user, builtins.base_context()).unwrap();
+        let parsed =
+            PostgresDialect::parse_schema_file(&user, builtins.base_context(), &mut None).unwrap();
         assert!(
             parsed
                 .get_table(&TableName::from(FullName::with_schema("public", "hoge")))

@@ -31,8 +31,11 @@ fn loads_builtin_and_user_schemas() -> Result<(), Box<dyn std::error::Error>> {
                 .expect("selected test metadata"),
         )?;
         let schema = home.join(format!("postgres/{version}/schema.sql"));
-        let builtins =
-            PostgresDialect::parse_schema_file(&schema, &FrozenBaseContext::from(context))?;
+        let builtins = PostgresDialect::parse_schema_file(
+            &schema,
+            &FrozenBaseContext::from(context),
+            &mut None,
+        )?;
         let pg_class = TableName::from(FullName::with_schema("pg_catalog", "pg_class"));
         assert!(
             builtins.get_table(&pg_class).is_some(),
@@ -43,8 +46,11 @@ fn loads_builtin_and_user_schemas() -> Result<(), Box<dyn std::error::Error>> {
             user_schema.path(),
             "CREATE TABLE hoge (id int PRIMARY KEY); SELECT abs(id) + 1 AS next_id FROM hoge;",
         )?;
-        let parsed =
-            PostgresDialect::parse_schema_file(user_schema.path(), builtins.base_context())?;
+        let parsed = PostgresDialect::parse_schema_file(
+            user_schema.path(),
+            builtins.base_context(),
+            &mut None,
+        )?;
         let user_table = TableName::from(FullName::with_schema("public", "hoge"));
         assert!(
             parsed.get_table(&user_table).is_some(),

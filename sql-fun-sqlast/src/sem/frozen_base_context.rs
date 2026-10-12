@@ -54,7 +54,10 @@ use std::sync::Arc;
 pub struct FrozenBaseContext(Arc<dyn BaseParseContext + Send + Sync>);
 
 impl FrozenBaseContext {
-    pub(crate) fn new<T>(context: T) -> Self
+    /// Freeze a caller-owned read view without exposing or mutating its catalog.
+    ///
+    /// Consumers can overlay request metadata while sharing immutable schema reads.
+    pub fn new<T>(context: T) -> Self
     where
         T: BaseParseContext + Send + Sync + 'static,
     {

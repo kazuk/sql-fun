@@ -13,7 +13,9 @@ working with SQL and `sql-fun` easier.
 2. Make sure the PostgreSQL submodule is available if your change needs it.
 3. Install `direnv` or an equivalent tool that can load [`.envrc`](.envrc)
    files.
-4. Install Docker CLI access.
+4. Install Docker CLI access. For interactive development-builder sessions, also
+   install the host Docker Compose plugin as described in
+   [the builder instructions](ci/github-actions/README.md#postgresql-development-oracles).
 5. Enable the repository environment.
 6. Make the Rust toolchain required by the workspace available.
 

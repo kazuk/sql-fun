@@ -30,6 +30,11 @@ characters of the asset digest without its `sha256:` prefix. The Dockerfile
 consumes these inputs and does not discover tool versions. A published image's
 immutable digest remains the downstream reproducibility boundary.
 
+Interactive `check` sessions additionally require the host Docker Compose plugin
+with `up --wait --wait-timeout` support. See [the builder instructions](README.md#postgresql-development-oracles)
+for installation, oracle endpoints, and session cleanup. Image-only builds using
+`--build-only` do not require Compose.
+
 ## Reviewing published versions
 
 The local check and both image workflows resolve the latest stable official

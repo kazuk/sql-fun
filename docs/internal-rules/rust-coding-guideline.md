@@ -93,6 +93,15 @@ use ::url::Url;
 
 ```
 
+### Module file paths
+
+- Follow Rust's default module file resolution conventions. Place module files
+  where a plain `mod name;` declaration resolves them without an explicit path.
+- Do not add `#[path = "name.rs"]` when Rust already resolves that file by
+  default. This applies to test modules as well as production modules.
+- Use `#[path]` only when a deliberately non-standard module location is
+  required; do not use it merely to restate the default path.
+
 ### Test placement
 
 - Place tests

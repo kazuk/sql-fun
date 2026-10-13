@@ -1,9 +1,10 @@
 //! Semantic coverage for immutable schema layers and independent descendants.
 
 use self::test_helpers::{
-    EXTENSION_A, EXTENSION_B, assert_missing_domain_base, assert_primary_key, assert_query_type,
-    assert_table_exists, assert_type_exists, builtin_root, chain_prefix, dependent_dump,
-    extension_sources, heavy, load_layer, load_schema, parent_with_same_named_tables, query,
+    EXTENSION_A, EXTENSION_B, assert_missing_domain_base, assert_missing_relation,
+    assert_primary_key, assert_query_type, assert_table_exists, assert_type_exists, builtin_root,
+    chain_prefix, dependent_dump, extension_sources, heavy, load_layer, load_schema,
+    parent_with_same_named_tables, query,
 };
 
 use ::sql_fun_sqlast::sem::{
@@ -37,12 +38,46 @@ fn runtime_file_chain_resolves_each_dump_from_its_ordered_prefix(
     Ok(())
 }
 
+#[rstest::rstest]
+#[case::unqualified("SELECT id FROM missing.items")]
+#[case::qualified("SELECT m.id FROM missing.items AS m")]
+fn missing_from_relation_reports_a_recoverable_problem(
+    #[case] query: &str,
+) -> Result<(), Box<dyn std::error::Error>> {
+    let root = builtin_root()?;
+    let parsed = load_schema(
+        &root,
+        &format!("CREATE VIEW public.missing_view AS {query};"),
+    )?;
+
+    assert_missing_relation(parsed.problems(), "missing.items");
+    Ok(())
+}
+
+#[test]
+fn dependent_view_keeps_missing_relation_problem_after_provider_is_loaded()
+-> Result<(), Box<dyn std::error::Error>> {
+    let root = builtin_root()?;
+    let dependent = load_schema(
+        &root,
+        "CREATE VIEW public.missing_view AS SELECT id FROM missing.items;",
+    )?;
+    assert_missing_relation(dependent.problems(), "missing.items");
+
+    let provider = load_schema(
+        dependent.base_context(),
+        "CREATE SCHEMA missing; CREATE TABLE missing.items (id integer);",
+    )?;
+    assert!(provider.problems().is_empty());
+    assert_table_exists(&provider, "missing.items");
+    assert_missing_relation(dependent.problems(), "missing.items");
+    Ok(())
+}
+
 #[test]
 fn dependent_file_reports_named_missing_domain_base_before_its_provider()
 -> Result<(), Box<dyn std::error::Error>> {
     let prefix = builtin_root()?;
-    // Reversing all of B also reaches the existing missing-FROM-source TODO.
-    // This dependency isolates the supported recoverable domain-base contract.
     let dependent = load_schema(
         &prefix,
         "CREATE SCHEMA b; CREATE DOMAIN b.state_alias AS a.state;",
@@ -645,6 +680,14 @@ mod test_helpers {
                 problem.domain_type_name() == &domain_name && problem.base_type_name() == base,
             _ => false,
         }));
+    }
+
+    pub(super) fn assert_missing_relation(problems: &[AnalysisProblem], relation: &str) {
+        assert!(problems.iter().any(|problem| matches!(
+            problem,
+            AnalysisProblem::NameResolution(NameResolution::RelationNotFound(name))
+                if name == relation
+        )));
     }
 
     pub(super) fn load_layer(

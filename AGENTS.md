@@ -207,6 +207,11 @@ directly:
 - Do not rebase merely because the target branch has advanced.
 - Distinguish pending checks and required reviews from merge conflicts
   and an unmet up-to-date branch requirement.
+- CI workflows here commonly take more than 10 minutes. While waiting, check
+  GitHub Actions status no more often than once every 5 minutes, unless an
+  immediate result is expected or a specific event requires verification.
+  Prefer waiting for workflow completion over repeatedly querying individual
+  jobs.
 - Before reporting a PR as ready to merge, verify mergeability and required
   CI results for the current PR head.
 

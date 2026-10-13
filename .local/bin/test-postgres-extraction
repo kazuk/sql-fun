@@ -96,6 +96,9 @@ def validate_interactive_init(binary, destination, fixture, declarations, ambien
         wait_for("sql-fun home directory (SQL_FUN_HOME)?")
         assert b"Choose engines" not in rendered(), "home choice must appear first"
         os.write(master, b"\r")  # Explicitly accept the SQL_FUN_HOME suggestion.
+        wait_for(f"Use {home}")
+        assert not home.exists(), "home must not be created before path confirmation"
+        os.write(master, b"y\r")  # Confirm the resolved absolute home path.
         wait_for("Space to select, Enter to confirm.")
         wait_for("[ ] postgres")
         wait_for("[ ] sqlite")

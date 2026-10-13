@@ -5,6 +5,13 @@ use crate::{ExtensionConfigError, HighlighterThemeError, MetadataError, args::Co
 /// Error definition for [`crate::SqlFunArgs`]
 #[derive(Debug, thiserror::Error)]
 pub enum SqlFunArgsError {
+    /// An explicit sql-fun home path was empty.
+    #[error("sql-fun home path must not be empty")]
+    EmptyHomePath,
+
+    /// The working directory needed for a relative home path was unavailable.
+    #[error("cannot resolve relative sql-fun home: current working directory unavailable: {0}")]
+    CurrentDirectoryUnavailable(#[source] std::io::Error),
     /// Not supported value
     #[error("{1} not supported for {0}")]
     NotSupported(String, String),
@@ -21,8 +28,10 @@ pub enum SqlFunArgsError {
     #[error("Unexpected error: {0}")]
     Unexpected(String),
 
-    /// HOME environment variable not defined
-    #[error("HOME environment variable not defined")]
+    /// The user home directory is unavailable or is not absolute.
+    #[error(
+        "user home directory unavailable; set HOME to an absolute path or supply an absolute sql-fun home path"
+    )]
     UserHomeNotDefined(),
 
     /// Environment variable access error
@@ -75,14 +84,30 @@ impl From<std::io::Error> for SqlFunArgsError {
 }
 
 impl SqlFunArgsError {
-    /// `std::env::home_dir` returns None
+    /// Reject an empty explicit home path.
+    ///
+    /// # Errors
+    /// Always returns [`Self::EmptyHomePath`].
+    #[track_caller]
+    pub const fn empty_home_path<T>() -> Result<T, Self> {
+        Err(Self::EmptyHomePath)
+    }
+
+    /// Report that the working directory required by a relative path is unavailable.
+    #[track_caller]
+    #[must_use]
+    pub const fn current_directory_unavailable(error: std::io::Error) -> Self {
+        Self::CurrentDirectoryUnavailable(error)
+    }
+
+    /// `std::env::home_dir` does not provide an absolute path.
     ///
     /// # Errors
     ///
     /// Always returns [`SqlFunArgsError::UserHomeNotDefined`].
     #[track_caller]
     pub fn user_home_not_defined<T>() -> Result<T, Self> {
-        log::error!("std::env::home_dir returns none");
+        log::error!("std::env::home_dir did not provide an absolute path");
         Err(Self::UserHomeNotDefined())
     }
 

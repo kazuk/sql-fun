@@ -22,6 +22,8 @@ pub struct InitializeArgs {
     /// Path to the sql-fun home directory.
     ///
     /// This is where catalogs, extensions, and configuration files are stored.
+    /// Accepts absolute paths, paths relative to the current working directory,
+    /// and paths beginning with ~/.
     /// If omitted, ask interactively. `SQL_FUN_HOME` supplies a suggested candidate;
     /// if it is unset, suggest ~/.sql-fun. The user must explicitly confirm the path.
     ///

@@ -26,6 +26,12 @@ Do not combine `--engines` with `--datasource`.
 You also choose the sql-fun home directory. The interactive prompt suggests
 `~/.sql-fun` or the configured common home; accepting the suggestion is an
 explicit choice. Use `init --sql-fun-home <path>` to supply the choice directly.
+The prompt, `--sql-fun-home`, and `SQL_FUN_HOME` accept absolute paths, paths
+relative to the command's current working directory (such as `./work`), and
+paths beginning with `~/` (such as `~/work`). Interactive setup shows the
+resolved absolute path for confirmation before using or creating that directory.
+Declining returns to path editing. A supplied `--sql-fun-home` skips this
+confirmation under `--yes`; `SQL_FUN_HOME` alone does not satisfy `--yes`.
 Application schemas and migrations remain managed by your own tools.
 
 ## Automatic setup

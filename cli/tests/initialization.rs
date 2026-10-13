@@ -266,6 +266,80 @@ fn environment_home_is_not_consent_to_noninteractive_setup() {
 }
 
 #[test]
+fn noninteractive_relative_home_uses_command_working_directory() {
+    let project = InitializedProject::new();
+    let result = project
+        .command()
+        .args([
+            "init",
+            "--yes",
+            "--engines",
+            "sqlite",
+            "--sql-fun-home",
+            "./relative-home",
+        ])
+        .output()
+        .unwrap();
+    let home = project.directory.path().join("relative-home");
+    assert!(
+        result.status.success(),
+        "{}",
+        String::from_utf8_lossy(&result.stderr)
+    );
+    assert!(home.is_dir());
+    assert!(
+        String::from_utf8_lossy(&result.stderr).contains(&format!("Created {}", home.display()))
+    );
+    let marker = home.join("marker");
+    std::fs::write(&marker, "keep").unwrap();
+    let rerun = project
+        .command()
+        .args([
+            "init",
+            "--yes",
+            "--engines",
+            "sqlite",
+            "--sql-fun-home",
+            "./relative-home",
+        ])
+        .output()
+        .unwrap();
+    assert!(rerun.status.success());
+    assert!(
+        String::from_utf8_lossy(&rerun.stderr).contains(&format!("Reusing {}", home.display()))
+    );
+    assert_eq!(std::fs::read_to_string(&marker).unwrap(), "keep");
+}
+
+#[test]
+fn noninteractive_home_relative_option_expands_home_directory() {
+    let project = InitializedProject::new();
+    let result = project
+        .command()
+        .env("HOME", project.directory.path())
+        .args([
+            "init",
+            "--yes",
+            "--engines",
+            "sqlite",
+            "--sql-fun-home",
+            "~/expanded-home",
+        ])
+        .output()
+        .unwrap();
+    let home = project.directory.path().join("expanded-home");
+    assert!(
+        result.status.success(),
+        "{}",
+        String::from_utf8_lossy(&result.stderr)
+    );
+    assert!(home.is_dir());
+    assert!(
+        String::from_utf8_lossy(&result.stderr).contains(&format!("Created {}", home.display()))
+    );
+}
+
+#[test]
 fn explicit_version_is_validated_without_a_project() {
     let project = InitializedProject::new();
     project.install_fixture("17");

@@ -19,7 +19,8 @@ fn path_owner<P: AsRef<Path>>(path: P) -> Result<u32, std::io::Error> {
 )]
 #[builder(build_fn(error = "SqlFunArgsBuilderError"))]
 pub struct MetadataArgs {
-    /// `home_dir`
+    /// sql-fun home path. Accepts absolute paths, working-directory-relative
+    /// paths, and paths beginning with `~/` from the option or `SQL_FUN_HOME`.
     #[clap(long, env = Self::SQL_FUN_HOME)]
     #[builder(setter(into, strip_option), default)]
     sql_fun_home: Option<PathBuf>,
@@ -193,6 +194,7 @@ impl MetadataArgs {
 
 #[cfg(test)]
 mod test_apply_envs {
+    use std::path::Path;
     use testresult::TestResult;
 
     use super::{MetadataArgs, SqlFunArgsBuilder};
@@ -242,6 +244,22 @@ mod test_apply_envs {
     }
 
     #[test]
+    fn home_relative_environment_value_resolves_from_home_directory() -> TestResult {
+        let envs = TestMetadataEnvs::new()
+            .with_sql_fun_home(Path::new("~/work"))
+            .into_map();
+        let mut builder = SqlFunArgsBuilder::default();
+        MetadataArgs::apply_envs(&mut builder, &envs)?;
+        let args = builder.build()?;
+
+        assert_eq!(
+            args.initialization_home()?,
+            std::env::home_dir().unwrap().join("work")
+        );
+        Ok(())
+    }
+
+    #[test]
     fn rejects_unsupported_sql_dialect_env_value() {
         let envs = TestMetadataEnvs::new().with_sql_dialect("mysql").into_map();
 
@@ -259,7 +277,8 @@ mod test_apply_envs {
 impl MetadataArgs {
     /// get home dir path
     ///
-    /// If `--sql-fun-home` or `SQL_FUN_HOME` env present : configured value
+    /// If `--sql-fun-home` or `SQL_FUN_HOME` env present: the configured value,
+    /// resolved from the working directory or user's home when relative.
     /// Else returns `${HOME}/.sql-fun`
     ///
     /// # Errors
@@ -280,16 +299,14 @@ impl MetadataArgs {
 
     pub(crate) fn initialization_home(&self) -> Result<PathBuf, SqlFunArgsError> {
         if let Some(path) = &self.sql_fun_home {
-            if path.is_absolute() {
-                Ok(path.clone())
-            } else {
-                Ok(std::env::current_dir()?.join(path))
-            }
-        } else if let Some(home) = std::env::home_dir() {
-            Ok(home.join(".sql-fun"))
+            super::resolve_sql_fun_home_path(path)
         } else {
-            SqlFunArgsError::user_home_not_defined()
+            super::resolve_sql_fun_home_path(Path::new("~/.sql-fun"))
         }
+    }
+
+    pub(crate) fn initialization_home_candidate(&self) -> Option<&Path> {
+        self.sql_fun_home.as_deref()
     }
 }
 

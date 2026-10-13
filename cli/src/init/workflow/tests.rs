@@ -68,20 +68,17 @@ impl Scenario {
 }
 
 #[test]
-fn rejects_existing_cli_path_that_is_a_file() {
+fn existing_cli_file_returns_to_editor() {
     let file = tempfile::NamedTempFile::new().unwrap();
     let mut scenario = Scenario::with_home(file.path(), false);
     scenario.accept_install();
-    assert_eq!(scenario.state(), &State::failed());
-    assert!(
-        scenario
-            .context
-            .finish()
-            .unwrap_err()
-            .to_string()
-            .contains("directory")
-    );
-    assert_eq!(scenario.request(), None);
+    assert_eq!(scenario.state(), &State::edit_home());
+    assert!(matches!(
+        scenario.context.notices.last(),
+        Some(super::Notice::InvalidHome(
+            super::HomePathError::NotDirectory(_)
+        ))
+    ));
 }
 
 #[test]
@@ -138,11 +135,11 @@ fn missing_cli_home_requires_confirmation_then_creates_parents() {
     let home = root.path().join("parent/home");
     let mut scenario = Scenario::with_home(&home, false);
     scenario.accept_install();
-    assert_eq!(scenario.state(), &State::confirm_create());
+    assert_eq!(scenario.state(), &State::confirm_home());
     assert_eq!(
         scenario.request(),
         Some(Request::Prompt(super::PromptRequest::confirm(
-            format!(include_str!("../confirm_create.txt"), path = home.display()).trim_end()
+            format!(include_str!("../confirm_home.txt"), path = home.display()).trim_end()
         ),))
     );
     assert!(!home.exists());
@@ -210,6 +207,8 @@ fn an_existing_file_is_rejected_then_an_edited_directory_is_created() {
     // An existing file is rejected without a filesystem write.
     assert!(scenario.context.error.is_none());
     scenario.answer(PromptResponse::text(new_home.to_str().unwrap()));
+    assert_eq!(scenario.state(), &State::confirm_home());
+    scenario.answer(PromptResponse::confirm(true));
     assert_eq!(scenario.state(), &State::create_edited_home());
     scenario.advance();
 
@@ -220,23 +219,22 @@ fn an_existing_file_is_rejected_then_an_edited_directory_is_created() {
 }
 
 #[test]
-fn editor_rejects_relative_paths_and_missing_parents() {
-    let root = tempfile::tempdir().unwrap();
+fn editor_accepts_relative_paths_and_rejects_missing_parents() {
+    let root = tempfile::tempdir_in(".").unwrap();
     let mut scenario = Scenario::new(&[]);
     scenario.accept_install();
-    scenario.answer(PromptResponse::text("relative/home"));
-    assert_eq!(scenario.state(), &State::edit_home());
-    assert!(matches!(
-        scenario.context.notices.last(),
-        Some(super::Notice::InvalidHome(
-            super::HomePathError::NotAbsolute
-        ))
-    ));
+    scenario.answer(PromptResponse::text(root.path().to_str().unwrap()));
+    assert_eq!(scenario.state(), &State::confirm_home());
+    assert_eq!(
+        scenario.context.home,
+        std::path::absolute(root.path()).unwrap()
+    );
+    scenario.answer(PromptResponse::confirm(false));
     let missing = root.path().join("missing/home");
     scenario.answer(PromptResponse::text(missing.to_str().unwrap()));
     assert_eq!(scenario.state(), &State::edit_home());
     assert!(
-        matches!(scenario.context.notices.last(), Some(super::Notice::InvalidHome(super::HomePathError::ParentNotFound(parent))) if parent == missing.parent().unwrap())
+        matches!(scenario.context.notices.last(), Some(super::Notice::InvalidHome(super::HomePathError::ParentNotFound(parent))) if parent == &std::path::absolute(missing.parent().unwrap()).unwrap())
     );
     assert!(!missing.exists());
     assert_eq!(
@@ -257,9 +255,92 @@ fn editor_accepts_existing_directory() {
     let mut scenario = Scenario::new(&[]);
     scenario.accept_install();
     scenario.answer(PromptResponse::text(root.path().to_str().unwrap()));
+    assert_eq!(scenario.state(), &State::confirm_home());
+    scenario.answer(PromptResponse::confirm(true));
     scenario.advance();
     assert_eq!(scenario.state(), &State::home_prepared());
     assert_eq!(scenario.context.home, root.path());
+}
+
+#[test]
+fn editor_rejects_a_file_as_parent_before_confirmation() {
+    let file = tempfile::NamedTempFile::new().unwrap();
+    let mut scenario = Scenario::new(&[]);
+    scenario.accept_install();
+    scenario.answer(PromptResponse::text(
+        file.path().join("home").to_str().unwrap(),
+    ));
+    assert_eq!(scenario.state(), &State::edit_home());
+    assert!(matches!(
+        scenario.context.notices.last(),
+        Some(super::Notice::InvalidHome(super::HomePathError::NotDirectory(path)))
+            if path == file.path()
+    ));
+}
+
+#[test]
+fn editor_expands_home_relative_path_and_confirms_absolute_path() {
+    let mut scenario = Scenario::new(&[]);
+    scenario.accept_install();
+    scenario.answer(PromptResponse::text("~/sql-fun-issue-345"));
+    let home = std::env::home_dir().unwrap().join("sql-fun-issue-345");
+    assert_eq!(scenario.state(), &State::confirm_home());
+    assert_eq!(scenario.context.home, home);
+    assert_eq!(
+        scenario.request(),
+        Some(Request::Prompt(super::PromptRequest::confirm(
+            format!(include_str!("../confirm_home.txt"), path = home.display()).trim_end()
+        )))
+    );
+    scenario.answer(PromptResponse::confirm(false));
+    assert_eq!(scenario.state(), &State::edit_home());
+    assert!(!scenario.context.notices.iter().any(|notice| matches!(
+        notice,
+        super::Notice::HomeCreated(_) | super::Notice::HomeExists(_)
+    )));
+}
+
+#[test]
+fn cli_home_relative_path_is_resolved_before_confirmation() {
+    let mut scenario = Scenario::with_home(Path::new("~/sql-fun-issue-345"), false);
+    scenario.accept_install();
+    assert_eq!(scenario.state(), &State::confirm_home());
+    assert_eq!(
+        scenario.context.home,
+        std::env::home_dir().unwrap().join("sql-fun-issue-345")
+    );
+}
+
+#[test]
+fn environment_candidate_is_editable_and_resolved_on_entry() {
+    let mut scenario = Scenario::new(&[]);
+    scenario.context.set_home(Path::new("~/sql-fun-issue-345"));
+    scenario.accept_install();
+    assert_eq!(scenario.state(), &State::edit_home());
+    assert_eq!(scenario.context.default_home, "~/sql-fun-issue-345");
+    scenario.answer(PromptResponse::text("~/sql-fun-issue-345"));
+    assert_eq!(scenario.state(), &State::confirm_home());
+    assert_eq!(
+        scenario.context.home,
+        std::env::home_dir().unwrap().join("sql-fun-issue-345")
+    );
+}
+
+#[test]
+fn existing_directory_is_reused_without_losing_contents() {
+    let root = tempfile::tempdir().unwrap();
+    let marker = root.path().join("marker");
+    std::fs::write(&marker, "preserve").unwrap();
+    let mut scenario = Scenario::with_home(root.path(), false);
+    scenario.accept_install();
+    assert_eq!(scenario.state(), &State::confirm_home());
+    scenario.answer(PromptResponse::confirm(true));
+    scenario.advance();
+    assert_eq!(scenario.state(), &State::home_prepared());
+    assert!(
+        matches!(scenario.context.notices.last(), Some(super::Notice::HomeExists(path)) if path == root.path())
+    );
+    assert_eq!(std::fs::read_to_string(&marker).unwrap(), "preserve");
 }
 
 #[test]
@@ -273,7 +354,10 @@ fn cli_still_accepts_relative_paths() {
     let mut scenario = Scenario::with_home(relative, true);
     scenario.run_automatic();
     assert_eq!(scenario.state(), &State::home_prepared());
-    assert_eq!(scenario.context.home, relative);
+    assert_eq!(
+        scenario.context.home,
+        std::env::current_dir().unwrap().join(relative)
+    );
 }
 
 #[test]

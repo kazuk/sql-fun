@@ -1,4 +1,5 @@
 mod error;
+mod home_path;
 mod impl_metadata;
 mod impl_sql_fun_home;
 mod init_args;
@@ -16,6 +17,7 @@ use clap::Parser;
 
 pub use self::{
     error::SqlFunArgsError,
+    home_path::resolve_sql_fun_home_path,
     init_args::InitializeArgs,
     log_args::{LoggingArgs, LoggingArgsBuilder},
     metadata_args::{MetadataArgs, MetadataArgsBuilder},
@@ -270,6 +272,12 @@ impl SqlFunArgs {
     /// Returns an error when the current directory or user home cannot be resolved.
     pub fn initialization_home(&self) -> Result<PathBuf, SqlFunArgsError> {
         self.metadata_args.initialization_home()
+    }
+
+    /// Return the configured home path without selecting or resolving it.
+    #[must_use]
+    pub fn initialization_home_candidate(&self) -> Option<&Path> {
+        self.metadata_args.initialization_home_candidate()
     }
 
     /// get builtin schema directory path

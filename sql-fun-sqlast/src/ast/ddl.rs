@@ -233,7 +233,7 @@ impl super::AlterCommand {
             Self::Owner(_) => Ok(self.resolve_owner()),
             Self::Default(name, expr) => Self::resolve_default(context, dialect, table, name, expr),
             Self::Constraint(constraint) => Self::resolve_constraint(context, table, constraint),
-            Self::Cluster(name) => Self::resolve_cluster(context, name),
+            Self::Cluster(name) => Self::resolve_cluster(context, table, name),
             Self::Rename(name) => Self::resolve_rename(context, name),
             Self::AddColumn(column) if dialect == Dialect::sqlite() => {
                 Self::resolve_add_column(context, dialect, table, column)
@@ -269,6 +269,10 @@ impl super::AlterCommand {
         constraint: &super::TableConstraint,
     ) -> Result<crate::sem::AlterObjSubCommand, AnalysisError> {
         use crate::sem::AlterObjSubCommand;
+        // Constraint-created indexes need the matched key even when the stored
+        // table declaration remains unqualified.
+        let resolved_table = context.resolve_table_name(table);
+        let table = resolved_table.as_ref().unwrap_or(table);
         Ok(AlterObjSubCommand::add_constraint(
             &constraint.resolve(context, table)?,
         ))
@@ -276,10 +280,20 @@ impl super::AlterCommand {
 
     fn resolve_cluster(
         context: &mut Resolution<'_>,
+        table: &crate::sem::TableName,
         name: &str,
     ) -> Result<crate::sem::AlterObjSubCommand, AnalysisError> {
         use crate::sem::AlterObjSubCommand;
-        if !context.has_index(name) {
+        let Some(resolved_table) = context.resolve_table_name(table) else {
+            // The enclosing ALTER TABLE resolver already reports the absent table.
+            return Ok(AlterObjSubCommand::cluster_on(name));
+        };
+        let index_name = crate::sem::FullName::new(
+            &resolved_table.full_name().catalog().cloned(),
+            &resolved_table.full_name().schema().cloned(),
+            &crate::sem::LocalName::from(name),
+        );
+        if !context.has_index(&index_name) {
             context.report_problem(AnalysisProblem::index_not_found(name))?;
         }
         Ok(AlterObjSubCommand::cluster_on(name))
@@ -1226,11 +1240,20 @@ impl Index {
         context: &mut Resolution<'_>,
         dialect: Dialect,
     ) -> Result<crate::sem::CreateIndex, AnalysisError> {
-        let table = crate::sem::TableName::from(self.relation.name.full_name()?);
+        let requested_table = crate::sem::TableName::from(self.relation.name.full_name()?);
+        let Some(table) = context.resolve_table_name(&requested_table) else {
+            context.report_problem(AnalysisProblem::relation_not_found(&requested_table))?;
+            return AnalysisError::raise_unexpected_none("CREATE INDEX target table");
+        };
+        let name = crate::sem::FullName::new(
+            &table.full_name().catalog().cloned(),
+            &table.full_name().schema().cloned(),
+            &crate::sem::LocalName::from(self.name.as_str()),
+        );
         let keys = Self::resolve_elements(&self.keys, context, dialect)?;
         let includes = Self::resolve_elements(&self.includes, context, dialect)?;
         Ok(crate::sem::CreateIndex::from_resolved(
-            &self.name,
+            &name,
             &table,
             &keys,
             &includes,

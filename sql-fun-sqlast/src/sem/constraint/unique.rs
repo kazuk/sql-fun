@@ -34,7 +34,11 @@ impl UniqueConstraint {
         let key_columns = IndexElementCollection::from_column_names(&self.keys);
 
         Ok(vec![ImplicitChange::from(CreateIndex::new(
-            &self.name,
+            &crate::sem::FullName::new(
+                &table.full_name().catalog().cloned(),
+                &table.full_name().schema().cloned(),
+                &crate::sem::LocalName::from(self.name.as_str()),
+            ),
             table,
             &key_columns,
         ))])

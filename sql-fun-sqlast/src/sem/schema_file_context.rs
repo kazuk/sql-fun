@@ -19,9 +19,10 @@ use crate::{
     StringSpan, TrieMap,
     sem::{
         AnalysisError, AnalysisProblem, BaseParseContext, CastDefinition, Comment, CreateExtension,
-        CreateIndex, CreateSchema, DiagnosticContext, FrozenBaseContext, GetSourcePathWithSpanOpt,
-        ImplicitChange, MutSourcePathWithSpan, ObjectKind, OperatorDefinition, OperatorInfoRead,
-        OperatorName, ParseContext, SchemaName, SemScalarExpr, SourceAccessService, VariableSet,
+        CreateIndex, CreateSchema, DiagnosticContext, FrozenBaseContext, FullName,
+        GetSourcePathWithSpanOpt, ImplicitChange, MutSourcePathWithSpan, ObjectKind,
+        OperatorDefinition, OperatorInfoRead, OperatorName, ParseContext, SchemaName,
+        SemScalarExpr, SourceAccessService, VariableSet,
         parse_context::{IndexInfoRead, SearchPathRead},
     },
 };
@@ -169,11 +170,159 @@ mod test_schema_file_context {
 }
 
 impl IndexInfoRead for SchemaCatalog {
-    fn get_index(&self, index_name: &str) -> Option<&CreateIndex> {
-        if let Some(index) = self.indexes.get(index_name) {
+    fn get_index_impl(&self, index_name: &FullName) -> Option<&CreateIndex> {
+        if let Some(index) = self.indexes.get(&index_name.to_string()) {
             Some(index)
         } else {
-            self.base.get_index(index_name)
+            self.base.get_index_impl(index_name)
+        }
+    }
+}
+
+#[cfg(test)]
+mod test_index_lookup {
+    use self::test_helpers::{index, layer};
+    use crate::sem::{BaseParseContext, FullName, IndexInfoRead, ParseContext};
+
+    #[rstest::rstest]
+    #[case::first(&["a", "b"], None, Some("a"))]
+    #[case::reversed(&["b", "a"], None, Some("b"))]
+    #[case::qualified(&["b"], Some("a"), Some("a"))]
+    #[case::empty(&[], None, None)]
+    #[case::missing(&["a", "b"], Some("missing"), None)]
+    fn lookup_uses_identity_and_search_path(
+        #[case] path: &[&str],
+        #[case] qualifier: Option<&str>,
+        #[case] expected: Option<&str>,
+    ) -> testresult::TestResult {
+        let context = layer(
+            path,
+            &[index("a", "items", "idx"), index("b", "items", "idx")],
+        )?;
+        let name = qualifier.map_or_else(
+            || FullName::from_local_name("idx"),
+            |schema| FullName::with_schema(schema, "idx"),
+        );
+        let expected = expected.map(|schema| FullName::with_schema(schema, "idx"));
+        assert_eq!(
+            context.get_index(&name).map(|index| index.name()),
+            expected.as_ref()
+        );
+        assert!(
+            context
+                .get_index_impl(&FullName::from_local_name("idx"))
+                .is_none()
+        );
+        Ok(())
+    }
+
+    #[rstest::rstest]
+    #[case::implicit(&["a"], "pg_catalog")]
+    #[case::explicit_last(&["a", "pg_catalog"], "a")]
+    fn index_lookup_reuses_catalog_precedence(
+        #[case] path: &[&str],
+        #[case] expected: &str,
+    ) -> testresult::TestResult {
+        let context = layer(
+            path,
+            &[
+                index("pg_catalog", "system", "idx"),
+                index("a", "items", "idx"),
+            ],
+        )?;
+        assert_eq!(
+            context
+                .get_index(&FullName::from_local_name("idx"))
+                .expect("index")
+                .name(),
+            &FullName::with_schema(expected, "idx")
+        );
+        Ok(())
+    }
+
+    #[test]
+    fn frozen_parent_is_searched_per_qualified_candidate() -> testresult::TestResult {
+        use crate::sem::SchemaFileContext;
+        use std::path::Path;
+        let parent = layer(&["b", "a"], &[index("a", "parent", "idx")])?.freeze();
+        let mut child = SchemaFileContext::new(Path::new("child.sql"), &parent);
+        child.set_search_path(&[
+            crate::sem::SchemaName::from("a"),
+            crate::sem::SchemaName::from("b"),
+        ]);
+        child = child.apply_create_index(&index("b", "child", "idx"))?;
+        assert_eq!(
+            child
+                .get_index(&FullName::from_local_name("idx"))
+                .unwrap()
+                .name(),
+            &FullName::with_schema("a", "idx")
+        );
+        let local = index("a", "replacement", "idx");
+        child = child.apply_create_index(&local)?;
+        // Compare object addresses to verify local precedence for the same identity.
+        assert!(!std::ptr::eq(
+            child.get_index(local.name()).unwrap(),
+            parent.get_index_impl(local.name()).unwrap()
+        ));
+        assert!(
+            child
+                .get_index(&FullName::from_local_name("absent"))
+                .is_none()
+        );
+        Ok(())
+    }
+
+    #[test]
+    fn sqlite_qualified_catalog_identities_coexist() -> testresult::TestResult {
+        let context = layer(
+            &["main", "aux"],
+            &[index("main", "items", "idx"), index("aux", "items", "idx")],
+        )?;
+        assert!(
+            context
+                .get_index_impl(&FullName::with_schema("main", "idx"))
+                .is_some()
+        );
+        assert!(
+            context
+                .get_index_impl(&FullName::with_schema("aux", "idx"))
+                .is_some()
+        );
+        Ok(())
+    }
+
+    mod test_helpers {
+        use crate::sem::{
+            CreateIndex, FullName, IndexElementCollection, ParseContext, SchemaFileContext,
+            SchemaName, TableName,
+        };
+        use crate::test_helpers::TestParseContext;
+        use std::path::Path;
+
+        pub(super) fn index(schema: &str, table: &str, name: &str) -> CreateIndex {
+            CreateIndex::new(
+                &FullName::with_schema(schema, name),
+                &TableName::from(FullName::with_schema(schema, table)),
+                &IndexElementCollection::default(),
+            )
+        }
+
+        pub(super) fn layer(
+            path: &[&str],
+            indexes: &[CreateIndex],
+        ) -> Result<SchemaFileContext, crate::sem::AnalysisError> {
+            let base = TestParseContext::default().freeze();
+            let mut context = SchemaFileContext::new(Path::new("indexes.sql"), &base);
+            let mut schemas = Vec::new();
+            for name in path {
+                schemas.push(SchemaName::from(name));
+            }
+            context.set_search_path(&schemas);
+            for index in indexes {
+                context = context.apply_create_index(index)?;
+            }
+            Ok(context)
         }
     }
 }
@@ -442,7 +591,9 @@ impl ParseContext for SchemaFileContext {
 
     fn apply_create_index(mut self, create_index: &CreateIndex) -> Result<Self, AnalysisError> {
         let name = create_index.name();
-        self.catalog.indexes.insert(name, create_index.clone());
+        self.catalog
+            .indexes
+            .insert(&name.to_string(), create_index.clone());
         Ok(self)
     }
 }

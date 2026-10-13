@@ -104,7 +104,7 @@ fn table_resolves_with_read_only_catalog(
 fn ddl_resolution_needs_no_catalog_write_interface(#[case] sql: &str) -> testresult::TestResult {
     let syntax =
         StatementNode::try_from_with_tokens(&SynBuilder::new().parse(sql), &IVec::default())?;
-    let catalog = test_helpers::ReadOnlyCatalog::new();
+    let catalog = test_helpers::ReadOnlyCatalog::with_index_table();
     let mut diagnostics = TestParseContext::default();
     syntax
         .resolve(&catalog, Dialect::postgres())
@@ -630,5 +630,23 @@ fn sqlite_blob_semantics_keep_hex_payload_after_spelling_upgrade(
         panic!("blob literal");
     };
     assert_eq!(value, payload);
+    Ok(())
+}
+
+#[test]
+fn missing_index_table_reports_resolution_problem() -> testresult::TestResult {
+    let syntax = StatementNode::try_from_with_tokens(
+        &SynBuilder::new().parse("CREATE INDEX idx ON missing.items(id)"),
+        &IVec::default(),
+    )?;
+    let catalog = test_helpers::ReadOnlyCatalog::new();
+    let mut diagnostics = TestParseContext::default();
+    assert!(
+        syntax
+            .resolve(&catalog, Dialect::postgres())
+            .report(&mut diagnostics)
+            .is_err()
+    );
+    assert_eq!(diagnostics.reported_problem_count(), 1);
     Ok(())
 }

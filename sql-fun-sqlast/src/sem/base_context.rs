@@ -140,8 +140,9 @@ impl ViewInfoRead for BaseContext {
 }
 
 impl IndexInfoRead for BaseContext {
-    fn get_index(&self, _index_name: &str) -> Option<&super::CreateIndex> {
-        todo!()
+    fn get_index_impl(&self, _index_name: &FullName) -> Option<&super::CreateIndex> {
+        // Builtin metadata contains no index definitions.
+        None
     }
 }
 

@@ -97,3 +97,33 @@ impl OptimizeStatement {
         Ok(self.idx_name.as_ref())
     }
 }
+
+#[cfg(test)]
+mod test_index_names {
+    use crate::syn::sqlite::Stmt;
+    use crate::test_helpers::SqliteSynBuilder;
+
+    #[rstest::rstest]
+    #[case::create("CREATE INDEX aux.idx ON items(id)")]
+    #[case::drop("DROP INDEX aux.idx")]
+    #[case::reindex("REINDEX aux.idx")]
+    fn qualified_index_syntax_preserves_database(#[case] sql: &str) {
+        let statement = SqliteSynBuilder.parse_as_stmt(sql);
+        let name = match &statement {
+            Stmt::CreateIndex(index) => {
+                assert_eq!(index.table_name().value(), "items");
+                index.idx_name()
+            }
+            Stmt::DropIndex(index) => index.idx_name(),
+            Stmt::Reindex(index) => index.idx_name().as_ref().expect("index name"),
+            _ => panic!("expected index statement"),
+        };
+        assert_eq!(name.name().value(), "idx");
+        assert_eq!(name.db_name().expect("database").value(), "aux");
+    }
+
+    #[test]
+    fn sqlite_create_rejects_schema_qualification_on_table() {
+        assert!(crate::SqliteDialect::parse("CREATE INDEX idx ON aux.items(id);").is_err());
+    }
+}

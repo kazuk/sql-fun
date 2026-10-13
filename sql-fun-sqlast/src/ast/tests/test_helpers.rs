@@ -59,6 +59,17 @@ impl ReadOnlyCatalog {
         );
         catalog
     }
+    pub(super) fn with_index_table() -> Self {
+        let mut catalog = Self::new();
+        catalog
+            .0
+            .set_get_search_path_result(&[crate::sem::SchemaName::from("public")]);
+        catalog
+            .0
+            .setup_table("items", &[], &crate::test_helpers::source_span());
+        catalog
+    }
+
     pub(super) fn new() -> Self {
         let mut context = TestParseContext::default();
         context.setup_type(PgBuiltInType::int4());
@@ -72,7 +83,7 @@ impl Catalog for ReadOnlyCatalog {
     fn metadata(&self) -> &::sql_fun_core::SqlFunMetadata {
         crate::sem::BaseParseContext::metadata(&self.0)
     }
-    fn has_index(&self, name: &str) -> bool {
+    fn has_index(&self, name: &FullName) -> bool {
         Catalog::has_index(&self.0, name)
     }
     fn has_sequence(&self, name: &FullName) -> bool {
@@ -83,6 +94,9 @@ impl Catalog for ReadOnlyCatalog {
     }
     fn get_type(&self, name: &FullName) -> Option<&TypeDefinition> {
         Catalog::get_type(&self.0, name)
+    }
+    fn resolve_table_name(&self, name: &TableName) -> Option<TableName> {
+        Catalog::resolve_table_name(&self.0, name)
     }
     fn get_table(&self, name: &TableName) -> Option<&CreateTable> {
         Catalog::get_table(&self.0, name)

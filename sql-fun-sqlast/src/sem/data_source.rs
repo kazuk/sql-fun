@@ -127,12 +127,7 @@ impl DataSource {
         }
     }
 
-    #[track_caller]
     fn unknown(name: &str, alias: &AliasSpec) -> Self {
-        #[cfg(test)]
-        panic!("unknown datasource {name}, alias {alias:?}");
-
-        #[cfg(not(test))]
         Self::Unknown(name.to_string(), alias.clone())
     }
 
@@ -148,7 +143,7 @@ impl DataSource {
             Self::UndefinedTableFunc(d) => d.push_alias_names(names),
             Self::RowFunctions(_data_source_row_functions) => todo!(),
             Self::RangeTableSample() => todo!(),
-            Self::Unknown(_, _) => todo!(),
+            Self::Unknown(_, alias) => names.push(alias.clone()),
         }
     }
 
@@ -222,7 +217,7 @@ impl DataSource {
             }
             Self::UndefinedTableFunc(_) => {}
             Self::RangeTableSample() => todo!(),
-            Self::Unknown(_, _) => todo!(),
+            Self::Unknown(_, _) => {}
             Self::RowFunctions(_) => todo!(),
         }
         result

@@ -13,7 +13,7 @@ mod panic_policy;
 mod pending_future;
 mod pid_file;
 mod schema_cache;
-mod session_wrapper;
+mod session;
 
 #[cfg(test)]
 mod test_helpers;
@@ -379,14 +379,13 @@ async fn serve_client(args: &Args, stream: TcpStream, addr: SocketAddr) -> Resul
     response_json.push('\n');
     write_half.write_all(response_json.as_bytes()).await?;
 
-    let wrapper = self::session_wrapper::SessionWrapper::new();
+    let wrapper = self::session::SessionWrapper::new();
     wrapper
         .session_handler(request_reader, write_half, addr, args.request_length_limit)
         .await
 }
 
 #[cfg(test)]
-#[path = "serve_client_tests.rs"]
 mod serve_client_tests;
 
 /// server error

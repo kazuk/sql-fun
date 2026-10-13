@@ -32,6 +32,20 @@ You can build and run tests using the `check-test-flow` script.
   corresponding job has finished on the final PR head and its result has been
   verified.
 
+## PostgreSQL Behavioral Oracles
+
+The development builder provides PostgreSQL 15–18 at `postgres15`, `postgres16`,
+`postgres17`, and `postgres18`, each on port 5432. Authentication is preconfigured
+through `PGUSER`, `PGPASSWORD`, and `PGDATABASE`; for example, use
+`psql -h postgres18` from the builder, explicitly selecting the version to query.
+
+Consult real PostgreSQL behavior when implementing or testing SQL parsing, type
+resolution, implicit casts, function/operator overload resolution, NULL semantics,
+and other PostgreSQL semantics. Compare versions where behavior may differ.
+These servers are development oracles, not dependencies of ordinary or offline
+tests. See [the builder README](ci/github-actions/README.md#postgresql-development-oracles)
+for operational details.
+
 ## Planning
 
 - Before finalizing an implementation plan, identify the technologies and

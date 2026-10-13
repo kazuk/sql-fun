@@ -42,6 +42,7 @@ use std::{fmt::Display, path::Path, str::FromStr};
 pub use self::{
     args::{
         InitializeArgs, SqlFunArgs, SqlFunArgsBuilder, SqlFunArgsBuilderError, SqlFunArgsError,
+        resolve_sql_fun_home_path,
     },
     builtin::PostgresBuiltinPaths,
     codegen_options::{BuilderSetter, CodegenOptions},

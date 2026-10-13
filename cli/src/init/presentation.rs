@@ -2,21 +2,24 @@ use std::path::{Path, PathBuf};
 
 #[derive(Debug)]
 pub enum HomePathError {
-    NotAbsolute,
+    Resolution(String),
     NotDirectory(PathBuf),
     ParentUnavailable,
     ParentNotFound(PathBuf),
 }
 
 impl HomePathError {
-    #[track_caller]
-    pub const fn not_absolute<T>() -> Result<T, Self> {
-        Err(Self::NotAbsolute)
+    pub fn resolution(error: &impl std::fmt::Display) -> Self {
+        Self::Resolution(error.to_string())
+    }
+
+    pub fn not_directory_error(path: &Path) -> Self {
+        Self::NotDirectory(path.to_path_buf())
     }
 
     #[track_caller]
     pub fn not_directory<T>(path: &Path) -> Result<T, Self> {
-        Err(Self::NotDirectory(path.to_path_buf()))
+        Err(Self::not_directory_error(path))
     }
 
     #[track_caller]
@@ -31,15 +34,11 @@ impl HomePathError {
 
     fn show(&self) {
         match self {
-            Self::NotAbsolute => Self::show_not_absolute(),
+            Self::Resolution(message) => eprintln!("{message}"),
             Self::NotDirectory(path) => eprintln!("{} is not a directory", path.display()),
             Self::ParentUnavailable => Self::show_parent_unavailable(),
             Self::ParentNotFound(path) => Self::show_parent_not_found(path),
         }
-    }
-
-    fn show_not_absolute() {
-        eprint!("{}", include_str!("absolute_path_required.txt"));
     }
 
     fn show_parent_unavailable() {
@@ -55,7 +54,6 @@ impl HomePathError {
 pub enum Notice {
     HomeDescription,
     HomeExists(PathBuf),
-    HomeAlreadyExists,
     HomeCreated(PathBuf),
     HomeCreateFailed(PathBuf, std::io::Error),
     InvalidHome(HomePathError),
@@ -68,10 +66,6 @@ impl Notice {
 
     pub fn home_exists(path: &Path) -> Self {
         Self::HomeExists(path.to_path_buf())
-    }
-
-    pub const fn home_already_exists() -> Self {
-        Self::HomeAlreadyExists
     }
 
     pub fn home_created(path: &Path) -> Self {
@@ -90,7 +84,6 @@ impl Notice {
         match self {
             Self::HomeDescription => Self::show_home_description(),
             Self::HomeExists(path) => Self::show_home_exists(path),
-            Self::HomeAlreadyExists => Self::show_home_already_exists(),
             Self::HomeCreated(path) => Self::show_home_created(path),
             Self::HomeCreateFailed(path, error) => Self::show_home_create_failed(path, error),
             Self::InvalidHome(error) => Self::show_invalid_home(error),
@@ -103,10 +96,6 @@ impl Notice {
 
     fn show_home_exists(path: &Path) {
         eprint!(include_str!("home_exists.txt"), path = path.display());
-    }
-
-    fn show_home_already_exists() {
-        print!("{}", include_str!("home_already_exists.txt"));
     }
 
     fn show_home_created(path: &Path) {

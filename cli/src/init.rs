@@ -41,8 +41,10 @@ pub async fn initialize(
         println!("{}", include_str!("init/banner.txt"));
     }
     let mut context = Initialization::from(init_args);
-    if init_args.sql_fun_home().is_none() {
-        context.set_home(&args.initialization_home().map_err(anyhow::Error::from)?);
+    if init_args.sql_fun_home().is_none()
+        && let Some(candidate) = args.initialization_home_candidate()
+    {
+        context.set_home(candidate);
     }
     // Interactive setup starts with the user's home choice; --yes validates all
     // supplied choices before any filesystem setup.

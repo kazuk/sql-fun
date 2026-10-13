@@ -1,1 +1,1 @@
-{path} create successfully
+Created {path}

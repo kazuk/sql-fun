@@ -11,7 +11,7 @@ use super::{
 
 use std::path::PathBuf;
 
-use ::sql_fun_core::InitializeArgs;
+use ::sql_fun_core::{InitializeArgs, resolve_sql_fun_home_path};
 use ::statig::Outcome;
 
 pub struct Initialization {
@@ -133,16 +133,31 @@ impl Workflow {
             context.notices.push(Notice::home_description());
         }
         if context.supplied_home {
-            if context.home.exists() {
-                if !context.home.is_dir() {
+            context.home = match resolve_sql_fun_home_path(&context.home) {
+                Ok(path) => path,
+                Err(error) => {
+                    if context.yes {
+                        return context.fail(anyhow::Error::from(error).into());
+                    }
+                    context
+                        .notices
+                        .push(Notice::invalid_home(HomePathError::resolution(&error)));
+                    return Outcome::Transition(State::edit_home());
+                }
+            };
+            if context.home.exists() && !context.home.is_dir() {
+                if context.yes {
                     return context
                         .fail(anyhow::anyhow!("sql-fun home must be a directory").into());
                 }
-                context.notices.push(Notice::home_exists(&context.home));
-                Outcome::Transition(State::home_prepared())
-            } else {
-                Outcome::Transition(State::confirm_create())
+                context
+                    .notices
+                    .push(Notice::invalid_home(HomePathError::not_directory_error(
+                        &context.home,
+                    )));
+                return Outcome::Transition(State::edit_home());
             }
+            Outcome::Transition(State::confirm_home())
         } else if context.yes {
             context.fail(anyhow::anyhow!("--yes requires --sql-fun-home").into())
         } else {
@@ -151,24 +166,29 @@ impl Workflow {
     }
 
     #[state]
-    fn confirm_create(event: &Event) -> Outcome<State> {
+    fn confirm_home(event: &Event, context: &Initialization) -> Outcome<State> {
         match event.confirmation() {
-            Some(true) => Outcome::Transition(State::create_home()),
+            Some(true) if context.supplied_home => Outcome::Transition(State::create_home()),
+            Some(true) => Outcome::Transition(State::create_edited_home()),
             Some(false) => Outcome::Transition(State::edit_home()),
             _ => Outcome::Handled,
         }
     }
 
-    // CLI/default paths deliberately retain their original fail-fast behavior.
+    // An explicitly supplied CLI path retains fail-fast creation behavior.
     #[state]
     fn create_home(event: &Event, context: &mut Initialization) -> Outcome<State> {
         if *event != Event::Advance {
             return Outcome::Handled;
         }
-        if !context.supplied_home && context.home.exists() {
-            context.notices.push(Notice::home_already_exists());
-        } else if let Err(error) = std::fs::create_dir_all(&context.home).or_else(InitError::io) {
+        let existed = context.home.exists();
+        if let Err(error) = std::fs::create_dir_all(&context.home).or_else(InitError::io) {
             return context.fail(error);
+        }
+        if existed {
+            context.notices.push(Notice::home_exists(&context.home));
+        } else {
+            context.notices.push(Notice::home_created(&context.home));
         }
         Outcome::Transition(State::home_prepared())
     }
@@ -178,18 +198,27 @@ impl Workflow {
         let Some(input) = event.text_input() else {
             return Outcome::Handled;
         };
-        let path = PathBuf::from(input);
-        let validation = if !path.is_absolute() {
-            HomePathError::not_absolute()
-        } else if path.exists() {
+        let path = match resolve_sql_fun_home_path(std::path::Path::new(input)) {
+            Ok(path) => path,
+            Err(error) => {
+                input.clone_into(&mut context.home_input);
+                context
+                    .notices
+                    .push(Notice::invalid_home(HomePathError::resolution(&error)));
+                return Outcome::Handled;
+            }
+        };
+        let validation = if path.exists() {
             if path.is_dir() {
                 Ok(())
             } else {
                 HomePathError::not_directory(&path)
             }
         } else if let Some(parent) = path.parent() {
-            if parent.exists() {
+            if parent.is_dir() {
                 Ok(())
+            } else if parent.exists() {
+                Err(HomePathError::not_directory_error(parent))
             } else {
                 HomePathError::parent_not_found(parent)
             }
@@ -203,7 +232,8 @@ impl Workflow {
         }
         context.home_input.clear();
         context.home = path;
-        Outcome::Transition(State::create_edited_home())
+        context.supplied_home = false;
+        Outcome::Transition(State::confirm_home())
     }
 
     // Only a path entered in the editor retries after a filesystem failure.
@@ -212,9 +242,14 @@ impl Workflow {
         if *event != Event::Advance {
             return Outcome::Handled;
         }
+        let existed = context.home.exists();
         match std::fs::create_dir_all(&context.home) {
             Ok(()) => {
-                context.notices.push(Notice::home_created(&context.home));
+                if existed {
+                    context.notices.push(Notice::home_exists(&context.home));
+                } else {
+                    context.notices.push(Notice::home_created(&context.home));
+                }
                 Outcome::Transition(State::home_prepared())
             }
             Err(error) => {
@@ -247,7 +282,7 @@ impl State {
         match self {
             Self::ConfirmInstall {} => Some(Self::confirm_install_request(context)),
             Self::PrepareHome {} => Some(Self::prepare_home_request()),
-            Self::ConfirmCreate {} => Some(Self::confirm_create_request(context)),
+            Self::ConfirmHome {} => Some(Self::confirm_home_request(context)),
             Self::CreateHome {} => Some(Self::create_home_request()),
             Self::EditHome {} => Some(Self::edit_home_request(context)),
             Self::CreateEditedHome {} => Some(Self::create_edited_home_request()),
@@ -312,7 +347,7 @@ mod test_prepare_home_request {
 }
 
 impl State {
-    fn confirm_create_request(context: &Initialization) -> Request {
+    fn confirm_home_request(context: &Initialization) -> Request {
         let automatic = if context.yes {
             Some(PromptResponse::confirm(true))
         } else {
@@ -321,7 +356,7 @@ impl State {
         Request::Prompt(
             PromptRequest::confirm(
                 format!(
-                    include_str!("confirm_create.txt"),
+                    include_str!("confirm_home.txt"),
                     path = context.home.display()
                 )
                 .trim_end(),
@@ -332,7 +367,7 @@ impl State {
 }
 
 #[cfg(test)]
-mod test_confirm_create_request {
+mod test_confirm_home_request {
     use super::test_helpers::initialization;
     use super::{PromptRequest, PromptResponse, Request, State};
 
@@ -341,9 +376,10 @@ mod test_confirm_create_request {
     #[case::assume_yes(true, Some(PromptResponse::confirm(true)))]
     fn requests_confirmation(#[case] yes: bool, #[case] automatic: Option<PromptResponse>) {
         assert_eq!(
-            State::confirm_create_request(&initialization(yes)),
+            State::confirm_home_request(&initialization(yes)),
             Request::Prompt(
-                PromptRequest::confirm("Create the chosen/home?").with_automatic(automatic)
+                PromptRequest::confirm("Use chosen/home as sql-fun home?")
+                    .with_automatic(automatic)
             ),
         );
     }

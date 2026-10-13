@@ -2,6 +2,8 @@ Choose the sql-fun home directory for engine-specific metadata and configuration
 
 The prompt suggests the configured SQL_FUN_HOME or ~/.sql-fun. Accepting the
 suggestion explicitly selects it; no directory is selected on your behalf.
+Enter an absolute path, a path relative to the current working directory,
+or a path beginning with ~/. The resolved absolute path is shown for confirmation.
 
 For subsequent commands, use the same path through SQL_FUN_HOME or the
 --sql-fun-home option.

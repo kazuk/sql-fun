@@ -174,8 +174,11 @@ macro_rules! forward_catalog_reads {
         }
 
         impl crate::sem::IndexInfoRead for $context {
-            fn get_index(&self, name: &str) -> Option<&crate::sem::CreateIndex> {
-                crate::sem::IndexInfoRead::get_index(self.$catalog(), name)
+            fn get_index_impl(
+                &self,
+                name: &crate::sem::FullName,
+            ) -> Option<&crate::sem::CreateIndex> {
+                crate::sem::IndexInfoRead::get_index_impl(self.$catalog(), name)
             }
         }
 

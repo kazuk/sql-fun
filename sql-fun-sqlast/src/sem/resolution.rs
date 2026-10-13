@@ -11,11 +11,12 @@ use std::collections::HashSet;
 /// The resolver cannot obtain a mutable catalog through this interface.
 pub(crate) trait Catalog {
     fn metadata(&self) -> &::sql_fun_core::SqlFunMetadata;
-    fn has_index(&self, name: &str) -> bool;
+    fn has_index(&self, name: &FullName) -> bool;
     fn has_sequence(&self, name: &FullName) -> bool;
     fn resolve_function_name(&self, name: &FullName) -> FullName;
     fn get_type(&self, name: &FullName) -> Option<&TypeDefinition>;
     fn get_table(&self, name: &TableName) -> Option<&CreateTable>;
+    fn resolve_table_name(&self, name: &TableName) -> Option<TableName>;
     fn get_view(&self, name: &ViewName) -> Option<&ViewLike>;
     fn get_function_by_name(&self, name: &FullName) -> Option<FunctionOverloadCollection>;
     fn get_operator_op(
@@ -43,8 +44,8 @@ impl<T: BaseParseContext> Catalog for T {
     fn metadata(&self) -> &::sql_fun_core::SqlFunMetadata {
         BaseParseContext::metadata(self)
     }
-    fn has_index(&self, name: &str) -> bool {
-        crate::sem::parse_context::IndexInfoRead::get_index(self, name).is_some()
+    fn has_index(&self, name: &FullName) -> bool {
+        BaseParseContext::get_index(self, name).is_some()
     }
     fn has_sequence(&self, name: &FullName) -> bool {
         BaseParseContext::get_sequence(self, name).is_some()
@@ -54,6 +55,9 @@ impl<T: BaseParseContext> Catalog for T {
     }
     fn get_type(&self, name: &FullName) -> Option<&TypeDefinition> {
         BaseParseContext::get_type(self, name)
+    }
+    fn resolve_table_name(&self, name: &TableName) -> Option<TableName> {
+        BaseParseContext::resolve_table_name(self, name)
     }
     fn get_table(&self, name: &TableName) -> Option<&CreateTable> {
         BaseParseContext::get_table(self, name)
@@ -212,7 +216,7 @@ impl Catalog for Resolution<'_> {
     fn metadata(&self) -> &::sql_fun_core::SqlFunMetadata {
         self.catalog.metadata()
     }
-    fn has_index(&self, name: &str) -> bool {
+    fn has_index(&self, name: &FullName) -> bool {
         self.catalog.has_index(name)
     }
     fn has_sequence(&self, name: &FullName) -> bool {
@@ -223,6 +227,9 @@ impl Catalog for Resolution<'_> {
     }
     fn get_type(&self, name: &FullName) -> Option<&TypeDefinition> {
         self.catalog.get_type(name)
+    }
+    fn resolve_table_name(&self, name: &TableName) -> Option<TableName> {
+        self.catalog.resolve_table_name(name)
     }
     fn get_table(&self, name: &TableName) -> Option<&CreateTable> {
         self.catalog.get_table(name)
@@ -277,7 +284,7 @@ impl Catalog for &mut Resolution<'_> {
     fn metadata(&self) -> &::sql_fun_core::SqlFunMetadata {
         self.catalog.metadata()
     }
-    fn has_index(&self, name: &str) -> bool {
+    fn has_index(&self, name: &FullName) -> bool {
         Catalog::has_index(&**self, name)
     }
     fn has_sequence(&self, name: &FullName) -> bool {
@@ -288,6 +295,9 @@ impl Catalog for &mut Resolution<'_> {
     }
     fn get_type(&self, name: &FullName) -> Option<&TypeDefinition> {
         self.catalog.get_type(name)
+    }
+    fn resolve_table_name(&self, name: &TableName) -> Option<TableName> {
+        Catalog::resolve_table_name(&**self, name)
     }
     fn get_table(&self, name: &TableName) -> Option<&CreateTable> {
         self.catalog.get_table(name)

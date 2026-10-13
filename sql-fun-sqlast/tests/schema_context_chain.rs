@@ -166,10 +166,10 @@ fn inherited_catalog_objects_and_merged_overloads_drive_query_analysis()
         &FullName::with_schema("a", "item_seq")
     );
     assert_eq!(
-        dump.get_index("items_id_idx")
+        dump.get_index(&FullName::with_schema("a", "items_id_idx"))
             .expect("inherited index")
             .name(),
-        "items_id_idx"
+        &FullName::with_schema("a", "items_id_idx")
     );
     assert_eq!(
         dump.get_function_by_name(&FullName::with_schema("a", "choose"))
@@ -490,6 +490,127 @@ fn inherited_drop_records_without_removing_tables_or_changing_other_layers(
     Ok(())
 }
 
+#[rstest::rstest]
+#[case::qualified("CREATE INDEX idx ON a.items(id)", "a")]
+#[case::unqualified("CREATE INDEX idx ON items(id)", "a")]
+fn index_creation_uses_resolved_table_schema(
+    #[case] statement: &str,
+    #[case] schema: &str,
+) -> Result<(), Box<dyn std::error::Error>> {
+    let root = heavy::index_root()?;
+    let tables = load_schema(
+        &root,
+        "CREATE SCHEMA a; CREATE SCHEMA b; CREATE TABLE a.items(id integer);",
+    )?;
+    let indexes = load_layer(tables.base_context(), &["b", "a"], statement)?;
+    assert!(indexes.problems().is_empty());
+    let name = FullName::with_schema(schema, "idx");
+    assert_eq!(
+        indexes.get_index(&name).expect("resolved index").name(),
+        &name
+    );
+    assert!(
+        indexes
+            .get_index(&FullName::with_schema("b", "idx"))
+            .is_none()
+    );
+    Ok(())
+}
+
+#[test]
+fn index_identity_uses_catalog_key_of_unqualified_table_declaration()
+-> Result<(), Box<dyn std::error::Error>> {
+    let root = heavy::index_root()?;
+    let tables = load_layer(&root, &["a"], "CREATE TABLE items(id integer);")?;
+    let indexes = load_layer(
+        tables.base_context(),
+        &["b", "a"],
+        "CREATE INDEX idx ON items(id); ALTER TABLE items ADD CONSTRAINT pk PRIMARY KEY(id);",
+    )?;
+    assert!(indexes.problems().is_empty());
+    for local in ["idx", "pk"] {
+        let name = FullName::with_schema("a", local);
+        assert_eq!(
+            indexes.get_index(&name).expect("resolved index").name(),
+            &name
+        );
+    }
+    Ok(())
+}
+
+#[test]
+fn explicit_and_constraint_indexes_in_distinct_schemas_coexist()
+-> Result<(), Box<dyn std::error::Error>> {
+    let root = heavy::index_root()?;
+    let parsed = load_schema(
+        &root,
+        r#"
+        CREATE SCHEMA a; CREATE SCHEMA b;
+        CREATE TABLE a.items(id integer, value integer);
+        ALTER TABLE a.items ADD CONSTRAINT pk PRIMARY KEY(id);
+        ALTER TABLE a.items ADD CONSTRAINT uq UNIQUE(value);
+        CREATE TABLE b.items(id integer, value integer);
+        ALTER TABLE b.items ADD CONSTRAINT pk PRIMARY KEY(id);
+        ALTER TABLE b.items ADD CONSTRAINT uq UNIQUE(value);
+        CREATE INDEX idx ON a.items(id);
+        CREATE INDEX idx ON b.items(id);
+    "#,
+    )?;
+    assert!(parsed.problems().is_empty());
+    for schema in ["a", "b"] {
+        for local in ["idx", "pk", "uq"] {
+            let name = FullName::with_schema(schema, local);
+            assert_eq!(
+                parsed.get_index(&name).expect("distinct index").name(),
+                &name
+            );
+        }
+    }
+    Ok(())
+}
+
+#[rstest::rstest]
+#[case::own_schema("CREATE INDEX idx ON a.items(id);", false)]
+#[case::other_schema("CREATE INDEX idx ON b.items(id);", true)]
+fn cluster_index_lookup_uses_target_table_schema(
+    #[case] create_index: &str,
+    #[case] missing: bool,
+) -> Result<(), Box<dyn std::error::Error>> {
+    let root = heavy::index_root()?;
+    let tables = load_schema(
+        &root,
+        "CREATE SCHEMA a; CREATE SCHEMA b; CREATE TABLE a.items(id integer); CREATE TABLE b.items(id integer);",
+    )?;
+    let indexes = load_schema(tables.base_context(), create_index)?;
+    let clustered = load_layer(
+        indexes.base_context(),
+        &["b"],
+        "ALTER TABLE a.items CLUSTER ON idx;",
+    )?;
+    assert_eq!(!clustered.problems().is_empty(), missing);
+    Ok(())
+}
+
+#[test]
+fn absent_index_traverses_schema_layers_to_builtin_root() -> Result<(), Box<dyn std::error::Error>>
+{
+    let root = heavy::index_root()?;
+    let missing = FullName::with_schema("public", "absent");
+    assert!(root.get_index_impl(&missing).is_none());
+    let parent = load_schema(&root, "CREATE TABLE public.items(id integer);")?;
+    let child = load_schema(
+        parent.base_context(),
+        "CREATE INDEX idx ON public.items(id);",
+    )?;
+    assert!(child.get_index(&missing).is_none());
+    assert!(
+        child
+            .get_index(&FullName::from_local_name("absent"))
+            .is_none()
+    );
+    Ok(())
+}
+
 mod test_helpers {
     pub(super) mod heavy {
         use std::path::Path;
@@ -497,6 +618,13 @@ mod test_helpers {
         use ::sql_fun_sqlast::{PostgresDialect, sem::FrozenBaseContext};
 
         use super::builtin_root;
+
+        /// Load real builtin type/function metadata for index absence and DDL
+        /// resolution tests. Every call reloads metadata, without sharing across
+        /// calls or nextest processes; the full builtin schema is not parsed.
+        pub fn index_root() -> Result<FrozenBaseContext, Box<dyn std::error::Error>> {
+            builtin_root()
+        }
 
         /// Parse the complete PostgreSQL 17 builtin schema for catalog integration
         /// coverage. Every call reloads metadata and parses the schema; results

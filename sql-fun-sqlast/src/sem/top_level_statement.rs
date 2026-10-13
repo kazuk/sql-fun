@@ -171,7 +171,6 @@ LANGUAGE C STRICT IMMUTABLE PARALLEL SAFE;"#
     #[case("ALTER TYPE public.user_kind OWNER TO application_owner;")]
     #[case("CREATE VIEW users_view AS SELECT 1 AS id;")]
     #[case("CREATE SCHEMA app CREATE TABLE app.users (id integer);")]
-    #[case("CREATE INDEX users_id_idx ON users (id);")]
     #[case("insert into users (id) values (1)")]
     #[case("update users set id = 1")]
     #[case("delete from users")]

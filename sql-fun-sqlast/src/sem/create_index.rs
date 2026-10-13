@@ -2,7 +2,10 @@ use sql_fun_core::IVec;
 
 use crate::{
     ast::TryFromWithTokens,
-    sem::{AnalysisError, AstAndContextPair, ColumnName, ParseContext, SemScalarExpr, TableName},
+    sem::{
+        AnalysisError, AstAndContextPair, ColumnName, FullName, ParseContext, SemScalarExpr,
+        TableName,
+    },
     syn::ScanToken,
 };
 
@@ -136,7 +139,7 @@ mod index_element_collection_tests {
 /// analyzed [`crate::syn::IndexStmt`]
 #[derive(Debug, Clone)]
 pub struct CreateIndex {
-    name: String,
+    name: FullName,
     #[cfg_attr(not(test), expect(dead_code))]
     table: TableName,
     #[cfg_attr(not(test), expect(dead_code))]
@@ -149,25 +152,25 @@ pub struct CreateIndex {
 
 impl CreateIndex {
     pub(crate) fn from_resolved(
-        name: &str,
+        name: &FullName,
         table: &TableName,
         keys: &IndexElementCollection,
         includes: &IndexElementCollection,
         unique: bool,
     ) -> Self {
         Self {
-            name: name.to_owned(),
+            name: name.clone(),
             table: table.clone(),
             key_columns: keys.clone(),
             include_columns: includes.clone(),
             unique,
         }
     }
-    /// create a instance
+    /// Create an index with its qualified catalog identity and resolved target table.
     #[must_use]
-    pub fn new(name: &str, table: &TableName, key_columns: &IndexElementCollection) -> Self {
+    pub fn new(name: &FullName, table: &TableName, key_columns: &IndexElementCollection) -> Self {
         Self {
-            name: name.to_string(),
+            name: name.clone(),
             table: table.clone(),
             key_columns: key_columns.clone(),
             include_columns: IndexElementCollection::default(),
@@ -175,16 +178,16 @@ impl CreateIndex {
         }
     }
 
-    /// create with `include_columns`
+    /// Create a qualified index with `include_columns`
     #[must_use]
     pub fn new_with_include_column(
-        name: &str,
+        name: &FullName,
         table: &TableName,
         key_columns: &IndexElementCollection,
         include_columns: &IndexElementCollection,
     ) -> Self {
         Self {
-            name: name.to_string(),
+            name: name.clone(),
             table: table.clone(),
             key_columns: key_columns.clone(),
             include_columns: include_columns.clone(),
@@ -192,9 +195,9 @@ impl CreateIndex {
         }
     }
 
-    /// get index name
+    /// Return the qualified catalog identity, including the target table schema.
     #[must_use]
-    pub fn name(&self) -> &str {
+    pub fn name(&self) -> &FullName {
         &self.name
     }
 }
@@ -210,9 +213,13 @@ mod create_index_tests {
         let key_columns =
             IndexElementCollection::from_column_names(&vec![ColumnName::from("id")].into());
 
-        let index = CreateIndex::new("idx_items_id", &table, &key_columns);
+        let index = CreateIndex::new(
+            &FullName::with_schema("public", "idx_items_id"),
+            &table,
+            &key_columns,
+        );
 
-        assert_eq!(index.name, "idx_items_id");
+        assert_eq!(index.name, FullName::with_schema("public", "idx_items_id"));
         assert_eq!(index.table, table);
         assert_eq!(index.key_columns.0.len(), 1);
         assert_eq!(index.include_columns.0.len(), 0);
@@ -228,7 +235,7 @@ mod create_index_tests {
             IndexElementCollection::from_column_names(&vec![ColumnName::from("metadata")].into());
 
         let index = CreateIndex::new_with_include_column(
-            "idx_items_id",
+            &FullName::with_schema("public", "idx_items_id"),
             &table,
             &key_columns,
             &include_columns,
@@ -357,8 +364,9 @@ mod analyze_index_stmt_tests {
 
     #[rstest::rstest]
     fn analyze_index_stmt_collects_keys_including_order_and_includes(
-        test_context: TestParseContext,
+        mut test_context: TestParseContext,
     ) {
+        test_context.setup_table("items", &[], &crate::test_helpers::source_span());
         let builder = SynBuilder::new();
         let relation = RangeVarOpt::from(
             builder.range_var(&FullName::with_schema("public", "items"), &AliasOpt::none()),
@@ -384,7 +392,10 @@ mod analyze_index_stmt_tests {
             panic!("expected create index ast");
         };
 
-        assert_eq!(create_index.name, "idx_items");
+        assert_eq!(
+            create_index.name,
+            FullName::with_schema("public", "idx_items")
+        );
         assert!(matches!(
             create_index.table.full_name().schema(),
             Some(schema) if schema.as_str() == "public"

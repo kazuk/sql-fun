@@ -292,8 +292,11 @@ impl FunctionInfoRead for TestParseContext {
 }
 
 impl IndexInfoRead for TestParseContext {
-    fn get_index(&self, _index_name: &str) -> Option<&CreateIndex> {
-        todo!()
+    fn get_index_impl(&self, index_name: &FullName) -> Option<&CreateIndex> {
+        self.create_indexes
+            .iter()
+            .rev()
+            .find(|index| index.name() == index_name)
     }
 }
 

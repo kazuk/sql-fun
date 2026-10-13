@@ -74,8 +74,8 @@ impl SourceAccessService for DefaultSourceAccessService {}
 
 /// get index definition
 pub trait IndexInfoRead {
-    /// get `CREATE INDEX` statement by index name
-    fn get_index(&self, index_name: &str) -> Option<&CreateIndex>;
+    /// Read an index by its exact qualified identity, without search-path expansion.
+    fn get_index_impl(&self, index_name: &FullName) -> Option<&CreateIndex>;
 }
 
 /// get function definition
@@ -158,9 +158,24 @@ pub trait BaseParseContext:
         expand_search_path(self, key, |k| self.get_type_impl(k))
     }
 
+    /// Look up an index, expanding unqualified names through the active search path.
+    /// Explicitly qualified names are read directly.
+    fn get_index(&self, name: &FullName) -> Option<&CreateIndex> {
+        expand_search_path(self, name, |key| self.get_index_impl(key))
+    }
+
     /// get `CREATE TABLE` statement by table name
     fn get_table(&self, name: &TableName) -> Option<&CreateTable> {
         expand_search_path(self, name.full_name(), |key| self.get_table_impl(key))
+    }
+
+    /// Resolve a table to the qualified catalog key that matched the search path.
+    /// A stored declaration can itself have an unqualified name.
+    fn resolve_table_name(&self, name: &TableName) -> Option<TableName> {
+        expand_search_path_inst(self, name.full_name(), |key| {
+            self.get_table_impl(key)?;
+            Some(TableName::from(key.clone()))
+        })
     }
 
     /// get `CREATE VIEW` statement by view name

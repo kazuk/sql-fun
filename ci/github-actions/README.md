@@ -57,7 +57,8 @@ Both local and network server connections require password authentication.
 Oracle data resides in separate tmpfs mounts and disappears when the session is
 removed. Use only small datasets needed to verify behavior. Bulk data loading,
 large datasets, and load or stress testing are prohibited because tmpfs storage
-consumes memory shared with the development environment. Normal tests can still run without these services; they are optional
+consumes memory shared with the development environment.
+Normal tests can still run without these services; they are optional
 behavioral references, not application runtime or unit-test dependencies.
 
 Each invocation prints a unique Compose project name. Shell exit, startup

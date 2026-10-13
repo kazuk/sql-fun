@@ -396,7 +396,7 @@ impl StatementNode {
                 .map(|function| crate::sem::SemAst::create_function(&function)),
             Self::Index(index) => index
                 .resolve(catalog, dialect)
-                .map(|index| crate::sem::SemAst::create_index(&index)),
+                .map(|index| crate::sem::SemAst::from_index_resolution(&index)),
             Self::TableAs(_) => crate::sem::Resolution::new(catalog).finish(
                 crate::sem::AnalysisError::raise_unexpected_input(
                     "table as requires catalog application",

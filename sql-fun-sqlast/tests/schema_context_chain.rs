@@ -490,6 +490,41 @@ fn inherited_drop_records_without_removing_tables_or_changing_other_layers(
     Ok(())
 }
 
+#[test]
+fn missing_index_table_recovers_without_registering_and_analyzes_later_statements()
+-> Result<(), Box<dyn std::error::Error>> {
+    let root = heavy::index_root()?;
+    let parsed = load_schema(
+        &root,
+        r#"
+        CREATE INDEX missing_idx ON missing.items(id);
+        CREATE TABLE public.items(id integer);
+        CREATE INDEX valid_idx ON public.items(id);
+        CREATE VIEW public.missing_view AS SELECT 1 AS id FROM later_missing.items;
+    "#,
+    )?;
+    assert_missing_relation(parsed.problems(), "missing.items");
+    assert_missing_relation(parsed.problems(), "later_missing.items");
+    assert_eq!(parsed.problems().len(), 2);
+    assert_table_exists(&parsed, "public.items");
+    let valid = FullName::with_schema("public", "valid_idx");
+    assert_eq!(
+        parsed.get_index(&valid).expect("later valid index").name(),
+        &valid
+    );
+    assert!(
+        parsed
+            .get_index_impl(&FullName::with_schema("missing", "missing_idx"))
+            .is_none()
+    );
+    assert!(
+        parsed
+            .get_index(&FullName::from_local_name("missing_idx"))
+            .is_none()
+    );
+    Ok(())
+}
+
 #[rstest::rstest]
 #[case::qualified("CREATE INDEX idx ON a.items(id)", "a")]
 #[case::unqualified("CREATE INDEX idx ON items(id)", "a")]

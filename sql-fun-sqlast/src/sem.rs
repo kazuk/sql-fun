@@ -220,6 +220,10 @@ impl From<CreateIndex> for ImplicitChange {
 /// Semantic AST for top-level statement
 #[derive(Debug, Clone)]
 pub enum SemAst {
+    /// A statement whose semantic resolution failed recoverably.
+    /// Diagnostics are retained by the context; no catalog definition is applied.
+    UnresolvedStatement,
+
     /// `alter owner` statement
     AlterOwner(AlterOwner),
 
@@ -288,6 +292,17 @@ pub enum SemAst {
 }
 
 impl SemAst {
+    pub(crate) fn unresolved_statement() -> Self {
+        Self::UnresolvedStatement
+    }
+    pub(crate) fn from_index_resolution(index: &Option<CreateIndex>) -> Self {
+        if let Some(index) = index {
+            Self::create_index(index)
+        } else {
+            Self::unresolved_statement()
+        }
+    }
+
     pub(crate) fn create_table(table: &CreateTable) -> Self {
         Self::CreateTable(table.clone())
     }

@@ -43,7 +43,9 @@ Consult real PostgreSQL behavior when implementing or testing SQL parsing, type
 resolution, implicit casts, function/operator overload resolution, NULL semantics,
 and other PostgreSQL semantics. Compare versions where behavior may differ.
 These servers are development oracles, not dependencies of ordinary or offline
-tests. See [the builder README](ci/github-actions/README.md#postgresql-development-oracles)
+tests. Use only small datasets needed to verify behavior. Bulk data loading,
+large datasets, and load or stress testing are prohibited: database storage uses
+tmpfs and consumes memory shared with the development environment. See [the builder README](ci/github-actions/README.md#postgresql-development-oracles)
 for operational details.
 
 ## Planning

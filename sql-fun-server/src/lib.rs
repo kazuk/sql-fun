@@ -13,6 +13,10 @@ mod panic_policy;
 mod pending_future;
 mod pid_file;
 mod schema_cache;
+mod session_wrapper;
+
+#[cfg(test)]
+mod test_helpers;
 
 use crate::buffers::JsonLinesStreamReader;
 
@@ -375,28 +379,15 @@ async fn serve_client(args: &Args, stream: TcpStream, addr: SocketAddr) -> Resul
     response_json.push('\n');
     write_half.write_all(response_json.as_bytes()).await?;
 
-    request_reader
-        .set_request_length_limit(args.request_length_limit)
-        .await;
-
-    while let Some(request) = request_reader.read_request().await? {
-        let request_message: JsonRpcRequest = serde_json::from_value(request)?;
-
-        let response = process_request(&request_message).await;
-        let response = match response {
-            Ok(result) => JsonRpcResponse::success(&request_message, result),
-            Err(error) => JsonRpcResponse::error(&request_message, &error),
-        };
-        let mut response_json = serde_json::to_string(&response)?;
-        response_json.push('\n');
-
-        tracing::info!("{addr}: sending {response_json}");
-        write_half.write_all(response_json.as_bytes()).await?;
-    }
-    write_half.flush().await?;
-    write_half.shutdown().await?;
-    Ok(())
+    let wrapper = self::session_wrapper::SessionWrapper::new();
+    wrapper
+        .session_handler(request_reader, write_half, addr, args.request_length_limit)
+        .await
 }
+
+#[cfg(test)]
+#[path = "serve_client_tests.rs"]
+mod serve_client_tests;
 
 /// server error
 #[derive(thiserror::Error, Debug)]

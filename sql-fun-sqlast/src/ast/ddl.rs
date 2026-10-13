@@ -1229,7 +1229,7 @@ impl Index {
         &self,
         catalog: &dyn Catalog,
         dialect: Dialect,
-    ) -> ResolutionOutcome<crate::sem::CreateIndex> {
+    ) -> ResolutionOutcome<Option<crate::sem::CreateIndex>> {
         let mut context = Resolution::new(catalog);
         let result = self.resolve_in(&mut context, dialect);
         context.finish(result)
@@ -1239,11 +1239,11 @@ impl Index {
         &self,
         context: &mut Resolution<'_>,
         dialect: Dialect,
-    ) -> Result<crate::sem::CreateIndex, AnalysisError> {
+    ) -> Result<Option<crate::sem::CreateIndex>, AnalysisError> {
         let requested_table = crate::sem::TableName::from(self.relation.name.full_name()?);
         let Some(table) = context.resolve_table_name(&requested_table) else {
             context.report_problem(AnalysisProblem::relation_not_found(&requested_table))?;
-            return AnalysisError::raise_unexpected_none("CREATE INDEX target table");
+            return Ok(None);
         };
         let name = crate::sem::FullName::new(
             &table.full_name().catalog().cloned(),
@@ -1252,13 +1252,13 @@ impl Index {
         );
         let keys = Self::resolve_elements(&self.keys, context, dialect)?;
         let includes = Self::resolve_elements(&self.includes, context, dialect)?;
-        Ok(crate::sem::CreateIndex::from_resolved(
+        Ok(Some(crate::sem::CreateIndex::from_resolved(
             &name,
             &table,
             &keys,
             &includes,
             self.unique,
-        ))
+        )))
     }
 
     pub(crate) fn resolve_and_apply<TContext: ParseContext>(
@@ -1266,7 +1266,12 @@ impl Index {
         mut context: TContext,
         dialect: Dialect,
     ) -> Result<AstAndContextPair<TContext>, AnalysisError> {
-        let index = self.resolve(&context, dialect).report(&mut context)?;
+        let Some(index) = self.resolve(&context, dialect).report(&mut context)? else {
+            return Ok(AstAndContextPair::new(
+                SemAst::unresolved_statement(),
+                context,
+            ));
+        };
         let context = context.apply_create_index(&index)?;
         Ok(AstAndContextPair::new(
             SemAst::create_index(&index),

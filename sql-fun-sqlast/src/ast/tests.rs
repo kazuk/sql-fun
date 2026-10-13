@@ -641,12 +641,9 @@ fn missing_index_table_reports_resolution_problem() -> testresult::TestResult {
     )?;
     let catalog = test_helpers::ReadOnlyCatalog::new();
     let mut diagnostics = TestParseContext::default();
-    assert!(
-        syntax
-            .resolve(&catalog, Dialect::postgres())
-            .report(&mut diagnostics)
-            .is_err()
-    );
+    syntax
+        .resolve(&catalog, Dialect::postgres())
+        .report(&mut diagnostics)?;
     assert_eq!(diagnostics.reported_problem_count(), 1);
     Ok(())
 }

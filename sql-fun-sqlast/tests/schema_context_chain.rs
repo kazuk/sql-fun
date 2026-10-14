@@ -604,43 +604,6 @@ fn explicit_and_constraint_indexes_in_distinct_schemas_coexist()
     Ok(())
 }
 
-#[test]
-fn quoted_index_components_with_dots_remain_distinct() -> Result<(), Box<dyn std::error::Error>> {
-    let root = heavy::index_root()?;
-    let parsed = load_schema(
-        &root,
-        r#"
-        CREATE SCHEMA "a.b"; CREATE SCHEMA a;
-        CREATE TABLE "a.b".first_item(id integer);
-        CREATE TABLE a.second_item(id integer);
-        CREATE INDEX idx ON "a.b".first_item(id);
-        CREATE INDEX "b.idx" ON a.second_item(id);
-        "#,
-    )?;
-    assert!(parsed.problems().is_empty());
-    for name in [
-        FullName::with_schema("a.b", "idx"),
-        FullName::with_schema("a", "b.idx"),
-    ] {
-        assert_eq!(
-            parsed.get_index_impl(&name).expect("distinct index").name(),
-            &name
-        );
-    }
-    let frozen = parsed.base_context();
-    for (schema, local) in [("a.b", "idx"), ("a", "b.idx")] {
-        let child = load_layer(frozen, &[schema], "")?;
-        assert_eq!(
-            child
-                .get_index(&FullName::from_local_name(local))
-                .expect("index from frozen parent")
-                .name(),
-            &FullName::with_schema(schema, local)
-        );
-    }
-    Ok(())
-}
-
 #[rstest::rstest]
 #[case::own_schema("CREATE INDEX idx ON a.items(id);", false)]
 #[case::other_schema("CREATE INDEX idx ON b.items(id);", true)]

@@ -496,12 +496,12 @@ fn missing_index_table_recovers_without_registering_and_analyzes_later_statement
     let root = heavy::index_root()?;
     let parsed = load_schema(
         &root,
-        r#"
+        r"
         CREATE INDEX missing_idx ON missing.items(id);
         CREATE TABLE public.items(id integer);
         CREATE INDEX valid_idx ON public.items(id);
         CREATE VIEW public.missing_view AS SELECT 1 AS id FROM later_missing.items;
-    "#,
+    ",
     )?;
     assert_missing_relation(parsed.problems(), "missing.items");
     assert_missing_relation(parsed.problems(), "later_missing.items");
@@ -579,7 +579,7 @@ fn explicit_and_constraint_indexes_in_distinct_schemas_coexist()
     let root = heavy::index_root()?;
     let parsed = load_schema(
         &root,
-        r#"
+        r"
         CREATE SCHEMA a; CREATE SCHEMA b;
         CREATE TABLE a.items(id integer, value integer);
         ALTER TABLE a.items ADD CONSTRAINT pk PRIMARY KEY(id);
@@ -589,7 +589,7 @@ fn explicit_and_constraint_indexes_in_distinct_schemas_coexist()
         ALTER TABLE b.items ADD CONSTRAINT uq UNIQUE(value);
         CREATE INDEX idx ON a.items(id);
         CREATE INDEX idx ON b.items(id);
-    "#,
+    ",
     )?;
     assert!(parsed.problems().is_empty());
     for schema in ["a", "b"] {

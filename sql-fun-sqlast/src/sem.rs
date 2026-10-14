@@ -292,7 +292,7 @@ pub enum SemAst {
 }
 
 impl SemAst {
-    pub(crate) fn unresolved_statement() -> Self {
+    pub(crate) const fn unresolved_statement() -> Self {
         Self::UnresolvedStatement
     }
     pub(crate) fn from_index_resolution(index: &Option<CreateIndex>) -> Self {

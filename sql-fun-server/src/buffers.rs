@@ -352,7 +352,7 @@ where
         idle_timeout: Duration,
     ) -> Result<Self, ReaderError> {
         if buffer_count < 2 {
-            return Err(std::io::Error::other("require 2 buffers"))?;
+            return Err(std::io::Error::other("require 2 buffers").into());
         }
         let (buf_tx, buf_rx) = tokio::sync::mpsc::channel(buffer_count);
         let (ret_tx, ret_rx) = tokio::sync::mpsc::channel(buffer_count);

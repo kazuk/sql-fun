@@ -29,7 +29,7 @@ impl<'ctx> CollectionRegistry<'ctx> {
 
     /// Register a reusable source without iterating or serializing its items.
     ///
-    /// Borrowing the source must implement IntoIterator for every read lifetime.
+    /// Borrowing the source must implement `IntoIterator` for every read lifetime.
     /// The caller guarantees immutable contents, deterministic ordering, and an
     /// exact, stable length. The mapping preserves the original API item shape.
     /// Ownership is transferred so both owned and schema-borrowing sources can
@@ -201,11 +201,11 @@ pub(super) enum CollectionRegistryError {
 }
 
 impl CollectionRegistryError {
-    fn invalid_handle() -> Self {
+    const fn invalid_handle() -> Self {
         Self::InvalidHandle
     }
 
-    fn handle_ids_exhausted() -> Self {
+    const fn handle_ids_exhausted() -> Self {
         Self::HandleIdsExhausted
     }
 }

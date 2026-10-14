@@ -63,12 +63,14 @@ impl Observation {
 }
 
 pub(super) struct ObservedSource {
+    items: Vec<usize>,
     observation: Arc<Observation>,
 }
 
 impl ObservedSource {
     pub(super) fn new() -> Self {
         Self {
+            items: vec![0, 1, 2, 3],
             observation: Arc::default(),
         }
     }
@@ -78,7 +80,7 @@ impl ObservedSource {
     }
 
     pub(super) fn len(&self) -> usize {
-        4
+        self.items.len()
     }
 
     pub(super) fn map(item: ObservedItem<'_>) -> Value {
@@ -87,6 +89,7 @@ impl ObservedSource {
     }
 }
 
+#[derive(Clone, Copy)]
 pub(super) struct ObservedItem<'read> {
     index: usize,
     observation: &'read Observation,
@@ -98,8 +101,8 @@ impl<'read> IntoIterator for &'read ObservedSource {
 
     fn into_iter(self) -> Self::IntoIter {
         self.observation.iterators.fetch_add(1, Ordering::Relaxed);
-        Box::new((0..self.len()).map(|index| ObservedItem {
-            index,
+        Box::new(self.items.iter().map(|index| ObservedItem {
+            index: *index,
             observation: &self.observation,
         }))
     }
@@ -112,7 +115,7 @@ impl Drop for ObservedSource {
 }
 
 /// Real schema borrow with a destructor that observes schema data on teardown.
-/// Uses the small synthetic SchemaProject fixture, not the full builtin catalog.
+/// Uses the small synthetic `SchemaProject` fixture, not the full builtin catalog.
 pub(super) struct SchemaColumns<'ctx> {
     table: &'ctx CreateTable,
     dropped: Arc<AtomicBool>,

@@ -48,7 +48,7 @@ fn reads_empty_collection() {
         .unwrap();
     let page = registry.read(&handle, 0, None).unwrap();
     assert_eq!(*page.total_length(), 0);
-    assert_eq!(page.items().as_slice(), []);
+    assert_eq!(page.items(), &Vec::<Value>::new());
     assert_eq!(registry.len(), 1);
 }
 

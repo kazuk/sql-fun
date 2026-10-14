@@ -34,11 +34,43 @@ pub use self::{
 
 use std::{convert::Infallible, error::Error as StdError, path::PathBuf};
 
-/// semantic analysis context handle
+/// Opaque identifier for a connection's registered semantic analysis context.
+///
+/// Constructing a handle does not register a context or grant access. Handles
+/// resolve only in the connection that issued them.
 #[cfg_attr(feature = "openrpc-schema", derive(schemars::JsonSchema))]
-#[derive(serde::Serialize, serde::Deserialize)]
+#[derive(Clone, PartialEq, Eq, Hash, serde::Serialize, serde::Deserialize)]
 #[serde(transparent)]
 pub struct ContextHandle(String);
+
+impl From<String> for ContextHandle {
+    /// Wrap a wire value without registering or validating a context.
+    fn from(value: String) -> Self {
+        Self(value)
+    }
+}
+
+#[cfg(test)]
+mod test_context_handle {
+    use crate::ContextHandle;
+    use std::collections::HashMap;
+
+    #[rstest::rstest]
+    #[case::opaque("context-42")]
+    #[case::empty("")]
+    #[case::arbitrary("unknown handle / 日本語")]
+    fn preserves_string_representation(#[case] value: &str) -> testresult::TestResult {
+        let handle = ContextHandle::from(value.to_owned());
+        let json = ::serde_json::to_string(&handle)?;
+        assert_eq!(json, ::serde_json::to_string(value)?);
+        let decoded: ContextHandle = ::serde_json::from_str(&json)?;
+        let mut registered = HashMap::new();
+        registered.insert(handle.clone(), 42);
+        assert!(handle == decoded);
+        assert_eq!(registered.get(&decoded), Some(&42));
+        Ok(())
+    }
+}
 
 /// position in SQL text
 #[cfg_attr(feature = "openrpc-schema", derive(schemars::JsonSchema))]

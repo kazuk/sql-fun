@@ -60,6 +60,10 @@ impl HandleIdAllocator {
 
     fn issue(&self) -> Result<ContextHandle, HandleIssuanceError> {
         // Ordering carries no schema publication: uniqueness alone is required.
+        #[allow(
+            deprecated,
+            reason = "try_update requires Rust 1.95; the workspace MSRV is 1.93"
+        )]
         let id = self
             .0
             .fetch_update(Ordering::Relaxed, Ordering::Relaxed, |id| id.checked_add(1))

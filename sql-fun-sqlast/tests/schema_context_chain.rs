@@ -605,8 +605,7 @@ fn explicit_and_constraint_indexes_in_distinct_schemas_coexist()
 }
 
 #[test]
-fn quoted_index_components_with_dots_remain_distinct()
--> Result<(), Box<dyn std::error::Error>> {
+fn quoted_index_components_with_dots_remain_distinct() -> Result<(), Box<dyn std::error::Error>> {
     let root = heavy::index_root()?;
     let parsed = load_schema(
         &root,

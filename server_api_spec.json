@@ -208,7 +208,7 @@
           ],
           "$defs": {
             "ContextHandle": {
-              "description": "semantic analysis context handle",
+              "description": "Opaque identifier for a connection's registered semantic analysis context.\n\nConstructing a handle does not register a context or grant access. Handles\nresolve only in the connection that issued them.",
               "type": "string"
             },
             "Collection": {
@@ -514,7 +514,7 @@
             ],
             "$defs": {
               "ContextHandle": {
-                "description": "semantic analysis context handle",
+                "description": "Opaque identifier for a connection's registered semantic analysis context.\n\nConstructing a handle does not register a context or grant access. Handles\nresolve only in the connection that issued them.",
                 "type": "string"
               },
               "AnalyzeQueryInput": {

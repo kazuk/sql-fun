@@ -33,6 +33,7 @@ typed-openrpc = { workspace = true, optional = true }
 url.workspace = true
 
 [dev-dependencies]
+rstest.workspace = true
 testresult.workspace = true
 
 [lints]

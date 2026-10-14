@@ -1,3 +1,7 @@
+mod context_handle_registry;
+
+use self::context_handle_registry::ContextHandleRegistry;
+
 use crate::{
     ServerError,
     buffers::JsonLinesStreamReader,
@@ -16,11 +20,18 @@ use ::tokio::{
 ///
 /// Future borrowing session state belongs inside the handler, so it is dropped
 /// before the wrapper's context owners rather than forming a self-reference.
-pub(super) struct SessionWrapper {}
+/// Its cursors may borrow schemas for the registry's lifetime. The future RPC
+/// facade must keep that lifetime separate from its shorter mutable-state borrow;
+/// registration through a shared registry borrow cannot invalidate live cursors.
+pub(super) struct SessionWrapper {
+    contexts: ContextHandleRegistry,
+}
 
 impl SessionWrapper {
-    pub(super) const fn new() -> Self {
-        Self {}
+    pub(super) fn new() -> Self {
+        Self {
+            contexts: ContextHandleRegistry::new(),
+        }
     }
 
     /// Run authenticated requests in the connection task using its existing reader.

@@ -6,12 +6,25 @@ use std::{
 };
 
 /// Small synthetic builtin catalog: no external service/full builtin parsing.
-pub(super) struct SchemaProject {
+pub(crate) struct SchemaProject {
     directory: ::tempfile::TempDir,
 }
 
 impl SchemaProject {
-    pub(super) fn new() -> Self {
+    /// Initialize a synthetic table without a PostgreSQL server or full builtin parsing.
+    pub(crate) async fn initialized_schema(
+        &self,
+        service: &SchemaCacheService,
+    ) -> std::sync::Arc<super::InitializedSchema> {
+        let dump = self.schema(
+            "registry.sql",
+            "CREATE TABLE retained (id int4, value int4);",
+        );
+        let selection = self.selection("products", &[], &dump, &Self::hash(&dump));
+        std::sync::Arc::new(service.initialize(&selection).await.unwrap())
+    }
+
+    pub(crate) fn new() -> Self {
         let directory = ::tempfile::tempdir().unwrap();
         let builtin = directory.path().join("postgres/17");
         std::fs::create_dir_all(&builtin).unwrap();
@@ -52,7 +65,7 @@ connector = 'orders-connector'
     pub(super) fn home(&self) -> &Path {
         self.directory.path()
     }
-    pub(super) fn service(&self) -> SchemaCacheService {
+    pub(crate) fn service(&self) -> SchemaCacheService {
         SchemaCacheService::new(self.home()).unwrap()
     }
     pub(super) fn schema(&self, name: &str, sql: &str) -> PathBuf {

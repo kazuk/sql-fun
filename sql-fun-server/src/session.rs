@@ -1,6 +1,9 @@
+mod collection_registry;
 mod context_handle_registry;
 
-use self::context_handle_registry::ContextHandleRegistry;
+use self::{
+    collection_registry::CollectionRegistry, context_handle_registry::ContextHandleRegistry,
+};
 
 use crate::{
     ServerError,
@@ -9,7 +12,7 @@ use crate::{
     process_request,
 };
 
-use std::net::SocketAddr;
+use std::{net::SocketAddr, num::NonZeroUsize};
 
 use ::tokio::{
     io::AsyncWriteExt,
@@ -44,6 +47,9 @@ impl SessionWrapper {
         addr: SocketAddr,
         request_length_limit: usize,
     ) -> Result<(), ServerError> {
+        // Handler-local storage drops before the wrapper's strong schema owners,
+        // including on early errors and task cancellation. RPC integration follows.
+        let _collections = CollectionRegistry::new(NonZeroUsize::new(1_024).unwrap());
         request_reader
             .set_request_length_limit(request_length_limit)
             .await;

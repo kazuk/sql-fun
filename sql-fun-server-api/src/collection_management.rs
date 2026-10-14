@@ -1,10 +1,14 @@
-use time::UtcDateTime;
-
 /// collection handle
 #[cfg_attr(feature = "openrpc-schema", derive(schemars::JsonSchema))]
-#[derive(serde::Serialize, serde::Deserialize, Debug)]
+#[derive(serde::Serialize, serde::Deserialize, Debug, Clone, PartialEq, Eq, Hash)]
 #[serde(transparent)]
 pub struct CollectionHandle(String);
+
+impl From<String> for CollectionHandle {
+    fn from(value: String) -> Self {
+        Self(value)
+    }
+}
 
 /// argument for [`crate::SqlFunServerApi::release_collection`]
 #[cfg_attr(feature = "openrpc-schema", derive(schemars::JsonSchema))]
@@ -51,25 +55,64 @@ pub struct Collection<T> {
     /// When true, client must be call `SqlFunServerApi::release_collection`
     require_release: bool,
 
-    /// expiration time
-    #[cfg_attr(
-        feature = "openrpc-schema",
-        schemars(schema_with = "self::schema_util::utc_datetime_schema")
-    )]
-    expire_at: UtcDateTime,
-
     /// collection items
     items: Vec<T>,
 }
 
-#[cfg(feature = "openrpc-schema")]
-mod schema_util {
-    use schemars::{Schema, SchemaGenerator};
+impl<T> Collection<T> {
+    /// Construct a page without converting its items.
+    ///
+    /// Retained collections remain readable until explicit release or connection
+    /// teardown. Reaching the last page does not release a retained collection.
+    /// This constructor takes ownership of the page's items to avoid cloning them.
+    #[must_use]
+    pub fn new(
+        handle: &CollectionHandle,
+        total_length: usize,
+        offset: usize,
+        require_release: bool,
+        items: Vec<T>,
+    ) -> Self {
+        Self {
+            handle: handle.clone(),
+            total_length,
+            offset,
+            require_release,
+            items,
+        }
+    }
+}
 
-    pub fn utc_datetime_schema(_gen: &mut SchemaGenerator) -> Schema {
-        schemars::json_schema!({
-            "type": "string",
-            "format": "date-time"
-        })
+#[cfg(test)]
+mod test_collection {
+    use super::{Collection, CollectionHandle};
+
+    #[test]
+    fn serializes_page_without_expiration_and_preserves_item_type() {
+        let handle = CollectionHandle::from("collection-7".to_owned());
+        let page = Collection::new(&handle, 3, 1, true, vec![42_u32]);
+        let json = ::serde_json::to_value(&page).unwrap();
+        assert_eq!(
+            json,
+            ::serde_json::json!({
+                "handle": "collection-7", "total_length": 3, "offset": 1,
+                "require_release": true, "items": [42]
+            })
+        );
+        let decoded: Collection<u32> = ::serde_json::from_value(json).unwrap();
+        assert_eq!(decoded.handle(), &handle);
+        assert_eq!(decoded.items(), &[42]);
+    }
+
+    #[cfg(feature = "openrpc-schema")]
+    #[test]
+    fn generated_schema_has_no_expiration_property_or_requirement() {
+        let schema = ::schemars::schema_for!(Collection<u32>);
+        let json = ::serde_json::to_value(schema).unwrap();
+        assert!(json["properties"].get("expire_at").is_none());
+        assert_eq!(json["properties"].as_object().unwrap().len(), 5);
+        let required = json["required"].as_array().unwrap();
+        assert_eq!(required.len(), 5);
+        assert!(!required.contains(&::serde_json::json!("expire_at")));
     }
 }

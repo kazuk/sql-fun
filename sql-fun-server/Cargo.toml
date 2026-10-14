@@ -22,7 +22,7 @@ async-trait.workspace = true
 clap = { workspace = true }
 derive-getters = { workspace = true }
 either.workspace = true
-elsa = { version = "1.11.2", default-features = false }
+elsa.workspace = true
 futures-core.workspace = true
 futures-util.workspace = true
 indexmap = { workspace = true }

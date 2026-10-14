@@ -51,6 +51,12 @@ for operational details.
 
 ## Planning
 
+- During planning, check available disk space on the filesystem containing
+  the worktree and build directories. Use 20 GB as the minimum baseline,
+  and allow more if the planned builds or tests require it.
+- Record the available capacity and estimated requirement in the plan.
+  If capacity is insufficient, state that the user must resolve the
+  shortage before implementation begins.
 - Before finalizing an implementation plan, identify the technologies and
   patterns already used by the relevant modules and crates.
   Evaluate whether they can satisfy the new requirement, including the
@@ -131,6 +137,26 @@ for operational details.
 - In a Codex agent environment, do not invoke `git worktree add` directly.
   Use the `agent-worktree` repository skill and its `agent-worktree-add`
   helper, which creates linked worktrees below `$GIT_ROOT/.worktrees/`.
+
+## Worktree Cleanup
+
+- After a pull request is merged or a task is explicitly abandoned,
+  remove the task's linked worktree.
+- Before removal, verify that no uncommitted changes, untracked files,
+  or unpushed commits need to be preserved. Account for squash merges when
+  checking commits; ancestry alone does not establish whether work was merged.
+- Do not remove worktrees used by active tasks or running processes.
+- Use `git worktree remove` without `--force`.
+- Removing the worktree also removes its task-local build artifacts,
+  including `target/`. Do not run `cargo clean` separately.
+- Never clean shared build directories or other tasks' worktrees.
+- The agent handling the task is responsible for cleanup when it observes
+  that the pull request has merged or the task has been abandoned.
+- If the agent finishes before merge, report the worktree path and pending
+  cleanup in the handoff. The next session handling that task must check
+  the pull request status and perform cleanup when eligible.
+- If removal is unsafe or cannot be completed, report the reason
+  and leave the worktree intact. Otherwise, report cleanup completion.
 
 ## Commits
 

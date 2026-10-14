@@ -5,6 +5,7 @@ mod table_info;
 mod type_info;
 mod view_info;
 
+use std::collections::HashMap;
 use std::path::{Path, PathBuf};
 
 use sql_fun_core::SqlFunArgs;
@@ -60,7 +61,7 @@ pub(super) struct SchemaCatalog {
     binary_operators: TrieMap<OperatorDefinition>,
     left_unary_operators: TrieMap<OperatorDefinition>,
     right_unary_operators: TrieMap<OperatorDefinition>,
-    indexes: TrieMap<CreateIndex>,
+    indexes: HashMap<FullName, CreateIndex>,
     sql_source_path: PathBuf,
     source: Option<SourcePathWithSpan>,
 }
@@ -100,7 +101,7 @@ impl SchemaFileContext {
                 binary_operators: TrieMap::default(),
                 left_unary_operators: TrieMap::default(),
                 right_unary_operators: TrieMap::default(),
-                indexes: TrieMap::default(),
+                indexes: HashMap::default(),
                 source: None,
             },
             statement_span: StringSpan::default(),
@@ -171,7 +172,7 @@ mod test_schema_file_context {
 
 impl IndexInfoRead for SchemaCatalog {
     fn get_index_impl(&self, index_name: &FullName) -> Option<&CreateIndex> {
-        if let Some(index) = self.indexes.get(&index_name.to_string()) {
+        if let Some(index) = self.indexes.get(index_name) {
             Some(index)
         } else {
             self.base.get_index_impl(index_name)
@@ -593,7 +594,7 @@ impl ParseContext for SchemaFileContext {
         let name = create_index.name();
         self.catalog
             .indexes
-            .insert(&name.to_string(), create_index.clone());
+            .insert(name.clone(), create_index.clone());
         Ok(self)
     }
 }

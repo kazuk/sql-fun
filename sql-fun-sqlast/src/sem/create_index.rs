@@ -197,7 +197,7 @@ impl CreateIndex {
 
     /// Return the qualified catalog identity, including the target table schema.
     #[must_use]
-    pub fn name(&self) -> &FullName {
+    pub const fn name(&self) -> &FullName {
         &self.name
     }
 }

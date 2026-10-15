@@ -27,12 +27,7 @@ impl ExtensionVersion {
 }
 
 impl ExtensionVersion {
-    /// Validate an explicitly selected installation version (not an update script).
-    ///
-    /// # Errors
-    ///
-    /// Rejects empty, path-like, and update-script version names.
-    pub fn installation(version: &str) -> Result<Self, ExtensionConfigError> {
+    fn installation(version: &str) -> Result<Self, ExtensionConfigError> {
         if version.is_empty()
             || version.contains("--")
             || version.contains('\0')

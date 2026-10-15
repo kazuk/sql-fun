@@ -65,15 +65,17 @@ connector = 'orders-connector'
 
     pub(crate) fn rpc_request(&self, sql: &str) -> ::serde_json::Value {
         let dump = self.schema("rpc.sql", sql);
+        // Exercise the same core-owned transfer as a CLI-selected datasource.
+        let mut builder = SqlFunArgs::builder(&HashMap::new()).unwrap();
+        builder
+            .sql_fun_home(self.home())
+            .metadata_file(self.home().join("Cargo.toml").to_str().unwrap())
+            .datasource(Some("products".to_owned()))
+            .schema_file(&dump);
+        let args = builder.build().unwrap();
         ::serde_json::json!({
-            "datasource":"products", "engine_dialect":"PostgreSQL",
-            "engine_version":{"PostgreSQL":"17"}, "extensions":[],
-            "search_path":["public"], "schema_dump":dump,
-            "expected_hash":Self::hash(&dump),
-            "environments":{
-                "SQL_FUN_HOME":self.home(),
-                "SQL_FUN_METADATA_FILE":self.home().join("Cargo.toml")
-            }
+            "datasource":"products", "schema_dump":dump,
+            "expected_hash":Self::hash(&dump), "environments":args.environments().unwrap()
         })
     }
 
@@ -93,10 +95,7 @@ connector = 'orders-connector'
         )
         .unwrap();
         let mut request = request;
-        request["extensions"] = ::serde_json::json!([
-            {"extension_name":"second", "extension_version":"2.0"},
-            {"extension_name":"first", "extension_version":"1.0"}
-        ]);
+        request["environments"]["SQL_FUN_EXTENSIONS"] = ::serde_json::json!("second@2.0,first@1.0");
         request
     }
 

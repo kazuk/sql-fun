@@ -368,3 +368,21 @@ pub(crate) fn initialization_choices_project(declarations: &str) -> tempfile::Te
     .unwrap();
     directory
 }
+
+/// Write a schema project with a named PostgreSQL datasource for configuration transfer.
+pub(crate) fn write_postgres_metadata_project(project: &TestProjectDir) -> TestMetadataProject {
+    let fixture = write_metadata_project(project, "transfer", "qa").unwrap();
+    project
+        .write_file(
+            "Cargo.toml",
+            r#"
+[package.metadata.database.default]
+engine = "PostgreSQL"
+dialect = "postgres"
+version = "16"
+search_path = ["public"]
+"#,
+        )
+        .unwrap();
+    fixture
+}

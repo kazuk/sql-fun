@@ -79,28 +79,6 @@
                 "description": "datasource name",
                 "type": "string"
               },
-              "engine_dialect": {
-                "description": "SQL dialect for schema",
-                "$ref": "#/$defs/EngineDialect"
-              },
-              "engine_version": {
-                "description": "Used for loading builtin schema objects",
-                "$ref": "#/$defs/EngineVersion"
-              },
-              "extensions": {
-                "description": "Enabled extensions",
-                "type": "array",
-                "items": {
-                  "$ref": "#/$defs/ExtensionSpec"
-                }
-              },
-              "search_path": {
-                "description": "Search path",
-                "type": "array",
-                "items": {
-                  "type": "string"
-                }
-              },
               "schema_dump": {
                 "description": "schema dump file",
                 "type": "string"
@@ -110,7 +88,7 @@
                 "type": "string"
               },
               "environments": {
-                "description": "Explicit `SQL_FUN_HOME` and `SQL_FUN_METADATA_FILE`; other keys are rejected.",
+                "description": "Configuration transferred by `sql_fun_core::SqlFunArgs::environments`.",
                 "type": "object",
                 "additionalProperties": {
                   "type": "string"
@@ -119,62 +97,10 @@
             },
             "required": [
               "datasource",
-              "engine_dialect",
-              "engine_version",
-              "extensions",
-              "search_path",
               "schema_dump",
               "expected_hash",
               "environments"
-            ],
-            "$defs": {
-              "EngineDialect": {
-                "description": "Engine dialect selecting SQL syntax perser.",
-                "oneOf": [
-                  {
-                    "description": "`PostgreSQL` valiant, selects parser as `pg_query`",
-                    "type": "string",
-                    "const": "PostgreSQL"
-                  }
-                ]
-              },
-              "EngineVersion": {
-                "description": "Selecting database builtin objects",
-                "oneOf": [
-                  {
-                    "description": "`PostgreSQL` and version string.",
-                    "type": "object",
-                    "properties": {
-                      "PostgreSQL": {
-                        "type": "string"
-                      }
-                    },
-                    "required": [
-                      "PostgreSQL"
-                    ],
-                    "additionalProperties": false
-                  }
-                ]
-              },
-              "ExtensionSpec": {
-                "description": "`PostgreSQL` extension",
-                "type": "object",
-                "properties": {
-                  "extension_name": {
-                    "description": "Name for extension",
-                    "type": "string"
-                  },
-                  "extension_version": {
-                    "description": "Version for extension",
-                    "type": "string"
-                  }
-                },
-                "required": [
-                  "extension_name",
-                  "extension_version"
-                ]
-              }
-            }
+            ]
           },
           "required": true
         }

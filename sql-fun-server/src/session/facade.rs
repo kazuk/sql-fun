@@ -4,7 +4,6 @@ use super::{
 use crate::{Api, InitializedSchema, JsonRpcError, json_rpc::JsonRpcRequest};
 use std::sync::Arc;
 
-use ::serde_json::Value;
 use ::sql_fun_server_api::{
     AnalysisProbrem, CollectionHandle, ContextHandle, InitializeSchemaArgs, ReadCollectionArgs,
     ReleaseCollectionArgs, SchemaContext, SqlFunServerApiError, StatementByteRange,
@@ -53,7 +52,7 @@ impl<'request, 'ctx> Session<'request, 'ctx> {
         L: Fn(&S) -> usize + Send + 'ctx,
         M: Send + 'ctx,
         for<'read> &'read S: IntoIterator,
-        for<'read> M: Fn(<&'read S as IntoIterator>::Item) -> Value,
+        for<'read> M: Fn(<&'read S as IntoIterator>::Item) -> ::serde_json::Value,
     {
         self.state
             .collections
@@ -64,7 +63,7 @@ impl<'request, 'ctx> Session<'request, 'ctx> {
     pub(super) fn read_collection(
         &self,
         args: &ReadCollectionArgs,
-    ) -> Result<Value, SqlFunServerApiError> {
+    ) -> Result<::serde_json::Value, SqlFunServerApiError> {
         let page = self.state.collections.read(
             args.collection_handle(),
             *args.start_offset(),
@@ -118,7 +117,7 @@ impl<'request, 'ctx> Session<'request, 'ctx> {
         &mut self,
         api: &Api,
         request: &JsonRpcRequest,
-    ) -> Result<Value, JsonRpcError> {
+    ) -> Result<::serde_json::Value, JsonRpcError> {
         let method = request.method();
         match method {
             "initialize_schema_context" => {
@@ -129,7 +128,7 @@ impl<'request, 'ctx> Session<'request, 'ctx> {
             "read_collection" => Ok(self.read_collection(&Self::arguments(request)?)?),
             "release_collection" => {
                 self.release_collection(&Self::arguments(request)?)?;
-                Ok(Value::Null)
+                Ok(::serde_json::Value::Null)
             }
             _ => crate::process_request(request),
         }
@@ -178,7 +177,7 @@ impl Diagnostics<'_> {
         StatementByteRange::new(span.offset(), span.len())
     }
 
-    fn map(item: Diagnostic<'_>) -> Value {
+    fn map(item: Diagnostic<'_>) -> ::serde_json::Value {
         let span = item.problem.statement_relative_span().map(Self::span);
         ::serde_json::to_value(AnalysisProbrem::new(item.problem.code(), item.path, span))
             .expect("diagnostic serializes")

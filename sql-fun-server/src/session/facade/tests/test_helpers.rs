@@ -4,7 +4,6 @@ use std::sync::{
     atomic::{AtomicBool, Ordering},
 };
 
-use ::serde_json::Value;
 use ::sql_fun_sqlast::sem::{BaseParseContext, ColumnDefinition, CreateTable, FullName, TableName};
 
 /// Real schema borrow with a destructor that observes schema data on teardown.
@@ -29,7 +28,7 @@ impl<'ctx> SchemaColumns<'ctx> {
             .count()
     }
 
-    pub(super) fn map(column: &ColumnDefinition) -> Value {
+    pub(super) fn map(column: &ColumnDefinition) -> ::serde_json::Value {
         ::serde_json::json!(column.name().as_ref().unwrap().as_str())
     }
 }

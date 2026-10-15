@@ -5,7 +5,7 @@ use std::sync::{
 };
 
 use ::elsa::sync::FrozenMap;
-use ::sql_fun_server_api::ContextHandle;
+use sql_fun_server_api::payloads::ContextHandle;
 
 // Only issuance identity is process-wide; registrations and schemas belong to wrappers.
 static HANDLE_IDS: HandleIdAllocator = HandleIdAllocator::new();

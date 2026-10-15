@@ -219,7 +219,7 @@ impl std::fmt::Display for PostgresEngineVersion {
 }
 
 impl PostgresEngineVersion {
-    /// Whether this uses canonical PostgreSQL major/prerelease naming.
+    /// Whether this uses canonical `PostgreSQL` major/prerelease naming.
     ///
     /// This does not imply that builtin extraction is supported for the version.
     #[must_use]

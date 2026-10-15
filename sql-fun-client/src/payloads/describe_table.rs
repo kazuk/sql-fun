@@ -1,6 +1,9 @@
 use std::path::PathBuf;
 
-use crate::{Collection, Nullability, TextSpan, TypeReference};
+use crate::{
+    Collection,
+    payloads::{Nullability, TextSpan, TypeReference},
+};
 
 /// column definition
 #[derive(serde::Serialize, serde::Deserialize, derive_getters::Getters)]
@@ -27,14 +30,14 @@ pub struct TableConstraint {
     // TODO: definition
 }
 
-/// argument for [`crate::SqlFunServerApi::describe_table`]
+/// argument for `describe_table`
 #[derive(serde::Serialize, serde::Deserialize, derive_getters::Getters)]
 pub struct DescribeTableArgs {
     schema_name: String,
     local_name: String,
 }
 
-/// response type for [`crate::SqlFunServerApi::describe_table`]
+/// response type for `describe_table`
 #[derive(serde::Serialize, serde::Deserialize, derive_getters::Getters)]
 pub struct DescribeTableResponse {
     definition_file: PathBuf,

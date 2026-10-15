@@ -12,7 +12,7 @@ pub(crate) struct SchemaProject {
 }
 
 impl SchemaProject {
-    /// Initialize a synthetic table without a PostgreSQL server or full builtin parsing.
+    /// Initialize a synthetic table without a `PostgreSQL` server or full builtin parsing.
     pub(crate) async fn initialized_schema(
         &self,
         service: &SchemaCacheService,

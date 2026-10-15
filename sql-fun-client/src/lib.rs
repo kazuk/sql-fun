@@ -4,6 +4,10 @@
 
 mod async_tokio;
 mod connection;
+/// api payload
+pub mod payloads;
+
+use crate::payloads::CollectionHandle;
 
 pub use self::async_tokio::{TcpJsonRpcClientAsync, TcpJsonRpcClientAsyncError};
 pub use self::connection::{ConnectionError, ConnectionOptions, ConnectionOptionsBuilder, connect};
@@ -12,6 +16,97 @@ use std::{
     io::{BufReader, Write},
     net::TcpStream,
 };
+
+/// client side collection representation
+#[cfg_attr(feature = "openrpc-schema", derive(schemars::JsonSchema))]
+#[derive(serde::Serialize, serde::Deserialize)]
+#[serde(from = "StreamingCollection<T>")]
+pub enum Collection<T> {
+    /// raw server response
+    Stream(StreamingCollection<T>),
+}
+
+impl<T> Collection<T> {
+    /// create [`Self::Stream`] variant
+    #[must_use]
+    pub fn new(
+        handle: &CollectionHandle,
+        total_length: usize,
+        offset: usize,
+        require_release: bool,
+        items: Vec<T>,
+    ) -> Self {
+        Self::Stream(StreamingCollection::new(
+            handle,
+            total_length,
+            offset,
+            require_release,
+            items,
+        ))
+    }
+
+    /// handle for collection
+    #[must_use]
+    pub fn handle(&self) -> &CollectionHandle {
+        match self {
+            Self::Stream(s) => s.handle(),
+        }
+    }
+
+    /// collection items
+    #[must_use]
+    pub fn items(&self) -> &[T] {
+        match self {
+            Self::Stream(s) => &s.items,
+        }
+    }
+}
+
+impl<T> From<StreamingCollection<T>> for Collection<T> {
+    fn from(value: StreamingCollection<T>) -> Self {
+        Self::Stream(value)
+    }
+}
+
+/// raw server response
+#[cfg_attr(feature = "openrpc-schema", derive(schemars::JsonSchema))]
+#[derive(serde::Serialize, serde::Deserialize, derive_getters::Getters)]
+pub struct StreamingCollection<T> {
+    /// handle for collecttion
+    handle: CollectionHandle,
+
+    /// length of collection
+    total_length: usize,
+
+    /// offset of items
+    offset: usize,
+
+    /// When true, client must be call `SqlFunServerApi::release_collection`
+    require_release: bool,
+
+    /// collection items
+    items: Vec<T>,
+}
+
+impl<T> StreamingCollection<T> {
+    /// create instance
+    #[must_use]
+    pub fn new(
+        handle: &CollectionHandle,
+        total_length: usize,
+        offset: usize,
+        require_release: bool,
+        items: Vec<T>,
+    ) -> Self {
+        Self {
+            handle: handle.clone(),
+            total_length,
+            offset,
+            require_release,
+            items,
+        }
+    }
+}
 
 /// JSON RPC Client errors
 #[derive(Debug, thiserror::Error)]

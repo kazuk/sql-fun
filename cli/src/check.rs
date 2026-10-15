@@ -223,11 +223,7 @@ impl CheckArgs {
     }
 
     fn depends_sql_fun(package: &cargo_metadata::Package) -> bool {
-        package
-            .dependencies
-            .iter()
-            .find(|d| d.name == "sql-fun")
-            .is_some()
+        package.dependencies.iter().any(|d| d.name == "sql-fun")
     }
 }
 

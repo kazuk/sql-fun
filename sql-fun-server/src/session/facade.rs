@@ -4,9 +4,12 @@ use super::{
 use crate::{Api, InitializedSchema, JsonRpcError, json_rpc::JsonRpcRequest};
 use std::sync::Arc;
 
-use ::sql_fun_server_api::{
-    AnalysisProbrem, CollectionHandle, ContextHandle, InitializeSchemaArgs, ReadCollectionArgs,
-    ReleaseCollectionArgs, SchemaContext, SqlFunServerApiError, StatementByteRange,
+use sql_fun_server_api::{
+    SqlFunServerApiError,
+    payloads::{
+        AnalysisProbrem, CollectionHandle, ContextHandle, InitializeSchemaArgs, ReadCollectionArgs,
+        ReleaseCollectionArgs, SchemaContext, StatementByteRange,
+    },
 };
 
 /// A request's mutable access to connection state, with independently long-lived

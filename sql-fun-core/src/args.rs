@@ -318,7 +318,7 @@ impl SqlFunArgs {
         self.metadata_args.cte_catalog_dir(metadata)
     }
 
-    /// PostgreSQL version explicitly selected by CLI or environment, without project metadata.
+    /// `PostgreSQL` version explicitly selected by CLI or environment, without project metadata.
     ///
     /// # Errors
     /// Returns an error if the configured version cannot be parsed.

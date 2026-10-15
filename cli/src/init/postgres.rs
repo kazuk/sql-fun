@@ -7,7 +7,7 @@ use ::sql_fun_core::{
     SqlFunArgs,
 };
 
-/// A PostgreSQL setup task with all choices resolved before installation.
+/// A `PostgreSQL` setup task with all choices resolved before installation.
 #[derive(Clone)]
 pub(super) struct PostgresSetup {
     args: InitializeArgs,

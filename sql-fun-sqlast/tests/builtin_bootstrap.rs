@@ -1,4 +1,4 @@
-//! Integration coverage for loading committed PostgreSQL builtin schemas.
+//! Integration coverage for loading committed `PostgreSQL` builtin schemas.
 
 use std::path::PathBuf;
 

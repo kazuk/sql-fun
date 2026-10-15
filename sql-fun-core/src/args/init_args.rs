@@ -1,6 +1,6 @@
 use std::path::PathBuf;
 
-use ::clap::{CommandFactory, ValueHint};
+use clap::{CommandFactory, ValueHint};
 
 /// Initialize `sql-fun` environments
 #[derive(clap::Parser, Debug, Clone)]
@@ -10,7 +10,7 @@ pub struct InitializeArgs {
     /// Required choices must be supplied through CLI parameters. Missing choices
     /// are errors; this flag does not select defaults. Existing installations
     /// are never overwritten. Supply --sql-fun-home and either --engines or
-    /// --datasource. PostgreSQL also requires --docker or --database-url, and
+    /// --datasource. `PostgreSQL` also requires --docker or --database-url, and
     /// --engine-versions.
     ///
     ///
@@ -43,22 +43,22 @@ pub struct InitializeArgs {
     #[arg(long = "datasource", value_delimiter = ',', num_args = 1.., conflicts_with = "engines")]
     datasources: Option<Vec<String>>,
 
-    /// Extract PostgreSQL builtins from an explicitly selected existing server.
+    /// Extract `PostgreSQL` builtins from an explicitly selected existing server.
     /// Uses libpq connection strings; prefer password files to inline credentials.
     #[arg(long, hide_env_values = true, conflicts_with = "docker")]
     database_url: Option<String>,
 
-    /// Extract each selected version using its registered PostgreSQL Docker image.
+    /// Extract each selected version using its registered `PostgreSQL` Docker image.
     #[arg(long, conflicts_with = "database_url")]
     docker: bool,
 
-    /// Address used to reach published PostgreSQL ports on the Docker host.
+    /// Address used to reach published `PostgreSQL` ports on the Docker host.
     ///
     /// Default: 127.0.0.1.
     #[arg(long, conflicts_with = "database_url")]
     docker_host_address: Option<String>,
 
-    /// Docker host interface on which PostgreSQL ports are published.
+    /// Docker host interface on which `PostgreSQL` ports are published.
     ///
     /// Default: 127.0.0.1 (loopback only).
     #[arg(long, conflicts_with = "database_url")]
@@ -71,12 +71,12 @@ pub struct InitializeArgs {
     timeout_seconds: Option<u64>,
 
     /// Explicitly select the database engine versions to initialize.
-    /// Currently applies to PostgreSQL setup only.
+    /// Currently applies to `PostgreSQL` setup only.
     ///
     /// Accepts space-separated values, comma-separated lists, or repeated options.
     ///
-    /// Supported PostgreSQL targets: 17, 18. If omitted, ask interactively.
-    /// Required with --yes when PostgreSQL setup is selected.
+    /// Supported `PostgreSQL` targets: 17, 18. If omitted, ask interactively.
+    /// Required with --yes when `PostgreSQL` setup is selected.
     ///
     #[arg(long, value_delimiter = ',', num_args = 1..)]
     engine_versions: Option<Vec<String>>,
@@ -95,7 +95,7 @@ impl InitializeArgs {
         &self.sql_fun_home
     }
 
-    /// Explicit PostgreSQL target selection; omission never selects defaults.
+    /// Explicit `PostgreSQL` target selection; omission never selects defaults.
     #[must_use]
     pub fn requested_versions(&self) -> Option<&[String]> {
         self.engine_versions.as_deref()

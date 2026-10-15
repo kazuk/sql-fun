@@ -180,7 +180,7 @@ pub fn parse_metadata<P: AsRef<Path> + std::fmt::Debug>(
     }
 }
 
-/// Parse PostgreSQL metadata without a CTE catalog.
+/// Parse `PostgreSQL` metadata without a CTE catalog.
 ///
 /// # Errors
 ///
@@ -202,7 +202,7 @@ dialect = "postgres"
     )
 }
 
-/// Parse PostgreSQL metadata with a CTE catalog path.
+/// Parse `PostgreSQL` metadata with a CTE catalog path.
 ///
 /// # Errors
 ///
@@ -369,7 +369,7 @@ pub(crate) fn initialization_choices_project(declarations: &str) -> tempfile::Te
     directory
 }
 
-/// Write a schema project with a named PostgreSQL datasource for configuration transfer.
+/// Write a schema project with a named `PostgreSQL` datasource for configuration transfer.
 pub(crate) fn write_postgres_metadata_project(project: &TestProjectDir) -> TestMetadataProject {
     let fixture = write_metadata_project(project, "transfer", "qa").unwrap();
     project

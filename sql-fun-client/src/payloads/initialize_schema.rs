@@ -1,6 +1,9 @@
 use std::{collections::HashMap, path::PathBuf};
 
-use crate::{AnalysisProbrem, Collection, ContextHandle};
+use crate::{
+    Collection,
+    payloads::{AnalysisProbrem, ContextHandle},
+};
 
 /// Engine dialect selecting SQL syntax perser.
 #[cfg_attr(feature = "openrpc-schema", derive(schemars::JsonSchema))]

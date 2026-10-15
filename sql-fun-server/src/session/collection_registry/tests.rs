@@ -5,8 +5,8 @@ use super::{HandleIdAllocator, MappedSource};
 use std::sync::atomic::AtomicU64;
 
 use ::serde_json::Value;
-use ::sql_fun_server_api::CollectionHandle;
 use ::sql_fun_sqlast::TrieMap;
+use sql_fun_server_api::payloads::CollectionHandle;
 
 #[rstest::rstest]
 #[case::first(0, Some(2), vec![0, 1])]

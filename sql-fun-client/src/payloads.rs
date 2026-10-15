@@ -3,6 +3,9 @@ mod describe_table;
 mod echo;
 mod initialize_schema;
 mod list_objects;
+mod traversal;
+
+pub use self::traversal::{CollectionPage, CollectionReference, CollectionTraversal};
 
 use std::path::PathBuf;
 
@@ -276,3 +279,5 @@ pub struct ReadCollectionArgs {
     /// when None, client requests read to end, but server implementation has a hard limit
     count: Option<usize>,
 }
+
+impl CollectionTraversal for AnalysisProbrem {}

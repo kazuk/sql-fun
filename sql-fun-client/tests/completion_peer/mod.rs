@@ -353,6 +353,7 @@ impl Peer {
                         }
                         continue;
                     }
+                    "echo" => request["params"].clone(),
                     "read_collection" => {
                         if let Some(sent) = read_sent.take() {
                             let _ = sent.send(());

@@ -79,9 +79,11 @@ impl SchemaContext {
     }
 }
 
-impl SchemaContext {
-    /// Mutably access the problems collection.
-    pub const fn problems_mut(&mut self) -> &mut Collection<AnalysisProbrem> {
-        &mut self.problems
+impl super::CollectionTraversal for SchemaContext {
+    fn collections(&self) -> Vec<&dyn super::CollectionReference> {
+        vec![&self.problems]
+    }
+    fn collections_mut(&mut self) -> Vec<&mut dyn super::CollectionReference> {
+        vec![&mut self.problems]
     }
 }

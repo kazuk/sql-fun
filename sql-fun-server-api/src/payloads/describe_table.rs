@@ -18,6 +18,8 @@ pub struct ColumnDefinition {
     constraint: Vec<ColumnConstraint>,
 }
 
+impl super::CollectionTraversal for ColumnDefinition {}
+
 /// constraint for column
 #[derive(serde::Serialize, serde::Deserialize)]
 pub enum ColumnConstraint {
@@ -29,6 +31,8 @@ pub enum ColumnConstraint {
 pub struct TableConstraint {
     // TODO: definition
 }
+
+impl super::CollectionTraversal for TableConstraint {}
 
 /// argument for `describe_table`
 #[derive(serde::Serialize, serde::Deserialize, derive_getters::Getters)]
@@ -47,13 +51,11 @@ pub struct DescribeTableResponse {
     constraints: Collection<TableConstraint>,
 }
 
-impl DescribeTableResponse {
-    /// Mutably access the columns collection.
-    pub const fn columns_mut(&mut self) -> &mut Collection<ColumnDefinition> {
-        &mut self.columns
+impl super::CollectionTraversal for DescribeTableResponse {
+    fn collections(&self) -> Vec<&dyn super::CollectionReference> {
+        vec![&self.columns, &self.constraints]
     }
-    /// Mutably access the constraints collection.
-    pub const fn constraints_mut(&mut self) -> &mut Collection<TableConstraint> {
-        &mut self.constraints
+    fn collections_mut(&mut self) -> Vec<&mut dyn super::CollectionReference> {
+        vec![&mut self.columns, &mut self.constraints]
     }
 }

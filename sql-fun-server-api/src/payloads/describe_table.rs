@@ -46,3 +46,14 @@ pub struct DescribeTableResponse {
     columns: Collection<ColumnDefinition>,
     constraints: Collection<TableConstraint>,
 }
+
+impl DescribeTableResponse {
+    /// Mutably access the columns collection.
+    pub const fn columns_mut(&mut self) -> &mut Collection<ColumnDefinition> {
+        &mut self.columns
+    }
+    /// Mutably access the constraints collection.
+    pub const fn constraints_mut(&mut self) -> &mut Collection<TableConstraint> {
+        &mut self.constraints
+    }
+}

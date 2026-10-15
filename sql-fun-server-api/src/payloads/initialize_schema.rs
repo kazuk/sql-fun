@@ -78,3 +78,10 @@ impl SchemaContext {
         }
     }
 }
+
+impl SchemaContext {
+    /// Mutably access the problems collection.
+    pub const fn problems_mut(&mut self) -> &mut Collection<AnalysisProbrem> {
+        &mut self.problems
+    }
+}

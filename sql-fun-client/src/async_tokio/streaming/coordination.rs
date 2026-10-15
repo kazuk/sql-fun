@@ -8,7 +8,8 @@ use ::tokio::io::{AsyncRead, AsyncWrite, AsyncWriteExt, BufReader};
 const OUTSTANDING_LIMIT: usize = 32;
 
 type CallbackFuture = Pin<Box<dyn Future<Output = Result<(), Infallible>> + Send>>;
-pub(super) type Callback = Box<dyn FnOnce(JsonRpcResponse) -> CallbackFuture + Send>;
+pub(super) type Callback =
+    Box<dyn FnOnce(Result<JsonRpcResponse, String>) -> CallbackFuture + Send>;
 
 /// The request owns this admission slot through callback task collection.
 pub(super) struct RequestSlot {
@@ -25,8 +26,8 @@ impl From<::tokio::sync::OwnedSemaphorePermit> for RequestSlot {
 pub(super) struct RequestAdmission(Arc<::tokio::sync::Semaphore>);
 
 impl RequestAdmission {
-    pub(super) fn new() -> Self {
-        Self(Arc::new(::tokio::sync::Semaphore::new(OUTSTANDING_LIMIT)))
+    pub(super) fn new(limit: usize) -> Self {
+        Self(Arc::new(::tokio::sync::Semaphore::new(limit)))
     }
 
     pub(super) async fn reserve_request(&self) -> Result<RequestSlot, String> {
@@ -40,6 +41,45 @@ impl RequestAdmission {
 
     pub(super) fn stop_accepting(&self) {
         self.0.close();
+    }
+}
+
+#[cfg(test)]
+mod admission_tests {
+    use super::RequestAdmission;
+    use std::time::Duration;
+
+    #[tokio::test]
+    async fn collection_capacity_is_independent_and_reusable() -> ::testresult::TestResult {
+        let normal = RequestAdmission::new(8);
+        let collections = RequestAdmission::new(24);
+        let mut normal_slots = Vec::new();
+        for _ in 0..8 {
+            normal_slots.push(normal.reserve_request().await?);
+        }
+        let mut internal_slots = Vec::new();
+        for _ in 0..24 {
+            internal_slots.push(collections.reserve_request().await?);
+        }
+        assert!(
+            ::tokio::time::timeout(Duration::from_millis(20), normal.reserve_request())
+                .await
+                .is_err()
+        );
+        assert!(
+            ::tokio::time::timeout(Duration::from_millis(20), collections.reserve_request())
+                .await
+                .is_err()
+        );
+        drop(internal_slots.pop());
+        let reused =
+            ::tokio::time::timeout(Duration::from_secs(1), collections.reserve_request()).await??;
+        drop(reused);
+        collections.stop_accepting();
+        assert!(collections.reserve_request().await.is_err());
+        drop(normal_slots);
+        drop(internal_slots);
+        Ok(())
     }
 }
 
@@ -90,27 +130,21 @@ impl Submission {
     }
 }
 
-pub(super) struct SubmissionQueue(Option<::tokio::sync::mpsc::Sender<Submission>>);
+#[derive(Clone)]
+pub(super) struct SubmissionQueue(::tokio::sync::mpsc::Sender<Submission>);
 pub(super) struct AcceptedRequests(::tokio::sync::mpsc::Receiver<Submission>);
 
 impl SubmissionQueue {
     pub(super) fn channel() -> (Self, AcceptedRequests) {
         let (sender, receiver) = ::tokio::sync::mpsc::channel(OUTSTANDING_LIMIT);
-        (Self(Some(sender)), AcceptedRequests(receiver))
+        (Self(sender), AcceptedRequests(receiver))
     }
 
     pub(super) async fn enqueue(&self, submission: Submission) -> Result<(), String> {
-        let Some(sender) = self.0.as_ref() else {
-            return Err(String::from("connection closed"));
-        };
-        sender
+        self.0
             .send(submission)
             .await
             .map_err(|_| String::from("connection closed"))
-    }
-
-    pub(super) fn finish_accepting(&mut self) {
-        self.0.take();
     }
 }
 
@@ -177,7 +211,7 @@ struct PendingCallback {
 }
 
 impl PendingCallback {
-    async fn deliver(self, response: JsonRpcResponse) -> RequestSlot {
+    async fn deliver(self, response: Result<JsonRpcResponse, String>) -> RequestSlot {
         let Ok(()) = (self.callback)(response).await;
         // The task result retains admission until completion is collected.
         self.slot
@@ -209,7 +243,7 @@ impl CallbackDeliveries {
         let Some(delivery) = self.pending.remove(&response.id()) else {
             return Err(format!("unexpected response ID {}", response.id()));
         };
-        self.running.spawn(delivery.deliver(response));
+        self.running.spawn(delivery.deliver(Ok(response)));
         Ok(())
     }
 
@@ -222,6 +256,17 @@ impl CallbackDeliveries {
     pub(super) async fn collect_completion(&mut self) {
         let _ = self.running.join_next().await;
     }
+    pub(super) fn fail_pending(&mut self, accepted: &mut AcceptedRequests, message: &str) {
+        accepted.0.close();
+        while let Ok(submission) = accepted.0.try_recv() {
+            self.register(submission);
+        }
+        for (_, delivery) in self.pending.drain() {
+            self.running
+                .spawn(delivery.deliver(Err(message.to_owned())));
+        }
+    }
+
     pub(super) async fn finish_deliveries(&mut self) {
         while self.has_running_callbacks() {
             self.collect_completion().await;

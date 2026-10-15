@@ -250,6 +250,13 @@ generator or templates instead of editing the generated file by hand.
 
 ## Tests and Checks
 
+Before invoking Cargo directly from a repository checkout, prepare the client
+payload source with `.local/bin/prepare-client-payloads`. This unconditionally
+copies the authoritative server API payload definitions into the client; do not
+edit the client copy independently. The standard check, coverage, Linux packaging,
+and crate publication commands perform this preparation themselves. Published
+client crate archives already contain the prepared source.
+
 The standard local verification flow is:
 
 ```sh

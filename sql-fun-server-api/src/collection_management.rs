@@ -43,3 +43,56 @@ impl<T> Collection<T> {
         }
     }
 }
+
+impl<T: crate::payloads::CollectionTraversal + ::serde::de::DeserializeOwned + 'static>
+    crate::payloads::CollectionTraversal for Collection<T>
+{
+    fn collections(&self) -> Vec<&dyn crate::payloads::CollectionReference> {
+        vec![self]
+    }
+    fn collections_mut(&mut self) -> Vec<&mut dyn crate::payloads::CollectionReference> {
+        vec![self]
+    }
+}
+impl<T: crate::payloads::CollectionTraversal + ::serde::de::DeserializeOwned + 'static>
+    crate::payloads::CollectionReference for Collection<T>
+{
+    fn page(&self) -> Option<crate::payloads::CollectionPage> {
+        Some(crate::payloads::CollectionPage::new(
+            &self.handle,
+            self.total_length,
+            self.offset,
+            self.require_release,
+            self.items.len(),
+        ))
+    }
+    fn insert(
+        &mut self,
+        offset: usize,
+        values: Vec<::serde_json::Value>,
+    ) -> Result<(), ::serde_json::Error> {
+        let page = self;
+        let index = offset.saturating_sub(page.offset);
+        if index > page.items.len() {
+            return Err(<::serde_json::Error as ::serde::de::Error>::custom(
+                "collection insertion exceeds decoded storage",
+            ));
+        }
+        for (inserted, value) in values.into_iter().enumerate() {
+            let item = ::serde_json::from_value(value)?;
+            page.items.insert(index + inserted, item);
+            // Preserve successfully decoded prefix items even if a later item fails.
+            page.offset = page.offset.min(offset);
+        }
+        Ok(())
+    }
+    fn children(&self) -> Vec<&dyn crate::payloads::CollectionReference> {
+        crate::payloads::CollectionTraversal::collections(&self.items)
+    }
+    fn children_mut(&mut self) -> Vec<&mut dyn crate::payloads::CollectionReference> {
+        crate::payloads::CollectionTraversal::collections_mut(&mut self.items)
+    }
+    fn finish(&mut self) {
+        // Server pages retain their wire representation; only clients own completion state.
+    }
+}

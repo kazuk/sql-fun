@@ -161,14 +161,16 @@ client.finish().await?;
 # }
 ```
 
-Typed completion materializes the **entire collection in client memory**. A wire
-collection deserializes into client `Collection::Stream`; successful completion
-produces `Collection::Completed`, whose `items()` contains the full ordered data
-and whose `handle()` is `None`. `Stream` represents incomplete state, without a
-public lazy stream or iterator contract. Initial nonzero offsets are supported by
-reading the missing prefix and suffix. Positive short pages are continued; zero
-progress or inconsistent pages fail. Empty and initially complete retained
-collections still require release before callback delivery.
+Typed completion materializes the **entire collection in client memory**. A
+wire collection deserializes into client `Collection::Stream`; successful
+completion produces `Collection::Completed`, whose `items()` contains the full
+ordered data and whose `handle()` is `None`. Completed state is client-only:
+serialization returns an error and its variant is excluded from the wire
+schema. `Stream` represents incomplete state, without a public lazy stream or
+iterator contract. Initial nonzero offsets are supported by reading the missing
+prefix and suffix. Positive short pages are continued; zero progress or
+inconsistent pages fail. Empty and initially complete retained collections
+still require release before callback delivery.
 
 All follow-up calls use the original authenticated connection. Internal RPCs have
 24 reserved admission slots and share the existing bounded queue with the 8 user
@@ -177,11 +179,13 @@ submitted read/release calls use user slots. No queue scheduling priority is
 promised. Use `invoke_method` for manual paging or opaque JSON results; selecting
 `serde_json::Value` with `invoke_typed` treats it as an opaque leaf.
 
-The library implements `CompleteResponse` for its API response/item types and
-for `Option<T>`, `Vec<T>`, and `Box<T>` composition. Custom response types implement
-that trait by registering all known collection-bearing fields and delegating
-completion to them. There is no blanket implementation that silently skips
-unknown types.
+The library provides `CompleteResponse` for API response/item types, including
+opaque `EchoArgs` results, and for `Option<T>`, `Vec<T>`, and `Box<T>` composition.
+For custom response types, implement `payloads::CollectionTraversal` to enumerate
+collection fields as type-erased `payloads::CollectionReference` references;
+`CompleteResponse` is then supplied automatically. Alternatively, implement
+`CompleteResponse` to register known handles and delegate completion explicitly.
+Unknown types are never silently skipped.
 
 On failure, the original callback receives an error rather than a partially
 completed result. While the connection remains usable, completion attempts to

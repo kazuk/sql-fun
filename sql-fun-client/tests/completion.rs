@@ -336,3 +336,25 @@ async fn copied_api_response_completes_every_nested_analysis_field() -> ::testre
     assert_eq!(log.reads(), 0);
     Ok(())
 }
+
+#[tokio::test]
+async fn official_echo_result_is_an_opaque_typed_leaf() -> ::testresult::TestResult {
+    let mut peer = Peer::start(Scenario::opaque()).await?;
+    let (sent, received) = ::tokio::sync::oneshot::channel();
+    peer.client()
+        .invoke_typed(
+            "echo",
+            &::serde_json::json!({"handle":"opaque","items":[],"total_length":100,"offset":0,"require_release":true}),
+            move |response: Result<::sql_fun_client::payloads::EchoArgs, _>| async move {
+                let value = response.unwrap().into_value();
+                assert_eq!(value["handle"], "opaque");
+                let _ = sent.send(());
+                Ok(())
+            },
+        )
+        .await?;
+    let log = peer.finish().await?;
+    received.await?;
+    assert_eq!(log.reads() + log.releases(), 0);
+    Ok(())
+}

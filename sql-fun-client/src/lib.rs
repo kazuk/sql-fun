@@ -28,7 +28,10 @@ use std::{
 pub enum Collection<T> {
     /// raw server response
     Stream(StreamingCollection<T>),
-    /// Fully materialized items whose required release succeeded.
+    /// Client-only materialized items whose required release succeeded.
+    /// This state is excluded from wire serialization and schema generation.
+    #[serde(skip)]
+    #[cfg_attr(feature = "openrpc-schema", schemars(skip))]
     Completed(Vec<T>),
 }
 
@@ -85,6 +88,22 @@ impl<T> Collection<T> {
 #[cfg(test)]
 mod collection_tests {
     #[test]
+    fn completed_state_has_no_wire_encoding() {
+        assert!(::serde_json::to_value(super::Collection::completed(vec![1_u32])).is_err());
+    }
+
+    #[cfg(feature = "openrpc-schema")]
+    #[test]
+    fn completed_state_is_not_a_wire_schema_variant() -> ::testresult::TestResult {
+        let schema = ::schemars::schema_for!(super::Collection<u32>);
+        let json = ::serde_json::to_string(&schema)?;
+        assert!(!json.contains("Completed"));
+        assert!(json.contains("total_length"));
+        assert!(json.contains("require_release"));
+        Ok(())
+    }
+
+    #[test]
     fn official_wire_page_starts_in_stream_state() -> ::testresult::TestResult {
         let handle = ::sql_fun_server_api::payloads::CollectionHandle::from("wire".to_owned());
         let wire = ::sql_fun_server_api::Collection::new(&handle, 3, 1, true, vec![7_u32]);
@@ -103,6 +122,74 @@ mod collection_tests {
 impl<T> From<StreamingCollection<T>> for Collection<T> {
     fn from(value: StreamingCollection<T>) -> Self {
         Self::Stream(value)
+    }
+}
+
+impl<T: crate::payloads::CollectionTraversal + ::serde::de::DeserializeOwned + 'static>
+    crate::payloads::CollectionTraversal for Collection<T>
+{
+    fn collections(&self) -> Vec<&dyn crate::payloads::CollectionReference> {
+        vec![self]
+    }
+    fn collections_mut(&mut self) -> Vec<&mut dyn crate::payloads::CollectionReference> {
+        vec![self]
+    }
+}
+impl<T: crate::payloads::CollectionTraversal + ::serde::de::DeserializeOwned + 'static>
+    crate::payloads::CollectionReference for Collection<T>
+{
+    fn page(&self) -> Option<crate::payloads::CollectionPage> {
+        match self {
+            Self::Stream(page) => Some(crate::payloads::CollectionPage::new(
+                &page.handle,
+                page.total_length,
+                page.offset,
+                page.require_release,
+                page.items.len(),
+            )),
+            Self::Completed(_) => None,
+        }
+    }
+    fn insert(
+        &mut self,
+        offset: usize,
+        values: Vec<::serde_json::Value>,
+    ) -> Result<(), ::serde_json::Error> {
+        let Self::Stream(page) = self else {
+            return Ok(());
+        };
+        let index = offset.saturating_sub(page.offset);
+        if index > page.items.len() {
+            return Err(<::serde_json::Error as ::serde::de::Error>::custom(
+                "collection insertion exceeds decoded storage",
+            ));
+        }
+        for (inserted, value) in values.into_iter().enumerate() {
+            let item = ::serde_json::from_value(value)?;
+            page.items.insert(index + inserted, item);
+            // Preserve successfully decoded prefix items even if a later item fails.
+            page.offset = page.offset.min(offset);
+        }
+        Ok(())
+    }
+    fn children(&self) -> Vec<&dyn crate::payloads::CollectionReference> {
+        use crate::payloads::CollectionTraversal;
+        match self {
+            Self::Stream(page) => page.items.collections(),
+            Self::Completed(items) => items.collections(),
+        }
+    }
+    fn children_mut(&mut self) -> Vec<&mut dyn crate::payloads::CollectionReference> {
+        use crate::payloads::CollectionTraversal;
+        match self {
+            Self::Stream(page) => page.items.collections_mut(),
+            Self::Completed(items) => items.collections_mut(),
+        }
+    }
+    fn finish(&mut self) {
+        if let Self::Stream(page) = self {
+            *self = Self::completed(std::mem::take(&mut page.items));
+        }
     }
 }
 
@@ -127,6 +214,10 @@ pub struct StreamingCollection<T> {
 }
 
 impl<T> StreamingCollection<T> {
+    pub(crate) fn into_items(self) -> Vec<T> {
+        self.items
+    }
+
     /// create instance
     #[must_use]
     pub fn new(

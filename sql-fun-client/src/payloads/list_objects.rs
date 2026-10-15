@@ -101,3 +101,5 @@ pub struct ObjectSummary {
     /// definition statement span
     definition_span: Option<TextSpan>,
 }
+
+impl super::CollectionTraversal for ObjectSummary {}

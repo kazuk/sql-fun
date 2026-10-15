@@ -39,6 +39,15 @@ pub struct AnalyzeQueryResponse {
     queries: Collection<AnalyzeQueryItem>,
 }
 
+impl super::CollectionTraversal for AnalyzeQueryResponse {
+    fn collections(&self) -> Vec<&dyn super::CollectionReference> {
+        vec![&self.queries]
+    }
+    fn collections_mut(&mut self) -> Vec<&mut dyn super::CollectionReference> {
+        vec![&mut self.queries]
+    }
+}
+
 /// kind of semantic analyzed query
 #[cfg_attr(feature = "openrpc-schema", derive(schemars::JsonSchema))]
 #[derive(serde::Serialize, serde::Deserialize)]
@@ -81,6 +90,27 @@ pub struct AnalyzeQueryItem {
     result_columns: Collection<ResultSetColumn>,
 }
 
+impl super::CollectionTraversal for AnalyzeQueryItem {
+    fn collections(&self) -> Vec<&dyn super::CollectionReference> {
+        vec![
+            &self.probrems,
+            &self.accessing_relations,
+            &self.column_access,
+            &self.parameters,
+            &self.result_columns,
+        ]
+    }
+    fn collections_mut(&mut self) -> Vec<&mut dyn super::CollectionReference> {
+        vec![
+            &mut self.probrems,
+            &mut self.accessing_relations,
+            &mut self.column_access,
+            &mut self.parameters,
+            &mut self.result_columns,
+        ]
+    }
+}
+
 /// parameter spec
 #[cfg_attr(feature = "openrpc-schema", derive(schemars::JsonSchema))]
 #[derive(serde::Serialize, serde::Deserialize, derive_getters::Getters)]
@@ -94,6 +124,8 @@ pub struct ParameterDescribe {
     /// parameter nullability
     nullability: Nullability,
 }
+
+impl super::CollectionTraversal for ParameterDescribe {}
 
 /// column access kind
 #[cfg_attr(feature = "openrpc-schema", derive(schemars::JsonSchema))]
@@ -162,6 +194,8 @@ pub struct ColumnAccess {
     access_kind: ColumnAccessKind,
 }
 
+impl super::CollectionTraversal for ColumnAccess {}
+
 /// result set column description item
 #[cfg_attr(feature = "openrpc-schema", derive(schemars::JsonSchema))]
 #[derive(serde::Serialize, serde::Deserialize, derive_getters::Getters)]
@@ -176,32 +210,4 @@ pub struct ResultSetColumn {
     nullability: Nullability,
 }
 
-impl AnalyzeQueryResponse {
-    /// Mutably access the queries collection.
-    pub const fn queries_mut(&mut self) -> &mut Collection<AnalyzeQueryItem> {
-        &mut self.queries
-    }
-}
-
-impl AnalyzeQueryItem {
-    /// Mutably access the probrems collection.
-    pub const fn probrems_mut(&mut self) -> &mut Collection<AnalysisProbrem> {
-        &mut self.probrems
-    }
-    /// Mutably access the accessing relations collection.
-    pub const fn accessing_relations_mut(&mut self) -> &mut Collection<ObjectSummary> {
-        &mut self.accessing_relations
-    }
-    /// Mutably access the column access collection.
-    pub const fn column_access_mut(&mut self) -> &mut Collection<ColumnAccess> {
-        &mut self.column_access
-    }
-    /// Mutably access the parameters collection.
-    pub const fn parameters_mut(&mut self) -> &mut Collection<ParameterDescribe> {
-        &mut self.parameters
-    }
-    /// Mutably access the result columns collection.
-    pub const fn result_columns_mut(&mut self) -> &mut Collection<ResultSetColumn> {
-        &mut self.result_columns
-    }
-}
+impl super::CollectionTraversal for ResultSetColumn {}

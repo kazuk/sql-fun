@@ -1,10 +1,6 @@
+use crate::StreamingCollection;
 use crate::async_tokio::streaming::RequestSender;
-use crate::payloads::{
-    AnalysisProbrem, AnalyzeQueryItem, AnalyzeQueryResponse, CollectionHandle, ColumnAccess,
-    ColumnDefinition, DescribeTableResponse, ObjectSummary, ParameterDescribe, ResultSetColumn,
-    SchemaContext, TableConstraint,
-};
-use crate::{Collection, StreamingCollection};
+use crate::payloads::{CollectionHandle, CollectionPage, CollectionReference, CollectionTraversal};
 use std::{collections::HashMap, fmt::Write, future::Future, pin::Pin};
 
 /// A response completion operation, including recursively nested collection items.
@@ -132,51 +128,71 @@ impl CompletionContext {
     }
 }
 
-impl<T: CompleteResponse + ::serde::de::DeserializeOwned + 'static> CompleteResponse
-    for Collection<T>
-{
+impl<T: CollectionTraversal> CompleteResponse for T {
     fn register_collections(&self, context: &mut CompletionContext) {
-        if let Self::Stream(page) = self {
-            context.retain(&page.handle, page.require_release);
-        }
-        for item in self.items() {
-            item.register_collections(context);
+        for collection in self.collections() {
+            context.register(collection);
         }
     }
-
     fn complete<'a>(&'a mut self, context: &'a mut CompletionContext) -> CompletionFuture<'a> {
         Box::pin(async move {
-            let page = match self {
-                Self::Stream(page) => page,
-                Self::Completed(items) => return items.complete(context).await,
-            };
-            context.retain(&page.handle, page.require_release);
-            let initial_end = page.checked_end()?;
-            let mut prefix = page.read_range(context, 0, page.offset).await?;
-            let mut suffix = page
-                .read_range(context, initial_end, page.total_length)
-                .await?;
-            prefix.append(&mut page.items);
-            prefix.append(&mut suffix);
-            prefix.register_collections(context);
-            prefix.complete(context).await?;
-            if page.require_release {
-                context.release(&page.handle).await?;
+            for collection in self.collections_mut() {
+                context.complete_collection(collection).await?;
             }
-            *self = Self::completed(prefix);
             Ok(())
         })
     }
 }
 
-impl<T: CompleteResponse + ::serde::de::DeserializeOwned + 'static> StreamingCollection<T> {
-    fn checked_end(&self) -> Result<usize, TypedResponseError> {
-        let Some(end) = self.offset.checked_add(self.items.len()) else {
+impl CompletionContext {
+    fn register(&mut self, collection: &dyn CollectionReference) {
+        if let Some(page) = collection.page() {
+            self.retain(page.handle(), *page.require_release());
+        }
+        for child in collection.children() {
+            self.register(child);
+        }
+    }
+
+    fn complete_collection<'a>(
+        &'a mut self,
+        collection: &'a mut dyn CollectionReference,
+    ) -> CompletionFuture<'a> {
+        Box::pin(async move {
+            if let Some(page) = collection.page() {
+                let initial_end =
+                    Self::checked_end(*page.offset(), *page.length(), *page.total_length())?;
+                self.read_range(collection, &page, 0, *page.offset())
+                    .await?;
+                self.read_range(collection, &page, initial_end, *page.total_length())
+                    .await?;
+                for child in collection.children_mut() {
+                    self.complete_collection(child).await?;
+                }
+                if *page.require_release() {
+                    self.release(page.handle()).await?;
+                }
+                collection.finish();
+            } else {
+                for child in collection.children_mut() {
+                    self.complete_collection(child).await?;
+                }
+            }
+            Ok(())
+        })
+    }
+
+    fn checked_end(
+        offset: usize,
+        length: usize,
+        total: usize,
+    ) -> Result<usize, TypedResponseError> {
+        let Some(end) = offset.checked_add(length) else {
             return Err(TypedResponseError::message(
                 "collection page range overflow",
             ));
         };
-        if end > self.total_length {
+        if end > total {
             return Err(TypedResponseError::message(
                 "collection page exceeds total length",
             ));
@@ -186,130 +202,39 @@ impl<T: CompleteResponse + ::serde::de::DeserializeOwned + 'static> StreamingCol
 
     async fn read_range(
         &mut self,
-        context: &mut CompletionContext,
+        collection: &mut dyn CollectionReference,
+        initial: &CollectionPage,
         mut offset: usize,
         end: usize,
-    ) -> Result<Vec<T>, TypedResponseError> {
-        let mut items = Vec::new();
+    ) -> Result<(), TypedResponseError> {
         while offset < end {
-            let params = ::serde_json::json!({
-                "collection_handle": self.handle, "start_offset": offset, "count": end - offset
-            });
-            let value = context
+            let params = ::serde_json::json!({"collection_handle": initial.handle(), "start_offset": offset, "count": end - offset});
+            let value = self
                 .sender
                 .collection_rpc("read_collection", &params)
                 .await?;
-            // Decode the wire metadata before T, preserving the outer handle on type errors.
             let page: StreamingCollection<::serde_json::Value> = ::serde_json::from_value(value)?;
-            if page.handle != self.handle
-                || page.offset != offset
-                || page.total_length != self.total_length
-                || page.require_release != self.require_release
+            if page.handle() != initial.handle()
+                || *page.offset() != offset
+                || page.total_length() != initial.total_length()
+                || page.require_release() != initial.require_release()
             {
                 return Err(TypedResponseError::message(
                     "inconsistent collection continuation metadata",
                 ));
             }
-            let next = page.checked_end()?;
+            let next = Self::checked_end(offset, page.items().len(), *page.total_length())?;
             if next > end || next == offset {
                 return Err(TypedResponseError::message(
                     "collection continuation exceeds requested range or makes no progress",
                 ));
             }
-            for value in page.items {
-                let item: T = ::serde_json::from_value(value)?;
-                item.register_collections(context);
-                items.push(item);
-            }
+            let decoded = collection.insert(offset, page.into_items());
+            // Even a partially decoded page can introduce handles needing cleanup.
+            self.register(collection);
+            decoded?;
             offset = next;
         }
-        Ok(items)
+        Ok(())
     }
 }
-
-impl<T: CompleteResponse> CompleteResponse for Vec<T> {
-    fn register_collections(&self, context: &mut CompletionContext) {
-        for item in self {
-            item.register_collections(context);
-        }
-    }
-    fn complete<'a>(&'a mut self, context: &'a mut CompletionContext) -> CompletionFuture<'a> {
-        Box::pin(async move {
-            for item in self {
-                item.complete(context).await?;
-            }
-            Ok(())
-        })
-    }
-}
-impl<T: CompleteResponse> CompleteResponse for Option<T> {
-    fn register_collections(&self, context: &mut CompletionContext) {
-        if let Some(item) = self {
-            item.register_collections(context);
-        }
-    }
-    fn complete<'a>(&'a mut self, context: &'a mut CompletionContext) -> CompletionFuture<'a> {
-        Box::pin(async move {
-            if let Some(item) = self {
-                item.complete(context).await?;
-            }
-            Ok(())
-        })
-    }
-}
-impl<T: CompleteResponse> CompleteResponse for Box<T> {
-    fn register_collections(&self, context: &mut CompletionContext) {
-        self.as_ref().register_collections(context);
-    }
-    fn complete<'a>(&'a mut self, context: &'a mut CompletionContext) -> CompletionFuture<'a> {
-        self.as_mut().complete(context)
-    }
-}
-
-macro_rules! leaf_response {
-    ($($ty:ty),* $(,)?) => { $(impl CompleteResponse for $ty {
-        fn register_collections(&self, _: &mut CompletionContext) {}
-        fn complete<'a>(&'a mut self, _: &'a mut CompletionContext) -> CompletionFuture<'a> { Box::pin(async { Ok(()) }) }
-    })* };
-}
-leaf_response!(
-    (),
-    String,
-    bool,
-    u8,
-    u16,
-    u32,
-    u64,
-    usize,
-    i8,
-    i16,
-    i32,
-    i64,
-    isize,
-    f32,
-    f64,
-    ::serde_json::Value,
-    AnalysisProbrem,
-    ColumnAccess,
-    ColumnDefinition,
-    ObjectSummary,
-    ParameterDescribe,
-    ResultSetColumn,
-    TableConstraint
-);
-
-macro_rules! response_fields {
-    ($ty:ty, $( $field:ident => $access:ident ),+ $(,)?) => {
-        impl CompleteResponse for $ty {
-            fn register_collections(&self, context: &mut CompletionContext) { $(self.$field().register_collections(context);)+ }
-            fn complete<'a>(&'a mut self, context: &'a mut CompletionContext) -> CompletionFuture<'a> {
-                Box::pin(async move { $(self.$access().complete(context).await?;)+ Ok(()) })
-            }
-        }
-    };
-}
-response_fields!(SchemaContext, problems => problems_mut);
-response_fields!(DescribeTableResponse, columns => columns_mut, constraints => constraints_mut);
-response_fields!(AnalyzeQueryResponse, queries => queries_mut);
-response_fields!(AnalyzeQueryItem, probrems => probrems_mut, accessing_relations => accessing_relations_mut,
-    column_access => column_access_mut, parameters => parameters_mut, result_columns => result_columns_mut);

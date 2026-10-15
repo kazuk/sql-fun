@@ -28,3 +28,5 @@ impl EchoPayload {
         }
     }
 }
+
+impl super::CollectionTraversal for EchoArgs {}

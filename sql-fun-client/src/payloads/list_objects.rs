@@ -1,6 +1,6 @@
 use std::path::PathBuf;
 
-use crate::TextSpan;
+use crate::payloads::TextSpan;
 
 /// filter condition for string
 #[cfg_attr(feature = "openrpc-schema", derive(schemars::JsonSchema))]
@@ -76,7 +76,7 @@ pub enum ObjectSummaryField {
     DefinitionSpan,
 }
 
-/// argument for [`crate::SqlFunServerApi::list_objects`]
+/// argument for `list_objects`
 #[cfg_attr(feature = "openrpc-schema", derive(schemars::JsonSchema))]
 #[derive(serde::Serialize, serde::Deserialize, derive_getters::Getters)]
 pub struct ListObjectArgs {

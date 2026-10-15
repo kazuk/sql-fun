@@ -8,7 +8,7 @@
 //! and datasource metadata. Its APIs determine the effective configuration and
 //! precedence between argument overrides and metadata, including SQL dialect,
 //! engine version, extensions, and search path. It also resolves SQL-Fun home
-//! resources, PostgreSQL builtin catalogs, and extension SQL files.
+//! resources, `PostgreSQL` builtin catalogs, and extension SQL files.
 //!
 //! # Configuration transfer
 //!

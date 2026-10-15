@@ -321,7 +321,7 @@
           "schema": {
             "$schema": "https://json-schema.org/draft/2020-12/schema",
             "title": "ReadCollectionArgs",
-            "description": "argument for [`crate::SqlFunServerApi::read_collection`]\n\nThe item type returned by `read_collection` is identical to the element type\nof the original `Collection<T>` that produced the handle, and never changes.\nThis method only reads the continuation of that collection; no type conversion\nis performed.",
+            "description": "argument for `read_collection`\n\nThe item type returned by `read_collection` is identical to the element type\nof the original `Collection<T>` that produced the handle, and never changes.\nThis method only reads the continuation of that collection; no type conversion\nis performed.",
             "type": "object",
             "properties": {
               "collection_handle": {
@@ -419,7 +419,7 @@
           "schema": {
             "$schema": "https://json-schema.org/draft/2020-12/schema",
             "title": "ReleaseCollectionArgs",
-            "description": "argument for [`crate::SqlFunServerApi::release_collection`]",
+            "description": "argument for `release_collection`",
             "type": "object",
             "properties": {
               "collection_handle": {
@@ -460,7 +460,7 @@
           "schema": {
             "$schema": "https://json-schema.org/draft/2020-12/schema",
             "title": "AnalyzeQueryArgs",
-            "description": "[`crate::SqlFunServerApi::analyze_query`] request arguments",
+            "description": "`analyze_query` request arguments",
             "type": "object",
             "properties": {
               "context_handle": {
@@ -536,7 +536,7 @@
         "schema": {
           "$schema": "https://json-schema.org/draft/2020-12/schema",
           "title": "AnalyzeQueryResponse",
-          "description": "response for [`crate::SqlFunServerApi::analyze_query`]",
+          "description": "response for `analyze_query`",
           "type": "object",
           "properties": {
             "queries": {
@@ -1308,7 +1308,7 @@
           "schema": {
             "$schema": "https://json-schema.org/draft/2020-12/schema",
             "title": "ListObjectArgs",
-            "description": "argument for [`crate::SqlFunServerApi::list_objects`]",
+            "description": "argument for `list_objects`",
             "type": "object",
             "properties": {
               "predicate": {

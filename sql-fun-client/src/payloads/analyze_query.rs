@@ -3,8 +3,11 @@ use std::path::PathBuf;
 use url::Url;
 
 use crate::{
-    AnalysisProbrem, Collection, ContextHandle, Nullability, ObjectKind, ObjectSummary, TextSpan,
-    TypeReference,
+    Collection,
+    payloads::{
+        AnalysisProbrem, ContextHandle, Nullability, ObjectKind, ObjectSummary, TextSpan,
+        TypeReference,
+    },
 };
 
 /// SQL file input source
@@ -19,7 +22,7 @@ pub enum AnalyzeQueryInput {
     Url(Url),
 }
 
-/// [`crate::SqlFunServerApi::analyze_query`] request arguments
+/// `analyze_query` request arguments
 #[cfg_attr(feature = "openrpc-schema", derive(schemars::JsonSchema))]
 #[derive(serde::Serialize, serde::Deserialize)]
 pub struct AnalyzeQueryArgs {
@@ -29,7 +32,7 @@ pub struct AnalyzeQueryArgs {
     query: AnalyzeQueryInput,
 }
 
-/// response for [`crate::SqlFunServerApi::analyze_query`]
+/// response for `analyze_query`
 #[cfg_attr(feature = "openrpc-schema", derive(schemars::JsonSchema))]
 #[derive(serde::Serialize, serde::Deserialize, derive_getters::Getters)]
 pub struct AnalyzeQueryResponse {

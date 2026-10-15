@@ -12,17 +12,21 @@ rust-version.workspace = true
 autotests = false
 
 [features]
+openrpc-schema = ["dep:schemars"]
 sqlite = ["sql-fun-server-api/sqlite"]
 
 [dependencies]
 bon = "3.10.1"
+derive-getters.workspace = true
 nix.workspace = true
+schemars = { workspace = true, optional = true }
 serde.workspace = true
 serde_json.workspace = true
 sql-fun-server-api.workspace = true
 thiserror.workspace = true
 tokio.workspace = true
 tracing.workspace = true
+url.workspace = true
 
 [dev-dependencies]
 clap.workspace = true

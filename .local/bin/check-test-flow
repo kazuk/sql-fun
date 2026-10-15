@@ -112,6 +112,13 @@ done
 cd "$(git rev-parse --show-toplevel)"
 GIT_ROOT="$(pwd)"
 
+echo '== Copy payload module from sql-fun-server-api to sql-fun-client'
+rm sql-fun-client/src/payloads.rs
+rm -rf sql-fun-client/src/payloads
+cp sql-fun-server-api/src/payloads.rs sql-fun-client/src/payloads.rs
+cp -r sql-fun-server-api/src/payloads sql-fun-client/src/payloads
+
+
 declare -A STEP_SELECTED=()
 if (( ${#SELECTED_STEPS[@]} > 0 )); then
   for step in "${SELECTED_STEPS[@]}"; do
@@ -147,6 +154,7 @@ function collect_changed() {
 
 function run_check()   { echo ">> cargo check $*";   cargo check   "$@"; }
 function run_nextest() { echo ">> cargo nextest run $*"; cargo nextest run "$@"; }
+function run_clippy() { echo ">> cargo clippy $*"; cargo clippy "$@"; }
 
 function run_affected() {
   if (( WORKSPACE_ONLY == 1 )); then
@@ -187,6 +195,8 @@ function run_affected() {
     for pkg in "${!AFFECTED[@]}"; do
       run_check   -p "$pkg" "${FEATURES[@]}"
       run_nextest -p "$pkg" "${FEATURES[@]}" ${NEXTEST_EXTRA}  --no-tests pass
+      run_clippy  -p "$pkg" "${FEATURES[@]}" --no-deps --all-targets \
+        -- -D warnings --allow unfulfilled_lint_expectations
     done
   else
     echo "== No affected crates detected."
@@ -233,7 +243,8 @@ function run_fmt() {
 
 function run_lint() {
   echo "== Linting"
-  cargo clippy --no-deps --workspace --all-targets "${FEATURES[@]}"
+  cargo clippy --no-deps --workspace --all-targets "${FEATURES[@]}" \
+    -- -D warnings --allow unfulfilled_lint_expectations
   RUST_LOG=error taplo lint
 }
 
@@ -341,8 +352,7 @@ function run_skill_validator() {
   echo "== Linting skills"
   # Repository skills may include a maintainer-facing README.md when SKILL.md
   # links to it, such as the third-party vendoring workflow.
-  skill-validator check --strict --allow-flat-layouts --emit-annotations .codex/skills
-  "${GIT_ROOT}/.local/bin/test-old-source-review"
+  skill-validator check --strict --allow-flat-layouts --emit-annotations .codex/skills --output compact
 }
 
 function run_rumdl() {

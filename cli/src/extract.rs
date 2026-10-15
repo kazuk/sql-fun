@@ -18,7 +18,7 @@ pub struct ExtractArgs {
 
 #[derive(clap::Subcommand, Debug, Clone)]
 enum Operation {
-    /// Extract builtin catalogs from a PostgreSQL connection or Docker image.
+    /// Extract builtin catalogs from a `PostgreSQL` connection or Docker image.
     Catalog(CatalogArgs),
     /// Print the standalone extension export script to standard output.
     ExportScript,
@@ -30,7 +30,7 @@ enum Operation {
 struct CatalogArgs {
     #[arg(skip)]
     expected_version: Option<sql_fun_core::PostgresVersion>,
-    /// PostgreSQL connection string; prefer `SQL_FUN_DATABASE_URL` to avoid shell history.
+    /// `PostgreSQL` connection string; prefer `SQL_FUN_DATABASE_URL` to avoid shell history.
     #[arg(
         long,
         env = "SQL_FUN_DATABASE_URL",
@@ -39,7 +39,7 @@ struct CatalogArgs {
         required_unless_present = "docker_image"
     )]
     database_url: Option<String>,
-    /// PostgreSQL image reference (use a digest for reproducibility).
+    /// `PostgreSQL` image reference (use a digest for reproducibility).
     #[arg(
         long,
         conflicts_with = "database_url",
@@ -49,7 +49,7 @@ struct CatalogArgs {
     /// Host address used to reach Docker's published port.
     #[arg(long, default_value = "127.0.0.1", requires = "docker_image")]
     docker_host_address: String,
-    /// Address on the Docker host on which to publish the PostgreSQL port.
+    /// Address on the Docker host on which to publish the `PostgreSQL` port.
     #[arg(long, default_value = "127.0.0.1", requires = "docker_image")]
     docker_bind_address: String,
     /// Destination containing schema.sql, catalog JSON, and metadata.json.

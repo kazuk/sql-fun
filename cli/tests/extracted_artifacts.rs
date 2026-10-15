@@ -1,4 +1,4 @@
-//! Loader compatibility for the officially extracted PostgreSQL artifacts.
+//! Loader compatibility for the officially extracted `PostgreSQL` artifacts.
 mod support;
 
 use std::path::PathBuf;

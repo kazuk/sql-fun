@@ -4,7 +4,7 @@ use std::{
     str::FromStr,
 };
 
-/// PostgreSQL major and optional beta/RC identity, independent of extraction support.
+/// `PostgreSQL` major and optional beta/RC identity, independent of extraction support.
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
 pub struct PostgresVersion {
     major: u32,
@@ -42,7 +42,7 @@ impl PostgresVersion {
         }
     }
 
-    /// Numeric PostgreSQL major.
+    /// Numeric `PostgreSQL` major.
     #[must_use]
     pub const fn major(&self) -> u32 {
         self.major
@@ -194,7 +194,7 @@ const VERSIONS: &[Support] = &[
     ),
 ];
 
-/// Authoritative PostgreSQL extraction capability inventory (catalog format 1).
+/// Authoritative `PostgreSQL` extraction capability inventory (catalog format 1).
 pub struct PostgresVersionInventory<'a>(&'a [Support]);
 
 impl PostgresVersionInventory<'static> {

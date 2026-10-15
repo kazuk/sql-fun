@@ -3103,8 +3103,10 @@ version = "0.1.0"
 dependencies = [
  "bon",
  "clap",
+ "derive-getters",
  "nix 0.31.3",
  "rstest",
+ "schemars",
  "serde",
  "serde_json",
  "sql-fun-server-api",
@@ -3114,6 +3116,7 @@ dependencies = [
  "tokio",
  "tracing",
  "tracing-subscriber",
+ "url",
 ]
 
 [[package]]

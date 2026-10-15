@@ -2,7 +2,7 @@ use super::ContextHandleRegistry;
 use crate::{schema_cache::test_helpers::SchemaProject, session::SessionWrapper};
 use std::sync::Arc;
 
-use ::sql_fun_server_api::ContextHandle;
+use ::sql_fun_server_api::payloads::ContextHandle;
 use ::sql_fun_sqlast::sem::{BaseParseContext, FullName, TableName};
 
 #[tokio::test]

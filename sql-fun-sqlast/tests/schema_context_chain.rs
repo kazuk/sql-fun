@@ -661,7 +661,7 @@ mod test_helpers {
             builtin_root()
         }
 
-        /// Parse the complete PostgreSQL 17 builtin schema for catalog integration
+        /// Parse the complete `PostgreSQL` 17 builtin schema for catalog integration
         /// coverage. Every call reloads metadata and parses the schema; results
         /// are not cached or shared between calls or test processes.
         pub fn builtin_schema() -> Result<FrozenBaseContext, Box<dyn std::error::Error>> {

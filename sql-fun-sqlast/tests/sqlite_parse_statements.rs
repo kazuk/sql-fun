@@ -1,4 +1,4 @@
-//! SQLite parsing through the public statement iterator.
+//! `SQLite` parsing through the public statement iterator.
 
 #![cfg(feature = "sqlite")]
 

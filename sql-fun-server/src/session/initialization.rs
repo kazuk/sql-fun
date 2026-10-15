@@ -2,7 +2,7 @@ use crate::{Api, InitializedSchema, SchemaLoadError, SchemaSelection};
 use std::path::PathBuf;
 
 use ::sql_fun_core::SqlFunArgs;
-use ::sql_fun_server_api::{InitializeSchemaArgs, SqlFunServerApiError};
+use ::sql_fun_server_api::{SqlFunServerApiError, payloads::InitializeSchemaArgs};
 
 /// Validated schema selection using configuration restored by core.
 pub(super) struct Initialization {

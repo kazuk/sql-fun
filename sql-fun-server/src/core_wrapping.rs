@@ -1,7 +1,7 @@
 use std::str::FromStr;
 
 use sql_fun_core::{PostgresEngineVersion, SqlDialect};
-use sql_fun_server_api::EngineDialect;
+use sql_fun_server_api::payloads::{EngineDialect, EngineVersion};
 
 pub struct CoreDialect(SqlDialect);
 
@@ -30,11 +30,11 @@ impl std::fmt::Display for InvalidEngneVersion {
     }
 }
 
-impl TryFrom<&sql_fun_server_api::EngineVersion> for CorePostgresVersion {
+impl TryFrom<&EngineVersion> for CorePostgresVersion {
     type Error = InvalidEngneVersion;
-    fn try_from(value: &sql_fun_server_api::EngineVersion) -> Result<Self, Self::Error> {
+    fn try_from(value: &EngineVersion) -> Result<Self, Self::Error> {
         match value {
-            sql_fun_server_api::EngineVersion::PostgreSQL(version) => Ok(Self(
+            EngineVersion::PostgreSQL(version) => Ok(Self(
                 PostgresEngineVersion::from_str(version).map_err(InvalidEngneVersion)?,
             )),
         }

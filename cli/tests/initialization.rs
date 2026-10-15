@@ -1,4 +1,4 @@
-//! Generic setup dispatch and initialization followed by normal PostgreSQL bootstrap.
+//! Generic setup dispatch and initialization followed by normal `PostgreSQL` bootstrap.
 use std::{
     path::{Path, PathBuf},
     process::Command,

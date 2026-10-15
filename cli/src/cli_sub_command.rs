@@ -16,7 +16,7 @@ pub enum CliSubCommand {
     /// Stream JSON Lines requests to the authenticated per-user server
     Api(ApiArgs),
 
-    /// Extract PostgreSQL catalogs or import extension files
+    /// Extract `PostgreSQL` catalogs or import extension files
     Extract(ExtractArgs),
 
     /// Get versions

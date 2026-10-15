@@ -1,4 +1,4 @@
-//! PostgreSQL parsing through the public statement iterator.
+//! `PostgreSQL` parsing through the public statement iterator.
 
 use ::sql_fun_sqlast::ast::Dialect;
 use ::sql_fun_sqlast::parse_statements;

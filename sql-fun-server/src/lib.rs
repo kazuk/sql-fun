@@ -37,6 +37,7 @@ use self::json_rpc::{JsonRpcRequest, JsonRpcResponse};
 use clap::Parser;
 use pid_file::PidFile;
 use serde_json::json;
+use sql_fun_server_api::payloads::EchoArgs;
 use std::{net::SocketAddr, sync::LazyLock, time::Duration};
 use tokio::{
     io::AsyncWriteExt,
@@ -147,7 +148,7 @@ pub fn process_request(
             let params = request_message
                 .params()
                 .ok_or_else(|| JsonRpcError::parameter_required(method))?;
-            let args = serde_json::from_value::<::sql_fun_server_api::EchoArgs>(params.clone())?;
+            let args = serde_json::from_value::<EchoArgs>(params.clone())?;
             Ok(args.into_value())
         }
 

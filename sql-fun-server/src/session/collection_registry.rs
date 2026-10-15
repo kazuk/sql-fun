@@ -5,7 +5,8 @@ use std::{
 };
 
 use ::serde_json::Value;
-use ::sql_fun_server_api::{Collection, CollectionHandle};
+use ::sql_fun_server_api::Collection;
+use sql_fun_server_api::payloads::CollectionHandle;
 
 static HANDLE_IDS: HandleIdAllocator = HandleIdAllocator::new();
 

@@ -3,11 +3,19 @@ mod test_helpers;
 
 use std::{path::PathBuf, process::ExitCode, sync::Arc};
 
-use ::anyhow::Context;
-use ::serde_json::Value;
-use ::sql_fun_client::{ConnectionOptions, JsonRpcResponse, TcpJsonRpcClientAsync};
-use ::tokio::io::{AsyncBufRead, AsyncBufReadExt, AsyncWrite, AsyncWriteExt, BufReader};
-use ::tokio::sync::{Mutex, watch};
+use anyhow::Context;
+use serde_json::Value;
+use sql_fun_client::{
+    ConnectionOptions, JsonRpcResponse, TcpJsonRpcClientAsync,
+    payloads::{
+        AnalyzeQueryArgs, DescribeTableArgs, EchoArgs, InitializeSchemaArgs, ListObjectArgs,
+        ReadCollectionArgs, ReleaseCollectionArgs,
+    },
+};
+use tokio::{
+    io::{AsyncBufRead, AsyncBufReadExt, AsyncWrite, AsyncWriteExt, BufReader},
+    sync::{Mutex, watch},
+};
 
 /// Arguments for the authenticated JSON Lines API bridge.
 #[derive(Debug, Clone, clap::Args)]
@@ -131,15 +139,13 @@ impl ApiInput {
             Ok(())
         }
         match method {
-            "echo" => typed::<::sql_fun_server_api::EchoArgs>(params),
-            "initialize_schema_context" => {
-                typed::<::sql_fun_server_api::InitializeSchemaArgs>(params)
-            }
-            "read_collection" => typed::<::sql_fun_server_api::ReadCollectionArgs>(params),
-            "release_collection" => typed::<::sql_fun_server_api::ReleaseCollectionArgs>(params),
-            "analyze_query" => typed::<::sql_fun_server_api::AnalyzeQueryArgs>(params),
-            "list_object" => typed::<::sql_fun_server_api::ListObjectArgs>(params),
-            "describe_table" => typed::<::sql_fun_server_api::DescribeTableArgs>(params),
+            "echo" => typed::<EchoArgs>(params),
+            "initialize_schema_context" => typed::<InitializeSchemaArgs>(params),
+            "read_collection" => typed::<ReadCollectionArgs>(params),
+            "release_collection" => typed::<ReleaseCollectionArgs>(params),
+            "analyze_query" => typed::<AnalyzeQueryArgs>(params),
+            "list_object" => typed::<ListObjectArgs>(params),
+            "describe_table" => typed::<DescribeTableArgs>(params),
             _ => anyhow::bail!("unknown API method {method}"),
         }
     }

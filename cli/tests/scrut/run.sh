@@ -37,8 +37,7 @@ api_dump_hash=$(sha256sum "$SQL_FUN_API_FIXTURE/schema.sql")
 api_dump_hash=${api_dump_hash%% *}
 jq -n --arg fixture "$SQL_FUN_API_FIXTURE" --arg hash "$api_dump_hash" '{
   method:"initialize_schema_context", params:{
-    datasource:"products", engine_dialect:"PostgreSQL",
-    engine_version:{PostgreSQL:"17"}, extensions:[], search_path:["public"],
+    datasource:"products",
     schema_dump:($fixture + "/schema.sql"), expected_hash:$hash,
     environments:{
       SQL_FUN_HOME:($fixture + "/home"),

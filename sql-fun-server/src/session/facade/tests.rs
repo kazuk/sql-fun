@@ -15,8 +15,6 @@ use std::{
     },
 };
 
-use ::serde_json::Value;
-
 #[rstest::rstest]
 #[case::normal(false, false)]
 #[case::released(false, true)]
@@ -54,7 +52,11 @@ async fn schema_borrows_survive_growth_and_drop_before_owners(
                 .register_context(&schema_owner.upgrade().unwrap())
                 .unwrap();
             session
-                .register_collection(vec![::serde_json::json!("other")], Vec::len, Value::clone)
+                .register_collection(
+                    vec![::serde_json::json!("other")],
+                    Vec::len,
+                    ::serde_json::Value::clone,
+                )
                 .unwrap();
         }
         assert_eq!(session.collection_count(), 257);

@@ -35,25 +35,13 @@ pub struct InitializeSchemaArgs {
     /// datasource name
     datasource: String,
 
-    /// SQL dialect for schema
-    engine_dialect: EngineDialect,
-
-    /// Used for loading builtin schema objects
-    engine_version: EngineVersion,
-
-    /// Enabled extensions
-    extensions: Vec<ExtensionSpec>,
-
-    /// Search path
-    search_path: Vec<String>,
-
     /// schema dump file
     schema_dump: PathBuf,
 
     /// Expected SHA-256 of the original dump text, supplied by the client.
     expected_hash: String,
 
-    /// Explicit `SQL_FUN_HOME` and `SQL_FUN_METADATA_FILE`; other keys are rejected.
+    /// Configuration transferred by `sql_fun_core::SqlFunArgs::environments`.
     environments: HashMap<String, String>,
 }
 

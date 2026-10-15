@@ -129,16 +129,9 @@ async fn collection_rpc_pages_repeatably_and_releases(
 #[case::mismatch("expected_hash", ::serde_json::json!("0".repeat(64)), "schema dump changed")]
 #[case::unknown_datasource("datasource", ::serde_json::json!("unknown"), "selected datasource")]
 #[case::empty_datasource("datasource", ::serde_json::json!(""), "explicit datasource")]
-#[case::version_conflict("engine_version", ::serde_json::json!({"PostgreSQL":"16"}), "conflict")]
-#[case::search_path_conflict("search_path", ::serde_json::json!(["other"]), "conflict")]
 #[case::missing_assets("environments", ::serde_json::json!({}), "SQL_FUN_HOME")]
 #[case::unselected_metadata("environments", ::serde_json::json!({"SQL_FUN_HOME":"/nonexistent"}), "SQL_FUN_METADATA_FILE")]
-#[case::unknown_environment("environments", ::serde_json::json!({"UNSUPPORTED":"x"}), "unsupported initialization environment")]
-#[case::empty_home("environments", ::serde_json::json!({"SQL_FUN_HOME":"", "SQL_FUN_METADATA_FILE":"x"}), "explicit SQL_FUN_HOME")]
-#[case::extension_without_version("extensions", ::serde_json::json!([{"extension_name":"test", "extension_version":""}]), "version")]
-#[case::invalid_extension_name("extensions", ::serde_json::json!([{"extension_name":"../test", "extension_version":"1.0"}]), "extension")]
-#[case::empty_engine_version("engine_version", ::serde_json::json!({"PostgreSQL":""}), "explicit engine version")]
-#[case::extension_name_injection("extensions", ::serde_json::json!([{"extension_name":"first@1,second", "extension_version":"2"}]), "CSV separators")]
+#[case::empty_home("environments", ::serde_json::json!({"SQL_FUN_HOME":"", "SQL_FUN_METADATA_FILE":"x"}), "SQL_FUN_HOME")]
 #[tokio::test(flavor = "multi_thread")]
 async fn initialization_errors_leave_connection_usable(
     #[case] field: &str,
@@ -341,6 +334,24 @@ async fn retained_statement_ranges_are_not_misreported_as_file_positions() {
     let offset = usize::try_from(range["offset"].as_u64().unwrap()).unwrap();
     let length = usize::try_from(range["length"].as_u64().unwrap()).unwrap();
     assert_eq!(&statement[offset..offset + length], "missing");
+    connection.end_requests().await;
+    connection.finish().await.unwrap();
+}
+
+#[tokio::test(flavor = "multi_thread")]
+async fn initialization_accepts_core_configuration_transfer() {
+    let project = SchemaProject::new();
+    let mut request = project.rpc_request("CREATE TABLE chosen_table (id int4);");
+    // Core's environment override takes precedence over metadata's public search path.
+    request["environments"]["SQL_FUN_PG_SEARCH_PATH"] = ::serde_json::json!("chosen");
+    request["environments"]["SQL_FUN_TERM_COLOR"] = ::serde_json::json!("never");
+    let mut connection = heavy::Connection::start(4096, 2).await;
+    connection.authenticate().await;
+    let response = connection.rpc("initialize_schema_context", &request).await;
+    assert!(
+        response["result"]["context_handle"].is_string(),
+        "{response}"
+    );
     connection.end_requests().await;
     connection.finish().await.unwrap();
 }

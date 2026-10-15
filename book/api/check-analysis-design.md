@@ -57,31 +57,28 @@ The **initialization request** (`InitializeSchemaArgs`) contains:
 | Field | Meaning |
 | --- | --- |
 | `datasource` | Datasource to initialize |
-| `engine_dialect` | SQL syntax dialect |
-| `engine_version` | Engine builtin definitions to use |
-| `extensions` | Selected extension names and versions |
-| `search_path` | Name-resolution search path |
 | `schema_dump` | Server-visible path to the schema dump |
 | `expected_hash` | Required lowercase hexadecimal SHA-256 of the original dump text |
-| `environments` | Explicit `SQL_FUN_HOME` and `SQL_FUN_METADATA_FILE` selections |
+| `environments` | Configuration map from `sql_fun_core::SqlFunArgs::environments` |
 
-Both environment entries are required and must be nonempty. Other environment
-keys are rejected; the server does not inherit its process environment to resolve
-request settings or discover a project. Paths are server-visible; relative paths
-resolve from the server working directory, so clients should use absolute paths.
+Clients transfer configuration using `sql_fun_core::SqlFunArgs::environments`.
+The server passes this map to core to restore `SqlFunArgs`, then asks core for the
+named datasource's metadata and effective configuration. Dialect, engine version,
+extensions, search path, and directory overrides follow core's existing argument
+and metadata precedence. They are not separately supplied or reconciled by RPC.
 
-The selected metadata must declare PostgreSQL and the same dialect as the request.
-If metadata also declares a version, search path, or extension list, it must agree
-with the corresponding explicit request setting (including extension order).
-Conflicts are errors. Missing optional metadata settings use the explicit request
-values. Every extension must include its selected name and installation version;
-the supplied extension order is the load order. Engine versions must be nonempty
-installation names, not paths. Extension names and versions cannot contain the
-CSV separators `,` or `@`. Extension installation scripts are resolved using
-the existing PostgreSQL extension directory:
-`<SQL_FUN_HOME>/postgresql/<engine-version>/extensions/<name>--<extension-version>.sql`.
-Initialization reads only the named installation scripts and does not infer
-extension dependencies or choose a version.
+The map must explicitly select a nonempty `SQL_FUN_HOME` and
+`SQL_FUN_METADATA_FILE`. Core rejects omitted selections before accessing assets;
+the server does not read its ambient process environment or discover a project.
+Other settings are interpreted by core's existing environment parser; unknown
+keys follow that parser's behavior and are ignored. Paths are server-visible;
+relative paths resolve from the server working directory, so clients should use
+absolute paths. Only the requested datasource's metadata is decoded.
+
+Initialization currently supports PostgreSQL. Extension scripts and their order
+are selected through core's configuration resolution, including explicit directory
+overrides. The usual extension directory is
+`<SQL_FUN_HOME>/postgresql/<engine-version>/extensions`.
 
 The first successful cache service registration fixes the builtin installation
 for the server lifetime. A later request selecting a different canonical

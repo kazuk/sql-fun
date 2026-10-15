@@ -1,8 +1,38 @@
 #![deny(missing_docs)]
 
-//! sql-fun-core library
+//! Shared configuration, resource resolution, and communication types for SQL-Fun.
 //!
-//! This library defines sql-fun's internal communication data objects.
+//! # Configuration ownership
+//!
+//! This crate owns interpretation of [`SqlFunArgs`], environment-based settings,
+//! and datasource metadata. Its APIs determine the effective configuration and
+//! precedence between argument overrides and metadata, including SQL dialect,
+//! engine version, extensions, and search path. It also resolves SQL-Fun home
+//! resources, PostgreSQL builtin catalogs, and extension SQL files.
+//!
+//! # Configuration transfer
+//!
+//! Configuration crosses both RPC and child-process boundaries as an environment
+//! variable [`HashMap<String, String>`](std::collections::HashMap).
+//! [`SqlFunArgs::environments`] serializes the selected configuration into this
+//! map. [`SqlFunArgs::from_environments`] restores it using core's environment
+//! parser without consulting the receiver's ambient process environment. The
+//! transferred map must explicitly select a nonempty SQL-Fun home and metadata
+//! file; missing selections are errors rather than permission to discover assets.
+//! The same map can be supplied to [`std::process::Command::envs`] when starting
+//! a child process.
+//!
+//! # Consumer boundary
+//!
+//! Other crates, especially the server, consume these APIs rather than interpret
+//! environment keys, reproduce metadata semantics, or reconstruct configuration
+//! from individual settings. A receiver restores [`SqlFunArgs`], requests the
+//! named datasource through [`SqlFunArgs::selected_metadata`], and uses core's
+//! accessors to obtain its effective configuration and resource paths. The
+//! consumer owns its transport and processing responsibilities, such as RPC
+//! validation, schema loading, and session state. Keeping configuration decisions
+//! in core lets arguments and metadata evolve without duplicating their handling
+//! in server initialization or other consumers.
 
 mod args;
 mod builtin;

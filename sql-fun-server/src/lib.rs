@@ -32,25 +32,12 @@ pub use self::{
     },
 };
 
-use self::{
-    core_wrapping::{CoreDialect, CorePostgresVersion},
-    error::SqlFunServerError,
-    json_rpc::{JsonRpcRequest, JsonRpcResponse},
-};
+use self::json_rpc::{JsonRpcRequest, JsonRpcResponse};
 
-use ::sql_fun_sqlast::{
-    PostgresDialect, SqlFunArgs,
-    sem::{BaseContext, FrozenBaseContext},
-};
 use clap::Parser;
 use pid_file::PidFile;
 use serde_json::json;
-use sql_fun_server_api::{
-    AnalyzeQueryArgs, AnalyzeQueryResponse, Collection, DescribeTableArgs, DescribeTableResponse,
-    InitializeSchemaArgs, ListObjectArgs, ObjectSummary, ReadCollectionArgs, ReleaseCollectionArgs,
-    SchemaContext, SqlFunServerApi, SqlFunServerApiError,
-};
-use std::{convert::Into, net::SocketAddr, sync::LazyLock, time::Duration};
+use std::{net::SocketAddr, sync::LazyLock, time::Duration};
 use tokio::{
     io::AsyncWriteExt,
     net::{TcpListener, TcpStream},
@@ -143,123 +130,6 @@ impl Api {
         service.require_installation(&canonical)?;
         Ok(service)
     }
-
-    async fn initialize_schema_context_impl(
-        &self,
-        args: InitializeSchemaArgs,
-    ) -> Result<SchemaContext, SqlFunServerError> {
-        if args.datasource().is_empty() {
-            return Err(SqlFunServerError::invalid_datasource(args.datasource()));
-        }
-        let mut builder = SqlFunArgs::builder(args.environments())?;
-        let dialect = CoreDialect::from(args.engine_dialect());
-        let engine_version = CorePostgresVersion::try_from(args.engine_version())?;
-        let extensions = args.extensions();
-        let search_path = args.search_path();
-        let schema_dump = args.schema_dump();
-        let extensions: Vec<_> = extensions
-            .iter()
-            .map(|e| format!("{}@{}", e.extension_name(), e.extension_version()))
-            .collect();
-        let extensions = extensions.join(",");
-
-        let context_args = builder
-            .sql_dialect(dialect)
-            .postgres_version(engine_version)
-            .postgres_search_path(search_path.clone())
-            .postgres_extensions(extensions)?
-            .schema_file(schema_dump)
-            .build()?;
-
-        let metadata_collection = context_args.load_metadata()?;
-        let metadata = metadata_collection
-            .get(args.datasource())
-            .ok_or_else(|| SqlFunServerError::invalid_datasource(args.datasource()))?;
-        let version = context_args.postgres_version(metadata)?;
-        let mut builtin_schema = version.definition_base_path(context_args.sql_fun_home()?);
-        builtin_schema.push("schema.sql");
-
-        let base_context = BaseContext::new(&context_args, metadata)?;
-        PostgresDialect::parse_schema_file(
-            &builtin_schema,
-            &FrozenBaseContext::from(base_context),
-            &mut None,
-        )?;
-
-        todo!();
-    }
-}
-
-#[async_trait::async_trait]
-impl sql_fun_server_api::SqlFunServerApi for Api {
-    async fn echo(
-        &self,
-        args: ::sql_fun_server_api::EchoArgs,
-    ) -> Result<serde_json::Value, SqlFunServerApiError> {
-        Ok(args.into_value())
-    }
-
-    /// Initialize schema-aware query analysis context
-    async fn initialize_schema_context(
-        &self,
-        args: InitializeSchemaArgs,
-    ) -> Result<SchemaContext, SqlFunServerApiError> {
-        self.initialize_schema_context_impl(args)
-            .await
-            .map_err(Into::into)
-    }
-
-    /// Read a collection
-    ///
-    /// When server returns multiple items, server keeps scrollable collection,
-    /// [`crate::SqlFunServerApi::read_collection`] reads items in collection.
-    ///
-    /// # Return value
-    ///
-    /// returns [`Collection<T>`], T depends collection item type
-    ///
-    async fn read_collection(
-        &self,
-        _args: ReadCollectionArgs,
-    ) -> Result<serde_json::Value, SqlFunServerApiError> {
-        todo!()
-    }
-
-    /// Release a collection
-    ///
-    /// When server returns collection, server keeps scrollable collection,
-    /// [`SqlFunServerApi::release_collection`] release a server side collection.
-    ///
-    async fn release_collection(
-        &self,
-        _args: ReleaseCollectionArgs,
-    ) -> Result<(), SqlFunServerApiError> {
-        todo!()
-    }
-
-    /// analyze query
-    async fn analyze_query(
-        &self,
-        _args: AnalyzeQueryArgs,
-    ) -> Result<AnalyzeQueryResponse, SqlFunServerApiError> {
-        todo!()
-    }
-
-    /// list schema objects
-    async fn list_objects(
-        &self,
-        _args: ListObjectArgs,
-    ) -> Result<Collection<ObjectSummary>, SqlFunServerApiError> {
-        todo!()
-    }
-
-    /// describe a table
-    async fn describe_table(
-        &self,
-        _args: DescribeTableArgs,
-    ) -> Result<DescribeTableResponse, SqlFunServerApiError> {
-        todo!()
-    }
 }
 
 /// process a request
@@ -267,7 +137,7 @@ impl sql_fun_server_api::SqlFunServerApi for Api {
 /// # Errors
 ///
 /// [`JsonRpcError`]
-pub async fn process_request(
+pub fn process_request(
     request_message: &JsonRpcRequest,
 ) -> Result<serde_json::Value, JsonRpcError> {
     let method = request_message.method();
@@ -278,18 +148,7 @@ pub async fn process_request(
                 .params()
                 .ok_or_else(|| JsonRpcError::parameter_required(method))?;
             let args = serde_json::from_value::<::sql_fun_server_api::EchoArgs>(params.clone())?;
-            Ok(Api::api_impl().echo(args).await?)
-        }
-        "initialize_schema_context" => {
-            let Some(params) = request_message.params() else {
-                Err(JsonRpcError::parameter_required(method))?
-            };
-            let initialize_arg: InitializeSchemaArgs = serde_json::from_value(params.clone())?;
-            let result = Api::api_impl()
-                .initialize_schema_context(initialize_arg)
-                .await?;
-            let result_value = serde_json::to_value(result)?;
-            Ok(result_value)
+            Ok(args.into_value())
         }
 
         _ => Err(JsonRpcError::unknown_method(method)),
@@ -305,16 +164,14 @@ mod test_echo_dispatch {
     #[case::array(r#"[null,{"nested":[1,2]},false]"#)]
     #[case::empty_object("{}")]
     #[case::empty_array("[]")]
-    #[tokio::test]
-    async fn echoes_without_schema_setup(#[case] params: &str) {
+    #[test]
+    fn echoes_without_schema_setup(#[case] params: &str) {
         let request: JsonRpcRequest = ::serde_json::from_str(&format!(
             r#"{{"jsonrpc":"2.0","id":7,"method":"echo","params":{params}}}"#
         ))
         .unwrap();
         assert_eq!(
-            process_request(&request)
-                .await
-                .unwrap_or_else(|_| panic!("valid echo parameters rejected")),
+            process_request(&request).unwrap_or_else(|_| panic!("valid echo parameters rejected")),
             ::serde_json::from_str::<::serde_json::Value>(params).unwrap()
         );
     }
@@ -323,17 +180,26 @@ mod test_echo_dispatch {
     #[case::omitted("")]
     #[case::null(",\"params\":null")]
     #[case::scalar(",\"params\":42")]
-    #[tokio::test]
-    async fn rejects_missing_or_scalar_params(#[case] params_field: &str) {
+    #[test]
+    fn rejects_missing_or_scalar_params(#[case] params_field: &str) {
         let request: JsonRpcRequest = ::serde_json::from_str(&format!(
             r#"{{"jsonrpc":"2.0","id":7,"method":"echo"{params_field}}}"#
         ))
         .unwrap();
-        assert!(process_request(&request).await.is_err());
+        assert!(process_request(&request).is_err());
     }
 }
 
 async fn serve_client(args: &Args, stream: TcpStream, addr: SocketAddr) -> Result<(), ServerError> {
+    serve_client_with_api(args, stream, addr, Api::api_impl()).await
+}
+
+async fn serve_client_with_api(
+    args: &Args,
+    stream: TcpStream,
+    addr: SocketAddr,
+    api: &Api,
+) -> Result<(), ServerError> {
     let (read_half, mut write_half) = stream.into_split();
 
     let mut request_reader = JsonLinesStreamReader::new_async(
@@ -381,12 +247,21 @@ async fn serve_client(args: &Args, stream: TcpStream, addr: SocketAddr) -> Resul
 
     let wrapper = self::session::SessionWrapper::new();
     wrapper
-        .session_handler(request_reader, write_half, addr, args.request_length_limit)
+        .session_handler(
+            request_reader,
+            write_half,
+            addr,
+            args.request_length_limit,
+            api,
+        )
         .await
 }
 
 #[cfg(test)]
 mod serve_client_tests;
+
+#[cfg(test)]
+mod session_rpc_tests;
 
 /// server error
 #[derive(thiserror::Error, Debug)]

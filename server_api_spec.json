@@ -105,8 +105,12 @@
                 "description": "schema dump file",
                 "type": "string"
               },
+              "expected_hash": {
+                "description": "Expected SHA-256 of the original dump text, supplied by the client.",
+                "type": "string"
+              },
               "environments": {
-                "description": "environment variables for initialization",
+                "description": "Explicit `SQL_FUN_HOME` and `SQL_FUN_METADATA_FILE`; other keys are rejected.",
                 "type": "object",
                 "additionalProperties": {
                   "type": "string"
@@ -120,6 +124,7 @@
               "extensions",
               "search_path",
               "schema_dump",
+              "expected_hash",
               "environments"
             ],
             "$defs": {
@@ -268,19 +273,42 @@
                   "type": "string"
                 },
                 "statement_span": {
-                  "description": "statement span",
-                  "$ref": "#/$defs/TextSpan"
+                  "description": "Statement span, or None when not retained by analysis.",
+                  "anyOf": [
+                    {
+                      "$ref": "#/$defs/TextSpan"
+                    },
+                    {
+                      "type": "null"
+                    }
+                  ]
                 },
                 "probrem_span": {
-                  "description": "probrem span",
-                  "$ref": "#/$defs/TextSpan"
+                  "description": "Problem span, or None when not retained by analysis.",
+                  "anyOf": [
+                    {
+                      "$ref": "#/$defs/TextSpan"
+                    },
+                    {
+                      "type": "null"
+                    }
+                  ]
+                },
+                "statement_relative_span": {
+                  "description": "Byte range relative to the SQL statement, when a file position is unavailable.",
+                  "anyOf": [
+                    {
+                      "$ref": "#/$defs/StatementByteRange"
+                    },
+                    {
+                      "type": "null"
+                    }
+                  ]
                 }
               },
               "required": [
                 "code",
-                "file_path",
-                "statement_span",
-                "probrem_span"
+                "file_path"
               ]
             },
             "TextSpan": {
@@ -328,6 +356,28 @@
                 "offset",
                 "line",
                 "col"
+              ]
+            },
+            "StatementByteRange": {
+              "description": "A retained byte range within a SQL statement, not a file position.",
+              "type": "object",
+              "properties": {
+                "offset": {
+                  "description": "UTF-8 byte offset from the SQL statement start.",
+                  "type": "integer",
+                  "format": "uint",
+                  "minimum": 0
+                },
+                "length": {
+                  "description": "Number of bytes in the retained range.",
+                  "type": "integer",
+                  "format": "uint",
+                  "minimum": 0
+                }
+              },
+              "required": [
+                "offset",
+                "length"
               ]
             }
           }
@@ -788,19 +838,64 @@
                   "type": "string"
                 },
                 "statement_span": {
-                  "description": "statement span",
-                  "$ref": "#/$defs/TextSpan"
+                  "description": "Statement span, or None when not retained by analysis.",
+                  "anyOf": [
+                    {
+                      "$ref": "#/$defs/TextSpan"
+                    },
+                    {
+                      "type": "null"
+                    }
+                  ]
                 },
                 "probrem_span": {
-                  "description": "probrem span",
-                  "$ref": "#/$defs/TextSpan"
+                  "description": "Problem span, or None when not retained by analysis.",
+                  "anyOf": [
+                    {
+                      "$ref": "#/$defs/TextSpan"
+                    },
+                    {
+                      "type": "null"
+                    }
+                  ]
+                },
+                "statement_relative_span": {
+                  "description": "Byte range relative to the SQL statement, when a file position is unavailable.",
+                  "anyOf": [
+                    {
+                      "$ref": "#/$defs/StatementByteRange"
+                    },
+                    {
+                      "type": "null"
+                    }
+                  ]
                 }
               },
               "required": [
                 "code",
-                "file_path",
-                "statement_span",
-                "probrem_span"
+                "file_path"
+              ]
+            },
+            "StatementByteRange": {
+              "description": "A retained byte range within a SQL statement, not a file position.",
+              "type": "object",
+              "properties": {
+                "offset": {
+                  "description": "UTF-8 byte offset from the SQL statement start.",
+                  "type": "integer",
+                  "format": "uint",
+                  "minimum": 0
+                },
+                "length": {
+                  "description": "Number of bytes in the retained range.",
+                  "type": "integer",
+                  "format": "uint",
+                  "minimum": 0
+                }
+              },
+              "required": [
+                "offset",
+                "length"
               ]
             },
             "Collection3": {

@@ -1,15 +1,16 @@
 mod collection_registry;
 mod context_handle_registry;
+mod facade;
+mod initialization;
 
 use self::{
     collection_registry::CollectionRegistry, context_handle_registry::ContextHandleRegistry,
 };
 
 use crate::{
-    ServerError,
+    Api, ServerError,
     buffers::JsonLinesStreamReader,
     json_rpc::{JsonRpcRequest, JsonRpcResponse},
-    process_request,
 };
 
 use std::{net::SocketAddr, num::NonZeroUsize};
@@ -19,11 +20,11 @@ use ::tokio::{
     net::tcp::{OwnedReadHalf, OwnedWriteHalf},
 };
 
-/// Per-authenticated-connection owner for subsequently retained schema contexts.
+/// Per-authenticated-connection owner of retained schema contexts.
 ///
-/// Future borrowing session state belongs inside the handler, so it is dropped
+/// Borrowing session state belongs inside the handler, so it is dropped
 /// before the wrapper's context owners rather than forming a self-reference.
-/// Its cursors may borrow schemas for the registry's lifetime. The future RPC
+/// Its sources may borrow schemas for the registry's lifetime. The RPC
 /// facade must keep that lifetime separate from its shorter mutable-state borrow;
 /// registration through a shared registry borrow cannot invalidate live cursors.
 pub(super) struct SessionWrapper {
@@ -46,10 +47,11 @@ impl SessionWrapper {
         mut write_half: OwnedWriteHalf,
         addr: SocketAddr,
         request_length_limit: usize,
+        api: &Api,
     ) -> Result<(), ServerError> {
         // Handler-local storage drops before the wrapper's strong schema owners,
-        // including on early errors and task cancellation. RPC integration follows.
-        let _collections = CollectionRegistry::new(NonZeroUsize::new(1_024).unwrap());
+        // including on early errors and task cancellation.
+        let mut state = SessionState::new(NonZeroUsize::new(1_024).unwrap());
         request_reader
             .set_request_length_limit(request_length_limit)
             .await;
@@ -57,7 +59,8 @@ impl SessionWrapper {
         while let Some(request) = request_reader.read_request().await? {
             let request_message: JsonRpcRequest = ::serde_json::from_value(request)?;
 
-            let response = process_request(&request_message).await;
+            let mut session = facade::Session::new(&self.contexts, &mut state);
+            let response = session.process_request(api, &request_message).await;
             let response = match response {
                 Ok(result) => JsonRpcResponse::success(&request_message, result),
                 Err(error) => JsonRpcResponse::error(&request_message, &error),
@@ -71,5 +74,18 @@ impl SessionWrapper {
         write_half.flush().await?;
         write_half.shutdown().await?;
         Ok(())
+    }
+}
+
+/// Lives inside the connection future, strictly shorter than its schema owners.
+struct SessionState<'ctx> {
+    collections: CollectionRegistry<'ctx>,
+}
+
+impl SessionState<'_> {
+    fn new(page_limit: NonZeroUsize) -> Self {
+        Self {
+            collections: CollectionRegistry::new(page_limit),
+        }
     }
 }

@@ -1,0 +1,6 @@
+[package.metadata.database.products]
+engine = "PostgreSQL"
+dialect = "postgres"
+version = "17"
+search_path = ["public"]
+connector = "products-connector"

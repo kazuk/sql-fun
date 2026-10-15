@@ -50,7 +50,10 @@ pub struct InitializeSchemaArgs {
     /// schema dump file
     schema_dump: PathBuf,
 
-    /// environment variables for initialization
+    /// Expected SHA-256 of the original dump text, supplied by the client.
+    expected_hash: String,
+
+    /// Explicit `SQL_FUN_HOME` and `SQL_FUN_METADATA_FILE`; other keys are rejected.
     environments: HashMap<String, String>,
 }
 
@@ -66,4 +69,21 @@ pub struct SchemaContext {
 
     /// schema analysis problems
     problems: Collection<AnalysisProbrem>,
+}
+
+impl SchemaContext {
+    /// Construct successful initialization metadata and its first diagnostic page.
+    /// Takes ownership of the page to avoid copying its items.
+    #[must_use]
+    pub fn new(
+        context_handle: &ContextHandle,
+        schema_dump_hash: &str,
+        problems: Collection<AnalysisProbrem>,
+    ) -> Self {
+        Self {
+            context_handle: Some(context_handle.clone()),
+            schema_dump_hash: schema_dump_hash.to_owned(),
+            problems,
+        }
+    }
 }

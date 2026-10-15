@@ -173,7 +173,7 @@ mod test_input {
 
     #[rstest::rstest]
     #[case::echo("echo", r#"[{"nested":[null,1,true]}]"#)]
-    #[case::initialize("initialize_schema_context", r#"{"datasource":"d","engine_dialect":"PostgreSQL","engine_version":{"PostgreSQL":"17"},"extensions":[],"search_path":[],"schema_dump":"schema.sql","environments":{}}"#)]
+    #[case::initialize("initialize_schema_context", r#"{"datasource":"d","engine_dialect":"PostgreSQL","engine_version":{"PostgreSQL":"17"},"extensions":[],"search_path":[],"schema_dump":"schema.sql","expected_hash":"0000000000000000000000000000000000000000000000000000000000000000","environments":{}}"#)]
     #[case::read(
         "read_collection",
         r#"{"collection_handle":"c","start_offset":0,"count":null}"#

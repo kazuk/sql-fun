@@ -225,6 +225,12 @@ pub struct StringSpan {
 }
 
 impl StringSpan {
+    /// Byte offset retained when this span was created.
+    #[must_use]
+    pub const fn offset(&self) -> usize {
+        self.offset
+    }
+
     /// create a new instance
     pub const fn new(offset: usize, len: usize) -> Self {
         Self { offset, len }

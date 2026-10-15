@@ -209,3 +209,12 @@ impl CollectionRegistryError {
         Self::HandleIdsExhausted
     }
 }
+
+impl From<CollectionRegistryError> for ::sql_fun_server_api::SqlFunServerApiError {
+    fn from(error: CollectionRegistryError) -> Self {
+        match error {
+            CollectionRegistryError::InvalidHandle => Self::invalid_collection_handle(),
+            CollectionRegistryError::HandleIdsExhausted => Self::new_unexpected(&error.to_string()),
+        }
+    }
+}

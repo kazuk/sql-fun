@@ -171,6 +171,44 @@ pub enum NameResolution {
 }
 
 impl NameResolution {
+    /// Stable diagnostic classification, independent of formatted debug output.
+    #[must_use]
+    pub(super) const fn code(&self) -> &'static str {
+        match self {
+            Self::DomainTypeNameNotFound(_) => DomainBaseTypeNameNotFound::CODE,
+            Self::FunctionNotFound(_) => FunctionNotFound::CODE,
+            Self::TableFunctionNotFound(..) => "table_function_not_found",
+            Self::UndefinedColumn(..) => "undefined_column",
+            Self::ColumnTypeNotFound(..) => "column_type_not_found",
+            Self::ColumnNotFoundInTableFunction(..) => "column_not_found_in_table_function",
+            Self::ColumnNotFoundInTable(..) => "column_not_found_in_table",
+            Self::ColumnAlreadyExists(..) => "column_already_exists",
+            Self::ColumnNotFoundInCte(..) => "column_not_found_in_cte",
+            Self::ColumnNotFoundInSubQuery(..) => "column_not_found_in_sub_query",
+            Self::ColumnNotFoundInSource(..) => "column_not_found_in_source",
+            Self::ColumnNotFoundInView(..) => "column_not_found_in_view",
+            Self::AmbiguousColumn(..) => "ambiguous_column",
+            Self::DuplicateAlias(..) => "duplicate_alias",
+            Self::UndefinedAlias(..) => "undefined_alias",
+            Self::RelationNotFound(..) => "relation_not_found",
+            Self::RelationAlreadyExists(..) => "relation_already_exists",
+            Self::ViewNotFound(..) => "view_not_found",
+            Self::IndexNotFound(..) => "index_not_found",
+            Self::SequenceNotFound(..) => "sequence_not_found",
+            Self::TableNotFound(..) => "table_not_found",
+            Self::CompositeTypeFieldNotFound(..) => "composite_type_field_not_found",
+            Self::CollationNotFound(..) => "collation_not_found",
+        }
+    }
+
+    pub(super) fn statement_relative_span(&self) -> Option<StringSpan> {
+        match self {
+            Self::DomainTypeNameNotFound(problem) => Some(problem.get_problem_span()),
+            Self::FunctionNotFound(problem) => Some(problem.get_problem_span()),
+            _ => None,
+        }
+    }
+
     pub(crate) fn render_report(
         &self,
         report_handler: &GraphicalReportHandler,

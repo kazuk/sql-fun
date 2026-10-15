@@ -50,6 +50,18 @@ where
             .cloned()
     }
 
+    #[cfg(test)]
+    pub(crate) fn active_waiters(&self, key: &K) -> usize {
+        self.state
+            .lock()
+            .expect("cache state")
+            .pending
+            .get(key)
+            .map_or(0, |waiters| {
+                waiters.iter().filter(|waiter| !waiter.is_closed()).count()
+            })
+    }
+
     /// Publish once, returning the existing value if another load completed first.
     ///
     /// # Panics

@@ -126,11 +126,101 @@ pub struct AnalysisProbrem {
     /// file path
     file_path: PathBuf,
 
-    /// statement span
-    statement_span: TextSpan,
+    /// Statement span, or None when not retained by analysis.
+    statement_span: Option<TextSpan>,
 
-    /// probrem span
-    probrem_span: TextSpan,
+    /// Problem span, or None when not retained by analysis.
+    probrem_span: Option<TextSpan>,
+
+    /// Byte range relative to the SQL statement, when a file position is unavailable.
+    statement_relative_span: Option<StatementByteRange>,
+}
+
+/// A retained byte range within a SQL statement, not a file position.
+#[cfg_attr(feature = "openrpc-schema", derive(schemars::JsonSchema))]
+#[derive(serde::Serialize, serde::Deserialize)]
+pub struct StatementByteRange {
+    /// UTF-8 byte offset from the SQL statement start.
+    offset: usize,
+    /// Number of bytes in the retained range.
+    length: usize,
+}
+
+impl StatementByteRange {
+    /// Construct a statement-relative range from retained analysis metadata.
+    #[must_use]
+    pub const fn new(offset: usize, length: usize) -> Self {
+        Self { offset, length }
+    }
+
+    /// UTF-8 byte offset from the statement start.
+    #[must_use]
+    pub const fn offset(&self) -> usize {
+        self.offset
+    }
+
+    /// Number of bytes in the range.
+    #[must_use]
+    pub const fn length(&self) -> usize {
+        self.length
+    }
+}
+
+impl AnalysisProbrem {
+    /// Construct a retained schema diagnostic without inventing missing locations.
+    /// Takes ownership of the optional span to avoid copying it.
+    #[must_use]
+    pub fn new(
+        code: &str,
+        file_path: &std::path::Path,
+        statement_relative_span: Option<StatementByteRange>,
+    ) -> Self {
+        Self {
+            code: code.to_owned(),
+            file_path: file_path.to_path_buf(),
+            statement_span: None,
+            probrem_span: None,
+            statement_relative_span,
+        }
+    }
+}
+
+#[cfg(test)]
+mod test_retained_diagnostic {
+    use super::{AnalysisProbrem, StatementByteRange};
+
+    #[test]
+    fn retains_byte_offsets_without_inventing_line_or_statement_positions() {
+        let problem = AnalysisProbrem::new(
+            "SF000001",
+            std::path::Path::new("schema.sql"),
+            Some(StatementByteRange::new(9, 7)),
+        );
+        let value = ::serde_json::to_value(problem).unwrap();
+        assert_eq!(
+            value,
+            ::serde_json::json!({
+                "code":"SF000001", "file_path":"schema.sql", "statement_span":null,
+                "probrem_span":null,
+                "statement_relative_span":{"offset":9,"length":7}
+            })
+        );
+        let _: AnalysisProbrem = ::serde_json::from_value(value).unwrap();
+    }
+
+    #[cfg(feature = "openrpc-schema")]
+    #[test]
+    fn schema_supports_unavailable_diagnostic_locations() {
+        let schema = ::serde_json::to_value(::schemars::schema_for!(AnalysisProbrem)).unwrap();
+        for field in ["statement_span", "probrem_span"] {
+            assert!(
+                schema["properties"][field]["anyOf"]
+                    .as_array()
+                    .unwrap()
+                    .contains(&::serde_json::json!({"type":"null"}))
+            );
+        }
+    }
 }
 
 /// error for api
@@ -143,6 +233,10 @@ pub enum SqlFunServerApiError {
     #[error("require release collection {0:?}")]
     RequireReleaseCollection(Vec<CollectionHandle>),
 
+    /// Unknown, foreign-session, or already released collection handle.
+    #[error("invalid collection handle")]
+    InvalidCollectionHandle,
+
     /// Generic unexpected error
     #[error("unexpected {0}")]
     Unexpected(String),
@@ -153,6 +247,12 @@ pub enum SqlFunServerApiError {
 }
 
 impl SqlFunServerApiError {
+    /// Construct an invalid collection handle error without revealing its owner.
+    #[must_use]
+    pub const fn invalid_collection_handle() -> Self {
+        Self::InvalidCollectionHandle
+    }
+
     /// raise a [`Self::Unexpected`] error
     ///
     /// # Errors

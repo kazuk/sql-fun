@@ -18,6 +18,35 @@ export USER="${SQL_FUN_API_FIXTURE##*/}"
 export SQL_FUN_SERVER="$SQL_FUN_TEST_SERVER_BIN"
 unset SQL_FUN_SERVER_COMMAND SQL_FUN_METADATA_FILE RUST_LOG
 
+# A small deterministic catalog exercises initialization without downloading or
+# parsing the developer's builtin installation. Only fixture-owned files are used.
+api_fixture_source=$(cd -- "$(dirname -- "${BASH_SOURCE[0]}")/fixtures" && pwd)
+mkdir -p "$SQL_FUN_API_FIXTURE/home/postgres/17"
+cp "$api_fixture_source/schema.sql" "$SQL_FUN_API_FIXTURE/schema.sql"
+cp "$api_fixture_source/Cargo.toml" "$SQL_FUN_API_FIXTURE/Cargo.toml"
+for catalog in functions func_detail; do
+  printf '[]\n' >"$SQL_FUN_API_FIXTURE/home/postgres/17/$catalog.json"
+done
+for catalog in left_unary_op right_unary_op casts; do
+  printf '{}\n' >"$SQL_FUN_API_FIXTURE/home/postgres/17/$catalog.json"
+done
+printf '%s\n' '{"intentionally_unused":[]}' >"$SQL_FUN_API_FIXTURE/home/postgres/17/binary_op.json"
+printf '%s\n' '[{"name":"int4"}]' >"$SQL_FUN_API_FIXTURE/home/postgres/17/pg_type.json"
+printf '%s\n' '-- synthetic builtin' >"$SQL_FUN_API_FIXTURE/home/postgres/17/schema.sql"
+api_dump_hash=$(sha256sum "$SQL_FUN_API_FIXTURE/schema.sql")
+api_dump_hash=${api_dump_hash%% *}
+jq -n --arg fixture "$SQL_FUN_API_FIXTURE" --arg hash "$api_dump_hash" '{
+  method:"initialize_schema_context", params:{
+    datasource:"products", engine_dialect:"PostgreSQL",
+    engine_version:{PostgreSQL:"17"}, extensions:[], search_path:["public"],
+    schema_dump:($fixture + "/schema.sql"), expected_hash:$hash,
+    environments:{
+      SQL_FUN_HOME:($fixture + "/home"),
+      SQL_FUN_METADATA_FILE:($fixture + "/Cargo.toml")
+    }
+  }
+}' >"$SQL_FUN_API_FIXTURE/initialize.json"
+
 api_server_pid=""
 function cleanup_api_fixture() {
   # Only signal our still-running shell child; a registration alone is never

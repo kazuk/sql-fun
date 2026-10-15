@@ -3,14 +3,18 @@
 #![deny(missing_docs)]
 
 mod async_tokio;
+mod completion;
 mod connection;
 /// api payload
 pub mod payloads;
 
-use crate::payloads::CollectionHandle;
-
 pub use self::async_tokio::{TcpJsonRpcClientAsync, TcpJsonRpcClientAsyncError};
+pub use self::completion::{
+    CompleteResponse, CompletionContext, CompletionFuture, TypedResponseError,
+};
 pub use self::connection::{ConnectionError, ConnectionOptions, ConnectionOptionsBuilder, connect};
+
+use crate::payloads::CollectionHandle;
 
 use std::{
     io::{BufReader, Write},
@@ -24,6 +28,8 @@ use std::{
 pub enum Collection<T> {
     /// raw server response
     Stream(StreamingCollection<T>),
+    /// Fully materialized items whose required release succeeded.
+    Completed(Vec<T>),
 }
 
 impl<T> Collection<T> {
@@ -45,11 +51,24 @@ impl<T> Collection<T> {
         ))
     }
 
+    /// Construct an already completed collection without retained server state.
+    #[must_use]
+    pub const fn completed(items: Vec<T>) -> Self {
+        Self::Completed(items)
+    }
+
+    /// Whether all items and required releases have completed.
+    #[must_use]
+    pub const fn is_completed(&self) -> bool {
+        matches!(self, Self::Completed(_))
+    }
+
     /// handle for collection
     #[must_use]
-    pub fn handle(&self) -> &CollectionHandle {
+    pub const fn handle(&self) -> Option<&CollectionHandle> {
         match self {
-            Self::Stream(s) => s.handle(),
+            Self::Stream(s) => Some(&s.handle),
+            Self::Completed(_) => None,
         }
     }
 
@@ -58,7 +77,26 @@ impl<T> Collection<T> {
     pub fn items(&self) -> &[T] {
         match self {
             Self::Stream(s) => &s.items,
+            Self::Completed(items) => items,
         }
+    }
+}
+
+#[cfg(test)]
+mod collection_tests {
+    #[test]
+    fn official_wire_page_starts_in_stream_state() -> ::testresult::TestResult {
+        let handle = ::sql_fun_server_api::payloads::CollectionHandle::from("wire".to_owned());
+        let wire = ::sql_fun_server_api::Collection::new(&handle, 3, 1, true, vec![7_u32]);
+        let client: super::Collection<u32> =
+            ::serde_json::from_value(::serde_json::to_value(wire)?)?;
+        assert!(!client.is_completed());
+        assert_eq!(client.items(), &[7]);
+        assert_eq!(
+            ::serde_json::to_value(client.handle())?,
+            ::serde_json::json!("wire")
+        );
+        Ok(())
     }
 }
 

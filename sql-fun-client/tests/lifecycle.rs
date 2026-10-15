@@ -215,3 +215,84 @@ async fn streams_multiple_requests_and_drains_actual_server() -> ::testresult::T
     reused.finish().await?;
     Ok(())
 }
+
+#[tokio::test]
+async fn typed_response_completes_real_session_collection_and_releases() -> ::testresult::TestResult
+{
+    // The actual server verifies authenticated handle lifetime and real bounded paging.
+    let fixture = heavy::ServerFixture::new()?;
+    let schema = test_helpers::schema::SchemaFixture::new()?;
+    let mut client = connect(&fixture.options()).await?;
+    let (sent, mut received) = ::tokio::sync::mpsc::unbounded_channel();
+    for _ in 0..8 {
+        let sent = sent.clone();
+        client
+            .invoke_typed(
+                "initialize_schema_context",
+                schema.request(),
+                move |response: Result<ObservedContext, _>| async move {
+                    let value = response.unwrap();
+                    assert!(value.context.problems().is_completed());
+                    assert_eq!(value.context.problems().items().len(), 1026);
+                    let _ = sent.send(value.handle);
+                    Ok(())
+                },
+            )
+            .await?;
+    }
+    drop(sent);
+    let mut handles = Vec::new();
+    for _ in 0..8 {
+        handles.push(
+            ::tokio::time::timeout(Duration::from_secs(20), received.recv())
+                .await?
+                .unwrap(),
+        );
+    }
+    let (sent, mut received) = ::tokio::sync::mpsc::unbounded_channel();
+    for handle in handles {
+        let sent = sent.clone();
+        client
+            .invoke_method(
+                "read_collection",
+                &::serde_json::json!({"collection_handle":handle, "start_offset":0, "count":1}),
+                move |response| async move {
+                    let _ = sent.send(response.into_result().is_err());
+                    Ok(())
+                },
+            )
+            .await?;
+    }
+    drop(sent);
+    ::tokio::time::timeout(Duration::from_secs(10), client.finish()).await??;
+    for _ in 0..8 {
+        assert!(received.recv().await.unwrap());
+    }
+
+    Ok(())
+}
+
+// Preserve the issued handle before completion solely to verify release afterward.
+#[derive(::serde::Deserialize)]
+#[serde(from = "sql_fun_client::payloads::SchemaContext")]
+struct ObservedContext {
+    context: ::sql_fun_client::payloads::SchemaContext,
+    handle: ::sql_fun_client::payloads::CollectionHandle,
+}
+impl From<::sql_fun_client::payloads::SchemaContext> for ObservedContext {
+    fn from(context: ::sql_fun_client::payloads::SchemaContext) -> Self {
+        let handle = context.problems().handle().unwrap().clone();
+        Self { context, handle }
+    }
+}
+impl ::sql_fun_client::CompleteResponse for ObservedContext {
+    fn register_collections(&self, context: &mut ::sql_fun_client::CompletionContext) {
+        self.context.register_collections(context);
+    }
+    fn complete<'a>(
+        &'a mut self,
+        context: &'a mut ::sql_fun_client::CompletionContext,
+    ) -> ::sql_fun_client::CompletionFuture<'a> {
+        self.context.complete(context)
+    }
+}

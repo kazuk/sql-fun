@@ -113,11 +113,7 @@ cd "$(git rev-parse --show-toplevel)"
 GIT_ROOT="$(pwd)"
 
 echo '== Copy payload module from sql-fun-server-api to sql-fun-client'
-rm sql-fun-client/src/payloads.rs
-rm -rf sql-fun-client/src/payloads
-cp sql-fun-server-api/src/payloads.rs sql-fun-client/src/payloads.rs
-cp -r sql-fun-server-api/src/payloads sql-fun-client/src/payloads
-
+"${GIT_ROOT}/.local/bin/prepare-client-payloads"
 
 declare -A STEP_SELECTED=()
 if (( ${#SELECTED_STEPS[@]} > 0 )); then

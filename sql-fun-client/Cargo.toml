@@ -31,6 +31,7 @@ url.workspace = true
 [dev-dependencies]
 clap.workspace = true
 rstest.workspace = true
+sha256.workspace = true
 tempfile.workspace = true
 testresult.workspace = true
 tracing-subscriber.workspace = true
@@ -38,6 +39,10 @@ tracing-subscriber.workspace = true
 [[test]]
 name = "lifecycle"
 path = "tests/lifecycle.rs"
+
+[[test]]
+name = "completion"
+path = "tests/completion.rs"
 
 [lints]
 workspace = true

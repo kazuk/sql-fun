@@ -50,6 +50,7 @@ and `result: "OK"`. TCP connection alone does not establish readiness.
 The self-contained example demonstrates the public connection API:
 
 ```sh
+.local/bin/prepare-client-payloads
 cargo build -p sql-fun-server
 cargo run -p sql-fun-client --example sql-fun-client-connect -- \
   --server-executable "$PWD/target/debug/sql-fun-server" \
@@ -112,22 +113,85 @@ client.finish().await?;
 ```
 
 Callbacks own their responses, must be `Send + 'static`, and return
-`Result<(), Infallible>`. Up to 32 accepted requests can remain unfinished,
+`Result<(), Infallible>`. Up to 8 accepted user requests can remain unfinished,
 including callbacks still running. Further submissions wait for capacity.
 Callbacks must not wait for additional submissions to the same saturated client.
 Callback order is unspecified, so applications needing serialized output should
 coordinate it themselves. Application output/storage errors are handled inside
 the callback; the client does not collect or report them.
 
-`finish(self)` flushes accepted requests, half-closes TCP writes, drains responses
-through EOF, and waits for callback completion. EOF with missing responses is an
-error. Transport/protocol failures also surface through subsequent submissions
+`finish(self)` stops new user submissions and completes accepted typed responses,
+including their reads/releases, before half-closing TCP writes. It then drains
+responses through EOF and waits for callback completion. EOF with missing responses
+is an error. Transport/protocol failures also surface through subsequent submissions
 and completion. `wait_for_failure()` permits observing terminal failure while
 waiting for further application input. Ordinary response frames are bounded to
 2 MiB; calls after initialization have no implicit deadline. Callers can apply
 `tokio::time::timeout`. Cancelling submission before acceptance leaves no pending
 request; dropping the client or cancelling `finish` closes its socket/tasks.
 Neither completion nor drop stops the shared server.
+
+Use `invoke_typed` to explicitly select automatic completion of client-owned typed
+responses. Supply the method, parameters, and result type; this API never infers
+collection handles from JSON keys. The original callback receives exactly one
+`Result<R, TypedResponseError>` after all collections, including those nested in
+items, have been read and any required releases have succeeded. Submission errors
+before acceptance return directly and do not invoke the callback.
+
+```rust,no_run
+# async fn example(
+#     mut client: sql_fun_client::TcpJsonRpcClientAsync,
+#     params: serde_json::Value,
+# ) -> Result<(), Box<dyn std::error::Error>> {
+client.invoke_typed(
+    "initialize_schema_context",
+    &params,
+    |response: Result<sql_fun_client::payloads::SchemaContext, _>| async move {
+        match response {
+            Ok(context) => {
+                println!("{} diagnostics", context.problems().items().len());
+            }
+            Err(error) => eprintln!("{error}"),
+        }
+        Ok(())
+    },
+).await?;
+client.finish().await?;
+# Ok(())
+# }
+```
+
+Typed completion materializes the **entire collection in client memory**. A wire
+collection deserializes into client `Collection::Stream`; successful completion
+produces `Collection::Completed`, whose `items()` contains the full ordered data
+and whose `handle()` is `None`. `Stream` represents incomplete state, without a
+public lazy stream or iterator contract. Initial nonzero offsets are supported by
+reading the missing prefix and suffix. Positive short pages are continued; zero
+progress or inconsistent pages fail. Empty and initially complete retained
+collections still require release before callback delivery.
+
+All follow-up calls use the original authenticated connection. Internal RPCs have
+24 reserved admission slots and share the existing bounded queue with the 8 user
+slots, allowing progress when all user slots await typed completion. Manually
+submitted read/release calls use user slots. No queue scheduling priority is
+promised. Use `invoke_method` for manual paging or opaque JSON results; selecting
+`serde_json::Value` with `invoke_typed` treats it as an opaque leaf.
+
+The library implements `CompleteResponse` for its API response/item types and
+for `Option<T>`, `Vec<T>`, and `Box<T>` composition. Custom response types implement
+that trait by registering all known collection-bearing fields and delegating
+completion to them. There is no blanket implementation that silently skips
+unknown types.
+
+On failure, the original callback receives an error rather than a partially
+completed result. While the connection remains usable, completion attempts to
+release known retained handles, including decoded sibling collections. Cleanup
+failures are included with the original error. A release whose outcome may be
+uncertain is not retried. Cleanup cannot guarantee release after disconnect,
+client drop/cancellation, undecodable initial responses, invalid handle metadata,
+or unread nested items. Dropping the client or cancelling `finish` closes the
+session and aborts its tasks; cleanup does not run in detached background tasks.
+No response completion can resume on a different connection.
 
 The client emits `tracing` INFO events after a request is written (`request_id`,
 `method`) and when a response is received (`request_id`, and `error_code` for

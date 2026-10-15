@@ -1,4 +1,4 @@
-mod streaming;
+pub(crate) mod streaming;
 
 #[cfg(test)]
 mod test_helpers;
@@ -90,7 +90,7 @@ impl TcpJsonRpcClientAsync {
 
     /// Submit a request with an infallible asynchronous response callback.
     ///
-    /// Acceptance does not wait for a response. At most 32 accepted requests,
+    /// Acceptance does not wait for a response. At most 8 accepted user requests,
     /// including running callbacks, can remain unfinished. Cancellation before
     /// acceptance leaves no pending request. Callbacks must not wait for further
     /// submissions to this same saturated client.
@@ -109,10 +109,74 @@ impl TcpJsonRpcClientAsync {
     {
         self.start_streaming()?;
         let streaming = self.streaming_connection()?;
-        self.id = streaming
-            .submit_request(self.id, method, params, callback)
-            .await?;
+        streaming.submit_request(method, params, callback).await?;
         Ok(())
+    }
+
+    /// Submit a typed response for full collection materialization and release.
+    ///
+    /// The callback runs exactly once after acceptance, with the completed result
+    /// or a decoding, collection, server, or connection error. Selecting this API
+    /// authorizes reading all pages into memory and releasing retained handles.
+    /// Use `invoke_method` for explicit manual paging instead. Dropping the client
+    /// or cancelling `finish` aborts callbacks and cannot guarantee release.
+    ///
+    /// ```no_run
+    /// # async fn example(mut client: sql_fun_client::TcpJsonRpcClientAsync,
+    /// # params: serde_json::Value) -> Result<(), Box<dyn std::error::Error>> {
+    /// client.invoke_typed("initialize_schema_context", &params,
+    ///     |result: Result<sql_fun_client::payloads::SchemaContext, _>| async move {
+    ///         if let Ok(context) = result {
+    ///             assert!(context.problems().is_completed());
+    ///         }
+    ///         Ok(())
+    ///     }).await?;
+    /// client.finish().await?;
+    /// # Ok(())
+    /// # }
+    /// ```
+    ///
+    /// # Errors
+    /// Returns submission failures before acceptance. No callback runs in that case.
+    pub async fn invoke_typed<R, F, Fut>(
+        &mut self,
+        method: &str,
+        params: &serde_json::Value,
+        callback: F,
+    ) -> Result<(), TcpJsonRpcClientAsyncError>
+    where
+        R: crate::CompleteResponse + ::serde::de::DeserializeOwned + Send + 'static,
+        F: FnOnce(Result<R, crate::TypedResponseError>) -> Fut + Send + 'static,
+        Fut: std::future::Future<Output = Result<(), std::convert::Infallible>> + Send + 'static,
+    {
+        self.start_streaming()?;
+        let sender = self.streaming_connection()?.sender();
+        let completion_sender = sender.clone();
+        let typed = sender.begin_typed();
+        sender
+            .submit_user(
+                method,
+                params,
+                Box::new(move |response| {
+                    Box::pin(async move {
+                        let _typed = typed;
+                        let mut context = crate::CompletionContext::new(completion_sender);
+                        let result = async {
+                            let response = response
+                                .map_err(|message| crate::TypedResponseError::message(&message))?;
+                            let value = response.into_result()?;
+                            let mut value: R = ::serde_json::from_value(value)?;
+                            value.register_collections(&mut context);
+                            value.complete(&mut context).await?;
+                            Ok(value)
+                        }
+                        .await;
+                        let result = context.finish(result).await;
+                        callback(result).await
+                    })
+                }),
+            )
+            .await
     }
 
     /// Wait for a terminal connection failure independently of submission.
@@ -152,7 +216,7 @@ impl TcpJsonRpcClientAsync {
             let Some(reader) = self.reader.take() else {
                 return TcpJsonRpcClientAsyncError::raise_connection_closed();
             };
-            self.streaming = Some(Streaming::start(reader)?);
+            self.streaming = Some(Streaming::start(reader, self.id)?);
         }
         Ok(())
     }
@@ -384,8 +448,8 @@ mod streaming_tests {
     #[tokio::test]
     async fn bounded_admission_cancellation_does_not_register_request() -> ::testresult::TestResult
     {
-        let mut client = test_helpers::draining_peer(32, false).await?;
-        for _ in 0..32 {
+        let mut client = test_helpers::draining_peer(8, false).await?;
+        for _ in 0..8 {
             client
                 .invoke_method("echo", &::serde_json::json!([]), |_| async { Ok(()) })
                 .await?;

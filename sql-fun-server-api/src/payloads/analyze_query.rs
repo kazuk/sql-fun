@@ -175,3 +175,33 @@ pub struct ResultSetColumn {
     /// nullability
     nullability: Nullability,
 }
+
+impl AnalyzeQueryResponse {
+    /// Mutably access the queries collection.
+    pub const fn queries_mut(&mut self) -> &mut Collection<AnalyzeQueryItem> {
+        &mut self.queries
+    }
+}
+
+impl AnalyzeQueryItem {
+    /// Mutably access the probrems collection.
+    pub const fn probrems_mut(&mut self) -> &mut Collection<AnalysisProbrem> {
+        &mut self.probrems
+    }
+    /// Mutably access the accessing relations collection.
+    pub const fn accessing_relations_mut(&mut self) -> &mut Collection<ObjectSummary> {
+        &mut self.accessing_relations
+    }
+    /// Mutably access the column access collection.
+    pub const fn column_access_mut(&mut self) -> &mut Collection<ColumnAccess> {
+        &mut self.column_access
+    }
+    /// Mutably access the parameters collection.
+    pub const fn parameters_mut(&mut self) -> &mut Collection<ParameterDescribe> {
+        &mut self.parameters
+    }
+    /// Mutably access the result columns collection.
+    pub const fn result_columns_mut(&mut self) -> &mut Collection<ResultSetColumn> {
+        &mut self.result_columns
+    }
+}

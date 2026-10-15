@@ -3109,6 +3109,7 @@ dependencies = [
  "schemars",
  "serde",
  "serde_json",
+ "sha256",
  "sql-fun-server-api",
  "tempfile",
  "testresult",

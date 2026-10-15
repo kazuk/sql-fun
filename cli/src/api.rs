@@ -365,13 +365,13 @@ mod test_bridge {
     async fn slow_output_bounds_submission_and_finish_waits_for_callbacks() {
         let (client, mut received) = test_helpers::eager_peer().await;
         let (writer, mut reader) = ::tokio::io::duplex(1);
-        // More than the client's 32 unfinished-request slots, with no output
+        // More than the client's 8 unfinished user-request slots, with no output
         // reader until capacity saturation has been observed on the wire.
         let input = test_helpers::echo_lines(40);
         let completion = ::tokio::spawn(async move {
             bridge(client, BufReader::new(input.as_bytes()), writer).await
         });
-        for expected in 1..=32 {
+        for expected in 1..=8 {
             assert_eq!(
                 ::tokio::time::timeout(std::time::Duration::from_secs(5), received.recv())
                     .await

@@ -1,0 +1,57 @@
+use std::fmt::Write;
+
+/// A small synthetic catalog for real-server diagnostic paging tests.
+pub struct SchemaFixture {
+    _directory: ::tempfile::TempDir,
+    request: ::serde_json::Value,
+}
+impl SchemaFixture {
+    pub const fn request(&self) -> &::serde_json::Value {
+        &self.request
+    }
+
+    /// Writes small fixture-owned files; no catalog parsing or external service.
+    pub fn new() -> ::testresult::TestResult<Self> {
+        let directory = ::tempfile::tempdir()?;
+        let root = directory.path();
+        let catalog = root.join("home/postgres/17");
+        std::fs::create_dir_all(&catalog)?;
+        for name in ["functions", "func_detail", "pg_type"] {
+            std::fs::write(catalog.join(format!("{name}.json")), "[]")?;
+        }
+        for name in ["left_unary_op", "right_unary_op", "casts"] {
+            std::fs::write(catalog.join(format!("{name}.json")), "{}")?;
+        }
+        std::fs::write(
+            catalog.join("binary_op.json"),
+            r#"{"intentionally_unused":[]}"#,
+        )?;
+        std::fs::write(catalog.join("schema.sql"), "-- synthetic builtin")?;
+        std::fs::write(
+            root.join("Cargo.toml"),
+            r#"
+[package.metadata.database.products]
+engine = "PostgreSQL"
+dialect = "postgres"
+version = "17"
+search_path = ["public"]
+connector = "products-connector"
+"#,
+        )?;
+        let mut sql = String::new();
+        for index in 0..513 {
+            ::std::writeln!(sql, "DROP TABLE missing_{index};")?;
+        }
+        let dump = root.join("schema.sql");
+        std::fs::write(&dump, &sql)?;
+        let request = ::serde_json::json!({
+            "datasource":"products", "schema_dump":dump,
+            "expected_hash": ::sha256::digest(sql),
+            "environments": {"SQL_FUN_HOME":root.join("home"), "SQL_FUN_METADATA_FILE":root.join("Cargo.toml")}
+        });
+        Ok(Self {
+            _directory: directory,
+            request,
+        })
+    }
+}

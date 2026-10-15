@@ -18,7 +18,6 @@ doc = false
 sqlite = ["sql-fun-core/sqlite", "sql-fun-sqlast/sqlite", "sql-fun-server-api/sqlite"]
 
 [dependencies]
-async-trait.workspace = true
 clap = { workspace = true }
 derive-getters = { workspace = true }
 either.workspace = true

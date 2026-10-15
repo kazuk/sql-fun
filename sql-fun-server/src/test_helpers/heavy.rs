@@ -1,4 +1,5 @@
-use crate::{Args, ServerError, serve_client};
+use crate::{Api, Args, ServerError, serve_client_with_api};
+use std::sync::Arc;
 
 use std::time::Duration;
 
@@ -13,13 +14,29 @@ const WAIT: Duration = Duration::from_secs(5);
 /// Starts a fresh test-owned TCP connection handler per fixture, without sharing.
 /// Real sockets exercise authentication, buffered handoff, and transport teardown.
 pub(crate) struct Connection {
-    responses: BufReader<OwnedReadHalf>,
-    requests: OwnedWriteHalf,
+    responses: Option<BufReader<OwnedReadHalf>>,
+    requests: Option<OwnedWriteHalf>,
     handler: JoinHandle<Result<(), ServerError>>,
 }
 
 impl Connection {
     pub(crate) async fn start(request_length_limit: usize, auth_timeout: u64) -> Self {
+        Self::start_with_api(
+            request_length_limit,
+            auth_timeout,
+            &Arc::new(Api {
+                schema_cache: std::sync::OnceLock::new(),
+            }),
+        )
+        .await
+    }
+
+    /// Uses the selected test-owned cache host so parallel tests never share installations.
+    pub(crate) async fn start_with_api(
+        request_length_limit: usize,
+        auth_timeout: u64,
+        api: &Arc<Api>,
+    ) -> Self {
         let listener = TcpListener::bind("127.0.0.1:0").await.unwrap();
         let client =
             ::tokio::time::timeout(WAIT, TcpStream::connect(listener.local_addr().unwrap()))
@@ -37,20 +54,35 @@ impl Connection {
             auth_timeout,
             token: "session-test-token".to_owned(),
         };
-        let handler = ::tokio::spawn(async move { serve_client(&args, server, peer).await });
+        let api = Arc::clone(api);
+        let handler =
+            ::tokio::spawn(async move { serve_client_with_api(&args, server, peer, &api).await });
         let (read, requests) = client.into_split();
         Self {
-            responses: BufReader::new(read),
-            requests,
+            responses: Some(BufReader::new(read)),
+            requests: Some(requests),
             handler,
         }
     }
 
     pub(crate) async fn send(&mut self, frames: &str) {
-        ::tokio::time::timeout(WAIT, self.requests.write_all(frames.as_bytes()))
-            .await
-            .unwrap()
-            .unwrap();
+        ::tokio::time::timeout(
+            WAIT,
+            self.requests.as_mut().unwrap().write_all(frames.as_bytes()),
+        )
+        .await
+        .unwrap()
+        .unwrap();
+    }
+
+    pub(crate) async fn rpc(
+        &mut self,
+        method: &str,
+        params: &::serde_json::Value,
+    ) -> ::serde_json::Value {
+        let request = ::serde_json::json!({"jsonrpc":"2.0","id":1,"method":method,"params":params});
+        self.send(&format!("{request}\n")).await;
+        self.response().await
     }
 
     pub(crate) async fn authenticate(&mut self) {
@@ -72,14 +104,14 @@ impl Connection {
 
     async fn response_line(&mut self) -> Result<String, std::io::Error> {
         let mut line = String::new();
-        ::tokio::time::timeout(WAIT, self.responses.read_line(&mut line))
+        ::tokio::time::timeout(WAIT, self.responses.as_mut().unwrap().read_line(&mut line))
             .await
             .unwrap()?;
         Ok(line)
     }
 
     pub(crate) async fn end_requests(&mut self) {
-        ::tokio::time::timeout(WAIT, self.requests.shutdown())
+        ::tokio::time::timeout(WAIT, self.requests.as_mut().unwrap().shutdown())
             .await
             .unwrap()
             .unwrap();
@@ -104,6 +136,13 @@ impl Connection {
             .await
             .unwrap()
             .unwrap()
+    }
+
+    /// Drop both client transport halves without the EOF/drain handshake.
+    pub(crate) async fn disconnect(&mut self) {
+        self.requests.take();
+        self.responses.take();
+        let _ = self.finish().await;
     }
 
     pub(crate) async fn cancel(&mut self) {

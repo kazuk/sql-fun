@@ -139,7 +139,10 @@ async fn path_resolution_and_server_error_envelope() -> ::testresult::TestResult
         .env("PATH", server.executable().parent().unwrap());
     let output = heavy::ApiServer::run_command(
         command,
-        "{\"method\":\"release_collection\",\"params\":{\"collection_handle\":\"unused\"}}\n",
+        concat!(
+            r#"{"method":"release_collection","params":{"collection_handle":"unused"}}"#,
+            "\n"
+        ),
     )
     .await?;
     assert!(
@@ -152,10 +155,8 @@ async fn path_resolution_and_server_error_envelope() -> ::testresult::TestResult
     assert_eq!(replies[0]["jsonrpc"], "2.0");
     assert!(replies[0]["id"].is_number());
     assert!(replies[0]["error"]["code"].is_i64());
-    assert_eq!(
-        replies[0]["error"]["message"],
-        "unknown method : release_collection"
-    );
+    assert_eq!(replies[0]["error"]["message"], "invalid collection handle");
+    assert_eq!(replies[0]["error"]["data"], "InvalidCollectionHandle");
     assert!(replies[0].get("result").is_none());
     Ok(())
 }

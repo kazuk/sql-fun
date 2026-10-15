@@ -7,8 +7,8 @@ SQL diagnostics without executing a query.
 
 > **API design draft:** The workflow and response capabilities below describe
 > the intended contract, not a fully available server feature. The server
-> currently accepts `initialize_schema_context` after authentication but
-> has not completed its implementation. `analyze_query` is declared in
+> implements connection-local `initialize_schema_context`, `read_collection`,
+> and `release_collection` after authentication. `analyze_query` is declared in
 > `sql-fun-server-api` but is not yet dispatched by the JSON-RPC server.
 > Examples marked **proposed** are illustrative, not executable requests.
 
@@ -52,7 +52,7 @@ configuration. The intended operation makes the selected engine's builtin
 objects, selected extensions, and datasource schema dump available to
 subsequent analysis.
 
-The **currently declared request** (`InitializeSchemaArgs`) contains:
+The **initialization request** (`InitializeSchemaArgs`) contains:
 
 | Field | Meaning |
 | --- | --- |
@@ -62,11 +62,30 @@ The **currently declared request** (`InitializeSchemaArgs`) contains:
 | `extensions` | Selected extension names and versions |
 | `search_path` | Name-resolution search path |
 | `schema_dump` | Server-visible path to the schema dump |
-| `environments` | Environment values for resolving initialization settings |
+| `expected_hash` | Required lowercase hexadecimal SHA-256 of the original dump text |
+| `environments` | Explicit `SQL_FUN_HOME` and `SQL_FUN_METADATA_FILE` selections |
 
-The exact ownership of settings already present in datasource metadata and
-also supplied by the request is not yet settled. Clients should not assume
-an undocumented default or precedence rule.
+Both environment entries are required and must be nonempty. Other environment
+keys are rejected; the server does not inherit its process environment to resolve
+request settings or discover a project. Paths are server-visible; relative paths
+resolve from the server working directory, so clients should use absolute paths.
+
+The selected metadata must declare PostgreSQL and the same dialect as the request.
+If metadata also declares a version, search path, or extension list, it must agree
+with the corresponding explicit request setting (including extension order).
+Conflicts are errors. Missing optional metadata settings use the explicit request
+values. Every extension must include its selected name and installation version;
+the supplied extension order is the load order. Engine versions must be nonempty
+installation names, not paths. Extension names and versions cannot contain the
+CSV separators `,` or `@`. Extension installation scripts are resolved using
+the existing PostgreSQL extension directory:
+`<SQL_FUN_HOME>/postgresql/<engine-version>/extensions/<name>--<extension-version>.sql`.
+Initialization reads only the named installation scripts and does not infer
+extension dependencies or choose a version.
+
+The first successful cache service registration fixes the builtin installation
+for the server lifetime. A later request selecting a different canonical
+`SQL_FUN_HOME` is rejected; restart the server to select a different installation.
 
 The **currently declared response** (`SchemaContext`) contains:
 
@@ -79,21 +98,22 @@ The **currently declared response** (`SchemaContext`) contains:
 A context handle, when provided, is passed unchanged to later analysis
 requests. The client should inspect initialization diagnostics before using
 the context. A missing handle must not be treated as a successfully initialized
-context. The conditions for publishing a partially built context remain
-unspecified.
+context. Successful initialization returns a handle even when recoverable schema
+diagnostics are present. Fatal loading/parsing/analysis failures return a JSON-RPC
+error and no usable context handle. Context handles remain valid only in the
+connection that initialized them, until that connection closes.
 
 The cache service now supports shared builtin and ordered extension prefixes.
-Its RPC integration still depends on connection-scoped session registration.
+Initialization registers its result in the requesting connection.
 The datasource must be explicitly selected; an omitted or unknown selection
 is an error. The server reads only the schema files selected for that request.
 Client and server must see the same local files. Aliases resolving to the same
 canonical path share a file identity; separate canonical paths have separate
 identities even when contents match.
 
-The initialization integration will require an `expected_hash` of the original
-schema-dump file text, calculated by the client using
-`sql_fun_core::Hasher::hash_file`. This field is **not yet present** in the
-historical wire shape above. The server first searches its in-memory schema
+Initialization requires an `expected_hash` of the original schema-dump file
+text, calculated by the client using `sql_fun_core::Hasher::hash_file`. The server
+first searches its in-memory schema
 cache for that hash under the same parent schema and resolved dump path. A hit
 returns the historical schema without reading the dump, even if the dump has
 changed or been deleted. This also preserves cached syntax or semantic errors.
@@ -238,13 +258,24 @@ query, a CTE definition, or generated SQL. Clients must not assume every
 span is an offset into the same SQL string. If an exact original location
 cannot be recovered, it must not be fabricated.
 
-The existing `AnalysisProbrem` type only carries `code`, `file_path`,
-`statement_span`, and `probrem_span`. Message, severity, and richer source
+The `AnalysisProbrem` type carries `code`, `file_path`, `statement_span`,
+`probrem_span`, and `statement_relative_span`. Message, severity, and richer source
 identity are intended capabilities that are not yet part of that type.
+Schema diagnostic codes identify the retained problem kind. Diagnostics keep
+layer order (builtin, ordered extensions, application dump) and analysis order
+within each layer. A missing `statement_span` or `probrem_span` is `null`.
+The cache does not retain statement positions in the file, so schema diagnostics
+return `null` for both file spans. If analysis retained a range inside its SQL
+statement, `statement_relative_span` contains its byte `offset` and `length`.
+This range cannot be treated as an offset into the schema file. The server does
+not reopen or reparse source files to invent missing positions.
 
 A JSON-RPC error represents a problem with the request, context state, or
-service operation. SQL diagnostics are analysis results. The precise
-classification of fatal parse/analysis failures is still being finalized.
+service operation. SQL diagnostics are analysis results. For schema
+initialization, loading failures and expected-hash mismatches use
+`SchemaContextInitializeFailed`. The error envelope includes a readable message
+and its serialized API error in `data`. Other query-analysis error details remain
+under design.
 
 ### 5. Read and release result collections
 
@@ -253,9 +284,24 @@ provides a collection handle, the intended client flow is to use
 `read_collection` for remaining items and `release_collection` when done.
 
 A collection belongs to the requesting connection's session. Do not pass a
-collection handle to another connection. Expiry, pagination details, and
-resource limits remain to be defined. Both collection operations are declared
-but not yet implemented.
+collection handle to another connection. `read_collection` accepts
+`collection_handle`, `start_offset` and `count`. Reads are repeatable at arbitrary
+offsets and preserve the original element type. Every page, including the initial
+diagnostic page, contains at most 1,024 items. `count: null` requests the remaining
+items subject to that limit. Zero counts, exhausted offsets, and offsets beyond
+the end return empty pages with the original `total_length` and requested
+`offset`.
+
+Retained collections set `require_release: true`, including empty collections
+and their final pages. They remain registered until `release_collection` or
+connection teardown; there is no expiration or automatic release on exhaustion.
+Release returns JSON `null`. Unknown, foreign-session, and already released
+handles produce the same `InvalidCollectionHandle` API error; repeated release
+is an error. Such RPC errors leave the connection usable.
+
+Each `sql-fun api` invocation creates a new session. A handle from one invocation
+cannot be continued or released by another invocation. Use a persistent RPC
+connection when continuation is needed.
 
 ## Using the API from `sql-fun check`
 
@@ -286,25 +332,21 @@ implementation and reference documentation cover the behavior.
 
 | Component | Present state |
 | --- | --- |
-| `sql-fun-server-api/src/initialize_schema.rs` | Historical initialization request/response shapes; PostgreSQL-only dialect/version enums |
+| `sql-fun-server-api/src/initialize_schema.rs` | Implemented initialization request/response; PostgreSQL-only dialect/version enums |
 | `sql-fun-server-api/src/analyze_query.rs` | Historical query input and result shapes |
 | `sql-fun-sqlast` | `FrozenBaseContext`, layered schema loading, recoverable schema problems |
 | `sql-fun-core` | Shared `ResolvedCteCatalog` and its serialization |
 | `sql-fun-codegen` | `QueryRequirements::extract` |
 | `sql-fun-server/src/cte_realization.rs` | `realize_cte_catalog` produces a common AST and `OrderedBindings`; it is server-internal |
-| `sql-fun-server/src/lib.rs` | Schema initialization stops at `todo!()`; query analysis, collection operations and query dispatcher are unfinished |
+| `sql-fun-server/src/lib.rs` | Connection-local initialization and collection RPCs implemented; query-analysis and object-consumer handlers remain unfinished |
 | `cli/src/check.rs` | Requirements extraction exists; server analysis and lockfile integration are incomplete |
 
 ### Pending design and implementation decisions
 
-1. **Schema selection and layering:** Decide the precedence between metadata
-   and explicit API settings; implement selected builtin, extension, and
-   datasource dump loading for supported dialects. Resolve extension file
-   locations and dependency order without inferring an unspecified choice.
-2. **Context publication and identity:** Define behavior on recoverable versus
-   fatal schema loading failures; context handle ownership, validity, and
-   invalidation; and whether a fingerprint of the *entire* semantic context
-   is needed in addition to `schema_dump_hash`.
+1. **Additional dialects:** Schema initialization currently supports PostgreSQL.
+   Any additional dialect needs its own implemented loading contract.
+2. **Context identity:** Decide whether callers need a fingerprint of the
+   *entire* semantic context in addition to `schema_dump_hash`.
 3. **Analysis inputs:** Reconcile the current `Text/File/Url` variant with
    `ResolvedCteCatalog`, avoiding duplicate base SQL. Define whether
    remote URL fetching is supported and its explicit authorization rules.
@@ -318,9 +360,8 @@ implementation and reference documentation cover the behavior.
 6. **Diagnostics:** Define source identity, positional mapping for base-query
    and catalog-CTE spans, severity/message, and how fatal `AnalysisError`
    differs from recoverable `AnalysisProblem` in RPC responses.
-7. **Server state and transport:** Complete dispatcher, context cache, and
-   session-isolated `read_collection`/`release_collection`, including
-   exhaustion and disconnect behavior.
+7. **Feature consumers:** Connect query analysis and object enumeration to the
+   existing connection-local context and collection infrastructure.
 8. **End-to-end checks:** Cover schema load errors, unknown datasource/handle,
    missing tables/columns, CTE binding order, type alternatives, multiple
    datasources and concurrent connections, and PostgreSQL/SQLite behavior.

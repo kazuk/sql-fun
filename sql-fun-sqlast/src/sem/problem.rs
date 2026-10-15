@@ -121,6 +121,45 @@ pub enum AnalysisProblem {
 }
 
 impl AnalysisProblem {
+    /// Stable diagnostic classification, independent of formatted debug output.
+    #[must_use]
+    pub const fn code(&self) -> &'static str {
+        match self {
+            Self::NameResolution(problem) => problem.code(),
+            Self::OverloadResolution(problem) => problem.code(),
+            Self::ExtensionNotFound(..) => "extension_not_found",
+            Self::NullabilityUnknown(..) => "nullability_unknown",
+            Self::ArgumentTypeMismatch(..) => "argument_type_mismatch",
+            Self::DuplicateDefElemKey(..) => "duplicate_def_elem_key",
+            Self::ExplicitCastNotDefined(..) => "explicit_cast_not_defined",
+            Self::CoalesceExprTypeUnknown(..) => "coalesce_expr_type_unknown",
+            Self::ExpressionTypeNotKnown(..) => "expression_type_not_known",
+            Self::UndefinedOperator(..) => "undefined_operator",
+            Self::RequireArray(..) => "require_array",
+            Self::SubQueryNotHaveColumnForDerivedColumnName(..) => {
+                "sub_query_not_have_column_for_derived_column_name"
+            }
+            Self::IncompatibleCaseValues(..) => "incompatible_case_values",
+            Self::CaseWhenExprTypeUnknown(..) => "case_when_expr_type_unknown",
+            Self::ArrayIndexTypeMismatch(..) => "array_index_type_mismatch",
+            Self::MemberAccessRequiresCompositeType(..) => "member_access_requires_composite_type",
+            Self::FunctionArgImplicitCastNotFound(..) => "function_arg_implicit_cast_not_found",
+            Self::ImplicitCastNotFound(..) => "implicit_cast_not_found",
+            Self::ParameterTypeMismatchForTableFunction(..) => {
+                "parameter_type_mismatch_for_table_function"
+            }
+        }
+    }
+
+    /// Retained statement-relative byte range, when recorded during analysis.
+    #[must_use]
+    pub fn statement_relative_span(&self) -> Option<StringSpan> {
+        match self {
+            Self::NameResolution(problem) => problem.statement_relative_span(),
+            _ => None,
+        }
+    }
+
     /// covert problem to report
     pub fn render_report(
         &self,
@@ -339,5 +378,36 @@ impl AnalysisProblem {
     #[cfg(feature = "sqlite")]
     pub(crate) fn type_not_found(_type_name: &FullName) -> Self {
         todo!()
+    }
+}
+
+#[cfg(test)]
+mod test_rpc_diagnostic_metadata {
+    use super::AnalysisProblem;
+    use crate::{
+        StringSpan,
+        sem::{FullName, TableName},
+    };
+
+    #[test]
+    fn preserves_existing_code_and_recorded_byte_range() {
+        let span = StringSpan::new(12, 7);
+        let problem = AnalysisProblem::domain_base_type_not_found(
+            &FullName::with_schema("public", "domain"),
+            "missing",
+            &span,
+        );
+        assert_eq!(problem.code(), "SF000001");
+        assert_eq!(problem.statement_relative_span().unwrap().offset(), 12);
+        assert_eq!(problem.statement_relative_span().unwrap().len(), 7);
+    }
+
+    #[test]
+    fn classifies_unlocated_problems_without_fabricating_a_span() {
+        let problem = AnalysisProblem::table_not_found(&TableName::from(FullName::with_schema(
+            "public", "missing",
+        )));
+        assert_eq!(problem.code(), "table_not_found");
+        assert!(problem.statement_relative_span().is_none());
     }
 }

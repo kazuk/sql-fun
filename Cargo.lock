@@ -3187,7 +3187,6 @@ dependencies = [
 name = "sql-fun-server"
 version = "0.1.0"
 dependencies = [
- "async-trait",
  "clap",
  "derive-getters",
  "either",

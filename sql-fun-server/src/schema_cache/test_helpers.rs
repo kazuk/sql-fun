@@ -2,6 +2,7 @@ use super::{SchemaCacheService, SchemaSelection};
 use ::sql_fun_core::{Hasher, SqlFunArgs, SqlFunMetadata, SqlFunMetadataCollection};
 use std::{
     collections::HashMap,
+    fmt::Write,
     path::{Path, PathBuf},
 };
 
@@ -62,7 +63,52 @@ connector = 'orders-connector'
         Self { directory }
     }
 
-    pub(super) fn home(&self) -> &Path {
+    pub(crate) fn rpc_request(&self, sql: &str) -> ::serde_json::Value {
+        let dump = self.schema("rpc.sql", sql);
+        ::serde_json::json!({
+            "datasource":"products", "engine_dialect":"PostgreSQL",
+            "engine_version":{"PostgreSQL":"17"}, "extensions":[],
+            "search_path":["public"], "schema_dump":dump,
+            "expected_hash":Self::hash(&dump),
+            "environments":{
+                "SQL_FUN_HOME":self.home(),
+                "SQL_FUN_METADATA_FILE":self.home().join("Cargo.toml")
+            }
+        })
+    }
+
+    pub(crate) fn request_with_extensions(&self) -> ::serde_json::Value {
+        let request = self.rpc_request("DROP TABLE missing_app;");
+        let (args, metadata) = self.analysis_inputs("products");
+        let directory = args.postgres_extensions_dir(&metadata).unwrap();
+        std::fs::create_dir_all(&directory).unwrap();
+        std::fs::write(
+            directory.join("first--1.0.sql"),
+            "DROP TABLE missing_first;",
+        )
+        .unwrap();
+        std::fs::write(
+            directory.join("second--2.0.sql"),
+            "DROP TABLE missing_second;",
+        )
+        .unwrap();
+        let mut request = request;
+        request["extensions"] = ::serde_json::json!([
+            {"extension_name":"second", "extension_version":"2.0"},
+            {"extension_name":"first", "extension_version":"1.0"}
+        ]);
+        request
+    }
+
+    pub(crate) fn diagnostic_request(&self, count: usize) -> ::serde_json::Value {
+        let mut sql = String::new();
+        for index in 0..count {
+            ::std::writeln!(&mut sql, "DROP TABLE missing_{index};").unwrap();
+        }
+        self.rpc_request(&sql)
+    }
+
+    pub(crate) fn home(&self) -> &Path {
         self.directory.path()
     }
     pub(crate) fn service(&self) -> SchemaCacheService {
@@ -112,5 +158,76 @@ connector = 'orders-connector'
     }
     pub(super) fn hash(path: &Path) -> String {
         Hasher::hash_file(path).unwrap()
+    }
+}
+
+/// A synchronized synthetic root load, used to test cancellation at the RPC
+/// boundary without delays or a full builtin catalog.
+pub(crate) struct SuspendedRoot {
+    api: std::sync::Arc<crate::Api>,
+    home: PathBuf,
+    key: super::SchemaContextKey,
+    resume: ::tokio::sync::oneshot::Sender<()>,
+    task: ::tokio::task::JoinHandle<()>,
+}
+
+impl SchemaProject {
+    pub(crate) async fn suspend_root(&self, api: &std::sync::Arc<crate::Api>) -> SuspendedRoot {
+        let home = self.home().to_path_buf();
+        let version = "17".parse().unwrap();
+        let search_path = vec!["public".to_owned()];
+        let key = super::SchemaContextKey::root(&version, &search_path);
+        let root = SchemaCacheService::load_root(&home, &version, &search_path, &key).unwrap();
+        let (resume, resumed) = ::tokio::sync::oneshot::channel();
+        let (ready, started) = ::tokio::sync::oneshot::channel();
+        let task_api = std::sync::Arc::clone(api);
+        let task_home = home.clone();
+        let task_key = key.clone();
+        let task = ::tokio::spawn(async move {
+            let service = task_api.schema_cache_service(&task_home).unwrap();
+            service
+                .roots
+                .load(&task_key, move || async move {
+                    ready.send(()).unwrap();
+                    resumed.await.unwrap();
+                    Ok(root)
+                })
+                .await
+                .unwrap();
+        });
+        started.await.unwrap();
+        SuspendedRoot {
+            api: std::sync::Arc::clone(api),
+            home,
+            key,
+            resume,
+            task,
+        }
+    }
+}
+
+impl SuspendedRoot {
+    pub(crate) async fn wait_for_rpc(&self) {
+        ::tokio::time::timeout(std::time::Duration::from_secs(5), async {
+            while self
+                .api
+                .schema_cache_service(&self.home)
+                .unwrap()
+                .roots
+                .active_waiters(&self.key)
+                < 2
+            {
+                ::tokio::task::yield_now().await;
+            }
+        })
+        .await
+        .unwrap();
+    }
+
+    pub(crate) async fn complete(self) {
+        self.resume.send(()).unwrap();
+        self.task.await.unwrap();
+        let roots = &self.api.schema_cache_service(&self.home).unwrap().roots;
+        assert!(roots.lookup(&self.key).is_some());
     }
 }

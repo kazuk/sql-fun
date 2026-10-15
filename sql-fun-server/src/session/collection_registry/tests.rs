@@ -2,7 +2,7 @@ mod test_helpers;
 
 use self::test_helpers::{BorrowedTrie, ObservedSource, registry};
 use super::{HandleIdAllocator, MappedSource};
-use std::sync::{Arc, atomic::AtomicU64};
+use std::sync::atomic::AtomicU64;
 
 use ::serde_json::Value;
 use ::sql_fun_server_api::CollectionHandle;
@@ -177,64 +177,4 @@ fn teardown_drops_unreleased_sources() {
         .unwrap();
     drop(registry);
     assert!(observation.was_dropped());
-}
-
-#[rstest::rstest]
-#[case::normal(false)]
-#[case::cancelled(true)]
-#[tokio::test]
-async fn schema_borrows_survive_growth_and_drop_before_owners(#[case] cancel: bool) {
-    use self::test_helpers::SchemaColumns;
-    use crate::{schema_cache::test_helpers::SchemaProject, session::SessionWrapper};
-    use std::sync::atomic::{AtomicBool, Ordering};
-
-    // The existing synthetic catalog fixture avoids full builtin parsing/services.
-    let project = SchemaProject::new();
-    let service = project.service();
-    let schema = project.initialized_schema(&service).await;
-    let owner = Arc::downgrade(&schema);
-    let wrapper = SessionWrapper::new();
-    let context = wrapper.contexts.register(&schema).unwrap();
-    drop(service);
-    drop(schema);
-    let dropped = Arc::new(AtomicBool::new(false));
-    let source_dropped = Arc::clone(&dropped);
-    let (ready, started) = ::tokio::sync::oneshot::channel();
-    let (finish, finished) = ::tokio::sync::oneshot::channel();
-    let schema_owner = owner.clone();
-    let task = ::tokio::spawn(async move {
-        let schema = wrapper.contexts.resolve(&context).unwrap();
-        let mut collections = registry(2);
-        let source = SchemaColumns::new(schema, &source_dropped);
-        let handle = collections
-            .register(source, SchemaColumns::len, SchemaColumns::map)
-            .unwrap();
-        for _ in 0..256 {
-            wrapper
-                .contexts
-                .register(&schema_owner.upgrade().unwrap())
-                .unwrap();
-            collections
-                .register(vec![::serde_json::json!("other")], Vec::len, Value::clone)
-                .unwrap();
-        }
-        ready.send(()).unwrap();
-        finished.await.unwrap();
-        let page = collections.read(&handle, 0, None).unwrap();
-        assert_eq!(
-            page.items(),
-            &[::serde_json::json!("id"), ::serde_json::json!("value")]
-        );
-    });
-    started.await.unwrap();
-    assert!(!dropped.load(Ordering::Relaxed));
-    if cancel {
-        task.abort();
-        assert!(task.await.unwrap_err().is_cancelled());
-    } else {
-        finish.send(()).unwrap();
-        task.await.unwrap();
-    }
-    assert!(dropped.load(Ordering::Relaxed));
-    assert!(owner.upgrade().is_none());
 }

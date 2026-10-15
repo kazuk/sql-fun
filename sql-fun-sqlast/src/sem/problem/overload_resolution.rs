@@ -21,6 +21,22 @@ pub enum OverloadResolution {
 }
 
 impl OverloadResolution {
+    /// Stable diagnostic classification, independent of formatted debug output.
+    #[must_use]
+    pub(super) const fn code(&self) -> &'static str {
+        match self {
+            Self::FunctionOverloadResolutionFailed(..) => "function_overload_resolution_failed",
+            Self::BinaryOperatorOverloadResolutionFailed(..) => {
+                "binary_operator_overload_resolution_failed"
+            }
+            Self::UnaryOperatorOverloadResolutionFailed(..) => {
+                "unary_operator_overload_resolution_failed"
+            }
+            Self::BinaryOperatorOverloadAmbiguous(..) => "binary_operator_overload_ambiguous",
+            Self::UnaryOperatorOverloadAmbiguous(..) => "unary_operator_overload_ambiguous",
+        }
+    }
+
     /// function argument type mismatch to overloads
     pub fn function_overload_resolution_failed(
         func_name: &FullName,

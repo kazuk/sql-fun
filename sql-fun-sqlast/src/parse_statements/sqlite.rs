@@ -63,8 +63,8 @@ impl Iterator for SqliteStatements<'_> {
                     StringSpan::new(start, self.input.len() - start),
                     &error.to_string(),
                 );
-                if let Some(label) =
-                    ::miette::Diagnostic::labels(&error).and_then(|mut labels| labels.next())
+                if let Some(mut labels) = ::miette::Diagnostic::labels(&error)
+                    && let Some(label) = labels.next()
                 {
                     failure = failure.with_position(StringSpan::new(label.offset(), label.len()));
                 }

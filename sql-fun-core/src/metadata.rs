@@ -22,11 +22,14 @@ impl InitializationDatasources {
     pub fn load_from(path: &Path) -> Result<Self, MetadataError> {
         let text = std::fs::read_to_string(path)?;
         let document: toml::Value = toml::from_str(&text)?;
-        let Some(database) = document
-            .get("package")
-            .and_then(|value| value.get("metadata"))
-            .and_then(|value| value.get("database"))
-        else {
+        let database = if let Some(package) = document.get("package")
+            && let Some(metadata) = package.get("metadata")
+        {
+            metadata.get("database")
+        } else {
+            None
+        };
+        let Some(database) = database else {
             return Ok(Self(toml::Table::new()));
         };
         let Some(table) = database.as_table() else {
@@ -56,18 +59,16 @@ impl InitializationDatasources {
     /// # Errors
     /// Rejects missing datasources or omitted engine choices, even for one option.
     pub fn engine(&self, name: &str) -> Result<&str, MetadataError> {
-        let Some(engine) = self
-            .0
-            .get(name)
-            .and_then(|value| value.get("engine"))
-            .and_then(toml::Value::as_str)
-        else {
-            return MetadataError::metadata_load_from_file(
-                name,
-                "selected datasource not found or engine not specified",
-            );
-        };
-        Ok(engine)
+        if let Some(datasource) = self.0.get(name)
+            && let Some(engine) = datasource.get("engine")
+            && let Some(engine) = engine.as_str()
+        {
+            return Ok(engine);
+        }
+        MetadataError::metadata_load_from_file(
+            name,
+            "selected datasource not found or engine not specified",
+        )
     }
 
     /// Resolve normal analysis metadata for a selected implemented setup task.

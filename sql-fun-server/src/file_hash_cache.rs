@@ -138,11 +138,13 @@ impl FileHashCache {
     /// Only hashes produced by sqlast snapshots are retained here.
     pub(crate) fn lookup(&self, path: &Path, token: ReadToken) -> Option<String> {
         let state = self.state.lock().expect("file hash state");
-        state
-            .paths
-            .get(path)
-            .filter(|entry| entry.generation == token.generation)
-            .and_then(|entry| entry.hash.clone())
+        if let Some(entry) = state.paths.get(path)
+            && entry.generation == token.generation
+        {
+            entry.hash.clone()
+        } else {
+            None
+        }
     }
 
     pub(crate) fn populate(

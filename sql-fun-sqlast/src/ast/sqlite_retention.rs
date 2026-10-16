@@ -229,11 +229,12 @@ impl SqliteTypeRetainer<'_> {
         while position < assignments.len() {
             let assignment = &mut assignments[position];
             self.list(&mut assignment.indirection)?;
-            let Some((source, column, width)) = assignment
-                .value
-                .as_mut()
-                .and_then(Expr::multi_assignment_data_mut)
-            else {
+            let data = if let Some(value) = assignment.value.as_mut() {
+                value.multi_assignment_data_mut()
+            } else {
+                None
+            };
+            let Some((source, column, width)) = data else {
                 self.optional(&mut assignment.value)?;
                 position += 1;
                 continue;
@@ -258,11 +259,12 @@ impl SqliteTypeRetainer<'_> {
                 ));
             };
             for (offset, assignment) in group.iter_mut().enumerate().skip(1) {
-                let Some((source, column, columns)) = assignment
-                    .value
-                    .as_mut()
-                    .and_then(Expr::multi_assignment_data_mut)
-                else {
+                let data = if let Some(value) = assignment.value.as_mut() {
+                    value.multi_assignment_data_mut()
+                } else {
+                    None
+                };
+                let Some((source, column, columns)) = data else {
                     return Err(AnalysisError::unexpected_input_error(
                         "inconsistent SQLite multi-column assignment group",
                     ));

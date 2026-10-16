@@ -191,10 +191,12 @@ pub(super) async fn extract(
 }
 
 fn required_string<'a>(value: &'a Value, field: &str) -> Result<&'a str, anyhow::Error> {
-    value
-        .get(field)
-        .and_then(Value::as_str)
-        .ok_or_else(|| anyhow::anyhow!("missing catalog field {field}"))
+    if let Some(value) = value.get(field)
+        && let Some(value) = value.as_str()
+    {
+        return Ok(value);
+    }
+    Err(anyhow::anyhow!("missing catalog field {field}"))
 }
 
 fn type_fields(

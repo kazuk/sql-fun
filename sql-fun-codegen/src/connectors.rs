@@ -494,28 +494,26 @@ impl TokioPostgresCodeGenerator {
             )
             .into());
         };
-        let row_type = Self::row_type_from_fn_bounds(&handler_generic.bounds).or_else(|| {
-            item_fn
-                .sig()
-                .generics
-                .where_clause
-                .as_ref()
-                .and_then(|where_clause| {
-                    where_clause.predicates.iter().find_map(|predicate| {
-                        let syn::WherePredicate::Type(predicate) = predicate else {
-                            return None;
-                        };
-                        let syn::Type::Path(bounded_type) = &predicate.bounded_ty else {
-                            return None;
-                        };
-                        if bounded_type.path.get_ident() == Some(handler_type) {
-                            Self::row_type_from_fn_bounds(&predicate.bounds)
-                        } else {
-                            None
-                        }
-                    })
+        let row_type =
+            if let Some(row_type) = Self::row_type_from_fn_bounds(&handler_generic.bounds) {
+                Some(row_type)
+            } else if let Some(where_clause) = item_fn.sig().generics.where_clause.as_ref() {
+                where_clause.predicates.iter().find_map(|predicate| {
+                    let syn::WherePredicate::Type(predicate) = predicate else {
+                        return None;
+                    };
+                    let syn::Type::Path(bounded_type) = &predicate.bounded_ty else {
+                        return None;
+                    };
+                    if bounded_type.path.get_ident() == Some(handler_type) {
+                        Self::row_type_from_fn_bounds(&predicate.bounds)
+                    } else {
+                        None
+                    }
                 })
-        });
+            } else {
+                None
+            };
         let Some(row_type) = row_type else {
             return Err(syn::Error::new_spanned(
                 handler_generic,

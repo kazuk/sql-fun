@@ -78,10 +78,12 @@ impl Statement {
     }
 
     /// Inspect an existing WITH clause without exposing mutable node storage.
-    pub fn with_clause(&self) -> Option<WithClause<'_>> {
-        self.node
-            .with_node()
-            .and_then(|node| WithClause::existing(node, self.dialect))
+    pub const fn with_clause(&self) -> Option<WithClause<'_>> {
+        if let Some(node) = self.node.with_node() {
+            WithClause::existing(node, self.dialect)
+        } else {
+            None
+        }
     }
 }
 

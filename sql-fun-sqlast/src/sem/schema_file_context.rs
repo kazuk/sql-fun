@@ -782,7 +782,6 @@ mod test_freeze {
 mod test_search_path {
     use crate::sem::{
         BaseParseContext, FullName, ParseContext, SchemaFileContext, SchemaName, SearchPathRead,
-        TypeDefinition, TypeReference,
     };
     use std::path::Path;
 
@@ -813,15 +812,22 @@ mod test_search_path {
         let expected_name = expected_schema.map(|schema| FullName::with_schema(schema, "item"));
 
         assert_eq!(
-            context.get_type(&name).and_then(TypeDefinition::full_name),
+            if let Some(ty) = context.get_type(&name) {
+                ty.full_name()
+            } else {
+                None
+            },
             expected_name.as_ref()
         );
         let overloads = context.get_function_by_name(&name);
-        let return_name = overloads
-            .as_ref()
-            .and_then(|overloads| overloads.get_at(0))
-            .and_then(|overload| overload.ret_type().as_ref())
-            .map(TypeReference::full_name);
+        let return_name = if let Some(overloads) = overloads.as_ref()
+            && let Some(overload) = overloads.get_at(0)
+            && let Some(ret_type) = overload.ret_type().as_ref()
+        {
+            Some(ret_type.full_name())
+        } else {
+            None
+        };
         assert_eq!(return_name, expected_name.as_ref());
         assert_eq!(
             context.resolve_function_name_with_search_path(&name),
@@ -848,9 +854,11 @@ mod test_search_path {
         assert!(descendant.get_search_path().is_empty());
         assert_eq!(descendant.get_default_schema(), None);
         assert_eq!(
-            descendant
-                .get_type(&name)
-                .and_then(TypeDefinition::full_name),
+            if let Some(ty) = descendant.get_type(&name) {
+                ty.full_name()
+            } else {
+                None
+            },
             Some(&FullName::with_schema("pg_catalog", "item"))
         );
         assert_eq!(
@@ -859,7 +867,11 @@ mod test_search_path {
         );
         assert_eq!(child.get_default_schema(), Some(SchemaName::from("app")));
         assert_eq!(
-            child.get_type(&name).and_then(TypeDefinition::full_name),
+            if let Some(ty) = child.get_type(&name) {
+                ty.full_name()
+            } else {
+                None
+            },
             Some(&FullName::with_schema("app", "item"))
         );
         assert_eq!(
@@ -871,7 +883,11 @@ mod test_search_path {
             Some(SchemaName::from("public"))
         );
         assert_eq!(
-            parent.get_type(&name).and_then(TypeDefinition::full_name),
+            if let Some(ty) = parent.get_type(&name) {
+                ty.full_name()
+            } else {
+                None
+            },
             Some(&FullName::with_schema("public", "item"))
         );
     }

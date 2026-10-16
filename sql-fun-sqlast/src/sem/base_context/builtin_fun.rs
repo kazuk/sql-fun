@@ -182,11 +182,11 @@ impl PgBuiltInFunctions {
 
         let mut variants = FunctionOverloadCollection::default();
         for overload in func_def {
-            if let Some(details) = self.function_details.get(local_name).and_then(|details| {
-                details
+            if let Some(details) = self.function_details.get(local_name)
+                && let Some(details) = details
                     .iter()
                     .find(|detail| detail.matches_args(&overload.args))
-            }) {
+            {
                 let mut args = Vec::new();
                 for arg in details.arg_iter() {
                     let arg_name = arg.arg_name.cloned();
@@ -230,10 +230,8 @@ impl PgBuiltInFunctions {
                 ));
             }
         }
-        let col_defs = if let Some(details) = self
-            .function_details
-            .get(local_name)
-            .and_then(|v| v.first())
+        let col_defs = if let Some(details) = self.function_details.get(local_name)
+            && let Some(details) = details.first()
         {
             let mut columns = Vec::new();
             for out_arg in details.out_args() {

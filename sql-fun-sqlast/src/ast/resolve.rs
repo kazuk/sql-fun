@@ -244,7 +244,8 @@ impl OperatorExpr {
                     .resolve_in(context, dialect, scope);
             }
             if self.name.0.as_slice() == ["-"]
-                && let Some(value) = self.right.as_ref().and_then(Expr::negated_literal)
+                && let Some(right) = self.right.as_ref()
+                && let Some(value) = right.negated_literal()
             {
                 return Ok(value);
             }

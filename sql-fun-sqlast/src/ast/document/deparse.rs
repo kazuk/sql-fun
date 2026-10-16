@@ -570,7 +570,12 @@ impl Xml {
             return w.invalid("XMLPARSE", "missing expression");
         };
         expr.emit(w)?;
-        let Some(preserve) = self.args.get(1).and_then(crate::ast::Expr::boolean_literal) else {
+        let preserve = if let Some(arg) = self.args.get(1) {
+            arg.boolean_literal()
+        } else {
+            None
+        };
+        let Some(preserve) = preserve else {
             return w.invalid("XMLPARSE", "whitespace choice must be a boolean literal");
         };
         w.sql(if preserve {

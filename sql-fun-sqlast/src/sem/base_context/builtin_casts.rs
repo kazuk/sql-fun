@@ -89,10 +89,8 @@ impl CastInfoRead for super::BaseContext {
             return Some(CastDefinition::new(CastContext::NoConversion));
         }
         if source_array == target_array
-            && let Some(cast) = self
-                .casts
-                .get(source_local_name)
-                .and_then(|targets| targets.get(target_local_name))
+            && let Some(targets) = self.casts.get(source_local_name)
+            && let Some(cast) = targets.get(target_local_name)
             && cast.use_in_explicit()
         {
             return Some(cast.clone());

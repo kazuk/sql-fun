@@ -176,7 +176,8 @@ fn parse_version(record: &str) -> Result<u64, anyhow::Error> {
         anyhow::ensure!(minor < 10_000, "invalid PostgreSQL minor version");
         major
             .checked_mul(10_000)
-            .and_then(|number| number.checked_add(minor))
+            .context("PostgreSQL version number overflow")?
+            .checked_add(minor)
             .context("PostgreSQL version number overflow")?
     } else {
         let identity: sql_fun_core::PostgresVersion =

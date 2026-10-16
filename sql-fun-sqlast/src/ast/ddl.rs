@@ -1429,10 +1429,11 @@ impl FunctionParameter {
         use crate::sem::ScalarAnalysisContext;
         let name = Some(self.name.clone());
         let type_name = self.type_name.name.full_name()?;
-        let param_type = context
-            .get_type(&type_name)
-            .and_then(|ty| ty.type_reference())
-            .cloned();
+        let param_type = if let Some(ty) = context.get_type(&type_name) {
+            ty.type_reference().cloned()
+        } else {
+            None
+        };
         let default = self
             .default
             .as_ref()
@@ -1554,10 +1555,11 @@ impl Function {
         for param in &self.parameters {
             params.push(param.resolve(context, dialect)?);
         }
-        let ret_type = context
-            .get_type(&ret_name)
-            .and_then(|ty| ty.type_reference())
-            .cloned();
+        let ret_type = if let Some(ty) = context.get_type(&ret_name) {
+            ty.type_reference().cloned()
+        } else {
+            None
+        };
         let strict = self.options.iter().any(FunctionOption::is_strict);
         let overload = OverloadVariant::new(&ret_type, &params, strict, false);
         Ok(CreateFunction::new(
@@ -1720,9 +1722,11 @@ impl Domain {
     fn resolve_in(&self, context: &mut Resolution<'_>) -> Result<CreateDomain, AnalysisError> {
         let name = self.name.full_name()?;
         let base_name = self.base.name.full_name()?;
-        let base = context
-            .get_type(&base_name)
-            .and_then(|base| base.full_name().cloned());
+        let base = if let Some(base) = context.get_type(&base_name) {
+            base.full_name().cloned()
+        } else {
+            None
+        };
         if base.is_none() {
             context.report_problem(AnalysisProblem::domain_base_type_not_found(
                 &name,

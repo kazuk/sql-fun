@@ -56,6 +56,17 @@ impl TypeInfoWrite for SchemaFileContext {
 pub(super) struct TypeDefinitionCollection(TrieMap<TypeDefinition>);
 
 impl TypeDefinitionCollection {
+    pub(super) fn cast_source_types(&self) -> Vec<TypeReference> {
+        let mut sources = Vec::new();
+        for (_, definition) in self.0.iter() {
+            if let Some(name) = definition.full_name() {
+                sources.push(TypeReference::concrete_type_ref(name, false));
+                sources.push(TypeReference::concrete_type_ref(name, true));
+            }
+        }
+        sources
+    }
+
     pub(super) fn get_type_impl<'a, TBaseContext>(
         &'a self,
         key: &FullName,

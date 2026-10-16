@@ -1,6 +1,8 @@
 use std::{collections::HashSet, str::FromStr};
 
-use crate::sem::{CastDefinition, CastInfoRead, FullName, TypeReference};
+use crate::sem::{
+    CastContext, CastDefinition, CastInfoRead, FullName, TypeInfoRead, TypeReference,
+};
 
 use super::SchemaCatalog;
 
@@ -11,6 +13,10 @@ impl CastInfoRead for SchemaCatalog {
             if let Ok(name) = FullName::from_str(&name) {
                 sources.insert(TypeReference::from_full_name(name));
             }
+        }
+        sources.extend(self.types.cast_source_types());
+        if explicit {
+            sources.extend(Self::io_string_types());
         }
         sources.retain(|source| {
             source == target
@@ -41,7 +47,9 @@ impl CastInfoRead for SchemaCatalog {
                 None
             }
         } else {
-            self.base.get_explicit_cast(source_type, target_type)
+            self.base
+                .get_explicit_cast(source_type, target_type)
+                .or_else(|| self.io_cast(source_type, target_type))
         }
     }
 
@@ -89,6 +97,22 @@ impl CastInfoRead for SchemaCatalog {
         } else {
             self.base.get_implicit_cast(source_type, target_type)
         }
+    }
+}
+
+impl SchemaCatalog {
+    fn io_string_types() -> [TypeReference; 4] {
+        ["text", "varchar", "bpchar", "name"].map(TypeReference::from_master_type_name)
+    }
+
+    fn io_cast(&self, source: &TypeReference, target: &TypeReference) -> Option<CastDefinition> {
+        self.get_type_impl(source.full_name())?;
+        self.get_type_impl(target.full_name())?;
+        let strings = Self::io_string_types();
+        if strings.contains(source) || strings.contains(target) {
+            return Some(CastDefinition::new(CastContext::explicit()));
+        }
+        None
     }
 }
 

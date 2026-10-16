@@ -221,9 +221,9 @@ part of the analysis result. Parameter-dependent result columns may likewise
 have several admissible types. Mapping these constraints to Rust types is a
 later code-generation step.
 
-Concrete PostgreSQL function signatures are supported. Unresolved polymorphic
-signatures and type unification of unresolved inputs in CASE, COALESCE, and
-indirection remain limitations and produce analysis errors.
+Concrete PostgreSQL function signatures are supported; unresolved polymorphic
+signatures remain unsupported. Type unification of unresolved inputs in CASE,
+COALESCE, and indirection stops analysis with an unimplemented-operation panic.
 
 ## Setting environment variables
 

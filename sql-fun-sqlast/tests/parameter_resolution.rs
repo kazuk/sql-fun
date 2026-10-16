@@ -24,6 +24,32 @@ fn real_postgres_catalog_preserves_numeric_source_types() -> Result<(), Box<dyn 
 }
 
 mod test_helpers {
+    pub(super) fn serialized_parameter_domains(
+        value: &::serde_json::Value,
+    ) -> Vec<::sql_fun_sqlast::sem::InputTypeConstraint> {
+        let mut domains = Vec::new();
+        match value {
+            ::serde_json::Value::Object(fields) => {
+                if let Some(parameter) = fields.get("Param") {
+                    domains.push(
+                        ::serde_json::from_value(parameter["constraint"].clone())
+                            .expect("serialized input domain"),
+                    );
+                }
+                for child in fields.values() {
+                    domains.extend(serialized_parameter_domains(child));
+                }
+            }
+            ::serde_json::Value::Array(values) => {
+                for child in values {
+                    domains.extend(serialized_parameter_domains(child));
+                }
+            }
+            _ => {}
+        }
+        domains
+    }
+
     pub(super) mod heavy {
         use ::sql_fun_sqlast::{
             SqlFunArgs,
@@ -102,5 +128,69 @@ fn parser_adapter_retains_the_same_constraints() -> Result<(), Box<dyn std::erro
             .parameter_constraints()
             .allows(&BTreeMap::from([(1, PgBuiltInType::bool())]))
     );
+    Ok(())
+}
+
+#[test]
+fn schema_defined_enum_supports_explicit_io_casts() -> Result<(), Box<dyn std::error::Error>> {
+    use ::sql_fun_sqlast::sem::{
+        CastInfoRead, FullName, ParseContext, SchemaFileContext, TypeReference,
+    };
+    let definition = parse_statements(
+        "create type public.mood as enum ('happy')",
+        Dialect::postgres(),
+    )
+    .next()
+    .unwrap()?;
+    let defined = definition.analyze(heavy::context()?)?;
+    let context = SchemaFileContext::new(
+        std::path::Path::new("query.sql"),
+        &defined.into_context().freeze(),
+    );
+    let mood = TypeReference::from_full_name(FullName::with_schema("public", "mood"));
+    let text = PgBuiltInType::text();
+    assert!(context.get_explicit_cast(&mood, &text).is_some());
+    assert!(context.get_explicit_cast(&text, &mood).is_some());
+    let statement = parse_statements("select $1::public.mood, $1::text", Dialect::postgres())
+        .next()
+        .unwrap()?;
+    let analyzed = statement.analyze(context)?;
+    assert!(
+        analyzed
+            .parameter_constraints()
+            .allows(&BTreeMap::from([(1, mood)]))
+    );
+    assert!(
+        analyzed
+            .parameter_constraints()
+            .allows(&BTreeMap::from([(1, text)]))
+    );
+    Ok(())
+}
+
+#[rstest::rstest]
+#[case::numeric("select 1 where (select $1 where $1 is null) + 1 > 0")]
+#[case::cast("select 1 where (select $1 where $1 is null)::integer > 0")]
+fn nested_queries_retain_solved_parameter_domains(
+    #[case] sql: &str,
+) -> Result<(), Box<dyn std::error::Error>> {
+    let statement = parse_statements(sql, Dialect::postgres()).next().unwrap()?;
+    let analyzed = statement.analyze(heavy::context()?)?;
+    let query = analyzed.ast().clone().into_select_statemtnt().unwrap();
+    let serialized = ::serde_json::to_value(&query)?;
+    let domains = test_helpers::serialized_parameter_domains(&serialized);
+    assert_ne!(domains, []);
+    for domain in domains {
+        assert!(!domain.is_any());
+        assert!(domain.allows(&PgBuiltInType::int4()));
+        assert_eq!(
+            &domain,
+            analyzed
+                .parameter_constraints()
+                .parameter(1)
+                .unwrap()
+                .constraint()
+        );
+    }
     Ok(())
 }

@@ -82,20 +82,20 @@ impl Iterator for SqliteStatements<'_> {
                 "EXPLAIN is not supported by the common AST",
             )));
         };
-        Some(
-            StatementNode::try_from(&statement)
-                .and_then(|node| {
-                    let statement = Statement::from_node(node, Dialect::sqlite(), span);
-                    #[cfg(feature = "workaround_turso_9791")]
-                    let statement = {
-                        let mut statement = statement;
-                        statement.retain_sqlite_type_syntax(self.input, &type_spans)?;
-                        statement
-                    };
-                    Ok(statement)
-                })
-                .map_err(|error| ParseStatementError::conversion(span, &error)),
-        )
+        let node = match StatementNode::try_from(&statement) {
+            Ok(node) => node,
+            Err(error) => return Some(Err(ParseStatementError::conversion(span, &error))),
+        };
+        let statement = Statement::from_node(node, Dialect::sqlite(), span);
+        #[cfg(feature = "workaround_turso_9791")]
+        let statement = {
+            let mut statement = statement;
+            if let Err(error) = statement.retain_sqlite_type_syntax(self.input, &type_spans) {
+                return Some(Err(ParseStatementError::conversion(span, &error)));
+            }
+            statement
+        };
+        Some(Ok(statement))
     }
 }
 

@@ -294,11 +294,17 @@ impl TokioPostgresCodeGenerator {
 impl TokioPostgresCodeGenerator {
     // Keep ambient span/environment acquisition separate from deterministic mapping.
     fn source_file_for(source_file: Option<&Path>, manifest_dir: Option<&Path>) -> LitStr {
-        let source_file = source_file
-            .and_then(|path| path.strip_prefix(manifest_dir?).ok())
-            .and_then(Path::to_str)
-            .unwrap_or("<unknown>");
-        LitStr::new(source_file, Span::call_site())
+        let path = if let Some(source_file) = source_file
+            && let Some(manifest_dir) = manifest_dir
+            && let Ok(relative_path) = source_file.strip_prefix(manifest_dir)
+            && let Some(path) = relative_path.to_str()
+        {
+            path
+        } else {
+            "<unknown>"
+        };
+
+        LitStr::new(path, Span::call_site())
     }
 }
 

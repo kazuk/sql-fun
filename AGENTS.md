@@ -32,6 +32,26 @@ You can build and run tests using the `check-test-flow` script.
   corresponding job has finished on the final PR head and its result has been
   verified.
 
+## Developer Workflow Compatibility
+
+- Treat the documented contributor workflow as a compatibility contract.
+  Changing required commands, prerequisites, or procedures in `CONTRIBUTING.md`
+  affects all contributors and is a breaking change to the development workflow,
+  even when the underlying code change is small.
+- Internal changes to `check-test-flow` that preserve its documented entry
+  point and contributor-facing behavior are routine implementation changes.
+  Prefer absorbing new build and preparation steps there rather than exposing
+  additional commands or manual prerequisites to contributors.
+- Do not add developer-facing commands, bypass paths, or contributor procedures
+  merely to accommodate internal implementation details. Document internal
+  execution mechanics in their owning scripts rather than turning them into
+  contributor obligations.
+- Changes to the contributor workflow that require developers or agents to
+  learn or perform different steps require an explicit maintainer decision.
+  A feature implementation task alone does not authorize such a change.
+  Clarifications that do not change contributor obligations remain routine
+  documentation changes.
+
 ## PostgreSQL Behavioral Oracles
 
 The development builder provides PostgreSQL 15–18 at `postgres15`, `postgres16`,

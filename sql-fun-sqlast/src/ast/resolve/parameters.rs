@@ -1,5 +1,5 @@
 //! Analysis-local graph building and replay. Source AST and catalog models stay intact.
-use crate::ast::Expr;
+use crate::ast::{Access, Expr, Name, OperatorKind};
 use crate::sem::{
     AnalysisError, Catalog, ConstrainedExpr, ConstraintGraph, InputTypeConstraint,
     ParameterConstraintProblem, ParameterConstraints, SemScalarExpr, SignatureAlternative,
@@ -202,6 +202,63 @@ impl ParameterResolution {
     pub(crate) fn parameter(&mut self, position: u32) -> SemScalarExpr {
         let node = self.graph.parameter(position);
         SemScalarExpr::parameter(position, node, self.graph.domain(node))
+    }
+
+    // These operations own the inference gaps; syntax resolvers only submit
+    // semantic operands. Concrete operands still follow existing analysis paths.
+    pub(crate) fn unify_case_types(
+        &mut self,
+        argument: Option<&SemScalarExpr>,
+        arms: &[(SemScalarExpr, SemScalarExpr)],
+        otherwise: Option<&SemScalarExpr>,
+    ) {
+        if argument.is_some_and(Self::needs_type_inference)
+            || otherwise.is_some_and(Self::needs_type_inference)
+        {
+            todo!("parameter-dependent CASE type unification");
+        }
+        for (condition, result) in arms {
+            if Self::needs_type_inference(condition) || Self::needs_type_inference(result) {
+                todo!("parameter-dependent CASE type unification");
+            }
+        }
+    }
+
+    pub(crate) fn unify_coalesce_types(&mut self, arguments: &[SemScalarExpr]) {
+        for argument in arguments {
+            if Self::needs_type_inference(argument) {
+                todo!("parameter-dependent COALESCE type unification");
+            }
+        }
+    }
+
+    pub(crate) fn constrain_indirection(&mut self, base: &SemScalarExpr, _accesses: &[Access]) {
+        if Self::needs_type_inference(base) {
+            todo!("parameter-dependent indirection type constraints");
+        }
+    }
+
+    fn needs_type_inference(value: &SemScalarExpr) -> bool {
+        value.constraint_node().is_some() && value.get_type().is_none()
+    }
+
+    pub(crate) fn sqlite_operator(
+        &mut self,
+        _name: &Name,
+        _left: Option<&SemScalarExpr>,
+        _right: Option<&SemScalarExpr>,
+    ) -> SemScalarExpr {
+        todo!("SQLite operator type constraints");
+    }
+
+    pub(crate) fn special_operator(
+        &mut self,
+        _kind: &OperatorKind,
+        _name: &Name,
+        _left: Option<&SemScalarExpr>,
+        _right: Option<&SemScalarExpr>,
+    ) -> SemScalarExpr {
+        todo!("parameter constraints for this operator form");
     }
 
     fn input(&mut self, value: &SemScalarExpr) -> usize {

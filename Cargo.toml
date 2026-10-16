@@ -73,6 +73,7 @@ use_self = { level = "warn" }
 multiple_crate_versions = { level = "allow" }
 missing_const_for_fn = "warn"
 disallowed_methods = "deny"
+mod_module_files = "deny"
 # See "Test placement" in docs/internal-rules/rust-coding-guideline.md.
 items_after_test_module = "allow"
 

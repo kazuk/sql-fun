@@ -13,6 +13,9 @@ mod lockfile;
 mod query_requirements;
 mod row_builder;
 mod rust_syn;
+/// Lightweight fixtures for code-generation unit tests.
+#[cfg(test)]
+pub mod test_helpers;
 
 use crate::{
     connectors::ConnectorSpec,

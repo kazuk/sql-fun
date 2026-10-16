@@ -7,10 +7,42 @@ use crate::sem::{
 use std::collections::{BTreeMap, HashMap};
 
 #[derive(Clone, Default)]
-struct QueryScope {
-    ctes: BTreeMap<String, Vec<Output>>,
-    sources: BTreeMap<String, Vec<Output>>,
-    outputs: Vec<Output>,
+struct Outputs(Vec<Output>);
+
+impl Outputs {
+    fn constraints(&self, graph: &ConstraintGraph) -> Vec<InputTypeConstraint> {
+        self.0
+            .iter()
+            .map(|output| output.constraint(graph).clone())
+            .collect()
+    }
+
+    fn renamed(&self, columns: &[String]) -> Self {
+        let mut outputs = self.clone();
+        for (output, name) in outputs.0.iter_mut().zip(columns) {
+            output.rename(name);
+        }
+        outputs
+    }
+
+    const fn scalar_node(&self) -> Option<usize> {
+        match self.0.as_slice() {
+            [output] => output.node,
+            _ => None,
+        }
+    }
+
+    fn column(&self, original: &SemScalarExpr, graph: &ConstraintGraph) -> Option<SemScalarExpr> {
+        let (_, column) = original.constraint_binding()?;
+        self.0
+            .iter()
+            .find(|output| output.has_name(column.as_str()))?
+            .column(original, graph)
+    }
+
+    fn push(&mut self, name: &str, value: &SemScalarExpr, text_projection: bool) {
+        self.0.push(Output::new(name, value, text_projection));
+    }
 }
 
 #[derive(Clone)]
@@ -20,46 +52,110 @@ struct Output {
     domain: InputTypeConstraint,
 }
 
-struct Expression {
-    operation: String,
-    arguments: Vec<SemScalarExpr>,
-    position: Option<u32>,
-    not_null: Option<bool>,
-    name: String,
+impl Output {
+    fn new(name: &str, value: &SemScalarExpr, text_projection: bool) -> Self {
+        let domain = if text_projection {
+            InputTypeConstraint::exact(&crate::sem::PgBuiltInType::text())
+        } else {
+            value
+                .get_type()
+                .as_ref()
+                .map(InputTypeConstraint::exact)
+                .unwrap_or_else(InputTypeConstraint::any)
+        };
+        Self {
+            name: name.to_owned(),
+            node: value.constraint_node(),
+            domain,
+        }
+    }
+
+    fn constraint<'a>(&'a self, graph: &'a ConstraintGraph) -> &'a InputTypeConstraint {
+        if let Some(node) = self.node {
+            let domain = graph.domain(node);
+            if !domain.is_any() {
+                return domain;
+            }
+        }
+        &self.domain
+    }
+
+    fn rename(&mut self, name: &str) {
+        self.name = name.to_owned();
+    }
+
+    fn has_name(&self, name: &str) -> bool {
+        self.name == name
+    }
+
+    fn column(&self, original: &SemScalarExpr, graph: &ConstraintGraph) -> Option<SemScalarExpr> {
+        Some(SemScalarExpr::constrained(&ConstrainedExpr::new(
+            self.node?,
+            "column",
+            &[],
+            self.constraint(graph),
+            original.is_not_null(),
+            &self.name,
+        )))
+    }
 }
 
-struct CachedExpression {
-    node: usize,
-    domain: InputTypeConstraint,
-    name: String,
-    not_null: Option<bool>,
+#[derive(Clone, Default)]
+struct QueryScope {
+    ctes: BTreeMap<String, Outputs>,
+    sources: BTreeMap<String, Outputs>,
+    outputs: Outputs,
+}
+
+impl QueryScope {
+    fn nested(&self) -> Self {
+        Self {
+            ctes: self.ctes.clone(),
+            ..Self::default()
+        }
+    }
+
+    fn cte(&mut self, name: &str, outputs: &Outputs, columns: &[String]) {
+        self.ctes.insert(name.to_owned(), outputs.renamed(columns));
+    }
+
+    fn relation(&mut self, name: Option<&str>, alias: &str, columns: &[String]) {
+        let outputs = name
+            .and_then(|name| self.ctes.get(name))
+            .cloned()
+            .unwrap_or_default();
+        self.derived(alias, &outputs, columns);
+    }
+
+    fn derived(&mut self, alias: &str, outputs: &Outputs, columns: &[String]) {
+        self.sources
+            .insert(alias.to_owned(), outputs.renamed(columns));
+    }
+
+    fn has_source(&self, alias: &str) -> bool {
+        self.sources.contains_key(alias)
+    }
+
+    fn column(&self, original: &SemScalarExpr, graph: &ConstraintGraph) -> Option<SemScalarExpr> {
+        let (alias, _) = original.constraint_binding()?;
+        self.sources.get(alias)?.column(original, graph)
+    }
 }
 
 #[derive(Default)]
 pub(crate) struct ParameterResolution {
     graph: ConstraintGraph,
-    expressions: HashMap<usize, CachedExpression>,
-    values: BTreeMap<usize, Expression>,
+    expressions: HashMap<usize, usize>,
+    active_expression: Option<usize>,
     scopes: Vec<QueryScope>,
-    completed: Vec<Output>,
+    completed: Outputs,
     replay: bool,
 }
 
 impl ParameterResolution {
     pub(crate) fn constraints(&self) -> ParameterConstraints {
         let mut constraints = ParameterConstraints::from_graph(&self.graph);
-        let outputs: Vec<_> = self
-            .completed
-            .iter()
-            .map(|output| {
-                output
-                    .node
-                    .filter(|node| !self.graph.domain(*node).is_any())
-                    .map(|node| self.graph.domain(node).clone())
-                    .unwrap_or_else(|| output.domain.clone())
-            })
-            .collect();
-        constraints.set_outputs(&outputs);
+        constraints.set_outputs(&self.completed.constraints(&self.graph));
         constraints
     }
 
@@ -70,99 +166,40 @@ impl ParameterResolution {
     }
 
     pub(crate) fn solve(&mut self) -> Result<bool, AnalysisError> {
-        if self.values.is_empty() {
+        if !self.graph.has_parameters() {
             return Ok(false);
         }
         self.graph.solve()?;
         self.replay = true;
         self.scopes.clear();
-        self.completed.clear();
+        self.completed = Outputs::default();
         Ok(true)
     }
 
-    pub(crate) fn cached(&self, expression: &Expr) -> Option<SemScalarExpr> {
-        if !self.replay {
-            return None;
-        }
-        self.expressions
+    // Replay rebuilds the whole semantic tree, including queries nested in an
+    // expression, while retaining the graph nodes from the collection pass.
+    pub(crate) fn enter_expression(&mut self, expression: &Expr) -> Option<usize> {
+        let previous = self.active_expression;
+        self.active_expression = self
+            .expressions
             .get(&(std::ptr::from_ref(expression) as usize))
-            .map(|cached| {
-                let value = self.materialize(cached.node);
-                if cached.name.is_empty() {
-                    value
-                } else {
-                    SemScalarExpr::constrained(&ConstrainedExpr::new(
-                        cached.node,
-                        "column",
-                        &[value],
-                        if self.graph.domain(cached.node).is_any() {
-                            &cached.domain
-                        } else {
-                            self.graph.domain(cached.node)
-                        },
-                        cached.not_null,
-                        &cached.name,
-                    ))
-                }
-            })
+            .copied();
+        previous
+    }
+
+    pub(crate) const fn leave_expression(&mut self, previous: Option<usize>) {
+        self.active_expression = previous;
     }
 
     pub(crate) fn remember(&mut self, expression: &Expr, value: &SemScalarExpr) {
         if let Some(node) = value.constraint_node() {
-            self.expressions.insert(
-                std::ptr::from_ref(expression) as usize,
-                CachedExpression {
-                    node,
-                    domain: value
-                        .get_type()
-                        .as_ref()
-                        .map(InputTypeConstraint::exact)
-                        .unwrap_or_else(InputTypeConstraint::any),
-                    name: value.get_column_name(),
-                    not_null: value.is_not_null(),
-                },
-            );
+            self.expressions
+                .insert(std::ptr::from_ref(expression) as usize, node);
         }
-    }
-
-    fn materialize(&self, node: usize) -> SemScalarExpr {
-        crate::sem::with_stack(|| {
-            let value = &self.values[&node];
-            let domain = self.graph.domain(node);
-            if let Some(position) = value.position {
-                return SemScalarExpr::parameter(position, node, domain);
-            }
-            let arguments: Vec<_> = value
-                .arguments
-                .iter()
-                .map(|argument| {
-                    if let Some(node) = argument.constraint_node() {
-                        self.materialize(node)
-                    } else {
-                        argument.clone()
-                    }
-                })
-                .collect();
-            SemScalarExpr::constrained(&ConstrainedExpr::new(
-                node,
-                &value.operation,
-                &arguments,
-                domain,
-                value.not_null,
-                &value.name,
-            ))
-        })
     }
 
     pub(crate) fn parameter(&mut self, position: u32) -> Result<SemScalarExpr, AnalysisError> {
         let node = self.graph.parameter(position)?;
-        self.values.entry(node).or_insert_with(|| Expression {
-            operation: "parameter".to_owned(),
-            arguments: Vec::new(),
-            position: Some(position),
-            not_null: None,
-            name: String::new(),
-        });
         Ok(SemScalarExpr::parameter(
             position,
             node,
@@ -189,18 +226,20 @@ impl ParameterResolution {
         domain: &InputTypeConstraint,
         not_null: Option<bool>,
     ) -> SemScalarExpr {
-        let node = self.graph.node(domain);
-        self.values.insert(
+        let node = if self.replay {
+            self.active_expression
+                .expect("replayed operation has a collected node")
+        } else {
+            self.graph.node(domain)
+        };
+        SemScalarExpr::constrained(&ConstrainedExpr::new(
             node,
-            Expression {
-                operation: operation.to_owned(),
-                arguments: arguments.to_vec(),
-                position: None,
-                not_null,
-                name: String::new(),
-            },
-        );
-        self.materialize(node)
+            operation,
+            arguments,
+            self.graph.domain(node),
+            not_null,
+            "",
+        ))
     }
 
     pub(crate) fn require(
@@ -210,7 +249,9 @@ impl ParameterResolution {
         target: &TypeReference,
         explicit: bool,
     ) {
-        if let Some(node) = value.constraint_node() {
+        if !self.replay
+            && let Some(node) = value.constraint_node()
+        {
             self.graph.restrict(
                 node,
                 &InputTypeConstraint::types(catalog.cast_sources(target, explicit)),
@@ -226,33 +267,33 @@ impl ParameterResolution {
         signatures: &[Signature],
     ) -> Result<SemScalarExpr, AnalysisError> {
         let result = self.operation(name, arguments, &InputTypeConstraint::any(), None);
-        let mut nodes: Vec<_> = arguments
-            .iter()
-            .map(|argument| self.input(argument))
-            .collect();
-        nodes.push(result.constraint_node().expect("operation has node"));
-        let domains: Vec<_> = nodes[..arguments.len()]
-            .iter()
-            .map(|node| self.graph.domain(*node).clone())
-            .collect();
-        let alternatives = Signature::alternatives(signatures, catalog, &domains);
-        self.graph.overload(&nodes, &alternatives, name);
+        if !self.replay {
+            let mut nodes = Vec::new();
+            let mut domains = Vec::new();
+            for argument in arguments {
+                let node = self.input(argument);
+                domains.push(self.graph.domain(node).clone());
+                nodes.push(node);
+            }
+            nodes.push(result.constraint_node().expect("operation has node"));
+            let alternatives = Signature::alternatives(signatures, catalog, &domains);
+            self.graph.overload(&nodes, &alternatives, name);
+        }
         Ok(result)
     }
 
     pub(crate) fn scalar_result(&mut self, value: &SemScalarExpr) -> Option<SemScalarExpr> {
-        let [output] = self.completed.as_slice() else {
-            return None;
-        };
-        let source = output.node?;
+        let source = self.completed.scalar_node()?;
         let result = self.operation(
             "scalar subquery",
             std::slice::from_ref(value),
             &InputTypeConstraint::any(),
             value.is_not_null(),
         );
-        self.graph
-            .equal(source, result.constraint_node().expect("operation node"));
+        if !self.replay {
+            self.graph
+                .equal(source, result.constraint_node().expect("operation node"));
+        }
         Some(result)
     }
 
@@ -263,86 +304,47 @@ impl ParameterResolution {
     }
 
     pub(crate) fn enter_query(&mut self) {
-        let ctes = self
+        let scope = self
             .scopes
             .last()
-            .map(|scope| scope.ctes.clone())
+            .map(QueryScope::nested)
             .unwrap_or_default();
-        self.scopes.push(QueryScope {
-            ctes,
-            ..QueryScope::default()
-        });
+        self.scopes.push(scope);
     }
+
     pub(crate) fn leave_query(&mut self) {
         self.completed = self.scopes.pop().expect("query scope").outputs;
     }
+
     pub(crate) fn output(&mut self, name: &str, value: &SemScalarExpr, text_projection: bool) {
         if let Some(scope) = self.scopes.last_mut() {
-            scope.outputs.push(Output {
-                name: name.to_owned(),
-                node: value.constraint_node(),
-                domain: if text_projection {
-                    InputTypeConstraint::exact(&crate::sem::PgBuiltInType::text())
-                } else {
-                    value
-                        .get_type()
-                        .as_ref()
-                        .map(InputTypeConstraint::exact)
-                        .unwrap_or_else(InputTypeConstraint::any)
-                },
-            });
+            scope.outputs.push(name, value, text_projection);
         }
     }
+
     pub(crate) fn cte(&mut self, name: &str, columns: &[String]) {
-        let mut outputs = self.completed.clone();
-        for (output, name) in outputs.iter_mut().zip(columns) {
-            output.name.clone_from(name);
-        }
         if let Some(scope) = self.scopes.last_mut() {
-            scope.ctes.insert(name.to_owned(), outputs);
+            scope.cte(name, &self.completed, columns);
         }
     }
+
     pub(crate) fn relation(&mut self, name: Option<&str>, alias: &str, columns: &[String]) {
         if let Some(scope) = self.scopes.last_mut() {
-            let mut outputs = name
-                .and_then(|name| scope.ctes.get(name))
-                .cloned()
-                .unwrap_or_default();
-            for (output, name) in outputs.iter_mut().zip(columns) {
-                output.name.clone_from(name);
-            }
-            scope.sources.insert(alias.to_owned(), outputs);
+            scope.relation(name, alias, columns);
         }
     }
+
     pub(crate) fn derived(&mut self, alias: &str, columns: &[String]) {
-        let mut outputs = self.completed.clone();
-        for (output, name) in outputs.iter_mut().zip(columns) {
-            output.name.clone_from(name);
-        }
         if let Some(scope) = self.scopes.last_mut() {
-            scope.sources.insert(alias.to_owned(), outputs);
+            scope.derived(alias, &self.completed, columns);
         }
     }
+
     pub(crate) fn column(&self, original: &SemScalarExpr) -> Option<SemScalarExpr> {
-        let (alias, column) = original.constraint_binding()?;
+        let (alias, _) = original.constraint_binding()?;
         for scope in self.scopes.iter().rev() {
-            if let Some(outputs) = scope.sources.get(alias) {
-                let output = outputs
-                    .iter()
-                    .find(|output| output.name == column.as_str())?;
-                let node = output.node?;
-                return Some(SemScalarExpr::constrained(&ConstrainedExpr::new(
-                    node,
-                    "column",
-                    &[],
-                    if self.graph.domain(node).is_any() {
-                        &output.domain
-                    } else {
-                        self.graph.domain(node)
-                    },
-                    original.is_not_null(),
-                    column.as_str(),
-                )));
+            if scope.has_source(alias) {
+                return scope.column(original, &self.graph);
             }
         }
         None
@@ -360,6 +362,56 @@ impl Signature {
             result: result.clone(),
         }
     }
+    pub(crate) fn new_concrete(inputs: &[TypeReference], result: &TypeReference) -> Option<Self> {
+        let signature = Self::new(inputs, result);
+        if signature.is_concrete_for_arity(inputs.len()) {
+            Some(signature)
+        } else {
+            None
+        }
+    }
+
+    fn is_concrete_for_arity(&self, arity: usize) -> bool {
+        self.inputs.len() == arity
+            && self
+                .inputs
+                .iter()
+                .chain([&self.result])
+                .all(Self::concrete_type)
+    }
+
+    fn concrete_type(ty: &TypeReference) -> bool {
+        !ty.is_dynamic() && !ty.is_simple_infer_arg() && !ty.is_common_infer_arg()
+    }
+
+    fn source_types(
+        &self,
+        catalog: &dyn Catalog,
+        index: usize,
+    ) -> std::collections::HashSet<TypeReference> {
+        catalog.cast_sources(&self.inputs[index], false)
+    }
+
+    fn cast_score(
+        &self,
+        catalog: &dyn Catalog,
+        source: &TypeReference,
+        index: usize,
+    ) -> Option<i32> {
+        Some(
+            catalog
+                .get_implicit_cast(source, &self.inputs[index])?
+                .context()
+                .overload_priority_score(),
+        )
+    }
+
+    fn result_alternative(&self, inputs: &[InputTypeConstraint]) -> SignatureAlternative {
+        let mut domains = inputs.to_vec();
+        domains.push(InputTypeConstraint::exact(&self.result));
+        SignatureAlternative::new(&domains)
+    }
+
     // Partition source types by their cast scores against all candidates. Types
     // within one partition have identical overload behavior, so the solver can
     // keep ranges without enumerating every concrete input tuple.
@@ -370,57 +422,16 @@ impl Signature {
     ) -> Vec<SignatureAlternative> {
         let signatures: Vec<_> = signatures
             .iter()
-            .filter(|signature| {
-                signature.inputs.len() == inputs.len()
-                    && signature
-                        .inputs
-                        .iter()
-                        .chain([&signature.result])
-                        .all(|ty| {
-                            !ty.is_dynamic()
-                                && !ty.is_simple_infer_arg()
-                                && !ty.is_common_infer_arg()
-                        })
-            })
+            .filter(|signature| signature.is_concrete_for_arity(inputs.len()))
             .collect();
-        let mut choices = Vec::new();
-        for (index, input) in inputs.iter().enumerate() {
-            let mut sources = std::collections::HashSet::new();
-            for signature in &signatures {
-                sources.extend(catalog.cast_sources(&signature.inputs[index], false));
-            }
-            let mut groups = BTreeMap::<Vec<Option<i32>>, Vec<TypeReference>>::new();
-            for source in sources {
-                if !input.allows(&source) {
-                    continue;
-                }
-                let scores = signatures
-                    .iter()
-                    .map(|signature| {
-                        catalog
-                            .get_implicit_cast(&source, &signature.inputs[index])
-                            .map(|cast| cast.context().overload_priority_score())
-                    })
-                    .collect();
-                groups.entry(scores).or_default().push(source);
-            }
-            choices.push(
-                groups
-                    .into_iter()
-                    .map(|(scores, types)| SourcePartition {
-                        scores,
-                        domain: InputTypeConstraint::types(types),
-                    })
-                    .collect::<Vec<_>>(),
-            );
-        }
+        let choices = SourcePartition::argument_choices(&signatures, catalog, inputs);
         let mut alternatives = Vec::new();
         Self::combine(
             &signatures,
             &choices,
             0,
             &[],
-            &vec![Some(0); signatures.len()],
+            &OverloadScores::initial(signatures.len()),
             &mut alternatives,
         );
         alternatives
@@ -431,40 +442,22 @@ impl Signature {
         choices: &[Vec<SourcePartition>],
         index: usize,
         domains: &[InputTypeConstraint],
-        scores: &[Option<i32>],
+        scores: &OverloadScores,
         alternatives: &mut Vec<SignatureAlternative>,
     ) {
         if index == choices.len() {
-            let Some(best) = scores.iter().flatten().max() else {
+            let Some(candidate) = scores.unique_best() else {
                 return;
             };
-            let mut candidates = scores
-                .iter()
-                .enumerate()
-                .filter(|(_, score)| score.as_ref() == Some(best));
-            let Some((candidate, _)) = candidates.next() else {
-                return;
-            };
-            // A concrete source assignment with tied best overloads is ambiguous.
-            if candidates.next().is_some() {
-                return;
-            }
-            let mut domains = domains.to_vec();
-            domains.push(InputTypeConstraint::exact(&signatures[candidate].result));
-            alternatives.push(SignatureAlternative::new(&domains));
+            alternatives.push(signatures[candidate].result_alternative(domains));
             return;
         }
         for choice in &choices[index] {
-            let next_scores: Vec<_> = scores
-                .iter()
-                .zip(&choice.scores)
-                .map(|(left, right)| Some((*left)? + (*right)?))
-                .collect();
-            if next_scores.iter().all(Option::is_none) {
+            let next_scores = choice.accumulate_scores(scores);
+            if next_scores.has_no_candidates() {
                 continue;
             }
-            let mut domains = domains.to_vec();
-            domains.push(choice.domain.clone());
+            let domains = choice.extend_domains(domains);
             crate::sem::with_stack(|| {
                 Self::combine(
                     signatures,
@@ -480,6 +473,100 @@ impl Signature {
 }
 
 struct SourcePartition {
-    scores: Vec<Option<i32>>,
+    scores: OverloadScores,
     domain: InputTypeConstraint,
+}
+
+impl SourcePartition {
+    // Sources in one partition have identical cast scores for every overload.
+    fn argument_choices(
+        signatures: &[&Signature],
+        catalog: &dyn Catalog,
+        inputs: &[InputTypeConstraint],
+    ) -> Vec<Vec<Self>> {
+        let mut choices = Vec::new();
+        for (index, input) in inputs.iter().enumerate() {
+            let mut sources = std::collections::HashSet::new();
+            for signature in signatures {
+                sources.extend(signature.source_types(catalog, index));
+            }
+            let mut groups = BTreeMap::<Vec<Option<i32>>, Vec<TypeReference>>::new();
+            for source in sources {
+                if !input.allows(&source) {
+                    continue;
+                }
+                let scores = signatures
+                    .iter()
+                    .map(|signature| signature.cast_score(catalog, &source, index))
+                    .collect();
+                groups.entry(scores).or_default().push(source);
+            }
+            choices.push(
+                groups
+                    .into_iter()
+                    .map(|(scores, types)| Self::new(&scores, &types))
+                    .collect::<Vec<_>>(),
+            );
+        }
+        choices
+    }
+
+    fn new(scores: &[Option<i32>], types: &[TypeReference]) -> Self {
+        Self {
+            scores: OverloadScores::new(scores),
+            domain: InputTypeConstraint::types(types.to_vec()),
+        }
+    }
+
+    fn accumulate_scores(&self, previous: &OverloadScores) -> OverloadScores {
+        self.scores.add(previous)
+    }
+
+    fn extend_domains(&self, previous: &[InputTypeConstraint]) -> Vec<InputTypeConstraint> {
+        let mut domains = previous.to_vec();
+        domains.push(self.domain.clone());
+        domains
+    }
+}
+
+struct OverloadScores(Vec<Option<i32>>);
+
+impl OverloadScores {
+    fn new(scores: &[Option<i32>]) -> Self {
+        Self(scores.to_vec())
+    }
+
+    fn initial(count: usize) -> Self {
+        Self(vec![Some(0); count])
+    }
+
+    fn add(&self, previous: &Self) -> Self {
+        Self(
+            previous
+                .0
+                .iter()
+                .zip(&self.0)
+                .map(|(left, right)| Some((*left)? + (*right)?))
+                .collect(),
+        )
+    }
+
+    fn has_no_candidates(&self) -> bool {
+        self.0.iter().all(Option::is_none)
+    }
+
+    fn unique_best(&self) -> Option<usize> {
+        let best = self.0.iter().flatten().max()?;
+        let mut candidates = self
+            .0
+            .iter()
+            .enumerate()
+            .filter(|(_, score)| score.as_ref() == Some(best));
+        let (candidate, _) = candidates.next()?;
+        // Tied best overloads are ambiguous for this concrete source assignment.
+        if candidates.next().is_some() {
+            return None;
+        }
+        Some(candidate)
+    }
 }

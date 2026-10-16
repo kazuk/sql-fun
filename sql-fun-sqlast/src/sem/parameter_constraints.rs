@@ -90,6 +90,13 @@ pub struct ParameterConstraint {
 }
 
 impl ParameterConstraint {
+    fn new(position: u32, constraint: &InputTypeConstraint) -> Self {
+        Self {
+            position,
+            constraint: constraint.clone(),
+        }
+    }
+
     /// Original one-based SQL parameter position; gaps are preserved.
     pub const fn position(&self) -> u32 {
         self.position
@@ -143,27 +150,12 @@ impl ParameterConstraints {
     /// overload assignment. Omitted positions remain unconstrained by this check.
     /// Unknown positions are rejected. This is inspection, not an analysis hint.
     pub fn allows(&self, types: &BTreeMap<u32, TypeReference>) -> bool {
-        let mut graph = self.graph.clone();
-        for (position, ty) in types {
-            let Some(node) = graph.parameters.get(position).copied() else {
-                return false;
-            };
-            graph.domains[node].intersect(&InputTypeConstraint::exact(ty));
-        }
-        graph.satisfiable()
+        self.graph.accepts(types)
     }
 
     pub(crate) fn from_graph(graph: &ConstraintGraph) -> Self {
-        let parameters = graph
-            .parameters
-            .iter()
-            .map(|(position, node)| ParameterConstraint {
-                position: *position,
-                constraint: graph.domains[*node].clone(),
-            })
-            .collect();
         Self {
-            parameters,
+            parameters: graph.parameter_constraints(),
             outputs: Vec::new(),
             graph: graph.clone(),
         }
@@ -177,6 +169,24 @@ impl SignatureAlternative {
     pub(crate) fn new(domains: &[InputTypeConstraint]) -> Self {
         Self(domains.to_vec())
     }
+    // Repeated operands share one node, so their requirements must intersect
+    // before comparing this alternative with the current graph domains.
+    fn compatible_with(&self, nodes: &[usize], domains: &[InputTypeConstraint]) -> bool {
+        let mut requirements = BTreeMap::<usize, InputTypeConstraint>::new();
+        for (node, required) in nodes.iter().zip(&self.0) {
+            requirements
+                .entry(*node)
+                .or_insert_with(InputTypeConstraint::any)
+                .intersect(required);
+        }
+        requirements
+            .into_iter()
+            .all(|(node, required)| domains[node].overlaps(&required))
+    }
+
+    fn include_domain(&self, index: usize, allowed: &mut InputTypeConstraint) {
+        allowed.union(&self.0[index]);
+    }
 }
 
 #[derive(Clone, Debug)]
@@ -184,6 +194,34 @@ struct OverloadConstraint {
     nodes: Vec<usize>,
     alternatives: Vec<SignatureAlternative>,
     context: String,
+}
+
+impl OverloadConstraint {
+    fn new(nodes: &[usize], alternatives: &[SignatureAlternative], context: &str) -> Self {
+        Self {
+            nodes: nodes.to_vec(),
+            alternatives: alternatives.to_vec(),
+            context: context.to_owned(),
+        }
+    }
+
+    fn retain_compatible(&mut self, domains: &[InputTypeConstraint]) -> bool {
+        self.alternatives
+            .retain(|alternative| alternative.compatible_with(&self.nodes, domains));
+        !self.alternatives.is_empty()
+    }
+
+    fn propagate_domains(&self, domains: &mut [InputTypeConstraint]) -> bool {
+        let mut changed = false;
+        for (index, node) in self.nodes.iter().enumerate() {
+            let mut allowed = InputTypeConstraint::types([]);
+            for alternative in &self.alternatives {
+                alternative.include_domain(index, &mut allowed);
+            }
+            changed |= domains[*node].intersect(&allowed);
+        }
+        changed
+    }
 }
 
 /// Private processing representation; never stored in catalog/source models.
@@ -205,6 +243,28 @@ impl ConstraintGraph {
             equalities: Vec::new(),
             requirements: Vec::new(),
         }
+    }
+
+    fn parameter_constraints(&self) -> Vec<ParameterConstraint> {
+        self.parameters
+            .iter()
+            .map(|(position, node)| ParameterConstraint::new(*position, self.domain(*node)))
+            .collect()
+    }
+
+    fn accepts(&self, types: &BTreeMap<u32, TypeReference>) -> bool {
+        let mut graph = self.clone();
+        for (position, ty) in types {
+            let Some(node) = graph.parameters.get(position).copied() else {
+                return false;
+            };
+            graph.domains[node].intersect(&InputTypeConstraint::exact(ty));
+        }
+        graph.satisfiable()
+    }
+
+    pub(crate) fn has_parameters(&self) -> bool {
+        !self.parameters.is_empty()
     }
 
     pub(crate) fn node(&mut self, domain: &InputTypeConstraint) -> usize {
@@ -247,11 +307,8 @@ impl ConstraintGraph {
         alternatives: &[SignatureAlternative],
         context: &str,
     ) {
-        self.overloads.push(OverloadConstraint {
-            nodes: nodes.to_vec(),
-            alternatives: alternatives.to_vec(),
-            context: context.to_owned(),
-        });
+        self.overloads
+            .push(OverloadConstraint::new(nodes, alternatives, context));
     }
 
     fn propagate(&mut self) -> bool {
@@ -267,30 +324,12 @@ impl ConstraintGraph {
                 changed |= self.domains[*left].intersect(&domain);
             }
             for overload in &mut self.overloads {
-                // One node may occupy several operand slots (e.g. $1 + $1).
-                overload.alternatives.retain(|alternative| {
-                    let mut requirements = BTreeMap::<usize, InputTypeConstraint>::new();
-                    for (node, required) in overload.nodes.iter().zip(&alternative.0) {
-                        requirements
-                            .entry(*node)
-                            .or_insert_with(InputTypeConstraint::any)
-                            .intersect(required);
-                    }
-                    requirements
-                        .into_iter()
-                        .all(|(node, required)| self.domains[node].overlaps(&required))
-                });
-                if overload.alternatives.is_empty() {
+                if !overload.retain_compatible(&self.domains) {
                     return false;
                 }
-                for (index, node) in overload.nodes.iter().enumerate() {
-                    let mut allowed = InputTypeConstraint::types([]);
-                    for alternative in &overload.alternatives {
-                        allowed.union(&alternative.0[index]);
-                    }
-                    changed |= self.domains[*node].intersect(&allowed);
-                }
+                changed |= overload.propagate_domains(&mut self.domains);
             }
+
             if !changed {
                 return true;
             }

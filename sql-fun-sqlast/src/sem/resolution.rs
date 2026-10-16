@@ -131,10 +131,6 @@ impl<'a> Resolution<'a> {
         overloads.parameter_signatures(self, arguments)
     }
 
-    pub(crate) const fn problem_count(&self) -> usize {
-        self.problems.len()
-    }
-
     pub(crate) const fn parameters(&mut self) -> &mut crate::ast::ParameterResolution {
         &mut self.parameters
     }

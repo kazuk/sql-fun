@@ -609,16 +609,6 @@ mod test_parameter_analysis {
         assert_matches::assert_matches!(error, crate::sem::AnalysisError::ParameterConstraint(_));
     }
 
-    #[rstest::rstest]
-    #[case::coalesce("select coalesce($1, 1)")]
-    #[case::case("select case when true then $1 else 1 end")]
-    fn unsupported_type_sensitive_contexts_do_not_publish_any(#[case] sql: &str) {
-        let error = analyze(sql, Dialect::postgres())
-            .err()
-            .expect("unsupported type unification");
-        assert_matches::assert_matches!(error, crate::sem::AnalysisError::ParameterConstraint(_));
-    }
-
     #[test]
     fn distinct_inputs_and_gaps_remain_independent() {
         let result = analyze(

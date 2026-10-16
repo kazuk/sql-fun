@@ -81,6 +81,11 @@ where
         &self.0
     }
 
+    /// Consume the analysis result and continue with its updated catalog context.
+    pub fn into_context(self) -> TParseContext {
+        self.1
+    }
+
     /// Context containing diagnostics and catalog updates from analysis.
     #[must_use]
     pub const fn context(&self) -> &TParseContext {

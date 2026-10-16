@@ -203,26 +203,20 @@ impl FunctionOverloadCollection {
             let Ok(bindings) = overload.bind_args(arguments.clone()) else {
                 continue;
             };
-            let Some(inputs) = bindings
-                .iter()
-                .map(ParameterBindResult::constraint_input_types)
-                .collect::<Option<Vec<_>>>()
-            else {
-                continue;
-            };
-            let inputs: Vec<_> = inputs.into_iter().flatten().collect();
-            let Some(result) = overload.ret_type.as_ref() else {
-                continue;
-            };
-            if inputs
-                .iter()
-                .chain([result])
-                .any(|ty| ty.is_dynamic() || ty.is_simple_infer_arg() || ty.is_common_infer_arg())
-            {
-                continue;
+            if let Some(signature) = overload.parameter_signature(&bindings) {
+                signatures.push(signature);
             }
-            signatures.push(crate::ast::Signature::new(&inputs, result));
         }
         signatures
+    }
+}
+
+impl OverloadVariant {
+    fn parameter_signature(
+        &self,
+        bindings: &[ParameterBindResult],
+    ) -> Option<crate::ast::Signature> {
+        let inputs = ParameterBindResult::constraint_inputs(bindings)?;
+        crate::ast::Signature::new_concrete(&inputs, self.ret_type.as_ref()?)
     }
 }

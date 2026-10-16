@@ -5,8 +5,8 @@ pub(crate) use self::parameters::Signature;
 
 use crate::StringSpan;
 use crate::ast::{
-    Access, BooleanOperator, Call, CallKind, Case, Cast, Dialect, Expr, Indirection, Literal, Name,
-    OperatorExpr, OperatorKind, SqlValue, Subquery, TypeName,
+    Access, BooleanExpr, BooleanOperator, Call, CallKind, Case, Cast, Dialect, Expr, Indirection,
+    Literal, Name, NullTest, OperatorExpr, OperatorKind, SqlValue, Subquery, TypeName,
 };
 use crate::sem::{
     AliasName, AnalysisError, AnalysisProblem, ArithExpr, CaseExprAnalysisContext, Catalog,
@@ -68,16 +68,21 @@ impl Expr {
         scope: &ScalarAnalysisContext<'_>,
     ) -> ResolutionOutcome<SemScalarExpr> {
         let mut context = Resolution::new(catalog);
-        let result = self
-            .resolve_in(&mut context, dialect, scope)
-            .and_then(|value| {
-                if context.solve_parameters()? {
-                    self.resolve_in(&mut context, dialect, scope)
-                } else {
-                    Ok(value)
-                }
-            });
+        let result = self.resolve_with_parameters(&mut context, dialect, scope);
         context.finish(result)
+    }
+
+    fn resolve_with_parameters(
+        &self,
+        context: &mut Resolution<'_>,
+        dialect: Dialect,
+        scope: &ScalarAnalysisContext<'_>,
+    ) -> Result<SemScalarExpr, AnalysisError> {
+        let value = self.resolve_in(context, dialect, scope)?;
+        if context.solve_parameters()? {
+            return self.resolve_in(context, dialect, scope);
+        }
+        Ok(value)
     }
 
     pub(super) fn resolve_in(
@@ -86,17 +91,13 @@ impl Expr {
         dialect: Dialect,
         scope: &ScalarAnalysisContext<'_>,
     ) -> Result<SemScalarExpr, AnalysisError> {
-        if let Some(value) = context.parameters().cached(self) {
-            return Ok(value);
+        let previous = context.parameters().enter_expression(self);
+        let result = crate::sem::with_stack(|| self.resolve_in_body(context, dialect, scope));
+        context.parameters().leave_expression(previous);
+        if let Ok(value) = &result {
+            context.parameters().remember(self, value);
         }
-        let problems_before = context.problem_count();
-        let value =
-            crate::sem::with_stack(|| Self::resolve_in_body(self, context, dialect, scope))?;
-        // Revisit expressions that reported diagnostics so replay cannot hide them.
-        if context.problem_count() == problems_before {
-            context.parameters().remember(self, &value);
-        }
-        Ok(value)
+        result
     }
 
     #[inline(never)]
@@ -114,46 +115,8 @@ impl Expr {
             // its binding behavior here; projection expansion is a separate task.
             Self::Star(name) => name.resolve_column(context, scope),
             Self::Operator(operator) => operator.resolve(context, dialect, scope),
-            Self::Boolean(boolean) => {
-                let arguments = Self::resolve_list(&boolean.arguments, context, dialect, scope)?;
-                if arguments
-                    .iter()
-                    .any(|argument| argument.constraint_node().is_some())
-                {
-                    if dialect == Dialect::postgres() {
-                        for argument in &arguments {
-                            context.parameter_require(
-                                argument,
-                                &crate::sem::PgBuiltInType::bool(),
-                                false,
-                            );
-                        }
-                    }
-                    return Ok(context.parameters().operation(
-                        "boolean",
-                        &arguments,
-                        &crate::sem::InputTypeConstraint::exact(&crate::sem::PgBuiltInType::bool()),
-                        None,
-                    ));
-                }
-                boolean.operator.resolve(&arguments)
-            }
-            Self::NullTest(test) => {
-                let argument = test.argument.resolve_in(context, dialect, scope)?;
-                if argument.constraint_node().is_some() {
-                    return Ok(context.parameters().operation(
-                        if test.negated {
-                            "IS NOT NULL"
-                        } else {
-                            "IS NULL"
-                        },
-                        &[argument],
-                        &crate::sem::InputTypeConstraint::exact(&crate::sem::PgBuiltInType::bool()),
-                        Some(true),
-                    ));
-                }
-                Ok(SemScalarExpr::null_test(&argument, test.negated))
-            }
+            Self::Boolean(boolean) => boolean.resolve(context, dialect, scope),
+            Self::NullTest(test) => test.resolve(context, dialect, scope),
             Self::Cast(cast) => cast.resolve(context, dialect, scope),
             Self::Call(call) => call.resolve(context, dialect, scope),
             Self::Case(case) => case.resolve(context, dialect, scope),
@@ -249,6 +212,58 @@ impl Literal {
     }
 }
 
+impl BooleanExpr {
+    fn resolve(
+        &self,
+        context: &mut Resolution<'_>,
+        dialect: Dialect,
+        scope: &ScalarAnalysisContext<'_>,
+    ) -> Result<SemScalarExpr, AnalysisError> {
+        let arguments = Expr::resolve_list(&self.arguments, context, dialect, scope)?;
+        if arguments
+            .iter()
+            .any(|argument| argument.constraint_node().is_some())
+        {
+            if dialect == Dialect::postgres() {
+                for argument in &arguments {
+                    context.parameter_require(argument, &crate::sem::PgBuiltInType::bool(), false);
+                }
+            }
+            return Ok(context.parameters().operation(
+                "boolean",
+                &arguments,
+                &crate::sem::InputTypeConstraint::exact(&crate::sem::PgBuiltInType::bool()),
+                None,
+            ));
+        }
+        self.operator.resolve(&arguments)
+    }
+}
+
+impl NullTest {
+    fn resolve(
+        &self,
+        context: &mut Resolution<'_>,
+        dialect: Dialect,
+        scope: &ScalarAnalysisContext<'_>,
+    ) -> Result<SemScalarExpr, AnalysisError> {
+        let argument = self.argument.resolve_in(context, dialect, scope)?;
+        if argument.constraint_node().is_some() {
+            return Ok(context.parameters().operation(
+                if self.negated {
+                    "IS NOT NULL"
+                } else {
+                    "IS NULL"
+                },
+                &[argument],
+                &crate::sem::InputTypeConstraint::exact(&crate::sem::PgBuiltInType::bool()),
+                Some(true),
+            ));
+        }
+        Ok(SemScalarExpr::null_test(&argument, self.negated))
+    }
+}
+
 impl BooleanOperator {
     fn resolve(&self, arguments: &[SemScalarExpr]) -> Result<SemScalarExpr, AnalysisError> {
         match self {
@@ -315,9 +330,7 @@ impl OperatorExpr {
                     .as_ref()
                     .is_some_and(|value| value.constraint_node().is_some())
             {
-                return Err(AnalysisError::parameter_constraint(
-                    "SQLite operator type constraints are not yet supported",
-                ));
+                todo!("SQLite operator type constraints");
             }
             todo!("SQLite operator semantics");
         }
@@ -364,20 +377,25 @@ impl OperatorKind {
                 )
             }
             Self::NullIf => Ok(ArithExpr::build_null_if(context, left, right)?.0),
-            Self::Between | Self::NotBetween => {
-                let left = left.expect("BETWEEN argument");
-                let values = right.expect("BETWEEN bounds").into_list_values()?;
-                let Ok([start, end]): Result<[SemScalarExpr; 2], _> = values.try_into() else {
-                    return AnalysisError::raise_unexpected_input("BETWEEN bounds");
-                };
-                Ok(if matches!(self, Self::NotBetween) {
-                    ArithExpr::not_between(left, (start, end))
-                } else {
-                    ArithExpr::between(left, (start, end))
-                })
-            }
+            Self::Between | Self::NotBetween => self.resolve_between(left, right),
             _ => todo!("operator semantic analysis"),
         }
+    }
+    fn resolve_between(
+        &self,
+        left: Option<SemScalarExpr>,
+        right: Option<SemScalarExpr>,
+    ) -> Result<SemScalarExpr, AnalysisError> {
+        let left = left.expect("BETWEEN argument");
+        let values = right.expect("BETWEEN bounds").into_list_values()?;
+        let Ok([start, end]): Result<[SemScalarExpr; 2], _> = values.try_into() else {
+            return AnalysisError::raise_unexpected_input("BETWEEN bounds");
+        };
+        Ok(if matches!(self, Self::NotBetween) {
+            ArithExpr::not_between(left, (start, end))
+        } else {
+            ArithExpr::between(left, (start, end))
+        })
     }
 }
 
@@ -451,28 +469,43 @@ impl CallKind {
             todo!("SQLite function affinity and overload semantics");
         }
         match self {
-            Self::Coalesce => {
-                let mut analysis = CoalesceAnalysis::new();
-                for argument in &call.arguments {
-                    let value = argument.resolve_in(context, dialect, scope)?;
-                    if value.constraint_node().is_some() && value.get_type().is_none() {
-                        return Err(AnalysisError::parameter_constraint(
-                            "parameter-dependent COALESCE type unification is not yet supported",
-                        ));
-                    }
-                    analysis.push(context, &value)?;
-                }
-                return Ok(analysis.finish(context)?.0);
-            }
+            Self::Coalesce => call.resolve_coalesce(context, dialect, scope),
             Self::MinMax => todo!("min/max semantic analysis"),
-            Self::Ordinary => {}
+            Self::Ordinary => call.resolve_ordinary(context, dialect, scope),
         }
-        let arguments = Expr::resolve_list(&call.arguments, context, dialect, scope)?;
+    }
+}
+
+impl Call {
+    fn resolve_coalesce(
+        &self,
+        context: &mut Resolution<'_>,
+        dialect: Dialect,
+        scope: &ScalarAnalysisContext<'_>,
+    ) -> Result<SemScalarExpr, AnalysisError> {
+        let mut analysis = CoalesceAnalysis::new();
+        for argument in &self.arguments {
+            let value = argument.resolve_in(context, dialect, scope)?;
+            if value.constraint_node().is_some() && value.get_type().is_none() {
+                todo!("parameter-dependent COALESCE type unification");
+            }
+            analysis.push(context, &value)?;
+        }
+        Ok(analysis.finish(context)?.0)
+    }
+
+    fn resolve_ordinary(
+        &self,
+        context: &mut Resolution<'_>,
+        dialect: Dialect,
+        scope: &ScalarAnalysisContext<'_>,
+    ) -> Result<SemScalarExpr, AnalysisError> {
+        let arguments = Expr::resolve_list(&self.arguments, context, dialect, scope)?;
         if arguments
             .iter()
             .any(|argument| argument.constraint_node().is_some())
         {
-            let name = call.name.full_name()?;
+            let name = self.name.full_name()?;
             let Some(overloads) = context.get_function_by_name(&name) else {
                 return Err(AnalysisError::parameter_constraint(&format!(
                     "function {name} not found"
@@ -483,9 +516,9 @@ impl CallKind {
         }
         FuncCallExpr::resolve_common(
             context,
-            &call.name.full_name()?,
+            &self.name.full_name()?,
             &arguments,
-            &call.location.unwrap_or_else(|| StringSpan::new(0, 0)),
+            &self.location.unwrap_or_else(|| StringSpan::new(0, 0)),
         )
     }
 }
@@ -507,9 +540,7 @@ impl Case {
             .as_ref()
             .is_some_and(|value| value.constraint_node().is_some() && value.get_type().is_none())
         {
-            return Err(AnalysisError::parameter_constraint(
-                "parameter-dependent CASE type unification is not yet supported",
-            ));
+            todo!("parameter-dependent CASE type unification");
         }
         analysis.set_argument(&argument);
         for arm in &self.arms {
@@ -518,9 +549,7 @@ impl Case {
             if (condition.constraint_node().is_some() && condition.get_type().is_none())
                 || (result.constraint_node().is_some() && result.get_type().is_none())
             {
-                return Err(AnalysisError::parameter_constraint(
-                    "parameter-dependent CASE type unification is not yet supported",
-                ));
+                todo!("parameter-dependent CASE type unification");
             }
             analysis.push_arm(context, &condition, &result)?;
         }
@@ -529,9 +558,7 @@ impl Case {
             .as_ref()
             .is_some_and(|value| value.constraint_node().is_some() && value.get_type().is_none())
         {
-            return Err(AnalysisError::parameter_constraint(
-                "parameter-dependent CASE type unification is not yet supported",
-            ));
+            todo!("parameter-dependent CASE type unification");
         }
         analysis.set_default(context, &otherwise)?;
         analysis.finish(context)
@@ -566,9 +593,7 @@ impl Indirection {
     ) -> Result<SemScalarExpr, AnalysisError> {
         let mut value = self.argument.resolve_in(context, dialect, scope)?;
         if value.constraint_node().is_some() && value.get_type().is_none() {
-            return Err(AnalysisError::parameter_constraint(
-                "parameter-dependent indirection type constraints are not yet supported",
-            ));
+            todo!("parameter-dependent indirection type constraints");
         }
         for item in &self.items {
             value = item.resolve(context, dialect, scope, value)?;
@@ -623,9 +648,7 @@ impl OperatorKind {
         right: Option<&SemScalarExpr>,
     ) -> Result<SemScalarExpr, AnalysisError> {
         if !matches!(self, Self::Ordinary) {
-            return Err(AnalysisError::parameter_constraint(
-                "parameter constraints for this operator form are not yet supported",
-            ));
+            todo!("parameter constraints for this operator form");
         }
         let name = name.operator_name()?;
         let Some(operator) = context.get_operator_op(&name, left.is_some(), right.is_some()) else {

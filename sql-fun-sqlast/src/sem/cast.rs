@@ -70,8 +70,7 @@ impl CastContext {
         Self::Implicit
     }
 
-    /// Construct an explicit context for semantic test fixtures.
-    #[cfg(test)]
+    /// Construct an explicit cast context.
     pub(crate) const fn explicit() -> Self {
         Self::Explicit
     }

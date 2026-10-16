@@ -34,6 +34,14 @@ impl ParameterBindResult {
         Self::NoInputParam(param.clone())
     }
 
+    pub(crate) fn constraint_inputs(bindings: &[Self]) -> Option<Vec<TypeReference>> {
+        let mut inputs = Vec::new();
+        for binding in bindings {
+            inputs.extend(binding.constraint_input_types()?);
+        }
+        Some(inputs)
+    }
+
     pub(crate) fn constraint_input_types(&self) -> Option<Vec<TypeReference>> {
         match self {
             Self::One(_, parameter) => Some(vec![parameter.get_type()?.clone()]),

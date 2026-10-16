@@ -425,6 +425,8 @@ impl StatementNode {
     where
         TContext: crate::sem::ParseContext,
     {
+        let mut context = context;
+        context.set_parameter_constraints(&crate::sem::ParameterConstraints::default());
         match self {
             Self::View(view) => view.resolve_and_apply(context, dialect),
             Self::Extension(extension) => extension.apply(context),
@@ -448,13 +450,8 @@ impl StatementNode {
             Self::Table(table) => table.resolve_and_apply(context, dialect),
             _ => {
                 let outcome = self.resolve(&context, dialect);
-                let mut context = context;
-                let (statement, parameters) = outcome.report_with_parameters(&mut context)?;
-                Ok(crate::AstAndContextPair::with_parameters(
-                    statement,
-                    context,
-                    &parameters,
-                ))
+                let statement = outcome.report(&mut context)?;
+                Ok(crate::AstAndContextPair::new(statement, context))
             }
         }
     }

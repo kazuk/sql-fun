@@ -166,7 +166,7 @@ fn public_sqlite_table_dispatch_preserves_column_semantics(
     ]);
     context.setup_type(crate::sem::PgBuiltInType::text());
     context.set_source_path_with_span(&source_span);
-    let crate::AstAndContextPair(statement, context, _) =
+    let crate::AstAndContextPair(statement, context) =
         SemAst::semantic_analysis_sqlite_stmt(context, parsed, &IVec::default())?;
     let SemAst::CreateTable(table) = statement else {
         panic!("semantic table");
@@ -488,7 +488,7 @@ mod sqlite {
         context.set_source_path_with_span(&source_span());
         let statement =
             SqliteSynBuilder.parse_as_stmt("with c(x) as (select 42) select x as n from c");
-        let crate::AstAndContextPair(ast, context, _) =
+        let crate::AstAndContextPair(ast, context) =
             SemAst::semantic_analysis_sqlite_stmt(context, statement, &IVec::default())?;
         let query = ast.into_select_statemtnt().expect("SELECT result");
         let column = query

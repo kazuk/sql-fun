@@ -2,6 +2,7 @@
 
 mod name_resolution;
 mod overload_resolution;
+mod parameter_constraint;
 mod sql_highlighter;
 
 use std::collections::HashSet;
@@ -19,6 +20,7 @@ use crate::{
 };
 
 pub use self::name_resolution::{DomainBaseTypeNameNotFound, NameResolution};
+pub use self::parameter_constraint::ParameterConstraintProblem;
 
 pub(crate) use self::{overload_resolution::OverloadResolution, sql_highlighter::SqlHighlighter};
 
@@ -58,6 +60,8 @@ trait RenderProblemReport: Problem {
 #[allow(clippy::large_enum_variant)]
 #[derive(Debug, Clone)]
 pub enum AnalysisProblem {
+    /// SQL-derived parameter requirements cannot be reconciled.
+    ParameterConstraint(ParameterConstraintProblem),
     /// Name resolution problems
     NameResolution(NameResolution),
     /// Overload resolution problems
@@ -121,10 +125,16 @@ pub enum AnalysisProblem {
 }
 
 impl AnalysisProblem {
+    /// Report conflicting or invalid SQL-derived parameter requirements.
+    pub fn parameter_constraint(message: &str) -> Self {
+        Self::ParameterConstraint(ParameterConstraintProblem::new(message))
+    }
+
     /// Stable diagnostic classification, independent of formatted debug output.
     #[must_use]
     pub const fn code(&self) -> &'static str {
         match self {
+            Self::ParameterConstraint(problem) => problem.code(),
             Self::NameResolution(problem) => problem.code(),
             Self::OverloadResolution(problem) => problem.code(),
             Self::ExtensionNotFound(..) => "extension_not_found",
@@ -171,6 +181,7 @@ impl AnalysisProblem {
 
         let report = match self {
             Self::NameResolution(nr) => nr.render_report(&report_handler, source)?,
+            Self::ParameterConstraint(problem) => problem.render_report(&report_handler, source)?,
             _ => todo!(),
         };
         Ok(report)

@@ -135,11 +135,18 @@ impl<'a> Resolution<'a> {
         &mut self.parameters
     }
     pub(crate) fn solve_parameters(&mut self) -> Result<bool, AnalysisError> {
-        let replay = self.parameters.solve()?;
-        if replay {
-            self.problems.clear();
+        match self.parameters.solve() {
+            Ok(replay) => {
+                if replay {
+                    self.problems.clear();
+                }
+                Ok(replay)
+            }
+            Err(problem) => {
+                self.report_problem(AnalysisProblem::parameter_constraint(problem.message()))?;
+                Ok(false)
+            }
         }
-        Ok(replay)
     }
     pub(crate) fn parameter_require(
         &mut self,
@@ -150,6 +157,19 @@ impl<'a> Resolution<'a> {
         self.parameters
             .require(self.catalog, value, target, explicit);
     }
+    pub(crate) fn unresolved_parameter_operation(
+        &mut self,
+        message: &str,
+        operation: &str,
+        arguments: &[crate::sem::SemScalarExpr],
+        domain: &crate::sem::InputTypeConstraint,
+    ) -> Result<crate::sem::SemScalarExpr, AnalysisError> {
+        self.report_problem(AnalysisProblem::parameter_constraint(message))?;
+        Ok(self
+            .parameters
+            .operation(operation, arguments, domain, None))
+    }
+
     pub(crate) fn parameter_call(
         &mut self,
         name: &str,
@@ -192,17 +212,12 @@ impl<T> ResolutionOutcome<T> {
         }
     }
 
-    pub(crate) fn report<C: DiagnosticContext>(self, context: &mut C) -> Result<T, AnalysisError> {
-        self.report_with_parameters(context).map(|(value, _)| value)
-    }
-    pub(crate) fn report_with_parameters<C: DiagnosticContext>(
-        self,
-        context: &mut C,
-    ) -> Result<(T, crate::sem::ParameterConstraints), AnalysisError> {
+    pub(crate) fn report<C: ParseContext>(self, context: &mut C) -> Result<T, AnalysisError> {
+        context.set_parameter_constraints(&self.parameters);
         for problem in self.problems {
             context.report_problem(problem)?;
         }
-        self.result.map(|value| (value, self.parameters))
+        self.result
     }
 }
 

@@ -1,6 +1,10 @@
 //! SQL input constraints are independent of parameter hints and Rust code generation.
 use self::test_helpers::heavy;
-use ::sql_fun_sqlast::{ast::Dialect, parse_statements, sem::PgBuiltInType};
+use ::sql_fun_sqlast::{
+    ast::Dialect,
+    parse_statements,
+    sem::{ParseContext, PgBuiltInType},
+};
 use std::collections::BTreeMap;
 
 #[test]
@@ -13,7 +17,7 @@ fn real_postgres_catalog_preserves_numeric_source_types() -> Result<(), Box<dyn 
         .next()
         .unwrap()?;
     let analyzed = statement.analyze(context)?;
-    let constraints = analyzed.parameter_constraints();
+    let constraints = analyzed.context().parameter_constraints();
     assert!(constraints.allows(&BTreeMap::from([(1, PgBuiltInType::int2())])));
     assert!(constraints.allows(&BTreeMap::from([(1, PgBuiltInType::int4())])));
     assert!(constraints.allows(&BTreeMap::from([(1, PgBuiltInType::int8())])));
@@ -91,6 +95,7 @@ fn real_catalog_contexts_produce_constraints(
     let analyzed = statement.analyze(heavy::context()?)?;
     assert!(
         !analyzed
+            .context()
             .parameter_constraints()
             .parameter(1)
             .unwrap()
@@ -120,11 +125,13 @@ fn parser_adapter_retains_the_same_constraints() -> Result<(), Box<dyn std::erro
         SelectStatement::analyze_select(heavy::context()?, select, &PostgresDialect::scan(sql)?)?;
     assert!(
         analyzed
+            .context()
             .parameter_constraints()
             .allows(&BTreeMap::from([(1, PgBuiltInType::int2())]))
     );
     assert!(
         !analyzed
+            .context()
             .parameter_constraints()
             .allows(&BTreeMap::from([(1, PgBuiltInType::bool())]))
     );
@@ -133,9 +140,7 @@ fn parser_adapter_retains_the_same_constraints() -> Result<(), Box<dyn std::erro
 
 #[test]
 fn schema_defined_enum_supports_explicit_io_casts() -> Result<(), Box<dyn std::error::Error>> {
-    use ::sql_fun_sqlast::sem::{
-        CastInfoRead, FullName, ParseContext, SchemaFileContext, TypeReference,
-    };
+    use ::sql_fun_sqlast::sem::{CastInfoRead, FullName, SchemaFileContext, TypeReference};
     let definition = parse_statements(
         "create type public.mood as enum ('happy')",
         Dialect::postgres(),
@@ -157,11 +162,13 @@ fn schema_defined_enum_supports_explicit_io_casts() -> Result<(), Box<dyn std::e
     let analyzed = statement.analyze(context)?;
     assert!(
         analyzed
+            .context()
             .parameter_constraints()
             .allows(&BTreeMap::from([(1, mood)]))
     );
     assert!(
         analyzed
+            .context()
             .parameter_constraints()
             .allows(&BTreeMap::from([(1, text)]))
     );
@@ -186,6 +193,7 @@ fn nested_queries_retain_solved_parameter_domains(
         assert_eq!(
             &domain,
             analyzed
+                .context()
                 .parameter_constraints()
                 .parameter(1)
                 .unwrap()

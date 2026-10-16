@@ -472,7 +472,8 @@ mod test_parameter_analysis {
     use crate::parse_statements;
     use crate::sem::{
         BinaryOperatorDefinition, CastContext, CastDefinition, FunctionOverloadCollection,
-        FunctionParam, OperatorDefinition, OperatorName, OverloadVariant, PgBuiltInType,
+        FunctionParam, OperatorDefinition, OperatorName, OverloadVariant, ParseContext,
+        PgBuiltInType,
     };
     use crate::test_helpers::TestParseContext;
     use std::collections::BTreeMap;
@@ -538,7 +539,7 @@ mod test_parameter_analysis {
     )]
     fn null_test_infers_any(#[case] sql: &str, #[case] dialect: Dialect) {
         let result = analyze(sql, dialect).unwrap();
-        let inputs = result.parameter_constraints();
+        let inputs = result.context().parameter_constraints();
         assert_eq!(
             inputs
                 .iter()
@@ -563,6 +564,7 @@ mod test_parameter_analysis {
     fn operator_preserves_implicit_input_range(#[case] sql: &str) {
         let result = analyze(sql, Dialect::postgres()).unwrap();
         let constraint = result
+            .context()
             .parameter_constraints()
             .parameter(1)
             .unwrap()
@@ -577,12 +579,22 @@ mod test_parameter_analysis {
     #[rstest::rstest]
     #[case::direct("select $1 + 1 as n, lower($1) as s")]
     #[case::cte("with x as (select $1 + 1 as n) select lower($1) as s from x")]
-    fn conflicting_uses_return_error(#[case] sql: &str) {
-        let error = analyze(sql, Dialect::postgres())
-            .err()
-            .expect("conflicting SQL inputs");
-        assert_matches::assert_matches!(error, crate::sem::AnalysisError::ParameterConstraint(_));
-        assert!(error.to_string().contains("$1"));
+    fn conflicting_uses_report_recoverable_problem(#[case] sql: &str) {
+        let analyzed =
+            analyze(sql, Dialect::postgres()).expect("analysis continues after a conflict");
+        let problems = analyzed.context().reported_problems();
+        assert_eq!(problems.len(), 1);
+        assert_eq!(problems[0].code(), "parameter_constraint");
+        let rendered = problems[0]
+            .render_report(&::sql_fun_core::HighlighterTheme::default(), sql.to_owned())
+            .unwrap();
+        assert!(rendered.contains("$1"));
+        assert!(
+            !analyzed
+                .context()
+                .parameter_constraints()
+                .allows(&BTreeMap::new())
+        );
     }
 
     #[test]
@@ -599,14 +611,17 @@ mod test_parameter_analysis {
             true,
             Some(&overloads),
         );
-        let error = parse_statements("select $1 + 1", Dialect::postgres())
+        let analyzed = parse_statements("select $1 + 1", Dialect::postgres())
             .next()
             .unwrap()
             .unwrap()
             .analyze(context)
-            .err()
-            .expect("ambiguous overloads must fail");
-        assert_matches::assert_matches!(error, crate::sem::AnalysisError::ParameterConstraint(_));
+            .expect("ambiguity is recoverable");
+        assert_eq!(analyzed.context().reported_problem_count(), 1);
+        assert_eq!(
+            analyzed.context().reported_problems()[0].code(),
+            "parameter_constraint"
+        );
     }
 
     #[test]
@@ -616,7 +631,7 @@ mod test_parameter_analysis {
             Dialect::postgres(),
         )
         .unwrap();
-        let inputs = result.parameter_constraints();
+        let inputs = result.context().parameter_constraints();
         assert_eq!(
             inputs
                 .iter()
@@ -636,6 +651,7 @@ mod test_parameter_analysis {
         let result = analyze(sql, Dialect::postgres()).unwrap();
         assert!(
             result
+                .context()
                 .parameter_constraints()
                 .parameter(1)
                 .unwrap()
@@ -644,6 +660,7 @@ mod test_parameter_analysis {
         );
         assert_eq!(
             result
+                .context()
                 .parameter_constraints()
                 .result_column(0)
                 .unwrap()
@@ -656,13 +673,81 @@ mod test_parameter_analysis {
             &Some(PgBuiltInType::text())
         );
     }
+    #[test]
+    fn subsequent_analysis_replaces_context_constraints() {
+        let first = analyze("select $7 + 1 as n", Dialect::postgres()).unwrap();
+        assert!(
+            first
+                .context()
+                .parameter_constraints()
+                .parameter(7)
+                .is_some()
+        );
+        let second = parse_statements("select 1 as n", Dialect::postgres())
+            .next()
+            .unwrap()
+            .unwrap()
+            .analyze(first.into_context())
+            .unwrap();
+        assert!(
+            second
+                .context()
+                .parameter_constraints()
+                .parameter(7)
+                .is_none()
+        );
+        assert_eq!(
+            second
+                .context()
+                .parameter_constraints()
+                .result_column(0)
+                .unwrap()
+                .admissible_types(),
+            Some([PgBuiltInType::int4()].as_slice())
+        );
+    }
+
+    #[test]
+    fn diagnostic_sink_failure_still_aborts_parameter_analysis() {
+        let mut context = context();
+        context.reject_diagnostics_after(0);
+        let error = parse_statements("select $1 + 1, lower($1)", Dialect::postgres())
+            .next()
+            .unwrap()
+            .unwrap()
+            .analyze(context)
+            .err()
+            .expect("diagnostic reporting must fail");
+        assert_eq!(error.to_string(), "diagnostic sink rejected a problem");
+    }
+
+    #[rstest::rstest]
+    #[case::cast("select $1::missing")]
+    #[case::function("select missing_function($1)")]
+    #[case::operator("select $1 @@@ 1")]
+    fn unresolved_parameter_operations_report_once(#[case] sql: &str) {
+        let result = analyze(sql, Dialect::postgres())
+            .expect("analysis recovers from unresolved operations");
+        assert_eq!(result.context().reported_problem_count(), 1);
+        assert_eq!(
+            result.context().reported_problems()[0].code(),
+            "parameter_constraint"
+        );
+        assert!(
+            result
+                .context()
+                .parameter_constraints()
+                .parameter(1)
+                .is_some()
+        );
+    }
 }
 
 #[cfg(test)]
 mod test_parameter_casts {
     use crate::ast::Dialect;
     use crate::parse_statements;
-    use crate::sem::PgBuiltInType;
+    use crate::sem::{ParseContext, PgBuiltInType};
     use crate::test_helpers::TestParseContext;
 
     #[rstest::rstest]
@@ -676,6 +761,7 @@ mod test_parameter_casts {
             .analyze(TestParseContext::default())
             .unwrap();
         let input = result
+            .context()
             .parameter_constraints()
             .parameter(1)
             .unwrap()
@@ -701,6 +787,7 @@ mod test_parameter_casts {
             .unwrap();
         assert!(
             result
+                .context()
                 .parameter_constraints()
                 .parameter(1)
                 .unwrap()

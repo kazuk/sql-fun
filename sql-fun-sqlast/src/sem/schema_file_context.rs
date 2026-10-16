@@ -41,6 +41,7 @@ pub struct SchemaFileContext {
     source_access_service: Option<Box<dyn SourceAccessService>>,
     reports: Vec<String>,
     problems: Vec<AnalysisProblem>,
+    parameter_constraints: crate::sem::ParameterConstraints,
 }
 
 #[derive(Debug)]
@@ -107,6 +108,7 @@ impl SchemaFileContext {
             source_access_service: None,
             reports: Default::default(),
             problems: Vec::new(),
+            parameter_constraints: crate::sem::ParameterConstraints::default(),
         }
     }
 
@@ -535,6 +537,14 @@ impl BaseParseContext for SchemaCatalog {
 }
 
 impl ParseContext for SchemaFileContext {
+    fn parameter_constraints(&self) -> &crate::sem::ParameterConstraints {
+        &self.parameter_constraints
+    }
+
+    fn set_parameter_constraints(&mut self, constraints: &crate::sem::ParameterConstraints) {
+        self.parameter_constraints = constraints.clone();
+    }
+
     fn freeze(self) -> FrozenBaseContext {
         FrozenBaseContext::new(self.catalog)
     }

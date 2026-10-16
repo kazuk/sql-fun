@@ -98,7 +98,7 @@ pub use self::{
         TableInfoWrite, TypeInfoRead, TypeInfoWrite, ViewInfoRead, ViewInfoWrite,
     },
     pg_type::{PgBuiltInType, TypeDefinition, TypeReference},
-    problem::AnalysisProblem,
+    problem::{AnalysisProblem, ParameterConstraintProblem},
     scalar_expr::{
         ArithExpr, ArrayExpr, BooleanExpr, CaseExpr, CoalesceExpr, CollateExpr,
         ColumnReferenceExpr, ConstrainedExpr, CteColumnRef, FuncCallExpr, ImplicitCastExpr,

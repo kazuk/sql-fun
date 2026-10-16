@@ -143,7 +143,7 @@ mod test_helpers {
     pub(super) fn analyze(sql: &str) -> Result<(SelectStatement, TestParseContext), AnalysisError> {
         let context = selected_context();
         let statement = SqliteSynBuilder.parse_as_stmt(sql);
-        let crate::AstAndContextPair(ast, context, _) = SemAst::semantic_analysis_sqlite_stmt(
+        let crate::AstAndContextPair(ast, context) = SemAst::semantic_analysis_sqlite_stmt(
             context,
             statement,
             &::sql_fun_core::IVec::default(),

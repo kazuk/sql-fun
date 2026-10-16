@@ -216,10 +216,10 @@ cast constrains its use without requiring a Rust type mapping at this stage.
 SQLite casts follow SQLite semantics and do not require PostgreSQL cast rules.
 PostgreSQL operator and ordinary function contexts retain admissible input types,
 including implicit casts, rather than selecting a single Rust type. Repeated
-uses must have compatible constraints. Correlated overload alternatives remain
-part of the analysis result. Parameter-dependent result columns may likewise
-have several admissible types. Mapping these constraints to Rust types is a
-later code-generation step.
+uses must have compatible constraints; conflicts produce semantic diagnostics.
+Correlated overload alternatives remain part of the analysis result.
+Parameter-dependent result columns may likewise have several admissible types.
+Mapping these constraints to Rust types is a later code-generation step.
 
 Concrete PostgreSQL function signatures are supported; unresolved polymorphic
 signatures remain unsupported. Type unification of unresolved inputs in CASE,

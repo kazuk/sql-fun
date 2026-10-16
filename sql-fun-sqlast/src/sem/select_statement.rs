@@ -117,12 +117,8 @@ impl SelectStatement {
         let syntax = crate::ast::Query::try_from_with_tokens(&syn, tokens)?;
         let outcome = syntax.resolve(&context, crate::ast::Dialect::postgres());
         let mut context = context;
-        let (query, parameters) = outcome.report_with_parameters(&mut context)?;
-        Ok(AstAndContextPair::with_parameters(
-            SemAst::select(&query),
-            context,
-            &parameters,
-        ))
+        let query = outcome.report(&mut context)?;
+        Ok(AstAndContextPair::new(SemAst::select(&query), context))
     }
 }
 

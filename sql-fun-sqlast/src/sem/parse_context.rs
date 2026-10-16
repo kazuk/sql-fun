@@ -239,12 +239,22 @@ pub trait ParseContext:
 where
     Self: Sized,
 {
+    /// Constraints derived from the most recently reported semantic analysis.
+    /// These are independent of parameter metadata hints and Rust type mapping.
+    /// Conflicts are reported through [`DiagnosticContext::report_problem`]; a
+    /// returned analysis result does not imply satisfiable constraints.
+    fn parameter_constraints(&self) -> &crate::sem::ParameterConstraints;
+
+    /// Replace the current analysis constraints, including an empty result.
+    fn set_parameter_constraints(&mut self, constraints: &crate::sem::ParameterConstraints);
+
     /// Consume this builder and share its completed catalog as an immutable base.
     ///
     /// Earlier successful edits, the effective search path, and final source
-    /// provenance remain readable. Diagnostic collection and source rendering
-    /// services are discarded; inspect problems before freezing or use a
-    /// schema-file loader to retain them on its parsed result.
+    /// provenance remain readable. Statement parameter constraints are discarded;
+    /// inspect them before freezing. Diagnostic collection and source rendering
+    /// services are also discarded; inspect problems before freezing or use a
+    /// schema-file loader to retain diagnostics on its parsed result.
     ///
     /// Freezing consumes the builder; it cannot be reused afterwards:
     ///

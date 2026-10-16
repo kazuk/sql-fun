@@ -1310,8 +1310,7 @@ impl Schema {
     ) -> Result<AstAndContextPair<TContext>, AnalysisError> {
         let mut elements = Vec::new();
         for element in &self.elements {
-            let AstAndContextPair(element, next, _) =
-                element.resolve_and_apply(context, dialect)?;
+            let AstAndContextPair(element, next) = element.resolve_and_apply(context, dialect)?;
             context = next;
             elements.push(element);
         }

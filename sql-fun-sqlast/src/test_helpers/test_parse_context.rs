@@ -36,6 +36,7 @@ pub struct TestParseContext {
     drop_tables: Vec<DropTable>,
     create_indexes: Vec<CreateIndex>,
     problems: Vec<AnalysisProblem>,
+    parameter_constraints: crate::sem::ParameterConstraints,
     report_failure_after: Option<usize>,
     source: Option<SourcePathWithSpan>,
     table_ref_types: Vec<TableName>,
@@ -381,8 +382,17 @@ impl FunctionInfoWrite for TestParseContext {
 }
 
 impl ParseContext for TestParseContext {
+    fn parameter_constraints(&self) -> &crate::sem::ParameterConstraints {
+        &self.parameter_constraints
+    }
+
+    fn set_parameter_constraints(&mut self, constraints: &crate::sem::ParameterConstraints) {
+        self.parameter_constraints = constraints.clone();
+    }
+
     fn freeze(mut self) -> crate::sem::FrozenBaseContext {
         self.problems.clear();
+        self.parameter_constraints = crate::sem::ParameterConstraints::default();
         self.report_failure_after = None;
         crate::sem::FrozenBaseContext::new(self)
     }

@@ -6,6 +6,7 @@ use super::realize_cte_catalog;
 use ::sql_fun_sqlast::{
     ParseStatementError, PlaceholderedSqlRenderError,
     ast::{AstMutationError, Dialect},
+    sem::ParseContext,
 };
 
 #[rstest::rstest]
@@ -254,7 +255,7 @@ fn realized_query_analysis_ignores_parameter_hints(
         .statement()
         .analyze(project.analysis_context("products"))
         .unwrap();
-    let inputs = analyzed.parameter_constraints();
+    let inputs = analyzed.context().parameter_constraints();
     assert_eq!(
         inputs
             .iter()

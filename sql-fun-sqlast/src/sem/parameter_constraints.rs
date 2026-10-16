@@ -1,6 +1,6 @@
 //! SQL-derived parameter domains and correlated overload alternatives.
 
-use crate::sem::{AnalysisError, TypeReference};
+use crate::sem::{ParameterConstraintProblem, TypeReference};
 use std::collections::BTreeMap;
 
 /// Admissible SQL types. An unconstrained domain is `any`, not inference failure.
@@ -116,14 +116,6 @@ pub struct ParameterConstraints {
 }
 
 impl ParameterConstraints {
-    pub(crate) const fn empty() -> Self {
-        Self {
-            parameters: Vec::new(),
-            outputs: Vec::new(),
-            graph: ConstraintGraph::empty(),
-        }
-    }
-
     pub(crate) fn set_outputs(&mut self, outputs: &[InputTypeConstraint]) {
         self.outputs = outputs.to_vec();
     }
@@ -235,16 +227,6 @@ pub(crate) struct ConstraintGraph {
 }
 
 impl ConstraintGraph {
-    const fn empty() -> Self {
-        Self {
-            domains: Vec::new(),
-            parameters: BTreeMap::new(),
-            overloads: Vec::new(),
-            equalities: Vec::new(),
-            requirements: Vec::new(),
-        }
-    }
-
     fn parameter_constraints(&self) -> Vec<ParameterConstraint> {
         self.parameters
             .iter()
@@ -273,18 +255,13 @@ impl ConstraintGraph {
         node
     }
 
-    pub(crate) fn parameter(&mut self, position: u32) -> Result<usize, AnalysisError> {
-        if position == 0 {
-            return Err(AnalysisError::parameter_constraint(
-                "parameter positions start at one",
-            ));
-        }
+    pub(crate) fn parameter(&mut self, position: u32) -> usize {
         if let Some(node) = self.parameters.get(&position) {
-            return Ok(*node);
+            return *node;
         }
         let node = self.node(&InputTypeConstraint::any());
         self.parameters.insert(position, node);
-        Ok(node)
+        node
     }
 
     pub(crate) fn domain(&self, node: usize) -> &InputTypeConstraint {
@@ -337,6 +314,9 @@ impl ConstraintGraph {
     }
 
     fn satisfiable(&mut self) -> bool {
+        if self.parameters.contains_key(&0) {
+            return false;
+        }
         if !self.propagate() {
             return false;
         }
@@ -360,9 +340,14 @@ impl ConstraintGraph {
         false
     }
 
-    pub(crate) fn solve(&mut self) -> Result<(), AnalysisError> {
+    pub(crate) fn solve(&mut self) -> Result<(), ParameterConstraintProblem> {
+        if self.parameters.contains_key(&0) {
+            return Err(ParameterConstraintProblem::new(
+                "parameter positions start at one",
+            ));
+        }
         if !self.satisfiable() {
-            return Err(self.error());
+            return Err(self.conflict());
         }
         // Remove globally impossible alternatives, not just locally inconsistent
         // ones. Retained alternatives stay correlated in the public result.
@@ -378,7 +363,7 @@ impl ConstraintGraph {
             self.overloads[index].alternatives = retained;
         }
         if !self.propagate() {
-            return Err(self.error());
+            return Err(self.conflict());
         }
         for node in 0..self.domains.len() {
             let Some(types) = self.domains[node].admissible_types().map(<[_]>::to_vec) else {
@@ -397,7 +382,7 @@ impl ConstraintGraph {
         Ok(())
     }
 
-    fn error(&self) -> AnalysisError {
+    fn conflict(&self) -> ParameterConstraintProblem {
         let positions: Vec<_> = self
             .parameters
             .keys()
@@ -408,7 +393,7 @@ impl ConstraintGraph {
             .iter()
             .map(|overload| overload.context.as_str())
             .collect();
-        AnalysisError::parameter_constraint(&format!(
+        ParameterConstraintProblem::new(&format!(
             "incompatible constraints for {} in {}; required types: {}",
             positions.join(", "),
             contexts.join(", "),
@@ -424,12 +409,26 @@ mod test_constraints {
     use std::collections::BTreeMap;
 
     #[test]
+    fn zero_position_is_a_recoverable_constraint_problem() {
+        let mut graph = ConstraintGraph::default();
+        graph.parameter(0);
+        assert!(
+            graph
+                .solve()
+                .unwrap_err()
+                .message()
+                .contains("positions start at one")
+        );
+        assert!(!ParameterConstraints::from_graph(&graph).allows(&BTreeMap::new()));
+    }
+
+    #[test]
     fn overload_alternatives_remain_correlated() {
         let int = InputTypeConstraint::exact(&PgBuiltInType::int4());
         let text = InputTypeConstraint::exact(&PgBuiltInType::text());
         let mut graph = ConstraintGraph::default();
-        let left = graph.parameter(1).unwrap();
-        let right = graph.parameter(2).unwrap();
+        let left = graph.parameter(1);
+        let right = graph.parameter(2);
         graph.overload(
             &[left, right],
             &[
@@ -459,7 +458,7 @@ mod test_constraints {
         let int = InputTypeConstraint::exact(&PgBuiltInType::int4());
         let text = InputTypeConstraint::exact(&PgBuiltInType::text());
         let mut graph = ConstraintGraph::default();
-        let input = graph.parameter(1).unwrap();
+        let input = graph.parameter(1);
         graph.overload(
             &[input, input],
             &[SignatureAlternative::new(&[int, text])],
@@ -473,9 +472,9 @@ mod test_constraints {
         let int = InputTypeConstraint::exact(&PgBuiltInType::int4());
         let text = InputTypeConstraint::exact(&PgBuiltInType::text());
         let mut graph = ConstraintGraph::default();
-        let first = graph.parameter(1).unwrap();
-        let second = graph.parameter(2).unwrap();
-        let third = graph.parameter(3).unwrap();
+        let first = graph.parameter(1);
+        let second = graph.parameter(2);
+        let third = graph.parameter(3);
         let alternatives = [
             SignatureAlternative::new(&[int.clone(), text.clone()]),
             SignatureAlternative::new(&[text, int]),

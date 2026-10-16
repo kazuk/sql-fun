@@ -2,7 +2,8 @@
 use crate::ast::Expr;
 use crate::sem::{
     AnalysisError, Catalog, ConstrainedExpr, ConstraintGraph, InputTypeConstraint,
-    ParameterConstraints, SemScalarExpr, SignatureAlternative, TypeReference,
+    ParameterConstraintProblem, ParameterConstraints, SemScalarExpr, SignatureAlternative,
+    TypeReference,
 };
 use std::collections::{BTreeMap, HashMap};
 
@@ -165,7 +166,7 @@ impl ParameterResolution {
             .is_some_and(|node| self.graph.domain(node).is_any())
     }
 
-    pub(crate) fn solve(&mut self) -> Result<bool, AnalysisError> {
+    pub(crate) fn solve(&mut self) -> Result<bool, ParameterConstraintProblem> {
         if !self.graph.has_parameters() {
             return Ok(false);
         }
@@ -198,13 +199,9 @@ impl ParameterResolution {
         }
     }
 
-    pub(crate) fn parameter(&mut self, position: u32) -> Result<SemScalarExpr, AnalysisError> {
-        let node = self.graph.parameter(position)?;
-        Ok(SemScalarExpr::parameter(
-            position,
-            node,
-            self.graph.domain(node),
-        ))
+    pub(crate) fn parameter(&mut self, position: u32) -> SemScalarExpr {
+        let node = self.graph.parameter(position);
+        SemScalarExpr::parameter(position, node, self.graph.domain(node))
     }
 
     fn input(&mut self, value: &SemScalarExpr) -> usize {

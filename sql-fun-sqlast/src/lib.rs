@@ -48,7 +48,7 @@ pub use self::{
 pub use sql_fun_core::{SqlFunArgs, SqlFunArgsBuilder, SqlFunArgsError};
 
 /// Semantic AST and parse context result
-pub struct AstAndContextPair<TParseContext>(SemAst, TParseContext, sem::ParameterConstraints)
+pub struct AstAndContextPair<TParseContext>(SemAst, TParseContext)
 where
     TParseContext: ParseContext;
 
@@ -58,21 +58,7 @@ where
 {
     /// create instance
     pub const fn new(ast: SemAst, context: TParseContext) -> Self {
-        Self(ast, context, sem::ParameterConstraints::empty())
-    }
-
-    pub(crate) fn with_parameters(
-        ast: SemAst,
-        context: TParseContext,
-        parameters: &sem::ParameterConstraints,
-    ) -> Self {
-        Self(ast, context, parameters.clone())
-    }
-
-    /// SQL-derived numbered input constraints, independent of metadata type hints.
-    /// `any` and admissible type ranges can be passed to later code-generation stages.
-    pub const fn parameter_constraints(&self) -> &sem::ParameterConstraints {
-        &self.2
+        Self(ast, context)
     }
 
     /// Analyzed statement produced by the selected parse context.
@@ -163,7 +149,7 @@ impl PostgresDialect {
             context.set_statement_span(StringSpan::from_str_in_str(&sql_statements, statement));
             let syn = Self::parse(statement)?;
             let tokens = Self::scan(statement)?;
-            let AstAndContextPair(sem, rcontext, _) =
+            let AstAndContextPair(sem, rcontext) =
                 SemAst::semantic_analysis(context, syn, &tokens)?;
             sem_results.push(sem);
             context = rcontext;

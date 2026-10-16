@@ -108,7 +108,7 @@ impl Expr {
         scope: &ScalarAnalysisContext<'_>,
     ) -> Result<SemScalarExpr, AnalysisError> {
         match self {
-            Self::Parameter(parameter) => context.parameters().parameter(parameter.position),
+            Self::Parameter(parameter) => Ok(context.parameters().parameter(parameter.position)),
             Self::Literal(value) => Ok(value.resolve()),
             Self::Column(name) => name.resolve_column(context, scope),
             // The legacy column adapter discarded the star component. Preserve
@@ -416,15 +416,19 @@ impl Cast {
         let argument = self.argument.resolve_in(context, dialect, scope)?;
         if argument.constraint_node().is_some() {
             let target = if dialect == Dialect::postgres() {
-                context.canonicalize_type_ref(&target).ok_or_else(|| {
-                    AnalysisError::parameter_constraint(&format!("cast target {target} not found"))
-                })?
+                let Some(canonical) = context.canonicalize_type_ref(&target) else {
+                    return context.unresolved_parameter_operation(
+                        &format!("cast target {target} not found"),
+                        "CAST",
+                        &[argument],
+                        &crate::sem::InputTypeConstraint::exact(&target),
+                    );
+                };
+                context.parameter_require(&argument, &canonical, true);
+                canonical
             } else {
                 target
             };
-            if dialect == Dialect::postgres() {
-                context.parameter_require(&argument, &target, true);
-            }
             return Ok(context.parameters().operation(
                 "CAST",
                 &[argument],
@@ -507,9 +511,12 @@ impl Call {
         {
             let name = self.name.full_name()?;
             let Some(overloads) = context.get_function_by_name(&name) else {
-                return Err(AnalysisError::parameter_constraint(&format!(
-                    "function {name} not found"
-                )));
+                return context.unresolved_parameter_operation(
+                    &format!("function {name} not found"),
+                    &name.to_string(),
+                    &arguments,
+                    &crate::sem::InputTypeConstraint::any(),
+                );
             };
             let signatures = context.parameter_function_signatures(&overloads, &arguments);
             return context.parameter_call(&name.to_string(), &arguments, &signatures);
@@ -651,13 +658,16 @@ impl OperatorKind {
             todo!("parameter constraints for this operator form");
         }
         let name = name.operator_name()?;
+        let arguments: Vec<_> = left.into_iter().chain(right).cloned().collect();
         let Some(operator) = context.get_operator_op(&name, left.is_some(), right.is_some()) else {
-            return Err(AnalysisError::parameter_constraint(&format!(
-                "operator {name:?} not found"
-            )));
+            return context.unresolved_parameter_operation(
+                &format!("operator {name:?} not found"),
+                &format!("{name:?}"),
+                &arguments,
+                &crate::sem::InputTypeConstraint::any(),
+            );
         };
         let signatures = operator.parameter_signatures();
-        let arguments: Vec<_> = left.into_iter().chain(right).cloned().collect();
         context.parameter_call(&format!("{name:?}"), &arguments, &signatures)
     }
 }

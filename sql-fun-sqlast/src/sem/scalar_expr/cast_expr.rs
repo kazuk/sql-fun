@@ -79,3 +79,54 @@ impl TypeCastExpr {
         Ok((result.report(&mut context)?, context))
     }
 }
+
+impl TypeCastExpr {
+    pub(crate) fn walk<V: crate::sem::traversal::SemanticVisitor>(
+        &mut self,
+        visitor: &mut V,
+    ) -> Result<(), crate::sem::AnalysisError> {
+        self.arg.walk(visitor)?;
+        Ok(())
+    }
+}
+
+impl ImplicitCastExpr {
+    pub(crate) fn walk<V: crate::sem::traversal::SemanticVisitor>(
+        &mut self,
+        visitor: &mut V,
+    ) -> Result<(), crate::sem::AnalysisError> {
+        self.value.walk(visitor)?;
+        Ok(())
+    }
+}
+
+impl TypeCastExpr {
+    pub(crate) fn collect_constraints(
+        &mut self,
+        parameters: &mut crate::sem::parameter_resolution::ParameterResolution,
+        context: &mut crate::sem::Resolution<'_>,
+        dialect: crate::ast::Dialect,
+    ) -> Result<Option<SemScalarExpr>, crate::sem::AnalysisError> {
+        if self.arg.constraint_node().is_none() {
+            return Ok(None);
+        }
+        let target = if dialect == crate::ast::Dialect::postgres() {
+            if let Some(target) =
+                crate::sem::Catalog::canonicalize_type_ref(context, &self.target_type)
+            {
+                parameters.require(context, &self.arg, &target, true);
+                target
+            } else {
+                self.target_type.clone()
+            }
+        } else {
+            self.target_type.clone()
+        };
+        Ok(Some(parameters.operation(
+            "CAST",
+            std::slice::from_ref(&self.arg),
+            &crate::sem::InputTypeConstraint::exact(&target),
+            None,
+        )))
+    }
+}

@@ -49,3 +49,13 @@ impl ViewDataSource {
         }
     }
 }
+
+impl ViewDataSource {
+    pub(crate) fn walk<V: crate::sem::traversal::SemanticVisitor>(
+        &mut self,
+        visitor: &mut V,
+    ) -> Result<(), crate::sem::AnalysisError> {
+        visitor.relation(None, self.alias.name().as_str(), &[]);
+        Ok(())
+    }
+}

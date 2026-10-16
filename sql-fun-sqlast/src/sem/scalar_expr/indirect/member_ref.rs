@@ -88,3 +88,19 @@ impl MemberRef {
         ))))
     }
 }
+
+impl MemberRef {
+    pub(crate) fn walk<V: crate::sem::traversal::SemanticVisitor>(
+        &mut self,
+        visitor: &mut V,
+    ) -> Result<(), crate::sem::AnalysisError> {
+        self.base.walk(visitor)?;
+        Ok(())
+    }
+}
+
+impl MemberRef {
+    pub(crate) fn requires_type_inference(&self) -> bool {
+        self.base.needs_type_inference()
+    }
+}

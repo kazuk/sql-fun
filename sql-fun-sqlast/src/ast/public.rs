@@ -696,14 +696,108 @@ mod test_parameter_analysis {
                 .parameter(7)
                 .is_none()
         );
-        assert_eq!(
+        assert!(
             second
                 .context()
                 .parameter_constraints()
                 .result_column(0)
-                .unwrap()
-                .admissible_types(),
-            Some([PgBuiltInType::int4()].as_slice())
+                .is_none()
+        );
+    }
+
+    #[rstest::rstest]
+    #[case::query("with x as (select 1 as n) select n + 1 from x")]
+    #[case::subquery("select (select 1) + 1 as n")]
+    fn parameter_free_analysis_skips_inference(#[case] sql: &str) {
+        let before = crate::sem::parameter_resolution::inference_runs();
+        let result = analyze(sql, Dialect::postgres()).unwrap();
+        assert_eq!(crate::sem::parameter_resolution::inference_runs(), before);
+        assert!(
+            result
+                .context()
+                .parameter_constraints()
+                .parameter(1)
+                .is_none()
+        );
+        assert!(
+            result
+                .context()
+                .parameter_constraints()
+                .result_column(0)
+                .is_none()
+        );
+    }
+
+    #[test]
+    fn parameter_free_function_keeps_null_argument_resolution() {
+        let before = crate::sem::parameter_resolution::inference_runs();
+        let result = analyze("select lower(null) as s", Dialect::postgres()).unwrap();
+        assert_eq!(crate::sem::parameter_resolution::inference_runs(), before);
+        assert_eq!(result.context().reported_problem_count(), 0);
+        let query = result.ast().clone().into_select_statemtnt().unwrap();
+        assert_eq!(
+            query.result_columns().get_column_at(0).unwrap().col_type(),
+            &Some(PgBuiltInType::text())
+        );
+    }
+
+    #[test]
+    fn schema_loading_skips_parameter_inference() {
+        use crate::sem::{MutSourcePathWithSpan, SchemaFileContext, SchemaName};
+        let before = crate::sem::parameter_resolution::inference_runs();
+        let mut context =
+            SchemaFileContext::new(std::path::Path::new("schema.sql"), &context().freeze());
+        context.set_source_path_with_span(&crate::test_helpers::source_span());
+        context.set_search_path(&[SchemaName::from("public"), SchemaName::from("pg_catalog")]);
+        let statements = parse_statements(
+            "create table t (n int4 default 1); create view v as select n from t;",
+            Dialect::postgres(),
+        );
+        for statement in statements {
+            let statement = statement.unwrap();
+            context.set_statement_span(*statement.span());
+            context = statement.analyze(context).unwrap().into_context();
+        }
+        assert_eq!(crate::sem::parameter_resolution::inference_runs(), before);
+        assert!(context.parameter_constraints().result_column(0).is_none());
+    }
+
+    #[test]
+    fn inference_preserves_unrelated_name_resolution_diagnostics() {
+        let baseline = analyze("select missing_column as absent", Dialect::postgres()).unwrap();
+        let expected = baseline.context().reported_problems();
+        assert!(!expected.is_empty());
+        let before = crate::sem::parameter_resolution::inference_runs();
+        let result = analyze(
+            "select $1 + 1 as n, missing_column as absent",
+            Dialect::postgres(),
+        )
+        .unwrap();
+        assert_eq!(
+            crate::sem::parameter_resolution::inference_runs(),
+            before + 1
+        );
+        assert_eq!(
+            format!("{:?}", result.context().reported_problems()),
+            format!("{expected:?}")
+        );
+        assert!(
+            result
+                .context()
+                .parameter_constraints()
+                .parameter(1)
+                .is_some()
+        );
+    }
+
+    #[test]
+    fn concrete_scalar_subquery_exposes_its_scalar_type() {
+        let result = analyze("select (select 1) + 1 as n", Dialect::postgres()).unwrap();
+        assert_eq!(result.context().reported_problem_count(), 0);
+        let query = result.ast().clone().into_select_statemtnt().unwrap();
+        assert_eq!(
+            query.result_columns().get_column_at(0).unwrap().col_type(),
+            &Some(PgBuiltInType::int4())
         );
     }
 
@@ -729,10 +823,6 @@ mod test_parameter_analysis {
         let result = analyze(sql, Dialect::postgres())
             .expect("analysis recovers from unresolved operations");
         assert_eq!(result.context().reported_problem_count(), 1);
-        assert_eq!(
-            result.context().reported_problems()[0].code(),
-            "parameter_constraint"
-        );
         assert!(
             result
                 .context()

@@ -187,7 +187,7 @@ impl FunctionOverloadCollection {
         &self,
         catalog: &impl crate::sem::Catalog,
         arguments: &[crate::sem::SemScalarExpr],
-    ) -> Vec<crate::ast::Signature> {
+    ) -> Vec<crate::sem::parameter_resolution::Signature> {
         let arguments = ArgumentBindingCollection::from_expr_list(arguments);
         let mut signatures = Vec::new();
         for overload in &self.overloads {
@@ -215,8 +215,8 @@ impl OverloadVariant {
     fn parameter_signature(
         &self,
         bindings: &[ParameterBindResult],
-    ) -> Option<crate::ast::Signature> {
+    ) -> Option<crate::sem::parameter_resolution::Signature> {
         let inputs = ParameterBindResult::constraint_inputs(bindings)?;
-        crate::ast::Signature::new_concrete(&inputs, self.ret_type.as_ref()?)
+        crate::sem::parameter_resolution::Signature::new_concrete(&inputs, self.ret_type.as_ref()?)
     }
 }

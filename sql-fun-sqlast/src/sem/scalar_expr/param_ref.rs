@@ -39,3 +39,9 @@ impl SemScalarExprNode for ParamRef {
         None
     }
 }
+
+impl ParamRef {
+    pub(crate) fn apply_constraints(&mut self, constraints: &crate::sem::ParameterConstraints) {
+        self.constraint = constraints.node_domain(self.node).clone();
+    }
+}

@@ -273,20 +273,20 @@ impl SemScalarExpr {
             Self::Const(_scalar_const_expr) => String::new(),
             Self::ColumnRef(cr) => cr.get_column_name().to_string(),
             Self::FuncCall(_func_call_expr) => String::new(),
-            Self::Arith(_arith_expr) => todo!(),
+            Self::Arith(_arith_expr) => String::new(),
             Self::TypeCast(_type_cast_expr) => String::new(),
-            Self::Case(_case_expr) => todo!(),
+            Self::Case(_case_expr) => String::new(),
             Self::Boolean(_boolean_expr) => String::new(),
-            Self::NullTest(_null_test_expr) => todo!(),
-            Self::SubLink(_sub_link_expr) => todo!(),
-            Self::Coalesce(_coalesce_expr) => todo!(),
+            Self::NullTest(_null_test_expr) => String::new(),
+            Self::SubLink(_sub_link_expr) => String::new(),
+            Self::Coalesce(_coalesce_expr) => String::new(),
             Self::MinMax(_min_max_expr) => todo!(),
             Self::Collate(_collate_expr) => todo!(),
             Self::SqlValue(_sql_value_expr) => todo!(),
             Self::Param(_) => String::new(),
             Self::Constrained(value) => value.name().to_owned(),
             Self::NamedArg(_named_arg_expr) => todo!(),
-            Self::Indirection(_indirection_expr) => todo!(),
+            Self::Indirection(_indirection_expr) => String::new(),
             Self::ImplicitCast(_implicit_cast_expr) => todo!(),
             Self::Array(_arr) => todo!(),
             Self::Unexpected(_node) => todo!(),
@@ -566,5 +566,121 @@ mod test_fits_array_index {
         expr.fits_array_index(&mut context)
             .expect("array index check");
         assert_eq!(context.reported_problem_count(), 0);
+    }
+}
+
+impl ListExpr {
+    pub(crate) fn walk<V: crate::sem::traversal::SemanticVisitor>(
+        &mut self,
+        visitor: &mut V,
+    ) -> Result<(), crate::sem::AnalysisError> {
+        for expression in &mut self.0 {
+            expression.walk(visitor)?;
+        }
+        Ok(())
+    }
+}
+
+impl SemScalarExpr {
+    pub(crate) fn walk<V: crate::sem::traversal::SemanticVisitor>(
+        &mut self,
+        visitor: &mut V,
+    ) -> Result<(), crate::sem::AnalysisError> {
+        crate::sem::with_stack(|| self.walk_body(visitor))?;
+        Ok(())
+    }
+}
+
+impl SemScalarExpr {
+    fn walk_body<V: crate::sem::traversal::SemanticVisitor>(
+        &mut self,
+        visitor: &mut V,
+    ) -> Result<(), AnalysisError> {
+        match self {
+            Self::Array(v) => v.walk(visitor)?,
+            Self::FuncCall(v) => v.walk(visitor)?,
+            Self::Arith(v) => v.walk(visitor)?,
+            Self::TypeCast(v) => v.walk(visitor)?,
+            Self::Case(v) => v.walk(visitor)?,
+            Self::Boolean(v) => v.walk(visitor)?,
+            Self::NullTest(v) => v.walk(visitor)?,
+            Self::SubLink(v) => v.walk(visitor)?,
+            Self::Coalesce(v) => v.walk(visitor)?,
+            Self::Constrained(v) => v.walk(visitor)?,
+            Self::Indirection(v) => v.walk(visitor)?,
+            Self::ImplicitCast(v) => v.walk(visitor)?,
+            Self::List(v) => v.walk(visitor)?,
+            Self::Const(_)
+            | Self::ColumnRef(_)
+            | Self::MinMax(_)
+            | Self::Collate(_)
+            | Self::SqlValue(_)
+            | Self::Param(_)
+            | Self::NamedArg(_)
+            | Self::Unexpected(_) => {}
+        }
+        visitor.expression(self)
+    }
+}
+
+impl SemScalarExpr {
+    pub(crate) fn needs_type_inference(&self) -> bool {
+        self.constraint_node().is_some() && self.get_type().is_none()
+    }
+    pub(crate) const fn is_unconstrained_parameter(&self) -> bool {
+        match self {
+            Self::Param(value) => value.constraint().is_any(),
+            _ => false,
+        }
+    }
+    pub(crate) fn apply_constraints(&mut self, constraints: &crate::sem::ParameterConstraints) {
+        match self {
+            Self::Param(value) => value.apply_constraints(constraints),
+            Self::Constrained(value) => value.apply_constraints(constraints),
+            _ => {}
+        }
+    }
+    pub(crate) fn collect_constraints(
+        &mut self,
+        parameters: &mut crate::sem::parameter_resolution::ParameterResolution,
+        context: &mut crate::sem::Resolution<'_>,
+        dialect: crate::ast::Dialect,
+    ) -> Result<(), AnalysisError> {
+        let replacement = match self {
+            Self::Param(value) => Some(parameters.parameter(value.position())),
+            Self::ColumnRef(_) => parameters.column(self),
+            Self::Arith(value) => value.collect_constraints(parameters, context, dialect)?,
+            Self::FuncCall(value) => value.collect_constraints(parameters, context)?,
+            Self::TypeCast(value) => value.collect_constraints(parameters, context, dialect)?,
+            Self::Boolean(value) => value.collect_constraints(parameters, context, dialect),
+            Self::NullTest(value) => value.collect_constraints(parameters),
+            Self::SubLink(_) => parameters.scalar_result(self),
+            Self::Case(value) => {
+                value.collect_constraints(parameters);
+                None
+            }
+            Self::Coalesce(value) => {
+                value.collect_constraints(parameters);
+                None
+            }
+            Self::Indirection(value) => {
+                value.collect_constraints(parameters);
+                None
+            }
+            _ => None,
+        };
+        if let Some(replacement) = replacement {
+            *self = replacement;
+        }
+        Ok(())
+    }
+}
+
+impl SemScalarExpr {
+    pub(crate) fn requires_argument_type(&self) -> bool {
+        self.get_type().is_none() && !self.as_const().is_some_and(ScalarConstExpr::is_null)
+    }
+    pub(crate) const fn arithmetic(value: ArithExpr) -> Self {
+        Self::Arith(value)
     }
 }

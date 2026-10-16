@@ -134,3 +134,45 @@ impl CoalesceAnalysis {
         ))
     }
 }
+
+impl CoalesceExpr {
+    pub(crate) fn walk<V: crate::sem::traversal::SemanticVisitor>(
+        &mut self,
+        visitor: &mut V,
+    ) -> Result<(), crate::sem::AnalysisError> {
+        for value in &mut self.arg_exprs {
+            value.walk(visitor)?;
+        }
+        Ok(())
+    }
+}
+
+impl CoalesceExpr {
+    pub(crate) fn collect_constraints(
+        &self,
+        parameters: &mut crate::sem::parameter_resolution::ParameterResolution,
+    ) {
+        if self
+            .arg_exprs
+            .iter()
+            .any(|value| value.needs_type_inference())
+        {
+            parameters.unify_coalesce_types(self);
+        }
+    }
+}
+
+impl CoalesceExpr {
+    pub(crate) fn defer_untyped(arguments: &[SemScalarExpr]) -> Option<SemScalarExpr> {
+        if arguments
+            .iter()
+            .all(|argument| argument.get_type().is_some())
+        {
+            return None;
+        }
+        Some(SemScalarExpr::coalesce(&Self {
+            arg_exprs: arguments.to_vec(),
+            coalesce_type: None,
+        }))
+    }
+}

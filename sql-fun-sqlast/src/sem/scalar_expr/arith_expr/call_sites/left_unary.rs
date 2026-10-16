@@ -85,3 +85,24 @@ mod test_left_unary_call_site {
         Ok(())
     }
 }
+
+impl LeftUnaryCallSite {
+    pub(crate) fn walk<V: crate::sem::traversal::SemanticVisitor>(
+        &mut self,
+        visitor: &mut V,
+    ) -> Result<(), crate::sem::AnalysisError> {
+        self.arg.walk(visitor)?;
+        Ok(())
+    }
+}
+
+impl LeftUnaryCallSite {
+    pub(crate) fn collect_constraints(
+        &self,
+        parameters: &mut crate::sem::parameter_resolution::ParameterResolution,
+        context: &mut crate::sem::Resolution<'_>,
+        dialect: crate::ast::Dialect,
+    ) -> Result<Option<SemScalarExpr>, AnalysisError> {
+        parameters.operator(context, dialect, &self.operator_name, Some(&self.arg), None)
+    }
+}

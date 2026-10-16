@@ -148,3 +148,29 @@ impl WithClause {
         Ok((result.report(&mut context)?, context))
     }
 }
+
+impl CteStatement {
+    pub(crate) fn walk<V: crate::sem::traversal::SemanticVisitor>(
+        &mut self,
+        visitor: &mut V,
+    ) -> Result<(), crate::sem::AnalysisError> {
+        match self {
+            Self::Select(query) => query.walk(visitor)?,
+            Self::Insert(_) | Self::Update(_) | Self::Delete(_) => {}
+        }
+        Ok(())
+    }
+}
+
+impl WithClause {
+    pub(crate) fn walk<V: crate::sem::traversal::SemanticVisitor>(
+        &mut self,
+        visitor: &mut V,
+    ) -> Result<(), crate::sem::AnalysisError> {
+        for (name, query) in &mut self.0 {
+            query.walk(visitor)?;
+            visitor.cte(name);
+        }
+        Ok(())
+    }
+}

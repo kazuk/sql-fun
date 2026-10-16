@@ -120,3 +120,18 @@ impl JoinExprDataSource {
         }
     }
 }
+
+impl JoinExprDataSource {
+    pub(crate) fn walk<V: crate::sem::traversal::SemanticVisitor>(
+        &mut self,
+        visitor: &mut V,
+    ) -> Result<(), crate::sem::AnalysisError> {
+        self.left.walk(visitor)?;
+        self.right.walk(visitor)?;
+        crate::sem::traversal::optional(&mut self.qualifications, visitor)?;
+        if let Some(value) = &self.qualifications {
+            visitor.predicate(value);
+        }
+        Ok(())
+    }
+}

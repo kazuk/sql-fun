@@ -693,3 +693,84 @@ impl CaseExprAnalysisContext {
         }
     }
 }
+
+impl CaseExpr {
+    pub(crate) fn walk<V: crate::sem::traversal::SemanticVisitor>(
+        &mut self,
+        visitor: &mut V,
+    ) -> Result<(), crate::sem::AnalysisError> {
+        crate::sem::traversal::optional(&mut self.arg_expr, visitor)?;
+        for arm in &mut self.when_exprs {
+            arm.walk(visitor)?;
+        }
+        crate::sem::traversal::optional(&mut self.default_expr, visitor)?;
+        Ok(())
+    }
+}
+
+impl CaseWhen {
+    pub(crate) fn walk<V: crate::sem::traversal::SemanticVisitor>(
+        &mut self,
+        visitor: &mut V,
+    ) -> Result<(), crate::sem::AnalysisError> {
+        self.when_value.walk(visitor)?;
+        self.result.walk(visitor)?;
+        Ok(())
+    }
+}
+
+impl CaseWhen {
+    fn needs_inference(&self) -> bool {
+        self.when_value.needs_type_inference() || self.result.needs_type_inference()
+    }
+}
+impl CaseExpr {
+    pub(crate) fn collect_constraints(
+        &self,
+        parameters: &mut crate::sem::parameter_resolution::ParameterResolution,
+    ) {
+        if self
+            .arg_expr
+            .as_ref()
+            .as_ref()
+            .is_some_and(|value| value.needs_type_inference())
+            || self
+                .default_expr
+                .as_ref()
+                .as_ref()
+                .is_some_and(|value| value.needs_type_inference())
+            || self.when_exprs.iter().any(CaseWhen::needs_inference)
+        {
+            parameters.unify_case_types(self);
+        }
+    }
+}
+
+impl CaseExpr {
+    pub(crate) fn defer_untyped(
+        argument: &Option<SemScalarExpr>,
+        arms: &[(SemScalarExpr, SemScalarExpr)],
+        otherwise: &Option<SemScalarExpr>,
+    ) -> Option<SemScalarExpr> {
+        let unknown = |value: &SemScalarExpr| value.get_type().is_none();
+        if !argument.as_ref().is_some_and(unknown)
+            && !otherwise.as_ref().is_some_and(unknown)
+            && !arms
+                .iter()
+                .any(|(condition, result)| unknown(condition) || unknown(result))
+        {
+            return None;
+        }
+        let mut when_exprs = Vec::new();
+        for (condition, result) in arms {
+            when_exprs.push(CaseWhen::new(condition.clone(), result.clone()));
+        }
+        Some(SemScalarExpr::case(&Self::new(
+            Box::new(argument.clone()),
+            when_exprs,
+            Box::new(otherwise.clone()),
+            None,
+            None,
+        )))
+    }
+}

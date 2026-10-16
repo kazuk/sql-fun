@@ -84,3 +84,13 @@ impl GroupedDataSource {
         source.create_column_ref(context, with, alias, column, nullable || source_nullable)
     }
 }
+
+impl GroupedDataSource {
+    pub(crate) fn walk<V: crate::sem::traversal::SemanticVisitor>(
+        &mut self,
+        visitor: &mut V,
+    ) -> Result<(), crate::sem::AnalysisError> {
+        self.source.walk(visitor)?;
+        Ok(())
+    }
+}

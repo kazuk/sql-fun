@@ -141,3 +141,12 @@ impl AliasSpec {
         self.derived_column_names.len()
     }
 }
+
+impl AliasSpec {
+    pub(crate) fn inference_columns(&self) -> Vec<String> {
+        self.derived_column_names
+            .iter()
+            .map(|name| name.as_str().to_owned())
+            .collect()
+    }
+}

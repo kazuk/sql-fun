@@ -81,3 +81,20 @@ impl ArrayIndex {
         Ok((arg, context))
     }
 }
+
+impl ArrayIndex {
+    pub(crate) fn walk<V: crate::sem::traversal::SemanticVisitor>(
+        &mut self,
+        visitor: &mut V,
+    ) -> Result<(), crate::sem::AnalysisError> {
+        self.array.walk(visitor)?;
+        self.index.walk(visitor)?;
+        Ok(())
+    }
+}
+
+impl ArrayIndex {
+    pub(crate) fn requires_type_inference(&self) -> bool {
+        self.array.needs_type_inference() || self.index.needs_type_inference()
+    }
+}

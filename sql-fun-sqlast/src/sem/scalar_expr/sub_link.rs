@@ -19,10 +19,21 @@ impl SubLinkExpr {
 
 impl SemScalarExprNode for SubLinkExpr {
     fn get_type(&self) -> Option<TypeReference> {
-        Some(self.type_ref.clone())
+        self.subselect.result_columns().scalar_type()
     }
 
     fn is_not_null(&self) -> Option<bool> {
         Some(false)
+    }
+}
+
+impl SubLinkExpr {
+    pub(crate) fn walk<V: crate::sem::traversal::SemanticVisitor>(
+        &mut self,
+        visitor: &mut V,
+    ) -> Result<(), crate::sem::AnalysisError> {
+        self.subselect.walk(visitor)?;
+        self.type_ref = self.subselect.returning_composite_type()?;
+        Ok(())
     }
 }

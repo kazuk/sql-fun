@@ -17,7 +17,6 @@ mod mutation;
 mod postgres;
 mod public;
 mod resolve;
-pub(crate) use self::resolve::{ParameterResolution, Signature};
 #[cfg(feature = "sqlite")]
 mod sqlite;
 #[cfg(all(feature = "sqlite", feature = "workaround_turso_9791"))]

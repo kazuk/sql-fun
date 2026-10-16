@@ -115,3 +115,61 @@ impl UndefinedOperatorAnyCallSite {
         ))
     }
 }
+
+impl AnyBinaryCallSite {
+    pub(crate) fn walk<V: crate::sem::traversal::SemanticVisitor>(
+        &mut self,
+        visitor: &mut V,
+    ) -> Result<(), crate::sem::AnalysisError> {
+        self.left_arg.walk(visitor)?;
+        self.right_arg.walk(visitor)?;
+        Ok(())
+    }
+}
+
+impl UndefinedOperatorAnyCallSite {
+    pub(crate) fn walk<V: crate::sem::traversal::SemanticVisitor>(
+        &mut self,
+        visitor: &mut V,
+    ) -> Result<(), crate::sem::AnalysisError> {
+        self.larg.walk(visitor)?;
+        self.rarg.walk(visitor)?;
+        Ok(())
+    }
+}
+
+impl AnyBinaryCallSite {
+    pub(crate) fn collect_constraints(
+        &self,
+        parameters: &mut crate::sem::parameter_resolution::ParameterResolution,
+    ) {
+        if self.left_arg.constraint_node().is_some() || self.right_arg.constraint_node().is_some() {
+            parameters.special_operator("ANY", &[&self.left_arg, &self.right_arg]);
+        }
+    }
+}
+
+impl UndefinedOperatorAnyCallSite {
+    pub(crate) fn collect_constraints(
+        &self,
+        parameters: &mut crate::sem::parameter_resolution::ParameterResolution,
+    ) {
+        if self.larg.constraint_node().is_some() || self.rarg.constraint_node().is_some() {
+            parameters.special_operator("ANY", &[&self.larg, &self.rarg]);
+        }
+    }
+}
+
+impl UndefinedOperatorAnyCallSite {
+    pub(crate) fn from_inputs(
+        name: &OperatorName,
+        left: SemScalarExpr,
+        right: SemScalarExpr,
+    ) -> Self {
+        Self {
+            operator_name: name.clone(),
+            larg: left,
+            rarg: right,
+        }
+    }
+}

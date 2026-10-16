@@ -12,7 +12,7 @@ pub enum QueryNameResolution {
     /// Reference to a FROM source.
     SourceAlias(AliasName),
     /// An operator name found in the catalog (overload selection is separate).
-    SortOperator(OperatorName),
+    Operator(OperatorName),
     /// Reference to a function definition, independently of overload selection.
     Function(crate::sem::FullName),
     /// Reference to a catalog type.
@@ -42,7 +42,7 @@ impl QueryNameResolution {
         Self::SourceAlias(alias.clone())
     }
     pub(crate) fn operator(operator: &OperatorName) -> Self {
-        Self::SortOperator(operator.clone())
+        Self::Operator(operator.clone())
     }
     pub(crate) const fn not_found() -> Self {
         Self::NotFound
@@ -778,7 +778,7 @@ pub struct ResolvedOperator {
 }
 impl ResolvedOperator {
     pub(crate) fn resolve(
-        context: &impl crate::sem::Catalog,
+        context: &impl crate::sem::ResolutionContext,
         name: &OperatorName,
         left: bool,
         right: bool,
@@ -787,7 +787,13 @@ impl ResolvedOperator {
             Self {
                 name: name.clone(),
                 resolution: QueryNameResolution::operator(name),
-                signatures: operator.parameter_signatures(),
+                // Parameter-free schema expressions need the lookup outcome, not
+                // a copy of every overload's inference signature.
+                signatures: if context.parameter_inference_needed() {
+                    operator.parameter_signatures()
+                } else {
+                    Vec::new()
+                },
             }
         } else {
             Self {

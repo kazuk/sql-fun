@@ -95,6 +95,12 @@ use ::url::Url;
 
 ### Module file paths
 
+- Do not use the legacy `mod.rs` module layout. Use self-named module files
+  such as `foo.rs` instead of `foo/mod.rs`. This applies to production code,
+  tests, and test helper modules.
+- The workspace `clippy::mod_module_files` lint enforces this rule for source
+  modules, but exempts integration-test paths. Check test module layouts during
+  review as well.
 - Follow Rust's default module file resolution conventions. Place module files
   where a plain `mod name;` declaration resolves them without an explicit path.
 - Do not add `#[path = "name.rs"]` when Rust already resolves that file by

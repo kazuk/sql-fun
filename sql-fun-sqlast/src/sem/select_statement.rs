@@ -148,8 +148,10 @@ pub struct SelectStatementNode {
     with_clause: WithClause,
     from_clause: FromClause,
     where_clause: Option<SemScalarExpr>,
+    // Keep clause payloads indirect: SelectStatement also determines the size
+    // of every SemAst retained while loading a schema dump.
     #[serde(default)]
-    clauses: crate::sem::SelectClauses,
+    clauses: Box<crate::sem::SelectClauses>,
 }
 
 impl SelectStatementNode {
@@ -164,7 +166,7 @@ impl SelectStatementNode {
             with_clause: with_clause.clone(),
             from_clause: from_clause.clone(),
             where_clause: where_clause.clone(),
-            clauses: crate::sem::SelectClauses::default(),
+            clauses: Box::default(),
         }
     }
     /// enumerate result set columns
@@ -335,7 +337,7 @@ impl SelectStatementNode {
             with_clause: with_clause.clone(),
             from_clause,
             where_clause,
-            clauses,
+            clauses: Box::new(clauses),
         }
     }
 }
@@ -355,7 +357,7 @@ impl SelectStatement {
         }
     }
     /// SELECT-specific clauses, if this is a simple SELECT body.
-    pub const fn select_clauses(&self) -> Option<&crate::sem::SelectClauses> {
+    pub fn select_clauses(&self) -> Option<&crate::sem::SelectClauses> {
         match self {
             Self::Simple(node) => Some(&node.clauses),
             _ => None,

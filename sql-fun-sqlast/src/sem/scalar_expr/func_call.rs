@@ -242,9 +242,11 @@ impl FuncCallExpr {
         } else {
             crate::sem::QueryNameResolution::not_found()
         });
-        expression.set_function_candidates(
-            candidates.map(crate::sem::FunctionOverloadCollection::into_snapshot),
-        );
+        if context.parameter_inference_needed() {
+            expression.set_function_candidates(
+                candidates.map(crate::sem::FunctionOverloadCollection::into_snapshot),
+            );
+        }
         Ok(expression)
     }
     fn resolve_binding<TContext: crate::sem::resolution::ResolutionContext>(

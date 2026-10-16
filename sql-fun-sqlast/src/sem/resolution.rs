@@ -107,6 +107,11 @@ impl<T: BaseParseContext> Catalog for T {
 
 /// Mutation is limited to an analysis-local diagnostic sink.
 pub(crate) trait ResolutionContext: Catalog {
+    // Query/expression operands must be resolved before checking whether their
+    // function/operator candidates will be needed by parameter inference.
+    fn parameter_inference_needed(&self) -> bool {
+        false
+    }
     fn report_problem(&mut self, problem: AnalysisProblem) -> Result<(), AnalysisError>;
 }
 
@@ -331,6 +336,9 @@ impl Catalog for Resolution<'_> {
 }
 
 impl ResolutionContext for Resolution<'_> {
+    fn parameter_inference_needed(&self) -> bool {
+        self.has_parameters
+    }
     fn report_problem(&mut self, problem: AnalysisProblem) -> Result<(), AnalysisError> {
         self.problems.push(problem);
         Ok(())
@@ -402,6 +410,9 @@ impl Catalog for &mut Resolution<'_> {
 }
 
 impl ResolutionContext for &mut Resolution<'_> {
+    fn parameter_inference_needed(&self) -> bool {
+        self.has_parameters
+    }
     fn report_problem(&mut self, problem: AnalysisProblem) -> Result<(), AnalysisError> {
         self.problems.push(problem);
         Ok(())

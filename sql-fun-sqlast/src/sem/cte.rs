@@ -84,8 +84,8 @@ impl CteStatement {
         }
     }
 
-    pub(crate) fn from_query(query: &SelectStatement) -> Self {
-        Self::Select(Box::new(query.clone()))
+    pub(crate) fn from_query(query: SelectStatement) -> Self {
+        Self::Select(Box::new(query))
     }
 
     pub(crate) fn resolved_column(
@@ -123,6 +123,9 @@ impl std::hash::Hash for WithClause {
 }
 
 impl WithClause {
+    pub(crate) fn take(&mut self, name: &str) -> Option<CteStatement> {
+        self.0.remove(name)
+    }
     /// get CTE query by name
     #[must_use]
     pub fn get(&self, name: &CteName) -> Option<&CteStatement> {

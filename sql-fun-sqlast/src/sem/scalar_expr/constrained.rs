@@ -5,6 +5,12 @@ use crate::sem::{InputTypeConstraint, SemScalarExpr, TypeReference};
 #[derive(Clone, Debug, PartialEq, Eq, Hash, serde::Serialize, serde::Deserialize)]
 pub struct ConstrainedExpr {
     operation: String,
+    #[serde(default)]
+    operator_binding: Option<Box<crate::sem::ResolvedOperator>>,
+    #[serde(default)]
+    cast_binding: Option<crate::sem::QueryNameResolution>,
+    #[serde(default)]
+    semantic_call: Option<Box<crate::sem::scalar_expr::func_call::FunctionBinding>>,
     arguments: Vec<SemScalarExpr>,
     types: InputTypeConstraint,
     not_null: Option<bool>,
@@ -25,11 +31,35 @@ impl ConstrainedExpr {
         Self {
             node,
             operation: operation.to_owned(),
+            operator_binding: None,
+            cast_binding: None,
+            semantic_call: None,
             arguments: arguments.to_vec(),
             types: types.clone(),
             not_null,
             name: name.to_owned(),
         }
+    }
+    pub(crate) fn retain_semantic_call(&mut self, call: &crate::sem::FuncCallExpr) {
+        self.semantic_call = Some(Box::new(call.binding_snapshot()));
+    }
+    /// Original function binding and modifiers, when this represents a function.
+    pub fn function_binding(&self) -> Option<&crate::sem::scalar_expr::func_call::FunctionBinding> {
+        self.semantic_call.as_deref()
+    }
+    pub(crate) fn retain_cast_binding(&mut self, binding: &crate::sem::QueryNameResolution) {
+        self.cast_binding = Some(binding.clone());
+    }
+    /// Target-name resolution for a parameter-dependent cast.
+    pub const fn cast_binding(&self) -> Option<&crate::sem::QueryNameResolution> {
+        self.cast_binding.as_ref()
+    }
+    pub(crate) fn retain_operator_binding(&mut self, binding: &crate::sem::ResolvedOperator) {
+        self.operator_binding = Some(Box::new(binding.clone()));
+    }
+    /// Completed operator lookup for a parameter-dependent operator expression.
+    pub fn operator_binding(&self) -> Option<&crate::sem::ResolvedOperator> {
+        self.operator_binding.as_deref()
     }
     /// SQL operation represented by this expression.
     pub fn operation(&self) -> &str {
@@ -62,6 +92,9 @@ impl ConstrainedExpr {
         &mut self,
         visitor: &mut V,
     ) -> Result<(), crate::sem::AnalysisError> {
+        if let Some(call) = &mut self.semantic_call {
+            call.walk(visitor)?;
+        }
         for value in &mut self.arguments {
             value.walk(visitor)?;
         }

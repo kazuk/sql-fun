@@ -1,5 +1,6 @@
 mod cte_column_ref;
 mod invalid_column_ref;
+mod output_column_ref;
 mod subquery_column_ref;
 mod table_column_ref;
 mod table_func_col_ref;
@@ -10,6 +11,7 @@ pub use self::{
     invalid_column_ref::{
         UndefinedAliasColumnRef, UnknownSourceColumnRef, UnknownTableFuncColumnRef,
     },
+    output_column_ref::OutputColumnRef,
     subquery_column_ref::SubQueryColumnRef,
     table_column_ref::TableColumnRef,
     table_func_col_ref::TableFunctionColumnRef,
@@ -31,6 +33,8 @@ trait ColumnReference {
 /// Column reference
 #[derive(Debug, Clone, Eq, Hash, PartialEq, serde::Serialize, serde::Deserialize)]
 pub enum ColumnReferenceExpr {
+    /// Reference to a resolved projection position (alias or ordinal).
+    OutputColumn(OutputColumnRef),
     /// CTE column
     CteColumn(CteColumnRef),
     /// Table column
@@ -65,6 +69,15 @@ impl SemScalarExprNode for ColumnReferenceExpr {
 }
 
 impl ColumnReferenceExpr {
+    pub(crate) fn output_column(index: usize, definition: &ColumnDefinition) -> Self {
+        Self::OutputColumn(OutputColumnRef::new(index, definition))
+    }
+    pub(crate) const fn output_index(&self) -> Option<usize> {
+        match self {
+            Self::OutputColumn(value) => Some(value.index()),
+            _ => None,
+        }
+    }
     pub(super) fn constraint_binding(&self) -> Option<(&str, &ColumnName)> {
         match self {
             Self::CteColumn(value) => {
@@ -97,6 +110,7 @@ impl ColumnReferenceExpr {
     #[must_use]
     pub fn get_type(&self) -> Option<TypeReference> {
         match self {
+            Self::OutputColumn(r) => r.get_type(),
             Self::CteColumn(r) => r.get_type(),
             Self::TableColumn(r) => r.get_type(),
             Self::ViewColumn(r) => r.get_type(),
@@ -114,6 +128,7 @@ impl ColumnReferenceExpr {
     #[must_use]
     pub fn is_not_null(&self) -> Option<bool> {
         match self {
+            Self::OutputColumn(r) => r.is_not_null(),
             Self::CteColumn(r) => r.is_not_null(),
             Self::TableColumn(r) => r.is_not_null(),
             Self::ViewColumn(r) => r.is_not_null(),
@@ -131,6 +146,7 @@ impl ColumnReferenceExpr {
     #[must_use]
     pub fn get_column_def(&self) -> &Option<ColumnDefinition> {
         match self {
+            Self::OutputColumn(r) => r.get_column_def(),
             Self::CteColumn(r) => r.get_column_def(),
             Self::TableColumn(r) => r.get_column_def(),
             Self::ViewColumn(r) => r.get_column_def(),
@@ -148,6 +164,7 @@ impl ColumnReferenceExpr {
     #[must_use]
     pub fn get_column_name(&self) -> &ColumnName {
         match self {
+            Self::OutputColumn(r) => r.get_column_name(),
             Self::CteColumn(r) => r.get_column_name(),
             Self::TableColumn(r) => r.get_column_name(),
             Self::ViewColumn(r) => r.get_column_name(),

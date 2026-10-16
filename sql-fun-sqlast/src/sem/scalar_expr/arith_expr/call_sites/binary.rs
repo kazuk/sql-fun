@@ -9,6 +9,8 @@ use crate::{
 #[derive(Debug, Clone, Eq, Hash, PartialEq, serde::Serialize, serde::Deserialize)]
 pub struct BinaryOpCallSite {
     operator_name: OperatorName,
+    #[serde(default)]
+    binding: Option<Box<crate::sem::ResolvedOperator>>,
     left_arg: SemScalarExpr,
     left_arg_type: Option<TypeReference>,
     right_arg: SemScalarExpr,
@@ -55,6 +57,7 @@ impl BinaryOpCallSite {
     {
         let call_site = Self {
             operator_name: name.clone(),
+            binding: None,
             left_arg_type: lexpr.get_type().clone(),
             right_arg_type: rexpr.get_type().clone(),
             left_arg: lexpr,
@@ -104,6 +107,8 @@ mod test_binary_op_call_site {
 #[derive(Debug, Clone, Eq, Hash, PartialEq, serde::Serialize, serde::Deserialize)]
 pub struct UndefinedOperatorCallSite {
     operator_name: OperatorName,
+    #[serde(default)]
+    binding: Option<Box<crate::sem::ResolvedOperator>>,
     larg: Option<SemScalarExpr>,
     rarg: Option<SemScalarExpr>,
 }
@@ -178,6 +183,7 @@ impl UndefinedOperatorCallSite {
         ))?;
         let call_site = Self {
             operator_name: name.clone(),
+            binding: None,
             larg: lexpr,
             rarg: rexpr,
         };
@@ -218,13 +224,23 @@ impl BinaryOpCallSite {
         context: &mut crate::sem::Resolution<'_>,
         dialect: crate::ast::Dialect,
     ) -> Result<Option<SemScalarExpr>, AnalysisError> {
-        parameters.operator(
-            context,
-            dialect,
-            &self.operator_name,
-            Some(&self.left_arg),
-            Some(&self.right_arg),
-        )
+        if let Some(binding) = &self.binding {
+            binding.infer(
+                parameters,
+                context,
+                dialect,
+                Some(&self.left_arg),
+                Some(&self.right_arg),
+            )
+        } else {
+            parameters.operator(
+                context,
+                dialect,
+                &self.operator_name,
+                Some(&self.left_arg),
+                Some(&self.right_arg),
+            )
+        }
     }
 }
 
@@ -235,13 +251,23 @@ impl UndefinedOperatorCallSite {
         context: &mut crate::sem::Resolution<'_>,
         dialect: crate::ast::Dialect,
     ) -> Result<Option<SemScalarExpr>, AnalysisError> {
-        parameters.operator(
-            context,
-            dialect,
-            &self.operator_name,
-            self.larg.as_ref(),
-            self.rarg.as_ref(),
-        )
+        if let Some(binding) = &self.binding {
+            binding.infer(
+                parameters,
+                context,
+                dialect,
+                self.larg.as_ref(),
+                self.rarg.as_ref(),
+            )
+        } else {
+            parameters.operator(
+                context,
+                dialect,
+                &self.operator_name,
+                self.larg.as_ref(),
+                self.rarg.as_ref(),
+            )
+        }
     }
 }
 
@@ -253,8 +279,27 @@ impl UndefinedOperatorCallSite {
     ) -> Self {
         Self {
             operator_name: name.clone(),
+            binding: None,
             larg: left,
             rarg: right,
         }
+    }
+}
+
+impl BinaryOpCallSite {
+    pub(crate) fn set_binding(&mut self, binding: crate::sem::ResolvedOperator) {
+        self.binding = Some(Box::new(binding));
+    }
+    pub(crate) fn binding(&self) -> Option<&crate::sem::ResolvedOperator> {
+        self.binding.as_deref()
+    }
+}
+
+impl UndefinedOperatorCallSite {
+    pub(crate) fn set_binding(&mut self, binding: crate::sem::ResolvedOperator) {
+        self.binding = Some(Box::new(binding));
+    }
+    pub(crate) fn binding(&self) -> Option<&crate::sem::ResolvedOperator> {
+        self.binding.as_deref()
     }
 }

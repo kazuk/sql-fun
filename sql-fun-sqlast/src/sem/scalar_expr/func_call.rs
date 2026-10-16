@@ -15,8 +15,13 @@ mod implementation {
     #[derive(Debug, Clone, Eq, Hash, PartialEq, serde::Serialize, serde::Deserialize)]
     pub struct FuncCallExpr {
         func_name: FullName,
+        name_resolution: crate::sem::QueryNameResolution,
+        #[serde(default)]
+        candidates: Option<Vec<OverloadVariant>>,
         overload: Option<OverloadVariant>,
         args: IVec<FuncCallArgs>,
+        #[serde(default)]
+        modifiers: Box<crate::sem::FunctionModifiers>,
     }
 
     #[derive(Debug, Clone, Eq, Hash, PartialEq, serde::Serialize, serde::Deserialize)]
@@ -25,6 +30,43 @@ mod implementation {
         arg_definition: Option<FunctionParam>,
     }
 
+    /// Function identity and SQL modifiers for a parameter-dependent call.
+    /// Operands are owned by the enclosing constrained expression.
+    #[derive(Debug, Clone, Eq, Hash, PartialEq, serde::Serialize, serde::Deserialize)]
+    pub struct FunctionBinding {
+        name: FullName,
+        resolution: crate::sem::QueryNameResolution,
+        modifiers: Box<crate::sem::FunctionModifiers>,
+    }
+    impl FunctionBinding {
+        /// Resolved function identity (or original name after a failed lookup).
+        pub const fn name(&self) -> &FullName {
+            &self.name
+        }
+        /// Completed name lookup, independent of overload selection.
+        pub const fn resolution(&self) -> &crate::sem::QueryNameResolution {
+            &self.resolution
+        }
+        /// SQL modifiers owned by this call.
+        pub fn modifiers(&self) -> &crate::sem::FunctionModifiers {
+            &self.modifiers
+        }
+        pub(crate) fn walk<V: crate::sem::traversal::SemanticVisitor>(
+            &mut self,
+            visitor: &mut V,
+        ) -> Result<(), crate::sem::AnalysisError> {
+            self.modifiers.walk(visitor)
+        }
+    }
+    impl FuncCallExpr {
+        pub(crate) fn binding_snapshot(&self) -> FunctionBinding {
+            FunctionBinding {
+                name: self.func_name.clone(),
+                resolution: self.name_resolution.clone(),
+                modifiers: self.modifiers.clone(),
+            }
+        }
+    }
     impl FuncCallExpr {
         /// create a instance
         #[must_use]
@@ -35,12 +77,43 @@ mod implementation {
         ) -> Self {
             Self {
                 func_name: func_name.clone(),
+                candidates: None,
+                name_resolution: if overload.is_some() {
+                    crate::sem::QueryNameResolution::function(func_name)
+                } else {
+                    crate::sem::QueryNameResolution::not_found()
+                },
                 overload: overload.clone(),
                 args: args.clone(),
+                modifiers: Box::default(),
             }
         }
     }
 
+    impl FuncCallExpr {
+        pub(crate) fn set_candidates(&mut self, candidates: Option<Vec<OverloadVariant>>) {
+            self.candidates = candidates;
+        }
+        pub(crate) fn candidates(&self) -> Option<crate::sem::FunctionOverloadCollection> {
+            self.candidates
+                .as_deref()
+                .map(crate::sem::FunctionOverloadCollection::new)
+        }
+        pub(crate) fn set_name_resolution(&mut self, outcome: crate::sem::QueryNameResolution) {
+            self.name_resolution = outcome;
+        }
+        /// Completed function-name lookup, independent of overload selection.
+        pub const fn name_resolution(&self) -> &crate::sem::QueryNameResolution {
+            &self.name_resolution
+        }
+        pub(crate) fn set_modifiers(&mut self, modifiers: crate::sem::FunctionModifiers) {
+            *self.modifiers = modifiers;
+        }
+        /// SQL modifiers retained alongside the resolved function binding.
+        pub fn modifiers(&self) -> &crate::sem::FunctionModifiers {
+            &self.modifiers
+        }
+    }
     impl FuncCallExpr {
         /// resolved calling overload
         #[must_use]
@@ -87,6 +160,7 @@ mod implementation {
                 arg.arg_expr.walk(visitor)?;
             }
             self.args = args.into();
+            self.modifiers.walk(visitor)?;
             Ok(())
         }
         pub(crate) fn inference_call(&self) -> (&FullName, Vec<SemScalarExpr>) {
@@ -98,7 +172,7 @@ mod implementation {
     }
 }
 
-pub use self::implementation::{FuncCallArgs, FuncCallExpr};
+pub use self::implementation::{FuncCallArgs, FuncCallExpr, FunctionBinding};
 
 impl FuncCallExpr {
     fn cast_operand_expression<TParseContext>(
@@ -158,8 +232,30 @@ impl FuncCallExpr {
         arguments: &[SemScalarExpr],
         span: &crate::StringSpan,
     ) -> Result<SemScalarExpr, AnalysisError> {
+        let resolved_name = context.resolve_function_name(name);
+        let candidates = context.get_function_by_name(name);
+        let found = candidates.is_some();
+        let mut expression =
+            Self::resolve_binding(context, name, arguments, span, candidates.as_ref())?;
+        expression.set_function_name_resolution(if found {
+            crate::sem::QueryNameResolution::function(&resolved_name)
+        } else {
+            crate::sem::QueryNameResolution::not_found()
+        });
+        expression.set_function_candidates(
+            candidates.map(crate::sem::FunctionOverloadCollection::into_snapshot),
+        );
+        Ok(expression)
+    }
+    fn resolve_binding<TContext: crate::sem::resolution::ResolutionContext>(
+        context: &mut TContext,
+        name: &FullName,
+        arguments: &[SemScalarExpr],
+        span: &crate::StringSpan,
+        overloads: Option<&crate::sem::FunctionOverloadCollection>,
+    ) -> Result<SemScalarExpr, AnalysisError> {
         let arg_types = ArgumentBindingCollection::from_expr_list(arguments);
-        if let Some(overloads) = context.get_function_by_name(name) {
+        if let Some(overloads) = overloads {
             if arguments.iter().any(SemScalarExpr::requires_argument_type) {
                 return Ok(Self::deferred(name, arguments));
             }
@@ -468,21 +564,21 @@ impl FuncCallExpr {
         {
             return Ok(None);
         }
-        if let Some(overloads) = crate::sem::Catalog::get_function_by_name(context, name) {
+        if let Some(overloads) = self.candidates() {
             let signatures = overloads.parameter_signatures(context, &arguments);
-            Ok(Some(parameters.call(
-                context,
-                &name.to_string(),
-                &arguments,
-                &signatures,
-            )?))
+            let mut result =
+                parameters.call(context, &name.to_string(), &arguments, &signatures)?;
+            result.retain_semantic_call(self);
+            Ok(Some(result))
         } else {
-            Ok(Some(parameters.operation(
+            let mut result = parameters.operation(
                 &name.to_string(),
                 &arguments,
                 &crate::sem::InputTypeConstraint::any(),
                 None,
-            )))
+            );
+            result.retain_semantic_call(self);
+            Ok(Some(result))
         }
     }
 }

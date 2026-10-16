@@ -282,11 +282,36 @@ impl OperatorExpr {
             }
             todo!("SQLite operator semantics");
         }
-        self.kind.resolve(context, &self.name, left, right)
+        let binding = self.kind.resolve_operator_name(
+            context,
+            &self.name,
+            left.is_some(),
+            right.is_some(),
+        )?;
+        let mut expression = self.kind.resolve(context, &self.name, left, right)?;
+        if let Some(binding) = binding {
+            expression.set_operator_binding(binding);
+        }
+        Ok(expression)
     }
 }
 
 impl OperatorKind {
+    fn resolve_operator_name(
+        &self,
+        context: &Resolution<'_>,
+        name: &Name,
+        left: bool,
+        right: bool,
+    ) -> Result<Option<crate::sem::ResolvedOperator>, AnalysisError> {
+        match self {
+            Self::Ordinary | Self::Any | Self::All => Ok(Some(
+                crate::sem::ResolvedOperator::resolve(context, &name.operator_name()?, left, right),
+            )),
+            _ => Ok(None),
+        }
+    }
+
     const fn without_catalog_operator(&self) -> bool {
         matches!(self, Self::Between | Self::NotBetween)
     }
@@ -351,10 +376,13 @@ impl Cast {
     ) -> Result<SemScalarExpr, AnalysisError> {
         let target = self.target.reference()?;
         let argument = self.argument.resolve_in(context, dialect, scope)?;
+        let mut resolution = crate::sem::QueryNameResolution::affinity(&target.to_string());
         let target = if dialect == Dialect::postgres() {
             if let Some(canonical) = context.canonicalize_type_ref(&target) {
+                resolution = crate::sem::QueryNameResolution::type_reference(&canonical);
                 canonical
             } else {
+                resolution = crate::sem::QueryNameResolution::not_found();
                 context.report_problem(AnalysisProblem::parameter_constraint(&format!(
                     "cast target {target} not found"
                 )))?;
@@ -369,7 +397,9 @@ impl Cast {
         {
             context.report_problem(AnalysisProblem::explicit_cast_not_defined(&source, &target))?;
         }
-        Ok(SemScalarExpr::explicit_cast(&argument, &target))
+        let mut expression = SemScalarExpr::explicit_cast(&argument, &target);
+        expression.set_cast_resolution(resolution);
+        Ok(expression)
     }
 }
 
@@ -380,7 +410,10 @@ impl Call {
         dialect: Dialect,
         scope: &ScalarAnalysisContext<'_>,
     ) -> Result<SemScalarExpr, AnalysisError> {
-        self.kind.resolve(self, context, dialect, scope)
+        let mut expression = self.kind.resolve(self, context, dialect, scope)?;
+        let modifiers = self.resolve_modifiers(context, dialect, scope)?;
+        expression.set_function_modifiers(modifiers);
+        Ok(expression)
     }
 }
 

@@ -10,6 +10,8 @@ use crate::{
 #[derive(Debug, Clone, Eq, Hash, PartialEq, serde::Serialize, serde::Deserialize)]
 pub struct AllBinaryCallSite {
     operator_name: OperatorName,
+    #[serde(default)]
+    binding: Option<Box<crate::sem::ResolvedOperator>>,
     operator_def: BinaryOperatorDefinition,
     left_arg: SemScalarExpr,
     right_arg: SemScalarExpr,
@@ -41,6 +43,7 @@ impl AllBinaryCallSite {
     {
         let call_site = Self {
             operator_name: name.clone(),
+            binding: None,
             operator_def,
             left_arg: lexpr,
             right_arg: rexpr,
@@ -68,6 +71,8 @@ impl AllBinaryCallSite {
 #[derive(Debug, Clone, Eq, Hash, PartialEq, serde::Serialize, serde::Deserialize)]
 pub struct UndefinedOperatorAllCallSite {
     operator_name: OperatorName,
+    #[serde(default)]
+    binding: Option<Box<crate::sem::ResolvedOperator>>,
     larg: SemScalarExpr,
     rarg: SemScalarExpr,
 }
@@ -106,6 +111,7 @@ impl UndefinedOperatorAllCallSite {
         ))?;
         let call_site = Self {
             operator_name: name.clone(),
+            binding: None,
             larg: lexpr,
             rarg: rexpr,
         };
@@ -169,8 +175,27 @@ impl UndefinedOperatorAllCallSite {
     ) -> Self {
         Self {
             operator_name: name.clone(),
+            binding: None,
             larg: left,
             rarg: right,
         }
+    }
+}
+
+impl AllBinaryCallSite {
+    pub(crate) fn set_binding(&mut self, binding: crate::sem::ResolvedOperator) {
+        self.binding = Some(Box::new(binding));
+    }
+    pub(crate) fn binding(&self) -> Option<&crate::sem::ResolvedOperator> {
+        self.binding.as_deref()
+    }
+}
+
+impl UndefinedOperatorAllCallSite {
+    pub(crate) fn set_binding(&mut self, binding: crate::sem::ResolvedOperator) {
+        self.binding = Some(Box::new(binding));
+    }
+    pub(crate) fn binding(&self) -> Option<&crate::sem::ResolvedOperator> {
+        self.binding.as_deref()
     }
 }

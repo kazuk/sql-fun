@@ -200,9 +200,11 @@ Use explicit `AS` names when stable result-column names matter.
 This is not complete SQLite query validation. Arithmetic and comparison operators,
 function type affinity, case-insensitive identifier binding,
 operator-dependent parameter analysis, star expansion, recursive CTE binding,
-and full compound type checking remain incomplete. Parsing grouping, ordering,
-or window clauses
-does not mean those clauses have been semantically validated. Different CASE
+and full compound type checking remain incomplete. Grouping, ordering, HAVING,
+LIMIT/OFFSET, and window definitions retain their supported expressions for
+analysis. Output aliases and ordering positions follow SQLite binding rules;
+compound ordering can refer to either operand's output expressions or aliases.
+This does not provide full grouping or window legality checks. Different CASE
 result types are not unified using PostgreSQL implicit casts.
 Use matching identifier spelling when referring to derived-query or CTE columns.
 
@@ -220,6 +222,19 @@ uses must have compatible constraints; conflicts produce semantic diagnostics.
 Correlated overload alternatives remain part of the analysis result.
 Parameter-dependent result columns may likewise have several admissible types.
 Mapping these constraints to Rust types is a later code-generation step.
+
+Parameters in supported ORDER BY, GROUP BY, HAVING, DISTINCT ON, LIMIT/OFFSET,
+aggregate FILTER/ordering, and window expressions also participate in analysis,
+including nested queries. PostgreSQL HAVING/FILTER predicates require boolean
+inputs; LIMIT/OFFSET and ROWS/GROUPS frame offsets use integer coercion rules.
+RANGE offsets use a known ordering type, including interval offsets for builtin
+date/time ordering. Parameter-dependent RANGE ordering and custom RANGE
+operator classes are not fully analyzed.
+PostgreSQL output aliases are available as standalone ORDER BY/GROUP BY items;
+GROUP BY gives source columns precedence, and HAVING uses source names.
+Missing and ambiguous references produce diagnostics while retaining their
+resolution outcomes. Successful name binding does not imply complete aggregate
+or window legality checking. Parameter-free queries skip parameter inference.
 
 Concrete PostgreSQL function signatures are supported; unresolved polymorphic
 signatures remain unsupported. Type unification of unresolved inputs in CASE,

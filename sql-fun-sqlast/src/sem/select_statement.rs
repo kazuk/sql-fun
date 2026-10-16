@@ -18,6 +18,10 @@ use ::sql_fun_core::IVec;
 #[allow(clippy::large_enum_variant)]
 #[derive(Debug, Clone, Eq, Hash, PartialEq, serde::Serialize, serde::Deserialize)]
 pub enum SelectStatement {
+    /// Query boundary with local CTEs and trailing clauses.
+    Query(Box<crate::sem::SemanticQuery>),
+    /// VALUES rows.
+    Values(crate::sem::SemanticValues),
     /// simple query
     Simple(SelectStatementNode),
     /// union
@@ -32,6 +36,8 @@ impl SelectStatement {
     pub(crate) fn rename_columns(&mut self, names: &[String]) {
         match self {
             Self::Simple(query) => query.result_columns.rename(names),
+            Self::Query(query) => query.body_mut().rename_columns(names),
+            Self::Values(values) => values.rename(names),
             Self::Union(left, _) | Self::Intersect(left, _) | Self::Except(left, _) => {
                 left.rename_columns(names)
             }
@@ -67,6 +73,8 @@ impl SelectStatement {
     pub fn get_result_column_def(&self, column: &ColumnName) -> Option<ColumnDefinition> {
         match self {
             Self::Simple(query) => query.get_result_column_def(column),
+            Self::Query(query) => query.body().get_result_column_def(column),
+            Self::Values(values) => values.columns().get_result_column_def(column),
             Self::Union(l, _r) => l.get_result_column_def(column),
             Self::Intersect(l, _r) => l.get_result_column_def(column),
             Self::Except(l, _r) => l.get_result_column_def(column),
@@ -78,6 +86,8 @@ impl SelectStatement {
     pub fn has_column(&self, column: &ColumnName) -> bool {
         match self {
             Self::Simple(query) => query.has_column(column),
+            Self::Query(query) => query.body().has_column(column),
+            Self::Values(values) => values.columns().has_column(column),
             Self::Union(l, _r) => l.has_column(column),
             Self::Intersect(l, _r) => l.has_column(column),
             Self::Except(l, _r) => l.has_column(column),
@@ -89,6 +99,8 @@ impl SelectStatement {
     pub fn result_columns(&self) -> &ResultColumnCollection {
         match self {
             Self::Simple(query) => &query.result_columns,
+            Self::Query(query) => query.body().result_columns(),
+            Self::Values(values) => values.columns(),
             Self::Union(l, _r) => l.result_columns(),
             Self::Intersect(l, _r) => l.result_columns(),
             Self::Except(l, _r) => l.result_columns(),
@@ -99,6 +111,13 @@ impl SelectStatement {
     pub fn returning_composite_type(&self) -> Result<TypeReference, AnalysisError> {
         match self {
             Self::Simple(query) => query.returning_composite_type(),
+            Self::Query(query) => query.body().returning_composite_type(),
+            Self::Values(values) => {
+                let fields = values.columns().composite_field_collection()?;
+                Ok(TypeReference::dynamic(&TypeDefinition::CompositeType(
+                    CreateCompositeType::from_fields(&fields),
+                )))
+            }
             Self::Union(l, _r) => l.returning_composite_type(),
             Self::Intersect(l, _r) => l.returning_composite_type(),
             Self::Except(l, _r) => l.returning_composite_type(),
@@ -129,6 +148,8 @@ pub struct SelectStatementNode {
     with_clause: WithClause,
     from_clause: FromClause,
     where_clause: Option<SemScalarExpr>,
+    #[serde(default)]
+    clauses: crate::sem::SelectClauses,
 }
 
 impl SelectStatementNode {
@@ -143,6 +164,7 @@ impl SelectStatementNode {
             with_clause: with_clause.clone(),
             from_clause: from_clause.clone(),
             where_clause: where_clause.clone(),
+            clauses: crate::sem::SelectClauses::default(),
         }
     }
     /// enumerate result set columns
@@ -260,12 +282,14 @@ impl SelectStatement {
 }
 
 impl SelectStatement {
-    fn walk_body<V: crate::sem::traversal::SemanticVisitor>(
+    pub(super) fn walk_body<V: crate::sem::traversal::SemanticVisitor>(
         &mut self,
         visitor: &mut V,
     ) -> Result<(), AnalysisError> {
         match self {
             Self::Simple(query) => query.walk(visitor),
+            Self::Query(query) => query.walk(visitor),
+            Self::Values(values) => values.walk(visitor),
             Self::Union(left, right) | Self::Intersect(left, right) | Self::Except(left, right) => {
                 left.walk(visitor)?;
                 visitor.retain_set_outputs();
@@ -286,7 +310,9 @@ impl SelectStatementNode {
         if let Some(predicate) = &self.where_clause {
             visitor.predicate(predicate);
         }
+        self.clauses.walk_windows(visitor)?;
         self.result_columns.walk(visitor)?;
+        self.clauses.walk(visitor)?;
         Ok(())
     }
 }
@@ -302,12 +328,43 @@ impl SelectStatementNode {
         with_clause: &WithClause,
         from_clause: FromClause,
         where_clause: Option<SemScalarExpr>,
+        clauses: crate::sem::SelectClauses,
     ) -> Self {
         Self {
             result_columns,
             with_clause: with_clause.clone(),
             from_clause,
             where_clause,
+            clauses,
+        }
+    }
+}
+
+impl SelectStatement {
+    pub(crate) fn query(query: crate::sem::SemanticQuery) -> Self {
+        Self::Query(Box::new(query))
+    }
+    pub(crate) fn values(rows: Vec<Vec<SemScalarExpr>>) -> Self {
+        Self::Values(crate::sem::SemanticValues::new(rows))
+    }
+    /// Query-wide clauses, if this value owns a query boundary.
+    pub const fn query_clauses(&self) -> Option<&crate::sem::SemanticQuery> {
+        match self {
+            Self::Query(query) => Some(query),
+            _ => None,
+        }
+    }
+    /// SELECT-specific clauses, if this is a simple SELECT body.
+    pub const fn select_clauses(&self) -> Option<&crate::sem::SelectClauses> {
+        match self {
+            Self::Simple(node) => Some(&node.clauses),
+            _ => None,
+        }
+    }
+    pub(crate) const fn source_scope(&self) -> Option<&FromClause> {
+        match self {
+            Self::Simple(node) => Some(&node.from_clause),
+            _ => None,
         }
     }
 }

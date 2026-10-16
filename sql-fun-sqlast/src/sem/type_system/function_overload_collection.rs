@@ -22,6 +22,9 @@ impl<'a> IntoIterator for &'a FunctionOverloadCollection {
 }
 
 impl FunctionOverloadCollection {
+    pub(crate) fn into_snapshot(self) -> Vec<OverloadVariant> {
+        self.overloads
+    }
     /// create new instance
     #[must_use]
     pub fn new(overloads: &[OverloadVariant]) -> Self {

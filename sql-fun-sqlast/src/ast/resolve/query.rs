@@ -1,6 +1,14 @@
+mod clauses;
+#[cfg(test)]
+mod test_helpers;
+#[cfg(test)]
+mod tests;
+
+use self::clauses::ClauseBinding;
 use crate::ast::{
-    Alias, Call, CallKind, CteBody, DerivedTable, Dialect, Expr, FromGroup, FromItem, Join,
-    JoinKind, Query, QueryBody, Relation, Select, SetOperation, SetQuery, TableFunctions, With,
+    Alias, Call, CallKind, CteBody, DerivedTable, Dialect, Expr, FromGroup, FromItem, Grouping,
+    Join, JoinKind, Lock, Order, Query, QueryBody, Relation, Select, SetOperation, SetQuery,
+    TableFunctions, Window, With,
 };
 use crate::sem::ColumnName;
 use crate::sem::{
@@ -47,7 +55,37 @@ impl Query {
         outer: Option<&ScalarAnalysisContext<'_>>,
     ) -> Result<SelectStatement, AnalysisError> {
         let with = self.with.resolve(context, dialect, outer)?;
-        self.body.resolve(context, dialect, &with, outer)
+        let body = self.body.resolve(context, dialect, &with, outer)?;
+        let empty = FromClause::default();
+        let order_outer = if self.body.is_compound() { None } else { outer };
+        let mut scope = ScalarAnalysisContext::nested(
+            &with,
+            body.source_scope().unwrap_or(&empty),
+            order_outer,
+        );
+        scope.set_windows(self.body.window_names());
+        if dialect == Dialect::sqlite() {
+            scope.set_output_aliases(body.result_columns());
+        }
+        let binding = self.body.order_binding();
+        let order = Order::resolve_for_query(
+            &self.order,
+            &self.body,
+            context,
+            dialect,
+            &scope,
+            body.result_columns(),
+            binding,
+        )?;
+        let row_scope = ScalarAnalysisContext::nested(&with, &empty, outer);
+        let limit = Expr::resolve_optional(&self.limit, context, dialect, &row_scope)?;
+        let offset = Expr::resolve_optional(&self.offset, context, dialect, &row_scope)?;
+        let locks = Lock::resolve_list(&self.locks, context, &scope)?;
+        let local = self.with.local_definitions(with);
+        let mut query =
+            crate::sem::SemanticQuery::new(local, self.with.recursive, body, order, limit, offset);
+        query.set_modifiers(self.with_ties, self.body.set_all(), locks);
+        Ok(SelectStatement::query(query))
     }
 }
 
@@ -108,14 +146,15 @@ impl QueryBody {
         match self {
             Self::Select(select) => select.resolve(context, dialect, with, outer),
             Self::Set(set) => set.resolve(context, dialect, with, outer),
-            // Legacy SELECT analysis returns no inferred columns for VALUES.
-            // Keep that semantic limitation while retaining every row in syntax.
-            Self::Values(_) => Ok(SelectStatement::simple(&SelectStatementNode::new(
-                &ResultColumnCollection::default(),
-                with,
-                &FromClause::default(),
-                &None,
-            ))),
+            Self::Values(rows) => {
+                let from = FromClause::default();
+                let scope = ScalarAnalysisContext::nested(with, &from, outer);
+                let mut resolved = Vec::new();
+                for row in rows {
+                    resolved.push(Expr::resolve_list(row, context, dialect, &scope)?);
+                }
+                Ok(SelectStatement::values(resolved))
+            }
         }
     }
 }
@@ -139,7 +178,9 @@ impl Select {
         outer: Option<&ScalarAnalysisContext<'_>>,
     ) -> Result<SelectStatement, AnalysisError> {
         let from = FromItem::resolve_list_in(&self.from, context, dialect, with, outer)?;
-        let scope = ScalarAnalysisContext::nested(with, &from, outer);
+        let mut scope = ScalarAnalysisContext::nested(with, &from, outer);
+        scope.set_windows(Window::names(&self.windows));
+        let windows = Window::resolve_definitions(&self.windows, context, dialect, &scope)?;
         let predicate = Expr::resolve_optional(&self.predicate, context, dialect, &scope)?;
         let mut results = ResultColumnCollection::default();
         for target in &self.targets {
@@ -150,13 +191,59 @@ impl Select {
                 .unwrap_or_else(|| expression.get_column_name());
             results.push_expression(&ColumnName::from(name.as_str()), expression);
         }
+        let distinct = if let Some(distinct) = &self.distinct {
+            let mut resolved = Vec::new();
+            for expression in distinct {
+                resolved.push(expression.resolve_clause(
+                    context,
+                    dialect,
+                    &scope,
+                    &results,
+                    ClauseBinding::Order,
+                )?);
+            }
+            Some(resolved)
+        } else {
+            None
+        };
+        if dialect == Dialect::sqlite() {
+            scope.set_output_aliases(&results);
+        }
+        let group = Grouping::resolve_list(&self.group, context, dialect, &scope, &results)?;
+        let having = Expr::resolve_optional(&self.having, context, dialect, &scope)?;
+        let mut clauses =
+            crate::sem::SelectClauses::new(distinct, group, self.group_distinct, having, windows);
+        let destination = self
+            .into
+            .as_ref()
+            .map(|into| into.resolve_destination())
+            .transpose()?;
+        clauses.set_destination(destination);
         Ok(SelectStatement::from(SelectStatementNode::from_resolution(
-            results, with, from, predicate,
+            results,
+            &WithClause::default(),
+            from,
+            predicate,
+            clauses,
         )))
     }
 }
 
 impl With {
+    fn local_definitions(&self, mut visible: WithClause) -> Vec<crate::sem::QueryCte> {
+        let mut local = Vec::new();
+        for entry in &self.entries {
+            if let Some(statement) = visible.take(&entry.name) {
+                local.push(crate::sem::QueryCte::new(
+                    &entry.name,
+                    entry.column_names(),
+                    entry.materialized,
+                    statement,
+                ));
+            }
+        }
+        local
+    }
     fn resolve(
         &self,
         context: &mut Resolution<'_>,
@@ -190,7 +277,7 @@ impl CteBody {
             Self::Query(query) => {
                 let mut query = query.resolve_in(context, dialect, Some(scope))?;
                 query.rename_columns(columns);
-                Ok(CteStatement::from_query(&query))
+                Ok(CteStatement::from_query(query))
             }
             // Preserve the existing semantic DML representation. Construction has
             // already retained the complete recursive syntax, without parser nodes.
@@ -570,5 +657,79 @@ impl SetQuery {
         let left = self.left.resolve_in(context, dialect, Some(&scope))?;
         let right = self.right.resolve_in(context, dialect, Some(&scope))?;
         Ok(self.operation.resolve(left, right))
+    }
+}
+
+impl QueryBody {
+    const fn is_compound(&self) -> bool {
+        matches!(self, Self::Set(_))
+    }
+    fn window_names(&self) -> Vec<String> {
+        match self {
+            Self::Select(select) => Window::names(&select.windows),
+            _ => Vec::new(),
+        }
+    }
+    const fn order_binding(&self) -> ClauseBinding {
+        match self {
+            Self::Set(_) => ClauseBinding::Compound,
+            _ => ClauseBinding::Order,
+        }
+    }
+    fn set_all(&self) -> bool {
+        match self {
+            Self::Set(set) => set.all,
+            _ => false,
+        }
+    }
+}
+
+impl Call {
+    pub(super) fn resolve_modifiers(
+        &self,
+        context: &mut Resolution<'_>,
+        dialect: Dialect,
+        scope: &ScalarAnalysisContext<'_>,
+    ) -> Result<crate::sem::FunctionModifiers, AnalysisError> {
+        let columns = ResultColumnCollection::default();
+        let order = Order::resolve_list(
+            &self.order,
+            context,
+            dialect,
+            scope,
+            &columns,
+            ClauseBinding::Source,
+        )?;
+        let within_order = Order::resolve_list(
+            &self.within_order,
+            context,
+            dialect,
+            scope,
+            &columns,
+            ClauseBinding::Source,
+        )?;
+        let filter = Expr::resolve_optional(&self.filter, context, dialect, scope)?;
+        let over = self
+            .over
+            .as_ref()
+            .map(|window| window.resolve_over(context, dialect, scope))
+            .transpose()?;
+        let (within_order, order) = if self.within_group && within_order.is_empty() {
+            (order, Vec::new())
+        } else {
+            (within_order, order)
+        };
+        let mut modifiers = crate::sem::FunctionModifiers::new(within_order, order, filter, over);
+        modifiers.set_flags(self.distinct, self.star, self.variadic, self.within_group);
+        Ok(modifiers)
+    }
+}
+
+impl crate::ast::Into {
+    fn resolve_destination(&self) -> Result<crate::sem::SelectDestination, AnalysisError> {
+        Ok(crate::sem::SelectDestination::new(
+            &self.relation.name.full_name()?,
+            &self.relation.persistence,
+        ))
     }
 }

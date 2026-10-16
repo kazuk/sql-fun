@@ -330,7 +330,11 @@ impl OperatorExpr {
                     .as_ref()
                     .is_some_and(|value| value.constraint_node().is_some())
             {
-                todo!("SQLite operator type constraints");
+                return Ok(context.parameters().sqlite_operator(
+                    &self.name,
+                    left.as_ref(),
+                    right.as_ref(),
+                ));
             }
             todo!("SQLite operator semantics");
         }
@@ -487,13 +491,11 @@ impl Call {
         dialect: Dialect,
         scope: &ScalarAnalysisContext<'_>,
     ) -> Result<SemScalarExpr, AnalysisError> {
+        let arguments = Expr::resolve_list(&self.arguments, context, dialect, scope)?;
+        context.parameters().unify_coalesce_types(&arguments);
         let mut analysis = CoalesceAnalysis::new();
-        for argument in &self.arguments {
-            let value = argument.resolve_in(context, dialect, scope)?;
-            if value.constraint_node().is_some() && value.get_type().is_none() {
-                todo!("parameter-dependent COALESCE type unification");
-            }
-            analysis.push(context, &value)?;
+        for argument in &arguments {
+            analysis.push(context, argument)?;
         }
         Ok(analysis.finish(context)?.0)
     }
@@ -538,34 +540,24 @@ impl Case {
         scope: &ScalarAnalysisContext<'_>,
     ) -> Result<SemScalarExpr, AnalysisError> {
         let argument = Expr::resolve_optional(&self.argument, context, dialect, scope)?;
+        let mut arms = Vec::new();
+        for arm in &self.arms {
+            let condition = arm.condition.resolve_in(context, dialect, scope)?;
+            let result = arm.result.resolve_in(context, dialect, scope)?;
+            arms.push((condition, result));
+        }
+        let otherwise = Expr::resolve_optional(&self.otherwise, context, dialect, scope)?;
+        context
+            .parameters()
+            .unify_case_types(argument.as_ref(), &arms, otherwise.as_ref());
         let mut analysis = if dialect == Dialect::sqlite() {
             CaseExprAnalysisContext::without_catalog_casts()
         } else {
             CaseExprAnalysisContext::new()
         };
-        if argument
-            .as_ref()
-            .is_some_and(|value| value.constraint_node().is_some() && value.get_type().is_none())
-        {
-            todo!("parameter-dependent CASE type unification");
-        }
         analysis.set_argument(&argument);
-        for arm in &self.arms {
-            let condition = arm.condition.resolve_in(context, dialect, scope)?;
-            let result = arm.result.resolve_in(context, dialect, scope)?;
-            if (condition.constraint_node().is_some() && condition.get_type().is_none())
-                || (result.constraint_node().is_some() && result.get_type().is_none())
-            {
-                todo!("parameter-dependent CASE type unification");
-            }
-            analysis.push_arm(context, &condition, &result)?;
-        }
-        let otherwise = Expr::resolve_optional(&self.otherwise, context, dialect, scope)?;
-        if otherwise
-            .as_ref()
-            .is_some_and(|value| value.constraint_node().is_some() && value.get_type().is_none())
-        {
-            todo!("parameter-dependent CASE type unification");
+        for (condition, result) in &arms {
+            analysis.push_arm(context, condition, result)?;
         }
         analysis.set_default(context, &otherwise)?;
         analysis.finish(context)
@@ -599,9 +591,9 @@ impl Indirection {
         scope: &ScalarAnalysisContext<'_>,
     ) -> Result<SemScalarExpr, AnalysisError> {
         let mut value = self.argument.resolve_in(context, dialect, scope)?;
-        if value.constraint_node().is_some() && value.get_type().is_none() {
-            todo!("parameter-dependent indirection type constraints");
-        }
+        context
+            .parameters()
+            .constrain_indirection(&value, &self.items);
         for item in &self.items {
             value = item.resolve(context, dialect, scope, value)?;
         }
@@ -655,7 +647,9 @@ impl OperatorKind {
         right: Option<&SemScalarExpr>,
     ) -> Result<SemScalarExpr, AnalysisError> {
         if !matches!(self, Self::Ordinary) {
-            todo!("parameter constraints for this operator form");
+            return Ok(context
+                .parameters()
+                .special_operator(self, name, left, right));
         }
         let name = name.operator_name()?;
         let arguments: Vec<_> = left.into_iter().chain(right).cloned().collect();

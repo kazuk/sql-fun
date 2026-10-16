@@ -200,7 +200,8 @@ Use explicit `AS` names when stable result-column names matter.
 This is not complete SQLite query validation. Arithmetic and comparison operators,
 function type affinity, case-insensitive identifier binding,
 operator-dependent parameter analysis, star expansion, recursive CTE binding,
-and full compound type checking remain incomplete. Parsing grouping, ordering, or window clauses
+and full compound type checking remain incomplete. Parsing grouping, ordering,
+or window clauses
 does not mean those clauses have been semantically validated. Different CASE
 result types are not unified using PostgreSQL implicit casts.
 Use matching identifier spelling when referring to derived-query or CTE columns.

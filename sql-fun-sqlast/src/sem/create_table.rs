@@ -529,13 +529,14 @@ mod test_analyze_create_table {
             panic!("expect CreateTable: {stmt:?}");
         };
         let tokens = Vec::default().into();
-        let AstAndContextPair(sem_ast, result_context) = super::CreateTable::analyze_create_table(
-            test_context,
-            &None,
-            ct,
-            &tokens,
-            &source_span,
-        )?;
+        let AstAndContextPair(sem_ast, result_context, _) =
+            super::CreateTable::analyze_create_table(
+                test_context,
+                &None,
+                ct,
+                &tokens,
+                &source_span,
+            )?;
         assert_matches!(sem_ast, SemAst::CreateTable(_));
         let Some(create_table) = sem_ast.as_create_table() else {
             panic!("expect CreateTable")
@@ -666,7 +667,7 @@ mod test_drop_table_analyze_drop_stmt {
             panic!("expect DropStmt");
         };
         let tokens = Vec::default().into();
-        let AstAndContextPair(ast, _result_context) =
+        let AstAndContextPair(ast, _result_context, _) =
             DropTable::analyze_drop_stmt(test_context, node, &tokens)?;
         let Some(drop_table) = ast.as_drop_table() else {
             panic!("{ast:?} is not DropTable");
@@ -721,7 +722,7 @@ mod test_drop_table_analyze_drop_table {
         let table_name = sqlite_syn.qualified_name("table_one");
         let statement = DropTableStatement::new(true, table_name);
         let tokens = Vec::default().into();
-        let AstAndContextPair(ast, result_context) =
+        let AstAndContextPair(ast, result_context, _) =
             super::DropTable::analyze_drop_table(test_context, statement, &tokens)?;
         let Some(drop_table) = ast.as_drop_table() else {
             panic!("{ast:?} is not DropTable")

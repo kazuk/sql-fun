@@ -29,6 +29,7 @@ mod frozen_base_context;
 mod insert_statement;
 mod names;
 mod operators;
+mod parameter_constraints;
 mod parse_context;
 mod pg_type;
 pub mod problem;
@@ -89,6 +90,7 @@ pub use self::{
     insert_statement::{InsertStatement, analyze_insert_statement},
     names::{CatalogName, FullName, LocalName, OperatorName, SchemaName, ValidOperatorName},
     operators::{BinaryOperatorDefinition, OperatorDefinition, UnaryOperatorDefinition},
+    parameter_constraints::{InputTypeConstraint, ParameterConstraint, ParameterConstraints},
     parse_context::{
         BaseParseContext, CastInfoRead, DefaultSourceAccessService, DiagnosticContext,
         FunctionInfoRead, FunctionInfoWrite, IndexInfoRead, OperatorInfoRead, ParseContext,
@@ -99,9 +101,10 @@ pub use self::{
     problem::AnalysisProblem,
     scalar_expr::{
         ArithExpr, ArrayExpr, BooleanExpr, CaseExpr, CoalesceExpr, CollateExpr,
-        ColumnReferenceExpr, CteColumnRef, FuncCallExpr, ImplicitCastExpr, IndirectionExpr,
-        MinMaxExpr, NamedArgExpr, NullTestExpr, ParamRef, ScalarAnalysisContext, ScalarConstExpr,
-        SemScalarExpr, SqlValueExpr, SubLinkExpr, SubQueryColumnRef, TableColumnRef, TypeCastExpr,
+        ColumnReferenceExpr, ConstrainedExpr, CteColumnRef, FuncCallExpr, ImplicitCastExpr,
+        IndirectionExpr, MinMaxExpr, NamedArgExpr, NullTestExpr, ParamRef, ScalarAnalysisContext,
+        ScalarConstExpr, SemScalarExpr, SqlValueExpr, SubLinkExpr, SubQueryColumnRef,
+        TableColumnRef, TypeCastExpr,
     },
     schema_file_context::SchemaFileContext,
     select_statement::SelectStatement,
@@ -118,6 +121,7 @@ pub(crate) use self::{
     create_comp_type::{CompositeFieldCollection, CompositeFieldDefinition},
     create_index::IndexElementCollection,
     data_source::{AliasName, JoinUsingClause},
+    parameter_constraints::{ConstraintGraph, SignatureAlternative},
     resolution::{Catalog, Resolution, ResolutionContext, ResolutionOutcome},
     scalar_expr::{CaseExprAnalysisContext, CoalesceAnalysis},
     select_statement::{ResultColumnCollection, SelectStatementNode},

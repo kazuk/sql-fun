@@ -38,6 +38,10 @@ impl super::ColumnReference for SubQueryColumnRef {
 }
 
 impl SubQueryColumnRef {
+    pub(super) const fn binding_alias(&self) -> &AliasName {
+        &self.alias
+    }
+
     /// create instance
     #[must_use]
     pub fn new(

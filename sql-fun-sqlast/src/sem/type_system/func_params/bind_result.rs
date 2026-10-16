@@ -34,6 +34,22 @@ impl ParameterBindResult {
         Self::NoInputParam(param.clone())
     }
 
+    pub(crate) fn constraint_input_types(&self) -> Option<Vec<TypeReference>> {
+        match self {
+            Self::One(_, parameter) => Some(vec![parameter.get_type()?.clone()]),
+            Self::NoInputParam(_) => Some(Vec::new()),
+            Self::VariadicParam(arguments, parameter) => {
+                let ty = parameter.get_type()?;
+                let ty = if ty.is_array() == Some(true) {
+                    ty.element_type()
+                } else {
+                    ty.clone()
+                };
+                Some(vec![ty; arguments.len()])
+            }
+        }
+    }
+
     pub fn get_arg_types(&self) -> Vec<TypeReference> {
         match self {
             Self::One(t, _) => t.iter().cloned().collect(),

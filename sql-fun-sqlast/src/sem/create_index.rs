@@ -384,7 +384,7 @@ mod analyze_index_stmt_tests {
             builder.index_stmt("idx_items", relation, index_params, include_params, false);
         let tokens: IVec<ScanToken> = IVec::default();
 
-        let AstAndContextPair(ast, context) =
+        let AstAndContextPair(ast, context, _) =
             CreateIndex::analyze_index_stmt(test_context, &None, index_stmt, &tokens)
                 .expect("analyze index");
 

@@ -10,6 +10,7 @@ use std::collections::HashSet;
 
 /// The resolver cannot obtain a mutable catalog through this interface.
 pub(crate) trait Catalog {
+    fn cast_sources(&self, target: &TypeReference, explicit: bool) -> HashSet<TypeReference>;
     fn metadata(&self) -> &::sql_fun_core::SqlFunMetadata;
     fn has_index(&self, name: &FullName) -> bool;
     fn has_sequence(&self, name: &FullName) -> bool;
@@ -41,6 +42,9 @@ pub(crate) trait Catalog {
 }
 
 impl<T: BaseParseContext> Catalog for T {
+    fn cast_sources(&self, target: &TypeReference, explicit: bool) -> HashSet<TypeReference> {
+        crate::sem::CastInfoRead::cast_sources(self, target, explicit)
+    }
     fn metadata(&self) -> &::sql_fun_core::SqlFunMetadata {
         BaseParseContext::metadata(self)
     }
@@ -115,19 +119,63 @@ impl<T: ParseContext> ResolutionContext for T {
 pub(crate) struct Resolution<'a> {
     catalog: &'a dyn Catalog,
     problems: Vec<AnalysisProblem>,
+    parameters: crate::ast::ParameterResolution,
 }
 
 impl<'a> Resolution<'a> {
+    pub(crate) fn parameter_function_signatures(
+        &self,
+        overloads: &FunctionOverloadCollection,
+        arguments: &[crate::sem::SemScalarExpr],
+    ) -> Vec<crate::ast::Signature> {
+        overloads.parameter_signatures(self, arguments)
+    }
+
+    pub(crate) const fn problem_count(&self) -> usize {
+        self.problems.len()
+    }
+
+    pub(crate) const fn parameters(&mut self) -> &mut crate::ast::ParameterResolution {
+        &mut self.parameters
+    }
+    pub(crate) fn solve_parameters(&mut self) -> Result<bool, AnalysisError> {
+        let replay = self.parameters.solve()?;
+        if replay {
+            self.problems.clear();
+        }
+        Ok(replay)
+    }
+    pub(crate) fn parameter_require(
+        &mut self,
+        value: &crate::sem::SemScalarExpr,
+        target: &TypeReference,
+        explicit: bool,
+    ) {
+        self.parameters
+            .require(self.catalog, value, target, explicit);
+    }
+    pub(crate) fn parameter_call(
+        &mut self,
+        name: &str,
+        arguments: &[crate::sem::SemScalarExpr],
+        signatures: &[crate::ast::Signature],
+    ) -> Result<crate::sem::SemScalarExpr, AnalysisError> {
+        self.parameters
+            .call(self.catalog, name, arguments, signatures)
+    }
+
     pub(crate) fn new(catalog: &'a dyn Catalog) -> Self {
         Self {
             catalog,
             problems: Vec::new(),
+            parameters: crate::ast::ParameterResolution::default(),
         }
     }
 
     pub(crate) fn finish<T>(self, result: Result<T, AnalysisError>) -> ResolutionOutcome<T> {
         ResolutionOutcome {
             result,
+            parameters: self.parameters.constraints(),
             problems: self.problems,
         }
     }
@@ -135,6 +183,7 @@ impl<'a> Resolution<'a> {
 
 pub(crate) struct ResolutionOutcome<T> {
     result: Result<T, AnalysisError>,
+    parameters: crate::sem::ParameterConstraints,
     problems: Vec<AnalysisProblem>,
 }
 
@@ -142,15 +191,22 @@ impl<T> ResolutionOutcome<T> {
     pub(crate) fn map<U>(self, f: impl FnOnce(T) -> U) -> ResolutionOutcome<U> {
         ResolutionOutcome {
             result: self.result.map(f),
+            parameters: self.parameters,
             problems: self.problems,
         }
     }
 
     pub(crate) fn report<C: DiagnosticContext>(self, context: &mut C) -> Result<T, AnalysisError> {
+        self.report_with_parameters(context).map(|(value, _)| value)
+    }
+    pub(crate) fn report_with_parameters<C: DiagnosticContext>(
+        self,
+        context: &mut C,
+    ) -> Result<(T, crate::sem::ParameterConstraints), AnalysisError> {
         for problem in self.problems {
             context.report_problem(problem)?;
         }
-        self.result
+        self.result.map(|value| (value, self.parameters))
     }
 }
 
@@ -213,6 +269,9 @@ mod test_resolution_outcome {
 }
 
 impl Catalog for Resolution<'_> {
+    fn cast_sources(&self, target: &TypeReference, explicit: bool) -> HashSet<TypeReference> {
+        self.catalog.cast_sources(target, explicit)
+    }
     fn metadata(&self) -> &::sql_fun_core::SqlFunMetadata {
         self.catalog.metadata()
     }
@@ -281,6 +340,9 @@ impl ResolutionContext for Resolution<'_> {
 }
 
 impl Catalog for &mut Resolution<'_> {
+    fn cast_sources(&self, target: &TypeReference, explicit: bool) -> HashSet<TypeReference> {
+        self.catalog.cast_sources(target, explicit)
+    }
     fn metadata(&self) -> &::sql_fun_core::SqlFunMetadata {
         self.catalog.metadata()
     }

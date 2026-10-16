@@ -19,7 +19,7 @@ fn retains_selected_postgres_metadata_without_reloading_default()
         .as_select_stmt()
         .as_inner()
         .expect("SELECT");
-    let AstAndContextPair(_, context) = SelectStatement::analyze_select(
+    let AstAndContextPair(_, context, _) = SelectStatement::analyze_select(
         context,
         select,
         &PostgresDialect::scan("select 42 as n")?,
@@ -39,7 +39,7 @@ fn retains_selected_sqlite_metadata_through_group_resolution()
         .into_plain_statement()
         .expect("plain SELECT");
     test_helpers::assert_selected_metadata(&context, &metadata);
-    let AstAndContextPair(ast, context) = crate::sem::SemAst::semantic_analysis_sqlite_stmt(
+    let AstAndContextPair(ast, context, _) = crate::sem::SemAst::semantic_analysis_sqlite_stmt(
         context,
         statement,
         &::sql_fun_core::IVec::default(),

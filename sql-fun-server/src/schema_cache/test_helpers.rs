@@ -230,3 +230,19 @@ impl SuspendedRoot {
         assert!(roots.lookup(&self.key).is_some());
     }
 }
+
+impl SchemaProject {
+    /// Analyze against this fixture's small synthetic catalog; no full builtin
+    /// schema parsing or external service is involved.
+    pub(crate) fn analysis_context(
+        &self,
+        datasource: &str,
+    ) -> ::sql_fun_sqlast::sem::SchemaFileContext {
+        let (args, metadata) = self.analysis_inputs(datasource);
+        let base = ::sql_fun_sqlast::sem::BaseContext::new(&args, &metadata).unwrap();
+        ::sql_fun_sqlast::sem::SchemaFileContext::new(
+            &self.home().join("query.sql"),
+            &::sql_fun_sqlast::sem::FrozenBaseContext::from(base),
+        )
+    }
+}

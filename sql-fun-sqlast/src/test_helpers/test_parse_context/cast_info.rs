@@ -43,6 +43,16 @@ impl TestParseContext {
 }
 
 impl CastInfoRead for TestParseContext {
+    fn cast_sources(&self, target: &TypeReference, _explicit: bool) -> HashSet<TypeReference> {
+        let mut sources = HashSet::from([target.clone()]);
+        for (source, casts) in &self.implicit_cast_results {
+            if casts.get(target).is_some_and(Option::is_some) {
+                sources.insert(source.clone());
+            }
+        }
+        sources
+    }
+
     fn get_explicit_cast(
         &self,
         _source_type: &TypeReference,

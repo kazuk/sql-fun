@@ -80,6 +80,10 @@ impl ReadOnlyCatalog {
 }
 
 impl Catalog for ReadOnlyCatalog {
+    fn cast_sources(&self, target: &TypeReference, explicit: bool) -> HashSet<TypeReference> {
+        crate::sem::CastInfoRead::cast_sources(&self.0, target, explicit)
+    }
+
     fn metadata(&self) -> &::sql_fun_core::SqlFunMetadata {
         crate::sem::BaseParseContext::metadata(&self.0)
     }

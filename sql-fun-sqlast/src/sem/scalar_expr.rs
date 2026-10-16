@@ -8,6 +8,7 @@ mod coalesce;
 mod collate;
 mod column_ref;
 mod const_expr;
+mod constrained;
 mod context;
 mod func_call;
 mod indirect;
@@ -30,6 +31,7 @@ pub use self::{
     collate::CollateExpr,
     column_ref::{ColumnReferenceExpr, CteColumnRef, SubQueryColumnRef, TableColumnRef},
     const_expr::ScalarConstExpr,
+    constrained::ConstrainedExpr,
     context::ScalarAnalysisContext,
     func_call::FuncCallExpr,
     indirect::IndirectionExpr,
@@ -41,7 +43,7 @@ pub use self::{
 };
 
 use crate::sem::{
-    AnalysisError, AnalysisProblem, ParseContext, PgBuiltInType, TypeReference,
+    AnalysisError, AnalysisProblem, ColumnName, ParseContext, PgBuiltInType, TypeReference,
     create_table::ColumnDefinition,
 };
 
@@ -100,6 +102,9 @@ pub enum SemScalarExpr {
     SqlValue(SqlValueExpr),
     /// parameter reference expression
     Param(ParamRef),
+
+    /// SQL constraint expression retaining parameter-dependent type alternatives.
+    Constrained(ConstrainedExpr),
     /// named argument expression
     NamedArg(NamedArgExpr),
     /// indirectrion expression
@@ -122,6 +127,31 @@ pub enum SemScalarExpr {
 }
 
 impl SemScalarExpr {
+    pub(crate) fn constraint_binding(&self) -> Option<(&str, &ColumnName)> {
+        match self {
+            Self::ColumnRef(value) => value.constraint_binding(),
+            _ => None,
+        }
+    }
+
+    pub(crate) const fn constraint_node(&self) -> Option<usize> {
+        match self {
+            Self::Param(value) => Some(value.node()),
+            Self::Constrained(value) => Some(value.node()),
+            _ => None,
+        }
+    }
+    pub(crate) fn parameter(
+        position: u32,
+        node: usize,
+        constraint: &crate::sem::InputTypeConstraint,
+    ) -> Self {
+        Self::Param(ParamRef::new(position, node, constraint))
+    }
+    pub(crate) fn constrained(value: &ConstrainedExpr) -> Self {
+        Self::Constrained(value.clone())
+    }
+
     /// get Const variant
     pub const fn as_const(&self) -> Option<&ScalarConstExpr> {
         match self {
@@ -167,6 +197,7 @@ impl SemScalarExpr {
             Self::MinMax(min_max_expr) => min_max_expr.get_type(),
             Self::Collate(collate_expr) => collate_expr.get_type(),
             Self::SqlValue(sql_value_expr) => sql_value_expr.get_type(),
+            Self::Constrained(value) => value.single_type(),
             Self::Param(param_ref) => param_ref.get_type(),
             Self::NamedArg(named_arg_expr) => named_arg_expr.get_type(),
             Self::Indirection(ind) => ind.get_type(),
@@ -194,6 +225,7 @@ impl SemScalarExpr {
             Self::MinMax(min_max_expr) => min_max_expr.is_not_null(),
             Self::Collate(collate_expr) => collate_expr.is_not_null(),
             Self::SqlValue(sql_value_expr) => sql_value_expr.is_not_null(),
+            Self::Constrained(value) => value.is_not_null(),
             Self::Param(param_ref) => param_ref.is_not_null(),
             Self::NamedArg(named_arg_expr) => named_arg_expr.is_not_null(),
             Self::Indirection(ind) => ind.is_not_null(),
@@ -229,7 +261,7 @@ impl SemScalarExpr {
     pub fn get_column_def(&self) -> Option<ColumnDefinition> {
         match self {
             Self::ColumnRef(c) => c.get_column_def().clone(),
-            Self::TypeCast(_) | Self::FuncCall(_) => None,
+            Self::TypeCast(_) | Self::FuncCall(_) | Self::Param(_) | Self::Constrained(_) => None,
             _ => todo!("not implemented {self:?}"),
         }
     }
@@ -251,7 +283,8 @@ impl SemScalarExpr {
             Self::MinMax(_min_max_expr) => todo!(),
             Self::Collate(_collate_expr) => todo!(),
             Self::SqlValue(_sql_value_expr) => todo!(),
-            Self::Param(_param_ref) => todo!(),
+            Self::Param(_) => String::new(),
+            Self::Constrained(value) => value.name().to_owned(),
             Self::NamedArg(_named_arg_expr) => todo!(),
             Self::Indirection(_indirection_expr) => todo!(),
             Self::ImplicitCast(_implicit_cast_expr) => todo!(),

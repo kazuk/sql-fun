@@ -40,13 +40,23 @@ impl SemScalarExprNode for ImplicitCastExpr {
 #[derive(Debug, Clone, Eq, Hash, PartialEq, serde::Serialize, serde::Deserialize)]
 pub struct TypeCastExpr {
     target_type: TypeReference,
+    resolution: crate::sem::QueryNameResolution,
     arg: Box<SemScalarExpr>,
 }
 
 impl TypeCastExpr {
+    pub(crate) fn set_resolution(&mut self, resolution: crate::sem::QueryNameResolution) {
+        self.resolution = resolution;
+    }
+    /// Completed target-name resolution (or SQLite affinity interpretation).
+    pub const fn resolution(&self) -> &crate::sem::QueryNameResolution {
+        &self.resolution
+    }
+
     pub(super) fn from_resolved(target_type: &TypeReference, arg: &SemScalarExpr) -> Self {
         Self {
             target_type: target_type.clone(),
+            resolution: crate::sem::QueryNameResolution::type_reference(target_type),
             arg: Box::new(arg.clone()),
         }
     }

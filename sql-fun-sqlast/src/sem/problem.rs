@@ -60,6 +60,8 @@ trait RenderProblemReport: Problem {
 #[allow(clippy::large_enum_variant)]
 #[derive(Debug, Clone)]
 pub enum AnalysisProblem {
+    /// A query clause contains an invalid, missing or ambiguous reference.
+    QueryReference(String),
     /// SQL-derived parameter requirements cannot be reconciled.
     ParameterConstraint(ParameterConstraintProblem),
     /// Name resolution problems
@@ -125,6 +127,10 @@ pub enum AnalysisProblem {
 }
 
 impl AnalysisProblem {
+    /// Report a clause binding problem without inventing a source location.
+    pub fn query_reference(message: &str) -> Self {
+        Self::QueryReference(message.to_owned())
+    }
     /// Report conflicting or invalid SQL-derived parameter requirements.
     pub fn parameter_constraint(message: &str) -> Self {
         Self::ParameterConstraint(ParameterConstraintProblem::new(message))
@@ -134,6 +140,7 @@ impl AnalysisProblem {
     #[must_use]
     pub const fn code(&self) -> &'static str {
         match self {
+            Self::QueryReference(_) => "query_reference",
             Self::ParameterConstraint(problem) => problem.code(),
             Self::NameResolution(problem) => problem.code(),
             Self::OverloadResolution(problem) => problem.code(),
@@ -180,6 +187,7 @@ impl AnalysisProblem {
             .with_syntax_highlighting(SqlHighlighter::from_theme(theme)?);
 
         let report = match self {
+            Self::QueryReference(message) => message.clone(),
             Self::NameResolution(nr) => nr.render_report(&report_handler, source)?,
             Self::ParameterConstraint(problem) => problem.render_report(&report_handler, source)?,
             _ => todo!(),

@@ -6,6 +6,8 @@ use crate::sem::{
 #[derive(Debug, Clone, Eq, Hash, PartialEq, serde::Serialize, serde::Deserialize)]
 pub struct LeftUnaryCallSite {
     operator_name: OperatorName,
+    #[serde(default)]
+    binding: Option<Box<crate::sem::ResolvedOperator>>,
     operator_def: UnaryOperatorDefinition,
     arg: SemScalarExpr,
 }
@@ -34,6 +36,7 @@ impl LeftUnaryCallSite {
     {
         let call_site = Self {
             operator_name: name.clone(),
+            binding: None,
             operator_def,
             arg: lexpr,
         };
@@ -103,6 +106,19 @@ impl LeftUnaryCallSite {
         context: &mut crate::sem::Resolution<'_>,
         dialect: crate::ast::Dialect,
     ) -> Result<Option<SemScalarExpr>, AnalysisError> {
-        parameters.operator(context, dialect, &self.operator_name, Some(&self.arg), None)
+        if let Some(binding) = &self.binding {
+            binding.infer(parameters, context, dialect, Some(&self.arg), None)
+        } else {
+            parameters.operator(context, dialect, &self.operator_name, Some(&self.arg), None)
+        }
+    }
+}
+
+impl LeftUnaryCallSite {
+    pub(crate) fn set_binding(&mut self, binding: crate::sem::ResolvedOperator) {
+        self.binding = Some(Box::new(binding));
+    }
+    pub(crate) fn binding(&self) -> Option<&crate::sem::ResolvedOperator> {
+        self.binding.as_deref()
     }
 }

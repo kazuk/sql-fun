@@ -752,7 +752,7 @@ mod test_parameter_analysis {
         context.set_source_path_with_span(&crate::test_helpers::source_span());
         context.set_search_path(&[SchemaName::from("public"), SchemaName::from("pg_catalog")]);
         let statements = parse_statements(
-            "create table t (n int4 default 1); create view v as select n from t;",
+            "create table t (n int4 default 1); create view v as select n from t group by n having true window w as (order by n) order by n limit 1 offset 0;",
             Dialect::postgres(),
         );
         for statement in statements {

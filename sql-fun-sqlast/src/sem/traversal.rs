@@ -12,6 +12,23 @@ pub(crate) trait SemanticVisitor {
     fn derived(&mut self, _alias: &str, _columns: &[String]) {}
     fn output(&mut self, _name: &str, _value: &mut SemScalarExpr) {}
     fn predicate(&mut self, _value: &SemScalarExpr) {}
+    fn order_operator(
+        &mut self,
+        _value: &SemScalarExpr,
+        _operator: &crate::sem::ResolvedOperator,
+    ) -> Result<(), AnalysisError> {
+        Ok(())
+    }
+    fn row_count(&mut self, _value: &SemScalarExpr) {}
+    fn window_definition(&mut self, _window: &crate::sem::QueryWindow) {}
+    fn frame_offset(
+        &mut self,
+        _value: &SemScalarExpr,
+        _mode: &str,
+        _order: &[crate::sem::QueryOrder],
+        _reference: Option<&crate::sem::QueryName>,
+    ) {
+    }
     fn retain_set_outputs(&mut self) {}
 }
 

@@ -34,6 +34,7 @@ pub(crate) mod parameter_resolution;
 mod parse_context;
 mod pg_type;
 pub mod problem;
+mod query;
 mod resolution;
 mod scalar_expr;
 mod schema_file_context;
@@ -101,12 +102,17 @@ pub use self::{
     },
     pg_type::{PgBuiltInType, TypeDefinition, TypeReference},
     problem::{AnalysisProblem, ParameterConstraintProblem},
+    query::{
+        FunctionModifiers, QueryCte, QueryFrame, QueryFrameBound, QueryGrouping, QueryLock,
+        QueryName, QueryNameResolution, QueryOrder, QueryWindow, ResolvedOperator, SelectClauses,
+        SelectDestination, SemanticQuery, SemanticValues,
+    },
     scalar_expr::{
         ArithExpr, ArrayExpr, BooleanExpr, CaseExpr, CoalesceExpr, CollateExpr,
-        ColumnReferenceExpr, ConstrainedExpr, CteColumnRef, FuncCallExpr, ImplicitCastExpr,
-        IndirectionExpr, MinMaxExpr, NamedArgExpr, NullTestExpr, ParamRef, ScalarAnalysisContext,
-        ScalarConstExpr, SemScalarExpr, SqlValueExpr, SubLinkExpr, SubQueryColumnRef,
-        TableColumnRef, TypeCastExpr,
+        ColumnReferenceExpr, ConstrainedExpr, CteColumnRef, FuncCallExpr, FunctionBinding,
+        ImplicitCastExpr, IndirectionExpr, MinMaxExpr, NamedArgExpr, NullTestExpr, OutputColumnRef,
+        ParamRef, ScalarAnalysisContext, ScalarConstExpr, SemScalarExpr, SqlValueExpr, SubLinkExpr,
+        SubQueryColumnRef, TableColumnRef, TypeCastExpr,
     },
     schema_file_context::SchemaFileContext,
     select_statement::SelectStatement,

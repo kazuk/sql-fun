@@ -16,11 +16,15 @@ pub struct ScalarAnalysisContext<'a> {
     with_clause: Cow<'a, WithClause>,
     from_clause: Cow<'a, FromClause>,
     parent: Option<Box<Self>>,
+    windows: Vec<String>,
+    output_aliases: Option<crate::sem::ResultColumnCollection>,
 }
 
 impl<'a> ScalarAnalysisContext<'a> {
     fn clone_scope(&self) -> Self {
         Self {
+            windows: self.windows.clone(),
+            output_aliases: self.output_aliases.clone(),
             with_clause: self.with_clause.clone(),
             from_clause: self.from_clause.clone(),
             parent: self
@@ -36,6 +40,8 @@ impl<'a> ScalarAnalysisContext<'a> {
             with_clause: Cow::Borrowed(with_clause),
             from_clause: Cow::Borrowed(from_clause),
             parent: None,
+            windows: Vec::new(),
+            output_aliases: None,
         }
     }
 
@@ -48,9 +54,75 @@ impl<'a> ScalarAnalysisContext<'a> {
             with_clause: Cow::Borrowed(with_clause),
             from_clause: Cow::Borrowed(from_clause),
             parent: parent.map(|parent| Box::new(parent.clone_scope())),
+            windows: Vec::new(),
+            output_aliases: None,
         }
     }
 
+    pub(crate) fn set_output_aliases(&mut self, columns: &crate::sem::ResultColumnCollection) {
+        self.output_aliases = Some(columns.clone());
+    }
+    pub(crate) fn has_input_column(
+        &self,
+        context: &crate::sem::Resolution<'_>,
+        column: &ColumnName,
+    ) -> bool {
+        match self
+            .from_clause
+            .find_alias_resolved(column, context, &self.with_clause)
+        {
+            Ok(None) => self
+                .parent
+                .as_ref()
+                .is_some_and(|parent| parent.has_input_column(context, column)),
+            _ => true,
+        }
+    }
+    pub(crate) fn resolve_lock(&self, name: &str) -> crate::sem::QueryNameResolution {
+        let alias = AliasName::from(name);
+        if self.from_clause.resolve_alias(&alias).is_some() {
+            crate::sem::QueryNameResolution::source(&alias)
+        } else {
+            crate::sem::QueryNameResolution::not_found()
+        }
+    }
+    pub(crate) fn with_window_names(&self, names: Vec<String>) -> Self {
+        let mut scope = self.clone_scope();
+        scope.windows = names;
+        scope
+    }
+    pub(crate) fn set_windows(&mut self, names: Vec<String>) {
+        self.windows = names;
+    }
+    pub(crate) fn resolve_window(
+        &self,
+        name: &str,
+        dialect: crate::ast::Dialect,
+    ) -> crate::sem::QueryNameResolution {
+        if dialect == crate::ast::Dialect::sqlite() {
+            return self
+                .windows
+                .iter()
+                .rposition(|candidate| candidate == name)
+                .map_or_else(
+                    crate::sem::QueryNameResolution::not_found,
+                    crate::sem::QueryNameResolution::window,
+                );
+        }
+        let mut candidates = self
+            .windows
+            .iter()
+            .enumerate()
+            .filter(|(_, candidate)| candidate.as_str() == name);
+        let Some((index, _)) = candidates.next() else {
+            return crate::sem::QueryNameResolution::not_found();
+        };
+        if candidates.next().is_some() {
+            crate::sem::QueryNameResolution::ambiguous()
+        } else {
+            crate::sem::QueryNameResolution::window(index)
+        }
+    }
     pub(crate) fn inherited_ctes(&self) -> WithClause {
         self.with_clause.as_ref().clone()
     }
@@ -97,6 +169,22 @@ impl ScalarAnalysisContext<'_> {
             return Ok((expr, context));
         };
         let Some(alias) = find_alias_result else {
+            if let Some(columns) = &self.output_aliases {
+                match columns.resolve_output(column, crate::ast::Dialect::sqlite()) {
+                    Ok(Some(index)) => {
+                        return Ok((
+                            columns.output_reference(index).expect("bound output"),
+                            context,
+                        ));
+                    }
+                    Err(()) => {
+                        let expression =
+                            ColumnReferenceExpr::ambiguous_column_resolved(&mut context, column)?;
+                        return Ok((expression, context));
+                    }
+                    Ok(None) => {}
+                }
+            }
             if let Some(parent) = &self.parent {
                 return parent.resolve_column(context, None, column);
             }

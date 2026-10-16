@@ -127,6 +127,42 @@ mod test_result_column_composite_field_definition {
 pub struct ResultColumnCollection(Vec<ResultColumn>);
 
 impl ResultColumnCollection {
+    pub(crate) fn refresh_value(&mut self, index: usize, value: &SemScalarExpr) {
+        if let Some(column) = self.0.get_mut(index) {
+            column.col_type = value.get_type();
+            column.is_not_null = value.is_not_null();
+        }
+    }
+
+    pub(crate) fn resolve_output(
+        &self,
+        name: &ColumnName,
+        dialect: crate::ast::Dialect,
+    ) -> Result<Option<usize>, ()> {
+        let mut found: Option<usize> = None;
+        for (index, column) in self.0.iter().enumerate() {
+            if column.col_name.as_ref() == Some(name) {
+                if dialect == crate::ast::Dialect::sqlite() {
+                    return Ok(Some(index));
+                }
+                if let Some(previous) = found {
+                    // PostgreSQL accepts duplicate aliases for identical expressions.
+                    if self.0[previous].expression != column.expression {
+                        return Err(());
+                    }
+                } else {
+                    found = Some(index);
+                }
+            }
+        }
+        Ok(found)
+    }
+    pub(crate) fn output_reference(&self, index: usize) -> Option<SemScalarExpr> {
+        let definition = self.0.get(index)?.create_column_definition();
+        Some(SemScalarExpr::column_reference(
+            crate::sem::ColumnReferenceExpr::output_column(index, &definition),
+        ))
+    }
     pub(crate) fn rename(&mut self, names: &[String]) {
         for (column, name) in self.0.iter_mut().zip(names) {
             column.col_name = Some(ColumnName::from(name.as_str()));

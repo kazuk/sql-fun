@@ -92,7 +92,7 @@ impl Output {
         Some(SemScalarExpr::constrained(&ConstrainedExpr::new(
             self.node?,
             "column",
-            &[],
+            std::slice::from_ref(original),
             self.constraint(graph),
             original.is_not_null(),
             &self.name,
@@ -105,6 +105,7 @@ struct QueryScope {
     ctes: BTreeMap<String, Outputs>,
     sources: BTreeMap<String, Outputs>,
     outputs: Outputs,
+    window_orders: Vec<Option<TypeReference>>,
 }
 
 impl QueryScope {
@@ -318,6 +319,15 @@ impl ParameterResolution {
     }
 
     pub(crate) fn column(&self, original: &SemScalarExpr) -> Option<SemScalarExpr> {
+        if let Some(index) = original.output_index() {
+            return self
+                .scopes
+                .last()?
+                .outputs
+                .0
+                .get(index)?
+                .column(original, &self.graph);
+        }
         let (alias, _) = original.constraint_binding()?;
         for scope in self.scopes.iter().rev() {
             if scope.has_source(alias) {
@@ -328,6 +338,7 @@ impl ParameterResolution {
     }
 }
 
+#[derive(Debug, Clone, Eq, Hash, PartialEq, serde::Serialize, serde::Deserialize)]
 pub(crate) struct Signature {
     inputs: Vec<TypeReference>,
     result: TypeReference,
@@ -588,6 +599,91 @@ impl crate::sem::traversal::SemanticVisitor for Collector<'_, '_> {
                 &crate::sem::PgBuiltInType::bool(),
                 false,
             );
+        }
+    }
+    fn order_operator(
+        &mut self,
+        value: &SemScalarExpr,
+        operator: &crate::sem::ResolvedOperator,
+    ) -> Result<(), AnalysisError> {
+        operator.infer(
+            &mut self.parameters,
+            self.context,
+            self.dialect,
+            Some(value),
+            Some(value),
+        )?;
+        Ok(())
+    }
+    fn row_count(&mut self, value: &SemScalarExpr) {
+        if self.dialect == Dialect::postgres() {
+            self.parameters.require(
+                self.context,
+                value,
+                &crate::sem::PgBuiltInType::int8(),
+                false,
+            );
+        }
+    }
+    fn window_definition(&mut self, window: &crate::sem::QueryWindow) {
+        if let Some(scope) = self.parameters.scopes.last_mut() {
+            scope
+                .window_orders
+                .push(window.ordering_type(&scope.window_orders));
+        }
+    }
+    fn frame_offset(
+        &mut self,
+        value: &SemScalarExpr,
+        mode: &str,
+        order: &[crate::sem::QueryOrder],
+        reference: Option<&crate::sem::QueryName>,
+    ) {
+        if self.dialect != Dialect::postgres() {
+            return;
+        }
+        if mode == "ROWS" || mode == "GROUPS" {
+            self.row_count(value);
+            return;
+        }
+        let ty = match order {
+            [order] => order.expression().get_type(),
+            [] => {
+                if let Some(reference) = reference
+                    && let Some(index) = reference.resolution().window_index()
+                    && let Some(scope) = self.parameters.scopes.last()
+                {
+                    scope.window_orders.get(index).cloned().flatten()
+                } else {
+                    None
+                }
+            }
+            _ => None,
+        };
+        if let Some(ty) = ty {
+            let target = if [
+                TypeReference::from_master_type_name("date"),
+                TypeReference::from_master_type_name("timestamp"),
+                TypeReference::from_master_type_name("timestamptz"),
+                TypeReference::from_master_type_name("time"),
+                TypeReference::from_master_type_name("timetz"),
+            ]
+            .contains(&ty)
+            {
+                TypeReference::from_master_type_name("interval")
+            } else if [
+                "int2", "int4", "int8", "numeric", "float4", "float8", "interval",
+            ]
+            .map(TypeReference::from_master_type_name)
+            .contains(&ty)
+            {
+                ty
+            } else {
+                // Custom RANGE operator classes need their in_range metadata;
+                // equal ordering and offset types cannot be assumed.
+                return;
+            };
+            self.parameters.require(self.context, value, &target, false);
         }
     }
     fn retain_set_outputs(&mut self) {

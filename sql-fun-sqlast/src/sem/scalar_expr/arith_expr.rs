@@ -258,3 +258,33 @@ impl ArithExpr {
         SemScalarExpr::arithmetic(Self::UndefinedOperatorAll(Box::new(call)))
     }
 }
+
+impl ArithExpr {
+    pub(crate) fn set_binding(&mut self, binding: crate::sem::ResolvedOperator) {
+        match self {
+            Self::OpBinary(call) => call.set_binding(binding),
+            Self::OpLeftUnary(call) => call.set_binding(binding),
+            Self::OpRightUnary(call) => call.set_binding(binding),
+            Self::OpAnyBinary(call) => call.set_binding(binding),
+            Self::OpAllBinary(call) => call.set_binding(binding),
+            Self::UndefinedOperator(call) => call.set_binding(binding),
+            Self::UndefinedOperatorAny(call) => call.set_binding(binding),
+            Self::UndefinedOperatorAll(call) => call.set_binding(binding),
+            _ => {}
+        }
+    }
+    /// Operator-name resolution, retained separately from overload/type selection.
+    pub fn binding(&self) -> Option<&crate::sem::ResolvedOperator> {
+        match self {
+            Self::OpBinary(call) => call.binding(),
+            Self::OpLeftUnary(call) => call.binding(),
+            Self::OpRightUnary(call) => call.binding(),
+            Self::OpAnyBinary(call) => call.binding(),
+            Self::OpAllBinary(call) => call.binding(),
+            Self::UndefinedOperator(call) => call.binding(),
+            Self::UndefinedOperatorAny(call) => call.binding(),
+            Self::UndefinedOperatorAll(call) => call.binding(),
+            _ => None,
+        }
+    }
+}

@@ -29,11 +29,13 @@ pub use self::{
     cast_expr::{ImplicitCastExpr, TypeCastExpr},
     coalesce::CoalesceExpr,
     collate::CollateExpr,
-    column_ref::{ColumnReferenceExpr, CteColumnRef, SubQueryColumnRef, TableColumnRef},
+    column_ref::{
+        ColumnReferenceExpr, CteColumnRef, OutputColumnRef, SubQueryColumnRef, TableColumnRef,
+    },
     const_expr::ScalarConstExpr,
     constrained::ConstrainedExpr,
     context::ScalarAnalysisContext,
-    func_call::FuncCallExpr,
+    func_call::{FuncCallExpr, FunctionBinding},
     indirect::IndirectionExpr,
     min_max::MinMaxExpr,
     named_arg::NamedArgExpr,
@@ -127,6 +129,61 @@ pub enum SemScalarExpr {
 }
 
 impl SemScalarExpr {
+    pub(crate) const fn column_reference(reference: ColumnReferenceExpr) -> Self {
+        Self::ColumnRef(reference)
+    }
+    pub(crate) fn set_cast_resolution(&mut self, resolution: crate::sem::QueryNameResolution) {
+        if let Self::TypeCast(cast) = self {
+            cast.set_resolution(resolution);
+        }
+    }
+    fn retain_cast_binding(&mut self, binding: &crate::sem::QueryNameResolution) {
+        if let Self::Constrained(value) = self {
+            value.retain_cast_binding(binding);
+        }
+    }
+    fn retain_operator_binding(&mut self, binding: &crate::sem::ResolvedOperator) {
+        if let Self::Constrained(value) = self {
+            value.retain_operator_binding(binding);
+        }
+    }
+    pub(crate) fn retain_semantic_call(&mut self, call: &FuncCallExpr) {
+        if let Self::Constrained(value) = self {
+            value.retain_semantic_call(call);
+        }
+    }
+    pub(crate) fn set_operator_binding(&mut self, binding: crate::sem::ResolvedOperator) {
+        if let Self::Arith(call) = self {
+            call.set_binding(binding);
+        }
+    }
+    pub(crate) fn set_function_candidates(
+        &mut self,
+        candidates: Option<Vec<crate::sem::OverloadVariant>>,
+    ) {
+        if let Self::FuncCall(call) = self {
+            call.set_candidates(candidates);
+        }
+    }
+    pub(crate) fn set_function_name_resolution(
+        &mut self,
+        outcome: crate::sem::QueryNameResolution,
+    ) {
+        if let Self::FuncCall(call) = self {
+            call.set_name_resolution(outcome);
+        }
+    }
+    pub(crate) fn set_function_modifiers(&mut self, modifiers: crate::sem::FunctionModifiers) {
+        if let Self::FuncCall(call) = self {
+            call.set_modifiers(modifiers);
+        }
+    }
+    pub(crate) const fn output_index(&self) -> Option<usize> {
+        match self {
+            Self::ColumnRef(value) => value.output_index(),
+            _ => None,
+        }
+    }
     pub(crate) fn constraint_binding(&self) -> Option<(&str, &ColumnName)> {
         match self {
             Self::ColumnRef(value) => value.constraint_binding(),
@@ -669,7 +726,15 @@ impl SemScalarExpr {
             }
             _ => None,
         };
-        if let Some(replacement) = replacement {
+        if let Some(mut replacement) = replacement {
+            if let Self::TypeCast(cast) = self {
+                replacement.retain_cast_binding(cast.resolution());
+            }
+            if let Self::Arith(operator) = self
+                && let Some(binding) = operator.binding()
+            {
+                replacement.retain_operator_binding(binding);
+            }
             *self = replacement;
         }
         Ok(())

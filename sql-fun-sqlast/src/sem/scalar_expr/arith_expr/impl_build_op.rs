@@ -15,6 +15,15 @@ impl ArithExpr {
     {
         if let Some(operator_def) = context.get_operator_op(name, lexpr.is_some(), rexpr.is_some())
         {
+            if lexpr
+                .as_ref()
+                .is_some_and(|value| value.get_type().is_none())
+                || rexpr
+                    .as_ref()
+                    .is_some_and(|value| value.get_type().is_none())
+            {
+                return Ok((Self::deferred_operator(name, lexpr, rexpr), context));
+            }
             let operator_def = operator_def.clone();
             match (lexpr, rexpr) {
                 (Some(l), Some(r)) => {

@@ -115,3 +115,32 @@ impl DataSourceRowsFromFunc {
         Ok((result.report(&mut context)?, context))
     }
 }
+
+impl DataSourceRowFunctions {
+    pub(crate) fn walk<V: crate::sem::traversal::SemanticVisitor>(
+        &mut self,
+        visitor: &mut V,
+    ) -> Result<(), AnalysisError> {
+        let mut functions = self.functions.to_vec();
+        for function in &mut functions {
+            function.walk(visitor)?;
+        }
+        self.functions = functions.into();
+        Ok(())
+    }
+}
+impl DataSourceRowsFromFunc {
+    pub(crate) fn walk<V: crate::sem::traversal::SemanticVisitor>(
+        &mut self,
+        visitor: &mut V,
+    ) -> Result<(), AnalysisError> {
+        match self {
+            Self::FuncCall(_, arguments, _) | Self::UndefinedFuncCall(_, arguments) => {
+                for argument in arguments {
+                    argument.walk(visitor)?;
+                }
+            }
+        }
+        Ok(())
+    }
+}

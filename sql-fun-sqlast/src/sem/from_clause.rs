@@ -85,3 +85,15 @@ impl FromClause {
         }
     }
 }
+
+impl FromClause {
+    pub(crate) fn walk<V: crate::sem::traversal::SemanticVisitor>(
+        &mut self,
+        visitor: &mut V,
+    ) -> Result<(), crate::sem::AnalysisError> {
+        for source in &mut self.0 {
+            source.walk(visitor)?;
+        }
+        Ok(())
+    }
+}

@@ -41,6 +41,9 @@ impl ArithExpr {
         };
 
         if let Some(operator_def) = context.get_operator_op(name, true, true) {
+            if lexpr.get_type().is_none() || rexpr.get_type().is_none() {
+                return Ok((Self::deferred_all_operator(name, lexpr, rexpr), context));
+            }
             let operator_def = operator_def.clone();
 
             let resolved_bin_op =

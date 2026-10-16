@@ -1,7 +1,4 @@
-mod parameters;
 mod query;
-pub(crate) use self::parameters::ParameterResolution;
-pub(crate) use self::parameters::Signature;
 
 use crate::StringSpan;
 use crate::ast::{
@@ -9,10 +6,10 @@ use crate::ast::{
     Literal, Name, NullTest, OperatorExpr, OperatorKind, SqlValue, Subquery, TypeName,
 };
 use crate::sem::{
-    AliasName, AnalysisError, AnalysisProblem, ArithExpr, CaseExprAnalysisContext, Catalog,
-    CoalesceAnalysis, ColumnName, FullName, FuncCallExpr, IndirectionExpr, OperatorName,
-    Resolution, ResolutionContext, ResolutionOutcome, ScalarAnalysisContext, ScalarConstExpr,
-    SemScalarExpr, SqlValueExpr, TypeReference,
+    AliasName, AnalysisError, AnalysisProblem, ArithExpr, CaseExpr, CaseExprAnalysisContext,
+    Catalog, CoalesceAnalysis, CoalesceExpr, ColumnName, FullName, FuncCallExpr, IndirectionExpr,
+    OperatorName, Resolution, ResolutionContext, ResolutionOutcome, ScalarAnalysisContext,
+    ScalarConstExpr, SemScalarExpr, SqlValueExpr, TypeReference,
 };
 
 impl Name {
@@ -50,7 +47,7 @@ impl Name {
                 &ColumnName::from(column.as_str()),
             )?
             .0;
-        Ok(context.parameters().column(&value).unwrap_or(value))
+        Ok(value)
     }
 }
 
@@ -68,21 +65,9 @@ impl Expr {
         scope: &ScalarAnalysisContext<'_>,
     ) -> ResolutionOutcome<SemScalarExpr> {
         let mut context = Resolution::new(catalog);
-        let result = self.resolve_with_parameters(&mut context, dialect, scope);
+        let result = self.resolve_in(&mut context, dialect, scope);
+        let result = context.infer_expression(result, dialect);
         context.finish(result)
-    }
-
-    fn resolve_with_parameters(
-        &self,
-        context: &mut Resolution<'_>,
-        dialect: Dialect,
-        scope: &ScalarAnalysisContext<'_>,
-    ) -> Result<SemScalarExpr, AnalysisError> {
-        let value = self.resolve_in(context, dialect, scope)?;
-        if context.solve_parameters()? {
-            return self.resolve_in(context, dialect, scope);
-        }
-        Ok(value)
     }
 
     pub(super) fn resolve_in(
@@ -91,13 +76,7 @@ impl Expr {
         dialect: Dialect,
         scope: &ScalarAnalysisContext<'_>,
     ) -> Result<SemScalarExpr, AnalysisError> {
-        let previous = context.parameters().enter_expression(self);
-        let result = crate::sem::with_stack(|| self.resolve_in_body(context, dialect, scope));
-        context.parameters().leave_expression(previous);
-        if let Ok(value) = &result {
-            context.parameters().remember(self, value);
-        }
-        result
+        crate::sem::with_stack(|| self.resolve_in_body(context, dialect, scope))
     }
 
     #[inline(never)]
@@ -108,7 +87,7 @@ impl Expr {
         scope: &ScalarAnalysisContext<'_>,
     ) -> Result<SemScalarExpr, AnalysisError> {
         match self {
-            Self::Parameter(parameter) => Ok(context.parameters().parameter(parameter.position)),
+            Self::Parameter(parameter) => Ok(context.parameter(parameter.position)),
             Self::Literal(value) => Ok(value.resolve()),
             Self::Column(name) => name.resolve_column(context, scope),
             // The legacy column adapter discarded the star component. Preserve
@@ -220,22 +199,6 @@ impl BooleanExpr {
         scope: &ScalarAnalysisContext<'_>,
     ) -> Result<SemScalarExpr, AnalysisError> {
         let arguments = Expr::resolve_list(&self.arguments, context, dialect, scope)?;
-        if arguments
-            .iter()
-            .any(|argument| argument.constraint_node().is_some())
-        {
-            if dialect == Dialect::postgres() {
-                for argument in &arguments {
-                    context.parameter_require(argument, &crate::sem::PgBuiltInType::bool(), false);
-                }
-            }
-            return Ok(context.parameters().operation(
-                "boolean",
-                &arguments,
-                &crate::sem::InputTypeConstraint::exact(&crate::sem::PgBuiltInType::bool()),
-                None,
-            ));
-        }
         self.operator.resolve(&arguments)
     }
 }
@@ -248,18 +211,6 @@ impl NullTest {
         scope: &ScalarAnalysisContext<'_>,
     ) -> Result<SemScalarExpr, AnalysisError> {
         let argument = self.argument.resolve_in(context, dialect, scope)?;
-        if argument.constraint_node().is_some() {
-            return Ok(context.parameters().operation(
-                if self.negated {
-                    "IS NOT NULL"
-                } else {
-                    "IS NULL"
-                },
-                &[argument],
-                &crate::sem::InputTypeConstraint::exact(&crate::sem::PgBuiltInType::bool()),
-                Some(true),
-            ));
-        }
         Ok(SemScalarExpr::null_test(&argument, self.negated))
     }
 }
@@ -308,14 +259,6 @@ impl OperatorExpr {
                 .expect("IS left operand")
                 .resolve_in(context, dialect, scope)?;
             let negated = self.name.0.as_slice() == ["is not"];
-            if argument.constraint_node().is_some() {
-                return Ok(context.parameters().operation(
-                    if negated { "IS NOT NULL" } else { "IS NULL" },
-                    &[argument],
-                    &crate::sem::InputTypeConstraint::exact(&crate::sem::PgBuiltInType::bool()),
-                    Some(true),
-                ));
-            }
             return Ok(SemScalarExpr::null_test(&argument, negated));
         }
         let left = Expr::resolve_optional(&self.left, context, dialect, scope)?;
@@ -325,29 +268,18 @@ impl OperatorExpr {
             // This was unimplemented by the SQLite analyzer before the migration.
             if left
                 .as_ref()
-                .is_some_and(|value| value.constraint_node().is_some())
+                .is_some_and(|value| value.get_type().is_none())
                 || right
                     .as_ref()
-                    .is_some_and(|value| value.constraint_node().is_some())
+                    .is_some_and(|value| value.get_type().is_none())
             {
-                return Ok(context.parameters().sqlite_operator(
-                    &self.name,
-                    left.as_ref(),
-                    right.as_ref(),
+                return Ok(ArithExpr::deferred_operator(
+                    &self.name.operator_name()?,
+                    left,
+                    right,
                 ));
             }
             todo!("SQLite operator semantics");
-        }
-        if left
-            .as_ref()
-            .is_some_and(|value| value.constraint_node().is_some())
-            || right
-                .as_ref()
-                .is_some_and(|value| value.constraint_node().is_some())
-        {
-            return self
-                .kind
-                .resolve_parameter(context, &self.name, left.as_ref(), right.as_ref());
         }
         self.kind.resolve(context, &self.name, left, right)
     }
@@ -418,32 +350,18 @@ impl Cast {
     ) -> Result<SemScalarExpr, AnalysisError> {
         let target = self.target.reference()?;
         let argument = self.argument.resolve_in(context, dialect, scope)?;
-        if argument.constraint_node().is_some() {
-            let target = if dialect == Dialect::postgres() {
-                let Some(canonical) = context.canonicalize_type_ref(&target) else {
-                    return context.unresolved_parameter_operation(
-                        &format!("cast target {target} not found"),
-                        "CAST",
-                        &[argument],
-                        &crate::sem::InputTypeConstraint::exact(&target),
-                    );
-                };
-                context.parameter_require(&argument, &canonical, true);
+        let target = if dialect == Dialect::postgres() {
+            if let Some(canonical) = context.canonicalize_type_ref(&target) {
                 canonical
             } else {
+                context.report_problem(AnalysisProblem::parameter_constraint(&format!(
+                    "cast target {target} not found"
+                )))?;
                 target
-            };
-            return Ok(context.parameters().operation(
-                "CAST",
-                &[argument],
-                &crate::sem::InputTypeConstraint::exact(&target),
-                None,
-            ));
-        }
-        #[cfg(feature = "sqlite")]
-        if dialect == Dialect::sqlite() && context.get_type(target.full_name()).is_none() {
-            context.report_problem(AnalysisProblem::type_not_found(target.full_name()))?;
-        }
+            }
+        } else {
+            target
+        };
         if dialect == Dialect::postgres()
             && let Some(source) = argument.get_type()
             && context.get_explicit_cast(&source, &target).is_none()
@@ -492,7 +410,9 @@ impl Call {
         scope: &ScalarAnalysisContext<'_>,
     ) -> Result<SemScalarExpr, AnalysisError> {
         let arguments = Expr::resolve_list(&self.arguments, context, dialect, scope)?;
-        context.parameters().unify_coalesce_types(&arguments);
+        if let Some(expression) = CoalesceExpr::defer_untyped(&arguments) {
+            return Ok(expression);
+        }
         let mut analysis = CoalesceAnalysis::new();
         for argument in &arguments {
             analysis.push(context, argument)?;
@@ -507,22 +427,6 @@ impl Call {
         scope: &ScalarAnalysisContext<'_>,
     ) -> Result<SemScalarExpr, AnalysisError> {
         let arguments = Expr::resolve_list(&self.arguments, context, dialect, scope)?;
-        if arguments
-            .iter()
-            .any(|argument| argument.constraint_node().is_some())
-        {
-            let name = self.name.full_name()?;
-            let Some(overloads) = context.get_function_by_name(&name) else {
-                return context.unresolved_parameter_operation(
-                    &format!("function {name} not found"),
-                    &name.to_string(),
-                    &arguments,
-                    &crate::sem::InputTypeConstraint::any(),
-                );
-            };
-            let signatures = context.parameter_function_signatures(&overloads, &arguments);
-            return context.parameter_call(&name.to_string(), &arguments, &signatures);
-        }
         FuncCallExpr::resolve_common(
             context,
             &self.name.full_name()?,
@@ -547,9 +451,9 @@ impl Case {
             arms.push((condition, result));
         }
         let otherwise = Expr::resolve_optional(&self.otherwise, context, dialect, scope)?;
-        context
-            .parameters()
-            .unify_case_types(argument.as_ref(), &arms, otherwise.as_ref());
+        if let Some(expression) = CaseExpr::defer_untyped(&argument, &arms, &otherwise) {
+            return Ok(expression);
+        }
         let mut analysis = if dialect == Dialect::sqlite() {
             CaseExprAnalysisContext::without_catalog_casts()
         } else {
@@ -572,8 +476,7 @@ impl Subquery {
         scope: &ScalarAnalysisContext<'_>,
     ) -> Result<SemScalarExpr, AnalysisError> {
         let query = self.query.resolve_in(context, dialect, Some(scope))?;
-        let value = SemScalarExpr::subquery(&query)?;
-        Ok(context.parameters().scalar_result(&value).unwrap_or(value))
+        SemScalarExpr::subquery(&query)
     }
 }
 
@@ -591,9 +494,6 @@ impl Indirection {
         scope: &ScalarAnalysisContext<'_>,
     ) -> Result<SemScalarExpr, AnalysisError> {
         let mut value = self.argument.resolve_in(context, dialect, scope)?;
-        context
-            .parameters()
-            .constrain_indirection(&value, &self.items);
         for item in &self.items {
             value = item.resolve(context, dialect, scope, value)?;
         }
@@ -622,46 +522,5 @@ impl Access {
             }
             Self::Star => AnalysisError::raise_unexpected_input("indirection star"),
         }
-    }
-}
-
-impl Expr {
-    fn is_parameter_projection(&self) -> bool {
-        match self {
-            Self::Parameter(_) => true,
-            Self::Parenthesized(expressions) => match expressions.as_slice() {
-                [expression] => expression.is_parameter_projection(),
-                _ => false,
-            },
-            _ => false,
-        }
-    }
-}
-
-impl OperatorKind {
-    fn resolve_parameter(
-        &self,
-        context: &mut Resolution<'_>,
-        name: &Name,
-        left: Option<&SemScalarExpr>,
-        right: Option<&SemScalarExpr>,
-    ) -> Result<SemScalarExpr, AnalysisError> {
-        if !matches!(self, Self::Ordinary) {
-            return Ok(context
-                .parameters()
-                .special_operator(self, name, left, right));
-        }
-        let name = name.operator_name()?;
-        let arguments: Vec<_> = left.into_iter().chain(right).cloned().collect();
-        let Some(operator) = context.get_operator_op(&name, left.is_some(), right.is_some()) else {
-            return context.unresolved_parameter_operation(
-                &format!("operator {name:?} not found"),
-                &format!("{name:?}"),
-                &arguments,
-                &crate::sem::InputTypeConstraint::any(),
-            );
-        };
-        let signatures = operator.parameter_signatures();
-        context.parameter_call(&format!("{name:?}"), &arguments, &signatures)
     }
 }

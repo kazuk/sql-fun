@@ -105,3 +105,29 @@ impl ArraySlice {
         Ok((arg, context))
     }
 }
+
+impl ArraySlice {
+    pub(crate) fn walk<V: crate::sem::traversal::SemanticVisitor>(
+        &mut self,
+        visitor: &mut V,
+    ) -> Result<(), crate::sem::AnalysisError> {
+        self.array.walk(visitor)?;
+        crate::sem::traversal::optional(&mut self.lower, visitor)?;
+        crate::sem::traversal::optional(&mut self.upper, visitor)?;
+        Ok(())
+    }
+}
+
+impl ArraySlice {
+    pub(crate) fn requires_type_inference(&self) -> bool {
+        self.array.needs_type_inference()
+            || self
+                .lower
+                .as_ref()
+                .is_some_and(SemScalarExpr::needs_type_inference)
+            || self
+                .upper
+                .as_ref()
+                .is_some_and(SemScalarExpr::needs_type_inference)
+    }
+}

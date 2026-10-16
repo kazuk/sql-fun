@@ -112,10 +112,14 @@ impl ParameterConstraint {
 pub struct ParameterConstraints {
     parameters: Vec<ParameterConstraint>,
     outputs: Vec<InputTypeConstraint>,
-    graph: ConstraintGraph,
+    graph: Option<ConstraintGraph>,
 }
 
 impl ParameterConstraints {
+    pub(crate) fn node_domain(&self, node: usize) -> &InputTypeConstraint {
+        self.graph.as_ref().expect("inferred graph").domain(node)
+    }
+
     pub(crate) fn set_outputs(&mut self, outputs: &[InputTypeConstraint]) {
         self.outputs = outputs.to_vec();
     }
@@ -142,14 +146,17 @@ impl ParameterConstraints {
     /// overload assignment. Omitted positions remain unconstrained by this check.
     /// Unknown positions are rejected. This is inspection, not an analysis hint.
     pub fn allows(&self, types: &BTreeMap<u32, TypeReference>) -> bool {
-        self.graph.accepts(types)
+        match &self.graph {
+            Some(graph) => graph.accepts(types),
+            None => types.is_empty(),
+        }
     }
 
     pub(crate) fn from_graph(graph: &ConstraintGraph) -> Self {
         Self {
             parameters: graph.parameter_constraints(),
             outputs: Vec::new(),
-            graph: graph.clone(),
+            graph: Some(graph.clone()),
         }
     }
 }
@@ -243,10 +250,6 @@ impl ConstraintGraph {
             graph.domains[node].intersect(&InputTypeConstraint::exact(ty));
         }
         graph.satisfiable()
-    }
-
-    pub(crate) fn has_parameters(&self) -> bool {
-        !self.parameters.is_empty()
     }
 
     pub(crate) fn node(&mut self, domain: &InputTypeConstraint) -> usize {

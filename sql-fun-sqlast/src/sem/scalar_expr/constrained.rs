@@ -56,3 +56,24 @@ impl ConstrainedExpr {
         self.not_null
     }
 }
+
+impl ConstrainedExpr {
+    pub(crate) fn walk<V: crate::sem::traversal::SemanticVisitor>(
+        &mut self,
+        visitor: &mut V,
+    ) -> Result<(), crate::sem::AnalysisError> {
+        for value in &mut self.arguments {
+            value.walk(visitor)?;
+        }
+        Ok(())
+    }
+}
+
+impl ConstrainedExpr {
+    pub(crate) fn apply_constraints(&mut self, constraints: &crate::sem::ParameterConstraints) {
+        let domain = constraints.node_domain(self.node);
+        if !domain.is_any() {
+            self.types = domain.clone();
+        }
+    }
+}

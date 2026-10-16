@@ -20,3 +20,15 @@ impl SemScalarExprNode for ArrayExpr {
         todo!()
     }
 }
+
+impl ArrayExpr {
+    pub(crate) fn walk<V: crate::sem::traversal::SemanticVisitor>(
+        &mut self,
+        visitor: &mut V,
+    ) -> Result<(), crate::sem::AnalysisError> {
+        for value in &mut self.0 {
+            value.walk(visitor)?;
+        }
+        Ok(())
+    }
+}

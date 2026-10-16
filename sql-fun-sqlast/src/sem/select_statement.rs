@@ -245,3 +245,69 @@ mod test_scalar_scope {
         Ok(())
     }
 }
+
+impl SelectStatement {
+    pub(crate) fn walk<V: crate::sem::traversal::SemanticVisitor>(
+        &mut self,
+        visitor: &mut V,
+    ) -> Result<(), crate::sem::AnalysisError> {
+        visitor.enter_query();
+        let result = self.walk_body(visitor);
+        visitor.leave_query();
+        result?;
+        Ok(())
+    }
+}
+
+impl SelectStatement {
+    fn walk_body<V: crate::sem::traversal::SemanticVisitor>(
+        &mut self,
+        visitor: &mut V,
+    ) -> Result<(), AnalysisError> {
+        match self {
+            Self::Simple(query) => query.walk(visitor),
+            Self::Union(left, right) | Self::Intersect(left, right) | Self::Except(left, right) => {
+                left.walk(visitor)?;
+                visitor.retain_set_outputs();
+                right.walk(visitor)
+            }
+        }
+    }
+}
+
+impl SelectStatementNode {
+    pub(crate) fn walk<V: crate::sem::traversal::SemanticVisitor>(
+        &mut self,
+        visitor: &mut V,
+    ) -> Result<(), crate::sem::AnalysisError> {
+        self.with_clause.walk(visitor)?;
+        self.from_clause.walk(visitor)?;
+        crate::sem::traversal::optional(&mut self.where_clause, visitor)?;
+        if let Some(predicate) = &self.where_clause {
+            visitor.predicate(predicate);
+        }
+        self.result_columns.walk(visitor)?;
+        Ok(())
+    }
+}
+
+impl From<SelectStatementNode> for SelectStatement {
+    fn from(node: SelectStatementNode) -> Self {
+        Self::Simple(node)
+    }
+}
+impl SelectStatementNode {
+    pub(crate) fn from_resolution(
+        result_columns: ResultColumnCollection,
+        with_clause: &WithClause,
+        from_clause: FromClause,
+        where_clause: Option<SemScalarExpr>,
+    ) -> Self {
+        Self {
+            result_columns,
+            with_clause: with_clause.clone(),
+            from_clause,
+            where_clause,
+        }
+    }
+}

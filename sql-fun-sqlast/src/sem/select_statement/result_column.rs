@@ -5,6 +5,9 @@ use crate::sem::{
 
 #[derive(Debug, Clone, Eq, Hash, PartialEq, serde::Serialize, serde::Deserialize)]
 pub struct ResultColumn {
+    // Retain the semantic projection without changing serialized column metadata.
+    #[serde(skip)]
+    expression: Option<Box<SemScalarExpr>>,
     col_name: Option<ColumnName>,
     col_type: Option<TypeReference>,
     is_not_null: Option<bool>,
@@ -17,6 +20,7 @@ impl ResultColumn {
         is_not_null: &Option<bool>,
     ) -> Self {
         Self {
+            expression: None,
             col_name: col_name.clone(),
             col_type: col_type.clone(),
             is_not_null: *is_not_null,
@@ -184,5 +188,67 @@ impl ResultColumnCollection {
             fields.push(field_def);
         }
         Ok(fields)
+    }
+}
+
+impl ResultColumnCollection {
+    pub(crate) fn walk<V: crate::sem::traversal::SemanticVisitor>(
+        &mut self,
+        visitor: &mut V,
+    ) -> Result<(), crate::sem::AnalysisError> {
+        for column in &mut self.0 {
+            if let Some(expression) = &mut column.expression {
+                expression.walk(visitor)?;
+                visitor.output(
+                    column.col_name.as_ref().map_or("", ColumnName::as_str),
+                    expression,
+                );
+                column.col_type = expression.get_type();
+                column.is_not_null = expression.is_not_null();
+            }
+        }
+        Ok(())
+    }
+}
+
+impl ResultColumnCollection {
+    pub(crate) fn push_expression(&mut self, name: &ColumnName, expression: SemScalarExpr) {
+        let mut column = ResultColumn::new(
+            &Some(name.clone()),
+            &expression.get_type(),
+            &expression.is_not_null(),
+        );
+        column.expression = Some(Box::new(expression));
+        self.0.push(column);
+    }
+}
+
+#[cfg(test)]
+mod test_projection_metadata_contract {
+    use super::{ResultColumn, ResultColumnCollection};
+    use crate::sem::{ColumnName, PgBuiltInType, ScalarConstExpr, SemScalarExpr};
+
+    #[test]
+    fn retained_projection_preserves_serialized_column_metadata() {
+        let name = ColumnName::from("n");
+        let expression = SemScalarExpr::literal(&ScalarConstExpr::new_integer(1));
+        let mut columns = ResultColumnCollection::default();
+        columns.push_expression(&name, expression);
+        let retained = columns.get_column_at(0).unwrap();
+        assert!(retained.expression.is_some());
+        let metadata = ResultColumn::new(&Some(name), &Some(PgBuiltInType::int4()), &Some(true));
+        assert_eq!(
+            ::serde_json::to_value(retained).unwrap(),
+            ::serde_json::to_value(metadata).unwrap()
+        );
+    }
+}
+
+impl ResultColumnCollection {
+    pub(crate) fn scalar_type(&self) -> Option<TypeReference> {
+        match self.0.as_slice() {
+            [column] => column.col_type.clone(),
+            _ => None,
+        }
     }
 }

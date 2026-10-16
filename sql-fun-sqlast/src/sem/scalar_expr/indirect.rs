@@ -70,3 +70,35 @@ impl SemScalarExprNode for IndirectionExpr {
         }
     }
 }
+
+impl IndirectionExpr {
+    pub(crate) fn walk<V: crate::sem::traversal::SemanticVisitor>(
+        &mut self,
+        visitor: &mut V,
+    ) -> Result<(), crate::sem::AnalysisError> {
+        match self {
+            Self::ArrayIndex(v) => v.walk(visitor)?,
+            Self::ArraySlice(v) => v.walk(visitor)?,
+            Self::MemberRef(v) => v.walk(visitor)?,
+        }
+        Ok(())
+    }
+}
+
+impl IndirectionExpr {
+    fn requires_type_inference(&self) -> bool {
+        match self {
+            Self::ArrayIndex(value) => value.requires_type_inference(),
+            Self::ArraySlice(value) => value.requires_type_inference(),
+            Self::MemberRef(value) => value.requires_type_inference(),
+        }
+    }
+    pub(crate) fn collect_constraints(
+        &self,
+        parameters: &mut crate::sem::parameter_resolution::ParameterResolution,
+    ) {
+        if self.requires_type_inference() {
+            parameters.constrain_indirection(self);
+        }
+    }
+}

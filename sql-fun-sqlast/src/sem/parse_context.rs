@@ -240,6 +240,7 @@ where
     Self: Sized,
 {
     /// Constraints derived from the most recently reported semantic analysis.
+    /// Parameter-free analyses skip inference and leave this result empty.
     /// These are independent of parameter metadata hints and Rust type mapping.
     /// Conflicts are reported through [`DiagnosticContext::report_problem`]; a
     /// returned analysis result does not imply satisfiable constraints.

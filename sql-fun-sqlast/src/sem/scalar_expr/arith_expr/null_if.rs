@@ -49,3 +49,26 @@ impl ArithExpr {
         Ok((SemScalarExpr::Arith(result), context))
     }
 }
+
+impl NullIfExpr {
+    pub(crate) fn walk<V: crate::sem::traversal::SemanticVisitor>(
+        &mut self,
+        visitor: &mut V,
+    ) -> Result<(), AnalysisError> {
+        self.return_value.walk(visitor)?;
+        self.comparison_value.walk(visitor)
+    }
+}
+
+impl NullIfExpr {
+    pub(crate) fn collect_constraints(
+        &self,
+        parameters: &mut crate::sem::parameter_resolution::ParameterResolution,
+    ) {
+        if self.return_value.constraint_node().is_some()
+            || self.comparison_value.constraint_node().is_some()
+        {
+            parameters.special_operator("NULLIF", &[&self.return_value, &self.comparison_value]);
+        }
+    }
+}

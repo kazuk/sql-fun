@@ -1,11 +1,10 @@
-//! Analysis-local graph building and replay. Source AST and catalog models stay intact.
-use crate::ast::{Access, Expr, Name, OperatorKind};
+//! Parameter inference over the name-resolved semantic tree.
+use crate::ast::Dialect;
 use crate::sem::{
     AnalysisError, Catalog, ConstrainedExpr, ConstraintGraph, InputTypeConstraint,
-    ParameterConstraintProblem, ParameterConstraints, SemScalarExpr, SignatureAlternative,
-    TypeReference,
+    ParameterConstraints, SemScalarExpr, SignatureAlternative, TypeReference,
 };
-use std::collections::{BTreeMap, HashMap};
+use std::collections::BTreeMap;
 
 #[derive(Clone, Default)]
 struct Outputs(Vec<Output>);
@@ -146,11 +145,8 @@ impl QueryScope {
 #[derive(Default)]
 pub(crate) struct ParameterResolution {
     graph: ConstraintGraph,
-    expressions: HashMap<usize, usize>,
-    active_expression: Option<usize>,
     scopes: Vec<QueryScope>,
     completed: Outputs,
-    replay: bool,
 }
 
 impl ParameterResolution {
@@ -160,43 +156,14 @@ impl ParameterResolution {
         constraints
     }
 
-    pub(crate) fn is_any(&self, value: &SemScalarExpr) -> bool {
-        value
-            .constraint_node()
-            .is_some_and(|node| self.graph.domain(node).is_any())
-    }
-
-    pub(crate) fn solve(&mut self) -> Result<bool, ParameterConstraintProblem> {
-        if !self.graph.has_parameters() {
-            return Ok(false);
+    fn solve(&mut self, context: &mut crate::sem::Resolution<'_>) -> Result<(), AnalysisError> {
+        if let Err(problem) = self.graph.solve() {
+            crate::sem::ResolutionContext::report_problem(
+                context,
+                crate::sem::AnalysisProblem::parameter_constraint(problem.message()),
+            )?;
         }
-        self.graph.solve()?;
-        self.replay = true;
-        self.scopes.clear();
-        self.completed = Outputs::default();
-        Ok(true)
-    }
-
-    // Replay rebuilds the whole semantic tree, including queries nested in an
-    // expression, while retaining the graph nodes from the collection pass.
-    pub(crate) fn enter_expression(&mut self, expression: &Expr) -> Option<usize> {
-        let previous = self.active_expression;
-        self.active_expression = self
-            .expressions
-            .get(&(std::ptr::from_ref(expression) as usize))
-            .copied();
-        previous
-    }
-
-    pub(crate) const fn leave_expression(&mut self, previous: Option<usize>) {
-        self.active_expression = previous;
-    }
-
-    pub(crate) fn remember(&mut self, expression: &Expr, value: &SemScalarExpr) {
-        if let Some(node) = value.constraint_node() {
-            self.expressions
-                .insert(std::ptr::from_ref(expression) as usize, node);
-        }
+        Ok(())
     }
 
     pub(crate) fn parameter(&mut self, position: u32) -> SemScalarExpr {
@@ -204,60 +171,24 @@ impl ParameterResolution {
         SemScalarExpr::parameter(position, node, self.graph.domain(node))
     }
 
-    // These operations own the inference gaps; syntax resolvers only submit
-    // semantic operands. Concrete operands still follow existing analysis paths.
-    pub(crate) fn unify_case_types(
-        &mut self,
-        argument: Option<&SemScalarExpr>,
-        arms: &[(SemScalarExpr, SemScalarExpr)],
-        otherwise: Option<&SemScalarExpr>,
-    ) {
-        if argument.is_some_and(Self::needs_type_inference)
-            || otherwise.is_some_and(Self::needs_type_inference)
-        {
-            todo!("parameter-dependent CASE type unification");
-        }
-        for (condition, result) in arms {
-            if Self::needs_type_inference(condition) || Self::needs_type_inference(result) {
-                todo!("parameter-dependent CASE type unification");
-            }
-        }
+    pub(crate) fn unify_case_types(&mut self, _case: &crate::sem::CaseExpr) {
+        todo!("parameter-dependent CASE type unification");
     }
-
-    pub(crate) fn unify_coalesce_types(&mut self, arguments: &[SemScalarExpr]) {
-        for argument in arguments {
-            if Self::needs_type_inference(argument) {
-                todo!("parameter-dependent COALESCE type unification");
-            }
-        }
+    pub(crate) fn unify_coalesce_types(&mut self, _coalesce: &crate::sem::CoalesceExpr) {
+        todo!("parameter-dependent COALESCE type unification");
     }
-
-    pub(crate) fn constrain_indirection(&mut self, base: &SemScalarExpr, _accesses: &[Access]) {
-        if Self::needs_type_inference(base) {
-            todo!("parameter-dependent indirection type constraints");
-        }
+    pub(crate) fn constrain_indirection(&mut self, _indirection: &crate::sem::IndirectionExpr) {
+        todo!("parameter-dependent indirection type constraints");
     }
-
-    fn needs_type_inference(value: &SemScalarExpr) -> bool {
-        value.constraint_node().is_some() && value.get_type().is_none()
-    }
-
     pub(crate) fn sqlite_operator(
         &mut self,
-        _name: &Name,
+        _name: &crate::sem::OperatorName,
         _left: Option<&SemScalarExpr>,
         _right: Option<&SemScalarExpr>,
     ) -> SemScalarExpr {
         todo!("SQLite operator type constraints");
     }
-
-    pub(crate) fn special_operator(
-        &mut self,
-        _kind: &OperatorKind,
-        _name: &Name,
-        _left: Option<&SemScalarExpr>,
-        _right: Option<&SemScalarExpr>,
-    ) -> SemScalarExpr {
+    pub(crate) fn special_operator(&mut self, _operation: &str, _arguments: &[&SemScalarExpr]) {
         todo!("parameter constraints for this operator form");
     }
 
@@ -280,12 +211,7 @@ impl ParameterResolution {
         domain: &InputTypeConstraint,
         not_null: Option<bool>,
     ) -> SemScalarExpr {
-        let node = if self.replay {
-            self.active_expression
-                .expect("replayed operation has a collected node")
-        } else {
-            self.graph.node(domain)
-        };
+        let node = self.graph.node(domain);
         SemScalarExpr::constrained(&ConstrainedExpr::new(
             node,
             operation,
@@ -303,9 +229,7 @@ impl ParameterResolution {
         target: &TypeReference,
         explicit: bool,
     ) {
-        if !self.replay
-            && let Some(node) = value.constraint_node()
-        {
+        if let Some(node) = value.constraint_node() {
             self.graph.restrict(
                 node,
                 &InputTypeConstraint::types(catalog.cast_sources(target, explicit)),
@@ -321,18 +245,16 @@ impl ParameterResolution {
         signatures: &[Signature],
     ) -> Result<SemScalarExpr, AnalysisError> {
         let result = self.operation(name, arguments, &InputTypeConstraint::any(), None);
-        if !self.replay {
-            let mut nodes = Vec::new();
-            let mut domains = Vec::new();
-            for argument in arguments {
-                let node = self.input(argument);
-                domains.push(self.graph.domain(node).clone());
-                nodes.push(node);
-            }
-            nodes.push(result.constraint_node().expect("operation has node"));
-            let alternatives = Signature::alternatives(signatures, catalog, &domains);
-            self.graph.overload(&nodes, &alternatives, name);
+        let mut nodes = Vec::new();
+        let mut domains = Vec::new();
+        for argument in arguments {
+            let node = self.input(argument);
+            domains.push(self.graph.domain(node).clone());
+            nodes.push(node);
         }
+        nodes.push(result.constraint_node().expect("operation has node"));
+        let alternatives = Signature::alternatives(signatures, catalog, &domains);
+        self.graph.overload(&nodes, &alternatives, name);
         Ok(result)
     }
 
@@ -344,10 +266,8 @@ impl ParameterResolution {
             &InputTypeConstraint::any(),
             value.is_not_null(),
         );
-        if !self.replay {
-            self.graph
-                .equal(source, result.constraint_node().expect("operation node"));
-        }
+        self.graph
+            .equal(source, result.constraint_node().expect("operation node"));
         Some(result)
     }
 
@@ -623,4 +543,156 @@ impl OverloadScores {
         }
         Some(candidate)
     }
+}
+
+struct Collector<'a, 'b> {
+    parameters: ParameterResolution,
+    context: &'a mut crate::sem::Resolution<'b>,
+    dialect: Dialect,
+}
+
+impl crate::sem::traversal::SemanticVisitor for Collector<'_, '_> {
+    fn expression(&mut self, expression: &mut SemScalarExpr) -> Result<(), AnalysisError> {
+        expression.collect_constraints(&mut self.parameters, self.context, self.dialect)
+    }
+    fn enter_query(&mut self) {
+        self.parameters.enter_query();
+    }
+    fn leave_query(&mut self) {
+        self.parameters.leave_query();
+    }
+    fn cte(&mut self, name: &str) {
+        self.parameters.cte(name, &[]);
+    }
+    fn relation(&mut self, name: Option<&str>, alias: &str, columns: &[String]) {
+        self.parameters.relation(name, alias, columns);
+    }
+    fn derived(&mut self, alias: &str, columns: &[String]) {
+        self.parameters.derived(alias, columns);
+    }
+    fn output(&mut self, name: &str, expression: &mut SemScalarExpr) {
+        self.parameters.output(
+            name,
+            expression,
+            self.dialect == Dialect::postgres() && expression.is_unconstrained_parameter(),
+        );
+    }
+    fn predicate(&mut self, value: &SemScalarExpr) {
+        if self.dialect == Dialect::postgres() {
+            self.parameters.require(
+                self.context,
+                value,
+                &crate::sem::PgBuiltInType::bool(),
+                false,
+            );
+        }
+    }
+    fn retain_set_outputs(&mut self) {
+        self.parameters.retain_completed_outputs();
+    }
+}
+
+struct Finalizer<'a> {
+    constraints: &'a ParameterConstraints,
+    dialect: Dialect,
+}
+impl crate::sem::traversal::SemanticVisitor for Finalizer<'_> {
+    fn expression(&mut self, expression: &mut SemScalarExpr) -> Result<(), AnalysisError> {
+        expression.apply_constraints(self.constraints);
+        Ok(())
+    }
+    fn output(&mut self, _name: &str, expression: &mut SemScalarExpr) {
+        if self.dialect == Dialect::postgres() && expression.is_unconstrained_parameter() {
+            *expression =
+                SemScalarExpr::wrap_implicit_cast(&crate::sem::PgBuiltInType::text(), expression);
+        }
+    }
+}
+
+impl ParameterResolution {
+    pub(crate) fn infer_query(
+        query: &mut crate::sem::SelectStatement,
+        context: &mut crate::sem::Resolution<'_>,
+        dialect: Dialect,
+    ) -> Result<ParameterConstraints, AnalysisError> {
+        #[cfg(test)]
+        INFERENCE_RUNS.with(|runs| runs.set(runs.get() + 1));
+        let mut collector = Collector {
+            parameters: Self::default(),
+            context,
+            dialect,
+        };
+        query.walk(&mut collector)?;
+        collector.parameters.solve(collector.context)?;
+        let constraints = collector.parameters.constraints();
+        query.walk(&mut Finalizer {
+            constraints: &constraints,
+            dialect,
+        })?;
+        Ok(constraints)
+    }
+    pub(crate) fn infer_expression(
+        expression: &mut SemScalarExpr,
+        context: &mut crate::sem::Resolution<'_>,
+        dialect: Dialect,
+    ) -> Result<ParameterConstraints, AnalysisError> {
+        #[cfg(test)]
+        INFERENCE_RUNS.with(|runs| runs.set(runs.get() + 1));
+        let mut collector = Collector {
+            parameters: Self::default(),
+            context,
+            dialect,
+        };
+        expression.walk(&mut collector)?;
+        collector.parameters.solve(collector.context)?;
+        let constraints = collector.parameters.constraints();
+        expression.walk(&mut Finalizer {
+            constraints: &constraints,
+            dialect,
+        })?;
+        Ok(constraints)
+    }
+
+    pub(crate) fn operator(
+        &mut self,
+        context: &mut crate::sem::Resolution<'_>,
+        dialect: Dialect,
+        name: &crate::sem::OperatorName,
+        left: Option<&SemScalarExpr>,
+        right: Option<&SemScalarExpr>,
+    ) -> Result<Option<SemScalarExpr>, AnalysisError> {
+        if !left.is_some_and(|arg| arg.constraint_node().is_some())
+            && !right.is_some_and(|arg| arg.constraint_node().is_some())
+        {
+            return Ok(None);
+        }
+        if dialect == Dialect::sqlite() {
+            return Ok(Some(self.sqlite_operator(name, left, right)));
+        }
+        let arguments: Vec<_> = left.into_iter().chain(right).cloned().collect();
+        if let Some(operator) = context.get_operator_op(name, left.is_some(), right.is_some()) {
+            let signatures = operator.parameter_signatures();
+            return Ok(Some(self.call(
+                context,
+                &format!("{name:?}"),
+                &arguments,
+                &signatures,
+            )?));
+        }
+        Ok(Some(self.operation(
+            &format!("{name:?}"),
+            &arguments,
+            &InputTypeConstraint::any(),
+            None,
+        )))
+    }
+}
+
+#[cfg(test)]
+std::thread_local! {
+    static INFERENCE_RUNS: std::cell::Cell<usize> = const { std::cell::Cell::new(0) };
+}
+#[cfg(test)]
+pub(crate) fn inference_runs() -> usize {
+    INFERENCE_RUNS.with(std::cell::Cell::get)
 }

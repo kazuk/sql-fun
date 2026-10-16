@@ -77,6 +77,25 @@ mod implementation {
             &self.arg_definition
         }
     }
+    impl FuncCallExpr {
+        pub(crate) fn walk<V: crate::sem::traversal::SemanticVisitor>(
+            &mut self,
+            visitor: &mut V,
+        ) -> Result<(), crate::sem::AnalysisError> {
+            let mut args = self.args.to_vec();
+            for arg in &mut args {
+                arg.arg_expr.walk(visitor)?;
+            }
+            self.args = args.into();
+            Ok(())
+        }
+        pub(crate) fn inference_call(&self) -> (&FullName, Vec<SemScalarExpr>) {
+            (
+                &self.func_name,
+                self.args.iter().map(|arg| arg.arg_expr.clone()).collect(),
+            )
+        }
+    }
 }
 
 pub use self::implementation::{FuncCallArgs, FuncCallExpr};
@@ -141,6 +160,9 @@ impl FuncCallExpr {
     ) -> Result<SemScalarExpr, AnalysisError> {
         let arg_types = ArgumentBindingCollection::from_expr_list(arguments);
         if let Some(overloads) = context.get_function_by_name(name) {
+            if arguments.iter().any(SemScalarExpr::requires_argument_type) {
+                return Ok(Self::deferred(name, arguments));
+            }
             if let Some(overload) = overloads.resolve_from_catalog(context, &arg_types) {
                 let args = Self::cast_operand_expression(
                     context,
@@ -430,5 +452,47 @@ mod test_func_call_expr_is_not_null {
         let func_call = FuncCallExpr::new(&func_name, &Some(overload), &args);
 
         assert_eq!(Some(false), func_call.is_not_null());
+    }
+}
+
+impl FuncCallExpr {
+    pub(crate) fn collect_constraints(
+        &self,
+        parameters: &mut crate::sem::parameter_resolution::ParameterResolution,
+        context: &mut crate::sem::Resolution<'_>,
+    ) -> Result<Option<SemScalarExpr>, AnalysisError> {
+        let (name, arguments) = self.inference_call();
+        if !arguments
+            .iter()
+            .any(|argument| argument.constraint_node().is_some())
+        {
+            return Ok(None);
+        }
+        if let Some(overloads) = crate::sem::Catalog::get_function_by_name(context, name) {
+            let signatures = overloads.parameter_signatures(context, &arguments);
+            Ok(Some(parameters.call(
+                context,
+                &name.to_string(),
+                &arguments,
+                &signatures,
+            )?))
+        } else {
+            Ok(Some(parameters.operation(
+                &name.to_string(),
+                &arguments,
+                &crate::sem::InputTypeConstraint::any(),
+                None,
+            )))
+        }
+    }
+}
+
+impl FuncCallExpr {
+    fn deferred(name: &FullName, arguments: &[SemScalarExpr]) -> SemScalarExpr {
+        let args = arguments
+            .iter()
+            .map(|argument| FuncCallArgs::new(argument, &None))
+            .collect::<Vec<_>>();
+        SemScalarExpr::function_call(&Self::new(name, &None, &args.into()))
     }
 }

@@ -92,3 +92,14 @@ impl SubQueryDataSource {
         )))
     }
 }
+
+impl SubQueryDataSource {
+    pub(crate) fn walk<V: crate::sem::traversal::SemanticVisitor>(
+        &mut self,
+        visitor: &mut V,
+    ) -> Result<(), crate::sem::AnalysisError> {
+        self.select_statement.walk(visitor)?;
+        visitor.derived(self.alias.name().as_str(), &self.alias.inference_columns());
+        Ok(())
+    }
+}

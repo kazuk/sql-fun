@@ -121,8 +121,8 @@ impl OperatorDefinition {
 }
 
 impl BinaryOperatorDefinition {
-    fn parameter_signature(&self) -> crate::ast::Signature {
-        crate::ast::Signature::new(
+    fn parameter_signature(&self) -> crate::sem::parameter_resolution::Signature {
+        crate::sem::parameter_resolution::Signature::new(
             &[self.left_arg_type.clone(), self.right_arg_type.clone()],
             &self.result_type,
         )
@@ -130,13 +130,16 @@ impl BinaryOperatorDefinition {
 }
 
 impl UnaryOperatorDefinition {
-    fn parameter_signature(&self) -> crate::ast::Signature {
-        crate::ast::Signature::new(std::slice::from_ref(&self.arg_type), &self.result_type)
+    fn parameter_signature(&self) -> crate::sem::parameter_resolution::Signature {
+        crate::sem::parameter_resolution::Signature::new(
+            std::slice::from_ref(&self.arg_type),
+            &self.result_type,
+        )
     }
 }
 
 impl OperatorDefinition {
-    pub(crate) fn parameter_signatures(&self) -> Vec<crate::ast::Signature> {
+    pub(crate) fn parameter_signatures(&self) -> Vec<crate::sem::parameter_resolution::Signature> {
         match self {
             Self::Binary(overloads) => overloads
                 .iter()

@@ -119,79 +119,65 @@ impl<T: ParseContext> ResolutionContext for T {
 pub(crate) struct Resolution<'a> {
     catalog: &'a dyn Catalog,
     problems: Vec<AnalysisProblem>,
-    parameters: crate::ast::ParameterResolution,
+    has_parameters: bool,
+    parameters: Option<crate::sem::ParameterConstraints>,
 }
 
 impl<'a> Resolution<'a> {
-    pub(crate) fn parameter_function_signatures(
-        &self,
-        overloads: &FunctionOverloadCollection,
-        arguments: &[crate::sem::SemScalarExpr],
-    ) -> Vec<crate::ast::Signature> {
-        overloads.parameter_signatures(self, arguments)
+    pub(crate) fn parameter(&mut self, position: u32) -> crate::sem::SemScalarExpr {
+        self.has_parameters = true;
+        crate::sem::SemScalarExpr::parameter(
+            position,
+            usize::MAX,
+            &crate::sem::InputTypeConstraint::any(),
+        )
     }
-
-    pub(crate) const fn parameters(&mut self) -> &mut crate::ast::ParameterResolution {
-        &mut self.parameters
-    }
-    pub(crate) fn solve_parameters(&mut self) -> Result<bool, AnalysisError> {
-        match self.parameters.solve() {
-            Ok(replay) => {
-                if replay {
-                    self.problems.clear();
-                }
-                Ok(replay)
-            }
-            Err(problem) => {
-                self.report_problem(AnalysisProblem::parameter_constraint(problem.message()))?;
-                Ok(false)
-            }
+    pub(crate) fn infer_query(
+        &mut self,
+        result: Result<crate::sem::SelectStatement, AnalysisError>,
+        dialect: crate::ast::Dialect,
+    ) -> Result<crate::sem::SelectStatement, AnalysisError> {
+        let mut query = result?;
+        if self.has_parameters {
+            self.parameters = Some(
+                crate::sem::parameter_resolution::ParameterResolution::infer_query(
+                    &mut query, self, dialect,
+                )?,
+            );
         }
+        Ok(query)
     }
-    pub(crate) fn parameter_require(
+    pub(crate) fn infer_expression(
         &mut self,
-        value: &crate::sem::SemScalarExpr,
-        target: &TypeReference,
-        explicit: bool,
-    ) {
-        self.parameters
-            .require(self.catalog, value, target, explicit);
-    }
-    pub(crate) fn unresolved_parameter_operation(
-        &mut self,
-        message: &str,
-        operation: &str,
-        arguments: &[crate::sem::SemScalarExpr],
-        domain: &crate::sem::InputTypeConstraint,
+        result: Result<crate::sem::SemScalarExpr, AnalysisError>,
+        dialect: crate::ast::Dialect,
     ) -> Result<crate::sem::SemScalarExpr, AnalysisError> {
-        self.report_problem(AnalysisProblem::parameter_constraint(message))?;
-        Ok(self
-            .parameters
-            .operation(operation, arguments, domain, None))
-    }
-
-    pub(crate) fn parameter_call(
-        &mut self,
-        name: &str,
-        arguments: &[crate::sem::SemScalarExpr],
-        signatures: &[crate::ast::Signature],
-    ) -> Result<crate::sem::SemScalarExpr, AnalysisError> {
-        self.parameters
-            .call(self.catalog, name, arguments, signatures)
+        let mut expression = result?;
+        if self.has_parameters {
+            self.parameters = Some(
+                crate::sem::parameter_resolution::ParameterResolution::infer_expression(
+                    &mut expression,
+                    self,
+                    dialect,
+                )?,
+            );
+        }
+        Ok(expression)
     }
 
     pub(crate) fn new(catalog: &'a dyn Catalog) -> Self {
         Self {
             catalog,
             problems: Vec::new(),
-            parameters: crate::ast::ParameterResolution::default(),
+            has_parameters: false,
+            parameters: None,
         }
     }
 
     pub(crate) fn finish<T>(self, result: Result<T, AnalysisError>) -> ResolutionOutcome<T> {
         ResolutionOutcome {
             result,
-            parameters: self.parameters.constraints(),
+            parameters: self.parameters.unwrap_or_default(),
             problems: self.problems,
         }
     }
@@ -257,7 +243,8 @@ mod test_resolution_outcome {
     }
 
     #[test]
-    fn reporting_failure_takes_precedence_and_stops_replay() -> testresult::TestResult {
+    fn reporting_failure_takes_precedence_and_stops_diagnostic_delivery() -> testresult::TestResult
+    {
         let catalog = TestParseContext::default();
         let mut resolution = Resolution::new(&catalog);
         for name in ["first", "second", "third"] {

@@ -139,3 +139,122 @@ impl SemScalarExprNode for ArithExpr {
         }
     }
 }
+
+impl BetweenExpr {
+    pub(crate) fn walk<V: crate::sem::traversal::SemanticVisitor>(
+        &mut self,
+        visitor: &mut V,
+    ) -> Result<(), crate::sem::AnalysisError> {
+        self.left.walk(visitor)?;
+        self.start.walk(visitor)?;
+        self.end.walk(visitor)?;
+        Ok(())
+    }
+}
+
+impl ArithExpr {
+    pub(crate) fn walk<V: crate::sem::traversal::SemanticVisitor>(
+        &mut self,
+        visitor: &mut V,
+    ) -> Result<(), crate::sem::AnalysisError> {
+        match self {
+            Self::OpBinary(v) => v.walk(visitor)?,
+            Self::OpLeftUnary(v) => v.walk(visitor)?,
+            Self::OpRightUnary(v) => v.walk(visitor)?,
+            Self::OpAnyBinary(v) => v.walk(visitor)?,
+            Self::OpAllBinary(v) => v.walk(visitor)?,
+            Self::UndefinedOperator(v) => v.walk(visitor)?,
+            Self::UndefinedOperatorAny(v) => v.walk(visitor)?,
+            Self::UndefinedOperatorAll(v) => v.walk(visitor)?,
+            Self::NullIfExpr(v) => v.walk(visitor)?,
+            Self::Between(v) => v.walk(visitor)?,
+        }
+        Ok(())
+    }
+}
+
+impl BetweenExpr {
+    fn collect_constraints(
+        &self,
+        parameters: &mut crate::sem::parameter_resolution::ParameterResolution,
+    ) {
+        if self.left.constraint_node().is_some()
+            || self.start.constraint_node().is_some()
+            || self.end.constraint_node().is_some()
+        {
+            parameters.special_operator("BETWEEN", &[&self.left, &self.start, &self.end]);
+        }
+    }
+}
+impl ArithExpr {
+    pub(crate) fn collect_constraints(
+        &self,
+        parameters: &mut crate::sem::parameter_resolution::ParameterResolution,
+        context: &mut crate::sem::Resolution<'_>,
+        dialect: crate::ast::Dialect,
+    ) -> Result<Option<SemScalarExpr>, crate::sem::AnalysisError> {
+        match self {
+            Self::OpBinary(v) => v.collect_constraints(parameters, context, dialect),
+            Self::OpLeftUnary(v) => v.collect_constraints(parameters, context, dialect),
+            Self::OpRightUnary(v) => v.collect_constraints(parameters, context, dialect),
+            Self::UndefinedOperator(v) => v.collect_constraints(parameters, context, dialect),
+            Self::OpAnyBinary(v) => {
+                v.collect_constraints(parameters);
+                Ok(None)
+            }
+            Self::OpAllBinary(v) => {
+                v.collect_constraints(parameters);
+                Ok(None)
+            }
+            Self::UndefinedOperatorAny(v) => {
+                v.collect_constraints(parameters);
+                Ok(None)
+            }
+            Self::UndefinedOperatorAll(v) => {
+                v.collect_constraints(parameters);
+                Ok(None)
+            }
+            Self::NullIfExpr(v) => {
+                v.collect_constraints(parameters);
+                Ok(None)
+            }
+            Self::Between(v) => {
+                v.collect_constraints(parameters);
+                Ok(None)
+            }
+        }
+    }
+}
+
+impl ArithExpr {
+    pub(crate) fn deferred_operator(
+        name: &crate::sem::OperatorName,
+        left: Option<SemScalarExpr>,
+        right: Option<SemScalarExpr>,
+    ) -> SemScalarExpr {
+        let call = UndefinedOperatorCallSite::from_inputs(name, left, right);
+        SemScalarExpr::arithmetic(Self::UndefinedOperator(Box::new(call)))
+    }
+}
+
+impl ArithExpr {
+    pub(crate) fn deferred_any_operator(
+        name: &crate::sem::OperatorName,
+        left: SemScalarExpr,
+        right: SemScalarExpr,
+    ) -> SemScalarExpr {
+        let call = UndefinedOperatorAnyCallSite::from_inputs(name, left, right);
+        SemScalarExpr::arithmetic(Self::UndefinedOperatorAny(Box::new(call)))
+    }
+}
+
+impl ArithExpr {
+    pub(crate) fn deferred_all_operator(
+        name: &crate::sem::OperatorName,
+        left: SemScalarExpr,
+        right: SemScalarExpr,
+    ) -> SemScalarExpr {
+        let call = UndefinedOperatorAllCallSite::from_inputs(name, left, right);
+        SemScalarExpr::arithmetic(Self::UndefinedOperatorAll(Box::new(call)))
+    }
+}

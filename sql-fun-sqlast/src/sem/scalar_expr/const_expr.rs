@@ -19,6 +19,10 @@ pub enum ScalarConstExpr {
 }
 
 impl ScalarConstExpr {
+    pub(crate) const fn is_null(&self) -> bool {
+        matches!(self, Self::Null)
+    }
+
     pub(crate) fn numeric(value: &str) -> Self {
         Self::Float(value.to_owned())
     }

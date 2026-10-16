@@ -259,3 +259,24 @@ impl DataSource {
         }
     }
 }
+
+impl DataSource {
+    pub(crate) fn walk<V: crate::sem::traversal::SemanticVisitor>(
+        &mut self,
+        visitor: &mut V,
+    ) -> Result<(), crate::sem::AnalysisError> {
+        match self {
+            Self::CteQuery(v) => v.walk(visitor)?,
+            Self::Table(v) => v.walk(visitor)?,
+            Self::View(v) => v.walk(visitor)?,
+            Self::JoinExpr(v) => v.walk(visitor)?,
+            Self::Group(v) => v.walk(visitor)?,
+            Self::SubQuery(v) => v.walk(visitor)?,
+            Self::CallTableFunc(value) => value.walk(visitor)?,
+            Self::UndefinedTableFunc(value) => value.walk(visitor)?,
+            Self::RowFunctions(value) => value.walk(visitor)?,
+            Self::RangeTableSample() | Self::Unknown(_, _) => {}
+        }
+        Ok(())
+    }
+}

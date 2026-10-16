@@ -188,3 +188,73 @@ impl UndefinedOperatorCallSite {
         ))
     }
 }
+
+impl BinaryOpCallSite {
+    pub(crate) fn walk<V: crate::sem::traversal::SemanticVisitor>(
+        &mut self,
+        visitor: &mut V,
+    ) -> Result<(), crate::sem::AnalysisError> {
+        self.left_arg.walk(visitor)?;
+        self.right_arg.walk(visitor)?;
+        Ok(())
+    }
+}
+
+impl UndefinedOperatorCallSite {
+    pub(crate) fn walk<V: crate::sem::traversal::SemanticVisitor>(
+        &mut self,
+        visitor: &mut V,
+    ) -> Result<(), crate::sem::AnalysisError> {
+        crate::sem::traversal::optional(&mut self.larg, visitor)?;
+        crate::sem::traversal::optional(&mut self.rarg, visitor)?;
+        Ok(())
+    }
+}
+
+impl BinaryOpCallSite {
+    pub(crate) fn collect_constraints(
+        &self,
+        parameters: &mut crate::sem::parameter_resolution::ParameterResolution,
+        context: &mut crate::sem::Resolution<'_>,
+        dialect: crate::ast::Dialect,
+    ) -> Result<Option<SemScalarExpr>, AnalysisError> {
+        parameters.operator(
+            context,
+            dialect,
+            &self.operator_name,
+            Some(&self.left_arg),
+            Some(&self.right_arg),
+        )
+    }
+}
+
+impl UndefinedOperatorCallSite {
+    pub(crate) fn collect_constraints(
+        &self,
+        parameters: &mut crate::sem::parameter_resolution::ParameterResolution,
+        context: &mut crate::sem::Resolution<'_>,
+        dialect: crate::ast::Dialect,
+    ) -> Result<Option<SemScalarExpr>, AnalysisError> {
+        parameters.operator(
+            context,
+            dialect,
+            &self.operator_name,
+            self.larg.as_ref(),
+            self.rarg.as_ref(),
+        )
+    }
+}
+
+impl UndefinedOperatorCallSite {
+    pub(crate) fn from_inputs(
+        name: &OperatorName,
+        left: Option<SemScalarExpr>,
+        right: Option<SemScalarExpr>,
+    ) -> Self {
+        Self {
+            operator_name: name.clone(),
+            larg: left,
+            rarg: right,
+        }
+    }
+}

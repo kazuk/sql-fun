@@ -121,3 +121,87 @@ impl SemScalarExprNode for NullTestExpr {
         Some(true)
     }
 }
+
+impl BooleanExpr {
+    pub(crate) fn walk<V: crate::sem::traversal::SemanticVisitor>(
+        &mut self,
+        visitor: &mut V,
+    ) -> Result<(), crate::sem::AnalysisError> {
+        self.body.walk(visitor)?;
+        Ok(())
+    }
+}
+
+impl BooleanExprBody {
+    pub(crate) fn walk<V: crate::sem::traversal::SemanticVisitor>(
+        &mut self,
+        visitor: &mut V,
+    ) -> Result<(), crate::sem::AnalysisError> {
+        match self {
+            Self::And(values) | Self::Or(values) => {
+                for value in values {
+                    value.walk(visitor)?;
+                }
+            }
+            Self::Not(value) => value.walk(visitor)?,
+        }
+        Ok(())
+    }
+}
+
+impl NullTestExpr {
+    pub(crate) fn walk<V: crate::sem::traversal::SemanticVisitor>(
+        &mut self,
+        visitor: &mut V,
+    ) -> Result<(), crate::sem::AnalysisError> {
+        self.arg_expr.walk(visitor)?;
+        Ok(())
+    }
+}
+
+impl BooleanExprBody {
+    fn inference_arguments(&self) -> Vec<SemScalarExpr> {
+        match self {
+            Self::And(values) | Self::Or(values) => values.clone(),
+            Self::Not(value) => vec![*value.clone()],
+        }
+    }
+}
+impl BooleanExpr {
+    pub(crate) fn collect_constraints(
+        &self,
+        parameters: &mut crate::sem::parameter_resolution::ParameterResolution,
+        context: &crate::sem::Resolution<'_>,
+        dialect: crate::ast::Dialect,
+    ) -> Option<SemScalarExpr> {
+        let arguments = self.body.inference_arguments();
+        if !arguments.iter().any(|arg| arg.constraint_node().is_some()) {
+            return None;
+        }
+        if dialect == crate::ast::Dialect::postgres() {
+            for arg in &arguments {
+                parameters.require(context, arg, &PgBuiltInType::bool(), false);
+            }
+        }
+        Some(parameters.operation(
+            "boolean",
+            &arguments,
+            &crate::sem::InputTypeConstraint::exact(&PgBuiltInType::bool()),
+            None,
+        ))
+    }
+}
+impl NullTestExpr {
+    pub(crate) fn collect_constraints(
+        &self,
+        parameters: &mut crate::sem::parameter_resolution::ParameterResolution,
+    ) -> Option<SemScalarExpr> {
+        self.arg_expr.constraint_node()?;
+        Some(parameters.operation(
+            "IS NULL",
+            std::slice::from_ref(&self.arg_expr),
+            &crate::sem::InputTypeConstraint::exact(&PgBuiltInType::bool()),
+            Some(true),
+        ))
+    }
+}

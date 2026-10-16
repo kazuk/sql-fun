@@ -258,7 +258,7 @@ fn realized_query_analysis_ignores_parameter_hints(
     assert_eq!(
         inputs
             .iter()
-            .map(sql_fun_sqlast::sem::ParameterConstraint::position)
+            .map(::sql_fun_sqlast::sem::ParameterConstraint::position)
             .collect::<Vec<_>>(),
         [1]
     );

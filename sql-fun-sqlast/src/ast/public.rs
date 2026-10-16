@@ -465,3 +465,267 @@ impl CteBody {
         }
     }
 }
+
+#[cfg(test)]
+mod test_parameter_analysis {
+    use crate::ast::Dialect;
+    use crate::parse_statements;
+    use crate::sem::{
+        BinaryOperatorDefinition, CastContext, CastDefinition, FunctionOverloadCollection,
+        FunctionParam, OperatorDefinition, OperatorName, OverloadVariant, PgBuiltInType,
+    };
+    use crate::test_helpers::TestParseContext;
+    use std::collections::BTreeMap;
+
+    fn context() -> TestParseContext {
+        let mut context = TestParseContext::default();
+        let int = PgBuiltInType::int4();
+        let small = PgBuiltInType::int2();
+        let text = PgBuiltInType::text();
+        context.setup_type(int.clone());
+        context.setup_type(small.clone());
+        context.setup_type(text.clone());
+        context.setup_type(PgBuiltInType::bool());
+        for ty in [&int, &small, &text] {
+            context.set_get_implicit_cast_result(
+                ty,
+                ty,
+                Some(CastDefinition::new(CastContext::no_conversion())),
+            );
+        }
+        context.set_get_implicit_cast_result(
+            &small,
+            &int,
+            Some(CastDefinition::new(CastContext::implicit())),
+        );
+        let add =
+            OperatorDefinition::binary(&[BinaryOperatorDefinition::new(&int, &int, &int, true)]);
+        context.set_get_operator_op_result(
+            &OperatorName::from_parts(None, "+"),
+            true,
+            true,
+            Some(&add),
+        );
+        let lower = OverloadVariant::new(
+            &Some(text.clone()),
+            &vec![FunctionParam::new_input_param(&None, &Some(text), &None)],
+            true,
+            false,
+        );
+        context.set_get_function_impl_result(
+            &crate::sem::FullName::with_schema("pg_catalog", "lower"),
+            &FunctionOverloadCollection::new(&[lower]),
+        );
+        context
+    }
+
+    fn analyze(
+        sql: &str,
+        dialect: Dialect,
+    ) -> Result<crate::AstAndContextPair<TestParseContext>, crate::sem::AnalysisError> {
+        parse_statements(sql, dialect)
+            .next()
+            .unwrap()
+            .unwrap()
+            .analyze(context())
+    }
+
+    #[rstest::rstest]
+    #[case::postgres("select $7 is null", Dialect::postgres())]
+    #[cfg_attr(
+        feature = "sqlite",
+        case::sqlite("select ?7 is null", Dialect::sqlite())
+    )]
+    fn null_test_infers_any(#[case] sql: &str, #[case] dialect: Dialect) {
+        let result = analyze(sql, dialect).unwrap();
+        let inputs = result.parameter_constraints();
+        assert_eq!(
+            inputs
+                .iter()
+                .map(crate::sem::ParameterConstraint::position)
+                .collect::<Vec<_>>(),
+            [7]
+        );
+        assert!(inputs.parameter(7).unwrap().constraint().is_any());
+        assert!(inputs.allows(&BTreeMap::from([(7, PgBuiltInType::text())])));
+        let select = result.ast().clone().into_select_statemtnt().unwrap();
+        let output = select.result_columns().get_column_at(0).unwrap();
+        assert_eq!(output.col_type(), &Some(PgBuiltInType::bool()));
+        assert_eq!(output.is_not_null(), &Some(true));
+    }
+
+    #[rstest::rstest]
+    #[case::operator("select $1 + 1 as n")]
+    #[case::cte("with x as (select $1 as n) select n + 1 as total from x")]
+    #[case::derived("select n + 1 as total from (select $1 as n) x")]
+    #[case::scalar("select (select $1) + 1 as total")]
+    #[case::later_use("with x as (select $1 as n) select n, $1 + 1 as total from x")]
+    fn operator_preserves_implicit_input_range(#[case] sql: &str) {
+        let result = analyze(sql, Dialect::postgres()).unwrap();
+        let constraint = result
+            .parameter_constraints()
+            .parameter(1)
+            .unwrap()
+            .constraint();
+        assert!(!constraint.is_any());
+        assert!(constraint.allows(&PgBuiltInType::int4()));
+        assert!(constraint.allows(&PgBuiltInType::int2()));
+        assert!(!constraint.allows(&PgBuiltInType::text()));
+        assert_eq!(result.context().reported_problem_count(), 0);
+    }
+
+    #[rstest::rstest]
+    #[case::direct("select $1 + 1 as n, lower($1) as s")]
+    #[case::cte("with x as (select $1 + 1 as n) select lower($1) as s from x")]
+    fn conflicting_uses_return_error(#[case] sql: &str) {
+        let error = analyze(sql, Dialect::postgres())
+            .err()
+            .expect("conflicting SQL inputs");
+        assert_matches::assert_matches!(error, crate::sem::AnalysisError::ParameterConstraint(_));
+        assert!(error.to_string().contains("$1"));
+    }
+
+    #[test]
+    fn tied_best_overloads_are_not_accepted_as_a_type_range() {
+        let mut context = context();
+        let int = PgBuiltInType::int4();
+        let overloads = OperatorDefinition::binary(&[
+            BinaryOperatorDefinition::new(&int, &int, &int, true),
+            BinaryOperatorDefinition::new(&int, &int, &PgBuiltInType::text(), true),
+        ]);
+        context.set_get_operator_op_result(
+            &OperatorName::from_parts(None, "+"),
+            true,
+            true,
+            Some(&overloads),
+        );
+        let error = parse_statements("select $1 + 1", Dialect::postgres())
+            .next()
+            .unwrap()
+            .unwrap()
+            .analyze(context)
+            .err()
+            .expect("ambiguous overloads must fail");
+        assert_matches::assert_matches!(error, crate::sem::AnalysisError::ParameterConstraint(_));
+    }
+
+    #[rstest::rstest]
+    #[case::coalesce("select coalesce($1, 1)")]
+    #[case::case("select case when true then $1 else 1 end")]
+    fn unsupported_type_sensitive_contexts_do_not_publish_any(#[case] sql: &str) {
+        let error = analyze(sql, Dialect::postgres())
+            .err()
+            .expect("unsupported type unification");
+        assert_matches::assert_matches!(error, crate::sem::AnalysisError::ParameterConstraint(_));
+    }
+
+    #[test]
+    fn distinct_inputs_and_gaps_remain_independent() {
+        let result = analyze(
+            "select $7 + 1 as n, $2 is null as missing, $7 is null as repeated",
+            Dialect::postgres(),
+        )
+        .unwrap();
+        let inputs = result.parameter_constraints();
+        assert_eq!(
+            inputs
+                .iter()
+                .map(crate::sem::ParameterConstraint::position)
+                .collect::<Vec<_>>(),
+            [2, 7]
+        );
+        assert!(inputs.parameter(2).unwrap().constraint().is_any());
+        assert!(!inputs.parameter(7).unwrap().constraint().is_any());
+        assert!(inputs.parameter(1).is_none());
+    }
+
+    #[rstest::rstest]
+    #[case::direct("select $1")]
+    #[case::cte("with x as (select $1 as n) select n from x")]
+    fn plain_projection_keeps_any_input_and_postgres_text_output(#[case] sql: &str) {
+        let result = analyze(sql, Dialect::postgres()).unwrap();
+        assert!(
+            result
+                .parameter_constraints()
+                .parameter(1)
+                .unwrap()
+                .constraint()
+                .is_any()
+        );
+        assert_eq!(
+            result
+                .parameter_constraints()
+                .result_column(0)
+                .unwrap()
+                .admissible_types(),
+            Some([PgBuiltInType::text()].as_slice())
+        );
+        let select = result.ast().clone().into_select_statemtnt().unwrap();
+        assert_eq!(
+            select.result_columns().get_column_at(0).unwrap().col_type(),
+            &Some(PgBuiltInType::text())
+        );
+    }
+}
+
+#[cfg(test)]
+mod test_parameter_casts {
+    use crate::ast::Dialect;
+    use crate::parse_statements;
+    use crate::sem::PgBuiltInType;
+    use crate::test_helpers::TestParseContext;
+
+    #[rstest::rstest]
+    #[case::boolean("select $1 as flag where $1")]
+    #[case::not("select not $1 as flag")]
+    fn boolean_context_constrains_input(#[case] sql: &str) {
+        let result = parse_statements(sql, Dialect::postgres())
+            .next()
+            .unwrap()
+            .unwrap()
+            .analyze(TestParseContext::default())
+            .unwrap();
+        let input = result
+            .parameter_constraints()
+            .parameter(1)
+            .unwrap()
+            .constraint();
+        assert!(input.allows(&PgBuiltInType::bool()));
+        assert!(!input.allows(&PgBuiltInType::int4()));
+    }
+
+    #[cfg(feature = "sqlite")]
+    #[rstest::rstest]
+    #[case::projection("select cast(?1 as integer) as n")]
+    #[case::cte("with x as (select cast(?1 as integer) as n) select n from x")]
+    fn sqlite_casts_do_not_require_postgres_casts(#[case] sql: &str) {
+        let mut context = TestParseContext::default();
+        context.setup_type(crate::sem::TypeReference::from_full_name(
+            crate::sem::FullName::from_local_name("integer"),
+        ));
+        let result = parse_statements(sql, Dialect::sqlite())
+            .next()
+            .unwrap()
+            .unwrap()
+            .analyze(context)
+            .unwrap();
+        assert!(
+            result
+                .parameter_constraints()
+                .parameter(1)
+                .unwrap()
+                .constraint()
+                .is_any()
+        );
+        assert_eq!(result.context().reported_problem_count(), 0);
+        let select = result.ast().clone().into_select_statemtnt().unwrap();
+        assert!(
+            select
+                .result_columns()
+                .get_column_at(0)
+                .unwrap()
+                .col_type()
+                .is_some()
+        );
+    }
+}

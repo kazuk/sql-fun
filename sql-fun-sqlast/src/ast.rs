@@ -17,6 +17,7 @@ mod mutation;
 mod postgres;
 mod public;
 mod resolve;
+pub(crate) use self::resolve::{ParameterResolution, Signature};
 #[cfg(feature = "sqlite")]
 mod sqlite;
 #[cfg(all(feature = "sqlite", feature = "workaround_turso_9791"))]
@@ -448,8 +449,12 @@ impl StatementNode {
             _ => {
                 let outcome = self.resolve(&context, dialect);
                 let mut context = context;
-                let statement = outcome.report(&mut context)?;
-                Ok(crate::AstAndContextPair::new(statement, context))
+                let (statement, parameters) = outcome.report_with_parameters(&mut context)?;
+                Ok(crate::AstAndContextPair::with_parameters(
+                    statement,
+                    context,
+                    &parameters,
+                ))
             }
         }
     }

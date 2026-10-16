@@ -43,6 +43,10 @@ impl super::ColumnReference for CteColumnRef {
 }
 
 impl CteColumnRef {
+    pub(super) const fn binding_alias(&self) -> &AliasName {
+        &self.alias
+    }
+
     /// create instance
     #[must_use]
     pub fn new(

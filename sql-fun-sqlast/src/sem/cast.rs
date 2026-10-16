@@ -58,6 +58,12 @@ impl CastDefinition {
 }
 
 impl CastContext {
+    /// Construct an identity context for semantic test fixtures.
+    #[cfg(test)]
+    pub(crate) const fn no_conversion() -> Self {
+        Self::NoConversion
+    }
+
     /// Construct an implicit context for semantic test fixtures.
     #[cfg(test)]
     pub(crate) const fn implicit() -> Self {

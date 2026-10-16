@@ -199,11 +199,30 @@ Use explicit `AS` names when stable result-column names matter.
 
 This is not complete SQLite query validation. Arithmetic and comparison operators,
 function type affinity, case-insensitive identifier binding,
-parameter analysis, star expansion, recursive CTE binding, and full compound
-type checking remain incomplete. Parsing grouping, ordering, or window clauses
+operator-dependent parameter analysis, star expansion, recursive CTE binding,
+and full compound type checking remain incomplete. Parsing grouping, ordering, or window clauses
 does not mean those clauses have been semantically validated. Different CASE
 result types are not unified using PostgreSQL implicit casts.
 Use matching identifier spelling when referring to derived-query or CTE columns.
+
+### Parameter analysis
+
+Numbered parameters (`$1` in PostgreSQL and `?1` in SQLite) retain their identity
+across supported nonrecursive CTEs and the outer query. SQL analysis derives
+input constraints from the query, independently of parameter type hints. A
+parameter used only by `IS NULL` has the valid constraint `any`; an explicit SQL
+cast constrains its use without requiring a Rust type mapping at this stage.
+SQLite casts follow SQLite semantics and do not require PostgreSQL cast rules.
+PostgreSQL operator and ordinary function contexts retain admissible input types,
+including implicit casts, rather than selecting a single Rust type. Repeated
+uses must have compatible constraints. Correlated overload alternatives remain
+part of the analysis result. Parameter-dependent result columns may likewise
+have several admissible types. Mapping these constraints to Rust types is a
+later code-generation step.
+
+Concrete PostgreSQL function signatures are supported. Unresolved polymorphic
+signatures and type unification of unresolved inputs in CASE, COALESCE, and
+indirection remain limitations and produce analysis errors.
 
 ## Setting environment variables
 

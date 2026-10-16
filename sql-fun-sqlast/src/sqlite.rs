@@ -199,7 +199,7 @@ impl SqliteDialect {
             context.set_statement_span(statement_span);
             let syn = statement.cmd;
             let tokens = Self::scan(statement_text)?;
-            let AstAndContextPair(sem, rcontext) =
+            let AstAndContextPair(sem, rcontext, _) =
                 SemAst::semantic_analysis_sqlite(context, syn, &tokens)?;
             sem_results.push(sem);
             context = rcontext;

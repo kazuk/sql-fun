@@ -181,3 +181,48 @@ impl FunctionOverloadCollection {
         }
     }
 }
+
+impl FunctionOverloadCollection {
+    pub(crate) fn parameter_signatures(
+        &self,
+        catalog: &impl crate::sem::Catalog,
+        arguments: &[crate::sem::SemScalarExpr],
+    ) -> Vec<crate::ast::Signature> {
+        let arguments = ArgumentBindingCollection::from_expr_list(arguments);
+        let mut signatures = Vec::new();
+        for overload in &self.overloads {
+            let mut overload = overload.clone();
+            let Ok(bindings) = overload.bind_args(arguments.clone()) else {
+                continue;
+            };
+            if Self::infer_simple(&bindings, &mut overload).is_err()
+                || Self::infer_common(&bindings, &mut overload, catalog).is_err()
+            {
+                continue;
+            }
+            let Ok(bindings) = overload.bind_args(arguments.clone()) else {
+                continue;
+            };
+            let Some(inputs) = bindings
+                .iter()
+                .map(ParameterBindResult::constraint_input_types)
+                .collect::<Option<Vec<_>>>()
+            else {
+                continue;
+            };
+            let inputs: Vec<_> = inputs.into_iter().flatten().collect();
+            let Some(result) = overload.ret_type.as_ref() else {
+                continue;
+            };
+            if inputs
+                .iter()
+                .chain([result])
+                .any(|ty| ty.is_dynamic() || ty.is_simple_infer_arg() || ty.is_common_infer_arg())
+            {
+                continue;
+            }
+            signatures.push(crate::ast::Signature::new(&inputs, result));
+        }
+        signatures
+    }
+}

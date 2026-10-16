@@ -5,6 +5,24 @@ use crate::sem::{CastDefinition, CastInfoRead, FullName, TypeReference};
 use super::SchemaCatalog;
 
 impl CastInfoRead for SchemaCatalog {
+    fn cast_sources(&self, target: &TypeReference, explicit: bool) -> HashSet<TypeReference> {
+        let mut sources = self.base.cast_sources(target, explicit);
+        for (name, _) in self.casts.iter() {
+            if let Ok(name) = FullName::from_str(&name) {
+                sources.insert(TypeReference::from_full_name(name));
+            }
+        }
+        sources.retain(|source| {
+            source == target
+                || if explicit {
+                    self.get_explicit_cast(source, target).is_some()
+                } else {
+                    self.get_implicit_cast(source, target).is_some()
+                }
+        });
+        sources
+    }
+
     fn get_explicit_cast(
         &self,
         source_type: &TypeReference,

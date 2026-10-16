@@ -65,6 +65,18 @@ impl SemScalarExprNode for ColumnReferenceExpr {
 }
 
 impl ColumnReferenceExpr {
+    pub(super) fn constraint_binding(&self) -> Option<(&str, &ColumnName)> {
+        match self {
+            Self::CteColumn(value) => {
+                Some((value.binding_alias().as_str(), value.get_column_name()))
+            }
+            Self::SubQueryColumn(value) => {
+                Some((value.binding_alias().as_str(), value.get_column_name()))
+            }
+            _ => None,
+        }
+    }
+
     pub(crate) fn cte_column(
         alias: &crate::sem::data_source::AliasName,
         cte_name: &crate::sem::CteName,

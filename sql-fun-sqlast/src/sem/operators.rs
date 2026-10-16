@@ -119,3 +119,31 @@ impl OperatorDefinition {
         Self::RightUnary(Vec::from_iter(unaries.to_vec()))
     }
 }
+
+impl OperatorDefinition {
+    pub(crate) fn parameter_signatures(&self) -> Vec<crate::ast::Signature> {
+        match self {
+            Self::Binary(overloads) => overloads
+                .iter()
+                .map(|overload| {
+                    crate::ast::Signature::new(
+                        &[
+                            overload.left_arg_type.clone(),
+                            overload.right_arg_type.clone(),
+                        ],
+                        &overload.result_type,
+                    )
+                })
+                .collect(),
+            Self::LeftUnary(overloads) | Self::RightUnary(overloads) => overloads
+                .iter()
+                .map(|overload| {
+                    crate::ast::Signature::new(
+                        std::slice::from_ref(&overload.arg_type),
+                        &overload.result_type,
+                    )
+                })
+                .collect(),
+        }
+    }
+}

@@ -9,6 +9,10 @@ use crate::sem::{AnalysisProblem, DiagnosticContext, TypeReference};
 /// error
 #[derive(Debug, thiserror::Error)]
 pub enum AnalysisError {
+    /// SQL-derived parameter requirements cannot be satisfied.
+    #[error("parameter constraint: {0}")]
+    ParameterConstraint(String),
+
     /// unknown error
     #[error("{0}")]
     GenericError(#[source] Box<dyn std::error::Error>),
@@ -59,6 +63,10 @@ pub enum AnalysisError {
 }
 
 impl AnalysisError {
+    pub(crate) fn parameter_constraint(message: &str) -> Self {
+        Self::ParameterConstraint(message.to_owned())
+    }
+
     /// raise `UnexpectedNone` error
     pub fn raise_unexpected_none<T>(message: &str) -> Result<T, Self> {
         Err(Self::UnexpectedNone(String::from(message)))

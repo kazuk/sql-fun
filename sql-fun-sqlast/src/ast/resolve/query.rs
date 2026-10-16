@@ -7,7 +7,7 @@ use crate::sem::{
     AliasSpec, AnalysisError, AnalysisProblem, Catalog, CteStatement, DataSource, FromClause,
     JoinKind as SemanticJoinKind, Resolution, ResolutionContext, ResolutionOutcome,
     ResultColumnCollection, ScalarAnalysisContext, SelectStatement, SelectStatementNode,
-    WithClause,
+    SemScalarExpr, WithClause,
 };
 
 impl Query {
@@ -17,7 +17,15 @@ impl Query {
         dialect: Dialect,
     ) -> ResolutionOutcome<SelectStatement> {
         let mut context = Resolution::new(catalog);
-        let result = self.resolve_in(&mut context, dialect, None);
+        let result = self
+            .resolve_in(&mut context, dialect, None)
+            .and_then(|query| {
+                if context.solve_parameters()? {
+                    self.resolve_in(&mut context, dialect, None)
+                } else {
+                    Ok(query)
+                }
+            });
         context.finish(result)
     }
 
@@ -37,8 +45,13 @@ impl Query {
         dialect: Dialect,
         outer: Option<&ScalarAnalysisContext<'_>>,
     ) -> Result<SelectStatement, AnalysisError> {
-        let with = self.with.resolve(context, dialect, outer)?;
-        self.body.resolve(context, dialect, &with, outer)
+        context.parameters().enter_query();
+        let result = self
+            .with
+            .resolve(context, dialect, outer)
+            .and_then(|with| self.body.resolve(context, dialect, &with, outer));
+        context.parameters().leave_query();
+        result
     }
 }
 
@@ -56,6 +69,7 @@ impl QueryBody {
                 let from = FromClause::default();
                 let scope = ScalarAnalysisContext::nested(with, &from, outer);
                 let left = set.left.resolve_in(context, dialect, Some(&scope))?;
+                context.parameters().retain_completed_outputs();
                 let right = set.right.resolve_in(context, dialect, Some(&scope))?;
                 Ok(set.operation.resolve(left, right))
             }
@@ -92,6 +106,11 @@ impl Select {
         let from = FromItem::resolve_list_in(&self.from, context, dialect, with, outer)?;
         let scope = ScalarAnalysisContext::nested(with, &from, outer);
         let predicate = Expr::resolve_optional(&self.predicate, context, dialect, &scope)?;
+        if dialect == Dialect::postgres()
+            && let Some(predicate) = &predicate
+        {
+            context.parameter_require(predicate, &crate::sem::PgBuiltInType::bool(), false);
+        }
         let mut results = ResultColumnCollection::default();
         for target in &self.targets {
             let expression = target.expression.resolve_in(context, dialect, &scope)?;
@@ -99,6 +118,18 @@ impl Select {
                 .alias
                 .clone()
                 .unwrap_or_else(|| expression.get_column_name());
+            let text_projection = dialect == Dialect::postgres()
+                && expression.constraint_node().is_some()
+                && context.parameters().is_any(&expression)
+                && target.expression.is_parameter_projection();
+            context
+                .parameters()
+                .output(&name, &expression, text_projection);
+            let expression = if text_projection {
+                SemScalarExpr::wrap_implicit_cast(&crate::sem::PgBuiltInType::text(), &expression)
+            } else {
+                expression
+            };
             results.push_column(&ColumnName::from(name.as_str()), &expression);
         }
         Ok(SelectStatement::simple(&SelectStatementNode::new(
@@ -123,6 +154,7 @@ impl With {
             let body = entry
                 .body
                 .resolve(context, dialect, &scope, &entry.column_names())?;
+            context.parameters().cte(&entry.name, &entry.column_names());
             with.insert(&entry.name, body);
         }
         Ok(with)
@@ -201,7 +233,27 @@ impl FromItem {
                     .as_ref()
                     .map(Alias::resolve)
                     .unwrap_or_else(|| AliasSpec::from_local_name(&name.local_name()));
-                DataSource::resolve_relation(context, &name, &alias, with)
+                let source = DataSource::resolve_relation(&mut *context, &name, &alias, with)?;
+                let source_alias = relation
+                    .alias
+                    .as_ref()
+                    .map(|alias| alias.name.as_str())
+                    .unwrap_or_else(|| name.name());
+                let columns = relation
+                    .alias
+                    .as_ref()
+                    .map(|alias| alias.columns.as_slice())
+                    .unwrap_or(&[]);
+                context.parameters().relation(
+                    if name.schema().is_none() && name.catalog().is_none() {
+                        Some(name.name())
+                    } else {
+                        None
+                    },
+                    source_alias,
+                    columns,
+                );
+                Ok(source)
             }
             Self::Query(derived) => {
                 let from = if derived.lateral {
@@ -216,6 +268,17 @@ impl FromItem {
                     .as_ref()
                     .map(Alias::resolve)
                     .unwrap_or_else(|| AliasSpec::from_local_name(""));
+                let source_alias = derived
+                    .alias
+                    .as_ref()
+                    .map(|alias| alias.name.as_str())
+                    .unwrap_or("");
+                let columns = derived
+                    .alias
+                    .as_ref()
+                    .map(|alias| alias.columns.as_slice())
+                    .unwrap_or(&[]);
+                context.parameters().derived(source_alias, columns);
                 Ok(DataSource::resolved_query(&query, &alias))
             }
             Self::Join(join) => {
@@ -230,6 +293,11 @@ impl FromItem {
                 visible.push(right.clone());
                 let scope = ScalarAnalysisContext::nested(with, &visible, outer);
                 let condition = Expr::resolve_optional(&join.condition, context, dialect, &scope)?;
+                if dialect == Dialect::postgres()
+                    && let Some(condition) = &condition
+                {
+                    context.parameter_require(condition, &crate::sem::PgBuiltInType::bool(), false);
+                }
                 Ok(DataSource::resolved_join(
                     &left,
                     &right,

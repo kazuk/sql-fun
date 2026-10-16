@@ -98,7 +98,7 @@ impl CreateView {
             AnalysisError::raise_unexpected_none("view_stmt.query")?
         };
 
-        let AstAndContextPair(select, context) =
+        let AstAndContextPair(select, context, _) =
             SelectStatement::analyze_select(context, query, tokens)?;
         let SemAst::SelectStatement(stmt) = select else {
             AnalysisError::raise_unexpected_none("select_statement")?

@@ -135,7 +135,7 @@ mod test_analyze_alter_table_statement {
         let alter_table_stmt =
             builder.alter_table_stmt(relation.into(), cmds, ObjectType::ObjectTable);
         let tokens = IVec::default();
-        let AstAndContextPair(res, ctx) = AlterTable::analyze_alter_table_statement(
+        let AstAndContextPair(res, ctx, _) = AlterTable::analyze_alter_table_statement(
             test_context,
             &None,
             alter_table_stmt,
@@ -170,7 +170,7 @@ mod test_analyze_alter_table_statement {
         let (alter_table, tokens) = parse_sqlite_alter_table("alter table users rename to members");
         let context = TestParseContext::default();
 
-        let AstAndContextPair(res, context) =
+        let AstAndContextPair(res, context, _) =
             AlterTable::analyze_alter_table(context, alter_table, &tokens, &source_span)
                 .expect("sqlite alter table should analyze");
         let SemAst::AlterTable(at) = res else {
@@ -204,7 +204,7 @@ mod test_analyze_alter_table_statement {
         context.setup_table("users", &[], &source_span);
         context.setup_table("members", &[], &source_span);
 
-        let AstAndContextPair(_, context) =
+        let AstAndContextPair(_, context, _) =
             AlterTable::analyze_alter_table(context, alter_table, &tokens, &source_span)
                 .expect("sqlite alter table should analyze");
         assert_eq!(context.reported_problem_count(), 1);
@@ -218,7 +218,7 @@ mod test_analyze_alter_table_statement {
         let mut context = sqlite_context();
         context.setup_table("users", &[make_column("name")], &source_span);
 
-        let AstAndContextPair(_, context) =
+        let AstAndContextPair(_, context, _) =
             AlterTable::analyze_alter_table(context, alter_table, &tokens, &source_span)
                 .expect("sqlite alter table should analyze");
         assert_eq!(context.reported_problem_count(), 1);
@@ -232,7 +232,7 @@ mod test_analyze_alter_table_statement {
         let mut context = sqlite_context();
         context.setup_table("users", &[make_column("name")], &source_span);
 
-        let AstAndContextPair(_, context) =
+        let AstAndContextPair(_, context, _) =
             AlterTable::analyze_alter_table(context, alter_table, &tokens, &source_span)
                 .expect("sqlite alter table should analyze");
         assert_eq!(context.reported_problem_count(), 1);
@@ -252,7 +252,7 @@ mod test_analyze_alter_table_statement {
             &source_span,
         );
 
-        let AstAndContextPair(_, context) =
+        let AstAndContextPair(_, context, _) =
             AlterTable::analyze_alter_table(context, alter_table, &tokens, &source_span)
                 .expect("sqlite alter table should analyze");
         assert_eq!(context.reported_problem_count(), 1);
@@ -268,7 +268,7 @@ mod test_analyze_alter_table_statement {
         let mut context = sqlite_context();
         context.setup_table("users", &[make_column("name")], &source_span);
 
-        let AstAndContextPair(_, context) =
+        let AstAndContextPair(_, context, _) =
             AlterTable::analyze_alter_table(context, alter_table, &tokens, &source_span)
                 .expect("sqlite alter table should analyze");
         assert_eq!(context.reported_problem_count(), 1);

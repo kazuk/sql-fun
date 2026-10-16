@@ -236,3 +236,39 @@ fn keeps_distinct_resolved_names_including_renamed_parameters() {
     let renamed = result.bindings().iter().nth(1).unwrap();
     assert_eq!(renamed.metadata().cte_bindings().len(), 1);
 }
+
+#[rstest::rstest]
+#[case::absent("shared", "shared")]
+#[case::matching("shared:int4", "shared:int4")]
+#[case::conflicting("shared:uuid", "shared:text")]
+fn realized_query_analysis_ignores_parameter_hints(
+    #[case] cte_parameter: &str,
+    #[case] base_parameter: &str,
+) {
+    let project = crate::schema_cache::test_helpers::SchemaProject::new();
+    let cte = format!("select ${{{cte_parameter}}} + 1 as n");
+    let base = format!("select n, ${{{base_parameter}}} + 2 as m from chosen");
+    let realized =
+        realize_cte_catalog(&resolved(&base, &[("chosen", &cte)]), Dialect::postgres()).unwrap();
+    let analyzed = realized
+        .statement()
+        .analyze(project.analysis_context("products"))
+        .unwrap();
+    let inputs = analyzed.parameter_constraints();
+    assert_eq!(
+        inputs
+            .iter()
+            .map(sql_fun_sqlast::sem::ParameterConstraint::position)
+            .collect::<Vec<_>>(),
+        [1]
+    );
+    let input = inputs.parameter(1).unwrap().constraint();
+    assert!(input.allows(&::sql_fun_sqlast::sem::PgBuiltInType::int4()));
+    assert!(!input.allows(&::sql_fun_sqlast::sem::PgBuiltInType::text()));
+    assert_eq!(realized.bindings().iter().count(), 1);
+    let query = analyzed.ast().clone().into_select_statemtnt().unwrap();
+    assert_eq!(
+        query.result_columns().get_column_at(0).unwrap().col_type(),
+        &Some(::sql_fun_sqlast::sem::PgBuiltInType::int4())
+    );
+}

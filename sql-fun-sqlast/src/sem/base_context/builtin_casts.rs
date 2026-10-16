@@ -47,6 +47,34 @@ impl PgBuiltinCasts {
 }
 
 impl CastInfoRead for super::BaseContext {
+    fn cast_sources(&self, target: &TypeReference, explicit: bool) -> HashSet<TypeReference> {
+        let mut sources = HashSet::from([target.clone()]);
+        for (name, _) in self.casts.iter() {
+            let source = TypeReference::concrete_type_ref(
+                &FullName::with_schema("pg_catalog", &name),
+                target.is_array() == Some(true),
+            );
+            let cast = if explicit {
+                self.get_explicit_cast(&source, target)
+            } else {
+                self.get_implicit_cast(&source, target)
+            };
+            if cast.is_some() {
+                sources.insert(source);
+            }
+        }
+        if explicit {
+            for (_, definition) in self.types.iter() {
+                if let Some(source) = definition.type_reference()
+                    && self.get_explicit_cast(source, target).is_some()
+                {
+                    sources.insert(source.clone());
+                }
+            }
+        }
+        sources
+    }
+
     fn get_explicit_cast(
         &self,
         source_type: &TypeReference,
@@ -60,14 +88,23 @@ impl CastInfoRead for super::BaseContext {
         if source_local_name == target_local_name && source_array == target_array {
             return Some(CastDefinition::new(CastContext::NoConversion));
         }
-        if source_array != target_array {
-            return None;
+        if source_array == target_array
+            && let Some(cast) = self
+                .casts
+                .get(source_local_name)
+                .and_then(|targets| targets.get(target_local_name))
+            && cast.use_in_explicit()
+        {
+            return Some(cast.clone());
         }
-
-        let from_source = self.casts.get(source_local_name)?;
-        let cast_def = from_source.get(target_local_name)?;
-        if cast_def.use_in_explicit() {
-            Some(cast_def.clone())
+        // PostgreSQL find_coercion_pathway permits explicit I/O coercion
+        // to or from the builtin string category even without a pg_cast row.
+        let source_string =
+            !source_array && matches!(source_local_name, "text" | "varchar" | "bpchar" | "name");
+        let target_string =
+            !target_array && matches!(target_local_name, "text" | "varchar" | "bpchar" | "name");
+        if source_string || target_string {
+            Some(CastDefinition::new(CastContext::Explicit))
         } else {
             None
         }
@@ -194,7 +231,7 @@ mod test_builtin_cast_identity {
                 .is_some_and(|cast| cast.is_no_conversion())
         );
         assert!(context.get_implicit_cast(&text, &text_array).is_none());
-        assert!(context.get_explicit_cast(&text_array, &text).is_none());
+        assert!(context.get_explicit_cast(&text_array, &text).is_some());
         assert!(context.get_implicit_cast(&public_text, &text).is_none());
         assert!(
             context

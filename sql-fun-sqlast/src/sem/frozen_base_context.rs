@@ -140,6 +140,14 @@ mod test_frozen_root {
 macro_rules! forward_catalog_reads {
     ($context:ty, $catalog:ident) => {
         impl crate::sem::CastInfoRead for $context {
+            fn cast_sources(
+                &self,
+                target: &crate::sem::TypeReference,
+                explicit: bool,
+            ) -> std::collections::HashSet<crate::sem::TypeReference> {
+                crate::sem::CastInfoRead::cast_sources(self.$catalog(), target, explicit)
+            }
+
             fn get_explicit_cast(
                 &self,
                 source: &crate::sem::TypeReference,

@@ -34,7 +34,6 @@ done < "$manifest"
 
 (( ${#expected_versions[@]} > 0 )) || { echo "manifest is empty" >&2; exit 1; }
 
-"$(git rev-parse --show-toplevel)/.local/bin/prepare-client-payloads"
 metadata="$(cargo metadata --no-deps --format-version=1)"
 for package in "${!expected_versions[@]}"; do
   actual_version="$(jq -er --arg package "$package" '.packages[] | select(.name == $package and .source == null and .publish != []) | .version' <<<"$metadata")" \

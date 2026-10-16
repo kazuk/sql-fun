@@ -50,7 +50,6 @@ and `result: "OK"`. TCP connection alone does not establish readiness.
 The self-contained example demonstrates the public connection API:
 
 ```sh
-.local/bin/prepare-client-payloads
 cargo build -p sql-fun-server
 cargo run -p sql-fun-client --example sql-fun-client-connect -- \
   --server-executable "$PWD/target/debug/sql-fun-server" \

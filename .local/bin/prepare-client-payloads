@@ -1,8 +1,0 @@
-#!/usr/bin/env bash
-# Prepare the authoritative payload source before any supported Cargo build/package flow.
-set -euo pipefail
-cd "$(git rev-parse --show-toplevel)"
-rm -f sql-fun-client/src/payloads.rs
-rm -rf sql-fun-client/src/payloads
-cp sql-fun-server-api/src/payloads.rs sql-fun-client/src/payloads.rs
-cp -r sql-fun-server-api/src/payloads sql-fun-client/src/payloads

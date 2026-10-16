@@ -16,7 +16,6 @@ for tool in cargo cargo-deb jq dpkg-deb dpkg-shlibdeps readelf tar gzip sha256su
 done
 
 cd "$(git rev-parse --show-toplevel)"
-"$(git rev-parse --show-toplevel)/.local/bin/prepare-client-payloads"
 metadata=$(cargo metadata --locked --no-deps --format-version 1)
 package_version=$(jq -er '.packages[] | select(.name == "sql-fun-cli") | .version' <<< "$metadata")
 build_dir=$(jq -er '.target_directory' <<< "$metadata")

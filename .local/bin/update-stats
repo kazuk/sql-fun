@@ -5,8 +5,6 @@ set -euo pipefail
 worktree_root="$(git rev-parse --show-toplevel)"
 cd "${worktree_root}"
 
-"${worktree_root}/.local/bin/prepare-client-payloads"
-
 mkdir -p stats
 cargo llvm-cov --all-features --all --no-fail-fast --summary-only nextest \
     > stats/coverage.txt

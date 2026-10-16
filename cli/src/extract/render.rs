@@ -16,13 +16,16 @@ impl HelperDef for SqlHelper {
         _: &mut RenderContext<'reg, 'rc>,
         output: &mut dyn Output,
     ) -> HelperResult {
-        let value = helper
-            .param(0)
-            .and_then(|p| p.value().get(self.kind))
-            .and_then(Value::as_str)
-            .ok_or_else(|| {
-                RenderErrorReason::Other(format!("expected a typed SQL {}", self.kind))
-            })?;
+        let value = if let Some(param) = helper.param(0)
+            && let Some(value) = param.value().get(self.kind)
+        {
+            value.as_str()
+        } else {
+            None
+        };
+        let value = value.ok_or_else(|| {
+            RenderErrorReason::Other(format!("expected a typed SQL {}", self.kind))
+        })?;
         if self.kind == "identifier" {
             output.write(&format!("\"{}\"", value.replace('"', "\"\"")))?;
         } else {

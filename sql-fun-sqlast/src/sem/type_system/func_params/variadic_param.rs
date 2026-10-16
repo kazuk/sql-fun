@@ -91,11 +91,15 @@ impl FunctionParameterTrait for FunctionParamVariadic {
             AnalysisError::raise_unexpected_none("function_parameter.arg_type")?
         };
         let param_type = FullName::try_from(param_type)?;
-        let param_type = context.get_type(&param_type);
+        let param_type = if let Some(definition) = context.get_type(&param_type) {
+            definition.type_reference().cloned()
+        } else {
+            None
+        };
         Ok((
             FunctionParam::from(&Self {
                 name: Some(param_name),
-                param_type: param_type.and_then(|v| v.type_reference()).cloned(),
+                param_type,
             }),
             context,
         ))

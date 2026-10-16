@@ -84,12 +84,20 @@ impl Event {
         }
     }
 
-    fn confirmation(&self) -> Option<bool> {
-        self.response().and_then(PromptResponse::confirmation)
+    const fn confirmation(&self) -> Option<bool> {
+        if let Some(response) = self.response() {
+            response.confirmation()
+        } else {
+            None
+        }
     }
 
     fn text_input(&self) -> Option<&str> {
-        self.response().and_then(PromptResponse::text_input)
+        if let Some(response) = self.response() {
+            response.text_input()
+        } else {
+            None
+        }
     }
 }
 

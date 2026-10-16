@@ -141,9 +141,8 @@ impl Drop for ServerFixture {
         // record alone does not authorize terminating the current test process.
         if let Ok(bytes) = std::fs::read(self.registration_path())
             && let Ok(record) = ::serde_json::from_slice::<::serde_json::Value>(&bytes)
-            && let Some(pid) = record["pid"]
-                .as_u64()
-                .and_then(|pid| i32::try_from(pid).ok())
+            && let Some(pid) = record["pid"].as_u64()
+            && let Ok(pid) = i32::try_from(pid)
             && u32::try_from(pid).ok() != Some(std::process::id())
             && let Ok(executable) = std::fs::read_link(format!("/proc/{pid}/exe"))
             && executable.to_string_lossy().trim_end_matches(" (deleted)")

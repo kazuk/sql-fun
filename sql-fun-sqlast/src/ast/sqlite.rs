@@ -871,10 +871,13 @@ fn parse_sqlite_type_modifiers(raw: &str) -> Result<SqliteTypeModifiers, Analysi
 
 fn valid_sqlite_numeric(value: &str) -> bool {
     fn strip_sign(value: &str) -> &str {
-        value
-            .strip_prefix('+')
-            .or_else(|| value.strip_prefix('-'))
-            .unwrap_or(value)
+        if let Some(unsigned) = value.strip_prefix('+') {
+            unsigned
+        } else if let Some(unsigned) = value.strip_prefix('-') {
+            unsigned
+        } else {
+            value
+        }
     }
 
     fn valid_digit_run(value: &str, is_digit: impl Fn(u8) -> bool) -> bool {
@@ -896,10 +899,12 @@ fn valid_sqlite_numeric(value: &str) -> bool {
     if value.is_empty() {
         return false;
     }
-    if let Some(hexadecimal) = value
-        .strip_prefix("0x")
-        .or_else(|| value.strip_prefix("0X"))
-    {
+    let hexadecimal = if let Some(hexadecimal) = value.strip_prefix("0x") {
+        Some(hexadecimal)
+    } else {
+        value.strip_prefix("0X")
+    };
+    if let Some(hexadecimal) = hexadecimal {
         return valid_digit_run(hexadecimal, |byte| byte.is_ascii_hexdigit());
     }
 

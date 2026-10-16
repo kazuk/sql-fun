@@ -47,9 +47,11 @@ impl CastInfoRead for SchemaCatalog {
                 None
             }
         } else {
-            self.base
-                .get_explicit_cast(source_type, target_type)
-                .or_else(|| self.io_cast(source_type, target_type))
+            if let Some(cast) = self.base.get_explicit_cast(source_type, target_type) {
+                Some(cast)
+            } else {
+                self.io_cast(source_type, target_type)
+            }
         }
     }
 

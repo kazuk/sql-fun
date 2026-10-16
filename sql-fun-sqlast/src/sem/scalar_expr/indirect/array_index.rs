@@ -52,9 +52,11 @@ impl ArrayIndex {
     ) -> Result<IndirectionExpr, AnalysisError> {
         array.require_array_resolved(context)?;
         index.fits_array_index_resolved(context)?;
-        let item_type = array
-            .get_type()
-            .and_then(|v| context.get_array_item_type(&v));
+        let item_type = if let Some(array_type) = array.get_type() {
+            context.get_array_item_type(&array_type)
+        } else {
+            None
+        };
 
         Ok(IndirectionExpr::ArrayIndex(Box::new(Self::new(
             array, index, item_type,

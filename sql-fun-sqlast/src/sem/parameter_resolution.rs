@@ -120,10 +120,13 @@ impl QueryScope {
     }
 
     fn relation(&mut self, name: Option<&str>, alias: &str, columns: &[String]) {
-        let outputs = name
-            .and_then(|name| self.ctes.get(name))
-            .cloned()
-            .unwrap_or_default();
+        let outputs = if let Some(name) = name
+            && let Some(outputs) = self.ctes.get(name)
+        {
+            outputs.clone()
+        } else {
+            Default::default()
+        };
         self.derived(alias, &outputs, columns);
     }
 

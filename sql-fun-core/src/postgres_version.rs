@@ -271,8 +271,12 @@ impl PostgresVersionInventory<'_> {
     }
 
     fn image(&self, version: &PostgresVersion) -> Result<&'static str, String> {
-        self.0.iter().find(|entry| entry.version == *version).and_then(|entry| entry.image)
-            .ok_or_else(|| format!("PostgreSQL {version} is not supported for builtin extraction; supported stable versions: {}", self.stable_targets().into_iter().map(|version| version.to_string()).collect::<Vec<_>>().join(", ")))
+        let image = if let Some(entry) = self.0.iter().find(|entry| entry.version == *version) {
+            entry.image
+        } else {
+            None
+        };
+        image.ok_or_else(|| format!("PostgreSQL {version} is not supported for builtin extraction; supported stable versions: {}", self.stable_targets().into_iter().map(|version| version.to_string()).collect::<Vec<_>>().join(", ")))
     }
 }
 

@@ -15,6 +15,9 @@ pub(crate) use ::turso_parser::{ast, error, token};
 mod lexer {
     include!(concat!(env!("OUT_DIR"), "/lexer.rs"));
 }
+// Keep the pinned third-party source unchanged. Remove this exception with the
+// vendored workaround when the upstream Turso fix is incorporated (issue #466).
+#[allow(clippy::disallowed_methods)]
 mod parser {
     include!(concat!(env!("OUT_DIR"), "/parser.rs"));
 }

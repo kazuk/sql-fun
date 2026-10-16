@@ -374,10 +374,16 @@ impl CteCatalog<'_> {
         let Some(obj) = value.as_object() else {
             return false;
         };
-        let Some(version) = obj.get(Self::VERSION_KEY).and_then(|v| v.as_str()) else {
+        let Some(version) = obj.get(Self::VERSION_KEY) else {
             return false;
         };
-        let Some(dialect) = value.get(Self::DIALECT_KEY).and_then(|v| v.as_str()) else {
+        let Some(version) = version.as_str() else {
+            return false;
+        };
+        let Some(dialect) = value.get(Self::DIALECT_KEY) else {
+            return false;
+        };
+        let Some(dialect) = dialect.as_str() else {
             return false;
         };
         version == "1" && Self::SUPPORTED_DIALECT.contains(&dialect)

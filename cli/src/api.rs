@@ -120,10 +120,8 @@ impl ApiInput {
                 "jsonrpc must be the string \"2.0\" when supplied"
             );
         }
-        let method = object
-            .get("method")
-            .and_then(Value::as_str)
-            .context("method must be a string")?;
+        let method = object.get("method").context("method must be a string")?;
+        let method = method.as_str().context("method must be a string")?;
         let params = object.get("params").context("params is required")?;
         Self::validate_params(method, params)
             .with_context(|| format!("invalid params for {method}"))?;

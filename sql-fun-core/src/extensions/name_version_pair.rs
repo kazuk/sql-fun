@@ -178,10 +178,16 @@ impl ExtensionNameVersionPair {
                 continue;
             }
             let name_path = PathBuf::from(entry.file_name());
-            let Some(ext) = name_path.extension().and_then(|v| v.to_str()) else {
+            let Some(ext) = name_path.extension() else {
                 continue;
             };
-            let Some(stem) = name_path.file_stem().and_then(|v| v.to_str()) else {
+            let Some(ext) = ext.to_str() else {
+                continue;
+            };
+            let Some(stem) = name_path.file_stem() else {
+                continue;
+            };
+            let Some(stem) = stem.to_str() else {
                 continue;
             };
             if !ext.eq_ignore_ascii_case("sql") || !stem.starts_with(&name_prefix) {

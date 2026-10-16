@@ -1,6 +1,7 @@
 mod fragment_many;
 mod hygiene;
 mod parameter_source;
+mod runtime;
 
 use rusqlite::Connection;
 
@@ -129,6 +130,7 @@ fn main() {
     fragment_many::verify();
     hygiene::verify();
     parameter_source::verify();
+    runtime::verify();
     if std::env::var("SQL_FUN_MODE").as_deref() == Ok("CHECK") {
         return;
     }

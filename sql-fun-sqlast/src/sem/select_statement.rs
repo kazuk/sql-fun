@@ -1,5 +1,6 @@
 mod result_column;
 
+pub(crate) use self::result_column::ResultColumn;
 pub use self::result_column::ResultColumnCollection;
 
 use crate::{

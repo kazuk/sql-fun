@@ -1,4 +1,4 @@
-use crate::sem::{AnalysisError, CreateIndex, InsertConflict, SemScalarExpr};
+use crate::sem::{AnalysisError, ColumnName, CreateIndex, InsertConflict, SemScalarExpr};
 
 impl CreateIndex {
     pub(crate) fn matches_inference(
@@ -10,14 +10,14 @@ impl CreateIndex {
         }
         let mut keys = Vec::new();
         for key in &self.key_columns.0 {
-            let expression = key.element.canonical_expression()?;
+            let expression = key.element.comparison_key()?;
             if !keys.contains(&expression) {
                 keys.push(expression);
             }
         }
         let mut inferred = Vec::new();
         for expression in conflict.inference() {
-            let expression = canonical(expression)?;
+            let expression = IndexKey::from_expression(expression)?;
             if !inferred.contains(&expression) {
                 inferred.push(expression);
             }
@@ -39,11 +39,30 @@ impl CreateIndex {
     }
 }
 
+/// A comparison key belongs to index inference, not to the retained SQL tree.
+#[derive(PartialEq, Eq)]
+enum IndexKey {
+    Column(ColumnName),
+    Expression(SemScalarExpr),
+}
+impl IndexKey {
+    fn column(name: &ColumnName) -> Self {
+        Self::Column(name.clone())
+    }
+    fn from_expression(expression: &SemScalarExpr) -> Result<Self, AnalysisError> {
+        if let Some(name) = expression.index_column_name() {
+            Ok(Self::column(name))
+        } else {
+            Ok(Self::Expression(canonical(expression)?))
+        }
+    }
+}
+
 impl super::IndexElement {
-    fn canonical_expression(&self) -> Result<SemScalarExpr, AnalysisError> {
+    fn comparison_key(&self) -> Result<IndexKey, AnalysisError> {
         match self {
-            Self::ColumnName(name) => Ok(SemScalarExpr::index_column(name)),
-            Self::Expr(expression) => canonical(expression),
+            Self::ColumnName(name) => Ok(IndexKey::column(name)),
+            Self::Expr(expression) => IndexKey::from_expression(expression),
         }
     }
 }

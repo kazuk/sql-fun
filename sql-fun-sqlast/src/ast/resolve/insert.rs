@@ -449,7 +449,10 @@ impl Conflict {
                 table.constraint(constraint),
             );
             if !lookup.is_usable() {
-                context.report_analysis_problem(AnalysisProblem::insert(crate::sem::problem::InsertProblemKind::conflict_constraint(),"ON CONFLICT constraint is not a unique or primary key constraint of the destination"))?;
+                context.report_analysis_problem(AnalysisProblem::insert(
+                    crate::sem::problem::InsertProblemKind::conflict_constraint(),
+                    "ON CONFLICT constraint is not a unique or primary key constraint of the destination",
+                ))?;
             }
             conflict.set_arbiter(crate::sem::InsertArbiterLookup::named(&lookup));
         }

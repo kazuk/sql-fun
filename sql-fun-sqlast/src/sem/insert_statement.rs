@@ -1,5 +1,5 @@
 mod arbiter;
-pub use arbiter::{
+pub use self::arbiter::{
     InsertArbiter, InsertArbiterLookup, InsertConstraintKind, InsertConstraintLookup,
 };
 

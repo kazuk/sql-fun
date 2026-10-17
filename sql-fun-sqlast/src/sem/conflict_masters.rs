@@ -445,7 +445,7 @@ impl ConflictMasters {
     }
 
     pub(crate) fn declare_sqlite_collation(&mut self, name: &str) -> Result<(), AnalysisError> {
-        if self.database.is_some() || name.is_empty() || name.contains('\0') {
+        if self.database.is_some() || name.contains('\0') {
             return Err(AnalysisError::unexpected_input_error(
                 "a valid collation name and SQLite catalog are required",
             ));

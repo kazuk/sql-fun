@@ -137,6 +137,14 @@ impl JoinExprDataSource {
 }
 
 impl JoinExprDataSource {
+    pub(super) fn matches_projection_qualifier(&self, qualifier: Option<&AliasName>) -> bool {
+        qualifier.is_none_or(|name| {
+            self.alias
+                .as_ref()
+                .is_some_and(|alias| alias.name() == name)
+        })
+    }
+
     pub(super) fn projection_names(
         &self,
         context: &impl crate::sem::ParseContext,

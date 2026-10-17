@@ -73,6 +73,12 @@ impl ColumnCollection {
             .find(|c| c.name().as_ref() == Some(column_name))
     }
 
+    fn apply_inline_primary_key_nullability(&mut self) {
+        for column in &mut self.0 {
+            column.apply_primary_key_nullability();
+        }
+    }
+
     /// append column definition
     pub fn push(&mut self, column: &ColumnDefinition) {
         self.0.push(column.clone());
@@ -316,6 +322,7 @@ impl CreateTable {
     }
 
     pub(crate) fn apply_primary_key_nullability(&mut self) {
+        self.columns.apply_inline_primary_key_nullability();
         let keys: Vec<_> = self.primary_key_columns().into_iter().cloned().collect();
         for key in keys {
             if let Some(column) = self.columns.get_column_mut(&key) {
@@ -365,11 +372,12 @@ impl CreateTable {
                 ));
             }
         }
-        if columns.len() == 1
+        // Named inline keys also occur in the table constraint collection.
+        // Use a column identity only when no table key already identifies it.
+        if arbiters.is_empty()
+            && columns.len() == 1
             && let Some(column) = self.columns.get_column_def(&columns[0])
-            && column.constraints().iter().any(|constraint| {
-                constraint.as_primary_key().is_some() || constraint.as_unique().is_some()
-            })
+            && column.has_unique_key()
         {
             arbiters.push(crate::sem::InsertArbiter::column_constraint(&columns[0]));
         }

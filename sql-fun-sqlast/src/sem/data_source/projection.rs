@@ -7,13 +7,15 @@ impl DataSource {
         with: &WithClause,
         qualifier: Option<&AliasName>,
     ) -> Result<Vec<(AliasName, ColumnName)>, AnalysisError> {
-        if qualifier.is_none() {
-            if let Self::JoinExpr(join) = self {
-                return join.projection_names(context, with);
-            }
-            if let Self::Group(group) = self {
-                return group.projection_names(context, with);
-            }
+        if let Self::JoinExpr(join) = self
+            && join.matches_projection_qualifier(qualifier)
+        {
+            return join.projection_names(context, with);
+        }
+        if qualifier.is_none()
+            && let Self::Group(group) = self
+        {
+            return group.projection_names(context, with);
         }
         let mut columns = Vec::new();
         for alias in self.get_aliases() {

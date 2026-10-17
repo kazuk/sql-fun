@@ -1,3 +1,4 @@
+mod join_and_key_semantics;
 mod views;
 
 use self::test_helpers::analyze;

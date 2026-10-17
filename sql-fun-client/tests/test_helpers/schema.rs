@@ -16,7 +16,7 @@ impl SchemaFixture {
         let root = directory.path();
         let catalog = root.join("home/postgres/17");
         std::fs::create_dir_all(&catalog)?;
-        for name in ["functions", "func_detail", "pg_type"] {
+        for name in ["functions", "func_detail", "pg_type", "operator_classes"] {
             std::fs::write(catalog.join(format!("{name}.json")), "[]")?;
         }
         for name in ["left_unary_op", "right_unary_op", "casts"] {
@@ -25,6 +25,23 @@ impl SchemaFixture {
         std::fs::write(
             catalog.join("binary_op.json"),
             r#"{"intentionally_unused":[]}"#,
+        )?;
+        std::fs::write(
+            catalog.join("collations.json"),
+            r#"{
+                "database": {
+                    "encoding": 6, "encoding_name": "UTF8", "provider": "c",
+                    "collate": "C", "ctype": "C", "locale": null,
+                    "icu_rules": null, "version": null,
+                    "default_collation": {"schema": "pg_catalog", "name": "default", "encoding": -1}
+                },
+                "collations": [{
+                    "schema": "pg_catalog", "name": "default", "encoding": -1,
+                    "provider": "d", "deterministic": true,
+                    "collate": null, "ctype": null, "locale": null,
+                    "icu_rules": null, "version": null
+                }]
+            }"#,
         )?;
         std::fs::write(catalog.join("schema.sql"), "-- synthetic builtin")?;
         std::fs::write(

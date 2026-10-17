@@ -48,6 +48,46 @@ the shared environment. In particular, splitting name resolution from
 parameter-constraint collection/solving/finalization must not split their
 access to `ParseContext`.
 
+## Semantic AST and name-resolution completeness
+
+**Retaining syntax is not the same as completing semantic analysis or name
+resolution.** A semantic AST must preserve the structured SQL constructs and
+references needed by subsequent passes. Merely copying an identifier or making
+an expression traversable does not constitute name resolution.
+
+For every name reference retained in the semantic AST:
+
+- Apply the applicable SQL dialect's visibility, scoping, precedence, and
+  ambiguity rules. **Every reference MUST be subjected to name resolution and
+  its outcome recorded**, including references in query clauses, CTEs,
+  windows, grouping, ordering, and function modifiers.
+- Represent successful resolution with a semantic type identifying the kind
+  of definition referenced, rather than an unclassified name. For example,
+  `OVER w` must resolve `w` against the applicable `WINDOW` definitions
+  and retain a typed window-alias binding.
+- Retain unresolved and ambiguous references where appropriate, but encode
+  each as an explicit, distinguishable completed lookup outcome (such as
+  `NotFound` or `Ambiguous`). A failed lookup is not an excuse to skip
+  resolution or discard the reference.
+- Subsequent semantic visitors and type-constraint passes MUST consume the
+  recorded outcomes without repeating name lookup. Type inference and
+  additional SQL legality validation are distinct phases; neither should
+  masquerade as completed name resolution.
+
+**A name-resolution implementation is complete only when every applicable
+reference has been visited and its lookup outcome represented**, regardless
+of whether resolution succeeded. A semantic representation or resolver that
+silently substitutes empty nodes, placeholder success, or unclassified names
+for unsupported behavior MUST NOT be presented as a completed implementation.
+Track independently actionable missing behavior in issues instead of hiding
+it; uncommon but valid SQL syntax is not grounds for excluding support.
+
+These requirements apply to each incremental SQL semantic-analysis issue,
+including its acceptance criteria and regression tests. Tests must inspect
+the resulting semantic bindings and explicit failure/ambiguity outcomes,
+not merely successful traversal or retained syntax. See the
+[name-resolution completion clarification in #463](https://github.com/kazuk/sql-fun/issues/463#issuecomment-6226367685).
+
 ## Diagnostics and future lint configuration
 
 Diagnostic policy is analysis-wide configuration, not an implementation

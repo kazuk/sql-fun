@@ -11,16 +11,33 @@ on:
   merge_group:
 
 concurrency:
-  group: build-test
-  cancel-in-progress: false
-  queue: max
+  group: build-test-${{ github.event.pull_request.number || github.ref }}
+  cancel-in-progress: ${{ github.event_name == 'pull_request' }}
 
 env:
   CARGO_TERM_COLOR: never
   USER: runner
 
 jobs:
+  pr-freshness:
+    runs-on: ubuntu-24.04
+    steps:
+      - name: Reject PR heads missing current main
+        if: github.event_name == 'pull_request'
+        env:
+          PR_NUMBER: ${{ github.event.pull_request.number }}
+        run: |
+          git init -q .
+          git remote add origin "https://github.com/${GITHUB_REPOSITORY}.git"
+          git fetch --no-tags origin '+refs/heads/main:refs/remotes/origin/main'
+          git fetch --no-tags origin "+refs/pull/${PR_NUMBER}/head:refs/remotes/origin/pr-head"
+          if ! git merge-base --is-ancestor refs/remotes/origin/main refs/remotes/origin/pr-head; then
+            echo "::error::PR head does not contain the current main; rebase before CI."
+            exit 1
+          fi
+
   workspace:
+    needs: pr-freshness
     runs-on: ubuntu-24.04
     container: &ci-builder-container
       image: ghcr.io/kazuk/ci-builder@sha256:911d5ec28d1a1981022eb07d510c90c73df720e214e2e164b83cec6aa7bb5636
@@ -89,6 +106,7 @@ jobs:
 
 
   workspace-all-features:
+    needs: pr-freshness
     runs-on: ubuntu-24.04
     container: *ci-builder-container
     steps:
@@ -152,6 +170,7 @@ jobs:
           reporter: java-junit
 
   msrv:
+    needs: pr-freshness
     runs-on: ubuntu-24.04
     container: *ci-builder-container
     steps:
@@ -192,6 +211,7 @@ jobs:
 
 
   fmt:
+    needs: pr-freshness
     runs-on: ubuntu-24.04
     container: *ci-builder-container
     steps:
@@ -204,6 +224,7 @@ jobs:
         run: .local/bin/check-test-flow --step=fmt --fmt-check
 
   lint:
+    needs: pr-freshness
     runs-on: ubuntu-24.04
     container: *ci-builder-container
     steps:
@@ -255,6 +276,7 @@ jobs:
         run: .local/bin/check-test-flow --step=markdown-lint
 
   server-api-spec:
+    needs: pr-freshness
     runs-on: ubuntu-24.04
     container: *ci-builder-container
     steps:
@@ -291,6 +313,7 @@ jobs:
           sccache --show-stats
 
   deny:
+    needs: pr-freshness
     runs-on: ubuntu-24.04
     container: *ci-builder-container
     steps:
@@ -303,6 +326,7 @@ jobs:
         run: .local/bin/check-test-flow --step=deny
 
   dependency-updates:
+    needs: pr-freshness
     runs-on: ubuntu-24.04
     container: *ci-builder-container
     steps:
@@ -324,6 +348,7 @@ jobs:
         run: .local/bin/check-test-flow --step=dependency-updates
 
   doc:
+    needs: pr-freshness
     runs-on: ubuntu-24.04
     container: *ci-builder-container
     steps:
@@ -363,6 +388,7 @@ jobs:
           if-no-files-found: error
 
   packaging:
+    needs: pr-freshness
     runs-on: ubuntu-24.04
     container: *ci-builder-container
     env:
@@ -383,6 +409,7 @@ jobs:
           if-no-files-found: error
 
   install-validation:
+    needs: pr-freshness
     runs-on: ubuntu-24.04
     needs: packaging
     steps:
@@ -430,6 +457,7 @@ jobs:
             '
 
   postgres-extraction:
+    needs: pr-freshness
     runs-on: ubuntu-24.04
     needs: packaging
     steps:

@@ -12,6 +12,7 @@ impl SqlEmit for StatementNode {
             Self::Delete(v) => v.emit(writer),
             Self::Merge(v) => v.emit(writer),
             Self::View(v) => v.emit(writer),
+            Self::ViewWrite(v) => v.emit(writer),
             Self::Extension(v) => v.emit(writer),
             Self::VariableSet(v) => v.emit(writer),
             Self::EnumType(v) => v.emit(writer),
@@ -208,5 +209,14 @@ impl crate::ast::SyntaxOption {
             _ => return w.invalid("SQLite table option", "unknown option"),
         };
         Ok(())
+    }
+}
+
+impl SqlEmit for crate::ast::view_write::WriteDeclaration {
+    fn emit(&self, writer: &mut SqlWriter) -> Result<(), DeparseError> {
+        writer.invalid(
+            "view write metadata",
+            "trigger/rule catalog metadata does not retain executable SQL for rendering",
+        )
     }
 }

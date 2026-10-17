@@ -171,6 +171,36 @@ impl SemScalarExpr {
             _ => unreachable!("row-image lookup must produce a column reference"),
         }
     }
+    pub(crate) fn bound_view_column(&self, view: &crate::sem::FullName) -> Option<&ColumnName> {
+        if let Self::ColumnRef(column) = self {
+            column.bound_view_column(view)
+        } else {
+            None
+        }
+    }
+
+    pub(crate) fn preserves_view_rows(&self, context: &impl crate::sem::BaseParseContext) -> bool {
+        if let Self::FuncCall(call) = self {
+            if call.modifiers().over().is_some() {
+                return false;
+            }
+            if let Some(overload) = call.overload()
+                && let Some(name) = call.name_resolution().function_identity()
+            {
+                return context.function_preserves_view_rows(name, overload);
+            }
+        }
+        true
+    }
+
+    pub(crate) fn view_source_column(&self) -> Option<&ColumnName> {
+        if let Self::ColumnRef(value) = self {
+            value.view_source_column()
+        } else {
+            None
+        }
+    }
+
     pub(crate) const fn column_reference(reference: ColumnReferenceExpr) -> Self {
         Self::ColumnRef(reference)
     }

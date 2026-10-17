@@ -153,6 +153,12 @@ impl TableInfoRead for BaseContext {
 }
 
 impl ViewInfoRead for BaseContext {
+    fn view_trigger_target(&self, _trigger: &FullName) -> Option<FullName> {
+        None
+    }
+    fn view_write_info(&self, _view: &FullName) -> Option<&crate::sem::ViewWriteInfo> {
+        None
+    }
     fn get_view_impl(&self, _key: &FullName) -> Option<&ViewLike> {
         None
     }
@@ -175,6 +181,14 @@ impl SequenceInfoRead for BaseContext {
 }
 
 impl FunctionInfoRead for BaseContext {
+    fn function_preserves_view_rows(
+        &self,
+        name: &FullName,
+        overload: &crate::sem::OverloadVariant,
+    ) -> bool {
+        self.functions.preserves_view_rows(name, overload)
+    }
+
     fn get_function_impl(&self, name: &FullName) -> Option<FunctionOverloadCollection> {
         let create_function = self.functions.find_function_by_name(name)?;
         Some(create_function.overloads().clone())
@@ -278,13 +292,17 @@ impl crate::sem::ConflictInfoRead for BaseContext {
 
 impl crate::sem::ViewInsertInfoRead for BaseContext {
     fn view_insert_support(&self, _view: &FullName) -> crate::sem::ViewInsertSupport {
-        todo!("catalog writable-view columns, INSTEAD OF INSERT triggers and rules")
+        unreachable!(
+            "builtin root contains no ordinary views; schema views belong to the schema layer"
+        )
     }
 }
 
 impl crate::sem::ViewUpdateInfoRead for BaseContext {
     fn view_update_support(&self, _view: &crate::sem::FullName) -> crate::sem::ViewUpdateSupport {
-        todo!("catalog writable-view columns, INSTEAD OF UPDATE triggers and rules")
+        unreachable!(
+            "builtin root contains no ordinary views; schema views belong to the schema layer"
+        )
     }
 }
 

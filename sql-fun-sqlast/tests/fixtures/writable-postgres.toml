@@ -1,0 +1,5 @@
+[package.metadata.database.default]
+engine = "PostgreSQL"
+dialect = "postgres"
+version = "17"
+search_path = ["public", "pg_catalog"]

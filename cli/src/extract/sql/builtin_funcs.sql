@@ -4,6 +4,8 @@ with base as (
     p.proname,
     rt.typname as retname,
     p.proisstrict,
+    p.prokind,
+    p.proretset,
     p.proargtypes,
     p.proargtypes::text as argtypes_text
   from pg_catalog.pg_proc p
@@ -36,7 +38,9 @@ funcs as (
       'name', b.proname,
       'args', coalesce(a.args, array[]::text[]),
       'ret', b.retname,
-      'is_strict', b.proisstrict
+      'is_strict', b.proisstrict,
+      'kind', b.prokind,
+      'returns_set', b.proretset
     ) as obj
   from base b
   left join args a on a.oid = b.oid

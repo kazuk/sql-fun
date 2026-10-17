@@ -43,6 +43,10 @@ impl super::ColumnReference for TableColumnRef {
 }
 
 impl TableColumnRef {
+    pub(in crate::sem) fn canonicalize_alias(&mut self) {
+        self.alias = AliasName::from(self.table_name.full_name().local_name().as_str());
+    }
+
     /// create instance
     #[must_use]
     pub fn new(

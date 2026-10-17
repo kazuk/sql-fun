@@ -754,8 +754,12 @@ impl SemScalarExpr {
 }
 
 impl SemScalarExpr {
-    pub(in crate::sem) fn index_column(name: &ColumnName) -> Self {
-        Self::column_reference(ColumnReferenceExpr::index_column(name))
+    pub(in crate::sem) fn index_column_name(&self) -> Option<&ColumnName> {
+        if let Self::ColumnRef(value) = self {
+            value.index_column_name()
+        } else {
+            None
+        }
     }
 
     pub(in crate::sem) fn canonicalize_index_binding(&mut self) {

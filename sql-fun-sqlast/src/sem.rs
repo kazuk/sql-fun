@@ -99,7 +99,10 @@ pub use self::{
         AliasSpec, DataSource, DataSourceRowFunctions, DataSourceRowsFromFunc, JoinKind, Nullable,
     },
     def_elem::{DefElemKey, DefElemList, analyze_def_elem_list},
-    delete_statement::{DeleteStatement, analyze_delete_statement},
+    delete_statement::{
+        DeleteCursor, DeleteRowColumn, DeleteRowVersion, DeleteStatement, ViewDeleteInfoRead,
+        ViewDeleteSupport, analyze_delete_statement,
+    },
     error::AnalysisError,
     from_clause::FromClause,
     frozen_base_context::FrozenBaseContext,
@@ -150,6 +153,7 @@ pub(crate) use self::{
     create_comp_type::{CompositeFieldCollection, CompositeFieldDefinition},
     create_index::IndexElementCollection,
     data_source::{AliasName, JoinUsingClause},
+    delete_statement::{DeleteDestination, DeletePredicate},
     parameter_constraints::{ConstraintGraph, SignatureAlternative},
     parse_context::CursorBindings,
     scalar_expr::{CaseExprAnalysisContext, CoalesceAnalysis},
@@ -377,6 +381,16 @@ impl SemAst {
         }
     }
 
+    pub(crate) fn delete(delete: &DeleteStatement) -> Self {
+        Self::DeleteStatement(delete.clone())
+    }
+    /// Inspect an analyzed DELETE.
+    pub const fn as_delete(&self) -> Option<&DeleteStatement> {
+        match self {
+            Self::DeleteStatement(delete) => Some(delete),
+            _ => None,
+        }
+    }
     pub(crate) fn update(update: &UpdateStatement) -> Self {
         Self::UpdateStatement(update.clone())
     }

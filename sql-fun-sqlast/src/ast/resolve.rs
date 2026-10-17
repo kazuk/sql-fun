@@ -1,3 +1,4 @@
+mod delete;
 mod insert;
 mod placement;
 mod query;

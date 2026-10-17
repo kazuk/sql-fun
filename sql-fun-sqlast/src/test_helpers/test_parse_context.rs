@@ -38,6 +38,7 @@ pub struct TestParseContext {
     type_definitions: HashMap<FullName, TypeDefinition>,
     table_definitions: HashMap<FullName, Option<CreateTable>>,
     view_definitions: HashMap<FullName, Option<ViewLike>>,
+    view_delete_support: HashMap<FullName, crate::sem::ViewDeleteSupport>,
     view_update_support: HashMap<FullName, crate::sem::ViewUpdateSupport>,
     view_insert_support: HashMap<FullName, crate::sem::ViewInsertSupport>,
     function_definitions: HashMap<FullName, FunctionOverloadCollection>,
@@ -76,7 +77,6 @@ impl TestParseContext {
         self
     }
 
-    #[cfg(feature = "sqlite")]
     pub(crate) fn with_metadata(mut self, metadata: &::sql_fun_core::SqlFunMetadata) -> Self {
         self.metadata = Some(metadata.clone());
         self
@@ -594,6 +594,25 @@ impl TestParseContext {
         support: &crate::sem::ViewUpdateSupport,
     ) {
         self.view_update_support
+            .insert(name.clone(), support.clone());
+    }
+}
+
+impl crate::sem::ViewDeleteInfoRead for TestParseContext {
+    fn view_delete_support(&self, view: &FullName) -> crate::sem::ViewDeleteSupport {
+        self.view_delete_support
+            .get(view)
+            .expect("explicit view DELETE capability fixture")
+            .clone()
+    }
+}
+impl TestParseContext {
+    pub(crate) fn set_view_delete_support(
+        &mut self,
+        name: &FullName,
+        support: &crate::sem::ViewDeleteSupport,
+    ) {
+        self.view_delete_support
             .insert(name.clone(), support.clone());
     }
 }

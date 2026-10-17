@@ -144,3 +144,41 @@ does not imply complete aggregate or window legality checking.
 Concrete PostgreSQL function signatures are supported; unresolved polymorphic
 signatures remain unsupported. Type unification of unresolved inputs in CASE,
 COALESCE, and indirection is unimplemented and can terminate analysis.
+
+## DELETE analysis
+
+PostgreSQL and SQLite DELETE analysis retains the qualified target, WITH
+queries, predicate bindings and RETURNING columns. PostgreSQL USING sources,
+ONLY/inheritance and positioned `WHERE CURRENT OF` are represented explicitly.
+Analysis does not delete rows or remove schema definitions. Without RETURNING,
+a DELETE has no result columns.
+
+PostgreSQL RETURNING can reference the target and USING sources. Unqualified
+`*` expands only the target; `source.*` expands the named source. A target alias
+hides the original table name. SQLite RETURNING instead uses the original table
+name, does not expose the target alias, and rejects qualified stars. Explicit
+SQLite INDEXED BY hints must name an index of the target.
+
+PostgreSQL DELETE CTEs expose RETURNING columns, including explicit CTE column
+aliases, to later queries. A DELETE CTE without RETURNING can be unreferenced,
+but cannot be read as a relation. Data-modifying CTEs must appear at the top
+level. SQLite permits WITH before DELETE, but not DELETE inside a CTE body.
+
+The configured engine version governs PostgreSQL RETURNING `old`/`new` names:
+these implicit row references are available starting with PostgreSQL 18.
+Explicit source aliases named `old` or `new` remain ordinary source bindings.
+The old image retains target-column nullability; the new image is nullable for
+DELETE. The current PostgreSQL parser does not accept PostgreSQL 18's
+`RETURNING WITH (OLD AS ..., NEW AS ...)` output-alias syntax, even when the
+configured engine is PostgreSQL 18.
+
+API consumers can supply DELETE-specific view capabilities through
+`ViewDeleteInfoRead`: deletability and RETURNING support are independent of
+INSERT/UPDATE capabilities. Materialized views are read-only. The bundled
+catalog still lacks the trigger/rule metadata needed to establish ordinary-view
+DELETE capabilities, so its view-capability lookup remains unimplemented.
+Production catalog support and integration tests are tracked in
+[#589](https://github.com/kazuk/sql-fun/issues/589).
+Positioned DELETE uses explicitly supplied current-session cursor facts; analysis
+does not check runtime cursor position or lifetime. The general SQLite expression
+and type-affinity limitations described above also apply to DELETE expressions.

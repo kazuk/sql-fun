@@ -6,7 +6,7 @@ impl CteBody {
         &self,
         top_level: bool,
     ) -> Result<(), AnalysisError> {
-        if matches!(self, Self::Insert(_) | Self::Update(_)) && !top_level {
+        if matches!(self, Self::Insert(_) | Self::Update(_) | Self::Delete(_)) && !top_level {
             return Err(AnalysisError::unexpected_input_error(
                 "data-modifying WITH must be at the top level",
             ));

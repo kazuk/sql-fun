@@ -136,11 +136,11 @@ impl UpdateStatement {
         &mut self,
         visitor: &mut V,
     ) -> Result<(), AnalysisError> {
-        visitor.enter_update();
+        visitor.enter_dml();
         visitor.enter_query();
         let result = self.walk_body(visitor);
         visitor.leave_query();
-        visitor.leave_update();
+        visitor.leave_dml();
         result
     }
     fn walk_body<V: SemanticVisitor>(&mut self, visitor: &mut V) -> Result<(), AnalysisError> {
@@ -153,7 +153,7 @@ impl UpdateStatement {
         }
         // PostgreSQL transforms WHERE and RETURNING before SET assignments.
         // This order matters when RETURNING resolves an unknown parameter.
-        visitor.update_returning(&mut self.returning)?;
+        visitor.dml_returning(&mut self.returning)?;
         for assignment in &mut self.assignments {
             assignment.walk(visitor)?;
         }

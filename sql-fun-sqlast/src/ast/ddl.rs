@@ -928,10 +928,10 @@ impl super::Column {
                 todo!("deferrable unique-key catalog representation");
             }
             let constraint = constraint.constraint.resolve(context, table, &name)?;
+            if let Some(nullability) = constraint.as_nullability() {
+                column.set_not_null(Some(nullability.is_not_null()));
+            }
             if context.dialect() == Dialect::sqlite() {
-                if let Some(nullability) = constraint.as_nullability() {
-                    column.set_not_null(Some(nullability.is_not_null()));
-                }
                 if let Some(default) = constraint.as_default() {
                     column.set_default(default.expr());
                 }

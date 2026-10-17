@@ -332,39 +332,6 @@ impl StatementNode {
         &self,
         context: &mut impl crate::sem::ParseContext,
     ) -> Result<crate::sem::SemAst, crate::sem::AnalysisError> {
-        let missing = match self {
-            Self::Insert(insert) => {
-                match crate::sem::InsertDestination::resolve(
-                    context,
-                    &crate::sem::TableName::from(insert.relation.name.full_name()?),
-                )? {
-                    Some(destination) => match destination.view_support() {
-                        Some(support) => support.missing_metadata_view().cloned(),
-                        None => None,
-                    },
-                    None => None,
-                }
-            }
-            Self::Update(update) => {
-                match crate::sem::UpdateDestination::resolve(
-                    context,
-                    &crate::sem::TableName::from(update.relation.name.full_name()?),
-                )? {
-                    Some(destination) => match destination.view_support() {
-                        Some(support) => support.missing_metadata_view().cloned(),
-                        None => None,
-                    },
-                    None => None,
-                }
-            }
-            _ => None,
-        };
-        if let Some(missing) = missing {
-            context.report_analysis_problem(crate::sem::AnalysisProblem::view(
-                &crate::sem::problem::ViewProblem::missing_metadata(&missing),
-            ))?;
-            return Ok(crate::sem::SemAst::unresolved_statement());
-        }
         match self {
             Self::Query(query) => query
                 .resolve(context)
@@ -436,6 +403,7 @@ impl StatementNode {
                 .resolve(context)
                 .map(|domain| crate::sem::SemAst::create_domain(&domain)),
         }
+        .or_else(|error| error.recover_view_metadata(context))
     }
 
     pub(crate) fn resolve_and_apply<TContext>(

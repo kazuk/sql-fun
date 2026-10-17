@@ -1,4 +1,4 @@
-//! Catalog-owned facts and decisions for ordinary writable views.
+//! Catalog facts and analyzer-owned decisions for ordinary writable views.
 //! Read projections remain in CreateView; these facts are never DML-owned.
 use crate::sem::problem::ViewProblem;
 use crate::sem::{
@@ -83,59 +83,70 @@ impl ViewWriteInfo {
 
     pub(crate) fn apply(&mut self, change: &ViewWriteChange) -> Result<(), ViewProblem> {
         match &change.action {
-            WriteAction::Sequence(actions) => {
-                for action in actions {
-                    self.apply(&ViewWriteChange::new(&change.view, action))?;
-                }
-            }
-            WriteAction::Object(change) => {
-                let exists = self
-                    .objects
-                    .iter()
-                    .any(|old| old.same_identity(&change.object));
-                if exists && change.if_not_exists {
-                    return Ok(());
-                }
-                if exists && !change.replace {
-                    return Err(ViewProblem::duplicate_object(
-                        &self.name,
-                        &change.object.name,
-                    ));
-                }
-                self.objects
-                    .retain(|old| !old.same_identity(&change.object));
-                self.objects.push(change.object.clone());
-            }
-            WriteAction::Default(default) => {
-                if !self
-                    .projections
-                    .iter()
-                    .any(|(column, _)| column.name().as_ref() == Some(&default.column))
-                {
-                    return Err(ViewProblem::unknown_default_column(
-                        &self.name,
-                        default.column.as_str(),
-                    ));
-                }
-                self.defaults
-                    .retain(|(column, _)| column != &default.column);
-                if let Some(value) = &default.value {
-                    self.defaults.push((default.column.clone(), value.clone()));
-                }
-            }
-            WriteAction::Drop(change) => {
-                if !change.if_not_exists
-                    && !self
-                        .objects
-                        .iter()
-                        .any(|old| old.same_identity(&change.object))
-                {
-                    return Err(ViewProblem::missing_object(&self.name, &change.object.name));
-                }
-                self.objects
-                    .retain(|old| !old.same_identity(&change.object));
-            }
+            WriteAction::Sequence(actions) => self.apply_sequence(actions),
+            WriteAction::Object(change) => self.apply_object(change),
+            WriteAction::Default(default) => self.apply_default_change(default),
+            WriteAction::Drop(change) => self.drop_object(change),
         }
+    }
+
+    fn apply_sequence(&mut self, actions: &[WriteAction]) -> Result<(), ViewProblem> {
+        for action in actions {
+            self.apply(&ViewWriteChange::new(&self.name, action))?;
+        }
+        Ok(())
+    }
+
+    fn apply_object(&mut self, change: &ObjectChange) -> Result<(), ViewProblem> {
+        let exists = self
+            .objects
+            .iter()
+            .any(|old| old.same_identity(&change.object));
+        if exists && change.if_not_exists {
+            return Ok(());
+        }
+        if exists && !change.replace {
+            return Err(ViewProblem::duplicate_object(
+                &self.name,
+                &change.object.name,
+            ));
+        }
+        self.objects
+            .retain(|old| !old.same_identity(&change.object));
+        self.objects.push(change.object.clone());
+        Ok(())
+    }
+
+    fn apply_default_change(&mut self, default: &ViewDefault) -> Result<(), ViewProblem> {
+        if !self
+            .projections
+            .iter()
+            .any(|(column, _)| column.name().as_ref() == Some(&default.column))
+        {
+            return Err(ViewProblem::unknown_default_column(
+                &self.name,
+                default.column.as_str(),
+            ));
+        }
+        self.defaults
+            .retain(|(column, _)| column != &default.column);
+        if let Some(value) = &default.value {
+            self.defaults.push((default.column.clone(), value.clone()));
+        }
+        Ok(())
+    }
+
+    fn drop_object(&mut self, change: &ObjectChange) -> Result<(), ViewProblem> {
+        if !change.if_not_exists
+            && !self
+                .objects
+                .iter()
+                .any(|old| old.same_identity(&change.object))
+        {
+            return Err(ViewProblem::missing_object(&self.name, &change.object.name));
+        }
+        self.objects
+            .retain(|old| !old.same_identity(&change.object));
         Ok(())
     }
 
@@ -177,6 +188,21 @@ impl ViewWriteInfo {
         event: WriteEvent,
         seen: &mut Vec<FullName>,
     ) -> Result<Decision, FullName> {
+        if let Some(decision) = self.explicit_write_decision(context, event) {
+            return Ok(decision);
+        }
+        let base = self.automatic_source_decision(context, event, seen)?;
+        if !base.writable {
+            return Ok(base);
+        }
+        Ok(self.project_writable_columns(&base))
+    }
+
+    fn explicit_write_decision(
+        &self,
+        context: &impl BaseParseContext,
+        event: WriteEvent,
+    ) -> Option<Decision> {
         let rules: Vec<_> = self
             .matching_objects(event)
             .filter(|object| object.is_rule())
@@ -189,7 +215,7 @@ impl ViewWriteInfo {
             let returning = rules
                 .iter()
                 .any(|object| object.replaces_unconditionally() && object.returning);
-            return Ok(Decision::writable(
+            return Some(Decision::writable(
                 &self.visible_columns(),
                 returning,
                 false,
@@ -204,16 +230,25 @@ impl ViewWriteInfo {
             if crate::ast::Dialect::from(context.metadata()) == crate::ast::Dialect::sqlite() {
                 decision.required_trigger_columns = self.trigger_columns(event);
             }
-            return Ok(decision);
+            return Some(decision);
         }
         if crate::ast::Dialect::from(context.metadata()) == crate::ast::Dialect::sqlite() {
-            return Ok(Decision::read_only());
+            return Some(Decision::read_only());
         }
         // Conditional INSTEAD rules prevent automatic rewriting, even when
         // no row would satisfy their condition. Triggers were considered above.
         if rules.iter().any(|object| object.is_instead_rule()) {
-            return Ok(Decision::read_only());
+            return Some(Decision::read_only());
         }
+        None
+    }
+
+    fn automatic_source_decision(
+        &self,
+        context: &impl BaseParseContext,
+        event: WriteEvent,
+        seen: &mut Vec<FullName>,
+    ) -> Result<Decision, FullName> {
         let Some(source) = &self.source else {
             return Ok(Decision::read_only());
         };
@@ -221,7 +256,19 @@ impl ViewWriteInfo {
             return Ok(Decision::read_only());
         }
         seen.push(source.clone());
-        let base = if let Some(table) = context.get_table_impl(source) {
+        let base = self.source_decision(context, source, event, seen);
+        seen.pop();
+        base
+    }
+
+    fn source_decision(
+        &self,
+        context: &impl BaseParseContext,
+        source: &FullName,
+        event: WriteEvent,
+        seen: &mut Vec<FullName>,
+    ) -> Result<Decision, FullName> {
+        let decision = if let Some(table) = context.get_table_impl(source) {
             let mut columns = Vec::new();
             while let Some(column) = table.get_column_at(columns.len()) {
                 columns.push(column.clone());
@@ -239,10 +286,10 @@ impl ViewWriteInfo {
         } else {
             Decision::read_only()
         };
-        seen.pop();
-        if !base.writable {
-            return Ok(base);
-        }
+        Ok(decision)
+    }
+
+    fn project_writable_columns(&self, base: &Decision) -> Decision {
         let mut columns = Vec::new();
         let mut assignment_columns = Vec::new();
         for (visible, source_column) in &self.projections {
@@ -252,31 +299,37 @@ impl ViewWriteInfo {
             let Some(definition) = base.column(name) else {
                 continue;
             };
-            let mut effective = ColumnDefinition::new(
-                visible.name(),
-                visible.get_type(),
-                definition.is_not_null(),
-                definition.constraints(),
-            );
-            self.apply_default(&mut effective);
+            columns.push(self.effective_projection(visible, definition));
             if let Some(visible_name) = visible.name() {
-                let key = base
-                    .assignment_columns
-                    .iter()
-                    .find(|column| column.name() == name)
-                    .map_or(name, ViewAssignmentColumn::source_column);
-                assignment_columns.push(ViewAssignmentColumn::new(visible_name, key));
+                assignment_columns.push(ViewAssignmentColumn::new(
+                    visible_name,
+                    base.assignment_column(name),
+                ));
             }
-            columns.push(effective);
         }
         // PostgreSQL requires at least one updatable projection, even for DEFAULT VALUES.
         if columns.is_empty() {
-            return Ok(Decision::read_only());
+            return Decision::read_only();
         }
         let mut decision = Decision::writable(&columns, base.returning, base.on_conflict);
         decision.assignment_columns = assignment_columns;
         decision.rewrites_defaults = true;
-        Ok(decision)
+        decision
+    }
+
+    fn effective_projection(
+        &self,
+        visible: &ColumnDefinition,
+        source: &ColumnDefinition,
+    ) -> ColumnDefinition {
+        let mut column = ColumnDefinition::new(
+            visible.name(),
+            visible.get_type(),
+            source.is_not_null(),
+            source.constraints(),
+        );
+        self.apply_default(&mut column);
+        column
     }
 
     fn trigger_columns(&self, event: WriteEvent) -> Option<Vec<ColumnName>> {
@@ -365,6 +418,12 @@ impl Decision {
             }
         }
     }
+    fn assignment_column<'a>(&'a self, name: &'a ColumnName) -> &'a ColumnName {
+        self.assignment_columns
+            .iter()
+            .find(|column| column.name() == name)
+            .map_or(name, ViewAssignmentColumn::source_column)
+    }
     fn column(&self, name: &ColumnName) -> Option<&ColumnDefinition> {
         self.columns
             .iter()
@@ -375,14 +434,17 @@ impl Decision {
 pub(crate) fn insert_support(
     context: &impl BaseParseContext,
     view: &FullName,
-) -> ViewInsertSupport {
+) -> Result<ViewInsertSupport, ViewProblem> {
+    if let Some(support) = context.view_insert_support(view) {
+        return Ok(support.clone());
+    }
     let decision = match context.view_write_info(view) {
         Some(info) => info.decision(context, WriteEvent::insert(), &mut vec![view.clone()]),
         None => Err(view.clone()),
     };
     let decision = match decision {
         Ok(decision) => decision,
-        Err(missing) => return ViewInsertSupport::missing_metadata(&missing),
+        Err(missing) => return Err(ViewProblem::missing_metadata(&missing)),
     };
     if decision.writable {
         let mut support = ViewInsertSupport::writable(
@@ -392,31 +454,34 @@ pub(crate) fn insert_support(
                 && crate::ast::Dialect::from(context.metadata()) != crate::ast::Dialect::sqlite(),
         );
         support.set_assignment_columns(&decision.assignment_columns);
-        support
+        Ok(support)
     } else {
-        ViewInsertSupport::read_only()
+        Ok(ViewInsertSupport::read_only())
     }
 }
 pub(crate) fn update_support(
     context: &impl BaseParseContext,
     view: &FullName,
-) -> ViewUpdateSupport {
+) -> Result<ViewUpdateSupport, ViewProblem> {
+    if let Some(support) = context.view_update_support(view) {
+        return Ok(support.clone());
+    }
     let decision = match context.view_write_info(view) {
         Some(info) => info.decision(context, WriteEvent::update(), &mut vec![view.clone()]),
         None => Err(view.clone()),
     };
     let decision = match decision {
         Ok(decision) => decision,
-        Err(missing) => return ViewUpdateSupport::missing_metadata(&missing),
+        Err(missing) => return Err(ViewProblem::missing_metadata(&missing)),
     };
     if decision.writable {
         let mut support = ViewUpdateSupport::writable(&decision.columns, decision.returning);
         support.set_assignment_columns(&decision.assignment_columns);
         decision.apply_update_defaults(&mut support);
         support.set_required_trigger_columns(decision.required_trigger_columns.as_deref());
-        support
+        Ok(support)
     } else {
-        ViewUpdateSupport::read_only()
+        Ok(ViewUpdateSupport::read_only())
     }
 }
 
@@ -506,6 +571,10 @@ pub(crate) struct ViewDefault {
     value: Option<SemScalarExpr>,
 }
 
+pub(crate) const TRIGGER_EVENT_INSERT: i32 = 4;
+pub(crate) const TRIGGER_EVENT_DELETE: i32 = 8;
+pub(crate) const TRIGGER_EVENT_UPDATE: i32 = 16;
+
 #[derive(Debug, Clone, Copy)]
 pub(crate) enum WriteEvent {
     Insert,
@@ -524,9 +593,9 @@ impl WriteEvent {
     }
     const fn mask(self) -> i32 {
         match self {
-            Self::Insert => 4,
-            Self::Update => 16,
-            Self::Delete => 8,
+            Self::Insert => TRIGGER_EVENT_INSERT,
+            Self::Update => TRIGGER_EVENT_UPDATE,
+            Self::Delete => TRIGGER_EVENT_DELETE,
         }
     }
 }

@@ -606,20 +606,14 @@ impl TestParseContext {
     }
 }
 impl crate::sem::ViewInsertInfoRead for TestParseContext {
-    fn view_insert_support(&self, view: &FullName) -> crate::sem::ViewInsertSupport {
-        self.view_insert_support
-            .get(view)
-            .expect("explicit view INSERT capability fixture")
-            .clone()
+    fn view_insert_support(&self, view: &FullName) -> Option<&crate::sem::ViewInsertSupport> {
+        self.view_insert_support.get(view)
     }
 }
 
 impl crate::sem::ViewUpdateInfoRead for TestParseContext {
-    fn view_update_support(&self, view: &FullName) -> crate::sem::ViewUpdateSupport {
-        self.view_update_support
-            .get(view)
-            .expect("explicit view UPDATE capability fixture")
-            .clone()
+    fn view_update_support(&self, view: &FullName) -> Option<&crate::sem::ViewUpdateSupport> {
+        self.view_update_support.get(view)
     }
 }
 

@@ -1,0 +1,43 @@
+{
+  "collations": [
+    {
+      "collate": "C",
+      "ctype": "C",
+      "deterministic": true,
+      "encoding": -1,
+      "icu_rules": null,
+      "locale": null,
+      "name": "C",
+      "provider": "c",
+      "schema": "pg_catalog",
+      "version": null
+    },
+    {
+      "collate": null,
+      "ctype": null,
+      "deterministic": true,
+      "encoding": -1,
+      "icu_rules": null,
+      "locale": null,
+      "name": "default",
+      "provider": "d",
+      "schema": "pg_catalog",
+      "version": null
+    }
+  ],
+  "database": {
+    "collate": "en_US.utf8",
+    "ctype": "en_US.utf8",
+    "default_collation": {
+      "encoding": -1,
+      "name": "default",
+      "schema": "pg_catalog"
+    },
+    "encoding": 6,
+    "encoding_name": "UTF8",
+    "icu_rules": null,
+    "locale": null,
+    "provider": "c",
+    "version": "2.41"
+  }
+}

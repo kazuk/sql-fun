@@ -173,7 +173,7 @@ pub(crate) use self::{
     parameter_constraints::{ConstraintGraph, SignatureAlternative},
     parse_context::CursorBindings,
     scalar_expr::{CaseExprAnalysisContext, CoalesceAnalysis},
-    select_statement::SelectStatementNode,
+    select_statement::{ResultColumn, SelectStatementNode},
     stack::with_stack,
     update_statement::{UpdateDestination, UpdatePredicate},
 };

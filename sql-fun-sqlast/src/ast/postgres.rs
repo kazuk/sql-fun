@@ -389,6 +389,16 @@ impl TryFromWithTokens<&syn::Node> for StatementNode {
         if let Some(merge) = value.as_merge_stmt().as_inner() {
             return Ok(Self::merge(Merge::try_from_with_tokens(&merge, tokens)?));
         }
+        if let Some(trigger) = value.as_create_trig_stmt().as_inner() {
+            return Ok(Self::view_write(
+                super::view_write::WriteDeclaration::try_from(&trigger)?,
+            ));
+        }
+        if let Some(rule) = value.as_rule_stmt().as_inner() {
+            return Ok(Self::view_write(
+                super::view_write::WriteDeclaration::try_from(&rule)?,
+            ));
+        }
         if let Some(view) = value.as_view_stmt().as_inner() {
             return Ok(Self::view(View::try_from_with_tokens(&view, tokens)?));
         }
@@ -412,6 +422,14 @@ impl TryFromWithTokens<&syn::Node> for StatementNode {
             )?));
         }
         if let Some(drop_table) = value.as_drop_stmt().as_inner() {
+            if matches!(
+                drop_table.get_remove_type().as_inner(),
+                Some(syn::ObjectType::ObjectTrigger | syn::ObjectType::ObjectRule)
+            ) {
+                return Ok(Self::view_write(
+                    super::view_write::WriteDeclaration::try_from(&drop_table)?,
+                ));
+            }
             return Ok(Self::drop_table(DropTable::try_from(&drop_table)?));
         }
         if let Some(alter_sequence) = value.as_alter_seq_stmt().as_inner() {

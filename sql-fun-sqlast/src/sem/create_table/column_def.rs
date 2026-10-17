@@ -39,6 +39,24 @@ impl Clone for ColumnDefinition {
 }
 
 impl ColumnDefinition {
+    pub(crate) fn replace_view_default(
+        &mut self,
+        view: &crate::sem::FullName,
+        value: &SemScalarExpr,
+    ) {
+        self.constraints
+            .retain(|constraint| constraint.as_default().is_none());
+        if let Some(name) = &self.name {
+            self.constraints.push(ColumnConstraint::default(
+                crate::sem::DefaultColumnConstraint::new(
+                    &TableName::from(view.clone()),
+                    name,
+                    value.clone(),
+                ),
+            ));
+        }
+    }
+
     /// create instance
     #[must_use]
     pub fn new(

@@ -285,11 +285,35 @@ impl InsertTargetCollection {
             {
                 columns.truncate(width);
             }
+            if context.dialect() == Dialect::postgres()
+                && self.source.is_some()
+                && let Some(support) = table.view_support()
+            {
+                let mut seen = Vec::new();
+                for target in &columns {
+                    let name = target.column().name().as_ref().expect("named destination");
+                    let key = support.assignment_column(name);
+                    if seen.contains(&key) {
+                        context.report_analysis_problem(AnalysisProblem::insert(
+                            crate::sem::problem::InsertProblemKind::duplicate_target(),
+                            "underlying column is assigned more than once",
+                        ))?;
+                    }
+                    seen.push(key);
+                }
+            }
         } else {
             let mut seen: Vec<&Assignment> = Vec::new();
             for assignment in assignments {
                 if context.dialect() == Dialect::postgres()
-                    && seen.iter().any(|previous| previous.overlaps(assignment))
+                    && seen.iter().any(|previous| {
+                        assignment.overlaps_mapped(previous, |name| {
+                            table.view_support().map_or_else(
+                                || name.clone(),
+                                |support| support.assignment_column(name).clone(),
+                            )
+                        })
+                    })
                 {
                     context.report_analysis_problem(AnalysisProblem::insert(
                         crate::sem::problem::InsertProblemKind::duplicate_target(),
@@ -517,6 +541,15 @@ impl Expr {
     }
 }
 impl Assignment {
+    pub(super) fn overlaps_mapped(
+        &self,
+        other: &Self,
+        map: impl Fn(&ColumnName) -> ColumnName,
+    ) -> bool {
+        let same = map(&ColumnName::from(self.name.as_str()))
+            == map(&ColumnName::from(other.name.as_str()));
+        same && (self.indirection.is_empty() || other.indirection.is_empty())
+    }
     pub(super) fn overlaps(&self, other: &Self) -> bool {
         if self.name != other.name {
             return false;

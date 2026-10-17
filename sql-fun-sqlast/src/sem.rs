@@ -54,9 +54,9 @@ mod view_like;
 
 pub(crate) use self::insert_statement::InsertDestination;
 
-#[expect(deprecated)]
 pub(crate) use self::conflict_masters::ConflictMasters;
 
+#[expect(deprecated)]
 pub use self::{
     alter_owner::AlterOwner,
     alter_seq::AlterSequence,

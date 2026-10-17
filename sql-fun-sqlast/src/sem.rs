@@ -101,7 +101,7 @@ pub use self::{
         TableInfoWrite, TypeInfoRead, TypeInfoWrite, ViewInfoRead, ViewInfoWrite,
     },
     pg_type::{PgBuiltInType, TypeDefinition, TypeReference},
-    problem::{AnalysisProblem, ParameterConstraintProblem},
+    problem::{AnalysisProblem, ParameterConstraintProblem, QueryProblem},
     query::{
         FunctionModifiers, QueryCte, QueryFrame, QueryFrameBound, QueryGrouping, QueryLock,
         QueryName, QueryNameResolution, QueryOrder, QueryWindow, ResolvedOperator, SelectClauses,

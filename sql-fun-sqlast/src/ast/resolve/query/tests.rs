@@ -559,3 +559,50 @@ fn sqlite_window_definitions_do_not_bind_projection_aliases() {
         SemScalarExpr::ColumnRef(ColumnReferenceExpr::UndefinedColumn(_))
     );
 }
+
+#[rstest::rstest]
+#[case::duplicate_window(
+    "SELECT 1 WINDOW w AS (), w AS ()",
+    vec![crate::sem::QueryProblem::duplicate_window_definition("w")]
+)]
+#[case::missing_window(
+    "SELECT sum(1) OVER absent",
+    vec![crate::sem::QueryProblem::reference_not_found("absent")]
+)]
+#[case::ambiguous_window(
+    "SELECT sum(1) OVER w WINDOW w AS (), w AS ()",
+    vec![crate::sem::QueryProblem::duplicate_window_definition("w"), crate::sem::QueryProblem::ambiguous_reference("w")]
+)]
+#[case::missing_operator(
+    "SELECT 1 ORDER BY 1 USING #",
+    vec![crate::sem::QueryProblem::reference_not_found("#")]
+)]
+#[case::missing_lock_source(
+    "SELECT n FROM (SELECT 1 AS n) s FOR UPDATE OF absent",
+    vec![crate::sem::QueryProblem::reference_not_found("absent")]
+)]
+#[case::zero_position(
+    "SELECT 1 ORDER BY 0",
+    vec![crate::sem::QueryProblem::position_out_of_range(0)]
+)]
+#[case::group_position(
+    "SELECT 1 GROUP BY 2",
+    vec![crate::sem::QueryProblem::position_out_of_range(2)]
+)]
+#[case::compound_expression(
+    "SELECT 1 UNION SELECT 2 ORDER BY 1 + 1",
+    vec![crate::sem::QueryProblem::invalid_compound_order()]
+)]
+fn reports_structured_query_problems(
+    #[case] sql: &str,
+    #[case] expected: Vec<crate::sem::QueryProblem>,
+) {
+    let (_, context) = resolve(sql, Dialect::postgres(), false).unwrap();
+    let mut actual = Vec::new();
+    for problem in context.reported_problems() {
+        if let Some(problem) = problem.query_problem() {
+            actual.push(problem.clone());
+        }
+    }
+    assert_eq!(actual, expected);
+}

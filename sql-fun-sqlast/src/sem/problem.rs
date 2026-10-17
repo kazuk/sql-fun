@@ -3,6 +3,7 @@
 mod name_resolution;
 mod overload_resolution;
 mod parameter_constraint;
+mod query;
 mod sql_highlighter;
 
 use std::collections::HashSet;
@@ -21,6 +22,7 @@ use crate::{
 
 pub use self::name_resolution::{DomainBaseTypeNameNotFound, NameResolution};
 pub use self::parameter_constraint::ParameterConstraintProblem;
+pub use self::query::QueryProblem;
 
 pub(crate) use self::{overload_resolution::OverloadResolution, sql_highlighter::SqlHighlighter};
 
@@ -60,8 +62,8 @@ trait RenderProblemReport: Problem {
 #[allow(clippy::large_enum_variant)]
 #[derive(Debug, Clone)]
 pub enum AnalysisProblem {
-    /// A query clause contains an invalid, missing or ambiguous reference.
-    QueryReference(String),
+    /// A structured SELECT clause violation.
+    Query(QueryProblem),
     /// SQL-derived parameter requirements cannot be reconciled.
     ParameterConstraint(ParameterConstraintProblem),
     /// Name resolution problems
@@ -127,9 +129,16 @@ pub enum AnalysisProblem {
 }
 
 impl AnalysisProblem {
-    /// Report a clause binding problem without inventing a source location.
-    pub fn query_reference(message: &str) -> Self {
-        Self::QueryReference(message.to_owned())
+    /// Report a structured SELECT clause violation without inventing a source location.
+    pub const fn query(problem: QueryProblem) -> Self {
+        Self::Query(problem)
+    }
+    /// Structured SELECT violation, independently of its diagnostic rendering.
+    pub const fn query_problem(&self) -> Option<&QueryProblem> {
+        match self {
+            Self::Query(problem) => Some(problem),
+            _ => None,
+        }
     }
     /// Report conflicting or invalid SQL-derived parameter requirements.
     pub fn parameter_constraint(message: &str) -> Self {
@@ -140,7 +149,7 @@ impl AnalysisProblem {
     #[must_use]
     pub const fn code(&self) -> &'static str {
         match self {
-            Self::QueryReference(_) => "query_reference",
+            Self::Query(problem) => problem.code(),
             Self::ParameterConstraint(problem) => problem.code(),
             Self::NameResolution(problem) => problem.code(),
             Self::OverloadResolution(problem) => problem.code(),
@@ -187,7 +196,7 @@ impl AnalysisProblem {
             .with_syntax_highlighting(SqlHighlighter::from_theme(theme)?);
 
         let report = match self {
-            Self::QueryReference(message) => message.clone(),
+            Self::Query(problem) => problem.render_report(&report_handler, source)?,
             Self::NameResolution(nr) => nr.render_report(&report_handler, source)?,
             Self::ParameterConstraint(problem) => problem.render_report(&report_handler, source)?,
             _ => todo!(),

@@ -170,6 +170,34 @@ impl ParameterResolution {
         Ok(())
     }
 
+    fn default_query_outputs(&mut self) {
+        // A subquery resolves its unknown projected parameters before an UPDATE
+        // destination can impose assignment constraints. Keep any solver failure
+        // in the graph for the final diagnostic-producing solve.
+        let _ = self.graph.solve();
+        if let Some(scope) = self.scopes.last() {
+            for output in &scope.outputs.0 {
+                if let Some(node) = output.node
+                    && self.graph.domain(node).is_any()
+                    && output.domain
+                        == InputTypeConstraint::exact(&crate::sem::PgBuiltInType::text())
+                {
+                    self.graph.restrict(node, &output.domain);
+                }
+            }
+        }
+    }
+    pub(crate) fn default_returning_parameter(&mut self, value: &SemScalarExpr) {
+        if value.is_unconstrained_parameter()
+            && let Some(node) = value.constraint_node()
+            && self.graph.domain(node).is_any()
+        {
+            self.graph.restrict(
+                node,
+                &InputTypeConstraint::exact(&crate::sem::PgBuiltInType::text()),
+            );
+        }
+    }
     pub(crate) fn parameter(&mut self, position: u32) -> SemScalarExpr {
         let node = self.graph.parameter(position);
         SemScalarExpr::parameter(position, node, self.graph.domain(node))
@@ -560,6 +588,7 @@ impl OverloadScores {
 }
 
 struct Collector<'a, C: crate::sem::ParseContext> {
+    update_depth: usize,
     parameters: ParameterResolution,
     context: &'a mut C,
 }
@@ -573,27 +602,49 @@ impl<C: crate::sem::ParseContext> crate::sem::traversal::SemanticVisitor for Col
         value: &mut SemScalarExpr,
         target: &crate::sem::InsertTarget,
     ) -> Result<(), AnalysisError> {
-        if self.context.dialect() == Dialect::postgres()
-            && let Some(ty) = target.assignment_type()
-        {
+        if let Some(ty) = target.assignment_type() {
+            self.assignment_value(value, &ty)?;
+        }
+        Ok(())
+    }
+    fn assignment_value(
+        &mut self,
+        value: &mut SemScalarExpr,
+        ty: &TypeReference,
+    ) -> Result<(), AnalysisError> {
+        if self.context.dialect() == Dialect::postgres() {
             if let Some(node) = value.constraint_node() {
                 self.parameters.graph.restrict(
                     node,
-                    &InputTypeConstraint::types(self.context.assignment_sources(&ty)),
+                    &InputTypeConstraint::types(self.context.assignment_sources(ty)),
                 );
             } else if let Some(source) = value.get_type()
-                && source != ty
-                && !self.context.get_assignment_cast(&source, &ty).is_some()
+                && &source != ty
+                && !self.context.get_assignment_cast(&source, ty).is_some()
             {
-                self.context
-                    .report_analysis_problem(crate::sem::AnalysisProblem::insert(
-                        crate::sem::problem::InsertProblemKind::assignment_type(),
-                        &format!("cannot assign {source:?} to {ty:?}"),
-                    ))?;
+                self.context.report_analysis_problem(
+                    crate::sem::AnalysisProblem::parameter_constraint(&format!(
+                        "cannot assign {source:?} to {ty:?}"
+                    )),
+                )?;
             }
-            if value.get_type().as_ref() != Some(&ty) {
-                *value = SemScalarExpr::wrap_implicit_cast(&ty, value);
+            if value.get_type().as_ref() != Some(ty) {
+                *value = SemScalarExpr::wrap_implicit_cast(ty, value);
             }
+        }
+        Ok(())
+    }
+    fn update_returning(
+        &mut self,
+        columns: &mut crate::sem::ResultColumnCollection,
+    ) -> Result<(), AnalysisError> {
+        if self.context.dialect() == Dialect::postgres() {
+            self.parameters.solve(self.context)?;
+        }
+        columns.walk(self)?;
+        if self.context.dialect() == Dialect::postgres() {
+            self.parameters.solve(self.context)?;
+            columns.default_returning_parameters(&mut self.parameters);
         }
         Ok(())
     }
@@ -608,10 +659,19 @@ impl<C: crate::sem::ParseContext> crate::sem::traversal::SemanticVisitor for Col
             );
         }
     }
+    fn enter_update(&mut self) {
+        self.update_depth += 1;
+    }
+    fn leave_update(&mut self) {
+        self.update_depth -= 1;
+    }
     fn enter_query(&mut self) {
         self.parameters.enter_query();
     }
     fn leave_query(&mut self) {
+        if self.update_depth > 0 && self.context.dialect() == Dialect::postgres() {
+            self.parameters.default_query_outputs();
+        }
         self.parameters.leave_query();
     }
     fn cte(&mut self, name: &str) {
@@ -751,6 +811,7 @@ impl ParameterResolution {
         #[cfg(test)]
         INFERENCE_RUNS.with(|runs| runs.set(runs.get() + 1));
         let mut collector = Collector {
+            update_depth: 0,
             parameters: Self::default(),
             context,
         };
@@ -770,6 +831,7 @@ impl ParameterResolution {
         #[cfg(test)]
         INFERENCE_RUNS.with(|runs| runs.set(runs.get() + 1));
         let mut collector = Collector {
+            update_depth: 0,
             parameters: Self::default(),
             context,
         };
@@ -782,6 +844,26 @@ impl ParameterResolution {
         })?;
         Ok(constraints)
     }
+    pub(crate) fn infer_update(
+        update: &mut crate::sem::UpdateStatement,
+        context: &mut impl crate::sem::ParseContext,
+    ) -> Result<ParameterConstraints, AnalysisError> {
+        #[cfg(test)]
+        INFERENCE_RUNS.with(|runs| runs.set(runs.get() + 1));
+        let mut collector = Collector {
+            update_depth: 0,
+            parameters: Self::default(),
+            context,
+        };
+        update.walk(&mut collector)?;
+        collector.parameters.solve(collector.context)?;
+        let constraints = collector.parameters.constraints();
+        update.walk(&mut Finalizer {
+            constraints: &constraints,
+            context: collector.context,
+        })?;
+        Ok(constraints)
+    }
     pub(crate) fn infer_expression(
         expression: &mut SemScalarExpr,
         context: &mut impl crate::sem::ParseContext,
@@ -789,6 +871,7 @@ impl ParameterResolution {
         #[cfg(test)]
         INFERENCE_RUNS.with(|runs| runs.set(runs.get() + 1));
         let mut collector = Collector {
+            update_depth: 0,
             parameters: Self::default(),
             context,
         };

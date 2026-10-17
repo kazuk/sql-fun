@@ -12,7 +12,25 @@ pub(crate) trait SemanticVisitor {
     ) -> Result<(), AnalysisError> {
         Ok(())
     }
+    fn assignment_value(
+        &mut self,
+        _value: &mut SemScalarExpr,
+        _target: &crate::sem::TypeReference,
+    ) -> Result<(), AnalysisError> {
+        Ok(())
+    }
+    fn update_returning(
+        &mut self,
+        columns: &mut crate::sem::ResultColumnCollection,
+    ) -> Result<(), AnalysisError>
+    where
+        Self: Sized,
+    {
+        columns.walk(self)
+    }
     fn subscript(&mut self, _value: &SemScalarExpr) {}
+    fn enter_update(&mut self) {}
+    fn leave_update(&mut self) {}
     fn enter_query(&mut self) {}
     fn leave_query(&mut self) {}
     fn cte(&mut self, _name: &str) {}

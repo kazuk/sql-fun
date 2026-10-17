@@ -130,7 +130,10 @@ impl SemAst {
                 let syntax = crate::ast::StatementNode::try_from(&Stmt::Select(select))?;
                 syntax.resolve_and_apply(context)
             }
-            Stmt::Update(_update) => todo!(),
+            Stmt::Update(update) => {
+                let syntax = crate::ast::StatementNode::try_from(&Stmt::Update(update))?;
+                syntax.resolve_and_apply(context)
+            }
             Stmt::Delete(_delete_statement) => todo!(),
             Stmt::Insert(insert) => {
                 let syntax = crate::ast::StatementNode::try_from(&Stmt::Insert(insert))?;

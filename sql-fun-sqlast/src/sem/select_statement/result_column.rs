@@ -139,6 +139,33 @@ mod test_result_column_composite_field_definition {
 pub struct ResultColumnCollection(Vec<ResultColumn>);
 
 impl ResultColumnCollection {
+    pub(crate) fn default_returning_parameters(
+        &self,
+        parameters: &mut crate::sem::parameter_resolution::ParameterResolution,
+    ) {
+        for column in &self.0 {
+            if let Some(value) = &column.expression {
+                parameters.default_returning_parameter(value);
+            }
+        }
+    }
+
+    pub(crate) fn assign_update_output<V: crate::sem::traversal::SemanticVisitor>(
+        &mut self,
+        visitor: &mut V,
+        index: usize,
+        ty: &TypeReference,
+    ) -> Result<(), AnalysisError> {
+        if let Some(column) = self.0.get_mut(index)
+            && let Some(value) = &mut column.expression
+        {
+            visitor.assignment_value(value, ty)?;
+            column.col_type = value.get_type();
+            column.is_not_null = value.is_not_null();
+        }
+        Ok(())
+    }
+
     /// Number of result columns.
     pub const fn len(&self) -> usize {
         self.0.len()

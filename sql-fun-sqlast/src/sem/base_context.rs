@@ -281,3 +281,9 @@ impl crate::sem::ViewInsertInfoRead for BaseContext {
         todo!("catalog writable-view columns, INSTEAD OF INSERT triggers and rules")
     }
 }
+
+impl crate::sem::ViewUpdateInfoRead for BaseContext {
+    fn view_update_support(&self, _view: &crate::sem::FullName) -> crate::sem::ViewUpdateSupport {
+        todo!("catalog writable-view columns, INSTEAD OF UPDATE triggers and rules")
+    }
+}

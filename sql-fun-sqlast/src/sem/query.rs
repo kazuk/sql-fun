@@ -685,6 +685,20 @@ pub struct SemanticValues {
     columns: ResultColumnCollection,
 }
 impl SemanticValues {
+    pub(crate) fn assign_update_output<V: SemanticVisitor>(
+        &mut self,
+        visitor: &mut V,
+        index: usize,
+        ty: &crate::sem::TypeReference,
+    ) -> Result<(), AnalysisError> {
+        for row in &mut self.rows {
+            if let Some(value) = row.get_mut(index) {
+                visitor.assignment_value(value, ty)?;
+            }
+        }
+        self.columns.assign_update_output(visitor, index, ty)
+    }
+
     pub(crate) fn new(rows: Vec<Vec<SemScalarExpr>>) -> Self {
         let mut columns = ResultColumnCollection::default();
         if let Some(first) = rows.first() {

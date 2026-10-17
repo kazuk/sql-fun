@@ -135,7 +135,10 @@ pub use self::{
     schema_file_context::SchemaFileContext,
     select_statement::{ResultColumnCollection, SelectStatement},
     type_system::{FunctionOverloadCollection, FunctionParam, OverloadVariant},
-    update_statement::{UpdateStatement, analyze_update_statement},
+    update_statement::{
+        UpdateAssignment, UpdateQueryValue, UpdateStatement, UpdateValue, ViewUpdateInfoRead,
+        ViewUpdateSupport, analyze_update_statement,
+    },
     variable_set::{VariableSet, analyze_variable_set},
     view_like::ViewLike,
 };
@@ -151,6 +154,7 @@ pub(crate) use self::{
     scalar_expr::{CaseExprAnalysisContext, CoalesceAnalysis},
     select_statement::SelectStatementNode,
     stack::with_stack,
+    update_statement::UpdateDestination,
 };
 
 use crate::StringSpan;
@@ -372,6 +376,16 @@ impl SemAst {
         }
     }
 
+    pub(crate) fn update(update: &UpdateStatement) -> Self {
+        Self::UpdateStatement(update.clone())
+    }
+    /// Inspect an analyzed UPDATE.
+    pub const fn as_update(&self) -> Option<&UpdateStatement> {
+        match self {
+            Self::UpdateStatement(update) => Some(update),
+            _ => None,
+        }
+    }
     pub(crate) fn insert(insert: &InsertStatement) -> Self {
         Self::InsertStatement(insert.clone())
     }

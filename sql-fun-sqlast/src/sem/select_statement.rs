@@ -33,6 +33,25 @@ pub enum SelectStatement {
 }
 
 impl SelectStatement {
+    pub(crate) fn assign_update_output<V: crate::sem::traversal::SemanticVisitor>(
+        &mut self,
+        visitor: &mut V,
+        index: usize,
+        ty: &TypeReference,
+    ) -> Result<(), AnalysisError> {
+        match self {
+            Self::Simple(query) => query
+                .result_columns
+                .assign_update_output(visitor, index, ty),
+            Self::Query(query) => query.body_mut().assign_update_output(visitor, index, ty),
+            Self::Values(values) => values.assign_update_output(visitor, index, ty),
+            Self::Union(left, right) | Self::Intersect(left, right) | Self::Except(left, right) => {
+                left.assign_update_output(visitor, index, ty)?;
+                right.assign_update_output(visitor, index, ty)
+            }
+        }
+    }
+
     pub(crate) fn has_width(&self, width: usize) -> bool {
         match self {
             Self::Simple(query) => query.result_columns.len() == width,

@@ -1,5 +1,7 @@
 mod insert;
+mod placement;
 mod query;
+mod update;
 
 use crate::StringSpan;
 use crate::ast::{

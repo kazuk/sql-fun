@@ -257,7 +257,9 @@ impl With {
             .map(ScalarAnalysisContext::inherited_ctes)
             .unwrap_or_default();
         for entry in &self.entries {
-            entry.body.require_insert_placement(outer.is_none())?;
+            entry
+                .body
+                .require_data_modifying_placement(outer.is_none())?;
             let from = FromClause::default();
             let scope = ScalarAnalysisContext::nested(&with, &from, outer);
             let body = entry.body.resolve(context, &scope, &entry.column_names())?;
@@ -294,7 +296,20 @@ impl CteBody {
                 insert.rename_columns(columns);
                 Ok(CteStatement::from_insert(insert))
             }
-            Self::Update(_) => todo!(),
+            Self::Update(update) => {
+                if context.dialect() == Dialect::sqlite() {
+                    return AnalysisError::raise_unexpected_input("SQLite UPDATE CTE");
+                }
+                let mut update = update.resolve_in(context, Some(scope))?;
+                if columns.len() > update.result_columns().len() {
+                    context.report_analysis_problem(AnalysisProblem::update(
+                        crate::sem::problem::UpdateProblemKind::cte_aliases(),
+                        "UPDATE CTE has more aliases than outputs",
+                    ))?;
+                }
+                update.rename_columns(columns);
+                Ok(CteStatement::from_update(update))
+            }
             Self::Delete(_) => todo!(),
             Self::Merge(_) => AnalysisError::raise_unexpected_none("common_table_expr.query"),
         }
@@ -474,7 +489,7 @@ impl CallKind {
 }
 
 impl FromItem {
-    fn resolve_list_in(
+    pub(super) fn resolve_list_in(
         items: &[Self],
         context: &mut impl ParseContext,
         with: &WithClause,

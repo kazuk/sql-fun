@@ -38,6 +38,7 @@ pub struct TestParseContext {
     type_definitions: HashMap<FullName, TypeDefinition>,
     table_definitions: HashMap<FullName, Option<CreateTable>>,
     view_definitions: HashMap<FullName, Option<ViewLike>>,
+    view_update_support: HashMap<FullName, crate::sem::ViewUpdateSupport>,
     view_insert_support: HashMap<FullName, crate::sem::ViewInsertSupport>,
     function_definitions: HashMap<FullName, FunctionOverloadCollection>,
     alter_tables: Vec<AlterTable>,
@@ -564,5 +565,25 @@ impl crate::sem::ViewInsertInfoRead for TestParseContext {
             .get(view)
             .expect("explicit view INSERT capability fixture")
             .clone()
+    }
+}
+
+impl crate::sem::ViewUpdateInfoRead for TestParseContext {
+    fn view_update_support(&self, view: &FullName) -> crate::sem::ViewUpdateSupport {
+        self.view_update_support
+            .get(view)
+            .expect("explicit view UPDATE capability fixture")
+            .clone()
+    }
+}
+
+impl TestParseContext {
+    pub(crate) fn set_view_update_support(
+        &mut self,
+        name: &FullName,
+        support: &crate::sem::ViewUpdateSupport,
+    ) {
+        self.view_update_support
+            .insert(name.clone(), support.clone());
     }
 }

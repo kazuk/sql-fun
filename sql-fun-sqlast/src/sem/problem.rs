@@ -6,6 +6,7 @@ mod overload_resolution;
 mod parameter_constraint;
 mod query;
 mod sql_highlighter;
+mod update;
 
 use std::collections::HashSet;
 
@@ -25,6 +26,7 @@ pub use self::insert::{InsertProblem, InsertProblemKind};
 pub use self::name_resolution::{DomainBaseTypeNameNotFound, NameResolution};
 pub use self::parameter_constraint::ParameterConstraintProblem;
 pub use self::query::QueryProblem;
+pub use self::update::{UpdateProblem, UpdateProblemKind};
 
 pub(crate) use self::{overload_resolution::OverloadResolution, sql_highlighter::SqlHighlighter};
 
@@ -66,6 +68,8 @@ trait RenderProblemReport: Problem {
 pub enum AnalysisProblem {
     /// A violation of INSERT semantic rules.
     Insert(InsertProblem),
+    /// A violation of UPDATE semantic rules.
+    Update(UpdateProblem),
     /// A structured SELECT clause violation.
     Query(QueryProblem),
     /// SQL-derived parameter requirements cannot be reconciled.
@@ -133,6 +137,16 @@ pub enum AnalysisProblem {
 }
 
 impl AnalysisProblem {
+    pub(crate) fn update(kind: UpdateProblemKind, message: &str) -> Self {
+        Self::Update(UpdateProblem::new(kind, message))
+    }
+    /// Structured UPDATE violation.
+    pub const fn update_problem(&self) -> Option<&UpdateProblem> {
+        match self {
+            Self::Update(problem) => Some(problem),
+            _ => None,
+        }
+    }
     pub(crate) fn insert(kind: InsertProblemKind, message: &str) -> Self {
         Self::Insert(InsertProblem::new(kind, message))
     }
@@ -167,6 +181,7 @@ impl AnalysisProblem {
     pub const fn code(&self) -> &'static str {
         match self {
             Self::Insert(problem) => problem.code(),
+            Self::Update(problem) => problem.code(),
             Self::Query(problem) => problem.code(),
             Self::ParameterConstraint(problem) => problem.code(),
             Self::NameResolution(problem) => problem.code(),
@@ -215,6 +230,7 @@ impl AnalysisProblem {
 
         let report = match self {
             Self::Insert(problem) => problem.render_report(&report_handler, source)?,
+            Self::Update(problem) => problem.render_report(&report_handler, source)?,
             Self::Query(problem) => problem.render_report(&report_handler, source)?,
             Self::NameResolution(nr) => nr.render_report(&report_handler, source)?,
             Self::ParameterConstraint(problem) => problem.render_report(&report_handler, source)?,

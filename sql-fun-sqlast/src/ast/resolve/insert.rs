@@ -1,5 +1,3 @@
-mod placement;
-
 use crate::ast::{
     Alias, Assignment, Conflict, ConflictAction, Dialect, Expr, Insert, Name, OverridingKind,
     Query, QueryBody, Target,
@@ -344,7 +342,7 @@ impl Expr {
     }
 }
 impl Assignment {
-    fn overlaps(&self, other: &Self) -> bool {
+    pub(super) fn overlaps(&self, other: &Self) -> bool {
         if self.name != other.name {
             return false;
         }

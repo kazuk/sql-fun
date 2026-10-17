@@ -23,7 +23,7 @@ pub enum CteStatement {
     /// `INSERT` statement
     Insert(Box<InsertStatement>),
     /// `UPDATE` statement
-    Update(UpdateStatement),
+    Update(Box<UpdateStatement>),
     /// `DELETE` statement
     Delete(DeleteStatement),
 }
@@ -70,10 +70,18 @@ impl CteStatement {
         match self {
             Self::Select(query) => Some(query.result_columns()),
             Self::Insert(insert) => Some(insert.result_columns()),
+            Self::Update(update) => Some(update.result_columns()),
             _ => None,
         }
     }
     pub(crate) fn require_readable(&self) -> Result<(), AnalysisError> {
+        if let Self::Update(update) = self
+            && update.result_columns().is_empty()
+        {
+            return Err(AnalysisError::unexpected_input_error(
+                "UPDATE CTE requires RETURNING to be read",
+            ));
+        }
         if let Self::Insert(insert) = self
             && insert.result_columns().is_empty()
         {
@@ -89,10 +97,14 @@ impl CteStatement {
         match self {
             Self::Select(query) => query.has_column(column),
             Self::Insert(insert) => insert.result_columns().has_column(column),
-            Self::Update(_) | Self::Delete(_) => false,
+            Self::Update(update) => update.result_columns().has_column(column),
+            Self::Delete(_) => false,
         }
     }
 
+    pub(crate) fn from_update(update: UpdateStatement) -> Self {
+        Self::Update(Box::new(update))
+    }
     pub(crate) fn from_insert(insert: InsertStatement) -> Self {
         Self::Insert(Box::new(insert))
     }
@@ -126,7 +138,16 @@ impl CteStatement {
                 };
                 result.map(|column| column.create_column_definition())
             }
-            Self::Update(_) | Self::Delete(_) => None,
+            Self::Update(update) => {
+                let columns = update.result_columns();
+                let result = if let Some(index) = index {
+                    columns.get_column_at(index)
+                } else {
+                    columns.get_column_with_skip_count(column, skip)
+                };
+                result.map(|column| column.create_column_definition())
+            }
+            Self::Delete(_) => None,
         }
     }
 }
@@ -182,7 +203,8 @@ impl CteStatement {
         match self {
             Self::Select(query) => query.walk(visitor)?,
             Self::Insert(insert) => insert.walk(visitor)?,
-            Self::Update(_) | Self::Delete(_) => {}
+            Self::Update(update) => update.walk(visitor)?,
+            Self::Delete(_) => {}
         }
         Ok(())
     }

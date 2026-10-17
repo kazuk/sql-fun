@@ -30,3 +30,17 @@ the workaround disabled for the upstream path to be selected.
 
 See the [installation prerequisites](../book/installation.md) for the native
 compiler and clang requirements when building from source.
+
+UPDATE analysis retains the destination and writable assignment bindings, FROM
+sources, WHERE, and RETURNING metadata. PostgreSQL UPDATE RETURNING can supply
+CTE columns; SQLite supports WITH before UPDATE, but not UPDATE inside a CTE.
+DEFAULT remains distinct from an expression, and row-subquery assignments retain
+the full query and selected output position. Inspect results with
+`SemAst::as_update()` and `UpdateStatement` accessors. SQLite RETURNING follows
+SQLite visibility rules: target aliases and FROM sources are not visible there.
+
+Catalog implementations provide `ViewUpdateInfoRead` independently of INSERT
+capabilities, including writable columns and RETURNING support. Built-in schema
+catalogs do not yet derive view trigger/rule capabilities; analysis of ordinary
+view destinations remains explicitly unimplemented in those catalogs. Table
+updates do not need that capability service.

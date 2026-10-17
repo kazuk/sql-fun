@@ -33,7 +33,7 @@ sql-fun-core = { workspace = true }
 stacker = { workspace = true }
 thiserror = { workspace = true }
 tracing = { workspace = true }
-turso_macros = { version = "=0.8.1", optional = true }
+turso_macros = { version = "=0.8.3", optional = true }
 turso_parser = { version = "=0.8.1", optional = true }
 
 [dev-dependencies]

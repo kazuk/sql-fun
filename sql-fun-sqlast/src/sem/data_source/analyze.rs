@@ -14,7 +14,7 @@ impl DataSource {
     // Standalone boundary fixture; nested queries resolve through their common scope.
     #[cfg(test)]
     fn analyze_range_subselect<TParseContext>(
-        context: TParseContext,
+        mut context: TParseContext,
         range_subsel: crate::syn::RangeSubselect,
         tokens: &IVec<ScanToken>,
     ) -> Result<(Self, TParseContext), AnalysisError>
@@ -25,14 +25,9 @@ impl DataSource {
             &range_subsel,
             tokens,
         )?);
-        let outcome = syntax.resolve_source(
-            &context,
-            crate::ast::Dialect::postgres(),
-            &WithClause::default(),
-            &FromClause::default(),
-        );
-        let mut context = context;
-        Ok((outcome.report(&mut context)?, context))
+        let outcome =
+            syntax.resolve_source(&mut context, &WithClause::default(), &FromClause::default());
+        Ok((outcome?, context))
     }
 }
 
@@ -76,7 +71,7 @@ mod test_analyze_range_subselect {
 impl DataSource {
     #[cfg(test)]
     fn analyze_join_expr<TParseContext>(
-        context: TParseContext,
+        mut context: TParseContext,
         with_clause: &WithClause,
         from_clause: &FromClause,
         join_expr: crate::syn::JoinExpr,
@@ -87,14 +82,8 @@ impl DataSource {
     {
         let syntax =
             crate::ast::FromItem::join(crate::ast::Join::try_from_with_tokens(&join_expr, tokens)?);
-        let outcome = syntax.resolve_source(
-            &context,
-            crate::ast::Dialect::postgres(),
-            with_clause,
-            from_clause,
-        );
-        let mut context = context;
-        Ok((outcome.report(&mut context)?, context))
+        let outcome = syntax.resolve_source(&mut context, with_clause, from_clause);
+        Ok((outcome?, context))
     }
 }
 
@@ -169,7 +158,7 @@ mod test_analyze_join_expr {
 impl DataSource {
     #[cfg(test)]
     fn analyze_range_table_func<TParseContext>(
-        context: TParseContext,
+        mut context: TParseContext,
         with_clause: &WithClause,
         from_clause: &FromClause,
         node: crate::syn::RangeTableFunc,
@@ -180,14 +169,8 @@ impl DataSource {
     {
         let syntax =
             crate::ast::FromItem::xml(crate::ast::XmlTable::try_from_with_tokens(&node, tokens)?);
-        let outcome = syntax.resolve_source(
-            &context,
-            crate::ast::Dialect::postgres(),
-            with_clause,
-            from_clause,
-        );
-        let mut context = context;
-        Ok((outcome.report(&mut context)?, context))
+        let outcome = syntax.resolve_source(&mut context, with_clause, from_clause);
+        Ok((outcome?, context))
     }
 }
 
@@ -239,7 +222,7 @@ mod test_data_source_analyze_range_table_func {
 impl DataSource {
     #[cfg(test)]
     fn analyze_range_func_rows_from<TParseContext>(
-        context: TParseContext,
+        mut context: TParseContext,
         with_clause: &WithClause,
         from_clause: &FromClause,
         node: crate::syn::RangeFunction,
@@ -251,14 +234,8 @@ impl DataSource {
         let syntax = crate::ast::FromItem::functions(
             crate::ast::TableFunctions::try_from_with_tokens(&node, tokens)?,
         );
-        let outcome = syntax.resolve_source(
-            &context,
-            crate::ast::Dialect::postgres(),
-            with_clause,
-            from_clause,
-        );
-        let mut context = context;
-        Ok((outcome.report(&mut context)?, context))
+        let outcome = syntax.resolve_source(&mut context, with_clause, from_clause);
+        Ok((outcome?, context))
     }
 }
 
@@ -315,7 +292,7 @@ mod test_data_source_analyze_range_func_rows_from {
 impl DataSource {
     #[cfg(test)]
     fn analyze_range_func<TParseContext>(
-        context: TParseContext,
+        mut context: TParseContext,
         with_clause: &WithClause,
         from_clause: &FromClause,
         node: crate::syn::RangeFunction,
@@ -327,14 +304,8 @@ impl DataSource {
         let syntax = crate::ast::FromItem::functions(
             crate::ast::TableFunctions::try_from_with_tokens(&node, tokens)?,
         );
-        let outcome = syntax.resolve_source(
-            &context,
-            crate::ast::Dialect::postgres(),
-            with_clause,
-            from_clause,
-        );
-        let mut context = context;
-        Ok((outcome.report(&mut context)?, context))
+        let outcome = syntax.resolve_source(&mut context, with_clause, from_clause);
+        Ok((outcome?, context))
     }
 }
 
@@ -386,7 +357,7 @@ mod test_data_source_analyze_range_functions {
 impl DataSource {
     /// semantic analyze from clause items
     pub fn analyze_from_clause_node<TParseContext>(
-        context: TParseContext,
+        mut context: TParseContext,
         with_clause: &WithClause,
         from_clause: &FromClause,
         node: crate::syn::Node,
@@ -396,13 +367,7 @@ impl DataSource {
         TParseContext: ParseContext,
     {
         let syntax = crate::ast::FromItem::try_from_with_tokens(&node, tokens)?;
-        let result = syntax.resolve_source(
-            &context,
-            crate::ast::Dialect::postgres(),
-            with_clause,
-            from_clause,
-        );
-        let mut context = context;
-        Ok((result.report(&mut context)?, context))
+        let result = syntax.resolve_source(&mut context, with_clause, from_clause);
+        Ok((result?, context))
     }
 }

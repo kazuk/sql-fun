@@ -3,7 +3,7 @@ use crate::sem::{AnalysisError, ParseContext, WithClause};
 
 impl DataSource {
     pub(super) fn analyze_range_var_node<TParseContext>(
-        context: TParseContext,
+        mut context: TParseContext,
         with_clause: &WithClause,
         range_var: crate::syn::RangeVar,
     ) -> Result<(Self, TParseContext), AnalysisError>
@@ -12,13 +12,11 @@ impl DataSource {
     {
         let syntax = crate::ast::FromItem::relation(crate::ast::Relation::try_from(&range_var)?);
         let outcome = syntax.resolve_source(
-            &context,
-            crate::ast::Dialect::postgres(),
+            &mut context,
             with_clause,
             &crate::sem::FromClause::default(),
         );
-        let mut context = context;
-        Ok((outcome.report(&mut context)?, context))
+        Ok((outcome?, context))
     }
 }
 

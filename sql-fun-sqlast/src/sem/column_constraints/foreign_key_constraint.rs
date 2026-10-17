@@ -265,14 +265,15 @@ impl ForeignKeyColumnConstraint {
             if let Some(pk_col_def) = pk_table.get_column_def(&primary_key_column) {
                 pk_col_def.get_type()
             } else {
-                context.report_problem(AnalysisProblem::column_not_found_in_table(
+                context.report_analysis_problem(AnalysisProblem::column_not_found_in_table(
                     &primary_key_table,
                     &primary_key_column,
                 ))?;
                 None
             }
         } else {
-            context.report_problem(AnalysisProblem::table_not_found(&primary_key_table))?;
+            context
+                .report_analysis_problem(AnalysisProblem::table_not_found(&primary_key_table))?;
             None
         };
 
@@ -323,7 +324,7 @@ impl ForeignKeyColumnConstraint {
                 RefArg::OnInsert(_) => {
                     AnalysisError::raise_unexpected_input("RefArg::OnInsert in FK args")?;
                 }
-                RefArg::Match(name) => context.report_problem(
+                RefArg::Match(name) => context.report_analysis_problem(
                     AnalysisProblem::sqlite_ignores_match_option_in_fk_constraint(
                         table_name,
                         column_name,
@@ -345,13 +346,13 @@ impl ForeignKeyColumnConstraint {
             if let Some(pk_col_def) = pk_table_def.get_column_def(&pk_column) {
                 pk_col_def.get_type()
             } else {
-                context.report_problem(AnalysisProblem::column_not_found_in_table(
+                context.report_analysis_problem(AnalysisProblem::column_not_found_in_table(
                     &pk_table, &pk_column,
                 ))?;
                 None
             }
         } else {
-            context.report_problem(AnalysisProblem::table_not_found(&pk_table))?;
+            context.report_analysis_problem(AnalysisProblem::table_not_found(&pk_table))?;
             None
         };
         let deferrability = syn

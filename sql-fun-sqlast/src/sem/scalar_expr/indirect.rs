@@ -19,7 +19,7 @@ pub enum IndirectionExpr {
 }
 
 impl IndirectionExpr {
-    pub(crate) fn resolved_index<TContext: crate::sem::resolution::ResolutionContext>(
+    pub(crate) fn resolved_index<TContext: crate::sem::ParseContext>(
         context: &mut TContext,
         base: SemScalarExpr,
         index: SemScalarExpr,
@@ -29,7 +29,7 @@ impl IndirectionExpr {
         )?))
     }
 
-    pub(crate) fn resolved_slice<TContext: crate::sem::resolution::ResolutionContext>(
+    pub(crate) fn resolved_slice<TContext: crate::sem::ParseContext>(
         context: &mut TContext,
         base: SemScalarExpr,
         lower: Option<SemScalarExpr>,
@@ -40,7 +40,7 @@ impl IndirectionExpr {
         )?))
     }
 
-    pub(crate) fn resolved_member<TContext: crate::sem::resolution::ResolutionContext>(
+    pub(crate) fn resolved_member<TContext: crate::sem::ParseContext>(
         context: &mut TContext,
         base: SemScalarExpr,
         name: &str,

@@ -199,14 +199,9 @@ mod test_builtin_cast_identity {
             env!("SQL_FUN_HOME"),
         ])
         .expect("test arguments");
-        let context = BaseContext::new(
-            &args,
-            args.load_metadata()
-                .expect("fixture metadata")
-                .get("default")
-                .expect("selected test metadata"),
-        )
-        .expect("builtin context");
+        let collection = args.load_metadata().expect("fixture metadata");
+        let selected = collection.get("default").expect("selected test metadata");
+        let context = BaseContext::new(&args, selected).expect("builtin context");
         let text = TypeReference::from_master_type_name("text");
         let text_array = TypeReference::from_master_type_name("_text");
         let public_text = TypeReference::from_full_name(FullName::with_schema("public", "text"));
@@ -260,8 +255,10 @@ mod test_builtin_cast_identity {
         assert!(context.get_implicit_castable(&text).contains(&regclass));
         assert!(!context.get_implicit_castable(&text).contains(&xml));
 
-        let schema_context =
-            SchemaFileContext::new(Path::new("fixture.sql"), &FrozenBaseContext::from(context));
+        let schema_context = {
+            let analysis_base = &FrozenBaseContext::from(context);
+            SchemaFileContext::new(Path::new("fixture.sql"), analysis_base, &args, selected)
+        };
         assert!(schema_context.get_implicit_cast(&mood, &mood).is_some());
         assert!(schema_context.get_explicit_cast(&mood, &mood).is_some());
         assert!(

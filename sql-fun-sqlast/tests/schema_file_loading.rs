@@ -34,7 +34,12 @@ mod test_helpers {
         path: &Path,
         base: &FrozenBaseContext,
     ) -> Result<ParsedSchemaDump, ParseDumpFileError> {
-        PostgresDialect::parse_schema_file(path, base, &mut None)
+        {
+            let (args, selected) =
+                environment("selected-postgres.toml").expect("fixture environment");
+            let analysis_base = base;
+            PostgresDialect::parse_schema_file(path, analysis_base, &mut None, &args, &selected)
+        }
     }
 
     #[cfg(feature = "sqlite")]
@@ -42,12 +47,17 @@ mod test_helpers {
         path: &Path,
         base: &FrozenBaseContext,
     ) -> Result<ParsedSchemaDump, ParseDumpFileError> {
-        SqliteDialect::parse_schema_file(path, base, &mut None)
+        {
+            let (args, selected) =
+                environment("selected-sqlite.toml").expect("fixture environment");
+            let analysis_base = base;
+            SqliteDialect::parse_schema_file(path, analysis_base, &mut None, &args, &selected)
+        }
     }
 
-    pub(super) fn selected_frozen_base(
+    fn environment(
         fixture: &str,
-    ) -> Result<FrozenBaseContext, Box<dyn std::error::Error>> {
+    ) -> Result<(SqlFunArgs, ::sql_fun_core::SqlFunMetadata), Box<dyn std::error::Error>> {
         let metadata_path = Path::new(env!("CARGO_MANIFEST_DIR"))
             .join("tests/fixtures")
             .join(fixture);
@@ -64,6 +74,13 @@ mod test_helpers {
             "--postgres-version",
             "17",
         ])?;
+        Ok((args, selected))
+    }
+
+    pub(super) fn selected_frozen_base(
+        fixture: &str,
+    ) -> Result<FrozenBaseContext, Box<dyn std::error::Error>> {
+        let (args, selected) = environment(fixture)?;
         Ok(BaseContext::new(&args, &selected)?.into())
     }
 

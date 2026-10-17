@@ -254,15 +254,14 @@ impl CreateIndex {
         keys: Vec<crate::syn::IndexElem>,
         tokens: &IVec<ScanToken>,
     ) -> Result<(IndexElementCollection, TContext), AnalysisError> {
-        use crate::ast::{Dialect, Index, IndexExpression};
-        use crate::sem::resolution::Resolution;
+        use crate::ast::{Index, IndexExpression};
         let keys = keys
             .iter()
             .map(|key| IndexExpression::try_from_with_tokens(key, tokens))
             .collect::<Result<Vec<_>, _>>()?;
-        let mut resolution = Resolution::new(&context);
-        let result = Index::resolve_elements(&keys, &mut resolution, Dialect::postgres());
-        let elements = resolution.finish(result).report(&mut context)?;
+        context.begin_analysis();
+        let result = Index::resolve_elements(&keys, &mut context);
+        let elements = context.finish_analysis(result)?;
         Ok((elements, context))
     }
 }
@@ -346,8 +345,7 @@ impl CreateIndex {
     where
         TParseContext: ParseContext,
     {
-        crate::ast::Index::try_from_with_tokens(&syn, tokens)?
-            .resolve_and_apply(context, crate::ast::Dialect::postgres())
+        crate::ast::Index::try_from_with_tokens(&syn, tokens)?.resolve_and_apply(context)
     }
 }
 

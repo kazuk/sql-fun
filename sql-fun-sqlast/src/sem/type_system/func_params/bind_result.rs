@@ -104,7 +104,7 @@ impl ParameterBindResult {
         self.test_catalog_castability(context)
     }
 
-    pub(crate) fn test_catalog_castability<TCatalog: crate::sem::resolution::Catalog>(
+    pub(crate) fn test_catalog_castability<TCatalog: crate::sem::BaseParseContext>(
         &self,
         context: &TCatalog,
     ) -> Result<i32, TypeError> {

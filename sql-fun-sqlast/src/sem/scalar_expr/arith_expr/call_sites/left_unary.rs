@@ -14,7 +14,7 @@ pub struct LeftUnaryCallSite {
 
 impl LeftUnaryCallSite {
     pub fn op_left_unary<TParseContext>(
-        context: TParseContext,
+        mut context: TParseContext,
         name: &OperatorName,
         operator_def: UnaryOperatorDefinition,
         lexpr: SemScalarExpr,
@@ -22,17 +22,18 @@ impl LeftUnaryCallSite {
     where
         TParseContext: ParseContext,
     {
-        Self::op_left_unary_resolved(context, name, operator_def, lexpr)
+        let (value, _) = Self::op_left_unary_resolved(&mut context, name, operator_def, lexpr)?;
+        Ok((value, context))
     }
 
-    pub(crate) fn op_left_unary_resolved<TParseContext>(
-        context: TParseContext,
+    pub(crate) fn op_left_unary_resolved<'context, TParseContext>(
+        context: &'context mut TParseContext,
         name: &OperatorName,
         operator_def: UnaryOperatorDefinition,
         lexpr: SemScalarExpr,
-    ) -> Result<(SemScalarExpr, TParseContext), AnalysisError>
+    ) -> Result<(SemScalarExpr, &'context mut TParseContext), AnalysisError>
     where
-        TParseContext: crate::sem::resolution::ResolutionContext,
+        TParseContext: crate::sem::ParseContext,
     {
         let call_site = Self {
             operator_name: name.clone(),
@@ -79,7 +80,7 @@ mod test_left_unary_call_site {
         let operator_def = UnaryOperatorDefinition::new(&type_ref, &type_ref, true);
         let expr = SemScalarExpr::new_const(ScalarConstExpr::new_integer(10));
 
-        LeftUnaryCallSite::op_left_unary_resolved(
+        LeftUnaryCallSite::op_left_unary(
             test_context,
             &OperatorName::Valid(ValidOperatorName::new("+")),
             operator_def,
@@ -103,13 +104,12 @@ impl LeftUnaryCallSite {
     pub(crate) fn collect_constraints(
         &self,
         parameters: &mut crate::sem::parameter_resolution::ParameterResolution,
-        context: &mut crate::sem::Resolution<'_>,
-        dialect: crate::ast::Dialect,
+        context: &mut impl crate::sem::ParseContext,
     ) -> Result<Option<SemScalarExpr>, AnalysisError> {
         if let Some(binding) = &self.binding {
-            binding.infer(parameters, context, dialect, Some(&self.arg), None)
+            binding.infer(parameters, context, Some(&self.arg), None)
         } else {
-            parameters.operator(context, dialect, &self.operator_name, Some(&self.arg), None)
+            parameters.operator(context, &self.operator_name, Some(&self.arg), None)
         }
     }
 }

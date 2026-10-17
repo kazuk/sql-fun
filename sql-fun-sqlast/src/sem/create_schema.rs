@@ -34,7 +34,6 @@ impl CreateSchema {
     where
         TParseContext: ParseContext,
     {
-        crate::ast::Schema::try_from_with_tokens(&syn, tokens)?
-            .resolve_and_apply(context, crate::ast::Dialect::postgres())
+        crate::ast::Schema::try_from_with_tokens(&syn, tokens)?.resolve_and_apply(context)
     }
 }

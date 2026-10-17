@@ -6,7 +6,7 @@ use crate::sem::{
 impl super::ArithExpr {
     /// create a instance
     pub fn build_op_any<TParseContext>(
-        context: TParseContext,
+        mut context: TParseContext,
         name: &OperatorName,
         lexpr: Option<SemScalarExpr>,
         rexpr: Option<SemScalarExpr>,
@@ -14,17 +14,18 @@ impl super::ArithExpr {
     where
         TParseContext: ParseContext,
     {
-        Self::build_op_any_resolved(context, name, lexpr, rexpr)
+        let (value, _) = Self::build_op_any_resolved(&mut context, name, lexpr, rexpr)?;
+        Ok((value, context))
     }
 
-    pub(crate) fn build_op_any_resolved<TParseContext>(
-        mut context: TParseContext,
+    pub(crate) fn build_op_any_resolved<'context, TParseContext>(
+        context: &'context mut TParseContext,
         name: &OperatorName,
         lexpr: Option<SemScalarExpr>,
         rexpr: Option<SemScalarExpr>,
-    ) -> Result<(SemScalarExpr, TParseContext), AnalysisError>
+    ) -> Result<(SemScalarExpr, &'context mut TParseContext), AnalysisError>
     where
-        TParseContext: crate::sem::resolution::ResolutionContext,
+        TParseContext: crate::sem::ParseContext,
     {
         let Some(lexpr) = lexpr else {
             AnalysisError::raise_unexpected_none("a_expr.lexpr")?
@@ -40,7 +41,7 @@ impl super::ArithExpr {
             let operator_def = operator_def.clone();
 
             let resolved_bin_op =
-                Self::resolve_overload_binary(&mut context, operator_def, lexpr, rexpr)?;
+                Self::resolve_overload_binary(context, operator_def, lexpr, rexpr)?;
             resolved_bin_op.into_any_call_site_expr(context, name)
         } else {
             UndefinedOperatorAnyCallSite::undefined_operator_any_resolved(
@@ -77,12 +78,7 @@ mod test_arith_expr_build_op_any {
         let operator_def = OperatorDefinition::Binary(vec![operator_def]);
         test_context.set_get_operator_op_result(&name, true, true, Some(&operator_def));
 
-        ArithExpr::build_op_any_resolved(
-            test_context,
-            &name,
-            Some(expr.clone()),
-            Some(expr.clone()),
-        )?;
+        ArithExpr::build_op_any(test_context, &name, Some(expr.clone()), Some(expr.clone()))?;
 
         Ok(())
     }

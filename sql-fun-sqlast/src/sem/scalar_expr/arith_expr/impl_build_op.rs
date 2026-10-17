@@ -4,14 +4,14 @@ use crate::sem::{
 };
 
 impl ArithExpr {
-    pub(crate) fn build_op<TParseContext>(
-        mut context: TParseContext,
+    pub(crate) fn build_op<'context, TParseContext>(
+        context: &'context mut TParseContext,
         name: &OperatorName,
         lexpr: Option<SemScalarExpr>,
         rexpr: Option<SemScalarExpr>,
-    ) -> Result<(SemScalarExpr, TParseContext), AnalysisError>
+    ) -> Result<(SemScalarExpr, &'context mut TParseContext), AnalysisError>
     where
-        TParseContext: crate::sem::resolution::ResolutionContext,
+        TParseContext: crate::sem::ParseContext,
     {
         if let Some(operator_def) = context.get_operator_op(name, lexpr.is_some(), rexpr.is_some())
         {
@@ -31,11 +31,11 @@ impl ArithExpr {
                 }
                 (None, None) => AnalysisError::raise_unexpected_input("lexpr, rexpr both None")?,
                 (Some(a), None) => {
-                    let resolved = Self::resolve_overload_unary(&mut context, operator_def, a)?;
+                    let resolved = Self::resolve_overload_unary(context, operator_def, a)?;
                     resolved.into_left_unary_call_site_expr(context, name)
                 }
                 (None, Some(a)) => {
-                    let resolved = Self::resolve_overload_unary(&mut context, operator_def, a)?;
+                    let resolved = Self::resolve_overload_unary(context, operator_def, a)?;
                     resolved.into_right_unary_call_site_expr(context, name)
                 }
             }
@@ -105,7 +105,7 @@ mod test_arith_expr_build_op {
         let left = left.map(|v| SemScalarExpr::new_const(ScalarConstExpr::new_integer(v)));
         let right = right.map(|v| SemScalarExpr::new_const(ScalarConstExpr::new_integer(v)));
 
-        ArithExpr::build_op(test_context, &name, left, right)?;
+        ArithExpr::build_op(&mut test_context, &name, left, right)?;
         Ok(())
     }
 }

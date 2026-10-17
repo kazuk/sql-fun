@@ -63,22 +63,22 @@ impl TableFunctionColumnRef {
         }
     }
 
-    pub(crate) fn function_source_ref<TParseContext>(
-        mut context: TParseContext,
+    pub(crate) fn function_source_ref<'context, TParseContext>(
+        context: &'context mut TParseContext,
         alias: &AliasName,
         column: &ColumnName,
         calling_func: &OverloadVariant,
         args: &IVec<SemScalarExpr>,
         nullability: Nullable,
-    ) -> Result<(SemScalarExpr, TParseContext), AnalysisError>
+    ) -> Result<(SemScalarExpr, &'context mut TParseContext), AnalysisError>
     where
-        TParseContext: crate::sem::resolution::ResolutionContext,
+        TParseContext: crate::sem::ParseContext,
     {
         let column_def = calling_func.get_result_column_def(column);
         if column_def.is_none() {
-            context.report_problem(AnalysisProblem::column_not_found_in_table_function(
-                alias, column,
-            ))?;
+            context.report_analysis_problem(
+                AnalysisProblem::column_not_found_in_table_function(alias, column),
+            )?;
         }
         let col_ref = Self::new(
             alias,
@@ -96,16 +96,16 @@ impl TableFunctionColumnRef {
 }
 
 impl ColumnReferenceExpr {
-    pub(crate) fn function_source_ref<TParseContext>(
-        context: TParseContext,
+    pub(crate) fn function_source_ref<'context, TParseContext>(
+        context: &'context mut TParseContext,
         alias: &AliasName,
         column: &ColumnName,
         calling_func: &OverloadVariant,
         args: &IVec<SemScalarExpr>,
         nullability: Nullable,
-    ) -> Result<(SemScalarExpr, TParseContext), AnalysisError>
+    ) -> Result<(SemScalarExpr, &'context mut TParseContext), AnalysisError>
     where
-        TParseContext: crate::sem::resolution::ResolutionContext,
+        TParseContext: crate::sem::ParseContext,
     {
         TableFunctionColumnRef::function_source_ref(
             context,

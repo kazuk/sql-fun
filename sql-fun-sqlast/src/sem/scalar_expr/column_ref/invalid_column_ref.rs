@@ -35,9 +35,9 @@ impl UndefinedAliasColumnRef {
         column: &ColumnName,
     ) -> Result<SemScalarExpr, AnalysisError>
     where
-        TParseContext: crate::sem::resolution::ResolutionContext,
+        TParseContext: crate::sem::ParseContext,
     {
-        context.report_problem(AnalysisProblem::undefined_alias(alias.to_string()))?;
+        context.report_analysis_problem(AnalysisProblem::undefined_alias(alias.to_string()))?;
 
         Ok(SemScalarExpr::ColumnRef(
             ColumnReferenceExpr::UndefinedAlias(Self {
@@ -83,11 +83,11 @@ impl UnknownSourceColumnRef {
 }
 
 impl ColumnReferenceExpr {
-    pub(crate) fn unknown_source_ref<TParseContext>(
-        context: TParseContext,
+    pub(crate) fn unknown_source_ref<'context, TParseContext>(
+        context: &'context mut TParseContext,
         alias: &AliasName,
         column: &ColumnName,
-    ) -> Result<(SemScalarExpr, TParseContext), AnalysisError> {
+    ) -> Result<(SemScalarExpr, &'context mut TParseContext), AnalysisError> {
         Ok((UnknownSourceColumnRef::new(alias, column), context))
     }
 }
@@ -127,11 +127,11 @@ impl UnknownTableFuncColumnRef {
 }
 
 impl ColumnReferenceExpr {
-    pub(crate) fn unknown_function_source_ref<TParseContext>(
-        context: TParseContext,
+    pub(crate) fn unknown_function_source_ref<'context, TParseContext>(
+        context: &'context mut TParseContext,
         alias: &AliasName,
         column: &ColumnName,
-    ) -> Result<(SemScalarExpr, TParseContext), AnalysisError> {
+    ) -> Result<(SemScalarExpr, &'context mut TParseContext), AnalysisError> {
         Ok((UnknownTableFuncColumnRef::new(alias, column), context))
     }
 }

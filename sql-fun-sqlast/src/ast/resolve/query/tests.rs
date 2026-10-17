@@ -417,14 +417,13 @@ fn inference_uses_captured_function_and_operator_bindings() {
         true,
         None,
     );
-    let mut resolution = crate::sem::Resolution::new(&catalog);
+    catalog.begin_analysis();
     let constraints = crate::sem::parameter_resolution::ParameterResolution::infer_query(
         &mut query,
-        &mut resolution,
-        Dialect::postgres(),
+        &mut catalog,
     )
     .unwrap();
-    resolution.finish(Ok(())).report(&mut catalog).unwrap();
+    catalog.finish_analysis(Ok(())).unwrap();
     assert_eq!(catalog.reported_problem_count(), 0);
     assert!(
         constraints

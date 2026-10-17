@@ -14,7 +14,7 @@ pub struct RightUnaryCallSite {
 
 impl RightUnaryCallSite {
     pub fn op_right_unary<TParseContext>(
-        context: TParseContext,
+        mut context: TParseContext,
         name: &OperatorName,
         operator_def: UnaryOperatorDefinition,
         rexpr: SemScalarExpr,
@@ -22,17 +22,18 @@ impl RightUnaryCallSite {
     where
         TParseContext: ParseContext,
     {
-        Self::op_right_unary_resolved(context, name, operator_def, rexpr)
+        let (value, _) = Self::op_right_unary_resolved(&mut context, name, operator_def, rexpr)?;
+        Ok((value, context))
     }
 
-    pub(crate) fn op_right_unary_resolved<TParseContext>(
-        context: TParseContext,
+    pub(crate) fn op_right_unary_resolved<'context, TParseContext>(
+        context: &'context mut TParseContext,
         name: &OperatorName,
         operator_def: UnaryOperatorDefinition,
         rexpr: SemScalarExpr,
-    ) -> Result<(SemScalarExpr, TParseContext), AnalysisError>
+    ) -> Result<(SemScalarExpr, &'context mut TParseContext), AnalysisError>
     where
-        TParseContext: crate::sem::resolution::ResolutionContext,
+        TParseContext: crate::sem::ParseContext,
     {
         let call_site = Self {
             operator_name: name.clone(),
@@ -73,13 +74,12 @@ impl RightUnaryCallSite {
     pub(crate) fn collect_constraints(
         &self,
         parameters: &mut crate::sem::parameter_resolution::ParameterResolution,
-        context: &mut crate::sem::Resolution<'_>,
-        dialect: crate::ast::Dialect,
+        context: &mut impl crate::sem::ParseContext,
     ) -> Result<Option<SemScalarExpr>, AnalysisError> {
         if let Some(binding) = &self.binding {
-            binding.infer(parameters, context, dialect, None, Some(&self.arg))
+            binding.infer(parameters, context, None, Some(&self.arg))
         } else {
-            parameters.operator(context, dialect, &self.operator_name, None, Some(&self.arg))
+            parameters.operator(context, &self.operator_name, None, Some(&self.arg))
         }
     }
 }

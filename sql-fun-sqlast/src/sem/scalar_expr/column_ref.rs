@@ -189,11 +189,11 @@ impl ColumnReferenceExpr {
         Self::undefined_column_resolved(context, column)
     }
 
-    pub(crate) fn undefined_column_resolved<TContext: crate::sem::resolution::ResolutionContext>(
+    pub(crate) fn undefined_column_resolved<TContext: crate::sem::ParseContext>(
         context: &mut TContext,
         column: &ColumnName,
     ) -> Result<SemScalarExpr, AnalysisError> {
-        context.report_problem(AnalysisProblem::column_not_found_in_source(column))?;
+        context.report_analysis_problem(AnalysisProblem::column_not_found_in_source(column))?;
         Ok(SemScalarExpr::ColumnRef(Self::UndefinedColumn(
             column.clone(),
         )))
@@ -210,11 +210,11 @@ impl ColumnReferenceExpr {
         Self::ambiguous_column_resolved(context, column)
     }
 
-    pub(crate) fn ambiguous_column_resolved<TContext: crate::sem::resolution::ResolutionContext>(
+    pub(crate) fn ambiguous_column_resolved<TContext: crate::sem::ParseContext>(
         context: &mut TContext,
         column: &ColumnName,
     ) -> Result<SemScalarExpr, AnalysisError> {
-        context.report_problem(AnalysisProblem::ambiguous_column(column))?;
+        context.report_analysis_problem(AnalysisProblem::ambiguous_column(column))?;
         Ok(SemScalarExpr::ColumnRef(Self::AmbiguousColumnRef(
             column.clone(),
         )))

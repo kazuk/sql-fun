@@ -78,7 +78,6 @@ impl CreateFunction {
     where
         TParseContext: ParseContext,
     {
-        crate::ast::Function::try_from_with_tokens(&syn, tokens)?
-            .resolve_and_apply(context, crate::ast::Dialect::postgres())
+        crate::ast::Function::try_from_with_tokens(&syn, tokens)?.resolve_and_apply(context)
     }
 }

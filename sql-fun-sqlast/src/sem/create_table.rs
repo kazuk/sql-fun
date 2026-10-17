@@ -122,9 +122,7 @@ pub struct CreateTable {
 
 #[cfg(test)]
 mod test_create_table_clone {
-    use crate::sem::{
-        BaseParseContext, ColumnName, ParseContext, SchemaFileContext, TableInfoWrite,
-    };
+    use crate::sem::{BaseParseContext, ColumnName, ParseContext, TableInfoWrite};
     use crate::test_helpers::TestParseContext;
     use std::path::Path;
 
@@ -137,7 +135,7 @@ mod test_create_table_clone {
         let cloned = table.clone();
         assert_eq!(cloned.primary_key_columns(), vec![&id]);
 
-        let mut context = SchemaFileContext::new(
+        let mut context = crate::test_helpers::schema_layer(
             Path::new("schema.sql"),
             &TestParseContext::default().freeze(),
         );
@@ -343,11 +341,8 @@ impl CreateTable {
     where
         TParseContext: ParseContext,
     {
-        crate::ast::Table::try_from_with_tokens(&create, tokens)?.resolve_and_apply_at(
-            context,
-            crate::ast::Dialect::postgres(),
-            source_span,
-        )
+        crate::ast::Table::try_from_with_tokens(&create, tokens)?
+            .resolve_and_apply_at(context, source_span)
     }
 
     pub(crate) fn push_drop_statement(&mut self, drop_table: &DropTable) {
@@ -374,9 +369,7 @@ impl CreateTable {
     {
         let syntax =
             crate::ast::Table::try_from(&syn)?.named(table_name.full_name(), *mode, temporary);
-        let table = syntax
-            .resolve(&context, crate::ast::Dialect::sqlite(), source_span)
-            .report(&mut context)?;
+        let table = syntax.resolve(&mut context, source_span)?;
         Ok((table, context))
     }
 }
@@ -448,7 +441,7 @@ impl CreateTable {
     {
         crate::ast::Table::try_from(&syn)?
             .named(table_name.full_name(), *mode, temporary)
-            .resolve_and_apply_at(context, crate::ast::Dialect::sqlite(), source_span)
+            .resolve_and_apply_at(context, source_span)
     }
 }
 
@@ -466,11 +459,7 @@ impl CreateTable {
     where
         TParseContext: ParseContext,
     {
-        crate::ast::Table::try_from(&syn)?.resolve_and_apply_at(
-            context,
-            crate::ast::Dialect::sqlite(),
-            source_span,
-        )
+        crate::ast::Table::try_from(&syn)?.resolve_and_apply_at(context, source_span)
     }
 }
 
@@ -628,7 +617,7 @@ impl DropTable {
             let full_name = FullName::try_from(object.as_list().get_items())?;
             let table_name = TableName::from(full_name);
             if context.get_table(&table_name).is_none() {
-                context.report_problem(AnalysisProblem::table_not_found(&table_name))?;
+                context.report_analysis_problem(AnalysisProblem::table_not_found(&table_name))?;
             }
             table_names.push(table_name);
         }
@@ -696,7 +685,7 @@ impl DropTable {
         let if_exists = syn.if_exists();
         let table_name = TableName::try_from(syn.name())?;
         if context.get_table(&table_name).is_none() {
-            context.report_problem(AnalysisProblem::table_not_found(&table_name))?;
+            context.report_analysis_problem(AnalysisProblem::table_not_found(&table_name))?;
         }
         let result = Self::new(std::slice::from_ref(&table_name), *if_exists, false);
         context = context.apply_drop_table(&result)?;

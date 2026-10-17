@@ -5,10 +5,7 @@ mod sql_emission;
 
 use crate::{
     AstAndContextPair, StringSpan,
-    sem::{
-        AnalysisError, AnalysisProblem, Catalog, CreateDomain, ParseContext, Resolution,
-        ResolutionContext, ResolutionOutcome, SemAst, TypeReference,
-    },
+    sem::{AnalysisError, AnalysisProblem, CreateDomain, ParseContext, SemAst, TypeReference},
 };
 
 use super::{Dialect, Expr, Name, StatementNode, SyntaxOption, TypeName};
@@ -35,47 +32,38 @@ impl super::AlterRelation {
     pub(crate) fn resolve_and_apply<TContext: ParseContext>(
         &self,
         context: TContext,
-        dialect: Dialect,
     ) -> Result<AstAndContextPair<TContext>, AnalysisError> {
         let source = context.get_source_path_with_span().cloned();
-        self.resolve_and_apply_with_source(context, dialect, source.as_ref())
+        self.resolve_and_apply_with_source(context, source.as_ref())
     }
 
     pub(crate) fn resolve_and_apply_at<TContext: ParseContext>(
         &self,
         context: TContext,
-        dialect: Dialect,
         source: &crate::sem::SourcePathWithSpan,
     ) -> Result<AstAndContextPair<TContext>, AnalysisError> {
-        self.resolve_and_apply_with_source(context, dialect, Some(source))
+        self.resolve_and_apply_with_source(context, Some(source))
     }
 
     fn resolve_and_apply_with_source<TContext: ParseContext>(
         &self,
         mut context: TContext,
-        dialect: Dialect,
         source: Option<&crate::sem::SourcePathWithSpan>,
     ) -> Result<AstAndContextPair<TContext>, AnalysisError> {
-        let mut resolution = Resolution::new(&context);
-        let result = self.resolve_in(&mut resolution, dialect, source);
-        let statement = resolution.finish(result).report(&mut context)?;
+        context.begin_analysis();
+        let result = self.resolve_in(&mut context, source);
+        let statement = context.finish_analysis(result)?;
         let context = statement.apply_relation_alter(context)?;
         Ok(AstAndContextPair::new(statement, context))
     }
 
     fn resolve_in(
         &self,
-        context: &mut Resolution<'_>,
-        dialect: Dialect,
+        context: &mut impl ParseContext,
         source: Option<&crate::sem::SourcePathWithSpan>,
     ) -> Result<SemAst, AnalysisError> {
-        self.kind.resolve(
-            context,
-            dialect,
-            &self.name.full_name()?,
-            &self.commands,
-            source,
-        )
+        self.kind
+            .resolve(context, &self.name.full_name()?, &self.commands, source)
     }
 }
 
@@ -98,14 +86,13 @@ impl super::AlterRelationKind {
 
     fn resolve(
         self,
-        context: &mut Resolution<'_>,
-        dialect: Dialect,
+        context: &mut impl ParseContext,
         name: &crate::sem::FullName,
         syntax_commands: &[super::AlterCommand],
         source: Option<&crate::sem::SourcePathWithSpan>,
     ) -> Result<SemAst, AnalysisError> {
         match self {
-            Self::Table => Self::resolve_table(context, dialect, name, syntax_commands, source),
+            Self::Table => Self::resolve_table(context, name, syntax_commands, source),
             Self::View => Self::resolve_view(context, name, syntax_commands, false),
             Self::MaterializedView => Self::resolve_view(context, name, syntax_commands, true),
             Self::Sequence => Self::resolve_sequence(context, name, syntax_commands),
@@ -114,8 +101,7 @@ impl super::AlterRelationKind {
     }
 
     fn resolve_table(
-        context: &mut Resolution<'_>,
-        dialect: Dialect,
+        context: &mut impl ParseContext,
         name: &crate::sem::FullName,
         syntax_commands: &[super::AlterCommand],
         source: Option<&crate::sem::SourcePathWithSpan>,
@@ -126,11 +112,11 @@ impl super::AlterRelationKind {
         };
         let table = TableName::from(name.clone());
         if context.get_table(&table).is_none() {
-            context.report_problem(AnalysisProblem::relation_not_found(&table))?;
+            context.report_analysis_problem(AnalysisProblem::relation_not_found(&table))?;
         }
         let mut commands = Vec::new();
         for command in syntax_commands {
-            commands.push(command.resolve(context, dialect, &table)?);
+            commands.push(command.resolve(context, &table)?);
         }
         Ok(SemAst::alter_table(&AlterTable::new(
             &table, &commands, source,
@@ -138,7 +124,7 @@ impl super::AlterRelationKind {
     }
 
     fn resolve_view(
-        context: &mut Resolution<'_>,
+        context: &mut impl ParseContext,
         name: &crate::sem::FullName,
         syntax_commands: &[super::AlterCommand],
         materialized: bool,
@@ -147,10 +133,10 @@ impl super::AlterRelationKind {
         let view = ViewName::from_full_name(name);
         if let Some(definition) = context.get_view(&view) {
             if materialized && !definition.is_materialized() {
-                context.report_problem(AnalysisProblem::view_not_matview(&view))?;
+                context.report_analysis_problem(AnalysisProblem::view_not_matview(&view))?;
             }
         } else {
-            context.report_problem(AnalysisProblem::view_not_found(&view))?;
+            context.report_analysis_problem(AnalysisProblem::view_not_found(&view))?;
         }
         let commands = syntax_commands
             .iter()
@@ -160,13 +146,13 @@ impl super::AlterRelationKind {
     }
 
     fn resolve_sequence(
-        context: &mut Resolution<'_>,
+        context: &mut impl ParseContext,
         name: &crate::sem::FullName,
         syntax_commands: &[super::AlterCommand],
     ) -> Result<SemAst, AnalysisError> {
         use crate::sem::AlterSequence;
-        if !context.has_sequence(name) {
-            context.report_problem(AnalysisProblem::sequence_not_found(name))?;
+        if context.get_sequence(name).is_none() {
+            context.report_analysis_problem(AnalysisProblem::sequence_not_found(name))?;
         }
         let commands = syntax_commands
             .iter()
@@ -180,12 +166,11 @@ impl super::AlterCommand {
     pub(crate) fn resolve_and_report<TContext: ParseContext>(
         &self,
         mut context: TContext,
-        dialect: Dialect,
         table: &crate::sem::TableName,
     ) -> Result<(crate::sem::AlterObjSubCommand, TContext), AnalysisError> {
-        let mut resolution = Resolution::new(&context);
-        let result = self.resolve(&mut resolution, dialect, table);
-        let command = resolution.finish(result).report(&mut context)?;
+        context.begin_analysis();
+        let result = self.resolve(&mut context, table);
+        let command = context.finish_analysis(result)?;
         Ok((command, context))
     }
     fn resolve_owner(&self) -> crate::sem::AlterObjSubCommand {
@@ -197,52 +182,54 @@ impl super::AlterCommand {
     }
 
     fn missing_column(
-        context: &mut Resolution<'_>,
+        context: &mut impl ParseContext,
         table: &crate::sem::TableName,
         column: &crate::sem::ColumnName,
     ) -> Result<(), AnalysisError> {
         if let Some(definition) = context.get_table(table)
             && !definition.has_column(column)
         {
-            context.report_problem(AnalysisProblem::column_not_found_in_table(table, column))?;
+            context.report_analysis_problem(AnalysisProblem::column_not_found_in_table(
+                table, column,
+            ))?;
         }
         Ok(())
     }
 
     fn existing_column(
-        context: &mut Resolution<'_>,
+        context: &mut impl ParseContext,
         table: &crate::sem::TableName,
         column: &crate::sem::ColumnName,
     ) -> Result<(), AnalysisError> {
         if let Some(definition) = context.get_table(table)
             && definition.has_column(column)
         {
-            context.report_problem(AnalysisProblem::column_already_exists(table, column))?;
+            context
+                .report_analysis_problem(AnalysisProblem::column_already_exists(table, column))?;
         }
         Ok(())
     }
 
     fn resolve(
         &self,
-        context: &mut Resolution<'_>,
-        dialect: Dialect,
+        context: &mut impl ParseContext,
         table: &crate::sem::TableName,
     ) -> Result<crate::sem::AlterObjSubCommand, AnalysisError> {
         match self {
-            Self::Postgres(command) => command.resolve(context, dialect, table),
+            Self::Postgres(command) => command.resolve(context, table),
             Self::Owner(_) => Ok(self.resolve_owner()),
-            Self::Default(name, expr) => Self::resolve_default(context, dialect, table, name, expr),
+            Self::Default(name, expr) => Self::resolve_default(context, table, name, expr),
             Self::Constraint(constraint) => Self::resolve_constraint(context, table, constraint),
             Self::Cluster(name) => Self::resolve_cluster(context, table, name),
             Self::Rename(name) => Self::resolve_rename(context, name),
-            Self::AddColumn(column) if dialect == Dialect::sqlite() => {
-                Self::resolve_add_column(context, dialect, table, column)
+            Self::AddColumn(column) if context.dialect() == Dialect::sqlite() => {
+                Self::resolve_add_column(context, table, column)
             }
-            Self::AlterColumn(name, column) if dialect == Dialect::sqlite() => {
-                Self::resolve_alter_column(context, dialect, table, name, column)
+            Self::AlterColumn(name, column) if context.dialect() == Dialect::sqlite() => {
+                Self::resolve_alter_column(context, table, name, column)
             }
             Self::RenameColumn(from, to) => Self::resolve_rename_column(context, table, from, to),
-            Self::DropColumn(name) if dialect == Dialect::sqlite() => {
+            Self::DropColumn(name) if context.dialect() == Dialect::sqlite() => {
                 Self::resolve_drop_column(context, table, name)
             }
             _ => todo!(),
@@ -250,21 +237,20 @@ impl super::AlterCommand {
     }
 
     fn resolve_default(
-        context: &mut Resolution<'_>,
-        dialect: Dialect,
+        context: &mut impl ParseContext,
         table: &crate::sem::TableName,
         name: &str,
         expr: &Expr,
     ) -> Result<crate::sem::AlterObjSubCommand, AnalysisError> {
         use crate::sem::{AlterObjSubCommand, ColumnName, ScalarAnalysisContext};
         let name = ColumnName::from(name);
-        let expr = expr.resolve_in(context, dialect, &ScalarAnalysisContext::default())?;
+        let expr = expr.resolve_in(context, &ScalarAnalysisContext::default())?;
         Self::missing_column(context, table, &name)?;
         Ok(AlterObjSubCommand::column_default(&name, &expr))
     }
 
     fn resolve_constraint(
-        context: &mut Resolution<'_>,
+        context: &mut impl ParseContext,
         table: &crate::sem::TableName,
         constraint: &super::TableConstraint,
     ) -> Result<crate::sem::AlterObjSubCommand, AnalysisError> {
@@ -279,7 +265,7 @@ impl super::AlterCommand {
     }
 
     fn resolve_cluster(
-        context: &mut Resolution<'_>,
+        context: &mut impl ParseContext,
         table: &crate::sem::TableName,
         name: &str,
     ) -> Result<crate::sem::AlterObjSubCommand, AnalysisError> {
@@ -293,32 +279,31 @@ impl super::AlterCommand {
             &resolved_table.full_name().schema().cloned(),
             &crate::sem::LocalName::from(name),
         );
-        if !context.has_index(&index_name) {
-            context.report_problem(AnalysisProblem::index_not_found(name))?;
+        if context.get_index(&index_name).is_none() {
+            context.report_analysis_problem(AnalysisProblem::index_not_found(name))?;
         }
         Ok(AlterObjSubCommand::cluster_on(name))
     }
 
     fn resolve_rename(
-        context: &mut Resolution<'_>,
+        context: &mut impl ParseContext,
         name: &Name,
     ) -> Result<crate::sem::AlterObjSubCommand, AnalysisError> {
         use crate::sem::{AlterObjSubCommand, TableName};
         let name = TableName::from(name.full_name()?);
         if context.get_table(&name).is_some() {
-            context.report_problem(AnalysisProblem::relation_already_exists(&name))?;
+            context.report_analysis_problem(AnalysisProblem::relation_already_exists(&name))?;
         }
         Ok(AlterObjSubCommand::rename_to(&name))
     }
 
     fn resolve_add_column(
-        context: &mut Resolution<'_>,
-        dialect: Dialect,
+        context: &mut impl ParseContext,
         table: &crate::sem::TableName,
         column: &super::Column,
     ) -> Result<crate::sem::AlterObjSubCommand, AnalysisError> {
         use crate::sem::AlterObjSubCommand;
-        let column = column.resolve(context, dialect, table)?;
+        let column = column.resolve(context, table)?;
         if let Some(name) = column.name() {
             Self::existing_column(context, table, name)?;
         }
@@ -326,8 +311,7 @@ impl super::AlterCommand {
     }
 
     fn resolve_alter_column(
-        context: &mut Resolution<'_>,
-        dialect: Dialect,
+        context: &mut impl ParseContext,
         table: &crate::sem::TableName,
         name: &str,
         column: &super::Column,
@@ -337,12 +321,12 @@ impl super::AlterCommand {
         Self::missing_column(context, table, &name)?;
         Ok(AlterObjSubCommand::alter_column(
             &name,
-            &column.resolve(context, dialect, table)?,
+            &column.resolve(context, table)?,
         ))
     }
 
     fn resolve_rename_column(
-        context: &mut Resolution<'_>,
+        context: &mut impl ParseContext,
         table: &crate::sem::TableName,
         from: &str,
         to: &str,
@@ -358,7 +342,7 @@ impl super::AlterCommand {
     }
 
     fn resolve_drop_column(
-        context: &mut Resolution<'_>,
+        context: &mut impl ParseContext,
         table: &crate::sem::TableName,
         name: &str,
     ) -> Result<crate::sem::AlterObjSubCommand, AnalysisError> {
@@ -592,12 +576,11 @@ impl PostgresAlterCommand {
     }
     fn resolve(
         &self,
-        context: &mut Resolution<'_>,
-        dialect: Dialect,
+        context: &mut impl ParseContext,
         table: &crate::sem::TableName,
     ) -> Result<crate::sem::AlterObjSubCommand, AnalysisError> {
         if let Some(legacy) = &self.legacy {
-            legacy.resolve(context, dialect, table)
+            legacy.resolve(context, table)
         } else {
             todo!()
         }
@@ -674,7 +657,7 @@ impl super::AlterCommand {
 impl super::TableConstraint {
     fn resolve(
         &self,
-        context: &mut Resolution<'_>,
+        context: &mut impl ParseContext,
         table: &crate::sem::TableName,
     ) -> Result<crate::sem::Constraint, AnalysisError> {
         use crate::sem::ColumnName;
@@ -684,7 +667,7 @@ impl super::TableConstraint {
             .map(|key| ColumnName::from(key.as_str()))
             .collect::<Vec<_>>();
         if context.get_table(table).is_none() {
-            context.report_problem(AnalysisProblem::relation_not_found(table))?;
+            context.report_analysis_problem(AnalysisProblem::relation_not_found(table))?;
         }
         for key in &keys {
             super::AlterCommand::missing_column(context, table, key)?;
@@ -696,7 +679,7 @@ impl super::TableConstraint {
 impl super::ColumnConstraint {
     fn resolve_table(
         &self,
-        context: &mut Resolution<'_>,
+        context: &mut impl ParseContext,
         table: &crate::sem::TableName,
         name: &str,
         keys: &[crate::sem::ColumnName],
@@ -731,7 +714,7 @@ impl super::ColumnConstraint {
 impl super::ForeignReference {
     fn resolve_table(
         &self,
-        context: &mut Resolution<'_>,
+        context: &mut impl ParseContext,
         table: &crate::sem::TableName,
         name: &str,
         keys: &[crate::sem::ColumnName],
@@ -739,7 +722,7 @@ impl super::ForeignReference {
         use crate::sem::{ColumnName, Constraint, ForeignKeyConstraint, TableName};
         let target = TableName::from(self.table.full_name()?);
         if context.get_table(&target).is_none() {
-            context.report_problem(AnalysisProblem::relation_not_found(&target))?;
+            context.report_analysis_problem(AnalysisProblem::relation_not_found(&target))?;
         }
         let target_keys = if self.columns.is_empty() {
             context
@@ -783,23 +766,19 @@ impl super::Table {
     pub(crate) fn resolve_and_apply<TContext: ParseContext>(
         &self,
         context: TContext,
-        dialect: Dialect,
     ) -> Result<AstAndContextPair<TContext>, AnalysisError> {
         let Some(source) = context.get_source_path_with_span().cloned() else {
             return AnalysisError::raise_unexpected_none("source span");
         };
-        self.resolve_and_apply_at(context, dialect, &source)
+        self.resolve_and_apply_at(context, &source)
     }
 
     pub(crate) fn resolve_and_apply_at<TContext: ParseContext>(
         &self,
         mut context: TContext,
-        dialect: Dialect,
         source: &crate::sem::SourcePathWithSpan,
     ) -> Result<AstAndContextPair<TContext>, AnalysisError> {
-        let table = self
-            .resolve(&context, dialect, source)
-            .report(&mut context)?;
+        let table = self.resolve(&mut context, source)?;
         let context = context.apply_create_table(&table)?;
         Ok(AstAndContextPair::new(
             SemAst::create_table(&table),
@@ -809,19 +788,17 @@ impl super::Table {
 
     pub(crate) fn resolve(
         &self,
-        catalog: &dyn Catalog,
-        dialect: Dialect,
+        context: &mut impl ParseContext,
         source: &crate::sem::SourcePathWithSpan,
-    ) -> ResolutionOutcome<crate::sem::CreateTable> {
-        let mut context = Resolution::new(catalog);
-        let result = self.resolve_in(&mut context, dialect, source);
-        context.finish(result)
+    ) -> Result<crate::sem::CreateTable, crate::sem::AnalysisError> {
+        context.begin_analysis();
+        let result = self.resolve_in(context, source);
+        context.finish_analysis(result)
     }
 
     fn resolve_in(
         &self,
-        context: &mut Resolution<'_>,
-        dialect: Dialect,
+        context: &mut impl ParseContext,
         source: &crate::sem::SourcePathWithSpan,
     ) -> Result<crate::sem::CreateTable, AnalysisError> {
         use crate::sem::{CreateTable, TableName};
@@ -831,7 +808,7 @@ impl super::Table {
         let name = TableName::from(self.name.full_name()?);
         let mut columns = Vec::new();
         for column in &self.columns {
-            columns.push(column.resolve(context, dialect, &name)?);
+            columns.push(column.resolve(context, &name)?);
         }
         Ok(CreateTable::new(
             &name,
@@ -847,18 +824,16 @@ impl super::Column {
     pub(crate) fn resolve_and_report<TContext: ParseContext>(
         &self,
         mut context: TContext,
-        dialect: Dialect,
         table: &crate::sem::TableName,
     ) -> Result<(crate::sem::ColumnDefinition, TContext), AnalysisError> {
-        let mut resolution = Resolution::new(&context);
-        let result = self.resolve(&mut resolution, dialect, table);
-        let column = resolution.finish(result).report(&mut context)?;
+        context.begin_analysis();
+        let result = self.resolve(&mut context, table);
+        let column = context.finish_analysis(result)?;
         Ok((column, context))
     }
     pub(super) fn resolve(
         &self,
-        context: &mut Resolution<'_>,
-        dialect: Dialect,
+        context: &mut impl ParseContext,
         table: &crate::sem::TableName,
     ) -> Result<crate::sem::ColumnDefinition, AnalysisError> {
         use crate::sem::{ColumnDefinition, ColumnName};
@@ -866,17 +841,17 @@ impl super::Column {
         let type_ref = if let Some(ty) = &self.type_name {
             let type_name = ty.name.full_name()?;
             if let Some(ty) = context.get_type(&type_name) {
-                if dialect == Dialect::sqlite() {
+                if context.dialect() == Dialect::sqlite() {
                     Some(TypeReference::from_full_name(type_name))
                 } else if let Some(type_ref) = ty.type_reference() {
                     Some(type_ref.clone())
                 } else {
                     let problem = AnalysisProblem::unexpected_dynamic_type(ty);
-                    context.report_problem(problem)?;
+                    context.report_analysis_problem(problem)?;
                     None
                 }
             } else {
-                context.report_problem(AnalysisProblem::column_type_not_found(
+                context.report_analysis_problem(AnalysisProblem::column_type_not_found(
                     table, &name, &type_name,
                 ))?;
                 None
@@ -887,10 +862,8 @@ impl super::Column {
         let mut column =
             ColumnDefinition::new(&Some(name.clone()), type_ref.as_ref(), self.not_null, &[]);
         for constraint in &self.constraints {
-            let constraint = constraint
-                .constraint
-                .resolve(context, dialect, table, &name)?;
-            if dialect == Dialect::sqlite() {
+            let constraint = constraint.constraint.resolve(context, table, &name)?;
+            if context.dialect() == Dialect::sqlite() {
                 if let Some(nullability) = constraint.as_nullability() {
                     column.set_not_null(Some(nullability.is_not_null()));
                 }
@@ -902,14 +875,16 @@ impl super::Column {
                 && let Some(pk_type) = fk.primary_key_column_type()
                 && col_type != pk_type
             {
-                context.report_problem(AnalysisProblem::foreign_key_column_type_mismatch(
-                    table,
-                    &name,
-                    col_type,
-                    fk.primary_key_table(),
-                    fk.primary_key_column(),
-                    pk_type,
-                ))?;
+                context.report_analysis_problem(
+                    AnalysisProblem::foreign_key_column_type_mismatch(
+                        table,
+                        &name,
+                        col_type,
+                        fk.primary_key_table(),
+                        fk.primary_key_column(),
+                        pk_type,
+                    ),
+                )?;
             }
             column.push_constraint(constraint);
         }
@@ -921,19 +896,17 @@ impl super::ColumnConstraint {
     pub(crate) fn resolve_and_report<TContext: ParseContext>(
         &self,
         mut context: TContext,
-        dialect: Dialect,
         table: &crate::sem::TableName,
         column: &crate::sem::ColumnName,
     ) -> Result<(crate::sem::ColumnConstraint, TContext), AnalysisError> {
-        let mut resolution = Resolution::new(&context);
-        let result = self.resolve(&mut resolution, dialect, table, column);
-        let constraint = resolution.finish(result).report(&mut context)?;
+        context.begin_analysis();
+        let result = self.resolve(&mut context, table, column);
+        let constraint = context.finish_analysis(result)?;
         Ok((constraint, context))
     }
     pub(super) fn resolve(
         &self,
-        context: &mut Resolution<'_>,
-        dialect: Dialect,
+        context: &mut impl ParseContext,
         table: &crate::sem::TableName,
         column: &crate::sem::ColumnName,
     ) -> Result<crate::sem::ColumnConstraint, AnalysisError> {
@@ -958,12 +931,12 @@ impl super::ColumnConstraint {
             Self::Default(expr) => ColumnConstraint::default(DefaultColumnConstraint::new(
                 table,
                 column,
-                expr.resolve_in(context, dialect, &scope)?,
+                expr.resolve_in(context, &scope)?,
             )),
             Self::Check(expr) => ColumnConstraint::check(CheckColumnConstraint::new(
                 table,
                 column,
-                expr.resolve_in(context, dialect, &scope)?,
+                expr.resolve_in(context, &scope)?,
             )),
             Self::PrimaryKey(conflict, deferrable) => {
                 ColumnConstraint::primary_key(PrimaryKeyColumnConstraint::new(
@@ -987,7 +960,7 @@ impl super::ColumnConstraint {
                 ColumnConstraint::generated(GeneratedColumnConstraint::new(
                     table,
                     column,
-                    expr.resolve_in(context, dialect, &ScalarAnalysisContext::default())?,
+                    expr.resolve_in(context, &ScalarAnalysisContext::default())?,
                     mode.clone(),
                 ))
             }
@@ -1006,7 +979,8 @@ impl super::ColumnConstraint {
             }
             Self::Collate(name) => {
                 if !CollateColumnConstraint::is_known_name(name) {
-                    context.report_problem(AnalysisProblem::collation_name_not_found(name))?;
+                    context
+                        .report_analysis_problem(AnalysisProblem::collation_name_not_found(name))?;
                 }
                 ColumnConstraint::collate(CollateColumnConstraint::new(table, column, name))
             }
@@ -1017,7 +991,7 @@ impl super::ColumnConstraint {
 impl super::ForeignReference {
     fn resolve(
         &self,
-        context: &mut Resolution<'_>,
+        context: &mut impl ParseContext,
         table: &crate::sem::TableName,
         column: &crate::sem::ColumnName,
     ) -> Result<crate::sem::ColumnConstraint, AnalysisError> {
@@ -1025,7 +999,7 @@ impl super::ForeignReference {
         let target = TableName::from(self.table.full_name()?);
         #[cfg(feature = "sqlite")]
         for name in &self.ignored_matches {
-            context.report_problem(
+            context.report_analysis_problem(
                 AnalysisProblem::sqlite_ignores_match_option_in_fk_constraint(table, column, name),
             )?;
         }
@@ -1037,14 +1011,14 @@ impl super::ForeignReference {
             if let Some(column) = target_table.get_column_def(&target_column) {
                 column.get_type_cloned()
             } else {
-                context.report_problem(AnalysisProblem::column_not_found_in_table(
+                context.report_analysis_problem(AnalysisProblem::column_not_found_in_table(
                     &target,
                     &target_column,
                 ))?;
                 None
             }
         } else {
-            context.report_problem(AnalysisProblem::table_not_found(&target))?;
+            context.report_analysis_problem(AnalysisProblem::table_not_found(&target))?;
             None
         };
         Ok(ColumnConstraint::foreign_key(
@@ -1097,22 +1071,20 @@ impl TableAs {
     pub(crate) fn resolve_and_apply<TContext: ParseContext>(
         &self,
         context: TContext,
-        dialect: Dialect,
     ) -> Result<AstAndContextPair<TContext>, AnalysisError> {
         let Some(source) = context.get_source_path_with_span().cloned() else {
             return AnalysisError::raise_unexpected_none("source span");
         };
-        self.resolve_and_apply_at(context, dialect, &source)
+        self.resolve_and_apply_at(context, &source)
     }
 
     pub(crate) fn resolve_and_apply_at<TContext: ParseContext>(
         &self,
         mut context: TContext,
-        dialect: Dialect,
         source: &crate::sem::SourcePathWithSpan,
     ) -> Result<AstAndContextPair<TContext>, AnalysisError> {
         use crate::sem::{CreateTable, CreateTableAs, CreateTableMode, TableName};
-        let query = self.query.resolve(&context, dialect).report(&mut context)?;
+        let query = self.query.resolve(&mut context)?;
         let name = self.into.relation.name.full_name()?;
         let columns = query.result_columns().column_definitions()?;
         let table = CreateTable::new(
@@ -1192,8 +1164,7 @@ impl Index {
 
     pub(crate) fn resolve_elements(
         elements: &[super::IndexExpression],
-        context: &mut Resolution<'_>,
-        dialect: Dialect,
+        context: &mut impl ParseContext,
     ) -> Result<crate::sem::IndexElementCollection, AnalysisError> {
         use crate::sem::{
             ColumnName, IndexElement, IndexElementCollection, IndexElementWithOrder,
@@ -1205,11 +1176,7 @@ impl Index {
                 return AnalysisError::raise_unexpected_input("SortbyUsing in IndexElem");
             }
             let value = if let Some(expr) = &element.expression {
-                IndexElement::from(&expr.resolve_in(
-                    context,
-                    dialect,
-                    &ScalarAnalysisContext::default(),
-                )?)
+                IndexElement::from(&expr.resolve_in(context, &ScalarAnalysisContext::default())?)
             } else {
                 IndexElement::from(&ColumnName::from(
                     element.name.as_deref().unwrap_or_default(),
@@ -1227,22 +1194,21 @@ impl Index {
 
     pub(super) fn resolve(
         &self,
-        catalog: &dyn Catalog,
-        dialect: Dialect,
-    ) -> ResolutionOutcome<Option<crate::sem::CreateIndex>> {
-        let mut context = Resolution::new(catalog);
-        let result = self.resolve_in(&mut context, dialect);
-        context.finish(result)
+        context: &mut impl ParseContext,
+    ) -> Result<Option<crate::sem::CreateIndex>, crate::sem::AnalysisError> {
+        context.begin_analysis();
+        let result = self.resolve_in(context);
+        context.finish_analysis(result)
     }
 
     fn resolve_in(
         &self,
-        context: &mut Resolution<'_>,
-        dialect: Dialect,
+        context: &mut impl ParseContext,
     ) -> Result<Option<crate::sem::CreateIndex>, AnalysisError> {
         let requested_table = crate::sem::TableName::from(self.relation.name.full_name()?);
         let Some(table) = context.resolve_table_name(&requested_table) else {
-            context.report_problem(AnalysisProblem::relation_not_found(&requested_table))?;
+            context
+                .report_analysis_problem(AnalysisProblem::relation_not_found(&requested_table))?;
             return Ok(None);
         };
         let name = crate::sem::FullName::new(
@@ -1250,8 +1216,8 @@ impl Index {
             &table.full_name().schema().cloned(),
             &crate::sem::LocalName::from(self.name.as_str()),
         );
-        let keys = Self::resolve_elements(&self.keys, context, dialect)?;
-        let includes = Self::resolve_elements(&self.includes, context, dialect)?;
+        let keys = Self::resolve_elements(&self.keys, context)?;
+        let includes = Self::resolve_elements(&self.includes, context)?;
         Ok(Some(crate::sem::CreateIndex::from_resolved(
             &name,
             &table,
@@ -1264,9 +1230,8 @@ impl Index {
     pub(crate) fn resolve_and_apply<TContext: ParseContext>(
         &self,
         mut context: TContext,
-        dialect: Dialect,
     ) -> Result<AstAndContextPair<TContext>, AnalysisError> {
-        let Some(index) = self.resolve(&context, dialect).report(&mut context)? else {
+        let Some(index) = self.resolve(&mut context)? else {
             return Ok(AstAndContextPair::new(
                 SemAst::unresolved_statement(),
                 context,
@@ -1306,11 +1271,10 @@ impl Schema {
     pub(crate) fn resolve_and_apply<TContext: ParseContext>(
         &self,
         mut context: TContext,
-        dialect: Dialect,
     ) -> Result<AstAndContextPair<TContext>, AnalysisError> {
         let mut elements = Vec::new();
         for element in &self.elements {
-            let AstAndContextPair(element, next) = element.resolve_and_apply(context, dialect)?;
+            let AstAndContextPair(element, next) = element.resolve_and_apply(context)?;
             context = next;
             elements.push(element);
         }
@@ -1400,11 +1364,10 @@ impl FunctionParameter {
     pub(crate) fn resolve_and_report<TContext: ParseContext>(
         &self,
         mut context: TContext,
-        dialect: Dialect,
     ) -> Result<(crate::sem::FunctionParam, TContext), AnalysisError> {
-        let mut resolution = Resolution::new(&context);
-        let result = self.resolve(&mut resolution, dialect);
-        let parameter = resolution.finish(result).report(&mut context)?;
+        context.begin_analysis();
+        let result = self.resolve(&mut context);
+        let parameter = context.finish_analysis(result)?;
         Ok((parameter, context))
     }
     pub(super) fn new(
@@ -1423,8 +1386,7 @@ impl FunctionParameter {
 
     fn resolve(
         &self,
-        context: &mut Resolution<'_>,
-        dialect: Dialect,
+        context: &mut impl ParseContext,
     ) -> Result<crate::sem::FunctionParam, AnalysisError> {
         use crate::sem::ScalarAnalysisContext;
         let name = Some(self.name.clone());
@@ -1437,7 +1399,7 @@ impl FunctionParameter {
         let default = self
             .default
             .as_ref()
-            .map(|expr| expr.resolve_in(context, dialect, &ScalarAnalysisContext::default()))
+            .map(|expr| expr.resolve_in(context, &ScalarAnalysisContext::default()))
             .transpose()?;
         Ok(self.mode.resolve_parameter(&name, &param_type, &default))
     }
@@ -1492,18 +1454,16 @@ impl Function {
 
     pub(super) fn resolve(
         &self,
-        catalog: &dyn Catalog,
-        dialect: Dialect,
-    ) -> ResolutionOutcome<crate::sem::CreateFunction> {
-        let mut context = Resolution::new(catalog);
-        let result = self.resolve_in(&mut context, dialect);
-        context.finish(result)
+        context: &mut impl ParseContext,
+    ) -> Result<crate::sem::CreateFunction, crate::sem::AnalysisError> {
+        context.begin_analysis();
+        let result = self.resolve_in(context);
+        context.finish_analysis(result)
     }
 
     fn resolve_in(
         &self,
-        context: &mut Resolution<'_>,
-        dialect: Dialect,
+        context: &mut impl ParseContext,
     ) -> Result<crate::sem::CreateFunction, AnalysisError> {
         use crate::sem::{
             ColumnCollection, ColumnDefinition, ColumnName, CreateFunction,
@@ -1543,9 +1503,9 @@ impl Function {
                     })
                 }
             } else {
-                context.report_problem(AnalysisProblem::function_result_set_type_not_found(
-                    &ret_name,
-                ))?;
+                context.report_analysis_problem(
+                    AnalysisProblem::function_result_set_type_not_found(&ret_name),
+                )?;
                 Some(ColumnCollection::new(Vec::new()))
             }
         } else {
@@ -1553,7 +1513,7 @@ impl Function {
         };
         let mut params = Vec::new();
         for param in &self.parameters {
-            params.push(param.resolve(context, dialect)?);
+            params.push(param.resolve(context)?);
         }
         let ret_type = if let Some(ty) = context.get_type(&ret_name) {
             ty.type_reference().cloned()
@@ -1572,9 +1532,8 @@ impl Function {
     pub(crate) fn resolve_and_apply<TContext: ParseContext>(
         &self,
         mut context: TContext,
-        dialect: Dialect,
     ) -> Result<AstAndContextPair<TContext>, AnalysisError> {
-        let function = self.resolve(&context, dialect).report(&mut context)?;
+        let function = self.resolve(&mut context)?;
         let context = context.apply_create_function(&function)?;
         Ok(AstAndContextPair::new(
             SemAst::create_function(&function),
@@ -1586,7 +1545,7 @@ impl Function {
 #[cfg(test)]
 mod test_function_null_input_semantics {
     use super::Function;
-    use crate::ast::{Dialect, TryFromWithTokens};
+    use crate::ast::TryFromWithTokens;
     use crate::syn::Opt;
     use crate::test_helpers::{SynBuilder, TestParseContext};
     use sql_fun_core::IVec;
@@ -1605,10 +1564,7 @@ mod test_function_null_input_semantics {
         )
         .unwrap();
         let mut context = TestParseContext::default();
-        let resolved = function
-            .resolve(&context, Dialect::postgres())
-            .report(&mut context)
-            .unwrap();
+        let resolved = function.resolve(&mut context).unwrap();
         assert_eq!(
             expected,
             resolved.overloads().get_at(0).unwrap().is_strict()
@@ -1713,13 +1669,16 @@ impl Domain {
         }
     }
 
-    pub(super) fn resolve(&self, catalog: &dyn Catalog) -> ResolutionOutcome<CreateDomain> {
-        let mut resolution = Resolution::new(catalog);
-        let result = self.resolve_in(&mut resolution);
-        resolution.finish(result)
+    pub(super) fn resolve(
+        &self,
+        context: &mut impl ParseContext,
+    ) -> Result<CreateDomain, crate::sem::AnalysisError> {
+        context.begin_analysis();
+        let result = self.resolve_in(context);
+        context.finish_analysis(result)
     }
 
-    fn resolve_in(&self, context: &mut Resolution<'_>) -> Result<CreateDomain, AnalysisError> {
+    fn resolve_in(&self, context: &mut impl ParseContext) -> Result<CreateDomain, AnalysisError> {
         let name = self.name.full_name()?;
         let base_name = self.base.name.full_name()?;
         let base = if let Some(base) = context.get_type(&base_name) {
@@ -1728,7 +1687,7 @@ impl Domain {
             None
         };
         if base.is_none() {
-            context.report_problem(AnalysisProblem::domain_base_type_not_found(
+            context.report_analysis_problem(AnalysisProblem::domain_base_type_not_found(
                 &name,
                 &base_name.to_string(),
                 &self.base_span,
@@ -1744,7 +1703,7 @@ impl Domain {
         &self,
         mut context: TContext,
     ) -> Result<AstAndContextPair<TContext>, AnalysisError> {
-        let domain = self.resolve(&context).report(&mut context)?;
+        let domain = self.resolve(&mut context)?;
         let context = context.apply_create_domain(&domain)?;
         Ok(AstAndContextPair::new(
             SemAst::create_domain(&domain),
@@ -1756,7 +1715,7 @@ impl Domain {
 #[cfg(test)]
 mod domain_tests {
     use crate::{
-        ast::{Dialect, StatementNode, TryFromWithTokens},
+        ast::{StatementNode, TryFromWithTokens},
         sem::SemAst,
         test_helpers::{SynBuilder, TestParseContext},
     };
@@ -1770,9 +1729,7 @@ mod domain_tests {
             &IVec::default(),
         )?;
         let mut context = TestParseContext::default();
-        let domain = syntax
-            .resolve(&context, Dialect::postgres())
-            .report(&mut context)?;
+        let domain = syntax.resolve(&mut context)?;
         assert!(matches!(domain, SemAst::CreateDomain(_)));
         assert_eq!(context.reported_problem_count(), 1);
         Ok(())

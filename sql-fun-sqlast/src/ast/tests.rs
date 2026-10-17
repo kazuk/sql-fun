@@ -7,7 +7,7 @@ mod test_helpers;
 
 use self::test_helpers::postgres;
 
-use crate::ast::{Dialect, StatementNode, TryFromWithTokens};
+use crate::ast::{StatementNode, TryFromWithTokens};
 use crate::sem::{ColumnName, PgBuiltInType};
 use crate::test_helpers::{SynBuilder, TestParseContext, source_span};
 
@@ -73,7 +73,7 @@ fn ddl_construction_does_not_require_referenced_objects(
 }
 
 #[rstest::rstest]
-fn table_resolves_with_read_only_catalog(
+fn table_resolution_uses_common_context(
     source_span: crate::sem::SourcePathWithSpan,
 ) -> testresult::TestResult {
     let syntax = StatementNode::try_from_with_tokens(
@@ -83,15 +83,12 @@ fn table_resolves_with_read_only_catalog(
     let StatementNode::Table(table) = syntax else {
         panic!("table syntax");
     };
-    let catalog = test_helpers::ReadOnlyCatalog::new();
-    let mut diagnostics = TestParseContext::default();
-    let table = table
-        .resolve(&catalog, Dialect::postgres(), &source_span)
-        .report(&mut diagnostics)?;
+    let mut catalog = test_helpers::AnalysisFixture::context();
+    let table = table.resolve(&mut catalog, &source_span)?;
     let id = table.get_column_def(&ColumnName::from("id")).expect("id");
     assert_eq!(id.get_type(), Some(&crate::sem::PgBuiltInType::int4()));
     assert!(id.constraints()[0].as_default().is_some());
-    assert_eq!(diagnostics.reported_problem_count(), 0);
+    assert_eq!(catalog.reported_problem_count(), 0);
     Ok(())
 }
 
@@ -101,15 +98,12 @@ fn table_resolves_with_read_only_catalog(
     "create function answer(x integer default 1) returns integer language sql strict as 'select x'"
 )]
 #[case("create index items_idx on items (id desc) include (extra)")]
-fn ddl_resolution_needs_no_catalog_write_interface(#[case] sql: &str) -> testresult::TestResult {
+fn ddl_resolution_uses_common_context(#[case] sql: &str) -> testresult::TestResult {
     let syntax =
         StatementNode::try_from_with_tokens(&SynBuilder::new().parse(sql), &IVec::default())?;
-    let catalog = test_helpers::ReadOnlyCatalog::with_index_table();
-    let mut diagnostics = TestParseContext::default();
-    syntax
-        .resolve(&catalog, Dialect::postgres())
-        .report(&mut diagnostics)?;
-    assert_eq!(diagnostics.reported_problem_count(), 0);
+    let mut catalog = test_helpers::AnalysisFixture::with_index_table();
+    syntax.resolve(&mut catalog)?;
+    assert_eq!(catalog.reported_problem_count(), 0);
     Ok(())
 }
 
@@ -159,7 +153,7 @@ fn public_sqlite_table_dispatch_preserves_column_semantics(
     use crate::sem::{MutSourcePathWithSpan, SemAst};
     let parsed = crate::test_helpers::SqliteSynBuilder
         .parse_as_stmt("create table items (label text not null default 'one')");
-    let mut context = TestParseContext::default();
+    let mut context = TestParseContext::default().with_dialect(crate::ast::Dialect::sqlite());
     context.set_get_search_path_result(&[
         crate::sem::SchemaName::from("public"),
         crate::sem::SchemaName::from("pg_catalog"),
@@ -319,29 +313,24 @@ fn shared_resolution_preserves_result_metadata(
     #[case] sql: &str,
     #[case] not_null: bool,
 ) -> testresult::TestResult {
-    let catalog = test_helpers::ReadOnlyCatalog::new();
-    let mut diagnostics = TestParseContext::default();
-    let query = postgres(sql)?
-        .resolve(&catalog, Dialect::postgres())
-        .report(&mut diagnostics)?;
+    let mut catalog = test_helpers::AnalysisFixture::context();
+    let query = postgres(sql)?.resolve(&mut catalog)?;
     let column = query
         .result_columns()
         .get_result_column_def(&ColumnName::from("n"))
         .expect("n");
     assert_eq!(column.get_type_cloned(), Some(PgBuiltInType::int4()));
     assert_eq!(column.is_not_null(), Some(not_null));
-    assert_eq!(diagnostics.reported_problem_count(), 0);
+    assert_eq!(catalog.reported_problem_count(), 0);
     Ok(())
 }
 
 #[test]
 fn correlated_scalar_subquery_uses_outer_scope() -> testresult::TestResult {
-    let catalog = test_helpers::ReadOnlyCatalog::new();
-    let mut diagnostics = TestParseContext::default();
+    let mut catalog = test_helpers::AnalysisFixture::context();
     let query =
         postgres("select (select outer_query.n) as result from (select 42 as n) outer_query")?
-            .resolve(&catalog, Dialect::postgres())
-            .report(&mut diagnostics)?;
+            .resolve(&mut catalog)?;
     assert!(
         query
             .result_columns()
@@ -350,17 +339,14 @@ fn correlated_scalar_subquery_uses_outer_scope() -> testresult::TestResult {
             .get_type_cloned()
             .is_some()
     );
-    assert_eq!(diagnostics.reported_problem_count(), 0);
+    assert_eq!(catalog.reported_problem_count(), 0);
     Ok(())
 }
 
 #[test]
 fn qualified_operator_uses_its_schema_during_lookup() -> testresult::TestResult {
-    let catalog = test_helpers::ReadOnlyCatalog::with_qualified_addition();
-    let mut diagnostics = TestParseContext::default();
-    let query = postgres("select 1 operator(pg_catalog.+) 2 as n")?
-        .resolve(&catalog, Dialect::postgres())
-        .report(&mut diagnostics)?;
+    let mut catalog = test_helpers::AnalysisFixture::with_qualified_addition();
+    let query = postgres("select 1 operator(pg_catalog.+) 2 as n")?.resolve(&mut catalog)?;
     let column = query
         .result_columns()
         .get_result_column_def(&ColumnName::from("n"))
@@ -368,18 +354,16 @@ fn qualified_operator_uses_its_schema_during_lookup() -> testresult::TestResult 
     assert_eq!(column.get_type_cloned(), Some(PgBuiltInType::int4()));
     // Preserve the existing binary-operator nullability baseline.
     assert_eq!(column.is_not_null(), Some(false));
-    assert_eq!(diagnostics.reported_problem_count(), 0);
+    assert_eq!(catalog.reported_problem_count(), 0);
     Ok(())
 }
 
 #[test]
 fn non_lateral_query_does_not_see_sibling_from_item() -> testresult::TestResult {
-    let catalog = test_helpers::ReadOnlyCatalog::new();
-    let mut diagnostics = TestParseContext::default();
+    let mut catalog = test_helpers::AnalysisFixture::context();
     postgres("select q.n as result from (select 42 as n) a, (select a.n) q")?
-        .resolve(&catalog, Dialect::postgres())
-        .report(&mut diagnostics)?;
-    assert_eq!(diagnostics.reported_problem_count(), 1);
+        .resolve(&mut catalog)?;
+    assert_eq!(catalog.reported_problem_count(), 1);
     Ok(())
 }
 
@@ -395,8 +379,8 @@ fn context_free_dml_expression_syntax(#[case] sql: &str) -> testresult::TestResu
 
 #[cfg(feature = "sqlite")]
 mod sqlite {
-    use crate::ast::tests::test_helpers::{ReadOnlyCatalog, postgres, sqlite};
-    use crate::ast::{Dialect, Expr};
+    use crate::ast::Expr;
+    use crate::ast::tests::test_helpers::{AnalysisFixture, postgres, sqlite};
     use crate::sem::{ColumnName, MutSourcePathWithSpan, PgBuiltInType, SemAst};
     use crate::test_helpers::{SqliteSynBuilder, TestParseContext, source_span};
 
@@ -405,14 +389,10 @@ mod sqlite {
     #[test]
     fn sqlite_case_does_not_use_postgres_implicit_casts() -> testresult::TestResult {
         let sql = "select case when true then 1 else 'text' end as n";
-        let catalog = ReadOnlyCatalog::with_integer_to_text_cast();
-        let mut diagnostics = TestParseContext::default();
-        let pg = postgres(sql)?
-            .resolve(&catalog, Dialect::postgres())
-            .report(&mut diagnostics)?;
-        let sqlite = sqlite(sql)?
-            .resolve(&catalog, Dialect::sqlite())
-            .report(&mut diagnostics)?;
+        let mut catalog = AnalysisFixture::with_integer_to_text_cast();
+        let pg = postgres(sql)?.resolve(&mut catalog)?;
+        catalog = catalog.with_dialect(crate::ast::Dialect::sqlite());
+        let sqlite = sqlite(sql)?.resolve(&mut catalog)?;
         let name = ColumnName::from("n");
         assert_eq!(
             pg.result_columns()
@@ -429,7 +409,7 @@ mod sqlite {
                 .get_type_cloned(),
             None
         );
-        assert_eq!(diagnostics.reported_problem_count(), 0);
+        assert_eq!(catalog.reported_problem_count(), 0);
         Ok(())
     }
 
@@ -441,16 +421,12 @@ mod sqlite {
     #[case("select b.n as n from (select 1 as n) a left join (select 2 as n) b on true")]
     #[case("select 1 as n union all select 2 as n union select 3 as n")]
     fn both_frontends_use_the_same_resolver(#[case] sql: &str) -> testresult::TestResult {
-        let catalog = ReadOnlyCatalog::new();
-        let mut diagnostics = TestParseContext::default();
-        let pg = postgres(sql)?
-            .resolve(&catalog, Dialect::postgres())
-            .report(&mut diagnostics)?;
-        let sqlite = sqlite(sql)?
-            .resolve(&catalog, Dialect::sqlite())
-            .report(&mut diagnostics)?;
+        let mut catalog = AnalysisFixture::context();
+        let pg = postgres(sql)?.resolve(&mut catalog)?;
+        catalog = catalog.with_dialect(crate::ast::Dialect::sqlite());
+        let sqlite = sqlite(sql)?.resolve(&mut catalog)?;
         assert_eq!(pg, sqlite);
-        assert_eq!(diagnostics.reported_problem_count(), 0);
+        assert_eq!(catalog.reported_problem_count(), 0);
         Ok(())
     }
 
@@ -484,7 +460,7 @@ mod sqlite {
 
     #[test]
     fn public_sqlite_select_dispatch_resolves_cte_columns() -> testresult::TestResult {
-        let mut context = TestParseContext::default();
+        let mut context = TestParseContext::default().with_dialect(crate::ast::Dialect::sqlite());
         context.set_source_path_with_span(&source_span());
         let statement =
             SqliteSynBuilder.parse_as_stmt("with c(x) as (select 42) select x as n from c");
@@ -503,14 +479,8 @@ mod sqlite {
     #[test]
     fn sqlite_unary_literal_does_not_use_postgres_operator_catalog() -> testresult::TestResult {
         let syntax = Expr::try_from(&SqliteSynBuilder.parse_expression("select -42"))?;
-        let mut context = TestParseContext::default();
-        let result = syntax
-            .resolve(
-                &context,
-                Dialect::sqlite(),
-                &crate::sem::ScalarAnalysisContext::default(),
-            )
-            .report(&mut context)?;
+        let mut context = TestParseContext::default().with_dialect(crate::ast::Dialect::sqlite());
+        let result = syntax.resolve(&mut context, &crate::sem::ScalarAnalysisContext::default())?;
         assert_eq!(result.get_type(), Some(PgBuiltInType::int4()));
         assert_eq!(context.reported_problem_count(), 0);
         Ok(())
@@ -639,11 +609,8 @@ fn missing_index_table_reports_resolution_problem() -> testresult::TestResult {
         &SynBuilder::new().parse("CREATE INDEX idx ON missing.items(id)"),
         &IVec::default(),
     )?;
-    let catalog = test_helpers::ReadOnlyCatalog::new();
-    let mut diagnostics = TestParseContext::default();
-    syntax
-        .resolve(&catalog, Dialect::postgres())
-        .report(&mut diagnostics)?;
-    assert_eq!(diagnostics.reported_problem_count(), 1);
+    let mut catalog = test_helpers::AnalysisFixture::context();
+    syntax.resolve(&mut catalog)?;
+    assert_eq!(catalog.reported_problem_count(), 1);
     Ok(())
 }

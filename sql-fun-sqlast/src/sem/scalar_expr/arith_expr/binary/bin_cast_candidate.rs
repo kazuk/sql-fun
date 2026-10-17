@@ -29,7 +29,7 @@ impl BinaryCastCandidate {
         right_type: &TypeReference,
     ) -> Vec<Self>
     where
-        TParseContext: crate::sem::resolution::ResolutionContext,
+        TParseContext: crate::sem::ParseContext,
     {
         let mut candidates = Vec::new();
         for overload in overloads {

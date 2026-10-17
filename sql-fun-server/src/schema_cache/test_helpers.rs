@@ -133,6 +133,15 @@ connector = 'orders-connector'
         let (args, metadata) = self.analysis_inputs(datasource);
         SchemaSelection::new(datasource, &args, &metadata, extensions, dump, expected).unwrap()
     }
+    pub(super) fn schema_environment(&self) -> (SqlFunArgs, SqlFunMetadata) {
+        super::SchemaCacheService::schema_environment(
+            self.home(),
+            &"17".parse().unwrap(),
+            &["public".to_owned()],
+        )
+        .unwrap()
+    }
+
     pub(super) fn analysis_inputs(&self, datasource: &str) -> (SqlFunArgs, SqlFunMetadata) {
         let metadata_path = self.directory.path().join("Cargo.toml");
         let metadata = SqlFunMetadataCollection::load_from(&metadata_path).unwrap();
@@ -232,6 +241,20 @@ impl SuspendedRoot {
 }
 
 impl SchemaProject {
+    pub(crate) fn analysis_context_over(
+        &self,
+        base: &::sql_fun_sqlast::sem::FrozenBaseContext,
+        datasource: &str,
+    ) -> ::sql_fun_sqlast::sem::SchemaFileContext {
+        let (args, metadata) = self.analysis_inputs(datasource);
+        ::sql_fun_sqlast::sem::SchemaFileContext::new(
+            &self.home().join("query.sql"),
+            base,
+            &args,
+            &metadata,
+        )
+    }
+
     /// Analyze against this fixture's small synthetic catalog; no full builtin
     /// schema parsing or external service is involved.
     pub(crate) fn analysis_context(
@@ -243,6 +266,8 @@ impl SchemaProject {
         ::sql_fun_sqlast::sem::SchemaFileContext::new(
             &self.home().join("query.sql"),
             &::sql_fun_sqlast::sem::FrozenBaseContext::from(base),
+            &args,
+            &metadata,
         )
     }
 }

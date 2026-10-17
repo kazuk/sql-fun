@@ -273,7 +273,7 @@ impl CommonInferContext {
         self.infer_from_catalog(context)
     }
 
-    pub(crate) fn infer_from_catalog<TCatalog: crate::sem::resolution::Catalog>(
+    pub(crate) fn infer_from_catalog<TCatalog: crate::sem::BaseParseContext>(
         &self,
         context: &TCatalog,
     ) -> Result<TypeReference, TypeError> {

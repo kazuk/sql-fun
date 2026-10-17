@@ -3,8 +3,8 @@ use crate::sem::data_source::{
     TableDataSource, UndefinedTableFuncDataSource, ViewDataSource, join_expr::JoinUsingClause,
 };
 use crate::sem::{
-    AnalysisError, AnalysisProblem, FullName, SelectStatement, SemScalarExpr, TableName, ViewName,
-    WithClause, resolution::ResolutionContext, type_system::ArgumentBindingCollection,
+    AnalysisError, AnalysisProblem, FullName, ParseContext, SelectStatement, SemScalarExpr,
+    TableName, ViewName, WithClause, type_system::ArgumentBindingCollection,
 };
 
 impl DataSource {
@@ -17,7 +17,7 @@ impl DataSource {
             alias,
         ))
     }
-    pub(crate) fn resolve_relation<C: ResolutionContext>(
+    pub(crate) fn resolve_relation<C: ParseContext>(
         context: &mut C,
         name: &FullName,
         alias: &AliasSpec,
@@ -36,9 +36,9 @@ impl DataSource {
                 alias,
             )))
         } else {
-            context.report_problem(AnalysisProblem::relation_not_found(&TableName::from(
-                name.clone(),
-            )))?;
+            context.report_analysis_problem(AnalysisProblem::relation_not_found(
+                &TableName::from(name.clone()),
+            ))?;
             Ok(Self::unknown(&name.to_string(), alias))
         }
     }
@@ -59,7 +59,7 @@ impl DataSource {
         JoinExprDataSource::new_data_source(kind, left, right, condition, alias, using, natural)
     }
 
-    pub(crate) fn resolve_function<C: ResolutionContext>(
+    pub(crate) fn resolve_function<C: ParseContext>(
         context: &mut C,
         name: &FullName,
         arguments: &[SemScalarExpr],
@@ -67,15 +67,15 @@ impl DataSource {
     ) -> Result<Self, AnalysisError> {
         let arg_types = ArgumentBindingCollection::from_expr_list(arguments);
         let Some(overloads) = context.get_function_by_name(name) else {
-            context.report_problem(AnalysisProblem::table_function_not_found(name))?;
+            context.report_analysis_problem(AnalysisProblem::table_function_not_found(name))?;
             return Ok(Self::UndefinedTableFunc(
                 UndefinedTableFuncDataSource::from_name(name, arguments, alias),
             ));
         };
         let Some(overload) = overloads.resolve_from_catalog(context, &arg_types) else {
-            context.report_problem(AnalysisProblem::parameter_type_mismatch_for_table_function(
-                name, &arg_types,
-            ))?;
+            context.report_analysis_problem(
+                AnalysisProblem::parameter_type_mismatch_for_table_function(name, &arg_types),
+            )?;
             return Ok(Self::UndefinedTableFunc(
                 UndefinedTableFuncDataSource::from_name(name, arguments, alias),
             ));

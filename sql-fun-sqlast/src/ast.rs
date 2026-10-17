@@ -319,99 +319,74 @@ impl StatementNode {
 
     pub(crate) fn resolve(
         &self,
-        catalog: &dyn crate::sem::Catalog,
-        dialect: Dialect,
-    ) -> crate::sem::ResolutionOutcome<crate::sem::SemAst> {
+        context: &mut impl crate::sem::ParseContext,
+    ) -> Result<crate::sem::SemAst, crate::sem::AnalysisError> {
         match self {
             Self::Query(query) => query
-                .resolve(catalog, dialect)
+                .resolve(context)
                 .map(|query| crate::sem::SemAst::select(&query)),
             // DML semantic analysis currently has no catalog-dependent result.
             // Keep construction at the common boundary so that its eventual
             // resolver can replace these markers without changing frontends.
-            Self::Insert(_) => crate::sem::Resolution::new(catalog).finish(Ok(
-                crate::sem::SemAst::InsertStatement(crate::sem::InsertStatement::empty()),
+            Self::Insert(_) => Ok(crate::sem::SemAst::InsertStatement(
+                crate::sem::InsertStatement::empty(),
             )),
-            Self::Update(_) => crate::sem::Resolution::new(catalog).finish(Ok(
-                crate::sem::SemAst::UpdateStatement(crate::sem::UpdateStatement::empty()),
+            Self::Update(_) => Ok(crate::sem::SemAst::UpdateStatement(
+                crate::sem::UpdateStatement::empty(),
             )),
-            Self::Delete(_) => crate::sem::Resolution::new(catalog).finish(Ok(
-                crate::sem::SemAst::DeleteStatement(crate::sem::DeleteStatement::empty()),
+            Self::Delete(_) => Ok(crate::sem::SemAst::DeleteStatement(
+                crate::sem::DeleteStatement::empty(),
             )),
-            Self::View(_) => crate::sem::Resolution::new(catalog).finish(
-                crate::sem::AnalysisError::raise_unexpected_input(
-                    "view requires catalog application",
-                ),
+            Self::View(_) => crate::sem::AnalysisError::raise_unexpected_input(
+                "view requires catalog application",
             ),
-            Self::Extension(_) => crate::sem::Resolution::new(catalog).finish(
-                crate::sem::AnalysisError::raise_unexpected_input(
-                    "extension requires catalog application",
-                ),
+            Self::Extension(_) => crate::sem::AnalysisError::raise_unexpected_input(
+                "extension requires catalog application",
             ),
-            Self::VariableSet(_) => crate::sem::Resolution::new(catalog).finish(
-                crate::sem::AnalysisError::raise_unexpected_input(
-                    "variable set requires catalog application",
-                ),
+            Self::VariableSet(_) => crate::sem::AnalysisError::raise_unexpected_input(
+                "variable set requires catalog application",
             ),
-            Self::EnumType(_) => crate::sem::Resolution::new(catalog).finish(
-                crate::sem::AnalysisError::raise_unexpected_input(
-                    "enum type requires catalog application",
-                ),
+            Self::EnumType(_) => crate::sem::AnalysisError::raise_unexpected_input(
+                "enum type requires catalog application",
             ),
-            Self::Sequence(_) => crate::sem::Resolution::new(catalog).finish(
-                crate::sem::AnalysisError::raise_unexpected_input(
-                    "sequence requires catalog application",
-                ),
+            Self::Sequence(_) => crate::sem::AnalysisError::raise_unexpected_input(
+                "sequence requires catalog application",
             ),
-            Self::DropTable(_) => crate::sem::Resolution::new(catalog).finish(
-                crate::sem::AnalysisError::raise_unexpected_input(
-                    "drop table requires catalog application",
-                ),
+            Self::DropTable(_) => crate::sem::AnalysisError::raise_unexpected_input(
+                "drop table requires catalog application",
             ),
-            Self::AlterSequence(_) => crate::sem::Resolution::new(catalog).finish(
-                crate::sem::AnalysisError::raise_unexpected_input(
-                    "alter sequence requires catalog application",
-                ),
+            Self::AlterSequence(_) => crate::sem::AnalysisError::raise_unexpected_input(
+                "alter sequence requires catalog application",
             ),
-            Self::Comment(_) => crate::sem::Resolution::new(catalog).finish(
-                crate::sem::AnalysisError::raise_unexpected_input(
-                    "comment requires catalog application",
-                ),
+            Self::Comment(_) => crate::sem::AnalysisError::raise_unexpected_input(
+                "comment requires catalog application",
             ),
-            Self::AlterOwner(_) => crate::sem::Resolution::new(catalog).finish(Ok(
-                crate::sem::SemAst::AlterOwner(crate::sem::AlterOwner::new()),
-            )),
-            Self::CompositeType(composite_type) => crate::sem::Resolution::new(catalog).finish(
-                composite_type
-                    .resolve()
-                    .map(crate::sem::SemAst::CreateCompType),
-            ),
-            Self::AlterRelation(_) => crate::sem::Resolution::new(catalog).finish(
-                crate::sem::AnalysisError::raise_unexpected_input(
-                    "statement requires catalog application",
-                ),
+            Self::AlterOwner(_) => {
+                Ok(crate::sem::SemAst::AlterOwner(crate::sem::AlterOwner::new()))
+            }
+            Self::CompositeType(composite_type) => composite_type
+                .resolve()
+                .map(crate::sem::SemAst::CreateCompType),
+            Self::AlterRelation(_) => crate::sem::AnalysisError::raise_unexpected_input(
+                "statement requires catalog application",
             ),
             Self::Function(function) => function
-                .resolve(catalog, dialect)
+                .resolve(context)
                 .map(|function| crate::sem::SemAst::create_function(&function)),
             Self::Index(index) => index
-                .resolve(catalog, dialect)
+                .resolve(context)
                 .map(|index| crate::sem::SemAst::from_index_resolution(&index)),
-            Self::TableAs(_) => crate::sem::Resolution::new(catalog).finish(
-                crate::sem::AnalysisError::raise_unexpected_input(
-                    "table as requires catalog application",
-                ),
+            Self::TableAs(_) => crate::sem::AnalysisError::raise_unexpected_input(
+                "table as requires catalog application",
             ),
-            Self::Table(_) => crate::sem::Resolution::new(catalog).finish(
-                crate::sem::AnalysisError::raise_unexpected_input("table requires source metadata"),
-            ),
-            Self::Schema(_) => crate::sem::Resolution::new(catalog).finish(
-                crate::sem::AnalysisError::raise_unexpected_input(
-                    "schema requires catalog application",
-                ),
+            Self::Table(_) => {
+                crate::sem::AnalysisError::raise_unexpected_input("table requires source metadata")
+            }
+            Self::Schema(_) => crate::sem::AnalysisError::raise_unexpected_input(
+                "schema requires catalog application",
             ),
             Self::Domain(domain) => domain
-                .resolve(catalog)
+                .resolve(context)
                 .map(|domain| crate::sem::SemAst::create_domain(&domain)),
         }
     }
@@ -419,7 +394,6 @@ impl StatementNode {
     pub(crate) fn resolve_and_apply<TContext>(
         &self,
         context: TContext,
-        dialect: Dialect,
     ) -> Result<crate::AstAndContextPair<TContext>, crate::sem::AnalysisError>
     where
         TContext: crate::sem::ParseContext,
@@ -427,9 +401,9 @@ impl StatementNode {
         let mut context = context;
         context.set_parameter_constraints(&crate::sem::ParameterConstraints::default());
         match self {
-            Self::View(view) => view.resolve_and_apply(context, dialect),
+            Self::View(view) => view.resolve_and_apply(context),
             Self::Extension(extension) => extension.apply(context),
-            Self::VariableSet(variable_set) => variable_set.resolve_and_apply(context, dialect),
+            Self::VariableSet(variable_set) => variable_set.resolve_and_apply(context),
             Self::EnumType(enum_type) => enum_type.apply(context),
             Self::Sequence(sequence) => sequence.apply(context),
             Self::DropTable(drop_table) => drop_table.apply(context),
@@ -440,16 +414,16 @@ impl StatementNode {
                 context,
             )),
             Self::CompositeType(composite_type) => composite_type.resolve_and_apply(context),
-            Self::AlterRelation(statement) => statement.resolve_and_apply(context, dialect),
+            Self::AlterRelation(statement) => statement.resolve_and_apply(context),
             Self::Domain(domain) => domain.resolve_and_apply(context),
-            Self::Function(function) => function.resolve_and_apply(context, dialect),
-            Self::Schema(schema) => schema.resolve_and_apply(context, dialect),
-            Self::Index(index) => index.resolve_and_apply(context, dialect),
-            Self::TableAs(table_as) => table_as.resolve_and_apply(context, dialect),
-            Self::Table(table) => table.resolve_and_apply(context, dialect),
+            Self::Function(function) => function.resolve_and_apply(context),
+            Self::Schema(schema) => schema.resolve_and_apply(context),
+            Self::Index(index) => index.resolve_and_apply(context),
+            Self::TableAs(table_as) => table_as.resolve_and_apply(context),
+            Self::Table(table) => table.resolve_and_apply(context),
             _ => {
-                let outcome = self.resolve(&context, dialect);
-                let statement = outcome.report(&mut context)?;
+                let outcome = self.resolve(&mut context);
+                let statement = outcome?;
                 Ok(crate::AstAndContextPair::new(statement, context))
             }
         }
@@ -661,8 +635,9 @@ impl DropTable {
         for name in &self.names {
             let table_name = crate::sem::TableName::from(name.full_name()?);
             if context.get_table(&table_name).is_none() {
-                context
-                    .report_problem(crate::sem::AnalysisProblem::table_not_found(&table_name))?;
+                context.report_analysis_problem(crate::sem::AnalysisProblem::table_not_found(
+                    &table_name,
+                ))?;
             }
             names.push(table_name);
         }
@@ -776,8 +751,7 @@ impl VariableSet {
 
     fn resolve_and_apply<TContext>(
         &self,
-        context: TContext,
-        dialect: Dialect,
+        mut context: TContext,
     ) -> Result<crate::AstAndContextPair<TContext>, crate::sem::AnalysisError>
     where
         TContext: crate::sem::ParseContext,
@@ -787,13 +761,8 @@ impl VariableSet {
                 "VariableSetStmt.args len!=1",
             );
         };
-        let outcome = argument.resolve(
-            &context,
-            dialect,
-            &crate::sem::ScalarAnalysisContext::default(),
-        );
-        let mut context = context;
-        let value = outcome.report(&mut context)?;
+        let outcome = argument.resolve(&mut context, &crate::sem::ScalarAnalysisContext::default());
+        let value = outcome?;
         let variable_set = crate::sem::VariableSet::new(&self.name, &value);
         let context = context.apply_variable_set(&variable_set)?;
         Ok(crate::AstAndContextPair::new(
@@ -877,14 +846,13 @@ impl View {
     fn resolve_and_apply<TContext>(
         &self,
         context: TContext,
-        dialect: Dialect,
     ) -> Result<crate::AstAndContextPair<TContext>, crate::sem::AnalysisError>
     where
         TContext: crate::sem::ParseContext,
     {
-        let outcome = self.query.resolve(&context, dialect);
         let mut context = context;
-        let query = outcome.report(&mut context)?;
+        let outcome = self.query.resolve(&mut context);
+        let query = outcome?;
         let view = crate::sem::CreateView::new(
             &self.name.full_name()?,
             &query,

@@ -36,6 +36,7 @@ pub struct TestParseContext {
     drop_tables: Vec<DropTable>,
     create_indexes: Vec<CreateIndex>,
     problems: Vec<AnalysisProblem>,
+    analysis_state: crate::sem::AnalysisState,
     parameter_constraints: crate::sem::ParameterConstraints,
     report_failure_after: Option<usize>,
     source: Option<SourcePathWithSpan>,
@@ -49,7 +50,22 @@ pub fn test_context() -> TestParseContext {
 }
 
 impl TestParseContext {
-    #[cfg(feature = "sqlite")]
+    /// Select this fixture's analysis environment explicitly.
+    pub(crate) fn with_dialect(mut self, dialect: crate::ast::Dialect) -> Self {
+        let selected = if dialect == crate::ast::Dialect::sqlite() {
+            "SQLite"
+        } else {
+            "postgres"
+        };
+        self.metadata = Some(
+            ::serde_json::from_value(::serde_json::json!({
+                "engine": selected, "dialect": selected, "version": "17", "search_path": ["public"]
+            }))
+            .expect("explicit fixture environment"),
+        );
+        self
+    }
+
     pub(crate) fn with_metadata(mut self, metadata: &::sql_fun_core::SqlFunMetadata) -> Self {
         self.metadata = Some(metadata.clone());
         self
@@ -328,7 +344,14 @@ impl BaseParseContext for TestParseContext {
     }
 
     fn get_args(&self) -> &sql_fun_core::SqlFunArgs {
-        todo!()
+        static ARGS: std::sync::LazyLock<::sql_fun_core::SqlFunArgs> =
+            std::sync::LazyLock::new(|| {
+                ::sql_fun_core::SqlFunArgs::builder(&std::collections::HashMap::new())
+                    .unwrap()
+                    .build()
+                    .unwrap()
+            });
+        &ARGS
     }
 
     fn get_source_file_path(&self) -> Option<&std::path::Path> {
@@ -382,6 +405,13 @@ impl FunctionInfoWrite for TestParseContext {
 }
 
 impl ParseContext for TestParseContext {
+    fn analysis_state(&self) -> &crate::sem::AnalysisState {
+        &self.analysis_state
+    }
+    fn analysis_state_mut(&mut self) -> &mut crate::sem::AnalysisState {
+        &mut self.analysis_state
+    }
+
     fn parameter_constraints(&self) -> &crate::sem::ParameterConstraints {
         &self.parameter_constraints
     }

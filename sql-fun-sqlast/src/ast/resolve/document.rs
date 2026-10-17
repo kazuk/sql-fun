@@ -1,15 +1,14 @@
-use crate::ast::{Dialect, XmlTable};
-use crate::sem::Resolution;
+use crate::ast::XmlTable;
+use crate::sem::ParseContext;
 use crate::sem::{AnalysisError, DataSource, ScalarAnalysisContext};
 
 impl XmlTable {
     pub(in crate::ast) fn resolve(
         &self,
-        context: &mut Resolution<'_>,
-        dialect: Dialect,
+        context: &mut impl ParseContext,
         scope: &ScalarAnalysisContext<'_>,
     ) -> Result<DataSource, AnalysisError> {
         self.rowexpr
-            .resolve_table_call(context, dialect, scope, self.alias.as_ref())
+            .resolve_table_call(context, scope, self.alias.as_ref())
     }
 }

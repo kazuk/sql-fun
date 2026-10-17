@@ -51,11 +51,8 @@ impl AlterTable {
     where
         TParseContext: ParseContext,
     {
-        crate::ast::AlterRelation::try_from_with_tokens(&syn, tokens)?.resolve_and_apply_at(
-            context,
-            crate::ast::Dialect::postgres(),
-            source_span,
-        )
+        crate::ast::AlterRelation::try_from_with_tokens(&syn, tokens)?
+            .resolve_and_apply_at(context, source_span)
     }
 
     /// analyze [`crate::syn::AlterTableStmt`]
@@ -70,11 +67,8 @@ impl AlterTable {
     where
         TParseContext: ParseContext,
     {
-        crate::ast::AlterRelation::try_from_with_tokens(&syn, tokens)?.resolve_and_apply_at(
-            context,
-            crate::ast::Dialect::postgres(),
-            source_span,
-        )
+        crate::ast::AlterRelation::try_from_with_tokens(&syn, tokens)?
+            .resolve_and_apply_at(context, source_span)
     }
 
     /// analyze [`crate::syn::sqlite::AlterTable`]
@@ -89,11 +83,7 @@ impl AlterTable {
     where
         TParseContext: ParseContext,
     {
-        crate::ast::AlterRelation::try_from(&syn)?.resolve_and_apply_at(
-            context,
-            crate::ast::Dialect::sqlite(),
-            source_span,
-        )
+        crate::ast::AlterRelation::try_from(&syn)?.resolve_and_apply_at(context, source_span)
     }
 }
 
@@ -168,7 +158,7 @@ mod test_analyze_alter_table_statement {
     #[rstest::rstest]
     fn test_analyze_sqlite_alter_table_reports_missing_relation(source_span: SourcePathWithSpan) {
         let (alter_table, tokens) = parse_sqlite_alter_table("alter table users rename to members");
-        let context = TestParseContext::default();
+        let context = TestParseContext::default().with_dialect(crate::ast::Dialect::sqlite());
 
         let AstAndContextPair(res, context) =
             AlterTable::analyze_alter_table(context, alter_table, &tokens, &source_span)
@@ -187,7 +177,7 @@ mod test_analyze_alter_table_statement {
 
     #[cfg(feature = "sqlite")]
     fn sqlite_context() -> TestParseContext {
-        let mut context = TestParseContext::default();
+        let mut context = TestParseContext::default().with_dialect(crate::ast::Dialect::sqlite());
         context.set_get_search_path_result(&[SchemaName::from("public")]);
         context.setup_type(TypeReference::concrete_type_ref(
             &FullName::with_schema("public", "text"),
@@ -302,7 +292,7 @@ impl AlterView {
     {
         crate::ast::AlterRelation::try_from_with_tokens(&syn, &IVec::default())?
             .with_view_kind(as_matview)
-            .resolve_and_apply(context, crate::ast::Dialect::postgres())
+            .resolve_and_apply(context)
     }
 }
 
@@ -388,11 +378,8 @@ impl AlterObjSubCommand {
     where
         TParseContext: ParseContext,
     {
-        crate::ast::AlterCommand::try_from_with_tokens(&cmd, tokens)?.resolve_and_report(
-            context,
-            crate::ast::Dialect::postgres(),
-            table_name,
-        )
+        crate::ast::AlterCommand::try_from_with_tokens(&cmd, tokens)?
+            .resolve_and_report(context, table_name)
     }
 }
 
@@ -465,11 +452,7 @@ impl AlterObjSubCommand {
     where
         TParseContext: ParseContext,
     {
-        crate::ast::AlterCommand::try_from(body)?.resolve_and_report(
-            context,
-            crate::ast::Dialect::sqlite(),
-            table_name,
-        )
+        crate::ast::AlterCommand::try_from(body)?.resolve_and_report(context, table_name)
     }
 }
 
@@ -484,10 +467,7 @@ impl AlterObjSubCommand {
     where
         TParseContext: ParseContext,
     {
-        crate::ast::AlterCommand::try_from_with_tokens(&cmd, tokens)?.resolve_and_report(
-            context,
-            crate::ast::Dialect::postgres(),
-            table_name,
-        )
+        crate::ast::AlterCommand::try_from_with_tokens(&cmd, tokens)?
+            .resolve_and_report(context, table_name)
     }
 }

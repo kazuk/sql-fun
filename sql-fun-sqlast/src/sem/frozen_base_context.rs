@@ -11,6 +11,9 @@ use std::sync::Arc;
 /// A frozen context exposes only [`BaseParseContext`] reads; it cannot be thawed
 /// or used to extract or mutably access the underlying catalog.
 ///
+/// Retained args and metadata describe how this catalog was built. They are
+/// historical evidence, not initialization inputs for a new analysis context.
+///
 /// # Examples
 ///
 /// Given a builder over an explicitly selected base, freeze it, read from the
@@ -20,11 +23,11 @@ use std::sync::Arc;
 /// use std::path::Path;
 /// use ::sql_fun_sqlast::sem::{BaseParseContext, FrozenBaseContext, ParseContext, SchemaFileContext};
 ///
-/// fn next_layer(builder: SchemaFileContext) {
+/// fn next_layer(builder: SchemaFileContext, args: &::sql_fun_core::SqlFunArgs, metadata: &::sql_fun_core::SqlFunMetadata) {
 ///     let frozen = builder.freeze();
 ///     let _metadata = frozen.metadata();
 ///     let shared = frozen.clone();
-///     let _next = SchemaFileContext::new(Path::new("schema.sql"), &shared);
+///     let _next = SchemaFileContext::new(Path::new("schema.sql"), &shared, args, metadata);
 /// }
 ///
 /// fn assert_shareable<T: Clone + std::fmt::Debug + Send + Sync>() {}
@@ -273,7 +276,7 @@ impl crate::sem::TypeInfoRead for FrozenBaseContext {
 
 #[cfg(test)]
 mod test_type_lookup_cost {
-    use crate::sem::{BaseParseContext, FullName, ParseContext, SchemaFileContext};
+    use crate::sem::{BaseParseContext, FullName, ParseContext};
     use std::{path::Path, sync::atomic::Ordering};
 
     #[rstest::rstest]
@@ -284,7 +287,7 @@ mod test_type_lookup_cost {
     fn qualified_type_miss_reaches_root_once(#[case] layers: usize) {
         let (mut base, probes) = test_helpers::counted_root();
         for _ in 0..layers {
-            base = SchemaFileContext::new(Path::new("layer.sql"), &base).freeze();
+            base = crate::test_helpers::schema_layer(Path::new("layer.sql"), &base).freeze();
         }
 
         assert!(

@@ -3,10 +3,9 @@ use crate::ast::{
     LockStrength, LockWait, Name, Order, Window,
 };
 use crate::sem::{
-    AnalysisError, AnalysisProblem, ColumnName, ColumnReferenceExpr, QueryFrame, QueryFrameBound,
-    QueryGrouping, QueryLock, QueryName, QueryNameResolution, QueryOrder, QueryProblem,
-    QueryWindow, Resolution, ResolutionContext, ResultColumnCollection, ScalarAnalysisContext,
-    SemScalarExpr,
+    AnalysisError, AnalysisProblem, ColumnName, ColumnReferenceExpr, ParseContext, QueryFrame,
+    QueryFrameBound, QueryGrouping, QueryLock, QueryName, QueryNameResolution, QueryOrder,
+    QueryProblem, QueryWindow, ResultColumnCollection, ScalarAnalysisContext, SemScalarExpr,
 };
 
 /// SQL92 alias/ordinal references are only accepted at a clause's top level.
@@ -31,8 +30,7 @@ impl ClauseBinding {
 impl Expr {
     pub(super) fn resolve_clause(
         &self,
-        context: &mut Resolution<'_>,
-        dialect: Dialect,
+        context: &mut impl ParseContext,
         scope: &ScalarAnalysisContext<'_>,
         columns: &ResultColumnCollection,
         binding: ClauseBinding,
@@ -44,7 +42,7 @@ impl Expr {
                 {
                     return Ok(reference);
                 }
-                context.report_problem(AnalysisProblem::query(
+                context.report_analysis_problem(AnalysisProblem::query(
                     QueryProblem::position_out_of_range(index),
                 ))?;
                 return ColumnReferenceExpr::undefined_column_resolved(
@@ -55,9 +53,9 @@ impl Expr {
             if let Some(name) = self.unqualified_column() {
                 let column = ColumnName::from(name);
                 if binding.input_first() && scope.has_input_column(context, &column) {
-                    return self.resolve_in(context, dialect, scope);
+                    return self.resolve_in(context, scope);
                 }
-                match columns.resolve_output(&column, dialect) {
+                match columns.resolve_output(&column, context) {
                     Ok(Some(index)) => {
                         return Ok(columns
                             .output_reference(index)
@@ -71,12 +69,12 @@ impl Expr {
             }
         }
         if binding.compound() {
-            context.report_problem(AnalysisProblem::query(
+            context.report_analysis_problem(AnalysisProblem::query(
                 QueryProblem::invalid_compound_order(),
             ))?;
             // Resolve against the compound's empty source scope, never an operand's.
         }
-        self.resolve_in(context, dialect, scope)
+        self.resolve_in(context, scope)
     }
     fn ordinal(&self) -> Option<i64> {
         match self {
@@ -103,15 +101,14 @@ impl Order {
     pub(super) fn resolve_for_query(
         values: &[Self],
         body: &crate::ast::QueryBody,
-        context: &mut Resolution<'_>,
-        dialect: Dialect,
+        context: &mut impl ParseContext,
         scope: &ScalarAnalysisContext<'_>,
         columns: &ResultColumnCollection,
         binding: ClauseBinding,
     ) -> Result<Vec<QueryOrder>, AnalysisError> {
         let mut orders = Vec::new();
         for order in values {
-            if dialect == Dialect::sqlite()
+            if context.dialect() == Dialect::sqlite()
                 && binding.compound()
                 && let Some(index) = body.match_sqlite_order(&order.expression)
             {
@@ -125,36 +122,34 @@ impl Order {
                     None,
                 ));
             } else {
-                orders.push(order.resolve(context, dialect, scope, columns, binding)?);
+                orders.push(order.resolve(context, scope, columns, binding)?);
             }
         }
         Ok(orders)
     }
     pub(super) fn resolve_list(
         values: &[Self],
-        context: &mut Resolution<'_>,
-        dialect: Dialect,
+        context: &mut impl ParseContext,
         scope: &ScalarAnalysisContext<'_>,
         columns: &ResultColumnCollection,
         binding: ClauseBinding,
     ) -> Result<Vec<QueryOrder>, AnalysisError> {
         let mut result = Vec::new();
         for order in values {
-            result.push(order.resolve(context, dialect, scope, columns, binding)?);
+            result.push(order.resolve(context, scope, columns, binding)?);
         }
         Ok(result)
     }
     fn resolve(
         &self,
-        context: &mut Resolution<'_>,
-        dialect: Dialect,
+        context: &mut impl ParseContext,
         scope: &ScalarAnalysisContext<'_>,
         columns: &ResultColumnCollection,
         binding: ClauseBinding,
     ) -> Result<QueryOrder, AnalysisError> {
         let expression = self
             .expression
-            .resolve_clause(context, dialect, scope, columns, binding)?;
+            .resolve_clause(context, scope, columns, binding)?;
         let using = if let Some(name) = &self.using {
             let operator_name = name.operator_name()?;
             let binding =
@@ -172,12 +167,12 @@ impl Order {
         ))
     }
     fn checked_name(
-        context: &mut Resolution<'_>,
+        context: &mut impl ParseContext,
         name: &str,
         resolution: QueryNameResolution,
     ) -> Result<QueryName, AnalysisError> {
         if let Some(problem) = resolution.reference_problem(name) {
-            context.report_problem(AnalysisProblem::query(problem))?;
+            context.report_analysis_problem(AnalysisProblem::query(problem))?;
         }
         Ok(QueryName::new(name, resolution))
     }
@@ -185,46 +180,38 @@ impl Order {
 impl Grouping {
     pub(super) fn resolve_list(
         values: &[Self],
-        context: &mut Resolution<'_>,
-        dialect: Dialect,
+        context: &mut impl ParseContext,
         scope: &ScalarAnalysisContext<'_>,
         columns: &ResultColumnCollection,
     ) -> Result<Vec<QueryGrouping>, AnalysisError> {
         let mut result = Vec::new();
         for group in values {
-            result.push(group.resolve(context, dialect, scope, columns)?);
+            result.push(group.resolve(context, scope, columns)?);
         }
         Ok(result)
     }
     fn resolve(
         &self,
-        context: &mut Resolution<'_>,
-        dialect: Dialect,
+        context: &mut impl ParseContext,
         scope: &ScalarAnalysisContext<'_>,
         columns: &ResultColumnCollection,
     ) -> Result<QueryGrouping, AnalysisError> {
         match self {
-            Self::Expression(expression) => {
-                Ok(QueryGrouping::expression(expression.resolve_clause(
-                    context,
-                    dialect,
-                    scope,
-                    columns,
-                    ClauseBinding::Group,
-                )?))
-            }
+            Self::Expression(expression) => Ok(QueryGrouping::expression(
+                expression.resolve_clause(context, scope, columns, ClauseBinding::Group)?,
+            )),
             Self::Empty => Ok(QueryGrouping::empty()),
             Self::Rollup(groups) => Ok(QueryGrouping::rollup(Self::resolve_list(
-                groups, context, dialect, scope, columns,
+                groups, context, scope, columns,
             )?)),
             Self::Cube(groups) => Ok(QueryGrouping::cube(Self::resolve_list(
-                groups, context, dialect, scope, columns,
+                groups, context, scope, columns,
             )?)),
             Self::Sets(groups) => Ok(QueryGrouping::sets(Self::resolve_list(
-                groups, context, dialect, scope, columns,
+                groups, context, scope, columns,
             )?)),
             Self::Simple(groups) => Ok(QueryGrouping::simple(Self::resolve_list(
-                groups, context, dialect, scope, columns,
+                groups, context, scope, columns,
             )?)),
         }
     }
@@ -232,15 +219,14 @@ impl Grouping {
 impl Window {
     pub(super) fn resolve_over(
         &self,
-        context: &mut Resolution<'_>,
-        dialect: Dialect,
+        context: &mut impl ParseContext,
         scope: &ScalarAnalysisContext<'_>,
     ) -> Result<QueryWindow, AnalysisError> {
         // pg_query stores OVER name in WindowDef.name; WINDOW declarations
         // use the same parser field for a definition. Classify at this boundary.
         if let Some(name) = &self.name {
             let reference =
-                Order::checked_name(context, name, scope.resolve_window(name, dialect))?;
+                Order::checked_name(context, name, scope.resolve_window(name, context))?;
             return Ok(QueryWindow::new(
                 None,
                 Some(reference),
@@ -250,18 +236,17 @@ impl Window {
                 None,
             ));
         }
-        self.resolve(context, dialect, scope)
+        self.resolve(context, scope)
     }
 
     pub(super) fn resolve(
         &self,
-        context: &mut Resolution<'_>,
-        dialect: Dialect,
+        context: &mut impl ParseContext,
         scope: &ScalarAnalysisContext<'_>,
     ) -> Result<QueryWindow, AnalysisError> {
         let reference = if let Some(name) = &self.reference {
-            let outcome = scope.resolve_window(name, dialect);
-            if dialect == Dialect::postgres() || self.reference_only {
+            let outcome = scope.resolve_window(name, context);
+            if context.dialect() == Dialect::postgres() || self.reference_only {
                 Some(Order::checked_name(context, name, outcome)?)
             } else {
                 Some(QueryName::new(name, outcome))
@@ -269,11 +254,10 @@ impl Window {
         } else {
             None
         };
-        let partition = Expr::resolve_list(&self.partition, context, dialect, scope)?;
+        let partition = Expr::resolve_list(&self.partition, context, scope)?;
         let order = Order::resolve_list(
             &self.order,
             context,
-            dialect,
             scope,
             &ResultColumnCollection::default(),
             ClauseBinding::Source,
@@ -281,7 +265,7 @@ impl Window {
         let frame = self
             .frame
             .as_ref()
-            .map(|frame| frame.resolve(context, dialect, scope))
+            .map(|frame| frame.resolve(context, scope))
             .transpose()?;
         Ok(QueryWindow::new(
             self.name.clone(),
@@ -294,28 +278,27 @@ impl Window {
     }
     pub(super) fn resolve_definitions(
         values: &[Self],
-        context: &mut Resolution<'_>,
-        dialect: Dialect,
+        context: &mut impl ParseContext,
         scope: &ScalarAnalysisContext<'_>,
     ) -> Result<Vec<QueryWindow>, AnalysisError> {
         let mut result = Vec::new();
         let mut names = Vec::new();
         for window in values {
-            let definition_scope = if dialect == Dialect::sqlite() {
+            let definition_scope = if context.dialect() == Dialect::sqlite() {
                 scope.with_window_names(Self::names(values))
             } else {
                 scope.with_window_names(names.clone())
             };
             if let Some(name) = &window.name {
-                if dialect == Dialect::postgres() && names.contains(name) {
-                    context.report_problem(AnalysisProblem::query(
+                if context.dialect() == Dialect::postgres() && names.contains(name) {
+                    context.report_analysis_problem(AnalysisProblem::query(
                         QueryProblem::duplicate_window_definition(name),
                     ))?;
                 }
                 names.push(name.clone());
             }
             // A definition can only inherit from preceding definitions.
-            result.push(window.resolve(context, dialect, &definition_scope)?);
+            result.push(window.resolve(context, &definition_scope)?);
         }
         Ok(result)
     }
@@ -329,16 +312,15 @@ impl Window {
 impl Frame {
     fn resolve(
         &self,
-        context: &mut Resolution<'_>,
-        dialect: Dialect,
+        context: &mut impl ParseContext,
         scope: &ScalarAnalysisContext<'_>,
     ) -> Result<QueryFrame, AnalysisError> {
         Ok(QueryFrame::new(
             self.mode.semantic_name(),
-            self.start.resolve(context, dialect, scope)?,
+            self.start.resolve(context, scope)?,
             self.end
                 .as_ref()
-                .map(|end| end.resolve(context, dialect, scope))
+                .map(|end| end.resolve(context, scope))
                 .transpose()?,
             self.exclusion
                 .map(|exclusion| exclusion.semantic_name().to_owned()),
@@ -367,18 +349,17 @@ impl FrameExclusion {
 impl FrameBound {
     fn resolve(
         &self,
-        context: &mut Resolution<'_>,
-        dialect: Dialect,
+        context: &mut impl ParseContext,
         scope: &ScalarAnalysisContext<'_>,
     ) -> Result<QueryFrameBound, AnalysisError> {
         match self {
             Self::UnboundedPreceding => Ok(QueryFrameBound::unbounded_preceding()),
             Self::Preceding(expression) => Ok(QueryFrameBound::preceding(
-                expression.resolve_in(context, dialect, scope)?,
+                expression.resolve_in(context, scope)?,
             )),
             Self::CurrentRow => Ok(QueryFrameBound::current_row()),
             Self::Following(expression) => Ok(QueryFrameBound::following(
-                expression.resolve_in(context, dialect, scope)?,
+                expression.resolve_in(context, scope)?,
             )),
             Self::UnboundedFollowing => Ok(QueryFrameBound::unbounded_following()),
         }
@@ -387,7 +368,7 @@ impl FrameBound {
 impl Lock {
     pub(super) fn resolve_list(
         values: &[Self],
-        context: &mut Resolution<'_>,
+        context: &mut impl ParseContext,
         scope: &ScalarAnalysisContext<'_>,
     ) -> Result<Vec<QueryLock>, AnalysisError> {
         let mut result = Vec::new();

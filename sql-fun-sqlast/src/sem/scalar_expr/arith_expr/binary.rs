@@ -13,7 +13,7 @@ use crate::sem::{
 impl ArithExpr {
     /// create a instance
     pub fn build_op_all<TParseContext>(
-        context: TParseContext,
+        mut context: TParseContext,
         name: &OperatorName,
         lexpr: Option<SemScalarExpr>,
         rexpr: Option<SemScalarExpr>,
@@ -21,17 +21,18 @@ impl ArithExpr {
     where
         TParseContext: ParseContext,
     {
-        Self::build_op_all_resolved(context, name, lexpr, rexpr)
+        let (value, _) = Self::build_op_all_resolved(&mut context, name, lexpr, rexpr)?;
+        Ok((value, context))
     }
 
-    pub(crate) fn build_op_all_resolved<TParseContext>(
-        mut context: TParseContext,
+    pub(crate) fn build_op_all_resolved<'context, TParseContext>(
+        context: &'context mut TParseContext,
         name: &OperatorName,
         lexpr: Option<SemScalarExpr>,
         rexpr: Option<SemScalarExpr>,
-    ) -> Result<(SemScalarExpr, TParseContext), AnalysisError>
+    ) -> Result<(SemScalarExpr, &'context mut TParseContext), AnalysisError>
     where
-        TParseContext: crate::sem::resolution::ResolutionContext,
+        TParseContext: crate::sem::ParseContext,
     {
         let Some(lexpr) = lexpr else {
             AnalysisError::raise_unexpected_none("a_expr.lexpr")?
@@ -47,7 +48,7 @@ impl ArithExpr {
             let operator_def = operator_def.clone();
 
             let resolved_bin_op =
-                Self::resolve_overload_binary(&mut context, operator_def, lexpr, rexpr)?;
+                Self::resolve_overload_binary(context, operator_def, lexpr, rexpr)?;
             resolved_bin_op.into_all_call_site_expr(context, name)
         } else {
             UndefinedOperatorAllCallSite::undefined_operator_all_resolved(
@@ -85,12 +86,7 @@ mod test_arith_expr_build_op_all {
         let operator_def = OperatorDefinition::Binary(vec![operator_def]);
         test_context.set_get_operator_op_result(&name, true, true, Some(&operator_def));
 
-        ArithExpr::build_op_all_resolved(
-            test_context,
-            &name,
-            Some(expr.clone()),
-            Some(expr.clone()),
-        )?;
+        ArithExpr::build_op_all(test_context, &name, Some(expr.clone()), Some(expr.clone()))?;
 
         Ok(())
     }
@@ -115,13 +111,13 @@ impl ResolvedBinaryOperator {
         }
     }
 
-    pub(super) fn into_call_site_expr<TParseContext>(
+    pub(super) fn into_call_site_expr<'context, TParseContext>(
         self,
-        context: TParseContext,
+        context: &'context mut TParseContext,
         name: &OperatorName,
-    ) -> Result<(SemScalarExpr, TParseContext), AnalysisError>
+    ) -> Result<(SemScalarExpr, &'context mut TParseContext), AnalysisError>
     where
-        TParseContext: crate::sem::resolution::ResolutionContext,
+        TParseContext: crate::sem::ParseContext,
     {
         if let Some(operator) = self.operator_def {
             super::BinaryOpCallSite::from_operator_definition_resolved(
@@ -137,13 +133,13 @@ impl ResolvedBinaryOperator {
         }
     }
 
-    pub(super) fn into_any_call_site_expr<TParseContext>(
+    pub(super) fn into_any_call_site_expr<'context, TParseContext>(
         self,
-        context: TParseContext,
+        context: &'context mut TParseContext,
         name: &OperatorName,
-    ) -> Result<(SemScalarExpr, TParseContext), AnalysisError>
+    ) -> Result<(SemScalarExpr, &'context mut TParseContext), AnalysisError>
     where
-        TParseContext: crate::sem::resolution::ResolutionContext,
+        TParseContext: crate::sem::ParseContext,
     {
         if let Some(operator) = self.operator_def {
             super::AnyBinaryCallSite::from_operator_definition_resolved(
@@ -159,13 +155,13 @@ impl ResolvedBinaryOperator {
         }
     }
 
-    pub(super) fn into_all_call_site_expr<TParseContext>(
+    pub(super) fn into_all_call_site_expr<'context, TParseContext>(
         self,
-        context: TParseContext,
+        context: &'context mut TParseContext,
         name: &OperatorName,
-    ) -> Result<(SemScalarExpr, TParseContext), AnalysisError>
+    ) -> Result<(SemScalarExpr, &'context mut TParseContext), AnalysisError>
     where
-        TParseContext: crate::sem::resolution::ResolutionContext,
+        TParseContext: crate::sem::ParseContext,
     {
         if let Some(operator) = self.operator_def {
             super::AllBinaryCallSite::from_operator_definition_resolved(
@@ -190,7 +186,7 @@ impl ArithExpr {
         rexpr: SemScalarExpr,
     ) -> Result<ResolvedBinaryOperator, AnalysisError>
     where
-        TParseContext: crate::sem::resolution::ResolutionContext,
+        TParseContext: crate::sem::ParseContext,
     {
         let OperatorDefinition::Binary(ref overloads) = operator_def else {
             AnalysisError::raise_unexpected_input("resolve_overload_binary with non binary op")?
@@ -206,7 +202,7 @@ impl ArithExpr {
                 &right_type,
             );
             if candidates.is_empty() {
-                context.report_problem(
+                context.report_analysis_problem(
                     AnalysisProblem::binary_operator_overload_resolution_failed(
                         &operator_def,
                         &left_type,
@@ -217,11 +213,13 @@ impl ArithExpr {
             }
             let filtered = BinaryCastCandidate::filter_best_candidate(candidates);
             if filtered.len() > 1 {
-                context.report_problem(AnalysisProblem::binary_operator_overload_ambiguous(
-                    &operator_def,
-                    &left_type,
-                    &right_type,
-                ))?;
+                context.report_analysis_problem(
+                    AnalysisProblem::binary_operator_overload_ambiguous(
+                        &operator_def,
+                        &left_type,
+                        &right_type,
+                    ),
+                )?;
             }
             let candidate = &filtered[0];
             let (lexpr, rexpr) = candidate.wrap_implicit_cast(lexpr, rexpr);
@@ -232,10 +230,12 @@ impl ArithExpr {
             ))
         } else {
             if lexpr.get_type().is_none() {
-                context.report_problem(AnalysisProblem::expression_type_not_known(&lexpr))?;
+                context
+                    .report_analysis_problem(AnalysisProblem::expression_type_not_known(&lexpr))?;
             }
             if rexpr.get_type().is_none() {
-                context.report_problem(AnalysisProblem::expression_type_not_known(&rexpr))?;
+                context
+                    .report_analysis_problem(AnalysisProblem::expression_type_not_known(&rexpr))?;
             }
 
             tracing::info!("argument type unknown");

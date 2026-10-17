@@ -24,7 +24,7 @@ impl FunctionParam {
         TParseContext: ParseContext,
     {
         crate::ast::FunctionParameter::try_from_with_tokens(&param, tokens)?
-            .resolve_and_report(context, crate::ast::Dialect::postgres())
+            .resolve_and_report(context)
     }
 }
 

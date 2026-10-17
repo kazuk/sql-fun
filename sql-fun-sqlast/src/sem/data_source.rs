@@ -63,31 +63,25 @@ pub enum DataSource {
 }
 
 impl DataSource {
-    pub(super) fn create_column_ref<TParseContext>(
+    pub(super) fn create_column_ref<'context, TParseContext>(
         &self,
-        mut context: TParseContext,
+        context: &'context mut TParseContext,
         with_clause: &WithClause,
         alias: &AliasName,
         column: &ColumnName,
         nullability: bool,
-    ) -> Result<(SemScalarExpr, TParseContext), AnalysisError>
+    ) -> Result<(SemScalarExpr, &'context mut TParseContext), AnalysisError>
     where
-        TParseContext: crate::sem::resolution::ResolutionContext,
+        TParseContext: crate::sem::ParseContext,
     {
         match self {
             Self::CteQuery(cteds) => {
-                let column_ref = cteds.create_column_ref(
-                    &mut context,
-                    with_clause,
-                    alias,
-                    column,
-                    nullability,
-                )?;
+                let column_ref =
+                    cteds.create_column_ref(context, with_clause, alias, column, nullability)?;
                 Ok((SemScalarExpr::ColumnRef(column_ref), context))
             }
             Self::Table(tableds) => {
-                let column_ref =
-                    tableds.create_column_ref(&mut context, alias, column, nullability)?;
+                let column_ref = tableds.create_column_ref(context, alias, column, nullability)?;
                 Ok((SemScalarExpr::ColumnRef(column_ref), context))
             }
             Self::View(viewds) => ColumnReferenceExpr::view_source_ref(
@@ -98,8 +92,7 @@ impl DataSource {
                 nullability,
             ),
             Self::SubQuery(subqds) => {
-                let column_ref =
-                    subqds.create_column_ref(&mut context, alias, column, nullability)?;
+                let column_ref = subqds.create_column_ref(context, alias, column, nullability)?;
                 Ok((SemScalarExpr::ColumnRef(column_ref), context))
             }
             Self::Unknown(_, _) => {
@@ -192,9 +185,7 @@ impl DataSource {
         self.aliases_for_column_resolved(column, context, with_clause)
     }
 
-    pub(crate) fn aliases_for_column_resolved<
-        TContext: crate::sem::resolution::ResolutionContext,
-    >(
+    pub(crate) fn aliases_for_column_resolved<TContext: crate::sem::ParseContext>(
         &self,
         column: &ColumnName,
         context: &TContext,
@@ -237,7 +228,7 @@ impl DataSource {
         }
     }
 
-    fn group_column_source<'a, C: crate::sem::resolution::ResolutionContext>(
+    fn group_column_source<'a, C: crate::sem::ParseContext>(
         &'a self,
         column: &ColumnName,
         context: &C,

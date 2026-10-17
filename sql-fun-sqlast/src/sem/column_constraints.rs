@@ -516,7 +516,6 @@ impl ColumnConstraint {
     {
         crate::ast::ColumnConstraint::try_from_with_tokens(syn, tokens)?.resolve_and_report(
             context,
-            crate::ast::Dialect::postgres(),
             table_name,
             column_name,
         )
@@ -645,7 +644,6 @@ impl ColumnConstraint {
     {
         crate::ast::ColumnConstraint::try_from(syn)?.resolve_and_report(
             context,
-            crate::ast::Dialect::sqlite(),
             table_name,
             column_name,
         )

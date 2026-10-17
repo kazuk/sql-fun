@@ -429,7 +429,7 @@ impl SemScalarExpr {
         Self::implicit_cast_resolved(context, result_type, expr)
     }
 
-    pub(crate) fn implicit_cast_resolved<TContext: crate::sem::resolution::ResolutionContext>(
+    pub(crate) fn implicit_cast_resolved<TContext: crate::sem::ParseContext>(
         context: &mut TContext,
         result_type: &TypeReference,
         expr: &mut Self,
@@ -442,7 +442,10 @@ impl SemScalarExpr {
         }
 
         let Some(cast) = context.get_implicit_cast(&ty, result_type) else {
-            context.report_problem(AnalysisProblem::implicit_cast_not_found(&ty, result_type))?;
+            context.report_analysis_problem(AnalysisProblem::implicit_cast_not_found(
+                &ty,
+                result_type,
+            ))?;
             return Ok(());
         };
         if !cast.is_no_conversion() {
@@ -517,7 +520,7 @@ impl SemScalarExpr {
         self.require_array_resolved(context)
     }
 
-    pub(crate) fn require_array_resolved<TContext: crate::sem::resolution::ResolutionContext>(
+    pub(crate) fn require_array_resolved<TContext: crate::sem::ParseContext>(
         &self,
         context: &mut TContext,
     ) -> Result<(), AnalysisError> {
@@ -525,7 +528,7 @@ impl SemScalarExpr {
             && let Some(is_array) = ty.is_array()
             && !is_array
         {
-            context.report_problem(AnalysisProblem::array_required(self, &ty))?;
+            context.report_analysis_problem(AnalysisProblem::array_required(self, &ty))?;
         }
         Ok(())
     }
@@ -572,7 +575,7 @@ impl SemScalarExpr {
         self.fits_array_index_resolved(context)
     }
 
-    pub(crate) fn fits_array_index_resolved<TContext: crate::sem::resolution::ResolutionContext>(
+    pub(crate) fn fits_array_index_resolved<TContext: crate::sem::ParseContext>(
         &self,
         context: &mut TContext,
     ) -> Result<(), AnalysisError> {
@@ -587,7 +590,8 @@ impl SemScalarExpr {
                 .get_implicit_cast(&ty, &PgBuiltInType::int8())
                 .is_none()
         {
-            context.report_problem(AnalysisProblem::array_index_type_mismatch(self, &ty))?;
+            context
+                .report_analysis_problem(AnalysisProblem::array_index_type_mismatch(self, &ty))?;
         }
         Ok(())
     }
@@ -700,16 +704,15 @@ impl SemScalarExpr {
     pub(crate) fn collect_constraints(
         &mut self,
         parameters: &mut crate::sem::parameter_resolution::ParameterResolution,
-        context: &mut crate::sem::Resolution<'_>,
-        dialect: crate::ast::Dialect,
+        context: &mut impl crate::sem::ParseContext,
     ) -> Result<(), AnalysisError> {
         let replacement = match self {
             Self::Param(value) => Some(parameters.parameter(value.position())),
             Self::ColumnRef(_) => parameters.column(self),
-            Self::Arith(value) => value.collect_constraints(parameters, context, dialect)?,
+            Self::Arith(value) => value.collect_constraints(parameters, context)?,
             Self::FuncCall(value) => value.collect_constraints(parameters, context)?,
-            Self::TypeCast(value) => value.collect_constraints(parameters, context, dialect)?,
-            Self::Boolean(value) => value.collect_constraints(parameters, context, dialect),
+            Self::TypeCast(value) => value.collect_constraints(parameters, context)?,
+            Self::Boolean(value) => value.collect_constraints(parameters, context),
             Self::NullTest(value) => value.collect_constraints(parameters),
             Self::SubLink(_) => parameters.scalar_result(self),
             Self::Case(value) => {

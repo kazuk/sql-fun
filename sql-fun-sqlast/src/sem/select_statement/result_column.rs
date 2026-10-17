@@ -137,12 +137,12 @@ impl ResultColumnCollection {
     pub(crate) fn resolve_output(
         &self,
         name: &ColumnName,
-        dialect: crate::ast::Dialect,
+        context: &impl crate::sem::ParseContext,
     ) -> Result<Option<usize>, ()> {
         let mut found: Option<usize> = None;
         for (index, column) in self.0.iter().enumerate() {
             if column.col_name.as_ref() == Some(name) {
-                if dialect == crate::ast::Dialect::sqlite() {
+                if context.dialect() == crate::ast::Dialect::sqlite() {
                     return Ok(Some(index));
                 }
                 if let Some(previous) = found {

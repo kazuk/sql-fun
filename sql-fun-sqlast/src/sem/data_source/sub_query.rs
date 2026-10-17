@@ -42,7 +42,7 @@ impl SubQueryDataSource {
         _with_clause: &WithClause,
         names: &mut Vec<AliasSpec>,
     ) where
-        TParseContext: crate::sem::resolution::ResolutionContext,
+        TParseContext: crate::sem::ParseContext,
     {
         if self.select_statement.has_column(column) {
             names.push(self.alias.clone());
@@ -61,7 +61,7 @@ impl SubQueryDataSource {
         nullability: Nullable,
     ) -> Result<ColumnReferenceExpr, AnalysisError>
     where
-        TParseContext: crate::sem::resolution::ResolutionContext,
+        TParseContext: crate::sem::ParseContext,
     {
         let result_columns = self.select_statement.result_columns();
         let column_def = if let Some(index) = self.alias.derived_column_index(column) {
@@ -69,7 +69,7 @@ impl SubQueryDataSource {
                 let column_def = result_column_ref.create_column_definition();
                 Some(column_def)
             } else {
-                context.report_problem(
+                context.report_analysis_problem(
                     AnalysisProblem::subquery_not_have_column_for_derived_column_name(),
                 )?;
                 None
@@ -80,7 +80,9 @@ impl SubQueryDataSource {
             let column_def = result_column_ref.create_column_definition();
             Some(column_def)
         } else {
-            context.report_problem(AnalysisProblem::column_not_found_in_subquery(alias, column))?;
+            context.report_analysis_problem(AnalysisProblem::column_not_found_in_subquery(
+                alias, column,
+            ))?;
             None
         };
 

@@ -8,6 +8,7 @@ mod base_context;
 mod cast;
 mod column_constraints;
 mod comment;
+mod conflict_masters;
 mod constraint;
 mod create_comp_type;
 mod create_domain;
@@ -72,6 +73,10 @@ pub use self::{
         UniqueColumnConstraint, Validity,
     },
     comment::{Comment, ObjectKind},
+    conflict_masters::{
+        CatalogTypeIdentity, CollationDefinition, CollationIdentity, ConflictMasters,
+        DatabaseCollation, MasterInfoRead, OperatorClassDefinition, OperatorFamilyIdentity,
+    },
     constraint::{AnalyzeConstraint, Constraint, PrimaryKeyConstraint},
     create_comp_type::CreateCompositeType,
     create_domain::CreateDomain,

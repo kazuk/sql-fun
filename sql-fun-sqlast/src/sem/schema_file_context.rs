@@ -961,15 +961,15 @@ mod test_search_path {
 }
 
 impl crate::sem::ConflictInfoRead for SchemaCatalog {
-    fn lookup_collation(&self, _name: &FullName) -> crate::sem::CatalogNameLookup {
-        todo!("collation extraction and catalog lookup")
+    fn lookup_collation(&self, name: &FullName) -> crate::sem::CatalogNameLookup {
+        crate::sem::conflict_masters::lookup_collation(self, name)
     }
     fn lookup_operator_class(
         &self,
-        _name: &FullName,
-        _access_method: &str,
+        name: &FullName,
+        access_method: &str,
     ) -> crate::sem::CatalogNameLookup {
-        todo!("operator-class extraction and catalog lookup")
+        crate::sem::conflict_masters::lookup_operator_class(self, name, access_method)
     }
     fn infer_conflict_arbiters(
         &self,
@@ -983,5 +983,11 @@ impl crate::sem::ConflictInfoRead for SchemaCatalog {
 impl crate::sem::ViewInsertInfoRead for SchemaCatalog {
     fn view_insert_support(&self, _view: &FullName) -> crate::sem::ViewInsertSupport {
         todo!("catalog writable-view columns, INSTEAD OF INSERT triggers and rules")
+    }
+}
+
+impl crate::sem::MasterInfoRead for SchemaCatalog {
+    fn conflict_masters(&self) -> &crate::sem::ConflictMasters {
+        self.base.conflict_masters()
     }
 }

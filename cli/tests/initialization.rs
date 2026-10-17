@@ -138,6 +138,8 @@ impl InitializedProject {
             "left_unary_op.json",
             "right_unary_op.json",
             "casts.json",
+            "collations.json",
+            "operator_classes.json",
         ] {
             std::fs::copy(source.join(name), target.join(name)).unwrap();
         }
@@ -547,4 +549,16 @@ fn engine_setup_ignores_unrequested_project_metadata(
         String::from_utf8_lossy(&result.stderr)
     );
     assert!(String::from_utf8_lossy(&result.stdout).contains("still under development"));
+}
+
+#[rstest::rstest]
+#[case::collations("collations.json")]
+#[case::operator_classes("operator_classes.json")]
+fn incomplete_master_generation_is_rejected(#[case] artifact: &str) {
+    let project = InitializedProject::new();
+    project.install_fixture("17");
+    std::fs::remove_file(project.home().join("postgres/17").join(artifact)).unwrap();
+    let result = project.init(&["--engine-versions", "17"]);
+    assert!(!result.status.success());
+    assert!(String::from_utf8_lossy(&result.stderr).contains(artifact));
 }

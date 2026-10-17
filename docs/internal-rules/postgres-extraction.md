@@ -40,10 +40,16 @@ artifacts in the installed-binary CI job.
 ## Additive master definitions
 
 Format 1 additionally produces `collations.json` and `operator_classes.json`.
-Existing payloads and metadata representations are unchanged. Existing consumers
-continue reading their known files; these two files are not new prerequisites
-for initialization, import, or semantic loading. Production master loading and
-required-file validation are owned by #583. Additional files travel with the
+Existing payloads and metadata representations are unchanged. The production
+semantic loader now requires both masters for PostgreSQL catalog
+initialization, and installed-generation validation checks their presence and
+JSON structure. The semantic loader validates composite identities, encoding,
+default-collation provenance, and class/family method consistency before exposing
+definitions through `BaseParseContext`. Missing masters fail with an artifact path;
+they never become empty successful lookups. Format remains 1, following the
+explicit #582 decision; older incomplete generations must be extracted again.
+Standalone catalog import retains its existing producer-side contract. Additional
+files travel with the
 candidate through publication, extension import, and new initialization.
 
 `--definition-schema` is repeatable and selects an exact namespace string, not

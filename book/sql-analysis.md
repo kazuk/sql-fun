@@ -71,12 +71,25 @@ Explicit conflict collation/operator-class references retain their completed
 catalog lookups, including missing and ambiguous outcomes. Custom analysis
 contexts provide these lookups and modifier-aware arbiter inference through
 `ConflictInfoRead`; SQL spellings are not treated as resolved identities.
-The bundled production catalogs do not yet supply these services and can
-terminate analysis at their catalog boundary. General partial-index predicate
-implication also requires additional catalog services. Production catalog support
-and the corresponding end-to-end verification are tracked in
-[#581](https://github.com/kazuk/sql-fun/issues/581); mock resolver tests do not
-establish support in those production contexts. DO UPDATE remains explicitly
+Production PostgreSQL catalogs load collation and operator-class definitions from
+`collations.json` and `operator_classes.json` in the explicitly selected catalog
+generation. Both files are required; incomplete or malformed generations fail to
+load. Name lookup honors qualification, the current search path, database encoding,
+and the requested access method. `BaseParseContext` exposes `MasterInfoRead` for
+typed definitions, database-default provenance, and operator-family/type relations;
+frozen catalogs retain the same definitions.
+
+SQLite lookup uses its connection-local, case-insensitive collation namespace.
+BINARY, NOCASE, and RTRIM are available. API consumers must explicitly declare
+custom names with `BaseContext::declare_sqlite_collation` before freezing the base;
+this declaration records availability for analysis and does not install a runtime
+collation or inspect a connection.
+
+Modifier-aware arbiter eligibility and general partial-index predicate implication
+still require additional catalog services and can terminate analysis at their
+catalog boundary. Their implementation and production INSERT end-to-end
+verification remain tracked in [#581](https://github.com/kazuk/sql-fun/issues/581).
+Master lookup support alone does not establish those INSERT capabilities. DO UPDATE remains explicitly
 unimplemented
 ([#474](https://github.com/kazuk/sql-fun/issues/474)); it does not produce a
 successful INSERT analysis, including later actions in SQLite UPSERT chains.

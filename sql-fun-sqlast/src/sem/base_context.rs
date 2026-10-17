@@ -35,6 +35,7 @@ pub struct BaseContext {
     right_unary_operators: TrieMap<OperatorDefinition>,
     search_path: Vec<SchemaName>,
     functions: PgBuiltInFunctions,
+    masters: crate::sem::ConflictMasters,
 }
 
 #[derive(serde::Deserialize)]
@@ -67,11 +68,17 @@ impl BaseContext {
         let right_unary_operators =
             PgBuiltinOperators::load_right_unary(paths.right_unary_operators()?)?;
         let casts = PgBuiltinCasts::load(paths.casts()?)?;
+        let masters = if crate::ast::Dialect::from(metadata) == crate::ast::Dialect::sqlite() {
+            crate::sem::ConflictMasters::sqlite()
+        } else {
+            crate::sem::ConflictMasters::load(&paths.collations()?, &paths.operator_classes()?)?
+        };
 
         Ok(Self {
             context_args: context_args.clone(),
             metadata: metadata.clone(),
             functions,
+            masters,
             types: builtin_type_data,
             casts,
             binary_operators,
@@ -79,6 +86,14 @@ impl BaseContext {
             right_unary_operators,
             search_path,
         })
+    }
+
+    /// Declare a connection-local SQLite collation without opening a connection.
+    ///
+    /// # Errors
+    /// Returns an error for a non-SQLite context or an invalid name.
+    pub fn declare_sqlite_collation(&mut self, name: &str) -> Result<(), AnalysisError> {
+        self.masters.declare_sqlite_collation(name)
     }
 
     fn load_builtin_types(
@@ -226,15 +241,15 @@ where
 }
 
 impl crate::sem::ConflictInfoRead for BaseContext {
-    fn lookup_collation(&self, _name: &FullName) -> crate::sem::CatalogNameLookup {
-        todo!("collation extraction and catalog lookup")
+    fn lookup_collation(&self, name: &FullName) -> crate::sem::CatalogNameLookup {
+        crate::sem::conflict_masters::lookup_collation(self, name)
     }
     fn lookup_operator_class(
         &self,
-        _name: &FullName,
-        _access_method: &str,
+        name: &FullName,
+        access_method: &str,
     ) -> crate::sem::CatalogNameLookup {
-        todo!("operator-class extraction and catalog lookup")
+        crate::sem::conflict_masters::lookup_operator_class(self, name, access_method)
     }
     fn infer_conflict_arbiters(
         &self,
@@ -248,5 +263,11 @@ impl crate::sem::ConflictInfoRead for BaseContext {
 impl crate::sem::ViewInsertInfoRead for BaseContext {
     fn view_insert_support(&self, _view: &FullName) -> crate::sem::ViewInsertSupport {
         todo!("catalog writable-view columns, INSTEAD OF INSERT triggers and rules")
+    }
+}
+
+impl crate::sem::MasterInfoRead for BaseContext {
+    fn conflict_masters(&self) -> &crate::sem::ConflictMasters {
+        &self.masters
     }
 }

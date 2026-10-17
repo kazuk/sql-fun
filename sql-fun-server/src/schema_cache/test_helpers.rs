@@ -40,6 +40,25 @@ impl SchemaProject {
             r#"{"+": [{"left":"int4", "right":"int4", "result":"int4", "strict":true}]}"#,
         )
         .unwrap();
+        std::fs::write(
+            builtin.join("collations.json"),
+            r#"{
+                "database": {
+                    "encoding": 6, "encoding_name": "UTF8", "provider": "c",
+                    "collate": "C", "ctype": "C", "locale": null,
+                    "icu_rules": null, "version": null,
+                    "default_collation": {"schema": "pg_catalog", "name": "default", "encoding": -1}
+                },
+                "collations": [{
+                    "schema": "pg_catalog", "name": "default", "encoding": -1,
+                    "provider": "d", "deterministic": true,
+                    "collate": null, "ctype": null, "locale": null,
+                    "icu_rules": null, "version": null
+                }]
+            }"#,
+        )
+        .unwrap();
+        std::fs::write(builtin.join("operator_classes.json"), "[]").unwrap();
         std::fs::write(builtin.join("pg_type.json"), r#"[{"name":"int4"}]"#).unwrap();
         std::fs::write(builtin.join("schema.sql"), "-- synthetic builtin\n").unwrap();
         std::fs::write(

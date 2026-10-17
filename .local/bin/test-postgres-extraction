@@ -212,6 +212,13 @@ def validate(binary, major, image, destination, host, bind):
     functions = json.loads((output / "functions.json").read_text())
     clock = next(f for f in functions if f["name"] == "clock_timestamp")
     assert clock["overloads"][0]["args"] == [], "zero-argument functions must not have a null argument"
+    for name, kind, returns_set in (("lower", "f", False), ("bool_and", "a", False), ("pg_ls_dir", "f", True)):
+        definition = next(function for function in functions if function["name"] == name)
+        assert all(overload["kind"] == kind and overload["returns_set"] == returns_set
+                   for overload in definition["overloads"]), f"incorrect view row properties: {name}"
+    schema = (output / "schema.sql").read_text()
+    assert "ON UPDATE TO pg_catalog.pg_settings DO INSTEAD NOTHING;" in schema
+    assert '"pg_stats" WITH (security_barrier' in schema
     validate_masters(output)
     first = payload(output)
     assert "extension/uuid-ossp.control" in first

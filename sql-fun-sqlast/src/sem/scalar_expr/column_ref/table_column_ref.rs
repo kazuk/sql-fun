@@ -46,6 +46,10 @@ impl TableColumnRef {
     pub(super) fn canonicalize_grouping_key(&mut self) {
         self.column_def = None;
     }
+    pub(super) fn belongs_to(&self, relation: &crate::sem::FullName) -> bool {
+        self.table_name.full_name() == relation
+    }
+
     pub(in crate::sem) fn canonicalize_alias(&mut self) {
         self.alias = AliasName::from(self.table_name.full_name().local_name().as_str());
     }

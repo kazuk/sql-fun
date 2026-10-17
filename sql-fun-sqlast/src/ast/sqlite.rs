@@ -37,6 +37,12 @@ impl TryFrom<&syn::Stmt> for StatementNode {
             syn::Stmt::AlterTable(table) => {
                 Ok(Self::alter_relation(super::AlterRelation::try_from(table)?))
             }
+            syn::Stmt::DropTrigger(trigger) => Ok(Self::view_write(
+                super::view_write::WriteDeclaration::try_from(trigger)?,
+            )),
+            syn::Stmt::CreateTrigger(trigger) => Ok(Self::view_write(
+                super::view_write::WriteDeclaration::try_from(trigger)?,
+            )),
             syn::Stmt::CreateView(view) => Ok(Self::view(View::try_from(view)?)),
             syn::Stmt::DropTable(drop_table) => Ok(Self::drop_table(DropTable::from(drop_table))),
             _ => AnalysisError::raise_unexpected_input("top-level SQLite statement"),

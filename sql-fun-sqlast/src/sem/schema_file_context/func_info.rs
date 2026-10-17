@@ -33,6 +33,32 @@ impl FunctionInfoRead for SchemaCatalog {
             false
         }
     }
+    fn function_preserves_view_rows(
+        &self,
+        name: &FullName,
+        overload: &crate::sem::OverloadVariant,
+    ) -> bool {
+        if let Some(preserves) = self
+            .function_view_rows
+            .get(&(name.clone(), overload.clone()))
+        {
+            return *preserves;
+        }
+        // Recover the producer signature through the existing overload binder:
+        // parameter inference specializes polymorphic signatures, while source
+        // properties continue to belong to their original overload identity.
+        let arguments = overload.input_bindings();
+        for ((function, signature), preserves) in &self.function_view_rows {
+            if function == name {
+                let candidate = FunctionOverloadCollection::new(std::slice::from_ref(signature))
+                    .resolve_from_catalog(self, &arguments);
+                if candidate.as_ref() == Some(overload) {
+                    return *preserves;
+                }
+            }
+        }
+        self.base.function_preserves_view_rows(name, overload)
+    }
 
     fn get_function_impl(&self, name: &FullName) -> Option<FunctionOverloadCollection> {
         let definitions = crate::sem::OwnershipInfoRead::routine_definitions(self, name);
@@ -54,6 +80,22 @@ impl FunctionInfoRead for SchemaCatalog {
 }
 
 impl FunctionInfoWrite for SchemaFileContext {
+    fn apply_function_view_rows(
+        mut self,
+        function: &CreateFunction,
+        preserves_rows: bool,
+    ) -> Result<Self, AnalysisError> {
+        let name = self.apply_default_schema(function.name())?;
+        let mut index = 0;
+        while let Some(overload) = function.overloads().get_at(index) {
+            self.catalog
+                .function_view_rows
+                .insert((name.clone(), overload.clone()), preserves_rows);
+            index += 1;
+        }
+        Ok(self)
+    }
+
     #[tracing::instrument(skip(self))]
     fn apply_create_function_impl(
         mut self,

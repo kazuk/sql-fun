@@ -91,15 +91,16 @@ impl CreateTableAs {
         Ok(())
     }
 
-    pub(crate) fn get_column_def(
-        &self,
-        _column_name: &super::ColumnName,
-    ) -> Option<ColumnDefinition> {
-        todo!()
+    pub(crate) fn result_columns(&self) -> &crate::sem::ResultColumnCollection {
+        self.query
+            .query_result_columns()
+            .expect("CREATE AS retains a query")
     }
-
-    pub(crate) fn has_column(&self, _column_name: &super::ColumnName) -> bool {
-        todo!()
+    pub(crate) fn get_column_def(&self, column: &super::ColumnName) -> Option<ColumnDefinition> {
+        self.result_columns().get_result_column_def(column)
+    }
+    pub(crate) fn has_column(&self, column: &super::ColumnName) -> bool {
+        self.result_columns().has_column(column)
     }
 
     /// analyze [`crate::syn::CreateTableAsStmt`]

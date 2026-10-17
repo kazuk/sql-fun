@@ -2,7 +2,9 @@
 
 Use `sql-fun extract` to obtain builtin catalogs for PostgreSQL 17 or 18.
 It writes `schema.sql`, catalog JSON files, and `metadata.json` to the directory
-you specify. Docker extraction also exports and imports the server installation's
+you specify. Outputs include `collations.json` and `operator_classes.json` for
+collation and index operator-class definitions. Docker extraction also exports
+and imports the server installation's
 extension SQL and control files.
 
 These commands produce candidate generations in a working directory.
@@ -68,6 +70,30 @@ Builtin metadata covers bootstrap objects in `pg_catalog` and
 `information_schema`. User-created objects and installed extension objects are
 not added to builtin catalogs. Export your application schema separately using
 your normal schema workflow.
+
+## Include additional master definitions
+
+To include collations and operator classes from additional schemas, select each
+schema explicitly. Pass its exact name as one argument, without SQL identifier
+quoting inside the value:
+
+```sh
+sql-fun extract catalog --database-url 'host=db.example.org dbname=app' \
+  --definition-schema public --definition-schema 'Extension Schema' \
+  --output ./work/app-masters
+```
+
+Repeated names are deduplicated. A nonexistent or empty name is an error.
+Selection includes user-created and installed extension definitions in those
+schemas, together with their referenced type/family identities. It does not
+export application tables, install extensions, or broaden other catalog files.
+Omitting this option retains builtin-only extraction. The selected scope is
+recorded in `metadata.json`.
+
+The new master files are additive to catalog format 1. Existing catalog import
+and initialization continue working, including with older format-1 generations
+that lack these files. Production semantic loading of these masters is separate
+work; extracting them alone does not enable conflict-target analysis.
 
 ## Obtain extension files from an administrator
 

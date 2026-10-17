@@ -22,7 +22,23 @@ like this (the client assigns the ID):
 `--user` selects the server namespace and overrides `USER`. Supply either;
 a missing or invalid user is an error. The server is shared by commands using
 the same user. A successful existing connection is reused without launching
-another server. Exiting the CLI leaves the shared server running.
+another server. After the last client disconnects, the shared server retains its
+cache for 180 seconds by default, then shuts down. A connection during that period
+reuses the server and cancels the pending shutdown. A later command can launch a
+new server after normal idle shutdown removes its registration.
+
+To change the idle period for a newly launched server, set
+`SQL_FUN_SERVER_IDLE_TIMEOUT` to a number of seconds; `0` disables automatic idle
+shutdown. For example:
+
+```sh
+SQL_FUN_SERVER_IDLE_TIMEOUT=600 sql-fun api --user alice
+```
+
+This setting is read when the server starts; it does not reconfigure an already
+running shared server. An open client connection prevents server idle shutdown
+even when it is not sending requests. The separate connection read timeout can
+still close an inactive connection.
 
 `SQL_FUN_SERVER` names an executable path, never a shell command. Relative paths
 are resolved from the caller's current working directory. If it is unset,

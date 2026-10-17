@@ -51,6 +51,7 @@ impl Connection {
             user: "session-test".to_owned(),
             request_length_limit,
             idle_timeout: 3,
+            server_idle_timeout: 180,
             auth_timeout,
             token: "session-test-token".to_owned(),
         };
@@ -159,4 +160,10 @@ impl Drop for Connection {
     fn drop(&mut self) {
         self.handler.abort();
     }
+}
+
+/// Binds a fresh loopback listener per test, without schema setup or sharing.
+/// Used to exercise the real accept loop when acceptance and expiry are ready.
+pub(crate) async fn idle_listener() -> TcpListener {
+    TcpListener::bind("127.0.0.1:0").await.unwrap()
 }

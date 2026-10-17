@@ -42,6 +42,7 @@ tracing.workspace = true
 rstest.workspace = true
 tempfile.workspace = true
 testresult.workspace = true
+tokio = { workspace = true, features = ["test-util"] }
 
 [lints]
 workspace = true

@@ -4,6 +4,7 @@
 
 mod buffers;
 mod cache;
+mod client_lifecycle;
 mod core_wrapping;
 mod cte_realization;
 mod error;
@@ -32,7 +33,10 @@ pub use self::{
     },
 };
 
-use self::json_rpc::{JsonRpcRequest, JsonRpcResponse};
+use self::{
+    client_lifecycle::ClientLifecycle,
+    json_rpc::{JsonRpcRequest, JsonRpcResponse},
+};
 
 use clap::Parser;
 use pid_file::PidFile;
@@ -56,6 +60,10 @@ pub struct Args {
     #[arg(short, long, env = "IDLE_TIMEOUT", default_value_t = 30)]
     idle_timeout: u64,
 
+    /// Seconds without connected clients before shutdown; 0 disables it.
+    #[arg(long, env = "SQL_FUN_SERVER_IDLE_TIMEOUT", default_value_t = 180)]
+    server_idle_timeout: u32,
+
     #[arg(short, long, env = "AUTH_TIMEOUT", default_value_t = 5)]
     auth_timeout: u64,
 
@@ -63,7 +71,7 @@ pub struct Args {
     token: String,
 }
 
-/// Run the server event loop until interrupted.
+/// Run the server until its client-free idle timeout expires or it is interrupted.
 ///
 /// # Errors
 ///
@@ -80,15 +88,30 @@ pub async fn service() -> Result<(), ServerError> {
     };
     args.token = pid_file.token().to_owned();
 
+    eprintln!("Server started at {local_addr}");
+    serve_connections(&args, listener).await
+}
+
+async fn serve_connections(args: &Args, listener: TcpListener) -> Result<(), ServerError> {
+    let mut clients = ClientLifecycle::from(args.server_idle_timeout);
     loop {
-        eprintln!("Server started at {local_addr}");
-
-        let (accepted_socker, remote_addr) = listener.accept().await?;
-        let args = args.clone();
-
-        tokio::task::spawn(async move { serve_client(&args, accepted_socker, remote_addr).await });
+        ::tokio::select! {
+            // A ready connection takes precedence over an expiring idle deadline.
+            biased;
+            accepted = listener.accept() => {
+                let (stream, remote_addr) = accepted?;
+                let args = args.clone();
+                clients.track_connection(async move {
+                    serve_client(&args, stream, remote_addr).await
+                });
+            }
+            () = clients.wait_for_idle_shutdown() => return Ok(()),
+        }
     }
 }
+
+#[cfg(test)]
+mod serve_connections_tests;
 
 /// API implementation
 pub struct Api {

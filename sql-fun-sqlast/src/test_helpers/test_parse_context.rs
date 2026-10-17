@@ -1,4 +1,5 @@
 mod cast_info;
+mod conflict_info;
 
 use crate::{
     StringSpan,
@@ -23,6 +24,10 @@ use std::collections::{HashMap, HashSet};
 /// ParseContext implementation for tests
 #[derive(Debug, Default)]
 pub struct TestParseContext {
+    collation_results: HashMap<FullName, crate::sem::CatalogNameLookup>,
+    operator_class_results: HashMap<(FullName, String), crate::sem::CatalogNameLookup>,
+    expected_conflict_modifiers: Option<Vec<crate::sem::InsertInferenceModifiers>>,
+    conflict_arbiters: Vec<crate::sem::InsertArbiter>,
     metadata: Option<::sql_fun_core::SqlFunMetadata>,
     implicit_cast_results: HashMap<TypeReference, HashMap<TypeReference, Option<CastDefinition>>>,
     implicit_castable_results: HashMap<TypeReference, HashSet<TypeReference>>,

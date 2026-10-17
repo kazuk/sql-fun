@@ -959,3 +959,23 @@ mod test_search_path {
         }
     }
 }
+
+impl crate::sem::ConflictInfoRead for SchemaCatalog {
+    fn lookup_collation(&self, _name: &FullName) -> crate::sem::CatalogNameLookup {
+        todo!("collation extraction and catalog lookup")
+    }
+    fn lookup_operator_class(
+        &self,
+        _name: &FullName,
+        _access_method: &str,
+    ) -> crate::sem::CatalogNameLookup {
+        todo!("operator-class extraction and catalog lookup")
+    }
+    fn infer_conflict_arbiters(
+        &self,
+        table: &crate::sem::TableName,
+        conflict: &crate::sem::InsertConflict,
+    ) -> Result<Vec<crate::sem::InsertArbiter>, AnalysisError> {
+        crate::sem::parse_context::conflict_info::infer_from_catalog(self, table, conflict)
+    }
+}

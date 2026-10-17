@@ -256,6 +256,7 @@ impl InsertValue {
 #[derive(Debug, Clone, Eq, Hash, PartialEq, serde::Serialize, serde::Deserialize)]
 pub struct InsertConflict {
     inference: Vec<SemScalarExpr>,
+    modifiers: Vec<InsertInferenceModifiers>,
     predicate: Option<SemScalarExpr>,
     arbiter: InsertArbiterLookup,
 }
@@ -268,6 +269,7 @@ impl InsertConflict {
         let arbiter = InsertArbiterLookup::initial(!inference.is_empty() || constraint.is_some());
         Self {
             inference,
+            modifiers: Vec::new(),
             predicate,
             arbiter,
         }
@@ -275,6 +277,23 @@ impl InsertConflict {
     /// Resolved conflict-target expressions.
     pub fn inference(&self) -> &[SemScalarExpr] {
         &self.inference
+    }
+    /// Catalog lookup outcomes for each inference expression, in source order.
+    pub fn modifiers(&self) -> &[InsertInferenceModifiers] {
+        &self.modifiers
+    }
+    pub(crate) fn set_modifiers(&mut self, modifiers: Vec<InsertInferenceModifiers>) {
+        self.modifiers = modifiers;
+    }
+    pub(crate) fn has_modifiers(&self) -> bool {
+        self.modifiers
+            .iter()
+            .any(InsertInferenceModifiers::is_explicit)
+    }
+    pub(crate) fn modifiers_are_bound(&self) -> bool {
+        self.modifiers
+            .iter()
+            .all(InsertInferenceModifiers::is_bound)
     }
     /// Resolved partial-index predicate.
     pub const fn predicate(&self) -> Option<&SemScalarExpr> {
@@ -296,6 +315,54 @@ impl InsertConflict {
             visitor.predicate(predicate);
         }
         Ok(())
+    }
+}
+
+/// Completed collation and operator-class lookups for one inference expression.
+#[derive(Debug, Clone, Eq, Hash, PartialEq, serde::Serialize, serde::Deserialize)]
+pub struct InsertInferenceModifiers {
+    collations: Vec<crate::sem::CatalogNameLookup>,
+    operator_class: Option<crate::sem::CatalogNameLookup>,
+}
+impl InsertInferenceModifiers {
+    #[cfg(test)]
+    pub(crate) fn new(
+        collation: Option<crate::sem::CatalogNameLookup>,
+        operator_class: Option<crate::sem::CatalogNameLookup>,
+    ) -> Self {
+        Self::from_lookups(collation.into_iter().collect(), operator_class)
+    }
+    pub(crate) const fn from_lookups(
+        collations: Vec<crate::sem::CatalogNameLookup>,
+        operator_class: Option<crate::sem::CatalogNameLookup>,
+    ) -> Self {
+        Self {
+            collations,
+            operator_class,
+        }
+    }
+    /// Effective explicit collation lookup, absent when no COLLATE was supplied.
+    pub fn collation(&self) -> Option<&crate::sem::CatalogNameLookup> {
+        self.collations.last()
+    }
+    /// All explicit COLLATE references, innermost to outermost, including names
+    /// overridden by a later COLLATE. Every reference must be resolved.
+    pub fn collation_references(&self) -> &[crate::sem::CatalogNameLookup] {
+        &self.collations
+    }
+    /// Explicit operator-class lookup, absent if SQL did not specify one.
+    pub const fn operator_class(&self) -> Option<&crate::sem::CatalogNameLookup> {
+        self.operator_class.as_ref()
+    }
+    const fn is_explicit(&self) -> bool {
+        !self.collations.is_empty() || self.operator_class.is_some()
+    }
+    fn is_bound(&self) -> bool {
+        self.collations.iter().all(|v| v.resolved_name().is_some())
+            && self
+                .operator_class
+                .as_ref()
+                .is_none_or(|v| v.resolved_name().is_some())
     }
 }
 

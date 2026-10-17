@@ -43,6 +43,9 @@ mod select_statement;
 mod stack;
 mod top_level_statement;
 pub(crate) mod traversal;
+
+#[cfg(test)]
+pub(crate) use self::parse_context::conflict_info::infer_from_catalog;
 mod type_system;
 mod update_statement;
 mod variable_set;
@@ -93,17 +96,18 @@ pub use self::{
     frozen_base_context::FrozenBaseContext,
     insert_statement::{
         InsertArbiter, InsertArbiterLookup, InsertConflict, InsertConstraintKind,
-        InsertConstraintLookup, InsertSource, InsertStatement, InsertTarget, InsertValue,
-        analyze_insert_statement,
+        InsertConstraintLookup, InsertInferenceModifiers, InsertSource, InsertStatement,
+        InsertTarget, InsertValue, analyze_insert_statement,
     },
     names::{CatalogName, FullName, LocalName, OperatorName, SchemaName, ValidOperatorName},
     operators::{BinaryOperatorDefinition, OperatorDefinition, UnaryOperatorDefinition},
     parameter_constraints::{InputTypeConstraint, ParameterConstraint, ParameterConstraints},
     parse_context::{
-        BaseParseContext, CastInfoRead, DefaultSourceAccessService, DiagnosticContext,
-        FunctionInfoRead, FunctionInfoWrite, IndexInfoRead, OperatorInfoRead, ParseContext,
-        SearchPathRead, SequenceInfoRead, SequenceInfoWrite, SourceAccessService, TableInfoRead,
-        TableInfoWrite, TypeInfoRead, TypeInfoWrite, ViewInfoRead, ViewInfoWrite,
+        BaseParseContext, CastInfoRead, CatalogNameLookup, ConflictInfoRead,
+        DefaultSourceAccessService, DiagnosticContext, FunctionInfoRead, FunctionInfoWrite,
+        IndexInfoRead, OperatorInfoRead, ParseContext, SearchPathRead, SequenceInfoRead,
+        SequenceInfoWrite, SourceAccessService, TableInfoRead, TableInfoWrite, TypeInfoRead,
+        TypeInfoWrite, ViewInfoRead, ViewInfoWrite,
     },
     pg_type::{PgBuiltInType, TypeDefinition, TypeReference},
     problem::{AnalysisProblem, ParameterConstraintProblem, QueryProblem},

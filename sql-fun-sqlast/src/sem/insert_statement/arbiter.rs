@@ -89,10 +89,12 @@ pub enum InsertArbiter {
     AnonymousTableKey(Vec<ColumnName>),
 }
 impl InsertArbiter {
-    pub(crate) fn index(name: &FullName) -> Self {
+    /// Bind an eligible index by its catalog identity.
+    pub fn index(name: &FullName) -> Self {
         Self::Index(name.clone())
     }
-    pub(crate) fn table_constraint(table: &TableName, constraint: &Constraint) -> Self {
+    /// Bind an eligible named or unnamed table key.
+    pub fn table_constraint(table: &TableName, constraint: &Constraint) -> Self {
         if constraint.name().is_empty() {
             Self::AnonymousTableKey(constraint.unique_key_columns())
         } else {
@@ -103,7 +105,8 @@ impl InsertArbiter {
             ))
         }
     }
-    pub(crate) fn column_constraint(column: &ColumnName) -> Self {
+    /// Bind an eligible inline key on a destination column.
+    pub fn column_constraint(column: &ColumnName) -> Self {
         Self::ColumnConstraint(column.clone())
     }
     /// The bound columns of an unnamed table key, if applicable.

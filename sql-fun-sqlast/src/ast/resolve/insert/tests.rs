@@ -466,11 +466,188 @@ fn sqlite_later_update_action_remains_explicitly_unimplemented() {
 }
 
 #[rstest::rstest]
-#[case::collation("INSERT INTO items VALUES(1,'x') ON CONFLICT(label COLLATE \"C\") DO NOTHING")]
-#[case::operator_class("INSERT INTO items VALUES(1,'x') ON CONFLICT(id int4_ops) DO NOTHING")]
-#[should_panic(expected = "collation/operator-class catalog resolution")]
-fn conflict_modifiers_require_catalog_resolution(#[case] sql: &str) {
-    analyze(sql, Dialect::postgres());
+#[case::collation(r#"label COLLATE "C""#, false, "C")]
+#[case::expression_collation(r#"(label COLLATE "C")"#, false, "C")]
+#[case::qualified_collation("label COLLATE custom.casefold", false, "custom.casefold")]
+#[case::operator_class("id int4_ops", true, "int4_ops")]
+#[case::qualified_operator_class("id custom.integer_ops", true, "custom.integer_ops")]
+fn binds_conflict_modifier_through_context(
+    #[case] target: &str,
+    #[case] operator: bool,
+    #[case] requested: &str,
+    #[values("found", "missing", "ambiguous")] outcome: &str,
+) {
+    let (statement, context, expected) =
+        test_helpers::modifier_analysis(target, operator, requested, outcome, Dialect::postgres());
+    let conflict = &statement.as_insert().unwrap().conflicts()[0];
+    let modifier = &conflict.modifiers()[0];
+    let lookup = if operator {
+        modifier.operator_class()
+    } else {
+        modifier.collation()
+    }
+    .unwrap();
+    assert_eq!(lookup, &expected);
+    assert_eq!(lookup.requested().to_string(), requested);
+    if outcome == "found" {
+        assert_eq!(
+            context.reported_problem_count(),
+            0,
+            "{:#?}",
+            context.reported_problems()
+        );
+        assert_eq!(
+            conflict.arbiter().arbiters().unwrap()[0]
+                .index_name()
+                .unwrap()
+                .to_string(),
+            "public.mock_arbiter"
+        );
+        assert!(lookup.resolved_name().unwrap().schema().is_some());
+    } else {
+        assert!(conflict.arbiter().is_not_found());
+        let kind = context.reported_problems()[0]
+            .insert_problem()
+            .unwrap()
+            .kind();
+        if outcome == "missing" {
+            assert!(lookup.is_missing());
+            assert_eq!(
+                kind,
+                crate::sem::problem::InsertProblemKind::ConflictNameMissing
+            );
+        } else {
+            assert_eq!(lookup.ambiguous_candidates().unwrap().len(), 2);
+            assert_eq!(
+                kind,
+                crate::sem::problem::InsertProblemKind::ConflictNameAmbiguous
+            );
+        }
+    }
+    let json = ::serde_json::to_string(statement.as_insert().unwrap()).unwrap();
+    let roundtrip: crate::sem::InsertStatement = ::serde_json::from_str(&json).unwrap();
+    assert_eq!(roundtrip.conflicts()[0].modifiers(), conflict.modifiers());
+}
+
+#[cfg(feature = "sqlite")]
+#[rstest::rstest]
+#[case::lower("label COLLATE nocase", "nocase")]
+#[case::parenthesized("(label COLLATE nocase)", "nocase")]
+#[case::mixed_case("label COLLATE NoCaSe", "NoCaSe")]
+fn sqlite_conflict_collation_uses_connection_catalog(
+    #[case] target: &str,
+    #[case] requested: &str,
+    #[values("found", "missing", "ambiguous")] outcome: &str,
+) {
+    let (statement, context, expected) =
+        test_helpers::modifier_analysis(target, false, requested, outcome, Dialect::sqlite());
+    let conflict = &statement.as_insert().unwrap().conflicts()[0];
+    assert_eq!(conflict.modifiers()[0].collation(), Some(&expected));
+    assert!(conflict.modifiers()[0].operator_class().is_none());
+    if outcome == "found" {
+        assert_eq!(context.reported_problem_count(), 0);
+        assert!(expected.resolved_name().unwrap().schema().is_none());
+    } else {
+        assert!(conflict.arbiter().is_not_found());
+        assert!(context.reported_problem_count() > 0);
+    }
+}
+
+#[test]
+fn preserves_modifier_positions_and_looks_up_both_names() {
+    use crate::sem::{CatalogNameLookup, FullName, InsertArbiter, InsertInferenceModifiers};
+    let dialect = Dialect::postgres();
+    let mut context = test_helpers::catalog(dialect);
+    let collation_name = FullName::from_local_name("C");
+    let class_name = FullName::from_local_name("text_ops");
+    let collation =
+        CatalogNameLookup::found(&collation_name, &FullName::with_schema("pg_catalog", "C"));
+    let operator_class = CatalogNameLookup::found(
+        &class_name,
+        &FullName::with_schema("pg_catalog", "text_ops"),
+    );
+    context.set_collation_lookup(&collation_name, &collation);
+    context.set_operator_class_lookup(&class_name, &operator_class);
+    let expected = vec![
+        InsertInferenceModifiers::new(None, None),
+        InsertInferenceModifiers::new(Some(collation), Some(operator_class)),
+    ];
+    context.expect_conflict_modifiers(
+        &expected,
+        &[InsertArbiter::index(&FullName::with_schema(
+            "public", "both",
+        ))],
+    );
+    let result = crate::parse_statements(
+        r#"INSERT INTO items VALUES(1,'x') ON CONFLICT(id, label COLLATE "C" text_ops) DO NOTHING"#,
+        dialect,
+    )
+    .next()
+    .unwrap()
+    .unwrap()
+    .node
+    .resolve(&mut context)
+    .unwrap();
+    assert_eq!(context.reported_problem_count(), 0);
+    assert_eq!(
+        result.as_insert().unwrap().conflicts()[0].modifiers(),
+        expected
+    );
+}
+
+#[test]
+fn retains_failed_inner_collation_even_when_outer_collation_is_bound() {
+    use crate::sem::{CatalogNameLookup, FullName};
+    let dialect = Dialect::postgres();
+    let mut context = test_helpers::catalog(dialect);
+    let missing = FullName::from_local_name("absent579");
+    let outer = FullName::from_local_name("C");
+    let missing_lookup = CatalogNameLookup::missing(&missing);
+    let outer_lookup = CatalogNameLookup::found(&outer, &FullName::with_schema("pg_catalog", "C"));
+    context.set_collation_lookup(&missing, &missing_lookup);
+    context.set_collation_lookup(&outer, &outer_lookup);
+    // Any attempt to infer an arbiter from these failed bindings is a bug.
+    context.expect_conflict_modifiers(&[], &[]);
+    let result = crate::parse_statements(
+        r#"INSERT INTO items VALUES(1,'x') ON CONFLICT ((label COLLATE absent579) COLLATE "C") DO NOTHING"#,
+        dialect,
+    ).next().unwrap().unwrap().node.resolve(&mut context).unwrap();
+    let conflict = &result.as_insert().unwrap().conflicts()[0];
+    assert_eq!(
+        conflict.modifiers()[0].collation_references(),
+        &[missing_lookup, outer_lookup.clone()]
+    );
+    assert_eq!(conflict.modifiers()[0].collation(), Some(&outer_lookup));
+    assert!(conflict.arbiter().is_not_found());
+    assert_eq!(
+        context.reported_problems()[0]
+            .insert_problem()
+            .unwrap()
+            .kind(),
+        crate::sem::problem::InsertProblemKind::ConflictNameMissing
+    );
+}
+
+#[test]
+fn resolved_modifier_does_not_guarantee_an_eligible_arbiter() {
+    let (statement, context, lookup) = test_helpers::modifier_analysis(
+        "id int4_ops",
+        true,
+        "int4_ops",
+        "unmatched",
+        Dialect::postgres(),
+    );
+    let conflict = &statement.as_insert().unwrap().conflicts()[0];
+    assert!(lookup.resolved_name().is_some());
+    assert_eq!(conflict.modifiers()[0].operator_class(), Some(&lookup));
+    assert!(conflict.arbiter().is_not_found());
+    assert_eq!(
+        context.reported_problems()[0]
+            .insert_problem()
+            .unwrap()
+            .kind(),
+        crate::sem::problem::InsertProblemKind::ConflictTarget
+    );
 }
 
 #[rstest::rstest]
@@ -700,6 +877,64 @@ mod test_helpers {
             &source_span(),
         );
         context
+    }
+    pub(super) fn modifier_analysis(
+        target: &str,
+        operator: bool,
+        requested: &str,
+        outcome: &str,
+        dialect: Dialect,
+    ) -> (SemAst, TestParseContext, crate::sem::CatalogNameLookup) {
+        use crate::sem::{CatalogNameLookup, FullName, InsertArbiter, InsertInferenceModifiers};
+        let mut context = catalog(dialect);
+        let requested_name = if let Some((schema, local)) = requested.split_once('.') {
+            FullName::with_schema(schema, local)
+        } else {
+            FullName::from_local_name(requested)
+        };
+        let canonical = if dialect == Dialect::sqlite() {
+            FullName::from_local_name("NOCASE")
+        } else if requested_name.schema().is_some() {
+            requested_name.clone()
+        } else {
+            FullName::with_schema("pg_catalog", requested)
+        };
+        let lookup = match outcome {
+            "found" | "unmatched" => CatalogNameLookup::found(&requested_name, &canonical),
+            "missing" => CatalogNameLookup::missing(&requested_name),
+            "ambiguous" => CatalogNameLookup::ambiguous(
+                &requested_name,
+                &[canonical, FullName::with_schema("custom", "other")],
+            ),
+            _ => panic!("unknown test outcome"),
+        };
+        let modifier = if operator {
+            context.set_operator_class_lookup(&requested_name, &lookup);
+            InsertInferenceModifiers::new(None, Some(lookup.clone()))
+        } else {
+            context.set_collation_lookup(&requested_name, &lookup);
+            InsertInferenceModifiers::new(Some(lookup.clone()), None)
+        };
+        // The mock independently checks the bound identities passed to inference.
+        // Catalog eligibility is deliberately not implemented by the resolver.
+        let arbiters = if outcome == "unmatched" {
+            Vec::new()
+        } else {
+            vec![InsertArbiter::index(&FullName::with_schema(
+                "public",
+                "mock_arbiter",
+            ))]
+        };
+        context.expect_conflict_modifiers(&[modifier], &arbiters);
+        let sql = format!("INSERT INTO items VALUES(1,'x') ON CONFLICT({target}) DO NOTHING");
+        let statement = crate::parse_statements(&sql, dialect)
+            .next()
+            .unwrap()
+            .unwrap()
+            .node
+            .resolve(&mut context)
+            .unwrap();
+        (statement, context, lookup)
     }
     pub(super) fn analyze(sql: &str, dialect: Dialect) -> (SemAst, TestParseContext) {
         let statement = crate::parse_statements(sql, dialect)

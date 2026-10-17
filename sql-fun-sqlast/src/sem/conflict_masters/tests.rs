@@ -226,6 +226,7 @@ fn sqlite_namespace_is_explicit_case_insensitive_and_retained() -> testresult::T
     let mut masters = ConflictMasters::sqlite();
     masters.declare_sqlite_collation("Custom.名")?;
     masters.declare_sqlite_collation("CUSTOM.名")?;
+    masters.declare_sqlite_collation("")?;
     let mut fixture = test_helpers::Masters::new()
         .context()
         .with_dialect(crate::ast::Dialect::sqlite());
@@ -240,7 +241,7 @@ fn sqlite_namespace_is_explicit_case_insensitive_and_retained() -> testresult::T
         &metadata,
     )
     .freeze();
-    for name in ["binary", "NoCase", "rtrim", "custom.名"] {
+    for name in ["binary", "NoCase", "rtrim", "custom.名", ""] {
         assert!(
             child
                 .lookup_collation(&FullName::from_local_name(name))
@@ -263,7 +264,7 @@ fn sqlite_namespace_is_explicit_case_insensitive_and_retained() -> testresult::T
             .lookup_operator_class(&FullName::from_local_name("ops"), "btree")
             .is_missing()
     );
-    assert!(masters.declare_sqlite_collation("").is_err());
+    assert!(masters.declare_sqlite_collation("bad\0name").is_err());
     let connection = ::rusqlite::Connection::open_in_memory()?;
     for name in ["binary", "NoCase", "rtrim"] {
         connection.prepare(&format!("SELECT 'x' COLLATE {name} = 'X'"))?;
@@ -274,6 +275,8 @@ fn sqlite_namespace_is_explicit_case_insensitive_and_retained() -> testresult::T
             .is_err()
     );
     connection.create_collation("Custom.名", |left, right| left.cmp(right))?;
+    connection.create_collation("", |left, right| left.cmp(right))?;
+    connection.prepare(r#"SELECT 'x' COLLATE "" = 'X'"#)?;
     connection.prepare(r#"SELECT 'x' COLLATE "CUSTOM.名" = 'X'"#)?;
     eprintln!("bundled SQLite {}", ::rusqlite::version());
     Ok(())

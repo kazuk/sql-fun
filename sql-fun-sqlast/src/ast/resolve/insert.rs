@@ -409,18 +409,13 @@ impl Conflict {
                 "only the last SQLite UPSERT clause may omit its conflict target",
             ))?;
         }
-        for item in &self.inference {
-            if !item.collation.0.is_empty() || !item.operator_class.0.is_empty() {
-                todo!("conflict collation/operator-class catalog resolution");
-            }
-        }
         let mut inference = Vec::new();
         for item in &self.inference {
             if let Some(name) = &item.name {
                 inference.push(Name::local(name).resolve_column(context, scope)?);
             }
             if let Some(expression) = &item.expression {
-                inference.push(expression.resolve_in(context, scope)?);
+                inference.push(expression.resolve_insert_inference(context, scope)?);
             }
         }
         let predicate = Expr::resolve_optional(&self.inference_predicate, context, scope)?;
@@ -442,6 +437,11 @@ impl Conflict {
         }
 
         let mut conflict = InsertConflict::new(inference, predicate, self.constraint.as_deref());
+        let mut modifiers = Vec::new();
+        for item in &self.inference {
+            modifiers.push(item.resolve_insert_modifiers(context)?);
+        }
+        conflict.set_modifiers(modifiers);
         if let Some(constraint) = &self.constraint {
             let lookup = crate::sem::InsertConstraintLookup::new(
                 name,
@@ -457,40 +457,13 @@ impl Conflict {
             conflict.set_arbiter(crate::sem::InsertArbiterLookup::named(&lookup));
         }
         if !self.inference.is_empty() {
-            let mut columns = Vec::new();
-            let mut only_columns = true;
-            for item in &self.inference {
-                if let Some(name) = &item.name {
-                    let name = ColumnName::from(name.as_str());
-                    if !columns.contains(&name) {
-                        columns.push(name);
-                    }
-                } else {
-                    only_columns = false;
-                }
-            }
-            let mut arbiters = if only_columns {
-                table.infer_insert_arbiters(name, &columns)
+            let arbiters = if conflict.modifiers_are_bound() {
+                context.infer_conflict_arbiters(name, &conflict)?
             } else {
                 Vec::new()
             };
-            let mut incomplete_metadata = false;
-            for index in context.indexes_for_table(name) {
-                if let Some(eligible) = index.matches_inference(&conflict)? {
-                    if eligible {
-                        arbiters.push(crate::sem::InsertArbiter::index(index.name()));
-                    }
-                } else {
-                    incomplete_metadata = true;
-                }
-            }
-            if arbiters.is_empty() && incomplete_metadata {
-                todo!(
-                    "conflict arbiter requires predicate implication or implicit index modifier metadata"
-                );
-            }
             conflict.set_arbiter(crate::sem::InsertArbiterLookup::inferred(&arbiters));
-            if arbiters.is_empty() {
+            if arbiters.is_empty() && conflict.modifiers_are_bound() {
                 context.report_analysis_problem(AnalysisProblem::insert(
                     crate::sem::problem::InsertProblemKind::conflict_target(),
                     "ON CONFLICT target has no matching unique key",
@@ -514,5 +487,88 @@ impl OverridingKind {
     }
     const fn overrides_identity(&self) -> bool {
         matches!(self, Self::UserValue | Self::SystemValue)
+    }
+}
+
+impl crate::ast::IndexExpression {
+    fn resolve_insert_modifiers(
+        &self,
+        context: &mut impl ParseContext,
+    ) -> Result<crate::sem::InsertInferenceModifiers, AnalysisError> {
+        let mut names = Vec::new();
+        if let Some(expression) = &self.expression {
+            expression.collect_insert_collations(&mut names);
+        }
+        if !self.collation.0.is_empty() {
+            names.push(&self.collation);
+        }
+        let mut collations = Vec::new();
+        for name in names {
+            let lookup = context.lookup_collation(&name.full_name()?);
+            lookup.report_insert_problem(context)?;
+            collations.push(lookup);
+        }
+        let operator_class = if self.operator_class.0.is_empty() {
+            None
+        } else {
+            let lookup = context.lookup_operator_class(&self.operator_class.full_name()?, "btree");
+            lookup.report_insert_problem(context)?;
+            Some(lookup)
+        };
+        Ok(crate::sem::InsertInferenceModifiers::from_lookups(
+            collations,
+            operator_class,
+        ))
+    }
+}
+impl Expr {
+    fn collect_insert_collations<'a>(&'a self, names: &mut Vec<&'a Name>) {
+        match self {
+            Self::Collate(collate) => {
+                collate.argument.collect_insert_collations(names);
+                names.push(&collate.name);
+            }
+            Self::Parenthesized(items) => {
+                if let [expression] = items.as_slice() {
+                    expression.collect_insert_collations(names);
+                }
+            }
+            _ => {}
+        }
+    }
+    fn resolve_insert_inference(
+        &self,
+        context: &mut impl ParseContext,
+        scope: &ScalarAnalysisContext<'_>,
+    ) -> Result<crate::sem::SemScalarExpr, AnalysisError> {
+        match self {
+            Self::Collate(collate) => collate.argument.resolve_insert_inference(context, scope),
+            Self::Parenthesized(items) => match items.as_slice() {
+                [expression] => expression.resolve_insert_inference(context, scope),
+                _ => self.resolve_in(context, scope),
+            },
+            _ => self.resolve_in(context, scope),
+        }
+    }
+}
+impl crate::sem::CatalogNameLookup {
+    fn report_insert_problem(&self, context: &mut impl ParseContext) -> Result<(), AnalysisError> {
+        let kind = if self.is_missing() {
+            Some(crate::sem::problem::InsertProblemKind::conflict_name_missing())
+        } else if self.ambiguous_candidates().is_some() {
+            Some(crate::sem::problem::InsertProblemKind::conflict_name_ambiguous())
+        } else {
+            None
+        };
+        if let Some(kind) = kind {
+            context.report_analysis_problem(AnalysisProblem::insert(
+                kind,
+                &format!(
+                    "conflict target catalog name {} has no unique binding",
+                    self.requested()
+                ),
+            ))?;
+        }
+        Ok(())
     }
 }

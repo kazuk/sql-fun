@@ -67,9 +67,17 @@ DO NOTHING retains and checks conflict targets against catalog constraints and
 unique indexes, including matching expression keys and identical partial-index
 predicates. Named constraint targets require constraint names retained in the
 schema; automatically generated database names are not inferred.
-General predicate implication and explicit collation/operator-class
-catalog resolution remain unimplemented; these forms do not produce successful
-analysis. DO UPDATE remains explicitly unimplemented
+Explicit conflict collation/operator-class references retain their completed
+catalog lookups, including missing and ambiguous outcomes. Custom analysis
+contexts provide these lookups and modifier-aware arbiter inference through
+`ConflictInfoRead`; SQL spellings are not treated as resolved identities.
+The bundled production catalogs do not yet supply these services and can
+terminate analysis at their catalog boundary. General partial-index predicate
+implication also requires additional catalog services. Production catalog support
+and the corresponding end-to-end verification are tracked in
+[#581](https://github.com/kazuk/sql-fun/issues/581); mock resolver tests do not
+establish support in those production contexts. DO UPDATE remains explicitly
+unimplemented
 ([#474](https://github.com/kazuk/sql-fun/issues/474)); it does not produce a
 successful INSERT analysis, including later actions in SQLite UPSERT chains.
 

@@ -20,6 +20,10 @@ pub enum InsertProblemKind {
     ConflictConstraint,
     /// An inference target has no eligible unique key.
     ConflictTarget,
+    /// A collation or operator class was not found in the applicable namespace.
+    ConflictNameMissing,
+    /// A collation or operator class has multiple visible matching definitions.
+    ConflictNameAmbiguous,
     /// A conflict predicate does not have boolean type.
     ConflictPredicate,
     /// A non-final SQLite UPSERT clause omits its target.
@@ -52,6 +56,12 @@ impl InsertProblemKind {
     }
     pub(crate) const fn conflict_target() -> Self {
         Self::ConflictTarget
+    }
+    pub(crate) const fn conflict_name_missing() -> Self {
+        Self::ConflictNameMissing
+    }
+    pub(crate) const fn conflict_name_ambiguous() -> Self {
+        Self::ConflictNameAmbiguous
     }
     pub(crate) const fn conflict_predicate() -> Self {
         Self::ConflictPredicate

@@ -191,6 +191,33 @@ macro_rules! forward_catalog_reads {
             }
         }
 
+        impl crate::sem::ConflictInfoRead for $context {
+            fn lookup_collation(
+                &self,
+                name: &crate::sem::FullName,
+            ) -> crate::sem::CatalogNameLookup {
+                crate::sem::ConflictInfoRead::lookup_collation(self.$catalog(), name)
+            }
+            fn lookup_operator_class(
+                &self,
+                name: &crate::sem::FullName,
+                method: &str,
+            ) -> crate::sem::CatalogNameLookup {
+                crate::sem::ConflictInfoRead::lookup_operator_class(self.$catalog(), name, method)
+            }
+            fn infer_conflict_arbiters(
+                &self,
+                table: &crate::sem::TableName,
+                conflict: &crate::sem::InsertConflict,
+            ) -> Result<Vec<crate::sem::InsertArbiter>, crate::sem::AnalysisError> {
+                crate::sem::ConflictInfoRead::infer_conflict_arbiters(
+                    self.$catalog(),
+                    table,
+                    conflict,
+                )
+            }
+        }
+
         impl crate::sem::IndexInfoRead for $context {
             fn indexes_for_table(
                 &self,

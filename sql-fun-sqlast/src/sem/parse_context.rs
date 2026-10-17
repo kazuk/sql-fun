@@ -1,4 +1,5 @@
 mod cast_info;
+pub(crate) mod conflict_info;
 mod seq_info;
 mod table_info;
 mod type_info;
@@ -11,6 +12,7 @@ use std::{
 
 pub use self::{
     cast_info::CastInfoRead,
+    conflict_info::{CatalogNameLookup, ConflictInfoRead},
     seq_info::{SequenceInfoRead, SequenceInfoWrite},
     table_info::{TableInfoRead, TableInfoWrite},
     type_info::{TypeInfoRead, TypeInfoWrite},
@@ -136,6 +138,7 @@ pub trait SearchPathRead {
 ///
 pub trait BaseParseContext:
     CastInfoRead
+    + ConflictInfoRead
     + FunctionInfoRead
     + IndexInfoRead
     + OperatorInfoRead

@@ -441,8 +441,7 @@ impl crate::ast::CurrentOf {
                 "CURRENT OF cursor parameters require a procedural variable resolver",
             ));
         }
-        let cursor =
-            crate::sem::UpdateCursor::new(&self.name, context.cursors().cursor(&self.name));
+        let cursor = crate::sem::UpdateCursor::new(&self.name, context.resolve_cursor(&self.name));
         let problem = match cursor.binding() {
             None => Some(format!(
                 "cursor {:?} does not exist in the current session scope",

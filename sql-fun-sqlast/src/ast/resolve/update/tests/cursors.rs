@@ -28,7 +28,7 @@ fn resolves_portal_in_current_context(
     let mut context = catalog(Dialect::postgres());
     let target = target.map(|name| TableName::from(FullName::with_schema("public", name)));
     let info = CursorInfo::new(target.as_ref(), updatable);
-    context.cursors_mut().bind("portal", &info);
+    context.bind_cursor("portal", &info);
     let statement = resolve(
         "UPDATE items AS i SET id=$1 WHERE CURRENT OF portal RETURNING i.id",
         &mut context,
@@ -60,9 +60,7 @@ fn resolves_portal_in_current_context(
 fn retains_missing_reference(#[case] other_binding: bool) {
     let mut context = catalog(Dialect::postgres());
     if other_binding {
-        context
-            .cursors_mut()
-            .bind("other", &CursorInfo::new(None, None));
+        context.bind_cursor("other", &CursorInfo::new(None, None));
     }
     let statement = resolve(
         "UPDATE items SET id=1 WHERE CURRENT OF absent",
@@ -78,9 +76,7 @@ fn retains_missing_reference(#[case] other_binding: bool) {
 #[test]
 fn portal_scope_survives_statement_reset_and_can_be_replaced() {
     let mut context = catalog(Dialect::postgres());
-    context
-        .cursors_mut()
-        .bind("portal", &CursorInfo::new(None, None));
+    context.bind_cursor("portal", &CursorInfo::new(None, None));
     let first = resolve(
         "UPDATE items SET id=1 WHERE CURRENT OF portal",
         &mut context,
@@ -108,7 +104,7 @@ fn portal_scope_survives_statement_reset_and_can_be_replaced() {
             .is_some()
     );
     let replacement = CursorInfo::new(None, Some(false));
-    context.cursors_mut().bind("portal", &replacement);
+    context.bind_cursor("portal", &replacement);
     let third = resolve(
         "UPDATE items SET id=3 WHERE CURRENT OF portal",
         &mut context,
@@ -129,7 +125,7 @@ fn portal_scope_survives_statement_reset_and_can_be_replaced() {
             .updatable(),
         None
     );
-    context.cursors_mut().remove("portal");
+    context.remove_cursor("portal");
     let last = resolve(
         "UPDATE items SET id=4 WHERE CURRENT OF portal",
         &mut context,
@@ -153,9 +149,7 @@ fn portal_names_follow_identifier_rules(
     #[case] missing: bool,
 ) {
     let mut context = catalog(Dialect::postgres());
-    context
-        .cursors_mut()
-        .bind("Mixed", &CursorInfo::new(None, None));
+    context.bind_cursor("Mixed", &CursorInfo::new(None, None));
     let statement = resolve(sql, &mut context);
     let cursor = statement.as_update().unwrap().current_of().unwrap();
     assert_eq!(cursor.name(), name);

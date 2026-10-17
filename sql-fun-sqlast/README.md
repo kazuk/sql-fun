@@ -40,7 +40,9 @@ the full query and selected output position. Inspect results with
 SQLite visibility rules: target aliases and FROM sources are not visible there.
 
 For PostgreSQL `WHERE CURRENT OF`, callers establish portal bindings through
-`ParseContext::cursors_mut().bind(name, &CursorInfo::new(target, updatable))`.
+`ParseContext::bind_cursor(name, &CursorInfo::new(target, updatable))`.
+`resolve_cursor(name)` looks up a specific portal; `remove_cursor(name)` removes
+its binding. The context provider owns storage and lifecycle bookkeeping.
 The optional target is a qualified relation identity; optional update eligibility
 records only known static facts. `UpdateStatement::current_of()` retains the
 portal name and binding, including missing bindings with an UPDATE diagnostic.

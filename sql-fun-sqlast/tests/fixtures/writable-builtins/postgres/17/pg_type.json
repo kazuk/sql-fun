@@ -1,0 +1,50 @@
+[
+  {
+    "name": "anyarray"
+  },
+  {
+    "name": "anyelement"
+  },
+  {
+    "name": "bool"
+  },
+  {
+    "name": "bpchar"
+  },
+  {
+    "name": "float4"
+  },
+  {
+    "name": "float8"
+  },
+  {
+    "name": "int2"
+  },
+  {
+    "name": "int4"
+  },
+  {
+    "name": "int8"
+  },
+  {
+    "name": "name"
+  },
+  {
+    "name": "numeric"
+  },
+  {
+    "name": "text"
+  },
+  {
+    "name": "trigger"
+  },
+  {
+    "name": "unknown"
+  },
+  {
+    "name": "varchar"
+  },
+  {
+    "name": "void"
+  }
+]

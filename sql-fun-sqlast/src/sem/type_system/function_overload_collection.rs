@@ -22,6 +22,17 @@ impl<'a> IntoIterator for &'a FunctionOverloadCollection {
 }
 
 impl FunctionOverloadCollection {
+    pub(crate) fn view_row_properties(
+        &self,
+        name: &crate::sem::FullName,
+        preserves_rows: bool,
+    ) -> Vec<((crate::sem::FullName, OverloadVariant), bool)> {
+        self.overloads
+            .iter()
+            .map(|overload| ((name.clone(), overload.clone()), preserves_rows))
+            .collect()
+    }
+
     pub(crate) fn into_snapshot(self) -> Vec<OverloadVariant> {
         self.overloads
     }

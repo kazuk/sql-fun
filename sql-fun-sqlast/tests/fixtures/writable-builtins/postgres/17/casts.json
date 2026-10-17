@@ -1,0 +1,324 @@
+{
+  "bool": {
+    "bpchar": {
+      "context": "a",
+      "func": "text(bool)",
+      "is_prefferd": false,
+      "method": "f"
+    },
+    "int4": {
+      "context": "e",
+      "func": "int4(bool)",
+      "is_prefferd": false,
+      "method": "f"
+    },
+    "text": {
+      "context": "a",
+      "func": "text(bool)",
+      "is_prefferd": true,
+      "method": "f"
+    },
+    "varchar": {
+      "context": "a",
+      "func": "text(bool)",
+      "is_prefferd": false,
+      "method": "f"
+    }
+  },
+  "bpchar": {
+    "bpchar": {
+      "context": "i",
+      "func": "bpchar(bpchar,int4,bool)",
+      "is_prefferd": false,
+      "method": "f"
+    },
+    "name": {
+      "context": "i",
+      "func": "name(bpchar)",
+      "is_prefferd": false,
+      "method": "f"
+    },
+    "text": {
+      "context": "i",
+      "func": "text(bpchar)",
+      "is_prefferd": true,
+      "method": "f"
+    },
+    "varchar": {
+      "context": "i",
+      "func": "text(bpchar)",
+      "is_prefferd": false,
+      "method": "f"
+    }
+  },
+  "float4": {
+    "float8": {
+      "context": "i",
+      "func": "float8(float4)",
+      "is_prefferd": true,
+      "method": "f"
+    },
+    "int2": {
+      "context": "a",
+      "func": "int2(float4)",
+      "is_prefferd": false,
+      "method": "f"
+    },
+    "int4": {
+      "context": "a",
+      "func": "int4(float4)",
+      "is_prefferd": false,
+      "method": "f"
+    },
+    "int8": {
+      "context": "a",
+      "func": "int8(float4)",
+      "is_prefferd": false,
+      "method": "f"
+    },
+    "numeric": {
+      "context": "a",
+      "func": "numeric(float4)",
+      "is_prefferd": false,
+      "method": "f"
+    }
+  },
+  "float8": {
+    "float4": {
+      "context": "a",
+      "func": "float4(float8)",
+      "is_prefferd": false,
+      "method": "f"
+    },
+    "int2": {
+      "context": "a",
+      "func": "int2(float8)",
+      "is_prefferd": false,
+      "method": "f"
+    },
+    "int4": {
+      "context": "a",
+      "func": "int4(float8)",
+      "is_prefferd": false,
+      "method": "f"
+    },
+    "int8": {
+      "context": "a",
+      "func": "int8(float8)",
+      "is_prefferd": false,
+      "method": "f"
+    },
+    "numeric": {
+      "context": "a",
+      "func": "numeric(float8)",
+      "is_prefferd": false,
+      "method": "f"
+    }
+  },
+  "int2": {
+    "float4": {
+      "context": "i",
+      "func": "float4(int2)",
+      "is_prefferd": false,
+      "method": "f"
+    },
+    "float8": {
+      "context": "i",
+      "func": "float8(int2)",
+      "is_prefferd": true,
+      "method": "f"
+    },
+    "int4": {
+      "context": "i",
+      "func": "int4(int2)",
+      "is_prefferd": false,
+      "method": "f"
+    },
+    "int8": {
+      "context": "i",
+      "func": "int8(int2)",
+      "is_prefferd": false,
+      "method": "f"
+    },
+    "numeric": {
+      "context": "i",
+      "func": "numeric(int2)",
+      "is_prefferd": false,
+      "method": "f"
+    }
+  },
+  "int4": {
+    "bool": {
+      "context": "e",
+      "func": "bool(int4)",
+      "is_prefferd": true,
+      "method": "f"
+    },
+    "float4": {
+      "context": "i",
+      "func": "float4(int4)",
+      "is_prefferd": false,
+      "method": "f"
+    },
+    "float8": {
+      "context": "i",
+      "func": "float8(int4)",
+      "is_prefferd": true,
+      "method": "f"
+    },
+    "int2": {
+      "context": "a",
+      "func": "int2(int4)",
+      "is_prefferd": false,
+      "method": "f"
+    },
+    "int8": {
+      "context": "i",
+      "func": "int8(int4)",
+      "is_prefferd": false,
+      "method": "f"
+    },
+    "numeric": {
+      "context": "i",
+      "func": "numeric(int4)",
+      "is_prefferd": false,
+      "method": "f"
+    }
+  },
+  "int8": {
+    "float4": {
+      "context": "i",
+      "func": "float4(int8)",
+      "is_prefferd": false,
+      "method": "f"
+    },
+    "float8": {
+      "context": "i",
+      "func": "float8(int8)",
+      "is_prefferd": true,
+      "method": "f"
+    },
+    "int2": {
+      "context": "a",
+      "func": "int2(int8)",
+      "is_prefferd": false,
+      "method": "f"
+    },
+    "int4": {
+      "context": "a",
+      "func": "int4(int8)",
+      "is_prefferd": false,
+      "method": "f"
+    },
+    "numeric": {
+      "context": "i",
+      "func": "numeric(int8)",
+      "is_prefferd": false,
+      "method": "f"
+    }
+  },
+  "name": {
+    "bpchar": {
+      "context": "a",
+      "func": "bpchar(name)",
+      "is_prefferd": false,
+      "method": "f"
+    },
+    "text": {
+      "context": "i",
+      "func": "text(name)",
+      "is_prefferd": true,
+      "method": "f"
+    },
+    "varchar": {
+      "context": "a",
+      "func": "varchar(name)",
+      "is_prefferd": false,
+      "method": "f"
+    }
+  },
+  "numeric": {
+    "float4": {
+      "context": "i",
+      "func": "float4(numeric)",
+      "is_prefferd": false,
+      "method": "f"
+    },
+    "float8": {
+      "context": "i",
+      "func": "float8(numeric)",
+      "is_prefferd": true,
+      "method": "f"
+    },
+    "int2": {
+      "context": "a",
+      "func": "int2(numeric)",
+      "is_prefferd": false,
+      "method": "f"
+    },
+    "int4": {
+      "context": "a",
+      "func": "int4(numeric)",
+      "is_prefferd": false,
+      "method": "f"
+    },
+    "int8": {
+      "context": "a",
+      "func": "int8(numeric)",
+      "is_prefferd": false,
+      "method": "f"
+    },
+    "numeric": {
+      "context": "i",
+      "func": "numeric(numeric,int4)",
+      "is_prefferd": false,
+      "method": "f"
+    }
+  },
+  "text": {
+    "bpchar": {
+      "context": "i",
+      "func": "0",
+      "is_prefferd": false,
+      "method": "b"
+    },
+    "name": {
+      "context": "i",
+      "func": "name(text)",
+      "is_prefferd": false,
+      "method": "f"
+    },
+    "varchar": {
+      "context": "i",
+      "func": "0",
+      "is_prefferd": false,
+      "method": "b"
+    }
+  },
+  "varchar": {
+    "bpchar": {
+      "context": "i",
+      "func": "0",
+      "is_prefferd": false,
+      "method": "b"
+    },
+    "name": {
+      "context": "i",
+      "func": "name(varchar)",
+      "is_prefferd": false,
+      "method": "f"
+    },
+    "text": {
+      "context": "i",
+      "func": "0",
+      "is_prefferd": true,
+      "method": "b"
+    },
+    "varchar": {
+      "context": "i",
+      "func": "varchar(varchar,int4,bool)",
+      "is_prefferd": false,
+      "method": "f"
+    }
+  }
+}

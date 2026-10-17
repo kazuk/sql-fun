@@ -13,6 +13,10 @@ pub enum AnalysisError {
     #[error("{0}")]
     GenericError(#[source] Box<dyn std::error::Error>),
 
+    /// Incomplete view catalog facts encountered during semantic analysis.
+    #[error("incomplete view write metadata: {0:?}")]
+    ViewMetadata(Box<crate::sem::problem::ViewProblem>),
+
     /// serde
     #[error(transparent)]
     SerdeJson(#[from] serde_json::Error),
@@ -59,6 +63,23 @@ pub enum AnalysisError {
 }
 
 impl AnalysisError {
+    pub(crate) fn view_metadata(problem: &crate::sem::problem::ViewProblem) -> Self {
+        Self::ViewMetadata(Box::new(problem.clone()))
+    }
+
+    pub(crate) fn recover_view_metadata(
+        self,
+        context: &mut impl ParseContext,
+    ) -> Result<crate::sem::SemAst, Self> {
+        match self {
+            Self::ViewMetadata(problem) => {
+                context.report_analysis_problem(AnalysisProblem::view(&problem))?;
+                Ok(crate::sem::SemAst::unresolved_statement())
+            }
+            other => Err(other),
+        }
+    }
+
     pub(crate) fn check_dialect(
         parsed: crate::ast::Dialect,
         configured: crate::ast::Dialect,

@@ -291,18 +291,17 @@ impl crate::sem::ConflictInfoRead for BaseContext {
 }
 
 impl crate::sem::ViewInsertInfoRead for BaseContext {
-    fn view_insert_support(&self, _view: &FullName) -> crate::sem::ViewInsertSupport {
-        unreachable!(
-            "builtin root contains no ordinary views; schema views belong to the schema layer"
-        )
+    fn view_insert_support(&self, _view: &FullName) -> Option<&crate::sem::ViewInsertSupport> {
+        None
     }
 }
 
 impl crate::sem::ViewUpdateInfoRead for BaseContext {
-    fn view_update_support(&self, _view: &crate::sem::FullName) -> crate::sem::ViewUpdateSupport {
-        unreachable!(
-            "builtin root contains no ordinary views; schema views belong to the schema layer"
-        )
+    fn view_update_support(
+        &self,
+        _view: &crate::sem::FullName,
+    ) -> Option<&crate::sem::ViewUpdateSupport> {
+        None
     }
 }
 

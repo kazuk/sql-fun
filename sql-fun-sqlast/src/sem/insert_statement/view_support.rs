@@ -1,9 +1,11 @@
 use crate::sem::{ColumnDefinition, ColumnName, FullName};
 
-/// Completed catalog decision about INSERT into an ordinary view.
+/// Catalog decision about INSERT into an ordinary view.
 /// An empty writable-column list still permits DEFAULT VALUES.
 #[derive(Debug, Clone, Eq, Hash, PartialEq, serde::Serialize, serde::Deserialize)]
 pub struct ViewInsertSupport {
+    #[serde(default)]
+    missing_metadata: Option<FullName>,
     writable_columns: Option<Vec<ColumnDefinition>>,
     returning: bool,
     #[serde(default)]
@@ -11,6 +13,16 @@ pub struct ViewInsertSupport {
     on_conflict: bool,
 }
 impl ViewInsertSupport {
+    pub(crate) fn missing_metadata(view: &FullName) -> Self {
+        let mut support = Self::read_only();
+        support.missing_metadata = Some(view.clone());
+        support
+    }
+    /// An explicitly incomplete catalog decision, distinct from read-only support.
+    pub const fn missing_metadata_view(&self) -> Option<&FullName> {
+        self.missing_metadata.as_ref()
+    }
+
     /// Record alias equivalence for automatic-view assignment targets.
     /// Trigger/rule-backed NEW-row fields have independent identities instead.
     pub fn set_assignment_columns(&mut self, columns: &[crate::sem::ViewAssignmentColumn]) {
@@ -28,6 +40,7 @@ impl ViewInsertSupport {
     /// The view cannot accept INSERT statements.
     pub const fn read_only() -> Self {
         Self {
+            missing_metadata: None,
             writable_columns: None,
             returning: false,
             assignment_columns: Vec::new(),
@@ -41,6 +54,7 @@ impl ViewInsertSupport {
     /// default, generated and identity constraints needed for INSERT validation.
     pub fn writable(columns: &[ColumnDefinition], returning: bool, on_conflict: bool) -> Self {
         Self {
+            missing_metadata: None,
             writable_columns: Some(columns.to_vec()),
             returning,
             assignment_columns: Vec::new(),
@@ -79,8 +93,9 @@ impl ViewInsertSupport {
 /// qualified; this is not a second search-path lookup.
 pub trait ViewInsertInfoRead {
     /// Return a completed capability decision for an existing ordinary view.
-    /// Missing trigger/rule/update metadata must remain explicitly unimplemented
-    /// in the catalog, rather than being interpreted as a read-only view.
+    /// Missing loaded metadata is retained explicitly by `missing_metadata_view`,
+    /// independently of a completed read-only decision. Unimplemented producer
+    /// functionality remains explicit at its implementation boundary.
     /// No trigger or rule body is executed by INSERT name resolution.
     fn view_insert_support(&self, view: &FullName) -> ViewInsertSupport;
 }

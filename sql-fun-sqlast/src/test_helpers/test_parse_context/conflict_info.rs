@@ -71,7 +71,7 @@ impl ConflictInfoRead for TestParseContext {
         &self,
         table: &TableName,
         conflict: &InsertConflict,
-    ) -> Result<Vec<InsertArbiter>, AnalysisError> {
+    ) -> Result<crate::sem::ConflictArbiterInference, AnalysisError> {
         if let Some(expected) = &self.expected_conflict_modifiers {
             if let Some(expected) = &self.expected_conflict_target {
                 assert_eq!(table, expected);
@@ -83,7 +83,9 @@ impl ConflictInfoRead for TestParseContext {
                 expected,
                 "bound modifiers supplied to catalog inference"
             );
-            Ok(self.conflict_arbiters.clone())
+            Ok(crate::sem::ConflictArbiterInference::complete(
+                &self.conflict_arbiters,
+            ))
         } else {
             crate::sem::infer_from_catalog(self, table, conflict)
         }

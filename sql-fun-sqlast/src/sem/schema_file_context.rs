@@ -1080,7 +1080,7 @@ impl crate::sem::ConflictInfoRead for SchemaCatalog {
         &self,
         table: &crate::sem::TableName,
         conflict: &crate::sem::InsertConflict,
-    ) -> Result<Vec<crate::sem::InsertArbiter>, AnalysisError> {
+    ) -> Result<crate::sem::ConflictArbiterInference, AnalysisError> {
         crate::sem::parse_context::conflict_info::infer_from_catalog(self, table, conflict)
     }
 }

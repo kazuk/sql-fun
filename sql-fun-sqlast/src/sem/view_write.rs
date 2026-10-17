@@ -1,5 +1,6 @@
 //! Catalog-owned facts and decisions for ordinary writable views.
 //! Read projections remain in CreateView; these facts are never DML-owned.
+use crate::sem::problem::ViewProblem;
 use crate::sem::{
     AnalysisError, BaseParseContext, ColumnDefinition, ColumnName, FullName, SemScalarExpr,
     TableName, ViewInsertSupport, ViewUpdateSupport,
@@ -40,12 +41,11 @@ impl ViewWriteInfo {
     }
     pub(crate) fn has_trigger(&self, trigger: &FullName) -> bool {
         self.name.schema() == trigger.schema()
-            && self
-                .objects
-                .iter()
-                .any(|object| !object.is_rule() && object.name == trigger.name().as_str())
+            && self.objects.iter().any(|object| {
+                !object.is_rule() && object.name.eq_ignore_ascii_case(trigger.name().as_str())
+            })
     }
-    pub(crate) fn replace_definition(&mut self, replacement: &Self) -> Result<(), AnalysisError> {
+    pub(crate) fn replace_definition(&mut self, replacement: &Self) -> Result<(), ViewProblem> {
         if self.projections.len() > replacement.projections.len()
             || self
                 .projections
@@ -55,9 +55,7 @@ impl ViewWriteInfo {
                     old.name() != new.name() || old.get_type() != new.get_type()
                 })
         {
-            return AnalysisError::raise_unexpected_input(
-                "CREATE OR REPLACE VIEW cannot remove, rename or change types of existing columns",
-            );
+            return Err(ViewProblem::invalid_replacement(&self.name));
         }
         self.source = replacement.source.clone();
         self.retained_options = replacement.retained_options.clone();
@@ -83,7 +81,7 @@ impl ViewWriteInfo {
         }
     }
 
-    pub(crate) fn apply(&mut self, change: &ViewWriteChange) -> Result<(), AnalysisError> {
+    pub(crate) fn apply(&mut self, change: &ViewWriteChange) -> Result<(), ViewProblem> {
         match &change.action {
             WriteAction::Sequence(actions) => {
                 for action in actions {
@@ -99,9 +97,10 @@ impl ViewWriteInfo {
                     return Ok(());
                 }
                 if exists && !change.replace {
-                    return AnalysisError::raise_unexpected_input(
-                        "view trigger/rule already exists",
-                    );
+                    return Err(ViewProblem::duplicate_object(
+                        &self.name,
+                        &change.object.name,
+                    ));
                 }
                 self.objects
                     .retain(|old| !old.same_identity(&change.object));
@@ -113,9 +112,10 @@ impl ViewWriteInfo {
                     .iter()
                     .any(|(column, _)| column.name().as_ref() == Some(&default.column))
                 {
-                    return AnalysisError::raise_unexpected_input(
-                        "view default column does not exist",
-                    );
+                    return Err(ViewProblem::unknown_default_column(
+                        &self.name,
+                        default.column.as_str(),
+                    ));
                 }
                 self.defaults
                     .retain(|(column, _)| column != &default.column);
@@ -130,9 +130,7 @@ impl ViewWriteInfo {
                         .iter()
                         .any(|old| old.same_identity(&change.object))
                 {
-                    return AnalysisError::raise_unexpected_input(
-                        "view trigger/rule does not exist",
-                    );
+                    return Err(ViewProblem::missing_object(&self.name, &change.object.name));
                 }
                 self.objects
                     .retain(|old| !old.same_identity(&change.object));
@@ -178,7 +176,7 @@ impl ViewWriteInfo {
         context: &impl BaseParseContext,
         event: WriteEvent,
         seen: &mut Vec<FullName>,
-    ) -> Decision {
+    ) -> Result<Decision, FullName> {
         let rules: Vec<_> = self
             .matching_objects(event)
             .filter(|object| object.is_rule())
@@ -191,7 +189,11 @@ impl ViewWriteInfo {
             let returning = rules
                 .iter()
                 .any(|object| object.replaces_unconditionally() && object.returning);
-            return Decision::writable(&self.visible_columns(), returning, false);
+            return Ok(Decision::writable(
+                &self.visible_columns(),
+                returning,
+                false,
+            ));
         }
         if trigger {
             let mut decision = Decision::writable(
@@ -202,21 +204,21 @@ impl ViewWriteInfo {
             if crate::ast::Dialect::from(context.metadata()) == crate::ast::Dialect::sqlite() {
                 decision.required_trigger_columns = self.trigger_columns(event);
             }
-            return decision;
+            return Ok(decision);
         }
         if crate::ast::Dialect::from(context.metadata()) == crate::ast::Dialect::sqlite() {
-            return Decision::read_only();
+            return Ok(Decision::read_only());
         }
         // Conditional INSTEAD rules prevent automatic rewriting, even when
         // no row would satisfy their condition. Triggers were considered above.
         if rules.iter().any(|object| object.is_instead_rule()) {
-            return Decision::read_only();
+            return Ok(Decision::read_only());
         }
         let Some(source) = &self.source else {
-            return Decision::read_only();
+            return Ok(Decision::read_only());
         };
         if seen.contains(source) {
-            return Decision::read_only();
+            return Ok(Decision::read_only());
         }
         seen.push(source.clone());
         let base = if let Some(table) = context.get_table_impl(source) {
@@ -231,15 +233,15 @@ impl ViewWriteInfo {
             } else {
                 context
                     .view_write_info(source)
-                    .expect("loaded ordinary-view write metadata")
-                    .decision(context, event, seen)
+                    .ok_or_else(|| source.clone())?
+                    .decision(context, event, seen)?
             }
         } else {
             Decision::read_only()
         };
         seen.pop();
         if !base.writable {
-            return base;
+            return Ok(base);
         }
         let mut columns = Vec::new();
         let mut assignment_columns = Vec::new();
@@ -269,12 +271,12 @@ impl ViewWriteInfo {
         }
         // PostgreSQL requires at least one updatable projection, even for DEFAULT VALUES.
         if columns.is_empty() {
-            return Decision::read_only();
+            return Ok(Decision::read_only());
         }
         let mut decision = Decision::writable(&columns, base.returning, base.on_conflict);
         decision.assignment_columns = assignment_columns;
         decision.rewrites_defaults = true;
-        decision
+        Ok(decision)
     }
 
     fn trigger_columns(&self, event: WriteEvent) -> Option<Vec<ColumnName>> {
@@ -374,10 +376,14 @@ pub(crate) fn insert_support(
     context: &impl BaseParseContext,
     view: &FullName,
 ) -> ViewInsertSupport {
-    let decision = context
-        .view_write_info(view)
-        .expect("loaded ordinary-view write metadata")
-        .decision(context, WriteEvent::insert(), &mut vec![view.clone()]);
+    let decision = match context.view_write_info(view) {
+        Some(info) => info.decision(context, WriteEvent::insert(), &mut vec![view.clone()]),
+        None => Err(view.clone()),
+    };
+    let decision = match decision {
+        Ok(decision) => decision,
+        Err(missing) => return ViewInsertSupport::missing_metadata(&missing),
+    };
     if decision.writable {
         let mut support = ViewInsertSupport::writable(
             &decision.columns,
@@ -395,10 +401,14 @@ pub(crate) fn update_support(
     context: &impl BaseParseContext,
     view: &FullName,
 ) -> ViewUpdateSupport {
-    let decision = context
-        .view_write_info(view)
-        .expect("loaded ordinary-view write metadata")
-        .decision(context, WriteEvent::update(), &mut vec![view.clone()]);
+    let decision = match context.view_write_info(view) {
+        Some(info) => info.decision(context, WriteEvent::update(), &mut vec![view.clone()]),
+        None => Err(view.clone()),
+    };
+    let decision = match decision {
+        Ok(decision) => decision,
+        Err(missing) => return ViewUpdateSupport::missing_metadata(&missing),
+    };
     if decision.writable {
         let mut support = ViewUpdateSupport::writable(&decision.columns, decision.returning);
         support.set_assignment_columns(&decision.assignment_columns);
@@ -454,6 +464,14 @@ impl WriteAction {
 
     pub(crate) fn sequence(actions: &[Self]) -> Self {
         Self::Sequence(actions.to_vec())
+    }
+    pub(crate) fn trigger_declaration(&self) -> Option<(&str, bool)> {
+        if let Self::Object(change) = self
+            && !change.object.is_rule()
+        {
+            return Some((&change.object.name, change.if_not_exists));
+        }
+        None
     }
     pub(crate) fn object(object: &WriteObject, replace: bool, if_not_exists: bool) -> Self {
         Self::Object(ObjectChange {
@@ -608,32 +626,48 @@ pub(crate) fn infer_view_arbiters(
     context: &impl BaseParseContext,
     view: &TableName,
     conflict: &crate::sem::InsertConflict,
-) -> Result<Vec<crate::sem::InsertArbiter>, AnalysisError> {
-    let info = context
-        .view_write_info(view.full_name())
-        .expect("bound view metadata");
+) -> Result<crate::sem::ConflictArbiterInference, AnalysisError> {
+    let Some(info) = context.view_write_info(view.full_name()) else {
+        return Ok(crate::sem::ConflictArbiterInference::missing_view_metadata(
+            view.full_name(),
+        ));
+    };
+    if let Err(missing) = info.decision(
+        context,
+        WriteEvent::insert(),
+        &mut vec![view.full_name().clone()],
+    ) {
+        return Ok(crate::sem::ConflictArbiterInference::missing_view_metadata(
+            &missing,
+        ));
+    }
     if info
         .matching_objects(WriteEvent::insert())
         .any(|object| object.is_instead_rule() || object.is_instead_trigger())
     {
-        return Ok(Vec::new());
+        return Ok(crate::sem::ConflictArbiterInference::complete(&[]));
     }
     let Some(source) = &info.source else {
-        return Ok(Vec::new());
+        return Ok(crate::sem::ConflictArbiterInference::complete(&[]));
     };
     let mut mapped = conflict.clone();
     if !mapped.map_view_columns(context, info, source)? {
-        return Ok(Vec::new());
+        return Ok(crate::sem::ConflictArbiterInference::complete(&[]));
     }
     let relation = TableName::from(source.clone());
-    let arbiters = context.infer_conflict_arbiters(&relation, &mapped)?;
+    let inference = context.infer_conflict_arbiters(&relation, &mapped)?;
     if context.get_table_impl(source).is_some() {
-        Ok(arbiters
-            .into_iter()
-            .map(|arbiter| arbiter.with_view_source(&relation))
-            .collect())
+        match inference.into_result() {
+            Ok(arbiters) => Ok(crate::sem::ConflictArbiterInference::complete(
+                &arbiters
+                    .into_iter()
+                    .map(|arbiter| arbiter.with_view_source(&relation))
+                    .collect::<Vec<_>>(),
+            )),
+            Err(problem) => Ok(crate::sem::ConflictArbiterInference::problem(&problem)),
+        }
     } else {
-        Ok(arbiters)
+        Ok(inference)
     }
 }
 

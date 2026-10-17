@@ -267,7 +267,7 @@ macro_rules! forward_catalog_reads {
                 &self,
                 table: &crate::sem::TableName,
                 conflict: &crate::sem::InsertConflict,
-            ) -> Result<Vec<crate::sem::InsertArbiter>, crate::sem::AnalysisError> {
+            ) -> Result<crate::sem::ConflictArbiterInference, crate::sem::AnalysisError> {
                 crate::sem::ConflictInfoRead::infer_conflict_arbiters(
                     self.$catalog(),
                     table,

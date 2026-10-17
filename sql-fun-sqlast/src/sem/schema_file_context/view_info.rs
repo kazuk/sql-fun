@@ -67,11 +67,16 @@ impl ViewInfoWrite for SchemaFileContext {
         mut self,
         change: &crate::sem::ViewWriteChange,
     ) -> Result<Self, AnalysisError> {
-        let mut info = self
-            .view_write_info(change.view())
-            .cloned()
-            .expect("bound view write metadata");
-        info.apply(change)?;
+        let Some(mut info) = self.view_write_info(change.view()).cloned() else {
+            self.report_analysis_problem(AnalysisProblem::view(
+                &crate::sem::problem::ViewProblem::missing_metadata(change.view()),
+            ))?;
+            return Ok(self);
+        };
+        if let Err(problem) = info.apply(change) {
+            self.report_analysis_problem(AnalysisProblem::view(&problem))?;
+            return Ok(self);
+        }
         self.catalog
             .view_writes
             .insert(&change.view().to_string(), info);

@@ -9,6 +9,7 @@ mod parameter_constraint;
 mod query;
 mod sql_highlighter;
 mod update;
+mod view;
 
 use std::collections::HashSet;
 
@@ -31,6 +32,7 @@ pub use self::ownership::OwnershipProblem;
 pub use self::parameter_constraint::ParameterConstraintProblem;
 pub use self::query::QueryProblem;
 pub use self::update::{UpdateProblem, UpdateProblemKind};
+pub use self::view::ViewProblem;
 
 pub(crate) use self::{overload_resolution::OverloadResolution, sql_highlighter::SqlHighlighter};
 
@@ -72,6 +74,8 @@ trait RenderProblemReport: Problem {
 pub enum AnalysisProblem {
     /// ALTER OWNER target or role lookup failed.
     Ownership(OwnershipProblem),
+    /// A view declaration or catalog capability violation.
+    View(ViewProblem),
     /// A violation of INSERT semantic rules.
     Insert(InsertProblem),
     /// A violation of DELETE semantic rules.
@@ -171,6 +175,18 @@ impl AnalysisProblem {
         }
     }
 
+    pub(crate) fn view(problem: &ViewProblem) -> Self {
+        Self::View(problem.clone())
+    }
+
+    /// Structured view declaration or capability violation.
+    pub const fn view_problem(&self) -> Option<&ViewProblem> {
+        if let Self::View(problem) = self {
+            Some(problem)
+        } else {
+            None
+        }
+    }
     pub(crate) fn update(kind: UpdateProblemKind, message: &str) -> Self {
         Self::Update(UpdateProblem::new(kind, message))
     }
@@ -215,6 +231,7 @@ impl AnalysisProblem {
     pub const fn code(&self) -> &'static str {
         match self {
             Self::Ownership(problem) => problem.code(),
+            Self::View(problem) => problem.code(),
             Self::Insert(problem) => problem.code(),
             Self::Update(problem) => problem.code(),
             Self::Delete(problem) => problem.code(),
@@ -266,6 +283,7 @@ impl AnalysisProblem {
 
         let report = match self {
             Self::Ownership(problem) => problem.render_report(&report_handler, source)?,
+            Self::View(problem) => problem.render_report(&report_handler, source)?,
             Self::Insert(problem) => problem.render_report(&report_handler, source)?,
             Self::Update(problem) => problem.render_report(&report_handler, source)?,
             Self::Delete(problem) => problem.render_report(&report_handler, source)?,

@@ -318,6 +318,16 @@ directly:
   changes what the reader needs to know or do. Recheck this when reviewing the
   final documentation diff.
 
+## SQL Analysis Context Architecture
+
+- Before planning, implementing, or reviewing SQL analyzers, name resolution,
+  semantic analysis, type/constraint inference, or their diagnostic and lint
+  behavior, read and apply
+  [docs/internal-rules/sql-analysis-context-guideline.md](docs/internal-rules/sql-analysis-context-guideline.md).
+- `ParseContext` is the mandatory shared environment for every SQL analyzer;
+  local scope or pass-state objects may supplement it but must not replace it.
+  Keep the detailed contract and rationale in the linked guideline.
+
 ## Coding Guidelines and Reviews
 
 - Before planning, implementing, or reviewing AST mutation APIs, read and apply

@@ -409,9 +409,8 @@ jobs:
           if-no-files-found: error
 
   install-validation:
-    needs: pr-freshness
+    needs: [pr-freshness, packaging]
     runs-on: ubuntu-24.04
-    needs: packaging
     steps:
       - uses: actions/checkout@v5
 
@@ -457,9 +456,8 @@ jobs:
             '
 
   postgres-extraction:
-    needs: pr-freshness
+    needs: [pr-freshness, packaging]
     runs-on: ubuntu-24.04
-    needs: packaging
     steps:
       - uses: actions/checkout@v5
 

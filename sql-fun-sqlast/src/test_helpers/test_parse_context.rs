@@ -426,11 +426,14 @@ impl FunctionInfoWrite for TestParseContext {
 }
 
 impl ParseContext for TestParseContext {
-    fn cursors(&self) -> &crate::sem::CursorBindings {
-        &self.cursors
+    fn resolve_cursor(&self, name: &str) -> Option<&crate::sem::CursorInfo> {
+        self.cursors.cursor(name)
     }
-    fn cursors_mut(&mut self) -> &mut crate::sem::CursorBindings {
-        &mut self.cursors
+    fn bind_cursor(&mut self, name: &str, info: &crate::sem::CursorInfo) {
+        self.cursors.bind(name, info);
+    }
+    fn remove_cursor(&mut self, name: &str) {
+        self.cursors.remove(name);
     }
     fn analysis_state(&self) -> &crate::sem::AnalysisState {
         &self.analysis_state

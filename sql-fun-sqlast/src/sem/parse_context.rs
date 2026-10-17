@@ -14,12 +14,14 @@ use std::{
 pub use self::{
     cast_info::CastInfoRead,
     conflict_info::{CatalogNameLookup, ConflictInfoRead},
-    cursors::{CursorBindings, CursorInfo},
+    cursors::CursorInfo,
     seq_info::{SequenceInfoRead, SequenceInfoWrite},
     table_info::{TableInfoRead, TableInfoWrite},
     type_info::{TypeInfoRead, TypeInfoWrite},
     view_info::{ViewInfoRead, ViewInfoWrite},
 };
+
+pub(crate) use self::cursors::CursorBindings;
 
 use crate::{
     StringSpan,
@@ -259,12 +261,18 @@ where
         crate::ast::Dialect::from(self.metadata())
     }
 
-    /// Portal bindings in the current session scope, independent of schema catalogs.
+    /// Resolve an exact portal name in the current session scope.
     /// An absent binding is an unresolved cursor, including in an empty scope.
-    fn cursors(&self) -> &CursorBindings;
+    /// Portal names are distinct from procedural refcursor variable names.
+    fn resolve_cursor(&self, name: &str) -> Option<&CursorInfo>;
 
-    /// Establish the session scope explicitly; statement analysis does not change it.
-    fn cursors_mut(&mut self) -> &mut CursorBindings;
+    /// Establish or replace a portal binding in the current session scope.
+    /// Providers own storage and lifecycle bookkeeping; analysis only looks up bindings.
+    /// Session bindings are independent of schema catalogs and are not frozen into them.
+    fn bind_cursor(&mut self, name: &str, info: &CursorInfo);
+
+    /// Remove a portal binding from the current session scope.
+    fn remove_cursor(&mut self, name: &str);
 
     /// Bookkeeping for the current outer analysis, independent of local scopes.
     fn analysis_state(&self) -> &crate::sem::AnalysisState;

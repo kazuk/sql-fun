@@ -95,6 +95,22 @@ impl ColumnDefinition {
         self.is_not_null = not_null;
     }
 
+    pub(super) fn apply_primary_key_nullability(&mut self) {
+        if self
+            .constraints
+            .iter()
+            .any(|constraint| constraint.as_primary_key().is_some())
+        {
+            self.set_not_null(Some(true));
+        }
+    }
+
+    pub(super) fn has_unique_key(&self) -> bool {
+        self.constraints.iter().any(|constraint| {
+            constraint.as_primary_key().is_some() || constraint.as_unique().is_some()
+        })
+    }
+
     /// get column constraints
     #[must_use]
     pub const fn constraints(&self) -> &[ColumnConstraint] {

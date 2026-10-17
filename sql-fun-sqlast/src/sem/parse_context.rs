@@ -13,7 +13,7 @@ use std::{
 
 pub use self::{
     cast_info::CastInfoRead,
-    conflict_info::{CatalogNameLookup, ConflictInfoRead},
+    conflict_info::{CatalogNameLookup, ConflictArbiterInference, ConflictInfoRead},
     cursors::CursorInfo,
     seq_info::{SequenceInfoRead, SequenceInfoWrite},
     table_info::{TableInfoRead, TableInfoWrite},

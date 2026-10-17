@@ -85,6 +85,29 @@ impl LookupOutcome {
     }
 }
 
+/// A completed arbiter lookup or an explicit catalog diagnostic.
+/// Missing view metadata must not masquerade as a completed empty inference.
+#[derive(Debug, Clone)]
+pub struct ConflictArbiterInference(Result<Vec<InsertArbiter>, Box<crate::sem::AnalysisProblem>>);
+impl ConflictArbiterInference {
+    /// Record completed inference, including a genuine no-match result.
+    pub fn complete(arbiters: &[InsertArbiter]) -> Self {
+        Self(Ok(arbiters.to_vec()))
+    }
+    pub(crate) fn problem(problem: &crate::sem::AnalysisProblem) -> Self {
+        Self(Err(Box::new(problem.clone())))
+    }
+    pub(crate) fn missing_view_metadata(view: &FullName) -> Self {
+        Self(Err(Box::new(crate::sem::AnalysisProblem::view(
+            &crate::sem::problem::ViewProblem::missing_metadata(view),
+        ))))
+    }
+    /// Consume the lookup while preserving an incomplete catalog diagnostic.
+    pub fn into_result(self) -> Result<Vec<InsertArbiter>, Box<crate::sem::AnalysisProblem>> {
+        self.0
+    }
+}
+
 /// Catalog services required by conflict-target name resolution and inference.
 ///
 /// These methods must return completed lookups, never guess a binding from its
@@ -133,7 +156,7 @@ pub trait ConflictInfoRead {
         &self,
         table: &TableName,
         conflict: &InsertConflict,
-    ) -> Result<Vec<InsertArbiter>, AnalysisError>;
+    ) -> Result<ConflictArbiterInference, AnalysisError>;
 }
 
 /// Existing catalog support, shared by production contexts until extractor
@@ -142,7 +165,7 @@ pub(crate) fn infer_from_catalog(
     context: &impl BaseParseContext,
     table: &TableName,
     conflict: &InsertConflict,
-) -> Result<Vec<InsertArbiter>, AnalysisError> {
+) -> Result<ConflictArbiterInference, AnalysisError> {
     if context.get_table(table).is_none() {
         return crate::sem::view_write::infer_view_arbiters(context, table, conflict);
     }
@@ -181,5 +204,5 @@ pub(crate) fn infer_from_catalog(
     if arbiters.is_empty() && needs_implication {
         todo!("catalog partial-index predicate implication service");
     }
-    Ok(arbiters)
+    Ok(ConflictArbiterInference::complete(&arbiters))
 }

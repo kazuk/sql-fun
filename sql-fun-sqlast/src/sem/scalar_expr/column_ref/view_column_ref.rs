@@ -1,7 +1,6 @@
 use crate::sem::scalar_expr::column_ref::{ColumnReference, ColumnReferenceExpr};
 use crate::sem::{
-    AnalysisError, AnalysisProblem, ColumnDefinition, ColumnName, Nullable, SemScalarExpr,
-    TypeReference, ViewName, data_source::AliasName,
+    ColumnDefinition, ColumnName, Nullable, TypeReference, ViewName, data_source::AliasName,
 };
 
 #[derive(Debug, Clone, Eq, Hash, PartialEq, serde::Serialize, serde::Deserialize)]
@@ -66,48 +65,22 @@ impl ViewColumnRef {
             datasource_nullable,
         }
     }
-
-    pub(crate) fn view_source_ref<'context, TParseContext>(
-        context: &'context mut TParseContext,
-        alias: &AliasName,
-        column: &ColumnName,
-        view_name: &ViewName,
-        nullability: Nullable,
-    ) -> Result<(SemScalarExpr, &'context mut TParseContext), AnalysisError>
-    where
-        TParseContext: crate::sem::ParseContext,
-    {
-        let Some(view) = context.get_view(view_name) else {
-            AnalysisError::raise_unexpected_input(&format!(
-                "view {view_name} not found in context"
-            ))?
-        };
-
-        let column_def = view.get_column_def(column);
-        if column_def.is_none() {
-            context.report_analysis_problem(AnalysisProblem::column_not_found_in_view(
-                view_name, column,
-            ))?;
-        }
-        let col_ref = Self::new(alias, column, view_name, &column_def, nullability);
-        Ok((
-            SemScalarExpr::ColumnRef(ColumnReferenceExpr::ViewColumn(col_ref)),
-            context,
-        ))
-    }
 }
 
 impl ColumnReferenceExpr {
-    pub(crate) fn view_source_ref<'context, TParseContext>(
-        context: &'context mut TParseContext,
+    pub(crate) fn view_column(
         alias: &AliasName,
         column: &ColumnName,
-        view_name: &ViewName,
-        nullability: Nullable,
-    ) -> Result<(SemScalarExpr, &'context mut TParseContext), AnalysisError>
-    where
-        TParseContext: crate::sem::ParseContext,
-    {
-        ViewColumnRef::view_source_ref(context, alias, column, view_name, nullability)
+        view: &ViewName,
+        definition: Option<&ColumnDefinition>,
+        nullable: Nullable,
+    ) -> Self {
+        Self::ViewColumn(ViewColumnRef::new(
+            alias,
+            column,
+            view,
+            &definition.cloned(),
+            nullable,
+        ))
     }
 }

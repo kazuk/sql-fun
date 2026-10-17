@@ -1,9 +1,11 @@
 use crate::sem::{ColumnDefinition, ColumnName, FullName};
 
-/// Completed catalog decision about UPDATE into an ordinary view.
+/// Catalog decision about UPDATE into an ordinary view.
 /// Capabilities are independent of INSERT permissions.
 #[derive(Debug, Clone, Eq, Hash, PartialEq, serde::Serialize, serde::Deserialize)]
 pub struct ViewUpdateSupport {
+    #[serde(default)]
+    missing_metadata: Option<FullName>,
     writable_columns: Option<Vec<ColumnDefinition>>,
     returning: bool,
     #[serde(default)]
@@ -14,6 +16,16 @@ pub struct ViewUpdateSupport {
     required_trigger_columns: Option<Vec<ColumnName>>,
 }
 impl ViewUpdateSupport {
+    pub(crate) fn missing_metadata(view: &FullName) -> Self {
+        let mut support = Self::read_only();
+        support.missing_metadata = Some(view.clone());
+        support
+    }
+    /// An explicitly incomplete catalog decision, distinct from read-only support.
+    pub const fn missing_metadata_view(&self) -> Option<&FullName> {
+        self.missing_metadata.as_ref()
+    }
+
     /// Record alias equivalence for automatic-view assignment targets.
     /// Trigger/rule-backed NEW-row fields have independent identities instead.
     pub fn set_assignment_columns(&mut self, columns: &[crate::sem::ViewAssignmentColumn]) {
@@ -43,6 +55,7 @@ impl ViewUpdateSupport {
     /// The view cannot accept UPDATE statements.
     pub const fn read_only() -> Self {
         Self {
+            missing_metadata: None,
             writable_columns: None,
             returning: false,
             unassignable_defaults: Vec::new(),
@@ -57,6 +70,7 @@ impl ViewUpdateSupport {
     /// default, generated and identity constraints needed for UPDATE validation.
     pub fn writable(columns: &[ColumnDefinition], returning: bool) -> Self {
         Self {
+            missing_metadata: None,
             writable_columns: Some(columns.to_vec()),
             returning,
             unassignable_defaults: Vec::new(),
@@ -74,7 +88,13 @@ impl ViewUpdateSupport {
     pub fn accepts_assignments(&self, columns: &[ColumnName]) -> bool {
         self.required_trigger_columns
             .as_ref()
-            .is_none_or(|required| required.iter().any(|column| columns.contains(column)))
+            .is_none_or(|required| {
+                required.iter().any(|column| {
+                    columns
+                        .iter()
+                        .any(|assigned| column.as_str().eq_ignore_ascii_case(assigned.as_str()))
+                })
+            })
     }
 
     /// Whether the view supports UPDATE RETURNING (rules may restrict this).
@@ -103,8 +123,9 @@ impl ViewUpdateSupport {
 /// qualified; this is not a second search-path lookup.
 pub trait ViewUpdateInfoRead {
     /// Return a completed capability decision for an existing ordinary view.
-    /// Missing trigger/rule/update metadata must remain explicitly unimplemented
-    /// in the catalog, rather than being interpreted as a read-only view.
+    /// Missing loaded metadata is retained explicitly by `missing_metadata_view`,
+    /// independently of a completed read-only decision. Unimplemented producer
+    /// functionality remains explicit at its implementation boundary.
     /// No trigger or rule body is executed by UPDATE name resolution.
     fn view_update_support(&self, view: &FullName) -> ViewUpdateSupport;
 }

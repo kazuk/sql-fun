@@ -130,23 +130,70 @@ mod test_helpers {
                 &self,
                 sql: &str,
             ) -> Result<Vec<::sql_fun_sqlast::sem::AnalysisProblem>, String> {
-                let context = SchemaFileContext::new(
-                    Path::new("query.sql"),
+                self.query_problems_at(self.context(), sql)
+            }
+            pub fn without_search_path(&self) -> FrozenBaseContext {
+                use ::sql_fun_sqlast::sem::ParseContext;
+                let mut context = SchemaFileContext::new(
+                    Path::new("empty-path.sql"),
                     self.context(),
                     &self.args,
                     &self.metadata,
                 );
+                context.set_search_path(&[]);
+                context.freeze()
+            }
+            pub fn incomplete_catalog(&self) -> Result<FrozenBaseContext, String> {
+                use ::sql_fun_sqlast::sem::{ParseContext, ViewInfoWrite};
+                let SemAst::CreateView(view) =
+                    self.analyze("CREATE VIEW public.incomplete AS SELECT id FROM public.items")?
+                else {
+                    panic!("expected view")
+                };
+                let context = SchemaFileContext::new(
+                    Path::new("older.sql"),
+                    self.context(),
+                    &self.args,
+                    &self.metadata,
+                );
+                let context = context
+                    .apply_create_view(&view)
+                    .map_err(|error| error.to_string())?;
                 let statement = ::sql_fun_sqlast::parse_statements(
-                    sql,
+                    "CREATE VIEW public.incomplete_nested AS SELECT id FROM public.incomplete",
                     ::sql_fun_sqlast::ast::Dialect::from(&self.metadata),
                 )
                 .next()
                 .unwrap()
                 .map_err(|error| error.to_string())?;
-                let result = statement
+                Ok(statement
                     .analyze(context)
-                    .map_err(|error| error.to_string())?;
-                Ok(result.into_context().problems().to_vec())
+                    .map_err(|error| error.to_string())?
+                    .into_context()
+                    .freeze())
+            }
+            pub fn query_problems_at(
+                &self,
+                base: &FrozenBaseContext,
+                sql: &str,
+            ) -> Result<Vec<::sql_fun_sqlast::sem::AnalysisProblem>, String> {
+                let mut context = SchemaFileContext::new(
+                    Path::new("query.sql"),
+                    base,
+                    &self.args,
+                    &self.metadata,
+                );
+                for statement in ::sql_fun_sqlast::parse_statements(
+                    sql,
+                    ::sql_fun_sqlast::ast::Dialect::from(&self.metadata),
+                ) {
+                    context = statement
+                        .map_err(|error| error.to_string())?
+                        .analyze(context)
+                        .map_err(|error| error.to_string())?
+                        .into_context();
+                }
+                Ok(context.problems().to_vec())
             }
             pub fn analyze(&self, sql: &str) -> Result<SemAst, String> {
                 let context = SchemaFileContext::new(
@@ -548,6 +595,12 @@ CREATE OR REPLACE VIEW public.v AS SELECT DISTINCT id FROM public.items;
     true,
     true
 )]
+#[case::additional_update(
+    "CREATE RULE r AS ON UPDATE TO public.v DO ALSO INSERT INTO public.audit VALUES(NEW.id);",
+    true,
+    true,
+    true
+)]
 #[case::instead(
     "CREATE RULE r AS ON INSERT TO public.v DO INSTEAD NOTHING;",
     true,
@@ -853,6 +906,191 @@ fn view_inference_expands_projection_expressions(
     assert_eq!(
         arbiters[0].source_relation().unwrap().full_name(),
         &FullName::with_schema("public", "items")
+    );
+    Ok(())
+}
+
+#[rstest::rstest]
+#[case::insert("INSERT INTO public.alias_view(x) VALUES (1) ON CONFLICT(x) DO NOTHING")]
+#[case::update("UPDATE public.alias_view SET x = 2 RETURNING x")]
+#[case::nested("UPDATE public.alias_nested SET y = 2 RETURNING y")]
+#[case::cast("UPDATE public.alias_cast SET x = 2")]
+fn from_column_aliases_preserve_source_identity(
+    #[case] sql: &str,
+) -> Result<(), Box<dyn std::error::Error>> {
+    let schema = heavy::ViewSchema::postgres(
+        r"
+CREATE TABLE public.items(id integer PRIMARY KEY);
+CREATE VIEW public.alias_view AS SELECT x FROM public.items AS i(x);
+CREATE VIEW public.alias_nested AS SELECT y FROM public.alias_view AS v(y);
+CREATE VIEW public.alias_cast AS SELECT x::integer AS x FROM public.items AS i(x);
+",
+    )?;
+    let result = schema.analyze(sql);
+    assert!(result.is_ok(), "{result:?}");
+    Ok(())
+}
+
+#[rstest::rstest]
+#[case::target(
+    "CREATE RULE r AS ON INSERT TO public.absent DO INSTEAD NOTHING",
+    "view_invalid_target"
+)]
+#[case::table(
+    "CREATE RULE r AS ON INSERT TO public.items DO INSTEAD NOTHING",
+    "view_invalid_target"
+)]
+#[case::missing_alter(
+    "ALTER VIEW public.absent ALTER COLUMN id SET DEFAULT 2",
+    "view_invalid_target"
+)]
+#[case::table_alter(
+    "ALTER VIEW public.items ALTER COLUMN id SET DEFAULT 2",
+    "view_invalid_target"
+)]
+#[case::duplicate(
+    "CREATE RULE r AS ON INSERT TO public.item_view DO INSTEAD NOTHING",
+    "view_duplicate_object"
+)]
+#[case::missing("DROP RULE absent ON public.item_view", "view_missing_object")]
+#[case::default(
+    "ALTER VIEW public.item_view ALTER COLUMN absent SET DEFAULT 2",
+    "view_unknown_default_column"
+)]
+#[case::replace(
+    "CREATE OR REPLACE VIEW public.item_view AS SELECT id FROM public.items",
+    "view_invalid_replacement"
+)]
+#[case::rename(
+    "CREATE OR REPLACE VIEW public.item_view AS SELECT id AS renamed, value, value+1 AS computed FROM public.items",
+    "view_invalid_replacement"
+)]
+#[case::type_change(
+    "CREATE OR REPLACE VIEW public.item_view AS SELECT id::bigint AS key, value, value+1 AS computed FROM public.items",
+    "view_invalid_replacement"
+)]
+#[case::missing_trigger("DROP TRIGGER absent ON public.item_view", "view_missing_object")]
+#[case::duplicate_view(
+    "CREATE VIEW public.item_view AS SELECT id FROM public.items",
+    "view_duplicate_object"
+)]
+#[case::alter("ALTER VIEW public.item_view DISABLE RULE r", "view_invalid_alter")]
+fn invalid_view_declarations_are_structured(
+    #[case] sql: &str,
+    #[case] code: &str,
+) -> Result<(), Box<dyn std::error::Error>> {
+    let schema = heavy::ViewSchema::postgres(&format!(
+        "{AUTOMATIC}\nCREATE RULE r AS ON INSERT TO public.item_view DO INSTEAD NOTHING;"
+    ))?;
+    let problems = schema.query_problems(&format!("{sql}; SELECT 1"))?;
+    assert!(
+        problems
+            .iter()
+            .any(|problem| problem.code() == code && problem.view_problem().is_some()),
+        "{problems:?}"
+    );
+    assert!(
+        schema
+            .analyze("UPDATE public.item_view SET value = 9")
+            .is_ok()
+    );
+    Ok(())
+}
+
+#[test]
+fn incomplete_view_metadata_is_explicit() -> Result<(), Box<dyn std::error::Error>> {
+    use ::sql_fun_sqlast::sem::{ConflictInfoRead, TableName};
+    let schema = heavy::ViewSchema::postgres(AUTOMATIC)?;
+    let older = schema.incomplete_catalog()?;
+    let view = FullName::with_schema("public", "incomplete");
+    assert_eq!(
+        older.view_insert_support(&view).missing_metadata_view(),
+        Some(&view)
+    );
+    assert_eq!(
+        older.view_update_support(&view).missing_metadata_view(),
+        Some(&view)
+    );
+    for nested in ["incomplete", "incomplete_nested"] {
+        let nested = FullName::with_schema("public", nested);
+        assert_eq!(
+            older.view_insert_support(&nested).missing_metadata_view(),
+            Some(&view)
+        );
+        assert_eq!(
+            older.view_update_support(&nested).missing_metadata_view(),
+            Some(&view)
+        );
+    }
+    for sql in [
+        "INSERT INTO public.incomplete_nested VALUES (1)",
+        "UPDATE public.incomplete_nested SET id = 2",
+        "INSERT INTO public.incomplete VALUES (1)",
+        "UPDATE public.incomplete SET id = 2",
+        "ALTER VIEW public.incomplete ALTER COLUMN id SET DEFAULT 2",
+    ] {
+        let problems = schema.query_problems_at(&older, sql)?;
+        assert!(
+            problems
+                .iter()
+                .any(|problem| problem.code() == "view_missing_write_metadata"),
+            "{problems:?}"
+        );
+    }
+    let statement = schema
+        .analyze("INSERT INTO public.item_view(key) VALUES (1) ON CONFLICT(key) DO NOTHING")?;
+    let conflict = &statement.as_insert().unwrap().conflicts()[0];
+    assert_eq!(
+        older
+            .infer_conflict_arbiters(&TableName::from(view), conflict)?
+            .into_result()
+            .unwrap_err()
+            .code(),
+        "view_missing_write_metadata"
+    );
+    Ok(())
+}
+
+#[cfg(feature = "sqlite")]
+#[test]
+fn sqlite_trigger_namespace_and_column_case_match_engine() -> Result<(), Box<dyn std::error::Error>>
+{
+    let ddl = r"
+CREATE TABLE items(a);
+CREATE VIEW v1 AS SELECT a FROM items;
+CREATE VIEW v2 AS SELECT a FROM items;
+CREATE TRIGGER Tr INSTEAD OF UPDATE OF A ON v1 BEGIN SELECT 1; END;
+CREATE TRIGGER IF NOT EXISTS tr INSTEAD OF INSERT ON v2 BEGIN SELECT 1; END;
+";
+    let db = ::rusqlite::Connection::open_in_memory()?;
+    db.execute_batch(ddl)?;
+    assert!(db.prepare("UPDATE v1 SET a = 1").is_ok());
+    assert!(db.prepare("INSERT INTO v2 VALUES (1)").is_err());
+    let schema = heavy::ViewSchema::sqlite(ddl)?;
+    assert!(schema.analyze("UPDATE v1 SET a = 1").is_ok());
+    assert!(schema.analyze("INSERT INTO v2 VALUES (1)").is_err());
+    let problems =
+        schema.query_problems("CREATE TRIGGER tr INSTEAD OF INSERT ON v2 BEGIN SELECT 1; END;")?;
+    assert!(
+        problems
+            .iter()
+            .any(|problem| problem.code() == "view_duplicate_object")
+    );
+    Ok(())
+}
+
+#[test]
+fn view_declaration_requires_a_selected_schema() -> Result<(), Box<dyn std::error::Error>> {
+    let schema = heavy::ViewSchema::postgres(AUTOMATIC)?;
+    let base = schema.without_search_path();
+    let problems = schema.query_problems_at(
+        &base,
+        "CREATE VIEW unqualified AS SELECT id FROM public.items; SELECT 1",
+    )?;
+    assert!(
+        problems
+            .iter()
+            .any(|problem| problem.code() == "view_invalid_target")
     );
     Ok(())
 }

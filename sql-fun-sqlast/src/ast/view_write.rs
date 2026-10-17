@@ -1,8 +1,8 @@
 //! Schema producers for writable-view metadata. No body is executed here.
 use crate::ast::{Expr, FromItem, Name, Query, QueryBody, View};
 use crate::sem::{
-    AnalysisError, AstAndContextPair, BaseParseContext, FullName, ParseContext, SelectStatement,
-    SemAst, ViewWriteChange, ViewWriteInfo,
+    AnalysisError, AstAndContextPair, FullName, ParseContext, SelectStatement, SemAst,
+    ViewWriteChange, ViewWriteInfo,
     view_write::{WriteAction, WriteEvent, WriteObject},
 };
 use crate::syn::{ListOpt, Opt};
@@ -10,15 +10,16 @@ use crate::syn::{ListOpt, Opt};
 impl View {
     pub(super) fn write_name(
         &self,
-        context: &impl ParseContext,
-    ) -> Result<FullName, AnalysisError> {
+        context: &mut impl ParseContext,
+    ) -> Result<Option<FullName>, AnalysisError> {
         qualify_declaration(&self.name.full_name()?, context)
     }
     pub(super) fn write_info(
         &self,
-        context: &impl ParseContext,
+        context: &mut impl ParseContext,
         query: &SelectStatement,
-    ) -> Result<ViewWriteInfo, AnalysisError> {
+        name: &FullName,
+    ) -> Result<Option<ViewWriteInfo>, AnalysisError> {
         let mut source = self.query.automatic_view_source(context)?;
         if source.is_some() && !crate::sem::view_write::projection_preserves_rows(context, query)? {
             source = None;
@@ -29,34 +30,40 @@ impl View {
                 .refine_view_cast_lineage(context, source, &mut projections)?;
         }
         let mut replacement = ViewWriteInfo::new(
-            &self.write_name(context)?,
+            name,
             source.as_ref(),
             &projections,
             &query.result_columns().view_expressions(),
         );
         replacement.retain_options(&self.options, self.check_option);
         if self.replace
-            && let Some(existing) = context.view_write_info(&self.write_name(context)?)
+            && let Some(existing) = context.view_write_info(name)
         {
             let mut retained = existing.clone();
-            retained.replace_definition(&replacement)?;
-            return Ok(retained);
+            if let Err(problem) = retained.replace_definition(&replacement) {
+                context.report_analysis_problem(crate::sem::AnalysisProblem::view(&problem))?;
+                return Ok(None);
+            }
+            return Ok(Some(retained));
         }
-        Ok(replacement)
+        Ok(Some(replacement))
     }
 }
 
 fn qualify_declaration(
     name: &FullName,
-    context: &impl BaseParseContext,
-) -> Result<FullName, AnalysisError> {
+    context: &mut impl ParseContext,
+) -> Result<Option<FullName>, AnalysisError> {
     if name.schema().is_some() {
-        return Ok(name.clone());
+        return Ok(Some(name.clone()));
     }
     let Some(schema) = context.get_default_schema() else {
-        return AnalysisError::raise_unexpected_input("view declaration requires an active schema");
+        context.report_analysis_problem(crate::sem::AnalysisProblem::view(
+            &crate::sem::problem::ViewProblem::invalid_target(name),
+        ))?;
+        return Ok(None);
     };
-    Ok(name.clone().set_schema(schema))
+    Ok(Some(name.clone().set_schema(schema)))
 }
 
 impl Expr {
@@ -67,16 +74,27 @@ impl Expr {
         &self,
         context: &impl ParseContext,
         columns: &'a [crate::sem::ColumnDefinition],
+        aliases: &[String],
     ) -> Result<Option<&'a crate::sem::ColumnDefinition>, AnalysisError> {
         match self {
-            Self::Column(name) => Ok(columns.iter().find(|column| {
-                column
-                    .name()
-                    .as_ref()
-                    .is_some_and(|column| name.0.last().is_some_and(|name| column.as_str() == name))
+            Self::Column(name) => Ok(columns.iter().enumerate().find_map(|(index, column)| {
+                let visible = match aliases.get(index) {
+                    Some(alias) => Some(alias.as_str()),
+                    None => column.name().as_ref().map(crate::sem::ColumnName::as_str),
+                };
+                if name
+                    .0
+                    .last()
+                    .is_some_and(|name| visible == Some(name.as_str()))
+                {
+                    Some(column)
+                } else {
+                    None
+                }
             })),
             Self::Cast(cast) if cast.target.modifiers.is_empty() => {
-                let Some(column) = cast.argument.view_cast_column(context, columns)? else {
+                let Some(column) = cast.argument.view_cast_column(context, columns, aliases)?
+                else {
                     return Ok(None);
                 };
                 let target = crate::sem::TypeReference::concrete_type_ref(
@@ -90,7 +108,7 @@ impl Expr {
                 }
             }
             Self::Parenthesized(values) if values.len() == 1 => {
-                values[0].view_cast_column(context, columns)
+                values[0].view_cast_column(context, columns, aliases)
             }
             _ => Ok(None),
         }
@@ -121,6 +139,14 @@ impl Query {
         } else {
             return Ok(());
         };
+        let aliases = match select.from.first() {
+            Some(FromItem::Relation(relation)) => relation
+                .alias
+                .as_ref()
+                .map(|alias| alias.columns.as_slice())
+                .unwrap_or_default(),
+            _ => &[],
+        };
         let mut index = 0;
         for target in &select.targets {
             if matches!(&target.expression, Expr::Star(_)) {
@@ -130,12 +156,14 @@ impl Query {
             if let Some((_, lineage)) = projections.get_mut(index)
                 && lineage.is_none()
             {
-                *lineage =
-                    if let Some(column) = target.expression.view_cast_column(context, &columns)? {
-                        column.name().clone()
-                    } else {
-                        None
-                    };
+                *lineage = if let Some(column) = target
+                    .expression
+                    .view_cast_column(context, &columns, aliases)?
+                {
+                    column.name().clone()
+                } else {
+                    None
+                };
             }
             index += 1;
         }
@@ -212,11 +240,17 @@ impl WriteDeclaration {
     }
     pub(super) fn resolve_and_apply<C: ParseContext>(
         &self,
-        context: C,
+        mut context: C,
     ) -> Result<AstAndContextPair<C>, AnalysisError> {
         let requested = self.relation.full_name()?;
         let bound = if self.trigger_lookup {
-            context.view_trigger_target(&qualify_declaration(&requested, &context)?)
+            let Some(trigger) = qualify_declaration(&requested, &mut context)? else {
+                return Ok(AstAndContextPair::new(
+                    SemAst::unresolved_statement(),
+                    context,
+                ));
+            };
+            context.view_trigger_target(&trigger)
         } else {
             crate::sem::search_path::expand_search_path_inst(&context, &requested, |key| {
                 context
@@ -231,7 +265,13 @@ impl WriteDeclaration {
                     .get_table(&crate::sem::TableName::from(requested.clone()))
                     .is_some()
             {
-                todo!("table trigger/rule analysis is separate from ordinary-view write metadata");
+                context.report_analysis_problem(crate::sem::AnalysisProblem::view(
+                    &crate::sem::problem::ViewProblem::invalid_target(&requested),
+                ))?;
+                return Ok(AstAndContextPair::new(
+                    SemAst::unresolved_statement(),
+                    context,
+                ));
             }
             if self.missing_ok {
                 return Ok(AstAndContextPair::new(
@@ -239,10 +279,32 @@ impl WriteDeclaration {
                     context,
                 ));
             }
-            return AnalysisError::raise_unexpected_input(
-                "write declaration target is not an ordinary view",
-            );
+            context.report_analysis_problem(crate::sem::AnalysisProblem::view(
+                &crate::sem::problem::ViewProblem::invalid_target(&requested),
+            ))?;
+            return Ok(AstAndContextPair::new(
+                SemAst::unresolved_statement(),
+                context,
+            ));
         };
+        if crate::ast::Dialect::from(context.metadata()) == crate::ast::Dialect::sqlite()
+            && let Some((trigger, if_not_exists)) = self.action.trigger_declaration()
+            && let Some(_owner) = context.view_trigger_target(&FullName::new(
+                &None,
+                &view.schema().cloned(),
+                &crate::sem::LocalName::from(trigger),
+            ))
+        {
+            if !if_not_exists {
+                context.report_analysis_problem(crate::sem::AnalysisProblem::view(
+                    &crate::sem::problem::ViewProblem::duplicate_object(&view, trigger),
+                ))?;
+            }
+            return Ok(AstAndContextPair::new(
+                SemAst::unresolved_statement(),
+                context,
+            ));
+        }
         let change = ViewWriteChange::new(&view, &self.action);
         let context = context.apply_view_write_change(&change)?;
         Ok(AstAndContextPair::new(

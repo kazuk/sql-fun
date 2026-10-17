@@ -89,13 +89,10 @@ impl DataSource {
                 let column_ref = tableds.create_column_ref(context, alias, column, nullability)?;
                 Ok((SemScalarExpr::ColumnRef(column_ref), context))
             }
-            Self::View(viewds) => ColumnReferenceExpr::view_source_ref(
-                context,
-                alias,
-                column,
-                viewds.view_name(),
-                nullability,
-            ),
+            Self::View(viewds) => {
+                let reference = viewds.create_column_ref(context, alias, column, nullability)?;
+                Ok((SemScalarExpr::column_reference(reference), context))
+            }
             Self::SubQuery(subqds) => {
                 let column_ref = subqds.create_column_ref(context, alias, column, nullability)?;
                 Ok((SemScalarExpr::ColumnRef(column_ref), context))

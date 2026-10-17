@@ -43,7 +43,13 @@ impl TableDataSource {
         TParseContext: crate::sem::ParseContext,
     {
         if let Some(table) = context.get_table(&self.name)
-            && table.has_column(column)
+            && (self
+                .alias
+                .derived_column_index(column)
+                .is_some_and(|index| table.get_column_at(index).is_some())
+                || table
+                    .get_column_def_with_skip_count(column, self.alias.len_derived_column())
+                    .is_some())
         {
             names.push(self.alias.clone());
         }

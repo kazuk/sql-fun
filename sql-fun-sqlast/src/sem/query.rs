@@ -25,7 +25,7 @@ pub enum QueryNameResolution {
     Ambiguous,
 }
 impl QueryNameResolution {
-    pub(crate) const fn function_name(&self) -> Option<&crate::sem::FullName> {
+    pub(crate) const fn function_identity(&self) -> Option<&crate::sem::FullName> {
         if let Self::Function(name) = self {
             Some(name)
         } else {

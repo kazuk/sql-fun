@@ -47,6 +47,10 @@ impl ViewColumnRef {
     pub(super) fn canonicalize_grouping_key(&mut self) {
         self.column_def = None;
     }
+    pub(super) fn belongs_to(&self, relation: &crate::sem::FullName) -> bool {
+        self.view_name.full_name() == relation
+    }
+
     fn new(
         alias: &AliasName,
         column: &ColumnName,

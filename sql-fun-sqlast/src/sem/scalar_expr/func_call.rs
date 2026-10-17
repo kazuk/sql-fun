@@ -60,7 +60,7 @@ mod implementation {
     }
     impl FuncCallExpr {
         pub(crate) fn canonicalize_grouping_key(&mut self) {
-            if let Some(name) = self.name_resolution.function_name() {
+            if let Some(name) = self.name_resolution.function_identity() {
                 self.func_name = name.clone();
             }
             self.candidates = None;

@@ -2667,6 +2667,11 @@ CREATE VIEW "pg_catalog"."pg_settings" AS  SELECT name,
     sourceline,
     pending_restart
    FROM pg_show_all_settings() a(name, setting, unit, category, short_desc, extra_desc, context, vartype, source, min_val, max_val, enumvals, boot_val, reset_val, sourcefile, sourceline, pending_restart);
+CREATE RULE pg_settings_n AS
+    ON UPDATE TO pg_catalog.pg_settings DO INSTEAD NOTHING;
+CREATE RULE pg_settings_u AS
+    ON UPDATE TO pg_catalog.pg_settings
+   WHERE new.name = old.name DO  SELECT set_config(old.name, new.setting, false) AS set_config;
 
 CREATE VIEW "pg_catalog"."pg_shadow" AS  SELECT pg_authid.rolname AS usename,
     pg_authid.oid AS usesysid,
@@ -3231,7 +3236,7 @@ CREATE VIEW "pg_catalog"."pg_statio_all_tables" AS  SELECT c.oid AS relid,
           WHERE pg_index.indrelid = t.oid) x ON true
   WHERE c.relkind = ANY (ARRAY['r'::"char", 't'::"char", 'm'::"char"]);
 
-CREATE VIEW "pg_catalog"."pg_stats" AS  SELECT n.nspname AS schemaname,
+CREATE VIEW "pg_catalog"."pg_stats" WITH (security_barrier = 'true') AS  SELECT n.nspname AS schemaname,
     c.relname AS tablename,
     a.attname,
     s.stainherit AS inherited,
@@ -3324,7 +3329,7 @@ CREATE VIEW "pg_catalog"."pg_stats" AS  SELECT n.nspname AS schemaname,
      LEFT JOIN pg_namespace n ON n.oid = c.relnamespace
   WHERE NOT a.attisdropped AND has_column_privilege(c.oid, a.attnum, 'select'::text) AND (c.relrowsecurity = false OR NOT row_security_active(c.oid));
 
-CREATE VIEW "pg_catalog"."pg_stats_ext" AS  SELECT cn.nspname AS schemaname,
+CREATE VIEW "pg_catalog"."pg_stats_ext" WITH (security_barrier = 'true') AS  SELECT cn.nspname AS schemaname,
     c.relname AS tablename,
     sn.nspname AS statistics_schemaname,
     s.stxname AS statistics_name,
@@ -3353,7 +3358,7 @@ CREATE VIEW "pg_catalog"."pg_stats_ext" AS  SELECT cn.nspname AS schemaname,
            FROM pg_mcv_list_items(sd.stxdmcv) pg_mcv_list_items(index, "values", nulls, frequency, base_frequency)) m ON sd.stxdmcv IS NOT NULL
   WHERE pg_has_role(c.relowner, 'USAGE'::text) AND (c.relrowsecurity = false OR NOT row_security_active(c.oid));
 
-CREATE VIEW "pg_catalog"."pg_stats_ext_exprs" AS  SELECT cn.nspname AS schemaname,
+CREATE VIEW "pg_catalog"."pg_stats_ext_exprs" WITH (security_barrier = 'true') AS  SELECT cn.nspname AS schemaname,
     c.relname AS tablename,
     sn.nspname AS statistics_schemaname,
     s.stxname AS statistics_name,

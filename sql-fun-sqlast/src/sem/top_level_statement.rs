@@ -127,8 +127,14 @@ impl SemAst {
             Stmt::Reindex(_reindex_statement) => todo!(),
             Stmt::Optimize(_optimize_statement) => todo!(),
             Stmt::CreateVirtualTable(_create_virtual_table) => todo!(),
-            Stmt::CreateTrigger(_create_trigger_statement) => todo!(),
-            Stmt::DropTrigger(_drop_trigger_statement) => todo!(),
+            Stmt::CreateTrigger(trigger) => {
+                let syntax = crate::ast::StatementNode::try_from(&Stmt::CreateTrigger(trigger))?;
+                syntax.resolve_and_apply(context)
+            }
+            Stmt::DropTrigger(trigger) => {
+                let syntax = crate::ast::StatementNode::try_from(&Stmt::DropTrigger(trigger))?;
+                syntax.resolve_and_apply(context)
+            }
             Stmt::CreateView(view) => {
                 let syntax = crate::ast::StatementNode::try_from(&Stmt::CreateView(view))?;
                 syntax.resolve_and_apply(context)

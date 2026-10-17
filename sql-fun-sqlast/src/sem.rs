@@ -42,7 +42,7 @@ pub mod problem;
 mod query;
 mod scalar_expr;
 mod schema_file_context;
-mod search_path;
+pub(crate) mod search_path;
 mod select_statement;
 mod stack;
 mod top_level_statement;
@@ -52,6 +52,8 @@ mod type_system;
 mod update_statement;
 mod variable_set;
 mod view_like;
+pub(crate) mod view_write;
+pub use self::view_write::{ViewAssignmentColumn, ViewWriteChange, ViewWriteInfo};
 
 pub(crate) use self::insert_statement::{
     InsertClauseSemantics, InsertClauseValues, InsertTargetCollection, InsertValueCollection,
@@ -124,7 +126,8 @@ pub use self::{
     insert_statement::{
         InsertArbiter, InsertArbiterLookup, InsertConflict, InsertConstraintKind,
         InsertConstraintLookup, InsertInferenceModifiers, InsertSource, InsertStatement,
-        InsertTarget, InsertValue, ViewInsertInfoRead, ViewInsertSupport, analyze_insert_statement,
+        InsertTarget, InsertValue, ViewInsertInfoRead, ViewInsertSupport, ViewSourceArbiter,
+        analyze_insert_statement,
     },
     names::{CatalogName, FullName, LocalName, OperatorName, SchemaName, ValidOperatorName},
     object_info::{ExtensionInfoRead, Kind, ObjectInfoRead},
@@ -335,6 +338,9 @@ pub enum SemAst {
     /// `create view` statement
     CreateView(CreateView),
 
+    /// A bound catalog change affecting view write capabilities.
+    ViewWriteChange(ViewWriteChange),
+
     /// `create index` statement
     CreateIndex(CreateIndex),
 
@@ -362,13 +368,19 @@ pub enum SemAst {
 
 impl SemAst {
     pub(crate) const fn select_statement(&self) -> Option<&SelectStatement> {
+        if let Self::SelectStatement(query) = self { Some(query) } else { None }
+    }
+    pub(crate) fn query_result_columns(&self) -> Option<&ResultColumnCollection> {
         if let Self::SelectStatement(query) = self {
-            Some(query)
+            Some(query.result_columns())
         } else {
             None
         }
     }
 
+    pub(crate) fn view_write_change(change: &ViewWriteChange) -> Self {
+        Self::ViewWriteChange(change.clone())
+    }
     pub(crate) const fn unresolved_statement() -> Self {
         Self::UnresolvedStatement
     }

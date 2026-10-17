@@ -26,6 +26,29 @@ impl Update {
         });
         context.finish_analysis(result)
     }
+    fn validate_view_trigger(
+        &self,
+        context: &mut impl ParseContext,
+        table: &UpdateDestination,
+    ) -> Result<(), AnalysisError> {
+        if let Some(support) = table.view_support() {
+            let columns: Vec<_> = self
+                .assignments
+                .iter()
+                .map(|assignment| ColumnName::from(assignment.name.as_str()))
+                .collect();
+            if !support.accepts_assignments(&columns) {
+                context.report_analysis_problem(AnalysisProblem::update(
+                    UpdateProblemKind::view_operation(),
+                    "SET targets do not activate an INSTEAD OF UPDATE trigger",
+                ))?;
+                return Err(AnalysisError::unexpected_input_error(
+                    "no matching view UPDATE trigger",
+                ));
+            }
+        }
+        Ok(())
+    }
     pub(in crate::ast) fn resolve_in(
         &self,
         context: &mut impl ParseContext,
@@ -34,6 +57,7 @@ impl Update {
         let requested = TableName::from(self.relation.name.full_name()?);
         let table = self.resolve_destination(context, &requested)?;
         self.validate_index_hint(context, &table)?;
+        self.validate_view_trigger(context, &table)?;
         let with = self.with.resolve(context, outer)?;
         let alias = self
             .relation

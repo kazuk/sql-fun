@@ -132,8 +132,36 @@ impl ColumnReferenceExpr {
         }
     }
 
+    pub(crate) fn bound_view_column(&self, view: &crate::sem::FullName) -> Option<&ColumnName> {
+        match self {
+            Self::TableColumn(column) if column.belongs_to(view) => Some(column.get_column_name()),
+            Self::ViewColumn(column) if column.belongs_to(view) => Some(column.get_column_name()),
+            _ => None,
+        }
+    }
+
     pub(crate) fn delete_row(version: crate::sem::DeleteRowVersion, source: &Self) -> Self {
         Self::DeleteRow(crate::sem::DeleteRowColumn::new(version, source))
+    }
+
+    pub(crate) fn view_source_column(&self) -> Option<&ColumnName> {
+        match self {
+            Self::TableColumn(value) => Some(value.get_column_name()),
+            Self::ViewColumn(value) => Some(value.get_column_name()),
+            _ => None,
+        }
+    }
+
+    pub(crate) fn table_column(
+        alias: &crate::sem::AliasName,
+        column: &ColumnName,
+        table: &crate::sem::TableName,
+        definition: Option<&ColumnDefinition>,
+        nullable: bool,
+    ) -> Self {
+        Self::TableColumn(TableColumnRef::new(
+            alias, column, table, definition, nullable,
+        ))
     }
 
     pub(in crate::sem) fn index_column_name(&self) -> Option<&ColumnName> {

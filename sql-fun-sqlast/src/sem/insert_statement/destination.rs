@@ -37,7 +37,8 @@ impl InsertDestination {
                 } else {
                     (
                         view.result_columns().column_definitions()?,
-                        context.view_insert_support(key),
+                        ViewInsertSupport::analyze(context, key)
+                            .map_err(|problem| AnalysisError::view_metadata(&problem))?,
                     )
                 };
                 let columns = columns

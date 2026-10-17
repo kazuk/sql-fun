@@ -7,20 +7,25 @@ pub struct ViewDataSource {
 }
 
 impl ViewDataSource {
+    fn result_column<'a>(
+        &self,
+        view: &'a crate::sem::ViewLike,
+        column: &ColumnName,
+    ) -> Option<&'a crate::sem::ResultColumn> {
+        let columns = view.result_columns();
+        if let Some(index) = self.alias.derived_column_index(column) {
+            columns.get_column_at(index)
+        } else {
+            columns.get_column_with_skip_count(column, self.alias.len_derived_column())
+        }
+    }
     fn column_definition(
         &self,
         view: &crate::sem::ViewLike,
         column: &ColumnName,
     ) -> Option<crate::sem::ColumnDefinition> {
-        let columns = view.result_columns().column_definitions().ok()?;
-        if let Some(index) = self.alias.derived_column_index(column) {
-            columns.get(index).cloned()
-        } else {
-            columns
-                .into_iter()
-                .skip(self.alias.len_derived_column())
-                .find(|definition| definition.name().as_ref() == Some(column))
-        }
+        self.result_column(view, column)
+            .map(crate::sem::ResultColumn::create_column_definition)
     }
     pub(super) fn create_column_ref(
         &self,
@@ -83,7 +88,7 @@ impl ViewDataSource {
         TParseContext: crate::sem::ParseContext,
     {
         if let Some(view) = context.get_view(&self.view)
-            && self.column_definition(view, column).is_some()
+            && self.result_column(view, column).is_some()
         {
             names.push(self.alias.clone());
         }

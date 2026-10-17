@@ -238,6 +238,26 @@ impl WriteDeclaration {
             missing_ok: false,
         }
     }
+    fn unresolved_target<C: ParseContext>(
+        &self,
+        mut context: C,
+        requested: &FullName,
+    ) -> Result<AstAndContextPair<C>, AnalysisError> {
+        let table_target = !self.trigger_lookup
+            && context
+                .get_table(&crate::sem::TableName::from(requested.clone()))
+                .is_some();
+        if table_target || !self.missing_ok {
+            context.report_analysis_problem(crate::sem::AnalysisProblem::view(
+                &crate::sem::problem::ViewProblem::invalid_target(requested),
+            ))?;
+        }
+        Ok(AstAndContextPair::new(
+            SemAst::unresolved_statement(),
+            context,
+        ))
+    }
+
     pub(super) fn resolve_and_apply<C: ParseContext>(
         &self,
         mut context: C,
@@ -260,32 +280,7 @@ impl WriteDeclaration {
             })
         };
         let Some(view) = bound else {
-            if !self.trigger_lookup
-                && context
-                    .get_table(&crate::sem::TableName::from(requested.clone()))
-                    .is_some()
-            {
-                context.report_analysis_problem(crate::sem::AnalysisProblem::view(
-                    &crate::sem::problem::ViewProblem::invalid_target(&requested),
-                ))?;
-                return Ok(AstAndContextPair::new(
-                    SemAst::unresolved_statement(),
-                    context,
-                ));
-            }
-            if self.missing_ok {
-                return Ok(AstAndContextPair::new(
-                    SemAst::unresolved_statement(),
-                    context,
-                ));
-            }
-            context.report_analysis_problem(crate::sem::AnalysisProblem::view(
-                &crate::sem::problem::ViewProblem::invalid_target(&requested),
-            ))?;
-            return Ok(AstAndContextPair::new(
-                SemAst::unresolved_statement(),
-                context,
-            ));
+            return self.unresolved_target(context, &requested);
         };
         if crate::ast::Dialect::from(context.metadata()) == crate::ast::Dialect::sqlite()
             && let Some((trigger, if_not_exists)) = self.action.trigger_declaration()
@@ -411,13 +406,13 @@ impl TryFrom<&crate::syn::sqlite::CreateTriggerStatement> for WriteDeclaration {
 fn sqlite_trigger_event(event: &crate::syn::sqlite::TriggerEvent) -> (i32, Vec<String>) {
     use crate::syn::sqlite::TriggerEvent;
     match event {
-        TriggerEvent::Insert => (4, Vec::new()),
-        TriggerEvent::Update => (16, Vec::new()),
+        TriggerEvent::Insert => (crate::sem::view_write::TRIGGER_EVENT_INSERT, Vec::new()),
+        TriggerEvent::Update => (crate::sem::view_write::TRIGGER_EVENT_UPDATE, Vec::new()),
         TriggerEvent::UpdateOf(columns) => (
-            16,
+            crate::sem::view_write::TRIGGER_EVENT_UPDATE,
             columns.iter().map(|name| name.value().to_owned()).collect(),
         ),
-        TriggerEvent::Delete => (8, Vec::new()),
+        TriggerEvent::Delete => (crate::sem::view_write::TRIGGER_EVENT_DELETE, Vec::new()),
     }
 }
 

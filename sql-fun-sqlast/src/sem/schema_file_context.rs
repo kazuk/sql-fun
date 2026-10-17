@@ -1147,14 +1147,17 @@ impl crate::sem::ConflictInfoRead for SchemaCatalog {
 }
 
 impl crate::sem::ViewInsertInfoRead for SchemaCatalog {
-    fn view_insert_support(&self, view: &FullName) -> crate::sem::ViewInsertSupport {
-        crate::sem::view_write::insert_support(self, view)
+    fn view_insert_support(&self, view: &FullName) -> Option<&crate::sem::ViewInsertSupport> {
+        self.base.view_insert_support(view)
     }
 }
 
 impl crate::sem::ViewUpdateInfoRead for SchemaCatalog {
-    fn view_update_support(&self, view: &crate::sem::FullName) -> crate::sem::ViewUpdateSupport {
-        crate::sem::view_write::update_support(self, view)
+    fn view_update_support(
+        &self,
+        view: &crate::sem::FullName,
+    ) -> Option<&crate::sem::ViewUpdateSupport> {
+        self.base.view_update_support(view)
     }
 }
 

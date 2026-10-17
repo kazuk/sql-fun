@@ -345,7 +345,7 @@ macro_rules! forward_catalog_reads {
             fn view_insert_support(
                 &self,
                 name: &crate::sem::FullName,
-            ) -> crate::sem::ViewInsertSupport {
+            ) -> Option<&crate::sem::ViewInsertSupport> {
                 crate::sem::ViewInsertInfoRead::view_insert_support(self.$catalog(), name)
             }
         }
@@ -362,7 +362,7 @@ macro_rules! forward_catalog_reads {
             fn view_update_support(
                 &self,
                 name: &crate::sem::FullName,
-            ) -> crate::sem::ViewUpdateSupport {
+            ) -> Option<&crate::sem::ViewUpdateSupport> {
                 crate::sem::ViewUpdateInfoRead::view_update_support(self.$catalog(), name)
             }
         }

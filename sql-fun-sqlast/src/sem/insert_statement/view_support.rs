@@ -1,11 +1,9 @@
 use crate::sem::{ColumnDefinition, ColumnName, FullName};
 
-/// Catalog decision about INSERT into an ordinary view.
+/// Analyzed capability for INSERT into an ordinary view.
 /// An empty writable-column list still permits DEFAULT VALUES.
 #[derive(Debug, Clone, Eq, Hash, PartialEq, serde::Serialize, serde::Deserialize)]
 pub struct ViewInsertSupport {
-    #[serde(default)]
-    missing_metadata: Option<FullName>,
     writable_columns: Option<Vec<ColumnDefinition>>,
     returning: bool,
     #[serde(default)]
@@ -13,14 +11,15 @@ pub struct ViewInsertSupport {
     on_conflict: bool,
 }
 impl ViewInsertSupport {
-    pub(crate) fn missing_metadata(view: &FullName) -> Self {
-        let mut support = Self::read_only();
-        support.missing_metadata = Some(view.clone());
-        support
-    }
-    /// An explicitly incomplete catalog decision, distinct from read-only support.
-    pub const fn missing_metadata_view(&self) -> Option<&FullName> {
-        self.missing_metadata.as_ref()
+    /// Analyze registered facts for an exactly bound ordinary view.
+    ///
+    /// # Errors
+    /// Returns a structured problem when this view or its source lacks write metadata.
+    pub fn analyze(
+        context: &impl crate::sem::BaseParseContext,
+        view: &FullName,
+    ) -> Result<Self, crate::sem::problem::ViewProblem> {
+        crate::sem::view_write::insert_support(context, view)
     }
 
     /// Record alias equivalence for automatic-view assignment targets.
@@ -40,7 +39,6 @@ impl ViewInsertSupport {
     /// The view cannot accept INSERT statements.
     pub const fn read_only() -> Self {
         Self {
-            missing_metadata: None,
             writable_columns: None,
             returning: false,
             assignment_columns: Vec::new(),
@@ -48,13 +46,12 @@ impl ViewInsertSupport {
         }
     }
     /// The view accepts INSERT, with exactly these assignable columns.
-    /// Catalogs must account for automatic updates, INSTEAD OF INSERT triggers,
+    /// Analysis accounts for automatic updates, INSTEAD OF INSERT triggers,
     /// and applicable INSTEAD rules according to the selected dialect.
     /// Definitions retain view-visible names and assignment types, plus effective
     /// default, generated and identity constraints needed for INSERT validation.
     pub fn writable(columns: &[ColumnDefinition], returning: bool, on_conflict: bool) -> Self {
         Self {
-            missing_metadata: None,
             writable_columns: Some(columns.to_vec()),
             returning,
             assignment_columns: Vec::new(),
@@ -92,10 +89,7 @@ impl ViewInsertSupport {
 /// Catalog service for view destinations. The name is already bound and
 /// qualified; this is not a second search-path lookup.
 pub trait ViewInsertInfoRead {
-    /// Return a completed capability decision for an existing ordinary view.
-    /// Missing loaded metadata is retained explicitly by `missing_metadata_view`,
-    /// independently of a completed read-only decision. Unimplemented producer
-    /// functionality remains explicit at its implementation boundary.
-    /// No trigger or rule body is executed by INSERT name resolution.
-    fn view_insert_support(&self, view: &FullName) -> ViewInsertSupport;
+    /// Retrieve explicitly registered support by exact identity, without deriving
+    /// capabilities or interpreting absence. The analyzer owns those decisions.
+    fn view_insert_support(&self, view: &FullName) -> Option<&ViewInsertSupport>;
 }

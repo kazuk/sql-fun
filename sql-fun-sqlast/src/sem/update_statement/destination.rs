@@ -35,7 +35,8 @@ impl UpdateDestination {
                 } else {
                     (
                         view.result_columns().column_definitions()?,
-                        context.view_update_support(key),
+                        ViewUpdateSupport::analyze(context, key)
+                            .map_err(|problem| AnalysisError::view_metadata(&problem))?,
                     )
                 };
                 let columns = columns

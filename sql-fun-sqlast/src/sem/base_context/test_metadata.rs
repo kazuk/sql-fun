@@ -96,6 +96,20 @@ fn selected_environment_does_not_inherit_or_reconcile_frozen_configuration()
 
 #[cfg(feature = "sqlite")]
 #[test]
+fn selected_dialect_does_not_depend_on_the_engine_name() -> testresult::TestResult {
+    use crate::sem::{BaseParseContext, ParseContext};
+    let metadata = test_helpers::sqlite_compatible_engine()?;
+    let context = crate::test_helpers::TestParseContext::default().with_metadata(&metadata);
+    assert_eq!(context.dialect(), crate::ast::Dialect::sqlite());
+    assert_eq!(
+        context.metadata().engine().as_custom().map(String::as_str),
+        Some("custom-sqlite-engine")
+    );
+    Ok(())
+}
+
+#[cfg(feature = "sqlite")]
+#[test]
 fn statement_rejects_a_different_metadata_dialect() -> testresult::TestResult {
     let context = crate::test_helpers::TestParseContext::default();
     let statement = crate::parse_statements("select 1", crate::ast::Dialect::sqlite())
@@ -115,6 +129,13 @@ mod test_helpers {
         SourcePathWithSpan,
     };
     use ::sql_fun_core::{SqlFunArgs, SqlFunMetadata, SqlFunMetadataCollection};
+
+    #[cfg(feature = "sqlite")]
+    pub(super) fn sqlite_compatible_engine() -> Result<SqlFunMetadata, ::serde_json::Error> {
+        ::serde_json::from_value(::serde_json::json!({
+            "engine": "custom-sqlite-engine", "dialect": "SQLite", "version": "3"
+        }))
+    }
 
     #[cfg(feature = "sqlite")]
     pub(super) fn context_over_catalog(

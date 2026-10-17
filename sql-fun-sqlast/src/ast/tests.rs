@@ -9,7 +9,9 @@ use self::test_helpers::postgres;
 
 use crate::ast::{StatementNode, TryFromWithTokens};
 use crate::sem::{ColumnName, PgBuiltInType};
-use crate::test_helpers::{SynBuilder, TestParseContext, source_span};
+#[cfg(feature = "sqlite")]
+use crate::test_helpers::TestParseContext;
+use crate::test_helpers::{SynBuilder, source_span};
 
 use ::sql_fun_core::IVec;
 

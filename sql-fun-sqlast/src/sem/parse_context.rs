@@ -243,6 +243,7 @@ where
     Self: Sized,
 {
     /// Dialect of the explicitly supplied metadata for this analysis.
+    /// Engine identity and SQL dialect are independent metadata fields.
     /// Historical configuration retained by a frozen catalog is not consulted.
     fn dialect(&self) -> crate::ast::Dialect {
         crate::ast::Dialect::from(self.metadata())

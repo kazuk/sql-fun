@@ -66,6 +66,7 @@ impl TestParseContext {
         self
     }
 
+    #[cfg(feature = "sqlite")]
     pub(crate) fn with_metadata(mut self, metadata: &::sql_fun_core::SqlFunMetadata) -> Self {
         self.metadata = Some(metadata.clone());
         self

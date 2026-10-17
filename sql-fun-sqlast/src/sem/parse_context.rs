@@ -139,7 +139,6 @@ pub trait SearchPathRead {
 pub trait BaseParseContext:
     CastInfoRead
     + ConflictInfoRead
-    + crate::sem::MasterInfoRead
     + FunctionInfoRead
     + IndexInfoRead
     + OperatorInfoRead

@@ -1,0 +1,14 @@
+{
+  "database": {
+    "encoding": 6, "encoding_name": "UTF8", "provider": "c",
+    "collate": "C", "ctype": "C", "locale": null,
+    "icu_rules": null, "version": null,
+    "default_collation": {"schema": "pg_catalog", "name": "default", "encoding": -1}
+  },
+  "collations": [{
+    "schema": "pg_catalog", "name": "default", "encoding": -1,
+    "provider": "d", "deterministic": true,
+    "collate": null, "ctype": null, "locale": null,
+    "icu_rules": null, "version": null
+  }]
+}

@@ -55,6 +55,8 @@ mod view_like;
 pub(crate) use self::insert_statement::InsertDestination;
 
 #[expect(deprecated)]
+pub(crate) use self::conflict_masters::ConflictMasters;
+
 pub use self::{
     alter_owner::AlterOwner,
     alter_seq::AlterSequence,
@@ -74,8 +76,8 @@ pub use self::{
     },
     comment::{Comment, ObjectKind},
     conflict_masters::{
-        CatalogTypeIdentity, CollationDefinition, CollationIdentity, ConflictMasters,
-        DatabaseCollation, MasterInfoRead, OperatorClassDefinition, OperatorFamilyIdentity,
+        CatalogTypeIdentity, CollationDefinition, CollationIdentity, DatabaseCollation,
+        OperatorClassDefinition, OperatorFamilyIdentity,
     },
     constraint::{AnalyzeConstraint, Constraint, PrimaryKeyConstraint},
     create_comp_type::CreateCompositeType,

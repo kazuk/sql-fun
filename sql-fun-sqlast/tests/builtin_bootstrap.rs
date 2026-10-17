@@ -72,16 +72,12 @@ fn assert_master_reads(context: &impl BaseParseContext) {
             .resolved_name(),
         Some(&name)
     );
-    let definition = context
-        .conflict_masters()
-        .qualified_collation(&name)
-        .unwrap();
+    let definition = context.collation_definition(&name).unwrap();
     assert_eq!(definition.encoding(), -1);
     assert_eq!(definition.provider(), "c");
-    let database = context.conflict_masters().database().unwrap();
+    let database = context.database_collation().unwrap();
     let default = context
-        .conflict_masters()
-        .collation(database.default_collation())
+        .collation_definition(&database.default_collation().qualified_name())
         .unwrap();
     assert_eq!(default.provider(), "d");
     for method in ["btree", "hash"] {
@@ -92,10 +88,7 @@ fn assert_master_reads(context: &impl BaseParseContext) {
                 .resolved_name(),
             Some(&name)
         );
-        let class = context
-            .conflict_masters()
-            .operator_class(&name, method)
-            .unwrap();
+        let class = context.operator_class_definition(&name, method).unwrap();
         assert_eq!(class.family().access_method(), method);
         assert_eq!(
             class.input_type().qualified_name(),

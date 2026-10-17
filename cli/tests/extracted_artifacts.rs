@@ -1,7 +1,7 @@
 //! Loader compatibility for the officially extracted `PostgreSQL` artifacts.
 mod support;
 
-use ::sql_fun_sqlast::sem::MasterInfoRead;
+use ::sql_fun_sqlast::sem::{ConflictInfoRead, FullName};
 use std::path::PathBuf;
 
 #[rstest::rstest]
@@ -23,9 +23,17 @@ fn extracted_catalogs_load_and_schema_is_postgresql_syntax(#[case] version: &str
             .expect("selected test metadata"),
     )
     .unwrap();
-    assert!(context.conflict_masters().database().is_some());
-    assert_ne!(context.conflict_masters().collations(), []);
-    assert_ne!(context.conflict_masters().operator_classes(), []);
+    assert!(context.database_collation().is_some());
+    assert!(
+        context
+            .collation_definition(&FullName::with_schema("pg_catalog", "C"))
+            .is_some()
+    );
+    assert!(
+        context
+            .operator_class_definition(&FullName::with_schema("pg_catalog", "int4_ops"), "btree")
+            .is_some()
+    );
     let schema = std::fs::read_to_string(catalog.join("schema.sql")).unwrap();
     pg_query::parse(&schema).unwrap();
     let mut extensions: sql_fun_core::PostgresExtensionsCollection =

@@ -1,0 +1,6 @@
+[{
+  "schema": "pg_catalog", "name": "int4_ops", "access_method": "btree",
+  "family": {"schema": "pg_catalog", "name": "integer_ops", "access_method": "btree"},
+  "input_type": {"schema": "pg_catalog", "name": "int4"},
+  "default": true, "key_type": null
+}]

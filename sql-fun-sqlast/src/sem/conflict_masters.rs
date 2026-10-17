@@ -1,12 +1,6 @@
 use crate::sem::{AnalysisError, BaseParseContext, CatalogNameLookup, FullName};
 use std::{collections::HashSet, fs::File, io::BufReader, path::Path};
 
-/// Read the explicitly loaded master catalog through the common context.
-pub trait MasterInfoRead {
-    /// Definitions and source database provenance retained by this catalog.
-    fn conflict_masters(&self) -> &ConflictMasters;
-}
-
 /// Qualified collation identity, including encoding eligibility.
 #[derive(Debug, Clone, Eq, PartialEq, serde::Deserialize)]
 pub struct CollationIdentity {
@@ -281,7 +275,7 @@ struct CollationPayload {
 
 /// Loaded master definitions. Lookup never opens files or database connections.
 #[derive(Debug, Clone)]
-pub struct ConflictMasters {
+pub(crate) struct ConflictMasters {
     database: Option<DatabaseCollation>,
     collations: Vec<CollationDefinition>,
     operator_classes: Vec<OperatorClassDefinition>,
@@ -289,16 +283,7 @@ pub struct ConflictMasters {
 }
 
 impl ConflictMasters {
-    /// Construct a SQLite namespace with its builtin collations available.
-    /// Custom context implementations can own this catalog without opening files.
-    ///
-    /// ```
-    /// use ::sql_fun_sqlast::sem::ConflictMasters;
-    /// let mut masters = ConflictMasters::sqlite();
-    /// masters.declare_sqlite_collation("provided")?;
-    /// assert!(masters.database().is_none());
-    /// # Ok::<(), sql_fun_sqlast::sem::AnalysisError>(())
-    /// ```
+    /// Construct a file-free SQLite namespace.
     pub const fn sqlite() -> Self {
         Self {
             sqlite_collations: Vec::new(),
@@ -309,7 +294,6 @@ impl ConflictMasters {
     }
 
     /// Load the two explicitly selected PostgreSQL master payloads.
-    /// Custom catalog providers can use this without initializing a `BaseContext`.
     ///
     /// # Errors
     /// Returns an artifact-specific error for missing/malformed payloads or invalid
@@ -379,6 +363,9 @@ impl ConflictMasters {
         if !has_default {
             return Err("missing default collation definition");
         }
+        if self.operator_classes.is_empty() {
+            return Err("missing operator-class definitions");
+        }
         let mut classes = HashSet::new();
         for class in &self.operator_classes {
             if class.schema.is_empty()
@@ -405,28 +392,9 @@ impl ConflictMasters {
         Ok(())
     }
 
-    /// Enumerate loaded collation definitions without choosing an encoding variant.
-    pub fn collations(&self) -> &[CollationDefinition] {
-        &self.collations
-    }
-
-    /// Enumerate loaded classes, retaining access-method-specific identities.
-    pub fn operator_classes(&self) -> &[OperatorClassDefinition] {
-        &self.operator_classes
-    }
-
     /// Source database provenance, absent for a SQLite connection namespace.
     pub const fn database(&self) -> Option<&DatabaseCollation> {
         self.database.as_ref()
-    }
-
-    /// Read a collation by its full composite identity, without namespace lookup.
-    pub fn collation(&self, identity: &CollationIdentity) -> Option<&CollationDefinition> {
-        self.collations.iter().find(|value| {
-            value.schema == identity.schema
-                && value.name == identity.name
-                && value.encoding == identity.encoding
-        })
     }
 
     /// Read the encoding-eligible definition at an exact qualified name.
@@ -481,7 +449,7 @@ impl ConflictMasters {
         Ok(())
     }
 
-    fn sqlite_lookup(&self, name: &FullName) -> CatalogNameLookup {
+    pub(crate) fn sqlite_lookup(&self, name: &FullName) -> CatalogNameLookup {
         if name.schema().is_some() || name.catalog().is_some() {
             return CatalogNameLookup::missing(name);
         }
@@ -512,13 +480,10 @@ pub(crate) fn lookup_collation(
     name: &FullName,
 ) -> CatalogNameLookup {
     if crate::ast::Dialect::from(context.metadata()) == crate::ast::Dialect::sqlite() {
-        return context.conflict_masters().sqlite_lookup(name);
+        return context.lookup_sqlite_collation(name);
     }
     lookup_postgres(context, name, |key| {
-        context
-            .conflict_masters()
-            .qualified_collation(key)
-            .is_some()
+        context.collation_definition(key).is_some()
     })
 }
 
@@ -531,10 +496,7 @@ pub(crate) fn lookup_operator_class(
         return CatalogNameLookup::missing(name);
     }
     lookup_postgres(context, name, |key| {
-        context
-            .conflict_masters()
-            .operator_class(key, method)
-            .is_some()
+        context.operator_class_definition(key, method).is_some()
     })
 }
 
@@ -544,7 +506,7 @@ fn lookup_postgres(
     exists: impl Fn(&FullName) -> bool,
 ) -> CatalogNameLookup {
     assert!(
-        context.conflict_masters().database().is_some(),
+        context.database_collation().is_some(),
         "PostgreSQL master definitions must be supplied by the selected base catalog"
     );
     if name.catalog().is_some() {

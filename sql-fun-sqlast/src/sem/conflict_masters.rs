@@ -289,7 +289,17 @@ pub struct ConflictMasters {
 }
 
 impl ConflictMasters {
-    pub(crate) const fn sqlite() -> Self {
+    /// Construct a SQLite namespace with its builtin collations available.
+    /// Custom context implementations can own this catalog without opening files.
+    ///
+    /// ```
+    /// use ::sql_fun_sqlast::sem::ConflictMasters;
+    /// let mut masters = ConflictMasters::sqlite();
+    /// masters.declare_sqlite_collation("provided")?;
+    /// assert!(masters.database().is_none());
+    /// # Ok::<(), sql_fun_sqlast::sem::AnalysisError>(())
+    /// ```
+    pub const fn sqlite() -> Self {
         Self {
             sqlite_collations: Vec::new(),
             database: None,
@@ -298,7 +308,13 @@ impl ConflictMasters {
         }
     }
 
-    pub(crate) fn load(collations: &Path, classes: &Path) -> Result<Self, AnalysisError> {
+    /// Load the two explicitly selected PostgreSQL master payloads.
+    /// Custom catalog providers can use this without initializing a `BaseContext`.
+    ///
+    /// # Errors
+    /// Returns an artifact-specific error for missing/malformed payloads or invalid
+    /// identities, encoding, default provenance, and class/family relationships.
+    pub fn load(collations: &Path, classes: &Path) -> Result<Self, AnalysisError> {
         let payload: CollationPayload = Self::read(collations)?;
         let operator_classes = Self::read(classes)?;
         let result = Self {
@@ -444,7 +460,12 @@ impl ConflictMasters {
             .find(|value| value.matches_name(name) && value.access_method == access_method)
     }
 
-    pub(crate) fn declare_sqlite_collation(&mut self, name: &str) -> Result<(), AnalysisError> {
+    /// Declare an explicitly supplied connection-local name, including an empty name.
+    /// This records availability; it does not register a runtime comparison callback.
+    ///
+    /// # Errors
+    /// Returns an error for a PostgreSQL catalog or a NUL-containing name.
+    pub fn declare_sqlite_collation(&mut self, name: &str) -> Result<(), AnalysisError> {
         if self.database.is_some() || name.contains('\0') {
             return Err(AnalysisError::unexpected_input_error(
                 "a valid collation name and SQLite catalog are required",

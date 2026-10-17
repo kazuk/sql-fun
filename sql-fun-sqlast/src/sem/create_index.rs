@@ -259,7 +259,7 @@ impl CreateIndex {
             .iter()
             .map(|key| IndexExpression::try_from_with_tokens(key, tokens))
             .collect::<Result<Vec<_>, _>>()?;
-        context.begin_analysis();
+        context.begin_parameter_type_analysis();
         let result = Index::resolve_elements(&keys, &mut context);
         let elements = context.finish_analysis(result)?;
         Ok((elements, context))

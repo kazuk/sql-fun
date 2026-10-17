@@ -325,18 +325,9 @@ impl StatementNode {
             Self::Query(query) => query
                 .resolve(context)
                 .map(|query| crate::sem::SemAst::select(&query)),
-            // DML semantic analysis currently has no catalog-dependent result.
-            // Keep construction at the common boundary so that its eventual
-            // resolver can replace these markers without changing frontends.
-            Self::Insert(_) => Ok(crate::sem::SemAst::InsertStatement(
-                crate::sem::InsertStatement::empty(),
-            )),
-            Self::Update(_) => Ok(crate::sem::SemAst::UpdateStatement(
-                crate::sem::UpdateStatement::empty(),
-            )),
-            Self::Delete(_) => Ok(crate::sem::SemAst::DeleteStatement(
-                crate::sem::DeleteStatement::empty(),
-            )),
+            Self::Insert(_) => todo!(),
+            Self::Update(_) => todo!(),
+            Self::Delete(_) => todo!(),
             Self::View(_) => crate::sem::AnalysisError::raise_unexpected_input(
                 "view requires catalog application",
             ),

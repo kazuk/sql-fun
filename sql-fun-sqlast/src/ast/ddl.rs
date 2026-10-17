@@ -50,7 +50,7 @@ impl super::AlterRelation {
         mut context: TContext,
         source: Option<&crate::sem::SourcePathWithSpan>,
     ) -> Result<AstAndContextPair<TContext>, AnalysisError> {
-        context.begin_analysis();
+        context.begin_parameter_type_analysis();
         let result = self.resolve_in(&mut context, source);
         let statement = context.finish_analysis(result)?;
         let context = statement.apply_relation_alter(context)?;
@@ -168,7 +168,7 @@ impl super::AlterCommand {
         mut context: TContext,
         table: &crate::sem::TableName,
     ) -> Result<(crate::sem::AlterObjSubCommand, TContext), AnalysisError> {
-        context.begin_analysis();
+        context.begin_parameter_type_analysis();
         let result = self.resolve(&mut context, table);
         let command = context.finish_analysis(result)?;
         Ok((command, context))
@@ -791,7 +791,7 @@ impl super::Table {
         context: &mut impl ParseContext,
         source: &crate::sem::SourcePathWithSpan,
     ) -> Result<crate::sem::CreateTable, crate::sem::AnalysisError> {
-        context.begin_analysis();
+        context.begin_parameter_type_analysis();
         let result = self.resolve_in(context, source);
         context.finish_analysis(result)
     }
@@ -826,7 +826,7 @@ impl super::Column {
         mut context: TContext,
         table: &crate::sem::TableName,
     ) -> Result<(crate::sem::ColumnDefinition, TContext), AnalysisError> {
-        context.begin_analysis();
+        context.begin_parameter_type_analysis();
         let result = self.resolve(&mut context, table);
         let column = context.finish_analysis(result)?;
         Ok((column, context))
@@ -899,7 +899,7 @@ impl super::ColumnConstraint {
         table: &crate::sem::TableName,
         column: &crate::sem::ColumnName,
     ) -> Result<(crate::sem::ColumnConstraint, TContext), AnalysisError> {
-        context.begin_analysis();
+        context.begin_parameter_type_analysis();
         let result = self.resolve(&mut context, table, column);
         let constraint = context.finish_analysis(result)?;
         Ok((constraint, context))
@@ -1196,7 +1196,7 @@ impl Index {
         &self,
         context: &mut impl ParseContext,
     ) -> Result<Option<crate::sem::CreateIndex>, crate::sem::AnalysisError> {
-        context.begin_analysis();
+        context.begin_parameter_type_analysis();
         let result = self.resolve_in(context);
         context.finish_analysis(result)
     }
@@ -1365,7 +1365,7 @@ impl FunctionParameter {
         &self,
         mut context: TContext,
     ) -> Result<(crate::sem::FunctionParam, TContext), AnalysisError> {
-        context.begin_analysis();
+        context.begin_parameter_type_analysis();
         let result = self.resolve(&mut context);
         let parameter = context.finish_analysis(result)?;
         Ok((parameter, context))
@@ -1456,7 +1456,7 @@ impl Function {
         &self,
         context: &mut impl ParseContext,
     ) -> Result<crate::sem::CreateFunction, crate::sem::AnalysisError> {
-        context.begin_analysis();
+        context.begin_parameter_type_analysis();
         let result = self.resolve_in(context);
         context.finish_analysis(result)
     }
@@ -1673,7 +1673,7 @@ impl Domain {
         &self,
         context: &mut impl ParseContext,
     ) -> Result<CreateDomain, crate::sem::AnalysisError> {
-        context.begin_analysis();
+        context.begin_parameter_type_analysis();
         let result = self.resolve_in(context);
         context.finish_analysis(result)
     }

@@ -22,9 +22,9 @@ impl Query {
         &self,
         context: &mut impl ParseContext,
     ) -> Result<SelectStatement, crate::sem::AnalysisError> {
-        context.begin_analysis();
+        context.begin_parameter_type_analysis();
         let result = self.resolve_in(context, None);
-        let result = context.infer_query(result);
+        let result = context.infer_query_parameter_types(result);
         context.finish_analysis(result)
     }
 
@@ -120,7 +120,7 @@ mod test_name_resolution_phase {
             Some(&operator),
         );
         let before = crate::sem::parameter_resolution::inference_runs();
-        catalog.begin_analysis();
+        catalog.begin_parameter_type_analysis();
         let result = query.resolve_in(&mut catalog, None);
         catalog.finish_analysis(result).unwrap();
         assert_eq!(catalog.reported_problem_count(), 0);
@@ -265,11 +265,9 @@ impl CteBody {
                 query.rename_columns(columns);
                 Ok(CteStatement::from_query(query))
             }
-            // Preserve the existing semantic DML representation. Construction has
-            // already retained the complete recursive syntax, without parser nodes.
-            Self::Insert(_) => Ok(CteStatement::insert()),
-            Self::Update(_) => Ok(CteStatement::update()),
-            Self::Delete(_) => Ok(CteStatement::delete()),
+            Self::Insert(_) => todo!(),
+            Self::Update(_) => todo!(),
+            Self::Delete(_) => todo!(),
             Self::Merge(_) => AnalysisError::raise_unexpected_none("common_table_expr.query"),
         }
     }
@@ -379,7 +377,7 @@ impl Expr {
         context: &mut impl ParseContext,
         scope: &ScalarAnalysisContext<'_>,
     ) -> Result<crate::sem::DataSourceRowsFromFunc, crate::sem::AnalysisError> {
-        context.begin_analysis();
+        context.begin_parameter_type_analysis();
         let result = self.resolve_rows_call(context, scope);
         context.finish_analysis(result)
     }
@@ -475,7 +473,7 @@ impl FromItem {
         context: &mut impl ParseContext,
         with: &WithClause,
     ) -> Result<FromClause, crate::sem::AnalysisError> {
-        context.begin_analysis();
+        context.begin_parameter_type_analysis();
         let result = Self::resolve_list_in(items, context, with, None);
         context.finish_analysis(result)
     }
@@ -485,7 +483,7 @@ impl FromItem {
         with: &WithClause,
         preceding: &FromClause,
     ) -> Result<DataSource, crate::sem::AnalysisError> {
-        context.begin_analysis();
+        context.begin_parameter_type_analysis();
         let result = self.resolve(context, with, preceding, None);
         context.finish_analysis(result)
     }
@@ -495,7 +493,7 @@ impl With {
         &self,
         context: &mut impl ParseContext,
     ) -> Result<WithClause, crate::sem::AnalysisError> {
-        context.begin_analysis();
+        context.begin_parameter_type_analysis();
         let result = self.resolve(context, None);
         context.finish_analysis(result)
     }

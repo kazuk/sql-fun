@@ -4,20 +4,14 @@ use crate::sem::{AnalysisError, ParseContext, SemAst};
 #[derive(Debug, Clone, Eq, Hash, PartialEq, serde::Serialize, serde::Deserialize)]
 pub struct InsertStatement {}
 
-impl InsertStatement {
-    pub(crate) const fn empty() -> Self {
-        Self {}
-    }
-}
-
 /// analyze [`crate::syn::InsertStmt`]
 pub fn analyze_insert_statement<TParseContext>(
-    context: TParseContext,
+    _context: TParseContext,
     _parent_schema: &Option<String>,
     _syn: crate::syn::InsertStmt,
 ) -> Result<(SemAst, TParseContext), AnalysisError>
 where
     TParseContext: ParseContext,
 {
-    Ok((SemAst::InsertStatement(InsertStatement {}), context))
+    todo!()
 }

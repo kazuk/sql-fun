@@ -52,7 +52,7 @@ mod test_analysis_lifecycle {
     #[test]
     fn completed_analysis_delivers_findings_before_fatal_error() -> testresult::TestResult {
         let mut context = TestParseContext::default();
-        context.begin_analysis();
+        context.begin_parameter_type_analysis();
         test_helpers::report_missing_functions(&mut context)?;
         assert_eq!(context.reported_problem_count(), 0);
         let fatal: Result<(), AnalysisError> = Err(std::io::Error::other("analysis failed").into());
@@ -72,7 +72,7 @@ mod test_analysis_lifecycle {
     -> testresult::TestResult {
         let mut context = TestParseContext::default();
         context.reject_diagnostics_after(1);
-        context.begin_analysis();
+        context.begin_parameter_type_analysis();
         test_helpers::report_missing_functions(&mut context)?;
         let fatal: Result<(), AnalysisError> = Err(std::io::Error::other("later failure").into());
         assert_eq!(
@@ -80,7 +80,7 @@ mod test_analysis_lifecycle {
             "diagnostic sink rejected a problem"
         );
         assert_eq!(context.reported_problem_count(), 1);
-        context.begin_analysis();
+        context.begin_parameter_type_analysis();
         context.finish_analysis(Ok(()))?;
         assert_eq!(context.reported_problem_count(), 1);
         assert!(!context.parameter_inference_needed());

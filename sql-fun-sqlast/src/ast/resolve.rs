@@ -63,9 +63,9 @@ impl Expr {
         context: &mut impl ParseContext,
         scope: &ScalarAnalysisContext<'_>,
     ) -> Result<SemScalarExpr, crate::sem::AnalysisError> {
-        context.begin_analysis();
+        context.begin_parameter_type_analysis();
         let result = self.resolve_in(context, scope);
-        let result = context.infer_expression(result);
+        let result = context.infer_expression_parameter_types(result);
         context.finish_analysis(result)
     }
 

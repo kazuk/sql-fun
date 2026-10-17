@@ -85,10 +85,10 @@ pub(super) fn resolve(
         panic!("query fixture expected");
     };
     let mut catalog = catalog().with_dialect(dialect);
-    catalog.begin_analysis();
+    catalog.begin_parameter_type_analysis();
     let query = query.resolve_in(&mut catalog, None);
     let query = if infer {
-        catalog.infer_query(query)
+        catalog.infer_query_parameter_types(query)
     } else {
         query
     };

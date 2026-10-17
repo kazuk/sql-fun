@@ -20,6 +20,15 @@ pub enum ViewProblem {
     InvalidAlter,
 }
 impl ViewProblem {
+    /// Exact catalog identity whose required write metadata is absent.
+    pub const fn missing_metadata_view(&self) -> Option<&FullName> {
+        if let Self::MissingMetadata(view) = self {
+            Some(view)
+        } else {
+            None
+        }
+    }
+
     pub(crate) fn invalid_target(view: &FullName) -> Self {
         Self::InvalidTarget(view.clone())
     }

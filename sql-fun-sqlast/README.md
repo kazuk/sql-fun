@@ -52,14 +52,16 @@ resolve procedural variables before supplying bindings. Cursor position and
 lifetime remain execution-time concerns. Session bindings survive statement
 analysis and are not part of frozen schema catalogs.
 
-Production schema catalogs derive `ViewUpdateInfoRead` independently of
-`ViewInsertInfoRead`, from explicitly loaded view, trigger, rule and default
-DDL. PostgreSQL automatic views preserve nested direct-column lineage and
-assignment restrictions; INSTEAD OF triggers and INSTEAD rules have independent
-operation and RETURNING capabilities. SQLite requires matching INSTEAD OF
-triggers, including UPDATE OF column applicability, and rejects view UPSERT.
-Materialized views remain read-only. View conflict inference preserves actual
-underlying arbiter identities rather than inventing view indexes.
+Schema catalogs retain explicitly loaded view, trigger, rule and default DDL.
+`ViewInsertSupport::analyze` and `ViewUpdateSupport::analyze` independently
+derive each operation's capabilities from those facts. `ViewInsertInfoRead` and
+`ViewUpdateInfoRead` retrieve optional registered capabilities without
+performing analysis. PostgreSQL automatic views preserve nested direct-column
+lineage and assignment restrictions; INSTEAD OF triggers and INSTEAD rules have
+independent operation and RETURNING capabilities. SQLite requires matching
+INSTEAD OF triggers, including UPDATE OF column applicability, and rejects view
+UPSERT. Materialized views remain read-only. View conflict inference preserves
+actual underlying arbiter identities rather than inventing view indexes.
 
 Frozen catalogs share source facts without sharing mutable layer changes. No
 trigger function or rule action is executed. The metadata producer is not a

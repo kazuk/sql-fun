@@ -43,13 +43,6 @@ impl Insert {
                 "INSERT destination relation not found",
             ));
         };
-        if let Some(support) = table.view_support()
-            && let Some(view) = support.missing_metadata_view()
-        {
-            context.report_analysis_problem(AnalysisProblem::view(
-                &crate::sem::problem::ViewProblem::missing_metadata(view),
-            ))?;
-        }
         if !table.is_writable() {
             context.report_analysis_problem(AnalysisProblem::insert(
                 crate::sem::problem::InsertProblemKind::read_only_target(),

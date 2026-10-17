@@ -76,13 +76,11 @@ impl FunctionInfoWrite for SchemaFileContext {
         preserves_rows: bool,
     ) -> Result<Self, AnalysisError> {
         let name = self.apply_default_schema(function.name())?;
-        let mut index = 0;
-        while let Some(overload) = function.overloads().get_at(index) {
-            self.catalog
-                .function_view_rows
-                .insert((name.clone(), overload.clone()), preserves_rows);
-            index += 1;
-        }
+        self.catalog.function_view_rows.extend(
+            function
+                .overloads()
+                .view_row_properties(&name, preserves_rows),
+        );
         Ok(self)
     }
 

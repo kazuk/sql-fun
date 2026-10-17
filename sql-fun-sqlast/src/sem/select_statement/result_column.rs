@@ -166,6 +166,33 @@ impl ResultColumnCollection {
         Ok(())
     }
 
+    pub(crate) fn view_expressions(&self) -> Vec<(ColumnName, SemScalarExpr)> {
+        let mut expressions = Vec::new();
+        for column in &self.0 {
+            if let Some(name) = column.column_name()
+                && let Some(expression) = column.expression()
+            {
+                expressions.push((name.clone(), expression.clone()));
+            }
+        }
+        expressions
+    }
+    pub(crate) fn view_projection(&self) -> Vec<(ColumnDefinition, Option<ColumnName>)> {
+        self.0
+            .iter()
+            .map(|column| {
+                (
+                    column.create_column_definition(),
+                    if let Some(expression) = column.expression() {
+                        expression.view_source_column().cloned()
+                    } else {
+                        None
+                    },
+                )
+            })
+            .collect()
+    }
+
     /// Number of result columns.
     pub const fn len(&self) -> usize {
         self.0.len()

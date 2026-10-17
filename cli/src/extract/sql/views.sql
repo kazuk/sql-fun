@@ -42,7 +42,33 @@ SELECT COALESCE(json_agg(
     'schema', vn.schema,
     'view',   vn.view,
     'kind',   vn.kind,
-    'definition', pg_get_viewdef(vn.oid, true)
+    'definition', pg_get_viewdef(vn.oid, true),
+    'options', COALESCE((
+      SELECT 'WITH (' || string_agg(format('%I = %L', option_name, option_value), ', ' ORDER BY option_name) || ')'
+      FROM pg_options_to_table((SELECT reloptions FROM pg_class WHERE oid = vn.oid))
+    ), ''),
+    'rules', COALESCE((
+      SELECT json_agg(json_build_object(
+        'prefix', format(E'CREATE RULE %I AS\n    ON %s TO %I', r.rulename,
+          CASE r.ev_type WHEN '2' THEN 'UPDATE' WHEN '3' THEN 'INSERT' WHEN '4' THEN 'DELETE' ELSE 'SELECT' END, vn.view),
+        'qualified_prefix', format(E'CREATE RULE %I AS\n    ON %s TO %I.%I', r.rulename,
+          CASE r.ev_type WHEN '2' THEN 'UPDATE' WHEN '3' THEN 'INSERT' WHEN '4' THEN 'DELETE' ELSE 'SELECT' END, vn.schema, vn.view),
+        'definition', pg_get_ruledef(r.oid, true)
+      ) ORDER BY r.rulename)
+      FROM pg_rewrite r WHERE r.ev_class = vn.oid AND r.rulename <> '_RETURN' AND r.oid < 16384
+    ), '[]'::json),
+    'write_metadata', COALESCE((
+      SELECT string_agg(statement, E'\n' ORDER BY category, name)
+      FROM (
+        SELECT 1 AS category, a.attname::text AS name,
+               format('ALTER VIEW %I.%I ALTER COLUMN %I SET DEFAULT %s;', vn.schema, vn.view, a.attname, pg_get_expr(d.adbin, d.adrelid)) AS statement
+        FROM pg_attrdef d JOIN pg_attribute a ON a.attrelid = d.adrelid AND a.attnum = d.adnum
+        WHERE d.adrelid = vn.oid AND d.oid < 16384
+        UNION ALL
+        SELECT 3, t.tgname::text, pg_get_triggerdef(t.oid, true) || ';'
+        FROM pg_trigger t WHERE t.tgrelid = vn.oid AND NOT t.tgisinternal AND t.oid < 16384
+      ) AS declarations
+    ), '')
   )
   ORDER BY md.depth, vn.schema, vn.view
 ), '[]'::json)

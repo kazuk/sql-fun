@@ -119,17 +119,44 @@ unimplemented
 ([#474](https://github.com/kazuk/sql-fun/issues/474)); it does not produce a
 successful INSERT analysis, including later actions in SQLite UPSERT chains.
 
-View destinations use the catalog's `ViewInsertInfoRead` decision about INSERT
-eligibility, writable column definitions, RETURNING, and ON CONFLICT. PostgreSQL
-catalogs must account for automatic updates, INSTEAD OF INSERT triggers, and
-INSTEAD rules; SQLite catalogs must account for INSTEAD OF INSERT triggers.
-Analysis checks assignments against the returned metadata and retains the
-capability decision in `InsertStatement::view_support`. Read-only view columns
-cannot receive DEFAULT either, but can be returned. Trigger and rule bodies are
-not executed. Bundled production catalogs still lack these services; their
-implementation and production integration tests are tracked in
-[#585](https://github.com/kazuk/sql-fun/issues/585). Custom contexts can supply
-them without changes to INSERT resolution.
+Ordinary view writes are analyzed from the schema declarations you explicitly
+load. PostgreSQL supports automatic writes through a single eligible relation,
+matching INSTEAD OF triggers, and unconditional INSTEAD rules. INSERT and UPDATE
+are independent: an INSERT trigger does not permit UPDATE. SQLite requires a
+matching INSTEAD OF trigger; an UPDATE OF trigger requires at least one of its
+listed columns in SET. Materialized views remain read-only.
+
+Automatic views retain direct-column aliases through nested views. DISTINCT,
+GROUP BY, HAVING, window functions, set-returning projections, joins, set
+operations, WITH, LIMIT and OFFSET prevent automatic writes. Computed columns
+cannot be assigned, even with DEFAULT, but remain available in RETURNING.
+Assignable columns retain effective base defaults and generated/identity
+restrictions; ALTER VIEW column defaults override base defaults. PostgreSQL
+expands view UPDATE DEFAULT before checking base generated/ALWAYS identity
+columns, so these assignments are rejected through automatic views even though
+the corresponding table UPDATE DEFAULT and view INSERT DEFAULT are allowed.
+Trigger/rule
+NEW-row fields have their own assignment semantics.
+
+RETURNING is checked independently. An applicable INSTEAD rule requires an
+unconditional replacement action with RETURNING. Conditional INSTEAD rules block
+automatic writes; an INSTEAD OF trigger can still permit the operation. Additional
+DO ALSO rules can coexist with automatic writes. For automatic PostgreSQL views,
+ON CONFLICT inference maps aliases to real underlying arbiters. Trigger-backed
+views allow targetless DO NOTHING without exposing base indexes. Rule replacement
+and trigger paths with INSERT/UPDATE rules reject ON CONFLICT. SQLite views reject
+UPSERT. Modifier and partial-index inference retains the limitations described
+above for #581.
+
+Load trigger/rule declarations, replacements, drops, and view defaults after the
+view declaration, in schema order. Catalog changes in a later schema layer do
+not mutate a frozen parent. The analyzer retains write capabilities in
+`InsertStatement::view_support` and `UpdateStatement::view_support`; it does not
+execute trigger functions, rule actions, CHECK OPTION checks, or runtime row
+constraints. Trigger/rule declarations currently supply catalog facts rather
+than full procedural-body validation, and cannot be rendered back to SQL through
+the common AST deparser. Broader trigger/rule and ALTER VIEW processing remains
+tracked separately.
 
 Deferrable unique-key catalog definitions, recursive CTE binding, and expressions
 already unsupported by the SELECT analyzer remain unsupported. Star expansion

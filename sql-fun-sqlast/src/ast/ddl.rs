@@ -50,6 +50,13 @@ impl super::AlterRelation {
         mut context: TContext,
         source: Option<&crate::sem::SourcePathWithSpan>,
     ) -> Result<AstAndContextPair<TContext>, AnalysisError> {
+        if let Some(change) = self.view_write_changes(&mut context)? {
+            let context = context.apply_view_write_change(&change)?;
+            return Ok(AstAndContextPair::new(
+                SemAst::view_write_change(&change),
+                context,
+            ));
+        }
         context.begin_parameter_type_analysis();
         let result = self.resolve_in(&mut context, source);
         let statement = context.finish_analysis(result)?;
@@ -983,7 +990,14 @@ impl super::Column {
                 if context.dialect() == Dialect::sqlite() {
                     Some(TypeReference::from_full_name(type_name))
                 } else if let Some(type_ref) = ty.type_reference() {
-                    Some(type_ref.clone())
+                    let array = self
+                        .type_name
+                        .as_ref()
+                        .is_some_and(|syntax| !syntax.array_bounds.is_empty());
+                    Some(TypeReference::concrete_type_ref(
+                        type_ref.full_name(),
+                        array,
+                    ))
                 } else {
                     let problem = AnalysisProblem::unexpected_dynamic_type(ty);
                     context.report_analysis_problem(problem)?;
@@ -1791,7 +1805,17 @@ impl Function {
         mut context: TContext,
     ) -> Result<AstAndContextPair<TContext>, AnalysisError> {
         let function = self.resolve(&mut context)?.with_replace(self.replace);
-        let context = context.apply_create_function(&function)?;
+        let preserves_rows = self
+            .result_type
+            .as_ref()
+            .is_none_or(|result| !result.set_of)
+            && !self
+                .options
+                .iter()
+                .any(|option| matches!(option, FunctionOption::Window));
+        let context = context
+            .apply_create_function(&function)?
+            .apply_function_view_rows(&function, preserves_rows)?;
         Ok(AstAndContextPair::new(
             SemAst::create_function(&function),
             context,
@@ -1990,5 +2014,114 @@ mod domain_tests {
         assert!(matches!(domain, SemAst::CreateDomain(_)));
         assert_eq!(context.reported_problem_count(), 1);
         Ok(())
+    }
+}
+
+impl super::AlterRelation {
+    fn view_write_changes(
+        &self,
+        context: &mut impl ParseContext,
+    ) -> Result<Option<crate::sem::ViewWriteChange>, AnalysisError> {
+        let requested = self.name.full_name()?;
+        let Some(name) =
+            crate::sem::search_path::expand_search_path_inst(context, &requested, |key| {
+                context
+                    .get_view_impl(key)
+                    .filter(|view| !view.is_materialized())
+                    .map(|_| key.clone())
+            })
+        else {
+            return Ok(None);
+        };
+        let mut actions = Vec::new();
+        for command in &self.commands {
+            let Some(action) = command.view_write_action(context)? else {
+                return Ok(None);
+            };
+            actions.push(action);
+        }
+        Ok(Some(crate::sem::ViewWriteChange::new(
+            &name,
+            &crate::sem::view_write::WriteAction::sequence(&actions),
+        )))
+    }
+}
+impl super::AlterCommand {
+    fn view_write_action(
+        &self,
+        context: &mut impl ParseContext,
+    ) -> Result<Option<crate::sem::view_write::WriteAction>, AnalysisError> {
+        match self {
+            Self::Postgres(command) => command.view_write_action(context),
+            Self::Default(name, expression) => {
+                let value = expression.resolve(
+                    context,
+                    &crate::sem::ScalarAnalysisContext::new(
+                        &crate::sem::WithClause::default(),
+                        &crate::sem::FromClause::default(),
+                    ),
+                )?;
+                Ok(Some(crate::sem::view_write::WriteAction::default(
+                    &crate::sem::ColumnName::from(name.as_str()),
+                    Some(&value),
+                )))
+            }
+            _ => Ok(None),
+        }
+    }
+}
+impl PostgresAlterCommand {
+    fn view_write_action(
+        &self,
+        context: &mut impl ParseContext,
+    ) -> Result<Option<crate::sem::view_write::WriteAction>, AnalysisError> {
+        use crate::sem::view_write::WriteAction;
+        let action = match self.operation {
+            AlterOperation::ColumnDefault => {
+                let value = self.definition.view_default(context)?;
+                WriteAction::default(
+                    &crate::sem::ColumnName::from(self.name.as_str()),
+                    value.as_ref(),
+                )
+            }
+            AlterOperation::EnableTrigger
+            | AlterOperation::EnableAlwaysTrigger
+            | AlterOperation::EnableTriggerAll
+            | AlterOperation::EnableTriggerUser
+            | AlterOperation::DisableTrigger
+            | AlterOperation::EnableReplicaTrigger
+            | AlterOperation::DisableTriggerAll
+            | AlterOperation::DisableTriggerUser
+            | AlterOperation::EnableRule
+            | AlterOperation::EnableAlwaysRule
+            | AlterOperation::DisableRule
+            | AlterOperation::EnableReplicaRule => {
+                return Err(AnalysisError::unexpected_input_error(
+                    "PostgreSQL does not permit ALTER trigger/rule state on views",
+                ));
+            }
+            _ => return Ok(None),
+        };
+        Ok(Some(action))
+    }
+}
+impl AlterDefinition {
+    fn view_default(
+        &self,
+        context: &mut impl ParseContext,
+    ) -> Result<Option<crate::sem::SemScalarExpr>, AnalysisError> {
+        match self {
+            Self::None => Ok(None),
+            Self::Expression(value) => value
+                .resolve(
+                    context,
+                    &crate::sem::ScalarAnalysisContext::new(
+                        &crate::sem::WithClause::default(),
+                        &crate::sem::FromClause::default(),
+                    ),
+                )
+                .map(Some),
+            _ => AnalysisError::raise_unexpected_input("view default expression"),
+        }
     }
 }

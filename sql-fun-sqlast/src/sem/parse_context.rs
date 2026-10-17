@@ -91,6 +91,15 @@ pub trait IndexInfoRead {
 
 /// get function definition
 pub trait FunctionInfoRead {
+    /// Whether this exact function overload is scalar and preserves source rows
+    /// in a view target list. Aggregate/window/set-returning calls return false.
+    /// A provider lacking function-kind metadata must remain explicitly unimplemented.
+    fn function_preserves_view_rows(
+        &self,
+        name: &FullName,
+        overload: &crate::sem::OverloadVariant,
+    ) -> bool;
+
     /// get `CREATE FUNCTION` statement by function name
     fn get_function_impl(&self, name: &FullName) -> Option<FunctionOverloadCollection>;
 }
@@ -100,6 +109,13 @@ pub trait FunctionInfoWrite
 where
     Self: Sized,
 {
+    /// Record source function properties separately from its readable signature.
+    fn apply_function_view_rows(
+        self,
+        function: &CreateFunction,
+        preserves_rows: bool,
+    ) -> Result<Self, AnalysisError>;
+
     /// apply `create function` statement (implementation)
     fn apply_create_function_impl(
         self,

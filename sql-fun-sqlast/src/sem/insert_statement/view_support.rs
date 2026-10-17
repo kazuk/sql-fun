@@ -6,14 +6,31 @@ use crate::sem::{ColumnDefinition, ColumnName, FullName};
 pub struct ViewInsertSupport {
     writable_columns: Option<Vec<ColumnDefinition>>,
     returning: bool,
+    #[serde(default)]
+    assignment_columns: Vec<crate::sem::ViewAssignmentColumn>,
     on_conflict: bool,
 }
 impl ViewInsertSupport {
+    /// Record alias equivalence for automatic-view assignment targets.
+    /// Trigger/rule-backed NEW-row fields have independent identities instead.
+    pub fn set_assignment_columns(&mut self, columns: &[crate::sem::ViewAssignmentColumn]) {
+        self.assignment_columns = columns.to_vec();
+    }
+    /// The underlying assignment-column key, or the supplied view name when
+    /// no rewrite mapping applies. Keys are compared within this destination.
+    pub fn assignment_column<'a>(&'a self, name: &'a ColumnName) -> &'a ColumnName {
+        self.assignment_columns
+            .iter()
+            .find(|column| column.name() == name)
+            .map_or(name, crate::sem::ViewAssignmentColumn::source_column)
+    }
+
     /// The view cannot accept INSERT statements.
     pub const fn read_only() -> Self {
         Self {
             writable_columns: None,
             returning: false,
+            assignment_columns: Vec::new(),
             on_conflict: false,
         }
     }
@@ -26,6 +43,7 @@ impl ViewInsertSupport {
         Self {
             writable_columns: Some(columns.to_vec()),
             returning,
+            assignment_columns: Vec::new(),
             on_conflict,
         }
     }
@@ -34,7 +52,8 @@ impl ViewInsertSupport {
         self.returning
     }
     /// Whether any ON CONFLICT clause is allowed, before arbiter inference.
-    /// SQLite views and PostgreSQL views with INSERT/UPDATE rules reject UPSERT.
+    /// SQLite views, rule replacement paths, and trigger paths with INSERT/UPDATE
+    /// rules reject UPSERT. Additional rules can coexist with automatic writes.
     pub const fn supports_on_conflict(&self) -> bool {
         self.on_conflict
     }

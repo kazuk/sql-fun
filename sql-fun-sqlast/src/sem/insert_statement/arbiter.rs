@@ -81,12 +81,20 @@ impl InsertConstraintLookup {
 pub enum InsertArbiter {
     /// An index identified by its qualified catalog name.
     Index(FullName),
+    /// An arbiter reached through a view rewrite, with its actual relation.
+    ViewSource(Box<ViewSourceArbiter>),
     /// A named table constraint, qualified by the INSERT destination.
     TableConstraint(InsertConstraintLookup),
     /// An inline unique/primary-key constraint on a bound destination column.
     ColumnConstraint(ColumnName),
     /// An unnamed table key, identified by its bound destination columns.
     AnonymousTableKey(Vec<ColumnName>),
+}
+/// Qualified source retained when rewriting a view conflict target.
+#[derive(Debug, Clone, Eq, Hash, PartialEq, serde::Serialize, serde::Deserialize)]
+pub struct ViewSourceArbiter {
+    relation: TableName,
+    arbiter: InsertArbiter,
 }
 impl InsertArbiter {
     pub(crate) fn contains_backing_index(arbiters: &[Self], name: &FullName) -> bool {
@@ -100,6 +108,23 @@ impl InsertArbiter {
             }
             _ => false,
         })
+    }
+    pub(crate) fn with_view_source(self, relation: &TableName) -> Self {
+        if self.source_relation().is_some() {
+            return self;
+        }
+        Self::ViewSource(Box::new(ViewSourceArbiter {
+            relation: relation.clone(),
+            arbiter: self,
+        }))
+    }
+    /// Actual destination of a view-mapped arbiter; never the view identity.
+    pub fn source_relation(&self) -> Option<&TableName> {
+        if let Self::ViewSource(source) = self {
+            Some(&source.relation)
+        } else {
+            None
+        }
     }
 
     /// Bind an eligible index by its catalog identity.
@@ -124,6 +149,9 @@ impl InsertArbiter {
     }
     /// The bound columns of an unnamed table key, if applicable.
     pub fn anonymous_key_columns(&self) -> Option<&[ColumnName]> {
+        if let Self::ViewSource(source) = self {
+            return source.arbiter.anonymous_key_columns();
+        }
         if let Self::AnonymousTableKey(columns) = self {
             Some(columns)
         } else {
@@ -131,7 +159,10 @@ impl InsertArbiter {
         }
     }
     /// The qualified index, if this arbiter is an index.
-    pub const fn index_name(&self) -> Option<&FullName> {
+    pub fn index_name(&self) -> Option<&FullName> {
+        if let Self::ViewSource(source) = self {
+            return source.arbiter.index_name();
+        }
         if let Self::Index(name) = self {
             Some(name)
         } else {
@@ -139,7 +170,10 @@ impl InsertArbiter {
         }
     }
     /// The bound table constraint, if applicable.
-    pub const fn constraint(&self) -> Option<&InsertConstraintLookup> {
+    pub fn constraint(&self) -> Option<&InsertConstraintLookup> {
+        if let Self::ViewSource(source) = self {
+            return source.arbiter.constraint();
+        }
         if let Self::TableConstraint(value) = self {
             Some(value)
         } else {
@@ -147,7 +181,10 @@ impl InsertArbiter {
         }
     }
     /// The bound inline-key column, if applicable.
-    pub const fn column(&self) -> Option<&ColumnName> {
+    pub fn column(&self) -> Option<&ColumnName> {
+        if let Self::ViewSource(source) = self {
+            return source.arbiter.column();
+        }
         if let Self::ColumnConstraint(value) = self {
             Some(value)
         } else {

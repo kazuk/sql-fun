@@ -151,7 +151,10 @@ PostgreSQL and SQLite DELETE analysis retains the qualified target, WITH
 queries, predicate bindings and RETURNING columns. PostgreSQL USING sources,
 ONLY/inheritance and positioned `WHERE CURRENT OF` are represented explicitly.
 Analysis does not delete rows or remove schema definitions. Without RETURNING,
-a DELETE has no result columns.
+a DELETE has no result columns. Invalid DELETE SQL produces inspectable analysis
+problems; a missing destination retains its requested name and an explicit failed
+lookup outcome. Read-only destinations retain their bindings and capability decision.
+Analyzer failures remain separate from SQL diagnostics.
 
 PostgreSQL RETURNING can reference the target and USING sources. Unqualified
 `*` expands only the target; `source.*` expands the named source. A target alias

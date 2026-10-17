@@ -47,6 +47,7 @@ impl Delete {
             self.resolve_returning_scope(context, &requested, &table, &alias, &with, &from)?;
         let mut delete = DeleteStatement::new(
             table.name(),
+            table.found(),
             &self.with.local_definitions(with),
             &from,
             &predicate,
@@ -67,18 +68,12 @@ impl Delete {
     ) -> Result<DeleteDestination, AnalysisError> {
         let Some(table) = DeleteDestination::resolve(context, requested) else {
             context.report_analysis_problem(AnalysisProblem::relation_not_found(requested))?;
-            return Err(AnalysisError::unexpected_input_error(
-                "DELETE destination not found",
-            ));
+            return Ok(DeleteDestination::missing(requested));
         };
         if !table.is_deletable() {
             context.report_analysis_problem(AnalysisProblem::delete(
                 DeleteProblemKind::read_only_target(),
-                "destination does not support DELETE",
             ))?;
-            return Err(AnalysisError::unexpected_input_error(
-                "read-only DELETE destination",
-            ));
         }
         if !self.returning.is_empty()
             && table
@@ -87,7 +82,6 @@ impl Delete {
         {
             context.report_analysis_problem(AnalysisProblem::delete(
                 DeleteProblemKind::view_operation(),
-                "view does not support DELETE RETURNING",
             ))?;
         }
         Ok(table)
@@ -113,7 +107,6 @@ impl Delete {
             {
                 context.report_analysis_problem(AnalysisProblem::delete(
                     DeleteProblemKind::index_hint(),
-                    "INDEXED BY does not identify an index of the DELETE destination",
                 ))?;
             }
         }
@@ -163,10 +156,8 @@ impl Delete {
                 .get_implicit_cast(&ty, &crate::sem::PgBuiltInType::bool())
                 .is_none()
         {
-            context.report_analysis_problem(AnalysisProblem::delete(
-                DeleteProblemKind::predicate(),
-                "DELETE WHERE requires boolean type",
-            ))?;
+            context
+                .report_analysis_problem(AnalysisProblem::delete(DeleteProblemKind::predicate()))?;
         }
         Ok(predicate
             .as_ref()
@@ -211,7 +202,6 @@ impl Delete {
                 if context.dialect() == Dialect::sqlite() && !name.0.is_empty() {
                     context.report_analysis_problem(AnalysisProblem::delete(
                         DeleteProblemKind::returning_qualifier(),
-                        "SQLite RETURNING does not permit qualified stars",
                     ))?;
                 }
                 // Unqualified RETURNING * expands only the modified relation.
@@ -229,7 +219,6 @@ impl Delete {
                 if columns.is_empty() {
                     context.report_analysis_problem(AnalysisProblem::delete(
                         DeleteProblemKind::returning_qualifier(),
-                        "RETURNING star source is not visible",
                     ))?;
                 }
                 for (source, column) in columns {
@@ -267,30 +256,26 @@ impl crate::ast::CurrentOf {
         target: &TableName,
     ) -> Result<crate::sem::DeleteCursor, AnalysisError> {
         if self.parameter != 0 {
-            return Err(AnalysisError::unexpected_input_error(
-                "CURRENT OF cursor parameters require a procedural variable resolver",
-            ));
+            context.report_analysis_problem(AnalysisProblem::delete(
+                DeleteProblemKind::cursor_parameter(self.parameter),
+            ))?;
+            return Ok(crate::sem::DeleteCursor::parameter(self.parameter));
         }
         let cursor = crate::sem::DeleteCursor::new(&self.name, context.resolve_cursor(&self.name));
         let problem = match cursor.binding() {
-            None => Some(format!(
-                "cursor {:?} does not exist in the current session scope",
-                self.name
-            )),
-            Some(info) if info.updatable() == Some(false) => Some(format!(
-                "cursor {:?} is not statically updatable",
-                self.name
-            )),
-            Some(info) if info.target().is_some_and(|relation| relation != target) => {
-                Some(format!("cursor {:?} does not target {}", self.name, target))
+            None => Some(DeleteProblemKind::missing_cursor(&self.name)),
+            Some(info) if info.updatable() == Some(false) => {
+                Some(DeleteProblemKind::non_updatable_cursor(&self.name))
             }
-            Some(_) => None,
+            Some(info) => info
+                .target()
+                .filter(|relation| *relation != target)
+                .map(|actual| {
+                    DeleteProblemKind::cursor_target_mismatch(&self.name, target, actual)
+                }),
         };
-        if let Some(message) = problem {
-            context.report_analysis_problem(AnalysisProblem::delete(
-                DeleteProblemKind::cursor(),
-                &message,
-            ))?;
+        if let Some(kind) = problem {
+            context.report_analysis_problem(AnalysisProblem::delete(kind))?;
         }
         Ok(cursor)
     }

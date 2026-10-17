@@ -226,9 +226,6 @@ fn resolves_array_assignment_targets(#[case] sql: &str) {
 #[case::missing_relation("INSERT INTO absent VALUES(1)")]
 #[case::missing_column("INSERT INTO items(absent) VALUES(1)")]
 #[case::unreadable_cte("WITH changed AS (INSERT INTO items(id) VALUES(1)) SELECT 1 FROM changed")]
-#[case::nested_cte(
-    "SELECT * FROM (WITH changed AS (INSERT INTO items(id) VALUES(1) RETURNING id) SELECT id FROM changed) s"
-)]
 fn fails_without_fabricated_bindings(#[case] sql: &str) {
     let statement = crate::parse_statements(sql, Dialect::postgres())
         .next()
@@ -951,4 +948,12 @@ mod test_helpers {
             .expect("semantic analysis");
         (result, context)
     }
+}
+
+#[test]
+fn nested_insert_cte_reports_a_query_problem() {
+    let mut context = test_helpers::catalog(Dialect::postgres());
+    let statement = crate::parse_statements("SELECT * FROM (WITH changed AS (INSERT INTO items(id) VALUES(1) RETURNING id) SELECT id FROM changed) s", Dialect::postgres()).next().unwrap().unwrap();
+    assert!(statement.node.resolve(&mut context).is_ok());
+    assert!(context.reported_problem_count() > 0);
 }

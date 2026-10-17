@@ -44,6 +44,27 @@ fn resolves_portal_in_current_context(
         "{:?}",
         context.reported_problems()
     );
+    if updatable == Some(false) {
+        assert_eq!(
+            context.reported_problems()[0]
+                .delete_problem()
+                .unwrap()
+                .kind(),
+            &crate::sem::problem::DeleteProblemKind::non_updatable_cursor("portal")
+        );
+    } else if invalid {
+        assert_eq!(
+            context.reported_problems()[0]
+                .delete_problem()
+                .unwrap()
+                .kind(),
+            &crate::sem::problem::DeleteProblemKind::cursor_target_mismatch(
+                "portal",
+                delete.target(),
+                target.as_ref().unwrap()
+            )
+        );
+    }
     assert!(
         context
             .parameter_constraints()
@@ -67,7 +88,13 @@ fn retains_missing_reference(#[case] other_binding: bool) {
     assert_eq!(cursor.name(), "absent");
     assert!(cursor.binding().is_none());
     assert_eq!(context.reported_problem_count(), 1);
-    assert!(context.reported_problems()[0].delete_problem().is_some());
+    assert_eq!(
+        context.reported_problems()[0]
+            .delete_problem()
+            .unwrap()
+            .kind(),
+        &crate::sem::problem::DeleteProblemKind::missing_cursor("absent")
+    );
 }
 
 #[test]
@@ -139,4 +166,40 @@ fn portal_names_follow_identifier_rules(
     let cursor = statement.as_delete().unwrap().current_of().unwrap();
     assert_eq!(cursor.name(), name);
     assert_eq!(cursor.binding().is_none(), missing);
+}
+
+#[test]
+fn retains_unsupported_procedural_cursor_parameter() {
+    let mut context = catalog(Dialect::postgres());
+    let mut statement = crate::parse_statements(
+        "DELETE FROM items WHERE CURRENT OF portal",
+        Dialect::postgres(),
+    )
+    .next()
+    .unwrap()
+    .unwrap();
+    let crate::ast::StatementNode::Delete(delete) = &mut statement.node else {
+        panic!("DELETE")
+    };
+    let Some(crate::ast::Expr::CurrentOf(cursor)) = &mut delete.predicate else {
+        panic!("CURRENT OF")
+    };
+    cursor.parameter = 3;
+    let result = statement.node.resolve(&mut context).unwrap();
+    assert_eq!(
+        result
+            .as_delete()
+            .unwrap()
+            .current_of()
+            .unwrap()
+            .parameter_number(),
+        Some(3)
+    );
+    assert_eq!(
+        context.reported_problems()[0]
+            .delete_problem()
+            .unwrap()
+            .kind(),
+        &crate::sem::problem::DeleteProblemKind::cursor_parameter(3)
+    );
 }

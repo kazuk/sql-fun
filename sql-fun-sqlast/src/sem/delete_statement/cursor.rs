@@ -5,15 +5,29 @@ use crate::sem::CursorInfo;
 pub struct DeleteCursor {
     name: String,
     binding: Option<CursorInfo>,
+    parameter: Option<i32>,
 }
 impl DeleteCursor {
     pub(crate) fn new(name: &str, binding: Option<&CursorInfo>) -> Self {
         Self {
             name: name.to_owned(),
             binding: binding.cloned(),
+            parameter: None,
         }
     }
+    pub(crate) const fn parameter(number: i32) -> Self {
+        Self {
+            name: String::new(),
+            binding: None,
+            parameter: Some(number),
+        }
+    }
+    /// Procedural cursor parameter number, when static name lookup is unavailable.
+    pub const fn parameter_number(&self) -> Option<i32> {
+        self.parameter
+    }
     /// Portal name retained from CURRENT OF, after SQL identifier normalization.
+    /// Empty for a procedural parameter; inspect `parameter_number` in that case.
     pub fn name(&self) -> &str {
         &self.name
     }

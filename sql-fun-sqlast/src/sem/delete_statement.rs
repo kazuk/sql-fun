@@ -20,6 +20,7 @@ use crate::sem::{
 #[derive(Debug, Clone, Eq, Hash, PartialEq, serde::Serialize, serde::Deserialize)]
 pub struct DeleteStatement {
     target: TableName,
+    target_found: bool,
     with: Vec<QueryCte>,
     from: FromClause,
     predicate: Option<DeletePredicate>,
@@ -32,6 +33,7 @@ pub struct DeleteStatement {
 impl DeleteStatement {
     pub(crate) fn new(
         target: &TableName,
+        target_found: bool,
         with: &[QueryCte],
         from: &FromClause,
         predicate: &Option<DeletePredicate>,
@@ -39,6 +41,7 @@ impl DeleteStatement {
     ) -> Self {
         Self {
             target: target.clone(),
+            target_found,
             with: with.to_vec(),
             from: from.clone(),
             predicate: predicate.clone(),
@@ -61,9 +64,14 @@ impl DeleteStatement {
         self.not_indexed = not_indexed;
         self.inherit = inherit;
     }
-    /// Qualified catalog destination identity.
+    /// Catalog destination identity, or the requested name when `target_found` is false.
     pub const fn target(&self) -> &TableName {
         &self.target
+    }
+    /// Whether destination lookup found a catalog relation. A false value retains
+    /// the requested name in `target`, without claiming a qualified binding.
+    pub const fn target_found(&self) -> bool {
+        self.target_found
     }
     /// Local WITH definitions in declaration order.
     pub fn with(&self) -> &[QueryCte] {

@@ -334,6 +334,39 @@ impl StatementNode {
         &self,
         context: &mut impl crate::sem::ParseContext,
     ) -> Result<crate::sem::SemAst, crate::sem::AnalysisError> {
+        let missing = match self {
+            Self::Insert(insert) => {
+                match crate::sem::InsertDestination::resolve(
+                    context,
+                    &crate::sem::TableName::from(insert.relation.name.full_name()?),
+                )? {
+                    Some(destination) => match destination.view_support() {
+                        Some(support) => support.missing_metadata_view().cloned(),
+                        None => None,
+                    },
+                    None => None,
+                }
+            }
+            Self::Update(update) => {
+                match crate::sem::UpdateDestination::resolve(
+                    context,
+                    &crate::sem::TableName::from(update.relation.name.full_name()?),
+                )? {
+                    Some(destination) => match destination.view_support() {
+                        Some(support) => support.missing_metadata_view().cloned(),
+                        None => None,
+                    },
+                    None => None,
+                }
+            }
+            _ => None,
+        };
+        if let Some(missing) = missing {
+            context.report_analysis_problem(crate::sem::AnalysisProblem::view(
+                &crate::sem::problem::ViewProblem::missing_metadata(&missing),
+            ))?;
+            return Ok(crate::sem::SemAst::unresolved_statement());
+        }
         match self {
             Self::Query(query) => query
                 .resolve(context)
@@ -895,14 +928,19 @@ impl View {
         let outcome = self.query.resolve(&mut context);
         let mut query = outcome?;
         query.rename_columns(&self.aliases);
-        let info = self.write_info(&context, &query)?;
-        let view = crate::sem::CreateView::new(
-            &name, &query, &[], &None, self.materialized,
-        )
-        .with_if_not_exists(self.if_not_exists)
-        .with_replace(self.replace)
-        .with_temporary(self.temporary);
-        let context = context.apply_create_view(&view)?.apply_view_write_info(&name, &info)?;
+        let Some(info) = self.write_info(&mut context, &query, &name)? else {
+            return Ok(crate::AstAndContextPair::new(
+                crate::sem::SemAst::unresolved_statement(),
+                context,
+            ));
+        };
+        let view = crate::sem::CreateView::new(&name, &query, &[], &None, self.materialized)
+.with_if_not_exists(self.if_not_exists)
+.with_replace(self.replace)
+.with_temporary(self.temporary);
+        let context = context
+            .apply_create_view(&view)?
+            .apply_view_write_info(&name, &info)?;
         Ok(crate::AstAndContextPair::new(
             crate::sem::SemAst::CreateView(view),
             context,

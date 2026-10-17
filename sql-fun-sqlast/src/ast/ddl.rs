@@ -138,12 +138,14 @@ impl super::AlterRelationKind {
     ) -> Result<SemAst, AnalysisError> {
         use crate::sem::{AlterView, ViewName};
         let view = ViewName::from_full_name(name);
-        if let Some(definition) = context.get_view(&view) {
-            if materialized && !definition.is_materialized() {
-                context.report_analysis_problem(AnalysisProblem::view_not_matview(&view))?;
-            }
-        } else {
-            context.report_analysis_problem(AnalysisProblem::view_not_found(&view))?;
+        let valid = context
+            .get_view(&view)
+            .is_some_and(|definition| definition.is_materialized() == materialized);
+        if !valid {
+            context.report_analysis_problem(AnalysisProblem::view(
+                &crate::sem::problem::ViewProblem::invalid_target(name),
+            ))?;
+            return Ok(SemAst::unresolved_statement());
         }
         let commands = syntax_commands
             .iter()
@@ -2096,9 +2098,10 @@ impl PostgresAlterCommand {
             | AlterOperation::EnableAlwaysRule
             | AlterOperation::DisableRule
             | AlterOperation::EnableReplicaRule => {
-                return Err(AnalysisError::unexpected_input_error(
-                    "PostgreSQL does not permit ALTER trigger/rule state on views",
-                ));
+                context.report_analysis_problem(AnalysisProblem::view(
+                    &crate::sem::problem::ViewProblem::invalid_alter(),
+                ))?;
+                return Ok(Some(WriteAction::sequence(&[])));
             }
             _ => return Ok(None),
         };

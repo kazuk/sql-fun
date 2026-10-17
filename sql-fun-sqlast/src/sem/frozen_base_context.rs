@@ -293,6 +293,14 @@ macro_rules! forward_catalog_reads {
             }
         }
 
+        impl crate::sem::ViewDeleteInfoRead for $context {
+            fn view_delete_support(
+                &self,
+                name: &crate::sem::FullName,
+            ) -> crate::sem::ViewDeleteSupport {
+                crate::sem::ViewDeleteInfoRead::view_delete_support(self.$catalog(), name)
+            }
+        }
         impl crate::sem::ViewUpdateInfoRead for $context {
             fn view_update_support(
                 &self,

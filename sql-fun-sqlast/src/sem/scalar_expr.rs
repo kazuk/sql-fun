@@ -129,6 +129,21 @@ pub enum SemScalarExpr {
 }
 
 impl SemScalarExpr {
+    /// PostgreSQL DELETE RETURNING row-image binding, when this is a direct column.
+    pub const fn delete_row_reference(&self) -> Option<&crate::sem::DeleteRowColumn> {
+        match self {
+            Self::ColumnRef(reference) => reference.delete_row_reference(),
+            _ => None,
+        }
+    }
+    pub(crate) fn delete_row_column(self, version: crate::sem::DeleteRowVersion) -> Self {
+        match self {
+            Self::ColumnRef(reference) => {
+                Self::column_reference(ColumnReferenceExpr::delete_row(version, &reference))
+            }
+            _ => unreachable!("row-image lookup must produce a column reference"),
+        }
+    }
     pub(crate) const fn column_reference(reference: ColumnReferenceExpr) -> Self {
         Self::ColumnRef(reference)
     }

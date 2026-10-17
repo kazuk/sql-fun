@@ -331,7 +331,9 @@ impl StatementNode {
             Self::Update(update) => update
                 .resolve(context)
                 .map(|update| crate::sem::SemAst::update(&update)),
-            Self::Delete(_) => todo!(),
+            Self::Delete(delete) => delete
+                .resolve(context)
+                .map(|delete| crate::sem::SemAst::delete(&delete)),
             Self::View(_) => crate::sem::AnalysisError::raise_unexpected_input(
                 "view requires catalog application",
             ),

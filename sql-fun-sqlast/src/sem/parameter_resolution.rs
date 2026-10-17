@@ -171,8 +171,8 @@ impl ParameterResolution {
     }
 
     fn default_query_outputs(&mut self) {
-        // A subquery resolves its unknown projected parameters before an UPDATE
-        // destination can impose assignment constraints. Keep any solver failure
+        // UPDATE/DELETE subqueries resolve unknown projected parameters before
+        // surrounding expressions or assignments constrain them. Keep solver failure
         // in the graph for the final diagnostic-producing solve.
         let _ = self.graph.solve();
         if let Some(scope) = self.scopes.last() {
@@ -588,7 +588,7 @@ impl OverloadScores {
 }
 
 struct Collector<'a, C: crate::sem::ParseContext> {
-    update_depth: usize,
+    dml_depth: usize,
     parameters: ParameterResolution,
     context: &'a mut C,
 }
@@ -634,7 +634,7 @@ impl<C: crate::sem::ParseContext> crate::sem::traversal::SemanticVisitor for Col
         }
         Ok(())
     }
-    fn update_returning(
+    fn dml_returning(
         &mut self,
         columns: &mut crate::sem::ResultColumnCollection,
     ) -> Result<(), AnalysisError> {
@@ -659,17 +659,17 @@ impl<C: crate::sem::ParseContext> crate::sem::traversal::SemanticVisitor for Col
             );
         }
     }
-    fn enter_update(&mut self) {
-        self.update_depth += 1;
+    fn enter_dml(&mut self) {
+        self.dml_depth += 1;
     }
-    fn leave_update(&mut self) {
-        self.update_depth -= 1;
+    fn leave_dml(&mut self) {
+        self.dml_depth -= 1;
     }
     fn enter_query(&mut self) {
         self.parameters.enter_query();
     }
     fn leave_query(&mut self) {
-        if self.update_depth > 0 && self.context.dialect() == Dialect::postgres() {
+        if self.dml_depth > 0 && self.context.dialect() == Dialect::postgres() {
             self.parameters.default_query_outputs();
         }
         self.parameters.leave_query();
@@ -811,7 +811,7 @@ impl ParameterResolution {
         #[cfg(test)]
         INFERENCE_RUNS.with(|runs| runs.set(runs.get() + 1));
         let mut collector = Collector {
-            update_depth: 0,
+            dml_depth: 0,
             parameters: Self::default(),
             context,
         };
@@ -831,7 +831,7 @@ impl ParameterResolution {
         #[cfg(test)]
         INFERENCE_RUNS.with(|runs| runs.set(runs.get() + 1));
         let mut collector = Collector {
-            update_depth: 0,
+            dml_depth: 0,
             parameters: Self::default(),
             context,
         };
@@ -851,7 +851,7 @@ impl ParameterResolution {
         #[cfg(test)]
         INFERENCE_RUNS.with(|runs| runs.set(runs.get() + 1));
         let mut collector = Collector {
-            update_depth: 0,
+            dml_depth: 0,
             parameters: Self::default(),
             context,
         };
@@ -864,6 +864,26 @@ impl ParameterResolution {
         })?;
         Ok(constraints)
     }
+    pub(crate) fn infer_delete(
+        delete: &mut crate::sem::DeleteStatement,
+        context: &mut impl crate::sem::ParseContext,
+    ) -> Result<ParameterConstraints, AnalysisError> {
+        #[cfg(test)]
+        INFERENCE_RUNS.with(|runs| runs.set(runs.get() + 1));
+        let mut collector = Collector {
+            dml_depth: 0,
+            parameters: Self::default(),
+            context,
+        };
+        delete.walk(&mut collector)?;
+        collector.parameters.solve(collector.context)?;
+        let constraints = collector.parameters.constraints();
+        delete.walk(&mut Finalizer {
+            constraints: &constraints,
+            context: collector.context,
+        })?;
+        Ok(constraints)
+    }
     pub(crate) fn infer_expression(
         expression: &mut SemScalarExpr,
         context: &mut impl crate::sem::ParseContext,
@@ -871,7 +891,7 @@ impl ParameterResolution {
         #[cfg(test)]
         INFERENCE_RUNS.with(|runs| runs.set(runs.get() + 1));
         let mut collector = Collector {
-            update_depth: 0,
+            dml_depth: 0,
             parameters: Self::default(),
             context,
         };

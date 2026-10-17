@@ -1,5 +1,6 @@
 #![doc= include_str!("problem.md")]
 
+mod delete;
 mod insert;
 mod name_resolution;
 mod overload_resolution;
@@ -22,6 +23,7 @@ use crate::{
     },
 };
 
+pub use self::delete::{DeleteProblem, DeleteProblemKind};
 pub use self::insert::{InsertProblem, InsertProblemKind};
 pub use self::name_resolution::{DomainBaseTypeNameNotFound, NameResolution};
 pub use self::parameter_constraint::ParameterConstraintProblem;
@@ -68,6 +70,8 @@ trait RenderProblemReport: Problem {
 pub enum AnalysisProblem {
     /// A violation of INSERT semantic rules.
     Insert(InsertProblem),
+    /// A violation of DELETE semantic rules.
+    Delete(DeleteProblem),
     /// A violation of UPDATE semantic rules.
     Update(UpdateProblem),
     /// A structured SELECT clause violation.
@@ -137,6 +141,17 @@ pub enum AnalysisProblem {
 }
 
 impl AnalysisProblem {
+    pub(crate) fn delete(kind: DeleteProblemKind, message: &str) -> Self {
+        Self::Delete(DeleteProblem::new(kind, message))
+    }
+    /// Structured DELETE violation, independently of diagnostic wording.
+    pub const fn delete_problem(&self) -> Option<&DeleteProblem> {
+        match self {
+            Self::Delete(problem) => Some(problem),
+            _ => None,
+        }
+    }
+
     pub(crate) fn update(kind: UpdateProblemKind, message: &str) -> Self {
         Self::Update(UpdateProblem::new(kind, message))
     }
@@ -182,6 +197,7 @@ impl AnalysisProblem {
         match self {
             Self::Insert(problem) => problem.code(),
             Self::Update(problem) => problem.code(),
+            Self::Delete(problem) => problem.code(),
             Self::Query(problem) => problem.code(),
             Self::ParameterConstraint(problem) => problem.code(),
             Self::NameResolution(problem) => problem.code(),
@@ -231,6 +247,7 @@ impl AnalysisProblem {
         let report = match self {
             Self::Insert(problem) => problem.render_report(&report_handler, source)?,
             Self::Update(problem) => problem.render_report(&report_handler, source)?,
+            Self::Delete(problem) => problem.render_report(&report_handler, source)?,
             Self::Query(problem) => problem.render_report(&report_handler, source)?,
             Self::NameResolution(nr) => nr.render_report(&report_handler, source)?,
             Self::ParameterConstraint(problem) => problem.render_report(&report_handler, source)?,

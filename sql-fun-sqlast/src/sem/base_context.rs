@@ -287,3 +287,9 @@ impl crate::sem::ViewUpdateInfoRead for BaseContext {
         todo!("catalog writable-view columns, INSTEAD OF UPDATE triggers and rules")
     }
 }
+
+impl crate::sem::ViewDeleteInfoRead for BaseContext {
+    fn view_delete_support(&self, _view: &crate::sem::FullName) -> crate::sem::ViewDeleteSupport {
+        todo!("catalog deletable views, INSTEAD OF DELETE triggers and rules")
+    }
+}

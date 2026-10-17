@@ -19,7 +19,7 @@ pub(crate) trait SemanticVisitor {
     ) -> Result<(), AnalysisError> {
         Ok(())
     }
-    fn update_returning(
+    fn dml_returning(
         &mut self,
         columns: &mut crate::sem::ResultColumnCollection,
     ) -> Result<(), AnalysisError>
@@ -29,8 +29,10 @@ pub(crate) trait SemanticVisitor {
         columns.walk(self)
     }
     fn subscript(&mut self, _value: &SemScalarExpr) {}
-    fn enter_update(&mut self) {}
-    fn leave_update(&mut self) {}
+    // UPDATE/DELETE finalize subquery projections before surrounding uses.
+    // INSERT SELECT instead receives destination assignment context.
+    fn enter_dml(&mut self) {}
+    fn leave_dml(&mut self) {}
     fn enter_query(&mut self) {}
     fn leave_query(&mut self) {}
     fn cte(&mut self, _name: &str) {}

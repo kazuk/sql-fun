@@ -33,6 +33,8 @@ trait ColumnReference {
 /// Column reference
 #[derive(Debug, Clone, Eq, Hash, PartialEq, serde::Serialize, serde::Deserialize)]
 pub enum ColumnReferenceExpr {
+    /// PostgreSQL DELETE RETURNING OLD/NEW target-column binding.
+    DeleteRow(crate::sem::DeleteRowColumn),
     /// Reference to a resolved projection position (alias or ordinal).
     OutputColumn(OutputColumnRef),
     /// CTE column
@@ -69,6 +71,17 @@ impl SemScalarExprNode for ColumnReferenceExpr {
 }
 
 impl ColumnReferenceExpr {
+    pub(crate) const fn delete_row_reference(&self) -> Option<&crate::sem::DeleteRowColumn> {
+        match self {
+            Self::DeleteRow(column) => Some(column),
+            _ => None,
+        }
+    }
+
+    pub(crate) fn delete_row(version: crate::sem::DeleteRowVersion, source: &Self) -> Self {
+        Self::DeleteRow(crate::sem::DeleteRowColumn::new(version, source))
+    }
+
     pub(in crate::sem) fn index_column_name(&self) -> Option<&ColumnName> {
         if let Self::TableColumn(value) = self {
             Some(value.get_column_name())
@@ -124,6 +137,7 @@ impl ColumnReferenceExpr {
     #[must_use]
     pub fn get_type(&self) -> Option<TypeReference> {
         match self {
+            Self::DeleteRow(value) => value.column_type(),
             Self::OutputColumn(r) => r.get_type(),
             Self::CteColumn(r) => r.get_type(),
             Self::TableColumn(r) => r.get_type(),
@@ -142,6 +156,7 @@ impl ColumnReferenceExpr {
     #[must_use]
     pub fn is_not_null(&self) -> Option<bool> {
         match self {
+            Self::DeleteRow(value) => value.is_not_null(),
             Self::OutputColumn(r) => r.is_not_null(),
             Self::CteColumn(r) => r.is_not_null(),
             Self::TableColumn(r) => r.is_not_null(),
@@ -160,6 +175,7 @@ impl ColumnReferenceExpr {
     #[must_use]
     pub fn get_column_def(&self) -> &Option<ColumnDefinition> {
         match self {
+            Self::DeleteRow(value) => value.column_definition(),
             Self::OutputColumn(r) => r.get_column_def(),
             Self::CteColumn(r) => r.get_column_def(),
             Self::TableColumn(r) => r.get_column_def(),
@@ -178,6 +194,7 @@ impl ColumnReferenceExpr {
     #[must_use]
     pub fn get_column_name(&self) -> &ColumnName {
         match self {
+            Self::DeleteRow(value) => value.column_name(),
             Self::OutputColumn(r) => r.get_column_name(),
             Self::CteColumn(r) => r.get_column_name(),
             Self::TableColumn(r) => r.get_column_name(),

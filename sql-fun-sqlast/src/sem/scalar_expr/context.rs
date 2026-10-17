@@ -18,6 +18,7 @@ pub struct ScalarAnalysisContext<'a> {
     parent: Option<Box<Self>>,
     windows: Vec<String>,
     output_aliases: Option<crate::sem::ResultColumnCollection>,
+    delete_returning_target: Option<AliasName>,
 }
 
 impl<'a> ScalarAnalysisContext<'a> {
@@ -25,6 +26,7 @@ impl<'a> ScalarAnalysisContext<'a> {
         Self {
             windows: self.windows.clone(),
             output_aliases: self.output_aliases.clone(),
+            delete_returning_target: self.delete_returning_target.clone(),
             with_clause: self.with_clause.clone(),
             from_clause: self.from_clause.clone(),
             parent: self
@@ -42,6 +44,7 @@ impl<'a> ScalarAnalysisContext<'a> {
             parent: None,
             windows: Vec::new(),
             output_aliases: None,
+            delete_returning_target: None,
         }
     }
 
@@ -56,9 +59,42 @@ impl<'a> ScalarAnalysisContext<'a> {
             parent: parent.map(|parent| Box::new(parent.clone_scope())),
             windows: Vec::new(),
             output_aliases: None,
+            delete_returning_target: None,
         }
     }
 
+    pub(crate) fn set_delete_returning_target(
+        &mut self,
+        target: &AliasName,
+        context: &impl ParseContext,
+    ) {
+        if context.dialect() != crate::ast::Dialect::postgres() {
+            return;
+        }
+        let Some(version) = context.metadata().engine_version() else {
+            return;
+        };
+        let Ok(version) = version
+            .to_string()
+            .parse::<::sql_fun_core::PostgresVersion>()
+        else {
+            return;
+        };
+        if version.major() >= 18 {
+            self.delete_returning_target = Some(target.clone());
+        }
+    }
+
+    pub(crate) fn delete_row_target(
+        &self,
+        alias: &AliasName,
+    ) -> Option<(&AliasName, crate::sem::DeleteRowVersion)> {
+        if self.from_clause.resolve_alias(alias).is_some() {
+            return None;
+        }
+        let version = crate::sem::DeleteRowVersion::from_alias(alias.as_str())?;
+        Some((self.delete_returning_target.as_ref()?, version))
+    }
     pub(crate) fn set_output_aliases(&mut self, columns: &crate::sem::ResultColumnCollection) {
         self.output_aliases = Some(columns.clone());
     }
@@ -154,6 +190,11 @@ impl ScalarAnalysisContext<'_> {
         column: &ColumnName,
     ) -> Result<(SemScalarExpr, &'context mut TContext), AnalysisError> {
         if let Some(alias) = alias {
+            if let Some((target, version)) = self.delete_row_target(alias) {
+                let (value, context) = self.resolve_source_column_ref(context, target, column)?;
+                return Ok((value.delete_row_column(version), context));
+            }
+
             if self.from_clause.resolve_alias(alias).is_none()
                 && let Some(parent) = &self.parent
             {

@@ -310,7 +310,20 @@ impl CteBody {
                 update.rename_columns(columns);
                 Ok(CteStatement::from_update(update))
             }
-            Self::Delete(_) => todo!(),
+            Self::Delete(delete) => {
+                if context.dialect() == Dialect::sqlite() {
+                    return AnalysisError::raise_unexpected_input("SQLite DELETE CTE");
+                }
+                let mut delete = delete.resolve_in(context, Some(scope))?;
+                if columns.len() > delete.result_columns().len() {
+                    context.report_analysis_problem(AnalysisProblem::delete(
+                        crate::sem::problem::DeleteProblemKind::cte_aliases(),
+                        "DELETE CTE has more aliases than outputs",
+                    ))?;
+                }
+                delete.rename_columns(columns);
+                Ok(CteStatement::from_delete(&delete))
+            }
             Self::Merge(_) => AnalysisError::raise_unexpected_none("common_table_expr.query"),
         }
     }

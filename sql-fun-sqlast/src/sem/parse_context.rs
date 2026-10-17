@@ -151,6 +151,7 @@ pub trait BaseParseContext:
     + TableInfoRead
     + crate::sem::ViewInsertInfoRead
     + crate::sem::ViewUpdateInfoRead
+    + crate::sem::ViewDeleteInfoRead
     + ViewInfoRead
     + SearchPathRead
     + GetSourcePathWithSpanOpt

@@ -1,3 +1,5 @@
+mod views;
+
 use self::test_helpers::analyze;
 use crate::ast::Dialect;
 use crate::sem::{ColumnName, ParseContext, PgBuiltInType};

@@ -81,10 +81,22 @@ unimplemented
 ([#474](https://github.com/kazuk/sql-fun/issues/474)); it does not produce a
 successful INSERT analysis, including later actions in SQLite UPSERT chains.
 
-INSERT into views, deferrable unique-key catalog definitions, recursive CTE
-binding, and expressions already unsupported by the SELECT analyzer remain
-unsupported. Star expansion supports tables, ordinary
-views, derived queries, nonrecursive CTEs, and joins; merged columns in FULL JOIN
+View destinations use the catalog's `ViewInsertInfoRead` decision about INSERT
+eligibility, writable column definitions, RETURNING, and ON CONFLICT. PostgreSQL
+catalogs must account for automatic updates, INSTEAD OF INSERT triggers, and
+INSTEAD rules; SQLite catalogs must account for INSTEAD OF INSERT triggers.
+Analysis checks assignments against the returned metadata and retains the
+capability decision in `InsertStatement::view_support`. Read-only view columns
+cannot receive DEFAULT either, but can be returned. Trigger and rule bodies are
+not executed. Bundled production catalogs still lack these services; their
+implementation and production integration tests are tracked in
+[#585](https://github.com/kazuk/sql-fun/issues/585). Custom contexts can supply
+them without changes to INSERT resolution.
+
+Deferrable unique-key catalog definitions, recursive CTE binding, and expressions
+already unsupported by the SELECT analyzer remain unsupported. Star expansion
+supports tables, ordinary views, derived queries, nonrecursive CTEs, and joins;
+merged columns in FULL JOIN
 stars remain unimplemented. The PostgreSQL parser currently accepts PostgreSQL 17
 grammar, so PostgreSQL 18's RETURNING OLD/NEW alias syntax is unavailable.
 These limitations can terminate analysis; parsing a statement does not establish

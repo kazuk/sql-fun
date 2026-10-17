@@ -979,3 +979,9 @@ impl crate::sem::ConflictInfoRead for SchemaCatalog {
         crate::sem::parse_context::conflict_info::infer_from_catalog(self, table, conflict)
     }
 }
+
+impl crate::sem::ViewInsertInfoRead for SchemaCatalog {
+    fn view_insert_support(&self, _view: &FullName) -> crate::sem::ViewInsertSupport {
+        todo!("catalog writable-view columns, INSTEAD OF INSERT triggers and rules")
+    }
+}

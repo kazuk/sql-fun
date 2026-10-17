@@ -8,6 +8,10 @@ pub enum InsertProblemKind {
     Arity,
     /// A PostgreSQL destination column is assigned more than once.
     DuplicateTarget,
+    /// A destination view or assigned view column is read-only.
+    ReadOnlyTarget,
+    /// A writable view does not support RETURNING or ON CONFLICT.
+    ViewOperation,
     /// An explicit value targets a generated column.
     GeneratedTarget,
     /// An explicit value violates identity override rules.
@@ -33,6 +37,12 @@ pub enum InsertProblemKind {
 }
 
 impl InsertProblemKind {
+    pub(crate) const fn view_operation() -> Self {
+        Self::ViewOperation
+    }
+    pub(crate) const fn read_only_target() -> Self {
+        Self::ReadOnlyTarget
+    }
     pub(crate) const fn arity() -> Self {
         Self::Arity
     }

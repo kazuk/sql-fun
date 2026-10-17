@@ -51,6 +51,8 @@ mod update_statement;
 mod variable_set;
 mod view_like;
 
+pub(crate) use self::insert_statement::InsertDestination;
+
 #[expect(deprecated)]
 pub use self::{
     alter_owner::AlterOwner,
@@ -97,7 +99,7 @@ pub use self::{
     insert_statement::{
         InsertArbiter, InsertArbiterLookup, InsertConflict, InsertConstraintKind,
         InsertConstraintLookup, InsertInferenceModifiers, InsertSource, InsertStatement,
-        InsertTarget, InsertValue, analyze_insert_statement,
+        InsertTarget, InsertValue, ViewInsertInfoRead, ViewInsertSupport, analyze_insert_statement,
     },
     names::{CatalogName, FullName, LocalName, OperatorName, SchemaName, ValidOperatorName},
     operators::{BinaryOperatorDefinition, OperatorDefinition, UnaryOperatorDefinition},

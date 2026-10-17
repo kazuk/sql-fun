@@ -5,8 +5,8 @@ use crate::ast::{
     Query, QueryBody, Target,
 };
 use crate::sem::{
-    AliasSpec, AnalysisError, AnalysisProblem, ColumnName, CreateTable, DataSource, FromClause,
-    InsertConflict, InsertSource, InsertStatement, InsertTarget, InsertValue, ParseContext,
+    AliasSpec, AnalysisError, AnalysisProblem, ColumnName, DataSource, FromClause, InsertConflict,
+    InsertDestination, InsertSource, InsertStatement, InsertTarget, InsertValue, ParseContext,
     ResultColumnCollection, ScalarAnalysisContext, TableName, WithClause,
 };
 
@@ -39,22 +39,42 @@ impl Insert {
             conflict.require_insert_action();
         }
         let requested = TableName::from(self.relation.name.full_name()?);
-        let Some(name) = context.resolve_table_name(&requested) else {
-            if context
-                .get_view(&crate::sem::ViewName::from_full_name(requested.full_name()))
-                .is_some()
-            {
-                todo!("INSERT into views requires writable-view catalog semantics");
-            }
+        let Some(table) = InsertDestination::resolve(context, &requested)? else {
             context.report_analysis_problem(AnalysisProblem::relation_not_found(&requested))?;
             return Err(AnalysisError::unexpected_input_error(
                 "INSERT destination relation not found",
             ));
         };
-        let table = context
-            .get_table(&name)
-            .expect("resolved INSERT table")
-            .clone();
+        if !table.is_writable() {
+            context.report_analysis_problem(AnalysisProblem::insert(
+                crate::sem::problem::InsertProblemKind::read_only_target(),
+                "destination view does not support INSERT",
+            ))?;
+            return Err(AnalysisError::unexpected_input_error(
+                "read-only INSERT destination",
+            ));
+        }
+        if let Some(support) = table.view_support() {
+            if !self.returning.is_empty() && !support.supports_returning() {
+                context.report_analysis_problem(AnalysisProblem::insert(
+                    crate::sem::problem::InsertProblemKind::view_operation(),
+                    "destination view does not support INSERT RETURNING",
+                ))?;
+                return Err(AnalysisError::unexpected_input_error(
+                    "unsupported view RETURNING",
+                ));
+            }
+            if self.conflict.is_some() && !support.supports_on_conflict() {
+                context.report_analysis_problem(AnalysisProblem::insert(
+                    crate::sem::problem::InsertProblemKind::view_operation(),
+                    "destination view does not support ON CONFLICT",
+                ))?;
+                return Err(AnalysisError::unexpected_input_error(
+                    "unsupported view ON CONFLICT",
+                ));
+            }
+        }
+        let name = table.name().clone();
         let with = self.with.resolve(context, outer)?;
         let empty = FromClause::default();
         let source_scope = ScalarAnalysisContext::nested(&with, &empty, outer);
@@ -128,6 +148,7 @@ impl Insert {
         } else {
             None
         };
+        insert.set_view_support(table.view_support());
         insert.set_modifiers(conflicts, overriding, self.or_conflict.clone());
         insert.validate_assignments(context)?;
         Ok(insert)
@@ -135,7 +156,7 @@ impl Insert {
     fn resolve_columns(
         &self,
         context: &mut impl ParseContext,
-        table: &CreateTable,
+        table: &InsertDestination,
         scope: &ScalarAnalysisContext<'_>,
         alias: &AliasSpec,
         source: &InsertSource,
@@ -193,6 +214,17 @@ impl Insert {
                     destination = access.resolve(context, scope, destination)?;
                 }
                 columns.push(InsertTarget::new(column, destination));
+            }
+        }
+        for target in &columns {
+            if self.source.is_some()
+                && let Some(name) = target.column().name()
+                && !table.can_assign(name)
+            {
+                context.report_analysis_problem(AnalysisProblem::insert(
+                    crate::sem::problem::InsertProblemKind::read_only_target(),
+                    &format!("view column {name} does not accept assignments"),
+                ))?;
             }
         }
         Ok(columns)
@@ -326,7 +358,7 @@ impl Target {
         targets: &[Self],
         context: &mut impl ParseContext,
         scope: &ScalarAnalysisContext<'_>,
-        table: &CreateTable,
+        table: &InsertDestination,
         alias: &AliasSpec,
     ) -> Result<ResultColumnCollection, AnalysisError> {
         let mut results = ResultColumnCollection::default();
@@ -397,7 +429,7 @@ impl Conflict {
         &self,
         context: &mut impl ParseContext,
         scope: &ScalarAnalysisContext<'_>,
-        table: &CreateTable,
+        table: &InsertDestination,
         name: &TableName,
     ) -> Result<Vec<InsertConflict>, AnalysisError> {
         if context.dialect() == Dialect::sqlite()

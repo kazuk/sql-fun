@@ -141,7 +141,7 @@ pub enum AnalysisProblem {
 }
 
 impl AnalysisProblem {
-    pub(crate) fn delete(kind: DeleteProblemKind) -> Self {
+    pub(crate) const fn delete(kind: DeleteProblemKind) -> Self {
         Self::Delete(DeleteProblem::new(kind))
     }
     /// Structured DELETE violation, independently of diagnostic wording.

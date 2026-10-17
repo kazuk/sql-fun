@@ -875,6 +875,9 @@ impl super::Table {
                 }
             }
         }
+        if context.dialect() == crate::ast::Dialect::postgres() {
+            table.apply_primary_key_nullability();
+        }
         Ok(table)
     }
 }

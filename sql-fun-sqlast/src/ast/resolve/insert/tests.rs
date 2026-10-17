@@ -510,6 +510,23 @@ fn resolves_named_constraint_identity(
     assert_eq!(lookup.kind(), expected);
     assert_eq!(lookup.name(), "key473");
     assert_eq!(lookup.table().to_string(), "public.keyed");
+    let returning = crate::parse_statements("INSERT INTO keyed VALUES(2) RETURNING id", dialect)
+        .next()
+        .unwrap()
+        .unwrap()
+        .node
+        .resolve(&mut context)
+        .unwrap();
+    let nullability = returning
+        .as_insert()
+        .unwrap()
+        .result_columns()
+        .get_column_at(0)
+        .unwrap()
+        .is_not_null();
+    if kind == "PRIMARY KEY" {
+        assert_eq!(nullability, &Some(true));
+    }
 }
 
 #[test]

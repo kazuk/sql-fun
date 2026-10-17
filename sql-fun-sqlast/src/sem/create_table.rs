@@ -315,6 +315,15 @@ impl CreateTable {
         Ok(Vec::new())
     }
 
+    pub(crate) fn apply_primary_key_nullability(&mut self) {
+        let keys: Vec<_> = self.primary_key_columns().into_iter().cloned().collect();
+        for key in keys {
+            if let Some(column) = self.columns.get_column_mut(&key) {
+                column.set_not_null(Some(true));
+            }
+        }
+    }
+
     pub(crate) fn record_declared_key(
         &mut self,
         constraint: &Constraint,

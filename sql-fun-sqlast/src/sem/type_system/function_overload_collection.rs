@@ -103,7 +103,7 @@ impl FunctionOverloadCollection {
         context: &TParseContext,
     ) -> Result<(), TypeError>
     where
-        TParseContext: crate::sem::resolution::Catalog,
+        TParseContext: crate::sem::BaseParseContext,
     {
         let mut common_infer_context = CommonInferContext::default();
         for param in bind_result {
@@ -121,7 +121,7 @@ impl FunctionOverloadCollection {
         context: &TParseContext,
     ) -> Result<i32, TypeError>
     where
-        TParseContext: crate::sem::resolution::Catalog,
+        TParseContext: crate::sem::BaseParseContext,
     {
         let mut total_score = 0i32;
         for param in bind_result {
@@ -142,7 +142,7 @@ impl FunctionOverloadCollection {
         self.resolve_from_catalog(context, arg_types)
     }
 
-    pub(crate) fn resolve_from_catalog<TCatalog: crate::sem::resolution::Catalog>(
+    pub(crate) fn resolve_from_catalog<TCatalog: crate::sem::BaseParseContext>(
         &self,
         context: &TCatalog,
         arg_types: &ArgumentBindingCollection,
@@ -188,7 +188,7 @@ impl FunctionOverloadCollection {
 impl FunctionOverloadCollection {
     pub(crate) fn parameter_signatures(
         &self,
-        catalog: &impl crate::sem::Catalog,
+        catalog: &impl crate::sem::BaseParseContext,
         arguments: &[crate::sem::SemScalarExpr],
     ) -> Vec<crate::sem::parameter_resolution::Signature> {
         let arguments = ArgumentBindingCollection::from_expr_list(arguments);

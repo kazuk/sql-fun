@@ -78,7 +78,7 @@ impl JoinExprDataSource {
         with_clause: &WithClause,
         names: &mut Vec<AliasSpec>,
     ) where
-        TParseContext: crate::sem::resolution::ResolutionContext,
+        TParseContext: crate::sem::ParseContext,
     {
         let mut left_aliases = self
             .left
@@ -92,7 +92,7 @@ impl JoinExprDataSource {
 }
 
 impl JoinExprDataSource {
-    pub(super) fn group_column_source<'a, C: crate::sem::resolution::ResolutionContext>(
+    pub(super) fn group_column_source<'a, C: crate::sem::ParseContext>(
         &'a self,
         column: &ColumnName,
         context: &C,

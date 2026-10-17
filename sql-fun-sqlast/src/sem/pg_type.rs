@@ -115,7 +115,7 @@ impl TypeDefinition {
         self.member_type_from_catalog(context, member)
     }
 
-    pub(crate) fn member_type_from_catalog<TCatalog: crate::sem::resolution::Catalog>(
+    pub(crate) fn member_type_from_catalog<TCatalog: crate::sem::BaseParseContext>(
         &self,
         context: &TCatalog,
         member: &str,

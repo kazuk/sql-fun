@@ -210,10 +210,16 @@ fn array_item_reads_follow_frozen_and_mutable_schema_layers()
         dump.base_context().get_array_item_type(&array),
         Some(PgBuiltInType::int4())
     );
-    let builder = ::sql_fun_sqlast::sem::SchemaFileContext::new(
-        std::path::Path::new("array.sql"),
-        dump.base_context(),
-    );
+    let builder = {
+        let (args, selected) = test_helpers::environment()?;
+        let analysis_base = dump.base_context();
+        ::sql_fun_sqlast::sem::SchemaFileContext::new(
+            std::path::Path::new("array.sql"),
+            analysis_base,
+            &args,
+            &selected,
+        )
+    };
     assert_eq!(
         builder.get_array_item_type(&array),
         Some(PgBuiltInType::int4())
@@ -667,9 +673,19 @@ mod test_helpers {
         pub fn builtin_schema() -> Result<FrozenBaseContext, Box<dyn std::error::Error>> {
             let root = builtin_root()?;
             let file = Path::new(env!("SQL_FUN_HOME")).join("postgres/17/schema.sql");
-            Ok(PostgresDialect::parse_schema_file(&file, &root, &mut None)?
-                .base_context()
-                .clone())
+            Ok({
+                let (args, selected) = super::environment()?;
+                let analysis_base = &root;
+                PostgresDialect::parse_schema_file(
+                    &file,
+                    analysis_base,
+                    &mut None,
+                    &args,
+                    &selected,
+                )
+            }?
+            .base_context()
+            .clone())
         }
 
         /// Parse the complete builtin schema and tablefunc extension for real
@@ -679,11 +695,19 @@ mod test_helpers {
             let prefix = builtin_schema()?;
             let file =
                 Path::new(env!("SQL_FUN_HOME")).join("postgres/17/extension/tablefunc--1.0.sql");
-            Ok(
-                PostgresDialect::parse_schema_file(&file, &prefix, &mut None)?
-                    .base_context()
-                    .clone(),
-            )
+            Ok({
+                let (args, selected) = super::environment()?;
+                let analysis_base = &prefix;
+                PostgresDialect::parse_schema_file(
+                    &file,
+                    analysis_base,
+                    &mut None,
+                    &args,
+                    &selected,
+                )
+            }?
+            .base_context()
+            .clone())
         }
     }
 
@@ -753,9 +777,8 @@ mod test_helpers {
         load_layer(&root, &["a", "b"], &schema)
     }
 
-    pub(super) fn builtin_root() -> Result<FrozenBaseContext, Box<dyn std::error::Error>> {
-        // Real type/function/operator/cast metadata is sufficient for small fixtures;
-        // only catalog and full-extension tests need the entire builtin schema SQL.
+    pub(super) fn environment()
+    -> Result<(SqlFunArgs, ::sql_fun_core::SqlFunMetadata), Box<dyn std::error::Error>> {
         let metadata = Path::new(env!("CARGO_MANIFEST_DIR")).join("sql_fun.metadata.toml");
         let args = SqlFunArgs::try_parse_from([
             "sqlfun",
@@ -767,8 +790,18 @@ mod test_helpers {
             "17",
         ])?;
         let metadata = args.load_metadata()?;
-        let selected = metadata.get("default").expect("selected fixture metadata");
-        Ok(FrozenBaseContext::from(BaseContext::new(&args, selected)?))
+        let selected = metadata
+            .get("default")
+            .expect("selected fixture metadata")
+            .clone();
+        Ok((args, selected))
+    }
+
+    pub(super) fn builtin_root() -> Result<FrozenBaseContext, Box<dyn std::error::Error>> {
+        // Real type/function/operator/cast metadata is sufficient for small fixtures;
+        // only catalog and full-extension tests need the entire builtin schema SQL.
+        let (args, selected) = environment()?;
+        Ok(FrozenBaseContext::from(BaseContext::new(&args, &selected)?))
     }
 
     pub(super) fn chain_prefix() -> Result<FrozenBaseContext, Box<dyn std::error::Error>> {
@@ -784,11 +817,17 @@ mod test_helpers {
     ) -> Result<ParsedSchemaDump, Box<dyn std::error::Error>> {
         let file = ::tempfile::NamedTempFile::new()?;
         std::fs::write(file.path(), sql)?;
-        Ok(PostgresDialect::parse_schema_file(
-            file.path(),
-            base,
-            &mut None,
-        )?)
+        Ok({
+            let (args, selected) = environment()?;
+            let analysis_base = base;
+            PostgresDialect::parse_schema_file(
+                file.path(),
+                analysis_base,
+                &mut None,
+                &args,
+                &selected,
+            )
+        }?)
     }
 
     pub(super) fn query(
@@ -860,17 +899,27 @@ mod test_helpers {
     ) -> Result<ParsedSchemaDump, Box<dyn std::error::Error>> {
         let file = ::tempfile::NamedTempFile::new()?;
         std::fs::write(file.path(), sql)?;
-        let mut context = SchemaFileContext::new(file.path(), base);
+        let mut context = {
+            let (args, selected) = environment()?;
+            let analysis_base = base;
+            SchemaFileContext::new(file.path(), analysis_base, &args, &selected)
+        };
         let mut schemas = Vec::new();
         for schema in search_path {
             schemas.push(SchemaName::from(schema));
         }
         context.set_search_path(&schemas);
-        Ok(PostgresDialect::parse_schema_file(
-            file.path(),
-            &context.freeze(),
-            &mut None,
-        )?)
+        Ok({
+            let (args, selected) = environment()?;
+            let analysis_base = &context.freeze();
+            PostgresDialect::parse_schema_file(
+                file.path(),
+                analysis_base,
+                &mut None,
+                &args,
+                &selected,
+            )
+        }?)
     }
 
     pub(super) fn assert_primary_key(

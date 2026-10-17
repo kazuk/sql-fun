@@ -171,14 +171,13 @@ impl BooleanExpr {
     pub(crate) fn collect_constraints(
         &self,
         parameters: &mut crate::sem::parameter_resolution::ParameterResolution,
-        context: &crate::sem::Resolution<'_>,
-        dialect: crate::ast::Dialect,
+        context: &impl crate::sem::ParseContext,
     ) -> Option<SemScalarExpr> {
         let arguments = self.body.inference_arguments();
         if !arguments.iter().any(|arg| arg.constraint_node().is_some()) {
             return None;
         }
-        if dialect == crate::ast::Dialect::postgres() {
+        if context.dialect() == crate::ast::Dialect::postgres() {
             for arg in &arguments {
                 parameters.require(context, arg, &PgBuiltInType::bool(), false);
             }

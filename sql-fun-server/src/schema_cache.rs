@@ -163,11 +163,7 @@ impl SchemaSelection {
                 "missing or unknown selected datasource",
             ));
         }
-        if args
-            .sql_dialect(metadata)
-            .map_err(|e| SchemaLoadError::source(&e))?
-            != SqlDialect::PostgreSQL
-        {
+        if metadata.sql_dialect() != SqlDialect::PostgreSQL {
             return Err(SchemaLoadError::invalid(
                 "schema cache initialization currently supports PostgreSQL",
             ));
@@ -297,6 +293,8 @@ impl SchemaCacheService {
         &self,
         selection: &SchemaSelection,
     ) -> Result<InitializedSchema, SchemaLoadError> {
+        let (args, metadata) =
+            Self::schema_environment(&self.home, &selection.version, &selection.search_path)?;
         let root_key = SchemaContextKey::root(&selection.version, &selection.search_path);
         let home = self.home.clone();
         let version = selection.version.clone();
@@ -316,14 +314,24 @@ impl SchemaCacheService {
             .version
             .definition_base_path(&self.home)
             .join("schema.sql");
-        layer = self.load_layer(&layer, &builtin_sql, None).await?;
+        layer = self
+            .load_layer(&layer, &builtin_sql, None, &args, &metadata)
+            .await?;
         Self::successful(&layer.outcome)?;
         for extension in &selection.extensions {
-            layer = self.load_layer(&layer, extension, None).await?;
+            layer = self
+                .load_layer(&layer, extension, None, &args, &metadata)
+                .await?;
             Self::successful(&layer.outcome)?;
         }
         layer = self
-            .load_layer(&layer, &selection.dump, Some(&selection.expected_hash))
+            .load_layer(
+                &layer,
+                &selection.dump,
+                Some(&selection.expected_hash),
+                &args,
+                &metadata,
+            )
             .await?;
         // Mismatch takes precedence even over deterministic SQL failure, after publication.
         let actual_hash = layer
@@ -350,12 +358,11 @@ impl SchemaCacheService {
             .map_err(|error| SchemaLoadError::source(&error.0))
     }
 
-    fn load_root(
+    fn schema_environment(
         home: &Path,
         version: &PostgresEngineVersion,
         search_path: &[String],
-        key: &SchemaContextKey,
-    ) -> Result<LoadedLayer, SchemaLoadError> {
+    ) -> Result<(SqlFunArgs, SqlFunMetadata), SchemaLoadError> {
         // Only schema-relevant inputs enter the shared root. No datasource config
         // or ambient environment is retained by the shared builtin catalog.
         let metadata: SqlFunMetadata = ::serde_json::from_value(::serde_json::json!({
@@ -369,6 +376,16 @@ impl SchemaCacheService {
             .term_color(::sql_fun_core::TerminalColor::Never)
             .build()
             .map_err(|e| SchemaLoadError::source(&e))?;
+        Ok((args, metadata))
+    }
+
+    fn load_root(
+        home: &Path,
+        version: &PostgresEngineVersion,
+        search_path: &[String],
+        key: &SchemaContextKey,
+    ) -> Result<LoadedLayer, SchemaLoadError> {
+        let (args, metadata) = Self::schema_environment(home, version, search_path)?;
         let base = BaseContext::new(&args, &metadata).map_err(|e| SchemaLoadError::source(&e))?;
         Ok(LoadedLayer {
             key: key.clone(),
@@ -407,6 +424,8 @@ impl SchemaCacheService {
         parent: &LoadedLayer,
         path: &Path,
         expected_hash: Option<&str>,
+        args: &SqlFunArgs,
+        metadata: &SqlFunMetadata,
     ) -> Result<LoadedLayer, SchemaLoadError> {
         Self::successful(&parent.outcome)?;
         let requested = std::path::absolute(path).map_err(|e| SchemaLoadError::source(&e))?;
@@ -470,7 +489,8 @@ impl SchemaCacheService {
         })
         .await
         .expect("SQL reader panicked")?;
-        self.resolve_layer(parent, snapshot, token).await
+        self.resolve_layer(parent, snapshot, token, args, metadata)
+            .await
     }
 
     async fn resolve_layer(
@@ -478,6 +498,8 @@ impl SchemaCacheService {
         parent: &LoadedLayer,
         snapshot: SqlFileSnapshot,
         token: crate::file_hash_cache::ReadToken,
+        args: &SqlFunArgs,
+        metadata: &SqlFunMetadata,
     ) -> Result<LoadedLayer, SchemaLoadError> {
         let path = snapshot.path().to_path_buf();
         let hash = snapshot.content_hash();
@@ -496,6 +518,8 @@ impl SchemaCacheService {
             generation: FileHashCache::generation(token),
             observed_hash: hash.to_owned(),
         };
+        let args = args.clone();
+        let metadata = metadata.clone();
         let parent = parent.clone();
         let hashes = Arc::clone(&self.hashes);
         let layers = Arc::clone(&self.layers);
@@ -503,7 +527,9 @@ impl SchemaCacheService {
             .load(&pending, move || async move {
                 ::tokio::task::spawn_blocking(move || {
                     let base = Self::successful(&parent.outcome)?;
-                    let parsed = PostgresDialect::parse_schema_snapshot(&snapshot, &base.base);
+                    let parsed = PostgresDialect::parse_schema_snapshot(
+                        &snapshot, &base.base, &args, &metadata,
+                    );
                     let outcome = Self::outcome(parsed, &path, &base.diagnostics)?;
                     let actual = snapshot.content_hash().to_owned();
                     let key = parent.key.layer(&actual, &path)?;

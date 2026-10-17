@@ -147,8 +147,8 @@ impl WithClause {
         TParseContext: ParseContext,
     {
         let syntax = crate::ast::With::try_from_with_tokens(syn, tokens)?;
-        let result = syntax.resolve_with(&context, crate::ast::Dialect::postgres());
-        Ok((result.report(&mut context)?, context))
+        let result = syntax.resolve_with(&mut context);
+        Ok((result?, context))
     }
 }
 

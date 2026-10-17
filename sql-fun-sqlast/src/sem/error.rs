@@ -4,7 +4,7 @@ use std::{
     path::{Path, PathBuf},
 };
 
-use crate::sem::{AnalysisProblem, DiagnosticContext, TypeReference};
+use crate::sem::{AnalysisProblem, ParseContext, TypeReference};
 
 /// error
 #[derive(Debug, thiserror::Error)]
@@ -59,6 +59,22 @@ pub enum AnalysisError {
 }
 
 impl AnalysisError {
+    pub(crate) fn check_dialect(
+        parsed: crate::ast::Dialect,
+        configured: crate::ast::Dialect,
+    ) -> Result<(), Self> {
+        if parsed != configured {
+            return Err(Self::dialect_mismatch(parsed, configured));
+        }
+        Ok(())
+    }
+
+    fn dialect_mismatch(parsed: crate::ast::Dialect, configured: crate::ast::Dialect) -> Self {
+        Self::UnexpectedInput(format!(
+            "statement dialect {parsed:?} does not match analysis metadata dialect {configured:?}"
+        ))
+    }
+
     /// raise `UnexpectedNone` error
     pub fn raise_unexpected_none<T>(message: &str) -> Result<T, Self> {
         Err(Self::UnexpectedNone(String::from(message)))
@@ -152,9 +168,9 @@ impl ProblemLikeError {
 
     pub fn report_problem_to<TContext>(self, context: &mut TContext) -> Result<(), AnalysisError>
     where
-        TContext: DiagnosticContext,
+        TContext: ParseContext,
     {
-        context.report_problem(self.into_problem())?;
+        context.report_analysis_problem(self.into_problem())?;
         Ok(())
     }
 }

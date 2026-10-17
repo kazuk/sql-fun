@@ -58,13 +58,14 @@ impl SemAst {
         statement: crate::syn::Node,
         tokens: &IVec<crate::syn::ScanToken>,
     ) -> Result<AstAndContextPair<TParseContext>, AnalysisError> {
+        AnalysisError::check_dialect(crate::ast::Dialect::postgres(), context.dialect())?;
         let Some(_) = context.get_source_path_with_span() else {
             AnalysisError::raise_unexpected_none("context get_source_path_with_span")?;
             AnalysisError::never();
         };
 
         let syntax = crate::ast::StatementNode::try_from_with_tokens(&statement, tokens)?;
-        syntax.resolve_and_apply(context, crate::ast::Dialect::postgres())
+        syntax.resolve_and_apply(context)
     }
 
     /// analyze [`Stmt`]
@@ -82,21 +83,22 @@ impl SemAst {
             AnalysisError::never();
         };
 
+        AnalysisError::check_dialect(crate::ast::Dialect::sqlite(), context.dialect())?;
         match syn {
             Stmt::AlterTable(alter_table) => {
                 let syntax = crate::ast::StatementNode::try_from(&Stmt::AlterTable(alter_table))?;
-                syntax.resolve_and_apply(context, crate::ast::Dialect::sqlite())
+                syntax.resolve_and_apply(context)
             }
             Stmt::CreateTable(create_table_statement) => {
                 let syntax = crate::ast::StatementNode::try_from(&Stmt::CreateTable(
                     create_table_statement,
                 ))?;
-                syntax.resolve_and_apply(context, crate::ast::Dialect::sqlite())
+                syntax.resolve_and_apply(context)
             }
             Stmt::DropTable(drop_table_statement) => {
                 let syntax =
                     crate::ast::StatementNode::try_from(&Stmt::DropTable(drop_table_statement))?;
-                syntax.resolve_and_apply(context, crate::ast::Dialect::sqlite())
+                syntax.resolve_and_apply(context)
             }
             Stmt::Analyze(_analyze_statement) => todo!(),
             Stmt::Attach(_attach_statement) => todo!(),
@@ -116,7 +118,7 @@ impl SemAst {
             Stmt::DropTrigger(_drop_trigger_statement) => todo!(),
             Stmt::CreateView(view) => {
                 let syntax = crate::ast::StatementNode::try_from(&Stmt::CreateView(view))?;
-                syntax.resolve_and_apply(context, crate::ast::Dialect::sqlite())
+                syntax.resolve_and_apply(context)
             }
             Stmt::CreateMaterializedView(_create_materialized_view) => todo!(),
             Stmt::DropView(_drop_view) => todo!(),
@@ -126,7 +128,7 @@ impl SemAst {
             Stmt::DropSequence(_drop_sequence_statement) => todo!(),
             Stmt::Select(select) => {
                 let syntax = crate::ast::StatementNode::try_from(&Stmt::Select(select))?;
-                syntax.resolve_and_apply(context, crate::ast::Dialect::sqlite())
+                syntax.resolve_and_apply(context)
             }
             Stmt::Update(_update) => todo!(),
             Stmt::Delete(_delete_statement) => todo!(),
@@ -187,15 +189,14 @@ LANGUAGE C STRICT IMMUTABLE PARALLEL SAFE;"#
 
         eprintln!("{parsed:?}");
 
-        let base_context = BaseContext::new(
-            &context_args,
-            context_args
-                .load_metadata()?
-                .get("default")
-                .expect("selected test metadata"),
-        )?;
+        let collection = context_args.load_metadata()?;
+        let selected = collection.get("default").expect("selected test metadata");
+        let base_context = BaseContext::new(&context_args, selected)?;
         let path = Path::new("test.sql");
-        let mut file_context = SchemaFileContext::new(path, &FrozenBaseContext::from(base_context));
+        let mut file_context = {
+            let analysis_base = &FrozenBaseContext::from(base_context);
+            SchemaFileContext::new(path, analysis_base, &context_args, selected)
+        };
         file_context.set_source_path_with_span(&source_span);
         let AstAndContextPair(_ast, _context) =
             SemAst::semantic_analysis(file_context, parsed, &tokens)?;

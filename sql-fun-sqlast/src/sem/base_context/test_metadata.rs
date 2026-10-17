@@ -56,6 +56,57 @@ fn retains_selected_sqlite_metadata_through_group_resolution()
     Ok(())
 }
 
+#[cfg(feature = "sqlite")]
+#[test]
+fn selected_environment_does_not_inherit_or_reconcile_frozen_configuration()
+-> testresult::TestResult {
+    use crate::sem::{BaseParseContext, ParseContext};
+    let base = crate::test_helpers::TestParseContext::default().freeze();
+    let selected = test_helpers::selected_metadata("selected-sqlite.toml")?;
+    let context = test_helpers::context_over_catalog(&base, &selected)?;
+    assert_eq!(
+        base.metadata().sql_dialect(),
+        ::sql_fun_core::SqlDialect::PostgreSQL
+    );
+    assert_eq!(context.dialect(), crate::ast::Dialect::sqlite());
+    // Args remain available as supplied, but their dialect override does not
+    // replace the selected metadata's analysis dialect.
+    assert_eq!(
+        context.get_args().sql_dialect(context.metadata())?,
+        ::sql_fun_core::SqlDialect::PostgreSQL
+    );
+    assert_eq!(context.metadata().name(), selected.name());
+    let analyzed = crate::parse_statements(
+        "select cast(?1 as integer) as n",
+        crate::ast::Dialect::sqlite(),
+    )
+    .next()
+    .unwrap()?
+    .analyze(context)?;
+    assert!(
+        analyzed
+            .context()
+            .parameter_constraints()
+            .parameter(1)
+            .is_some()
+    );
+    assert_eq!(analyzed.context().metadata().name(), selected.name());
+    Ok(())
+}
+
+#[cfg(feature = "sqlite")]
+#[test]
+fn statement_rejects_a_different_metadata_dialect() -> testresult::TestResult {
+    let context = crate::test_helpers::TestParseContext::default();
+    let statement = crate::parse_statements("select 1", crate::ast::Dialect::sqlite())
+        .next()
+        .unwrap()?;
+    let error = statement.analyze(context).err().expect("dialect mismatch");
+    assert!(error.to_string().contains("Sqlite"));
+    assert!(error.to_string().contains("Postgres"));
+    Ok(())
+}
+
 mod test_helpers {
     use std::path::Path;
 
@@ -64,6 +115,22 @@ mod test_helpers {
         SourcePathWithSpan,
     };
     use ::sql_fun_core::{SqlFunArgs, SqlFunMetadata, SqlFunMetadataCollection};
+
+    #[cfg(feature = "sqlite")]
+    pub(super) fn context_over_catalog(
+        base: &FrozenBaseContext,
+        metadata: &SqlFunMetadata,
+    ) -> Result<SchemaFileContext, Box<dyn std::error::Error>> {
+        let args = SqlFunArgs::builder(&std::collections::HashMap::new())?
+            .sql_dialect(::sql_fun_core::SqlDialect::PostgreSQL)
+            .build()?;
+        Ok(SchemaFileContext::new(
+            Path::new("query.sql"),
+            base,
+            &args,
+            metadata,
+        ))
+    }
 
     pub(super) fn selected_metadata(
         fixture: &str,
@@ -89,8 +156,10 @@ mod test_helpers {
         ])?;
         let base = BaseContext::new(&args, metadata)?;
         assert_selected_metadata(&base, metadata);
-        let mut context =
-            SchemaFileContext::new(Path::new("query.sql"), &FrozenBaseContext::from(base));
+        let mut context = {
+            let analysis_base = &FrozenBaseContext::from(base);
+            SchemaFileContext::new(Path::new("query.sql"), analysis_base, &args, metadata)
+        };
         context.set_source_path_with_span(&SourcePathWithSpan::new(
             "query.sql",
             &crate::StringSpan::default(),

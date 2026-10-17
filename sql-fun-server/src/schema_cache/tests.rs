@@ -5,6 +5,32 @@ use std::sync::Arc;
 use super::test_helpers::SchemaProject;
 
 #[tokio::test]
+async fn new_analysis_uses_selected_environment_over_shared_normalized_catalog() {
+    let project = SchemaProject::new();
+    let service = project.service();
+    let dump = project.schema("dump.sql", "CREATE TABLE app_table (id int4);");
+    let selection = project.selection("products", &[], &dump, &SchemaProject::hash(&dump));
+    let schema = service.initialize(&selection).await.unwrap();
+    let context = project.analysis_context_over(schema.base_context(), "products");
+    assert_eq!(context.metadata().name(), "products");
+    assert_ne!(
+        context.metadata().name(),
+        schema.base_context().metadata().name()
+    );
+    let query = ::sql_fun_sqlast::parse_statements(
+        "select id from app_table",
+        ::sql_fun_sqlast::ast::Dialect::postgres(),
+    )
+    .next()
+    .unwrap()
+    .unwrap()
+    .analyze(context)
+    .unwrap();
+    assert_eq!(query.context().metadata().name(), "products");
+    assert!(query.context().problems().is_empty());
+}
+
+#[tokio::test]
 async fn shares_prefix_and_preserves_analysis_parameter_evidence() {
     let project = SchemaProject::new();
     let service = project.service();
@@ -109,7 +135,11 @@ async fn snapshot_hash_and_analysis_stay_paired_after_file_changes() {
     project.schema("dump.sql", "CREATE TABLE new_table (id int4);");
     service.hashes.invalidate(&path);
     let actual = SchemaProject::hash(&path);
-    let loaded = service.resolve_layer(&root, snapshot, token).await.unwrap();
+    let (args, metadata) = project.schema_environment();
+    let loaded = service
+        .resolve_layer(&root, snapshot, token, &args, &metadata)
+        .await
+        .unwrap();
     assert_eq!(loaded.hash.as_deref(), Some(old.as_str()));
     let table = TableName::from(FullName::with_schema("public", "old_table"));
     assert!(
@@ -310,7 +340,11 @@ async fn removed_file_does_not_change_an_already_read_snapshot() {
     let snapshot = ::sql_fun_sqlast::SqlFileSnapshot::read(&path).unwrap();
     let token = service.hashes.begin(&path).unwrap();
     std::fs::remove_file(&path).unwrap();
-    let loaded = service.resolve_layer(&root, snapshot, token).await.unwrap();
+    let (args, metadata) = project.schema_environment();
+    let loaded = service
+        .resolve_layer(&root, snapshot, token, &args, &metadata)
+        .await
+        .unwrap();
     let table = TableName::from(FullName::with_schema("public", "retained"));
     assert!(
         SchemaCacheService::successful(&loaded.outcome)
@@ -319,7 +353,12 @@ async fn removed_file_does_not_change_an_already_read_snapshot() {
             .get_table(&table)
             .is_some()
     );
-    assert!(service.load_layer(&root, &path, None).await.is_err());
+    assert!(
+        service
+            .load_layer(&root, &path, None, &args, &metadata)
+            .await
+            .is_err()
+    );
 }
 
 #[tokio::test]
@@ -424,12 +463,15 @@ async fn changed_observation_does_not_join_older_pending_extension() {
     ready.await.unwrap();
     project.schema("extension.sql", "CREATE TABLE new_extension (id int4);");
     // Reuse the generation deliberately: absent notifications must not merge observations.
+    let (args, metadata) = project.schema_environment();
     let loaded = ::tokio::time::timeout(
         std::time::Duration::from_secs(5),
         service.resolve_layer(
             &root,
             ::sql_fun_sqlast::SqlFileSnapshot::read(&path).unwrap(),
             token,
+            &args,
+            &metadata,
         ),
     )
     .await

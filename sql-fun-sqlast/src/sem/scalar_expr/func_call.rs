@@ -182,7 +182,7 @@ impl FuncCallExpr {
         overload: &OverloadVariant,
     ) -> Result<IVec<FuncCallArgs>, AnalysisError>
     where
-        TParseContext: crate::sem::resolution::ResolutionContext,
+        TParseContext: crate::sem::ParseContext,
     {
         let mut args = Vec::new();
         for (index, arg) in arg_exprs.iter().enumerate() {
@@ -211,7 +211,7 @@ impl FuncCallExpr {
                         arg = SemScalarExpr::wrap_implicit_cast(target_type, &arg);
                     }
                 } else {
-                    context.report_problem(
+                    context.report_analysis_problem(
                         AnalysisProblem::function_arg_implicit_cast_not_found(
                             func_name, index, t, &arg,
                         ),
@@ -226,13 +226,13 @@ impl FuncCallExpr {
 }
 
 impl FuncCallExpr {
-    pub(crate) fn resolve_common<TContext: crate::sem::resolution::ResolutionContext>(
+    pub(crate) fn resolve_common<TContext: crate::sem::ParseContext>(
         context: &mut TContext,
         name: &FullName,
         arguments: &[SemScalarExpr],
         span: &crate::StringSpan,
     ) -> Result<SemScalarExpr, AnalysisError> {
-        let resolved_name = context.resolve_function_name(name);
+        let resolved_name = context.resolve_function_name_with_search_path(name);
         let candidates = context.get_function_by_name(name);
         let found = candidates.is_some();
         let mut expression =
@@ -249,7 +249,7 @@ impl FuncCallExpr {
         }
         Ok(expression)
     }
-    fn resolve_binding<TContext: crate::sem::resolution::ResolutionContext>(
+    fn resolve_binding<TContext: crate::sem::ParseContext>(
         context: &mut TContext,
         name: &FullName,
         arguments: &[SemScalarExpr],
@@ -274,11 +274,11 @@ impl FuncCallExpr {
                     &args,
                 )));
             }
-            context.report_problem(AnalysisProblem::function_overload_resolution_failed(
-                name, &arg_types,
-            ))?;
+            context.report_analysis_problem(
+                AnalysisProblem::function_overload_resolution_failed(name, &arg_types),
+            )?;
         } else {
-            context.report_problem(AnalysisProblem::function_not_found(name, span))?;
+            context.report_analysis_problem(AnalysisProblem::function_not_found(name, span))?;
         }
         let mut args = Vec::new();
         for argument in arguments {
@@ -557,7 +557,7 @@ impl FuncCallExpr {
     pub(crate) fn collect_constraints(
         &self,
         parameters: &mut crate::sem::parameter_resolution::ParameterResolution,
-        context: &mut crate::sem::Resolution<'_>,
+        context: &mut impl crate::sem::ParseContext,
     ) -> Result<Option<SemScalarExpr>, AnalysisError> {
         let (name, arguments) = self.inference_call();
         if !arguments

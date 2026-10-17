@@ -69,12 +69,14 @@ impl Statement {
     ///
     /// # Errors
     ///
-    /// Returns the resolver or diagnostic reporting error.
+    /// Returns a dialect mismatch, resolver, or diagnostic reporting error.
+    /// The statement dialect must match the supplied context metadata.
     pub fn analyze<TContext: crate::sem::ParseContext>(
         &self,
         context: TContext,
     ) -> Result<crate::AstAndContextPair<TContext>, crate::sem::AnalysisError> {
-        self.node.resolve_and_apply(context, self.dialect)
+        crate::sem::AnalysisError::check_dialect(self.dialect, context.dialect())?;
+        self.node.resolve_and_apply(context)
     }
 
     /// Inspect an existing WITH clause without exposing mutable node storage.
@@ -112,7 +114,7 @@ mod test_statement_analyze {
         let mut with = base.ensure_with_clause().unwrap();
         with.insert(0, &first).unwrap();
         with.insert(1, &second).unwrap();
-        let mut context = TestParseContext::default();
+        let mut context = TestParseContext::default().with_dialect(dialect);
         context.setup_type(PgBuiltInType::int4());
         let analyzed = base.analyze(context).unwrap();
         let query = analyzed.ast().clone().into_select_statemtnt().unwrap();
@@ -530,7 +532,7 @@ mod test_parameter_analysis {
             .next()
             .unwrap()
             .unwrap()
-            .analyze(context())
+            .analyze(context().with_dialect(dialect))
     }
 
     #[rstest::rstest]
@@ -707,6 +709,37 @@ mod test_parameter_analysis {
         );
     }
 
+    #[test]
+    fn parameter_state_restarts_after_parameter_free_analysis() {
+        let first = analyze("select $7 + 1", Dialect::postgres()).unwrap();
+        let plain = parse_statements("select 1", Dialect::postgres())
+            .next()
+            .unwrap()
+            .unwrap()
+            .analyze(first.into_context())
+            .unwrap();
+        let third = parse_statements("select $2 + 1", Dialect::postgres())
+            .next()
+            .unwrap()
+            .unwrap()
+            .analyze(plain.into_context())
+            .unwrap();
+        assert!(
+            third
+                .context()
+                .parameter_constraints()
+                .parameter(7)
+                .is_none()
+        );
+        assert!(
+            third
+                .context()
+                .parameter_constraints()
+                .parameter(2)
+                .is_some()
+        );
+    }
+
     #[rstest::rstest]
     #[case::query("with x as (select 1 as n) select n + 1 from x")]
     #[case::subquery("select (select 1) + 1 as n")]
@@ -745,10 +778,12 @@ mod test_parameter_analysis {
 
     #[test]
     fn schema_loading_skips_parameter_inference() {
-        use crate::sem::{MutSourcePathWithSpan, SchemaFileContext, SchemaName};
+        use crate::sem::{MutSourcePathWithSpan, SchemaName};
         let before = crate::sem::parameter_resolution::inference_runs();
-        let mut context =
-            SchemaFileContext::new(std::path::Path::new("schema.sql"), &context().freeze());
+        let mut context = crate::test_helpers::schema_layer(
+            std::path::Path::new("schema.sql"),
+            &context().freeze(),
+        );
         context.set_source_path_with_span(&crate::test_helpers::source_span());
         context.set_search_path(&[SchemaName::from("public"), SchemaName::from("pg_catalog")]);
         let statements = parse_statements(
@@ -867,7 +902,7 @@ mod test_parameter_casts {
     #[case::projection("select cast(?1 as integer) as n")]
     #[case::cte("with x as (select cast(?1 as integer) as n) select n from x")]
     fn sqlite_casts_do_not_require_postgres_casts(#[case] sql: &str) {
-        let mut context = TestParseContext::default();
+        let mut context = TestParseContext::default().with_dialect(Dialect::sqlite());
         context.setup_type(crate::sem::TypeReference::from_full_name(
             crate::sem::FullName::from_local_name("integer"),
         ));

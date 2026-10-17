@@ -41,12 +41,15 @@ pub struct SchemaFileContext {
     source_access_service: Option<Box<dyn SourceAccessService>>,
     reports: Vec<String>,
     problems: Vec<AnalysisProblem>,
+    analysis_state: crate::sem::AnalysisState,
     parameter_constraints: crate::sem::ParameterConstraints,
 }
 
 #[derive(Debug)]
 pub(super) struct SchemaCatalog {
     base: FrozenBaseContext,
+    args: SqlFunArgs,
+    metadata: ::sql_fun_core::SqlFunMetadata,
     search_path: Vec<SchemaName>,
     types: TypeDefinitionCollection,
     tables: TableDefinitionCollection,
@@ -67,8 +70,13 @@ pub(super) struct SchemaCatalog {
 }
 
 impl SchemaFileContext {
-    /// create context for loading schema file
+    /// Create a context with explicit current-analysis configuration.
     ///
+    /// The frozen base supplies catalog data only. Its retained configuration is
+    /// historical evidence and is neither inherited nor reconciled with these inputs.
+    ///
+    /// The effective SQL search path continues the catalog layer chain (including
+    /// prior SQL `SET` statements), independently of configuration ownership.
     /// The initial search path is copied from the supplied base. Later changes
     /// to this context's search path leave the base unchanged.
     /// A mutable builder cannot be supplied as the base, even by reference:
@@ -77,15 +85,22 @@ impl SchemaFileContext {
     /// use std::path::Path;
     /// use ::sql_fun_sqlast::sem::SchemaFileContext;
     ///
-    /// fn mutable_base(builder: SchemaFileContext) {
-    ///     let _next = SchemaFileContext::new(Path::new("schema.sql"), &builder);
+    /// fn mutable_base(builder: SchemaFileContext, args: &::sql_fun_core::SqlFunArgs, metadata: &::sql_fun_core::SqlFunMetadata) {
+    ///     let _next = SchemaFileContext::new(Path::new("schema.sql"), &builder, args, metadata);
     /// }
     /// ```
-    pub fn new(sql_source_path: &Path, base: &FrozenBaseContext) -> Self {
+    pub fn new(
+        sql_source_path: &Path,
+        base: &FrozenBaseContext,
+        args: &SqlFunArgs,
+        metadata: &::sql_fun_core::SqlFunMetadata,
+    ) -> Self {
         let search_path = base.get_search_path().to_vec();
         Self {
             catalog: SchemaCatalog {
                 base: base.clone(),
+                args: args.clone(),
+                metadata: metadata.clone(),
                 search_path,
                 sql_source_path: sql_source_path.to_path_buf(),
                 types: TypeDefinitionCollection::default(),
@@ -108,6 +123,7 @@ impl SchemaFileContext {
             source_access_service: None,
             reports: Default::default(),
             problems: Vec::new(),
+            analysis_state: crate::sem::AnalysisState::default(),
             parameter_constraints: crate::sem::ParameterConstraints::default(),
         }
     }
@@ -160,14 +176,14 @@ mod test_schema_file_context {
     use std::path::Path;
 
     use crate::{
-        sem::{ParseContext, SchemaFileContext},
+        sem::ParseContext,
         test_helpers::{TestParseContext, test_context},
     };
 
     #[rstest::rstest]
     fn test_new(test_context: TestParseContext) {
         let path = Path::new("hoge.sql");
-        let _context = SchemaFileContext::new(path, &test_context.freeze());
+        let _context = crate::test_helpers::schema_layer(path, &test_context.freeze());
     }
 }
 
@@ -244,10 +260,9 @@ mod test_index_lookup {
 
     #[test]
     fn frozen_parent_is_searched_per_qualified_candidate() -> testresult::TestResult {
-        use crate::sem::SchemaFileContext;
         use std::path::Path;
         let parent = layer(&["b", "a"], &[index("a", "parent", "idx")])?.freeze();
-        let mut child = SchemaFileContext::new(Path::new("child.sql"), &parent);
+        let mut child = crate::test_helpers::schema_layer(Path::new("child.sql"), &parent);
         child.set_search_path(&[
             crate::sem::SchemaName::from("a"),
             crate::sem::SchemaName::from("b"),
@@ -315,7 +330,7 @@ mod test_index_lookup {
             indexes: &[CreateIndex],
         ) -> Result<SchemaFileContext, crate::sem::AnalysisError> {
             let base = TestParseContext::default().freeze();
-            let mut context = SchemaFileContext::new(Path::new("indexes.sql"), &base);
+            let mut context = crate::test_helpers::schema_layer(Path::new("indexes.sql"), &base);
             let mut schemas = Vec::new();
             for name in path {
                 schemas.push(SchemaName::from(name));
@@ -389,7 +404,7 @@ mod test_operator_layers {
             has_right: bool,
         ) -> crate::sem::FrozenBaseContext {
             let root = TestParseContext::default().freeze();
-            let mut parent = SchemaFileContext::new(Path::new("parent.sql"), &root);
+            let mut parent = crate::test_helpers::schema_layer(Path::new("parent.sql"), &root);
             register(
                 &mut parent,
                 "+",
@@ -404,7 +419,8 @@ mod test_operator_layers {
                 has_right,
                 &PgBuiltInType::int4(),
             );
-            let mut child = SchemaFileContext::new(Path::new("child.sql"), &parent.freeze());
+            let mut child =
+                crate::test_helpers::schema_layer(Path::new("child.sql"), &parent.freeze());
             register(&mut child, "+", has_left, has_right, &PgBuiltInType::int8());
             child.freeze()
         }
@@ -487,9 +503,7 @@ impl DiagnosticContext for SchemaFileContext {
 #[cfg(test)]
 mod test_diagnostic_context {
     use crate::StringSpan;
-    use crate::sem::{
-        AnalysisProblem, DiagnosticContext, FullName, ParseContext, SchemaFileContext,
-    };
+    use crate::sem::{AnalysisProblem, DiagnosticContext, FullName, ParseContext};
     use crate::test_helpers::TestParseContext;
     use std::path::Path;
 
@@ -498,7 +512,7 @@ mod test_diagnostic_context {
         let mut base = TestParseContext::default();
         base.reject_diagnostics_after(0);
         let base = base.freeze();
-        let mut context = SchemaFileContext::new(Path::new("schema.sql"), &base);
+        let mut context = crate::test_helpers::schema_layer(Path::new("schema.sql"), &base);
         let first = AnalysisProblem::function_not_found(
             &FullName::from_local_name("first"),
             &StringSpan::new(0, 5),
@@ -514,9 +528,10 @@ mod test_diagnostic_context {
         assert_eq!(context.problems().len(), 2);
         let parsed = context.into_parsed(Vec::new());
         assert_eq!(parsed.problems().len(), 2);
-        let descendant = SchemaFileContext::new(Path::new("descendant.sql"), parsed.base_context());
+        let descendant =
+            crate::test_helpers::schema_layer(Path::new("descendant.sql"), parsed.base_context());
         assert!(descendant.problems().is_empty());
-        let sibling = SchemaFileContext::new(Path::new("sibling.sql"), &base);
+        let sibling = crate::test_helpers::schema_layer(Path::new("sibling.sql"), &base);
         assert!(sibling.problems().is_empty());
         Ok(())
     }
@@ -524,11 +539,11 @@ mod test_diagnostic_context {
 
 impl BaseParseContext for SchemaCatalog {
     fn metadata(&self) -> &::sql_fun_core::SqlFunMetadata {
-        self.base.metadata()
+        &self.metadata
     }
 
     fn get_args(&self) -> &SqlFunArgs {
-        self.base.get_args()
+        &self.args
     }
 
     fn get_source_file_path(&self) -> Option<&Path> {
@@ -537,6 +552,13 @@ impl BaseParseContext for SchemaCatalog {
 }
 
 impl ParseContext for SchemaFileContext {
+    fn analysis_state(&self) -> &crate::sem::AnalysisState {
+        &self.analysis_state
+    }
+    fn analysis_state_mut(&mut self) -> &mut crate::sem::AnalysisState {
+        &mut self.analysis_state
+    }
+
     fn parameter_constraints(&self) -> &crate::sem::ParameterConstraints {
         &self.parameter_constraints
     }
@@ -610,7 +632,7 @@ impl ParseContext for SchemaFileContext {
 
 #[cfg(test)]
 mod test_extension_record {
-    use crate::sem::{CreateExtension, ParseContext, SchemaFileContext};
+    use crate::sem::{CreateExtension, ParseContext};
     use crate::test_helpers::TestParseContext;
     use std::path::Path;
 
@@ -619,7 +641,7 @@ mod test_extension_record {
     -> testresult::TestResult {
         let root = TestParseContext::default().freeze();
         let extension = CreateExtension::from_name("not_installed_by_this_operation");
-        let context = SchemaFileContext::new(Path::new("extension.sql"), &root)
+        let context = crate::test_helpers::schema_layer(Path::new("extension.sql"), &root)
             .apply_create_extension(&extension)?;
 
         assert_eq!(
@@ -640,8 +662,8 @@ mod test_extension_record {
 mod test_freeze {
     use crate::StringSpan;
     use crate::sem::{
-        BaseParseContext, ColumnName, GetSourcePathWithSpanOpt, ParseContext, SchemaFileContext,
-        SchemaName, SearchPathRead, TableInfoWrite,
+        BaseParseContext, ColumnName, GetSourcePathWithSpanOpt, ParseContext, SchemaName,
+        SearchPathRead, TableInfoWrite,
     };
     use std::path::Path;
 
@@ -649,7 +671,7 @@ mod test_freeze {
     fn consuming_freeze_keeps_definitions_and_provenance_and_drops_source_service()
     -> testresult::TestResult {
         let base = test_helpers::empty_base();
-        let mut context = SchemaFileContext::new(Path::new("parent.sql"), &base);
+        let mut context = crate::test_helpers::schema_layer(Path::new("parent.sql"), &base);
         let statement_span = StringSpan::new(12, 24);
         context.set_statement_span(statement_span);
         let table = test_helpers::table_with_id();
@@ -678,11 +700,11 @@ mod test_freeze {
     fn child_alteration_leaves_shared_parent_and_sibling_unchanged() -> testresult::TestResult {
         let base = test_helpers::empty_base();
         let table = test_helpers::table_with_key_candidates();
-        let parent = SchemaFileContext::new(Path::new("parent.sql"), &base)
+        let parent = crate::test_helpers::schema_layer(Path::new("parent.sql"), &base)
             .apply_create_table(&table)?
             .freeze();
-        let mut left = SchemaFileContext::new(Path::new("left.sql"), &parent);
-        let right = SchemaFileContext::new(Path::new("right.sql"), &parent);
+        let mut left = crate::test_helpers::schema_layer(Path::new("left.sql"), &parent);
+        let right = crate::test_helpers::schema_layer(Path::new("right.sql"), &parent);
         left.set_search_path(&[SchemaName::from("left")]);
         let left = left
             .apply_alter_table(&test_helpers::add_primary_key(&table, "other_id"))?
@@ -780,9 +802,7 @@ mod test_freeze {
 
 #[cfg(test)]
 mod test_search_path {
-    use crate::sem::{
-        BaseParseContext, FullName, ParseContext, SchemaFileContext, SchemaName, SearchPathRead,
-    };
+    use crate::sem::{BaseParseContext, FullName, ParseContext, SchemaName, SearchPathRead};
     use std::path::Path;
 
     #[rstest::rstest]
@@ -799,7 +819,7 @@ mod test_search_path {
         #[case] qualifier: Option<&str>,
         #[case] expected_schema: Option<&str>,
     ) {
-        let mut context = SchemaFileContext::new(
+        let mut context = crate::test_helpers::schema_layer(
             Path::new("schema.sql"),
             &test_helpers::catalog_with_search_path(&["public"]),
         );
@@ -837,16 +857,16 @@ mod test_search_path {
 
     #[test]
     fn nested_contexts_keep_their_own_search_paths() {
-        let parent = SchemaFileContext::new(
+        let parent = crate::test_helpers::schema_layer(
             Path::new("parent.sql"),
             &test_helpers::catalog_with_search_path(&["public", "pg_catalog"]),
         )
         .freeze();
-        let mut child = SchemaFileContext::new(Path::new("child.sql"), &parent);
+        let mut child = crate::test_helpers::schema_layer(Path::new("child.sql"), &parent);
         assert_eq!(child.get_search_path(), parent.get_search_path());
         child.set_search_path(&test_helpers::search_path(&["app", "pg_catalog"]));
         let child = child.freeze();
-        let mut descendant = SchemaFileContext::new(Path::new("descendant.sql"), &child);
+        let mut descendant = crate::test_helpers::schema_layer(Path::new("descendant.sql"), &child);
         assert_eq!(descendant.get_search_path(), child.get_search_path());
         descendant.set_search_path(&[]);
 

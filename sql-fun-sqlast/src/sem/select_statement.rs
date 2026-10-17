@@ -126,7 +126,7 @@ impl SelectStatement {
 
     /// analyze [`crate::syn::SelectStmt`]
     pub fn analyze_select<TParseContext>(
-        context: TParseContext,
+        mut context: TParseContext,
         syn: crate::syn::SelectStmt,
         tokens: &IVec<ScanToken>,
     ) -> Result<AstAndContextPair<TParseContext>, AnalysisError>
@@ -134,9 +134,8 @@ impl SelectStatement {
         TParseContext: ParseContext,
     {
         let syntax = crate::ast::Query::try_from_with_tokens(&syn, tokens)?;
-        let outcome = syntax.resolve(&context, crate::ast::Dialect::postgres());
-        let mut context = context;
-        let query = outcome.report(&mut context)?;
+        let outcome = syntax.resolve(&mut context);
+        let query = outcome?;
         Ok(AstAndContextPair::new(SemAst::select(&query), context))
     }
 }
@@ -201,8 +200,8 @@ impl SelectStatementNode {
         TParseContext: ParseContext,
     {
         let syntax = crate::ast::Query::try_from_with_tokens(&syn, tokens)?;
-        let outcome = syntax.resolve(&context, crate::ast::Dialect::postgres());
-        let query = outcome.report(&mut context)?;
+        let outcome = syntax.resolve(&mut context);
+        let query = outcome?;
         Ok((query, context))
     }
 }

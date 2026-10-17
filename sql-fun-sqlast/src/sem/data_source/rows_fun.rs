@@ -54,24 +54,24 @@ pub enum DataSourceRowsFromFunc {
 }
 
 impl DataSourceRowsFromFunc {
-    pub(crate) fn resolve<C: crate::sem::resolution::ResolutionContext>(
+    pub(crate) fn resolve<C: crate::sem::ParseContext>(
         context: &mut C,
         name: &FullName,
         arguments: &[SemScalarExpr],
     ) -> Result<Self, AnalysisError> {
         let types = ArgumentBindingCollection::from_expr_list(arguments);
         let Some(overloads) = context.get_function_by_name(name) else {
-            context.report_problem(AnalysisProblem::table_function_not_found(name))?;
+            context.report_analysis_problem(AnalysisProblem::table_function_not_found(name))?;
             return Ok(Self::UndefinedFuncCall(name.clone(), arguments.to_vec()));
         };
         let Some(overload) = overloads.resolve_from_catalog(context, &types) else {
-            context.report_problem(AnalysisProblem::function_overload_resolution_failed(
-                name, &types,
-            ))?;
+            context.report_analysis_problem(
+                AnalysisProblem::function_overload_resolution_failed(name, &types),
+            )?;
             return Ok(Self::UndefinedFuncCall(name.clone(), arguments.to_vec()));
         };
         Ok(Self::FuncCall(
-            context.resolve_function_name(name),
+            context.resolve_function_name_with_search_path(name),
             arguments.to_vec(),
             overload.returning_table(),
         ))
@@ -89,15 +89,15 @@ impl DataSourceRowsFromFunc {
     {
         let syntax = crate::ast::Expr::try_from_with_tokens(&func_call, tokens)?;
         let result = syntax.resolve_rows(
-            &context,
+            &mut context,
             &ScalarAnalysisContext::new(with_clause, from_clause),
         );
-        Ok((result.report(&mut context)?, context))
+        Ok((result?, context))
     }
 
     /// analyze Node in RangeFunction.functions
     pub fn analyze_node<TParseContext>(
-        context: TParseContext,
+        mut context: TParseContext,
         with_clause: &WithClause,
         from_clause: &FromClause,
         function: crate::syn::Node,
@@ -108,11 +108,10 @@ impl DataSourceRowsFromFunc {
     {
         let syntax = crate::ast::Expr::try_from_with_tokens(&function, tokens)?;
         let result = syntax.resolve_rows(
-            &context,
+            &mut context,
             &ScalarAnalysisContext::new(with_clause, from_clause),
         );
-        let mut context = context;
-        Ok((result.report(&mut context)?, context))
+        Ok((result?, context))
     }
 }
 

@@ -24,18 +24,14 @@ fn loads_builtin_and_user_schemas() -> Result<(), Box<dyn std::error::Error>> {
             version,
         ])?;
 
-        let context = BaseContext::new(
-            &args,
-            args.load_metadata()?
-                .get("default")
-                .expect("selected test metadata"),
-        )?;
+        let collection = args.load_metadata()?;
+        let selected = collection.get("default").expect("selected test metadata");
+        let context = BaseContext::new(&args, selected)?;
         let schema = home.join(format!("postgres/{version}/schema.sql"));
-        let builtins = PostgresDialect::parse_schema_file(
-            &schema,
-            &FrozenBaseContext::from(context),
-            &mut None,
-        )?;
+        let builtins = {
+            let analysis_base = &FrozenBaseContext::from(context);
+            PostgresDialect::parse_schema_file(&schema, analysis_base, &mut None, &args, selected)
+        }?;
         let pg_class = TableName::from(FullName::with_schema("pg_catalog", "pg_class"));
         assert!(
             builtins.get_table(&pg_class).is_some(),
@@ -46,11 +42,16 @@ fn loads_builtin_and_user_schemas() -> Result<(), Box<dyn std::error::Error>> {
             user_schema.path(),
             "CREATE TABLE hoge (id int PRIMARY KEY); SELECT abs(id) + 1 AS next_id FROM hoge;",
         )?;
-        let parsed = PostgresDialect::parse_schema_file(
-            user_schema.path(),
-            builtins.base_context(),
-            &mut None,
-        )?;
+        let parsed = {
+            let analysis_base = builtins.base_context();
+            PostgresDialect::parse_schema_file(
+                user_schema.path(),
+                analysis_base,
+                &mut None,
+                &args,
+                selected,
+            )
+        }?;
         let user_table = TableName::from(FullName::with_schema("public", "hoge"));
         assert!(
             parsed.get_table(&user_table).is_some(),

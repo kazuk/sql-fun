@@ -190,14 +190,13 @@ impl ArithExpr {
     pub(crate) fn collect_constraints(
         &self,
         parameters: &mut crate::sem::parameter_resolution::ParameterResolution,
-        context: &mut crate::sem::Resolution<'_>,
-        dialect: crate::ast::Dialect,
+        context: &mut impl crate::sem::ParseContext,
     ) -> Result<Option<SemScalarExpr>, crate::sem::AnalysisError> {
         match self {
-            Self::OpBinary(v) => v.collect_constraints(parameters, context, dialect),
-            Self::OpLeftUnary(v) => v.collect_constraints(parameters, context, dialect),
-            Self::OpRightUnary(v) => v.collect_constraints(parameters, context, dialect),
-            Self::UndefinedOperator(v) => v.collect_constraints(parameters, context, dialect),
+            Self::OpBinary(v) => v.collect_constraints(parameters, context),
+            Self::OpLeftUnary(v) => v.collect_constraints(parameters, context),
+            Self::OpRightUnary(v) => v.collect_constraints(parameters, context),
+            Self::UndefinedOperator(v) => v.collect_constraints(parameters, context),
             Self::OpAnyBinary(v) => {
                 v.collect_constraints(parameters);
                 Ok(None)

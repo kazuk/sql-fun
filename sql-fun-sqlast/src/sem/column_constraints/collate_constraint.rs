@@ -66,7 +66,9 @@ impl CollateColumnConstraint {
     {
         let collation_name = syn.collation_name().value();
         if !Self::is_known_name(collation_name) {
-            context.report_problem(AnalysisProblem::collation_name_not_found(collation_name))?;
+            context.report_analysis_problem(AnalysisProblem::collation_name_not_found(
+                collation_name,
+            ))?;
         }
         Ok((
             ColumnConstraint::collate(Self::new(table_name, column_name, collation_name)),

@@ -64,7 +64,7 @@ impl<'a> ScalarAnalysisContext<'a> {
     }
     pub(crate) fn has_input_column(
         &self,
-        context: &crate::sem::Resolution<'_>,
+        context: &impl crate::sem::ParseContext,
         column: &ColumnName,
     ) -> bool {
         match self
@@ -97,9 +97,9 @@ impl<'a> ScalarAnalysisContext<'a> {
     pub(crate) fn resolve_window(
         &self,
         name: &str,
-        dialect: crate::ast::Dialect,
+        context: &impl crate::sem::ParseContext,
     ) -> crate::sem::QueryNameResolution {
-        if dialect == crate::ast::Dialect::sqlite() {
+        if context.dialect() == crate::ast::Dialect::sqlite() {
             return self
                 .windows
                 .iter()
@@ -136,22 +136,23 @@ impl ScalarAnalysisContext<'_> {
     /// resulting expression.
     pub fn resolve_column_ref<TParseContext>(
         &self,
-        context: TParseContext,
+        mut context: TParseContext,
         alias: Option<&AliasName>,
         column: &ColumnName,
     ) -> Result<(SemScalarExpr, TParseContext), AnalysisError>
     where
         TParseContext: ParseContext,
     {
-        self.resolve_column(context, alias, column)
+        let (value, _) = self.resolve_column(&mut context, alias, column)?;
+        Ok((value, context))
     }
 
-    pub(crate) fn resolve_column<TContext: crate::sem::resolution::ResolutionContext>(
+    pub(crate) fn resolve_column<'context, TContext: crate::sem::ParseContext>(
         &self,
-        mut context: TContext,
+        context: &'context mut TContext,
         alias: Option<&AliasName>,
         column: &ColumnName,
-    ) -> Result<(SemScalarExpr, TContext), AnalysisError> {
+    ) -> Result<(SemScalarExpr, &'context mut TContext), AnalysisError> {
         if let Some(alias) = alias {
             if self.from_clause.resolve_alias(alias).is_none()
                 && let Some(parent) = &self.parent
@@ -163,14 +164,14 @@ impl ScalarAnalysisContext<'_> {
 
         let Ok(find_alias_result) =
             self.from_clause
-                .find_alias_resolved(column, &context, &self.with_clause)
+                .find_alias_resolved(column, &*context, &self.with_clause)
         else {
-            let expr = ColumnReferenceExpr::ambiguous_column_resolved(&mut context, column)?;
+            let expr = ColumnReferenceExpr::ambiguous_column_resolved(context, column)?;
             return Ok((expr, context));
         };
         let Some(alias) = find_alias_result else {
             if let Some(columns) = &self.output_aliases {
-                match columns.resolve_output(column, crate::ast::Dialect::sqlite()) {
+                match columns.resolve_output(column, context) {
                     Ok(Some(index)) => {
                         return Ok((
                             columns.output_reference(index).expect("bound output"),
@@ -179,7 +180,7 @@ impl ScalarAnalysisContext<'_> {
                     }
                     Err(()) => {
                         let expression =
-                            ColumnReferenceExpr::ambiguous_column_resolved(&mut context, column)?;
+                            ColumnReferenceExpr::ambiguous_column_resolved(context, column)?;
                         return Ok((expression, context));
                     }
                     Ok(None) => {}
@@ -188,7 +189,7 @@ impl ScalarAnalysisContext<'_> {
             if let Some(parent) = &self.parent {
                 return parent.resolve_column(context, None, column);
             }
-            let expr = ColumnReferenceExpr::undefined_column_resolved(&mut context, column)?;
+            let expr = ColumnReferenceExpr::undefined_column_resolved(context, column)?;
             return Ok((expr, context));
         };
         self.resolve_source_column_ref(context, alias.name(), column)
@@ -339,17 +340,17 @@ mod test_resolve_column_ref {
 }
 
 impl ScalarAnalysisContext<'_> {
-    fn resolve_source_column_ref<TParseContext>(
+    fn resolve_source_column_ref<'context, TParseContext>(
         &self,
-        mut context: TParseContext,
+        context: &'context mut TParseContext,
         alias: &AliasName,
         column: &ColumnName,
-    ) -> Result<(SemScalarExpr, TParseContext), AnalysisError>
+    ) -> Result<(SemScalarExpr, &'context mut TParseContext), AnalysisError>
     where
-        TParseContext: crate::sem::resolution::ResolutionContext,
+        TParseContext: crate::sem::ParseContext,
     {
         let Some((source, nullability)) = self.from_clause.resolve_alias(alias) else {
-            let expr = UndefinedAliasColumnRef::new_with_report(&mut context, alias, column)?;
+            let expr = UndefinedAliasColumnRef::new_with_report(context, alias, column)?;
             return Ok((expr, context));
         };
         source.create_column_ref(context, &self.with_clause, alias, column, nullability)

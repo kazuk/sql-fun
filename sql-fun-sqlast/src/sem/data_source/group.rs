@@ -1,6 +1,6 @@
 use crate::sem::{
-    AliasSpec, AnalysisError, ColumnName, DataSource, Nullable, SemScalarExpr, WithClause,
-    data_source::AliasName, resolution::ResolutionContext, scalar_expr::ColumnReferenceExpr,
+    AliasSpec, AnalysisError, ColumnName, DataSource, Nullable, ParseContext, SemScalarExpr,
+    WithClause, data_source::AliasName, scalar_expr::ColumnReferenceExpr,
 };
 
 /// A SQLite parenthesized source, retaining its original column bindings.
@@ -43,7 +43,7 @@ impl GroupedDataSource {
         }
     }
 
-    pub(super) fn get_aliases_for_column<C: ResolutionContext>(
+    pub(super) fn get_aliases_for_column<C: ParseContext>(
         &self,
         column: &ColumnName,
         context: &C,
@@ -60,7 +60,7 @@ impl GroupedDataSource {
         }
     }
 
-    pub(super) fn column_source<'a, C: ResolutionContext>(
+    pub(super) fn column_source<'a, C: ParseContext>(
         &'a self,
         column: &ColumnName,
         context: &C,
@@ -69,16 +69,16 @@ impl GroupedDataSource {
         self.source.group_column_source(column, context, with)
     }
 
-    pub(super) fn create_column_ref<C: ResolutionContext>(
+    pub(super) fn create_column_ref<'context, C: ParseContext>(
         &self,
-        mut context: C,
+        context: &'context mut C,
         with: &WithClause,
         alias: &AliasName,
         column: &ColumnName,
         nullable: Nullable,
-    ) -> Result<(SemScalarExpr, C), AnalysisError> {
-        let Some((source, source_nullable)) = self.column_source(column, &context, with) else {
-            let expr = ColumnReferenceExpr::undefined_column_resolved(&mut context, column)?;
+    ) -> Result<(SemScalarExpr, &'context mut C), AnalysisError> {
+        let Some((source, source_nullable)) = self.column_source(column, &*context, with) else {
+            let expr = ColumnReferenceExpr::undefined_column_resolved(context, column)?;
             return Ok((expr, context));
         };
         source.create_column_ref(context, with, alias, column, nullable || source_nullable)

@@ -58,6 +58,6 @@ impl AlterSequence {
         TParseContext: ParseContext,
     {
         crate::ast::AlterRelation::try_from_with_tokens(&syn, &sql_fun_core::IVec::default())?
-            .resolve_and_apply(context, crate::ast::Dialect::postgres())
+            .resolve_and_apply(context)
     }
 }

@@ -222,9 +222,12 @@ pub trait DiagnosticContext {
     fn report_problem(&mut self, problem: AnalysisProblem) -> Result<(), AnalysisError>;
 }
 
-/// modifiable schema
+/// Common environment for SQL analysis and mutable schema loading.
 ///
-/// use in schema loading
+/// Configuration, catalog services, diagnostic policy, and published results
+/// come from this context. Local name scopes and inference graphs remain separate.
+/// Implementations receive current args and explicitly selected metadata at
+/// initialization; a frozen catalog does not supply their configuration.
 ///
 pub trait ParseContext:
     SequenceInfoWrite
@@ -239,6 +242,108 @@ pub trait ParseContext:
 where
     Self: Sized,
 {
+    /// Dialect of the explicitly supplied metadata for this analysis.
+    /// Historical configuration retained by a frozen catalog is not consulted.
+    fn dialect(&self) -> crate::ast::Dialect {
+        crate::ast::Dialect::from(self.metadata())
+    }
+
+    /// Bookkeeping for the current outer analysis, independent of local scopes.
+    fn analysis_state(&self) -> &crate::sem::AnalysisState;
+
+    /// Mutable bookkeeping for the current outer analysis.
+    fn analysis_state_mut(&mut self) -> &mut crate::sem::AnalysisState;
+
+    /// Start an independent statement or standalone expression analysis.
+    /// Nested queries must not call this operation.
+    fn begin_analysis(&mut self) {
+        self.analysis_state_mut().begin();
+        self.set_parameter_constraints(&crate::sem::ParameterConstraints::default());
+    }
+
+    /// Complete analysis and deliver ordered structured findings, even on error.
+    ///
+    /// Diagnostic rejection takes precedence over the analysis result and stops
+    /// delivery. This is the completion boundary for future expectation checks;
+    /// policy at emission sites is provided by this same context.
+    ///
+    /// # Errors
+    /// Returns diagnostic delivery failures before the supplied analysis error.
+    fn finish_analysis<T>(&mut self, result: Result<T, AnalysisError>) -> Result<T, AnalysisError> {
+        let problems = self.analysis_state_mut().take_problems();
+        for problem in problems {
+            self.report_problem(problem)?;
+        }
+        result
+    }
+
+    /// Queue a structured finding in this analysis's diagnostic lifecycle.
+    /// Direct semantic helper calls outside an active run deliver immediately.
+    ///
+    /// # Errors
+    /// Returns diagnostic delivery errors for calls outside an active analysis.
+    fn report_analysis_problem(&mut self, problem: AnalysisProblem) -> Result<(), AnalysisError> {
+        if self.analysis_state().active() {
+            self.analysis_state_mut().report(problem);
+            Ok(())
+        } else {
+            self.report_problem(problem)
+        }
+    }
+
+    /// Whether parameter operands have been encountered in the current analysis.
+    fn parameter_inference_needed(&self) -> bool {
+        self.analysis_state().has_parameters()
+    }
+
+    /// Record a parameter operand without starting constraint collection.
+    fn parameter(&mut self, position: u32) -> SemScalarExpr {
+        self.analysis_state_mut().parameter();
+        SemScalarExpr::parameter(
+            position,
+            usize::MAX,
+            &crate::sem::InputTypeConstraint::any(),
+        )
+    }
+
+    /// Infer parameters over an already name-resolved query, when required.
+    ///
+    /// # Errors
+    /// Propagates the supplied result or constraint-analysis errors.
+    fn infer_query(
+        &mut self,
+        result: Result<crate::sem::SelectStatement, AnalysisError>,
+    ) -> Result<crate::sem::SelectStatement, AnalysisError> {
+        let mut query = result?;
+        if self.parameter_inference_needed() {
+            let constraints = crate::sem::parameter_resolution::ParameterResolution::infer_query(
+                &mut query, self,
+            )?;
+            self.set_parameter_constraints(&constraints);
+        }
+        Ok(query)
+    }
+
+    /// Infer parameters over an already name-resolved standalone expression.
+    ///
+    /// # Errors
+    /// Propagates the supplied result or constraint-analysis errors.
+    fn infer_expression(
+        &mut self,
+        result: Result<SemScalarExpr, AnalysisError>,
+    ) -> Result<SemScalarExpr, AnalysisError> {
+        let mut expression = result?;
+        if self.parameter_inference_needed() {
+            let constraints =
+                crate::sem::parameter_resolution::ParameterResolution::infer_expression(
+                    &mut expression,
+                    self,
+                )?;
+            self.set_parameter_constraints(&constraints);
+        }
+        Ok(expression)
+    }
+
     /// Constraints derived from the most recently reported semantic analysis.
     /// Parameter-free analyses skip inference and leave this result empty.
     /// These are independent of parameter metadata hints and Rust type mapping.
@@ -365,14 +470,14 @@ where
         arg_types: ArgumentBindingCollection,
     ) -> Result<DataSource, AnalysisError> {
         let Some(overloads) = self.get_function_by_name(&func_name) else {
-            self.report_problem(AnalysisProblem::table_function_not_found(&func_name))?;
+            self.report_analysis_problem(AnalysisProblem::table_function_not_found(&func_name))?;
             return DataSource::undefined_table_function(call, arg_exprs, alias_name);
         };
 
         let Some(calling_overload) = overloads.resolve_overload(self, &arg_types) else {
-            self.report_problem(AnalysisProblem::parameter_type_mismatch_for_table_function(
-                &func_name, &arg_types,
-            ))?;
+            self.report_analysis_problem(
+                AnalysisProblem::parameter_type_mismatch_for_table_function(&func_name, &arg_types),
+            )?;
             return DataSource::undefined_table_function(call, arg_exprs, alias_name);
         };
 

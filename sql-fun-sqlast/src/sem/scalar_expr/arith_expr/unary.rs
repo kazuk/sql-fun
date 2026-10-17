@@ -24,7 +24,7 @@ impl UnaryCastCandidate {
         arg_type: &TypeReference,
     ) -> Vec<Self>
     where
-        TParseContext: crate::sem::resolution::ResolutionContext,
+        TParseContext: crate::sem::ParseContext,
     {
         let mut candidates = Vec::new();
         for overload in overloads {
@@ -70,13 +70,13 @@ impl ResolvedUnaryOperator {
         }
     }
 
-    pub(super) fn into_left_unary_call_site_expr<TParseContext>(
+    pub(super) fn into_left_unary_call_site_expr<'context, TParseContext>(
         self,
-        context: TParseContext,
+        context: &'context mut TParseContext,
         name: &OperatorName,
-    ) -> Result<(SemScalarExpr, TParseContext), AnalysisError>
+    ) -> Result<(SemScalarExpr, &'context mut TParseContext), AnalysisError>
     where
-        TParseContext: crate::sem::resolution::ResolutionContext,
+        TParseContext: crate::sem::ParseContext,
     {
         if let Some(operator) = self.operator_def {
             super::LeftUnaryCallSite::op_left_unary_resolved(context, name, operator, self.arg_expr)
@@ -90,13 +90,13 @@ impl ResolvedUnaryOperator {
         }
     }
 
-    pub(super) fn into_right_unary_call_site_expr<TParseContext>(
+    pub(super) fn into_right_unary_call_site_expr<'context, TParseContext>(
         self,
-        context: TParseContext,
+        context: &'context mut TParseContext,
         name: &OperatorName,
-    ) -> Result<(SemScalarExpr, TParseContext), AnalysisError>
+    ) -> Result<(SemScalarExpr, &'context mut TParseContext), AnalysisError>
     where
-        TParseContext: crate::sem::resolution::ResolutionContext,
+        TParseContext: crate::sem::ParseContext,
     {
         if let Some(operator) = self.operator_def {
             super::RightUnaryCallSite::op_right_unary_resolved(
@@ -123,7 +123,7 @@ impl super::ArithExpr {
         input: SemScalarExpr,
     ) -> Result<ResolvedUnaryOperator, AnalysisError>
     where
-        TParseContext: crate::sem::resolution::ResolutionContext,
+        TParseContext: crate::sem::ParseContext,
     {
         let overloads = match &operator_def {
             OperatorDefinition::LeftUnary(u) => u,
@@ -135,7 +135,7 @@ impl super::ArithExpr {
             let candidates =
                 UnaryCastCandidate::enumerate_from_context(context, overloads, &arg_type);
             if candidates.is_empty() {
-                context.report_problem(
+                context.report_analysis_problem(
                     AnalysisProblem::unary_operator_overload_resolution_failed(
                         &operator_def,
                         &arg_type,
@@ -145,10 +145,9 @@ impl super::ArithExpr {
             }
             let filtered = UnaryCastCandidate::filter_best_candidate(candidates);
             if filtered.len() > 1 {
-                context.report_problem(AnalysisProblem::unary_operator_overload_ambiguous(
-                    &operator_def,
-                    &arg_type,
-                ))?;
+                context.report_analysis_problem(
+                    AnalysisProblem::unary_operator_overload_ambiguous(&operator_def, &arg_type),
+                )?;
             }
             let candidate = &filtered[0];
             let arg_expr = candidate.wrap_implicit_cast(input);

@@ -59,7 +59,7 @@ impl CteDataSource {
         nullability: Nullable,
     ) -> Result<ColumnReferenceExpr, AnalysisError>
     where
-        TParseContext: crate::sem::resolution::ResolutionContext,
+        TParseContext: crate::sem::ParseContext,
     {
         let Some(cte) = with_clause.get(&self.name) else {
             AnalysisError::raise_unexpected_input(&format!(
@@ -73,12 +73,13 @@ impl CteDataSource {
         let column_def = cte.resolved_column(column, index, self.alias.len_derived_column());
         if column_def.is_none() {
             if index.is_some() {
-                context.report_problem(
+                context.report_analysis_problem(
                     AnalysisProblem::cte_not_have_column_for_derived_column_name(),
                 )?;
             } else {
-                context
-                    .report_problem(AnalysisProblem::column_not_found_in_cte(&self.name, column))?;
+                context.report_analysis_problem(AnalysisProblem::column_not_found_in_cte(
+                    &self.name, column,
+                ))?;
             }
         }
         Ok(ColumnReferenceExpr::cte_column(

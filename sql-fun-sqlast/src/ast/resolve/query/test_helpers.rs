@@ -1,8 +1,9 @@
 use crate::ast::{Dialect, StatementNode};
+use crate::sem::ParseContext;
 use crate::sem::{
     AnalysisError, BinaryOperatorDefinition, CastContext, CastDefinition, ColumnName,
     FunctionParam, MutSourcePathWithSpan, OperatorDefinition, OperatorName, OverloadVariant,
-    PgBuiltInType, Resolution, SchemaName, SelectStatement, TypeReference,
+    PgBuiltInType, SchemaName, SelectStatement, TypeReference,
 };
 use crate::test_helpers::{TestParseContext, source_span};
 
@@ -83,15 +84,15 @@ pub(super) fn resolve(
     let StatementNode::Query(query) = statement.node else {
         panic!("query fixture expected");
     };
-    let mut catalog = catalog();
-    let mut resolution = Resolution::new(&catalog);
-    let query = query.resolve_in(&mut resolution, dialect, None);
+    let mut catalog = catalog().with_dialect(dialect);
+    catalog.begin_analysis();
+    let query = query.resolve_in(&mut catalog, None);
     let query = if infer {
-        resolution.infer_query(query, dialect)
+        catalog.infer_query(query)
     } else {
         query
     };
-    let query = resolution.finish(query).report(&mut catalog)?;
+    let query = catalog.finish_analysis(query)?;
     Ok((query, catalog))
 }
 

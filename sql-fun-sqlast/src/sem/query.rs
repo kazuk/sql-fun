@@ -785,7 +785,7 @@ pub struct ResolvedOperator {
 }
 impl ResolvedOperator {
     pub(crate) fn resolve(
-        context: &impl crate::sem::ResolutionContext,
+        context: &impl crate::sem::ParseContext,
         name: &OperatorName,
         left: bool,
         right: bool,
@@ -817,8 +817,7 @@ impl ResolvedOperator {
     pub(crate) fn infer(
         &self,
         parameters: &mut crate::sem::parameter_resolution::ParameterResolution,
-        context: &mut crate::sem::Resolution<'_>,
-        dialect: crate::ast::Dialect,
+        context: &mut impl crate::sem::ParseContext,
         left: Option<&SemScalarExpr>,
         right: Option<&SemScalarExpr>,
     ) -> Result<Option<SemScalarExpr>, AnalysisError> {
@@ -827,7 +826,7 @@ impl ResolvedOperator {
         {
             return Ok(None);
         }
-        if dialect == crate::ast::Dialect::sqlite() {
+        if context.dialect() == crate::ast::Dialect::sqlite() {
             return Ok(Some(parameters.sqlite_operator(&self.name, left, right)));
         }
         let arguments = Self::arguments(left, right);

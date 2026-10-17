@@ -61,9 +61,9 @@ mod test_helpers {
         };
         use std::path::PathBuf;
 
-        /// Loads the full builtin function/operator/cast metadata once per call.
-        /// This is intentionally heavy to validate the real catalog contracts.
-        pub(crate) fn context() -> Result<SchemaFileContext, Box<dyn std::error::Error>> {
+        pub(crate) fn environment()
+        -> Result<(SqlFunArgs, ::sql_fun_core::SqlFunMetadata), Box<dyn std::error::Error>>
+        {
             let metadata = PathBuf::from(env!("CARGO_MANIFEST_DIR")).join("sql_fun.metadata.toml");
             let args = <SqlFunArgs as ::clap::Parser>::try_parse_from([
                 "sqlfun",
@@ -74,10 +74,25 @@ mod test_helpers {
                 "--postgres-version",
                 "17",
             ])?;
-            let base = BaseContext::new(&args, args.load_metadata()?.get("default").unwrap())?;
+            let mut collection = args.load_metadata()?;
+            Ok((
+                args,
+                collection
+                    .remove("default")
+                    .expect("selected test metadata"),
+            ))
+        }
+
+        /// Loads the full builtin function/operator/cast metadata once per call.
+        /// This is intentionally heavy to validate the real catalog contracts.
+        pub(crate) fn context() -> Result<SchemaFileContext, Box<dyn std::error::Error>> {
+            let (args, selected) = environment()?;
+            let base = BaseContext::new(&args, &selected)?;
             Ok(SchemaFileContext::new(
-                &metadata,
+                std::path::Path::new("query.sql"),
                 &FrozenBaseContext::from(base),
+                &args,
+                &selected,
             ))
         }
     }
@@ -148,10 +163,16 @@ fn schema_defined_enum_supports_explicit_io_casts() -> Result<(), Box<dyn std::e
     .next()
     .unwrap()?;
     let defined = definition.analyze(heavy::context()?)?;
-    let context = SchemaFileContext::new(
-        std::path::Path::new("query.sql"),
-        &defined.into_context().freeze(),
-    );
+    let context = {
+        let (args, selected) = heavy::environment()?;
+        let analysis_base = &defined.into_context().freeze();
+        SchemaFileContext::new(
+            std::path::Path::new("query.sql"),
+            analysis_base,
+            &args,
+            &selected,
+        )
+    };
     let mood = TypeReference::from_full_name(FullName::with_schema("public", "mood"));
     let text = PgBuiltInType::text();
     assert!(context.get_explicit_cast(&mood, &text).is_some());

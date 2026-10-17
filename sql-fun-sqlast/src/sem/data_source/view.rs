@@ -40,7 +40,7 @@ impl ViewDataSource {
         context: &TParseContext,
         names: &mut Vec<AliasSpec>,
     ) where
-        TParseContext: crate::sem::resolution::ResolutionContext,
+        TParseContext: crate::sem::ParseContext,
     {
         if let Some(view) = context.get_view(&self.view)
             && view.has_column(column)

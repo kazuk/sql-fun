@@ -49,7 +49,7 @@ impl ArraySlice {
         Self::slice_resolved(array, lower, upper, context)
     }
 
-    pub(super) fn slice_resolved<TContext: crate::sem::resolution::ResolutionContext>(
+    pub(super) fn slice_resolved<TContext: crate::sem::ParseContext>(
         array: SemScalarExpr,
         lower: Option<SemScalarExpr>,
         upper: Option<SemScalarExpr>,

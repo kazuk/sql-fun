@@ -1,7 +1,7 @@
 //! Parameter inference over the name-resolved semantic tree.
 use crate::ast::Dialect;
 use crate::sem::{
-    AnalysisError, Catalog, ConstrainedExpr, ConstraintGraph, InputTypeConstraint,
+    AnalysisError, BaseParseContext, ConstrainedExpr, ConstraintGraph, InputTypeConstraint,
     ParameterConstraints, SemScalarExpr, SignatureAlternative, TypeReference,
 };
 use std::collections::BTreeMap;
@@ -160,9 +160,9 @@ impl ParameterResolution {
         constraints
     }
 
-    fn solve(&mut self, context: &mut crate::sem::Resolution<'_>) -> Result<(), AnalysisError> {
+    fn solve(&mut self, context: &mut impl crate::sem::ParseContext) -> Result<(), AnalysisError> {
         if let Err(problem) = self.graph.solve() {
-            crate::sem::ResolutionContext::report_problem(
+            crate::sem::ParseContext::report_analysis_problem(
                 context,
                 crate::sem::AnalysisProblem::parameter_constraint(problem.message()),
             )?;
@@ -228,7 +228,7 @@ impl ParameterResolution {
 
     pub(crate) fn require(
         &mut self,
-        catalog: &dyn Catalog,
+        catalog: &impl BaseParseContext,
         value: &SemScalarExpr,
         target: &TypeReference,
         explicit: bool,
@@ -243,7 +243,7 @@ impl ParameterResolution {
 
     pub(crate) fn call(
         &mut self,
-        catalog: &dyn Catalog,
+        catalog: &impl BaseParseContext,
         name: &str,
         arguments: &[SemScalarExpr],
         signatures: &[Signature],
@@ -374,7 +374,7 @@ impl Signature {
 
     fn source_types(
         &self,
-        catalog: &dyn Catalog,
+        catalog: &impl BaseParseContext,
         index: usize,
     ) -> std::collections::HashSet<TypeReference> {
         catalog.cast_sources(&self.inputs[index], false)
@@ -382,7 +382,7 @@ impl Signature {
 
     fn cast_score(
         &self,
-        catalog: &dyn Catalog,
+        catalog: &impl BaseParseContext,
         source: &TypeReference,
         index: usize,
     ) -> Option<i32> {
@@ -405,7 +405,7 @@ impl Signature {
     // keep ranges without enumerating every concrete input tuple.
     fn alternatives(
         signatures: &[Self],
-        catalog: &dyn Catalog,
+        catalog: &impl BaseParseContext,
         inputs: &[InputTypeConstraint],
     ) -> Vec<SignatureAlternative> {
         let signatures: Vec<_> = signatures
@@ -469,7 +469,7 @@ impl SourcePartition {
     // Sources in one partition have identical cast scores for every overload.
     fn argument_choices(
         signatures: &[&Signature],
-        catalog: &dyn Catalog,
+        catalog: &impl BaseParseContext,
         inputs: &[InputTypeConstraint],
     ) -> Vec<Vec<Self>> {
         let mut choices = Vec::new();
@@ -559,15 +559,14 @@ impl OverloadScores {
     }
 }
 
-struct Collector<'a, 'b> {
+struct Collector<'a, C: crate::sem::ParseContext> {
     parameters: ParameterResolution,
-    context: &'a mut crate::sem::Resolution<'b>,
-    dialect: Dialect,
+    context: &'a mut C,
 }
 
-impl crate::sem::traversal::SemanticVisitor for Collector<'_, '_> {
+impl<C: crate::sem::ParseContext> crate::sem::traversal::SemanticVisitor for Collector<'_, C> {
     fn expression(&mut self, expression: &mut SemScalarExpr) -> Result<(), AnalysisError> {
-        expression.collect_constraints(&mut self.parameters, self.context, self.dialect)
+        expression.collect_constraints(&mut self.parameters, self.context)
     }
     fn enter_query(&mut self) {
         self.parameters.enter_query();
@@ -588,11 +587,12 @@ impl crate::sem::traversal::SemanticVisitor for Collector<'_, '_> {
         self.parameters.output(
             name,
             expression,
-            self.dialect == Dialect::postgres() && expression.is_unconstrained_parameter(),
+            self.context.dialect() == Dialect::postgres()
+                && expression.is_unconstrained_parameter(),
         );
     }
     fn predicate(&mut self, value: &SemScalarExpr) {
-        if self.dialect == Dialect::postgres() {
+        if self.context.dialect() == Dialect::postgres() {
             self.parameters.require(
                 self.context,
                 value,
@@ -606,17 +606,11 @@ impl crate::sem::traversal::SemanticVisitor for Collector<'_, '_> {
         value: &SemScalarExpr,
         operator: &crate::sem::ResolvedOperator,
     ) -> Result<(), AnalysisError> {
-        operator.infer(
-            &mut self.parameters,
-            self.context,
-            self.dialect,
-            Some(value),
-            Some(value),
-        )?;
+        operator.infer(&mut self.parameters, self.context, Some(value), Some(value))?;
         Ok(())
     }
     fn row_count(&mut self, value: &SemScalarExpr) {
-        if self.dialect == Dialect::postgres() {
+        if self.context.dialect() == Dialect::postgres() {
             self.parameters.require(
                 self.context,
                 value,
@@ -639,7 +633,7 @@ impl crate::sem::traversal::SemanticVisitor for Collector<'_, '_> {
         order: &[crate::sem::QueryOrder],
         reference: Option<&crate::sem::QueryName>,
     ) {
-        if self.dialect != Dialect::postgres() {
+        if self.context.dialect() != Dialect::postgres() {
             return;
         }
         if mode == "ROWS" || mode == "GROUPS" {
@@ -691,17 +685,18 @@ impl crate::sem::traversal::SemanticVisitor for Collector<'_, '_> {
     }
 }
 
-struct Finalizer<'a> {
+struct Finalizer<'a, C: crate::sem::ParseContext> {
     constraints: &'a ParameterConstraints,
-    dialect: Dialect,
+    context: &'a C,
 }
-impl crate::sem::traversal::SemanticVisitor for Finalizer<'_> {
+impl<C: crate::sem::ParseContext> crate::sem::traversal::SemanticVisitor for Finalizer<'_, C> {
     fn expression(&mut self, expression: &mut SemScalarExpr) -> Result<(), AnalysisError> {
         expression.apply_constraints(self.constraints);
         Ok(())
     }
     fn output(&mut self, _name: &str, expression: &mut SemScalarExpr) {
-        if self.dialect == Dialect::postgres() && expression.is_unconstrained_parameter() {
+        if self.context.dialect() == Dialect::postgres() && expression.is_unconstrained_parameter()
+        {
             *expression =
                 SemScalarExpr::wrap_implicit_cast(&crate::sem::PgBuiltInType::text(), expression);
         }
@@ -711,51 +706,46 @@ impl crate::sem::traversal::SemanticVisitor for Finalizer<'_> {
 impl ParameterResolution {
     pub(crate) fn infer_query(
         query: &mut crate::sem::SelectStatement,
-        context: &mut crate::sem::Resolution<'_>,
-        dialect: Dialect,
+        context: &mut impl crate::sem::ParseContext,
     ) -> Result<ParameterConstraints, AnalysisError> {
         #[cfg(test)]
         INFERENCE_RUNS.with(|runs| runs.set(runs.get() + 1));
         let mut collector = Collector {
             parameters: Self::default(),
             context,
-            dialect,
         };
         query.walk(&mut collector)?;
         collector.parameters.solve(collector.context)?;
         let constraints = collector.parameters.constraints();
         query.walk(&mut Finalizer {
             constraints: &constraints,
-            dialect,
+            context: collector.context,
         })?;
         Ok(constraints)
     }
     pub(crate) fn infer_expression(
         expression: &mut SemScalarExpr,
-        context: &mut crate::sem::Resolution<'_>,
-        dialect: Dialect,
+        context: &mut impl crate::sem::ParseContext,
     ) -> Result<ParameterConstraints, AnalysisError> {
         #[cfg(test)]
         INFERENCE_RUNS.with(|runs| runs.set(runs.get() + 1));
         let mut collector = Collector {
             parameters: Self::default(),
             context,
-            dialect,
         };
         expression.walk(&mut collector)?;
         collector.parameters.solve(collector.context)?;
         let constraints = collector.parameters.constraints();
         expression.walk(&mut Finalizer {
             constraints: &constraints,
-            dialect,
+            context: collector.context,
         })?;
         Ok(constraints)
     }
 
     pub(crate) fn operator(
         &mut self,
-        context: &mut crate::sem::Resolution<'_>,
-        dialect: Dialect,
+        context: &mut impl crate::sem::ParseContext,
         name: &crate::sem::OperatorName,
         left: Option<&SemScalarExpr>,
         right: Option<&SemScalarExpr>,
@@ -765,7 +755,7 @@ impl ParameterResolution {
         {
             return Ok(None);
         }
-        if dialect == Dialect::sqlite() {
+        if context.dialect() == Dialect::sqlite() {
             return Ok(Some(self.sqlite_operator(name, left, right)));
         }
         let arguments: Vec<_> = left.into_iter().chain(right).cloned().collect();

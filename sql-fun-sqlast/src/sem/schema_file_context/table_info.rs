@@ -1,8 +1,8 @@
 use crate::{
     TrieMap,
     sem::{
-        AlterTable, AnalysisError, AnalysisProblem, CreateTable, DiagnosticContext, DropTable,
-        FullName, ImplicitChange, TableInfoRead, TableInfoWrite, TableName,
+        AlterTable, AnalysisError, AnalysisProblem, CreateTable, DropTable, FullName,
+        ImplicitChange, ParseContext, TableInfoRead, TableInfoWrite, TableName,
         search_path::expand_search_path_inst,
     },
 };
@@ -69,7 +69,7 @@ impl TableInfoWrite for SchemaFileContext {
     fn apply_alter_table(mut self, alter_table: &AlterTable) -> Result<Self, AnalysisError> {
         let table_name = alter_table.table();
         let Some((key, table)) = self.table_for_update(table_name) else {
-            self.report_problem(AnalysisProblem::table_not_found(table_name))?;
+            self.report_analysis_problem(AnalysisProblem::table_not_found(table_name))?;
             return Ok(self);
         };
 
@@ -88,7 +88,7 @@ impl TableInfoWrite for SchemaFileContext {
         let table_names = drop_table.table_names();
         for table_name in table_names {
             let Some((key, table)) = self.table_for_update(table_name) else {
-                self.report_problem(AnalysisProblem::table_not_found(table_name))?;
+                self.report_analysis_problem(AnalysisProblem::table_not_found(table_name))?;
                 continue;
             };
             self.catalog
@@ -124,7 +124,7 @@ mod test_drop_catalog_key {
         let mut context = test_helpers::unqualified_tables()?;
         if inherited {
             let base = context.freeze();
-            context = super::SchemaFileContext::new(std::path::Path::new("child.sql"), &base);
+            context = crate::test_helpers::schema_layer(std::path::Path::new("child.sql"), &base);
         }
         test_helpers::set_search_path(&mut context, path);
         let name = TableName::from(target.parse::<FullName>()?);
@@ -158,7 +158,8 @@ mod test_drop_catalog_key {
 
         pub(super) fn unqualified_tables() -> Result<SchemaFileContext, AnalysisError> {
             let root = crate::test_helpers::TestParseContext::default().freeze();
-            let mut context = SchemaFileContext::new(std::path::Path::new("parent.sql"), &root);
+            let mut context =
+                crate::test_helpers::schema_layer(std::path::Path::new("parent.sql"), &root);
             let table = CreateTable::new(
                 &TableName::from("items".parse::<FullName>()?),
                 Vec::new(),

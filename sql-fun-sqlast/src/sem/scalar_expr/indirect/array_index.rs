@@ -45,7 +45,7 @@ impl ArrayIndex {
         Self::index_resolved(array, index, context)
     }
 
-    pub(super) fn index_resolved<TContext: crate::sem::resolution::ResolutionContext>(
+    pub(super) fn index_resolved<TContext: crate::sem::ParseContext>(
         array: SemScalarExpr,
         index: SemScalarExpr,
         context: &mut TContext,

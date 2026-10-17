@@ -67,7 +67,7 @@ impl TableFunctionDataSource {
         _with_clause: &WithClause,
         names: &mut Vec<AliasSpec>,
     ) where
-        TParseContext: crate::sem::resolution::ResolutionContext,
+        TParseContext: crate::sem::ParseContext,
     {
         let returning_table = &self.function.returning_table();
         if returning_table.has_column(column) {

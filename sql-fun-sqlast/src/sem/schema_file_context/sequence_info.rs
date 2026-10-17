@@ -1,8 +1,8 @@
 use crate::{
     TrieMap,
     sem::{
-        AlterSequence, AnalysisError, AnalysisProblem, BaseParseContext, CreateSequence,
-        DiagnosticContext, FullName, SequenceInfoRead, SequenceInfoWrite,
+        AlterSequence, AnalysisError, AnalysisProblem, BaseParseContext, CreateSequence, FullName,
+        ParseContext, SequenceInfoRead, SequenceInfoWrite,
     },
 };
 
@@ -38,7 +38,7 @@ impl SequenceInfoWrite for SchemaFileContext {
     {
         let seq_name = alter_seq.seq_name();
         let Some(mut seq) = self.get_sequence(seq_name).cloned() else {
-            self.report_problem(AnalysisProblem::sequence_not_found(seq_name))?;
+            self.report_analysis_problem(AnalysisProblem::sequence_not_found(seq_name))?;
             return Ok(self);
         };
 

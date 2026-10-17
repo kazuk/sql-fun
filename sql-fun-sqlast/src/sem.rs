@@ -3,6 +3,7 @@
 mod alter_owner;
 mod alter_seq;
 mod alter_table;
+mod analysis_state;
 mod base_context;
 mod cast;
 mod column_constraints;
@@ -35,7 +36,6 @@ mod parse_context;
 mod pg_type;
 pub mod problem;
 mod query;
-mod resolution;
 mod scalar_expr;
 mod schema_file_context;
 mod search_path;
@@ -53,6 +53,7 @@ pub use self::{
     alter_owner::AlterOwner,
     alter_seq::AlterSequence,
     alter_table::{AlterTable, AlterView},
+    analysis_state::AnalysisState,
     base_context::BaseContext,
     cast::{CastContext, CastDefinition},
     column_constraints::{
@@ -130,7 +131,6 @@ pub(crate) use self::{
     create_index::IndexElementCollection,
     data_source::{AliasName, JoinUsingClause},
     parameter_constraints::{ConstraintGraph, SignatureAlternative},
-    resolution::{Catalog, Resolution, ResolutionContext, ResolutionOutcome},
     scalar_expr::{CaseExprAnalysisContext, CoalesceAnalysis},
     select_statement::{ResultColumnCollection, SelectStatementNode},
     stack::with_stack,

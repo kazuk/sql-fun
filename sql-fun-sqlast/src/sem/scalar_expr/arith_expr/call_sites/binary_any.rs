@@ -18,7 +18,7 @@ pub struct AnyBinaryCallSite {
 
 impl AnyBinaryCallSite {
     pub fn from_operator_definition<TParseContext>(
-        context: TParseContext,
+        mut context: TParseContext,
         name: &OperatorName,
         operator_def: BinaryOperatorDefinition,
         lexpr: SemScalarExpr,
@@ -27,18 +27,25 @@ impl AnyBinaryCallSite {
     where
         TParseContext: ParseContext,
     {
-        Self::from_operator_definition_resolved(context, name, operator_def, lexpr, rexpr)
+        let (value, _) = Self::from_operator_definition_resolved(
+            &mut context,
+            name,
+            operator_def,
+            lexpr,
+            rexpr,
+        )?;
+        Ok((value, context))
     }
 
-    pub(crate) fn from_operator_definition_resolved<TParseContext>(
-        context: TParseContext,
+    pub(crate) fn from_operator_definition_resolved<'context, TParseContext>(
+        context: &'context mut TParseContext,
         name: &OperatorName,
         operator_def: BinaryOperatorDefinition,
         lexpr: SemScalarExpr,
         rexpr: SemScalarExpr,
-    ) -> Result<(SemScalarExpr, TParseContext), AnalysisError>
+    ) -> Result<(SemScalarExpr, &'context mut TParseContext), AnalysisError>
     where
-        TParseContext: crate::sem::resolution::ResolutionContext,
+        TParseContext: crate::sem::ParseContext,
     {
         let call_site = Self {
             operator_name: name.clone(),
@@ -82,7 +89,7 @@ impl UndefinedOperatorAnyCallSite {
     }
 
     pub fn undefined_operator_any<TParseContext>(
-        context: TParseContext,
+        mut context: TParseContext,
         name: &OperatorName,
         lexpr: SemScalarExpr,
         rexpr: SemScalarExpr,
@@ -90,19 +97,20 @@ impl UndefinedOperatorAnyCallSite {
     where
         TParseContext: ParseContext,
     {
-        Self::undefined_operator_any_resolved(context, name, lexpr, rexpr)
+        let (value, _) = Self::undefined_operator_any_resolved(&mut context, name, lexpr, rexpr)?;
+        Ok((value, context))
     }
 
-    pub(crate) fn undefined_operator_any_resolved<TParseContext>(
-        mut context: TParseContext,
+    pub(crate) fn undefined_operator_any_resolved<'context, TParseContext>(
+        context: &'context mut TParseContext,
         name: &OperatorName,
         lexpr: SemScalarExpr,
         rexpr: SemScalarExpr,
-    ) -> Result<(SemScalarExpr, TParseContext), AnalysisError>
+    ) -> Result<(SemScalarExpr, &'context mut TParseContext), AnalysisError>
     where
-        TParseContext: crate::sem::resolution::ResolutionContext,
+        TParseContext: crate::sem::ParseContext,
     {
-        context.report_problem(AnalysisProblem::undefined_operator(
+        context.report_analysis_problem(AnalysisProblem::undefined_operator(
             AExprKind::AexprOp,
             name,
             &Some(lexpr.clone()),

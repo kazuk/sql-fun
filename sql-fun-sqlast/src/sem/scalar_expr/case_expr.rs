@@ -44,7 +44,7 @@ mod test_case_expr_analysis_context_new {
 }
 
 impl CaseExprAnalysisContext {
-    fn collect_result<TContext: crate::sem::resolution::ResolutionContext>(
+    fn collect_result<TContext: crate::sem::ParseContext>(
         &mut self,
         context: &mut TContext,
         result: &SemScalarExpr,
@@ -55,10 +55,12 @@ impl CaseExprAnalysisContext {
             } else if let Some(result_type) = context.canonicalize_type_ref(&result_type) {
                 self.result_types.insert(result_type);
             } else {
-                context.report_problem(AnalysisProblem::expression_type_not_known(result))?;
+                context
+                    .report_analysis_problem(AnalysisProblem::expression_type_not_known(result))?;
             }
         } else {
-            context.report_problem(AnalysisProblem::case_when_type_unknown(result.clone()))?;
+            context
+                .report_analysis_problem(AnalysisProblem::case_when_type_unknown(result.clone()))?;
         }
         self.nullabilities.push(result.is_not_null());
         Ok(())
@@ -330,7 +332,7 @@ impl CaseExprAnalysisContext {
         result_type: &TypeReference,
     ) -> Result<Option<TypeReference>, AnalysisError>
     where
-        TParseContext: crate::sem::resolution::ResolutionContext,
+        TParseContext: crate::sem::ParseContext,
     {
         for when_expr in &mut self.when_exprs {
             let Some(_ty) = when_expr.result.get_type() else {
@@ -352,7 +354,7 @@ impl CaseExprAnalysisContext {
         context: &mut TParseContext,
     ) -> Result<Option<TypeReference>, AnalysisError>
     where
-        TParseContext: crate::sem::resolution::ResolutionContext,
+        TParseContext: crate::sem::ParseContext,
     {
         if self.result_types.len() == 1 {
             return Ok(self.result_types.iter().next().cloned());
@@ -360,7 +362,7 @@ impl CaseExprAnalysisContext {
 
         let cast_candidates = self.enumerate_cast_candidates(context);
         if cast_candidates.is_empty() {
-            context.report_problem(AnalysisProblem::incompatible_case_values(
+            context.report_analysis_problem(AnalysisProblem::incompatible_case_values(
                 self.result_types.clone(),
             ))?;
             Ok(None)
@@ -469,7 +471,7 @@ impl CaseExprAnalysisContext {
         context: &mut TParseContext,
     ) -> HashMap<TypeReference, Vec<crate::sem::CastDefinition>>
     where
-        TParseContext: crate::sem::resolution::ResolutionContext,
+        TParseContext: crate::sem::ParseContext,
     {
         let mut cast_candidates = HashMap::new();
         for ty1 in self.result_types.clone() {
@@ -570,7 +572,7 @@ impl CaseExprAnalysisContext {
         context: &mut TParseContext,
     ) -> Result<CaseExpr, AnalysisError>
     where
-        TParseContext: crate::sem::resolution::ResolutionContext,
+        TParseContext: crate::sem::ParseContext,
     {
         let case_expr_type = self.type_fixup(context)?;
         let is_not_null = self.is_not_null();
@@ -640,7 +642,7 @@ impl CaseExprAnalysisContext {
     pub(crate) fn set_argument(&mut self, argument: &Option<SemScalarExpr>) {
         self.case_arg = argument.clone();
     }
-    pub(crate) fn push_arm<C: crate::sem::resolution::ResolutionContext>(
+    pub(crate) fn push_arm<C: crate::sem::ParseContext>(
         &mut self,
         context: &mut C,
         condition: &SemScalarExpr,
@@ -651,7 +653,7 @@ impl CaseExprAnalysisContext {
             .push(CaseWhen::new(condition.clone(), result.clone()));
         Ok(())
     }
-    pub(crate) fn set_default<C: crate::sem::resolution::ResolutionContext>(
+    pub(crate) fn set_default<C: crate::sem::ParseContext>(
         &mut self,
         context: &mut C,
         value: &Option<SemScalarExpr>,
@@ -662,7 +664,7 @@ impl CaseExprAnalysisContext {
         self.default_expr = value.clone();
         Ok(())
     }
-    pub(crate) fn finish<C: crate::sem::resolution::ResolutionContext>(
+    pub(crate) fn finish<C: crate::sem::ParseContext>(
         self,
         context: &mut C,
     ) -> Result<SemScalarExpr, AnalysisError> {

@@ -12,50 +12,45 @@ use crate::ast::{
 };
 use crate::sem::ColumnName;
 use crate::sem::{
-    AliasSpec, AnalysisError, AnalysisProblem, Catalog, CteStatement, DataSource, FromClause,
-    JoinKind as SemanticJoinKind, Resolution, ResolutionContext, ResolutionOutcome,
-    ResultColumnCollection, ScalarAnalysisContext, SelectStatement, SelectStatementNode,
-    WithClause,
+    AliasSpec, AnalysisError, AnalysisProblem, CteStatement, DataSource, FromClause,
+    JoinKind as SemanticJoinKind, ParseContext, ResultColumnCollection, ScalarAnalysisContext,
+    SelectStatement, SelectStatementNode, WithClause,
 };
 
 impl Query {
     pub(crate) fn resolve(
         &self,
-        catalog: &dyn Catalog,
-        dialect: Dialect,
-    ) -> ResolutionOutcome<SelectStatement> {
-        let mut context = Resolution::new(catalog);
-        let result = self.resolve_in(&mut context, dialect, None);
-        let result = context.infer_query(result, dialect);
-        context.finish(result)
+        context: &mut impl ParseContext,
+    ) -> Result<SelectStatement, crate::sem::AnalysisError> {
+        context.begin_analysis();
+        let result = self.resolve_in(context, None);
+        let result = context.infer_query(result);
+        context.finish_analysis(result)
     }
 
     pub(super) fn resolve_in(
         &self,
-        context: &mut Resolution<'_>,
-        dialect: Dialect,
+        context: &mut impl ParseContext,
         outer: Option<&ScalarAnalysisContext<'_>>,
     ) -> Result<SelectStatement, AnalysisError> {
-        crate::sem::with_stack(|| Self::resolve_in_body(self, context, dialect, outer))
+        crate::sem::with_stack(|| Self::resolve_in_body(self, context, outer))
     }
 
     #[inline(never)]
     fn resolve_in_body(
         &self,
-        context: &mut Resolution<'_>,
-        dialect: Dialect,
+        context: &mut impl ParseContext,
         outer: Option<&ScalarAnalysisContext<'_>>,
     ) -> Result<SelectStatement, AnalysisError> {
-        self.resolve_query_body(context, dialect, outer)
+        self.resolve_query_body(context, outer)
     }
     fn resolve_query_body(
         &self,
-        context: &mut Resolution<'_>,
-        dialect: Dialect,
+        context: &mut impl ParseContext,
         outer: Option<&ScalarAnalysisContext<'_>>,
     ) -> Result<SelectStatement, AnalysisError> {
-        let with = self.with.resolve(context, dialect, outer)?;
-        let body = self.body.resolve(context, dialect, &with, outer)?;
+        let with = self.with.resolve(context, outer)?;
+        let body = self.body.resolve(context, &with, outer)?;
         let empty = FromClause::default();
         let order_outer = if self.body.is_compound() { None } else { outer };
         let mut scope = ScalarAnalysisContext::nested(
@@ -64,7 +59,7 @@ impl Query {
             order_outer,
         );
         scope.set_windows(self.body.window_names());
-        if dialect == Dialect::sqlite() {
+        if context.dialect() == Dialect::sqlite() {
             scope.set_output_aliases(body.result_columns());
         }
         let binding = self.body.order_binding();
@@ -72,14 +67,13 @@ impl Query {
             &self.order,
             &self.body,
             context,
-            dialect,
             &scope,
             body.result_columns(),
             binding,
         )?;
         let row_scope = ScalarAnalysisContext::nested(&with, &empty, outer);
-        let limit = Expr::resolve_optional(&self.limit, context, dialect, &row_scope)?;
-        let offset = Expr::resolve_optional(&self.offset, context, dialect, &row_scope)?;
+        let limit = Expr::resolve_optional(&self.limit, context, &row_scope)?;
+        let offset = Expr::resolve_optional(&self.offset, context, &row_scope)?;
         let locks = Lock::resolve_list(&self.locks, context, &scope)?;
         let local = self.with.local_definitions(with);
         let mut query =
@@ -92,9 +86,8 @@ impl Query {
 #[cfg(test)]
 mod test_name_resolution_phase {
     use crate::ast::{Dialect, StatementNode};
-    use crate::sem::{
-        BinaryOperatorDefinition, OperatorDefinition, OperatorName, PgBuiltInType, Resolution,
-    };
+    use crate::sem::ParseContext;
+    use crate::sem::{BinaryOperatorDefinition, OperatorDefinition, OperatorName, PgBuiltInType};
     use crate::test_helpers::TestParseContext;
 
     #[rstest::rstest]
@@ -127,9 +120,9 @@ mod test_name_resolution_phase {
             Some(&operator),
         );
         let before = crate::sem::parameter_resolution::inference_runs();
-        let mut resolution = Resolution::new(&catalog);
-        let result = query.resolve_in(&mut resolution, dialect, None);
-        resolution.finish(result).report(&mut catalog).unwrap();
+        catalog.begin_analysis();
+        let result = query.resolve_in(&mut catalog, None);
+        catalog.finish_analysis(result).unwrap();
         assert_eq!(catalog.reported_problem_count(), 0);
         assert_eq!(crate::sem::parameter_resolution::inference_runs(), before);
     }
@@ -138,20 +131,19 @@ mod test_name_resolution_phase {
 impl QueryBody {
     fn resolve(
         &self,
-        context: &mut Resolution<'_>,
-        dialect: Dialect,
+        context: &mut impl ParseContext,
         with: &WithClause,
         outer: Option<&ScalarAnalysisContext<'_>>,
     ) -> Result<SelectStatement, AnalysisError> {
         match self {
-            Self::Select(select) => select.resolve(context, dialect, with, outer),
-            Self::Set(set) => set.resolve(context, dialect, with, outer),
+            Self::Select(select) => select.resolve(context, with, outer),
+            Self::Set(set) => set.resolve(context, with, outer),
             Self::Values(rows) => {
                 let from = FromClause::default();
                 let scope = ScalarAnalysisContext::nested(with, &from, outer);
                 let mut resolved = Vec::new();
                 for row in rows {
-                    resolved.push(Expr::resolve_list(row, context, dialect, &scope)?);
+                    resolved.push(Expr::resolve_list(row, context, &scope)?);
                 }
                 Ok(SelectStatement::values(resolved))
             }
@@ -172,19 +164,18 @@ impl SetOperation {
 impl Select {
     fn resolve(
         &self,
-        context: &mut Resolution<'_>,
-        dialect: Dialect,
+        context: &mut impl ParseContext,
         with: &WithClause,
         outer: Option<&ScalarAnalysisContext<'_>>,
     ) -> Result<SelectStatement, AnalysisError> {
-        let from = FromItem::resolve_list_in(&self.from, context, dialect, with, outer)?;
+        let from = FromItem::resolve_list_in(&self.from, context, with, outer)?;
         let mut scope = ScalarAnalysisContext::nested(with, &from, outer);
         scope.set_windows(Window::names(&self.windows));
-        let windows = Window::resolve_definitions(&self.windows, context, dialect, &scope)?;
-        let predicate = Expr::resolve_optional(&self.predicate, context, dialect, &scope)?;
+        let windows = Window::resolve_definitions(&self.windows, context, &scope)?;
+        let predicate = Expr::resolve_optional(&self.predicate, context, &scope)?;
         let mut results = ResultColumnCollection::default();
         for target in &self.targets {
-            let expression = target.expression.resolve_in(context, dialect, &scope)?;
+            let expression = target.expression.resolve_in(context, &scope)?;
             let name = target
                 .alias
                 .clone()
@@ -196,7 +187,6 @@ impl Select {
             for expression in distinct {
                 resolved.push(expression.resolve_clause(
                     context,
-                    dialect,
                     &scope,
                     &results,
                     ClauseBinding::Order,
@@ -206,11 +196,11 @@ impl Select {
         } else {
             None
         };
-        if dialect == Dialect::sqlite() {
+        if context.dialect() == Dialect::sqlite() {
             scope.set_output_aliases(&results);
         }
-        let group = Grouping::resolve_list(&self.group, context, dialect, &scope, &results)?;
-        let having = Expr::resolve_optional(&self.having, context, dialect, &scope)?;
+        let group = Grouping::resolve_list(&self.group, context, &scope, &results)?;
+        let having = Expr::resolve_optional(&self.having, context, &scope)?;
         let mut clauses =
             crate::sem::SelectClauses::new(distinct, group, self.group_distinct, having, windows);
         let destination = self
@@ -246,8 +236,7 @@ impl With {
     }
     fn resolve(
         &self,
-        context: &mut Resolution<'_>,
-        dialect: Dialect,
+        context: &mut impl ParseContext,
         outer: Option<&ScalarAnalysisContext<'_>>,
     ) -> Result<WithClause, AnalysisError> {
         let mut with = outer
@@ -256,9 +245,7 @@ impl With {
         for entry in &self.entries {
             let from = FromClause::default();
             let scope = ScalarAnalysisContext::nested(&with, &from, outer);
-            let body = entry
-                .body
-                .resolve(context, dialect, &scope, &entry.column_names())?;
+            let body = entry.body.resolve(context, &scope, &entry.column_names())?;
             with.insert(&entry.name, body);
         }
         Ok(with)
@@ -268,14 +255,13 @@ impl With {
 impl CteBody {
     fn resolve(
         &self,
-        context: &mut Resolution<'_>,
-        dialect: Dialect,
+        context: &mut impl ParseContext,
         scope: &ScalarAnalysisContext<'_>,
         columns: &[String],
     ) -> Result<CteStatement, AnalysisError> {
         match self {
             Self::Query(query) => {
-                let mut query = query.resolve_in(context, dialect, Some(scope))?;
+                let mut query = query.resolve_in(context, Some(scope))?;
                 query.rename_columns(columns);
                 Ok(CteStatement::from_query(query))
             }
@@ -309,37 +295,30 @@ impl JoinKind {
 impl FromItem {
     fn resolve(
         &self,
-        context: &mut Resolution<'_>,
-        dialect: Dialect,
+        context: &mut impl ParseContext,
         with: &WithClause,
         preceding: &FromClause,
         outer: Option<&ScalarAnalysisContext<'_>>,
     ) -> Result<DataSource, AnalysisError> {
-        crate::sem::with_stack(|| {
-            Self::resolve_body(self, context, dialect, with, preceding, outer)
-        })
+        crate::sem::with_stack(|| Self::resolve_body(self, context, with, preceding, outer))
     }
 
     #[inline(never)]
     fn resolve_body(
         &self,
-        context: &mut Resolution<'_>,
-        dialect: Dialect,
+        context: &mut impl ParseContext,
         with: &WithClause,
         preceding: &FromClause,
         outer: Option<&ScalarAnalysisContext<'_>>,
     ) -> Result<DataSource, AnalysisError> {
         match self {
-            Self::Relation(relation) => relation.resolve(context, dialect, with, preceding, outer),
-            Self::Query(derived) => derived.resolve(context, dialect, with, preceding, outer),
-            Self::Join(join) => join.resolve(context, dialect, with, preceding, outer),
-            Self::Functions(functions) => {
-                functions.resolve(context, dialect, with, preceding, outer)
-            }
-            Self::Group(group) => group.resolve(context, dialect, with, preceding, outer),
+            Self::Relation(relation) => relation.resolve(context, with, preceding, outer),
+            Self::Query(derived) => derived.resolve(context, with, preceding, outer),
+            Self::Join(join) => join.resolve(context, with, preceding, outer),
+            Self::Functions(functions) => functions.resolve(context, with, preceding, outer),
+            Self::Group(group) => group.resolve(context, with, preceding, outer),
             Self::Xml(table) => table.resolve(
                 context,
-                dialect,
                 &ScalarAnalysisContext::nested(with, preceding, outer),
             ),
             Self::Sample(_) => todo!("table expression semantic analysis"),
@@ -367,8 +346,7 @@ impl Join {
 impl TableFunctions {
     fn resolve(
         &self,
-        context: &mut Resolution<'_>,
-        dialect: Dialect,
+        context: &mut impl ParseContext,
         with: &WithClause,
         preceding: &FromClause,
         outer: Option<&ScalarAnalysisContext<'_>>,
@@ -377,11 +355,7 @@ impl TableFunctions {
         if self.rows_from {
             let mut functions = Vec::new();
             for function in &self.calls {
-                functions.push(
-                    function
-                        .expression
-                        .resolve_rows_call(context, dialect, &scope)?,
-                );
+                functions.push(function.expression.resolve_rows_call(context, &scope)?);
             }
             let alias = self
                 .alias
@@ -395,30 +369,29 @@ impl TableFunctions {
         };
         function
             .expression
-            .resolve_table_call(context, dialect, &scope, self.alias.as_ref())
+            .resolve_table_call(context, &scope, self.alias.as_ref())
     }
 }
 
 impl Expr {
     pub(crate) fn resolve_rows(
         &self,
-        catalog: &dyn Catalog,
+        context: &mut impl ParseContext,
         scope: &ScalarAnalysisContext<'_>,
-    ) -> ResolutionOutcome<crate::sem::DataSourceRowsFromFunc> {
-        let mut context = Resolution::new(catalog);
-        let result = self.resolve_rows_call(&mut context, Dialect::postgres(), scope);
-        context.finish(result)
+    ) -> Result<crate::sem::DataSourceRowsFromFunc, crate::sem::AnalysisError> {
+        context.begin_analysis();
+        let result = self.resolve_rows_call(context, scope);
+        context.finish_analysis(result)
     }
     fn resolve_rows_call(
         &self,
-        context: &mut Resolution<'_>,
-        dialect: Dialect,
+        context: &mut impl ParseContext,
         scope: &ScalarAnalysisContext<'_>,
     ) -> Result<crate::sem::DataSourceRowsFromFunc, AnalysisError> {
         match self {
             Self::Call(call) => {
                 call.kind.require_table_function()?;
-                let arguments = Self::resolve_list(&call.arguments, context, dialect, scope)?;
+                let arguments = Self::resolve_list(&call.arguments, context, scope)?;
                 crate::sem::DataSourceRowsFromFunc::resolve(
                     context,
                     &call.name.full_name()?,
@@ -431,13 +404,12 @@ impl Expr {
     }
     pub(in crate::ast) fn resolve_table_call(
         &self,
-        context: &mut Resolution<'_>,
-        dialect: Dialect,
+        context: &mut impl ParseContext,
         scope: &ScalarAnalysisContext<'_>,
         alias: Option<&Alias>,
     ) -> Result<DataSource, AnalysisError> {
         match self {
-            Self::Call(call) => call.resolve_table(context, dialect, scope, alias),
+            Self::Call(call) => call.resolve_table(context, scope, alias),
             _ => AnalysisError::raise_unexpected_none("table expression is not FuncCall"),
         }
     }
@@ -446,16 +418,15 @@ impl Expr {
 impl Call {
     fn resolve_table(
         &self,
-        context: &mut Resolution<'_>,
-        dialect: Dialect,
+        context: &mut impl ParseContext,
         scope: &ScalarAnalysisContext<'_>,
         alias: Option<&Alias>,
     ) -> Result<DataSource, AnalysisError> {
-        if dialect == Dialect::sqlite() {
+        if context.dialect() == Dialect::sqlite() {
             todo!("SQLite table function affinity and overload semantics");
         }
         self.kind.require_table_function()?;
-        let arguments = Expr::resolve_list(&self.arguments, context, dialect, scope)?;
+        let arguments = Expr::resolve_list(&self.arguments, context, scope)?;
         let name = self.name.full_name()?;
         let alias = alias
             .map(Alias::resolve)
@@ -479,18 +450,18 @@ impl CallKind {
 impl FromItem {
     fn resolve_list_in(
         items: &[Self],
-        context: &mut Resolution<'_>,
-        dialect: Dialect,
+        context: &mut impl ParseContext,
         with: &WithClause,
         outer: Option<&ScalarAnalysisContext<'_>>,
     ) -> Result<FromClause, AnalysisError> {
         let mut from = FromClause::default();
         let mut aliases = Vec::new();
         for item in items {
-            let source = item.resolve(context, dialect, with, &from, outer)?;
+            let source = item.resolve(context, with, &from, outer)?;
             for alias in source.get_aliases() {
                 if aliases.contains(&alias) {
-                    context.report_problem(AnalysisProblem::duplicate_alias(alias.name()))?;
+                    context
+                        .report_analysis_problem(AnalysisProblem::duplicate_alias(alias.name()))?;
                 }
                 aliases.push(alias);
             }
@@ -501,43 +472,39 @@ impl FromItem {
     }
     pub(crate) fn resolve_list(
         items: &[Self],
-        catalog: &dyn Catalog,
-        dialect: Dialect,
+        context: &mut impl ParseContext,
         with: &WithClause,
-    ) -> ResolutionOutcome<FromClause> {
-        let mut context = Resolution::new(catalog);
-        let result = Self::resolve_list_in(items, &mut context, dialect, with, None);
-        context.finish(result)
+    ) -> Result<FromClause, crate::sem::AnalysisError> {
+        context.begin_analysis();
+        let result = Self::resolve_list_in(items, context, with, None);
+        context.finish_analysis(result)
     }
     pub(crate) fn resolve_source(
         &self,
-        catalog: &dyn Catalog,
-        dialect: Dialect,
+        context: &mut impl ParseContext,
         with: &WithClause,
         preceding: &FromClause,
-    ) -> ResolutionOutcome<DataSource> {
-        let mut context = Resolution::new(catalog);
-        let result = self.resolve(&mut context, dialect, with, preceding, None);
-        context.finish(result)
+    ) -> Result<DataSource, crate::sem::AnalysisError> {
+        context.begin_analysis();
+        let result = self.resolve(context, with, preceding, None);
+        context.finish_analysis(result)
     }
 }
 impl With {
     pub(crate) fn resolve_with(
         &self,
-        catalog: &dyn Catalog,
-        dialect: Dialect,
-    ) -> ResolutionOutcome<WithClause> {
-        let mut context = Resolution::new(catalog);
-        let result = self.resolve(&mut context, dialect, None);
-        context.finish(result)
+        context: &mut impl ParseContext,
+    ) -> Result<WithClause, crate::sem::AnalysisError> {
+        context.begin_analysis();
+        let result = self.resolve(context, None);
+        context.finish_analysis(result)
     }
 }
 
 impl Relation {
     fn resolve(
         &self,
-        context: &mut Resolution<'_>,
-        _dialect: Dialect,
+        context: &mut impl ParseContext,
         with: &WithClause,
         _preceding: &FromClause,
         _outer: Option<&ScalarAnalysisContext<'_>>,
@@ -548,7 +515,7 @@ impl Relation {
             .as_ref()
             .map(Alias::resolve)
             .unwrap_or_else(|| AliasSpec::from_local_name(&name.local_name()));
-        let source = DataSource::resolve_relation(&mut *context, &name, &alias, with)?;
+        let source = DataSource::resolve_relation(context, &name, &alias, with)?;
         Ok(source)
     }
 }
@@ -556,8 +523,7 @@ impl Relation {
 impl DerivedTable {
     fn resolve(
         &self,
-        context: &mut Resolution<'_>,
-        dialect: Dialect,
+        context: &mut impl ParseContext,
         with: &WithClause,
         preceding: &FromClause,
         outer: Option<&ScalarAnalysisContext<'_>>,
@@ -568,7 +534,7 @@ impl DerivedTable {
             FromClause::default()
         };
         let scope = ScalarAnalysisContext::nested(with, &from, outer);
-        let query = self.query.resolve_in(context, dialect, Some(&scope))?;
+        let query = self.query.resolve_in(context, Some(&scope))?;
         let alias = self
             .alias
             .as_ref()
@@ -581,23 +547,18 @@ impl DerivedTable {
 impl Join {
     fn resolve(
         &self,
-        context: &mut Resolution<'_>,
-        dialect: Dialect,
+        context: &mut impl ParseContext,
         with: &WithClause,
         preceding: &FromClause,
         outer: Option<&ScalarAnalysisContext<'_>>,
     ) -> Result<DataSource, AnalysisError> {
-        let left = self
-            .left
-            .resolve(context, dialect, with, preceding, outer)?;
+        let left = self.left.resolve(context, with, preceding, outer)?;
         let mut visible = preceding.clone();
         visible.push(left.clone());
-        let right = self
-            .right
-            .resolve(context, dialect, with, &visible, outer)?;
+        let right = self.right.resolve(context, with, &visible, outer)?;
         visible.push(right.clone());
         let scope = ScalarAnalysisContext::nested(with, &visible, outer);
-        let condition = Expr::resolve_optional(&self.condition, context, dialect, &scope)?;
+        let condition = Expr::resolve_optional(&self.condition, context, &scope)?;
         Ok(DataSource::resolved_join(
             &left,
             &right,
@@ -613,8 +574,7 @@ impl Join {
 impl FromGroup {
     fn resolve(
         &self,
-        context: &mut Resolution<'_>,
-        dialect: Dialect,
+        context: &mut impl ParseContext,
         with: &WithClause,
         preceding: &FromClause,
         outer: Option<&ScalarAnalysisContext<'_>>,
@@ -622,9 +582,9 @@ impl FromGroup {
         let Some((first, items)) = self.items.split_first() else {
             return AnalysisError::raise_unexpected_input("empty FROM group");
         };
-        let mut source = first.resolve(context, dialect, with, preceding, outer)?;
+        let mut source = first.resolve(context, with, preceding, outer)?;
         for item in items {
-            let right = item.resolve(context, dialect, with, preceding, outer)?;
+            let right = item.resolve(context, with, preceding, outer)?;
             source = DataSource::resolved_join(
                 &source,
                 &right,
@@ -647,15 +607,14 @@ impl FromGroup {
 impl SetQuery {
     fn resolve(
         &self,
-        context: &mut Resolution<'_>,
-        dialect: Dialect,
+        context: &mut impl ParseContext,
         with: &WithClause,
         outer: Option<&ScalarAnalysisContext<'_>>,
     ) -> Result<SelectStatement, AnalysisError> {
         let from = FromClause::default();
         let scope = ScalarAnalysisContext::nested(with, &from, outer);
-        let left = self.left.resolve_in(context, dialect, Some(&scope))?;
-        let right = self.right.resolve_in(context, dialect, Some(&scope))?;
+        let left = self.left.resolve_in(context, Some(&scope))?;
+        let right = self.right.resolve_in(context, Some(&scope))?;
         Ok(self.operation.resolve(left, right))
     }
 }
@@ -687,32 +646,24 @@ impl QueryBody {
 impl Call {
     pub(super) fn resolve_modifiers(
         &self,
-        context: &mut Resolution<'_>,
-        dialect: Dialect,
+        context: &mut impl ParseContext,
         scope: &ScalarAnalysisContext<'_>,
     ) -> Result<crate::sem::FunctionModifiers, AnalysisError> {
         let columns = ResultColumnCollection::default();
-        let order = Order::resolve_list(
-            &self.order,
-            context,
-            dialect,
-            scope,
-            &columns,
-            ClauseBinding::Source,
-        )?;
+        let order =
+            Order::resolve_list(&self.order, context, scope, &columns, ClauseBinding::Source)?;
         let within_order = Order::resolve_list(
             &self.within_order,
             context,
-            dialect,
             scope,
             &columns,
             ClauseBinding::Source,
         )?;
-        let filter = Expr::resolve_optional(&self.filter, context, dialect, scope)?;
+        let filter = Expr::resolve_optional(&self.filter, context, scope)?;
         let over = self
             .over
             .as_ref()
-            .map(|window| window.resolve_over(context, dialect, scope))
+            .map(|window| window.resolve_over(context, scope))
             .transpose()?;
         let (within_order, order) = if self.within_group && within_order.is_empty() {
             (order, Vec::new())

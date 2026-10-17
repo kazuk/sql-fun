@@ -1,10 +1,10 @@
 //! Semantic regressions through both parser frontends on explicit small stacks.
 //! Parsing/conversion gets 2 MiB; resolution also exercises 512 KiB host threads.
 
-use super::test_helpers::{ReadOnlyCatalog, postgres};
+use super::test_helpers::{AnalysisFixture, postgres};
 use crate::ast::Dialect;
 use crate::sem::{ColumnName, PgBuiltInType};
-use crate::test_helpers::{TestParseContext, on_small_stack, small_stack_regression};
+use crate::test_helpers::{on_small_stack, small_stack_regression};
 
 #[rstest::rstest]
 #[case::left_joins("left_joins")]
@@ -49,21 +49,17 @@ fn sqlite_small_stack(
 }
 
 mod test_helpers {
-    use super::{ColumnName, Dialect, PgBuiltInType, ReadOnlyCatalog, TestParseContext};
+    use super::{AnalysisFixture, ColumnName, Dialect, PgBuiltInType};
     use crate::ast::Query;
 
     pub(super) fn assert_result(syntax: &Query, dialect: Dialect, scenario: &str) {
-        let catalog = ReadOnlyCatalog::new();
-        let mut diagnostics = TestParseContext::default();
-        let result = syntax
-            .resolve(&catalog, dialect)
-            .report(&mut diagnostics)
-            .expect("normal query analysis");
+        let mut catalog = AnalysisFixture::context().with_dialect(dialect);
+        let result = syntax.resolve(&mut catalog).expect("normal query analysis");
         let column = result
             .get_result_column_def(&ColumnName::from("n"))
             .expect("named output column");
         if scenario == "diagnostic" {
-            assert_eq!(diagnostics.reported_problem_count(), 1);
+            assert_eq!(catalog.reported_problem_count(), 1);
         } else {
             if scenario == "scalar_subqueries" {
                 // Scalar-subquery type modeling is outside this stack regression.
@@ -71,7 +67,7 @@ mod test_helpers {
             } else {
                 assert_eq!(column.get_type_cloned(), Some(PgBuiltInType::int4()));
             }
-            assert_eq!(diagnostics.reported_problem_count(), 0);
+            assert_eq!(catalog.reported_problem_count(), 0);
         }
     }
 

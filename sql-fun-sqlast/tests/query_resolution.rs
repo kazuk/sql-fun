@@ -53,15 +53,13 @@ mod test_helpers {
             "17",
         ])
         .expect("fixture arguments");
-        let base = BaseContext::new(
-            &args,
-            args.load_metadata()
-                .expect("fixture metadata")
-                .get("default")
-                .expect("selected test metadata"),
-        )
-        .expect("builtin catalog fixture");
-        let context = SchemaFileContext::new(&metadata, &FrozenBaseContext::from(base));
+        let collection = args.load_metadata().expect("fixture metadata");
+        let selected = collection.get("default").expect("selected test metadata");
+        let base = BaseContext::new(&args, selected).expect("builtin catalog fixture");
+        let context = {
+            let analysis_base = &FrozenBaseContext::from(base);
+            SchemaFileContext::new(&metadata, analysis_base, &args, selected)
+        };
         let syntax = PostgresDialect::parse(sql).expect("legal SELECT syntax");
         let tokens = PostgresDialect::scan(sql).expect("SELECT tokens");
         let select = syntax

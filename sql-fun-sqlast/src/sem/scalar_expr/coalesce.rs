@@ -34,13 +34,13 @@ impl CoalesceAnalysis {
             first_non_null: None,
         }
     }
-    pub(crate) fn push<C: crate::sem::resolution::ResolutionContext>(
+    pub(crate) fn push<C: crate::sem::ParseContext>(
         &mut self,
         context: &mut C,
         arg_expr: &SemScalarExpr,
     ) -> Result<(), AnalysisError> {
         if let Some(fnn) = &self.first_non_null {
-            context.report_problem(AnalysisProblem::unreachable_coalesce_argument(
+            context.report_analysis_problem(AnalysisProblem::unreachable_coalesce_argument(
                 arg_expr, fnn,
             ))?;
         } else if let Some(nn) = &arg_expr.is_not_null()
@@ -55,15 +55,17 @@ impl CoalesceAnalysis {
             };
             self.expr_types.insert(type_ref);
         } else {
-            context.report_problem(AnalysisProblem::unknown_type_in_coalesce_expr(arg_expr))?;
+            context.report_analysis_problem(AnalysisProblem::unknown_type_in_coalesce_expr(
+                arg_expr,
+            ))?;
         }
         self.arg_exprs.push(arg_expr.clone());
         Ok(())
     }
-    pub(crate) fn finish<C: crate::sem::resolution::ResolutionContext>(
+    pub(crate) fn finish<C: crate::sem::ParseContext>(
         self,
-        mut context: C,
-    ) -> Result<(SemScalarExpr, C), AnalysisError> {
+        context: &mut C,
+    ) -> Result<(SemScalarExpr, &mut C), AnalysisError> {
         if self.expr_types.len() == 1 {
             // ALL expressions returns same type no cast required
             let coalesce_type = self.expr_types.iter().next().cloned().unwrap();
@@ -113,7 +115,7 @@ impl CoalesceAnalysis {
             }
             let choose = final_candidates.iter().next();
             if final_candidates.len() > 1 {
-                context.report_problem(AnalysisProblem::coalesce_expr_type_ambiguous(
+                context.report_analysis_problem(AnalysisProblem::coalesce_expr_type_ambiguous(
                     &self.arg_exprs,
                     &final_candidates,
                     choose,
@@ -121,7 +123,9 @@ impl CoalesceAnalysis {
             }
             choose
         } else {
-            context.report_problem(AnalysisProblem::coalesce_expr_type_unknown(&self.arg_exprs))?;
+            context.report_analysis_problem(AnalysisProblem::coalesce_expr_type_unknown(
+                &self.arg_exprs,
+            ))?;
             None
         };
 

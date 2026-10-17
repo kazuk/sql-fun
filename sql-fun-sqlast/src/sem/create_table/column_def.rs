@@ -116,11 +116,8 @@ impl ColumnDefinition {
     where
         TParseContext: ParseContext,
     {
-        crate::ast::Column::try_from_with_tokens(column_def, tokens)?.resolve_and_report(
-            context,
-            crate::ast::Dialect::postgres(),
-            table_name,
-        )
+        crate::ast::Column::try_from_with_tokens(column_def, tokens)?
+            .resolve_and_report(context, table_name)
     }
 
     /// analyze [`crate::syn::sqlite::ColumnDefinition`]
@@ -134,11 +131,7 @@ impl ColumnDefinition {
     where
         TParseContext: ParseContext,
     {
-        crate::ast::Column::try_from(syn)?.resolve_and_report(
-            context,
-            crate::ast::Dialect::sqlite(),
-            table_name,
-        )
+        crate::ast::Column::try_from(syn)?.resolve_and_report(context, table_name)
     }
 }
 
@@ -174,7 +167,7 @@ mod test_sqlite_column_definition {
     }
 
     fn setup_context() -> TestParseContext {
-        let mut context = TestParseContext::default();
+        let mut context = TestParseContext::default().with_dialect(crate::ast::Dialect::sqlite());
         context.set_get_search_path_result(&[SchemaName::from("public")]);
         context.setup_type(TypeReference::concrete_type_ref(
             &FullName::with_schema("public", "integer"),

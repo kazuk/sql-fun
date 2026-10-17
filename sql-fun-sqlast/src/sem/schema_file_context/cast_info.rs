@@ -188,10 +188,10 @@ mod test_cast_layers {
             let source = named_type("source");
             let shared = named_type("shared");
             let inherited = named_type("inherited");
-            let mut parent = SchemaFileContext::new(Path::new("parent.sql"), &root);
+            let mut parent = crate::test_helpers::schema_layer(Path::new("parent.sql"), &root);
             register(&mut parent, &source, &shared, CastContext::implicit());
             register(&mut parent, &source, &inherited, CastContext::implicit());
-            let child = SchemaFileContext::new(Path::new("child.sql"), &parent.freeze());
+            let child = crate::test_helpers::schema_layer(Path::new("child.sql"), &parent.freeze());
             (child, source, shared, inherited)
         }
 

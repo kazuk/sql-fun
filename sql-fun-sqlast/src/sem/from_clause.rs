@@ -30,13 +30,8 @@ impl FromClause {
         TParseContext: ParseContext,
     {
         let syntax = crate::ast::FromItem::try_collect_from_with_tokens(syn, tokens)?;
-        let result = crate::ast::FromItem::resolve_list(
-            &syntax,
-            &context,
-            crate::ast::Dialect::postgres(),
-            with_clause,
-        );
-        Ok((result.report(&mut context)?, context))
+        let result = crate::ast::FromItem::resolve_list(&syntax, &mut context, with_clause);
+        Ok((result?, context))
     }
 
     /// get data-source by alias name
@@ -63,7 +58,7 @@ impl FromClause {
         self.find_alias_resolved(column, context, with_clause)
     }
 
-    pub(crate) fn find_alias_resolved<TContext: crate::sem::resolution::ResolutionContext>(
+    pub(crate) fn find_alias_resolved<TContext: crate::sem::ParseContext>(
         &self,
         column: &ColumnName,
         context: &TContext,

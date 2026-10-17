@@ -79,14 +79,13 @@ where
             if let Some(table) = context.get_table(table_name).cloned() {
                 for key_col_name in &keys {
                     if !table.has_column(key_col_name) {
-                        context.report_problem(AnalysisProblem::column_not_found_in_table(
-                            table_name,
-                            key_col_name,
-                        ))?;
+                        context.report_analysis_problem(
+                            AnalysisProblem::column_not_found_in_table(table_name, key_col_name),
+                        )?;
                     }
                 }
             } else {
-                context.report_problem(AnalysisProblem::relation_not_found(table_name))?;
+                context.report_analysis_problem(AnalysisProblem::relation_not_found(table_name))?;
             }
         }
 

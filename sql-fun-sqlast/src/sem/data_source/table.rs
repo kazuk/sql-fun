@@ -40,7 +40,7 @@ impl TableDataSource {
         context: &TParseContext,
         names: &mut Vec<AliasSpec>,
     ) where
-        TParseContext: crate::sem::resolution::ResolutionContext,
+        TParseContext: crate::sem::ParseContext,
     {
         if let Some(table) = context.get_table(&self.name)
             && table.has_column(column)
@@ -61,7 +61,7 @@ impl TableDataSource {
         nullability: Nullable,
     ) -> Result<ColumnReferenceExpr, AnalysisError>
     where
-        TParseContext: crate::sem::resolution::ResolutionContext,
+        TParseContext: crate::sem::ParseContext,
     {
         let Some(table) = context.get_table(&self.name) else {
             AnalysisError::raise_unexpected_input(&format!(
@@ -75,7 +75,7 @@ impl TableDataSource {
             if let Some(column_def) = table.get_column_at(index) {
                 Some(column_def)
             } else {
-                context.report_problem(
+                context.report_analysis_problem(
                     AnalysisProblem::table_not_have_column_for_derived_column_name(),
                 )?;
                 None
@@ -85,7 +85,7 @@ impl TableDataSource {
         {
             Some(column_def)
         } else {
-            context.report_problem(AnalysisProblem::column_not_found_in_table(
+            context.report_analysis_problem(AnalysisProblem::column_not_found_in_table(
                 &self.name, column,
             ))?;
             None

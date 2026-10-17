@@ -60,15 +60,15 @@ impl ViewColumnRef {
         }
     }
 
-    pub(crate) fn view_source_ref<TParseContext>(
-        mut context: TParseContext,
+    pub(crate) fn view_source_ref<'context, TParseContext>(
+        context: &'context mut TParseContext,
         alias: &AliasName,
         column: &ColumnName,
         view_name: &ViewName,
         nullability: Nullable,
-    ) -> Result<(SemScalarExpr, TParseContext), AnalysisError>
+    ) -> Result<(SemScalarExpr, &'context mut TParseContext), AnalysisError>
     where
-        TParseContext: crate::sem::resolution::ResolutionContext,
+        TParseContext: crate::sem::ParseContext,
     {
         let Some(view) = context.get_view(view_name) else {
             AnalysisError::raise_unexpected_input(&format!(
@@ -78,7 +78,9 @@ impl ViewColumnRef {
 
         let column_def = view.get_column_def(column);
         if column_def.is_none() {
-            context.report_problem(AnalysisProblem::column_not_found_in_view(view_name, column))?;
+            context.report_analysis_problem(AnalysisProblem::column_not_found_in_view(
+                view_name, column,
+            ))?;
         }
         let col_ref = Self::new(alias, column, view_name, &column_def, nullability);
         Ok((
@@ -89,15 +91,15 @@ impl ViewColumnRef {
 }
 
 impl ColumnReferenceExpr {
-    pub(crate) fn view_source_ref<TParseContext>(
-        context: TParseContext,
+    pub(crate) fn view_source_ref<'context, TParseContext>(
+        context: &'context mut TParseContext,
         alias: &AliasName,
         column: &ColumnName,
         view_name: &ViewName,
         nullability: Nullable,
-    ) -> Result<(SemScalarExpr, TParseContext), AnalysisError>
+    ) -> Result<(SemScalarExpr, &'context mut TParseContext), AnalysisError>
     where
-        TParseContext: crate::sem::resolution::ResolutionContext,
+        TParseContext: crate::sem::ParseContext,
     {
         ViewColumnRef::view_source_ref(context, alias, column, view_name, nullability)
     }

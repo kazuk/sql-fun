@@ -40,12 +40,14 @@ impl MemberRef {
         ty: &TypeReference,
     ) -> Result<Option<TypeReference>, AnalysisError>
     where
-        TParseContext: crate::sem::resolution::ResolutionContext,
+        TParseContext: crate::sem::ParseContext,
     {
         if let Some(member_type) = td.member_type_from_catalog(context, member) {
             Ok(Some(member_type))
         } else {
-            context.report_problem(AnalysisProblem::composite_type_field_not_found(ty, member))?;
+            context.report_analysis_problem(AnalysisProblem::composite_type_field_not_found(
+                ty, member,
+            ))?;
             Ok(None)
         }
     }
@@ -61,7 +63,7 @@ impl MemberRef {
         Self::member_resolved(source, member, context)
     }
 
-    pub(super) fn member_resolved<TContext: crate::sem::resolution::ResolutionContext>(
+    pub(super) fn member_resolved<TContext: crate::sem::ParseContext>(
         source: SemScalarExpr,
         member: String,
         context: &mut TContext,
@@ -72,10 +74,9 @@ impl MemberRef {
             } else if let Some(td) = context.get_type(ty.full_name()).cloned() {
                 Self::test_member_exist(&member, context, &td, ty)?
             } else {
-                context.report_problem(AnalysisProblem::member_access_requires_composite_type(
-                    ty.full_name(),
-                    &member,
-                ))?;
+                context.report_analysis_problem(
+                    AnalysisProblem::member_access_requires_composite_type(ty.full_name(), &member),
+                )?;
                 None
             }
         } else {

@@ -266,7 +266,7 @@ impl FunctionParam {
         self.castability_one_from_catalog(context, source_type)
     }
 
-    pub(crate) fn castability_one_from_catalog<TCatalog: crate::sem::resolution::Catalog>(
+    pub(crate) fn castability_one_from_catalog<TCatalog: crate::sem::BaseParseContext>(
         &self,
         context: &TCatalog,
         source_type: &Option<TypeReference>,
@@ -305,7 +305,7 @@ impl FunctionParam {
         self.castability_variadic_from_catalog(context, source_types)
     }
 
-    pub(crate) fn castability_variadic_from_catalog<TCatalog: crate::sem::resolution::Catalog>(
+    pub(crate) fn castability_variadic_from_catalog<TCatalog: crate::sem::BaseParseContext>(
         &self,
         context: &TCatalog,
         source_types: &IVec<Option<TypeReference>>,

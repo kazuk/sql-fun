@@ -3,7 +3,7 @@ use crate::sem::{AnalysisError, OperatorDefinition, OperatorName, ParseContext, 
 impl super::ArithExpr {
     /// create a instance
     pub fn build_binary_op<TParseContext>(
-        context: TParseContext,
+        mut context: TParseContext,
         name: &OperatorName,
         lexpr: SemScalarExpr,
         rexpr: SemScalarExpr,
@@ -12,21 +12,22 @@ impl super::ArithExpr {
     where
         TParseContext: ParseContext,
     {
-        Self::build_binary_op_resolved(context, name, lexpr, rexpr, operator_def)
+        let (value, _) =
+            Self::build_binary_op_resolved(&mut context, name, lexpr, rexpr, operator_def)?;
+        Ok((value, context))
     }
 
-    pub(crate) fn build_binary_op_resolved<TParseContext>(
-        mut context: TParseContext,
+    pub(crate) fn build_binary_op_resolved<'context, TParseContext>(
+        context: &'context mut TParseContext,
         name: &OperatorName,
         lexpr: SemScalarExpr,
         rexpr: SemScalarExpr,
         operator_def: OperatorDefinition,
-    ) -> Result<(SemScalarExpr, TParseContext), AnalysisError>
+    ) -> Result<(SemScalarExpr, &'context mut TParseContext), AnalysisError>
     where
-        TParseContext: crate::sem::resolution::ResolutionContext,
+        TParseContext: crate::sem::ParseContext,
     {
-        let resolved_bin_op =
-            Self::resolve_overload_binary(&mut context, operator_def, lexpr, rexpr)?;
+        let resolved_bin_op = Self::resolve_overload_binary(context, operator_def, lexpr, rexpr)?;
         resolved_bin_op.into_call_site_expr(context, name)
     }
 }
@@ -58,7 +59,7 @@ mod test_arith_expr_build_binary_op {
         let operator_def = BinaryOperatorDefinition::new(&type_ref, &type_ref, &type_ref, true);
         let operator_def = OperatorDefinition::Binary(vec![operator_def]);
 
-        let (_expr, _context) = ArithExpr::build_binary_op_resolved(
+        let (_expr, _context) = ArithExpr::build_binary_op(
             test_context,
             &name,
             expr.clone(),

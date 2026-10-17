@@ -191,3 +191,14 @@ pub fn small_stack_regression(stack_size: usize, operation: impl FnOnce() + Send
         );
     }
 }
+
+/// Create a lightweight schema layer with the explicitly selected PostgreSQL test environment.
+/// The supplied base contributes catalog data only.
+pub(crate) fn schema_layer(
+    path: &std::path::Path,
+    base: &crate::sem::FrozenBaseContext,
+) -> crate::sem::SchemaFileContext {
+    use crate::sem::BaseParseContext;
+    let environment = TestParseContext::default();
+    crate::sem::SchemaFileContext::new(path, base, environment.get_args(), environment.metadata())
+}

@@ -157,6 +157,10 @@ impl SqliteDialect {
     /// PostgreSQL). The hash remains available on syntax/semantic failure;
     /// failed reads leave it unset. The file is never reopened to hash it.
     ///
+    /// `args` and `metadata` explicitly select the current analysis environment.
+    /// Configuration retained by `input_context` is historical only. The selected
+    /// metadata dialect must match this loader.
+    ///
     /// The base and its siblings remain unchanged. Successful results retain the
     /// file's semantic statements and recoverable problems; their frozen base
     /// can be passed to the next file without retaining those statements.
@@ -169,26 +173,33 @@ impl SqliteDialect {
         dump_file: &Path,
         input_context: &FrozenBaseContext,
         content_hash: &mut Option<String>,
+        args: &::sql_fun_core::SqlFunArgs,
+        metadata: &::sql_fun_core::SqlFunMetadata,
     ) -> Result<ParsedSchemaDump, ParseDumpFileError> {
         *content_hash = None;
         let snapshot = crate::SqlFileSnapshot::read(dump_file)?;
         *content_hash = Some(snapshot.content_hash().to_owned());
-        Self::parse_schema_snapshot(&snapshot, input_context)
+        Self::parse_schema_snapshot(&snapshot, input_context, args, metadata)
     }
 
     /// Analyze exactly the previously read snapshot, without reopening its file.
+    /// The supplied args and selected metadata configure this analysis independently
+    /// of the frozen catalog; metadata must select this loader's dialect.
     ///
     /// # Errors
     /// Returns syntax or fatal semantic analysis failures.
     pub fn parse_schema_snapshot(
         snapshot: &crate::SqlFileSnapshot,
         input_context: &FrozenBaseContext,
+        args: &::sql_fun_core::SqlFunArgs,
+        metadata: &::sql_fun_core::SqlFunMetadata,
     ) -> Result<ParsedSchemaDump, ParseDumpFileError> {
         let sql_statements = snapshot.text();
         let dump_file = snapshot.path();
 
         let mut parser = TursoParser::new(sql_statements.as_bytes());
-        let mut context = SchemaFileContext::new(dump_file, input_context);
+        let mut context = SchemaFileContext::new(dump_file, input_context, args, metadata);
+        crate::sem::AnalysisError::check_dialect(crate::ast::Dialect::sqlite(), context.dialect())?;
         let mut sem_results = Vec::new();
         while let Some(statement) = Self::next_statement(&mut parser)? {
             let statement_span = StringSpan::new(statement.offset, statement.len);
@@ -220,7 +231,18 @@ mod test_schema_content_hash {
         let file = test_helpers::schema_file(sql);
         let base = test_helpers::base_with_public_schema();
         let mut hash = None;
-        let result = SqliteDialect::parse_schema_file(file.path(), &base, &mut hash);
+        let result = {
+            let analysis_base = &base;
+            let environment = crate::test_helpers::TestParseContext::default()
+                .with_dialect(crate::ast::Dialect::sqlite());
+            SqliteDialect::parse_schema_file(
+                file.path(),
+                analysis_base,
+                &mut hash,
+                crate::sem::BaseParseContext::get_args(&environment),
+                crate::sem::BaseParseContext::metadata(&environment),
+            )
+        };
         assert_eq!(result.is_ok(), succeeds, "{result:?}");
         assert_eq!(
             hash,
@@ -234,7 +256,20 @@ mod test_schema_content_hash {
         let snapshot = crate::SqlFileSnapshot::read(file.path()).unwrap();
         let base = test_helpers::base_with_public_schema();
         std::fs::remove_file(file.path()).unwrap();
-        assert!(SqliteDialect::parse_schema_snapshot(&snapshot, &base).is_ok());
+        assert!(
+            {
+                let analysis_base = &base;
+                let environment = crate::test_helpers::TestParseContext::default()
+                    .with_dialect(crate::ast::Dialect::sqlite());
+                SqliteDialect::parse_schema_snapshot(
+                    &snapshot,
+                    analysis_base,
+                    crate::sem::BaseParseContext::get_args(&environment),
+                    crate::sem::BaseParseContext::metadata(&environment),
+                )
+            }
+            .is_ok()
+        );
     }
 
     #[test]
@@ -242,11 +277,18 @@ mod test_schema_content_hash {
         let directory = ::tempfile::tempdir().unwrap();
         let base = test_helpers::base_with_public_schema();
         let mut hash = Some("previous".to_owned());
-        let error = SqliteDialect::parse_schema_file(
-            &directory.path().join("missing.sql"),
-            &base,
-            &mut hash,
-        )
+        let error = {
+            let analysis_base = &base;
+            let environment = crate::test_helpers::TestParseContext::default()
+                .with_dialect(crate::ast::Dialect::sqlite());
+            SqliteDialect::parse_schema_file(
+                &directory.path().join("missing.sql"),
+                analysis_base,
+                &mut hash,
+                crate::sem::BaseParseContext::get_args(&environment),
+                crate::sem::BaseParseContext::metadata(&environment),
+            )
+        }
         .unwrap_err();
         assert!(error.is_io());
         assert!(hash.is_none());
@@ -255,7 +297,8 @@ mod test_schema_content_hash {
     mod test_helpers {
         pub(super) fn base_with_public_schema() -> crate::sem::FrozenBaseContext {
             use crate::sem::{ParseContext, SchemaName};
-            let mut base = crate::test_helpers::TestParseContext::default();
+            let mut base = crate::test_helpers::TestParseContext::default()
+                .with_dialect(crate::ast::Dialect::sqlite());
             base.set_get_search_path_result(&[SchemaName::from("public")]);
             base.freeze()
         }

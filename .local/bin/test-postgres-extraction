@@ -120,6 +120,91 @@ def validate_interactive_init(binary, destination, fixture, declarations, ambien
     print(f"Interactive init ({fixture}): no project inspection, home choice and explicit engine selection passed", flush=True)
 
 
+def validate_masters(directory):
+    collations = json.loads((directory / "collations.json").read_text())
+    classes = json.loads((directory / "operator_classes.json").read_text())
+    database = collations["database"]
+    default = database["default_collation"]
+    assert any(all(c[k] == default[k] for k in ("schema", "name", "encoding"))
+               and c["provider"] == "d" for c in collations["collations"])
+    assert database["encoding_name"] == "UTF8"
+    assert any(c["name"] == "C" and c["encoding"] == -1 for c in collations["collations"])
+    assert any(c["name"] == "int4_ops" and c["access_method"] == "btree"
+               and c["default"] and c["family"]["name"] == "integer_ops"
+               and c["input_type"] == {"schema": "pg_catalog", "name": "int4"}
+               and c["key_type"] is None for c in classes)
+    assert any(c["key_type"] is not None for c in classes)
+    return collations, classes
+
+
+def validate_selected_masters(binary, major, destination, environment, bundle_file, identifier):
+    # Include quotes, backslashes, SQL punctuation and Unicode in exact CLI inputs.
+    schema = "Odd'\\\"; -- 雪"
+    other = "other masters"
+    extension_schema = "extension masters"
+    quoted = '"' + schema.replace('"', '""') + '"'
+    sql = f'''CREATE SCHEMA {quoted};
+CREATE SCHEMA "other masters";
+CREATE SCHEMA "extension masters";
+CREATE EXTENSION btree_gin SCHEMA "extension masters";
+CREATE DOMAIN "other masters"."Type 雪" AS integer;
+CREATE OPERATOR FAMILY "other masters"."Family 雪" USING btree;
+CREATE OPERATOR CLASS {quoted}."Same 雪" FOR TYPE "other masters"."Type 雪"
+ USING btree FAMILY "other masters"."Family 雪" AS
+ OPERATOR 1 < (integer,integer), OPERATOR 3 = (integer,integer),
+ FUNCTION 1 btint4cmp(integer,integer);
+CREATE OPERATOR CLASS {quoted}."Same 雪" FOR TYPE integer USING hash AS
+ OPERATOR 1 = (integer,integer), FUNCTION 1 hashint4(integer);
+CREATE COLLATION {quoted}."Name 雪" FROM pg_catalog."C";
+CREATE COLLATION "other masters"."Name 雪" FROM pg_catalog."C";
+CREATE COLLATION {quoted}."Encoding" (provider=libc, locale='C');
+CREATE COLLATION pg_catalog."not a builtin" FROM pg_catalog."C";
+'''
+    run("docker", "exec", "-i", identifier, "psql", "-X", "-U", "postgres",
+        "-v", "ON_ERROR_STOP=1", data=sql.encode())
+    builtin = destination / f"{major}-masters-builtin"
+    run(binary, "extract", "catalog", "--output", str(builtin), env=environment)
+    assert payload(builtin) == payload(destination / f"{major}-restricted")
+    selected = destination / f"{major}-selected-masters"
+    options = ["--definition-schema", schema, "--definition-schema", extension_schema]
+    run(binary, "extract", "catalog", *options, "--output", str(selected), env=environment)
+    collations, classes = validate_masters(selected)
+    metadata = json.loads((selected / "metadata.json").read_text())
+    assert metadata["format_version"] == 1
+    assert metadata["definition_schemas"] == sorted([schema, extension_schema])
+    for filename, digest in payload(builtin).items():
+        if filename not in ("collations.json", "operator_classes.json"):
+            assert payload(selected)[filename] == digest, "additional scope changed existing catalogs"
+    assert {c["schema"] for c in collations["collations"]} == {"pg_catalog", schema}
+    encoding_variants = [c["encoding"] for c in collations["collations"]
+                         if c["schema"] == schema and c["name"] == "Encoding"]
+    assert encoding_variants == [6], "database-specific encoding must be retained"
+    named = [c for c in classes if c["schema"] == schema and c["name"] == "Same 雪"]
+    assert {c["access_method"] for c in named} == {"btree", "hash"}
+    btree = next(c for c in named if c["access_method"] == "btree")
+    assert btree["input_type"] == {"schema": other, "name": "Type 雪"}
+    assert btree["family"] == {"schema": other, "name": "Family 雪", "access_method": "btree"}
+    assert not btree["default"]
+    assert any(c["schema"] == extension_schema for c in classes), "installed extension masters lost"
+    assert not any(c["schema"] == other for c in classes), "references must not broaden selection"
+    repeated = destination / f"{major}-selected-repeat"
+    run(binary, "extract", "catalog", "--definition-schema", extension_schema,
+        "--definition-schema", schema, "--definition-schema", schema,
+        "--output", str(repeated), env=environment)
+    assert payload(repeated) == payload(selected)
+    assert (repeated / "metadata.json").read_bytes() == (selected / "metadata.json").read_bytes()
+    imported = destination / f"{major}-selected-imported"
+    run(binary, "extract", "import-extensions", "--catalog", str(selected), "--bundle", str(bundle_file),
+        "--output", str(imported), env=environment)
+    for name in ("collations.json", "operator_classes.json", "metadata.json"):
+        assert (imported / name).read_bytes() == (selected / name).read_bytes()
+    missing = destination / f"{major}-missing-schema"
+    run(binary, "extract", "catalog", "--definition-schema", "unselected missing schema",
+        "--output", str(missing), env=environment, success=False)
+    assert not missing.exists(), "invalid scope published partial output"
+    print(f"PostgreSQL {major}: exact schema scope, encoding variants, cross-schema references and extension masters passed", flush=True)
+
+
 def validate(binary, major, image, destination, host, bind):
     output = destination / major
     run(binary, "extract", "catalog", "--docker-image", image,
@@ -127,6 +212,7 @@ def validate(binary, major, image, destination, host, bind):
     functions = json.loads((output / "functions.json").read_text())
     clock = next(f for f in functions if f["name"] == "clock_timestamp")
     assert clock["overloads"][0]["args"] == [], "zero-argument functions must not have a null argument"
+    validate_masters(output)
     first = payload(output)
     assert "extension/uuid-ossp.control" in first
     assert json.loads((output / "metadata.json").read_text())["server_version_num"] // 10000 == int(major)
@@ -189,6 +275,7 @@ GRANT CONNECT ON DATABASE postgres TO extractor;
         assert not (existing / "extension").exists(), "catalog-only extraction must not retain stale extension files"
         run(binary, "extract", "import-extensions", "--bundle", str(bundle_file), "--catalog", str(existing), "--output", str(destination / f"{major}-restricted-imported"), env=limited_env)
         assert payload(destination / f"{major}-restricted-imported") == first, "user or extension objects contaminated builtin metadata"
+        validate_selected_masters(binary, major, destination, limited_env, bundle_file, identifier)
         previous = payload(existing)
         failed = run(binary, "extract", "catalog", "--database-url", "postgresql://secret-user:secret-password@127.0.0.1:1/postgres",
                      "--timeout-seconds", "2", "--output", str(destination / f"{major}-failed-connection"), success=False)

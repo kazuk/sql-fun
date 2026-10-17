@@ -40,7 +40,7 @@ $ home="$TMPDIR/postgres-initialization-contract/home"
 > for version in 17 18; do
 >   for artifact in metadata.json schema.sql pg_type.json functions.json \
 >     func_detail.json binary_op.json left_unary_op.json \
->     right_unary_op.json casts.json; do
+>     right_unary_op.json casts.json collations.json operator_classes.json; do
 >     test -s "$home/postgres/$version/$artifact"
 >   done
 > done

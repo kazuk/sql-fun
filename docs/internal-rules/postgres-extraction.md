@@ -37,6 +37,81 @@ are extraction inputs. The pinned integration images define the official
 reproduction environment. Verify both payload and metadata against committed
 artifacts in the installed-binary CI job.
 
+## Additive master definitions
+
+Format 1 additionally produces `collations.json` and `operator_classes.json`.
+Existing payloads and metadata representations are unchanged. Existing consumers
+continue reading their known files; these two files are not new prerequisites
+for initialization, import, or semantic loading. Production master loading and
+required-file validation are owned by #583. Additional files travel with the
+candidate through publication, extension import, and new initialization.
+
+`--definition-schema` is repeatable and selects an exact namespace string, not
+an SQL identifier expression or a search-path entry. Names are deduplicated and
+sorted; empty/NUL-containing or nonexistent names fail before publication.
+Explicit selection includes all master definitions in those namespaces,
+including normal-OID user and extension definitions. Without this input, masters
+include bootstrap definitions in `pg_catalog` only. Other payload scopes remain
+unchanged. Nonempty selections add a sorted `definition_schemas` array to
+`metadata.json`; the existing `scope` still describes builtin schema extraction.
+No schema is inferred from the connection search path, extension files, or
+application metadata. Referenced identities outside the selection are included
+inline, without selecting further definitions.
+
+### Collations
+
+`collations.json` is an object with `database` and `collations` members.
+`collations` is an array ordered by `(schema, name, encoding)`, using PostgreSQL's
+`C` collation for exact UTF-8 string ordering. Each entry contains:
+
+| Field | Representation |
+| --- | --- |
+| `schema`, `name` | Exact namespace/object identifier strings |
+| `encoding` | PostgreSQL encoding integer; `-1` means any encoding |
+| `provider` | PostgreSQL provider code, including `d` for database default |
+| `deterministic` | Boolean from `collisdeterministic` |
+| `collate`, `ctype`, `locale`, `icu_rules`, `version` | Nullable catalog strings |
+
+Identity is `(schema, name, encoding)`. Preserve every encoding variant in scope;
+extraction does not apply consumer encoding eligibility or name resolution.
+`database` contains `encoding` (integer), `encoding_name` (string), `provider`,
+`collate`, `ctype`, `locale`, `icu_rules`, and `version` from the selected source
+database's encoding and locale configuration. Locale/rules/version fields retain
+catalog nulls. Its `default_collation` is an object with `schema`, `name`, and
+`encoding`, identifying the extracted provider-`d` collation. The database's name
+is not an object identity and is not serialized. No effective collation is
+chosen for an index or column here.
+
+### Operator classes
+
+`operator_classes.json` is an array ordered by `(schema, name, access_method)`
+with `C` string ordering. Each entry contains:
+
+| Field | Representation |
+| --- | --- |
+| `schema`, `name` | Exact namespace/object identifier strings |
+| `access_method` | Global access-method identifier string |
+| `family` | Object with `schema`, `name`, and `access_method` |
+| `input_type` | Object with exact type `schema` and `name` |
+| `default` | Boolean from `opcdefault` for this method/input type |
+| `key_type` | Type identity object, or null when `opckeytype = 0` |
+
+Class identity is `(schema, name, access_method)`; family identity also includes
+its method. Type identities use catalog namespace/name, including arrays,
+domains, and pseudo-types, rather than SQL display spellings. Joins ensure the
+referenced family belongs to the same method and preserve type identities even
+outside selected namespaces. Null `key_type` means no distinct storage type,
+not a missing reference. Matching and default selection are consumer work.
+
+Neither payload exports OIDs as portable identities. Database locale/provider,
+server encoding/build, installed definitions and selected namespaces are inputs
+to reproduction. Existing pinned-image CI reproduces both new files, alongside
+all previously committed payloads and metadata. Producer-side offline checks
+cover identity uniqueness/order, relationship shapes and default provenance;
+real-server extraction checks cover explicit scope, legal unusual names,
+encoding properties, cross-schema references and installed extension masters.
+These checks do not claim production conflict-target lookup support.
+
 ## Extension bundle contract
 
 The standalone script writes an uncompressed GNU tar/PAX archive with:

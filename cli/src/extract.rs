@@ -1,6 +1,7 @@
 mod bundle;
 mod catalog;
 mod container;
+mod definition_schemas;
 mod publication;
 mod render;
 #[cfg(test)]
@@ -52,6 +53,9 @@ struct CatalogArgs {
     /// Address on the Docker host on which to publish the `PostgreSQL` port.
     #[arg(long, default_value = "127.0.0.1", requires = "docker_image")]
     docker_bind_address: String,
+    /// Include additional collation/operator-class definitions from this exact schema (repeatable).
+    #[arg(long = "definition-schema")]
+    definition_schemas: Vec<String>,
     /// Destination containing schema.sql, catalog JSON, and metadata.json.
     #[arg(long)]
     output: PathBuf,
@@ -130,6 +134,7 @@ pub(crate) async fn initialize_catalog(
         },
         docker_host_address: args.docker_host_address().to_owned(),
         docker_bind_address: args.docker_bind_address().to_owned(),
+        definition_schemas: Vec::new(),
         output: output.to_path_buf(),
         timeout_seconds: args.timeout_seconds(),
     };
@@ -138,6 +143,7 @@ pub(crate) async fn initialize_catalog(
 
 impl CatalogArgs {
     async fn execute(&self) -> Result<(), anyhow::Error> {
+        let schemas = self::definition_schemas::DefinitionSchemas::new(&self.definition_schemas)?;
         which::which("psql").map_err(|_| {
             anyhow::anyhow!(
                 "psql is required for catalog extraction; install the PostgreSQL client tools"
@@ -180,7 +186,7 @@ impl CatalogArgs {
                     "expected PostgreSQL {expected}, connected server reports {actual}"
                 );
             }
-            catalog::extract(&connection, stage.path(), &provenance).await?;
+            catalog::extract(&connection, stage.path(), &provenance, &schemas).await?;
             if let Some(instance) = &container {
                 let bundle_path = stage.path().join("export.tar");
                 instance.export(&bundle_path).await?;

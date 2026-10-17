@@ -1,4 +1,7 @@
-use crate::extract::render::{Renderer, fragment, identifier};
+use crate::extract::{
+    definition_schemas::DefinitionSchemas,
+    render::{Renderer, fragment, identifier},
+};
 
 use std::{collections::BTreeMap, fmt::Write, path::Path, time::Duration};
 
@@ -96,6 +99,7 @@ pub(super) async fn extract(
     configuration: &str,
     output: &Path,
     provenance: &Value,
+    schemas: &DefinitionSchemas,
 ) -> Result<(), anyhow::Error> {
     let identity = detect(configuration).await?;
     let queries = [
@@ -110,10 +114,13 @@ pub(super) async fn extract(
         include_str!("sql/builtin_columns.sql"),
         include_str!("sql/schema_functions.sql"),
         include_str!("sql/views.sql"),
+        include_str!("sql/collations.sql"),
+        include_str!("sql/operator_classes.sql"),
     ];
     let mut sql = String::from(
         "BEGIN ISOLATION LEVEL REPEATABLE READ READ ONLY;\nSET LOCAL search_path = pg_catalog; SET LOCAL standard_conforming_strings = on; SET LOCAL extra_float_digits = 3; SET LOCAL timezone = 'UTC'; SET LOCAL statement_timeout = '60s';\nSHOW server_version_num;\n",
     );
+    sql.push_str(&schemas.session_sql()?);
     for query in queries {
         writeln!(
             sql,
@@ -177,12 +184,16 @@ pub(super) async fn extract(
     type_fields(&mut views, &["schema", "view"], &["definition"])?;
     schema.push_str(&renderer.render("views", &views)?);
     std::fs::write(output.join("schema.sql"), schema)?;
+    for filename in ["collations.json", "operator_classes.json"] {
+        write_json(&output.join(filename), &next_catalog(&mut lines)?)?;
+    }
     anyhow::ensure!(lines.next().is_none(), "unexpected psql catalog result");
     let mut metadata = serde_json::json!({
         "format_version": 1, "server_version_num": version,
         "extractor_version": env!("CARGO_PKG_VERSION"), "provenance": provenance,
         "scope": "bootstrap-pg_catalog-and-information_schema"
     });
+    schemas.record_scope(&mut metadata);
     if !identity.is_stable() {
         metadata["version_identity"] = identity.to_string().into();
     }

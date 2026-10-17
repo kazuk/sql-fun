@@ -34,21 +34,20 @@ impl TestParseContext {
 }
 impl ConflictInfoRead for TestParseContext {
     fn database_collation(&self) -> Option<&crate::sem::DatabaseCollation> {
-        self.masters.as_ref().and_then(|masters| masters.database())
+        let masters = self.masters.as_ref()?;
+        masters.database()
     }
     fn collation_definition(&self, name: &FullName) -> Option<&crate::sem::CollationDefinition> {
-        self.masters
-            .as_ref()
-            .and_then(|masters| masters.qualified_collation(name))
+        let masters = self.masters.as_ref()?;
+        masters.qualified_collation(name)
     }
     fn operator_class_definition(
         &self,
         name: &FullName,
         method: &str,
     ) -> Option<&crate::sem::OperatorClassDefinition> {
-        self.masters
-            .as_ref()
-            .and_then(|masters| masters.operator_class(name, method))
+        let masters = self.masters.as_ref()?;
+        masters.operator_class(name, method)
     }
     fn lookup_sqlite_collation(&self, name: &FullName) -> CatalogNameLookup {
         self.masters

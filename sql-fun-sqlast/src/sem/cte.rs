@@ -29,16 +29,6 @@ pub enum CteStatement {
 }
 
 impl CteStatement {
-    pub(crate) const fn insert() -> Self {
-        Self::Insert(InsertStatement::empty())
-    }
-    pub(crate) const fn update() -> Self {
-        Self::Update(UpdateStatement::empty())
-    }
-    pub(crate) const fn delete() -> Self {
-        Self::Delete(DeleteStatement::empty())
-    }
-
     /// get column from result set
     pub fn get_column<TParseContext>(
         &self,

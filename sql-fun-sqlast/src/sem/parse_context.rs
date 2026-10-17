@@ -255,9 +255,9 @@ where
     /// Mutable bookkeeping for the current outer analysis.
     fn analysis_state_mut(&mut self) -> &mut crate::sem::AnalysisState;
 
-    /// Start an independent statement or standalone expression analysis.
+    /// Start parameter type analysis for an independent statement or expression.
     /// Nested queries must not call this operation.
-    fn begin_analysis(&mut self) {
+    fn begin_parameter_type_analysis(&mut self) {
         self.analysis_state_mut().begin();
         self.set_parameter_constraints(&crate::sem::ParameterConstraints::default());
     }
@@ -311,7 +311,7 @@ where
     ///
     /// # Errors
     /// Propagates the supplied result or constraint-analysis errors.
-    fn infer_query(
+    fn infer_query_parameter_types(
         &mut self,
         result: Result<crate::sem::SelectStatement, AnalysisError>,
     ) -> Result<crate::sem::SelectStatement, AnalysisError> {
@@ -329,7 +329,7 @@ where
     ///
     /// # Errors
     /// Propagates the supplied result or constraint-analysis errors.
-    fn infer_expression(
+    fn infer_expression_parameter_types(
         &mut self,
         result: Result<SemScalarExpr, AnalysisError>,
     ) -> Result<SemScalarExpr, AnalysisError> {

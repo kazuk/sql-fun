@@ -417,7 +417,7 @@ fn inference_uses_captured_function_and_operator_bindings() {
         true,
         None,
     );
-    catalog.begin_analysis();
+    catalog.begin_parameter_type_analysis();
     let constraints = crate::sem::parameter_resolution::ParameterResolution::infer_query(
         &mut query,
         &mut catalog,

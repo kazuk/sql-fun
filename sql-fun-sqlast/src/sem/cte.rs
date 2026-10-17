@@ -74,6 +74,9 @@ impl CteStatement {
             Self::Delete(delete) => Some(delete.result_columns()),
         }
     }
+    pub(crate) fn is_unreadable_delete(&self) -> bool {
+        matches!(self, Self::Delete(delete) if delete.result_columns().is_empty())
+    }
     pub(crate) fn require_readable(&self) -> Result<(), AnalysisError> {
         if let Self::Update(update) = self
             && update.result_columns().is_empty()
@@ -87,13 +90,6 @@ impl CteStatement {
         {
             return Err(AnalysisError::unexpected_input_error(
                 "INSERT CTE requires RETURNING to be read",
-            ));
-        }
-        if let Self::Delete(delete) = self
-            && delete.result_columns().is_empty()
-        {
-            return Err(AnalysisError::unexpected_input_error(
-                "DELETE CTE requires RETURNING to be read",
             ));
         }
         Ok(())

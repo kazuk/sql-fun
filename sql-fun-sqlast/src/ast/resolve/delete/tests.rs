@@ -1,4 +1,5 @@
 mod cursors;
+mod sql_driven;
 mod versions;
 mod views;
 
@@ -185,10 +186,10 @@ fn retains_distinct_missing_and_ambiguous_lookup_outcomes() {
 #[case::missing_target("DELETE FROM absent")]
 #[case::unreadable("WITH d AS (DELETE FROM items) SELECT * FROM d")]
 #[case::nested("SELECT (WITH d AS (DELETE FROM items RETURNING id) SELECT id FROM d)")]
-fn rejects_invalid_structure(#[case] sql: &str) {
-    assert!(
-        test_helpers::resolve(sql, &mut catalog(Dialect::postgres()), Dialect::postgres()).is_err()
-    );
+fn retains_invalid_structure_as_diagnostics(#[case] sql: &str) {
+    let mut context = catalog(Dialect::postgres());
+    assert!(test_helpers::resolve(sql, &mut context, Dialect::postgres()).is_ok());
+    assert!(context.reported_problem_count() > 0);
 }
 
 #[test]
@@ -467,6 +468,49 @@ fn sqlite_missing_index_reports_a_structured_violation() {
             .delete_problem()
             .unwrap()
             .kind(),
-        crate::sem::problem::DeleteProblemKind::index_hint()
+        &crate::sem::problem::DeleteProblemKind::index_hint()
     );
+}
+
+#[rstest::rstest]
+#[case::missing("DELETE FROM absent WHERE $1::boolean RETURNING absent.id", false)]
+#[case::missing_star("DELETE FROM absent RETURNING *", false)]
+#[case::found("DELETE FROM items RETURNING id", true)]
+fn retains_destination_lookup_outcome(#[case] sql: &str, #[case] found: bool) {
+    let mut context = catalog(Dialect::postgres());
+    let statement = test_helpers::resolve(sql, &mut context, Dialect::postgres()).unwrap();
+    let delete = statement.as_delete().unwrap();
+    assert_eq!(delete.target_found(), found);
+    assert_eq!(context.reported_problem_count() == 0, found);
+    if !found {
+        assert_eq!(delete.target().to_string(), "absent");
+        assert!(matches!(
+            delete
+                .from()
+                .resolve_alias(&crate::sem::AliasName::from("absent"))
+                .unwrap()
+                .0,
+            crate::sem::DataSource::Unknown(_, _)
+        ));
+    }
+}
+
+#[cfg(feature = "sqlite")]
+#[test]
+fn sqlite_delete_cte_reports_an_unsupported_operation() {
+    let mut context = catalog(Dialect::sqlite());
+    // The common AST can carry a DELETE CTE even though SQLite's parser rejects it.
+    let statement = crate::parse_statements(
+        "WITH d AS (DELETE FROM items RETURNING id) SELECT id FROM d",
+        Dialect::postgres(),
+    )
+    .next()
+    .unwrap()
+    .unwrap();
+    assert!(statement.node.resolve(&mut context).is_ok());
+    assert!(context.reported_problems().iter().any(|problem| {
+        problem.delete_problem().is_some_and(|problem| {
+            problem.kind() == &crate::sem::problem::DeleteProblemKind::sqlite_cte()
+        })
+    }));
 }

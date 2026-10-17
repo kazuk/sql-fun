@@ -73,6 +73,7 @@ impl DataSource {
                 .into_iter()
                 .map(|(_, name)| name)
                 .collect()),
+            Self::Unknown(_, _) => Ok(Vec::new()),
             Self::SubQuery(query) => Ok(query.select_statement().result_columns().names()),
             _ => AnalysisError::raise_unexpected_input(
                 "star source has no enumerable result columns",

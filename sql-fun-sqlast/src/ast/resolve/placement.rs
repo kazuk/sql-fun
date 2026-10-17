@@ -4,17 +4,15 @@ use crate::sem::AnalysisError;
 impl CteBody {
     pub(in crate::ast::resolve) fn require_data_modifying_placement(
         &self,
+        context: &mut impl crate::sem::ParseContext,
         top_level: bool,
     ) -> Result<(), AnalysisError> {
-        if matches!(self, Self::Insert(_) | Self::Update(_) | Self::Delete(_)) && !top_level {
-            return Err(AnalysisError::unexpected_input_error(
-                "data-modifying WITH must be at the top level",
-            ));
-        }
-        if self.contains_invalid_cte_clause() {
-            return Err(AnalysisError::unexpected_input_error(
-                "nested data-modifying WITH or SELECT INTO in CTE",
-            ));
+        if (matches!(self, Self::Insert(_) | Self::Update(_) | Self::Delete(_)) && !top_level)
+            || self.contains_invalid_cte_clause()
+        {
+            context.report_analysis_problem(crate::sem::AnalysisProblem::query(
+                crate::sem::problem::QueryProblem::invalid_cte_placement(),
+            ))?;
         }
         Ok(())
     }

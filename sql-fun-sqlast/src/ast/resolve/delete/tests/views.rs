@@ -48,9 +48,12 @@ fn respects_delete_capabilities(
         "{:?}",
         context.reported_problems()
     );
+    let result = result.unwrap();
+    assert!(result.as_delete().unwrap().target_found());
+    assert_eq!(result.as_delete().unwrap().view_support(), Some(&support));
     if valid {
         assert_eq!(
-            result.unwrap().as_delete().unwrap().target().to_string(),
+            result.as_delete().unwrap().target().to_string(),
             "public.writable_items"
         );
     }

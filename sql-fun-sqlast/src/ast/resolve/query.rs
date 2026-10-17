@@ -259,7 +259,7 @@ impl With {
         for entry in &self.entries {
             entry
                 .body
-                .require_data_modifying_placement(outer.is_none())?;
+                .require_data_modifying_placement(context, outer.is_none())?;
             let from = FromClause::default();
             let scope = ScalarAnalysisContext::nested(&with, &from, outer);
             let body = entry.body.resolve(context, &scope, &entry.column_names())?;
@@ -312,13 +312,14 @@ impl CteBody {
             }
             Self::Delete(delete) => {
                 if context.dialect() == Dialect::sqlite() {
-                    return AnalysisError::raise_unexpected_input("SQLite DELETE CTE");
+                    context.report_analysis_problem(AnalysisProblem::delete(
+                        crate::sem::problem::DeleteProblemKind::sqlite_cte(),
+                    ))?;
                 }
                 let mut delete = delete.resolve_in(context, Some(scope))?;
                 if columns.len() > delete.result_columns().len() {
                     context.report_analysis_problem(AnalysisProblem::delete(
                         crate::sem::problem::DeleteProblemKind::cte_aliases(),
-                        "DELETE CTE has more aliases than outputs",
                     ))?;
                 }
                 delete.rename_columns(columns);

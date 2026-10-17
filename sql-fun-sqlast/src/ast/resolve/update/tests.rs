@@ -78,7 +78,6 @@ fn reports_invalid_update(#[case] sql: &str) {
 #[case::missing_column("UPDATE items SET absent=1")]
 #[case::row_width("UPDATE items SET (id,label)=(SELECT 1)")]
 #[case::unreadable("WITH u AS (UPDATE items SET id=1) SELECT * FROM u")]
-#[case::nested("SELECT (WITH u AS (UPDATE items SET id=1 RETURNING id) SELECT id FROM u)")]
 fn rejects_invalid_structure(#[case] sql: &str) {
     let mut context = catalog(Dialect::postgres());
     let statement = crate::parse_statements(sql, Dialect::postgres())
@@ -348,4 +347,13 @@ fn postgres_returning_defaults_unknown_parameters_to_text(#[case] sql: &str) {
     let parameter = context.parameter_constraints().parameter(1).unwrap();
     assert!(parameter.constraint().allows(&PgBuiltInType::text()));
     assert!(!parameter.constraint().allows(&PgBuiltInType::int4()));
+}
+
+#[test]
+fn nested_update_cte_reports_a_query_problem() {
+    let (_, context) = analyze(
+        "SELECT (WITH u AS (UPDATE items SET id=1 RETURNING id) SELECT id FROM u)",
+        Dialect::postgres(),
+    );
+    assert!(context.reported_problem_count() > 0);
 }

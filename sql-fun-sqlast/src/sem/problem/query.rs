@@ -4,6 +4,8 @@ use ::miette::{GraphicalReportHandler, MietteDiagnostic, NamedSource, Report, Se
 /// Structured violations in SELECT clauses, distinct from retained name bindings.
 #[derive(Clone, Debug, Eq, PartialEq)]
 pub enum QueryProblem {
+    /// A WITH body violates data-modifying or SELECT INTO placement rules.
+    InvalidCtePlacement,
     /// A WINDOW declaration repeats an existing definition name.
     DuplicateWindowDefinition(String),
     /// A clause name has no applicable definition.
@@ -17,6 +19,9 @@ pub enum QueryProblem {
 }
 
 impl QueryProblem {
+    pub(crate) const fn invalid_cte_placement() -> Self {
+        Self::InvalidCtePlacement
+    }
     pub(crate) fn duplicate_window_definition(name: &str) -> Self {
         Self::DuplicateWindowDefinition(name.to_owned())
     }
@@ -34,6 +39,7 @@ impl QueryProblem {
     }
     pub(super) const fn code(&self) -> &'static str {
         match self {
+            Self::InvalidCtePlacement => "query_invalid_cte_placement",
             Self::DuplicateWindowDefinition(_) => "query_duplicate_window_definition",
             Self::ReferenceNotFound(_) => "query_reference_not_found",
             Self::AmbiguousReference(_) => "query_reference_ambiguous",
@@ -47,6 +53,7 @@ impl QueryProblem {
         source: String,
     ) -> Result<String, AnalysisError> {
         let message = match self {
+            Self::InvalidCtePlacement => "data-modifying WITH must be at the top level; nested WITH bodies cannot contain modifying WITH or SELECT INTO".to_owned(),
             Self::DuplicateWindowDefinition(name) => format!("duplicate window definition: {name}"),
             Self::ReferenceNotFound(name) => format!("clause reference not found: {name}"),
             Self::AmbiguousReference(name) => format!("ambiguous clause reference: {name}"),

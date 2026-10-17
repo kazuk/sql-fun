@@ -24,7 +24,13 @@ impl DataSource {
         with: &WithClause,
     ) -> Result<Self, AnalysisError> {
         if let Some(cte) = with.get(&name.to_string()) {
-            cte.require_readable()?;
+            if cte.is_unreadable_delete() {
+                context.report_analysis_problem(AnalysisProblem::delete(
+                    crate::sem::problem::DeleteProblemKind::unreadable_cte(&name.to_string()),
+                ))?;
+            } else {
+                cte.require_readable()?;
+            }
             Ok(CteDataSource::new_data_source(&name.to_string(), alias))
         } else if context.get_table(&TableName::from(name.clone())).is_some() {
             Ok(TableDataSource::new_data_source(

@@ -4,6 +4,7 @@ mod view_support;
 
 pub use self::arbiter::{
     InsertArbiter, InsertArbiterLookup, InsertConstraintKind, InsertConstraintLookup,
+    ViewSourceArbiter,
 };
 pub(crate) use self::destination::InsertDestination;
 pub use self::view_support::{ViewInsertInfoRead, ViewInsertSupport};
@@ -275,6 +276,13 @@ pub struct InsertConflict {
     arbiter: InsertArbiterLookup,
 }
 impl InsertConflict {
+    pub(crate) fn map_view_expressions<V: SemanticVisitor>(
+        &mut self,
+        visitor: &mut V,
+    ) -> Result<(), AnalysisError> {
+        self.walk(visitor)
+    }
+
     pub(crate) const fn new(
         inference: Vec<SemScalarExpr>,
         predicate: Option<SemScalarExpr>,

@@ -55,12 +55,14 @@ pub(super) struct SchemaCatalog {
     types: TypeDefinitionCollection,
     tables: TableDefinitionCollection,
     functions: FunctionDefinitionCollection,
+    function_view_rows: std::collections::HashMap<(FullName, crate::sem::OverloadVariant), bool>,
     extensions: TrieMap<CreateExtension>,
     variables: TrieMap<SemScalarExpr>,
     schemas: TrieMap<CreateSchema>,
     sequences: SequenceInfoCollection,
     comments: TrieMap<(ObjectKind, String)>,
     views: ViewInformationCollection,
+    view_writes: TrieMap<crate::sem::ViewWriteInfo>,
     casts: TrieMap<TrieMap<CastDefinition>>,
     binary_operators: TrieMap<OperatorDefinition>,
     left_unary_operators: TrieMap<OperatorDefinition>,
@@ -107,12 +109,14 @@ impl SchemaFileContext {
                 types: TypeDefinitionCollection::default(),
                 tables: TableDefinitionCollection::default(),
                 functions: FunctionDefinitionCollection::default(),
+                function_view_rows: std::collections::HashMap::default(),
                 extensions: TrieMap::default(),
                 variables: TrieMap::default(),
                 schemas: TrieMap::default(),
                 sequences: SequenceInfoCollection::default(),
                 comments: TrieMap::default(),
                 views: ViewInformationCollection::default(),
+                view_writes: TrieMap::default(),
                 casts: TrieMap::default(),
                 binary_operators: TrieMap::default(),
                 left_unary_operators: TrieMap::default(),
@@ -1014,14 +1018,14 @@ impl crate::sem::ConflictInfoRead for SchemaCatalog {
 }
 
 impl crate::sem::ViewInsertInfoRead for SchemaCatalog {
-    fn view_insert_support(&self, _view: &FullName) -> crate::sem::ViewInsertSupport {
-        todo!("catalog writable-view columns, INSTEAD OF INSERT triggers and rules")
+    fn view_insert_support(&self, view: &FullName) -> crate::sem::ViewInsertSupport {
+        crate::sem::view_write::insert_support(self, view)
     }
 }
 
 impl crate::sem::ViewUpdateInfoRead for SchemaCatalog {
-    fn view_update_support(&self, _view: &crate::sem::FullName) -> crate::sem::ViewUpdateSupport {
-        todo!("catalog writable-view columns, INSTEAD OF UPDATE triggers and rules")
+    fn view_update_support(&self, view: &crate::sem::FullName) -> crate::sem::ViewUpdateSupport {
+        crate::sem::view_write::update_support(self, view)
     }
 }
 

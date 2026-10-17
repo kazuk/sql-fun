@@ -5,7 +5,12 @@ It writes `schema.sql`, catalog JSON files, and `metadata.json` to the directory
 you specify. Outputs include `collations.json` and `operator_classes.json` for
 collation and index operator-class definitions. Docker extraction also exports
 and imports the server installation's
-extension SQL and control files.
+extension SQL and control files. Extracted builtin views retain their options,
+column defaults and write rules/triggers. Function metadata distinguishes scalar,
+aggregate/window and set-returning functions so view-write analysis can reject
+row-expanding projections. Refresh older builtin generations before relying on
+these view-write capabilities. Application views and their declarations still
+come from your explicitly selected schema inputs.
 
 These commands produce candidate generations in a working directory.
 `$SQL_FUN_HOME` contains installed state; it is not an extraction workspace.

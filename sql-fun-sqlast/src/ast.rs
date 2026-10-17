@@ -24,6 +24,7 @@ mod sqlite_retention;
 #[cfg(test)]
 mod tests;
 mod validation;
+mod view_write;
 
 pub use self::deparse::DeparseError;
 pub use self::mutation::{AstMutationError, CteDefinition, HaveWithClause, WithClauseMut};
@@ -217,6 +218,7 @@ pub(crate) enum StatementNode {
     Update(Update),
     Delete(Delete),
     View(View),
+    ViewWrite(view_write::WriteDeclaration),
     Extension(Extension),
     VariableSet(VariableSet),
     EnumType(EnumType),
@@ -250,6 +252,10 @@ impl StatementNode {
 
     const fn delete(value: Delete) -> Self {
         Self::Delete(value)
+    }
+
+    const fn view_write(value: view_write::WriteDeclaration) -> Self {
+        Self::ViewWrite(value)
     }
 
     const fn view(value: View) -> Self {
@@ -334,6 +340,9 @@ impl StatementNode {
             Self::Delete(delete) => delete
                 .resolve(context)
                 .map(|delete| crate::sem::SemAst::delete(&delete)),
+            Self::ViewWrite(_) => crate::sem::AnalysisError::raise_unexpected_input(
+                "view write declaration requires catalog application",
+            ),
             Self::View(_) => crate::sem::AnalysisError::raise_unexpected_input(
                 "view requires catalog application",
             ),
@@ -399,6 +408,7 @@ impl StatementNode {
         context.set_parameter_constraints(&crate::sem::ParameterConstraints::default());
         match self {
             Self::View(view) => view.resolve_and_apply(context),
+            Self::ViewWrite(change) => change.resolve_and_apply(context),
             Self::Extension(extension) => extension.apply(context),
             Self::VariableSet(variable_set) => variable_set.resolve_and_apply(context),
             Self::EnumType(enum_type) => enum_type.apply(context),
@@ -848,16 +858,27 @@ impl View {
         TContext: crate::sem::ParseContext,
     {
         let mut context = context;
+        let name = self.write_name(&context)?;
+        if context.get_view_impl(&name).is_some() {
+            if self.if_not_exists {
+                return Ok(crate::AstAndContextPair::new(
+                    crate::sem::SemAst::unresolved_statement(),
+                    context,
+                ));
+            }
+            if !self.replace {
+                return crate::sem::AnalysisError::raise_unexpected_input("view already exists");
+            }
+        }
         let outcome = self.query.resolve(&mut context);
-        let query = outcome?;
-        let view = crate::sem::CreateView::new(
-            &self.name.full_name()?,
-            &query,
-            &[],
-            &None,
-            self.materialized,
-        );
-        let context = context.apply_create_view(&view)?;
+        let mut query = outcome?;
+        query.rename_columns(&self.aliases);
+        let name = self.write_name(&context)?;
+        let info = self.write_info(&context, &query)?;
+        let view = crate::sem::CreateView::new(&name, &query, &[], &None, self.materialized);
+        let context = context
+            .apply_create_view(&view)?
+            .apply_view_write_info(&name, &info)?;
         Ok(crate::AstAndContextPair::new(
             crate::sem::SemAst::CreateView(view),
             context,

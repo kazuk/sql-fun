@@ -99,6 +99,16 @@ mod test_function_param_display {
 }
 
 impl FunctionParam {
+    pub(crate) fn is_input(&self) -> bool {
+        match self {
+            Self::In(parameter) => parameter.is_input_param(),
+            Self::InOut(parameter) => parameter.is_input_param(),
+            Self::Variadic(parameter) => parameter.is_input_param(),
+            Self::Out(parameter) => parameter.is_input_param(),
+            Self::Table(parameter) => parameter.is_input_param(),
+        }
+    }
+
     pub(crate) fn new_in_out_param(
         name: &Option<String>,
         param_type: &Option<TypeReference>,

@@ -26,6 +26,29 @@ impl Update {
         });
         context.finish_analysis(result)
     }
+    fn validate_view_trigger(
+        &self,
+        context: &mut impl ParseContext,
+        table: &UpdateDestination,
+    ) -> Result<(), AnalysisError> {
+        if let Some(support) = table.view_support() {
+            let columns: Vec<_> = self
+                .assignments
+                .iter()
+                .map(|assignment| ColumnName::from(assignment.name.as_str()))
+                .collect();
+            if !support.accepts_assignments(&columns) {
+                context.report_analysis_problem(AnalysisProblem::update(
+                    UpdateProblemKind::view_operation(),
+                    "SET targets do not activate an INSTEAD OF UPDATE trigger",
+                ))?;
+                return Err(AnalysisError::unexpected_input_error(
+                    "no matching view UPDATE trigger",
+                ));
+            }
+        }
+        Ok(())
+    }
     pub(super) fn resolve_in(
         &self,
         context: &mut impl ParseContext,
@@ -34,6 +57,7 @@ impl Update {
         let requested = TableName::from(self.relation.name.full_name()?);
         let table = self.resolve_destination(context, &requested)?;
         self.validate_index_hint(context, &table)?;
+        self.validate_view_trigger(context, &table)?;
         let with = self.with.resolve(context, outer)?;
         let alias = self
             .relation
@@ -165,7 +189,14 @@ impl Update {
         let mut seen: Vec<&Assignment> = Vec::new();
         for assignment in &self.assignments {
             if context.dialect() == Dialect::postgres()
-                && seen.iter().any(|previous| previous.overlaps(assignment))
+                && seen.iter().any(|previous| {
+                    assignment.overlaps_mapped(previous, |name| {
+                        table.view_support().map_or_else(
+                            || name.clone(),
+                            |support| support.assignment_column(name).clone(),
+                        )
+                    })
+                })
             {
                 context.report_analysis_problem(AnalysisProblem::update(
                     UpdateProblemKind::duplicate_target(),
@@ -196,6 +227,13 @@ impl Update {
                 destination = access.resolve(context, scope, destination)?;
             }
             let value = assignment.resolve_update_value(context, scope)?;
+            if value.is_default()
+                && table
+                    .view_support()
+                    .is_some_and(|support| !support.can_assign_default(&column_name))
+            {
+                context.report_analysis_problem(AnalysisProblem::update(UpdateProblemKind::default_target(), "view rewriting expands DEFAULT before the base generated/identity assignment check"))?;
+            }
             assignment.validate_update_value(context, column, &value)?;
             assignments.push(UpdateAssignment::new(column, &destination, &value));
         }

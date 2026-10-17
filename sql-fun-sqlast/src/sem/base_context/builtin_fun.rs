@@ -27,6 +27,30 @@ struct PgFunctionProto {
     args: Vec<String>,
     ret: String,
     is_strict: bool,
+    #[serde(default)]
+    kind: Option<String>,
+    #[serde(default)]
+    returns_set: Option<bool>,
+}
+
+impl PgFunctionProto {
+    fn preserves_view_rows(&self) -> bool {
+        let (Some(kind), Some(returns_set)) = (&self.kind, self.returns_set) else {
+            todo!("builtin function kind/returns_set extraction metadata");
+        };
+        kind == "f" && !returns_set
+    }
+    fn matches_input_signature(&self, overload: &OverloadVariant) -> bool {
+        let input: Vec<_> = overload
+            .params()
+            .iter()
+            .filter(|parameter| parameter.is_input())
+            .collect();
+        self.args.len() == input.len()
+            && self.args.iter().zip(input).all(|(name, parameter)| {
+                parameter.get_type() == Some(&TypeReference::from_master_type_name(name))
+            })
+    }
 }
 
 #[derive(Debug, serde::Deserialize)]
@@ -150,6 +174,34 @@ pub struct PgBuiltInFunctions {
 }
 
 impl PgBuiltInFunctions {
+    pub(super) fn preserves_view_rows(&self, name: &FullName, overload: &OverloadVariant) -> bool {
+        let definitions = self
+            .function_by_name
+            .get(name.name().as_str())
+            .expect("bound builtin function");
+        // PostgreSQL's masters currently give every overload of a name the
+        // same row-preservation property (including polymorphic signatures).
+        // Keep an exact-signature path for future mixed-property overloads.
+        let mut common = None;
+        let mut uniform = true;
+        for definition in definitions {
+            let preserves = definition.preserves_view_rows();
+            if common.is_some_and(|old| old != preserves) {
+                uniform = false;
+            }
+            common = Some(preserves);
+        }
+        if uniform {
+            return common.expect("builtin has overloads");
+        }
+        for definition in definitions {
+            if definition.matches_input_signature(overload) {
+                return definition.preserves_view_rows();
+            }
+        }
+        todo!("builtin function properties for selected polymorphic overload")
+    }
+
     pub(super) fn load_from<P: AsRef<Path>, P2: AsRef<Path>>(
         path: P,
         details_path: P2,

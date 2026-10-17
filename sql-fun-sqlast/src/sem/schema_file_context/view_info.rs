@@ -23,6 +23,25 @@ impl ViewInformationCollection {
 }
 
 impl ViewInfoRead for SchemaCatalog {
+    fn view_trigger_target(&self, trigger: &FullName) -> Option<FullName> {
+        for (_, info) in self.view_writes.iter() {
+            if info.has_trigger(trigger) {
+                return Some(info.name().clone());
+            }
+        }
+        let target = self.base.view_trigger_target(trigger)?;
+        self.view_write_info(&target)
+            .filter(|info| info.has_trigger(trigger))
+            .map(|_| target)
+    }
+
+    fn view_write_info(&self, view: &FullName) -> Option<&crate::sem::ViewWriteInfo> {
+        if let Some(info) = self.view_writes.get(&view.to_string()) {
+            Some(info)
+        } else {
+            self.base.view_write_info(view)
+        }
+    }
     fn get_view_impl(&self, key: &FullName) -> Option<&ViewLike> {
         if let Some(v) = self.views.get(key) {
             Some(v)
@@ -33,6 +52,31 @@ impl ViewInfoRead for SchemaCatalog {
 }
 
 impl ViewInfoWrite for SchemaFileContext {
+    fn apply_view_write_info(
+        mut self,
+        view: &FullName,
+        info: &crate::sem::ViewWriteInfo,
+    ) -> Result<Self, AnalysisError> {
+        self.catalog
+            .view_writes
+            .insert(&view.to_string(), info.clone());
+        Ok(self)
+    }
+    fn apply_view_write_change(
+        mut self,
+        change: &crate::sem::ViewWriteChange,
+    ) -> Result<Self, AnalysisError> {
+        let mut info = self
+            .view_write_info(change.view())
+            .cloned()
+            .expect("bound view write metadata");
+        info.apply(change)?;
+        self.catalog
+            .view_writes
+            .insert(&change.view().to_string(), info);
+        Ok(self)
+    }
+
     #[tracing::instrument(skip(self))]
     fn apply_alter_view(mut self, alter_view: &AlterView) -> Result<Self, AnalysisError>
     where

@@ -127,6 +127,8 @@ mod test_statement_analyze {
 /// Parser-independent statement category.
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
 pub enum StatementKind {
+    /// A trigger/rule declaration used by writable-view schema analysis.
+    ViewWrite,
     /// SELECT, VALUES, or a set operation.
     Query,
     /// INSERT.
@@ -174,6 +176,9 @@ pub enum StatementKind {
 }
 
 impl StatementKind {
+    const fn view_write() -> Self {
+        Self::ViewWrite
+    }
     /// The query category.
     pub const fn query() -> Self {
         Self::Query
@@ -293,6 +298,7 @@ impl StatementNode {
             Self::Update(_) => StatementKind::update(),
             Self::Delete(_) => StatementKind::delete(),
             Self::View(_) => StatementKind::view(),
+            Self::ViewWrite(_) => StatementKind::view_write(),
             Self::Extension(_) => StatementKind::extension(),
             Self::VariableSet(_) => StatementKind::variable_set(),
             Self::EnumType(_) => StatementKind::enum_type(),

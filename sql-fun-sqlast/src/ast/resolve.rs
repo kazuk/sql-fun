@@ -367,7 +367,10 @@ impl OperatorKind {
 
 impl TypeName {
     fn reference(&self) -> Result<TypeReference, AnalysisError> {
-        Ok(TypeReference::from_full_name(self.name.full_name()?))
+        Ok(TypeReference::concrete_type_ref(
+            &self.name.full_name()?,
+            !self.array_bounds.is_empty(),
+        ))
     }
 }
 

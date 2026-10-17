@@ -150,6 +150,12 @@ impl TestParseContext {
 }
 
 impl ViewInfoRead for TestParseContext {
+    fn view_trigger_target(&self, _trigger: &FullName) -> Option<FullName> {
+        None
+    }
+    fn view_write_info(&self, _view: &FullName) -> Option<&crate::sem::ViewWriteInfo> {
+        None
+    }
     fn get_view_impl(&self, key: &FullName) -> Option<&ViewLike> {
         if let Some(v) = self.view_definitions.get(key) {
             v.as_ref()
@@ -160,6 +166,19 @@ impl ViewInfoRead for TestParseContext {
 }
 
 impl ViewInfoWrite for TestParseContext {
+    fn apply_view_write_info(
+        self,
+        _view: &FullName,
+        _info: &crate::sem::ViewWriteInfo,
+    ) -> Result<Self, AnalysisError> {
+        todo!()
+    }
+    fn apply_view_write_change(
+        self,
+        _change: &crate::sem::ViewWriteChange,
+    ) -> Result<Self, AnalysisError> {
+        todo!()
+    }
     fn apply_alter_view(self, _alter_table: &AlterView) -> Result<Self, AnalysisError> {
         todo!()
     }
@@ -318,6 +337,14 @@ impl OperatorInfoRead for TestParseContext {
 }
 
 impl FunctionInfoRead for TestParseContext {
+    fn function_preserves_view_rows(
+        &self,
+        _name: &FullName,
+        _overload: &crate::sem::OverloadVariant,
+    ) -> bool {
+        todo!("mock function-kind properties")
+    }
+
     fn get_function_impl(&self, name: &FullName) -> Option<FunctionOverloadCollection> {
         self.function_definitions.get(name).cloned()
     }
@@ -416,6 +443,14 @@ impl SequenceInfoWrite for TestParseContext {
 }
 
 impl FunctionInfoWrite for TestParseContext {
+    fn apply_function_view_rows(
+        self,
+        _function: &CreateFunction,
+        _preserves_rows: bool,
+    ) -> Result<Self, AnalysisError> {
+        todo!()
+    }
+
     fn apply_create_function_impl(
         self,
         _name: &FullName,

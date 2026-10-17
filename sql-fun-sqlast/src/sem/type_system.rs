@@ -51,6 +51,16 @@ pub struct OverloadVariant {
 }
 
 impl OverloadVariant {
+    pub(crate) fn input_bindings(&self) -> ArgumentBindingCollection {
+        let mut arguments = ArgumentBindingCollection::default();
+        for parameter in &self.params {
+            if parameter.is_input() {
+                arguments.push(parameter.get_type().cloned());
+            }
+        }
+        arguments
+    }
+
     /// apply simple infer result
     pub fn apply_simple_infer_result(&mut self, infer_result_type: &TypeReference) {
         if let Some(t) = self.ret_type.as_mut() {

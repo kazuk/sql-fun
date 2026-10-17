@@ -37,6 +37,23 @@ are extraction inputs. The pinned integration images define the official
 reproduction environment. Verify both payload and metadata against committed
 artifacts in the installed-binary CI job.
 
+## Function row properties
+
+Each `functions.json` overload additionally records `kind` (`pg_proc.prokind`)
+and `returns_set` (`pg_proc.proretset`). View-write analysis uses these source
+facts to disqualify aggregate/window/set-returning projections without changing
+the readable function-signature model. Regenerate older masters before using
+function-containing writable views; missing properties remain explicitly
+unimplemented at that provider boundary. Builtin view rendering additionally
+retains reloptions, column defaults and
+bootstrap trigger/rule declarations. Rule targets are explicitly qualified; the
+extractor checks the supported server deparser prefix before replacing it. These
+facts use the existing typed identifier/fragment rendering contract and are
+limited to the already selected bootstrap views and bootstrap object OIDs.
+Scope and format version remain unchanged. The installed extraction integration
+harness verifies the fields
+for scalar, aggregate and set-returning functions on both supported versions.
+
 ## Additive master definitions
 
 Format 1 additionally produces `collations.json` and `operator_classes.json`.

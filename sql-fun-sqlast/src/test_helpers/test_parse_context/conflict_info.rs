@@ -5,6 +5,9 @@ use crate::sem::{
 };
 
 impl TestParseContext {
+    pub(crate) fn expect_conflict_target(&mut self, target: &TableName) {
+        self.expected_conflict_target = Some(target.clone());
+    }
     pub(crate) fn set_collation_lookup(&mut self, name: &FullName, result: &CatalogNameLookup) {
         self.collation_results.insert(name.clone(), result.clone());
     }
@@ -44,7 +47,11 @@ impl ConflictInfoRead for TestParseContext {
         conflict: &InsertConflict,
     ) -> Result<Vec<InsertArbiter>, AnalysisError> {
         if let Some(expected) = &self.expected_conflict_modifiers {
-            assert_eq!(table.full_name(), &FullName::with_schema("public", "items"));
+            if let Some(expected) = &self.expected_conflict_target {
+                assert_eq!(table, expected);
+            } else {
+                assert_eq!(table.full_name(), &FullName::with_schema("public", "items"));
+            }
             assert_eq!(
                 conflict.modifiers(),
                 expected,

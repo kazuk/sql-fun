@@ -1,7 +1,12 @@
 mod arbiter;
+mod destination;
+mod view_support;
+
 pub use self::arbiter::{
     InsertArbiter, InsertArbiterLookup, InsertConstraintKind, InsertConstraintLookup,
 };
+pub(crate) use self::destination::InsertDestination;
+pub use self::view_support::{ViewInsertInfoRead, ViewInsertSupport};
 
 use crate::ast::TryFromWithTokens;
 use crate::sem::traversal::SemanticVisitor;
@@ -14,6 +19,7 @@ use crate::sem::{
 #[derive(Debug, Clone, Eq, Hash, PartialEq, serde::Serialize, serde::Deserialize)]
 pub struct InsertStatement {
     target: TableName,
+    view_support: Option<ViewInsertSupport>,
     columns: Vec<InsertTarget>,
     source: InsertSource,
     with: Vec<QueryCte>,
@@ -32,6 +38,7 @@ impl InsertStatement {
     ) -> Self {
         Self {
             target: target.clone(),
+            view_support: None,
             columns,
             source,
             with,
@@ -51,7 +58,14 @@ impl InsertStatement {
         self.overriding = overriding;
         self.or_conflict = or_conflict;
     }
-    /// Catalog identity of the writable destination.
+    pub(crate) fn set_view_support(&mut self, support: Option<&ViewInsertSupport>) {
+        self.view_support = support.cloned();
+    }
+    /// Catalog capability retained for a view destination; absent for a table.
+    pub const fn view_support(&self) -> Option<&ViewInsertSupport> {
+        self.view_support.as_ref()
+    }
+    /// Catalog identity of the destination relation (table or view).
     pub const fn target(&self) -> &TableName {
         &self.target
     }

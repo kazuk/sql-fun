@@ -105,6 +105,9 @@ pub trait ConflictInfoRead {
     /// identities. Respect collation, operator-family/input-type equivalence,
     /// partial predicate implication, and dialect-specific matching rules.
     /// Failed modifier lookups must never yield a successful arbiter binding.
+    /// The destination identity can denote a writable view. Apply the dialect's
+    /// view rewrite mapping and return actual underlying arbiter identities;
+    /// do not assume every writable view exposes its base relation's indexes.
     fn infer_conflict_arbiters(
         &self,
         table: &TableName,
@@ -119,6 +122,9 @@ pub(crate) fn infer_from_catalog(
     table: &TableName,
     conflict: &InsertConflict,
 ) -> Result<Vec<InsertArbiter>, AnalysisError> {
+    if context.get_table(table).is_none() {
+        todo!("catalog view conflict-arbiter mapping");
+    }
     if conflict.has_modifiers() {
         todo!("catalog index modifier eligibility metadata");
     }

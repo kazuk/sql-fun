@@ -26,6 +26,7 @@ use std::collections::{HashMap, HashSet};
 pub struct TestParseContext {
     collation_results: HashMap<FullName, crate::sem::CatalogNameLookup>,
     operator_class_results: HashMap<(FullName, String), crate::sem::CatalogNameLookup>,
+    expected_conflict_target: Option<TableName>,
     expected_conflict_modifiers: Option<Vec<crate::sem::InsertInferenceModifiers>>,
     conflict_arbiters: Vec<crate::sem::InsertArbiter>,
     metadata: Option<::sql_fun_core::SqlFunMetadata>,
@@ -36,6 +37,7 @@ pub struct TestParseContext {
     type_definitions: HashMap<FullName, TypeDefinition>,
     table_definitions: HashMap<FullName, Option<CreateTable>>,
     view_definitions: HashMap<FullName, Option<ViewLike>>,
+    view_insert_support: HashMap<FullName, crate::sem::ViewInsertSupport>,
     function_definitions: HashMap<FullName, FunctionOverloadCollection>,
     alter_tables: Vec<AlterTable>,
     drop_tables: Vec<DropTable>,
@@ -542,5 +544,24 @@ impl TestParseContext {
             syn.as_select_stmt().get_from_clause(),
             &sql_fun_core::IVec::default(),
         )
+    }
+}
+
+impl TestParseContext {
+    pub(crate) fn set_view_insert_support(
+        &mut self,
+        name: &FullName,
+        support: &crate::sem::ViewInsertSupport,
+    ) {
+        self.view_insert_support
+            .insert(name.clone(), support.clone());
+    }
+}
+impl crate::sem::ViewInsertInfoRead for TestParseContext {
+    fn view_insert_support(&self, view: &FullName) -> crate::sem::ViewInsertSupport {
+        self.view_insert_support
+            .get(view)
+            .expect("explicit view INSERT capability fixture")
+            .clone()
     }
 }

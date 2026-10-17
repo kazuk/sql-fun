@@ -262,6 +262,15 @@ macro_rules! forward_catalog_reads {
             }
         }
 
+        impl crate::sem::ViewInsertInfoRead for $context {
+            fn view_insert_support(
+                &self,
+                name: &crate::sem::FullName,
+            ) -> crate::sem::ViewInsertSupport {
+                crate::sem::ViewInsertInfoRead::view_insert_support(self.$catalog(), name)
+            }
+        }
+
         impl crate::sem::ViewInfoRead for $context {
             fn get_view_impl(&self, name: &crate::sem::FullName) -> Option<&crate::sem::ViewLike> {
                 crate::sem::ViewInfoRead::get_view_impl(self.$catalog(), name)

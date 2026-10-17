@@ -89,7 +89,8 @@ Modifier-aware arbiter eligibility and general partial-index predicate implicati
 still require additional catalog services and can terminate analysis at their
 catalog boundary. Their implementation and production INSERT end-to-end
 verification remain tracked in [#581](https://github.com/kazuk/sql-fun/issues/581).
-Master lookup support alone does not establish those INSERT capabilities. DO UPDATE remains explicitly
+Master lookup support alone does not establish those INSERT capabilities.
+DO UPDATE remains explicitly
 unimplemented
 ([#474](https://github.com/kazuk/sql-fun/issues/474)); it does not produce a
 successful INSERT analysis, including later actions in SQLite UPSERT chains.

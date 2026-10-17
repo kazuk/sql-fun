@@ -4,6 +4,7 @@ mod cte;
 mod group;
 mod join_expr;
 mod join_kind;
+mod projection;
 mod resolved;
 mod rows_fun;
 mod sub_query;

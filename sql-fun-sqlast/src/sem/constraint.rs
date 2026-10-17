@@ -38,6 +38,25 @@ pub enum Constraint {
 }
 
 impl Constraint {
+    pub(crate) fn unique_key_columns(&self) -> Vec<crate::sem::ColumnName> {
+        match self {
+            Self::PrimaryKey(key) => key.keys().to_vec(),
+            Self::Unique(key) => key.key_columns(),
+            Self::Foreign(_) => Vec::new(),
+        }
+    }
+
+    pub(crate) fn matches_unique_columns(&self, columns: &[crate::sem::ColumnName]) -> bool {
+        match self {
+            Self::PrimaryKey(key) => {
+                key.keys().len() == columns.len()
+                    && key.keys().iter().all(|name| columns.contains(name))
+            }
+            Self::Unique(key) => key.matches_columns(columns),
+            Self::Foreign(_) => false,
+        }
+    }
+
     pub(crate) fn primary_key(value: &PrimaryKeyConstraint) -> Self {
         Self::PrimaryKey(value.clone())
     }

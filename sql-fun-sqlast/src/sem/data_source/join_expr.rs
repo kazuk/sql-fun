@@ -135,3 +135,46 @@ impl JoinExprDataSource {
         Ok(())
     }
 }
+
+impl JoinExprDataSource {
+    pub(super) fn projection_names(
+        &self,
+        context: &impl crate::sem::ParseContext,
+        with: &WithClause,
+    ) -> Result<Vec<(AliasName, ColumnName)>, crate::sem::AnalysisError> {
+        let left = self.left.projection_names(context, with, None)?;
+        let right = self.right.projection_names(context, with, None)?;
+        let merged = if let Some(using) = &self.using_clause {
+            using.using_columns.clone()
+        } else if self.natural {
+            left.iter()
+                .filter(|(_, name)| right.iter().any(|(_, other)| name == other))
+                .map(|(_, name)| name.clone())
+                .collect()
+        } else {
+            Vec::new()
+        };
+        if merged.is_empty() {
+            return Ok(left.into_iter().chain(right).collect());
+        }
+        self.kind.require_projectable_merged_columns();
+        let mut columns = Vec::new();
+        if context.dialect() == crate::ast::Dialect::postgres() {
+            for name in &merged {
+                let source = if self.kind.uses_right_join_column() {
+                    &right
+                } else {
+                    &left
+                };
+                if let Some(column) = source.iter().find(|(_, column)| column == name) {
+                    columns.push(column.clone());
+                }
+            }
+            columns.extend(left.into_iter().filter(|(_, name)| !merged.contains(name)));
+        } else {
+            columns.extend(left);
+        }
+        columns.extend(right.into_iter().filter(|(_, name)| !merged.contains(name)));
+        Ok(columns)
+    }
+}

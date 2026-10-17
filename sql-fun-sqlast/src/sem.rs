@@ -91,7 +91,11 @@ pub use self::{
     error::AnalysisError,
     from_clause::FromClause,
     frozen_base_context::FrozenBaseContext,
-    insert_statement::{InsertStatement, analyze_insert_statement},
+    insert_statement::{
+        InsertArbiter, InsertArbiterLookup, InsertConflict, InsertConstraintKind,
+        InsertConstraintLookup, InsertSource, InsertStatement, InsertTarget, InsertValue,
+        analyze_insert_statement,
+    },
     names::{CatalogName, FullName, LocalName, OperatorName, SchemaName, ValidOperatorName},
     operators::{BinaryOperatorDefinition, OperatorDefinition, UnaryOperatorDefinition},
     parameter_constraints::{InputTypeConstraint, ParameterConstraint, ParameterConstraints},
@@ -116,7 +120,7 @@ pub use self::{
         SubQueryColumnRef, TableColumnRef, TypeCastExpr,
     },
     schema_file_context::SchemaFileContext,
-    select_statement::SelectStatement,
+    select_statement::{ResultColumnCollection, SelectStatement},
     type_system::{FunctionOverloadCollection, FunctionParam, OverloadVariant},
     update_statement::{UpdateStatement, analyze_update_statement},
     variable_set::{VariableSet, analyze_variable_set},
@@ -132,7 +136,7 @@ pub(crate) use self::{
     data_source::{AliasName, JoinUsingClause},
     parameter_constraints::{ConstraintGraph, SignatureAlternative},
     scalar_expr::{CaseExprAnalysisContext, CoalesceAnalysis},
-    select_statement::{ResultColumnCollection, SelectStatementNode},
+    select_statement::SelectStatementNode,
     stack::with_stack,
 };
 
@@ -352,6 +356,18 @@ impl SemAst {
             Self::AlterView(view) => context.apply_alter_view(view),
             Self::AlterSequence(sequence) => context.apply_alter_sequence(sequence),
             _ => AnalysisError::raise_unexpected_input("alter relation result"),
+        }
+    }
+
+    pub(crate) fn insert(insert: &InsertStatement) -> Self {
+        Self::InsertStatement(insert.clone())
+    }
+
+    /// Inspect an analyzed INSERT.
+    pub const fn as_insert(&self) -> Option<&InsertStatement> {
+        match self {
+            Self::InsertStatement(insert) => Some(insert),
+            _ => None,
         }
     }
 

@@ -654,14 +654,15 @@ impl SemanticQuery {
     pub fn locks(&self) -> &[QueryLock] {
         &self.locks
     }
-    pub(crate) fn walk<V: SemanticVisitor>(
+    pub(crate) fn walk_assigned<V: SemanticVisitor>(
         &mut self,
         visitor: &mut V,
+        targets: &[crate::sem::InsertTarget],
     ) -> Result<(), AnalysisError> {
         for entry in &mut self.with {
             entry.walk(visitor)?;
         }
-        self.body.walk_body(visitor)?;
+        self.body.walk_body_assigned(visitor, targets)?;
         for order in &mut self.order {
             order.walk(visitor)?;
         }
@@ -706,13 +707,17 @@ impl SemanticValues {
     pub(crate) fn rename(&mut self, names: &[String]) {
         self.columns.rename(names);
     }
-    pub(crate) fn walk<V: SemanticVisitor>(
+    pub(crate) fn walk_assigned<V: SemanticVisitor>(
         &mut self,
         visitor: &mut V,
+        targets: &[crate::sem::InsertTarget],
     ) -> Result<(), AnalysisError> {
         for (row_index, row) in self.rows.iter_mut().enumerate() {
             for (index, value) in row.iter_mut().enumerate() {
                 value.walk(visitor)?;
+                if let Some(target) = targets.get(index) {
+                    visitor.assignment(value, target)?;
+                }
                 if row_index == 0 {
                     let column = self
                         .columns
@@ -769,7 +774,10 @@ impl QueryCte {
     pub const fn statement(&self) -> &crate::sem::CteStatement {
         &self.statement
     }
-    fn walk<V: SemanticVisitor>(&mut self, visitor: &mut V) -> Result<(), AnalysisError> {
+    pub(crate) fn walk<V: SemanticVisitor>(
+        &mut self,
+        visitor: &mut V,
+    ) -> Result<(), AnalysisError> {
         self.statement.walk(visitor)?;
         visitor.cte(&self.name);
         Ok(())

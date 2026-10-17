@@ -175,6 +175,20 @@ impl Select {
         let predicate = Expr::resolve_optional(&self.predicate, context, &scope)?;
         let mut results = ResultColumnCollection::default();
         for target in &self.targets {
+            if let Expr::Star(name) = &target.expression {
+                let qualifier = name.star_qualifier()?;
+                let columns = from.projection_names(context, with, qualifier.as_ref())?;
+                if columns.is_empty() {
+                    context.report_analysis_problem(AnalysisProblem::query(
+                        crate::sem::problem::QueryProblem::reference_not_found("star source"),
+                    ))?;
+                }
+                for (alias, column) in columns {
+                    let expression = scope.resolve_column(context, Some(&alias), &column)?.0;
+                    results.push_expression(&column, expression);
+                }
+                continue;
+            }
             let expression = target.expression.resolve_in(context, &scope)?;
             let name = target
                 .alias
@@ -220,7 +234,7 @@ impl Select {
 }
 
 impl With {
-    fn local_definitions(&self, mut visible: WithClause) -> Vec<crate::sem::QueryCte> {
+    pub(super) fn local_definitions(&self, mut visible: WithClause) -> Vec<crate::sem::QueryCte> {
         let mut local = Vec::new();
         for entry in &self.entries {
             if let Some(statement) = visible.take(&entry.name) {
@@ -234,7 +248,7 @@ impl With {
         }
         local
     }
-    fn resolve(
+    pub(super) fn resolve(
         &self,
         context: &mut impl ParseContext,
         outer: Option<&ScalarAnalysisContext<'_>>,
@@ -243,6 +257,7 @@ impl With {
             .map(ScalarAnalysisContext::inherited_ctes)
             .unwrap_or_default();
         for entry in &self.entries {
+            entry.body.require_insert_placement(outer.is_none())?;
             let from = FromClause::default();
             let scope = ScalarAnalysisContext::nested(&with, &from, outer);
             let body = entry.body.resolve(context, &scope, &entry.column_names())?;
@@ -265,7 +280,20 @@ impl CteBody {
                 query.rename_columns(columns);
                 Ok(CteStatement::from_query(query))
             }
-            Self::Insert(_) => todo!(),
+            Self::Insert(insert) => {
+                if context.dialect() == Dialect::sqlite() {
+                    return AnalysisError::raise_unexpected_input("SQLite INSERT CTE");
+                }
+                let mut insert = insert.resolve_in(context, Some(scope))?;
+                if columns.len() > insert.result_columns().len() {
+                    context.report_analysis_problem(AnalysisProblem::insert(
+                        crate::sem::problem::InsertProblemKind::cte_aliases(),
+                        "INSERT CTE has more column aliases than RETURNING columns",
+                    ))?;
+                }
+                insert.rename_columns(columns);
+                Ok(CteStatement::from_insert(insert))
+            }
             Self::Update(_) => todo!(),
             Self::Delete(_) => todo!(),
             Self::Merge(_) => AnalysisError::raise_unexpected_none("common_table_expr.query"),
@@ -274,7 +302,7 @@ impl CteBody {
 }
 
 impl Alias {
-    fn resolve(&self) -> AliasSpec {
+    pub(super) fn resolve(&self) -> AliasSpec {
         AliasSpec::from_names(&self.name, &self.columns)
     }
 }

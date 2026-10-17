@@ -45,6 +45,10 @@ impl AliasSpec {
         }
     }
 
+    pub(crate) fn derived_column_at(&self, index: usize) -> Option<&ColumnName> {
+        self.derived_column_names.get(index)
+    }
+
     /// get alias name
     #[must_use]
     pub const fn name(&self) -> &AliasName {

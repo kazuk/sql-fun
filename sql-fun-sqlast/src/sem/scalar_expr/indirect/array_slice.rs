@@ -131,3 +131,17 @@ impl ArraySlice {
                 .is_some_and(SemScalarExpr::needs_type_inference)
     }
 }
+
+impl ArraySlice {
+    pub(super) fn walk_assignment_target<V: crate::sem::traversal::SemanticVisitor>(
+        &mut self,
+        visitor: &mut V,
+    ) -> Result<(), AnalysisError> {
+        self.array.walk_assignment_target(visitor)?;
+        for index in [&mut self.lower, &mut self.upper].into_iter().flatten() {
+            index.walk(visitor)?;
+            visitor.subscript(index);
+        }
+        Ok(())
+    }
+}

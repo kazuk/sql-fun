@@ -16,6 +16,14 @@ pub struct UniqueConstraint {
 }
 
 impl UniqueConstraint {
+    pub(crate) fn key_columns(&self) -> Vec<ColumnName> {
+        self.keys.iter().cloned().collect()
+    }
+
+    pub(crate) fn matches_columns(&self, columns: &[ColumnName]) -> bool {
+        self.keys.len() == columns.len() && self.keys.iter().all(|name| columns.contains(name))
+    }
+
     pub(crate) fn new(name: &str, table: &TableName, keys: &[ColumnName]) -> Self {
         Self {
             name: name.to_owned(),

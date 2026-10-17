@@ -100,3 +100,11 @@ impl JoinKind {
         }
     }
 }
+
+impl JoinKind {
+    pub(super) fn require_projectable_merged_columns(&self) {
+        if matches!(self, Self::Full) {
+            todo!("FULL JOIN merged-column expressions in star projection");
+        }
+    }
+}

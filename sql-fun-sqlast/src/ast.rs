@@ -325,7 +325,9 @@ impl StatementNode {
             Self::Query(query) => query
                 .resolve(context)
                 .map(|query| crate::sem::SemAst::select(&query)),
-            Self::Insert(_) => todo!(),
+            Self::Insert(insert) => insert
+                .resolve(context)
+                .map(|insert| crate::sem::SemAst::insert(&insert)),
             Self::Update(_) => todo!(),
             Self::Delete(_) => todo!(),
             Self::View(_) => crate::sem::AnalysisError::raise_unexpected_input(

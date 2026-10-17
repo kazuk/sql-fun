@@ -7,6 +7,20 @@ use crate::sem::{
 use super::SchemaCatalog;
 
 impl CastInfoRead for SchemaCatalog {
+    fn get_assignment_cast(
+        &self,
+        source: &TypeReference,
+        target: &TypeReference,
+    ) -> Option<CastDefinition> {
+        if let Some(cast) = self.get_explicit_cast(source, target)
+            && cast.context().use_in_assignment()
+        {
+            Some(cast)
+        } else {
+            self.base.get_assignment_cast(source, target)
+        }
+    }
+
     fn cast_sources(&self, target: &TypeReference, explicit: bool) -> HashSet<TypeReference> {
         let mut sources = self.base.cast_sources(target, explicit);
         for (name, _) in self.casts.iter() {

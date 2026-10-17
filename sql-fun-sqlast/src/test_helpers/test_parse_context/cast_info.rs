@@ -55,10 +55,14 @@ impl CastInfoRead for TestParseContext {
 
     fn get_explicit_cast(
         &self,
-        _source_type: &TypeReference,
-        _target_type: &TypeReference,
+        source_type: &TypeReference,
+        target_type: &TypeReference,
     ) -> Option<CastDefinition> {
-        todo!()
+        self.implicit_cast_results
+            .get(source_type)?
+            .get(target_type)
+            .cloned()
+            .flatten()
     }
 
     fn get_implicit_cast(

@@ -188,6 +188,17 @@ mod test_schema_file_context {
 }
 
 impl IndexInfoRead for SchemaCatalog {
+    fn indexes_for_table(&self, table: &crate::sem::TableName) -> Vec<&CreateIndex> {
+        let mut indexes = self.base.indexes_for_table(table);
+        indexes.retain(|index| !self.indexes.contains(&index.name().to_string()));
+        indexes.extend(
+            self.indexes
+                .iter()
+                .map(|(_, index)| index)
+                .filter(|index| index.belongs_to(table)),
+        );
+        indexes
+    }
     fn get_index_impl(&self, index_name: &FullName) -> Option<&CreateIndex> {
         if let Some(index) = self.indexes.get(&index_name.to_string()) {
             Some(index)

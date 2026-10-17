@@ -1,5 +1,6 @@
 #![doc= include_str!("problem.md")]
 
+mod insert;
 mod name_resolution;
 mod overload_resolution;
 mod parameter_constraint;
@@ -20,6 +21,7 @@ use crate::{
     },
 };
 
+pub use self::insert::{InsertProblem, InsertProblemKind};
 pub use self::name_resolution::{DomainBaseTypeNameNotFound, NameResolution};
 pub use self::parameter_constraint::ParameterConstraintProblem;
 pub use self::query::QueryProblem;
@@ -62,6 +64,8 @@ trait RenderProblemReport: Problem {
 #[allow(clippy::large_enum_variant)]
 #[derive(Debug, Clone)]
 pub enum AnalysisProblem {
+    /// A violation of INSERT semantic rules.
+    Insert(InsertProblem),
     /// A structured SELECT clause violation.
     Query(QueryProblem),
     /// SQL-derived parameter requirements cannot be reconciled.
@@ -129,6 +133,19 @@ pub enum AnalysisProblem {
 }
 
 impl AnalysisProblem {
+    pub(crate) fn insert(kind: InsertProblemKind, message: &str) -> Self {
+        Self::Insert(InsertProblem::new(kind, message))
+    }
+
+    /// Structured INSERT violation, independently of diagnostic wording.
+    pub const fn insert_problem(&self) -> Option<&InsertProblem> {
+        if let Self::Insert(problem) = self {
+            Some(problem)
+        } else {
+            None
+        }
+    }
+
     /// Report a structured SELECT clause violation without inventing a source location.
     pub const fn query(problem: QueryProblem) -> Self {
         Self::Query(problem)
@@ -149,6 +166,7 @@ impl AnalysisProblem {
     #[must_use]
     pub const fn code(&self) -> &'static str {
         match self {
+            Self::Insert(problem) => problem.code(),
             Self::Query(problem) => problem.code(),
             Self::ParameterConstraint(problem) => problem.code(),
             Self::NameResolution(problem) => problem.code(),
@@ -196,6 +214,7 @@ impl AnalysisProblem {
             .with_syntax_highlighting(SqlHighlighter::from_theme(theme)?);
 
         let report = match self {
+            Self::Insert(problem) => problem.render_report(&report_handler, source)?,
             Self::Query(problem) => problem.render_report(&report_handler, source)?,
             Self::NameResolution(nr) => nr.render_report(&report_handler, source)?,
             Self::ParameterConstraint(problem) => problem.render_report(&report_handler, source)?,

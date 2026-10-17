@@ -14,6 +14,18 @@ use ::sql_fun_core::IVec;
 pub struct FromClause(Vec<DataSource>);
 
 impl FromClause {
+    pub(crate) fn projection_names(
+        &self,
+        context: &impl ParseContext,
+        with: &WithClause,
+        qualifier: Option<&AliasName>,
+    ) -> Result<Vec<(AliasName, ColumnName)>, AnalysisError> {
+        let mut names = Vec::new();
+        for source in &self.0 {
+            names.extend(source.projection_names(context, with, qualifier)?);
+        }
+        Ok(names)
+    }
     /// add data source
     pub fn push(&mut self, source: DataSource) {
         self.0.push(source);

@@ -122,8 +122,12 @@ impl TypeInfoRead for BaseContext {
         self.types.get(&key.to_string())
     }
 
-    fn get_array_item_type(&self, _type_name: &TypeReference) -> Option<TypeReference> {
-        todo!()
+    fn get_array_item_type(&self, type_name: &TypeReference) -> Option<TypeReference> {
+        if type_name.is_array() == Some(true) {
+            Some(type_name.element_type())
+        } else {
+            None
+        }
     }
 }
 
@@ -140,6 +144,9 @@ impl ViewInfoRead for BaseContext {
 }
 
 impl IndexInfoRead for BaseContext {
+    fn indexes_for_table(&self, _table: &crate::sem::TableName) -> Vec<&super::CreateIndex> {
+        Vec::new()
+    }
     fn get_index_impl(&self, _index_name: &FullName) -> Option<&super::CreateIndex> {
         // Builtin metadata contains no index definitions.
         None

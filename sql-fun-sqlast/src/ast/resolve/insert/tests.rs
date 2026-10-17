@@ -1,0 +1,699 @@
+use self::test_helpers::analyze;
+use crate::ast::Dialect;
+use crate::sem::{ColumnName, ParseContext, PgBuiltInType};
+
+#[rstest::rstest]
+#[case::values("INSERT INTO items VALUES (1, 'one') RETURNING *", 2)]
+#[case::partial("INSERT INTO items VALUES (1) RETURNING id", 1)]
+#[case::named("INSERT INTO items(label, id) VALUES ('one', 1) RETURNING id AS n", 1)]
+#[case::defaults("INSERT INTO items DEFAULT VALUES RETURNING *", 2)]
+#[case::default_cell("INSERT INTO items VALUES (DEFAULT, 'one') RETURNING id", 1)]
+#[case::multi_row("INSERT INTO items(id) VALUES (1), (2) RETURNING id", 1)]
+#[case::select("INSERT INTO items(id) SELECT 1 RETURNING id", 1)]
+#[case::select_star("INSERT INTO items SELECT * FROM items RETURNING id", 1)]
+#[case::join_star(
+    "INSERT INTO items SELECT * FROM (SELECT id FROM items) l JOIN (SELECT label FROM items) r ON true RETURNING id",
+    1
+)]
+#[case::using_star(
+    "INSERT INTO items(id) SELECT * FROM (SELECT id FROM items) l JOIN (SELECT id FROM items) r USING(id) RETURNING id",
+    1
+)]
+#[case::derived_star(
+    "INSERT INTO items(id) SELECT s.* FROM (SELECT 1 AS n) s RETURNING id",
+    1
+)]
+#[case::cte_star(
+    "WITH c AS (SELECT 1 AS n) INSERT INTO items(id) SELECT * FROM c RETURNING id",
+    1
+)]
+#[case::compound("INSERT INTO items(id) SELECT 1 UNION ALL SELECT 2 RETURNING id", 1)]
+#[case::cte_source(
+    "WITH c AS (SELECT 1 AS n) INSERT INTO items(id) SELECT n FROM c RETURNING id",
+    1
+)]
+#[case::no_returning("INSERT INTO items(id) VALUES (1)", 0)]
+#[case::alias("INSERT INTO items AS i VALUES (1, 'one') RETURNING i.id", 1)]
+#[case::nothing(
+    "INSERT INTO items(id) VALUES (1) ON CONFLICT DO NOTHING RETURNING id",
+    1
+)]
+fn resolves_insert_semantics(#[case] sql: &str, #[case] width: usize) {
+    let (statement, context) = analyze(sql, Dialect::postgres());
+    assert_eq!(
+        context.reported_problem_count(),
+        0,
+        "{:#?}",
+        context.reported_problems()
+    );
+    let insert = statement.as_insert().expect("analyzed INSERT");
+    assert_eq!(insert.target().to_string(), "public.items");
+    assert_eq!(insert.result_columns().len(), width);
+    if width > 0 {
+        assert_eq!(
+            insert.result_columns().get_column_at(0).unwrap().col_type(),
+            &Some(PgBuiltInType::int4())
+        );
+    }
+}
+
+#[rstest::rstest]
+#[case::cte("WITH c AS (SELECT $1 n) INSERT INTO items(id) SELECT n FROM c")]
+#[case::value("INSERT INTO items(id) VALUES ($1) RETURNING id")]
+#[case::select("INSERT INTO items(id) SELECT $1 RETURNING id")]
+#[case::later_row("INSERT INTO items(id) VALUES (1), ($1) RETURNING id")]
+#[case::repeated("INSERT INTO items(id) VALUES ($1), ($1) RETURNING id")]
+#[case::compound("INSERT INTO items(id) SELECT $1 UNION ALL SELECT $1 RETURNING id")]
+fn infers_assignment_parameters(#[case] sql: &str) {
+    let (_, context) = analyze(sql, Dialect::postgres());
+    assert_eq!(
+        context.reported_problem_count(),
+        0,
+        "{:#?}",
+        context.reported_problems()
+    );
+    let constraint = context
+        .parameter_constraints()
+        .parameter(1)
+        .expect("parameter");
+    assert!(constraint.constraint().allows(&PgBuiltInType::int4()));
+    assert!(!constraint.constraint().allows(&PgBuiltInType::text()));
+}
+
+#[rstest::rstest]
+#[case::arity("INSERT INTO items VALUES (1, 'x', 3)")]
+#[case::duplicate("INSERT INTO items(id, id) VALUES (1, 2)")]
+#[case::types("INSERT INTO items(id) VALUES (true)")]
+#[case::explicit_partial("INSERT INTO items(id, label) VALUES (1)")]
+#[case::branch_arity("INSERT INTO items(id) SELECT 1 UNION ALL SELECT 1, 2")]
+#[case::conflicting_parameter("INSERT INTO flags(id, flag) VALUES ($1, $1)")]
+#[case::cte_alias_arity(
+    "WITH c(a,b) AS (INSERT INTO items(id) VALUES(1) RETURNING id) SELECT a FROM c"
+)]
+#[case::alias_scope("INSERT INTO items AS i VALUES (1) RETURNING items.id")]
+#[case::source_scope("INSERT INTO items(id) SELECT n FROM (SELECT 1 AS n) s RETURNING s.n")]
+fn reports_invalid_insert(#[case] sql: &str) {
+    let (_, context) = analyze(sql, Dialect::postgres());
+    assert!(context.reported_problem_count() > 0);
+}
+
+#[test]
+fn returning_is_exposed_through_insert_cte() {
+    let (statement, context) = analyze(
+        "WITH inserted(n) AS (INSERT INTO items VALUES ($1) RETURNING id) SELECT n FROM inserted",
+        Dialect::postgres(),
+    );
+    assert_eq!(
+        context.reported_problem_count(),
+        0,
+        "{:#?}",
+        context.reported_problems()
+    );
+    let query = statement.into_select_statemtnt().expect("SELECT");
+    assert_eq!(
+        query
+            .result_columns()
+            .get_result_column_def(&ColumnName::from("n"))
+            .unwrap()
+            .get_type(),
+        Some(&PgBuiltInType::int4())
+    );
+    assert!(context.parameter_constraints().parameter(1).is_some());
+}
+
+#[test]
+fn default_values_retains_analyzed_target_without_fabricated_source() {
+    let (statement, _) = analyze(
+        "INSERT INTO items DEFAULT VALUES RETURNING id",
+        Dialect::postgres(),
+    );
+    let insert = statement.as_insert().unwrap();
+    assert_eq!(insert.columns().len(), 2);
+    assert!(insert.source().rows().is_none());
+    assert!(insert.source().as_query().is_none());
+}
+
+#[test]
+#[should_panic(expected = "#474")]
+fn update_action_stays_explicitly_unimplemented() {
+    analyze(
+        "INSERT INTO items(id) VALUES (1) ON CONFLICT(id) DO UPDATE SET id = excluded.id",
+        Dialect::postgres(),
+    );
+}
+
+#[cfg(feature = "sqlite")]
+#[rstest::rstest]
+#[case::values("INSERT INTO items VALUES (1, 'one') RETURNING *")]
+#[case::partial("INSERT INTO items(id) VALUES (1) RETURNING id")]
+#[case::default_values("INSERT INTO items DEFAULT VALUES RETURNING id")]
+#[case::select("INSERT INTO items(id) SELECT 1 RETURNING id")]
+#[case::replace("INSERT OR REPLACE INTO items(id) VALUES (1) RETURNING id")]
+#[case::duplicate("INSERT INTO items(id,id) VALUES(1,2) RETURNING id")]
+#[case::original_qualifier("INSERT INTO items AS i(id) VALUES (1) RETURNING items.id")]
+fn sqlite_insert(#[case] sql: &str) {
+    let (statement, context) = analyze(sql, Dialect::sqlite());
+    assert_eq!(
+        context.reported_problem_count(),
+        0,
+        "{:#?}",
+        context.reported_problems()
+    );
+    assert!(!statement.as_insert().unwrap().result_columns().is_empty());
+}
+
+#[cfg(feature = "sqlite")]
+#[test]
+fn sqlite_implicit_columns_require_full_arity() {
+    let (_, context) = analyze("INSERT INTO items VALUES (1)", Dialect::sqlite());
+    assert!(context.reported_problem_count() > 0);
+}
+
+#[rstest::rstest]
+#[case::always("INSERT INTO identity_items(id) VALUES(1)", true)]
+#[case::default_value("INSERT INTO identity_items(id) VALUES(DEFAULT)", false)]
+#[case::system(
+    "INSERT INTO identity_items(id) OVERRIDING SYSTEM VALUE VALUES(1)",
+    false
+)]
+#[case::user(
+    "INSERT INTO identity_items(id) OVERRIDING USER VALUE VALUES(1)",
+    false
+)]
+#[case::generated("INSERT INTO generated_items(id,g) VALUES(1,2)", true)]
+#[case::generated_default("INSERT INTO generated_items(id,g) VALUES(1,DEFAULT)", false)]
+fn validates_generated_destinations(#[case] sql: &str, #[case] invalid: bool) {
+    let (_, context) = analyze(sql, Dialect::postgres());
+    assert_eq!(
+        context.reported_problem_count() > 0,
+        invalid,
+        "{:#?}",
+        context.reported_problems()
+    );
+}
+
+#[rstest::rstest]
+#[case::element("INSERT INTO arrays(a[1]) VALUES($1)")]
+#[case::parameter_index("INSERT INTO arrays(a[$2]) VALUES($1)")]
+fn resolves_array_assignment_targets(#[case] sql: &str) {
+    let (statement, context) = analyze(sql, Dialect::postgres());
+    assert_eq!(
+        context.reported_problem_count(),
+        0,
+        "{:#?}",
+        context.reported_problems()
+    );
+    assert_eq!(
+        statement.as_insert().unwrap().columns()[0]
+            .destination()
+            .get_type(),
+        Some(PgBuiltInType::int4())
+    );
+    assert!(
+        context
+            .parameter_constraints()
+            .parameter(1)
+            .unwrap()
+            .constraint()
+            .allows(&PgBuiltInType::int4())
+    );
+}
+
+#[rstest::rstest]
+#[case::missing_relation("INSERT INTO absent VALUES(1)")]
+#[case::missing_column("INSERT INTO items(absent) VALUES(1)")]
+#[case::unreadable_cte("WITH changed AS (INSERT INTO items(id) VALUES(1)) SELECT 1 FROM changed")]
+#[case::nested_cte(
+    "SELECT * FROM (WITH changed AS (INSERT INTO items(id) VALUES(1) RETURNING id) SELECT id FROM changed) s"
+)]
+fn fails_without_fabricated_bindings(#[case] sql: &str) {
+    let statement = crate::parse_statements(sql, Dialect::postgres())
+        .next()
+        .unwrap()
+        .unwrap();
+    let mut context = test_helpers::catalog(Dialect::postgres());
+    assert!(statement.node.resolve(&mut context).is_err());
+}
+
+#[test]
+fn public_postgres_entry_points_share_insert_resolution() {
+    use crate::{
+        PostgresDialect,
+        sem::{SemAst, analyze_insert_statement},
+        syn::{ListOpt, Opt},
+    };
+    let sql = "INSERT INTO items(id) VALUES($1) RETURNING id";
+    let parsed = PostgresDialect::parse(sql).unwrap();
+    let tokens = PostgresDialect::scan(sql).unwrap();
+    let result = SemAst::semantic_analysis(
+        test_helpers::catalog(Dialect::postgres()),
+        parsed.clone(),
+        &tokens,
+    )
+    .unwrap();
+    assert_eq!(result.ast().as_insert().unwrap().result_columns().len(), 1);
+    assert!(
+        result
+            .context()
+            .parameter_constraints()
+            .parameter(1)
+            .is_some()
+    );
+    let insert = parsed
+        .get_stmts()
+        .get(0)
+        .get_stmt()
+        .as_insert_stmt()
+        .as_inner()
+        .unwrap();
+    let (result, context) =
+        analyze_insert_statement(test_helpers::catalog(Dialect::postgres()), &None, insert)
+            .unwrap();
+    assert_eq!(result.as_insert().unwrap().result_columns().len(), 1);
+    assert!(context.parameter_constraints().parameter(1).is_some());
+}
+
+#[test]
+fn unreferenced_modifying_cte_is_still_analyzed_once() {
+    let before = crate::sem::parameter_resolution::inference_runs();
+    let (_, context) = analyze(
+        "WITH changed AS (INSERT INTO items(id) VALUES($1)) SELECT 1",
+        Dialect::postgres(),
+    );
+    assert_eq!(context.reported_problem_count(), 0);
+    assert!(context.parameter_constraints().parameter(1).is_some());
+    assert_eq!(
+        crate::sem::parameter_resolution::inference_runs(),
+        before + 1
+    );
+}
+
+#[rstest::rstest]
+#[case::value("INSERT INTO items(id) VALUES($1)")]
+#[case::subscript("INSERT INTO arrays(a[$1]) VALUES(1)")]
+fn assignment_casts_do_not_become_overload_implicit_casts(#[case] sql: &str) {
+    use crate::sem::{CastContext, CastDefinition};
+    let mut context = test_helpers::catalog(Dialect::postgres());
+    context.setup_type(PgBuiltInType::int8());
+    context.set_get_implicit_cast_result(
+        &PgBuiltInType::int8(),
+        &PgBuiltInType::int4(),
+        Some(CastDefinition::new(CastContext::assignment())),
+    );
+    let statement = crate::parse_statements(sql, Dialect::postgres())
+        .next()
+        .unwrap()
+        .unwrap();
+    statement.node.resolve(&mut context).unwrap();
+    assert!(
+        context
+            .parameter_constraints()
+            .parameter(1)
+            .unwrap()
+            .constraint()
+            .allows(&PgBuiltInType::int8())
+    );
+    assert!(
+        !crate::sem::CastInfoRead::get_implicit_cast(
+            &context,
+            &PgBuiltInType::int8(),
+            &PgBuiltInType::int4()
+        )
+        .unwrap()
+        .use_in_implicit()
+    );
+    assert_eq!(context.reported_problem_count(), 0);
+}
+
+#[cfg(feature = "sqlite")]
+#[rstest::rstest]
+#[case::values("INSERT INTO items VALUES(1,'one') RETURNING *", true)]
+#[case::short_values("INSERT INTO items VALUES(1)", false)]
+#[case::explicit_column("INSERT INTO items(id) VALUES(1) RETURNING id", true)]
+#[case::duplicates("INSERT INTO items(id,id) VALUES(1,2)", true)]
+#[case::qualified_original("INSERT INTO items AS i(id) VALUES(1) RETURNING items.id", true)]
+#[case::qualified_alias("INSERT INTO items AS i(id) VALUES(1) RETURNING i.id", false)]
+#[case::qualified_star("INSERT INTO items(id) VALUES(1) RETURNING items.*", false)]
+#[case::affinity("INSERT INTO items(id) VALUES('one') RETURNING id", true)]
+fn agrees_with_bundled_sqlite(#[case] sql: &str, #[case] accepted: bool) {
+    let oracle = ::rusqlite::Connection::open_in_memory().unwrap();
+    oracle
+        .execute_batch("CREATE TABLE items(id INTEGER, label TEXT)")
+        .unwrap();
+    assert_eq!(
+        oracle.prepare(sql).is_ok(),
+        accepted,
+        "SQLite {}: {sql}",
+        ::rusqlite::version()
+    );
+    let (_, context) = analyze(sql, Dialect::sqlite());
+    assert_eq!(
+        context.reported_problem_count() == 0,
+        accepted,
+        "{:#?}",
+        context.reported_problems()
+    );
+}
+
+#[cfg(feature = "sqlite")]
+#[test]
+fn public_sqlite_entry_point_retains_returning_and_parameters() {
+    use crate::{sem::SemAst, sqlite::SqliteDialect};
+    let sql = "INSERT INTO items(id) VALUES(?1) RETURNING id";
+    let statement = SqliteDialect::parse(sql)
+        .unwrap()
+        .unwrap()
+        .into_plain_statement()
+        .unwrap();
+    let result = SemAst::semantic_analysis_sqlite_stmt(
+        test_helpers::catalog(Dialect::sqlite()),
+        statement,
+        &SqliteDialect::scan(sql).unwrap(),
+    )
+    .unwrap();
+    assert_eq!(result.ast().as_insert().unwrap().result_columns().len(), 1);
+    assert!(
+        result
+            .context()
+            .parameter_constraints()
+            .parameter(1)
+            .unwrap()
+            .constraint()
+            .is_any()
+    );
+}
+
+#[rstest::rstest]
+#[case::unique("CREATE UNIQUE INDEX ix ON items(id)", "(id)", true)]
+#[case::duplicate("CREATE UNIQUE INDEX ix ON items(id)", "(id,id)", true)]
+#[case::nonunique("CREATE INDEX ix ON items(id)", "(id)", false)]
+#[case::wrong_column("CREATE UNIQUE INDEX ix ON items(label)", "(id)", false)]
+#[case::expression(
+    "CREATE UNIQUE INDEX ix ON items((id IS NOT NULL))",
+    "((id IS NOT NULL))",
+    true
+)]
+#[case::expression_mismatch(
+    "CREATE UNIQUE INDEX ix ON items((id IS NOT NULL))",
+    "((id IS NULL))",
+    false
+)]
+#[case::partial(
+    "CREATE UNIQUE INDEX ix ON items(id) WHERE id IS NOT NULL",
+    "(id) WHERE id IS NOT NULL",
+    true
+)]
+#[case::partial_without_predicate(
+    "CREATE UNIQUE INDEX ix ON items(id) WHERE id IS NOT NULL",
+    "(id)",
+    false
+)]
+fn validates_conflict_index(#[case] index: &str, #[case] target: &str, #[case] accepted: bool) {
+    let dialect = Dialect::postgres();
+    let mut context = crate::parse_statements(index, dialect)
+        .next()
+        .unwrap()
+        .unwrap()
+        .analyze(test_helpers::catalog(dialect))
+        .unwrap()
+        .into_context();
+    assert_eq!(context.reported_problem_count(), 0);
+    let sql = format!("INSERT INTO items(id) VALUES(1) ON CONFLICT {target} DO NOTHING");
+    let statement = crate::parse_statements(&sql, dialect)
+        .next()
+        .unwrap()
+        .unwrap();
+    let result = statement.node.resolve(&mut context).unwrap();
+    assert_eq!(
+        context.reported_problem_count() == 0,
+        accepted,
+        "{:#?}",
+        context.reported_problems()
+    );
+    assert_eq!(result.as_insert().unwrap().conflicts().len(), 1);
+    let lookup = result.as_insert().unwrap().conflicts()[0].arbiter();
+    assert_eq!(lookup.is_not_found(), !accepted);
+    if accepted {
+        let index = lookup.arbiters().unwrap()[0].index_name().unwrap();
+        assert_eq!(index, &crate::sem::FullName::with_schema("public", "ix"));
+    }
+}
+
+#[test]
+fn returning_retains_expression_alias_and_nullability() {
+    let (statement, context) = analyze(
+        "INSERT INTO items AS i VALUES(1,'x') RETURNING i.label AS name, i.id",
+        Dialect::postgres(),
+    );
+    assert_eq!(context.reported_problem_count(), 0);
+    let columns = statement.as_insert().unwrap().result_columns();
+    let label = columns.get_column_at(0).unwrap();
+    assert_eq!(label.column_name(), &Some(ColumnName::from("name")));
+    assert_eq!(label.col_type(), &Some(PgBuiltInType::text()));
+    assert_eq!(label.is_not_null(), &Some(false));
+    assert!(label.expression().is_some());
+    assert_eq!(columns.get_column_at(1).unwrap().is_not_null(), &Some(true));
+}
+
+#[cfg(feature = "sqlite")]
+#[test]
+#[should_panic(expected = "#474")]
+fn sqlite_later_update_action_remains_explicitly_unimplemented() {
+    analyze(
+        "INSERT INTO items VALUES(1,'x') ON CONFLICT(id) DO NOTHING ON CONFLICT DO UPDATE SET label='x'",
+        Dialect::sqlite(),
+    );
+}
+
+#[rstest::rstest]
+#[case::collation("INSERT INTO items VALUES(1,'x') ON CONFLICT(label COLLATE \"C\") DO NOTHING")]
+#[case::operator_class("INSERT INTO items VALUES(1,'x') ON CONFLICT(id int4_ops) DO NOTHING")]
+#[should_panic(expected = "collation/operator-class catalog resolution")]
+fn conflict_modifiers_require_catalog_resolution(#[case] sql: &str) {
+    analyze(sql, Dialect::postgres());
+}
+
+#[rstest::rstest]
+#[case::primary("PRIMARY KEY", crate::sem::InsertConstraintKind::PrimaryKey)]
+#[case::unique("UNIQUE", crate::sem::InsertConstraintKind::Unique)]
+fn resolves_named_constraint_identity(
+    #[case] kind: &str,
+    #[case] expected: crate::sem::InsertConstraintKind,
+) {
+    let dialect = Dialect::postgres();
+    let ddl = format!("CREATE TABLE keyed(id int4, CONSTRAINT key473 {kind}(id))");
+    let mut context = crate::parse_statements(&ddl, dialect)
+        .next()
+        .unwrap()
+        .unwrap()
+        .analyze(test_helpers::catalog(dialect))
+        .unwrap()
+        .into_context();
+    let statement = crate::parse_statements(
+        "INSERT INTO keyed VALUES(1) ON CONFLICT ON CONSTRAINT key473 DO NOTHING",
+        dialect,
+    )
+    .next()
+    .unwrap()
+    .unwrap();
+    let result = statement.node.resolve(&mut context).unwrap();
+    assert_eq!(
+        context.reported_problem_count(),
+        0,
+        "{:#?}",
+        context.reported_problems()
+    );
+    let lookup = result.as_insert().unwrap().conflicts()[0]
+        .arbiter()
+        .constraint()
+        .unwrap();
+    assert_eq!(lookup.kind(), expected);
+    assert_eq!(lookup.name(), "key473");
+    assert_eq!(lookup.table().to_string(), "public.keyed");
+}
+
+#[test]
+fn retains_failed_constraint_lookup_and_structured_problem() {
+    let (statement, context) = analyze(
+        "INSERT INTO items VALUES(1,'x') ON CONFLICT ON CONSTRAINT absent DO NOTHING",
+        Dialect::postgres(),
+    );
+    let lookup = statement.as_insert().unwrap().conflicts()[0]
+        .arbiter()
+        .constraint()
+        .unwrap();
+    assert_eq!(lookup.kind(), crate::sem::InsertConstraintKind::NotFound);
+    assert_eq!(lookup.name(), "absent");
+    assert_eq!(
+        context.reported_problems()[0]
+            .insert_problem()
+            .unwrap()
+            .kind(),
+        crate::sem::problem::InsertProblemKind::ConflictConstraint
+    );
+}
+
+#[test]
+fn retains_multiple_unnamed_table_keys_without_fabricating_names() {
+    let dialect = Dialect::postgres();
+    let mut context = crate::parse_statements(
+        "CREATE TABLE keyed(id int4, label text, UNIQUE(id), UNIQUE(label))",
+        dialect,
+    )
+    .next()
+    .unwrap()
+    .unwrap()
+    .analyze(test_helpers::catalog(dialect))
+    .unwrap()
+    .into_context();
+    let statement = crate::parse_statements(
+        "INSERT INTO keyed VALUES(1,'x') ON CONFLICT(label) DO NOTHING",
+        dialect,
+    )
+    .next()
+    .unwrap()
+    .unwrap();
+    let result = statement.node.resolve(&mut context).unwrap();
+    assert_eq!(
+        context.reported_problem_count(),
+        0,
+        "{:#?}",
+        context.reported_problems()
+    );
+    let arbiters = result.as_insert().unwrap().conflicts()[0]
+        .arbiter()
+        .arbiters()
+        .unwrap();
+    assert_eq!(
+        arbiters[0].anonymous_key_columns(),
+        Some([ColumnName::from("label")].as_slice())
+    );
+    assert!(arbiters[0].constraint().is_none());
+}
+
+mod test_helpers {
+    use crate::ast::Dialect;
+    use crate::sem::{
+        ColumnDefinition, ColumnName, MutSourcePathWithSpan, PgBuiltInType, SchemaName, SemAst,
+    };
+    use crate::test_helpers::{TestParseContext, source_span};
+
+    pub(super) fn catalog(dialect: Dialect) -> TestParseContext {
+        let mut context = TestParseContext::default().with_dialect(dialect);
+        context.set_source_path_with_span(&source_span());
+        context.set_get_search_path_result(&[
+            SchemaName::from("public"),
+            SchemaName::from("pg_catalog"),
+        ]);
+        context.setup_type(PgBuiltInType::int4());
+        context.setup_type(PgBuiltInType::text());
+        context.setup_type(PgBuiltInType::bool());
+        context.setup_table(
+            "items",
+            &[
+                ColumnDefinition::new(
+                    &Some(ColumnName::from("id")),
+                    Some(&PgBuiltInType::int4()),
+                    Some(true),
+                    &[],
+                ),
+                ColumnDefinition::new(
+                    &Some(ColumnName::from("label")),
+                    Some(&PgBuiltInType::text()),
+                    Some(false),
+                    &[],
+                ),
+            ],
+            &source_span(),
+        );
+        context.setup_table(
+            "flags",
+            &[
+                ColumnDefinition::new(
+                    &Some(ColumnName::from("id")),
+                    Some(&PgBuiltInType::int4()),
+                    Some(false),
+                    &[],
+                ),
+                ColumnDefinition::new(
+                    &Some(ColumnName::from("flag")),
+                    Some(&PgBuiltInType::bool()),
+                    Some(false),
+                    &[],
+                ),
+            ],
+            &source_span(),
+        );
+        let array =
+            crate::sem::TypeReference::concrete_type_ref(PgBuiltInType::int4().full_name(), true);
+        context.setup_type(array.clone());
+        context.setup_table(
+            "arrays",
+            &[ColumnDefinition::new(
+                &Some(ColumnName::from("a")),
+                Some(&array),
+                Some(false),
+                &[],
+            )],
+            &source_span(),
+        );
+        let identity = crate::sem::IdentityColumnConstraint::new(
+            &crate::sem::TableName::from(crate::sem::FullName::with_schema(
+                "public",
+                "identity_items",
+            )),
+            &ColumnName::from("id"),
+            crate::sem::IdentityColumnMode::always(),
+        );
+        context.setup_table(
+            "identity_items",
+            &[ColumnDefinition::new(
+                &Some(ColumnName::from("id")),
+                Some(&PgBuiltInType::int4()),
+                Some(true),
+                &[crate::sem::ColumnConstraint::identity(identity)],
+            )],
+            &source_span(),
+        );
+        let generated = crate::sem::GeneratedColumnConstraint::new(
+            &crate::sem::TableName::from(crate::sem::FullName::with_schema(
+                "public",
+                "generated_items",
+            )),
+            &ColumnName::from("g"),
+            crate::sem::ScalarConstExpr::null(),
+            Some(crate::sem::GeneratedColumnMode::stored()),
+        );
+        context.setup_table(
+            "generated_items",
+            &[
+                ColumnDefinition::new(
+                    &Some(ColumnName::from("id")),
+                    Some(&PgBuiltInType::int4()),
+                    Some(false),
+                    &[],
+                ),
+                ColumnDefinition::new(
+                    &Some(ColumnName::from("g")),
+                    Some(&PgBuiltInType::int4()),
+                    Some(false),
+                    &[crate::sem::ColumnConstraint::generated(generated)],
+                ),
+            ],
+            &source_span(),
+        );
+        context
+    }
+    pub(super) fn analyze(sql: &str, dialect: Dialect) -> (SemAst, TestParseContext) {
+        let statement = crate::parse_statements(sql, dialect)
+            .next()
+            .unwrap()
+            .unwrap();
+        let mut context = catalog(dialect);
+        let result = statement
+            .node
+            .resolve(&mut context)
+            .expect("semantic analysis");
+        (result, context)
+    }
+}

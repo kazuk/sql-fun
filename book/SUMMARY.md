@@ -4,6 +4,7 @@
 - [Installation](./installation.md)
 - [SQLite project bootstrap](./sqlite-bootstrap.md)
 - [SQL Functions](./sql_functions.md)
+- [SQL analysis coverage and limitations](./sql-analysis.md)
 - [Collecting ordered rows](./sql_fun_collector.md)
 - [Reusable CTE](./reusable_cte.md)
 - [Database Performance Management](./database-performance-management.md)

@@ -2,6 +2,9 @@
 
 `sql-fun` code generators translates `SQL` into Rust function.
 
+See [SQL analysis coverage and limitations](sql-analysis.md) when choosing query
+forms or investigating analysis diagnostics.
+
 ## Attribute arguments
 
 Attribute arguments specifies SQL statement and datasource.

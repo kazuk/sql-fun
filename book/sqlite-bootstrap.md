@@ -15,8 +15,8 @@ runtime their application actually uses.
 SQLite support is under development and requires the `sqlite` feature on the
 proc-macro, CLI, and server. Follow the current
 [installation instructions](installation.md) for those features and tools.
-See [SQLite parser limitations](installation.md#sqlite-parser-limitations) and
-[SQLite analysis coverage](installation.md#sqlite-analysis-coverage) for the
+See [SQLite parser limitations](sql-analysis.md#sqlite-parser-limitations) and
+[SQLite analysis coverage](sql-analysis.md#sqlite-analysis-coverage) for the
 current limits. Enabling the feature does not provide the planned extraction
 workflow described here.
 

@@ -13,6 +13,9 @@ Check the application embedded queries and prepare to build.
     - When schema cache not found or invalid:
       - uses `sql-fun-server` and schema aware validation in on-demand.
 
+For supported SQL forms and known analysis limitations, see
+[SQL analysis coverage and limitations](../sql-analysis.md).
+
 ## Prerequisites
 
 `sql-fun check` requires `cargo-expand` for both PostgreSQL and SQLite.

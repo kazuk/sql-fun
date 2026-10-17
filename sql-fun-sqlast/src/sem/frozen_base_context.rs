@@ -191,6 +191,11 @@ macro_rules! forward_catalog_reads {
             }
         }
 
+        impl crate::sem::MasterInfoRead for $context {
+            fn conflict_masters(&self) -> &crate::sem::ConflictMasters {
+                crate::sem::MasterInfoRead::conflict_masters(self.$catalog())
+            }
+        }
         impl crate::sem::ConflictInfoRead for $context {
             fn lookup_collation(
                 &self,

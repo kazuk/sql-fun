@@ -5,6 +5,10 @@ use crate::sem::{
 };
 
 impl TestParseContext {
+    pub(crate) fn set_conflict_masters(&mut self, masters: &crate::sem::ConflictMasters) {
+        self.masters = Some(masters.clone());
+    }
+
     pub(crate) fn expect_conflict_target(&mut self, target: &TableName) {
         self.expected_conflict_target = Some(target.clone());
     }
@@ -61,5 +65,13 @@ impl ConflictInfoRead for TestParseContext {
         } else {
             crate::sem::infer_from_catalog(self, table, conflict)
         }
+    }
+}
+
+impl crate::sem::MasterInfoRead for TestParseContext {
+    fn conflict_masters(&self) -> &crate::sem::ConflictMasters {
+        self.masters
+            .as_ref()
+            .expect("test master definitions must be supplied explicitly")
     }
 }

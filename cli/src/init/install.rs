@@ -15,6 +15,8 @@ const REQUIRED: &[&str] = &[
     "left_unary_op.json",
     "right_unary_op.json",
     "casts.json",
+    "collations.json",
+    "operator_classes.json",
 ];
 
 pub(super) fn validate(path: &Path, version: &PostgresVersion) -> Result<(), anyhow::Error> {
@@ -61,12 +63,18 @@ pub(super) fn validate(path: &Path, version: &PostgresVersion) -> Result<(), any
         if *name != "schema.sql" {
             let catalog: serde_json::Value = serde_json::from_slice(&content)
                 .with_context(|| format!("invalid builtin JSON {name}"))?;
-            let valid_shape =
-                if ["pg_type.json", "functions.json", "func_detail.json"].contains(name) {
-                    catalog.is_array()
-                } else {
-                    catalog.is_object()
-                };
+            let valid_shape = if [
+                "pg_type.json",
+                "functions.json",
+                "func_detail.json",
+                "operator_classes.json",
+            ]
+            .contains(name)
+            {
+                catalog.is_array()
+            } else {
+                catalog.is_object()
+            };
             anyhow::ensure!(valid_shape, "invalid builtin catalog structure in {name}");
         }
     }

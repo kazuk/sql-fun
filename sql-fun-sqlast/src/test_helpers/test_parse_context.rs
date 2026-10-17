@@ -24,6 +24,7 @@ use std::collections::{HashMap, HashSet};
 /// ParseContext implementation for tests
 #[derive(Debug, Default)]
 pub struct TestParseContext {
+    masters: Option<crate::sem::ConflictMasters>,
     collation_results: HashMap<FullName, crate::sem::CatalogNameLookup>,
     operator_class_results: HashMap<(FullName, String), crate::sem::CatalogNameLookup>,
     expected_conflict_target: Option<TableName>,

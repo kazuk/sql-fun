@@ -132,7 +132,10 @@ impl SemAst {
             }
             Stmt::Update(_update) => todo!(),
             Stmt::Delete(_delete_statement) => todo!(),
-            Stmt::Insert(_insert_statement) => todo!(),
+            Stmt::Insert(insert) => {
+                let syntax = crate::ast::StatementNode::try_from(&Stmt::Insert(insert))?;
+                syntax.resolve_and_apply(context)
+            }
             Stmt::Pragma(_pragma_statement) => todo!(),
             Stmt::CreateDomain(_create_domain_statement) => todo!(),
             Stmt::DropDomain(_drop_domain_statement) => todo!(),

@@ -102,3 +102,16 @@ impl IndirectionExpr {
         }
     }
 }
+
+impl IndirectionExpr {
+    pub(crate) fn walk_assignment_target<V: crate::sem::traversal::SemanticVisitor>(
+        &mut self,
+        visitor: &mut V,
+    ) -> Result<(), AnalysisError> {
+        match self {
+            Self::ArrayIndex(target) => target.walk_assignment_target(visitor),
+            Self::ArraySlice(target) => target.walk_assignment_target(visitor),
+            Self::MemberRef(target) => target.walk_assignment_target(visitor),
+        }
+    }
+}

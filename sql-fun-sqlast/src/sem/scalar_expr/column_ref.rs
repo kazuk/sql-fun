@@ -69,6 +69,16 @@ impl SemScalarExprNode for ColumnReferenceExpr {
 }
 
 impl ColumnReferenceExpr {
+    pub(in crate::sem) fn index_column(name: &ColumnName) -> Self {
+        Self::UndefinedColumn(name.clone())
+    }
+
+    pub(in crate::sem) fn canonicalize_index_binding(&mut self) {
+        if let Self::TableColumn(value) = self {
+            *self = Self::index_column(value.get_column_name());
+        }
+    }
+
     pub(crate) fn output_column(index: usize, definition: &ColumnDefinition) -> Self {
         Self::OutputColumn(OutputColumnRef::new(index, definition))
     }

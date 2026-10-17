@@ -47,6 +47,22 @@ impl PgBuiltinCasts {
 }
 
 impl CastInfoRead for super::BaseContext {
+    fn get_assignment_cast(
+        &self,
+        source: &TypeReference,
+        target: &TypeReference,
+    ) -> Option<CastDefinition> {
+        let cast = self.get_explicit_cast(source, target)?;
+        if cast.context().use_in_assignment() {
+            return Some(cast);
+        }
+        let (name, array) = self.builtin_cast_type(target)?;
+        if !array && matches!(name, "text" | "varchar" | "bpchar" | "name") {
+            return Some(CastDefinition::new(CastContext::Assignment));
+        }
+        None
+    }
+
     fn cast_sources(&self, target: &TypeReference, explicit: bool) -> HashSet<TypeReference> {
         let mut sources = HashSet::from([target.clone()]);
         for (name, _) in self.casts.iter() {

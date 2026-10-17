@@ -100,3 +100,15 @@ impl ArrayIndex {
         self.array.needs_type_inference() || self.index.needs_type_inference()
     }
 }
+
+impl ArrayIndex {
+    pub(super) fn walk_assignment_target<V: crate::sem::traversal::SemanticVisitor>(
+        &mut self,
+        visitor: &mut V,
+    ) -> Result<(), AnalysisError> {
+        self.array.walk_assignment_target(visitor)?;
+        self.index.walk(visitor)?;
+        visitor.subscript(&self.index);
+        Ok(())
+    }
+}

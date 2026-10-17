@@ -568,6 +568,46 @@ impl<C: crate::sem::ParseContext> crate::sem::traversal::SemanticVisitor for Col
     fn expression(&mut self, expression: &mut SemScalarExpr) -> Result<(), AnalysisError> {
         expression.collect_constraints(&mut self.parameters, self.context)
     }
+    fn assignment(
+        &mut self,
+        value: &mut SemScalarExpr,
+        target: &crate::sem::InsertTarget,
+    ) -> Result<(), AnalysisError> {
+        if self.context.dialect() == Dialect::postgres()
+            && let Some(ty) = target.assignment_type()
+        {
+            if let Some(node) = value.constraint_node() {
+                self.parameters.graph.restrict(
+                    node,
+                    &InputTypeConstraint::types(self.context.assignment_sources(&ty)),
+                );
+            } else if let Some(source) = value.get_type()
+                && source != ty
+                && !self.context.get_assignment_cast(&source, &ty).is_some()
+            {
+                self.context
+                    .report_analysis_problem(crate::sem::AnalysisProblem::insert(
+                        crate::sem::problem::InsertProblemKind::assignment_type(),
+                        &format!("cannot assign {source:?} to {ty:?}"),
+                    ))?;
+            }
+            if value.get_type().as_ref() != Some(&ty) {
+                *value = SemScalarExpr::wrap_implicit_cast(&ty, value);
+            }
+        }
+        Ok(())
+    }
+    fn subscript(&mut self, value: &SemScalarExpr) {
+        if let Some(node) = value.constraint_node() {
+            self.parameters.graph.restrict(
+                node,
+                &InputTypeConstraint::types(
+                    self.context
+                        .assignment_sources(&crate::sem::PgBuiltInType::int4()),
+                ),
+            );
+        }
+    }
     fn enter_query(&mut self) {
         self.parameters.enter_query();
     }
@@ -718,6 +758,25 @@ impl ParameterResolution {
         collector.parameters.solve(collector.context)?;
         let constraints = collector.parameters.constraints();
         query.walk(&mut Finalizer {
+            constraints: &constraints,
+            context: collector.context,
+        })?;
+        Ok(constraints)
+    }
+    pub(crate) fn infer_insert(
+        insert: &mut crate::sem::InsertStatement,
+        context: &mut impl crate::sem::ParseContext,
+    ) -> Result<ParameterConstraints, AnalysisError> {
+        #[cfg(test)]
+        INFERENCE_RUNS.with(|runs| runs.set(runs.get() + 1));
+        let mut collector = Collector {
+            parameters: Self::default(),
+            context,
+        };
+        insert.walk(&mut collector)?;
+        collector.parameters.solve(collector.context)?;
+        let constraints = collector.parameters.constraints();
+        insert.walk(&mut Finalizer {
             constraints: &constraints,
             context: collector.context,
         })?;

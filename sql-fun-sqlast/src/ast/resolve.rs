@@ -1,3 +1,4 @@
+mod insert;
 mod query;
 
 use crate::StringSpan;
@@ -13,6 +14,14 @@ use crate::sem::{
 };
 
 impl Name {
+    pub(super) fn star_qualifier(&self) -> Result<Option<AliasName>, AnalysisError> {
+        match self.0.as_slice() {
+            [] => Ok(None),
+            [alias] => Ok(Some(AliasName::from(alias.as_str()))),
+            _ => AnalysisError::raise_unexpected_input("star qualification"),
+        }
+    }
+
     pub(super) fn full_name(&self) -> Result<FullName, AnalysisError> {
         match self.0.as_slice() {
             [local] => Ok(FullName::from_local_name(local)),
@@ -147,7 +156,7 @@ impl Expr {
         Ok(values)
     }
 
-    fn resolve_optional(
+    pub(super) fn resolve_optional(
         expression: &Option<Self>,
         context: &mut impl ParseContext,
         scope: &ScalarAnalysisContext<'_>,
@@ -522,7 +531,7 @@ impl Indirection {
 }
 
 impl Access {
-    fn resolve(
+    pub(super) fn resolve(
         &self,
         context: &mut impl ParseContext,
         scope: &ScalarAnalysisContext<'_>,

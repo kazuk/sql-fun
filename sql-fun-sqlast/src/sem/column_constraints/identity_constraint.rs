@@ -105,6 +105,11 @@ impl ColumnConstraintTrait for IdentityColumnConstraint {
 }
 
 impl IdentityColumnConstraint {
+    /// Whether explicit values require an OVERRIDING clause.
+    pub const fn is_always(&self) -> bool {
+        matches!(self.generated_when, IdentityColumnMode::Always)
+    }
+
     /// analyze [`crate::syn::Constraint`]
     pub fn analyze_constraint<TParseContext>(
         context: TParseContext,

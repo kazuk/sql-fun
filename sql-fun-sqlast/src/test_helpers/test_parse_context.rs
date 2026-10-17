@@ -243,8 +243,12 @@ impl TypeInfoRead for TestParseContext {
         self.type_definitions.get(key)
     }
 
-    fn get_array_item_type(&self, _type_name: &TypeReference) -> Option<TypeReference> {
-        todo!()
+    fn get_array_item_type(&self, type_name: &TypeReference) -> Option<TypeReference> {
+        if type_name.is_array() == Some(true) {
+            Some(type_name.element_type())
+        } else {
+            None
+        }
     }
 }
 
@@ -310,6 +314,12 @@ impl FunctionInfoRead for TestParseContext {
 }
 
 impl IndexInfoRead for TestParseContext {
+    fn indexes_for_table(&self, table: &TableName) -> Vec<&CreateIndex> {
+        self.create_indexes
+            .iter()
+            .filter(|index| index.belongs_to(table))
+            .collect()
+    }
     fn get_index_impl(&self, index_name: &FullName) -> Option<&CreateIndex> {
         self.create_indexes
             .iter()

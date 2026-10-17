@@ -23,7 +23,8 @@ impl DataSource {
         alias: &AliasSpec,
         with: &WithClause,
     ) -> Result<Self, AnalysisError> {
-        if with.get(&name.to_string()).is_some() {
+        if let Some(cte) = with.get(&name.to_string()) {
+            cte.require_readable()?;
             Ok(CteDataSource::new_data_source(&name.to_string(), alias))
         } else if context.get_table(&TableName::from(name.clone())).is_some() {
             Ok(TableDataSource::new_data_source(

@@ -4,6 +4,7 @@ use crate::sem::{
 };
 
 #[derive(Debug, Clone, Eq, Hash, PartialEq, serde::Serialize, serde::Deserialize)]
+/// Metadata and retained expression of one result column.
 pub struct ResultColumn {
     // Retain the semantic projection without changing serialized column metadata.
     #[serde(skip)]
@@ -14,6 +15,7 @@ pub struct ResultColumn {
 }
 
 impl ResultColumn {
+    /// Construct result-column metadata without a retained expression.
     pub fn new(
         col_name: &Option<ColumnName>,
         col_type: &Option<TypeReference>,
@@ -43,20 +45,29 @@ mod test_result_column_new {
 }
 
 impl ResultColumn {
+    /// The retained name-resolved projection, when available.
+    pub fn expression(&self) -> Option<&SemScalarExpr> {
+        self.expression.as_deref()
+    }
+
+    /// The SQL result name, when known.
     pub const fn column_name(&self) -> &Option<ColumnName> {
         &self.col_name
     }
 
+    /// The SQL result type, when known.
     pub const fn col_type(&self) -> &Option<TypeReference> {
         &self.col_type
     }
 
+    /// The result nullability, when known.
     pub const fn is_not_null(&self) -> &Option<bool> {
         &self.is_not_null
     }
 }
 
 impl ResultColumn {
+    /// Materialize this result as a column definition.
     pub fn create_column_definition(&self) -> ColumnDefinition {
         ColumnDefinition::new(
             &self.col_name,
@@ -81,6 +92,7 @@ mod test_result_column_create_column_definition {
 }
 
 impl ResultColumn {
+    /// Materialize this result as a composite field.
     pub fn composite_field_definition(&self) -> Result<CompositeFieldDefinition, AnalysisError> {
         let Some(name) = &self.col_name else {
             AnalysisError::raise_unexpected_none("result_column.col_name")?;
@@ -127,6 +139,21 @@ mod test_result_column_composite_field_definition {
 pub struct ResultColumnCollection(Vec<ResultColumn>);
 
 impl ResultColumnCollection {
+    /// Number of result columns.
+    pub const fn len(&self) -> usize {
+        self.0.len()
+    }
+    /// Whether the result has no columns.
+    pub const fn is_empty(&self) -> bool {
+        self.0.is_empty()
+    }
+
+    pub(crate) fn names(&self) -> Vec<ColumnName> {
+        self.0
+            .iter()
+            .filter_map(|column| column.col_name.clone())
+            .collect()
+    }
     pub(crate) fn refresh_value(&mut self, index: usize, value: &SemScalarExpr) {
         if let Some(column) = self.0.get_mut(index) {
             column.col_type = value.get_type();
@@ -169,6 +196,7 @@ impl ResultColumnCollection {
         }
     }
 
+    /// Look up result metadata by SQL column name.
     pub fn get_result_column_def(&self, column_name: &ColumnName) -> Option<ColumnDefinition> {
         self.0.iter().find_map(|c| {
             if c.col_name.as_ref() == Some(column_name) {
@@ -179,10 +207,12 @@ impl ResultColumnCollection {
         })
     }
 
+    /// Whether a result with this SQL name exists.
     pub fn has_column(&self, column: &ColumnName) -> bool {
         self.0.iter().any(|rc| rc.col_name.as_ref() == Some(column))
     }
 
+    /// Append metadata derived from an expression.
     pub fn push_column(&mut self, name: &ColumnName, value_expr: &SemScalarExpr) {
         let col_type = value_expr.get_type();
         self.0.push(ResultColumn::new(
@@ -192,6 +222,7 @@ impl ResultColumnCollection {
         ));
     }
 
+    /// Materialize all results as column definitions in order.
     pub fn column_definitions(&self) -> Result<Vec<ColumnDefinition>, AnalysisError> {
         let mut columns = Vec::new();
         for column in &self.0 {
@@ -203,20 +234,25 @@ impl ResultColumnCollection {
         Ok(columns)
     }
 
+    /// Look up result metadata by zero-based position.
     pub fn get_column_at(&self, index: usize) -> Option<&ResultColumn> {
         self.0.get(index)
     }
 
+    /// Look up a SQL name after skipping the first results.
     pub fn get_column_with_skip_count(
         &self,
         name: &ColumnName,
         skip_count: usize,
     ) -> Option<&ResultColumn> {
-        self.0[skip_count..]
+        self.0
+            .get(skip_count..)
+            .unwrap_or_default()
             .iter()
             .find(|v| v.col_name.as_ref() == Some(name))
     }
 
+    /// Materialize these results as composite fields.
     pub fn composite_field_collection(&self) -> Result<CompositeFieldCollection, AnalysisError> {
         let mut fields = CompositeFieldCollection::default();
         for result_column in &self.0 {
@@ -232,9 +268,19 @@ impl ResultColumnCollection {
         &mut self,
         visitor: &mut V,
     ) -> Result<(), crate::sem::AnalysisError> {
-        for column in &mut self.0 {
+        self.walk_assigned(visitor, &[])
+    }
+    pub(crate) fn walk_assigned<V: crate::sem::traversal::SemanticVisitor>(
+        &mut self,
+        visitor: &mut V,
+        targets: &[crate::sem::InsertTarget],
+    ) -> Result<(), AnalysisError> {
+        for (index, column) in self.0.iter_mut().enumerate() {
             if let Some(expression) = &mut column.expression {
                 expression.walk(visitor)?;
+                if let Some(target) = targets.get(index) {
+                    visitor.assignment(expression, target)?;
+                }
                 visitor.output(
                     column.col_name.as_ref().map_or("", ColumnName::as_str),
                     expression,

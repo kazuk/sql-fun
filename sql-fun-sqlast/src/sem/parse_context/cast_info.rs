@@ -10,6 +10,27 @@ pub trait CastInfoRead {
     /// casts are included. This does not compose transitive cast paths.
     fn cast_sources(&self, target: &TypeReference, explicit: bool) -> HashSet<TypeReference>;
 
+    /// Resolve a direct assignment conversion, distinct from explicit coercion.
+    fn get_assignment_cast(
+        &self,
+        source: &TypeReference,
+        target: &TypeReference,
+    ) -> Option<CastDefinition> {
+        self.get_explicit_cast(source, target)
+            .filter(|cast| cast.context().use_in_assignment())
+    }
+
+    /// Source types eligible for assignment to `target`, including identity.
+    fn assignment_sources(&self, target: &TypeReference) -> HashSet<TypeReference> {
+        let mut sources: HashSet<_> = self
+            .cast_sources(target, true)
+            .into_iter()
+            .filter(|source| self.get_assignment_cast(source, target).is_some())
+            .collect();
+        sources.insert(target.clone());
+        sources
+    }
+
     /// get explicit cast operation
     fn get_explicit_cast(
         &self,

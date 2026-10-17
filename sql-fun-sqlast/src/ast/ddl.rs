@@ -655,6 +655,42 @@ impl super::AlterCommand {
 }
 
 impl super::TableConstraint {
+    fn resolve_declared_key(
+        &self,
+        context: &mut impl ParseContext,
+        table: &crate::sem::CreateTable,
+    ) -> Result<Option<crate::sem::Constraint>, AnalysisError> {
+        if !self.constraint.is_unique_key() {
+            return Ok(None);
+        }
+        if self.extras.deferrable {
+            todo!("deferrable unique-key catalog representation");
+        }
+        let keys: Vec<_> = self
+            .keys
+            .iter()
+            .map(|key| crate::sem::ColumnName::from(key.as_str()))
+            .collect();
+        for key in &keys {
+            if !table.has_column(key) {
+                context.report_analysis_problem(AnalysisProblem::column_not_found_in_table(
+                    table.name(),
+                    key,
+                ))?;
+            }
+        }
+        self.constraint
+            .resolve_table(
+                context,
+                table.name(),
+                self.name.as_deref().unwrap_or_default(),
+                &keys,
+            )
+            .map(Some)
+    }
+}
+
+impl super::TableConstraint {
     fn resolve(
         &self,
         context: &mut impl ParseContext,
@@ -672,10 +708,19 @@ impl super::TableConstraint {
         for key in &keys {
             super::AlterCommand::missing_column(context, table, key)?;
         }
+        if self.constraint.is_unique_key() && self.extras.deferrable {
+            todo!("deferrable unique-key catalog representation");
+        }
         let name = self.name.as_deref().unwrap_or_default();
         self.constraint.resolve_table(context, table, name, &keys)
     }
 }
+impl super::ColumnConstraint {
+    const fn is_unique_key(&self) -> bool {
+        matches!(self, Self::PrimaryKey(_, _) | Self::Unique(_))
+    }
+}
+
 impl super::ColumnConstraint {
     fn resolve_table(
         &self,
@@ -810,13 +855,27 @@ impl super::Table {
         for column in &self.columns {
             columns.push(column.resolve(context, &name)?);
         }
-        Ok(CreateTable::new(
-            &name,
-            columns,
-            self.mode,
-            self.temporary,
-            source,
-        ))
+        let mut table = CreateTable::new(&name, columns, self.mode, self.temporary, source);
+        for definition in &self.constraints {
+            if let Some(constraint) = definition.resolve_declared_key(context, &table)? {
+                table.record_declared_key(&constraint)?;
+            }
+        }
+        for column in &self.columns {
+            for definition in &column.constraints {
+                if definition.name.is_some() && definition.constraint.is_unique_key() {
+                    let keys = [crate::sem::ColumnName::from(column.name.as_str())];
+                    let constraint = definition.constraint.resolve_table(
+                        context,
+                        &name,
+                        definition.name.as_deref().expect("named inline key"),
+                        &keys,
+                    )?;
+                    table.record_declared_key(&constraint)?;
+                }
+            }
+        }
+        Ok(table)
     }
 }
 
@@ -862,6 +921,9 @@ impl super::Column {
         let mut column =
             ColumnDefinition::new(&Some(name.clone()), type_ref.as_ref(), self.not_null, &[]);
         for constraint in &self.constraints {
+            if constraint.constraint.is_unique_key() && constraint.extras.deferrable {
+                todo!("deferrable unique-key catalog representation");
+            }
             let constraint = constraint.constraint.resolve(context, table, &name)?;
             if context.dialect() == Dialect::sqlite() {
                 if let Some(nullability) = constraint.as_nullability() {
@@ -1162,13 +1224,22 @@ impl Index {
         self
     }
 
+    #[cfg(test)]
     pub(crate) fn resolve_elements(
         elements: &[super::IndexExpression],
         context: &mut impl ParseContext,
     ) -> Result<crate::sem::IndexElementCollection, AnalysisError> {
+        use crate::sem::ScalarAnalysisContext;
+        Self::resolve_elements_in(elements, context, &ScalarAnalysisContext::default())
+    }
+
+    fn resolve_elements_in(
+        elements: &[super::IndexExpression],
+        context: &mut impl ParseContext,
+        scope: &crate::sem::ScalarAnalysisContext<'_>,
+    ) -> Result<crate::sem::IndexElementCollection, AnalysisError> {
         use crate::sem::{
-            ColumnName, IndexElement, IndexElementCollection, IndexElementWithOrder,
-            ScalarAnalysisContext, SortOrder,
+            ColumnName, IndexElement, IndexElementCollection, IndexElementWithOrder, SortOrder,
         };
         let mut collection = IndexElementCollection::default();
         for element in elements {
@@ -1176,7 +1247,7 @@ impl Index {
                 return AnalysisError::raise_unexpected_input("SortbyUsing in IndexElem");
             }
             let value = if let Some(expr) = &element.expression {
-                IndexElement::from(&expr.resolve_in(context, &ScalarAnalysisContext::default())?)
+                IndexElement::from(&expr.resolve_in(context, scope)?)
             } else {
                 IndexElement::from(&ColumnName::from(
                     element.name.as_deref().unwrap_or_default(),
@@ -1216,15 +1287,23 @@ impl Index {
             &table.full_name().schema().cloned(),
             &crate::sem::LocalName::from(self.name.as_str()),
         );
-        let keys = Self::resolve_elements(&self.keys, context)?;
-        let includes = Self::resolve_elements(&self.includes, context)?;
-        Ok(Some(crate::sem::CreateIndex::from_resolved(
-            &name,
-            &table,
-            &keys,
-            &includes,
-            self.unique,
-        )))
+        let alias = crate::sem::AliasSpec::from_local_name(&table.full_name().local_name());
+        let with = crate::sem::WithClause::default();
+        let mut from = crate::sem::FromClause::default();
+        from.push(crate::sem::DataSource::resolve_relation(
+            context,
+            table.full_name(),
+            &alias,
+            &with,
+        )?);
+        let scope = crate::sem::ScalarAnalysisContext::nested(&with, &from, None);
+        let keys = Self::resolve_elements_in(&self.keys, context, &scope)?;
+        let includes = Self::resolve_elements_in(&self.includes, context, &scope)?;
+        let predicate = Expr::resolve_optional(&self.predicate, context, &scope)?;
+        let mut index =
+            crate::sem::CreateIndex::from_resolved(&name, &table, &keys, &includes, self.unique);
+        index.set_predicate(predicate);
+        Ok(Some(index))
     }
 
     pub(crate) fn resolve_and_apply<TContext: ParseContext>(

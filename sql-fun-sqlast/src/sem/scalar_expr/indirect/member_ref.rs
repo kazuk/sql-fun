@@ -105,3 +105,13 @@ impl MemberRef {
         self.base.needs_type_inference()
     }
 }
+
+impl MemberRef {
+    pub(super) fn walk_assignment_target<V: crate::sem::traversal::SemanticVisitor>(
+        &mut self,
+        visitor: &mut V,
+    ) -> Result<(), AnalysisError> {
+        self.base.walk_assignment_target(visitor)?;
+        Ok(())
+    }
+}

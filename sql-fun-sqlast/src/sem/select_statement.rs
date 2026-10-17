@@ -33,6 +33,16 @@ pub enum SelectStatement {
 }
 
 impl SelectStatement {
+    pub(crate) fn has_width(&self, width: usize) -> bool {
+        match self {
+            Self::Simple(query) => query.result_columns.len() == width,
+            Self::Query(query) => query.body().has_width(width),
+            Self::Values(values) => values.rows().iter().all(|row| row.len() == width),
+            Self::Union(left, right) | Self::Except(left, right) | Self::Intersect(left, right) => {
+                left.has_width(width) && right.has_width(width)
+            }
+        }
+    }
     pub(crate) fn rename_columns(&mut self, names: &[String]) {
         match self {
             Self::Simple(query) => query.result_columns.rename(names),
@@ -287,24 +297,42 @@ impl SelectStatement {
         &mut self,
         visitor: &mut V,
     ) -> Result<(), AnalysisError> {
+        self.walk_body_assigned(visitor, &[])
+    }
+    pub(crate) fn walk_assigned<V: crate::sem::traversal::SemanticVisitor>(
+        &mut self,
+        visitor: &mut V,
+        targets: &[crate::sem::InsertTarget],
+    ) -> Result<(), AnalysisError> {
+        visitor.enter_query();
+        let result = self.walk_body_assigned(visitor, targets);
+        visitor.leave_query();
+        result
+    }
+    pub(super) fn walk_body_assigned<V: crate::sem::traversal::SemanticVisitor>(
+        &mut self,
+        visitor: &mut V,
+        targets: &[crate::sem::InsertTarget],
+    ) -> Result<(), AnalysisError> {
         match self {
-            Self::Simple(query) => query.walk(visitor),
-            Self::Query(query) => query.walk(visitor),
-            Self::Values(values) => values.walk(visitor),
+            Self::Simple(query) => query.walk_assigned(visitor, targets),
+            Self::Query(query) => query.walk_assigned(visitor, targets),
+            Self::Values(values) => values.walk_assigned(visitor, targets),
             Self::Union(left, right) | Self::Intersect(left, right) | Self::Except(left, right) => {
-                left.walk(visitor)?;
+                left.walk_assigned(visitor, targets)?;
                 visitor.retain_set_outputs();
-                right.walk(visitor)
+                right.walk_assigned(visitor, targets)
             }
         }
     }
 }
 
 impl SelectStatementNode {
-    pub(crate) fn walk<V: crate::sem::traversal::SemanticVisitor>(
+    fn walk_assigned<V: crate::sem::traversal::SemanticVisitor>(
         &mut self,
         visitor: &mut V,
-    ) -> Result<(), crate::sem::AnalysisError> {
+        targets: &[crate::sem::InsertTarget],
+    ) -> Result<(), AnalysisError> {
         self.with_clause.walk(visitor)?;
         self.from_clause.walk(visitor)?;
         crate::sem::traversal::optional(&mut self.where_clause, visitor)?;
@@ -312,7 +340,7 @@ impl SelectStatementNode {
             visitor.predicate(predicate);
         }
         self.clauses.walk_windows(visitor)?;
-        self.result_columns.walk(visitor)?;
+        self.result_columns.walk_assigned(visitor, targets)?;
         self.clauses.walk(visitor)?;
         Ok(())
     }

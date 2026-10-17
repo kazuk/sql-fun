@@ -143,6 +143,13 @@ mod test_frozen_root {
 macro_rules! forward_catalog_reads {
     ($context:ty, $catalog:ident) => {
         impl crate::sem::CastInfoRead for $context {
+            fn get_assignment_cast(
+                &self,
+                source: &crate::sem::TypeReference,
+                target: &crate::sem::TypeReference,
+            ) -> Option<crate::sem::CastDefinition> {
+                crate::sem::CastInfoRead::get_assignment_cast(self.$catalog(), source, target)
+            }
             fn cast_sources(
                 &self,
                 target: &crate::sem::TypeReference,
@@ -185,6 +192,12 @@ macro_rules! forward_catalog_reads {
         }
 
         impl crate::sem::IndexInfoRead for $context {
+            fn indexes_for_table(
+                &self,
+                table: &crate::sem::TableName,
+            ) -> Vec<&crate::sem::CreateIndex> {
+                crate::sem::IndexInfoRead::indexes_for_table(self.$catalog(), table)
+            }
             fn get_index_impl(
                 &self,
                 name: &crate::sem::FullName,

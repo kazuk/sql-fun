@@ -22,6 +22,10 @@ pub struct CreateView {
 }
 
 impl CreateView {
+    pub(crate) fn result_columns(&self) -> &crate::sem::ResultColumnCollection {
+        self.query.result_columns()
+    }
+
     /// create instance
     #[must_use]
     pub fn new(

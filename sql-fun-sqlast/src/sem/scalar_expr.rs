@@ -752,3 +752,25 @@ impl SemScalarExpr {
         Self::Arith(value)
     }
 }
+
+impl SemScalarExpr {
+    pub(in crate::sem) fn index_column(name: &ColumnName) -> Self {
+        Self::column_reference(ColumnReferenceExpr::index_column(name))
+    }
+
+    pub(in crate::sem) fn canonicalize_index_binding(&mut self) {
+        if let Self::ColumnRef(value) = self {
+            value.canonicalize_index_binding();
+        }
+    }
+
+    pub(crate) fn walk_assignment_target<V: crate::sem::traversal::SemanticVisitor>(
+        &mut self,
+        visitor: &mut V,
+    ) -> Result<(), AnalysisError> {
+        if let Self::Indirection(target) = self {
+            target.walk_assignment_target(visitor)?;
+        }
+        Ok(())
+    }
+}

@@ -30,7 +30,7 @@ Use explicit `AS` names when stable result-column names matter.
 
 This is not complete SQLite query validation. Arithmetic and comparison operators,
 function type affinity, case-insensitive identifier binding,
-operator-dependent parameter analysis, star expansion, recursive CTE binding,
+operator-dependent parameter analysis, recursive CTE binding,
 and full compound type checking remain incomplete.
 Supported expressions in GROUP BY, ORDER BY, HAVING, LIMIT/OFFSET, and window
 clauses participate in analysis. Output aliases and ordering positions follow
@@ -39,10 +39,54 @@ expressions or aliases. Full grouping and window legality checks remain incomple
 Different CASE result types are not unified using PostgreSQL implicit casts.
 Use matching identifier spelling when referring to derived-query or CTE columns.
 
+## INSERT analysis
+
+PostgreSQL and SQLite INSERT analysis retains the destination column bindings,
+VALUES or query source, conflict policy, and RETURNING result names, types, and
+nullability. Without RETURNING, the analyzed statement has no result columns.
+DEFAULT VALUES and PostgreSQL per-value DEFAULT remain distinct from explicit
+expressions; analysis does not evaluate database defaults or execute the INSERT.
+
+Explicit destination columns follow the supplied order. PostgreSQL also permits
+values for only the first columns when the column list is omitted; SQLite
+requires values for every non-generated column in that form. Generated and
+PostgreSQL identity columns are checked against DEFAULT and OVERRIDING rules.
+PostgreSQL assignment conversions constrain INSERT inputs, including inputs from
+SELECT sources. SQLite inputs retain SQLite's dynamic typing rather than using
+PostgreSQL assignment casts; successful analysis does not guarantee that a value
+passes runtime constraints, including STRICT table checks.
+
+RETURNING resolves destination columns and expands `*`. PostgreSQL permits
+`alias.*` and hides the original table name after an INSERT alias is supplied.
+SQLite RETURNING uses the original table name and rejects qualified stars.
+PostgreSQL INSERT CTEs expose their RETURNING columns to subsequent queries;
+a CTE without RETURNING cannot be read as a relation. SQLite permits WITH before
+INSERT but does not permit INSERT inside a CTE body.
+
+DO NOTHING retains and checks conflict targets against catalog constraints and
+unique indexes, including matching expression keys and identical partial-index
+predicates. Named constraint targets require constraint names retained in the
+schema; automatically generated database names are not inferred.
+General predicate implication and explicit collation/operator-class
+catalog resolution remain unimplemented; these forms do not produce successful
+analysis. DO UPDATE remains explicitly unimplemented
+([#474](https://github.com/kazuk/sql-fun/issues/474)); it does not produce a
+successful INSERT analysis, including later actions in SQLite UPSERT chains.
+
+INSERT into views, deferrable unique-key catalog definitions, recursive CTE
+binding, and expressions already unsupported by the SELECT analyzer remain
+unsupported. Star expansion supports tables, ordinary
+views, derived queries, nonrecursive CTEs, and joins; merged columns in FULL JOIN
+stars remain unimplemented. The PostgreSQL parser currently accepts PostgreSQL 17
+grammar, so PostgreSQL 18's RETURNING OLD/NEW alias syntax is unavailable.
+These limitations can terminate analysis; parsing a statement does not establish
+that its semantics are supported.
+
 ## Parameter analysis
 
 Numbered parameters (`$1` in PostgreSQL and `?1` in SQLite) can be used across
-supported nonrecursive CTEs and the outer query. Repeated uses of a parameter
+supported nonrecursive CTEs and the outer statement, including INSERT sources,
+RETURNING, and conflict predicates. Repeated uses of a parameter
 must have compatible SQL type requirements; conflicts produce diagnostics.
 A parameter used only by `IS NULL` has no particular type requirement. Explicit
 SQL casts constrain accepted input types. SQLite casts follow SQLite semantics

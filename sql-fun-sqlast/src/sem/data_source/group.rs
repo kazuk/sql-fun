@@ -18,6 +18,19 @@ impl GroupedDataSource {
         }
     }
 
+    pub(super) fn projection_names(
+        &self,
+        context: &impl ParseContext,
+        with: &WithClause,
+    ) -> Result<Vec<(AliasName, ColumnName)>, AnalysisError> {
+        Ok(self
+            .source
+            .projection_names(context, with, None)?
+            .into_iter()
+            .map(|(_, name)| (self.alias.name().clone(), name))
+            .collect())
+    }
+
     pub(super) fn is_joined(&self) -> bool {
         self.source.is_joined()
     }

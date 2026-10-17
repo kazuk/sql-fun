@@ -1,3 +1,5 @@
+mod arbiter;
+
 use sql_fun_core::IVec;
 
 use crate::{
@@ -54,7 +56,6 @@ impl From<&SemScalarExpr> for IndexElement {
 /// combine column and sort order , `col_name`
 #[derive(Debug, Clone)]
 pub struct IndexElementWithOrder {
-    #[cfg_attr(not(test), expect(dead_code))]
     element: IndexElement,
     #[cfg_attr(not(test), expect(dead_code))]
     col_name: Option<String>,
@@ -140,17 +141,22 @@ mod index_element_collection_tests {
 #[derive(Debug, Clone)]
 pub struct CreateIndex {
     name: FullName,
-    #[cfg_attr(not(test), expect(dead_code))]
     table: TableName,
-    #[cfg_attr(not(test), expect(dead_code))]
     key_columns: IndexElementCollection,
     #[cfg_attr(not(test), expect(dead_code))]
     include_columns: IndexElementCollection,
-    #[cfg_attr(not(test), expect(dead_code))]
     unique: bool,
+    predicate: Option<SemScalarExpr>,
 }
 
 impl CreateIndex {
+    pub(crate) fn set_predicate(&mut self, predicate: Option<SemScalarExpr>) {
+        self.predicate = predicate;
+    }
+
+    pub(crate) fn belongs_to(&self, table: &TableName) -> bool {
+        &self.table == table
+    }
     pub(crate) fn from_resolved(
         name: &FullName,
         table: &TableName,
@@ -164,6 +170,7 @@ impl CreateIndex {
             key_columns: keys.clone(),
             include_columns: includes.clone(),
             unique,
+            predicate: None,
         }
     }
     /// Create an index with its qualified catalog identity and resolved target table.
@@ -175,6 +182,7 @@ impl CreateIndex {
             key_columns: key_columns.clone(),
             include_columns: IndexElementCollection::default(),
             unique: true,
+            predicate: None,
         }
     }
 
@@ -192,6 +200,7 @@ impl CreateIndex {
             key_columns: key_columns.clone(),
             include_columns: include_columns.clone(),
             unique: true,
+            predicate: None,
         }
     }
 

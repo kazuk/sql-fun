@@ -21,7 +21,7 @@ pub enum CteStatement {
     /// `SELECT` statement
     Select(Box<SelectStatement>),
     /// `INSERT` statement
-    Insert(InsertStatement),
+    Insert(Box<InsertStatement>),
     /// `UPDATE` statement
     Update(UpdateStatement),
     /// `DELETE` statement
@@ -33,45 +33,68 @@ impl CteStatement {
     pub fn get_column<TParseContext>(
         &self,
         _context: &TParseContext,
-        _name: &ColumnName,
+        name: &ColumnName,
     ) -> Option<ColumnDefinition>
     where
         TParseContext: ParseContext,
     {
-        todo!()
+        self.resolved_column(name, None, 0)
     }
 
     /// get column at index
     pub fn get_column_at<TParseContext>(
         &self,
         _context: &TParseContext,
-        _index: usize,
-    ) -> Option<&ColumnDefinition>
+        index: usize,
+    ) -> Option<ColumnDefinition>
     where
         TParseContext: ParseContext,
     {
-        todo!()
+        self.resolved_column(&ColumnName::from(""), Some(index), 0)
     }
 
     /// get column definition with skip count
     pub fn get_column_def_with_skip_count<TParseContext>(
         &self,
         _context: &TParseContext,
-        _name: &ColumnName,
-        _skip_count: usize,
-    ) -> Option<&ColumnDefinition>
+        name: &ColumnName,
+        skip_count: usize,
+    ) -> Option<ColumnDefinition>
     where
         TParseContext: ParseContext,
     {
-        todo!()
+        self.resolved_column(name, None, skip_count)
+    }
+
+    pub(crate) fn result_columns(&self) -> Option<&crate::sem::ResultColumnCollection> {
+        match self {
+            Self::Select(query) => Some(query.result_columns()),
+            Self::Insert(insert) => Some(insert.result_columns()),
+            _ => None,
+        }
+    }
+    pub(crate) fn require_readable(&self) -> Result<(), AnalysisError> {
+        if let Self::Insert(insert) = self
+            && insert.result_columns().is_empty()
+        {
+            return Err(AnalysisError::unexpected_input_error(
+                "INSERT CTE requires RETURNING to be read",
+            ));
+        }
+        Ok(())
     }
 
     /// test column existing
     pub(crate) fn has_column(&self, column: &ColumnName) -> bool {
         match self {
             Self::Select(query) => query.has_column(column),
-            Self::Insert(_) | Self::Update(_) | Self::Delete(_) => false,
+            Self::Insert(insert) => insert.result_columns().has_column(column),
+            Self::Update(_) | Self::Delete(_) => false,
         }
+    }
+
+    pub(crate) fn from_insert(insert: InsertStatement) -> Self {
+        Self::Insert(Box::new(insert))
     }
 
     pub(crate) fn from_query(query: SelectStatement) -> Self {
@@ -94,7 +117,16 @@ impl CteStatement {
                 };
                 result.map(|column| column.create_column_definition())
             }
-            Self::Insert(_) | Self::Update(_) | Self::Delete(_) => None,
+            Self::Insert(insert) => {
+                let columns = insert.result_columns();
+                let result = if let Some(index) = index {
+                    columns.get_column_at(index)
+                } else {
+                    columns.get_column_with_skip_count(column, skip)
+                };
+                result.map(|column| column.create_column_definition())
+            }
+            Self::Update(_) | Self::Delete(_) => None,
         }
     }
 }
@@ -149,7 +181,8 @@ impl CteStatement {
     ) -> Result<(), crate::sem::AnalysisError> {
         match self {
             Self::Select(query) => query.walk(visitor)?,
-            Self::Insert(_) | Self::Update(_) | Self::Delete(_) => {}
+            Self::Insert(insert) => insert.walk(visitor)?,
+            Self::Update(_) | Self::Delete(_) => {}
         }
         Ok(())
     }

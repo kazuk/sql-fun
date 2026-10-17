@@ -315,6 +315,58 @@ impl CreateTable {
         Ok(Vec::new())
     }
 
+    pub(crate) fn record_declared_key(
+        &mut self,
+        constraint: &Constraint,
+    ) -> Result<(), AnalysisError> {
+        let key = if constraint.name().is_empty() {
+            // An internal map slot identifies an unnamed declaration; it is never
+            // exposed as a fabricated SQL constraint/index name.
+            format!("<unnamed:{}>", self.constraints.len())
+        } else {
+            constraint.name().to_owned()
+        };
+        if self.constraints.contains_key(&key) {
+            return Err(AnalysisError::unexpected_input_error(
+                "duplicate constraint name",
+            ));
+        }
+        self.constraints.insert(key, constraint.clone());
+        Ok(())
+    }
+
+    /// Look up an explicitly named table constraint.
+    pub(crate) fn constraint(&self, name: &str) -> Option<&Constraint> {
+        self.constraints
+            .get(name)
+            .filter(|constraint| constraint.name() == name)
+    }
+
+    pub(crate) fn infer_insert_arbiters(
+        &self,
+        destination: &TableName,
+        columns: &[ColumnName],
+    ) -> Vec<crate::sem::InsertArbiter> {
+        let mut arbiters = Vec::new();
+        for constraint in self.constraints.values() {
+            if constraint.matches_unique_columns(columns) {
+                arbiters.push(crate::sem::InsertArbiter::table_constraint(
+                    destination,
+                    constraint,
+                ));
+            }
+        }
+        if columns.len() == 1
+            && let Some(column) = self.columns.get_column_def(&columns[0])
+            && column.constraints().iter().any(|constraint| {
+                constraint.as_primary_key().is_some() || constraint.as_unique().is_some()
+            })
+        {
+            arbiters.push(crate::sem::InsertArbiter::column_constraint(&columns[0]));
+        }
+        arbiters
+    }
+
     /// get primary key column names
     #[must_use]
     pub fn primary_key_columns(&self) -> Vec<&ColumnName> {

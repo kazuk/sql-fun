@@ -5,6 +5,14 @@ pub(crate) trait SemanticVisitor {
     fn expression(&mut self, _expression: &mut SemScalarExpr) -> Result<(), AnalysisError> {
         Ok(())
     }
+    fn assignment(
+        &mut self,
+        _value: &mut SemScalarExpr,
+        _target: &crate::sem::InsertTarget,
+    ) -> Result<(), AnalysisError> {
+        Ok(())
+    }
+    fn subscript(&mut self, _value: &SemScalarExpr) {}
     fn enter_query(&mut self) {}
     fn leave_query(&mut self) {}
     fn cte(&mut self, _name: &str) {}

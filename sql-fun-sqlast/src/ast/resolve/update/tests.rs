@@ -1,4 +1,5 @@
 mod assignments;
+mod cursors;
 mod views;
 
 use self::test_helpers::{analyze, catalog};

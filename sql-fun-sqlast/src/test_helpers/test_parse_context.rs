@@ -45,6 +45,7 @@ pub struct TestParseContext {
     drop_tables: Vec<DropTable>,
     create_indexes: Vec<CreateIndex>,
     problems: Vec<AnalysisProblem>,
+    cursors: crate::sem::CursorBindings,
     analysis_state: crate::sem::AnalysisState,
     parameter_constraints: crate::sem::ParameterConstraints,
     report_failure_after: Option<usize>,
@@ -425,6 +426,12 @@ impl FunctionInfoWrite for TestParseContext {
 }
 
 impl ParseContext for TestParseContext {
+    fn cursors(&self) -> &crate::sem::CursorBindings {
+        &self.cursors
+    }
+    fn cursors_mut(&mut self) -> &mut crate::sem::CursorBindings {
+        &mut self.cursors
+    }
     fn analysis_state(&self) -> &crate::sem::AnalysisState {
         &self.analysis_state
     }

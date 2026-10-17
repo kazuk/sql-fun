@@ -112,11 +112,11 @@ pub use self::{
     operators::{BinaryOperatorDefinition, OperatorDefinition, UnaryOperatorDefinition},
     parameter_constraints::{InputTypeConstraint, ParameterConstraint, ParameterConstraints},
     parse_context::{
-        BaseParseContext, CastInfoRead, CatalogNameLookup, ConflictInfoRead,
-        DefaultSourceAccessService, DiagnosticContext, FunctionInfoRead, FunctionInfoWrite,
-        IndexInfoRead, OperatorInfoRead, ParseContext, SearchPathRead, SequenceInfoRead,
-        SequenceInfoWrite, SourceAccessService, TableInfoRead, TableInfoWrite, TypeInfoRead,
-        TypeInfoWrite, ViewInfoRead, ViewInfoWrite,
+        BaseParseContext, CastInfoRead, CatalogNameLookup, ConflictInfoRead, CursorBindings,
+        CursorInfo, DefaultSourceAccessService, DiagnosticContext, FunctionInfoRead,
+        FunctionInfoWrite, IndexInfoRead, OperatorInfoRead, ParseContext, SearchPathRead,
+        SequenceInfoRead, SequenceInfoWrite, SourceAccessService, TableInfoRead, TableInfoWrite,
+        TypeInfoRead, TypeInfoWrite, ViewInfoRead, ViewInfoWrite,
     },
     pg_type::{PgBuiltInType, TypeDefinition, TypeReference},
     problem::{AnalysisProblem, ParameterConstraintProblem, QueryProblem},
@@ -136,8 +136,8 @@ pub use self::{
     select_statement::{ResultColumnCollection, SelectStatement},
     type_system::{FunctionOverloadCollection, FunctionParam, OverloadVariant},
     update_statement::{
-        UpdateAssignment, UpdateQueryValue, UpdateStatement, UpdateValue, ViewUpdateInfoRead,
-        ViewUpdateSupport, analyze_update_statement,
+        UpdateAssignment, UpdateCursor, UpdateQueryValue, UpdateStatement, UpdateValue,
+        ViewUpdateInfoRead, ViewUpdateSupport, analyze_update_statement,
     },
     variable_set::{VariableSet, analyze_variable_set},
     view_like::ViewLike,
@@ -154,7 +154,7 @@ pub(crate) use self::{
     scalar_expr::{CaseExprAnalysisContext, CoalesceAnalysis},
     select_statement::SelectStatementNode,
     stack::with_stack,
-    update_statement::UpdateDestination,
+    update_statement::{UpdateDestination, UpdatePredicate},
 };
 
 use crate::StringSpan;

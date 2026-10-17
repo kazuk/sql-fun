@@ -75,9 +75,11 @@ Production PostgreSQL catalogs load collation and operator-class definitions fro
 `collations.json` and `operator_classes.json` in the explicitly selected catalog
 generation. Both files are required; incomplete or malformed generations fail to
 load. Name lookup honors qualification, the current search path, database encoding,
-and the requested access method. `BaseParseContext` exposes `MasterInfoRead` for
-typed definitions, database-default provenance, and operator-family/type relations;
-frozen catalogs retain the same definitions.
+and the requested access method. `ConflictInfoRead` provides purpose-specific
+`database_collation`, `collation_definition`, and `operator_class_definition` reads
+for database-default provenance and qualified definitions with operator-family/type
+relations. The provider selects encoding/access-method eligibility; backing master
+collections remain private. Frozen catalogs retain the same read services.
 
 SQLite lookup uses its connection-local, case-insensitive collation namespace.
 BINARY, NOCASE, and RTRIM are available. API consumers must explicitly declare

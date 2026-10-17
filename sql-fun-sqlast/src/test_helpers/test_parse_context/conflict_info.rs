@@ -33,6 +33,29 @@ impl TestParseContext {
     }
 }
 impl ConflictInfoRead for TestParseContext {
+    fn database_collation(&self) -> Option<&crate::sem::DatabaseCollation> {
+        self.masters.as_ref().and_then(|masters| masters.database())
+    }
+    fn collation_definition(&self, name: &FullName) -> Option<&crate::sem::CollationDefinition> {
+        self.masters
+            .as_ref()
+            .and_then(|masters| masters.qualified_collation(name))
+    }
+    fn operator_class_definition(
+        &self,
+        name: &FullName,
+        method: &str,
+    ) -> Option<&crate::sem::OperatorClassDefinition> {
+        self.masters
+            .as_ref()
+            .and_then(|masters| masters.operator_class(name, method))
+    }
+    fn lookup_sqlite_collation(&self, name: &FullName) -> CatalogNameLookup {
+        self.masters
+            .as_ref()
+            .expect("explicit test namespace")
+            .sqlite_lookup(name)
+    }
     fn lookup_collation(&self, name: &FullName) -> CatalogNameLookup {
         self.collation_results
             .get(name)
@@ -65,13 +88,5 @@ impl ConflictInfoRead for TestParseContext {
         } else {
             crate::sem::infer_from_catalog(self, table, conflict)
         }
-    }
-}
-
-impl crate::sem::MasterInfoRead for TestParseContext {
-    fn conflict_masters(&self) -> &crate::sem::ConflictMasters {
-        self.masters
-            .as_ref()
-            .expect("test master definitions must be supplied explicitly")
     }
 }

@@ -191,12 +191,29 @@ macro_rules! forward_catalog_reads {
             }
         }
 
-        impl crate::sem::MasterInfoRead for $context {
-            fn conflict_masters(&self) -> &crate::sem::ConflictMasters {
-                crate::sem::MasterInfoRead::conflict_masters(self.$catalog())
-            }
-        }
         impl crate::sem::ConflictInfoRead for $context {
+            fn database_collation(&self) -> Option<&crate::sem::DatabaseCollation> {
+                self.$catalog().database_collation()
+            }
+            fn collation_definition(
+                &self,
+                name: &crate::sem::FullName,
+            ) -> Option<&crate::sem::CollationDefinition> {
+                self.$catalog().collation_definition(name)
+            }
+            fn operator_class_definition(
+                &self,
+                name: &crate::sem::FullName,
+                method: &str,
+            ) -> Option<&crate::sem::OperatorClassDefinition> {
+                self.$catalog().operator_class_definition(name, method)
+            }
+            fn lookup_sqlite_collation(
+                &self,
+                name: &crate::sem::FullName,
+            ) -> crate::sem::CatalogNameLookup {
+                self.$catalog().lookup_sqlite_collation(name)
+            }
             fn lookup_collation(
                 &self,
                 name: &crate::sem::FullName,

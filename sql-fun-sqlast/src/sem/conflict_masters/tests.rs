@@ -1,6 +1,6 @@
 use super::{ConflictMasters, lookup_collation, lookup_operator_class};
 use crate::sem::{
-    BaseParseContext, CollationIdentity, ConflictInfoRead, FullName, MasterInfoRead, ParseContext,
+    BaseParseContext, CollationIdentity, ConflictInfoRead, FullName, ParseContext,
     SchemaFileContext, SchemaName,
 };
 
@@ -43,13 +43,14 @@ fn preserves_encoding_identity_and_precedence(
     fixture.set_encoding(encoding);
     fixture.add_collation("public", "variant", -1, "c");
     fixture.add_collation("public", "variant", 6, "c");
-    let masters = fixture.load().unwrap();
+    let context = fixture.context();
     let name = FullName::with_schema("public", "variant");
-    let definition = masters.qualified_collation(&name).unwrap();
+    let definition = context.collation_definition(&name).unwrap();
     assert_eq!(definition.encoding(), selected_encoding);
     let identity = CollationIdentity::new(&name, definition.encoding()).unwrap();
-    assert_eq!(masters.collation(&identity), Some(definition));
-    assert_eq!(masters.database().unwrap().encoding(), encoding);
+    assert_eq!(identity.qualified_name(), definition.qualified_name());
+    assert_eq!(identity.encoding(), definition.encoding());
+    assert_eq!(context.database_collation().unwrap().encoding(), encoding);
 }
 
 #[rstest::rstest]
@@ -64,9 +65,8 @@ fn filters_icu_encoding_eligibility(#[case] encoding: i32, #[case] found: bool) 
     fixture.add_collation("public", "icu", -1, "i");
     assert_eq!(
         fixture
-            .load()
-            .unwrap()
-            .qualified_collation(&FullName::with_schema("public", "icu"))
+            .context()
+            .collation_definition(&FullName::with_schema("public", "icu"))
             .is_some(),
         found
     );
@@ -136,9 +136,22 @@ fn child_lookup_uses_current_path_and_freeze_preserves_it() {
         lookup_collation(&frozen, &requested).resolved_name(),
         Some(&FullName::with_schema("first", "Mixed.名"))
     );
+    assert_eq!(child.database_collation(), frozen.database_collation());
+    let qualified = FullName::with_schema("second", "Mixed.名");
     assert_eq!(
-        child.conflict_masters().database(),
-        frozen.conflict_masters().database()
+        child.collation_definition(&qualified),
+        frozen.collation_definition(&qualified)
+    );
+    assert!(child.collation_definition(&requested).is_none());
+    assert!(
+        child
+            .operator_class_definition(&FullName::from_local_name("ops"), "btree")
+            .is_none()
+    );
+    assert!(
+        child
+            .operator_class_definition(&FullName::with_schema("public", "ops"), "gin")
+            .is_none()
     );
 }
 
@@ -150,10 +163,7 @@ fn operator_class_reads_retain_method_family_type_and_default() {
     for method in ["btree", "hash"] {
         let result = lookup_operator_class(&context, &FullName::from_local_name("ops"), method);
         assert_eq!(result.resolved_name(), Some(&name));
-        let definition = context
-            .conflict_masters()
-            .operator_class(&name, method)
-            .unwrap();
+        let definition = context.operator_class_definition(&name, method).unwrap();
         assert_eq!(definition.family().access_method(), method);
         assert_eq!(
             definition.input_type().qualified_name(),
@@ -204,6 +214,7 @@ fn unqualified_lookup_skips_temporary_namespaces() {
 #[rstest::rstest]
 #[case::duplicate_collation("duplicate_collation")]
 #[case::duplicate_class("duplicate_class")]
+#[case::empty_classes("empty_classes")]
 #[case::encoding("encoding")]
 #[case::default_identity("default_identity")]
 #[case::default_provider("default_provider")]
@@ -294,7 +305,7 @@ fn sqlite_base_needs_no_postgres_masters_and_exposes_registration() -> testresul
             .resolved_name()
             .is_some()
     );
-    assert!(frozen.conflict_masters().database().is_none());
+    assert!(frozen.database_collation().is_none());
     Ok(())
 }
 
@@ -451,6 +462,7 @@ mod test_helpers {
                     let value = self.classes[0].clone();
                     self.classes.as_array_mut().unwrap().push(value);
                 }
+                "empty_classes" => self.classes = ::serde_json::json!([]),
                 "encoding" => self.collations["database"]["encoding"] = 35.into(),
                 "default_identity" => {
                     self.collations["database"]["default_collation"]["name"] = "absent".into()

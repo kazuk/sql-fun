@@ -91,6 +91,27 @@ impl LookupOutcome {
 /// spelling. A catalog that cannot perform a lookup must explicitly remain
 /// unimplemented at its implementation boundary.
 pub trait ConflictInfoRead {
+    /// Source database encoding and default-collation provenance, absent for SQLite.
+    fn database_collation(&self) -> Option<&crate::sem::DatabaseCollation>;
+
+    /// Read one PostgreSQL collation at an exact schema-qualified name.
+    /// The provider selects the variant eligible for its database encoding.
+    /// Unqualified/catalog-qualified names and SQLite namespaces return `None`.
+    fn collation_definition(&self, name: &FullName) -> Option<&crate::sem::CollationDefinition>;
+
+    /// Read one PostgreSQL operator class at an exact schema-qualified name for
+    /// the explicitly supplied access method. Does not select a default class.
+    fn operator_class_definition(
+        &self,
+        name: &FullName,
+        access_method: &str,
+    ) -> Option<&crate::sem::OperatorClassDefinition>;
+
+    /// Resolve a name in the explicit SQLite connection-local namespace.
+    /// Available independently of the context's historical analysis dialect;
+    /// qualified names are missing. No connection is inspected.
+    fn lookup_sqlite_collation(&self, name: &FullName) -> CatalogNameLookup;
+
     /// Resolve a collation using the selected dialect's namespace rules.
     /// PostgreSQL uses explicit qualification or the active search path (and
     /// database encoding); SQLite uses its case-insensitive connection namespace.

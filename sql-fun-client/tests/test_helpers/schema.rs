@@ -16,9 +16,15 @@ impl SchemaFixture {
         let root = directory.path();
         let catalog = root.join("home/postgres/17");
         std::fs::create_dir_all(&catalog)?;
-        for name in ["functions", "func_detail", "pg_type", "operator_classes"] {
+        for name in ["functions", "func_detail", "pg_type"] {
             std::fs::write(catalog.join(format!("{name}.json")), "[]")?;
         }
+        std::fs::write(
+            catalog.join("operator_classes.json"),
+            r#"[{"schema":"pg_catalog","name":"int4_ops","access_method":"btree",
+                "family":{"schema":"pg_catalog","name":"integer_ops","access_method":"btree"},
+                "input_type":{"schema":"pg_catalog","name":"int4"},"default":true,"key_type":null}]"#,
+        )?;
         for name in ["left_unary_op", "right_unary_op", "casts"] {
             std::fs::write(catalog.join(format!("{name}.json")), "{}")?;
         }

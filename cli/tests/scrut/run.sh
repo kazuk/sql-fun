@@ -33,6 +33,9 @@ done
 printf '%s\n' '{"intentionally_unused":[]}' >"$SQL_FUN_API_FIXTURE/home/postgres/17/binary_op.json"
 printf '%s\n' '[{"name":"int4"}]' >"$SQL_FUN_API_FIXTURE/home/postgres/17/pg_type.json"
 printf '%s\n' '-- synthetic builtin' >"$SQL_FUN_API_FIXTURE/home/postgres/17/schema.sql"
+for catalog in collations operator_classes; do
+  cp "$api_fixture_source/$catalog.json" "$SQL_FUN_API_FIXTURE/home/postgres/17/$catalog.json"
+done
 api_dump_hash=$(sha256sum "$SQL_FUN_API_FIXTURE/schema.sql")
 api_dump_hash=${api_dump_hash%% *}
 jq -n --arg fixture "$SQL_FUN_API_FIXTURE" --arg hash "$api_dump_hash" '{

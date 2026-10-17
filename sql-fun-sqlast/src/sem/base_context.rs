@@ -241,6 +241,22 @@ where
 }
 
 impl crate::sem::ConflictInfoRead for BaseContext {
+    fn database_collation(&self) -> Option<&crate::sem::DatabaseCollation> {
+        self.masters.database()
+    }
+    fn collation_definition(&self, name: &FullName) -> Option<&crate::sem::CollationDefinition> {
+        self.masters.qualified_collation(name)
+    }
+    fn operator_class_definition(
+        &self,
+        name: &FullName,
+        method: &str,
+    ) -> Option<&crate::sem::OperatorClassDefinition> {
+        self.masters.operator_class(name, method)
+    }
+    fn lookup_sqlite_collation(&self, name: &FullName) -> crate::sem::CatalogNameLookup {
+        self.masters.sqlite_lookup(name)
+    }
     fn lookup_collation(&self, name: &FullName) -> crate::sem::CatalogNameLookup {
         crate::sem::conflict_masters::lookup_collation(self, name)
     }
@@ -263,11 +279,5 @@ impl crate::sem::ConflictInfoRead for BaseContext {
 impl crate::sem::ViewInsertInfoRead for BaseContext {
     fn view_insert_support(&self, _view: &FullName) -> crate::sem::ViewInsertSupport {
         todo!("catalog writable-view columns, INSTEAD OF INSERT triggers and rules")
-    }
-}
-
-impl crate::sem::MasterInfoRead for BaseContext {
-    fn conflict_masters(&self) -> &crate::sem::ConflictMasters {
-        &self.masters
     }
 }

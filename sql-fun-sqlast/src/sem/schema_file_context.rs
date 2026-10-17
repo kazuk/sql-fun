@@ -961,6 +961,28 @@ mod test_search_path {
 }
 
 impl crate::sem::ConflictInfoRead for SchemaCatalog {
+    fn database_collation(&self) -> Option<&crate::sem::DatabaseCollation> {
+        self.base.database_collation()
+    }
+    fn collation_definition(
+        &self,
+        name: &crate::sem::FullName,
+    ) -> Option<&crate::sem::CollationDefinition> {
+        self.base.collation_definition(name)
+    }
+    fn operator_class_definition(
+        &self,
+        name: &crate::sem::FullName,
+        method: &str,
+    ) -> Option<&crate::sem::OperatorClassDefinition> {
+        self.base.operator_class_definition(name, method)
+    }
+    fn lookup_sqlite_collation(
+        &self,
+        name: &crate::sem::FullName,
+    ) -> crate::sem::CatalogNameLookup {
+        self.base.lookup_sqlite_collation(name)
+    }
     fn lookup_collation(&self, name: &FullName) -> crate::sem::CatalogNameLookup {
         crate::sem::conflict_masters::lookup_collation(self, name)
     }
@@ -983,11 +1005,5 @@ impl crate::sem::ConflictInfoRead for SchemaCatalog {
 impl crate::sem::ViewInsertInfoRead for SchemaCatalog {
     fn view_insert_support(&self, _view: &FullName) -> crate::sem::ViewInsertSupport {
         todo!("catalog writable-view columns, INSTEAD OF INSERT triggers and rules")
-    }
-}
-
-impl crate::sem::MasterInfoRead for SchemaCatalog {
-    fn conflict_masters(&self) -> &crate::sem::ConflictMasters {
-        self.base.conflict_masters()
     }
 }

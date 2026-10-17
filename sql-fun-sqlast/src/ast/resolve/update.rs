@@ -32,8 +32,46 @@ impl Update {
         outer: Option<&ScalarAnalysisContext<'_>>,
     ) -> Result<UpdateStatement, AnalysisError> {
         let requested = TableName::from(self.relation.name.full_name()?);
-        let Some(table) = UpdateDestination::resolve(context, &requested)? else {
-            context.report_analysis_problem(AnalysisProblem::relation_not_found(&requested))?;
+        let table = self.resolve_destination(context, &requested)?;
+        self.validate_index_hint(context, &table)?;
+        let with = self.with.resolve(context, outer)?;
+        let alias = self
+            .relation
+            .alias
+            .as_ref()
+            .map(Alias::resolve)
+            .unwrap_or_else(|| AliasSpec::from_local_name(&requested.full_name().local_name()));
+        let from = self.resolve_sources(context, &table, &alias, &with)?;
+        let scope = ScalarAnalysisContext::nested(&with, &from, None);
+        let assignments = self.resolve_assignments(context, &table, &alias, &with, &scope)?;
+        let predicate = self.resolve_predicate(context, table.name(), &scope)?;
+        let returning =
+            self.resolve_returning_scope(context, &requested, &table, &alias, &with, &from)?;
+        let mut update = UpdateStatement::new(
+            table.name(),
+            &assignments,
+            &self.with.local_definitions(with),
+            &from,
+            &predicate,
+            &returning,
+        );
+        update.set_modifiers(
+            table.view_support(),
+            &self.or_conflict,
+            &self.relation.indexed,
+            self.relation.not_indexed,
+            self.relation.inherit,
+        );
+        update.validate_assignments(context)?;
+        Ok(update)
+    }
+    fn resolve_destination(
+        &self,
+        context: &mut impl ParseContext,
+        requested: &TableName,
+    ) -> Result<UpdateDestination, AnalysisError> {
+        let Some(table) = UpdateDestination::resolve(context, requested)? else {
+            context.report_analysis_problem(AnalysisProblem::relation_not_found(requested))?;
             return Err(AnalysisError::unexpected_input_error(
                 "UPDATE destination not found",
             ));
@@ -57,6 +95,13 @@ impl Update {
                 "view does not support UPDATE RETURNING",
             ))?;
         }
+        Ok(table)
+    }
+    fn validate_index_hint(
+        &self,
+        context: &mut impl ParseContext,
+        table: &UpdateDestination,
+    ) -> Result<(), AnalysisError> {
         if let Some(index) = &self.relation.indexed {
             let name = crate::sem::FullName::with_schema(
                 table
@@ -77,34 +122,45 @@ impl Update {
                 ))?;
             }
         }
-        let with = self.with.resolve(context, outer)?;
-        let alias = self
-            .relation
-            .alias
-            .as_ref()
-            .map(Alias::resolve)
-            .unwrap_or_else(|| AliasSpec::from_local_name(&requested.full_name().local_name()));
-        let mut target_from = FromClause::default();
-        target_from.push(DataSource::resolve_relation(
-            context,
-            table.name().full_name(),
-            &alias,
-            &WithClause::default(),
-        )?);
-        let target_scope = ScalarAnalysisContext::nested(&with, &target_from, None);
+        Ok(())
+    }
+    fn resolve_sources(
+        &self,
+        context: &mut impl ParseContext,
+        table: &UpdateDestination,
+        alias: &AliasSpec,
+        with: &WithClause,
+    ) -> Result<FromClause, AnalysisError> {
         // FROM subqueries cannot implicitly see the UPDATE target. Correlation
         // within RHS expressions uses the complete scope assembled below.
-        let mut from = FromItem::resolve_list_in(&self.from, context, &with, None)?;
+        let mut from = FromItem::resolve_list_in(&self.from, context, with, None)?;
         if from.resolve_alias(alias.name()).is_some() {
             context.report_analysis_problem(AnalysisProblem::duplicate_alias(alias.name()))?;
         }
         from.push(DataSource::resolve_relation(
             context,
             table.name().full_name(),
-            &alias,
+            alias,
             &WithClause::default(),
         )?);
-        let scope = ScalarAnalysisContext::nested(&with, &from, None);
+        Ok(from)
+    }
+    fn resolve_assignments(
+        &self,
+        context: &mut impl ParseContext,
+        table: &UpdateDestination,
+        alias: &AliasSpec,
+        with: &WithClause,
+        scope: &ScalarAnalysisContext<'_>,
+    ) -> Result<Vec<UpdateAssignment>, AnalysisError> {
+        let mut target_from = FromClause::default();
+        target_from.push(DataSource::resolve_relation(
+            context,
+            table.name().full_name(),
+            alias,
+            &WithClause::default(),
+        )?);
+        let target_scope = ScalarAnalysisContext::nested(with, &target_from, None);
         let mut assignments = Vec::new();
         let mut seen: Vec<&Assignment> = Vec::new();
         for assignment in &self.assignments {
@@ -137,38 +193,26 @@ impl Update {
                 Name::from_parts(&[alias.name().as_str().to_owned(), assignment.name.clone()])
                     .resolve_column(context, &target_scope)?;
             for access in &assignment.indirection {
-                destination = access.resolve(context, &scope, destination)?;
+                destination = access.resolve(context, scope, destination)?;
             }
-            let value = assignment.resolve_update_value(context, &scope)?;
-            if value.is_default() && !assignment.indirection.is_empty() {
-                context.report_analysis_problem(AnalysisProblem::update(
-                    UpdateProblemKind::default_target(),
-                    "DEFAULT requires a whole-column destination",
-                ))?;
-            }
-            let constraints = column.constraints();
-            if constraints.iter().any(|c| c.as_generated().is_some())
-                && (!value.is_default() || context.dialect() == Dialect::sqlite())
-            {
-                context.report_analysis_problem(AnalysisProblem::update(
-                    UpdateProblemKind::generated_target(),
-                    "generated column accepts only PostgreSQL DEFAULT",
-                ))?;
-            }
-            if constraints
-                .iter()
-                .filter_map(|c| c.as_identity())
-                .any(|c| c.is_always())
-                && !value.is_default()
-            {
-                context.report_analysis_problem(AnalysisProblem::update(
-                    UpdateProblemKind::identity_target(),
-                    "GENERATED ALWAYS identity accepts only DEFAULT",
-                ))?;
-            }
+            let value = assignment.resolve_update_value(context, scope)?;
+            assignment.validate_update_value(context, column, &value)?;
             assignments.push(UpdateAssignment::new(column, &destination, &value));
         }
-        let predicate = Expr::resolve_optional(&self.predicate, context, &scope)?;
+        Ok(assignments)
+    }
+    fn resolve_predicate(
+        &self,
+        context: &mut impl ParseContext,
+        target: &TableName,
+        scope: &ScalarAnalysisContext<'_>,
+    ) -> Result<Option<crate::sem::UpdatePredicate>, AnalysisError> {
+        if let Some(expression) = &self.predicate
+            && let Some(cursor) = expression.resolve_current_of(context, target)?
+        {
+            return Ok(Some(crate::sem::UpdatePredicate::current_of(&cursor)));
+        }
+        let predicate = Expr::resolve_optional(&self.predicate, context, scope)?;
         if context.dialect() == Dialect::postgres()
             && let Some(value) = &predicate
             && let Some(ty) = value.get_type()
@@ -185,6 +229,19 @@ impl Update {
                 "UPDATE WHERE requires boolean type",
             ))?;
         }
+        Ok(predicate
+            .as_ref()
+            .map(crate::sem::UpdatePredicate::expression))
+    }
+    fn resolve_returning_scope(
+        &self,
+        context: &mut impl ParseContext,
+        requested: &TableName,
+        table: &UpdateDestination,
+        alias: &AliasSpec,
+        with: &WithClause,
+        from: &FromClause,
+    ) -> Result<ResultColumnCollection, AnalysisError> {
         let mut returning_from = FromClause::default();
         let returning = if context.dialect() == Dialect::sqlite() {
             let returning_alias = AliasSpec::from_local_name(&requested.full_name().local_name());
@@ -194,27 +251,11 @@ impl Update {
                 &returning_alias,
                 &WithClause::default(),
             )?);
-            self.resolve_returning(context, &with, &returning_from, Some(&returning_alias))?
+            self.resolve_returning(context, with, &returning_from, Some(&returning_alias))?
         } else {
-            self.resolve_returning(context, &with, &from, Some(&alias))?
+            self.resolve_returning(context, with, from, Some(alias))?
         };
-        let mut update = UpdateStatement::new(
-            table.name(),
-            &assignments,
-            &self.with.local_definitions(with),
-            &from,
-            &predicate,
-            &returning,
-        );
-        update.set_modifiers(
-            table.view_support(),
-            &self.or_conflict,
-            &self.relation.indexed,
-            self.relation.not_indexed,
-            self.relation.inherit,
-        );
-        update.validate_assignments(context)?;
-        Ok(update)
+        Ok(returning)
     }
     fn resolve_returning(
         &self,
@@ -260,6 +301,40 @@ impl Update {
     }
 }
 impl Assignment {
+    fn validate_update_value(
+        &self,
+        context: &mut impl ParseContext,
+        column: &crate::sem::ColumnDefinition,
+        value: &UpdateValue,
+    ) -> Result<(), AnalysisError> {
+        if value.is_default() && !self.indirection.is_empty() {
+            context.report_analysis_problem(AnalysisProblem::update(
+                UpdateProblemKind::default_target(),
+                "DEFAULT requires a whole-column destination",
+            ))?;
+        }
+        let mut generated = false;
+        let mut identity_always = false;
+        for constraint in column.constraints() {
+            generated |= constraint.as_generated().is_some();
+            identity_always |= constraint
+                .as_identity()
+                .is_some_and(|identity| identity.is_always());
+        }
+        if generated && (!value.is_default() || context.dialect() == Dialect::sqlite()) {
+            context.report_analysis_problem(AnalysisProblem::update(
+                UpdateProblemKind::generated_target(),
+                "generated column accepts only PostgreSQL DEFAULT",
+            ))?;
+        }
+        if identity_always && !value.is_default() {
+            context.report_analysis_problem(AnalysisProblem::update(
+                UpdateProblemKind::identity_target(),
+                "GENERATED ALWAYS identity accepts only DEFAULT",
+            ))?;
+        }
+        Ok(())
+    }
     fn resolve_update_value(
         &self,
         context: &mut impl ParseContext,
@@ -277,6 +352,16 @@ impl Assignment {
     }
 }
 impl Expr {
+    fn resolve_current_of(
+        &self,
+        context: &mut impl ParseContext,
+        target: &TableName,
+    ) -> Result<Option<crate::sem::UpdateCursor>, AnalysisError> {
+        match self {
+            Self::CurrentOf(cursor) => cursor.resolve_update(context, target).map(Some),
+            _ => Ok(None),
+        }
+    }
     fn resolve_update_row(
         &self,
         context: &mut impl ParseContext,
@@ -342,5 +427,42 @@ impl crate::ast::Subquery {
             ));
         }
         Ok(UpdateValue::query(&query, index))
+    }
+}
+
+impl crate::ast::CurrentOf {
+    fn resolve_update(
+        &self,
+        context: &mut impl ParseContext,
+        target: &TableName,
+    ) -> Result<crate::sem::UpdateCursor, AnalysisError> {
+        if self.parameter != 0 {
+            return Err(AnalysisError::unexpected_input_error(
+                "CURRENT OF cursor parameters require a procedural variable resolver",
+            ));
+        }
+        let cursor =
+            crate::sem::UpdateCursor::new(&self.name, context.cursors().cursor(&self.name));
+        let problem = match cursor.binding() {
+            None => Some(format!(
+                "cursor {:?} does not exist in the current session scope",
+                self.name
+            )),
+            Some(info) if info.updatable() == Some(false) => Some(format!(
+                "cursor {:?} is not statically updatable",
+                self.name
+            )),
+            Some(info) if info.target().is_some_and(|relation| relation != target) => {
+                Some(format!("cursor {:?} does not target {}", self.name, target))
+            }
+            Some(_) => None,
+        };
+        if let Some(message) = problem {
+            context.report_analysis_problem(AnalysisProblem::update(
+                UpdateProblemKind::cursor(),
+                &message,
+            ))?;
+        }
+        Ok(cursor)
     }
 }

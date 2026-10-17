@@ -1,6 +1,9 @@
+mod cursor;
 mod destination;
 mod view_support;
 
+pub use self::cursor::UpdateCursor;
+pub(crate) use self::cursor::UpdatePredicate;
 pub(crate) use self::destination::UpdateDestination;
 pub use self::view_support::{ViewUpdateInfoRead, ViewUpdateSupport};
 
@@ -18,7 +21,7 @@ pub struct UpdateStatement {
     assignments: Vec<UpdateAssignment>,
     with: Vec<QueryCte>,
     from: FromClause,
-    predicate: Option<SemScalarExpr>,
+    predicate: Option<UpdatePredicate>,
     returning: ResultColumnCollection,
     view_support: Option<ViewUpdateSupport>,
     or_conflict: Option<crate::sem::ConflictClause>,
@@ -32,7 +35,7 @@ impl UpdateStatement {
         assignments: &[UpdateAssignment],
         with: &[QueryCte],
         from: &FromClause,
-        predicate: &Option<SemScalarExpr>,
+        predicate: &Option<UpdatePredicate>,
         returning: &ResultColumnCollection,
     ) -> Self {
         Self {
@@ -79,9 +82,22 @@ impl UpdateStatement {
     pub const fn from(&self) -> &FromClause {
         &self.from
     }
-    /// Resolved WHERE expression.
-    pub const fn predicate(&self) -> Option<&SemScalarExpr> {
-        self.predicate.as_ref()
+    /// Resolved boolean WHERE expression; see `current_of` for positioned updates.
+    pub fn predicate(&self) -> Option<&SemScalarExpr> {
+        if let Some(predicate) = &self.predicate {
+            predicate.as_expression()
+        } else {
+            None
+        }
+    }
+    /// Positioned WHERE predicate, including an unresolved portal reference.
+    /// Mutually exclusive with the ordinary boolean predicate.
+    pub const fn current_of(&self) -> Option<&UpdateCursor> {
+        if let Some(predicate) = &self.predicate {
+            predicate.as_cursor()
+        } else {
+            None
+        }
     }
     /// RETURNING outputs; empty when RETURNING is absent.
     pub const fn result_columns(&self) -> &ResultColumnCollection {
@@ -132,9 +148,8 @@ impl UpdateStatement {
             cte.walk(visitor)?;
         }
         self.from.walk(visitor)?;
-        crate::sem::traversal::optional(&mut self.predicate, visitor)?;
-        if let Some(predicate) = &self.predicate {
-            visitor.predicate(predicate);
+        if let Some(predicate) = &mut self.predicate {
+            predicate.walk(visitor)?;
         }
         // PostgreSQL transforms WHERE and RETURNING before SET assignments.
         // This order matters when RETURNING resolves an unknown parameter.

@@ -39,6 +39,17 @@ the full query and selected output position. Inspect results with
 `SemAst::as_update()` and `UpdateStatement` accessors. SQLite RETURNING follows
 SQLite visibility rules: target aliases and FROM sources are not visible there.
 
+For PostgreSQL `WHERE CURRENT OF`, callers establish portal bindings through
+`ParseContext::cursors_mut().bind(name, &CursorInfo::new(target, updatable))`.
+The optional target is a qualified relation identity; optional update eligibility
+records only known static facts. `UpdateStatement::current_of()` retains the
+portal name and binding, including missing bindings with an UPDATE diagnostic.
+Known target mismatches and static ineligibility are diagnosed. Portal names are
+session scoped and distinct from PL/pgSQL `refcursor` variable names; callers must
+resolve procedural variables before supplying bindings. Cursor position and
+lifetime remain execution-time concerns. Session bindings survive statement
+analysis and are not part of frozen schema catalogs.
+
 Catalog implementations provide `ViewUpdateInfoRead` independently of INSERT
 capabilities, including writable columns and RETURNING support. Built-in schema
 catalogs do not yet derive view trigger/rule capabilities; analysis of ordinary

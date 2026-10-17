@@ -41,6 +41,7 @@ pub struct SchemaFileContext {
     source_access_service: Option<Box<dyn SourceAccessService>>,
     reports: Vec<String>,
     problems: Vec<AnalysisProblem>,
+    cursors: crate::sem::CursorBindings,
     analysis_state: crate::sem::AnalysisState,
     parameter_constraints: crate::sem::ParameterConstraints,
 }
@@ -123,6 +124,7 @@ impl SchemaFileContext {
             source_access_service: None,
             reports: Default::default(),
             problems: Vec::new(),
+            cursors: crate::sem::CursorBindings::default(),
             analysis_state: crate::sem::AnalysisState::default(),
             parameter_constraints: crate::sem::ParameterConstraints::default(),
         }
@@ -563,6 +565,12 @@ impl BaseParseContext for SchemaCatalog {
 }
 
 impl ParseContext for SchemaFileContext {
+    fn cursors(&self) -> &crate::sem::CursorBindings {
+        &self.cursors
+    }
+    fn cursors_mut(&mut self) -> &mut crate::sem::CursorBindings {
+        &mut self.cursors
+    }
     fn analysis_state(&self) -> &crate::sem::AnalysisState {
         &self.analysis_state
     }

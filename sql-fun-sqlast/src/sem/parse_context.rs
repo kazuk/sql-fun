@@ -1,5 +1,6 @@
 mod cast_info;
 pub(crate) mod conflict_info;
+mod cursors;
 mod seq_info;
 mod table_info;
 mod type_info;
@@ -13,6 +14,7 @@ use std::{
 pub use self::{
     cast_info::CastInfoRead,
     conflict_info::{CatalogNameLookup, ConflictInfoRead},
+    cursors::{CursorBindings, CursorInfo},
     seq_info::{SequenceInfoRead, SequenceInfoWrite},
     table_info::{TableInfoRead, TableInfoWrite},
     type_info::{TypeInfoRead, TypeInfoWrite},
@@ -256,6 +258,13 @@ where
     fn dialect(&self) -> crate::ast::Dialect {
         crate::ast::Dialect::from(self.metadata())
     }
+
+    /// Portal bindings in the current session scope, independent of schema catalogs.
+    /// An absent binding is an unresolved cursor, including in an empty scope.
+    fn cursors(&self) -> &CursorBindings;
+
+    /// Establish the session scope explicitly; statement analysis does not change it.
+    fn cursors_mut(&mut self) -> &mut CursorBindings;
 
     /// Bookkeeping for the current outer analysis, independent of local scopes.
     fn analysis_state(&self) -> &crate::sem::AnalysisState;

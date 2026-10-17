@@ -26,8 +26,13 @@ pub enum UpdateProblemKind {
     CteAliases,
     /// WHERE requires boolean type.
     Predicate,
+    /// A CURRENT OF portal is missing or statically incompatible with the target.
+    Cursor,
 }
 impl UpdateProblemKind {
+    pub(crate) const fn cursor() -> Self {
+        Self::Cursor
+    }
     pub(crate) const fn default_target() -> Self {
         Self::DefaultTarget
     }

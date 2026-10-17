@@ -4,8 +4,9 @@ use crate::ast::{
 };
 use crate::sem::{
     AnalysisError, AnalysisProblem, ColumnName, ColumnReferenceExpr, QueryFrame, QueryFrameBound,
-    QueryGrouping, QueryLock, QueryName, QueryNameResolution, QueryOrder, QueryWindow, Resolution,
-    ResolutionContext, ResultColumnCollection, ScalarAnalysisContext, SemScalarExpr,
+    QueryGrouping, QueryLock, QueryName, QueryNameResolution, QueryOrder, QueryProblem,
+    QueryWindow, Resolution, ResolutionContext, ResultColumnCollection, ScalarAnalysisContext,
+    SemScalarExpr,
 };
 
 /// SQL92 alias/ordinal references are only accepted at a clause's top level.
@@ -43,8 +44,8 @@ impl Expr {
                 {
                     return Ok(reference);
                 }
-                context.report_problem(AnalysisProblem::query_reference(
-                    "ORDER/GROUP BY position is outside the select list",
+                context.report_problem(AnalysisProblem::query(
+                    QueryProblem::position_out_of_range(index),
                 ))?;
                 return ColumnReferenceExpr::undefined_column_resolved(
                     context,
@@ -70,8 +71,8 @@ impl Expr {
             }
         }
         if binding.compound() {
-            context.report_problem(AnalysisProblem::query_reference(
-                "compound ORDER BY must refer to a result column",
+            context.report_problem(AnalysisProblem::query(
+                QueryProblem::invalid_compound_order(),
             ))?;
             // Resolve against the compound's empty source scope, never an operand's.
         }
@@ -175,10 +176,8 @@ impl Order {
         name: &str,
         resolution: QueryNameResolution,
     ) -> Result<QueryName, AnalysisError> {
-        if !resolution.is_resolved() {
-            context.report_problem(AnalysisProblem::query_reference(&format!(
-                "missing or ambiguous clause reference: {name}"
-            )))?;
+        if let Some(problem) = resolution.reference_problem(name) {
+            context.report_problem(AnalysisProblem::query(problem))?;
         }
         Ok(QueryName::new(name, resolution))
     }
@@ -309,9 +308,9 @@ impl Window {
             };
             if let Some(name) = &window.name {
                 if dialect == Dialect::postgres() && names.contains(name) {
-                    context.report_problem(AnalysisProblem::query_reference(&format!(
-                        "duplicate window definition: {name}"
-                    )))?;
+                    context.report_problem(AnalysisProblem::query(
+                        QueryProblem::duplicate_window_definition(name),
+                    ))?;
                 }
                 names.push(name.clone());
             }

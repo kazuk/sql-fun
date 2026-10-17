@@ -56,6 +56,13 @@ impl QueryNameResolution {
             _ => None,
         }
     }
+    pub(crate) fn reference_problem(&self, name: &str) -> Option<crate::sem::QueryProblem> {
+        match self {
+            Self::NotFound => Some(crate::sem::QueryProblem::reference_not_found(name)),
+            Self::Ambiguous => Some(crate::sem::QueryProblem::ambiguous_reference(name)),
+            _ => None,
+        }
+    }
     pub(crate) const fn is_resolved(&self) -> bool {
         !matches!(self, Self::NotFound | Self::Ambiguous)
     }
@@ -823,7 +830,7 @@ impl ResolvedOperator {
         if dialect == crate::ast::Dialect::sqlite() {
             return Ok(Some(parameters.sqlite_operator(&self.name, left, right)));
         }
-        let arguments: Vec<_> = left.into_iter().chain(right).cloned().collect();
+        let arguments = Self::arguments(left, right);
         let result = if self.resolution.is_resolved() {
             parameters.call(
                 context,
@@ -840,6 +847,15 @@ impl ResolvedOperator {
             )
         };
         Ok(Some(result))
+    }
+}
+
+impl ResolvedOperator {
+    fn arguments(
+        left: Option<&SemScalarExpr>,
+        right: Option<&SemScalarExpr>,
+    ) -> Vec<SemScalarExpr> {
+        left.into_iter().chain(right).cloned().collect()
     }
 }
 

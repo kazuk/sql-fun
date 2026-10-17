@@ -92,8 +92,8 @@ impl ColumnReferenceExpr {
 
     pub(crate) fn view_source_column(&self) -> Option<&ColumnName> {
         match self {
-            Self::TableColumn(value) => Some(value.get_column_name()),
-            Self::ViewColumn(value) => Some(value.get_column_name()),
+            Self::TableColumn(value) => value.get_column_def().as_ref()?.name().as_ref(),
+            Self::ViewColumn(value) => value.get_column_def().as_ref()?.name().as_ref(),
             _ => None,
         }
     }

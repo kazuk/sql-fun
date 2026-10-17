@@ -128,7 +128,10 @@ above for #581.
 
 Load trigger/rule declarations, replacements, drops, and view defaults after the
 view declaration, in schema order. Catalog changes in a later schema layer do
-not mutate a frozen parent. The analyzer retains write capabilities in
+not mutate a frozen parent. Invalid view declarations produce structured
+semantic diagnostics and leave the existing definition intact. If a catalog
+reports `view_missing_write_metadata`, rebuild it from complete schema
+declarations before analyzing writes. The analyzer retains write capabilities in
 `InsertStatement::view_support` and `UpdateStatement::view_support`; it does not
 execute trigger functions, rule actions, CHECK OPTION checks, or runtime row
 constraints. Trigger/rule declarations currently supply catalog facts rather

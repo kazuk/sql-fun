@@ -43,7 +43,7 @@ impl CreateIndex {
 #[derive(PartialEq, Eq)]
 enum IndexKey {
     Column(ColumnName),
-    Expression(SemScalarExpr),
+    Expression(Box<SemScalarExpr>),
 }
 impl IndexKey {
     fn column(name: &ColumnName) -> Self {
@@ -53,7 +53,7 @@ impl IndexKey {
         if let Some(name) = expression.index_column_name() {
             Ok(Self::column(name))
         } else {
-            Ok(Self::Expression(canonical(expression)?))
+            Ok(Self::Expression(Box::new(canonical(expression)?)))
         }
     }
 }

@@ -22,10 +22,10 @@ impl DefinitionSchemas {
         let names = serde_json::to_string(&self.0)?.replace('\'', "''");
         Ok(format!(
             "SET LOCAL sql_fun.definition_schemas = '{names}';\n\
-             DO $scope$ BEGIN IF EXISTS (\
+             SELECT (NOT EXISTS (\
              SELECT 1 FROM jsonb_array_elements_text(current_setting('sql_fun.definition_schemas')::jsonb) AS selected(name) \
              WHERE NOT EXISTS (SELECT 1 FROM pg_catalog.pg_namespace WHERE nspname::text = selected.name)\
-             ) THEN RAISE EXCEPTION 'selected definition schema does not exist'; END IF; END $scope$;\n"
+             ))::text;\n"
         ))
     }
 

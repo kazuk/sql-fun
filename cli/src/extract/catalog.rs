@@ -139,6 +139,10 @@ pub(super) async fn extract(
         version / 10_000 == identity.major(),
         "server version changed during extraction"
     );
+    anyhow::ensure!(
+        next_catalog(&mut lines)?.as_bool() == Some(true),
+        "selected definition schema does not exist"
+    );
     for filename in [
         "pg_type.json",
         "functions.json",

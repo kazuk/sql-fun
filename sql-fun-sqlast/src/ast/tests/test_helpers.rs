@@ -1,5 +1,5 @@
 use crate::ast::{Query, TryFromWithTokens};
-use crate::sem::{AnalysisError, CastDefinition, OperatorDefinition, OperatorName, PgBuiltInType};
+use crate::sem::{AnalysisError, OperatorDefinition, OperatorName, PgBuiltInType};
 use crate::syn::Opt;
 use crate::test_helpers::{SynBuilder, TestParseContext};
 
@@ -48,7 +48,9 @@ impl AnalysisFixture {
         catalog.set_get_implicit_cast_result(
             &PgBuiltInType::int4(),
             &PgBuiltInType::text(),
-            Some(CastDefinition::new(crate::sem::CastContext::implicit())),
+            Some(crate::sem::CastDefinition::new(
+                crate::sem::CastContext::implicit(),
+            )),
         );
         catalog
     }

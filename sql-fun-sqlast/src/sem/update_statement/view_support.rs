@@ -14,14 +14,14 @@ pub struct ViewUpdateSupport {
     required_trigger_columns: Option<Vec<ColumnName>>,
 }
 impl ViewUpdateSupport {
-    /// Analyze registered facts for an exactly bound ordinary view.
+    /// Analyze semantic definitions for an exactly bound ordinary view.
     ///
     /// # Errors
-    /// Returns a structured problem when this view or its source lacks write metadata.
+    /// Returns the reported structured cause or a diagnostic delivery failure.
     pub fn analyze(
-        context: &impl crate::sem::BaseParseContext,
+        context: &mut impl crate::sem::ParseContext,
         view: &FullName,
-    ) -> Result<Self, crate::sem::problem::ViewProblem> {
+    ) -> Result<Self, crate::sem::AnalysisError> {
         crate::sem::ViewWriteEvaluation::new(context).update(view)
     }
 

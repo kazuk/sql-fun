@@ -1,4 +1,3 @@
-use crate::sem::search_path::expand_relation_search_path;
 use crate::sem::{
     AnalysisError, InsertDestination, ParseContext, TableName, UpdateDestination, ViewLike,
     ViewMergeSupport,
@@ -14,28 +13,30 @@ pub(crate) struct MergeDestination {
 }
 impl MergeDestination {
     pub(crate) fn resolve(
-        context: &impl ParseContext,
+        context: &mut impl ParseContext,
         requested: &TableName,
     ) -> Result<Option<Self>, AnalysisError> {
-        expand_relation_search_path(context, requested.full_name(), |key| {
-            let name = TableName::from(key.clone());
-            if context.get_table_impl(key).is_some() {
-                return Some(Self::resolve_table(context, &name));
-            }
-            if let Some(view) = context.get_view_impl(key) {
-                if view.is_materialized() {
-                    Some(Self::resolve_materialized_view(context, &name))
-                } else {
-                    Some(Self::resolve_view(context, &name, view))
-                }
-            } else {
-                None
-            }
-        })
-        .transpose()
+        let Some(identity) = context.resolve_relation_name(requested.full_name()) else {
+            return Ok(None);
+        };
+        let name = TableName::from(identity);
+        if context.get_table(&name).is_some() {
+            return Self::resolve_table(context, &name).map(Some);
+        }
+        let view = context
+            .get_view(&crate::sem::ViewName::from_full_name(name.full_name()))
+            .expect("resolved view");
+        if view.is_materialized() {
+            Self::resolve_materialized_view(context, &name).map(Some)
+        } else {
+            Self::resolve_view(context, &name, view).map(Some)
+        }
     }
 
-    fn resolve_table(context: &impl ParseContext, name: &TableName) -> Result<Self, AnalysisError> {
+    fn resolve_table(
+        context: &mut impl ParseContext,
+        name: &TableName,
+    ) -> Result<Self, AnalysisError> {
         let insert =
             InsertDestination::resolve(context, name)?.expect("resolved MERGE target table");
         let update =
@@ -50,7 +51,7 @@ impl MergeDestination {
     }
 
     fn resolve_materialized_view(
-        context: &impl ParseContext,
+        context: &mut impl ParseContext,
         name: &TableName,
     ) -> Result<Self, AnalysisError> {
         let insert = InsertDestination::resolve(context, name)?

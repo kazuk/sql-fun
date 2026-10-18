@@ -15,7 +15,7 @@ pub(crate) struct InsertDestination {
 impl InsertDestination {
     /// Rule definition analysis binds the destination shape without evaluating whether a future write can execute.
     pub(crate) fn resolve_rule_target(
-        context: &impl ParseContext,
+        context: &mut impl ParseContext,
         requested: &TableName,
     ) -> Result<Option<Self>, AnalysisError> {
         let Some(name) = context.resolve_relation_name(requested.full_name()) else {
@@ -40,16 +40,23 @@ impl InsertDestination {
         })
     }
     pub(crate) fn resolve(
-        context: &impl ParseContext,
+        context: &mut impl ParseContext,
         requested: &TableName,
     ) -> Result<Option<Self>, AnalysisError> {
-        expand_relation_search_path(context, requested.full_name(), |key| {
-            Self::resolve_at(context, key)
-        })
-        .transpose()
+        let key = expand_relation_search_path(context, requested.full_name(), |key| {
+            if context.dialect() == crate::ast::Dialect::sqlite() {
+                context.sqlite_relation_identity(key)
+            } else {
+                context.resolve_relation_name(key)
+            }
+        });
+        let Some(key) = key else {
+            return Ok(None);
+        };
+        Self::resolve_at(context, &key).transpose()
     }
     fn resolve_at(
-        context: &impl ParseContext,
+        context: &mut impl ParseContext,
         key: &crate::sem::FullName,
     ) -> Option<Result<Self, AnalysisError>> {
         let canonical;
@@ -72,23 +79,27 @@ impl InsertDestination {
                 merge_view_support: None,
             }));
         }
-        if let Some(view) = context.get_view(&crate::sem::ViewName::from_full_name(key)) {
-            return Some(Self::from_view(context, key, view));
+        if context
+            .get_view(&crate::sem::ViewName::from_full_name(key))
+            .is_some()
+        {
+            return Some(Self::from_view(context, key));
         }
         None
     }
     fn from_view(
-        context: &impl ParseContext,
+        context: &mut impl ParseContext,
         key: &crate::sem::FullName,
-        view: &ViewLike,
     ) -> Result<Self, AnalysisError> {
+        let view = context
+            .get_view(&crate::sem::ViewName::from_full_name(key))
+            .expect("resolved view");
         let (columns, support) = if view.is_materialized() {
             (Vec::new(), ViewInsertSupport::read_only())
         } else {
             (
                 view.result_columns().column_definitions()?,
-                ViewInsertSupport::analyze(context, key)
-                    .map_err(|problem| AnalysisError::view_metadata(&problem))?,
+                ViewInsertSupport::analyze(context, key)?,
             )
         };
         let columns = columns

@@ -97,11 +97,6 @@ impl ConflictArbiterInference {
     pub(crate) fn problem(problem: &crate::sem::AnalysisProblem) -> Self {
         Self(Err(Box::new(problem.clone())))
     }
-    pub(crate) fn missing_view_metadata(view: &FullName) -> Self {
-        Self(Err(Box::new(crate::sem::AnalysisProblem::view(
-            &crate::sem::problem::ViewProblem::missing_metadata(view),
-        ))))
-    }
     /// Consume the lookup while preserving an incomplete catalog diagnostic.
     pub fn into_result(self) -> Result<Vec<InsertArbiter>, Box<crate::sem::AnalysisProblem>> {
         self.0
@@ -149,9 +144,8 @@ pub trait ConflictInfoRead {
     /// identities. Respect collation, operator-family/input-type equivalence,
     /// partial predicate implication, and dialect-specific matching rules.
     /// Failed modifier lookups must never yield a successful arbiter binding.
-    /// The destination identity can denote a writable view. Apply the dialect's
-    /// view rewrite mapping and return actual underlying arbiter identities;
-    /// do not assume every writable view exposes its base relation's indexes.
+    /// Reads table catalog facts. Writable-view rewrite analysis belongs to
+    /// `ViewWriteEvaluation` and requires the active `ParseContext`.
     fn infer_conflict_arbiters(
         &self,
         table: &TableName,
@@ -166,9 +160,6 @@ pub(crate) fn infer_from_catalog(
     table: &TableName,
     conflict: &InsertConflict,
 ) -> Result<ConflictArbiterInference, AnalysisError> {
-    if context.get_table(table).is_none() {
-        return crate::sem::ViewWriteEvaluation::new(context).infer_arbiters(table, conflict);
-    }
     if conflict.has_modifiers() {
         todo!("catalog index modifier eligibility metadata");
     }

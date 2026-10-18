@@ -4,6 +4,8 @@ use ::miette::{GraphicalReportHandler, MietteDiagnostic, NamedSource, Report, Se
 /// A view declaration or capability cannot be analyzed as requested.
 #[derive(Debug, Clone, Eq, PartialEq)]
 pub enum ViewProblem {
+    /// An existing View could not be evaluated; the original cause remains in AnalysisError.
+    EvaluationFailed(FullName, String),
     /// The declaration target is absent or is not an ordinary view.
     InvalidTarget(FullName),
     /// A view default refers to an unknown column.
@@ -23,6 +25,9 @@ impl ViewProblem {
         }
     }
 
+    pub(crate) fn evaluation_failed(view: &FullName, cause: &AnalysisError) -> Self {
+        Self::EvaluationFailed(view.clone(), cause.to_string())
+    }
     pub(crate) fn invalid_target(view: &FullName) -> Self {
         Self::InvalidTarget(view.clone())
     }
@@ -38,6 +43,7 @@ impl ViewProblem {
     }
     pub(super) const fn code(&self) -> &'static str {
         match self {
+            Self::EvaluationFailed(..) => "view_evaluation_failed",
             Self::InvalidTarget(_) => "view_invalid_target",
             Self::UnknownDefaultColumn(..) => "view_unknown_default_column",
             Self::MissingMetadata(_) => "view_missing_write_metadata",
@@ -50,6 +56,7 @@ impl ViewProblem {
         source: String,
     ) -> Result<String, AnalysisError> {
         let message = match self {
+            Self::EvaluationFailed(view, cause) => format!("cannot evaluate View {view}: {cause}"),
             Self::InvalidTarget(view) => {
                 format!("declaration target {view} is not an ordinary view")
             }

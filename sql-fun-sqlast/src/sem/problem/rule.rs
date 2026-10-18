@@ -7,6 +7,8 @@ pub enum RuleProblem {
     Target(FullName),
     /// An existing definition conflicts with CREATE.
     Duplicate(RuleIdentity),
+    /// No effective rule exists under this relation-scoped identity.
+    Missing(RuleIdentity),
     /// A rule-specific legality constraint was violated.
     Definition(RuleDefinitionProblem),
 }
@@ -22,6 +24,9 @@ impl RuleProblem {
     pub(crate) fn target(target: &FullName) -> Self {
         Self::Target(target.clone())
     }
+    pub(crate) fn missing(identity: &RuleIdentity) -> Self {
+        Self::Missing(identity.clone())
+    }
     pub(crate) fn duplicate(identity: &RuleIdentity) -> Self {
         Self::Duplicate(identity.clone())
     }
@@ -33,9 +38,10 @@ impl RuleProblem {
         handler: &::miette::GraphicalReportHandler,
         source: String,
     ) -> Result<String, AnalysisError> {
-        let diagnostic = ::miette::MietteDiagnostic::new(format!("invalid CREATE RULE: {self:?}"))
-            .with_code("rule_invalid_definition")
-            .with_severity(::miette::Severity::Error);
+        let diagnostic =
+            ::miette::MietteDiagnostic::new(format!("invalid rule statement: {self:?}"))
+                .with_code("rule_invalid_definition")
+                .with_severity(::miette::Severity::Error);
         let report = ::miette::Report::new(diagnostic)
             .with_source_code(::miette::NamedSource::new("SQL", source));
         let mut rendered = String::new();

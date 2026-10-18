@@ -70,6 +70,12 @@ impl ViewLike {
             view.associate_trigger(name);
         }
     }
+    pub(crate) fn dissociate_trigger(&mut self, name: &crate::sem::FullName) {
+        if let Self::View(view) = self {
+            view.dissociate_trigger(name);
+        }
+    }
+
     pub(crate) fn result_columns(&self) -> &crate::sem::ResultColumnCollection {
         match self {
             Self::View(view) => view.result_columns(),

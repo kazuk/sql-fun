@@ -396,6 +396,12 @@ where
     /// Associate the supplied name with the exact target in this layer.
     fn associate_trigger(self, target: &FullName, name: &FullName) -> Result<Self, AnalysisError>;
 
+    /// Mask a trigger identity in this layer, stopping inherited lookup.
+    /// DDL separately selects the matching target-link update.
+    fn cancel_trigger(self, identity: &crate::sem::TriggerIdentity) -> Result<Self, AnalysisError>;
+    /// Remove an explicitly selected trigger reference from a current-layer target clone.
+    fn dissociate_trigger(self, target: &FullName, name: &FullName) -> Result<Self, AnalysisError>;
+
     /// Dialect of the explicitly supplied metadata for this analysis.
     /// Engine identity and SQL dialect are independent metadata fields.
     /// Historical configuration retained by a frozen catalog is not consulted.

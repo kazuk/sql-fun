@@ -1,4 +1,5 @@
 mod delete;
+mod drop_trigger;
 pub(in crate::ast) mod insert;
 mod placement;
 mod query;

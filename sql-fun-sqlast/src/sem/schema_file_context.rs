@@ -58,7 +58,8 @@ pub(super) struct SchemaCatalog {
     rules: std::collections::HashMap<crate::sem::RuleIdentity, Option<crate::sem::CreateRule>>,
     ownership: crate::sem::ownership::OwnershipCatalog,
     base: FrozenBaseContext,
-    triggers: std::collections::HashMap<crate::sem::TriggerIdentity, crate::sem::CreateTrigger>,
+    triggers:
+        std::collections::HashMap<crate::sem::TriggerIdentity, Option<crate::sem::CreateTrigger>>,
     args: SqlFunArgs,
     metadata: ::sql_fun_core::SqlFunMetadata,
     search_path: Vec<SchemaName>,
@@ -665,7 +666,7 @@ impl BaseParseContext for SchemaCatalog {
         identity: &crate::sem::TriggerIdentity,
     ) -> Option<&crate::sem::CreateTrigger> {
         if let Some(trigger) = self.triggers.get(identity) {
-            Some(trigger)
+            trigger.as_ref()
         } else {
             self.base.trigger(identity)
         }
@@ -724,7 +725,7 @@ impl ParseContext for SchemaFileContext {
     ) -> Result<Self, AnalysisError> {
         self.catalog
             .triggers
-            .insert(trigger.identity().clone(), trigger.clone());
+            .insert(trigger.identity().clone(), Some(trigger.clone()));
         Ok(self)
     }
     fn associate_trigger(
@@ -737,6 +738,32 @@ impl ParseContext for SchemaFileContext {
             self.catalog.tables.insert_create_table(target, &table);
         } else if let Some(mut view) = self.get_view_impl(target).cloned() {
             view.associate_trigger(name);
+            self.catalog.views.insert(target, &view);
+        } else {
+            return Err(AnalysisError::trigger(
+                &crate::sem::problem::TriggerProblem::target(target),
+            ));
+        }
+        Ok(self)
+    }
+
+    fn cancel_trigger(
+        mut self,
+        identity: &crate::sem::TriggerIdentity,
+    ) -> Result<Self, AnalysisError> {
+        self.catalog.triggers.insert(identity.clone(), None);
+        Ok(self)
+    }
+    fn dissociate_trigger(
+        mut self,
+        target: &FullName,
+        name: &FullName,
+    ) -> Result<Self, AnalysisError> {
+        if let Some(mut table) = self.get_table_impl(target).cloned() {
+            table.dissociate_trigger(name);
+            self.catalog.tables.insert_create_table(target, &table);
+        } else if let Some(mut view) = self.get_view_impl(target).cloned() {
+            view.dissociate_trigger(name);
             self.catalog.views.insert(target, &view);
         } else {
             return Err(AnalysisError::trigger(

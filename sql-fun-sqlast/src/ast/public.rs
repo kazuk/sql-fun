@@ -136,10 +136,12 @@ mod test_statement_analyze {
 /// Parser-independent statement category.
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
 pub enum StatementKind {
-    /// A trigger/rule declaration used by writable-view schema analysis.
+    /// A legacy CREATE/DROP RULE declaration used by writable-view schema analysis.
     ViewWrite,
     /// An unresolved CREATE TRIGGER definition. Analysis awaits #602 / #555.
     CreateTrigger,
+    /// An unresolved DROP TRIGGER statement. Analysis awaits #555.
+    DropTrigger,
     /// SELECT, VALUES, or a set operation.
     Query,
     /// INSERT.
@@ -190,6 +192,11 @@ impl StatementKind {
     /// The CREATE TRIGGER category.
     pub const fn create_trigger() -> Self {
         Self::CreateTrigger
+    }
+
+    /// The DROP TRIGGER category.
+    pub const fn drop_trigger() -> Self {
+        Self::DropTrigger
     }
 
     const fn view_write() -> Self {
@@ -316,6 +323,7 @@ impl StatementNode {
             Self::Merge(_) => StatementKind::merge(),
             Self::View(_) => StatementKind::view(),
             Self::CreateTrigger(_) => StatementKind::create_trigger(),
+            Self::DropTrigger(_) => StatementKind::drop_trigger(),
             Self::ViewWrite(_) => StatementKind::view_write(),
             Self::Extension(_) => StatementKind::extension(),
             Self::VariableSet(_) => StatementKind::variable_set(),

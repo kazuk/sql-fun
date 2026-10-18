@@ -172,10 +172,10 @@ mod test_helpers {
             &self,
             name: &::sql_fun_sqlast::sem::FullName,
         ) -> Result<FrozenBaseContext, String> {
-            use ::sql_fun_sqlast::sem::{ParseContext, ViewInfoRead, ViewInfoWrite};
+            use ::sql_fun_sqlast::sem::{BaseParseContext, ParseContext, ViewInfoWrite};
             let view = self
                 .context()
-                .get_view_impl(name)
+                .get_view(&::sql_fun_sqlast::sem::ViewName::from_full_name(name))
                 .unwrap()
                 .ordinary_definition()
                 .unwrap();
@@ -265,30 +265,44 @@ mod test_helpers {
         }
     }
 
-    pub trait ViewAnalysis {
-        fn analyze_insert(
+    impl ViewSchema {
+        pub fn analysis_context_at(&self, base: &FrozenBaseContext) -> SchemaFileContext {
+            SchemaFileContext::new(
+                Path::new("view-analysis.sql"),
+                base,
+                &self.args,
+                &self.metadata,
+            )
+        }
+        pub fn analyze_insert_at(
             &self,
+            base: &FrozenBaseContext,
             view: &::sql_fun_sqlast::sem::FullName,
-        ) -> ::sql_fun_sqlast::sem::ViewInsertSupport;
-        fn analyze_update(
+        ) -> ::sql_fun_sqlast::sem::ViewInsertSupport {
+            ::sql_fun_sqlast::sem::ViewWriteEvaluation::new(&mut self.analysis_context_at(base))
+                .insert(view)
+                .expect("complete fixture write facts")
+        }
+        pub fn analyze_update_at(
             &self,
+            base: &FrozenBaseContext,
             view: &::sql_fun_sqlast::sem::FullName,
-        ) -> ::sql_fun_sqlast::sem::ViewUpdateSupport;
-    }
-    impl ViewAnalysis for FrozenBaseContext {
-        fn analyze_insert(
+        ) -> ::sql_fun_sqlast::sem::ViewUpdateSupport {
+            ::sql_fun_sqlast::sem::ViewWriteEvaluation::new(&mut self.analysis_context_at(base))
+                .update(view)
+                .expect("complete fixture write facts")
+        }
+        pub fn analyze_insert(
             &self,
             view: &::sql_fun_sqlast::sem::FullName,
         ) -> ::sql_fun_sqlast::sem::ViewInsertSupport {
-            ::sql_fun_sqlast::sem::ViewInsertSupport::analyze(self, view)
-                .expect("complete fixture write facts")
+            self.analyze_insert_at(self.context(), view)
         }
-        fn analyze_update(
+        pub fn analyze_update(
             &self,
             view: &::sql_fun_sqlast::sem::FullName,
         ) -> ::sql_fun_sqlast::sem::ViewUpdateSupport {
-            ::sql_fun_sqlast::sem::ViewUpdateSupport::analyze(self, view)
-                .expect("complete fixture write facts")
+            self.analyze_update_at(self.context(), view)
         }
     }
 
@@ -326,7 +340,6 @@ mod test_helpers {
         }
     }
 }
-use self::test_helpers::ViewAnalysis;
 use self::test_helpers::{ViewSchema, heavy};
 use ::sql_fun_sqlast::sem::FullName;
 
@@ -377,8 +390,8 @@ fn read_only_shapes(#[case] query: &str) -> Result<(), Box<dyn std::error::Error
         "CREATE TABLE public.items(id integer); CREATE VIEW public.v AS {query};"
     ))?;
     let name = FullName::with_schema("public", "v");
-    assert!(!schema.context().analyze_insert(&name).is_writable());
-    assert!(!schema.context().analyze_update(&name).is_writable());
+    assert!(!schema.analyze_insert(&name).is_writable());
+    assert!(!schema.analyze_update(&name).is_writable());
     Ok(())
 }
 
@@ -391,7 +404,7 @@ CREATE VIEW public.v AS SELECT id AS key, value, calc, value+1 AS computed FROM 
 ",
     )?;
     let name = FullName::with_schema("public", "v");
-    let support = schema.context().analyze_update(&name);
+    let support = schema.analyze_update(&name);
     let key = support.column_definition(&"key".into()).unwrap();
     assert!(
         key.constraints()
@@ -488,8 +501,8 @@ CREATE FUNCTION public.noop() RETURNS trigger LANGUAGE plpgsql AS 'BEGIN RETURN 
 "
     ))?;
     let name = FullName::with_schema("public", "v");
-    let i = schema.context().analyze_insert(&name);
-    let u = schema.context().analyze_update(&name);
+    let i = schema.analyze_insert(&name);
+    let u = schema.analyze_update(&name);
     assert_eq!(i.is_writable(), insert);
     assert_eq!(u.is_writable(), update);
     if insert {
@@ -522,9 +535,7 @@ fn view_default_overrides_base_default() -> Result<(), Box<dyn std::error::Error
     let schema = ViewSchema::postgres(&format!(
         "{AUTOMATIC} ALTER VIEW public.item_view ALTER COLUMN value SET DEFAULT 42;"
     ))?;
-    let support = schema
-        .context()
-        .analyze_insert(&FullName::with_schema("public", "item_view"));
+    let support = schema.analyze_insert(&FullName::with_schema("public", "item_view"));
     let column = support.column_definition(&"value".into()).unwrap();
     let defaults: Vec<_> = column
         .constraints()
@@ -606,9 +617,7 @@ fn function_row_properties(
     let schema = heavy::postgres(&format!(
         "CREATE TABLE public.items(id integer); CREATE VIEW public.v AS {query};"
     ))?;
-    let support = schema
-        .context()
-        .analyze_update(&FullName::with_schema("public", "v"));
+    let support = schema.analyze_update(&FullName::with_schema("public", "v"));
     assert_eq!(support.is_writable(), writable);
     Ok(())
 }
@@ -662,13 +671,13 @@ CREATE FUNCTION public.noop() RETURNS trigger LANGUAGE plpgsql AS $$BEGIN RETURN
     )?;
     let name = FullName::with_schema("public", "v");
     let child = schema.layer("CREATE TRIGGER it INSTEAD OF INSERT ON public.v FOR EACH ROW EXECUTE FUNCTION public.noop();")?;
-    assert!(child.analyze_insert(&name).is_writable());
-    assert!(!child.analyze_update(&name).is_writable());
-    assert!(!schema.context().analyze_insert(&name).is_writable());
+    assert!(schema.analyze_insert_at(&child, &name).is_writable());
+    assert!(!schema.analyze_update_at(&child, &name).is_writable());
+    assert!(!schema.analyze_insert(&name).is_writable());
     let replaced =
         schema.layer("CREATE OR REPLACE VIEW public.v AS SELECT id FROM public.items;")?;
-    assert!(replaced.analyze_update(&name).is_writable());
-    assert!(!schema.context().analyze_update(&name).is_writable());
+    assert!(schema.analyze_update_at(&replaced, &name).is_writable());
+    assert!(!schema.analyze_update(&name).is_writable());
     let schema = ViewSchema::postgres(
         r"
 CREATE TABLE public.items(id int);
@@ -679,10 +688,10 @@ ALTER VIEW public.v ALTER COLUMN id SET DEFAULT 42;
 CREATE OR REPLACE VIEW public.v AS SELECT DISTINCT id FROM public.items;
 ",
     )?;
-    assert!(schema.context().analyze_insert(&name).is_writable());
+    assert!(schema.analyze_insert(&name).is_writable());
     let dropped = schema.layer("DROP TRIGGER it ON public.v;")?;
-    assert!(!dropped.analyze_insert(&name).is_writable());
-    assert!(schema.context().analyze_insert(&name).is_writable());
+    assert!(!schema.analyze_insert_at(&dropped, &name).is_writable());
+    assert!(schema.analyze_insert(&name).is_writable());
     Ok(())
 }
 
@@ -774,13 +783,11 @@ fn bound_names_do_not_reselect_shadowed_views() -> Result<(), Box<dyn std::error
     assert!(schema.analyze("INSERT INTO other.v VALUES(1)").is_err());
     assert!(
         !schema
-            .context()
             .analyze_update(&FullName::with_schema("other", "v"))
             .is_writable()
     );
     assert!(
         schema
-            .context()
             .analyze_update(&FullName::with_schema("public", "v"))
             .is_writable()
     );
@@ -793,9 +800,11 @@ fn materialized_views_are_not_write_destinations() -> Result<(), Box<dyn std::er
         "CREATE TABLE public.items(id int); CREATE MATERIALIZED VIEW public.v AS SELECT id FROM public.items;",
     )?;
     let name = FullName::with_schema("public", "v");
-    let support = ::sql_fun_sqlast::sem::ViewWriteEvaluation::new(schema.context())
-        .evaluate(&name)
-        .unwrap();
+    let support = ::sql_fun_sqlast::sem::ViewWriteEvaluation::new(
+        &mut schema.analysis_context_at(schema.context()),
+    )
+    .evaluate(&name)
+    .unwrap();
     assert!(!support.insert().is_writable());
     assert!(!support.update().is_writable());
     assert!(schema.analyze("INSERT INTO public.v VALUES(1)").is_err());
@@ -812,8 +821,8 @@ fn defaults_and_rule_drops_change_only_the_child() -> Result<(), Box<dyn std::er
     )?;
     let name = FullName::with_schema("public", "v");
     let child = schema.layer("DROP RULE r ON public.v;")?;
-    assert!(!child.analyze_insert(&name).is_writable());
-    assert!(schema.context().analyze_insert(&name).is_writable());
+    assert!(!schema.analyze_insert_at(&child, &name).is_writable());
+    assert!(schema.analyze_insert(&name).is_writable());
     assert!(
         schema
             .layer("ALTER VIEW public.v ALTER COLUMN missing SET DEFAULT 42;")
@@ -844,10 +853,10 @@ fn sqlite_drop_masks_inherited_trigger() -> Result<(), Box<dyn std::error::Error
         "CREATE TABLE items(a); CREATE VIEW v AS SELECT a FROM items; CREATE TRIGGER it INSTEAD OF INSERT ON v BEGIN SELECT 1; END;",
     )?;
     let name = FullName::with_schema("main", "v");
-    assert!(schema.context().analyze_insert(&name).is_writable());
+    assert!(schema.analyze_insert(&name).is_writable());
     let child = schema.layer("DROP TRIGGER it;")?;
-    assert!(!child.analyze_insert(&name).is_writable());
-    assert!(schema.context().analyze_insert(&name).is_writable());
+    assert!(!schema.analyze_insert_at(&child, &name).is_writable());
+    assert!(schema.analyze_insert(&name).is_writable());
     assert!(
         schema
             .layer("CREATE TRIGGER IF NOT EXISTS it INSTEAD OF INSERT ON v BEGIN SELECT 1; END;")
@@ -869,7 +878,6 @@ fn declared_function_properties(
     ))?;
     assert_eq!(
         schema
-            .context()
             .analyze_update(&FullName::with_schema("public", "v"))
             .is_writable(),
         writable
@@ -885,9 +893,9 @@ fn extracted_builtin_rules_reach_production_analysis(
 ) -> Result<(), Box<dyn std::error::Error>> {
     let schema = heavy::builtin_settings(version)?;
     let name = FullName::with_schema("pg_catalog", "pg_settings");
-    assert!(!schema.context().analyze_insert(&name).is_writable());
-    assert!(schema.context().analyze_update(&name).is_writable());
-    assert!(!schema.context().analyze_update(&name).supports_returning());
+    assert!(!schema.analyze_insert(&name).is_writable());
+    assert!(schema.analyze_update(&name).is_writable());
+    assert!(!schema.analyze_update(&name).supports_returning());
     assert!(
         schema
             .analyze("UPDATE pg_catalog.pg_settings SET setting='on' WHERE name='enable_seqscan'")
@@ -981,7 +989,6 @@ fn polymorphic_function_properties_use_the_producer_signature()
     )?;
     assert!(
         schema
-            .context()
             .analyze_update(&FullName::with_schema("public", "v"))
             .is_writable()
     );
@@ -1087,7 +1094,6 @@ fn invalid_view_declarations_are_structured(
 
 #[test]
 fn incomplete_view_metadata_is_explicit() -> Result<(), Box<dyn std::error::Error>> {
-    use ::sql_fun_sqlast::sem::{ConflictInfoRead, TableName};
     let schema = ViewSchema::postgres(AUTOMATIC)?;
     let older = schema.incomplete_catalog()?;
     let view = FullName::with_schema("public", "incomplete");
@@ -1100,15 +1106,25 @@ fn incomplete_view_metadata_is_explicit() -> Result<(), Box<dyn std::error::Erro
     for nested in ["incomplete", "incomplete_nested"] {
         let nested = FullName::with_schema("public", nested);
         assert_eq!(
-            ::sql_fun_sqlast::sem::ViewInsertSupport::analyze(&older, &nested)
-                .unwrap_err()
-                .missing_metadata_view(),
+            ::sql_fun_sqlast::sem::ViewWriteEvaluation::new(
+                &mut schema.analysis_context_at(&older)
+            )
+            .insert(&nested)
+            .unwrap_err()
+            .view_problem()
+            .unwrap()
+            .missing_metadata_view(),
             Some(&FullName::with_schema("public", "items"))
         );
         assert_eq!(
-            ::sql_fun_sqlast::sem::ViewUpdateSupport::analyze(&older, &nested)
-                .unwrap_err()
-                .missing_metadata_view(),
+            ::sql_fun_sqlast::sem::ViewWriteEvaluation::new(
+                &mut schema.analysis_context_at(&older)
+            )
+            .update(&nested)
+            .unwrap_err()
+            .view_problem()
+            .unwrap()
+            .missing_metadata_view(),
             Some(&FullName::with_schema("public", "items"))
         );
     }
@@ -1122,20 +1138,22 @@ fn incomplete_view_metadata_is_explicit() -> Result<(), Box<dyn std::error::Erro
         assert!(
             problems
                 .iter()
-                .any(|problem| problem.code() == "view_missing_write_metadata"),
+                .filter(|problem| problem.code() == "view_missing_write_metadata")
+                .count()
+                == 1,
             "{problems:?}"
         );
     }
-    let statement = schema
-        .analyze("INSERT INTO public.item_view(key) VALUES (1) ON CONFLICT(key) DO NOTHING")?;
-    let conflict = &statement.as_insert().unwrap().conflicts()[0];
+    let problems = schema.query_problems_at(
+        &older,
+        "INSERT INTO public.incomplete VALUES (1) ON CONFLICT(id) DO NOTHING",
+    )?;
     assert_eq!(
-        older
-            .infer_conflict_arbiters(&TableName::from(view), conflict)?
-            .into_result()
-            .unwrap_err()
-            .code(),
-        "view_missing_write_metadata"
+        problems
+            .iter()
+            .filter(|problem| problem.code() == "view_missing_write_metadata")
+            .count(),
+        1
     );
     Ok(())
 }
@@ -1189,11 +1207,11 @@ fn select_rule_replacement_refreshes_view_facts_in_the_child()
         "CREATE TABLE public.items(id integer); CREATE VIEW public.v AS SELECT id FROM public.items;",
     )?;
     let name = FullName::with_schema("public", "v");
-    assert!(schema.context().analyze_insert(&name).is_writable());
+    assert!(schema.analyze_insert(&name).is_writable());
     let child = schema.layer(r#"CREATE OR REPLACE RULE "_RETURN" AS ON SELECT TO public.v DO INSTEAD SELECT DISTINCT id FROM public.items"#)?;
-    assert!(!child.analyze_insert(&name).is_writable());
-    assert!(!child.analyze_update(&name).is_writable());
-    assert!(schema.context().analyze_insert(&name).is_writable());
+    assert!(!schema.analyze_insert_at(&child, &name).is_writable());
+    assert!(!schema.analyze_update_at(&child, &name).is_writable());
+    assert!(schema.analyze_insert(&name).is_writable());
     Ok(())
 }
 
@@ -1242,22 +1260,22 @@ CREATE OR REPLACE RULE "_RETURN" AS ON SELECT TO public.v DO INSTEAD SELECT id F
             .distinct()
             .is_none()
     );
-    assert!(child.analyze_insert(&name).is_writable());
-    assert!(!child.analyze_update(&name).is_writable());
+    assert!(schema.analyze_insert_at(&child, &name).is_writable());
+    assert!(!schema.analyze_update_at(&child, &name).is_writable());
     Ok(())
 }
 
 #[test]
 fn evaluation_service_reads_definition_options_and_retained_defaults()
 -> Result<(), Box<dyn std::error::Error>> {
-    use ::sql_fun_sqlast::sem::{ViewInfoRead, ViewWriteEvaluation};
+    use ::sql_fun_sqlast::sem::{BaseParseContext, ViewWriteEvaluation};
     let schema = ViewSchema::postgres(
         "CREATE TABLE public.items(id integer); CREATE VIEW public.v WITH (security_barrier = true) AS SELECT id FROM public.items WITH LOCAL CHECK OPTION; ALTER VIEW public.v ALTER COLUMN id SET DEFAULT 7;",
     )?;
     let name = FullName::with_schema("public", "v");
     let definition = schema
         .context()
-        .get_view_impl(&name)
+        .get_view(&::sql_fun_sqlast::sem::ViewName::from_full_name(&name))
         .unwrap()
         .ordinary_definition()
         .unwrap();
@@ -1266,13 +1284,14 @@ fn evaluation_service_reads_definition_options_and_retained_defaults()
         definition.check_option(),
         ::sql_fun_sqlast::sem::ViewCheckOption::Local
     ));
-    let service = ViewWriteEvaluation::new(schema.context());
+    let mut context = schema.analysis_context_at(schema.context());
+    let mut service = ViewWriteEvaluation::new(&mut context);
     let result = service.evaluate(&name).unwrap();
     assert!(result.insert().is_writable());
     assert!(result.update().is_writable());
     let replacement =
         schema.layer("CREATE OR REPLACE VIEW public.v AS SELECT id FROM public.items;")?;
-    let support = ViewWriteEvaluation::new(&replacement)
+    let support = ViewWriteEvaluation::new(&mut schema.analysis_context_at(&replacement))
         .insert(&name)
         .unwrap();
     let column = support.column_definition(&"id".into()).unwrap();
@@ -1294,18 +1313,22 @@ fn evaluation_service_reads_definition_options_and_retained_defaults()
 #[test]
 fn evaluation_excludes_masked_rule_references_and_uses_recreated_definitions()
 -> Result<(), Box<dyn std::error::Error>> {
-    use ::sql_fun_sqlast::sem::{RuleIdentity, ViewInfoRead, ViewWriteEvaluation};
+    use ::sql_fun_sqlast::sem::{BaseParseContext, RuleIdentity, ViewWriteEvaluation};
     let schema = ViewSchema::postgres(
         "CREATE TABLE public.items(id integer); CREATE VIEW public.v AS SELECT DISTINCT id FROM public.items; CREATE RULE r AS ON INSERT TO public.v DO INSTEAD NOTHING;",
     )?;
     let name = FullName::with_schema("public", "v");
     let identity = RuleIdentity::new(&name, "r");
     let child = schema.mask_rule(&identity)?;
-    let references = child.get_view_impl(&name).unwrap().rules().unwrap();
+    let references = child
+        .get_view(&::sql_fun_sqlast::sem::ViewName::from_full_name(&name))
+        .unwrap()
+        .rules()
+        .unwrap();
     assert_eq!(references.identities().len(), 1);
     assert!(references.resolve(&child).is_empty());
     assert!(
-        !ViewWriteEvaluation::new(&child)
+        !ViewWriteEvaluation::new(&mut schema.analysis_context_at(&child))
             .insert(&name)
             .unwrap()
             .is_writable()
@@ -1315,14 +1338,14 @@ fn evaluation_excludes_masked_rule_references_and_uses_recreated_definitions()
         "CREATE RULE r AS ON INSERT TO public.v DO INSTEAD NOTHING;",
     )?;
     assert!(
-        ViewWriteEvaluation::new(&recreated)
+        ViewWriteEvaluation::new(&mut schema.analysis_context_at(&recreated))
             .insert(&name)
             .unwrap()
             .is_writable()
     );
     assert_eq!(
         recreated
-            .get_view_impl(&name)
+            .get_view(&::sql_fun_sqlast::sem::ViewName::from_full_name(&name))
             .unwrap()
             .rules()
             .unwrap()
@@ -1331,13 +1354,13 @@ fn evaluation_excludes_masked_rule_references_and_uses_recreated_definitions()
         1
     );
     assert!(
-        ViewWriteEvaluation::new(schema.context())
+        ViewWriteEvaluation::new(&mut schema.analysis_context_at(schema.context()))
             .insert(&name)
             .unwrap()
             .is_writable()
     );
     assert!(
-        !ViewWriteEvaluation::new(&child)
+        !ViewWriteEvaluation::new(&mut schema.analysis_context_at(&child))
             .insert(&name)
             .unwrap()
             .is_writable()
@@ -1360,11 +1383,12 @@ fn missing_linked_definition_is_incomplete_not_a_dropped_capability(
     ))?;
     let name = FullName::with_schema("public", "v");
     let detached = schema.detached_view_catalog(&name)?;
-    let problem = ::sql_fun_sqlast::sem::ViewWriteEvaluation::new(&detached)
-        .insert(&name)
-        .unwrap_err();
+    let problem =
+        ::sql_fun_sqlast::sem::ViewWriteEvaluation::new(&mut schema.analysis_context_at(&detached))
+            .insert(&name)
+            .unwrap_err();
     assert_eq!(
-        problem.missing_metadata_view(),
+        problem.view_problem().unwrap().missing_metadata_view(),
         Some(&FullName::with_schema("public", missing))
     );
     Ok(())
@@ -1383,7 +1407,7 @@ fn evaluation_excludes_cancelled_trigger_links_and_accepts_recreation()
     let child = schema.mask_trigger(&identity)?;
     assert!(child.trigger_is_cancelled(&identity));
     assert!(
-        !ViewWriteEvaluation::new(&child)
+        !ViewWriteEvaluation::new(&mut schema.analysis_context_at(&child))
             .insert(&name)
             .unwrap()
             .is_writable()
@@ -1391,19 +1415,19 @@ fn evaluation_excludes_cancelled_trigger_links_and_accepts_recreation()
     let recreated = schema.layer_at(&child, declaration)?;
     assert!(!recreated.trigger_is_cancelled(&identity));
     assert!(
-        ViewWriteEvaluation::new(&recreated)
+        ViewWriteEvaluation::new(&mut schema.analysis_context_at(&recreated))
             .insert(&name)
             .unwrap()
             .is_writable()
     );
     assert!(
-        ViewWriteEvaluation::new(schema.context())
+        ViewWriteEvaluation::new(&mut schema.analysis_context_at(schema.context()))
             .insert(&name)
             .unwrap()
             .is_writable()
     );
     assert!(
-        !ViewWriteEvaluation::new(&child)
+        !ViewWriteEvaluation::new(&mut schema.analysis_context_at(&child))
             .insert(&name)
             .unwrap()
             .is_writable()

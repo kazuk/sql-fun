@@ -652,9 +652,15 @@ impl Conflict {
         }
         if !self.inference.is_empty() {
             let arbiters = if conflict.modifiers_are_bound() {
-                match context
-                    .infer_conflict_arbiters(name, &conflict)?
-                    .into_result()
+                match if context
+                    .get_view(&crate::sem::ViewName::from_full_name(name.full_name()))
+                    .is_some()
+                {
+                    crate::sem::ViewWriteEvaluation::new(context).infer_arbiters(name, &conflict)?
+                } else {
+                    context.infer_conflict_arbiters(name, &conflict)?
+                }
+                .into_result()
                 {
                     Ok(arbiters) => arbiters,
                     Err(problem) => {

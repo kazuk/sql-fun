@@ -1,51 +1,62 @@
 //! Analyzer-owned writable-view decisions from effective semantic definitions.
 use crate::sem::problem::ViewProblem;
 use crate::sem::{
-    AnalysisError, BaseParseContext, ColumnDefinition, ColumnName, FullName, SemScalarExpr,
-    TableName, ViewInsertSupport, ViewUpdateSupport,
+    AnalysisError, ColumnDefinition, ColumnName, FullName, ParseContext, SemScalarExpr, TableName,
+    ViewInsertSupport, ViewUpdateSupport,
 };
 
-/// Domain service evaluating an exactly bound ordinary View through its semantic catalog.
-/// The backend is injected once. Evaluation does not register or mutate definitions.
-/// DML analyzers supply their shared ParseContext; frozen catalogs expose the same read backend.
-pub struct ViewWriteEvaluation<'a, C> {
-    context: &'a C,
+/// Writable-view analysis with the caller's full diagnostic environment.
+/// Catalog definitions remain unchanged; semantic problems are reported here.
+pub struct ViewWriteEvaluation<'a, C: ParseContext> {
+    context: &'a mut C,
 }
-impl<'a, C: BaseParseContext> ViewWriteEvaluation<'a, C> {
-    /// Use the caller's existing common context as the catalog backend.
-    pub const fn new(context: &'a C) -> Self {
+impl<'a, C: ParseContext> ViewWriteEvaluation<'a, C> {
+    /// Inject the active analysis context once.
+    pub const fn new(context: &'a mut C) -> Self {
         Self { context }
     }
-    /// Evaluate INSERT support without requiring an UPDATE result.
+    /// Evaluate INSERT support and report semantic failures.
     /// # Errors
-    /// Reports the exact unavailable semantic definition.
-    pub fn insert(&self, view: &FullName) -> Result<ViewInsertSupport, ViewProblem> {
-        insert_support(self.context, view)
+    /// Returns the reported structured cause or a diagnostic delivery failure.
+    pub fn insert(&mut self, view: &FullName) -> Result<ViewInsertSupport, AnalysisError> {
+        let result = insert_support(self.context, view);
+        self.report(view, result)
     }
-    /// Evaluate UPDATE support without requiring an INSERT result.
+    /// Evaluate UPDATE support and report semantic failures.
     /// # Errors
-    /// Reports the exact unavailable semantic definition.
-    pub fn update(&self, view: &FullName) -> Result<ViewUpdateSupport, ViewProblem> {
-        update_support(self.context, view)
+    /// Returns the reported structured cause or a diagnostic delivery failure.
+    pub fn update(&mut self, view: &FullName) -> Result<ViewUpdateSupport, AnalysisError> {
+        let result = update_support(self.context, view);
+        self.report(view, result)
+    }
+    /// Evaluate independent INSERT and UPDATE support.
+    /// # Errors
+    /// Returns the reported structured cause or a diagnostic delivery failure.
+    pub fn evaluate(&mut self, view: &FullName) -> Result<ViewWriteSupport, AnalysisError> {
+        Ok(ViewWriteSupport {
+            insert: self.insert(view)?,
+            update: self.update(view)?,
+        })
     }
     pub(crate) fn infer_arbiters(
-        &self,
+        &mut self,
         view: &TableName,
         conflict: &crate::sem::InsertConflict,
     ) -> Result<crate::sem::ConflictArbiterInference, AnalysisError> {
-        infer_view_arbiters(self.context, view, conflict)
+        let result = infer_view_arbiters(self.context, view, conflict);
+        self.report(view.full_name(), result)
     }
-    /// Evaluate independent INSERT and UPDATE support from effective semantic definitions.
-    ///
-    /// # Errors
-    /// Retains the exact identity whose semantic definition is unavailable.
-    pub fn evaluate(&self, view: &FullName) -> Result<ViewWriteSupport, ViewProblem> {
-        Ok(ViewWriteSupport {
-            insert: insert_support(self.context, view)?,
-            update: update_support(self.context, view)?,
-        })
+    fn report<T>(
+        &mut self,
+        view: &FullName,
+        result: Result<T, AnalysisError>,
+    ) -> Result<T, AnalysisError> {
+        result.or_else(|error| error.report_view_evaluation(self.context, view))
     }
 }
+#[cfg(test)]
+mod tests;
+
 /// Effective operation-specific writable-view analysis results.
 pub struct ViewWriteSupport {
     insert: ViewInsertSupport,
@@ -73,7 +84,7 @@ struct EvaluationView<'a> {
 impl<'a> EvaluationView<'a> {
     fn matching_rules<'c>(
         &self,
-        context: &'c impl BaseParseContext,
+        context: &'c impl ParseContext,
         event: WriteEvent,
     ) -> Vec<&'c crate::sem::CreateRule> {
         self.definition
@@ -83,7 +94,7 @@ impl<'a> EvaluationView<'a> {
             .filter(|rule| rule.event().write_event() == Some(event))
             .collect()
     }
-    fn has_conflict_rules(&self, context: &impl BaseParseContext) -> bool {
+    fn has_conflict_rules(&self, context: &impl ParseContext) -> bool {
         self.definition.rules().resolve(context).iter().any(|rule| {
             matches!(
                 rule.event(),
@@ -93,7 +104,7 @@ impl<'a> EvaluationView<'a> {
     }
     fn matching_triggers<'c>(
         &self,
-        context: &'c impl BaseParseContext,
+        context: &'c impl ParseContext,
         event: WriteEvent,
     ) -> Vec<&'c crate::sem::CreateTrigger> {
         self.definition
@@ -110,12 +121,14 @@ impl<'a> EvaluationView<'a> {
             })
             .collect()
     }
-    fn load(context: &'a impl BaseParseContext, name: &FullName) -> Result<Self, FullName> {
-        let view = context.get_view_impl(name).ok_or_else(|| name.clone())?;
-        let definition = view.ordinary_definition().ok_or_else(|| name.clone())?;
+    fn load(context: &'a impl ParseContext, name: &FullName) -> Result<Self, AnalysisError> {
+        let view = lookup_bound_view(context, name)?.ok_or_else(|| missing_definition(name))?;
+        let definition = view
+            .ordinary_definition()
+            .ok_or_else(|| missing_definition(name))?;
         for identity in definition.rules().identities() {
             if context.rule(identity).is_none() && !rule_is_cancelled(context, identity) {
-                return Err(identity.name().clone());
+                return Err(missing_definition(identity.name()));
             }
         }
         for trigger in definition.triggers().names() {
@@ -126,11 +139,10 @@ impl<'a> EvaluationView<'a> {
                     crate::sem::TriggerIdentity::postgres(name, trigger)
                 };
             if context.trigger(&identity).is_none() && !context.trigger_is_cancelled(&identity) {
-                return Err(trigger.clone());
+                return Err(missing_definition(trigger));
             }
         }
-        let source =
-            automatic_view_source(context, definition.query()).map_err(|_| name.clone())?;
+        let source = automatic_view_source(context, definition.query())?;
         let projections = definition
             .column_lineage()
             .project(definition.result_columns());
@@ -144,10 +156,10 @@ impl<'a> EvaluationView<'a> {
     }
     fn decision(
         &self,
-        context: &impl BaseParseContext,
+        context: &impl ParseContext,
         event: WriteEvent,
         seen: &mut Vec<FullName>,
-    ) -> Result<Decision, FullName> {
+    ) -> Result<Decision, AnalysisError> {
         self.decision_from_facts(context, event, seen)
     }
     fn source_expression(&self, column: &ColumnName) -> Option<&SemScalarExpr> {
@@ -171,10 +183,10 @@ impl<'a> EvaluationView<'a> {
 
     fn decision_from_facts(
         &self,
-        context: &impl BaseParseContext,
+        context: &impl ParseContext,
         event: WriteEvent,
         seen: &mut Vec<FullName>,
-    ) -> Result<Decision, FullName> {
+    ) -> Result<Decision, AnalysisError> {
         if let Some(decision) = self.explicit_write_decision(context, event) {
             return Ok(decision);
         }
@@ -187,7 +199,7 @@ impl<'a> EvaluationView<'a> {
 
     fn explicit_write_decision(
         &self,
-        context: &impl BaseParseContext,
+        context: &impl ParseContext,
         event: WriteEvent,
     ) -> Option<Decision> {
         let rules = self.matching_rules(context, event);
@@ -238,10 +250,10 @@ impl<'a> EvaluationView<'a> {
     }
     fn automatic_source_decision(
         &self,
-        context: &impl BaseParseContext,
+        context: &impl ParseContext,
         event: WriteEvent,
         seen: &mut Vec<FullName>,
-    ) -> Result<Decision, FullName> {
+    ) -> Result<Decision, AnalysisError> {
         let Some(source) = &self.source else {
             return Ok(Decision::read_only());
         };
@@ -256,11 +268,11 @@ impl<'a> EvaluationView<'a> {
 
     fn source_decision(
         &self,
-        context: &impl BaseParseContext,
+        context: &impl ParseContext,
         source: &FullName,
         event: WriteEvent,
         seen: &mut Vec<FullName>,
-    ) -> Result<Decision, FullName> {
+    ) -> Result<Decision, AnalysisError> {
         let decision = if let Some(table) =
             context.get_table(&crate::sem::TableName::from(source.clone()))
         {
@@ -276,7 +288,7 @@ impl<'a> EvaluationView<'a> {
                 EvaluationView::load(context, source)?.decision(context, event, seen)?
             }
         } else {
-            return Err(source.clone());
+            return Err(missing_definition(source));
         };
         Ok(decision)
     }
@@ -401,25 +413,21 @@ impl Decision {
     }
 }
 
-pub(crate) fn insert_support(
-    context: &impl BaseParseContext,
+fn insert_support(
+    context: &impl ParseContext,
     view: &FullName,
-) -> Result<ViewInsertSupport, ViewProblem> {
-    if context
-        .get_view_impl(view)
-        .is_some_and(crate::sem::ViewLike::is_materialized)
-    {
+) -> Result<ViewInsertSupport, AnalysisError> {
+    if lookup_bound_view(context, view)?.is_some_and(crate::sem::ViewLike::is_materialized) {
         return Ok(ViewInsertSupport::read_only());
     }
     if let Some(support) = context.view_insert_support(view) {
         return Ok(support.clone());
     }
-    let decision = EvaluationView::load(context, view)
-        .and_then(|info| info.decision(context, WriteEvent::insert(), &mut vec![view.clone()]));
-    let decision = match decision {
-        Ok(decision) => decision,
-        Err(missing) => return Err(ViewProblem::missing_metadata(&missing)),
-    };
+    let decision = EvaluationView::load(context, view)?.decision(
+        context,
+        WriteEvent::insert(),
+        &mut vec![view.clone()],
+    )?;
     if decision.writable {
         let mut support = ViewInsertSupport::writable(
             &decision.columns,
@@ -433,25 +441,21 @@ pub(crate) fn insert_support(
         Ok(ViewInsertSupport::read_only())
     }
 }
-pub(crate) fn update_support(
-    context: &impl BaseParseContext,
+fn update_support(
+    context: &impl ParseContext,
     view: &FullName,
-) -> Result<ViewUpdateSupport, ViewProblem> {
-    if context
-        .get_view_impl(view)
-        .is_some_and(crate::sem::ViewLike::is_materialized)
-    {
+) -> Result<ViewUpdateSupport, AnalysisError> {
+    if lookup_bound_view(context, view)?.is_some_and(crate::sem::ViewLike::is_materialized) {
         return Ok(ViewUpdateSupport::read_only());
     }
     if let Some(support) = context.view_update_support(view) {
         return Ok(support.clone());
     }
-    let decision = EvaluationView::load(context, view)
-        .and_then(|info| info.decision(context, WriteEvent::update(), &mut vec![view.clone()]));
-    let decision = match decision {
-        Ok(decision) => decision,
-        Err(missing) => return Err(ViewProblem::missing_metadata(&missing)),
-    };
+    let decision = EvaluationView::load(context, view)?.decision(
+        context,
+        WriteEvent::update(),
+        &mut vec![view.clone()],
+    )?;
     if decision.writable {
         let mut support = ViewUpdateSupport::writable(&decision.columns, decision.returning);
         support.set_assignment_columns(&decision.assignment_columns);
@@ -512,27 +516,16 @@ fn required_trigger_columns(
 }
 
 fn infer_view_arbiters(
-    context: &impl BaseParseContext,
+    context: &impl ParseContext,
     view: &TableName,
     conflict: &crate::sem::InsertConflict,
 ) -> Result<crate::sem::ConflictArbiterInference, AnalysisError> {
-    let info = match EvaluationView::load(context, view.full_name()) {
-        Ok(info) => info,
-        Err(missing) => {
-            return Ok(crate::sem::ConflictArbiterInference::missing_view_metadata(
-                &missing,
-            ));
-        }
-    };
-    if let Err(missing) = info.decision(
+    let info = EvaluationView::load(context, view.full_name())?;
+    info.decision(
         context,
         WriteEvent::insert(),
         &mut vec![view.full_name().clone()],
-    ) {
-        return Ok(crate::sem::ConflictArbiterInference::missing_view_metadata(
-            &missing,
-        ));
-    }
+    )?;
     if info
         .matching_rules(context, WriteEvent::insert())
         .iter()
@@ -551,7 +544,11 @@ fn infer_view_arbiters(
         return Ok(crate::sem::ConflictArbiterInference::complete(&[]));
     }
     let relation = TableName::from(source.clone());
-    let inference = context.infer_conflict_arbiters(&relation, &mapped)?;
+    let inference = if context.get_table(&relation).is_some() {
+        context.infer_conflict_arbiters(&relation, &mapped)?
+    } else {
+        infer_view_arbiters(context, &relation, &mapped)?
+    };
     if context
         .get_table(&crate::sem::TableName::from(source.clone()))
         .is_some()
@@ -573,7 +570,7 @@ fn infer_view_arbiters(
 impl crate::sem::InsertConflict {
     fn map_view_columns(
         &mut self,
-        context: &impl BaseParseContext,
+        context: &impl ParseContext,
         view: &EvaluationView<'_>,
         source: &FullName,
     ) -> Result<bool, AnalysisError> {
@@ -593,7 +590,7 @@ struct ViewColumnMapper<'a, C> {
     source: &'a FullName,
     complete: bool,
 }
-impl<C: BaseParseContext> crate::sem::traversal::SemanticVisitor for ViewColumnMapper<'_, C> {
+impl<C: ParseContext> crate::sem::traversal::SemanticVisitor for ViewColumnMapper<'_, C> {
     fn expression(&mut self, expression: &mut SemScalarExpr) -> Result<(), AnalysisError> {
         let Some(column) = expression.bound_view_column(&self.view.name) else {
             return Ok(());
@@ -608,9 +605,15 @@ impl<C: BaseParseContext> crate::sem::traversal::SemanticVisitor for ViewColumnM
             }
             return Ok(());
         };
-        let definition = if let Some(table) = self.context.get_table_impl(self.source) {
+        let definition = if let Some(table) = self
+            .context
+            .get_table(&TableName::from(self.source.clone()))
+        {
             table.get_column_def(mapped).cloned()
-        } else if let Some(view) = self.context.get_view_impl(self.source) {
+        } else if let Some(view) = self
+            .context
+            .get_view(&crate::sem::ViewName::from_full_name(self.source))
+        {
             view.get_column_def(mapped)
         } else {
             None
@@ -642,7 +645,7 @@ fn rule_is_cancelled(
 }
 
 fn automatic_view_source(
-    context: &impl BaseParseContext,
+    context: &impl ParseContext,
     query: &crate::sem::SelectStatement,
 ) -> Result<Option<FullName>, AnalysisError> {
     use crate::sem::SelectStatement;
@@ -675,7 +678,7 @@ fn automatic_view_source(
 }
 
 fn projection_preserves_rows(
-    context: &impl BaseParseContext,
+    context: &impl ParseContext,
     query: &crate::sem::SelectStatement,
 ) -> Result<bool, AnalysisError> {
     let mut check = ProjectionRows {
@@ -691,7 +694,7 @@ struct ProjectionRows<'a, C> {
     preserves: bool,
     depth: usize,
 }
-impl<C: BaseParseContext> crate::sem::traversal::SemanticVisitor for ProjectionRows<'_, C> {
+impl<C: ParseContext> crate::sem::traversal::SemanticVisitor for ProjectionRows<'_, C> {
     fn enter_query(&mut self) {
         self.depth += 1;
     }
@@ -728,4 +731,20 @@ impl ViewAssignmentColumn {
     pub const fn source_column(&self) -> &ColumnName {
         &self.source
     }
+}
+
+fn missing_definition(name: &FullName) -> AnalysisError {
+    AnalysisError::view_metadata(&ViewProblem::missing_metadata(name))
+}
+
+fn lookup_bound_view<'a>(
+    context: &'a impl ParseContext,
+    name: &FullName,
+) -> Result<Option<&'a crate::sem::ViewLike>, AnalysisError> {
+    if name.schema().is_none() {
+        return Err(AnalysisError::unexpected_input_error(&format!(
+            "View evaluation requires an already-resolved schema-qualified name: {name}"
+        )));
+    }
+    Ok(context.get_view(&crate::sem::ViewName::from_full_name(name)))
 }

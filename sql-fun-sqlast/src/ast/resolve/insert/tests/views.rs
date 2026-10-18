@@ -250,7 +250,9 @@ mod test_helpers {
             crate::sem::SchemaName::from("later"),
         ]);
         if sql.contains("ON CONFLICT(id)") && dialect == Dialect::postgres() {
-            context.expect_conflict_target(&crate::sem::TableName::from(name.clone()));
+            context.expect_conflict_target(&crate::sem::TableName::from(FullName::with_schema(
+                "public", "items",
+            )));
             context.expect_conflict_modifiers(
                 &[crate::sem::InsertInferenceModifiers::new(None, None)],
                 &[crate::sem::InsertArbiter::index(&FullName::with_schema(

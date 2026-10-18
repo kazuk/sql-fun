@@ -120,12 +120,14 @@ unimplemented
 successful INSERT analysis, including later actions in SQLite UPSERT chains.
 
 Ordinary view writes are analyzed from the schema declarations you explicitly
-load. API consumers construct `ViewWriteEvaluation::new(&context)` with the
+load. API consumers construct `ViewWriteEvaluation::new(&mut context)` with the
 existing analysis context, then call `insert`, `update`, or `evaluate` with an
 already-bound View `FullName`. Evaluation follows the View's effective semantic
 Trigger/Rule references and does not register capabilities or resolve a new
 search path. `ViewInsertSupport::analyze` and `ViewUpdateSupport::analyze` use
-this same service. Frozen catalogs expose the common context read interface.
+this same service. The service reports semantic problems through that context
+and preserves their structured causes. Frozen contexts store analysis results;
+writable-view analysis requires an active `ParseContext`.
 PostgreSQL supports automatic writes through a single eligible relation,
 matching INSTEAD OF triggers, and unconditional INSTEAD rules. INSERT and UPDATE
 are independent: an INSERT trigger does not permit UPDATE. SQLite requires a

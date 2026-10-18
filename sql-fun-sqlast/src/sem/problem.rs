@@ -8,8 +8,10 @@ mod ownership;
 mod parameter_constraint;
 mod query;
 mod sql_highlighter;
+mod trigger;
 mod update;
 mod view;
+pub use self::trigger::TriggerProblem;
 
 use std::collections::HashSet;
 
@@ -74,6 +76,8 @@ trait RenderProblemReport: Problem {
 pub enum AnalysisProblem {
     /// ALTER OWNER target or role lookup failed.
     Ownership(OwnershipProblem),
+    /// Invalid trigger semantics.
+    Trigger(TriggerProblem),
     /// A view declaration or catalog capability violation.
     View(ViewProblem),
     /// A violation of INSERT semantic rules.
@@ -164,6 +168,10 @@ impl AnalysisProblem {
         }
     }
 
+    pub(crate) fn trigger(problem: &TriggerProblem) -> Self {
+        Self::Trigger(problem.clone())
+    }
+
     pub(crate) const fn delete(kind: DeleteProblemKind) -> Self {
         Self::Delete(DeleteProblem::new(kind))
     }
@@ -231,6 +239,7 @@ impl AnalysisProblem {
     pub const fn code(&self) -> &'static str {
         match self {
             Self::Ownership(problem) => problem.code(),
+            Self::Trigger(_) => "trigger_invalid_definition",
             Self::View(problem) => problem.code(),
             Self::Insert(problem) => problem.code(),
             Self::Update(problem) => problem.code(),
@@ -283,6 +292,7 @@ impl AnalysisProblem {
 
         let report = match self {
             Self::Ownership(problem) => problem.render_report(&report_handler, source)?,
+            Self::Trigger(problem) => problem.render_report(&report_handler, source)?,
             Self::View(problem) => problem.render_report(&report_handler, source)?,
             Self::Insert(problem) => problem.render_report(&report_handler, source)?,
             Self::Update(problem) => problem.render_report(&report_handler, source)?,

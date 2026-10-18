@@ -2,6 +2,7 @@
 use crate::sem::{AnalysisError, SemScalarExpr};
 
 pub(crate) trait SemanticVisitor {
+    fn relation_identity(&mut self, _name: &crate::sem::FullName) {}
     fn expression(&mut self, _expression: &mut SemScalarExpr) -> Result<(), AnalysisError> {
         Ok(())
     }

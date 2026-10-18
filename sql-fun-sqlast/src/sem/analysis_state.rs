@@ -14,6 +14,9 @@ pub struct AnalysisState {
 }
 
 impl AnalysisState {
+    pub(crate) const fn has_problems(&self) -> bool {
+        !self.problems.is_empty()
+    }
     pub(crate) fn begin(&mut self) {
         *self = Self {
             active: true,

@@ -9,6 +9,10 @@ use crate::sem::{AnalysisProblem, ParseContext, TypeReference};
 /// error
 #[derive(Debug, thiserror::Error)]
 pub enum AnalysisError {
+    /// Invalid trigger definition or application.
+    #[error("invalid trigger: {0:?}")]
+    Trigger(Box<crate::sem::problem::TriggerProblem>),
+
     /// unknown error
     #[error("{0}")]
     GenericError(#[source] Box<dyn std::error::Error>),
@@ -63,6 +67,9 @@ pub enum AnalysisError {
 }
 
 impl AnalysisError {
+    pub(crate) fn trigger(problem: &crate::sem::problem::TriggerProblem) -> Self {
+        Self::Trigger(Box::new(problem.clone()))
+    }
     pub(crate) fn view_metadata(problem: &crate::sem::problem::ViewProblem) -> Self {
         Self::ViewMetadata(Box::new(problem.clone()))
     }

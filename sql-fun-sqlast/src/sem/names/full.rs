@@ -41,6 +41,26 @@ impl TryFrom<&crate::syn::sqlite::QualifiedName> for FullName {
 }
 
 impl FullName {
+    pub(crate) fn sqlite_eq(&self, other: &Self) -> bool {
+        const fn equal(left: Option<&str>, right: Option<&str>) -> bool {
+            match (left, right) {
+                (Some(left), Some(right)) => left.eq_ignore_ascii_case(right),
+                (None, None) => true,
+                _ => false,
+            }
+        }
+        equal(
+            self.catalog().map(CatalogName::as_str),
+            other.catalog().map(CatalogName::as_str),
+        ) && equal(
+            self.schema().map(SchemaName::as_str),
+            other.schema().map(SchemaName::as_str),
+        ) && self
+            .name()
+            .as_str()
+            .eq_ignore_ascii_case(other.name().as_str())
+    }
+
     /// Construct from logical components.
     ///
     /// # Panics

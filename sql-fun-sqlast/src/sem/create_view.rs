@@ -16,6 +16,7 @@ use super::{AnalysisError, FullName, ParseContext, SelectStatement, SemAst};
 pub struct CreateView {
     name: FullName,
     query: SelectStatement,
+    triggers: crate::sem::TriggerReferences,
     alter_statements: Vec<AlterView>,
     owner: Option<crate::sem::OwnerSpecification>,
     materialized: bool,
@@ -31,6 +32,13 @@ impl CreateView {
         self.owner = Some(owner.clone());
     }
 
+    /// Fully qualified trigger references associated with this relation.
+    pub const fn triggers(&self) -> &crate::sem::TriggerReferences {
+        &self.triggers
+    }
+    pub(crate) fn associate_trigger(&mut self, name: &crate::sem::FullName) {
+        self.triggers.associate(name);
+    }
     pub(crate) fn result_columns(&self) -> &crate::sem::ResultColumnCollection {
         self.query.result_columns()
     }
@@ -46,6 +54,7 @@ impl CreateView {
     ) -> Self {
         Self {
             name: name.clone(),
+            triggers: crate::sem::TriggerReferences::default(),
             query: query.clone(),
             alter_statements: alter_statements.to_owned(),
             owner: owner.as_deref().map(crate::sem::OwnerSpecification::named),

@@ -19,14 +19,69 @@ pub struct ScalarAnalysisContext<'a> {
     windows: Vec<String>,
     output_aliases: Option<crate::sem::ResultColumnCollection>,
     delete_returning_target: Option<AliasName>,
+    qualified_only: bool,
+    trigger_namespace: Option<crate::sem::SchemaName>,
 }
 
 impl<'a> ScalarAnalysisContext<'a> {
+    pub(crate) const fn trigger(with: &'a WithClause, from: &'a FromClause) -> Self {
+        let mut scope = Self::new(with, from);
+        scope.qualified_only = true;
+        scope
+    }
+    pub(crate) fn set_trigger_namespace(&mut self, schema: Option<&crate::sem::SchemaName>) {
+        self.trigger_namespace = schema.cloned();
+    }
+    fn trigger_namespace(&self) -> Option<&crate::sem::SchemaName> {
+        if let Some(schema) = &self.trigger_namespace {
+            Some(schema)
+        } else if let Some(parent) = &self.parent {
+            parent.trigger_namespace()
+        } else {
+            None
+        }
+    }
+    pub(crate) fn trigger_relation_name(
+        &self,
+        context: &impl ParseContext,
+        name: &crate::sem::FullName,
+    ) -> Result<crate::sem::FullName, AnalysisError> {
+        if context.dialect() != crate::ast::Dialect::sqlite() {
+            return Ok(name.clone());
+        }
+        let Some(schema) = self.trigger_namespace() else {
+            return Ok(name.clone());
+        };
+        if name.catalog().is_some()
+            || name
+                .schema()
+                .is_some_and(|supplied| !supplied.as_str().eq_ignore_ascii_case(schema.as_str()))
+        {
+            return Err(AnalysisError::trigger(
+                &crate::sem::problem::TriggerProblem::options(
+                    name,
+                    "non-TEMP SQLite triggers can reference only their own database",
+                ),
+            ));
+        }
+        Ok(name.replace_schema(schema))
+    }
+    pub(crate) fn trigger_scope(&self) -> Option<&Self> {
+        if self.qualified_only {
+            Some(self)
+        } else if let Some(parent) = &self.parent {
+            parent.trigger_scope()
+        } else {
+            None
+        }
+    }
     fn clone_scope(&self) -> Self {
         Self {
             windows: self.windows.clone(),
             output_aliases: self.output_aliases.clone(),
             delete_returning_target: self.delete_returning_target.clone(),
+            qualified_only: self.qualified_only,
+            trigger_namespace: self.trigger_namespace.clone(),
             with_clause: self.with_clause.clone(),
             from_clause: self.from_clause.clone(),
             parent: self
@@ -45,6 +100,8 @@ impl<'a> ScalarAnalysisContext<'a> {
             windows: Vec::new(),
             output_aliases: None,
             delete_returning_target: None,
+            qualified_only: false,
+            trigger_namespace: None,
         }
     }
 
@@ -60,6 +117,8 @@ impl<'a> ScalarAnalysisContext<'a> {
             windows: Vec::new(),
             output_aliases: None,
             delete_returning_target: None,
+            qualified_only: false,
+            trigger_namespace: None,
         }
     }
 
@@ -232,6 +291,8 @@ impl<'a> ScalarAnalysisContext<'a> {
             windows: Vec::new(),
             output_aliases: None,
             delete_returning_target: None,
+            qualified_only: false,
+            trigger_namespace: None,
         }
     }
 }
@@ -275,6 +336,15 @@ impl ScalarAnalysisContext<'_> {
         column: &ColumnName,
     ) -> Result<(SemScalarExpr, &'context mut TContext), AnalysisError> {
         if let Some(alias) = alias {
+            if self.qualified_only && context.dialect() == crate::ast::Dialect::sqlite() {
+                let normalized = AliasName::from(alias.as_str().to_ascii_lowercase().as_str());
+                if let Some((source, _)) = self.from_clause.resolve_alias(&normalized) {
+                    let canonical = source
+                        .trigger_column(context, column)
+                        .unwrap_or_else(|| column.clone());
+                    return self.resolve_source_column_ref(context, &normalized, &canonical);
+                }
+            }
             if let Some((target, role, nullable)) = self.merge_row_target(alias) {
                 let (value, context) = self.resolve_source_column_ref(context, target, column)?;
                 return Ok((value.merge_record_column(role, nullable), context));
@@ -292,6 +362,10 @@ impl ScalarAnalysisContext<'_> {
             return self.resolve_source_column_ref(context, alias, column);
         }
 
+        if self.qualified_only {
+            let expr = ColumnReferenceExpr::undefined_column_resolved(context, column)?;
+            return Ok((expr, context));
+        }
         let Ok(find_alias_result) =
             self.from_clause
                 .find_alias_resolved(column, &*context, &self.with_clause)

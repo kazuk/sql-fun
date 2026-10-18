@@ -3,7 +3,7 @@ use crate::sem::{
     TypeDefinition, TypeInfoRead, TypeInfoWrite, TypeReference,
 };
 
-use std::collections::HashMap;
+use crate::TrieMap;
 
 use super::{SchemaCatalog, SchemaFileContext};
 
@@ -52,16 +52,16 @@ impl TypeInfoWrite for SchemaFileContext {
 }
 
 #[derive(Debug, Default)]
-pub(super) struct TypeDefinitionCollection(HashMap<FullName, TypeDefinition>);
+pub(super) struct TypeDefinitionCollection(TrieMap<TypeDefinition>);
 
 impl TypeDefinitionCollection {
     pub(super) fn replace_definition(&mut self, key: &FullName, definition: &TypeDefinition) {
-        self.0.insert(key.clone(), definition.clone());
+        self.0.insert(&key.catalog_key(), definition.clone());
     }
 
     pub(super) fn cast_source_types(&self) -> Vec<TypeReference> {
         let mut sources = Vec::new();
-        for definition in self.0.values() {
+        for (_, definition) in self.0.iter() {
             if let Some(name) = definition.full_name() {
                 sources.push(TypeReference::concrete_type_ref(name, false));
                 sources.push(TypeReference::concrete_type_ref(name, true));
@@ -78,7 +78,7 @@ impl TypeDefinitionCollection {
     where
         TBaseContext: BaseParseContext + std::fmt::Debug,
     {
-        if let Some(v) = self.0.get(key) {
+        if let Some(v) = self.0.get(&key.catalog_key()) {
             Some(v)
         } else {
             base.get_type_impl(key)
@@ -87,12 +87,13 @@ impl TypeDefinitionCollection {
 
     pub(super) fn insert_table_ref(&mut self, table_name: &TableName) {
         let table_ref = TypeDefinition::table_ref(table_name);
-        self.0.insert(table_name.full_name().clone(), table_ref);
+        self.0
+            .insert(&table_name.full_name().catalog_key(), table_ref);
     }
 
     pub(super) fn insert_create_enum(&mut self, name: &FullName, create_enum: &CreateEnum) {
         self.0
-            .insert(name.clone(), TypeDefinition::from(create_enum));
+            .insert(&name.catalog_key(), TypeDefinition::from(create_enum));
     }
 
     pub(super) fn insert_create_composite_type(
@@ -101,11 +102,11 @@ impl TypeDefinitionCollection {
         create_comp_type: &CreateCompositeType,
     ) {
         self.0
-            .insert(name.clone(), TypeDefinition::from(create_comp_type));
+            .insert(&name.catalog_key(), TypeDefinition::from(create_comp_type));
     }
 
     pub(super) fn insert_create_domain(&mut self, name: &FullName, create_domain: &CreateDomain) {
         self.0
-            .insert(name.clone(), TypeDefinition::from(create_domain));
+            .insert(&name.catalog_key(), TypeDefinition::from(create_domain));
     }
 }

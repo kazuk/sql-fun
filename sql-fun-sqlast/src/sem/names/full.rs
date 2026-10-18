@@ -28,6 +28,25 @@ impl TryFrom<&crate::syn::sqlite::QualifiedName> for FullName {
 }
 
 impl FullName {
+    /// Collision-free internal trie key, preserving absent qualifiers and identifier boundaries.
+    pub(crate) fn catalog_key(&self) -> String {
+        let mut key = String::new();
+        for component in [
+            self.catalog.as_ref().map(CatalogName::as_str),
+            self.schema.as_ref().map(SchemaName::as_str),
+            Some(self.name.as_str()),
+        ] {
+            if let Some(component) = component {
+                key.push_str(&component.len().to_string());
+                key.push(':');
+                key.push_str(component);
+            } else {
+                key.push('-');
+            }
+        }
+        key
+    }
+
     /// create instance
     #[must_use]
     pub fn new(
@@ -235,6 +254,23 @@ impl FullName {
     #[must_use]
     pub fn is_any_compatible_multi_range(&self) -> bool {
         self.schema_is_pg_catalog() && self.name == LocalName::from("anycompatiblemultirange")
+    }
+}
+
+#[cfg(test)]
+mod catalog_key_tests {
+    use super::FullName;
+
+    #[rstest::rstest]
+    #[case::quoted_separator(FullName::with_schema("a.b", "c"), FullName::with_schema("a", "b.c"))]
+    #[case::absent_schema(FullName::from_local_name("x"), FullName::with_schema("", "x"))]
+    #[case::qualifier_kind(
+        FullName::with_catalog("a", None, "x"),
+        FullName::with_schema("a", "x")
+    )]
+    fn distinct_names_remain_distinct_trie_keys(#[case] left: FullName, #[case] right: FullName) {
+        assert_ne!(left, right);
+        assert_ne!(left.catalog_key(), right.catalog_key());
     }
 }
 

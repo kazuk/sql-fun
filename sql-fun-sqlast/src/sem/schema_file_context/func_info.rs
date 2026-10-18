@@ -3,16 +3,16 @@ use crate::sem::{
     FunctionOverloadCollection,
 };
 
-use std::collections::HashMap;
+use crate::TrieMap;
 
 use super::{SchemaCatalog, SchemaFileContext};
 
 #[derive(Debug, Default)]
-pub struct FunctionDefinitionCollection(HashMap<FullName, Vec<CreateFunction>>);
+pub struct FunctionDefinitionCollection(TrieMap<Vec<CreateFunction>>);
 
 impl FunctionDefinitionCollection {
     pub(super) fn definitions(&self, name: &FullName) -> Vec<CreateFunction> {
-        self.0.get(name).cloned().unwrap_or_default()
+        self.0.get(&name.catalog_key()).cloned().unwrap_or_default()
     }
     pub(super) fn insert(&mut self, name: &FullName, create_function: &CreateFunction) {
         let mut definitions = self.definitions(name);
@@ -21,7 +21,7 @@ impl FunctionDefinitionCollection {
             definitions.retain(|existing| existing.ownership_identity(name) != identity);
             definitions.push(definition);
         }
-        self.0.insert(name.clone(), definitions);
+        self.0.insert(&name.catalog_key(), definitions);
     }
 }
 

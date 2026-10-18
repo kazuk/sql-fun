@@ -843,3 +843,85 @@ fn omitted_routine_signatures_consider_all_visible_search_path_candidates(
     assert!(second[0].owner().is_none());
     Ok(())
 }
+
+#[rstest::rstest]
+#[case::unknown_base_owner(false)]
+#[case::known_base_owner(true)]
+fn ownership_only_override_wins_over_immutable_base_definition(
+    #[case] known_base_owner: bool,
+) -> testresult::TestResult {
+    let mut context = ownership_context();
+    if known_base_owner {
+        context = apply_ownership_sql(context, "ALTER TYPE pg_catalog.int4 OWNER TO alice")?
+            .into_context();
+    }
+    let name = FullName::with_schema("pg_catalog", "int4");
+    let before = context.ownership_definitions(ObjectKind::TYPE, &name);
+    let base = context.freeze();
+    let child = schema_layer(std::path::Path::new("child.sql"), &base);
+    let result = apply_ownership_sql(child, "ALTER TYPE pg_catalog.int4 OWNER TO bob")?;
+    let definitions = result
+        .context()
+        .ownership_definitions(ObjectKind::TYPE, &name);
+    assert_eq!(definitions.len(), 1);
+    assert_eq!(
+        definitions[0]
+            .owner()
+            .unwrap()
+            .resolved_role()
+            .map(Role::name),
+        Some("bob")
+    );
+    assert_eq!(base.ownership_definitions(ObjectKind::TYPE, &name), before);
+    let child_base = result.into_context().freeze();
+    let grandchild = schema_layer(std::path::Path::new("grandchild.sql"), &child_base);
+    assert_eq!(
+        grandchild.ownership_definitions(ObjectKind::TYPE, &name),
+        definitions
+    );
+    let changed = apply_ownership_sql(grandchild, "ALTER TYPE pg_catalog.int4 OWNER TO alice")?;
+    assert_eq!(
+        changed
+            .context()
+            .ownership_definitions(ObjectKind::TYPE, &name)[0]
+            .owner()
+            .unwrap()
+            .resolved_role()
+            .map(Role::name),
+        Some("alice")
+    );
+    assert_eq!(
+        child_base.ownership_definitions(ObjectKind::TYPE, &name),
+        definitions
+    );
+    Ok(())
+}
+
+#[rstest::rstest]
+#[case::named("alice", Some("alice"), None, 0)]
+#[case::missing("missing", None, None, 1)]
+#[case::current("CURRENT_USER", None, Some("CURRENT_USER"), 0)]
+fn schema_authorization_retains_the_supplied_owner_and_lookup_outcome(
+    #[case] authorization: &str,
+    #[case] role_name: Option<&str>,
+    #[case] keyword: Option<&str>,
+    #[case] diagnostic_count: usize,
+) -> testresult::TestResult {
+    let result = apply_ownership_sql(
+        ownership_context(),
+        &format!("CREATE SCHEMA app AUTHORIZATION {authorization}"),
+    )?;
+    let schema = result.context().schema_definition("app").unwrap();
+    let owner = schema.owner().unwrap();
+    assert_eq!(owner.resolved_role().map(Role::name), role_name);
+    assert_eq!(owner.session_keyword(), keyword);
+    if keyword.is_none() {
+        assert_eq!(owner.name(), Some(authorization));
+    }
+    assert_eq!(result.context().problems().len(), diagnostic_count);
+    let definitions = result
+        .context()
+        .ownership_definitions(ObjectKind::SCHEMA, &FullName::from_local_name("app"));
+    assert_eq!(definitions[0].owner(), Some(owner));
+    Ok(())
+}

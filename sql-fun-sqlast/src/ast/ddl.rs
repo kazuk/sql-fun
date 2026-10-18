@@ -1362,13 +1362,21 @@ impl Schema {
         &self,
         mut context: TContext,
     ) -> Result<AstAndContextPair<TContext>, AnalysisError> {
+        let owner = if let Some(authorization) = &self.authorization {
+            Some(authorization.resolve_owner(&mut context)?)
+        } else {
+            None
+        };
         let mut elements = Vec::new();
         for element in &self.elements {
             let AstAndContextPair(element, next) = element.resolve_and_apply(context)?;
             context = next;
             elements.push(element);
         }
-        let schema = crate::sem::CreateSchema::new(&self.name, &elements);
+        let mut schema = crate::sem::CreateSchema::new(&self.name, &elements);
+        if let Some(owner) = owner {
+            schema.change_owner(&owner);
+        }
         let context = context.apply_create_schema(&schema)?;
         Ok(AstAndContextPair::new(
             SemAst::create_schema(&schema),

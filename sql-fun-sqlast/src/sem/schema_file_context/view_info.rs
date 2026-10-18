@@ -6,20 +6,20 @@ use crate::{
     syn::ObjectType,
 };
 
-use std::collections::HashMap;
+use crate::TrieMap;
 
 use super::{SchemaCatalog, SchemaFileContext};
 
 #[derive(Debug, Default)]
-pub struct ViewInformationCollection(HashMap<FullName, ViewLike>);
+pub struct ViewInformationCollection(TrieMap<ViewLike>);
 
 impl ViewInformationCollection {
     fn get(&self, key: &FullName) -> Option<&ViewLike> {
-        self.0.get(key)
+        self.0.get(&key.catalog_key())
     }
 
     pub(super) fn insert(&mut self, key: &FullName, value: &ViewLike) {
-        self.0.insert(key.clone(), value.clone());
+        self.0.insert(&key.catalog_key(), value.clone());
     }
 }
 

@@ -40,10 +40,11 @@ impl OwnershipInfoRead for SchemaCatalog {
         let modeled = crate::sem::ownership::model_definitions(self, kind, name);
         let mut definitions = self.ownership.definitions(kind, name);
         if !modeled.is_empty() {
-            // Richer DDL is authoritative; inventory records supply ownership only
-            // for immutable terminal definitions such as builtin types.
+            // Current-layer inventory overrides precede modeled/base snapshots.
+            // Mutable DDL is updated directly; immutable definitions retain only
+            // an ownership override, which must also survive freezing.
             if definitions.is_empty() {
-                if kind.code() == 50
+                if kind == ObjectKind::TYPE
                     && self
                         .get_type_impl(name)
                         .is_some_and(|definition| definition.is_builtin())
@@ -89,78 +90,120 @@ impl SchemaFileContext {
         let Some(identity) = alteration.applied_identity() else {
             return Ok(self);
         };
-        let name = identity.name();
         let owner = alteration.owner();
-        match identity.kind().code() {
-            42 => {
-                if let Some(mut definition) = self.get_table_impl(name).cloned() {
-                    definition.change_owner(owner);
-                    self.catalog.tables.insert_create_table(name, &definition);
-                    self.change_dependent_sequence_owners(
-                        &crate::sem::TableName::from(name.clone()),
-                        owner,
-                    );
-                }
+        match identity.kind() {
+            ObjectKind::TABLE => self.change_table_owner(identity, owner),
+            ObjectKind::SEQUENCE => self.change_sequence_owner(identity, owner),
+            ObjectKind::MATERIALIZED_VIEW | ObjectKind::VIEW => {
+                self.change_view_owner(identity, owner)
             }
-            38 => {
-                if let Some(mut definition) = self.get_sequence_impl(name).cloned() {
-                    definition.change_owner(owner);
-                    self.catalog.sequences.insert(name, &definition);
-                }
+            ObjectKind::DOMAIN | ObjectKind::TYPE => self.change_type_owner(identity, owner),
+            ObjectKind::SCHEMA => self.change_schema_owner(identity, owner),
+            ObjectKind::FUNCTION | ObjectKind::PROCEDURE => {
+                self.change_routine_owner(identity, owner)
             }
-            24 | 52 => {
-                if let Some(mut definition) = self.get_view_impl(name).cloned() {
-                    definition.change_owner(owner);
-                    self.catalog.views.insert(name, &definition);
-                }
-            }
-            13 | 50 => {
-                if let Some(mut definition) = self.get_type_impl(name).cloned() {
-                    if definition.change_owner(owner) {
-                        self.catalog.types.replace_definition(name, &definition);
-                    } else {
-                        self.catalog
-                            .ownership
-                            .insert(&OwnedObjectDefinition::new(identity, Some(owner)));
-                    }
-                } else {
-                    self.catalog
-                        .ownership
-                        .insert(&OwnedObjectDefinition::new(identity, Some(owner)));
-                }
-            }
-            37 => {
-                if let Some(mut definition) = self.schema_definition(name.name().as_str()).cloned()
-                {
-                    definition.change_owner(owner);
-                    self.catalog
-                        .schemas
-                        .insert(name.name().as_str(), definition);
-                } else {
-                    self.catalog
-                        .ownership
-                        .insert(&OwnedObjectDefinition::new(identity, Some(owner)));
-                }
-            }
-            20 | 30 => {
-                if let Some(mut definition) = self
-                    .routine_definitions(name)
-                    .into_iter()
-                    .find(|definition| definition.ownership_identity(name) == *identity)
-                {
-                    definition.change_owner(owner);
-                    self.catalog.functions.insert(name, &definition);
-                } else {
-                    self.catalog
-                        .ownership
-                        .insert(&OwnedObjectDefinition::new(identity, Some(owner)));
-                }
-            }
-            _ => self
-                .catalog
-                .ownership
-                .insert(&OwnedObjectDefinition::new(identity, Some(owner))),
+            _ => self.retain_owner_override(identity, owner),
         }
         Ok(self)
+    }
+    fn change_table_owner(
+        &mut self,
+        identity: &crate::sem::OwnershipIdentity,
+        owner: &crate::sem::OwnerSpecification,
+    ) {
+        let name = identity.name();
+        if let Some(mut definition) = self.get_table_impl(name).cloned() {
+            definition.change_owner(owner);
+            self.catalog.tables.insert_create_table(name, &definition);
+            self.change_dependent_sequence_owners(
+                &crate::sem::TableName::from(name.clone()),
+                owner,
+            );
+        }
+    }
+
+    fn change_sequence_owner(
+        &mut self,
+        identity: &crate::sem::OwnershipIdentity,
+        owner: &crate::sem::OwnerSpecification,
+    ) {
+        let name = identity.name();
+        if let Some(mut definition) = self.get_sequence_impl(name).cloned() {
+            definition.change_owner(owner);
+            self.catalog.sequences.insert(name, &definition);
+        }
+    }
+
+    fn change_view_owner(
+        &mut self,
+        identity: &crate::sem::OwnershipIdentity,
+        owner: &crate::sem::OwnerSpecification,
+    ) {
+        let name = identity.name();
+        if let Some(mut definition) = self.get_view_impl(name).cloned() {
+            definition.change_owner(owner);
+            self.catalog.views.insert(name, &definition);
+        }
+    }
+
+    fn change_type_owner(
+        &mut self,
+        identity: &crate::sem::OwnershipIdentity,
+        owner: &crate::sem::OwnerSpecification,
+    ) {
+        let name = identity.name();
+        if let Some(mut definition) = self.get_type_impl(name).cloned() {
+            if definition.change_owner(owner) {
+                self.catalog.types.replace_definition(name, &definition);
+            } else {
+                self.retain_owner_override(identity, owner);
+            }
+        } else {
+            self.retain_owner_override(identity, owner);
+        }
+    }
+
+    fn change_schema_owner(
+        &mut self,
+        identity: &crate::sem::OwnershipIdentity,
+        owner: &crate::sem::OwnerSpecification,
+    ) {
+        let name = identity.name();
+        if let Some(mut definition) = self.schema_definition(name.name().as_str()).cloned() {
+            definition.change_owner(owner);
+            self.catalog
+                .schemas
+                .insert(name.name().as_str(), definition);
+        } else {
+            self.retain_owner_override(identity, owner);
+        }
+    }
+
+    fn change_routine_owner(
+        &mut self,
+        identity: &crate::sem::OwnershipIdentity,
+        owner: &crate::sem::OwnerSpecification,
+    ) {
+        let name = identity.name();
+        if let Some(mut definition) = self
+            .routine_definitions(name)
+            .into_iter()
+            .find(|definition| definition.ownership_identity(name) == *identity)
+        {
+            definition.change_owner(owner);
+            self.catalog.functions.insert(name, &definition);
+        } else {
+            self.retain_owner_override(identity, owner);
+        }
+    }
+
+    fn retain_owner_override(
+        &mut self,
+        identity: &crate::sem::OwnershipIdentity,
+        owner: &crate::sem::OwnerSpecification,
+    ) {
+        self.catalog
+            .ownership
+            .insert(&OwnedObjectDefinition::new(identity, Some(owner)));
     }
 }

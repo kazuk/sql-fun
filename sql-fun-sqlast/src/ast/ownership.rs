@@ -70,7 +70,10 @@ impl ObjectTarget {
         kind: ObjectKind,
         context: &mut impl ParseContext,
     ) -> Result<RequestedIdentity, AnalysisError> {
-        let (name, access_method) = if matches!(kind.code(), 25 | 27) {
+        let (name, access_method) = if matches!(
+            kind,
+            ObjectKind::OPERATOR_CLASS | ObjectKind::OPERATOR_FAMILY
+        ) {
             let Some((method, name)) = self.name.split_first() else {
                 return AnalysisError::raise_unexpected_input("operator class/family identity");
             };
@@ -150,69 +153,93 @@ impl OwnershipIdentity {
         if !self.kind().valid_owner_kind() {
             return OwnershipLookup::invalid_kind(self);
         }
-        let mut names = Vec::new();
-        if self.kind().owner_schema_scoped() && self.name().schema().is_none() {
-            for schema in context.get_search_path() {
-                names.push(self.name().replace_schema(schema));
-            }
-            // PostgreSQL implicitly searches pg_catalog unless it was explicitly placed.
-            let catalog = crate::sem::SchemaName::from("pg_catalog");
-            if !context.get_search_path().contains(&catalog) {
-                names.insert(0, self.name().replace_schema(&catalog));
-            }
-        } else {
-            names.push(self.name().clone());
-        }
-        if self.arguments().is_none() && matches!(self.kind().code(), 20 | 30 | 35) {
+        let names = self.qualified_candidate_names(context);
+        if self.needs_visible_routine_resolution() {
             return self.resolve_visible_routines(context, &names);
         }
         for name in names {
-            if self.kind().code() == 50
-                && context.get_type_impl(&name).is_some_and(|definition| {
-                    definition.is_relation_type() || definition.is_array() == Some(true)
-                })
-            {
-                return OwnershipLookup::invalid_kind(&self.with_name(&name));
-            }
-            if self.kind().code() == 13
-                && context
-                    .get_type_impl(&name)
-                    .is_some_and(|definition| !definition.is_domain())
-            {
-                return OwnershipLookup::invalid_kind(&self.with_name(&name));
-            }
-            let requested = self.with_name(&name);
-            let matches: Vec<_> = context
-                .ownership_definitions(self.kind(), &name)
-                .into_iter()
-                .filter(|definition| requested.matches(definition.identity()))
-                .collect();
-            if matches.is_empty() && matches!(self.kind().code(), 20 | 30) {
-                let routine_request = if let Some(arguments) = self.arguments() {
-                    Self::with_arguments(ObjectKind::from(35), &name, arguments)
-                } else {
-                    Self::named(ObjectKind::from(35), &name)
-                };
-                if context
-                    .ownership_definitions(ObjectKind::from(35), &name)
-                    .into_iter()
-                    .any(|definition| routine_request.matches(definition.identity()))
-                {
-                    return OwnershipLookup::invalid_kind(&requested);
-                }
-            }
-            if matches.len() == 1 {
-                return OwnershipLookup::resolved(matches[0].identity());
-            }
-            if matches.len() > 1 {
-                let identities: Vec<_> = matches
-                    .into_iter()
-                    .map(|definition| definition.identity().clone())
-                    .collect();
-                return OwnershipLookup::ambiguous(&identities);
+            if let Some(outcome) = self.with_name(&name).resolve_qualified_target(context) {
+                return outcome;
             }
         }
         OwnershipLookup::not_found(self)
+    }
+
+    fn qualified_candidate_names(&self, context: &impl ParseContext) -> Vec<crate::sem::FullName> {
+        if !self.kind().owner_schema_scoped() || self.name().schema().is_some() {
+            return vec![self.name().clone()];
+        }
+        let mut names = Vec::new();
+        let catalog = crate::sem::SchemaName::from("pg_catalog");
+        // PostgreSQL implicitly searches pg_catalog unless it was explicitly placed.
+        if !context.get_search_path().contains(&catalog) {
+            names.push(self.name().replace_schema(&catalog));
+        }
+        for schema in context.get_search_path() {
+            names.push(self.name().replace_schema(schema));
+        }
+        names
+    }
+
+    fn needs_visible_routine_resolution(&self) -> bool {
+        self.arguments().is_none()
+            && matches!(
+                self.kind(),
+                ObjectKind::FUNCTION | ObjectKind::PROCEDURE | ObjectKind::ROUTINE
+            )
+    }
+
+    fn resolve_qualified_target(&self, context: &impl ParseContext) -> Option<OwnershipLookup> {
+        if self.has_incompatible_type_kind(context) {
+            return Some(OwnershipLookup::invalid_kind(self));
+        }
+        let mut identities = self.matching_catalog_identities(context);
+        if identities.len() > 1 {
+            Some(OwnershipLookup::ambiguous(&identities))
+        } else if let Some(identity) = identities.pop() {
+            Some(OwnershipLookup::resolved(&identity))
+        } else if self.has_incompatible_routine_kind(context) {
+            Some(OwnershipLookup::invalid_kind(self))
+        } else {
+            None
+        }
+    }
+
+    fn has_incompatible_type_kind(&self, context: &impl ParseContext) -> bool {
+        if !matches!(self.kind(), ObjectKind::TYPE | ObjectKind::DOMAIN) {
+            return false;
+        }
+        let Some(definition) = context.get_type_impl(self.name()) else {
+            return false;
+        };
+        match self.kind() {
+            ObjectKind::TYPE => {
+                definition.is_relation_type() || definition.is_array() == Some(true)
+            }
+            ObjectKind::DOMAIN => !definition.is_domain(),
+            _ => false,
+        }
+    }
+
+    fn matching_catalog_identities(&self, context: &impl ParseContext) -> Vec<Self> {
+        context
+            .ownership_definitions(self.kind(), self.name())
+            .into_iter()
+            .filter(|definition| self.matches(definition.identity()))
+            .map(|definition| definition.identity().clone())
+            .collect()
+    }
+
+    fn has_incompatible_routine_kind(&self, context: &impl ParseContext) -> bool {
+        if !matches!(self.kind(), ObjectKind::FUNCTION | ObjectKind::PROCEDURE) {
+            return false;
+        }
+        let requested = if let Some(arguments) = self.arguments() {
+            Self::with_arguments(ObjectKind::ROUTINE, self.name(), arguments)
+        } else {
+            Self::named(ObjectKind::ROUTINE, self.name())
+        };
+        !requested.matching_catalog_identities(context).is_empty()
     }
 
     fn resolve_visible_routines(
@@ -222,7 +249,7 @@ impl OwnershipIdentity {
     ) -> OwnershipLookup {
         let mut visible = Vec::new();
         for name in names {
-            for definition in context.ownership_definitions(ObjectKind::from(35), name) {
+            for definition in context.ownership_definitions(ObjectKind::ROUTINE, name) {
                 let identity = definition.identity();
                 if !Self::contains_signature(&visible, identity) {
                     visible.push(identity.clone());

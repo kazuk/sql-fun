@@ -23,6 +23,7 @@ mod sqlite;
 mod sqlite_retention;
 #[cfg(test)]
 mod tests;
+mod trigger;
 mod validation;
 mod view_write;
 
@@ -219,6 +220,7 @@ pub(crate) enum StatementNode {
     Delete(Delete),
     View(View),
     ViewWrite(view_write::WriteDeclaration),
+    CreateTrigger(CreateTrigger),
     Extension(Extension),
     VariableSet(VariableSet),
     EnumType(EnumType),
@@ -252,6 +254,10 @@ impl StatementNode {
 
     const fn delete(value: Delete) -> Self {
         Self::Delete(value)
+    }
+
+    const fn create_trigger(value: CreateTrigger) -> Self {
+        Self::CreateTrigger(value)
     }
 
     const fn view_write(value: view_write::WriteDeclaration) -> Self {
@@ -340,6 +346,7 @@ impl StatementNode {
             Self::Delete(delete) => delete
                 .resolve(context)
                 .map(|delete| crate::sem::SemAst::delete(&delete)),
+            Self::CreateTrigger(_) => todo!("CREATE TRIGGER semantic analysis: #602 / #555"),
             Self::ViewWrite(_) => crate::sem::AnalysisError::raise_unexpected_input(
                 "view write declaration requires catalog application",
             ),
@@ -1860,4 +1867,68 @@ impl SubqueryKind {
     const fn any() -> Self {
         Self::Any
     }
+}
+
+// Unresolved trigger syntax; interpretation belongs to statement-specific analyzers.
+#[derive(Clone, Debug)]
+pub(crate) struct CreateTrigger {
+    name: Name,
+    relation: Relation,
+    replace: bool,
+    if_not_exists: bool,
+    temporary: bool,
+    timing: Option<TriggerTiming>,
+    events: Vec<TriggerEvent>,
+    granularity: Option<TriggerGranularity>,
+    predicate: Option<Expr>,
+    constraint: Option<TriggerConstraint>,
+    transitions: Vec<TriggerTransition>,
+    body: TriggerBody,
+}
+
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+enum TriggerTiming {
+    Before,
+    After,
+    InsteadOf,
+}
+
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+enum TriggerGranularity {
+    Row,
+    Statement,
+}
+
+#[derive(Clone, Debug, PartialEq, Eq)]
+enum TriggerEvent {
+    Insert,
+    Update(Vec<String>),
+    Delete,
+    Truncate,
+}
+
+#[derive(Clone, Debug)]
+struct TriggerConstraint {
+    relation: Option<Relation>,
+    deferrable: bool,
+    initially_deferred: bool,
+}
+
+#[derive(Clone, Debug)]
+struct TriggerTransition {
+    name: String,
+    new: bool,
+    table: bool,
+}
+
+#[derive(Clone, Debug)]
+enum TriggerBody {
+    Function(TriggerFunction),
+    Commands(Vec<StatementNode>),
+}
+
+#[derive(Clone, Debug)]
+struct TriggerFunction {
+    name: Name,
+    arguments: Vec<String>,
 }

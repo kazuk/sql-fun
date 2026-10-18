@@ -67,6 +67,10 @@ impl Statement {
     /// No SQL reparsing or catalog-file discovery occurs. This uses the same
     /// resolver and diagnostic reporting as the normal semantic-analysis path.
     ///
+    /// # Panics
+    ///
+    /// CREATE TRIGGER analysis is not implemented yet (#602 / #555).
+    ///
     /// # Errors
     ///
     /// Returns a dialect mismatch, resolver, or diagnostic reporting error.
@@ -129,6 +133,8 @@ mod test_statement_analyze {
 pub enum StatementKind {
     /// A trigger/rule declaration used by writable-view schema analysis.
     ViewWrite,
+    /// An unresolved CREATE TRIGGER definition. Analysis awaits #602 / #555.
+    CreateTrigger,
     /// SELECT, VALUES, or a set operation.
     Query,
     /// INSERT.
@@ -176,6 +182,11 @@ pub enum StatementKind {
 }
 
 impl StatementKind {
+    /// The CREATE TRIGGER category.
+    pub const fn create_trigger() -> Self {
+        Self::CreateTrigger
+    }
+
     const fn view_write() -> Self {
         Self::ViewWrite
     }
@@ -298,6 +309,7 @@ impl StatementNode {
             Self::Update(_) => StatementKind::update(),
             Self::Delete(_) => StatementKind::delete(),
             Self::View(_) => StatementKind::view(),
+            Self::CreateTrigger(_) => StatementKind::create_trigger(),
             Self::ViewWrite(_) => StatementKind::view_write(),
             Self::Extension(_) => StatementKind::extension(),
             Self::VariableSet(_) => StatementKind::variable_set(),

@@ -93,15 +93,7 @@ impl InsertDestination {
         };
         let columns = columns
             .into_iter()
-            .map(|column| {
-                if let Some(name) = column.name()
-                    && let Some(definition) = support.column_definition(name)
-                {
-                    definition.clone()
-                } else {
-                    column
-                }
-            })
+            .map(|column| Self::writable_column(column, &support))
             .collect();
         Ok(Self {
             name: TableName::from(key.clone()),
@@ -124,15 +116,7 @@ impl InsertDestination {
         };
         let columns = columns
             .into_iter()
-            .map(|column| {
-                if let Some(name) = column.name()
-                    && let Some(definition) = support.insert_column_definition(name)
-                {
-                    definition.clone()
-                } else {
-                    column
-                }
-            })
+            .map(|column| Self::merge_column(column, support))
             .collect();
         Ok(Self {
             name: name.clone(),
@@ -141,6 +125,24 @@ impl InsertDestination {
             view_support: None,
             merge_view_support: Some(support.clone()),
         })
+    }
+    fn writable_column(column: ColumnDefinition, support: &ViewInsertSupport) -> ColumnDefinition {
+        if let Some(name) = column.name()
+            && let Some(definition) = support.column_definition(name)
+        {
+            definition.clone()
+        } else {
+            column
+        }
+    }
+    fn merge_column(column: ColumnDefinition, support: &ViewMergeSupport) -> ColumnDefinition {
+        if let Some(name) = column.name()
+            && let Some(definition) = support.insert_column_definition(name)
+        {
+            definition.clone()
+        } else {
+            column
+        }
     }
     pub(crate) const fn name(&self) -> &TableName {
         &self.name

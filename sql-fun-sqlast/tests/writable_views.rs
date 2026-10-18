@@ -96,6 +96,21 @@ mod test_helpers {
         pub fn layer(&self, sql: &str) -> Result<FrozenBaseContext, String> {
             self.layer_at(self.context(), sql)
         }
+        pub fn mask_trigger(
+            &self,
+            identity: &::sql_fun_sqlast::sem::TriggerIdentity,
+        ) -> Result<FrozenBaseContext, String> {
+            use ::sql_fun_sqlast::sem::ParseContext;
+            SchemaFileContext::new(
+                Path::new("mask.sql"),
+                self.context(),
+                &self.args,
+                &self.metadata,
+            )
+            .cancel_trigger(identity)
+            .map(ParseContext::freeze)
+            .map_err(|error| error.to_string())
+        }
         pub fn mask_rule(
             &self,
             identity: &::sql_fun_sqlast::sem::RuleIdentity,
@@ -1351,6 +1366,47 @@ fn missing_linked_definition_is_incomplete_not_a_dropped_capability(
     assert_eq!(
         problem.missing_metadata_view(),
         Some(&FullName::with_schema("public", missing))
+    );
+    Ok(())
+}
+
+#[test]
+fn evaluation_excludes_cancelled_trigger_links_and_accepts_recreation()
+-> Result<(), Box<dyn std::error::Error>> {
+    use ::sql_fun_sqlast::sem::{BaseParseContext, TriggerIdentity, ViewWriteEvaluation};
+    let declaration = "CREATE TRIGGER t INSTEAD OF INSERT ON public.v FOR EACH ROW EXECUTE FUNCTION public.noop()";
+    let schema = ViewSchema::postgres(&format!(
+        "CREATE TABLE public.items(id integer); CREATE VIEW public.v AS SELECT DISTINCT id FROM public.items; CREATE FUNCTION public.noop() RETURNS trigger LANGUAGE plpgsql AS 'BEGIN RETURN NEW; END'; {declaration};"
+    ))?;
+    let name = FullName::with_schema("public", "v");
+    let identity = TriggerIdentity::postgres(&name, &FullName::with_schema("public", "t"));
+    let child = schema.mask_trigger(&identity)?;
+    assert!(child.trigger_is_cancelled(&identity));
+    assert!(
+        !ViewWriteEvaluation::new(&child)
+            .insert(&name)
+            .unwrap()
+            .is_writable()
+    );
+    let recreated = schema.layer_at(&child, declaration)?;
+    assert!(!recreated.trigger_is_cancelled(&identity));
+    assert!(
+        ViewWriteEvaluation::new(&recreated)
+            .insert(&name)
+            .unwrap()
+            .is_writable()
+    );
+    assert!(
+        ViewWriteEvaluation::new(schema.context())
+            .insert(&name)
+            .unwrap()
+            .is_writable()
+    );
+    assert!(
+        !ViewWriteEvaluation::new(&child)
+            .insert(&name)
+            .unwrap()
+            .is_writable()
     );
     Ok(())
 }

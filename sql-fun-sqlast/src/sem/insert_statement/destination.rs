@@ -44,53 +44,72 @@ impl InsertDestination {
         requested: &TableName,
     ) -> Result<Option<Self>, AnalysisError> {
         expand_relation_search_path(context, requested.full_name(), |key| {
-            if let Some(table) = context.get_table_impl(key) {
-                let mut columns = Vec::new();
-                while let Some(column) = table.get_column_at(columns.len()) {
-                    columns.push(column.clone());
-                }
-                return Some(Ok(Self {
-                    name: TableName::from(key.clone()),
-                    columns,
-                    table: Some(table.clone()),
-                    view_support: None,
-                    merge_view_support: None,
-                }));
-            }
-            context
-                .get_view(&crate::sem::ViewName::from_full_name(key))
-                .map(|view| {
-                    let (columns, support) = if view.is_materialized() {
-                        (Vec::new(), ViewInsertSupport::read_only())
-                    } else {
-                        (
-                            view.result_columns().column_definitions()?,
-                            ViewInsertSupport::analyze(context, key)
-                                .map_err(|problem| AnalysisError::view_metadata(&problem))?,
-                        )
-                    };
-                    let columns = columns
-                        .into_iter()
-                        .map(|column| {
-                            if let Some(name) = column.name()
-                                && let Some(definition) = support.column_definition(name)
-                            {
-                                definition.clone()
-                            } else {
-                                column
-                            }
-                        })
-                        .collect();
-                    Ok(Self {
-                        name: TableName::from(key.clone()),
-                        columns,
-                        table: None,
-                        view_support: Some(support),
-                        merge_view_support: None,
-                    })
-                })
+            Self::resolve_at(context, key)
         })
         .transpose()
+    }
+    fn resolve_at(
+        context: &impl ParseContext,
+        key: &crate::sem::FullName,
+    ) -> Option<Result<Self, AnalysisError>> {
+        let canonical;
+        let key = if context.dialect() == crate::ast::Dialect::sqlite() {
+            canonical = context.sqlite_relation_identity(key)?;
+            &canonical
+        } else {
+            key
+        };
+        if let Some(table) = context.get_table(&TableName::from(key.clone())) {
+            let mut columns = Vec::new();
+            while let Some(column) = table.get_column_at(columns.len()) {
+                columns.push(column.clone());
+            }
+            return Some(Ok(Self {
+                name: TableName::from(key.clone()),
+                columns,
+                table: Some(table.clone()),
+                view_support: None,
+                merge_view_support: None,
+            }));
+        }
+        if let Some(view) = context.get_view(&crate::sem::ViewName::from_full_name(key)) {
+            return Some(Self::from_view(context, key, view));
+        }
+        None
+    }
+    fn from_view(
+        context: &impl ParseContext,
+        key: &crate::sem::FullName,
+        view: &ViewLike,
+    ) -> Result<Self, AnalysisError> {
+        let (columns, support) = if view.is_materialized() {
+            (Vec::new(), ViewInsertSupport::read_only())
+        } else {
+            (
+                view.result_columns().column_definitions()?,
+                ViewInsertSupport::analyze(context, key)
+                    .map_err(|problem| AnalysisError::view_metadata(&problem))?,
+            )
+        };
+        let columns = columns
+            .into_iter()
+            .map(|column| {
+                if let Some(name) = column.name()
+                    && let Some(definition) = support.column_definition(name)
+                {
+                    definition.clone()
+                } else {
+                    column
+                }
+            })
+            .collect();
+        Ok(Self {
+            name: TableName::from(key.clone()),
+            columns,
+            table: None,
+            view_support: Some(support),
+            merge_view_support: None,
+        })
     }
 
     pub(crate) fn for_merge_view(

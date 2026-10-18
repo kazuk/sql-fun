@@ -29,7 +29,7 @@ pub struct ScalarAnalysisContext<'a> {
 struct RuleScope {
     identity: crate::sem::RuleIdentity,
     event: crate::sem::RuleEvent,
-    forbidden: bool,
+    forbidden: Option<&'static str>,
 }
 
 impl<'a> ScalarAnalysisContext<'a> {
@@ -85,9 +85,13 @@ impl<'a> ScalarAnalysisContext<'a> {
         };
         scope
     }
-    pub(crate) fn insert_returning_outer(&self, context: &impl ParseContext) -> Option<&Self> {
+    pub(crate) fn insert_returning_outer(&self, context: &impl ParseContext) -> Option<Self> {
         if self.in_rule_definition() && postgres_18_or_later(context) {
-            Some(self)
+            let mut restricted = self.clone_scope();
+            restricted.forbid_rule_rows(
+                "PostgreSQL 18 INSERT RETURNING destination row images are pending #621",
+            );
+            Some(restricted)
         } else {
             None
         }
@@ -122,7 +126,7 @@ impl<'a> ScalarAnalysisContext<'a> {
         scope.rule = Some(RuleScope {
             identity: identity.clone(),
             event,
-            forbidden: false,
+            forbidden: None,
         });
         scope
     }
@@ -147,15 +151,15 @@ impl<'a> ScalarAnalysisContext<'a> {
     }
     pub(crate) fn without_rule_rows(&self) -> Self {
         let mut scope = self.clone_scope();
-        scope.forbid_rule_rows();
+        scope.forbid_rule_rows("OLD/NEW are not allowed in this rule subquery");
         scope
     }
-    fn forbid_rule_rows(&mut self) {
+    fn forbid_rule_rows(&mut self, detail: &'static str) {
         if let Some(rule) = &mut self.rule {
-            rule.forbidden = true;
+            rule.forbidden = Some(detail);
         }
         if let Some(parent) = &mut self.parent {
-            parent.forbid_rule_rows();
+            parent.forbid_rule_rows(detail);
         }
     }
     pub(crate) fn in_rule_definition(&self) -> bool {
@@ -177,25 +181,19 @@ impl<'a> ScalarAnalysisContext<'a> {
     pub(crate) fn direct_rule_identity(&self) -> Option<&crate::sem::RuleIdentity> {
         self.rule
             .as_ref()
-            .filter(|rule| !rule.forbidden)
+            .filter(|rule| rule.forbidden.is_none())
             .map(|rule| &rule.identity)
     }
-    fn validate_rule_reference(
-        &self,
-        context: &mut impl ParseContext,
-        alias: &AliasName,
-    ) -> Result<(), AnalysisError> {
+    fn validate_rule_reference(&self, alias: &AliasName) -> Result<(), AnalysisError> {
         if let Some(rule) = &self.rule
-            && (rule.forbidden || !rule.event.permits_row(alias.as_str()))
+            && (rule.forbidden.is_some() || !rule.event.permits_row(alias.as_str()))
         {
-            let detail = if rule.forbidden {
-                "OLD/NEW are not allowed in this rule subquery"
-            } else {
-                "OLD/NEW reference is not available for this event"
-            };
-            context.report_analysis_problem(crate::sem::AnalysisProblem::rule(
+            let detail = rule
+                .forbidden
+                .unwrap_or("OLD/NEW reference is not available for this event");
+            return Err(AnalysisError::rule(
                 &crate::sem::problem::RuleProblem::definition(&rule.identity, detail),
-            ))?;
+            ));
         }
         Ok(())
     }
@@ -350,11 +348,23 @@ impl<'a> ScalarAnalysisContext<'a> {
         self.from_clause.as_ref()
     }
 
+    fn rule_rows_visible(&self) -> bool {
+        if let Some(rule) = &self.rule {
+            rule.forbidden.is_none()
+        } else if let Some(parent) = &self.parent {
+            parent.rule_rows_visible()
+        } else {
+            false
+        }
+    }
     pub(crate) fn set_delete_returning_target(
         &mut self,
         target: &AliasName,
         context: &impl ParseContext,
     ) {
+        if self.rule_rows_visible() {
+            return;
+        }
         if context.dialect() != crate::ast::Dialect::postgres() {
             return;
         }
@@ -742,7 +752,7 @@ impl ScalarAnalysisContext<'_> {
             let expr = UndefinedAliasColumnRef::new_with_report(context, alias, column)?;
             return Ok((expr, context));
         };
-        self.validate_rule_reference(context, alias)?;
+        self.validate_rule_reference(alias)?;
         source.create_column_ref(context, &self.with_clause, alias, column, nullability)
     }
 }

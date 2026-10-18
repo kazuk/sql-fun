@@ -11,6 +11,14 @@ pub enum RuleProblem {
     Definition(RuleDefinitionProblem),
 }
 impl RuleProblem {
+    /// Rule-specific legality restriction, if this is a definition failure.
+    pub fn definition_detail(&self) -> Option<&str> {
+        if let Self::Definition(problem) = self {
+            Some(problem.detail())
+        } else {
+            None
+        }
+    }
     pub(crate) fn target(target: &FullName) -> Self {
         Self::Target(target.clone())
     }

@@ -26,7 +26,7 @@ use std::collections::{HashMap, HashSet};
 pub struct TestParseContext {
     rules: HashMap<crate::sem::RuleIdentity, Option<crate::sem::CreateRule>>,
     ownership: crate::sem::ownership::OwnershipCatalog,
-    triggers: HashMap<crate::sem::TriggerIdentity, crate::sem::CreateTrigger>,
+    triggers: HashMap<crate::sem::TriggerIdentity, Option<crate::sem::CreateTrigger>>,
     masters: Option<crate::sem::ConflictMasters>,
     collation_results: HashMap<FullName, crate::sem::CatalogNameLookup>,
     operator_class_results: HashMap<(FullName, String), crate::sem::CatalogNameLookup>,
@@ -432,7 +432,11 @@ impl BaseParseContext for TestParseContext {
         &self,
         identity: &crate::sem::TriggerIdentity,
     ) -> Option<&crate::sem::CreateTrigger> {
-        self.triggers.get(identity)
+        if let Some(trigger) = self.triggers.get(identity) {
+            trigger.as_ref()
+        } else {
+            None
+        }
     }
     fn metadata(&self) -> &::sql_fun_core::SqlFunMetadata {
         static DEFAULT_METADATA: std::sync::LazyLock<::sql_fun_core::SqlFunMetadata> =
@@ -555,7 +559,7 @@ impl ParseContext for TestParseContext {
         trigger: &crate::sem::CreateTrigger,
     ) -> Result<Self, AnalysisError> {
         self.triggers
-            .insert(trigger.identity().clone(), trigger.clone());
+            .insert(trigger.identity().clone(), Some(trigger.clone()));
         Ok(self)
     }
     fn associate_trigger(
@@ -567,6 +571,30 @@ impl ParseContext for TestParseContext {
             table.associate_trigger(name);
         } else if let Some(Some(view)) = self.view_definitions.get_mut(target) {
             view.associate_trigger(name);
+        } else {
+            return Err(AnalysisError::trigger(
+                &crate::sem::problem::TriggerProblem::target(target),
+            ));
+        }
+        Ok(self)
+    }
+
+    fn cancel_trigger(
+        mut self,
+        identity: &crate::sem::TriggerIdentity,
+    ) -> Result<Self, AnalysisError> {
+        self.triggers.insert(identity.clone(), None);
+        Ok(self)
+    }
+    fn dissociate_trigger(
+        mut self,
+        target: &FullName,
+        name: &FullName,
+    ) -> Result<Self, AnalysisError> {
+        if let Some(Some(table)) = self.table_definitions.get_mut(target) {
+            table.dissociate_trigger(name);
+        } else if let Some(Some(view)) = self.view_definitions.get_mut(target) {
+            view.dissociate_trigger(name);
         } else {
             return Err(AnalysisError::trigger(
                 &crate::sem::problem::TriggerProblem::target(target),

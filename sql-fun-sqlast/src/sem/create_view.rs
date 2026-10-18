@@ -83,6 +83,10 @@ impl CreateView {
     pub(crate) fn associate_trigger(&mut self, name: &crate::sem::FullName) {
         self.triggers.associate(name);
     }
+    pub(crate) fn dissociate_trigger(&mut self, name: &crate::sem::FullName) {
+        self.triggers.dissociate(name);
+    }
+
     pub(crate) fn result_columns(&self) -> &crate::sem::ResultColumnCollection {
         self.query.result_columns()
     }

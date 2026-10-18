@@ -46,6 +46,14 @@ impl TableColumnRef {
     pub(super) fn canonicalize_grouping_key(&mut self) {
         self.column_def = None;
     }
+    /// Exact relation identity for this resolved column.
+    pub const fn relation(&self) -> &crate::sem::FullName {
+        self.table_name.full_name()
+    }
+    /// Local source alias, including trigger OLD/NEW aliases.
+    pub const fn alias(&self) -> &AliasName {
+        &self.alias
+    }
     pub(super) fn belongs_to(&self, relation: &crate::sem::FullName) -> bool {
         self.table_name.full_name() == relation
     }

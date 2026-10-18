@@ -54,7 +54,18 @@ impl Update {
         context: &mut impl ParseContext,
         outer: Option<&ScalarAnalysisContext<'_>>,
     ) -> Result<UpdateStatement, AnalysisError> {
-        let requested = TableName::from(self.relation.name.full_name()?);
+        let trigger_outer = if let Some(scope) = outer {
+            scope.trigger_scope()
+        } else {
+            None
+        };
+        let name = self.relation.name.full_name()?;
+        let name = if let Some(scope) = outer {
+            scope.trigger_relation_name(context, &name)?
+        } else {
+            name
+        };
+        let requested = TableName::from(name);
         let table = self.resolve_destination(context, &requested)?;
         self.validate_index_hint(context, &table)?;
         self.validate_view_trigger(context, &table)?;
@@ -65,8 +76,8 @@ impl Update {
             .as_ref()
             .map(Alias::resolve)
             .unwrap_or_else(|| AliasSpec::from_local_name(&requested.full_name().local_name()));
-        let from = self.resolve_sources(context, &table, &alias, &with)?;
-        let scope = ScalarAnalysisContext::nested(&with, &from, None);
+        let from = self.resolve_sources(context, &table, &alias, &with, trigger_outer)?;
+        let scope = ScalarAnalysisContext::nested(&with, &from, trigger_outer);
         let mut target_from = FromClause::default();
         target_from.push(DataSource::resolve_relation(
             context,
@@ -169,10 +180,11 @@ impl Update {
         table: &UpdateDestination,
         alias: &AliasSpec,
         with: &WithClause,
+        outer: Option<&ScalarAnalysisContext<'_>>,
     ) -> Result<FromClause, AnalysisError> {
         // FROM subqueries cannot implicitly see the UPDATE target. Correlation
         // within RHS expressions uses the complete scope assembled below.
-        let mut from = FromItem::resolve_list_in(&self.from, context, with, None)?;
+        let mut from = FromItem::resolve_list_in(&self.from, context, with, outer)?;
         if from.resolve_alias(alias.name()).is_some() {
             context.report_analysis_problem(AnalysisProblem::duplicate_alias(alias.name()))?;
         }

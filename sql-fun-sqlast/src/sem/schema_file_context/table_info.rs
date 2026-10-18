@@ -8,11 +8,21 @@ use crate::TrieMap;
 use super::{SchemaCatalog, SchemaFileContext};
 
 #[derive(Debug, Default)]
-pub struct TableDefinitionCollection(TrieMap<CreateTable>);
+pub struct TableDefinitionCollection(TrieMap<CreateTable>, Vec<FullName>);
 
 impl TableDefinitionCollection {
+    pub(super) fn sqlite_name(&self, name: &FullName) -> Option<FullName> {
+        self.1
+            .iter()
+            .find(|candidate| candidate.sqlite_eq(name))
+            .cloned()
+    }
+
     pub(super) fn insert_create_table(&mut self, name: &FullName, create_table: &CreateTable) {
         self.0.insert(&name.to_string(), create_table.clone());
+        if !self.1.contains(name) {
+            self.1.push(name.clone());
+        }
     }
 
     fn get(&self, name: &FullName) -> Option<&CreateTable> {

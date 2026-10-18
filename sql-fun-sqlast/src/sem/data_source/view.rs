@@ -100,6 +100,7 @@ impl ViewDataSource {
         &mut self,
         visitor: &mut V,
     ) -> Result<(), crate::sem::AnalysisError> {
+        visitor.relation_identity(self.view.full_name());
         visitor.relation(None, self.alias.name().as_str(), &[]);
         Ok(())
     }

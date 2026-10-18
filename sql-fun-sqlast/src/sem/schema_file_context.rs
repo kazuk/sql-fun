@@ -11,6 +11,7 @@ mod table_info;
 mod type_info;
 mod view_info;
 
+use crate::sem::{TableInfoRead, ViewInfoRead};
 use std::path::{Path, PathBuf};
 
 use sql_fun_core::SqlFunArgs;
@@ -56,6 +57,7 @@ pub struct SchemaFileContext {
 pub(super) struct SchemaCatalog {
     ownership: crate::sem::ownership::OwnershipCatalog,
     base: FrozenBaseContext,
+    triggers: std::collections::HashMap<crate::sem::TriggerIdentity, crate::sem::CreateTrigger>,
     args: SqlFunArgs,
     metadata: ::sql_fun_core::SqlFunMetadata,
     search_path: Vec<SchemaName>,
@@ -113,6 +115,7 @@ impl SchemaFileContext {
             catalog: SchemaCatalog {
                 ownership: Default::default(),
                 base: base.clone(),
+                triggers: std::collections::HashMap::new(),
                 args: args.clone(),
                 metadata: metadata.clone(),
                 search_path,
@@ -619,6 +622,26 @@ mod test_diagnostic_context {
 }
 
 impl BaseParseContext for SchemaCatalog {
+    fn sqlite_relation_identity(&self, name: &FullName) -> Option<FullName> {
+        if let Some(name) = self.tables.sqlite_name(name) {
+            Some(name)
+        } else if let Some(name) = self.views.sqlite_name(name) {
+            Some(name)
+        } else {
+            self.base.sqlite_relation_identity(name)
+        }
+    }
+
+    fn trigger(
+        &self,
+        identity: &crate::sem::TriggerIdentity,
+    ) -> Option<&crate::sem::CreateTrigger> {
+        if let Some(trigger) = self.triggers.get(identity) {
+            Some(trigger)
+        } else {
+            self.base.trigger(identity)
+        }
+    }
     fn metadata(&self) -> &::sql_fun_core::SqlFunMetadata {
         &self.metadata
     }
@@ -666,6 +689,34 @@ impl ParseContext for SchemaFileContext {
     }
     fn apply_alter_owner(self, alteration: &crate::sem::AlterOwner) -> Result<Self, AnalysisError> {
         self.apply_ownership_change(alteration)
+    }
+
+    fn register_trigger(
+        mut self,
+        trigger: &crate::sem::CreateTrigger,
+    ) -> Result<Self, AnalysisError> {
+        self.catalog
+            .triggers
+            .insert(trigger.identity().clone(), trigger.clone());
+        Ok(self)
+    }
+    fn associate_trigger(
+        mut self,
+        target: &FullName,
+        name: &FullName,
+    ) -> Result<Self, AnalysisError> {
+        if let Some(mut table) = self.get_table_impl(target).cloned() {
+            table.associate_trigger(name);
+            self.catalog.tables.insert_create_table(target, &table);
+        } else if let Some(mut view) = self.get_view_impl(target).cloned() {
+            view.associate_trigger(name);
+            self.catalog.views.insert(target, &view);
+        } else {
+            return Err(AnalysisError::trigger(
+                &crate::sem::problem::TriggerProblem::target(target),
+            ));
+        }
+        Ok(self)
     }
 
     fn resolve_cursor(&self, name: &str) -> Option<&crate::sem::CursorInfo> {

@@ -601,7 +601,7 @@ fn nested_arbiters_retain_the_actual_source() -> Result<(), Box<dyn std::error::
 }
 
 #[test]
-#[ignore = "CREATE TRIGGER no longer registers legacy metadata; new semantic definitions/apply tracked by #602"]
+#[ignore = "semantic trigger-based writability evaluation remains owned by #618"]
 fn later_layers_and_replace_preserve_frozen_parents() -> Result<(), Box<dyn std::error::Error>> {
     let schema = ViewSchema::postgres(
         r"
@@ -1011,8 +1011,6 @@ CREATE VIEW public.alias_cast AS SELECT x::integer AS x FROM public.items AS i(x
     "CREATE OR REPLACE VIEW public.item_view AS SELECT id::bigint AS key, value, value+1 AS computed FROM public.items",
     "view_invalid_replacement"
 )]
-#[ignore = "DROP TRIGGER no longer uses legacy metadata; semantic analysis/registration owned by #555"]
-#[case::missing_trigger("DROP TRIGGER absent ON public.item_view", "view_missing_object")]
 #[case::duplicate_view(
     "CREATE VIEW public.item_view AS SELECT id FROM public.items",
     "conflicting_creation"

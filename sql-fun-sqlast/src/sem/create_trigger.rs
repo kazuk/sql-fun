@@ -53,6 +53,9 @@ impl TriggerReferences {
             self.0.push(name.clone());
         }
     }
+    pub(crate) fn dissociate(&mut self, name: &FullName) {
+        self.0.retain(|stored| stored != name);
+    }
     /// Resolve each reference through the effective context, using its dialect namespace.
     pub fn resolve<'a>(
         &self,

@@ -27,6 +27,7 @@ mod cte;
 mod data_source;
 mod def_elem;
 mod delete_statement;
+mod drop_trigger;
 mod error;
 mod from_clause;
 mod frozen_base_context;
@@ -81,6 +82,8 @@ pub use self::merge_statement::{
 };
 
 pub(crate) use self::conflict_masters::ConflictMasters;
+
+pub use self::drop_trigger::{DropDependencyBehavior, DropTrigger};
 
 #[expect(deprecated)]
 pub use self::{
@@ -302,6 +305,8 @@ impl From<CreateIndex> for ImplicitChange {
 pub enum SemAst {
     /// A resolved CREATE TRIGGER statement.
     CreateTrigger(Box<CreateTrigger>),
+    /// Resolved DROP TRIGGER, including explicit IF EXISTS no-op outcomes.
+    DropTrigger(DropTrigger),
     /// Analyzed PostgreSQL CREATE RULE.
     CreateRule(Box<CreateRule>),
     /// A statement whose semantic resolution failed recoverably.

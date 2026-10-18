@@ -234,7 +234,13 @@ the existing expression/DML support limits. SQLite RAISE expression analysis
 such as PostgreSQL `WHEN (NEW IS NOT NULL)`
 ([#614](https://github.com/kazuk/sql-fun/issues/614)) remain unsupported.
 Unsuccessful analysis does not register a trigger or attach its name to a target.
-DROP TRIGGER catalog removal is separate from CREATE TRIGGER support.
+PostgreSQL `DROP TRIGGER` resolves the ON relation and its relation-scoped trigger
+identity. `SemAst::trigger_drop()` exposes the resolved identity, dependency
+behavior and whether lookup found a definition. `IF EXISTS` retains an explicit
+no-op outcome for a missing trigger or relation. Applying a successful drop
+masks inherited definitions and removes the target reference in the current
+layer; re-creation replaces the mask. SQLite DROP TRIGGER remains separate
+work ([#555](https://github.com/kazuk/sql-fun/issues/555)).
 
 Deferrable unique-key catalog definitions, recursive CTE binding, and expressions
 already unsupported by the SELECT analyzer remain unsupported. Star expansion

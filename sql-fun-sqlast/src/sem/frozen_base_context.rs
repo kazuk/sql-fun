@@ -408,6 +408,10 @@ macro_rules! forward_catalog_reads {
         }
 
         impl crate::sem::BaseParseContext for $context {
+            fn rule(&self, identity: &crate::sem::RuleIdentity) -> Option<&crate::sem::CreateRule> {
+                crate::sem::BaseParseContext::rule(self.$catalog(), identity)
+            }
+
             fn sqlite_relation_identity(&self, name: &FullName) -> Option<FullName> {
                 self.$catalog().sqlite_relation_identity(name)
             }

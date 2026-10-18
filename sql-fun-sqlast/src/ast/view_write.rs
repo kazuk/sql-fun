@@ -15,21 +15,7 @@ impl View {
         query: &SelectStatement,
         name: &FullName,
     ) -> Result<Option<ViewWriteInfo>, AnalysisError> {
-        let mut source = self.query.automatic_view_source(context)?;
-        if source.is_some() && !crate::sem::view_write::projection_preserves_rows(context, query)? {
-            source = None;
-        }
-        let mut projections = query.result_columns().view_projection();
-        if let Some(source) = &source {
-            self.query
-                .refine_view_cast_lineage(context, source, &mut projections)?;
-        }
-        let mut replacement = ViewWriteInfo::new(
-            name,
-            source.as_ref(),
-            &projections,
-            &query.result_columns().view_expressions(),
-        );
+        let mut replacement = self.query.rule_write_info(context, query, name)?;
         replacement.retain_options(&self.options, self.check_option);
         if self.replace
             && let Some(existing) = context.view_write_info(name)
@@ -111,6 +97,27 @@ impl Expr {
 }
 
 impl Query {
+    pub(in crate::ast) fn rule_write_info(
+        &self,
+        context: &impl ParseContext,
+        query: &SelectStatement,
+        name: &FullName,
+    ) -> Result<ViewWriteInfo, AnalysisError> {
+        let mut source = self.automatic_view_source(context)?;
+        if source.is_some() && !crate::sem::view_write::projection_preserves_rows(context, query)? {
+            source = None;
+        }
+        let mut projections = query.result_columns().view_projection();
+        if let Some(source) = &source {
+            self.refine_view_cast_lineage(context, source, &mut projections)?;
+        }
+        Ok(ViewWriteInfo::new(
+            name,
+            source.as_ref(),
+            &projections,
+            &query.result_columns().view_expressions(),
+        ))
+    }
     fn refine_view_cast_lineage(
         &self,
         context: &impl ParseContext,

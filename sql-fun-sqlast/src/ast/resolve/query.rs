@@ -50,7 +50,16 @@ impl Query {
         outer: Option<&ScalarAnalysisContext<'_>>,
     ) -> Result<SelectStatement, AnalysisError> {
         let with = self.with.resolve(context, outer)?;
-        let body = self.body.resolve(context, &with, outer)?;
+        let restricted = if self.body.is_compound()
+            && outer.is_some_and(|scope| scope.direct_rule_identity().is_some())
+        {
+            outer.map(ScalarAnalysisContext::without_rule_rows)
+        } else {
+            None
+        };
+        let body = self
+            .body
+            .resolve(context, &with, restricted.as_ref().or(outer))?;
         let empty = FromClause::default();
         let order_outer = if self.body.is_compound() { None } else { outer };
         let mut scope = ScalarAnalysisContext::nested(
@@ -168,7 +177,20 @@ impl Select {
         with: &WithClause,
         outer: Option<&ScalarAnalysisContext<'_>>,
     ) -> Result<SelectStatement, AnalysisError> {
+        if self.into.is_some()
+            && let Some(identity) = outer.and_then(ScalarAnalysisContext::rule_identity)
+        {
+            return Err(AnalysisError::rule(
+                &crate::sem::problem::RuleProblem::definition(
+                    identity,
+                    "SELECT INTO is not allowed in rule actions",
+                ),
+            ));
+        }
         let from = FromItem::resolve_list_in(&self.from, context, with, outer)?;
+        if let Some(scope) = outer {
+            scope.validate_rule_sources(context, &from)?;
+        }
         let mut scope = ScalarAnalysisContext::nested(with, &from, outer);
         scope.set_windows(Window::names(&self.windows));
         let windows = Window::resolve_definitions(&self.windows, context, &scope)?;
@@ -177,7 +199,12 @@ impl Select {
         for target in &self.targets {
             if let Expr::Star(name) = &target.expression {
                 let qualifier = name.star_qualifier()?;
-                let columns = from.projection_names(context, with, qualifier.as_ref())?;
+                let mut columns = from.projection_names(context, with, qualifier.as_ref())?;
+                if columns.is_empty()
+                    && let Some(qualifier) = &qualifier
+                {
+                    columns = scope.projection_names(context, qualifier)?;
+                }
                 if columns.is_empty() {
                     context.report_analysis_problem(AnalysisProblem::query(
                         crate::sem::problem::QueryProblem::reference_not_found("star source"),
@@ -260,11 +287,24 @@ impl With {
             .map(ScalarAnalysisContext::inherited_ctes)
             .unwrap_or_default();
         for entry in &self.entries {
-            entry
-                .body
-                .require_data_modifying_placement(context, outer.is_none())?;
+            if let Some(identity) = outer.and_then(ScalarAnalysisContext::direct_rule_identity)
+                && matches!(entry.name.as_str(), "old" | "new")
+            {
+                context.report_analysis_problem(AnalysisProblem::rule(
+                    &crate::sem::problem::RuleProblem::definition(
+                        identity,
+                        "CTE conflicts with rule OLD/NEW namespace",
+                    ),
+                ))?;
+            }
+            entry.body.require_data_modifying_placement(
+                context,
+                outer.is_none()
+                    || outer.is_some_and(|scope| scope.direct_rule_identity().is_some()),
+            )?;
             let from = FromClause::default();
-            let scope = ScalarAnalysisContext::nested(&with, &from, outer);
+            let restricted = outer.map(ScalarAnalysisContext::without_rule_rows);
+            let scope = ScalarAnalysisContext::nested(&with, &from, restricted.as_ref());
             let body = entry.body.resolve(context, &scope, &entry.column_names())?;
             with.insert_resolved(context, &entry.name, body);
         }

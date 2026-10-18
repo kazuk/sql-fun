@@ -21,6 +21,7 @@ pub struct CreateView {
     name: FullName,
     query: SelectStatement,
     triggers: crate::sem::TriggerReferences,
+    rules: crate::sem::RuleReferences,
     alter_statements: Vec<AlterView>,
     owner: Option<crate::sem::OwnerSpecification>,
     materialized: bool,
@@ -48,6 +49,22 @@ impl CreateView {
     pub(crate) const fn with_replace(mut self, value: bool) -> Self {
         self.replace = value;
         self
+    }
+    pub(crate) fn replace_rule_query(&mut self, query: &crate::sem::SelectStatement) {
+        self.query = query.clone();
+    }
+    pub(crate) fn retain_rule_references(&mut self, references: &crate::sem::RuleReferences) {
+        self.rules = references.clone();
+    }
+    /// Rule links owned by this relation; resolve against the effective context.
+    pub const fn rules(&self) -> &crate::sem::RuleReferences {
+        &self.rules
+    }
+    pub(crate) fn associate_rule(&mut self, identity: &crate::sem::RuleIdentity) {
+        self.rules.associate(identity);
+    }
+    pub(crate) fn dissociate_rule(&mut self, identity: &crate::sem::RuleIdentity) {
+        self.rules.dissociate(identity);
     }
 
     /// Retained ownership; None means no ownership information was supplied.
@@ -85,6 +102,7 @@ impl CreateView {
             replace: false,
             name: name.clone(),
             triggers: crate::sem::TriggerReferences::default(),
+            rules: crate::sem::RuleReferences::default(),
             query: query.clone(),
             alter_statements: alter_statements.to_owned(),
             owner: owner.as_deref().map(crate::sem::OwnerSpecification::named),

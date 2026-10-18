@@ -95,45 +95,23 @@ conversion identified by this audit.
 `StatementNode::CreateRule` and `StatementKind::CreateRule` replace only CREATE
 RULE's legacy route. DROP RULE now has its dedicated route under #601; the
 aggregate ViewWrite variant and WriteDeclaration syntax adapter are removed.
-Semantic analysis
-is an explicit `todo!()` owned by #604, which will use ParseContext; no legacy
-metadata compatibility adapter is installed. Deparsing returns the existing
-unsupported-node error. WITH mutation and CTE-body construction reject this
-statement through their existing boundaries. SQLite type retention rejects
-CREATE RULE alongside the other PostgreSQL-only statements.
+Semantic analysis is implemented by `ast/resolve/rule.rs` over common syntax
+and the shared ParseContext. `sem::CreateRule` retains the analyzed statement;
+context storage receives explicit definition and target-link operations. No
+legacy metadata adapter or raw frontend-node resolver is installed. Existing
+writable-view consumers derive their facts from the effective analyzed rules.
+Deparsing retains its unsupported-node boundary.
 
-Focused unit tests and `tests/create_rule_ast.rs` execute in the standard affected
-and workspace nextest paths. They use no builtin catalog. Legacy semantic tests
-that require CREATE RULE registration are temporarily ignored with #604 ownership;
-unrelated diagnostic cases must remain executable without a CREATE RULE fixture.
+Focused syntax and semantic tests execute in the standard affected/workspace
+nextest paths. Tests formerly ignored solely for #604 are restored, including
+production PostgreSQL builtin/bootstrap and CLI initialization checks. The
+`defaults_and_rule_drops_change_only_the_child` integration case still awaits
+DROP RULE SQL semantics (#605); service tests cover tombstones, explicit unlink,
+replacement, re-creation and frozen parent/sibling isolation meanwhile.
 
-The staged semantic-test gaps observed during this migration are:
-
-| Test | Why it awaits #604 |
-| --- | --- |
-| `independent_write_mechanisms`: insert_rule, update_rule, rule_returning, conditional_rule, additional_rule | Each case registers a CREATE RULE through the removed legacy path |
-| `automatic_rule_precedence`: conditional, additional, additional_update, instead | Rule registration is required before evaluating write precedence |
-| `defaults_and_rule_drops_change_only_the_child` | Creates a parent rule before testing child cancellation/replacement |
-| `invalid_view_declarations_are_structured`: target, table, duplicate | These diagnostics belong to CREATE RULE semantic analysis |
-| `extracted_builtin_rules_reach_production_analysis`: postgres17, postgres18 | Analyzes production pg_settings CREATE RULE definitions |
-| `builtin_bootstrap::loads_builtin_and_user_schemas`: seventeen, eighteen | Production builtin loading reaches those pg_settings rules |
-| `schema_context_chain::inherited_catalog_objects_and_merged_overloads_drive_query_analysis` | Its full builtin bootstrap reaches those rules |
-| `schema_context_chain::tablefunc_crosstab_call_resolves_after_explicit_extension_loading` | Its full builtin bootstrap reaches those rules before extension analysis |
-| `tests::parse_adventure_works_schema` | Its full builtin bootstrap reaches those rules before the small-stack schema check |
-
-These are 20 sqlast cases, each observed failing at the #604
-semantic `todo!()`, not syntax conversion. Restore/rewrite them when #604's
-semantic-definition/application model can load the rules. The other diagnostic
-cases no longer share a CREATE RULE fixture; the duplicate case supplies both
-rule declarations itself. Existing trigger-migration ignores are unchanged.
-
-Workspace validation also observed three CLI initialization tests reaching the
-same #604 boundary through their production-builtin `assert_semantics` check:
-`initialization_preserves_and_loads_an_existing_valid_generation`,
-`a_later_version_failure_preserves_the_completed_version`, and
-`explicit_mixed_engine_setup_retains_both_dispatch_paths`. Each is individually
-ignored with that exact reason and #604 ownership. Restore their end-to-end
-semantic assertions with the other production bootstrap cases; the remaining
-CLI initialization cases stay enabled. This brings the new temporary ignores
-to 23 across the workspace, without modifying initialization behavior or its
-contributor-facing procedures.
+NOTIFY conversion remains owned by #608. Rule analysis explicitly rejects
+unimplemented subquery semantics tracked by #570–#573, rather than accepting
+scalar placeholders. ON CONFLICT DO UPDATE retains its existing #474 boundary.
+Exact result compatibility for modifier-capable types is rejected pending
+shared type-modifier retention (#619). These are independent semantic
+limitations, not alternate parser routes.

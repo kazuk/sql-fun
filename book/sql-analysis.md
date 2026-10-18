@@ -160,6 +160,42 @@ constraints. Trigger/rule SQL cannot currently be rendered back through the
 common AST deparser. Broader rule and ALTER VIEW processing remains tracked
 separately.
 
+### CREATE RULE definitions
+
+PostgreSQL `CREATE RULE` analysis returns `SemAst::rule()`, retaining the rule's
+resolved relation/name identity, event, replacement and INSTEAD options, boolean
+condition, ordered analyzed actions, dependencies and available source location.
+DO NOTHING retains an empty action list. Table and ordinary-view targets are
+supported; materialized views are rejected. OLD/NEW bind to actual target
+columns and are checked against the event and their enclosing query scope.
+Bind parameters and unresolved definitions are rejected.
+
+Rule names belong to their target relation. `BaseParseContext::rule` retrieves an
+exact `RuleIdentity`; `CreateTable::rules`, `CreateView::rules` and
+`ViewLike::rules` expose target links whose `resolve` method yields the effective
+analyzed definitions. Resolving alone has no catalog effects. Applying a valid
+statement registers its definition and target link in the current layer;
+replacement leaves frozen parents and siblings intact.
+
+RETURNING requires an unconditional INSTEAD rule with one returning action and
+matching target column count, order and types. ON SELECT requires an ordinary
+view, `CREATE OR REPLACE RULE "_RETURN"`, an unconditional INSTEAD single SELECT,
+and matching result names as well as types. It replaces the view query and its
+write-analysis facts. INSERT action RETURNING can reference enclosing rule rows
+on PostgreSQL 18; earlier versions retain their restricted INSERT scope.
+
+Actions use the common query/INSERT/UPDATE/DELETE analyzers. Their ordinary
+limitations apply, including ON CONFLICT DO UPDATE (#474). Within rules,
+EXISTS (#570), quantified/row (#571), ARRAY (#572) and multi-expression (#573)
+subquery semantics are explicitly rejected pending their implementations;
+scalar and correlated subqueries remain supported. Exact result compatibility
+for known built-in modifier-capable types (such as varchar, numeric and
+timestamp, including arrays) is rejected pending type-modifier retention (#619), even when their
+base types match. NOTIFY is still blocked at common syntax conversion (#608). DROP RULE SQL analysis belongs to #605;
+CREATE → DROP → CREATE SQL integration remains pending that issue. Context
+cancellation and explicit target-unlink APIs are available for that work.
+No rewrite expansion, action execution or SQL rendering is performed.
+
 ### CREATE TRIGGER definitions
 
 PostgreSQL and SQLite `CREATE TRIGGER` analysis produces a dedicated semantic

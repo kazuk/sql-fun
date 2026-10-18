@@ -10,6 +10,7 @@ mod column_ref;
 mod const_expr;
 mod constrained;
 mod context;
+mod exists;
 mod func_call;
 pub(crate) mod grouping;
 mod indirect;
@@ -37,6 +38,7 @@ pub use self::{
     const_expr::ScalarConstExpr,
     constrained::ConstrainedExpr,
     context::ScalarAnalysisContext,
+    exists::ExistsExpr,
     func_call::{FuncCallExpr, FunctionBinding},
     grouping::{GroupingArgument, GroupingExpr},
     indirect::IndirectionExpr,
@@ -99,6 +101,8 @@ pub enum SemScalarExpr {
     NullTest(NullTestExpr),
     /// sub-query expression
     SubLink(SubLinkExpr),
+    /// EXISTS predicate retaining its analyzed query.
+    Exists(ExistsExpr),
     /// calesce expression
     Coalesce(CoalesceExpr),
     /// min-max expressions
@@ -327,6 +331,7 @@ impl SemScalarExpr {
             Self::Boolean(_boolean_expr) => Self::builtin_boolean_type(),
             Self::NullTest(_null_test_expr) => Self::builtin_boolean_type(),
             Self::SubLink(sub_link_expr) => sub_link_expr.get_type(),
+            Self::Exists(value) => value.get_type(),
             Self::Coalesce(coalesce_expr) => coalesce_expr.get_type(),
             Self::MinMax(min_max_expr) => min_max_expr.get_type(),
             Self::Collate(collate_expr) => collate_expr.get_type(),
@@ -357,6 +362,7 @@ impl SemScalarExpr {
             Self::Boolean(boolean_expr) => boolean_expr.is_not_null(),
             Self::NullTest(null_test_expr) => null_test_expr.is_not_null(),
             Self::SubLink(sub_link_expr) => sub_link_expr.is_not_null(),
+            Self::Exists(value) => value.is_not_null(),
             Self::Coalesce(coalesce_expr) => coalesce_expr.is_not_null(),
             Self::MinMax(min_max_expr) => min_max_expr.is_not_null(),
             Self::Collate(collate_expr) => collate_expr.is_not_null(),
@@ -402,6 +408,7 @@ impl SemScalarExpr {
             | Self::FuncCall(_)
             | Self::Param(_)
             | Self::Constrained(_)
+            | Self::Exists(_)
             | Self::Grouping(_)
             | Self::MergeAction => None,
             _ => todo!("not implemented {self:?}"),
@@ -420,7 +427,7 @@ impl SemScalarExpr {
             Self::Case(_case_expr) => String::new(),
             Self::Boolean(_boolean_expr) => String::new(),
             Self::NullTest(_null_test_expr) => String::new(),
-            Self::SubLink(_sub_link_expr) => String::new(),
+            Self::SubLink(_) | Self::Exists(_) => String::new(),
             Self::Coalesce(_coalesce_expr) => String::new(),
             Self::MinMax(_min_max_expr) => todo!(),
             Self::Collate(_collate_expr) => todo!(),
@@ -754,6 +761,7 @@ impl SemScalarExpr {
             Self::Boolean(v) => v.walk(visitor)?,
             Self::NullTest(v) => v.walk(visitor)?,
             Self::SubLink(v) => v.walk(visitor)?,
+            Self::Exists(value) => value.walk(visitor)?,
             Self::Coalesce(v) => v.walk(visitor)?,
             Self::Constrained(v) => v.walk(visitor)?,
             Self::Indirection(v) => v.walk(visitor)?,
@@ -804,6 +812,8 @@ impl SemScalarExpr {
             Self::Boolean(value) => value.collect_constraints(parameters, context),
             Self::NullTest(value) => value.collect_constraints(parameters),
             Self::SubLink(_) => parameters.scalar_result(self),
+            // Child constraints are collected by traversal; EXISTS has its own boolean type.
+            Self::Exists(_) => None,
             Self::Case(value) => {
                 value.collect_constraints(parameters);
                 None

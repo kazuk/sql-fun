@@ -1,6 +1,6 @@
 use crate::sem::scalar_expr::{
-    ArrayExpr, BooleanExpr, ListExpr, NullTestExpr, ScalarConstExpr, SemScalarExpr, SubLinkExpr,
-    TypeCastExpr,
+    ArrayExpr, BooleanExpr, ExistsExpr, ListExpr, NullTestExpr, ScalarConstExpr, SemScalarExpr,
+    SubLinkExpr, TypeCastExpr,
     boolean::{BooleanExprBody, NullTestType},
 };
 use crate::sem::{AnalysisError, SelectStatement, TypeReference};
@@ -52,6 +52,16 @@ impl SemScalarExpr {
     }
     pub(crate) fn explicit_cast(value: &Self, target: &TypeReference) -> Self {
         Self::TypeCast(TypeCastExpr::from_resolved(target, value))
+    }
+    pub(crate) fn exists(query: &SelectStatement) -> Self {
+        Self::Exists(ExistsExpr::from(query))
+    }
+    /// EXISTS predicate, when this expression directly represents one.
+    pub const fn as_exists(&self) -> Option<&ExistsExpr> {
+        match self {
+            Self::Exists(value) => Some(value),
+            _ => None,
+        }
     }
     pub(crate) fn subquery(query: &SelectStatement) -> Result<Self, AnalysisError> {
         Ok(Self::SubLink(SubLinkExpr::from_resolved(query)?))

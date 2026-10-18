@@ -8,7 +8,8 @@ mod update;
 use crate::StringSpan;
 use crate::ast::{
     Access, BooleanExpr, BooleanOperator, Call, CallKind, Case, Cast, Dialect, Expr, Indirection,
-    Literal, Name, NullTest, OperatorExpr, OperatorKind, SqlValue, Subquery, TypeName,
+    Literal, Name, NullTest, OperatorExpr, OperatorKind, SqlValue, Subquery, SubqueryKind,
+    TypeName,
 };
 use crate::sem::{
     AliasName, AnalysisError, AnalysisProblem, ArithExpr, CaseExpr, CaseExprAnalysisContext,
@@ -551,7 +552,16 @@ impl Subquery {
         scope: &ScalarAnalysisContext<'_>,
     ) -> Result<SemScalarExpr, AnalysisError> {
         let query = self.query.resolve_in(context, Some(scope))?;
-        SemScalarExpr::subquery(&query)
+        self.kind.resolve(&query)
+    }
+}
+
+impl SubqueryKind {
+    fn resolve(&self, query: &crate::sem::SelectStatement) -> Result<SemScalarExpr, AnalysisError> {
+        match self {
+            Self::Exists => Ok(SemScalarExpr::exists(query)),
+            _ => SemScalarExpr::subquery(query),
+        }
     }
 }
 

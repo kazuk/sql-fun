@@ -133,6 +133,22 @@ pub enum SemScalarExpr {
 }
 
 impl SemScalarExpr {
+    /// Resolved table-column binding, when this expression directly references one.
+    pub const fn table_column_reference(&self) -> Option<&TableColumnRef> {
+        if let Self::ColumnRef(reference) = self {
+            reference.table_column_reference()
+        } else {
+            None
+        }
+    }
+    pub(crate) const fn function_dependency(&self) -> Option<&crate::sem::FullName> {
+        if let Self::FuncCall(call) = self {
+            call.name_resolution().function_identity()
+        } else {
+            None
+        }
+    }
+
     /// MERGE record binding, when this is a direct column reference.
     pub const fn merge_record_reference(&self) -> Option<&self::column_ref::MergeRecordColumnRef> {
         match self {

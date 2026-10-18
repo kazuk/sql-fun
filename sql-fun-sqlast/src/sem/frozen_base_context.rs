@@ -408,6 +408,15 @@ macro_rules! forward_catalog_reads {
         }
 
         impl crate::sem::BaseParseContext for $context {
+            fn sqlite_relation_identity(&self, name: &FullName) -> Option<FullName> {
+                self.$catalog().sqlite_relation_identity(name)
+            }
+            fn trigger(
+                &self,
+                identity: &crate::sem::TriggerIdentity,
+            ) -> Option<&crate::sem::CreateTrigger> {
+                self.$catalog().trigger(identity)
+            }
             fn metadata(&self) -> &::sql_fun_core::SqlFunMetadata {
                 crate::sem::BaseParseContext::metadata(self.$catalog())
             }

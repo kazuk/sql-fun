@@ -20,6 +20,7 @@ mod create_schema;
 mod create_seq;
 mod create_table;
 mod create_table_as;
+mod create_trigger;
 mod create_view;
 mod cte;
 mod data_source;
@@ -53,6 +54,11 @@ mod update_statement;
 mod variable_set;
 mod view_like;
 pub(crate) mod view_write;
+pub use self::create_trigger::{
+    CreateTrigger, TriggerBody, TriggerConstraint, TriggerDependencies, TriggerEvent,
+    TriggerEventColumn, TriggerFunction, TriggerGranularity, TriggerIdentity, TriggerReferences,
+    TriggerTiming, TriggerTransition,
+};
 pub use self::view_write::{ViewAssignmentColumn, ViewWriteChange, ViewWriteInfo};
 
 pub(crate) use self::insert_statement::{
@@ -288,6 +294,8 @@ impl From<CreateIndex> for ImplicitChange {
 /// Semantic AST for top-level statement
 #[derive(Debug, Clone)]
 pub enum SemAst {
+    /// A resolved CREATE TRIGGER statement.
+    CreateTrigger(Box<CreateTrigger>),
     /// A statement whose semantic resolution failed recoverably.
     /// Diagnostics are retained by the context; no catalog definition is applied.
     UnresolvedStatement,
@@ -368,6 +376,40 @@ pub enum SemAst {
 impl SemAst {
     pub(crate) const fn select_statement(&self) -> Option<&SelectStatement> {
         if let Self::SelectStatement(query) = self { Some(query) } else { None }
+    }
+    pub(crate) fn walk_trigger_command<V: self::traversal::SemanticVisitor>(
+        &mut self,
+        visitor: &mut V,
+    ) -> Result<(), AnalysisError> {
+        match self {
+            Self::SelectStatement(query) => query.walk(visitor),
+            Self::InsertStatement(insert) => {
+                visitor.relation_identity(insert.target().full_name());
+                insert.walk(visitor)
+            }
+            Self::UpdateStatement(update) => {
+                visitor.relation_identity(update.target().full_name());
+                update.walk(visitor)
+            }
+            Self::DeleteStatement(delete) => {
+                visitor.relation_identity(delete.target().full_name());
+                delete.walk(visitor)
+            }
+            _ => unreachable!("only resolved SQLite trigger commands are traversed here"),
+        }
+    }
+
+    /// Retain a resolved trigger statement.
+    pub fn create_trigger(trigger: &CreateTrigger) -> Self {
+        Self::CreateTrigger(Box::new(trigger.clone()))
+    }
+    /// Inspect a resolved trigger statement.
+    pub fn trigger(&self) -> Option<&CreateTrigger> {
+        if let Self::CreateTrigger(trigger) = self {
+            Some(trigger)
+        } else {
+            None
+        }
     }
     pub(crate) fn query_result_columns(&self) -> Option<&ResultColumnCollection> {
         if let Self::SelectStatement(query) = self {

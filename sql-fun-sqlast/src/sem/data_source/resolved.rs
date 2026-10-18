@@ -8,6 +8,21 @@ use crate::sem::{
 };
 
 impl DataSource {
+    pub(crate) fn trigger_column(
+        &self,
+        context: &impl ParseContext,
+        column: &crate::sem::ColumnName,
+    ) -> Option<crate::sem::ColumnName> {
+        let target = match self {
+            Self::Table(table) => table.name().full_name(),
+            Self::View(view) => view.view_name().full_name(),
+            _ => return None,
+        };
+        crate::sem::CreateTrigger::column(context, target, column)?
+            .name()
+            .clone()
+    }
+
     pub(crate) fn resolved_rows(
         functions: &[crate::sem::DataSourceRowsFromFunc],
         alias: &AliasSpec,
@@ -23,6 +38,17 @@ impl DataSource {
         alias: &AliasSpec,
         with: &WithClause,
     ) -> Result<Self, AnalysisError> {
+        let canonical;
+        let name = if context.dialect() == crate::ast::Dialect::sqlite()
+            && with.get(&name.to_string()).is_none()
+        {
+            canonical = crate::sem::search_path::expand_search_path_inst(context, name, |key| {
+                context.sqlite_relation_identity(key)
+            });
+            canonical.as_ref().unwrap_or(name)
+        } else {
+            name
+        };
         if let Some(cte) = with.get(&name.to_string()) {
             if cte.is_unreadable_delete() {
                 context.report_analysis_problem(AnalysisProblem::delete(

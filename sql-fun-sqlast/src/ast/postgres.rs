@@ -395,9 +395,9 @@ impl TryFromWithTokens<&syn::Node> for StatementNode {
             ));
         }
         if let Some(rule) = value.as_rule_stmt().as_inner() {
-            return Ok(Self::view_write(
-                super::view_write::WriteDeclaration::try_from(&rule)?,
-            ));
+            return Ok(Self::create_rule(super::CreateRule::try_from_with_tokens(
+                &rule, tokens,
+            )?));
         }
         if let Some(view) = value.as_view_stmt().as_inner() {
             return Ok(Self::view(View::try_from_with_tokens(&view, tokens)?));

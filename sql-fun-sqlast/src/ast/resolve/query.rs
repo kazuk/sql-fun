@@ -266,7 +266,7 @@ impl With {
             let from = FromClause::default();
             let scope = ScalarAnalysisContext::nested(&with, &from, outer);
             let body = entry.body.resolve(context, &scope, &entry.column_names())?;
-            with.insert(&entry.name, body);
+            with.insert_resolved(context, &entry.name, body);
         }
         Ok(with)
     }
@@ -578,7 +578,7 @@ impl Relation {
         outer: Option<&ScalarAnalysisContext<'_>>,
     ) -> Result<DataSource, AnalysisError> {
         let name = self.name.full_name()?;
-        let name = if with.get(&name.to_string()).is_none()
+        let name = if with.resolve_name(context, &name).is_none()
             && let Some(scope) = outer
         {
             scope.trigger_relation_name(context, &name)?

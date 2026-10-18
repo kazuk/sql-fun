@@ -38,10 +38,19 @@ impl DataSource {
         alias: &AliasSpec,
         with: &WithClause,
     ) -> Result<Self, AnalysisError> {
+        if let Some(cte_name) = with.resolve_name(context, name) {
+            let cte = with.get(cte_name).expect("resolved CTE name is stored");
+            if cte.is_unreadable_delete() {
+                context.report_analysis_problem(AnalysisProblem::delete(
+                    crate::sem::problem::DeleteProblemKind::unreadable_cte(cte_name),
+                ))?;
+            } else {
+                cte.require_readable()?;
+            }
+            return Ok(CteDataSource::new_data_source(cte_name, alias));
+        }
         let canonical;
-        let name = if context.dialect() == crate::ast::Dialect::sqlite()
-            && with.get(&name.to_string()).is_none()
-        {
+        let name = if context.dialect() == crate::ast::Dialect::sqlite() {
             canonical = crate::sem::search_path::expand_search_path_inst(context, name, |key| {
                 context.sqlite_relation_identity(key)
             });
@@ -49,16 +58,7 @@ impl DataSource {
         } else {
             name
         };
-        if let Some(cte) = with.get(&name.to_string()) {
-            if cte.is_unreadable_delete() {
-                context.report_analysis_problem(AnalysisProblem::delete(
-                    crate::sem::problem::DeleteProblemKind::unreadable_cte(&name.to_string()),
-                ))?;
-            } else {
-                cte.require_readable()?;
-            }
-            Ok(CteDataSource::new_data_source(&name.to_string(), alias))
-        } else if context.get_table(&TableName::from(name.clone())).is_some() {
+        if context.get_table(&TableName::from(name.clone())).is_some() {
             Ok(TableDataSource::new_data_source(
                 &TableName::from(name.clone()),
                 alias,

@@ -37,9 +37,9 @@ impl TryFrom<&syn::Stmt> for StatementNode {
             syn::Stmt::AlterTable(table) => {
                 Ok(Self::alter_relation(super::AlterRelation::try_from(table)?))
             }
-            syn::Stmt::DropTrigger(trigger) => Ok(Self::view_write(
-                super::view_write::WriteDeclaration::try_from(trigger)?,
-            )),
+            syn::Stmt::DropTrigger(trigger) => {
+                Ok(Self::drop_trigger(super::DropTrigger::try_from(trigger)?))
+            }
             syn::Stmt::CreateTrigger(trigger) => Ok(Self::create_trigger(
                 super::CreateTrigger::try_from(trigger)?,
             )),

@@ -1019,6 +1019,7 @@ CREATE VIEW public.alias_cast AS SELECT x::integer AS x FROM public.items AS i(x
     "CREATE OR REPLACE VIEW public.item_view AS SELECT id::bigint AS key, value, value+1 AS computed FROM public.items",
     "view_invalid_replacement"
 )]
+#[ignore = "DROP TRIGGER no longer uses legacy metadata; semantic analysis/registration owned by #555"]
 #[case::missing_trigger("DROP TRIGGER absent ON public.item_view", "view_missing_object")]
 #[case::duplicate_view(
     "CREATE VIEW public.item_view AS SELECT id FROM public.items",

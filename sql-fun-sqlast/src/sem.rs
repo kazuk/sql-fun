@@ -415,7 +415,7 @@ impl SemAst {
             None
         }
     }
-    pub(crate) fn rule_returning(&self) -> Option<&ResultColumnCollection> {
+    pub(crate) const fn rule_returning(&self) -> Option<&ResultColumnCollection> {
         match self {
             Self::InsertStatement(statement) => Some(statement.result_columns()),
             Self::UpdateStatement(statement) => Some(statement.result_columns()),
@@ -436,7 +436,7 @@ impl SemAst {
         }
     }
     /// Inspect a resolved SELECT/query statement, including a rule action.
-    pub fn select_statement(&self) -> Option<&SelectStatement> {
+    pub const fn select_statement(&self) -> Option<&SelectStatement> {
         if let Self::SelectStatement(query) = self {
             Some(query)
         } else {

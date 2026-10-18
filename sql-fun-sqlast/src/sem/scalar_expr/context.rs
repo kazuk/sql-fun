@@ -78,7 +78,11 @@ impl<'a> ScalarAnalysisContext<'a> {
         outer: Option<&Self>,
     ) -> Self {
         let mut scope = Self::nested(with, from, outer);
-        scope.rule = outer.and_then(|parent| parent.rule.clone());
+        scope.rule = if let Some(parent) = outer {
+            parent.rule.clone()
+        } else {
+            None
+        };
         scope
     }
     pub(crate) fn insert_returning_outer(&self, context: &impl ParseContext) -> Option<&Self> {
@@ -90,9 +94,6 @@ impl<'a> ScalarAnalysisContext<'a> {
     }
     pub(crate) fn with_clause(&self) -> &WithClause {
         &self.with_clause
-    }
-    pub(crate) fn from_clause(&self) -> &FromClause {
-        &self.from_clause
     }
     pub(crate) fn projection_names(
         &self,
@@ -165,11 +166,13 @@ impl<'a> ScalarAnalysisContext<'a> {
                 .is_some_and(|parent| parent.in_rule_definition())
     }
     pub(crate) fn rule_identity(&self) -> Option<&crate::sem::RuleIdentity> {
-        self.rule.as_ref().map(|rule| &rule.identity).or_else(|| {
-            self.parent
-                .as_ref()
-                .and_then(|parent| parent.rule_identity())
-        })
+        if let Some(rule) = &self.rule {
+            Some(&rule.identity)
+        } else if let Some(parent) = &self.parent {
+            parent.rule_identity()
+        } else {
+            None
+        }
     }
     pub(crate) fn direct_rule_identity(&self) -> Option<&crate::sem::RuleIdentity> {
         self.rule

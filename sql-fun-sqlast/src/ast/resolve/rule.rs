@@ -217,20 +217,25 @@ impl CreateRule {
         loop {
             let expected = if let Some(table) = context.get_table_impl(identity.target()) {
                 table.get_column_at(index).cloned()
-            } else {
-                context
-                    .get_view_impl(identity.target())
-                    .and_then(|view| view.result_columns().get_column_at(index))
-                    .map(sem::ResultColumn::create_column_definition)
-            };
-            if expected
-                .as_ref()
-                .and_then(sem::ColumnDefinition::get_type)
-                .is_some_and(sem::TypeReference::rule_shape_needs_modifiers)
-                || columns
+            } else if let Some(view) = context.get_view_impl(identity.target()) {
+                view.result_columns()
                     .get_column_at(index)
-                    .and_then(|column| column.col_type().as_ref())
-                    .is_some_and(sem::TypeReference::rule_shape_needs_modifiers)
+                    .map(sem::ResultColumn::create_column_definition)
+            } else {
+                None
+            };
+            let expected_type = if let Some(expected) = &expected {
+                expected.get_type()
+            } else {
+                None
+            };
+            let actual_type = if let Some(actual) = columns.get_column_at(index) {
+                actual.col_type().as_ref()
+            } else {
+                None
+            };
+            if expected_type.is_some_and(sem::TypeReference::rule_shape_needs_modifiers)
+                || actual_type.is_some_and(sem::TypeReference::rule_shape_needs_modifiers)
             {
                 return Self::invalid(
                     identity,
@@ -287,7 +292,7 @@ impl crate::ast::Query {
     }
 }
 impl StatementNode {
-    fn rule_query(&self) -> Option<&crate::ast::Query> {
+    const fn rule_query(&self) -> Option<&crate::ast::Query> {
         if let Self::Query(query) = self {
             Some(query)
         } else {
@@ -394,7 +399,7 @@ impl sem::TypeReference {
 }
 
 impl crate::ast::Expr {
-    fn is_rule_boolean_literal(&self) -> bool {
+    const fn is_rule_boolean_literal(&self) -> bool {
         if let Self::Literal(literal) = self {
             literal.is_rule_boolean_literal()
         } else {

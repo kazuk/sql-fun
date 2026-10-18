@@ -202,7 +202,8 @@ impl Select {
         query_id: usize,
     ) -> Result<SelectStatement, AnalysisError> {
         if self.into.is_some()
-            && let Some(identity) = outer.and_then(ScalarAnalysisContext::rule_identity)
+            && let Some(scope) = outer
+            && let Some(identity) = scope.rule_identity()
         {
             return Err(AnalysisError::rule(
                 &crate::sem::problem::RuleProblem::definition(
@@ -327,7 +328,8 @@ impl With {
             .map(ScalarAnalysisContext::inherited_ctes)
             .unwrap_or_default();
         for entry in &self.entries {
-            if let Some(identity) = outer.and_then(ScalarAnalysisContext::direct_rule_identity)
+            if let Some(scope) = outer
+                && let Some(identity) = scope.direct_rule_identity()
                 && matches!(entry.name.as_str(), "old" | "new")
             {
                 context.report_analysis_problem(AnalysisProblem::rule(

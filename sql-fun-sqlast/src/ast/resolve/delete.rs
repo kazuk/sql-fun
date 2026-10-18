@@ -197,7 +197,7 @@ impl Delete {
         outer: &ScalarAnalysisContext<'_>,
     ) -> Result<ResultColumnCollection, AnalysisError> {
         let with = outer.with_clause();
-        let from = outer.from_clause();
+        let from = outer.sources();
         if context.dialect() == Dialect::sqlite() {
             let returning_alias = AliasSpec::from_local_name(&requested.full_name().local_name());
             let mut returning_from = FromClause::default();

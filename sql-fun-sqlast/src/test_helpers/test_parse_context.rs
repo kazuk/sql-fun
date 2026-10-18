@@ -394,7 +394,11 @@ impl DiagnosticContext for TestParseContext {
 
 impl BaseParseContext for TestParseContext {
     fn rule(&self, identity: &crate::sem::RuleIdentity) -> Option<&crate::sem::CreateRule> {
-        self.rules.get(identity).and_then(Option::as_ref)
+        if let Some(rule) = self.rules.get(identity) {
+            rule.as_ref()
+        } else {
+            None
+        }
     }
 
     fn sqlite_relation_identity(&self, name: &FullName) -> Option<FullName> {

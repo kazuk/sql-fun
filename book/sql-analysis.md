@@ -243,11 +243,13 @@ layer; re-creation replaces the mask.
 
 SQLite `DROP TRIGGER` uses the schema-scoped trigger namespace, comparing ASCII
 identifiers without case sensitivity. An unqualified name searches TEMP, main,
-and the explicitly configured attached-schema order. A qualified name selects
-that schema only. The resolved trigger supplies its owning relation; no ON
-relation or dependency behavior is invented. `IF EXISTS` retains an explicit
-no-op when lookup finds no definition. Application masks inherited definitions
-and removes the target link in the child, preserving parent and sibling catalogs.
+and the explicitly configured attached-schema order. Configure attached schemas
+in their SQLite ATTACH order: the earliest attached database wins when names
+collide across attachments. A qualified name selects that schema only. The
+resolved trigger supplies its owning relation; no ON relation or dependency
+behavior is invented. `IF EXISTS` retains an explicit no-op when lookup finds
+no definition. Application masks inherited definitions and removes the target
+link in the child, preserving parent and sibling catalogs.
 
 Deferrable unique-key catalog definitions, recursive CTE binding, and expressions
 already unsupported by the SELECT analyzer remain unsupported. Star expansion

@@ -98,9 +98,58 @@ fn agrees_with_bundled_sqlite_drop_namespace_behavior() -> testresult::TestResul
     Ok(())
 }
 
+#[rstest::rstest]
+#[case::first_attached("zeta", "alpha", false)]
+#[case::reversed_attachments("alpha", "zeta", false)]
+#[case::qualified_later_attachment("zeta", "alpha", true)]
+fn attached_schema_order_matches_bundled_sqlite(
+    #[case] first: &str,
+    #[case] second: &str,
+    #[case] qualified: bool,
+) -> testresult::TestResult {
+    let (parent, connection) = test_helpers::attached_catalog(first, second)?;
+    let selected = if qualified { second } else { first };
+    let sql = if qualified {
+        format!("DROP TRIGGER {second}.audit")
+    } else {
+        "DROP TRIGGER audit".to_owned()
+    };
+    let pair = test_helpers::apply(test_helpers::layer(&parent), &sql)?;
+    let selected_identity = TriggerIdentity::sqlite(&FullName::with_schema(selected, "audit"));
+    let drop = pair.ast().trigger_drop().unwrap();
+    assert_eq!(drop.identity(), Some(&selected_identity));
+    assert_eq!(
+        drop.target(),
+        Some(&FullName::with_schema(selected, "items"))
+    );
+    connection.execute_batch(&sql)?;
+    let child = pair.into_context().freeze();
+    for schema in [first, second] {
+        let count: i64 = connection.query_row(
+            &format!(
+                "SELECT count(*) FROM {schema}.sqlite_schema WHERE type='trigger' AND name='audit'"
+            ),
+            [],
+            |row| row.get(0),
+        )?;
+        let identity = TriggerIdentity::sqlite(&FullName::with_schema(schema, "audit"));
+        assert_eq!(count, i64::from(schema != selected));
+        assert_eq!(child.trigger(&identity).is_some(), count == 1);
+        assert!(parent.trigger(&identity).is_some());
+        assert_eq!(
+            test_helpers::table_trigger_count(&child, schema),
+            usize::from(schema != selected)
+        );
+        assert_eq!(test_helpers::table_trigger_count(&parent, schema), 1);
+    }
+    Ok(())
+}
+
 mod test_helpers {
     use crate::sem::{BaseContext, FrozenBaseContext, SchemaFileContext};
-    use crate::sem::{BaseParseContext, FullName, ParseContext, TriggerIdentity, ViewInfoRead};
+    use crate::sem::{
+        BaseParseContext, FullName, ParseContext, SchemaName, TableName, TriggerIdentity, ViewName,
+    };
     pub(super) const CREATE_AUDIT: &str =
         "CREATE TRIGGER audit INSTEAD OF INSERT ON item_view BEGIN SELECT 1; END";
     pub(super) fn identity() -> TriggerIdentity {
@@ -144,6 +193,33 @@ mod test_helpers {
         assert!(context.problems().is_empty(), "{:?}", context.problems());
         Ok(context.freeze())
     }
+    pub(super) fn attached_catalog(
+        first: &str,
+        second: &str,
+    ) -> Result<(FrozenBaseContext, ::rusqlite::Connection), Box<dyn std::error::Error>> {
+        let base = catalog()?;
+        let mut context = apply(layer(&base), "DROP TRIGGER main.audit")?.into_context();
+        context.set_search_path(&[
+            SchemaName::from("main"),
+            SchemaName::from(first),
+            SchemaName::from(second),
+        ]);
+        let connection = ::rusqlite::Connection::open_in_memory()?;
+        for schema in [first, second] {
+            connection.execute_batch(&format!("ATTACH DATABASE ':memory:' AS {schema}"))?;
+            for sql in [
+                format!("CREATE TABLE {schema}.items(id)"),
+                format!(
+                    "CREATE TRIGGER {schema}.audit BEFORE INSERT ON {schema}.items BEGIN SELECT 1; END"
+                ),
+            ] {
+                connection.execute_batch(&sql)?;
+                context = apply(context, &sql)?.into_context();
+            }
+        }
+        assert!(context.problems().is_empty(), "{:?}", context.problems());
+        Ok((context.freeze(), connection))
+    }
     pub(super) fn layer(base: &FrozenBaseContext) -> SchemaFileContext {
         SchemaFileContext::new(
             std::path::Path::new("drop-trigger.sql"),
@@ -168,10 +244,19 @@ mod test_helpers {
         );
         statement(sql).analyze(context)
     }
+    pub(super) fn table_trigger_count(context: &FrozenBaseContext, schema: &str) -> usize {
+        let target = FullName::with_schema(schema, "items");
+        context
+            .get_table(&TableName::from(target.clone()))
+            .unwrap()
+            .triggers()
+            .resolve(context, &target)
+            .len()
+    }
     pub(super) fn active_count(context: &FrozenBaseContext) -> usize {
         let target = FullName::with_schema("main", "item_view");
         context
-            .get_view_impl(&target)
+            .get_view(&ViewName::from_full_name(&target))
             .unwrap()
             .triggers()
             .unwrap()

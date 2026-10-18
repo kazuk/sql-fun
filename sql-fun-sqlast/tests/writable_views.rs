@@ -1017,6 +1017,7 @@ CREATE VIEW public.alias_cast AS SELECT x::integer AS x FROM public.items AS i(x
     "CREATE RULE r AS ON INSERT TO public.item_view DO INSTEAD NOTHING; CREATE RULE r AS ON INSERT TO public.item_view DO INSTEAD NOTHING",
     "view_duplicate_object"
 )]
+#[ignore = "DROP RULE no longer uses legacy metadata; semantic definition/registration owned by #605"]
 #[case::missing("DROP RULE absent ON public.item_view", "view_missing_object")]
 #[case::default(
     "ALTER VIEW public.item_view ALTER COLUMN absent SET DEFAULT 2",

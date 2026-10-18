@@ -1,11 +1,6 @@
 //! Schema producers for writable-view metadata. No body is executed here.
-use crate::ast::{Expr, FromItem, Name, Query, QueryBody, View};
-use crate::sem::{
-    AnalysisError, AstAndContextPair, FullName, ParseContext, SelectStatement, SemAst,
-    ViewWriteChange, ViewWriteInfo,
-    view_write::{WriteAction, WriteEvent, WriteObject},
-};
-use crate::syn::{ListOpt, Opt};
+use crate::ast::{Expr, FromItem, Query, QueryBody, View};
+use crate::sem::{AnalysisError, FullName, ParseContext, SelectStatement, ViewWriteInfo};
 
 impl View {
     pub(super) fn write_name(
@@ -219,106 +214,5 @@ impl FromItem {
                 }
             },
         ))
-    }
-}
-
-#[derive(Debug, Clone)]
-pub(crate) struct WriteDeclaration {
-    relation: Name,
-    action: WriteAction,
-    missing_ok: bool,
-}
-impl WriteDeclaration {
-    fn new(relation: &Name, action: &WriteAction) -> Self {
-        Self {
-            relation: relation.clone(),
-            action: action.clone(),
-            missing_ok: false,
-        }
-    }
-    fn unresolved_target<C: ParseContext>(
-        &self,
-        mut context: C,
-        requested: &FullName,
-    ) -> Result<AstAndContextPair<C>, AnalysisError> {
-        let table_target = context
-            .get_table(&crate::sem::TableName::from(requested.clone()))
-            .is_some();
-        if table_target || !self.missing_ok {
-            context.report_analysis_problem(crate::sem::AnalysisProblem::view(
-                &crate::sem::problem::ViewProblem::invalid_target(requested),
-            ))?;
-        }
-        Ok(AstAndContextPair::new(
-            SemAst::unresolved_statement(),
-            context,
-        ))
-    }
-
-    pub(super) fn resolve_and_apply<C: ParseContext>(
-        &self,
-        mut context: C,
-    ) -> Result<AstAndContextPair<C>, AnalysisError> {
-        let requested = self.relation.full_name()?;
-        let bound = crate::sem::search_path::expand_search_path_inst(&context, &requested, |key| {
-            context
-                .get_view_impl(key)
-                .filter(|view| !view.is_materialized())
-                .map(|_| key.clone())
-        });
-        let Some(view) = bound else {
-            return self.unresolved_target(context, &requested);
-        };
-        if crate::ast::Dialect::from(context.metadata()) == crate::ast::Dialect::sqlite()
-            && let Some((trigger, if_not_exists)) = self.action.trigger_declaration()
-            && let Some(_owner) = context.view_trigger_target(&FullName::new(
-                &None,
-                &view.schema().cloned(),
-                &crate::sem::LocalName::from(trigger),
-            ))
-        {
-            if !if_not_exists {
-                context.report_analysis_problem(crate::sem::AnalysisProblem::view(
-                    &crate::sem::problem::ViewProblem::duplicate_object(&view, trigger),
-                ))?;
-            }
-            return Ok(AstAndContextPair::new(
-                SemAst::unresolved_statement(),
-                context,
-            ));
-        }
-        let change = ViewWriteChange::new(&view, &self.action);
-        let context = context.apply_view_write_change(&change)?;
-        Ok(AstAndContextPair::new(
-            SemAst::view_write_change(&change),
-            context,
-        ))
-    }
-}
-
-impl TryFrom<&crate::syn::DropStmt> for WriteDeclaration {
-    type Error = AnalysisError;
-    fn try_from(value: &crate::syn::DropStmt) -> Result<Self, Self::Error> {
-        if !matches!(
-            value.get_remove_type().as_inner(),
-            Some(crate::syn::ObjectType::ObjectRule)
-        ) {
-            return AnalysisError::raise_unexpected_input("legacy DROP RULE object type");
-        }
-        let objects = value.get_objects().as_inner().unwrap_or_default();
-        if objects.len() != 1 {
-            return AnalysisError::raise_unexpected_input("one view rule drop target required");
-        }
-        let mut parts = Name::try_from(objects[0].as_list().get_items())?.0;
-        let Some(name) = parts.pop() else {
-            return AnalysisError::raise_unexpected_input("rule drop name");
-        };
-        let object = WriteObject::rule(&name, WriteEvent::insert(), false, false, false, &[]);
-        let mut declaration = Self::new(
-            &Name::from_parts(&parts),
-            &WriteAction::drop_object(&object, value.get_missing_ok()),
-        );
-        declaration.missing_ok = value.get_missing_ok();
-        Ok(declaration)
     }
 }

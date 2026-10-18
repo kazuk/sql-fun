@@ -270,7 +270,14 @@ impl UpdateAssignmentCollection {
         let mut seen: Vec<&Assignment> = Vec::new();
         for assignment in assignments {
             if context.dialect() == Dialect::postgres()
-                && seen.iter().any(|previous| previous.overlaps(assignment))
+                && seen.iter().any(|previous| {
+                    assignment.overlaps_mapped(previous, |name| {
+                        table.view_support().map_or_else(
+                            || name.clone(),
+                            |support| support.assignment_column(name).clone(),
+                        )
+                    })
+                })
             {
                 context.report_analysis_problem(AnalysisProblem::update(
                     UpdateProblemKind::duplicate_target(),
@@ -301,6 +308,16 @@ impl UpdateAssignmentCollection {
                 destination = access.resolve(context, rhs_scope, destination)?;
             }
             let value = assignment.resolve_update_value(context, rhs_scope)?;
+            if value.is_default()
+                && table
+                    .view_support()
+                    .is_some_and(|support| !support.can_assign_default(&column_name))
+            {
+                context.report_analysis_problem(AnalysisProblem::update(
+                    UpdateProblemKind::default_target(),
+                    "view rewriting expands DEFAULT before the base generated/identity assignment check",
+                ))?;
+            }
             assignment.validate_update_value(context, column, &value)?;
             resolved.push(crate::sem::UpdateAssignment::new(
                 column,

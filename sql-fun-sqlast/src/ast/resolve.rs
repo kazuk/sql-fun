@@ -124,14 +124,7 @@ impl Expr {
             },
             Self::Indirection(indirection) => indirection.resolve(context, scope),
             Self::SqlValue(value) => value.resolve(),
-            Self::MergeAction => {
-                if !scope.merge_action_available() {
-                    return Err(AnalysisError::unexpected_input_error(
-                        "merge_action() is only permitted in MERGE RETURNING",
-                    ));
-                }
-                Ok(SemScalarExpr::merge_action())
-            }
+            Self::MergeAction => Self::resolve_merge_action(scope),
             Self::Collate(collate) if context.dialect() == Dialect::sqlite() => {
                 collate.argument.resolve_in(context, scope)
             }
@@ -153,6 +146,17 @@ impl Expr {
                 todo!("expression semantic analysis")
             }
         }
+    }
+
+    fn resolve_merge_action(
+        scope: &ScalarAnalysisContext<'_>,
+    ) -> Result<SemScalarExpr, AnalysisError> {
+        if !scope.merge_action_available() {
+            return Err(AnalysisError::unexpected_input_error(
+                "merge_action() is only permitted in MERGE RETURNING",
+            ));
+        }
+        Ok(SemScalarExpr::merge_action())
     }
 
     fn resolve_list(

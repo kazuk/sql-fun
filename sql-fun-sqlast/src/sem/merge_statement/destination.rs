@@ -1,5 +1,6 @@
 use crate::sem::{
-    AnalysisError, InsertDestination, ParseContext, TableName, UpdateDestination, ViewMergeSupport,
+    AnalysisError, InsertDestination, ParseContext, TableName, UpdateDestination, ViewLike,
+    ViewMergeSupport,
 };
 
 /// MERGE-owned projection of a bound table or view target.
@@ -20,33 +21,15 @@ impl MergeDestination {
             if context.get_table_impl(key).is_some() {
                 return Some(Self::resolve_table(context, &name));
             }
-            context.get_view_impl(key).map(|view| {
+            if let Some(view) = context.get_view_impl(key) {
                 if view.is_materialized() {
-                    let insert = InsertDestination::resolve(context, &name)?
-                        .expect("resolved MERGE target materialized view");
-                    let update = UpdateDestination::resolve(context, &name)?
-                        .expect("resolved MERGE target materialized view");
-                    Ok(Self {
-                        name,
-                        insert,
-                        update,
-                        view_support: None,
-                        materialized_view: true,
-                    })
+                    Some(Self::resolve_materialized_view(context, &name))
                 } else {
-                    super::MergeStatement::require_version(context, 17)?;
-                    let support = context.view_merge_support(key);
-                    let insert = InsertDestination::for_merge_view(&name, view, &support)?;
-                    let update = UpdateDestination::for_merge_view(&name, view, &support)?;
-                    Ok(Self {
-                        name,
-                        insert,
-                        update,
-                        view_support: Some(support),
-                        materialized_view: false,
-                    })
+                    Some(Self::resolve_view(context, &name, view))
                 }
-            })
+            } else {
+                None
+            }
         })
         .transpose()
     }
@@ -61,6 +44,41 @@ impl MergeDestination {
             insert,
             update,
             view_support: None,
+            materialized_view: false,
+        })
+    }
+
+    fn resolve_materialized_view(
+        context: &impl ParseContext,
+        name: &TableName,
+    ) -> Result<Self, AnalysisError> {
+        let insert = InsertDestination::resolve(context, name)?
+            .expect("resolved MERGE target materialized view");
+        let update = UpdateDestination::resolve(context, name)?
+            .expect("resolved MERGE target materialized view");
+        Ok(Self {
+            name: name.clone(),
+            insert,
+            update,
+            view_support: None,
+            materialized_view: true,
+        })
+    }
+
+    fn resolve_view(
+        context: &impl ParseContext,
+        name: &TableName,
+        view: &ViewLike,
+    ) -> Result<Self, AnalysisError> {
+        super::MergeStatement::require_version(context, 17)?;
+        let support = context.view_merge_support(name.full_name());
+        let insert = InsertDestination::for_merge_view(name, view, &support)?;
+        let update = UpdateDestination::for_merge_view(name, view, &support)?;
+        Ok(Self {
+            name: name.clone(),
+            insert,
+            update,
+            view_support: Some(support),
             materialized_view: false,
         })
     }

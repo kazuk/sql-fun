@@ -143,7 +143,7 @@ pub enum StatementKind {
     DropRule,
     /// An unresolved CREATE TRIGGER definition. Analysis awaits #602 / #555.
     CreateTrigger,
-    /// An unresolved PostgreSQL CREATE RULE definition. Analysis awaits #604.
+    /// A PostgreSQL CREATE RULE definition; analysis resolves its statement-specific semantics.
     CreateRule,
     /// An unresolved DROP TRIGGER statement. Analysis awaits #555.
     DropTrigger,

@@ -55,6 +55,7 @@ pub struct SchemaFileContext {
 
 #[derive(Debug)]
 pub(super) struct SchemaCatalog {
+    rules: std::collections::HashMap<crate::sem::RuleIdentity, Option<crate::sem::CreateRule>>,
     ownership: crate::sem::ownership::OwnershipCatalog,
     base: FrozenBaseContext,
     triggers: std::collections::HashMap<crate::sem::TriggerIdentity, crate::sem::CreateTrigger>,
@@ -113,6 +114,7 @@ impl SchemaFileContext {
         let search_path = base.get_search_path().to_vec();
         Self {
             catalog: SchemaCatalog {
+                rules: std::collections::HashMap::new(),
                 ownership: Default::default(),
                 base: base.clone(),
                 triggers: std::collections::HashMap::new(),
@@ -622,6 +624,13 @@ mod test_diagnostic_context {
 }
 
 impl BaseParseContext for SchemaCatalog {
+    fn rule(&self, identity: &crate::sem::RuleIdentity) -> Option<&crate::sem::CreateRule> {
+        match self.rules.get(identity) {
+            Some(entry) => entry.as_ref(),
+            None => self.base.rule(identity),
+        }
+    }
+
     fn sqlite_relation_identity(&self, name: &FullName) -> Option<FullName> {
         if let Some(name) = self.tables.sqlite_name(name) {
             Some(name)
@@ -679,6 +688,52 @@ impl ParseContext for SchemaFileContext {
             context.catalog.source = baseline.get_source_path_with_span().cloned();
         }
         Ok(crate::AstAndContextPair::new(ast, context))
+    }
+    fn register_rule(mut self, rule: &crate::sem::CreateRule) -> Result<Self, AnalysisError> {
+        self.catalog
+            .rules
+            .insert(rule.identity().clone(), Some(rule.clone()));
+        Ok(self)
+    }
+    fn cancel_rule(mut self, identity: &crate::sem::RuleIdentity) -> Result<Self, AnalysisError> {
+        self.catalog.rules.insert(identity.clone(), None);
+        Ok(self)
+    }
+    fn associate_rule(
+        mut self,
+        target: &FullName,
+        identity: &crate::sem::RuleIdentity,
+    ) -> Result<Self, AnalysisError> {
+        if let Some(mut table) = self.get_table_impl(target).cloned() {
+            table.associate_rule(identity);
+            self.catalog.tables.insert_create_table(target, &table);
+        } else if let Some(mut view) = self.get_view_impl(target).cloned() {
+            view.associate_rule(identity);
+            self.catalog.views.insert(target, &view);
+        } else {
+            return Err(AnalysisError::rule(
+                &crate::sem::problem::RuleProblem::target(target),
+            ));
+        }
+        Ok(self)
+    }
+    fn dissociate_rule(
+        mut self,
+        target: &FullName,
+        identity: &crate::sem::RuleIdentity,
+    ) -> Result<Self, AnalysisError> {
+        if let Some(mut table) = self.get_table_impl(target).cloned() {
+            table.dissociate_rule(identity);
+            self.catalog.tables.insert_create_table(target, &table);
+        } else if let Some(mut view) = self.get_view_impl(target).cloned() {
+            view.dissociate_rule(identity);
+            self.catalog.views.insert(target, &view);
+        } else {
+            return Err(AnalysisError::rule(
+                &crate::sem::problem::RuleProblem::target(target),
+            ));
+        }
+        Ok(self)
     }
 
     fn insert_role(&mut self, role: &crate::sem::Role) {

@@ -68,3 +68,12 @@ trigger function or rule action is executed. The metadata producer is not a
 procedural-body validator; trigger/rule SQL rendering and broader ALTER VIEW
 processing are separate work. See [SQL analysis](../book/sql-analysis.md) for the
 supported mechanisms and conflict-inference limitations.
+
+PostgreSQL `CREATE RULE` produces `SemAst::rule()`: a named analyzed definition
+with its resolved target, event, condition, ordered actions and dependencies.
+`BaseParseContext::rule` looks up a `RuleIdentity`; table/view `rules()` links
+resolve the effective definitions in a schema layer. Rule names are local to
+their owning relation. `OR REPLACE` updates that identity without duplicating
+its link. Analysis binds OLD/NEW to target columns and never executes actions.
+See [CREATE RULE definitions](../book/sql-analysis.md#create-rule-definitions)
+for validation and current boundaries.

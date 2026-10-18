@@ -9,9 +9,7 @@ use ::sql_fun_sqlast::{
 };
 
 #[rstest::rstest]
-#[ignore = "builtin pg_settings CREATE RULE semantic analysis awaits #604"]
 #[case::seventeen("17")]
-#[ignore = "builtin pg_settings CREATE RULE semantic analysis awaits #604"]
 #[case::eighteen("18")]
 fn loads_builtin_and_user_schemas(#[case] version: &str) -> Result<(), Box<dyn std::error::Error>> {
     let manifest = PathBuf::from(env!("CARGO_MANIFEST_DIR"));

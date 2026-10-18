@@ -66,7 +66,11 @@ impl Update {
             name
         };
         let requested = TableName::from(name);
-        let table = self.resolve_destination(context, &requested)?;
+        let table = self.resolve_destination(
+            context,
+            &requested,
+            outer.is_some_and(ScalarAnalysisContext::in_rule_definition),
+        )?;
         self.validate_index_hint(context, &table)?;
         self.validate_view_trigger(context, &table)?;
         let with = self.with.resolve(context, outer)?;
@@ -77,6 +81,9 @@ impl Update {
             .map(Alias::resolve)
             .unwrap_or_else(|| AliasSpec::from_local_name(&requested.full_name().local_name()));
         let from = self.resolve_sources(context, &table, &alias, &with, trigger_outer)?;
+        if let Some(outer) = outer {
+            outer.validate_rule_sources(context, &from)?;
+        }
         let scope = ScalarAnalysisContext::nested(&with, &from, trigger_outer);
         let mut target_from = FromClause::default();
         target_from.push(DataSource::resolve_relation(
@@ -96,7 +103,7 @@ impl Update {
         )?;
         let predicate = self.resolve_predicate(context, table.name(), &scope)?;
         let returning =
-            self.resolve_returning_scope(context, &requested, &table, &alias, &with, &from)?;
+            self.resolve_returning_scope(context, &requested, &table, &alias, &scope)?;
         let mut update = UpdateStatement::new(
             table.name(),
             &assignments,
@@ -119,8 +126,14 @@ impl Update {
         &self,
         context: &mut impl ParseContext,
         requested: &TableName,
+        rule_definition: bool,
     ) -> Result<UpdateDestination, AnalysisError> {
-        let Some(table) = UpdateDestination::resolve(context, requested)? else {
+        let destination = if rule_definition {
+            UpdateDestination::resolve_rule_target(context, requested)?
+        } else {
+            UpdateDestination::resolve(context, requested)?
+        };
+        let Some(table) = destination else {
             context.report_analysis_problem(AnalysisProblem::relation_not_found(requested))?;
             return Err(AnalysisError::unexpected_input_error(
                 "UPDATE destination not found",
@@ -234,9 +247,10 @@ impl Update {
         requested: &TableName,
         table: &UpdateDestination,
         alias: &AliasSpec,
-        with: &WithClause,
-        from: &FromClause,
+        outer: &ScalarAnalysisContext<'_>,
     ) -> Result<ResultColumnCollection, AnalysisError> {
+        let with = outer.with_clause();
+        let from = outer.from_clause();
         if context.dialect() == Dialect::sqlite() {
             let returning_alias = AliasSpec::from_local_name(&requested.full_name().local_name());
             let mut returning_from = FromClause::default();
@@ -256,7 +270,7 @@ impl Update {
                 &returning_alias,
             )
         } else {
-            let scope = ScalarAnalysisContext::nested(with, from, None);
+            let scope = ScalarAnalysisContext::nested(with, from, Some(outer));
             ResultColumnCollection::resolve_for_update(
                 &self.returning,
                 context,

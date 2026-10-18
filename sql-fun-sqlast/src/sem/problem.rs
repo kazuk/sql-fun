@@ -1,4 +1,6 @@
 #![doc= include_str!("problem.md")]
+mod rule;
+pub use self::rule::{RuleDefinitionProblem, RuleProblem};
 
 mod creation;
 mod delete;
@@ -78,6 +80,8 @@ trait RenderProblemReport: Problem {
 pub enum AnalysisProblem {
     /// A creation conflicts with an existing catalog identity.
     Creation(CreationProblem),
+    /// Invalid rule definition.
+    Rule(RuleProblem),
     /// ALTER OWNER target or role lookup failed.
     Ownership(OwnershipProblem),
     /// Invalid trigger semantics.
@@ -169,6 +173,9 @@ impl AnalysisProblem {
         }
     }
 
+    pub(crate) fn rule(problem: &RuleProblem) -> Self {
+        Self::Rule(problem.clone())
+    }
     pub(crate) fn ownership_target(target: &crate::sem::OwnershipLookup) -> Self {
         Self::Ownership(OwnershipProblem::target(target))
     }
@@ -256,6 +263,7 @@ impl AnalysisProblem {
         match self {
             Self::Creation(_) => "conflicting_creation",
             Self::Ownership(problem) => problem.code(),
+            Self::Rule(_) => "rule_invalid_definition",
             Self::Trigger(_) => "trigger_invalid_definition",
             Self::View(problem) => problem.code(),
             Self::Insert(problem) => problem.code(),
@@ -310,6 +318,7 @@ impl AnalysisProblem {
         let report = match self {
             Self::Creation(problem) => problem.render_report(&report_handler, source)?,
             Self::Ownership(problem) => problem.render_report(&report_handler, source)?,
+            Self::Rule(problem) => problem.render_report(&report_handler, source)?,
             Self::Trigger(problem) => problem.render_report(&report_handler, source)?,
             Self::View(problem) => problem.render_report(&report_handler, source)?,
             Self::Insert(problem) => problem.render_report(&report_handler, source)?,

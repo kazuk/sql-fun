@@ -221,6 +221,7 @@ pub(crate) enum StatementNode {
     View(View),
     ViewWrite(view_write::WriteDeclaration),
     CreateTrigger(CreateTrigger),
+    DropTrigger(DropTrigger),
     Extension(Extension),
     VariableSet(VariableSet),
     EnumType(EnumType),
@@ -258,6 +259,10 @@ impl StatementNode {
 
     const fn create_trigger(value: CreateTrigger) -> Self {
         Self::CreateTrigger(value)
+    }
+
+    const fn drop_trigger(value: DropTrigger) -> Self {
+        Self::DropTrigger(value)
     }
 
     const fn view_write(value: view_write::WriteDeclaration) -> Self {
@@ -346,6 +351,7 @@ impl StatementNode {
             Self::Delete(delete) => delete
                 .resolve(context)
                 .map(|delete| crate::sem::SemAst::delete(&delete)),
+            Self::DropTrigger(_) => todo!("DROP TRIGGER semantic analysis: #555"),
             Self::CreateTrigger(_) => todo!("CREATE TRIGGER semantic analysis: #602 / #555"),
             Self::ViewWrite(_) => crate::sem::AnalysisError::raise_unexpected_input(
                 "view write declaration requires catalog application",
@@ -1867,6 +1873,21 @@ impl SubqueryKind {
     const fn any() -> Self {
         Self::Any
     }
+}
+
+// DROP TRIGGER retains only syntax; SQLite has no ON relation or drop behavior.
+#[derive(Clone, Debug)]
+pub(crate) struct DropTrigger {
+    name: Name,
+    relation: Option<Name>,
+    if_exists: bool,
+    behavior: Option<TriggerDropBehavior>,
+}
+
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+enum TriggerDropBehavior {
+    Cascade,
+    Restrict,
 }
 
 // Unresolved trigger syntax; interpretation belongs to statement-specific analyzers.

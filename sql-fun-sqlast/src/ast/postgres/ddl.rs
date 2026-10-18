@@ -67,9 +67,8 @@ impl crate::ast::AlterCommand {
         use crate::ast::{Column, TableConstraint};
         Ok(Some(
             match required(value.get_subtype().as_inner(), "alter_table_cmd.subtype")? {
-                syn::AlterTableType::AtChangeOwner => Self::Owner(required(
-                    value.get_newowner().get_rolename(),
-                    "alter_table_cmd.newowner",
+                syn::AlterTableType::AtChangeOwner => Self::Owner(crate::ast::Role::try_from(
+                    &required(value.get_newowner().as_inner(), "alter_table_cmd.newowner")?,
                 )?),
                 syn::AlterTableType::AtColumnDefault => Self::Default(
                     value.get_name(),

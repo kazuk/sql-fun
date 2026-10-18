@@ -12,12 +12,23 @@ use crate::{
 /// analyzed [`crate::syn::CreateFunctionStmt`]
 #[derive(Debug, Clone)]
 pub struct CreateFunction {
+    owner: Option<crate::sem::OwnerSpecification>,
+    object_kind: crate::sem::ObjectKind,
     name: FullName,
     overloads: FunctionOverloadCollection,
     returning_columdef: Option<ColumnCollection>,
 }
 
 impl CreateFunction {
+    /// Retained ownership; None means no ownership information was supplied.
+    pub const fn owner(&self) -> Option<&crate::sem::OwnerSpecification> {
+        self.owner.as_ref()
+    }
+    /// Commit an ownership change, leaving the rest of the definition intact.
+    pub(crate) fn change_owner(&mut self, owner: &crate::sem::OwnerSpecification) {
+        self.owner = Some(owner.clone());
+    }
+
     /// create new instance
     #[must_use]
     pub fn new(
@@ -26,6 +37,8 @@ impl CreateFunction {
         returning_columns: &Option<ColumnCollection>,
     ) -> Self {
         Self {
+            owner: None,
+            object_kind: crate::sem::ObjectKind::from(20),
             name: name.clone(),
             overloads: overloads.clone(),
             returning_columdef: returning_columns.clone(),
@@ -79,5 +92,46 @@ impl CreateFunction {
         TParseContext: ParseContext,
     {
         crate::ast::Function::try_from_with_tokens(&syn, tokens)?.resolve_and_apply(context)
+    }
+}
+
+impl CreateFunction {
+    pub(crate) fn contains_identity(
+        definitions: &[Self],
+        name: &FullName,
+        identity: &crate::sem::OwnershipIdentity,
+    ) -> bool {
+        for definition in definitions {
+            if definition.ownership_identity(name) == *identity {
+                return true;
+            }
+        }
+        false
+    }
+    pub(crate) fn with_procedure_kind(mut self, procedure: bool) -> Self {
+        if procedure {
+            self.object_kind = crate::sem::ObjectKind::from(30);
+        }
+        self
+    }
+    /// Actual routine kind (FUNCTION or PROCEDURE).
+    pub const fn object_kind(&self) -> crate::sem::ObjectKind {
+        self.object_kind
+    }
+    pub(crate) fn split_definitions(&self) -> Vec<Self> {
+        let mut definitions = Vec::new();
+        for overload in &self.overloads {
+            let mut definition = self.clone();
+            definition.overloads = FunctionOverloadCollection::new(std::slice::from_ref(overload));
+            definitions.push(definition);
+        }
+        definitions
+    }
+    pub(crate) fn ownership_identity(&self, key: &FullName) -> crate::sem::OwnershipIdentity {
+        let arguments = self
+            .overloads
+            .get_at(0)
+            .map_or_else(Vec::new, OverloadVariant::identity_arguments);
+        crate::sem::OwnershipIdentity::with_arguments(self.object_kind, key, &arguments)
     }
 }

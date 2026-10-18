@@ -27,6 +27,36 @@ pub enum TypeDefinition {
 }
 
 impl TypeDefinition {
+    pub(crate) const fn is_builtin(&self) -> bool {
+        matches!(self, Self::Builtin(_))
+    }
+
+    pub(crate) const fn is_relation_type(&self) -> bool {
+        matches!(self, Self::TableRef(_, _))
+    }
+    pub(crate) const fn is_domain(&self) -> bool {
+        matches!(self, Self::Domain(_))
+    }
+    /// Ownership retained by a standalone type definition.
+    /// Table row types obtain ownership from their referenced relation.
+    pub const fn owner(&self) -> Option<&crate::sem::OwnerSpecification> {
+        match self {
+            Self::Enum(definition) => definition.owner(),
+            Self::CompositeType(definition) => definition.owner(),
+            Self::Domain(definition) => definition.owner(),
+            _ => None,
+        }
+    }
+    pub(crate) fn change_owner(&mut self, owner: &crate::sem::OwnerSpecification) -> bool {
+        match self {
+            Self::Enum(definition) => definition.change_owner(owner),
+            Self::CompositeType(definition) => definition.change_owner(owner),
+            Self::Domain(definition) => definition.change_owner(owner),
+            _ => return false,
+        }
+        true
+    }
+
     /// type is array?
     #[must_use]
     pub fn is_array(&self) -> Option<bool> {

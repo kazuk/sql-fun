@@ -1,43 +1,46 @@
-use crate::{
-    TrieMap,
-    sem::{
-        AnalysisError, CreateFunction, FullName, FunctionInfoRead, FunctionInfoWrite,
-        FunctionOverloadCollection,
-    },
+use crate::sem::{
+    AnalysisError, CreateFunction, FullName, FunctionInfoRead, FunctionInfoWrite,
+    FunctionOverloadCollection,
 };
+
+use std::collections::HashMap;
 
 use super::{SchemaCatalog, SchemaFileContext};
 
 #[derive(Debug, Default)]
-pub struct FunctionDefinitionCollection(TrieMap<FunctionOverloadCollection>);
+pub struct FunctionDefinitionCollection(HashMap<FullName, Vec<CreateFunction>>);
 
 impl FunctionDefinitionCollection {
-    pub fn get(&self, name: &FullName) -> Option<&FunctionOverloadCollection> {
-        self.0.get(&name.to_string())
+    pub(super) fn definitions(&self, name: &FullName) -> Vec<CreateFunction> {
+        self.0.get(name).cloned().unwrap_or_default()
     }
-
-    pub fn insert(&mut self, name: &FullName, create_function: &CreateFunction) {
-        let key = &name.to_string();
-        if let Some(overload_collection) = self.0.get_mut(key) {
-            overload_collection.append(create_function.overloads());
-        } else {
-            let mut overload_collection = FunctionOverloadCollection::default();
-            overload_collection.append(create_function.overloads());
-            self.0.insert(key, overload_collection);
+    pub(super) fn insert(&mut self, name: &FullName, create_function: &CreateFunction) {
+        let mut definitions = self.definitions(name);
+        for definition in create_function.split_definitions() {
+            let identity = definition.ownership_identity(name);
+            definitions.retain(|existing| existing.ownership_identity(name) != identity);
+            definitions.push(definition);
         }
+        self.0.insert(name.clone(), definitions);
     }
 }
 
 impl FunctionInfoRead for SchemaCatalog {
     fn get_function_impl(&self, name: &FullName) -> Option<FunctionOverloadCollection> {
-        let self_funcs = self.functions.get(name);
-        let base_funcs = self.base.get_function_impl(name);
-
-        match (self_funcs, base_funcs) {
-            (Some(s), Some(b)) => Some(s.clone().merged(b)),
-            (Some(s), None) => Some(s.clone()),
-            (None, Some(b)) => Some(b.clone()),
-            (None, None) => None,
+        let definitions = crate::sem::OwnershipInfoRead::routine_definitions(self, name);
+        if definitions.is_empty() {
+            return None;
+        }
+        let mut overloads = FunctionOverloadCollection::default();
+        for definition in definitions {
+            if definition.object_kind().code() == 20 {
+                overloads.append(definition.overloads());
+            }
+        }
+        if overloads.is_empty() {
+            None
+        } else {
+            Some(overloads)
         }
     }
 }

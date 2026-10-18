@@ -142,6 +142,30 @@ mod test_frozen_root {
 
 macro_rules! forward_catalog_reads {
     ($context:ty, $catalog:ident) => {
+        impl crate::sem::RoleInfoRead for $context {
+            fn role_by_name(&self, name: &str) -> Option<&crate::sem::Role> {
+                crate::sem::RoleInfoRead::role_by_name(self.$catalog(), name)
+            }
+        }
+        impl crate::sem::OwnershipInfoRead for $context {
+            fn schema_definition(&self, name: &str) -> Option<&crate::sem::CreateSchema> {
+                crate::sem::OwnershipInfoRead::schema_definition(self.$catalog(), name)
+            }
+
+            fn ownership_definitions(
+                &self,
+                kind: crate::sem::ObjectKind,
+                name: &crate::sem::FullName,
+            ) -> Vec<crate::sem::OwnedObjectDefinition> {
+                crate::sem::OwnershipInfoRead::ownership_definitions(self.$catalog(), kind, name)
+            }
+            fn routine_definitions(
+                &self,
+                name: &crate::sem::FullName,
+            ) -> Vec<crate::sem::CreateFunction> {
+                crate::sem::OwnershipInfoRead::routine_definitions(self.$catalog(), name)
+            }
+        }
         impl crate::sem::CastInfoRead for $context {
             fn get_assignment_cast(
                 &self,
@@ -267,6 +291,13 @@ macro_rules! forward_catalog_reads {
         }
 
         impl crate::sem::SequenceInfoRead for $context {
+            fn sequences_owned_by(
+                &self,
+                table: &crate::sem::TableName,
+            ) -> Vec<crate::sem::CreateSequence> {
+                crate::sem::SequenceInfoRead::sequences_owned_by(self.$catalog(), table)
+            }
+
             fn get_sequence_impl(
                 &self,
                 name: &crate::sem::FullName,

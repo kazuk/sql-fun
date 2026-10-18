@@ -299,3 +299,20 @@ impl crate::sem::ViewMergeInfoRead for BaseContext {
         todo!("catalog MERGE-eligible views, rules, triggers and action columns")
     }
 }
+
+impl crate::sem::RoleInfoRead for BaseContext {}
+impl crate::sem::OwnershipInfoRead for BaseContext {
+    fn routine_definitions(&self, name: &FullName) -> Vec<crate::sem::CreateFunction> {
+        self.get_function_impl(name)
+            .map_or_else(Vec::new, |overloads| {
+                crate::sem::CreateFunction::new(name, &overloads, &None).split_definitions()
+            })
+    }
+    fn ownership_definitions(
+        &self,
+        kind: crate::sem::ObjectKind,
+        name: &FullName,
+    ) -> Vec<crate::sem::OwnedObjectDefinition> {
+        crate::sem::ownership::model_definitions(self, kind, name)
+    }
+}

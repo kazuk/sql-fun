@@ -29,6 +29,13 @@ impl GetSourcePathWithSpan for AlterTable {
 }
 
 impl AlterTable {
+    pub(crate) fn applied_owner(&self) -> Option<&crate::sem::OwnerSpecification> {
+        self.commands
+            .iter()
+            .rev()
+            .find_map(AlterObjSubCommand::applied_owner)
+    }
+
     pub(crate) fn new(
         table: &TableName,
         commands: &[AlterObjSubCommand],
@@ -298,7 +305,7 @@ impl AlterView {
 
 #[derive(Debug, Clone)]
 pub enum AlterObjSubCommand {
-    ChangeOwner(String),
+    ChangeOwner(crate::sem::OwnerSpecification),
     SetColumnDefault(ColumnName, Box<SemScalarExpr>),
     AddConstraint(Constraint),
     ClusterOn(String),
@@ -311,8 +318,18 @@ pub enum AlterObjSubCommand {
 }
 
 impl AlterObjSubCommand {
-    pub(crate) fn change_owner(owner: &str) -> Self {
-        Self::ChangeOwner(owner.to_owned())
+    const fn applied_owner(&self) -> Option<&crate::sem::OwnerSpecification> {
+        if let Self::ChangeOwner(owner) = self
+            && owner.can_apply()
+        {
+            Some(owner)
+        } else {
+            None
+        }
+    }
+
+    pub(crate) fn resolved_owner(owner: &crate::sem::OwnerSpecification) -> Self {
+        Self::ChangeOwner(owner.clone())
     }
     pub(crate) fn column_default(column: &ColumnName, expression: &SemScalarExpr) -> Self {
         Self::SetColumnDefault(column.clone(), Box::new(expression.clone()))
@@ -348,7 +365,9 @@ pub fn analyze_alter_obj_change_owner<TParseContext>(
     let Some(new_owner) = cmd.get_newowner().get_rolename() else {
         AnalysisError::raise_unexpected_none("alter_table_cmd.newwoner")?
     };
-    Ok(AlterObjSubCommand::ChangeOwner(new_owner))
+    Ok(AlterObjSubCommand::resolved_owner(
+        &crate::sem::OwnerSpecification::named(&new_owner),
+    ))
 }
 
 #[cfg(test)]

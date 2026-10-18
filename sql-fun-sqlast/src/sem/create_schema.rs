@@ -7,14 +7,25 @@ use super::{AnalysisError, ParseContext, SemAst};
 /// analyzed [`crate::syn::CreateSchemaStmt`]
 #[derive(Debug, Clone)]
 pub struct CreateSchema {
+    owner: Option<crate::sem::OwnerSpecification>,
     name: String,
     #[expect(dead_code)]
     elements: Vec<SemAst>,
 }
 
 impl CreateSchema {
+    /// Retained ownership; None means no ownership information was supplied.
+    pub const fn owner(&self) -> Option<&crate::sem::OwnerSpecification> {
+        self.owner.as_ref()
+    }
+    /// Commit an ownership change, leaving the rest of the definition intact.
+    pub(crate) fn change_owner(&mut self, owner: &crate::sem::OwnerSpecification) {
+        self.owner = Some(owner.clone());
+    }
+
     pub(crate) fn new(name: &str, elements: &[SemAst]) -> Self {
         Self {
+            owner: None,
             name: name.to_owned(),
             elements: elements.to_vec(),
         }

@@ -1,5 +1,6 @@
 mod cast_info;
 mod func_info;
+mod ownership;
 mod sequence_info;
 mod table_info;
 mod type_info;
@@ -48,6 +49,7 @@ pub struct SchemaFileContext {
 
 #[derive(Debug)]
 pub(super) struct SchemaCatalog {
+    ownership: crate::sem::ownership::OwnershipCatalog,
     base: FrozenBaseContext,
     args: SqlFunArgs,
     metadata: ::sql_fun_core::SqlFunMetadata,
@@ -99,6 +101,7 @@ impl SchemaFileContext {
         let search_path = base.get_search_path().to_vec();
         Self {
             catalog: SchemaCatalog {
+                ownership: Default::default(),
                 base: base.clone(),
                 args: args.clone(),
                 metadata: metadata.clone(),
@@ -565,6 +568,16 @@ impl BaseParseContext for SchemaCatalog {
 }
 
 impl ParseContext for SchemaFileContext {
+    fn insert_role(&mut self, role: &crate::sem::Role) {
+        self.catalog.ownership.insert_role(role);
+    }
+    fn insert_owned_object(&mut self, definition: &crate::sem::OwnedObjectDefinition) {
+        self.catalog.ownership.insert(definition);
+    }
+    fn apply_alter_owner(self, alteration: &crate::sem::AlterOwner) -> Result<Self, AnalysisError> {
+        self.apply_ownership_change(alteration)
+    }
+
     fn resolve_cursor(&self, name: &str) -> Option<&crate::sem::CursorInfo> {
         self.cursors.cursor(name)
     }

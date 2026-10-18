@@ -10,6 +10,19 @@ use crate::{SqliteToken, syn::sqlite::Stmt};
 use ::sql_fun_core::IVec;
 
 impl SemAst {
+    /// Retain an analyzed ownership change.
+    pub fn alter_owner(alteration: &crate::sem::AlterOwner) -> Self {
+        Self::AlterOwner(alteration.clone())
+    }
+    /// Ownership semantics for this statement, when applicable.
+    pub const fn ownership_change(&self) -> Option<&crate::sem::AlterOwner> {
+        if let Self::AlterOwner(alteration) = self {
+            Some(alteration)
+        } else {
+            None
+        }
+    }
+
     /// analyze top-level SQL statement
     pub fn semantic_analysis<TParseContext>(
         context: TParseContext,

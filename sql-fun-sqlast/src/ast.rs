@@ -14,6 +14,7 @@ mod ddl;
 mod deparse;
 mod document;
 mod mutation;
+mod ownership;
 mod postgres;
 mod public;
 mod resolve;
@@ -193,7 +194,7 @@ pub(crate) enum AlterRelationKind {
 #[derive(Clone, Debug)]
 pub(crate) enum AlterCommand {
     Postgres(Box<ddl::PostgresAlterCommand>),
-    Owner(String),
+    Owner(Role),
     Default(String, Expr),
     Constraint(TableConstraint),
     Cluster(String),
@@ -366,9 +367,9 @@ impl StatementNode {
             Self::Comment(_) => crate::sem::AnalysisError::raise_unexpected_input(
                 "comment requires catalog application",
             ),
-            Self::AlterOwner(_) => {
-                Ok(crate::sem::SemAst::AlterOwner(crate::sem::AlterOwner::new()))
-            }
+            Self::AlterOwner(alteration) => alteration
+                .resolve(context)
+                .map(|alteration| crate::sem::SemAst::alter_owner(&alteration)),
             Self::CompositeType(composite_type) => composite_type
                 .resolve()
                 .map(crate::sem::SemAst::CreateCompType),
@@ -414,10 +415,7 @@ impl StatementNode {
             Self::DropTable(drop_table) => drop_table.apply(context),
             Self::AlterSequence(alter_sequence) => alter_sequence.apply(context),
             Self::Comment(comment) => comment.apply(context),
-            Self::AlterOwner(_) => Ok(crate::AstAndContextPair::new(
-                crate::sem::SemAst::AlterOwner(crate::sem::AlterOwner::new()),
-                context,
-            )),
+            Self::AlterOwner(alteration) => alteration.resolve_and_apply(context),
             Self::CompositeType(composite_type) => composite_type.resolve_and_apply(context),
             Self::AlterRelation(statement) => statement.resolve_and_apply(context),
             Self::Domain(domain) => domain.resolve_and_apply(context),
@@ -602,7 +600,25 @@ impl AlterSequence {
     where
         TContext: crate::sem::ParseContext,
     {
-        let alter_sequence = crate::sem::AlterSequence::new(&self.name.full_name()?, &[]);
+        let mut context = context;
+        let mut alter_sequence = crate::sem::AlterSequence::new(&self.name.full_name()?, &[]);
+        for option in &self.options {
+            if option.name == "owned_by" {
+                let relation = if let Some(requested) = option.owned_relation()? {
+                    if let Some(relation) = context.resolve_table_name(&requested) {
+                        Some(relation)
+                    } else {
+                        context.report_analysis_problem(
+                            crate::sem::AnalysisProblem::table_not_found(&requested),
+                        )?;
+                        continue;
+                    }
+                } else {
+                    None
+                };
+                alter_sequence = alter_sequence.with_owned_by(relation.as_ref());
+            }
+        }
         let context = context.apply_alter_sequence(&alter_sequence)?;
         Ok(crate::AstAndContextPair::new(
             crate::sem::SemAst::AlterSequence(alter_sequence),
@@ -683,12 +699,24 @@ impl Sequence {
 
     fn apply<TContext>(
         &self,
-        context: TContext,
+        mut context: TContext,
     ) -> Result<crate::AstAndContextPair<TContext>, crate::sem::AnalysisError>
     where
         TContext: crate::sem::ParseContext,
     {
-        let sequence = crate::sem::CreateSequence::new(&self.name.full_name()?);
+        let mut sequence = crate::sem::CreateSequence::new(&self.name.full_name()?);
+        for option in &self.options {
+            if let Some(table) = option.owned_relation()? {
+                let Some(resolved) = context.resolve_table_name(&table) else {
+                    context.report_analysis_problem(
+                        crate::sem::AnalysisProblem::table_not_found(&table),
+                    )?;
+                    continue;
+                };
+                let table = resolved;
+                sequence.set_owned_by(&table);
+            }
+        }
         let context = context.apply_create_sequence(&sequence)?;
         Ok(crate::AstAndContextPair::new(
             crate::sem::SemAst::CreateSequence(sequence),

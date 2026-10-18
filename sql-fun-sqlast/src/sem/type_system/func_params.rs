@@ -99,6 +99,13 @@ mod test_function_param_display {
 }
 
 impl FunctionParam {
+    pub(crate) fn identity_argument(&self) -> Option<Option<TypeReference>> {
+        match self {
+            Self::In(_) | Self::InOut(_) | Self::Variadic(_) => Some(self.get_type().cloned()),
+            Self::Out(_) | Self::Table(_) => None,
+        }
+    }
+
     pub(crate) fn new_in_out_param(
         name: &Option<String>,
         param_type: &Option<TypeReference>,

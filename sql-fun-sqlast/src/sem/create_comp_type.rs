@@ -36,15 +36,29 @@ impl CompositeFieldCollection {
 }
 
 /// analyzed [`crate::syn::CompositeTypeStmt`]
-#[derive(Debug, Clone, Eq, Hash, PartialEq, serde::Serialize, serde::Deserialize)]
+#[derive(Debug, Clone, serde::Serialize, serde::Deserialize)]
 pub struct CreateCompositeType {
+    #[serde(skip)]
+    owner: Option<crate::sem::OwnerSpecification>,
     type_ref: Option<TypeReference>,
     fields: CompositeFieldCollection,
 }
 
 impl CreateCompositeType {
+    /// Retained ownership; None means no ownership information was supplied.
+    /// Ownership is catalog state: it is omitted from the existing serialized
+    /// type format and does not affect SQL type equality or hashing.
+    pub const fn owner(&self) -> Option<&crate::sem::OwnerSpecification> {
+        self.owner.as_ref()
+    }
+    /// Commit an ownership change, leaving the rest of the definition intact.
+    pub(crate) fn change_owner(&mut self, owner: &crate::sem::OwnerSpecification) {
+        self.owner = Some(owner.clone());
+    }
+
     pub(crate) fn new(name: &FullName, fields: &CompositeFieldCollection) -> Self {
         Self {
+            owner: None,
             type_ref: Some(TypeReference::from_full_name(name.clone())),
             fields: fields.clone(),
         }
@@ -82,6 +96,7 @@ impl CreateCompositeType {
     #[must_use]
     pub fn from_fields(fields: &CompositeFieldCollection) -> Self {
         Self {
+            owner: None,
             type_ref: None,
             fields: fields.clone(),
         }
@@ -164,5 +179,19 @@ impl TryFrom<&ColumnDef> for CompositeFieldDefinition {
             field_type: Some(type_ref),
             is_not_null: Some(value.get_is_not_null()),
         })
+    }
+}
+
+// Ownership changes do not change SQL type identity or the existing serialized type format.
+impl PartialEq for CreateCompositeType {
+    fn eq(&self, other: &Self) -> bool {
+        self.type_ref == other.type_ref && self.fields == other.fields
+    }
+}
+impl Eq for CreateCompositeType {}
+impl std::hash::Hash for CreateCompositeType {
+    fn hash<H: std::hash::Hasher>(&self, state: &mut H) {
+        std::hash::Hash::hash(&self.type_ref, state);
+        std::hash::Hash::hash(&self.fields, state);
     }
 }

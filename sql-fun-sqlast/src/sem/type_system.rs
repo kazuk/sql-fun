@@ -51,6 +51,13 @@ pub struct OverloadVariant {
 }
 
 impl OverloadVariant {
+    pub(crate) fn identity_arguments(&self) -> Vec<Option<TypeReference>> {
+        self.params
+            .iter()
+            .filter_map(FunctionParam::identity_argument)
+            .collect()
+    }
+
     /// apply simple infer result
     pub fn apply_simple_infer_result(&mut self, infer_result_type: &TypeReference) {
         if let Some(t) = self.ret_type.as_mut() {

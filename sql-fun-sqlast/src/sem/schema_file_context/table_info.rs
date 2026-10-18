@@ -3,20 +3,20 @@ use crate::sem::{
     ParseContext, TableInfoRead, TableInfoWrite, TableName, search_path::expand_search_path_inst,
 };
 
-use std::collections::HashMap;
+use crate::TrieMap;
 
 use super::{SchemaCatalog, SchemaFileContext};
 
 #[derive(Debug, Default)]
-pub struct TableDefinitionCollection(HashMap<FullName, CreateTable>);
+pub struct TableDefinitionCollection(TrieMap<CreateTable>);
 
 impl TableDefinitionCollection {
     pub(super) fn insert_create_table(&mut self, name: &FullName, create_table: &CreateTable) {
-        self.0.insert(name.clone(), create_table.clone());
+        self.0.insert(&name.catalog_key(), create_table.clone());
     }
 
     fn get(&self, name: &FullName) -> Option<&CreateTable> {
-        self.0.get(name)
+        self.0.get(&name.catalog_key())
     }
 
     fn apply_alter(

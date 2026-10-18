@@ -3,12 +3,12 @@ use crate::sem::{
     SequenceInfoRead, SequenceInfoWrite,
 };
 
-use std::collections::HashMap;
+use crate::TrieMap;
 
 use super::{SchemaCatalog, SchemaFileContext};
 
 #[derive(Debug, Default)]
-pub struct SequenceInfoCollection(HashMap<FullName, CreateSequence>);
+pub struct SequenceInfoCollection(TrieMap<CreateSequence>);
 
 impl SequenceInfoCollection {
     fn owned_by(&self, table: &crate::sem::TableName) -> Vec<CreateSequence> {
@@ -20,11 +20,11 @@ impl SequenceInfoCollection {
     }
 
     fn get(&self, key: &FullName) -> Option<&CreateSequence> {
-        self.0.get(key)
+        self.0.get(&key.catalog_key())
     }
 
     pub(super) fn insert(&mut self, key: &FullName, definition: &CreateSequence) {
-        self.0.insert(key.clone(), definition.clone());
+        self.0.insert(&key.catalog_key(), definition.clone());
     }
 }
 

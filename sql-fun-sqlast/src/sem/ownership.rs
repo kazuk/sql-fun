@@ -259,45 +259,63 @@ pub trait OwnershipInfoRead {
 impl ObjectKind {
     pub(crate) fn accepts_owner_kind(self, actual: Self) -> bool {
         self == actual
-            || (self.code() == 35 && matches!(actual.code(), 20 | 30))
-            || (self.code() == 50 && actual.code() == 13)
+            || (self == Self::ROUTINE && matches!(actual, Self::FUNCTION | Self::PROCEDURE))
+            || (self == Self::TYPE && actual == Self::DOMAIN)
     }
     pub(crate) const fn owner_schema_scoped(self) -> bool {
         matches!(
-            self.code(),
-            2 | 8 | 9 | 13 | 20 | 24 | 25 | 26 | 27 | 30 | 35 | 38 | 40 | 42 | 46 | 47 | 50 | 52
+            self,
+            Self::AGGREGATE
+                | Self::COLLATION
+                | Self::CONVERSION
+                | Self::DOMAIN
+                | Self::FUNCTION
+                | Self::MATERIALIZED_VIEW
+                | Self::OPERATOR_CLASS
+                | Self::OPERATOR
+                | Self::OPERATOR_FAMILY
+                | Self::PROCEDURE
+                | Self::ROUTINE
+                | Self::SEQUENCE
+                | Self::STATISTICS
+                | Self::TABLE
+                | Self::TEXT_SEARCH_CONFIGURATION
+                | Self::TEXT_SEARCH_DICTIONARY
+                | Self::TYPE
+                | Self::VIEW
         )
     }
     pub(crate) const fn valid_owner_kind(self) -> bool {
         matches!(
-            self.code(),
-            2 | 8
-                | 9
-                | 10
-                | 13
-                | 15
-                | 17
-                | 18
-                | 20
-                | 22
-                | 23
-                | 24
-                | 25
-                | 26
-                | 27
-                | 30
-                | 31
-                | 35
-                | 37
-                | 38
-                | 39
-                | 40
-                | 42
-                | 43
-                | 46
-                | 47
-                | 50
-                | 52
+            self,
+            Self::AGGREGATE
+                | Self::COLLATION
+                | Self::CONVERSION
+                | Self::DATABASE
+                | Self::DOMAIN
+                | Self::EVENT_TRIGGER
+                | Self::FOREIGN_DATA_WRAPPER
+                | Self::FOREIGN_SERVER
+                | Self::FUNCTION
+                | Self::LANGUAGE
+                | Self::LARGE_OBJECT
+                | Self::MATERIALIZED_VIEW
+                | Self::OPERATOR_CLASS
+                | Self::OPERATOR
+                | Self::OPERATOR_FAMILY
+                | Self::PROCEDURE
+                | Self::PUBLICATION
+                | Self::ROUTINE
+                | Self::SCHEMA
+                | Self::SEQUENCE
+                | Self::SUBSCRIPTION
+                | Self::STATISTICS
+                | Self::TABLE
+                | Self::TABLESPACE
+                | Self::TEXT_SEARCH_CONFIGURATION
+                | Self::TEXT_SEARCH_DICTIONARY
+                | Self::TYPE
+                | Self::VIEW
         )
     }
 }
@@ -342,26 +360,26 @@ pub(crate) fn model_definitions<C: crate::sem::BaseParseContext + ?Sized>(
     name: &FullName,
 ) -> Vec<OwnedObjectDefinition> {
     let mut identity = OwnershipIdentity::named(kind, name);
-    let owner = match kind.code() {
-        42 => context
+    let owner = match kind {
+        ObjectKind::TABLE => context
             .get_table_impl(name)
             .map(|definition| definition.owner()),
-        38 => context
+        ObjectKind::SEQUENCE => context
             .get_sequence_impl(name)
             .map(|definition| definition.owner()),
-        24 | 52 => context
+        ObjectKind::MATERIALIZED_VIEW | ObjectKind::VIEW => context
             .get_view_impl(name)
-            .filter(|view| view.is_materialized() == (kind.code() == 24))
+            .filter(|view| view.is_materialized() == (kind == ObjectKind::MATERIALIZED_VIEW))
             .map(|view| view.owner()),
-        37 => context
+        ObjectKind::SCHEMA => context
             .schema_definition(name.name().as_str())
             .map(|definition| definition.owner()),
-        13 | 50 => context
+        ObjectKind::DOMAIN | ObjectKind::TYPE => context
             .get_type_impl(name)
-            .filter(|definition| kind.code() == 50 || definition.is_domain())
+            .filter(|definition| kind == ObjectKind::TYPE || definition.is_domain())
             .map(|definition| {
                 if definition.is_domain() {
-                    identity = OwnershipIdentity::named(ObjectKind::from(13), name);
+                    identity = OwnershipIdentity::named(ObjectKind::DOMAIN, name);
                 }
                 if definition.is_relation_type() {
                     if let Some(table) = context.get_table_impl(name) {
@@ -373,7 +391,7 @@ pub(crate) fn model_definitions<C: crate::sem::BaseParseContext + ?Sized>(
                     definition.owner()
                 }
             }),
-        20 | 30 | 35 => {
+        ObjectKind::FUNCTION | ObjectKind::PROCEDURE | ObjectKind::ROUTINE => {
             return context
                 .routine_definitions(name)
                 .into_iter()

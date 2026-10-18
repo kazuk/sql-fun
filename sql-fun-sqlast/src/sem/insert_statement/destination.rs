@@ -12,6 +12,37 @@ pub(crate) struct InsertDestination {
     merge_view_support: Option<ViewMergeSupport>,
 }
 impl InsertDestination {
+    /// Rule definition analysis binds the destination shape without evaluating whether a future write can execute.
+    pub(crate) fn resolve_rule_target(
+        context: &impl ParseContext,
+        requested: &TableName,
+    ) -> Result<Option<Self>, AnalysisError> {
+        if let Some(destination) = crate::sem::search_path::expand_search_path_inst(
+            context,
+            requested.full_name(),
+            |key| {
+                if context.get_table_impl(key).is_some() {
+                    return Some(
+                        Self::resolve(context, &TableName::from(key.clone()))
+                            .map(|value| value.expect("resolved table")),
+                    );
+                }
+                context.get_view_impl(key).map(|view| {
+                    Ok(Self {
+                        name: TableName::from(key.clone()),
+                        columns: view.result_columns().column_definitions()?,
+                        table: None,
+                        view_support: None,
+                        merge_view_support: None,
+                    })
+                })
+            },
+        ) {
+            destination.map(Some)
+        } else {
+            Self::resolve(context, requested)
+        }
+    }
     pub(crate) fn resolve(
         context: &impl ParseContext,
         requested: &TableName,

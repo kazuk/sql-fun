@@ -58,21 +58,30 @@ impl DataSource {
         } else {
             name
         };
-        if context.get_table(&TableName::from(name.clone())).is_some() {
-            Ok(TableDataSource::new_data_source(
-                &TableName::from(name.clone()),
+        let resolved = crate::sem::search_path::expand_search_path_inst(context, name, |key| {
+            if context.get_table_impl(key).is_some() {
+                Some((key.clone(), true))
+            } else if context.get_view_impl(key).is_some() {
+                Some((key.clone(), false))
+            } else {
+                None
+            }
+        });
+        match resolved {
+            Some((name, true)) => Ok(TableDataSource::new_data_source(
+                &TableName::from(name),
                 alias,
-            ))
-        } else if context.get_view(&ViewName::from_full_name(name)).is_some() {
-            Ok(Self::View(ViewDataSource::from_name(
-                &ViewName::from_full_name(name),
+            )),
+            Some((name, false)) => Ok(Self::View(ViewDataSource::from_name(
+                &ViewName::from_full_name(&name),
                 alias,
-            )))
-        } else {
-            context.report_analysis_problem(AnalysisProblem::relation_not_found(
-                &TableName::from(name.clone()),
-            ))?;
-            Ok(Self::unknown(&name.to_string(), alias))
+            ))),
+            None => {
+                context.report_analysis_problem(AnalysisProblem::relation_not_found(
+                    &TableName::from(name.clone()),
+                ))?;
+                Ok(Self::unknown(&name.to_string(), alias))
+            }
         }
     }
 

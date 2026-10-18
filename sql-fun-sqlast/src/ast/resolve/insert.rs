@@ -44,7 +44,12 @@ impl Insert {
             name
         };
         let requested = TableName::from(name);
-        let Some(table) = InsertDestination::resolve(context, &requested)? else {
+        let destination = if outer.is_some_and(ScalarAnalysisContext::in_rule_definition) {
+            InsertDestination::resolve_rule_target(context, &requested)?
+        } else {
+            InsertDestination::resolve(context, &requested)?
+        };
+        let Some(table) = destination else {
             context.report_analysis_problem(AnalysisProblem::relation_not_found(&requested))?;
             return Err(AnalysisError::unexpected_input_error(
                 "INSERT destination relation not found",
@@ -82,7 +87,7 @@ impl Insert {
         let name = table.name().clone();
         let with = self.with.resolve(context, outer)?;
         let empty = FromClause::default();
-        let source_scope = ScalarAnalysisContext::nested(&with, &empty, outer);
+        let source_scope = ScalarAnalysisContext::rule_action_source(&with, &empty, outer);
         let source = self
             .source
             .as_ref()
@@ -111,7 +116,10 @@ impl Insert {
             &alias,
             &WithClause::default(),
         )?);
-        let scope = ScalarAnalysisContext::nested(&with, &from, None);
+        if let Some(outer) = outer {
+            outer.validate_rule_sources(context, &from)?;
+        }
+        let scope = ScalarAnalysisContext::nested(&with, &from, outer);
         let implicit_width = if context.dialect() == Dialect::postgres() {
             if self.source.is_some() {
                 Some(source.width())
@@ -146,7 +154,11 @@ impl Insert {
             &returning_alias,
             &WithClause::default(),
         )?);
-        let returning_scope = ScalarAnalysisContext::nested(&with, &returning_from, None);
+        let returning_scope = ScalarAnalysisContext::nested(
+            &with,
+            &returning_from,
+            outer.and_then(|scope| scope.insert_returning_outer(context)),
+        );
         let returning = ResultColumnCollection::resolve_for_insert(
             &self.returning,
             context,

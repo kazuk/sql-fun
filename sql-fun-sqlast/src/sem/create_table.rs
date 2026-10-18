@@ -117,6 +117,7 @@ pub struct CreateTable {
     name: TableName,
     columns: ColumnCollection,
     triggers: crate::sem::TriggerReferences,
+    rules: crate::sem::RuleReferences,
     alter_statements: Vec<AlterTable>,
     drop_statements: Vec<DropTable>,
     owner: Option<crate::sem::OwnerSpecification>,
@@ -195,6 +196,17 @@ impl GetSourcePathWithSpan for CreateTable {
 }
 
 impl CreateTable {
+    /// Rule links owned by this relation; resolve against the effective context.
+    pub const fn rules(&self) -> &crate::sem::RuleReferences {
+        &self.rules
+    }
+    pub(crate) fn associate_rule(&mut self, identity: &crate::sem::RuleIdentity) {
+        self.rules.associate(identity);
+    }
+    pub(crate) fn dissociate_rule(&mut self, identity: &crate::sem::RuleIdentity) {
+        self.rules.dissociate(identity);
+    }
+
     /// Retained ownership; None means no ownership information was supplied.
     pub const fn owner(&self) -> Option<&crate::sem::OwnerSpecification> {
         self.owner.as_ref()
@@ -223,6 +235,7 @@ impl CreateTable {
         Self {
             name: name.clone(),
             triggers: crate::sem::TriggerReferences::default(),
+            rules: crate::sem::RuleReferences::default(),
             columns: ColumnCollection(columns),
             alter_statements: Default::default(),
             drop_statements: Default::default(),

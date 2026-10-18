@@ -368,7 +368,9 @@ impl StatementNode {
             Self::Merge(merge) => merge
                 .resolve(context)
                 .map(|merge| crate::sem::SemAst::merge(&merge)),
-            Self::CreateRule(_) => todo!("CREATE RULE semantic analysis: #604"),
+            Self::CreateRule(rule) => rule
+                .resolve(context)
+                .map(|rule| crate::sem::SemAst::create_rule(&rule)),
             Self::DropTrigger(_) => todo!("DROP TRIGGER semantic analysis: #555"),
             Self::CreateTrigger(trigger) => trigger
                 .resolve(context)
@@ -440,6 +442,7 @@ impl StatementNode {
         context.set_parameter_constraints(&crate::sem::ParameterConstraints::default());
         match self {
             Self::CreateTrigger(trigger) => trigger.resolve_and_apply(context),
+            Self::CreateRule(rule) => rule.resolve_and_apply(context),
             Self::View(view) => view.resolve_and_apply(context),
             Self::Extension(extension) => extension.apply(context),
             Self::VariableSet(variable_set) => variable_set.resolve_and_apply(context),
@@ -923,10 +926,26 @@ impl View {
                 context,
             ));
         };
-        let view = crate::sem::CreateView::new(&name, &query, &[], &None, self.materialized);
+        let mut view = crate::sem::CreateView::new(&name, &query, &[], &None, self.materialized);
+        let replacement_rule = if self.replace {
+            if let Some(references) = context
+                .get_view_impl(&name)
+                .and_then(crate::sem::ViewLike::rules)
+            {
+                view.retain_rule_references(references);
+            }
+            crate::sem::CreateRule::replace_view_definition(&context, &name, &query)?
+        } else {
+            None
+        };
         let context = context
             .apply_create_view(&view)?
             .apply_view_write_info(&name, &info)?;
+        let context = if let Some(rule) = replacement_rule {
+            context.register_rule(&rule)?
+        } else {
+            context
+        };
         Ok(crate::AstAndContextPair::new(
             crate::sem::SemAst::CreateView(view),
             context,

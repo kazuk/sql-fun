@@ -3,6 +3,7 @@ pub(in crate::ast) mod insert;
 mod placement;
 mod query;
 mod returning;
+mod rule;
 mod trigger;
 mod update;
 
@@ -524,6 +525,13 @@ impl Subquery {
         context: &mut impl ParseContext,
         scope: &ScalarAnalysisContext<'_>,
     ) -> Result<SemScalarExpr, AnalysisError> {
+        if let Some(identity) = scope.rule_identity()
+            && let Some(detail) = self.kind.pending_rule_semantics()
+        {
+            return Err(AnalysisError::rule(
+                &crate::sem::problem::RuleProblem::definition(identity, detail),
+            ));
+        }
         let query = self.query.resolve_in(context, Some(scope))?;
         SemScalarExpr::subquery(&query)
     }

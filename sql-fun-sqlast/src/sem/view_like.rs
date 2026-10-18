@@ -12,6 +12,37 @@ pub enum ViewLike {
 }
 
 impl ViewLike {
+    pub(crate) fn with_rule_query(
+        &self,
+        query: &crate::sem::SelectStatement,
+    ) -> Option<CreateView> {
+        if let Self::View(view) = self {
+            let mut view = view.as_ref().clone();
+            view.replace_rule_query(query);
+            Some(view)
+        } else {
+            None
+        }
+    }
+
+    /// Rule links of an ordinary view; materialized views cannot own user rules.
+    pub fn rules(&self) -> Option<&crate::sem::RuleReferences> {
+        match self {
+            Self::View(view) => Some(view.rules()),
+            Self::MaterializedView(_) => None,
+        }
+    }
+    pub(crate) fn associate_rule(&mut self, identity: &crate::sem::RuleIdentity) {
+        if let Self::View(view) = self {
+            view.associate_rule(identity);
+        }
+    }
+    pub(crate) fn dissociate_rule(&mut self, identity: &crate::sem::RuleIdentity) {
+        if let Self::View(view) = self {
+            view.dissociate_rule(identity);
+        }
+    }
+
     /// Ownership of the retained view or materialized-view definition.
     pub fn owner(&self) -> Option<&crate::sem::OwnerSpecification> {
         match self {

@@ -7,6 +7,24 @@ pub(crate) struct DeleteDestination {
     view_support: Option<ViewDeleteSupport>,
 }
 impl DeleteDestination {
+    /// Bind a rule action destination without evaluating later execution eligibility.
+    pub(crate) fn resolve_rule_target(
+        context: &impl ParseContext,
+        requested: &TableName,
+    ) -> Option<Self> {
+        crate::sem::search_path::expand_search_path_inst(context, requested.full_name(), |key| {
+            if context.get_table_impl(key).is_some() || context.get_view_impl(key).is_some() {
+                Some(Self {
+                    name: TableName::from(key.clone()),
+                    found: true,
+                    view_support: None,
+                })
+            } else {
+                None
+            }
+        })
+    }
+
     pub(crate) fn resolve(context: &impl ParseContext, requested: &TableName) -> Option<Self> {
         crate::sem::search_path::expand_search_path_inst(context, requested.full_name(), |key| {
             let canonical;

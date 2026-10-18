@@ -16,6 +16,7 @@ mod create_enum_type;
 mod create_extension;
 mod create_function;
 mod create_index;
+mod create_rule;
 mod create_schema;
 mod create_seq;
 mod create_table;
@@ -53,6 +54,9 @@ mod update_statement;
 mod variable_set;
 mod view_like;
 pub(crate) mod view_write;
+pub use self::create_rule::{
+    CreateRule, RuleDependencies, RuleEvent, RuleIdentity, RuleReferences,
+};
 pub use self::create_trigger::{
     CreateTrigger, TriggerBody, TriggerConstraint, TriggerDependencies, TriggerEvent,
     TriggerEventColumn, TriggerFunction, TriggerGranularity, TriggerIdentity, TriggerReferences,
@@ -287,6 +291,8 @@ impl From<CreateIndex> for ImplicitChange {
 pub enum SemAst {
     /// A resolved CREATE TRIGGER statement.
     CreateTrigger(Box<CreateTrigger>),
+    /// Analyzed PostgreSQL CREATE RULE.
+    CreateRule(Box<CreateRule>),
     /// A statement whose semantic resolution failed recoverably.
     /// Diagnostics are retained by the context; no catalog definition is applied.
     UnresolvedStatement,
@@ -365,16 +371,13 @@ pub enum SemAst {
 }
 
 impl SemAst {
-    pub(crate) fn walk_trigger_command<V: self::traversal::SemanticVisitor>(
+    pub(crate) fn walk_nested_command<V: self::traversal::SemanticVisitor>(
         &mut self,
         visitor: &mut V,
     ) -> Result<(), AnalysisError> {
         match self {
             Self::SelectStatement(query) => query.walk(visitor),
-            Self::InsertStatement(insert) => {
-                visitor.relation_identity(insert.target().full_name());
-                insert.walk(visitor)
-            }
+            Self::InsertStatement(insert) => insert.walk(visitor),
             Self::UpdateStatement(update) => {
                 visitor.relation_identity(update.target().full_name());
                 update.walk(visitor)
@@ -383,10 +386,30 @@ impl SemAst {
                 visitor.relation_identity(delete.target().full_name());
                 delete.walk(visitor)
             }
-            _ => unreachable!("only resolved SQLite trigger commands are traversed here"),
+            _ => unreachable!("only resolved common query/DML actions are traversed here"),
         }
     }
 
+    /// Retain an analyzed rule definition.
+    pub fn create_rule(rule: &CreateRule) -> Self {
+        Self::CreateRule(Box::new(rule.clone()))
+    }
+    /// Inspect the statement-specific rule definition.
+    pub fn rule(&self) -> Option<&CreateRule> {
+        if let Self::CreateRule(rule) = self {
+            Some(rule)
+        } else {
+            None
+        }
+    }
+    pub(crate) fn rule_returning(&self) -> Option<&ResultColumnCollection> {
+        match self {
+            Self::InsertStatement(statement) => Some(statement.result_columns()),
+            Self::UpdateStatement(statement) => Some(statement.result_columns()),
+            Self::DeleteStatement(statement) => Some(statement.result_columns()),
+            _ => None,
+        }
+    }
     /// Retain a resolved trigger statement.
     pub fn create_trigger(trigger: &CreateTrigger) -> Self {
         Self::CreateTrigger(Box::new(trigger.clone()))
@@ -395,6 +418,14 @@ impl SemAst {
     pub fn trigger(&self) -> Option<&CreateTrigger> {
         if let Self::CreateTrigger(trigger) = self {
             Some(trigger)
+        } else {
+            None
+        }
+    }
+    /// Inspect a resolved SELECT/query statement, including a rule action.
+    pub fn select_statement(&self) -> Option<&SelectStatement> {
+        if let Self::SelectStatement(query) = self {
+            Some(query)
         } else {
             None
         }

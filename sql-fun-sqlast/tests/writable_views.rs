@@ -389,35 +389,30 @@ CREATE VIEW public.v AS SELECT id AS key, value, calc, value+1 AS computed FROM 
     true,
     true
 )]
-#[ignore = "CREATE RULE no longer registers legacy metadata; semantic definitions/apply owned by #604"]
 #[case::insert_rule(
     "CREATE RULE ri AS ON INSERT TO public.v DO INSTEAD NOTHING;",
     true,
     false,
     false
 )]
-#[ignore = "CREATE RULE no longer registers legacy metadata; semantic definitions/apply owned by #604"]
 #[case::update_rule(
     "CREATE RULE ru AS ON UPDATE TO public.v DO INSTEAD NOTHING;",
     false,
     true,
     false
 )]
-#[ignore = "CREATE RULE no longer registers legacy metadata; semantic definitions/apply owned by #604"]
 #[case::rule_returning(
     "CREATE RULE ri AS ON INSERT TO public.v DO INSTEAD INSERT INTO public.items VALUES(NEW.id) RETURNING id;",
     true,
     false,
     true
 )]
-#[ignore = "CREATE RULE no longer registers legacy metadata; semantic definitions/apply owned by #604"]
 #[case::conditional_rule(
     "CREATE RULE ri AS ON INSERT TO public.v WHERE NEW.id > 0 DO INSTEAD NOTHING;",
     false,
     false,
     false
 )]
-#[ignore = "CREATE RULE no longer registers legacy metadata; semantic definitions/apply owned by #604"]
 #[case::additional_rule(
     "CREATE RULE ri AS ON INSERT TO public.v DO ALSO INSERT INTO public.items VALUES(NEW.id);",
     false,
@@ -640,28 +635,24 @@ CREATE OR REPLACE VIEW public.v AS SELECT DISTINCT id FROM public.items;
 }
 
 #[rstest::rstest]
-#[ignore = "CREATE RULE no longer registers legacy metadata; semantic definitions/apply owned by #604"]
 #[case::conditional(
     "CREATE RULE r AS ON INSERT TO public.v WHERE NEW.id>0 DO INSTEAD NOTHING;",
     false,
     false,
     false
 )]
-#[ignore = "CREATE RULE no longer registers legacy metadata; semantic definitions/apply owned by #604"]
 #[case::additional(
     "CREATE RULE r AS ON INSERT TO public.v DO ALSO INSERT INTO public.audit VALUES(NEW.id);",
     true,
     true,
     true
 )]
-#[ignore = "CREATE RULE no longer registers legacy metadata; semantic definitions/apply owned by #604"]
 #[case::additional_update(
     "CREATE RULE r AS ON UPDATE TO public.v DO ALSO INSERT INTO public.audit VALUES(NEW.id);",
     true,
     true,
     true
 )]
-#[ignore = "CREATE RULE no longer registers legacy metadata; semantic definitions/apply owned by #604"]
 #[case::instead(
     "CREATE RULE r AS ON INSERT TO public.v DO INSTEAD NOTHING;",
     true,
@@ -759,7 +750,7 @@ fn materialized_views_are_not_write_destinations() -> Result<(), Box<dyn std::er
 }
 
 #[test]
-#[ignore = "CREATE RULE no longer registers legacy metadata; semantic definitions/apply owned by #604"]
+#[ignore = "DROP RULE semantic analysis/application remains owned by #605"]
 fn defaults_and_rule_drops_change_only_the_child() -> Result<(), Box<dyn std::error::Error>> {
     let schema = ViewSchema::postgres(
         "CREATE TABLE public.items(id int DEFAULT 7); CREATE VIEW public.v AS SELECT DISTINCT id FROM public.items; CREATE RULE r AS ON INSERT TO public.v DO INSTEAD NOTHING;",
@@ -833,9 +824,7 @@ fn declared_function_properties(
 }
 
 #[rstest::rstest]
-#[ignore = "production pg_settings rules reach CREATE RULE semantic todo; restore after #604"]
 #[case::postgres17("17")]
-#[ignore = "production pg_settings rules reach CREATE RULE semantic todo; restore after #604"]
 #[case::postgres18("18")]
 fn extracted_builtin_rules_reach_production_analysis(
     #[case] version: &str,
@@ -994,16 +983,6 @@ CREATE VIEW public.alias_cast AS SELECT x::integer AS x FROM public.items AS i(x
 }
 
 #[rstest::rstest]
-#[ignore = "CREATE RULE diagnostics require the new semantic definition/registration model in #604"]
-#[case::target(
-    "CREATE RULE r AS ON INSERT TO public.absent DO INSTEAD NOTHING",
-    "view_invalid_target"
-)]
-#[ignore = "CREATE RULE diagnostics require the new semantic definition/registration model in #604"]
-#[case::table(
-    "CREATE RULE r AS ON INSERT TO public.items DO INSTEAD NOTHING",
-    "view_invalid_target"
-)]
 #[case::missing_alter(
     "ALTER VIEW public.absent ALTER COLUMN id SET DEFAULT 2",
     "view_invalid_target"
@@ -1011,11 +990,6 @@ CREATE VIEW public.alias_cast AS SELECT x::integer AS x FROM public.items AS i(x
 #[case::table_alter(
     "ALTER VIEW public.items ALTER COLUMN id SET DEFAULT 2",
     "view_invalid_target"
-)]
-#[ignore = "CREATE RULE diagnostics require the new semantic definition/registration model in #604"]
-#[case::duplicate(
-    "CREATE RULE r AS ON INSERT TO public.item_view DO INSTEAD NOTHING; CREATE RULE r AS ON INSERT TO public.item_view DO INSTEAD NOTHING",
-    "view_duplicate_object"
 )]
 #[ignore = "DROP RULE no longer uses legacy metadata; semantic definition/registration owned by #605"]
 #[case::missing("DROP RULE absent ON public.item_view", "view_missing_object")]
@@ -1046,8 +1020,6 @@ fn invalid_view_declarations_are_structured(
     #[case] sql: &str,
     #[case] code: &str,
 ) -> Result<(), Box<dyn std::error::Error>> {
-    // Unrelated diagnostics do not require a rule definition. Keep the duplicate
-    // rule setup in its own case so the staged #604 gap does not disable them.
     let schema = ViewSchema::postgres(AUTOMATIC)?;
     let problems = schema.query_problems(&format!("{sql}; SELECT 1"))?;
     assert!(
@@ -1162,5 +1134,68 @@ fn view_declaration_requires_a_selected_schema() -> Result<(), Box<dyn std::erro
             .iter()
             .any(|problem| problem.code() == "view_invalid_target")
     );
+    Ok(())
+}
+
+#[test]
+fn select_rule_replacement_refreshes_view_facts_in_the_child()
+-> Result<(), Box<dyn std::error::Error>> {
+    let schema = ViewSchema::postgres(
+        "CREATE TABLE public.items(id integer); CREATE VIEW public.v AS SELECT id FROM public.items;",
+    )?;
+    let name = FullName::with_schema("public", "v");
+    assert!(schema.context().analyze_insert(&name).is_writable());
+    let child = schema.layer(r#"CREATE OR REPLACE RULE "_RETURN" AS ON SELECT TO public.v DO INSTEAD SELECT DISTINCT id FROM public.items"#)?;
+    assert!(!child.analyze_insert(&name).is_writable());
+    assert!(!child.analyze_update(&name).is_writable());
+    assert!(schema.context().analyze_insert(&name).is_writable());
+    Ok(())
+}
+
+#[test]
+fn replacing_a_view_preserves_named_rule_links_and_refreshes_its_select_rule()
+-> Result<(), Box<dyn std::error::Error>> {
+    use ::sql_fun_sqlast::sem::{BaseParseContext, RuleIdentity, ViewInfoRead};
+    let schema = ViewSchema::postgres(
+        r#"
+CREATE TABLE public.items(id integer);
+CREATE VIEW public.v AS SELECT id FROM public.items;
+CREATE RULE r AS ON INSERT TO public.v DO INSTEAD NOTHING;
+CREATE OR REPLACE RULE "_RETURN" AS ON SELECT TO public.v DO INSTEAD SELECT id FROM public.items;
+"#,
+    )?;
+    let name = FullName::with_schema("public", "v");
+    let child =
+        schema.layer("CREATE OR REPLACE VIEW public.v AS SELECT DISTINCT id FROM public.items")?;
+    let view = child.get_view_impl(&name).unwrap();
+    assert_eq!(view.rules().unwrap().resolve(&child).len(), 2);
+    let identity = RuleIdentity::new(&name, "_RETURN");
+    let rule = child.rule(&identity).unwrap();
+    assert!(
+        rule.actions()[0]
+            .select_statement()
+            .unwrap()
+            .query_clauses()
+            .unwrap()
+            .body()
+            .select_clauses()
+            .unwrap()
+            .distinct()
+            .is_some()
+    );
+    assert!(
+        schema.context().rule(&identity).unwrap().actions()[0]
+            .select_statement()
+            .unwrap()
+            .query_clauses()
+            .unwrap()
+            .body()
+            .select_clauses()
+            .unwrap()
+            .distinct()
+            .is_none()
+    );
+    assert!(child.analyze_insert(&name).is_writable());
+    assert!(!child.analyze_update(&name).is_writable());
     Ok(())
 }

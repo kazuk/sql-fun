@@ -1,4 +1,6 @@
 #![doc= include_str!("problem.md")]
+mod rule;
+pub use self::rule::{RuleDefinitionProblem, RuleProblem};
 
 mod delete;
 mod insert;
@@ -74,6 +76,8 @@ trait RenderProblemReport: Problem {
 #[allow(clippy::large_enum_variant)]
 #[derive(Debug, Clone)]
 pub enum AnalysisProblem {
+    /// Invalid rule definition.
+    Rule(RuleProblem),
     /// ALTER OWNER target or role lookup failed.
     Ownership(OwnershipProblem),
     /// Invalid trigger semantics.
@@ -153,6 +157,9 @@ pub enum AnalysisProblem {
 }
 
 impl AnalysisProblem {
+    pub(crate) fn rule(problem: &RuleProblem) -> Self {
+        Self::Rule(problem.clone())
+    }
     pub(crate) fn ownership_target(target: &crate::sem::OwnershipLookup) -> Self {
         Self::Ownership(OwnershipProblem::target(target))
     }
@@ -239,6 +246,7 @@ impl AnalysisProblem {
     pub const fn code(&self) -> &'static str {
         match self {
             Self::Ownership(problem) => problem.code(),
+            Self::Rule(_) => "rule_invalid_definition",
             Self::Trigger(_) => "trigger_invalid_definition",
             Self::View(problem) => problem.code(),
             Self::Insert(problem) => problem.code(),
@@ -292,6 +300,7 @@ impl AnalysisProblem {
 
         let report = match self {
             Self::Ownership(problem) => problem.render_report(&report_handler, source)?,
+            Self::Rule(problem) => problem.render_report(&report_handler, source)?,
             Self::Trigger(problem) => problem.render_report(&report_handler, source)?,
             Self::View(problem) => problem.render_report(&report_handler, source)?,
             Self::Insert(problem) => problem.render_report(&report_handler, source)?,

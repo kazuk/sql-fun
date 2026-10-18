@@ -12,11 +12,11 @@ pub struct TableDefinitionCollection(TrieMap<CreateTable>);
 
 impl TableDefinitionCollection {
     pub(super) fn insert_create_table(&mut self, name: &FullName, create_table: &CreateTable) {
-        self.0.insert(&name.catalog_key(), create_table.clone());
+        self.0.insert(&name.to_string(), create_table.clone());
     }
 
     fn get(&self, name: &FullName) -> Option<&CreateTable> {
-        self.0.get(&name.catalog_key())
+        self.0.get(&name.to_string())
     }
 
     fn apply_alter(

@@ -1,5 +1,7 @@
 mod cast_info;
 mod func_info;
+#[cfg(test)]
+mod name_identity_tests;
 mod ownership;
 mod sequence_info;
 mod table_info;
@@ -61,8 +63,10 @@ pub(super) struct SchemaCatalog {
     variables: TrieMap<SemScalarExpr>,
     schemas: TrieMap<CreateSchema>,
     sequences: SequenceInfoCollection,
+    // Compound targets (signatures, columns, casts) use checked SQL target spelling.
     comments: TrieMap<(ObjectKind, String)>,
     views: ViewInformationCollection,
+    // Concrete TypeReference spelling preserves canonical FullName + array identity.
     casts: TrieMap<TrieMap<CastDefinition>>,
     binary_operators: TrieMap<OperatorDefinition>,
     left_unary_operators: TrieMap<OperatorDefinition>,
@@ -321,6 +325,57 @@ mod test_index_lookup {
             context
                 .get_index_impl(&FullName::with_schema("aux", "idx"))
                 .is_some()
+        );
+        Ok(())
+    }
+
+    #[test]
+    fn quoted_names_do_not_alias_or_shadow_other_indexes() -> testresult::TestResult {
+        use crate::sem::{FullName, IndexInfoRead, ParseContext, TableName};
+        let left = index("a.b", "parent_table", "c");
+        let right = index("a", "other_table", "b.c");
+        let parent = layer(&["a.b", "a"], &[left.clone()])?.freeze();
+        let child = crate::test_helpers::schema_layer(std::path::Path::new("child.sql"), &parent);
+        let child = child.apply_create_index(&right)?;
+        assert_eq!(
+            child
+                .get_index(&FullName::from_local_name("c"))
+                .expect("search-path parent index")
+                .name(),
+            left.name()
+        );
+        assert_eq!(
+            child
+                .get_index(&FullName::from_local_name("b.c"))
+                .expect("search-path child index")
+                .name(),
+            right.name()
+        );
+        assert_eq!(
+            child
+                .get_index_impl(left.name())
+                .expect("parent index")
+                .name(),
+            left.name()
+        );
+        assert_eq!(
+            child
+                .get_index_impl(right.name())
+                .expect("child index")
+                .name(),
+            right.name()
+        );
+        let table = TableName::from(FullName::with_schema("a.b", "parent_table"));
+        assert_eq!(child.indexes_for_table(&table).len(), 1);
+        let replacement = index("a.b", "replacement_table", "c");
+        let frozen = child.apply_create_index(&replacement)?.freeze();
+        assert!(frozen.indexes_for_table(&table).is_empty());
+        assert_eq!(
+            frozen
+                .get_index_impl(right.name())
+                .expect("other index")
+                .name(),
+            right.name()
         );
         Ok(())
     }

@@ -4,7 +4,11 @@ use super::{
     TypeDefinition, concrete_type::ConcreteTypeReference, dynamic_type::DynamicTypeReference,
 };
 
-/// type reference
+/// A concrete named type (optionally an array), or an inferred dynamic type.
+///
+/// Concrete types display their canonical [`FullName`] followed by `[]` for
+/// an array. `FromStr` reads that canonical spelling without SQL case folding
+/// or type-alias interpretation; dynamic types have no canonical text form.
 #[derive(Debug, Clone, Eq, PartialEq, Hash, serde::Serialize, serde::Deserialize)]
 pub enum TypeReference {
     /// concrete type with array qualifies
@@ -280,5 +284,54 @@ impl std::fmt::Display for TypeReference {
             Self::Concrete(c) => write!(f, "{c}"),
             Self::Dynamic(_d) => todo!(),
         }
+    }
+}
+
+impl std::str::FromStr for TypeReference {
+    type Err = crate::sem::AnalysisError;
+
+    /// Read canonical concrete type spelling, preserving quoted suffixes.
+    fn from_str(value: &str) -> Result<Self, Self::Err> {
+        let (name, is_array) = if let Some(name) = value.strip_suffix("[]") {
+            (name, true)
+        } else {
+            (value, false)
+        };
+        Ok(Self::concrete_type_ref(
+            &name.parse::<FullName>()?,
+            is_array,
+        ))
+    }
+}
+
+#[cfg(test)]
+mod canonical_type_tests {
+    use super::TypeReference;
+    use crate::sem::FullName;
+
+    #[rstest::rstest]
+    #[case::plain(FullName::with_schema("fixture", "item"))]
+    #[case::dot(FullName::with_schema("a.b", "item"))]
+    #[case::quote(FullName::with_schema("a", "b\"c"))]
+    #[case::literal_array_suffix(FullName::with_schema("a", "item[]"))]
+    #[case::catalog(FullName::with_catalog("db", "a.b", "c"))]
+    fn preserves_type_identity(
+        #[case] name: FullName,
+        #[values(false, true)] array: bool,
+    ) -> testresult::TestResult {
+        let reference = TypeReference::concrete_type_ref(&name, array);
+        assert_eq!(reference.to_string().parse::<TypeReference>()?, reference);
+        assert_ne!(
+            reference.to_string(),
+            TypeReference::concrete_type_ref(&name, !array).to_string()
+        );
+        Ok(())
+    }
+
+    #[test]
+    fn scalar_array_spelling_is_not_an_array() {
+        let scalar = TypeReference::concrete_type_ref(&FullName::with_schema("a", "item[]"), false);
+        let array = TypeReference::concrete_type_ref(&FullName::with_schema("a", "item"), true);
+        assert_ne!(scalar.to_string(), array.to_string());
     }
 }

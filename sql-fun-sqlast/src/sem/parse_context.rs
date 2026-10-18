@@ -1,6 +1,7 @@
 mod cast_info;
 pub(crate) mod conflict_info;
 mod cursors;
+mod rule_info;
 mod seq_info;
 mod table_info;
 mod type_info;
@@ -15,6 +16,7 @@ pub use self::{
     cast_info::CastInfoRead,
     conflict_info::{CatalogNameLookup, ConflictArbiterInference, ConflictInfoRead},
     cursors::CursorInfo,
+    rule_info::{RuleInfoRead, RuleInfoWrite},
     seq_info::{SequenceInfoRead, SequenceInfoWrite},
     table_info::{TableInfoRead, TableInfoWrite},
     type_info::{TypeInfoRead, TypeInfoWrite},
@@ -168,6 +170,7 @@ pub trait BaseParseContext:
     + crate::sem::ObjectInfoRead
     + IndexInfoRead
     + OperatorInfoRead
+    + RuleInfoRead
     + SequenceInfoRead
     + TypeInfoRead
     + TableInfoRead
@@ -182,9 +185,6 @@ pub trait BaseParseContext:
 {
     /// Resolve an exact SQLite relation key using ASCII case-insensitive identifiers.
     fn sqlite_relation_identity(&self, name: &FullName) -> Option<FullName>;
-
-    /// Look up a rule by resolved relation and definition name. A tombstone stops parent lookup.
-    fn rule(&self, identity: &crate::sem::RuleIdentity) -> Option<&crate::sem::CreateRule>;
 
     /// Look up an exact trigger identity in the effective context layer.
     fn trigger(&self, identity: &crate::sem::TriggerIdentity)
@@ -229,6 +229,19 @@ pub trait BaseParseContext:
         expand_relation_search_path(self, name.full_name(), |key| {
             self.get_table_impl(key)?;
             Some(TableName::from(key.clone()))
+        })
+    }
+
+    /// Resolve a relation key in search-path order across both tables and views.
+    fn resolve_relation_name(&self, name: &FullName) -> Option<FullName> {
+        expand_search_path_inst(self, name, |key| {
+            if self.get_table(&TableName::from(key.clone())).is_some()
+                || self.get_view(&ViewName::from_full_name(key)).is_some()
+            {
+                Some(key.clone())
+            } else {
+                None
+            }
         })
     }
 
@@ -284,7 +297,8 @@ pub trait DiagnosticContext {
 /// initialization; a frozen catalog does not supply their configuration.
 ///
 pub trait ParseContext:
-    SequenceInfoWrite
+    RuleInfoWrite
+    + SequenceInfoWrite
     + TypeInfoWrite
     + TableInfoWrite
     + ViewInfoWrite
@@ -385,24 +399,6 @@ where
             Ok(true)
         }
     }
-    /// Register the supplied analyzed rule in the current layer, replacing a tombstone.
-    fn register_rule(self, rule: &crate::sem::CreateRule) -> Result<Self, AnalysisError>;
-    /// Mask an exact rule identity in this layer, including inherited definitions.
-    /// DDL must separately request removal of the target link.
-    fn cancel_rule(self, identity: &crate::sem::RuleIdentity) -> Result<Self, AnalysisError>;
-    /// Attach the explicitly supplied identity to a cloned current-layer target definition.
-    fn associate_rule(
-        self,
-        target: &FullName,
-        identity: &crate::sem::RuleIdentity,
-    ) -> Result<Self, AnalysisError>;
-    /// Remove the explicitly supplied target link in this layer. Does not infer a DROP.
-    fn dissociate_rule(
-        self,
-        target: &FullName,
-        identity: &crate::sem::RuleIdentity,
-    ) -> Result<Self, AnalysisError>;
-
     /// Register a completed definition in this layer. Ownership is decided by DDL application.
     fn register_trigger(self, trigger: &crate::sem::CreateTrigger) -> Result<Self, AnalysisError>;
     /// Associate the supplied name with the exact target in this layer.

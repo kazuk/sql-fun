@@ -931,7 +931,7 @@ impl View {
 .with_replace(self.replace)
 .with_temporary(self.temporary);
         let replacement_rule = if self.replace {
-            if let Some(existing) = context.get_view_impl(&name)
+            if let Some(existing) = context.get_view(&crate::sem::ViewName::from_full_name(&name))
                 && let Some(references) = existing.rules()
             {
                 view.retain_rule_references(references);

@@ -170,10 +170,12 @@ supported; materialized views are rejected. OLD/NEW bind to actual target
 columns and are checked against the event and their enclosing query scope.
 Bind parameters and unresolved definitions are rejected.
 
-Rule names belong to their target relation. `BaseParseContext::rule` retrieves an
+Rule names belong to their target relation. `RuleInfoRead::rule` retrieves an
 exact `RuleIdentity`; `CreateTable::rules`, `CreateView::rules` and
 `ViewLike::rules` expose target links whose `resolve` method yields the effective
-analyzed definitions. Resolving alone has no catalog effects. Applying a valid
+analyzed definitions. `RuleInfoWrite` provides explicit registration, cancellation
+and target-link updates, with shared defaults for layered lookup and association.
+Resolving alone has no catalog effects. Applying a valid
 statement registers its definition and target link in the current layer;
 replacement leaves frozen parents and siblings intact.
 

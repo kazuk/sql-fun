@@ -1,5 +1,5 @@
 use crate::sem::{
-    BaseParseContext, FullName, ParseContext, RuleEvent, RuleIdentity, TableInfoRead, ViewInfoRead,
+    BaseParseContext, FullName, ParseContext, RuleEvent, RuleIdentity, RuleInfoRead, RuleInfoWrite,
 };
 
 #[rstest::rstest]
@@ -181,7 +181,7 @@ fn rejects_invalid_definition_without_registration(#[case] sql: &str) {
     assert!(has_rule_problem);
     assert!(
         context
-            .get_table_impl(identity.target())
+            .get_table(&crate::sem::TableName::from((identity.target()).clone()))
             .unwrap()
             .rules()
             .identities()
@@ -236,7 +236,7 @@ fn named_lookup_target_links_and_layered_tombstones_agree() -> testresult::TestR
     assert!(context.rule(&view_identity).is_some());
     assert_eq!(
         context
-            .get_table_impl(identity.target())
+            .get_table(&crate::sem::TableName::from((identity.target()).clone()))
             .unwrap()
             .rules()
             .resolve(&context)
@@ -245,7 +245,9 @@ fn named_lookup_target_links_and_layered_tombstones_agree() -> testresult::TestR
     );
     assert_eq!(
         context
-            .get_view_impl(view_identity.target())
+            .get_view(&crate::sem::ViewName::from_full_name(
+                view_identity.target()
+            ))
             .unwrap()
             .rules()
             .unwrap()
@@ -261,7 +263,7 @@ fn named_lookup_target_links_and_layered_tombstones_agree() -> testresult::TestR
     assert!(child.rule(&identity).is_none());
     assert_eq!(
         child
-            .get_table_impl(identity.target())
+            .get_table(&crate::sem::TableName::from((identity.target()).clone()))
             .unwrap()
             .rules()
             .resolve(&child)
@@ -271,7 +273,7 @@ fn named_lookup_target_links_and_layered_tombstones_agree() -> testresult::TestR
     assert!(parent.rule(&identity).is_some());
     assert_eq!(
         parent
-            .get_table_impl(identity.target())
+            .get_table(&crate::sem::TableName::from((identity.target()).clone()))
             .unwrap()
             .rules()
             .resolve(&parent)
@@ -289,7 +291,7 @@ fn named_lookup_target_links_and_layered_tombstones_agree() -> testresult::TestR
     assert!(recreated.rule(&identity).unwrap().instead());
     assert_eq!(
         recreated
-            .get_table_impl(identity.target())
+            .get_table(&crate::sem::TableName::from((identity.target()).clone()))
             .unwrap()
             .rules()
             .resolve(&recreated)
@@ -329,7 +331,9 @@ fn replacement_updates_links_without_duplicates_and_rejected_analysis_preserves_
         "CREATE OR REPLACE RULE r AS ON INSERT TO item_view DO SELECT NEW.id",
         test_helpers::layer(&parent),
     )?;
-    let view = child.get_view_impl(identity.target()).unwrap();
+    let view = child
+        .get_view(&crate::sem::ViewName::from_full_name(identity.target()))
+        .unwrap();
     let active = view.rules().unwrap().resolve(&child);
     assert_eq!(active.len(), 1);
     assert!(!active[0].instead());
@@ -348,7 +352,7 @@ fn select_rule_replacement_updates_the_target_query() -> testresult::TestResult 
     let identity = RuleIdentity::new(&FullName::with_schema("public", "item_view"), "_RETURN");
     assert_eq!(
         context
-            .get_view_impl(identity.target())
+            .get_view(&crate::sem::ViewName::from_full_name(identity.target()))
             .unwrap()
             .rules()
             .unwrap()
@@ -398,7 +402,7 @@ fn exact_identities_preserve_relation_scope_and_quoted_components() -> testresul
         let registered = context.rule(&identity).unwrap();
         assert_eq!(registered.target(), &target);
         let linked = context
-            .get_table_impl(&target)
+            .get_table(&crate::sem::TableName::from(target.clone()))
             .unwrap()
             .rules()
             .resolve(&context);

@@ -45,6 +45,9 @@ impl ColumnReference for TableFunctionColumnRef {
 }
 
 impl TableFunctionColumnRef {
+    pub(super) fn canonicalize_grouping_key(&mut self) {
+        self.column_def = None;
+    }
     fn new(
         alias: &AliasName,
         column: &ColumnName,

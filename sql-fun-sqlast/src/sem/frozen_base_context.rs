@@ -218,6 +218,10 @@ macro_rules! forward_catalog_reads {
         }
 
         impl crate::sem::FunctionInfoRead for $context {
+            fn is_aggregate_impl(&self, name: &crate::sem::FullName) -> bool {
+                crate::sem::FunctionInfoRead::is_aggregate_impl(self.$catalog(), name)
+            }
+
             fn get_function_impl(
                 &self,
                 name: &crate::sem::FullName,

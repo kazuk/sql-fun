@@ -43,6 +43,9 @@ impl super::ColumnReference for CteColumnRef {
 }
 
 impl CteColumnRef {
+    pub(super) fn canonicalize_grouping_key(&mut self) {
+        self.column_def = None;
+    }
     pub(super) const fn binding_alias(&self) -> &AliasName {
         &self.alias
     }

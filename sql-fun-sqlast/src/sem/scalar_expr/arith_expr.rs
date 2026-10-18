@@ -52,6 +52,14 @@ pub struct BetweenExpr {
 }
 
 impl ArithExpr {
+    pub(super) fn canonicalize_grouping_key(&mut self) {
+        if let Some(binding) = self.binding() {
+            let mut binding = binding.clone();
+            binding.canonicalize_grouping_key();
+            self.set_binding(binding);
+        }
+    }
+
     /// build between expression node
     pub fn between(left: SemScalarExpr, range: (SemScalarExpr, SemScalarExpr)) -> SemScalarExpr {
         SemScalarExpr::Arith(Self::Between(Box::new(BetweenExpr {

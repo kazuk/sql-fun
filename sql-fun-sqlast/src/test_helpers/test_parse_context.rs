@@ -44,6 +44,7 @@ pub struct TestParseContext {
     view_insert_support: HashMap<FullName, crate::sem::ViewInsertSupport>,
     view_merge_support: HashMap<FullName, crate::sem::ViewMergeSupport>,
     function_definitions: HashMap<FullName, FunctionOverloadCollection>,
+    aggregate_functions: HashSet<FullName>,
     sequence_definitions: HashMap<FullName, CreateSequence>,
     alter_tables: Vec<AlterTable>,
     drop_tables: Vec<DropTable>,
@@ -321,6 +322,10 @@ impl OperatorInfoRead for TestParseContext {
 }
 
 impl FunctionInfoRead for TestParseContext {
+    fn is_aggregate_impl(&self, name: &FullName) -> bool {
+        self.aggregate_functions.contains(name)
+    }
+
     fn get_function_impl(&self, name: &FullName) -> Option<FunctionOverloadCollection> {
         self.function_definitions.get(name).cloned()
     }
@@ -565,6 +570,10 @@ impl TestParseContext {
             .insert(name.clone(), overloads.clone());
     }
 
+    pub(crate) fn setup_aggregate(&mut self, name: &str, overloads: &[OverloadVariant]) {
+        let name = self.setup_function(name, overloads);
+        self.aggregate_functions.insert(name);
+    }
     /// setup function overload collection with variants
     pub fn setup_function(&mut self, name: &str, overloads: &[OverloadVariant]) -> FullName {
         let name = FullName::with_schema("public", name);

@@ -75,6 +75,27 @@ impl SemScalarExprNode for ColumnReferenceExpr {
 }
 
 impl ColumnReferenceExpr {
+    pub(super) const fn grouping_reference_resolved(&self) -> bool {
+        !matches!(
+            self,
+            Self::UndefinedAlias(_)
+                | Self::UndefinedTableOrView(_)
+                | Self::UndefinedFunction(_)
+                | Self::UndefinedColumn(_)
+                | Self::AmbiguousColumnRef(_)
+        )
+    }
+    pub(super) fn canonicalize_grouping_key(&mut self) {
+        match self {
+            Self::CteColumn(value) => value.canonicalize_grouping_key(),
+            Self::TableColumn(value) => value.canonicalize_grouping_key(),
+            Self::ViewColumn(value) => value.canonicalize_grouping_key(),
+            Self::SubQueryColumn(value) => value.canonicalize_grouping_key(),
+            Self::TableFuncColumn(value) => value.canonicalize_grouping_key(),
+            _ => {}
+        }
+    }
+
     /// MERGE record binding, when this reference belongs to a MERGE record.
     pub const fn merge_record_reference(&self) -> Option<&MergeRecordColumnRef> {
         if let Self::MergeRecord(reference) = self {

@@ -38,6 +38,9 @@ impl super::ColumnReference for SubQueryColumnRef {
 }
 
 impl SubQueryColumnRef {
+    pub(super) fn canonicalize_grouping_key(&mut self) {
+        self.column_def = None;
+    }
     pub(super) const fn binding_alias(&self) -> &AliasName {
         &self.alias
     }

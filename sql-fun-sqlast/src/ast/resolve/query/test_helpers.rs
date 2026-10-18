@@ -59,8 +59,9 @@ pub(super) fn catalog() -> TestParseContext {
         false,
         false,
     );
-    context.setup_function("sum", &[sum]);
-    context.setup_function(
+    context.setup_function("identity", std::slice::from_ref(&sum));
+    context.setup_aggregate("sum", &[sum]);
+    context.setup_aggregate(
         "mode",
         &[OverloadVariant::new(
             &Some(PgBuiltInType::int4()),
@@ -109,4 +110,15 @@ pub(super) fn output_type(query: &SelectStatement, name: &str) -> Option<TypeRef
         .get_result_column_def(&ColumnName::from(name))
         .unwrap()
         .get_type_cloned()
+}
+
+/// Small explicitly selected table for grouping placement checks in DML.
+pub(super) fn grouping_table_context() -> TestParseContext {
+    crate::parse_statements("CREATE TABLE t(a integer)", Dialect::postgres())
+        .next()
+        .unwrap()
+        .unwrap()
+        .analyze(catalog().with_dialect(Dialect::postgres()))
+        .unwrap()
+        .into_context()
 }

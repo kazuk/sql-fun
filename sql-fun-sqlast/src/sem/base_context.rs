@@ -1,3 +1,4 @@
+mod aggregate_info;
 mod builtin_casts;
 mod builtin_fun;
 mod builtin_ope;
@@ -175,6 +176,10 @@ impl SequenceInfoRead for BaseContext {
 }
 
 impl FunctionInfoRead for BaseContext {
+    fn is_aggregate_impl(&self, name: &FullName) -> bool {
+        self::aggregate_info::builtin_aggregate(name)
+    }
+
     fn get_function_impl(&self, name: &FullName) -> Option<FunctionOverloadCollection> {
         let create_function = self.functions.find_function_by_name(name)?;
         Some(create_function.overloads().clone())

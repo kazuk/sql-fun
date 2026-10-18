@@ -139,6 +139,23 @@ mod test_result_column_composite_field_definition {
 pub struct ResultColumnCollection(Vec<ResultColumn>);
 
 impl ResultColumnCollection {
+    pub(crate) fn validate_grouping_target(
+        &mut self,
+        index: usize,
+        query_id: usize,
+        context: &mut impl crate::sem::ParseContext,
+    ) -> Result<(), AnalysisError> {
+        if let Some(column) = self.0.get_mut(index)
+            && let Some(expression) = &mut column.expression
+        {
+            expression.reject_grouping_key(query_id, context)?;
+        }
+        Ok(())
+    }
+
+    pub(crate) fn grouping_expression(&self, index: usize) -> Option<&SemScalarExpr> {
+        self.0.get(index)?.expression()
+    }
     pub(crate) fn default_returning_parameters(
         &self,
         parameters: &mut crate::sem::parameter_resolution::ParameterResolution,

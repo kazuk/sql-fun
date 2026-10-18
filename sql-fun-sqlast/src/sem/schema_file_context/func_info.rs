@@ -26,6 +26,14 @@ impl FunctionDefinitionCollection {
 }
 
 impl FunctionInfoRead for SchemaCatalog {
+    fn is_aggregate_impl(&self, name: &FullName) -> bool {
+        if self.functions.definitions(name).is_empty() {
+            self.base.is_aggregate_impl(name)
+        } else {
+            false
+        }
+    }
+
     fn get_function_impl(&self, name: &FullName) -> Option<FunctionOverloadCollection> {
         let definitions = crate::sem::OwnershipInfoRead::routine_definitions(self, name);
         if definitions.is_empty() {

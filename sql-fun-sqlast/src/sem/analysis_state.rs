@@ -11,9 +11,19 @@ pub struct AnalysisState {
     active: bool,
     has_parameters: bool,
     problems: Vec<AnalysisProblem>,
+    grouping: crate::sem::scalar_expr::grouping::GroupingAnalysis,
 }
 
 impl AnalysisState {
+    pub(crate) const fn grouping(&self) -> &crate::sem::scalar_expr::grouping::GroupingAnalysis {
+        &self.grouping
+    }
+    pub(crate) const fn grouping_mut(
+        &mut self,
+    ) -> &mut crate::sem::scalar_expr::grouping::GroupingAnalysis {
+        &mut self.grouping
+    }
+
     pub(crate) fn begin(&mut self) {
         *self = Self {
             active: true,

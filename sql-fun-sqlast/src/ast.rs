@@ -928,9 +928,8 @@ impl View {
         };
         let mut view = crate::sem::CreateView::new(&name, &query, &[], &None, self.materialized);
         let replacement_rule = if self.replace {
-            if let Some(references) = context
-                .get_view_impl(&name)
-                .and_then(crate::sem::ViewLike::rules)
+            if let Some(existing) = context.get_view_impl(&name)
+                && let Some(references) = existing.rules()
             {
                 view.retain_rule_references(references);
             }

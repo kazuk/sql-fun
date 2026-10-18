@@ -168,8 +168,9 @@ EXISTS (#570), quantified/row (#571), ARRAY (#572) and multi-expression (#573)
 subquery semantics are explicitly rejected pending their implementations;
 scalar and correlated subqueries remain supported. Exact result compatibility
 for known built-in modifier-capable types (such as varchar, numeric and
-timestamp, including arrays) is rejected pending type-modifier retention (#619), even when their
-base types match. NOTIFY is still blocked at common syntax conversion (#608). DROP RULE SQL analysis belongs to #605;
+timestamp, including arrays) is rejected pending type-modifier retention (#619),
+even when their base types match. NOTIFY is still blocked at common syntax
+conversion (#608). DROP RULE SQL analysis belongs to #605;
 CREATE → DROP → CREATE SQL integration remains pending that issue. Context
 cancellation and explicit target-unlink APIs are available for that work.
 No rewrite expansion, action execution or SQL rendering is performed.

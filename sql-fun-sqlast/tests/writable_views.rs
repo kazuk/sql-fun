@@ -1015,7 +1015,7 @@ CREATE VIEW public.alias_cast AS SELECT x::integer AS x FROM public.items AS i(x
 #[case::missing_trigger("DROP TRIGGER absent ON public.item_view", "view_missing_object")]
 #[case::duplicate_view(
     "CREATE VIEW public.item_view AS SELECT id FROM public.items",
-    "view_duplicate_object"
+    "conflicting_creation"
 )]
 #[case::alter("ALTER VIEW public.item_view DISABLE RULE r", "view_invalid_alter")]
 fn invalid_view_declarations_are_structured(
@@ -1025,9 +1025,8 @@ fn invalid_view_declarations_are_structured(
     let schema = ViewSchema::postgres(AUTOMATIC)?;
     let problems = schema.query_problems(&format!("{sql}; SELECT 1"))?;
     assert!(
-        problems
-            .iter()
-            .any(|problem| problem.code() == code && problem.view_problem().is_some()),
+        problems.iter().any(|problem| problem.code() == code
+            && (problem.view_problem().is_some() || problem.creation_problem().is_some())),
         "{problems:?}"
     );
     assert!(

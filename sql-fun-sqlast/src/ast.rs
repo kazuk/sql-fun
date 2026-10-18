@@ -903,7 +903,18 @@ impl View {
         TContext: crate::sem::ParseContext,
     {
         let mut context = context;
-        let name = context.creation_name(&self.name.full_name()?, self.temporary)?;
+        let requested = self.name.full_name()?;
+        if requested.schema().is_none() && !self.temporary && context.get_default_schema().is_none()
+        {
+            context.report_analysis_problem(crate::sem::AnalysisProblem::view(
+                &crate::sem::problem::ViewProblem::invalid_target(&requested),
+            ))?;
+            return Ok(crate::AstAndContextPair::new(
+                crate::sem::SemAst::unresolved_statement(),
+                context,
+            ));
+        }
+        let name = context.creation_name(&requested, self.temporary)?;
         let kind = if self.materialized {
             crate::sem::Kind::materialized_view()
         } else {

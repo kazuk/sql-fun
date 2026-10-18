@@ -649,3 +649,226 @@ fn sqlite_skipped_view_does_not_resolve_the_query() -> testresult::TestResult {
     );
     Ok(())
 }
+
+#[rstest::rstest]
+#[case::implicit(&["public"], "pg_temp")]
+#[case::explicit_late(&["public", "pg_temp"], "public")]
+#[case::explicit_first(&["pg_temp", "public"], "pg_temp")]
+fn temporary_relations_and_row_types_follow_search_path(
+    #[case] path: &[&str],
+    #[case] selected: &str,
+    #[values(false, true)] inherited: bool,
+) -> testresult::TestResult {
+    use crate::sem::{BaseParseContext, SchemaName, TableName};
+    let mut context = test_helpers::postgres(
+        "CREATE TABLE public.t(permanent integer); CREATE TEMP TABLE t(temporary integer)",
+    )?;
+    if inherited {
+        context = test_helpers::child(context.freeze());
+    }
+    let mut schemas = Vec::new();
+    for schema in path {
+        schemas.push(SchemaName::from(schema));
+    }
+    context.set_search_path(&schemas);
+    let name = FullName::from_local_name("t");
+    assert_eq!(
+        context
+            .resolve_table_name(&TableName::from(name.clone()))
+            .expect("table")
+            .full_name(),
+        &FullName::with_schema(selected, "t")
+    );
+    assert_eq!(
+        context.resolve_type_name(&name),
+        Some(FullName::with_schema(selected, "t"))
+    );
+    let column = if selected == "pg_temp" {
+        "temporary"
+    } else {
+        "permanent"
+    };
+    let context = test_helpers::apply(context, &format!("SELECT {column} FROM t"))?;
+    assert!(context.problems().is_empty(), "{:?}", context.problems());
+    Ok(())
+}
+
+#[test]
+fn temporary_view_shadows_permanent_table_without_affecting_routines() -> testresult::TestResult {
+    use crate::sem::{BaseParseContext, SchemaName, TableName};
+    let context = test_helpers::postgres(
+        "CREATE TABLE public.t(permanent integer); CREATE TEMP VIEW t AS SELECT 1 AS temporary; CREATE FUNCTION public.f() RETURNS integer LANGUAGE SQL AS 'SELECT 1'; CREATE FUNCTION pg_temp.f() RETURNS bigint LANGUAGE SQL AS 'SELECT 1'",
+    )?;
+    assert!(
+        context
+            .get_table(&TableName::from(FullName::from_local_name("t")))
+            .is_none()
+    );
+    let mut context = test_helpers::apply(context, "SELECT temporary FROM t")?;
+    assert!(context.problems().is_empty(), "{:?}", context.problems());
+    context = test_helpers::child(context.freeze());
+    context.set_search_path(&[SchemaName::from("pg_temp"), SchemaName::from("public")]);
+    assert_eq!(
+        context.resolve_function_name_with_search_path(&FullName::from_local_name("f")),
+        FullName::with_schema("public", "f")
+    );
+    Ok(())
+}
+
+#[rstest::rstest]
+#[case::temporary("CREATE TEMP TABLE t AS SELECT 1 AS temporary", "pg_temp", "temporary")]
+#[case::aliases(
+    "CREATE TABLE t(renamed) AS SELECT 1 AS original, 2 AS second",
+    "public",
+    "renamed"
+)]
+fn table_as_retains_creation_identity_and_column_names(
+    #[case] sql: &str,
+    #[case] schema: &str,
+    #[case] column: &str,
+) -> testresult::TestResult {
+    let context = if schema == "pg_temp" {
+        let context = test_helpers::postgres("CREATE TABLE public.t(permanent integer)")?;
+        test_helpers::apply(context, sql)?
+    } else {
+        test_helpers::postgres(sql)?
+    };
+    let table = context
+        .get_table_impl(&FullName::with_schema(schema, "t"))
+        .expect("created table");
+    assert!(table.has_column(&ColumnName::from(column)));
+    if column == "renamed" {
+        assert!(!table.has_column(&ColumnName::from("original")));
+        assert!(table.has_column(&ColumnName::from("second")));
+    }
+    let context = test_helpers::apply(context, &format!("SELECT {column} FROM t"))?;
+    assert!(context.problems().is_empty(), "{:?}", context.problems());
+    Ok(())
+}
+
+#[rstest::rstest]
+#[case::too_many("CREATE TABLE t(a,b) AS SELECT 1 AS original")]
+#[case::duplicate("CREATE TABLE t(a,a) AS SELECT 1,2")]
+#[case::duplicate_with_unrenamed("CREATE TABLE t(second) AS SELECT 1 AS first,2 AS second")]
+fn invalid_table_as_column_names_do_not_publish_definitions(
+    #[case] sql: &str,
+) -> testresult::TestResult {
+    let context = test_helpers::postgres(sql)?;
+    assert_eq!(context.problems().len(), 1);
+    let name = FullName::with_schema("public", "t");
+    assert!(context.object_kind(&name).is_none());
+    assert!(context.get_table_impl(&name).is_none());
+    assert!(context.get_type_impl(&name).is_none());
+    let context = test_helpers::apply(context, "CREATE TABLE t(valid integer)")?;
+    assert_eq!(context.object_kind(&name), Some(Kind::table()));
+    Ok(())
+}
+
+#[rstest::rstest]
+#[case::check(
+    "CREATE TABLE t(a integer CONSTRAINT same CHECK (a>0), b integer CONSTRAINT same CHECK (b>0))"
+)]
+#[case::foreign_key(
+    "CREATE TABLE t(a integer CONSTRAINT same REFERENCES parent(id), b integer CONSTRAINT same REFERENCES parent(id))"
+)]
+#[case::mixed("CREATE TABLE t(a integer CONSTRAINT same CHECK (a>0), CONSTRAINT same UNIQUE(a))")]
+fn all_named_column_constraints_participate_in_collision_checks(
+    #[case] sql: &str,
+) -> testresult::TestResult {
+    let context = test_helpers::postgres(sql)?;
+    assert_eq!(context.problems().len(), 1);
+    let problem = context.problems()[0]
+        .creation_problem()
+        .expect("constraint conflict");
+    assert_eq!(problem.namespace(), "constraint");
+    assert_eq!(problem.name(), &FullName::from_local_name("same"));
+    assert!(
+        context
+            .object_kind(&FullName::with_schema("public", "t"))
+            .is_none()
+    );
+    Ok(())
+}
+
+#[cfg(feature = "sqlite")]
+#[test]
+fn sqlite_unqualified_lookup_prefers_explicitly_created_temp_table() -> testresult::TestResult {
+    let context =
+        test_helpers::apply_sqlite(test_helpers::sqlite_context(), "CREATE TABLE t(permanent)")?;
+    let context = test_helpers::apply_sqlite(context, "CREATE TEMP TABLE t(temporary)")?;
+    let context = test_helpers::apply_sqlite(context, "SELECT temporary FROM t")?;
+    assert!(context.problems().is_empty(), "{:?}", context.problems());
+    Ok(())
+}
+
+#[test]
+fn named_defaults_and_pre18_not_null_do_not_occupy_constraint_names() -> testresult::TestResult {
+    let context = test_helpers::postgres(
+        "CREATE TABLE t(a integer CONSTRAINT same DEFAULT 1, b integer CONSTRAINT same DEFAULT 2, c integer CONSTRAINT same NOT NULL)",
+    )?;
+    assert!(context.problems().is_empty(), "{:?}", context.problems());
+    assert_eq!(
+        context.object_kind(&FullName::with_schema("public", "t")),
+        Some(Kind::table())
+    );
+    Ok(())
+}
+
+#[test]
+fn materialized_view_applies_the_output_column_name_list() -> testresult::TestResult {
+    let context =
+        test_helpers::postgres("CREATE MATERIALIZED VIEW v(renamed) AS SELECT 1 AS original")?;
+    assert!(context.problems().is_empty(), "{:?}", context.problems());
+    let view = context
+        .get_view_impl(&FullName::with_schema("public", "v"))
+        .expect("view");
+    assert!(
+        view.result_columns()
+            .has_column(&ColumnName::from("renamed"))
+    );
+    assert!(
+        !view
+            .result_columns()
+            .has_column(&ColumnName::from("original"))
+    );
+    Ok(())
+}
+
+#[test]
+fn postgres18_named_not_null_occupies_the_constraint_namespace() -> testresult::TestResult {
+    use crate::sem::{BaseParseContext, MutSourcePathWithSpan, SchemaFileContext, SchemaName};
+    let mut metadata = ::sql_fun_core::SqlFunMetadataCollection::load_from(concat!(
+        env!("CARGO_MANIFEST_DIR"),
+        "/tests/fixtures/selected-postgres.toml"
+    ))?;
+    let selected = metadata
+        .remove("analytics")
+        .expect("PostgreSQL 18 metadata");
+    let parent = test_helpers::postgres("")?.freeze();
+    let mut context = SchemaFileContext::new(
+        std::path::Path::new("not_null.sql"),
+        &parent,
+        parent.get_args(),
+        &selected,
+    );
+    context.set_search_path(&[SchemaName::from("public")]);
+    context.set_source_path_with_span(&crate::test_helpers::source_span());
+    let context = test_helpers::apply(
+        context,
+        "CREATE TABLE t(a integer CONSTRAINT same NOT NULL, b integer CONSTRAINT same NOT NULL)",
+    )?;
+    assert_eq!(context.problems().len(), 1);
+    assert_eq!(
+        context.problems()[0]
+            .creation_problem()
+            .expect("conflict")
+            .namespace(),
+        "constraint"
+    );
+    assert!(
+        context
+            .object_kind(&FullName::with_schema("public", "t"))
+            .is_none()
+    );
+    Ok(())
+}

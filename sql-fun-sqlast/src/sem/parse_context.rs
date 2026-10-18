@@ -32,7 +32,9 @@ use crate::{
         GetSourcePathWithSpanOpt, MutSourcePathWithSpan, OperatorDefinition, OperatorName,
         SchemaName, SemScalarExpr, TableName, TypeDefinition, TypeReference, VariableSet, ViewLike,
         ViewName,
-        search_path::{expand_search_path, expand_search_path_inst},
+        search_path::{
+            expand_relation_search_path, expand_search_path_inst, expand_type_search_path,
+        },
         type_system::ArgumentBindingCollection,
     },
 };
@@ -173,18 +175,18 @@ pub trait BaseParseContext:
 
     /// get type by name
     fn get_type(&self, key: &FullName) -> Option<&TypeDefinition> {
-        expand_search_path(self, key, |k| self.get_type_impl(k))
+        expand_type_search_path(self, key, |k| self.get_type_impl(k))
     }
 
     /// Look up an index, expanding unqualified names through the active search path.
     /// Explicitly qualified names are read directly.
     fn get_index(&self, name: &FullName) -> Option<&CreateIndex> {
-        expand_search_path(self, name, |key| self.get_index_impl(key))
+        expand_relation_search_path(self, name, |key| self.get_index_impl(key))
     }
 
     /// Resolve a type to the exact qualified catalog key selected by the search path.
     fn resolve_type_name(&self, name: &FullName) -> Option<FullName> {
-        expand_search_path_inst(self, name, |key| {
+        expand_type_search_path(self, name, |key| {
             self.get_type_impl(key)?;
             Some(key.clone())
         })
@@ -192,13 +194,13 @@ pub trait BaseParseContext:
 
     /// get `CREATE TABLE` statement by table name
     fn get_table(&self, name: &TableName) -> Option<&CreateTable> {
-        expand_search_path(self, name.full_name(), |key| self.get_table_impl(key))
+        expand_relation_search_path(self, name.full_name(), |key| self.get_table_impl(key))
     }
 
     /// Resolve a table to the qualified catalog key that matched the search path.
     /// A stored declaration can itself have an unqualified name.
     fn resolve_table_name(&self, name: &TableName) -> Option<TableName> {
-        expand_search_path_inst(self, name.full_name(), |key| {
+        expand_relation_search_path(self, name.full_name(), |key| {
             self.get_table_impl(key)?;
             Some(TableName::from(key.clone()))
         })
@@ -206,12 +208,12 @@ pub trait BaseParseContext:
 
     /// get `CREATE VIEW` statement by view name
     fn get_view(&self, key: &ViewName) -> Option<&ViewLike> {
-        expand_search_path(self, key.full_name(), |key| self.get_view_impl(key))
+        expand_relation_search_path(self, key.full_name(), |key| self.get_view_impl(key))
     }
 
     /// get `CREATE SEQUENCE` statement by sequence name
     fn get_sequence(&self, seq_name: &FullName) -> Option<&CreateSequence> {
-        expand_search_path(self, seq_name, |key| self.get_sequence_impl(key))
+        expand_relation_search_path(self, seq_name, |key| self.get_sequence_impl(key))
     }
 
     /// get `CREATE FUNCTION` statement by function name

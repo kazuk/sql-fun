@@ -1,3 +1,4 @@
+use crate::sem::search_path::expand_relation_search_path;
 use crate::sem::{
     AnalysisError, InsertDestination, ParseContext, TableName, UpdateDestination, ViewLike,
     ViewMergeSupport,
@@ -16,7 +17,7 @@ impl MergeDestination {
         context: &impl ParseContext,
         requested: &TableName,
     ) -> Result<Option<Self>, AnalysisError> {
-        crate::sem::search_path::expand_search_path_inst(context, requested.full_name(), |key| {
+        expand_relation_search_path(context, requested.full_name(), |key| {
             let name = TableName::from(key.clone());
             if context.get_table_impl(key).is_some() {
                 return Some(Self::resolve_table(context, &name));

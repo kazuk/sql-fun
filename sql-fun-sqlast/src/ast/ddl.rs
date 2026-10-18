@@ -724,6 +724,28 @@ impl super::TableConstraint {
     }
 }
 impl super::ColumnConstraint {
+    fn has_catalog_name(&self, context: &impl ParseContext) -> bool {
+        match self {
+            Self::PrimaryKey(..)
+            | Self::Unique(_)
+            | Self::Check(_)
+            | Self::ForeignKey(_)
+            | Self::Exclusion => true,
+            Self::Nullability(true, ..) => {
+                let Some(version) = context.metadata().engine_version() else {
+                    return false;
+                };
+                let Ok(version) = version
+                    .to_string()
+                    .parse::<::sql_fun_core::PostgresVersion>()
+                else {
+                    return false;
+                };
+                version.major() >= 18
+            }
+            _ => false,
+        }
+    }
     const fn is_unique_key(&self) -> bool {
         matches!(self, Self::PrimaryKey(_, _) | Self::Unique(_))
     }
@@ -826,7 +848,7 @@ impl super::Table {
         self.resolve_and_apply_at(context, &source)
     }
 
-    fn duplicate_constraint_name(&self) -> Option<&str> {
+    fn duplicate_constraint_name(&self, context: &impl ParseContext) -> Option<&str> {
         let mut names = Vec::new();
         for definition in &self.constraints {
             if let Some(name) = definition.name.as_deref() {
@@ -838,7 +860,7 @@ impl super::Table {
         }
         for column in &self.columns {
             for definition in &column.constraints {
-                if definition.constraint.is_unique_key()
+                if definition.constraint.has_catalog_name(context)
                     && let Some(name) = definition.name.as_deref()
                 {
                     if names.contains(&name) {
@@ -868,7 +890,7 @@ impl super::Table {
             ));
         }
         if context.dialect() == Dialect::postgres()
-            && let Some(constraint) = self.duplicate_constraint_name()
+            && let Some(constraint) = self.duplicate_constraint_name(&context)
         {
             context.report_problem(AnalysisProblem::creation(
                 crate::sem::problem::CreationProblem::constraint(&name, constraint, source.span()),
@@ -1204,14 +1226,45 @@ impl TableAs {
         source: &crate::sem::SourcePathWithSpan,
     ) -> Result<AstAndContextPair<TContext>, AnalysisError> {
         use crate::sem::{CreateTable, CreateTableAs, CreateTableMode, TableName};
-        let query = self.query.resolve(&mut context)?;
+        let mut query = self.query.resolve(&mut context)?;
         let name = self.into.relation.name.full_name()?;
+        if self.into.columns.len() > query.result_columns().len() {
+            context.report_problem(AnalysisProblem::creation(
+                crate::sem::problem::CreationProblem::named(
+                    &name,
+                    "too many output column names",
+                    source.span(),
+                ),
+            ))?;
+            return Ok(AstAndContextPair::new(
+                SemAst::unresolved_statement(),
+                context,
+            ));
+        }
+        query.rename_columns(&self.into.columns);
         let columns = query.result_columns().column_definitions()?;
+        let mut names = Vec::new();
+        for column in &columns {
+            if names.contains(&column.name()) {
+                context.report_problem(AnalysisProblem::creation(
+                    crate::sem::problem::CreationProblem::named(
+                        &name,
+                        "duplicate output column name",
+                        source.span(),
+                    ),
+                ))?;
+                return Ok(AstAndContextPair::new(
+                    SemAst::unresolved_statement(),
+                    context,
+                ));
+            }
+            names.push(column.name());
+        }
         let table = CreateTable::new(
             &TableName::from(name.clone()),
             columns,
             CreateTableMode::from_if_not_exists(self.if_not_exists),
-            false,
+            self.into.relation.persistence == "t",
             source,
         );
         let table_as = CreateTableAs::new(&name, &SemAst::select(&query), self.materialized)

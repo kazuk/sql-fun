@@ -1,6 +1,6 @@
 use crate::sem::{
     AlterTable, AnalysisError, AnalysisProblem, CreateTable, FullName, ParseContext, TableInfoRead,
-    TableInfoWrite, TableName, search_path::expand_search_path_inst,
+    TableInfoWrite, TableName, search_path::expand_relation_search_path,
 };
 
 use crate::TrieMap;
@@ -34,7 +34,7 @@ impl TableInfoRead for SchemaCatalog {
 
 impl SchemaFileContext {
     fn table_for_update(&self, name: &TableName) -> Option<(FullName, CreateTable)> {
-        expand_search_path_inst(self, name.full_name(), |key| {
+        expand_relation_search_path(self, name.full_name(), |key| {
             let table = self.get_table_impl(key)?.clone();
             // A declaration may be unqualified even when its catalog key is
             // qualified. Retain the key that actually matched the lookup.

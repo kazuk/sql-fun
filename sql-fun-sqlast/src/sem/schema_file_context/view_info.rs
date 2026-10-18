@@ -42,13 +42,15 @@ impl ViewInfoWrite for SchemaFileContext {
         Self: Sized,
     {
         let view_name = alter_view.view();
-        let Some((key, mut view)) =
-            crate::sem::search_path::expand_search_path_inst(&self, view_name.full_name(), |key| {
+        let Some((key, mut view)) = crate::sem::search_path::expand_relation_search_path(
+            &self,
+            view_name.full_name(),
+            |key| {
                 self.get_view_impl(key)
                     .cloned()
                     .map(|view| (key.clone(), view))
-            })
-        else {
+            },
+        ) else {
             self.report_analysis_problem(AnalysisProblem::view_not_found(view_name))?;
             return Ok(self);
         };

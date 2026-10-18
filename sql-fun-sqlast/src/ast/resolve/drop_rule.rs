@@ -45,10 +45,7 @@ impl DropRule {
     ) -> Result<sem::DropRule, AnalysisError> {
         let identity = RuleIdentity::new(target, requested.name().as_str());
         let found = context.rule(&identity).is_some();
-        if found
-            && identity.name().name().as_str() == "_RETURN"
-            && context.get_view_impl(target).is_some()
-        {
+        if identity.name().name().as_str() == "_RETURN" && context.get_view_impl(target).is_some() {
             return Err(AnalysisError::rule(&RuleProblem::definition(
                 &identity,
                 "the View requires its SELECT rule; drop the View instead",

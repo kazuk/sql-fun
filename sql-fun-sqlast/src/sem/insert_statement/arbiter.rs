@@ -89,6 +89,19 @@ pub enum InsertArbiter {
     AnonymousTableKey(Vec<ColumnName>),
 }
 impl InsertArbiter {
+    pub(crate) fn contains_backing_index(arbiters: &[Self], name: &FullName) -> bool {
+        arbiters.iter().any(|arbiter| match arbiter {
+            Self::Index(existing) => existing == name,
+            Self::TableConstraint(constraint) => {
+                let table = constraint.table().full_name();
+                table.catalog() == name.catalog()
+                    && table.schema() == name.schema()
+                    && constraint.name() == name.name().as_str()
+            }
+            _ => false,
+        })
+    }
+
     /// Bind an eligible index by its catalog identity.
     pub fn index(name: &FullName) -> Self {
         Self::Index(name.clone())

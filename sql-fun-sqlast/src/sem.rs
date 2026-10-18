@@ -31,6 +31,7 @@ mod frozen_base_context;
 mod insert_statement;
 mod merge_statement;
 mod names;
+mod object_info;
 mod operators;
 pub(crate) mod ownership;
 mod parameter_constraints;
@@ -126,6 +127,7 @@ pub use self::{
         InsertTarget, InsertValue, ViewInsertInfoRead, ViewInsertSupport, analyze_insert_statement,
     },
     names::{CatalogName, FullName, LocalName, OperatorName, SchemaName, ValidOperatorName},
+    object_info::{ExtensionInfoRead, Kind, ObjectInfoRead},
     operators::{BinaryOperatorDefinition, OperatorDefinition, UnaryOperatorDefinition},
     ownership::{
         OwnedObjectDefinition, OwnerSpecification, OwnershipIdentity, OwnershipInfoRead, Role,
@@ -267,6 +269,13 @@ pub enum ImplicitChange {
     CreateIndex(CreateIndex),
 }
 
+impl ImplicitChange {
+    pub(crate) fn into_index(self) -> CreateIndex {
+        match self {
+            Self::CreateIndex(index) => index,
+        }
+    }
+}
 impl From<CreateIndex> for ImplicitChange {
     fn from(value: CreateIndex) -> Self {
         Self::CreateIndex(value)
@@ -351,6 +360,14 @@ pub enum SemAst {
 }
 
 impl SemAst {
+    pub(crate) const fn select_statement(&self) -> Option<&SelectStatement> {
+        if let Self::SelectStatement(query) = self {
+            Some(query)
+        } else {
+            None
+        }
+    }
+
     pub(crate) const fn unresolved_statement() -> Self {
         Self::UnresolvedStatement
     }

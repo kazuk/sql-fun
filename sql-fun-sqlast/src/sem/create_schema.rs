@@ -7,6 +7,8 @@ use super::{AnalysisError, ParseContext, SemAst};
 /// analyzed [`crate::syn::CreateSchemaStmt`]
 #[derive(Debug, Clone)]
 pub struct CreateSchema {
+    if_not_exists: bool,
+
     owner: Option<crate::sem::OwnerSpecification>,
     name: String,
     #[expect(dead_code)]
@@ -14,6 +16,14 @@ pub struct CreateSchema {
 }
 
 impl CreateSchema {
+    pub(crate) const fn if_not_exists(&self) -> bool {
+        self.if_not_exists
+    }
+    pub(crate) const fn with_if_not_exists(mut self, value: bool) -> Self {
+        self.if_not_exists = value;
+        self
+    }
+
     /// Retained ownership; None means no ownership information was supplied.
     pub const fn owner(&self) -> Option<&crate::sem::OwnerSpecification> {
         self.owner.as_ref()
@@ -25,6 +35,7 @@ impl CreateSchema {
 
     pub(crate) fn new(name: &str, elements: &[SemAst]) -> Self {
         Self {
+            if_not_exists: false,
             owner: None,
             name: name.to_owned(),
             elements: elements.to_vec(),

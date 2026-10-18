@@ -901,7 +901,7 @@ fn ownership_only_override_wins_over_immutable_base_definition(
 #[case::named("alice", Some("alice"), None, 0)]
 #[case::missing("missing", None, None, 1)]
 #[case::current("CURRENT_USER", None, Some("CURRENT_USER"), 0)]
-fn schema_authorization_retains_the_supplied_owner_and_lookup_outcome(
+fn schema_authorization_preserves_valid_owners_and_rejects_missing_roles(
     #[case] authorization: &str,
     #[case] role_name: Option<&str>,
     #[case] keyword: Option<&str>,
@@ -911,6 +911,24 @@ fn schema_authorization_retains_the_supplied_owner_and_lookup_outcome(
         ownership_context(),
         &format!("CREATE SCHEMA app AUTHORIZATION {authorization}"),
     )?;
+    assert_eq!(result.context().problems().len(), diagnostic_count);
+    if diagnostic_count != 0 {
+        assert!(result.context().schema_definition("app").is_none());
+        assert!(
+            result
+                .context()
+                .ownership_definitions(ObjectKind::SCHEMA, &FullName::from_local_name("app"))
+                .is_empty()
+        );
+        assert_eq!(
+            result.context().problems()[0]
+                .ownership_problem()
+                .unwrap()
+                .role_name(),
+            Some(authorization)
+        );
+        return Ok(());
+    }
     let schema = result.context().schema_definition("app").unwrap();
     let owner = schema.owner().unwrap();
     assert_eq!(owner.resolved_role().map(Role::name), role_name);

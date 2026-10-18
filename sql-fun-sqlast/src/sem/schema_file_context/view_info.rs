@@ -25,6 +25,8 @@ impl ViewInformationCollection {
 
 impl ViewInfoRead for SchemaCatalog {
     fn get_view_impl(&self, key: &FullName) -> Option<&ViewLike> {
+        let identity = self.relation_identity(key);
+        let key = &identity;
         if let Some(v) = self.views.get(key) {
             Some(v)
         } else {
@@ -51,7 +53,7 @@ impl ViewInfoWrite for SchemaFileContext {
             return Ok(self);
         };
         view.apply_alter(alter_view)?;
-        self.catalog.views.insert(&key, &view);
+        self.catalog.store_view(&key, &view)?;
         Ok(self)
     }
 
@@ -62,9 +64,16 @@ impl ViewInfoWrite for SchemaFileContext {
         let name = self.apply_default_schema(create_table_as.name())?;
         match create_table_as.obj_type() {
             ObjectType::ObjectMatview => {
+                if !self.permits_relation_creation(
+                    &name,
+                    crate::sem::Kind::materialized_view(),
+                    create_table_as.if_not_exists(),
+                    false,
+                )? {
+                    return Ok(self);
+                }
                 self.catalog
-                    .views
-                    .insert(&name, &ViewLike::from(create_table_as));
+                    .store_view(&name, &ViewLike::from(create_table_as))?;
                 Ok(self)
             }
             _ => {
@@ -75,10 +84,42 @@ impl ViewInfoWrite for SchemaFileContext {
 
     #[tracing::instrument(skip(self))]
     fn apply_create_view(mut self, create_view: &CreateView) -> Result<Self, AnalysisError> {
-        let name = self.apply_default_schema(create_view.name())?;
-        self.catalog
-            .views
-            .insert(&name, &ViewLike::from(create_view));
+        let name = self.creation_name(create_view.name(), create_view.temporary())?;
+        let kind = if create_view.is_materialized() {
+            crate::sem::Kind::materialized_view()
+        } else {
+            crate::sem::Kind::view()
+        };
+        if !self.permits_relation_creation(
+            &name,
+            kind,
+            create_view.if_not_exists(),
+            create_view.replace(),
+        )? {
+            return Ok(self);
+        }
+        let mut definition = ViewLike::from(create_view);
+        if create_view.replace()
+            && let Some(previous) = self.get_view_impl(&name)
+        {
+            if !definition
+                .result_columns()
+                .can_replace_view_columns(previous.result_columns())
+            {
+                self.report_analysis_problem(AnalysisProblem::creation(
+                    crate::sem::problem::CreationProblem::named(
+                        &name,
+                        "view replacement",
+                        &self.creation_span(),
+                    ),
+                ))?;
+                return Ok(self);
+            }
+            if let Some(owner) = previous.owner() {
+                definition.change_owner(owner);
+            }
+        }
+        self.catalog.store_view(&name, &definition)?;
         Ok(self)
     }
 }

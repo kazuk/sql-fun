@@ -40,6 +40,9 @@ impl TypeInfoWrite for SchemaFileContext {
         self.catalog
             .types
             .insert_create_composite_type(name, create_comp_type);
+        self.catalog
+            .objects
+            .insert(&name.to_string(), crate::sem::Kind::composite_type());
     }
 
     fn insert_create_domain(&mut self, name: &FullName, create_domain: &CreateDomain) {

@@ -142,6 +142,17 @@ mod test_frozen_root {
 
 macro_rules! forward_catalog_reads {
     ($context:ty, $catalog:ident) => {
+        impl crate::sem::ObjectInfoRead for $context {
+            fn object_kind(&self, name: &crate::sem::FullName) -> Option<crate::sem::Kind> {
+                self.$catalog().object_kind(name)
+            }
+        }
+        impl crate::sem::ExtensionInfoRead for $context {
+            fn extension_exists(&self, name: &str) -> bool {
+                self.$catalog().extension_exists(name)
+            }
+        }
+
         impl crate::sem::RoleInfoRead for $context {
             fn role_by_name(&self, name: &str) -> Option<&crate::sem::Role> {
                 crate::sem::RoleInfoRead::role_by_name(self.$catalog(), name)

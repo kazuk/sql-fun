@@ -1,6 +1,6 @@
 use crate::sem::{
-    AlterTable, AnalysisError, AnalysisProblem, CreateTable, DropTable, FullName, ImplicitChange,
-    ParseContext, TableInfoRead, TableInfoWrite, TableName, search_path::expand_search_path_inst,
+    AlterTable, AnalysisError, AnalysisProblem, CreateTable, FullName, ParseContext, TableInfoRead,
+    TableInfoWrite, TableName, search_path::expand_search_path_inst,
 };
 
 use crate::TrieMap;
@@ -18,31 +18,12 @@ impl TableDefinitionCollection {
     fn get(&self, name: &FullName) -> Option<&CreateTable> {
         self.0.get(&name.to_string())
     }
-
-    fn apply_alter(
-        &mut self,
-        alter_table: &AlterTable,
-        key: &FullName,
-        mut table: CreateTable,
-    ) -> Result<Vec<ImplicitChange>, AnalysisError> {
-        let implicit_changes = table.apply_alter(alter_table)?;
-        self.insert_create_table(key, &table);
-        Ok(implicit_changes)
-    }
-
-    fn push_drop_statement(
-        &mut self,
-        key: &FullName,
-        mut table: CreateTable,
-        drop_table: &DropTable,
-    ) {
-        table.push_drop_statement(drop_table);
-        self.insert_create_table(key, &table);
-    }
 }
 
 impl TableInfoRead for SchemaCatalog {
     fn get_table_impl(&self, key: &FullName) -> Option<&CreateTable> {
+        let identity = self.relation_identity(key);
+        let key = &identity;
         if let Some(v) = self.tables.get(key) {
             Some(v)
         } else {
@@ -66,20 +47,54 @@ impl TableInfoWrite for SchemaFileContext {
     #[tracing::instrument(skip(self))]
     fn apply_alter_table(mut self, alter_table: &AlterTable) -> Result<Self, AnalysisError> {
         let table_name = alter_table.table();
-        let Some((key, table)) = self.table_for_update(table_name) else {
+        let Some((key, mut table)) = self.table_for_update(table_name) else {
             self.report_analysis_problem(AnalysisProblem::table_not_found(table_name))?;
             return Ok(self);
         };
 
-        let implicit_changes = self.catalog.tables.apply_alter(alter_table, &key, table)?;
+        if let Some(name) = alter_table.conflicting_constraint(&table) {
+            self.report_analysis_problem(AnalysisProblem::creation(
+                crate::sem::problem::CreationProblem::constraint(
+                    &key,
+                    &name,
+                    &self.creation_span(),
+                ),
+            ))?;
+            return Ok(self);
+        }
+        let implicit_changes = table.apply_alter(alter_table)?;
+        let mut indexes = Vec::new();
+        for change in implicit_changes {
+            let index = change.into_index().with_table_identity(&key);
+            if !self.permits_relation_creation(
+                index.name(),
+                crate::sem::Kind::index(),
+                false,
+                false,
+            )? {
+                return Ok(self);
+            }
+            if crate::sem::CreateIndex::contains_name(&indexes, index.name()) {
+                self.report_analysis_problem(AnalysisProblem::creation(
+                    crate::sem::problem::CreationProblem::relation(
+                        index.name(),
+                        crate::sem::Kind::index(),
+                        crate::sem::Kind::index(),
+                        &self.creation_span(),
+                    ),
+                ))?;
+                return Ok(self);
+            }
+            indexes.push(index);
+        }
+        self.catalog.store_table(&key, &table);
         if let Some(owner) = alter_table.applied_owner() {
             self.change_dependent_sequence_owners(&TableName::from(key), owner);
         }
-        let mut context = self;
-        for implicit_change in implicit_changes {
-            context = context.apply_implicit_change(implicit_change)?;
+        for index in indexes {
+            self.catalog.store_index(&index);
         }
-        Ok(context)
+        Ok(self)
     }
 
     fn apply_drop_table(
@@ -92,15 +107,15 @@ impl TableInfoWrite for SchemaFileContext {
                 self.report_analysis_problem(AnalysisProblem::table_not_found(table_name))?;
                 continue;
             };
-            self.catalog
-                .tables
-                .push_drop_statement(&key, table, drop_table);
+            let mut table = table;
+            table.push_drop_statement(drop_table);
+            self.catalog.store_table(&key, &table);
         }
         Ok(self)
     }
 
     fn insert_create_table(&mut self, name: &FullName, create_table: &CreateTable) {
-        self.catalog.tables.insert_create_table(name, create_table);
+        self.catalog.store_table(name, create_table);
     }
 }
 

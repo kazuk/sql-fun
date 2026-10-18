@@ -146,6 +146,8 @@ pub trait BaseParseContext:
     + CastInfoRead
     + ConflictInfoRead
     + FunctionInfoRead
+    + crate::sem::ExtensionInfoRead
+    + crate::sem::ObjectInfoRead
     + IndexInfoRead
     + OperatorInfoRead
     + SequenceInfoRead
@@ -266,6 +268,96 @@ pub trait ParseContext:
 where
     Self: Sized,
 {
+    /// Apply nested schema declarations as one publication group.
+    /// Implementations retain diagnostics while discarding catalog writes when a
+    /// nested declaration is rejected. The closure keeps using this ParseContext.
+    fn apply_creation_group<F>(
+        self,
+        operation: F,
+    ) -> Result<crate::AstAndContextPair<Self>, AnalysisError>
+    where
+        F: FnOnce(Self) -> Result<crate::AstAndContextPair<Self>, AnalysisError>;
+
+    /// Effective creation identity, including explicitly requested temporary storage.
+    fn creation_name(&self, name: &FullName, temporary: bool) -> Result<FullName, AnalysisError> {
+        if temporary && name.schema().is_none() {
+            let schema = if self.dialect() == crate::ast::Dialect::sqlite() {
+                "temp"
+            } else {
+                "pg_temp"
+            };
+            Ok(name.clone().set_schema(SchemaName::from(schema)))
+        } else {
+            self.apply_default_schema(name)
+        }
+    }
+
+    /// Validate creation against the exact shared relation namespace.
+    /// Returns false for an accepted no-op or a diagnosed conflict.
+    fn permits_relation_creation(
+        &mut self,
+        name: &FullName,
+        kind: crate::sem::Kind,
+        if_not_exists: bool,
+        replace: bool,
+    ) -> Result<bool, AnalysisError> {
+        if self.dialect() == crate::ast::Dialect::sqlite()
+            && name
+                .name()
+                .as_str()
+                .to_ascii_lowercase()
+                .starts_with("sqlite_")
+        {
+            let span = self
+                .get_source_path_with_span()
+                .map_or(StringSpan::default(), |source| *source.span());
+            self.report_problem(AnalysisProblem::creation(
+                crate::sem::problem::CreationProblem::named(name, "reserved SQLite name", &span),
+            ))?;
+            return Ok(false);
+        }
+        if let Some(existing) = self.object_kind(name) {
+            if if_not_exists
+                && (self.dialect() != crate::ast::Dialect::sqlite()
+                    || kind.permits_sqlite_noop(existing))
+            {
+                return Ok(false);
+            }
+            if replace && kind == crate::sem::Kind::view() && existing == kind {
+                return Ok(true);
+            }
+            let span = self
+                .get_source_path_with_span()
+                .map_or(StringSpan::default(), |source| *source.span());
+            self.report_problem(AnalysisProblem::creation(
+                crate::sem::problem::CreationProblem::relation(name, kind, existing, &span),
+            ))?;
+            return Ok(false);
+        }
+        if self.dialect() == crate::ast::Dialect::postgres()
+            && kind.creates_row_type()
+            && !self.permits_type_creation(name)?
+        {
+            return Ok(false);
+        }
+        Ok(true)
+    }
+
+    /// Validate a separate PostgreSQL type-name namespace without publishing a definition.
+    fn permits_type_creation(&mut self, name: &FullName) -> Result<bool, AnalysisError> {
+        if self.get_type_impl(name).is_some() {
+            let span = self
+                .get_source_path_with_span()
+                .map_or(StringSpan::default(), |source| *source.span());
+            self.report_problem(AnalysisProblem::creation(
+                crate::sem::problem::CreationProblem::named(name, "type", &span),
+            ))?;
+            Ok(false)
+        } else {
+            Ok(true)
+        }
+    }
+
     /// Dialect of the explicitly supplied metadata for this analysis.
     /// Engine identity and SQL dialect are independent metadata fields.
     /// Historical configuration retained by a frozen catalog is not consulted.
@@ -431,6 +523,17 @@ where
             AnalysisError::never()
         };
         let name = self.apply_default_schema(name)?;
+        if !self.permits_type_creation(&name)? {
+            return Ok(self);
+        }
+        if !self.permits_relation_creation(
+            &name,
+            crate::sem::Kind::composite_type(),
+            false,
+            false,
+        )? {
+            return Ok(self);
+        }
         self.insert_create_composite_type(&name, create_comp_type);
         Ok(self)
     }
@@ -438,6 +541,9 @@ where
     /// apply `create domain` to current schema
     fn apply_create_domain(mut self, create_domain: &CreateDomain) -> Result<Self, AnalysisError> {
         let name = self.apply_default_schema(create_domain.name())?;
+        if !self.permits_type_creation(&name)? {
+            return Ok(self);
+        }
         self.insert_create_domain(&name, create_domain);
         Ok(self)
     }
@@ -472,16 +578,61 @@ where
     /// apply `create type as enum` statement to  current schema
     fn apply_create_enum(mut self, create_enum_type: &CreateEnum) -> Result<Self, AnalysisError> {
         let name = self.apply_default_schema(create_enum_type.name())?;
+        if !self.permits_type_creation(&name)? {
+            return Ok(self);
+        }
         self.insert_create_enum(&name, create_enum_type);
         Ok(self)
     }
 
     /// apply `create table` statement to current schema
     fn apply_create_table(mut self, create_table: &CreateTable) -> Result<Self, AnalysisError> {
-        let name = self.apply_default_schema(create_table.name().full_name())?;
+        let name = self.creation_name(create_table.name().full_name(), create_table.temporary())?;
+        if !self.permits_relation_creation(
+            &name,
+            crate::sem::Kind::table(),
+            create_table.mode().if_not_exists(),
+            false,
+        )? {
+            return Ok(self);
+        }
+        let indexes = if self.dialect() == crate::ast::Dialect::postgres() {
+            create_table.declared_indexes(&name)?
+        } else {
+            Vec::new()
+        };
+        for index in &indexes {
+            if index.name() == &name {
+                let span =
+                    *crate::sem::GetSourcePathWithSpan::get_source_path_with_span(create_table)
+                        .span();
+                self.report_problem(AnalysisProblem::creation(
+                    crate::sem::problem::CreationProblem::relation(
+                        &name,
+                        crate::sem::Kind::index(),
+                        crate::sem::Kind::table(),
+                        &span,
+                    ),
+                ))?;
+                return Ok(self);
+            }
+            if !self.permits_relation_creation(
+                index.name(),
+                crate::sem::Kind::index(),
+                false,
+                false,
+            )? {
+                return Ok(self);
+            }
+        }
         self.insert_create_table(&name, create_table);
         // when create table, define composite type as table
-        self.insert_table_ref_type(&TableName::from(name));
+        if self.dialect() == crate::ast::Dialect::postgres() {
+            self.insert_table_ref_type(&TableName::from(name));
+        }
+        for index in indexes {
+            self = self.apply_create_index(&index)?;
+        }
         Ok(self)
     }
 

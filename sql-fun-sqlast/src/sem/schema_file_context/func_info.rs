@@ -1,6 +1,6 @@
 use crate::sem::{
     AnalysisError, CreateFunction, FullName, FunctionInfoRead, FunctionInfoWrite,
-    FunctionOverloadCollection,
+    FunctionOverloadCollection, ParseContext,
 };
 
 use crate::TrieMap;
@@ -52,7 +52,28 @@ impl FunctionInfoWrite for SchemaFileContext {
         name: &FullName,
         create_function: &CreateFunction,
     ) -> Result<Self, AnalysisError> {
-        self.catalog.functions.insert(name, create_function);
+        let existing = crate::sem::OwnershipInfoRead::routine_definitions(&self, name);
+        let mut candidates = Vec::new();
+        for mut candidate in create_function.split_definitions() {
+            if let Some(previous) = candidate.previous_definition(&existing, &candidates) {
+                if !create_function.replace() || !candidate.can_replace(previous) {
+                    self.report_analysis_problem(crate::sem::AnalysisProblem::creation(
+                        crate::sem::problem::CreationProblem::routine(
+                            &candidate.ownership_identity(name),
+                            &self.creation_span(),
+                        ),
+                    ))?;
+                    return Ok(self);
+                }
+                if let Some(owner) = previous.owner() {
+                    candidate.change_owner(owner);
+                }
+            }
+            candidates.push(candidate);
+        }
+        for candidate in candidates {
+            self.catalog.functions.insert(name, &candidate);
+        }
         Ok(self)
     }
 }

@@ -344,7 +344,11 @@ impl SqlEmit for EnumType {
 impl SqlEmit for Sequence {
     fn emit(&self, writer: &mut SqlWriter) -> Result<(), DeparseError> {
         writer.postgres_only("CREATE SEQUENCE")?;
-        writer.sql("CREATE SEQUENCE");
+        if self.temporary {
+            writer.sql("CREATE TEMPORARY SEQUENCE");
+        } else {
+            writer.sql("CREATE SEQUENCE");
+        }
         if self.if_not_exists {
             writer.sql(" IF NOT EXISTS");
         }

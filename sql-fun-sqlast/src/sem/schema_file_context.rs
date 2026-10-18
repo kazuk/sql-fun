@@ -1,7 +1,10 @@
 mod cast_info;
+#[cfg(test)]
+mod creation_tests;
 mod func_info;
 #[cfg(test)]
 mod name_identity_tests;
+mod object_info;
 mod ownership;
 mod sequence_info;
 mod table_info;
@@ -72,6 +75,7 @@ pub(super) struct SchemaCatalog {
     left_unary_operators: TrieMap<OperatorDefinition>,
     right_unary_operators: TrieMap<OperatorDefinition>,
     indexes: TrieMap<CreateIndex>,
+    objects: TrieMap<crate::sem::Kind>,
     sql_source_path: PathBuf,
     source: Option<SourcePathWithSpan>,
 }
@@ -125,6 +129,7 @@ impl SchemaFileContext {
                 left_unary_operators: TrieMap::default(),
                 right_unary_operators: TrieMap::default(),
                 indexes: TrieMap::default(),
+                objects: TrieMap::default(),
                 source: None,
             },
             statement_span: StringSpan::default(),
@@ -297,8 +302,9 @@ mod test_index_lookup {
         );
         let local = index("a", "replacement", "idx");
         child = child.apply_create_index(&local)?;
-        // Compare object addresses to verify local precedence for the same identity.
-        assert!(!std::ptr::eq(
+        // A rejected duplicate must continue reading the shared parent definition.
+        assert_eq!(child.problems().len(), 1);
+        assert!(std::ptr::eq(
             child.get_index(local.name()).unwrap(),
             parent.get_index_impl(local.name()).unwrap()
         ));
@@ -369,7 +375,7 @@ mod test_index_lookup {
         assert_eq!(child.indexes_for_table(&table).len(), 1);
         let replacement = index("a.b", "replacement_table", "c");
         let frozen = child.apply_create_index(&replacement)?.freeze();
-        assert!(frozen.indexes_for_table(&table).is_empty());
+        assert_eq!(frozen.indexes_for_table(&table).len(), 1);
         assert_eq!(
             frozen
                 .get_index_impl(right.name())
@@ -623,6 +629,31 @@ impl BaseParseContext for SchemaCatalog {
 }
 
 impl ParseContext for SchemaFileContext {
+    fn apply_creation_group<F>(
+        mut self,
+        operation: F,
+    ) -> Result<crate::AstAndContextPair<Self>, AnalysisError>
+    where
+        F: FnOnce(Self) -> Result<crate::AstAndContextPair<Self>, AnalysisError>,
+    {
+        // Stage a sparse child layer. Failed groups discard only their writes;
+        // sharing the baseline avoids cloning catalog tries or definition bodies.
+        let path = self.catalog.sql_source_path.clone();
+        let args = self.catalog.args.clone();
+        let metadata = self.catalog.metadata.clone();
+        let empty = Self::new(&path, &self.catalog.base, &args, &metadata).catalog;
+        let baseline = FrozenBaseContext::new(std::mem::replace(&mut self.catalog, empty));
+        self.catalog = Self::new(&path, &baseline, &args, &metadata).catalog;
+        self.catalog.source = baseline.get_source_path_with_span().cloned();
+        let before = self.problems.len();
+        let crate::AstAndContextPair(ast, mut context) = operation(self)?;
+        if context.problems.len() != before {
+            context.catalog = Self::new(&path, &baseline, &args, &metadata).catalog;
+            context.catalog.source = baseline.get_source_path_with_span().cloned();
+        }
+        Ok(crate::AstAndContextPair::new(ast, context))
+    }
+
     fn insert_role(&mut self, role: &crate::sem::Role) {
         self.catalog.ownership.insert_role(role);
     }
@@ -682,6 +713,18 @@ impl ParseContext for SchemaFileContext {
         create_extension: &CreateExtension,
     ) -> Result<Self, AnalysisError> {
         let name = create_extension.name();
+        if crate::sem::ExtensionInfoRead::extension_exists(&self, name) {
+            if !create_extension.if_not_exists() {
+                self.report_problem(AnalysisProblem::creation(
+                    crate::sem::problem::CreationProblem::named(
+                        &FullName::from_local_name(name),
+                        "extension",
+                        &self.creation_span(),
+                    ),
+                ))?;
+            }
+            return Ok(self);
+        }
         self.catalog
             .extensions
             .insert(name, create_extension.clone());
@@ -698,6 +741,18 @@ impl ParseContext for SchemaFileContext {
 
     fn apply_create_schema(mut self, create_schema: &CreateSchema) -> Result<Self, AnalysisError> {
         let name = create_schema.name();
+        if crate::sem::OwnershipInfoRead::schema_definition(&self, name).is_some() {
+            if !create_schema.if_not_exists() {
+                self.report_problem(AnalysisProblem::creation(
+                    crate::sem::problem::CreationProblem::named(
+                        &FullName::from_local_name(name),
+                        "schema",
+                        &self.creation_span(),
+                    ),
+                ))?;
+            }
+            return Ok(self);
+        }
         self.catalog.schemas.insert(name, create_schema.clone());
         Ok(self)
     }
@@ -713,9 +768,15 @@ impl ParseContext for SchemaFileContext {
 
     fn apply_create_index(mut self, create_index: &CreateIndex) -> Result<Self, AnalysisError> {
         let name = create_index.name();
-        self.catalog
-            .indexes
-            .insert(&name.to_string(), create_index.clone());
+        if !self.permits_relation_creation(
+            name,
+            crate::sem::Kind::index(),
+            create_index.if_not_exists(),
+            false,
+        )? {
+            return Ok(self);
+        }
+        self.catalog.store_index(create_index);
         Ok(self)
     }
 }

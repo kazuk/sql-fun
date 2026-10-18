@@ -432,6 +432,18 @@ impl FunctionInfoWrite for TestParseContext {
 }
 
 impl ParseContext for TestParseContext {
+    fn apply_creation_group<F>(
+        self,
+        operation: F,
+    ) -> Result<crate::AstAndContextPair<Self>, AnalysisError>
+    where
+        F: FnOnce(Self) -> Result<crate::AstAndContextPair<Self>, AnalysisError>,
+    {
+        // Schema publication tests use SchemaFileContext. This fixture records
+        // direct calls rather than implementing the production catalog layers.
+        operation(self)
+    }
+
     fn insert_role(&mut self, role: &crate::sem::Role) {
         self.ownership.insert_role(role);
     }
@@ -683,5 +695,26 @@ impl crate::sem::OwnershipInfoRead for TestParseContext {
             .map_or_else(Vec::new, |overloads| {
                 CreateFunction::new(name, &overloads, &None).split_definitions()
             })
+    }
+}
+
+impl crate::sem::ObjectInfoRead for TestParseContext {
+    fn object_kind(&self, name: &crate::sem::FullName) -> Option<crate::sem::Kind> {
+        if self.get_table_impl(name).is_some() {
+            Some(crate::sem::Kind::table())
+        } else if self.get_view_impl(name).is_some() {
+            Some(crate::sem::Kind::view())
+        } else if self.get_sequence_impl(name).is_some() {
+            Some(crate::sem::Kind::sequence())
+        } else if self.get_index_impl(name).is_some() {
+            Some(crate::sem::Kind::index())
+        } else {
+            None
+        }
+    }
+}
+impl crate::sem::ExtensionInfoRead for TestParseContext {
+    fn extension_exists(&self, _: &str) -> bool {
+        false
     }
 }

@@ -316,3 +316,14 @@ impl crate::sem::OwnershipInfoRead for BaseContext {
         crate::sem::ownership::model_definitions(self, kind, name)
     }
 }
+
+impl crate::sem::ObjectInfoRead for BaseContext {
+    fn object_kind(&self, _: &FullName) -> Option<crate::sem::Kind> {
+        None
+    }
+}
+impl crate::sem::ExtensionInfoRead for BaseContext {
+    fn extension_exists(&self, _: &str) -> bool {
+        false
+    }
+}

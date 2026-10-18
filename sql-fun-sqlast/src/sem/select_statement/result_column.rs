@@ -249,6 +249,13 @@ impl ResultColumnCollection {
         ));
     }
 
+    pub(crate) fn can_replace_view_columns(&self, previous: &Self) -> bool {
+        self.0.len() >= previous.0.len()
+            && self.0.iter().zip(&previous.0).all(|(new, old)| {
+                new.column_name() == old.column_name() && new.col_type() == old.col_type()
+            })
+    }
+
     /// Materialize all results as column definitions in order.
     pub fn column_definitions(&self) -> Result<Vec<ColumnDefinition>, AnalysisError> {
         let mut columns = Vec::new();

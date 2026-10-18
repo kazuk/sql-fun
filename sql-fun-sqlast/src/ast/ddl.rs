@@ -826,11 +826,58 @@ impl super::Table {
         self.resolve_and_apply_at(context, &source)
     }
 
+    fn duplicate_constraint_name(&self) -> Option<&str> {
+        let mut names = Vec::new();
+        for definition in &self.constraints {
+            if let Some(name) = definition.name.as_deref() {
+                if names.contains(&name) {
+                    return Some(name);
+                }
+                names.push(name);
+            }
+        }
+        for column in &self.columns {
+            for definition in &column.constraints {
+                if definition.constraint.is_unique_key()
+                    && let Some(name) = definition.name.as_deref()
+                {
+                    if names.contains(&name) {
+                        return Some(name);
+                    }
+                    names.push(name);
+                }
+            }
+        }
+        None
+    }
     pub(crate) fn resolve_and_apply_at<TContext: ParseContext>(
         &self,
         mut context: TContext,
         source: &crate::sem::SourcePathWithSpan,
     ) -> Result<AstAndContextPair<TContext>, AnalysisError> {
+        let name = context.creation_name(&self.name.full_name()?, self.temporary)?;
+        if !context.permits_relation_creation(
+            &name,
+            crate::sem::Kind::table(),
+            self.mode.if_not_exists(),
+            false,
+        )? {
+            return Ok(AstAndContextPair::new(
+                SemAst::unresolved_statement(),
+                context,
+            ));
+        }
+        if context.dialect() == Dialect::postgres()
+            && let Some(constraint) = self.duplicate_constraint_name()
+        {
+            context.report_problem(AnalysisProblem::creation(
+                crate::sem::problem::CreationProblem::constraint(&name, constraint, source.span()),
+            ))?;
+            return Ok(AstAndContextPair::new(
+                SemAst::unresolved_statement(),
+                context,
+            ));
+        }
         let table = self.resolve(&mut context, source)?;
         let context = context.apply_create_table(&table)?;
         Ok(AstAndContextPair::new(
@@ -1163,13 +1210,17 @@ impl TableAs {
         let table = CreateTable::new(
             &TableName::from(name.clone()),
             columns,
-            CreateTableMode::Default,
+            CreateTableMode::from_if_not_exists(self.if_not_exists),
             false,
             source,
         );
-        let context = context.apply_create_table(&table)?;
-        let table_as = CreateTableAs::new(&name, &SemAst::select(&query), self.materialized);
-        let context = context.apply_create_table_as(&table_as)?;
+        let table_as = CreateTableAs::new(&name, &SemAst::select(&query), self.materialized)
+            .with_if_not_exists(self.if_not_exists);
+        let context = if self.materialized {
+            context.apply_create_table_as(&table_as)?
+        } else {
+            context.apply_create_table(&table)?
+        };
         Ok(AstAndContextPair::new(
             SemAst::create_table_as(&table_as),
             context,
@@ -1313,6 +1364,7 @@ impl Index {
         let predicate = Expr::resolve_optional(&self.predicate, context, &scope)?;
         let mut index =
             crate::sem::CreateIndex::from_resolved(&name, &table, &keys, &includes, self.unique);
+        index = index.with_if_not_exists(self.if_not_exists);
         index.set_predicate(predicate);
         Ok(Some(index))
     }
@@ -1360,20 +1412,45 @@ impl Schema {
 
     pub(crate) fn resolve_and_apply<TContext: ParseContext>(
         &self,
+        context: TContext,
+    ) -> Result<AstAndContextPair<TContext>, AnalysisError> {
+        context.apply_creation_group(|context| self.resolve_group(context))
+    }
+    fn resolve_group<TContext: ParseContext>(
+        &self,
         mut context: TContext,
     ) -> Result<AstAndContextPair<TContext>, AnalysisError> {
+        if context.schema_definition(&self.name).is_some() {
+            let schema = crate::sem::CreateSchema::new(&self.name, &[])
+                .with_if_not_exists(self.if_not_exists);
+            let context = context.apply_create_schema(&schema)?;
+            return Ok(AstAndContextPair::new(
+                SemAst::create_schema(&schema),
+                context,
+            ));
+        }
         let owner = if let Some(authorization) = &self.authorization {
             Some(authorization.resolve_owner(&mut context)?)
         } else {
             None
         };
+        let previous_path = context.get_search_path().to_vec();
+        let mut schema_path = vec![crate::sem::SchemaName::from(self.name.as_str())];
+        for schema in &previous_path {
+            if !schema_path.contains(schema) {
+                schema_path.push(schema.clone());
+            }
+        }
+        context.set_search_path(&schema_path);
         let mut elements = Vec::new();
         for element in &self.elements {
             let AstAndContextPair(element, next) = element.resolve_and_apply(context)?;
             context = next;
             elements.push(element);
         }
-        let mut schema = crate::sem::CreateSchema::new(&self.name, &elements);
+        context.set_search_path(&previous_path);
+        let mut schema = crate::sem::CreateSchema::new(&self.name, &elements)
+            .with_if_not_exists(self.if_not_exists);
         if let Some(owner) = owner {
             schema.change_owner(&owner);
         }
@@ -1660,7 +1737,7 @@ impl Function {
         &self,
         mut context: TContext,
     ) -> Result<AstAndContextPair<TContext>, AnalysisError> {
-        let function = self.resolve(&mut context)?;
+        let function = self.resolve(&mut context)?.with_replace(self.replace);
         let context = context.apply_create_function(&function)?;
         Ok(AstAndContextPair::new(
             SemAst::create_function(&function),

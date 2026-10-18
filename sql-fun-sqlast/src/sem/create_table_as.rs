@@ -14,8 +14,9 @@ use super::{AlterView, AnalysisError, FullName, ParseContext, SemAst};
 /// analyzed [`crate::syn::CreateTableAsStmt`]
 #[derive(Debug, Clone)]
 pub struct CreateTableAs {
+    if_not_exists: bool,
+
     name: FullName,
-    #[expect(dead_code)]
     query: Box<SemAst>,
     obj_type: ObjectType,
     owner: Option<crate::sem::OwnerSpecification>,
@@ -23,6 +24,21 @@ pub struct CreateTableAs {
 }
 
 impl CreateTableAs {
+    pub(crate) fn result_columns(&self) -> &crate::sem::ResultColumnCollection {
+        self.query
+            .select_statement()
+            .expect("CREATE AS query is a SELECT")
+            .result_columns()
+    }
+
+    pub(crate) const fn if_not_exists(&self) -> bool {
+        self.if_not_exists
+    }
+    pub(crate) const fn with_if_not_exists(mut self, value: bool) -> Self {
+        self.if_not_exists = value;
+        self
+    }
+
     /// Retained ownership; None means no ownership information was supplied.
     pub const fn owner(&self) -> Option<&crate::sem::OwnerSpecification> {
         self.owner.as_ref()
@@ -34,6 +50,7 @@ impl CreateTableAs {
 
     pub(crate) fn new(name: &FullName, query: &SemAst, materialized: bool) -> Self {
         Self {
+            if_not_exists: false,
             name: name.clone(),
             query: Box::new(query.clone()),
             obj_type: if materialized {

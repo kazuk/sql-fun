@@ -101,6 +101,9 @@ pub enum CreateTableMode {
 }
 
 impl CreateTableMode {
+    pub(crate) const fn if_not_exists(self) -> bool {
+        matches!(self, Self::IfNotExists)
+    }
     /// create instance for if not exists
     pub const fn from_if_not_exists(if_not_exists: bool) -> Self {
         if if_not_exists {
@@ -226,6 +229,21 @@ impl CreateTable {
         }
     }
 
+    pub(crate) fn declared_indexes(
+        &self,
+        name: &FullName,
+    ) -> Result<Vec<crate::sem::CreateIndex>, AnalysisError> {
+        let mut indexes = Vec::new();
+        for constraint in self.constraints.values() {
+            if !constraint.name().is_empty() {
+                for change in constraint.implicit_changes()? {
+                    indexes.push(change.into_index().with_table_identity(name));
+                }
+            }
+        }
+        Ok(indexes)
+    }
+
     /// get table name
     #[must_use]
     pub const fn name(&self) -> &TableName {
@@ -292,7 +310,7 @@ impl CreateTable {
         alter_table: &AlterTable,
     ) -> Result<Vec<ImplicitChange>, AnalysisError> {
         self.alter_statements.push(alter_table.clone());
-
+        let mut implicit_changes = Vec::new();
         for cmd in alter_table.commands() {
             match cmd {
                 AlterObjSubCommand::ChangeOwner(new_owner) => {
@@ -308,7 +326,7 @@ impl CreateTable {
                 AlterObjSubCommand::AddConstraint(constraint) => {
                     self.constraints
                         .insert(constraint.name().to_string(), constraint.clone());
-                    return constraint.implicit_changes();
+                    implicit_changes.extend(constraint.implicit_changes()?);
                 }
                 AlterObjSubCommand::ClusterOn(index_name) => {
                     self.cluster_on = Some(index_name.clone())
@@ -331,7 +349,7 @@ impl CreateTable {
             }
         }
 
-        Ok(Vec::new())
+        Ok(implicit_changes)
     }
 
     pub(crate) fn apply_primary_key_nullability(&mut self) {
@@ -615,8 +633,12 @@ mod test_analyze_create_table {
         assert_eq!(create_table.mode(), &table_mode);
         assert_eq!(create_table.temporary(), temporary);
 
-        let Some(_table_in_context) = result_context.get_table(&sem_builder.table_name(table_name))
-        else {
+        let lookup_name = if temporary {
+            crate::sem::TableName::from(crate::sem::FullName::with_schema("pg_temp", table_name))
+        } else {
+            sem_builder.table_name(table_name)
+        };
+        let Some(_table_in_context) = result_context.get_table(&lookup_name) else {
             panic!("table not found in context")
         };
 

@@ -29,6 +29,22 @@ impl GetSourcePathWithSpan for AlterTable {
 }
 
 impl AlterTable {
+    pub(crate) fn conflicting_constraint(&self, table: &crate::sem::CreateTable) -> Option<String> {
+        let mut names = Vec::new();
+        for command in &self.commands {
+            if let Some(constraint) = command.added_constraint() {
+                let name = constraint.name();
+                if !name.is_empty() {
+                    if table.constraint(name).is_some() || names.contains(&name) {
+                        return Some(name.to_owned());
+                    }
+                    names.push(name);
+                }
+            }
+        }
+        None
+    }
+
     pub(crate) fn applied_owner(&self) -> Option<&crate::sem::OwnerSpecification> {
         self.commands
             .iter()
@@ -318,6 +334,14 @@ pub enum AlterObjSubCommand {
 }
 
 impl AlterObjSubCommand {
+    const fn added_constraint(&self) -> Option<&Constraint> {
+        if let Self::AddConstraint(constraint) = self {
+            Some(constraint)
+        } else {
+            None
+        }
+    }
+
     const fn applied_owner(&self) -> Option<&crate::sem::OwnerSpecification> {
         if let Self::ChangeOwner(owner) = self
             && owner.can_apply()

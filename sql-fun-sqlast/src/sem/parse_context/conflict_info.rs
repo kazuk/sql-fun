@@ -171,7 +171,7 @@ pub(crate) fn infer_from_catalog(
     let mut needs_implication = false;
     for index in context.indexes_for_table(table) {
         if let Some(eligible) = index.matches_inference(conflict)? {
-            if eligible {
+            if eligible && !InsertArbiter::contains_backing_index(&arbiters, index.name()) {
                 arbiters.push(InsertArbiter::index(index.name()));
             }
         } else {

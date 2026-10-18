@@ -4,6 +4,28 @@ This page is for application developers writing queries or investigating SQL
 analysis diagnostics. It describes supported forms and current limitations;
 installation and initial configuration are covered in [Installation](installation.md).
 
+## Conflicting schema definitions
+
+Schema analysis diagnoses duplicate definitions in the supplied schema files,
+including conflicts with definitions from earlier files. A rejected declaration
+preserves the existing definition and analysis continues with later statements.
+Tables, views, sequences, and indexes share relation names in PostgreSQL;
+standalone composite types also occupy that namespace. Other types and routine
+overloads follow their own namespace rules. Names in different schemas remain
+distinct.
+
+Supported `IF NOT EXISTS` forms preserve existing definitions. PostgreSQL
+`OR REPLACE` permits compatible view and routine replacements; it does not permit
+replacing an unrelated object kind. SQLite table/view names are compared without
+ASCII case distinctions, including quoted names. SQLite `CREATE INDEX` semantic
+analysis and automatically generated database index names remain unsupported.
+SQLite tables with repeated constraint names also remain unsupported by the
+retained schema model, although SQLite itself permits them.
+
+`DROP TABLE` is retained as schema metadata; it does not remove the definition or
+free its name for another CREATE. Supply the intended schema definitions rather
+than treating schema files as a migration execution history.
+
 ## SQLite parser limitations
 
 SQLite support is under development. Its sql-fun parser currently limits

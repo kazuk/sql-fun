@@ -30,7 +30,7 @@ impl ViewLike {
     pub(crate) fn result_columns(&self) -> &crate::sem::ResultColumnCollection {
         match self {
             Self::View(view) => view.result_columns(),
-            Self::MaterializedView(_) => todo!("materialized-view result enumeration"),
+            Self::MaterializedView(view) => view.result_columns(),
         }
     }
 

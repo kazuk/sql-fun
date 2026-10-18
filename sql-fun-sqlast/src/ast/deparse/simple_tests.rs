@@ -26,6 +26,7 @@ use crate::ast::{Dialect, DropTable, Name};
 #[case(
     "ALTER SEQUENCE IF EXISTS app.s AS smallint INCREMENT BY 3 NO MINVALUE NO MAXVALUE RESTART WITH 7 CACHE 2 NO CYCLE OWNED BY NONE"
 )]
+#[case("CREATE TEMPORARY SEQUENCE s")]
 #[case("CREATE TYPE app.mood AS ENUM ('sad', 'ok', 'happy')")]
 #[case("DROP TABLE IF EXISTS app.t, archive.t CASCADE")]
 #[case("INSERT INTO app.items AS target (id) VALUES (1)")]

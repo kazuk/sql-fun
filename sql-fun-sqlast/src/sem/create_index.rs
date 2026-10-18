@@ -140,6 +140,8 @@ mod index_element_collection_tests {
 /// analyzed [`crate::syn::IndexStmt`]
 #[derive(Debug, Clone)]
 pub struct CreateIndex {
+    if_not_exists: bool,
+
     name: FullName,
     table: TableName,
     key_columns: IndexElementCollection,
@@ -150,6 +152,27 @@ pub struct CreateIndex {
 }
 
 impl CreateIndex {
+    pub(crate) fn contains_name(indexes: &[Self], name: &FullName) -> bool {
+        indexes.iter().any(|index| index.name() == name)
+    }
+    pub(crate) fn with_table_identity(mut self, table: &FullName) -> Self {
+        self.table = TableName::from(table.clone());
+        self.name = FullName::new(
+            &table.catalog().cloned(),
+            &table.schema().cloned(),
+            self.name.name(),
+        );
+        self
+    }
+
+    pub(crate) const fn if_not_exists(&self) -> bool {
+        self.if_not_exists
+    }
+    pub(crate) const fn with_if_not_exists(mut self, value: bool) -> Self {
+        self.if_not_exists = value;
+        self
+    }
+
     pub(crate) fn set_predicate(&mut self, predicate: Option<SemScalarExpr>) {
         self.predicate = predicate;
     }
@@ -165,6 +188,7 @@ impl CreateIndex {
         unique: bool,
     ) -> Self {
         Self {
+            if_not_exists: false,
             name: name.clone(),
             table: table.clone(),
             key_columns: keys.clone(),
@@ -177,6 +201,7 @@ impl CreateIndex {
     #[must_use]
     pub fn new(name: &FullName, table: &TableName, key_columns: &IndexElementCollection) -> Self {
         Self {
+            if_not_exists: false,
             name: name.clone(),
             table: table.clone(),
             key_columns: key_columns.clone(),
@@ -195,6 +220,7 @@ impl CreateIndex {
         include_columns: &IndexElementCollection,
     ) -> Self {
         Self {
+            if_not_exists: false,
             name: name.clone(),
             table: table.clone(),
             key_columns: key_columns.clone(),

@@ -648,17 +648,7 @@ impl crate::sem::RuleInfoWrite for SchemaFileContext {
     }
 }
 
-impl BaseParseContext for SchemaCatalog {
-    fn sqlite_relation_identity(&self, name: &FullName) -> Option<FullName> {
-        if let Some(name) = self.tables.sqlite_name(name) {
-            Some(name)
-        } else if let Some(name) = self.views.sqlite_name(name) {
-            Some(name)
-        } else {
-            self.base.sqlite_relation_identity(name)
-        }
-    }
-
+impl crate::sem::TriggerInfoRead for SchemaCatalog {
     fn trigger_is_cancelled(&self, identity: &crate::sem::TriggerIdentity) -> bool {
         if let Some(entry) = self.triggers.get(identity) {
             entry.is_none()
@@ -676,6 +666,19 @@ impl BaseParseContext for SchemaCatalog {
             self.base.trigger(identity)
         }
     }
+}
+
+impl BaseParseContext for SchemaCatalog {
+    fn sqlite_relation_identity(&self, name: &FullName) -> Option<FullName> {
+        if let Some(name) = self.tables.sqlite_name(name) {
+            Some(name)
+        } else if let Some(name) = self.views.sqlite_name(name) {
+            Some(name)
+        } else {
+            self.base.sqlite_relation_identity(name)
+        }
+    }
+
     fn metadata(&self) -> &::sql_fun_core::SqlFunMetadata {
         &self.metadata
     }
@@ -686,6 +689,61 @@ impl BaseParseContext for SchemaCatalog {
 
     fn get_source_file_path(&self) -> Option<&Path> {
         Some(self.sql_source_path.as_path())
+    }
+}
+
+impl crate::sem::TriggerInfoWrite for SchemaFileContext {
+    fn register_trigger(
+        mut self,
+        trigger: &crate::sem::CreateTrigger,
+    ) -> Result<Self, AnalysisError> {
+        self.catalog
+            .triggers
+            .insert(trigger.identity().clone(), Some(trigger.clone()));
+        Ok(self)
+    }
+    fn associate_trigger(
+        mut self,
+        target: &FullName,
+        name: &FullName,
+    ) -> Result<Self, AnalysisError> {
+        if let Some(mut table) = self.get_table_impl(target).cloned() {
+            table.associate_trigger(name);
+            self.catalog.tables.insert_create_table(target, &table);
+        } else if let Some(mut view) = self.get_view_impl(target).cloned() {
+            view.associate_trigger(name);
+            self.catalog.views.insert(target, &view);
+        } else {
+            self.report_analysis_problem(crate::sem::AnalysisProblem::trigger(
+                &crate::sem::problem::TriggerProblem::target(target),
+            ))?;
+        }
+        Ok(self)
+    }
+    fn cancel_trigger(
+        mut self,
+        identity: &crate::sem::TriggerIdentity,
+    ) -> Result<Self, AnalysisError> {
+        self.catalog.triggers.insert(identity.clone(), None);
+        Ok(self)
+    }
+    fn dissociate_trigger(
+        mut self,
+        target: &FullName,
+        name: &FullName,
+    ) -> Result<Self, AnalysisError> {
+        if let Some(mut table) = self.get_table_impl(target).cloned() {
+            table.dissociate_trigger(name);
+            self.catalog.tables.insert_create_table(target, &table);
+        } else if let Some(mut view) = self.get_view_impl(target).cloned() {
+            view.dissociate_trigger(name);
+            self.catalog.views.insert(target, &view);
+        } else {
+            self.report_analysis_problem(crate::sem::AnalysisProblem::trigger(
+                &crate::sem::problem::TriggerProblem::target(target),
+            ))?;
+        }
+        Ok(self)
     }
 }
 
@@ -722,60 +780,6 @@ impl ParseContext for SchemaFileContext {
     }
     fn apply_alter_owner(self, alteration: &crate::sem::AlterOwner) -> Result<Self, AnalysisError> {
         self.apply_ownership_change(alteration)
-    }
-
-    fn register_trigger(
-        mut self,
-        trigger: &crate::sem::CreateTrigger,
-    ) -> Result<Self, AnalysisError> {
-        self.catalog
-            .triggers
-            .insert(trigger.identity().clone(), Some(trigger.clone()));
-        Ok(self)
-    }
-    fn associate_trigger(
-        mut self,
-        target: &FullName,
-        name: &FullName,
-    ) -> Result<Self, AnalysisError> {
-        if let Some(mut table) = self.get_table_impl(target).cloned() {
-            table.associate_trigger(name);
-            self.catalog.tables.insert_create_table(target, &table);
-        } else if let Some(mut view) = self.get_view_impl(target).cloned() {
-            view.associate_trigger(name);
-            self.catalog.views.insert(target, &view);
-        } else {
-            self.report_analysis_problem(crate::sem::AnalysisProblem::trigger(
-                &crate::sem::problem::TriggerProblem::target(target),
-            ))?;
-        }
-        Ok(self)
-    }
-
-    fn cancel_trigger(
-        mut self,
-        identity: &crate::sem::TriggerIdentity,
-    ) -> Result<Self, AnalysisError> {
-        self.catalog.triggers.insert(identity.clone(), None);
-        Ok(self)
-    }
-    fn dissociate_trigger(
-        mut self,
-        target: &FullName,
-        name: &FullName,
-    ) -> Result<Self, AnalysisError> {
-        if let Some(mut table) = self.get_table_impl(target).cloned() {
-            table.dissociate_trigger(name);
-            self.catalog.tables.insert_create_table(target, &table);
-        } else if let Some(mut view) = self.get_view_impl(target).cloned() {
-            view.dissociate_trigger(name);
-            self.catalog.views.insert(target, &view);
-        } else {
-            self.report_analysis_problem(crate::sem::AnalysisProblem::trigger(
-                &crate::sem::problem::TriggerProblem::target(target),
-            ))?;
-        }
-        Ok(self)
     }
 
     fn resolve_cursor(&self, name: &str) -> Option<&crate::sem::CursorInfo> {

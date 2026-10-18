@@ -1,4 +1,4 @@
-use crate::sem::{BaseParseContext, FullName, ParseContext, TriggerIdentity};
+use crate::sem::{FullName, ParseContext, TriggerIdentity, TriggerInfoRead};
 
 #[test]
 fn drop_masks_inherited_trigger_and_recreation_preserves_other_links() -> testresult::TestResult {

@@ -230,16 +230,20 @@ impl GetSourcePathWithSpanOpt for BaseContext {
     }
 }
 
-impl BaseParseContext for BaseContext {
-    fn sqlite_relation_identity(&self, _name: &FullName) -> Option<FullName> {
-        None
-    }
+impl crate::sem::TriggerInfoRead for BaseContext {
     fn trigger(
         &self,
         _identity: &crate::sem::TriggerIdentity,
     ) -> Option<&crate::sem::CreateTrigger> {
         None
     }
+}
+
+impl BaseParseContext for BaseContext {
+    fn sqlite_relation_identity(&self, _name: &FullName) -> Option<FullName> {
+        None
+    }
+
     fn metadata(&self) -> &SqlFunMetadata {
         &self.metadata
     }

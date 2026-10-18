@@ -314,8 +314,9 @@ impl RetainSqliteTypes for StatementNode {
             Self::View(value) => value.retain_types(retainer),
             Self::Table(value) => value.retain_types(retainer),
             Self::AlterRelation(value) => value.retain_types(retainer),
-            Self::DropTable(_) | Self::ViewWrite(_) | Self::DropTrigger(_) => Ok(()),
-            Self::CreateRule(_)
+            Self::DropTable(_) | Self::DropTrigger(_) => Ok(()),
+            Self::DropRule(_)
+            | Self::CreateRule(_)
             | Self::Extension(_)
             | Self::VariableSet(_)
             | Self::EnumType(_)

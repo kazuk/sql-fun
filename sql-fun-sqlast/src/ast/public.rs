@@ -134,10 +134,13 @@ mod test_statement_analyze {
 }
 
 /// Parser-independent statement category.
+///
+/// Trigger and rule statements have dedicated categories; the former aggregate
+/// `ViewWrite` category has been removed.
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
 pub enum StatementKind {
-    /// A legacy DROP RULE declaration used by writable-view schema analysis.
-    ViewWrite,
+    /// An unresolved PostgreSQL DROP RULE statement. Analysis awaits #605.
+    DropRule,
     /// An unresolved CREATE TRIGGER definition. Analysis awaits #602 / #555.
     CreateTrigger,
     /// An unresolved PostgreSQL CREATE RULE definition. Analysis awaits #604.
@@ -206,8 +209,9 @@ impl StatementKind {
         Self::DropTrigger
     }
 
-    const fn view_write() -> Self {
-        Self::ViewWrite
+    /// The PostgreSQL DROP RULE category.
+    pub const fn drop_rule() -> Self {
+        Self::DropRule
     }
     /// The query category.
     pub const fn query() -> Self {
@@ -332,7 +336,7 @@ impl StatementNode {
             Self::CreateTrigger(_) => StatementKind::create_trigger(),
             Self::CreateRule(_) => StatementKind::create_rule(),
             Self::DropTrigger(_) => StatementKind::drop_trigger(),
-            Self::ViewWrite(_) => StatementKind::view_write(),
+            Self::DropRule(_) => StatementKind::drop_rule(),
             Self::Extension(_) => StatementKind::extension(),
             Self::VariableSet(_) => StatementKind::variable_set(),
             Self::EnumType(_) => StatementKind::enum_type(),

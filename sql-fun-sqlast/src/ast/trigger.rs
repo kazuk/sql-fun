@@ -261,7 +261,7 @@ impl TryFrom<&syn::DropStmt> for super::DropTrigger {
             name: Name::from_parts(&[name]),
             relation: Some(Name::from_parts(&parts)),
             if_exists: value.get_missing_ok(),
-            behavior: Some(super::TriggerDropBehavior::try_from(
+            behavior: Some(super::DropBehavior::try_from(
                 value.get_behavior().as_inner(),
             )?),
         })
@@ -270,18 +270,6 @@ impl TryFrom<&syn::DropStmt> for super::DropTrigger {
 
 #[cfg(test)]
 mod drop_tests;
-
-impl TryFrom<Option<syn::DropBehavior>> for super::TriggerDropBehavior {
-    type Error = AnalysisError;
-
-    fn try_from(value: Option<syn::DropBehavior>) -> Result<Self, Self::Error> {
-        match value {
-            Some(syn::DropBehavior::DropCascade) => Ok(Self::Cascade),
-            Some(syn::DropBehavior::DropRestrict) => Ok(Self::Restrict),
-            _ => AnalysisError::raise_unexpected_input("DROP TRIGGER behavior"),
-        }
-    }
-}
 
 #[cfg(feature = "sqlite")]
 impl TryFrom<&syn::sqlite::DropTriggerStatement> for super::DropTrigger {

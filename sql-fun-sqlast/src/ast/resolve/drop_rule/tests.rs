@@ -229,13 +229,20 @@ mod test_helpers {
 }
 
 #[rstest::rstest]
-#[case::restrict("RESTRICT")]
-#[case::cascade("CASCADE")]
+#[case::implicit_restrict("RESTRICT", false)]
+#[case::implicit_cascade("CASCADE", false)]
+#[case::explicit_restrict("RESTRICT", true)]
+#[case::explicit_cascade("CASCADE", true)]
 fn cannot_drop_the_select_rule_required_by_a_view(
     #[case] behavior: &str,
+    #[case] explicit: bool,
 ) -> testresult::TestResult {
     let parent = test_helpers::catalog()?;
-    let context = test_helpers::apply(test_helpers::layer(&parent), "CREATE OR REPLACE RULE \"_RETURN\" AS ON SELECT TO public.item_view DO INSTEAD SELECT id FROM public.items")?.into_context().freeze();
+    let context = if explicit {
+        test_helpers::apply(test_helpers::layer(&parent), "CREATE OR REPLACE RULE \"_RETURN\" AS ON SELECT TO public.item_view DO INSTEAD SELECT id FROM public.items")?.into_context().freeze()
+    } else {
+        parent
+    };
     let mut child = test_helpers::layer(&context);
     let result = test_helpers::statement(&format!(
         "DROP RULE \"_RETURN\" ON public.item_view {behavior}"
@@ -252,7 +259,10 @@ fn cannot_drop_the_select_rule_required_by_a_view(
             .contains("View requires")
     );
     let identity = RuleIdentity::new(&FullName::with_schema("public", "item_view"), "_RETURN");
-    assert!(child.rule(&identity).is_some());
-    assert_eq!(test_helpers::active_count(&child.freeze()), 3);
+    assert_eq!(child.rule(&identity).is_some(), explicit);
+    assert_eq!(
+        test_helpers::active_count(&child.freeze()),
+        if explicit { 3 } else { 2 }
+    );
     Ok(())
 }

@@ -1,336 +1,331 @@
-//! View-write semantics with small catalog fixtures, plus focused production-provider coverage.
-//! Both run in the standard workspace flow.
+//! View-write semantics using the maintained sql-fun-home catalogs.
+//! All cases run in the standard workspace flow.
 use ::sql_fun_sqlast::sem::RuleInfoRead;
 
 mod test_helpers {
-    use ::clap::Parser;
-    use ::sql_fun_core::{SqlFunArgs, SqlFunMetadata};
-    use ::sql_fun_sqlast::{
-        ParsedSchemaDump, PostgresDialect,
-        sem::{BaseContext, FrozenBaseContext, SchemaFileContext, SemAst},
-    };
-    use std::path::Path;
+    pub mod heavy {
+        use ::clap::Parser;
+        use ::sql_fun_core::{SqlFunArgs, SqlFunMetadata};
+        use ::sql_fun_sqlast::{
+            ParsedSchemaDump, PostgresDialect,
+            sem::{BaseContext, FrozenBaseContext, SchemaFileContext, SemAst},
+        };
+        use std::path::Path;
 
-    pub struct ViewSchema {
-        args: SqlFunArgs,
-        metadata: SqlFunMetadata,
-        parsed: ParsedSchemaDump,
-    }
-    impl ViewSchema {
-        /// Load the small catalog fixture needed by these semantic cases.
-        /// Full production masters are covered separately in `heavy` tests.
-        pub fn postgres(sql: &str) -> Result<Self, Box<dyn std::error::Error>> {
-            Self::load_fixture(sql, false)
+        pub struct ViewSchema {
+            args: SqlFunArgs,
+            metadata: SqlFunMetadata,
+            parsed: ParsedSchemaDump,
         }
-        #[cfg(feature = "sqlite")]
-        pub fn sqlite(sql: &str) -> Result<Self, Box<dyn std::error::Error>> {
-            Self::load_fixture(sql, true)
-        }
-        fn load_fixture(sql: &str, sqlite: bool) -> Result<Self, Box<dyn std::error::Error>> {
-            let home =
-                Path::new(env!("CARGO_MANIFEST_DIR")).join("tests/fixtures/writable-builtins");
-            Self::load_from_catalog(sql, sqlite, "17", &home)
-        }
-        fn load_from_catalog(
-            sql: &str,
-            sqlite: bool,
-            version: &str,
-            builtin_home: &Path,
-        ) -> Result<Self, Box<dyn std::error::Error>> {
-            let manifest = Path::new(env!("CARGO_MANIFEST_DIR"));
-            let metadata_file = if sqlite {
-                manifest.join("tests/fixtures/writable-sqlite.toml")
-            } else {
-                manifest.join("tests/fixtures/writable-postgres.toml")
-            };
-            let args = SqlFunArgs::try_parse_from([
-                "sql-fun",
-                "--metadata-file",
-                metadata_file.to_str().unwrap(),
-                "--sql-fun-home",
-                builtin_home.to_str().unwrap(),
-                "--postgres-version",
-                version,
-            ])?;
-            let selected = args.load_metadata()?.get("default").unwrap().clone();
-            let base = FrozenBaseContext::from(BaseContext::new(&args, &selected)?);
-            let file = ::tempfile::NamedTempFile::new()?;
-            std::fs::write(file.path(), sql)?;
-            let parsed = {
-                #[cfg(feature = "sqlite")]
-                if sqlite {
-                    ::sql_fun_sqlast::SqliteDialect::parse_schema_file(
-                        file.path(),
-                        &base,
-                        &mut None,
-                        &args,
-                        &selected,
-                    )?
+        impl ViewSchema {
+            /// Load the maintained PostgreSQL 17 catalog for view-write analysis.
+            /// Each call reloads the full catalog without sharing across test processes.
+            pub fn postgres(sql: &str) -> Result<Self, Box<dyn std::error::Error>> {
+                Self::load_from_catalog(sql, false, "17", Path::new(env!("SQL_FUN_HOME")))
+            }
+            /// Load the maintained catalog with SQLite metadata for view-write analysis.
+            /// Each call reloads the full catalog without sharing across test processes.
+            #[cfg(feature = "sqlite")]
+            pub fn sqlite(sql: &str) -> Result<Self, Box<dyn std::error::Error>> {
+                Self::load_from_catalog(sql, true, "17", Path::new(env!("SQL_FUN_HOME")))
+            }
+            fn load_from_catalog(
+                sql: &str,
+                sqlite: bool,
+                version: &str,
+                builtin_home: &Path,
+            ) -> Result<Self, Box<dyn std::error::Error>> {
+                let manifest = Path::new(env!("CARGO_MANIFEST_DIR"));
+                let metadata_file = if sqlite {
+                    manifest.join("tests/fixtures/writable-sqlite.toml")
                 } else {
-                    PostgresDialect::parse_schema_file(
-                        file.path(),
-                        &base,
-                        &mut None,
-                        &args,
-                        &selected,
-                    )?
-                }
-                #[cfg(not(feature = "sqlite"))]
-                {
-                    PostgresDialect::parse_schema_file(
-                        file.path(),
-                        &base,
-                        &mut None,
-                        &args,
-                        &selected,
-                    )?
-                }
-            };
-            assert!(parsed.problems().is_empty(), "{:?}", parsed.problems());
-            Ok(Self {
-                args,
-                metadata: selected,
-                parsed,
-            })
-        }
-        pub fn layer(&self, sql: &str) -> Result<FrozenBaseContext, String> {
-            self.layer_at(self.context(), sql)
-        }
-        pub fn mask_trigger(
-            &self,
-            identity: &::sql_fun_sqlast::sem::TriggerIdentity,
-        ) -> Result<FrozenBaseContext, String> {
-            use ::sql_fun_sqlast::sem::ParseContext;
-            SchemaFileContext::new(
-                Path::new("mask.sql"),
-                self.context(),
-                &self.args,
-                &self.metadata,
-            )
-            .cancel_trigger(identity)
-            .map(ParseContext::freeze)
-            .map_err(|error| error.to_string())
-        }
-        pub fn mask_rule(
-            &self,
-            identity: &::sql_fun_sqlast::sem::RuleIdentity,
-        ) -> Result<FrozenBaseContext, String> {
-            use ::sql_fun_sqlast::sem::{ParseContext, RuleInfoWrite};
-            SchemaFileContext::new(
-                Path::new("mask.sql"),
-                self.context(),
-                &self.args,
-                &self.metadata,
-            )
-            .cancel_rule(identity)
-            .map(ParseContext::freeze)
-            .map_err(|error| error.to_string())
-        }
-        pub fn layer_at(
-            &self,
-            base: &FrozenBaseContext,
-            sql: &str,
-        ) -> Result<FrozenBaseContext, String> {
-            let mut context =
-                SchemaFileContext::new(Path::new("layer.sql"), base, &self.args, &self.metadata);
-            for statement in ::sql_fun_sqlast::parse_statements(
-                sql,
-                ::sql_fun_sqlast::ast::Dialect::from(&self.metadata),
-            ) {
-                context = statement
-                    .map_err(|error| error.to_string())?
-                    .analyze(context)
-                    .map_err(|error| error.to_string())?
-                    .into_context();
+                    manifest.join("tests/fixtures/writable-postgres.toml")
+                };
+                let args = SqlFunArgs::try_parse_from([
+                    "sql-fun",
+                    "--metadata-file",
+                    metadata_file.to_str().unwrap(),
+                    "--sql-fun-home",
+                    builtin_home.to_str().unwrap(),
+                    "--postgres-version",
+                    version,
+                ])?;
+                let selected = args.load_metadata()?.get("default").unwrap().clone();
+                let base = FrozenBaseContext::from(BaseContext::new(&args, &selected)?);
+                let file = ::tempfile::NamedTempFile::new()?;
+                std::fs::write(file.path(), sql)?;
+                let parsed = {
+                    #[cfg(feature = "sqlite")]
+                    if sqlite {
+                        ::sql_fun_sqlast::SqliteDialect::parse_schema_file(
+                            file.path(),
+                            &base,
+                            &mut None,
+                            &args,
+                            &selected,
+                        )?
+                    } else {
+                        PostgresDialect::parse_schema_file(
+                            file.path(),
+                            &base,
+                            &mut None,
+                            &args,
+                            &selected,
+                        )?
+                    }
+                    #[cfg(not(feature = "sqlite"))]
+                    {
+                        PostgresDialect::parse_schema_file(
+                            file.path(),
+                            &base,
+                            &mut None,
+                            &args,
+                            &selected,
+                        )?
+                    }
+                };
+                assert!(parsed.problems().is_empty(), "{:?}", parsed.problems());
+                Ok(Self {
+                    args,
+                    metadata: selected,
+                    parsed,
+                })
             }
-            if !context.problems().is_empty() {
-                return Err(format!("{:?}", context.problems()));
+            pub fn layer(&self, sql: &str) -> Result<FrozenBaseContext, String> {
+                self.layer_at(self.context(), sql)
             }
-            Ok(::sql_fun_sqlast::sem::ParseContext::freeze(context))
-        }
-        pub const fn context(&self) -> &FrozenBaseContext {
-            self.parsed.base_context()
-        }
-        pub fn query_problems(
-            &self,
-            sql: &str,
-        ) -> Result<Vec<::sql_fun_sqlast::sem::AnalysisProblem>, String> {
-            self.query_problems_at(self.context(), sql)
-        }
-        pub fn without_search_path(&self) -> FrozenBaseContext {
-            use ::sql_fun_sqlast::sem::ParseContext;
-            let mut context = SchemaFileContext::new(
-                Path::new("empty-path.sql"),
-                self.context(),
-                &self.args,
-                &self.metadata,
-            );
-            context.set_search_path(&[]);
-            context.freeze()
-        }
-        pub fn detached_view_catalog(
-            &self,
-            name: &::sql_fun_sqlast::sem::FullName,
-        ) -> Result<FrozenBaseContext, String> {
-            use ::sql_fun_sqlast::sem::{BaseParseContext, ParseContext, ViewInfoWrite};
-            let view = self
-                .context()
-                .get_view(&::sql_fun_sqlast::sem::ViewName::from_full_name(name))
-                .unwrap()
-                .ordinary_definition()
-                .unwrap();
-            let base = FrozenBaseContext::from(
-                BaseContext::new(&self.args, &self.metadata).map_err(|error| error.to_string())?,
-            );
-            SchemaFileContext::new(Path::new("detached.sql"), &base, &self.args, &self.metadata)
-                .apply_create_view(view)
+            pub fn mask_trigger(
+                &self,
+                identity: &::sql_fun_sqlast::sem::TriggerIdentity,
+            ) -> Result<FrozenBaseContext, String> {
+                use ::sql_fun_sqlast::sem::ParseContext;
+                SchemaFileContext::new(
+                    Path::new("mask.sql"),
+                    self.context(),
+                    &self.args,
+                    &self.metadata,
+                )
+                .cancel_trigger(identity)
                 .map(ParseContext::freeze)
                 .map_err(|error| error.to_string())
-        }
-        pub fn incomplete_catalog(&self) -> Result<FrozenBaseContext, String> {
-            use ::sql_fun_sqlast::sem::{ParseContext, ViewInfoWrite};
-            let SemAst::CreateView(view) =
-                self.analyze("CREATE VIEW public.incomplete AS SELECT id FROM public.items")?
-            else {
-                panic!("expected view")
-            };
-            let context = SchemaFileContext::new(
-                Path::new("older.sql"),
-                &FrozenBaseContext::from(
+            }
+            pub fn mask_rule(
+                &self,
+                identity: &::sql_fun_sqlast::sem::RuleIdentity,
+            ) -> Result<FrozenBaseContext, String> {
+                use ::sql_fun_sqlast::sem::{ParseContext, RuleInfoWrite};
+                SchemaFileContext::new(
+                    Path::new("mask.sql"),
+                    self.context(),
+                    &self.args,
+                    &self.metadata,
+                )
+                .cancel_rule(identity)
+                .map(ParseContext::freeze)
+                .map_err(|error| error.to_string())
+            }
+            pub fn layer_at(
+                &self,
+                base: &FrozenBaseContext,
+                sql: &str,
+            ) -> Result<FrozenBaseContext, String> {
+                let mut context = SchemaFileContext::new(
+                    Path::new("layer.sql"),
+                    base,
+                    &self.args,
+                    &self.metadata,
+                );
+                for statement in ::sql_fun_sqlast::parse_statements(
+                    sql,
+                    ::sql_fun_sqlast::ast::Dialect::from(&self.metadata),
+                ) {
+                    context = statement
+                        .map_err(|error| error.to_string())?
+                        .analyze(context)
+                        .map_err(|error| error.to_string())?
+                        .into_context();
+                }
+                if !context.problems().is_empty() {
+                    return Err(format!("{:?}", context.problems()));
+                }
+                Ok(::sql_fun_sqlast::sem::ParseContext::freeze(context))
+            }
+            pub const fn context(&self) -> &FrozenBaseContext {
+                self.parsed.base_context()
+            }
+            pub fn query_problems(
+                &self,
+                sql: &str,
+            ) -> Result<Vec<::sql_fun_sqlast::sem::AnalysisProblem>, String> {
+                self.query_problems_at(self.context(), sql)
+            }
+            pub fn without_search_path(&self) -> FrozenBaseContext {
+                use ::sql_fun_sqlast::sem::ParseContext;
+                let mut context = SchemaFileContext::new(
+                    Path::new("empty-path.sql"),
+                    self.context(),
+                    &self.args,
+                    &self.metadata,
+                );
+                context.set_search_path(&[]);
+                context.freeze()
+            }
+            pub fn detached_view_catalog(
+                &self,
+                name: &::sql_fun_sqlast::sem::FullName,
+            ) -> Result<FrozenBaseContext, String> {
+                use ::sql_fun_sqlast::sem::{BaseParseContext, ParseContext, ViewInfoWrite};
+                let view = self
+                    .context()
+                    .get_view(&::sql_fun_sqlast::sem::ViewName::from_full_name(name))
+                    .unwrap()
+                    .ordinary_definition()
+                    .unwrap();
+                let base = FrozenBaseContext::from(
                     BaseContext::new(&self.args, &self.metadata)
                         .map_err(|error| error.to_string())?,
-                ),
-                &self.args,
-                &self.metadata,
-            );
-            let context = context
-                .apply_create_view(&view)
-                .map_err(|error| error.to_string())?;
-            let statement = ::sql_fun_sqlast::parse_statements(
-                "CREATE VIEW public.incomplete_nested AS SELECT id FROM public.incomplete",
-                ::sql_fun_sqlast::ast::Dialect::from(&self.metadata),
-            )
-            .next()
-            .unwrap()
-            .map_err(|error| error.to_string())?;
-            Ok(statement
-                .analyze(context)
-                .map_err(|error| error.to_string())?
-                .into_context()
-                .freeze())
-        }
-        pub fn query_problems_at(
-            &self,
-            base: &FrozenBaseContext,
-            sql: &str,
-        ) -> Result<Vec<::sql_fun_sqlast::sem::AnalysisProblem>, String> {
-            Ok(self.analyze_statements_at(base, sql)?.problems().to_vec())
-        }
-        pub fn analyze_statements_at(
-            &self,
-            base: &FrozenBaseContext,
-            sql: &str,
-        ) -> Result<SchemaFileContext, String> {
-            let mut context =
-                SchemaFileContext::new(Path::new("query.sql"), base, &self.args, &self.metadata);
-            for statement in ::sql_fun_sqlast::parse_statements(
-                sql,
-                ::sql_fun_sqlast::ast::Dialect::from(&self.metadata),
-            ) {
-                let statement = statement.map_err(|error| error.to_string())?;
-                ::sql_fun_sqlast::sem::ParseContext::set_statement_span(
-                    &mut context,
-                    *statement.span(),
                 );
-                context = statement
+                SchemaFileContext::new(Path::new("detached.sql"), &base, &self.args, &self.metadata)
+                    .apply_create_view(view)
+                    .map(ParseContext::freeze)
+                    .map_err(|error| error.to_string())
+            }
+            pub fn incomplete_catalog(&self) -> Result<FrozenBaseContext, String> {
+                use ::sql_fun_sqlast::sem::{ParseContext, ViewInfoWrite};
+                let SemAst::CreateView(view) =
+                    self.analyze("CREATE VIEW public.incomplete AS SELECT id FROM public.items")?
+                else {
+                    panic!("expected view")
+                };
+                let context = SchemaFileContext::new(
+                    Path::new("older.sql"),
+                    &FrozenBaseContext::from(
+                        BaseContext::new(&self.args, &self.metadata)
+                            .map_err(|error| error.to_string())?,
+                    ),
+                    &self.args,
+                    &self.metadata,
+                );
+                let context = context
+                    .apply_create_view(&view)
+                    .map_err(|error| error.to_string())?;
+                let statement = ::sql_fun_sqlast::parse_statements(
+                    "CREATE VIEW public.incomplete_nested AS SELECT id FROM public.incomplete",
+                    ::sql_fun_sqlast::ast::Dialect::from(&self.metadata),
+                )
+                .next()
+                .unwrap()
+                .map_err(|error| error.to_string())?;
+                Ok(statement
                     .analyze(context)
                     .map_err(|error| error.to_string())?
-                    .into_context();
+                    .into_context()
+                    .freeze())
             }
-            Ok(context)
-        }
-        pub fn analyze(&self, sql: &str) -> Result<SemAst, String> {
-            let context = SchemaFileContext::new(
-                Path::new("query.sql"),
-                self.context(),
-                &self.args,
-                &self.metadata,
-            );
-            let statement = ::sql_fun_sqlast::parse_statements(
-                sql,
-                ::sql_fun_sqlast::ast::Dialect::from(&self.metadata),
-            )
-            .next()
-            .unwrap()
-            .map_err(|error| error.to_string())?;
-            let result = statement
-                .analyze(context)
+            pub fn query_problems_at(
+                &self,
+                base: &FrozenBaseContext,
+                sql: &str,
+            ) -> Result<Vec<::sql_fun_sqlast::sem::AnalysisProblem>, String> {
+                Ok(self.analyze_statements_at(base, sql)?.problems().to_vec())
+            }
+            pub fn analyze_statements_at(
+                &self,
+                base: &FrozenBaseContext,
+                sql: &str,
+            ) -> Result<SchemaFileContext, String> {
+                let mut context = SchemaFileContext::new(
+                    Path::new("query.sql"),
+                    base,
+                    &self.args,
+                    &self.metadata,
+                );
+                for statement in ::sql_fun_sqlast::parse_statements(
+                    sql,
+                    ::sql_fun_sqlast::ast::Dialect::from(&self.metadata),
+                ) {
+                    let statement = statement.map_err(|error| error.to_string())?;
+                    ::sql_fun_sqlast::sem::ParseContext::set_statement_span(
+                        &mut context,
+                        *statement.span(),
+                    );
+                    context = statement
+                        .analyze(context)
+                        .map_err(|error| error.to_string())?
+                        .into_context();
+                }
+                Ok(context)
+            }
+            pub fn analyze(&self, sql: &str) -> Result<SemAst, String> {
+                let context = SchemaFileContext::new(
+                    Path::new("query.sql"),
+                    self.context(),
+                    &self.args,
+                    &self.metadata,
+                );
+                let statement = ::sql_fun_sqlast::parse_statements(
+                    sql,
+                    ::sql_fun_sqlast::ast::Dialect::from(&self.metadata),
+                )
+                .next()
+                .unwrap()
                 .map_err(|error| error.to_string())?;
-            let ast = result.ast().clone();
-            let context = result.into_context();
-            if context.problems().is_empty() {
-                Ok(ast)
-            } else {
-                Err(format!("{:?}", context.problems()))
+                let result = statement
+                    .analyze(context)
+                    .map_err(|error| error.to_string())?;
+                let ast = result.ast().clone();
+                let context = result.into_context();
+                if context.problems().is_empty() {
+                    Ok(ast)
+                } else {
+                    Err(format!("{:?}", context.problems()))
+                }
             }
         }
-    }
 
-    impl ViewSchema {
-        pub fn analysis_context_at(&self, base: &FrozenBaseContext) -> SchemaFileContext {
-            SchemaFileContext::new(
-                Path::new("view-analysis.sql"),
-                base,
-                &self.args,
-                &self.metadata,
-            )
+        impl ViewSchema {
+            pub fn analysis_context_at(&self, base: &FrozenBaseContext) -> SchemaFileContext {
+                SchemaFileContext::new(
+                    Path::new("view-analysis.sql"),
+                    base,
+                    &self.args,
+                    &self.metadata,
+                )
+            }
+            pub fn analyze_insert_at(
+                &self,
+                base: &FrozenBaseContext,
+                view: &::sql_fun_sqlast::sem::FullName,
+            ) -> ::sql_fun_sqlast::sem::ViewInsertSupport {
+                ::sql_fun_sqlast::sem::ViewWriteEvaluation::new(&mut self.analysis_context_at(base))
+                    .insert(view)
+                    .expect("analysis engine succeeds")
+                    .expect("complete view write facts")
+            }
+            pub fn analyze_update_at(
+                &self,
+                base: &FrozenBaseContext,
+                view: &::sql_fun_sqlast::sem::FullName,
+            ) -> ::sql_fun_sqlast::sem::ViewUpdateSupport {
+                ::sql_fun_sqlast::sem::ViewWriteEvaluation::new(&mut self.analysis_context_at(base))
+                    .update(view)
+                    .expect("analysis engine succeeds")
+                    .expect("complete view write facts")
+            }
+            pub fn analyze_insert(
+                &self,
+                view: &::sql_fun_sqlast::sem::FullName,
+            ) -> ::sql_fun_sqlast::sem::ViewInsertSupport {
+                self.analyze_insert_at(self.context(), view)
+            }
+            pub fn analyze_update(
+                &self,
+                view: &::sql_fun_sqlast::sem::FullName,
+            ) -> ::sql_fun_sqlast::sem::ViewUpdateSupport {
+                self.analyze_update_at(self.context(), view)
+            }
         }
-        pub fn analyze_insert_at(
-            &self,
-            base: &FrozenBaseContext,
-            view: &::sql_fun_sqlast::sem::FullName,
-        ) -> ::sql_fun_sqlast::sem::ViewInsertSupport {
-            ::sql_fun_sqlast::sem::ViewWriteEvaluation::new(&mut self.analysis_context_at(base))
-                .insert(view)
-                .expect("analysis engine succeeds")
-                .expect("complete fixture write facts")
-        }
-        pub fn analyze_update_at(
-            &self,
-            base: &FrozenBaseContext,
-            view: &::sql_fun_sqlast::sem::FullName,
-        ) -> ::sql_fun_sqlast::sem::ViewUpdateSupport {
-            ::sql_fun_sqlast::sem::ViewWriteEvaluation::new(&mut self.analysis_context_at(base))
-                .update(view)
-                .expect("analysis engine succeeds")
-                .expect("complete fixture write facts")
-        }
-        pub fn analyze_insert(
-            &self,
-            view: &::sql_fun_sqlast::sem::FullName,
-        ) -> ::sql_fun_sqlast::sem::ViewInsertSupport {
-            self.analyze_insert_at(self.context(), view)
-        }
-        pub fn analyze_update(
-            &self,
-            view: &::sql_fun_sqlast::sem::FullName,
-        ) -> ::sql_fun_sqlast::sem::ViewUpdateSupport {
-            self.analyze_update_at(self.context(), view)
-        }
-    }
 
-    pub mod heavy {
-        use super::ViewSchema;
-        /// Reload full production builtin JSON per call/process. These tests
-        /// specifically verify extracted function properties and rule metadata.
-        pub fn postgres(sql: &str) -> Result<ViewSchema, Box<dyn std::error::Error>> {
-            ViewSchema::load_from_catalog(
-                sql,
-                false,
-                "17",
-                std::path::Path::new(env!("SQL_FUN_HOME")),
-            )
-        }
         /// Read emitted `pg_settings` and load its full production builtin catalog.
         /// Each call loads the selected version independently, without caching.
         pub fn builtin_settings(version: &str) -> Result<ViewSchema, Box<dyn std::error::Error>> {
@@ -353,7 +348,8 @@ mod test_helpers {
         }
     }
 }
-use self::test_helpers::{ViewSchema, heavy};
+
+use self::test_helpers::heavy;
 use ::sql_fun_sqlast::sem::FullName;
 
 const AUTOMATIC: &str = r"
@@ -386,7 +382,7 @@ fn automatic_view_query(
     #[case] sql: &str,
     #[case] accepted: bool,
 ) -> Result<(), Box<dyn std::error::Error>> {
-    let schema = ViewSchema::postgres(AUTOMATIC)?;
+    let schema = heavy::ViewSchema::postgres(AUTOMATIC)?;
     let result = schema.analyze(sql);
     assert_eq!(result.is_ok(), accepted, "{sql}: {result:?}");
     Ok(())
@@ -400,7 +396,7 @@ fn automatic_view_query(
 #[case::constant("SELECT 1 AS id")]
 #[case::grouping("SELECT id, GROUPING(id) AS grouped FROM public.items GROUP BY id")]
 fn read_only_shapes(#[case] query: &str) -> Result<(), Box<dyn std::error::Error>> {
-    let schema = ViewSchema::postgres(&format!(
+    let schema = heavy::ViewSchema::postgres(&format!(
         "CREATE TABLE public.items(id integer); CREATE VIEW public.v AS {query};"
     ))?;
     let name = FullName::with_schema("public", "v");
@@ -411,7 +407,7 @@ fn read_only_shapes(#[case] query: &str) -> Result<(), Box<dyn std::error::Error
 
 #[test]
 fn writable_columns_preserve_effective_constraints() -> Result<(), Box<dyn std::error::Error>> {
-    let schema = ViewSchema::postgres(
+    let schema = heavy::ViewSchema::postgres(
         r"
 CREATE TABLE public.items(id integer GENERATED ALWAYS AS IDENTITY, value integer DEFAULT 7, calc integer GENERATED ALWAYS AS (42) STORED);
 CREATE VIEW public.v AS SELECT id AS key, value, calc, value+1 AS computed FROM public.items;
@@ -506,7 +502,7 @@ fn independent_write_mechanisms(
     #[case] update: bool,
     #[case] returning: bool,
 ) -> Result<(), Box<dyn std::error::Error>> {
-    let schema = ViewSchema::postgres(&format!(
+    let schema = heavy::ViewSchema::postgres(&format!(
         r"
 CREATE TABLE public.items(id integer);
 CREATE VIEW public.v AS SELECT DISTINCT id FROM public.items;
@@ -546,7 +542,7 @@ CREATE FUNCTION public.noop() RETURNS trigger LANGUAGE plpgsql AS 'BEGIN RETURN 
 
 #[test]
 fn view_default_overrides_base_default() -> Result<(), Box<dyn std::error::Error>> {
-    let schema = ViewSchema::postgres(&format!(
+    let schema = heavy::ViewSchema::postgres(&format!(
         "{AUTOMATIC} ALTER VIEW public.item_view ALTER COLUMN value SET DEFAULT 42;"
     ))?;
     let support = schema.analyze_insert(&FullName::with_schema("public", "item_view"));
@@ -613,7 +609,7 @@ fn sqlite_trigger_oracle(
     oracle.execute_batch(&ddl)?;
     eprintln!("bundled SQLite {}", ::rusqlite::version());
     assert_eq!(oracle.prepare(query).is_ok(), accepted, "{query}");
-    let schema = ViewSchema::sqlite(&ddl)?;
+    let schema = heavy::ViewSchema::sqlite(&ddl)?;
     let result = schema.analyze(query);
     assert_eq!(result.is_ok(), accepted, "{query}: {result:?}");
     Ok(())
@@ -628,7 +624,7 @@ fn function_row_properties(
     #[case] query: &str,
     #[case] writable: bool,
 ) -> Result<(), Box<dyn std::error::Error>> {
-    let schema = heavy::postgres(&format!(
+    let schema = heavy::ViewSchema::postgres(&format!(
         "CREATE TABLE public.items(id integer); CREATE VIEW public.v AS {query};"
     ))?;
     let support = schema.analyze_update(&FullName::with_schema("public", "v"));
@@ -648,7 +644,7 @@ fn duplicate_projection_assignments(
     #[case] query: &str,
     #[case] accepted: bool,
 ) -> Result<(), Box<dyn std::error::Error>> {
-    let schema = ViewSchema::postgres(
+    let schema = heavy::ViewSchema::postgres(
         "CREATE TABLE public.items(a int,b int[]); CREATE VIEW public.v AS SELECT a AS x,a AS y,b AS p,b AS q FROM public.items;",
     )?;
     let result = schema.analyze(query);
@@ -658,7 +654,7 @@ fn duplicate_projection_assignments(
 
 #[test]
 fn nested_arbiters_retain_the_actual_source() -> Result<(), Box<dyn std::error::Error>> {
-    let schema = ViewSchema::postgres(AUTOMATIC)?;
+    let schema = heavy::ViewSchema::postgres(AUTOMATIC)?;
     let statement = schema
         .analyze("INSERT INTO public.nested(renamed) VALUES(1) ON CONFLICT(renamed) DO NOTHING")?;
     let arbiters = statement.as_insert().unwrap().conflicts()[0]
@@ -676,7 +672,7 @@ fn nested_arbiters_retain_the_actual_source() -> Result<(), Box<dyn std::error::
 
 #[test]
 fn later_layers_and_replace_preserve_frozen_parents() -> Result<(), Box<dyn std::error::Error>> {
-    let schema = ViewSchema::postgres(
+    let schema = heavy::ViewSchema::postgres(
         r"
 CREATE TABLE public.items(id int);
 CREATE VIEW public.v AS SELECT DISTINCT id FROM public.items;
@@ -692,7 +688,7 @@ CREATE FUNCTION public.noop() RETURNS trigger LANGUAGE plpgsql AS $$BEGIN RETURN
         schema.layer("CREATE OR REPLACE VIEW public.v AS SELECT id FROM public.items;")?;
     assert!(schema.analyze_update_at(&replaced, &name).is_writable());
     assert!(!schema.analyze_update(&name).is_writable());
-    let schema = ViewSchema::postgres(
+    let schema = heavy::ViewSchema::postgres(
         r"
 CREATE TABLE public.items(id int);
 CREATE VIEW public.v AS SELECT DISTINCT id FROM public.items;
@@ -752,7 +748,7 @@ fn automatic_rule_precedence(
     #[case] returning: bool,
     #[case] conflict: bool,
 ) -> Result<(), Box<dyn std::error::Error>> {
-    let schema = ViewSchema::postgres(&format!(
+    let schema = heavy::ViewSchema::postgres(&format!(
         r"
 CREATE TABLE public.items(id int PRIMARY KEY);
 CREATE TABLE public.audit(id int);
@@ -785,7 +781,7 @@ CREATE FUNCTION public.noop() RETURNS trigger LANGUAGE plpgsql AS $$BEGIN RETURN
 
 #[test]
 fn bound_names_do_not_reselect_shadowed_views() -> Result<(), Box<dyn std::error::Error>> {
-    let schema = ViewSchema::postgres(
+    let schema = heavy::ViewSchema::postgres(
         "CREATE SCHEMA other; CREATE TABLE public.items(id int); CREATE VIEW public.v AS SELECT id FROM public.items; CREATE VIEW other.v AS SELECT DISTINCT id FROM public.items;",
     )?;
     assert!(
@@ -810,7 +806,7 @@ fn bound_names_do_not_reselect_shadowed_views() -> Result<(), Box<dyn std::error
 
 #[test]
 fn materialized_views_are_not_write_destinations() -> Result<(), Box<dyn std::error::Error>> {
-    let schema = ViewSchema::postgres(
+    let schema = heavy::ViewSchema::postgres(
         "CREATE TABLE public.items(id int); CREATE MATERIALIZED VIEW public.v AS SELECT id FROM public.items;",
     )?;
     let name = FullName::with_schema("public", "v");
@@ -831,7 +827,7 @@ fn materialized_views_are_not_write_destinations() -> Result<(), Box<dyn std::er
 
 #[test]
 fn defaults_and_rule_drops_change_only_the_child() -> Result<(), Box<dyn std::error::Error>> {
-    let schema = ViewSchema::postgres(
+    let schema = heavy::ViewSchema::postgres(
         "CREATE TABLE public.items(id int DEFAULT 7); CREATE VIEW public.v AS SELECT DISTINCT id FROM public.items; CREATE RULE r AS ON INSERT TO public.v DO INSTEAD NOTHING;",
     )?;
     let name = FullName::with_schema("public", "v");
@@ -864,7 +860,7 @@ fn defaults_and_rule_drops_change_only_the_child() -> Result<(), Box<dyn std::er
 #[cfg(feature = "sqlite")]
 #[test]
 fn sqlite_drop_masks_inherited_trigger() -> Result<(), Box<dyn std::error::Error>> {
-    let schema = ViewSchema::sqlite(
+    let schema = heavy::ViewSchema::sqlite(
         "CREATE TABLE items(a); CREATE VIEW v AS SELECT a FROM items; CREATE TRIGGER it INSTEAD OF INSERT ON v BEGIN SELECT 1; END;",
     )?;
     let name = FullName::with_schema("main", "v");
@@ -888,7 +884,7 @@ fn declared_function_properties(
     #[case] result: &str,
     #[case] writable: bool,
 ) -> Result<(), Box<dyn std::error::Error>> {
-    let schema = ViewSchema::postgres(&format!(
+    let schema = heavy::ViewSchema::postgres(&format!(
         "CREATE TABLE public.items(id int); CREATE FUNCTION public.custom(i int) RETURNS {result} LANGUAGE sql AS 'SELECT i'; CREATE VIEW public.v AS SELECT id,public.custom(id) AS expression FROM public.items;"
     ))?;
     assert_eq!(
@@ -934,7 +930,7 @@ fn view_cast_lineage(
     #[case] column: &str,
     #[case] writable: bool,
 ) -> Result<(), Box<dyn std::error::Error>> {
-    let schema = ViewSchema::postgres(&format!(
+    let schema = heavy::ViewSchema::postgres(&format!(
         "CREATE TABLE public.items(id int,value varchar); CREATE VIEW public.v AS {query};"
     ))?;
     let result = schema.analyze(&format!("UPDATE public.v SET {column}=DEFAULT"));
@@ -946,7 +942,7 @@ fn view_cast_lineage(
 fn view_write_bindings_and_diagnostics_remain_structured() -> Result<(), Box<dyn std::error::Error>>
 {
     use ::sql_fun_sqlast::sem::problem::{InsertProblemKind, UpdateProblemKind};
-    let schema = ViewSchema::postgres(AUTOMATIC)?;
+    let schema = heavy::ViewSchema::postgres(AUTOMATIC)?;
     let insert = schema.analyze("INSERT INTO item_view(key) VALUES($1) RETURNING computed")?;
     let insert = insert.as_insert().unwrap();
     assert_eq!(
@@ -988,7 +984,7 @@ fn view_default_rewrite(
     #[case] query: &str,
     #[case] accepted: bool,
 ) -> Result<(), Box<dyn std::error::Error>> {
-    let schema = ViewSchema::postgres(
+    let schema = heavy::ViewSchema::postgres(
         "CREATE TABLE public.items(id int GENERATED ALWAYS AS IDENTITY, calc int GENERATED ALWAYS AS(42) STORED, other int GENERATED BY DEFAULT AS IDENTITY); CREATE VIEW public.v AS SELECT id AS key,calc,other FROM public.items;",
     )?;
     let result = schema.analyze(query);
@@ -999,7 +995,7 @@ fn view_default_rewrite(
 #[test]
 fn polymorphic_function_properties_use_the_producer_signature()
 -> Result<(), Box<dyn std::error::Error>> {
-    let schema = ViewSchema::postgres(
+    let schema = heavy::ViewSchema::postgres(
         "CREATE TABLE public.items(id int); CREATE FUNCTION public.custom(i anyelement) RETURNS anyelement LANGUAGE sql AS 'SELECT i'; CREATE FUNCTION public.custom(i text) RETURNS SETOF text LANGUAGE sql AS 'SELECT i'; CREATE VIEW public.v AS SELECT id,public.custom(id) AS expression FROM public.items;",
     )?;
     assert!(
@@ -1017,7 +1013,7 @@ fn polymorphic_function_properties_use_the_producer_signature()
 fn view_inference_expands_projection_expressions(
     #[case] query: &str,
 ) -> Result<(), Box<dyn std::error::Error>> {
-    let schema = ViewSchema::postgres(
+    let schema = heavy::ViewSchema::postgres(
         "CREATE TABLE public.items(a int); CREATE UNIQUE INDEX expression_key ON public.items((a+1)); CREATE VIEW public.v AS SELECT a AS id,a+1 AS computed FROM public.items; CREATE VIEW public.nested(id,renamed) AS SELECT id,computed FROM public.v;",
     )?;
     let statement = schema.analyze(query)?;
@@ -1045,7 +1041,7 @@ fn view_inference_expands_projection_expressions(
 fn from_column_aliases_preserve_source_identity(
     #[case] sql: &str,
 ) -> Result<(), Box<dyn std::error::Error>> {
-    let schema = ViewSchema::postgres(
+    let schema = heavy::ViewSchema::postgres(
         r"
 CREATE TABLE public.items(id integer PRIMARY KEY);
 CREATE VIEW public.alias_view AS SELECT x FROM public.items AS i(x);
@@ -1092,7 +1088,7 @@ fn invalid_view_declarations_are_structured(
     #[case] sql: &str,
     #[case] code: &str,
 ) -> Result<(), Box<dyn std::error::Error>> {
-    let schema = ViewSchema::postgres(AUTOMATIC)?;
+    let schema = heavy::ViewSchema::postgres(AUTOMATIC)?;
     let problems = schema.query_problems(&format!("{sql}; SELECT 1"))?;
     assert!(
         problems.iter().any(|problem| problem.code() == code
@@ -1109,7 +1105,7 @@ fn invalid_view_declarations_are_structured(
 
 #[test]
 fn incomplete_view_metadata_is_explicit() -> Result<(), Box<dyn std::error::Error>> {
-    let schema = ViewSchema::postgres(AUTOMATIC)?;
+    let schema = heavy::ViewSchema::postgres(AUTOMATIC)?;
     let older = schema.incomplete_catalog()?;
     let view = FullName::with_schema("public", "incomplete");
     assert!(
@@ -1187,7 +1183,7 @@ CREATE TRIGGER IF NOT EXISTS tr INSTEAD OF INSERT ON v2 BEGIN SELECT 1; END;
     db.execute_batch(ddl)?;
     assert!(db.prepare("UPDATE v1 SET a = 1").is_ok());
     assert!(db.prepare("INSERT INTO v2 VALUES (1)").is_err());
-    let schema = ViewSchema::sqlite(ddl)?;
+    let schema = heavy::ViewSchema::sqlite(ddl)?;
     assert!(schema.analyze("UPDATE v1 SET a = 1").is_ok());
     assert!(schema.analyze("INSERT INTO v2 VALUES (1)").is_err());
     assert!(
@@ -1200,7 +1196,7 @@ CREATE TRIGGER IF NOT EXISTS tr INSTEAD OF INSERT ON v2 BEGIN SELECT 1; END;
 
 #[test]
 fn view_declaration_requires_a_selected_schema() -> Result<(), Box<dyn std::error::Error>> {
-    let schema = ViewSchema::postgres(AUTOMATIC)?;
+    let schema = heavy::ViewSchema::postgres(AUTOMATIC)?;
     let base = schema.without_search_path();
     let problems = schema.query_problems_at(
         &base,
@@ -1217,7 +1213,7 @@ fn view_declaration_requires_a_selected_schema() -> Result<(), Box<dyn std::erro
 #[test]
 fn select_rule_replacement_refreshes_view_facts_in_the_child()
 -> Result<(), Box<dyn std::error::Error>> {
-    let schema = ViewSchema::postgres(
+    let schema = heavy::ViewSchema::postgres(
         "CREATE TABLE public.items(id integer); CREATE VIEW public.v AS SELECT id FROM public.items;",
     )?;
     let name = FullName::with_schema("public", "v");
@@ -1233,7 +1229,7 @@ fn select_rule_replacement_refreshes_view_facts_in_the_child()
 fn replacing_a_view_preserves_named_rule_links_and_refreshes_its_select_rule()
 -> Result<(), Box<dyn std::error::Error>> {
     use ::sql_fun_sqlast::sem::{BaseParseContext, RuleIdentity};
-    let schema = ViewSchema::postgres(
+    let schema = heavy::ViewSchema::postgres(
         r#"
 CREATE TABLE public.items(id integer);
 CREATE VIEW public.v AS SELECT id FROM public.items;
@@ -1283,7 +1279,7 @@ CREATE OR REPLACE RULE "_RETURN" AS ON SELECT TO public.v DO INSTEAD SELECT id F
 fn evaluation_service_reads_definition_options_and_retained_defaults()
 -> Result<(), Box<dyn std::error::Error>> {
     use ::sql_fun_sqlast::sem::{BaseParseContext, ViewWriteEvaluation};
-    let schema = ViewSchema::postgres(
+    let schema = heavy::ViewSchema::postgres(
         "CREATE TABLE public.items(id integer); CREATE VIEW public.v WITH (security_barrier = true) AS SELECT id FROM public.items WITH LOCAL CHECK OPTION; ALTER VIEW public.v ALTER COLUMN id SET DEFAULT 7;",
     )?;
     let name = FullName::with_schema("public", "v");
@@ -1329,7 +1325,7 @@ fn evaluation_service_reads_definition_options_and_retained_defaults()
 fn evaluation_excludes_masked_rule_references_and_uses_recreated_definitions()
 -> Result<(), Box<dyn std::error::Error>> {
     use ::sql_fun_sqlast::sem::{BaseParseContext, RuleIdentity, ViewWriteEvaluation};
-    let schema = ViewSchema::postgres(
+    let schema = heavy::ViewSchema::postgres(
         "CREATE TABLE public.items(id integer); CREATE VIEW public.v AS SELECT DISTINCT id FROM public.items; CREATE RULE r AS ON INSERT TO public.v DO INSTEAD NOTHING;",
     )?;
     let name = FullName::with_schema("public", "v");
@@ -1397,7 +1393,7 @@ fn missing_linked_definition_is_incomplete_not_a_dropped_capability(
     #[case] declaration: &str,
     #[case] missing: &str,
 ) -> Result<(), Box<dyn std::error::Error>> {
-    let schema = ViewSchema::postgres(&format!(
+    let schema = heavy::ViewSchema::postgres(&format!(
         "CREATE TABLE public.items(id integer); CREATE VIEW public.v AS SELECT DISTINCT id FROM public.items; {declaration};"
     ))?;
     let name = FullName::with_schema("public", "v");
@@ -1424,7 +1420,7 @@ fn evaluation_excludes_cancelled_trigger_links_and_accepts_recreation()
 -> Result<(), Box<dyn std::error::Error>> {
     use ::sql_fun_sqlast::sem::{BaseParseContext, TriggerIdentity, ViewWriteEvaluation};
     let declaration = "CREATE TRIGGER t INSTEAD OF INSERT ON public.v FOR EACH ROW EXECUTE FUNCTION public.noop()";
-    let schema = ViewSchema::postgres(&format!(
+    let schema = heavy::ViewSchema::postgres(&format!(
         "CREATE TABLE public.items(id integer); CREATE VIEW public.v AS SELECT DISTINCT id FROM public.items; CREATE FUNCTION public.noop() RETURNS trigger LANGUAGE plpgsql AS 'BEGIN RETURN NEW; END'; {declaration};"
     ))?;
     let name = FullName::with_schema("public", "v");
@@ -1504,7 +1500,7 @@ fn semantic_problems_allow_subsequent_statements(
     #[case] invalid: &str,
     #[case] expected_code: &str,
 ) -> Result<(), Box<dyn std::error::Error>> {
-    let schema = ViewSchema::postgres(
+    let schema = heavy::ViewSchema::postgres(
         "CREATE TABLE public.items(id integer); CREATE VIEW public.writable AS SELECT id FROM public.items; CREATE VIEW public.read_only AS SELECT DISTINCT id FROM public.items;",
     )?;
     let problems = schema.query_problems_at(schema.context(), &format!(
@@ -1518,7 +1514,7 @@ fn semantic_problems_allow_subsequent_statements(
 #[test]
 fn rejected_default_changes_leave_the_view_unchanged() -> Result<(), Box<dyn std::error::Error>> {
     use ::sql_fun_sqlast::sem::ParseContext;
-    let schema = ViewSchema::postgres(
+    let schema = heavy::ViewSchema::postgres(
         "CREATE TABLE public.items(id integer); CREATE VIEW public.v AS SELECT id FROM public.items; ALTER VIEW public.v ALTER COLUMN id SET DEFAULT 7;",
     )?;
     let context = schema.analyze_statements_at(schema.context(),

@@ -2,7 +2,7 @@ use crate::sem::{BaseParseContext, FullName, ParseContext, TriggerIdentity};
 
 #[test]
 fn drop_masks_inherited_trigger_and_recreation_preserves_other_links() -> testresult::TestResult {
-    let parent = test_helpers::catalog()?;
+    let parent = test_helpers::heavy::catalog()?;
     let pair = test_helpers::apply(test_helpers::layer(&parent), "DROP TRIGGER AUDIT")?;
     let drop = pair.ast().trigger_drop().unwrap();
     assert_eq!(drop.identity(), Some(&test_helpers::identity()));
@@ -38,7 +38,7 @@ fn drop_masks_inherited_trigger_and_recreation_preserves_other_links() -> testre
 #[case("DROP TRIGGER IF EXISTS absent")]
 #[case("DROP TRIGGER IF EXISTS main.absent")]
 fn absent_if_exists_is_an_explicit_noop(#[case] sql: &str) -> testresult::TestResult {
-    let parent = test_helpers::catalog()?;
+    let parent = test_helpers::heavy::catalog()?;
     let pair = test_helpers::apply(test_helpers::layer(&parent), sql)?;
     let drop = pair.ast().trigger_drop().unwrap();
     assert!(!drop.found());
@@ -58,7 +58,7 @@ fn absent_if_exists_is_an_explicit_noop(#[case] sql: &str) -> testresult::TestRe
 
 #[test]
 fn temp_trigger_precedes_main_and_qualified_drop_selects_its_namespace() -> testresult::TestResult {
-    let parent = test_helpers::catalog()?;
+    let parent = test_helpers::heavy::catalog()?;
     let context = test_helpers::apply(
         test_helpers::layer(&parent),
         "CREATE TEMP TRIGGER audit INSTEAD OF INSERT ON main.item_view BEGIN SELECT 1; END",
@@ -107,7 +107,7 @@ fn attached_schema_order_matches_bundled_sqlite(
     #[case] second: &str,
     #[case] qualified: bool,
 ) -> testresult::TestResult {
-    let (parent, connection) = test_helpers::attached_catalog(first, second)?;
+    let (parent, connection) = test_helpers::heavy::attached_catalog(first, second)?;
     let selected = if qualified { second } else { first };
     let sql = if qualified {
         format!("DROP TRIGGER {second}.audit")
@@ -146,80 +146,16 @@ fn attached_schema_order_matches_bundled_sqlite(
 }
 
 mod test_helpers {
-    use crate::sem::{BaseContext, FrozenBaseContext, SchemaFileContext};
     use crate::sem::{
         BaseParseContext, FullName, ParseContext, SchemaName, TableName, TriggerIdentity, ViewName,
     };
+    use crate::sem::{FrozenBaseContext, SchemaFileContext};
     pub(super) const CREATE_AUDIT: &str =
         "CREATE TRIGGER audit INSTEAD OF INSERT ON item_view BEGIN SELECT 1; END";
     pub(super) fn identity() -> TriggerIdentity {
         TriggerIdentity::sqlite(&FullName::with_schema("main", "audit"))
     }
-    // Small explicitly selected builtin fixture; no full production master is loaded.
-    pub(super) fn catalog() -> Result<FrozenBaseContext, Box<dyn std::error::Error>> {
-        use ::clap::Parser;
-        let manifest = std::path::Path::new(env!("CARGO_MANIFEST_DIR"));
-        let args = ::sql_fun_core::SqlFunArgs::try_parse_from([
-            "sql-fun",
-            "--metadata-file",
-            manifest
-                .join("tests/fixtures/writable-sqlite.toml")
-                .to_str()
-                .unwrap(),
-            "--sql-fun-home",
-            manifest
-                .join("tests/fixtures/writable-builtins")
-                .to_str()
-                .unwrap(),
-            "--postgres-version",
-            "17",
-        ])?;
-        let metadata = args.load_metadata()?.get("default").unwrap().clone();
-        let base = FrozenBaseContext::from(BaseContext::new(&args, &metadata)?);
-        let mut context = SchemaFileContext::new(
-            std::path::Path::new("drop-trigger.sql"),
-            &base,
-            &args,
-            &metadata,
-        );
-        for sql in [
-            "CREATE TABLE items(id)",
-            "CREATE VIEW item_view AS SELECT id FROM items",
-            CREATE_AUDIT,
-            "CREATE TRIGGER other INSTEAD OF UPDATE ON item_view BEGIN SELECT 1; END",
-        ] {
-            context = apply(context, sql)?.into_context();
-        }
-        assert!(context.problems().is_empty(), "{:?}", context.problems());
-        Ok(context.freeze())
-    }
-    pub(super) fn attached_catalog(
-        first: &str,
-        second: &str,
-    ) -> Result<(FrozenBaseContext, ::rusqlite::Connection), Box<dyn std::error::Error>> {
-        let base = catalog()?;
-        let mut context = apply(layer(&base), "DROP TRIGGER main.audit")?.into_context();
-        context.set_search_path(&[
-            SchemaName::from("main"),
-            SchemaName::from(first),
-            SchemaName::from(second),
-        ]);
-        let connection = ::rusqlite::Connection::open_in_memory()?;
-        for schema in [first, second] {
-            connection.execute_batch(&format!("ATTACH DATABASE ':memory:' AS {schema}"))?;
-            for sql in [
-                format!("CREATE TABLE {schema}.items(id)"),
-                format!(
-                    "CREATE TRIGGER {schema}.audit BEFORE INSERT ON {schema}.items BEGIN SELECT 1; END"
-                ),
-            ] {
-                connection.execute_batch(&sql)?;
-                context = apply(context, &sql)?.into_context();
-            }
-        }
-        assert!(context.problems().is_empty(), "{:?}", context.problems());
-        Ok((context.freeze(), connection))
-    }
+
     pub(super) fn layer(base: &FrozenBaseContext) -> SchemaFileContext {
         SchemaFileContext::new(
             std::path::Path::new("drop-trigger.sql"),
@@ -262,5 +198,77 @@ mod test_helpers {
             .unwrap()
             .resolve(context, &target)
             .len()
+    }
+    pub(super) mod heavy {
+        use super::{CREATE_AUDIT, FrozenBaseContext, ParseContext, SchemaFileContext, apply};
+        use super::{SchemaName, layer};
+        use crate::sem::BaseContext;
+        /// Reload the maintained catalog and analyze the test schema on each call.
+        /// Catalog state is not shared across independent test processes.
+        pub(in super::super) fn catalog() -> Result<FrozenBaseContext, Box<dyn std::error::Error>> {
+            use ::clap::Parser;
+            let manifest = std::path::Path::new(env!("CARGO_MANIFEST_DIR"));
+            let args = ::sql_fun_core::SqlFunArgs::try_parse_from([
+                "sql-fun",
+                "--metadata-file",
+                manifest
+                    .join("tests/fixtures/writable-sqlite.toml")
+                    .to_str()
+                    .unwrap(),
+                "--sql-fun-home",
+                env!("SQL_FUN_HOME"),
+                "--postgres-version",
+                "17",
+            ])?;
+            let metadata = args.load_metadata()?.get("default").unwrap().clone();
+            let base = FrozenBaseContext::from(BaseContext::new(&args, &metadata)?);
+            let mut context = SchemaFileContext::new(
+                std::path::Path::new("drop-trigger.sql"),
+                &base,
+                &args,
+                &metadata,
+            );
+            for sql in [
+                "CREATE TABLE items(id)",
+                "CREATE VIEW item_view AS SELECT id FROM items",
+                CREATE_AUDIT,
+                "CREATE TRIGGER other INSTEAD OF UPDATE ON item_view BEGIN SELECT 1; END",
+            ] {
+                context = apply(context, sql)?.into_context();
+            }
+            assert!(context.problems().is_empty(), "{:?}", context.problems());
+            Ok(context.freeze())
+        }
+
+        /// Load the maintained catalog and an in-memory SQLite oracle per call.
+        /// Neither catalog nor connection is shared across test processes.
+        pub(in super::super) fn attached_catalog(
+            first: &str,
+            second: &str,
+        ) -> Result<(FrozenBaseContext, ::rusqlite::Connection), Box<dyn std::error::Error>>
+        {
+            let base = catalog()?;
+            let mut context = apply(layer(&base), "DROP TRIGGER main.audit")?.into_context();
+            context.set_search_path(&[
+                SchemaName::from("main"),
+                SchemaName::from(first),
+                SchemaName::from(second),
+            ]);
+            let connection = ::rusqlite::Connection::open_in_memory()?;
+            for schema in [first, second] {
+                connection.execute_batch(&format!("ATTACH DATABASE ':memory:' AS {schema}"))?;
+                for sql in [
+                    format!("CREATE TABLE {schema}.items(id)"),
+                    format!(
+                        "CREATE TRIGGER {schema}.audit BEFORE INSERT ON {schema}.items BEGIN SELECT 1; END"
+                    ),
+                ] {
+                    connection.execute_batch(&sql)?;
+                    context = apply(context, &sql)?.into_context();
+                }
+            }
+            assert!(context.problems().is_empty(), "{:?}", context.problems());
+            Ok((context.freeze(), connection))
+        }
     }
 }

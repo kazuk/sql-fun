@@ -154,15 +154,13 @@ impl Insert {
             &returning_alias,
             &WithClause::default(),
         )?);
-        let returning_scope = ScalarAnalysisContext::nested(
-            &with,
-            &returning_from,
-            if let Some(scope) = outer {
-                scope.insert_returning_outer(context)
-            } else {
-                None
-            },
-        );
+        let rule_returning = if let Some(scope) = outer {
+            scope.insert_returning_outer(context)
+        } else {
+            None
+        };
+        let returning_scope =
+            ScalarAnalysisContext::nested(&with, &returning_from, rule_returning.as_ref());
         let returning = ResultColumnCollection::resolve_for_insert(
             &self.returning,
             context,

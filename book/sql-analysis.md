@@ -159,8 +159,9 @@ RETURNING requires an unconditional INSTEAD rule with one returning action and
 matching target column count, order and types. ON SELECT requires an ordinary
 view, `CREATE OR REPLACE RULE "_RETURN"`, an unconditional INSTEAD single SELECT,
 and matching result names as well as types. It replaces the view query and its
-write-analysis facts. INSERT action RETURNING can reference enclosing rule rows
-on PostgreSQL 18; earlier versions retain their restricted INSERT scope.
+write-analysis facts. UPDATE/DELETE action RETURNING binds visible rule rows;
+PostgreSQL 18 destination row images in INSERT RETURNING remain a separately
+tracked semantic boundary (#621), rather than binding the enclosing rule row.
 
 Actions use the common query/INSERT/UPDATE/DELETE analyzers. Their ordinary
 limitations apply, including ON CONFLICT DO UPDATE (#474). Within rules,

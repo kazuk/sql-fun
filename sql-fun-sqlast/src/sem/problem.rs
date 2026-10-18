@@ -194,6 +194,14 @@ impl AnalysisProblem {
         Self::View(problem.clone())
     }
 
+    /// Structured CREATE RULE failure, when this diagnostic describes a rule.
+    pub const fn rule_problem(&self) -> Option<&RuleProblem> {
+        if let Self::Rule(problem) = self {
+            Some(problem)
+        } else {
+            None
+        }
+    }
     /// Structured view declaration or capability violation.
     pub const fn view_problem(&self) -> Option<&ViewProblem> {
         if let Self::View(problem) = self {

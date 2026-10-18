@@ -144,7 +144,10 @@ mod test_delete {
 }
 
 impl Relation {
-    fn sqlite_target(name: &syn::QualifiedName, indexed: Option<&syn::Indexed>) -> Self {
+    pub(in crate::ast) fn sqlite_target(
+        name: &syn::QualifiedName,
+        indexed: Option<&syn::Indexed>,
+    ) -> Self {
         let (indexed, not_indexed) = match indexed {
             Some(syn::Indexed::IndexedBy(name)) => (Some(name.value().to_owned()), false),
             Some(syn::Indexed::NotIndexed) => (None, true),
@@ -307,6 +310,109 @@ impl TryFrom<&syn::SortedColumn> for IndexExpression {
                 .nulls()
                 .as_ref()
                 .map(|order| matches!(order, syn::NullsOrder::First)),
+        })
+    }
+}
+
+impl TryFrom<&syn::TriggerCmd> for crate::ast::StatementNode {
+    type Error = AnalysisError;
+
+    fn try_from(value: &syn::TriggerCmd) -> Result<Self, Self::Error> {
+        match value {
+            syn::TriggerCmd::Update(value) => Ok(Self::update(Update::try_from(value)?)),
+            syn::TriggerCmd::Insert(value) => Ok(Self::insert(Insert::try_from(value)?)),
+            syn::TriggerCmd::Delete(value) => Ok(Self::delete(Delete::try_from(value)?)),
+            syn::TriggerCmd::Select(value) => Ok(Self::query(Query::try_from(value)?)),
+        }
+    }
+}
+
+impl Relation {
+    fn sqlite_trigger_target(name: &syn::Name) -> Self {
+        Self {
+            name: Name::from_parts(&[name.value().to_owned()]),
+            alias: None,
+            inherit: false,
+            persistence: String::new(),
+            indexed: None,
+            not_indexed: false,
+        }
+    }
+}
+
+impl TryFrom<&syn::TriggerCmdUpdate> for Update {
+    type Error = AnalysisError;
+
+    fn try_from(value: &syn::TriggerCmdUpdate) -> Result<Self, Self::Error> {
+        Ok(Self {
+            with: With::default(),
+            relation: Relation::sqlite_trigger_target(value.table_name()),
+            assignments: Assignment::sqlite_sets(value.sets())?,
+            from: FromItem::try_from_clause_opt(value.from().as_ref())?,
+            predicate: Expr::try_from_opt(value.where_clause().as_deref())?,
+            or_conflict: ConflictClause::from_opt(value.or_conflict().as_ref()),
+            returning: Vec::new(),
+        })
+    }
+}
+
+impl TryFrom<&syn::TriggerCmdInsert> for Insert {
+    type Error = AnalysisError;
+
+    fn try_from(value: &syn::TriggerCmdInsert) -> Result<Self, Self::Error> {
+        Ok(Self {
+            with: With::default(),
+            relation: Relation::sqlite_trigger_target(value.table_name()),
+            columns: Assignment::insert_columns(value.col_names()),
+            source: Some(Query::try_from(value.select())?),
+            overriding: None,
+            conflict: Conflict::try_from_opt(value.upsert().as_deref())?,
+            or_conflict: ConflictClause::from_opt(value.or_conflict().as_ref()),
+            returning: Target::try_from_list(value.returning())?,
+        })
+    }
+}
+
+#[cfg(test)]
+mod test_trigger_insert {
+    use crate::ast::Insert;
+    use crate::syn::sqlite::{InsertBody, Stmt, TriggerCmdInsert};
+    use crate::test_helpers::SqliteSynBuilder;
+
+    #[test]
+    fn retains_adapter_returning_field_even_though_sql_parser_rejects_clause() {
+        let Stmt::Insert(insert) =
+            SqliteSynBuilder.parse_as_stmt("INSERT INTO audit(a) SELECT 1 RETURNING a AS recorded")
+        else {
+            panic!("INSERT fixture")
+        };
+        let InsertBody::Select(source) = insert.body() else {
+            panic!("SELECT source")
+        };
+        let command = TriggerCmdInsert::new(
+            None,
+            SqliteSynBuilder.name("audit"),
+            insert.columns().clone(),
+            source.select().clone(),
+            None,
+            insert.returning().clone(),
+        );
+        let common = Insert::try_from(&command).expect("trigger command conversion");
+        assert_eq!(common.returning[0].alias.as_deref(), Some("recorded"));
+        assert_eq!(common.columns[0].name, "a");
+    }
+}
+
+impl TryFrom<&syn::TriggerCmdDelete> for Delete {
+    type Error = AnalysisError;
+
+    fn try_from(value: &syn::TriggerCmdDelete) -> Result<Self, Self::Error> {
+        Ok(Self {
+            with: With::default(),
+            relation: Relation::sqlite_trigger_target(value.table_name()),
+            using: Vec::new(),
+            predicate: Expr::try_from_opt(value.where_clause().as_deref())?,
+            returning: Vec::new(),
         })
     }
 }

@@ -390,8 +390,8 @@ impl TryFromWithTokens<&syn::Node> for StatementNode {
             return Ok(Self::merge(Merge::try_from_with_tokens(&merge, tokens)?));
         }
         if let Some(trigger) = value.as_create_trig_stmt().as_inner() {
-            return Ok(Self::view_write(
-                super::view_write::WriteDeclaration::try_from(&trigger)?,
+            return Ok(Self::create_trigger(
+                super::CreateTrigger::try_from_with_tokens(&trigger, tokens)?,
             ));
         }
         if let Some(rule) = value.as_rule_stmt().as_inner() {

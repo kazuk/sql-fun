@@ -1030,3 +1030,9 @@ impl crate::sem::ViewDeleteInfoRead for SchemaCatalog {
         todo!("catalog deletable views, INSTEAD OF DELETE triggers and rules")
     }
 }
+
+impl crate::sem::ViewMergeInfoRead for SchemaCatalog {
+    fn view_merge_support(&self, _view: &crate::sem::FullName) -> crate::sem::ViewMergeSupport {
+        todo!("catalog MERGE-eligible views, rules, triggers and action columns")
+    }
+}

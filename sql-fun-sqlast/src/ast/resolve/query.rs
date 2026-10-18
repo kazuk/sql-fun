@@ -7,7 +7,7 @@ mod tests;
 use self::clauses::ClauseBinding;
 use crate::ast::{
     Alias, Call, CallKind, CteBody, DerivedTable, Dialect, Expr, FromGroup, FromItem, Grouping,
-    Join, JoinKind, Lock, Order, Query, QueryBody, Relation, Select, SetOperation, SetQuery,
+    Join, JoinKind, Lock, Merge, Order, Query, QueryBody, Relation, Select, SetOperation, SetQuery,
     TableFunctions, Window, With,
 };
 use crate::sem::ColumnName;
@@ -234,7 +234,10 @@ impl Select {
 }
 
 impl With {
-    pub(super) fn local_definitions(&self, mut visible: WithClause) -> Vec<crate::sem::QueryCte> {
+    pub(in crate::ast) fn local_definitions(
+        &self,
+        mut visible: WithClause,
+    ) -> Vec<crate::sem::QueryCte> {
         let mut local = Vec::new();
         for entry in &self.entries {
             if let Some(statement) = visible.take(&entry.name) {
@@ -248,7 +251,7 @@ impl With {
         }
         local
     }
-    pub(super) fn resolve(
+    pub(in crate::ast) fn resolve(
         &self,
         context: &mut impl ParseContext,
         outer: Option<&ScalarAnalysisContext<'_>>,
@@ -325,13 +328,23 @@ impl CteBody {
                 delete.rename_columns(columns);
                 Ok(CteStatement::from_delete(&delete))
             }
-            Self::Merge(_) => AnalysisError::raise_unexpected_none("common_table_expr.query"),
+            Self::Merge(merge) => {
+                Merge::require_version(context, 17)?;
+                let mut merge = merge.resolve_in(context, Some(scope))?;
+                if columns.len() > merge.result_columns().len() {
+                    return Err(AnalysisError::unexpected_input_error(
+                        "MERGE CTE declares more aliases than RETURNING columns",
+                    ));
+                }
+                merge.rename_columns(columns);
+                Ok(CteStatement::from_merge(merge))
+            }
         }
     }
 }
 
 impl Alias {
-    pub(super) fn resolve(&self) -> AliasSpec {
+    pub(in crate::ast) fn resolve(&self) -> AliasSpec {
         AliasSpec::from_names(&self.name, &self.columns)
     }
 }
@@ -348,7 +361,7 @@ impl JoinKind {
 }
 
 impl FromItem {
-    fn resolve(
+    pub(in crate::ast) fn resolve(
         &self,
         context: &mut impl ParseContext,
         with: &WithClause,
@@ -503,7 +516,7 @@ impl CallKind {
 }
 
 impl FromItem {
-    pub(super) fn resolve_list_in(
+    pub(in crate::ast) fn resolve_list_in(
         items: &[Self],
         context: &mut impl ParseContext,
         with: &WithClause,

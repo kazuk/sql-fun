@@ -7,6 +7,9 @@ impl DataSource {
         with: &WithClause,
         qualifier: Option<&AliasName>,
     ) -> Result<Vec<(AliasName, ColumnName)>, AnalysisError> {
+        if let Self::MergeRecord(record) = self {
+            return record.projection_names(context, with, qualifier);
+        }
         if let Self::JoinExpr(join) = self
             && join.matches_projection_qualifier(qualifier)
         {
@@ -33,7 +36,7 @@ impl DataSource {
         }
         Ok(columns)
     }
-    fn column_names(
+    pub(super) fn column_names(
         &self,
         context: &impl ParseContext,
         with: &WithClause,
@@ -74,6 +77,7 @@ impl DataSource {
                 .map(|(_, name)| name)
                 .collect()),
             Self::Unknown(_, _) => Ok(Vec::new()),
+            Self::MergeRecord(record) => record.column_names(context, with),
             Self::SubQuery(query) => Ok(query.select_statement().result_columns().names()),
             _ => AnalysisError::raise_unexpected_input(
                 "star source has no enumerable result columns",

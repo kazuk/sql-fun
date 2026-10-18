@@ -1,7 +1,8 @@
 mod delete;
-mod insert;
+pub(in crate::ast) mod insert;
 mod placement;
 mod query;
+mod returning;
 mod update;
 
 use crate::StringSpan;
@@ -17,7 +18,7 @@ use crate::sem::{
 };
 
 impl Name {
-    pub(super) fn star_qualifier(&self) -> Result<Option<AliasName>, AnalysisError> {
+    pub(in crate::ast) fn star_qualifier(&self) -> Result<Option<AliasName>, AnalysisError> {
         match self.0.as_slice() {
             [] => Ok(None),
             [alias] => Ok(Some(AliasName::from(alias.as_str()))),
@@ -25,7 +26,7 @@ impl Name {
         }
     }
 
-    pub(super) fn full_name(&self) -> Result<FullName, AnalysisError> {
+    pub(in crate::ast) fn full_name(&self) -> Result<FullName, AnalysisError> {
         match self.0.as_slice() {
             [local] => Ok(FullName::from_local_name(local)),
             [schema, local] => Ok(FullName::with_schema(schema, local)),
@@ -81,7 +82,7 @@ impl Expr {
         context.finish_analysis(result)
     }
 
-    pub(super) fn resolve_in(
+    pub(in crate::ast) fn resolve_in(
         &self,
         context: &mut impl ParseContext,
         scope: &ScalarAnalysisContext<'_>,
@@ -123,6 +124,14 @@ impl Expr {
             },
             Self::Indirection(indirection) => indirection.resolve(context, scope),
             Self::SqlValue(value) => value.resolve(),
+            Self::MergeAction => {
+                if !scope.merge_action_available() {
+                    return Err(AnalysisError::unexpected_input_error(
+                        "merge_action() is only permitted in MERGE RETURNING",
+                    ));
+                }
+                Ok(SemScalarExpr::merge_action())
+            }
             Self::Collate(collate) if context.dialect() == Dialect::sqlite() => {
                 collate.argument.resolve_in(context, scope)
             }
@@ -133,7 +142,6 @@ impl Expr {
             | Self::Grouping(_)
             | Self::Row(_)
             | Self::CurrentOf(_)
-            | Self::MergeAction
             | Self::TruthTest(_) => {
                 AnalysisError::raise_unexpected_input("unsupported raw scalar expression")
             }

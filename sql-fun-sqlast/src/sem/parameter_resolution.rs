@@ -884,6 +884,26 @@ impl ParameterResolution {
         })?;
         Ok(constraints)
     }
+    pub(crate) fn infer_merge(
+        merge: &mut crate::sem::MergeStatement,
+        context: &mut impl crate::sem::ParseContext,
+    ) -> Result<ParameterConstraints, AnalysisError> {
+        #[cfg(test)]
+        INFERENCE_RUNS.with(|runs| runs.set(runs.get() + 1));
+        let mut collector = Collector {
+            dml_depth: 0,
+            parameters: Self::default(),
+            context,
+        };
+        merge.walk(&mut collector)?;
+        collector.parameters.solve(collector.context)?;
+        let constraints = collector.parameters.constraints();
+        merge.walk(&mut Finalizer {
+            constraints: &constraints,
+            context: collector.context,
+        })?;
+        Ok(constraints)
+    }
     pub(crate) fn infer_expression(
         expression: &mut SemScalarExpr,
         context: &mut impl crate::sem::ParseContext,

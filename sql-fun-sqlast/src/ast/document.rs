@@ -1,4 +1,5 @@
 mod deparse;
+mod merge;
 
 #[path = "postgres/document.rs"]
 mod postgres;
@@ -400,6 +401,10 @@ pub(crate) struct Merge {
 impl Merge {
     pub(super) const fn with_node(&self) -> &With {
         &self.with_clause
+    }
+
+    pub(super) const fn with_node_mut(&mut self) -> &mut With {
+        &mut self.with_clause
     }
 }
 

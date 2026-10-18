@@ -1,8 +1,8 @@
-use crate::ast::{Alias, Delete, Dialect, Expr, FromItem, Target};
+use crate::ast::{Alias, Delete, Dialect, Expr, FromItem};
 use crate::sem::DeleteDestination;
 use crate::sem::problem::DeleteProblemKind;
 use crate::sem::{
-    AliasSpec, AnalysisError, AnalysisProblem, ColumnName, DataSource, DeleteStatement, FromClause,
+    AliasSpec, AnalysisError, AnalysisProblem, DataSource, DeleteStatement, FromClause,
     ParseContext, ResultColumnCollection, ScalarAnalysisContext, TableName, WithClause,
 };
 
@@ -172,69 +172,37 @@ impl Delete {
         with: &WithClause,
         from: &FromClause,
     ) -> Result<ResultColumnCollection, AnalysisError> {
-        let mut returning_from = FromClause::default();
-        let returning = if context.dialect() == Dialect::sqlite() {
+        if context.dialect() == Dialect::sqlite() {
             let returning_alias = AliasSpec::from_local_name(&requested.full_name().local_name());
+            let mut returning_from = FromClause::default();
             returning_from.push(DataSource::resolve_relation(
                 context,
                 table.name().full_name(),
                 &returning_alias,
                 &WithClause::default(),
             )?);
-            self.resolve_returning(context, with, &returning_from, &returning_alias)?
+            let mut scope = ScalarAnalysisContext::nested(with, &returning_from, None);
+            scope.set_delete_returning_target(returning_alias.name(), context);
+            ResultColumnCollection::resolve_for_delete(
+                &self.returning,
+                context,
+                with,
+                &returning_from,
+                &scope,
+                &returning_alias,
+            )
         } else {
-            self.resolve_returning(context, with, from, alias)?
-        };
-        Ok(returning)
-    }
-    fn resolve_returning(
-        &self,
-        context: &mut impl ParseContext,
-        with: &WithClause,
-        from: &FromClause,
-        target: &AliasSpec,
-    ) -> Result<ResultColumnCollection, AnalysisError> {
-        let mut scope = ScalarAnalysisContext::nested(with, from, None);
-        scope.set_delete_returning_target(target.name(), context);
-        let mut results = ResultColumnCollection::default();
-        for Target { expression, alias } in &self.returning {
-            if let Expr::Star(name) = expression {
-                if context.dialect() == Dialect::sqlite() && !name.0.is_empty() {
-                    context.report_analysis_problem(AnalysisProblem::delete(
-                        DeleteProblemKind::returning_qualifier(),
-                    ))?;
-                }
-                // Unqualified RETURNING * expands only the modified relation.
-                let qualifier = if name.0.is_empty() {
-                    Some(target.name().clone())
-                } else {
-                    name.star_qualifier()?
-                };
-                let projection_qualifier = qualifier.as_ref().map(|alias| {
-                    scope
-                        .delete_row_target(alias)
-                        .map_or(alias, |(target, _)| target)
-                });
-                let columns = from.projection_names(context, with, projection_qualifier)?;
-                if columns.is_empty() {
-                    context.report_analysis_problem(AnalysisProblem::delete(
-                        DeleteProblemKind::returning_qualifier(),
-                    ))?;
-                }
-                for (source, column) in columns {
-                    let binding_alias = qualifier.as_ref().unwrap_or(&source);
-                    let value = scope
-                        .resolve_column(context, Some(binding_alias), &column)?
-                        .0;
-                    results.push_expression(&column, value);
-                }
-            } else {
-                let value = expression.resolve_in(context, &scope)?;
-                let name = alias.clone().unwrap_or_else(|| value.get_column_name());
-                results.push_expression(&ColumnName::from(name.as_str()), value);
-            }
+            let mut scope = ScalarAnalysisContext::nested(with, from, None);
+            scope.set_delete_returning_target(alias.name(), context);
+            ResultColumnCollection::resolve_for_delete(
+                &self.returning,
+                context,
+                with,
+                from,
+                &scope,
+                alias,
+            )
         }
-        Ok(results)
     }
 }
 impl Expr {

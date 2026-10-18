@@ -63,6 +63,52 @@ impl<'a> ScalarAnalysisContext<'a> {
         }
     }
 
+    pub(crate) fn for_merge_on(
+        with_clause: &'a WithClause,
+        target: &crate::sem::DataSource,
+        source: &crate::sem::DataSource,
+    ) -> Self {
+        Self::with_owned_from_clause(with_clause, FromClause::for_merge_on(target, source))
+    }
+
+    pub(crate) fn for_merge_when(
+        with_clause: &'a WithClause,
+        target: &crate::sem::DataSource,
+        source: &crate::sem::DataSource,
+        kind: crate::sem::MergeMatchKind,
+    ) -> Self {
+        Self::with_owned_from_clause(
+            with_clause,
+            FromClause::for_merge_when(target, source, kind),
+        )
+    }
+
+    pub(crate) fn for_merge_returning(
+        context: &impl ParseContext,
+        with_clause: &'a WithClause,
+        target: &crate::sem::DataSource,
+        source: &crate::sem::DataSource,
+        source_nullable: bool,
+        old_nullable: bool,
+        new_nullable: bool,
+    ) -> Self {
+        Self::with_owned_from_clause(
+            with_clause,
+            FromClause::for_merge_returning(
+                target,
+                source,
+                source_nullable,
+                old_nullable,
+                new_nullable,
+                postgres_18_or_later(context),
+            ),
+        )
+    }
+
+    pub(crate) fn sources(&self) -> &FromClause {
+        self.from_clause.as_ref()
+    }
+
     pub(crate) fn set_delete_returning_target(
         &mut self,
         target: &AliasName,
@@ -162,6 +208,45 @@ impl<'a> ScalarAnalysisContext<'a> {
     pub(crate) fn inherited_ctes(&self) -> WithClause {
         self.with_clause.as_ref().clone()
     }
+
+    pub(crate) fn merge_action_available(&self) -> bool {
+        self.from_clause.merge_action_available()
+            || self
+                .parent
+                .as_deref()
+                .is_some_and(Self::merge_action_available)
+    }
+
+    pub(crate) fn merge_row_target(
+        &self,
+        alias: &AliasName,
+    ) -> Option<(&AliasName, crate::sem::data_source::MergeRecordRole, bool)> {
+        self.from_clause.merge_row_target(alias)
+    }
+
+    const fn with_owned_from_clause(with_clause: &'a WithClause, from_clause: FromClause) -> Self {
+        Self {
+            with_clause: Cow::Borrowed(with_clause),
+            from_clause: Cow::Owned(from_clause),
+            parent: None,
+            windows: Vec::new(),
+            output_aliases: None,
+            delete_returning_target: None,
+        }
+    }
+}
+
+fn postgres_18_or_later(context: &impl ParseContext) -> bool {
+    if context.dialect() != crate::ast::Dialect::postgres() {
+        return false;
+    }
+    let Some(version) = context.metadata().engine_version() else {
+        return false;
+    };
+    version
+        .to_string()
+        .parse::<::sql_fun_core::PostgresVersion>()
+        .is_ok_and(|version| version.major() >= 18)
 }
 
 impl ScalarAnalysisContext<'_> {
@@ -190,6 +275,10 @@ impl ScalarAnalysisContext<'_> {
         column: &ColumnName,
     ) -> Result<(SemScalarExpr, &'context mut TContext), AnalysisError> {
         if let Some(alias) = alias {
+            if let Some((target, role, nullable)) = self.merge_row_target(alias) {
+                let (value, context) = self.resolve_source_column_ref(context, target, column)?;
+                return Ok((value.merge_record_column(role, nullable), context));
+            }
             if let Some((target, version)) = self.delete_row_target(alias) {
                 let (value, context) = self.resolve_source_column_ref(context, target, column)?;
                 return Ok((value.delete_row_column(version), context));

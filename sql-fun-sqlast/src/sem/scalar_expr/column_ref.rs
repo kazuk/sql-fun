@@ -1,5 +1,6 @@
 mod cte_column_ref;
 mod invalid_column_ref;
+mod merge_record_column_ref;
 mod output_column_ref;
 mod subquery_column_ref;
 mod table_column_ref;
@@ -11,6 +12,7 @@ pub use self::{
     invalid_column_ref::{
         UndefinedAliasColumnRef, UnknownSourceColumnRef, UnknownTableFuncColumnRef,
     },
+    merge_record_column_ref::MergeRecordColumnRef,
     output_column_ref::OutputColumnRef,
     subquery_column_ref::SubQueryColumnRef,
     table_column_ref::TableColumnRef,
@@ -35,6 +37,8 @@ trait ColumnReference {
 pub enum ColumnReferenceExpr {
     /// PostgreSQL DELETE RETURNING OLD/NEW target-column binding.
     DeleteRow(crate::sem::DeleteRowColumn),
+    /// MERGE target, source, or row-image column binding.
+    MergeRecord(MergeRecordColumnRef),
     /// Reference to a resolved projection position (alias or ordinal).
     OutputColumn(OutputColumnRef),
     /// CTE column
@@ -71,6 +75,35 @@ impl SemScalarExprNode for ColumnReferenceExpr {
 }
 
 impl ColumnReferenceExpr {
+    /// MERGE record binding, when this reference belongs to a MERGE record.
+    pub const fn merge_record_reference(&self) -> Option<&MergeRecordColumnRef> {
+        if let Self::MergeRecord(reference) = self {
+            Some(reference)
+        } else {
+            None
+        }
+    }
+
+    pub(crate) fn undefined_alias_resolved<C: ParseContext>(
+        context: &mut C,
+        alias: &crate::sem::data_source::AliasName,
+        column: &ColumnName,
+    ) -> Result<SemScalarExpr, AnalysisError> {
+        UndefinedAliasColumnRef::new_with_report(context, alias, column)
+    }
+
+    pub(crate) fn merge_record(
+        role: crate::sem::data_source::MergeRecordRole,
+        source: &Self,
+        nullable: bool,
+    ) -> Self {
+        let source = match source {
+            Self::MergeRecord(reference) => reference.source(),
+            _ => source,
+        };
+        Self::MergeRecord(MergeRecordColumnRef::new(role, source, nullable))
+    }
+
     pub(crate) const fn delete_row_reference(&self) -> Option<&crate::sem::DeleteRowColumn> {
         match self {
             Self::DeleteRow(column) => Some(column),
@@ -107,6 +140,7 @@ impl ColumnReferenceExpr {
     }
     pub(super) fn constraint_binding(&self) -> Option<(&str, &ColumnName)> {
         match self {
+            Self::MergeRecord(value) => value.source().constraint_binding(),
             Self::CteColumn(value) => {
                 Some((value.binding_alias().as_str(), value.get_column_name()))
             }
@@ -138,6 +172,7 @@ impl ColumnReferenceExpr {
     pub fn get_type(&self) -> Option<TypeReference> {
         match self {
             Self::DeleteRow(value) => value.column_type(),
+            Self::MergeRecord(value) => value.column_type(),
             Self::OutputColumn(r) => r.get_type(),
             Self::CteColumn(r) => r.get_type(),
             Self::TableColumn(r) => r.get_type(),
@@ -157,6 +192,7 @@ impl ColumnReferenceExpr {
     pub fn is_not_null(&self) -> Option<bool> {
         match self {
             Self::DeleteRow(value) => value.is_not_null(),
+            Self::MergeRecord(value) => value.is_not_null(),
             Self::OutputColumn(r) => r.is_not_null(),
             Self::CteColumn(r) => r.is_not_null(),
             Self::TableColumn(r) => r.is_not_null(),
@@ -176,6 +212,7 @@ impl ColumnReferenceExpr {
     pub fn get_column_def(&self) -> &Option<ColumnDefinition> {
         match self {
             Self::DeleteRow(value) => value.column_definition(),
+            Self::MergeRecord(value) => value.column_definition(),
             Self::OutputColumn(r) => r.get_column_def(),
             Self::CteColumn(r) => r.get_column_def(),
             Self::TableColumn(r) => r.get_column_def(),
@@ -195,6 +232,7 @@ impl ColumnReferenceExpr {
     pub fn get_column_name(&self) -> &ColumnName {
         match self {
             Self::DeleteRow(value) => value.column_name(),
+            Self::MergeRecord(value) => value.column_name(),
             Self::OutputColumn(r) => r.get_column_name(),
             Self::CteColumn(r) => r.get_column_name(),
             Self::TableColumn(r) => r.get_column_name(),

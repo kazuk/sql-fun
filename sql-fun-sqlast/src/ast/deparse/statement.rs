@@ -10,6 +10,7 @@ impl SqlEmit for StatementNode {
             Self::Insert(v) => v.emit(writer),
             Self::Update(v) => v.emit(writer),
             Self::Delete(v) => v.emit(writer),
+            Self::Merge(v) => v.emit(writer),
             Self::View(v) => v.emit(writer),
             Self::Extension(v) => v.emit(writer),
             Self::VariableSet(v) => v.emit(writer),

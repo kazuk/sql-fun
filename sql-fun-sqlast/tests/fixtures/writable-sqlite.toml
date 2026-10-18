@@ -1,5 +1,0 @@
-[package.metadata.database.default]
-engine = "SQLite"
-dialect = "SQLite"
-version = "3"
-search_path = ["main"]

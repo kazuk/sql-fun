@@ -207,20 +207,17 @@ mod test_helpers {
         /// Catalog state is not shared across independent test processes.
         pub(in super::super) fn catalog() -> Result<FrozenBaseContext, Box<dyn std::error::Error>> {
             use ::clap::Parser;
-            let manifest = std::path::Path::new(env!("CARGO_MANIFEST_DIR"));
             let args = ::sql_fun_core::SqlFunArgs::try_parse_from([
                 "sql-fun",
-                "--metadata-file",
-                manifest
-                    .join("tests/fixtures/writable-sqlite.toml")
-                    .to_str()
-                    .unwrap(),
                 "--sql-fun-home",
                 env!("SQL_FUN_HOME"),
                 "--postgres-version",
                 "17",
             ])?;
-            let metadata = args.load_metadata()?.get("default").unwrap().clone();
+            let metadata = ::serde_json::from_value(::serde_json::json!({
+                "engine": "SQLite", "dialect": "SQLite", "version": "3",
+                "search_path": ["main"]
+            }))?;
             let base = FrozenBaseContext::from(BaseContext::new(&args, &metadata)?);
             let mut context = SchemaFileContext::new(
                 std::path::Path::new("drop-trigger.sql"),

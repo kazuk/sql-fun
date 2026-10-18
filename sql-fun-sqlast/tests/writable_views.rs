@@ -35,22 +35,24 @@ mod test_helpers {
                 version: &str,
                 builtin_home: &Path,
             ) -> Result<Self, Box<dyn std::error::Error>> {
-                let manifest = Path::new(env!("CARGO_MANIFEST_DIR"));
-                let metadata_file = if sqlite {
-                    manifest.join("tests/fixtures/writable-sqlite.toml")
-                } else {
-                    manifest.join("tests/fixtures/writable-postgres.toml")
-                };
                 let args = SqlFunArgs::try_parse_from([
                     "sql-fun",
-                    "--metadata-file",
-                    metadata_file.to_str().unwrap(),
                     "--sql-fun-home",
                     builtin_home.to_str().unwrap(),
                     "--postgres-version",
                     version,
                 ])?;
-                let selected = args.load_metadata()?.get("default").unwrap().clone();
+                let selected = if sqlite {
+                    ::serde_json::from_value(::serde_json::json!({
+                        "engine": "SQLite", "dialect": "SQLite", "version": "3",
+                        "search_path": ["main"]
+                    }))?
+                } else {
+                    ::serde_json::from_value(::serde_json::json!({
+                        "engine": "PostgreSQL", "dialect": "postgres", "version": "17",
+                        "search_path": ["public", "pg_catalog"]
+                    }))?
+                };
                 let base = FrozenBaseContext::from(BaseContext::new(&args, &selected)?);
                 let file = ::tempfile::NamedTempFile::new()?;
                 std::fs::write(file.path(), sql)?;

@@ -53,11 +53,14 @@ lifetime remain execution-time concerns. Session bindings survive statement
 analysis and are not part of frozen schema catalogs.
 
 Schema catalogs retain explicitly loaded view, trigger, rule and default DDL.
-`ViewWriteEvaluation::new(&context)` evaluates an already-bound View `FullName`
+`ViewWriteEvaluation::new(&mut context)` evaluates an already-bound View `FullName`
 from its actual semantic definition and effective associated Trigger/Rule
 references. `insert`, `update`, and `evaluate` expose independent operation
 results. `ViewInsertSupport::analyze` and `ViewUpdateSupport::analyze` use this
-same service. `ViewInsertInfoRead` and
+same service, reporting failures through the active `ParseContext`.
+Frozen contexts store analysis results; writable-view analysis requires an
+active `ParseContext`.
+`ViewInsertInfoRead` and
 `ViewUpdateInfoRead` retrieve optional registered capabilities without
 performing analysis. PostgreSQL automatic views preserve nested direct-column
 lineage and assignment restrictions; INSTEAD OF triggers and INSTEAD rules have

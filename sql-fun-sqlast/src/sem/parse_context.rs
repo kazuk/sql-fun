@@ -240,7 +240,7 @@ pub trait BaseParseContext:
 
     /// Resolve a relation key in search-path order across both tables and views.
     fn resolve_relation_name(&self, name: &FullName) -> Option<FullName> {
-        expand_search_path_inst(self, name, |key| relation_name_at(self, key))
+        expand_relation_search_path(self, name, |key| relation_name_at(self, key))
     }
 
     /// get `CREATE VIEW` statement by view name

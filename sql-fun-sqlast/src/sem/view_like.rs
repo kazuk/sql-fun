@@ -19,7 +19,7 @@ impl ViewLike {
         if let Self::View(view) = self {
             let mut view = view.as_ref().clone();
             view.replace_rule_query(query);
-            Some(view)
+            Some(view.with_replace(true))
         } else {
             None
         }

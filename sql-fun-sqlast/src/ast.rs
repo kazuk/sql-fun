@@ -909,9 +909,7 @@ impl View {
         } else {
             crate::sem::Kind::view()
         };
-        if context.dialect() == Dialect::sqlite()
-            && !context.permits_relation_creation(&name, kind, self.if_not_exists, self.replace)?
-        {
+        if !context.permits_relation_creation(&name, kind, self.if_not_exists, self.replace)? {
             return Ok(crate::AstAndContextPair::new(
                 crate::sem::SemAst::unresolved_statement(),
                 context,
@@ -927,9 +925,9 @@ impl View {
             ));
         };
         let mut view = crate::sem::CreateView::new(&name, &query, &[], &None, self.materialized)
-.with_if_not_exists(self.if_not_exists)
-.with_replace(self.replace)
-.with_temporary(self.temporary);
+            .with_if_not_exists(self.if_not_exists)
+            .with_replace(self.replace)
+            .with_temporary(self.temporary);
         let replacement_rule = if self.replace {
             if let Some(existing) = context.get_view(&crate::sem::ViewName::from_full_name(&name))
                 && let Some(references) = existing.rules()

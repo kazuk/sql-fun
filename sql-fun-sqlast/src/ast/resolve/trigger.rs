@@ -59,40 +59,100 @@ impl CreateTrigger {
         });
         self.validate(context, &target, timing, granularity)?;
         let identity = self.resolve_identity(context, &target)?;
+        let events = self.resolve_events(context, &target)?;
+        let with = WithClause::default();
+        let from = self.resolve_row_bindings(context, &target, granularity, &with)?;
+        let scope = self.analysis_scope(context, &target, &with, &from);
+        let predicate = self.resolve_predicate(context, &scope, &target)?;
+        let constraint = self
+            .constraint
+            .as_ref()
+            .map(|constraint| constraint.resolve(context))
+            .transpose()?;
+        let transitions = self.resolve_transitions(context, &target);
+        let body = self.body.resolve(context, &scope)?;
+        let definition = sem::CreateTrigger::new(
+            &identity,
+            &target,
+            timing.semantic(),
+            granularity.semantic(),
+            &body,
+        );
+        self.finish_definition(
+            context,
+            definition,
+            &events,
+            &predicate,
+            &constraint,
+            &transitions,
+        )
+    }
+    fn resolve_events(
+        &self,
+        context: &impl ParseContext,
+        target: &FullName,
+    ) -> Result<Vec<sem::TriggerEvent>, AnalysisError> {
         let mut events = Vec::new();
         for event in &self.events {
-            events.push(event.resolve(context, &target)?);
+            events.push(event.resolve(context, target)?);
         }
-        let with = WithClause::default();
+        Ok(events)
+    }
+    fn resolve_row_bindings(
+        &self,
+        context: &mut impl ParseContext,
+        target: &FullName,
+        granularity: TriggerGranularity,
+        with: &WithClause,
+    ) -> Result<FromClause, AnalysisError> {
         let mut from = FromClause::default();
         if granularity == TriggerGranularity::Row {
             if self.has_old() {
                 from.push(DataSource::resolve_relation(
                     context,
-                    &target,
+                    target,
                     &AliasSpec::from_local_name("old"),
-                    &with,
+                    with,
                 )?);
             }
             if self.has_new() {
                 from.push(DataSource::resolve_relation(
                     context,
-                    &target,
+                    target,
                     &AliasSpec::from_local_name("new"),
-                    &with,
+                    with,
                 )?);
             }
         }
-        let mut scope = ScalarAnalysisContext::trigger(&with, &from);
-        if sqlite && !self.temporary {
+        Ok(from)
+    }
+    fn analysis_scope<'a>(
+        &self,
+        context: &impl ParseContext,
+        target: &FullName,
+        with: &'a WithClause,
+        from: &'a FromClause,
+    ) -> ScalarAnalysisContext<'a> {
+        let mut scope = ScalarAnalysisContext::trigger(with, from);
+        if context.dialect() == Dialect::sqlite() && !self.temporary {
             scope.set_trigger_namespace(target.schema());
         }
+        scope
+    }
+    fn resolve_predicate(
+        &self,
+        context: &mut impl ParseContext,
+        scope: &ScalarAnalysisContext<'_>,
+        target: &FullName,
+    ) -> Result<Option<sem::SemScalarExpr>, AnalysisError> {
         let mut predicate = self
             .predicate
             .as_ref()
-            .map(|expression| expression.resolve_in(context, &scope))
+            .map(|expression| expression.resolve_in(context, scope))
             .transpose()?;
-        if !sqlite && let Some(predicate) = &mut predicate {
+        if context.dialect() != Dialect::sqlite()
+            && let Some(predicate) = &mut predicate
+        {
             if self
                 .predicate
                 .as_ref()
@@ -111,7 +171,7 @@ impl CreateTrigger {
                 .get_type()
                 .is_none_or(|ty| ty != sem::PgBuiltInType::bool())
             {
-                return Self::invalid(&target, "WHEN must have boolean type");
+                return Self::invalid(target, "WHEN must have boolean type");
             }
             let mut inspected = predicate.clone();
             let mut validator = WhenValidator {
@@ -121,33 +181,38 @@ impl CreateTrigger {
             inspected.walk(&mut validator)?;
             if validator.invalid {
                 return Self::invalid(
-                    &target,
+                    target,
                     "PostgreSQL WHEN cannot contain subqueries, aggregates, windows or set-returning functions",
                 );
             }
         }
-        let constraint = self
-            .constraint
-            .as_ref()
-            .map(|constraint| constraint.resolve(context))
-            .transpose()?;
+        Ok(predicate)
+    }
+    fn resolve_transitions(
+        &self,
+        _context: &impl ParseContext,
+        target: &FullName,
+    ) -> Vec<sem::TriggerTransition> {
         let mut transitions = Vec::new();
         for transition in &self.transitions {
             transitions.push(sem::TriggerTransition::new(
                 &transition.name,
                 transition.new,
-                &target,
+                target,
             ));
         }
-        let body = self.body.resolve(context, &scope)?;
-        let mut definition = sem::CreateTrigger::new(
-            &identity,
-            &target,
-            timing.semantic(),
-            granularity.semantic(),
-            &body,
-        );
-        definition.set_event_semantics(&events, &predicate, &constraint, &transitions);
+        transitions
+    }
+    fn finish_definition(
+        &self,
+        context: &impl ParseContext,
+        mut definition: sem::CreateTrigger,
+        events: &[sem::TriggerEvent],
+        predicate: &Option<sem::SemScalarExpr>,
+        constraint: &Option<sem::TriggerConstraint>,
+        transitions: &[sem::TriggerTransition],
+    ) -> Result<sem::CreateTrigger, AnalysisError> {
+        definition.set_event_semantics(events, predicate, constraint, transitions);
         definition.set_creation_mode(self.replace, self.if_not_exists, self.temporary);
         definition.retain_dependencies(context)?;
         Ok(definition)

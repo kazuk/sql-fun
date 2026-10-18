@@ -212,22 +212,6 @@ impl FromItem {
             return Ok(None);
         };
         let requested = relation.name.full_name()?;
-        Ok(crate::sem::search_path::expand_search_path_inst(
-            context,
-            &requested,
-            |key| {
-                if context
-                    .get_table(&crate::sem::TableName::from(key.clone()))
-                    .is_some()
-                    || context
-                        .get_view(&crate::sem::ViewName::from_full_name(key))
-                        .is_some()
-                {
-                    Some(key.clone())
-                } else {
-                    None
-                }
-            },
-        ))
+        Ok(context.resolve_relation_name(&requested))
     }
 }

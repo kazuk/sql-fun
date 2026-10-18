@@ -15,37 +15,51 @@ impl DeleteDestination {
     ) -> Option<Self> {
         context
             .resolve_relation_name(requested.full_name())
-            .map(|name| Self {
-                name: TableName::from(name),
-                found: true,
-                view_support: None,
-            })
+            .map(Self::from_rule_target)
     }
-
+    fn from_rule_target(name: crate::sem::FullName) -> Self {
+        Self {
+            name: TableName::from(name),
+            found: true,
+            view_support: None,
+        }
+    }
     pub(crate) fn resolve(context: &impl ParseContext, requested: &TableName) -> Option<Self> {
         expand_relation_search_path(context, requested.full_name(), |key| {
-            if context.get_table_impl(key).is_some() {
-                return Some(Self {
-                    name: TableName::from(key.clone()),
-                    found: true,
-                    view_support: None,
-                });
-            }
-            context
-                .get_view(&crate::sem::ViewName::from_full_name(key))
-                .map(|view| {
-                    let support = if view.is_materialized() {
-                        ViewDeleteSupport::read_only()
-                    } else {
-                        context.view_delete_support(key)
-                    };
-                    Self {
-                        name: TableName::from(key.clone()),
-                        found: true,
-                        view_support: Some(support),
-                    }
-                })
+            Self::resolve_at(context, key)
         })
+    }
+    fn resolve_at(context: &impl ParseContext, key: &crate::sem::FullName) -> Option<Self> {
+        let canonical;
+        let key = if context.dialect() == crate::ast::Dialect::sqlite() {
+            canonical = context.sqlite_relation_identity(key)?;
+            &canonical
+        } else {
+            key
+        };
+        if context.get_table(&TableName::from(key.clone())).is_some() {
+            return Some(Self::from_rule_target(key.clone()));
+        }
+        if let Some(view) = context.get_view(&crate::sem::ViewName::from_full_name(key)) {
+            return Some(Self::from_view(context, key, view));
+        }
+        None
+    }
+    fn from_view(
+        context: &impl ParseContext,
+        key: &crate::sem::FullName,
+        view: &crate::sem::ViewLike,
+    ) -> Self {
+        let support = if view.is_materialized() {
+            ViewDeleteSupport::read_only()
+        } else {
+            context.view_delete_support(key)
+        };
+        Self {
+            name: TableName::from(key.clone()),
+            found: true,
+            view_support: Some(support),
+        }
     }
     pub(crate) fn missing(name: &TableName) -> Self {
         Self {

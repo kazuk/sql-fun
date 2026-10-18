@@ -211,11 +211,10 @@ impl CreateRule {
         self.source.as_ref()
     }
     pub(crate) fn has_returning(&self) -> bool {
-        self.actions.iter().any(|action| {
-            action
-                .rule_returning()
-                .is_some_and(|columns| !columns.is_empty())
-        })
+        self.actions
+            .iter()
+            .filter_map(SemAst::rule_returning)
+            .any(|columns| !columns.is_empty())
     }
     fn retain_dependencies(&mut self) -> Result<(), AnalysisError> {
         let mut dependencies = RuleDependencies::default();

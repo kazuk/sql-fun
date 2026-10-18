@@ -13,25 +13,29 @@ impl CreateRule {
     ) -> Result<sem::CreateRule, AnalysisError> {
         context.begin_parameter_type_analysis();
         let result = self.resolve_definition(context);
-        let result = result.and_then(|definition| {
-            if context.parameter_inference_needed() {
-                return Self::invalid(
-                    definition.identity(),
-                    "rule definitions cannot contain bind parameters",
-                );
-            }
-            if context.analysis_state().has_problems() {
-                return Self::invalid(
-                    definition.identity(),
-                    "rule contains unresolved or invalid constructs",
-                );
-            }
-            Ok(definition)
-        });
+        let result = result.and_then(|definition| Self::validate_resolved(context, definition));
         if let Err(error) = &result {
             error.report_rule_problem(context)?;
         }
         context.finish_analysis(result)
+    }
+    fn validate_resolved(
+        context: &impl ParseContext,
+        definition: sem::CreateRule,
+    ) -> Result<sem::CreateRule, AnalysisError> {
+        if context.parameter_inference_needed() {
+            return Self::invalid(
+                definition.identity(),
+                "rule definitions cannot contain bind parameters",
+            );
+        }
+        if context.analysis_state().has_problems() {
+            return Self::invalid(
+                definition.identity(),
+                "rule contains unresolved or invalid constructs",
+            );
+        }
+        Ok(definition)
     }
     pub(crate) fn resolve_and_apply<C: ParseContext>(
         &self,

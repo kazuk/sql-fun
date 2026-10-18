@@ -58,25 +58,23 @@ impl DataSource {
         } else {
             name
         };
-        let resolved = context.resolve_relation_name(name).map(|key| {
-            let table = context.get_table(&TableName::from(key.clone())).is_some();
-            (key, table)
-        });
-        match resolved {
-            Some((name, true)) => Ok(TableDataSource::new_data_source(
-                &TableName::from(name),
+        if let Some(name) = context.resolve_relation_name(name) {
+            Ok(Self::from_relation_name(context, &name, alias))
+        } else {
+            context.report_analysis_problem(AnalysisProblem::relation_not_found(
+                &TableName::from(name.clone()),
+            ))?;
+            Ok(Self::unknown(&name.to_string(), alias))
+        }
+    }
+    fn from_relation_name(context: &impl ParseContext, name: &FullName, alias: &AliasSpec) -> Self {
+        if context.get_table(&TableName::from(name.clone())).is_some() {
+            TableDataSource::new_data_source(&TableName::from(name.clone()), alias)
+        } else {
+            Self::View(ViewDataSource::from_name(
+                &ViewName::from_full_name(name),
                 alias,
-            )),
-            Some((name, false)) => Ok(Self::View(ViewDataSource::from_name(
-                &ViewName::from_full_name(&name),
-                alias,
-            ))),
-            None => {
-                context.report_analysis_problem(AnalysisProblem::relation_not_found(
-                    &TableName::from(name.clone()),
-                ))?;
-                Ok(Self::unknown(&name.to_string(), alias))
-            }
+            ))
         }
     }
 

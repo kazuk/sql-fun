@@ -235,15 +235,7 @@ pub trait BaseParseContext:
 
     /// Resolve a relation key in search-path order across both tables and views.
     fn resolve_relation_name(&self, name: &FullName) -> Option<FullName> {
-        expand_search_path_inst(self, name, |key| {
-            if self.get_table(&TableName::from(key.clone())).is_some()
-                || self.get_view(&ViewName::from_full_name(key)).is_some()
-            {
-                Some(key.clone())
-            } else {
-                None
-            }
-        })
+        expand_search_path_inst(self, name, |key| relation_name_at(self, key))
     }
 
     /// get `CREATE VIEW` statement by view name
@@ -585,5 +577,18 @@ where
             arg_exprs,
             alias_name,
         ))
+    }
+}
+
+fn relation_name_at(
+    context: &(impl BaseParseContext + ?Sized),
+    key: &FullName,
+) -> Option<FullName> {
+    if context.get_table(&TableName::from(key.clone())).is_some()
+        || context.get_view(&ViewName::from_full_name(key)).is_some()
+    {
+        Some(key.clone())
+    } else {
+        None
     }
 }

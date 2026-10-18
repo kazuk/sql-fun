@@ -113,6 +113,22 @@ impl<'a> EvaluationView<'a> {
     fn load(context: &'a impl BaseParseContext, name: &FullName) -> Result<Self, FullName> {
         let view = context.get_view_impl(name).ok_or_else(|| name.clone())?;
         let definition = view.ordinary_definition().ok_or_else(|| name.clone())?;
+        for identity in definition.rules().identities() {
+            if context.rule(identity).is_none() && !rule_is_cancelled(context, identity) {
+                return Err(identity.name().clone());
+            }
+        }
+        for trigger in definition.triggers().names() {
+            let identity =
+                if crate::ast::Dialect::from(context.metadata()) == crate::ast::Dialect::sqlite() {
+                    crate::sem::TriggerIdentity::sqlite(trigger)
+                } else {
+                    crate::sem::TriggerIdentity::postgres(name, trigger)
+                };
+            if context.trigger(&identity).is_none() && !context.trigger_is_cancelled(&identity) {
+                return Err(trigger.clone());
+            }
+        }
         let source =
             automatic_view_source(context, definition.query()).map_err(|_| name.clone())?;
         let projections = definition

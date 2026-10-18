@@ -14,6 +14,10 @@ use super::{AnalysisError, FullName, ParseContext, SelectStatement, SemAst};
 /// analyzed [`crate::syn::ViewStmt`]
 #[derive(Debug, Clone)]
 pub struct CreateView {
+    temporary: bool,
+    if_not_exists: bool,
+    replace: bool,
+
     name: FullName,
     query: SelectStatement,
     alter_statements: Vec<AlterView>,
@@ -22,6 +26,29 @@ pub struct CreateView {
 }
 
 impl CreateView {
+    pub(crate) const fn temporary(&self) -> bool {
+        self.temporary
+    }
+    pub(crate) const fn with_temporary(mut self, value: bool) -> Self {
+        self.temporary = value;
+        self
+    }
+
+    pub(crate) const fn if_not_exists(&self) -> bool {
+        self.if_not_exists
+    }
+    pub(crate) const fn with_if_not_exists(mut self, value: bool) -> Self {
+        self.if_not_exists = value;
+        self
+    }
+    pub(crate) const fn replace(&self) -> bool {
+        self.replace
+    }
+    pub(crate) const fn with_replace(mut self, value: bool) -> Self {
+        self.replace = value;
+        self
+    }
+
     /// Retained ownership; None means no ownership information was supplied.
     pub const fn owner(&self) -> Option<&crate::sem::OwnerSpecification> {
         self.owner.as_ref()
@@ -45,6 +72,9 @@ impl CreateView {
         materialized: bool,
     ) -> Self {
         Self {
+            temporary: false,
+            if_not_exists: false,
+            replace: false,
             name: name.clone(),
             query: query.clone(),
             alter_statements: alter_statements.to_owned(),

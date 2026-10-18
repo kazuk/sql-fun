@@ -29,7 +29,7 @@ fn distinct_names_survive_exact_lookup_and_layering(
 }
 
 #[test]
-fn child_shadows_only_the_exact_qualified_table() -> testresult::TestResult {
+fn duplicate_child_preserves_both_qualified_parent_tables() -> testresult::TestResult {
     let left = FullName::with_schema("a.b", "c");
     let right = FullName::with_schema("a", "b.c");
     let mut context = test_helpers::context();
@@ -37,8 +37,10 @@ fn child_shadows_only_the_exact_qualified_table() -> testresult::TestResult {
     context = test_helpers::declare(context, "table", &right, "other_marker")?;
     let parent = context.freeze();
     let child = crate::test_helpers::schema_layer(std::path::Path::new("child.sql"), &parent);
-    let child = test_helpers::declare(child, "table", &left, "child_marker")?.freeze();
-    test_helpers::assert_definition(&child, "table", &left, "child_marker");
+    let child = test_helpers::declare(child, "table", &left, "child_marker")?;
+    assert_eq!(child.problems().len(), 1);
+    let child = child.freeze();
+    test_helpers::assert_definition(&child, "table", &left, "parent_marker");
     test_helpers::assert_definition(&child, "table", &right, "other_marker");
     test_helpers::assert_definition(&parent, "table", &left, "parent_marker");
     Ok(())

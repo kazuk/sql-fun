@@ -65,7 +65,7 @@ impl SequenceInfoWrite for SchemaFileContext {
             return Ok(self);
         };
         seq.apply_alter(alter_seq)?;
-        self.catalog.sequences.insert(&key, &seq);
+        self.catalog.store_sequence(&key, &seq);
         Ok(self)
     }
 
@@ -73,10 +73,17 @@ impl SequenceInfoWrite for SchemaFileContext {
         mut self,
         create_sequence: &CreateSequence,
     ) -> Result<Self, AnalysisError> {
-        let name = self.apply_default_schema(create_sequence.name())?;
+        let name = self.creation_name(create_sequence.name(), create_sequence.temporary())?;
+        if !self.permits_relation_creation(
+            &name,
+            crate::sem::Kind::sequence(),
+            create_sequence.if_not_exists(),
+            false,
+        )? {
+            return Ok(self);
+        }
         self.catalog
-            .sequences
-            .insert(&name, &create_sequence.with_catalog_name(&name));
+            .store_sequence(&name, &create_sequence.with_catalog_name(&name));
         Ok(self)
     }
 }

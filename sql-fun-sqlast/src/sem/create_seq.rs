@@ -8,6 +8,9 @@ use super::{AnalysisError, FullName, ParseContext, SemAst, alter_table::AlterObj
 /// analyzed [`crate::syn::CreateSeqStmt`]
 #[derive(Debug, Clone)]
 pub struct CreateSequence {
+    temporary: bool,
+    if_not_exists: bool,
+
     name: FullName,
     alter_statements: Vec<AlterSequence>,
     owner: Option<crate::sem::OwnerSpecification>,
@@ -15,6 +18,22 @@ pub struct CreateSequence {
 }
 
 impl CreateSequence {
+    pub(crate) const fn temporary(&self) -> bool {
+        self.temporary
+    }
+    pub(crate) const fn with_temporary(mut self, value: bool) -> Self {
+        self.temporary = value;
+        self
+    }
+
+    pub(crate) const fn if_not_exists(&self) -> bool {
+        self.if_not_exists
+    }
+    pub(crate) const fn with_if_not_exists(mut self, value: bool) -> Self {
+        self.if_not_exists = value;
+        self
+    }
+
     pub(crate) fn with_catalog_name(&self, name: &FullName) -> Self {
         let mut definition = self.clone();
         definition.name = name.clone();
@@ -43,6 +62,8 @@ impl CreateSequence {
     #[must_use]
     pub fn new(name: &FullName) -> Self {
         Self {
+            temporary: false,
+            if_not_exists: false,
             name: name.clone(),
             alter_statements: Default::default(),
             owner: Default::default(),

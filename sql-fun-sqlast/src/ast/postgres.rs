@@ -665,7 +665,8 @@ impl TryFromWithTokens<&syn::CreateSeqStmt> for Sequence {
             value.get_owner_id(),
             value.get_for_identity(),
             value.get_if_not_exists(),
-        ))
+        )
+        .with_temporary(sequence.get_relpersistence() == "t"))
     }
 }
 

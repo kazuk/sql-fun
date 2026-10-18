@@ -79,7 +79,7 @@ impl SchemaFileContext {
     ) {
         for mut sequence in self.sequences_owned_by(table) {
             sequence.change_owner(owner);
-            self.catalog.sequences.insert(sequence.name(), &sequence);
+            self.catalog.store_sequence(sequence.name(), &sequence);
         }
     }
 
@@ -95,7 +95,7 @@ impl SchemaFileContext {
             ObjectKind::TABLE => self.change_table_owner(identity, owner),
             ObjectKind::SEQUENCE => self.change_sequence_owner(identity, owner),
             ObjectKind::MATERIALIZED_VIEW | ObjectKind::VIEW => {
-                self.change_view_owner(identity, owner)
+                self.change_view_owner(identity, owner)?
             }
             ObjectKind::DOMAIN | ObjectKind::TYPE => self.change_type_owner(identity, owner),
             ObjectKind::SCHEMA => self.change_schema_owner(identity, owner),
@@ -114,7 +114,7 @@ impl SchemaFileContext {
         let name = identity.name();
         if let Some(mut definition) = self.get_table_impl(name).cloned() {
             definition.change_owner(owner);
-            self.catalog.tables.insert_create_table(name, &definition);
+            self.catalog.store_table(name, &definition);
             self.change_dependent_sequence_owners(
                 &crate::sem::TableName::from(name.clone()),
                 owner,
@@ -130,7 +130,7 @@ impl SchemaFileContext {
         let name = identity.name();
         if let Some(mut definition) = self.get_sequence_impl(name).cloned() {
             definition.change_owner(owner);
-            self.catalog.sequences.insert(name, &definition);
+            self.catalog.store_sequence(name, &definition);
         }
     }
 
@@ -138,12 +138,13 @@ impl SchemaFileContext {
         &mut self,
         identity: &crate::sem::OwnershipIdentity,
         owner: &crate::sem::OwnerSpecification,
-    ) {
+    ) -> Result<(), AnalysisError> {
         let name = identity.name();
         if let Some(mut definition) = self.get_view_impl(name).cloned() {
             definition.change_owner(owner);
-            self.catalog.views.insert(name, &definition);
+            self.catalog.store_view(name, &definition)?;
         }
+        Ok(())
     }
 
     fn change_type_owner(

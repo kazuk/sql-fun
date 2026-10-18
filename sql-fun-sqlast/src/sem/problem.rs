@@ -1,5 +1,6 @@
 #![doc= include_str!("problem.md")]
 
+mod creation;
 mod delete;
 mod insert;
 mod name_resolution;
@@ -24,6 +25,7 @@ use crate::{
     },
 };
 
+pub use self::creation::CreationProblem;
 pub use self::delete::{DeleteProblem, DeleteProblemKind};
 pub use self::insert::{InsertProblem, InsertProblemKind};
 pub use self::name_resolution::{DomainBaseTypeNameNotFound, NameResolution};
@@ -70,6 +72,8 @@ trait RenderProblemReport: Problem {
 #[allow(clippy::large_enum_variant)]
 #[derive(Debug, Clone)]
 pub enum AnalysisProblem {
+    /// A creation conflicts with an existing catalog identity.
+    Creation(CreationProblem),
     /// ALTER OWNER target or role lookup failed.
     Ownership(OwnershipProblem),
     /// A violation of INSERT semantic rules.
@@ -145,6 +149,18 @@ pub enum AnalysisProblem {
 }
 
 impl AnalysisProblem {
+    pub(crate) const fn creation(problem: CreationProblem) -> Self {
+        Self::Creation(problem)
+    }
+    /// Structured creation failure, independently of rendered diagnostic text.
+    pub const fn creation_problem(&self) -> Option<&CreationProblem> {
+        if let Self::Creation(problem) = self {
+            Some(problem)
+        } else {
+            None
+        }
+    }
+
     pub(crate) fn ownership_target(target: &crate::sem::OwnershipLookup) -> Self {
         Self::Ownership(OwnershipProblem::target(target))
     }
@@ -214,6 +230,7 @@ impl AnalysisProblem {
     #[must_use]
     pub const fn code(&self) -> &'static str {
         match self {
+            Self::Creation(_) => "conflicting_creation",
             Self::Ownership(problem) => problem.code(),
             Self::Insert(problem) => problem.code(),
             Self::Update(problem) => problem.code(),
@@ -265,6 +282,7 @@ impl AnalysisProblem {
             .with_syntax_highlighting(SqlHighlighter::from_theme(theme)?);
 
         let report = match self {
+            Self::Creation(problem) => problem.render_report(&report_handler, source)?,
             Self::Ownership(problem) => problem.render_report(&report_handler, source)?,
             Self::Insert(problem) => problem.render_report(&report_handler, source)?,
             Self::Update(problem) => problem.render_report(&report_handler, source)?,

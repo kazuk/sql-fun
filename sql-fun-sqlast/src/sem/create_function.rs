@@ -12,6 +12,8 @@ use crate::{
 /// analyzed [`crate::syn::CreateFunctionStmt`]
 #[derive(Debug, Clone)]
 pub struct CreateFunction {
+    replace: bool,
+
     owner: Option<crate::sem::OwnerSpecification>,
     object_kind: crate::sem::ObjectKind,
     name: FullName,
@@ -20,6 +22,14 @@ pub struct CreateFunction {
 }
 
 impl CreateFunction {
+    pub(crate) const fn replace(&self) -> bool {
+        self.replace
+    }
+    pub(crate) const fn with_replace(mut self, value: bool) -> Self {
+        self.replace = value;
+        self
+    }
+
     /// Retained ownership; None means no ownership information was supplied.
     pub const fn owner(&self) -> Option<&crate::sem::OwnerSpecification> {
         self.owner.as_ref()
@@ -37,6 +47,7 @@ impl CreateFunction {
         returning_columns: &Option<ColumnCollection>,
     ) -> Self {
         Self {
+            replace: false,
             owner: None,
             object_kind: crate::sem::ObjectKind::from(20),
             name: name.clone(),
@@ -96,6 +107,35 @@ impl CreateFunction {
 }
 
 impl CreateFunction {
+    pub(crate) fn previous_definition<'a>(
+        &self,
+        existing: &'a [Self],
+        pending: &'a [Self],
+    ) -> Option<&'a Self> {
+        for definitions in [existing, pending] {
+            for previous in definitions {
+                if self.same_signature(previous) {
+                    return Some(previous);
+                }
+            }
+        }
+        None
+    }
+    fn same_signature(&self, other: &Self) -> bool {
+        self.overloads
+            .get_at(0)
+            .map(OverloadVariant::identity_arguments)
+            == other
+                .overloads
+                .get_at(0)
+                .map(OverloadVariant::identity_arguments)
+    }
+    pub(crate) fn can_replace(&self, other: &Self) -> bool {
+        self.object_kind == other.object_kind
+            && self.returning_columdef == other.returning_columdef
+            && self.overloads.get_at(0).map(OverloadVariant::ret_type)
+                == other.overloads.get_at(0).map(OverloadVariant::ret_type)
+    }
     pub(crate) fn contains_identity(
         definitions: &[Self],
         name: &FullName,

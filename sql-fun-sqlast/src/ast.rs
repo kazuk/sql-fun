@@ -648,6 +648,7 @@ impl DropTable {
 
 #[derive(Clone, Debug)]
 pub(crate) struct Sequence {
+    temporary: bool,
     name: Name,
     options: Vec<SyntaxOption>,
     owner_id: u32,
@@ -656,6 +657,10 @@ pub(crate) struct Sequence {
 }
 
 impl Sequence {
+    const fn with_temporary(mut self, value: bool) -> Self {
+        self.temporary = value;
+        self
+    }
     const fn new(
         name: Name,
         options: Vec<SyntaxOption>,
@@ -664,6 +669,7 @@ impl Sequence {
         if_not_exists: bool,
     ) -> Self {
         Self {
+            temporary: false,
             name,
             options,
             owner_id,
@@ -679,7 +685,9 @@ impl Sequence {
     where
         TContext: crate::sem::ParseContext,
     {
-        let mut sequence = crate::sem::CreateSequence::new(&self.name.full_name()?);
+        let mut sequence = crate::sem::CreateSequence::new(&self.name.full_name()?)
+            .with_if_not_exists(self.if_not_exists)
+            .with_temporary(self.temporary);
         for option in &self.options {
             if let Some(table) = option.owned_relation()? {
                 let Some(resolved) = context.resolve_table_name(&table) else {
@@ -803,7 +811,8 @@ impl Extension {
     where
         TContext: crate::sem::ParseContext,
     {
-        let extension = crate::sem::CreateExtension::from_name(&self.name);
+        let extension = crate::sem::CreateExtension::from_name(&self.name)
+            .with_if_not_exists(self.if_not_exists);
         let context = context.apply_create_extension(&extension)?;
         Ok(crate::AstAndContextPair::new(
             crate::sem::SemAst::CreateExtension(extension),
@@ -859,15 +868,33 @@ impl View {
         TContext: crate::sem::ParseContext,
     {
         let mut context = context;
+        let name = context.creation_name(&self.name.full_name()?, self.temporary)?;
+        let kind = if self.materialized {
+            crate::sem::Kind::materialized_view()
+        } else {
+            crate::sem::Kind::view()
+        };
+        if context.dialect() == Dialect::sqlite()
+            && !context.permits_relation_creation(&name, kind, self.if_not_exists, self.replace)?
+        {
+            return Ok(crate::AstAndContextPair::new(
+                crate::sem::SemAst::unresolved_statement(),
+                context,
+            ));
+        }
         let outcome = self.query.resolve(&mut context);
-        let query = outcome?;
+        let mut query = outcome?;
+        query.rename_columns(&self.aliases);
         let view = crate::sem::CreateView::new(
             &self.name.full_name()?,
             &query,
             &[],
             &None,
             self.materialized,
-        );
+        )
+        .with_if_not_exists(self.if_not_exists)
+        .with_replace(self.replace)
+        .with_temporary(self.temporary);
         let context = context.apply_create_view(&view)?;
         Ok(crate::AstAndContextPair::new(
             crate::sem::SemAst::CreateView(view),

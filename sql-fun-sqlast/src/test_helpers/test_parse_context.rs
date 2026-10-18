@@ -525,7 +525,6 @@ impl FunctionInfoWrite for TestParseContext {
 }
 
 impl ParseContext for TestParseContext {
-<<<<<<< HEAD
     fn apply_creation_group<F>(
         self,
         operation: F,
@@ -537,50 +536,6 @@ impl ParseContext for TestParseContext {
         // direct calls rather than implementing the production catalog layers.
         operation(self)
     }
-    fn register_rule(mut self, rule: &crate::sem::CreateRule) -> Result<Self, AnalysisError> {
-        self.rules
-            .insert(rule.identity().clone(), Some(rule.clone()));
-        Ok(self)
-    }
-    fn cancel_rule(mut self, identity: &crate::sem::RuleIdentity) -> Result<Self, AnalysisError> {
-        self.rules.insert(identity.clone(), None);
-        Ok(self)
-    }
-    fn associate_rule(
-        mut self,
-        target: &FullName,
-        identity: &crate::sem::RuleIdentity,
-    ) -> Result<Self, AnalysisError> {
-        if let Some(Some(table)) = self.table_definitions.get_mut(target) {
-            table.associate_rule(identity);
-        } else if let Some(Some(view)) = self.view_definitions.get_mut(target) {
-            view.associate_rule(identity);
-        } else {
-            return Err(AnalysisError::rule(
-                &crate::sem::problem::RuleProblem::target(target),
-            ));
-        }
-        Ok(self)
-    }
-    fn dissociate_rule(
-        mut self,
-        target: &FullName,
-        identity: &crate::sem::RuleIdentity,
-    ) -> Result<Self, AnalysisError> {
-        if let Some(Some(table)) = self.table_definitions.get_mut(target) {
-            table.dissociate_rule(identity);
-        } else if let Some(Some(view)) = self.view_definitions.get_mut(target) {
-            view.dissociate_rule(identity);
-        } else {
-            return Err(AnalysisError::rule(
-                &crate::sem::problem::RuleProblem::target(target),
-            ));
-        }
-        Ok(self)
-    }
-
-=======
->>>>>>> 0ee32d5 (refactor(sqlast): use public catalog and rule info services)
     fn insert_role(&mut self, role: &crate::sem::Role) {
         self.ownership.insert_role(role);
     }

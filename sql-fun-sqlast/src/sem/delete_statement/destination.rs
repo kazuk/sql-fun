@@ -1,3 +1,4 @@
+use crate::sem::search_path::expand_relation_search_path;
 use crate::sem::{ParseContext, TableName, ViewDeleteSupport};
 
 /// DELETE-owned projection of the bound catalog destination.
@@ -8,7 +9,7 @@ pub(crate) struct DeleteDestination {
 }
 impl DeleteDestination {
     pub(crate) fn resolve(context: &impl ParseContext, requested: &TableName) -> Option<Self> {
-        crate::sem::search_path::expand_search_path_inst(context, requested.full_name(), |key| {
+        expand_relation_search_path(context, requested.full_name(), |key| {
             if context.get_table_impl(key).is_some() {
                 return Some(Self {
                     name: TableName::from(key.clone()),

@@ -55,7 +55,7 @@ impl SequenceInfoWrite for SchemaFileContext {
     {
         let seq_name = alter_seq.seq_name();
         let Some((key, mut seq)) =
-            crate::sem::search_path::expand_search_path_inst(&self, seq_name, |key| {
+            crate::sem::search_path::expand_relation_search_path(&self, seq_name, |key| {
                 self.get_sequence_impl(key)
                     .cloned()
                     .map(|sequence| (key.clone(), sequence))

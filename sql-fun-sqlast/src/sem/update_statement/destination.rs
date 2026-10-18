@@ -1,3 +1,4 @@
+use crate::sem::search_path::expand_relation_search_path;
 use crate::sem::{
     AnalysisError, ColumnDefinition, ColumnName, ParseContext, TableName, ViewLike,
     ViewMergeSupport, ViewUpdateSupport,
@@ -15,7 +16,7 @@ impl UpdateDestination {
         context: &impl ParseContext,
         requested: &TableName,
     ) -> Result<Option<Self>, AnalysisError> {
-        crate::sem::search_path::expand_search_path_inst(context, requested.full_name(), |key| {
+        expand_relation_search_path(context, requested.full_name(), |key| {
             if let Some(table) = context.get_table_impl(key) {
                 let mut columns = Vec::new();
                 while let Some(column) = table.get_column_at(columns.len()) {

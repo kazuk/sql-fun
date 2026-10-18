@@ -77,6 +77,8 @@ reads so frozen ancestors do not reappear, and must update dependent identities.
 - SQLite permits repeated constraint names, but the existing retained table model
   keys constraints by name and cannot represent that form. It remains unsupported;
   the PostgreSQL duplicate-constraint guard is not applied to SQLite.
+- Materialized-view creation retains output metadata, but direct column-reference
+  services in `CreateTableAs` still have existing unimplemented branches.
 - Foreign-table creation and several ALTER statement families are unsupported.
 - Automatically generated database index/constraint names are not inferred by the
   existing schema model. This change validates explicitly named constraint indexes;
@@ -88,7 +90,10 @@ reads so frozen ancestors do not reappear, and must update dependent identities.
 - Schema existence, attached-database inventory, and PostgreSQL session-specific
   temporary-schema identity are not fully modeled. Explicit temporary declarations
   use logical `pg_temp` (PostgreSQL) or `temp` (SQLite), separate from permanent
-  creation names. Existing lookup/search-path limitations still apply.
+  creation names. Unqualified relation/type lookup searches temporary schemas first unless
+  explicitly positioned in the search path. PostgreSQL routine lookup excludes
+  the temporary schema. Session-specific physical temporary-schema names remain
+  outside this model.
 
 These boundaries are limitations, not successful dispatch or coverage claims.
 
@@ -100,9 +105,17 @@ FUNCTION/PROCEDURE signature conflicts. PostgreSQL 18 additionally verified the
 composite-type backing relation and legal enum/index coexistence. All probes
 rolled back their changes. Ordinary tests do not require these servers.
 
+Review follow-up probes on PostgreSQL 15 and 18 confirmed duplicate column CHECK
+names are rejected, while named NOT NULL constraints enter the constraint-name
+namespace only in PostgreSQL 18. Named DEFAULT clauses do not occupy it.
+PostgreSQL 18 also confirmed explicit `pg_temp` search-path positioning and
+rejection of an overlong CREATE TABLE AS column list.
+
 SQLite regression cases compare accepted/rejected creation with an in-memory
 `rusqlite` connection, using the existing dev dependency; no SQLite CLI is required.
 
+- [PostgreSQL search path](https://www.postgresql.org/docs/18/runtime-config-client.html#GUC-SEARCH-PATH)
+- [PostgreSQL CREATE TABLE AS](https://www.postgresql.org/docs/18/sql-createtableas.html)
 - [PostgreSQL CREATE TABLE](https://www.postgresql.org/docs/18/sql-createtable.html)
 - [PostgreSQL CREATE INDEX](https://www.postgresql.org/docs/18/sql-createindex.html)
 - [PostgreSQL CREATE TYPE](https://www.postgresql.org/docs/18/sql-createtype.html)

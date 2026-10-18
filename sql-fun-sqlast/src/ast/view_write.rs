@@ -309,30 +309,6 @@ impl WriteDeclaration {
     }
 }
 
-impl TryFrom<&crate::syn::CreateTrigStmt> for WriteDeclaration {
-    type Error = AnalysisError;
-    fn try_from(value: &crate::syn::CreateTrigStmt) -> Result<Self, Self::Error> {
-        let relation =
-            super::postgres::required(value.get_relation().as_inner(), "trigger target")?;
-        let mut columns = Vec::new();
-        for node in value.get_columns().as_inner().unwrap_or_default() {
-            columns.push(super::postgres::required(
-                node.as_string().get_sval(),
-                "trigger column",
-            )?);
-        }
-        let object = WriteObject::trigger(
-            &value.get_trigname(),
-            value.get_events(),
-            value.get_timing() & 64 != 0,
-            &columns,
-        );
-        Ok(Self::new(
-            &Name::from(&relation),
-            &WriteAction::object(&object, value.get_replace(), false),
-        ))
-    }
-}
 impl TryFrom<&crate::syn::RuleStmt> for WriteDeclaration {
     type Error = AnalysisError;
     fn try_from(value: &crate::syn::RuleStmt) -> Result<Self, Self::Error> {
@@ -379,40 +355,6 @@ impl TryFrom<Option<crate::syn::CmdType>> for WriteEvent {
             Some(crate::syn::CmdType::CmdDelete) => Ok(Self::delete()),
             _ => AnalysisError::raise_unexpected_input("view write rule event"),
         }
-    }
-}
-
-#[cfg(feature = "sqlite")]
-impl TryFrom<&crate::syn::sqlite::CreateTriggerStatement> for WriteDeclaration {
-    type Error = AnalysisError;
-    fn try_from(value: &crate::syn::sqlite::CreateTriggerStatement) -> Result<Self, Self::Error> {
-        let (events, columns) = sqlite_trigger_event(value.event());
-        let object = WriteObject::trigger(
-            value.trigger_name().name().value(),
-            events,
-            matches!(
-                value.time(),
-                Some(crate::syn::sqlite::TriggerTime::InsteadOf)
-            ),
-            &columns,
-        );
-        Ok(Self::new(
-            &Name::from(value.table_name()),
-            &WriteAction::object(&object, false, *value.if_not_exists()),
-        ))
-    }
-}
-#[cfg(feature = "sqlite")]
-fn sqlite_trigger_event(event: &crate::syn::sqlite::TriggerEvent) -> (i32, Vec<String>) {
-    use crate::syn::sqlite::TriggerEvent;
-    match event {
-        TriggerEvent::Insert => (crate::sem::view_write::TRIGGER_EVENT_INSERT, Vec::new()),
-        TriggerEvent::Update => (crate::sem::view_write::TRIGGER_EVENT_UPDATE, Vec::new()),
-        TriggerEvent::UpdateOf(columns) => (
-            crate::sem::view_write::TRIGGER_EVENT_UPDATE,
-            columns.iter().map(|name| name.value().to_owned()).collect(),
-        ),
-        TriggerEvent::Delete => (crate::sem::view_write::TRIGGER_EVENT_DELETE, Vec::new()),
     }
 }
 

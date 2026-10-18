@@ -388,15 +388,32 @@ impl DiagnosticContext for TestParseContext {
     }
 }
 
-impl BaseParseContext for TestParseContext {
-    fn rule(&self, identity: &crate::sem::RuleIdentity) -> Option<&crate::sem::CreateRule> {
-        if let Some(rule) = self.rules.get(identity) {
-            rule.as_ref()
-        } else {
-            None
-        }
+impl crate::sem::RuleInfoRead for TestParseContext {
+    fn local_rule(
+        &self,
+        identity: &crate::sem::RuleIdentity,
+    ) -> Option<Option<&crate::sem::CreateRule>> {
+        self.rules.get(identity).map(Option::as_ref)
     }
+    fn rule_parent(&self) -> Option<&dyn crate::sem::RuleInfoRead> {
+        None
+    }
+}
+impl crate::sem::RuleInfoWrite for TestParseContext {
+    fn store_rule(
+        &mut self,
+        identity: &crate::sem::RuleIdentity,
+        definition: Option<&crate::sem::CreateRule>,
+    ) {
+        self.rules.insert(identity.clone(), definition.cloned());
+    }
+    fn store_rule_view(&mut self, target: &FullName, view: &crate::sem::ViewLike) {
+        self.view_definitions
+            .insert(target.clone(), Some(view.clone()));
+    }
+}
 
+impl BaseParseContext for TestParseContext {
     fn sqlite_relation_identity(&self, name: &FullName) -> Option<FullName> {
         for (candidate, definition) in &self.table_definitions {
             if candidate.sqlite_eq(name) && definition.is_some() {
@@ -504,48 +521,6 @@ impl FunctionInfoWrite for TestParseContext {
 }
 
 impl ParseContext for TestParseContext {
-    fn register_rule(mut self, rule: &crate::sem::CreateRule) -> Result<Self, AnalysisError> {
-        self.rules
-            .insert(rule.identity().clone(), Some(rule.clone()));
-        Ok(self)
-    }
-    fn cancel_rule(mut self, identity: &crate::sem::RuleIdentity) -> Result<Self, AnalysisError> {
-        self.rules.insert(identity.clone(), None);
-        Ok(self)
-    }
-    fn associate_rule(
-        mut self,
-        target: &FullName,
-        identity: &crate::sem::RuleIdentity,
-    ) -> Result<Self, AnalysisError> {
-        if let Some(Some(table)) = self.table_definitions.get_mut(target) {
-            table.associate_rule(identity);
-        } else if let Some(Some(view)) = self.view_definitions.get_mut(target) {
-            view.associate_rule(identity);
-        } else {
-            return Err(AnalysisError::rule(
-                &crate::sem::problem::RuleProblem::target(target),
-            ));
-        }
-        Ok(self)
-    }
-    fn dissociate_rule(
-        mut self,
-        target: &FullName,
-        identity: &crate::sem::RuleIdentity,
-    ) -> Result<Self, AnalysisError> {
-        if let Some(Some(table)) = self.table_definitions.get_mut(target) {
-            table.dissociate_rule(identity);
-        } else if let Some(Some(view)) = self.view_definitions.get_mut(target) {
-            view.dissociate_rule(identity);
-        } else {
-            return Err(AnalysisError::rule(
-                &crate::sem::problem::RuleProblem::target(target),
-            ));
-        }
-        Ok(self)
-    }
-
     fn insert_role(&mut self, role: &crate::sem::Role) {
         self.ownership.insert_role(role);
     }

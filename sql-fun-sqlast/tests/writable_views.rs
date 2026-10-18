@@ -1,5 +1,7 @@
 //! View-write semantics with small catalog fixtures, plus focused production-provider coverage.
 //! Both run in the standard workspace flow.
+use ::sql_fun_sqlast::sem::RuleInfoRead;
+
 mod test_helpers {
     use ::clap::Parser;
     use ::sql_fun_core::{SqlFunArgs, SqlFunMetadata};
@@ -1155,7 +1157,7 @@ fn select_rule_replacement_refreshes_view_facts_in_the_child()
 #[test]
 fn replacing_a_view_preserves_named_rule_links_and_refreshes_its_select_rule()
 -> Result<(), Box<dyn std::error::Error>> {
-    use ::sql_fun_sqlast::sem::{BaseParseContext, RuleIdentity, ViewInfoRead};
+    use ::sql_fun_sqlast::sem::{BaseParseContext, RuleIdentity};
     let schema = ViewSchema::postgres(
         r#"
 CREATE TABLE public.items(id integer);
@@ -1167,7 +1169,9 @@ CREATE OR REPLACE RULE "_RETURN" AS ON SELECT TO public.v DO INSTEAD SELECT id F
     let name = FullName::with_schema("public", "v");
     let child =
         schema.layer("CREATE OR REPLACE VIEW public.v AS SELECT DISTINCT id FROM public.items")?;
-    let view = child.get_view_impl(&name).unwrap();
+    let view = child
+        .get_view(&sql_fun_sqlast::sem::ViewName::from_full_name(&name))
+        .unwrap();
     assert_eq!(view.rules().unwrap().resolve(&child).len(), 2);
     let identity = RuleIdentity::new(&name, "_RETURN");
     let rule = child.rule(&identity).unwrap();

@@ -202,7 +202,7 @@ impl ViewWriteInfo {
     }
     fn with_effective_rules(&self, context: &impl BaseParseContext) -> Self {
         let mut effective = self.clone();
-        if let Some(view) = context.get_view_impl(&self.name)
+        if let Some(view) = context.get_view(&crate::sem::ViewName::from_full_name(&self.name))
             && let Some(references) = view.rules()
         {
             for rule in references.resolve(context) {
@@ -300,13 +300,15 @@ impl ViewWriteInfo {
         event: WriteEvent,
         seen: &mut Vec<FullName>,
     ) -> Result<Decision, FullName> {
-        let decision = if let Some(table) = context.get_table_impl(source) {
+        let decision = if let Some(table) =
+            context.get_table(&crate::sem::TableName::from(source.clone()))
+        {
             let mut columns = Vec::new();
             while let Some(column) = table.get_column_at(columns.len()) {
                 columns.push(column.clone());
             }
             Decision::writable(&columns, true, true)
-        } else if let Some(view) = context.get_view_impl(source) {
+        } else if let Some(view) = context.get_view(&crate::sem::ViewName::from_full_name(source)) {
             if view.is_materialized() {
                 Decision::read_only()
             } else {
@@ -768,7 +770,10 @@ pub(crate) fn infer_view_arbiters(
     }
     let relation = TableName::from(source.clone());
     let inference = context.infer_conflict_arbiters(&relation, &mapped)?;
-    if context.get_table_impl(source).is_some() {
+    if context
+        .get_table(&crate::sem::TableName::from(source.clone()))
+        .is_some()
+    {
         match inference.into_result() {
             Ok(arbiters) => Ok(crate::sem::ConflictArbiterInference::complete(
                 &arbiters

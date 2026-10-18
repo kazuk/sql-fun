@@ -233,9 +233,6 @@ impl GetSourcePathWithSpanOpt for BaseContext {
 }
 
 impl BaseParseContext for BaseContext {
-    fn rule(&self, _identity: &crate::sem::RuleIdentity) -> Option<&crate::sem::CreateRule> {
-        None
-    }
     fn sqlite_relation_identity(&self, _name: &FullName) -> Option<FullName> {
         None
     }
@@ -345,3 +342,5 @@ impl crate::sem::OwnershipInfoRead for BaseContext {
         crate::sem::ownership::model_definitions(self, kind, name)
     }
 }
+
+impl crate::sem::RuleInfoRead for BaseContext {}

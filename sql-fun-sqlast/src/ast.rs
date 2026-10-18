@@ -900,7 +900,10 @@ impl View {
                 context,
             ));
         };
-        if context.get_view_impl(&name).is_some() {
+        if context
+            .get_view(&crate::sem::ViewName::from_full_name(&name))
+            .is_some()
+        {
             if self.if_not_exists {
                 return Ok(crate::AstAndContextPair::new(
                     crate::sem::SemAst::unresolved_statement(),
@@ -928,7 +931,7 @@ impl View {
         };
         let mut view = crate::sem::CreateView::new(&name, &query, &[], &None, self.materialized);
         let replacement_rule = if self.replace {
-            if let Some(existing) = context.get_view_impl(&name)
+            if let Some(existing) = context.get_view(&crate::sem::ViewName::from_full_name(&name))
                 && let Some(references) = existing.rules()
             {
                 view.retain_rule_references(references);

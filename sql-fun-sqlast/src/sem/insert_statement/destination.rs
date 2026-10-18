@@ -17,31 +17,26 @@ impl InsertDestination {
         context: &impl ParseContext,
         requested: &TableName,
     ) -> Result<Option<Self>, AnalysisError> {
-        if let Some(destination) = crate::sem::search_path::expand_search_path_inst(
-            context,
-            requested.full_name(),
-            |key| {
-                if context.get_table_impl(key).is_some() {
-                    return Some(
-                        Self::resolve(context, &TableName::from(key.clone()))
-                            .map(|value| value.expect("resolved table")),
-                    );
-                }
-                context.get_view_impl(key).map(|view| {
-                    Ok(Self {
-                        name: TableName::from(key.clone()),
-                        columns: view.result_columns().column_definitions()?,
-                        table: None,
-                        view_support: None,
-                        merge_view_support: None,
-                    })
-                })
-            },
-        ) {
-            destination.map(Some)
-        } else {
-            Self::resolve(context, requested)
+        let Some(name) = context.resolve_relation_name(requested.full_name()) else {
+            return Self::resolve(context, requested);
+        };
+        let name = TableName::from(name);
+        if context.get_table(&name).is_some() {
+            return Self::resolve(context, &name);
         }
+        let view = context
+            .get_view(&crate::sem::ViewName::from_full_name(name.full_name()))
+            .expect("resolved view");
+        Self::from_rule_view(&name, view).map(Some)
+    }
+    fn from_rule_view(name: &TableName, view: &ViewLike) -> Result<Self, AnalysisError> {
+        Ok(Self {
+            name: name.clone(),
+            columns: view.result_columns().column_definitions()?,
+            table: None,
+            view_support: None,
+            merge_view_support: None,
+        })
     }
     pub(crate) fn resolve(
         context: &impl ParseContext,
@@ -56,7 +51,7 @@ impl InsertDestination {
                 key
             };
 
-            if let Some(table) = context.get_table_impl(key) {
+            if let Some(table) = context.get_table(&crate::sem::TableName::from(key.clone())) {
                 let mut columns = Vec::new();
                 while let Some(column) = table.get_column_at(columns.len()) {
                     columns.push(column.clone());
@@ -69,36 +64,38 @@ impl InsertDestination {
                     merge_view_support: None,
                 }));
             }
-            context.get_view_impl(key).map(|view| {
-                let (columns, support) = if view.is_materialized() {
-                    (Vec::new(), ViewInsertSupport::read_only())
-                } else {
-                    (
-                        view.result_columns().column_definitions()?,
-                        ViewInsertSupport::analyze(context, key)
-                            .map_err(|problem| AnalysisError::view_metadata(&problem))?,
-                    )
-                };
-                let columns = columns
-                    .into_iter()
-                    .map(|column| {
-                        if let Some(name) = column.name()
-                            && let Some(definition) = support.column_definition(name)
-                        {
-                            definition.clone()
-                        } else {
-                            column
-                        }
+            context
+                .get_view(&crate::sem::ViewName::from_full_name(key))
+                .map(|view| {
+                    let (columns, support) = if view.is_materialized() {
+                        (Vec::new(), ViewInsertSupport::read_only())
+                    } else {
+                        (
+                            view.result_columns().column_definitions()?,
+                            ViewInsertSupport::analyze(context, key)
+                                .map_err(|problem| AnalysisError::view_metadata(&problem))?,
+                        )
+                    };
+                    let columns = columns
+                        .into_iter()
+                        .map(|column| {
+                            if let Some(name) = column.name()
+                                && let Some(definition) = support.column_definition(name)
+                            {
+                                definition.clone()
+                            } else {
+                                column
+                            }
+                        })
+                        .collect();
+                    Ok(Self {
+                        name: TableName::from(key.clone()),
+                        columns,
+                        table: None,
+                        view_support: Some(support),
+                        merge_view_support: None,
                     })
-                    .collect();
-                Ok(Self {
-                    name: TableName::from(key.clone()),
-                    columns,
-                    table: None,
-                    view_support: Some(support),
-                    merge_view_support: None,
                 })
-            })
         })
         .transpose()
     }

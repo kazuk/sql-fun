@@ -12,17 +12,13 @@ impl DeleteDestination {
         context: &impl ParseContext,
         requested: &TableName,
     ) -> Option<Self> {
-        crate::sem::search_path::expand_search_path_inst(context, requested.full_name(), |key| {
-            if context.get_table_impl(key).is_some() || context.get_view_impl(key).is_some() {
-                Some(Self {
-                    name: TableName::from(key.clone()),
-                    found: true,
-                    view_support: None,
-                })
-            } else {
-                None
-            }
-        })
+        context
+            .resolve_relation_name(requested.full_name())
+            .map(|name| Self {
+                name: TableName::from(name),
+                found: true,
+                view_support: None,
+            })
     }
 
     pub(crate) fn resolve(context: &impl ParseContext, requested: &TableName) -> Option<Self> {
@@ -35,25 +31,30 @@ impl DeleteDestination {
                 key
             };
 
-            if context.get_table_impl(key).is_some() {
+            if context
+                .get_table(&crate::sem::TableName::from(key.clone()))
+                .is_some()
+            {
                 return Some(Self {
                     name: TableName::from(key.clone()),
                     found: true,
                     view_support: None,
                 });
             }
-            context.get_view_impl(key).map(|view| {
-                let support = if view.is_materialized() {
-                    ViewDeleteSupport::read_only()
-                } else {
-                    context.view_delete_support(key)
-                };
-                Self {
-                    name: TableName::from(key.clone()),
-                    found: true,
-                    view_support: Some(support),
-                }
-            })
+            context
+                .get_view(&crate::sem::ViewName::from_full_name(key))
+                .map(|view| {
+                    let support = if view.is_materialized() {
+                        ViewDeleteSupport::read_only()
+                    } else {
+                        context.view_delete_support(key)
+                    };
+                    Self {
+                        name: TableName::from(key.clone()),
+                        found: true,
+                        view_support: Some(support),
+                    }
+                })
         })
     }
     pub(crate) fn missing(name: &TableName) -> Self {

@@ -50,16 +50,11 @@ impl CreateRule {
     ) -> Result<sem::CreateRule, AnalysisError> {
         AnalysisError::check_dialect(Dialect::postgres(), context.dialect())?;
         let requested = self.relation.name.full_name()?;
-        let target = sem::search_path::expand_search_path_inst(context, &requested, |name| {
-            if context.get_table_impl(name).is_some() || context.get_view_impl(name).is_some() {
-                Some(name.clone())
-            } else {
-                None
-            }
-        })
-        .ok_or_else(|| AnalysisError::rule(&RuleProblem::target(&requested)))?;
+        let target = context
+            .resolve_relation_name(&requested)
+            .ok_or_else(|| AnalysisError::rule(&RuleProblem::target(&requested)))?;
         if context
-            .get_view_impl(&target)
+            .get_view(&crate::sem::ViewName::from_full_name(&target))
             .is_some_and(sem::ViewLike::is_materialized)
         {
             return Err(AnalysisError::rule(&RuleProblem::target(&target)));
@@ -126,7 +121,10 @@ impl CreateRule {
             return Err(AnalysisError::rule(&RuleProblem::duplicate(identity)));
         }
         if self.event == RuleEvent::Select {
-            if context.get_view_impl(identity.target()).is_none() {
+            if context
+                .get_view(&crate::sem::ViewName::from_full_name(identity.target()))
+                .is_none()
+            {
                 return Self::invalid(identity, "ON SELECT requires an ordinary view");
             }
             if !self.replace {
@@ -215,9 +213,13 @@ impl CreateRule {
     ) -> Result<(), AnalysisError> {
         let mut index = 0;
         loop {
-            let expected = if let Some(table) = context.get_table_impl(identity.target()) {
+            let expected = if let Some(table) =
+                context.get_table(&crate::sem::TableName::from(identity.target().clone()))
+            {
                 table.get_column_at(index).cloned()
-            } else if let Some(view) = context.get_view_impl(identity.target()) {
+            } else if let Some(view) =
+                context.get_view(&crate::sem::ViewName::from_full_name(identity.target()))
+            {
                 view.result_columns()
                     .get_column_at(index)
                     .map(sem::ResultColumn::create_column_definition)

@@ -396,11 +396,19 @@ macro_rules! forward_catalog_reads {
             }
         }
 
-        impl crate::sem::BaseParseContext for $context {
-            fn rule(&self, identity: &crate::sem::RuleIdentity) -> Option<&crate::sem::CreateRule> {
-                crate::sem::BaseParseContext::rule(self.$catalog(), identity)
+        impl crate::sem::RuleInfoRead for $context {
+            fn local_rule(
+                &self,
+                identity: &crate::sem::RuleIdentity,
+            ) -> Option<Option<&crate::sem::CreateRule>> {
+                crate::sem::RuleInfoRead::local_rule(self.$catalog(), identity)
             }
+            fn rule_parent(&self) -> Option<&dyn crate::sem::RuleInfoRead> {
+                crate::sem::RuleInfoRead::rule_parent(self.$catalog())
+            }
+        }
 
+        impl crate::sem::BaseParseContext for $context {
             fn sqlite_relation_identity(&self, name: &FullName) -> Option<FullName> {
                 self.$catalog().sqlite_relation_identity(name)
             }

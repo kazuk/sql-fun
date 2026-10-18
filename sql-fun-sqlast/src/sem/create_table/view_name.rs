@@ -23,7 +23,8 @@ impl Display for ViewName {
 }
 
 impl ViewName {
-    pub(crate) fn from_full_name(name: &FullName) -> Self {
+    /// Construct a view name from an explicit catalog identity.
+    pub fn from_full_name(name: &FullName) -> Self {
         Self(name.clone())
     }
 

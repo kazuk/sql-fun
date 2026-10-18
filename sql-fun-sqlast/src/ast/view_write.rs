@@ -127,13 +127,15 @@ impl Query {
         let QueryBody::Select(select) = &self.body else {
             return Ok(());
         };
-        let columns = if let Some(table) = context.get_table_impl(source) {
+        let columns = if let Some(table) =
+            context.get_table(&crate::sem::TableName::from(source.clone()))
+        {
             let mut columns = Vec::new();
             while let Some(column) = table.get_column_at(columns.len()) {
                 columns.push(column.clone());
             }
             columns
-        } else if let Some(view) = context.get_view_impl(source) {
+        } else if let Some(view) = context.get_view(&crate::sem::ViewName::from_full_name(source)) {
             if view.is_materialized() {
                 return Ok(());
             }
@@ -214,7 +216,13 @@ impl FromItem {
             context,
             &requested,
             |key| {
-                if context.get_table_impl(key).is_some() || context.get_view_impl(key).is_some() {
+                if context
+                    .get_table(&crate::sem::TableName::from(key.clone()))
+                    .is_some()
+                    || context
+                        .get_view(&crate::sem::ViewName::from_full_name(key))
+                        .is_some()
+                {
                     Some(key.clone())
                 } else {
                     None

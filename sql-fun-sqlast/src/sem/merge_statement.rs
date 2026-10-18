@@ -65,6 +65,8 @@ impl MergeInsert {
 /// A typed MERGE action; it does not contain a standalone DML statement.
 #[derive(Debug, Clone, Eq, Hash, PartialEq, serde::Serialize, serde::Deserialize)]
 pub enum MergeAction {
+    /// A diagnosed action whose semantics could not be resolved.
+    Unresolved,
     /// UPDATE assignments.
     Update(MergeUpdate),
     /// INSERT clause.
@@ -84,6 +86,9 @@ impl MergeUpdate {
     }
 }
 impl MergeAction {
+    pub(crate) const fn unresolved() -> Self {
+        Self::Unresolved
+    }
     pub(crate) fn update(assignments: &UpdateAssignmentCollection) -> Self {
         Self::Update(MergeUpdate(assignments.clone()))
     }
@@ -127,14 +132,14 @@ impl MergeAction {
         match self {
             Self::Update(value) => value.0.walk(visitor),
             Self::Insert(value) => value.clause.walk(visitor),
-            Self::Delete | Self::Nothing => Ok(()),
+            Self::Unresolved | Self::Delete | Self::Nothing => Ok(()),
         }
     }
     fn validate(&mut self, context: &mut impl ParseContext) -> Result<(), AnalysisError> {
         match self {
             Self::Update(value) => value.0.validate(context),
             Self::Insert(value) => value.clause.validate_assignments(context),
-            Self::Delete | Self::Nothing => Ok(()),
+            Self::Unresolved | Self::Delete | Self::Nothing => Ok(()),
         }
     }
 }

@@ -184,16 +184,20 @@ impl<'a> ScalarAnalysisContext<'a> {
             .filter(|rule| rule.forbidden.is_none())
             .map(|rule| &rule.identity)
     }
-    fn validate_rule_reference(&self, alias: &AliasName) -> Result<(), AnalysisError> {
+    fn validate_rule_reference(
+        &self,
+        context: &mut impl ParseContext,
+        alias: &AliasName,
+    ) -> Result<(), AnalysisError> {
         if let Some(rule) = &self.rule
             && (rule.forbidden.is_some() || !rule.event.permits_row(alias.as_str()))
         {
             let detail = rule
                 .forbidden
                 .unwrap_or("OLD/NEW reference is not available for this event");
-            return Err(AnalysisError::rule(
+            context.report_analysis_problem(crate::sem::AnalysisProblem::rule(
                 &crate::sem::problem::RuleProblem::definition(&rule.identity, detail),
-            ));
+            ))?;
         }
         Ok(())
     }
@@ -217,7 +221,7 @@ impl<'a> ScalarAnalysisContext<'a> {
     }
     pub(crate) fn trigger_relation_name(
         &self,
-        context: &impl ParseContext,
+        context: &mut impl ParseContext,
         name: &crate::sem::FullName,
     ) -> Result<crate::sem::FullName, AnalysisError> {
         if context.dialect() != crate::ast::Dialect::sqlite() {
@@ -231,12 +235,12 @@ impl<'a> ScalarAnalysisContext<'a> {
                 .schema()
                 .is_some_and(|supplied| !supplied.as_str().eq_ignore_ascii_case(schema.as_str()))
         {
-            return Err(AnalysisError::trigger(
+            context.report_analysis_problem(crate::sem::AnalysisProblem::trigger(
                 &crate::sem::problem::TriggerProblem::options(
                     name,
                     "non-TEMP SQLite triggers can reference only their own database",
                 ),
-            ));
+            ))?;
         }
         Ok(name.replace_schema(schema))
     }
@@ -752,7 +756,7 @@ impl ScalarAnalysisContext<'_> {
             let expr = UndefinedAliasColumnRef::new_with_report(context, alias, column)?;
             return Ok((expr, context));
         };
-        self.validate_rule_reference(alias)?;
+        self.validate_rule_reference(context, alias)?;
         source.create_column_ref(context, &self.with_clause, alias, column, nullability)
     }
 }

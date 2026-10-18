@@ -9,23 +9,9 @@ use crate::sem::{AnalysisProblem, ParseContext, TypeReference};
 /// error
 #[derive(Debug, thiserror::Error)]
 pub enum AnalysisError {
-    /// Writable-view evaluation failure already delivered to the analysis context.
-    #[error(transparent)]
-    ViewEvaluation(Box<Self>),
-    /// Invalid rule definition or application.
-    #[error("invalid rule: {0:?}")]
-    Rule(Box<crate::sem::problem::RuleProblem>),
-    /// Invalid trigger definition or application.
-    #[error("invalid trigger: {0:?}")]
-    Trigger(Box<crate::sem::problem::TriggerProblem>),
-
     /// unknown error
     #[error("{0}")]
     GenericError(#[source] Box<dyn std::error::Error>),
-
-    /// Incomplete view catalog facts encountered during semantic analysis.
-    #[error("incomplete View semantics: {0:?}")]
-    ViewMetadata(Box<crate::sem::problem::ViewProblem>),
 
     /// serde
     #[error(transparent)]
@@ -73,64 +59,6 @@ pub enum AnalysisError {
 }
 
 impl AnalysisError {
-    pub(crate) fn report_view_evaluation<T>(
-        self,
-        context: &mut impl ParseContext,
-        view: &crate::sem::FullName,
-    ) -> Result<T, Self> {
-        let problem = match &self {
-            Self::ViewEvaluation(_) => return Err(self),
-            Self::ViewMetadata(problem) => AnalysisProblem::view(problem),
-            Self::Rule(problem) => AnalysisProblem::rule(problem),
-            Self::Trigger(problem) => AnalysisProblem::trigger(problem),
-            _ => AnalysisProblem::view(&crate::sem::problem::ViewProblem::evaluation_failed(
-                view, &self,
-            )),
-        };
-        context.report_analysis_problem(problem)?;
-        Err(Self::ViewEvaluation(Box::new(self)))
-    }
-
-    /// Inspect the structured View problem through a reported evaluation failure.
-    pub fn view_problem(&self) -> Option<&crate::sem::problem::ViewProblem> {
-        match self {
-            Self::ViewMetadata(problem) => Some(problem),
-            Self::ViewEvaluation(cause) => cause.view_problem(),
-            _ => None,
-        }
-    }
-    pub(crate) fn report_rule_problem(&self, context: &mut impl ParseContext) -> Result<(), Self> {
-        if let Self::Rule(problem) = self {
-            context.report_analysis_problem(AnalysisProblem::rule(problem))?;
-        }
-        Ok(())
-    }
-    pub(crate) fn rule(problem: &crate::sem::problem::RuleProblem) -> Self {
-        Self::Rule(Box::new(problem.clone()))
-    }
-    pub(crate) fn trigger(problem: &crate::sem::problem::TriggerProblem) -> Self {
-        Self::Trigger(Box::new(problem.clone()))
-    }
-    pub(crate) fn view_metadata(problem: &crate::sem::problem::ViewProblem) -> Self {
-        Self::ViewMetadata(Box::new(problem.clone()))
-    }
-
-    pub(crate) fn recover_view_metadata(
-        self,
-        context: &mut impl ParseContext,
-    ) -> Result<crate::sem::SemAst, Self> {
-        match self {
-            Self::ViewEvaluation(cause) if matches!(cause.as_ref(), Self::ViewMetadata(_)) => {
-                Ok(crate::sem::SemAst::unresolved_statement())
-            }
-            Self::ViewMetadata(problem) => {
-                context.report_analysis_problem(AnalysisProblem::view(&problem))?;
-                Ok(crate::sem::SemAst::unresolved_statement())
-            }
-            other => Err(other),
-        }
-    }
-
     pub(crate) fn check_dialect(
         parsed: crate::ast::Dialect,
         configured: crate::ast::Dialect,

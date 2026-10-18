@@ -561,9 +561,9 @@ impl Subquery {
         if let Some(identity) = scope.rule_identity()
             && let Some(detail) = self.kind.pending_rule_semantics()
         {
-            return Err(AnalysisError::rule(
+            context.report_analysis_problem(crate::sem::AnalysisProblem::rule(
                 &crate::sem::problem::RuleProblem::definition(identity, detail),
-            ));
+            ))?;
         }
         let query = self.query.resolve_in(context, Some(scope))?;
         self.kind.resolve(&query)

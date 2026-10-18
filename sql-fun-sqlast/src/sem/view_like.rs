@@ -92,15 +92,21 @@ impl ViewLike {
         }
     }
 
-    /// apply alter view statement
+    /// Apply ALTER VIEW; false means a problem was reported without changing the view.
     ///
     /// # Errors
     ///
     /// - `AnalysisError`
-    pub fn apply_alter(&mut self, alter_view: &AlterView) -> Result<(), AnalysisError> {
+    pub fn apply_alter(
+        &mut self,
+        context: &mut impl crate::sem::ParseContext,
+        alter_view: &AlterView,
+    ) -> Result<bool, AnalysisError> {
         match self {
-            Self::View(create_view) => create_view.apply_alter(alter_view),
-            Self::MaterializedView(create_table_as) => create_table_as.apply_alter(alter_view),
+            Self::View(create_view) => create_view.apply_alter(context, alter_view),
+            Self::MaterializedView(create_table_as) => {
+                create_table_as.apply_alter(alter_view).map(|()| true)
+            }
         }
     }
 

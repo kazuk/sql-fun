@@ -51,15 +51,18 @@ impl UpdateDestination {
         let Some(key) = key else {
             return Ok(None);
         };
-        Self::resolve_at(context, &key).transpose()
+        Self::resolve_at(context, &key)
     }
     fn resolve_at(
         context: &mut impl ParseContext,
         key: &crate::sem::FullName,
-    ) -> Option<Result<Self, AnalysisError>> {
+    ) -> Result<Option<Self>, AnalysisError> {
         let canonical;
         let key = if context.dialect() == crate::ast::Dialect::sqlite() {
-            canonical = context.sqlite_relation_identity(key)?;
+            let Some(identity) = context.sqlite_relation_identity(key) else {
+                return Ok(None);
+            };
+            canonical = identity;
             &canonical
         } else {
             key
@@ -69,7 +72,7 @@ impl UpdateDestination {
             while let Some(column) = table.get_column_at(columns.len()) {
                 columns.push(column.clone());
             }
-            return Some(Ok(Self {
+            return Ok(Some(Self {
                 name: TableName::from(key.clone()),
                 columns,
                 view_support: None,
@@ -80,35 +83,37 @@ impl UpdateDestination {
             .get_view(&crate::sem::ViewName::from_full_name(key))
             .is_some()
         {
-            return Some(Self::from_view(context, key));
+            return Self::from_view(context, key);
         }
-        None
+        Ok(None)
     }
     fn from_view(
         context: &mut impl ParseContext,
         key: &crate::sem::FullName,
-    ) -> Result<Self, AnalysisError> {
+    ) -> Result<Option<Self>, AnalysisError> {
         let view = context
             .get_view(&crate::sem::ViewName::from_full_name(key))
             .expect("resolved view");
         let (columns, support) = if view.is_materialized() {
             (Vec::new(), ViewUpdateSupport::read_only())
         } else {
-            (
-                view.result_columns().column_definitions()?,
-                ViewUpdateSupport::analyze(context, key)?,
-            )
+            (view.result_columns().column_definitions()?, {
+                let Some(support) = ViewUpdateSupport::analyze(context, key)? else {
+                    return Ok(None);
+                };
+                support
+            })
         };
         let columns = columns
             .into_iter()
             .map(|column| Self::writable_column(column, &support))
             .collect();
-        Ok(Self {
+        Ok(Some(Self {
             name: TableName::from(key.clone()),
             columns,
             view_support: Some(support),
             merge_view_support: None,
-        })
+        }))
     }
 
     pub(crate) fn for_merge_view(

@@ -45,7 +45,10 @@ pub trait RuleInfoWrite: BaseParseContext + TableInfoWrite + Sized {
         self,
         target: &FullName,
         identity: &RuleIdentity,
-    ) -> Result<Self, AnalysisError> {
+    ) -> Result<Self, AnalysisError>
+    where
+        Self: crate::sem::ParseContext,
+    {
         self.update_rule_link(target, identity, true)
     }
     /// Remove an explicitly supplied target link, without inferring a DROP.
@@ -53,7 +56,10 @@ pub trait RuleInfoWrite: BaseParseContext + TableInfoWrite + Sized {
         self,
         target: &FullName,
         identity: &RuleIdentity,
-    ) -> Result<Self, AnalysisError> {
+    ) -> Result<Self, AnalysisError>
+    where
+        Self: crate::sem::ParseContext,
+    {
         self.update_rule_link(target, identity, false)
     }
     /// Update a target link using the caller's explicit association decision.
@@ -62,7 +68,10 @@ pub trait RuleInfoWrite: BaseParseContext + TableInfoWrite + Sized {
         target: &FullName,
         identity: &RuleIdentity,
         associate: bool,
-    ) -> Result<Self, AnalysisError> {
+    ) -> Result<Self, AnalysisError>
+    where
+        Self: crate::sem::ParseContext,
+    {
         if let Some(mut table) = self.get_table(&TableName::from(target.clone())).cloned() {
             if associate {
                 table.associate_rule(identity);
@@ -78,9 +87,9 @@ pub trait RuleInfoWrite: BaseParseContext + TableInfoWrite + Sized {
             }
             self.store_rule_view(target, &view);
         } else {
-            return Err(AnalysisError::rule(
+            self.report_analysis_problem(crate::sem::AnalysisProblem::rule(
                 &crate::sem::problem::RuleProblem::target(target),
-            ));
+            ))?;
         }
         Ok(self)
     }

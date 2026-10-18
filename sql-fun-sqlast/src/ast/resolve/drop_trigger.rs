@@ -1,4 +1,5 @@
 use crate::ast::{Dialect, DropBehavior, DropTrigger};
+use crate::sem::ResolutionFailure;
 use crate::sem::problem::TriggerProblem;
 use crate::sem::{self, AnalysisError, FullName, ParseContext, SemAst, TriggerIdentity};
 
@@ -6,21 +7,18 @@ impl DropTrigger {
     pub(crate) fn resolve(
         &self,
         context: &mut impl ParseContext,
-    ) -> Result<sem::DropTrigger, AnalysisError> {
+    ) -> Result<Option<sem::DropTrigger>, AnalysisError> {
         let result = if context.dialect() == Dialect::sqlite() {
             self.resolve_sqlite(context)
         } else {
             self.resolve_postgres(context)
         };
-        if let Err(AnalysisError::Trigger(problem)) = &result {
-            context.report_analysis_problem(sem::AnalysisProblem::trigger(problem))?;
-        }
-        result
+        ResolutionFailure::finish(result, context)
     }
     fn resolve_sqlite(
         &self,
         context: &impl ParseContext,
-    ) -> Result<sem::DropTrigger, AnalysisError> {
+    ) -> Result<sem::DropTrigger, ResolutionFailure> {
         let requested = self.name.full_name()?;
         let identity = if requested.schema().is_some() {
             let identity = TriggerIdentity::sqlite(&requested);
@@ -57,7 +55,7 @@ impl DropTrigger {
             None
         };
         if !self.if_exists {
-            return Err(AnalysisError::trigger(&TriggerProblem::missing_name(
+            return Err(ResolutionFailure::trigger(&TriggerProblem::missing_name(
                 &requested,
             )));
         }
@@ -71,7 +69,7 @@ impl DropTrigger {
     fn resolve_postgres(
         &self,
         context: &impl ParseContext,
-    ) -> Result<sem::DropTrigger, AnalysisError> {
+    ) -> Result<sem::DropTrigger, ResolutionFailure> {
         let requested = self.name.full_name()?;
         let requested_target = self
             .relation
@@ -93,7 +91,7 @@ impl DropTrigger {
                     behavior,
                 ));
             }
-            return Err(AnalysisError::trigger(&TriggerProblem::target(
+            return Err(ResolutionFailure::trigger(&TriggerProblem::target(
                 &requested_target,
             )));
         };
@@ -106,7 +104,7 @@ impl DropTrigger {
         requested_target: &FullName,
         target: &FullName,
         behavior: sem::DropDependencyBehavior,
-    ) -> Result<sem::DropTrigger, AnalysisError> {
+    ) -> Result<sem::DropTrigger, ResolutionFailure> {
         let name = FullName::new(
             &target.catalog().cloned(),
             &target.schema().cloned(),
@@ -115,7 +113,9 @@ impl DropTrigger {
         let identity = TriggerIdentity::postgres(target, &name);
         let found = context.trigger(&identity).is_some();
         if !found && !self.if_exists {
-            return Err(AnalysisError::trigger(&TriggerProblem::missing(&identity)));
+            return Err(ResolutionFailure::trigger(&TriggerProblem::missing(
+                &identity,
+            )));
         }
         Ok(sem::DropTrigger::new(
             requested,
@@ -130,10 +130,15 @@ impl DropTrigger {
         &self,
         mut context: C,
     ) -> Result<crate::AstAndContextPair<C>, AnalysisError> {
-        let statement = self.resolve(&mut context)?;
-        let context = statement.apply(context)?;
+        let Some(definition) = self.resolve(&mut context)? else {
+            return Ok(crate::AstAndContextPair::new(
+                SemAst::unresolved_statement(),
+                context,
+            ));
+        };
+        let context = definition.apply(context)?;
         Ok(crate::AstAndContextPair::new(
-            SemAst::drop_trigger(&statement),
+            SemAst::drop_trigger(&definition),
             context,
         ))
     }

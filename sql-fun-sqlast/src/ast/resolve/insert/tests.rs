@@ -223,16 +223,28 @@ fn resolves_array_assignment_targets(#[case] sql: &str) {
 }
 
 #[rstest::rstest]
-#[case::missing_relation("INSERT INTO absent VALUES(1)")]
-#[case::missing_column("INSERT INTO items(absent) VALUES(1)")]
-#[case::unreadable_cte("WITH changed AS (INSERT INTO items(id) VALUES(1)) SELECT 1 FROM changed")]
-fn fails_without_fabricated_bindings(#[case] sql: &str) {
+#[case::missing_relation("INSERT INTO absent VALUES(1)", false)]
+#[case::missing_column("INSERT INTO items(absent) VALUES(1)", false)]
+#[case::unreadable_cte(
+    "WITH changed AS (INSERT INTO items(id) VALUES(1)) SELECT 1 FROM changed",
+    true
+)]
+fn fails_without_fabricated_bindings(#[case] sql: &str, #[case] fatal: bool) {
     let statement = crate::parse_statements(sql, Dialect::postgres())
         .next()
         .unwrap()
         .unwrap();
     let mut context = test_helpers::catalog(Dialect::postgres());
-    assert!(statement.node.resolve(&mut context).is_err());
+    let result = statement.node.resolve(&mut context);
+    if fatal {
+        assert!(result.is_err());
+    } else {
+        assert!(matches!(
+            result.unwrap(),
+            crate::sem::SemAst::UnresolvedStatement
+        ));
+        assert!(context.reported_problem_count() > 0);
+    }
 }
 
 #[test]

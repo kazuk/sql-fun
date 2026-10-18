@@ -356,30 +356,48 @@ impl StatementNode {
             Self::Query(query) => query
                 .resolve(context)
                 .map(|query| crate::sem::SemAst::select(&query)),
-            Self::Insert(insert) => insert
-                .resolve(context)
-                .map(|insert| crate::sem::SemAst::insert(&insert)),
-            Self::Update(update) => update
-                .resolve(context)
-                .map(|update| crate::sem::SemAst::update(&update)),
+            Self::Insert(insert) => insert.resolve(context).map(|value| {
+                value.as_ref().map_or_else(
+                    crate::sem::SemAst::unresolved_statement,
+                    crate::sem::SemAst::insert,
+                )
+            }),
+            Self::Update(update) => update.resolve(context).map(|value| {
+                value.as_ref().map_or_else(
+                    crate::sem::SemAst::unresolved_statement,
+                    crate::sem::SemAst::update,
+                )
+            }),
             Self::Delete(delete) => delete
                 .resolve(context)
                 .map(|delete| crate::sem::SemAst::delete(&delete)),
             Self::Merge(merge) => merge
                 .resolve(context)
                 .map(|merge| crate::sem::SemAst::merge(&merge)),
-            Self::CreateRule(rule) => rule
-                .resolve(context)
-                .map(|rule| crate::sem::SemAst::create_rule(&rule)),
-            Self::DropTrigger(trigger) => trigger
-                .resolve(context)
-                .map(|statement| crate::sem::SemAst::drop_trigger(&statement)),
-            Self::CreateTrigger(trigger) => trigger
-                .resolve(context)
-                .map(|trigger| crate::sem::SemAst::create_trigger(&trigger)),
-            Self::DropRule(rule) => rule
-                .resolve(context)
-                .map(|rule| crate::sem::SemAst::drop_rule(&rule)),
+            Self::CreateRule(rule) => rule.resolve(context).map(|value| {
+                value.as_ref().map_or_else(
+                    crate::sem::SemAst::unresolved_statement,
+                    crate::sem::SemAst::create_rule,
+                )
+            }),
+            Self::DropTrigger(trigger) => trigger.resolve(context).map(|value| {
+                value.as_ref().map_or_else(
+                    crate::sem::SemAst::unresolved_statement,
+                    crate::sem::SemAst::drop_trigger,
+                )
+            }),
+            Self::CreateTrigger(trigger) => trigger.resolve(context).map(|value| {
+                value.as_ref().map_or_else(
+                    crate::sem::SemAst::unresolved_statement,
+                    crate::sem::SemAst::create_trigger,
+                )
+            }),
+            Self::DropRule(rule) => rule.resolve(context).map(|value| {
+                value.as_ref().map_or_else(
+                    crate::sem::SemAst::unresolved_statement,
+                    crate::sem::SemAst::drop_rule,
+                )
+            }),
             Self::View(_) => crate::sem::AnalysisError::raise_unexpected_input(
                 "view requires catalog application",
             ),
@@ -432,7 +450,6 @@ impl StatementNode {
                 .resolve(context)
                 .map(|domain| crate::sem::SemAst::create_domain(&domain)),
         }
-        .or_else(|error| error.recover_view_metadata(context))
     }
 
     pub(crate) fn resolve_and_apply<TContext>(

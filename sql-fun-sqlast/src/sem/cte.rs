@@ -18,6 +18,8 @@ pub type CteName = String;
 /// CTE query item types
 #[derive(Debug, Clone, Eq, Hash, PartialEq, serde::Serialize, serde::Deserialize)]
 pub enum CteStatement {
+    /// A diagnosed CTE body that could not be resolved.
+    Unresolved,
     /// `SELECT` statement
     Select(Box<SelectStatement>),
     /// `INSERT` statement
@@ -31,6 +33,10 @@ pub enum CteStatement {
 }
 
 impl CteStatement {
+    pub(crate) const fn unresolved() -> Self {
+        Self::Unresolved
+    }
+
     /// get column from result set
     pub fn get_column<TParseContext>(
         &self,
@@ -70,6 +76,7 @@ impl CteStatement {
 
     pub(crate) fn result_columns(&self) -> Option<&crate::sem::ResultColumnCollection> {
         match self {
+            Self::Unresolved => None,
             Self::Select(query) => Some(query.result_columns()),
             Self::Insert(insert) => Some(insert.result_columns()),
             Self::Update(update) => Some(update.result_columns()),
@@ -108,6 +115,7 @@ impl CteStatement {
     /// test column existing
     pub(crate) fn has_column(&self, column: &ColumnName) -> bool {
         match self {
+            Self::Unresolved => false,
             Self::Select(query) => query.has_column(column),
             Self::Insert(insert) => insert.result_columns().has_column(column),
             Self::Update(update) => update.result_columns().has_column(column),
@@ -141,6 +149,7 @@ impl CteStatement {
         skip: usize,
     ) -> Option<ColumnDefinition> {
         match self {
+            Self::Unresolved => None,
             Self::Select(query) => {
                 let columns = query.result_columns();
                 let result = if let Some(index) = index {
@@ -270,6 +279,7 @@ impl CteStatement {
         visitor: &mut V,
     ) -> Result<(), crate::sem::AnalysisError> {
         match self {
+            Self::Unresolved => {}
             Self::Select(query) => query.walk(visitor)?,
             Self::Insert(insert) => insert.walk(visitor)?,
             Self::Update(update) => update.walk(visitor)?,

@@ -126,7 +126,12 @@ already-bound View `FullName`. Evaluation follows the View's effective semantic
 Trigger/Rule references and does not register capabilities or resolve a new
 search path. `ViewInsertSupport::analyze` and `ViewUpdateSupport::analyze` use
 this same service. The service reports semantic problems through that context
-and preserves their structured causes. Frozen contexts store analysis results;
+and returns `Ok(None)` when evaluation cannot finish because of a semantic
+problem. A read-only view still yields `Ok(Some(support))`; a write to that
+view reports a problem. Invalid statements leave an explicitly unresolved
+result so later statements can still be analyzed. `AnalysisError` is reserved
+for unrecoverable failures, including internal parser/analysis contract
+violations and diagnostic delivery failures. Frozen contexts store analysis results;
 writable-view analysis requires an active `ParseContext`.
 PostgreSQL supports automatic writes through a single eligible relation,
 matching INSTEAD OF triggers, and unconditional INSTEAD rules. INSERT and UPDATE

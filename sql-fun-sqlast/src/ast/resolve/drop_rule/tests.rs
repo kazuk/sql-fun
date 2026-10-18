@@ -84,7 +84,7 @@ fn invalid_drop_leaves_named_definitions_and_links_intact(
         test_helpers::statement(sql)
             .node
             .resolve(&mut child)
-            .is_err()
+            .is_ok_and(|ast| matches!(ast, crate::sem::SemAst::UnresolvedStatement))
     );
     assert!(child.rule(&test_helpers::identity()).is_some());
     assert_eq!(test_helpers::active_count(&child.freeze()), 2);
@@ -254,14 +254,14 @@ fn cannot_drop_the_select_rule_required_by_a_view(
     ))
     .node
     .resolve(&mut child);
-    let Err(crate::sem::AnalysisError::Rule(problem)) = result else {
-        panic!("expected rule diagnostic")
-    };
+    assert!(matches!(result?, crate::sem::SemAst::UnresolvedStatement));
     assert!(
-        problem
-            .definition_detail()
-            .unwrap()
-            .contains("View requires")
+        child
+            .problems()
+            .iter()
+            .any(|problem| problem.rule_problem().is_some_and(|rule| rule
+                .definition_detail()
+                .is_some_and(|detail| detail.contains("View requires"))))
     );
     let identity = RuleIdentity::new(&FullName::with_schema("public", "item_view"), "_RETURN");
     assert_eq!(child.rule(&identity).is_some(), explicit);

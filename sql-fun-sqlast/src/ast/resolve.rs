@@ -108,6 +108,7 @@ impl Expr {
             Self::NullTest(test) => test.resolve(context, scope),
             Self::Cast(cast) => cast.resolve(context, scope),
             Self::Call(call) => call.resolve(context, scope),
+            Self::Grouping(arguments) => Self::resolve_grouping(arguments, context, scope),
             Self::Case(case) => case.resolve(context, scope),
             Self::Subquery(query) => query.resolve(context, scope),
             Self::Array(items) => Ok(SemScalarExpr::array(&Self::resolve_list(
@@ -132,7 +133,6 @@ impl Expr {
             // accepted by the scalar dispatcher, independently of its conversion.
             Self::Collate(_)
             | Self::Document(_)
-            | Self::Grouping(_)
             | Self::Row(_)
             | Self::CurrentOf(_)
             | Self::TruthTest(_) => {
@@ -426,14 +426,44 @@ impl Call {
         context: &mut impl ParseContext,
         scope: &ScalarAnalysisContext<'_>,
     ) -> Result<SemScalarExpr, AnalysisError> {
-        let mut expression = self.kind.resolve(self, context, scope)?;
-        let modifiers = self.resolve_modifiers(context, scope)?;
+        let aggregate = if self.kind.is_ordinary() && self.over.is_none() {
+            let name = context.resolve_function_name_with_search_path(&self.name.full_name()?);
+            context.is_aggregate_impl(&name)
+        } else {
+            false
+        };
+        let capture = if aggregate {
+            Some(crate::sem::ReferenceCapture::default())
+        } else {
+            None
+        };
+        let aggregate_scope;
+        let argument_scope = if let Some(capture) = &capture {
+            aggregate_scope = scope
+                .with_grouping_capture(capture)
+                .with_grouping_placement("aggregate argument");
+            &aggregate_scope
+        } else {
+            scope
+        };
+        let mut expression = self.kind.resolve(self, context, argument_scope)?;
+        let modifiers = self.resolve_modifiers(context, argument_scope)?;
+        if let Some(capture) = &capture {
+            let (owner, levels_up, _) = capture.owner(scope.grouping_scope());
+            scope.grouping_scope().aggregate(owner, levels_up);
+        } else if self.over.is_some() {
+            scope.grouping_scope().window();
+        }
         expression.set_function_modifiers(modifiers);
         Ok(expression)
     }
 }
 
 impl CallKind {
+    const fn is_ordinary(&self) -> bool {
+        matches!(self, Self::Ordinary)
+    }
+
     fn resolve(
         &self,
         call: &Call,
@@ -565,5 +595,51 @@ impl Access {
             }
             Self::Star => AnalysisError::raise_unexpected_input("indirection star"),
         }
+    }
+}
+
+impl Expr {
+    fn resolve_grouping(
+        arguments: &[Self],
+        context: &mut impl ParseContext,
+        scope: &ScalarAnalysisContext<'_>,
+    ) -> Result<SemScalarExpr, AnalysisError> {
+        context
+            .analysis_state_mut()
+            .grouping_mut()
+            .register_operation();
+        let capture = crate::sem::ReferenceCapture::default();
+        let argument_scope = scope
+            .with_grouping_capture(&capture)
+            .with_grouping_placement("GROUPING argument");
+        let arguments = Self::resolve_list(arguments, context, &argument_scope)?;
+        let (owner, levels_up, placement) = capture.owner(scope.grouping_scope());
+        let mut valid = true;
+        if capture.invalid_nesting(owner, scope.grouping_scope()) {
+            valid = false;
+            context.report_analysis_problem(AnalysisProblem::query(
+                crate::sem::QueryProblem::invalid_grouping_placement(
+                    "GROUPING argument containing an aggregate or window function",
+                ),
+            ))?;
+        }
+        scope.grouping_scope().aggregate(owner, levels_up);
+        if owner.is_none() || !placement.is_empty() {
+            valid = false;
+            context.report_analysis_problem(AnalysisProblem::query(
+                crate::sem::QueryProblem::invalid_grouping_placement(if placement.is_empty() {
+                    "expression outside SELECT"
+                } else {
+                    &placement
+                }),
+            ))?;
+        }
+        if arguments.len() > 31 {
+            valid = false;
+            context.report_analysis_problem(AnalysisProblem::query(
+                crate::sem::QueryProblem::too_many_grouping_arguments(),
+            ))?;
+        }
+        Ok(SemScalarExpr::grouping(&arguments, owner, levels_up, valid))
     }
 }

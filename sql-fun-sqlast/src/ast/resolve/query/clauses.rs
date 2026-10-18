@@ -197,9 +197,14 @@ impl Grouping {
         columns: &ResultColumnCollection,
     ) -> Result<QueryGrouping, AnalysisError> {
         match self {
-            Self::Expression(expression) => Ok(QueryGrouping::expression(
-                expression.resolve_clause(context, scope, columns, ClauseBinding::Group)?,
-            )),
+            Self::Expression(expression) => {
+                Ok(QueryGrouping::expression(expression.resolve_clause(
+                    context,
+                    &scope.with_grouping_placement("GROUP BY"),
+                    columns,
+                    ClauseBinding::Group,
+                )?))
+            }
             Self::Empty => Ok(QueryGrouping::empty()),
             Self::Rollup(groups) => Ok(QueryGrouping::rollup(Self::resolve_list(
                 groups, context, scope, columns,
@@ -315,12 +320,13 @@ impl Frame {
         context: &mut impl ParseContext,
         scope: &ScalarAnalysisContext<'_>,
     ) -> Result<QueryFrame, AnalysisError> {
+        let frame_scope = scope.with_grouping_placement("window frame offset");
         Ok(QueryFrame::new(
             self.mode.semantic_name(),
-            self.start.resolve(context, scope)?,
+            self.start.resolve(context, &frame_scope)?,
             self.end
                 .as_ref()
-                .map(|end| end.resolve(context, scope))
+                .map(|end| end.resolve(context, &frame_scope))
                 .transpose()?,
             self.exclusion
                 .map(|exclusion| exclusion.semantic_name().to_owned()),

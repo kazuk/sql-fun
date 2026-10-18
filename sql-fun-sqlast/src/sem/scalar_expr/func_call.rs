@@ -59,6 +59,13 @@ mod implementation {
         }
     }
     impl FuncCallExpr {
+        pub(crate) fn canonicalize_grouping_key(&mut self) {
+            if let Some(name) = self.name_resolution.function_name() {
+                self.func_name = name.clone();
+            }
+            self.candidates = None;
+        }
+
         pub(crate) fn binding_snapshot(&self) -> FunctionBinding {
             FunctionBinding {
                 name: self.func_name.clone(),

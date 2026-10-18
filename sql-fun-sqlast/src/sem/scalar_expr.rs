@@ -11,6 +11,7 @@ mod const_expr;
 mod constrained;
 mod context;
 mod func_call;
+pub(crate) mod grouping;
 mod indirect;
 mod min_max;
 mod named_arg;
@@ -37,6 +38,7 @@ pub use self::{
     constrained::ConstrainedExpr,
     context::ScalarAnalysisContext,
     func_call::{FuncCallExpr, FunctionBinding},
+    grouping::{GroupingArgument, GroupingExpr},
     indirect::IndirectionExpr,
     min_max::MinMaxExpr,
     named_arg::NamedArgExpr,
@@ -83,6 +85,8 @@ pub enum SemScalarExpr {
     ColumnRef(ColumnReferenceExpr),
     /// function call expression
     FuncCall(FuncCallExpr),
+    /// PostgreSQL grouping bit mask with resolved grouping-key bindings.
+    Grouping(GroupingExpr),
     /// arith expression
     Arith(ArithExpr),
     /// type casting expression
@@ -133,6 +137,41 @@ pub enum SemScalarExpr {
 }
 
 impl SemScalarExpr {
+    pub(super) fn grouping_references_resolved(&self) -> bool {
+        match self {
+            Self::ColumnRef(value) => value.grouping_reference_resolved(),
+            Self::Grouping(value) => value.is_valid(),
+            Self::FuncCall(value) => value.name_resolution().is_resolved(),
+            Self::TypeCast(value) => value.resolution().is_resolved(),
+            Self::Arith(value) => {
+                if let Some(binding) = value.binding() {
+                    binding.resolution().is_resolved()
+                } else {
+                    true
+                }
+            }
+            Self::Unexpected(_) => false,
+            _ => true,
+        }
+    }
+    pub(super) fn normalize_grouping_cast(&mut self) {
+        if let Self::TypeCast(value) = self
+            && let Some(operand) = value.grouping_key_operand()
+        {
+            *self = operand.clone();
+        }
+    }
+    pub(super) fn canonicalize_grouping_key(&mut self) {
+        match self {
+            Self::Grouping(value) => value.canonicalize_grouping_key(),
+            Self::FuncCall(value) => value.canonicalize_grouping_key(),
+            Self::Arith(value) => value.canonicalize_grouping_key(),
+            Self::Param(value) => value.canonicalize_grouping_key(),
+            Self::Constrained(value) => value.canonicalize_grouping_key(),
+            Self::ColumnRef(value) => value.canonicalize_grouping_key(),
+            _ => {}
+        }
+    }
     /// MERGE record binding, when this is a direct column reference.
     pub const fn merge_record_reference(&self) -> Option<&self::column_ref::MergeRecordColumnRef> {
         match self {
@@ -302,6 +341,7 @@ impl SemScalarExpr {
             Self::Indirection(ind) => ind.get_type(),
             Self::ImplicitCast(ice) => ice.get_type(),
             Self::Array(arr) => arr.get_type(),
+            Self::Grouping(_) => Some(PgBuiltInType::int4()),
             Self::MergeAction => Some(PgBuiltInType::text()),
             Self::Unexpected(_node) => None,
             Self::ColumnRef(cr) => cr.get_type(),
@@ -331,7 +371,7 @@ impl SemScalarExpr {
             Self::Indirection(ind) => ind.is_not_null(),
             Self::ImplicitCast(ice) => ice.is_not_null(),
             Self::Array(arr) => arr.is_not_null(),
-            Self::MergeAction => Some(true),
+            Self::Grouping(_) | Self::MergeAction => Some(true),
             Self::Unexpected(_node) => None,
             Self::ColumnRef(cr) => cr.is_not_null(),
             Self::List(_list) => todo!(),
@@ -366,6 +406,7 @@ impl SemScalarExpr {
             | Self::FuncCall(_)
             | Self::Param(_)
             | Self::Constrained(_)
+            | Self::Grouping(_)
             | Self::MergeAction => None,
             _ => todo!("not implemented {self:?}"),
         }
@@ -394,6 +435,7 @@ impl SemScalarExpr {
             Self::Indirection(_indirection_expr) => String::new(),
             Self::ImplicitCast(_implicit_cast_expr) => todo!(),
             Self::Array(_arr) => todo!(),
+            Self::Grouping(_) => "grouping".to_owned(),
             Self::MergeAction => "merge_action".to_owned(),
             Self::Unexpected(_node) => todo!(),
             Self::List(_list) => todo!(),
@@ -707,6 +749,7 @@ impl SemScalarExpr {
         visitor: &mut V,
     ) -> Result<(), AnalysisError> {
         match self {
+            Self::Grouping(v) => v.walk(visitor)?,
             Self::Array(v) => v.walk(visitor)?,
             Self::FuncCall(v) => v.walk(visitor)?,
             Self::Arith(v) => v.walk(visitor)?,

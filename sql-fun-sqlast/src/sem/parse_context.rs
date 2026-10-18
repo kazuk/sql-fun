@@ -91,6 +91,13 @@ pub trait IndexInfoRead {
 
 /// get function definition
 pub trait FunctionInfoRead {
+    /// Whether an exactly qualified routine is an aggregate. Ordinary routines
+    /// are the default; catalogs retaining aggregates must override this method.
+    /// Callers must first resolve the routine through the selected catalog.
+    fn is_aggregate_impl(&self, _name: &FullName) -> bool {
+        false
+    }
+
     /// get `CREATE FUNCTION` statement by function name
     fn get_function_impl(&self, name: &FullName) -> Option<FunctionOverloadCollection>;
 }
@@ -465,6 +472,7 @@ where
         result: Result<SemScalarExpr, AnalysisError>,
     ) -> Result<SemScalarExpr, AnalysisError> {
         let mut expression = result?;
+        expression.complete_grouping(self)?;
         if self.parameter_inference_needed() {
             let constraints =
                 crate::sem::parameter_resolution::ParameterResolution::infer_expression(

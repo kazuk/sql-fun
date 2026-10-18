@@ -44,6 +44,9 @@ impl ColumnReference for ViewColumnRef {
 }
 
 impl ViewColumnRef {
+    pub(super) fn canonicalize_grouping_key(&mut self) {
+        self.column_def = None;
+    }
     fn new(
         alias: &AliasName,
         column: &ColumnName,

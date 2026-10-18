@@ -41,6 +41,9 @@ impl SemScalarExprNode for ParamRef {
 }
 
 impl ParamRef {
+    pub(super) const fn canonicalize_grouping_key(&mut self) {
+        self.node = 0;
+    }
     pub(crate) fn apply_constraints(&mut self, constraints: &crate::sem::ParameterConstraints) {
         self.constraint = constraints.node_domain(self.node).clone();
     }

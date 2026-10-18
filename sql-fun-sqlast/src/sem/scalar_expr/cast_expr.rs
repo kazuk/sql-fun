@@ -45,6 +45,15 @@ pub struct TypeCastExpr {
 }
 
 impl TypeCastExpr {
+    pub(super) fn grouping_key_operand(&self) -> Option<&SemScalarExpr> {
+        if self.resolution.is_resolved() && self.arg.get_type().as_ref() == Some(&self.target_type)
+        {
+            Some(&self.arg)
+        } else {
+            None
+        }
+    }
+
     pub(crate) fn set_resolution(&mut self, resolution: crate::sem::QueryNameResolution) {
         self.resolution = resolution;
     }

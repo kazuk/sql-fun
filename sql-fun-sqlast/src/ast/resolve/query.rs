@@ -1,5 +1,7 @@
 mod clauses;
 #[cfg(test)]
+mod grouping_tests;
+#[cfg(test)]
 mod test_helpers;
 #[cfg(test)]
 mod tests;
@@ -50,7 +52,15 @@ impl Query {
         outer: Option<&ScalarAnalysisContext<'_>>,
     ) -> Result<SelectStatement, AnalysisError> {
         let with = self.with.resolve(context, outer)?;
-        let body = self.body.resolve(context, &with, outer)?;
+        let query_id = context.analysis_state_mut().grouping_mut().new_query();
+        let body = self.body.resolve(context, &with, outer, query_id)?;
+        if body.select_clauses().is_none() {
+            context.analysis_state_mut().grouping_mut().set_keys(
+                query_id,
+                &[],
+                body.result_columns(),
+            )?;
+        }
         let empty = FromClause::default();
         let order_outer = if self.body.is_compound() { None } else { outer };
         let mut scope = ScalarAnalysisContext::nested(
@@ -58,6 +68,7 @@ impl Query {
             body.source_scope().unwrap_or(&empty),
             order_outer,
         );
+        scope.set_grouping_query(query_id);
         scope.set_windows(self.body.window_names());
         if context.dialect() == Dialect::sqlite() {
             scope.set_output_aliases(body.result_columns());
@@ -72,6 +83,7 @@ impl Query {
             binding,
         )?;
         let row_scope = ScalarAnalysisContext::nested(&with, &empty, outer);
+        let row_scope = row_scope.with_grouping_placement("LIMIT/OFFSET");
         let limit = Expr::resolve_optional(&self.limit, context, &row_scope)?;
         let offset = Expr::resolve_optional(&self.offset, context, &row_scope)?;
         let locks = Lock::resolve_list(&self.locks, context, &scope)?;
@@ -79,7 +91,9 @@ impl Query {
         let mut query =
             crate::sem::SemanticQuery::new(local, self.with.recursive, body, order, limit, offset);
         query.set_modifiers(self.with_ties, self.body.set_all(), locks);
-        Ok(SelectStatement::query(query))
+        let mut query = SelectStatement::query(query);
+        query.complete_grouping(context)?;
+        Ok(query)
     }
 }
 
@@ -134,13 +148,16 @@ impl QueryBody {
         context: &mut impl ParseContext,
         with: &WithClause,
         outer: Option<&ScalarAnalysisContext<'_>>,
+        query_id: usize,
     ) -> Result<SelectStatement, AnalysisError> {
         match self {
-            Self::Select(select) => select.resolve(context, with, outer),
+            Self::Select(select) => select.resolve(context, with, outer, query_id),
             Self::Set(set) => set.resolve(context, with, outer),
             Self::Values(rows) => {
                 let from = FromClause::default();
-                let scope = ScalarAnalysisContext::nested(with, &from, outer);
+                let mut scope = ScalarAnalysisContext::nested(with, &from, outer);
+                scope.set_grouping_query(query_id);
+                let scope = scope.with_grouping_placement("VALUES");
                 let mut resolved = Vec::new();
                 for row in rows {
                     resolved.push(Expr::resolve_list(row, context, &scope)?);
@@ -167,12 +184,18 @@ impl Select {
         context: &mut impl ParseContext,
         with: &WithClause,
         outer: Option<&ScalarAnalysisContext<'_>>,
+        query_id: usize,
     ) -> Result<SelectStatement, AnalysisError> {
         let from = FromItem::resolve_list_in(&self.from, context, with, outer)?;
         let mut scope = ScalarAnalysisContext::nested(with, &from, outer);
+        scope.set_grouping_query(query_id);
         scope.set_windows(Window::names(&self.windows));
         let windows = Window::resolve_definitions(&self.windows, context, &scope)?;
-        let predicate = Expr::resolve_optional(&self.predicate, context, &scope)?;
+        let predicate = Expr::resolve_optional(
+            &self.predicate,
+            context,
+            &scope.with_grouping_placement("WHERE"),
+        )?;
         let mut results = ResultColumnCollection::default();
         for target in &self.targets {
             if let Expr::Star(name) = &target.expression {
@@ -214,6 +237,13 @@ impl Select {
             scope.set_output_aliases(&results);
         }
         let group = Grouping::resolve_list(&self.group, context, &scope, &results)?;
+        for grouping in &group {
+            grouping.validate_grouping_targets(&mut results, query_id, context)?;
+        }
+        context
+            .analysis_state_mut()
+            .grouping_mut()
+            .set_keys(query_id, &group, &results)?;
         let having = Expr::resolve_optional(&self.having, context, &scope)?;
         let mut clauses =
             crate::sem::SelectClauses::new(distinct, group, self.group_distinct, having, windows);
@@ -626,7 +656,11 @@ impl Join {
         let right = self.right.resolve(context, with, &visible, outer)?;
         visible.push(right.clone());
         let scope = ScalarAnalysisContext::nested(with, &visible, outer);
-        let condition = Expr::resolve_optional(&self.condition, context, &scope)?;
+        let condition = Expr::resolve_optional(
+            &self.condition,
+            context,
+            &scope.with_grouping_placement("JOIN condition"),
+        )?;
         Ok(DataSource::resolved_join(
             &left,
             &right,
@@ -727,7 +761,11 @@ impl Call {
             &columns,
             ClauseBinding::Source,
         )?;
-        let filter = Expr::resolve_optional(&self.filter, context, scope)?;
+        let filter = Expr::resolve_optional(
+            &self.filter,
+            context,
+            &scope.with_grouping_placement("aggregate FILTER"),
+        )?;
         let over = self
             .over
             .as_ref()

@@ -17,14 +17,43 @@ pub struct ScalarAnalysisContext<'a> {
     from_clause: Cow<'a, FromClause>,
     parent: Option<Box<Self>>,
     windows: Vec<String>,
+    grouping: super::grouping::GroupingScope,
     output_aliases: Option<crate::sem::ResultColumnCollection>,
     delete_returning_target: Option<AliasName>,
 }
 
 impl<'a> ScalarAnalysisContext<'a> {
+    pub(crate) const fn grouping_scope(&self) -> &super::grouping::GroupingScope {
+        &self.grouping
+    }
+    pub(crate) const fn set_grouping_query(&mut self, id: usize) {
+        self.grouping.set_query(id);
+    }
+
+    pub(crate) fn with_grouping_capture(
+        &self,
+        capture: &super::grouping::ReferenceCapture,
+    ) -> Self {
+        let mut scope = self.clone_scope();
+        scope.add_grouping_capture(capture);
+        scope
+    }
+    fn add_grouping_capture(&mut self, capture: &super::grouping::ReferenceCapture) {
+        self.grouping.add_capture(capture);
+        if let Some(parent) = &mut self.parent {
+            parent.add_grouping_capture(capture);
+        }
+    }
+    pub(crate) fn with_grouping_placement(&self, placement: &str) -> Self {
+        let mut scope = self.clone_scope();
+        scope.grouping.set_placement(placement);
+        scope
+    }
+
     fn clone_scope(&self) -> Self {
         Self {
             windows: self.windows.clone(),
+            grouping: self.grouping.clone(),
             output_aliases: self.output_aliases.clone(),
             delete_returning_target: self.delete_returning_target.clone(),
             with_clause: self.with_clause.clone(),
@@ -43,6 +72,7 @@ impl<'a> ScalarAnalysisContext<'a> {
             from_clause: Cow::Borrowed(from_clause),
             parent: None,
             windows: Vec::new(),
+            grouping: super::grouping::GroupingScope::new(),
             output_aliases: None,
             delete_returning_target: None,
         }
@@ -58,6 +88,7 @@ impl<'a> ScalarAnalysisContext<'a> {
             from_clause: Cow::Borrowed(from_clause),
             parent: parent.map(|parent| Box::new(parent.clone_scope())),
             windows: Vec::new(),
+            grouping: super::grouping::GroupingScope::nested(parent.map(|scope| &scope.grouping)),
             output_aliases: None,
             delete_returning_target: None,
         }
@@ -230,6 +261,7 @@ impl<'a> ScalarAnalysisContext<'a> {
             from_clause: Cow::Owned(from_clause),
             parent: None,
             windows: Vec::new(),
+            grouping: super::grouping::GroupingScope::new(),
             output_aliases: None,
             delete_returning_target: None,
         }
@@ -479,6 +511,7 @@ impl ScalarAnalysisContext<'_> {
     where
         TParseContext: crate::sem::ParseContext,
     {
+        self.grouping.reference();
         let Some((source, nullability)) = self.from_clause.resolve_alias(alias) else {
             let expr = UndefinedAliasColumnRef::new_with_report(context, alias, column)?;
             return Ok((expr, context));

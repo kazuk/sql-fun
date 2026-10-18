@@ -25,6 +25,14 @@ pub enum QueryNameResolution {
     Ambiguous,
 }
 impl QueryNameResolution {
+    pub(crate) const fn function_name(&self) -> Option<&crate::sem::FullName> {
+        if let Self::Function(name) = self {
+            Some(name)
+        } else {
+            None
+        }
+    }
+
     pub(crate) fn type_reference(value: &crate::sem::TypeReference) -> Self {
         Self::Type(value.clone())
     }
@@ -806,6 +814,10 @@ pub struct ResolvedOperator {
     signatures: Vec<crate::sem::parameter_resolution::Signature>,
 }
 impl ResolvedOperator {
+    pub(crate) fn canonicalize_grouping_key(&mut self) {
+        self.signatures.clear();
+    }
+
     pub(crate) fn resolve(
         context: &impl crate::sem::ParseContext,
         name: &OperatorName,

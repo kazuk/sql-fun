@@ -103,6 +103,12 @@ impl ConstrainedExpr {
 }
 
 impl ConstrainedExpr {
+    pub(super) fn canonicalize_grouping_key(&mut self) {
+        self.node = 0;
+        if let Some(binding) = &mut self.operator_binding {
+            binding.canonicalize_grouping_key();
+        }
+    }
     pub(crate) fn apply_constraints(&mut self, constraints: &crate::sem::ParameterConstraints) {
         let domain = constraints.node_domain(self.node);
         if !domain.is_any() {

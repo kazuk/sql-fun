@@ -1,4 +1,4 @@
-//! Context-free CREATE RULE syntax conversion, without writable-view analysis.
+//! Context-free PostgreSQL rule syntax conversion, without writable-view analysis.
 
 use crate::ast::{
     CreateRule, Expr, Name, Relation, RuleEvent, StatementNode, TryFromWithTokens,
@@ -78,3 +78,38 @@ impl TryFrom<Option<syn::CmdType>> for RuleEvent {
         }
     }
 }
+
+impl TryFrom<&syn::DropStmt> for super::DropRule {
+    type Error = AnalysisError;
+
+    fn try_from(value: &syn::DropStmt) -> Result<Self, Self::Error> {
+        if !matches!(
+            value.get_remove_type().as_inner(),
+            Some(syn::ObjectType::ObjectRule)
+        ) {
+            return AnalysisError::raise_unexpected_input("DROP RULE object type");
+        }
+        if value.get_concurrent() {
+            return AnalysisError::raise_unexpected_input("DROP RULE cannot be concurrent");
+        }
+        let objects = value.get_objects().as_inner().unwrap_or_default();
+        let [object] = objects.as_slice() else {
+            return AnalysisError::raise_unexpected_input("one DROP RULE target required");
+        };
+        let mut parts = Name::try_from(object.as_list().get_items())?.0;
+        // PostgreSQL appends the rule identifier to the ON relation's name list.
+        if parts.len() < 2 {
+            return AnalysisError::raise_unexpected_input("DROP RULE relation and name");
+        }
+        let name = parts.pop().expect("checked DROP RULE target length");
+        Ok(Self {
+            name: Name::from_parts(&[name]),
+            relation: Name::from_parts(&parts),
+            if_exists: value.get_missing_ok(),
+            behavior: super::DropBehavior::try_from(value.get_behavior().as_inner())?,
+        })
+    }
+}
+
+#[cfg(test)]
+mod drop_tests;

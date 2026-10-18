@@ -27,6 +27,7 @@ mod cte;
 mod data_source;
 mod def_elem;
 mod delete_statement;
+mod drop_dependency_behavior;
 mod drop_trigger;
 mod error;
 mod from_clause;
@@ -83,7 +84,8 @@ pub use self::merge_statement::{
 
 pub(crate) use self::conflict_masters::ConflictMasters;
 
-pub use self::drop_trigger::{DropDependencyBehavior, DropTrigger};
+pub use self::drop_dependency_behavior::DropDependencyBehavior;
+pub use self::drop_trigger::DropTrigger;
 
 #[expect(deprecated)]
 pub use self::{

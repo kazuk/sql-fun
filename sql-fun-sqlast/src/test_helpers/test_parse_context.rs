@@ -392,15 +392,32 @@ impl DiagnosticContext for TestParseContext {
     }
 }
 
-impl BaseParseContext for TestParseContext {
-    fn rule(&self, identity: &crate::sem::RuleIdentity) -> Option<&crate::sem::CreateRule> {
-        if let Some(rule) = self.rules.get(identity) {
-            rule.as_ref()
-        } else {
-            None
-        }
+impl crate::sem::RuleInfoRead for TestParseContext {
+    fn local_rule(
+        &self,
+        identity: &crate::sem::RuleIdentity,
+    ) -> Option<Option<&crate::sem::CreateRule>> {
+        self.rules.get(identity).map(Option::as_ref)
     }
+    fn rule_parent(&self) -> Option<&dyn crate::sem::RuleInfoRead> {
+        None
+    }
+}
+impl crate::sem::RuleInfoWrite for TestParseContext {
+    fn store_rule(
+        &mut self,
+        identity: &crate::sem::RuleIdentity,
+        definition: Option<&crate::sem::CreateRule>,
+    ) {
+        self.rules.insert(identity.clone(), definition.cloned());
+    }
+    fn store_rule_view(&mut self, target: &FullName, view: &crate::sem::ViewLike) {
+        self.view_definitions
+            .insert(target.clone(), Some(view.clone()));
+    }
+}
 
+impl BaseParseContext for TestParseContext {
     fn sqlite_relation_identity(&self, name: &FullName) -> Option<FullName> {
         for (candidate, definition) in &self.table_definitions {
             if candidate.sqlite_eq(name) && definition.is_some() {
@@ -508,6 +525,7 @@ impl FunctionInfoWrite for TestParseContext {
 }
 
 impl ParseContext for TestParseContext {
+<<<<<<< HEAD
     fn apply_creation_group<F>(
         self,
         operation: F,
@@ -561,6 +579,8 @@ impl ParseContext for TestParseContext {
         Ok(self)
     }
 
+=======
+>>>>>>> 0ee32d5 (refactor(sqlast): use public catalog and rule info services)
     fn insert_role(&mut self, role: &crate::sem::Role) {
         self.ownership.insert_role(role);
     }

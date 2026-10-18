@@ -1,4 +1,4 @@
-use crate::ast::{Dialect, DropTrigger, StatementKind, StatementNode, TriggerDropBehavior};
+use crate::ast::{Dialect, DropBehavior, DropTrigger, StatementKind, StatementNode};
 use crate::{parse_statements, syn};
 
 impl StatementNode {
@@ -40,12 +40,12 @@ fn postgres_preserves_target_names(
 }
 
 #[rstest::rstest]
-#[case::implicit_restrict("", TriggerDropBehavior::Restrict)]
-#[case::explicit_restrict(" RESTRICT", TriggerDropBehavior::Restrict)]
-#[case::cascade(" CASCADE", TriggerDropBehavior::Cascade)]
+#[case::implicit_restrict("", DropBehavior::restrict())]
+#[case::explicit_restrict(" RESTRICT", DropBehavior::restrict())]
+#[case::cascade(" CASCADE", DropBehavior::cascade())]
 fn postgres_preserves_drop_options(
     #[case] suffix: &str,
-    #[case] behavior: TriggerDropBehavior,
+    #[case] behavior: DropBehavior,
     #[values(false, true)] if_exists: bool,
 ) {
     let clause = if if_exists { "IF EXISTS " } else { "" };
@@ -88,7 +88,7 @@ fn equivalent_concepts_use_common_shapes() {
     assert_eq!(postgres.if_exists, sqlite.if_exists);
     assert!(postgres.relation.is_some());
     assert!(sqlite.relation.is_none());
-    assert_eq!(postgres.behavior, Some(TriggerDropBehavior::Restrict));
+    assert_eq!(postgres.behavior, Some(DropBehavior::restrict()));
     assert!(sqlite.behavior.is_none());
 }
 
@@ -156,7 +156,7 @@ fn rejects_non_list_target() {
 }
 
 #[test]
-#[should_panic(expected = "DROP TRIGGER behavior")]
+#[should_panic(expected = "DROP behavior")]
 fn rejects_unspecified_behavior() {
     let mut syntax = postgres_drop_syntax("DROP TRIGGER t ON r");
     syntax.behavior = 0;

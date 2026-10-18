@@ -51,9 +51,10 @@ impl DataSource {
         }
         let canonical;
         let name = if context.dialect() == crate::ast::Dialect::sqlite() {
-            canonical = crate::sem::search_path::expand_search_path_inst(context, name, |key| {
-                context.sqlite_relation_identity(key)
-            });
+            canonical =
+                crate::sem::search_path::expand_relation_search_path(context, name, |key| {
+                    context.sqlite_relation_identity(key)
+                });
             canonical.as_ref().unwrap_or(name)
         } else {
             name

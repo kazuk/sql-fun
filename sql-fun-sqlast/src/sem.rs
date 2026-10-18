@@ -28,6 +28,7 @@ mod data_source;
 mod def_elem;
 mod delete_statement;
 mod drop_dependency_behavior;
+mod drop_rule;
 mod drop_trigger;
 mod error;
 mod from_clause;
@@ -65,6 +66,7 @@ pub use self::create_trigger::{
     TriggerEventColumn, TriggerFunction, TriggerGranularity, TriggerIdentity, TriggerReferences,
     TriggerTiming, TriggerTransition,
 };
+pub use self::drop_rule::DropRule;
 pub use self::view_write::{ViewAssignmentColumn, ViewWriteChange, ViewWriteInfo};
 
 pub(crate) use self::insert_statement::{
@@ -310,6 +312,8 @@ pub enum SemAst {
     DropTrigger(DropTrigger),
     /// Analyzed PostgreSQL CREATE RULE.
     CreateRule(Box<CreateRule>),
+    /// Resolved PostgreSQL DROP RULE.
+    DropRule(DropRule),
     /// A statement whose semantic resolution failed recoverably.
     /// Diagnostics are retained by the context; no catalog definition is applied.
     UnresolvedStatement,

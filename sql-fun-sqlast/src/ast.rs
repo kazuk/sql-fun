@@ -377,7 +377,9 @@ impl StatementNode {
             Self::CreateTrigger(trigger) => trigger
                 .resolve(context)
                 .map(|trigger| crate::sem::SemAst::create_trigger(&trigger)),
-            Self::DropRule(_) => todo!("DROP RULE semantic analysis: #605"),
+            Self::DropRule(rule) => rule
+                .resolve(context)
+                .map(|rule| crate::sem::SemAst::drop_rule(&rule)),
             Self::View(_) => crate::sem::AnalysisError::raise_unexpected_input(
                 "view requires catalog application",
             ),
@@ -446,6 +448,7 @@ impl StatementNode {
             Self::CreateTrigger(trigger) => trigger.resolve_and_apply(context),
             Self::DropTrigger(trigger) => trigger.resolve_and_apply(context),
             Self::CreateRule(rule) => rule.resolve_and_apply(context),
+            Self::DropRule(rule) => rule.resolve_and_apply(context),
             Self::View(view) => view.resolve_and_apply(context),
             Self::Extension(extension) => extension.apply(context),
             Self::VariableSet(variable_set) => variable_set.resolve_and_apply(context),

@@ -195,10 +195,17 @@ scalar and correlated subqueries remain supported. Exact result compatibility
 for known built-in modifier-capable types (such as varchar, numeric and
 timestamp, including arrays) is rejected pending type-modifier retention (#619),
 even when their base types match. NOTIFY is still blocked at common syntax
-conversion (#608). DROP RULE SQL analysis belongs to #605;
-CREATE → DROP → CREATE SQL integration remains pending that issue. Context
-cancellation and explicit target-unlink APIs are available for that work.
+conversion (#608).
 No rewrite expansion, action execution or SQL rendering is performed.
+
+PostgreSQL `DROP RULE` resolves its ON relation first and retains the exact
+relation-scoped rule identity, IF EXISTS lookup outcome and dependency choice
+in `SemAst::rule_drop()`. Application masks the named definition and removes its
+target link in the current layer. Frozen parents and siblings remain unchanged;
+re-creation replaces the cancellation. IF EXISTS accepts a missing relation or
+rule as an explicit no-op. A View's required `_RETURN` SELECT rule cannot be
+dropped, including with CASCADE; drop the View instead. CASCADE/RESTRICT is
+retained for inspection, without executing database dependency removal.
 
 ### CREATE TRIGGER definitions
 

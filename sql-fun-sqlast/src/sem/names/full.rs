@@ -296,6 +296,7 @@ mod tests;
 impl<'de> serde::Deserialize<'de> for FullName {
     fn deserialize<D: serde::Deserializer<'de>>(deserializer: D) -> Result<Self, D::Error> {
         #[derive(serde::Deserialize)]
+        #[serde(rename = "FullName")]
         struct Components {
             catalog: Option<CatalogName>,
             schema: Option<SchemaName>,

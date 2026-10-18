@@ -56,6 +56,26 @@ fn resolves_postgres_statement_without_applying(#[case] sql: &str) -> testresult
 }
 
 #[rstest::rstest]
+#[case::table("other")]
+#[case::view("item_view")]
+#[case::materialized_view("item_matview")]
+fn constraint_from_retains_referenced_relation(#[case] referenced: &str) -> testresult::TestResult {
+    let mut context = test_helpers::catalog(Dialect::postgres());
+    let statement = test_helpers::resolve(
+        &format!(
+            "CREATE CONSTRAINT TRIGGER audit AFTER UPDATE ON items FROM {referenced} FOR EACH ROW EXECUTE FUNCTION audit_fn()"
+        ),
+        &mut context,
+    )?;
+    let definition = statement.trigger().unwrap();
+    let expected = FullName::with_schema("public", referenced);
+    assert_eq!(definition.constraint().unwrap().relation(), Some(&expected));
+    assert!(definition.dependencies().relations().contains(&expected));
+    assert_eq!(context.reported_problem_count(), 0);
+    Ok(())
+}
+
+#[rstest::rstest]
 #[case::set_returning_function(
     "CREATE TRIGGER audit AFTER UPDATE ON items EXECUTE FUNCTION set_trigger_fn()"
 )]
@@ -642,6 +662,17 @@ mod test_helpers {
         let view_name = FullName::with_schema(schema, "item_view");
         let view = crate::sem::CreateView::new(&view_name, &query, &[], &None, false);
         context.set_get_view_impl_result(&view_name, &Some(crate::sem::ViewLike::from(&view)));
+        let materialized_name = FullName::with_schema(schema, "item_matview");
+        let materialized = crate::sem::CreateTableAs::new(
+            &materialized_name,
+            &crate::sem::SemAst::select(&query),
+            true,
+        );
+        context.set_get_view_impl_result(
+            &materialized_name,
+            &Some(crate::sem::ViewLike::from(&materialized)),
+        );
+
         let overload = OverloadVariant::new(
             &Some(TypeReference::from_full_name(FullName::with_schema(
                 "pg_catalog",

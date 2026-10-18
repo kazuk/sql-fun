@@ -659,6 +659,13 @@ impl BaseParseContext for SchemaCatalog {
         }
     }
 
+    fn trigger_is_cancelled(&self, identity: &crate::sem::TriggerIdentity) -> bool {
+        if let Some(entry) = self.triggers.get(identity) {
+            entry.is_none()
+        } else {
+            self.base.trigger_is_cancelled(identity)
+        }
+    }
     fn trigger(
         &self,
         identity: &crate::sem::TriggerIdentity,

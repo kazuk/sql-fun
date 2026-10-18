@@ -411,6 +411,9 @@ macro_rules! forward_catalog_reads {
             fn sqlite_relation_identity(&self, name: &FullName) -> Option<FullName> {
                 self.$catalog().sqlite_relation_identity(name)
             }
+            fn trigger_is_cancelled(&self, identity: &crate::sem::TriggerIdentity) -> bool {
+                self.$catalog().trigger_is_cancelled(identity)
+            }
             fn trigger(
                 &self,
                 identity: &crate::sem::TriggerIdentity,

@@ -409,6 +409,9 @@ impl BaseParseContext for TestParseContext {
         None
     }
 
+    fn trigger_is_cancelled(&self, identity: &crate::sem::TriggerIdentity) -> bool {
+        self.triggers.get(identity).is_some_and(Option::is_none)
+    }
     fn trigger(
         &self,
         identity: &crate::sem::TriggerIdentity,

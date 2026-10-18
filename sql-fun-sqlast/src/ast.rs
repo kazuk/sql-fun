@@ -13,6 +13,7 @@
 mod ddl;
 mod deparse;
 mod document;
+mod drop_behavior;
 mod mutation;
 mod postgres;
 mod public;
@@ -221,7 +222,7 @@ pub(crate) enum StatementNode {
     Delete(Delete),
     Merge(Merge),
     View(View),
-    ViewWrite(view_write::WriteDeclaration),
+    DropRule(DropRule),
     CreateTrigger(CreateTrigger),
     CreateRule(CreateRule),
     DropTrigger(DropTrigger),
@@ -276,8 +277,8 @@ impl StatementNode {
         Self::DropTrigger(value)
     }
 
-    const fn view_write(value: view_write::WriteDeclaration) -> Self {
-        Self::ViewWrite(value)
+    const fn drop_rule(value: DropRule) -> Self {
+        Self::DropRule(value)
     }
 
     const fn view(value: View) -> Self {
@@ -368,9 +369,7 @@ impl StatementNode {
             Self::CreateRule(_) => todo!("CREATE RULE semantic analysis: #604"),
             Self::DropTrigger(_) => todo!("DROP TRIGGER semantic analysis: #555"),
             Self::CreateTrigger(_) => todo!("CREATE TRIGGER semantic analysis: #602 / #555"),
-            Self::ViewWrite(_) => crate::sem::AnalysisError::raise_unexpected_input(
-                "view write declaration requires catalog application",
-            ),
+            Self::DropRule(_) => todo!("DROP RULE semantic analysis: #605"),
             Self::View(_) => crate::sem::AnalysisError::raise_unexpected_input(
                 "view requires catalog application",
             ),
@@ -437,7 +436,6 @@ impl StatementNode {
         context.set_parameter_constraints(&crate::sem::ParameterConstraints::default());
         match self {
             Self::View(view) => view.resolve_and_apply(context),
-            Self::ViewWrite(change) => change.resolve_and_apply(context),
             Self::Extension(extension) => extension.apply(context),
             Self::VariableSet(variable_set) => variable_set.resolve_and_apply(context),
             Self::EnumType(enum_type) => enum_type.apply(context),
@@ -1910,17 +1908,26 @@ enum RuleEvent {
     Delete,
 }
 
+// Unresolved PostgreSQL DROP RULE syntax; the ON relation is always explicit.
+#[derive(Clone, Debug)]
+pub(crate) struct DropRule {
+    name: Name,
+    relation: Name,
+    if_exists: bool,
+    behavior: DropBehavior,
+}
+
 // DROP TRIGGER retains only syntax; SQLite has no ON relation or drop behavior.
 #[derive(Clone, Debug)]
 pub(crate) struct DropTrigger {
     name: Name,
     relation: Option<Name>,
     if_exists: bool,
-    behavior: Option<TriggerDropBehavior>,
+    behavior: Option<DropBehavior>,
 }
 
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
-enum TriggerDropBehavior {
+enum DropBehavior {
     Cascade,
     Restrict,
 }

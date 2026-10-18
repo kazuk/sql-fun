@@ -93,7 +93,9 @@ conversion identified by this audit.
 ## Integration and staged semantics
 
 `StatementNode::CreateRule` and `StatementKind::CreateRule` replace only CREATE
-RULE's legacy route. DROP RULE remains on ViewWrite until #601. Semantic analysis
+RULE's legacy route. DROP RULE now has its dedicated route under #601; the
+aggregate ViewWrite variant and WriteDeclaration syntax adapter are removed.
+Semantic analysis
 is an explicit `todo!()` owned by #604, which will use ParseContext; no legacy
 metadata compatibility adapter is installed. Deparsing returns the existing
 unsupported-node error. WITH mutation and CTE-body construction reject this

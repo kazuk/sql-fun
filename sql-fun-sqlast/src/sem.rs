@@ -381,9 +381,6 @@ pub enum SemAst {
 }
 
 impl SemAst {
-    pub(crate) const fn select_statement(&self) -> Option<&SelectStatement> {
-        if let Self::SelectStatement(query) = self { Some(query) } else { None }
-    }
     pub(crate) fn walk_nested_command<V: self::traversal::SemanticVisitor>(
         &mut self,
         visitor: &mut V,

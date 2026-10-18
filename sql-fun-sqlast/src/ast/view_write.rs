@@ -3,12 +3,6 @@ use crate::ast::{Expr, FromItem, Query, QueryBody, View};
 use crate::sem::{AnalysisError, FullName, ParseContext, SelectStatement, ViewWriteInfo};
 
 impl View {
-    pub(super) fn write_name(
-        &self,
-        context: &mut impl ParseContext,
-    ) -> Result<Option<FullName>, AnalysisError> {
-        qualify_declaration(&self.name.full_name()?, context)
-    }
     pub(super) fn write_info(
         &self,
         context: &mut impl ParseContext,
@@ -29,22 +23,6 @@ impl View {
         }
         Ok(Some(replacement))
     }
-}
-
-fn qualify_declaration(
-    name: &FullName,
-    context: &mut impl ParseContext,
-) -> Result<Option<FullName>, AnalysisError> {
-    if name.schema().is_some() {
-        return Ok(Some(name.clone()));
-    }
-    let Some(schema) = context.get_default_schema() else {
-        context.report_analysis_problem(crate::sem::AnalysisProblem::view(
-            &crate::sem::problem::ViewProblem::invalid_target(name),
-        ))?;
-        return Ok(None);
-    };
-    Ok(Some(name.clone().set_schema(schema)))
 }
 
 impl Expr {

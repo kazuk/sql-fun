@@ -4,6 +4,7 @@ mod cursors;
 mod rule_info;
 mod seq_info;
 mod table_info;
+mod trigger_info;
 mod type_info;
 mod view_info;
 
@@ -19,6 +20,7 @@ pub use self::{
     rule_info::{RuleInfoRead, RuleInfoWrite},
     seq_info::{SequenceInfoRead, SequenceInfoWrite},
     table_info::{TableInfoRead, TableInfoWrite},
+    trigger_info::{TriggerInfoRead, TriggerInfoWrite},
     type_info::{TypeInfoRead, TypeInfoWrite},
     view_info::{ViewInfoRead, ViewInfoWrite},
 };
@@ -177,6 +179,7 @@ pub trait BaseParseContext:
     + IndexInfoRead
     + OperatorInfoRead
     + RuleInfoRead
+    + TriggerInfoRead
     + SequenceInfoRead
     + TypeInfoRead
     + TableInfoRead
@@ -191,16 +194,6 @@ pub trait BaseParseContext:
 {
     /// Resolve an exact SQLite relation key using ASCII case-insensitive identifiers.
     fn sqlite_relation_identity(&self, name: &FullName) -> Option<FullName>;
-
-    /// Whether effective lookup stopped at an explicit trigger cancellation.
-    /// Missing definitions without a cancellation return false.
-    fn trigger_is_cancelled(&self, _identity: &crate::sem::TriggerIdentity) -> bool {
-        false
-    }
-
-    /// Look up an exact trigger identity in the effective context layer.
-    fn trigger(&self, identity: &crate::sem::TriggerIdentity)
-    -> Option<&crate::sem::CreateTrigger>;
 
     /// Resolved metadata for the database selected by the caller.
     fn metadata(&self) -> &::sql_fun_core::SqlFunMetadata;
@@ -302,6 +295,7 @@ pub trait DiagnosticContext {
 ///
 pub trait ParseContext:
     RuleInfoWrite
+    + TriggerInfoWrite
     + SequenceInfoWrite
     + TypeInfoWrite
     + TableInfoWrite
@@ -403,17 +397,6 @@ where
             Ok(true)
         }
     }
-    /// Register a completed definition in this layer. Ownership is decided by DDL application.
-    fn register_trigger(self, trigger: &crate::sem::CreateTrigger) -> Result<Self, AnalysisError>;
-    /// Associate the supplied name with the exact target in this layer.
-    fn associate_trigger(self, target: &FullName, name: &FullName) -> Result<Self, AnalysisError>;
-
-    /// Mask a trigger identity in this layer, stopping inherited lookup.
-    /// DDL separately selects the matching target-link update.
-    fn cancel_trigger(self, identity: &crate::sem::TriggerIdentity) -> Result<Self, AnalysisError>;
-    /// Remove an explicitly selected trigger reference from a current-layer target clone.
-    fn dissociate_trigger(self, target: &FullName, name: &FullName) -> Result<Self, AnalysisError>;
-
     /// Dialect of the explicitly supplied metadata for this analysis.
     /// Engine identity and SQL dialect are independent metadata fields.
     /// Historical configuration retained by a frozen catalog is not consulted.

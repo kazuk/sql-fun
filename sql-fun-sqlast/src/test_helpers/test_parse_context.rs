@@ -398,6 +398,22 @@ impl crate::sem::RuleInfoWrite for TestParseContext {
     }
 }
 
+impl crate::sem::TriggerInfoRead for TestParseContext {
+    fn trigger_is_cancelled(&self, identity: &crate::sem::TriggerIdentity) -> bool {
+        self.triggers.get(identity).is_some_and(Option::is_none)
+    }
+    fn trigger(
+        &self,
+        identity: &crate::sem::TriggerIdentity,
+    ) -> Option<&crate::sem::CreateTrigger> {
+        if let Some(trigger) = self.triggers.get(identity) {
+            trigger.as_ref()
+        } else {
+            None
+        }
+    }
+}
+
 impl BaseParseContext for TestParseContext {
     fn sqlite_relation_identity(&self, name: &FullName) -> Option<FullName> {
         for (candidate, definition) in &self.table_definitions {
@@ -413,19 +429,6 @@ impl BaseParseContext for TestParseContext {
         None
     }
 
-    fn trigger_is_cancelled(&self, identity: &crate::sem::TriggerIdentity) -> bool {
-        self.triggers.get(identity).is_some_and(Option::is_none)
-    }
-    fn trigger(
-        &self,
-        identity: &crate::sem::TriggerIdentity,
-    ) -> Option<&crate::sem::CreateTrigger> {
-        if let Some(trigger) = self.triggers.get(identity) {
-            trigger.as_ref()
-        } else {
-            None
-        }
-    }
     fn metadata(&self) -> &::sql_fun_core::SqlFunMetadata {
         static DEFAULT_METADATA: std::sync::LazyLock<::sql_fun_core::SqlFunMetadata> =
             std::sync::LazyLock::new(|| {
@@ -512,6 +515,56 @@ impl FunctionInfoWrite for TestParseContext {
     }
 }
 
+impl crate::sem::TriggerInfoWrite for TestParseContext {
+    fn register_trigger(
+        mut self,
+        trigger: &crate::sem::CreateTrigger,
+    ) -> Result<Self, AnalysisError> {
+        self.triggers
+            .insert(trigger.identity().clone(), Some(trigger.clone()));
+        Ok(self)
+    }
+    fn associate_trigger(
+        mut self,
+        target: &FullName,
+        name: &FullName,
+    ) -> Result<Self, AnalysisError> {
+        if let Some(Some(table)) = self.table_definitions.get_mut(target) {
+            table.associate_trigger(name);
+        } else if let Some(Some(view)) = self.view_definitions.get_mut(target) {
+            view.associate_trigger(name);
+        } else {
+            self.report_analysis_problem(crate::sem::AnalysisProblem::trigger(
+                &crate::sem::problem::TriggerProblem::target(target),
+            ))?;
+        }
+        Ok(self)
+    }
+    fn cancel_trigger(
+        mut self,
+        identity: &crate::sem::TriggerIdentity,
+    ) -> Result<Self, AnalysisError> {
+        self.triggers.insert(identity.clone(), None);
+        Ok(self)
+    }
+    fn dissociate_trigger(
+        mut self,
+        target: &FullName,
+        name: &FullName,
+    ) -> Result<Self, AnalysisError> {
+        if let Some(Some(table)) = self.table_definitions.get_mut(target) {
+            table.dissociate_trigger(name);
+        } else if let Some(Some(view)) = self.view_definitions.get_mut(target) {
+            view.dissociate_trigger(name);
+        } else {
+            self.report_analysis_problem(crate::sem::AnalysisProblem::trigger(
+                &crate::sem::problem::TriggerProblem::target(target),
+            ))?;
+        }
+        Ok(self)
+    }
+}
+
 impl ParseContext for TestParseContext {
     fn apply_creation_group<F>(
         self,
@@ -538,55 +591,6 @@ impl ParseContext for TestParseContext {
             let definition =
                 crate::sem::OwnedObjectDefinition::new(identity, Some(alteration.owner()));
             self.ownership.insert(&definition);
-        }
-        Ok(self)
-    }
-
-    fn register_trigger(
-        mut self,
-        trigger: &crate::sem::CreateTrigger,
-    ) -> Result<Self, AnalysisError> {
-        self.triggers
-            .insert(trigger.identity().clone(), Some(trigger.clone()));
-        Ok(self)
-    }
-    fn associate_trigger(
-        mut self,
-        target: &FullName,
-        name: &FullName,
-    ) -> Result<Self, AnalysisError> {
-        if let Some(Some(table)) = self.table_definitions.get_mut(target) {
-            table.associate_trigger(name);
-        } else if let Some(Some(view)) = self.view_definitions.get_mut(target) {
-            view.associate_trigger(name);
-        } else {
-            self.report_analysis_problem(crate::sem::AnalysisProblem::trigger(
-                &crate::sem::problem::TriggerProblem::target(target),
-            ))?;
-        }
-        Ok(self)
-    }
-
-    fn cancel_trigger(
-        mut self,
-        identity: &crate::sem::TriggerIdentity,
-    ) -> Result<Self, AnalysisError> {
-        self.triggers.insert(identity.clone(), None);
-        Ok(self)
-    }
-    fn dissociate_trigger(
-        mut self,
-        target: &FullName,
-        name: &FullName,
-    ) -> Result<Self, AnalysisError> {
-        if let Some(Some(table)) = self.table_definitions.get_mut(target) {
-            table.dissociate_trigger(name);
-        } else if let Some(Some(view)) = self.view_definitions.get_mut(target) {
-            view.dissociate_trigger(name);
-        } else {
-            self.report_analysis_problem(crate::sem::AnalysisProblem::trigger(
-                &crate::sem::problem::TriggerProblem::target(target),
-            ))?;
         }
         Ok(self)
     }

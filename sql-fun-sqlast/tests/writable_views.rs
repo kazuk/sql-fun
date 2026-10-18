@@ -100,7 +100,7 @@ mod test_helpers {
                 &self,
                 identity: &::sql_fun_sqlast::sem::TriggerIdentity,
             ) -> Result<FrozenBaseContext, String> {
-                use ::sql_fun_sqlast::sem::ParseContext;
+                use ::sql_fun_sqlast::sem::{ParseContext, TriggerInfoWrite};
                 SchemaFileContext::new(
                     Path::new("mask.sql"),
                     self.context(),
@@ -1420,7 +1420,7 @@ fn missing_linked_definition_is_incomplete_not_a_dropped_capability(
 #[test]
 fn evaluation_excludes_cancelled_trigger_links_and_accepts_recreation()
 -> Result<(), Box<dyn std::error::Error>> {
-    use ::sql_fun_sqlast::sem::{BaseParseContext, TriggerIdentity, ViewWriteEvaluation};
+    use ::sql_fun_sqlast::sem::{TriggerIdentity, TriggerInfoRead, ViewWriteEvaluation};
     let declaration = "CREATE TRIGGER t INSTEAD OF INSERT ON public.v FOR EACH ROW EXECUTE FUNCTION public.noop()";
     let schema = heavy::ViewSchema::postgres(&format!(
         "CREATE TABLE public.items(id integer); CREATE VIEW public.v AS SELECT DISTINCT id FROM public.items; CREATE FUNCTION public.noop() RETURNS trigger LANGUAGE plpgsql AS 'BEGIN RETURN NEW; END'; {declaration};"

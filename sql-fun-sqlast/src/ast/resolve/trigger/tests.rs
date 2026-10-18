@@ -1,5 +1,5 @@
 use crate::ast::Dialect;
-use crate::sem::{BaseParseContext, FullName, ParseContext, TableInfoRead, TriggerIdentity};
+use crate::sem::{FullName, ParseContext, TableInfoRead, TriggerIdentity, TriggerInfoRead};
 
 #[rstest::rstest]
 #[case::function_when(

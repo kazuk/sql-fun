@@ -410,10 +410,7 @@ macro_rules! forward_catalog_reads {
             }
         }
 
-        impl crate::sem::BaseParseContext for $context {
-            fn sqlite_relation_identity(&self, name: &FullName) -> Option<FullName> {
-                self.$catalog().sqlite_relation_identity(name)
-            }
+        impl crate::sem::TriggerInfoRead for $context {
             fn trigger_is_cancelled(&self, identity: &crate::sem::TriggerIdentity) -> bool {
                 self.$catalog().trigger_is_cancelled(identity)
             }
@@ -423,6 +420,13 @@ macro_rules! forward_catalog_reads {
             ) -> Option<&crate::sem::CreateTrigger> {
                 self.$catalog().trigger(identity)
             }
+        }
+
+        impl crate::sem::BaseParseContext for $context {
+            fn sqlite_relation_identity(&self, name: &FullName) -> Option<FullName> {
+                self.$catalog().sqlite_relation_identity(name)
+            }
+
             fn metadata(&self) -> &::sql_fun_core::SqlFunMetadata {
                 crate::sem::BaseParseContext::metadata(self.$catalog())
             }

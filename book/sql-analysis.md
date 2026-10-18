@@ -125,7 +125,8 @@ existing analysis context, then call `insert`, `update`, or `evaluate` with an
 already-bound View `FullName`. Evaluation follows the View's effective semantic
 Trigger/Rule references and does not register capabilities or resolve a new
 search path. `ViewInsertSupport::analyze` and `ViewUpdateSupport::analyze` use
-this same service. Frozen catalogs expose the common context read interface. PostgreSQL supports automatic writes through a single eligible relation,
+this same service. Frozen catalogs expose the common context read interface.
+PostgreSQL supports automatic writes through a single eligible relation,
 matching INSTEAD OF triggers, and unconditional INSTEAD rules. INSERT and UPDATE
 are independent: an INSERT trigger does not permit UPDATE. SQLite requires a
 matching INSTEAD OF trigger; an UPDATE OF trigger requires at least one of its
@@ -188,7 +189,8 @@ RETURNING requires an unconditional INSTEAD rule with one returning action and
 matching target column count, order and types. ON SELECT requires an ordinary
 view, `CREATE OR REPLACE RULE "_RETURN"`, an unconditional INSTEAD single SELECT,
 and matching result names as well as types. It replaces the view query and its
-resolved output-column lineage. UPDATE/DELETE action RETURNING binds visible rule rows;
+resolved output-column lineage. UPDATE/DELETE action RETURNING binds visible
+rule rows;
 PostgreSQL 18 destination row images in INSERT RETURNING remain a separately
 tracked semantic boundary (#621), rather than binding the enclosing rule row.
 

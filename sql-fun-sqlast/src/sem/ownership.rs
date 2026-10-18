@@ -359,54 +359,116 @@ pub(crate) fn model_definitions<C: crate::sem::BaseParseContext + ?Sized>(
     kind: ObjectKind,
     name: &FullName,
 ) -> Vec<OwnedObjectDefinition> {
-    let mut identity = OwnershipIdentity::named(kind, name);
-    let owner = match kind {
-        ObjectKind::TABLE => context
-            .get_table_impl(name)
-            .map(|definition| definition.owner()),
-        ObjectKind::SEQUENCE => context
-            .get_sequence_impl(name)
-            .map(|definition| definition.owner()),
-        ObjectKind::MATERIALIZED_VIEW | ObjectKind::VIEW => context
-            .get_view_impl(name)
-            .filter(|view| view.is_materialized() == (kind == ObjectKind::MATERIALIZED_VIEW))
-            .map(|view| view.owner()),
-        ObjectKind::SCHEMA => context
-            .schema_definition(name.name().as_str())
-            .map(|definition| definition.owner()),
-        ObjectKind::DOMAIN | ObjectKind::TYPE => context
-            .get_type_impl(name)
-            .filter(|definition| kind == ObjectKind::TYPE || definition.is_domain())
-            .map(|definition| {
-                if definition.is_domain() {
-                    identity = OwnershipIdentity::named(ObjectKind::DOMAIN, name);
-                }
-                if definition.is_relation_type() {
-                    if let Some(table) = context.get_table_impl(name) {
-                        table.owner()
-                    } else {
-                        None
-                    }
-                } else {
-                    definition.owner()
-                }
-            }),
+    match kind {
+        ObjectKind::TABLE => table_definitions(context, kind, name),
+        ObjectKind::SEQUENCE => sequence_definitions(context, kind, name),
+        ObjectKind::MATERIALIZED_VIEW | ObjectKind::VIEW => view_definitions(context, kind, name),
+        ObjectKind::SCHEMA => schema_definitions(context, kind, name),
+        ObjectKind::DOMAIN | ObjectKind::TYPE => type_definitions(context, kind, name),
         ObjectKind::FUNCTION | ObjectKind::PROCEDURE | ObjectKind::ROUTINE => {
-            return context
-                .routine_definitions(name)
-                .into_iter()
-                .filter(|definition| kind.accepts_owner_kind(definition.object_kind()))
-                .map(|definition| {
-                    OwnedObjectDefinition::new(
-                        &definition.ownership_identity(name),
-                        definition.owner(),
-                    )
-                })
-                .collect();
+            routine_definitions(context, kind, name)
         }
-        _ => None,
+        _ => Vec::new(),
+    }
+}
+
+fn table_definitions<C: crate::sem::BaseParseContext + ?Sized>(
+    context: &C,
+    kind: ObjectKind,
+    name: &FullName,
+) -> Vec<OwnedObjectDefinition> {
+    let Some(definition) = context.get_table_impl(name) else {
+        return Vec::new();
     };
-    owner.map_or_else(Vec::new, |owner| {
-        vec![OwnedObjectDefinition::new(&identity, owner)]
-    })
+    ownership_snapshot(kind, name, definition.owner())
+}
+
+fn sequence_definitions<C: crate::sem::BaseParseContext + ?Sized>(
+    context: &C,
+    kind: ObjectKind,
+    name: &FullName,
+) -> Vec<OwnedObjectDefinition> {
+    let Some(definition) = context.get_sequence_impl(name) else {
+        return Vec::new();
+    };
+    ownership_snapshot(kind, name, definition.owner())
+}
+
+fn view_definitions<C: crate::sem::BaseParseContext + ?Sized>(
+    context: &C,
+    kind: ObjectKind,
+    name: &FullName,
+) -> Vec<OwnedObjectDefinition> {
+    let Some(definition) = context
+        .get_view_impl(name)
+        .filter(|view| view.is_materialized() == (kind == ObjectKind::MATERIALIZED_VIEW))
+    else {
+        return Vec::new();
+    };
+    ownership_snapshot(kind, name, definition.owner())
+}
+
+fn schema_definitions<C: crate::sem::BaseParseContext + ?Sized>(
+    context: &C,
+    kind: ObjectKind,
+    name: &FullName,
+) -> Vec<OwnedObjectDefinition> {
+    let Some(definition) = context.schema_definition(name.name().as_str()) else {
+        return Vec::new();
+    };
+    ownership_snapshot(kind, name, definition.owner())
+}
+
+fn type_definitions<C: crate::sem::BaseParseContext + ?Sized>(
+    context: &C,
+    kind: ObjectKind,
+    name: &FullName,
+) -> Vec<OwnedObjectDefinition> {
+    let Some(definition) = context
+        .get_type_impl(name)
+        .filter(|definition| kind == ObjectKind::TYPE || definition.is_domain())
+    else {
+        return Vec::new();
+    };
+    let actual_kind = if definition.is_domain() {
+        ObjectKind::DOMAIN
+    } else {
+        kind
+    };
+    let owner = if definition.is_relation_type() {
+        if let Some(table) = context.get_table_impl(name) {
+            table.owner()
+        } else {
+            None
+        }
+    } else {
+        definition.owner()
+    };
+    ownership_snapshot(actual_kind, name, owner)
+}
+
+fn routine_definitions<C: crate::sem::BaseParseContext + ?Sized>(
+    context: &C,
+    kind: ObjectKind,
+    name: &FullName,
+) -> Vec<OwnedObjectDefinition> {
+    context
+        .routine_definitions(name)
+        .into_iter()
+        .filter(|definition| kind.accepts_owner_kind(definition.object_kind()))
+        .map(|definition| {
+            OwnedObjectDefinition::new(&definition.ownership_identity(name), definition.owner())
+        })
+        .collect()
+}
+
+fn ownership_snapshot(
+    kind: ObjectKind,
+    name: &FullName,
+    owner: Option<&OwnerSpecification>,
+) -> Vec<OwnedObjectDefinition> {
+    vec![OwnedObjectDefinition::new(
+        &OwnershipIdentity::named(kind, name),
+        owner,
+    )]
 }

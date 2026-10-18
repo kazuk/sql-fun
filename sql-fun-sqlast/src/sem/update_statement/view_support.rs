@@ -22,7 +22,7 @@ impl ViewUpdateSupport {
         context: &impl crate::sem::BaseParseContext,
         view: &FullName,
     ) -> Result<Self, crate::sem::problem::ViewProblem> {
-        crate::sem::view_write::update_support(context, view)
+        crate::sem::ViewWriteEvaluation::new(context).update(view)
     }
 
     /// Record alias equivalence for automatic-view assignment targets.

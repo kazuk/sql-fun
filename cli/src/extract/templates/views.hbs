@@ -1,6 +1,6 @@
 {{#each this}}
 CREATE VIEW {{ident schema}}.{{ident view}}{{#if options.fragment}} {{sql options}}{{/if}} AS {{sql definition}}
-{{#if write_metadata.fragment}}{{sql write_metadata}}
+{{#if declarations.fragment}}{{sql declarations}}
 {{/if}}
 
 {{/each}}

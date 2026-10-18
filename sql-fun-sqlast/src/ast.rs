@@ -28,7 +28,7 @@ mod sqlite_retention;
 mod tests;
 mod trigger;
 mod validation;
-mod view_write;
+mod view_definition;
 
 pub use self::deparse::DeparseError;
 pub(crate) use self::deparse::render_full_name;
@@ -935,16 +935,14 @@ impl View {
         let outcome = self.query.resolve(&mut context);
         let mut query = outcome?;
         query.rename_columns(&self.aliases);
-        let Some(info) = self.write_info(&mut context, &query, &name)? else {
-            return Ok(crate::AstAndContextPair::new(
-                crate::sem::SemAst::unresolved_statement(),
-                context,
-            ));
-        };
+        let lineage = self.query.view_lineage(&context, &query)?;
+        let options = self.semantic_options(&mut context)?;
         let mut view = crate::sem::CreateView::new(&name, &query, &[], &None, self.materialized)
             .with_if_not_exists(self.if_not_exists)
             .with_replace(self.replace)
-            .with_temporary(self.temporary);
+            .with_temporary(self.temporary)
+            .with_column_lineage(&lineage)
+            .with_options(&options, self.check_option.semantic());
         let replacement_rule = if self.replace {
             if let Some(existing) = context.get_view(&crate::sem::ViewName::from_full_name(&name))
                 && let Some(references) = existing.rules()
@@ -955,9 +953,7 @@ impl View {
         } else {
             None
         };
-        let context = context
-            .apply_create_view(&view)?
-            .apply_view_write_info(&name, &info)?;
+        let context = context.apply_create_view(&view)?;
         let context = if let Some(rule) = replacement_rule {
             context.register_rule(&rule)?
         } else {

@@ -121,6 +121,13 @@ impl FromClause {
         }
         Ok(names)
     }
+    pub(crate) fn single_relation_name(&self) -> Option<crate::sem::FullName> {
+        match self.0.as_slice() {
+            [DataSource::Table(table)] => Some(table.name().full_name().clone()),
+            [DataSource::View(view)] => Some(view.view_name().full_name().clone()),
+            _ => None,
+        }
+    }
     /// add data source
     pub fn push(&mut self, source: DataSource) {
         self.0.push(source);

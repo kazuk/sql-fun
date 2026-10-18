@@ -154,12 +154,6 @@ impl TableInfoRead for BaseContext {
 }
 
 impl ViewInfoRead for BaseContext {
-    fn view_trigger_target(&self, _trigger: &FullName) -> Option<FullName> {
-        None
-    }
-    fn view_write_info(&self, _view: &FullName) -> Option<&crate::sem::ViewWriteInfo> {
-        None
-    }
     fn get_view_impl(&self, _key: &FullName) -> Option<&ViewLike> {
         None
     }

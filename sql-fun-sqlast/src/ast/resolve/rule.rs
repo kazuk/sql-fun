@@ -106,8 +106,8 @@ impl CreateRule {
             let query = definition.actions()[0]
                 .select_statement()
                 .expect("resolved SELECT action");
-            let info = syntax.rule_write_info(context, query, &target)?;
-            definition.retain_select_write_info(&info, context)?;
+            let lineage = syntax.view_lineage(context, query)?;
+            definition.retain_select_lineage(&lineage);
         }
         Ok(definition)
     }

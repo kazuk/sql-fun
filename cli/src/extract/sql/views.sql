@@ -57,7 +57,7 @@ SELECT COALESCE(json_agg(
       ) ORDER BY r.rulename)
       FROM pg_rewrite r WHERE r.ev_class = vn.oid AND r.rulename <> '_RETURN' AND r.oid < 16384
     ), '[]'::json),
-    'write_metadata', COALESCE((
+    'declarations', COALESCE((
       SELECT string_agg(statement, E'\n' ORDER BY category, name)
       FROM (
         SELECT 1 AS category, a.attname::text AS name,

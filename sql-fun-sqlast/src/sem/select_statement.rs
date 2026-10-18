@@ -184,6 +184,9 @@ pub struct SelectStatementNode {
 }
 
 impl SelectStatementNode {
+    pub(crate) const fn with_clause(&self) -> &WithClause {
+        &self.with_clause
+    }
     pub fn new(
         result_columns: &ResultColumnCollection,
         with_clause: &WithClause,

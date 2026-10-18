@@ -74,7 +74,6 @@ pub(super) struct SchemaCatalog {
     // Compound targets (signatures, columns, casts) use checked SQL target spelling.
     comments: TrieMap<(ObjectKind, String)>,
     views: ViewInformationCollection,
-    view_writes: TrieMap<crate::sem::ViewWriteInfo>,
     // Concrete TypeReference spelling preserves canonical FullName + array identity.
     casts: TrieMap<TrieMap<CastDefinition>>,
     binary_operators: TrieMap<OperatorDefinition>,
@@ -133,7 +132,6 @@ impl SchemaFileContext {
                 sequences: SequenceInfoCollection::default(),
                 comments: TrieMap::default(),
                 views: ViewInformationCollection::default(),
-                view_writes: TrieMap::default(),
                 casts: TrieMap::default(),
                 binary_operators: TrieMap::default(),
                 left_unary_operators: TrieMap::default(),

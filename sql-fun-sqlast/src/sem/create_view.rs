@@ -20,6 +20,10 @@ pub struct CreateView {
 
     name: FullName,
     query: SelectStatement,
+    lineage: crate::sem::ViewColumnLineage,
+    options: Vec<crate::sem::ViewOption>,
+    check_option: crate::sem::ViewCheckOption,
+    defaults: Vec<(ColumnName, crate::sem::SemScalarExpr)>,
     triggers: crate::sem::TriggerReferences,
     rules: crate::sem::RuleReferences,
     alter_statements: Vec<AlterView>,
@@ -28,6 +32,63 @@ pub struct CreateView {
 }
 
 impl CreateView {
+    /// View options from its defining declaration.
+    pub fn options(&self) -> &[crate::sem::ViewOption] {
+        &self.options
+    }
+    /// Declared CHECK OPTION.
+    pub const fn check_option(&self) -> crate::sem::ViewCheckOption {
+        self.check_option
+    }
+    pub(crate) fn with_options(
+        mut self,
+        options: &[crate::sem::ViewOption],
+        check: crate::sem::ViewCheckOption,
+    ) -> Self {
+        self.options = options.to_vec();
+        self.check_option = check;
+        self
+    }
+    /// The resolved defining query.
+    pub const fn query(&self) -> &SelectStatement {
+        &self.query
+    }
+    /// Proven output-column lineage, independent of writability policy.
+    pub const fn column_lineage(&self) -> &crate::sem::ViewColumnLineage {
+        &self.lineage
+    }
+    pub(crate) fn with_column_lineage(mut self, lineage: &crate::sem::ViewColumnLineage) -> Self {
+        self.lineage = lineage.clone();
+        self
+    }
+    pub(crate) fn apply_column_default(&self, column: &mut ColumnDefinition) {
+        if let Some((_, value)) = self
+            .defaults
+            .iter()
+            .find(|(name, _)| column.name().as_ref() == Some(name))
+        {
+            column.replace_view_default(&self.name, value);
+        }
+    }
+    pub(crate) fn change_column_default(
+        &mut self,
+        name: &ColumnName,
+        value: Option<&crate::sem::SemScalarExpr>,
+    ) -> Result<(), AnalysisError> {
+        if !self.query.has_column(name) {
+            return Err(AnalysisError::view_metadata(
+                &crate::sem::problem::ViewProblem::unknown_default_column(
+                    &self.name,
+                    name.as_str(),
+                ),
+            ));
+        }
+        self.defaults.retain(|(existing, _)| existing != name);
+        if let Some(value) = value {
+            self.defaults.push((name.clone(), value.clone()));
+        }
+        Ok(())
+    }
     pub(crate) const fn temporary(&self) -> bool {
         self.temporary
     }
@@ -52,6 +113,14 @@ impl CreateView {
     }
     pub(crate) fn replace_rule_query(&mut self, query: &crate::sem::SelectStatement) {
         self.query = query.clone();
+        self.lineage = crate::sem::ViewColumnLineage::from_query(query);
+    }
+    pub(crate) fn retain_relation_state(&mut self, previous: &Self) {
+        self.triggers = previous.triggers.clone();
+        self.rules = previous.rules.clone();
+        self.defaults = previous.defaults.clone();
+        self.owner = previous.owner.clone();
+        self.alter_statements = previous.alter_statements.clone();
     }
     pub(crate) fn retain_rule_references(&mut self, references: &crate::sem::RuleReferences) {
         self.rules = references.clone();
@@ -108,6 +177,10 @@ impl CreateView {
             triggers: crate::sem::TriggerReferences::default(),
             rules: crate::sem::RuleReferences::default(),
             query: query.clone(),
+            lineage: crate::sem::ViewColumnLineage::from_query(query),
+            defaults: Vec::new(),
+            options: Vec::new(),
+            check_option: crate::sem::ViewCheckOption::none(),
             alter_statements: alter_statements.to_owned(),
             owner: owner.as_deref().map(crate::sem::OwnerSpecification::named),
             materialized,
@@ -142,6 +215,12 @@ impl CreateView {
                     if new_owner.can_apply() {
                         self.change_owner(new_owner);
                     }
+                }
+                AlterObjSubCommand::SetColumnDefault(name, value) => {
+                    self.change_column_default(name, Some(value))?
+                }
+                AlterObjSubCommand::DropColumnDefault(name) => {
+                    self.change_column_default(name, None)?
                 }
                 _ => todo!(),
             }

@@ -12,6 +12,15 @@ pub enum ViewLike {
 }
 
 impl ViewLike {
+    /// Ordinary View semantic definition; materialized views have a different definition.
+    pub fn ordinary_definition(&self) -> Option<&crate::sem::CreateView> {
+        if let Self::View(view) = self {
+            Some(view)
+        } else {
+            None
+        }
+    }
+
     pub(crate) fn with_rule_query(
         &self,
         query: &crate::sem::SelectStatement,

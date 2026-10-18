@@ -167,7 +167,7 @@ pub(crate) fn infer_from_catalog(
     conflict: &InsertConflict,
 ) -> Result<ConflictArbiterInference, AnalysisError> {
     if context.get_table(table).is_none() {
-        return crate::sem::view_write::infer_view_arbiters(context, table, conflict);
+        return crate::sem::ViewWriteEvaluation::new(context).infer_arbiters(table, conflict);
     }
     if conflict.has_modifiers() {
         todo!("catalog index modifier eligibility metadata");

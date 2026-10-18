@@ -599,7 +599,7 @@ fn sqlite_cte_precedes_case_insensitive_catalog_lookup(
 )]
 #[case::case_sensitive_catalog_fallback(
     r#"WITH "Items" AS (SELECT 7 AS cte_only) SELECT id AS picked FROM ITEMS"#,
-    "public.items"
+    "items"
 )]
 fn postgres_cte_lookup_preserves_quoted_case(
     #[case] sql: &str,

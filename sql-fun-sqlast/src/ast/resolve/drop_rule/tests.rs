@@ -1,11 +1,17 @@
 use crate::sem::{FullName, ParseContext, RuleIdentity, RuleInfoRead};
 
 #[rstest::rstest]
-#[case::restrict("DROP RULE audit ON item_view RESTRICT", false)]
-#[case::cascade("DROP RULE audit ON public.item_view CASCADE", true)]
+#[case::restrict(
+    "DROP RULE audit ON item_view RESTRICT",
+    crate::sem::DropDependencyBehavior::restrict()
+)]
+#[case::cascade(
+    "DROP RULE audit ON public.item_view CASCADE",
+    crate::sem::DropDependencyBehavior::cascade()
+)]
 fn resolved_drop_does_not_apply_until_requested(
     #[case] sql: &str,
-    #[case] cascade: bool,
+    #[case] behavior: crate::sem::DropDependencyBehavior,
 ) -> testresult::TestResult {
     let parent = test_helpers::catalog()?;
     let mut child = test_helpers::layer(&parent);
@@ -13,7 +19,7 @@ fn resolved_drop_does_not_apply_until_requested(
     let drop = statement.rule_drop().unwrap();
     assert!(drop.found());
     assert_eq!(drop.identity(), Some(&test_helpers::identity()));
-    assert_eq!(drop.cascade(), cascade);
+    assert_eq!(drop.behavior(), behavior);
     assert!(!drop.if_exists());
     assert!(child.rule(&test_helpers::identity()).is_some());
     Ok(())
@@ -138,7 +144,7 @@ fn relation_search_path_does_not_fall_through_to_a_later_rule() -> testresult::T
 
 mod test_helpers {
     use crate::sem::{BaseContext, FrozenBaseContext, SchemaFileContext};
-    use crate::sem::{BaseParseContext, FullName, ParseContext, RuleIdentity, ViewInfoRead};
+    use crate::sem::{BaseParseContext, FullName, ParseContext, RuleIdentity, TableName, ViewName};
     pub(super) const CREATE_AUDIT: &str =
         "CREATE RULE audit AS ON INSERT TO item_view DO INSTEAD NOTHING";
     pub(super) fn identity() -> RuleIdentity {
@@ -207,10 +213,9 @@ mod test_helpers {
         statement(sql).analyze(context)
     }
     pub(super) fn table_rule_count(context: &FrozenBaseContext) -> usize {
-        use crate::sem::TableInfoRead;
         let target = FullName::with_schema("public", "items");
         context
-            .get_table_impl(&target)
+            .get_table(&TableName::from(target.clone()))
             .unwrap()
             .rules()
             .resolve(context)
@@ -219,7 +224,7 @@ mod test_helpers {
     pub(super) fn active_count(context: &FrozenBaseContext) -> usize {
         let target = FullName::with_schema("public", "item_view");
         context
-            .get_view_impl(&target)
+            .get_view(&ViewName::from_full_name(&target))
             .unwrap()
             .rules()
             .unwrap()

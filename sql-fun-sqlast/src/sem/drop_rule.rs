@@ -1,4 +1,6 @@
-use crate::sem::{AnalysisError, FullName, ParseContext, RuleIdentity, SemAst};
+use crate::sem::{
+    AnalysisError, DropDependencyBehavior, FullName, ParseContext, RuleIdentity, SemAst,
+};
 
 /// Resolved DROP RULE and the completed lookup outcome.
 /// An IF EXISTS no-op retains the requested names and any resolved relation.
@@ -9,7 +11,7 @@ pub struct DropRule {
     identity: Option<RuleIdentity>,
     found: bool,
     if_exists: bool,
-    behavior: bool,
+    behavior: DropDependencyBehavior,
 }
 impl DropRule {
     pub(crate) fn new(
@@ -18,7 +20,7 @@ impl DropRule {
         identity: Option<&RuleIdentity>,
         found: bool,
         if_exists: bool,
-        behavior: bool,
+        behavior: DropDependencyBehavior,
     ) -> Self {
         Self {
             requested: requested.clone(),
@@ -45,12 +47,12 @@ impl DropRule {
     pub const fn found(&self) -> bool {
         self.found
     }
-    /// Whether missing relations and triggers are accepted as no-ops.
+    /// Whether missing relations and rules are accepted as no-ops.
     pub const fn if_exists(&self) -> bool {
         self.if_exists
     }
-    /// Whether CASCADE was selected; false means RESTRICT.
-    pub const fn cascade(&self) -> bool {
+    /// Requested dependency behavior.
+    pub const fn behavior(&self) -> DropDependencyBehavior {
         self.behavior
     }
     pub(crate) fn apply<C: ParseContext>(&self, context: C) -> Result<C, AnalysisError> {

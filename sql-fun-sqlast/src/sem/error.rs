@@ -21,7 +21,7 @@ pub enum AnalysisError {
     GenericError(#[source] Box<dyn std::error::Error>),
 
     /// Incomplete view catalog facts encountered during semantic analysis.
-    #[error("incomplete view write metadata: {0:?}")]
+    #[error("incomplete View semantics: {0:?}")]
     ViewMetadata(Box<crate::sem::problem::ViewProblem>),
 
     /// serde

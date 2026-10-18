@@ -56,6 +56,7 @@ pub(crate) mod traversal;
 mod type_system;
 mod update_statement;
 mod variable_set;
+mod view_definition;
 mod view_like;
 pub(crate) mod view_write;
 pub use self::create_rule::{
@@ -67,7 +68,8 @@ pub use self::create_trigger::{
     TriggerTiming, TriggerTransition,
 };
 pub use self::drop_rule::DropRule;
-pub use self::view_write::{ViewAssignmentColumn, ViewWriteChange, ViewWriteInfo};
+pub use self::view_definition::{ViewCheckOption, ViewColumnLineage, ViewOption};
+pub use self::view_write::{ViewAssignmentColumn, ViewWriteEvaluation, ViewWriteSupport};
 
 pub(crate) use self::insert_statement::{
     InsertClauseSemantics, InsertClauseValues, InsertTargetCollection, InsertValueCollection,
@@ -365,7 +367,6 @@ pub enum SemAst {
     CreateView(CreateView),
 
     /// A bound catalog change affecting view write capabilities.
-    ViewWriteChange(ViewWriteChange),
 
     /// `create index` statement
     CreateIndex(CreateIndex),
@@ -460,9 +461,6 @@ impl SemAst {
         }
     }
 
-    pub(crate) fn view_write_change(change: &ViewWriteChange) -> Self {
-        Self::ViewWriteChange(change.clone())
-    }
     pub(crate) const fn unresolved_statement() -> Self {
         Self::UnresolvedStatement
     }

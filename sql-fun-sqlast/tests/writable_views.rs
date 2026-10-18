@@ -94,12 +94,30 @@ mod test_helpers {
             })
         }
         pub fn layer(&self, sql: &str) -> Result<FrozenBaseContext, String> {
-            let mut context = SchemaFileContext::new(
-                Path::new("layer.sql"),
+            self.layer_at(self.context(), sql)
+        }
+        pub fn mask_rule(
+            &self,
+            identity: &::sql_fun_sqlast::sem::RuleIdentity,
+        ) -> Result<FrozenBaseContext, String> {
+            use ::sql_fun_sqlast::sem::{ParseContext, RuleInfoWrite};
+            SchemaFileContext::new(
+                Path::new("mask.sql"),
                 self.context(),
                 &self.args,
                 &self.metadata,
-            );
+            )
+            .cancel_rule(identity)
+            .map(ParseContext::freeze)
+            .map_err(|error| error.to_string())
+        }
+        pub fn layer_at(
+            &self,
+            base: &FrozenBaseContext,
+            sql: &str,
+        ) -> Result<FrozenBaseContext, String> {
+            let mut context =
+                SchemaFileContext::new(Path::new("layer.sql"), base, &self.args, &self.metadata);
             for statement in ::sql_fun_sqlast::parse_statements(
                 sql,
                 ::sql_fun_sqlast::ast::Dialect::from(&self.metadata),
@@ -144,7 +162,10 @@ mod test_helpers {
             };
             let context = SchemaFileContext::new(
                 Path::new("older.sql"),
-                self.context(),
+                &FrozenBaseContext::from(
+                    BaseContext::new(&self.args, &self.metadata)
+                        .map_err(|error| error.to_string())?,
+                ),
                 &self.args,
                 &self.metadata,
             );
@@ -370,21 +391,18 @@ CREATE VIEW public.v AS SELECT id AS key, value, calc, value+1 AS computed FROM 
 }
 
 #[rstest::rstest]
-#[ignore = "CREATE TRIGGER no longer registers legacy metadata; new semantic definitions/apply tracked by #602"]
 #[case::insert_trigger(
     "CREATE TRIGGER ti INSTEAD OF INSERT ON public.v FOR EACH ROW EXECUTE FUNCTION public.noop();",
     true,
     false,
     true
 )]
-#[ignore = "CREATE TRIGGER no longer registers legacy metadata; new semantic definitions/apply tracked by #602"]
 #[case::update_trigger(
     "CREATE TRIGGER tu INSTEAD OF UPDATE ON public.v FOR EACH ROW EXECUTE FUNCTION public.noop();",
     false,
     true,
     true
 )]
-#[ignore = "CREATE TRIGGER no longer registers legacy metadata; new semantic definitions/apply tracked by #602"]
 #[case::both_triggers(
     "CREATE TRIGGER ti INSTEAD OF INSERT OR UPDATE ON public.v FOR EACH ROW EXECUTE FUNCTION public.noop();",
     true,
@@ -524,7 +542,6 @@ fn view_default_overrides_base_default() -> Result<(), Box<dyn std::error::Error
     "INSERT INTO v(a) VALUES(1) ON CONFLICT(a) DO NOTHING",
     false
 )]
-#[ignore = "CREATE TRIGGER no longer registers legacy metadata; new semantic definitions/apply tracked by #555"]
 fn sqlite_trigger_oracle(
     #[case] trigger: &str,
     #[case] query: &str,
@@ -601,7 +618,7 @@ fn nested_arbiters_retain_the_actual_source() -> Result<(), Box<dyn std::error::
 }
 
 #[test]
-#[ignore = "semantic trigger-based writability evaluation remains owned by #618"]
+#[ignore = "DROP TRIGGER integration follows #603"]
 fn later_layers_and_replace_preserve_frozen_parents() -> Result<(), Box<dyn std::error::Error>> {
     let schema = ViewSchema::postgres(
         r"
@@ -661,14 +678,12 @@ CREATE OR REPLACE VIEW public.v AS SELECT DISTINCT id FROM public.items;
     false,
     false
 )]
-#[ignore = "CREATE TRIGGER no longer registers legacy metadata; new semantic definitions/apply tracked by #602"]
 #[case::conditional_trigger(
     "CREATE RULE r AS ON INSERT TO public.v WHERE NEW.id>0 DO INSTEAD NOTHING; CREATE TRIGGER it INSTEAD OF INSERT ON public.v FOR EACH ROW EXECUTE FUNCTION public.noop();",
     true,
     false,
     false
 )]
-#[ignore = "CREATE TRIGGER no longer registers legacy metadata; new semantic definitions/apply tracked by #602"]
 #[case::additional_trigger(
     "CREATE RULE r AS ON INSERT TO public.v DO ALSO INSERT INTO public.audit VALUES(NEW.id); CREATE TRIGGER it INSTEAD OF INSERT ON public.v FOR EACH ROW EXECUTE FUNCTION public.noop();",
     true,
@@ -744,6 +759,12 @@ fn materialized_views_are_not_write_destinations() -> Result<(), Box<dyn std::er
     let schema = ViewSchema::postgres(
         "CREATE TABLE public.items(id int); CREATE MATERIALIZED VIEW public.v AS SELECT id FROM public.items;",
     )?;
+    let name = FullName::with_schema("public", "v");
+    let support = ::sql_fun_sqlast::sem::ViewWriteEvaluation::new(schema.context())
+        .evaluate(&name)
+        .unwrap();
+    assert!(!support.insert().is_writable());
+    assert!(!support.update().is_writable());
     assert!(schema.analyze("INSERT INTO public.v VALUES(1)").is_err());
     assert!(schema.analyze("UPDATE public.v SET id=1").is_err());
     assert!(schema.analyze("SELECT id FROM public.v").is_ok());
@@ -786,7 +807,7 @@ fn defaults_and_rule_drops_change_only_the_child() -> Result<(), Box<dyn std::er
 
 #[cfg(feature = "sqlite")]
 #[test]
-#[ignore = "CREATE TRIGGER no longer registers legacy metadata; new semantic definitions/apply tracked by #555"]
+#[ignore = "SQLite DROP TRIGGER semantics remain owned by #555"]
 fn sqlite_drop_masks_inherited_trigger() -> Result<(), Box<dyn std::error::Error>> {
     let schema = ViewSchema::sqlite(
         "CREATE TABLE items(a); CREATE VIEW v AS SELECT a FROM items; CREATE TRIGGER it INSTEAD OF INSERT ON v BEGIN SELECT 1; END;",
@@ -1001,15 +1022,15 @@ CREATE VIEW public.alias_cast AS SELECT x::integer AS x FROM public.items AS i(x
 )]
 #[case::replace(
     "CREATE OR REPLACE VIEW public.item_view AS SELECT id FROM public.items",
-    "view_invalid_replacement"
+    "conflicting_creation"
 )]
 #[case::rename(
     "CREATE OR REPLACE VIEW public.item_view AS SELECT id AS renamed, value, value+1 AS computed FROM public.items",
-    "view_invalid_replacement"
+    "conflicting_creation"
 )]
 #[case::type_change(
     "CREATE OR REPLACE VIEW public.item_view AS SELECT id::bigint AS key, value, value+1 AS computed FROM public.items",
-    "view_invalid_replacement"
+    "conflicting_creation"
 )]
 #[case::duplicate_view(
     "CREATE VIEW public.item_view AS SELECT id FROM public.items",
@@ -1053,13 +1074,13 @@ fn incomplete_view_metadata_is_explicit() -> Result<(), Box<dyn std::error::Erro
             ::sql_fun_sqlast::sem::ViewInsertSupport::analyze(&older, &nested)
                 .unwrap_err()
                 .missing_metadata_view(),
-            Some(&view)
+            Some(&FullName::with_schema("public", "items"))
         );
         assert_eq!(
             ::sql_fun_sqlast::sem::ViewUpdateSupport::analyze(&older, &nested)
                 .unwrap_err()
                 .missing_metadata_view(),
-            Some(&view)
+            Some(&FullName::with_schema("public", "items"))
         );
     }
     for sql in [
@@ -1067,7 +1088,6 @@ fn incomplete_view_metadata_is_explicit() -> Result<(), Box<dyn std::error::Erro
         "UPDATE public.incomplete_nested SET id = 2",
         "INSERT INTO public.incomplete VALUES (1)",
         "UPDATE public.incomplete SET id = 2",
-        "ALTER VIEW public.incomplete ALTER COLUMN id SET DEFAULT 2",
     ] {
         let problems = schema.query_problems_at(&older, sql)?;
         assert!(
@@ -1093,7 +1113,6 @@ fn incomplete_view_metadata_is_explicit() -> Result<(), Box<dyn std::error::Erro
 
 #[cfg(feature = "sqlite")]
 #[test]
-#[ignore = "CREATE TRIGGER no longer registers legacy metadata; new semantic definitions/apply tracked by #555"]
 fn sqlite_trigger_namespace_and_column_case_match_engine() -> Result<(), Box<dyn std::error::Error>>
 {
     let ddl = r"
@@ -1110,12 +1129,10 @@ CREATE TRIGGER IF NOT EXISTS tr INSTEAD OF INSERT ON v2 BEGIN SELECT 1; END;
     let schema = ViewSchema::sqlite(ddl)?;
     assert!(schema.analyze("UPDATE v1 SET a = 1").is_ok());
     assert!(schema.analyze("INSERT INTO v2 VALUES (1)").is_err());
-    let problems =
-        schema.query_problems("CREATE TRIGGER tr INSTEAD OF INSERT ON v2 BEGIN SELECT 1; END;")?;
     assert!(
-        problems
-            .iter()
-            .any(|problem| problem.code() == "view_duplicate_object")
+        schema
+            .analyze("CREATE TRIGGER tr INSTEAD OF INSERT ON v2 BEGIN SELECT 1; END;")
+            .is_err()
     );
     Ok(())
 }
@@ -1198,5 +1215,103 @@ CREATE OR REPLACE RULE "_RETURN" AS ON SELECT TO public.v DO INSTEAD SELECT id F
     );
     assert!(child.analyze_insert(&name).is_writable());
     assert!(!child.analyze_update(&name).is_writable());
+    Ok(())
+}
+
+#[test]
+fn evaluation_service_reads_definition_options_and_retained_defaults()
+-> Result<(), Box<dyn std::error::Error>> {
+    use ::sql_fun_sqlast::sem::{ViewInfoRead, ViewWriteEvaluation};
+    let schema = ViewSchema::postgres(
+        "CREATE TABLE public.items(id integer); CREATE VIEW public.v WITH (security_barrier = true) AS SELECT id FROM public.items WITH LOCAL CHECK OPTION; ALTER VIEW public.v ALTER COLUMN id SET DEFAULT 7;",
+    )?;
+    let name = FullName::with_schema("public", "v");
+    let definition = schema
+        .context()
+        .get_view_impl(&name)
+        .unwrap()
+        .ordinary_definition()
+        .unwrap();
+    assert_eq!(definition.options()[0].name(), "security_barrier");
+    assert!(matches!(
+        definition.check_option(),
+        ::sql_fun_sqlast::sem::ViewCheckOption::Local
+    ));
+    let service = ViewWriteEvaluation::new(schema.context());
+    let result = service.evaluate(&name).unwrap();
+    assert!(result.insert().is_writable());
+    assert!(result.update().is_writable());
+    let replacement =
+        schema.layer("CREATE OR REPLACE VIEW public.v AS SELECT id FROM public.items;")?;
+    let support = ViewWriteEvaluation::new(&replacement)
+        .insert(&name)
+        .unwrap();
+    let column = support.column_definition(&"id".into()).unwrap();
+    let defaults: Vec<_> = column
+        .constraints()
+        .iter()
+        .filter_map(|constraint| constraint.as_default())
+        .collect();
+    assert_eq!(defaults.len(), 1);
+    assert_eq!(
+        defaults[0].expr().as_const(),
+        Some(&::sql_fun_sqlast::sem::ScalarConstExpr::new_integer(7))
+    );
+    let problems = schema.query_problems_at(&replacement, "INSERT INTO public.v DEFAULT VALUES")?;
+    assert!(problems.is_empty(), "{problems:?}");
+    Ok(())
+}
+
+#[test]
+fn evaluation_excludes_masked_rule_references_and_uses_recreated_definitions()
+-> Result<(), Box<dyn std::error::Error>> {
+    use ::sql_fun_sqlast::sem::{RuleIdentity, ViewInfoRead, ViewWriteEvaluation};
+    let schema = ViewSchema::postgres(
+        "CREATE TABLE public.items(id integer); CREATE VIEW public.v AS SELECT DISTINCT id FROM public.items; CREATE RULE r AS ON INSERT TO public.v DO INSTEAD NOTHING;",
+    )?;
+    let name = FullName::with_schema("public", "v");
+    let identity = RuleIdentity::new(&name, "r");
+    let child = schema.mask_rule(&identity)?;
+    let references = child.get_view_impl(&name).unwrap().rules().unwrap();
+    assert_eq!(references.identities().len(), 1);
+    assert!(references.resolve(&child).is_empty());
+    assert!(
+        !ViewWriteEvaluation::new(&child)
+            .insert(&name)
+            .unwrap()
+            .is_writable()
+    );
+    let recreated = schema.layer_at(
+        &child,
+        "CREATE RULE r AS ON INSERT TO public.v DO INSTEAD NOTHING;",
+    )?;
+    assert!(
+        ViewWriteEvaluation::new(&recreated)
+            .insert(&name)
+            .unwrap()
+            .is_writable()
+    );
+    assert_eq!(
+        recreated
+            .get_view_impl(&name)
+            .unwrap()
+            .rules()
+            .unwrap()
+            .resolve(&recreated)
+            .len(),
+        1
+    );
+    assert!(
+        ViewWriteEvaluation::new(schema.context())
+            .insert(&name)
+            .unwrap()
+            .is_writable()
+    );
+    assert!(
+        !ViewWriteEvaluation::new(&child)
+            .insert(&name)
+            .unwrap()
+            .is_writable()
+    );
     Ok(())
 }

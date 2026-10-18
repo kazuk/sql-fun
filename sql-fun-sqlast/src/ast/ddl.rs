@@ -50,12 +50,20 @@ impl super::AlterRelation {
         mut context: TContext,
         source: Option<&crate::sem::SourcePathWithSpan>,
     ) -> Result<AstAndContextPair<TContext>, AnalysisError> {
-        if let Some(change) = self.view_write_changes(&mut context)? {
-            let context = context.apply_view_write_change(&change)?;
-            return Ok(AstAndContextPair::new(
-                SemAst::view_write_change(&change),
-                context,
-            ));
+        let changes = self.view_default_changes(&mut context);
+        let changes = match changes {
+            Err(AnalysisError::ViewMetadata(problem)) => {
+                context.report_analysis_problem(AnalysisProblem::view(&problem))?;
+                return Ok(AstAndContextPair::new(
+                    SemAst::unresolved_statement(),
+                    context,
+                ));
+            }
+            result => result?,
+        };
+        if let Some(change) = changes {
+            let context = context.apply_alter_view(&change)?;
+            return Ok(AstAndContextPair::new(SemAst::alter_view(&change), context));
         }
         context.begin_parameter_type_analysis();
         let result = self.resolve_in(&mut context, source);
@@ -2020,13 +2028,13 @@ mod domain_tests {
 }
 
 impl super::AlterRelation {
-    fn view_write_changes(
+    fn view_default_changes(
         &self,
         context: &mut impl ParseContext,
-    ) -> Result<Option<crate::sem::ViewWriteChange>, AnalysisError> {
+    ) -> Result<Option<crate::sem::AlterView>, AnalysisError> {
         let requested = self.name.full_name()?;
         let Some(name) =
-            crate::sem::search_path::expand_search_path_inst(context, &requested, |key| {
+            crate::sem::search_path::expand_relation_search_path(context, &requested, |key| {
                 context
                     .get_view_impl(key)
                     .filter(|view| !view.is_materialized())
@@ -2037,24 +2045,28 @@ impl super::AlterRelation {
         };
         let mut actions = Vec::new();
         for command in &self.commands {
-            let Some(action) = command.view_write_action(context)? else {
+            let Some(action) = command.view_default_action(context)? else {
                 return Ok(None);
             };
             actions.push(action);
         }
-        Ok(Some(crate::sem::ViewWriteChange::new(
-            &name,
-            &crate::sem::view_write::WriteAction::sequence(&actions),
-        )))
+        let change =
+            crate::sem::AlterView::new(&crate::sem::ViewName::from_full_name(&name), &actions);
+        context
+            .get_view_impl(&name)
+            .expect("resolved ordinary View")
+            .clone()
+            .apply_alter(&change)?;
+        Ok(Some(change))
     }
 }
 impl super::AlterCommand {
-    fn view_write_action(
+    fn view_default_action(
         &self,
         context: &mut impl ParseContext,
-    ) -> Result<Option<crate::sem::view_write::WriteAction>, AnalysisError> {
+    ) -> Result<Option<crate::sem::AlterObjSubCommand>, AnalysisError> {
         match self {
-            Self::Postgres(command) => command.view_write_action(context),
+            Self::Postgres(command) => command.view_default_action(context),
             Self::Default(name, expression) => {
                 let value = expression.resolve(
                     context,
@@ -2063,9 +2075,9 @@ impl super::AlterCommand {
                         &crate::sem::FromClause::default(),
                     ),
                 )?;
-                Ok(Some(crate::sem::view_write::WriteAction::default(
+                Ok(Some(crate::sem::AlterObjSubCommand::column_default(
                     &crate::sem::ColumnName::from(name.as_str()),
-                    Some(&value),
+                    &value,
                 )))
             }
             _ => Ok(None),
@@ -2073,18 +2085,23 @@ impl super::AlterCommand {
     }
 }
 impl PostgresAlterCommand {
-    fn view_write_action(
+    fn view_default_action(
         &self,
         context: &mut impl ParseContext,
-    ) -> Result<Option<crate::sem::view_write::WriteAction>, AnalysisError> {
-        use crate::sem::view_write::WriteAction;
+    ) -> Result<Option<crate::sem::AlterObjSubCommand>, AnalysisError> {
+        use crate::sem::AlterObjSubCommand;
         let action = match self.operation {
             AlterOperation::ColumnDefault => {
                 let value = self.definition.view_default(context)?;
-                WriteAction::default(
-                    &crate::sem::ColumnName::from(self.name.as_str()),
-                    value.as_ref(),
-                )
+                match value {
+                    Some(value) => AlterObjSubCommand::column_default(
+                        &crate::sem::ColumnName::from(self.name.as_str()),
+                        &value,
+                    ),
+                    None => AlterObjSubCommand::drop_column_default(&crate::sem::ColumnName::from(
+                        self.name.as_str(),
+                    )),
+                }
             }
             AlterOperation::EnableTrigger
             | AlterOperation::EnableAlwaysTrigger
@@ -2098,10 +2115,9 @@ impl PostgresAlterCommand {
             | AlterOperation::EnableAlwaysRule
             | AlterOperation::DisableRule
             | AlterOperation::EnableReplicaRule => {
-                context.report_analysis_problem(AnalysisProblem::view(
+                return Err(AnalysisError::view_metadata(
                     &crate::sem::problem::ViewProblem::invalid_alter(),
-                ))?;
-                return Ok(Some(WriteAction::sequence(&[])));
+                ));
             }
             _ => return Ok(None),
         };

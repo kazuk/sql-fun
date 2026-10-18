@@ -9,6 +9,14 @@ pub(crate) struct DeleteDestination {
 impl DeleteDestination {
     pub(crate) fn resolve(context: &impl ParseContext, requested: &TableName) -> Option<Self> {
         crate::sem::search_path::expand_search_path_inst(context, requested.full_name(), |key| {
+            let canonical;
+            let key = if context.dialect() == crate::ast::Dialect::sqlite() {
+                canonical = context.sqlite_relation_identity(key)?;
+                &canonical
+            } else {
+                key
+            };
+
             if context.get_table_impl(key).is_some() {
                 return Some(Self {
                     name: TableName::from(key.clone()),

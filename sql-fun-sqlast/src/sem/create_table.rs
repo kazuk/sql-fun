@@ -116,6 +116,7 @@ impl CreateTableMode {
 pub struct CreateTable {
     name: TableName,
     columns: ColumnCollection,
+    triggers: crate::sem::TriggerReferences,
     alter_statements: Vec<AlterTable>,
     drop_statements: Vec<DropTable>,
     owner: Option<String>,
@@ -194,6 +195,13 @@ impl GetSourcePathWithSpan for CreateTable {
 }
 
 impl CreateTable {
+    /// Fully qualified trigger references associated with this relation.
+    pub const fn triggers(&self) -> &crate::sem::TriggerReferences {
+        &self.triggers
+    }
+    pub(crate) fn associate_trigger(&mut self, name: &crate::sem::FullName) {
+        self.triggers.associate(name);
+    }
     /// new instance with column definitions
     #[must_use]
     pub fn new(
@@ -205,6 +213,7 @@ impl CreateTable {
     ) -> Self {
         Self {
             name: name.clone(),
+            triggers: crate::sem::TriggerReferences::default(),
             columns: ColumnCollection(columns),
             alter_statements: Default::default(),
             drop_statements: Default::default(),

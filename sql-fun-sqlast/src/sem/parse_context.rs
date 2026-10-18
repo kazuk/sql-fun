@@ -174,6 +174,13 @@ pub trait BaseParseContext:
     + GetSourcePathWithSpanOpt
     + std::fmt::Debug
 {
+    /// Resolve an exact SQLite relation key using ASCII case-insensitive identifiers.
+    fn sqlite_relation_identity(&self, name: &FullName) -> Option<FullName>;
+
+    /// Look up an exact trigger identity in the effective context layer.
+    fn trigger(&self, identity: &crate::sem::TriggerIdentity)
+    -> Option<&crate::sem::CreateTrigger>;
+
     /// Resolved metadata for the database selected by the caller.
     fn metadata(&self) -> &::sql_fun_core::SqlFunMetadata;
 
@@ -203,6 +210,11 @@ pub trait BaseParseContext:
     /// A stored declaration can itself have an unqualified name.
     fn resolve_table_name(&self, name: &TableName) -> Option<TableName> {
         expand_search_path_inst(self, name.full_name(), |key| {
+            if crate::ast::Dialect::from(self.metadata()) == crate::ast::Dialect::sqlite() {
+                let canonical = self.sqlite_relation_identity(key)?;
+                self.get_table_impl(&canonical)?;
+                return Some(TableName::from(canonical));
+            }
             self.get_table_impl(key)?;
             Some(TableName::from(key.clone()))
         })
@@ -272,6 +284,11 @@ pub trait ParseContext:
 where
     Self: Sized,
 {
+    /// Register a completed definition in this layer. Ownership is decided by DDL application.
+    fn register_trigger(self, trigger: &crate::sem::CreateTrigger) -> Result<Self, AnalysisError>;
+    /// Associate the supplied name with the exact target in this layer.
+    fn associate_trigger(self, target: &FullName, name: &FullName) -> Result<Self, AnalysisError>;
+
     /// Dialect of the explicitly supplied metadata for this analysis.
     /// Engine identity and SQL dialect are independent metadata fields.
     /// Historical configuration retained by a frozen catalog is not consulted.

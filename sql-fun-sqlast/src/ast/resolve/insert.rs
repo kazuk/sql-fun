@@ -37,7 +37,13 @@ impl Insert {
         if let Some(conflict) = &self.conflict {
             conflict.require_insert_action();
         }
-        let requested = TableName::from(self.relation.name.full_name()?);
+        let name = self.relation.name.full_name()?;
+        let name = if let Some(scope) = outer {
+            scope.trigger_relation_name(context, &name)?
+        } else {
+            name
+        };
+        let requested = TableName::from(name);
         let Some(table) = InsertDestination::resolve(context, &requested)? else {
             context.report_analysis_problem(AnalysisProblem::relation_not_found(&requested))?;
             return Err(AnalysisError::unexpected_input_error(

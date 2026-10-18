@@ -3,6 +3,7 @@ pub(in crate::ast) mod insert;
 mod placement;
 mod query;
 mod returning;
+mod trigger;
 mod update;
 
 use crate::StringSpan;

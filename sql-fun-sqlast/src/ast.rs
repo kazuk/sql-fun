@@ -368,7 +368,9 @@ impl StatementNode {
                 .map(|merge| crate::sem::SemAst::merge(&merge)),
             Self::CreateRule(_) => todo!("CREATE RULE semantic analysis: #604"),
             Self::DropTrigger(_) => todo!("DROP TRIGGER semantic analysis: #555"),
-            Self::CreateTrigger(_) => todo!("CREATE TRIGGER semantic analysis: #602 / #555"),
+            Self::CreateTrigger(trigger) => trigger
+                .resolve(context)
+                .map(|trigger| crate::sem::SemAst::create_trigger(&trigger)),
             Self::DropRule(_) => todo!("DROP RULE semantic analysis: #605"),
             Self::View(_) => crate::sem::AnalysisError::raise_unexpected_input(
                 "view requires catalog application",
@@ -435,6 +437,7 @@ impl StatementNode {
         let mut context = context;
         context.set_parameter_constraints(&crate::sem::ParameterConstraints::default());
         match self {
+            Self::CreateTrigger(trigger) => trigger.resolve_and_apply(context),
             Self::View(view) => view.resolve_and_apply(context),
             Self::Extension(extension) => extension.apply(context),
             Self::VariableSet(variable_set) => variable_set.resolve_and_apply(context),

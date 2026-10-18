@@ -12,6 +12,18 @@ pub enum ViewLike {
 }
 
 impl ViewLike {
+    /// Trigger references for an ordinary view. Materialized views cannot own triggers.
+    pub fn triggers(&self) -> Option<&crate::sem::TriggerReferences> {
+        match self {
+            Self::View(view) => Some(view.triggers()),
+            Self::MaterializedView(_) => None,
+        }
+    }
+    pub(crate) fn associate_trigger(&mut self, name: &crate::sem::FullName) {
+        if let Self::View(view) = self {
+            view.associate_trigger(name);
+        }
+    }
     pub(crate) fn result_columns(&self) -> &crate::sem::ResultColumnCollection {
         match self {
             Self::View(view) => view.result_columns(),

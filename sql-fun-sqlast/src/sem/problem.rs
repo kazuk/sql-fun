@@ -7,8 +7,10 @@ mod overload_resolution;
 mod parameter_constraint;
 mod query;
 mod sql_highlighter;
+mod trigger;
 mod update;
 mod view;
+pub use self::trigger::TriggerProblem;
 
 use std::collections::HashSet;
 
@@ -70,6 +72,8 @@ trait RenderProblemReport: Problem {
 #[allow(clippy::large_enum_variant)]
 #[derive(Debug, Clone)]
 pub enum AnalysisProblem {
+    /// Invalid trigger semantics.
+    Trigger(TriggerProblem),
     /// A view declaration or catalog capability violation.
     View(ViewProblem),
     /// A violation of INSERT semantic rules.
@@ -145,6 +149,10 @@ pub enum AnalysisProblem {
 }
 
 impl AnalysisProblem {
+    pub(crate) fn trigger(problem: &TriggerProblem) -> Self {
+        Self::Trigger(problem.clone())
+    }
+
     pub(crate) const fn delete(kind: DeleteProblemKind) -> Self {
         Self::Delete(DeleteProblem::new(kind))
     }
@@ -211,6 +219,7 @@ impl AnalysisProblem {
     #[must_use]
     pub const fn code(&self) -> &'static str {
         match self {
+            Self::Trigger(_) => "trigger_invalid_definition",
             Self::View(problem) => problem.code(),
             Self::Insert(problem) => problem.code(),
             Self::Update(problem) => problem.code(),
@@ -262,6 +271,7 @@ impl AnalysisProblem {
             .with_syntax_highlighting(SqlHighlighter::from_theme(theme)?);
 
         let report = match self {
+            Self::Trigger(problem) => problem.render_report(&report_handler, source)?,
             Self::View(problem) => problem.render_report(&report_handler, source)?,
             Self::Insert(problem) => problem.render_report(&report_handler, source)?,
             Self::Update(problem) => problem.render_report(&report_handler, source)?,

@@ -51,6 +51,9 @@ pub struct OverloadVariant {
 }
 
 impl OverloadVariant {
+    pub(crate) fn has_input_parameters(&self) -> bool {
+        self.params.iter().any(FunctionParam::is_input)
+    }
     pub(crate) fn input_bindings(&self) -> ArgumentBindingCollection {
         let mut arguments = ArgumentBindingCollection::default();
         for parameter in &self.params {

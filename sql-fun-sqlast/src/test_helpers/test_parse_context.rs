@@ -24,6 +24,7 @@ use std::collections::{HashMap, HashSet};
 /// ParseContext implementation for tests
 #[derive(Debug, Default)]
 pub struct TestParseContext {
+    triggers: HashMap<crate::sem::TriggerIdentity, crate::sem::CreateTrigger>,
     masters: Option<crate::sem::ConflictMasters>,
     collation_results: HashMap<FullName, crate::sem::CatalogNameLookup>,
     operator_class_results: HashMap<(FullName, String), crate::sem::CatalogNameLookup>,
@@ -43,6 +44,7 @@ pub struct TestParseContext {
     view_insert_support: HashMap<FullName, crate::sem::ViewInsertSupport>,
     view_merge_support: HashMap<FullName, crate::sem::ViewMergeSupport>,
     function_definitions: HashMap<FullName, FunctionOverloadCollection>,
+    function_row_properties: HashMap<(FullName, OverloadVariant), bool>,
     alter_tables: Vec<AlterTable>,
     drop_tables: Vec<DropTable>,
     create_indexes: Vec<CreateIndex>,
@@ -340,9 +342,15 @@ impl OperatorInfoRead for TestParseContext {
 impl FunctionInfoRead for TestParseContext {
     fn function_preserves_view_rows(
         &self,
-        _name: &FullName,
-        _overload: &crate::sem::OverloadVariant,
+        name: &FullName,
+        overload: &crate::sem::OverloadVariant,
     ) -> bool {
+        if let Some(preserves_rows) = self
+            .function_row_properties
+            .get(&(name.clone(), overload.clone()))
+        {
+            return *preserves_rows;
+        }
         todo!("mock function-kind properties")
     }
 
@@ -378,6 +386,26 @@ impl DiagnosticContext for TestParseContext {
 }
 
 impl BaseParseContext for TestParseContext {
+    fn sqlite_relation_identity(&self, name: &FullName) -> Option<FullName> {
+        for (candidate, definition) in &self.table_definitions {
+            if candidate.sqlite_eq(name) && definition.is_some() {
+                return Some(candidate.clone());
+            }
+        }
+        for (candidate, definition) in &self.view_definitions {
+            if candidate.sqlite_eq(name) && definition.is_some() {
+                return Some(candidate.clone());
+            }
+        }
+        None
+    }
+
+    fn trigger(
+        &self,
+        identity: &crate::sem::TriggerIdentity,
+    ) -> Option<&crate::sem::CreateTrigger> {
+        self.triggers.get(identity)
+    }
     fn metadata(&self) -> &::sql_fun_core::SqlFunMetadata {
         static DEFAULT_METADATA: std::sync::LazyLock<::sql_fun_core::SqlFunMetadata> =
             std::sync::LazyLock::new(|| {
@@ -462,6 +490,31 @@ impl FunctionInfoWrite for TestParseContext {
 }
 
 impl ParseContext for TestParseContext {
+    fn register_trigger(
+        mut self,
+        trigger: &crate::sem::CreateTrigger,
+    ) -> Result<Self, AnalysisError> {
+        self.triggers
+            .insert(trigger.identity().clone(), trigger.clone());
+        Ok(self)
+    }
+    fn associate_trigger(
+        mut self,
+        target: &FullName,
+        name: &FullName,
+    ) -> Result<Self, AnalysisError> {
+        if let Some(Some(table)) = self.table_definitions.get_mut(target) {
+            table.associate_trigger(name);
+        } else if let Some(Some(view)) = self.view_definitions.get_mut(target) {
+            view.associate_trigger(name);
+        } else {
+            return Err(AnalysisError::trigger(
+                &crate::sem::problem::TriggerProblem::target(target),
+            ));
+        }
+        Ok(self)
+    }
+
     fn resolve_cursor(&self, name: &str) -> Option<&crate::sem::CursorInfo> {
         self.cursors.cursor(name)
     }
@@ -563,6 +616,16 @@ impl TestParseContext {
     ) {
         self.function_definitions
             .insert(name.clone(), overloads.clone());
+    }
+
+    pub(crate) fn set_function_row_property(
+        &mut self,
+        name: &FullName,
+        overload: &OverloadVariant,
+        preserves_rows: bool,
+    ) {
+        self.function_row_properties
+            .insert((name.clone(), overload.clone()), preserves_rows);
     }
 
     /// setup function overload collection with variants

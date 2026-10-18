@@ -296,55 +296,6 @@ impl WriteDeclaration {
     }
 }
 
-impl TryFrom<&crate::syn::RuleStmt> for WriteDeclaration {
-    type Error = AnalysisError;
-    fn try_from(value: &crate::syn::RuleStmt) -> Result<Self, Self::Error> {
-        let relation = super::postgres::required(value.get_relation().as_inner(), "rule target")?;
-        let event = WriteEvent::try_from(value.get_event().as_inner())?;
-        let actions = value.get_actions().as_inner().unwrap_or_default();
-        let returning = actions.iter().any(rule_action_has_returning);
-        let object = WriteObject::rule(
-            &value.get_rulename(),
-            event,
-            value.get_instead(),
-            value.get_where_clause().as_inner().is_some(),
-            returning,
-            &actions,
-        );
-        Ok(Self::new(
-            &Name::from(&relation),
-            &WriteAction::object(&object, value.get_replace(), false),
-        ))
-    }
-}
-fn rule_action_has_returning(node: &crate::syn::Node) -> bool {
-    node.as_insert_stmt()
-        .get_returning_list()
-        .as_inner()
-        .is_some_and(|list| !list.is_empty())
-        || node
-            .as_update_stmt()
-            .get_returning_list()
-            .as_inner()
-            .is_some_and(|list| !list.is_empty())
-        || node
-            .as_delete_stmt()
-            .get_returning_list()
-            .as_inner()
-            .is_some_and(|list| !list.is_empty())
-}
-impl TryFrom<Option<crate::syn::CmdType>> for WriteEvent {
-    type Error = AnalysisError;
-    fn try_from(value: Option<crate::syn::CmdType>) -> Result<Self, Self::Error> {
-        match value {
-            Some(crate::syn::CmdType::CmdInsert) => Ok(Self::insert()),
-            Some(crate::syn::CmdType::CmdUpdate) => Ok(Self::update()),
-            Some(crate::syn::CmdType::CmdDelete) => Ok(Self::delete()),
-            _ => AnalysisError::raise_unexpected_input("view write rule event"),
-        }
-    }
-}
-
 impl TryFrom<&crate::syn::DropStmt> for WriteDeclaration {
     type Error = AnalysisError;
     fn try_from(value: &crate::syn::DropStmt) -> Result<Self, Self::Error> {

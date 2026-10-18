@@ -18,6 +18,7 @@ mod ownership;
 mod postgres;
 mod public;
 mod resolve;
+mod rule;
 #[cfg(feature = "sqlite")]
 mod sqlite;
 #[cfg(all(feature = "sqlite", feature = "workaround_turso_9791"))]
@@ -224,6 +225,7 @@ pub(crate) enum StatementNode {
     View(View),
     ViewWrite(view_write::WriteDeclaration),
     CreateTrigger(CreateTrigger),
+    CreateRule(CreateRule),
     DropTrigger(DropTrigger),
     Extension(Extension),
     VariableSet(VariableSet),
@@ -266,6 +268,10 @@ impl StatementNode {
 
     const fn create_trigger(value: CreateTrigger) -> Self {
         Self::CreateTrigger(value)
+    }
+
+    const fn create_rule(value: CreateRule) -> Self {
+        Self::CreateRule(value)
     }
 
     const fn drop_trigger(value: DropTrigger) -> Self {
@@ -361,6 +367,7 @@ impl StatementNode {
             Self::Merge(merge) => merge
                 .resolve(context)
                 .map(|merge| crate::sem::SemAst::merge(&merge)),
+            Self::CreateRule(_) => todo!("CREATE RULE semantic analysis: #604"),
             Self::DropTrigger(_) => todo!("DROP TRIGGER semantic analysis: #555"),
             Self::CreateTrigger(_) => todo!("CREATE TRIGGER semantic analysis: #602 / #555"),
             Self::ViewWrite(_) => crate::sem::AnalysisError::raise_unexpected_input(
@@ -1887,6 +1894,26 @@ impl SubqueryKind {
     const fn any() -> Self {
         Self::Any
     }
+}
+
+// Unresolved PostgreSQL rule syntax; no catalog or writable-view assumptions.
+#[derive(Clone, Debug)]
+pub(crate) struct CreateRule {
+    name: Name,
+    relation: Relation,
+    replace: bool,
+    event: RuleEvent,
+    predicate: Option<Expr>,
+    instead: bool,
+    actions: Vec<StatementNode>,
+}
+
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+enum RuleEvent {
+    Select,
+    Insert,
+    Update,
+    Delete,
 }
 
 // DROP TRIGGER retains only syntax; SQLite has no ON relation or drop behavior.

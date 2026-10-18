@@ -147,7 +147,9 @@ fn relation_search_path_does_not_fall_through_to_a_later_trigger() -> testresult
 
 mod test_helpers {
     use crate::sem::{BaseContext, FrozenBaseContext, SchemaFileContext};
-    use crate::sem::{BaseParseContext, FullName, ParseContext, TriggerIdentity, ViewInfoRead};
+    use crate::sem::{
+        BaseParseContext, FullName, ParseContext, TableName, TriggerIdentity, ViewName,
+    };
     pub(super) const CREATE_AUDIT: &str = "CREATE TRIGGER audit INSTEAD OF INSERT ON item_view FOR EACH ROW EXECUTE FUNCTION audit_fn()";
     pub(super) fn identity() -> TriggerIdentity {
         TriggerIdentity::postgres(
@@ -219,10 +221,9 @@ mod test_helpers {
         statement(sql).analyze(context)
     }
     pub(super) fn table_trigger_count(context: &FrozenBaseContext) -> usize {
-        use crate::sem::TableInfoRead;
         let target = FullName::with_schema("public", "items");
         context
-            .get_table_impl(&target)
+            .get_table(&TableName::from(target.clone()))
             .unwrap()
             .triggers()
             .resolve(context, &target)
@@ -231,7 +232,7 @@ mod test_helpers {
     pub(super) fn active_count(context: &FrozenBaseContext) -> usize {
         let target = FullName::with_schema("public", "item_view");
         context
-            .get_view_impl(&target)
+            .get_view(&ViewName::from_full_name(&target))
             .unwrap()
             .triggers()
             .unwrap()

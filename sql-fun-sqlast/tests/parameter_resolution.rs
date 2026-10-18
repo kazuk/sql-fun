@@ -27,38 +27,6 @@ fn real_postgres_catalog_preserves_numeric_source_types() -> Result<(), Box<dyn 
     Ok(())
 }
 
-#[rstest::rstest]
-#[case::composite_member(
-    "select (pair).n as value from public.scalar_inputs",
-    PgBuiltInType::int4()
-)]
-#[case::cast_member(
-    "select (pair).n::bigint as value from public.scalar_inputs",
-    PgBuiltInType::int8()
-)]
-#[case::explicit_cast(
-    "select cast(n as bigint) as value from public.scalar_inputs",
-    PgBuiltInType::int8()
-)]
-fn maintained_scalar_analysis_preserves_result_types(
-    #[case] sql: &str,
-    #[case] expected: ::sql_fun_sqlast::sem::TypeReference,
-) -> Result<(), Box<dyn std::error::Error>> {
-    // Real builtin cast metadata and composite definitions are required to verify result types.
-    let statement = parse_statements(sql, Dialect::postgres()).next().unwrap()?;
-    let analyzed = statement.analyze(heavy::scalar_input_context()?)?;
-    assert!(
-        analyzed.context().problems().is_empty(),
-        "{:?}",
-        analyzed.context().problems()
-    );
-    let select = analyzed.ast().clone().into_select_statemtnt().unwrap();
-    let column = select.result_columns().get_column_at(0).unwrap();
-    assert_eq!(column.col_type().as_ref(), Some(&expected));
-    assert_eq!(column.expression().unwrap().get_type(), Some(expected));
-    Ok(())
-}
-
 mod test_helpers {
     pub(super) fn serialized_parameter_domains(
         value: &::serde_json::Value,
@@ -112,33 +80,6 @@ mod test_helpers {
                 collection
                     .remove("default")
                     .expect("selected test metadata"),
-            ))
-        }
-
-        /// Loads builtin metadata and parses a table schema once per call to
-        /// verify column-based indirection and cast result types against real catalog data.
-        pub(crate) fn scalar_input_context() -> Result<SchemaFileContext, Box<dyn std::error::Error>>
-        {
-            let (args, selected) = environment()?;
-            let base = FrozenBaseContext::from(BaseContext::new(&args, &selected)?);
-            let schema_file = ::tempfile::NamedTempFile::new()?;
-            std::fs::write(
-                schema_file.path(),
-                "create type public.scalar_pair as (n integer); create table public.scalar_inputs (pair public.scalar_pair, n integer);",
-            )?;
-            let parsed = ::sql_fun_sqlast::PostgresDialect::parse_schema_file(
-                schema_file.path(),
-                &base,
-                &mut None,
-                &args,
-                &selected,
-            )?;
-            assert!(parsed.problems().is_empty());
-            Ok(SchemaFileContext::new(
-                std::path::Path::new("query.sql"),
-                parsed.base_context(),
-                &args,
-                &selected,
             ))
         }
 

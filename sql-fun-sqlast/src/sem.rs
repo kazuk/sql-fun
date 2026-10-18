@@ -45,6 +45,8 @@ mod stack;
 mod top_level_statement;
 pub(crate) mod traversal;
 
+pub(crate) use self::update_statement::UpdateAssignmentCollection;
+pub(crate) use self::insert_statement::{InsertClauseSemantics, InsertClauseValues, InsertTargetCollection, InsertValueCollection};
 #[cfg(test)]
 pub(crate) use self::parse_context::conflict_info::infer_from_catalog;
 mod type_system;

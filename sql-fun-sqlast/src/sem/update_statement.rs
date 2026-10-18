@@ -14,11 +14,42 @@ use crate::sem::{
     ResultColumnCollection, SelectStatement, SemAst, SemScalarExpr, TableName, TypeReference,
 };
 
+/// Resolved UPDATE assignments in SQL order.
+///
+/// The transparent representation preserves the serialized array used by
+/// `UpdateStatement` while keeping assignment construction and traversal typed.
+#[derive(Debug, Default, Clone, Eq, Hash, PartialEq, serde::Serialize, serde::Deserialize)]
+#[serde(transparent)]
+pub(crate) struct UpdateAssignmentCollection(Vec<UpdateAssignment>);
+impl UpdateAssignmentCollection {
+    pub(crate) fn push(&mut self, assignment: UpdateAssignment) {
+        self.0.push(assignment);
+    }
+    pub(crate) fn as_slice(&self) -> &[UpdateAssignment] {
+        &self.0
+    }
+    pub(crate) fn validate(
+        &mut self,
+        context: &mut impl ParseContext,
+    ) -> Result<(), AnalysisError> {
+        self.walk(&mut AssignmentChecker { context })
+    }
+    pub(crate) fn walk<V: SemanticVisitor>(
+        &mut self,
+        visitor: &mut V,
+    ) -> Result<(), AnalysisError> {
+        for assignment in &mut self.0 {
+            assignment.walk(visitor)?;
+        }
+        Ok(())
+    }
+}
+
 /// An analyzed UPDATE, including its destination, sources and RETURNING outputs.
 #[derive(Debug, Clone, Eq, Hash, PartialEq, serde::Serialize, serde::Deserialize)]
 pub struct UpdateStatement {
     target: TableName,
-    assignments: Vec<UpdateAssignment>,
+    assignments: UpdateAssignmentCollection,
     with: Vec<QueryCte>,
     from: FromClause,
     predicate: Option<UpdatePredicate>,
@@ -32,7 +63,7 @@ pub struct UpdateStatement {
 impl UpdateStatement {
     pub(crate) fn new(
         target: &TableName,
-        assignments: &[UpdateAssignment],
+        assignments: &UpdateAssignmentCollection,
         with: &[QueryCte],
         from: &FromClause,
         predicate: &Option<UpdatePredicate>,
@@ -40,7 +71,7 @@ impl UpdateStatement {
     ) -> Self {
         Self {
             target: target.clone(),
-            assignments: assignments.to_vec(),
+            assignments: assignments.clone(),
             with: with.to_vec(),
             from: from.clone(),
             predicate: predicate.clone(),
@@ -72,7 +103,7 @@ impl UpdateStatement {
     }
     /// Assignments in SQL order; RHS bindings refer to the pre-update row.
     pub fn assignments(&self) -> &[UpdateAssignment] {
-        &self.assignments
+        self.assignments.as_slice()
     }
     /// Local WITH definitions in declaration order.
     pub fn with(&self) -> &[QueryCte] {
@@ -154,10 +185,7 @@ impl UpdateStatement {
         // PostgreSQL transforms WHERE and RETURNING before SET assignments.
         // This order matters when RETURNING resolves an unknown parameter.
         visitor.dml_returning(&mut self.returning)?;
-        for assignment in &mut self.assignments {
-            assignment.walk(visitor)?;
-        }
-        Ok(())
+        self.assignments.walk(visitor)
     }
 }
 

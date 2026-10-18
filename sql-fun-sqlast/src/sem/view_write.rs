@@ -612,6 +612,19 @@ impl<C: BaseParseContext> crate::sem::traversal::SemanticVisitor for ViewColumnM
     }
 }
 
+fn rule_is_cancelled(
+    context: &dyn crate::sem::RuleInfoRead,
+    identity: &crate::sem::RuleIdentity,
+) -> bool {
+    if let Some(entry) = context.local_rule(identity) {
+        entry.is_none()
+    } else if let Some(parent) = context.rule_parent() {
+        rule_is_cancelled(parent, identity)
+    } else {
+        false
+    }
+}
+
 fn automatic_view_source(
     context: &impl BaseParseContext,
     query: &crate::sem::SelectStatement,

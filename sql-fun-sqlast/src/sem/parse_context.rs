@@ -192,6 +192,12 @@ pub trait BaseParseContext:
     /// Resolve an exact SQLite relation key using ASCII case-insensitive identifiers.
     fn sqlite_relation_identity(&self, name: &FullName) -> Option<FullName>;
 
+    /// Whether effective lookup stopped at an explicit trigger cancellation.
+    /// Missing definitions without a cancellation return false.
+    fn trigger_is_cancelled(&self, _identity: &crate::sem::TriggerIdentity) -> bool {
+        false
+    }
+
     /// Look up an exact trigger identity in the effective context layer.
     fn trigger(&self, identity: &crate::sem::TriggerIdentity)
     -> Option<&crate::sem::CreateTrigger>;

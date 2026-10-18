@@ -153,6 +153,25 @@ mod test_helpers {
             context.set_search_path(&[]);
             context.freeze()
         }
+        pub fn detached_view_catalog(
+            &self,
+            name: &::sql_fun_sqlast::sem::FullName,
+        ) -> Result<FrozenBaseContext, String> {
+            use ::sql_fun_sqlast::sem::{ParseContext, ViewInfoRead, ViewInfoWrite};
+            let view = self
+                .context()
+                .get_view_impl(name)
+                .unwrap()
+                .ordinary_definition()
+                .unwrap();
+            let base = FrozenBaseContext::from(
+                BaseContext::new(&self.args, &self.metadata).map_err(|error| error.to_string())?,
+            );
+            SchemaFileContext::new(Path::new("detached.sql"), &base, &self.args, &self.metadata)
+                .apply_create_view(view)
+                .map(ParseContext::freeze)
+                .map_err(|error| error.to_string())
+        }
         pub fn incomplete_catalog(&self) -> Result<FrozenBaseContext, String> {
             use ::sql_fun_sqlast::sem::{ParseContext, ViewInfoWrite};
             let SemAst::CreateView(view) =
@@ -1307,6 +1326,31 @@ fn evaluation_excludes_masked_rule_references_and_uses_recreated_definitions()
             .insert(&name)
             .unwrap()
             .is_writable()
+    );
+    Ok(())
+}
+
+#[rstest::rstest]
+#[case::rule("CREATE RULE r AS ON INSERT TO public.v DO INSTEAD NOTHING", "r")]
+#[case::trigger(
+    "CREATE FUNCTION public.noop() RETURNS trigger LANGUAGE plpgsql AS 'BEGIN RETURN NEW; END'; CREATE TRIGGER t INSTEAD OF INSERT ON public.v FOR EACH ROW EXECUTE FUNCTION public.noop()",
+    "t"
+)]
+fn missing_linked_definition_is_incomplete_not_a_dropped_capability(
+    #[case] declaration: &str,
+    #[case] missing: &str,
+) -> Result<(), Box<dyn std::error::Error>> {
+    let schema = ViewSchema::postgres(&format!(
+        "CREATE TABLE public.items(id integer); CREATE VIEW public.v AS SELECT DISTINCT id FROM public.items; {declaration};"
+    ))?;
+    let name = FullName::with_schema("public", "v");
+    let detached = schema.detached_view_catalog(&name)?;
+    let problem = ::sql_fun_sqlast::sem::ViewWriteEvaluation::new(&detached)
+        .insert(&name)
+        .unwrap_err();
+    assert_eq!(
+        problem.missing_metadata_view(),
+        Some(&FullName::with_schema("public", missing))
     );
     Ok(())
 }

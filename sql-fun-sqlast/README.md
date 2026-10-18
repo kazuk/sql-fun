@@ -67,7 +67,8 @@ UPSERT. Materialized views remain read-only. View conflict inference preserves
 actual underlying arbiter identities rather than inventing view indexes.
 
 Frozen catalogs share source facts without sharing mutable layer changes. No
-trigger function or rule action is executed. Evaluation does not interpret opaque procedural bodies; trigger/rule SQL rendering and broader ALTER VIEW
+trigger function or rule action is executed. Evaluation does not interpret
+opaque procedural bodies; trigger/rule SQL rendering and broader ALTER VIEW
 processing are separate work. See [SQL analysis](../book/sql-analysis.md) for the
 supported mechanisms and conflict-inference limitations.
 

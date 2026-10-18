@@ -618,7 +618,6 @@ fn nested_arbiters_retain_the_actual_source() -> Result<(), Box<dyn std::error::
 }
 
 #[test]
-#[ignore = "DROP TRIGGER integration follows #603"]
 fn later_layers_and_replace_preserve_frozen_parents() -> Result<(), Box<dyn std::error::Error>> {
     let schema = ViewSchema::postgres(
         r"
@@ -773,7 +772,6 @@ fn materialized_views_are_not_write_destinations() -> Result<(), Box<dyn std::er
 }
 
 #[test]
-#[ignore = "DROP RULE semantic analysis/application remains owned by #605"]
 fn defaults_and_rule_drops_change_only_the_child() -> Result<(), Box<dyn std::error::Error>> {
     let schema = ViewSchema::postgres(
         "CREATE TABLE public.items(id int DEFAULT 7); CREATE VIEW public.v AS SELECT DISTINCT id FROM public.items; CREATE RULE r AS ON INSERT TO public.v DO INSTEAD NOTHING;",
@@ -807,7 +805,6 @@ fn defaults_and_rule_drops_change_only_the_child() -> Result<(), Box<dyn std::er
 
 #[cfg(feature = "sqlite")]
 #[test]
-#[ignore = "SQLite DROP TRIGGER semantics remain owned by #555"]
 fn sqlite_drop_masks_inherited_trigger() -> Result<(), Box<dyn std::error::Error>> {
     let schema = ViewSchema::sqlite(
         "CREATE TABLE items(a); CREATE VIEW v AS SELECT a FROM items; CREATE TRIGGER it INSTEAD OF INSERT ON v BEGIN SELECT 1; END;",
@@ -1014,8 +1011,6 @@ CREATE VIEW public.alias_cast AS SELECT x::integer AS x FROM public.items AS i(x
     "ALTER VIEW public.items ALTER COLUMN id SET DEFAULT 2",
     "view_invalid_target"
 )]
-#[ignore = "DROP RULE no longer uses legacy metadata; semantic definition/registration owned by #605"]
-#[case::missing("DROP RULE absent ON public.item_view", "view_missing_object")]
 #[case::default(
     "ALTER VIEW public.item_view ALTER COLUMN absent SET DEFAULT 2",
     "view_unknown_default_column"

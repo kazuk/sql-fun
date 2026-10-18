@@ -4,6 +4,7 @@ mod cte;
 mod group;
 mod join_expr;
 mod join_kind;
+mod merge_record;
 mod projection;
 mod resolved;
 mod rows_fun;
@@ -20,6 +21,7 @@ pub use self::{
     group::GroupedDataSource,
     join_expr::JoinExprDataSource,
     join_kind::JoinKind,
+    merge_record::{MergeRecordDataSource, MergeRecordRole},
     rows_fun::{DataSourceRowFunctions, DataSourceRowsFromFunc},
     sub_query::SubQueryDataSource,
     table::TableDataSource,
@@ -47,6 +49,8 @@ pub enum DataSource {
     View(ViewDataSource),
     /// join expression
     JoinExpr(Box<JoinExprDataSource>),
+    /// A target or source record exposed by a MERGE scope.
+    MergeRecord(Box<MergeRecordDataSource>),
     /// SQLite parenthesized source with a group alias.
     Group(Box<GroupedDataSource>),
     /// sub-query
@@ -105,6 +109,9 @@ impl DataSource {
             }
             // resolve_alias not returns this variants
             Self::JoinExpr(_) => unreachable!(),
+            Self::MergeRecord(record) => {
+                record.create_column_ref(context, with_clause, alias, column, nullability)
+            }
             Self::CallTableFunc(ds) => ColumnReferenceExpr::function_source_ref(
                 context,
                 alias,
@@ -131,6 +138,7 @@ impl DataSource {
             Self::Table(d) => d.push_alias_names(names),
             Self::View(d) => d.push_alias_names(names),
             Self::JoinExpr(d) => d.push_alias_names(names),
+            Self::MergeRecord(d) => d.push_alias_names(names),
             Self::Group(d) => d.push_alias_names(names),
             Self::SubQuery(d) => d.push_alias_names(names),
             Self::CallTableFunc(d) => d.push_alias_names(names),
@@ -157,6 +165,7 @@ impl DataSource {
             Self::Table(d) => d.resolve_alias(self, name),
             Self::View(d) => d.resolve_alias(self, name),
             Self::JoinExpr(d) => d.resolve_alias(name),
+            Self::MergeRecord(d) => d.resolve_alias(self, name),
             Self::Group(d) => d.resolve_alias(self, name),
             Self::SubQuery(d) => d.resolve_alias(self, name),
             Self::CallTableFunc(d) => d.resolve_alias(self, name),
@@ -198,6 +207,9 @@ impl DataSource {
             Self::Table(d) => d.get_aliases_for_column(column, context, &mut result),
             Self::View(d) => d.get_aliases_for_column(column, context, &mut result),
             Self::JoinExpr(d) => {
+                d.get_aliases_for_column(column, context, with_clause, &mut result);
+            }
+            Self::MergeRecord(d) => {
                 d.get_aliases_for_column(column, context, with_clause, &mut result);
             }
             Self::Group(d) => d.get_aliases_for_column(column, context, with_clause, &mut result),
@@ -262,6 +274,7 @@ impl DataSource {
             Self::Table(v) => v.walk(visitor)?,
             Self::View(v) => v.walk(visitor)?,
             Self::JoinExpr(v) => v.walk(visitor)?,
+            Self::MergeRecord(v) => v.walk(visitor)?,
             Self::Group(v) => v.walk(visitor)?,
             Self::SubQuery(v) => v.walk(visitor)?,
             Self::CallTableFunc(value) => value.walk(visitor)?,
@@ -270,5 +283,24 @@ impl DataSource {
             Self::RangeTableSample() | Self::Unknown(_, _) => {}
         }
         Ok(())
+    }
+}
+
+impl DataSource {
+    pub(crate) fn merge_action_available(&self) -> bool {
+        match self {
+            Self::MergeRecord(record) => record.merge_action_available(),
+            _ => false,
+        }
+    }
+
+    pub(crate) fn merge_row_target(
+        &self,
+        alias: &AliasName,
+    ) -> Option<(&AliasName, MergeRecordRole, bool)> {
+        match self {
+            Self::MergeRecord(record) => record.merge_row_target(alias),
+            _ => None,
+        }
     }
 }

@@ -4,7 +4,7 @@ mod query;
 use crate::ast::{
     Access, AlterOwner, AlterSequence, BooleanExpr, BooleanOperator, Call, CallKind, Case, CaseArm,
     Cast, CastTarget, Collate, Comment, Delete, DomainConstraintTarget, DropTable, EnumType, Expr,
-    Extension, FromOpt, Indirection, Insert, Literal, Name, NamedArgument, NullTest,
+    Extension, FromOpt, Indirection, Insert, Literal, Merge, Name, NamedArgument, NullTest,
     ObjectArgument, ObjectTarget, OperatorExpr, OperatorKind, Order, Parameter, Query, Role,
     Sequence, Slice, SqlValue, StatementNode, Subquery, SubqueryKind, SyntaxOption,
     TransformTarget, TruthTest, TryCollectFromWithTokens, TryFromWithTokens, TryFromWithTokensOpt,
@@ -385,6 +385,9 @@ impl TryFromWithTokens<&syn::Node> for StatementNode {
         }
         if let Some(delete) = value.as_delete_stmt().as_inner() {
             return Ok(Self::delete(Delete::try_from_with_tokens(&delete, tokens)?));
+        }
+        if let Some(merge) = value.as_merge_stmt().as_inner() {
+            return Ok(Self::merge(Merge::try_from_with_tokens(&merge, tokens)?));
         }
         if let Some(view) = value.as_view_stmt().as_inner() {
             return Ok(Self::view(View::try_from_with_tokens(&view, tokens)?));

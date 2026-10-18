@@ -31,18 +31,18 @@ pub struct InsertStatement {
 impl InsertStatement {
     pub(crate) fn new(
         target: &TableName,
-        columns: InsertTargetCollection,
-        source: InsertSource,
-        with: Vec<QueryCte>,
-        returning: ResultColumnCollection,
+        columns: &InsertTargetCollection,
+        source: &InsertSource,
+        with: &[QueryCte],
+        returning: &ResultColumnCollection,
     ) -> Self {
         Self {
             target: target.clone(),
             view_support: None,
-            columns,
-            source,
-            with,
-            returning,
+            columns: columns.clone(),
+            source: source.clone(),
+            with: with.to_vec(),
+            returning: returning.clone(),
             conflicts: Vec::new(),
             overriding: None,
             or_conflict: None,
@@ -144,6 +144,15 @@ impl InsertTargetCollection {
     pub(crate) fn as_mut_slice(&mut self) -> &mut [InsertTarget] {
         &mut self.0
     }
+    pub(crate) fn get(&self, index: usize) -> Option<&InsertTarget> {
+        self.0.get(index)
+    }
+    fn walk<V: SemanticVisitor>(&mut self, visitor: &mut V) -> Result<(), AnalysisError> {
+        for target in &mut self.0 {
+            target.destination.walk_assignment_target(visitor)?;
+        }
+        Ok(())
+    }
 }
 
 /// Resolved direct VALUES for one INSERT clause.
@@ -157,8 +166,22 @@ impl InsertValueCollection {
     pub(crate) fn as_slice(&self) -> &[InsertValue] {
         &self.0
     }
-    pub(crate) fn len(&self) -> usize {
+    pub(crate) const fn len(&self) -> usize {
         self.0.len()
+    }
+    fn walk<V: SemanticVisitor>(
+        &mut self,
+        visitor: &mut V,
+        targets: &InsertTargetCollection,
+    ) -> Result<(), AnalysisError> {
+        for (index, value) in self.0.iter_mut().enumerate() {
+            if let Some(target) = targets.get(index) {
+                value.walk(visitor, target)?;
+            } else if let Some(expression) = value.expression_mut() {
+                expression.walk(visitor)?;
+            }
+        }
+        Ok(())
     }
 }
 
@@ -168,6 +191,23 @@ pub(crate) enum InsertClauseValues {
     DefaultValues,
     Values(InsertValueCollection),
 }
+impl InsertClauseValues {
+    pub(crate) fn from_values(values: Option<InsertValueCollection>) -> Self {
+        values.map_or(Self::DefaultValues, Self::Values)
+    }
+    pub(crate) const fn values(&self) -> Option<&InsertValueCollection> {
+        match self {
+            Self::DefaultValues => None,
+            Self::Values(values) => Some(values),
+        }
+    }
+    pub(crate) const fn values_mut(&mut self) -> Option<&mut InsertValueCollection> {
+        match self {
+            Self::DefaultValues => None,
+            Self::Values(values) => Some(values),
+        }
+    }
+}
 
 /// Reusable resolved target and values pair for INSERT-like clauses.
 #[derive(Debug, Clone, Eq, Hash, PartialEq, serde::Serialize, serde::Deserialize)]
@@ -176,11 +216,11 @@ pub(crate) struct InsertClauseSemantics {
     values: InsertClauseValues,
 }
 impl InsertClauseSemantics {
-    pub(crate) const fn new(
-        targets: InsertTargetCollection,
-        values: InsertClauseValues,
-    ) -> Self {
-        Self { targets, values }
+    pub(crate) fn new(targets: &InsertTargetCollection, values: &InsertClauseValues) -> Self {
+        Self {
+            targets: targets.clone(),
+            values: values.clone(),
+        }
     }
     pub(crate) const fn targets(&self) -> &InsertTargetCollection {
         &self.targets
@@ -198,17 +238,9 @@ impl InsertClauseSemantics {
         &mut self,
         visitor: &mut V,
     ) -> Result<(), AnalysisError> {
-        for target in self.targets.as_mut_slice() {
-            target.destination.walk_assignment_target(visitor)?;
-        }
-        if let InsertClauseValues::Values(values) = &mut self.values {
-            for (index, value) in values.0.iter_mut().enumerate() {
-                if let Some(target) = self.targets.as_slice().get(index) {
-                    value.walk(visitor, target)?;
-                } else if let Some(expression) = value.expression_mut() {
-                    expression.walk(visitor)?;
-                }
-            }
+        self.targets.walk(visitor)?;
+        if let Some(values) = self.values.values_mut() {
+            values.walk(visitor, &self.targets)?;
         }
         Ok(())
     }
@@ -254,7 +286,7 @@ impl InsertSource {
     pub(crate) const fn default_values() -> Self {
         Self::DefaultValues
     }
-    pub(crate) fn empty_values() -> Self {
+    pub(crate) const fn empty_values() -> Self {
         Self::Values(Vec::new())
     }
     pub(crate) fn push_values(&mut self, values: &InsertValueCollection) {

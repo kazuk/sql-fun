@@ -1,4 +1,4 @@
-use crate::ast::{Alias, Assignment, Dialect, Expr, FromItem, Name, Target, Update};
+use crate::ast::{Alias, Assignment, Dialect, Expr, FromItem, Name, Update};
 use crate::sem::UpdateDestination;
 use crate::sem::problem::UpdateProblemKind;
 use crate::sem::{
@@ -26,7 +26,7 @@ impl Update {
         });
         context.finish_analysis(result)
     }
-    pub(super) fn resolve_in(
+    pub(in crate::ast) fn resolve_in(
         &self,
         context: &mut impl ParseContext,
         outer: Option<&ScalarAnalysisContext<'_>>,
@@ -43,12 +43,20 @@ impl Update {
             .unwrap_or_else(|| AliasSpec::from_local_name(&requested.full_name().local_name()));
         let from = self.resolve_sources(context, &table, &alias, &with)?;
         let scope = ScalarAnalysisContext::nested(&with, &from, None);
+        let mut target_from = FromClause::default();
+        target_from.push(DataSource::resolve_relation(
+            context,
+            table.name().full_name(),
+            &alias,
+            &WithClause::default(),
+        )?);
+        let target_scope = ScalarAnalysisContext::nested(&with, &target_from, None);
         let assignments = UpdateAssignmentCollection::resolve(
             context,
             &self.assignments,
             &table,
             &alias,
-            &with,
+            &target_scope,
             &scope,
         )?;
         let predicate = self.resolve_predicate(context, table.name(), &scope)?;
@@ -193,62 +201,35 @@ impl Update {
         with: &WithClause,
         from: &FromClause,
     ) -> Result<ResultColumnCollection, AnalysisError> {
-        let mut returning_from = FromClause::default();
-        let returning = if context.dialect() == Dialect::sqlite() {
+        if context.dialect() == Dialect::sqlite() {
             let returning_alias = AliasSpec::from_local_name(&requested.full_name().local_name());
+            let mut returning_from = FromClause::default();
             returning_from.push(DataSource::resolve_relation(
                 context,
                 table.name().full_name(),
                 &returning_alias,
                 &WithClause::default(),
             )?);
-            self.resolve_returning(context, with, &returning_from, Some(&returning_alias))?
+            let scope = ScalarAnalysisContext::nested(with, &returning_from, None);
+            ResultColumnCollection::resolve_for_update(
+                &self.returning,
+                context,
+                with,
+                &returning_from,
+                &scope,
+                &returning_alias,
+            )
         } else {
-            self.resolve_returning(context, with, from, Some(alias))?
-        };
-        Ok(returning)
-    }
-    fn resolve_returning(
-        &self,
-        context: &mut impl ParseContext,
-        with: &WithClause,
-        from: &FromClause,
-        target: Option<&AliasSpec>,
-    ) -> Result<ResultColumnCollection, AnalysisError> {
-        let scope = ScalarAnalysisContext::nested(with, from, None);
-        let mut results = ResultColumnCollection::default();
-        for Target { expression, alias } in &self.returning {
-            if let Expr::Star(name) = expression {
-                if context.dialect() == Dialect::sqlite() && !name.0.is_empty() {
-                    context.report_analysis_problem(AnalysisProblem::update(
-                        UpdateProblemKind::returning_qualifier(),
-                        "SQLite RETURNING does not permit qualified stars",
-                    ))?;
-                }
-                // Unqualified RETURNING * expands only the modified relation.
-                let qualifier = if name.0.is_empty() {
-                    target.map(|a| a.name().clone())
-                } else {
-                    name.star_qualifier()?
-                };
-                let columns = from.projection_names(context, with, qualifier.as_ref())?;
-                if columns.is_empty() {
-                    context.report_analysis_problem(AnalysisProblem::update(
-                        UpdateProblemKind::returning_qualifier(),
-                        "RETURNING star source is not visible",
-                    ))?;
-                }
-                for (source, column) in columns {
-                    let value = scope.resolve_column(context, Some(&source), &column)?.0;
-                    results.push_expression(&column, value);
-                }
-            } else {
-                let value = expression.resolve_in(context, &scope)?;
-                let name = alias.clone().unwrap_or_else(|| value.get_column_name());
-                results.push_expression(&ColumnName::from(name.as_str()), value);
-            }
+            let scope = ScalarAnalysisContext::nested(with, from, None);
+            ResultColumnCollection::resolve_for_update(
+                &self.returning,
+                context,
+                with,
+                from,
+                &scope,
+                alias,
+            )
         }
-        Ok(results)
     }
 }
 
@@ -258,17 +239,9 @@ impl UpdateAssignmentCollection {
         assignments: &[Assignment],
         table: &UpdateDestination,
         alias: &AliasSpec,
-        with: &WithClause,
+        target_scope: &ScalarAnalysisContext<'_>,
         rhs_scope: &ScalarAnalysisContext<'_>,
     ) -> Result<Self, AnalysisError> {
-        let mut target_from = FromClause::default();
-        target_from.push(DataSource::resolve_relation(
-            context,
-            table.name().full_name(),
-            alias,
-            &WithClause::default(),
-        )?);
-        let target_scope = ScalarAnalysisContext::nested(with, &target_from, None);
         let mut resolved = Self::default();
         let mut seen: Vec<&Assignment> = Vec::new();
         for assignment in assignments {
@@ -299,7 +272,7 @@ impl UpdateAssignmentCollection {
             }
             let mut destination =
                 Name::from_parts(&[alias.name().as_str().to_owned(), assignment.name.clone()])
-                    .resolve_column(context, &target_scope)?;
+                    .resolve_column(context, target_scope)?;
             for access in &assignment.indirection {
                 destination = access.resolve(context, rhs_scope, destination)?;
             }

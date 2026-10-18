@@ -1,5 +1,6 @@
 use crate::sem::{
-    AnalysisError, ColumnDefinition, ColumnName, ParseContext, TableName, ViewUpdateSupport,
+    AnalysisError, ColumnDefinition, ColumnName, ParseContext, TableName, ViewLike,
+    ViewMergeSupport, ViewUpdateSupport,
 };
 
 /// UPDATE-owned projection of existing relation definitions.
@@ -7,6 +8,7 @@ pub(crate) struct UpdateDestination {
     name: TableName,
     columns: Vec<ColumnDefinition>,
     view_support: Option<ViewUpdateSupport>,
+    merge_view_support: Option<ViewMergeSupport>,
 }
 impl UpdateDestination {
     pub(crate) fn resolve(
@@ -23,6 +25,7 @@ impl UpdateDestination {
                     name: TableName::from(key.clone()),
                     columns,
                     view_support: None,
+                    merge_view_support: None,
                 }));
             }
             context.get_view_impl(key).map(|view| {
@@ -50,10 +53,41 @@ impl UpdateDestination {
                     name: TableName::from(key.clone()),
                     columns,
                     view_support: Some(support),
+                    merge_view_support: None,
                 })
             })
         })
         .transpose()
+    }
+
+    pub(crate) fn for_merge_view(
+        name: &TableName,
+        view: &ViewLike,
+        support: &ViewMergeSupport,
+    ) -> Result<Self, AnalysisError> {
+        let columns = if view.is_materialized() {
+            Vec::new()
+        } else {
+            view.result_columns().column_definitions()?
+        };
+        let columns = columns
+            .into_iter()
+            .map(|column| {
+                if let Some(name) = column.name()
+                    && let Some(definition) = support.update_column_definition(name)
+                {
+                    definition.clone()
+                } else {
+                    column
+                }
+            })
+            .collect();
+        Ok(Self {
+            name: name.clone(),
+            columns,
+            view_support: None,
+            merge_view_support: Some(support.clone()),
+        })
     }
     pub(crate) const fn name(&self) -> &TableName {
         &self.name
@@ -67,13 +101,21 @@ impl UpdateDestination {
         self.view_support.as_ref()
     }
     pub(crate) fn is_writable(&self) -> bool {
-        self.view_support
-            .as_ref()
-            .is_none_or(ViewUpdateSupport::is_writable)
+        if let Some(support) = &self.merge_view_support {
+            support.supports_update()
+        } else {
+            self.view_support
+                .as_ref()
+                .is_none_or(ViewUpdateSupport::is_writable)
+        }
     }
     pub(crate) fn can_assign(&self, column: &ColumnName) -> bool {
-        self.view_support
-            .as_ref()
-            .is_none_or(|support| support.can_assign(column))
+        if let Some(support) = &self.merge_view_support {
+            support.update_column_definition(column).is_some()
+        } else {
+            self.view_support
+                .as_ref()
+                .is_none_or(|support| support.can_assign(column))
+        }
     }
 }

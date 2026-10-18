@@ -36,11 +36,11 @@ use self::document::{
     JsonBehavior, JsonBehaviorType, JsonColumn, JsonEncoding, JsonExprOp, JsonFormat,
     JsonFormatType, JsonFunction, JsonKeyValue, JsonObject, JsonObjectAggregate, JsonOutput,
     JsonParse, JsonPath, JsonPredicate, JsonQuotes, JsonReturning, JsonScalar, JsonSerialize,
-    JsonTableColumnType, JsonValue, JsonValueType, JsonWrapper, Merge, MergeMatchKind, MergeWhen,
+    JsonTableColumnType, JsonValue, JsonValueType, JsonWrapper, MergeMatchKind, MergeWhen,
     MultiAssignment, OverridingKind, Xml, XmlColumn, XmlExprOp, XmlOptionType, XmlSerialize,
 };
 
-pub(crate) use self::document::{JsonTable, XmlTable};
+pub(crate) use self::document::{JsonTable, Merge, XmlTable};
 
 pub(crate) use self::ddl::{
     CompositeType, Domain, Function, FunctionParameter, Index, Schema, TableAs,
@@ -216,6 +216,7 @@ pub(crate) enum StatementNode {
     Insert(Insert),
     Update(Update),
     Delete(Delete),
+    Merge(Merge),
     View(View),
     Extension(Extension),
     VariableSet(VariableSet),
@@ -250,6 +251,10 @@ impl StatementNode {
 
     const fn delete(value: Delete) -> Self {
         Self::Delete(value)
+    }
+
+    const fn merge(value: Merge) -> Self {
+        Self::Merge(value)
     }
 
     const fn view(value: View) -> Self {
@@ -334,6 +339,9 @@ impl StatementNode {
             Self::Delete(delete) => delete
                 .resolve(context)
                 .map(|delete| crate::sem::SemAst::delete(&delete)),
+            Self::Merge(merge) => merge
+                .resolve(context)
+                .map(|merge| crate::sem::SemAst::merge(&merge)),
             Self::View(_) => crate::sem::AnalysisError::raise_unexpected_input(
                 "view requires catalog application",
             ),

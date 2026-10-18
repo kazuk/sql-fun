@@ -1,8 +1,8 @@
 use crate::{
     ast::TryFromWithTokens,
     sem::{
-        AnalysisError, DeleteStatement, InsertStatement, ParseContext, SelectStatement,
-        UpdateStatement,
+        AnalysisError, DeleteStatement, InsertStatement, MergeStatement, ParseContext,
+        SelectStatement, UpdateStatement,
         create_table::{ColumnDefinition, ColumnName},
     },
     syn::ScanToken,
@@ -26,6 +26,8 @@ pub enum CteStatement {
     Update(Box<UpdateStatement>),
     /// `DELETE` statement
     Delete(Box<DeleteStatement>),
+    /// `MERGE` statement
+    Merge(Box<MergeStatement>),
 }
 
 impl CteStatement {
@@ -72,6 +74,7 @@ impl CteStatement {
             Self::Insert(insert) => Some(insert.result_columns()),
             Self::Update(update) => Some(update.result_columns()),
             Self::Delete(delete) => Some(delete.result_columns()),
+            Self::Merge(merge) => Some(merge.result_columns()),
         }
     }
     pub(crate) fn is_unreadable_delete(&self) -> bool {
@@ -92,6 +95,13 @@ impl CteStatement {
                 "INSERT CTE requires RETURNING to be read",
             ));
         }
+        if let Self::Merge(merge) = self
+            && merge.result_columns().is_empty()
+        {
+            return Err(AnalysisError::unexpected_input_error(
+                "MERGE CTE requires RETURNING to be read",
+            ));
+        }
         Ok(())
     }
 
@@ -102,6 +112,7 @@ impl CteStatement {
             Self::Insert(insert) => insert.result_columns().has_column(column),
             Self::Update(update) => update.result_columns().has_column(column),
             Self::Delete(delete) => delete.result_columns().has_column(column),
+            Self::Merge(merge) => merge.result_columns().has_column(column),
         }
     }
 
@@ -113,6 +124,10 @@ impl CteStatement {
     }
     pub(crate) fn from_insert(insert: InsertStatement) -> Self {
         Self::Insert(Box::new(insert))
+    }
+
+    pub(crate) fn from_merge(merge: MergeStatement) -> Self {
+        Self::Merge(Box::new(merge))
     }
 
     pub(crate) fn from_query(query: SelectStatement) -> Self {
@@ -146,6 +161,15 @@ impl CteStatement {
             }
             Self::Update(update) => {
                 let columns = update.result_columns();
+                let result = if let Some(index) = index {
+                    columns.get_column_at(index)
+                } else {
+                    columns.get_column_with_skip_count(column, skip)
+                };
+                result.map(|column| column.create_column_definition())
+            }
+            Self::Merge(merge) => {
+                let columns = merge.result_columns();
                 let result = if let Some(index) = index {
                     columns.get_column_at(index)
                 } else {
@@ -219,6 +243,7 @@ impl CteStatement {
             Self::Insert(insert) => insert.walk(visitor)?,
             Self::Update(update) => update.walk(visitor)?,
             Self::Delete(delete) => delete.walk(visitor)?,
+            Self::Merge(merge) => merge.walk(visitor)?,
         }
         Ok(())
     }

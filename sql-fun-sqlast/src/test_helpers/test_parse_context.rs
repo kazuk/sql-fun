@@ -41,6 +41,7 @@ pub struct TestParseContext {
     view_delete_support: HashMap<FullName, crate::sem::ViewDeleteSupport>,
     view_update_support: HashMap<FullName, crate::sem::ViewUpdateSupport>,
     view_insert_support: HashMap<FullName, crate::sem::ViewInsertSupport>,
+    view_merge_support: HashMap<FullName, crate::sem::ViewMergeSupport>,
     function_definitions: HashMap<FullName, FunctionOverloadCollection>,
     alter_tables: Vec<AlterTable>,
     drop_tables: Vec<DropTable>,
@@ -606,6 +607,16 @@ impl crate::sem::ViewDeleteInfoRead for TestParseContext {
             .clone()
     }
 }
+
+impl crate::sem::ViewMergeInfoRead for TestParseContext {
+    fn view_merge_support(&self, view: &FullName) -> crate::sem::ViewMergeSupport {
+        self.view_merge_support
+            .get(view)
+            .expect("explicit view MERGE capability fixture")
+            .clone()
+    }
+}
+
 impl TestParseContext {
     pub(crate) fn set_view_delete_support(
         &mut self,
@@ -613,6 +624,15 @@ impl TestParseContext {
         support: &crate::sem::ViewDeleteSupport,
     ) {
         self.view_delete_support
+            .insert(name.clone(), support.clone());
+    }
+
+    pub(crate) fn set_view_merge_support(
+        &mut self,
+        name: &FullName,
+        support: &crate::sem::ViewMergeSupport,
+    ) {
+        self.view_merge_support
             .insert(name.clone(), support.clone());
     }
 }

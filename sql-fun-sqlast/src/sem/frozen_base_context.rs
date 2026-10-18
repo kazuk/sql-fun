@@ -310,6 +310,15 @@ macro_rules! forward_catalog_reads {
             }
         }
 
+        impl crate::sem::ViewMergeInfoRead for $context {
+            fn view_merge_support(
+                &self,
+                name: &crate::sem::FullName,
+            ) -> crate::sem::ViewMergeSupport {
+                crate::sem::ViewMergeInfoRead::view_merge_support(self.$catalog(), name)
+            }
+        }
+
         impl crate::sem::ViewInfoRead for $context {
             fn get_view_impl(&self, name: &crate::sem::FullName) -> Option<&crate::sem::ViewLike> {
                 crate::sem::ViewInfoRead::get_view_impl(self.$catalog(), name)

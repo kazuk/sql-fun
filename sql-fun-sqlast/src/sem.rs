@@ -29,6 +29,7 @@ mod error;
 mod from_clause;
 mod frozen_base_context;
 mod insert_statement;
+mod merge_statement;
 mod names;
 mod operators;
 mod parameter_constraints;
@@ -45,16 +46,25 @@ mod stack;
 mod top_level_statement;
 pub(crate) mod traversal;
 
-pub(crate) use self::update_statement::UpdateAssignmentCollection;
-pub(crate) use self::insert_statement::{InsertClauseSemantics, InsertClauseValues, InsertTargetCollection, InsertValueCollection};
-#[cfg(test)]
-pub(crate) use self::parse_context::conflict_info::infer_from_catalog;
 mod type_system;
 mod update_statement;
 mod variable_set;
 mod view_like;
 
+pub(crate) use self::insert_statement::{
+    InsertClauseSemantics, InsertClauseValues, InsertTargetCollection, InsertValueCollection,
+};
+#[cfg(test)]
+pub(crate) use self::parse_context::conflict_info::infer_from_catalog;
+pub(crate) use self::update_statement::UpdateAssignmentCollection;
+
 pub(crate) use self::insert_statement::InsertDestination;
+pub(crate) use self::merge_statement::MergeDestination;
+pub(crate) use self::merge_statement::MergeWhenCollection;
+pub use self::merge_statement::{
+    MergeAction, MergeInsert, MergeMatchKind, MergeStatement, MergeUpdate, MergeWhen,
+    ViewMergeInfoRead, ViewMergeSupport, ViewMergeTriggers, analyze_merge_statement,
+};
 
 pub(crate) use self::conflict_masters::ConflictMasters;
 
@@ -98,7 +108,8 @@ pub use self::{
     create_view::CreateView,
     cte::{CteName, CteStatement, WithClause},
     data_source::{
-        AliasSpec, DataSource, DataSourceRowFunctions, DataSourceRowsFromFunc, JoinKind, Nullable,
+        AliasSpec, DataSource, DataSourceRowFunctions, DataSourceRowsFromFunc, JoinKind,
+        MergeRecordDataSource, MergeRecordRole, Nullable,
     },
     def_elem::{DefElemKey, DefElemList, analyze_def_elem_list},
     delete_statement::{
@@ -133,9 +144,9 @@ pub use self::{
     scalar_expr::{
         ArithExpr, ArrayExpr, BooleanExpr, CaseExpr, CoalesceExpr, CollateExpr,
         ColumnReferenceExpr, ConstrainedExpr, CteColumnRef, FuncCallExpr, FunctionBinding,
-        ImplicitCastExpr, IndirectionExpr, MinMaxExpr, NamedArgExpr, NullTestExpr, OutputColumnRef,
-        ParamRef, ScalarAnalysisContext, ScalarConstExpr, SemScalarExpr, SqlValueExpr, SubLinkExpr,
-        SubQueryColumnRef, TableColumnRef, TypeCastExpr,
+        ImplicitCastExpr, IndirectionExpr, MergeRecordColumnRef, MinMaxExpr, NamedArgExpr,
+        NullTestExpr, OutputColumnRef, ParamRef, ScalarAnalysisContext, ScalarConstExpr,
+        SemScalarExpr, SqlValueExpr, SubLinkExpr, SubQueryColumnRef, TableColumnRef, TypeCastExpr,
     },
     schema_file_context::SchemaFileContext,
     select_statement::{ResultColumnCollection, SelectStatement},
@@ -324,6 +335,9 @@ pub enum SemAst {
     /// `delete` statement
     DeleteStatement(DeleteStatement),
 
+    /// `merge` statement
+    MergeStatement(MergeStatement),
+
     /// `create extension` statement
     CreateExtension(CreateExtension),
 
@@ -383,6 +397,16 @@ impl SemAst {
         }
     }
 
+    pub(crate) fn merge(merge: &MergeStatement) -> Self {
+        Self::MergeStatement(merge.clone())
+    }
+    /// Inspect an analyzed MERGE.
+    pub const fn as_merge(&self) -> Option<&MergeStatement> {
+        match self {
+            Self::MergeStatement(merge) => Some(merge),
+            _ => None,
+        }
+    }
     pub(crate) fn delete(delete: &DeleteStatement) -> Self {
         Self::DeleteStatement(delete.clone())
     }

@@ -307,6 +307,9 @@ impl RetainSqliteTypes for StatementNode {
             Self::Insert(value) => value.retain_types(retainer),
             Self::Update(value) => value.retain_types(retainer),
             Self::Delete(value) => value.retain_types(retainer),
+            Self::Merge(_) => Err(AnalysisError::unexpected_input_error(
+                "non-SQLite statement in SQLite type retention",
+            )),
             Self::View(value) => value.retain_types(retainer),
             Self::Table(value) => value.retain_types(retainer),
             Self::AlterRelation(value) => value.retain_types(retainer),

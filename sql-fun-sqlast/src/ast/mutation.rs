@@ -269,6 +269,7 @@ impl StatementNode {
             Self::Insert(node) => Ok(CteBody::insert(node.clone())),
             Self::Update(node) => Ok(CteBody::update(node.clone())),
             Self::Delete(node) => Ok(CteBody::delete(node.clone())),
+            Self::Merge(node) => Ok(CteBody::merge(node.clone())),
             _ => Err(MutationProblem::invalid_body(dialect)),
         }
     }
@@ -279,6 +280,7 @@ impl StatementNode {
             Self::Insert(node) => Some(&mut node.with),
             Self::Update(node) => Some(&mut node.with),
             Self::Delete(node) => Some(&mut node.with),
+            Self::Merge(node) => Some(node.with_node_mut()),
             _ => None,
         }
     }

@@ -30,7 +30,8 @@ pub use self::{
     coalesce::CoalesceExpr,
     collate::CollateExpr,
     column_ref::{
-        ColumnReferenceExpr, CteColumnRef, OutputColumnRef, SubQueryColumnRef, TableColumnRef,
+        ColumnReferenceExpr, CteColumnRef, MergeRecordColumnRef, OutputColumnRef,
+        SubQueryColumnRef, TableColumnRef,
     },
     const_expr::ScalarConstExpr,
     constrained::ConstrainedExpr,
@@ -124,16 +125,42 @@ pub enum SemScalarExpr {
     /// expression list
     List(ListExpr),
 
+    /// The action performed by the enclosing PostgreSQL MERGE.
+    MergeAction,
+
     /// Unexpected syntax node in expression
     Unexpected(String),
 }
 
 impl SemScalarExpr {
+    /// MERGE record binding, when this is a direct column reference.
+    pub const fn merge_record_reference(&self) -> Option<&self::column_ref::MergeRecordColumnRef> {
+        match self {
+            Self::ColumnRef(reference) => reference.merge_record_reference(),
+            _ => None,
+        }
+    }
+
+    pub(crate) const fn merge_action() -> Self {
+        Self::MergeAction
+    }
     /// PostgreSQL DELETE RETURNING row-image binding, when this is a direct column.
     pub const fn delete_row_reference(&self) -> Option<&crate::sem::DeleteRowColumn> {
         match self {
             Self::ColumnRef(reference) => reference.delete_row_reference(),
             _ => None,
+        }
+    }
+    pub(crate) fn merge_record_column(
+        self,
+        role: crate::sem::MergeRecordRole,
+        nullable: bool,
+    ) -> Self {
+        match self {
+            Self::ColumnRef(reference) => Self::column_reference(
+                ColumnReferenceExpr::merge_record(role, &reference, nullable),
+            ),
+            _ => unreachable!("MERGE record lookup must produce a column reference"),
         }
     }
     pub(crate) fn delete_row_column(self, version: crate::sem::DeleteRowVersion) -> Self {
@@ -275,6 +302,7 @@ impl SemScalarExpr {
             Self::Indirection(ind) => ind.get_type(),
             Self::ImplicitCast(ice) => ice.get_type(),
             Self::Array(arr) => arr.get_type(),
+            Self::MergeAction => Some(PgBuiltInType::text()),
             Self::Unexpected(_node) => None,
             Self::ColumnRef(cr) => cr.get_type(),
             Self::List(_list) => todo!(),
@@ -303,6 +331,7 @@ impl SemScalarExpr {
             Self::Indirection(ind) => ind.is_not_null(),
             Self::ImplicitCast(ice) => ice.is_not_null(),
             Self::Array(arr) => arr.is_not_null(),
+            Self::MergeAction => Some(true),
             Self::Unexpected(_node) => None,
             Self::ColumnRef(cr) => cr.is_not_null(),
             Self::List(_list) => todo!(),
@@ -333,7 +362,11 @@ impl SemScalarExpr {
     pub fn get_column_def(&self) -> Option<ColumnDefinition> {
         match self {
             Self::ColumnRef(c) => c.get_column_def().clone(),
-            Self::TypeCast(_) | Self::FuncCall(_) | Self::Param(_) | Self::Constrained(_) => None,
+            Self::TypeCast(_)
+            | Self::FuncCall(_)
+            | Self::Param(_)
+            | Self::Constrained(_)
+            | Self::MergeAction => None,
             _ => todo!("not implemented {self:?}"),
         }
     }
@@ -361,6 +394,7 @@ impl SemScalarExpr {
             Self::Indirection(_indirection_expr) => String::new(),
             Self::ImplicitCast(_implicit_cast_expr) => todo!(),
             Self::Array(_arr) => todo!(),
+            Self::MergeAction => "merge_action".to_owned(),
             Self::Unexpected(_node) => todo!(),
             Self::List(_list) => todo!(),
         }
@@ -693,6 +727,7 @@ impl SemScalarExpr {
             | Self::SqlValue(_)
             | Self::Param(_)
             | Self::NamedArg(_)
+            | Self::MergeAction
             | Self::Unexpected(_) => {}
         }
         visitor.expression(self)

@@ -62,6 +62,11 @@ impl Statement {
         self.node.is_delete()
     }
 
+    /// Whether this is a MERGE statement.
+    pub const fn is_merge(&self) -> bool {
+        self.node.is_merge()
+    }
+
     /// Analyze this common statement directly using the supplied context.
     ///
     /// No SQL reparsing or catalog-file discovery occurs. This uses the same
@@ -135,7 +140,7 @@ pub enum StatementKind {
     Update,
     /// DELETE.
     Delete,
-    /// MERGE as a CTE body.
+    /// MERGE.
     Merge,
     /// A view definition.
     View,
@@ -292,6 +297,7 @@ impl StatementNode {
             Self::Insert(_) => StatementKind::insert(),
             Self::Update(_) => StatementKind::update(),
             Self::Delete(_) => StatementKind::delete(),
+            Self::Merge(_) => StatementKind::merge(),
             Self::View(_) => StatementKind::view(),
             Self::Extension(_) => StatementKind::extension(),
             Self::VariableSet(_) => StatementKind::variable_set(),
@@ -328,12 +334,17 @@ impl StatementNode {
         matches!(self, Self::Insert(_))
     }
 
+    const fn is_merge(&self) -> bool {
+        matches!(self, Self::Merge(_))
+    }
+
     pub(super) const fn with_node(&self) -> Option<&With> {
         match self {
             Self::Query(node) => Some(&node.with),
             Self::Insert(node) => Some(&node.with),
             Self::Update(node) => Some(&node.with),
             Self::Delete(node) => Some(&node.with),
+            Self::Merge(node) => Some(node.with_node()),
             _ => None,
         }
     }

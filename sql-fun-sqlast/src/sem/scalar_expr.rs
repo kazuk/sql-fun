@@ -143,13 +143,9 @@ impl SemScalarExpr {
             Self::Grouping(value) => value.is_valid(),
             Self::FuncCall(value) => value.name_resolution().is_resolved(),
             Self::TypeCast(value) => value.resolution().is_resolved(),
-            Self::Arith(value) => {
-                if let Some(binding) = value.binding() {
-                    binding.resolution().is_resolved()
-                } else {
-                    true
-                }
-            }
+            Self::Arith(value) => value
+                .binding()
+                .is_none_or(|binding| binding.resolution().is_resolved()),
             Self::Unexpected(_) => false,
             _ => true,
         }

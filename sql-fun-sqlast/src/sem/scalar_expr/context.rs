@@ -50,6 +50,19 @@ impl<'a> ScalarAnalysisContext<'a> {
         scope
     }
 
+    /// Replace visible sources without introducing another SQL query level.
+    pub(crate) fn with_from_clause(&self, from: &FromClause) -> Self {
+        let mut scope = self.clone_scope();
+        scope.from_clause = Cow::Owned(from.clone());
+        scope
+    }
+
+    pub(crate) fn with_added_source(&self, source: &crate::sem::DataSource) -> Self {
+        let mut scope = self.clone_scope();
+        scope.from_clause.to_mut().push(source.clone());
+        scope
+    }
+
     fn clone_scope(&self) -> Self {
         Self {
             windows: self.windows.clone(),

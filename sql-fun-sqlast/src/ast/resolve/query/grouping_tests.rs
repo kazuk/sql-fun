@@ -194,6 +194,63 @@ fn binds_the_owning_query(#[case] sql: &str, #[case] levels_up: usize) {
     }
 }
 
+#[rstest::rstest]
+#[case::correlated_from(
+    "SELECT * FROM (VALUES (1)) s(a), LATERAL (SELECT GROUPING(s.a) GROUP BY s.a) x",
+    false,
+    1
+)]
+#[case::correlated_join(
+    "SELECT * FROM (VALUES (1)) s(a) JOIN LATERAL (SELECT GROUPING(s.a) GROUP BY s.a) x ON true",
+    false,
+    1
+)]
+#[case::local(
+    "SELECT * FROM (VALUES (1)) s(a), LATERAL (SELECT GROUPING(t.a) FROM (VALUES(2)) t(a) GROUP BY t.a) x",
+    true,
+    0
+)]
+#[case::mixed(
+    "SELECT * FROM (VALUES (1)) s(a), LATERAL (SELECT GROUPING(t.a+s.a) FROM (VALUES(2)) t(a) GROUP BY t.a+s.a) x",
+    true,
+    0
+)]
+fn binds_grouping_in_lateral_sources(
+    #[case] sql: &str,
+    #[case] valid: bool,
+    #[case] levels_up: usize,
+    #[values(false, true)] infer: bool,
+) {
+    let (query, context) = resolve(sql, Dialect::postgres(), infer).unwrap();
+    let groupings = groupings(&query);
+    assert!(!groupings.is_empty());
+    for grouping in groupings {
+        assert_eq!(grouping.is_valid(), valid, "{sql}: {grouping:?}");
+        assert_eq!(grouping.levels_up(), levels_up, "{sql}: {grouping:?}");
+        assert_eq!(
+            grouping.arguments()[0].key_index(),
+            if valid { Some(0) } else { None }
+        );
+    }
+    if valid {
+        assert_eq!(
+            context.reported_problem_count(),
+            0,
+            "{sql}: {:?}",
+            context.reported_problems()
+        );
+    } else {
+        assert!(
+            context
+                .reported_problems()
+                .iter()
+                .any(|problem| problem.code() == "query_invalid_grouping_placement"),
+            "{sql}: {:?}",
+            context.reported_problems()
+        );
+    }
+}
+
 #[test]
 fn retains_type_nullability_and_parameter_operands() {
     let (query, context) = resolve(

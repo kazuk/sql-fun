@@ -1,6 +1,6 @@
 use crate::ast::{DropBehavior, DropRule};
 use crate::sem::problem::RuleProblem;
-use crate::sem::{self, AnalysisError, FullName, ParseContext, RuleIdentity, SemAst};
+use crate::sem::{self, AnalysisError, FullName, ParseContext, RuleIdentity, SemAst, ViewName};
 
 impl DropRule {
     pub(crate) fn resolve(
@@ -19,7 +19,10 @@ impl DropRule {
     ) -> Result<sem::DropRule, AnalysisError> {
         let requested = self.name.full_name()?;
         let requested_target = self.relation.full_name()?;
-        let cascade = matches!(self.behavior, DropBehavior::Cascade);
+        let behavior = match self.behavior {
+            DropBehavior::Cascade => sem::DropDependencyBehavior::cascade(),
+            DropBehavior::Restrict => sem::DropDependencyBehavior::restrict(),
+        };
         let Some(target) = context.resolve_relation_name(&requested_target) else {
             if self.if_exists {
                 return Ok(sem::DropRule::new(
@@ -28,12 +31,12 @@ impl DropRule {
                     None,
                     false,
                     true,
-                    cascade,
+                    behavior,
                 ));
             }
             return Err(AnalysisError::rule(&RuleProblem::target(&requested_target)));
         };
-        self.resolve_on(context, &requested, &requested_target, &target, cascade)
+        self.resolve_on(context, &requested, &requested_target, &target, behavior)
     }
     fn resolve_on(
         &self,
@@ -41,11 +44,15 @@ impl DropRule {
         requested: &FullName,
         requested_target: &FullName,
         target: &FullName,
-        cascade: bool,
+        behavior: sem::DropDependencyBehavior,
     ) -> Result<sem::DropRule, AnalysisError> {
         let identity = RuleIdentity::new(target, requested.name().as_str());
         let found = context.rule(&identity).is_some();
-        if identity.name().name().as_str() == "_RETURN" && context.get_view_impl(target).is_some() {
+        if identity.name().name().as_str() == "_RETURN"
+            && context
+                .get_view(&ViewName::from_full_name(target))
+                .is_some()
+        {
             return Err(AnalysisError::rule(&RuleProblem::definition(
                 &identity,
                 "the View requires its SELECT rule; drop the View instead",
@@ -60,7 +67,7 @@ impl DropRule {
             Some(&identity),
             found,
             self.if_exists,
-            cascade,
+            behavior,
         ))
     }
     pub(crate) fn resolve_and_apply<C: ParseContext>(

@@ -58,14 +58,9 @@ impl DataSource {
         } else {
             name
         };
-        let resolved = crate::sem::search_path::expand_search_path_inst(context, name, |key| {
-            if context.get_table_impl(key).is_some() {
-                Some((key.clone(), true))
-            } else if context.get_view_impl(key).is_some() {
-                Some((key.clone(), false))
-            } else {
-                None
-            }
+        let resolved = context.resolve_relation_name(name).map(|key| {
+            let table = context.get_table(&TableName::from(key.clone())).is_some();
+            (key, table)
         });
         match resolved {
             Some((name, true)) => Ok(TableDataSource::new_data_source(

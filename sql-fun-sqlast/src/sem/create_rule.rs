@@ -245,7 +245,8 @@ impl CreateRule {
         // DDL chooses both operations; storage does not interpret rule semantics.
         let context = context.associate_rule(self.identity.target(), &self.identity)?;
         let context = if self.event == RuleEvent::select() {
-            let Some(view) = context.get_view_impl(self.target()) else {
+            let Some(view) = context.get_view(&crate::sem::ViewName::from_full_name(self.target()))
+            else {
                 return Err(AnalysisError::rule(
                     &crate::sem::problem::RuleProblem::target(self.target()),
                 ));

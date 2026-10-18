@@ -286,11 +286,11 @@ impl InsertTargetCollection {
                 columns.truncate(width);
             }
             if context.dialect() == Dialect::postgres()
-                && self.source.is_some()
+                && mode.source_is_present
                 && let Some(support) = table.view_support()
             {
                 let mut seen = Vec::new();
-                for target in &columns {
+                for target in columns.as_slice() {
                     let name = target.column().name().as_ref().expect("named destination");
                     let key = support.assignment_column(name);
                     if seen.contains(&key) {
@@ -549,14 +549,6 @@ impl Assignment {
         let same = map(&ColumnName::from(self.name.as_str()))
             == map(&ColumnName::from(other.name.as_str()));
         same && (self.indirection.is_empty() || other.indirection.is_empty())
-    }
-    pub(super) fn overlaps(&self, other: &Self) -> bool {
-        if self.name != other.name {
-            return false;
-        }
-        // Multiple subfield/subscript assignments are legal. Whole-column
-        // assignments conflict with every assignment to that column.
-        self.indirection.is_empty() || other.indirection.is_empty()
     }
 }
 impl ConflictAction {

@@ -226,6 +226,10 @@ impl CreateTable {
     pub(crate) fn associate_trigger(&mut self, name: &crate::sem::FullName) {
         self.triggers.associate(name);
     }
+    pub(crate) fn dissociate_trigger(&mut self, name: &crate::sem::FullName) {
+        self.triggers.dissociate(name);
+    }
+
     /// new instance with column definitions
     #[must_use]
     pub fn new(

@@ -371,7 +371,9 @@ impl StatementNode {
             Self::CreateRule(rule) => rule
                 .resolve(context)
                 .map(|rule| crate::sem::SemAst::create_rule(&rule)),
-            Self::DropTrigger(_) => todo!("DROP TRIGGER semantic analysis: #555"),
+            Self::DropTrigger(trigger) => trigger
+                .resolve(context)
+                .map(|statement| crate::sem::SemAst::drop_trigger(&statement)),
             Self::CreateTrigger(trigger) => trigger
                 .resolve(context)
                 .map(|trigger| crate::sem::SemAst::create_trigger(&trigger)),
@@ -442,6 +444,7 @@ impl StatementNode {
         context.set_parameter_constraints(&crate::sem::ParameterConstraints::default());
         match self {
             Self::CreateTrigger(trigger) => trigger.resolve_and_apply(context),
+            Self::DropTrigger(trigger) => trigger.resolve_and_apply(context),
             Self::CreateRule(rule) => rule.resolve_and_apply(context),
             Self::View(view) => view.resolve_and_apply(context),
             Self::Extension(extension) => extension.apply(context),

@@ -6,6 +6,8 @@ pub enum TriggerProblem {
     Target(FullName),
     /// Duplicate trigger in its dialect namespace.
     Duplicate(TriggerIdentity),
+    /// Requested trigger does not exist in the resolved relation namespace.
+    Missing(TriggerIdentity),
     /// Unknown event column.
     Column(FullName, String),
     /// Missing or invalid zero-input trigger function.
@@ -19,6 +21,9 @@ impl TriggerProblem {
     }
     pub(crate) fn duplicate(identity: &TriggerIdentity) -> Self {
         Self::Duplicate(identity.clone())
+    }
+    pub(crate) fn missing(identity: &TriggerIdentity) -> Self {
+        Self::Missing(identity.clone())
     }
     pub(crate) fn column(target: &FullName, column: &str) -> Self {
         Self::Column(target.clone(), column.to_owned())
@@ -35,7 +40,7 @@ impl TriggerProblem {
         source: String,
     ) -> Result<String, AnalysisError> {
         let diagnostic =
-            ::miette::MietteDiagnostic::new(format!("invalid CREATE TRIGGER: {self:?}"))
+            ::miette::MietteDiagnostic::new(format!("invalid trigger statement: {self:?}"))
                 .with_code("trigger_invalid_definition")
                 .with_severity(::miette::Severity::Error);
         let report = ::miette::Report::new(diagnostic)

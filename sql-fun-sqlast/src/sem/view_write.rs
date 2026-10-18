@@ -610,6 +610,10 @@ pub(crate) struct WriteObject {
 }
 #[derive(Debug, Clone)]
 enum WriteObjectKind {
+    #[expect(
+        dead_code,
+        reason = "legacy trigger metadata is disconnected by #598/#599; replaced by #555"
+    )]
     Trigger(TriggerFacts),
     Rule(RuleFacts),
 }
@@ -634,6 +638,10 @@ impl WriteObject {
         }
     }
 
+    #[expect(
+        dead_code,
+        reason = "legacy trigger constructor is disconnected by #598/#599; replaced by #555"
+    )]
     pub(crate) fn trigger(name: &str, events: i32, instead: bool, columns: &[String]) -> Self {
         Self {
             name: name.to_owned(),

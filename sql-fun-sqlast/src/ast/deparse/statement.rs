@@ -12,6 +12,7 @@ impl SqlEmit for StatementNode {
             Self::Delete(v) => v.emit(writer),
             Self::Merge(v) => v.emit(writer),
             Self::View(v) => v.emit(writer),
+            Self::DropTrigger(_) => writer.unsupported("DROP TRIGGER"),
             Self::CreateTrigger(_) => writer.unsupported("CREATE TRIGGER"),
             Self::ViewWrite(v) => v.emit(writer),
             Self::Extension(v) => v.emit(writer),

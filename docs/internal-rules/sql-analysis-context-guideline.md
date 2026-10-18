@@ -88,6 +88,57 @@ the resulting semantic bindings and explicit failure/ambiguity outcomes,
 not merely successful traversal or retained syntax. See the
 [name-resolution completion clarification in #463](https://github.com/kazuk/sql-fun/issues/463#issuecomment-6226367685).
 
+## Semantic errors and DDL application
+
+**Successful semantic analysis does not imply that a DDL statement can be
+applied.** The semantic AST records analysis outcomes, including failed name
+resolution, invalid definitions, and explicit inapplicability. An analyzed
+`CREATE TRIGGER` or `CREATE RULE` that the selected database would reject on
+semantic grounds is a valid analysis result when that rejection is correctly
+represented.
+
+- Report ordinary SQL semantic errors as structured `AnalysisProblem` values
+  through `ParseContext`, retain their outcomes in the semantic AST, and allow
+  subsequent statements to be analyzed. Missing targets, unresolved names, and
+  invalid trigger or rule definitions MUST NOT become unrecoverable engine
+  errors merely because the statement cannot be applied.
+- Retain the resolved targets, definitions, associations, and validation
+  outcomes needed to determine the statement's catalog effects. Represent
+  applicability explicitly in the semantic AST so the application phase can
+  consume the completed decision. Preserving an invalid statement's structure
+  and failure state is part of semantic analysis; discarding it into an
+  undifferentiated unresolved placeholder loses that result.
+- Keep applicability independent of diagnostic delivery. `AnalysisProblem`
+  reporting is a separate path; neither the presence nor the number of reported
+  problems is an application decision. Diagnostic suppression MUST NOT make an
+  inapplicable statement applicable.
+
+DDL application is the catalog state transition that prepares the environment
+for analyzing the next SQL statement:
+
+- An applicable statement updates the catalog according to its recorded
+  semantic result, then analysis continues.
+- An inapplicable statement leaves the catalog unchanged, then analysis
+  continues. It MUST NOT publish a rejected definition, change target links,
+  or leave partial updates behind.
+
+Application MUST consume recorded resolution and applicability outcomes rather
+than repeat name resolution or semantic validation, inspect the diagnostic
+collection, or reconstruct why the database would reject the statement. If
+application needs such reasoning, first check whether the semantic AST is
+missing a required outcome. The application phase's difficulty is not a reason
+to omit that state from the semantic AST.
+
+Reserve `AnalysisError` for unrecoverable engine or infrastructure failures.
+Parser/analysis contract violations, such as a required parser node being
+absent, may fail with `UnexpectedInput` or `UnexpectedNone`. These failures are
+distinct from successfully detecting a semantic error in user SQL.
+
+Regression coverage for rejected DDL should inspect the retained semantic
+failure and applicability state, the structured diagnostic, the unchanged
+catalog, and successful analysis of a subsequent statement. Assertions about
+reported diagnostics alone do not establish the state-transition contract.
+
 ## Diagnostics and future lint configuration
 
 Diagnostic policy is analysis-wide configuration, not an implementation
@@ -120,6 +171,11 @@ parameter, confirm:
 - Are diagnostic reporting and lint-policy decisions available through
   the same shared environment?
 - Does a refactor preserve established semantic phases and their outputs?
+- Does the semantic AST retain failed resolution, validation outcomes, and DDL
+  applicability independently of diagnostic reporting?
+- Can application consume the recorded decision without repeating semantic
+  analysis, and does rejected DDL leave the catalog unchanged for the next SQL
+  statement?
 
 An existing implementation that bypasses this contract is technical debt,
 not a precedent for introducing another bypass. See issue

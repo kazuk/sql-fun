@@ -204,6 +204,34 @@ impl std::hash::Hash for WithClause {
 }
 
 impl WithClause {
+    pub(crate) fn resolve_name(
+        &self,
+        context: &impl ParseContext,
+        name: &crate::sem::FullName,
+    ) -> Option<&CteName> {
+        if name.schema().is_some() || name.catalog().is_some() {
+            return None;
+        }
+        self.0.keys().find(|candidate| {
+            if context.dialect() == crate::ast::Dialect::sqlite() {
+                candidate.eq_ignore_ascii_case(name.name().as_str())
+            } else {
+                candidate.as_str() == name.name().as_str()
+            }
+        })
+    }
+    pub(crate) fn insert_resolved(
+        &mut self,
+        context: &impl ParseContext,
+        name: &CteName,
+        statement: CteStatement,
+    ) {
+        if context.dialect() == crate::ast::Dialect::sqlite() {
+            self.0
+                .retain(|candidate, _| !candidate.eq_ignore_ascii_case(name));
+        }
+        self.insert(name, statement);
+    }
     pub(crate) fn take(&mut self, name: &str) -> Option<CteStatement> {
         self.0.remove(name)
     }

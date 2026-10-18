@@ -385,6 +385,7 @@ fn automatic_view_query(
 #[case::join("SELECT a.id FROM public.items a JOIN public.items b ON a.id=b.id")]
 #[case::expression_only("SELECT id + 1 AS id FROM public.items")]
 #[case::constant("SELECT 1 AS id")]
+#[case::grouping("SELECT id, GROUPING(id) AS grouped FROM public.items GROUP BY id")]
 fn read_only_shapes(#[case] query: &str) -> Result<(), Box<dyn std::error::Error>> {
     let schema = ViewSchema::postgres(&format!(
         "CREATE TABLE public.items(id integer); CREATE VIEW public.v AS {query};"

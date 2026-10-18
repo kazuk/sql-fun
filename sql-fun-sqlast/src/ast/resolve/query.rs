@@ -60,7 +60,9 @@ impl Query {
             None
         };
         let query_id = context.analysis_state_mut().grouping_mut().new_query();
-        let body = self.body.resolve(context, &with, restricted.as_ref().or(outer), query_id)?;
+        let body = self
+            .body
+            .resolve(context, &with, restricted.as_ref().or(outer), query_id)?;
         if body.select_clauses().is_none() {
             context.analysis_state_mut().grouping_mut().set_keys(
                 query_id,
@@ -471,7 +473,7 @@ impl FromItem {
         scope: &ScalarAnalysisContext<'_>,
     ) -> Result<DataSource, AnalysisError> {
         match self {
-            Self::Relation(relation) => relation.resolve(context, with),
+            Self::Relation(relation) => relation.resolve(context, with, scope),
             Self::Query(derived) => derived.resolve(context, scope),
             Self::Join(join) => join.resolve(context, with, scope),
             Self::Functions(functions) => functions.resolve(context, scope),
@@ -670,13 +672,10 @@ impl Relation {
         &self,
         context: &mut impl ParseContext,
         with: &WithClause,
-        _preceding: &FromClause,
-        outer: Option<&ScalarAnalysisContext<'_>>,
+        scope: &ScalarAnalysisContext<'_>,
     ) -> Result<DataSource, AnalysisError> {
         let name = self.name.full_name()?;
-        let name = if with.resolve_name(context, &name).is_none()
-            && let Some(scope) = outer
-        {
+        let name = if with.resolve_name(context, &name).is_none() {
             scope.trigger_relation_name(context, &name)?
         } else {
             name

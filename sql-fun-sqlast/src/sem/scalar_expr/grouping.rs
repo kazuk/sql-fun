@@ -256,19 +256,38 @@ impl QueryGrouping {
     ) -> Result<(), AnalysisError> {
         match self {
             Self::Expression(expression) => {
-                if let Some(index) = expression.output_index() {
-                    columns.validate_grouping_target(index, query_id, context)?;
-                }
+                Self::validate_expression_target(expression, columns, query_id, context)
             }
-            Self::Empty => {}
+            Self::Empty => Ok(()),
             Self::Rollup(groups)
             | Self::Cube(groups)
             | Self::Sets(groups)
             | Self::Simple(groups) => {
-                for group in groups {
-                    group.validate_grouping_targets(columns, query_id, context)?;
-                }
+                Self::validate_target_list(groups, columns, query_id, context)
             }
+        }
+    }
+
+    fn validate_expression_target(
+        expression: &SemScalarExpr,
+        columns: &mut ResultColumnCollection,
+        query_id: usize,
+        context: &mut impl ParseContext,
+    ) -> Result<(), AnalysisError> {
+        if let Some(index) = expression.output_index() {
+            columns.validate_grouping_target(index, query_id, context)?;
+        }
+        Ok(())
+    }
+
+    fn validate_target_list(
+        groups: &[Self],
+        columns: &mut ResultColumnCollection,
+        query_id: usize,
+        context: &mut impl ParseContext,
+    ) -> Result<(), AnalysisError> {
+        for group in groups {
+            group.validate_grouping_targets(columns, query_id, context)?;
         }
         Ok(())
     }
@@ -279,23 +298,36 @@ impl QueryGrouping {
         keys: &mut Vec<Option<SemScalarExpr>>,
     ) -> Result<(), AnalysisError> {
         match self {
-            Self::Expression(expression) => {
-                let expression = if let Some(index) = expression.output_index() {
-                    columns.grouping_expression(index).unwrap_or(expression)
-                } else {
-                    expression
-                };
-                keys.push(comparison_key(expression)?);
-            }
-            Self::Empty => {}
+            Self::Expression(expression) => Self::collect_expression_key(expression, columns, keys),
+            Self::Empty => Ok(()),
             Self::Rollup(groups)
             | Self::Cube(groups)
             | Self::Sets(groups)
-            | Self::Simple(groups) => {
-                for group in groups {
-                    group.collect_grouping_keys(columns, keys)?;
-                }
-            }
+            | Self::Simple(groups) => Self::collect_key_list(groups, columns, keys),
+        }
+    }
+
+    fn collect_expression_key(
+        expression: &SemScalarExpr,
+        columns: &ResultColumnCollection,
+        keys: &mut Vec<Option<SemScalarExpr>>,
+    ) -> Result<(), AnalysisError> {
+        let expression = if let Some(index) = expression.output_index() {
+            columns.grouping_expression(index).unwrap_or(expression)
+        } else {
+            expression
+        };
+        keys.push(comparison_key(expression)?);
+        Ok(())
+    }
+
+    fn collect_key_list(
+        groups: &[Self],
+        columns: &ResultColumnCollection,
+        keys: &mut Vec<Option<SemScalarExpr>>,
+    ) -> Result<(), AnalysisError> {
+        for group in groups {
+            group.collect_grouping_keys(columns, keys)?;
         }
         Ok(())
     }

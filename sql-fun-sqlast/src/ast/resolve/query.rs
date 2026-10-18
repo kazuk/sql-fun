@@ -153,18 +153,26 @@ impl QueryBody {
         match self {
             Self::Select(select) => select.resolve(context, with, outer, query_id),
             Self::Set(set) => set.resolve(context, with, outer),
-            Self::Values(rows) => {
-                let from = FromClause::default();
-                let mut scope = ScalarAnalysisContext::nested(with, &from, outer);
-                scope.set_grouping_query(query_id);
-                let scope = scope.with_grouping_placement("VALUES");
-                let mut resolved = Vec::new();
-                for row in rows {
-                    resolved.push(Expr::resolve_list(row, context, &scope)?);
-                }
-                Ok(SelectStatement::values(resolved))
-            }
+            Self::Values(rows) => Self::resolve_values(rows, context, with, outer, query_id),
         }
+    }
+
+    fn resolve_values(
+        rows: &[Vec<Expr>],
+        context: &mut impl ParseContext,
+        with: &WithClause,
+        outer: Option<&ScalarAnalysisContext<'_>>,
+        query_id: usize,
+    ) -> Result<SelectStatement, AnalysisError> {
+        let from = FromClause::default();
+        let mut scope = ScalarAnalysisContext::nested(with, &from, outer);
+        scope.set_grouping_query(query_id);
+        let scope = scope.with_grouping_placement("VALUES");
+        let mut resolved = Vec::new();
+        for row in rows {
+            resolved.push(Expr::resolve_list(row, context, &scope)?);
+        }
+        Ok(SelectStatement::values(resolved))
     }
 }
 
@@ -186,7 +194,11 @@ impl Select {
         outer: Option<&ScalarAnalysisContext<'_>>,
         query_id: usize,
     ) -> Result<SelectStatement, AnalysisError> {
-        let from = FromItem::resolve_list_in(&self.from, context, with, outer)?;
+        let empty = FromClause::default();
+        let mut from_scope = ScalarAnalysisContext::nested(with, &empty, outer);
+        from_scope.set_grouping_query(query_id);
+        let from_scope = from_scope.with_grouping_placement("FROM clause of its own query level");
+        let from = FromItem::resolve_list_in_scope(&self.from, context, with, &from_scope)?;
         let mut scope = ScalarAnalysisContext::nested(with, &from, outer);
         scope.set_grouping_query(query_id);
         scope.set_windows(Window::names(&self.windows));
@@ -398,7 +410,17 @@ impl FromItem {
         preceding: &FromClause,
         outer: Option<&ScalarAnalysisContext<'_>>,
     ) -> Result<DataSource, AnalysisError> {
-        crate::sem::with_stack(|| Self::resolve_body(self, context, with, preceding, outer))
+        let scope = ScalarAnalysisContext::nested(with, preceding, outer);
+        self.resolve_in_scope(context, with, &scope)
+    }
+
+    fn resolve_in_scope(
+        &self,
+        context: &mut impl ParseContext,
+        with: &WithClause,
+        scope: &ScalarAnalysisContext<'_>,
+    ) -> Result<DataSource, AnalysisError> {
+        crate::sem::with_stack(|| self.resolve_body(context, with, scope))
     }
 
     #[inline(never)]
@@ -406,19 +428,15 @@ impl FromItem {
         &self,
         context: &mut impl ParseContext,
         with: &WithClause,
-        preceding: &FromClause,
-        outer: Option<&ScalarAnalysisContext<'_>>,
+        scope: &ScalarAnalysisContext<'_>,
     ) -> Result<DataSource, AnalysisError> {
         match self {
-            Self::Relation(relation) => relation.resolve(context, with, preceding, outer),
-            Self::Query(derived) => derived.resolve(context, with, preceding, outer),
-            Self::Join(join) => join.resolve(context, with, preceding, outer),
-            Self::Functions(functions) => functions.resolve(context, with, preceding, outer),
-            Self::Group(group) => group.resolve(context, with, preceding, outer),
-            Self::Xml(table) => table.resolve(
-                context,
-                &ScalarAnalysisContext::nested(with, preceding, outer),
-            ),
+            Self::Relation(relation) => relation.resolve(context, with),
+            Self::Query(derived) => derived.resolve(context, scope),
+            Self::Join(join) => join.resolve(context, with, scope),
+            Self::Functions(functions) => functions.resolve(context, scope),
+            Self::Group(group) => group.resolve(context, with, scope),
+            Self::Xml(table) => table.resolve(context, scope),
             Self::Sample(_) => todo!("table expression semantic analysis"),
             Self::Json(_) => AnalysisError::raise_unexpected_none("from_clause inner node"),
         }
@@ -445,15 +463,12 @@ impl TableFunctions {
     fn resolve(
         &self,
         context: &mut impl ParseContext,
-        with: &WithClause,
-        preceding: &FromClause,
-        outer: Option<&ScalarAnalysisContext<'_>>,
+        scope: &ScalarAnalysisContext<'_>,
     ) -> Result<DataSource, AnalysisError> {
-        let scope = ScalarAnalysisContext::nested(with, preceding, outer);
         if self.rows_from {
             let mut functions = Vec::new();
             for function in &self.calls {
-                functions.push(function.expression.resolve_rows_call(context, &scope)?);
+                functions.push(function.expression.resolve_rows_call(context, scope)?);
             }
             let alias = self
                 .alias
@@ -467,7 +482,7 @@ impl TableFunctions {
         };
         function
             .expression
-            .resolve_table_call(context, &scope, self.alias.as_ref())
+            .resolve_table_call(context, scope, self.alias.as_ref())
     }
 }
 
@@ -552,10 +567,21 @@ impl FromItem {
         with: &WithClause,
         outer: Option<&ScalarAnalysisContext<'_>>,
     ) -> Result<FromClause, AnalysisError> {
+        let from = FromClause::default();
+        let scope = ScalarAnalysisContext::nested(with, &from, outer);
+        Self::resolve_list_in_scope(items, context, with, &scope)
+    }
+
+    fn resolve_list_in_scope(
+        items: &[Self],
+        context: &mut impl ParseContext,
+        with: &WithClause,
+        scope: &ScalarAnalysisContext<'_>,
+    ) -> Result<FromClause, AnalysisError> {
         let mut from = FromClause::default();
         let mut aliases = Vec::new();
         for item in items {
-            let source = item.resolve(context, with, &from, outer)?;
+            let source = item.resolve_in_scope(context, with, &scope.with_from_clause(&from))?;
             for alias in source.get_aliases() {
                 if aliases.contains(&alias) {
                     context
@@ -604,8 +630,6 @@ impl Relation {
         &self,
         context: &mut impl ParseContext,
         with: &WithClause,
-        _preceding: &FromClause,
-        _outer: Option<&ScalarAnalysisContext<'_>>,
     ) -> Result<DataSource, AnalysisError> {
         let name = self.name.full_name()?;
         let alias = self
@@ -622,17 +646,16 @@ impl DerivedTable {
     fn resolve(
         &self,
         context: &mut impl ParseContext,
-        with: &WithClause,
-        preceding: &FromClause,
-        outer: Option<&ScalarAnalysisContext<'_>>,
+        scope: &ScalarAnalysisContext<'_>,
     ) -> Result<DataSource, AnalysisError> {
-        let from = if self.lateral {
-            preceding.clone()
+        let non_lateral_scope;
+        let scope = if self.lateral {
+            scope
         } else {
-            FromClause::default()
+            non_lateral_scope = scope.with_from_clause(&FromClause::default());
+            &non_lateral_scope
         };
-        let scope = ScalarAnalysisContext::nested(with, &from, outer);
-        let query = self.query.resolve_in(context, Some(&scope))?;
+        let query = self.query.resolve_in(context, Some(scope))?;
         let alias = self
             .alias
             .as_ref()
@@ -647,15 +670,12 @@ impl Join {
         &self,
         context: &mut impl ParseContext,
         with: &WithClause,
-        preceding: &FromClause,
-        outer: Option<&ScalarAnalysisContext<'_>>,
+        scope: &ScalarAnalysisContext<'_>,
     ) -> Result<DataSource, AnalysisError> {
-        let left = self.left.resolve(context, with, preceding, outer)?;
-        let mut visible = preceding.clone();
-        visible.push(left.clone());
-        let right = self.right.resolve(context, with, &visible, outer)?;
-        visible.push(right.clone());
-        let scope = ScalarAnalysisContext::nested(with, &visible, outer);
+        let left = self.left.resolve_in_scope(context, with, scope)?;
+        let visible = scope.with_added_source(&left);
+        let right = self.right.resolve_in_scope(context, with, &visible)?;
+        let scope = visible.with_added_source(&right);
         let condition = Expr::resolve_optional(
             &self.condition,
             context,
@@ -678,15 +698,14 @@ impl FromGroup {
         &self,
         context: &mut impl ParseContext,
         with: &WithClause,
-        preceding: &FromClause,
-        outer: Option<&ScalarAnalysisContext<'_>>,
+        scope: &ScalarAnalysisContext<'_>,
     ) -> Result<DataSource, AnalysisError> {
         let Some((first, items)) = self.items.split_first() else {
             return AnalysisError::raise_unexpected_input("empty FROM group");
         };
-        let mut source = first.resolve(context, with, preceding, outer)?;
+        let mut source = first.resolve_in_scope(context, with, scope)?;
         for item in items {
-            let right = item.resolve(context, with, preceding, outer)?;
+            let right = item.resolve_in_scope(context, with, scope)?;
             source = DataSource::resolved_join(
                 &source,
                 &right,

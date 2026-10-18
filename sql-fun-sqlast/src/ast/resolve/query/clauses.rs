@@ -198,12 +198,7 @@ impl Grouping {
     ) -> Result<QueryGrouping, AnalysisError> {
         match self {
             Self::Expression(expression) => {
-                Ok(QueryGrouping::expression(expression.resolve_clause(
-                    context,
-                    &scope.with_grouping_placement("GROUP BY"),
-                    columns,
-                    ClauseBinding::Group,
-                )?))
+                Self::resolve_expression(expression, context, scope, columns)
             }
             Self::Empty => Ok(QueryGrouping::empty()),
             Self::Rollup(groups) => Ok(QueryGrouping::rollup(Self::resolve_list(
@@ -219,6 +214,18 @@ impl Grouping {
                 groups, context, scope, columns,
             )?)),
         }
+    }
+
+    fn resolve_expression(
+        expression: &Expr,
+        context: &mut impl ParseContext,
+        scope: &ScalarAnalysisContext<'_>,
+        columns: &ResultColumnCollection,
+    ) -> Result<QueryGrouping, AnalysisError> {
+        let scope = scope.with_grouping_placement("GROUP BY");
+        let expression =
+            expression.resolve_clause(context, &scope, columns, ClauseBinding::Group)?;
+        Ok(QueryGrouping::expression(expression))
     }
 }
 impl Window {

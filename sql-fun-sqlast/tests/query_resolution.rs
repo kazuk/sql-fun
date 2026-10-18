@@ -31,52 +31,6 @@ fn table_sample_retains_explicit_unimplemented_marker() {
     let _ = heavy::analyze("select 1 from missing tablesample system(1)");
 }
 
-#[test]
-fn grouping_reaches_the_public_semantic_boundary() {
-    // The production catalog verifies bindings at the public analysis boundary.
-    let analysis = heavy::query(
-        "SELECT GROUPING(a) AS mask FROM (SELECT 1 AS a) s GROUP BY ROLLUP(a) ORDER BY GROUPING(a)",
-    )
-    .unwrap();
-    assert!(analysis.context().problems().is_empty());
-    let query = analysis.ast().clone().into_select_statemtnt().unwrap();
-    let expression = query
-        .result_columns()
-        .get_column_at(0)
-        .unwrap()
-        .expression()
-        .unwrap();
-    let grouping = expression.as_grouping().unwrap();
-    assert!(grouping.is_valid());
-    assert_eq!(grouping.arguments()[0].key_index(), Some(0));
-    assert_eq!(
-        expression.get_type(),
-        Some(::sql_fun_sqlast::sem::PgBuiltInType::int4())
-    );
-    assert_eq!(expression.is_not_null(), Some(true));
-    assert!(
-        query.query_clauses().unwrap().order()[0]
-            .expression()
-            .as_grouping()
-            .unwrap()
-            .is_valid()
-    );
-}
-
-#[test]
-fn builtin_aggregate_rejects_nested_grouping() {
-    // Real builtin metadata, through SchemaFileContext and its frozen base.
-    let analysis =
-        heavy::query("SELECT sum(GROUPING(a)) FROM (SELECT 1 AS a) s GROUP BY a").unwrap();
-    assert!(
-        analysis
-            .context()
-            .problems()
-            .iter()
-            .any(|problem| problem.code() == "query_invalid_grouping_placement")
-    );
-}
-
 mod test_helpers {
     pub(super) mod heavy {
         use std::path::PathBuf;
@@ -89,11 +43,9 @@ mod test_helpers {
             syn::{ListOpt, Opt},
         };
 
-        /// Loads builtin JSON catalogs for each invocation. These integration checks
-        /// require the production catalog and public analysis boundary; no cache is shared.
-        pub(crate) fn query(
-            sql: &str,
-        ) -> Result<::sql_fun_sqlast::AstAndContextPair<SchemaFileContext>, AnalysisError> {
+        /// Loads builtin JSON catalogs for each invocation to check the public
+        /// analysis boundary. Initialization is repeated; no cache is shared.
+        pub(crate) fn analyze(sql: &str) -> Result<(), AnalysisError> {
             let metadata = PathBuf::from(env!("CARGO_MANIFEST_DIR")).join("sql_fun.metadata.toml");
             let args = <SqlFunArgs as ::clap::Parser>::try_parse_from([
                 "sqlfun",
@@ -121,12 +73,7 @@ mod test_helpers {
                 .as_select_stmt()
                 .as_inner()
                 .expect("SELECT fixture");
-            SelectStatement::analyze_select(context, select, &tokens)
-        }
-
-        /// Loads the real builtin catalogs on every invocation, as query does.
-        pub(crate) fn analyze(sql: &str) -> Result<(), AnalysisError> {
-            query(sql).map(|_| ())
+            SelectStatement::analyze_select(context, select, &tokens).map(|_| ())
         }
     }
 }

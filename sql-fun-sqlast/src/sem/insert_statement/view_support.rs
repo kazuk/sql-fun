@@ -13,12 +13,14 @@ pub struct ViewInsertSupport {
 impl ViewInsertSupport {
     /// Analyze semantic definitions for an exactly bound ordinary view.
     ///
+    /// Returns `None` after reporting a semantic problem through the context.
+    ///
     /// # Errors
-    /// Returns the reported structured cause or a diagnostic delivery failure.
+    /// Returns only unrecoverable analysis or diagnostic delivery failures.
     pub fn analyze(
         context: &mut impl crate::sem::ParseContext,
         view: &FullName,
-    ) -> Result<Self, crate::sem::AnalysisError> {
+    ) -> Result<Option<Self>, crate::sem::AnalysisError> {
         crate::sem::ViewWriteEvaluation::new(context).insert(view)
     }
 

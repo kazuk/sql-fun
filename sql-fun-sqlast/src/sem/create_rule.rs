@@ -225,20 +225,28 @@ impl CreateRule {
         }
         Ok(())
     }
-    pub(crate) fn apply<C: ParseContext>(&self, context: C) -> Result<C, AnalysisError> {
+    pub(crate) fn apply<C: ParseContext>(&self, mut context: C) -> Result<C, AnalysisError> {
         if !self.replace && context.rule(&self.identity).is_some() {
-            return Err(AnalysisError::rule(
+            context.report_analysis_problem(crate::sem::AnalysisProblem::rule(
                 &crate::sem::problem::RuleProblem::duplicate(&self.identity),
-            ));
+            ))?;
+            return Ok(context);
+        }
+        if context.resolve_relation_name(self.target()).is_none() {
+            context.report_analysis_problem(crate::sem::AnalysisProblem::rule(
+                &crate::sem::problem::RuleProblem::target(self.target()),
+            ))?;
+            return Ok(context);
         }
         // DDL chooses both operations; storage does not interpret rule semantics.
-        let context = context.associate_rule(self.identity.target(), &self.identity)?;
+        let mut context = context.associate_rule(self.identity.target(), &self.identity)?;
         let context = if self.event == RuleEvent::select() {
             let Some(view) = context.get_view(&crate::sem::ViewName::from_full_name(self.target()))
             else {
-                return Err(AnalysisError::rule(
+                context.report_analysis_problem(crate::sem::AnalysisProblem::rule(
                     &crate::sem::problem::RuleProblem::target(self.target()),
-                ));
+                ))?;
+                return Ok(context);
             };
             let query = self.actions[0]
                 .select_statement()

@@ -1,4 +1,5 @@
 use crate::ast::{DropBehavior, DropRule};
+use crate::sem::ResolutionFailure;
 use crate::sem::problem::RuleProblem;
 use crate::sem::{self, AnalysisError, FullName, ParseContext, RuleIdentity, SemAst, ViewName};
 
@@ -6,17 +7,14 @@ impl DropRule {
     pub(crate) fn resolve(
         &self,
         context: &mut impl ParseContext,
-    ) -> Result<sem::DropRule, AnalysisError> {
+    ) -> Result<Option<sem::DropRule>, AnalysisError> {
         let result = self.resolve_definition(context);
-        if let Err(AnalysisError::Rule(problem)) = &result {
-            context.report_analysis_problem(sem::AnalysisProblem::rule(problem))?;
-        }
-        result
+        ResolutionFailure::finish(result, context)
     }
     fn resolve_definition(
         &self,
         context: &impl ParseContext,
-    ) -> Result<sem::DropRule, AnalysisError> {
+    ) -> Result<sem::DropRule, ResolutionFailure> {
         let requested = self.name.full_name()?;
         let requested_target = self.relation.full_name()?;
         let behavior = match self.behavior {
@@ -34,7 +32,9 @@ impl DropRule {
                     behavior,
                 ));
             }
-            return Err(AnalysisError::rule(&RuleProblem::target(&requested_target)));
+            return Err(ResolutionFailure::rule(&RuleProblem::target(
+                &requested_target,
+            )));
         };
         self.resolve_on(context, &requested, &requested_target, &target, behavior)
     }
@@ -45,7 +45,7 @@ impl DropRule {
         requested_target: &FullName,
         target: &FullName,
         behavior: sem::DropDependencyBehavior,
-    ) -> Result<sem::DropRule, AnalysisError> {
+    ) -> Result<sem::DropRule, ResolutionFailure> {
         let identity = RuleIdentity::new(target, requested.name().as_str());
         let found = context.rule(&identity).is_some();
         if identity.name().name().as_str() == "_RETURN"
@@ -53,13 +53,13 @@ impl DropRule {
                 .get_view(&ViewName::from_full_name(target))
                 .is_some()
         {
-            return Err(AnalysisError::rule(&RuleProblem::definition(
+            return Err(ResolutionFailure::rule(&RuleProblem::definition(
                 &identity,
                 "the View requires its SELECT rule; drop the View instead",
             )));
         }
         if !found && !self.if_exists {
-            return Err(AnalysisError::rule(&RuleProblem::missing(&identity)));
+            return Err(ResolutionFailure::rule(&RuleProblem::missing(&identity)));
         }
         Ok(sem::DropRule::new(
             requested,
@@ -74,10 +74,15 @@ impl DropRule {
         &self,
         mut context: C,
     ) -> Result<crate::AstAndContextPair<C>, AnalysisError> {
-        let statement = self.resolve(&mut context)?;
-        let context = statement.apply(context)?;
+        let Some(definition) = self.resolve(&mut context)? else {
+            return Ok(crate::AstAndContextPair::new(
+                SemAst::unresolved_statement(),
+                context,
+            ));
+        };
+        let context = definition.apply(context)?;
         Ok(crate::AstAndContextPair::new(
-            SemAst::drop_rule(&statement),
+            SemAst::drop_rule(&definition),
             context,
         ))
     }

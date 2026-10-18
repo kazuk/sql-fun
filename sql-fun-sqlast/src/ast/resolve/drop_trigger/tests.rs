@@ -81,7 +81,7 @@ fn invalid_drop_leaves_named_definitions_and_links_intact(
         test_helpers::statement(sql)
             .node
             .resolve(&mut child)
-            .is_err()
+            .is_ok_and(|ast| matches!(ast, crate::sem::SemAst::UnresolvedStatement))
     );
     assert!(child.trigger(&test_helpers::identity()).is_some());
     assert_eq!(test_helpers::active_count(&child.freeze()), 2);

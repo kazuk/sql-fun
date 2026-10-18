@@ -3,6 +3,7 @@ use crate::ast::{
     CreateTrigger, Dialect, StatementNode, TriggerBody, TriggerConstraint, TriggerEvent,
     TriggerFunction, TriggerGranularity, TriggerTiming,
 };
+use crate::sem::ResolutionFailure;
 use crate::sem::problem::TriggerProblem;
 use crate::sem::{
     self, AliasSpec, AnalysisError, ColumnName, DataSource, FromClause, FullName, ParseContext,
@@ -13,42 +14,46 @@ impl CreateTrigger {
     pub(crate) fn resolve(
         &self,
         context: &mut impl ParseContext,
-    ) -> Result<sem::CreateTrigger, AnalysisError> {
+    ) -> Result<Option<sem::CreateTrigger>, AnalysisError> {
         context.begin_parameter_type_analysis();
-        let result = self.resolve_in(context);
-        let result = if context.parameter_inference_needed() {
-            Self::invalid(
-                &self.relation.name.full_name()?,
-                "trigger definitions cannot contain bind parameters",
-            )
-        } else if context.analysis_state().has_problems() {
-            Err(AnalysisError::trigger(&TriggerProblem::options(
-                &self.relation.name.full_name()?,
-                "trigger contains unresolved or invalid expressions",
-            )))
-        } else {
-            result
-        };
-        if let Err(AnalysisError::Trigger(problem)) = &result {
-            context.report_analysis_problem(sem::AnalysisProblem::trigger(problem))?;
-        }
+        let result = self.resolve_in(context).and_then(|definition| {
+            if context.parameter_inference_needed() {
+                return Self::invalid(
+                    &self.relation.name.full_name()?,
+                    "trigger definitions cannot contain bind parameters",
+                );
+            }
+            if context.analysis_state().has_problems() {
+                return Self::invalid(
+                    &self.relation.name.full_name()?,
+                    "trigger contains unresolved or invalid expressions",
+                );
+            }
+            Ok(definition)
+        });
+        let result = ResolutionFailure::finish(result, context);
         context.finish_analysis(result)
     }
     pub(crate) fn resolve_and_apply<C: ParseContext>(
         &self,
         mut context: C,
     ) -> Result<crate::AstAndContextPair<C>, AnalysisError> {
-        let resolved = self.resolve(&mut context)?;
-        let context = resolved.apply(context)?;
+        let Some(definition) = self.resolve(&mut context)? else {
+            return Ok(crate::AstAndContextPair::new(
+                SemAst::unresolved_statement(),
+                context,
+            ));
+        };
+        let context = definition.apply(context)?;
         Ok(crate::AstAndContextPair::new(
-            SemAst::create_trigger(&resolved),
+            SemAst::create_trigger(&definition),
             context,
         ))
     }
     fn resolve_in(
         &self,
         context: &mut impl ParseContext,
-    ) -> Result<sem::CreateTrigger, AnalysisError> {
+    ) -> Result<sem::CreateTrigger, ResolutionFailure> {
         let target = self.resolve_target(context)?;
         let sqlite = context.dialect() == Dialect::sqlite();
         let timing = self.timing.unwrap_or(TriggerTiming::Before);
@@ -59,6 +64,7 @@ impl CreateTrigger {
         });
         self.validate(context, &target, timing, granularity)?;
         let identity = self.resolve_identity(context, &target)?;
+        self.validate_identity(context, &identity)?;
         let events = self.resolve_events(context, &target)?;
         let with = WithClause::default();
         let from = self.resolve_row_bindings(context, &target, granularity, &with)?;
@@ -91,7 +97,7 @@ impl CreateTrigger {
         &self,
         context: &impl ParseContext,
         target: &FullName,
-    ) -> Result<Vec<sem::TriggerEvent>, AnalysisError> {
+    ) -> Result<Vec<sem::TriggerEvent>, ResolutionFailure> {
         let mut events = Vec::new();
         for event in &self.events {
             events.push(event.resolve(context, target)?);
@@ -104,7 +110,7 @@ impl CreateTrigger {
         target: &FullName,
         granularity: TriggerGranularity,
         with: &WithClause,
-    ) -> Result<FromClause, AnalysisError> {
+    ) -> Result<FromClause, ResolutionFailure> {
         let mut from = FromClause::default();
         if granularity == TriggerGranularity::Row {
             if self.has_old() {
@@ -144,7 +150,7 @@ impl CreateTrigger {
         context: &mut impl ParseContext,
         scope: &ScalarAnalysisContext<'_>,
         target: &FullName,
-    ) -> Result<Option<sem::SemScalarExpr>, AnalysisError> {
+    ) -> Result<Option<sem::SemScalarExpr>, ResolutionFailure> {
         let mut predicate = self
             .predicate
             .as_ref()
@@ -211,13 +217,13 @@ impl CreateTrigger {
         predicate: &Option<sem::SemScalarExpr>,
         constraint: &Option<sem::TriggerConstraint>,
         transitions: &[sem::TriggerTransition],
-    ) -> Result<sem::CreateTrigger, AnalysisError> {
+    ) -> Result<sem::CreateTrigger, ResolutionFailure> {
         definition.set_event_semantics(events, predicate, constraint, transitions);
         definition.set_creation_mode(self.replace, self.if_not_exists, self.temporary);
         definition.retain_dependencies(context)?;
         Ok(definition)
     }
-    fn resolve_target(&self, context: &impl ParseContext) -> Result<FullName, AnalysisError> {
+    fn resolve_target(&self, context: &impl ParseContext) -> Result<FullName, ResolutionFailure> {
         let mut name = self.relation.name.full_name()?;
         // Non-TEMP SQLite triggers belong to the selected trigger schema and
         // cannot attach to a relation in another database.
@@ -233,7 +239,10 @@ impl CreateTrigger {
         }
         Self::relation(context, &name)
     }
-    fn relation(context: &impl ParseContext, name: &FullName) -> Result<FullName, AnalysisError> {
+    fn relation(
+        context: &impl ParseContext,
+        name: &FullName,
+    ) -> Result<FullName, ResolutionFailure> {
         sem::search_path::expand_search_path_inst(context, name, |key| {
             if context.dialect() == Dialect::sqlite() {
                 return context.sqlite_relation_identity(key);
@@ -244,13 +253,13 @@ impl CreateTrigger {
                 None
             }
         })
-        .ok_or_else(|| AnalysisError::trigger(&TriggerProblem::target(name)))
+        .ok_or_else(|| ResolutionFailure::trigger(&TriggerProblem::target(name)))
     }
     fn resolve_identity(
         &self,
         context: &impl ParseContext,
         target: &FullName,
-    ) -> Result<sem::TriggerIdentity, AnalysisError> {
+    ) -> Result<sem::TriggerIdentity, ResolutionFailure> {
         let supplied = self.name.full_name()?;
         if context.dialect() == Dialect::postgres() {
             if supplied.schema().is_some() || supplied.catalog().is_some() {
@@ -287,6 +296,21 @@ impl CreateTrigger {
             Ok(sem::TriggerIdentity::sqlite(&supplied.set_schema(schema)))
         }
     }
+    fn validate_identity(
+        &self,
+        context: &impl ParseContext,
+        identity: &sem::TriggerIdentity,
+    ) -> Result<(), ResolutionFailure> {
+        if let Some(existing) = context.trigger(identity)
+            && !self.if_not_exists
+            && (!self.replace || existing.constraint().is_some() || self.constraint.is_some())
+        {
+            return Err(ResolutionFailure::trigger(&TriggerProblem::duplicate(
+                identity,
+            )));
+        }
+        Ok(())
+    }
     fn has_old(&self) -> bool {
         self.events.iter().all(TriggerEvent::has_old)
     }
@@ -299,7 +323,7 @@ impl CreateTrigger {
         target: &FullName,
         timing: TriggerTiming,
         granularity: TriggerGranularity,
-    ) -> Result<(), AnalysisError> {
+    ) -> Result<(), ResolutionFailure> {
         let view = context.get_view_impl(target);
         if view.is_some_and(sem::ViewLike::is_materialized) {
             return Self::invalid(target, "materialized views cannot own triggers");
@@ -390,8 +414,8 @@ impl CreateTrigger {
         }
         Ok(())
     }
-    fn invalid<T>(target: &FullName, rule: &str) -> Result<T, AnalysisError> {
-        Err(AnalysisError::trigger(&TriggerProblem::options(
+    fn invalid<T>(target: &FullName, rule: &str) -> Result<T, ResolutionFailure> {
+        Err(ResolutionFailure::trigger(&TriggerProblem::options(
             target, rule,
         )))
     }
@@ -434,7 +458,7 @@ impl TriggerEvent {
         &self,
         context: &impl ParseContext,
         target: &FullName,
-    ) -> Result<sem::TriggerEvent, AnalysisError> {
+    ) -> Result<sem::TriggerEvent, ResolutionFailure> {
         match self {
             Self::Insert => Ok(sem::TriggerEvent::insert()),
             Self::Delete => Ok(sem::TriggerEvent::delete()),
@@ -445,7 +469,7 @@ impl TriggerEvent {
                     let column = ColumnName::from(name.as_str());
                     let definition = sem::CreateTrigger::column(context, target, &column);
                     if definition.is_none() && context.dialect() == Dialect::postgres() {
-                        return Err(AnalysisError::trigger(&TriggerProblem::column(
+                        return Err(ResolutionFailure::trigger(&TriggerProblem::column(
                             target, name,
                         )));
                     }
@@ -460,7 +484,7 @@ impl TriggerConstraint {
     fn resolve(
         &self,
         context: &impl ParseContext,
-    ) -> Result<sem::TriggerConstraint, AnalysisError> {
+    ) -> Result<sem::TriggerConstraint, ResolutionFailure> {
         let relation = self
             .relation
             .as_ref()
@@ -478,7 +502,7 @@ impl TriggerBody {
         &self,
         context: &mut impl ParseContext,
         scope: &ScalarAnalysisContext<'_>,
-    ) -> Result<sem::TriggerBody, AnalysisError> {
+    ) -> Result<sem::TriggerBody, ResolutionFailure> {
         match self {
             Self::Function(function) => Ok(sem::TriggerBody::function(&function.resolve(context)?)),
             Self::Commands(commands) => {
@@ -492,32 +516,35 @@ impl TriggerBody {
     }
 }
 impl TriggerFunction {
-    fn resolve(&self, context: &impl ParseContext) -> Result<sem::TriggerFunction, AnalysisError> {
+    fn resolve(
+        &self,
+        context: &impl ParseContext,
+    ) -> Result<sem::TriggerFunction, ResolutionFailure> {
         let requested = self.name.full_name()?;
         let name = context.resolve_function_name_with_search_path(&requested);
         let overloads = context
             .get_function_impl(&name)
-            .ok_or_else(|| AnalysisError::trigger(&TriggerProblem::function(&requested)))?;
+            .ok_or_else(|| ResolutionFailure::trigger(&TriggerProblem::function(&requested)))?;
         let mut candidate = None;
         for overload in &overloads {
             if !overload.has_input_parameters() {
                 if candidate.is_some() {
-                    return Err(AnalysisError::trigger(&TriggerProblem::function(&name)));
+                    return Err(ResolutionFailure::trigger(&TriggerProblem::function(&name)));
                 }
                 candidate = Some(overload);
             }
         }
         let Some(candidate) = candidate else {
-            return Err(AnalysisError::trigger(&TriggerProblem::function(&name)));
+            return Err(ResolutionFailure::trigger(&TriggerProblem::function(&name)));
         };
         let Some(return_type) = candidate.ret_type() else {
-            return Err(AnalysisError::trigger(&TriggerProblem::function(&name)));
+            return Err(ResolutionFailure::trigger(&TriggerProblem::function(&name)));
         };
         if return_type.full_name() != &FullName::with_schema("pg_catalog", "trigger") {
-            return Err(AnalysisError::trigger(&TriggerProblem::function(&name)));
+            return Err(ResolutionFailure::trigger(&TriggerProblem::function(&name)));
         }
         if !context.function_preserves_view_rows(&name, candidate) {
-            return Err(AnalysisError::trigger(&TriggerProblem::function(&name)));
+            return Err(ResolutionFailure::trigger(&TriggerProblem::function(&name)));
         }
         Ok(sem::TriggerFunction::new(
             &name,
@@ -531,11 +558,12 @@ impl StatementNode {
         &self,
         context: &mut impl ParseContext,
         scope: &ScalarAnalysisContext<'_>,
-    ) -> Result<SemAst, AnalysisError> {
+    ) -> Result<SemAst, ResolutionFailure> {
         match self {
             Self::Query(query) => query
                 .resolve_in(context, Some(scope))
-                .map(|statement| SemAst::select(&statement)),
+                .map(|statement| SemAst::select(&statement))
+                .map_err(Into::into),
             Self::Insert(insert) => insert.resolve_trigger_command(context, scope),
             Self::Update(update) => update.resolve_trigger_command(context, scope),
             Self::Delete(delete) => delete.resolve_trigger_command(context, scope),
@@ -563,7 +591,7 @@ impl<C: ParseContext> sem::traversal::SemanticVisitor for WhenValidator<'_, C> {
 }
 
 impl crate::ast::Relation {
-    fn validate_trigger_command(&self) -> Result<(), AnalysisError> {
+    fn validate_trigger_command(&self) -> Result<(), ResolutionFailure> {
         if self.name.0.len() != 1 || self.indexed.is_some() || self.not_indexed {
             return CreateTrigger::invalid(
                 &self.name.full_name()?,
@@ -578,7 +606,7 @@ impl crate::ast::Insert {
         &self,
         context: &mut impl ParseContext,
         scope: &ScalarAnalysisContext<'_>,
-    ) -> Result<SemAst, AnalysisError> {
+    ) -> Result<SemAst, ResolutionFailure> {
         self.relation.validate_trigger_command()?;
         if !self.returning.is_empty() || self.source.is_none() {
             return CreateTrigger::invalid(
@@ -587,7 +615,12 @@ impl crate::ast::Insert {
             );
         }
         self.resolve_in(context, Some(scope))
-            .map(|statement| SemAst::insert(&statement))
+            .map(|statement| {
+                statement
+                    .as_ref()
+                    .map_or_else(SemAst::unresolved_statement, SemAst::insert)
+            })
+            .map_err(Into::into)
     }
 }
 impl crate::ast::Update {
@@ -595,7 +628,7 @@ impl crate::ast::Update {
         &self,
         context: &mut impl ParseContext,
         scope: &ScalarAnalysisContext<'_>,
-    ) -> Result<SemAst, AnalysisError> {
+    ) -> Result<SemAst, ResolutionFailure> {
         self.relation.validate_trigger_command()?;
         if !self.returning.is_empty() {
             return CreateTrigger::invalid(
@@ -604,7 +637,12 @@ impl crate::ast::Update {
             );
         }
         self.resolve_in(context, Some(scope))
-            .map(|statement| SemAst::update(&statement))
+            .map(|statement| {
+                statement
+                    .as_ref()
+                    .map_or_else(SemAst::unresolved_statement, SemAst::update)
+            })
+            .map_err(Into::into)
     }
 }
 impl crate::ast::Delete {
@@ -612,7 +650,7 @@ impl crate::ast::Delete {
         &self,
         context: &mut impl ParseContext,
         scope: &ScalarAnalysisContext<'_>,
-    ) -> Result<SemAst, AnalysisError> {
+    ) -> Result<SemAst, ResolutionFailure> {
         self.relation.validate_trigger_command()?;
         if !self.returning.is_empty() {
             return CreateTrigger::invalid(
@@ -622,6 +660,7 @@ impl crate::ast::Delete {
         }
         self.resolve_in(context, Some(scope))
             .map(|statement| SemAst::delete(&statement))
+            .map_err(Into::into)
     }
 }
 

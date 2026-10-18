@@ -567,5 +567,10 @@ where
     AnalysisError::check_dialect(crate::ast::Dialect::postgres(), context.dialect())?;
     let syntax = crate::ast::Insert::try_from_with_tokens(&syn, &::sql_fun_core::IVec::default())?;
     let insert = syntax.resolve(&mut context)?;
-    Ok((SemAst::insert(&insert), context))
+    Ok((
+        insert
+            .as_ref()
+            .map_or_else(SemAst::unresolved_statement, SemAst::insert),
+        context,
+    ))
 }

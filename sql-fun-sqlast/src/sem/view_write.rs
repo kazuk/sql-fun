@@ -1,4 +1,5 @@
 //! Analyzer-owned writable-view decisions from effective semantic definitions.
+use crate::sem::ResolutionFailure;
 use crate::sem::problem::ViewProblem;
 use crate::sem::{
     AnalysisError, ColumnDefinition, ColumnName, FullName, ParseContext, SemScalarExpr, TableName,
@@ -11,47 +12,43 @@ pub struct ViewWriteEvaluation<'a, C: ParseContext> {
     context: &'a mut C,
 }
 impl<'a, C: ParseContext> ViewWriteEvaluation<'a, C> {
-    /// Inject the active analysis context once.
+    /// Use the caller's mutable analysis context for lookup and diagnostics.
     pub const fn new(context: &'a mut C) -> Self {
         Self { context }
     }
-    /// Evaluate INSERT support and report semantic failures.
+    /// Evaluate INSERT support; None means a semantic problem was reported.
     /// # Errors
-    /// Returns the reported structured cause or a diagnostic delivery failure.
-    pub fn insert(&mut self, view: &FullName) -> Result<ViewInsertSupport, AnalysisError> {
+    /// Returns only an unrecoverable analysis or diagnostic delivery failure.
+    pub fn insert(&mut self, view: &FullName) -> Result<Option<ViewInsertSupport>, AnalysisError> {
         let result = insert_support(self.context, view);
-        self.report(view, result)
+        ResolutionFailure::finish(result, self.context)
     }
-    /// Evaluate UPDATE support and report semantic failures.
+    /// Evaluate UPDATE support; None means a semantic problem was reported.
     /// # Errors
-    /// Returns the reported structured cause or a diagnostic delivery failure.
-    pub fn update(&mut self, view: &FullName) -> Result<ViewUpdateSupport, AnalysisError> {
+    /// Returns only an unrecoverable analysis or diagnostic delivery failure.
+    pub fn update(&mut self, view: &FullName) -> Result<Option<ViewUpdateSupport>, AnalysisError> {
         let result = update_support(self.context, view);
-        self.report(view, result)
+        ResolutionFailure::finish(result, self.context)
     }
-    /// Evaluate independent INSERT and UPDATE support.
+    /// Evaluate both operations; None means a semantic problem was reported.
     /// # Errors
-    /// Returns the reported structured cause or a diagnostic delivery failure.
-    pub fn evaluate(&mut self, view: &FullName) -> Result<ViewWriteSupport, AnalysisError> {
-        Ok(ViewWriteSupport {
-            insert: self.insert(view)?,
-            update: self.update(view)?,
-        })
+    /// Returns only an unrecoverable analysis or diagnostic delivery failure.
+    pub fn evaluate(&mut self, view: &FullName) -> Result<Option<ViewWriteSupport>, AnalysisError> {
+        let Some(insert) = self.insert(view)? else {
+            return Ok(None);
+        };
+        let Some(update) = self.update(view)? else {
+            return Ok(None);
+        };
+        Ok(Some(ViewWriteSupport { insert, update }))
     }
     pub(crate) fn infer_arbiters(
         &mut self,
         view: &TableName,
         conflict: &crate::sem::InsertConflict,
-    ) -> Result<crate::sem::ConflictArbiterInference, AnalysisError> {
+    ) -> Result<Option<crate::sem::ConflictArbiterInference>, AnalysisError> {
         let result = infer_view_arbiters(self.context, view, conflict);
-        self.report(view.full_name(), result)
-    }
-    fn report<T>(
-        &mut self,
-        view: &FullName,
-        result: Result<T, AnalysisError>,
-    ) -> Result<T, AnalysisError> {
-        result.or_else(|error| error.report_view_evaluation(self.context, view))
+        ResolutionFailure::finish(result, self.context)
     }
 }
 #[cfg(test)]
@@ -121,7 +118,7 @@ impl<'a> EvaluationView<'a> {
             })
             .collect()
     }
-    fn load(context: &'a impl ParseContext, name: &FullName) -> Result<Self, AnalysisError> {
+    fn load(context: &'a impl ParseContext, name: &FullName) -> Result<Self, ResolutionFailure> {
         let view = lookup_bound_view(context, name)?.ok_or_else(|| missing_definition(name))?;
         let definition = view
             .ordinary_definition()
@@ -159,7 +156,7 @@ impl<'a> EvaluationView<'a> {
         context: &impl ParseContext,
         event: WriteEvent,
         seen: &mut Vec<FullName>,
-    ) -> Result<Decision, AnalysisError> {
+    ) -> Result<Decision, ResolutionFailure> {
         self.decision_from_facts(context, event, seen)
     }
     fn source_expression(&self, column: &ColumnName) -> Option<&SemScalarExpr> {
@@ -186,7 +183,7 @@ impl<'a> EvaluationView<'a> {
         context: &impl ParseContext,
         event: WriteEvent,
         seen: &mut Vec<FullName>,
-    ) -> Result<Decision, AnalysisError> {
+    ) -> Result<Decision, ResolutionFailure> {
         if let Some(decision) = self.explicit_write_decision(context, event) {
             return Ok(decision);
         }
@@ -253,7 +250,7 @@ impl<'a> EvaluationView<'a> {
         context: &impl ParseContext,
         event: WriteEvent,
         seen: &mut Vec<FullName>,
-    ) -> Result<Decision, AnalysisError> {
+    ) -> Result<Decision, ResolutionFailure> {
         let Some(source) = &self.source else {
             return Ok(Decision::read_only());
         };
@@ -272,7 +269,7 @@ impl<'a> EvaluationView<'a> {
         source: &FullName,
         event: WriteEvent,
         seen: &mut Vec<FullName>,
-    ) -> Result<Decision, AnalysisError> {
+    ) -> Result<Decision, ResolutionFailure> {
         let decision = if let Some(table) =
             context.get_table(&crate::sem::TableName::from(source.clone()))
         {
@@ -416,7 +413,7 @@ impl Decision {
 fn insert_support(
     context: &impl ParseContext,
     view: &FullName,
-) -> Result<ViewInsertSupport, AnalysisError> {
+) -> Result<ViewInsertSupport, ResolutionFailure> {
     if lookup_bound_view(context, view)?.is_some_and(crate::sem::ViewLike::is_materialized) {
         return Ok(ViewInsertSupport::read_only());
     }
@@ -444,7 +441,7 @@ fn insert_support(
 fn update_support(
     context: &impl ParseContext,
     view: &FullName,
-) -> Result<ViewUpdateSupport, AnalysisError> {
+) -> Result<ViewUpdateSupport, ResolutionFailure> {
     if lookup_bound_view(context, view)?.is_some_and(crate::sem::ViewLike::is_materialized) {
         return Ok(ViewUpdateSupport::read_only());
     }
@@ -519,7 +516,7 @@ fn infer_view_arbiters(
     context: &impl ParseContext,
     view: &TableName,
     conflict: &crate::sem::InsertConflict,
-) -> Result<crate::sem::ConflictArbiterInference, AnalysisError> {
+) -> Result<crate::sem::ConflictArbiterInference, ResolutionFailure> {
     let info = EvaluationView::load(context, view.full_name())?;
     info.decision(
         context,
@@ -733,17 +730,17 @@ impl ViewAssignmentColumn {
     }
 }
 
-fn missing_definition(name: &FullName) -> AnalysisError {
-    AnalysisError::view_metadata(&ViewProblem::missing_metadata(name))
+fn missing_definition(name: &FullName) -> ResolutionFailure {
+    ResolutionFailure::view(&ViewProblem::missing_metadata(name))
 }
 
 fn lookup_bound_view<'a>(
     context: &'a impl ParseContext,
     name: &FullName,
-) -> Result<Option<&'a crate::sem::ViewLike>, AnalysisError> {
+) -> Result<Option<&'a crate::sem::ViewLike>, ResolutionFailure> {
     if name.schema().is_none() {
-        return Err(AnalysisError::unexpected_input_error(&format!(
-            "View evaluation requires an already-resolved schema-qualified name: {name}"
+        return Err(ResolutionFailure::view(&ViewProblem::missing_metadata(
+            name,
         )));
     }
     Ok(context.get_view(&crate::sem::ViewName::from_full_name(name)))

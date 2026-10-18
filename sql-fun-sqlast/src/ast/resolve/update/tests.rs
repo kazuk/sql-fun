@@ -74,17 +74,26 @@ fn reports_invalid_update(#[case] sql: &str) {
 }
 
 #[rstest::rstest]
-#[case::missing_relation("UPDATE absent SET id=1")]
-#[case::missing_column("UPDATE items SET absent=1")]
-#[case::row_width("UPDATE items SET (id,label)=(SELECT 1)")]
-#[case::unreadable("WITH u AS (UPDATE items SET id=1) SELECT * FROM u")]
-fn rejects_invalid_structure(#[case] sql: &str) {
+#[case::missing_relation("UPDATE absent SET id=1", false)]
+#[case::missing_column("UPDATE items SET absent=1", false)]
+#[case::row_width("UPDATE items SET (id,label)=(SELECT 1)", true)]
+#[case::unreadable("WITH u AS (UPDATE items SET id=1) SELECT * FROM u", true)]
+fn rejects_invalid_structure(#[case] sql: &str, #[case] fatal: bool) {
     let mut context = catalog(Dialect::postgres());
     let statement = crate::parse_statements(sql, Dialect::postgres())
         .next()
         .unwrap()
         .unwrap();
-    assert!(statement.node.resolve(&mut context).is_err());
+    let result = statement.node.resolve(&mut context);
+    if fatal {
+        assert!(result.is_err());
+    } else {
+        assert!(matches!(
+            result.unwrap(),
+            crate::sem::SemAst::UnresolvedStatement
+        ));
+        assert!(context.reported_problem_count() > 0);
+    }
 }
 
 #[test]

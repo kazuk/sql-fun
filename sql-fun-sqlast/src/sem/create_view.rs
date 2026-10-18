@@ -74,13 +74,11 @@ impl CreateView {
         &mut self,
         name: &ColumnName,
         value: Option<&crate::sem::SemScalarExpr>,
-    ) -> Result<(), AnalysisError> {
+    ) -> Result<(), crate::sem::problem::ViewProblem> {
         if !self.query.has_column(name) {
-            return Err(AnalysisError::view_metadata(
-                &crate::sem::problem::ViewProblem::unknown_default_column(
-                    &self.name,
-                    name.as_str(),
-                ),
+            return Err(crate::sem::problem::ViewProblem::unknown_default_column(
+                &self.name,
+                name.as_str(),
             ));
         }
         self.defaults.retain(|(existing, _)| existing != name);
@@ -205,28 +203,25 @@ impl CreateView {
         self.query.has_column(column)
     }
 
-    /// apply `ALTER VIEW`
-    pub fn apply_alter(&mut self, alter_view: &AlterView) -> Result<(), AnalysisError> {
-        self.alter_statements.push(alter_view.clone());
-
-        for cmd in alter_view.commands() {
-            match cmd {
-                AlterObjSubCommand::ChangeOwner(new_owner) => {
-                    if new_owner.can_apply() {
-                        self.change_owner(new_owner);
-                    }
-                }
-                AlterObjSubCommand::SetColumnDefault(name, value) => {
-                    self.change_column_default(name, Some(value))?
-                }
-                AlterObjSubCommand::DropColumnDefault(name) => {
-                    self.change_column_default(name, None)?
-                }
-                _ => todo!(),
+    /// Apply `ALTER VIEW`, returning false after reporting an invalid column.
+    /// Rejected changes leave the view unchanged.
+    pub fn apply_alter(
+        &mut self,
+        context: &mut impl ParseContext,
+        alter_view: &AlterView,
+    ) -> Result<bool, AnalysisError> {
+        for command in alter_view.commands() {
+            if !command.validate_for_view(context, self)? {
+                return Ok(false);
             }
         }
+        self.alter_statements.push(alter_view.clone());
 
-        Ok(())
+        for command in alter_view.commands() {
+            command.apply_to_view(self);
+        }
+
+        Ok(true)
     }
 
     /// view is materialized
@@ -267,5 +262,41 @@ impl CreateView {
             SemAst::CreateView(create_view),
             context,
         ))
+    }
+}
+
+impl AlterObjSubCommand {
+    fn validate_for_view(
+        &self,
+        context: &mut impl ParseContext,
+        view: &CreateView,
+    ) -> Result<bool, AnalysisError> {
+        let name = match self {
+            Self::SetColumnDefault(name, _) | Self::DropColumnDefault(name) => name,
+            _ => return Ok(true),
+        };
+        if view.has_column(name) {
+            return Ok(true);
+        }
+        context.report_analysis_problem(crate::sem::AnalysisProblem::view(
+            &crate::sem::problem::ViewProblem::unknown_default_column(&view.name, name.as_str()),
+        ))?;
+        Ok(false)
+    }
+    fn apply_to_view(&self, view: &mut CreateView) {
+        match self {
+            Self::ChangeOwner(owner) => {
+                if owner.can_apply() {
+                    view.change_owner(owner);
+                }
+            }
+            Self::SetColumnDefault(name, value) => view
+                .change_column_default(name, Some(value))
+                .expect("validated default column"),
+            Self::DropColumnDefault(name) => view
+                .change_column_default(name, None)
+                .expect("validated default column"),
+            _ => todo!(),
+        }
     }
 }

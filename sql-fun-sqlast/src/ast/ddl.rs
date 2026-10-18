@@ -51,15 +51,11 @@ impl super::AlterRelation {
         source: Option<&crate::sem::SourcePathWithSpan>,
     ) -> Result<AstAndContextPair<TContext>, AnalysisError> {
         let changes = self.view_default_changes(&mut context);
-        let changes = match changes {
-            Err(AnalysisError::ViewMetadata(problem)) => {
-                context.report_analysis_problem(AnalysisProblem::view(&problem))?;
-                return Ok(AstAndContextPair::new(
-                    SemAst::unresolved_statement(),
-                    context,
-                ));
-            }
-            result => result?,
+        let Some(changes) = crate::sem::ResolutionFailure::finish(changes, &mut context)? else {
+            return Ok(AstAndContextPair::new(
+                SemAst::unresolved_statement(),
+                context,
+            ));
         };
         if let Some(change) = changes {
             let context = context.apply_alter_view(&change)?;
@@ -2031,7 +2027,7 @@ impl super::AlterRelation {
     fn view_default_changes(
         &self,
         context: &mut impl ParseContext,
-    ) -> Result<Option<crate::sem::AlterView>, AnalysisError> {
+    ) -> Result<Option<crate::sem::AlterView>, crate::sem::ResolutionFailure> {
         let requested = self.name.full_name()?;
         let Some(name) =
             crate::sem::search_path::expand_relation_search_path(context, &requested, |key| {
@@ -2052,11 +2048,13 @@ impl super::AlterRelation {
         }
         let change =
             crate::sem::AlterView::new(&crate::sem::ViewName::from_full_name(&name), &actions);
-        context
+        let mut view = context
             .get_view_impl(&name)
             .expect("resolved ordinary View")
-            .clone()
-            .apply_alter(&change)?;
+            .clone();
+        if !view.apply_alter(context, &change)? {
+            return Err(crate::sem::ResolutionFailure::reported());
+        }
         Ok(Some(change))
     }
 }
@@ -2064,7 +2062,7 @@ impl super::AlterCommand {
     fn view_default_action(
         &self,
         context: &mut impl ParseContext,
-    ) -> Result<Option<crate::sem::AlterObjSubCommand>, AnalysisError> {
+    ) -> Result<Option<crate::sem::AlterObjSubCommand>, crate::sem::ResolutionFailure> {
         match self {
             Self::Postgres(command) => command.view_default_action(context),
             Self::Default(name, expression) => {
@@ -2088,7 +2086,7 @@ impl PostgresAlterCommand {
     fn view_default_action(
         &self,
         context: &mut impl ParseContext,
-    ) -> Result<Option<crate::sem::AlterObjSubCommand>, AnalysisError> {
+    ) -> Result<Option<crate::sem::AlterObjSubCommand>, crate::sem::ResolutionFailure> {
         use crate::sem::AlterObjSubCommand;
         let action = match self.operation {
             AlterOperation::ColumnDefault => {
@@ -2115,7 +2113,7 @@ impl PostgresAlterCommand {
             | AlterOperation::EnableAlwaysRule
             | AlterOperation::DisableRule
             | AlterOperation::EnableReplicaRule => {
-                return Err(AnalysisError::view_metadata(
+                return Err(crate::sem::ResolutionFailure::view(
                     &crate::sem::problem::ViewProblem::invalid_alter(),
                 ));
             }
@@ -2128,7 +2126,7 @@ impl AlterDefinition {
     fn view_default(
         &self,
         context: &mut impl ParseContext,
-    ) -> Result<Option<crate::sem::SemScalarExpr>, AnalysisError> {
+    ) -> Result<Option<crate::sem::SemScalarExpr>, crate::sem::ResolutionFailure> {
         match self {
             Self::None => Ok(None),
             Self::Expression(value) => value
@@ -2139,8 +2137,11 @@ impl AlterDefinition {
                         &crate::sem::FromClause::default(),
                     ),
                 )
-                .map(Some),
-            _ => AnalysisError::raise_unexpected_input("view default expression"),
+                .map(Some)
+                .map_err(Into::into),
+            _ => {
+                AnalysisError::raise_unexpected_input("view default expression").map_err(Into::into)
+            }
         }
     }
 }

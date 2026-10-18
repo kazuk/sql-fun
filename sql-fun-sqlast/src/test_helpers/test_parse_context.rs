@@ -560,9 +560,9 @@ impl ParseContext for TestParseContext {
         } else if let Some(Some(view)) = self.view_definitions.get_mut(target) {
             view.associate_trigger(name);
         } else {
-            return Err(AnalysisError::trigger(
+            self.report_analysis_problem(crate::sem::AnalysisProblem::trigger(
                 &crate::sem::problem::TriggerProblem::target(target),
-            ));
+            ))?;
         }
         Ok(self)
     }
@@ -584,9 +584,9 @@ impl ParseContext for TestParseContext {
         } else if let Some(Some(view)) = self.view_definitions.get_mut(target) {
             view.dissociate_trigger(name);
         } else {
-            return Err(AnalysisError::trigger(
+            self.report_analysis_problem(crate::sem::AnalysisProblem::trigger(
                 &crate::sem::problem::TriggerProblem::target(target),
-            ));
+            ))?;
         }
         Ok(self)
     }

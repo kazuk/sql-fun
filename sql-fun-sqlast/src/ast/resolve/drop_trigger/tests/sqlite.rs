@@ -50,7 +50,7 @@ fn absent_if_exists_is_an_explicit_noop(#[case] sql: &str) -> testresult::TestRe
         test_helpers::statement("DROP TRIGGER absent")
             .node
             .resolve(&mut context)
-            .is_err()
+            .is_ok_and(|ast| matches!(ast, crate::sem::SemAst::UnresolvedStatement))
     );
     assert_eq!(test_helpers::active_count(&context.freeze()), 2);
     Ok(())

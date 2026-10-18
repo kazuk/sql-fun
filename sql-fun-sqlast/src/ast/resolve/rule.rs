@@ -1,5 +1,6 @@
 //! PostgreSQL rule analysis over common syntax only.
 use crate::ast::{CreateRule, Dialect, RuleEvent, StatementNode};
+use crate::sem::ResolutionFailure;
 use crate::sem::problem::RuleProblem;
 use crate::sem::{
     self, AliasSpec, AnalysisError, DataSource, FromClause, ParseContext, RuleIdentity,
@@ -10,19 +11,18 @@ impl CreateRule {
     pub(crate) fn resolve(
         &self,
         context: &mut impl ParseContext,
-    ) -> Result<sem::CreateRule, AnalysisError> {
+    ) -> Result<Option<sem::CreateRule>, AnalysisError> {
         context.begin_parameter_type_analysis();
-        let result = self.resolve_definition(context);
-        let result = result.and_then(|definition| Self::validate_resolved(context, definition));
-        if let Err(error) = &result {
-            error.report_rule_problem(context)?;
-        }
+        let result = self
+            .resolve_definition(context)
+            .and_then(|definition| Self::validate_resolved(context, definition));
+        let result = ResolutionFailure::finish(result, context);
         context.finish_analysis(result)
     }
     fn validate_resolved(
         context: &impl ParseContext,
         definition: sem::CreateRule,
-    ) -> Result<sem::CreateRule, AnalysisError> {
+    ) -> Result<sem::CreateRule, ResolutionFailure> {
         if context.parameter_inference_needed() {
             return Self::invalid(
                 definition.identity(),
@@ -41,7 +41,12 @@ impl CreateRule {
         &self,
         mut context: C,
     ) -> Result<crate::AstAndContextPair<C>, AnalysisError> {
-        let definition = self.resolve(&mut context)?;
+        let Some(definition) = self.resolve(&mut context)? else {
+            return Ok(crate::AstAndContextPair::new(
+                SemAst::unresolved_statement(),
+                context,
+            ));
+        };
         let context = definition.apply(context)?;
         Ok(crate::AstAndContextPair::new(
             SemAst::create_rule(&definition),
@@ -51,17 +56,17 @@ impl CreateRule {
     fn resolve_definition(
         &self,
         context: &mut impl ParseContext,
-    ) -> Result<sem::CreateRule, AnalysisError> {
+    ) -> Result<sem::CreateRule, ResolutionFailure> {
         AnalysisError::check_dialect(Dialect::postgres(), context.dialect())?;
         let requested = self.relation.name.full_name()?;
         let target = context
             .resolve_relation_name(&requested)
-            .ok_or_else(|| AnalysisError::rule(&RuleProblem::target(&requested)))?;
+            .ok_or_else(|| ResolutionFailure::rule(&RuleProblem::target(&requested)))?;
         if context
             .get_view(&crate::sem::ViewName::from_full_name(&target))
             .is_some_and(sem::ViewLike::is_materialized)
         {
-            return Err(AnalysisError::rule(&RuleProblem::target(&target)));
+            return Err(ResolutionFailure::rule(&RuleProblem::target(&target)));
         }
         let name = self.name.full_name()?;
         let identity = RuleIdentity::new(&target, name.name().as_str());
@@ -111,8 +116,8 @@ impl CreateRule {
         }
         Ok(definition)
     }
-    fn invalid<T>(identity: &RuleIdentity, detail: &str) -> Result<T, AnalysisError> {
-        Err(AnalysisError::rule(&RuleProblem::definition(
+    fn invalid<T>(identity: &RuleIdentity, detail: &str) -> Result<T, ResolutionFailure> {
+        Err(ResolutionFailure::rule(&RuleProblem::definition(
             identity, detail,
         )))
     }
@@ -120,9 +125,9 @@ impl CreateRule {
         &self,
         context: &impl ParseContext,
         identity: &RuleIdentity,
-    ) -> Result<(), AnalysisError> {
+    ) -> Result<(), ResolutionFailure> {
         if !self.replace && context.rule(identity).is_some() {
-            return Err(AnalysisError::rule(&RuleProblem::duplicate(identity)));
+            return Err(ResolutionFailure::rule(&RuleProblem::duplicate(identity)));
         }
         if self.event == RuleEvent::Select {
             if context
@@ -132,7 +137,7 @@ impl CreateRule {
                 return Self::invalid(identity, "ON SELECT requires an ordinary view");
             }
             if !self.replace {
-                return Err(AnalysisError::rule(&RuleProblem::duplicate(identity)));
+                return Err(ResolutionFailure::rule(&RuleProblem::duplicate(identity)));
             }
             if identity.name().name().as_str() != "_RETURN"
                 || !self.instead
@@ -154,7 +159,7 @@ impl CreateRule {
         context: &mut impl ParseContext,
         scope: &ScalarAnalysisContext<'_>,
         identity: &RuleIdentity,
-    ) -> Result<Option<sem::SemScalarExpr>, AnalysisError> {
+    ) -> Result<Option<sem::SemScalarExpr>, ResolutionFailure> {
         let Some(syntax) = &self.predicate else {
             return Ok(None);
         };
@@ -186,7 +191,7 @@ impl CreateRule {
         &self,
         context: &impl ParseContext,
         definition: &sem::CreateRule,
-    ) -> Result<(), AnalysisError> {
+    ) -> Result<(), ResolutionFailure> {
         let mut returning = false;
         for action in definition.actions() {
             if let Some(columns) = action.rule_returning()
@@ -214,7 +219,7 @@ impl CreateRule {
         identity: &RuleIdentity,
         columns: &sem::ResultColumnCollection,
         names: bool,
-    ) -> Result<(), AnalysisError> {
+    ) -> Result<(), ResolutionFailure> {
         let mut index = 0;
         loop {
             let expected = if let Some(table) =
@@ -279,7 +284,7 @@ impl RuleEvent {
 mod tests;
 
 impl crate::ast::CteBody {
-    fn validate_select_rule_ctes(&self, identity: &RuleIdentity) -> Result<(), AnalysisError> {
+    fn validate_select_rule_ctes(&self, identity: &RuleIdentity) -> Result<(), ResolutionFailure> {
         match self {
             Self::Query(query) => query.validate_select_rule_ctes(identity),
             _ => CreateRule::invalid(
@@ -290,7 +295,7 @@ impl crate::ast::CteBody {
     }
 }
 impl crate::ast::Query {
-    fn validate_select_rule_ctes(&self, identity: &RuleIdentity) -> Result<(), AnalysisError> {
+    fn validate_select_rule_ctes(&self, identity: &RuleIdentity) -> Result<(), ResolutionFailure> {
         for entry in &self.with.entries {
             entry.body.validate_select_rule_ctes(identity)?;
         }
@@ -305,7 +310,7 @@ impl StatementNode {
             None
         }
     }
-    fn validate_select_rule_ctes(&self, identity: &RuleIdentity) -> Result<(), AnalysisError> {
+    fn validate_select_rule_ctes(&self, identity: &RuleIdentity) -> Result<(), ResolutionFailure> {
         if let Self::Query(query) = self {
             query.validate_select_rule_ctes(identity)?;
         }
@@ -316,20 +321,32 @@ impl StatementNode {
         context: &mut impl ParseContext,
         scope: &ScalarAnalysisContext<'_>,
         identity: &RuleIdentity,
-    ) -> Result<SemAst, AnalysisError> {
+    ) -> Result<SemAst, ResolutionFailure> {
         match self {
             Self::Query(query) => query
                 .resolve_in(context, Some(scope))
-                .map(|query| SemAst::select(&query)),
+                .map(|query| SemAst::select(&query))
+                .map_err(Into::into),
             Self::Insert(insert) => insert
                 .resolve_in(context, Some(scope))
-                .map(|insert| SemAst::insert(&insert)),
+                .map(|value| {
+                    value
+                        .as_ref()
+                        .map_or_else(SemAst::unresolved_statement, SemAst::insert)
+                })
+                .map_err(Into::into),
             Self::Update(update) => update
                 .resolve_in(context, Some(scope))
-                .map(|update| SemAst::update(&update)),
+                .map(|value| {
+                    value
+                        .as_ref()
+                        .map_or_else(SemAst::unresolved_statement, SemAst::update)
+                })
+                .map_err(Into::into),
             Self::Delete(delete) => delete
                 .resolve_in(context, Some(scope))
-                .map(|delete| SemAst::delete(&delete)),
+                .map(|delete| SemAst::delete(&delete))
+                .map_err(Into::into),
             _ => CreateRule::invalid(
                 identity,
                 "unsupported rule action; expected a common query or INSERT/UPDATE/DELETE statement",

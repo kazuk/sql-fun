@@ -230,14 +230,17 @@ impl MergeWhen {
                 "MERGE target does not accept UPDATE assignments",
             ));
         }
-        let assignments = UpdateAssignmentCollection::resolve(
+        let result = UpdateAssignmentCollection::resolve(
             context,
             &self.target_list,
             target.update(),
             alias,
             target_scope,
             scope,
-        )?;
+        );
+        let Some(assignments) = crate::sem::ResolutionFailure::finish(result, context)? else {
+            return Ok(MergeAction::unresolved());
+        };
         Ok(MergeAction::update(&assignments))
     }
     fn resolve_insert_action(
@@ -258,14 +261,17 @@ impl MergeWhen {
         } else {
             Some(self.values.as_slice())
         };
-        let clause = InsertClauseSemantics::resolve(
+        let result = InsertClauseSemantics::resolve(
             context,
             &self.target_list,
             &InsertTargetBinding::new(target.insert(), alias, target_scope),
             values,
             scope,
             Some(&self.overriding),
-        )?;
+        );
+        let Some(clause) = crate::sem::ResolutionFailure::finish(result, context)? else {
+            return Ok(MergeAction::unresolved());
+        };
         let overriding = self.overriding.merge_override();
         Ok(MergeAction::insert(&clause, overriding.as_deref()))
     }

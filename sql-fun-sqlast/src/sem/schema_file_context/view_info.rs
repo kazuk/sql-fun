@@ -64,7 +64,9 @@ impl ViewInfoWrite for SchemaFileContext {
             self.report_analysis_problem(AnalysisProblem::view_not_found(view_name))?;
             return Ok(self);
         };
-        view.apply_alter(alter_view)?;
+        if !view.apply_alter(&mut self, alter_view)? {
+            return Ok(self);
+        }
         self.catalog.store_view(&key, &view)?;
         Ok(self)
     }

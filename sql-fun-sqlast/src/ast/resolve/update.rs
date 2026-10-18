@@ -1,4 +1,5 @@
 use crate::ast::{Alias, Assignment, Dialect, Expr, FromItem, Name, Update};
+use crate::sem::ResolutionFailure;
 use crate::sem::UpdateDestination;
 use crate::sem::problem::UpdateProblemKind;
 use crate::sem::{
@@ -11,18 +12,21 @@ impl Update {
     pub(crate) fn resolve(
         &self,
         context: &mut impl ParseContext,
-    ) -> Result<UpdateStatement, AnalysisError> {
+    ) -> Result<Option<UpdateStatement>, AnalysisError> {
         context.begin_parameter_type_analysis();
-        let result = self.resolve_in(context, None).and_then(|mut update| {
+        let result = self.resolve_in(context, None).and_then(|value| {
+            let Some(mut statement) = value else {
+                return Ok(None);
+            };
             if context.parameter_inference_needed() {
                 let constraints =
                     crate::sem::parameter_resolution::ParameterResolution::infer_update(
-                        &mut update,
+                        &mut statement,
                         context,
                     )?;
                 context.set_parameter_constraints(&constraints);
             }
-            Ok(update)
+            Ok(Some(statement))
         });
         context.finish_analysis(result)
     }
@@ -30,7 +34,7 @@ impl Update {
         &self,
         context: &mut impl ParseContext,
         table: &UpdateDestination,
-    ) -> Result<(), AnalysisError> {
+    ) -> Result<(), ResolutionFailure> {
         if let Some(support) = table.view_support() {
             let columns: Vec<_> = self
                 .assignments
@@ -42,9 +46,7 @@ impl Update {
                     UpdateProblemKind::view_operation(),
                     "SET targets do not activate an INSTEAD OF UPDATE trigger",
                 ))?;
-                return Err(AnalysisError::unexpected_input_error(
-                    "no matching view UPDATE trigger",
-                ));
+                return Err(ResolutionFailure::reported());
             }
         }
         Ok(())
@@ -53,7 +55,15 @@ impl Update {
         &self,
         context: &mut impl ParseContext,
         outer: Option<&ScalarAnalysisContext<'_>>,
-    ) -> Result<UpdateStatement, AnalysisError> {
+    ) -> Result<Option<UpdateStatement>, AnalysisError> {
+        let result = self.resolve_definition(context, outer);
+        ResolutionFailure::finish(result, context)
+    }
+    fn resolve_definition(
+        &self,
+        context: &mut impl ParseContext,
+        outer: Option<&ScalarAnalysisContext<'_>>,
+    ) -> Result<UpdateStatement, ResolutionFailure> {
         let trigger_outer = if let Some(scope) = outer {
             scope.trigger_scope()
         } else {
@@ -127,26 +137,27 @@ impl Update {
         context: &mut impl ParseContext,
         requested: &TableName,
         rule_definition: bool,
-    ) -> Result<UpdateDestination, AnalysisError> {
+    ) -> Result<UpdateDestination, ResolutionFailure> {
         let destination = if rule_definition {
             UpdateDestination::resolve_rule_target(context, requested)?
         } else {
             UpdateDestination::resolve(context, requested)?
         };
         let Some(table) = destination else {
-            context.report_analysis_problem(AnalysisProblem::relation_not_found(requested))?;
-            return Err(AnalysisError::unexpected_input_error(
-                "UPDATE destination not found",
-            ));
+            if context
+                .resolve_relation_name(requested.full_name())
+                .is_none()
+            {
+                context.report_analysis_problem(AnalysisProblem::relation_not_found(requested))?;
+            }
+            return Err(ResolutionFailure::reported());
         };
         if !table.is_writable() {
             context.report_analysis_problem(AnalysisProblem::update(
                 UpdateProblemKind::read_only_target(),
                 "destination does not support UPDATE",
             ))?;
-            return Err(AnalysisError::unexpected_input_error(
-                "read-only UPDATE destination",
-            ));
+            return Err(ResolutionFailure::reported());
         }
         if !self.returning.is_empty()
             && table
@@ -164,7 +175,7 @@ impl Update {
         &self,
         context: &mut impl ParseContext,
         table: &UpdateDestination,
-    ) -> Result<(), AnalysisError> {
+    ) -> Result<(), ResolutionFailure> {
         if let Some(index) = &self.relation.indexed {
             let name = crate::sem::FullName::with_schema(
                 table
@@ -194,7 +205,7 @@ impl Update {
         alias: &AliasSpec,
         with: &WithClause,
         outer: Option<&ScalarAnalysisContext<'_>>,
-    ) -> Result<FromClause, AnalysisError> {
+    ) -> Result<FromClause, ResolutionFailure> {
         // FROM subqueries cannot implicitly see the UPDATE target. Correlation
         // within RHS expressions uses the complete scope assembled below.
         let mut from = FromItem::resolve_list_in(&self.from, context, with, outer)?;
@@ -214,7 +225,7 @@ impl Update {
         context: &mut impl ParseContext,
         target: &TableName,
         scope: &ScalarAnalysisContext<'_>,
-    ) -> Result<Option<crate::sem::UpdatePredicate>, AnalysisError> {
+    ) -> Result<Option<crate::sem::UpdatePredicate>, ResolutionFailure> {
         if let Some(expression) = &self.predicate
             && let Some(cursor) = expression.resolve_current_of(context, target)?
         {
@@ -248,7 +259,7 @@ impl Update {
         table: &UpdateDestination,
         alias: &AliasSpec,
         outer: &ScalarAnalysisContext<'_>,
-    ) -> Result<ResultColumnCollection, AnalysisError> {
+    ) -> Result<ResultColumnCollection, ResolutionFailure> {
         let with = outer.with_clause();
         let from = outer.sources();
         if context.dialect() == Dialect::sqlite() {
@@ -269,6 +280,7 @@ impl Update {
                 &scope,
                 &returning_alias,
             )
+            .map_err(Into::into)
         } else {
             let scope = ScalarAnalysisContext::nested(with, from, Some(outer));
             ResultColumnCollection::resolve_for_update(
@@ -279,6 +291,7 @@ impl Update {
                 &scope,
                 alias,
             )
+            .map_err(Into::into)
         }
     }
 }
@@ -291,7 +304,7 @@ impl UpdateAssignmentCollection {
         alias: &AliasSpec,
         target_scope: &ScalarAnalysisContext<'_>,
         rhs_scope: &ScalarAnalysisContext<'_>,
-    ) -> Result<Self, AnalysisError> {
+    ) -> Result<Self, ResolutionFailure> {
         let mut resolved = Self::default();
         let mut seen: Vec<&Assignment> = Vec::new();
         for assignment in assignments {
@@ -317,9 +330,7 @@ impl UpdateAssignmentCollection {
                     table.name(),
                     &column_name,
                 ))?;
-                return Err(AnalysisError::unexpected_input_error(
-                    "UPDATE column not found",
-                ));
+                return Err(ResolutionFailure::reported());
             };
             if !table.can_assign(&column_name) {
                 context.report_analysis_problem(AnalysisProblem::update(
@@ -360,7 +371,7 @@ impl Assignment {
         context: &mut impl ParseContext,
         column: &crate::sem::ColumnDefinition,
         value: &UpdateValue,
-    ) -> Result<(), AnalysisError> {
+    ) -> Result<(), ResolutionFailure> {
         if value.is_default() && !self.indirection.is_empty() {
             context.report_analysis_problem(AnalysisProblem::update(
                 UpdateProblemKind::default_target(),
@@ -393,9 +404,9 @@ impl Assignment {
         &self,
         context: &mut impl ParseContext,
         scope: &ScalarAnalysisContext<'_>,
-    ) -> Result<UpdateValue, AnalysisError> {
+    ) -> Result<UpdateValue, ResolutionFailure> {
         let Some(value) = &self.value else {
-            return AnalysisError::raise_unexpected_input("missing UPDATE RHS");
+            return AnalysisError::raise_unexpected_input("missing UPDATE RHS").map_err(Into::into);
         };
         if let Some((source, position, width)) = value.multi_assignment_data() {
             let index = usize::try_from(position - 1)
@@ -410,7 +421,7 @@ impl Expr {
         &self,
         context: &mut impl ParseContext,
         target: &TableName,
-    ) -> Result<Option<crate::sem::UpdateCursor>, AnalysisError> {
+    ) -> Result<Option<crate::sem::UpdateCursor>, ResolutionFailure> {
         match self {
             Self::CurrentOf(cursor) => cursor.resolve_update(context, target).map(Some),
             _ => Ok(None),
@@ -422,7 +433,7 @@ impl Expr {
         scope: &ScalarAnalysisContext<'_>,
         index: usize,
         width: usize,
-    ) -> Result<UpdateValue, AnalysisError> {
+    ) -> Result<UpdateValue, ResolutionFailure> {
         match self {
             Self::Row(values) | Self::Parenthesized(values) | Self::List(values) => {
                 Self::resolve_update_row_values(values, context, scope, index, width)
@@ -430,7 +441,8 @@ impl Expr {
             Self::Subquery(query) => query.resolve_update_row(context, scope, index, width),
             _ => Err(AnalysisError::unexpected_input_error(
                 "row assignment requires row or subquery",
-            )),
+            )
+            .into()),
         }
     }
     fn resolve_update_row_values(
@@ -439,11 +451,11 @@ impl Expr {
         scope: &ScalarAnalysisContext<'_>,
         index: usize,
         width: usize,
-    ) -> Result<UpdateValue, AnalysisError> {
+    ) -> Result<UpdateValue, ResolutionFailure> {
         if values.len() != width {
-            return Err(AnalysisError::unexpected_input_error(
-                "row assignment width mismatch",
-            ));
+            return Err(
+                AnalysisError::unexpected_input_error("row assignment width mismatch").into(),
+            );
         }
         values
             .get(index)
@@ -455,7 +467,7 @@ impl Expr {
         &self,
         context: &mut impl ParseContext,
         scope: &ScalarAnalysisContext<'_>,
-    ) -> Result<UpdateValue, AnalysisError> {
+    ) -> Result<UpdateValue, ResolutionFailure> {
         match self {
             Self::Default => Ok(UpdateValue::default_value()),
             _ => Ok(UpdateValue::expression(&self.resolve_in(context, scope)?)),
@@ -473,12 +485,12 @@ impl crate::ast::Subquery {
         scope: &ScalarAnalysisContext<'_>,
         index: usize,
         width: usize,
-    ) -> Result<UpdateValue, AnalysisError> {
+    ) -> Result<UpdateValue, ResolutionFailure> {
         let query = self.query.resolve_in(context, Some(scope))?;
         if !query.has_width(width) {
-            return Err(AnalysisError::unexpected_input_error(
-                "row subquery width mismatch",
-            ));
+            return Err(
+                AnalysisError::unexpected_input_error("row subquery width mismatch").into(),
+            );
         }
         Ok(UpdateValue::query(&query, index))
     }
@@ -489,11 +501,12 @@ impl crate::ast::CurrentOf {
         &self,
         context: &mut impl ParseContext,
         target: &TableName,
-    ) -> Result<crate::sem::UpdateCursor, AnalysisError> {
+    ) -> Result<crate::sem::UpdateCursor, ResolutionFailure> {
         if self.parameter != 0 {
             return Err(AnalysisError::unexpected_input_error(
                 "CURRENT OF cursor parameters require a procedural variable resolver",
-            ));
+            )
+            .into());
         }
         let cursor = crate::sem::UpdateCursor::new(&self.name, context.resolve_cursor(&self.name));
         let problem = match cursor.binding() {

@@ -485,16 +485,23 @@ impl CreateTrigger {
     pub const fn temporary(&self) -> bool {
         self.temporary
     }
-    pub(crate) fn apply<C: ParseContext>(&self, context: C) -> Result<C, AnalysisError> {
+    pub(crate) fn apply<C: ParseContext>(&self, mut context: C) -> Result<C, AnalysisError> {
         if let Some(existing) = context.trigger(self.identity()) {
             if self.if_not_exists {
                 return Ok(context);
             }
             if !self.replace || existing.constraint().is_some() || self.constraint.is_some() {
-                return Err(AnalysisError::trigger(
+                context.report_analysis_problem(crate::sem::AnalysisProblem::trigger(
                     &crate::sem::problem::TriggerProblem::duplicate(self.identity()),
-                ));
+                ))?;
+                return Ok(context);
             }
+        }
+        if context.resolve_relation_name(&self.target).is_none() {
+            context.report_analysis_problem(crate::sem::AnalysisProblem::trigger(
+                &crate::sem::problem::TriggerProblem::target(&self.target),
+            ))?;
+            return Ok(context);
         }
         // DDL determines the association; storage only performs the supplied update.
         let context = context.associate_trigger(&self.target, self.identity.name())?;

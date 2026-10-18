@@ -45,6 +45,7 @@ mod parse_context;
 mod pg_type;
 pub mod problem;
 mod query;
+mod resolution;
 mod scalar_expr;
 mod schema_file_context;
 pub(crate) mod search_path;
@@ -76,6 +77,7 @@ pub(crate) use self::insert_statement::{
 };
 #[cfg(test)]
 pub(crate) use self::parse_context::conflict_info::infer_from_catalog;
+pub(crate) use self::resolution::ResolutionFailure;
 pub(crate) use self::update_statement::UpdateAssignmentCollection;
 
 pub(crate) use self::insert_statement::InsertDestination;

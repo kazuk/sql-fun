@@ -745,9 +745,9 @@ impl ParseContext for SchemaFileContext {
             view.associate_trigger(name);
             self.catalog.views.insert(target, &view);
         } else {
-            return Err(AnalysisError::trigger(
+            self.report_analysis_problem(crate::sem::AnalysisProblem::trigger(
                 &crate::sem::problem::TriggerProblem::target(target),
-            ));
+            ))?;
         }
         Ok(self)
     }
@@ -771,9 +771,9 @@ impl ParseContext for SchemaFileContext {
             view.dissociate_trigger(name);
             self.catalog.views.insert(target, &view);
         } else {
-            return Err(AnalysisError::trigger(
+            self.report_analysis_problem(crate::sem::AnalysisProblem::trigger(
                 &crate::sem::problem::TriggerProblem::target(target),
-            ));
+            ))?;
         }
         Ok(self)
     }

@@ -2,6 +2,7 @@ use crate::ast::{
     Alias, Assignment, Conflict, ConflictAction, Dialect, Expr, Insert, Name, OverridingKind,
     Query, QueryBody,
 };
+use crate::sem::ResolutionFailure;
 use crate::sem::{
     AliasSpec, AnalysisError, AnalysisProblem, ColumnName, DataSource, FromClause,
     InsertClauseSemantics, InsertClauseValues, InsertConflict, InsertDestination, InsertSource,
@@ -13,27 +14,37 @@ impl Insert {
     pub(crate) fn resolve(
         &self,
         context: &mut impl ParseContext,
-    ) -> Result<InsertStatement, AnalysisError> {
+    ) -> Result<Option<InsertStatement>, AnalysisError> {
         context.begin_parameter_type_analysis();
-        let result = self.resolve_in(context, None);
-        let result = result.and_then(|mut insert| {
+        let result = self.resolve_in(context, None).and_then(|value| {
+            let Some(mut statement) = value else {
+                return Ok(None);
+            };
             if context.parameter_inference_needed() {
                 let constraints =
                     crate::sem::parameter_resolution::ParameterResolution::infer_insert(
-                        &mut insert,
+                        &mut statement,
                         context,
                     )?;
                 context.set_parameter_constraints(&constraints);
             }
-            Ok(insert)
+            Ok(Some(statement))
         });
         context.finish_analysis(result)
     }
-    pub(super) fn resolve_in(
+    pub(in crate::ast) fn resolve_in(
         &self,
         context: &mut impl ParseContext,
         outer: Option<&ScalarAnalysisContext<'_>>,
-    ) -> Result<InsertStatement, AnalysisError> {
+    ) -> Result<Option<InsertStatement>, AnalysisError> {
+        let result = self.resolve_definition(context, outer);
+        ResolutionFailure::finish(result, context)
+    }
+    fn resolve_definition(
+        &self,
+        context: &mut impl ParseContext,
+        outer: Option<&ScalarAnalysisContext<'_>>,
+    ) -> Result<InsertStatement, ResolutionFailure> {
         if let Some(conflict) = &self.conflict {
             conflict.require_insert_action();
         }
@@ -50,19 +61,20 @@ impl Insert {
             InsertDestination::resolve(context, &requested)?
         };
         let Some(table) = destination else {
-            context.report_analysis_problem(AnalysisProblem::relation_not_found(&requested))?;
-            return Err(AnalysisError::unexpected_input_error(
-                "INSERT destination relation not found",
-            ));
+            if context
+                .resolve_relation_name(requested.full_name())
+                .is_none()
+            {
+                context.report_analysis_problem(AnalysisProblem::relation_not_found(&requested))?;
+            }
+            return Err(ResolutionFailure::reported());
         };
         if !table.is_writable() {
             context.report_analysis_problem(AnalysisProblem::insert(
                 crate::sem::problem::InsertProblemKind::read_only_target(),
                 "destination view does not support INSERT",
             ))?;
-            return Err(AnalysisError::unexpected_input_error(
-                "read-only INSERT destination",
-            ));
+            return Err(ResolutionFailure::reported());
         }
         if let Some(support) = table.view_support() {
             if !self.returning.is_empty() && !support.supports_returning() {
@@ -70,18 +82,14 @@ impl Insert {
                     crate::sem::problem::InsertProblemKind::view_operation(),
                     "destination view does not support INSERT RETURNING",
                 ))?;
-                return Err(AnalysisError::unexpected_input_error(
-                    "unsupported view RETURNING",
-                ));
+                return Err(ResolutionFailure::reported());
             }
             if self.conflict.is_some() && !support.supports_on_conflict() {
                 context.report_analysis_problem(AnalysisProblem::insert(
                     crate::sem::problem::InsertProblemKind::view_operation(),
                     "destination view does not support ON CONFLICT",
                 ))?;
-                return Err(AnalysisError::unexpected_input_error(
-                    "unsupported view ON CONFLICT",
-                ));
+                return Err(ResolutionFailure::reported());
             }
         }
         let name = table.name().clone();
@@ -202,7 +210,7 @@ impl InsertClauseSemantics {
         values: Option<&[Expr]>,
         value_scope: &ScalarAnalysisContext<'_>,
         overriding: Option<&OverridingKind>,
-    ) -> Result<Self, AnalysisError> {
+    ) -> Result<Self, ResolutionFailure> {
         let implicit_width = values.map(|values| values.len());
         let targets = InsertTargetCollection::resolve(
             context,
@@ -225,7 +233,7 @@ impl InsertClauseSemantics {
         &self,
         context: &mut impl ParseContext,
         overriding: Option<&OverridingKind>,
-    ) -> Result<(), AnalysisError> {
+    ) -> Result<(), ResolutionFailure> {
         if let Some(values) = self.values().values() {
             self.targets()
                 .validate_values(context, values, overriding)?;
@@ -276,7 +284,7 @@ impl InsertTargetCollection {
         destination: &InsertTargetBinding<'_, '_>,
         expression_scope: &ScalarAnalysisContext<'_>,
         mode: InsertTargetMode,
-    ) -> Result<Self, AnalysisError> {
+    ) -> Result<Self, ResolutionFailure> {
         let table = destination.table;
         let alias = destination.alias;
         let scope = destination.scope;
@@ -347,9 +355,7 @@ impl InsertTargetCollection {
                         table.name(),
                         &column_name,
                     ))?;
-                    return Err(AnalysisError::unexpected_input_error(
-                        "INSERT destination column not found",
-                    ));
+                    return Err(ResolutionFailure::reported());
                 };
                 let mut destination =
                     Name::from_parts(&[alias.name().as_str().to_owned(), assignment.name.clone()])
@@ -379,7 +385,7 @@ impl InsertTargetCollection {
         context: &mut impl ParseContext,
         values: &InsertValueCollection,
         overriding: Option<&OverridingKind>,
-    ) -> Result<(), AnalysisError> {
+    ) -> Result<(), ResolutionFailure> {
         validate_insert_width(
             context,
             values.len(),
@@ -405,7 +411,7 @@ impl InsertTargetCollection {
         source: &InsertSource,
         source_is_present: bool,
         overriding: Option<&OverridingKind>,
-    ) -> Result<(), AnalysisError> {
+    ) -> Result<(), ResolutionFailure> {
         if !source_is_present {
             return Ok(());
         }
@@ -430,7 +436,7 @@ impl InsertValueCollection {
         expressions: &[Expr],
         context: &mut impl ParseContext,
         scope: &ScalarAnalysisContext<'_>,
-    ) -> Result<Self, AnalysisError> {
+    ) -> Result<Self, ResolutionFailure> {
         let mut values = Self::default();
         for expression in expressions {
             values.push(expression.resolve_insert_value(context, scope)?);
@@ -445,7 +451,7 @@ impl InsertTarget {
         context: &mut impl ParseContext,
         defaults_only: bool,
         overrides_identity: bool,
-    ) -> Result<(), AnalysisError> {
+    ) -> Result<(), ResolutionFailure> {
         let constraints = self.column().constraints();
         if constraints
             .iter()
@@ -478,7 +484,7 @@ impl InsertSource {
         &self,
         context: &mut impl ParseContext,
         width: usize,
-    ) -> Result<(), AnalysisError> {
+    ) -> Result<(), ResolutionFailure> {
         validate_insert_width(
             context,
             self.width(),
@@ -512,7 +518,7 @@ fn validate_insert_width(
     actual: usize,
     expected: usize,
     message: &str,
-) -> Result<(), AnalysisError> {
+) -> Result<(), ResolutionFailure> {
     if actual != expected {
         context.report_analysis_problem(AnalysisProblem::insert(
             crate::sem::problem::InsertProblemKind::arity(),
@@ -530,7 +536,7 @@ impl Query {
         &self,
         context: &mut impl ParseContext,
         scope: &ScalarAnalysisContext<'_>,
-    ) -> Result<InsertSource, AnalysisError> {
+    ) -> Result<InsertSource, ResolutionFailure> {
         if let QueryBody::Values(rows) = &self.body
             && self.with.entries.is_empty()
             && self.order.is_empty()
@@ -553,7 +559,7 @@ impl Expr {
         &self,
         context: &mut impl ParseContext,
         scope: &ScalarAnalysisContext<'_>,
-    ) -> Result<InsertValue, AnalysisError> {
+    ) -> Result<InsertValue, ResolutionFailure> {
         match self {
             Self::Default => Ok(InsertValue::default_value()),
             _ => Ok(InsertValue::expression(self.resolve_in(context, scope)?)),
@@ -593,7 +599,7 @@ impl Conflict {
         scope: &ScalarAnalysisContext<'_>,
         table: &InsertDestination,
         name: &TableName,
-    ) -> Result<Vec<InsertConflict>, AnalysisError> {
+    ) -> Result<Vec<InsertConflict>, ResolutionFailure> {
         if context.dialect() == Dialect::sqlite()
             && self.next.is_some()
             && self.inference.is_empty()
@@ -656,7 +662,9 @@ impl Conflict {
                     .get_view(&crate::sem::ViewName::from_full_name(name.full_name()))
                     .is_some()
                 {
-                    crate::sem::ViewWriteEvaluation::new(context).infer_arbiters(name, &conflict)?
+                    crate::sem::ViewWriteEvaluation::new(context)
+                        .infer_arbiters(name, &conflict)?
+                        .ok_or_else(ResolutionFailure::reported)?
                 } else {
                     context.infer_conflict_arbiters(name, &conflict)?
                 }
@@ -703,7 +711,7 @@ impl crate::ast::IndexExpression {
     fn resolve_insert_modifiers(
         &self,
         context: &mut impl ParseContext,
-    ) -> Result<crate::sem::InsertInferenceModifiers, AnalysisError> {
+    ) -> Result<crate::sem::InsertInferenceModifiers, ResolutionFailure> {
         let mut names = Vec::new();
         if let Some(expression) = &self.expression {
             expression.collect_insert_collations(&mut names);
@@ -749,19 +757,22 @@ impl Expr {
         &self,
         context: &mut impl ParseContext,
         scope: &ScalarAnalysisContext<'_>,
-    ) -> Result<crate::sem::SemScalarExpr, AnalysisError> {
+    ) -> Result<crate::sem::SemScalarExpr, ResolutionFailure> {
         match self {
             Self::Collate(collate) => collate.argument.resolve_insert_inference(context, scope),
             Self::Parenthesized(items) => match items.as_slice() {
                 [expression] => expression.resolve_insert_inference(context, scope),
-                _ => self.resolve_in(context, scope),
+                _ => self.resolve_in(context, scope).map_err(Into::into),
             },
-            _ => self.resolve_in(context, scope),
+            _ => self.resolve_in(context, scope).map_err(Into::into),
         }
     }
 }
 impl crate::sem::CatalogNameLookup {
-    fn report_insert_problem(&self, context: &mut impl ParseContext) -> Result<(), AnalysisError> {
+    fn report_insert_problem(
+        &self,
+        context: &mut impl ParseContext,
+    ) -> Result<(), ResolutionFailure> {
         let kind = if self.is_missing() {
             Some(crate::sem::problem::InsertProblemKind::conflict_name_missing())
         } else if self.ambiguous_candidates().is_some() {

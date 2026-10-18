@@ -171,7 +171,11 @@ fn resolves_complete_statement_without_applying(
 #[case::union_rows("CREATE RULE r AS ON UPDATE TO items DO SELECT OLD.id UNION SELECT NEW.id")]
 fn rejects_invalid_definition_without_registration(#[case] sql: &str) {
     let mut context = test_helpers::catalog();
-    assert!(test_helpers::resolve(sql, &mut context).is_err(), "{sql}");
+    assert!(
+        test_helpers::resolve(sql, &mut context)
+            .is_ok_and(|ast| matches!(ast, crate::sem::SemAst::UnresolvedStatement)),
+        "{sql}"
+    );
     let identity = RuleIdentity::new(&FullName::with_schema("public", "items"), "r");
     assert!(context.rule(&identity).is_none());
     let mut has_rule_problem = false;
@@ -317,7 +321,7 @@ fn replacement_updates_links_without_duplicates_and_rejected_analysis_preserves_
             "CREATE OR REPLACE RULE r AS ON INSERT TO item_view DO SELECT OLD.id",
             &mut child
         )
-        .is_err()
+        .is_ok_and(|ast| matches!(ast, crate::sem::SemAst::UnresolvedStatement))
     );
     assert!(child.rule(&identity).unwrap().instead());
     assert!(
@@ -325,7 +329,7 @@ fn replacement_updates_links_without_duplicates_and_rejected_analysis_preserves_
             "CREATE RULE r AS ON INSERT TO item_view DO NOTHING",
             test_helpers::layer(&parent)
         )
-        .is_err()
+        .is_ok_and(|context| !context.problems().is_empty())
     );
     let child = test_helpers::apply(
         "CREATE OR REPLACE RULE r AS ON INSERT TO item_view DO SELECT NEW.id",
@@ -409,12 +413,21 @@ fn exact_identities_preserve_relation_scope_and_quoted_components() -> testresul
         assert_eq!(linked.len(), 1);
         assert!(std::ptr::eq(linked[0], registered));
     }
-    let error = test_helpers::resolve(
+    let unresolved = test_helpers::resolve(
         "CREATE RULE r AS ON INSERT TO items DO NOTHING",
         &mut context,
     )
-    .unwrap_err();
-    assert!(error.to_string().contains("Duplicate"));
+    .unwrap();
+    assert!(matches!(
+        unresolved,
+        crate::sem::SemAst::UnresolvedStatement
+    ));
+    assert!(
+        context
+            .problems()
+            .iter()
+            .any(|problem| problem.code() == "rule_invalid_definition")
+    );
     Ok(())
 }
 
@@ -426,7 +439,7 @@ fn insert_returning_does_not_bind_enclosing_rule_rows(
     test_helpers::resolve(
         "CREATE RULE r AS ON UPDATE TO items DO INSTEAD INSERT INTO sink VALUES(NEW.id) RETURNING OLD.id",
         &mut context,
-    ).unwrap_err();
+    ).unwrap();
     if version == "18" {
         let mut has_boundary = false;
         for problem in context.reported_problems() {
@@ -460,8 +473,13 @@ fn returning_distinguishes_rule_rows_from_action_destination(
         &format!("CREATE RULE r AS ON UPDATE TO items DO INSTEAD {action}"),
         &mut context,
     );
-    assert_eq!(result.is_ok(), accepted, "{version}: {result:?}");
-    if let Ok(statement) = result {
+    let statement = result?;
+    assert_eq!(
+        statement.rule().is_some(),
+        accepted,
+        "{version}: {statement:?}"
+    );
+    if accepted {
         let reference = statement.rule().unwrap().actions()[0]
             .rule_returning()
             .unwrap()
@@ -521,8 +539,19 @@ fn modifier_capable_results_have_an_explicit_semantic_boundary() -> testresult::
     let name = FullName::with_schema("public", "sized_view");
     let view = crate::sem::CreateView::new(&name, &query, &[], &None, false);
     context.set_get_view_impl_result(&name, &Some(crate::sem::ViewLike::from(&view)));
-    let error = test_helpers::resolve(r#"CREATE OR REPLACE RULE "_RETURN" AS ON SELECT TO sized_view DO INSTEAD SELECT id FROM sized"#, &mut context).unwrap_err();
-    assert!(error.to_string().contains("#619"));
+    let unresolved = test_helpers::resolve(r#"CREATE OR REPLACE RULE "_RETURN" AS ON SELECT TO sized_view DO INSTEAD SELECT id FROM sized"#, &mut context).unwrap();
+    assert!(matches!(
+        unresolved,
+        crate::sem::SemAst::UnresolvedStatement
+    ));
+    assert!(
+        context
+            .reported_problems()
+            .iter()
+            .any(|problem| problem.rule_problem().is_some_and(|rule| rule
+                .definition_detail()
+                .is_some_and(|detail| detail.contains("#619"))))
+    );
     assert!(context.rule(&RuleIdentity::new(&name, "_RETURN")).is_none());
     Ok(())
 }

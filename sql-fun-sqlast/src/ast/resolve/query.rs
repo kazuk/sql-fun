@@ -207,12 +207,12 @@ impl Select {
             && let Some(scope) = outer
             && let Some(identity) = scope.rule_identity()
         {
-            return Err(AnalysisError::rule(
+            context.report_analysis_problem(crate::sem::AnalysisProblem::rule(
                 &crate::sem::problem::RuleProblem::definition(
                     identity,
                     "SELECT INTO is not allowed in rule actions",
                 ),
-            ));
+            ))?;
         }
         let empty = FromClause::default();
         let mut from_scope = ScalarAnalysisContext::nested(with, &empty, outer);
@@ -373,7 +373,9 @@ impl CteBody {
                 if context.dialect() == Dialect::sqlite() {
                     return AnalysisError::raise_unexpected_input("SQLite INSERT CTE");
                 }
-                let mut insert = insert.resolve_in(context, Some(scope))?;
+                let Some(mut insert) = insert.resolve_in(context, Some(scope))? else {
+                    return Ok(CteStatement::unresolved());
+                };
                 if columns.len() > insert.result_columns().len() {
                     context.report_analysis_problem(AnalysisProblem::insert(
                         crate::sem::problem::InsertProblemKind::cte_aliases(),
@@ -387,7 +389,9 @@ impl CteBody {
                 if context.dialect() == Dialect::sqlite() {
                     return AnalysisError::raise_unexpected_input("SQLite UPDATE CTE");
                 }
-                let mut update = update.resolve_in(context, Some(scope))?;
+                let Some(mut update) = update.resolve_in(context, Some(scope))? else {
+                    return Ok(CteStatement::unresolved());
+                };
                 if columns.len() > update.result_columns().len() {
                     context.report_analysis_problem(AnalysisProblem::update(
                         crate::sem::problem::UpdateProblemKind::cte_aliases(),

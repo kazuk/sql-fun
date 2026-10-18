@@ -122,7 +122,11 @@ fn constraint_from_retains_referenced_relation(#[case] referenced: &str) -> test
 )]
 fn rejects_invalid_postgres_semantics(#[case] sql: &str) {
     let mut context = test_helpers::catalog(Dialect::postgres());
-    assert!(test_helpers::resolve(sql, &mut context).is_err(), "{sql}");
+    assert!(
+        test_helpers::resolve(sql, &mut context)
+            .is_ok_and(|ast| matches!(ast, crate::sem::SemAst::UnresolvedStatement)),
+        "{sql}"
+    );
     assert!(context.reported_problem_count() > 0);
     let key = TriggerIdentity::postgres(
         &FullName::with_schema("public", "items"),
@@ -222,7 +226,10 @@ fn named_lookup_and_target_links_agree_across_layers() -> testresult::TestResult
             "CREATE TRIGGER audit BEFORE UPDATE ON items EXECUTE FUNCTION audit_fn()",
             sibling
         )
-        .is_err()
+        .is_ok_and(
+            |pair| matches!(pair.ast(), crate::sem::SemAst::UnresolvedStatement)
+                && !pair.context().problems().is_empty()
+        )
     );
     Ok(())
 }
@@ -333,7 +340,10 @@ fn sqlite_duplicate_namespace_and_if_not_exists() -> testresult::TestResult {
             "CREATE TRIGGER AUDIT AFTER UPDATE ON other BEGIN SELECT NEW.id; END",
             test_helpers::layer(&frozen)
         )
-        .is_err()
+        .is_ok_and(
+            |pair| matches!(pair.ast(), crate::sem::SemAst::UnresolvedStatement)
+                && !pair.context().problems().is_empty()
+        )
     );
     let context = test_helpers::apply(
         "CREATE TRIGGER IF NOT EXISTS AUDIT AFTER UPDATE ON other BEGIN SELECT NEW.id; END",
@@ -396,7 +406,7 @@ fn failed_child_analysis_preserves_parent_and_sibling_catalogs() -> testresult::
     let root = test_helpers::catalog(Dialect::postgres()).freeze();
     let target = FullName::with_schema("public", "items");
     let sibling = test_helpers::layer(&root);
-    assert!(test_helpers::apply("CREATE TRIGGER audit BEFORE UPDATE ON items FOR EACH ROW WHEN (missing IS NULL) EXECUTE FUNCTION audit_fn()", test_helpers::layer(&root)).is_err());
+    assert!(test_helpers::apply("CREATE TRIGGER audit BEFORE UPDATE ON items FOR EACH ROW WHEN (missing IS NULL) EXECUTE FUNCTION audit_fn()", test_helpers::layer(&root)).is_ok_and(|pair| matches!(pair.ast(), crate::sem::SemAst::UnresolvedStatement) && !pair.context().problems().is_empty()));
     assert!(
         root.get_table_impl(&target)
             .unwrap()
@@ -525,7 +535,10 @@ fn rejects_invalid_sqlite_definition(#[case] sql: &str) -> testresult::TestResul
     assert!(oracle.execute_batch(sql).is_err());
     let mut context = test_helpers::catalog(Dialect::sqlite());
     test_helpers::add_tables(&mut context, "aux");
-    assert!(test_helpers::resolve(sql, &mut context).is_err());
+    assert!(
+        test_helpers::resolve(sql, &mut context)
+            .is_ok_and(|ast| matches!(ast, crate::sem::SemAst::UnresolvedStatement))
+    );
     Ok(())
 }
 

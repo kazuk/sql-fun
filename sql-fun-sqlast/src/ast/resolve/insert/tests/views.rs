@@ -126,7 +126,10 @@ fn resolves_sqlite_trigger_view(#[case] sql: &str) {
 )]
 fn rejects_unsupported_view_operation(#[case] sql: &str, #[case] dialect: Dialect) {
     let (statement, context) = test_helpers::analyze(sql, dialect, true, true);
-    assert!(statement.is_err());
+    assert!(matches!(
+        statement.unwrap(),
+        crate::sem::SemAst::UnresolvedStatement
+    ));
     assert!(context.reported_problems().iter().any(|problem| {
         problem.insert_problem().is_some_and(|problem| {
             problem.kind() == crate::sem::problem::InsertProblemKind::ViewOperation
@@ -162,7 +165,10 @@ fn rejects_sqlite_view_upsert() {
         true,
         true,
     );
-    assert!(statement.is_err());
+    assert!(matches!(
+        statement.unwrap(),
+        crate::sem::SemAst::UnresolvedStatement
+    ));
     assert_eq!(context.reported_problem_count(), 1);
 }
 

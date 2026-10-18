@@ -7,11 +7,12 @@ use crate::sem::{
 #[derive(Debug, Clone)]
 pub struct DropTrigger {
     requested: FullName,
-    requested_target: FullName,
+    requested_target: Option<FullName>,
+    target: Option<FullName>,
     identity: Option<TriggerIdentity>,
     found: bool,
     if_exists: bool,
-    behavior: DropDependencyBehavior,
+    behavior: Option<DropDependencyBehavior>,
 }
 impl DropTrigger {
     pub(crate) fn new(
@@ -24,22 +25,47 @@ impl DropTrigger {
     ) -> Self {
         Self {
             requested: requested.clone(),
-            requested_target: requested_target.clone(),
+            requested_target: Some(requested_target.clone()),
+            target: if let Some(identity) = identity {
+                identity.relation().cloned()
+            } else {
+                None
+            },
             identity: identity.cloned(),
             found,
             if_exists,
-            behavior,
+            behavior: Some(behavior),
         }
+    }
+    pub(crate) fn sqlite(
+        requested: &FullName,
+        identity: Option<&TriggerIdentity>,
+        target: Option<&FullName>,
+        if_exists: bool,
+    ) -> Self {
+        Self {
+            requested: requested.clone(),
+            requested_target: None,
+            target: target.cloned(),
+            identity: identity.cloned(),
+            found: target.is_some(),
+            if_exists,
+            behavior: None,
+        }
+    }
+    /// Resolved owning relation, including SQLite's target discovered from its named definition.
+    pub const fn target(&self) -> Option<&FullName> {
+        self.target.as_ref()
     }
     /// Trigger name supplied by the statement.
     pub const fn requested_name(&self) -> &FullName {
         &self.requested
     }
-    /// ON relation name supplied by the statement.
-    pub const fn requested_target(&self) -> &FullName {
-        &self.requested_target
+    /// ON relation supplied by PostgreSQL; absent in SQLite.
+    pub const fn requested_target(&self) -> Option<&FullName> {
+        self.requested_target.as_ref()
     }
-    /// Relation-scoped identity, absent only if the ON relation was not found.
+    /// Resolved dialect-specific identity; absent if unqualified lookup found no object.
     pub const fn identity(&self) -> Option<&TriggerIdentity> {
         self.identity.as_ref()
     }
@@ -51,8 +77,8 @@ impl DropTrigger {
     pub const fn if_exists(&self) -> bool {
         self.if_exists
     }
-    /// Requested dependency behavior.
-    pub const fn behavior(&self) -> DropDependencyBehavior {
+    /// Requested PostgreSQL dependency behavior; absent in SQLite.
+    pub const fn behavior(&self) -> Option<DropDependencyBehavior> {
         self.behavior
     }
     pub(crate) fn apply<C: ParseContext>(&self, context: C) -> Result<C, AnalysisError> {
@@ -63,9 +89,10 @@ impl DropTrigger {
             .identity
             .as_ref()
             .expect("found trigger has resolved identity");
-        let target = identity
-            .relation()
-            .expect("PostgreSQL trigger has owning relation");
+        let target = self
+            .target
+            .as_ref()
+            .expect("found trigger has owning relation");
         context
             .cancel_trigger(identity)?
             .dissociate_trigger(target, identity.name())

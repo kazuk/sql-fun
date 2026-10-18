@@ -7,14 +7,66 @@ impl DropTrigger {
         &self,
         context: &mut impl ParseContext,
     ) -> Result<sem::DropTrigger, AnalysisError> {
-        if context.dialect() == Dialect::sqlite() {
-            todo!("SQLite DROP TRIGGER semantic resolution: #555");
-        }
-        let result = self.resolve_postgres(context);
+        let result = if context.dialect() == Dialect::sqlite() {
+            self.resolve_sqlite(context)
+        } else {
+            self.resolve_postgres(context)
+        };
         if let Err(AnalysisError::Trigger(problem)) = &result {
             context.report_analysis_problem(sem::AnalysisProblem::trigger(problem))?;
         }
         result
+    }
+    fn resolve_sqlite(
+        &self,
+        context: &impl ParseContext,
+    ) -> Result<sem::DropTrigger, AnalysisError> {
+        let requested = self.name.full_name()?;
+        let identity = if requested.schema().is_some() {
+            let identity = TriggerIdentity::sqlite(&requested);
+            if let Some(definition) = context.trigger(&identity) {
+                return Ok(sem::DropTrigger::sqlite(
+                    &requested,
+                    Some(&identity),
+                    Some(definition.target()),
+                    self.if_exists,
+                ));
+            }
+            Some(identity)
+        } else {
+            let mut schemas = vec![sem::SchemaName::from("temp"), sem::SchemaName::from("main")];
+            for schema in context.get_search_path() {
+                if !schemas
+                    .iter()
+                    .any(|existing| existing.as_str().eq_ignore_ascii_case(schema.as_str()))
+                {
+                    schemas.push(schema.clone());
+                }
+            }
+            for schema in schemas {
+                let identity = TriggerIdentity::sqlite(&requested.clone().set_schema(schema));
+                if let Some(definition) = context.trigger(&identity) {
+                    return Ok(sem::DropTrigger::sqlite(
+                        &requested,
+                        Some(&identity),
+                        Some(definition.target()),
+                        self.if_exists,
+                    ));
+                }
+            }
+            None
+        };
+        if !self.if_exists {
+            return Err(AnalysisError::trigger(&TriggerProblem::missing_name(
+                &requested,
+            )));
+        }
+        Ok(sem::DropTrigger::sqlite(
+            &requested,
+            identity.as_ref(),
+            None,
+            true,
+        ))
     }
     fn resolve_postgres(
         &self,

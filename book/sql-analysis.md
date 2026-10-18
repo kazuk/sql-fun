@@ -239,8 +239,15 @@ identity. `SemAst::trigger_drop()` exposes the resolved identity, dependency
 behavior and whether lookup found a definition. `IF EXISTS` retains an explicit
 no-op outcome for a missing trigger or relation. Applying a successful drop
 masks inherited definitions and removes the target reference in the current
-layer; re-creation replaces the mask. SQLite DROP TRIGGER remains separate
-work ([#555](https://github.com/kazuk/sql-fun/issues/555)).
+layer; re-creation replaces the mask.
+
+SQLite `DROP TRIGGER` uses the schema-scoped trigger namespace, comparing ASCII
+identifiers without case sensitivity. An unqualified name searches TEMP, main,
+and the explicitly configured attached-schema order. A qualified name selects
+that schema only. The resolved trigger supplies its owning relation; no ON
+relation or dependency behavior is invented. `IF EXISTS` retains an explicit
+no-op when lookup finds no definition. Application masks inherited definitions
+and removes the target link in the child, preserving parent and sibling catalogs.
 
 Deferrable unique-key catalog definitions, recursive CTE binding, and expressions
 already unsupported by the SELECT analyzer remain unsupported. Star expansion

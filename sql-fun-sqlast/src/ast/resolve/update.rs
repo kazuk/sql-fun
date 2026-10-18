@@ -3,8 +3,8 @@ use crate::sem::UpdateDestination;
 use crate::sem::problem::UpdateProblemKind;
 use crate::sem::{
     AliasSpec, AnalysisError, AnalysisProblem, ColumnName, DataSource, FromClause, ParseContext,
-    ResultColumnCollection, ScalarAnalysisContext, TableName, UpdateAssignment, UpdateStatement,
-    UpdateValue, WithClause,
+    ResultColumnCollection, ScalarAnalysisContext, TableName, UpdateAssignmentCollection,
+    UpdateStatement, UpdateValue, WithClause,
 };
 
 impl Update {
@@ -43,7 +43,14 @@ impl Update {
             .unwrap_or_else(|| AliasSpec::from_local_name(&requested.full_name().local_name()));
         let from = self.resolve_sources(context, &table, &alias, &with)?;
         let scope = ScalarAnalysisContext::nested(&with, &from, None);
-        let assignments = self.resolve_assignments(context, &table, &alias, &with, &scope)?;
+        let assignments = UpdateAssignmentCollection::resolve(
+            context,
+            &self.assignments,
+            &table,
+            &alias,
+            &with,
+            &scope,
+        )?;
         let predicate = self.resolve_predicate(context, table.name(), &scope)?;
         let returning =
             self.resolve_returning_scope(context, &requested, &table, &alias, &with, &from)?;
@@ -145,62 +152,6 @@ impl Update {
         )?);
         Ok(from)
     }
-    fn resolve_assignments(
-        &self,
-        context: &mut impl ParseContext,
-        table: &UpdateDestination,
-        alias: &AliasSpec,
-        with: &WithClause,
-        scope: &ScalarAnalysisContext<'_>,
-    ) -> Result<Vec<UpdateAssignment>, AnalysisError> {
-        let mut target_from = FromClause::default();
-        target_from.push(DataSource::resolve_relation(
-            context,
-            table.name().full_name(),
-            alias,
-            &WithClause::default(),
-        )?);
-        let target_scope = ScalarAnalysisContext::nested(with, &target_from, None);
-        let mut assignments = Vec::new();
-        let mut seen: Vec<&Assignment> = Vec::new();
-        for assignment in &self.assignments {
-            if context.dialect() == Dialect::postgres()
-                && seen.iter().any(|previous| previous.overlaps(assignment))
-            {
-                context.report_analysis_problem(AnalysisProblem::update(
-                    UpdateProblemKind::duplicate_target(),
-                    "column assigned more than once",
-                ))?;
-            }
-            seen.push(assignment);
-            let column_name = ColumnName::from(assignment.name.as_str());
-            let Some(column) = table.column(&column_name) else {
-                context.report_analysis_problem(AnalysisProblem::column_not_found_in_table(
-                    table.name(),
-                    &column_name,
-                ))?;
-                return Err(AnalysisError::unexpected_input_error(
-                    "UPDATE column not found",
-                ));
-            };
-            if !table.can_assign(&column_name) {
-                context.report_analysis_problem(AnalysisProblem::update(
-                    UpdateProblemKind::read_only_target(),
-                    "view column does not accept UPDATE assignments",
-                ))?;
-            }
-            let mut destination =
-                Name::from_parts(&[alias.name().as_str().to_owned(), assignment.name.clone()])
-                    .resolve_column(context, &target_scope)?;
-            for access in &assignment.indirection {
-                destination = access.resolve(context, scope, destination)?;
-            }
-            let value = assignment.resolve_update_value(context, scope)?;
-            assignment.validate_update_value(context, column, &value)?;
-            assignments.push(UpdateAssignment::new(column, &destination, &value));
-        }
-        Ok(assignments)
-    }
     fn resolve_predicate(
         &self,
         context: &mut impl ParseContext,
@@ -298,6 +249,69 @@ impl Update {
             }
         }
         Ok(results)
+    }
+}
+
+impl UpdateAssignmentCollection {
+    pub(crate) fn resolve(
+        context: &mut impl ParseContext,
+        assignments: &[Assignment],
+        table: &UpdateDestination,
+        alias: &AliasSpec,
+        with: &WithClause,
+        rhs_scope: &ScalarAnalysisContext<'_>,
+    ) -> Result<Self, AnalysisError> {
+        let mut target_from = FromClause::default();
+        target_from.push(DataSource::resolve_relation(
+            context,
+            table.name().full_name(),
+            alias,
+            &WithClause::default(),
+        )?);
+        let target_scope = ScalarAnalysisContext::nested(with, &target_from, None);
+        let mut resolved = Self::default();
+        let mut seen: Vec<&Assignment> = Vec::new();
+        for assignment in assignments {
+            if context.dialect() == Dialect::postgres()
+                && seen.iter().any(|previous| previous.overlaps(assignment))
+            {
+                context.report_analysis_problem(AnalysisProblem::update(
+                    UpdateProblemKind::duplicate_target(),
+                    "column assigned more than once",
+                ))?;
+            }
+            seen.push(assignment);
+            let column_name = ColumnName::from(assignment.name.as_str());
+            let Some(column) = table.column(&column_name) else {
+                context.report_analysis_problem(AnalysisProblem::column_not_found_in_table(
+                    table.name(),
+                    &column_name,
+                ))?;
+                return Err(AnalysisError::unexpected_input_error(
+                    "UPDATE column not found",
+                ));
+            };
+            if !table.can_assign(&column_name) {
+                context.report_analysis_problem(AnalysisProblem::update(
+                    UpdateProblemKind::read_only_target(),
+                    "view column does not accept UPDATE assignments",
+                ))?;
+            }
+            let mut destination =
+                Name::from_parts(&[alias.name().as_str().to_owned(), assignment.name.clone()])
+                    .resolve_column(context, &target_scope)?;
+            for access in &assignment.indirection {
+                destination = access.resolve(context, rhs_scope, destination)?;
+            }
+            let value = assignment.resolve_update_value(context, rhs_scope)?;
+            assignment.validate_update_value(context, column, &value)?;
+            resolved.push(crate::sem::UpdateAssignment::new(
+                column,
+                &destination,
+                &value,
+            ));
+        }
+        Ok(resolved)
     }
 }
 impl Assignment {

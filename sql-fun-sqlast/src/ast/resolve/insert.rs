@@ -4,7 +4,8 @@ use crate::ast::{
 };
 use crate::sem::{
     AliasSpec, AnalysisError, AnalysisProblem, ColumnName, DataSource, FromClause, InsertConflict,
-    InsertDestination, InsertSource, InsertStatement, InsertTarget, InsertValue, ParseContext,
+    InsertClauseSemantics, InsertClauseValues, InsertDestination, InsertSource, InsertStatement,
+    InsertTarget, InsertTargetCollection, InsertValue, InsertValueCollection, ParseContext,
     ResultColumnCollection, ScalarAnalysisContext, TableName, WithClause,
 };
 
@@ -105,9 +106,28 @@ impl Insert {
             &WithClause::default(),
         )?);
         let scope = ScalarAnalysisContext::nested(&with, &from, None);
-        let columns = self.resolve_columns(context, &table, &scope, &alias, &source)?;
-        self.validate_width(context, &source, columns.len())?;
-        self.validate_generated_values(context, &columns, &source)?;
+        let implicit_width = if context.dialect() == Dialect::postgres() {
+            if self.source.is_some() {
+                Some(source.width())
+            } else {
+                None
+            }
+        } else {
+            None
+        };
+        let columns = InsertTargetCollection::resolve(
+            context,
+            &self.columns,
+            &InsertTargetBinding::new(&table, &alias, &scope),
+            InsertTargetMode::new(self.source.is_some(), implicit_width),
+        )?;
+        validate_insert_source(
+            context,
+            &columns,
+            &source,
+            self.source.is_some(),
+            self.overriding.as_ref(),
+        )?;
         let returning_alias = if context.dialect() == Dialect::sqlite() {
             AliasSpec::from_local_name(&self.relation.name.full_name()?.local_name())
         } else {
@@ -151,16 +171,82 @@ impl Insert {
         insert.validate_assignments(context)?;
         Ok(insert)
     }
-    fn resolve_columns(
-        &self,
+}
+
+/// Resolve one INSERT-like clause using independent destination and value scopes.
+impl InsertClauseSemantics {
+    pub(super) fn resolve(
         context: &mut impl ParseContext,
-        table: &InsertDestination,
-        scope: &ScalarAnalysisContext<'_>,
-        alias: &AliasSpec,
-        source: &InsertSource,
-    ) -> Result<Vec<InsertTarget>, AnalysisError> {
-        let mut columns = Vec::new();
-        if self.columns.is_empty() {
+        assignments: &[Assignment],
+        destination: &InsertTargetBinding<'_, '_>,
+        values: Option<&[Expr]>,
+        value_scope: &ScalarAnalysisContext<'_>,
+        overriding: Option<&OverridingKind>,
+    ) -> Result<Self, AnalysisError> {
+        let implicit_width = values.map(|values| values.len());
+        let targets = InsertTargetCollection::resolve(
+            context,
+            assignments,
+            destination,
+            InsertTargetMode::new(true, implicit_width),
+        )?;
+        let values = values
+            .map(|values| resolve_insert_values(values, context, value_scope))
+            .transpose()?;
+        let clause = Self::new(
+            targets,
+            values.map_or(InsertClauseValues::DefaultValues, InsertClauseValues::Values),
+        );
+        validate_insert_clause(context, &clause, overriding)?;
+        let mut clause = clause;
+        clause.validate_assignments(context)?;
+        Ok(clause)
+    }
+}
+
+/// Destination-only bindings for an INSERT target list.
+pub(super) struct InsertTargetBinding<'a, 'scope> {
+    table: &'a InsertDestination,
+    scope: &'a ScalarAnalysisContext<'scope>,
+    alias: &'a AliasSpec,
+}
+impl<'a, 'scope> InsertTargetBinding<'a, 'scope> {
+    pub(super) const fn new(
+        table: &'a InsertDestination,
+        alias: &'a AliasSpec,
+        scope: &'a ScalarAnalysisContext<'scope>,
+    ) -> Self {
+        Self { table, scope, alias }
+    }
+}
+
+#[derive(Clone, Copy)]
+pub(super) struct InsertTargetMode {
+    source_is_present: bool,
+    implicit_width: Option<usize>,
+}
+impl InsertTargetMode {
+    pub(super) const fn new(source_is_present: bool, implicit_width: Option<usize>) -> Self {
+        Self {
+            source_is_present,
+            implicit_width,
+        }
+    }
+}
+
+/// Resolve destination bindings for an INSERT clause.
+impl InsertTargetCollection {
+    pub(super) fn resolve(
+        context: &mut impl ParseContext,
+        assignments: &[Assignment],
+        destination: &InsertTargetBinding<'_, '_>,
+        mode: InsertTargetMode,
+    ) -> Result<Self, AnalysisError> {
+        let table = destination.table;
+        let alias = destination.alias;
+        let scope = destination.scope;
+        let mut columns = Self::default();
+        if assignments.is_empty() {
             let mut index = 0;
             while let Some(column) = table.get_column_at(index) {
                 index += 1;
@@ -168,23 +254,27 @@ impl Insert {
                     && column
                         .constraints()
                         .iter()
-                        .any(|c| c.as_generated().is_some())
+                        .any(|constraint| constraint.as_generated().is_some())
                 {
                     continue;
                 }
                 let name = column.name().as_ref().expect("catalog column name");
-                let destination =
-                    Name::from_parts(&[alias.name().as_str().to_owned(), name.as_str().to_owned()])
-                        .resolve_column(context, scope)?;
+                let destination = Name::from_parts(&[
+                    alias.name().as_str().to_owned(),
+                    name.as_str().to_owned(),
+                ])
+                .resolve_column(context, scope)?;
                 columns.push(InsertTarget::new(column, destination));
             }
             // PostgreSQL permits the first N implicit columns, unlike SQLite.
-            if context.dialect() == Dialect::postgres() && self.source.is_some() {
-                columns.truncate(source.width());
+            if context.dialect() == Dialect::postgres()
+                && let Some(width) = mode.implicit_width
+            {
+                columns.truncate(width);
             }
         } else {
             let mut seen: Vec<&Assignment> = Vec::new();
-            for assignment in &self.columns {
+            for assignment in assignments {
                 if context.dialect() == Dialect::postgres()
                     && seen.iter().any(|previous| previous.overlaps(assignment))
                 {
@@ -194,28 +284,29 @@ impl Insert {
                     ))?;
                 }
                 seen.push(assignment);
-                let Some(column) =
-                    table.get_column_def(&ColumnName::from(assignment.name.as_str()))
-                else {
+                let column_name = ColumnName::from(assignment.name.as_str());
+                let Some(column) = table.get_column_def(&column_name) else {
                     context.report_analysis_problem(AnalysisProblem::column_not_found_in_table(
                         table.name(),
-                        &ColumnName::from(assignment.name.as_str()),
+                        &column_name,
                     ))?;
                     return Err(AnalysisError::unexpected_input_error(
                         "INSERT destination column not found",
                     ));
                 };
-                let mut destination =
-                    Name::from_parts(&[alias.name().as_str().to_owned(), assignment.name.clone()])
-                        .resolve_column(context, scope)?;
+                let mut destination = Name::from_parts(&[
+                    alias.name().as_str().to_owned(),
+                    assignment.name.clone(),
+                ])
+                .resolve_column(context, scope)?;
                 for access in &assignment.indirection {
                     destination = access.resolve(context, scope, destination)?;
                 }
                 columns.push(InsertTarget::new(column, destination));
             }
         }
-        for target in &columns {
-            if self.source.is_some()
+        for target in columns.as_slice() {
+            if mode.source_is_present
                 && let Some(name) = target.column().name()
                 && !table.can_assign(name)
             {
@@ -227,77 +318,145 @@ impl Insert {
         }
         Ok(columns)
     }
-    fn validate_width(
-        &self,
-        context: &mut impl ParseContext,
-        source: &InsertSource,
-        width: usize,
-    ) -> Result<(), AnalysisError> {
-        if self.source.is_some() && source.width() != width {
-            context.report_analysis_problem(AnalysisProblem::insert(
-                crate::sem::problem::InsertProblemKind::arity(),
-                "INSERT source and destination column counts differ",
-            ))?;
-        }
-        if let Some(query) = source.as_query()
-            && !query.has_width(width)
-        {
-            context.report_analysis_problem(AnalysisProblem::insert(
-                crate::sem::problem::InsertProblemKind::arity(),
-                "INSERT query branches must match destination column count",
-            ))?;
-        }
-        if let Some(rows) = source.rows() {
-            for row in rows {
-                if row.len() != width {
-                    context.report_analysis_problem(AnalysisProblem::insert(
-                        crate::sem::problem::InsertProblemKind::arity(),
-                        "INSERT VALUES rows must match the destination column count",
-                    ))?;
-                }
-            }
-        }
-        Ok(())
+}
+
+/// Resolve one direct VALUES row against the caller-selected expression scope.
+pub(super) fn resolve_insert_values(
+    expressions: &[Expr],
+    context: &mut impl ParseContext,
+    scope: &ScalarAnalysisContext<'_>,
+) -> Result<InsertValueCollection, AnalysisError> {
+    let mut values = InsertValueCollection::default();
+    for expression in expressions {
+        values.push(expression.resolve_insert_value(context, scope)?);
     }
-    fn validate_generated_values(
-        &self,
-        context: &mut impl ParseContext,
-        columns: &[InsertTarget],
-        source: &InsertSource,
-    ) -> Result<(), AnalysisError> {
-        if self.source.is_none() {
-            return Ok(());
-        }
-        for (index, target) in columns.iter().enumerate() {
-            let constraints = target.column().constraints();
-            let defaults_only = source.rows().is_some_and(|rows| {
-                rows.iter()
-                    .all(|row| row.get(index).is_some_and(InsertValue::is_default))
-            });
-            if constraints.iter().any(|c| c.as_generated().is_some()) && !defaults_only {
-                context.report_analysis_problem(AnalysisProblem::insert(
-                    crate::sem::problem::InsertProblemKind::generated_target(),
-                    "generated column accepts only DEFAULT",
-                ))?;
-            }
-            if constraints
-                .iter()
-                .filter_map(|c| c.as_identity())
-                .any(|c| c.is_always())
-                && !defaults_only
-                && !self
-                    .overriding
-                    .as_ref()
-                    .is_some_and(OverridingKind::overrides_identity)
-            {
-                context.report_analysis_problem(AnalysisProblem::insert(
-                    crate::sem::problem::InsertProblemKind::identity_target(),
-                    "GENERATED ALWAYS identity requires DEFAULT or OVERRIDING",
-                ))?;
-            }
-        }
-        Ok(())
+    Ok(values)
+}
+
+fn validate_insert_clause(
+    context: &mut impl ParseContext,
+    clause: &InsertClauseSemantics,
+    overriding: Option<&OverridingKind>,
+) -> Result<(), AnalysisError> {
+    let InsertClauseValues::Values(values) = clause.values() else {
+        return Ok(());
+    };
+    validate_insert_width(
+        context,
+        values.len(),
+        clause.targets().as_slice().len(),
+        "INSERT source and destination column counts differ",
+    )?;
+    for (index, target) in clause.targets().as_slice().iter().enumerate() {
+        let defaults_only = values
+            .as_slice()
+            .get(index)
+            .is_some_and(InsertValue::is_default);
+        validate_generated_target(
+            context,
+            target,
+            defaults_only,
+            overriding.is_some_and(OverridingKind::overrides_identity),
+        )?;
     }
+    Ok(())
+}
+
+fn validate_insert_source(
+    context: &mut impl ParseContext,
+    targets: &InsertTargetCollection,
+    source: &InsertSource,
+    source_is_present: bool,
+    overriding: Option<&OverridingKind>,
+) -> Result<(), AnalysisError> {
+    if !source_is_present {
+        return Ok(());
+    }
+    let width = targets.as_slice().len();
+    validate_insert_width(
+        context,
+        source.width(),
+        width,
+        "INSERT source and destination column counts differ",
+    )?;
+    if let Some(query) = source.as_query()
+        && !query.has_width(width)
+    {
+        context.report_analysis_problem(AnalysisProblem::insert(
+            crate::sem::problem::InsertProblemKind::arity(),
+            "INSERT query branches must match destination column count",
+        ))?;
+    }
+    if let Some(rows) = source.rows() {
+        for row in rows {
+            validate_insert_width(
+                context,
+                row.len(),
+                width,
+                "INSERT VALUES rows must match the destination column count",
+            )?;
+        }
+    }
+    for (index, target) in targets.as_slice().iter().enumerate() {
+        let defaults_only = source.rows().is_some_and(|rows| {
+            rows.iter()
+                .all(|row| row.get(index).is_some_and(InsertValue::is_default))
+        });
+        validate_generated_target(
+            context,
+            target,
+            defaults_only,
+            overriding.is_some_and(OverridingKind::overrides_identity),
+        )?;
+    }
+    Ok(())
+}
+
+fn validate_insert_width(
+    context: &mut impl ParseContext,
+    actual: usize,
+    expected: usize,
+    message: &str,
+) -> Result<(), AnalysisError> {
+    if actual != expected {
+        context.report_analysis_problem(AnalysisProblem::insert(
+            crate::sem::problem::InsertProblemKind::arity(),
+            message,
+        ))?;
+    }
+    Ok(())
+}
+
+fn validate_generated_target(
+    context: &mut impl ParseContext,
+    target: &InsertTarget,
+    defaults_only: bool,
+    overrides_identity: bool,
+) -> Result<(), AnalysisError> {
+    let constraints = target.column().constraints();
+    if constraints
+        .iter()
+        .any(|constraint| constraint.as_generated().is_some())
+        && !defaults_only
+    {
+        context.report_analysis_problem(AnalysisProblem::insert(
+            crate::sem::problem::InsertProblemKind::generated_target(),
+            "generated column accepts only DEFAULT",
+        ))?;
+    }
+    if constraints
+        .iter()
+        .filter_map(|constraint| constraint.as_identity())
+        .any(|identity| identity.is_always())
+        && !defaults_only
+        && !overrides_identity
+    {
+        context.report_analysis_problem(AnalysisProblem::insert(
+            crate::sem::problem::InsertProblemKind::identity_target(),
+            "GENERATED ALWAYS identity requires DEFAULT or OVERRIDING",
+        ))?;
+    }
+    Ok(())
 }
 
 #[cfg(test)]
@@ -316,15 +475,12 @@ impl Query {
             && self.offset.is_none()
             && self.locks.is_empty()
         {
-            let mut resolved = Vec::new();
+            let mut source = InsertSource::empty_values();
             for row in rows {
-                let mut values = Vec::new();
-                for value in row {
-                    values.push(value.resolve_insert_value(context, scope)?);
-                }
-                resolved.push(values);
+                let values = resolve_insert_values(row, context, scope)?;
+                source.push_values(&values);
             }
-            return Ok(InsertSource::values(resolved));
+            return Ok(source);
         }
         Ok(InsertSource::query(self.resolve_in(context, Some(scope))?))
     }

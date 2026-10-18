@@ -20,7 +20,7 @@ use crate::sem::{
 pub struct InsertStatement {
     target: TableName,
     view_support: Option<ViewInsertSupport>,
-    columns: Vec<InsertTarget>,
+    columns: InsertTargetCollection,
     source: InsertSource,
     with: Vec<QueryCte>,
     returning: ResultColumnCollection,
@@ -31,7 +31,7 @@ pub struct InsertStatement {
 impl InsertStatement {
     pub(crate) fn new(
         target: &TableName,
-        columns: Vec<InsertTarget>,
+        columns: InsertTargetCollection,
         source: InsertSource,
         with: Vec<QueryCte>,
         returning: ResultColumnCollection,
@@ -71,7 +71,7 @@ impl InsertStatement {
     }
     /// Ordered destination bindings for source values.
     pub fn columns(&self) -> &[InsertTarget] {
-        &self.columns
+        self.columns.as_slice()
     }
     /// Resolved source, distinguishing DEFAULT VALUES and per-value DEFAULT.
     pub const fn source(&self) -> &InsertSource {
@@ -119,11 +119,98 @@ impl InsertStatement {
         for entry in &mut self.with {
             entry.walk(visitor)?;
         }
-        self.source.walk(visitor, &mut self.columns)?;
+        self.source.walk(visitor, self.columns.as_mut_slice())?;
         for conflict in &mut self.conflicts {
             conflict.walk(visitor)?;
         }
         self.returning.walk(visitor)
+    }
+}
+
+/// Ordered INSERT targets collected while resolving a clause.
+#[derive(Debug, Clone, Default, Eq, Hash, PartialEq, serde::Serialize, serde::Deserialize)]
+#[serde(transparent)]
+pub(crate) struct InsertTargetCollection(Vec<InsertTarget>);
+impl InsertTargetCollection {
+    pub(crate) fn push(&mut self, target: InsertTarget) {
+        self.0.push(target);
+    }
+    pub(crate) fn truncate(&mut self, len: usize) {
+        self.0.truncate(len);
+    }
+    pub(crate) fn as_slice(&self) -> &[InsertTarget] {
+        &self.0
+    }
+    pub(crate) fn as_mut_slice(&mut self) -> &mut [InsertTarget] {
+        &mut self.0
+    }
+}
+
+/// Resolved direct VALUES for one INSERT clause.
+#[derive(Debug, Clone, Default, Eq, Hash, PartialEq, serde::Serialize, serde::Deserialize)]
+#[serde(transparent)]
+pub(crate) struct InsertValueCollection(Vec<InsertValue>);
+impl InsertValueCollection {
+    pub(crate) fn push(&mut self, value: InsertValue) {
+        self.0.push(value);
+    }
+    pub(crate) fn as_slice(&self) -> &[InsertValue] {
+        &self.0
+    }
+    pub(crate) fn len(&self) -> usize {
+        self.0.len()
+    }
+}
+
+/// Values belonging to one INSERT-like clause, preserving DEFAULT VALUES.
+#[derive(Debug, Clone, Eq, Hash, PartialEq, serde::Serialize, serde::Deserialize)]
+pub(crate) enum InsertClauseValues {
+    DefaultValues,
+    Values(InsertValueCollection),
+}
+
+/// Reusable resolved target and values pair for INSERT-like clauses.
+#[derive(Debug, Clone, Eq, Hash, PartialEq, serde::Serialize, serde::Deserialize)]
+pub(crate) struct InsertClauseSemantics {
+    targets: InsertTargetCollection,
+    values: InsertClauseValues,
+}
+impl InsertClauseSemantics {
+    pub(crate) const fn new(
+        targets: InsertTargetCollection,
+        values: InsertClauseValues,
+    ) -> Self {
+        Self { targets, values }
+    }
+    pub(crate) const fn targets(&self) -> &InsertTargetCollection {
+        &self.targets
+    }
+    pub(crate) const fn values(&self) -> &InsertClauseValues {
+        &self.values
+    }
+    pub(crate) fn validate_assignments(
+        &mut self,
+        context: &mut impl ParseContext,
+    ) -> Result<(), AnalysisError> {
+        self.walk(&mut AssignmentChecker { context })
+    }
+    pub(crate) fn walk<V: SemanticVisitor>(
+        &mut self,
+        visitor: &mut V,
+    ) -> Result<(), AnalysisError> {
+        for target in self.targets.as_mut_slice() {
+            target.destination.walk_assignment_target(visitor)?;
+        }
+        if let InsertClauseValues::Values(values) = &mut self.values {
+            for (index, value) in values.0.iter_mut().enumerate() {
+                if let Some(target) = self.targets.as_slice().get(index) {
+                    value.walk(visitor, target)?;
+                } else if let Some(expression) = value.expression_mut() {
+                    expression.walk(visitor)?;
+                }
+            }
+        }
+        Ok(())
     }
 }
 
@@ -167,8 +254,16 @@ impl InsertSource {
     pub(crate) const fn default_values() -> Self {
         Self::DefaultValues
     }
-    pub(crate) const fn values(rows: Vec<Vec<InsertValue>>) -> Self {
-        Self::Values(rows)
+    pub(crate) fn empty_values() -> Self {
+        Self::Values(Vec::new())
+    }
+    pub(crate) fn push_values(&mut self, values: &InsertValueCollection) {
+        match self {
+            Self::Values(rows) => rows.push(values.0.clone()),
+            Self::DefaultValues | Self::Query(_) => {
+                unreachable!("direct VALUES can only be appended to an INSERT VALUES source")
+            }
+        }
     }
     pub(crate) fn query(query: SelectStatement) -> Self {
         Self::Query(Box::new(query))

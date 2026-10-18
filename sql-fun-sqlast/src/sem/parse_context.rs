@@ -141,7 +141,9 @@ pub trait SearchPathRead {
 /// [`ParseContext`] presents mutate functions.
 ///
 pub trait BaseParseContext:
-    CastInfoRead
+    crate::sem::RoleInfoRead
+    + crate::sem::OwnershipInfoRead
+    + CastInfoRead
     + ConflictInfoRead
     + FunctionInfoRead
     + IndexInfoRead
@@ -176,6 +178,14 @@ pub trait BaseParseContext:
     /// Explicitly qualified names are read directly.
     fn get_index(&self, name: &FullName) -> Option<&CreateIndex> {
         expand_search_path(self, name, |key| self.get_index_impl(key))
+    }
+
+    /// Resolve a type to the exact qualified catalog key selected by the search path.
+    fn resolve_type_name(&self, name: &FullName) -> Option<FullName> {
+        expand_search_path_inst(self, name, |key| {
+            self.get_type_impl(key)?;
+            Some(key.clone())
+        })
     }
 
     /// get `CREATE TABLE` statement by table name
@@ -431,6 +441,17 @@ where
         self.insert_create_domain(&name, create_domain);
         Ok(self)
     }
+
+    /// Register a role explicitly supplied by the caller's catalog inventory.
+    fn insert_role(&mut self, role: &crate::sem::Role);
+
+    /// Register an existing object of a class without a richer retained DDL model.
+    /// This establishes existence, never an implicit consequence of ALTER OWNER.
+    fn insert_owned_object(&mut self, definition: &crate::sem::OwnedObjectDefinition);
+
+    /// Apply a resolved ownership change. Invalid outcomes leave the catalog unchanged.
+    fn apply_alter_owner(self, alter_owner: &crate::sem::AlterOwner)
+    -> Result<Self, AnalysisError>;
 
     /// apply `comment` statement to current schema
     fn apply_comment(self, comment: &Comment) -> Result<Self, AnalysisError>;

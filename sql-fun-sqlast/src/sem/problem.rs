@@ -4,6 +4,7 @@ mod delete;
 mod insert;
 mod name_resolution;
 mod overload_resolution;
+mod ownership;
 mod parameter_constraint;
 mod query;
 mod sql_highlighter;
@@ -26,6 +27,7 @@ use crate::{
 pub use self::delete::{DeleteProblem, DeleteProblemKind};
 pub use self::insert::{InsertProblem, InsertProblemKind};
 pub use self::name_resolution::{DomainBaseTypeNameNotFound, NameResolution};
+pub use self::ownership::OwnershipProblem;
 pub use self::parameter_constraint::ParameterConstraintProblem;
 pub use self::query::QueryProblem;
 pub use self::update::{UpdateProblem, UpdateProblemKind};
@@ -68,6 +70,8 @@ trait RenderProblemReport: Problem {
 #[allow(clippy::large_enum_variant)]
 #[derive(Debug, Clone)]
 pub enum AnalysisProblem {
+    /// ALTER OWNER target or role lookup failed.
+    Ownership(OwnershipProblem),
     /// A violation of INSERT semantic rules.
     Insert(InsertProblem),
     /// A violation of DELETE semantic rules.
@@ -141,6 +145,21 @@ pub enum AnalysisProblem {
 }
 
 impl AnalysisProblem {
+    pub(crate) fn ownership_target(target: &crate::sem::OwnershipLookup) -> Self {
+        Self::Ownership(OwnershipProblem::target(target))
+    }
+    pub(crate) fn ownership_role_not_found(name: &str) -> Self {
+        Self::Ownership(OwnershipProblem::missing_role(name))
+    }
+    /// Ownership failure, independent of diagnostic formatting.
+    pub const fn ownership_problem(&self) -> Option<&OwnershipProblem> {
+        if let Self::Ownership(problem) = self {
+            Some(problem)
+        } else {
+            None
+        }
+    }
+
     pub(crate) const fn delete(kind: DeleteProblemKind) -> Self {
         Self::Delete(DeleteProblem::new(kind))
     }
@@ -195,6 +214,7 @@ impl AnalysisProblem {
     #[must_use]
     pub const fn code(&self) -> &'static str {
         match self {
+            Self::Ownership(problem) => problem.code(),
             Self::Insert(problem) => problem.code(),
             Self::Update(problem) => problem.code(),
             Self::Delete(problem) => problem.code(),
@@ -245,6 +265,7 @@ impl AnalysisProblem {
             .with_syntax_highlighting(SqlHighlighter::from_theme(theme)?);
 
         let report = match self {
+            Self::Ownership(problem) => problem.render_report(&report_handler, source)?,
             Self::Insert(problem) => problem.render_report(&report_handler, source)?,
             Self::Update(problem) => problem.render_report(&report_handler, source)?,
             Self::Delete(problem) => problem.render_report(&report_handler, source)?,

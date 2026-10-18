@@ -1,24 +1,22 @@
-use crate::{
-    TrieMap,
-    sem::{
-        AlterTable, AnalysisError, AnalysisProblem, CreateTable, DropTable, FullName,
-        ImplicitChange, ParseContext, TableInfoRead, TableInfoWrite, TableName,
-        search_path::expand_search_path_inst,
-    },
+use crate::sem::{
+    AlterTable, AnalysisError, AnalysisProblem, CreateTable, DropTable, FullName, ImplicitChange,
+    ParseContext, TableInfoRead, TableInfoWrite, TableName, search_path::expand_search_path_inst,
 };
+
+use std::collections::HashMap;
 
 use super::{SchemaCatalog, SchemaFileContext};
 
 #[derive(Debug, Default)]
-pub struct TableDefinitionCollection(TrieMap<CreateTable>);
+pub struct TableDefinitionCollection(HashMap<FullName, CreateTable>);
 
 impl TableDefinitionCollection {
-    fn insert_create_table(&mut self, name: &FullName, create_table: &CreateTable) {
-        self.0.insert(&name.to_string(), create_table.clone());
+    pub(super) fn insert_create_table(&mut self, name: &FullName, create_table: &CreateTable) {
+        self.0.insert(name.clone(), create_table.clone());
     }
 
     fn get(&self, name: &FullName) -> Option<&CreateTable> {
-        self.0.get(&name.to_string())
+        self.0.get(name)
     }
 
     fn apply_alter(
@@ -74,6 +72,9 @@ impl TableInfoWrite for SchemaFileContext {
         };
 
         let implicit_changes = self.catalog.tables.apply_alter(alter_table, &key, table)?;
+        if let Some(owner) = alter_table.applied_owner() {
+            self.change_dependent_sequence_owners(&TableName::from(key), owner);
+        }
         let mut context = self;
         for implicit_change in implicit_changes {
             context = context.apply_implicit_change(implicit_change)?;

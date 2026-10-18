@@ -2,6 +2,7 @@
 //! test helper types
 
 mod adventure_works;
+pub(crate) mod ownership;
 mod syn_builder;
 mod test_parse_context;
 

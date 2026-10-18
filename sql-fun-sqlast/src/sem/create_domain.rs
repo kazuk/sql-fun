@@ -9,15 +9,29 @@ use crate::{
 use super::{AnalysisError, FullName, ParseContext};
 
 /// analyzed [`crate::syn::CreateDomainStmt`]
-#[derive(Debug, Clone, Eq, Hash, PartialEq, serde::Serialize, serde::Deserialize)]
+#[derive(Debug, Clone, serde::Serialize, serde::Deserialize)]
 pub struct CreateDomain {
+    #[serde(skip)]
+    owner: Option<crate::sem::OwnerSpecification>,
     type_ref: TypeReference,
     base_type: Option<FullName>,
 }
 
 impl CreateDomain {
+    /// Retained ownership; None means no ownership information was supplied.
+    /// Ownership is catalog state: it is omitted from the existing serialized
+    /// type format and does not affect SQL type equality or hashing.
+    pub const fn owner(&self) -> Option<&crate::sem::OwnerSpecification> {
+        self.owner.as_ref()
+    }
+    /// Commit an ownership change, leaving the rest of the definition intact.
+    pub(crate) fn change_owner(&mut self, owner: &crate::sem::OwnerSpecification) {
+        self.owner = Some(owner.clone());
+    }
+
     pub(crate) fn new(type_ref: &TypeReference, base_type: &Option<FullName>) -> Self {
         Self {
+            owner: None,
             type_ref: type_ref.clone(),
             base_type: base_type.clone(),
         }
@@ -44,5 +58,19 @@ impl CreateDomain {
         TParseContext: ParseContext,
     {
         crate::ast::Domain::try_from_with_tokens(&syn, tokens)?.resolve_and_apply(context)
+    }
+}
+
+// Ownership changes do not change SQL type identity or the existing serialized type format.
+impl PartialEq for CreateDomain {
+    fn eq(&self, other: &Self) -> bool {
+        self.type_ref == other.type_ref && self.base_type == other.base_type
+    }
+}
+impl Eq for CreateDomain {}
+impl std::hash::Hash for CreateDomain {
+    fn hash<H: std::hash::Hasher>(&self, state: &mut H) {
+        std::hash::Hash::hash(&self.type_ref, state);
+        std::hash::Hash::hash(&self.base_type, state);
     }
 }

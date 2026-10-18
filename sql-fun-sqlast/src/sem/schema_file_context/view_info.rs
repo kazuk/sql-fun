@@ -1,24 +1,25 @@
 use crate::{
-    TrieMap,
     sem::{
-        AlterView, AnalysisError, AnalysisProblem, BaseParseContext, CreateTableAs, CreateView,
-        FullName, ParseContext, ViewInfoRead, ViewInfoWrite, ViewLike,
+        AlterView, AnalysisError, AnalysisProblem, CreateTableAs, CreateView, FullName,
+        ParseContext, ViewInfoRead, ViewInfoWrite, ViewLike,
     },
     syn::ObjectType,
 };
 
+use std::collections::HashMap;
+
 use super::{SchemaCatalog, SchemaFileContext};
 
 #[derive(Debug, Default)]
-pub struct ViewInformationCollection(TrieMap<ViewLike>);
+pub struct ViewInformationCollection(HashMap<FullName, ViewLike>);
 
 impl ViewInformationCollection {
     fn get(&self, key: &FullName) -> Option<&ViewLike> {
-        self.0.get(&key.to_string())
+        self.0.get(key)
     }
 
-    fn insert(&mut self, key: &FullName, value: &ViewLike) {
-        self.0.insert(&key.to_string(), value.clone());
+    pub(super) fn insert(&mut self, key: &FullName, value: &ViewLike) {
+        self.0.insert(key.clone(), value.clone());
     }
 }
 
@@ -39,13 +40,18 @@ impl ViewInfoWrite for SchemaFileContext {
         Self: Sized,
     {
         let view_name = alter_view.view();
-        let Some(mut view) = self.get_view(view_name).cloned() else {
+        let Some((key, mut view)) =
+            crate::sem::search_path::expand_search_path_inst(&self, view_name.full_name(), |key| {
+                self.get_view_impl(key)
+                    .cloned()
+                    .map(|view| (key.clone(), view))
+            })
+        else {
             self.report_analysis_problem(AnalysisProblem::view_not_found(view_name))?;
             return Ok(self);
         };
-
         view.apply_alter(alter_view)?;
-        self.catalog.views.insert(view_name.full_name(), &view);
+        self.catalog.views.insert(&key, &view);
         Ok(self)
     }
 
@@ -53,12 +59,12 @@ impl ViewInfoWrite for SchemaFileContext {
         mut self,
         create_table_as: &CreateTableAs,
     ) -> Result<Self, AnalysisError> {
-        let name = create_table_as.name();
+        let name = self.apply_default_schema(create_table_as.name())?;
         match create_table_as.obj_type() {
             ObjectType::ObjectMatview => {
                 self.catalog
                     .views
-                    .insert(name, &ViewLike::from(create_table_as));
+                    .insert(&name, &ViewLike::from(create_table_as));
                 Ok(self)
             }
             _ => {
@@ -69,10 +75,10 @@ impl ViewInfoWrite for SchemaFileContext {
 
     #[tracing::instrument(skip(self))]
     fn apply_create_view(mut self, create_view: &CreateView) -> Result<Self, AnalysisError> {
-        let name = create_view.name();
+        let name = self.apply_default_schema(create_view.name())?;
         self.catalog
             .views
-            .insert(name, &ViewLike::from(create_view));
+            .insert(&name, &ViewLike::from(create_view));
         Ok(self)
     }
 }

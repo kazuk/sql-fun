@@ -586,10 +586,10 @@ impl SqlEmit for AlterCommand {
 }
 
 impl AlterCommand {
-    fn emit_owner(owner: &str, writer: &mut SqlWriter) -> Result<(), DeparseError> {
+    fn emit_owner(owner: &crate::ast::Role, writer: &mut SqlWriter) -> Result<(), DeparseError> {
         writer.postgres_only("OWNER TO")?;
         writer.sql("OWNER TO ");
-        writer.ident(owner)
+        owner.emit(writer)
     }
 
     fn emit_column_default(

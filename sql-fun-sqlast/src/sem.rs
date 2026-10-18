@@ -32,6 +32,7 @@ mod insert_statement;
 mod merge_statement;
 mod names;
 mod operators;
+pub(crate) mod ownership;
 mod parameter_constraints;
 pub(crate) mod parameter_resolution;
 mod parse_context;
@@ -70,8 +71,8 @@ pub(crate) use self::conflict_masters::ConflictMasters;
 
 #[expect(deprecated)]
 pub use self::{
-    alter_owner::AlterOwner,
-    alter_seq::AlterSequence,
+    alter_owner::{AlterOwner, OwnershipArgumentFailure, OwnershipLookup},
+    alter_seq::{AlterSequence, SequenceDependency},
     alter_table::{AlterTable, AlterView},
     analysis_state::AnalysisState,
     base_context::BaseContext,
@@ -126,6 +127,10 @@ pub use self::{
     },
     names::{CatalogName, FullName, LocalName, OperatorName, SchemaName, ValidOperatorName},
     operators::{BinaryOperatorDefinition, OperatorDefinition, UnaryOperatorDefinition},
+    ownership::{
+        OwnedObjectDefinition, OwnerSpecification, OwnershipIdentity, OwnershipInfoRead, Role,
+        RoleInfoRead,
+    },
     parameter_constraints::{InputTypeConstraint, ParameterConstraint, ParameterConstraints},
     parse_context::{
         BaseParseContext, CastInfoRead, CatalogNameLookup, ConflictInfoRead, CursorInfo,

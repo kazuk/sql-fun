@@ -12,6 +12,21 @@ pub enum ViewLike {
 }
 
 impl ViewLike {
+    /// Ownership of the retained view or materialized-view definition.
+    pub fn owner(&self) -> Option<&crate::sem::OwnerSpecification> {
+        match self {
+            Self::View(view) => view.owner(),
+            Self::MaterializedView(view) => view.owner(),
+        }
+    }
+    /// Replace ownership, preserving all view data.
+    pub(crate) fn change_owner(&mut self, owner: &crate::sem::OwnerSpecification) {
+        match self {
+            Self::View(view) => view.change_owner(owner),
+            Self::MaterializedView(view) => view.change_owner(owner),
+        }
+    }
+
     pub(crate) fn result_columns(&self) -> &crate::sem::ResultColumnCollection {
         match self {
             Self::View(view) => view.result_columns(),

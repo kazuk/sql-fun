@@ -18,11 +18,20 @@ pub struct CreateTableAs {
     #[expect(dead_code)]
     query: Box<SemAst>,
     obj_type: ObjectType,
-    owner: Option<String>,
+    owner: Option<crate::sem::OwnerSpecification>,
     alter_statements: Vec<AlterView>,
 }
 
 impl CreateTableAs {
+    /// Retained ownership; None means no ownership information was supplied.
+    pub const fn owner(&self) -> Option<&crate::sem::OwnerSpecification> {
+        self.owner.as_ref()
+    }
+    /// Commit an ownership change, leaving the rest of the definition intact.
+    pub(crate) fn change_owner(&mut self, owner: &crate::sem::OwnerSpecification) {
+        self.owner = Some(owner.clone());
+    }
+
     pub(crate) fn new(name: &FullName, query: &SemAst, materialized: bool) -> Self {
         Self {
             name: name.clone(),
@@ -53,7 +62,11 @@ impl CreateTableAs {
 
         for cmd in alter_view.commands() {
             match cmd {
-                AlterObjSubCommand::ChangeOwner(new_owner) => self.owner = Some(new_owner.clone()),
+                AlterObjSubCommand::ChangeOwner(new_owner) => {
+                    if new_owner.can_apply() {
+                        self.change_owner(new_owner);
+                    }
+                }
                 _ => todo!(),
             }
         }

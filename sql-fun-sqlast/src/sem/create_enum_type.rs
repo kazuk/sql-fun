@@ -3,15 +3,29 @@ use crate::{sem::AstAndContextPair, syn::ListOpt};
 use super::{AnalysisError, FullName, ParseContext, SemAst};
 
 /// analyzed [`crate::syn::CreateEnumStmt`]
-#[derive(Debug, Clone, Eq, Hash, PartialEq, serde::Serialize, serde::Deserialize)]
+#[derive(Debug, Clone, serde::Serialize, serde::Deserialize)]
 pub struct CreateEnum {
+    #[serde(skip)]
+    owner: Option<crate::sem::OwnerSpecification>,
     name: FullName,
     values: Vec<EnumValueDefinition>,
 }
 
 impl CreateEnum {
+    /// Retained ownership; None means no ownership information was supplied.
+    /// Ownership is catalog state: it is omitted from the existing serialized
+    /// type format and does not affect SQL type equality or hashing.
+    pub const fn owner(&self) -> Option<&crate::sem::OwnerSpecification> {
+        self.owner.as_ref()
+    }
+    /// Commit an ownership change, leaving the rest of the definition intact.
+    pub(crate) fn change_owner(&mut self, owner: &crate::sem::OwnerSpecification) {
+        self.owner = Some(owner.clone());
+    }
+
     pub(crate) fn new(name: &FullName, values: &[String]) -> Self {
         Self {
+            owner: None,
             name: name.clone(),
             values: values
                 .iter()
@@ -63,4 +77,18 @@ impl CreateEnum {
 #[derive(Debug, Clone, Eq, Hash, PartialEq, serde::Serialize, serde::Deserialize)]
 pub struct EnumValueDefinition {
     name: String,
+}
+
+// Ownership changes do not change SQL type identity or the existing serialized type format.
+impl PartialEq for CreateEnum {
+    fn eq(&self, other: &Self) -> bool {
+        self.name == other.name && self.values == other.values
+    }
+}
+impl Eq for CreateEnum {}
+impl std::hash::Hash for CreateEnum {
+    fn hash<H: std::hash::Hasher>(&self, state: &mut H) {
+        std::hash::Hash::hash(&self.name, state);
+        std::hash::Hash::hash(&self.values, state);
+    }
 }

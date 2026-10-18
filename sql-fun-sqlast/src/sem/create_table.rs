@@ -118,7 +118,7 @@ pub struct CreateTable {
     columns: ColumnCollection,
     alter_statements: Vec<AlterTable>,
     drop_statements: Vec<DropTable>,
-    owner: Option<String>,
+    owner: Option<crate::sem::OwnerSpecification>,
     cluster_on: Option<String>,
     constraints: HashMap<String, Constraint>,
     mode: CreateTableMode,
@@ -194,6 +194,15 @@ impl GetSourcePathWithSpan for CreateTable {
 }
 
 impl CreateTable {
+    /// Retained ownership; None means no ownership information was supplied.
+    pub const fn owner(&self) -> Option<&crate::sem::OwnerSpecification> {
+        self.owner.as_ref()
+    }
+    /// Commit an ownership change, leaving the rest of the definition intact.
+    pub(crate) fn change_owner(&mut self, owner: &crate::sem::OwnerSpecification) {
+        self.owner = Some(owner.clone());
+    }
+
     /// new instance with column definitions
     #[must_use]
     pub fn new(
@@ -286,7 +295,11 @@ impl CreateTable {
 
         for cmd in alter_table.commands() {
             match cmd {
-                AlterObjSubCommand::ChangeOwner(new_owner) => self.owner = Some(new_owner.clone()),
+                AlterObjSubCommand::ChangeOwner(new_owner) => {
+                    if new_owner.can_apply() {
+                        self.change_owner(new_owner);
+                    }
+                }
                 AlterObjSubCommand::SetColumnDefault(column_name, sem_scalar_expr) => {
                     if let Some(column) = self.columns.get_column_mut(column_name) {
                         column.set_default(sem_scalar_expr);

@@ -140,8 +140,8 @@ impl super::AlterRelationKind {
         }
         let commands = syntax_commands
             .iter()
-            .map(super::AlterCommand::resolve_owner)
-            .collect::<Vec<_>>();
+            .map(|command| command.resolve_owner(context))
+            .collect::<Result<Vec<_>, _>>()?;
         Ok(SemAst::alter_view(&AlterView::new(&view, &commands)))
     }
 
@@ -156,8 +156,8 @@ impl super::AlterRelationKind {
         }
         let commands = syntax_commands
             .iter()
-            .map(super::AlterCommand::resolve_owner)
-            .collect::<Vec<_>>();
+            .map(|command| command.resolve_owner(context))
+            .collect::<Result<Vec<_>, _>>()?;
         Ok(SemAst::alter_sequence(&AlterSequence::new(name, &commands)))
     }
 }
@@ -173,10 +173,15 @@ impl super::AlterCommand {
         let command = context.finish_analysis(result)?;
         Ok((command, context))
     }
-    fn resolve_owner(&self) -> crate::sem::AlterObjSubCommand {
+    fn resolve_owner(
+        &self,
+        context: &mut impl ParseContext,
+    ) -> Result<crate::sem::AlterObjSubCommand, AnalysisError> {
         match self {
-            Self::Postgres(command) => command.resolve_owner(),
-            Self::Owner(owner) => crate::sem::AlterObjSubCommand::change_owner(owner),
+            Self::Postgres(command) => command.resolve_owner(context),
+            Self::Owner(owner) => Ok(crate::sem::AlterObjSubCommand::resolved_owner(
+                &owner.resolve_owner(context)?,
+            )),
             _ => todo!(),
         }
     }
@@ -217,7 +222,7 @@ impl super::AlterCommand {
     ) -> Result<crate::sem::AlterObjSubCommand, AnalysisError> {
         match self {
             Self::Postgres(command) => command.resolve(context, table),
-            Self::Owner(_) => Ok(self.resolve_owner()),
+            Self::Owner(_) => self.resolve_owner(context),
             Self::Default(name, expr) => Self::resolve_default(context, table, name, expr),
             Self::Constraint(constraint) => Self::resolve_constraint(context, table, constraint),
             Self::Cluster(name) => Self::resolve_cluster(context, table, name),
@@ -567,9 +572,12 @@ impl PostgresAlterCommand {
             legacy: legacy.cloned().map(Box::new),
         }
     }
-    fn resolve_owner(&self) -> crate::sem::AlterObjSubCommand {
+    fn resolve_owner(
+        &self,
+        context: &mut impl ParseContext,
+    ) -> Result<crate::sem::AlterObjSubCommand, AnalysisError> {
         if let Some(legacy) = &self.legacy {
-            legacy.resolve_owner()
+            legacy.resolve_owner(context)
         } else {
             todo!()
         }
@@ -1473,11 +1481,9 @@ impl FunctionParameter {
         use crate::sem::ScalarAnalysisContext;
         let name = Some(self.name.clone());
         let type_name = self.type_name.name.full_name()?;
-        let param_type = if let Some(ty) = context.get_type(&type_name) {
-            ty.type_reference().cloned()
-        } else {
-            None
-        };
+        let param_type = context.resolve_type_name(&type_name).map(|name| {
+            TypeReference::concrete_type_ref(&name, !self.type_name.array_bounds.is_empty())
+        });
         let default = self
             .default
             .as_ref()
@@ -1489,7 +1495,7 @@ impl FunctionParameter {
 
 impl ParameterMode {
     const fn is_output(self) -> bool {
-        matches!(self, Self::Out)
+        matches!(self, Self::Out | Self::InOut | Self::Table)
     }
 
     fn resolve_parameter(
@@ -1552,6 +1558,37 @@ impl Function {
             FunctionOverloadCollection, OverloadVariant,
         };
         let name = self.name.full_name()?;
+        if self.procedure || self.result_type.is_none() {
+            let mut params = Vec::new();
+            let mut outputs = Vec::new();
+            for param in &self.parameters {
+                let resolved = param.resolve(context)?;
+                if param.mode.is_output() {
+                    outputs.push(resolved.get_type().cloned());
+                }
+                params.push(resolved);
+            }
+            let ret_type = if self.procedure {
+                None
+            } else if outputs.len() == 1 {
+                outputs.pop().flatten()
+            } else if !outputs.is_empty() {
+                Some(TypeReference::concrete_type_ref(
+                    &crate::sem::FullName::with_schema("pg_catalog", "record"),
+                    false,
+                ))
+            } else {
+                return AnalysisError::raise_unexpected_none("create_function.return_type");
+            };
+            let strict = self.options.iter().any(FunctionOption::is_strict);
+            let overload = OverloadVariant::new(&ret_type, &params, strict, false);
+            return Ok(CreateFunction::new(
+                &name,
+                &FunctionOverloadCollection::new(&[overload]),
+                &None,
+            )
+            .with_procedure_kind(self.procedure));
+        }
         let Some(result_type) = &self.result_type else {
             return AnalysisError::raise_unexpected_none("create_function.return_type");
         };

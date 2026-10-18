@@ -17,11 +17,20 @@ pub struct CreateView {
     name: FullName,
     query: SelectStatement,
     alter_statements: Vec<AlterView>,
-    owner: Option<String>,
+    owner: Option<crate::sem::OwnerSpecification>,
     materialized: bool,
 }
 
 impl CreateView {
+    /// Retained ownership; None means no ownership information was supplied.
+    pub const fn owner(&self) -> Option<&crate::sem::OwnerSpecification> {
+        self.owner.as_ref()
+    }
+    /// Commit an ownership change, leaving the rest of the definition intact.
+    pub(crate) fn change_owner(&mut self, owner: &crate::sem::OwnerSpecification) {
+        self.owner = Some(owner.clone());
+    }
+
     pub(crate) fn result_columns(&self) -> &crate::sem::ResultColumnCollection {
         self.query.result_columns()
     }
@@ -39,7 +48,7 @@ impl CreateView {
             name: name.clone(),
             query: query.clone(),
             alter_statements: alter_statements.to_owned(),
-            owner: owner.clone(),
+            owner: owner.as_deref().map(crate::sem::OwnerSpecification::named),
             materialized,
         }
     }
@@ -68,7 +77,11 @@ impl CreateView {
 
         for cmd in alter_view.commands() {
             match cmd {
-                AlterObjSubCommand::ChangeOwner(new_owner) => self.owner = Some(new_owner.clone()),
+                AlterObjSubCommand::ChangeOwner(new_owner) => {
+                    if new_owner.can_apply() {
+                        self.change_owner(new_owner);
+                    }
+                }
                 _ => todo!(),
             }
         }

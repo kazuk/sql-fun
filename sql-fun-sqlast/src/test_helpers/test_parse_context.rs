@@ -24,6 +24,7 @@ use std::collections::{HashMap, HashSet};
 /// ParseContext implementation for tests
 #[derive(Debug, Default)]
 pub struct TestParseContext {
+    ownership: crate::sem::ownership::OwnershipCatalog,
     masters: Option<crate::sem::ConflictMasters>,
     collation_results: HashMap<FullName, crate::sem::CatalogNameLookup>,
     operator_class_results: HashMap<(FullName, String), crate::sem::CatalogNameLookup>,
@@ -43,6 +44,7 @@ pub struct TestParseContext {
     view_insert_support: HashMap<FullName, crate::sem::ViewInsertSupport>,
     view_merge_support: HashMap<FullName, crate::sem::ViewMergeSupport>,
     function_definitions: HashMap<FullName, FunctionOverloadCollection>,
+    sequence_definitions: HashMap<FullName, CreateSequence>,
     alter_tables: Vec<AlterTable>,
     drop_tables: Vec<DropTable>,
     create_indexes: Vec<CreateIndex>,
@@ -264,8 +266,8 @@ impl TypeInfoRead for TestParseContext {
 }
 
 impl SequenceInfoRead for TestParseContext {
-    fn get_sequence_impl(&self, _key: &FullName) -> Option<&CreateSequence> {
-        todo!()
+    fn get_sequence_impl(&self, key: &FullName) -> Option<&CreateSequence> {
+        self.sequence_definitions.get(key)
     }
 }
 
@@ -409,10 +411,13 @@ impl SequenceInfoWrite for TestParseContext {
     }
 
     fn apply_create_sequence(
-        self,
-        _create_sequence: &CreateSequence,
+        mut self,
+        create_sequence: &CreateSequence,
     ) -> Result<Self, AnalysisError> {
-        todo!()
+        let key = self.apply_default_schema(create_sequence.name())?;
+        self.sequence_definitions
+            .insert(key.clone(), create_sequence.with_catalog_name(&key));
+        Ok(self)
     }
 }
 
@@ -427,6 +432,24 @@ impl FunctionInfoWrite for TestParseContext {
 }
 
 impl ParseContext for TestParseContext {
+    fn insert_role(&mut self, role: &crate::sem::Role) {
+        self.ownership.insert_role(role);
+    }
+    fn insert_owned_object(&mut self, definition: &crate::sem::OwnedObjectDefinition) {
+        self.ownership.insert(definition);
+    }
+    fn apply_alter_owner(
+        mut self,
+        alteration: &crate::sem::AlterOwner,
+    ) -> Result<Self, AnalysisError> {
+        if let Some(identity) = alteration.applied_identity() {
+            let definition =
+                crate::sem::OwnedObjectDefinition::new(identity, Some(alteration.owner()));
+            self.ownership.insert(&definition);
+        }
+        Ok(self)
+    }
+
     fn resolve_cursor(&self, name: &str) -> Option<&crate::sem::CursorInfo> {
         self.cursors.cursor(name)
     }
@@ -634,5 +657,31 @@ impl TestParseContext {
     ) {
         self.view_merge_support
             .insert(name.clone(), support.clone());
+    }
+}
+
+impl crate::sem::RoleInfoRead for TestParseContext {
+    fn role_by_name(&self, name: &str) -> Option<&crate::sem::Role> {
+        self.ownership.role(name)
+    }
+}
+impl crate::sem::OwnershipInfoRead for TestParseContext {
+    fn ownership_definitions(
+        &self,
+        kind: crate::sem::ObjectKind,
+        name: &FullName,
+    ) -> Vec<crate::sem::OwnedObjectDefinition> {
+        let supplied = self.ownership.definitions(kind, name);
+        if supplied.is_empty() {
+            crate::sem::ownership::model_definitions(self, kind, name)
+        } else {
+            supplied
+        }
+    }
+    fn routine_definitions(&self, name: &FullName) -> Vec<CreateFunction> {
+        self.get_function_impl(name)
+            .map_or_else(Vec::new, |overloads| {
+                CreateFunction::new(name, &overloads, &None).split_definitions()
+            })
     }
 }

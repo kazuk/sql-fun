@@ -307,6 +307,7 @@ impl RetainSqliteTypes for StatementNode {
             Self::Insert(value) => value.retain_types(retainer),
             Self::Update(value) => value.retain_types(retainer),
             Self::Delete(value) => value.retain_types(retainer),
+            Self::CreateTrigger(value) => value.retain_types(retainer),
             Self::View(value) => value.retain_types(retainer),
             Self::Table(value) => value.retain_types(retainer),
             Self::AlterRelation(value) => value.retain_types(retainer),
@@ -945,5 +946,29 @@ impl RetainSqliteTypes for Delete {
         retainer.list(&mut self.using)?;
         retainer.optional(&mut self.predicate)?;
         retainer.list(&mut self.returning)
+    }
+}
+
+impl RetainSqliteTypes for crate::ast::CreateTrigger {
+    fn retain_types_inner(
+        &mut self,
+        retainer: &mut SqliteTypeRetainer<'_>,
+    ) -> Result<(), AnalysisError> {
+        retainer.optional(&mut self.predicate)?;
+        self.body.retain_types(retainer)
+    }
+}
+
+impl RetainSqliteTypes for crate::ast::TriggerBody {
+    fn retain_types_inner(
+        &mut self,
+        retainer: &mut SqliteTypeRetainer<'_>,
+    ) -> Result<(), AnalysisError> {
+        match self {
+            Self::Commands(commands) => retainer.list(commands),
+            Self::Function(_) => Err(AnalysisError::unexpected_input_error(
+                "function trigger body in SQLite type retention",
+            )),
+        }
     }
 }

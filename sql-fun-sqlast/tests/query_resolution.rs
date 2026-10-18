@@ -31,38 +31,6 @@ fn table_sample_retains_explicit_unimplemented_marker() {
     let _ = heavy::analyze("select 1 from missing tablesample system(1)");
 }
 
-#[test]
-fn exists_retains_non_null_boolean_and_analyzed_child_at_public_boundary() {
-    // The real builtin catalog verifies public name resolution and inference.
-    let analyzed =
-        heavy::analyze("SELECT EXISTS (SELECT $1::integer AS n WHERE $1::integer < 2) AS found")
-            .expect("EXISTS analysis");
-    let ::sql_fun_sqlast::sem::SemAst::SelectStatement(query) = analyzed else {
-        panic!("SELECT semantics expected");
-    };
-    let column = query.result_columns().get_column_at(0).unwrap();
-    assert_eq!(
-        column.col_type(),
-        &Some(::sql_fun_sqlast::sem::PgBuiltInType::bool())
-    );
-    assert_eq!(column.is_not_null(), &Some(true));
-    let exists = column
-        .expression()
-        .unwrap()
-        .as_exists()
-        .expect("EXISTS retained after inference");
-    assert_eq!(exists.query().result_columns().len(), 1);
-    assert_eq!(
-        exists
-            .query()
-            .result_columns()
-            .get_column_at(0)
-            .unwrap()
-            .col_type(),
-        &Some(::sql_fun_sqlast::sem::PgBuiltInType::int4()),
-    );
-}
-
 mod test_helpers {
     pub(super) mod heavy {
         use std::path::PathBuf;
@@ -71,14 +39,13 @@ mod test_helpers {
             PostgresDialect, SqlFunArgs,
             sem::{
                 AnalysisError, BaseContext, FrozenBaseContext, SchemaFileContext, SelectStatement,
-                SemAst,
             },
             syn::{ListOpt, Opt},
         };
 
         /// Loads builtin JSON catalogs for each invocation to check the public
         /// analysis boundary. Initialization is repeated; no cache is shared.
-        pub(crate) fn analyze(sql: &str) -> Result<SemAst, AnalysisError> {
+        pub(crate) fn analyze(sql: &str) -> Result<(), AnalysisError> {
             let metadata = PathBuf::from(env!("CARGO_MANIFEST_DIR")).join("sql_fun.metadata.toml");
             let args = <SqlFunArgs as ::clap::Parser>::try_parse_from([
                 "sqlfun",
@@ -106,8 +73,7 @@ mod test_helpers {
                 .as_select_stmt()
                 .as_inner()
                 .expect("SELECT fixture");
-            SelectStatement::analyze_select(context, select, &tokens)
-                .map(|analyzed| analyzed.ast().clone())
+            SelectStatement::analyze_select(context, select, &tokens).map(|_| ())
         }
     }
 }

@@ -111,6 +111,7 @@ impl InsertStatement {
         &mut self,
         visitor: &mut V,
     ) -> Result<(), AnalysisError> {
+        visitor.relation_identity(self.target().full_name());
         visitor.enter_query();
         let result = self.walk_body(visitor);
         visitor.leave_query();

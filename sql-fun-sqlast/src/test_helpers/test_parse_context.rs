@@ -24,6 +24,7 @@ use std::collections::{HashMap, HashSet};
 /// ParseContext implementation for tests
 #[derive(Debug, Default)]
 pub struct TestParseContext {
+    rules: HashMap<crate::sem::RuleIdentity, Option<crate::sem::CreateRule>>,
     ownership: crate::sem::ownership::OwnershipCatalog,
     triggers: HashMap<crate::sem::TriggerIdentity, crate::sem::CreateTrigger>,
     masters: Option<crate::sem::ConflictMasters>,
@@ -392,6 +393,10 @@ impl DiagnosticContext for TestParseContext {
 }
 
 impl BaseParseContext for TestParseContext {
+    fn rule(&self, identity: &crate::sem::RuleIdentity) -> Option<&crate::sem::CreateRule> {
+        self.rules.get(identity).and_then(Option::as_ref)
+    }
+
     fn sqlite_relation_identity(&self, name: &FullName) -> Option<FullName> {
         for (candidate, definition) in &self.table_definitions {
             if candidate.sqlite_eq(name) && definition.is_some() {
@@ -509,6 +514,47 @@ impl ParseContext for TestParseContext {
         // Schema publication tests use SchemaFileContext. This fixture records
         // direct calls rather than implementing the production catalog layers.
         operation(self)
+    }
+    fn register_rule(mut self, rule: &crate::sem::CreateRule) -> Result<Self, AnalysisError> {
+        self.rules
+            .insert(rule.identity().clone(), Some(rule.clone()));
+        Ok(self)
+    }
+    fn cancel_rule(mut self, identity: &crate::sem::RuleIdentity) -> Result<Self, AnalysisError> {
+        self.rules.insert(identity.clone(), None);
+        Ok(self)
+    }
+    fn associate_rule(
+        mut self,
+        target: &FullName,
+        identity: &crate::sem::RuleIdentity,
+    ) -> Result<Self, AnalysisError> {
+        if let Some(Some(table)) = self.table_definitions.get_mut(target) {
+            table.associate_rule(identity);
+        } else if let Some(Some(view)) = self.view_definitions.get_mut(target) {
+            view.associate_rule(identity);
+        } else {
+            return Err(AnalysisError::rule(
+                &crate::sem::problem::RuleProblem::target(target),
+            ));
+        }
+        Ok(self)
+    }
+    fn dissociate_rule(
+        mut self,
+        target: &FullName,
+        identity: &crate::sem::RuleIdentity,
+    ) -> Result<Self, AnalysisError> {
+        if let Some(Some(table)) = self.table_definitions.get_mut(target) {
+            table.dissociate_rule(identity);
+        } else if let Some(Some(view)) = self.view_definitions.get_mut(target) {
+            view.dissociate_rule(identity);
+        } else {
+            return Err(AnalysisError::rule(
+                &crate::sem::problem::RuleProblem::target(target),
+            ));
+        }
+        Ok(self)
     }
 
     fn insert_role(&mut self, role: &crate::sem::Role) {

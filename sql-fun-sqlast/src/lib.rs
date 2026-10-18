@@ -466,7 +466,6 @@ mod tests {
     }
 
     #[rstest::rstest]
-    #[ignore = "full builtin bootstrap analyzes pg_settings CREATE RULE; restore after #604"]
     fn parse_adventure_works_schema(
         context_args: SqlFunArgs,
         _enable_stack_overflow_backtrace: EnableStackOverflowBacktrace,

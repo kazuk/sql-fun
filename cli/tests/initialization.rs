@@ -192,7 +192,6 @@ impl InitializedProject {
 }
 
 #[test]
-#[ignore = "assert_semantics loads builtin pg_settings CREATE RULE; restore after #604"]
 fn initialization_preserves_and_loads_an_existing_valid_generation() {
     let project = InitializedProject::new();
     project.install_fixture("17");
@@ -259,7 +258,6 @@ fn initialization_diagnoses_a_configured_datasource_version_outside_the_selectio
 }
 
 #[test]
-#[ignore = "assert_semantics loads builtin pg_settings CREATE RULE; restore after #604"]
 fn a_later_version_failure_preserves_the_completed_version() {
     let project = InitializedProject::new();
     project.install_fixture("17");
@@ -427,7 +425,6 @@ fn ambient_postgres_connection_does_not_select_sqlite_setup_source() {
 }
 
 #[test]
-#[ignore = "assert_semantics loads builtin pg_settings CREATE RULE; restore after #604"]
 fn explicit_mixed_engine_setup_retains_both_dispatch_paths() {
     let project = InitializedProject::new();
     project.install_fixture("17");

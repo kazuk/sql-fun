@@ -554,7 +554,7 @@ impl TriggerBody {
             }
             Self::Commands(commands) => {
                 for command in commands {
-                    command.walk_trigger_command(dependencies)?;
+                    command.walk_nested_command(dependencies)?;
                 }
             }
         }

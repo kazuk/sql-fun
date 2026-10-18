@@ -9,6 +9,9 @@ use crate::sem::{AnalysisProblem, ParseContext, TypeReference};
 /// error
 #[derive(Debug, thiserror::Error)]
 pub enum AnalysisError {
+    /// Invalid rule definition or application.
+    #[error("invalid rule: {0:?}")]
+    Rule(Box<crate::sem::problem::RuleProblem>),
     /// Invalid trigger definition or application.
     #[error("invalid trigger: {0:?}")]
     Trigger(Box<crate::sem::problem::TriggerProblem>),
@@ -67,6 +70,15 @@ pub enum AnalysisError {
 }
 
 impl AnalysisError {
+    pub(crate) fn report_rule_problem(&self, context: &mut impl ParseContext) -> Result<(), Self> {
+        if let Self::Rule(problem) = self {
+            context.report_analysis_problem(AnalysisProblem::rule(problem))?;
+        }
+        Ok(())
+    }
+    pub(crate) fn rule(problem: &crate::sem::problem::RuleProblem) -> Self {
+        Self::Rule(Box::new(problem.clone()))
+    }
     pub(crate) fn trigger(problem: &crate::sem::problem::TriggerProblem) -> Self {
         Self::Trigger(Box::new(problem.clone()))
     }

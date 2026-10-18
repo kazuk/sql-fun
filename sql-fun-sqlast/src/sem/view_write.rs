@@ -64,6 +64,15 @@ impl ViewWriteInfo {
         Ok(())
     }
 
+    pub(crate) fn replace_rule_definition(
+        &mut self,
+        replacement: &Self,
+    ) -> Result<(), ViewProblem> {
+        let options = self.retained_options.clone();
+        self.replace_definition(replacement)?;
+        self.retained_options = options;
+        Ok(())
+    }
     pub(crate) fn new(
         name: &FullName,
         source: Option<&FullName>,
@@ -183,6 +192,29 @@ impl ViewWriteInfo {
     }
 
     fn decision(
+        &self,
+        context: &impl BaseParseContext,
+        event: WriteEvent,
+        seen: &mut Vec<FullName>,
+    ) -> Result<Decision, FullName> {
+        let effective = self.with_effective_rules(context);
+        effective.decision_from_facts(context, event, seen)
+    }
+    fn with_effective_rules(&self, context: &impl BaseParseContext) -> Self {
+        let mut effective = self.clone();
+        if let Some(view) = context.get_view_impl(&self.name)
+            && let Some(references) = view.rules()
+        {
+            for rule in references.resolve(context) {
+                if let Some(object) = WriteObject::from_analyzed_rule(rule) {
+                    effective.objects.retain(|old| !old.same_identity(&object));
+                    effective.objects.push(object);
+                }
+            }
+        }
+        effective
+    }
+    fn decision_from_facts(
         &self,
         context: &impl BaseParseContext,
         event: WriteEvent,
@@ -587,10 +619,6 @@ pub(crate) const TRIGGER_EVENT_UPDATE: i32 = 16;
 pub(crate) enum WriteEvent {
     Insert,
     Update,
-    #[expect(
-        dead_code,
-        reason = "legacy rule metadata construction disconnected by #600; replaced by #604"
-    )]
     Delete,
 }
 impl WriteEvent {
@@ -600,10 +628,6 @@ impl WriteEvent {
     pub(crate) const fn update() -> Self {
         Self::Update
     }
-    #[expect(
-        dead_code,
-        reason = "legacy rule metadata construction disconnected by #600; replaced by #604"
-    )]
     pub(crate) const fn delete() -> Self {
         Self::Delete
     }
@@ -631,10 +655,6 @@ enum WriteObjectKind {
         reason = "legacy trigger metadata is disconnected by #598/#599; replaced by #555"
     )]
     Trigger(TriggerFacts),
-    #[expect(
-        dead_code,
-        reason = "legacy rule metadata disconnected by #600/#601; replaced by #604/#605"
-    )]
     Rule(RuleFacts),
 }
 #[derive(Debug, Clone)]
@@ -647,7 +667,7 @@ struct TriggerFacts {
 struct RuleFacts {
     instead: bool,
     conditional: bool,
-    actions: Vec<crate::syn::Node>,
+    actions: Vec<crate::sem::SemAst>,
 }
 impl WriteObject {
     const fn rule_action_count(&self) -> Option<usize> {
@@ -674,29 +694,19 @@ impl WriteObject {
             enabled: true,
         }
     }
-    #[expect(
-        dead_code,
-        reason = "legacy rule metadata disconnected by #600/#601; replaced by #604/#605"
-    )]
-    pub(crate) fn rule(
-        name: &str,
-        event: WriteEvent,
-        instead: bool,
-        conditional: bool,
-        returning: bool,
-        actions: &[crate::syn::Node],
-    ) -> Self {
-        Self {
-            name: name.to_owned(),
+    fn from_analyzed_rule(rule: &crate::sem::CreateRule) -> Option<Self> {
+        let event = rule.event().write_event()?;
+        Some(Self {
+            name: rule.identity().name().name().as_str().to_owned(),
             events: event.mask(),
             kind: WriteObjectKind::Rule(RuleFacts {
-                instead,
-                conditional,
-                actions: actions.to_vec(),
+                instead: rule.instead(),
+                conditional: rule.predicate().is_some(),
+                actions: rule.actions().to_vec(),
             }),
-            returning,
+            returning: rule.has_returning(),
             enabled: true,
-        }
+        })
     }
     fn trigger_columns(&self) -> Option<&[String]> {
         if let WriteObjectKind::Trigger(facts) = &self.kind
@@ -733,6 +743,7 @@ pub(crate) fn infer_view_arbiters(
             view.full_name(),
         ));
     };
+    let info = info.with_effective_rules(context);
     if let Err(missing) = info.decision(
         context,
         WriteEvent::insert(),
@@ -752,7 +763,7 @@ pub(crate) fn infer_view_arbiters(
         return Ok(crate::sem::ConflictArbiterInference::complete(&[]));
     };
     let mut mapped = conflict.clone();
-    if !mapped.map_view_columns(context, info, source)? {
+    if !mapped.map_view_columns(context, &info, source)? {
         return Ok(crate::sem::ConflictArbiterInference::complete(&[]));
     }
     let relation = TableName::from(source.clone());

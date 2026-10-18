@@ -415,23 +415,78 @@ fn exact_identities_preserve_relation_scope_and_quoted_components() -> testresul
 }
 
 #[rstest::rstest]
-#[case("15", false)]
-#[case("16", false)]
-#[case("17", false)]
-#[case("18", true)]
-fn insert_returning_uses_versioned_rule_scope(
-    #[case] version: &str,
+fn insert_returning_does_not_bind_enclosing_rule_rows(
+    #[values("15", "16", "17", "18")] version: &str,
+) {
+    let mut context = test_helpers::catalog_version(version);
+    test_helpers::resolve(
+        "CREATE RULE r AS ON UPDATE TO items DO INSTEAD INSERT INTO sink VALUES(NEW.id) RETURNING OLD.id",
+        &mut context,
+    ).unwrap_err();
+    if version == "18" {
+        let mut has_boundary = false;
+        for problem in context.reported_problems() {
+            if let Some(rule) = problem.rule_problem() {
+                has_boundary |= rule
+                    .definition_detail()
+                    .is_some_and(|detail| detail.contains("#621"));
+            }
+        }
+        assert!(has_boundary);
+    }
+}
+
+#[rstest::rstest]
+#[case::update("UPDATE sink SET other=NEW.id RETURNING OLD.id", true)]
+#[case::delete("DELETE FROM sink RETURNING OLD.id", true)]
+#[case::update_wrong_relation("UPDATE sink SET other=NEW.id RETURNING OLD.other", false)]
+#[case::delete_wrong_relation("DELETE FROM sink RETURNING OLD.other", false)]
+fn returning_distinguishes_rule_rows_from_action_destination(
+    #[values("15", "16", "17", "18")] version: &str,
+    #[case] action: &str,
     #[case] accepted: bool,
 ) -> testresult::TestResult {
-    let metadata = ::serde_json::from_value(::serde_json::json!({
-        "engine": "postgres", "dialect": "postgres", "version": version, "search_path": ["public"]
-    }))?;
-    let mut context = test_helpers::catalog().with_metadata(&metadata);
+    let mut context = test_helpers::catalog_version(version);
+    test_helpers::add_table_column(
+        &mut context,
+        &FullName::with_schema("public", "sink"),
+        "other",
+    );
     let result = test_helpers::resolve(
-        "CREATE RULE r AS ON UPDATE TO items DO INSTEAD INSERT INTO sink VALUES(NEW.id) RETURNING OLD.id",
+        &format!("CREATE RULE r AS ON UPDATE TO items DO INSTEAD {action}"),
         &mut context,
     );
     assert_eq!(result.is_ok(), accepted, "{version}: {result:?}");
+    if let Ok(statement) = result {
+        let reference = statement.rule().unwrap().actions()[0]
+            .rule_returning()
+            .unwrap()
+            .get_column_at(0)
+            .unwrap()
+            .expression()
+            .unwrap()
+            .table_column_reference()
+            .unwrap();
+        assert_eq!(
+            reference.relation(),
+            &FullName::with_schema("public", "items")
+        );
+    }
+    Ok(())
+}
+
+#[test]
+fn cte_delete_returning_uses_its_destination_row_image_on_postgres18() -> testresult::TestResult {
+    let mut context = test_helpers::catalog_version("18");
+    test_helpers::add_table_column(
+        &mut context,
+        &FullName::with_schema("public", "sink"),
+        "other",
+    );
+    test_helpers::resolve(
+        "CREATE RULE r AS ON UPDATE TO items DO WITH x AS (DELETE FROM sink RETURNING OLD.other) SELECT other FROM x",
+        &mut context,
+    )?;
     Ok(())
 }
 
@@ -519,6 +574,12 @@ mod test_helpers {
     };
     use crate::test_helpers::TestParseContext;
 
+    pub(super) fn catalog_version(version: &str) -> TestParseContext {
+        let metadata = ::serde_json::from_value(::serde_json::json!({
+            "engine": "postgres", "dialect": "postgres", "version": version, "search_path": ["public"]
+        })).expect("explicit rule fixture version");
+        catalog().with_metadata(&metadata)
+    }
     pub(super) fn catalog() -> TestParseContext {
         let mut context = TestParseContext::default().with_dialect(Dialect::postgres());
         context.set_get_search_path_result(&[SchemaName::from("public")]);
@@ -560,8 +621,11 @@ mod test_helpers {
         context
     }
     pub(super) fn add_table(context: &mut TestParseContext, name: &FullName) {
+        add_table_column(context, name, "id");
+    }
+    pub(super) fn add_table_column(context: &mut TestParseContext, name: &FullName, column: &str) {
         let column = ColumnDefinition::new(
-            &Some(ColumnName::from("id")),
+            &Some(ColumnName::from(column)),
             Some(&PgBuiltInType::int4()),
             Some(false),
             &[],

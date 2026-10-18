@@ -113,5 +113,6 @@ NOTIFY conversion remains owned by #608. Rule analysis explicitly rejects
 unimplemented subquery semantics tracked by #570–#573, rather than accepting
 scalar placeholders. ON CONFLICT DO UPDATE retains its existing #474 boundary.
 Exact result compatibility for modifier-capable types is rejected pending
-shared type-modifier retention (#619). These are independent semantic
+shared type-modifier retention (#619). PostgreSQL 18 INSERT RETURNING destination
+row images are diagnosed pending #621. These are independent semantic
 limitations, not alternate parser routes.

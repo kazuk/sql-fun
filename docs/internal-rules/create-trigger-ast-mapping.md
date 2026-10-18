@@ -105,7 +105,8 @@ classification API. Payloads remain private, like other common statements.
 `Statement::analyze` reaches an explicit `todo!()` owned by #602/#555; it cannot
 register legacy `WriteDeclaration`/`ViewWriteChange` trigger metadata. Deparsing
 returns the existing unsupported-node error. DROP TRIGGER and CREATE/DROP RULE
-keep their existing routes until their own migration issues.
+now have dedicated routes under #599–#601; the aggregate ViewWrite variant and
+WriteDeclaration syntax adapter have been removed.
 
 CREATE TRIGGER cannot be a WITH carrier or CTE body through the existing mutation
 API. SQLite type retention visits WHEN first, then the command list in source

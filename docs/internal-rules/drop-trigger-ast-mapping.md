@@ -17,7 +17,7 @@ by `syn/sqlite/trigger_statement.rs` and `syn/sqlite/names.rs`.
 | PG `objects` | Exactly one List target; split the final trigger identifier from the preceding ON relation components | `postgres_preserves_target_names`, invalid-target tests |
 | PG nested List `items`, String `sval` | Shared `Name` conversion retains ordered identifier values; relation retains all supplied components, trigger has one | Target-name tests cover bare, schema/catalog qualification, quoted dots, escaped quotes, case folding and overqualified unresolved names |
 | PG `remove_type` | `ObjectTrigger` selects `StatementNode::DropTrigger`; other kinds cannot enter the payload conversion | `rejects_other_drop_kinds`; public classification tests |
-| PG `behavior` | `DropCascade` / `DropRestrict` become `TriggerDropBehavior`; undefined/absent values are rejected | `postgres_preserves_drop_options`, `rejects_unspecified_behavior` |
+| PG `behavior` | `DropCascade` / `DropRestrict` become `DropBehavior`; undefined/absent values are rejected | `postgres_preserves_drop_options`, `rejects_unspecified_behavior` |
 | PG `missing_ok` | `DropTrigger.if_exists` | Drop-option tests cross both flag values with all behavior spellings |
 | PG `concurrent` | Always false in DROP TRIGGER grammar; contradictory adapter input is rejected | `rejects_contradictory_concurrent_flag` |
 | SQLite `if_exists` | Same `if_exists` flag | `sqlite_preserves_names_without_inventing_relation_or_behavior` |
@@ -56,8 +56,9 @@ feature).
 
 Semantic dispatch has an explicit `todo!()` owned by #555. This statement no
 longer creates, resolves or applies legacy `WriteDeclaration`/`ViewWriteChange`
-metadata. CREATE/DROP RULE retain their existing routes until #600/#601; the
-aggregate variant remains for them. No semantic fallback is provided.
+metadata. All four statement migrations (#598–#601) now have dedicated routes;
+the aggregate ViewWrite variant and WriteDeclaration syntax adapter are removed.
+No semantic fallback is provided.
 
 The `missing_trigger` case of `invalid_view_declarations_are_structured` in
 `tests/writable_views.rs` now has a targeted ignore naming #555: it expected a

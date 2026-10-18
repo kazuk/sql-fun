@@ -434,9 +434,7 @@ impl TryFromWithTokens<&syn::Node> for StatementNode {
                 drop_table.get_remove_type().as_inner(),
                 Some(syn::ObjectType::ObjectRule)
             ) {
-                return Ok(Self::view_write(
-                    super::view_write::WriteDeclaration::try_from(&drop_table)?,
-                ));
+                return Ok(Self::drop_rule(super::DropRule::try_from(&drop_table)?));
             }
             return Ok(Self::drop_table(DropTable::try_from(&drop_table)?));
         }

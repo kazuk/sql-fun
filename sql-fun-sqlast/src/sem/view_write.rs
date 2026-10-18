@@ -520,6 +520,10 @@ pub(crate) enum WriteAction {
     )]
     Object(ObjectChange),
     Default(Box<ViewDefault>),
+    #[expect(
+        dead_code,
+        reason = "legacy DROP RULE metadata disconnected by #601; replaced by #605"
+    )]
     Drop(ObjectChange),
 }
 impl WriteAction {
@@ -533,14 +537,6 @@ impl WriteAction {
 
     pub(crate) fn sequence(actions: &[Self]) -> Self {
         Self::Sequence(actions.to_vec())
-    }
-    pub(crate) fn trigger_declaration(&self) -> Option<(&str, bool)> {
-        if let Self::Object(change) = self
-            && !change.object.is_rule()
-        {
-            return Some((&change.object.name, change.if_not_exists));
-        }
-        None
     }
     #[expect(
         dead_code,
@@ -559,6 +555,10 @@ impl WriteAction {
             value: value.cloned(),
         }))
     }
+    #[expect(
+        dead_code,
+        reason = "legacy DROP RULE metadata disconnected by #601; replaced by #605"
+    )]
     pub(crate) fn drop_object(object: &WriteObject, if_exists: bool) -> Self {
         Self::Drop(ObjectChange {
             object: object.clone(),
@@ -631,6 +631,10 @@ enum WriteObjectKind {
         reason = "legacy trigger metadata is disconnected by #598/#599; replaced by #555"
     )]
     Trigger(TriggerFacts),
+    #[expect(
+        dead_code,
+        reason = "legacy rule metadata disconnected by #600/#601; replaced by #604/#605"
+    )]
     Rule(RuleFacts),
 }
 #[derive(Debug, Clone)]
@@ -670,6 +674,10 @@ impl WriteObject {
             enabled: true,
         }
     }
+    #[expect(
+        dead_code,
+        reason = "legacy rule metadata disconnected by #600/#601; replaced by #604/#605"
+    )]
     pub(crate) fn rule(
         name: &str,
         event: WriteEvent,

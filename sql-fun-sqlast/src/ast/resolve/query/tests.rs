@@ -1,4 +1,6 @@
 //! Semantic behavior at the query-analysis boundary. All fixtures use a small catalog.
+mod exists;
+
 use super::test_helpers::{output_index, output_type, query, resolve};
 use crate::ast::Dialect;
 use crate::sem::{

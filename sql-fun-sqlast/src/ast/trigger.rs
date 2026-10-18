@@ -1,4 +1,4 @@
-//! CREATE TRIGGER syntax conversion, without catalog access.
+//! CREATE/DROP TRIGGER syntax conversion, without catalog access.
 
 use crate::ast::{
     CreateTrigger, Expr, Name, Relation, TriggerBody, TriggerConstraint, TriggerEvent,
@@ -231,5 +231,71 @@ impl TriggerFunction {
             )?);
         }
         Ok(arguments)
+    }
+}
+
+impl TryFrom<&syn::DropStmt> for super::DropTrigger {
+    type Error = AnalysisError;
+
+    fn try_from(value: &syn::DropStmt) -> Result<Self, Self::Error> {
+        if !matches!(
+            value.get_remove_type().as_inner(),
+            Some(syn::ObjectType::ObjectTrigger)
+        ) {
+            return AnalysisError::raise_unexpected_input("DROP TRIGGER object type");
+        }
+        if value.get_concurrent() {
+            return AnalysisError::raise_unexpected_input("DROP TRIGGER cannot be concurrent");
+        }
+        let objects = value.get_objects().as_inner().unwrap_or_default();
+        let [object] = objects.as_slice() else {
+            return AnalysisError::raise_unexpected_input("one DROP TRIGGER target required");
+        };
+        let mut parts = Name::try_from(object.as_list().get_items())?.0;
+        // The raw parser appends the trigger identifier to the ON relation's name list.
+        if parts.len() < 2 {
+            return AnalysisError::raise_unexpected_input("DROP TRIGGER relation and name");
+        }
+        let name = parts.pop().expect("checked DROP TRIGGER target length");
+        Ok(Self {
+            name: Name::from_parts(&[name]),
+            relation: Some(Name::from_parts(&parts)),
+            if_exists: value.get_missing_ok(),
+            behavior: Some(super::TriggerDropBehavior::try_from(
+                value.get_behavior().as_inner(),
+            )?),
+        })
+    }
+}
+
+#[cfg(test)]
+mod drop_tests;
+
+impl TryFrom<Option<syn::DropBehavior>> for super::TriggerDropBehavior {
+    type Error = AnalysisError;
+
+    fn try_from(value: Option<syn::DropBehavior>) -> Result<Self, Self::Error> {
+        match value {
+            Some(syn::DropBehavior::DropCascade) => Ok(Self::Cascade),
+            Some(syn::DropBehavior::DropRestrict) => Ok(Self::Restrict),
+            _ => AnalysisError::raise_unexpected_input("DROP TRIGGER behavior"),
+        }
+    }
+}
+
+#[cfg(feature = "sqlite")]
+impl TryFrom<&syn::sqlite::DropTriggerStatement> for super::DropTrigger {
+    type Error = AnalysisError;
+
+    fn try_from(value: &syn::sqlite::DropTriggerStatement) -> Result<Self, Self::Error> {
+        if value.trigger_name().alias().is_some() {
+            return AnalysisError::raise_unexpected_input("DROP TRIGGER cannot have an alias");
+        }
+        Ok(Self {
+            name: Name::from(value.trigger_name()),
+            relation: None,
+            if_exists: *value.if_exists(),
+            behavior: None,
+        })
     }
 }

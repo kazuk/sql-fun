@@ -421,7 +421,15 @@ impl TryFromWithTokens<&syn::Node> for StatementNode {
         if let Some(drop_table) = value.as_drop_stmt().as_inner() {
             if matches!(
                 drop_table.get_remove_type().as_inner(),
-                Some(syn::ObjectType::ObjectTrigger | syn::ObjectType::ObjectRule)
+                Some(syn::ObjectType::ObjectTrigger)
+            ) {
+                return Ok(Self::drop_trigger(super::DropTrigger::try_from(
+                    &drop_table,
+                )?));
+            }
+            if matches!(
+                drop_table.get_remove_type().as_inner(),
+                Some(syn::ObjectType::ObjectRule)
             ) {
                 return Ok(Self::view_write(
                     super::view_write::WriteDeclaration::try_from(&drop_table)?,

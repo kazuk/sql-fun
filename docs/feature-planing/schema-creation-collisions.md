@@ -90,7 +90,8 @@ reads so frozen ancestors do not reappear, and must update dependent identities.
 - Schema existence, attached-database inventory, and PostgreSQL session-specific
   temporary-schema identity are not fully modeled. Explicit temporary declarations
   use logical `pg_temp` (PostgreSQL) or `temp` (SQLite), separate from permanent
-  creation names. Unqualified relation/type lookup searches temporary schemas first unless
+  creation names. Unqualified relation/type lookup searches temporary schemas
+  first unless
   explicitly positioned in the search path. PostgreSQL routine lookup excludes
   the temporary schema. Session-specific physical temporary-schema names remain
   outside this model.

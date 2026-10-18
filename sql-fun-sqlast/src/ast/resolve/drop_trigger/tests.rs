@@ -13,7 +13,7 @@ fn resolved_drop_does_not_apply_until_requested(
     let drop = statement.trigger_drop().unwrap();
     assert!(drop.found());
     assert_eq!(drop.identity(), Some(&test_helpers::identity()));
-    assert_eq!(drop.behavior().is_cascade(), cascade);
+    assert_eq!(drop.behavior().unwrap().is_cascade(), cascade);
     assert!(!drop.if_exists());
     assert!(child.trigger(&test_helpers::identity()).is_some());
     Ok(())
@@ -240,3 +240,6 @@ mod test_helpers {
             .len()
     }
 }
+
+#[cfg(feature = "sqlite")]
+mod sqlite;

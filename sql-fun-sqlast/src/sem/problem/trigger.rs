@@ -8,6 +8,8 @@ pub enum TriggerProblem {
     Duplicate(TriggerIdentity),
     /// Requested trigger does not exist in the resolved relation namespace.
     Missing(TriggerIdentity),
+    /// No SQLite trigger matched an unbound requested name.
+    MissingName(FullName),
     /// Unknown event column.
     Column(FullName, String),
     /// Missing or invalid zero-input trigger function.
@@ -21,6 +23,9 @@ impl TriggerProblem {
     }
     pub(crate) fn duplicate(identity: &TriggerIdentity) -> Self {
         Self::Duplicate(identity.clone())
+    }
+    pub(crate) fn missing_name(name: &FullName) -> Self {
+        Self::MissingName(name.clone())
     }
     pub(crate) fn missing(identity: &TriggerIdentity) -> Self {
         Self::Missing(identity.clone())

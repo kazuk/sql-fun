@@ -22,9 +22,8 @@ impl CastInfoRead for SchemaCatalog {
     fn cast_sources(&self, target: &TypeReference, explicit: bool) -> HashSet<TypeReference> {
         let mut sources = self.base.cast_sources(target, explicit);
         for (name, _) in self.casts.iter() {
-            if let Ok(source) = TypeReference::from_str(&name) {
-                sources.insert(source);
-            }
+            let source = TypeReference::from_str(&name).expect("canonical concrete type key");
+            sources.insert(source);
         }
         sources.extend(self.types.cast_source_types());
         if explicit {
@@ -179,27 +178,46 @@ mod test_cast_layers {
     }
 
     #[rstest::rstest]
-    #[case::dot(
+    #[case::dot_scalar(
         crate::sem::FullName::with_schema("a.b", "c"),
-        crate::sem::FullName::with_schema("a", "b.c")
+        crate::sem::FullName::with_schema("a", "b.c"),
+        false,
+        false
+    )]
+    #[case::dot_arrays(
+        crate::sem::FullName::with_schema("a.b", "c"),
+        crate::sem::FullName::with_schema("a", "b.c"),
+        true,
+        true
     )]
     #[case::quotes(
         crate::sem::FullName::with_schema("a\"b", "c"),
-        crate::sem::FullName::with_schema("a", "b\"c")
+        crate::sem::FullName::with_schema("a", "b\"c"),
+        false,
+        false
     )]
     #[case::array_suffix(
         crate::sem::FullName::with_schema("a", "item[]"),
-        crate::sem::FullName::with_schema("a", "item")
+        crate::sem::FullName::with_schema("a", "item"),
+        false,
+        true
+    )]
+    #[case::array_flag(
+        crate::sem::FullName::with_schema("a", "item"),
+        crate::sem::FullName::with_schema("a", "item"),
+        false,
+        true
     )]
     fn preserves_cast_keys_and_enumerated_types(
         #[case] left: crate::sem::FullName,
         #[case] right: crate::sem::FullName,
-        #[values(false, true)] array: bool,
+        #[case] source_array: bool,
+        #[case] other_array: bool,
     ) {
         use crate::sem::TypeReference;
         let (mut child, _, _, _) = test_helpers::cast_layer();
-        let source = TypeReference::concrete_type_ref(&left, array);
-        let other = TypeReference::concrete_type_ref(&right, !array);
+        let source = TypeReference::concrete_type_ref(&left, source_array);
+        let other = TypeReference::concrete_type_ref(&right, other_array);
         let target = test_helpers::named_type("target");
         test_helpers::register(&mut child, &source, &target, CastContext::implicit());
         test_helpers::register(&mut child, &other, &target, CastContext::explicit());
@@ -210,6 +228,8 @@ mod test_cast_layers {
             crate::test_helpers::schema_layer(std::path::Path::new("cast-child.sql"), &parent);
         assert!(child.get_implicit_cast(&source, &target).is_some());
         assert!(child.get_implicit_cast(&other, &target).is_none());
+        assert!(child.get_implicit_cast(&target, &source).is_some());
+        assert!(child.get_implicit_cast(&target, &other).is_none());
         let sources = child.cast_sources(&target, false);
         assert!(sources.contains(&source));
         assert!(!sources.contains(&other));

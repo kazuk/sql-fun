@@ -323,6 +323,8 @@ impl AlterView {
 pub enum AlterObjSubCommand {
     ChangeOwner(crate::sem::OwnerSpecification),
     SetColumnDefault(ColumnName, Box<SemScalarExpr>),
+    /// Remove a column default.
+    DropColumnDefault(ColumnName),
     AddConstraint(Constraint),
     ClusterOn(String),
 
@@ -354,6 +356,9 @@ impl AlterObjSubCommand {
 
     pub(crate) fn resolved_owner(owner: &crate::sem::OwnerSpecification) -> Self {
         Self::ChangeOwner(owner.clone())
+    }
+    pub(crate) fn drop_column_default(column: &ColumnName) -> Self {
+        Self::DropColumnDefault(column.clone())
     }
     pub(crate) fn column_default(column: &ColumnName, expression: &SemScalarExpr) -> Self {
         Self::SetColumnDefault(column.clone(), Box::new(expression.clone()))

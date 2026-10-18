@@ -90,15 +90,15 @@ mod tests {
         let renderer = Renderer::new().unwrap();
         let data = serde_json::json!([{
             "schema": identifier("odd\" schema"), "view": identifier("SELECT<&"),
-            "definition": fragment("SELECT '<&>\"'::text AS \"a\";"), "options": fragment(""), "write_metadata": fragment("")
+            "definition": fragment("SELECT '<&>\"'::text AS \"a\";"), "options": fragment(""), "declarations": fragment("")
         }]);
         assert_eq!(
             renderer.render("views", &data).unwrap(),
             "CREATE VIEW \"odd\"\" schema\".\"SELECT<&\" AS SELECT '<&>\"'::text AS \"a\";\n\n"
         );
-        let wrong = serde_json::json!([{"schema": fragment("public"), "view": identifier("v"), "definition": fragment("SELECT 1;"), "options": fragment(""), "write_metadata": fragment("")}]);
+        let wrong = serde_json::json!([{"schema": fragment("public"), "view": identifier("v"), "definition": fragment("SELECT 1;"), "options": fragment(""), "declarations": fragment("")}]);
         assert!(renderer.render("views", &wrong).is_err());
-        let wrong = serde_json::json!([{"schema": identifier("public"), "view": identifier("v"), "definition": identifier("SELECT 1;"), "options": fragment(""), "write_metadata": fragment("")}]);
+        let wrong = serde_json::json!([{"schema": identifier("public"), "view": identifier("v"), "definition": identifier("SELECT 1;"), "options": fragment(""), "declarations": fragment("")}]);
         assert!(renderer.render("views", &wrong).is_err());
     }
 }

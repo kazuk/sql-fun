@@ -204,6 +204,9 @@ impl std::hash::Hash for WithClause {
 }
 
 impl WithClause {
+    pub(crate) fn is_empty(&self) -> bool {
+        self.0.is_empty()
+    }
     pub(crate) fn resolve_name(
         &self,
         context: &impl ParseContext,

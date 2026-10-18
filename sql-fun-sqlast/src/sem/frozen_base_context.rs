@@ -374,18 +374,6 @@ macro_rules! forward_catalog_reads {
         }
 
         impl crate::sem::ViewInfoRead for $context {
-            fn view_trigger_target(
-                &self,
-                trigger: &crate::sem::FullName,
-            ) -> Option<crate::sem::FullName> {
-                crate::sem::ViewInfoRead::view_trigger_target(self.$catalog(), trigger)
-            }
-            fn view_write_info(
-                &self,
-                view: &crate::sem::FullName,
-            ) -> Option<&crate::sem::ViewWriteInfo> {
-                crate::sem::ViewInfoRead::view_write_info(self.$catalog(), view)
-            }
             fn get_view_impl(&self, name: &crate::sem::FullName) -> Option<&crate::sem::ViewLike> {
                 crate::sem::ViewInfoRead::get_view_impl(self.$catalog(), name)
             }

@@ -1,29 +1,6 @@
-//! Schema producers for writable-view metadata. No body is executed here.
-use crate::ast::{Expr, FromItem, Query, QueryBody, View};
-use crate::sem::{AnalysisError, FullName, ParseContext, SelectStatement, ViewWriteInfo};
-
-impl View {
-    pub(super) fn write_info(
-        &self,
-        context: &mut impl ParseContext,
-        query: &SelectStatement,
-        name: &FullName,
-    ) -> Result<Option<ViewWriteInfo>, AnalysisError> {
-        let mut replacement = self.query.rule_write_info(context, query, name)?;
-        replacement.retain_options(&self.options, self.check_option);
-        if self.replace
-            && let Some(existing) = context.view_write_info(name)
-        {
-            let mut retained = existing.clone();
-            if let Err(problem) = retained.replace_definition(&replacement) {
-                context.report_analysis_problem(crate::sem::AnalysisProblem::view(&problem))?;
-                return Ok(None);
-            }
-            return Ok(Some(retained));
-        }
-        Ok(Some(replacement))
-    }
-}
+//! Resolved View projection lineage retained independently of DML capabilities.
+use crate::ast::{Expr, FromItem, Query, QueryBody};
+use crate::sem::{AnalysisError, FullName, ParseContext, SelectStatement, ViewColumnLineage};
 
 impl Expr {
     // PostgreSQL removes an explicit cast to the same type without typmods.
@@ -75,26 +52,18 @@ impl Expr {
 }
 
 impl Query {
-    pub(in crate::ast) fn rule_write_info(
+    pub(in crate::ast) fn view_lineage(
         &self,
         context: &impl ParseContext,
         query: &SelectStatement,
-        name: &FullName,
-    ) -> Result<ViewWriteInfo, AnalysisError> {
-        let mut source = self.automatic_view_source(context)?;
-        if source.is_some() && !crate::sem::view_write::projection_preserves_rows(context, query)? {
-            source = None;
-        }
+    ) -> Result<ViewColumnLineage, AnalysisError> {
+        let source = self.automatic_view_source(context)?;
         let mut projections = query.result_columns().view_projection();
         if let Some(source) = &source {
             self.refine_view_cast_lineage(context, source, &mut projections)?;
         }
-        Ok(ViewWriteInfo::new(
-            name,
-            source.as_ref(),
-            &projections,
-            &query.result_columns().view_expressions(),
-        ))
+        let sources: Vec<_> = projections.into_iter().map(|(_, source)| source).collect();
+        Ok(ViewColumnLineage::new(&sources))
     }
     fn refine_view_cast_lineage(
         &self,
@@ -191,5 +160,49 @@ impl FromItem {
         };
         let requested = relation.name.full_name()?;
         Ok(context.resolve_relation_name(&requested))
+    }
+}
+
+impl crate::ast::View {
+    pub(super) fn semantic_options(
+        &self,
+        context: &mut impl ParseContext,
+    ) -> Result<Vec<crate::sem::ViewOption>, AnalysisError> {
+        let mut options = Vec::new();
+        for option in &self.options {
+            let value = match &option.value {
+                None => None,
+                Some(crate::ast::SyntaxValue::Expression(Expr::Column(name))) => {
+                    Some(crate::sem::SemScalarExpr::literal(
+                        &crate::sem::ScalarConstExpr::string(&name.0.join(".")),
+                    ))
+                }
+                Some(crate::ast::SyntaxValue::Expression(expression)) => Some(expression.resolve(
+                    context,
+                    &crate::sem::ScalarAnalysisContext::new(
+                        &crate::sem::WithClause::default(),
+                        &crate::sem::FromClause::default(),
+                    ),
+                )?),
+                Some(crate::ast::SyntaxValue::Type(_)) => {
+                    return AnalysisError::raise_unexpected_input("View option type");
+                }
+            };
+            options.push(crate::sem::ViewOption::new(
+                option.namespace.as_deref(),
+                &option.name,
+                value.as_ref(),
+            ));
+        }
+        Ok(options)
+    }
+}
+impl crate::ast::ViewCheckOption {
+    pub(super) const fn semantic(self) -> crate::sem::ViewCheckOption {
+        match self {
+            Self::None => crate::sem::ViewCheckOption::none(),
+            Self::Local => crate::sem::ViewCheckOption::local(),
+            Self::Cascaded => crate::sem::ViewCheckOption::cascaded(),
+        }
     }
 }

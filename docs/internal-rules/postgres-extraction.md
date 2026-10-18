@@ -50,6 +50,12 @@ bootstrap trigger/rule declarations. Rule targets are explicitly qualified; the
 extractor checks the supported server deparser prefix before replacing it. These
 facts use the existing typed identifier/fragment rendering contract and are
 limited to the already selected bootstrap views and bootstrap object OIDs.
+The internal `declarations` rendering field carries canonical ALTER VIEW defaults,
+CREATE TRIGGER, and CREATE RULE SQL into the ordinary schema loader. It replaces
+the old `write_metadata` transport name; no parallel writable-view catalog is
+constructed. These statements, reloptions, dependency ordering, and function row
+properties remain necessary semantic inputs. The transport rename leaves emitted
+schema SQL and committed PostgreSQL 17/18 artifacts unchanged.
 Scope and format version remain unchanged. The installed extraction integration
 harness verifies the fields
 for scalar, aggregate and set-returning functions on both supported versions.

@@ -53,8 +53,11 @@ lifetime remain execution-time concerns. Session bindings survive statement
 analysis and are not part of frozen schema catalogs.
 
 Schema catalogs retain explicitly loaded view, trigger, rule and default DDL.
-`ViewInsertSupport::analyze` and `ViewUpdateSupport::analyze` independently
-derive each operation's capabilities from those facts. `ViewInsertInfoRead` and
+`ViewWriteEvaluation::new(&context)` evaluates an already-bound View `FullName`
+from its actual semantic definition and effective associated Trigger/Rule
+references. `insert`, `update`, and `evaluate` expose independent operation
+results. `ViewInsertSupport::analyze` and `ViewUpdateSupport::analyze` use this
+same service. `ViewInsertInfoRead` and
 `ViewUpdateInfoRead` retrieve optional registered capabilities without
 performing analysis. PostgreSQL automatic views preserve nested direct-column
 lineage and assignment restrictions; INSTEAD OF triggers and INSTEAD rules have
@@ -64,8 +67,7 @@ UPSERT. Materialized views remain read-only. View conflict inference preserves
 actual underlying arbiter identities rather than inventing view indexes.
 
 Frozen catalogs share source facts without sharing mutable layer changes. No
-trigger function or rule action is executed. The metadata producer is not a
-procedural-body validator; trigger/rule SQL rendering and broader ALTER VIEW
+trigger function or rule action is executed. Evaluation does not interpret opaque procedural bodies; trigger/rule SQL rendering and broader ALTER VIEW
 processing are separate work. See [SQL analysis](../book/sql-analysis.md) for the
 supported mechanisms and conflict-inference limitations.
 

@@ -34,25 +34,6 @@ impl ViewInformationCollection {
 }
 
 impl ViewInfoRead for SchemaCatalog {
-    fn view_trigger_target(&self, trigger: &FullName) -> Option<FullName> {
-        for (_, info) in self.view_writes.iter() {
-            if info.has_trigger(trigger) {
-                return Some(info.name().clone());
-            }
-        }
-        let target = self.base.view_trigger_target(trigger)?;
-        self.view_write_info(&target)
-            .filter(|info| info.has_trigger(trigger))
-            .map(|_| target)
-    }
-
-    fn view_write_info(&self, view: &FullName) -> Option<&crate::sem::ViewWriteInfo> {
-        if let Some(info) = self.view_writes.get(&view.to_string()) {
-            Some(info)
-        } else {
-            self.base.view_write_info(view)
-        }
-    }
     fn get_view_impl(&self, key: &FullName) -> Option<&ViewLike> {
         let identity = self.relation_identity(key);
         let key = &identity;
@@ -65,36 +46,6 @@ impl ViewInfoRead for SchemaCatalog {
 }
 
 impl ViewInfoWrite for SchemaFileContext {
-    fn apply_view_write_info(
-        mut self,
-        view: &FullName,
-        info: &crate::sem::ViewWriteInfo,
-    ) -> Result<Self, AnalysisError> {
-        self.catalog
-            .view_writes
-            .insert(&view.to_string(), info.clone());
-        Ok(self)
-    }
-    fn apply_view_write_change(
-        mut self,
-        change: &crate::sem::ViewWriteChange,
-    ) -> Result<Self, AnalysisError> {
-        let Some(mut info) = self.view_write_info(change.view()).cloned() else {
-            self.report_analysis_problem(AnalysisProblem::view(
-                &crate::sem::problem::ViewProblem::missing_metadata(change.view()),
-            ))?;
-            return Ok(self);
-        };
-        if let Err(problem) = info.apply(change) {
-            self.report_analysis_problem(AnalysisProblem::view(&problem))?;
-            return Ok(self);
-        }
-        self.catalog
-            .view_writes
-            .insert(&change.view().to_string(), info);
-        Ok(self)
-    }
-
     #[tracing::instrument(skip(self))]
     fn apply_alter_view(mut self, alter_view: &AlterView) -> Result<Self, AnalysisError>
     where
@@ -175,6 +126,11 @@ impl ViewInfoWrite for SchemaFileContext {
                     ),
                 ))?;
                 return Ok(self);
+            }
+            if let Some(previous) = previous.ordinary_definition()
+                && let ViewLike::View(current) = &mut definition
+            {
+                current.retain_relation_state(previous);
             }
             if let Some(owner) = previous.owner() {
                 definition.change_owner(owner);

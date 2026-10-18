@@ -112,7 +112,7 @@ pub struct CreateRule {
     actions: Vec<SemAst>,
     dependencies: RuleDependencies,
     source: Option<crate::sem::SourcePathWithSpan>,
-    select_write_info: Option<crate::sem::ViewWriteInfo>,
+    select_lineage: Option<crate::sem::ViewColumnLineage>,
 }
 impl CreateRule {
     pub(crate) fn new(
@@ -133,7 +133,7 @@ impl CreateRule {
             actions: actions.to_vec(),
             dependencies: RuleDependencies::default(),
             source: context.get_source_path_with_span().cloned(),
-            select_write_info: None,
+            select_lineage: None,
         };
         definition.retain_dependencies()?;
         Ok(definition)
@@ -158,21 +158,8 @@ impl CreateRule {
         )
         .map(Some)
     }
-    pub(crate) fn retain_select_write_info(
-        &mut self,
-        replacement: &crate::sem::ViewWriteInfo,
-        context: &impl ParseContext,
-    ) -> Result<(), AnalysisError> {
-        let info = if let Some(existing) = context.view_write_info(self.target()) {
-            let mut info = existing.clone();
-            info.replace_rule_definition(replacement)
-                .map_err(|problem| AnalysisError::view_metadata(&problem))?;
-            info
-        } else {
-            replacement.clone()
-        };
-        self.select_write_info = Some(info);
-        Ok(())
+    pub(crate) fn retain_select_lineage(&mut self, lineage: &crate::sem::ViewColumnLineage) {
+        self.select_lineage = Some(lineage.clone());
     }
     /// Registered object identity.
     pub const fn identity(&self) -> &RuleIdentity {
@@ -209,6 +196,9 @@ impl CreateRule {
     /// Source location, when provided by the caller.
     pub const fn source(&self) -> Option<&crate::sem::SourcePathWithSpan> {
         self.source.as_ref()
+    }
+    pub(crate) const fn replaces_unconditionally(&self) -> bool {
+        self.instead && self.predicate.is_none()
     }
     pub(crate) fn has_returning(&self) -> bool {
         self.actions
@@ -256,13 +246,13 @@ impl CreateRule {
             let view = view
                 .with_rule_query(query)
                 .expect("validated ordinary view");
+            let view = if let Some(lineage) = &self.select_lineage {
+                view.with_column_lineage(lineage)
+            } else {
+                view
+            };
             let context = context.apply_create_view(&view)?;
             context.associate_rule(self.target(), &self.identity)?
-        } else {
-            context
-        };
-        let context = if let Some(info) = &self.select_write_info {
-            context.apply_view_write_info(self.target(), info)?
         } else {
             context
         };

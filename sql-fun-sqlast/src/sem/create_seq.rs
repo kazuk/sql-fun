@@ -104,6 +104,7 @@ impl CreateSequence {
                 | AlterObjSubCommand::AlterColumn(_, _)
                 | AlterObjSubCommand::RenameColumn(_, _)
                 | AlterObjSubCommand::DropColumn(_)
+                | AlterObjSubCommand::DropColumnDefault(_)
                 | AlterObjSubCommand::SetColumnDefault(_, _) => {
                     AnalysisError::raise_unexpected_input("unexpected alter sequence alter cmd")?;
                     AnalysisError::never()

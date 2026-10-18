@@ -349,6 +349,7 @@ impl CreateTable {
                         column.set_default(sem_scalar_expr);
                     }
                 }
+                AlterObjSubCommand::DropColumnDefault(_) => todo!(),
                 AlterObjSubCommand::AddConstraint(constraint) => {
                     self.constraints
                         .insert(constraint.name().to_string(), constraint.clone());

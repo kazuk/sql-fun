@@ -19,7 +19,7 @@ impl ViewInsertSupport {
         context: &impl crate::sem::BaseParseContext,
         view: &FullName,
     ) -> Result<Self, crate::sem::problem::ViewProblem> {
-        crate::sem::view_write::insert_support(context, view)
+        crate::sem::ViewWriteEvaluation::new(context).insert(view)
     }
 
     /// Record alias equivalence for automatic-view assignment targets.

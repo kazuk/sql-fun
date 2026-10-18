@@ -208,7 +208,7 @@ fn render_schema(lines: &mut std::str::SplitTerminator<'_, char>) -> Result<Stri
     type_fields(
         &mut views,
         &["schema", "view"],
-        &["definition", "options", "write_metadata"],
+        &["definition", "options", "declarations"],
     )?;
     schema.push_str(&renderer.render("views", &views)?);
     Ok(schema)
@@ -222,7 +222,7 @@ fn qualify_view_rules(views: &mut Value) -> Result<(), anyhow::Error> {
         .as_array_mut()
         .ok_or_else(|| anyhow::anyhow!("invalid view catalog rows"))?
     {
-        let mut metadata = required_string(view, "write_metadata")?.to_owned();
+        let mut declarations = required_string(view, "declarations")?.to_owned();
         for rule in view["rules"]
             .as_array()
             .ok_or_else(|| anyhow::anyhow!("missing view rule catalog"))?
@@ -232,13 +232,13 @@ fn qualify_view_rules(views: &mut Value) -> Result<(), anyhow::Error> {
             let suffix = definition
                 .strip_prefix(prefix)
                 .ok_or_else(|| anyhow::anyhow!("unexpected PostgreSQL rule deparser prefix"))?;
-            if !metadata.is_empty() {
-                metadata.push('\n');
+            if !declarations.is_empty() {
+                declarations.push('\n');
             }
-            metadata.push_str(required_string(rule, "qualified_prefix")?);
-            metadata.push_str(suffix);
+            declarations.push_str(required_string(rule, "qualified_prefix")?);
+            declarations.push_str(suffix);
         }
-        view["write_metadata"] = Value::String(metadata);
+        view["declarations"] = Value::String(declarations);
     }
     Ok(())
 }
@@ -250,7 +250,7 @@ mod test_view_rule_qualification {
     #[test]
     fn qualifies_only_the_checked_target_prefix() {
         let mut views = serde_json::json!([{
-            "write_metadata": "",
+            "declarations": "",
             "rules": [{
                 "prefix": "CREATE RULE r AS\n    ON UPDATE TO v",
                 "qualified_prefix": "CREATE RULE r AS\n    ON UPDATE TO pg_catalog.v",
@@ -259,7 +259,7 @@ mod test_view_rule_qualification {
         }]);
         qualify_view_rules(&mut views).unwrap();
         assert_eq!(
-            views[0]["write_metadata"],
+            views[0]["declarations"],
             "CREATE RULE r AS\n    ON UPDATE TO pg_catalog.v DO INSTEAD NOTHING;"
         );
         views[0]["rules"][0]["definition"] = serde_json::json!("unexpected server format");

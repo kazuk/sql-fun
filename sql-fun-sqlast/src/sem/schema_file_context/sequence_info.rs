@@ -20,11 +20,11 @@ impl SequenceInfoCollection {
     }
 
     fn get(&self, key: &FullName) -> Option<&CreateSequence> {
-        self.0.get(&key.catalog_key())
+        self.0.get(&key.to_string())
     }
 
     pub(super) fn insert(&mut self, key: &FullName, definition: &CreateSequence) {
-        self.0.insert(&key.catalog_key(), definition.clone());
+        self.0.insert(&key.to_string(), definition.clone());
     }
 }
 

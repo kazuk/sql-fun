@@ -15,11 +15,11 @@ pub struct ViewInformationCollection(TrieMap<ViewLike>);
 
 impl ViewInformationCollection {
     fn get(&self, key: &FullName) -> Option<&ViewLike> {
-        self.0.get(&key.catalog_key())
+        self.0.get(&key.to_string())
     }
 
     pub(super) fn insert(&mut self, key: &FullName, value: &ViewLike) {
-        self.0.insert(&key.catalog_key(), value.clone());
+        self.0.insert(&key.to_string(), value.clone());
     }
 }
 

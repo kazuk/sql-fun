@@ -27,6 +27,7 @@ mod tests;
 mod validation;
 
 pub use self::deparse::DeparseError;
+pub(crate) use self::deparse::render_full_name;
 pub use self::mutation::{AstMutationError, CteDefinition, HaveWithClause, WithClauseMut};
 pub use self::public::{CommonTableExpression, Statement, StatementKind, WithClause};
 
@@ -525,48 +526,22 @@ impl Comment {
         }
     }
 
-    fn apply<TContext>(
+    pub(crate) fn apply<TContext>(
         &self,
         context: TContext,
     ) -> Result<crate::AstAndContextPair<TContext>, crate::sem::AnalysisError>
     where
         TContext: crate::sem::ParseContext,
     {
-        let target = self.target.semantic_name();
+        let target = self.canonical_target().map_err(|error| {
+            crate::sem::AnalysisError::unexpected_input_error(&error.to_string())
+        })?;
         let comment = crate::sem::Comment::new(&target, self.object_kind, &self.text);
         let context = context.apply_comment(&comment)?;
         Ok(crate::AstAndContextPair::new(
             crate::sem::SemAst::Comment(comment),
             context,
         ))
-    }
-}
-
-impl ObjectTarget {
-    fn semantic_name(&self) -> String {
-        if let Some(cast) = &self.cast {
-            format!(
-                "{} AS {}",
-                cast.source.name.0.join("."),
-                cast.target.name.0.join(".")
-            )
-        } else if let Some(type_name) = &self.type_name {
-            type_name.name.0.join(".")
-        } else if let Some(target) = &self.domain_constraint {
-            format!(
-                "{} ON DOMAIN {}",
-                target.constraint,
-                target.domain.name.0.join(".")
-            )
-        } else if let Some(target) = &self.transform {
-            format!(
-                "FOR {} LANGUAGE {}",
-                target.type_name.name.0.join("."),
-                target.language
-            )
-        } else {
-            self.name.join(".")
-        }
     }
 }
 

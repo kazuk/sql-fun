@@ -44,23 +44,40 @@ impl TryFrom<RangeVar> for FullName {
         let catalog = value.get_catalogname();
         let schema = value.get_schemaname();
         let name = value.get_relname();
-        Ok(Self {
-            catalog: {
-                if catalog.is_empty() {
-                    None
-                } else {
-                    Some(CatalogName::from(&catalog))
-                }
+        if !catalog.is_empty() && schema.is_empty() {
+            return Err(AnalysisError::unexpected_input_error(
+                "a catalog requires a schema",
+            ));
+        }
+        Ok(Self::new(
+            &if catalog.is_empty() {
+                None
+            } else {
+                Some(CatalogName::from(&catalog))
             },
-            schema: {
-                if schema.is_empty() {
-                    None
-                } else {
-                    Some(SchemaName::from(&schema))
-                }
+            &if schema.is_empty() {
+                None
+            } else {
+                Some(SchemaName::from(&schema))
             },
-            name: LocalName::from(&name),
-        })
+            &LocalName::from(&name),
+        ))
+    }
+}
+
+#[cfg(test)]
+mod range_var_tests {
+    use super::FullName;
+
+    #[test]
+    fn rejects_catalog_without_schema() {
+        let relation = ::pg_query::protobuf::RangeVar {
+            catalogname: "db".to_owned(),
+            relname: "items".to_owned(),
+            ..Default::default()
+        };
+        let relation = crate::syn::RangeVar::from(relation);
+        assert!(FullName::try_from(relation).is_err());
     }
 }
 
@@ -98,25 +115,6 @@ impl std::str::FromStr for FullName {
     type Err = AnalysisError;
 
     fn from_str(s: &str) -> Result<Self, Self::Err> {
-        let parts: Vec<&str> = s.split('.').collect();
-        if parts.len() == 3 {
-            Ok(Self {
-                catalog: Some(CatalogName::from(parts[0])),
-                schema: Some(SchemaName::from(parts[1])),
-                name: LocalName::from(parts[2]),
-            })
-        } else if parts.len() == 2 {
-            Ok(Self {
-                catalog: None,
-                schema: Some(SchemaName::from(parts[0])),
-                name: LocalName::from(parts[1]),
-            })
-        } else {
-            Ok(Self {
-                catalog: None,
-                schema: None,
-                name: LocalName::from(parts[0]),
-            })
-        }
+        Self::parse_components(s)
     }
 }

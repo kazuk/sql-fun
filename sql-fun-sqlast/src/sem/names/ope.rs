@@ -16,7 +16,11 @@ pub struct ValidOperatorName {
 impl Display for ValidOperatorName {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         if let Some(schema_name) = &self.schema_name {
-            write!(f, "{schema_name}.")?;
+            write!(
+                f,
+                "{}.",
+                crate::identifier::CanonicalIdentifier::from(schema_name.as_str())
+            )?;
         }
         write!(f, "{}", self.op_name)?;
         Ok(())
@@ -30,6 +34,8 @@ mod display_tests {
     #[rstest::rstest]
     #[case(None, "+")]
     #[case(Some("pg_catalog"), "pg_catalog.+")]
+    #[case(Some("a.b"), r#""a.b".+"#)]
+    #[case(Some("a\"b"), r#""a""b".+"#)]
     fn preserves_qualification(#[case] schema: Option<&str>, #[case] expected: &str) {
         assert_eq!(
             ValidOperatorName::from_parts(schema, "+").to_string(),

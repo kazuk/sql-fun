@@ -30,7 +30,7 @@ impl Name {
         match self.0.as_slice() {
             [local] => Ok(FullName::from_local_name(local)),
             [schema, local] => Ok(FullName::with_schema(schema, local)),
-            [catalog, schema, local] => Ok(FullName::with_catalog(catalog, Some(schema), local)),
+            [catalog, schema, local] => Ok(FullName::with_catalog(catalog, schema, local)),
             _ => AnalysisError::raise_unexpected_input("qualified name component count"),
         }
     }

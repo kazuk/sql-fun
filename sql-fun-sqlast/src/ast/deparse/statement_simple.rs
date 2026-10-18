@@ -579,6 +579,13 @@ impl SqlEmit for Comment {
 }
 
 impl Comment {
+    pub(in crate::ast) fn canonical_target(&self) -> Result<String, DeparseError> {
+        let mut writer = SqlWriter::new(crate::ast::Dialect::postgres());
+        self.target
+            .emit_comment_target(self.object_kind.code(), &mut writer)?;
+        Ok(writer.into_sql())
+    }
+
     fn emit_comment_kind(writer: &mut SqlWriter, kind: u32) -> Result<(), DeparseError> {
         let keyword = match kind {
             1 => "ACCESS METHOD",

@@ -117,9 +117,7 @@ impl SqlWriter {
         if name.contains('\0') || (self.is_postgres() && name.is_empty()) {
             return self.invalid("identifier", "identifier is empty or contains NUL");
         }
-        self.sql("\"");
-        self.sql(&name.replace('"', "\"\""));
-        self.sql("\"");
+        self.sql(&crate::identifier::QuotedIdentifier::from(name).to_string());
         Ok(())
     }
     pub(in crate::ast) fn string(&mut self, value: &str) -> Result<(), DeparseError> {
@@ -226,4 +224,23 @@ impl Statement {
         self.node.emit(&mut writer)?;
         Ok(writer.sql)
     }
+}
+
+/// Render a semantic name using the same checked identifier emitter as the AST.
+pub(crate) fn render_full_name(
+    name: &crate::sem::FullName,
+    dialect: Dialect,
+) -> Result<String, DeparseError> {
+    let mut writer = SqlWriter::new(dialect);
+    if let Some(catalog) = name.catalog() {
+        writer.postgres_only("catalog-qualified name")?;
+        writer.ident(catalog.as_str())?;
+        writer.sql(".");
+    }
+    if let Some(schema) = name.schema() {
+        writer.ident(schema.as_str())?;
+        writer.sql(".");
+    }
+    writer.ident(name.name().as_str())?;
+    Ok(writer.into_sql())
 }

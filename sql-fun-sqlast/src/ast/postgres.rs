@@ -352,7 +352,7 @@ mod test_name_from_range_var {
     #[rstest::rstest]
     #[case(FullName::new(&None, &None, &LocalName::from("items")))]
     #[case(FullName::with_schema("app", "items"))]
-    #[case(FullName::with_catalog("catalog", Some("app"), "items"))]
+    #[case(FullName::with_catalog("catalog", "app", "items"))]
     fn preserves_relation_qualification(#[case] expected: FullName) -> testresult::TestResult {
         let source = SynBuilder::new().range_var(&expected, &AliasOpt::none());
         assert_eq!(Name::from(&source).full_name()?, expected);

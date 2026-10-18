@@ -488,7 +488,12 @@ fn binds_conflict_modifier_through_context(
     }
     .unwrap();
     assert_eq!(lookup, &expected);
-    assert_eq!(lookup.requested().to_string(), requested);
+    assert_eq!(
+        lookup.requested(),
+        &requested
+            .parse::<crate::sem::FullName>()
+            .expect("logical fixture name")
+    );
     if outcome == "found" {
         assert_eq!(
             context.reported_problem_count(),

@@ -1,8 +1,6 @@
 use std::{collections::HashSet, str::FromStr};
 
-use crate::sem::{
-    CastContext, CastDefinition, CastInfoRead, FullName, TypeInfoRead, TypeReference,
-};
+use crate::sem::{CastContext, CastDefinition, CastInfoRead, TypeInfoRead, TypeReference};
 
 use super::SchemaCatalog;
 
@@ -24,8 +22,8 @@ impl CastInfoRead for SchemaCatalog {
     fn cast_sources(&self, target: &TypeReference, explicit: bool) -> HashSet<TypeReference> {
         let mut sources = self.base.cast_sources(target, explicit);
         for (name, _) in self.casts.iter() {
-            if let Ok(name) = FullName::from_str(&name) {
-                sources.insert(TypeReference::from_full_name(name));
+            if let Ok(source) = TypeReference::from_str(&name) {
+                sources.insert(source);
             }
         }
         sources.extend(self.types.cast_source_types());
@@ -78,9 +76,9 @@ impl CastInfoRead for SchemaCatalog {
         if let Some(s) = self.casts.get(&source_type.to_string()) {
             for (k, v) in s.iter() {
                 if v.use_in_implicit() {
-                    castable.insert(TypeReference::from_full_name(
-                        FullName::from_str(k.as_str()).expect("key parseable"),
-                    ));
+                    castable.insert(
+                        TypeReference::from_str(k.as_str()).expect("canonical concrete type key"),
+                    );
                 }
             }
         }
@@ -178,6 +176,47 @@ mod test_cast_layers {
             HashSet::from([source.clone(), shared, inherited, local])
         );
         assert!(!frozen.get_implicit_castable(&source).contains(&explicit));
+    }
+
+    #[rstest::rstest]
+    #[case::dot(
+        crate::sem::FullName::with_schema("a.b", "c"),
+        crate::sem::FullName::with_schema("a", "b.c")
+    )]
+    #[case::quotes(
+        crate::sem::FullName::with_schema("a\"b", "c"),
+        crate::sem::FullName::with_schema("a", "b\"c")
+    )]
+    #[case::array_suffix(
+        crate::sem::FullName::with_schema("a", "item[]"),
+        crate::sem::FullName::with_schema("a", "item")
+    )]
+    fn preserves_cast_keys_and_enumerated_types(
+        #[case] left: crate::sem::FullName,
+        #[case] right: crate::sem::FullName,
+        #[values(false, true)] array: bool,
+    ) {
+        use crate::sem::TypeReference;
+        let (mut child, _, _, _) = test_helpers::cast_layer();
+        let source = TypeReference::concrete_type_ref(&left, array);
+        let other = TypeReference::concrete_type_ref(&right, !array);
+        let target = test_helpers::named_type("target");
+        test_helpers::register(&mut child, &source, &target, CastContext::implicit());
+        test_helpers::register(&mut child, &other, &target, CastContext::explicit());
+        test_helpers::register(&mut child, &target, &source, CastContext::implicit());
+        test_helpers::register(&mut child, &target, &other, CastContext::explicit());
+        let parent = child.freeze();
+        let child =
+            crate::test_helpers::schema_layer(std::path::Path::new("cast-child.sql"), &parent);
+        assert!(child.get_implicit_cast(&source, &target).is_some());
+        assert!(child.get_implicit_cast(&other, &target).is_none());
+        let sources = child.cast_sources(&target, false);
+        assert!(sources.contains(&source));
+        assert!(!sources.contains(&other));
+        let targets = child.get_implicit_castable(&target);
+        assert!(targets.contains(&source));
+        assert!(!targets.contains(&other));
+        assert!(child.cast_sources(&target, true).contains(&other));
     }
 
     mod test_helpers {

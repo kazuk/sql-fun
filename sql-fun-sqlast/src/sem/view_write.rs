@@ -514,6 +514,10 @@ impl ViewWriteChange {
 #[derive(Debug, Clone)]
 pub(crate) enum WriteAction {
     Sequence(Vec<Self>),
+    #[expect(
+        dead_code,
+        reason = "legacy rule metadata construction disconnected by #600; replaced by #604"
+    )]
     Object(ObjectChange),
     Default(Box<ViewDefault>),
     Drop(ObjectChange),
@@ -538,6 +542,10 @@ impl WriteAction {
         }
         None
     }
+    #[expect(
+        dead_code,
+        reason = "legacy rule metadata construction disconnected by #600; replaced by #604"
+    )]
     pub(crate) fn object(object: &WriteObject, replace: bool, if_not_exists: bool) -> Self {
         Self::Object(ObjectChange {
             object: object.clone(),
@@ -579,6 +587,10 @@ pub(crate) const TRIGGER_EVENT_UPDATE: i32 = 16;
 pub(crate) enum WriteEvent {
     Insert,
     Update,
+    #[expect(
+        dead_code,
+        reason = "legacy rule metadata construction disconnected by #600; replaced by #604"
+    )]
     Delete,
 }
 impl WriteEvent {
@@ -588,6 +600,10 @@ impl WriteEvent {
     pub(crate) const fn update() -> Self {
         Self::Update
     }
+    #[expect(
+        dead_code,
+        reason = "legacy rule metadata construction disconnected by #600; replaced by #604"
+    )]
     pub(crate) const fn delete() -> Self {
         Self::Delete
     }

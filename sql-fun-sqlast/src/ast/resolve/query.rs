@@ -630,8 +630,17 @@ impl Relation {
         &self,
         context: &mut impl ParseContext,
         with: &WithClause,
+        _preceding: &FromClause,
+        outer: Option<&ScalarAnalysisContext<'_>>,
     ) -> Result<DataSource, AnalysisError> {
         let name = self.name.full_name()?;
+        let name = if with.get(&name.to_string()).is_none()
+            && let Some(scope) = outer
+        {
+            scope.trigger_relation_name(context, &name)?
+        } else {
+            name
+        };
         let alias = self
             .alias
             .as_ref()

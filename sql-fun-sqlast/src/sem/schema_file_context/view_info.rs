@@ -11,15 +11,25 @@ use crate::TrieMap;
 use super::{SchemaCatalog, SchemaFileContext};
 
 #[derive(Debug, Default)]
-pub struct ViewInformationCollection(TrieMap<ViewLike>);
+pub struct ViewInformationCollection(TrieMap<ViewLike>, Vec<FullName>);
 
 impl ViewInformationCollection {
+    pub(super) fn sqlite_name(&self, name: &FullName) -> Option<FullName> {
+        self.1
+            .iter()
+            .find(|candidate| candidate.sqlite_eq(name))
+            .cloned()
+    }
+
     fn get(&self, key: &FullName) -> Option<&ViewLike> {
         self.0.get(&key.to_string())
     }
 
     pub(super) fn insert(&mut self, key: &FullName, value: &ViewLike) {
         self.0.insert(&key.to_string(), value.clone());
+        if !self.1.contains(key) {
+            self.1.push(key.clone());
+        }
     }
 }
 

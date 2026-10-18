@@ -186,6 +186,13 @@ pub trait BaseParseContext:
     + GetSourcePathWithSpanOpt
     + std::fmt::Debug
 {
+    /// Resolve an exact SQLite relation key using ASCII case-insensitive identifiers.
+    fn sqlite_relation_identity(&self, name: &FullName) -> Option<FullName>;
+
+    /// Look up an exact trigger identity in the effective context layer.
+    fn trigger(&self, identity: &crate::sem::TriggerIdentity)
+    -> Option<&crate::sem::CreateTrigger>;
+
     /// Resolved metadata for the database selected by the caller.
     fn metadata(&self) -> &::sql_fun_core::SqlFunMetadata;
 
@@ -381,6 +388,10 @@ where
             Ok(true)
         }
     }
+    /// Register a completed definition in this layer. Ownership is decided by DDL application.
+    fn register_trigger(self, trigger: &crate::sem::CreateTrigger) -> Result<Self, AnalysisError>;
+    /// Associate the supplied name with the exact target in this layer.
+    fn associate_trigger(self, target: &FullName, name: &FullName) -> Result<Self, AnalysisError>;
 
     /// Dialect of the explicitly supplied metadata for this analysis.
     /// Engine identity and SQL dialect are independent metadata fields.

@@ -96,6 +96,14 @@ impl ColumnReferenceExpr {
         }
     }
 
+    /// Resolved table-column binding.
+    pub const fn table_column_reference(&self) -> Option<&TableColumnRef> {
+        if let Self::TableColumn(reference) = self {
+            Some(reference)
+        } else {
+            None
+        }
+    }
     /// MERGE record binding, when this reference belongs to a MERGE record.
     pub const fn merge_record_reference(&self) -> Option<&MergeRecordColumnRef> {
         if let Self::MergeRecord(reference) = self {

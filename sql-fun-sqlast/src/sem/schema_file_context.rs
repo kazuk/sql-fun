@@ -334,7 +334,7 @@ mod test_index_lookup {
         use crate::sem::{FullName, IndexInfoRead, ParseContext, TableName};
         let left = index("a.b", "parent_table", "c");
         let right = index("a", "other_table", "b.c");
-        let parent = layer(&["a.b", "a"], &[left.clone()])?.freeze();
+        let parent = layer(&["a.b", "a"], std::slice::from_ref(&left))?.freeze();
         let child = crate::test_helpers::schema_layer(std::path::Path::new("child.sql"), &parent);
         let child = child.apply_create_index(&right)?;
         assert_eq!(

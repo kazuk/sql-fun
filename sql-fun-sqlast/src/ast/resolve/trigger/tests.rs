@@ -509,6 +509,91 @@ fn rejects_invalid_sqlite_definition(#[case] sql: &str) -> testresult::TestResul
     Ok(())
 }
 
+#[cfg(feature = "sqlite")]
+#[rstest::rstest]
+#[case::query_cte(
+    "WITH Items AS (SELECT 7 AS cte_only) SELECT cte_only AS picked FROM ITEMS",
+    "Items"
+)]
+#[case::qualified_table(
+    "WITH Items AS (SELECT 7 AS cte_only) SELECT id AS picked FROM main.items",
+    "main.items"
+)]
+#[case::nested_cte_shadow(
+    "WITH Items AS (SELECT 7 AS outer_only) SELECT picked FROM (WITH items AS (SELECT 9 AS inner_only) SELECT inner_only AS picked FROM ITEMS) s",
+    "items"
+)]
+#[case::trigger_cte(
+    "CREATE TRIGGER audit AFTER UPDATE ON items BEGIN SELECT picked FROM (WITH Other AS (SELECT 7 AS cte_only) SELECT cte_only AS picked FROM OTHER) s; END",
+    "Other"
+)]
+#[case::trigger_qualified_table(
+    "CREATE TRIGGER audit AFTER UPDATE ON items BEGIN SELECT picked FROM (WITH Other AS (SELECT 7 AS cte_only) SELECT id AS picked FROM main.other) s; END",
+    "main.other"
+)]
+fn sqlite_cte_precedes_case_insensitive_catalog_lookup(
+    #[case] sql: &str,
+    #[case] expected_source: &str,
+) -> testresult::TestResult {
+    let oracle = test_helpers::sqlite_oracle()?;
+    oracle.execute_batch("INSERT INTO items VALUES (42); INSERT INTO other VALUES (42);")?;
+    let mut context = test_helpers::catalog(Dialect::sqlite());
+    let statement = test_helpers::resolve(sql, &mut context)?;
+    let command = if let Some(trigger) = statement.trigger() {
+        oracle.execute_batch(sql)?;
+        trigger.body().statements()[0].clone()
+    } else {
+        let actual: i64 = oracle.query_row(sql, [], |row| row.get(0))?;
+        assert_eq!(
+            actual,
+            match expected_source {
+                "Items" => 7,
+                "items" => 9,
+                _ => 42,
+            }
+        );
+        statement
+    };
+    let mut query = command.into_select_statemtnt().unwrap();
+    assert_eq!(
+        context.reported_problem_count(),
+        0,
+        "{:?}",
+        context.reported_problems()
+    );
+    assert!(
+        query
+            .get_result_column_def(&crate::sem::ColumnName::from("picked"))
+            .unwrap()
+            .get_type_cloned()
+            .is_some()
+    );
+    assert_eq!(test_helpers::bound_sources(&mut query)?, [expected_source]);
+    Ok(())
+}
+
+#[rstest::rstest]
+#[case::quoted_cte(
+    r#"WITH "Items" AS (SELECT 7 AS cte_only) SELECT cte_only AS picked FROM "Items""#,
+    "Items"
+)]
+#[case::case_sensitive_catalog_fallback(
+    r#"WITH "Items" AS (SELECT 7 AS cte_only) SELECT id AS picked FROM ITEMS"#,
+    "public.items"
+)]
+fn postgres_cte_lookup_preserves_quoted_case(
+    #[case] sql: &str,
+    #[case] expected_source: &str,
+) -> testresult::TestResult {
+    let mut context = test_helpers::catalog(Dialect::postgres());
+    let mut query = test_helpers::resolve(sql, &mut context)?
+        .into_select_statemtnt()
+        .unwrap();
+    assert_eq!(context.reported_problem_count(), 0);
+    assert_eq!(test_helpers::bound_sources(&mut query)?, [expected_source]);
+    Ok(())
+}
+
 mod test_helpers {
     use crate::ast::Dialect;
     use crate::sem::{
@@ -518,6 +603,25 @@ mod test_helpers {
     };
     use crate::test_helpers::TestParseContext;
 
+    pub(super) fn bound_sources(
+        query: &mut crate::sem::SelectStatement,
+    ) -> Result<Vec<String>, AnalysisError> {
+        #[derive(Default)]
+        struct BoundSources(Vec<String>);
+        impl crate::sem::traversal::SemanticVisitor for BoundSources {
+            fn relation_identity(&mut self, name: &FullName) {
+                self.0.push(name.to_string());
+            }
+            fn relation(&mut self, name: Option<&str>, _alias: &str, _columns: &[String]) {
+                if let Some(name) = name {
+                    self.0.push(name.to_owned());
+                }
+            }
+        }
+        let mut sources = BoundSources::default();
+        query.walk(&mut sources)?;
+        Ok(sources.0)
+    }
     pub(super) fn catalog(dialect: Dialect) -> TestParseContext {
         let mut context = TestParseContext::default().with_dialect(dialect);
         let schema = if dialect == Dialect::sqlite() {

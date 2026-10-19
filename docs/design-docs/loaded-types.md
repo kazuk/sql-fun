@@ -26,6 +26,59 @@ pretend that every type has a name, element, base, or members. Accessors expose
 only the category's components. A consumer can inspect a loaded value without
 consulting storage again.
 
+## Selected-catalog type entrypoint
+
+`types::TypeContext::new(&context)` is the public entrypoint for consumers that
+already hold a selected `ParseContext` and want to work with loaded values. Its
+implementation lives in `types::compat` and is re-exported as
+`types::TypeContext`; every legacy conversion and catalog call remains in the
+compatibility boundary. It borrows the selected context without building another
+catalog, retaining declaration storage, or discovering ambient inputs.
+
+`ParseContext` remains the common environment passed through SQL analyzers and
+the authority for catalog, dialect, search path and analysis configuration. The
+explicitly requested `TypeContext` facade is an opt-in view over that authority,
+not an alternative analyzer environment. This addition does not migrate existing
+analyzers or replace their `ParseContext` parameters.
+
+| Operation | Loaded API and behavior |
+| --- | --- |
+| Resolve a selected type name | `type_by_name(&FullName)` follows the selected context's type search path and returns `Result<Option<TypeReference>, ConversionError>`. |
+| Read an exact catalog key | `type_by_exact_name(&FullName)` performs exact lookup without search-path expansion, with the same result shape. |
+| Inspect an array component | `array_item_type(&dyn TypeDefinition)` returns an owned clone of an `ArrayType` element, or `None` for another category. It performs no catalog lookup. |
+| Look up a directed relationship | `implicit_cast`, `assignment_cast`, and `explicit_cast` accept loaded source and target values and return `Result<Option<CastDefinition>, ConversionError>`. |
+| Enumerate source candidates | `cast_sources(target, explicit)` and `assignment_sources(target)` accept a loaded target and return a loaded `Candidates` or `Never` through `Result<TypeReference, ConversionError>`. |
+| Enumerate implicit targets | `implicit_castable(source)` accepts a loaded source and returns the selected legacy catalog's implicit target candidates through the same result shape. |
+
+Name lookup distinguishes an absent definition (`Ok(None)`) from a present
+definition whose components cannot load (`Err`). Array inspection is intrinsic:
+an `ArrayType` containing `Any` yields a cloned `Any` element even though `Any`
+has no legacy catalog mapping. A scalar returns `None`; a domain is not flattened
+to expose its underlying array.
+
+Catalog-backed operations accepting loaded inputs must project those values
+faithfully into legacy references before delegation. A nominal name alone is
+insufficient: projection reloads its definition from the selected catalog and
+compares the complete loaded snapshot, including category and recursively loaded
+components. A stale or different snapshot returns `LoadedTypeMismatch` rather
+than discarding labels, members, base types or other identity components. Array
+projection retains the wrapper and validates the element snapshot.
+
+Anonymous structural values can project into dynamic legacy definitions when
+all components have faithful representations. Delegation preserves the legacy
+catalog's handling of dynamic references, including its rejection of dynamic
+cast lookups; projection does not invent structural cast rules. Constraints (`Any`,
+`Never`, `Candidates`), custom trait implementations, and nested arrays without
+a faithful legacy representation return `UnsupportedLoadedType`. They are not
+converted into nominal placeholders, flattened or expanded into new searches.
+These restrictions apply to catalog delegation, not to owned construction,
+equality, cloning or intrinsic array inspection.
+
+The low-level `compat::load_implicit_castable(context, source)` exposes the same
+legacy implicit-target enumeration for explicitly supplied legacy references.
+All enumerations load every reported candidate completely or return an error;
+none return partial candidate sets or interpret missing data as an empty set.
+
 ## Identity contract
 
 Equality compares concrete category and all components below recursively. It is
@@ -219,8 +272,9 @@ fallback behavior. No catalog maps, analyzers, or existing call sites change.
 `compat::load_cast_sources(context, target, explicit)` loads exactly the source
 candidates from the selected legacy enumeration, with the caller choosing
 implicit (`false`) or explicit (`true`) eligibility. `load_assignment_sources`
-uses the corresponding assignment enumeration. Completeness is the existing
-catalog API's enumeration contract; neither adds transitive cast searches.
+uses the corresponding assignment enumeration. `load_implicit_castable` instead
+loads implicit target candidates from a supplied source. Completeness is the
+existing catalog API's enumeration contract; none adds transitive cast searches.
 The target is resolved and validated separately: candidate input types are not
 the expression's target/result type. An empty successful enumeration becomes
 `Never`; an error loading any candidate returns an error without a partial set.

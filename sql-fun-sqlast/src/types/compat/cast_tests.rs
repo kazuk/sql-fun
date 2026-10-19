@@ -80,7 +80,7 @@ mod test_helpers {
                         Some(true),
                         &[],
                     )],
-                    CreateTableMode::Default,
+                    CreateTableMode::from_if_not_exists(false),
                     false,
                     &source_span(),
                 );
@@ -122,7 +122,7 @@ mod test_helpers {
 #[rstest::rstest]
 #[case::implicit(CastContext::implicit(), crate::types::CastContext::implicit())]
 #[case::preferred(
-    CastContext::ImplicitPrefeerd,
+    CastContext::implicit_preferred(),
     crate::types::CastContext::implicit_preferred()
 )]
 #[case::assignment(CastContext::assignment(), crate::types::CastContext::assignment())]

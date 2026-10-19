@@ -15,6 +15,7 @@ mod domain;
 mod enumeration;
 
 pub use self::cast::{CastContext, CastDefinition};
+pub use self::compat::TypeContext;
 pub use self::composite::{CompositeType, ImplicitCompositeType, Member, Members, TableRowType};
 pub use self::constraint::{Any, Candidates, Never};
 pub use self::domain::DomainType;

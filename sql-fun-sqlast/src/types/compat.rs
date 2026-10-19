@@ -9,6 +9,8 @@
 mod cast;
 mod context;
 mod loaded_reference;
+mod polymorphic;
+pub use self::polymorphic::polymorphic_position;
 
 pub use self::cast::{
     load_assignment_cast, load_assignment_sources, load_cast_definition, load_cast_sources,

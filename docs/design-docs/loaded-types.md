@@ -70,8 +70,8 @@ analyzers or replace their `ParseContext` parameters.
 | Resolve a selected type name | `type_by_name(&FullName)` follows the selected provider's type search path and returns `Result<Option<TypeReference>, C::Error>`. |
 | Read an exact catalog key | `type_by_exact_name(&FullName)` performs exact lookup without search-path expansion, with the same result shape. |
 | Inspect an array component | `array_item_type(&dyn TypeDefinition)` returns an owned clone of an `ArrayType` element, or `None` for another category. It requires no provider trait bound and performs no catalog lookup. |
-| Look up a directed relationship | `implicit_cast`, `assignment_cast`, and `explicit_cast` accept loaded source and target values and return `Result<Option<CastDefinition>, C::Error>`. |
-| Enumerate source candidates | `cast_sources(target, explicit)` and `assignment_sources(target)` accept a loaded target and return a loaded `Candidates` or `Never` through `Result<TypeReference, C::Error>`. |
+| Look up a directed relationship | `implicit_cast`, `assignment_cast`, and `explicit_cast` accept loaded source and target values and return `Result<CastQueryOutcome<Option<CastDefinition>>, CastQueryError<C::Error>>`. |
+| Enumerate source candidates | `cast_sources(target, explicit)` and `assignment_sources(target)` accept a loaded target and return a loaded `Candidates` or `Never` through `Result<CastQueryOutcome<TypeReference>, CastQueryError<C::Error>>`. |
 | Enumerate implicit targets | `implicit_castable(source)` accepts a loaded source and returns the selected provider's implicit target candidates through the same result shape. |
 
 Here `C` is the selected provider implementing `TypeContextRead`. Name lookup
@@ -189,8 +189,9 @@ member types, unsupported named categories or table-reference shapes, recursion,
 and excessive nesting. Finite owned values cannot represent recursive catalog
 graphs; conversion detects active-name cycles and bounds nesting to 128 levels.
 
-Range, multirange, polymorphic, and pseudo-type loading remains limited by the
-legacy catalog data.
+Concrete range/multirange and other pseudo-type catalog loading remains limited
+by the legacy catalog data. Named polymorphic construction instead uses the
+catalog-independent signature APIs described below.
 The compatibility loader explicitly rejects recognized special builtins (for
 example `pg_catalog.int4range`, `record`, `anyelement`, and `void`) with
 `UnsupportedNamedType`; its spelling-based guard is not an exhaustive PostgreSQL
@@ -198,8 +199,10 @@ category classifier. For example, the semantic builtin catalog retains names
 without range subtype or multirange base components. Those cannot be reconstructed
 as complete loaded values, even when a cast relationship exists. Do not fabricate
 `BaseType` values for these categories. Extending catalog classification and
-representing those components require separate work. SQL inference and overload
-selection remain deferred operations.
+extracting those components require separate work. `RangeType` and
+`MultirangeType` can already own explicitly supplied
+components, including polymorphic constraints, without catalog loading. SQL
+inference and overload selection remain deferred operations.
 
 ## `sem::TypeDefinition` capability audit
 
@@ -239,11 +242,11 @@ missing SQL behavior in those legacy methods or change existing callers.
 | `full_name()` | Use category-specific `name()` accessors; anonymous and structural values need no fabricated name. |
 | `is_array()`, `element_type()` | Inspect `ArrayType` and access `element_type()`. Other categories do not expose an element. |
 | `is_record()` | Inspect the relevant explicit composite, implicit composite, or table-row category; dynamic ownership does not itself imply record shape. Loading the pseudo-type `record` is deferred. |
-| `is_range()`, `range_subtype()`, `is_multi_range()`, `multi_range_base_element()` | Deferred range categories and component APIs; no suffix-based reconstruction. |
-| `into_range_type()`, `into_multi_range_type()` | Deferred category construction with actual range metadata. |
-| `is_simple_infer_arg()`, `is_common_infer_arg()` | Deferred inference classification. |
-| `is_any_element()`, `is_any_array()`, `is_any_non_array()`, `is_any_range()`, `is_any_multi_range()` | Deferred simple polymorphic categories. |
-| `is_any_compatible()`, `is_any_compatible_array()`, `is_any_compatible_non_array()`, `is_any_compatible_range()`, `is_any_compatible_multi_range()` | Deferred compatible-family polymorphic categories. |
+| `is_range()`, `range_subtype()`, `is_multi_range()`, `multi_range_base_element()` | `RangeType::subtype()`, `MultirangeType::range().subtype()`; no suffix-based reconstruction. |
+| `into_range_type()`, `into_multi_range_type()` | Construct `RangeType` / `MultirangeType` with explicit nominal identity and components; no subtype-only reconstruction. |
+| `is_simple_infer_arg()`, `is_common_infer_arg()` | `PolymorphicCategory::family()`; inference execution remains deferred. |
+| `is_any_element()`, `is_any_array()`, `is_any_non_array()`, `is_any_range()`, `is_any_multi_range()` | Simple-family `PolymorphicCategory` values and signature variables. |
+| `is_any_compatible()`, `is_any_compatible_array()`, `is_any_compatible_non_array()`, `is_any_compatible_range()`, `is_any_compatible_multi_range()` | Common-family `PolymorphicCategory` values and independent signature variables. |
 | `apply_simple_infer_result()`, `apply_common_infer_result()` | Deferred inference operations; loaded equality does not infer or mutate a result type. |
 | `Display`, `FromStr` | Remain legacy concrete-reference text interfaces; no universal loaded textual encoding or parser is introduced. |
 | `Clone`, `Eq`, `PartialEq`, `Debug` | Supported through owned components and the loaded trait's identity/clone contract. |
@@ -336,8 +339,9 @@ previous behavior. `types::compat` only adapts catalog facts and references.
 
 Builtin string classification covers `pg_catalog.text`, `varchar`, `bpchar` and
 `name`. Custom string-category metadata is not represented in the loaded model;
-a native provider must expose those relationships itself. Pseudo/polymorphic
-loading and inference remain outside this API; `unknown` is not an ordinary
+a native provider must expose those relationships itself. Polymorphic
+cast questions are explicitly deferred as described below; binding and inference
+execution remain outside this API; `unknown` is not an ordinary
 concrete cast endpoint. No transitive cast search is introduced.
 
 A returned domain endpoint retains its nominal identity and loaded base. Domain
@@ -377,3 +381,133 @@ These rules follow PostgreSQL's
 [`find_coercion_pathway`](https://github.com/postgres/postgres/blob/REL_18_STABLE/src/backend/parser/parse_coerce.c).
 Small rolled-back PostgreSQL 15–18 oracle queries verified domain and I/O
 eligibility. Permanent regression tests use native providers and offline catalogs.
+
+## PostgreSQL signature polymorphism
+
+This section is for maintainers migrating semantic consumers and composing loaded
+function signatures (#636), not for CLI users. No contributor steps change.
+
+`SignaturePolymorphism::new(&positions)` atomically constructs all named
+polymorphic occurrences of one signature, preserving their declaration order and
+input/output/INOUT/variadic roles. Other concrete parameters remain owned by the
+function-signature consumer. `PolymorphicPosition::new(category, role)` supplies
+one declaration. `types()` returns immutable `PolymorphicType` values that can be
+cloned/boxed into argument and result components without a catalog or
+`ParseContext`. This scope is signature-local data, not an analyzer environment;
+existing analyzers must still receive `ParseContext`.
+
+`PolymorphicCategory` covers the six simple-family names (`anyelement`,
+`anyarray`, `anynonarray`, `anyenum`, `anyrange`, `anymultirange`) and five common
+names (`anycompatible`, `anycompatiblearray`, `anycompatiblenonarray`,
+`anycompatiblerange`, `anycompatiblemultirange`). There is no `anycompatibleenum`.
+The PostgreSQL special pseudo-type `any`, `unknown`, and unconstrained `types::Any`
+are not named linked variables. PostgreSQL 15–18 expose the same eleven names.
+The category matrix follows the PostgreSQL
+[type system documentation](https://www.postgresql.org/docs/18/extend-type-system.html#EXTEND-TYPES-POLYMORPHIC).
+
+Interpretation is explicit: `from_postgres_identifier` accepts a logical,
+already-normalized/unquoted identifier, not raw SQL; a quoted lowercase
+`"anyelement"` becomes the logical `anyelement`, while quoted `"AnyElement"`
+remains different. `from_postgres_name` accepts only resolved `pg_catalog` names
+without a catalog qualifier. It does not resolve unqualified/user-schema names.
+The removable `compat::polymorphic_position` only adapts scalar legacy references
+into position declarations. Collect these declarations and finalize **once per
+signature**, not once per reference. The general catalog loader continues to
+reject pseudo-type loading and does not silently construct independent scopes.
+
+Each type's `variable()` provides a signature-scoped identity and related
+`element()`, `array()`, `range()`, and `multirange()` variables. The two families
+are independent. Enum/nonarray occurrences constrain the shared element variable,
+including restrictions declared on outputs. Array and variadic occurrences keep
+an element relationship without adding an unconditional `anynonarray`
+restriction: PostgreSQL permits domains over arrays as array elements and in
+variadic calls. The declaration role remains available through
+`PolymorphicRole::is_variadic()` for future binding rules.
+`requires_enum()` / `requires_nonarray()` expose
+these requirements without executing them. Simple-family exact matching and
+common-family common-type selection remain distinct. Common-family range and
+multirange variables retain shared range identity and subtype agreement; subtype
+coercibility alone cannot establish range compatibility.
+
+Clones preserve binding identity and complete restrictions. Independent scopes
+have distinct identity even with identical declarations. Equality includes the
+category; `anyelement` and `anyenum` can share a variable without being identical
+category values. This is binding identity, not alpha-equivalence of whole
+function signatures; #636 must preserve scopes when assembling/cloning a
+signature, and must not use freshly rebuilt scopes to compare binding identity.
+No scope can be forged or extended after finalization.
+
+Outputs require inputs in the same family. Range/multirange outputs require a
+range/multirange input supplying the nominal identity; both cross-directions are
+valid. Array/element output relations need no catalog to be represented. No
+actual call type is required, so valid unresolved constraints are not rejected.
+Variadic polymorphic positions require the applicable array category. Errors
+refer to the index in the supplied polymorphic-position list.
+
+`RangeType::new(name, subtype)` and `MultirangeType::new(name, range)` own typed
+components, possibly constraints. Two ranges sharing a subtype can still have
+different nominal identities. A multirange owns the complete related range.
+There is no subtype-based choice of range identity. Their catalog ingestion is
+still missing: the current legacy builtin records lack the complete range
+subtype, multirange-to-range link, and reliable category facts needed for faithful
+loading. Those facts must be supplied by future catalog extraction/adaptation,
+coordinated with #634 cast endpoints and #636 concrete signature components;
+this issue does not change the legacy storage model or fabricate those facts.
+Named polymorphic signature constraints themselves have no such prerequisite.
+
+| Existing inference concept | Representation / migration boundary |
+| --- | --- |
+| `is_simple_infer_arg`, `SimpleInferContext::collect` / `push_input_param` | Simple-family variable links and input roles; exact binding is future work. |
+| `is_common_infer_arg`, `CommonInferContext::collect` / `push_input_param` | Independent common-family links; cast-based common-type selection remains future work. |
+| Element/subtype/multirange-base extraction | Variable `element()` relation; concrete `ArrayType::element_type`, `RangeType::subtype`, `MultirangeType::range`. |
+| `get_inference_result` and common candidate ranking | Future solver; no execution or candidate selection here. |
+| `apply_simple_infer_result`, `apply_common_infer_result`, OUT/table results | Shared output occurrences identify the future substitution targets; legacy types are unchanged. |
+| Variadic bindings | Variadic role, array variable, and shared element relationship; argument binding is not executed. |
+
+Legacy simple inference omits `anyenum` dispatch, and legacy range reconstruction
+contains `todo!()` paths. The new representation covers these categories without
+changing those legacy algorithms, extending serialization, or activating a new
+analyzer.
+
+## Cast questions involving polymorphic constraints
+
+All six public `TypeContext` cast methods now return `CastQueryOutcome<T>` inside
+`Result<_, CastQueryError<C::Error>>`. Pair lookup uses
+`T = Option<CastDefinition>`; enumeration uses `T = TypeReference`.
+`resolution()` / `into_resolution()` inspect a determinate answer;
+`deferred_query()` inspects a binding-dependent question. Callers must handle both
+outcomes explicitly. A deferred enumeration is not a type candidate and must not
+be converted into `Never`, `Any`, or a partial complete candidate set.
+
+`DeferredCastQuery` owns source/target values as applicable, direction, mode and
+selected dialect; cloning preserves all variable linkage. It executes no binding
+or automatic retry. `CastQueryError::provider_error()` retains actual provider
+failures; `unsupported_query_dialect()` identifies a PostgreSQL-constraint query
+under SQLite. These errors do not invalidate constructed type values.
+
+| Endpoints or query | Outcome |
+| --- | --- |
+| Recursively concrete pair | Resolved cast or known absence under existing provider/dialect rules. |
+| Concrete ↔ polymorphic | Deferred; no implicit binding, catalog projection, or cast invented. |
+| Polymorphic ↔ polymorphic, same or different scope/family | Deferred; variable identity alone is not a SQL identity cast. |
+| Array/range/multirange containing constraints | Deferred whole-value query, retaining all structural/nominal relationships. |
+| Other nesting (domain/composite members/candidate alternatives) | Recursively deferred before any provider facts are requested. |
+| Mixed scalar/container shapes containing constraints | Deferred, since shape mismatch alone cannot exclude a registered whole-type cast. |
+| Enumeration on a constrained value | Deferred enumeration, retaining its direction and mode. |
+| PostgreSQL constraint under SQLite | Explicit unsupported-dialect operation error, including recursive nesting. |
+| Concrete SQLite operation | Existing provider behavior wrapped in a resolved outcome. |
+
+`TypeDefinition::contains_polymorphic()` is the permanent recursive capability
+used before provider dispatch. Structural implementations must inspect owned
+components; the default describes a leaf without these constraints. Existing
+builtins recurse through arrays, domains, all record members, ranges,
+multiranges, and candidates. No legacy projection failure determines the answer
+to a polymorphic query. `TypeContextRead` remains the concrete-fact provider
+contract, with its existing return types; native providers need not implement
+polymorphic inference. `compat` remains catalog adaptation only.
+
+For fully concrete ranges, intrinsic equality and existing provider casts can
+produce determinate answers. No cast is derived merely from range subtype casts.
+Determining more constrained cases would require binding/solving; this issue
+conservatively preserves those questions rather than adding such an algorithm.
+The legacy `sem` cast APIs and all existing analyzer consumers remain unchanged.

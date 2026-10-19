@@ -1,3 +1,5 @@
+mod polymorphic;
+
 use crate::sem::FullName;
 use crate::types::{Any, Candidates, CastContext, TypeContext, array::ArrayType};
 
@@ -271,13 +273,15 @@ fn native_provider_preserves_directed_loaded_casts(#[case] expected: CastContext
     } else {
         context.explicit_cast(catalog.source(), catalog.target())
     };
-    let cast = result.unwrap().unwrap();
+    let cast = result.unwrap().into_resolution().unwrap().unwrap();
     assert_eq!(cast.context(), expected);
     assert!(cast.source().same_type(catalog.source()));
     assert!(cast.target().same_type(catalog.target()));
     assert!(
         context
             .explicit_cast(catalog.target(), catalog.source())
+            .unwrap()
+            .into_resolution()
             .unwrap()
             .is_none()
     );
@@ -294,11 +298,15 @@ fn native_candidate_reads_preserve_inputs_outputs_and_mode() {
         context
             .cast_sources(catalog.target(), true)
             .unwrap()
+            .into_resolution()
+            .unwrap()
             .same_type(both.as_ref())
     );
     assert!(
         context
             .cast_sources(catalog.target(), false)
+            .unwrap()
+            .into_resolution()
             .unwrap()
             .same_type(identity.as_ref())
     );
@@ -306,11 +314,15 @@ fn native_candidate_reads_preserve_inputs_outputs_and_mode() {
         context
             .assignment_sources(catalog.target())
             .unwrap()
+            .into_resolution()
+            .unwrap()
             .same_type(both.as_ref())
     );
     assert!(
         context
             .implicit_castable(catalog.source())
+            .unwrap()
+            .into_resolution()
             .unwrap()
             .same_type(both.as_ref())
     );
@@ -338,31 +350,31 @@ fn native_error_type_propagates_through_every_read_operation() {
         context
             .implicit_cast(catalog.source(), catalog.target())
             .unwrap_err(),
-        expected
+        crate::types::CastQueryError::provider(expected)
     );
     assert_eq!(
         context
             .assignment_cast(catalog.source(), catalog.target())
             .unwrap_err(),
-        expected
+        crate::types::CastQueryError::provider(expected)
     );
     assert_eq!(
         context
             .explicit_cast(catalog.source(), catalog.target())
             .unwrap_err(),
-        expected
+        crate::types::CastQueryError::provider(expected)
     );
     assert_eq!(
         context.cast_sources(catalog.target(), true).unwrap_err(),
-        expected
+        crate::types::CastQueryError::provider(expected)
     );
     assert_eq!(
         context.assignment_sources(catalog.target()).unwrap_err(),
-        expected
+        crate::types::CastQueryError::provider(expected)
     );
     assert_eq!(
         context.implicit_castable(catalog.source()).unwrap_err(),
-        expected
+        crate::types::CastQueryError::provider(expected)
     );
 }
 
@@ -381,15 +393,29 @@ fn native_scalar_provider_supports_unregistered_loaded_arrays() {
     let context = TypeContext::new(&catalog);
     let source = ArrayType::new(catalog.source());
     let target = ArrayType::new(catalog.target());
-    let cast = context.implicit_cast(&source, &target).unwrap().unwrap();
+    let cast = context
+        .implicit_cast(&source, &target)
+        .unwrap()
+        .into_resolution()
+        .unwrap()
+        .unwrap();
     assert_eq!(cast.context(), CastContext::implicit());
     assert!(cast.source().same_type(&source));
     assert!(cast.target().same_type(&target));
-    assert!(context.implicit_cast(&target, &source).unwrap().is_none());
+    assert!(
+        context
+            .implicit_cast(&target, &source)
+            .unwrap()
+            .into_resolution()
+            .unwrap()
+            .is_none()
+    );
     let nested_source = ArrayType::new(&source);
     let nested_target = ArrayType::new(&target);
     let nested = context
         .explicit_cast(&nested_source, &nested_target)
+        .unwrap()
+        .into_resolution()
         .unwrap()
         .unwrap();
     assert_eq!(nested.context(), CastContext::explicit());
@@ -413,12 +439,24 @@ fn domain_array_coercion_preserves_nominal_identity_and_endpoints() {
     assert!(!source_domain.same_type(catalog.source()));
     let source = ArrayType::new(&source_domain);
     let target = ArrayType::new(&target_domain);
-    let cast = context.assignment_cast(&source, &target).unwrap().unwrap();
+    let cast = context
+        .assignment_cast(&source, &target)
+        .unwrap()
+        .into_resolution()
+        .unwrap()
+        .unwrap();
     assert_eq!(cast.context(), CastContext::assignment());
     assert!(cast.source().same_type(&source));
     assert!(cast.target().same_type(&target));
     assert!(!cast.source().same_type(&ArrayType::new(catalog.source())));
-    assert!(context.assignment_cast(&target, &source).unwrap().is_none());
+    assert!(
+        context
+            .assignment_cast(&target, &source)
+            .unwrap()
+            .into_resolution()
+            .unwrap()
+            .is_none()
+    );
 }
 
 #[rstest::rstest]
@@ -436,6 +474,8 @@ fn structural_array_lifting_preserves_scalar_categories(
     let cast = context
         .explicit_cast(&source_array, &text_array)
         .unwrap()
+        .into_resolution()
+        .unwrap()
         .unwrap();
     assert_eq!(cast.context(), CastContext::explicit());
     assert!(cast.source().same_type(&source_array));
@@ -443,6 +483,8 @@ fn structural_array_lifting_preserves_scalar_categories(
     assert!(
         context
             .implicit_cast(&text_array, &source_array)
+            .unwrap()
+            .into_resolution()
             .unwrap()
             .is_none()
     );
@@ -462,6 +504,8 @@ fn postgres_io_coercions_need_no_provider_scalar_cast(#[case] value: crate::type
         context
             .assignment_cast(&value_array, &text_array)
             .unwrap()
+            .into_resolution()
+            .unwrap()
             .unwrap()
             .context(),
         CastContext::assignment()
@@ -469,6 +513,8 @@ fn postgres_io_coercions_need_no_provider_scalar_cast(#[case] value: crate::type
     assert_eq!(
         context
             .explicit_cast(&text_array, &value_array)
+            .unwrap()
+            .into_resolution()
             .unwrap()
             .unwrap()
             .context(),
@@ -478,17 +524,23 @@ fn postgres_io_coercions_need_no_provider_scalar_cast(#[case] value: crate::type
         context
             .implicit_cast(&value_array, &text_array)
             .unwrap()
+            .into_resolution()
+            .unwrap()
             .is_none()
     );
     assert!(
         context
             .implicit_cast(&text_array, &value_array)
             .unwrap()
+            .into_resolution()
+            .unwrap()
             .is_none()
     );
     assert!(
         context
             .assignment_cast(&text_array, &value_array)
+            .unwrap()
+            .into_resolution()
             .unwrap()
             .is_none()
     );
@@ -508,9 +560,28 @@ fn registered_explicit_cast_blocks_automatic_assignment_io() {
         &CastContext::explicit(),
     );
     let context = TypeContext::new(&catalog);
-    assert!(context.implicit_cast(&source, &text).unwrap().is_none());
-    assert!(context.assignment_cast(&source, &text).unwrap().is_none());
-    let cast = context.explicit_cast(&source, &text).unwrap().unwrap();
+    assert!(
+        context
+            .implicit_cast(&source, &text)
+            .unwrap()
+            .into_resolution()
+            .unwrap()
+            .is_none()
+    );
+    assert!(
+        context
+            .assignment_cast(&source, &text)
+            .unwrap()
+            .into_resolution()
+            .unwrap()
+            .is_none()
+    );
+    let cast = context
+        .explicit_cast(&source, &text)
+        .unwrap()
+        .into_resolution()
+        .unwrap()
+        .unwrap();
     assert_eq!(cast.context(), CastContext::explicit());
     assert!(cast.source().same_type(&source));
     assert!(cast.target().same_type(&text));
@@ -527,11 +598,32 @@ fn registered_explicit_array_cast_precedes_implicit_element_cast() {
         context
             .implicit_cast(catalog.source(), catalog.target())
             .unwrap()
+            .into_resolution()
+            .unwrap()
             .is_some()
     );
-    assert!(context.implicit_cast(&source, &target).unwrap().is_none());
-    assert!(context.assignment_cast(&source, &target).unwrap().is_none());
-    let cast = context.explicit_cast(&source, &target).unwrap().unwrap();
+    assert!(
+        context
+            .implicit_cast(&source, &target)
+            .unwrap()
+            .into_resolution()
+            .unwrap()
+            .is_none()
+    );
+    assert!(
+        context
+            .assignment_cast(&source, &target)
+            .unwrap()
+            .into_resolution()
+            .unwrap()
+            .is_none()
+    );
+    let cast = context
+        .explicit_cast(&source, &target)
+        .unwrap()
+        .into_resolution()
+        .unwrap()
+        .unwrap();
     assert_eq!(cast.context(), CastContext::explicit());
     assert!(cast.source().same_type(&source));
     assert!(cast.target().same_type(&target));
@@ -575,13 +667,19 @@ fn domain_coercion_uses_underlying_relationship_for_each_context(#[case] scenari
     let implicit = context
         .implicit_cast(source.as_ref(), target.as_ref())
         .unwrap()
+        .into_resolution()
+        .unwrap()
         .unwrap();
     let assignment = context
         .assignment_cast(source.as_ref(), target.as_ref())
         .unwrap()
+        .into_resolution()
+        .unwrap()
         .unwrap();
     let explicit = context
         .explicit_cast(source.as_ref(), target.as_ref())
+        .unwrap()
+        .into_resolution()
         .unwrap()
         .unwrap();
     assert_eq!(implicit.context(), CastContext::implicit());
@@ -593,17 +691,23 @@ fn domain_coercion_uses_underlying_relationship_for_each_context(#[case] scenari
         context
             .implicit_cast(target.as_ref(), source.as_ref())
             .unwrap()
+            .into_resolution()
+            .unwrap()
             .is_none()
     );
     assert!(
         context
             .assignment_cast(target.as_ref(), source.as_ref())
             .unwrap()
+            .into_resolution()
+            .unwrap()
             .is_none()
     );
     assert!(
         context
             .explicit_cast(target.as_ref(), source.as_ref())
+            .unwrap()
+            .into_resolution()
             .unwrap()
             .is_none()
     );
@@ -631,9 +735,30 @@ fn scalar_element_relationship_does_not_imply_scalar_array_cast(
             &target_array as &dyn crate::types::TypeDefinition,
         )
     };
-    assert!(context.implicit_cast(source, target).unwrap().is_none());
-    assert!(context.assignment_cast(source, target).unwrap().is_none());
-    assert!(context.explicit_cast(source, target).unwrap().is_none());
+    assert!(
+        context
+            .implicit_cast(source, target)
+            .unwrap()
+            .into_resolution()
+            .unwrap()
+            .is_none()
+    );
+    assert!(
+        context
+            .assignment_cast(source, target)
+            .unwrap()
+            .into_resolution()
+            .unwrap()
+            .is_none()
+    );
+    assert!(
+        context
+            .explicit_cast(source, target)
+            .unwrap()
+            .into_resolution()
+            .unwrap()
+            .is_none()
+    );
 }
 
 #[rstest::rstest]
@@ -651,11 +776,15 @@ fn postgres_io_does_not_fabricate_coercions_for_inference_values(
         context
             .assignment_cast(value.as_ref(), &text)
             .unwrap()
+            .into_resolution()
+            .unwrap()
             .is_none()
     );
     assert!(
         context
             .explicit_cast(value.as_ref(), &text)
+            .unwrap()
+            .into_resolution()
             .unwrap()
             .is_none()
     );
@@ -663,11 +792,15 @@ fn postgres_io_does_not_fabricate_coercions_for_inference_values(
         context
             .explicit_cast(&text, value.as_ref())
             .unwrap()
+            .into_resolution()
+            .unwrap()
             .is_none()
     );
     assert!(
         context
             .implicit_cast(value.as_ref(), &text)
+            .unwrap()
+            .into_resolution()
             .unwrap()
             .is_none()
     );
@@ -688,12 +821,16 @@ fn assignment_candidates_include_provider_explicit_universe_when_io_permits() {
         context
             .assignment_sources(&text)
             .unwrap()
+            .into_resolution()
+            .unwrap()
             .same_type(expected.as_ref())
     );
     let implicit = Candidates::from_candidates(&[text.clone_box()]);
     assert!(
         context
             .cast_sources(&text, false)
+            .unwrap()
+            .into_resolution()
             .unwrap()
             .same_type(implicit.as_ref())
     );
@@ -715,20 +852,46 @@ fn selected_native_dialect_controls_automatic_io_coercions(
     let catalog = test_helpers::NativeCatalog::io_only(&value, &text).with_dialect(dialect);
     let context = TypeContext::new(&catalog);
     assert_eq!(
-        context.assignment_cast(&value, &text).unwrap().is_some(),
+        context
+            .assignment_cast(&value, &text)
+            .unwrap()
+            .into_resolution()
+            .unwrap()
+            .is_some(),
         allows_io
     );
     assert_eq!(
-        context.explicit_cast(&text, &value).unwrap().is_some(),
+        context
+            .explicit_cast(&text, &value)
+            .unwrap()
+            .into_resolution()
+            .unwrap()
+            .is_some(),
         allows_io
     );
     assert_eq!(
         context
             .assignment_cast(&ArrayType::new(&value), &ArrayType::new(&text))
             .unwrap()
+            .into_resolution()
+            .unwrap()
             .is_some(),
         allows_io
     );
-    assert!(context.implicit_cast(&value, &text).unwrap().is_none());
-    assert!(context.assignment_cast(&text, &value).unwrap().is_none());
+    assert!(
+        context
+            .implicit_cast(&value, &text)
+            .unwrap()
+            .into_resolution()
+            .unwrap()
+            .is_none()
+    );
+    assert!(
+        context
+            .assignment_cast(&text, &value)
+            .unwrap()
+            .into_resolution()
+            .unwrap()
+            .is_none()
+    );
 }

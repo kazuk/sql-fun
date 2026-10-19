@@ -33,6 +33,10 @@ impl PartialEq for ArrayType {
 }
 
 impl TypeDefinition for ArrayType {
+    fn contains_polymorphic(&self) -> bool {
+        self.element_type.contains_polymorphic()
+    }
+
     fn as_any(&self) -> &dyn Any {
         self
     }

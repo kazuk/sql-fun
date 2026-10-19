@@ -1,6 +1,8 @@
 //! Owned, directed cast relationships, independent of type equality.
 
+mod query;
 mod resolve;
+pub use self::query::{CastQueryDirection, CastQueryError, CastQueryOutcome, DeferredCastQuery};
 
 pub(super) use self::resolve::CastResolver;
 

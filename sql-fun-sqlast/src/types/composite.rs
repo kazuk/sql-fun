@@ -83,6 +83,12 @@ mod member_tests {
 pub struct Members(Vec<Member>);
 
 impl Members {
+    fn contains_polymorphic(&self) -> bool {
+        self.0
+            .iter()
+            .any(|member| member.type_.contains_polymorphic())
+    }
+
     /// Clone the supplied members, retaining their order.
     #[must_use]
     pub fn new(members: &[Member]) -> Self {
@@ -155,6 +161,10 @@ impl CompositeType {
 }
 
 impl TypeDefinition for CompositeType {
+    fn contains_polymorphic(&self) -> bool {
+        self.members.contains_polymorphic()
+    }
+
     fn as_any(&self) -> &dyn Any {
         self
     }
@@ -213,6 +223,10 @@ impl ImplicitCompositeType {
 }
 
 impl TypeDefinition for ImplicitCompositeType {
+    fn contains_polymorphic(&self) -> bool {
+        self.members.contains_polymorphic()
+    }
+
     fn as_any(&self) -> &dyn Any {
         self
     }
@@ -276,6 +290,10 @@ impl TableRowType {
 }
 
 impl TypeDefinition for TableRowType {
+    fn contains_polymorphic(&self) -> bool {
+        self.members.contains_polymorphic()
+    }
+
     fn as_any(&self) -> &dyn Any {
         self
     }

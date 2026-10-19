@@ -3,8 +3,8 @@
 use crate::ast::Dialect;
 use crate::sem::FullName;
 use crate::types::{
-    CastContext, CastDefinition, TypeDefinition, TypeReference, array::ArrayType,
-    cast::CastResolver,
+    CastContext, CastDefinition, CastQueryError, CastQueryOutcome, TypeDefinition, TypeReference,
+    array::ArrayType, cast::CastResolver,
 };
 
 /// Read catalog information using complete loaded types.
@@ -142,62 +142,73 @@ impl<C: TypeContextRead> TypeContext<'_, C> {
     }
 
     /// Read a direct implicit cast between complete loaded snapshots.
-    /// A missing relationship is `Ok(None)`; provider failures remain errors.
+    /// A determinate missing relationship is resolved `None`; binding-dependent
+    /// queries are deferred. Provider failures remain errors.
     /// This does not search transitive paths or solve constraints.
     pub fn implicit_cast(
         &self,
         source: &dyn TypeDefinition,
         target: &dyn TypeDefinition,
-    ) -> Result<Option<CastDefinition>, C::Error> {
-        CastResolver::new(self.context).cast(source, target, CastContext::implicit())
+    ) -> Result<CastQueryOutcome<Option<CastDefinition>>, CastQueryError<C::Error>> {
+        CastResolver::new(self.context).query_cast(source, target, CastContext::implicit())
     }
 
-    /// Read a direct assignment cast using the provider's assignment rules.
+    /// Read a direct assignment cast, or defer if polymorphic binding is needed.
     pub fn assignment_cast(
         &self,
         source: &dyn TypeDefinition,
         target: &dyn TypeDefinition,
-    ) -> Result<Option<CastDefinition>, C::Error> {
-        CastResolver::new(self.context).cast(source, target, CastContext::assignment())
+    ) -> Result<CastQueryOutcome<Option<CastDefinition>>, CastQueryError<C::Error>> {
+        CastResolver::new(self.context).query_cast(source, target, CastContext::assignment())
     }
 
-    /// Read a direct explicit cast, preserving its returned cast context.
+    /// Read a direct explicit cast, or defer if polymorphic binding is needed.
     pub fn explicit_cast(
         &self,
         source: &dyn TypeDefinition,
         target: &dyn TypeDefinition,
-    ) -> Result<Option<CastDefinition>, C::Error> {
-        CastResolver::new(self.context).cast(source, target, CastContext::explicit())
+    ) -> Result<CastQueryOutcome<Option<CastDefinition>>, CastQueryError<C::Error>> {
+        CastResolver::new(self.context).query_cast(source, target, CastContext::explicit())
     }
 
     /// Load accepted source candidates for this target.
     /// `explicit` selects explicit (`true`) or implicit (`false`) eligibility.
-    /// Load every reported candidate or return an error; empty success is `Never`.
+    /// Concrete empty results resolve to `Never`; binding-dependent enumeration
+    /// is deferred rather than presented as an empty or partial candidate set.
     pub fn cast_sources(
         &self,
         target: &dyn TypeDefinition,
         explicit: bool,
-    ) -> Result<TypeReference, C::Error> {
-        CastResolver::new(self.context).cast_sources(target, explicit)
+    ) -> Result<CastQueryOutcome<TypeReference>, CastQueryError<C::Error>> {
+        CastResolver::new(self.context).query_sources(
+            target,
+            if explicit {
+                CastContext::explicit()
+            } else {
+                CastContext::implicit()
+            },
+        )
     }
 
     /// Load accepted assignment-source candidates for this target.
-    /// Load every reported candidate or return an error; empty success is `Never`.
+    /// Concrete empty results resolve to `Never`; binding-dependent enumeration
+    /// is deferred rather than presented as an empty or partial candidate set.
     pub fn assignment_sources(
         &self,
         target: &dyn TypeDefinition,
-    ) -> Result<TypeReference, C::Error> {
-        CastResolver::new(self.context).sources(target, CastContext::assignment())
+    ) -> Result<CastQueryOutcome<TypeReference>, CastQueryError<C::Error>> {
+        CastResolver::new(self.context).query_sources(target, CastContext::assignment())
     }
 
     /// Load direct implicit target candidates reachable from this source.
     /// This is the output direction, distinct from source-candidate enumeration.
-    /// Load every reported candidate or return an error; empty success is `Never`.
+    /// Concrete empty results resolve to `Never`; binding-dependent enumeration
+    /// is deferred rather than presented as an empty or partial candidate set.
     pub fn implicit_castable(
         &self,
         source: &dyn TypeDefinition,
-    ) -> Result<TypeReference, C::Error> {
-        CastResolver::new(self.context).implicit_castable(source)
+    ) -> Result<CastQueryOutcome<TypeReference>, CastQueryError<C::Error>> {
+        CastResolver::new(self.context).query_targets(source)
     }
 }
 

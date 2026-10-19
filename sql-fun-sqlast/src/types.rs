@@ -14,13 +14,24 @@ mod constraint;
 mod context;
 mod domain;
 mod enumeration;
+mod polymorphic;
+mod range;
 
-pub use self::cast::{CastContext, CastDefinition};
+pub use self::cast::{
+    CastContext, CastDefinition, CastQueryDirection, CastQueryError, CastQueryOutcome,
+    DeferredCastQuery,
+};
 pub use self::composite::{CompositeType, ImplicitCompositeType, Member, Members, TableRowType};
 pub use self::constraint::{Any, Candidates, Never};
 pub use self::context::{TypeContext, TypeContextRead};
 pub use self::domain::DomainType;
 pub use self::enumeration::EnumType;
+
+pub use self::polymorphic::{
+    PolymorphicCategory, PolymorphicError, PolymorphicFamily, PolymorphicPosition, PolymorphicRole,
+    PolymorphicType, PolymorphicVariable, SignaturePolymorphism,
+};
+pub use self::range::{MultirangeType, RangeType};
 
 use std::any::Any as StdAny;
 
@@ -30,6 +41,14 @@ use std::any::Any as StdAny;
 /// concrete category as well as all identity components. Cloning preserves
 /// identity and owns the cloned components independently of catalog storage.
 pub trait TypeDefinition: std::fmt::Debug + StdAny {
+    /// Whether this value contains PostgreSQL polymorphic constraints recursively.
+    ///
+    /// Custom structural categories must include their owned components. The
+    /// default describes a leaf without polymorphic variables. This is a query
+    /// capability, not catalog validation or a cast-eligibility decision.
+    fn contains_polymorphic(&self) -> bool {
+        false
+    }
     /// Inspect a category to access its category-specific capabilities.
     fn as_any(&self) -> &dyn StdAny;
     /// Clone this value and its owned components.

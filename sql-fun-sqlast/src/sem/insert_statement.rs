@@ -537,7 +537,7 @@ impl<C: ParseContext> SemanticVisitor for AssignmentChecker<'_, C> {
         if let Some(source) = value.get_type()
             && !unknown_literal
             && source != ty
-            && !self.context.get_assignment_cast(&source, &ty).is_some()
+            && self.context.get_assignment_cast(&source, &ty).is_none()
         {
             self.context
                 .report_analysis_problem(AnalysisProblem::insert(

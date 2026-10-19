@@ -855,8 +855,8 @@ impl ResolvedOperator {
         left: Option<&SemScalarExpr>,
         right: Option<&SemScalarExpr>,
     ) -> Result<Option<SemScalarExpr>, AnalysisError> {
-        if !left.is_some_and(|value| value.constraint_node().is_some())
-            && !right.is_some_and(|value| value.constraint_node().is_some())
+        if left.is_some_and(|value| value.constraint_node().is_none())
+            && right.is_some_and(|value| value.constraint_node().is_none())
         {
             return Ok(None);
         }

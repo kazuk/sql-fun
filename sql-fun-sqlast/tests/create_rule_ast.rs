@@ -1,4 +1,4 @@
-//! Public syntax/classification boundary for PostgreSQL CREATE RULE.
+//! Public syntax/classification boundary for `PostgreSQL` CREATE RULE.
 
 use ::sql_fun_sqlast::ast::{CteDefinition, Dialect, HaveWithClause, StatementKind};
 use ::sql_fun_sqlast::parse_statements;

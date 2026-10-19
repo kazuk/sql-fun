@@ -53,11 +53,27 @@ impl PgBuiltinCasts {
 mod loader_tests;
 
 impl CastInfoRead for super::BaseContext {
+    fn registered_cast(
+        &self,
+        source: &TypeReference,
+        target: &TypeReference,
+    ) -> Option<CastDefinition> {
+        let (source_name, source_array) = self.builtin_cast_type(source)?;
+        let (target_name, target_array) = self.builtin_cast_type(target)?;
+        if source_array || target_array {
+            return None;
+        }
+        self.casts.get(source_name)?.get(target_name).cloned()
+    }
+
     fn get_assignment_cast(
         &self,
         source: &TypeReference,
         target: &TypeReference,
     ) -> Option<CastDefinition> {
+        if let Some(cast) = self.array_element_cast(source, target, Self::get_assignment_cast) {
+            return Some(cast);
+        }
         let cast = self.get_explicit_cast(source, target)?;
         if cast.context().use_in_assignment() {
             return Some(cast);
@@ -92,6 +108,18 @@ impl CastInfoRead for super::BaseContext {
                 {
                     sources.insert(source.clone());
                 }
+                if crate::ast::Dialect::from(&self.metadata) == crate::ast::Dialect::postgres()
+                    && !target.is_dynamic()
+                    && target.is_array() == Some(true)
+                    && let Some(source) = definition.type_reference()
+                    && !source.is_dynamic()
+                    && source.is_array() == Some(false)
+                {
+                    let array_source = TypeReference::concrete_type_ref(source.full_name(), true);
+                    if self.get_explicit_cast(&array_source, target).is_some() {
+                        sources.insert(array_source);
+                    }
+                }
             }
         }
         sources
@@ -104,6 +132,11 @@ impl CastInfoRead for super::BaseContext {
     ) -> Option<super::CastDefinition> {
         if !source_type.is_dynamic() && source_type == target_type {
             return Some(CastDefinition::new(CastContext::NoConversion));
+        }
+        if let Some(cast) =
+            self.array_element_cast(source_type, target_type, Self::get_explicit_cast)
+        {
+            return Some(cast);
         }
         let (source_local_name, source_array) = self.builtin_cast_type(source_type)?;
         let (target_local_name, target_array) = self.builtin_cast_type(target_type)?;
@@ -137,6 +170,11 @@ impl CastInfoRead for super::BaseContext {
     ) -> Option<super::CastDefinition> {
         if !source_type.is_dynamic() && source_type == target_type {
             return Some(CastDefinition::new(CastContext::NoConversion));
+        }
+        if let Some(cast) =
+            self.array_element_cast(source_type, target_type, Self::get_implicit_cast)
+        {
+            return Some(cast);
         }
         let (source_local_name, source_array) = self.builtin_cast_type(source_type)?;
         let (target_local_name, target_array) = self.builtin_cast_type(target_type)?;
@@ -181,6 +219,23 @@ impl CastInfoRead for super::BaseContext {
 }
 
 impl super::BaseContext {
+    fn array_element_cast(
+        &self,
+        source: &TypeReference,
+        target: &TypeReference,
+        lookup: fn(&Self, &TypeReference, &TypeReference) -> Option<CastDefinition>,
+    ) -> Option<CastDefinition> {
+        if crate::ast::Dialect::from(&self.metadata) != crate::ast::Dialect::postgres()
+            || source.is_dynamic()
+            || target.is_dynamic()
+            || source.is_array() != Some(true)
+            || target.is_array() != Some(true)
+        {
+            return None;
+        }
+        lookup(self, &source.element_type(), &target.element_type())
+    }
+
     fn builtin_cast_type<'a>(&self, ty: &'a TypeReference) -> Option<(&'a str, bool)> {
         if ty.is_dynamic() {
             return None;

@@ -564,7 +564,9 @@ These leaf operations need no context. Membership uses `same_type`: a supplied
 `Candidates` value contributes its direct members, `Never` contributes none, and
 another loaded value is a singleton. Nested constraints are not expanded. A caller
 can supply cast-expanded candidates, but the leaf operations perform no casts,
-compatibility tests, polymorphic binding, ranking or solving. For complete calls, `match_call(&[CallArgument])` maps syntax-order positional and
+compatibility tests, polymorphic binding, ranking or solving.
+
+For complete calls, `match_call(&[CallArgument])` maps syntax-order positional and
 named arguments to each declaration, checks omitted required parameters, defaults,
 excess arguments and duplicate assignments, and tests each supplied value's type
 candidates. Positional arguments must precede named arguments. OUT/TABLE parameters

@@ -70,6 +70,12 @@ impl CastContext {
         Self::Implicit
     }
 
+    /// Construct a preferred implicit context for semantic test fixtures.
+    #[cfg(test)]
+    pub(crate) const fn implicit_preferred() -> Self {
+        Self::ImplicitPrefeerd
+    }
+
     /// Construct an explicit cast context.
     pub(crate) const fn explicit() -> Self {
         Self::Explicit

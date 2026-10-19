@@ -50,22 +50,22 @@ mod test_overload_rank {
 
     #[rstest::rstest]
     #[case::exact_over_preferred(
-        CastContext::NoConversion,
-        CastContext::Implicit,
-        CastContext::ImplicitPrefeerd,
-        CastContext::ImplicitPrefeerd
+        CastContext::no_conversion(),
+        CastContext::implicit(),
+        CastContext::implicit_preferred(),
+        CastContext::implicit_preferred()
     )]
     #[case::two_exact(
-        CastContext::NoConversion,
-        CastContext::NoConversion,
-        CastContext::NoConversion,
-        CastContext::ImplicitPrefeerd
+        CastContext::no_conversion(),
+        CastContext::no_conversion(),
+        CastContext::no_conversion(),
+        CastContext::implicit_preferred()
     )]
     #[case::preferred_tiebreak(
-        CastContext::NoConversion,
-        CastContext::ImplicitPrefeerd,
-        CastContext::NoConversion,
-        CastContext::Implicit
+        CastContext::no_conversion(),
+        CastContext::implicit_preferred(),
+        CastContext::no_conversion(),
+        CastContext::implicit()
     )]
     fn stages_cannot_outweigh_exact_matches(
         #[case] left: CastContext,
@@ -81,8 +81,8 @@ mod test_overload_rank {
 
     #[test]
     fn argument_order_does_not_break_ties() {
-        let exact = OverloadRank::from(CastContext::NoConversion);
-        let implicit = OverloadRank::from(CastContext::Implicit);
+        let exact = OverloadRank::from(CastContext::no_conversion());
+        let implicit = OverloadRank::from(CastContext::implicit());
         assert_eq!(exact + implicit, implicit + exact);
     }
 }

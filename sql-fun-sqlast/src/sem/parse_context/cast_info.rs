@@ -4,20 +4,6 @@ use crate::sem::{CastDefinition, TypeReference};
 
 /// get cast definition
 pub trait CastInfoRead {
-    /// Read a catalog-registered relationship without deriving coercion rules.
-    ///
-    /// Providers with explicit cast entries must expose the selected entry even
-    /// when its context excludes the requested conversion. PostgreSQL array
-    /// derivation uses this to preserve whole-array cast precedence. Providers
-    /// without registered entries may retain the default absence.
-    fn registered_cast(
-        &self,
-        _source: &TypeReference,
-        _target: &TypeReference,
-    ) -> Option<CastDefinition> {
-        None
-    }
-
     /// Enumerate source types accepted by a cast to `target`, including identity.
     ///
     /// `explicit` selects explicit-cast eligibility; otherwise only implicit

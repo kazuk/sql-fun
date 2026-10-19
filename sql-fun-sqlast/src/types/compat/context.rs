@@ -1,7 +1,7 @@
 //! Legacy catalog backend for the independent loaded-value read contract.
 
 use crate::sem::{FullName, ParseContext};
-use crate::types::{CastDefinition, TypeContextRead, TypeDefinition, TypeReference};
+use crate::types::{CastDefinition, Never, TypeContextRead, TypeDefinition, TypeReference};
 
 use super::{
     ConversionError, Loader, load_assignment_cast, load_assignment_sources, load_cast_sources,
@@ -10,6 +10,24 @@ use super::{
 
 impl<C: ParseContext> TypeContextRead for C {
     type Error = ConversionError;
+
+    fn supports_postgres_coercions(&self) -> bool {
+        self.dialect() == crate::ast::Dialect::postgres()
+    }
+
+    fn existing_array_cast(
+        &self,
+        source: &dyn TypeDefinition,
+        target: &dyn TypeDefinition,
+    ) -> Result<Option<CastDefinition>, Self::Error> {
+        let Some(source) = optional_reference(self, source)? else {
+            return Ok(None);
+        };
+        let Some(target) = optional_reference(self, target)? else {
+            return Ok(None);
+        };
+        load_explicit_cast(self, &source, &target)
+    }
 
     fn type_by_exact_name(&self, name: &FullName) -> Result<Option<TypeReference>, Self::Error> {
         let Some(definition) = self.get_type_impl(name) else {
@@ -32,8 +50,12 @@ impl<C: ParseContext> TypeContextRead for C {
         source: &dyn TypeDefinition,
         target: &dyn TypeDefinition,
     ) -> Result<Option<CastDefinition>, Self::Error> {
-        let source = loaded_reference::reference(self, source)?;
-        let target = loaded_reference::reference(self, target)?;
+        let Some(source) = optional_reference(self, source)? else {
+            return Ok(None);
+        };
+        let Some(target) = optional_reference(self, target)? else {
+            return Ok(None);
+        };
         load_implicit_cast(self, &source, &target)
     }
 
@@ -42,8 +64,12 @@ impl<C: ParseContext> TypeContextRead for C {
         source: &dyn TypeDefinition,
         target: &dyn TypeDefinition,
     ) -> Result<Option<CastDefinition>, Self::Error> {
-        let source = loaded_reference::reference(self, source)?;
-        let target = loaded_reference::reference(self, target)?;
+        let Some(source) = optional_reference(self, source)? else {
+            return Ok(None);
+        };
+        let Some(target) = optional_reference(self, target)? else {
+            return Ok(None);
+        };
         load_assignment_cast(self, &source, &target)
     }
 
@@ -52,8 +78,12 @@ impl<C: ParseContext> TypeContextRead for C {
         source: &dyn TypeDefinition,
         target: &dyn TypeDefinition,
     ) -> Result<Option<CastDefinition>, Self::Error> {
-        let source = loaded_reference::reference(self, source)?;
-        let target = loaded_reference::reference(self, target)?;
+        let Some(source) = optional_reference(self, source)? else {
+            return Ok(None);
+        };
+        let Some(target) = optional_reference(self, target)? else {
+            return Ok(None);
+        };
         load_explicit_cast(self, &source, &target)
     }
 
@@ -62,17 +92,39 @@ impl<C: ParseContext> TypeContextRead for C {
         target: &dyn TypeDefinition,
         explicit: bool,
     ) -> Result<TypeReference, Self::Error> {
-        load_cast_sources(self, &loaded_reference::reference(self, target)?, explicit)
+        let Some(target) = optional_reference(self, target)? else {
+            return Ok(Box::new(Never::new()));
+        };
+        load_cast_sources(self, &target, explicit)
     }
 
     fn assignment_sources(
         &self,
         target: &dyn TypeDefinition,
     ) -> Result<TypeReference, Self::Error> {
-        load_assignment_sources(self, &loaded_reference::reference(self, target)?)
+        let Some(target) = optional_reference(self, target)? else {
+            return Ok(Box::new(Never::new()));
+        };
+        load_assignment_sources(self, &target)
     }
 
     fn implicit_castable(&self, source: &dyn TypeDefinition) -> Result<TypeReference, Self::Error> {
-        load_implicit_castable(self, &loaded_reference::reference(self, source)?)
+        let Some(source) = optional_reference(self, source)? else {
+            return Ok(Box::new(Never::new()));
+        };
+        load_implicit_castable(self, &source)
+    }
+}
+
+// Only retrieve legacy facts when the value has a legacy catalog reference.
+// Structural derivation belongs to the permanent TypeContext implementation.
+fn optional_reference<C: ParseContext>(
+    context: &C,
+    value: &dyn TypeDefinition,
+) -> Result<Option<crate::sem::TypeReference>, ConversionError> {
+    match loaded_reference::reference(context, value) {
+        Ok(reference) => Ok(Some(reference)),
+        Err(error) if error.has_no_legacy_reference() => Ok(None),
+        Err(error) => Err(error),
     }
 }

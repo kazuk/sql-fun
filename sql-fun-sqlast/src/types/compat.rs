@@ -64,6 +64,14 @@ pub enum ConversionError {
 }
 
 impl ConversionError {
+    // A legacy catalog has no facts for these otherwise valid loaded values.
+    const fn has_no_legacy_reference(&self) -> bool {
+        matches!(
+            self,
+            Self::UnsupportedLoadedType(_) | Self::TypeNotFound(_) | Self::RelationNotFound(_)
+        )
+    }
+
     /// Report that an explicit catalog is needed.
     pub fn catalog_required(name: &FullName) -> Self {
         Self::CatalogRequired(name.clone())

@@ -206,6 +206,12 @@ impl TypeDefinition {
     }
 }
 
+impl From<&ColumnCollection> for TypeDefinition {
+    fn from(value: &ColumnCollection) -> Self {
+        Self::ImplicitComposite(value.clone())
+    }
+}
+
 impl From<&CreateEnum> for TypeDefinition {
     fn from(value: &CreateEnum) -> Self {
         Self::Enum(value.clone())

@@ -177,6 +177,86 @@ mod test_cast_layers {
         assert!(!frozen.get_implicit_castable(&source).contains(&explicit));
     }
 
+    #[test]
+    fn loaded_casts_preserve_postgres_layer_shadowing_and_assignment_fallback() {
+        assert_loaded_cast_layer(crate::ast::Dialect::postgres());
+    }
+
+    #[cfg(feature = "sqlite")]
+    #[test]
+    fn loaded_casts_preserve_sqlite_layer_shadowing_and_assignment_fallback() {
+        assert_loaded_cast_layer(crate::ast::Dialect::sqlite());
+    }
+
+    fn assert_loaded_cast_layer(dialect: crate::ast::Dialect) {
+        use crate::sem::BaseParseContext;
+        use crate::test_helpers::TestParseContext;
+        use crate::types::compat::{
+            load_assignment_cast, load_explicit_cast, load_implicit_cast, load_reference,
+        };
+
+        let (mut child, source, shared, inherited) = test_helpers::cast_layer_with_dialect(dialect);
+        test_helpers::register(&mut child, &source, &shared, CastContext::explicit());
+        let environment = TestParseContext::default().with_dialect(dialect);
+        let context = crate::sem::SchemaFileContext::new(
+            std::path::Path::new("read.sql"),
+            &child.freeze(),
+            environment.get_args(),
+            environment.metadata(),
+        );
+
+        assert!(
+            load_implicit_cast(&context, &source, &shared)
+                .expect("complete endpoints")
+                .is_none()
+        );
+        let local = load_explicit_cast(&context, &source, &shared)
+            .expect("complete endpoints")
+            .expect("local explicit relationship");
+        assert_eq!(local.context(), crate::types::CastContext::explicit());
+        assert!(
+            local.source().same_type(
+                load_reference(&context, &source)
+                    .expect("loaded source")
+                    .as_ref()
+            )
+        );
+        assert!(
+            local.target().same_type(
+                load_reference(&context, &shared)
+                    .expect("loaded target")
+                    .as_ref()
+            )
+        );
+        let inherited_cast = load_implicit_cast(&context, &source, &inherited)
+            .expect("complete endpoints")
+            .expect("absent local pair inherits parent cast");
+        assert_eq!(
+            inherited_cast.context(),
+            crate::types::CastContext::from(
+                context
+                    .get_implicit_cast(&source, &inherited)
+                    .expect("legacy inherited cast")
+                    .context()
+            )
+        );
+        // Assignment falls back to the parent even though the explicit local
+        // relationship shadows the parent's implicit relationship.
+        let assignment = load_assignment_cast(&context, &source, &shared)
+            .expect("complete endpoints")
+            .expect("assignment fallback to parent");
+        assert_eq!(assignment.context(), crate::types::CastContext::implicit());
+        assert_eq!(
+            assignment.context(),
+            crate::types::CastContext::from(
+                context
+                    .get_assignment_cast(&source, &shared)
+                    .expect("legacy assignment fallback")
+                    .context()
+            )
+        );
+    }
+
     #[rstest::rstest]
     #[case::dot_scalar(
         crate::sem::FullName::with_schema("a.b", "c"),
@@ -242,7 +322,8 @@ mod test_cast_layers {
     mod test_helpers {
         use crate::TrieMap;
         use crate::sem::{
-            CastContext, CastDefinition, FullName, ParseContext, SchemaFileContext, TypeReference,
+            BaseParseContext, CastContext, CastDefinition, FullName, ParseContext,
+            SchemaFileContext, TypeReference,
         };
         use crate::test_helpers::TestParseContext;
         use std::path::Path;
@@ -257,14 +338,46 @@ mod test_cast_layers {
             TypeReference,
             TypeReference,
         ) {
-            let root = TestParseContext::default().freeze();
+            cast_layer_with_dialect(crate::ast::Dialect::postgres())
+        }
+
+        pub(super) fn cast_layer_with_dialect(
+            dialect: crate::ast::Dialect,
+        ) -> (
+            SchemaFileContext,
+            TypeReference,
+            TypeReference,
+            TypeReference,
+        ) {
+            let mut root = TestParseContext::default().with_dialect(dialect);
             let source = named_type("source");
             let shared = named_type("shared");
             let inherited = named_type("inherited");
-            let mut parent = crate::test_helpers::schema_layer(Path::new("parent.sql"), &root);
+            for reference in [&source, &shared, &inherited] {
+                root.set_get_type_impl_result(
+                    reference.full_name(),
+                    &crate::sem::TypeDefinition::from(&crate::sem::CreateEnum::new(
+                        reference.full_name(),
+                        &["value".to_owned()],
+                    )),
+                );
+            }
+            let environment = TestParseContext::default().with_dialect(dialect);
+            let root = root.freeze();
+            let mut parent = SchemaFileContext::new(
+                Path::new("parent.sql"),
+                &root,
+                environment.get_args(),
+                environment.metadata(),
+            );
             register(&mut parent, &source, &shared, CastContext::implicit());
             register(&mut parent, &source, &inherited, CastContext::implicit());
-            let child = crate::test_helpers::schema_layer(Path::new("child.sql"), &parent.freeze());
+            let child = SchemaFileContext::new(
+                Path::new("child.sql"),
+                &parent.freeze(),
+                environment.get_args(),
+                environment.metadata(),
+            );
             (child, source, shared, inherited)
         }
 

@@ -3,18 +3,23 @@ use crate::sem::{BaseParseContext, FullName, TypeDefinition};
 use crate::test_helpers::TestParseContext;
 
 #[rstest::rstest]
-#[case::fifteen(include_str!("../../../tests/fixtures/type_categories/15.json"))]
-#[case::sixteen(include_str!("../../../tests/fixtures/type_categories/16.json"))]
-#[case::seventeen(include_str!("../../../tests/fixtures/type_categories/17.json"))]
-#[case::eighteen(include_str!("../../../tests/fixtures/type_categories/18.json"))]
-fn oracle_samples_survive_loading_and_lookup(#[case] fixture: &str) {
-    #[derive(serde::Deserialize)]
-    struct Sample {
-        types: Vec<BuiltinTypeInfo>,
-    }
-    let sample: Sample = serde_json::from_str(fixture).unwrap();
+#[case::seventeen("17")]
+#[case::eighteen("18")]
+fn committed_catalogs_survive_loading_and_lookup(#[case] version: &str) {
+    let path = std::path::Path::new(env!("CARGO_MANIFEST_DIR"))
+        .join("../sql-fun-home/postgres")
+        .join(version)
+        .join("pg_type.json");
+    let catalog = std::fs::read_to_string(path).unwrap();
+    let records: Vec<BuiltinTypeInfo> = serde_json::from_str(&catalog).unwrap();
+    assert!(!records.is_empty());
     let mut context = TestParseContext::default();
-    for record in sample.types {
+    for record in records {
+        assert!(
+            record.category.is_some(),
+            "defined builtin: {}",
+            record.name
+        );
         let definition = TypeDefinition::from(&record);
         let name = FullName::with_schema("pg_catalog", &record.name);
         context.set_get_type_impl_result(&name, &definition);

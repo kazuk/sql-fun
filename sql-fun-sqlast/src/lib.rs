@@ -13,6 +13,7 @@ pub mod ast;
 pub mod engine_specific;
 pub mod sem;
 pub mod syn;
+pub mod types;
 
 mod identifier;
 mod parse_statements;

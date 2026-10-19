@@ -12,8 +12,8 @@ mod update;
 use crate::StringSpan;
 use crate::ast::{
     Access, BooleanExpr, BooleanOperator, Call, CallKind, Case, Cast, Dialect, Expr, Indirection,
-    Literal, Name, NullTest, OperatorExpr, OperatorKind, SqlValue, Subquery, SubqueryKind,
-    TypeName,
+    Literal, Name, NamedArgument, NullTest, OperatorExpr, OperatorKind, SqlValue, Subquery,
+    SubqueryKind, TypeName,
 };
 use crate::sem::{
     AliasName, AnalysisError, AnalysisProblem, ArithExpr, CaseExpr, CaseExprAnalysisContext,
@@ -113,6 +113,7 @@ impl Expr {
             Self::NullTest(test) => test.resolve(context, scope),
             Self::Cast(cast) => cast.resolve(context, scope),
             Self::Call(call) => call.resolve(context, scope),
+            Self::NamedArgument(argument) => argument.resolve(context, scope),
             Self::Grouping(arguments) => Self::resolve_grouping(arguments, context, scope),
             Self::Case(case) => case.resolve(context, scope),
             Self::Subquery(query) => query.resolve(context, scope),
@@ -147,7 +148,7 @@ impl Expr {
                 AnalysisError::raise_unexpected_input("unsupported raw scalar expression")
             }
             // Preserve existing explicit unimplemented markers as well.
-            Self::NamedArgument(_) | Self::Default | Self::Raise(_) | Self::InTable(_) => {
+            Self::Default | Self::Raise(_) | Self::InTable(_) => {
                 todo!("expression semantic analysis")
             }
         }
@@ -185,6 +186,27 @@ impl Expr {
             .as_ref()
             .map(|expression| expression.resolve_in(context, scope))
             .transpose()
+    }
+}
+
+impl Expr {
+    const fn is_named_argument(&self) -> bool {
+        matches!(self, Self::NamedArgument(_))
+    }
+}
+
+impl NamedArgument {
+    fn resolve(
+        &self,
+        context: &mut impl ParseContext,
+        scope: &ScalarAnalysisContext<'_>,
+    ) -> Result<SemScalarExpr, AnalysisError> {
+        let value = self.argument.resolve_in(context, scope)?;
+        Ok(SemScalarExpr::named_argument(
+            &self.name,
+            &value,
+            &self.location,
+        ))
     }
 }
 
@@ -490,6 +512,18 @@ impl CallKind {
 }
 
 impl Call {
+    fn defers_function_signature(&self) -> bool {
+        self.variadic || self.arguments.iter().any(Expr::is_named_argument)
+    }
+
+    fn resolve_supplied_call(
+        &self,
+        context: &mut impl ParseContext,
+        arguments: &[SemScalarExpr],
+    ) -> Result<FuncCallExpr, AnalysisError> {
+        FuncCallExpr::resolve_supplied(context, &self.name.full_name()?, arguments, &self.location)
+    }
+
     fn resolve_coalesce(
         &self,
         context: &mut impl ParseContext,
@@ -512,6 +546,11 @@ impl Call {
         scope: &ScalarAnalysisContext<'_>,
     ) -> Result<SemScalarExpr, AnalysisError> {
         let arguments = Expr::resolve_list(&self.arguments, context, scope)?;
+        if self.defers_function_signature() {
+            return Ok(SemScalarExpr::function_call(
+                &self.resolve_supplied_call(context, &arguments)?,
+            ));
+        }
         FuncCallExpr::resolve_common(
             context,
             &self.name.full_name()?,

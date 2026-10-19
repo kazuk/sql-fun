@@ -1,6 +1,7 @@
 mod alias;
 mod analyze;
 mod cte;
+mod deferred_fun;
 mod group;
 mod join_expr;
 mod join_kind;
@@ -18,6 +19,7 @@ pub(crate) use self::join_expr::JoinUsingClause;
 pub use self::{
     alias::{AliasName, AliasSpec},
     cte::CteDataSource,
+    deferred_fun::DeferredTableFunction,
     group::GroupedDataSource,
     join_expr::JoinExprDataSource,
     join_kind::JoinKind,
@@ -57,6 +59,8 @@ pub enum DataSource {
     SubQuery(Box<SubQueryDataSource>),
     /// table function
     CallTableFunc(TableFunctionDataSource),
+    /// Function name lookup is complete; signature and output columns are deferred.
+    DeferredTableFunc(DeferredTableFunction),
     /// table function as source but not found
     UndefinedTableFunc(UndefinedTableFuncDataSource),
     /// ROWS clause
@@ -117,7 +121,7 @@ impl DataSource {
                 ds.arguments(),
                 nullability,
             ),
-            Self::UndefinedTableFunc(_ds) => {
+            Self::UndefinedTableFunc(_) | Self::DeferredTableFunc(_) => {
                 ColumnReferenceExpr::unknown_function_source_ref(context, alias, column)
             }
             Self::RangeTableSample() => todo!(),
@@ -139,8 +143,9 @@ impl DataSource {
             Self::Group(d) => d.push_alias_names(names),
             Self::SubQuery(d) => d.push_alias_names(names),
             Self::CallTableFunc(d) => d.push_alias_names(names),
+            Self::DeferredTableFunc(d) => d.push_alias_names(names),
             Self::UndefinedTableFunc(d) => d.push_alias_names(names),
-            Self::RowFunctions(_data_source_row_functions) => todo!(),
+            Self::RowFunctions(functions) => names.extend(functions.get_aliases()),
             Self::RangeTableSample() => todo!(),
             Self::Unknown(_, alias) => names.push(alias.clone()),
         }
@@ -166,6 +171,7 @@ impl DataSource {
             Self::Group(d) => d.resolve_alias(self, name),
             Self::SubQuery(d) => d.resolve_alias(self, name),
             Self::CallTableFunc(d) => d.resolve_alias(self, name),
+            Self::DeferredTableFunc(d) => d.resolve_alias(self, name),
             Self::UndefinedTableFunc(d) => d.resolve_alias(self, name),
             Self::RangeTableSample() => todo!(),
             Self::Unknown(_, alias) => {
@@ -216,7 +222,7 @@ impl DataSource {
             Self::CallTableFunc(d) => {
                 d.get_aliases_for_column(column, context, with_clause, &mut result);
             }
-            Self::UndefinedTableFunc(_) => {}
+            Self::UndefinedTableFunc(_) | Self::DeferredTableFunc(_) => {}
             Self::RangeTableSample() => todo!(),
             Self::Unknown(_, _) => {}
             Self::RowFunctions(_) => todo!(),
@@ -275,6 +281,7 @@ impl DataSource {
             Self::Group(v) => v.walk(visitor)?,
             Self::SubQuery(v) => v.walk(visitor)?,
             Self::CallTableFunc(value) => value.walk(visitor)?,
+            Self::DeferredTableFunc(value) => value.walk(visitor)?,
             Self::UndefinedTableFunc(value) => value.walk(visitor)?,
             Self::RowFunctions(value) => value.walk(visitor)?,
             Self::RangeTableSample() | Self::Unknown(_, _) => {}

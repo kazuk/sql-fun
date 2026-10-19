@@ -39,7 +39,7 @@ pub use self::{
     constrained::ConstrainedExpr,
     context::ScalarAnalysisContext,
     exists::ExistsExpr,
-    func_call::{FuncCallExpr, FunctionBinding},
+    func_call::{FuncCallArgs, FuncCallExpr, FunctionBinding},
     grouping::{GroupingArgument, GroupingExpr},
     indirect::IndirectionExpr,
     min_max::MinMaxExpr,
@@ -167,6 +167,7 @@ impl SemScalarExpr {
             Self::FuncCall(value) => value.canonicalize_grouping_key(),
             Self::Arith(value) => value.canonicalize_grouping_key(),
             Self::Param(value) => value.canonicalize_grouping_key(),
+            Self::NamedArg(value) => value.canonicalize_grouping_key(),
             Self::Constrained(value) => value.canonicalize_grouping_key(),
             Self::ColumnRef(value) => value.canonicalize_grouping_key(),
             _ => {}
@@ -480,7 +481,7 @@ impl SemScalarExpr {
             Self::SqlValue(_sql_value_expr) => todo!(),
             Self::Param(_) => String::new(),
             Self::Constrained(value) => value.name().to_owned(),
-            Self::NamedArg(_named_arg_expr) => todo!(),
+            Self::NamedArg(named_arg_expr) => named_arg_expr.value().get_column_name(),
             Self::Indirection(_indirection_expr) => String::new(),
             Self::ImplicitCast(_implicit_cast_expr) => todo!(),
             Self::Array(_arr) => todo!(),
@@ -801,6 +802,7 @@ impl SemScalarExpr {
             Self::Grouping(v) => v.walk(visitor)?,
             Self::Array(v) => v.walk(visitor)?,
             Self::FuncCall(v) => v.walk(visitor)?,
+            Self::NamedArg(v) => v.walk(visitor)?,
             Self::Arith(v) => v.walk(visitor)?,
             Self::TypeCast(v) => v.walk(visitor)?,
             Self::Case(v) => v.walk(visitor)?,
@@ -819,7 +821,6 @@ impl SemScalarExpr {
             | Self::Collate(_)
             | Self::SqlValue(_)
             | Self::Param(_)
-            | Self::NamedArg(_)
             | Self::MergeAction
             | Self::Unexpected(_) => {}
         }
@@ -828,6 +829,24 @@ impl SemScalarExpr {
 }
 
 impl SemScalarExpr {
+    /// Preserve a supplied argument name without resolving a formal parameter.
+    pub fn named_argument(name: &str, value: &Self, span: &Option<crate::StringSpan>) -> Self {
+        Self::NamedArg(NamedArgExpr::new(name, value, span))
+    }
+    /// Function invocation retained independently of signature resolution.
+    pub const fn as_function_call(&self) -> Option<&FuncCallExpr> {
+        match self {
+            Self::FuncCall(value) => Some(value),
+            _ => None,
+        }
+    }
+    /// Supplied named argument, if this expression is an argument wrapper.
+    pub const fn as_named_argument(&self) -> Option<&NamedArgExpr> {
+        match self {
+            Self::NamedArg(value) => Some(value),
+            _ => None,
+        }
+    }
     pub(crate) fn needs_type_inference(&self) -> bool {
         self.constraint_node().is_some() && self.get_type().is_none()
     }

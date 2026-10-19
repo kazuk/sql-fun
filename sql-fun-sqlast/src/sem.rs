@@ -133,8 +133,8 @@ pub use self::{
     create_view::CreateView,
     cte::{CteName, CteStatement, WithClause},
     data_source::{
-        AliasSpec, DataSource, DataSourceRowFunctions, DataSourceRowsFromFunc, JoinKind,
-        MergeRecordDataSource, MergeRecordRole, Nullable,
+        AliasSpec, DataSource, DataSourceRowFunctions, DataSourceRowsFromFunc,
+        DeferredTableFunction, JoinKind, MergeRecordDataSource, MergeRecordRole, Nullable,
     },
     def_elem::{DefElemKey, DefElemList, analyze_def_elem_list},
     delete_statement::{
@@ -175,7 +175,7 @@ pub use self::{
     },
     scalar_expr::{
         ArithExpr, ArrayExpr, BooleanExpr, CaseExpr, CoalesceExpr, CollateExpr,
-        ColumnReferenceExpr, ConstrainedExpr, CteColumnRef, ExistsExpr, FuncCallExpr,
+        ColumnReferenceExpr, ConstrainedExpr, CteColumnRef, ExistsExpr, FuncCallArgs, FuncCallExpr,
         FunctionBinding, GroupingArgument, GroupingExpr, ImplicitCastExpr, IndirectionExpr,
         MergeRecordColumnRef, MinMaxExpr, NamedArgExpr, NullTestExpr, OutputColumnRef, ParamRef,
         ScalarAnalysisContext, ScalarConstExpr, SemScalarExpr, SqlValueExpr, SubLinkExpr,

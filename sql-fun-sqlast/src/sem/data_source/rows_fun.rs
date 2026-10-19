@@ -37,6 +37,11 @@ impl DataSourceRowFunctions {
         }
     }
 
+    /// Calls supplied to ROWS FROM, in written order.
+    pub const fn functions(&self) -> &IVec<DataSourceRowsFromFunc> {
+        &self.functions
+    }
+
     /// get alias name
     #[must_use]
     pub fn get_aliases(&self) -> Vec<AliasSpec> {
@@ -49,11 +54,23 @@ impl DataSourceRowFunctions {
 pub enum DataSourceRowsFromFunc {
     /// resolved table function call
     FuncCall(FullName, Vec<SemScalarExpr>, ColumnCollection),
+    /// Name lookup is complete, but signature and return columns are deferred.
+    DeferredFuncCall(crate::sem::FuncCallExpr),
     /// undefined table function call
     UndefinedFuncCall(FullName, Vec<SemScalarExpr>),
 }
 
 impl DataSourceRowsFromFunc {
+    pub(crate) fn deferred(call: &crate::sem::FuncCallExpr) -> Self {
+        Self::DeferredFuncCall(call.clone())
+    }
+    /// Preserved invocation when its signature is deferred.
+    pub const fn deferred_function(&self) -> Option<&crate::sem::FuncCallExpr> {
+        match self {
+            Self::DeferredFuncCall(call) => Some(call),
+            _ => None,
+        }
+    }
     pub(crate) fn resolve<C: crate::sem::ParseContext>(
         context: &mut C,
         name: &FullName,
@@ -134,6 +151,7 @@ impl DataSourceRowsFromFunc {
         visitor: &mut V,
     ) -> Result<(), AnalysisError> {
         match self {
+            Self::DeferredFuncCall(call) => call.walk(visitor)?,
             Self::FuncCall(_, arguments, _) | Self::UndefinedFuncCall(_, arguments) => {
                 for argument in arguments {
                     argument.walk(visitor)?;

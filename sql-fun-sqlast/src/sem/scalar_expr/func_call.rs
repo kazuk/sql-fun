@@ -19,15 +19,20 @@ mod implementation {
         #[serde(default)]
         candidates: Option<Vec<OverloadVariant>>,
         overload: Option<OverloadVariant>,
+        #[serde(default)]
+        signature_deferred: bool,
         args: IVec<FuncCallArgs>,
         #[serde(default)]
         modifiers: Box<crate::sem::FunctionModifiers>,
     }
 
+    /// A supplied argument, its call position, and any independently established formal association.
     #[derive(Debug, Clone, Eq, Hash, PartialEq, serde::Serialize, serde::Deserialize)]
     pub struct FuncCallArgs {
         arg_expr: SemScalarExpr,
         arg_definition: Option<FunctionParam>,
+        #[serde(default)]
+        position: usize,
     }
 
     /// Function identity and SQL modifiers for a parameter-dependent call.
@@ -82,6 +87,10 @@ mod implementation {
             overload: &Option<OverloadVariant>,
             args: &IVec<FuncCallArgs>,
         ) -> Self {
+            let mut positioned = Vec::new();
+            for argument in args {
+                positioned.push(argument.at_position(positioned.len()));
+            }
             Self {
                 func_name: func_name.clone(),
                 candidates: None,
@@ -91,13 +100,53 @@ mod implementation {
                     crate::sem::QueryNameResolution::not_found()
                 },
                 overload: overload.clone(),
-                args: args.clone(),
+                signature_deferred: false,
+                args: positioned.into(),
                 modifiers: Box::default(),
             }
         }
     }
 
+    #[cfg(test)]
+    mod test_supplied_arguments {
+        use super::{FuncCallArgs, FuncCallExpr};
+        use crate::sem::{FullName, FunctionParam, PgBuiltInType, ScalarConstExpr, SemScalarExpr};
+
+        #[test]
+        fn owning_call_assigns_positions_without_losing_known_associations() {
+            let value = SemScalarExpr::literal(&ScalarConstExpr::new_integer(1));
+            let formal = FunctionParam::new_input_param(
+                &Some("known".to_owned()),
+                &Some(PgBuiltInType::int4()),
+                &None,
+            );
+            let named = SemScalarExpr::named_argument("known", &value, &None);
+            let arguments = vec![
+                FuncCallArgs::new(&value, &None),
+                FuncCallArgs::new(&named, &Some(formal.clone())),
+            ]
+            .into();
+            let call = FuncCallExpr::new(&FullName::from_local_name("f"), &None, &arguments);
+            assert_eq!(call.args()[0].position(), 0);
+            assert_eq!(call.args()[0].supplied_name(), None);
+            assert_eq!(call.args()[1].position(), 1);
+            assert_eq!(call.args()[1].supplied_name(), Some("known"));
+            assert_eq!(call.args()[1].arg_definition(), &Some(formal));
+            assert_eq!(call.args()[1].value(), &value);
+            let restored: FuncCallExpr =
+                ::serde_json::from_str(&::serde_json::to_string(&call).unwrap()).unwrap();
+            assert_eq!(restored, call);
+        }
+    }
+
     impl FuncCallExpr {
+        pub(super) const fn defer_signature(&mut self) {
+            self.signature_deferred = true;
+        }
+        /// Whether signature binding is explicitly deferred, independently of name lookup.
+        pub const fn signature_is_deferred(&self) -> bool {
+            self.signature_deferred
+        }
         pub(crate) fn set_candidates(&mut self, candidates: Option<Vec<OverloadVariant>>) {
             self.candidates = candidates;
         }
@@ -138,21 +187,54 @@ mod implementation {
     }
 
     impl FuncCallArgs {
+        /// Preserve an expression and an already known formal association. The owning call assigns its position.
         pub fn new(arg_expr: &SemScalarExpr, arg_definition: &Option<FunctionParam>) -> Self {
             Self {
                 arg_expr: arg_expr.clone(),
                 arg_definition: arg_definition.clone(),
+                position: 0,
             }
         }
     }
 
     impl FuncCallArgs {
+        fn at_position(&self, position: usize) -> Self {
+            let mut arg = self.clone();
+            arg.position = position;
+            arg
+        }
+        /// Zero-based position in the supplied call, independent of a formal index or `$n`.
+        pub const fn position(&self) -> usize {
+            self.position
+        }
+        /// Optional supplied name. `None` identifies a positional argument.
+        pub fn supplied_name(&self) -> Option<&str> {
+            self.arg_expr
+                .as_named_argument()
+                .map(crate::sem::NamedArgExpr::name)
+        }
+        /// The value inside a named wrapper, or the positional expression itself.
+        pub fn value(&self) -> &SemScalarExpr {
+            self.arg_expr
+                .as_named_argument()
+                .map_or(&self.arg_expr, crate::sem::NamedArgExpr::value)
+        }
+        /// Source span of the supplied argument name, when reliably available.
+        pub const fn source_span(&self) -> Option<&crate::StringSpan> {
+            if let Some(named) = self.arg_expr.as_named_argument() {
+                named.source_span()
+            } else {
+                None
+            }
+        }
+        /// Supplied expression, including its named wrapper when present.
         pub const fn arg_expr(&self) -> &SemScalarExpr {
             &self.arg_expr
         }
     }
 
     impl FuncCallArgs {
+        /// Already established formal association; `None` does not imply an invalid argument.
         pub const fn arg_definition(&self) -> &Option<FunctionParam> {
             &self.arg_definition
         }
@@ -182,6 +264,48 @@ mod implementation {
 pub use self::implementation::{FuncCallArgs, FuncCallExpr, FunctionBinding};
 
 impl FuncCallExpr {
+    pub(crate) fn resolve_supplied(
+        context: &mut impl crate::sem::ParseContext,
+        name: &FullName,
+        arguments: &[SemScalarExpr],
+        span: &Option<crate::StringSpan>,
+    ) -> Result<Self, AnalysisError> {
+        let mut names = std::collections::HashSet::new();
+        let mut args = Vec::new();
+        for argument in arguments {
+            let position = args.len();
+            if let Some(named) = argument.as_named_argument() {
+                if !names.insert(named.name()) {
+                    context.report_analysis_problem(AnalysisProblem::call_argument(
+                        crate::sem::problem::CallArgumentProblem::duplicate_name(named.name()),
+                    ))?;
+                }
+            } else if !names.is_empty() {
+                context.report_analysis_problem(AnalysisProblem::call_argument(
+                    crate::sem::problem::CallArgumentProblem::positional_after_named(position),
+                ))?;
+            }
+            args.push(FuncCallArgs::new(argument, &None));
+        }
+        let found = context.get_function_by_name(name).is_some();
+        if !found {
+            context.report_analysis_problem(AnalysisProblem::function_not_found(
+                name,
+                &span.unwrap_or_else(|| crate::StringSpan::new(0, 0)),
+            ))?;
+        }
+        let mut call = Self::new(name, &None, &args.into());
+        call.set_name_resolution(if found {
+            crate::sem::QueryNameResolution::function(
+                &context.resolve_function_name_with_search_path(name),
+            )
+        } else {
+            crate::sem::QueryNameResolution::not_found()
+        });
+        call.defer_signature();
+        Ok(call)
+    }
+
     fn cast_operand_expression<TParseContext>(
         context: &mut TParseContext,
         func_name: &FullName,
@@ -566,6 +690,9 @@ impl FuncCallExpr {
         parameters: &mut crate::sem::parameter_resolution::ParameterResolution,
         context: &mut impl crate::sem::ParseContext,
     ) -> Result<Option<SemScalarExpr>, AnalysisError> {
+        if self.signature_is_deferred() {
+            return Ok(None);
+        }
         let (name, arguments) = self.inference_call();
         if !arguments
             .iter()

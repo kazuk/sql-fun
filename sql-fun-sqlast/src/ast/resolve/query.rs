@@ -551,6 +551,11 @@ impl Expr {
             Self::Call(call) => {
                 call.kind.require_table_function()?;
                 let arguments = Self::resolve_list(&call.arguments, context, scope)?;
+                if call.defers_function_signature() {
+                    let mut function = call.resolve_supplied_call(context, &arguments)?;
+                    function.set_modifiers(call.resolve_modifiers(context, scope)?);
+                    return Ok(crate::sem::DataSourceRowsFromFunc::deferred(&function));
+                }
                 crate::sem::DataSourceRowsFromFunc::resolve(
                     context,
                     &call.name.full_name()?,
@@ -590,6 +595,11 @@ impl Call {
         let alias = alias
             .map(Alias::resolve)
             .unwrap_or_else(|| AliasSpec::from_local_name(&name.local_name()));
+        if self.defers_function_signature() {
+            let mut call = self.resolve_supplied_call(context, &arguments)?;
+            call.set_modifiers(self.resolve_modifiers(context, scope)?);
+            return Ok(DataSource::deferred_table_function(&call, &alias));
+        }
         DataSource::resolve_function(context, &name, &arguments, &alias)
     }
 }

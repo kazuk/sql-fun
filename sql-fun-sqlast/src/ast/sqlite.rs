@@ -1003,6 +1003,7 @@ impl Call {
             kind: CallKind::ordinary(),
             name: Name::local(name),
             arguments: Vec::new(),
+            argument_locations: Vec::new(),
             star: false,
             distinct: false,
             variadic: false,

@@ -222,7 +222,8 @@ impl DataSource {
             Self::CallTableFunc(d) => {
                 d.get_aliases_for_column(column, context, with_clause, &mut result);
             }
-            Self::UndefinedTableFunc(_) | Self::DeferredTableFunc(_) => {}
+            Self::UndefinedTableFunc(_) => {}
+            Self::DeferredTableFunc(d) => d.push_alias_names(&mut result),
             Self::RangeTableSample() => todo!(),
             Self::Unknown(_, _) => {}
             Self::RowFunctions(_) => todo!(),

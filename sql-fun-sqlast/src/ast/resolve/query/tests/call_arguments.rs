@@ -306,3 +306,61 @@ fn grouping_matches_named_calls_at_different_source_locations() {
         context.reported_problems()
     );
 }
+
+#[rstest::rstest]
+#[case::unqualified("SELECT value FROM identity(arg => 1)")]
+#[case::qualified("SELECT identity.value FROM identity(arg => 1)")]
+#[case::aliased("SELECT value FROM identity(arg => 1) AS f")]
+fn retains_unknown_columns_from_deferred_functions(#[case] sql: &str) {
+    let (query, context) = resolve(sql, Dialect::postgres(), false).unwrap();
+    assert_eq!(context.reported_problem_count(), 0);
+    assert!(matches!(
+        projection(&query),
+        SemScalarExpr::ColumnRef(crate::sem::ColumnReferenceExpr::UndefinedFunction(_))
+    ));
+    assert!(projection(&query).get_type().is_none());
+}
+
+#[test]
+fn unknown_function_columns_remain_ambiguous_between_sources() {
+    let (query, context) = resolve(
+        "SELECT value FROM identity(arg => 1) AS f, identity(arg => 2) AS g",
+        Dialect::postgres(),
+        false,
+    )
+    .unwrap();
+    assert_eq!(context.reported_problem_count(), 1);
+    assert!(matches!(
+        projection(&query),
+        SemScalarExpr::ColumnRef(crate::sem::ColumnReferenceExpr::AmbiguousColumnRef(_))
+    ));
+}
+
+#[test]
+fn deferred_projection_cannot_establish_view_row_preservation() {
+    let (query, context) =
+        resolve("SELECT identity(arg => 1)", Dialect::postgres(), false).unwrap();
+    assert!(!projection(&query).preserves_view_rows(&context));
+}
+
+#[rstest::rstest]
+#[case::duplicate("SELECT identity(a => 1, a => 2)", "a")]
+#[case::quoted_duplicate(r#"SELECT identity("Arg" => 1, "Arg" => 2)"#, r#""Arg""#)]
+#[case::parameter("SELECT identity(a => 1, $2)", "$2")]
+fn call_diagnostics_identify_the_offending_argument(#[case] sql: &str, #[case] token: &str) {
+    let (_, context) = resolve(sql, Dialect::postgres(), false).unwrap();
+    let problem = &context.reported_problems()[0];
+    let span = problem.statement_relative_span().unwrap();
+    assert_eq!(span.get_from(sql), Some(token));
+    assert_eq!(span.offset(), sql.rfind(token).unwrap());
+}
+
+#[test]
+fn unanchored_positional_literals_do_not_get_fabricated_diagnostic_spans() {
+    let (_, context) = resolve("SELECT identity(a => 1, 2)", Dialect::postgres(), false).unwrap();
+    assert!(
+        context.reported_problems()[0]
+            .statement_relative_span()
+            .is_none()
+    );
+}

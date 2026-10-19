@@ -521,7 +521,13 @@ impl Call {
         context: &mut impl ParseContext,
         arguments: &[SemScalarExpr],
     ) -> Result<FuncCallExpr, AnalysisError> {
-        FuncCallExpr::resolve_supplied(context, &self.name.full_name()?, arguments, &self.location)
+        FuncCallExpr::resolve_supplied(
+            context,
+            &self.name.full_name()?,
+            arguments,
+            &self.argument_locations,
+            &self.location,
+        )
     }
 
     fn resolve_coalesce(

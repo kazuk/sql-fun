@@ -16,6 +16,17 @@ use std::collections::BTreeMap;
 #[case::unknown_string("greatest('2',1)", "int4", Some(true))]
 #[case::typed_null("least(NULL::integer,NULL)", "int4", Some(false))]
 #[case::preferred("greatest(1::numeric,2::float8,3::int4)", "float8", Some(true))]
+#[case::range("least(NULL::int4range,NULL::int4range)", "int4range", Some(false))]
+#[case::multirange(
+    "greatest(NULL::int4multirange,NULL::int4multirange)",
+    "int4multirange",
+    Some(false)
+)]
+#[case::vector(
+    "greatest(NULL::int2vector,NULL::int2vector)",
+    "int2vector",
+    Some(false)
+)]
 #[case::arrays("greatest('{1}'::int4[],'{2}'::int8[])", "_int8", Some(true))]
 #[case::nested("least(greatest(1,NULL),2.5)", "numeric", Some(true))]
 fn result_metadata_matches_postgres(

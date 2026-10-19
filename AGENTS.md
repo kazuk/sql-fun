@@ -88,6 +88,28 @@ for operational details.
   second strategy; propose a new strategy only when its technical advantage
   clearly outweighs its additional maintenance and conceptual cost.
 
+## Unplanned Problems and Change Authorization
+
+- Approval of an implementation plan authorizes only the work within that
+  plan. Discovering a pre-existing defect, missing shared capability, or
+  unexpected constraint does not authorize choosing or implementing a workaround
+  or fix outside that scope.
+- When such a problem is found, investigate and report concrete evidence,
+  reproduction conditions, affected existing consumers, and implications for
+  the approved plan. Surface repository-wide correctness risks promptly rather
+  than treating them only as obstacles to completing the current task.
+- Do not independently select, implement, or conceal an unplanned workaround,
+  fallback, shared-service modification, or unrelated bug fix, regardless of its
+  size or whether tests pass. Obtain an explicit maintainer decision on its
+  scope and approach before proceeding with that work.
+- If the approved task depends on the unresolved decision, pause the affected
+  implementation and request the decision; unaffected investigation or
+  explicitly authorized work may continue. Do not silently weaken acceptance
+  criteria or use a local workaround to bypass the decision.
+- This authorization boundary also applies during refactoring: the guidance
+  below to avoid preserving known bugs does not grant permission to fix
+  independently discovered, out-of-scope problems without approval.
+
 ## Crate Boundaries and Public APIs
 
 - Define processing-specific data structures in the crate responsible for that

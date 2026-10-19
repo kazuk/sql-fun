@@ -73,7 +73,13 @@ impl TypeDefinition {
     /// table definition reference
     #[must_use]
     pub fn table_ref(table_name: &TableName) -> Self {
-        let tr = TypeReference::from_full_name(table_name.full_name().clone());
+        Self::table_ref_with_array(table_name, false)
+    }
+
+    /// Reference a table row while retaining its array qualification.
+    #[must_use]
+    pub(crate) fn table_ref_with_array(table_name: &TableName, is_array: bool) -> Self {
+        let tr = TypeReference::concrete_type_ref(table_name.full_name(), is_array);
         Self::TableRef(table_name.clone(), tr)
     }
 

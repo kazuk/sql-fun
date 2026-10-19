@@ -145,6 +145,24 @@ pub fn load_assignment_sources<C: ParseContext>(
     Ok(Candidates::from_candidates(&candidates))
 }
 
+/// Load the target-type candidates enumerated as implicitly castable from a source.
+///
+/// Uses the selected catalog's `get_implicit_castable` operation directly, with
+/// the same complete-loading and empty-result contract as [`load_cast_sources`].
+/// The resulting candidates describe output types, not accepted source types.
+pub fn load_implicit_castable<C: ParseContext>(
+    context: &C,
+    source: &LegacyReference,
+) -> Result<TypeReference, ConversionError> {
+    let source = resolve_reference(context, source)?;
+    load_reference(context, &source)?;
+    let mut candidates = Vec::new();
+    for target in context.get_implicit_castable(&source) {
+        candidates.push(load_reference(context, &target)?);
+    }
+    Ok(Candidates::from_candidates(&candidates))
+}
+
 fn resolve_reference<C: ParseContext>(
     context: &C,
     reference: &LegacyReference,

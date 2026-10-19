@@ -1,7 +1,7 @@
 //! Legacy operator catalog adaptation; permanent operations live in `types`.
 
 use super::ConversionError;
-use super::signature::{component, polymorphic_link, resolved_reference};
+use super::function::{component, polymorphic_link, resolved_reference};
 use crate::sem::{
     OperatorDefinition, OperatorName, ParseContext, TypeReference as LegacyReference,
 };

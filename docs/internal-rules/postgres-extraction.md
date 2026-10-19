@@ -85,9 +85,10 @@ category is an additive optional field. Domain classification is retained throug
 serialization, independently of the existing domain identity/equality contract.
 
 Committed generations and the full extraction CLI support PostgreSQL 17/18.
-The category query and loader also have small oracle-derived samples for 15/16;
-these samples do not extend the CLI's supported version matrix. The fixture
-README records their provenance, and ordinary Rust tests need no live server.
+Automated category load/read round-trips use these existing committed catalogs;
+no separate oracle snapshots are maintained. PostgreSQL 15–18 behavior can be
+checked with small development-oracle queries without extending the CLI's
+supported version matrix or making ordinary Rust tests depend on live servers.
 
 ## Additive master definitions
 

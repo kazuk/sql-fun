@@ -269,14 +269,18 @@ pub trait BaseParseContext:
         .unwrap_or_else(|| fun_name.clone())
     }
 
-    /// canonicalize a type reference
+    /// Canonicalize a reference to the catalog key selected by the search path.
     fn canonicalize_type_ref(&self, type_ref: &TypeReference) -> Option<TypeReference> {
-        let type_def = self.get_type(type_ref.full_name())?;
-        type_def.full_name().map(|full_name| {
-            TypeReference::concrete_type_ref(full_name, type_ref.is_array().unwrap_or(false))
-        })
+        let full_name = self.resolve_type_name(type_ref.full_name())?;
+        Some(TypeReference::concrete_type_ref(
+            &full_name,
+            type_ref.is_array().unwrap_or(false),
+        ))
     }
 }
+
+#[cfg(test)]
+mod canonicalization_tests;
 
 /// Mutable diagnostic sink for semantic analysis.
 pub trait DiagnosticContext {

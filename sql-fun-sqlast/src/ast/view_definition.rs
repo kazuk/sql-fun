@@ -37,7 +37,10 @@ impl Expr {
                     &cast.target.name.full_name()?,
                     !cast.target.array_bounds.is_empty(),
                 );
-                if context.canonicalize_type_ref(&target).as_ref() == column.get_type() {
+                if let Some(source) = column.get_type()
+                    && let Some(source) = context.canonicalize_type_ref(source)
+                    && context.canonicalize_type_ref(&target).as_ref() == Some(&source)
+                {
                     Ok(Some(column))
                 } else {
                     Ok(None)

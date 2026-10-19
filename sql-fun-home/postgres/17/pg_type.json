@@ -1,326 +1,434 @@
 [
   {
+    "category": "B",
     "name": "bool"
   },
   {
+    "category": "U",
     "name": "bytea"
   },
   {
+    "category": "Z",
     "name": "char"
   },
   {
+    "category": "S",
     "name": "name"
   },
   {
+    "category": "N",
     "name": "int8"
   },
   {
+    "category": "N",
     "name": "int2"
   },
   {
+    "category": "A",
     "name": "int2vector"
   },
   {
+    "category": "N",
     "name": "int4"
   },
   {
+    "category": "N",
     "name": "regproc"
   },
   {
+    "category": "S",
     "name": "text"
   },
   {
+    "category": "N",
     "name": "oid"
   },
   {
+    "category": "U",
     "name": "tid"
   },
   {
+    "category": "U",
     "name": "xid"
   },
   {
+    "category": "U",
     "name": "cid"
   },
   {
+    "category": "A",
     "name": "oidvector"
   },
   {
+    "category": "P",
     "name": "pg_ddl_command"
   },
   {
+    "category": "U",
     "name": "json"
   },
   {
+    "category": "U",
     "name": "xml"
   },
   {
+    "category": "Z",
     "name": "pg_node_tree"
   },
   {
+    "category": "P",
     "name": "table_am_handler"
   },
   {
+    "category": "P",
     "name": "index_am_handler"
   },
   {
+    "category": "G",
     "name": "point"
   },
   {
+    "category": "G",
     "name": "lseg"
   },
   {
+    "category": "G",
     "name": "path"
   },
   {
+    "category": "G",
     "name": "box"
   },
   {
+    "category": "G",
     "name": "polygon"
   },
   {
+    "category": "G",
     "name": "line"
   },
   {
+    "category": "I",
     "name": "cidr"
   },
   {
+    "category": "N",
     "name": "float4"
   },
   {
+    "category": "N",
     "name": "float8"
   },
   {
+    "category": "X",
     "name": "unknown"
   },
   {
+    "category": "G",
     "name": "circle"
   },
   {
+    "category": "U",
     "name": "macaddr8"
   },
   {
+    "category": "N",
     "name": "money"
   },
   {
+    "category": "U",
     "name": "macaddr"
   },
   {
+    "category": "I",
     "name": "inet"
   },
   {
+    "category": "U",
     "name": "aclitem"
   },
   {
+    "category": "S",
     "name": "bpchar"
   },
   {
+    "category": "S",
     "name": "varchar"
   },
   {
+    "category": "D",
     "name": "date"
   },
   {
+    "category": "D",
     "name": "time"
   },
   {
+    "category": "D",
     "name": "timestamp"
   },
   {
+    "category": "D",
     "name": "timestamptz"
   },
   {
+    "category": "T",
     "name": "interval"
   },
   {
+    "category": "D",
     "name": "timetz"
   },
   {
+    "category": "V",
     "name": "bit"
   },
   {
+    "category": "V",
     "name": "varbit"
   },
   {
+    "category": "N",
     "name": "numeric"
   },
   {
+    "category": "U",
     "name": "refcursor"
   },
   {
+    "category": "N",
     "name": "regprocedure"
   },
   {
+    "category": "N",
     "name": "regoper"
   },
   {
+    "category": "N",
     "name": "regoperator"
   },
   {
+    "category": "N",
     "name": "regclass"
   },
   {
+    "category": "N",
     "name": "regtype"
   },
   {
+    "category": "P",
     "name": "record"
   },
   {
+    "category": "P",
     "name": "cstring"
   },
   {
+    "category": "P",
     "name": "any"
   },
   {
+    "category": "P",
     "name": "anyarray"
   },
   {
+    "category": "P",
     "name": "void"
   },
   {
+    "category": "P",
     "name": "trigger"
   },
   {
+    "category": "P",
     "name": "language_handler"
   },
   {
+    "category": "P",
     "name": "internal"
   },
   {
+    "category": "P",
     "name": "anyelement"
   },
   {
+    "category": "P",
     "name": "_record"
   },
   {
+    "category": "P",
     "name": "anynonarray"
   },
   {
+    "category": "U",
     "name": "uuid"
   },
   {
+    "category": "U",
     "name": "txid_snapshot"
   },
   {
+    "category": "P",
     "name": "fdw_handler"
   },
   {
+    "category": "U",
     "name": "pg_lsn"
   },
   {
+    "category": "P",
     "name": "tsm_handler"
   },
   {
+    "category": "Z",
     "name": "pg_ndistinct"
   },
   {
+    "category": "Z",
     "name": "pg_dependencies"
   },
   {
+    "category": "P",
     "name": "anyenum"
   },
   {
+    "category": "U",
     "name": "tsvector"
   },
   {
+    "category": "U",
     "name": "tsquery"
   },
   {
+    "category": "U",
     "name": "gtsvector"
   },
   {
+    "category": "N",
     "name": "regconfig"
   },
   {
+    "category": "N",
     "name": "regdictionary"
   },
   {
+    "category": "U",
     "name": "jsonb"
   },
   {
+    "category": "P",
     "name": "anyrange"
   },
   {
+    "category": "P",
     "name": "event_trigger"
   },
   {
+    "category": "R",
     "name": "int4range"
   },
   {
+    "category": "R",
     "name": "numrange"
   },
   {
+    "category": "R",
     "name": "tsrange"
   },
   {
+    "category": "R",
     "name": "tstzrange"
   },
   {
+    "category": "R",
     "name": "daterange"
   },
   {
+    "category": "R",
     "name": "int8range"
   },
   {
+    "category": "U",
     "name": "jsonpath"
   },
   {
+    "category": "N",
     "name": "regnamespace"
   },
   {
+    "category": "N",
     "name": "regrole"
   },
   {
+    "category": "N",
     "name": "regcollation"
   },
   {
+    "category": "R",
     "name": "int4multirange"
   },
   {
+    "category": "R",
     "name": "nummultirange"
   },
   {
+    "category": "R",
     "name": "tsmultirange"
   },
   {
+    "category": "R",
     "name": "tstzmultirange"
   },
   {
+    "category": "R",
     "name": "datemultirange"
   },
   {
+    "category": "R",
     "name": "int8multirange"
   },
   {
+    "category": "P",
     "name": "anymultirange"
   },
   {
+    "category": "P",
     "name": "anycompatiblemultirange"
   },
   {
+    "category": "Z",
     "name": "pg_brin_bloom_summary"
   },
   {
+    "category": "Z",
     "name": "pg_brin_minmax_multi_summary"
   },
   {
+    "category": "Z",
     "name": "pg_mcv_list"
   },
   {
+    "category": "U",
     "name": "pg_snapshot"
   },
   {
+    "category": "U",
     "name": "xid8"
   },
   {
+    "category": "P",
     "name": "anycompatible"
   },
   {
+    "category": "P",
     "name": "anycompatiblearray"
   },
   {
+    "category": "P",
     "name": "anycompatiblenonarray"
   },
   {
+    "category": "P",
     "name": "anycompatiblerange"
   }
 ]

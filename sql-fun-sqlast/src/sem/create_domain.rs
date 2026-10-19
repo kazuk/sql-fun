@@ -15,6 +15,8 @@ pub struct CreateDomain {
     owner: Option<crate::sem::OwnerSpecification>,
     type_ref: TypeReference,
     base_type: Option<FullName>,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    category: Option<crate::sem::TypeCategory>,
 }
 
 impl CreateDomain {
@@ -32,10 +34,19 @@ impl CreateDomain {
     pub(crate) fn new(type_ref: &TypeReference, base_type: &Option<FullName>) -> Self {
         Self {
             owner: None,
+            category: None,
             type_ref: type_ref.clone(),
             base_type: base_type.clone(),
         }
     }
+    pub(crate) const fn category(&self) -> Option<crate::sem::TypeCategory> {
+        self.category
+    }
+
+    pub(crate) const fn set_category(&mut self, category: Option<crate::sem::TypeCategory>) {
+        self.category = category;
+    }
+
     /// get name
     #[must_use]
     pub fn name(&self) -> &FullName {

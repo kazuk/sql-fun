@@ -12,9 +12,8 @@ use crate::{
     TrieMap,
     sem::{
         AnalysisError, BaseParseContext, CastDefinition, CreateTable, FullName, FunctionInfoRead,
-        FunctionOverloadCollection, GetSourcePathWithSpanOpt, IndexInfoRead, LocalName,
-        OperatorDefinition, SchemaName, SourcePathWithSpan, TypeDefinition, TypeReference,
-        ViewLike,
+        FunctionOverloadCollection, GetSourcePathWithSpanOpt, IndexInfoRead, OperatorDefinition,
+        SchemaName, SourcePathWithSpan, TypeDefinition, TypeReference, ViewLike,
         parse_context::{
             OperatorInfoRead, SearchPathRead, SequenceInfoRead, TableInfoRead, TypeInfoRead,
             ViewInfoRead,
@@ -42,7 +41,19 @@ pub struct BaseContext {
 #[derive(serde::Deserialize)]
 struct BuiltinTypeInfo {
     name: String,
+    #[serde(default)]
+    category: Option<crate::sem::TypeCategory>,
 }
+
+impl From<&BuiltinTypeInfo> for TypeDefinition {
+    fn from(info: &BuiltinTypeInfo) -> Self {
+        let name = FullName::with_schema("pg_catalog", &info.name);
+        Self::builtin_with_category(&name, info.category)
+    }
+}
+
+#[cfg(test)]
+mod test_type_categories;
 
 impl BaseContext {
     /// Initialize builtin schema information with the caller's selected metadata.
@@ -101,16 +112,19 @@ impl BaseContext {
         paths: &PostgresBuiltinPaths,
     ) -> Result<TrieMap<TypeDefinition>, AnalysisError> {
         let builtin_types_path = paths.types()?;
-        let builtin_types: Vec<BuiltinTypeInfo> =
-            serde_json::from_reader(BufReader::new(File::open(builtin_types_path)?))?;
+        let builtin_types: Vec<BuiltinTypeInfo> = serde_json::from_reader(BufReader::new(
+            File::open(&builtin_types_path)?,
+        ))
+        .map_err(|error| {
+            AnalysisError::unexpected_input_error(&format!(
+                "invalid type catalog {}: {error}",
+                builtin_types_path.display()
+            ))
+        })?;
         let mut builtin_type_data = TrieMap::new();
         for builtin_type in builtin_types {
-            let full_name = FullName::new(
-                &None,
-                &Some(SchemaName::from("pg_catalog")),
-                &LocalName::from(&builtin_type.name),
-            );
-            let type_definition = TypeDefinition::builtin(&full_name);
+            let type_definition = TypeDefinition::from(&builtin_type);
+            let full_name = type_definition.full_name().expect("catalog type identity");
             builtin_type_data.insert(&full_name.to_string(), type_definition);
         }
         Ok(builtin_type_data)

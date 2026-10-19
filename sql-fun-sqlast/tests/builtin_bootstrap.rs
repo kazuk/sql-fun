@@ -43,7 +43,13 @@ fn loads_builtin_and_user_schemas(#[case] version: &str) -> Result<(), Box<dyn s
     let user_schema = tempfile::NamedTempFile::new()?;
     std::fs::write(
         user_schema.path(),
-        "CREATE TABLE hoge (id int PRIMARY KEY); SELECT abs(id) + 1 AS next_id FROM hoge;",
+        "CREATE TABLE hoge (id int PRIMARY KEY);
+         CREATE TYPE mood AS ENUM ('ok');
+         CREATE TYPE pair AS (x integer);
+         CREATE DOMAIN number AS integer;
+         CREATE DOMAIN nested_number AS number;
+         CREATE DOMAIN numbers AS integer[];
+         SELECT abs(id) + 1 AS next_id FROM hoge;",
     )?;
     let parsed = {
         let analysis_base = builtins.base_context();
@@ -56,6 +62,26 @@ fn loads_builtin_and_user_schemas(#[case] version: &str) -> Result<(), Box<dyn s
         )
     }?;
     assert_master_reads(parsed.base_context());
+    // This existing bootstrap test intentionally uses the real catalog/schema loader.
+    for (name, code) in [
+        ("hoge", 'C'),
+        ("mood", 'E'),
+        ("pair", 'C'),
+        ("number", 'N'),
+        ("nested_number", 'N'),
+        ("numbers", 'A'),
+    ] {
+        let definition = parsed
+            .get_type(&FullName::from_local_name(name))
+            .expect("DDL type");
+        assert_eq!(
+            definition
+                .category(&parsed)
+                .map(sql_fun_sqlast::sem::TypeCategory::code),
+            Some(code)
+        );
+    }
+
     let user_table = TableName::from(FullName::with_schema("public", "hoge"));
     assert!(
         parsed.get_table(&user_table).is_some(),

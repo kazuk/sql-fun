@@ -1,8 +1,9 @@
+mod category;
 mod concrete_type;
 mod dynamic_type;
 mod type_ref;
 
-pub use self::type_ref::TypeReference;
+pub use self::{category::TypeCategory, type_ref::TypeReference};
 
 use crate::sem::{
     ColumnCollection, ColumnName, CreateCompositeType, CreateDomain, CreateEnum, FullName,
@@ -19,14 +20,50 @@ pub enum TypeDefinition {
     /// a domain type
     Domain(CreateDomain),
     /// a builtin type
-    Builtin(TypeReference),
+    Builtin(BuiltinTypeDefinition),
     /// table
     TableRef(TableName, TypeReference),
     /// implicit composite type
     ImplicitComposite(ColumnCollection),
 }
 
+/// Catalog-loaded nominal type and its optional PostgreSQL classification.
+/// The flattened reference retains the existing serialized reference shape.
+#[derive(Debug, Clone, Eq, Hash, PartialEq, serde::Serialize, serde::Deserialize)]
+pub struct BuiltinTypeDefinition {
+    #[serde(flatten)]
+    reference: TypeReference,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    category: Option<TypeCategory>,
+}
+
 impl TypeDefinition {
+    /// Construct a catalog type without inferring classification from its name.
+    pub fn builtin_with_category(full_name: &FullName, category: Option<TypeCategory>) -> Self {
+        Self::Builtin(BuiltinTypeDefinition {
+            reference: TypeReference::concrete_type_ref(full_name, false),
+            category,
+        })
+    }
+
+    /// PostgreSQL classification from catalog metadata or verified DDL semantics.
+    ///
+    /// Missing metadata, unresolved domains, and non-PostgreSQL contexts
+    /// return `None`, distinct from the PostgreSQL codes `X` and `U`.
+    pub fn category(&self, context: &impl crate::sem::BaseParseContext) -> Option<TypeCategory> {
+        if crate::ast::Dialect::from(context.metadata()) != crate::ast::Dialect::postgres() {
+            return None;
+        }
+        match self {
+            Self::Builtin(definition) => definition.category,
+            Self::Enum(_) => TypeCategory::try_from('E').ok(),
+            Self::CompositeType(_) | Self::TableRef(_, _) | Self::ImplicitComposite(_) => {
+                TypeCategory::try_from('C').ok()
+            }
+            Self::Domain(definition) => definition.category(),
+        }
+    }
+
     pub(crate) const fn is_builtin(&self) -> bool {
         matches!(self, Self::Builtin(_))
     }
@@ -64,7 +101,7 @@ impl TypeDefinition {
             Self::Enum(_) => Some(false),
             Self::CompositeType(_) => Some(false),
             Self::Domain(create_domain) => create_domain.type_ref().is_array(),
-            Self::Builtin(type_reference) => type_reference.is_array(),
+            Self::Builtin(definition) => definition.reference.is_array(),
             Self::TableRef(_, type_reference) => type_reference.is_array(),
             Self::ImplicitComposite(_) => Some(false),
         }
@@ -81,7 +118,7 @@ impl TypeDefinition {
     #[must_use]
     pub fn type_reference(&self) -> Option<&TypeReference> {
         match self {
-            Self::Builtin(tr) => Some(tr),
+            Self::Builtin(definition) => Some(&definition.reference),
             Self::Domain(ct) => Some(ct.type_ref()),
             Self::CompositeType(ct) => ct.type_ref().as_ref(),
             Self::TableRef(_, tr) => Some(tr),
@@ -96,7 +133,7 @@ impl TypeDefinition {
             Self::Enum(create_enum) => Some(create_enum.name()),
             Self::CompositeType(create_composite_type) => create_composite_type.name(),
             Self::Domain(create_domain) => Some(create_domain.name()),
-            Self::Builtin(tr) => Some(tr.full_name()),
+            Self::Builtin(definition) => Some(definition.reference.full_name()),
             Self::TableRef(t, _) => Some(t.full_name()),
             Self::ImplicitComposite(_) => todo!(),
         }
@@ -105,7 +142,7 @@ impl TypeDefinition {
     /// get builtin type by name
     #[must_use]
     pub fn builtin(full_name: &FullName) -> Self {
-        Self::Builtin(TypeReference::concrete_type_ref(full_name, false))
+        Self::builtin_with_category(full_name, None)
     }
 
     /// check type compatibility

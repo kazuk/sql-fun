@@ -1,6 +1,7 @@
 select coalesce(
   json_agg(
-    json_build_object('name', t.typname)
+    json_build_object('name', t.typname, 'category',
+      case when t.typisdefined then t.typcategory::text else null end)
     order by t.oid
   ),
   '[]'::json

@@ -8,6 +8,13 @@ use crate::TrieMap;
 use super::{SchemaCatalog, SchemaFileContext};
 
 impl TypeInfoRead for SchemaCatalog {
+    fn builtin_type_category(&self, name: &FullName) -> Option<(char, bool)> {
+        self.base.builtin_type_category(name)
+    }
+    fn builtin_type_ordered(&self, name: &FullName) -> bool {
+        self.base.builtin_type_ordered(name)
+    }
+
     fn get_type_impl(&self, key: &FullName) -> Option<&TypeDefinition> {
         self.types.get_type_impl(key, &self.base)
     }
@@ -22,6 +29,13 @@ impl TypeInfoRead for SchemaCatalog {
 }
 
 impl TypeInfoRead for SchemaFileContext {
+    fn builtin_type_category(&self, name: &FullName) -> Option<(char, bool)> {
+        self.catalog.builtin_type_category(name)
+    }
+    fn builtin_type_ordered(&self, name: &FullName) -> bool {
+        self.catalog.builtin_type_ordered(name)
+    }
+
     fn get_type_impl(&self, key: &FullName) -> Option<&TypeDefinition> {
         self.catalog.get_type_impl(key)
     }

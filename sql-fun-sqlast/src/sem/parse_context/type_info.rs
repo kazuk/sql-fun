@@ -8,6 +8,18 @@ pub trait TypeInfoRead {
     /// get type by name
     fn get_type_impl(&self, key: &FullName) -> Option<&TypeDefinition>;
 
+    /// PostgreSQL category and preferred-type flag for an exact builtin identity.
+    /// Missing facts must not be interpreted as a user-defined category.
+    fn builtin_type_category(&self, _name: &FullName) -> Option<(char, bool)> {
+        None
+    }
+
+    /// Whether a builtin has a default B-tree comparison implementation,
+    /// including PostgreSQL binary-compatible operator-class input types.
+    fn builtin_type_ordered(&self, _name: &FullName) -> bool {
+        false
+    }
+
     /// get item type for array type
     fn get_array_item_type(&self, type_name: &TypeReference) -> Option<TypeReference>;
 }

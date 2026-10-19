@@ -508,7 +508,14 @@ impl CallKind {
         }
         match self {
             Self::Coalesce => call.resolve_coalesce(context, scope),
-            Self::MinMax => todo!("min/max semantic analysis"),
+            Self::MinMax => {
+                let arguments = Expr::resolve_list(&call.arguments, context, scope)?;
+                crate::sem::MinMaxExpr::resolve(
+                    context,
+                    call.name.full_name()?.name().as_str(),
+                    &arguments,
+                )
+            }
             Self::Ordinary => call.resolve_ordinary(context, scope),
         }
     }

@@ -53,6 +53,11 @@ impl CreateDomain {
         self.type_ref.full_name()
     }
 
+    /// Resolved base type of this domain, when lookup succeeded.
+    pub(crate) const fn base_type(&self) -> Option<&FullName> {
+        self.base_type.as_ref()
+    }
+
     /// get base type reference
     #[must_use]
     pub const fn type_ref(&self) -> &TypeReference {

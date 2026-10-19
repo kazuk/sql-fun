@@ -291,6 +291,133 @@ impl ParameterResolution {
         Ok(result)
     }
 
+    pub(crate) fn min_max(
+        &mut self,
+        context: &mut impl crate::sem::ParseContext,
+        operation: &str,
+        arguments: &[SemScalarExpr],
+    ) -> Result<(usize, InputTypeConstraint), AnalysisError> {
+        use crate::sem::MinMaxExpr;
+        let mut choices = std::collections::HashSet::new();
+        for argument in arguments {
+            if let Some(ty) = MinMaxExpr::input_type(argument)
+                && ty != MinMaxExpr::unknown()
+            {
+                choices.insert(ty.clone());
+                choices.extend(context.get_implicit_castable(&MinMaxExpr::base_type(context, &ty)));
+            }
+            if let Some(node) = argument.constraint_node()
+                && let Some(types) = self.graph.domain(node).admissible_types()
+            {
+                choices.extend(types.iter().cloned());
+            }
+        }
+        // A wholly unknown PostgreSQL common-type expression resolves to text.
+        // Keep admissible source types (e.g. varchar) separate from that target.
+        if choices.is_empty() {
+            let target = crate::sem::PgBuiltInType::text();
+            for argument in arguments {
+                self.require(context, argument, &target, false);
+            }
+            let domain = InputTypeConstraint::exact(&target);
+            return Ok((self.graph.node(&domain), domain));
+        }
+        for target in choices.clone() {
+            choices.extend(context.cast_sources(&target, false));
+        }
+        let choices = InputTypeConstraint::types(choices);
+        let mut nodes = Vec::new();
+        let mut domains = Vec::new();
+        for argument in arguments {
+            let node = if let Some(node) = argument.constraint_node() {
+                self.graph.restrict(node, &choices);
+                node
+            } else {
+                self.graph.node(
+                    &MinMaxExpr::input_type(argument)
+                        .as_ref()
+                        .map(InputTypeConstraint::exact)
+                        .unwrap_or_else(InputTypeConstraint::any),
+                )
+            };
+            domains.push(self.graph.domain(node).clone());
+            nodes.push(node);
+        }
+        let mut candidate = nodes[0];
+        let mut candidate_types = domains[0].clone();
+        // A chain of binary selection relations keeps growth polynomial in the
+        // type universe instead of enumerating every argument tuple. Conversion
+        // checks relate each original input to the final candidate below.
+        for (input, domain) in nodes.iter().zip(&domains).skip(1) {
+            let mut alternatives = Vec::new();
+            let mut targets = Vec::new();
+            for left in candidate_types.admissible_types().unwrap_or(&[]) {
+                for right in domain.admissible_types().unwrap_or(&[]) {
+                    let selected = if left == right {
+                        Ok(left.clone())
+                    } else {
+                        MinMaxExpr::next_candidate(
+                            context,
+                            &MinMaxExpr::base_type(context, left),
+                            &MinMaxExpr::base_type(context, right),
+                        )
+                    };
+                    if let Ok(target) = selected {
+                        alternatives.push(SignatureAlternative::new(&[
+                            InputTypeConstraint::exact(left),
+                            InputTypeConstraint::exact(right),
+                            InputTypeConstraint::exact(&target),
+                        ]));
+                        targets.push(target);
+                    }
+                }
+            }
+            candidate_types = InputTypeConstraint::types(targets);
+            let next = self.graph.node(&candidate_types);
+            self.graph
+                .overload(&[candidate, *input, next], &alternatives, operation);
+            candidate = next;
+        }
+        let mut alternatives = Vec::new();
+        let mut targets = Vec::new();
+        for source in candidate_types.admissible_types().unwrap_or(&[]) {
+            let target = if *source == MinMaxExpr::unknown() {
+                crate::sem::PgBuiltInType::text()
+            } else {
+                source.clone()
+            };
+            if MinMaxExpr::ordered(context, &target) {
+                targets.push(target.clone());
+                alternatives.push(SignatureAlternative::new(&[
+                    InputTypeConstraint::exact(source),
+                    InputTypeConstraint::exact(&target),
+                ]));
+            }
+        }
+        let domain = InputTypeConstraint::types(targets);
+        let result = self.graph.node(&domain);
+        self.graph
+            .overload(&[candidate, result], &alternatives, operation);
+        for (node, input) in nodes.iter().zip(&domains) {
+            let mut alternatives = Vec::new();
+            for target in domain.admissible_types().unwrap_or(&[]) {
+                let sources = input
+                    .admissible_types()
+                    .unwrap_or(&[])
+                    .iter()
+                    .filter(|source| MinMaxExpr::can_coerce(context, source, target))
+                    .cloned();
+                alternatives.push(SignatureAlternative::new(&[
+                    InputTypeConstraint::types(sources),
+                    InputTypeConstraint::exact(target),
+                ]));
+            }
+            self.graph
+                .overload(&[*node, result], &alternatives, operation);
+        }
+        Ok((result, domain))
+    }
+
     pub(crate) fn scalar_result(&mut self, value: &SemScalarExpr) -> Option<SemScalarExpr> {
         let source = self.completed.scalar_node()?;
         let result = self.operation(

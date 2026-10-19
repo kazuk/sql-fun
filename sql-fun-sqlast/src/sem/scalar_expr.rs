@@ -164,6 +164,7 @@ impl SemScalarExpr {
     pub(super) fn canonicalize_grouping_key(&mut self) {
         match self {
             Self::Grouping(value) => value.canonicalize_grouping_key(),
+            Self::MinMax(value) => value.canonicalize_grouping_key(),
             Self::FuncCall(value) => value.canonicalize_grouping_key(),
             Self::Arith(value) => value.canonicalize_grouping_key(),
             Self::Param(value) => value.canonicalize_grouping_key(),
@@ -323,6 +324,7 @@ impl SemScalarExpr {
         match self {
             Self::Param(value) => Some(value.node()),
             Self::Constrained(value) => Some(value.node()),
+            Self::MinMax(value) => value.node(),
             _ => None,
         }
     }
@@ -332,6 +334,17 @@ impl SemScalarExpr {
         constraint: &crate::sem::InputTypeConstraint,
     ) -> Self {
         Self::Param(ParamRef::new(position, node, constraint))
+    }
+    /// PostgreSQL GREATEST/LEAST semantics, when this is a MinMax expression.
+    pub const fn as_min_max(&self) -> Option<&MinMaxExpr> {
+        if let Self::MinMax(value) = self {
+            Some(value)
+        } else {
+            None
+        }
+    }
+    pub(crate) fn min_max(value: &MinMaxExpr) -> Self {
+        Self::MinMax(value.clone())
     }
     pub(crate) fn constrained(value: &ConstrainedExpr) -> Self {
         Self::Constrained(value.clone())
@@ -476,7 +489,7 @@ impl SemScalarExpr {
             Self::NullTest(_null_test_expr) => String::new(),
             Self::SubLink(_) | Self::Exists(_) => String::new(),
             Self::Coalesce(_coalesce_expr) => String::new(),
-            Self::MinMax(_min_max_expr) => todo!(),
+            Self::MinMax(value) => value.operation().to_owned(),
             Self::Collate(_collate_expr) => todo!(),
             Self::SqlValue(_sql_value_expr) => todo!(),
             Self::Param(_) => String::new(),
@@ -811,13 +824,13 @@ impl SemScalarExpr {
             Self::SubLink(v) => v.walk(visitor)?,
             Self::Exists(value) => value.walk(visitor)?,
             Self::Coalesce(v) => v.walk(visitor)?,
+            Self::MinMax(v) => v.walk(visitor)?,
             Self::Constrained(v) => v.walk(visitor)?,
             Self::Indirection(v) => v.walk(visitor)?,
             Self::ImplicitCast(v) => v.walk(visitor)?,
             Self::List(v) => v.walk(visitor)?,
             Self::Const(_)
             | Self::ColumnRef(_)
-            | Self::MinMax(_)
             | Self::Collate(_)
             | Self::SqlValue(_)
             | Self::Param(_)
@@ -860,6 +873,7 @@ impl SemScalarExpr {
         match self {
             Self::Param(value) => value.apply_constraints(constraints),
             Self::Constrained(value) => value.apply_constraints(constraints),
+            Self::MinMax(value) => value.apply_constraints(constraints),
             _ => {}
         }
     }
@@ -881,6 +895,10 @@ impl SemScalarExpr {
             Self::Exists(_) => None,
             Self::Case(value) => {
                 value.collect_constraints(parameters);
+                None
+            }
+            Self::MinMax(value) => {
+                value.collect_constraints(parameters, context)?;
                 None
             }
             Self::Coalesce(value) => {

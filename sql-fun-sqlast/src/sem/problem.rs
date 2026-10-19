@@ -9,6 +9,7 @@ mod creation;
 mod delete;
 mod index;
 mod insert;
+mod min_max;
 mod name_resolution;
 mod overload_resolution;
 mod ownership;
@@ -39,6 +40,7 @@ pub use self::creation::CreationProblem;
 pub use self::delete::{DeleteProblem, DeleteProblemKind};
 pub use self::index::{IndexProblem, IndexProblemKind};
 pub use self::insert::{InsertProblem, InsertProblemKind};
+pub use self::min_max::MinMaxProblem;
 pub use self::name_resolution::{DomainBaseTypeNameNotFound, NameResolution};
 pub use self::ownership::OwnershipProblem;
 pub use self::parameter_constraint::ParameterConstraintProblem;
@@ -88,6 +90,8 @@ pub enum AnalysisProblem {
     Index(IndexProblem),
     /// An ALTER COLUMN binding or attribute is invalid.
     AlterColumn(ColumnAttributeProblem),
+    /// Invalid PostgreSQL GREATEST/LEAST common type or comparison capability.
+    MinMax(MinMaxProblem),
     /// A function invocation has an invalid argument order or repeated name.
     CallArgument(CallArgumentProblem),
     /// A creation conflicts with an existing catalog identity.
@@ -313,6 +317,10 @@ impl AnalysisProblem {
             _ => None,
         }
     }
+    /// Report a PostgreSQL GREATEST/LEAST semantic failure.
+    pub(crate) const fn min_max(problem: MinMaxProblem) -> Self {
+        Self::MinMax(problem)
+    }
     /// Report conflicting or invalid SQL-derived parameter requirements.
     pub fn parameter_constraint(message: &str) -> Self {
         Self::ParameterConstraint(ParameterConstraintProblem::new(message))
@@ -334,6 +342,7 @@ impl AnalysisProblem {
             Self::Delete(problem) => problem.code(),
             Self::Query(problem) => problem.code(),
             Self::CallArgument(problem) => problem.code(),
+            Self::MinMax(problem) => problem.code(),
             Self::ParameterConstraint(problem) => problem.code(),
             Self::NameResolution(problem) => problem.code(),
             Self::OverloadResolution(problem) => problem.code(),
@@ -394,6 +403,7 @@ impl AnalysisProblem {
             Self::Query(problem) => problem.render_report(&report_handler, source)?,
             Self::CallArgument(problem) => problem.render_report(&report_handler, source)?,
             Self::NameResolution(nr) => nr.render_report(&report_handler, source)?,
+            Self::MinMax(problem) => problem.render_report(&report_handler, source)?,
             Self::ParameterConstraint(problem) => problem.render_report(&report_handler, source)?,
             _ => todo!(),
         };

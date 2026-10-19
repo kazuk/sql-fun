@@ -1,5 +1,6 @@
 //! Parameter inference over the name-resolved semantic tree.
 use crate::ast::Dialect;
+use crate::sem::overload_rank::OverloadRank;
 use crate::sem::{
     AnalysisError, BaseParseContext, ConstrainedExpr, ConstraintGraph, InputTypeConstraint,
     ParameterConstraints, SemScalarExpr, SignatureAlternative, TypeReference,
@@ -413,13 +414,8 @@ impl Signature {
         catalog: &impl BaseParseContext,
         source: &TypeReference,
         index: usize,
-    ) -> Option<i32> {
-        Some(
-            catalog
-                .get_implicit_cast(source, &self.inputs[index])?
-                .context()
-                .overload_priority_score(),
-        )
+    ) -> Option<OverloadRank> {
+        OverloadRank::argument(catalog, Some(source), Some(&self.inputs[index]))
     }
 
     fn result_alternative(&self, inputs: &[InputTypeConstraint]) -> SignatureAlternative {
@@ -506,7 +502,7 @@ impl SourcePartition {
             for signature in signatures {
                 sources.extend(signature.source_types(catalog, index));
             }
-            let mut groups = BTreeMap::<Vec<Option<i32>>, Vec<TypeReference>>::new();
+            let mut groups = BTreeMap::<Vec<Option<OverloadRank>>, Vec<TypeReference>>::new();
             for source in sources {
                 if !input.allows(&source) {
                     continue;
@@ -527,7 +523,7 @@ impl SourcePartition {
         choices
     }
 
-    fn new(scores: &[Option<i32>], types: &[TypeReference]) -> Self {
+    fn new(scores: &[Option<OverloadRank>], types: &[TypeReference]) -> Self {
         Self {
             scores: OverloadScores::new(scores),
             domain: InputTypeConstraint::types(types.to_vec()),
@@ -545,15 +541,15 @@ impl SourcePartition {
     }
 }
 
-struct OverloadScores(Vec<Option<i32>>);
+struct OverloadScores(Vec<Option<OverloadRank>>);
 
 impl OverloadScores {
-    fn new(scores: &[Option<i32>]) -> Self {
+    fn new(scores: &[Option<OverloadRank>]) -> Self {
         Self(scores.to_vec())
     }
 
     fn initial(count: usize) -> Self {
-        Self(vec![Some(0); count])
+        Self(vec![Some(OverloadRank::default()); count])
     }
 
     fn add(&self, previous: &Self) -> Self {

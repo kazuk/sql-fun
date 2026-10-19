@@ -344,9 +344,9 @@ impl FuncCallExpr {
         let mut args = Vec::new();
         for (index, arg) in arg_exprs.iter().enumerate() {
             let mut arg = arg.clone();
-            let arg_def = overload.get_arg_def_at(index);
+            let arg_def = overload.call_argument(index);
             if let Some(arg_definition) = arg_def
-                && let Some(arg_def_type) = arg_definition.get_type()
+                && let Some(arg_def_type) = arg_definition.call_argument_type()
                 && let Some(arg_val_type) = arg.get_type()
             {
                 let Some(t) = context.get_type(arg_def_type.full_name()) else {
@@ -354,18 +354,9 @@ impl FuncCallExpr {
                         "type {arg_def_type} not found in context"
                     ))?
                 };
-                let Some(vt) = context.get_type(arg_val_type.full_name()) else {
-                    AnalysisError::raise_unexpected_input(&format!(
-                        "type {arg_val_type} not found in context"
-                    ))?
-                };
-
-                if let Some(source_type) = vt.type_reference()
-                    && let Some(target_type) = t.type_reference()
-                    && let Some(cast) = context.get_implicit_cast(source_type, target_type)
-                {
+                if let Some(cast) = context.get_implicit_cast(&arg_val_type, &arg_def_type) {
                     if !cast.is_no_conversion() {
-                        arg = SemScalarExpr::wrap_implicit_cast(target_type, &arg);
+                        arg = SemScalarExpr::wrap_implicit_cast(&arg_def_type, &arg);
                     }
                 } else {
                     context.report_analysis_problem(

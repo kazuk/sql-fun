@@ -28,8 +28,8 @@ pub use self::context::{TypeContext, TypeContextRead};
 pub use self::domain::DomainType;
 pub use self::enumeration::EnumType;
 pub use self::function::{
-    DefaultExpression, FunctionOverloads, FunctionParameter, FunctionReadError, FunctionResult,
-    FunctionSignature, ParameterMode, PseudoType,
+    CallArgument, DefaultExpression, FunctionCallMatches, FunctionOverloads, FunctionParameter,
+    FunctionReadError, FunctionResult, FunctionSignature, ParameterMode, PseudoType,
 };
 
 pub use self::polymorphic::{

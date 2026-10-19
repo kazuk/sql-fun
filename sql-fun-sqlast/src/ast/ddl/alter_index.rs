@@ -158,7 +158,11 @@ impl Index {
 // TypeName. Here they are parameter values, not references to database types.
 impl TypeName {
     fn index_option_word(&self) -> String {
-        self.name.index_option_word()
+        let mut word = self.name.index_option_word();
+        for _ in &self.array_bounds {
+            word.push_str("[]");
+        }
+        word
     }
 }
 impl Name {

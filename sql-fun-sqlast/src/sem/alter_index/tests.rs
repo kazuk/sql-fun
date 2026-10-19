@@ -74,6 +74,7 @@ fn applies_storage_parameters(
 #[case::no_integer("SET (fillfactor)", IndexProblemKind::invalid_value())]
 #[case::wrong_integer("SET (fillfactor=abc)", IndexProblemKind::invalid_value())]
 #[case::wrong_boolean("SET (deduplicate_items=o)", IndexProblemKind::invalid_value())]
+#[case::array_boolean("SET (deduplicate_items=off[])", IndexProblemKind::invalid_value())]
 #[case::boolean_whitespace("SET (deduplicate_items=' true ')", IndexProblemKind::invalid_value())]
 #[case::negative_scale(
     "SET (vacuum_cleanup_index_scale_factor=-1)",

@@ -1,6 +1,6 @@
 use crate::sem::{BaseParseContext, CastContext, TypeReference};
 
-/// Exact matches are eliminated before preferred conversions are considered.
+/// Compare exact-match counts before considering preferred conversions.
 /// This uses existing cast preferences; category/unknown resolution is separate.
 #[derive(Debug, Clone, Copy, Default, PartialEq, Eq, PartialOrd, Ord)]
 pub(crate) struct OverloadRank {

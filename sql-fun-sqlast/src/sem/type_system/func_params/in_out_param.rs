@@ -71,7 +71,7 @@ impl FunctionParameterTrait for FunctionParamInOut {
     }
 
     fn default_expr(&self) -> Option<&SemScalarExpr> {
-        None
+        self.default_expr.as_ref()
     }
 
     fn from_syn<TParseContext>(
@@ -123,6 +123,9 @@ impl FunctionParameterTrait for FunctionParamInOut {
         arg_types: &mut ArgumentBindingCollection,
     ) -> Result<ParameterBindResult, TypeError> {
         let Some(arg) = arg_types.pop_front() else {
+            if self.default_expr.is_some() {
+                return Ok(ParameterBindResult::no_input(&FunctionParam::from(self)));
+            }
             Err(TypeError::BindFailed(Box::new(FunctionParam::InOut(
                 self.clone(),
             ))))?

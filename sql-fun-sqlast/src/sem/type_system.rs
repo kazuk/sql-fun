@@ -51,6 +51,24 @@ pub struct OverloadVariant {
 }
 
 impl OverloadVariant {
+    pub(crate) fn is_variadic(&self) -> bool {
+        self.params.iter().any(FunctionParam::is_variadic)
+    }
+
+    pub(crate) fn call_argument(&self, position: usize) -> Option<&FunctionParam> {
+        let mut input_index = 0;
+        for parameter in &self.params {
+            if !parameter.is_input() {
+                continue;
+            }
+            if input_index == position || parameter.is_variadic() {
+                return Some(parameter);
+            }
+            input_index += 1;
+        }
+        None
+    }
+
     pub(crate) fn identity_arguments(&self) -> Vec<Option<TypeReference>> {
         self.params
             .iter()
@@ -196,6 +214,9 @@ impl OverloadVariant {
         let mut results = Vec::new();
         for param in &self.params {
             results.push(param.bind_arg(&mut arg_types)?);
+        }
+        if arg_types.pop_front().is_some() {
+            return Err(TypeError::too_many_arguments());
         }
         Ok(results)
     }

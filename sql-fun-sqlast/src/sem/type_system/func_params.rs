@@ -99,6 +99,19 @@ mod test_function_param_display {
 }
 
 impl FunctionParam {
+    pub(crate) const fn is_variadic(&self) -> bool {
+        matches!(self, Self::Variadic(_))
+    }
+
+    pub(crate) fn call_argument_type(&self) -> Option<TypeReference> {
+        let ty = self.get_type()?;
+        if self.is_variadic() && ty.is_array() == Some(true) {
+            Some(ty.element_type())
+        } else {
+            Some(ty.clone())
+        }
+    }
+
     pub(crate) fn identity_argument(&self) -> Option<Option<TypeReference>> {
         match self {
             Self::In(_) | Self::InOut(_) | Self::Variadic(_) => Some(self.get_type().cloned()),

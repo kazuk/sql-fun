@@ -127,18 +127,37 @@ impl FunctionOverloadCollection {
         Ok(())
     }
 
-    fn test_castability<TParseContext>(
-        bind_result: &Vec<ParameterBindResult>,
-        context: &TParseContext,
-    ) -> Result<i32, TypeError>
-    where
-        TParseContext: crate::sem::BaseParseContext,
-    {
-        let mut total_score = 0i32;
-        for param in bind_result {
-            total_score += param.test_catalog_castability(context)?;
+    // PostgreSQL prefers a non-variadic declaration over an expanded variadic
+    // declaration with the same effective input signature in this collection.
+    fn shadows_expanded_variadic(
+        &self,
+        overload: &OverloadVariant,
+        bindings: &[ParameterBindResult],
+        arguments: &ArgumentBindingCollection,
+    ) -> bool {
+        if !overload.is_variadic() {
+            return false;
         }
-        Ok(total_score)
+        let Some(inputs) = ParameterBindResult::constraint_inputs(bindings) else {
+            return false;
+        };
+        self.overloads.iter().any(|other| {
+            !other.is_variadic()
+                && other.bind_args(arguments.clone()).is_ok_and(|bindings| {
+                    ParameterBindResult::constraint_inputs(&bindings).as_ref() == Some(&inputs)
+                })
+        })
+    }
+
+    fn overload_rank(
+        bindings: &[ParameterBindResult],
+        context: &impl crate::sem::BaseParseContext,
+    ) -> Option<crate::sem::overload_rank::OverloadRank> {
+        let mut rank = crate::sem::overload_rank::OverloadRank::default();
+        for binding in bindings {
+            rank = rank + binding.overload_rank(context)?;
+        }
+        Some(rank)
     }
 
     /// resolve variant for parameter types
@@ -179,19 +198,24 @@ impl FunctionOverloadCollection {
                 continue 'overload;
             };
 
-            let Ok(score) = Self::test_castability(&bind_result, context) else {
+            if self.shadows_expanded_variadic(&overload, &bind_result, arg_types) {
+                continue;
+            }
+
+            let Some(score) = Self::overload_rank(&bind_result, context) else {
                 continue 'overload;
             };
 
             candidates.push((overload, score));
         }
 
-        if candidates.len() == 1 {
-            // candidates[0]
-            candidates.into_iter().next().map(|(overload, _)| overload)
-        } else {
-            // multiple overload found, then ambiguous
+        let best = candidates.iter().map(|(_, rank)| *rank).max()?;
+        let mut best_candidates = candidates.into_iter().filter(|(_, rank)| *rank == best);
+        let (overload, _) = best_candidates.next()?;
+        if best_candidates.next().is_some() {
             None
+        } else {
+            Some(overload)
         }
     }
 }
@@ -217,6 +241,9 @@ impl FunctionOverloadCollection {
             let Ok(bindings) = overload.bind_args(arguments.clone()) else {
                 continue;
             };
+            if self.shadows_expanded_variadic(&overload, &bindings, &arguments) {
+                continue;
+            }
             if let Some(signature) = overload.parameter_signature(&bindings) {
                 signatures.push(signature);
             }

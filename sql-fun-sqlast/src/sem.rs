@@ -38,6 +38,7 @@ mod merge_statement;
 mod names;
 mod object_info;
 mod operators;
+mod overload_rank;
 pub(crate) mod ownership;
 mod parameter_constraints;
 pub(crate) mod parameter_resolution;

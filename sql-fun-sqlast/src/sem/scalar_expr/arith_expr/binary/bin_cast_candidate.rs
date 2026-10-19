@@ -1,9 +1,10 @@
+use crate::sem::overload_rank::OverloadRank;
 use crate::sem::{BinaryOperatorDefinition, CastContext, SemScalarExpr, TypeReference};
 
 pub struct BinaryCastCandidate {
     left: CastContext,
     right: CastContext,
-    priority: i32,
+    priority: OverloadRank,
     operator: BinaryOperatorDefinition,
 }
 
@@ -11,7 +12,7 @@ impl BinaryCastCandidate {
     const fn new(
         left: CastContext,
         right: CastContext,
-        priority: i32,
+        priority: OverloadRank,
         operator: BinaryOperatorDefinition,
     ) -> Self {
         Self {
@@ -37,8 +38,8 @@ impl BinaryCastCandidate {
                 && let Some(right_cast) =
                     context.get_implicit_cast(right_type, overload.right_arg_type())
             {
-                let priority = left_cast.context().overload_priority_score()
-                    + right_cast.context().overload_priority_score();
+                let priority = OverloadRank::from(left_cast.context())
+                    + OverloadRank::from(right_cast.context());
 
                 candidates.push(Self::new(
                     left_cast.context(),

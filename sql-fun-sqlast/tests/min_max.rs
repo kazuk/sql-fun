@@ -68,6 +68,11 @@ fn invalid_operands_report_semantic_problems(
 
 #[rstest::rstest]
 #[case::domain("greatest(NULL::amount,NULL::amount)", "public.amount")]
+#[case::array_domain("greatest(NULL::amount_array,NULL::integer[])", "pg_catalog.int4[]")]
+#[case::array_domain_nested(
+    "greatest(NULL::nested_amount_array,NULL::integer[])",
+    "pg_catalog.int4[]"
+)]
 #[case::domain_base("least(NULL::amount,1)", "pg_catalog.int4")]
 #[case::domain_array("greatest(NULL::amount[],NULL::integer[])", "pg_catalog.int4[]")]
 #[case::domain_unknown("greatest(NULL::amount,NULL)", "pg_catalog.int4")]
@@ -81,6 +86,8 @@ fn schema_types_preserve_common_type_rules(
         &format!("select {expression} as result"),
         &[
             "create domain amount as integer",
+            "create domain amount_array as integer[]",
+            "create domain nested_amount_array as amount_array",
             "create type mood as enum ('low','high')",
             "create type pair as (n integer)",
         ],

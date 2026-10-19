@@ -8,6 +8,20 @@ use crate::TrieMap;
 use super::{SchemaCatalog, SchemaFileContext};
 
 impl TypeInfoRead for SchemaCatalog {
+    fn domain_base_type(&self, name: &FullName) -> Option<TypeReference> {
+        if let Some(base) = self.domain_bases.get(&name.to_string()) {
+            return base.clone();
+        }
+        if self.types.contains(name) {
+            return self
+                .get_type_impl(name)?
+                .domain_base()
+                .cloned()
+                .map(TypeReference::from_full_name);
+        }
+        self.base.domain_base_type(name)
+    }
+
     fn builtin_type_category(&self, name: &FullName) -> Option<(char, bool)> {
         self.base.builtin_type_category(name)
     }
@@ -29,6 +43,10 @@ impl TypeInfoRead for SchemaCatalog {
 }
 
 impl TypeInfoRead for SchemaFileContext {
+    fn domain_base_type(&self, name: &FullName) -> Option<TypeReference> {
+        self.catalog.domain_base_type(name)
+    }
+
     fn builtin_type_category(&self, name: &FullName) -> Option<(char, bool)> {
         self.catalog.builtin_type_category(name)
     }
@@ -46,6 +64,18 @@ impl TypeInfoRead for SchemaFileContext {
 }
 
 impl TypeInfoWrite for SchemaFileContext {
+    fn insert_create_domain_with_base(
+        &mut self,
+        name: &FullName,
+        domain: &CreateDomain,
+        base: Option<&TypeReference>,
+    ) {
+        self.insert_create_domain(name, domain);
+        self.catalog
+            .domain_bases
+            .insert(&name.to_string(), base.cloned());
+    }
+
     fn insert_table_ref_type(&mut self, name: &TableName) {
         self.catalog.types.insert_table_ref(name);
     }
@@ -65,6 +95,13 @@ impl TypeInfoWrite for SchemaFileContext {
 
     fn insert_create_domain(&mut self, name: &FullName, create_domain: &CreateDomain) {
         self.catalog.types.insert_create_domain(name, create_domain);
+        self.catalog.domain_bases.insert(
+            &name.to_string(),
+            create_domain
+                .base_type()
+                .cloned()
+                .map(TypeReference::from_full_name),
+        );
     }
 
     fn insert_create_enum(&mut self, name: &FullName, create_enum: &CreateEnum) {
@@ -76,6 +113,10 @@ impl TypeInfoWrite for SchemaFileContext {
 pub(super) struct TypeDefinitionCollection(TrieMap<TypeDefinition>);
 
 impl TypeDefinitionCollection {
+    pub(super) fn contains(&self, name: &FullName) -> bool {
+        self.0.get(&name.to_string()).is_some()
+    }
+
     pub(super) fn replace_definition(&mut self, key: &FullName, definition: &TypeDefinition) {
         self.0.insert(&key.to_string(), definition.clone());
     }

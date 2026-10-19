@@ -191,6 +191,8 @@ fn public_cast_lookup_accepts_loaded_values_and_preserves_context(
     let cast = context
         .explicit_cast(loaded_source.as_ref(), loaded_target.as_ref())
         .unwrap()
+        .into_resolution()
+        .unwrap()
         .unwrap();
     assert_eq!(
         cast.context(),
@@ -201,6 +203,8 @@ fn public_cast_lookup_accepts_loaded_values_and_preserves_context(
     assert_eq!(
         context
             .assignment_cast(loaded_source.as_ref(), loaded_target.as_ref())
+            .unwrap()
+            .into_resolution()
             .unwrap()
             .is_some(),
         cast_context.use_in_assignment()
@@ -280,11 +284,11 @@ fn stale_named_snapshot_is_not_reinterpreted_using_current_catalog() {
         .unwrap();
     assert_eq!(
         context.explicit_cast(&stale, current.as_ref()).unwrap_err(),
-        ConversionError::loaded_type_mismatch()
+        crate::types::CastQueryError::provider(ConversionError::loaded_type_mismatch())
     );
     assert_eq!(
         context.implicit_castable(&stale).unwrap_err(),
-        ConversionError::loaded_type_mismatch()
+        crate::types::CastQueryError::provider(ConversionError::loaded_type_mismatch())
     );
 }
 
@@ -301,11 +305,15 @@ fn constraint_values_cannot_become_catalog_cast_endpoints(
         context
             .explicit_cast(value.as_ref(), value.as_ref())
             .unwrap()
+            .into_resolution()
+            .unwrap()
             .is_none()
     );
     assert!(
         context
             .implicit_castable(value.as_ref())
+            .unwrap()
+            .into_resolution()
             .unwrap()
             .as_any()
             .is::<Never>()
@@ -331,7 +339,11 @@ fn implicit_castable_loads_candidate_outputs_without_selecting_one() {
     let loaded_source = context.type_by_name(source.full_name()).unwrap().unwrap();
     let loaded_target = context.type_by_name(target.full_name()).unwrap().unwrap();
     let expected = Candidates::from_candidates(&[loaded_source.clone(), loaded_target]);
-    let candidates = context.implicit_castable(loaded_source.as_ref()).unwrap();
+    let candidates = context
+        .implicit_castable(loaded_source.as_ref())
+        .unwrap()
+        .into_resolution()
+        .unwrap();
     assert!(candidates.same_type(expected.as_ref()));
     assert!(!candidates.same_type(loaded_source.as_ref()));
 }
@@ -346,6 +358,8 @@ fn empty_provider_implicit_targets_retain_intrinsic_identity() {
     assert!(
         context
             .implicit_castable(loaded.as_ref())
+            .unwrap()
+            .into_resolution()
             .unwrap()
             .same_type(expected.as_ref())
     );
@@ -365,7 +379,9 @@ fn missing_implicit_candidate_returns_error_instead_of_partial_values() {
     let loaded = context.type_by_name(source.full_name()).unwrap().unwrap();
     assert_eq!(
         context.implicit_castable(loaded.as_ref()).unwrap_err(),
-        ConversionError::type_not_found(missing.full_name())
+        crate::types::CastQueryError::provider(ConversionError::type_not_found(
+            missing.full_name()
+        ))
     );
 }
 
@@ -387,11 +403,15 @@ fn source_candidates_are_separate_from_cast_result(#[values(false, true)] explic
         context
             .cast_sources(loaded_target.as_ref(), explicit)
             .unwrap()
+            .into_resolution()
+            .unwrap()
             .same_type(expected.as_ref())
     );
     assert!(
         context
             .assignment_sources(loaded_target.as_ref())
+            .unwrap()
+            .into_resolution()
             .unwrap()
             .same_type(expected.as_ref())
     );
@@ -419,6 +439,8 @@ fn loaded_category_endpoints_survive_public_cast_lookup(#[case] category: &str) 
     let cast = context
         .implicit_cast(value.as_ref(), value.as_ref())
         .unwrap()
+        .into_resolution()
+        .unwrap()
         .unwrap();
     assert!(cast.source().same_type(value.as_ref()));
     assert!(cast.target().same_type(value.as_ref()));
@@ -441,6 +463,8 @@ fn table_row_endpoints_keep_members_with_or_without_type_registration(
     let context = TypeContext::new(&catalog);
     let cast = context
         .implicit_cast(loaded.as_ref(), loaded.as_ref())
+        .unwrap()
+        .into_resolution()
         .unwrap()
         .unwrap();
     assert!(cast.source().same_type(loaded.as_ref()));
@@ -468,7 +492,12 @@ fn nested_array_cast_uses_loaded_components_without_legacy_projection() {
     let array = ArrayType::new(&base);
     let nested = ArrayType::new(&array);
     let context = TypeContext::new(&catalog);
-    let cast = context.explicit_cast(&nested, &nested).unwrap().unwrap();
+    let cast = context
+        .explicit_cast(&nested, &nested)
+        .unwrap()
+        .into_resolution()
+        .unwrap()
+        .unwrap();
     assert!(cast.context().is_no_conversion());
     assert!(cast.source().same_type(&nested));
     assert!(cast.target().same_type(&nested));
@@ -503,7 +532,7 @@ fn changed_nested_member_snapshot_is_rejected() {
     let current = context.type_by_name(name.full_name()).unwrap().unwrap();
     assert_eq!(
         context.explicit_cast(&stale, current.as_ref()).unwrap_err(),
-        ConversionError::loaded_type_mismatch()
+        crate::types::CastQueryError::provider(ConversionError::loaded_type_mismatch())
     );
 }
 
@@ -526,6 +555,8 @@ fn array_of_unregistered_table_row_preserves_members_in_public_cast() {
     let context = TypeContext::new(&catalog);
     let cast = context
         .implicit_cast(loaded.as_ref(), loaded.as_ref())
+        .unwrap()
+        .into_resolution()
         .unwrap()
         .unwrap();
     assert!(cast.source().same_type(loaded.as_ref()));
@@ -587,6 +618,8 @@ fn builtin_array_casts_preserve_element_cast_context(
     let cast = context
         .explicit_cast(&source_array, &target_array)
         .unwrap()
+        .into_resolution()
+        .unwrap()
         .unwrap();
     assert_eq!(cast.context(), expected);
     assert!(cast.source().same_type(&source_array));
@@ -595,12 +628,16 @@ fn builtin_array_casts_preserve_element_cast_context(
         context
             .implicit_cast(&source_array, &target_array)
             .unwrap()
+            .into_resolution()
+            .unwrap()
             .is_some(),
         implicit
     );
     assert_eq!(
         context
             .assignment_cast(&source_array, &target_array)
+            .unwrap()
+            .into_resolution()
             .unwrap()
             .map(|cast| cast.context()),
         assignment
@@ -624,6 +661,8 @@ fn custom_enum_array_casts_and_candidates_follow_element_relationships() {
     let cast = context
         .implicit_cast(&source_array, &target_array)
         .unwrap()
+        .into_resolution()
+        .unwrap()
         .unwrap();
     assert_eq!(cast.context(), crate::types::CastContext::implicit());
     assert!(cast.source().same_type(&source_array));
@@ -636,11 +675,15 @@ fn custom_enum_array_casts_and_candidates_follow_element_relationships() {
         context
             .cast_sources(&target_array, false)
             .unwrap()
+            .into_resolution()
+            .unwrap()
             .same_type(expected.as_ref())
     );
     assert!(
         context
             .assignment_sources(&target_array)
+            .unwrap()
+            .into_resolution()
             .unwrap()
             .same_type(expected.as_ref())
     );
@@ -648,11 +691,15 @@ fn custom_enum_array_casts_and_candidates_follow_element_relationships() {
         context
             .implicit_castable(&source_array)
             .unwrap()
+            .into_resolution()
+            .unwrap()
             .same_type(expected.as_ref())
     );
     assert!(
         context
             .implicit_cast(&target_array, &source_array)
+            .unwrap()
+            .into_resolution()
             .unwrap()
             .is_none()
     );
@@ -678,6 +725,8 @@ fn sqlite_does_not_inherit_postgresql_element_array_casts() {
                 &ArrayType::new(target.as_ref())
             )
             .unwrap()
+            .into_resolution()
+            .unwrap()
             .is_none()
     );
 }
@@ -702,6 +751,8 @@ fn unregistered_table_row_array_identity_uses_loaded_components() {
         context
             .implicit_cast(&array, &array)
             .unwrap()
+            .into_resolution()
+            .unwrap()
             .unwrap()
             .context()
             .is_no_conversion()
@@ -710,6 +761,8 @@ fn unregistered_table_row_array_identity_uses_loaded_components() {
         context
             .assignment_cast(&array, &array)
             .unwrap()
+            .into_resolution()
+            .unwrap()
             .unwrap()
             .context()
             .is_no_conversion()
@@ -717,6 +770,8 @@ fn unregistered_table_row_array_identity_uses_loaded_components() {
     assert!(
         context
             .explicit_cast(&array, &array)
+            .unwrap()
+            .into_resolution()
             .unwrap()
             .unwrap()
             .context()
@@ -739,14 +794,23 @@ fn inherited_builtin_identity_remains_no_conversion(#[case] local: &str) {
     let scalar = context
         .explicit_cast(value.as_ref(), value.as_ref())
         .unwrap()
+        .into_resolution()
+        .unwrap()
         .unwrap();
     assert!(scalar.context().is_no_conversion());
     let array = ArrayType::new(value.as_ref());
-    let cast = context.explicit_cast(&array, &array).unwrap().unwrap();
+    let cast = context
+        .explicit_cast(&array, &array)
+        .unwrap()
+        .into_resolution()
+        .unwrap()
+        .unwrap();
     assert!(cast.context().is_no_conversion());
     assert!(
         context
             .implicit_cast(&array, &array)
+            .unwrap()
+            .into_resolution()
             .unwrap()
             .unwrap()
             .context()
@@ -755,6 +819,8 @@ fn inherited_builtin_identity_remains_no_conversion(#[case] local: &str) {
     assert!(
         context
             .assignment_cast(&array, &array)
+            .unwrap()
+            .into_resolution()
             .unwrap()
             .unwrap()
             .context()
@@ -776,6 +842,8 @@ fn unregistered_complete_values_use_permanent_io_rules() {
     let cast = context
         .assignment_cast(&value, text.as_ref())
         .unwrap()
+        .into_resolution()
+        .unwrap()
         .unwrap();
     assert_eq!(cast.context(), crate::types::CastContext::assignment());
     assert!(cast.source().same_type(&value));
@@ -784,6 +852,8 @@ fn unregistered_complete_values_use_permanent_io_rules() {
     let cast = context
         .assignment_cast(&nested, text.as_ref())
         .unwrap()
+        .into_resolution()
+        .unwrap()
         .unwrap();
     assert_eq!(cast.context(), crate::types::CastContext::assignment());
     assert!(cast.source().same_type(&nested));
@@ -791,6 +861,8 @@ fn unregistered_complete_values_use_permanent_io_rules() {
     assert!(
         context
             .implicit_cast(&value, text.as_ref())
+            .unwrap()
+            .into_resolution()
             .unwrap()
             .is_none()
     );
@@ -805,7 +877,12 @@ fn unregistered_loaded_enum_retains_identity_in_all_candidate_directions() {
         &FullName::with_schema("unregistered", "state"),
         &["one".to_owned()],
     );
-    let cast = context.implicit_cast(&value, &value).unwrap().unwrap();
+    let cast = context
+        .implicit_cast(&value, &value)
+        .unwrap()
+        .into_resolution()
+        .unwrap()
+        .unwrap();
     assert!(cast.context().is_no_conversion());
     assert!(cast.source().same_type(&value));
     assert!(cast.target().same_type(&value));
@@ -814,11 +891,15 @@ fn unregistered_loaded_enum_retains_identity_in_all_candidate_directions() {
         context
             .cast_sources(&value, false)
             .unwrap()
+            .into_resolution()
+            .unwrap()
             .same_type(expected.as_ref())
     );
     assert!(
         context
             .cast_sources(&value, true)
+            .unwrap()
+            .into_resolution()
             .unwrap()
             .same_type(expected.as_ref())
     );
@@ -826,11 +907,15 @@ fn unregistered_loaded_enum_retains_identity_in_all_candidate_directions() {
         context
             .assignment_sources(&value)
             .unwrap()
+            .into_resolution()
+            .unwrap()
             .same_type(expected.as_ref())
     );
     assert!(
         context
             .implicit_castable(&value)
+            .unwrap()
+            .into_resolution()
             .unwrap()
             .same_type(expected.as_ref())
     );

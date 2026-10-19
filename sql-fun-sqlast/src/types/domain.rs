@@ -60,6 +60,10 @@ mod construction_tests {
 }
 
 impl TypeDefinition for DomainType {
+    fn contains_polymorphic(&self) -> bool {
+        self.base_type.contains_polymorphic()
+    }
+
     fn as_any(&self) -> &dyn Any {
         self
     }

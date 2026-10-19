@@ -269,8 +269,8 @@ impl OperatorCall {
 /// retains whole signatures, without casts, binding, ranking or automatic choice.
 ///
 /// ```
-/// use sql_fun_sqlast::sem::{FullName, OperatorName};
-/// use sql_fun_sqlast::types::{OperatorCall, OperatorOverloads, OperatorSignature, base::BaseType};
+/// use ::sql_fun_sqlast::sem::{FullName, OperatorName};
+/// use ::sql_fun_sqlast::types::{OperatorCall, OperatorOverloads, OperatorSignature, base::BaseType};
 /// let int = BaseType::new(&FullName::with_schema("pg_catalog", "int4"));
 /// let text = BaseType::new(&FullName::with_schema("pg_catalog", "text"));
 /// let name = OperatorName::from_parts(None, "+");

@@ -10,9 +10,12 @@ mod cast;
 mod context;
 mod function;
 mod loaded_reference;
+mod operator;
 mod polymorphic;
+mod signature;
 
 pub use self::function::FunctionLoadError;
+pub use self::operator::OperatorLoadError;
 pub use self::polymorphic::polymorphic_position;
 
 pub use self::cast::{
@@ -33,6 +36,9 @@ use crate::types::{
 /// Conversion cannot preserve the requested loaded type's components.
 #[derive(Debug, Clone, Eq, PartialEq, ::thiserror::Error)]
 pub enum ConversionError {
+    /// An operator signature component could not be loaded completely.
+    #[error("{0}")]
+    Operator(Box<operator::OperatorLoadError>),
     /// A signature component could not be loaded completely.
     #[error("{0}")]
     Function(Box<function::FunctionLoadError>),
@@ -72,6 +78,11 @@ pub enum ConversionError {
 }
 
 impl ConversionError {
+    /// Report an operator error with its name, form, overload and component.
+    pub fn operator(error: &operator::OperatorLoadError) -> Self {
+        Self::Operator(Box::new(error.clone()))
+    }
+
     /// Report a signature error with its function, overload and component path.
     pub fn function(error: &function::FunctionLoadError) -> Self {
         Self::Function(Box::new(error.clone()))

@@ -47,6 +47,14 @@ pub trait TypeContextRead {
         Ok(None)
     }
 
+    /// Load whole operator signatures using the selected provider's name policy.
+    /// Absence is `Ok(None)`; unavailable signature components are errors.
+    fn operator_by_name(
+        &self,
+        name: &crate::sem::OperatorName,
+        form: crate::types::OperatorForm,
+    ) -> Result<Option<crate::types::OperatorOverloads>, Self::Error>;
+
     /// Load complete function signatures at an exact catalog key.
     /// Absence is `Ok(None)`; incomplete producer metadata is an error.
     fn function_by_exact_name(
@@ -142,6 +150,16 @@ impl<'a, C> TypeContext<'a, C> {
 }
 
 impl<C: TypeContextRead> TypeContext<'_, C> {
+    /// Load whole operator signatures for the explicitly supplied name and form.
+    /// Uses the provider's existing lookup policy, without independently choosing a dialect.
+    pub fn operator_by_name(
+        &self,
+        name: &crate::sem::OperatorName,
+        form: crate::types::OperatorForm,
+    ) -> Result<Option<crate::types::OperatorOverloads>, C::Error> {
+        self.context.operator_by_name(name, form)
+    }
+
     /// Load whole signatures at an exact key, preserving provider order and linkage.
     pub fn function_by_exact_name(
         &self,

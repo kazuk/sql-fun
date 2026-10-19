@@ -11,6 +11,14 @@ use super::{
 impl<C: ParseContext> TypeContextRead for C {
     type Error = ConversionError;
 
+    fn operator_by_name(
+        &self,
+        name: &crate::sem::OperatorName,
+        form: crate::types::OperatorForm,
+    ) -> Result<Option<crate::types::OperatorOverloads>, Self::Error> {
+        super::operator::by_name(self, name, form)
+    }
+
     fn function_by_exact_name(
         &self,
         name: &FullName,

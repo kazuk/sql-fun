@@ -123,6 +123,41 @@ mod test_helpers {
     impl TypeContextRead for NativeCatalog {
         type Error = &'static str;
 
+        fn operator_by_name(
+            &self,
+            name: &crate::sem::OperatorName,
+            form: crate::types::OperatorForm,
+        ) -> Result<Option<crate::types::OperatorOverloads>, Self::Error> {
+            self.check()?;
+            if name != &crate::sem::OperatorName::from_parts(Some("native"), "~") {
+                return Ok(None);
+            }
+            let signature = if form == crate::types::OperatorForm::binary() {
+                crate::types::OperatorSignature::binary(
+                    name,
+                    self.source(),
+                    self.target(),
+                    self.target(),
+                    true,
+                )
+            } else if form == crate::types::OperatorForm::left_unary() {
+                crate::types::OperatorSignature::left_unary(
+                    name,
+                    self.source(),
+                    self.target(),
+                    true,
+                )
+            } else {
+                crate::types::OperatorSignature::right_unary(
+                    name,
+                    self.source(),
+                    self.target(),
+                    true,
+                )
+            };
+            Ok(Some(crate::types::OperatorOverloads::new(&[signature])))
+        }
+
         fn function_by_exact_name(
             &self,
             name: &FullName,
@@ -940,5 +975,52 @@ fn native_provider_exposes_whole_function_signatures() {
         TypeContext::new(&test_helpers::NativeCatalog::failing())
             .function_by_name(&test_helpers::NativeCatalog::source_name())
             .is_err()
+    );
+}
+
+#[rstest::rstest]
+#[case::postgres(crate::ast::Dialect::postgres())]
+#[case::sqlite(crate::ast::Dialect::sqlite())]
+fn native_operator_reads_use_loaded_structural_values(#[case] dialect: crate::ast::Dialect) {
+    use crate::sem::OperatorName;
+    use crate::types::{OperatorCall, OperatorForm, base::BaseType};
+    let scalar = BaseType::new(&FullName::with_schema("native", "element"));
+    let array = ArrayType::new(&scalar);
+    let provider =
+        test_helpers::NativeCatalog::with_endpoints(&array, &scalar).with_dialect(dialect);
+    let context = TypeContext::new(&provider);
+    let name = OperatorName::from_parts(Some("native"), "~");
+    let overloads = context
+        .operator_by_name(&name, OperatorForm::binary())
+        .unwrap()
+        .unwrap();
+    let matches = overloads.match_call(&OperatorCall::binary(&array, &scalar));
+    assert_eq!(matches.overloads().signatures().len(), 1);
+    assert!(
+        matches.overloads().signatures()[0]
+            .result()
+            .same_type(&scalar)
+    );
+    assert!(
+        matches.overloads().signatures()[0]
+            .left_operand()
+            .unwrap()
+            .same_type(&array)
+    );
+    assert!(
+        context
+            .operator_by_name(
+                &OperatorName::from_parts(None, "missing"),
+                OperatorForm::binary()
+            )
+            .unwrap()
+            .is_none()
+    );
+    let unavailable = test_helpers::NativeCatalog::failing();
+    assert_eq!(
+        TypeContext::new(&unavailable)
+            .operator_by_name(&name, OperatorForm::binary())
+            .unwrap_err(),
+        "native catalog unavailable"
     );
 }

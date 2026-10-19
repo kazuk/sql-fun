@@ -15,6 +15,7 @@ mod context;
 mod domain;
 mod enumeration;
 mod function;
+mod operator;
 mod polymorphic;
 mod range;
 
@@ -30,6 +31,10 @@ pub use self::enumeration::EnumType;
 pub use self::function::{
     CallArgument, DefaultExpression, FunctionCallMatches, FunctionOverloads, FunctionParameter,
     FunctionReadError, FunctionResult, FunctionSignature, ParameterMode, PseudoType,
+};
+
+pub use self::operator::{
+    OperatorCall, OperatorCallMatches, OperatorForm, OperatorOverloads, OperatorSignature,
 };
 
 pub use self::polymorphic::{

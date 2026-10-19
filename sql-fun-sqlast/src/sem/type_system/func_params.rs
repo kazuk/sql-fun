@@ -362,3 +362,43 @@ impl FunctionParam {
         }
     }
 }
+
+impl FunctionParam {
+    /// Parameter's logical SQL name, if supplied.
+    pub fn name(&self) -> Option<&str> {
+        match self {
+            Self::In(p) => p.name(),
+            Self::Out(p) => p.name(),
+            Self::InOut(p) => p.name(),
+            Self::Variadic(p) => p.name(),
+            Self::Table(p) => p.name(),
+        }
+        .map(String::as_str)
+        .filter(|name| !name.is_empty())
+    }
+    /// Complete retained default expression, without changing legacy binding rules.
+    pub const fn retained_default(&self) -> Option<&SemScalarExpr> {
+        match self {
+            Self::In(p) => p.retained_default(),
+            Self::InOut(p) => p.retained_default(),
+            Self::Variadic(p) => p.retained_default(),
+            _ => None,
+        }
+    }
+    /// Whether this parameter accepts an input value.
+    pub const fn accepts_input(&self) -> bool {
+        matches!(self, Self::In(_) | Self::InOut(_) | Self::Variadic(_))
+    }
+    /// Whether this parameter contributes an output column.
+    pub const fn produces_output(&self) -> bool {
+        matches!(self, Self::Out(_) | Self::InOut(_) | Self::Table(_))
+    }
+    /// Whether this is a variadic input.
+    pub const fn is_variadic(&self) -> bool {
+        matches!(self, Self::Variadic(_))
+    }
+    /// Whether this is a RETURNS TABLE column.
+    pub const fn is_table_column(&self) -> bool {
+        matches!(self, Self::Table(_))
+    }
+}

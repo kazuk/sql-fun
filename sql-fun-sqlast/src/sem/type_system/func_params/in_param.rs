@@ -167,3 +167,9 @@ impl FunctionParameterTrait for FunctionParamIn {
         }
     }
 }
+
+impl FunctionParamIn {
+    pub(super) const fn retained_default(&self) -> Option<&SemScalarExpr> {
+        self.default_expr.as_ref()
+    }
+}

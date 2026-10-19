@@ -90,6 +90,19 @@ no separate oracle snapshots are maintained. PostgreSQL 15–18 behavior can be
 checked with small development-oracle queries without extending the CLI's
 supported version matrix or making ordinary Rust tests depend on live servers.
 
+## Complete function signatures
+
+Each function overload carries an additive `signature` declaration object. It
+retains return cardinality, procedure kind, ordered argument types, names/modes,
+and the complete server-deparsed default-expression list with its first input
+position. Original declared result identity remains the overload's `ret` field.
+The builtin loader stores these facts separately from legacy computed return
+records; loaded-type adaptation never infers cardinality from an OUT parameter.
+Missing declaration payloads remain explicitly unavailable to loaded signature
+lookups. Regenerated PostgreSQL 17/18 artifacts and installed-extraction assertions
+must agree with the consumer before this stack merges into `main`. Scope and
+format version remain unchanged.
+
 ## Additive master definitions
 
 Format 1 additionally produces `collations.json` and `operator_classes.json`.

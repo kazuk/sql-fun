@@ -44,6 +44,8 @@ impl ArgumentBindingCollection {
 /// function overload variant
 #[derive(Debug, Clone, Eq, Hash, PartialEq, serde::Serialize, serde::Deserialize)]
 pub struct OverloadVariant {
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    signature_metadata: Option<FunctionSignatureMetadata>,
     ret_type: Option<TypeReference>,
     params: Vec<FunctionParam>,
     is_strict: bool,
@@ -120,6 +122,7 @@ impl OverloadVariant {
         returns_not_null: bool,
     ) -> Self {
         Self {
+            signature_metadata: None,
             ret_type: ret_type.clone(),
             params: params.to_owned(),
             is_strict,
@@ -219,5 +222,77 @@ impl OverloadVariant {
             return Err(TypeError::too_many_arguments());
         }
         Ok(results)
+    }
+}
+
+/// Retained declaration facts, separate from the legacy computed return type.
+#[derive(Debug, Clone, Eq, Hash, PartialEq, serde::Serialize, serde::Deserialize)]
+pub struct FunctionSignatureMetadata {
+    result: Option<TypeReference>,
+    returns_set: bool,
+    procedure: bool,
+    default_sql: Option<String>,
+    default_start: usize,
+    parameters: Vec<FunctionParam>,
+}
+
+impl FunctionSignatureMetadata {
+    /// Preserve declaration facts supplied by the producer, without guessing missing values.
+    pub fn new(
+        result: &Option<TypeReference>,
+        parameters: &[FunctionParam],
+        returns_set: bool,
+        procedure: bool,
+    ) -> Self {
+        Self {
+            result: result.clone(),
+            returns_set,
+            procedure,
+            default_sql: None,
+            default_start: 0,
+            parameters: parameters.to_vec(),
+        }
+    }
+    /// Parameters in declaration order, before legacy normalization.
+    pub fn parameters(&self) -> &[FunctionParam] {
+        &self.parameters
+    }
+    /// Retain the complete PostgreSQL default-expression list and first defaulted input index.
+    pub fn with_default_sql(mut self, sql: &str, start: usize) -> Self {
+        self.default_sql = Some(sql.to_owned());
+        self.default_start = start;
+        self
+    }
+    /// Original declared result, before legacy output-record synthesis.
+    pub const fn result(&self) -> Option<&TypeReference> {
+        self.result.as_ref()
+    }
+    /// Whether the declaration returns a set.
+    pub const fn returns_set(&self) -> bool {
+        self.returns_set
+    }
+    /// Whether this is a procedure rather than a function.
+    pub const fn is_procedure(&self) -> bool {
+        self.procedure
+    }
+    /// Complete SQL default-expression list, if supplied by the extractor.
+    pub fn default_sql(&self) -> Option<&str> {
+        self.default_sql.as_deref()
+    }
+    /// First defaulted input index in the callable input sequence.
+    pub const fn default_start(&self) -> usize {
+        self.default_start
+    }
+}
+
+impl OverloadVariant {
+    /// Attach complete declaration metadata without changing legacy execution fields.
+    pub fn with_signature_metadata(mut self, metadata: &FunctionSignatureMetadata) -> Self {
+        self.signature_metadata = Some(metadata.clone());
+        self
+    }
+    /// Declaration metadata, absent for an incomplete/old producer.
+    pub const fn signature_metadata(&self) -> Option<&FunctionSignatureMetadata> {
+        self.signature_metadata.as_ref()
     }
 }

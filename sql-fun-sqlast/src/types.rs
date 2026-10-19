@@ -14,6 +14,7 @@ mod constraint;
 mod context;
 mod domain;
 mod enumeration;
+mod function;
 mod polymorphic;
 mod range;
 
@@ -26,6 +27,10 @@ pub use self::constraint::{Any, Candidates, Never};
 pub use self::context::{TypeContext, TypeContextRead};
 pub use self::domain::DomainType;
 pub use self::enumeration::EnumType;
+pub use self::function::{
+    DefaultExpression, FunctionOverloads, FunctionParameter, FunctionReadError, FunctionResult,
+    FunctionSignature, ParameterMode, PseudoType,
+};
 
 pub use self::polymorphic::{
     PolymorphicCategory, PolymorphicError, PolymorphicFamily, PolymorphicPosition, PolymorphicRole,

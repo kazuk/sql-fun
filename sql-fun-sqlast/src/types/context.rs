@@ -47,6 +47,19 @@ pub trait TypeContextRead {
         Ok(None)
     }
 
+    /// Load complete function signatures at an exact catalog key.
+    /// Absence is `Ok(None)`; incomplete producer metadata is an error.
+    fn function_by_exact_name(
+        &self,
+        name: &FullName,
+    ) -> Result<Option<crate::types::FunctionOverloads>, Self::Error>;
+
+    /// Resolve the function name through the selected provider's search path.
+    fn function_by_name(
+        &self,
+        name: &FullName,
+    ) -> Result<Option<crate::types::FunctionOverloads>, Self::Error>;
+
     /// Load an exact catalog key without expanding the search path.
     /// Absence is `Ok(None)`; a present but incomplete definition is an error.
     fn type_by_exact_name(&self, name: &FullName) -> Result<Option<TypeReference>, Self::Error>;
@@ -129,6 +142,22 @@ impl<'a, C> TypeContext<'a, C> {
 }
 
 impl<C: TypeContextRead> TypeContext<'_, C> {
+    /// Load whole signatures at an exact key, preserving provider order and linkage.
+    pub fn function_by_exact_name(
+        &self,
+        name: &FullName,
+    ) -> Result<Option<crate::types::FunctionOverloads>, C::Error> {
+        self.context.function_by_exact_name(name)
+    }
+
+    /// Load whole signatures using the selected provider's function search path.
+    pub fn function_by_name(
+        &self,
+        name: &FullName,
+    ) -> Result<Option<crate::types::FunctionOverloads>, C::Error> {
+        self.context.function_by_name(name)
+    }
+
     /// Load an exact catalog key without expanding the search path.
     /// Absence is `Ok(None)`; a present but incomplete definition is an error.
     pub fn type_by_exact_name(&self, name: &FullName) -> Result<Option<TypeReference>, C::Error> {

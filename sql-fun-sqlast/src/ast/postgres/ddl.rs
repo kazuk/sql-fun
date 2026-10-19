@@ -142,11 +142,17 @@ impl TryFromWithTokens<&syn::ColumnDef> for crate::ast::Column {
         tokens: &IVec<syn::ScanToken>,
     ) -> Result<Self, Self::Error> {
         use crate::ast::TableConstraint;
+        let mut type_mod = None;
         let type_name = if let Some(type_name) = value.get_type_name().as_inner() {
+            let type_mod_value = type_name.get_typemod();
+            if type_mod_value != 0 {
+                type_mod = Some(type_mod_value);
+            }
             Some(TypeName::try_from_with_tokens(&type_name, tokens)?)
         } else {
             None
         };
+
         let collation = if let Some(clause) = value.get_coll_clause().as_inner() {
             Name::try_from(clause.get_collname())?
         } else {
@@ -165,6 +171,7 @@ impl TryFromWithTokens<&syn::ColumnDef> for crate::ast::Column {
             compression: super::nonempty(value.get_compression()),
             storage: super::nonempty(value.get_storage_name()),
             name: value.get_colname(),
+            type_mod,
             type_name,
             constraints,
             not_null: Some(value.get_is_not_null()),

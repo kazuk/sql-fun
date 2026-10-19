@@ -1012,6 +1012,7 @@ mod test_constraint_emit {
             collation: Name::default(),
             compression: None,
             storage: None,
+            type_mod: None,
             name: "value".to_owned(),
             type_name: Some(TypeName {
                 name: Name::from_parts(&["INTEGER".to_owned()]),
@@ -1067,6 +1068,7 @@ mod test_constraint_emit {
             storage: None,
             name: "value".to_owned(),
             type_name: None,
+            type_mod: None,
             constraints: Vec::new(),
             not_null: None,
         };

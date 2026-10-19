@@ -8,7 +8,8 @@ behavior or require additions to the user manual.
 ## Module boundary
 
 `sem::TypeDefinition`, `sem::TypeReference`, and `ParseContext` remain the existing
-semantic storage and analysis interfaces, including their serialization contracts.
+semantic storage and analysis interfaces. Existing serialized fields retain their
+meaning; the explicitly authorized function-metadata extension is described below.
 The new `types::TypeDefinition` is a trait for an owned loaded value;
 `types::TypeReference` is `Box<dyn TypeDefinition>`. Category implementations own
 their components and do not retain legacy declaration or column-collection
@@ -511,3 +512,79 @@ produce determinate answers. No cast is derived merely from range subtype casts.
 Determining more constrained cases would require binding/solving; this issue
 conservatively preserves those questions rather than adding such an algorithm.
 The legacy `sem` cast APIs and all existing analyzer consumers remain unchanged.
+
+## Complete function signatures and overload views
+
+`FunctionSignature` is a loaded `TypeDefinition` retaining the qualified name,
+ordered `FunctionParameter` values, `FunctionResult`, strictness and return
+nullability. Parameter modes distinguish IN, OUT, INOUT, VARIADIC and TABLE.
+Results distinguish scalar, set and procedure declarations. `declared_type()`
+retains the original declaration; `result_type()` exposes the projected value,
+including a known output-record structure composed by `FunctionResult::record`.
+Output members stay
+in declaration order in the parameters; an open PostgreSQL `record` remains a
+`PseudoType`, not an empty anonymous composite. The declared type is preserved
+independently of legacy computed output-record types. Concrete nested values
+use the existing category loaders and their explicit unavailable-data errors.
+
+`DefaultExpression` owns an unevaluated expression representation. Compatibility
+conversion retains the complete serialized semantic expression with the explicit
+`sql-fun-sem-expression-v1` representation identifier. PostgreSQL extraction
+supplies a complete deparsed SQL default-expression list and each default's list
+index (`postgresql-sql-list`). A comma inside an expression is never interpreted
+as a separator by the adapter. Snapshot equality compares the representation and
+index; it does not claim SQL expression equivalence or evaluate defaults.
+
+`TypeContext::function_by_exact_name` and `function_by_name` delegate to the
+selected `TypeContextRead` provider and return `Result<Option<FunctionOverloads>,
+provider error>`. Name absence is distinct from a present but incomplete
+declaration. Legacy lookup, default conversion, nested type loading and source
+metadata interpretation are confined to `types::compat::function`. The adapter
+loads every overload or reports the function, zero-based overload index and
+component path; it never silently discards an incomplete signature.
+
+`FunctionOverloads` owns complete signatures, preserving provider order and
+duplicate snapshots. Its identity follows `Candidates` set equality: order and
+duplicates do not affect identity. `candidates()` produces whole-signature
+`Candidates` or `Never` for the empty collection. Clone preserves polymorphic
+variable identity; independently loaded scopes are distinct. All polymorphic
+occurrences in one declaration are finalized once through `SignaturePolymorphism`,
+using the selected provider dialect. No inference or overload selection runs.
+
+`argument_candidates(index)` and `result_candidates()` project derived candidate
+views. `filter_argument(index, candidates)` and `filter_result(candidates)` retain
+whole original signatures. Input indices exclude OUT/TABLE parameters. Named
+counterparts use `ColumnName` logical values and resolve each overload separately:
+quoted spelling is exact, and names may occupy different positions in different
+overloads. Missing names/positions contribute nothing and fail a corresponding
+filter; duplicate callable names produce `FunctionReadError`. Procedures contribute
+no declared result to a result projection. Empty results remain usable collections.
+
+These leaf operations need no context. Membership uses `same_type`: a supplied
+`Candidates` value contributes its direct members, `Never` contributes none, and
+another loaded value is a singleton. Nested constraints are not expanded. A caller
+can supply cast-expanded candidates, but the leaf operations perform no casts,
+compatibility tests, polymorphic binding, ranking or solving. The caller also owns
+full named/positional call binding, omission/default checks and variadic call rules.
+Independent projections must never be recombined into invented signatures.
+
+### Catalog retention and extraction migration
+
+`OverloadVariant::signature_metadata` optionally retains a
+`FunctionSignatureMetadata` snapshot, populated by common-AST declarations and
+builtin ingestion. It preserves original parameters, declared result,
+cardinality, procedure kind and extracted defaults independently of legacy
+execution fields. Existing semantic consumers continue using their existing
+fields and algorithms. Serialization adds this explicitly authorized field;
+old serialized overloads deserialize with unavailable metadata, not invented
+scalar cardinality. New declarations preserve metadata through catalog insertion
+and overload merging. The existing `OverloadVariant::new` remains an incomplete
+legacy constructor unless explicit declaration metadata is attached.
+
+The additive `functions.json` signature payload is produced and consumed in this
+stack; committed PostgreSQL 17/18 catalogs are refreshed. Older catalogs still
+serve legacy consumers, but loaded signature lookup reports missing metadata and
+requires regeneration. The extraction integration job validates producer fields,
+and the maintained catalog-loader tests exercise real extracted scalar, set,
+record and overloaded signatures on both committed versions. All producer/consumer
+mismatches must be resolved before integration into `main`.

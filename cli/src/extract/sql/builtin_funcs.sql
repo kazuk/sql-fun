@@ -7,6 +7,11 @@ with base as (
     p.prokind,
     p.proretset,
     p.proargtypes,
+    p.proallargtypes,
+    p.proargmodes,
+    p.proargnames,
+    p.pronargdefaults,
+    pg_get_expr(p.proargdefaults, 0) as default_sql,
     p.proargtypes::text as argtypes_text
   from pg_catalog.pg_proc p
   join pg_catalog.pg_namespace n on n.oid = p.pronamespace
@@ -39,6 +44,20 @@ funcs as (
       'args', coalesce(a.args, array[]::text[]),
       'ret', b.retname,
       'is_strict', b.proisstrict,
+      'signature', json_build_object(
+        'returns_set', b.proretset,
+        'procedure', b.prokind = 'p',
+        'all_args', (
+          select coalesce(json_agg(t.typname order by u.ord), '[]'::json)
+          from unnest(coalesce(b.proallargtypes, b.proargtypes::oid[]))
+            with ordinality as u(oid, ord)
+          join pg_catalog.pg_type t on t.oid = u.oid
+        ),
+        'modes', coalesce(b.proargmodes::text[], array[]::text[]),
+        'names', coalesce(b.proargnames, array[]::text[]),
+        'default_sql', b.default_sql,
+        'default_start', cardinality(b.proargtypes::oid[]) - b.pronargdefaults
+      ),
       'kind', b.prokind,
       'returns_set', b.proretset
     ) as obj

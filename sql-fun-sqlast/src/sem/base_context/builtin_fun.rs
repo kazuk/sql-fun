@@ -28,6 +28,8 @@ struct PgFunctionProto {
     ret: String,
     is_strict: bool,
     #[serde(default)]
+    signature: Option<PgSignature>,
+    #[serde(default)]
     kind: Option<String>,
     #[serde(default)]
     returns_set: Option<bool>,
@@ -53,16 +55,127 @@ impl PgFunctionProto {
     }
 }
 
+/// Complete declaration payload added to v1 extraction without changing legacy execution fields.
+#[derive(Debug, serde::Deserialize)]
+struct PgSignature {
+    returns_set: bool,
+    procedure: bool,
+    all_args: Vec<String>,
+    modes: Vec<String>,
+    names: Vec<String>,
+    default_sql: Option<String>,
+    default_start: usize,
+}
+
+impl PgFunctionProto {
+    fn attach_metadata(&self, overload: OverloadVariant) -> OverloadVariant {
+        if let Some(signature) = &self.signature
+            && let Some(metadata) = signature.metadata(&self.ret)
+        {
+            overload.with_signature_metadata(&metadata)
+        } else {
+            overload
+        }
+    }
+}
+
+impl PgSignature {
+    fn metadata(&self, result: &str) -> Option<crate::sem::FunctionSignatureMetadata> {
+        if (!self.modes.is_empty() && self.modes.len() != self.all_args.len())
+            || (!self.names.is_empty() && self.names.len() != self.all_args.len())
+        {
+            return None;
+        }
+        let mut parameters = Vec::new();
+        for (index, type_name) in self.all_args.iter().enumerate() {
+            let name = self
+                .names
+                .get(index)
+                .filter(|name| !name.is_empty())
+                .cloned();
+            let type_ = Some(TypeReference::from_master_type_name(type_name));
+            let parameter = match self.modes.get(index).map(String::as_str).unwrap_or("i") {
+                "i" => FunctionParam::new_input_param(&name, &type_, &None),
+                "o" => FunctionParam::new_output_param(&name, &type_),
+                "b" => FunctionParam::new_in_out_param(&name, &type_, &None),
+                "v" => FunctionParam::new_variadig_param(&name, &type_),
+                "t" => FunctionParam::new_table_param(&name, &type_),
+                _ => return None,
+            };
+            parameters.push(parameter);
+        }
+        let inputs = parameters
+            .iter()
+            .filter(|parameter| parameter.accepts_input())
+            .count();
+        if self.default_start > inputs
+            || (self.default_sql.is_none() && self.default_start != inputs)
+            || (self.default_sql.is_some() && self.default_start == inputs)
+        {
+            return None;
+        }
+        let result = if self.procedure {
+            None
+        } else {
+            Some(TypeReference::from_master_type_name(result))
+        };
+        let mut metadata = crate::sem::FunctionSignatureMetadata::new(
+            &result,
+            &parameters,
+            self.returns_set,
+            self.procedure,
+        );
+        if let Some(sql) = &self.default_sql {
+            metadata = metadata.with_default_sql(sql, self.default_start);
+        }
+        Some(metadata)
+    }
+}
+
+#[cfg(test)]
+mod test_signature_metadata {
+    use super::PgSignature;
+
+    #[rstest::rstest]
+    #[case::no_defaults(1, None, true)]
+    #[case::default(0, Some("ROW(1, 2)"), true)]
+    #[case::missing_expression(0, None, false)]
+    #[case::missing_parameter(2, Some("1"), false)]
+    #[case::extra_expression(1, Some("1"), false)]
+    fn defaults_require_complete_producer_information(
+        #[case] start: usize,
+        #[case] sql: Option<&str>,
+        #[case] valid: bool,
+    ) {
+        let signature = PgSignature {
+            returns_set: false,
+            procedure: false,
+            all_args: vec!["int4".to_owned()],
+            modes: vec![],
+            names: vec!["a".to_owned()],
+            default_sql: sql.map(str::to_owned),
+            default_start: start,
+        };
+        assert_eq!(signature.metadata("int4").is_some(), valid);
+    }
+}
+
 #[derive(Debug, serde::Deserialize)]
 enum PgArgMode {
     In,
     Out,
     Variadic,
+    InOut,
+    Table,
 }
 
 impl PgArgMode {
+    const fn is_input(&self) -> bool {
+        matches!(self, Self::In | Self::InOut | Self::Variadic)
+    }
+
     const fn is_output(&self) -> bool {
-        matches!(self, Self::Out)
+        matches!(self, Self::Out | Self::InOut | Self::Table)
     }
 
     fn function_param(
@@ -74,6 +187,8 @@ impl PgArgMode {
             Self::In => FunctionParam::new_input_param(name, param_type, &None),
             Self::Out => FunctionParam::new_output_param(name, param_type),
             Self::Variadic => FunctionParam::new_variadig_param(name, param_type),
+            Self::InOut => FunctionParam::new_in_out_param(name, param_type, &None),
+            Self::Table => FunctionParam::new_table_param(name, param_type),
         }
     }
 }
@@ -86,6 +201,8 @@ impl std::str::FromStr for PgArgMode {
             "i" => Self::In,
             "o" => Self::Out,
             "v" => Self::Variadic,
+            "b" => Self::InOut,
+            "t" => Self::Table,
             s => return Err(String::from(s)),
         })
     }
@@ -111,7 +228,7 @@ struct PgFunctionArgRef<'a> {
 impl PgFunctionDetail {
     fn matches_args(&self, args: &[String]) -> bool {
         self.arg_iter()
-            .filter(|arg| !arg.arg_mode.is_output())
+            .filter(|arg| arg.arg_mode.is_input())
             .map(|arg| arg.arg_type)
             .eq(args.iter())
     }
@@ -255,12 +372,12 @@ impl PgBuiltInFunctions {
                 let create_comp_type = CreateCompositeType::from_fields(&composite_fields);
                 let type_def = TypeDefinition::CompositeType(create_comp_type);
                 let ret_type = TypeReference::dynamic(&type_def);
-                variants.push(&OverloadVariant::new(
+                variants.push(&overload.attach_metadata(OverloadVariant::new(
                     &Some(ret_type),
                     &args,
                     overload.is_strict,
                     false,
-                ));
+                )));
             } else {
                 let ret_type = Some(TypeReference::from_master_type_name(&overload.ret));
                 let params = overload
@@ -274,12 +391,12 @@ impl PgBuiltInFunctions {
                         )
                     })
                     .collect();
-                variants.push(&OverloadVariant::new(
+                variants.push(&overload.attach_metadata(OverloadVariant::new(
                     &ret_type,
                     &params,
                     overload.is_strict,
                     false,
-                ));
+                )));
             }
         }
         let col_defs = if let Some(details) = self.function_details.get(local_name)

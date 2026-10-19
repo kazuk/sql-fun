@@ -8,8 +8,11 @@
 
 mod cast;
 mod context;
+mod function;
 mod loaded_reference;
 mod polymorphic;
+
+pub use self::function::FunctionLoadError;
 pub use self::polymorphic::polymorphic_position;
 
 pub use self::cast::{
@@ -30,6 +33,9 @@ use crate::types::{
 /// Conversion cannot preserve the requested loaded type's components.
 #[derive(Debug, Clone, Eq, PartialEq, ::thiserror::Error)]
 pub enum ConversionError {
+    /// A signature component could not be loaded completely.
+    #[error("{0}")]
+    Function(Box<function::FunctionLoadError>),
     /// A component needs an explicitly supplied catalog.
     #[error("type requires a ParseContext: {0}")]
     CatalogRequired(FullName),
@@ -66,6 +72,11 @@ pub enum ConversionError {
 }
 
 impl ConversionError {
+    /// Report a signature error with its function, overload and component path.
+    pub fn function(error: &function::FunctionLoadError) -> Self {
+        Self::Function(Box::new(error.clone()))
+    }
+
     // A legacy catalog has no facts for these otherwise valid loaded values.
     const fn has_no_legacy_reference(&self) -> bool {
         matches!(

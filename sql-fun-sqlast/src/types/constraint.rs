@@ -126,7 +126,9 @@ impl Candidates {
         &self.candidates
     }
 
-    fn contains(&self, candidate: &dyn TypeDefinition) -> bool {
+    /// Test same-type membership among the directly stored candidates.
+    /// Nested constraints are not expanded and no compatibility or binding is attempted.
+    pub fn contains(&self, candidate: &dyn TypeDefinition) -> bool {
         self.candidates
             .iter()
             .any(|value| value.same_type(candidate))

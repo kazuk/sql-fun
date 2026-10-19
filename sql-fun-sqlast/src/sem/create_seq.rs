@@ -97,7 +97,8 @@ impl CreateSequence {
                         self.change_owner(s);
                     }
                 }
-                AlterObjSubCommand::AddConstraint(_)
+                AlterObjSubCommand::ColumnAttributes(_)
+                | AlterObjSubCommand::AddConstraint(_)
                 | AlterObjSubCommand::ClusterOn(_)
                 | AlterObjSubCommand::RenameTo(_)
                 | AlterObjSubCommand::AddColumn(_)

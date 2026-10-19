@@ -26,6 +26,41 @@ retained schema model, although SQLite itself permits them.
 free its name for another CREATE. Supply the intended schema definitions rather
 than treating schema files as a migration execution history.
 
+## PostgreSQL ALTER COLUMN attributes
+
+Schema analysis supports these operations on ordinary table columns:
+
+- `SET NOT NULL` and `DROP NOT NULL`, including their effects on subsequent
+  query result nullability. Dropping NOT NULL from a primary-key or identity
+  column is rejected.
+- `SET STATISTICS` with integer targets from `-1` through `10000`. `-1` restores
+  the database default; higher targets are reduced to `10000` with a warning.
+  The `DEFAULT` spelling requires an explicitly configured PostgreSQL version
+  of 17 or later.
+- `SET` and `RESET` for `n_distinct` and `n_distinct_inherited`. RESET also accepts
+  unknown or repeated option names as no-ops, as PostgreSQL does.
+- `DROP EXPRESSION [IF EXISTS]` for stored generated columns. After removal,
+  INSERT and UPDATE treat the column as an ordinary column. A virtual generated
+  column cannot use this operation; the current SQL parser does not accept
+  PostgreSQL 18's `VIRTUAL` declaration syntax.
+
+These operations can be combined in one ALTER TABLE statement. Analysis follows
+PostgreSQL's operation phases: for example, combining SET NOT NULL and DROP NOT
+NULL leaves the column NOT NULL regardless of their textual order. An invalid
+operation leaves the catalog unchanged for the whole statement, and later
+statements can still be analyzed. Analysis updates schema metadata; it does not
+scan database rows to establish that existing values satisfy a new constraint.
+
+Combining these operations with other ALTER commands, changing a generation
+expression with `SET EXPRESSION`, changing storage/compression, generic foreign
+column options, and applying column attributes through ALTER INDEX or ALTER
+FOREIGN TABLE or materialized views remain unimplemented. Version-dependent
+validation for custom PostgreSQL version identifiers remains unimplemented.
+Inheritance and partition propagation are
+also outside the currently modeled schema behavior. The semantic API exposes
+completed column bindings, requested settings, validation outcomes, and statement
+applicability for the implemented operations.
+
 ## SQLite parser limitations
 
 SQLite support is under development. Its sql-fun parser currently limits

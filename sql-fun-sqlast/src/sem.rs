@@ -1,6 +1,7 @@
 #![doc = include_str!("sem.md")]
 
 mod alter_index;
+mod alter_column;
 mod alter_owner;
 mod alter_seq;
 mod alter_table;
@@ -100,6 +101,10 @@ pub use self::{
     alter_index::{
         AlterIndex, IndexAlteration, IndexStatisticsChange, IndexStorageChange,
         IndexStorageParameter, IndexTarget,
+    },
+    alter_column::{
+        AlterColumnAttributes, ColumnAttributeAction, ColumnAttributeBinding,
+        ColumnAttributeOption, ColumnStatisticsTarget,
     },
     alter_owner::{AlterOwner, OwnershipArgumentFailure, OwnershipLookup},
     alter_seq::{AlterSequence, SequenceDependency},
@@ -453,6 +458,14 @@ impl SemAst {
     pub fn trigger(&self) -> Option<&CreateTrigger> {
         if let Self::CreateTrigger(trigger) = self {
             Some(trigger)
+        } else {
+            None
+        }
+    }
+    /// Inspect an analyzed ALTER TABLE statement and its applicability.
+    pub const fn alter_table_statement(&self) -> Option<&AlterTable> {
+        if let Self::AlterTable(statement) = self {
+            Some(statement)
         } else {
             None
         }

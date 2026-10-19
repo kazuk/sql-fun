@@ -91,6 +91,12 @@ pub struct GeneratedColumnConstraint {
 }
 
 impl GeneratedColumnConstraint {
+    pub(crate) fn is_stored(&self) -> bool {
+        self.generated_when == Some(GeneratedColumnMode::stored())
+    }
+    pub(crate) fn is_virtual(&self) -> bool {
+        self.generated_when == Some(GeneratedColumnMode::r#virtual())
+    }
     /// create instance
     pub fn new(
         table_name: &TableName,

@@ -460,6 +460,15 @@ impl BaseParseContext for TestParseContext {
 }
 
 impl TypeInfoWrite for TestParseContext {
+    fn insert_create_domain_with_base(
+        &mut self,
+        name: &FullName,
+        domain: &CreateDomain,
+        _base: Option<&TypeReference>,
+    ) {
+        self.insert_create_domain(name, domain);
+    }
+
     fn insert_table_ref_type(&mut self, name: &TableName) {
         self.table_ref_types.push(name.clone());
     }

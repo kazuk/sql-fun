@@ -75,6 +75,10 @@ impl ParsedSchemaDump {
 }
 
 impl TypeInfoRead for ParsedSchemaDump {
+    fn domain_base_type(&self, name: &FullName) -> Option<TypeReference> {
+        self.base_context().domain_base_type(name)
+    }
+
     fn builtin_type_category(&self, name: &FullName) -> Option<(char, bool)> {
         self.base_context().builtin_type_category(name)
     }

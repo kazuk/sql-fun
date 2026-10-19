@@ -447,6 +447,10 @@ forward_catalog_reads!(crate::sem::SchemaFileContext, catalog);
 forward_catalog_reads!(crate::ParsedSchemaDump, base_context);
 
 impl crate::sem::TypeInfoRead for FrozenBaseContext {
+    fn domain_base_type(&self, name: &FullName) -> Option<TypeReference> {
+        self.catalog().domain_base_type(name)
+    }
+
     fn builtin_type_category(&self, name: &FullName) -> Option<(char, bool)> {
         self.catalog().builtin_type_category(name)
     }

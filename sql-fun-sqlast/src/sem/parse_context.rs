@@ -583,12 +583,26 @@ where
     }
 
     /// apply `create domain` to current schema
-    fn apply_create_domain(mut self, create_domain: &CreateDomain) -> Result<Self, AnalysisError> {
+    fn apply_create_domain(self, create_domain: &CreateDomain) -> Result<Self, AnalysisError> {
+        let base = create_domain
+            .base_type()
+            .cloned()
+            .map(TypeReference::from_full_name);
+        self.apply_create_domain_with_base(create_domain, base.as_ref())
+    }
+
+    /// Publish a domain and its complete resolved base without changing the
+    /// declaration's existing serialized representation.
+    fn apply_create_domain_with_base(
+        mut self,
+        create_domain: &CreateDomain,
+        base: Option<&TypeReference>,
+    ) -> Result<Self, AnalysisError> {
         let name = self.apply_default_schema(create_domain.name())?;
         if !self.permits_type_creation(&name)? {
             return Ok(self);
         }
-        self.insert_create_domain(&name, create_domain);
+        self.insert_create_domain_with_base(&name, create_domain, base);
         Ok(self)
     }
 

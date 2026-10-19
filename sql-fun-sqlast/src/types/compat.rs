@@ -6,6 +6,13 @@
 //! Unsupported range/polymorphic/pseudo-type loading and incomplete or recursive
 //! catalogs produce typed errors rather than fabricated terminal types.
 
+mod cast;
+
+pub use self::cast::{
+    load_assignment_cast, load_assignment_sources, load_cast_definition, load_cast_sources,
+    load_explicit_cast, load_implicit_cast,
+};
+
 use crate::sem::{
     ColumnCollection, ColumnDefinition, CreateCompositeType, CreateDomain, CreateEnum, FullName,
     ParseContext, SchemaFileContext, TableName, TypeDefinition as LegacyDefinition,
@@ -34,8 +41,8 @@ pub enum ConversionError {
     /// A field has no known type; the index is zero based.
     #[error("member at index {0} has no type")]
     MissingMemberType(usize),
-    /// A nominal builtin needs a category not implemented by this seam.
-    #[error("loading this named category is not supported: {0}")]
+    /// A named category cannot be loaded completely from the legacy data.
+    #[error("complete category components unavailable for named type: {0}")]
     UnsupportedNamedType(FullName),
     /// A declaration's own identity is dynamic rather than a nominal reference.
     #[error("declaration identity requires a concrete named reference")]
@@ -404,3 +411,6 @@ impl<'a, C: ParseContext> Loader<'a, C> {
 
 #[cfg(test)]
 mod tests;
+
+#[cfg(test)]
+mod cast_tests;

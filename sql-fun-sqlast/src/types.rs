@@ -7,25 +7,29 @@
 
 pub mod array;
 pub mod base;
+mod cast;
 pub mod compat;
 mod composite;
+mod constraint;
 mod domain;
 mod enumeration;
 
+pub use self::cast::{CastContext, CastDefinition};
 pub use self::composite::{CompositeType, ImplicitCompositeType, Member, Members, TableRowType};
+pub use self::constraint::{Any, Candidates, Never};
 pub use self::domain::DomainType;
 pub use self::enumeration::EnumType;
 
-use std::any::Any;
+use std::any::Any as StdAny;
 
 /// An owned type value with category-defined, recursively comparable components.
 ///
 /// Implementations must make `same_type` an equivalence relation, comparing
 /// concrete category as well as all identity components. Cloning preserves
 /// identity and owns the cloned components independently of catalog storage.
-pub trait TypeDefinition: std::fmt::Debug + Any {
+pub trait TypeDefinition: std::fmt::Debug + StdAny {
     /// Inspect a category to access its category-specific capabilities.
-    fn as_any(&self) -> &dyn Any;
+    fn as_any(&self) -> &dyn StdAny;
     /// Clone this value and its owned components.
     fn clone_box(&self) -> TypeReference;
     /// Compare category and identity components, without considering coercions.

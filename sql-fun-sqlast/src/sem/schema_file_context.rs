@@ -884,6 +884,12 @@ impl ParseContext for SchemaFileContext {
         Ok(self)
     }
 
+    fn apply_alter_index(mut self, index: &crate::sem::AlterIndex) -> Result<Self, AnalysisError> {
+        if let Some(replacement) = index.replacement() {
+            self.catalog.store_index(replacement);
+        }
+        Ok(self)
+    }
     fn apply_create_index(mut self, create_index: &CreateIndex) -> Result<Self, AnalysisError> {
         let name = create_index.name();
         if !self.permits_relation_creation(

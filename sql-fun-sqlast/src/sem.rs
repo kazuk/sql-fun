@@ -1,5 +1,6 @@
 #![doc = include_str!("sem.md")]
 
+mod alter_index;
 mod alter_owner;
 mod alter_seq;
 mod alter_table;
@@ -96,6 +97,10 @@ pub use self::drop_trigger::DropTrigger;
 
 #[expect(deprecated)]
 pub use self::{
+    alter_index::{
+        AlterIndex, IndexAlteration, IndexStatisticsChange, IndexStorageChange,
+        IndexStorageParameter, IndexTarget,
+    },
     alter_owner::{AlterOwner, OwnershipArgumentFailure, OwnershipLookup},
     alter_seq::{AlterSequence, SequenceDependency},
     alter_table::{AlterTable, AlterView},
@@ -123,7 +128,9 @@ pub use self::{
     create_enum_type::CreateEnum,
     create_extension::CreateExtension,
     create_function::CreateFunction,
-    create_index::{CreateIndex, IndexElement, IndexElementWithOrder, SortOrder},
+    create_index::{
+        CreateIndex, IndexElement, IndexElementWithOrder, IndexStorageValue, SortOrder,
+    },
     create_schema::CreateSchema,
     create_seq::CreateSequence,
     create_table::{
@@ -329,6 +336,8 @@ pub enum SemAst {
 
     /// `alter sequence` statement
     AlterSequence(AlterSequence),
+    /// Analyzed ALTER INDEX, including rejected and skipped alterations.
+    AlterIndex(AlterIndex),
 
     /// `alter table` statement
     AlterTable(AlterTable),
@@ -499,6 +508,17 @@ impl SemAst {
     pub(crate) fn alter_view(view: &AlterView) -> Self {
         Self::AlterView(view.clone())
     }
+    pub(crate) fn alter_index(index: &AlterIndex) -> Self {
+        Self::AlterIndex(index.clone())
+    }
+    /// Inspect the completed ALTER INDEX analysis.
+    pub const fn as_alter_index(&self) -> Option<&AlterIndex> {
+        if let Self::AlterIndex(index) = self {
+            Some(index)
+        } else {
+            None
+        }
+    }
     pub(crate) fn alter_sequence(sequence: &AlterSequence) -> Self {
         Self::AlterSequence(sequence.clone())
     }
@@ -512,6 +532,7 @@ impl SemAst {
             Self::AlterTable(table) => context.apply_alter_table(table),
             Self::AlterView(view) => context.apply_alter_view(view),
             Self::AlterSequence(sequence) => context.apply_alter_sequence(sequence),
+            Self::AlterIndex(index) => context.apply_alter_index(index),
             _ => AnalysisError::raise_unexpected_input("alter relation result"),
         }
     }

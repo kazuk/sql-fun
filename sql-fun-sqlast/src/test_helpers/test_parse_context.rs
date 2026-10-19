@@ -660,6 +660,14 @@ impl ParseContext for TestParseContext {
         todo!()
     }
 
+    fn apply_alter_index(mut self, index: &crate::sem::AlterIndex) -> Result<Self, AnalysisError> {
+        if let Some(replacement) = index.replacement() {
+            self.create_indexes
+                .retain(|existing| existing.name() != replacement.name());
+            self.create_indexes.push(replacement.clone());
+        }
+        Ok(self)
+    }
     fn apply_create_index(self, _create_index: &CreateIndex) -> Result<Self, AnalysisError> {
         let mut context = self;
         context.create_indexes.push(_create_index.clone());

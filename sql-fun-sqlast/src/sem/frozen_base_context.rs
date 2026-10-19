@@ -178,6 +178,13 @@ macro_rules! forward_catalog_reads {
             }
         }
         impl crate::sem::CastInfoRead for $context {
+            fn registered_cast(
+                &self,
+                source: &crate::sem::TypeReference,
+                target: &crate::sem::TypeReference,
+            ) -> Option<crate::sem::CastDefinition> {
+                crate::sem::CastInfoRead::registered_cast(self.$catalog(), source, target)
+            }
             fn get_assignment_cast(
                 &self,
                 source: &crate::sem::TypeReference,

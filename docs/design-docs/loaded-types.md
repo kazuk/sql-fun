@@ -285,7 +285,7 @@ absence can be reported. `Ok(None)` is an absent direct relationship between
 valid loaded endpoints; `Err(ConversionError)` is unavailable/incomplete endpoint
 data. The returned context is the catalog's value, not the requested mode.
 Assignment lookup delegates to the dedicated legacy assignment API to retain its
-fallback behavior. No catalog maps, analyzers, or existing call sites change.
+fallback behavior. Existing analyzers and call sites retain their interfaces.
 
 `compat::load_cast_sources(context, target, explicit)` loads exactly the source
 candidates from the selected legacy enumeration, with the caller choosing
@@ -299,3 +299,29 @@ the expression's target/result type. An empty successful enumeration becomes
 Identity remains a candidate where the catalog enumerates it. Missing metadata
 never becomes `Any` or `Never`. Constraint solving and semantic-consumer migration
 remain outside this boundary.
+
+### PostgreSQL array cast derivation
+
+The PostgreSQL catalog provider derives array-to-array relationships from element
+casts in the same requested context, including custom catalog types and element
+I/O coercions. For example, `int2[]` to `int4[]` is implicit, the reverse requires
+assignment or explicit conversion, and `text[]` to `int4[]` requires an explicit
+cast. The loaded relationship owns the complete array endpoints and preserves
+the element lookup's context for the requested operation; eligibility does not
+imply endpoint equality.
+
+`sem::CastInfoRead::registered_cast` exposes an actual catalog entry without
+deriving coercions, so inherited entries can be distinguished from a provider's
+derived relationships. A registered whole-array cast takes precedence over
+element derivation, including
+when its context excludes the requested operation. Source and target candidate
+enumerations apply the same array rules. These rules belong to the PostgreSQL
+provider rather than the dialect-independent `TypeContext` facade; native
+providers retain their own semantics and SQLite does not acquire these rules.
+There is no transitive cast search or flattening of loaded domains or nested
+arrays. The temporary adapter's projection restrictions still apply.
+
+This follows PostgreSQL's
+[`find_coercion_pathway`](https://github.com/postgres/postgres/blob/REL_18_STABLE/src/backend/parser/parse_coerce.c)
+array-element coercion rule. PostgreSQL 15–18 were consulted as behavioral
+oracles; regression tests use the repository's offline catalogs.

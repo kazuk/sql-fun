@@ -5,11 +5,43 @@ use crate::sem::{CastContext, CastDefinition, CastInfoRead, TypeInfoRead, TypeRe
 use super::SchemaCatalog;
 
 impl CastInfoRead for SchemaCatalog {
+    fn registered_cast(
+        &self,
+        source: &TypeReference,
+        target: &TypeReference,
+    ) -> Option<CastDefinition> {
+        if source.is_dynamic() || target.is_dynamic() {
+            return None;
+        }
+        if let Some(cast) = self.local_cast(source, target) {
+            Some(cast)
+        } else {
+            self.base.registered_cast(source, target)
+        }
+    }
+
     fn get_assignment_cast(
         &self,
         source: &TypeReference,
         target: &TypeReference,
     ) -> Option<CastDefinition> {
+        if source.is_dynamic() || target.is_dynamic() {
+            return self.base.get_assignment_cast(source, target);
+        }
+        if crate::ast::Dialect::from(&self.metadata) == crate::ast::Dialect::postgres()
+            && source.is_array() == Some(true)
+            && target.is_array() == Some(true)
+            && let Some(cast) = self.registered_cast(source, target)
+        {
+            return if cast.context().use_in_assignment() {
+                Some(cast)
+            } else {
+                None
+            };
+        }
+        if let Some((source, target)) = self.array_elements(source, target) {
+            return self.get_assignment_cast(&source, &target);
+        }
         if let Some(cast) = self.get_explicit_cast(source, target)
             && cast.context().use_in_assignment()
         {
@@ -28,6 +60,16 @@ impl CastInfoRead for SchemaCatalog {
         sources.extend(self.types.cast_source_types());
         if explicit {
             sources.extend(Self::io_string_types());
+        }
+        if crate::ast::Dialect::from(&self.metadata) == crate::ast::Dialect::postgres()
+            && !target.is_dynamic()
+            && target.is_array() == Some(true)
+        {
+            for source in self.cast_sources(&target.element_type(), explicit) {
+                if !source.is_dynamic() && source.is_array() == Some(false) {
+                    sources.insert(TypeReference::concrete_type_ref(source.full_name(), true));
+                }
+            }
         }
         sources.retain(|source| {
             source == target
@@ -49,15 +91,16 @@ impl CastInfoRead for SchemaCatalog {
             return None;
         }
 
-        if let Some(s) = self.casts.get(&source_type.to_string())
-            && let Some(t) = s.get(&target_type.to_string())
-        {
-            if t.use_in_explicit() {
-                Some(t.clone())
+        if let Some(cast) = self.prioritized_cast(source_type, target_type) {
+            if cast.use_in_explicit() {
+                Some(cast)
             } else {
                 None
             }
         } else {
+            if let Some((source, target)) = self.array_elements(source_type, target_type) {
+                return self.get_explicit_cast(&source, &target);
+            }
             if let Some(cast) = self.base.get_explicit_cast(source_type, target_type) {
                 Some(cast)
             } else {
@@ -82,6 +125,17 @@ impl CastInfoRead for SchemaCatalog {
             }
         }
 
+        if crate::ast::Dialect::from(&self.metadata) == crate::ast::Dialect::postgres()
+            && source_type.is_array() == Some(true)
+        {
+            for target in self.get_implicit_castable(&source_type.element_type()) {
+                if !target.is_dynamic() && target.is_array() == Some(false) {
+                    castable.insert(TypeReference::concrete_type_ref(target.full_name(), true));
+                }
+            }
+            castable.retain(|target| self.get_implicit_cast(source_type, target).is_some());
+        }
+
         // source_type -> source_type is always available with no conversion
         if !castable.contains(source_type) {
             castable.insert(source_type.clone());
@@ -99,21 +153,65 @@ impl CastInfoRead for SchemaCatalog {
             return None;
         }
 
-        if let Some(s) = self.casts.get(&source_type.to_string())
-            && let Some(t) = s.get(&target_type.to_string())
-        {
-            if t.use_in_implicit() {
-                Some(t.clone())
+        if let Some(cast) = self.prioritized_cast(source_type, target_type) {
+            if cast.use_in_implicit() {
+                Some(cast)
             } else {
                 None
             }
         } else {
+            if let Some((source, target)) = self.array_elements(source_type, target_type) {
+                return self.get_implicit_cast(&source, &target);
+            }
             self.base.get_implicit_cast(source_type, target_type)
         }
     }
 }
 
 impl SchemaCatalog {
+    fn local_cast(&self, source: &TypeReference, target: &TypeReference) -> Option<CastDefinition> {
+        self.casts
+            .get(&source.to_string())?
+            .get(&target.to_string())
+            .cloned()
+    }
+
+    fn prioritized_cast(
+        &self,
+        source: &TypeReference,
+        target: &TypeReference,
+    ) -> Option<CastDefinition> {
+        if let Some(cast) = self.local_cast(source, target) {
+            return Some(cast);
+        }
+        // Only array lifting needs to inspect inherited registered rows before
+        // delegation. Scalar delegation preserves the base's identity handling.
+        if crate::ast::Dialect::from(&self.metadata) == crate::ast::Dialect::postgres()
+            && source.is_array() == Some(true)
+            && target.is_array() == Some(true)
+        {
+            self.base.registered_cast(source, target)
+        } else {
+            None
+        }
+    }
+
+    fn array_elements(
+        &self,
+        source: &TypeReference,
+        target: &TypeReference,
+    ) -> Option<(TypeReference, TypeReference)> {
+        if crate::ast::Dialect::from(&self.metadata) != crate::ast::Dialect::postgres()
+            || source.is_dynamic()
+            || target.is_dynamic()
+            || source.is_array() != Some(true)
+            || target.is_array() != Some(true)
+        {
+            return None;
+        }
+        Some((source.element_type(), target.element_type()))
+    }
+
     fn io_string_types() -> [TypeReference; 4] {
         ["text", "varchar", "bpchar", "name"].map(TypeReference::from_master_type_name)
     }
@@ -175,6 +273,122 @@ mod test_cast_layers {
             HashSet::from([source.clone(), shared, inherited, local])
         );
         assert!(!frozen.get_implicit_castable(&source).contains(&explicit));
+    }
+
+    #[test]
+    fn local_element_shadow_is_preserved_for_arrays() {
+        let (mut context, source, target, _) = test_helpers::cast_layer();
+        test_helpers::register(&mut context, &source, &target, CastContext::explicit());
+        let array_source = crate::sem::TypeReference::concrete_type_ref(source.full_name(), true);
+        let array_target = crate::sem::TypeReference::concrete_type_ref(target.full_name(), true);
+        assert!(context.get_implicit_cast(&source, &target).is_none());
+        assert!(
+            context
+                .get_implicit_cast(&array_source, &array_target)
+                .is_none()
+        );
+        assert_eq!(
+            context
+                .get_explicit_cast(&array_source, &array_target)
+                .unwrap()
+                .context(),
+            CastContext::explicit()
+        );
+        assert_eq!(
+            context
+                .get_assignment_cast(&array_source, &array_target)
+                .unwrap()
+                .context(),
+            context
+                .get_assignment_cast(&source, &target)
+                .unwrap()
+                .context()
+        );
+        assert!(
+            !context
+                .cast_sources(&array_target, false)
+                .contains(&array_source)
+        );
+        assert!(
+            !context
+                .get_implicit_castable(&array_source)
+                .contains(&array_target)
+        );
+    }
+
+    #[test]
+    fn local_whole_array_cast_shadows_element_cast() {
+        let (mut context, source, target, _) = test_helpers::cast_layer();
+        let array_source = crate::sem::TypeReference::concrete_type_ref(source.full_name(), true);
+        let array_target = crate::sem::TypeReference::concrete_type_ref(target.full_name(), true);
+        test_helpers::register(
+            &mut context,
+            &array_source,
+            &array_target,
+            CastContext::explicit(),
+        );
+        assert!(context.get_implicit_cast(&source, &target).is_some());
+        assert!(
+            context
+                .get_implicit_cast(&array_source, &array_target)
+                .is_none()
+        );
+        assert!(
+            context
+                .get_assignment_cast(&array_source, &array_target)
+                .is_none()
+        );
+        assert!(
+            !context
+                .cast_sources(&array_target, false)
+                .contains(&array_source)
+        );
+        assert!(
+            !context
+                .get_implicit_castable(&array_source)
+                .contains(&array_target)
+        );
+    }
+
+    #[test]
+    fn inherited_whole_array_cast_shadows_local_element_cast() {
+        let (mut parent, source, target, _) = test_helpers::cast_layer();
+        let array_source = crate::sem::TypeReference::concrete_type_ref(source.full_name(), true);
+        let array_target = crate::sem::TypeReference::concrete_type_ref(target.full_name(), true);
+        test_helpers::register(
+            &mut parent,
+            &array_source,
+            &array_target,
+            CastContext::explicit(),
+        );
+        let mut child = crate::test_helpers::schema_layer(
+            std::path::Path::new("array-child.sql"),
+            &parent.freeze(),
+        );
+        test_helpers::register(&mut child, &source, &target, CastContext::implicit());
+        assert!(child.get_implicit_cast(&source, &target).is_some());
+        assert!(
+            child
+                .get_implicit_cast(&array_source, &array_target)
+                .is_none()
+        );
+        assert_eq!(
+            child
+                .get_explicit_cast(&array_source, &array_target)
+                .unwrap()
+                .context(),
+            CastContext::explicit(),
+        );
+        assert!(
+            !child
+                .cast_sources(&array_target, false)
+                .contains(&array_source)
+        );
+        assert!(
+            !child
+                .get_implicit_castable(&array_source)
+                .contains(&array_target)
+        );
     }
 
     #[test]

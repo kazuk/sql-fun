@@ -114,6 +114,63 @@ mod test_helpers {
             _ => unreachable!(),
         }
     }
+    pub(super) fn enum_cast_catalog(dialect: crate::ast::Dialect) -> crate::sem::SchemaFileContext {
+        use crate::sem::{
+            BaseParseContext, CastContext, CastDefinition, ParseContext, SchemaFileContext,
+        };
+        use std::path::Path;
+        let mut root = TestParseContext::default().with_dialect(dialect);
+        let source = enumeration(&mut root, "source", &["first"]);
+        let target = enumeration(&mut root, "target", &["second"]);
+        root.set_get_implicit_cast_result(
+            &source,
+            &target,
+            Some(CastDefinition::new(CastContext::implicit())),
+        );
+        root.set_get_implicit_castable_result(
+            &source,
+            &std::collections::HashSet::from([source.clone(), target]),
+        );
+        let environment = TestParseContext::default().with_dialect(dialect);
+        let root = root.freeze();
+        SchemaFileContext::new(
+            Path::new("array-casts.sql"),
+            &root,
+            environment.get_args(),
+            environment.metadata(),
+        )
+    }
+
+    pub(super) mod heavy {
+        use crate::sem::{BaseContext, BaseParseContext, FrozenBaseContext, SchemaFileContext};
+        use ::clap::Parser;
+        use ::sql_fun_core::SqlFunArgs;
+        use std::path::{Path, PathBuf};
+
+        /// Loads real builtin metadata for each caller to verify catalog array casts.
+        pub(in crate::types::compat) fn builtin_context() -> SchemaFileContext {
+            let base = builtin_root_context();
+            let args = base.get_args().clone();
+            let metadata = base.metadata().clone();
+            let base = FrozenBaseContext::from(base);
+            SchemaFileContext::new(Path::new("array-casts.sql"), &base, &args, &metadata)
+        }
+        /// Loads real builtin metadata for each caller to verify catalog array casts.
+        pub(in crate::types::compat) fn builtin_root_context() -> BaseContext {
+            let metadata = PathBuf::from(env!("CARGO_MANIFEST_DIR")).join("sql_fun.metadata.toml");
+            let args = SqlFunArgs::try_parse_from([
+                "sqlfun",
+                "--metadata-file",
+                metadata.to_str().expect("metadata path"),
+                "--sql-fun-home",
+                env!("SQL_FUN_HOME"),
+            ])
+            .expect("fixture args");
+            let collection = args.load_metadata().expect("fixture metadata");
+            let selected = collection.get("default").expect("selected metadata");
+            BaseContext::new(&args, selected).expect("builtin context")
+        }
+    }
 }
 
 #[rstest::rstest]
@@ -472,4 +529,228 @@ fn array_of_unregistered_table_row_preserves_members_in_public_cast() {
     let member = row.members().member("value").unwrap();
     assert_eq!(member.is_not_null(), Some(true));
     assert!(member.member_type().as_any().is::<BaseType>());
+}
+
+#[rstest::rstest]
+#[case::implicit(
+    "int2",
+    "int4",
+    crate::types::CastContext::implicit(),
+    Some(crate::types::CastContext::implicit()),
+    true
+)]
+#[case::assignment(
+    "int4",
+    "int2",
+    crate::types::CastContext::assignment(),
+    Some(crate::types::CastContext::assignment()),
+    false
+)]
+#[case::assignment_io(
+    "int4",
+    "text",
+    crate::types::CastContext::explicit(),
+    Some(crate::types::CastContext::assignment()),
+    false
+)]
+#[case::explicit_io("text", "int4", crate::types::CastContext::explicit(), None, false)]
+fn builtin_array_casts_preserve_element_cast_context(
+    #[case] source: &str,
+    #[case] target: &str,
+    #[case] expected: crate::types::CastContext,
+    #[case] assignment: Option<crate::types::CastContext>,
+    #[case] implicit: bool,
+) {
+    // Real builtin metadata supplies the element cast and I/O eligibility.
+    let catalog = test_helpers::heavy::builtin_context();
+    let context = TypeContext::new(&catalog);
+    let source = context
+        .type_by_name(&FullName::with_schema("pg_catalog", source))
+        .unwrap()
+        .unwrap();
+    let target = context
+        .type_by_name(&FullName::with_schema("pg_catalog", target))
+        .unwrap()
+        .unwrap();
+    let source_array = ArrayType::new(source.as_ref());
+    let target_array = ArrayType::new(target.as_ref());
+    let cast = context
+        .explicit_cast(&source_array, &target_array)
+        .unwrap()
+        .unwrap();
+    assert_eq!(cast.context(), expected);
+    assert!(cast.source().same_type(&source_array));
+    assert!(cast.target().same_type(&target_array));
+    assert_eq!(
+        context
+            .implicit_cast(&source_array, &target_array)
+            .unwrap()
+            .is_some(),
+        implicit
+    );
+    assert_eq!(
+        context
+            .assignment_cast(&source_array, &target_array)
+            .unwrap()
+            .map(|cast| cast.context()),
+        assignment
+    );
+}
+
+#[test]
+fn custom_enum_array_casts_and_candidates_follow_element_relationships() {
+    let catalog = test_helpers::enum_cast_catalog(crate::ast::Dialect::postgres());
+    let context = TypeContext::new(&catalog);
+    let source = context
+        .type_by_name(&FullName::with_schema("public", "source"))
+        .unwrap()
+        .unwrap();
+    let target = context
+        .type_by_name(&FullName::with_schema("public", "target"))
+        .unwrap()
+        .unwrap();
+    let source_array = ArrayType::new(source.as_ref());
+    let target_array = ArrayType::new(target.as_ref());
+    let cast = context
+        .implicit_cast(&source_array, &target_array)
+        .unwrap()
+        .unwrap();
+    assert_eq!(cast.context(), crate::types::CastContext::implicit());
+    assert!(cast.source().same_type(&source_array));
+    assert!(cast.target().same_type(&target_array));
+    let expected = Candidates::from_candidates(&[
+        Box::new(source_array.clone()),
+        Box::new(target_array.clone()),
+    ]);
+    assert!(
+        context
+            .cast_sources(&target_array, false)
+            .unwrap()
+            .same_type(expected.as_ref())
+    );
+    assert!(
+        context
+            .assignment_sources(&target_array)
+            .unwrap()
+            .same_type(expected.as_ref())
+    );
+    assert!(
+        context
+            .implicit_castable(&source_array)
+            .unwrap()
+            .same_type(expected.as_ref())
+    );
+    assert!(
+        context
+            .implicit_cast(&target_array, &source_array)
+            .unwrap()
+            .is_none()
+    );
+}
+
+#[cfg(feature = "sqlite")]
+#[test]
+fn sqlite_does_not_inherit_postgresql_element_array_casts() {
+    let catalog = test_helpers::enum_cast_catalog(crate::ast::Dialect::sqlite());
+    let context = TypeContext::new(&catalog);
+    let source = context
+        .type_by_name(&FullName::with_schema("public", "source"))
+        .unwrap()
+        .unwrap();
+    let target = context
+        .type_by_name(&FullName::with_schema("public", "target"))
+        .unwrap()
+        .unwrap();
+    assert!(
+        context
+            .implicit_cast(
+                &ArrayType::new(source.as_ref()),
+                &ArrayType::new(target.as_ref())
+            )
+            .unwrap()
+            .is_none()
+    );
+}
+
+#[test]
+fn unregistered_table_row_array_lookup_in_schema_catalog_returns_absent() {
+    use crate::sem::{BaseParseContext, ParseContext, SchemaFileContext};
+    use std::path::Path;
+    let mut root = test_helpers::context();
+    let row_reference = test_helpers::table_row(&mut root, false);
+    let row = super::load_reference(&root, &row_reference).unwrap();
+    let array = ArrayType::new(row.as_ref());
+    let environment = test_helpers::context();
+    let catalog = SchemaFileContext::new(
+        Path::new("dynamic-array-casts.sql"),
+        &root.freeze(),
+        environment.get_args(),
+        environment.metadata(),
+    );
+    let context = TypeContext::new(&catalog);
+    assert!(context.implicit_cast(&array, &array).unwrap().is_none());
+    assert!(context.assignment_cast(&array, &array).unwrap().is_none());
+    assert!(context.explicit_cast(&array, &array).unwrap().is_none());
+}
+
+#[rstest::rstest]
+#[case::varchar("varchar")]
+#[case::numeric("numeric")]
+#[case::timestamp("timestamp")]
+fn inherited_builtin_identity_remains_no_conversion(#[case] local: &str) {
+    // Actual pg_cast self rows include typmod functions; same-type lookup remains identity.
+    let catalog = test_helpers::heavy::builtin_context();
+    let context = TypeContext::new(&catalog);
+    let value = context
+        .type_by_name(&FullName::with_schema("pg_catalog", local))
+        .unwrap()
+        .unwrap();
+    let scalar = context
+        .explicit_cast(value.as_ref(), value.as_ref())
+        .unwrap()
+        .unwrap();
+    assert!(scalar.context().is_no_conversion());
+    let array = ArrayType::new(value.as_ref());
+    let cast = context.explicit_cast(&array, &array).unwrap().unwrap();
+    assert!(cast.context().is_no_conversion());
+    assert!(
+        context
+            .implicit_cast(&array, &array)
+            .unwrap()
+            .unwrap()
+            .context()
+            .is_no_conversion()
+    );
+    assert!(
+        context
+            .assignment_cast(&array, &array)
+            .unwrap()
+            .unwrap()
+            .context()
+            .is_no_conversion()
+    );
+}
+
+#[test]
+fn builtin_array_io_candidates_include_types_without_pg_cast_rows() {
+    use crate::sem::{CastInfoRead, TypeReference as LegacyReference};
+    // Raw catalog enumeration avoids requiring unsupported named categories to load.
+    let catalog = test_helpers::heavy::builtin_root_context();
+    let uuid_array = LegacyReference::from_master_type_name("_uuid");
+    let text_array = LegacyReference::from_master_type_name("_text");
+    assert!(
+        catalog
+            .cast_sources(&text_array, true)
+            .contains(&uuid_array)
+    );
+    assert!(
+        catalog
+            .assignment_sources(&text_array)
+            .contains(&uuid_array)
+    );
+    assert!(
+        !catalog
+            .cast_sources(&text_array, false)
+            .contains(&uuid_array)
+    );
 }

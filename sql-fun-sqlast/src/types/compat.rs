@@ -7,11 +7,15 @@
 //! catalogs produce typed errors rather than fabricated terminal types.
 
 mod cast;
+mod context;
+mod loaded_reference;
 
 pub use self::cast::{
     load_assignment_cast, load_assignment_sources, load_cast_definition, load_cast_sources,
-    load_explicit_cast, load_implicit_cast,
+    load_explicit_cast, load_implicit_cast, load_implicit_castable,
 };
+
+pub use self::context::TypeContext;
 
 use crate::sem::{
     ColumnCollection, ColumnDefinition, CreateCompositeType, CreateDomain, CreateEnum, FullName,
@@ -44,6 +48,12 @@ pub enum ConversionError {
     /// A named category cannot be loaded completely from the legacy data.
     #[error("complete category components unavailable for named type: {0}")]
     UnsupportedNamedType(FullName),
+    /// A loaded category has no faithful legacy catalog reference.
+    #[error("loaded type has no faithful legacy representation: {0}")]
+    UnsupportedLoadedType(&'static str),
+    /// Loaded identity components differ from the selected catalog snapshot.
+    #[error("loaded type components do not match the selected catalog")]
+    LoadedTypeMismatch,
     /// A declaration's own identity is dynamic rather than a nominal reference.
     #[error("declaration identity requires a concrete named reference")]
     UnsupportedIdentityReference,
@@ -79,6 +89,14 @@ impl ConversionError {
     /// Report a category outside this seam's loading support.
     pub fn unsupported_named_type(name: &FullName) -> Self {
         Self::UnsupportedNamedType(name.clone())
+    }
+    /// Report a loaded shape that cannot be represented by the legacy model.
+    pub const fn unsupported_loaded_type(reason: &'static str) -> Self {
+        Self::UnsupportedLoadedType(reason)
+    }
+    /// Report a loaded snapshot that differs from the selected catalog.
+    pub const fn loaded_type_mismatch() -> Self {
+        Self::LoadedTypeMismatch
     }
     /// Report a declaration identity that cannot be interpreted as a name.
     pub const fn unsupported_identity_reference() -> Self {
@@ -414,3 +432,6 @@ mod tests;
 
 #[cfg(test)]
 mod cast_tests;
+
+#[cfg(test)]
+mod context_tests;

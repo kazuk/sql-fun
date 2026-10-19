@@ -277,3 +277,67 @@ fn quoted_names_are_exact_and_explicit_variadic_must_be_last() {
             .is_empty()
     );
 }
+
+/// PostgreSQL 15–18 reject omission without a default, even for variadic-only
+/// functions; an explicit empty VARIADIC array or a declared default permits it.
+#[rstest::rstest]
+fn zero_variadic_values_follow_postgresql(
+    #[values(false, true)] preceding_fixed: bool,
+    #[values(false, true)] has_default: bool,
+    #[values(false, true)] explicit_empty_array: bool,
+) {
+    let integer = test_helpers::integer();
+    let array = ArrayType::new(&integer);
+    let default = if has_default {
+        Some(DefaultExpression::sql_list("ARRAY[]::integer[]", 0))
+    } else {
+        None
+    };
+    let mut parameters = Vec::new();
+    let mut arguments = Vec::new();
+    if preceding_fixed {
+        parameters.push(test_helpers::parameter(
+            "a",
+            &integer,
+            ParameterMode::input(),
+            false,
+        ));
+        arguments.push(CallArgument::positional(&integer));
+    }
+    parameters.push(FunctionParameter::new(
+        &Some(ColumnName::new("xs")),
+        ParameterMode::variadic(),
+        &array,
+        &default,
+    ));
+    if explicit_empty_array {
+        arguments.push(CallArgument::positional(&array).with_variadic());
+    }
+    let signature = test_helpers::signature(&parameters, &integer);
+    let overloads = FunctionOverloads::new(std::slice::from_ref(&signature));
+    let matched = overloads.match_call(&arguments).unwrap();
+    assert_eq!(!matched.is_empty(), has_default || explicit_empty_array);
+    if has_default || explicit_empty_array {
+        assert_eq!(matched.overloads().signatures(), &[signature]);
+        // Omission creates no synthetic call argument. Explicit arrays keep a slot.
+        assert!(
+            matched
+                .argument_candidates(arguments.len())
+                .as_any()
+                .is::<Never>()
+        );
+        if explicit_empty_array {
+            assert!(
+                matched
+                    .argument_candidates(arguments.len() - 1)
+                    .as_any()
+                    .downcast_ref::<Candidates>()
+                    .unwrap()
+                    .contains(&array)
+            );
+        }
+    } else {
+        assert!(matched.argument_candidates(0).as_any().is::<Never>());
+        assert!(matched.result_candidates().as_any().is::<Never>());
+    }
+}

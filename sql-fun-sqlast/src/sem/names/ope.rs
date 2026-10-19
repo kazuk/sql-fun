@@ -92,7 +92,9 @@ pub enum OperatorName {
 }
 
 impl OperatorName {
-    pub(crate) fn from_parts(schema: Option<&str>, name: &str) -> Self {
+    /// Construct a name from explicitly supplied logical schema and operator spelling.
+    /// No search path resolution or SQL text parsing is performed.
+    pub fn from_parts(schema: Option<&str>, name: &str) -> Self {
         Self::Valid(ValidOperatorName::from_parts(schema, name))
     }
 

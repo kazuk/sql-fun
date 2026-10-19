@@ -474,6 +474,27 @@ mod test_operator_layers {
             .get_operator_op(&OperatorName::new("-"), has_left, has_right)
             .expect("inherited operator");
         test_helpers::assert_returns(inherited, &PgBuiltInType::int4());
+        let form = if has_left && has_right {
+            crate::types::OperatorForm::binary()
+        } else if has_left {
+            crate::types::OperatorForm::left_unary()
+        } else {
+            crate::types::OperatorForm::right_unary()
+        };
+        let context = crate::test_helpers::schema_layer(std::path::Path::new("read.sql"), &child);
+        let loaded = crate::types::TypeContext::new(&context);
+        let local_loaded = loaded
+            .operator_by_name(&OperatorName::new("+"), form)
+            .unwrap()
+            .unwrap();
+        let inherited_loaded = loaded
+            .operator_by_name(&OperatorName::new("-"), form)
+            .unwrap()
+            .unwrap();
+        let int4 = crate::types::base::BaseType::new(PgBuiltInType::int4().full_name());
+        let int8 = crate::types::base::BaseType::new(PgBuiltInType::int8().full_name());
+        assert!(local_loaded.signatures()[0].result().same_type(&int8));
+        assert!(inherited_loaded.signatures()[0].result().same_type(&int4));
     }
 
     mod test_helpers {
@@ -488,8 +509,11 @@ mod test_operator_layers {
             has_left: bool,
             has_right: bool,
         ) -> crate::sem::FrozenBaseContext {
-            let root = TestParseContext::default().freeze();
-            let mut parent = crate::test_helpers::schema_layer(Path::new("parent.sql"), &root);
+            let mut root = TestParseContext::default();
+            root.setup_type(PgBuiltInType::int4());
+            root.setup_type(PgBuiltInType::int8());
+            let mut parent =
+                crate::test_helpers::schema_layer(Path::new("parent.sql"), &root.freeze());
             register(
                 &mut parent,
                 "+",

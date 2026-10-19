@@ -606,3 +606,62 @@ requires regeneration. The extraction integration job validates producer fields,
 and the maintained catalog-loader tests exercise real extracted scalar, set,
 record and overloaded signatures on both committed versions. All producer/consumer
 mismatches must be resolved before integration into `main`.
+
+### Operator signatures and correlated calls
+
+`OperatorSignature` owns the available operator catalog key (`OperatorName`),
+`OperatorForm`, ordered loaded operands, result and strictness. Identity compares
+all of these components recursively, including structural types and polymorphic
+variable linkage. Clone preserves the loaded snapshot and its scopes.
+`left_unary()` means a **left operand**, `value OP` (postfix); `right_unary()` means
+a **right operand**, `OP value` (prefix). Absent operands are properties of the
+form, not `Never` values. A signature's left/right operand reads return `None`
+when that syntactic side is absent. Syntax-order operand index zero denotes the
+only supplied value for either unary form.
+
+`OperatorOverloads` retains whole signatures in provider order, including
+duplicate snapshots. Its equality follows `Candidates` set identity; `candidates()`
+returns whole-signature candidates or `Never` when empty. Operand/result
+projections produce candidate views. Filters keep every matching original
+signature, preserving operand/result correlation. Membership is direct
+`same_type`, exactly as for functions: `Candidates` contributes direct members,
+`Never` contributes none, and other values are singleton inputs. No casts,
+polymorphic binding, ranking or automatic selection occur.
+
+`OperatorCall::binary`, `left_unary` and `right_unary` explicitly describe the
+invocation form and supplied operand type candidates. `match_call` checks the
+form and all operands together. `OperatorCallMatches` exposes whole survivors,
+syntax-order operand projections, result projections and further filtering.
+It does not import function defaults, named arguments or VARIADIC behavior.
+Independent candidate projections must not be recombined into new signatures.
+The public rustdoc on `OperatorOverloads` demonstrates correlated matching.
+
+`TypeContext::operator_by_name(name, form)` delegates to the selected
+`TypeContextRead` provider. Native providers supply loaded signatures directly;
+`types::compat::operator` adapts `ParseContext::get_operator_op`. This preserves
+the existing form-specific key lookup and local/parent catalog precedence.
+There is no new search-path or schema fallback policy. Explicit qualified and
+unqualified keys remain distinct; quoted schema components retain logical name
+identity. `OperatorName::from_parts` constructs an explicitly supplied logical
+name without parsing SQL or resolving its schema.
+
+Legacy builtin JSON stores operator spelling and operand/result type names,
+with unary direction determined by its file. It does not retain arbitrary
+operator schema provenance, and the legacy lookup does not return a canonical
+resolved operator name. Loaded legacy signatures therefore identify the
+available lookup key, without inventing schema qualification. In particular,
+a qualified key absent from that provider remains absent. This API does not
+claim that differently qualified keys denote the same declaration. Existing
+extractors already retain the required operand, result and strictness fields;
+no legacy storage or serialization changes are needed for these components.
+
+Shared signature-component adaptation in `types::compat::signature` resolves
+legacy type references and preserves declared pseudo categories and signature
+polymorphic linkage using the provider's dialect. Complete concrete structural
+types use the existing reference loader. Unavailable nested definitions,
+recursive types and unsupported concrete layouts remain explicit conversion
+failures. `OperatorLoadError` reports name, requested form, zero-based overload
+index, component path and underlying reason. Loading is all-or-error: a failing
+overload is never omitted. Missing catalog keys return `Ok(None)`; a reported
+empty overload vector returns `Some(empty)` whose candidates are `Never`.
+Existing analyzers and their operator resolver do not consume this opt-in API.

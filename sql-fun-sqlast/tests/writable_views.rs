@@ -18,7 +18,7 @@ mod test_helpers {
             parsed: ParsedSchemaDump,
         }
         impl ViewSchema {
-            /// Load the maintained PostgreSQL 17 catalog for view-write analysis.
+            /// Load the maintained `PostgreSQL` 17 catalog for view-write analysis.
             /// Each call reloads the full catalog without sharing across test processes.
             pub fn postgres(sql: &str) -> Result<Self, Box<dyn std::error::Error>> {
                 Self::load_from_catalog(sql, false, "17", Path::new(env!("SQL_FUN_HOME")))

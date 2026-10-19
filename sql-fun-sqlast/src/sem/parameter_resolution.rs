@@ -616,7 +616,7 @@ impl<C: crate::sem::ParseContext> crate::sem::traversal::SemanticVisitor for Col
                 );
             } else if let Some(source) = value.get_type()
                 && &source != ty
-                && !self.context.get_assignment_cast(&source, ty).is_some()
+                && self.context.get_assignment_cast(&source, ty).is_none()
             {
                 self.context.report_analysis_problem(
                     crate::sem::AnalysisProblem::parameter_constraint(&format!(
@@ -928,8 +928,8 @@ impl ParameterResolution {
         left: Option<&SemScalarExpr>,
         right: Option<&SemScalarExpr>,
     ) -> Result<Option<SemScalarExpr>, AnalysisError> {
-        if !left.is_some_and(|arg| arg.constraint_node().is_some())
-            && !right.is_some_and(|arg| arg.constraint_node().is_some())
+        if left.is_some_and(|arg| arg.constraint_node().is_none())
+            && right.is_some_and(|arg| arg.constraint_node().is_none())
         {
             return Ok(None);
         }

@@ -33,8 +33,9 @@ working with loaded values. `TypeContext` and the public `TypeContextRead`
 provider contract live permanently in `types/context.rs` and are re-exported
 from `types`. The facade borrows an explicitly selected provider and delegates
 catalog facts; it owns no catalog storage and discovers no ambient inputs.
-PostgreSQL coercion policy operates on loaded components in this permanent
-module, separately from the provider and the removable adapter.
+PostgreSQL coercion policy operates on loaded components in
+`types/cast/resolve.rs`, separately from the context entrypoint, provider and
+removable adapter.
 
 `TypeContextRead` has an associated `Error` and eight primary loaded-value
 operations:
@@ -42,8 +43,9 @@ two type lookups, three directed cast lookups and three candidate enumerations.
 Native providers implement this contract directly using their own error type,
 without importing legacy references or `types::compat`. Removing the temporary
 legacy adapter later leaves the public `TypeContext` implementation and provider
-interface intact. The optional `supports_postgres_coercions` hook explicitly
-selects PostgreSQL component rules; its default preserves provider-only behavior.
+interface intact. The required `dialect` method returns the actual selected
+`ast::Dialect`. PostgreSQL rules follow that dialect, without a separate feature
+flag or silent default. Other dialects retain provider-only cast behavior.
 `registered_cast` supplies an actual native catalog entry, while
 `existing_array_cast` supplies a provider's existing whole-array relationship.
 Both fact hooks default to no fact and contain no derivation policy.
@@ -51,8 +53,8 @@ Both fact hooks default to no fact and contain no derivation policy.
 `types/compat/context.rs` contains the blanket adapter implementing
 `TypeContextRead` for a selected `sem::ParseContext`, with
 `type Error = compat::ConversionError`. All legacy projection, conversion and
-catalog fact retrieval stays in `compat`. Its PostgreSQL capability comes from
-the selected context dialect; it implements no component coercion rules.
+catalog fact retrieval stays in `compat`. Its `dialect` method forwards
+`ParseContext::dialect`; it implements no component coercion rules.
 Existing consumers can therefore pass
 their selected `ParseContext` to `TypeContext::new`, while native providers have
 no dependency on that adapter.
@@ -317,8 +319,9 @@ remain outside this boundary.
 
 ### PostgreSQL coercion policy in the permanent type system
 
-When the selected provider enables PostgreSQL coercions, `TypeContext` implements
-these rules in `types/context.rs`. Existing `sem::ParseContext` and
+When the selected provider returns the PostgreSQL dialect, `TypeContext` delegates
+these rules to `types/cast/resolve.rs`. `types/context.rs` retains the public
+entrypoint, provider contract and delegation. Existing `sem::ParseContext` and
 `sem::CastInfoRead` APIs, cast implementations and semantic consumers retain their
 previous behavior. `types::compat` only adapts catalog facts and references.
 

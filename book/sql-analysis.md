@@ -316,6 +316,25 @@ grammar, so PostgreSQL 18's RETURNING OLD/NEW alias syntax is unavailable.
 These limitations can terminate analysis; parsing a statement does not establish
 that its semantics are supported.
 
+## PostgreSQL GREATEST and LEAST
+
+`GREATEST` and `LEAST` analyze every operand and report a PostgreSQL common
+result type, implicit coercions, and nullability. NULL operands are ignored;
+a guaranteed non-null operand makes the result non-null. All-unknown literal
+inputs resolve to `text`. Incompatible types and types without a comparison
+implementation, such as `json`, produce diagnostics.
+
+Numbered parameters participate in common-type analysis, including nested
+expressions, subqueries, and nonrecursive CTEs. Several admissible input types
+can produce different result types; the analysis retains these alternatives.
+An explicit SQL cast can specify an operand's type. These expressions are
+separate from aggregate `MIN`/`MAX` and SQLite scalar `min`/`max`.
+
+Mixed-type selection requires builtin metadata containing PostgreSQL type
+categories and preferred-type flags. If analysis reports missing type facts,
+refresh the selected builtin catalog using the existing
+[extraction workflow](cli/extract.md).
+
 ## Parameter analysis
 
 Numbered parameters (`$1` in PostgreSQL and `?1` in SQLite) can be used across

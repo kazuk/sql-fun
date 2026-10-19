@@ -75,6 +75,13 @@ impl ParsedSchemaDump {
 }
 
 impl TypeInfoRead for ParsedSchemaDump {
+    fn builtin_type_category(&self, name: &FullName) -> Option<(char, bool)> {
+        self.base_context().builtin_type_category(name)
+    }
+    fn builtin_type_ordered(&self, name: &FullName) -> bool {
+        self.base_context().builtin_type_ordered(name)
+    }
+
     fn get_type_impl(&self, key: &FullName) -> Option<&TypeDefinition> {
         self.base_context().get_type_impl(key)
     }

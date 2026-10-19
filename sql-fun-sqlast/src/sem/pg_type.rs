@@ -94,6 +94,24 @@ impl TypeDefinition {
         true
     }
 
+    pub(crate) const fn domain_base(&self) -> Option<&FullName> {
+        if let Self::Domain(domain) = self {
+            domain.base_type()
+        } else {
+            None
+        }
+    }
+    pub(crate) const fn user_type_category(&self) -> Option<char> {
+        match self {
+            Self::Enum(_) => Some('E'),
+            Self::CompositeType(_) | Self::TableRef(..) | Self::ImplicitComposite(_) => Some('C'),
+            _ => None,
+        }
+    }
+    pub(crate) const fn has_structural_ordering(&self) -> bool {
+        self.user_type_category().is_some()
+    }
+
     /// type is array?
     #[must_use]
     pub fn is_array(&self) -> Option<bool> {

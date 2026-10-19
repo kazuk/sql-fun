@@ -29,6 +29,7 @@ pub struct BaseContext {
     context_args: SqlFunArgs,
     metadata: SqlFunMetadata,
     types: TrieMap<TypeDefinition>,
+    binary_ordered_types: std::collections::HashSet<FullName>,
     casts: TrieMap<TrieMap<CastDefinition>>,
     binary_operators: TrieMap<OperatorDefinition>,
     left_unary_operators: TrieMap<OperatorDefinition>,
@@ -79,19 +80,20 @@ impl BaseContext {
             PgBuiltinOperators::load_left_unary(paths.left_unary_operators()?)?;
         let right_unary_operators =
             PgBuiltinOperators::load_right_unary(paths.right_unary_operators()?)?;
-        let casts = PgBuiltinCasts::load(paths.casts()?)?;
         let masters = if crate::ast::Dialect::from(metadata) == crate::ast::Dialect::sqlite() {
             crate::sem::ConflictMasters::sqlite()
         } else {
             crate::sem::ConflictMasters::load(&paths.collations()?, &paths.operator_classes()?)?
         };
 
+        let (casts, binary_ordered_types) = PgBuiltinCasts::load(paths.casts()?, &masters)?;
         Ok(Self {
             context_args: context_args.clone(),
             metadata: metadata.clone(),
             functions,
             masters,
             types: builtin_type_data,
+            binary_ordered_types,
             casts,
             binary_operators,
             left_unary_operators,
@@ -108,9 +110,7 @@ impl BaseContext {
         self.masters.declare_sqlite_collation(name)
     }
 
-    fn load_builtin_types(
-        paths: &PostgresBuiltinPaths,
-    ) -> Result<TrieMap<TypeDefinition>, AnalysisError> {
+    fn load_builtin_types(paths: &PostgresBuiltinPaths) -> Result<TrieMap<TypeDefinition>, AnalysisError> {
         let builtin_types_path = paths.types()?;
         let builtin_types: Vec<BuiltinTypeInfo> = serde_json::from_reader(BufReader::new(
             File::open(&builtin_types_path)?,
@@ -147,6 +147,9 @@ impl BaseContext {
 mod test_metadata;
 
 impl TypeInfoRead for BaseContext {
+    fn builtin_type_ordered(&self, name: &FullName) -> bool {
+        self.masters.type_ordered(name) || self.binary_ordered_types.contains(name)
+    }
     fn get_type_impl(&self, key: &FullName) -> Option<&TypeDefinition> {
         tracing::info!("get type {key}");
         self.types.get(&key.to_string())

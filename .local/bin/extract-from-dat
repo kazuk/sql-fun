@@ -23,7 +23,7 @@ cargo run -q -p parse_dat ${PG_TYPE_DAT} \
   | jq '[
   .[] 
   | select(.typtype != "c")
-  | { "name": .typname } ]
+  | { "name": .typname, "category": (.typcategory // "U"), "preferred": (.typispreferred == "t") } ]
   ' > "${BUILTIN_TYPE_PATH}"
 
 # extract functions

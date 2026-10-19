@@ -23,16 +23,26 @@ pub struct CastInfo {
 // alias: source_type -> target_type -> CastInfo
 pub type CastMap = HashMap<String, HashMap<String, CastInfo>>;
 
+type LoadedCasts = (TrieMap<TrieMap<CastDefinition>>, HashSet<FullName>);
+
 impl PgBuiltinCasts {
     pub(super) fn load<P: AsRef<Path>>(
         path: P,
-    ) -> Result<TrieMap<TrieMap<CastDefinition>>, AnalysisError> {
+        masters: &crate::sem::ConflictMasters,
+    ) -> Result<LoadedCasts, AnalysisError> {
         let casts: CastMap = super::deserialize_from_path(path)?;
 
         let mut result = TrieMap::new();
+        let mut binary_ordered = HashSet::new();
         for (source, m) in casts {
             let mut group = TrieMap::new();
             for (target, ci) in m {
+                if ci.method == "b"
+                    && ci.context == "i"
+                    && masters.type_ordered(&FullName::with_schema("pg_catalog", &target))
+                {
+                    binary_ordered.insert(FullName::with_schema("pg_catalog", &source));
+                }
                 let cc = match ci.context.as_str() {
                     "i" if ci.preferred => CastContext::ImplicitPrefeerd,
                     "i" => CastContext::Implicit,
@@ -45,7 +55,7 @@ impl PgBuiltinCasts {
             }
             result.insert(&source, group);
         }
-        Ok(result)
+        Ok((result, binary_ordered))
     }
 }
 

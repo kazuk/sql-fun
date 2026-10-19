@@ -317,6 +317,14 @@ impl ConflictMasters {
         Ok(result)
     }
 
+    pub(crate) fn type_ordered(&self, name: &FullName) -> bool {
+        self.operator_classes.iter().any(|class| {
+            class.default
+                && class.access_method == "btree"
+                && class.input_type.qualified_name() == *name
+        })
+    }
+
     fn read<T: serde::de::DeserializeOwned>(path: &Path) -> Result<T, AnalysisError> {
         let read = || -> Result<T, Box<dyn std::error::Error>> {
             Ok(serde_json::from_reader(BufReader::new(File::open(path)?))?)

@@ -166,6 +166,26 @@ impl MinMaxExpr {
         {
             return true;
         }
+        // PostgreSQL's default B-tree classes for these concrete families
+        // have polymorphic input types, not the concrete result type's name.
+        let range_family = context
+            .builtin_type_category(base.full_name())
+            .is_some_and(|(category, _)| category == 'R');
+        let family = if range_family && base.is_range() {
+            Some("anyrange")
+        } else if range_family && base.is_multi_range() {
+            Some("anymultirange")
+        } else if base == TypeReference::from_master_type_name("int2vector") {
+            // int2vector uses array comparison over int2 despite having a
+            // distinct nominal spelling in the legacy type representation.
+            Some("anyarray")
+        } else {
+            None
+        };
+        if let Some(family) = family {
+            return context
+                .builtin_type_ordered(TypeReference::from_master_type_name(family).full_name());
+        }
         context.builtin_type_ordered(base.full_name())
     }
 

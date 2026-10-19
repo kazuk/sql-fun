@@ -116,12 +116,14 @@ impl TryFrom<&syn::ColumnDefinition> for Column {
             .iter()
             .map(TableConstraint::try_from)
             .collect::<Result<Vec<_>, _>>()?;
+        let column_type = value.column_type();
         Ok(Self {
             collation: Name::default(),
             compression: None,
             storage: None,
             name: value.column_name().value().to_owned(),
-            type_name: value.column_type().map(TypeName::try_from).transpose()?,
+            type_name: column_type.map(TypeName::try_from).transpose()?,
+            type_mod: None,
             constraints,
             not_null: None,
         })

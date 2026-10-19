@@ -126,6 +126,7 @@ pub(crate) struct Column {
     storage: Option<String>,
     name: String,
     type_name: Option<TypeName>,
+    type_mod: Option<i32>,
     constraints: Vec<TableConstraint>,
     not_null: Option<bool>,
 }

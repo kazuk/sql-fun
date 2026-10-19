@@ -115,8 +115,10 @@ done
 git -C "$fixture/repo" remote set-url origin https://github.com/fixture/repository.git
 expect_failure env CREATE_FAILURE=true "$create" "${args[@]}"
 [[ "$(wc -l < "$fixture/requests")" -eq 7 ]]
-# Fixture worktrees test Git repository context; production worktrees use agent-worktree-add.
-git -C "$fixture/repo" worktree add -q --detach "$fixture/linked" HEAD
-"$fixture/linked/.codex/skills/old-source-review/scripts/create-maintenance-issue.sh" "${args[@]}" >/dev/null
+# Use the controlled helper with an explicit fixture root, even when GIT_ROOT
+# points to the developer checkout and the agent Git wrapper is active.
+linked="$(GIT_ROOT="$fixture/repo" "$root/.local/bin/agent-worktree-add" linked HEAD)"
+[[ "$linked" == "$fixture/repo/.worktrees/linked" ]]
+"$linked/.codex/skills/old-source-review/scripts/create-maintenance-issue.sh" "${args[@]}" >/dev/null
 [[ "$(wc -l < "$fixture/requests")" -eq 8 ]]
 printf 'Old-source-review contracts passed\n'

@@ -142,21 +142,13 @@ mod test_helpers {
     }
 
     pub(super) mod heavy {
-        use crate::sem::{BaseContext, BaseParseContext, FrozenBaseContext, SchemaFileContext};
+        use crate::sem::{BaseContext, FrozenBaseContext, SchemaFileContext};
         use ::clap::Parser;
         use ::sql_fun_core::SqlFunArgs;
         use std::path::{Path, PathBuf};
 
         /// Loads real builtin metadata for each caller to verify catalog array casts.
         pub(in crate::types::compat) fn builtin_context() -> SchemaFileContext {
-            let base = builtin_root_context();
-            let args = base.get_args().clone();
-            let metadata = base.metadata().clone();
-            let base = FrozenBaseContext::from(base);
-            SchemaFileContext::new(Path::new("array-casts.sql"), &base, &args, &metadata)
-        }
-        /// Loads real builtin metadata for each caller to verify catalog array casts.
-        pub(in crate::types::compat) fn builtin_root_context() -> BaseContext {
             let metadata = PathBuf::from(env!("CARGO_MANIFEST_DIR")).join("sql_fun.metadata.toml");
             let args = SqlFunArgs::try_parse_from([
                 "sqlfun",
@@ -168,7 +160,10 @@ mod test_helpers {
             .expect("fixture args");
             let collection = args.load_metadata().expect("fixture metadata");
             let selected = collection.get("default").expect("selected metadata");
-            BaseContext::new(&args, selected).expect("builtin context")
+            let base = FrozenBaseContext::from(
+                BaseContext::new(&args, selected).expect("builtin context"),
+            );
+            SchemaFileContext::new(Path::new("array-casts.sql"), &base, &args, selected)
         }
     }
 }
@@ -305,9 +300,16 @@ fn constraint_values_cannot_become_catalog_cast_endpoints(
     assert!(
         context
             .explicit_cast(value.as_ref(), value.as_ref())
-            .is_err()
+            .unwrap()
+            .is_none()
     );
-    assert!(context.implicit_castable(value.as_ref()).is_err());
+    assert!(
+        context
+            .implicit_castable(value.as_ref())
+            .unwrap()
+            .as_any()
+            .is::<Never>()
+    );
 }
 
 #[test]
@@ -320,6 +322,11 @@ fn implicit_castable_loads_candidate_outputs_without_selecting_one() {
         &source,
         &HashSet::from([source.clone(), target.clone()]),
     );
+    catalog.set_get_implicit_cast_result(
+        &source,
+        &target,
+        Some(CastDefinition::new(CastContext::implicit())),
+    );
     let context = TypeContext::new(&catalog);
     let loaded_source = context.type_by_name(source.full_name()).unwrap().unwrap();
     let loaded_target = context.type_by_name(target.full_name()).unwrap().unwrap();
@@ -330,17 +337,17 @@ fn implicit_castable_loads_candidate_outputs_without_selecting_one() {
 }
 
 #[test]
-fn empty_implicit_castable_is_never() {
+fn empty_provider_implicit_targets_retain_intrinsic_identity() {
     let mut catalog = test_helpers::context();
     let source = test_helpers::base(&mut catalog, "source");
     let context = TypeContext::new(&catalog);
     let loaded = context.type_by_name(source.full_name()).unwrap().unwrap();
+    let expected = Candidates::from_candidates(std::slice::from_ref(&loaded));
     assert!(
         context
             .implicit_castable(loaded.as_ref())
             .unwrap()
-            .as_any()
-            .is::<Never>()
+            .same_type(expected.as_ref())
     );
 }
 
@@ -449,19 +456,22 @@ fn table_row_endpoints_keep_members_with_or_without_type_registration(
 }
 
 #[test]
-fn nested_array_cast_rejects_shape_the_legacy_model_cannot_preserve() {
+fn nested_array_cast_uses_loaded_components_without_legacy_projection() {
     let mut catalog = test_helpers::context();
     let reference = test_helpers::base(&mut catalog, "integer");
+    catalog.set_get_implicit_cast_result(
+        &reference,
+        &reference,
+        Some(CastDefinition::new(CastContext::no_conversion())),
+    );
     let base = BaseType::new(reference.full_name());
     let array = ArrayType::new(&base);
     let nested = ArrayType::new(&array);
     let context = TypeContext::new(&catalog);
-    assert_eq!(
-        context.explicit_cast(&nested, &nested).unwrap_err(),
-        ConversionError::unsupported_loaded_type(
-            "array element has no scalar concrete legacy reference"
-        )
-    );
+    let cast = context.explicit_cast(&nested, &nested).unwrap().unwrap();
+    assert!(cast.context().is_no_conversion());
+    assert!(cast.source().same_type(&nested));
+    assert!(cast.target().same_type(&nested));
 }
 
 #[test]
@@ -673,7 +683,7 @@ fn sqlite_does_not_inherit_postgresql_element_array_casts() {
 }
 
 #[test]
-fn unregistered_table_row_array_lookup_in_schema_catalog_returns_absent() {
+fn unregistered_table_row_array_identity_uses_loaded_components() {
     use crate::sem::{BaseParseContext, ParseContext, SchemaFileContext};
     use std::path::Path;
     let mut root = test_helpers::context();
@@ -688,9 +698,30 @@ fn unregistered_table_row_array_lookup_in_schema_catalog_returns_absent() {
         environment.metadata(),
     );
     let context = TypeContext::new(&catalog);
-    assert!(context.implicit_cast(&array, &array).unwrap().is_none());
-    assert!(context.assignment_cast(&array, &array).unwrap().is_none());
-    assert!(context.explicit_cast(&array, &array).unwrap().is_none());
+    assert!(
+        context
+            .implicit_cast(&array, &array)
+            .unwrap()
+            .unwrap()
+            .context()
+            .is_no_conversion()
+    );
+    assert!(
+        context
+            .assignment_cast(&array, &array)
+            .unwrap()
+            .unwrap()
+            .context()
+            .is_no_conversion()
+    );
+    assert!(
+        context
+            .explicit_cast(&array, &array)
+            .unwrap()
+            .unwrap()
+            .context()
+            .is_no_conversion()
+    );
 }
 
 #[rstest::rstest]
@@ -732,25 +763,75 @@ fn inherited_builtin_identity_remains_no_conversion(#[case] local: &str) {
 }
 
 #[test]
-fn builtin_array_io_candidates_include_types_without_pg_cast_rows() {
-    use crate::sem::{CastInfoRead, TypeReference as LegacyReference};
-    // Raw catalog enumeration avoids requiring unsupported named categories to load.
-    let catalog = test_helpers::heavy::builtin_root_context();
-    let uuid_array = LegacyReference::from_master_type_name("_uuid");
-    let text_array = LegacyReference::from_master_type_name("_text");
+fn unregistered_complete_values_use_permanent_io_rules() {
+    let mut catalog = test_helpers::context();
+    let text_name = FullName::with_schema("pg_catalog", "text");
+    catalog.set_get_type_impl_result(&text_name, &LegacyDefinition::builtin(&text_name));
+    let context = TypeContext::new(&catalog);
+    let text = context.type_by_exact_name(&text_name).unwrap().unwrap();
+    let value = EnumType::new(
+        &FullName::with_schema("unregistered", "state"),
+        &["one".to_owned()],
+    );
+    let cast = context
+        .assignment_cast(&value, text.as_ref())
+        .unwrap()
+        .unwrap();
+    assert_eq!(cast.context(), crate::types::CastContext::assignment());
+    assert!(cast.source().same_type(&value));
+    assert!(cast.target().same_type(text.as_ref()));
+    let nested = ArrayType::new(&ArrayType::new(&value));
+    let cast = context
+        .assignment_cast(&nested, text.as_ref())
+        .unwrap()
+        .unwrap();
+    assert_eq!(cast.context(), crate::types::CastContext::assignment());
+    assert!(cast.source().same_type(&nested));
+    assert!(cast.target().same_type(text.as_ref()));
     assert!(
-        catalog
-            .cast_sources(&text_array, true)
-            .contains(&uuid_array)
+        context
+            .implicit_cast(&value, text.as_ref())
+            .unwrap()
+            .is_none()
+    );
+}
+
+#[test]
+fn unregistered_loaded_enum_retains_identity_in_all_candidate_directions() {
+    use crate::types::TypeDefinition;
+    let catalog = test_helpers::context();
+    let context = TypeContext::new(&catalog);
+    let value = EnumType::new(
+        &FullName::with_schema("unregistered", "state"),
+        &["one".to_owned()],
+    );
+    let cast = context.implicit_cast(&value, &value).unwrap().unwrap();
+    assert!(cast.context().is_no_conversion());
+    assert!(cast.source().same_type(&value));
+    assert!(cast.target().same_type(&value));
+    let expected = Candidates::from_candidates(&[value.clone_box()]);
+    assert!(
+        context
+            .cast_sources(&value, false)
+            .unwrap()
+            .same_type(expected.as_ref())
     );
     assert!(
-        catalog
-            .assignment_sources(&text_array)
-            .contains(&uuid_array)
+        context
+            .cast_sources(&value, true)
+            .unwrap()
+            .same_type(expected.as_ref())
     );
     assert!(
-        !catalog
-            .cast_sources(&text_array, false)
-            .contains(&uuid_array)
+        context
+            .assignment_sources(&value)
+            .unwrap()
+            .same_type(expected.as_ref())
+    );
+    assert!(
+        context
+            .implicit_castable(&value)
+            .unwrap()
+            .same_type(expected.as_ref())
     );
 }

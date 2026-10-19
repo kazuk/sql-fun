@@ -32,19 +32,28 @@ consulting storage again.
 working with loaded values. `TypeContext` and the public `TypeContextRead`
 provider contract live permanently in `types/context.rs` and are re-exported
 from `types`. The facade borrows an explicitly selected provider and delegates
-catalog reads; it owns no catalog storage and discovers no ambient inputs.
+catalog facts; it owns no catalog storage and discovers no ambient inputs.
+PostgreSQL coercion policy operates on loaded components in this permanent
+module, separately from the provider and the removable adapter.
 
-`TypeContextRead` has an associated `Error` and eight loaded-value operations:
+`TypeContextRead` has an associated `Error` and eight primary loaded-value
+operations:
 two type lookups, three directed cast lookups and three candidate enumerations.
 Native providers implement this contract directly using their own error type,
 without importing legacy references or `types::compat`. Removing the temporary
 legacy adapter later leaves the public `TypeContext` implementation and provider
-interface intact.
+interface intact. The optional `supports_postgres_coercions` hook explicitly
+selects PostgreSQL component rules; its default preserves provider-only behavior.
+`registered_cast` supplies an actual native catalog entry, while
+`existing_array_cast` supplies a provider's existing whole-array relationship.
+Both fact hooks default to no fact and contain no derivation policy.
 
 `types/compat/context.rs` contains the blanket adapter implementing
 `TypeContextRead` for a selected `sem::ParseContext`, with
 `type Error = compat::ConversionError`. All legacy projection, conversion and
-catalog interaction stays in `compat`. Existing consumers can therefore pass
+catalog fact retrieval stays in `compat`. Its PostgreSQL capability comes from
+the selected context dialect; it implements no component coercion rules.
+Existing consumers can therefore pass
 their selected `ParseContext` to `TypeContext::new`, while native providers have
 no dependency on that adapter.
 
@@ -73,9 +82,11 @@ array. These operations do not depend on legacy representability.
 ### Temporary legacy adapter
 
 The following projection restrictions belong to the `ParseContext` adapter,
-not to `TypeContextRead` or to native providers. Adapter operations accepting
-loaded inputs must project those values faithfully into legacy references
-before delegation. A nominal name alone is insufficient: projection reloads its
+not to `TypeContextRead` or to native providers. Provider operations delegated
+to the legacy catalog project loaded inputs
+faithfully into legacy references. Permanent structural operations use their
+loaded components directly and need no legacy array flag or catalog
+registration. A nominal name alone is insufficient: projection reloads its
 definition from the selected catalog and compares the complete loaded snapshot,
 including category and recursively loaded components. A stale or different
 snapshot returns `LoadedTypeMismatch` rather than discarding labels, members,
@@ -85,9 +96,13 @@ and validates the element snapshot.
 Anonymous structural values can project into dynamic legacy definitions when
 all components have faithful representations. Delegation preserves the legacy
 catalog's handling of dynamic references, including its rejection of dynamic cast
-lookups; projection does not invent structural cast rules. Constraints (`Any`,
-`Never`, `Candidates`), custom trait implementations, and nested arrays without
-a faithful legacy representation return `UnsupportedLoadedType`. The adapter does
+lookups; projection does not invent structural cast rules. Direct low-level
+legacy conversion of constraints (`Any`, `Never`,
+`Candidates`), custom trait implementations, or nested arrays without a faithful
+legacy representation returns `UnsupportedLoadedType`. For optional provider
+facts, a value without a legacy reference contributes no catalog fact; this does
+not invalidate the loaded type or stop permanent component derivation. The
+adapter does
 not convert them into nominal placeholders, flatten them or expand them into new
 searches. These restrictions do not limit owned construction, equality, cloning,
 intrinsic array inspection or a native provider's supported loaded categories.
@@ -300,28 +315,62 @@ Identity remains a candidate where the catalog enumerates it. Missing metadata
 never becomes `Any` or `Never`. Constraint solving and semantic-consumer migration
 remain outside this boundary.
 
-### PostgreSQL array cast derivation
+### PostgreSQL coercion policy in the permanent type system
 
-The PostgreSQL catalog provider derives array-to-array relationships from element
-casts in the same requested context, including custom catalog types and element
-I/O coercions. For example, `int2[]` to `int4[]` is implicit, the reverse requires
-assignment or explicit conversion, and `text[]` to `int4[]` requires an explicit
-cast. The loaded relationship owns the complete array endpoints and preserves
-the element lookup's context for the requested operation; eligibility does not
-imply endpoint equality.
+When the selected provider enables PostgreSQL coercions, `TypeContext` implements
+these rules in `types/context.rs`. Existing `sem::ParseContext` and
+`sem::CastInfoRead` APIs, cast implementations and semantic consumers retain their
+previous behavior. `types::compat` only adapts catalog facts and references.
 
-`sem::CastInfoRead::registered_cast` exposes an actual catalog entry without
-deriving coercions, so inherited entries can be distinguished from a provider's
-derived relationships. A registered whole-array cast takes precedence over
-element derivation, including
-when its context excludes the requested operation. Source and target candidate
-enumerations apply the same array rules. These rules belong to the PostgreSQL
-provider rather than the dialect-independent `TypeContext` facade; native
-providers retain their own semantics and SQLite does not acquire these rules.
-There is no transitive cast search or flattening of loaded domains or nested
-arrays. The temporary adapter's projection restrictions still apply.
+| Behavior | Supported contract |
+| --- | --- |
+| Equal concrete loaded values | Intrinsic `NoConversion`, without catalog registration. Constraints and pseudo-types are excluded from this SQL rule. |
+| Array to array | Recurse over `ArrayType::element_type()` in the same requested mode and direction. Preserve complete endpoints, including nested arrays and domain elements. A rejected element conversion remains rejected. |
+| Domain to/from base or another domain | Recurse through loaded base components for eligibility, then retain the original domain endpoints. Different domain identities remain unequal; base-equivalent conversion is `Implicit`, not `NoConversion`. Domains over arrays use the same rules. |
+| String I/O | With no overriding native registered cast, conversion to builtin string types is assignment-eligible; conversion from them is explicit-only. Scalar, array, enum, composite and domain endpoints are supported. Scalar/array element compatibility alone never establishes scalar-to-array conversion; string I/O is a separate rule. |
+| Registered cast | `TypeContextRead::registered_cast` is authoritative for all modes, including explicit-only entries that block automatic coercion. A provider's `existing_array_cast` also precedes element derivation. |
+| Candidate enumeration | Combine provider facts with arrays of reported element candidates, then filter through the permanent cast rules. Domain base candidates are likewise considered. This enumerates the selected provider's candidate universe, not every constructible anonymous type or domain. |
 
-This follows PostgreSQL's
-[`find_coercion_pathway`](https://github.com/postgres/postgres/blob/REL_18_STABLE/src/backend/parser/parse_coerce.c)
-array-element coercion rule. PostgreSQL 15–18 were consulted as behavioral
-oracles; regression tests use the repository's offline catalogs.
+Builtin string classification covers `pg_catalog.text`, `varchar`, `bpchar` and
+`name`. Custom string-category metadata is not represented in the loaded model;
+a native provider must expose those relationships itself. Pseudo/polymorphic
+loading and inference remain outside this API; `unknown` is not an ordinary
+concrete cast endpoint. No transitive cast search is introduced.
+
+A returned domain endpoint retains its nominal identity and loaded base. Domain
+CHECK/default declarations remain in the existing declaration catalog; this API
+does not execute casts, validate particular values, or compare CHECK expressions.
+A successful eligibility lookup does not promise that a runtime value satisfies
+the target domain's constraints.
+
+Record-expression coercion is a separate expression-level operation: PostgreSQL
+examines and converts individual expression fields in `coerce_record_to_complex`.
+A pair of loaded type values contains no record expression, so this API does not
+claim to implement that conversion. It does support concrete composite/string
+I/O and provider-supplied composite cast relationships. Absence here is not a
+verdict about whether a particular `ROW(...)` expression can be coerced.
+
+#### Legacy provider limits
+
+The adapter retains the selected legacy catalog's existing lookup and enumeration
+facts. Its existing whole-array lookup can already include builtin derivation;
+it is not a raw `pg_cast` row interface. The legacy API does not expose registered
+row provenance separately from automatic I/O or derived relationships, so the
+adapter cannot implement the native `registered_cast` fact hook. Native providers
+can distinguish these facts and enforce exact registered-row precedence. Legacy
+layer overrides whose meaning depends on that unavailable provenance retain this
+interoperability limitation; no new legacy API or semantic behavior is introduced
+to reconstruct it. For a complete input snapshot without a legacy
+name/reference, the provider
+returns no input catalog fact. This differs from failing to load a candidate
+reported by the catalog: reported candidates still load completely or return
+the existing loading error, never a partial set. Existing conversion/loading
+errors remain practical adapter failures; no new cast-decision error category is
+added.
+
+These rules follow PostgreSQL's
+[`CREATE CAST`](https://www.postgresql.org/docs/18/sql-createcast.html),
+[type system](https://www.postgresql.org/docs/18/extend-type-system.html) and
+[`find_coercion_pathway`](https://github.com/postgres/postgres/blob/REL_18_STABLE/src/backend/parser/parse_coerce.c).
+Small rolled-back PostgreSQL 15–18 oracle queries verified domain and I/O
+eligibility. Permanent regression tests use native providers and offline catalogs.

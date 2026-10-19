@@ -5,6 +5,24 @@
 See [SQL analysis coverage and limitations](sql-analysis.md) when choosing query
 forms or investigating analysis diagnostics.
 
+## PostgreSQL named function arguments
+
+PostgreSQL function calls in query SQL can use positional arguments, named
+arguments (`f(arg => value)` or `f(arg := value)`), or positional arguments
+followed by named arguments. Unquoted argument names follow PostgreSQL's
+lowercase normalization; quoted names retain their case.
+
+For calls with named arguments or explicit `VARIADIC`, semantic analysis checks
+the function name's existence and preserves the supplied arguments. Signature
+matching, argument/result type inference, and default applicability remain
+deferred. Duplicate argument names and positional arguments after named ones
+are rejected. Omitted arguments are preserved as omissions; defaults are not
+inserted by this analysis.
+
+A PostgreSQL function argument name identifies a parameter of the called SQL
+function. It is separate from sql-fun's `${parameter_name}` notation, which
+supplies a query input from Rust.
+
 ## Attribute arguments
 
 Attribute arguments specifies SQL statement and datasource.

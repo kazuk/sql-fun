@@ -256,7 +256,9 @@ fn offset_in_string(haystack: &StdString, needle: &str) -> Option<usize> {
 }
 
 ///  offset and length for SQL statement
-#[derive(Debug, Clone, Copy, Default)]
+#[derive(
+    Debug, Clone, Copy, Default, Eq, PartialEq, Hash, serde::Serialize, serde::Deserialize,
+)]
 pub struct StringSpan {
     offset: usize,
     len: usize,

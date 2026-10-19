@@ -2,6 +2,7 @@
 mod rule;
 pub use self::rule::{RuleDefinitionProblem, RuleProblem};
 
+mod call_argument;
 mod creation;
 mod delete;
 mod insert;
@@ -30,6 +31,7 @@ use crate::{
     },
 };
 
+pub use self::call_argument::CallArgumentProblem;
 pub use self::creation::CreationProblem;
 pub use self::delete::{DeleteProblem, DeleteProblemKind};
 pub use self::insert::{InsertProblem, InsertProblemKind};
@@ -78,6 +80,8 @@ trait RenderProblemReport: Problem {
 #[allow(clippy::large_enum_variant)]
 #[derive(Debug, Clone)]
 pub enum AnalysisProblem {
+    /// A function invocation has an invalid argument order or repeated name.
+    CallArgument(CallArgumentProblem),
     /// A creation conflicts with an existing catalog identity.
     Creation(CreationProblem),
     /// Invalid rule definition.
@@ -249,6 +253,11 @@ impl AnalysisProblem {
         }
     }
 
+    /// Report a signature-independent invocation violation.
+    pub const fn call_argument(problem: CallArgumentProblem) -> Self {
+        Self::CallArgument(problem)
+    }
+
     /// Report a structured SELECT clause violation without inventing a source location.
     pub const fn query(problem: QueryProblem) -> Self {
         Self::Query(problem)
@@ -278,6 +287,7 @@ impl AnalysisProblem {
             Self::Update(problem) => problem.code(),
             Self::Delete(problem) => problem.code(),
             Self::Query(problem) => problem.code(),
+            Self::CallArgument(problem) => problem.code(),
             Self::ParameterConstraint(problem) => problem.code(),
             Self::NameResolution(problem) => problem.code(),
             Self::OverloadResolution(problem) => problem.code(),
@@ -333,6 +343,7 @@ impl AnalysisProblem {
             Self::Update(problem) => problem.render_report(&report_handler, source)?,
             Self::Delete(problem) => problem.render_report(&report_handler, source)?,
             Self::Query(problem) => problem.render_report(&report_handler, source)?,
+            Self::CallArgument(problem) => problem.render_report(&report_handler, source)?,
             Self::NameResolution(nr) => nr.render_report(&report_handler, source)?,
             Self::ParameterConstraint(problem) => problem.render_report(&report_handler, source)?,
             _ => todo!(),

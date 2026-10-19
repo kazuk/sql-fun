@@ -1135,6 +1135,7 @@ impl TryFromWithTokens<&syn::NamedArgExpr> for NamedArgument {
         Ok(Self {
             name: argument.get_name(),
             argument: Expr::try_from_with_tokens(&argument.get_arg(), tokens)?,
+            location: source_span(argument.get_location(), tokens),
         })
     }
 }

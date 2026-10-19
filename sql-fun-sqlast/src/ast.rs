@@ -1402,6 +1402,7 @@ pub(crate) struct Slice {
 pub(crate) struct NamedArgument {
     name: String,
     argument: Expr,
+    location: Option<StringSpan>,
 }
 
 #[derive(Clone, Debug)]

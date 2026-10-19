@@ -564,8 +564,24 @@ These leaf operations need no context. Membership uses `same_type`: a supplied
 `Candidates` value contributes its direct members, `Never` contributes none, and
 another loaded value is a singleton. Nested constraints are not expanded. A caller
 can supply cast-expanded candidates, but the leaf operations perform no casts,
-compatibility tests, polymorphic binding, ranking or solving. The caller also owns
-full named/positional call binding, omission/default checks and variadic call rules.
+compatibility tests, polymorphic binding, ranking or solving. For complete calls, `match_call(&[CallArgument])` maps syntax-order positional and
+named arguments to each declaration, checks omitted required parameters, defaults,
+excess arguments and duplicate assignments, and tests each supplied value's type
+candidates. Positional arguments must precede named arguments. OUT/TABLE parameters
+consume no values. `CallArgument::with_variadic()` explicitly represents SQL
+VARIADIC array passing; ordinary variadic values match the array element type and
+require at least one value unless the parameter has a declared default. Named
+variadic arguments require explicit VARIADIC. Invalid call shapes produce no matches;
+ambiguous declaration names produce `FunctionReadError`.
+
+`FunctionCallMatches` retains the original signatures and their individual mappings.
+Its `argument_candidates(index)` uses **syntactic call position**, including named
+values and each expanded variadic value; it never requires a declaration index.
+`result_candidates()` projects results and `overloads()` exposes whole survivors.
+`filter_argument` and `filter_result` retain mappings for successive refinement.
+Empty projections are `Never`. No overload is ranked or automatically chosen.
+Type matching retains the leaf API's direct same-type membership contract: implicit
+casts and polymorphic binding/instantiation remain separate caller responsibilities.
 Independent projections must never be recombined into invented signatures.
 
 ### Catalog retention and extraction migration

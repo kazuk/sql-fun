@@ -399,3 +399,64 @@ fn known_record_results_project_complete_structural_output_members() {
         signatures
     );
 }
+
+#[test]
+fn resolved_name_filters_call_and_projects_supplied_and_result_types() {
+    use crate::types::{CallArgument, Never, base::BaseType};
+    let mut context = test_helpers::context();
+    test_helpers::declare(
+        &mut context,
+        "CREATE FUNCTION public.f(a int, b text DEFAULT 'd') RETURNS text LANGUAGE sql AS 'SELECT b'",
+    );
+    let overloads = TypeContext::new(&context)
+        .function_by_name(&FullName::from_local_name("f"))
+        .unwrap()
+        .unwrap();
+    let integer = BaseType::new(&FullName::with_schema("pg_catalog", "int4"));
+    let text = BaseType::new(&FullName::with_schema("pg_catalog", "text"));
+    let matched = overloads
+        .match_call(&[
+            CallArgument::named(&ColumnName::new("b"), &text),
+            CallArgument::named(&ColumnName::new("a"), &integer),
+        ])
+        .unwrap();
+    assert!(!matched.is_empty());
+    assert!(
+        matched
+            .argument_candidates(0)
+            .as_any()
+            .downcast_ref::<Candidates>()
+            .unwrap()
+            .contains(&text)
+    );
+    assert!(
+        matched
+            .argument_candidates(1)
+            .as_any()
+            .downcast_ref::<Candidates>()
+            .unwrap()
+            .contains(&integer)
+    );
+    assert!(
+        matched
+            .result_candidates()
+            .as_any()
+            .downcast_ref::<Candidates>()
+            .unwrap()
+            .contains(&text)
+    );
+    assert!(matched.filter_result(&integer).is_empty());
+    assert!(
+        matched
+            .filter_argument(0, &integer)
+            .argument_candidates(1)
+            .same_type(&Never::new())
+    );
+    assert!(
+        !overloads
+            .match_call(&[CallArgument::positional(&integer)])
+            .unwrap()
+            .is_empty()
+    );
+    assert!(overloads.match_call(&[]).unwrap().is_empty());
+}

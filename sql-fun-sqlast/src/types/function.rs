@@ -1,5 +1,9 @@
 //! Complete function signatures and pure operations on correlated overloads.
 
+mod call;
+
+pub use self::call::{CallArgument, FunctionCallMatches};
+
 use crate::sem::{ColumnName, FullName};
 use crate::types::{
     Candidates, ImplicitCompositeType, Member, Members, TypeDefinition, TypeReference,
@@ -371,7 +375,7 @@ impl FunctionReadError {
 /// ```
 /// use ::sql_fun_sqlast::sem::{ColumnName, FullName};
 /// use ::sql_fun_sqlast::types::{
-///     FunctionOverloads, FunctionParameter, FunctionResult, FunctionSignature,
+///     CallArgument, FunctionOverloads, FunctionParameter, FunctionResult, FunctionSignature,
 ///     ParameterMode, base::BaseType,
 /// };
 /// let integer = BaseType::new(&FullName::with_schema("pg_catalog", "int4"));
@@ -386,6 +390,14 @@ impl FunctionReadError {
 /// let remaining = overloads.filter_argument_by_name(&ColumnName::new("value"), &integer)?;
 /// assert_eq!(remaining.signatures().len(), 1);
 /// assert_eq!(remaining.filter_result(&integer), remaining);
+/// // Call-shaped filtering needs no declaration index or input count.
+/// let matched = overloads.match_call(&[
+///     CallArgument::named(&ColumnName::new("value"), &integer),
+/// ])?;
+/// assert_eq!(matched.overloads(), remaining);
+/// let accepted_value_types = matched.argument_candidates(0); // syntax order
+/// let possible_results = matched.result_candidates();
+/// assert!(!matched.filter_result(&integer).is_empty());
 /// # Ok::<(), sql_fun_sqlast::types::FunctionReadError>(())
 /// ```
 #[derive(Debug, Clone, Default)]

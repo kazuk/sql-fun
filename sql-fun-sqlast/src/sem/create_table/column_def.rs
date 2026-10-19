@@ -22,6 +22,95 @@ pub struct ColumnDefinition {
     #[deprecated = "query from constraints"]
     default: Option<Box<SemScalarExpr>>,
     constraints: Vec<ColumnConstraint>,
+    #[serde(default, skip_serializing_if = "ColumnAttributes::is_empty")]
+    attributes: ColumnAttributes,
+}
+
+/// Persistent PostgreSQL per-column planning attributes.
+#[derive(Clone, Debug, Default, Eq, Hash, PartialEq, serde::Serialize, serde::Deserialize)]
+struct ColumnAttributes {
+    statistics_target: Option<i32>,
+    n_distinct: Option<String>,
+    n_distinct_inherited: Option<String>,
+}
+impl ColumnAttributes {
+    fn is_empty(&self) -> bool {
+        self == &Self::default()
+    }
+}
+
+impl ColumnDefinition {
+    /// Explicit statistics target; None uses PostgreSQL's configured default.
+    pub const fn statistics_target(&self) -> Option<i32> {
+        self.attributes.statistics_target
+    }
+    /// Explicit n_distinct estimate retained from ALTER COLUMN SET.
+    pub fn distinct_estimate(&self) -> Option<f64> {
+        if let Some(value) = &self.attributes.n_distinct {
+            value.trim().parse().ok()
+        } else {
+            None
+        }
+    }
+    /// Explicit n_distinct_inherited estimate retained from ALTER COLUMN SET.
+    pub fn inherited_distinct_estimate(&self) -> Option<f64> {
+        if let Some(value) = &self.attributes.n_distinct_inherited {
+            value.trim().parse().ok()
+        } else {
+            None
+        }
+    }
+    pub(crate) const fn apply_statistics_target(&mut self, value: Option<i32>) {
+        self.attributes.statistics_target = value;
+    }
+    pub(crate) fn apply_distinct_option(&mut self, name: &str, value: Option<&str>) {
+        match name {
+            "n_distinct" => self.attributes.n_distinct = value.map(str::to_owned),
+            "n_distinct_inherited" => {
+                self.attributes.n_distinct_inherited = value.map(str::to_owned)
+            }
+            _ => unreachable!("only validated column options are applied"),
+        }
+    }
+    pub(crate) fn drop_generation_expression(&mut self) {
+        self.constraints
+            .retain(|constraint| constraint.as_generated().is_none());
+    }
+    pub(crate) fn apply_attribute_nullability(&mut self, table: &TableName, value: bool) {
+        self.constraints
+            .retain(|constraint| constraint.as_nullability().is_none());
+        if let Some(column) = &self.name {
+            self.constraints.push(ColumnConstraint::nullability(
+                crate::sem::ColumnNullabilityConstraint::new(table, column, value, None, None),
+            ));
+        }
+        // Keep the existing query metadata accessor in sync with the constraint.
+        self.set_not_null(Some(value));
+    }
+    pub(crate) fn has_identity(&self) -> bool {
+        self.constraints
+            .iter()
+            .any(|constraint| constraint.as_identity().is_some())
+    }
+    pub(crate) fn has_inline_primary_key(&self) -> bool {
+        self.constraints
+            .iter()
+            .any(|constraint| constraint.as_primary_key().is_some())
+    }
+    pub(crate) fn has_stored_generation(&self) -> bool {
+        self.constraints.iter().any(|constraint| {
+            constraint
+                .as_generated()
+                .is_some_and(crate::sem::GeneratedColumnConstraint::is_stored)
+        })
+    }
+    pub(crate) fn has_virtual_generation(&self) -> bool {
+        self.constraints.iter().any(|constraint| {
+            constraint
+                .as_generated()
+                .is_some_and(crate::sem::GeneratedColumnConstraint::is_virtual)
+        })
+    }
 }
 
 impl Clone for ColumnDefinition {
@@ -34,6 +123,7 @@ impl Clone for ColumnDefinition {
             #[expect(deprecated)]
             default: self.default.clone(),
             constraints: self.constraints.clone(),
+            attributes: self.attributes.clone(),
         }
     }
 }
@@ -73,6 +163,7 @@ impl ColumnDefinition {
             #[expect(deprecated)]
             default: Default::default(),
             constraints: constraints.to_vec(),
+            attributes: ColumnAttributes::default(),
         }
     }
 

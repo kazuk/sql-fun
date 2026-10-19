@@ -20,6 +20,10 @@ pub struct AlterTable {
     table: TableName,
     commands: Vec<AlterObjSubCommand>,
     source_span: SourcePathWithSpan,
+    #[getter(skip)]
+    applicable: bool,
+    #[getter(skip)]
+    resolved_target: Option<TableName>,
 }
 
 impl GetSourcePathWithSpan for AlterTable {
@@ -29,6 +33,28 @@ impl GetSourcePathWithSpan for AlterTable {
 }
 
 impl AlterTable {
+    /// Whether completed semantic analysis permits catalog application.
+    pub const fn can_apply(&self) -> bool {
+        self.applicable
+    }
+    /// Canonical target binding retained by the column-attribute analyzer.
+    pub const fn resolved_target(&self) -> Option<&TableName> {
+        self.resolved_target.as_ref()
+    }
+    pub(crate) fn column_attributes(
+        table: &TableName,
+        target: Option<&TableName>,
+        commands: &[AlterObjSubCommand],
+        source: &SourcePathWithSpan,
+    ) -> Self {
+        let mut statement = Self::new(table, commands, source);
+        statement.resolved_target = target.cloned();
+        statement.applicable = target.is_some()
+            && commands
+                .iter()
+                .all(AlterObjSubCommand::can_apply_column_attributes);
+        statement
+    }
     pub(crate) fn conflicting_constraint(&self, table: &crate::sem::CreateTable) -> Option<String> {
         let mut names = Vec::new();
         for command in &self.commands {
@@ -61,6 +87,8 @@ impl AlterTable {
             table: table.clone(),
             commands: commands.to_vec(),
             source_span: source_span.clone(),
+            applicable: true,
+            resolved_target: None,
         }
     }
     /// analyze [`crate::syn::AlterTableStmt`]
@@ -321,6 +349,8 @@ impl AlterView {
 
 #[derive(Debug, Clone)]
 pub enum AlterObjSubCommand {
+    /// An analyzed PostgreSQL column-attribute operation.
+    ColumnAttributes(Box<crate::sem::AlterColumnAttributes>),
     ChangeOwner(crate::sem::OwnerSpecification),
     SetColumnDefault(ColumnName, Box<SemScalarExpr>),
     /// Remove a column default.
@@ -336,6 +366,26 @@ pub enum AlterObjSubCommand {
 }
 
 impl AlterObjSubCommand {
+    pub(crate) fn column_attributes(value: &crate::sem::AlterColumnAttributes) -> Self {
+        Self::ColumnAttributes(Box::new(value.clone()))
+    }
+    /// Retained column binding, requested action, and validation outcomes.
+    pub fn column_attribute_change(&self) -> Option<&crate::sem::AlterColumnAttributes> {
+        if let Self::ColumnAttributes(value) = self {
+            Some(value)
+        } else {
+            None
+        }
+    }
+    fn can_apply_column_attributes(&self) -> bool {
+        self.column_attribute_change()
+            .is_some_and(crate::sem::AlterColumnAttributes::can_apply)
+    }
+    pub(crate) fn apply_column_attributes(&self, table: &mut crate::sem::CreateTable) {
+        if let Self::ColumnAttributes(value) = self {
+            value.apply(table);
+        }
+    }
     const fn added_constraint(&self) -> Option<&Constraint> {
         if let Self::AddConstraint(constraint) = self {
             Some(constraint)

@@ -56,8 +56,17 @@ impl SchemaFileContext {
 impl TableInfoWrite for SchemaFileContext {
     #[tracing::instrument(skip(self))]
     fn apply_alter_table(mut self, alter_table: &AlterTable) -> Result<Self, AnalysisError> {
+        if !alter_table.can_apply() {
+            return Ok(self);
+        }
         let table_name = alter_table.table();
-        let Some((key, mut table)) = self.table_for_update(table_name) else {
+        let bound_table = alter_table.resolved_target().map(|target| {
+            self.get_table_impl(target.full_name())
+                .cloned()
+                .map(|table| (target.full_name().clone(), table))
+        });
+        let table = bound_table.unwrap_or_else(|| self.table_for_update(table_name));
+        let Some((key, mut table)) = table else {
             self.report_analysis_problem(AnalysisProblem::table_not_found(table_name))?;
             return Ok(self);
         };

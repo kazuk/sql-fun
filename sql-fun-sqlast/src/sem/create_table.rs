@@ -330,15 +330,29 @@ impl CreateTable {
         self.columns.has_column(column)
     }
 
+    pub(crate) fn apply_column_attributes(
+        &mut self,
+        column: &ColumnName,
+        action: &crate::sem::ColumnAttributeAction,
+    ) {
+        if let Some(column) = self.columns.get_column_mut(column) {
+            action.apply(&self.name, column);
+        }
+    }
+
     /// apply `alter table` statement
     pub fn apply_alter(
         &mut self,
         alter_table: &AlterTable,
     ) -> Result<Vec<ImplicitChange>, AnalysisError> {
+        if !alter_table.can_apply() {
+            return Ok(Vec::new());
+        }
         self.alter_statements.push(alter_table.clone());
         let mut implicit_changes = Vec::new();
         for cmd in alter_table.commands() {
             match cmd {
+                AlterObjSubCommand::ColumnAttributes(_) => cmd.apply_column_attributes(self),
                 AlterObjSubCommand::ChangeOwner(new_owner) => {
                     if new_owner.can_apply() {
                         self.change_owner(new_owner);

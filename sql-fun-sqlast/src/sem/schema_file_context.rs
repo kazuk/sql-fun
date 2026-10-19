@@ -1,5 +1,7 @@
 mod cast_info;
 #[cfg(test)]
+mod column_attribute_tests;
+#[cfg(test)]
 mod creation_tests;
 mod func_info;
 #[cfg(test)]

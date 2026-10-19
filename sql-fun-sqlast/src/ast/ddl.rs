@@ -1,6 +1,8 @@
 //! Owned DDL syntax. Catalog bindings are obtained only during resolution.
 
 mod alter_index;
+mod column_attributes;
+
 #[path = "deparse/ddl.rs"]
 mod sql_emission;
 
@@ -74,6 +76,9 @@ impl super::AlterRelation {
         context: &mut impl ParseContext,
         source: Option<&crate::sem::SourcePathWithSpan>,
     ) -> Result<SemAst, AnalysisError> {
+        if self.kind.supports_table_column_attributes() && self.has_column_attributes() {
+            return self.resolve_column_attributes(context, source);
+        }
         self.kind.resolve(
             context,
             &self.name.full_name()?,
@@ -622,6 +627,9 @@ impl PostgresAlterCommand {
         context: &mut impl ParseContext,
         table: &crate::sem::TableName,
     ) -> Result<crate::sem::AlterObjSubCommand, AnalysisError> {
+        if self.operation.column_attribute_phase().is_some() {
+            return self.resolve_single_column_attribute(context, table);
+        }
         if let Some(legacy) = &self.legacy {
             legacy.resolve(context, table)
         } else {

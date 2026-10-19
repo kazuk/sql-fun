@@ -1,5 +1,7 @@
 #![doc= include_str!("problem.md")]
+mod alter_column;
 mod rule;
+pub use self::alter_column::{AlterColumnProblem, ColumnAttributeProblem};
 pub use self::rule::{RuleDefinitionProblem, RuleProblem};
 
 mod call_argument;
@@ -84,6 +86,8 @@ trait RenderProblemReport: Problem {
 pub enum AnalysisProblem {
     /// Invalid index alteration or a statistics warning.
     Index(IndexProblem),
+    /// An ALTER COLUMN binding or attribute is invalid.
+    AlterColumn(ColumnAttributeProblem),
     /// A function invocation has an invalid argument order or repeated name.
     CallArgument(CallArgumentProblem),
     /// A creation conflicts with an existing catalog identity.
@@ -175,6 +179,21 @@ impl AnalysisProblem {
     /// Structured index diagnostic independent of rendered text.
     pub const fn index_problem(&self) -> Option<&IndexProblem> {
         if let Self::Index(problem) = self {
+            Some(problem)
+        } else {
+            None
+        }
+    }
+    pub(crate) fn alter_column(
+        table: &TableName,
+        column: &ColumnName,
+        problem: &AlterColumnProblem,
+    ) -> Self {
+        Self::AlterColumn(ColumnAttributeProblem::new(table, column, problem))
+    }
+    /// Structured ALTER COLUMN validation outcome.
+    pub const fn alter_column_problem(&self) -> Option<&ColumnAttributeProblem> {
+        if let Self::AlterColumn(problem) = self {
             Some(problem)
         } else {
             None
@@ -295,6 +314,7 @@ impl AnalysisProblem {
     pub const fn code(&self) -> &'static str {
         match self {
             Self::Index(problem) => problem.code(),
+            Self::AlterColumn(problem) => problem.code(),
             Self::Creation(_) => "conflicting_creation",
             Self::Ownership(problem) => problem.code(),
             Self::Rule(_) => "rule_invalid_definition",
@@ -353,6 +373,7 @@ impl AnalysisProblem {
 
         let report = match self {
             Self::Index(problem) => problem.render_report(&report_handler, source)?,
+            Self::AlterColumn(problem) => problem.render_report(&report_handler, source)?,
             Self::Creation(problem) => problem.render_report(&report_handler, source)?,
             Self::Ownership(problem) => problem.render_report(&report_handler, source)?,
             Self::Rule(problem) => problem.render_report(&report_handler, source)?,

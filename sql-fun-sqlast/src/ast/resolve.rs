@@ -438,11 +438,14 @@ impl Cast {
         };
         if context.dialect() == Dialect::postgres()
             && let Some(source) = argument.get_type()
-            && context.get_explicit_cast(&source, &target).is_none()
         {
-            context.report_analysis_problem(AnalysisProblem::explicit_cast_not_defined(
-                &source, &target,
-            ))?;
+            // Stored declarations may retain unqualified source names.
+            let source = context.canonicalize_type_ref(&source).unwrap_or(source);
+            if context.get_explicit_cast(&source, &target).is_none() {
+                context.report_analysis_problem(AnalysisProblem::explicit_cast_not_defined(
+                    &source, &target,
+                ))?;
+            }
         }
         let mut expression = SemScalarExpr::explicit_cast(&argument, &target);
         expression.set_cast_resolution(resolution);

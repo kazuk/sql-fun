@@ -16,6 +16,8 @@ pub struct CastInfo {
     pub func: String,
     pub method: String,
     pub context: String,
+    #[serde(default, rename = "is_prefferd")]
+    preferred: bool,
 }
 
 // alias: source_type -> target_type -> CastInfo
@@ -32,6 +34,7 @@ impl PgBuiltinCasts {
             let mut group = TrieMap::new();
             for (target, ci) in m {
                 let cc = match ci.context.as_str() {
+                    "i" if ci.preferred => CastContext::ImplicitPrefeerd,
                     "i" => CastContext::Implicit,
                     "a" => CastContext::Assignment,
                     "e" => CastContext::Explicit,
@@ -45,6 +48,9 @@ impl PgBuiltinCasts {
         Ok(result)
     }
 }
+
+#[cfg(test)]
+mod loader_tests;
 
 impl CastInfoRead for super::BaseContext {
     fn get_assignment_cast(

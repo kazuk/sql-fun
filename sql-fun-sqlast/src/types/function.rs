@@ -369,8 +369,8 @@ impl FunctionReadError {
 /// casts, binds polymorphic values, ranks overloads, or reconstructs signatures.
 ///
 /// ```
-/// use sql_fun_sqlast::sem::{ColumnName, FullName};
-/// use sql_fun_sqlast::types::{
+/// use ::sql_fun_sqlast::sem::{ColumnName, FullName};
+/// use ::sql_fun_sqlast::types::{
 ///     FunctionOverloads, FunctionParameter, FunctionResult, FunctionSignature,
 ///     ParameterMode, base::BaseType,
 /// };

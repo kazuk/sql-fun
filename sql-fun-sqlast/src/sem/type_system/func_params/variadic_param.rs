@@ -44,12 +44,15 @@ impl From<&FunctionParamVariadic> for FunctionParam {
 pub struct FunctionParamVariadic {
     name: Option<String>,
     param_type: Option<TypeReference>,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    default_expr: Option<SemScalarExpr>,
 }
 impl FunctionParamVariadic {
     pub fn new(name: Option<&String>, param_type: Option<&TypeReference>) -> Self {
         Self {
             name: name.cloned(),
             param_type: param_type.cloned(),
+            default_expr: None,
         }
     }
 }
@@ -100,6 +103,7 @@ impl FunctionParameterTrait for FunctionParamVariadic {
             FunctionParam::from(&Self {
                 name: Some(param_name),
                 param_type,
+                default_expr: None,
             }),
             context,
         ))
@@ -130,5 +134,28 @@ impl FunctionParameterTrait for FunctionParamVariadic {
         if let Some(ty) = self.param_type.as_mut() {
             ty.apply_common_infer_result(common_infer_result);
         }
+    }
+}
+
+impl FunctionParamVariadic {
+    pub(super) const fn retained_default(&self) -> Option<&SemScalarExpr> {
+        self.default_expr.as_ref()
+    }
+    pub(super) fn with_default(mut self, default: &Option<SemScalarExpr>) -> Self {
+        self.default_expr = default.clone();
+        self
+    }
+}
+
+impl FunctionParam {
+    /// Retain an explicitly supplied variadic default without changing legacy binding.
+    pub fn new_variadic_param_with_default(
+        name: &Option<String>,
+        param_type: &Option<TypeReference>,
+        default: &Option<SemScalarExpr>,
+    ) -> Self {
+        Self::Variadic(
+            FunctionParamVariadic::new(name.as_ref(), param_type.as_ref()).with_default(default),
+        )
     }
 }

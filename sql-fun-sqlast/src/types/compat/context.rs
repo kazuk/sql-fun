@@ -11,6 +11,20 @@ use super::{
 impl<C: ParseContext> TypeContextRead for C {
     type Error = ConversionError;
 
+    fn function_by_exact_name(
+        &self,
+        name: &FullName,
+    ) -> Result<Option<crate::types::FunctionOverloads>, Self::Error> {
+        super::function::by_exact_name(self, name)
+    }
+
+    fn function_by_name(
+        &self,
+        name: &FullName,
+    ) -> Result<Option<crate::types::FunctionOverloads>, Self::Error> {
+        super::function::by_name(self, name)
+    }
+
     fn dialect(&self) -> crate::ast::Dialect {
         ParseContext::dialect(self)
     }

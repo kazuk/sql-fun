@@ -12,6 +12,11 @@ row-expanding projections. Refresh older builtin generations before relying on
 these view-write capabilities. Application views and their declarations still
 come from your explicitly selected schema inputs.
 
+Function catalogs also retain argument names, modes, defaults, and scalar versus
+set return information for loaded-signature APIs. Regenerate older catalogs with
+the updated extractor before using these APIs; an older generation can report
+unavailable signature metadata even when existing semantic analysis still works.
+
 These commands produce candidate generations in a working directory.
 `$SQL_FUN_HOME` contains installed state; it is not an extraction workspace.
 Installing or upgrading a generation is a separate operation.

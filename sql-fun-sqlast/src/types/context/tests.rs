@@ -123,6 +123,30 @@ mod test_helpers {
     impl TypeContextRead for NativeCatalog {
         type Error = &'static str;
 
+        fn function_by_exact_name(
+            &self,
+            name: &FullName,
+        ) -> Result<Option<crate::types::FunctionOverloads>, Self::Error> {
+            self.check()?;
+            if name != &Self::source_name() {
+                return Ok(None);
+            }
+            let signature = crate::types::FunctionSignature::new(
+                name,
+                &[],
+                &crate::types::FunctionResult::scalar(self.target.as_ref()),
+                false,
+                false,
+            );
+            Ok(Some(crate::types::FunctionOverloads::new(&[signature])))
+        }
+        fn function_by_name(
+            &self,
+            name: &FullName,
+        ) -> Result<Option<crate::types::FunctionOverloads>, Self::Error> {
+            self.function_by_exact_name(name)
+        }
+
         fn registered_cast(
             &self,
             source: &dyn TypeDefinition,
@@ -893,5 +917,28 @@ fn selected_native_dialect_controls_automatic_io_coercions(
             .into_resolution()
             .unwrap()
             .is_none()
+    );
+}
+
+#[test]
+fn native_provider_exposes_whole_function_signatures() {
+    let provider = test_helpers::NativeCatalog::available();
+    let context = TypeContext::new(&provider);
+    let signatures = context
+        .function_by_exact_name(&test_helpers::NativeCatalog::source_name())
+        .unwrap()
+        .unwrap();
+    assert_eq!(signatures.signatures().len(), 1);
+    assert!(signatures.result_candidates().as_any().is::<Candidates>());
+    assert_eq!(
+        context
+            .function_by_name(&test_helpers::NativeCatalog::source_name())
+            .unwrap(),
+        Some(signatures)
+    );
+    assert!(
+        TypeContext::new(&test_helpers::NativeCatalog::failing())
+            .function_by_name(&test_helpers::NativeCatalog::source_name())
+            .is_err()
     );
 }

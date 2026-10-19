@@ -1667,7 +1667,9 @@ impl ParameterMode {
             Self::In => FunctionParam::new_input_param(name, param_type, default),
             Self::Out => FunctionParam::new_output_param(name, param_type),
             Self::InOut => FunctionParam::new_in_out_param(name, param_type, default),
-            Self::Variadic => FunctionParam::new_variadig_param(name, param_type),
+            Self::Variadic => {
+                FunctionParam::new_variadic_param_with_default(name, param_type, default)
+            }
             Self::Table => FunctionParam::new_table_param(name, param_type),
         }
     }
@@ -1739,7 +1741,14 @@ impl Function {
                 return AnalysisError::raise_unexpected_none("create_function.return_type");
             };
             let strict = self.options.iter().any(FunctionOption::is_strict);
-            let overload = OverloadVariant::new(&ret_type, &params, strict, false);
+            let metadata = crate::sem::FunctionSignatureMetadata::new(
+                &ret_type,
+                &params,
+                false,
+                self.procedure,
+            );
+            let overload = OverloadVariant::new(&ret_type, &params, strict, false)
+                .with_signature_metadata(&metadata);
             return Ok(CreateFunction::new(
                 &name,
                 &FunctionOverloadCollection::new(&[overload]),
@@ -1798,7 +1807,20 @@ impl Function {
             None
         };
         let strict = self.options.iter().any(FunctionOption::is_strict);
-        let overload = OverloadVariant::new(&ret_type, &params, strict, false);
+        let declared_result = Some(TypeReference::concrete_type_ref(
+            &context
+                .resolve_type_name(&ret_name)
+                .unwrap_or_else(|| ret_name.clone()),
+            !result_type.array_bounds.is_empty(),
+        ));
+        let metadata = crate::sem::FunctionSignatureMetadata::new(
+            &declared_result,
+            &params,
+            result_type.set_of,
+            false,
+        );
+        let overload = OverloadVariant::new(&ret_type, &params, strict, false)
+            .with_signature_metadata(&metadata);
         Ok(CreateFunction::new(
             &name,
             &FunctionOverloadCollection::new(&[overload]),

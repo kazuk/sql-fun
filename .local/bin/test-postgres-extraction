@@ -216,6 +216,17 @@ def validate(binary, major, image, destination, host, bind):
         definition = next(function for function in functions if function["name"] == name)
         assert all(overload["kind"] == kind and overload["returns_set"] == returns_set
                    for overload in definition["overloads"]), f"incorrect view row properties: {name}"
+    for function in functions:
+        for overload in function["overloads"]:
+            signature = overload["signature"]
+            assert signature["returns_set"] == overload["returns_set"]
+            assert signature["procedure"] == (overload["kind"] == "p")
+            arguments = signature["all_args"]
+            assert not signature["modes"] or len(signature["modes"]) == len(arguments)
+            assert not signature["names"] or len(signature["names"]) == len(arguments)
+            assert 0 <= signature["default_start"] <= len(overload["args"])
+    assert not next(f for f in functions if f["name"] == "json_to_record")["overloads"][0]["signature"]["returns_set"]
+    assert next(f for f in functions if f["name"] == "pg_get_keywords")["overloads"][0]["signature"]["returns_set"]
     schema = (output / "schema.sql").read_text()
     assert "ON UPDATE TO pg_catalog.pg_settings DO INSTEAD NOTHING;" in schema
     assert '"pg_stats" WITH (security_barrier' in schema

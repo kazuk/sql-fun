@@ -183,7 +183,9 @@ pub use self::{
     },
     schema_file_context::SchemaFileContext,
     select_statement::{ResultColumnCollection, SelectStatement},
-    type_system::{FunctionOverloadCollection, FunctionParam, OverloadVariant},
+    type_system::{
+        FunctionOverloadCollection, FunctionParam, FunctionSignatureMetadata, OverloadVariant,
+    },
     update_statement::{
         UpdateAssignment, UpdateCursor, UpdateQueryValue, UpdateStatement, UpdateValue,
         ViewUpdateInfoRead, ViewUpdateSupport, analyze_update_statement,

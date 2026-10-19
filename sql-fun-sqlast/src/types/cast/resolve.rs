@@ -1,5 +1,6 @@
 //! Dialect-aware cast resolution and candidate enumeration over loaded types.
 
+use super::{CastQueryError, CastQueryOutcome, DeferredCastQuery};
 use crate::ast::Dialect;
 use crate::types::{
     Candidates, CastContext, CastDefinition, CompositeType, DomainType, EnumType,
@@ -16,17 +17,57 @@ impl<'a, C: TypeContextRead> CastResolver<'a, C> {
         Self { context }
     }
 
-    pub(in crate::types) fn cast_sources(
+    pub(in crate::types) fn query_cast(
+        &self,
+        source: &dyn TypeDefinition,
+        target: &dyn TypeDefinition,
+        mode: CastContext,
+    ) -> Result<CastQueryOutcome<Option<CastDefinition>>, CastQueryError<C::Error>> {
+        if source.contains_polymorphic() || target.contains_polymorphic() {
+            self.require_postgres()?;
+            let query = DeferredCastQuery::pair(source, target, mode, self.context.dialect());
+            return Ok(CastQueryOutcome::deferred(&query));
+        }
+        self.cast(source, target, mode)
+            .map(CastQueryOutcome::resolved)
+            .map_err(CastQueryError::provider)
+    }
+
+    pub(in crate::types) fn query_sources(
         &self,
         target: &dyn TypeDefinition,
-        explicit: bool,
-    ) -> Result<TypeReference, C::Error> {
-        let mode = if explicit {
-            CastContext::explicit()
-        } else {
-            CastContext::implicit()
-        };
+        mode: CastContext,
+    ) -> Result<CastQueryOutcome<TypeReference>, CastQueryError<C::Error>> {
+        if target.contains_polymorphic() {
+            self.require_postgres()?;
+            let query = DeferredCastQuery::sources(target, mode, self.context.dialect());
+            return Ok(CastQueryOutcome::deferred(&query));
+        }
         self.sources(target, mode)
+            .map(CastQueryOutcome::resolved)
+            .map_err(CastQueryError::provider)
+    }
+
+    pub(in crate::types) fn query_targets(
+        &self,
+        source: &dyn TypeDefinition,
+    ) -> Result<CastQueryOutcome<TypeReference>, CastQueryError<C::Error>> {
+        if source.contains_polymorphic() {
+            self.require_postgres()?;
+            let query = DeferredCastQuery::targets(source, self.context.dialect());
+            return Ok(CastQueryOutcome::deferred(&query));
+        }
+        self.implicit_castable(source)
+            .map(CastQueryOutcome::resolved)
+            .map_err(CastQueryError::provider)
+    }
+
+    fn require_postgres(&self) -> Result<(), CastQueryError<C::Error>> {
+        if self.context.dialect() == Dialect::postgres() {
+            Ok(())
+        } else {
+            Err(CastQueryError::unsupported_dialect(self.context.dialect()))
+        }
     }
 
     pub(in crate::types) fn implicit_castable(
@@ -178,6 +219,15 @@ impl<'a, C: TypeContextRead> CastResolver<'a, C> {
         }
         if let Some(domain) = value.as_any().downcast_ref::<DomainType>() {
             return Self::concrete_sql_type(domain.base_type());
+        }
+        if let Some(range) = value.as_any().downcast_ref::<crate::types::RangeType>() {
+            return Self::concrete_sql_type(range.subtype());
+        }
+        if let Some(multirange) = value
+            .as_any()
+            .downcast_ref::<crate::types::MultirangeType>()
+        {
+            return Self::concrete_sql_type(multirange.range());
         }
         if let Some(base) = value.as_any().downcast_ref::<BaseType>() {
             let name = base.name();

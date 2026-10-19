@@ -146,6 +146,11 @@ impl PartialEq for Candidates {
 }
 
 impl TypeDefinition for Candidates {
+    fn contains_polymorphic(&self) -> bool {
+        self.candidates
+            .iter()
+            .any(|value| value.contains_polymorphic())
+    }
     fn as_any(&self) -> &dyn StdAny {
         self
     }

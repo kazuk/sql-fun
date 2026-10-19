@@ -42,6 +42,9 @@ two named definitions with different loaded components are different values.
 | `CompositeType` | Optional qualified name and ordered `Members` | `name()`, `members()` |
 | `ImplicitCompositeType` | Ordered `Members`, with its own category identity | `members()` |
 | `TableRowType` | Resolved qualified table name and ordered `Members` | `name()`, `members()` |
+| `Any` | No components; unconstrained | None |
+| `Never` | No components; no possible type | None |
+| `Candidates` | Set-wise identity of complete candidate types | `candidates()` |
 | `Member` | Optional logical name, loaded type, and `is_not_null: Option<bool>` | `name()`, `member_type()`, `is_not_null()` |
 | `Members` | Ordered members, including duplicates and unnamed members | `members()`, `member(name)` |
 
@@ -52,9 +55,9 @@ remain distinct categories even when their members match. A domain over an array
 is distinct from an array of that domain. A base name containing `[]` is still a
 base name; arrays are represented by wrappers.
 
-Ownership, constraints, default expressions, and declaration syntax are not part
-of this loaded identity. Their omission does not migrate or discard the legacy
-catalog's declaration semantics: those remain owned by the existing declaration
+Ownership, declaration constraints, default expressions, and declaration syntax
+are not part of this loaded identity. Their omission does not migrate or discard
+the legacy catalog's declaration semantics: those remain owned by the existing declaration
 model. In particular, domain identity here does not claim to represent CHECK or
 default-expression equivalence.
 
@@ -98,13 +101,17 @@ member types, unsupported named categories or table-reference shapes, recursion,
 and excessive nesting. Finite owned values cannot represent recursive catalog
 graphs; conversion detects active-name cycles and bounds nesting to 128 levels.
 
-Range, multirange, polymorphic, and pseudo-type behavior is outside this seam.
+Range, multirange, polymorphic, and pseudo-type loading remains limited by the
+legacy catalog data.
 The compatibility loader explicitly rejects recognized special builtins (for
 example `pg_catalog.int4range`, `record`, `anyelement`, and `void`) with
 `UnsupportedNamedType`; its spelling-based guard is not an exhaustive PostgreSQL
-category classifier. Extending catalog classification and representing these
-categories require separate work. SQL inference and cast compatibility also
-remain separate, deferred operations.
+category classifier. For example, the semantic builtin catalog retains names
+without range subtype or multirange base components. Those cannot be reconstructed
+as complete loaded values, even when a cast relationship exists. Do not fabricate
+`BaseType` values for these categories. Extending catalog classification and
+representing those components require separate work. SQL inference and overload
+selection remain deferred operations.
 
 ## `sem::TypeDefinition` capability audit
 
@@ -160,3 +167,63 @@ deferred capability must remain on the existing boundary until that capability
 has an explicit category and operation contract. This PR supplies the owned
 representation and conversion seam, rather than changing existing semantic
 analysis, overload selection, or storage to use it.
+
+## Shared constraint categories
+
+`Any::new()` explicitly constructs an unconstrained type, including the initial
+state of an unnarrowed parameter. `Never::new()` constructs a valid constraint
+state with no possible type. Neither category has components, and they remain
+distinct from each other and from SQL pseudo/polymorphic types such as `unknown`
+and `anyelement`.
+
+`Candidates::from_candidates(&values)` owns complete clones in a private
+`Vec<Box<dyn TypeDefinition>>`. A successful empty collection becomes `Never`;
+a nonempty collection becomes `Candidates`, including a singleton. Candidate
+identity is set-wise: order and duplicate count do not affect equality. Storage
+preserves the supplied values and order, including nested constraints; there is
+no flattening, ranking, automatic singleton selection, or inference. Equality
+compares candidate values recursively. Thus a nested candidate category is not
+identical to its flattened alternatives. These shared types can also hold whole
+operator/function signatures for subsequent work; they are not cast-specific
+containers.
+
+## Loaded cast relationships
+
+`types::CastDefinition` owns the ordered source and target loaded types and a
+`types::CastContext`. Relationship equality compares all three components,
+recursively comparing endpoint identities. It does not implement
+`TypeDefinition`. `NoConversion` records the catalog's identity relationship;
+neither it nor any other cast establishes type equality. The contexts retain
+implicit preferred, implicit, assignment, explicit, and no-conversion distinctions.
+No selection score or overload ranking is introduced.
+
+Legacy `sem::CastDefinition` stores only context. Its endpoint references are
+supplied separately; builtin JSON function/method fields are not available in
+that semantic definition. `compat::load_cast_definition` adapts such a supplied
+definition and endpoints through an explicitly selected `ParseContext`, preserving
+its context and loading complete endpoints. It does not verify eligibility of
+arbitrarily paired metadata.
+
+`compat::load_implicit_cast`, `load_assignment_cast`, and `load_explicit_cast`
+resolve concrete endpoint names through that same context, retaining array
+qualification, then query the corresponding legacy lookup on those resolved
+references. This name-resolving API intentionally compares with legacy calls on
+resolved references, rather than raw unqualified inputs. Dynamic inputs retain
+the legacy lookup's handling. Both endpoints must load completely before an
+absence can be reported. `Ok(None)` is an absent direct relationship between
+valid loaded endpoints; `Err(ConversionError)` is unavailable/incomplete endpoint
+data. The returned context is the catalog's value, not the requested mode.
+Assignment lookup delegates to the dedicated legacy assignment API to retain its
+fallback behavior. No catalog maps, analyzers, or existing call sites change.
+
+`compat::load_cast_sources(context, target, explicit)` loads exactly the source
+candidates from the selected legacy enumeration, with the caller choosing
+implicit (`false`) or explicit (`true`) eligibility. `load_assignment_sources`
+uses the corresponding assignment enumeration. Completeness is the existing
+catalog API's enumeration contract; neither adds transitive cast searches.
+The target is resolved and validated separately: candidate input types are not
+the expression's target/result type. An empty successful enumeration becomes
+`Never`; an error loading any candidate returns an error without a partial set.
+Identity remains a candidate where the catalog enumerates it. Missing metadata
+never becomes `Any` or `Never`. Constraint solving and semantic-consumer migration
+remain outside this boundary.

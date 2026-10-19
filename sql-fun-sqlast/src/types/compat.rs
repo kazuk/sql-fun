@@ -15,8 +15,6 @@ pub use self::cast::{
     load_explicit_cast, load_implicit_cast, load_implicit_castable,
 };
 
-pub use self::context::TypeContext;
-
 use crate::sem::{
     ColumnCollection, ColumnDefinition, CreateCompositeType, CreateDomain, CreateEnum, FullName,
     ParseContext, SchemaFileContext, TableName, TypeDefinition as LegacyDefinition,

@@ -26,55 +26,73 @@ pretend that every type has a name, element, base, or members. Accessors expose
 only the category's components. A consumer can inspect a loaded value without
 consulting storage again.
 
-## Selected-catalog type entrypoint
+## Selected-provider type entrypoint
 
-`types::TypeContext::new(&context)` is the public entrypoint for consumers that
-already hold a selected `ParseContext` and want to work with loaded values. Its
-implementation lives in `types::compat` and is re-exported as
-`types::TypeContext`; every legacy conversion and catalog call remains in the
-compatibility boundary. It borrows the selected context without building another
-catalog, retaining declaration storage, or discovering ambient inputs.
+`types::TypeContext::new(&provider)` is the public entrypoint for consumers
+working with loaded values. `TypeContext` and the public `TypeContextRead`
+provider contract live permanently in `types/context.rs` and are re-exported
+from `types`. The facade borrows an explicitly selected provider and delegates
+catalog reads; it owns no catalog storage and discovers no ambient inputs.
+
+`TypeContextRead` has an associated `Error` and eight loaded-value operations:
+two type lookups, three directed cast lookups and three candidate enumerations.
+Native providers implement this contract directly using their own error type,
+without importing legacy references or `types::compat`. Removing the temporary
+legacy adapter later leaves the public `TypeContext` implementation and provider
+interface intact.
+
+`types/compat/context.rs` contains the blanket adapter implementing
+`TypeContextRead` for a selected `sem::ParseContext`, with
+`type Error = compat::ConversionError`. All legacy projection, conversion and
+catalog interaction stays in `compat`. Existing consumers can therefore pass
+their selected `ParseContext` to `TypeContext::new`, while native providers have
+no dependency on that adapter.
 
 `ParseContext` remains the common environment passed through SQL analyzers and
-the authority for catalog, dialect, search path and analysis configuration. The
-explicitly requested `TypeContext` facade is an opt-in view over that authority,
+the authority for their catalog, dialect, search path and analysis configuration.
+The explicitly requested `TypeContext` facade provides loaded-type reads; it is
 not an alternative analyzer environment. This addition does not migrate existing
 analyzers or replace their `ParseContext` parameters.
 
 | Operation | Loaded API and behavior |
 | --- | --- |
-| Resolve a selected type name | `type_by_name(&FullName)` follows the selected context's type search path and returns `Result<Option<TypeReference>, ConversionError>`. |
+| Resolve a selected type name | `type_by_name(&FullName)` follows the selected provider's type search path and returns `Result<Option<TypeReference>, C::Error>`. |
 | Read an exact catalog key | `type_by_exact_name(&FullName)` performs exact lookup without search-path expansion, with the same result shape. |
-| Inspect an array component | `array_item_type(&dyn TypeDefinition)` returns an owned clone of an `ArrayType` element, or `None` for another category. It performs no catalog lookup. |
-| Look up a directed relationship | `implicit_cast`, `assignment_cast`, and `explicit_cast` accept loaded source and target values and return `Result<Option<CastDefinition>, ConversionError>`. |
-| Enumerate source candidates | `cast_sources(target, explicit)` and `assignment_sources(target)` accept a loaded target and return a loaded `Candidates` or `Never` through `Result<TypeReference, ConversionError>`. |
-| Enumerate implicit targets | `implicit_castable(source)` accepts a loaded source and returns the selected legacy catalog's implicit target candidates through the same result shape. |
+| Inspect an array component | `array_item_type(&dyn TypeDefinition)` returns an owned clone of an `ArrayType` element, or `None` for another category. It requires no provider trait bound and performs no catalog lookup. |
+| Look up a directed relationship | `implicit_cast`, `assignment_cast`, and `explicit_cast` accept loaded source and target values and return `Result<Option<CastDefinition>, C::Error>`. |
+| Enumerate source candidates | `cast_sources(target, explicit)` and `assignment_sources(target)` accept a loaded target and return a loaded `Candidates` or `Never` through `Result<TypeReference, C::Error>`. |
+| Enumerate implicit targets | `implicit_castable(source)` accepts a loaded source and returns the selected provider's implicit target candidates through the same result shape. |
 
-Name lookup distinguishes an absent definition (`Ok(None)`) from a present
-definition whose components cannot load (`Err`). Array inspection is intrinsic:
-an `ArrayType` containing `Any` yields a cloned `Any` element even though `Any`
-has no legacy catalog mapping. A scalar returns `None`; a domain is not flattened
-to expose its underlying array.
+Here `C` is the selected provider implementing `TypeContextRead`. Name lookup
+distinguishes an absent definition (`Ok(None)`) from a present definition whose
+components cannot load (`Err`). Array inspection is intrinsic: an `ArrayType`
+containing `Any` yields a cloned `Any` element. Nested arrays are preserved;
+a scalar returns `None`; a domain is not flattened to expose its underlying
+array. These operations do not depend on legacy representability.
 
-Catalog-backed operations accepting loaded inputs must project those values
-faithfully into legacy references before delegation. A nominal name alone is
-insufficient: projection reloads its definition from the selected catalog and
-compares the complete loaded snapshot, including category and recursively loaded
-components. A stale or different snapshot returns `LoadedTypeMismatch` rather
-than discarding labels, members, base types or other identity components. Array
-projection retains the wrapper and validates the element snapshot.
+### Temporary legacy adapter
+
+The following projection restrictions belong to the `ParseContext` adapter,
+not to `TypeContextRead` or to native providers. Adapter operations accepting
+loaded inputs must project those values faithfully into legacy references
+before delegation. A nominal name alone is insufficient: projection reloads its
+definition from the selected catalog and compares the complete loaded snapshot,
+including category and recursively loaded components. A stale or different
+snapshot returns `LoadedTypeMismatch` rather than discarding labels, members,
+base types or other identity components. Array projection retains the wrapper
+and validates the element snapshot.
 
 Anonymous structural values can project into dynamic legacy definitions when
 all components have faithful representations. Delegation preserves the legacy
-catalog's handling of dynamic references, including its rejection of dynamic
-cast lookups; projection does not invent structural cast rules. Constraints (`Any`,
+catalog's handling of dynamic references, including its rejection of dynamic cast
+lookups; projection does not invent structural cast rules. Constraints (`Any`,
 `Never`, `Candidates`), custom trait implementations, and nested arrays without
-a faithful legacy representation return `UnsupportedLoadedType`. They are not
-converted into nominal placeholders, flattened or expanded into new searches.
-These restrictions apply to catalog delegation, not to owned construction,
-equality, cloning or intrinsic array inspection.
+a faithful legacy representation return `UnsupportedLoadedType`. The adapter does
+not convert them into nominal placeholders, flatten them or expand them into new
+searches. These restrictions do not limit owned construction, equality, cloning,
+intrinsic array inspection or a native provider's supported loaded categories.
 
-The low-level `compat::load_implicit_castable(context, source)` exposes the same
+The low-level `compat::load_implicit_castable(context, source)` exposes the
 legacy implicit-target enumeration for explicitly supplied legacy references.
 All enumerations load every reported candidate completely or return an error;
 none return partial candidate sets or interpret missing data as an empty set.

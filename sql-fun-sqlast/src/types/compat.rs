@@ -12,7 +12,6 @@ mod function;
 mod loaded_reference;
 mod operator;
 mod polymorphic;
-mod signature;
 
 pub use self::function::FunctionLoadError;
 pub use self::operator::OperatorLoadError;

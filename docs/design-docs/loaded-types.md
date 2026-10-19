@@ -655,7 +655,7 @@ claim that differently qualified keys denote the same declaration. Existing
 extractors already retain the required operand, result and strictness fields;
 no legacy storage or serialization changes are needed for these components.
 
-Shared signature-component adaptation in `types::compat::signature` resolves
+Existing signature-component helpers in `types::compat::function` resolve
 legacy type references and preserves declared pseudo categories and signature
 polymorphic linkage using the provider's dialect. Complete concrete structural
 types use the existing reference loader. Unavailable nested definitions,

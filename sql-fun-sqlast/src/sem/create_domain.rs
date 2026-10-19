@@ -59,6 +59,14 @@ impl CreateDomain {
         &self.type_ref
     }
 
+    /// Underlying type name retained by the legacy declaration, if available.
+    ///
+    /// This differs from `type_ref`, which identifies the domain itself.
+    #[must_use]
+    pub const fn base_type(&self) -> Option<&FullName> {
+        self.base_type.as_ref()
+    }
+
     /// analyze [`crate::syn::CreateDomainStmt`]
     pub fn analyze_create_domain<TParseContext>(
         context: TParseContext,

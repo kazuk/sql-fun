@@ -92,3 +92,11 @@ impl std::hash::Hash for CreateEnum {
         std::hash::Hash::hash(&self.values, state);
     }
 }
+
+impl EnumValueDefinition {
+    /// Label text, preserving declaration order through `CreateEnum::values`.
+    #[must_use]
+    pub fn name(&self) -> &str {
+        &self.name
+    }
+}

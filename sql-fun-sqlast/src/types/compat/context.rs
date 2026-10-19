@@ -11,8 +11,8 @@ use super::{
 impl<C: ParseContext> TypeContextRead for C {
     type Error = ConversionError;
 
-    fn supports_postgres_coercions(&self) -> bool {
-        self.dialect() == crate::ast::Dialect::postgres()
+    fn dialect(&self) -> crate::ast::Dialect {
+        ParseContext::dialect(self)
     }
 
     fn existing_array_cast(

@@ -12,7 +12,7 @@ mod test_helpers {
         source: TypeReference,
         target: TypeReference,
         failing: bool,
-        postgres: bool,
+        dialect: crate::ast::Dialect,
         scalar_relationship: bool,
         registered: Option<CastDefinition>,
     }
@@ -23,7 +23,7 @@ mod test_helpers {
                 source: Box::new(BaseType::new(&Self::source_name())),
                 target: Box::new(BaseType::new(&Self::target_name())),
                 failing: false,
-                postgres: false,
+                dialect: crate::ast::Dialect::sqlite(),
                 scalar_relationship: true,
                 registered: None,
             }
@@ -37,7 +37,7 @@ mod test_helpers {
                 source: source.clone_box(),
                 target: target.clone_box(),
                 failing: false,
-                postgres: true,
+                dialect: crate::ast::Dialect::postgres(),
                 scalar_relationship: true,
                 registered: None,
             }
@@ -45,7 +45,7 @@ mod test_helpers {
 
         pub(super) fn postgres() -> Self {
             Self {
-                postgres: true,
+                dialect: crate::ast::Dialect::postgres(),
                 ..Self::available()
             }
         }
@@ -64,6 +64,11 @@ mod test_helpers {
             context: &CastContext,
         ) -> Self {
             self.registered = Some(CastDefinition::new(source, target, context));
+            self
+        }
+
+        pub(super) fn with_dialect(mut self, dialect: crate::ast::Dialect) -> Self {
+            self.dialect = dialect;
             self
         }
 
@@ -131,8 +136,8 @@ mod test_helpers {
             Ok(None)
         }
 
-        fn supports_postgres_coercions(&self) -> bool {
-            self.postgres
+        fn dialect(&self) -> crate::ast::Dialect {
+            self.dialect
         }
 
         fn type_by_exact_name(
@@ -692,4 +697,38 @@ fn assignment_candidates_include_provider_explicit_universe_when_io_permits() {
             .unwrap()
             .same_type(implicit.as_ref())
     );
+}
+
+#[rstest::rstest]
+#[case::postgres(crate::ast::Dialect::postgres(), true)]
+#[case::sqlite(crate::ast::Dialect::sqlite(), false)]
+fn selected_native_dialect_controls_automatic_io_coercions(
+    #[case] dialect: crate::ast::Dialect,
+    #[case] allows_io: bool,
+) {
+    use crate::types::{EnumType, base::BaseType};
+    let value = EnumType::new(
+        &FullName::with_schema("native", "state"),
+        &["one".to_owned()],
+    );
+    let text = BaseType::new(&FullName::with_schema("pg_catalog", "text"));
+    let catalog = test_helpers::NativeCatalog::io_only(&value, &text).with_dialect(dialect);
+    let context = TypeContext::new(&catalog);
+    assert_eq!(
+        context.assignment_cast(&value, &text).unwrap().is_some(),
+        allows_io
+    );
+    assert_eq!(
+        context.explicit_cast(&text, &value).unwrap().is_some(),
+        allows_io
+    );
+    assert_eq!(
+        context
+            .assignment_cast(&ArrayType::new(&value), &ArrayType::new(&text))
+            .unwrap()
+            .is_some(),
+        allows_io
+    );
+    assert!(context.implicit_cast(&value, &text).unwrap().is_none());
+    assert!(context.assignment_cast(&text, &value).unwrap().is_none());
 }

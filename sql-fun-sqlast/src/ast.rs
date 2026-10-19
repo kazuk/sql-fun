@@ -1315,6 +1315,7 @@ pub(crate) struct Call {
     kind: CallKind,
     name: Name,
     arguments: Vec<Expr>,
+    argument_locations: Vec<Option<StringSpan>>,
     star: bool,
     distinct: bool,
     variadic: bool,

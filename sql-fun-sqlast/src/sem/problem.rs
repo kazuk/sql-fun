@@ -320,6 +320,7 @@ impl AnalysisProblem {
     pub fn statement_relative_span(&self) -> Option<StringSpan> {
         match self {
             Self::NameResolution(problem) => problem.statement_relative_span(),
+            Self::CallArgument(problem) => problem.statement_relative_span(),
             _ => None,
         }
     }

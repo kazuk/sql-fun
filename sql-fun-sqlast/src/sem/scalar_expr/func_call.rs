@@ -21,9 +21,22 @@ mod implementation {
         overload: Option<OverloadVariant>,
         #[serde(default)]
         signature_deferred: bool,
+        #[serde(deserialize_with = "deserialize_arguments")]
         args: IVec<FuncCallArgs>,
         #[serde(default)]
         modifiers: Box<crate::sem::FunctionModifiers>,
+    }
+
+    fn deserialize_arguments<'de, D: serde::Deserializer<'de>>(
+        deserializer: D,
+    ) -> Result<IVec<FuncCallArgs>, D::Error> {
+        let arguments = <Vec<FuncCallArgs> as serde::Deserialize>::deserialize(deserializer)?;
+        Ok(arguments
+            .into_iter()
+            .enumerate()
+            .map(|(position, argument)| argument.at_position(position))
+            .collect::<Vec<_>>()
+            .into())
     }
 
     /// A supplied argument, its call position, and any independently established formal association.
@@ -135,6 +148,12 @@ mod implementation {
             assert_eq!(call.args()[1].value(), &value);
             let restored: FuncCallExpr =
                 ::serde_json::from_str(&::serde_json::to_string(&call).unwrap()).unwrap();
+            assert_eq!(restored, call);
+            let mut legacy = ::serde_json::to_value(&call).unwrap();
+            for argument in legacy["args"].as_array_mut().unwrap() {
+                argument.as_object_mut().unwrap().remove("position");
+            }
+            let restored: FuncCallExpr = ::serde_json::from_value(legacy).unwrap();
             assert_eq!(restored, call);
         }
     }
@@ -268,6 +287,7 @@ impl FuncCallExpr {
         context: &mut impl crate::sem::ParseContext,
         name: &FullName,
         arguments: &[SemScalarExpr],
+        argument_spans: &[Option<crate::StringSpan>],
         span: &Option<crate::StringSpan>,
     ) -> Result<Self, AnalysisError> {
         let mut names = std::collections::HashSet::new();
@@ -277,12 +297,18 @@ impl FuncCallExpr {
             if let Some(named) = argument.as_named_argument() {
                 if !names.insert(named.name()) {
                     context.report_analysis_problem(AnalysisProblem::call_argument(
-                        crate::sem::problem::CallArgumentProblem::duplicate_name(named.name()),
+                        crate::sem::problem::CallArgumentProblem::duplicate_name(
+                            named.name(),
+                            &named.source_span().copied(),
+                        ),
                     ))?;
                 }
             } else if !names.is_empty() {
                 context.report_analysis_problem(AnalysisProblem::call_argument(
-                    crate::sem::problem::CallArgumentProblem::positional_after_named(position),
+                    crate::sem::problem::CallArgumentProblem::positional_after_named(
+                        position,
+                        &argument_spans.get(position).copied().flatten(),
+                    ),
                 ))?;
             }
             args.push(FuncCallArgs::new(argument, &None));

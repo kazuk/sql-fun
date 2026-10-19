@@ -1603,6 +1603,53 @@ mod test_source_span {
     }
 }
 
+fn call_argument_token_span(location: i32, tokens: &IVec<syn::ScanToken>) -> Option<StringSpan> {
+    if location < 0 {
+        return None;
+    }
+    for token in tokens {
+        if token.get_start() == location {
+            return Some(StringSpan::new(
+                location as usize,
+                (token.get_end() - token.get_start()) as usize,
+            ));
+        }
+    }
+    None
+}
+
+// Keep absent parser anchors absent rather than guessing an expression location.
+fn call_argument_span(node: &syn::Node, tokens: &IVec<syn::ScanToken>) -> Option<StringSpan> {
+    if let Some(value) = node.as_column_ref().as_inner() {
+        return call_argument_token_span(value.get_location(), tokens);
+    }
+    if let Some(value) = node.as_param_ref().as_inner() {
+        return call_argument_token_span(value.get_location(), tokens);
+    }
+    if let Some(value) = node.as_func_call().as_inner() {
+        return call_argument_token_span(value.get_location(), tokens);
+    }
+    if let Some(value) = node.as_a_expr().as_inner() {
+        return call_argument_token_span(value.get_location(), tokens);
+    }
+    if let Some(value) = node.as_type_cast().as_inner() {
+        return call_argument_token_span(value.get_location(), tokens);
+    }
+    if let Some(value) = node.as_a_array_expr().as_inner() {
+        return call_argument_token_span(value.get_location(), tokens);
+    }
+    if let Some(value) = node.as_row_expr().as_inner() {
+        return call_argument_token_span(value.get_location(), tokens);
+    }
+    if let Some(value) = node.as_case_expr().as_inner() {
+        return call_argument_token_span(value.get_location(), tokens);
+    }
+    if let Some(value) = node.as_named_arg_expr().as_inner() {
+        return call_argument_token_span(value.get_location(), tokens);
+    }
+    None
+}
+
 impl TryFromWithTokens<&syn::FuncCall> for Call {
     type Error = AnalysisError;
 
@@ -1619,6 +1666,13 @@ impl TryFromWithTokens<&syn::FuncCall> for Call {
             kind: CallKind::ordinary(),
             within_order: Vec::new(),
             arguments: Expr::try_collect_from_with_tokens(value.get_args(), tokens)?,
+            argument_locations: value
+                .get_args()
+                .as_inner()
+                .unwrap_or_default()
+                .into_iter()
+                .map(|node| call_argument_span(&node, tokens))
+                .collect(),
             star: value.get_agg_star(),
             distinct: value.get_agg_distinct(),
             variadic: value.get_func_variadic(),
@@ -1642,6 +1696,7 @@ impl Call {
             kind: CallKind::special(name),
             name: Name::local(name),
             arguments,
+            argument_locations: Vec::new(),
             star: false,
             distinct: false,
             variadic: false,

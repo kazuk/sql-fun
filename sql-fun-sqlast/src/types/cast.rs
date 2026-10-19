@@ -1,5 +1,9 @@
 //! Owned, directed cast relationships, independent of type equality.
 
+mod resolve;
+
+pub(super) use self::resolve::CastResolver;
+
 use crate::types::{TypeDefinition, TypeReference};
 
 /// The catalog's eligibility and identity distinction for a direct cast.

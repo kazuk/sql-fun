@@ -1980,10 +1980,20 @@ impl Domain {
                 &self.base_span,
             ))?;
         }
-        Ok(CreateDomain::new(
-            &TypeReference::from_full_name(name),
-            &base,
-        ))
+        let mut domain = CreateDomain::new(&TypeReference::from_full_name(name), &base);
+        let category = if let Some(base) = context.get_type(&base_name) {
+            if self.base.array_bounds.is_empty() {
+                base.category(context)
+            } else if context.dialect() == crate::ast::Dialect::postgres() {
+                crate::sem::TypeCategory::try_from('A').ok()
+            } else {
+                None
+            }
+        } else {
+            None
+        };
+        domain.set_category(category);
+        Ok(domain)
     }
 
     pub(crate) fn resolve_and_apply<TContext: ParseContext>(

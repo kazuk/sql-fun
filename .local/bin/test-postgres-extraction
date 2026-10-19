@@ -209,6 +209,10 @@ def validate(binary, major, image, destination, host, bind):
     output = destination / major
     run(binary, "extract", "catalog", "--docker-image", image,
         "--docker-host-address", host, "--docker-bind-address", bind, "--output", str(output))
+    types = {row["name"]: row["category"] for row in json.loads((output / "pg_type.json").read_text())}
+    assert all(isinstance(code, str) and len(code) == 1 for code in types.values())
+    assert {name: types[name] for name in ("char", "unknown", "_record", "int4range")} == {
+        "char": "Z", "unknown": "X", "_record": "P", "int4range": "R"}
     functions = json.loads((output / "functions.json").read_text())
     clock = next(f for f in functions if f["name"] == "clock_timestamp")
     assert clock["overloads"][0]["args"] == [], "zero-argument functions must not have a null argument"

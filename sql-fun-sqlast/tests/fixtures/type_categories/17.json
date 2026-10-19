@@ -1,0 +1,69 @@
+{
+  "server_version_num": 170006,
+  "types": [
+    {
+      "category": "B",
+      "name": "bool"
+    },
+    {
+      "category": "U",
+      "name": "bytea"
+    },
+    {
+      "category": "Z",
+      "name": "char"
+    },
+    {
+      "category": "A",
+      "name": "int2vector"
+    },
+    {
+      "category": "N",
+      "name": "int4"
+    },
+    {
+      "category": "S",
+      "name": "text"
+    },
+    {
+      "category": "G",
+      "name": "point"
+    },
+    {
+      "category": "X",
+      "name": "unknown"
+    },
+    {
+      "category": "I",
+      "name": "inet"
+    },
+    {
+      "category": "D",
+      "name": "date"
+    },
+    {
+      "category": "T",
+      "name": "interval"
+    },
+    {
+      "category": "V",
+      "name": "varbit"
+    },
+    {
+      "category": "P",
+      "name": "record"
+    },
+    {
+      "category": "P",
+      "name": "_record"
+    },
+    {
+      "category": "R",
+      "name": "int4range"
+    },
+    {
+      "category": "R",
+      "name": "int4multirange"
+    }
+  ]
+}

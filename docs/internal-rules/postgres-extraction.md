@@ -60,6 +60,35 @@ Scope and format version remain unchanged. The installed extraction integration
 harness verifies the fields
 for scalar, aggregate and set-returning functions on both supported versions.
 
+## Type categories
+
+`pg_type.json` records `name` and `category`. For defined types, `category` is
+exactly `pg_type.typcategory`, a single printable ASCII code, including uncommon
+builtin and user-defined codes. Shell types emit null because PostgreSQL does
+not guarantee their classification. The builtin extraction scope is unchanged;
+this does not select application or extension schemas.
+
+The semantic type definition retains category independently of type names,
+preferred status, and casts. `TypeDefinition::category` uses the supplied
+catalog context to restrict PostgreSQL-specific semantics to that dialect.
+PostgreSQL enum definitions have category `E`; composite and table-row
+representations have `C`. DDL domains retain their resolved base category at
+analysis time (including `A` for a declared array base). Missing base metadata
+remains unavailable. Synthetic anonymous composites describe row structure and
+have `C`; an unclassified nominal definition remains unavailable.
+
+Older name-only records and serialized definitions remain readable with category
+unavailable. Missing/null is distinct from `X` (the PostgreSQL unknown type) and
+`U` (user-defined). Malformed supplied codes fail loading with the catalog path.
+New metadata is serialized without changing the existing nominal-reference shape;
+category is an additive optional field. Domain classification is retained through
+serialization, independently of the existing domain identity/equality contract.
+
+Committed generations and the full extraction CLI support PostgreSQL 17/18.
+The category query and loader also have small oracle-derived samples for 15/16;
+these samples do not extend the CLI's supported version matrix. The fixture
+README records their provenance, and ordinary Rust tests need no live server.
+
 ## Additive master definitions
 
 Format 1 additionally produces `collations.json` and `operator_classes.json`.

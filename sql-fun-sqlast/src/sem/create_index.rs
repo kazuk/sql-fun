@@ -1,4 +1,6 @@
 mod arbiter;
+mod settings;
+pub use self::settings::IndexStorageValue;
 
 use sql_fun_core::IVec;
 
@@ -41,6 +43,11 @@ pub enum IndexElement {
     Expr(Box<SemScalarExpr>),
 }
 
+impl IndexElement {
+    const fn is_expression(&self) -> bool {
+        matches!(self, Self::Expr(_))
+    }
+}
 impl From<&ColumnName> for IndexElement {
     fn from(value: &ColumnName) -> Self {
         Self::ColumnName(value.clone())
@@ -141,17 +148,64 @@ mod index_element_collection_tests {
 #[derive(Debug, Clone)]
 pub struct CreateIndex {
     if_not_exists: bool,
+    access_method: String,
+    storage_parameters: std::collections::BTreeMap<String, IndexStorageValue>,
+    statistics: std::collections::BTreeMap<i32, i32>,
 
     name: FullName,
     table: TableName,
     key_columns: IndexElementCollection,
-    #[cfg_attr(not(test), expect(dead_code))]
     include_columns: IndexElementCollection,
     unique: bool,
     predicate: Option<SemScalarExpr>,
 }
 
 impl CreateIndex {
+    /// Index access method retained from CREATE INDEX.
+    pub fn access_method(&self) -> &str {
+        &self.access_method
+    }
+    pub(crate) fn set_access_method(&mut self, method: &str) {
+        self.access_method = if method.is_empty() {
+            "btree".to_owned()
+        } else {
+            method.to_owned()
+        };
+    }
+    /// Explicit storage override; None means the database default is in effect.
+    pub fn storage_parameter(&self, name: &str) -> Option<&IndexStorageValue> {
+        self.storage_parameters.get(name)
+    }
+    /// Explicit expression-column statistics target; None means the system default.
+    pub fn statistics_target(&self, column: i32) -> Option<i32> {
+        self.statistics.get(&column).copied()
+    }
+    pub(crate) fn apply_statistics(&mut self, column: i32, target: i32) {
+        if target == -1 {
+            self.statistics.remove(&column);
+        } else {
+            self.statistics.insert(column, target);
+        }
+    }
+    pub(crate) fn statistics_column_problem(
+        &self,
+        column: i32,
+    ) -> Option<crate::sem::problem::IndexProblemKind> {
+        use crate::sem::problem::IndexProblemKind;
+        let position = usize::try_from(column - 1).ok()?;
+        if let Some(element) = self.key_columns.0.get(position) {
+            if element.element.is_expression() {
+                None
+            } else {
+                Some(IndexProblemKind::non_expression_column())
+            }
+        } else if position < self.key_columns.0.len() + self.include_columns.0.len() {
+            Some(IndexProblemKind::included_column())
+        } else {
+            Some(IndexProblemKind::invalid_column())
+        }
+    }
+
     pub(crate) fn contains_name(indexes: &[Self], name: &FullName) -> bool {
         indexes.iter().any(|index| index.name() == name)
     }
@@ -189,6 +243,9 @@ impl CreateIndex {
     ) -> Self {
         Self {
             if_not_exists: false,
+            access_method: "btree".to_owned(),
+            storage_parameters: std::collections::BTreeMap::new(),
+            statistics: std::collections::BTreeMap::new(),
             name: name.clone(),
             table: table.clone(),
             key_columns: keys.clone(),
@@ -202,6 +259,9 @@ impl CreateIndex {
     pub fn new(name: &FullName, table: &TableName, key_columns: &IndexElementCollection) -> Self {
         Self {
             if_not_exists: false,
+            access_method: "btree".to_owned(),
+            storage_parameters: std::collections::BTreeMap::new(),
+            statistics: std::collections::BTreeMap::new(),
             name: name.clone(),
             table: table.clone(),
             key_columns: key_columns.clone(),
@@ -221,6 +281,9 @@ impl CreateIndex {
     ) -> Self {
         Self {
             if_not_exists: false,
+            access_method: "btree".to_owned(),
+            storage_parameters: std::collections::BTreeMap::new(),
+            statistics: std::collections::BTreeMap::new(),
             name: name.clone(),
             table: table.clone(),
             key_columns: key_columns.clone(),

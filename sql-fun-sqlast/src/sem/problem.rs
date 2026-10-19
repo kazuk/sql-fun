@@ -5,6 +5,7 @@ pub use self::rule::{RuleDefinitionProblem, RuleProblem};
 mod call_argument;
 mod creation;
 mod delete;
+mod index;
 mod insert;
 mod name_resolution;
 mod overload_resolution;
@@ -34,6 +35,7 @@ use crate::{
 pub use self::call_argument::CallArgumentProblem;
 pub use self::creation::CreationProblem;
 pub use self::delete::{DeleteProblem, DeleteProblemKind};
+pub use self::index::{IndexProblem, IndexProblemKind};
 pub use self::insert::{InsertProblem, InsertProblemKind};
 pub use self::name_resolution::{DomainBaseTypeNameNotFound, NameResolution};
 pub use self::ownership::OwnershipProblem;
@@ -80,6 +82,8 @@ trait RenderProblemReport: Problem {
 #[allow(clippy::large_enum_variant)]
 #[derive(Debug, Clone)]
 pub enum AnalysisProblem {
+    /// Invalid index alteration or a statistics warning.
+    Index(IndexProblem),
     /// A function invocation has an invalid argument order or repeated name.
     CallArgument(CallArgumentProblem),
     /// A creation conflicts with an existing catalog identity.
@@ -165,6 +169,18 @@ pub enum AnalysisProblem {
 }
 
 impl AnalysisProblem {
+    pub(crate) fn index(problem: &IndexProblem) -> Self {
+        Self::Index(problem.clone())
+    }
+    /// Structured index diagnostic independent of rendered text.
+    pub const fn index_problem(&self) -> Option<&IndexProblem> {
+        if let Self::Index(problem) = self {
+            Some(problem)
+        } else {
+            None
+        }
+    }
+
     pub(crate) const fn creation(problem: CreationProblem) -> Self {
         Self::Creation(problem)
     }
@@ -278,6 +294,7 @@ impl AnalysisProblem {
     #[must_use]
     pub const fn code(&self) -> &'static str {
         match self {
+            Self::Index(problem) => problem.code(),
             Self::Creation(_) => "conflicting_creation",
             Self::Ownership(problem) => problem.code(),
             Self::Rule(_) => "rule_invalid_definition",
@@ -335,6 +352,7 @@ impl AnalysisProblem {
             .with_syntax_highlighting(SqlHighlighter::from_theme(theme)?);
 
         let report = match self {
+            Self::Index(problem) => problem.render_report(&report_handler, source)?,
             Self::Creation(problem) => problem.render_report(&report_handler, source)?,
             Self::Ownership(problem) => problem.render_report(&report_handler, source)?,
             Self::Rule(problem) => problem.render_report(&report_handler, source)?,

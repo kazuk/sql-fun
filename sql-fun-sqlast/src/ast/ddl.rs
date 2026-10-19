@@ -1,5 +1,6 @@
 //! Owned DDL syntax. Catalog bindings are obtained only during resolution.
 
+mod alter_index;
 #[path = "deparse/ddl.rs"]
 mod sql_emission;
 
@@ -73,8 +74,13 @@ impl super::AlterRelation {
         context: &mut impl ParseContext,
         source: Option<&crate::sem::SourcePathWithSpan>,
     ) -> Result<SemAst, AnalysisError> {
-        self.kind
-            .resolve(context, &self.name.full_name()?, &self.commands, source)
+        self.kind.resolve(
+            context,
+            &self.name.full_name()?,
+            &self.commands,
+            source,
+            self.if_exists,
+        )
     }
 }
 
@@ -101,14 +107,30 @@ impl super::AlterRelationKind {
         name: &crate::sem::FullName,
         syntax_commands: &[super::AlterCommand],
         source: Option<&crate::sem::SourcePathWithSpan>,
+        if_exists: bool,
     ) -> Result<SemAst, AnalysisError> {
         match self {
             Self::Table => Self::resolve_table(context, name, syntax_commands, source),
             Self::View => Self::resolve_view(context, name, syntax_commands, false),
             Self::MaterializedView => Self::resolve_view(context, name, syntax_commands, true),
             Self::Sequence => Self::resolve_sequence(context, name, syntax_commands),
-            Self::ForeignTable | Self::Index | Self::CompositeType => todo!(),
+            Self::Index => Self::resolve_index(context, name, syntax_commands, if_exists),
+            Self::ForeignTable | Self::CompositeType => todo!(),
         }
+    }
+
+    fn resolve_index(
+        context: &mut impl ParseContext,
+        name: &crate::sem::FullName,
+        syntax_commands: &[super::AlterCommand],
+        if_exists: bool,
+    ) -> Result<SemAst, AnalysisError> {
+        let mut operations = Vec::new();
+        for command in syntax_commands {
+            operations.push(command.resolve_index(context)?);
+        }
+        let statement = crate::sem::AlterIndex::resolve(context, name, if_exists, &operations)?;
+        Ok(SemAst::alter_index(&statement))
     }
 
     fn resolve_table(
@@ -1439,6 +1461,9 @@ impl Index {
             crate::sem::CreateIndex::from_resolved(&name, &table, &keys, &includes, self.unique);
         index = index.with_if_not_exists(self.if_not_exists);
         index.set_predicate(predicate);
+        if !self.initialize_index_storage(context, &mut index)? {
+            return Ok(None);
+        }
         Ok(Some(index))
     }
 

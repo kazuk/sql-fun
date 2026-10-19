@@ -701,6 +701,9 @@ where
     /// apply `create schema` to current schema
     fn apply_create_schema(self, create_schema: &CreateSchema) -> Result<Self, AnalysisError>;
 
+    /// Publish the recorded atomic ALTER INDEX replacement; rejected or skipped statements do nothing.
+    fn apply_alter_index(self, index: &crate::sem::AlterIndex) -> Result<Self, AnalysisError>;
+
     /// apply `create index` statement to current schema
     fn apply_create_index(self, create_index: &CreateIndex) -> Result<Self, AnalysisError>;
 

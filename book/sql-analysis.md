@@ -369,7 +369,15 @@ and do not require PostgreSQL cast rules.
 
 PostgreSQL analysis accounts for implicit casts in operator and ordinary function
 calls. A parameter or a parameter-dependent result column may have several
-admissible types.
+admissible types. These domains describe alternatives for explicitly typed
+inputs, rather than PostgreSQL's single signature inferred by an untyped
+`PREPARE`. For example, `SELECT ARRAY[$1,1]` admits an `integer` input with an
+`integer[]` result and a `bigint` input with a `bigint[]` result. PostgreSQL
+chooses `integer` when preparing that statement without parameter types.
+`ParameterConstraints::allows` checks admissible assignments; analysis does not
+select a final protocol binding. A result column's `col_type()` is absent when
+several result types remain; inspect `ParameterConstraints::result_column`
+for its domain. An explicit SQL cast can narrow the result type.
 
 Parameters in supported ORDER BY, GROUP BY, HAVING, DISTINCT ON, LIMIT/OFFSET,
 aggregate FILTER/ordering, and window expressions participate in analysis,

@@ -338,14 +338,18 @@ fn constructed_types_reach_existing_consumers(#[case] sql: &str) -> testresult::
     Ok(())
 }
 
-#[test]
-fn anonymous_record_arrays_do_not_implicitly_become_named_composite_arrays()
--> testresult::TestResult {
+#[rstest::rstest]
+#[case::scalar("pg_control_system()", "control")]
+#[case::array("ARRAY[pg_control_system()]", "control[]")]
+fn anonymous_records_do_not_implicitly_become_named_composites(
+    #[case] expression: &str,
+    #[case] target: &str,
+) -> testresult::TestResult {
     let analyzed = heavy::analyze(
-        "SELECT f(ARRAY[pg_control_system()])",
+        &format!("SELECT f({expression})"),
         &[
             "CREATE TYPE control AS (system_identifier bigint, pg_control_version integer, catalog_version_no integer, pg_control_last_modified timestamptz)",
-            "CREATE FUNCTION f(value control[]) RETURNS int LANGUAGE sql AS 'SELECT 1'",
+            &format!("CREATE FUNCTION f(value {target}) RETURNS int LANGUAGE sql AS 'SELECT 1'"),
         ],
     )?;
     assert!(
@@ -403,6 +407,98 @@ fn parameter_with_anonymous_records_uses_the_record_family() -> testresult::Test
                 1,
                 TypeReference::from_master_type_name("record")
             )]))
+    );
+    Ok(())
+}
+
+#[rstest::rstest]
+#[case::anonymous("f(pg_control_system())", "text")]
+#[case::named("f(NULL::control)", "int4")]
+#[case::anonymous_array("fa(ARRAY[pg_control_system()])", "text")]
+fn competing_record_overloads_select_postgres_candidate(
+    #[case] expression: &str,
+    #[case] result: &str,
+) -> testresult::TestResult {
+    let analyzed = heavy::analyze(
+        &format!("SELECT {expression}"),
+        &[
+            "CREATE TYPE control AS (system_identifier bigint, pg_control_version integer, catalog_version_no integer, pg_control_last_modified timestamptz)",
+            "CREATE FUNCTION f(value record) RETURNS text LANGUAGE plpgsql AS 'BEGIN RETURN NULL; END'",
+            "CREATE FUNCTION f(value control) RETURNS integer LANGUAGE sql AS 'SELECT 1'",
+            "CREATE FUNCTION fa(value anyarray) RETURNS text LANGUAGE sql AS 'SELECT NULL::text'",
+            "CREATE FUNCTION fa(value control[]) RETURNS integer LANGUAGE sql AS 'SELECT 1'",
+        ],
+    )?;
+    assert!(
+        analyzed.context().problems().is_empty(),
+        "{:?}",
+        analyzed.context().problems()
+    );
+    let query = analyzed.ast().clone().into_select_statemtnt().unwrap();
+    assert_eq!(
+        query.result_columns().get_column_at(0).unwrap().col_type(),
+        &Some(TypeReference::from_master_type_name(result))
+    );
+    Ok(())
+}
+
+#[test]
+fn public_array_parameter_domains_do_not_select_an_untyped_prepare_signature()
+-> testresult::TestResult {
+    let analyzed = heavy::analyze("SELECT ARRAY[$1,1]", &[])?;
+    assert!(analyzed.context().problems().is_empty());
+    let constraints = analyzed.context().parameter_constraints();
+    for ty in [PgBuiltInType::int4(), PgBuiltInType::int8()] {
+        assert!(constraints.parameter(1).unwrap().constraint().allows(&ty));
+        assert!(constraints.allows(&BTreeMap::from([(1, ty.clone())])));
+        assert!(
+            constraints
+                .result_column(0)
+                .unwrap()
+                .allows(&ty.array_type())
+        );
+    }
+    let query = analyzed.ast().clone().into_select_statemtnt().unwrap();
+    assert!(
+        query
+            .result_columns()
+            .get_column_at(0)
+            .unwrap()
+            .col_type()
+            .is_none()
+    );
+    let narrowed = heavy::analyze("SELECT ARRAY[$1::integer,1]", &[])?;
+    let query = narrowed.ast().clone().into_select_statemtnt().unwrap();
+    assert_eq!(
+        query.result_columns().get_column_at(0).unwrap().col_type(),
+        &Some(PgBuiltInType::int4().array_type())
+    );
+    Ok(())
+}
+
+#[rstest::rstest]
+#[case::scalar("g(pg_control_system(), NULL)")]
+#[case::array("ga(ARRAY[pg_control_system()], NULL)")]
+fn record_overloads_preserve_postgres_ambiguity(
+    #[case] expression: &str,
+) -> testresult::TestResult {
+    let analyzed = heavy::analyze(
+        &format!("SELECT {expression}"),
+        &[
+            "CREATE FUNCTION g(value record, other integer) RETURNS integer LANGUAGE plpgsql AS 'BEGIN RETURN 1; END'",
+            "CREATE FUNCTION g(value record, other bigint) RETURNS bigint LANGUAGE plpgsql AS 'BEGIN RETURN 1; END'",
+            "CREATE FUNCTION ga(value anyarray, other integer) RETURNS integer LANGUAGE sql AS 'SELECT 1'",
+            "CREATE FUNCTION ga(value anyarray, other bigint) RETURNS bigint LANGUAGE sql AS 'SELECT 1::bigint'",
+        ],
+    )?;
+    assert!(
+        analyzed
+            .context()
+            .problems()
+            .iter()
+            .any(|problem| problem.code() == "function_overload_resolution_failed"),
+        "{:?}",
+        analyzed.context().problems()
     );
     Ok(())
 }

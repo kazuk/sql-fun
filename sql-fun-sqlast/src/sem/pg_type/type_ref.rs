@@ -73,7 +73,11 @@ impl TypeReference {
         context: &impl crate::sem::BaseParseContext,
     ) -> Option<crate::sem::CastContext> {
         if self.is_dynamic() || target.is_dynamic() {
-            if self.matches_structure(target, context) {
+            let accepts_record = *target == Self::from_master_type_name("record")
+                && self
+                    .type_definition()
+                    .is_some_and(|definition| definition.structural_columns().is_some());
+            if accepts_record || self.matches_structure(target, context) {
                 Some(crate::sem::CastContext::no_conversion())
             } else {
                 None
@@ -388,6 +392,16 @@ mod array_identity_tests {
         TypeReference::dynamic(&TypeDefinition::from(&CreateCompositeType::from_fields(
             &fields,
         )))
+    }
+
+    #[test]
+    fn anonymous_record_accepts_generic_record_without_cast_master() {
+        let mut context = crate::test_helpers::TestParseContext::default();
+        let source = record(&PgBuiltInType::int4());
+        let target = TypeReference::from_master_type_name("record");
+        context.set_get_implicit_cast_result(&source, &target, None);
+        assert!(source.implicit_match_context(&target, &context).is_some());
+        assert!(!source.matches_structure(&target, &context));
     }
 
     #[rstest::rstest]

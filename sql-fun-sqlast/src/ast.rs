@@ -427,7 +427,7 @@ impl StatementNode {
                 .resolve(context)
                 .map(|alteration| crate::sem::SemAst::alter_owner(&alteration)),
             Self::CompositeType(composite_type) => composite_type
-                .resolve()
+                .resolve(context)
                 .map(crate::sem::SemAst::CreateCompType),
             Self::AlterRelation(_) => crate::sem::AnalysisError::raise_unexpected_input(
                 "statement requires catalog application",

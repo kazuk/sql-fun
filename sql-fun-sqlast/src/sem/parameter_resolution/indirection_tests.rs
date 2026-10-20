@@ -394,3 +394,58 @@ fn owned_named_composites_preserve_nominal_identity() -> Result<(), Box<dyn std:
     )])));
     Ok(())
 }
+
+#[rstest::rstest]
+#[case::array_member("(NULL::public.array_value).items", true)]
+#[case::array_index("((NULL::public.array_value).items)[1]", false)]
+#[case::scalar_member("(NULL::public.array_value).scalar", false)]
+fn declared_composite_array_fields_retain_result_types(
+    #[case] expression: &str,
+    #[case] is_array: bool,
+    #[values(false, true)] frozen: bool,
+) -> Result<(), Box<dyn std::error::Error>> {
+    let context = test_helpers::schema(
+        "CREATE TYPE public.array_value AS (items integer[], scalar integer)",
+        frozen,
+    )?;
+    assert!(context.problems().is_empty(), "{:?}", context.problems());
+    let analyzed = parse_statements(&format!("SELECT {expression}"), Dialect::postgres())
+        .next()
+        .unwrap()?
+        .analyze(context)?;
+    assert!(
+        analyzed.context().problems().is_empty(),
+        "{:?}",
+        analyzed.context().problems()
+    );
+    let query = analyzed.ast().clone().into_select_statemtnt().unwrap();
+    assert_eq!(
+        query.result_columns().get_column_at(0).unwrap().col_type(),
+        &Some(crate::sem::TypeReference::concrete_type_ref(
+            PgBuiltInType::int4().full_name(),
+            is_array,
+        ))
+    );
+    Ok(())
+}
+
+#[rstest::rstest]
+fn declared_composite_scalar_field_rejects_subscripts(
+    #[values(false, true)] frozen: bool,
+) -> Result<(), Box<dyn std::error::Error>> {
+    let context = test_helpers::schema(
+        "CREATE TYPE public.array_value AS (items integer[], scalar integer)",
+        frozen,
+    )?;
+    assert!(context.problems().is_empty(), "{:?}", context.problems());
+    let analyzed = parse_statements(
+        "SELECT ((NULL::public.array_value).scalar)[1]",
+        Dialect::postgres(),
+    )
+    .next()
+    .unwrap()?
+    .analyze(context)?;
+    assert_eq!(analyzed.context().problems().len(), 1);
+    assert_eq!(analyzed.context().problems()[0].code(), "require_array");
+    Ok(())
+}

@@ -1927,10 +1927,13 @@ impl CompositeType {
         }
     }
 
-    pub(super) fn resolve(&self) -> Result<crate::sem::CreateCompositeType, AnalysisError> {
+    pub(super) fn resolve(
+        &self,
+        context: &mut impl ParseContext,
+    ) -> Result<crate::sem::CreateCompositeType, AnalysisError> {
         let mut fields = crate::sem::CompositeFieldCollection::default();
         for field in &self.fields {
-            fields.push(field.resolve()?);
+            fields.push(field.resolve(context)?);
         }
         Ok(crate::sem::CreateCompositeType::new(
             &self.name.full_name()?,
@@ -1940,9 +1943,9 @@ impl CompositeType {
 
     pub(super) fn resolve_and_apply<TContext: ParseContext>(
         &self,
-        context: TContext,
+        mut context: TContext,
     ) -> Result<AstAndContextPair<TContext>, AnalysisError> {
-        let composite = self.resolve()?;
+        let composite = self.resolve(&mut context)?;
         let context = context.apply_create_comp_type(&composite)?;
         Ok(AstAndContextPair::new(
             SemAst::CreateCompType(composite),
@@ -1966,13 +1969,53 @@ impl CompositeField {
         }
     }
 
-    fn resolve(&self) -> Result<crate::sem::CompositeFieldDefinition, AnalysisError> {
-        let type_ref = TypeReference::concrete_type_ref(&self.type_name.name.full_name()?, false);
+    fn resolve(
+        &self,
+        _context: &mut impl ParseContext,
+    ) -> Result<crate::sem::CompositeFieldDefinition, AnalysisError> {
+        let type_ref = self.type_name.reference()?;
         Ok(crate::sem::CompositeFieldDefinition::new(
             &self.name,
             &Some(type_ref),
             &Some(self.is_not_null),
         ))
+    }
+}
+
+#[cfg(test)]
+mod test_composite_field_resolution {
+    use super::CompositeType;
+    use crate::ast::TryFromWithTokens;
+    use crate::sem::{PgBuiltInType, TypeReference};
+    use crate::syn::Opt;
+    use crate::test_helpers::{SynBuilder, TestParseContext};
+    use ::sql_fun_core::IVec;
+
+    #[rstest::rstest]
+    #[case::array("integer[]", true)]
+    #[case::dimensions("integer[][]", true)]
+    #[case::bound("integer[3]", true)]
+    #[case::scalar("integer", false)]
+    fn retains_declared_array_identity(#[case] declaration: &str, #[case] is_array: bool) {
+        let syntax = SynBuilder::new().parse(&format!(
+            "CREATE TYPE public.array_value AS (items {declaration})"
+        ));
+        let composite = CompositeType::try_from_with_tokens(
+            &syntax.as_composite_type_stmt().as_inner().unwrap(),
+            &IVec::default(),
+        )
+        .unwrap();
+        let field = composite.fields[0]
+            .resolve(&mut TestParseContext::default())
+            .unwrap();
+        assert_eq!(field.name(), "items");
+        assert_eq!(
+            field.get_type(),
+            Some(TypeReference::concrete_type_ref(
+                PgBuiltInType::int4().full_name(),
+                is_array,
+            ))
+        );
     }
 }
 

@@ -61,6 +61,8 @@ mod test_helpers {
         };
         use std::path::PathBuf;
 
+        /// Reloads selected test metadata on every call; no result is shared.
+        /// The real metadata selects the builtin catalog used by schema tests.
         pub(crate) fn environment()
         -> Result<(SqlFunArgs, ::sql_fun_core::SqlFunMetadata), Box<dyn std::error::Error>>
         {
@@ -83,6 +85,10 @@ mod test_helpers {
             ))
         }
 
+        /// Reloads and parses the full builtin catalog, then analyzes the supplied
+        /// schema on every call to exercise real schema casts and row types.
+        /// The frozen path additionally reloads metadata when rebuilding the
+        /// context. Initialization is repeated per call and is not shared.
         pub(crate) fn schema(
             sql: &str,
             frozen: bool,
@@ -554,6 +560,46 @@ fn deferred_member_access_retains_conflicts(
     #[case] diagnostic: &str,
 ) -> Result<(), Box<dyn std::error::Error>> {
     let context = heavy::schema("create type public.point_value as (n integer)", false)?;
+    let analyzed = parse_statements(sql, Dialect::postgres())
+        .next()
+        .unwrap()?
+        .analyze(context)?;
+    assert!(
+        analyzed
+            .context()
+            .problems()
+            .iter()
+            .any(|problem| problem.code() == diagnostic),
+        "{:?}",
+        analyzed.context().problems()
+    );
+    assert!(
+        !analyzed
+            .context()
+            .parameter_constraints()
+            .allows(&BTreeMap::new())
+    );
+    Ok(())
+}
+
+#[rstest::rstest]
+#[case::missing_member(
+    "select (($1).v).missing, $1::public.outer_value",
+    "composite_type_field_not_found"
+)]
+#[case::scalar_base(
+    "select ((($1).v).n).missing, $1::public.outer_value",
+    "member_access_requires_composite_type"
+)]
+fn nested_deferred_members_report_structured_errors(
+    #[case] sql: &str,
+    #[case] diagnostic: &str,
+) -> Result<(), Box<dyn std::error::Error>> {
+    // Real catalog definitions exercise deferred nested member resolution.
+    let context = heavy::schema(
+        "create type public.inner_value as (n integer); create type public.outer_value as (v public.inner_value);",
+        false,
+    )?;
     let analyzed = parse_statements(sql, Dialect::postgres())
         .next()
         .unwrap()?

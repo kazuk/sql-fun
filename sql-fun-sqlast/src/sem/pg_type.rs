@@ -94,7 +94,7 @@ impl TypeDefinition {
         true
     }
 
-    pub(crate) const fn domain_base(&self) -> Option<&FullName> {
+    pub(crate) const fn domain_base(&self) -> Option<&TypeReference> {
         if let Self::Domain(domain) = self {
             domain.base_type()
         } else {

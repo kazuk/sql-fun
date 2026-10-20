@@ -14,16 +14,6 @@ pub trait TypeInfoRead {
         false
     }
 
-    /// Complete resolved base of a domain, preserving array qualification.
-    /// The default adapts legacy scalar declarations; catalogs retaining array
-    /// bases override it with their complete resolved type facts.
-    fn domain_base_type(&self, name: &FullName) -> Option<TypeReference> {
-        self.get_type_impl(name)?
-            .domain_base()
-            .cloned()
-            .map(TypeReference::from_full_name)
-    }
-
     /// get item type for array type
     fn get_array_item_type(&self, type_name: &TypeReference) -> Option<TypeReference>;
 }
@@ -45,14 +35,6 @@ where
 
     /// insert create domain statement
     fn insert_create_domain(&mut self, name: &FullName, create_domain: &CreateDomain);
-
-    /// Retain the complete domain base alongside the existing declaration model.
-    fn insert_create_domain_with_base(
-        &mut self,
-        name: &FullName,
-        domain: &CreateDomain,
-        base: Option<&TypeReference>,
-    );
 
     /// register enum type
     fn insert_create_enum(&mut self, name: &FullName, create_enum_type: &CreateEnum);

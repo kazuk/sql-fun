@@ -2001,7 +2001,7 @@ impl Domain {
     fn resolve_in(&self, context: &mut impl ParseContext) -> Result<CreateDomain, AnalysisError> {
         let name = self.name.full_name()?;
         let base_name = self.base.name.full_name()?;
-        let base = context.resolve_type_name(&base_name);
+        let base = context.canonicalize_type_ref(&self.base.reference()?);
         if base.is_none() {
             context.report_analysis_problem(AnalysisProblem::domain_base_type_not_found(
                 &name,
@@ -2030,10 +2030,7 @@ impl Domain {
         mut context: TContext,
     ) -> Result<AstAndContextPair<TContext>, AnalysisError> {
         let domain = self.resolve(&mut context)?;
-        let base = domain
-            .base_type()
-            .map(|name| TypeReference::concrete_type_ref(name, !self.base.array_bounds.is_empty()));
-        let context = context.apply_create_domain_with_base(&domain, base.as_ref())?;
+        let context = context.apply_create_domain(&domain)?;
         Ok(AstAndContextPair::new(
             SemAst::create_domain(&domain),
             context,

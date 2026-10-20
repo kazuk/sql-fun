@@ -405,7 +405,7 @@ impl OperatorKind {
 }
 
 impl TypeName {
-    fn reference(&self) -> Result<TypeReference, AnalysisError> {
+    pub(in crate::ast) fn reference(&self) -> Result<TypeReference, AnalysisError> {
         Ok(TypeReference::concrete_type_ref(
             &self.name.full_name()?,
             !self.array_bounds.is_empty(),

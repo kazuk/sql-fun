@@ -29,6 +29,16 @@ impl MemberRef {
         self.base.is_not_null()
     }
 
+    /// Base expression whose composite field is accessed.
+    pub const fn base(&self) -> &SemScalarExpr {
+        &self.base
+    }
+
+    /// Field identifier after SQL identifier normalization.
+    pub fn member(&self) -> &str {
+        &self.member
+    }
+
     pub const fn member_type(&self) -> &Option<TypeReference> {
         &self.member_type
     }
@@ -101,8 +111,20 @@ impl MemberRef {
 }
 
 impl MemberRef {
-    pub(crate) fn requires_type_inference(&self) -> bool {
-        self.base.needs_type_inference()
+    pub(super) fn set_member_type(&mut self, ty: &Option<TypeReference>) {
+        self.member_type.clone_from(ty);
+    }
+
+    pub(super) fn collect_constraints(
+        &self,
+        parameters: &mut crate::sem::parameter_resolution::ParameterResolution,
+    ) -> Option<SemScalarExpr> {
+        if self.base.constraint_node().is_none() && !self.base.needs_type_inference() {
+            return None;
+        }
+        let mut result = parameters.member_access(&self.base, &self.member);
+        result.retain_indirection(&IndirectionExpr::MemberRef(Box::new(self.clone())));
+        Some(result)
     }
 }
 

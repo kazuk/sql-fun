@@ -162,6 +162,8 @@ impl ParameterResolution {
     }
 
     fn solve(&mut self, context: &mut impl crate::sem::ParseContext) -> Result<(), AnalysisError> {
+        self.graph.prepare_projections(context);
+        self.graph.report_projection_problems(context)?;
         if let Err(problem) = self.graph.solve() {
             crate::sem::ParseContext::report_analysis_problem(
                 context,
@@ -171,7 +173,8 @@ impl ParameterResolution {
         Ok(())
     }
 
-    fn default_query_outputs(&mut self) {
+    fn default_query_outputs(&mut self, context: &impl crate::sem::ParseContext) {
+        self.graph.prepare_projections(context);
         // UPDATE/DELETE subqueries resolve unknown projected parameters before
         // surrounding expressions or assignments constrain them. Keep solver failure
         // in the graph for the final diagnostic-producing solve.
@@ -210,9 +213,57 @@ impl ParameterResolution {
     pub(crate) fn unify_coalesce_types(&mut self, _coalesce: &crate::sem::CoalesceExpr) {
         todo!("parameter-dependent COALESCE type unification");
     }
-    pub(crate) fn constrain_indirection(&mut self, _indirection: &crate::sem::IndirectionExpr) {
-        todo!("parameter-dependent indirection type constraints");
+    pub(crate) fn member_access(&mut self, base: &SemScalarExpr, member: &str) -> SemScalarExpr {
+        let source = self.input(base);
+        let result = self.operation(
+            "member access",
+            &[],
+            &InputTypeConstraint::any(),
+            base.is_not_null(),
+        );
+        self.graph.project(
+            source,
+            result.constraint_node().expect("operation node"),
+            crate::sem::parameter_constraints::TypeProjection::member(member),
+        );
+        result
     }
+    pub(crate) fn array_access(
+        &mut self,
+        context: &mut impl crate::sem::ParseContext,
+        base: &SemScalarExpr,
+        bounds: &[&SemScalarExpr],
+        slice: bool,
+    ) -> SemScalarExpr {
+        for bound in bounds {
+            let node = self.input(bound);
+            self.graph.restrict(
+                node,
+                &InputTypeConstraint::types(
+                    context.assignment_sources(&crate::sem::PgBuiltInType::int4()),
+                ),
+            );
+        }
+        let source = self.input(base);
+        let result = self.operation(
+            "array access",
+            &[],
+            &InputTypeConstraint::any(),
+            base.is_not_null(),
+        );
+        let projection = if slice {
+            crate::sem::parameter_constraints::TypeProjection::array()
+        } else {
+            crate::sem::parameter_constraints::TypeProjection::array_element()
+        };
+        self.graph.project(
+            source,
+            result.constraint_node().expect("operation node"),
+            projection,
+        );
+        result
+    }
+
     pub(crate) fn sqlite_operator(
         &mut self,
         _name: &crate::sem::OperatorName,
@@ -811,7 +862,7 @@ impl<C: crate::sem::ParseContext> crate::sem::traversal::SemanticVisitor for Col
     }
     fn leave_query(&mut self) {
         if self.dml_depth > 0 && self.context.dialect() == Dialect::postgres() {
-            self.parameters.default_query_outputs();
+            self.parameters.default_query_outputs(self.context);
         }
         self.parameters.leave_query();
     }

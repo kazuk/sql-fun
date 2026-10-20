@@ -29,6 +29,21 @@ impl ArraySlice {
         }
     }
 
+    /// Array expression being sliced.
+    pub const fn array(&self) -> &SemScalarExpr {
+        &self.array
+    }
+
+    /// Explicit lower bound; absence preserves PostgreSQL's omitted-bound form.
+    pub const fn lower(&self) -> Option<&SemScalarExpr> {
+        self.lower.as_ref()
+    }
+
+    /// Explicit upper bound; absence preserves PostgreSQL's omitted-bound form.
+    pub const fn upper(&self) -> Option<&SemScalarExpr> {
+        self.upper.as_ref()
+    }
+
     pub fn array_type(&self) -> Option<TypeReference> {
         self.array.get_type()
     }
@@ -119,20 +134,6 @@ impl ArraySlice {
 }
 
 impl ArraySlice {
-    pub(crate) fn requires_type_inference(&self) -> bool {
-        self.array.needs_type_inference()
-            || self
-                .lower
-                .as_ref()
-                .is_some_and(SemScalarExpr::needs_type_inference)
-            || self
-                .upper
-                .as_ref()
-                .is_some_and(SemScalarExpr::needs_type_inference)
-    }
-}
-
-impl ArraySlice {
     pub(super) fn walk_assignment_target<V: crate::sem::traversal::SemanticVisitor>(
         &mut self,
         visitor: &mut V,
@@ -143,5 +144,18 @@ impl ArraySlice {
             visitor.subscript(index);
         }
         Ok(())
+    }
+}
+
+impl ArraySlice {
+    pub(super) fn collect_constraints(
+        &self,
+        parameters: &mut crate::sem::parameter_resolution::ParameterResolution,
+        context: &mut impl crate::sem::ParseContext,
+    ) -> SemScalarExpr {
+        let bounds: Vec<_> = self.lower.iter().chain(&self.upper).collect();
+        let mut result = parameters.array_access(context, &self.array, &bounds, true);
+        result.retain_indirection(&IndirectionExpr::slice(self));
+        result
     }
 }

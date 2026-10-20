@@ -30,6 +30,15 @@ impl ArrayIndex {
         &self.array
     }
 
+    pub(super) fn set_item_type(&mut self, item_type: &Option<TypeReference>) {
+        self.item_type = item_type.clone();
+    }
+
+    /// Index expression, including its inferred parameter domain.
+    pub const fn index(&self) -> &SemScalarExpr {
+        &self.index
+    }
+
     pub const fn item_type(&self) -> &Option<TypeReference> {
         &self.item_type
     }
@@ -96,12 +105,6 @@ impl ArrayIndex {
 }
 
 impl ArrayIndex {
-    pub(crate) fn requires_type_inference(&self) -> bool {
-        self.array.needs_type_inference() || self.index.needs_type_inference()
-    }
-}
-
-impl ArrayIndex {
     pub(super) fn walk_assignment_target<V: crate::sem::traversal::SemanticVisitor>(
         &mut self,
         visitor: &mut V,
@@ -110,5 +113,17 @@ impl ArrayIndex {
         self.index.walk(visitor)?;
         visitor.subscript(&self.index);
         Ok(())
+    }
+}
+
+impl ArrayIndex {
+    pub(super) fn collect_constraints(
+        &self,
+        parameters: &mut crate::sem::parameter_resolution::ParameterResolution,
+        context: &mut impl crate::sem::ParseContext,
+    ) -> SemScalarExpr {
+        let mut result = parameters.array_access(context, &self.array, &[&self.index], false);
+        result.retain_indirection(&IndirectionExpr::index(self));
+        result
     }
 }

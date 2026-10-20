@@ -1,3 +1,12 @@
+// The derive emits sibling implementations, outside the annotated type's lint scope.
+#![cfg_attr(
+    feature = "openrpc-schema",
+    expect(
+        clippy::disallowed_methods,
+        reason = "schemars generates Option::and_then for serde defaults in derived schemas"
+    )
+)]
+
 mod analyze_query;
 mod describe_table;
 mod echo;

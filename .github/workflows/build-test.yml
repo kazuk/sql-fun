@@ -261,7 +261,7 @@ jobs:
           sccache --start-server
           export RUSTC_WRAPPER=sccache
           export SCCACHE_DIR=/github/home/.cache/sccache
-          .local/bin/check-test-flow --step=lint
+          .local/bin/check-test-flow --all-features --step=lint
           sccache --show-stats
 
       - name: Check crate package metadata

@@ -64,9 +64,14 @@ The user must provide parameters in one line:
 
     ```rust
     #[cfg(test)]
-    pub mod test_helpers;
+    mod test_helpers;
     ```
 
+  - Same-crate unit tests can use `crate::test_helpers`; expose shared helper
+    functions/types as `pub(crate)` where needed.
+  - Integration tests under `tests/` compile as separate crates and cannot use
+    this `#[cfg(test)]` module, because the library is compiled without
+    `cfg(test)` for those consumers.
 - Extract helpers into `crate::test_helpers` to keep tests simple, BUT:
   - Do NOT move test-case-specific inputs/expected values into `test_helpers` as
     hardcoded constants.

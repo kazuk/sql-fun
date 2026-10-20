@@ -109,12 +109,18 @@ argument binding and simple/common polymorphic inference.
 matches before preferred conversions. Inspect these existing paths and their
 callers before adding another binding or ranking strategy; the ranking helper
 alone is not a complete implementation of PostgreSQL overload resolution.
-In particular, [#673](https://github.com/kazuk/sql-fun/issues/673) tracks a known
-concrete-versus-polymorphic candidate-ranking defect: after polymorphic
-substitution, competing `fa(control[])` and `fa(anyarray)` declarations can
-incorrectly tie even for `fa(NULL::control[])`. PostgreSQL selects the original
-concrete declaration. The same distinction matters for `record` / `anyelement`.
-Do not treat successful structural matching as proof of correct overload choice.
+Function ranking retains the original call-bound declarations alongside the
+instantiated bindings. Instantiated inputs establish applicability and result
+types; substituted polymorphic positions earn no exact-match or preferred-cast
+credit. This distinction also survives in deferred function signatures, where
+ranking is evaluated separately for each admissible source assignment. Operator
+signatures keep their existing ranking behavior. For example, `fa(control[])`
+beats `fa(anyarray)` for `fa(NULL::control[])`, and `f(record)` beats
+`f(anyelement)` for an anonymous record. Structural matching still determines
+applicability without catalog cast lookup for dynamic operands; successful
+structural matching alone does not establish the correct overload choice.
+See the regressions for [#673](https://github.com/kazuk/sql-fun/issues/673) in
+`function_overload_collection/tests.rs` and `tests/arrays.rs`.
 
 ### ARRAY constructor results
 

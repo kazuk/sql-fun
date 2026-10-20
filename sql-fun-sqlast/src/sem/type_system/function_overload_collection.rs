@@ -151,11 +151,12 @@ impl FunctionOverloadCollection {
 
     fn overload_rank(
         bindings: &[ParameterBindResult],
+        declarations: &[ParameterBindResult],
         context: &impl crate::sem::BaseParseContext,
     ) -> Option<crate::sem::overload_rank::OverloadRank> {
         let mut rank = crate::sem::overload_rank::OverloadRank::default();
-        for binding in bindings {
-            rank = rank + binding.overload_rank(context)?;
+        for (binding, declaration) in std::iter::zip(bindings, declarations) {
+            rank = rank + binding.overload_rank(context, declaration)?;
         }
         Some(rank)
     }
@@ -185,11 +186,15 @@ impl FunctionOverloadCollection {
                 continue 'overload;
             };
 
-            let Ok(()) = Self::infer_simple(&bind_result, &mut overload) else {
+            if self.shadows_expanded_variadic(&overload, &bind_result, arg_types) {
+                continue;
+            }
+            let declared_bindings = bind_result;
+            let Ok(()) = Self::infer_simple(&declared_bindings, &mut overload) else {
                 continue 'overload;
             };
 
-            let Ok(()) = Self::infer_common(&bind_result, &mut overload, context) else {
+            let Ok(()) = Self::infer_common(&declared_bindings, &mut overload, context) else {
                 continue 'overload;
             };
 
@@ -198,11 +203,7 @@ impl FunctionOverloadCollection {
                 continue 'overload;
             };
 
-            if self.shadows_expanded_variadic(&overload, &bind_result, arg_types) {
-                continue;
-            }
-
-            let Some(score) = Self::overload_rank(&bind_result, context) else {
+            let Some(score) = Self::overload_rank(&bind_result, &declared_bindings, context) else {
                 continue 'overload;
             };
 
@@ -220,6 +221,9 @@ impl FunctionOverloadCollection {
     }
 }
 
+#[cfg(test)]
+mod tests;
+
 impl FunctionOverloadCollection {
     pub(crate) fn parameter_signatures(
         &self,
@@ -233,18 +237,19 @@ impl FunctionOverloadCollection {
             let Ok(bindings) = overload.bind_args(arguments.clone()) else {
                 continue;
             };
-            if Self::infer_simple(&bindings, &mut overload).is_err()
-                || Self::infer_common(&bindings, &mut overload, catalog).is_err()
+            if self.shadows_expanded_variadic(&overload, &bindings, &arguments) {
+                continue;
+            }
+            let declared_bindings = bindings;
+            if Self::infer_simple(&declared_bindings, &mut overload).is_err()
+                || Self::infer_common(&declared_bindings, &mut overload, catalog).is_err()
             {
                 continue;
             }
             let Ok(bindings) = overload.bind_args(arguments.clone()) else {
                 continue;
             };
-            if self.shadows_expanded_variadic(&overload, &bindings, &arguments) {
-                continue;
-            }
-            if let Some(signature) = overload.parameter_signature(&bindings) {
+            if let Some(signature) = overload.parameter_signature(&bindings, &declared_bindings) {
                 signatures.push(signature);
             }
         }
@@ -256,8 +261,14 @@ impl OverloadVariant {
     fn parameter_signature(
         &self,
         bindings: &[ParameterBindResult],
+        declarations: &[ParameterBindResult],
     ) -> Option<crate::sem::parameter_resolution::Signature> {
         let inputs = ParameterBindResult::constraint_inputs(bindings)?;
-        crate::sem::parameter_resolution::Signature::new_concrete(&inputs, self.ret_type.as_ref()?)
+        let declared_inputs = ParameterBindResult::constraint_inputs(declarations)?;
+        crate::sem::parameter_resolution::Signature::new_function(
+            &inputs,
+            &declared_inputs,
+            self.ret_type.as_ref()?,
+        )
     }
 }

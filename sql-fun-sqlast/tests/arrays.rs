@@ -415,10 +415,14 @@ fn parameter_with_anonymous_records_uses_the_record_family() -> testresult::Test
 #[case::anonymous("f(pg_control_system())", "text")]
 #[case::named("f(NULL::control)", "int4")]
 #[case::anonymous_array("fa(ARRAY[pg_control_system()])", "text")]
+#[case::named_array("fa(NULL::control[])", "int4")]
+#[case::constructed_named_array("fa(ARRAY[NULL::control])", "int4")]
+#[case::anonymous_polymorphic("fp(pg_control_system())", "text")]
 fn competing_record_overloads_select_postgres_candidate(
     #[case] expression: &str,
     #[case] result: &str,
 ) -> testresult::TestResult {
+    // Real builtin metadata supplies pg_control_system's anonymous row type.
     let analyzed = heavy::analyze(
         &format!("SELECT {expression}"),
         &[
@@ -427,6 +431,8 @@ fn competing_record_overloads_select_postgres_candidate(
             "CREATE FUNCTION f(value control) RETURNS integer LANGUAGE sql AS 'SELECT 1'",
             "CREATE FUNCTION fa(value anyarray) RETURNS text LANGUAGE sql AS 'SELECT NULL::text'",
             "CREATE FUNCTION fa(value control[]) RETURNS integer LANGUAGE sql AS 'SELECT 1'",
+            "CREATE FUNCTION fp(value record) RETURNS text LANGUAGE plpgsql AS 'BEGIN RETURN NULL; END'",
+            "CREATE FUNCTION fp(value anyelement) RETURNS integer LANGUAGE sql AS 'SELECT 1'",
         ],
     )?;
     assert!(

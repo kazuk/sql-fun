@@ -145,3 +145,36 @@ async fn failed_initialization_registers_no_collection() {
     );
     assert_eq!(session.collection_count(), 0);
 }
+
+#[tokio::test]
+async fn retained_presentation_survives_source_file_changes() {
+    let project = SchemaProject::new();
+    let api = Api {
+        schema_cache: OnceLock::new(),
+    };
+    let original = "CREATE TABLE retained (id int4);\nCREATE TABLE retained (id int4);";
+    let args: ::sql_fun_server_api::payloads::InitializeSchemaArgs =
+        ::serde_json::from_value(project.rpc_request(original)).unwrap();
+    let wrapper = SessionWrapper::new();
+    let mut state = SessionState::new(NonZeroUsize::new(2).unwrap());
+    let mut session = Session::new(&wrapper.contexts, &mut state);
+    let response = session
+        .initialize_schema_context(&api, &args)
+        .await
+        .unwrap();
+    // Presentation must use the analyzed statement, even after file replacement.
+    std::fs::write(args.schema_dump(), "SELECT 42;").unwrap();
+    let value = ::serde_json::to_value(response).unwrap();
+    let items = value["problems"]["items"].as_array().unwrap();
+    assert_eq!(items.len(), 1);
+    let presentation = &items[0]["presentation"];
+    assert!(
+        presentation["source"]
+            .as_str()
+            .unwrap()
+            .contains("CREATE TABLE retained")
+    );
+    assert_eq!(presentation["dialect"], "postgres");
+    assert!(presentation["statement_offset"].as_u64().unwrap() > 0);
+    assert!(presentation["problem"].is_object());
+}

@@ -34,17 +34,21 @@
 //! in core lets arguments and metadata evolve without duplicating their handling
 //! in server initialization or other consumers.
 
+/// Structured semantic diagnostics without terminal presentation.
+pub mod analysis_problem;
 mod args;
 mod builtin;
 mod codegen_options;
 mod coll;
 mod cte_catalog;
+mod diagnostic_presentation;
 mod extensions;
 mod highlighter;
 mod lookup_result;
 mod metadata;
 mod placehlodered_sql;
 mod postgres_version;
+mod sql_tokens;
 
 /// `sql-fun` code generator lockfile
 pub mod lockfile;
@@ -58,10 +62,12 @@ pub use self::{
         CteParameterBindingCollection, CteParameterCollection, CteParameterRename,
         ParameterRenameCollection, ResolvedCteCatalog,
     },
+    diagnostic_presentation::DiagnosticPresentation,
     placehlodered_sql::{
         FragmentName, ParameterName, PlaceholderTypeHint, PlaceholderedSql, PlaceholderedSqlError,
         PlaceholderedSqlToken,
     },
+    sql_tokens::{SqlToken, TokenKind, TokenStream, TokenStreamError},
 };
 
 #[cfg(test)]
@@ -82,7 +88,7 @@ pub use self::{
         ExtensionConfigError, ExtensionNameVersionPair, ExtensionVersion,
         PostgresExtensionsCollection, PostgresExtensionsParseError,
     },
-    highlighter::{HighlighterStyle, HighlighterTheme, HighlighterThemeError, TerminalColor},
+    highlighter::TerminalColor,
     lookup_result::LookupResult,
     metadata::{
         InitializationDatasources, MetadataError, PostgresEngineVersion, SqlFunMetadata,
@@ -92,7 +98,8 @@ pub use self::{
 };
 
 /// SQL Dialect
-#[derive(Debug, serde::Deserialize, Clone, Copy, PartialEq)]
+#[cfg_attr(feature = "openrpc-schema", derive(schemars::JsonSchema))]
+#[derive(Debug, serde::Serialize, serde::Deserialize, Clone, Copy, PartialEq)]
 pub enum SqlDialect {
     /// postgres using a `pg_query` crate for parsing a syntax.
     #[serde(rename = "postgres")]

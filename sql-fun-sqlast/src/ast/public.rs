@@ -638,10 +638,8 @@ mod test_parameter_analysis {
         let problems = analyzed.context().reported_problems();
         assert_eq!(problems.len(), 1);
         assert_eq!(problems[0].code(), "parameter_constraint");
-        let rendered = problems[0]
-            .render_report(&::sql_fun_core::HighlighterTheme::default(), sql.to_owned())
-            .unwrap();
-        assert!(rendered.contains("$1"));
+        let metadata = problems[0].render_metadata().expect("parameter metadata");
+        assert!(metadata.message().contains("$1"));
         assert!(
             !analyzed
                 .context()

@@ -52,6 +52,7 @@ impl SchemaContextKey {
 pub struct LayerDiagnostics {
     path: PathBuf,
     problems: Vec<AnalysisProblem>,
+    presentations: Vec<Option<::sql_fun_core::DiagnosticPresentation>>,
 }
 
 impl LayerDiagnostics {
@@ -59,6 +60,11 @@ impl LayerDiagnostics {
     #[must_use]
     pub fn path(&self) -> &Path {
         &self.path
+    }
+    /// Statement source and structured data retained for each diagnostic.
+    #[must_use]
+    pub fn diagnostic_presentations(&self) -> &[Option<::sql_fun_core::DiagnosticPresentation>] {
+        &self.presentations
     }
     /// Recoverable problems in original analysis order.
     #[must_use]
@@ -408,6 +414,7 @@ impl SchemaCacheService {
                 diagnostics.push(Arc::new(LayerDiagnostics {
                     path: path.to_path_buf(),
                     problems: parsed.problems().to_vec(),
+                    presentations: parsed.diagnostic_presentations().to_vec(),
                 }));
                 Ok(Arc::new(CachedSchemaAnalysis {
                     base: parsed.base_context().clone(),

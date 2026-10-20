@@ -24,8 +24,9 @@ fn direct_evaluation_reports_missing_definition_once(#[case] insert: bool) {
         context.reported_problems()[0]
             .view_problem()
             .unwrap()
-            .missing_metadata_view(),
-        Some(&name)
+            .missing_metadata_view()
+            .map(|view| view.as_str()),
+        Some(name.to_string().as_str())
     );
 }
 

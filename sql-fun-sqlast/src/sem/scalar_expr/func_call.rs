@@ -299,7 +299,7 @@ impl FuncCallExpr {
                     context.report_analysis_problem(AnalysisProblem::call_argument(
                         crate::sem::problem::CallArgumentProblem::duplicate_name(
                             named.name(),
-                            &named.source_span().copied(),
+                            &named.source_span().map(Into::into),
                         ),
                     ))?;
                 }
@@ -307,7 +307,12 @@ impl FuncCallExpr {
                 context.report_analysis_problem(AnalysisProblem::call_argument(
                     crate::sem::problem::CallArgumentProblem::positional_after_named(
                         position,
-                        &argument_spans.get(position).copied().flatten(),
+                        &argument_spans
+                            .get(position)
+                            .copied()
+                            .flatten()
+                            .as_ref()
+                            .map(Into::into),
                     ),
                 ))?;
             }

@@ -1,8 +1,10 @@
-use crate::sem::{
-    FullName, OperatorDefinition, TypeReference, type_system::ArgumentBindingCollection,
+use super::{
+    AnalysisProblem, ArgumentBindingCollection, FullName, OperatorDefinition, TypeReference,
 };
 
-#[derive(Debug, Clone)]
+#[derive(Debug, Clone, ::serde::Serialize, ::serde::Deserialize)]
+#[cfg_attr(feature = "openrpc-schema", derive(::schemars::JsonSchema))]
+/// Function and operator overload failures.
 pub enum OverloadResolution {
     /// function overload resolve failed
     FunctionOverloadResolutionFailed(FullName, ArgumentBindingCollection),
@@ -38,62 +40,67 @@ impl OverloadResolution {
     }
 
     /// function argument type mismatch to overloads
+    #[must_use]
     pub fn function_overload_resolution_failed(
-        func_name: &FullName,
-        arg_types: &ArgumentBindingCollection,
+        func_name: impl Into<FullName>,
+        arg_types: impl Into<ArgumentBindingCollection>,
     ) -> Self {
-        Self::FunctionOverloadResolutionFailed(func_name.clone(), arg_types.to_owned())
+        Self::FunctionOverloadResolutionFailed(func_name.into(), arg_types.into())
     }
 
     /// Binary operator type not matches overloads
+    #[must_use]
     pub fn binary_operator_overload_resolution_failed(
-        operator_def: &OperatorDefinition,
-        left_type: &TypeReference,
-        right_type: &TypeReference,
+        operator_def: impl Into<OperatorDefinition>,
+        left_type: impl Into<TypeReference>,
+        right_type: impl Into<TypeReference>,
     ) -> Self {
         Self::BinaryOperatorOverloadResolutionFailed(
-            operator_def.clone(),
-            left_type.clone(),
-            right_type.clone(),
+            operator_def.into(),
+            left_type.into(),
+            right_type.into(),
         )
     }
 
     /// Unarry operator type not matches overloads
+    #[must_use]
     pub fn unary_operator_overload_resolution_failed(
-        operator_def: &OperatorDefinition,
-        arg_type: &TypeReference,
+        operator_def: impl Into<OperatorDefinition>,
+        arg_type: impl Into<TypeReference>,
     ) -> Self {
-        Self::UnaryOperatorOverloadResolutionFailed(operator_def.clone(), arg_type.clone())
+        Self::UnaryOperatorOverloadResolutionFailed(operator_def.into(), arg_type.into())
     }
 
     /// Binary operaot type overloads ambiguous
+    #[must_use]
     pub fn binary_operator_overload_ambiguous(
-        operator_def: &OperatorDefinition,
-        left_type: &TypeReference,
-        right_type: &TypeReference,
+        operator_def: impl Into<OperatorDefinition>,
+        left_type: impl Into<TypeReference>,
+        right_type: impl Into<TypeReference>,
     ) -> Self {
         Self::BinaryOperatorOverloadAmbiguous(
-            operator_def.clone(),
-            left_type.clone(),
-            right_type.clone(),
+            operator_def.into(),
+            left_type.into(),
+            right_type.into(),
         )
     }
 
     /// Unarray operator type ambiguous
+    #[must_use]
     pub fn unary_operator_overload_ambiguous(
-        operator_def: &OperatorDefinition,
-        arg_type: &TypeReference,
+        operator_def: impl Into<OperatorDefinition>,
+        arg_type: impl Into<TypeReference>,
     ) -> Self {
-        Self::UnaryOperatorOverloadAmbiguous(operator_def.clone(), arg_type.clone())
+        Self::UnaryOperatorOverloadAmbiguous(operator_def.into(), arg_type.into())
     }
 }
 
-impl super::AnalysisProblem {
+impl AnalysisProblem {
     /// function argument type mismatch to overloads
-    #[tracing::instrument()]
+    #[must_use]
     pub fn function_overload_resolution_failed(
-        func_name: &FullName,
-        arg_types: &ArgumentBindingCollection,
+        func_name: impl Into<FullName>,
+        arg_types: impl Into<ArgumentBindingCollection>,
     ) -> Self {
         Self::OverloadResolution(OverloadResolution::function_overload_resolution_failed(
             func_name, arg_types,
@@ -101,11 +108,11 @@ impl super::AnalysisProblem {
     }
 
     /// Binary operator type not matches overloads
-    #[tracing::instrument()]
+    #[must_use]
     pub fn binary_operator_overload_resolution_failed(
-        operator_def: &OperatorDefinition,
-        left_type: &TypeReference,
-        right_type: &TypeReference,
+        operator_def: impl Into<OperatorDefinition>,
+        left_type: impl Into<TypeReference>,
+        right_type: impl Into<TypeReference>,
     ) -> Self {
         Self::OverloadResolution(
             OverloadResolution::binary_operator_overload_resolution_failed(
@@ -117,10 +124,10 @@ impl super::AnalysisProblem {
     }
 
     /// Unarry operator type not matches overloads
-    #[tracing::instrument()]
+    #[must_use]
     pub fn unary_operator_overload_resolution_failed(
-        operator_def: &OperatorDefinition,
-        arg_type: &TypeReference,
+        operator_def: impl Into<OperatorDefinition>,
+        arg_type: impl Into<TypeReference>,
     ) -> Self {
         Self::OverloadResolution(
             OverloadResolution::unary_operator_overload_resolution_failed(operator_def, arg_type),
@@ -128,11 +135,11 @@ impl super::AnalysisProblem {
     }
 
     /// Binary operaot type overloads ambiguous
-    #[tracing::instrument()]
+    #[must_use]
     pub fn binary_operator_overload_ambiguous(
-        operator_def: &OperatorDefinition,
-        left_type: &TypeReference,
-        right_type: &TypeReference,
+        operator_def: impl Into<OperatorDefinition>,
+        left_type: impl Into<TypeReference>,
+        right_type: impl Into<TypeReference>,
     ) -> Self {
         Self::OverloadResolution(OverloadResolution::binary_operator_overload_ambiguous(
             operator_def,
@@ -142,10 +149,10 @@ impl super::AnalysisProblem {
     }
 
     /// Unarray operator type ambiguous
-    #[tracing::instrument()]
+    #[must_use]
     pub fn unary_operator_overload_ambiguous(
-        operator_def: &OperatorDefinition,
-        arg_type: &TypeReference,
+        operator_def: impl Into<OperatorDefinition>,
+        arg_type: impl Into<TypeReference>,
     ) -> Self {
         Self::OverloadResolution(OverloadResolution::unary_operator_overload_ambiguous(
             operator_def,

@@ -12,6 +12,15 @@ impl SchemaFixture {
 
     /// Writes small fixture-owned files; no catalog parsing or external service.
     pub fn new() -> ::testresult::TestResult<Self> {
+        let mut sql = String::new();
+        for index in 0..513 {
+            ::std::writeln!(sql, "DROP TABLE missing_{index};")?;
+        }
+        Self::with_sql(&sql)
+    }
+
+    /// A minimal catalog with explicitly supplied schema SQL.
+    pub fn with_sql(sql: &str) -> ::testresult::TestResult<Self> {
         let directory = ::tempfile::tempdir()?;
         let root = directory.path();
         let catalog = root.join("home/postgres/17");
@@ -61,12 +70,8 @@ search_path = ["public"]
 connector = "products-connector"
 "#,
         )?;
-        let mut sql = String::new();
-        for index in 0..513 {
-            ::std::writeln!(sql, "DROP TABLE missing_{index};")?;
-        }
         let dump = root.join("schema.sql");
-        std::fs::write(&dump, &sql)?;
+        std::fs::write(&dump, sql)?;
         let request = ::serde_json::json!({
             "datasource":"products", "schema_dump":dump,
             "expected_hash": ::sha256::digest(sql),

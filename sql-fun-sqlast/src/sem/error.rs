@@ -45,10 +45,6 @@ pub enum AnalysisError {
     #[error(transparent)]
     Meta(#[from] sql_fun_core::MetadataError),
 
-    /// highlighter theme replated errors
-    #[error(transparent)]
-    HighlighterTheme(#[from] sql_fun_core::HighlighterThemeError),
-
     /// file not found
     #[error("file not found : {0}")]
     FileNotFound(PathBuf),

@@ -37,7 +37,7 @@ impl UndefinedAliasColumnRef {
     where
         TParseContext: crate::sem::ParseContext,
     {
-        context.report_analysis_problem(AnalysisProblem::undefined_alias(alias.to_string()))?;
+        context.report_analysis_problem(AnalysisProblem::undefined_alias(alias.as_str()))?;
 
         Ok(SemScalarExpr::ColumnRef(
             ColumnReferenceExpr::UndefinedAlias(Self {

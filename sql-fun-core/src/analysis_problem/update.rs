@@ -1,8 +1,8 @@
-use crate::sem::AnalysisError;
-use ::miette::{GraphicalReportHandler, MietteDiagnostic, NamedSource, Report, Severity};
+use super::DiagnosticMetadata;
 
 /// Structured UPDATE violation, independently of its rendered message.
-#[derive(Clone, Copy, Debug, Eq, PartialEq)]
+#[derive(Clone, Copy, Debug, Eq, PartialEq, ::serde::Serialize, ::serde::Deserialize)]
+#[cfg_attr(feature = "openrpc-schema", derive(::schemars::JsonSchema))]
 pub enum UpdateProblemKind {
     /// INDEXED BY does not identify an index of the destination.
     IndexHint,
@@ -30,84 +30,100 @@ pub enum UpdateProblemKind {
     Cursor,
 }
 impl UpdateProblemKind {
-    pub(crate) const fn cursor() -> Self {
+    /// Diagnostic cursor.
+    #[must_use]
+    pub const fn cursor() -> Self {
         Self::Cursor
     }
-    pub(crate) const fn default_target() -> Self {
+    /// Diagnostic default target.
+    #[must_use]
+    pub const fn default_target() -> Self {
         Self::DefaultTarget
     }
-    pub(crate) const fn index_hint() -> Self {
+    /// Diagnostic index hint.
+    #[must_use]
+    pub const fn index_hint() -> Self {
         Self::IndexHint
     }
-    pub(crate) const fn duplicate_target() -> Self {
+    /// Diagnostic duplicate target.
+    #[must_use]
+    pub const fn duplicate_target() -> Self {
         Self::DuplicateTarget
     }
-    pub(crate) const fn read_only_target() -> Self {
+    /// Diagnostic read only target.
+    #[must_use]
+    pub const fn read_only_target() -> Self {
         Self::ReadOnlyTarget
     }
-    pub(crate) const fn view_operation() -> Self {
+    /// Diagnostic view operation.
+    #[must_use]
+    pub const fn view_operation() -> Self {
         Self::ViewOperation
     }
-    pub(crate) const fn generated_target() -> Self {
+    /// Diagnostic generated target.
+    #[must_use]
+    pub const fn generated_target() -> Self {
         Self::GeneratedTarget
     }
-    pub(crate) const fn identity_target() -> Self {
+    /// Diagnostic identity target.
+    #[must_use]
+    pub const fn identity_target() -> Self {
         Self::IdentityTarget
     }
-    pub(crate) const fn assignment_type() -> Self {
+    /// Diagnostic assignment type.
+    #[must_use]
+    pub const fn assignment_type() -> Self {
         Self::AssignmentType
     }
-    pub(crate) const fn returning_qualifier() -> Self {
+    /// Diagnostic returning qualifier.
+    #[must_use]
+    pub const fn returning_qualifier() -> Self {
         Self::ReturningQualifier
     }
-    pub(crate) const fn cte_aliases() -> Self {
+    /// Diagnostic cte aliases.
+    #[must_use]
+    pub const fn cte_aliases() -> Self {
         Self::CteAliases
     }
-    pub(crate) const fn predicate() -> Self {
+    /// Diagnostic predicate.
+    #[must_use]
+    pub const fn predicate() -> Self {
         Self::Predicate
     }
 }
 
 /// A violation of UPDATE destination, assignment or result rules.
-#[derive(Clone, Debug)]
+#[derive(Clone, Debug, ::serde::Serialize, ::serde::Deserialize)]
+#[cfg_attr(feature = "openrpc-schema", derive(::schemars::JsonSchema))]
 pub struct UpdateProblem {
     kind: UpdateProblemKind,
     message: String,
 }
 
 impl UpdateProblem {
-    pub(crate) fn new(kind: UpdateProblemKind, message: &str) -> Self {
+    /// Diagnostic new.
+    #[must_use]
+    pub fn new(kind: UpdateProblemKind, message: &str) -> Self {
         Self {
             kind,
             message: message.to_owned(),
         }
     }
 
-    pub(super) const fn code(&self) -> &'static str {
-        "update_semantics"
-    }
-
     /// The structured rule violated, independently of diagnostic wording.
+    #[must_use]
     pub const fn kind(&self) -> UpdateProblemKind {
         self.kind
     }
 
     /// The UPDATE requirement that was violated.
+    #[must_use]
     pub fn message(&self) -> &str {
         &self.message
     }
 
-    pub(super) fn render_report(
-        &self,
-        handler: &GraphicalReportHandler,
-        source: String,
-    ) -> Result<String, AnalysisError> {
-        let diagnostic = MietteDiagnostic::new(self.message.clone())
-            .with_code(self.code())
-            .with_severity(Severity::Error);
-        let report = Report::new(diagnostic).with_source_code(NamedSource::new("SQL", source));
-        let mut rendered = String::new();
-        handler.render_report(&mut rendered, &*report)?;
-        Ok(rendered)
+    /// Diagnostic presentation data.
+    pub(super) fn render_metadata(&self) -> DiagnosticMetadata {
+        DiagnosticMetadata::from(self.message())
     }
 }

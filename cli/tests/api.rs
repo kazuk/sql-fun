@@ -243,3 +243,31 @@ async fn environment_launch_and_explicit_reference_do_not_discover_metadata()
     assert_eq!(responses(&output).len(), 1);
     Ok(())
 }
+
+#[tokio::test]
+async fn renders_server_diagnostic_from_retained_source_after_file_changes()
+-> ::testresult::TestResult {
+    use ::clap::Parser;
+
+    // A real server and client verify source provenance across the transport.
+    let server = heavy::ApiServer::new()?;
+    let schema = test_helpers::schema::SchemaFixture::with_sql(
+        "CREATE SCHEMA retained; CREATE SCHEMA retained;",
+    )?;
+    let context = server.initialize_schema(&schema).await?;
+    test_helpers::overwrite_schema_source(&schema, "-- changed after analysis")?;
+    let problem = context
+        .problems()
+        .items()
+        .first()
+        .expect("duplicate schema diagnostic");
+    let presentation = problem.presentation().as_ref().expect("retained statement");
+    let args = ::sql_fun_core::SqlFunArgs::try_parse_from(["sql-fun", "--term-color", "never"])?;
+    let output = ::sql_fun_cli::render_diagnostic(presentation, &args)?;
+    assert_eq!(problem.code(), "conflicting_creation");
+    assert_eq!(presentation.source(), " CREATE SCHEMA retained");
+    assert!(output.contains(presentation.source()), "{output}");
+    assert!(!output.contains("changed after analysis"));
+    assert!(!output.contains("\x1b["));
+    Ok(())
+}

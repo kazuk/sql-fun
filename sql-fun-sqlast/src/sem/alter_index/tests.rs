@@ -617,16 +617,21 @@ fn retained_options_and_rendered_diagnostics_describe_the_rejected_statement()
     assert_eq!(storage.parameters()[0].value(), Some("70"));
     assert_eq!(storage.parameters()[0].namespace(), None);
     let problem = &statement.problems()[0];
-    assert_eq!(problem.name(), &test_helpers::index_name());
+    assert_eq!(
+        problem.name().as_str(),
+        test_helpers::index_name().to_string()
+    );
     assert_eq!(problem.parameter_name(), Some("deduplicate_items"));
     assert_eq!(problem.value(), Some("o"));
     assert_eq!(problem.column(), None);
-    let report = result.context().problems()[0].render_report(
-        &::sql_fun_core::HighlighterTheme::default(),
-        "ALTER INDEX idx SET (fillfactor=70,deduplicate_items=o)".to_owned(),
-    )?;
-    assert!(report.contains("index_invalid_alteration"));
-    assert!(report.contains("deduplicate_items"));
+    let metadata = result.context().problems()[0]
+        .render_metadata()
+        .expect("index diagnostic metadata");
+    assert_eq!(
+        result.context().problems()[0].code(),
+        "index_invalid_alteration"
+    );
+    assert!(metadata.message().contains("deduplicate_items"));
     assert_eq!(test_helpers::fillfactor(result.context()), None);
     Ok(())
 }

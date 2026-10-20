@@ -25,7 +25,7 @@ pub use self::{
 };
 
 use crate::{
-    HighlighterTheme, PostgresExtensionsCollection, SqlDialect, SqlFunMetadata, TerminalColor,
+    PostgresExtensionsCollection, SqlDialect, SqlFunMetadata, TerminalColor,
     metadata::{PostgresEngineVersion, SqlFunMetadataCollection},
 };
 
@@ -459,46 +459,16 @@ impl SqlFunArgs {
         Ok(result)
     }
 
-    /// get terminal color value
+    /// Requested terminal color mode, without inspecting the terminal.
     #[must_use]
-    pub fn term_color(&self) -> TerminalColor {
-        self.term_color.get_value()
+    pub const fn term_color(&self) -> TerminalColor {
+        self.term_color
     }
 
-    /// get syntax highlighter theme
-    ///
-    /// when [`Self::term_color`] is never, returns [`HighlighterTheme::default`]
-    /// when [`Self::highlighter_theme`] is None, returns `${SQL_FUN_HOME}/highlighter/default.toml`
-    /// when [`Self::highlighter_theme`] is Some and relative path,
-    ///     returns ${SQL_FUN_HOME}/highlighter/specified-path
-    /// when [`Self::highlighter_theme`] is Some and absolute path,
-    ///     returns load from absolute path
-    ///
-    /// # Errors
-    ///
-    /// Returns [`SqlFunArgsError`] if failed load theme.
-    ///
-    pub fn highlighter_theme(&self) -> Result<HighlighterTheme, SqlFunArgsError> {
-        let term_color = self.term_color();
-        if term_color.is_never() {
-            Ok(HighlighterTheme::default())
-        } else {
-            let theme_path = if let Some(theme_path) = &self.highlighter_theme {
-                if theme_path.is_absolute() {
-                    theme_path.clone()
-                } else {
-                    let mut base = self.sql_fun_home()?;
-                    base.push("highlighter");
-                    base.push(theme_path);
-                    base
-                }
-            } else {
-                let mut path = self.sql_fun_home()?;
-                path.push("highlighter/default.toml");
-                path
-            };
-            Ok(HighlighterTheme::from_toml(theme_path)?)
-        }
+    /// Explicitly configured highlighter theme path.
+    #[must_use]
+    pub fn highlighter_theme_path(&self) -> Option<&Path> {
+        self.highlighter_theme.as_deref()
     }
 
     /// get project dir

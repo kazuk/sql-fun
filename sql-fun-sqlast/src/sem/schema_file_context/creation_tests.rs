@@ -75,10 +75,23 @@ fn rejects_shared_relation_names(
     let problem = context.problems()[0]
         .creation_problem()
         .expect("creation conflict");
-    assert_eq!(problem.existing_kind(), Some(existing));
-    assert_eq!(problem.requested_kind(), Some(requested));
-    assert_eq!(problem.name(), &FullName::with_schema("public", "t"));
-    assert_eq!(context.object_kind(problem.name()), Some(existing));
+    assert_eq!(
+        problem
+            .existing_kind()
+            .map(::sql_fun_core::analysis_problem::Kind::as_str),
+        Some(existing.to_string().as_str())
+    );
+    assert_eq!(
+        problem
+            .requested_kind()
+            .map(::sql_fun_core::analysis_problem::Kind::as_str),
+        Some(requested.to_string().as_str())
+    );
+    assert_eq!(problem.name().as_str(), "public.t");
+    assert_eq!(
+        context.object_kind(&FullName::with_schema("public", "t")),
+        Some(existing)
+    );
     context = test_helpers::apply(context, "CREATE TABLE public.later(id integer)")?;
     assert_eq!(
         context.object_kind(&FullName::with_schema("public", "later")),
@@ -607,20 +620,33 @@ fn rejected_nested_schema_rolls_back_all_definitions() -> testresult::TestResult
     Ok(())
 }
 
-#[test]
-fn duplicate_declared_constraint_is_recoverable() -> testresult::TestResult {
-    let context = test_helpers::postgres(
-        "CREATE TABLE public.items(id integer, CONSTRAINT duplicate UNIQUE(id), CONSTRAINT duplicate UNIQUE(id)); CREATE TABLE public.later(id integer)",
-    )?;
+#[rstest::rstest]
+#[case::plain("duplicate")]
+#[case::spaced(r#""has space""#)]
+#[case::dotted(r#""a.b""#)]
+#[case::quoted(r#""a""b""#)]
+fn duplicate_declared_constraint_is_recoverable(#[case] name: &str) -> testresult::TestResult {
+    let context = test_helpers::postgres(&format!(
+        "CREATE TABLE public.items(id integer, CONSTRAINT {name} UNIQUE(id), CONSTRAINT {name} UNIQUE(id)); CREATE TABLE public.later(id integer)",
+    ))?;
     assert_eq!(context.problems().len(), 1);
     let problem = context.problems()[0]
         .creation_problem()
         .expect("constraint conflict");
     assert_eq!(problem.namespace(), "constraint");
-    assert_eq!(problem.name(), &FullName::from_local_name("duplicate"));
+    assert_eq!(problem.name().as_str(), name);
     assert_eq!(
-        problem.container(),
-        Some(&FullName::with_schema("public", "items"))
+        context.problems()[0]
+            .render_metadata()
+            .expect("constraint diagnostic")
+            .message(),
+        format!("conflicting constraint definition: {name}"),
+    );
+    assert_eq!(
+        problem
+            .container()
+            .map(::sql_fun_core::analysis_problem::FullName::as_str),
+        Some("public.items")
     );
     assert!(
         context
@@ -630,6 +656,32 @@ fn duplicate_declared_constraint_is_recoverable() -> testresult::TestResult {
     assert_eq!(
         context.object_kind(&FullName::with_schema("public", "later")),
         Some(Kind::table())
+    );
+    Ok(())
+}
+
+#[test]
+fn duplicate_altered_constraint_retains_canonical_name() -> testresult::TestResult {
+    let context = test_helpers::postgres(
+        r#"CREATE TABLE public.items(id integer, CONSTRAINT "a.b""c" UNIQUE(id)); ALTER TABLE public.items ADD CONSTRAINT "a.b""c" UNIQUE(id)"#,
+    )?;
+    assert_eq!(context.problems().len(), 1);
+    let diagnostic = &context.problems()[0];
+    assert_eq!(diagnostic.code(), "conflicting_creation");
+    assert_eq!(
+        diagnostic
+            .creation_problem()
+            .expect("constraint conflict")
+            .name()
+            .as_str(),
+        r#""a.b""c""#,
+    );
+    assert_eq!(
+        diagnostic
+            .render_metadata()
+            .expect("constraint diagnostic")
+            .message(),
+        r#"conflicting constraint definition: "a.b""c""#,
     );
     Ok(())
 }
@@ -781,7 +833,7 @@ fn all_named_column_constraints_participate_in_collision_checks(
         .creation_problem()
         .expect("constraint conflict");
     assert_eq!(problem.namespace(), "constraint");
-    assert_eq!(problem.name(), &FullName::from_local_name("same"));
+    assert_eq!(problem.name().as_str(), "same");
     assert!(
         context
             .object_kind(&FullName::with_schema("public", "t"))

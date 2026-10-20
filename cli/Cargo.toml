@@ -48,12 +48,15 @@ derive_builder.workspace = true
 directories.workspace = true
 either.workspace = true
 env_logger.workspace = true
+fs-err.workspace = true
 futures-util.workspace = true
 glob.workspace = true
 handlebars.workspace = true
 inquire.workspace = true
 log.workspace = true
+miette.workspace = true
 nix.workspace = true
+owo-colors.workspace = true
 serde.workspace = true
 serde_json.workspace = true
 shellexpand.workspace = true
@@ -61,6 +64,7 @@ sql-fun-client.workspace = true
 sql-fun-codegen.workspace = true
 sql-fun-core.workspace = true
 sql-fun-server-api.workspace = true
+sql-fun-sqlast.workspace = true
 statig.workspace = true
 syn.workspace = true
 tar.workspace = true
@@ -76,7 +80,7 @@ which.workspace = true
 [dev-dependencies]
 pg_query.workspace = true
 rstest.workspace = true
-sql-fun-sqlast.workspace = true
+sha256.workspace = true
 testresult.workspace = true
 
 [[test]]

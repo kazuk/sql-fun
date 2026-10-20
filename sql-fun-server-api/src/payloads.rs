@@ -125,10 +125,24 @@ impl DiagnosticSeverity {
     }
 }
 
+impl From<::sql_fun_core::analysis_problem::DiagnosticSeverity> for DiagnosticSeverity {
+    fn from(value: ::sql_fun_core::analysis_problem::DiagnosticSeverity) -> Self {
+        use ::sql_fun_core::analysis_problem::DiagnosticSeverity as CoreSeverity;
+        match value {
+            CoreSeverity::Error => Self::error(),
+            CoreSeverity::Warning => Self::warning(),
+            CoreSeverity::Advice => Self::advice(),
+        }
+    }
+}
+
 /// semantic analysis probrem
 #[cfg_attr(feature = "openrpc-schema", derive(schemars::JsonSchema))]
 #[derive(serde::Serialize, serde::Deserialize, derive_getters::Getters)]
 pub struct AnalysisProbrem {
+    /// Structured diagnostic and analyzed source for optional CLI presentation.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    presentation: Option<::sql_fun_core::DiagnosticPresentation>,
     /// Diagnostic severity, retained independently of its code.
     severity: DiagnosticSeverity,
 
@@ -149,6 +163,16 @@ pub struct AnalysisProbrem {
 }
 
 impl AnalysisProbrem {
+    /// Attach presentation data without changing the existing summary fields.
+    #[must_use]
+    pub fn with_presentation(
+        mut self,
+        presentation: Option<&::sql_fun_core::DiagnosticPresentation>,
+    ) -> Self {
+        self.presentation = presentation.cloned();
+        self
+    }
+
     /// Construct a retained schema diagnostic without inventing missing locations.
     /// Takes ownership of the optional span to avoid copying it.
     #[must_use]
@@ -159,6 +183,7 @@ impl AnalysisProbrem {
         statement_relative_span: Option<StatementByteRange>,
     ) -> Self {
         Self {
+            presentation: None,
             severity,
             code: code.to_owned(),
             file_path: file_path.to_path_buf(),

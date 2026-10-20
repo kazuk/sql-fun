@@ -1,8 +1,8 @@
-use crate::sem::AnalysisError;
-use ::miette::{GraphicalReportHandler, MietteDiagnostic, NamedSource, Report, Severity};
+use super::{ColumnName, DiagnosticMetadata, DiagnosticSeverity, TableName};
 
 /// A completed ALTER COLUMN binding or validation outcome.
-#[derive(Clone, Debug, PartialEq, Eq)]
+#[derive(Clone, Debug, PartialEq, Eq, ::serde::Serialize, ::serde::Deserialize)]
+#[cfg_attr(feature = "openrpc-schema", derive(::schemars::JsonSchema))]
 pub enum AlterColumnProblem {
     /// The target relation does not exist or has the wrong kind.
     MissingRelation,
@@ -33,59 +33,88 @@ pub enum AlterColumnProblem {
 }
 
 impl AlterColumnProblem {
-    pub(crate) const fn missing_relation() -> Self {
+    /// Diagnostic missing relation.
+    #[must_use]
+    pub const fn missing_relation() -> Self {
         Self::MissingRelation
     }
-    pub(crate) const fn missing_column() -> Self {
+    /// Diagnostic missing column.
+    #[must_use]
+    pub const fn missing_column() -> Self {
         Self::MissingColumn
     }
-    pub(crate) const fn primary_key() -> Self {
+    /// Diagnostic primary key.
+    #[must_use]
+    pub const fn primary_key() -> Self {
         Self::PrimaryKey
     }
-    pub(crate) const fn identity() -> Self {
+    /// Diagnostic identity.
+    #[must_use]
+    pub const fn identity() -> Self {
         Self::Identity
     }
-    pub(crate) const fn not_stored_generated() -> Self {
+    /// Diagnostic not stored generated.
+    #[must_use]
+    pub const fn not_stored_generated() -> Self {
         Self::NotStoredGenerated
     }
-    pub(crate) const fn virtual_generated() -> Self {
+    /// Diagnostic virtual generated.
+    #[must_use]
+    pub const fn virtual_generated() -> Self {
         Self::VirtualGenerated
     }
-    pub(crate) const fn version() -> Self {
+    /// Diagnostic version.
+    #[must_use]
+    pub const fn version() -> Self {
         Self::Version
     }
-    pub(crate) const fn statistics_too_low(value: i32) -> Self {
+    /// Diagnostic statistics too low.
+    #[must_use]
+    pub const fn statistics_too_low(value: i32) -> Self {
         Self::StatisticsTooLow(value)
     }
-    pub(crate) const fn statistics_reduced(value: i32) -> Self {
+    /// Diagnostic statistics reduced.
+    #[must_use]
+    pub const fn statistics_reduced(value: i32) -> Self {
         Self::StatisticsReduced(value)
     }
-    pub(crate) fn unknown_option(name: &str) -> Self {
+    /// Diagnostic unknown option.
+    #[must_use]
+    pub fn unknown_option(name: &str) -> Self {
         Self::UnknownOption(name.to_owned())
     }
-    pub(crate) fn duplicate_option(name: &str) -> Self {
+    /// Diagnostic duplicate option.
+    #[must_use]
+    pub fn duplicate_option(name: &str) -> Self {
         Self::DuplicateOption(name.to_owned())
     }
-    pub(crate) fn invalid_option(name: &str) -> Self {
+    /// Diagnostic invalid option.
+    #[must_use]
+    pub fn invalid_option(name: &str) -> Self {
         Self::InvalidOption(name.to_owned())
     }
-    pub(crate) fn reset_value(name: &str) -> Self {
+    /// Diagnostic reset value.
+    #[must_use]
+    pub fn reset_value(name: &str) -> Self {
         Self::ResetValue(name.to_owned())
     }
 
     /// Whether this outcome prevents catalog application.
+    #[must_use]
     pub const fn is_error(&self) -> bool {
         !matches!(self, Self::StatisticsReduced(_))
     }
 
-    pub(crate) const fn severity(&self) -> Severity {
+    /// Diagnostic severity.
+    pub(super) const fn severity(&self) -> DiagnosticSeverity {
         if self.is_error() {
-            Severity::Error
+            DiagnosticSeverity::Error
         } else {
-            Severity::Warning
+            DiagnosticSeverity::Warning
         }
     }
 
+    /// Diagnostic code.
     pub(super) const fn code(&self) -> &'static str {
         match self {
             Self::MissingRelation => "alter_column_missing_relation",
@@ -104,13 +133,12 @@ impl AlterColumnProblem {
         }
     }
 
-    pub(super) fn render_report(
+    /// Diagnostic presentation data.
+    pub(super) fn render_metadata(
         &self,
-        handler: &GraphicalReportHandler,
-        source: String,
-        table: &crate::sem::TableName,
-        column: &crate::sem::ColumnName,
-    ) -> Result<String, AnalysisError> {
+        table: &TableName,
+        column: &ColumnName,
+    ) -> DiagnosticMetadata {
         let message = match self {
             Self::MissingRelation => "ALTER COLUMN target is absent or is not a table".to_owned(),
             Self::MissingColumn => "ALTER COLUMN target column does not exist".to_owned(),
@@ -139,58 +167,55 @@ impl AlterColumnProblem {
             }
             Self::ResetValue(name) => format!("RESET option {name} must not include a value"),
         };
-        let severity = self.severity();
+
         let message = format!("{table}.{column}: {message}");
-        let diagnostic = MietteDiagnostic::new(message)
-            .with_code(self.code())
-            .with_severity(severity);
-        let report = Report::new(diagnostic).with_source_code(NamedSource::new("SQL", source));
-        let mut rendered = String::new();
-        handler.render_report(&mut rendered, &*report)?;
-        Ok(rendered)
+        DiagnosticMetadata::from(message)
     }
 }
 
 /// A structured ALTER COLUMN diagnostic with its semantic target identity.
-#[derive(Clone, Debug)]
+#[derive(Clone, Debug, ::serde::Serialize, ::serde::Deserialize)]
+#[cfg_attr(feature = "openrpc-schema", derive(::schemars::JsonSchema))]
 pub struct ColumnAttributeProblem {
-    table: crate::sem::TableName,
-    column: crate::sem::ColumnName,
+    table: TableName,
+    column: ColumnName,
     reason: AlterColumnProblem,
 }
 impl ColumnAttributeProblem {
-    pub(crate) fn new(
-        table: &crate::sem::TableName,
-        column: &crate::sem::ColumnName,
+    /// Diagnostic new.
+    #[must_use]
+    pub fn new(
+        table: impl Into<TableName>,
+        column: impl Into<ColumnName>,
         reason: &AlterColumnProblem,
     ) -> Self {
         Self {
-            table: table.clone(),
-            column: column.clone(),
+            table: table.into(),
+            column: column.into(),
             reason: reason.clone(),
         }
     }
     /// Requested or resolved table identity.
-    pub const fn table(&self) -> &crate::sem::TableName {
+    #[must_use]
+    pub const fn table(&self) -> &TableName {
         &self.table
     }
     /// Requested column name.
-    pub const fn column(&self) -> &crate::sem::ColumnName {
+    #[must_use]
+    pub const fn column(&self) -> &ColumnName {
         &self.column
     }
     /// Completed binding/validation outcome.
+    #[must_use]
     pub const fn reason(&self) -> &AlterColumnProblem {
         &self.reason
     }
+    /// Diagnostic code.
     pub(super) const fn code(&self) -> &'static str {
         self.reason.code()
     }
-    pub(super) fn render_report(
-        &self,
-        handler: &GraphicalReportHandler,
-        source: String,
-    ) -> Result<String, AnalysisError> {
-        self.reason
-            .render_report(handler, source, &self.table, &self.column)
+    /// Diagnostic presentation data.
+    pub(super) fn render_metadata(&self) -> DiagnosticMetadata {
+        self.reason.render_metadata(&self.table, &self.column)
     }
 }

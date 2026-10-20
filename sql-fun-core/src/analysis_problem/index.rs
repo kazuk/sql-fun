@@ -1,7 +1,10 @@
-use crate::sem::{AnalysisError, FullName};
+use std::fmt::Write;
+
+use super::{DiagnosticMetadata, DiagnosticSeverity, FullName};
 
 /// Classification of a rejected index alteration or a statistics warning.
-#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+#[derive(Clone, Copy, Debug, PartialEq, Eq, ::serde::Serialize, ::serde::Deserialize)]
+#[cfg_attr(feature = "openrpc-schema", derive(::schemars::JsonSchema))]
 pub enum IndexProblemKind {
     /// No relation occupies the requested name.
     MissingTarget,
@@ -30,54 +33,68 @@ pub enum IndexProblemKind {
 }
 impl IndexProblemKind {
     /// Classify: missing target.
+    #[must_use]
     pub const fn missing_target() -> Self {
         Self::MissingTarget
     }
     /// Classify: wrong kind.
+    #[must_use]
     pub const fn wrong_kind() -> Self {
         Self::WrongKind
     }
     /// Classify: invalid namespace.
+    #[must_use]
     pub const fn invalid_namespace() -> Self {
         Self::InvalidNamespace
     }
     /// Classify: unknown parameter.
+    #[must_use]
     pub const fn unknown_parameter() -> Self {
         Self::UnknownParameter
     }
     /// Classify: duplicate parameter.
+    #[must_use]
     pub const fn duplicate_parameter() -> Self {
         Self::DuplicateParameter
     }
     /// Classify: invalid value.
+    #[must_use]
     pub const fn invalid_value() -> Self {
         Self::InvalidValue
     }
     /// Classify: RESET parameter supplies a value.
+    #[must_use]
     pub const fn reset_value() -> Self {
         Self::ResetValue
     }
     /// Classify: invalid column.
+    #[must_use]
     pub const fn invalid_column() -> Self {
         Self::InvalidColumn
     }
     /// Classify: non expression column.
+    #[must_use]
     pub const fn non_expression_column() -> Self {
         Self::NonExpressionColumn
     }
     /// Classify: included column.
+    #[must_use]
     pub const fn included_column() -> Self {
         Self::IncludedColumn
     }
     /// Classify: statistics too low.
+    #[must_use]
     pub const fn statistics_too_low() -> Self {
         Self::StatisticsTooLow
     }
     /// Classify: statistics clamped.
+    #[must_use]
     pub const fn statistics_clamped() -> Self {
         Self::StatisticsClamped
     }
-    pub(crate) const fn is_warning(self) -> bool {
+    /// Diagnostic is warning.
+    #[must_use]
+    pub const fn is_warning(self) -> bool {
         matches!(self, Self::StatisticsClamped)
     }
     const fn message(self) -> &'static str {
@@ -99,7 +116,8 @@ impl IndexProblemKind {
 }
 
 /// Structured index diagnostic, retained independently of diagnostic delivery.
-#[derive(Clone, Debug)]
+#[derive(Clone, Debug, ::serde::Serialize, ::serde::Deserialize)]
+#[cfg_attr(feature = "openrpc-schema", derive(::schemars::JsonSchema))]
 pub struct IndexProblem {
     target: FullName,
     kind: IndexProblemKind,
@@ -108,17 +126,21 @@ pub struct IndexProblem {
     column: Option<i32>,
 }
 impl IndexProblem {
-    pub(crate) fn target(target: &FullName, kind: IndexProblemKind) -> Self {
+    /// Diagnostic target.
+    #[must_use]
+    pub fn target(target: impl Into<FullName>, kind: IndexProblemKind) -> Self {
         Self {
-            target: target.clone(),
+            target: target.into(),
             kind,
             parameter: None,
             value: None,
             column: None,
         }
     }
-    pub(crate) fn parameter(
-        target: &FullName,
+    /// Diagnostic parameter.
+    #[must_use]
+    pub fn parameter(
+        target: impl Into<FullName>,
         kind: IndexProblemKind,
         name: &str,
         value: Option<&str>,
@@ -128,8 +150,10 @@ impl IndexProblem {
         problem.value = value.map(str::to_owned);
         problem
     }
-    pub(crate) fn statistics(
-        target: &FullName,
+    /// Diagnostic statistics.
+    #[must_use]
+    pub fn statistics(
+        target: impl Into<FullName>,
         kind: IndexProblemKind,
         column: i32,
         value: i32,
@@ -140,29 +164,36 @@ impl IndexProblem {
         problem
     }
     /// Index or visible relation identity associated with this diagnostic.
+    #[must_use]
     pub const fn name(&self) -> &FullName {
         &self.target
     }
     /// Semantic diagnostic classification.
+    #[must_use]
     pub const fn kind(&self) -> IndexProblemKind {
         self.kind
     }
     /// Rejected storage parameter, including its namespace when specified.
+    #[must_use]
     pub fn parameter_name(&self) -> Option<&str> {
         self.parameter.as_deref()
     }
     /// Requested value, before validation or clamping.
+    #[must_use]
     pub fn value(&self) -> Option<&str> {
         self.value.as_deref()
     }
     /// Requested one-based index column ordinal.
+    #[must_use]
     pub const fn column(&self) -> Option<i32> {
         self.column
     }
     /// Whether this diagnostic permits application.
+    #[must_use]
     pub const fn is_warning(&self) -> bool {
         self.kind.is_warning()
     }
+    /// Diagnostic code.
     pub(super) const fn code(&self) -> &'static str {
         if self.is_warning() {
             "index_statistics_clamped"
@@ -170,36 +201,26 @@ impl IndexProblem {
             "index_invalid_alteration"
         }
     }
-    pub(super) const fn severity(&self) -> ::miette::Severity {
+    /// Diagnostic severity.
+    pub(super) const fn severity(&self) -> DiagnosticSeverity {
         if self.is_warning() {
-            ::miette::Severity::Warning
+            DiagnosticSeverity::Warning
         } else {
-            ::miette::Severity::Error
+            DiagnosticSeverity::Error
         }
     }
-    pub(super) fn render_report(
-        &self,
-        handler: &::miette::GraphicalReportHandler,
-        source: String,
-    ) -> Result<String, AnalysisError> {
-        let severity = self.severity();
+    /// Diagnostic presentation data.
+    pub(super) fn render_metadata(&self) -> DiagnosticMetadata {
         let mut message = format!("{}: {}", self.target, self.kind.message());
         if let Some(parameter) = &self.parameter {
-            message.push_str(&format!(" ({parameter})"));
+            let _ = write!(message, " ({parameter})");
         }
         if let Some(column) = self.column {
-            message.push_str(&format!(" (column {column})"));
+            let _ = write!(message, " (column {column})");
         }
         if let Some(value) = &self.value {
-            message.push_str(&format!(": {value}"));
+            let _ = write!(message, ": {value}");
         }
-        let diagnostic = ::miette::MietteDiagnostic::new(message)
-            .with_code(self.code())
-            .with_severity(severity);
-        let report = ::miette::Report::new(diagnostic)
-            .with_source_code(::miette::NamedSource::new("SQL", source));
-        let mut output = String::new();
-        handler.render_report(&mut output, &*report)?;
-        Ok(output)
+        DiagnosticMetadata::from(message)
     }
 }

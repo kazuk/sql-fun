@@ -1,6 +1,5 @@
 //! PostgreSQL common-type semantics through the maintained public analysis API.
 use self::test_helpers::heavy;
-use ::sql_fun_core::HighlighterTheme;
 use ::sql_fun_sqlast::sem::{ParseContext, PgBuiltInType, TypeInfoRead, TypeReference};
 use std::collections::BTreeMap;
 
@@ -86,9 +85,10 @@ fn invalid_operands_report_semantic_problems(
         .iter()
         .find(|problem| problem.code() == code)
         .unwrap();
-    let report =
-        problem.render_report(&HighlighterTheme::default(), format!("select {expression}"))?;
-    assert!(report.contains(code));
+    let metadata = problem
+        .render_metadata()
+        .expect("implemented min/max diagnostic");
+    assert!(metadata.message().contains("GREATEST/LEAST"));
     Ok(())
 }
 

@@ -1135,8 +1135,9 @@ fn incomplete_view_metadata_is_explicit() -> Result<(), Box<dyn std::error::Erro
                 context.problems()[0]
                     .view_problem()
                     .unwrap()
-                    .missing_metadata_view(),
-                Some(&FullName::with_schema("public", "items"))
+                    .missing_metadata_view()
+                    .map(sql_fun_core::analysis_problem::FullName::as_str),
+                Some("public.items")
             );
         }
     }
@@ -1411,8 +1412,13 @@ fn missing_linked_definition_is_incomplete_not_a_dropped_capability(
         context.problems()[0]
             .view_problem()
             .unwrap()
-            .missing_metadata_view(),
-        Some(&FullName::with_schema("public", missing))
+            .missing_metadata_view()
+            .map(sql_fun_core::analysis_problem::FullName::as_str),
+        Some(
+            FullName::with_schema("public", missing)
+                .to_string()
+                .as_str()
+        )
     );
     Ok(())
 }

@@ -591,6 +591,29 @@
                   "additionalProperties": false
                 },
                 {
+                  "description": "A COALESCE argument follows a proven non-null operand.",
+                  "type": "object",
+                  "properties": {
+                    "UnreachableCoalesceArgument": {
+                      "type": "array",
+                      "prefixItems": [
+                        {
+                          "$ref": "#/$defs/SemScalarExpr"
+                        },
+                        {
+                          "$ref": "#/$defs/SemScalarExpr"
+                        }
+                      ],
+                      "minItems": 2,
+                      "maxItems": 2
+                    }
+                  },
+                  "required": [
+                    "UnreachableCoalesceArgument"
+                  ],
+                  "additionalProperties": false
+                },
+                {
                   "description": "Coalesce expr type unknown",
                   "type": "object",
                   "properties": {
@@ -2730,12 +2753,12 @@
               "description": "Retained diagnostic text for `DefElemKey`.",
               "type": "string"
             },
-            "ExpressionList": {
-              "description": "Retained diagnostic text for `ExpressionList`.",
-              "type": "string"
-            },
             "SemScalarExpr": {
               "description": "Retained diagnostic text for `SemScalarExpr`.",
+              "type": "string"
+            },
+            "ExpressionList": {
+              "description": "Retained diagnostic text for `ExpressionList`.",
               "type": "string"
             },
             "AExprKind": {
@@ -3707,6 +3730,29 @@
                   "additionalProperties": false
                 },
                 {
+                  "description": "A COALESCE argument follows a proven non-null operand.",
+                  "type": "object",
+                  "properties": {
+                    "UnreachableCoalesceArgument": {
+                      "type": "array",
+                      "prefixItems": [
+                        {
+                          "$ref": "#/$defs/SemScalarExpr"
+                        },
+                        {
+                          "$ref": "#/$defs/SemScalarExpr"
+                        }
+                      ],
+                      "minItems": 2,
+                      "maxItems": 2
+                    }
+                  },
+                  "required": [
+                    "UnreachableCoalesceArgument"
+                  ],
+                  "additionalProperties": false
+                },
+                {
                   "description": "Coalesce expr type unknown",
                   "type": "object",
                   "properties": {
@@ -5846,12 +5892,12 @@
               "description": "Retained diagnostic text for `DefElemKey`.",
               "type": "string"
             },
-            "ExpressionList": {
-              "description": "Retained diagnostic text for `ExpressionList`.",
-              "type": "string"
-            },
             "SemScalarExpr": {
               "description": "Retained diagnostic text for `SemScalarExpr`.",
+              "type": "string"
+            },
+            "ExpressionList": {
+              "description": "Retained diagnostic text for `ExpressionList`.",
               "type": "string"
             },
             "AExprKind": {

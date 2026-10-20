@@ -502,3 +502,37 @@ it does not permit a target of another relation kind.
 Other access-method storage parameters, `SET TABLESPACE`, `RENAME`, extension
 dependencies, `ALL IN TABLESPACE`, and `ATTACH PARTITION` remain unimplemented.
 Recognizing their syntax does not imply semantic or catalog support.
+
+## Qualified column references
+
+PostgreSQL column analysis accepts `column`, `table_or_alias.column`,
+`schema.table.column`, and `database.schema.table.column`. References bind only
+to relations visible in the current query or an enclosing query. A table or
+view alias hides its original relation name, even when the alias repeats the
+table name: `FROM public.items AS items` allows `items.id`, but hides
+`public.items.id`.
+
+To analyze PostgreSQL database-qualified columns, explicitly set the actual
+database name in the selected datasource metadata:
+
+```toml
+[package.metadata.database.default]
+engine = "PostgreSQL"
+dialect = "postgres"
+version = "17"
+database-name = "application"
+```
+
+`database-name` is the exact logical database identifier, without SQL quoting;
+it must be nonempty and contain no NUL character. It is independent of the
+metadata datasource name (`default` in this example), and is never inferred from
+a connection or a query. If a database-qualified column is used without this
+setting, analysis retains a `column_database_name_required` failure. A different
+database name produces `column_cross_database`; PostgreSQL cross-database
+column references are unsupported.
+
+With the `sqlite` feature, SQLite uses `database.table_or_alias.column`, where
+`database` is an explicitly referenced SQLite namespace such as `main`.
+Identifiers are matched with SQLite's ASCII case-insensitive rules. PostgreSQL's
+four-component column form is invalid in SQLite. These column-reference rules
+do not extend support for schema- or database-qualified `*` expansion.

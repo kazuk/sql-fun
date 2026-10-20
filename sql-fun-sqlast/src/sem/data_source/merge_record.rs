@@ -52,6 +52,17 @@ pub struct MergeRecordDataSource {
 }
 
 impl MergeRecordDataSource {
+    pub(super) fn qualified_source<'a>(
+        &'a self,
+        context: &impl ParseContext,
+        name: &crate::sem::FullName,
+    ) -> Result<Option<super::QualifiedSource<'a>>, ()> {
+        Ok(self
+            .source
+            .qualified_source(context, name)?
+            .map(|source| source.with_merge(self.role, self.nullable)))
+    }
+
     pub(crate) fn new(
         source: &DataSource,
         role: MergeRecordRole,

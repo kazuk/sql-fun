@@ -30,6 +30,23 @@ struct MergeRowImageNullability {
 }
 
 impl FromClause {
+    pub(crate) fn qualified_source<'a>(
+        &'a self,
+        context: &impl ParseContext,
+        name: &crate::sem::FullName,
+    ) -> Result<Option<crate::sem::data_source::QualifiedSource<'a>>, ()> {
+        let mut result = None;
+        for source in &self.0 {
+            if let Some(candidate) = source.qualified_source(context, name)? {
+                if result.is_some() {
+                    return Err(());
+                }
+                result = Some(candidate);
+            }
+        }
+        Ok(result)
+    }
+
     pub(crate) fn for_merge_on(target: &DataSource, source: &DataSource) -> Self {
         Self::merge_scope(target, source, MergeScopeConfig::on())
     }
@@ -199,7 +216,7 @@ mod test_find_alias_for_column {
     #[rstest::rstest]
     #[case::found(
         "(SELECT 1 AS id) a",
-        LookupResult::found(AliasSpec::from_local_name("a"))
+        LookupResult::found(AliasSpec::from_names("a", &[]))
     )]
     #[case::absent("(SELECT 1 AS other) a", LookupResult::not_found())]
     #[case::unknown("missing.items a", LookupResult::unknown())]

@@ -343,6 +343,14 @@ pub struct SqlFunMetadata {
     /// Database extensions
     extensions: Option<PostgresExtensionsCollection>,
 
+    /// Explicit PostgreSQL database identity for catalog-qualified SQL references.
+    #[serde(
+        rename = "database-name",
+        default,
+        deserialize_with = "SqlFunMetadata::deserialize_database_name"
+    )]
+    database_name: Option<String>,
+
     /// Schema search path
     search_path: Option<Vec<String>>,
 
@@ -397,6 +405,21 @@ impl MetadataError {
 }
 
 impl SqlFunMetadata {
+    fn deserialize_database_name<'de, D: serde::Deserializer<'de>>(
+        deserializer: D,
+    ) -> Result<Option<String>, D::Error> {
+        let name = <Option<String> as serde::Deserialize>::deserialize(deserializer)?;
+        if name
+            .as_ref()
+            .is_some_and(|name| name.is_empty() || name.contains('\0'))
+        {
+            return Err(serde::de::Error::custom(
+                "database-name must be a nonempty identifier without NUL",
+            ));
+        }
+        Ok(name)
+    }
+
     /// Code generation options configured for this datasource.
     #[must_use]
     pub const fn codegen_options(&self) -> &crate::CodegenOptions {
@@ -422,6 +445,12 @@ impl SqlFunMetadata {
         } else {
             "default"
         }
+    }
+
+    /// Explicit database identity, independent of the datasource selection name.
+    #[must_use]
+    pub fn database_name(&self) -> Option<&str> {
+        self.database_name.as_deref()
     }
 
     /// get CTE catalog directory path
@@ -502,6 +531,30 @@ impl SqlFunMetadata {
     #[must_use]
     pub const fn connector(&self) -> &Option<String> {
         &self.connector
+    }
+}
+
+#[cfg(test)]
+mod test_database_name {
+    use crate::test_helpers::metadata_with_codegen_options;
+
+    #[rstest::rstest]
+    #[case::absent("", None)]
+    #[case::explicit("database-name = 'my.db'", Some("my.db"))]
+    #[case::case_sensitive("database-name = 'My DB'", Some("My DB"))]
+    fn retains_only_explicit_identity(#[case] input: &str, #[case] expected: Option<&str>) {
+        let metadata = metadata_with_codegen_options(input).unwrap();
+        let selected = metadata.get("default").unwrap();
+        assert_eq!(selected.database_name(), expected);
+        assert_eq!(selected.name(), "default");
+    }
+
+    #[rstest::rstest]
+    #[case::empty("database-name = ''")]
+    #[case::wrong_type("database-name = 42")]
+    #[case::nul(r#"database-name = "bad\u0000name""#)]
+    fn rejects_invalid_identity(#[case] input: &str) {
+        assert!(metadata_with_codegen_options(input).is_err());
     }
 }
 

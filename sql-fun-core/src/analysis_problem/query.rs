@@ -4,6 +4,16 @@ use super::DiagnosticMetadata;
 #[derive(Clone, Debug, Eq, PartialEq, ::serde::Serialize, ::serde::Deserialize)]
 #[cfg_attr(feature = "openrpc-schema", derive(::schemars::JsonSchema))]
 pub enum QueryProblem {
+    /// Database-name metadata is required for column reference.
+    ColumnDatabaseNameRequired(String),
+    /// Cross-database column reference is not supported.
+    ColumnCrossDatabase(String),
+    /// Column qualification is invalid for the selected dialect.
+    ColumnQualificationInvalid(String),
+    /// Visible source not found for column reference.
+    ColumnSourceNotFound(String),
+    /// Ambiguous visible source for column reference.
+    ColumnSourceAmbiguous(String),
     /// GROUPING argument does not match a grouping expression of its owner.
     GroupingArgumentNotGrouped,
     /// GROUPING is not allowed in this expression context.
@@ -26,6 +36,31 @@ pub enum QueryProblem {
 }
 
 impl QueryProblem {
+    /// Database-name metadata is required for column reference.
+    #[must_use]
+    pub fn column_database_name_required(reference: &str) -> Self {
+        Self::ColumnDatabaseNameRequired(reference.to_owned())
+    }
+    /// Cross-database column reference is not supported.
+    #[must_use]
+    pub fn column_cross_database(reference: &str) -> Self {
+        Self::ColumnCrossDatabase(reference.to_owned())
+    }
+    /// Column qualification is invalid for the selected dialect.
+    #[must_use]
+    pub fn column_qualification_invalid(reference: &str) -> Self {
+        Self::ColumnQualificationInvalid(reference.to_owned())
+    }
+    /// Visible source not found for column reference.
+    #[must_use]
+    pub fn column_source_not_found(reference: &str) -> Self {
+        Self::ColumnSourceNotFound(reference.to_owned())
+    }
+    /// Ambiguous visible source for column reference.
+    #[must_use]
+    pub fn column_source_ambiguous(reference: &str) -> Self {
+        Self::ColumnSourceAmbiguous(reference.to_owned())
+    }
     /// Diagnostic grouping argument not grouped.
     #[must_use]
     pub const fn grouping_argument_not_grouped() -> Self {
@@ -75,6 +110,11 @@ impl QueryProblem {
     /// Diagnostic code.
     pub(super) const fn code(&self) -> &'static str {
         match self {
+            Self::ColumnDatabaseNameRequired(_) => "column_database_name_required",
+            Self::ColumnCrossDatabase(_) => "column_cross_database",
+            Self::ColumnQualificationInvalid(_) => "column_qualification_invalid",
+            Self::ColumnSourceNotFound(_) => "column_source_not_found",
+            Self::ColumnSourceAmbiguous(_) => "column_source_ambiguous",
             Self::GroupingArgumentNotGrouped => "query_grouping_argument_not_grouped",
             Self::InvalidGroupingPlacement(_) => "query_invalid_grouping_placement",
             Self::TooManyGroupingArguments => "query_too_many_grouping_arguments",
@@ -89,6 +129,12 @@ impl QueryProblem {
     /// Diagnostic presentation data.
     pub(super) fn render_metadata(&self) -> DiagnosticMetadata {
         let message = match self {
+            Self::ColumnDatabaseNameRequired(reference) => format!("database-name metadata is required for column reference: {reference}"),
+            Self::ColumnCrossDatabase(reference) => format!("cross-database column reference is not supported: {reference}"),
+            Self::ColumnQualificationInvalid(reference) => format!("column qualification is invalid for the selected dialect: {reference}"),
+            Self::ColumnSourceNotFound(reference) => format!("visible source not found for column reference: {reference}"),
+            Self::ColumnSourceAmbiguous(reference) => format!("ambiguous visible source for column reference: {reference}"),
+
             Self::GroupingArgumentNotGrouped => "arguments to GROUPING must be grouping expressions of the associated query level".to_owned(),
             Self::InvalidGroupingPlacement(placement) => format!("grouping operations are not allowed in {placement}"),
             Self::TooManyGroupingArguments => "GROUPING must have fewer than 32 arguments".to_owned(),

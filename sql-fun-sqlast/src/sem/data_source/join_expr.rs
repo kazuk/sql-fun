@@ -34,6 +34,28 @@ pub struct JoinExprDataSource {
 }
 
 impl JoinExprDataSource {
+    pub(super) fn qualified_source<'a>(
+        &'a self,
+        context: &impl crate::sem::ParseContext,
+        name: &crate::sem::FullName,
+    ) -> Result<Option<super::QualifiedSource<'a>>, ()> {
+        if self.alias.is_some() {
+            return Ok(None);
+        }
+        let left = self.left.qualified_source(context, name)?;
+        let right = self.right.qualified_source(context, name)?;
+        match (left, right) {
+            (Some(_), Some(_)) => Err(()),
+            (Some(source), None) => Ok(Some(
+                source.with_nullability(self.kind.left_nullable(false)),
+            )),
+            (None, Some(source)) => Ok(Some(
+                source.with_nullability(self.kind.right_nullable(false)),
+            )),
+            (None, None) => Ok(None),
+        }
+    }
+
     pub(super) fn new_data_source(
         kind: &JoinKind,
         left: &DataSource,

@@ -56,6 +56,20 @@ impl Name {
         let (alias, column) = match self.0.as_slice() {
             [column] => (None, column),
             [alias, column] => (Some(AliasName::from(alias.as_str())), column),
+            [schema, table, column] => {
+                return scope.resolve_qualified_column(
+                    context,
+                    &FullName::with_schema(schema, table),
+                    &ColumnName::from(column.as_str()),
+                );
+            }
+            [catalog, schema, table, column] => {
+                return scope.resolve_qualified_column(
+                    context,
+                    &FullName::with_catalog(catalog, schema, table),
+                    &ColumnName::from(column.as_str()),
+                );
+            }
             _ => return AnalysisError::raise_unexpected_input("column qualification"),
         };
         let value = scope

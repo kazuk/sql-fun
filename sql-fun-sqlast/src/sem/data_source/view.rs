@@ -7,6 +7,21 @@ pub struct ViewDataSource {
 }
 
 impl ViewDataSource {
+    pub(super) fn qualified_source<'a>(
+        &'a self,
+        source: &'a DataSource,
+        context: &impl crate::sem::ParseContext,
+        name: &crate::sem::FullName,
+        alias: Option<&'a AliasSpec>,
+    ) -> Option<super::QualifiedSource<'a>> {
+        let alias = alias.unwrap_or(&self.alias);
+        if super::qualified::relation_matches(context, name, self.view.full_name(), alias) {
+            Some(super::QualifiedSource::new(source, alias.name()))
+        } else {
+            None
+        }
+    }
+
     fn result_column<'a>(
         &self,
         view: &'a crate::sem::ViewLike,

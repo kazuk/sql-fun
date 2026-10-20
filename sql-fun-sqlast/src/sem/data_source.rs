@@ -8,6 +8,7 @@ mod join_expr;
 mod join_kind;
 mod merge_record;
 mod projection;
+mod qualified;
 mod resolved;
 mod rows_fun;
 mod sub_query;
@@ -31,7 +32,9 @@ pub use self::{
     undefined::UndefinedTableFuncDataSource,
     view::ViewDataSource,
 };
-pub(crate) use self::{column_candidates::ColumnCandidates, join_expr::JoinUsingClause};
+pub(crate) use self::{
+    column_candidates::ColumnCandidates, join_expr::JoinUsingClause, qualified::QualifiedSource,
+};
 
 use crate::sem::{
     AnalysisError, ColumnName, ParseContext, SemScalarExpr, WithClause,

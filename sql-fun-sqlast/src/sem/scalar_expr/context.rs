@@ -509,6 +509,60 @@ fn postgres_18_or_later(context: &impl ParseContext) -> bool {
 }
 
 impl ScalarAnalysisContext<'_> {
+    pub(crate) fn resolve_qualified_column(
+        &self,
+        context: &mut impl ParseContext,
+        qualifier: &crate::sem::FullName,
+        column: &ColumnName,
+    ) -> Result<SemScalarExpr, AnalysisError> {
+        use super::column_ref::QualifiedColumnFailure;
+        let mut relation = qualifier.clone();
+        if let Some(catalog) = qualifier.catalog() {
+            if context.dialect() == crate::ast::Dialect::sqlite() {
+                return QualifiedColumnFailure::invalid(context, qualifier, column);
+            }
+            let Some(database) = context.metadata().database_name() else {
+                return QualifiedColumnFailure::database_required(context, qualifier, column);
+            };
+            if catalog.as_str() != database {
+                return QualifiedColumnFailure::cross_database(context, qualifier, column);
+            }
+            relation =
+                crate::sem::FullName::new(&None, &qualifier.schema().cloned(), qualifier.name());
+        }
+        self.resolve_qualified_in_scope(context, &relation, qualifier, column)
+    }
+
+    fn resolve_qualified_in_scope(
+        &self,
+        context: &mut impl ParseContext,
+        relation: &crate::sem::FullName,
+        requested: &crate::sem::FullName,
+        column: &ColumnName,
+    ) -> Result<SemScalarExpr, AnalysisError> {
+        use super::column_ref::QualifiedColumnFailure;
+        // Row-image environments expose OLD/NEW aliases rather than relation names.
+        let source = if self.qualified_only {
+            Ok(None)
+        } else {
+            self.from_clause.qualified_source(context, relation)
+        };
+        match source {
+            Ok(Some(source)) => {
+                self.grouping.reference();
+                source.bind(context, &self.with_clause, column)
+            }
+            Err(()) => QualifiedColumnFailure::ambiguous(context, requested, column),
+            Ok(None) => {
+                if let Some(parent) = &self.parent {
+                    parent.resolve_qualified_in_scope(context, relation, requested, column)
+                } else {
+                    QualifiedColumnFailure::not_found(context, requested, column)
+                }
+            }
+        }
+    }
+
     /// Resolve a column reference in this scope, reporting missing or ambiguous names.
     ///
     /// An alias restricts lookup to that data source. Without an alias, the column
@@ -538,7 +592,7 @@ impl ScalarAnalysisContext<'_> {
                 let normalized = AliasName::from(alias.as_str().to_ascii_lowercase().as_str());
                 if let Some((source, _)) = self.from_clause.resolve_alias(&normalized) {
                     let canonical = source
-                        .trigger_column(context, column)
+                        .canonical_relation_column(context, column)
                         .unwrap_or_else(|| column.clone());
                     return self.resolve_source_column_ref(context, &normalized, &canonical);
                 }

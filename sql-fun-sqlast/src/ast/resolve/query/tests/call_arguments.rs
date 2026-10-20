@@ -351,7 +351,10 @@ fn call_diagnostics_identify_the_offending_argument(#[case] sql: &str, #[case] t
     let (_, context) = resolve(sql, Dialect::postgres(), false).unwrap();
     let problem = &context.reported_problems()[0];
     let span = problem.statement_relative_span().unwrap();
-    assert_eq!(span.get_from(sql), Some(token));
+    assert_eq!(
+        sql.get(span.offset()..span.offset() + span.len()),
+        Some(token)
+    );
     assert_eq!(span.offset(), sql.rfind(token).unwrap());
 }
 

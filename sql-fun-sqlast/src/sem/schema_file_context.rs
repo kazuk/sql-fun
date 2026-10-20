@@ -48,7 +48,8 @@ pub struct SchemaFileContext {
     catalog: SchemaCatalog,
     statement_span: StringSpan,
     source_access_service: Option<Box<dyn SourceAccessService>>,
-    reports: Vec<String>,
+    diagnostic_source: Option<String>,
+    presentations: Vec<Option<::sql_fun_core::DiagnosticPresentation>>,
     problems: Vec<AnalysisProblem>,
     cursors: crate::sem::CursorBindings,
     analysis_state: crate::sem::AnalysisState,
@@ -144,7 +145,8 @@ impl SchemaFileContext {
             },
             statement_span: StringSpan::default(),
             source_access_service: None,
-            reports: Default::default(),
+            diagnostic_source: None,
+            presentations: Vec::new(),
             problems: Vec::new(),
             cursors: crate::sem::CursorBindings::default(),
             analysis_state: crate::sem::AnalysisState::default(),
@@ -154,8 +156,7 @@ impl SchemaFileContext {
 
     /// Recoverable problems collected by this layer, in reporting order.
     ///
-    /// A diagnostic rendering failure is returned immediately and the rejected
-    /// problem is not collected. Earlier accepted problems remain available.
+    /// Collection does not access a terminal, theme, or source file.
     pub fn problems(&self) -> &[AnalysisProblem] {
         &self.problems
     }
@@ -164,12 +165,18 @@ impl SchemaFileContext {
         &self.catalog
     }
 
+    /// Retain the explicitly analyzed statement for diagnostic presentation.
+    pub(crate) fn set_diagnostic_source(&mut self, source: &str) {
+        self.diagnostic_source = Some(source.to_owned());
+    }
+
     pub(crate) fn into_parsed(
         mut self,
         sem_results: Vec<crate::sem::SemAst>,
     ) -> crate::ParsedSchemaDump {
         let problems = std::mem::take(&mut self.problems);
-        crate::ParsedSchemaDump::new(sem_results, self.freeze(), problems)
+        let presentations = std::mem::take(&mut self.presentations);
+        crate::ParsedSchemaDump::new(sem_results, self.freeze(), problems, presentations)
     }
 
     /// apply index from constraint
@@ -569,19 +576,15 @@ impl SearchPathRead for SchemaCatalog {
 
 impl DiagnosticContext for SchemaFileContext {
     fn report_problem(&mut self, problem: AnalysisProblem) -> Result<(), AnalysisError> {
-        if let Some(source_provider) = &self.source_access_service {
-            let source = source_provider.get_source_span(
-                self.get_args(),
-                self.catalog.sql_source_path.as_path(),
-                self.statement_span,
-            )?;
-            let theme = self.get_args().highlighter_theme()?;
-
-            let report = problem.render_report(&theme, source)?;
-            eprintln!("{report}");
-            self.reports.push(report)
-        }
-
+        let presentation = self.diagnostic_source.as_deref().map(|source| {
+            ::sql_fun_core::DiagnosticPresentation::new(
+                &problem,
+                source,
+                self.metadata().sql_dialect(),
+                self.statement_span.offset(),
+            )
+        });
+        self.presentations.push(presentation);
         self.problems.push(problem);
         Ok(())
     }
@@ -594,12 +597,28 @@ mod test_diagnostic_context {
     use crate::test_helpers::TestParseContext;
     use std::path::Path;
 
+    #[derive(Debug)]
+    struct UnavailableSource;
+
+    impl crate::sem::SourceAccessService for UnavailableSource {
+        fn get_source_span(
+            &self,
+            _args: &::sql_fun_core::SqlFunArgs,
+            _path: &Path,
+            _span: StringSpan,
+        ) -> Result<String, crate::sem::AnalysisError> {
+            panic!("diagnostic collection must not reopen the source")
+        }
+    }
+
     #[test]
     fn collects_problems_without_reporting_to_base() -> testresult::TestResult {
         let mut base = TestParseContext::default();
         base.reject_diagnostics_after(0);
         let base = base.freeze();
         let mut context = crate::test_helpers::schema_layer(Path::new("schema.sql"), &base);
+        context.set_source_file(Box::new(UnavailableSource));
+        context.set_diagnostic_source("first second");
         let first = AnalysisProblem::function_not_found(
             &FullName::from_local_name("first"),
             &StringSpan::new(0, 5),
@@ -615,6 +634,10 @@ mod test_diagnostic_context {
         assert_eq!(context.problems().len(), 2);
         let parsed = context.into_parsed(Vec::new());
         assert_eq!(parsed.problems().len(), 2);
+        let presentations = parsed.diagnostic_presentations();
+        assert_eq!(presentations.len(), 2);
+        assert_eq!(presentations[0].as_ref().unwrap().source(), "first second");
+        assert_eq!(presentations[1].as_ref().unwrap().source(), "first second");
         let descendant =
             crate::test_helpers::schema_layer(Path::new("descendant.sql"), parsed.base_context());
         assert!(descendant.problems().is_empty());

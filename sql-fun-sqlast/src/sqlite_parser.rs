@@ -22,5 +22,6 @@ mod parser {
     include!(concat!(env!("OUT_DIR"), "/parser.rs"));
 }
 
+pub(crate) use self::lexer::Lexer;
 pub(crate) use self::parser::{Parser, TypeSpan};
 type Result<T, E = error::Error> = std::result::Result<T, E>;

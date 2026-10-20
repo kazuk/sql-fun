@@ -936,7 +936,11 @@ impl super::Table {
             && let Some(constraint) = self.duplicate_constraint_name(&context)
         {
             context.report_problem(AnalysisProblem::creation(
-                crate::sem::problem::CreationProblem::constraint(&name, constraint, source.span()),
+                crate::sem::problem::CreationProblem::constraint(
+                    &name,
+                    &crate::sem::FullName::from_local_name(constraint),
+                    source.span(),
+                ),
             ))?;
             return Ok(AstAndContextPair::new(
                 SemAst::unresolved_statement(),

@@ -43,6 +43,7 @@ pub struct ParsedSchemaDump {
     _sem_results: Vec<SemAst>,
     base: FrozenBaseContext,
     problems: Vec<AnalysisProblem>,
+    presentations: Vec<Option<::sql_fun_core::DiagnosticPresentation>>,
 }
 
 impl ParsedSchemaDump {
@@ -50,11 +51,13 @@ impl ParsedSchemaDump {
         sem_results: Vec<SemAst>,
         base: FrozenBaseContext,
         problems: Vec<AnalysisProblem>,
+        presentations: Vec<Option<::sql_fun_core::DiagnosticPresentation>>,
     ) -> Self {
         Self {
             _sem_results: sem_results,
             base,
             problems,
+            presentations,
         }
     }
 
@@ -64,6 +67,13 @@ impl ParsedSchemaDump {
     /// result, without retaining its semantic statements or problems.
     pub const fn base_context(&self) -> &FrozenBaseContext {
         &self.base
+    }
+
+    /// Presentation context for each problem, in the same reporting order.
+    ///
+    /// An absent entry means the context was not given statement source text.
+    pub fn diagnostic_presentations(&self) -> &[Option<::sql_fun_core::DiagnosticPresentation>] {
+        &self.presentations
     }
 
     /// Recoverable problems from this file, in reporting order.

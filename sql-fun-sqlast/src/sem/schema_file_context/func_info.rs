@@ -107,6 +107,7 @@ impl FunctionInfoWrite for SchemaFileContext {
                 if !create_function.replace() || !candidate.can_replace(previous) {
                     self.report_analysis_problem(crate::sem::AnalysisProblem::creation(
                         crate::sem::problem::CreationProblem::routine(
+                            name,
                             &candidate.ownership_identity(name),
                             &self.creation_span(),
                         ),

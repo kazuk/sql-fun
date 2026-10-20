@@ -1,8 +1,8 @@
-use crate::sem::AnalysisError;
-use ::miette::{GraphicalReportHandler, MietteDiagnostic, NamedSource, Report, Severity};
+use super::DiagnosticMetadata;
 
 /// Structured violations in SELECT clauses, distinct from retained name bindings.
-#[derive(Clone, Debug, Eq, PartialEq)]
+#[derive(Clone, Debug, Eq, PartialEq, ::serde::Serialize, ::serde::Deserialize)]
+#[cfg_attr(feature = "openrpc-schema", derive(::schemars::JsonSchema))]
 pub enum QueryProblem {
     /// GROUPING argument does not match a grouping expression of its owner.
     GroupingArgumentNotGrouped,
@@ -26,34 +26,53 @@ pub enum QueryProblem {
 }
 
 impl QueryProblem {
-    pub(crate) const fn grouping_argument_not_grouped() -> Self {
+    /// Diagnostic grouping argument not grouped.
+    #[must_use]
+    pub const fn grouping_argument_not_grouped() -> Self {
         Self::GroupingArgumentNotGrouped
     }
-    pub(crate) fn invalid_grouping_placement(placement: &str) -> Self {
+    /// Diagnostic invalid grouping placement.
+    #[must_use]
+    pub fn invalid_grouping_placement(placement: &str) -> Self {
         Self::InvalidGroupingPlacement(placement.to_owned())
     }
-    pub(crate) const fn too_many_grouping_arguments() -> Self {
+    /// Diagnostic too many grouping arguments.
+    #[must_use]
+    pub const fn too_many_grouping_arguments() -> Self {
         Self::TooManyGroupingArguments
     }
 
-    pub(crate) const fn invalid_cte_placement() -> Self {
+    /// Diagnostic invalid cte placement.
+    #[must_use]
+    pub const fn invalid_cte_placement() -> Self {
         Self::InvalidCtePlacement
     }
-    pub(crate) fn duplicate_window_definition(name: &str) -> Self {
+    /// Diagnostic duplicate window definition.
+    #[must_use]
+    pub fn duplicate_window_definition(name: &str) -> Self {
         Self::DuplicateWindowDefinition(name.to_owned())
     }
-    pub(crate) fn reference_not_found(name: &str) -> Self {
+    /// Diagnostic reference not found.
+    #[must_use]
+    pub fn reference_not_found(name: &str) -> Self {
         Self::ReferenceNotFound(name.to_owned())
     }
-    pub(crate) fn ambiguous_reference(name: &str) -> Self {
+    /// Diagnostic ambiguous reference.
+    #[must_use]
+    pub fn ambiguous_reference(name: &str) -> Self {
         Self::AmbiguousReference(name.to_owned())
     }
-    pub(crate) const fn position_out_of_range(position: i64) -> Self {
+    /// Diagnostic position out of range.
+    #[must_use]
+    pub const fn position_out_of_range(position: i64) -> Self {
         Self::PositionOutOfRange(position)
     }
-    pub(crate) const fn invalid_compound_order() -> Self {
+    /// Diagnostic invalid compound order.
+    #[must_use]
+    pub const fn invalid_compound_order() -> Self {
         Self::InvalidCompoundOrder
     }
+    /// Diagnostic code.
     pub(super) const fn code(&self) -> &'static str {
         match self {
             Self::GroupingArgumentNotGrouped => "query_grouping_argument_not_grouped",
@@ -67,11 +86,8 @@ impl QueryProblem {
             Self::InvalidCompoundOrder => "query_invalid_compound_order",
         }
     }
-    pub(super) fn render_report(
-        &self,
-        handler: &GraphicalReportHandler,
-        source: String,
-    ) -> Result<String, AnalysisError> {
+    /// Diagnostic presentation data.
+    pub(super) fn render_metadata(&self) -> DiagnosticMetadata {
         let message = match self {
             Self::GroupingArgumentNotGrouped => "arguments to GROUPING must be grouping expressions of the associated query level".to_owned(),
             Self::InvalidGroupingPlacement(placement) => format!("grouping operations are not allowed in {placement}"),
@@ -87,49 +103,6 @@ impl QueryProblem {
                 "compound ORDER BY must refer to a result column".to_owned()
             }
         };
-        let diagnostic = MietteDiagnostic::new(message)
-            .with_code(self.code())
-            .with_severity(Severity::Error);
-        let report = Report::new(diagnostic).with_source_code(NamedSource::new("SQL", source));
-        let mut rendered = String::new();
-        handler.render_report(&mut rendered, &*report)?;
-        Ok(rendered)
-    }
-}
-
-#[cfg(test)]
-mod tests {
-    use super::QueryProblem;
-
-    #[rstest::rstest]
-    #[case::duplicate(
-        QueryProblem::duplicate_window_definition("w"),
-        "duplicate window definition: w"
-    )]
-    #[case::missing(
-        QueryProblem::reference_not_found("w"),
-        "clause reference not found: w"
-    )]
-    #[case::ambiguous(
-        QueryProblem::ambiguous_reference("w"),
-        "ambiguous clause reference: w"
-    )]
-    #[case::position(
-        QueryProblem::position_out_of_range(3),
-        "position 3 is outside the select list"
-    )]
-    #[case::compound(
-        QueryProblem::invalid_compound_order(),
-        "compound ORDER BY must refer to a result column"
-    )]
-    fn renders_structured_problem(#[case] problem: QueryProblem, #[case] message: &str) {
-        let report = problem
-            .render_report(
-                &::miette::GraphicalReportHandler::new(),
-                "SELECT 1".to_owned(),
-            )
-            .unwrap();
-        assert!(report.contains(message));
-        assert!(report.contains(problem.code()));
+        DiagnosticMetadata::from(message)
     }
 }

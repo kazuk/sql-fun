@@ -3,8 +3,10 @@
 mod api;
 mod child_proc;
 mod cli_sub_command;
+mod diagnostic;
 mod docker;
 mod extract;
+mod highlighter_theme;
 mod init;
 mod runnable;
 
@@ -15,6 +17,7 @@ pub use self::{
     api::ApiArgs,
     check::CheckArgs,
     cli_sub_command::CliSubCommand,
+    diagnostic::{DiagnosticRenderer, render_diagnostic},
     extract::ExtractArgs,
     runnable::{RunnableCommand, StdStream},
 };

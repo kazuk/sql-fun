@@ -980,7 +980,8 @@ mod test_helpers {
         let domain_name = domain.parse::<FullName>().expect("fixture domain name");
         assert!(problems.iter().any(|problem| match problem {
             AnalysisProblem::NameResolution(NameResolution::DomainTypeNameNotFound(problem)) =>
-                problem.domain_type_name() == &domain_name && problem.base_type_name() == base,
+                problem.domain_type_name().as_str() == domain_name.to_string()
+                    && problem.base_type_name() == base,
             _ => false,
         }));
     }

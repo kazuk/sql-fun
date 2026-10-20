@@ -12,8 +12,8 @@ rust-version.workspace = true
 autotests = false
 
 [features]
-openrpc-schema = ["dep:schemars"]
-sqlite = ["sql-fun-server-api/sqlite"]
+openrpc-schema = ["sql-fun-core/openrpc-schema", "dep:schemars"]
+sqlite = ["sql-fun-server-api/sqlite", "sql-fun-core/sqlite"]
 
 [dependencies]
 bon = "3.10.1"
@@ -22,6 +22,7 @@ nix.workspace = true
 schemars = { workspace = true, optional = true }
 serde.workspace = true
 serde_json.workspace = true
+sql-fun-core.workspace = true
 sql-fun-server-api.workspace = true
 thiserror.workspace = true
 tokio.workspace = true

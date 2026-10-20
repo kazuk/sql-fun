@@ -173,26 +173,21 @@ impl Diagnostics<'_> {
 struct Diagnostic<'ctx> {
     path: &'ctx std::path::Path,
     problem: &'ctx ::sql_fun_sqlast::sem::AnalysisProblem,
+    presentation: Option<&'ctx ::sql_fun_core::DiagnosticPresentation>,
 }
 
 impl Diagnostics<'_> {
-    const fn span(span: ::sql_fun_sqlast::StringSpan) -> StatementByteRange {
+    const fn span(span: ::sql_fun_core::analysis_problem::StringSpan) -> StatementByteRange {
         StatementByteRange::new(span.offset(), span.len())
     }
 
     fn map(item: Diagnostic<'_>) -> ::serde_json::Value {
         let span = item.problem.statement_relative_span().map(Self::span);
-        let severity = match item.problem.severity() {
-            ::miette::Severity::Error => DiagnosticSeverity::error(),
-            ::miette::Severity::Warning => DiagnosticSeverity::warning(),
-            ::miette::Severity::Advice => DiagnosticSeverity::advice(),
-        };
-        ::serde_json::to_value(AnalysisProbrem::new(
-            item.problem.code(),
-            severity,
-            item.path,
-            span,
-        ))
+        let severity = DiagnosticSeverity::from(item.problem.severity());
+        ::serde_json::to_value(
+            AnalysisProbrem::new(item.problem.code(), severity, item.path, span)
+                .with_presentation(item.presentation),
+        )
         .expect("diagnostic serializes")
     }
 }
@@ -209,6 +204,7 @@ impl<'read> IntoIterator for &'read Diagnostics<'_> {
 struct LayerProblems<'ctx> {
     path: &'ctx std::path::Path,
     problems: &'ctx [::sql_fun_sqlast::sem::AnalysisProblem],
+    presentations: &'ctx [Option<::sql_fun_core::DiagnosticPresentation>],
 }
 
 impl<'ctx> LayerProblems<'ctx> {
@@ -216,14 +212,23 @@ impl<'ctx> LayerProblems<'ctx> {
         Self {
             path: layer.path(),
             problems: layer.problems(),
+            presentations: layer.diagnostic_presentations(),
         }
         .into_items()
     }
 
     fn into_items(self) -> impl Iterator<Item = Diagnostic<'ctx>> {
-        self.problems.iter().map(move |problem| Diagnostic {
-            path: self.path,
-            problem,
-        })
+        self.problems
+            .iter()
+            .enumerate()
+            .map(move |(index, problem)| Diagnostic {
+                path: self.path,
+                problem,
+                presentation: if let Some(presentation) = self.presentations.get(index) {
+                    presentation.as_ref()
+                } else {
+                    None
+                },
+            })
     }
 }

@@ -104,11 +104,8 @@ mod test_applicability {
         let problem = problems[0]
             .alter_column_problem()
             .expect("structured diagnostic");
-        assert_eq!(problem.column(), &crate::sem::ColumnName::from("a"));
-        assert_eq!(
-            problem.table().full_name(),
-            &crate::sem::FullName::with_schema("public", "t")
-        );
+        assert_eq!(problem.column().as_str(), "a");
+        assert_eq!(problem.table().as_str(), "public.t");
         assert!(problem.reason().is_error());
         assert!(context.problems().is_empty());
         assert!(!statement.alter_table_statement().unwrap().can_apply());

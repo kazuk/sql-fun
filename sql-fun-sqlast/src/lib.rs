@@ -19,13 +19,13 @@ mod parse_statements;
 mod placeholdered_sql;
 mod schema_dump_file;
 mod sql_file;
+mod sql_tokens;
 #[cfg(feature = "sqlite")]
 mod sqlite;
 #[cfg(all(feature = "sqlite", feature = "workaround_turso_9791"))]
 mod sqlite_parser;
 mod trie_map;
 
-use miette::LabeledSpan;
 use sql_fun_core::IVec;
 
 pub use self::sql_file::SqlFileSnapshot;
@@ -44,6 +44,7 @@ pub use self::{
     parse_statements::{ParseStatementError, parse_statements},
     placeholdered_sql::PlaceholderedSqlRenderError,
     schema_dump_file::{ParseDumpFileError, ParsedSchemaDump},
+    sql_tokens::{TokenizeSqlError, tokenize_sql},
     trie_map::TrieMap,
 };
 pub use sql_fun_core::{SqlFunArgs, SqlFunArgsBuilder, SqlFunArgsError};
@@ -162,6 +163,7 @@ impl PostgresDialect {
         let mut sem_results = Vec::new();
         for statement in statements {
             context.set_statement_span(StringSpan::from_str_in_str(&sql_statements, statement));
+            context.set_diagnostic_source(statement);
             let syn = Self::parse(statement)?;
             let tokens = Self::scan(statement)?;
             let AstAndContextPair(sem, rcontext) =
@@ -311,10 +313,6 @@ impl StringSpan {
     /// Return true when len equals 0
     pub const fn is_empty(&self) -> bool {
         self.len == 0
-    }
-
-    fn new_labeled_span(&self, label: &str) -> LabeledSpan {
-        LabeledSpan::new(Some(String::from(label)), self.offset, self.len)
     }
 
     fn from_scan_token(tok: &crate::syn::ScanToken) -> Self {

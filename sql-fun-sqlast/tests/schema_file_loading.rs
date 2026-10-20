@@ -116,7 +116,7 @@ mod test_helpers {
     fn has_missing_table_problem(problems: &[AnalysisProblem], expected: &TableName) -> bool {
         problems.iter().any(|problem| match problem {
             AnalysisProblem::NameResolution(NameResolution::TableNotFound(actual)) => {
-                actual == expected
+                actual.as_str() == expected.to_string()
             }
             _ => false,
         })

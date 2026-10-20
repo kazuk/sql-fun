@@ -35,6 +35,27 @@ impl ApiServer {
         command
     }
 
+    /// Run schema initialization through the CLI's real client/server transport.
+    pub async fn initialize_schema(
+        &self,
+        schema: &super::schema::SchemaFixture,
+    ) -> ::testresult::TestResult<::sql_fun_server_api::payloads::SchemaContext> {
+        let request = ::serde_json::json!({
+            "method": "initialize_schema_context", "params": schema.request()
+        });
+        let output = self.run(&format!("{request}\n")).await?;
+        assert!(
+            output.status.success(),
+            "{}",
+            String::from_utf8_lossy(&output.stderr)
+        );
+        let mut replies = super::responses(&output);
+        assert_eq!(replies.len(), 1);
+        Ok(::serde_json::from_value(
+            replies.remove(0)["result"].clone(),
+        )?)
+    }
+
     pub fn executable(&self) -> &Path {
         self.0.executable()
     }

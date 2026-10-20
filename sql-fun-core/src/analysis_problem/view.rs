@@ -1,8 +1,8 @@
-use crate::sem::{AnalysisError, FullName};
-use ::miette::{GraphicalReportHandler, MietteDiagnostic, NamedSource, Report, Severity};
+use super::{DiagnosticMetadata, FullName};
 
 /// A view declaration or capability cannot be analyzed as requested.
-#[derive(Debug, Clone, Eq, PartialEq)]
+#[derive(Debug, Clone, Eq, PartialEq, ::serde::Serialize, ::serde::Deserialize)]
+#[cfg_attr(feature = "openrpc-schema", derive(::schemars::JsonSchema))]
 pub enum ViewProblem {
     /// The declaration target is absent or is not an ordinary view.
     InvalidTarget(FullName),
@@ -15,6 +15,7 @@ pub enum ViewProblem {
 }
 impl ViewProblem {
     /// Exact catalog identity whose required semantic definition is absent.
+    #[must_use]
     pub const fn missing_metadata_view(&self) -> Option<&FullName> {
         if let Self::MissingMetadata(view) = self {
             Some(view)
@@ -23,19 +24,28 @@ impl ViewProblem {
         }
     }
 
-    pub(crate) fn invalid_target(view: &FullName) -> Self {
-        Self::InvalidTarget(view.clone())
+    /// Diagnostic invalid target.
+    #[must_use]
+    pub fn invalid_target(view: impl Into<FullName>) -> Self {
+        Self::InvalidTarget(view.into())
     }
-    pub(crate) fn unknown_default_column(view: &FullName, name: &str) -> Self {
-        Self::UnknownDefaultColumn(view.clone(), name.to_owned())
+    /// Diagnostic unknown default column.
+    #[must_use]
+    pub fn unknown_default_column(view: impl Into<FullName>, name: &str) -> Self {
+        Self::UnknownDefaultColumn(view.into(), name.to_owned())
     }
-    pub(crate) const fn invalid_alter() -> Self {
+    /// Diagnostic invalid alter.
+    #[must_use]
+    pub const fn invalid_alter() -> Self {
         Self::InvalidAlter
     }
 
-    pub(crate) fn missing_metadata(view: &FullName) -> Self {
-        Self::MissingMetadata(view.clone())
+    /// Diagnostic missing metadata.
+    #[must_use]
+    pub fn missing_metadata(view: impl Into<FullName>) -> Self {
+        Self::MissingMetadata(view.into())
     }
+    /// Diagnostic code.
     pub(super) const fn code(&self) -> &'static str {
         match self {
             Self::InvalidTarget(_) => "view_invalid_target",
@@ -44,11 +54,8 @@ impl ViewProblem {
             Self::InvalidAlter => "view_invalid_alter",
         }
     }
-    pub(super) fn render_report(
-        &self,
-        handler: &GraphicalReportHandler,
-        source: String,
-    ) -> Result<String, AnalysisError> {
+    /// Diagnostic presentation data.
+    pub(super) fn render_metadata(&self) -> DiagnosticMetadata {
         let message = match self {
             Self::InvalidTarget(view) => {
                 format!("declaration target {view} is not an ordinary view")
@@ -63,12 +70,6 @@ impl ViewProblem {
                 "PostgreSQL does not permit ALTER trigger/rule state on views".to_owned()
             }
         };
-        let diagnostic = MietteDiagnostic::new(message)
-            .with_code(self.code())
-            .with_severity(Severity::Error);
-        let report = Report::new(diagnostic).with_source_code(NamedSource::new("SQL", source));
-        let mut rendered = String::new();
-        handler.render_report(&mut rendered, &*report)?;
-        Ok(rendered)
+        DiagnosticMetadata::from(message)
     }
 }

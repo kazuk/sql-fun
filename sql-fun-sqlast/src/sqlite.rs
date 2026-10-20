@@ -208,6 +208,7 @@ impl SqliteDialect {
                 AnalysisError::never()
             };
             context.set_statement_span(statement_span);
+            context.set_diagnostic_source(statement_text);
             let syn = statement.cmd;
             let tokens = Self::scan(statement_text)?;
             let AstAndContextPair(sem, rcontext) =

@@ -1,8 +1,8 @@
-use crate::sem::AnalysisError;
-use ::miette::{GraphicalReportHandler, MietteDiagnostic, NamedSource, Report, Severity};
+use super::DiagnosticMetadata;
 
 /// Structured INSERT violation, independently of its rendered message.
-#[derive(Clone, Copy, Debug, Eq, PartialEq)]
+#[derive(Clone, Copy, Debug, Eq, PartialEq, ::serde::Serialize, ::serde::Deserialize)]
+#[cfg_attr(feature = "openrpc-schema", derive(::schemars::JsonSchema))]
 pub enum InsertProblemKind {
     /// Source and destination arity differ.
     Arity,
@@ -37,93 +37,115 @@ pub enum InsertProblemKind {
 }
 
 impl InsertProblemKind {
-    pub(crate) const fn view_operation() -> Self {
+    /// Diagnostic view operation.
+    #[must_use]
+    pub const fn view_operation() -> Self {
         Self::ViewOperation
     }
-    pub(crate) const fn read_only_target() -> Self {
+    /// Diagnostic read only target.
+    #[must_use]
+    pub const fn read_only_target() -> Self {
         Self::ReadOnlyTarget
     }
-    pub(crate) const fn arity() -> Self {
+    /// Diagnostic arity.
+    #[must_use]
+    pub const fn arity() -> Self {
         Self::Arity
     }
-    pub(crate) const fn duplicate_target() -> Self {
+    /// Diagnostic duplicate target.
+    #[must_use]
+    pub const fn duplicate_target() -> Self {
         Self::DuplicateTarget
     }
-    pub(crate) const fn generated_target() -> Self {
+    /// Diagnostic generated target.
+    #[must_use]
+    pub const fn generated_target() -> Self {
         Self::GeneratedTarget
     }
-    pub(crate) const fn identity_target() -> Self {
+    /// Diagnostic identity target.
+    #[must_use]
+    pub const fn identity_target() -> Self {
         Self::IdentityTarget
     }
-    pub(crate) const fn assignment_type() -> Self {
+    /// Diagnostic assignment type.
+    #[must_use]
+    pub const fn assignment_type() -> Self {
         Self::AssignmentType
     }
-    pub(crate) const fn returning_qualifier() -> Self {
+    /// Diagnostic returning qualifier.
+    #[must_use]
+    pub const fn returning_qualifier() -> Self {
         Self::ReturningQualifier
     }
-    pub(crate) const fn conflict_constraint() -> Self {
+    /// Diagnostic conflict constraint.
+    #[must_use]
+    pub const fn conflict_constraint() -> Self {
         Self::ConflictConstraint
     }
-    pub(crate) const fn conflict_target() -> Self {
+    /// Diagnostic conflict target.
+    #[must_use]
+    pub const fn conflict_target() -> Self {
         Self::ConflictTarget
     }
-    pub(crate) const fn conflict_name_missing() -> Self {
+    /// Diagnostic conflict name missing.
+    #[must_use]
+    pub const fn conflict_name_missing() -> Self {
         Self::ConflictNameMissing
     }
-    pub(crate) const fn conflict_name_ambiguous() -> Self {
+    /// Diagnostic conflict name ambiguous.
+    #[must_use]
+    pub const fn conflict_name_ambiguous() -> Self {
         Self::ConflictNameAmbiguous
     }
-    pub(crate) const fn conflict_predicate() -> Self {
+    /// Diagnostic conflict predicate.
+    #[must_use]
+    pub const fn conflict_predicate() -> Self {
         Self::ConflictPredicate
     }
-    pub(crate) const fn conflict_chain() -> Self {
+    /// Diagnostic conflict chain.
+    #[must_use]
+    pub const fn conflict_chain() -> Self {
         Self::ConflictChain
     }
-    pub(crate) const fn cte_aliases() -> Self {
+    /// Diagnostic cte aliases.
+    #[must_use]
+    pub const fn cte_aliases() -> Self {
         Self::CteAliases
     }
 }
 
 /// A violation of INSERT destination, source or conflict rules.
-#[derive(Clone, Debug)]
+#[derive(Clone, Debug, ::serde::Serialize, ::serde::Deserialize)]
+#[cfg_attr(feature = "openrpc-schema", derive(::schemars::JsonSchema))]
 pub struct InsertProblem {
     kind: InsertProblemKind,
     message: String,
 }
 
 impl InsertProblem {
-    pub(crate) fn new(kind: InsertProblemKind, message: &str) -> Self {
+    /// Diagnostic new.
+    #[must_use]
+    pub fn new(kind: InsertProblemKind, message: &str) -> Self {
         Self {
             kind,
             message: message.to_owned(),
         }
     }
 
-    pub(super) const fn code(&self) -> &'static str {
-        "insert_semantics"
-    }
-
     /// The structured rule violated, independently of diagnostic wording.
+    #[must_use]
     pub const fn kind(&self) -> InsertProblemKind {
         self.kind
     }
 
     /// The INSERT requirement that was violated.
+    #[must_use]
     pub fn message(&self) -> &str {
         &self.message
     }
 
-    pub(super) fn render_report(
-        &self,
-        handler: &GraphicalReportHandler,
-        source: String,
-    ) -> Result<String, AnalysisError> {
-        let diagnostic = MietteDiagnostic::new(self.message.clone())
-            .with_code(self.code())
-            .with_severity(Severity::Error);
-        let report = Report::new(diagnostic).with_source_code(NamedSource::new("SQL", source));
-        let mut rendered = String::new();
-        handler.render_report(&mut rendered, &*report)?;
-        Ok(rendered)
+    /// Diagnostic presentation data.
+    pub(super) fn render_metadata(&self) -> DiagnosticMetadata {
+        DiagnosticMetadata::from(self.message())
     }
 }

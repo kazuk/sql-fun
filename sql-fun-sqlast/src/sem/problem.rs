@@ -1,642 +1,136 @@
-#![doc= include_str!("problem.md")]
-mod alter_column;
-mod rule;
-pub use self::alter_column::{AlterColumnProblem, ColumnAttributeProblem};
-pub use self::rule::{RuleDefinitionProblem, RuleProblem};
-
-mod call_argument;
-mod creation;
-mod delete;
-mod index;
-mod insert;
-mod min_max;
-mod name_resolution;
-mod overload_resolution;
-mod ownership;
-mod parameter_constraint;
-mod query;
-mod sql_highlighter;
-mod trigger;
-mod update;
-mod view;
-pub use self::trigger::TriggerProblem;
-
-use std::collections::HashSet;
-
-use miette::{GraphicalReportHandler, LabeledSpan, NamedSource, Report};
-use sql_fun_core::HighlighterTheme;
-
-use crate::{
-    StringSpan,
-    sem::{
-        AnalysisError, ColumnName, DefElemKey, FullName, OperatorName, SemScalarExpr, TableName,
-        TypeDefinition, TypeReference, create_table::ViewName,
-        type_system::ArgumentBindingCollection,
-    },
+//! SQL analysis diagnostic adapters.
+use ::sql_fun_core::analysis_problem as diagnostic;
+pub use ::sql_fun_core::analysis_problem::{
+    AlterColumnProblem, AnalysisProblem, CallArgumentProblem, ColumnAttributeProblem,
+    CreationProblem, DeleteProblem, DeleteProblemKind, DomainBaseTypeNameNotFound,
+    FunctionNotFound, IndexProblem, IndexProblemKind, InsertProblem, InsertProblemKind,
+    MinMaxProblem, NameResolution, OverloadResolution, OwnershipProblem,
+    ParameterConstraintProblem, QueryProblem, RuleDefinitionProblem, RuleProblem, TriggerProblem,
+    UpdateProblem, UpdateProblemKind, ViewProblem,
 };
-
-pub use self::call_argument::CallArgumentProblem;
-pub use self::creation::CreationProblem;
-pub use self::delete::{DeleteProblem, DeleteProblemKind};
-pub use self::index::{IndexProblem, IndexProblemKind};
-pub use self::insert::{InsertProblem, InsertProblemKind};
-pub use self::min_max::MinMaxProblem;
-pub use self::name_resolution::{DomainBaseTypeNameNotFound, NameResolution};
-pub use self::ownership::OwnershipProblem;
-pub use self::parameter_constraint::ParameterConstraintProblem;
-pub use self::query::QueryProblem;
-pub use self::update::{UpdateProblem, UpdateProblemKind};
-pub use self::view::ViewProblem;
-
-pub(crate) use self::{overload_resolution::OverloadResolution, sql_highlighter::SqlHighlighter};
-
-trait Problem {
-    const CODE: &'static str;
-    const MESSAGE: &'static str;
-    const SEVERITY: miette::Severity;
-    const SPAN_LABEL: &'static str;
-
-    fn get_problem_span(&self) -> StringSpan;
-
-    fn labeled_problem_span(&self) -> LabeledSpan {
-        self.get_problem_span().new_labeled_span(Self::SPAN_LABEL)
+impl From<&crate::sem::FullName> for diagnostic::FullName {
+    fn from(value: &crate::sem::FullName) -> Self {
+        Self::new(&value.to_string())
     }
 }
-
-trait RenderProblemReport: Problem {
-    fn generate_report(
-        &self,
-        handler: &GraphicalReportHandler,
-        source: String,
-    ) -> Result<String, AnalysisError> {
-        let diag = miette::MietteDiagnostic::new(Self::MESSAGE)
-            .with_code(Self::CODE)
-            .with_severity(Self::SEVERITY)
-            .with_label(self.labeled_problem_span());
-
-        let report = Report::new(diag).with_source_code(NamedSource::new("SQL", source));
-
-        let mut out = String::new();
-        handler.render_report(&mut out, &*report)?;
-        Ok(out)
+impl From<&crate::sem::ColumnName> for diagnostic::ColumnName {
+    fn from(value: &crate::sem::ColumnName) -> Self {
+        Self::new(&value.to_string())
     }
 }
-
-/// Semantic analysis problems
-#[allow(clippy::large_enum_variant)]
-#[derive(Debug, Clone)]
-pub enum AnalysisProblem {
-    /// Invalid index alteration or a statistics warning.
-    Index(IndexProblem),
-    /// An ALTER COLUMN binding or attribute is invalid.
-    AlterColumn(ColumnAttributeProblem),
-    /// Invalid PostgreSQL GREATEST/LEAST common type or comparison capability.
-    MinMax(MinMaxProblem),
-    /// A function invocation has an invalid argument order or repeated name.
-    CallArgument(CallArgumentProblem),
-    /// A creation conflicts with an existing catalog identity.
-    Creation(CreationProblem),
-    /// Invalid rule definition.
-    Rule(RuleProblem),
-    /// ALTER OWNER target or role lookup failed.
-    Ownership(OwnershipProblem),
-    /// Invalid trigger semantics.
-    Trigger(TriggerProblem),
-    /// A view declaration or catalog capability violation.
-    View(ViewProblem),
-    /// A violation of INSERT semantic rules.
-    Insert(InsertProblem),
-    /// A violation of DELETE semantic rules.
-    Delete(DeleteProblem),
-    /// A violation of UPDATE semantic rules.
-    Update(UpdateProblem),
-    /// A structured SELECT clause violation.
-    Query(QueryProblem),
-    /// SQL-derived parameter requirements cannot be reconciled.
-    ParameterConstraint(ParameterConstraintProblem),
-    /// Name resolution problems
-    NameResolution(NameResolution),
-    /// Overload resolution problems
-    OverloadResolution(OverloadResolution),
-
-    /// extension not found
-    ExtensionNotFound(String),
-
-    /// can not to guess nullablity
-    NullabilityUnknown(String),
-
-    /// Argument type mismatch
-    ArgumentTypeMismatch(FullName, usize),
-
-    /// duplicate def elem key
-    DuplicateDefElemKey(DefElemKey),
-
-    /// explicit cast not defined
-    ExplicitCastNotDefined(TypeReference, TypeReference),
-
-    /// Coalesce expr type unknown
-    CoalesceExprTypeUnknown(Vec<SemScalarExpr>),
-
-    /// Expression type not known
-    ExpressionTypeNotKnown(SemScalarExpr),
-
-    /// Operator Not Defined
-    UndefinedOperator(
-        crate::syn::AExprKind,
-        OperatorName,
-        Option<SemScalarExpr>,
-        Option<SemScalarExpr>,
-    ),
-
-    /// Array Required
-    RequireArray(SemScalarExpr, TypeReference),
-
-    /// sub query not have a derived column
-    SubQueryNotHaveColumnForDerivedColumnName(),
-
-    /// incompatible case values
-    IncompatibleCaseValues(HashSet<TypeReference>),
-
-    /// case when expr type unknown
-    CaseWhenExprTypeUnknown(SemScalarExpr),
-
-    /// array type mismatch
-    ArrayIndexTypeMismatch(SemScalarExpr, TypeReference),
-
-    /// member access requires composite type
-    MemberAccessRequiresCompositeType(FullName, String),
-
-    /// function argument implicit cast not found
-    FunctionArgImplicitCastNotFound(FullName, usize, TypeDefinition, SemScalarExpr),
-
-    /// implicit cast not found
-    ImplicitCastNotFound(TypeReference, TypeReference),
-
-    /// no compatible table-function overload
-    ParameterTypeMismatchForTableFunction(FullName, ArgumentBindingCollection),
-}
-
-impl AnalysisProblem {
-    pub(crate) fn index(problem: &IndexProblem) -> Self {
-        Self::Index(problem.clone())
-    }
-    /// Structured index diagnostic independent of rendered text.
-    pub const fn index_problem(&self) -> Option<&IndexProblem> {
-        if let Self::Index(problem) = self {
-            Some(problem)
-        } else {
-            None
-        }
-    }
-    /// Diagnostic severity, independent of rendering and catalog applicability.
-    pub const fn severity(&self) -> ::miette::Severity {
-        match self {
-            Self::AlterColumn(problem) => problem.reason().severity(),
-            Self::Index(problem) => problem.severity(),
-            _ => ::miette::Severity::Error,
-        }
-    }
-
-    pub(crate) fn alter_column(
-        table: &TableName,
-        column: &ColumnName,
-        problem: &AlterColumnProblem,
-    ) -> Self {
-        Self::AlterColumn(ColumnAttributeProblem::new(table, column, problem))
-    }
-    /// Structured ALTER COLUMN validation outcome.
-    pub const fn alter_column_problem(&self) -> Option<&ColumnAttributeProblem> {
-        if let Self::AlterColumn(problem) = self {
-            Some(problem)
-        } else {
-            None
-        }
-    }
-
-    pub(crate) const fn creation(problem: CreationProblem) -> Self {
-        Self::Creation(problem)
-    }
-    /// Structured creation failure, independently of rendered diagnostic text.
-    pub const fn creation_problem(&self) -> Option<&CreationProblem> {
-        if let Self::Creation(problem) = self {
-            Some(problem)
-        } else {
-            None
-        }
-    }
-
-    pub(crate) fn rule(problem: &RuleProblem) -> Self {
-        Self::Rule(problem.clone())
-    }
-    pub(crate) fn ownership_target(target: &crate::sem::OwnershipLookup) -> Self {
-        Self::Ownership(OwnershipProblem::target(target))
-    }
-    pub(crate) fn ownership_role_not_found(name: &str) -> Self {
-        Self::Ownership(OwnershipProblem::missing_role(name))
-    }
-    /// Ownership failure, independent of diagnostic formatting.
-    pub const fn ownership_problem(&self) -> Option<&OwnershipProblem> {
-        if let Self::Ownership(problem) = self {
-            Some(problem)
-        } else {
-            None
-        }
-    }
-
-    pub(crate) fn trigger(problem: &TriggerProblem) -> Self {
-        Self::Trigger(problem.clone())
-    }
-
-    pub(crate) const fn delete(kind: DeleteProblemKind) -> Self {
-        Self::Delete(DeleteProblem::new(kind))
-    }
-    /// Structured DELETE violation, independently of diagnostic wording.
-    pub const fn delete_problem(&self) -> Option<&DeleteProblem> {
-        match self {
-            Self::Delete(problem) => Some(problem),
-            _ => None,
-        }
-    }
-
-    pub(crate) fn view(problem: &ViewProblem) -> Self {
-        Self::View(problem.clone())
-    }
-
-    /// Structured CREATE RULE failure, when this diagnostic describes a rule.
-    pub const fn rule_problem(&self) -> Option<&RuleProblem> {
-        if let Self::Rule(problem) = self {
-            Some(problem)
-        } else {
-            None
-        }
-    }
-    /// Structured view declaration or capability violation.
-    pub const fn view_problem(&self) -> Option<&ViewProblem> {
-        if let Self::View(problem) = self {
-            Some(problem)
-        } else {
-            None
-        }
-    }
-    pub(crate) fn update(kind: UpdateProblemKind, message: &str) -> Self {
-        Self::Update(UpdateProblem::new(kind, message))
-    }
-    /// Structured UPDATE violation.
-    pub const fn update_problem(&self) -> Option<&UpdateProblem> {
-        match self {
-            Self::Update(problem) => Some(problem),
-            _ => None,
-        }
-    }
-    pub(crate) fn insert(kind: InsertProblemKind, message: &str) -> Self {
-        Self::Insert(InsertProblem::new(kind, message))
-    }
-
-    /// Structured INSERT violation, independently of diagnostic wording.
-    pub const fn insert_problem(&self) -> Option<&InsertProblem> {
-        if let Self::Insert(problem) = self {
-            Some(problem)
-        } else {
-            None
-        }
-    }
-
-    /// Report a signature-independent invocation violation.
-    pub const fn call_argument(problem: CallArgumentProblem) -> Self {
-        Self::CallArgument(problem)
-    }
-
-    /// Report a structured SELECT clause violation without inventing a source location.
-    pub const fn query(problem: QueryProblem) -> Self {
-        Self::Query(problem)
-    }
-    /// Structured SELECT violation, independently of its diagnostic rendering.
-    pub const fn query_problem(&self) -> Option<&QueryProblem> {
-        match self {
-            Self::Query(problem) => Some(problem),
-            _ => None,
-        }
-    }
-    /// Report a PostgreSQL GREATEST/LEAST semantic failure.
-    pub(crate) const fn min_max(problem: MinMaxProblem) -> Self {
-        Self::MinMax(problem)
-    }
-    /// Report conflicting or invalid SQL-derived parameter requirements.
-    pub fn parameter_constraint(message: &str) -> Self {
-        Self::ParameterConstraint(ParameterConstraintProblem::new(message))
-    }
-
-    /// Stable diagnostic classification, independent of formatted debug output.
-    #[must_use]
-    pub const fn code(&self) -> &'static str {
-        match self {
-            Self::Index(problem) => problem.code(),
-            Self::AlterColumn(problem) => problem.code(),
-            Self::Creation(_) => "conflicting_creation",
-            Self::Ownership(problem) => problem.code(),
-            Self::Rule(_) => "rule_invalid_definition",
-            Self::Trigger(_) => "trigger_invalid_definition",
-            Self::View(problem) => problem.code(),
-            Self::Insert(problem) => problem.code(),
-            Self::Update(problem) => problem.code(),
-            Self::Delete(problem) => problem.code(),
-            Self::Query(problem) => problem.code(),
-            Self::CallArgument(problem) => problem.code(),
-            Self::MinMax(problem) => problem.code(),
-            Self::ParameterConstraint(problem) => problem.code(),
-            Self::NameResolution(problem) => problem.code(),
-            Self::OverloadResolution(problem) => problem.code(),
-            Self::ExtensionNotFound(..) => "extension_not_found",
-            Self::NullabilityUnknown(..) => "nullability_unknown",
-            Self::ArgumentTypeMismatch(..) => "argument_type_mismatch",
-            Self::DuplicateDefElemKey(..) => "duplicate_def_elem_key",
-            Self::ExplicitCastNotDefined(..) => "explicit_cast_not_defined",
-            Self::CoalesceExprTypeUnknown(..) => "coalesce_expr_type_unknown",
-            Self::ExpressionTypeNotKnown(..) => "expression_type_not_known",
-            Self::UndefinedOperator(..) => "undefined_operator",
-            Self::RequireArray(..) => "require_array",
-            Self::SubQueryNotHaveColumnForDerivedColumnName(..) => {
-                "sub_query_not_have_column_for_derived_column_name"
-            }
-            Self::IncompatibleCaseValues(..) => "incompatible_case_values",
-            Self::CaseWhenExprTypeUnknown(..) => "case_when_expr_type_unknown",
-            Self::ArrayIndexTypeMismatch(..) => "array_index_type_mismatch",
-            Self::MemberAccessRequiresCompositeType(..) => "member_access_requires_composite_type",
-            Self::FunctionArgImplicitCastNotFound(..) => "function_arg_implicit_cast_not_found",
-            Self::ImplicitCastNotFound(..) => "implicit_cast_not_found",
-            Self::ParameterTypeMismatchForTableFunction(..) => {
-                "parameter_type_mismatch_for_table_function"
-            }
-        }
-    }
-
-    /// Retained statement-relative byte range, when recorded during analysis.
-    #[must_use]
-    pub fn statement_relative_span(&self) -> Option<StringSpan> {
-        match self {
-            Self::NameResolution(problem) => problem.statement_relative_span(),
-            Self::CallArgument(problem) => problem.statement_relative_span(),
-            _ => None,
-        }
-    }
-
-    /// covert problem to report
-    pub fn render_report(
-        &self,
-        theme: &HighlighterTheme,
-        source: String,
-    ) -> Result<String, AnalysisError> {
-        let report_handler = GraphicalReportHandler::new()
-            .with_syntax_highlighting(SqlHighlighter::from_theme(theme)?);
-
-        let report = match self {
-            Self::Index(problem) => problem.render_report(&report_handler, source)?,
-            Self::AlterColumn(problem) => problem.render_report(&report_handler, source)?,
-            Self::Creation(problem) => problem.render_report(&report_handler, source)?,
-            Self::Ownership(problem) => problem.render_report(&report_handler, source)?,
-            Self::Rule(problem) => problem.render_report(&report_handler, source)?,
-            Self::Trigger(problem) => problem.render_report(&report_handler, source)?,
-            Self::View(problem) => problem.render_report(&report_handler, source)?,
-            Self::Insert(problem) => problem.render_report(&report_handler, source)?,
-            Self::Update(problem) => problem.render_report(&report_handler, source)?,
-            Self::Delete(problem) => problem.render_report(&report_handler, source)?,
-            Self::Query(problem) => problem.render_report(&report_handler, source)?,
-            Self::CallArgument(problem) => problem.render_report(&report_handler, source)?,
-            Self::NameResolution(nr) => nr.render_report(&report_handler, source)?,
-            Self::MinMax(problem) => problem.render_report(&report_handler, source)?,
-            Self::ParameterConstraint(problem) => problem.render_report(&report_handler, source)?,
-            _ => todo!(),
-        };
-        Ok(report)
-    }
-
-    /// extension not found
-    #[tracing::instrument()]
-    pub fn extension_not_found(name: &str) -> Self {
-        Self::ExtensionNotFound(String::from(name))
-    }
-
-    /// expression nullability not known
-    #[tracing::instrument()]
-    pub fn nullability_unknown(item_name: &str) -> Self {
-        Self::NullabilityUnknown(String::from(item_name))
-    }
-
-    /// function argument type mismatch
-    #[tracing::instrument()]
-    pub fn argument_type_mismatch(func_name: &FullName, index: usize) -> Self {
-        Self::ArgumentTypeMismatch(func_name.clone(), index)
-    }
-
-    /// duplicate name in definition element
-    #[tracing::instrument()]
-    pub fn duplicate_def_elem_key(key: &DefElemKey) -> Self {
-        Self::DuplicateDefElemKey(key.clone())
-    }
-
-    /// doing explicit cast conversion , but not allowed
-    #[tracing::instrument()]
-    pub fn explicit_cast_not_defined(source: &TypeReference, target: &TypeReference) -> Self {
-        Self::ExplicitCastNotDefined(source.clone(), target.clone())
-    }
-
-    /// expression requires array but not
-    #[tracing::instrument()]
-    pub fn array_required(expr: &SemScalarExpr, type_inspected: &TypeReference) -> Self {
-        Self::RequireArray(expr.clone(), type_inspected.clone())
-    }
-
-    /// array index type not integer
-    #[tracing::instrument()]
-    pub fn array_index_type_mismatch(expr: &SemScalarExpr, type_inspected: &TypeReference) -> Self {
-        Self::ArrayIndexTypeMismatch(expr.clone(), type_inspected.clone())
-    }
-
-    /// member accessing to non-composite type
-    #[tracing::instrument()]
-    pub fn member_access_requires_composite_type(type_name: &FullName, member_name: &str) -> Self {
-        Self::MemberAccessRequiresCompositeType(type_name.clone(), member_name.to_string())
-    }
-
-    /// operator not defined
-    #[track_caller]
-    #[tracing::instrument()]
-    pub fn undefined_operator(
-        aexpr_op: crate::syn::AExprKind,
-        name: &OperatorName,
-        left_arg: &Option<SemScalarExpr>,
-        right_arg: &Option<SemScalarExpr>,
-    ) -> Self {
-        Self::UndefinedOperator(aexpr_op, name.clone(), left_arg.clone(), right_arg.clone())
-    }
-
-    /// parameter type can not cast to function argument
-    #[tracing::instrument()]
-    pub fn parameter_type_mismatch_for_table_function(
-        name: &FullName,
-        arg_types: &ArgumentBindingCollection,
-    ) -> Self {
-        Self::ParameterTypeMismatchForTableFunction(name.clone(), arg_types.clone())
-    }
-
-    /// specified function result set type not found
-    #[track_caller]
-    #[tracing::instrument()]
-    pub fn function_result_set_type_not_found(ret_type: &super::FullName) -> Self {
-        todo!("{ret_type:?}")
-    }
-
-    /// coalece argument unreachable
-    #[tracing::instrument()]
-    pub fn unreachable_coalesce_argument(
-        arg_expr: &SemScalarExpr,
-        first_non_null: &SemScalarExpr,
-    ) -> Self {
-        todo!()
-    }
-
-    /// unknown type used in coalesce
-    #[tracing::instrument()]
-    pub fn unknown_type_in_coalesce_expr(arg_expr: &SemScalarExpr) -> Self {
-        todo!()
-    }
-
-    /// colesce expression result type ambiguous
-    #[tracing::instrument()]
-    pub fn coalesce_expr_type_ambiguous(
-        arg_exprs: &Vec<SemScalarExpr>,
-        candidates: &HashSet<TypeReference>,
-        choose: Option<&TypeReference>,
-    ) -> Self {
-        todo!()
-    }
-
-    /// all of coalesce type is not known
-    #[tracing::instrument()]
-    pub fn coalesce_expr_type_unknown(arg_exprs: &[SemScalarExpr]) -> Self {
-        tracing::warn!("{arg_exprs:#?}");
-        Self::CoalesceExprTypeUnknown(arg_exprs.to_vec())
-    }
-
-    /// implicit cast not allowed
-    #[tracing::instrument()]
-    pub fn function_arg_implicit_cast_not_found(
-        func_name: &FullName,
-        index: usize,
-        t: &TypeDefinition,
-        arg: &SemScalarExpr,
-    ) -> Self {
-        Self::FunctionArgImplicitCastNotFound(func_name.clone(), index, t.clone(), arg.clone())
-    }
-
-    /// view used as materialized view, but not a materialized view
-    #[tracing::instrument()]
-    pub fn view_not_matview(view_name: &ViewName) -> Self {
-        todo!()
-    }
-
-    /// operator name syntax is invalid
-    #[tracing::instrument()]
-    pub fn operator_name_syntax(v: &[String]) -> Self {
-        todo!()
-    }
-
-    /// expression type not known
-    #[tracing::instrument()]
-    pub fn expression_type_not_known(expr: &SemScalarExpr) -> Self {
-        Self::ExpressionTypeNotKnown(expr.clone())
-    }
-
-    /// case when type unknown
-    #[tracing::instrument()]
-    pub fn case_when_type_unknown(case_when_expr: SemScalarExpr) -> Self {
-        Self::CaseWhenExprTypeUnknown(case_when_expr)
-    }
-
-    /// implicit cast not found
-    #[tracing::instrument()]
-    pub fn implicit_cast_not_found(ty: &TypeReference, result_type: &TypeReference) -> Self {
-        Self::ImplicitCastNotFound(ty.clone(), result_type.clone())
-    }
-
-    /// incompatible cast values
-    #[tracing::instrument()]
-    pub fn incompatible_case_values(result_types: HashSet<TypeReference>) -> Self {
-        Self::IncompatibleCaseValues(result_types)
-    }
-
-    /// unexpected dynamic type
-    #[tracing::instrument()]
-    pub fn unexpected_dynamic_type(sem_type: &TypeDefinition) -> Self {
-        todo!()
-    }
-
-    /// table not have column
-    #[tracing::instrument()]
-    pub fn table_not_have_column_for_derived_column_name() -> Self {
-        todo!()
-    }
-
-    /// cte not have column
-    #[tracing::instrument()]
-    pub fn cte_not_have_column_for_derived_column_name() -> Self {
-        todo!()
-    }
-
-    /// subquery not have column
-    #[tracing::instrument()]
-    pub fn subquery_not_have_column_for_derived_column_name() -> Self {
-        Self::SubQueryNotHaveColumnForDerivedColumnName()
-    }
-
-    pub(crate) fn foreign_key_column_type_mismatch(
-        _fk_table_name: &TableName,
-        _fk_column_name: &ColumnName,
-        _fk_column_type: &TypeReference,
-        _pk_table_name: &TableName,
-        _pk_column_name: &ColumnName,
-        _pk_column_type: &TypeReference,
-    ) -> Self {
-        todo!()
-    }
-
-    #[cfg(feature = "sqlite")]
-    pub(crate) fn sqlite_ignores_match_option_in_fk_constraint(
-        _table_name: &TableName,
-        _column_name: &ColumnName,
-        _name: &str,
-    ) -> Self {
-        todo!()
+impl From<&crate::sem::TableName> for diagnostic::TableName {
+    fn from(value: &crate::sem::TableName) -> Self {
+        Self::new(&value.to_string())
     }
 }
-
-#[cfg(test)]
-mod test_rpc_diagnostic_metadata {
-    use super::AnalysisProblem;
-    use crate::{
-        StringSpan,
-        sem::{FullName, TableName},
-    };
-
-    #[test]
-    fn preserves_existing_code_and_recorded_byte_range() {
-        let span = StringSpan::new(12, 7);
-        let problem = AnalysisProblem::domain_base_type_not_found(
-            &FullName::with_schema("public", "domain"),
-            "missing",
-            &span,
-        );
-        assert_eq!(problem.code(), "SF000001");
-        assert_eq!(problem.statement_relative_span().unwrap().offset(), 12);
-        assert_eq!(problem.statement_relative_span().unwrap().len(), 7);
+impl From<&crate::sem::TypeReference> for diagnostic::TypeReference {
+    fn from(value: &crate::sem::TypeReference) -> Self {
+        Self::new(&if value.is_dynamic() {
+            "record".to_owned()
+        } else {
+            value.to_string()
+        })
     }
-
-    #[test]
-    fn classifies_unlocated_problems_without_fabricating_a_span() {
-        let problem = AnalysisProblem::table_not_found(&TableName::from(FullName::with_schema(
-            "public", "missing",
-        )));
-        assert_eq!(problem.code(), "table_not_found");
-        assert!(problem.statement_relative_span().is_none());
+}
+impl From<&crate::sem::TypeDefinition> for diagnostic::TypeDefinition {
+    fn from(value: &crate::sem::TypeDefinition) -> Self {
+        Self::new(&format!("{value:?}"))
+    }
+}
+impl From<&crate::sem::SemScalarExpr> for diagnostic::SemScalarExpr {
+    fn from(value: &crate::sem::SemScalarExpr) -> Self {
+        Self::new(&format!("{value:?}"))
+    }
+}
+impl From<crate::sem::SemScalarExpr> for diagnostic::SemScalarExpr {
+    fn from(value: crate::sem::SemScalarExpr) -> Self {
+        Self::from(&value)
+    }
+}
+impl From<&crate::sem::DefElemKey> for diagnostic::DefElemKey {
+    fn from(value: &crate::sem::DefElemKey) -> Self {
+        Self::new(&format!("{value:?}"))
+    }
+}
+impl From<&crate::sem::OperatorName> for diagnostic::OperatorName {
+    fn from(value: &crate::sem::OperatorName) -> Self {
+        Self::new(&format!("{value:?}"))
+    }
+}
+impl From<&crate::sem::type_system::ArgumentBindingCollection>
+    for diagnostic::ArgumentBindingCollection
+{
+    fn from(value: &crate::sem::type_system::ArgumentBindingCollection) -> Self {
+        Self::new(&format!("{value:?}"))
+    }
+}
+impl From<&crate::syn::AExprKind> for diagnostic::AExprKind {
+    fn from(value: &crate::syn::AExprKind) -> Self {
+        Self::new(&format!("{value:?}"))
+    }
+}
+impl From<crate::syn::AExprKind> for diagnostic::AExprKind {
+    fn from(value: crate::syn::AExprKind) -> Self {
+        Self::from(&value)
+    }
+}
+impl From<&crate::sem::data_source::AliasName> for diagnostic::AliasName {
+    fn from(value: &crate::sem::data_source::AliasName) -> Self {
+        Self::new(&value.to_string())
+    }
+}
+impl From<&crate::sem::ViewName> for diagnostic::ViewName {
+    fn from(value: &crate::sem::ViewName) -> Self {
+        Self::new(&value.to_string())
+    }
+}
+impl From<&crate::sem::RuleIdentity> for diagnostic::RuleIdentity {
+    fn from(value: &crate::sem::RuleIdentity) -> Self {
+        Self::new(&format!("{value:?}"))
+    }
+}
+impl From<&crate::sem::TriggerIdentity> for diagnostic::TriggerIdentity {
+    fn from(value: &crate::sem::TriggerIdentity) -> Self {
+        Self::new(&format!("{value:?}"))
+    }
+}
+impl From<&crate::sem::OwnershipIdentity> for diagnostic::OwnershipIdentity {
+    fn from(value: &crate::sem::OwnershipIdentity) -> Self {
+        Self::new(&format!("{value:?}"))
+    }
+}
+impl From<&crate::sem::OwnershipLookup> for diagnostic::OwnershipLookup {
+    fn from(value: &crate::sem::OwnershipLookup) -> Self {
+        Self::new(value.code(), &value.diagnostic_message())
+    }
+}
+impl From<&crate::sem::Kind> for diagnostic::Kind {
+    fn from(value: &crate::sem::Kind) -> Self {
+        Self::new(&value.to_string())
+    }
+}
+impl From<crate::sem::Kind> for diagnostic::Kind {
+    fn from(value: crate::sem::Kind) -> Self {
+        Self::from(&value)
+    }
+}
+impl From<&crate::sem::OperatorDefinition> for diagnostic::OperatorDefinition {
+    fn from(value: &crate::sem::OperatorDefinition) -> Self {
+        Self::new(&format!("{value:?}"))
+    }
+}
+impl From<&crate::syn::TypeName> for diagnostic::TypeName {
+    fn from(value: &crate::syn::TypeName) -> Self {
+        Self::new(&value.full_name().to_string())
+    }
+}
+impl From<&crate::StringSpan> for diagnostic::StringSpan {
+    fn from(value: &crate::StringSpan) -> Self {
+        Self::new(value.offset(), value.len())
+    }
+}
+impl From<&crate::sem::FullName> for diagnostic::DebugName {
+    fn from(value: &crate::sem::FullName) -> Self {
+        Self::new(&format!("{value:?}"))
     }
 }

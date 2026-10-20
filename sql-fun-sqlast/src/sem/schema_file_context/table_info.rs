@@ -75,7 +75,7 @@ impl TableInfoWrite for SchemaFileContext {
             self.report_analysis_problem(AnalysisProblem::creation(
                 crate::sem::problem::CreationProblem::constraint(
                     &key,
-                    &name,
+                    &FullName::from_local_name(&name),
                     &self.creation_span(),
                 ),
             ))?;

@@ -503,6 +503,31 @@ fn record_overloads_preserve_postgres_ambiguity(
     Ok(())
 }
 
+#[test]
+fn declared_composite_array_fields_use_shipped_catalog_types() -> testresult::TestResult {
+    // The shipped catalog and schema-file loader are part of this regression:
+    // SQL integer aliases must retain canonical int4 array identity after DDL.
+    let analyzed = heavy::analyze(
+        "SELECT (NULL::public.array_value).items, ((NULL::public.array_value).items)[1]",
+        &["CREATE TYPE public.array_value AS (items integer[])"],
+    )?;
+    assert!(
+        analyzed.context().problems().is_empty(),
+        "{:?}",
+        analyzed.context().problems()
+    );
+    let query = analyzed.ast().clone().into_select_statemtnt().unwrap();
+    assert_eq!(
+        query.result_columns().get_column_at(0).unwrap().col_type(),
+        &Some(PgBuiltInType::int4().array_type())
+    );
+    assert_eq!(
+        query.result_columns().get_column_at(1).unwrap().col_type(),
+        &Some(PgBuiltInType::int4())
+    );
+    Ok(())
+}
+
 mod test_helpers {
     pub(super) mod heavy {
         use ::sql_fun_sqlast::{

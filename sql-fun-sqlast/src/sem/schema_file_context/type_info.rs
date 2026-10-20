@@ -8,7 +8,7 @@ use crate::TrieMap;
 use super::{SchemaCatalog, SchemaFileContext};
 
 impl TypeInfoRead for SchemaCatalog {
-    fn builtin_type_ordered(&self, name: &FullName) -> bool {
+    fn builtin_type_ordered(&self, name: &FullName) -> Option<bool> {
         self.base.builtin_type_ordered(name)
     }
 
@@ -26,7 +26,7 @@ impl TypeInfoRead for SchemaCatalog {
 }
 
 impl TypeInfoRead for SchemaFileContext {
-    fn builtin_type_ordered(&self, name: &FullName) -> bool {
+    fn builtin_type_ordered(&self, name: &FullName) -> Option<bool> {
         self.catalog.builtin_type_ordered(name)
     }
 

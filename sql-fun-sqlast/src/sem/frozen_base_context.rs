@@ -447,7 +447,7 @@ forward_catalog_reads!(crate::sem::SchemaFileContext, catalog);
 forward_catalog_reads!(crate::ParsedSchemaDump, base_context);
 
 impl crate::sem::TypeInfoRead for FrozenBaseContext {
-    fn builtin_type_ordered(&self, name: &FullName) -> bool {
+    fn builtin_type_ordered(&self, name: &FullName) -> Option<bool> {
         self.catalog().builtin_type_ordered(name)
     }
 
@@ -508,7 +508,7 @@ mod test_type_lookup_cost {
         forward_catalog_reads!(CountingRoot, base);
 
         impl TypeInfoRead for CountingRoot {
-            fn builtin_type_ordered(&self, name: &FullName) -> bool {
+            fn builtin_type_ordered(&self, name: &FullName) -> Option<bool> {
                 self.base.builtin_type_ordered(name)
             }
 

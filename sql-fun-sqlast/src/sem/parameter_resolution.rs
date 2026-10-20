@@ -386,7 +386,15 @@ impl ParameterResolution {
             } else {
                 source.clone()
             };
-            if MinMaxExpr::ordered(context, &target) {
+            let ordering = MinMaxExpr::ordered(context, &target);
+            if ordering.is_none() {
+                context.report_analysis_problem(crate::sem::AnalysisProblem::min_max(
+                    crate::sem::problem::MinMaxProblem::missing_comparison_facts(&target),
+                ))?;
+            }
+            // Unknown comparison support is not evidence against a type candidate.
+            // Retain its type relationship while reporting the missing catalog facts.
+            if ordering != Some(false) {
                 targets.push(target.clone());
                 alternatives.push(SignatureAlternative::new(&[
                     InputTypeConstraint::exact(source),

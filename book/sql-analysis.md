@@ -331,7 +331,7 @@ An explicit SQL cast can specify an operand's type. These expressions are
 separate from aggregate `MIN`/`MAX` and SQLite scalar `min`/`max`.
 
 Mixed-type selection uses PostgreSQL type categories and the preferred-type
-flags in builtin cast metadata. If analysis reports missing type facts,
+flags in builtin cast metadata. If analysis reports missing type or comparison facts,
 refresh the selected builtin catalog using the existing
 [extraction workflow](cli/extract.md).
 

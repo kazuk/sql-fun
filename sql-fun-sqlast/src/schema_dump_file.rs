@@ -75,7 +75,7 @@ impl ParsedSchemaDump {
 }
 
 impl TypeInfoRead for ParsedSchemaDump {
-    fn builtin_type_ordered(&self, name: &FullName) -> bool {
+    fn builtin_type_ordered(&self, name: &FullName) -> Option<bool> {
         self.base_context().builtin_type_ordered(name)
     }
 

@@ -9,6 +9,8 @@ pub enum MinMaxProblem {
     Incompatible(Box<TypeReference>, Box<TypeReference>),
     /// Required type-category metadata is unavailable.
     MissingTypeFacts(TypeReference),
+    /// Comparison metadata is unavailable for the result type.
+    MissingComparisonFacts(TypeReference),
     /// The result type has no PostgreSQL comparison implementation.
     NotOrdered(TypeReference),
 }
@@ -22,6 +24,9 @@ impl MinMaxProblem {
     pub(crate) fn missing_type_facts(ty: &TypeReference) -> Self {
         Self::MissingTypeFacts(ty.clone())
     }
+    pub(crate) fn missing_comparison_facts(ty: &TypeReference) -> Self {
+        Self::MissingComparisonFacts(ty.clone())
+    }
     pub(crate) fn not_ordered(ty: &TypeReference) -> Self {
         Self::NotOrdered(ty.clone())
     }
@@ -30,6 +35,7 @@ impl MinMaxProblem {
             Self::Empty => "min_max_empty",
             Self::Incompatible(..) => "min_max_incompatible_types",
             Self::MissingTypeFacts(_) => "min_max_missing_type_facts",
+            Self::MissingComparisonFacts(_) => "min_max_missing_comparison_facts",
             Self::NotOrdered(_) => "min_max_not_ordered",
         }
     }
@@ -45,6 +51,9 @@ impl MinMaxProblem {
             }
             Self::MissingTypeFacts(ty) => {
                 format!("GREATEST/LEAST requires type-category metadata for {ty}")
+            }
+            Self::MissingComparisonFacts(ty) => {
+                format!("GREATEST/LEAST requires comparison metadata for {ty}")
             }
             Self::NotOrdered(ty) => {
                 format!("GREATEST/LEAST cannot identify a comparison function for {ty}")

@@ -202,6 +202,57 @@ fn statistics_retain_requested_and_effective_values(
     Ok(())
 }
 
+#[rstest::rstest]
+#[case::known("RESET (fillfactor=70)")]
+#[case::unknown("RESET (unknown=70)")]
+#[case::namespace("RESET (xyz.fillfactor=70)")]
+#[case::toast("RESET (toast.fillfactor=70)")]
+#[case::atomic("RESET (fillfactor), RESET (deduplicate_items=on)")]
+fn reset_values_retain_failure_and_leave_existing_settings_unchanged(
+    #[case] command: &str,
+) -> testresult::TestResult {
+    let original = test_helpers::alter(
+        test_helpers::catalog()?,
+        "SET (fillfactor=65, deduplicate_items=off)",
+    )?;
+    let result = test_helpers::alter(original.into_context(), command)?;
+    let statement = result.ast().as_alter_index().expect("retained ALTER INDEX");
+    assert!(!statement.is_applicable());
+    assert_eq!(statement.problems().len(), 1);
+    let problem = &statement.problems()[0];
+    assert_eq!(problem.kind(), IndexProblemKind::reset_value());
+    assert!(!problem.is_warning());
+    assert!(problem.value().is_some());
+    assert_eq!(result.context().problems().len(), 1);
+    assert_eq!(test_helpers::fillfactor(result.context()), Some(65));
+    assert_eq!(
+        test_helpers::deduplicate(test_helpers::index(result.context())),
+        Some(false)
+    );
+    let continued = test_helpers::alter(result.into_context(), "SET (fillfactor=85)")?;
+    assert!(continued.ast().as_alter_index().unwrap().is_applicable());
+    assert_eq!(test_helpers::fillfactor(continued.context()), Some(85));
+    Ok(())
+}
+
+#[rstest::rstest]
+#[case::unknown_namespace("RESET (xyz.fillfactor)")]
+#[case::toast("RESET (toast.fillfactor)")]
+#[case::unknown_name("RESET (xyz.unknown)")]
+fn namespaced_resets_preserve_existing_settings(#[case] command: &str) -> testresult::TestResult {
+    let original = test_helpers::alter(test_helpers::catalog()?, "SET (fillfactor=65)")?;
+    let result = test_helpers::alter(original.into_context(), command)?;
+    let statement = result.ast().as_alter_index().expect("retained ALTER INDEX");
+    assert!(statement.is_applicable());
+    assert!(statement.problems().is_empty());
+    assert!(result.context().problems().is_empty());
+    let change = statement.operations()[0].storage_change().unwrap();
+    assert!(change.is_reset());
+    assert!(change.parameters()[0].namespace().is_some());
+    assert_eq!(test_helpers::fillfactor(result.context()), Some(65));
+    Ok(())
+}
+
 #[test]
 fn reset_and_repeated_changes_preserve_unrelated_settings() -> testresult::TestResult {
     let result = test_helpers::alter(

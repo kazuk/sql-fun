@@ -76,7 +76,7 @@ impl IndexStorageParameter {
     pub fn name(&self) -> &str {
         &self.name
     }
-    /// Requested value; None means a bare SET parameter or a RESET parameter.
+    /// Requested value; None means a bare parameter. RESET rejects supplied values.
     pub fn value(&self) -> Option<&str> {
         self.value.as_deref()
     }
@@ -119,14 +119,18 @@ impl IndexStorageChange {
         let mut problems = Vec::new();
         let mut seen = std::collections::HashSet::new();
         for parameter in &self.parameters {
+            if self.reset && parameter.value().is_some() {
+                problems.push(parameter.problem(index.name(), IndexProblemKind::reset_value()));
+                continue;
+            }
             let namespace = parameter.namespace();
-            if namespace.is_some_and(|namespace| namespace != "toast") {
+            if !self.reset && namespace.is_some_and(|namespace| namespace != "toast") {
                 problems
                     .push(parameter.problem(index.name(), IndexProblemKind::invalid_namespace()));
                 continue;
             }
-            // PostgreSQL accepts the toast namespace here but does not apply it
-            // to an index. Retain it in the operation, without a catalog effect.
+            // SET ignores toast options on indexes; RESET ignores all namespaces.
+            // Retain the parameter in the operation, without a catalog effect.
             if namespace.is_some() {
                 continue;
             }

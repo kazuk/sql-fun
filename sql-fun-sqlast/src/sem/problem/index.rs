@@ -15,6 +15,8 @@ pub enum IndexProblemKind {
     DuplicateParameter,
     /// A storage value has the wrong type or range.
     InvalidValue,
+    /// A RESET parameter supplies a value.
+    ResetValue,
     /// The column ordinal is outside the index layout.
     InvalidColumn,
     /// An ordinary key column cannot have index statistics.
@@ -51,6 +53,10 @@ impl IndexProblemKind {
     pub const fn invalid_value() -> Self {
         Self::InvalidValue
     }
+    /// Classify: RESET parameter supplies a value.
+    pub const fn reset_value() -> Self {
+        Self::ResetValue
+    }
     /// Classify: invalid column.
     pub const fn invalid_column() -> Self {
         Self::InvalidColumn
@@ -82,6 +88,7 @@ impl IndexProblemKind {
             Self::UnknownParameter => "unrecognized index storage parameter",
             Self::DuplicateParameter => "index parameter specified more than once",
             Self::InvalidValue => "invalid index storage parameter value",
+            Self::ResetValue => "RESET must not include values for parameters",
             Self::InvalidColumn => "index column number is out of range",
             Self::NonExpressionColumn => "cannot alter statistics on a non-expression index column",
             Self::IncludedColumn => "cannot alter statistics on an included index column",

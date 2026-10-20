@@ -283,6 +283,19 @@
               "description": "Semantic analysis problems",
               "oneOf": [
                 {
+                  "description": "Invalid ARRAY constructor typing.",
+                  "type": "object",
+                  "properties": {
+                    "Array": {
+                      "$ref": "#/$defs/ArrayProblem"
+                    }
+                  },
+                  "required": [
+                    "Array"
+                  ],
+                  "additionalProperties": false
+                },
+                {
                   "description": "Invalid index alteration or a statistics warning.",
                   "type": "object",
                   "properties": {
@@ -820,6 +833,56 @@
                 }
               ]
             },
+            "ArrayProblem": {
+              "description": "A PostgreSQL ARRAY constructor type-resolution failure.",
+              "oneOf": [
+                {
+                  "description": "An empty constructor has no explicit element type.",
+                  "type": "string",
+                  "const": "Empty"
+                },
+                {
+                  "description": "Operand types cannot be matched or coerced to the target.",
+                  "type": "object",
+                  "properties": {
+                    "Incompatible": {
+                      "type": "array",
+                      "prefixItems": [
+                        {
+                          "$ref": "#/$defs/TypeReference"
+                        },
+                        {
+                          "$ref": "#/$defs/TypeReference"
+                        }
+                      ],
+                      "minItems": 2,
+                      "maxItems": 2
+                    }
+                  },
+                  "required": [
+                    "Incompatible"
+                  ],
+                  "additionalProperties": false
+                },
+                {
+                  "description": "Required type-category metadata is unavailable.",
+                  "type": "object",
+                  "properties": {
+                    "MissingTypeFacts": {
+                      "$ref": "#/$defs/TypeReference"
+                    }
+                  },
+                  "required": [
+                    "MissingTypeFacts"
+                  ],
+                  "additionalProperties": false
+                }
+              ]
+            },
+            "TypeReference": {
+              "description": "Retained diagnostic text for `TypeReference`.",
+              "type": "string"
+            },
             "IndexProblem": {
               "description": "Structured index diagnostic, retained independently of diagnostic delivery.",
               "type": "object",
@@ -1143,10 +1206,6 @@
                   "additionalProperties": false
                 }
               ]
-            },
-            "TypeReference": {
-              "description": "Retained diagnostic text for `TypeReference`.",
-              "type": "string"
             },
             "CallArgumentProblem": {
               "description": "Invocation-shape violations decidable without a function signature.",
@@ -3275,6 +3334,19 @@
               "description": "Semantic analysis problems",
               "oneOf": [
                 {
+                  "description": "Invalid ARRAY constructor typing.",
+                  "type": "object",
+                  "properties": {
+                    "Array": {
+                      "$ref": "#/$defs/ArrayProblem"
+                    }
+                  },
+                  "required": [
+                    "Array"
+                  ],
+                  "additionalProperties": false
+                },
+                {
                   "description": "Invalid index alteration or a statistics warning.",
                   "type": "object",
                   "properties": {
@@ -3812,6 +3884,56 @@
                 }
               ]
             },
+            "ArrayProblem": {
+              "description": "A PostgreSQL ARRAY constructor type-resolution failure.",
+              "oneOf": [
+                {
+                  "description": "An empty constructor has no explicit element type.",
+                  "type": "string",
+                  "const": "Empty"
+                },
+                {
+                  "description": "Operand types cannot be matched or coerced to the target.",
+                  "type": "object",
+                  "properties": {
+                    "Incompatible": {
+                      "type": "array",
+                      "prefixItems": [
+                        {
+                          "$ref": "#/$defs/TypeReference"
+                        },
+                        {
+                          "$ref": "#/$defs/TypeReference"
+                        }
+                      ],
+                      "minItems": 2,
+                      "maxItems": 2
+                    }
+                  },
+                  "required": [
+                    "Incompatible"
+                  ],
+                  "additionalProperties": false
+                },
+                {
+                  "description": "Required type-category metadata is unavailable.",
+                  "type": "object",
+                  "properties": {
+                    "MissingTypeFacts": {
+                      "$ref": "#/$defs/TypeReference"
+                    }
+                  },
+                  "required": [
+                    "MissingTypeFacts"
+                  ],
+                  "additionalProperties": false
+                }
+              ]
+            },
+            "TypeReference": {
+              "description": "Retained diagnostic text for `TypeReference`.",
+              "type": "string"
+            },
             "IndexProblem": {
               "description": "Structured index diagnostic, retained independently of diagnostic delivery.",
               "type": "object",
@@ -4135,10 +4257,6 @@
                   "additionalProperties": false
                 }
               ]
-            },
-            "TypeReference": {
-              "description": "Retained diagnostic text for `TypeReference`.",
-              "type": "string"
             },
             "CallArgumentProblem": {
               "description": "Invocation-shape violations decidable without a function signature.",

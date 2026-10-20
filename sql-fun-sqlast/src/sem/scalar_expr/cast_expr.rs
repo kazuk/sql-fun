@@ -45,6 +45,10 @@ pub struct TypeCastExpr {
 }
 
 impl TypeCastExpr {
+    pub(super) fn array_projection_name(&self) -> Option<&'static str> {
+        self.arg.array_projection_name()
+    }
+
     pub(super) fn grouping_key_operand(&self) -> Option<&SemScalarExpr> {
         if self.resolution.is_resolved() && self.arg.get_type().as_ref() == Some(&self.target_type)
         {

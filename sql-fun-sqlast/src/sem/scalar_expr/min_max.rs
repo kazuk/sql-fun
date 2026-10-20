@@ -114,6 +114,9 @@ impl MinMaxExpr {
         };
         let category =
             category.ok_or_else(|| crate::sem::problem::MinMaxProblem::missing_type_facts(ty))?;
+        if ty.is_dynamic() {
+            return Ok((category.code(), false));
+        }
         let preferred = context.cast_sources(ty, false).into_iter().any(|source| {
             context
                 .get_implicit_cast(&source, ty)
@@ -131,7 +134,7 @@ impl MinMaxExpr {
             return true;
         }
         let source = Self::base_type(context, source);
-        if source == *target || context.get_implicit_cast(&source, target).is_some() {
+        if source == *target || source.implicit_match_context(target, context).is_some() {
             return true;
         }
         if source.is_array() == Some(true) && target.is_array() == Some(true) {
@@ -211,6 +214,22 @@ impl MinMaxExpr {
         context: &impl ParseContext,
         inputs: &[TypeReference],
     ) -> Result<TypeReference, crate::sem::problem::MinMaxProblem> {
+        let target = Self::select_common_type(context, inputs)?;
+        match Self::ordered(context, &target) {
+            Some(true) => {}
+            Some(false) => return Err(crate::sem::problem::MinMaxProblem::not_ordered(&target)),
+            None => {
+                return Err(crate::sem::problem::MinMaxProblem::missing_comparison_facts(&target));
+            }
+        }
+        Ok(target)
+    }
+
+    /// PostgreSQL ordered common-type selection, without comparison requirements.
+    pub(crate) fn select_common_type(
+        context: &impl ParseContext,
+        inputs: &[TypeReference],
+    ) -> Result<TypeReference, crate::sem::problem::MinMaxProblem> {
         let Some(first) = inputs.first() else {
             return Err(crate::sem::problem::MinMaxProblem::empty());
         };
@@ -233,13 +252,6 @@ impl MinMaxExpr {
                 return Err(crate::sem::problem::MinMaxProblem::incompatible(
                     input, &target,
                 ));
-            }
-        }
-        match Self::ordered(context, &target) {
-            Some(true) => {}
-            Some(false) => return Err(crate::sem::problem::MinMaxProblem::not_ordered(&target)),
-            None => {
-                return Err(crate::sem::problem::MinMaxProblem::missing_comparison_facts(&target));
             }
         }
         Ok(target)

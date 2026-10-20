@@ -304,8 +304,8 @@ impl FunctionParam {
         if let Some(source_type) = source_type
             && let Some(target_type) = self.get_type()
         {
-            if let Some(cast) = context.get_implicit_cast(source_type, target_type) {
-                Ok(cast.context().overload_priority_score())
+            if let Some(cast) = source_type.implicit_match_context(target_type, context) {
+                Ok(cast.overload_priority_score())
             } else {
                 TypeError::implicit_cast_not_found(
                     &format!("{source_type:?}"),
@@ -345,8 +345,8 @@ impl FunctionParam {
             #[expect(clippy::manual_flatten)]
             for source_type in source_types {
                 if let Some(st) = source_type {
-                    if let Some(cast) = context.get_implicit_cast(st, target_type) {
-                        scores.push(cast.context().overload_priority_score());
+                    if let Some(cast) = st.implicit_match_context(target_type, context) {
+                        scores.push(cast.overload_priority_score());
                     } else {
                         TypeError::implicit_cast_not_found(
                             &format!("{st}"),

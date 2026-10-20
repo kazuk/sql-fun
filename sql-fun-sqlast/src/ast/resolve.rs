@@ -117,9 +117,7 @@ impl Expr {
             Self::Grouping(arguments) => Self::resolve_grouping(arguments, context, scope),
             Self::Case(case) => case.resolve(context, scope),
             Self::Subquery(query) => query.resolve(context, scope),
-            Self::Array(items) => Ok(SemScalarExpr::array(&Self::resolve_list(
-                items, context, scope,
-            )?)),
+            Self::Array(items) => Self::resolve_array(items, context, scope, None),
             Self::List(items) => Ok(SemScalarExpr::list(&Self::resolve_list(
                 items, context, scope,
             )?)),
@@ -152,6 +150,38 @@ impl Expr {
                 todo!("expression semantic analysis")
             }
         }
+    }
+
+    fn resolve_array(
+        items: &[Self],
+        context: &mut impl ParseContext,
+        scope: &ScalarAnalysisContext<'_>,
+        target: Option<&TypeReference>,
+    ) -> Result<SemScalarExpr, AnalysisError> {
+        let mut values = Vec::with_capacity(items.len());
+        for item in items {
+            values.push(item.resolve_array_target(context, scope, target)?);
+        }
+        crate::sem::ArrayExpr::resolve(context, &values, target)
+    }
+
+    fn resolve_array_target(
+        &self,
+        context: &mut impl ParseContext,
+        scope: &ScalarAnalysisContext<'_>,
+        target: Option<&TypeReference>,
+    ) -> Result<SemScalarExpr, AnalysisError> {
+        crate::sem::with_stack(|| {
+            if let Self::Array(items) = self {
+                Self::resolve_array(items, context, scope, target)
+            } else if let Self::Parenthesized(items) = self
+                && let [item] = items.as_slice()
+            {
+                item.resolve_array_target(context, scope, target)
+            } else {
+                self.resolve_in(context, scope)
+            }
+        })
     }
 
     fn resolve_merge_action(
@@ -420,7 +450,6 @@ impl Cast {
         scope: &ScalarAnalysisContext<'_>,
     ) -> Result<SemScalarExpr, AnalysisError> {
         let target = self.target.reference()?;
-        let argument = self.argument.resolve_in(context, scope)?;
         let mut resolution = crate::sem::QueryNameResolution::affinity(&target.to_string());
         let target = if context.dialect() == Dialect::postgres() {
             if let Some(canonical) = context.canonicalize_type_ref(&target) {
@@ -435,6 +464,16 @@ impl Cast {
             }
         } else {
             target
+        };
+        let expected = crate::sem::MinMaxExpr::base_type(context, &target);
+        let argument = if context.dialect() == Dialect::postgres()
+            && resolution.is_resolved()
+            && expected.is_array() == Some(true)
+        {
+            self.argument
+                .resolve_array_target(context, scope, Some(&expected))?
+        } else {
+            self.argument.resolve_in(context, scope)?
         };
         if context.dialect() == Dialect::postgres()
             && let Some(source) = argument.get_type()

@@ -1,7 +1,7 @@
 //! SQL analysis diagnostic adapters.
 use ::sql_fun_core::analysis_problem as diagnostic;
 pub use ::sql_fun_core::analysis_problem::{
-    AlterColumnProblem, AnalysisProblem, CallArgumentProblem, ColumnAttributeProblem,
+    AlterColumnProblem, AnalysisProblem, ArrayProblem, CallArgumentProblem, ColumnAttributeProblem,
     CreationProblem, DeleteProblem, DeleteProblemKind, DomainBaseTypeNameNotFound,
     FunctionNotFound, IndexProblem, IndexProblemKind, InsertProblem, InsertProblemKind,
     MinMaxProblem, NameResolution, OverloadResolution, OwnershipProblem,

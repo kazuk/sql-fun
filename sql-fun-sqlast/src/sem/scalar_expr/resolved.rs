@@ -31,8 +31,8 @@ impl SemScalarExpr {
     pub(crate) fn literal(value: &ScalarConstExpr) -> Self {
         Self::Const(value.clone())
     }
-    pub(crate) fn array(values: &[Self]) -> Self {
-        Self::Array(ArrayExpr::from_values(values))
+    pub(crate) fn analyzed_array(value: &ArrayExpr) -> Self {
+        Self::Array(value.clone())
     }
     pub(crate) fn list(values: &[Self]) -> Self {
         Self::List(ListExpr(values.to_vec()))

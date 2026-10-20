@@ -17,9 +17,7 @@ impl OverloadRank {
         let (Some(source), Some(target)) = (source, target) else {
             return Some(Self::default());
         };
-        Some(Self::from(
-            catalog.get_implicit_cast(source, target)?.context(),
-        ))
+        Some(Self::from(source.implicit_match_context(target, catalog)?))
     }
 }
 

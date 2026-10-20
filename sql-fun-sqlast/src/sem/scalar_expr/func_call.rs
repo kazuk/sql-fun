@@ -354,12 +354,12 @@ impl FuncCallExpr {
                 && let Some(arg_def_type) = arg_definition.call_argument_type()
                 && let Some(arg_val_type) = arg.get_type()
             {
-                let Some(t) = context.get_type(arg_def_type.full_name()) else {
+                let Some(t) = arg_def_type.definition_from_catalog(context) else {
                     AnalysisError::raise_unexpected_input(&format!(
                         "type {arg_def_type} not found in context"
                     ))?
                 };
-                if let Some(cast) = context.get_implicit_cast(&arg_val_type, &arg_def_type) {
+                if let Some(cast) = arg_val_type.implicit_match_context(&arg_def_type, context) {
                     if !cast.is_no_conversion() {
                         arg = SemScalarExpr::wrap_implicit_cast(&arg_def_type, &arg);
                     }

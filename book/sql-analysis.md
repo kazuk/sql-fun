@@ -335,6 +335,28 @@ flags in builtin cast metadata. If analysis reports missing type or comparison f
 refresh the selected builtin catalog using the existing
 [extraction workflow](cli/extract.md).
 
+## PostgreSQL ARRAY constructors
+
+`ARRAY[...]` retains its ordered elements and selects a common type using
+PostgreSQL's type categories and implicit conversions. For example,
+`ARRAY[1,2.5]` has type `numeric[]`; all-unknown strings or NULLs produce
+`text[]`. The constructed array is non-null even when its elements may be NULL.
+Its implicit output name is `array`; an explicit alias supplies the output name.
+
+An empty constructor requires an explicit array cast, such as
+`ARRAY[]::integer[]`. The cast also supplies the element type to nested
+constructors, including nested empty arrays. Nested arrays have the same SQL
+type identity as a one-dimensional array of the same element type. Analysis
+reports incompatible types and missing type-category facts as diagnostics.
+
+Arrays of anonymous records are supported. PostgreSQL subscripting yields a
+generic `record` without accessible field names; use a named composite element
+type when subsequent SQL needs field references.
+
+Numbered parameters participate in constructor analysis. The result retains
+admissible input and output types and their relationships; explicit casts
+constrain the target type. `ARRAY(SELECT ...)` is tracked separately (#572).
+
 ## Parameter analysis
 
 Numbered parameters (`$1` in PostgreSQL and `?1` in SQLite) can be used across

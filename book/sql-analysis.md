@@ -389,8 +389,26 @@ Missing and ambiguous references produce diagnostics. Successful name binding
 does not imply complete aggregate or window legality checking.
 
 Concrete PostgreSQL function signatures are supported; unresolved polymorphic
-signatures remain unsupported. Type unification of unresolved inputs in CASE,
-COALESCE, and indirection is unimplemented and can terminate analysis.
+signatures remain unsupported. Type unification of unresolved inputs in
+COALESCE and indirection is unimplemented and can terminate analysis.
+
+PostgreSQL parameter-dependent CASE expressions constrain searched WHEN
+conditions to boolean and simple CASE operands through equality overloads.
+Result branches use implicit common-type conversion, considering ELSE before
+THEN branches in source order. Omitted ELSE retains a nullable NULL result.
+Input and result domains can contain several alternatives; inspect them through
+`ParameterConstraints` rather than assuming a single result type. For example,
+`CASE WHEN true THEN $1 ELSE 1 END` accepts integer and bigint inputs with
+corresponding numeric result alternatives.
+
+A known shared common-type inference limitation affects CASE when untyped
+result parameters have no typed result branch to anchor them: inference can
+narrow the result to text too early and reject valid explicitly typed
+assignments.
+This also affects ARRAY and GREATEST/LEAST parameter analysis. Such CASE results
+are not fully supported yet. SQLite CASE analysis does not apply these
+PostgreSQL boolean or implicit-cast constraints; parameter-dependent SQLite
+result typing remains incomplete.
 
 ## DELETE analysis
 

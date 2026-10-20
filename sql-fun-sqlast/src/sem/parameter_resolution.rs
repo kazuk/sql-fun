@@ -1,6 +1,8 @@
 //! Parameter inference over the name-resolved semantic tree.
 
 #[cfg(test)]
+mod case_tests;
+#[cfg(test)]
 mod indirection_tests;
 use crate::ast::Dialect;
 use crate::sem::overload_rank::OverloadRank;
@@ -210,8 +212,32 @@ impl ParameterResolution {
         SemScalarExpr::parameter(position, node, self.graph.domain(node))
     }
 
-    pub(crate) fn unify_case_types(&mut self, _case: &crate::sem::CaseExpr) {
-        todo!("parameter-dependent CASE type unification");
+    pub(crate) fn unify_case_types(
+        &mut self,
+        context: &mut impl crate::sem::ParseContext,
+        results: &[SemScalarExpr],
+    ) -> Result<(usize, InputTypeConstraint), AnalysisError> {
+        self.common_type(context, "CASE", results, false)
+    }
+
+    pub(crate) fn case_condition(
+        &mut self,
+        context: &impl crate::sem::ParseContext,
+        condition: &SemScalarExpr,
+    ) -> usize {
+        let node = self.input(condition);
+        // Bare NULL/string literals have PostgreSQL unknown type and can be
+        // coerced to boolean. Parameters instead retain their source domain.
+        if crate::sem::MinMaxExpr::input_type(condition) != Some(crate::sem::MinMaxExpr::unknown())
+        {
+            self.graph.restrict(
+                node,
+                &InputTypeConstraint::types(
+                    context.cast_sources(&crate::sem::PgBuiltInType::bool(), false),
+                ),
+            );
+        }
+        node
     }
     pub(crate) fn unify_coalesce_types(&mut self, _coalesce: &crate::sem::CoalesceExpr) {
         todo!("parameter-dependent COALESCE type unification");

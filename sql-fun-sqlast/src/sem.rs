@@ -190,7 +190,7 @@ pub use self::{
         SelectDestination, SemanticQuery, SemanticValues,
     },
     scalar_expr::{
-        ArithExpr, ArrayExpr, BooleanExpr, CaseExpr, CoalesceExpr, CollateExpr,
+        ArithExpr, ArrayExpr, BooleanExpr, CaseExpr, CaseWhen, CoalesceExpr, CollateExpr,
         ColumnReferenceExpr, ConstrainedExpr, CteColumnRef, ExistsExpr, FuncCallArgs, FuncCallExpr,
         FunctionBinding, GroupingArgument, GroupingExpr, ImplicitCastExpr, IndirectionExpr,
         MergeRecordColumnRef, MinMaxExpr, NamedArgExpr, NullTestExpr, OutputColumnRef, ParamRef,

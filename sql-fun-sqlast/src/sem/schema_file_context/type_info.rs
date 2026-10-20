@@ -13,7 +13,11 @@ impl TypeInfoRead for SchemaCatalog {
     }
 
     fn get_array_item_type(&self, type_name: &TypeReference) -> Option<TypeReference> {
-        Some(TypeReference::from_full_name(type_name.full_name().clone()))
+        if type_name.is_array() == Some(true) {
+            Some(type_name.element_type())
+        } else {
+            None
+        }
     }
 }
 

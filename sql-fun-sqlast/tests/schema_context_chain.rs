@@ -8,8 +8,8 @@ use self::test_helpers::{
 };
 
 use ::sql_fun_sqlast::sem::{
-    BaseParseContext, ColumnName, FullName, GetSourcePathWithSpanOpt, IndexInfoRead, PgBuiltInType,
-    SearchPathRead, TableName, TypeInfoRead, TypeReference, ViewInfoRead,
+    BaseParseContext, ColumnName, FullName, GetSourcePathWithSpanOpt, IndexInfoRead, ParseContext,
+    PgBuiltInType, SearchPathRead, TableName, TypeInfoRead, TypeReference, ViewInfoRead,
 };
 
 #[rstest::rstest]
@@ -196,34 +196,119 @@ fn inherited_catalog_objects_and_merged_overloads_drive_query_analysis()
     Ok(())
 }
 
-#[test]
-fn array_item_reads_follow_frozen_and_mutable_schema_layers()
--> Result<(), Box<dyn std::error::Error>> {
-    let builtin = builtin_root()?;
-    let first = load_schema(&builtin, EXTENSION_A)?;
-    let second = load_schema(first.base_context(), EXTENSION_B)?;
-    let dump = load_schema(second.base_context(), dependent_dump(2))?;
+#[rstest::rstest]
+#[case::scalar(false, None)]
+#[case::array(true, Some(PgBuiltInType::int4()))]
+fn array_item_reads_agree_across_context_layers(
+    #[case] is_array: bool,
+    #[case] expected: Option<TypeReference>,
+) -> Result<(), Box<dyn std::error::Error>> {
+    let root = test_helpers::builtin_context()?;
+    let reference =
+        TypeReference::concrete_type_ref(&FullName::with_schema("pg_catalog", "int4"), is_array);
+    assert_eq!(root.get_array_item_type(&reference), expected);
+    let builtin = ::sql_fun_sqlast::sem::FrozenBaseContext::from(root);
+    assert_eq!(builtin.get_array_item_type(&reference), expected);
 
+    let dump = load_schema(&builtin, "CREATE TABLE public.items (id integer);")?;
+    assert_eq!(
+        dump.base_context().get_array_item_type(&reference),
+        expected
+    );
+    let builder = test_helpers::schema_builder(dump.base_context())?;
+    assert_eq!(builder.get_array_item_type(&reference), expected);
+    assert_eq!(builder.freeze().get_array_item_type(&reference), expected);
+    Ok(())
+}
+
+#[rstest::rstest]
+#[case::integer("integer[]")]
+#[case::qualified("pg_catalog.int4[]")]
+#[case::bounded("integer[3][4]")]
+fn sql_array_declarations_survive_schema_layers(
+    #[case] declaration: &str,
+) -> Result<(), Box<dyn std::error::Error>> {
+    let root = builtin_root()?;
+    let parsed = load_schema(
+        &root,
+        &format!(
+            "CREATE TABLE public.array_items (values {declaration}, scalar integer); \
+             CREATE VIEW public.array_view AS \
+             SELECT values[1] AS n, values AS items, scalar FROM public.array_items;"
+        ),
+    )?;
+    assert!(parsed.problems().is_empty(), "{:?}", parsed.problems());
     let array =
         TypeReference::concrete_type_ref(&FullName::with_schema("pg_catalog", "int4"), true);
+    let table = parsed
+        .get_table(&TableName::from(FullName::with_schema(
+            "public",
+            "array_items",
+        )))
+        .expect("SQL-declared table");
     assert_eq!(
-        dump.base_context().get_array_item_type(&array),
-        Some(PgBuiltInType::int4())
+        table
+            .get_column_def(&ColumnName::from("values"))
+            .expect("array column")
+            .get_type(),
+        Some(&array)
     );
-    let builder = {
-        let (args, selected) = test_helpers::environment()?;
-        let analysis_base = dump.base_context();
-        ::sql_fun_sqlast::sem::SchemaFileContext::new(
-            std::path::Path::new("array.sql"),
-            analysis_base,
-            &args,
-            &selected,
-        )
-    };
     assert_eq!(
-        builder.get_array_item_type(&array),
-        Some(PgBuiltInType::int4())
+        table
+            .get_column_def(&ColumnName::from("scalar"))
+            .expect("scalar column")
+            .get_type(),
+        Some(&PgBuiltInType::int4())
     );
+    let view = parsed
+        .get_view_impl(&FullName::with_schema("public", "array_view"))
+        .expect("SQL-declared view");
+    assert_query_type(view, "n", &PgBuiltInType::int4());
+    assert_query_type(view, "items", &array);
+    assert_query_type(view, "scalar", &PgBuiltInType::int4());
+
+    let descendant = query(
+        parsed.base_context(),
+        "SELECT values[1] AS n, values AS items, scalar FROM public.array_items",
+    )?;
+    assert_query_type(&descendant, "n", &PgBuiltInType::int4());
+    assert_query_type(&descendant, "items", &array);
+    assert_query_type(&descendant, "scalar", &PgBuiltInType::int4());
+    Ok(())
+}
+
+#[rstest::rstest]
+#[case::cast("CAST(NULL AS integer[])", true)]
+#[case::postgres_cast("NULL::integer[]", true)]
+#[case::qualified("NULL::pg_catalog.int4[]", true)]
+#[case::bounded("CAST(NULL AS integer[3][4])", true)]
+#[case::scalar("CAST(NULL AS integer)", false)]
+fn sql_casts_preserve_array_identity(
+    #[case] expression: &str,
+    #[case] is_array: bool,
+) -> Result<(), Box<dyn std::error::Error>> {
+    let root = builtin_root()?;
+    let resolved = query(&root, &format!("SELECT {expression} AS value"))?;
+    let expected =
+        TypeReference::concrete_type_ref(&FullName::with_schema("pg_catalog", "int4"), is_array);
+    assert_query_type(&resolved, "value", &expected);
+    if is_array {
+        let indexed = query(&root, &format!("SELECT ({expression})[1] AS value"))?;
+        assert_query_type(&indexed, "value", &PgBuiltInType::int4());
+    }
+    Ok(())
+}
+
+#[test]
+fn sql_scalar_subscript_reports_array_required() -> Result<(), Box<dyn std::error::Error>> {
+    let root = builtin_root()?;
+    let parsed = load_schema(
+        &root,
+        "CREATE TABLE public.scalar_items (value integer); \
+         CREATE VIEW public.invalid_array_view AS SELECT value[1] FROM public.scalar_items;",
+    )?;
+    assert_eq!(parsed.problems().len(), 1, "{:?}", parsed.problems());
+    assert_eq!(parsed.problems()[0].code(), "require_array");
     Ok(())
 }
 
@@ -797,11 +882,27 @@ mod test_helpers {
         Ok((args, selected))
     }
 
-    pub(super) fn builtin_root() -> Result<FrozenBaseContext, Box<dyn std::error::Error>> {
+    pub(super) fn builtin_context() -> Result<BaseContext, Box<dyn std::error::Error>> {
         // Real type/function/operator/cast metadata is sufficient for small fixtures;
         // only catalog and full-extension tests need the entire builtin schema SQL.
         let (args, selected) = environment()?;
-        Ok(FrozenBaseContext::from(BaseContext::new(&args, &selected)?))
+        Ok(BaseContext::new(&args, &selected)?)
+    }
+
+    pub(super) fn builtin_root() -> Result<FrozenBaseContext, Box<dyn std::error::Error>> {
+        Ok(FrozenBaseContext::from(builtin_context()?))
+    }
+
+    pub(super) fn schema_builder(
+        base: &FrozenBaseContext,
+    ) -> Result<SchemaFileContext, Box<dyn std::error::Error>> {
+        let (args, selected) = environment()?;
+        Ok(SchemaFileContext::new(
+            std::path::Path::new("array.sql"),
+            base,
+            &args,
+            &selected,
+        ))
     }
 
     pub(super) fn chain_prefix() -> Result<FrozenBaseContext, Box<dyn std::error::Error>> {

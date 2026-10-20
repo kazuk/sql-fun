@@ -85,6 +85,10 @@ impl ParsedSchemaDump {
 }
 
 impl TypeInfoRead for ParsedSchemaDump {
+    fn type_references(&self) -> Vec<TypeReference> {
+        self.base_context().type_references()
+    }
+
     fn builtin_type_ordered(&self, name: &FullName) -> Option<bool> {
         self.base_context().builtin_type_ordered(name)
     }

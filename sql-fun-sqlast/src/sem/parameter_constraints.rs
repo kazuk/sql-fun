@@ -1,6 +1,10 @@
 //! SQL-derived parameter domains and correlated overload alternatives.
 
+mod common_type;
 mod structural;
+
+use self::common_type::{CommonTypeConstraint, CommonTypeFacts};
+use std::sync::Arc;
 
 pub(crate) use self::structural::TypeProjection;
 
@@ -269,6 +273,9 @@ pub(crate) struct ConstraintGraph {
     equalities: Vec<(usize, usize)>,
     structural: Vec<StructuralConstraint>,
     requirements: Vec<String>,
+    common_types: Vec<CommonTypeConstraint>,
+    common_problems: Vec<crate::sem::problem::MinMaxProblem>,
+    common_facts: Option<Arc<CommonTypeFacts>>,
 }
 
 impl ConstraintGraph {
@@ -337,12 +344,40 @@ impl ConstraintGraph {
             .push(OverloadConstraint::new(nodes, alternatives, context));
     }
 
+    pub(crate) fn common_type(
+        &mut self,
+        context: &impl crate::sem::ParseContext,
+        inputs: &[usize],
+        comparison: bool,
+        operation: &str,
+    ) -> usize {
+        if self.common_facts.is_none() {
+            self.common_facts = Some(Arc::new(CommonTypeFacts::prepare(context)));
+        }
+        let result = self.node(&InputTypeConstraint::any());
+        self.common_types.push(CommonTypeConstraint::new(
+            inputs, result, comparison, operation,
+        ));
+        result
+    }
+
     pub(crate) fn project(&mut self, source: usize, result: usize, projection: TypeProjection) {
         self.structural
             .push(StructuralConstraint::new(source, result, projection));
     }
 
     pub(crate) fn prepare_projections(&mut self, context: &impl crate::sem::ParseContext) {
+        if let Some(facts) = &mut self.common_facts {
+            let facts = Arc::make_mut(facts);
+            for ty in self
+                .domains
+                .iter()
+                .filter_map(InputTypeConstraint::admissible_types)
+                .flatten()
+            {
+                facts.retain(context, ty);
+            }
+        }
         let mut types: Vec<_> = self
             .domains
             .iter()
@@ -370,8 +405,12 @@ impl ConstraintGraph {
     ) -> Result<(), crate::sem::AnalysisError> {
         // Inspect each relationship before it can discard an invalid source.
         // A clone preserves the original graph for solving and conflict reporting.
-        self.clone()
+        let mut diagnostic_graph = self.clone();
+        diagnostic_graph
             .propagate_with(|relation, domains| relation.report_problem(domains, context))?;
+        for problem in diagnostic_graph.common_problems {
+            context.report_analysis_problem(crate::sem::AnalysisProblem::min_max(problem))?;
+        }
         Ok(())
     }
 
@@ -389,6 +428,17 @@ impl ConstraintGraph {
                 return Ok(false);
             }
             let mut changed = false;
+            if let Some(facts) = self.common_facts.clone() {
+                let mut deferred = Vec::new();
+                for relation in std::mem::take(&mut self.common_types) {
+                    if relation.instantiate(self, &facts) {
+                        changed = true;
+                    } else {
+                        deferred.push(relation);
+                    }
+                }
+                self.common_types = deferred;
+            }
             for (left, right) in &self.equalities {
                 let domain = self.domains[*left].clone();
                 changed |= self.domains[*right].intersect(&domain);

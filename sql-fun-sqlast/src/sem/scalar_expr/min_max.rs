@@ -95,7 +95,7 @@ impl MinMaxExpr {
         base
     }
 
-    fn category(
+    pub(crate) fn category(
         context: &impl ParseContext,
         ty: &TypeReference,
     ) -> Result<(char, bool), crate::sem::problem::MinMaxProblem> {
@@ -156,16 +156,30 @@ impl MinMaxExpr {
         if *input == Self::unknown() {
             return Ok(candidate.clone());
         }
-        let (category, preferred) = Self::category(context, candidate)?;
-        if category != Self::category(context, input)?.0 {
+        Self::select_candidate(
+            candidate,
+            input,
+            Self::category(context, candidate)?,
+            Self::category(context, input)?,
+            Self::can_coerce(context, candidate, input),
+            Self::can_coerce(context, input, candidate),
+        )
+    }
+
+    pub(crate) fn select_candidate(
+        candidate: &TypeReference,
+        input: &TypeReference,
+        (category, preferred): (char, bool),
+        (input_category, _): (char, bool),
+        forward: bool,
+        backward: bool,
+    ) -> Result<TypeReference, crate::sem::problem::MinMaxProblem> {
+        if category != input_category {
             return Err(crate::sem::problem::MinMaxProblem::incompatible(
                 candidate, input,
             ));
         }
-        if !preferred
-            && Self::can_coerce(context, candidate, input)
-            && !Self::can_coerce(context, input, candidate)
-        {
+        if !preferred && forward && !backward {
             return Ok(input.clone());
         }
         Ok(candidate.clone())

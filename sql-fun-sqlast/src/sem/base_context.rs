@@ -149,6 +149,17 @@ impl BaseContext {
 mod test_metadata;
 
 impl TypeInfoRead for BaseContext {
+    fn type_references(&self) -> Vec<TypeReference> {
+        self.types
+            .iter()
+            .filter_map(|(_, definition)| {
+                definition
+                    .full_name()
+                    .map(|name| TypeReference::concrete_type_ref(name, false))
+            })
+            .collect()
+    }
+
     fn builtin_type_ordered(&self, name: &FullName) -> Option<bool> {
         if crate::ast::Dialect::from(&self.metadata) != crate::ast::Dialect::postgres() {
             return None;

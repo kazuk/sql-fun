@@ -286,6 +286,51 @@ fn an_outer_cast_receives_the_case_result_domain() -> testresult::TestResult {
     Ok(())
 }
 
+#[rstest::rstest]
+#[case::null("CASE WHEN true THEN $1 ELSE NULL END")]
+#[case::omitted_else("CASE WHEN true THEN $1 END")]
+#[case::string("CASE WHEN true THEN $1 ELSE '1' END")]
+#[case::two_parameters("CASE WHEN true THEN $1 ELSE $2 END")]
+#[case::nested("CASE WHEN true THEN CASE WHEN false THEN $1 END ELSE $2 END")]
+fn unanchored_result_parameters_preserve_assignments(
+    #[case] expression: &str,
+) -> testresult::TestResult {
+    // Real catalog casts distinguish numeric and string assignment families.
+    let analyzed = heavy::analyze(&format!("SELECT {expression}"), &[])?;
+    assert!(
+        analyzed.context().problems().is_empty(),
+        "{:?}",
+        analyzed.context().problems()
+    );
+    let constraints = analyzed.context().parameter_constraints();
+    assert!(constraints.result_column(0).unwrap().is_any());
+    let mut assignments = BTreeMap::from([(1, PgBuiltInType::int4())]);
+    if expression.contains("$2") {
+        assignments.insert(2, PgBuiltInType::int8());
+    }
+    assert!(constraints.allows(&assignments));
+    if expression.contains("$2") {
+        assignments.insert(2, PgBuiltInType::text());
+        assert!(!constraints.allows(&assignments));
+    }
+    assert!(constraints.allows(&BTreeMap::from([(
+        1,
+        TypeReference::from_master_type_name("json")
+    )])));
+    let query = analyzed.ast().clone().into_select_statemtnt().unwrap();
+    assert!(
+        query
+            .result_columns()
+            .get_column_at(0)
+            .unwrap()
+            .expression()
+            .unwrap()
+            .as_case()
+            .is_some()
+    );
+    Ok(())
+}
+
 mod test_helpers {
     pub(super) mod heavy {
         use ::sql_fun_sqlast::{

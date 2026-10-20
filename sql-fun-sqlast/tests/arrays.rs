@@ -156,12 +156,45 @@ fn parameters_retain_correlated_numeric_sources(#[case] sql: &str) -> testresult
 }
 
 #[rstest::rstest]
-#[case::only("ARRAY[$1]", "_text")]
-#[case::null("ARRAY[$1,NULL]", "_text")]
-#[case::explicit("ARRAY[$1]::int[]", "_int4")]
-fn parameters_default_or_use_explicit_target(
+#[case::array("ARRAY[$1,NULL]")]
+#[case::greatest("GREATEST($1,NULL)")]
+#[case::least("LEAST($1,NULL)")]
+#[case::case("CASE WHEN true THEN $1 ELSE NULL END")]
+fn unanchored_parameters_accept_typed_assignments(
     #[case] expression: &str,
-    #[case] ty: &str,
+    #[values(false, true)] reverse: bool,
+) -> testresult::TestResult {
+    // Real builtin casts and comparison facts determine the admissible sources.
+    let sql = if reverse {
+        format!("SELECT $1::integer, {expression}")
+    } else {
+        format!("SELECT {expression}, $1::integer")
+    };
+    let analyzed = heavy::analyze(&sql, &[])?;
+    assert!(
+        analyzed.context().problems().is_empty(),
+        "{:?}",
+        analyzed.context().problems()
+    );
+    let constraints = analyzed.context().parameter_constraints();
+    assert!(constraints.allows(&BTreeMap::from([(1, PgBuiltInType::int4())])));
+    let result = constraints.result_column(usize::from(reverse)).unwrap();
+    let expected = if expression.starts_with("ARRAY") {
+        PgBuiltInType::int4().array_type()
+    } else {
+        PgBuiltInType::int4()
+    };
+    assert!(result.allows(&expected), "{result:?}");
+    Ok(())
+}
+
+#[rstest::rstest]
+#[case::only("ARRAY[$1]", None)]
+#[case::null("ARRAY[$1,NULL]", None)]
+#[case::explicit("ARRAY[$1]::int[]", Some("_int4"))]
+fn parameters_retain_uncertainty_or_use_explicit_target(
+    #[case] expression: &str,
+    #[case] ty: Option<&str>,
 ) -> testresult::TestResult {
     let analyzed = heavy::analyze(&format!("SELECT {expression} AS result"), &[])?;
     assert!(
@@ -172,7 +205,7 @@ fn parameters_default_or_use_explicit_target(
     let query = analyzed.ast().clone().into_select_statemtnt().unwrap();
     assert_eq!(
         query.result_columns().get_column_at(0).unwrap().col_type(),
-        &Some(TypeReference::from_master_type_name(ty))
+        &ty.map(TypeReference::from_master_type_name)
     );
     Ok(())
 }
@@ -531,6 +564,121 @@ fn declared_composite_array_fields_use_shipped_catalog_types() -> testresult::Te
         query.result_columns().get_column_at(1).unwrap().col_type(),
         &Some(PgBuiltInType::int4())
     );
+    Ok(())
+}
+
+#[rstest::rstest]
+#[case::single("ARRAY[$1]")]
+#[case::null("ARRAY[$1,NULL]")]
+#[case::string("ARRAY[$1,'1']")]
+#[case::repeated("ARRAY[$1,$1]")]
+#[case::nested("ARRAY[ARRAY[$1],ARRAY[$1,NULL]]")]
+#[case::subquery("ARRAY[(SELECT $1)]")]
+fn unanchored_arrays_keep_owned_constraints(#[case] expression: &str) -> testresult::TestResult {
+    // The builtin catalog supplies scalar and array conversion families. The
+    // cloned constraint graph must remain inspectable after its context is gone.
+    let constraints = {
+        let analyzed = heavy::analyze(&format!("SELECT {expression}"), &[])?;
+        assert!(
+            analyzed.context().problems().is_empty(),
+            "{:?}",
+            analyzed.context().problems()
+        );
+        analyzed.context().parameter_constraints().clone()
+    };
+    assert!(constraints.result_column(0).unwrap().is_any());
+    for ty in [
+        PgBuiltInType::int4(),
+        PgBuiltInType::int8(),
+        PgBuiltInType::text(),
+    ] {
+        assert!(constraints.allows(&BTreeMap::from([(1, ty)])));
+    }
+    Ok(())
+}
+
+#[rstest::rstest]
+#[case::direct("SELECT ARRAY[$1,$2]")]
+#[case::nested("SELECT ARRAY[ARRAY[$1],ARRAY[$2]]")]
+#[case::cte("WITH c AS (SELECT ARRAY[$1,$2] AS n) SELECT n FROM c")]
+fn unanchored_array_inputs_remain_jointly_constrained(#[case] sql: &str) -> testresult::TestResult {
+    let analyzed = heavy::analyze(sql, &[])?;
+    assert!(
+        analyzed.context().problems().is_empty(),
+        "{:?}",
+        analyzed.context().problems()
+    );
+    let constraints = analyzed.context().parameter_constraints();
+    assert!(constraints.allows(&BTreeMap::from([
+        (1, PgBuiltInType::int4()),
+        (2, PgBuiltInType::int8())
+    ])));
+    assert!(constraints.allows(&BTreeMap::from([(1, PgBuiltInType::int4())])));
+    assert!(!constraints.allows(&BTreeMap::from([
+        (1, PgBuiltInType::int4()),
+        (2, PgBuiltInType::text())
+    ])));
+    assert!(constraints.allows(&BTreeMap::from([
+        (1, TypeReference::from_master_type_name("json")),
+        (2, TypeReference::from_master_type_name("json"))
+    ])));
+    Ok(())
+}
+
+#[rstest::rstest]
+#[case::predicate("SELECT ARRAY[$1,NULL] WHERE $1", "_bool")]
+#[case::cte(
+    "WITH c AS (SELECT ARRAY[$1,NULL] AS n) SELECT n FROM c WHERE $1",
+    "_bool"
+)]
+#[case::subscript("SELECT (ARRAY[$1])[1] + 1", "int4")]
+fn late_constraints_reach_array_results(
+    #[case] sql: &str,
+    #[case] ty: &str,
+) -> testresult::TestResult {
+    let analyzed = heavy::analyze(sql, &[])?;
+    assert!(
+        analyzed.context().problems().is_empty(),
+        "{:?}",
+        analyzed.context().problems()
+    );
+    assert!(
+        analyzed
+            .context()
+            .parameter_constraints()
+            .result_column(0)
+            .unwrap()
+            .allows(&TypeReference::from_master_type_name(ty))
+    );
+    Ok(())
+}
+
+#[test]
+fn deferred_arrays_accept_catalog_defined_types() -> testresult::TestResult {
+    // Enum/domain declarations and their catalog cast rules are part of this contract.
+    let analyzed = heavy::analyze(
+        "SELECT ARRAY[$1,$2]",
+        &[
+            "CREATE TYPE mood AS ENUM ('low','high')",
+            "CREATE TYPE other_mood AS ENUM ('low','high')",
+            "CREATE DOMAIN amount AS integer",
+        ],
+    )?;
+    let constraints = analyzed.context().parameter_constraints().clone();
+    drop(analyzed);
+    let mood = TypeReference::from_full_name(::sql_fun_sqlast::sem::FullName::with_schema(
+        "public", "mood",
+    ));
+    let other = TypeReference::from_full_name(::sql_fun_sqlast::sem::FullName::with_schema(
+        "public",
+        "other_mood",
+    ));
+    let amount = TypeReference::from_full_name(::sql_fun_sqlast::sem::FullName::with_schema(
+        "public", "amount",
+    ));
+    assert!(constraints.allows(&BTreeMap::from([(1, mood.clone()), (2, mood.clone())])));
+    assert!(!constraints.allows(&BTreeMap::from([(1, mood), (2, other)])));
+    assert!(constraints.allows(&BTreeMap::from([(1, amount), (2, PgBuiltInType::int4())])));
     Ok(())
 }
 

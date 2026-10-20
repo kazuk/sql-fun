@@ -171,8 +171,8 @@ fn parameter_sources_allow_numeric_promotion(
 }
 
 #[test]
-fn all_unknown_parameters_resolve_to_text_and_keep_minmax() -> Result<(), Box<dyn std::error::Error>>
-{
+fn unanchored_parameters_retain_alternatives_and_keep_minmax()
+-> Result<(), Box<dyn std::error::Error>> {
     let analyzed = heavy::analyze("select greatest($1,$2) as result", &[])?;
     assert!(
         analyzed.context().problems().is_empty(),
@@ -187,12 +187,22 @@ fn all_unknown_parameters_resolve_to_text_and_keep_minmax() -> Result<(), Box<dy
         .expression()
         .unwrap();
     let minmax = expression.as_min_max().unwrap();
-    assert_eq!(
-        minmax.types().admissible_types(),
-        Some([PgBuiltInType::text()].as_slice())
-    );
+    assert!(minmax.types().is_any());
+    let constraints = analyzed.context().parameter_constraints();
+    assert!(constraints.allows(&BTreeMap::from([
+        (1, PgBuiltInType::int4()),
+        (2, PgBuiltInType::int8())
+    ])));
+    assert!(!constraints.allows(&BTreeMap::from([
+        (1, PgBuiltInType::int4()),
+        (2, PgBuiltInType::text())
+    ])));
+    assert!(!constraints.allows(&BTreeMap::from([(
+        1,
+        TypeReference::from_master_type_name("json")
+    )])));
     assert_eq!(minmax.arguments().len(), 2);
-    assert_eq!(expression.get_type(), Some(PgBuiltInType::text()));
+    assert_eq!(expression.get_type(), None);
     Ok(())
 }
 

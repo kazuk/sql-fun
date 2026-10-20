@@ -256,6 +256,10 @@ impl TableInfoWrite for TestParseContext {
 }
 
 impl TypeInfoRead for TestParseContext {
+    fn builtin_type_ordered(&self, _name: &FullName) -> bool {
+        todo!("TestParseContext does not provide a builtin comparison catalog")
+    }
+
     fn get_type_impl(&self, key: &FullName) -> Option<&TypeDefinition> {
         self.type_definitions.get(key)
     }

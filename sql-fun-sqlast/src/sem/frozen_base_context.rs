@@ -508,6 +508,10 @@ mod test_type_lookup_cost {
         forward_catalog_reads!(CountingRoot, base);
 
         impl TypeInfoRead for CountingRoot {
+            fn builtin_type_ordered(&self, name: &FullName) -> bool {
+                self.base.builtin_type_ordered(name)
+            }
+
             fn get_type_impl(&self, name: &FullName) -> Option<&TypeDefinition> {
                 assert_eq!(
                     self.probes.fetch_add(1, Ordering::Relaxed),

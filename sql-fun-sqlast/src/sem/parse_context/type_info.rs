@@ -10,9 +10,9 @@ pub trait TypeInfoRead {
 
     /// Whether a builtin has a default B-tree comparison implementation,
     /// including PostgreSQL binary-compatible operator-class input types.
-    fn builtin_type_ordered(&self, _name: &FullName) -> bool {
-        false
-    }
+    /// Implementations must consult their catalog or forward to its provider;
+    /// unavailable comparison metadata must not be reported as `false`.
+    fn builtin_type_ordered(&self, name: &FullName) -> bool;
 
     /// get item type for array type
     fn get_array_item_type(&self, type_name: &TypeReference) -> Option<TypeReference>;

@@ -138,6 +138,10 @@ impl ParameterConstraint {
 }
 
 /// Statement-wide input constraints, including relationships between overloads.
+///
+/// These are admissible assignments for explicitly typed inputs, not the single
+/// parameter signature selected by PostgreSQL's untyped `PREPARE`. Analysis does
+/// not select a final wire-protocol parameter binding from this domain.
 #[derive(Clone, Debug, Default)]
 pub struct ParameterConstraints {
     parameters: Vec<ParameterConstraint>,

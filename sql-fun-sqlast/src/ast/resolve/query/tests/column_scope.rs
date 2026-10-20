@@ -36,6 +36,26 @@ fn unresolved_local_relation_blocks_outer_binding(#[case] sql: &str) {
 }
 
 #[rstest::rstest]
+#[case::missing("SELECT (SELECT id FROM missing()) FROM outer_items")]
+#[case::competing_known("SELECT (SELECT id FROM known_items, missing()) FROM outer_items")]
+#[case::unknown_first("SELECT (SELECT id FROM missing(), known_items) FROM outer_items")]
+#[case::join("SELECT (SELECT id FROM known_items CROSS JOIN missing()) FROM outer_items")]
+#[case::nested("SELECT (SELECT (SELECT id) FROM missing()) FROM outer_items")]
+fn unresolved_table_function_blocks_outer_binding(#[case] sql: &str) {
+    let (mut query, context) = column_scope_query(sql, Dialect::postgres());
+    let mut bindings = Bindings::default();
+    query.walk(&mut bindings).unwrap();
+    assert!(bindings.tables.is_empty(), "{bindings:?}");
+    assert_eq!(bindings.unresolved, 1, "{bindings:?}");
+    assert!(
+        context
+            .reported_problems()
+            .iter()
+            .any(|problem| problem.code() == "table_function_not_found")
+    );
+}
+
+#[rstest::rstest]
 #[case::resolved_absence("SELECT (SELECT id FROM local_items) FROM outer_items", "outer_items")]
 #[case::empty_from("SELECT (SELECT id) FROM outer_items", "outer_items")]
 #[case::nested_absence(

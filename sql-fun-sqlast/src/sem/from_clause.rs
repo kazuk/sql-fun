@@ -203,6 +203,7 @@ mod test_find_alias_for_column {
     )]
     #[case::absent("(SELECT 1 AS other) a", LookupResult::not_found())]
     #[case::unknown("missing.items a", LookupResult::unknown())]
+    #[case::unknown_function("missing() a", LookupResult::unknown())]
     #[case::competing("(SELECT 1 AS id) a, missing.items b", LookupResult::unknown())]
     #[case::reversed("missing.items b, (SELECT 1 AS id) a", LookupResult::unknown())]
     fn preserves_lookup_conclusiveness(
@@ -220,6 +221,7 @@ mod test_find_alias_for_column {
     #[case::known("(SELECT 1 AS id) a")]
     #[case::absent("(SELECT 1 AS other) a")]
     #[case::unknown("missing.items a")]
+    #[case::unknown_function("missing() a")]
     fn source_candidate_api_preserves_lookup_conclusiveness(
         #[case] from_sql: &str,
     ) -> testresult::TestResult {

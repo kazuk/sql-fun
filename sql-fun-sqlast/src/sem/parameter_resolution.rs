@@ -380,6 +380,7 @@ impl ParameterResolution {
         }
         let mut alternatives = Vec::new();
         let mut targets = Vec::new();
+        let mut unordered = None;
         for source in candidate_types.admissible_types().unwrap_or(&[]) {
             let target = if *source == MinMaxExpr::unknown() {
                 crate::sem::PgBuiltInType::text()
@@ -394,13 +395,22 @@ impl ParameterResolution {
             }
             // Unknown comparison support is not evidence against a type candidate.
             // Retain its type relationship while reporting the missing catalog facts.
-            if ordering != Some(false) {
+            if ordering == Some(false) {
+                unordered.get_or_insert(target);
+            } else {
                 targets.push(target.clone());
                 alternatives.push(SignatureAlternative::new(&[
                     InputTypeConstraint::exact(source),
                     InputTypeConstraint::exact(&target),
                 ]));
             }
+        }
+        if targets.is_empty()
+            && let Some(target) = unordered
+        {
+            context.report_analysis_problem(crate::sem::AnalysisProblem::min_max(
+                crate::sem::problem::MinMaxProblem::not_ordered(&target),
+            ))?;
         }
         let domain = InputTypeConstraint::types(targets);
         let result = self.graph.node(&domain);

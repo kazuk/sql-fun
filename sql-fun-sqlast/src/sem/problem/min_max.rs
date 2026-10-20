@@ -39,6 +39,14 @@ impl MinMaxProblem {
             Self::NotOrdered(_) => "min_max_not_ordered",
         }
     }
+    fn type_label(ty: &TypeReference) -> String {
+        if ty.is_dynamic() {
+            "record".to_owned()
+        } else {
+            ty.to_string()
+        }
+    }
+
     pub(super) fn render_report(
         &self,
         handler: &::miette::GraphicalReportHandler,
@@ -47,16 +55,29 @@ impl MinMaxProblem {
         let message = match self {
             Self::Empty => "GREATEST/LEAST requires at least one argument".to_owned(),
             Self::Incompatible(left, right) => {
-                format!("GREATEST/LEAST cannot match {left} and {right}")
+                format!(
+                    "GREATEST/LEAST cannot match {} and {}",
+                    Self::type_label(left),
+                    Self::type_label(right)
+                )
             }
             Self::MissingTypeFacts(ty) => {
-                format!("GREATEST/LEAST requires type-category metadata for {ty}")
+                format!(
+                    "GREATEST/LEAST requires type-category metadata for {}",
+                    Self::type_label(ty)
+                )
             }
             Self::MissingComparisonFacts(ty) => {
-                format!("GREATEST/LEAST requires comparison metadata for {ty}")
+                format!(
+                    "GREATEST/LEAST requires comparison metadata for {}",
+                    Self::type_label(ty)
+                )
             }
             Self::NotOrdered(ty) => {
-                format!("GREATEST/LEAST cannot identify a comparison function for {ty}")
+                format!(
+                    "GREATEST/LEAST cannot identify a comparison function for {}",
+                    Self::type_label(ty)
+                )
             }
         };
         let diagnostic = ::miette::MietteDiagnostic::new(message)

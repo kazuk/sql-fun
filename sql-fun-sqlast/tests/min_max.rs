@@ -1,5 +1,6 @@
 //! PostgreSQL common-type semantics through the maintained public analysis API.
 use self::test_helpers::heavy;
+use ::sql_fun_core::HighlighterTheme;
 use ::sql_fun_sqlast::sem::{ParseContext, PgBuiltInType, TypeInfoRead, TypeReference};
 use std::collections::BTreeMap;
 
@@ -59,6 +60,11 @@ fn result_metadata_matches_postgres(
 #[case::typed_string("least('2'::text,1)", "min_max_incompatible_types")]
 #[case::preferred_category(r#"least('a'::text,'b'::"char")"#, "min_max_incompatible_types")]
 #[case::json("greatest('{}'::json,'{}'::json)", "min_max_not_ordered")]
+#[case::parameter_json("greatest($1,'{}'::json)", "min_max_not_ordered")]
+#[case::parameter_json_reverse("least('{}'::json,$1)", "min_max_not_ordered")]
+#[case::parameter_json_array("least($1,'{}'::json[])", "min_max_not_ordered")]
+#[case::dynamic_left("greatest(pg_control_system(),1)", "min_max_incompatible_types")]
+#[case::dynamic_right("least(1,pg_control_system())", "min_max_incompatible_types")]
 #[case::json_array("least('{}'::json[],'{}'::json[])", "min_max_not_ordered")]
 fn invalid_operands_report_semantic_problems(
     #[case] expression: &str,
@@ -74,6 +80,15 @@ fn invalid_operands_report_semantic_problems(
         "{:?}",
         analyzed.context().problems()
     );
+    let problem = analyzed
+        .context()
+        .problems()
+        .iter()
+        .find(|problem| problem.code() == code)
+        .unwrap();
+    let report =
+        problem.render_report(&HighlighterTheme::default(), format!("select {expression}"))?;
+    assert!(report.contains(code));
     Ok(())
 }
 

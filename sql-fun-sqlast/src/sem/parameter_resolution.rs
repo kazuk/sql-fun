@@ -1,4 +1,7 @@
 //! Parameter inference over the name-resolved semantic tree.
+
+#[cfg(test)]
+mod indirection_tests;
 use crate::ast::Dialect;
 use crate::sem::overload_rank::OverloadRank;
 use crate::sem::{

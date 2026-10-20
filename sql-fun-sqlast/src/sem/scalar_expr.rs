@@ -40,7 +40,7 @@ pub use self::{
     exists::ExistsExpr,
     func_call::{FuncCallArgs, FuncCallExpr, FunctionBinding},
     grouping::{GroupingArgument, GroupingExpr},
-    indirect::IndirectionExpr,
+    indirect::{ArraySubscript, ArraySubscripts, IndirectionExpr},
     min_max::MinMaxExpr,
     named_arg::NamedArgExpr,
     param_ref::ParamRef,

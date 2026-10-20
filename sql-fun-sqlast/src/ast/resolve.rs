@@ -694,16 +694,79 @@ impl Indirection {
         context: &mut impl ParseContext,
         scope: &ScalarAnalysisContext<'_>,
     ) -> Result<SemScalarExpr, AnalysisError> {
-        let mut value = self.argument.resolve_in(context, scope)?;
-        for item in &self.items {
-            value = item.resolve(context, scope, value)?;
-        }
-        Ok(value)
+        let value = self.argument.resolve_in(context, scope)?;
+        Access::resolve_sequence(&self.items, context, scope, value)
     }
 }
 
 impl Access {
-    pub(super) fn resolve(
+    pub(super) fn resolve_sequence(
+        items: &[Self],
+        context: &mut impl ParseContext,
+        scope: &ScalarAnalysisContext<'_>,
+        mut base: SemScalarExpr,
+    ) -> Result<SemScalarExpr, AnalysisError> {
+        let mut remaining = items;
+        while let Some((first, rest)) = remaining.split_first() {
+            let count = if context.dialect() == Dialect::postgres() {
+                Self::subscript_prefix_length(remaining)
+            } else {
+                0
+            };
+            if count > 1 {
+                let (group, rest) = remaining.split_at(count);
+                let mut subscripts = Vec::with_capacity(count);
+                for access in group {
+                    subscripts.push(access.resolve_subscript(context, scope)?);
+                }
+                base = IndirectionExpr::resolved_subscripts(context, &base, &subscripts)?;
+                remaining = rest;
+            } else {
+                base = first.resolve(context, scope, base)?;
+                remaining = rest;
+            }
+        }
+        Ok(base)
+    }
+
+    fn subscript_prefix_length(items: &[Self]) -> usize {
+        let mut count = 0;
+        for access in items {
+            if !access.is_subscript() {
+                break;
+            }
+            count += 1;
+        }
+        count
+    }
+
+    const fn is_subscript(&self) -> bool {
+        matches!(self, Self::Index(_) | Self::Slice(_))
+    }
+
+    fn resolve_subscript(
+        &self,
+        context: &mut impl ParseContext,
+        scope: &ScalarAnalysisContext<'_>,
+    ) -> Result<crate::sem::ArraySubscript, AnalysisError> {
+        match self {
+            Self::Index(index) => {
+                let index = index.resolve_in(context, scope)?;
+                Ok(crate::sem::ArraySubscript::index(&index))
+            }
+            Self::Slice(slice) => {
+                let lower = Expr::resolve_optional(&slice.lower, context, scope)?;
+                let upper = Expr::resolve_optional(&slice.upper, context, scope)?;
+                Ok(crate::sem::ArraySubscript::slice(
+                    lower.as_ref(),
+                    upper.as_ref(),
+                ))
+            }
+            _ => AnalysisError::raise_unexpected_input("array subscript"),
+        }
+    }
+
+    fn resolve(
         &self,
         context: &mut impl ParseContext,
         scope: &ScalarAnalysisContext<'_>,

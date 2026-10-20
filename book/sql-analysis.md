@@ -423,7 +423,9 @@ until input assignments are supplied to `ParameterConstraints::allows`. This
 also applies to ARRAY and GREATEST/LEAST. All-unknown SQL literals still resolve
 to `text`. SQLite CASE analysis does not apply these PostgreSQL boolean or
 implicit-cast constraints; parameter-dependent SQLite result typing remains
-incomplete.
+incomplete. SQLite COALESCE retains its operands without PostgreSQL common-type
+conversions; its parameter-dependent result typing remains incomplete, and its
+input parameters remain unconstrained by COALESCE.
 
 ## DELETE analysis
 

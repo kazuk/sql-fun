@@ -71,7 +71,8 @@ impl QueryNameResolution {
             _ => None,
         }
     }
-    pub(crate) const fn is_resolved(&self) -> bool {
+    /// Whether name lookup succeeded; operator/function overload selection is separate.
+    pub const fn is_resolved(&self) -> bool {
         !matches!(self, Self::NotFound | Self::Ambiguous)
     }
 }

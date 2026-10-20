@@ -27,7 +27,7 @@ pub use self::{
     arith_expr::ArithExpr,
     array::ArrayExpr,
     boolean::{BooleanExpr, NullTestExpr},
-    case_expr::CaseExpr,
+    case_expr::{CaseExpr, CaseWhen},
     cast_expr::{ImplicitCastExpr, TypeCastExpr},
     coalesce::CoalesceExpr,
     collate::CollateExpr,
@@ -166,6 +166,7 @@ impl SemScalarExpr {
             Self::Grouping(value) => value.canonicalize_grouping_key(),
             Self::MinMax(value) => value.canonicalize_grouping_key(),
             Self::Array(value) => value.canonicalize_grouping_key(),
+            Self::Case(value) => value.canonicalize_grouping_key(),
             Self::FuncCall(value) => value.canonicalize_grouping_key(),
             Self::Arith(value) => value.canonicalize_grouping_key(),
             Self::Param(value) => value.canonicalize_grouping_key(),
@@ -290,6 +291,14 @@ impl SemScalarExpr {
             value.retain_semantic_call(call);
         }
     }
+    /// Completed operator-name binding retained before and after parameter inference.
+    pub fn operator_binding(&self) -> Option<&crate::sem::ResolvedOperator> {
+        match self {
+            Self::Arith(value) => value.binding(),
+            Self::Constrained(value) => value.operator_binding(),
+            _ => None,
+        }
+    }
     pub(crate) fn set_operator_binding(&mut self, binding: crate::sem::ResolvedOperator) {
         if let Self::Arith(call) = self {
             call.set_binding(binding);
@@ -335,6 +344,7 @@ impl SemScalarExpr {
             Self::Constrained(value) => Some(value.node()),
             Self::MinMax(value) => value.node(),
             Self::Array(value) => value.node(),
+            Self::Case(value) => value.node(),
             _ => None,
         }
     }
@@ -344,6 +354,13 @@ impl SemScalarExpr {
         constraint: &crate::sem::InputTypeConstraint,
     ) -> Self {
         Self::Param(ParamRef::new(position, node, constraint))
+    }
+    /// Structured CASE with analyzed conditions, results, and implicit coercions.
+    pub const fn as_case(&self) -> Option<&CaseExpr> {
+        match self {
+            Self::Case(value) => Some(value),
+            _ => None,
+        }
     }
     /// Analyzed ARRAY constructor, including its elements and type outcome.
     pub const fn as_array(&self) -> Option<&ArrayExpr> {
@@ -909,6 +926,7 @@ impl SemScalarExpr {
             Self::Constrained(value) => value.apply_constraints(constraints),
             Self::MinMax(value) => value.apply_constraints(constraints),
             Self::Array(value) => value.apply_constraints(constraints),
+            Self::Case(value) => value.apply_constraints(constraints),
             _ => {}
         }
     }
@@ -929,7 +947,7 @@ impl SemScalarExpr {
             // Child constraints are collected by traversal; EXISTS has its own boolean type.
             Self::Exists(_) => None,
             Self::Case(value) => {
-                value.collect_constraints(parameters);
+                value.collect_constraints(parameters, context)?;
                 None
             }
             Self::Array(value) => {

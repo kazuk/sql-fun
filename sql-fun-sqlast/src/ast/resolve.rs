@@ -643,7 +643,7 @@ impl Case {
             arms.push((condition, result));
         }
         let otherwise = Expr::resolve_optional(&self.otherwise, context, scope)?;
-        if let Some(expression) = CaseExpr::defer_untyped(&argument, &arms, &otherwise) {
+        if let Some(expression) = CaseExpr::defer_untyped(context, &argument, &arms, &otherwise)? {
             return Ok(expression);
         }
         let mut analysis = if context.dialect() == Dialect::sqlite() {

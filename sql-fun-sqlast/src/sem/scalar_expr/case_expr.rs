@@ -1,5 +1,6 @@
 use crate::sem::{
-    AnalysisError, AnalysisProblem, SemScalarExpr, TypeReference, scalar_expr::SemScalarExprNode,
+    AnalysisError, AnalysisProblem, InputTypeConstraint, MinMaxExpr, SemScalarExpr, TypeReference,
+    scalar_expr::SemScalarExprNode,
 };
 #[cfg(test)]
 use crate::{
@@ -576,25 +577,33 @@ impl CaseExprAnalysisContext {
     {
         let case_expr_type = self.type_fixup(context)?;
         let is_not_null = self.is_not_null();
-        Ok(CaseExpr {
-            arg_expr: Box::new(self.case_arg),
-            default_expr: Box::new(self.default_expr),
-            when_exprs: self.when_exprs,
+        Ok(CaseExpr::new(
+            Box::new(self.case_arg),
+            self.when_exprs,
+            Box::new(self.default_expr),
             case_expr_type,
             is_not_null,
-        })
+        ))
     }
 }
 
+/// An ordered CASE arm with its condition, result, and simple-CASE comparison.
 #[derive(Debug, Clone, Eq, Hash, PartialEq, serde::Serialize, serde::Deserialize)]
 pub struct CaseWhen {
     when_value: SemScalarExpr,
     result: SemScalarExpr,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    comparison: Option<SemScalarExpr>,
 }
 
 impl CaseWhen {
+    /// Construct an arm before simple-CASE equality binding and type inference.
     pub const fn new(when_value: SemScalarExpr, result: SemScalarExpr) -> Self {
-        Self { when_value, result }
+        Self {
+            when_value,
+            result,
+            comparison: None,
+        }
     }
 }
 
@@ -606,6 +615,12 @@ pub struct CaseExpr {
     default_expr: Box<Option<SemScalarExpr>>,
     case_expr_type: Option<TypeReference>,
     is_not_null: Option<bool>,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    types: Option<InputTypeConstraint>,
+    #[serde(skip)]
+    node: Option<usize>,
+    #[serde(skip)]
+    condition_nodes: Vec<usize>,
 }
 
 impl CaseExpr {
@@ -624,6 +639,9 @@ impl CaseExpr {
             default_expr,
             case_expr_type,
             is_not_null,
+            types: None,
+            node: None,
+            condition_nodes: Vec::new(),
         }
     }
 }
@@ -668,22 +686,25 @@ impl CaseExprAnalysisContext {
         self,
         context: &mut C,
     ) -> Result<SemScalarExpr, AnalysisError> {
-        if !self.catalog_casts {
+        let mut value = if !self.catalog_casts {
             let result_type = if self.result_types.len() == 1 {
                 self.result_types.iter().next().cloned()
             } else {
                 None
             };
             let nullable = self.is_not_null();
-            return Ok(SemScalarExpr::case(&CaseExpr::new(
+            CaseExpr::new(
                 Box::new(self.case_arg),
                 self.when_exprs,
                 Box::new(self.default_expr),
                 result_type,
                 nullable,
-            )));
-        }
-        Ok(SemScalarExpr::case(&self.into_case_expr(context)?))
+            )
+        } else {
+            self.into_case_expr(context)?
+        };
+        value.bind_comparisons(context)?;
+        Ok(SemScalarExpr::case(&value))
     }
 }
 
@@ -717,43 +738,203 @@ impl CaseWhen {
     ) -> Result<(), crate::sem::AnalysisError> {
         self.when_value.walk(visitor)?;
         self.result.walk(visitor)?;
+        if let Some(comparison) = &mut self.comparison {
+            comparison.walk(visitor)?;
+        }
         Ok(())
     }
 }
 
-impl CaseWhen {
-    fn needs_inference(&self) -> bool {
-        self.when_value.needs_type_inference() || self.result.needs_type_inference()
-    }
-}
 impl CaseExpr {
     pub(crate) fn collect_constraints(
-        &self,
+        &mut self,
         parameters: &mut crate::sem::parameter_resolution::ParameterResolution,
-    ) {
-        if self
-            .arg_expr
-            .as_ref()
-            .as_ref()
-            .is_some_and(|value| value.needs_type_inference())
-            || self
+        context: &mut impl crate::sem::ParseContext,
+    ) -> Result<(), AnalysisError> {
+        if self.types.is_none()
+            && !self
+                .arg_expr
+                .as_ref()
+                .as_ref()
+                .is_some_and(|value| value.constraint_node().is_some())
+            && !self
                 .default_expr
                 .as_ref()
                 .as_ref()
-                .is_some_and(|value| value.needs_type_inference())
-            || self.when_exprs.iter().any(CaseWhen::needs_inference)
+                .is_some_and(|value| value.constraint_node().is_some())
+            && !self.when_exprs.iter().any(CaseWhen::has_constraints)
         {
-            parameters.unify_case_types(self);
+            return Ok(());
         }
+        // SQLite's heterogeneous CASE results do not impose PostgreSQL cast or
+        // boolean requirements. Preserve its existing unresolved result metadata.
+        if context.dialect() == crate::ast::Dialect::sqlite() {
+            return Ok(());
+        }
+        for arm in &self.when_exprs {
+            let condition = arm.comparison.as_ref().unwrap_or(&arm.when_value);
+            self.condition_nodes
+                .push(parameters.case_condition(context, condition));
+        }
+        // PostgreSQL considers ELSE first for historical reasons. An absent
+        // ELSE supplies an unknown NULL, not a parameter or an inferred value.
+        let mut results = vec![
+            self.default_expr
+                .as_ref()
+                .clone()
+                .unwrap_or_else(crate::sem::ScalarConstExpr::null),
+        ];
+        for arm in &self.when_exprs {
+            results.push(arm.result.clone());
+        }
+        let (node, types) = parameters.unify_case_types(context, &results)?;
+        self.node = Some(node);
+        self.case_expr_type = types.single_type();
+        self.types = Some(types);
+        Ok(())
+    }
+
+    pub(crate) const fn node(&self) -> Option<usize> {
+        self.node
+    }
+
+    pub(crate) fn apply_constraints(&mut self, constraints: &crate::sem::ParameterConstraints) {
+        let Some(node) = self.node else {
+            return;
+        };
+        let mut types = constraints.node_domain(node).clone();
+        if self
+            .condition_nodes
+            .iter()
+            .any(|node| constraints.node_domain(*node).admissible_types() == Some(&[]))
+        {
+            types = InputTypeConstraint::types([]);
+        }
+        self.case_expr_type = types.single_type();
+        self.types = Some(types);
+        if let Some(target) = &self.case_expr_type {
+            for arm in &mut self.when_exprs {
+                Self::coerce(&mut arm.result, target);
+            }
+            if let Some(otherwise) = self.default_expr.as_mut() {
+                Self::coerce(otherwise, target);
+            }
+        }
+        for (arm, node) in self.when_exprs.iter_mut().zip(&self.condition_nodes) {
+            if arm.comparison.is_none()
+                && constraints.node_domain(*node).admissible_types() != Some(&[])
+            {
+                Self::coerce(&mut arm.when_value, &crate::sem::PgBuiltInType::bool());
+            }
+        }
+        self.is_not_null = self.result_nullability();
+    }
+
+    fn coerce(value: &mut SemScalarExpr, target: &TypeReference) {
+        if value.get_type().as_ref() != Some(target)
+            || MinMaxExpr::input_type(value) == Some(MinMaxExpr::unknown())
+        {
+            *value = SemScalarExpr::wrap_implicit_cast(target, value);
+        }
+    }
+
+    fn result_nullability(&self) -> Option<bool> {
+        let Some(otherwise) = self.default_expr.as_ref() else {
+            return Some(false);
+        };
+        if otherwise.is_not_null() == Some(false)
+            || self
+                .when_exprs
+                .iter()
+                .any(|arm| arm.result.is_not_null() == Some(false))
+        {
+            Some(false)
+        } else if otherwise.is_not_null() == Some(true)
+            && self
+                .when_exprs
+                .iter()
+                .all(|arm| arm.result.is_not_null() == Some(true))
+        {
+            Some(true)
+        } else {
+            None
+        }
+    }
+
+    pub(super) fn canonicalize_grouping_key(&mut self) {
+        self.node = None;
+        self.condition_nodes.clear();
+    }
+
+    /// Optional selector of a simple CASE; searched CASE has no selector.
+    pub fn argument(&self) -> Option<&SemScalarExpr> {
+        self.arg_expr.as_ref().as_ref()
+    }
+
+    /// Ordered WHEN conditions and THEN results, retaining inferred coercions.
+    pub fn arms(&self) -> &[CaseWhen] {
+        &self.when_exprs
+    }
+
+    /// Explicit ELSE expression. Absence retains SQL's implicit NULL result.
+    pub fn otherwise(&self) -> Option<&SemScalarExpr> {
+        self.default_expr.as_ref().as_ref()
+    }
+}
+
+impl CaseWhen {
+    const fn has_constraints(&self) -> bool {
+        self.when_value.constraint_node().is_some() || self.result.constraint_node().is_some()
+    }
+
+    /// Analyzed WHEN operand (or predicate in a searched CASE).
+    pub const fn condition(&self) -> &SemScalarExpr {
+        &self.when_value
+    }
+
+    /// Analyzed THEN result, including its implicit coercion when determined.
+    pub const fn result(&self) -> &SemScalarExpr {
+        &self.result
+    }
+
+    /// Simple-CASE equality expression and its operator binding, if present.
+    pub const fn comparison(&self) -> Option<&SemScalarExpr> {
+        self.comparison.as_ref()
     }
 }
 
 impl CaseExpr {
+    fn bind_comparisons(
+        &mut self,
+        context: &mut impl crate::sem::ParseContext,
+    ) -> Result<(), AnalysisError> {
+        if context.dialect() != crate::ast::Dialect::postgres() {
+            return Ok(());
+        }
+        let Some(argument) = self.arg_expr.as_ref() else {
+            return Ok(());
+        };
+        for arm in &mut self.when_exprs {
+            let name = crate::sem::OperatorName::from_parts(None, "=");
+            let binding = crate::sem::ResolvedOperator::resolve(context, &name, true, true);
+            let (mut comparison, _) = crate::sem::ArithExpr::build_op(
+                context,
+                &name,
+                Some(argument.clone()),
+                Some(arm.when_value.clone()),
+            )?;
+            comparison.set_operator_binding(binding);
+            arm.comparison = Some(comparison);
+        }
+        Ok(())
+    }
+
     pub(crate) fn defer_untyped(
+        context: &mut impl crate::sem::ParseContext,
         argument: &Option<SemScalarExpr>,
         arms: &[(SemScalarExpr, SemScalarExpr)],
         otherwise: &Option<SemScalarExpr>,
-    ) -> Option<SemScalarExpr> {
+    ) -> Result<Option<SemScalarExpr>, AnalysisError> {
         let unknown = |value: &SemScalarExpr| value.get_type().is_none();
         if !argument.as_ref().is_some_and(unknown)
             && !otherwise.as_ref().is_some_and(unknown)
@@ -761,18 +942,22 @@ impl CaseExpr {
                 .iter()
                 .any(|(condition, result)| unknown(condition) || unknown(result))
         {
-            return None;
+            return Ok(None);
         }
         let mut when_exprs = Vec::new();
         for (condition, result) in arms {
             when_exprs.push(CaseWhen::new(condition.clone(), result.clone()));
         }
-        Some(SemScalarExpr::case(&Self::new(
+        let mut value = Self::new(
             Box::new(argument.clone()),
             when_exprs,
             Box::new(otherwise.clone()),
             None,
             None,
-        )))
+        );
+        value.bind_comparisons(context)?;
+        value.types = Some(InputTypeConstraint::any());
+        value.is_not_null = value.result_nullability();
+        Ok(Some(SemScalarExpr::case(&value)))
     }
 }

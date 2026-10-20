@@ -31,7 +31,7 @@ use crate::{
         CreateIndex, CreateSchema, DiagnosticContext, FrozenBaseContext, FullName,
         GetSourcePathWithSpanOpt, ImplicitChange, MutSourcePathWithSpan, ObjectKind,
         OperatorDefinition, OperatorInfoRead, OperatorName, ParseContext, SchemaName,
-        SemScalarExpr, SourceAccessService, TypeReference, VariableSet,
+        SemScalarExpr, SourceAccessService, VariableSet,
         parse_context::{IndexInfoRead, SearchPathRead},
     },
 };
@@ -66,9 +66,6 @@ pub(super) struct SchemaCatalog {
     metadata: ::sql_fun_core::SqlFunMetadata,
     search_path: Vec<SchemaName>,
     types: TypeDefinitionCollection,
-    // Complete resolved domain bases supplement the legacy FullName-only
-    // declaration without changing its shared serialization contract.
-    domain_bases: TrieMap<Option<TypeReference>>,
     tables: TableDefinitionCollection,
     functions: FunctionDefinitionCollection,
     function_view_rows: std::collections::HashMap<(FullName, crate::sem::OverloadVariant), bool>,
@@ -128,7 +125,6 @@ impl SchemaFileContext {
                 search_path,
                 sql_source_path: sql_source_path.to_path_buf(),
                 types: TypeDefinitionCollection::default(),
-                domain_bases: TrieMap::default(),
                 tables: TableDefinitionCollection::default(),
                 functions: FunctionDefinitionCollection::default(),
                 function_view_rows: std::collections::HashMap::default(),

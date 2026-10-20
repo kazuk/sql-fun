@@ -14,7 +14,7 @@ pub struct CreateDomain {
     #[serde(skip)]
     owner: Option<crate::sem::OwnerSpecification>,
     type_ref: TypeReference,
-    base_type: Option<FullName>,
+    base_type: Option<TypeReference>,
     #[serde(default, skip_serializing_if = "Option::is_none")]
     category: Option<crate::sem::TypeCategory>,
 }
@@ -31,7 +31,7 @@ impl CreateDomain {
         self.owner = Some(owner.clone());
     }
 
-    pub(crate) fn new(type_ref: &TypeReference, base_type: &Option<FullName>) -> Self {
+    pub(crate) fn new(type_ref: &TypeReference, base_type: &Option<TypeReference>) -> Self {
         Self {
             owner: None,
             category: None,
@@ -53,12 +53,12 @@ impl CreateDomain {
         self.type_ref.full_name()
     }
 
-    /// Resolved base type of this domain, when lookup succeeded.
-    pub(crate) const fn base_type(&self) -> Option<&FullName> {
+    /// Resolved base type, including array qualification, when lookup succeeded.
+    pub(crate) const fn base_type(&self) -> Option<&TypeReference> {
         self.base_type.as_ref()
     }
 
-    /// get base type reference
+    /// Reference identifying this domain, distinct from its base type.
     #[must_use]
     pub const fn type_ref(&self) -> &TypeReference {
         &self.type_ref
@@ -74,6 +74,33 @@ impl CreateDomain {
         TParseContext: ParseContext,
     {
         crate::ast::Domain::try_from_with_tokens(&syn, tokens)?.resolve_and_apply(context)
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::CreateDomain;
+    use crate::sem::{FullName, TypeReference};
+
+    #[rstest::rstest]
+    #[case::unresolved(None)]
+    #[case::scalar(Some(TypeReference::from_master_type_name("int4")))]
+    #[case::array(Some(TypeReference::from_master_type_name("_int4")))]
+    #[case::nested_domain(Some(TypeReference::from_full_name(FullName::with_schema(
+        "public", "amounts"
+    ))))]
+    fn domain_base_survives_serialization(#[case] base: Option<TypeReference>) {
+        let reference = TypeReference::from_full_name(FullName::with_schema("public", "amount"));
+        let domain = CreateDomain::new(&reference, &base);
+        let serialized = ::serde_json::to_value(&domain).unwrap();
+        assert_eq!(
+            serialized["base_type"],
+            ::serde_json::to_value(&base).unwrap()
+        );
+        let restored: CreateDomain = ::serde_json::from_value(serialized).unwrap();
+        assert_eq!(restored.base_type(), base.as_ref());
+        assert_eq!(restored.type_ref(), &reference);
+        assert_eq!(restored, domain);
     }
 }
 

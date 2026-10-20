@@ -84,10 +84,13 @@ impl MinMaxExpr {
         let mut base = ty.clone();
         let mut seen = std::collections::HashSet::new();
         while !base.is_dynamic() && base.is_array() != Some(true) && seen.insert(base.clone()) {
-            let Some(reference) = context.domain_base_type(base.full_name()) else {
+            let Some(definition) = context.get_type_impl(base.full_name()) else {
                 break;
             };
-            base = reference;
+            let Some(reference) = definition.domain_base() else {
+                break;
+            };
+            base = reference.clone();
         }
         base
     }

@@ -94,18 +94,32 @@ for operational details.
   plan. Discovering a pre-existing defect, missing shared capability, or
   unexpected constraint does not authorize choosing or implementing a workaround
   or fix outside that scope.
-- When such a problem is found, investigate and report concrete evidence,
-  reproduction conditions, affected existing consumers, and implications for
-  the approved plan. Surface repository-wide correctness risks promptly rather
-  than treating them only as obstacles to completing the current task.
+- Prioritize completing the original task. When another problem is found,
+  record concrete evidence, reproduction conditions, affected existing
+  consumers, and its possible impact on the approved plan. Surface
+  repository-wide correctness risks promptly; reporting a problem does not
+  make its repair a prerequisite for the current task.
+- Before proposing a prerequisite fix or pausing implementation, investigate
+  the problem's actual effect on the original task's acceptance criteria and
+  whether the task can be completed within its approved scope without fixing
+  that problem. Judge blocking status by this dependency, not by the problem's
+  severity, shared nature, or importance to other consumers.
+- If the original task can be completed correctly within its approved scope,
+  leave the separate problem untouched and continue through completion and PR
+  submission. Then consult the maintainer about the separate problem's need
+  for repair and priority. Do not require a separate fix PR to precede work
+  that can be completed independently.
 - Do not independently select, implement, or conceal an unplanned workaround,
   fallback, shared-service modification, or unrelated bug fix, regardless of its
   size or whether tests pass. Obtain an explicit maintainer decision on its
   scope and approach before proceeding with that work.
-- If the approved task depends on the unresolved decision, pause the affected
-  implementation and request the decision; unaffected investigation or
-  explicitly authorized work may continue. Do not silently weaken acceptance
-  criteria or use a local workaround to bypass the decision.
+- Pause affected implementation and request a scope decision only when the
+  original task cannot be completed correctly without resolving the separate
+  problem. Identify the specific acceptance criterion that cannot be met,
+  provide evidence of the dependency, explain why alternatives within the
+  approved scope are insufficient, and request the narrowest necessary
+  decision. Unaffected authorized work may continue. Do not silently weaken
+  acceptance criteria or use an unapproved workaround to bypass the decision.
 - This authorization boundary also applies during refactoring: the guidance
   below to avoid preserving known bugs does not grant permission to fix
   independently discovered, out-of-scope problems without approval.

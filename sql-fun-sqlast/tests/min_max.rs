@@ -1,6 +1,6 @@
 //! PostgreSQL common-type semantics through the maintained public analysis API.
 use self::test_helpers::heavy;
-use ::sql_fun_sqlast::sem::{ParseContext, PgBuiltInType, TypeReference};
+use ::sql_fun_sqlast::sem::{ParseContext, PgBuiltInType, TypeInfoRead, TypeReference};
 use std::collections::BTreeMap;
 
 #[rstest::rstest]
@@ -305,6 +305,26 @@ fn dynamic_composite_operands_retain_their_type(
     assert_eq!(
         expression.arguments()[0].get_type().as_ref(),
         column.col_type().as_ref()
+    );
+    Ok(())
+}
+
+#[rstest::rstest]
+#[case::ordered("int4", Some(true))]
+#[case::not_ordered("json", Some(false))]
+#[case::unknown_identity("not_a_catalog_type", None)]
+fn comparison_catalog_distinguishes_absence_from_negative_answers(
+    #[case] name: &str,
+    #[case] expected: Option<bool>,
+) -> Result<(), Box<dyn std::error::Error>> {
+    // Use the shipped catalog to verify real positive/negative facts and context forwarding.
+    let analyzed = heavy::analyze("select 1", &[])?;
+    let reference = TypeReference::from_master_type_name(name);
+    assert_eq!(
+        analyzed
+            .context()
+            .builtin_type_ordered(reference.full_name()),
+        expected
     );
     Ok(())
 }

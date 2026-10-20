@@ -168,7 +168,7 @@ impl MinMaxExpr {
         Ok(candidate.clone())
     }
 
-    pub(crate) fn ordered(context: &impl ParseContext, ty: &TypeReference) -> bool {
+    pub(crate) fn ordered(context: &impl ParseContext, ty: &TypeReference) -> Option<bool> {
         let base = Self::base_type(context, ty);
         if base.is_array() == Some(true) {
             return Self::ordered(context, &base.element_type());
@@ -179,12 +179,16 @@ impl MinMaxExpr {
             context.get_type_impl(base.full_name())
         };
         if definition.is_some_and(|definition| definition.has_structural_ordering()) {
-            return true;
+            return Some(true);
         }
         // PostgreSQL's default B-tree classes for these concrete families
         // have polymorphic input types, not the concrete result type's name.
-        let range_family =
-            Self::category(context, &base).is_ok_and(|(category, _)| category == 'R');
+        let direct = context.builtin_type_ordered(base.full_name());
+        if direct == Some(true) {
+            return direct;
+        }
+        let (category, _) = Self::category(context, &base).ok()?;
+        let range_family = category == 'R';
         let family = if range_family && base.is_range() {
             Some("anyrange")
         } else if range_family && base.is_multi_range() {
@@ -200,7 +204,7 @@ impl MinMaxExpr {
             return context
                 .builtin_type_ordered(TypeReference::from_master_type_name(family).full_name());
         }
-        context.builtin_type_ordered(base.full_name())
+        direct
     }
 
     pub(crate) fn common_type(
@@ -231,8 +235,12 @@ impl MinMaxExpr {
                 ));
             }
         }
-        if !Self::ordered(context, &target) {
-            return Err(crate::sem::problem::MinMaxProblem::not_ordered(&target));
+        match Self::ordered(context, &target) {
+            Some(true) => {}
+            Some(false) => return Err(crate::sem::problem::MinMaxProblem::not_ordered(&target)),
+            None => {
+                return Err(crate::sem::problem::MinMaxProblem::missing_comparison_facts(&target));
+            }
         }
         Ok(target)
     }
@@ -283,6 +291,42 @@ impl MinMaxExpr {
                 self.coerce(&ty);
             }
         }
+    }
+}
+
+#[cfg(test)]
+mod comparison_knowledge_tests {
+    use super::MinMaxExpr;
+    use crate::sem::{AnalysisProblem, PgBuiltInType, ScalarConstExpr, SemScalarExpr};
+    use crate::test_helpers::TestParseContext;
+
+    #[test]
+    fn absent_comparison_knowledge_reports_missing_metadata() {
+        let context = TestParseContext::default();
+        let problem = MinMaxExpr::common_type(&context, &[PgBuiltInType::int4()]).unwrap_err();
+        assert_eq!(
+            AnalysisProblem::min_max(problem).code(),
+            "min_max_missing_comparison_facts"
+        );
+    }
+
+    #[test]
+    fn absent_comparison_knowledge_does_not_eliminate_parameter_types() {
+        let mut context = TestParseContext::default();
+        let mut parameters = crate::sem::parameter_resolution::ParameterResolution::default();
+        let arguments = [
+            parameters.parameter(1),
+            SemScalarExpr::new_const(ScalarConstExpr::new_integer(1)),
+        ];
+        let (_, types) = parameters
+            .min_max(&mut context, "greatest", &arguments)
+            .unwrap();
+        assert_eq!(types.single_type(), Some(PgBuiltInType::int4()));
+        assert_eq!(context.reported_problems().len(), 1);
+        assert_eq!(
+            context.reported_problems()[0].code(),
+            "min_max_missing_comparison_facts"
+        );
     }
 }
 

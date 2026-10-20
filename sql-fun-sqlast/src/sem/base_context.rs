@@ -149,8 +149,12 @@ impl BaseContext {
 mod test_metadata;
 
 impl TypeInfoRead for BaseContext {
-    fn builtin_type_ordered(&self, name: &FullName) -> bool {
-        self.masters.type_ordered(name) || self.binary_ordered_types.contains(name)
+    fn builtin_type_ordered(&self, name: &FullName) -> Option<bool> {
+        if crate::ast::Dialect::from(&self.metadata) != crate::ast::Dialect::postgres() {
+            return None;
+        }
+        self.types.get(&name.to_string())?;
+        Some(self.masters.type_ordered(name) || self.binary_ordered_types.contains(name))
     }
     fn get_type_impl(&self, key: &FullName) -> Option<&TypeDefinition> {
         tracing::info!("get type {key}");

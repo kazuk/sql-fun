@@ -20,7 +20,8 @@ The core representations are in
 | --- | --- |
 | `TypeReference::Concrete` | Named type identity and an array qualifier; definition lookup uses the analysis context. |
 | `TypeReference::Dynamic` | An owned, boxed clone of a `TypeDefinition`, including definitions without a registered schema name. |
-| `TypeDefinition` | Enum, composite, domain, builtin, table-row reference, or implicit composite definition. |
+| `TypeDefinition` | Array, enum, composite, domain, builtin, table-row reference, or implicit composite definition. |
+| `TypeDefinition::Array` | An `ArrayTypeDefinition` retaining its element reference, including anonymous structural definitions. |
 | `TypeDefinition::ImplicitComposite` | Columns defining an anonymous row shape. |
 
 `TypeReference::dynamic(&definition)` retains the definition independently of
@@ -45,13 +46,27 @@ scope.
 
 Do not assume every `TypeReference` method supports both variants. Several
 dynamic branches currently use `todo!()`, including `full_name()`, display,
-`element_type()`, and polymorphic-type operations. Inspect the method before
-using it on a potentially dynamic reference. Concrete canonical text parsing
-and formatting do not provide a text representation for dynamic definitions.
+and some polymorphic-type operations. Inspect the method before using it on a
+potentially dynamic reference. Concrete canonical text parsing and formatting
+do not provide a text representation for dynamic definitions.
 
-The concrete array qualifier is a boolean, not a dimension count. Do not infer
-multidimensional SQL indexing semantics from that representation alone. The
-structural array projections currently operate on concrete array references.
+`TypeReference::array_type()` constructs either a concrete array qualifier or a
+dynamic `TypeDefinition::Array`. On a dynamic array, `element_type()` returns the
+retained element reference; calling it on a non-array dynamic definition panics.
+`ArrayTypeDefinition::element()` exposes the element by reference. See
+[`pg_type/array.rs`](../../sql-fun-sqlast/src/sem/pg_type/array.rs).
+An already-array reference stays the same when `array_type()` is called again.
+The concrete array qualifier is a boolean, not a dimension count: nested SQL
+arrays share their element family's array type identity. Do not infer SQL
+indexing or shape validation from this representation alone. The deferred
+structural array projections described below still require concrete references;
+support for dynamic array construction and element introspection does not imply
+support in every inference consumer.
+
+Simple/common polymorphic substitution can use a dynamic inference result for
+the supported element, array, and non-array placeholders (`anyelement`,
+`anyarray`, `anynonarray`, and their `anycompatible` counterparts). This does not
+make all polymorphic methods callable on a dynamic receiver.
 
 ## Known types, unknowns, and casts
 
@@ -63,6 +78,22 @@ fallback type. Check the expression and resolution phase that produced it.
 Use the existing catalog lookup and cast interfaces through `ParseContext` /
 `BaseParseContext`. Resolve SQL names with the active search path and dialect;
 canonical concrete type text parsing is not SQL alias resolution.
+The crate-private `TypeReference::definition_from_catalog` returns the retained
+dynamic definition or looks up a concrete reference through the shared context.
+
+If either operand is dynamic, it cannot be passed through the catalog cast
+master. Use the existing `TypeReference::implicit_match_context` path, shared by
+overload ranking, argument validation, and common-type coercion checks. It
+compares structure instead of querying cast masters; only two concrete operands
+use catalog implicit-cast lookup. Structural matching recursively compares array
+elements and positional anonymous-record field types, ignoring field names and
+nullability. Named composites retain nominal identity: matching field layouts
+do not authorize implicit conversion from an anonymous record to a named
+composite or its array. An anonymous record can satisfy a generic `record`
+argument. `NoConversion` records a successful match in these callers; verify
+PostgreSQL-visible candidate selection and rejection behavior when changing it.
+Keep these rules in the existing matching implementation rather than adding a
+second cast service.
 
 [`cast.rs`](../../sql-fun-sqlast/src/sem/cast.rs) distinguishes identity,
 implicit, assignment, and explicit conversions. A catalog cast's existence
@@ -78,6 +109,30 @@ argument binding and simple/common polymorphic inference.
 matches before preferred conversions. Inspect these existing paths and their
 callers before adding another binding or ranking strategy; the ranking helper
 alone is not a complete implementation of PostgreSQL overload resolution.
+In particular, [#673](https://github.com/kazuk/sql-fun/issues/673) tracks a known
+concrete-versus-polymorphic candidate-ranking defect: after polymorphic
+substitution, competing `fa(control[])` and `fa(anyarray)` declarations can
+incorrectly tie even for `fa(NULL::control[])`. PostgreSQL selects the original
+concrete declaration. The same distinction matters for `record` / `anyelement`.
+Do not treat successful structural matching as proof of correct overload choice.
+
+### ARRAY constructor results
+
+[`scalar_expr/array.rs`](../../sql-fun-sqlast/src/sem/scalar_expr/array.rs)
+retains every operand, output type domains, and element coercions. It reuses the
+ordered common-type selection in `MinMaxExpr` without requiring GREATEST/LEAST's
+comparison implementation. An explicit array cast supplies the element target
+to nested and empty constructors before analysis. Constructor-specific typing
+failures retain an empty domain and structured `ArrayProblem` diagnostics rather
+than becoming unrestricted inputs. Construction is non-null independently of element
+nullability.
+
+Anonymous element definitions can remain available through the structural array
+API. SQL subscripting of an anonymous-record array nevertheless yields generic
+`record` without accessible field names; retained internal fields do not imply
+that subsequent SQL member access is legal. See
+[`tests/arrays.rs`](../../sql-fun-sqlast/tests/arrays.rs) for the constructor,
+parameter, coercion, and record-overload regression coverage.
 
 ## Deferred parameter constraints
 
@@ -93,6 +148,16 @@ owns domains, correlated alternatives, and the common propagation graph.
   checking each domain independently can accept incompatible combinations.
   Omitted positions remain unconstrained by that inspection; unknown parameter
   positions are rejected. Inspection does not supply analysis hints.
+- These domains represent admissible explicitly typed inputs, not the single
+  parameter signature inferred by an untyped PostgreSQL `PREPARE`. For example,
+  `SELECT ARRAY[$1,1]` admits both an `int4` input with an `int4[]` result and an
+  `int8` input with an `int8[]` result; an untyped PostgreSQL PREPARE selects
+  `int4`. Analysis does not choose a final wire-protocol binding.
+  `ParameterConstraints::result_column` exposes the output domain;
+  `col_type()` may remain absent when multiple result types survive. An explicit
+  SQL cast can narrow the result. See the public-boundary tests in
+  [`tests/arrays.rs`](../../sql-fun-sqlast/tests/arrays.rs) and the
+  [parameter analysis documentation](../../book/sql-analysis.md#parameter-analysis).
 - Preserve structure for unresolved expressions in the semantic tree and graph.
   Array indexing, slices, and member access use relationships in
   [`parameter_constraints/structural.rs`](../../sql-fun-sqlast/src/sem/parameter_constraints/structural.rs)

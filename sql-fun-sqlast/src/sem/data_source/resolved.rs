@@ -8,7 +8,7 @@ use crate::sem::{
 };
 
 impl DataSource {
-    pub(crate) fn trigger_column(
+    pub(crate) fn canonical_relation_column(
         &self,
         context: &impl ParseContext,
         column: &crate::sem::ColumnName,

@@ -11,6 +11,21 @@ pub struct TableDataSource {
 }
 
 impl TableDataSource {
+    pub(super) fn qualified_source<'a>(
+        &'a self,
+        source: &'a DataSource,
+        context: &impl crate::sem::ParseContext,
+        name: &crate::sem::FullName,
+        alias: Option<&'a AliasSpec>,
+    ) -> Option<super::QualifiedSource<'a>> {
+        let alias = alias.unwrap_or(&self.alias);
+        if super::qualified::relation_matches(context, name, self.name.full_name(), alias) {
+            Some(super::QualifiedSource::new(source, alias.name()))
+        } else {
+            None
+        }
+    }
+
     pub(super) fn new_data_source(name: &TableName, alias: &AliasSpec) -> DataSource {
         DataSource::Table(Self {
             name: name.clone(),

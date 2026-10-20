@@ -11,6 +11,33 @@ pub struct GroupedDataSource {
 }
 
 impl GroupedDataSource {
+    pub(super) fn sqlite_qualified_group_source<'a>(
+        &'a self,
+        context: &impl ParseContext,
+        name: &crate::sem::FullName,
+        alias: &'a AliasSpec,
+    ) -> Option<super::QualifiedSource<'a>> {
+        self.source
+            .sqlite_qualified_group_source(context, name, alias)
+    }
+
+    pub(super) fn qualified_source<'a>(
+        &'a self,
+        context: &impl ParseContext,
+        name: &crate::sem::FullName,
+    ) -> Result<Option<super::QualifiedSource<'a>>, ()> {
+        if context.dialect() != crate::ast::Dialect::sqlite() {
+            return Ok(None);
+        }
+        if self.is_joined() {
+            self.source.qualified_source(context, name)
+        } else {
+            Ok(self
+                .source
+                .sqlite_qualified_group_source(context, name, &self.alias))
+        }
+    }
+
     pub(super) fn new(source: &DataSource, alias: &AliasSpec) -> Self {
         Self {
             source: source.clone(),

@@ -117,7 +117,7 @@ impl CreateTrigger {
                 from.push(DataSource::resolve_relation(
                     context,
                     target,
-                    &AliasSpec::from_local_name("old"),
+                    &AliasSpec::from_names("old", &[]),
                     with,
                 )?);
             }
@@ -125,7 +125,7 @@ impl CreateTrigger {
                 from.push(DataSource::resolve_relation(
                     context,
                     target,
-                    &AliasSpec::from_local_name("new"),
+                    &AliasSpec::from_names("new", &[]),
                     with,
                 )?);
             }

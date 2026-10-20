@@ -33,7 +33,7 @@ pub use self::{
     collate::CollateExpr,
     column_ref::{
         ColumnReferenceExpr, CteColumnRef, MergeRecordColumnRef, OutputColumnRef,
-        SubQueryColumnRef, TableColumnRef,
+        QualifiedColumnFailure, SubQueryColumnRef, TableColumnRef,
     },
     const_expr::ScalarConstExpr,
     constrained::ConstrainedExpr,
@@ -173,6 +173,14 @@ impl SemScalarExpr {
             Self::Constrained(value) => value.canonicalize_grouping_key(),
             Self::ColumnRef(value) => value.canonicalize_grouping_key(),
             _ => {}
+        }
+    }
+    /// Completed qualification failure for a direct column reference.
+    pub const fn qualification_failure(&self) -> Option<&self::column_ref::QualifiedColumnFailure> {
+        if let Self::ColumnRef(reference) = self {
+            reference.qualification_failure()
+        } else {
+            None
         }
     }
     /// Resolved table-column binding, when this expression directly references one.

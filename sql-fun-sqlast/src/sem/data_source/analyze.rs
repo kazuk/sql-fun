@@ -280,7 +280,7 @@ mod test_data_source_analyze_range_func_rows_from {
             overload.returning_table(),
         );
         let expected_functions: IVec<_> = vec![expected_rows_func].into();
-        let expected_alias = AliasSpec::from_local_name("rows_alias");
+        let expected_alias = AliasSpec::from_names("rows_alias", &[]);
         let expected_row_functions =
             DataSourceRowFunctions::new(&expected_functions, &expected_alias);
         let expected = DataSource::RowFunctions(expected_row_functions);

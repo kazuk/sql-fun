@@ -63,6 +63,11 @@ version = "17"
 connector = "tokio-postgres"
 ```
 
+For PostgreSQL queries using `database.schema.table.column`, configure
+`database-name` explicitly as described in
+[qualified column references](sql-analysis.md#qualified-column-references).
+The datasource selection name does not supply the database identity.
+
 - `default`: default database for this application
 - `engine`: identifies the database engine. Use "PostgreSQL" for PostgreSQL or
   "sqlite" for SQLite.

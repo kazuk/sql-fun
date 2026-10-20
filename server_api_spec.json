@@ -1991,6 +1991,71 @@
               "description": "Structured violations in SELECT clauses, distinct from retained name bindings.",
               "oneOf": [
                 {
+                  "description": "Database-name metadata is required for column reference.",
+                  "type": "object",
+                  "properties": {
+                    "ColumnDatabaseNameRequired": {
+                      "type": "string"
+                    }
+                  },
+                  "required": [
+                    "ColumnDatabaseNameRequired"
+                  ],
+                  "additionalProperties": false
+                },
+                {
+                  "description": "Cross-database column reference is not supported.",
+                  "type": "object",
+                  "properties": {
+                    "ColumnCrossDatabase": {
+                      "type": "string"
+                    }
+                  },
+                  "required": [
+                    "ColumnCrossDatabase"
+                  ],
+                  "additionalProperties": false
+                },
+                {
+                  "description": "Column qualification is invalid for the selected dialect.",
+                  "type": "object",
+                  "properties": {
+                    "ColumnQualificationInvalid": {
+                      "type": "string"
+                    }
+                  },
+                  "required": [
+                    "ColumnQualificationInvalid"
+                  ],
+                  "additionalProperties": false
+                },
+                {
+                  "description": "Visible source not found for column reference.",
+                  "type": "object",
+                  "properties": {
+                    "ColumnSourceNotFound": {
+                      "type": "string"
+                    }
+                  },
+                  "required": [
+                    "ColumnSourceNotFound"
+                  ],
+                  "additionalProperties": false
+                },
+                {
+                  "description": "Ambiguous visible source for column reference.",
+                  "type": "object",
+                  "properties": {
+                    "ColumnSourceAmbiguous": {
+                      "type": "string"
+                    }
+                  },
+                  "required": [
+                    "ColumnSourceAmbiguous"
+                  ],
+                  "additionalProperties": false
+                },
+                {
                   "description": "GROUPING argument does not match a grouping expression of its owner.",
                   "type": "string",
                   "const": "GroupingArgumentNotGrouped"
@@ -5041,6 +5106,71 @@
             "QueryProblem": {
               "description": "Structured violations in SELECT clauses, distinct from retained name bindings.",
               "oneOf": [
+                {
+                  "description": "Database-name metadata is required for column reference.",
+                  "type": "object",
+                  "properties": {
+                    "ColumnDatabaseNameRequired": {
+                      "type": "string"
+                    }
+                  },
+                  "required": [
+                    "ColumnDatabaseNameRequired"
+                  ],
+                  "additionalProperties": false
+                },
+                {
+                  "description": "Cross-database column reference is not supported.",
+                  "type": "object",
+                  "properties": {
+                    "ColumnCrossDatabase": {
+                      "type": "string"
+                    }
+                  },
+                  "required": [
+                    "ColumnCrossDatabase"
+                  ],
+                  "additionalProperties": false
+                },
+                {
+                  "description": "Column qualification is invalid for the selected dialect.",
+                  "type": "object",
+                  "properties": {
+                    "ColumnQualificationInvalid": {
+                      "type": "string"
+                    }
+                  },
+                  "required": [
+                    "ColumnQualificationInvalid"
+                  ],
+                  "additionalProperties": false
+                },
+                {
+                  "description": "Visible source not found for column reference.",
+                  "type": "object",
+                  "properties": {
+                    "ColumnSourceNotFound": {
+                      "type": "string"
+                    }
+                  },
+                  "required": [
+                    "ColumnSourceNotFound"
+                  ],
+                  "additionalProperties": false
+                },
+                {
+                  "description": "Ambiguous visible source for column reference.",
+                  "type": "object",
+                  "properties": {
+                    "ColumnSourceAmbiguous": {
+                      "type": "string"
+                    }
+                  },
+                  "required": [
+                    "ColumnSourceAmbiguous"
+                  ],
+                  "additionalProperties": false
+                },
                 {
                   "description": "GROUPING argument does not match a grouping expression of its owner.",
                   "type": "string",

@@ -78,7 +78,7 @@ impl CreateRule {
             rows.push(DataSource::resolve_relation(
                 context,
                 &target,
-                &AliasSpec::from_local_name(alias),
+                &AliasSpec::from_names(alias, &[]),
                 &with,
             )?);
         }

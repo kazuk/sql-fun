@@ -2,6 +2,7 @@ mod cte_column_ref;
 mod invalid_column_ref;
 mod merge_record_column_ref;
 mod output_column_ref;
+mod qualified_column_failure;
 mod subquery_column_ref;
 mod table_column_ref;
 mod table_func_col_ref;
@@ -14,6 +15,7 @@ pub use self::{
     },
     merge_record_column_ref::MergeRecordColumnRef,
     output_column_ref::OutputColumnRef,
+    qualified_column_failure::QualifiedColumnFailure,
     subquery_column_ref::SubQueryColumnRef,
     table_column_ref::TableColumnRef,
     table_func_col_ref::TableFunctionColumnRef,
@@ -35,6 +37,8 @@ trait ColumnReference {
 /// Column reference
 #[derive(Debug, Clone, Eq, Hash, PartialEq, serde::Serialize, serde::Deserialize)]
 pub enum ColumnReferenceExpr {
+    /// Failed qualified lookup with its requested identity and reason.
+    QualifiedFailure(QualifiedColumnFailure),
     /// PostgreSQL DELETE RETURNING OLD/NEW target-column binding.
     DeleteRow(crate::sem::DeleteRowColumn),
     /// MERGE target, source, or row-image column binding.
@@ -75,10 +79,22 @@ impl SemScalarExprNode for ColumnReferenceExpr {
 }
 
 impl ColumnReferenceExpr {
+    pub(crate) fn qualified_failure(failure: &QualifiedColumnFailure) -> Self {
+        Self::QualifiedFailure(failure.clone())
+    }
+    /// Completed qualification failure, when this column did not bind a source.
+    pub const fn qualification_failure(&self) -> Option<&QualifiedColumnFailure> {
+        if let Self::QualifiedFailure(failure) = self {
+            Some(failure)
+        } else {
+            None
+        }
+    }
     pub(super) const fn grouping_reference_resolved(&self) -> bool {
         !matches!(
             self,
-            Self::UndefinedAlias(_)
+            Self::QualifiedFailure(_)
+                | Self::UndefinedAlias(_)
                 | Self::UndefinedTableOrView(_)
                 | Self::UndefinedFunction(_)
                 | Self::UndefinedColumn(_)
@@ -240,7 +256,7 @@ impl ColumnReferenceExpr {
             Self::UndefinedTableOrView(r) => r.get_type(),
             Self::UndefinedFunction(r) => r.get_type(),
             Self::UndefinedColumn(_) => None,
-            Self::AmbiguousColumnRef(_) => None,
+            Self::AmbiguousColumnRef(_) | Self::QualifiedFailure(_) => None,
         }
     }
 
@@ -260,7 +276,7 @@ impl ColumnReferenceExpr {
             Self::UndefinedTableOrView(r) => r.is_not_null(),
             Self::UndefinedFunction(r) => r.is_not_null(),
             Self::UndefinedColumn(_) => None,
-            Self::AmbiguousColumnRef(_) => None,
+            Self::AmbiguousColumnRef(_) | Self::QualifiedFailure(_) => None,
         }
     }
 
@@ -280,7 +296,7 @@ impl ColumnReferenceExpr {
             Self::UndefinedTableOrView(r) => r.get_column_def(),
             Self::UndefinedFunction(r) => r.get_column_def(),
             Self::UndefinedColumn(_) => &None,
-            Self::AmbiguousColumnRef(_) => &None,
+            Self::AmbiguousColumnRef(_) | Self::QualifiedFailure(_) => &None,
         }
     }
 
@@ -301,6 +317,7 @@ impl ColumnReferenceExpr {
             Self::UndefinedFunction(r) => r.get_column_name(),
             Self::UndefinedColumn(c) => c,
             Self::AmbiguousColumnRef(c) => c,
+            Self::QualifiedFailure(failure) => failure.column(),
         }
     }
 

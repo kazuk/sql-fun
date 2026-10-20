@@ -639,11 +639,11 @@ impl FromItem {
         for item in items {
             let source = item.resolve_in_scope(context, with, &scope.with_from_clause(&from))?;
             for alias in source.get_aliases() {
-                if aliases.contains(&alias) {
+                if aliases.contains(alias.name()) {
                     context
                         .report_analysis_problem(AnalysisProblem::duplicate_alias(alias.name()))?;
                 }
-                aliases.push(alias);
+                aliases.push(alias.name().clone());
             }
             from.push(source);
         }

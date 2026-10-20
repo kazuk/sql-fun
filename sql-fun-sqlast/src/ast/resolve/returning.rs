@@ -41,7 +41,6 @@ impl ResultColumnCollection {
         with: &WithClause,
         from: &FromClause,
         scope: &ScalarAnalysisContext<'_>,
-        target: &AliasSpec,
     ) -> Result<Self, AnalysisError> {
         let mut results = Self::default();
         for target_expr in targets {
@@ -53,12 +52,8 @@ impl ResultColumnCollection {
                     ))?;
                 }
                 // Unqualified RETURNING * expands only the modified relation.
-                let qualifier = if name.0.is_empty() {
-                    Some(target.name().clone())
-                } else {
-                    name.star_qualifier()?
-                };
-                if results.expand_projection(
+                let qualifier = name.star_qualifier()?;
+                if results.expand_returning_projection(
                     context,
                     with,
                     from,
@@ -85,7 +80,6 @@ impl ResultColumnCollection {
         with: &WithClause,
         from: &FromClause,
         scope: &ScalarAnalysisContext<'_>,
-        target: &AliasSpec,
     ) -> Result<Self, AnalysisError> {
         let mut results = Self::default();
         for target_expr in targets {
@@ -96,11 +90,7 @@ impl ResultColumnCollection {
                     ))?;
                 }
                 // Unqualified RETURNING * expands only the modified relation.
-                let qualifier = if name.0.is_empty() {
-                    Some(target.name().clone())
-                } else {
-                    name.star_qualifier()?
-                };
+                let qualifier = name.star_qualifier()?;
                 // PostgreSQL 18 can bind OLD and NEW to the modified row while
                 // projection_names still needs the underlying target alias.
                 let projection_qualifier = qualifier.as_ref().map(|alias| {
@@ -108,13 +98,15 @@ impl ResultColumnCollection {
                         .delete_row_target(alias)
                         .map_or(alias, |(target, _)| target)
                 });
-                if results.expand_projection(
+                if results.expand_returning_projection(
                     context,
                     with,
                     from,
                     scope,
                     projection_qualifier,
-                    qualifier.as_ref(),
+                    qualifier
+                        .as_ref()
+                        .filter(|alias| scope.delete_row_target(alias).is_some()),
                 )? == 0
                 {
                     context.report_analysis_problem(AnalysisProblem::delete(
@@ -165,10 +157,43 @@ impl ResultColumnCollection {
         binding_qualifier: Option<&AliasName>,
     ) -> Result<usize, AnalysisError> {
         let columns = from.projection_names(context, with, projection_qualifier)?;
+        self.append_projection_columns(columns, context, scope, binding_qualifier)
+    }
+
+    fn expand_returning_projection(
+        &mut self,
+        context: &mut impl ParseContext,
+        with: &WithClause,
+        from: &FromClause,
+        scope: &ScalarAnalysisContext<'_>,
+        projection_qualifier: Option<&AliasName>,
+        binding_qualifier: Option<&AliasName>,
+    ) -> Result<usize, AnalysisError> {
+        let columns = if projection_qualifier.is_none() || binding_qualifier.is_some() {
+            from.destination_projection(context, with)?
+        } else {
+            from.projection_names(context, with, projection_qualifier)?
+        };
+        self.append_projection_columns(columns, context, scope, binding_qualifier)
+    }
+
+    fn append_projection_columns(
+        &mut self,
+        columns: Vec<crate::sem::ProjectionColumn<'_>>,
+        context: &mut impl ParseContext,
+        scope: &ScalarAnalysisContext<'_>,
+        binding_qualifier: Option<&AliasName>,
+    ) -> Result<usize, AnalysisError> {
         let count = columns.len();
-        for (source, column) in columns {
-            let qualifier = binding_qualifier.unwrap_or(&source);
-            self.append_resolved_column(&column, Some(qualifier), context, scope)?;
+        for column in columns {
+            let value = if let Some(qualifier) = binding_qualifier {
+                scope
+                    .resolve_column(context, Some(qualifier), column.name())?
+                    .0
+            } else {
+                column.bind(context, scope)?
+            };
+            self.push_expression(column.name(), value);
         }
         Ok(count)
     }

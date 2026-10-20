@@ -30,6 +30,40 @@ struct MergeRowImageNullability {
 }
 
 impl FromClause {
+    pub(crate) fn namespace(&self) -> crate::sem::data_source::SourceNamespace<'_> {
+        let mut namespace = crate::sem::data_source::SourceNamespace::default();
+        for source in &self.0 {
+            namespace.append(source.namespace());
+        }
+        namespace
+    }
+
+    pub(crate) fn contains_alias(&self, name: &AliasName) -> bool {
+        self.namespace().contains_alias(name)
+    }
+
+    pub(crate) fn destination_source(
+        &self,
+        alias: &AliasName,
+    ) -> Option<crate::sem::data_source::QualifiedSource<'_>> {
+        self.0
+            .last()?
+            .namespace()
+            .resolve_name(alias)
+            .ok()
+            .flatten()
+    }
+
+    pub(crate) fn validate_source(
+        &self,
+        context: &mut impl ParseContext,
+        source: &DataSource,
+    ) -> Result<(), AnalysisError> {
+        source
+            .namespace()
+            .validate_against(&self.namespace(), context)
+    }
+
     pub(crate) fn qualified_source<'a>(
         &'a self,
         context: &impl ParseContext,
@@ -118,7 +152,7 @@ impl FromClause {
         &self,
         alias: &crate::sem::data_source::AliasName,
     ) -> Option<(&crate::sem::data_source::AliasName, MergeRecordRole, bool)> {
-        if self.resolve_alias(alias).is_some() {
+        if self.contains_alias(alias) {
             return None;
         }
         self.0
@@ -128,16 +162,36 @@ impl FromClause {
 
     pub(crate) fn projection_names(
         &self,
-        context: &impl ParseContext,
+        context: &mut impl ParseContext,
         with: &WithClause,
         qualifier: Option<&AliasName>,
-    ) -> Result<Vec<(AliasName, ColumnName)>, AnalysisError> {
+    ) -> Result<Vec<crate::sem::data_source::ProjectionColumn<'_>>, AnalysisError> {
+        if let Some(qualifier) = qualifier
+            && self.namespace().resolve_name(qualifier).is_err()
+        {
+            return Ok(vec![crate::sem::data_source::ProjectionColumn::ambiguous(
+                context, qualifier,
+            )?]);
+        }
         let mut names = Vec::new();
         for source in &self.0 {
             names.extend(source.projection_names(context, with, qualifier)?);
         }
         Ok(names)
     }
+    /// UPDATE/DELETE RETURNING * selects the destination occurrence, even when
+    /// another source exposes the same local relation name.
+    pub(crate) fn destination_projection(
+        &self,
+        context: &impl ParseContext,
+        with: &WithClause,
+    ) -> Result<Vec<crate::sem::data_source::ProjectionColumn<'_>>, AnalysisError> {
+        let Some(source) = self.0.last() else {
+            return Ok(Vec::new());
+        };
+        source.projection_names(context, with, None)
+    }
+
     pub(crate) fn single_relation_name(&self) -> Option<crate::sem::FullName> {
         match self.0.as_slice() {
             [DataSource::Table(table)] => Some(table.name().full_name().clone()),
@@ -165,9 +219,10 @@ impl FromClause {
         Ok((result?, context))
     }
 
-    /// get data-source by alias name
+    /// Resolve a unique visible alias. Missing or ambiguous aliases return `None`.
     #[must_use]
     pub fn resolve_alias(&self, alias_name: &AliasName) -> Option<(&DataSource, Nullable)> {
+        self.namespace().resolve_name(alias_name).ok().flatten()?;
         for source in &self.0 {
             if let Some(resolved) = source.resolve_alias(alias_name) {
                 return Some(resolved);

@@ -43,6 +43,12 @@ impl super::ColumnReference for TableColumnRef {
 }
 
 impl TableColumnRef {
+    pub(super) fn with_reference_name(mut self, alias: &AliasName, column: &ColumnName) -> Self {
+        self.alias = alias.clone();
+        self.column = column.clone();
+        self
+    }
+
     pub(super) fn canonicalize_grouping_key(&mut self) {
         self.column_def = None;
     }

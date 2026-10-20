@@ -543,6 +543,14 @@ view alias hides its original relation name, even when the alias repeats the
 table name: `FROM public.items AS items` allows `items.id`, but hides
 `public.items.id`.
 
+Distinct unaliased relations with the same local name can coexist across schemas:
+`SELECT a.t.id, b.t.id FROM a.t, b.t` binds each column to its named relation.
+The short qualifier `t.id` (and `t.*`) is ambiguous in that query, even if only
+one relation contains the requested column. An unqualified column can still
+resolve when exactly one relation supplies it. `SELECT *` includes both sources
+in FROM order. Repeating the same relation without distinct aliases remains
+invalid, as does reusing an explicit alias.
+
 To analyze PostgreSQL database-qualified columns, explicitly set the actual
 database name in the selected datasource metadata:
 

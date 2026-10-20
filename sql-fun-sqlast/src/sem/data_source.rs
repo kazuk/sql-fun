@@ -7,6 +7,7 @@ mod group;
 mod join_expr;
 mod join_kind;
 mod merge_record;
+mod namespace;
 mod projection;
 mod qualified;
 mod resolved;
@@ -33,7 +34,8 @@ pub use self::{
     view::ViewDataSource,
 };
 pub(crate) use self::{
-    column_candidates::ColumnCandidates, join_expr::JoinUsingClause, qualified::QualifiedSource,
+    column_candidates::ColumnCandidates, join_expr::JoinUsingClause, namespace::SourceNamespace,
+    projection::ProjectionColumn, qualified::QualifiedSource,
 };
 
 use crate::sem::{
@@ -112,8 +114,9 @@ impl DataSource {
             Self::Group(group) => {
                 group.create_column_ref(context, with_clause, alias, column, nullability)
             }
-            // resolve_alias not returns this variants
-            Self::JoinExpr(_) => unreachable!(),
+            Self::JoinExpr(join) => {
+                join.create_column_ref(context, with_clause, column, nullability)
+            }
             Self::MergeRecord(record) => {
                 record.create_column_ref(context, with_clause, alias, column, nullability)
             }
@@ -163,14 +166,15 @@ impl DataSource {
         results
     }
 
-    /// resolve alias name to data source
+    /// Resolve a unique visible alias. Missing or ambiguous aliases return `None`.
     #[must_use]
     pub fn resolve_alias(&self, name: &AliasName) -> Option<(&Self, Nullable)> {
+        self.namespace().resolve_name(name).ok().flatten()?;
         match self {
             Self::CteQuery(d) => d.resolve_alias(self, name),
             Self::Table(d) => d.resolve_alias(self, name),
             Self::View(d) => d.resolve_alias(self, name),
-            Self::JoinExpr(d) => d.resolve_alias(name),
+            Self::JoinExpr(d) => d.resolve_alias(self, name),
             Self::MergeRecord(d) => d.resolve_alias(self, name),
             Self::Group(d) => d.resolve_alias(self, name),
             Self::SubQuery(d) => d.resolve_alias(self, name),

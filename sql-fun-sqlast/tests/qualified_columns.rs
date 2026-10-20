@@ -35,8 +35,11 @@ fn binds_canonical_table_identity(
 #[test]
 fn same_named_relations_keep_distinct_qualified_bindings() -> testresult::TestResult {
     let analyzed = heavy::analyze("SELECT a.t.id, b.t.id FROM a.t, b.t", None)?;
-    // Existing FROM validation emits a false duplicate diagnostic; tracked in #677.
-    // This regression verifies binding independently without suppressing that diagnostic.
+    assert!(
+        analyzed.context().problems().is_empty(),
+        "{:?}",
+        analyzed.context().problems()
+    );
     let query = analyzed.ast().clone().into_select_statemtnt().unwrap();
     for (index, schema, expected_type) in [
         (0, "a", ::sql_fun_sqlast::sem::PgBuiltInType::int4()),

@@ -235,20 +235,19 @@ impl Select {
         for target in &self.targets {
             if let Expr::Star(name) = &target.expression {
                 let qualifier = name.star_qualifier()?;
-                let mut columns = from.projection_names(context, with, qualifier.as_ref())?;
-                if columns.is_empty()
-                    && let Some(qualifier) = &qualifier
-                {
-                    columns = scope.projection_names(context, qualifier)?;
-                }
+                let columns = if let Some(qualifier) = &qualifier {
+                    scope.projection_names(context, qualifier)?
+                } else {
+                    from.projection_names(context, with, None)?
+                };
                 if columns.is_empty() {
                     context.report_analysis_problem(AnalysisProblem::query(
                         crate::sem::problem::QueryProblem::reference_not_found("star source"),
                     ))?;
                 }
-                for (alias, column) in columns {
-                    let expression = scope.resolve_column(context, Some(&alias), &column)?.0;
-                    results.push_expression(&column, expression);
+                for column in columns {
+                    let expression = column.bind(context, &scope)?;
+                    results.push_expression(column.name(), expression);
                 }
                 continue;
             }
@@ -635,16 +634,9 @@ impl FromItem {
         scope: &ScalarAnalysisContext<'_>,
     ) -> Result<FromClause, AnalysisError> {
         let mut from = FromClause::default();
-        let mut aliases = Vec::new();
         for item in items {
             let source = item.resolve_in_scope(context, with, &scope.with_from_clause(&from))?;
-            for alias in source.get_aliases() {
-                if aliases.contains(alias.name()) {
-                    context
-                        .report_analysis_problem(AnalysisProblem::duplicate_alias(alias.name()))?;
-                }
-                aliases.push(alias.name().clone());
-            }
+            from.validate_source(context, &source)?;
             from.push(source);
         }
 
@@ -737,6 +729,9 @@ impl Join {
         let left = self.left.resolve_in_scope(context, with, scope)?;
         let visible = scope.with_added_source(&left);
         let right = self.right.resolve_in_scope(context, with, &visible)?;
+        right
+            .namespace()
+            .validate_against(&left.namespace(), context)?;
         let scope = visible.with_added_source(&right);
         let condition = Expr::resolve_optional(
             &self.condition,

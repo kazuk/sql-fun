@@ -268,6 +268,19 @@ impl SemScalarExpr {
         }
     }
 
+    pub(crate) fn with_source_reference_name(
+        self,
+        alias: &crate::sem::AliasName,
+        column: &crate::sem::ColumnName,
+    ) -> Self {
+        match self {
+            Self::ColumnRef(reference) => {
+                Self::column_reference(reference.with_reference_name(alias, column))
+            }
+            _ => self,
+        }
+    }
+
     pub(crate) const fn column_reference(reference: ColumnReferenceExpr) -> Self {
         Self::ColumnRef(reference)
     }

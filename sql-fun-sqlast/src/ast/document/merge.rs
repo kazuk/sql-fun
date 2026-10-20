@@ -79,7 +79,7 @@ impl Merge {
         let source = self
             .source_relation
             .resolve(context, &with, &FromClause::default(), None)?;
-        if source.resolve_alias(alias.name()).is_some() {
+        if source.namespace().contains_alias(alias.name()) {
             context.report_analysis_problem(AnalysisProblem::duplicate_alias(alias.name()))?;
         }
         let on_scope = ScalarAnalysisContext::for_merge_on(&with, &target, &source);

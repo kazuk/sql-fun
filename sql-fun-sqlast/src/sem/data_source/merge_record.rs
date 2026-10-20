@@ -161,8 +161,13 @@ impl MergeRecordDataSource {
         context: &impl ParseContext,
         with: &WithClause,
         qualifier: Option<&AliasName>,
-    ) -> Result<Vec<(AliasName, ColumnName)>, AnalysisError> {
-        self.source.projection_names(context, with, qualifier)
+    ) -> Result<Vec<super::ProjectionColumn<'_>>, AnalysisError> {
+        Ok(self
+            .source
+            .projection_names(context, with, qualifier)?
+            .into_iter()
+            .map(|column| column.with_merge(self.role, self.nullable))
+            .collect())
     }
 
     pub(super) fn column_names(

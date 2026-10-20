@@ -147,15 +147,14 @@ impl Delete {
         // USING subqueries cannot implicitly see the DELETE target. WHERE and
         // RETURNING subqueries use the complete scope assembled below.
         let mut from = FromItem::resolve_list_in(&self.using, context, with, outer)?;
-        if from.resolve_alias(alias.name()).is_some() {
-            context.report_analysis_problem(AnalysisProblem::duplicate_alias(alias.name()))?;
-        }
-        from.push(DataSource::resolve_relation(
+        let source = DataSource::resolve_relation(
             context,
             table.name().full_name(),
             alias,
             &WithClause::default(),
-        )?);
+        )?;
+        from.validate_source(context, &source)?;
+        from.push(source);
         Ok(from)
     }
     fn resolve_predicate(
@@ -215,19 +214,11 @@ impl Delete {
                 with,
                 &returning_from,
                 &scope,
-                &returning_alias,
             )
         } else {
             let mut scope = ScalarAnalysisContext::nested(with, from, Some(outer));
             scope.set_delete_returning_target(alias.name(), context);
-            ResultColumnCollection::resolve_for_delete(
-                &self.returning,
-                context,
-                with,
-                from,
-                &scope,
-                alias,
-            )
+            ResultColumnCollection::resolve_for_delete(&self.returning, context, with, from, &scope)
         }
     }
 }

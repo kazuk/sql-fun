@@ -4,18 +4,19 @@ use crate::sem::{
 };
 
 /// A visible source occurrence, selected without a second lookup by bare alias.
+#[derive(Debug, Clone)]
 pub(crate) struct QualifiedSource<'a> {
     source: &'a DataSource,
-    alias: &'a AliasName,
+    alias: AliasName,
     nullable: bool,
     merge_role: Option<MergeRecordRole>,
 }
 
 impl<'a> QualifiedSource<'a> {
-    pub(super) const fn new(source: &'a DataSource, alias: &'a AliasName) -> Self {
+    pub(super) fn new(source: &'a DataSource, alias: &AliasName) -> Self {
         Self {
             source,
-            alias,
+            alias: alias.clone(),
             nullable: false,
             merge_role: None,
         }
@@ -32,8 +33,22 @@ impl<'a> QualifiedSource<'a> {
         self
     }
 
+    pub(crate) const fn alias(&self) -> &AliasName {
+        &self.alias
+    }
+
+    pub(super) fn column_candidates(
+        &self,
+        context: &impl ParseContext,
+        with: &WithClause,
+        column: &ColumnName,
+    ) -> Result<super::ColumnCandidates, AnalysisError> {
+        self.source
+            .column_occurrence_candidates(context, with, column, &self.alias)
+    }
+
     pub(crate) fn bind(
-        self,
+        &self,
         context: &mut impl ParseContext,
         with: &WithClause,
         column: &ColumnName,
@@ -47,7 +62,7 @@ impl<'a> QualifiedSource<'a> {
         };
         let value = self
             .source
-            .create_column_ref(context, with, self.alias, column, self.nullable)?
+            .create_column_ref(context, with, &self.alias, column, self.nullable)?
             .0;
         Ok(if let Some(role) = self.merge_role {
             value.merge_record_column(role, self.nullable)
@@ -58,6 +73,28 @@ impl<'a> QualifiedSource<'a> {
 }
 
 impl DataSource {
+    fn column_occurrence_candidates(
+        &self,
+        context: &impl ParseContext,
+        with: &WithClause,
+        column: &ColumnName,
+        alias: &AliasName,
+    ) -> Result<super::ColumnCandidates, AnalysisError> {
+        if let Self::JoinExpr(join) = self {
+            if join.column_candidates(column, context, with).is_unknown() {
+                return Ok(super::ColumnCandidates::unknown());
+            }
+            let mut aliases = Vec::new();
+            for projected in join.project(context, with, None)? {
+                if projected.name() == column {
+                    aliases.push(super::AliasSpec::from_local_name(alias.as_str()));
+                }
+            }
+            return Ok(super::ColumnCandidates::from(aliases));
+        }
+        Ok(self.aliases_for_column_resolved(column, context, with))
+    }
+
     pub(super) fn sqlite_qualified_group_source<'a>(
         &'a self,
         context: &impl ParseContext,

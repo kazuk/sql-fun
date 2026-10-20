@@ -16,6 +16,15 @@ pub enum MinMaxProblem {
     NotOrdered(TypeReference),
 }
 impl MinMaxProblem {
+    pub(super) fn into_array_problem(self) -> Result<super::ArrayProblem, Self> {
+        match self {
+            Self::Empty => Ok(super::ArrayProblem::empty()),
+            Self::Incompatible(left, right) => Ok(super::ArrayProblem::incompatible(*left, *right)),
+            Self::MissingTypeFacts(ty) => Ok(super::ArrayProblem::missing_type_facts(ty)),
+            comparison => Err(comparison),
+        }
+    }
+
     /// Diagnostic empty.
     #[must_use]
     pub const fn empty() -> Self {

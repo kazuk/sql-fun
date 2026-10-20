@@ -351,6 +351,18 @@ impl ParameterResolution {
         operation: &str,
         arguments: &[SemScalarExpr],
     ) -> Result<(usize, InputTypeConstraint), AnalysisError> {
+        self.common_type(context, operation, arguments, true)
+    }
+
+    // Shared ordered selection relations; comparison validation belongs only
+    // to GREATEST/LEAST. ARRAY lifts the selected type into its result below.
+    fn common_type(
+        &mut self,
+        context: &mut impl crate::sem::ParseContext,
+        operation: &str,
+        arguments: &[SemScalarExpr],
+        comparison: bool,
+    ) -> Result<(usize, InputTypeConstraint), AnalysisError> {
         use crate::sem::MinMaxExpr;
         let mut choices = std::collections::HashSet::new();
         for argument in arguments {
@@ -441,7 +453,11 @@ impl ParameterResolution {
             } else {
                 source.clone()
             };
-            let ordering = MinMaxExpr::ordered(context, &target);
+            let ordering = if comparison {
+                MinMaxExpr::ordered(context, &target)
+            } else {
+                Some(true)
+            };
             if ordering.is_none() {
                 context.report_analysis_problem(crate::sem::AnalysisProblem::min_max(
                     crate::sem::problem::MinMaxProblem::missing_comparison_facts(&target),
@@ -488,6 +504,43 @@ impl ParameterResolution {
                 .overload(&[*node, result], &alternatives, operation);
         }
         Ok((result, domain))
+    }
+
+    pub(crate) fn array(
+        &mut self,
+        context: &mut impl crate::sem::ParseContext,
+        arguments: &[SemScalarExpr],
+        explicit_target: Option<&TypeReference>,
+        multidimensional: bool,
+    ) -> Result<(usize, InputTypeConstraint), AnalysisError> {
+        if let Some(target) = explicit_target {
+            let element = if multidimensional {
+                target.clone()
+            } else {
+                target.element_type()
+            };
+            for argument in arguments {
+                self.require(context, argument, &element, true);
+            }
+            let domain = InputTypeConstraint::exact(target);
+            return Ok((self.graph.node(&domain), domain));
+        }
+        let (element, domain) = self.common_type(context, "ARRAY", arguments, false)?;
+        let mut alternatives = Vec::new();
+        let mut arrays = Vec::new();
+        for ty in domain.admissible_types().unwrap_or(&[]) {
+            let array = ty.array_type();
+            arrays.push(array.clone());
+            alternatives.push(SignatureAlternative::new(&[
+                InputTypeConstraint::exact(ty),
+                InputTypeConstraint::exact(&array),
+            ]));
+        }
+        let domain = InputTypeConstraint::types(arrays);
+        let node = self.graph.node(&domain);
+        self.graph
+            .overload(&[element, node], &alternatives, "ARRAY element/result");
+        Ok((node, domain))
     }
 
     pub(crate) fn scalar_result(&mut self, value: &SemScalarExpr) -> Option<SemScalarExpr> {

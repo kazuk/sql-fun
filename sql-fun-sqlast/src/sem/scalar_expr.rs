@@ -165,6 +165,7 @@ impl SemScalarExpr {
         match self {
             Self::Grouping(value) => value.canonicalize_grouping_key(),
             Self::MinMax(value) => value.canonicalize_grouping_key(),
+            Self::Array(value) => value.canonicalize_grouping_key(),
             Self::FuncCall(value) => value.canonicalize_grouping_key(),
             Self::Arith(value) => value.canonicalize_grouping_key(),
             Self::Param(value) => value.canonicalize_grouping_key(),
@@ -325,6 +326,7 @@ impl SemScalarExpr {
             Self::Param(value) => Some(value.node()),
             Self::Constrained(value) => Some(value.node()),
             Self::MinMax(value) => value.node(),
+            Self::Array(value) => value.node(),
             _ => None,
         }
     }
@@ -334,6 +336,14 @@ impl SemScalarExpr {
         constraint: &crate::sem::InputTypeConstraint,
     ) -> Self {
         Self::Param(ParamRef::new(position, node, constraint))
+    }
+    /// Analyzed ARRAY constructor, including its elements and type outcome.
+    pub const fn as_array(&self) -> Option<&ArrayExpr> {
+        if let Self::Array(value) = self {
+            Some(value)
+        } else {
+            None
+        }
     }
     /// PostgreSQL GREATEST/LEAST semantics, when this is a MinMax expression.
     pub const fn as_min_max(&self) -> Option<&MinMaxExpr> {
@@ -480,6 +490,14 @@ impl SemScalarExpr {
         }
     }
 
+    pub(super) fn array_projection_name(&self) -> Option<&'static str> {
+        match self {
+            Self::Array(_) => Some("array"),
+            Self::TypeCast(value) => value.array_projection_name(),
+            _ => None,
+        }
+    }
+
     /// get column name
     #[must_use]
     pub fn get_column_name(&self) -> String {
@@ -488,7 +506,7 @@ impl SemScalarExpr {
             Self::ColumnRef(cr) => cr.get_column_name().to_string(),
             Self::FuncCall(_func_call_expr) => String::new(),
             Self::Arith(_arith_expr) => String::new(),
-            Self::TypeCast(_type_cast_expr) => String::new(),
+            Self::TypeCast(value) => value.array_projection_name().unwrap_or_default().to_owned(),
             Self::Case(_case_expr) => String::new(),
             Self::Boolean(_boolean_expr) => String::new(),
             Self::NullTest(_null_test_expr) => String::new(),
@@ -502,7 +520,7 @@ impl SemScalarExpr {
             Self::NamedArg(named_arg_expr) => named_arg_expr.value().get_column_name(),
             Self::Indirection(_indirection_expr) => String::new(),
             Self::ImplicitCast(_implicit_cast_expr) => todo!(),
-            Self::Array(_arr) => todo!(),
+            Self::Array(_) => "array".to_owned(),
             Self::Grouping(_) => "grouping".to_owned(),
             Self::MergeAction => "merge_action".to_owned(),
             Self::Unexpected(_node) => todo!(),
@@ -882,6 +900,7 @@ impl SemScalarExpr {
             Self::Param(value) => value.apply_constraints(constraints),
             Self::Constrained(value) => value.apply_constraints(constraints),
             Self::MinMax(value) => value.apply_constraints(constraints),
+            Self::Array(value) => value.apply_constraints(constraints),
             _ => {}
         }
     }
@@ -903,6 +922,10 @@ impl SemScalarExpr {
             Self::Exists(_) => None,
             Self::Case(value) => {
                 value.collect_constraints(parameters);
+                None
+            }
+            Self::Array(value) => {
+                value.collect_constraints(parameters, context)?;
                 None
             }
             Self::MinMax(value) => {

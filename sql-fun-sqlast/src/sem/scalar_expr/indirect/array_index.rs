@@ -62,7 +62,7 @@ impl ArrayIndex {
         array.require_array_resolved(context)?;
         index.fits_array_index_resolved(context)?;
         let item_type = if let Some(array_type) = array.get_type() {
-            context.get_array_item_type(&array_type)
+            Self::resolved_item_type(context, &array_type)
         } else {
             None
         };
@@ -70,6 +70,23 @@ impl ArrayIndex {
         Ok(IndirectionExpr::ArrayIndex(Box::new(Self::new(
             array, index, item_type,
         ))))
+    }
+
+    fn resolved_item_type(
+        context: &impl ParseContext,
+        array: &TypeReference,
+    ) -> Option<TypeReference> {
+        let element = context.get_array_item_type(array)?;
+        // PostgreSQL subscripting does not propagate the anonymous record's
+        // typmod/field descriptor. The array definition retains that structure.
+        if context.dialect() == crate::ast::Dialect::postgres()
+            && element.is_dynamic()
+            && element.is_record()
+        {
+            Some(TypeReference::from_master_type_name("record"))
+        } else {
+            Some(element)
+        }
     }
 
     pub fn analyze_index<TParseContext>(

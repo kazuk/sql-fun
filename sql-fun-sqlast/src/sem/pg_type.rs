@@ -1,8 +1,10 @@
+mod array;
 mod category;
 mod concrete_type;
 mod dynamic_type;
 mod type_ref;
 
+pub use self::array::ArrayTypeDefinition;
 pub use self::{category::TypeCategory, type_ref::TypeReference};
 
 use crate::sem::{
@@ -13,6 +15,8 @@ use crate::sem::{
 /// type definitions
 #[derive(Debug, Clone, Eq, Hash, PartialEq, serde::Serialize, serde::Deserialize)]
 pub enum TypeDefinition {
+    /// An array whose element retains its structural type identity.
+    Array(ArrayTypeDefinition),
     /// an enum type
     Enum(CreateEnum),
     /// a composite type
@@ -38,6 +42,47 @@ pub struct BuiltinTypeDefinition {
 }
 
 impl TypeDefinition {
+    /// Define a structural array without requiring a catalog name for its element.
+    #[must_use]
+    pub fn array(element: &TypeReference) -> Self {
+        Self::Array(ArrayTypeDefinition::new(element))
+    }
+
+    pub(crate) const fn array_element(&self) -> Option<&TypeReference> {
+        if let Self::Array(array) = self {
+            Some(array.element())
+        } else {
+            None
+        }
+    }
+
+    pub(crate) fn matches_structure(
+        &self,
+        other: &Self,
+        context: &impl crate::sem::BaseParseContext,
+    ) -> bool {
+        if self == other {
+            return true;
+        }
+        // Anonymous record descriptors are positional. A named composite
+        // retains nominal identity; equal field layouts do not authorize an
+        // implicit conversion from an anonymous record to that named type.
+        match (self.structural_columns(), other.structural_columns()) {
+            (Some(left), Some(right)) => left.matches_type_structure(&right, context),
+            _ => false,
+        }
+    }
+
+    fn structural_columns(&self) -> Option<ColumnCollection> {
+        match self {
+            Self::CompositeType(value) if value.type_ref().is_none() => {
+                Some(value.get_column_collection())
+            }
+            Self::ImplicitComposite(value) => Some(value.clone()),
+            _ => None,
+        }
+    }
+
     /// Construct a catalog type without inferring classification from its name.
     pub fn builtin_with_category(full_name: &FullName, category: Option<TypeCategory>) -> Self {
         Self::Builtin(BuiltinTypeDefinition {
@@ -55,6 +100,7 @@ impl TypeDefinition {
             return None;
         }
         match self {
+            Self::Array(_) => TypeCategory::try_from('A').ok(),
             Self::Builtin(definition) => definition.category,
             Self::Enum(_) => TypeCategory::try_from('E').ok(),
             Self::CompositeType(_) | Self::TableRef(_, _) | Self::ImplicitComposite(_) => {
@@ -115,6 +161,7 @@ impl TypeDefinition {
     #[must_use]
     pub fn is_array(&self) -> Option<bool> {
         match self {
+            Self::Array(_) => Some(true),
             Self::Enum(_) => Some(false),
             Self::CompositeType(_) => Some(false),
             Self::Domain(create_domain) => create_domain.type_ref().is_array(),
@@ -135,6 +182,7 @@ impl TypeDefinition {
     #[must_use]
     pub fn type_reference(&self) -> Option<&TypeReference> {
         match self {
+            Self::Array(_) => None,
             Self::Builtin(definition) => Some(&definition.reference),
             Self::Domain(ct) => Some(ct.type_ref()),
             Self::CompositeType(ct) => ct.type_ref().as_ref(),
@@ -147,6 +195,7 @@ impl TypeDefinition {
     #[must_use]
     pub fn full_name(&self) -> Option<&FullName> {
         match self {
+            Self::Array(_) => None,
             Self::Enum(create_enum) => Some(create_enum.name()),
             Self::CompositeType(create_composite_type) => create_composite_type.name(),
             Self::Domain(create_domain) => Some(create_domain.name()),
@@ -165,6 +214,9 @@ impl TypeDefinition {
     /// check type compatibility
     #[must_use]
     pub fn compatible_with(&self, other: &Self) -> bool {
+        if matches!(self, Self::Array(_)) || matches!(other, Self::Array(_)) {
+            return self == other;
+        }
         if self.full_name() == other.full_name() {
             true
         } else {
@@ -205,6 +257,7 @@ impl TypeDefinition {
         member: &str,
     ) -> Option<TypeReference> {
         match self {
+            Self::Array(_) => None,
             Self::Enum(_create_enum) => todo!(),
             Self::CompositeType(create_composite_type) => {
                 create_composite_type.get_member(member)?.get_type()
@@ -220,6 +273,27 @@ impl TypeDefinition {
                 cd.get_type_cloned()
             }
         }
+    }
+}
+
+#[cfg(test)]
+mod array_definition_tests {
+    use super::{PgBuiltInType, TypeDefinition, TypeReference};
+
+    #[rstest::rstest]
+    #[case::same_element("int4", true)]
+    #[case::different_element("text", false)]
+    fn array_definition_compatibility_retains_element_identity(
+        #[case] element: &str,
+        #[case] compatible: bool,
+    ) {
+        let left = TypeDefinition::array(&PgBuiltInType::int4());
+        let right = TypeDefinition::array(&TypeReference::from_master_type_name(element));
+        assert_eq!(left.compatible_with(&right), compatible);
+        assert_eq!(right.compatible_with(&left), compatible);
+        let scalar = TypeDefinition::builtin(PgBuiltInType::int4().full_name());
+        assert!(!left.compatible_with(&scalar));
+        assert!(!scalar.compatible_with(&left));
     }
 }
 

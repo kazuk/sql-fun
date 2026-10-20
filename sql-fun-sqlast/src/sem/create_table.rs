@@ -34,6 +34,20 @@ impl ColumnCollection {
         Self(columns)
     }
 
+    pub(crate) fn matches_type_structure(
+        &self,
+        other: &Self,
+        context: &impl crate::sem::BaseParseContext,
+    ) -> bool {
+        self.0.len() == other.0.len()
+            && self.0.iter().zip(&other.0).all(|(left, right)| {
+                match (left.get_type_cloned(), right.get_type_cloned()) {
+                    (Some(left), Some(right)) => left.matches_structure(&right, context),
+                    _ => false,
+                }
+            })
+    }
+
     /// find mutateble column by name
     pub fn get_column_mut(&mut self, column_name: &ColumnName) -> Option<&mut ColumnDefinition> {
         self.0

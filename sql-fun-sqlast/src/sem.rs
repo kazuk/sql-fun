@@ -179,7 +179,10 @@ pub use self::{
         SourceAccessService, TableInfoRead, TableInfoWrite, TriggerInfoRead, TriggerInfoWrite,
         TypeInfoRead, TypeInfoWrite, ViewInfoRead, ViewInfoWrite,
     },
-    pg_type::{BuiltinTypeDefinition, PgBuiltInType, TypeCategory, TypeDefinition, TypeReference},
+    pg_type::{
+        ArrayTypeDefinition, BuiltinTypeDefinition, PgBuiltInType, TypeCategory, TypeDefinition,
+        TypeReference,
+    },
     problem::{AnalysisProblem, ParameterConstraintProblem, QueryProblem},
     query::{
         FunctionModifiers, QueryCte, QueryFrame, QueryFrameBound, QueryGrouping, QueryLock,

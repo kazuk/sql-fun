@@ -1,5 +1,6 @@
 //! Presentation-neutral SQL analysis diagnostics.
 mod alter_column;
+mod array;
 mod call_argument;
 mod creation;
 mod delete;
@@ -16,6 +17,7 @@ mod trigger;
 mod update;
 mod view;
 pub use self::alter_column::{AlterColumnProblem, ColumnAttributeProblem};
+pub use self::array::ArrayProblem;
 pub use self::call_argument::CallArgumentProblem;
 pub use self::creation::CreationProblem;
 pub use self::delete::{
@@ -46,6 +48,8 @@ pub use self::values::{
 #[derive(Debug, Clone, ::serde::Serialize, ::serde::Deserialize)]
 #[cfg_attr(feature = "openrpc-schema", derive(::schemars::JsonSchema))]
 pub enum AnalysisProblem {
+    /// Invalid ARRAY constructor typing.
+    Array(ArrayProblem),
     /// Invalid index alteration or a statistics warning.
     Index(IndexProblem),
     /// An ALTER COLUMN binding or attribute is invalid.
@@ -312,6 +316,12 @@ impl AnalysisProblem {
             _ => None,
         }
     }
+    /// An ARRAY constructor typing failure.
+    #[must_use]
+    pub const fn array(problem: ArrayProblem) -> Self {
+        Self::Array(problem)
+    }
+
     /// Report a PostgreSQL GREATEST/LEAST semantic failure.
     #[must_use]
     pub const fn min_max(problem: MinMaxProblem) -> Self {
@@ -340,6 +350,7 @@ impl AnalysisProblem {
             Self::Query(problem) => problem.code(),
             Self::CallArgument(problem) => problem.code(),
             Self::MinMax(problem) => problem.code(),
+            Self::Array(problem) => problem.code(),
             Self::ParameterConstraint(_) => "parameter_constraint",
             Self::NameResolution(problem) => problem.code(),
             Self::OverloadResolution(problem) => problem.code(),
@@ -394,6 +405,7 @@ impl AnalysisProblem {
             Self::Query(problem) => problem.render_metadata(),
             Self::CallArgument(problem) => problem.render_metadata(),
             Self::MinMax(problem) => problem.render_metadata(),
+            Self::Array(problem) => problem.render_metadata(),
             Self::ParameterConstraint(problem) => problem.render_metadata(),
             Self::NameResolution(problem) => return problem.render_metadata(),
             _ => return None,

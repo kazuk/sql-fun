@@ -19,6 +19,19 @@ pub enum IndirectionExpr {
 }
 
 impl IndirectionExpr {
+    pub(super) fn index(value: &ArrayIndex) -> Self {
+        Self::ArrayIndex(Box::new(value.clone()))
+    }
+    pub(super) fn slice(value: &ArraySlice) -> Self {
+        Self::ArraySlice(Box::new(value.clone()))
+    }
+    pub(crate) fn set_result_type(&mut self, result: &Option<TypeReference>) {
+        match self {
+            Self::ArrayIndex(value) => value.set_item_type(result),
+            Self::ArraySlice(_) => {}
+            Self::MemberRef(value) => value.set_member_type(result),
+        }
+    }
     pub(crate) fn resolved_index<TContext: crate::sem::ParseContext>(
         context: &mut TContext,
         base: SemScalarExpr,
@@ -86,19 +99,15 @@ impl IndirectionExpr {
 }
 
 impl IndirectionExpr {
-    fn requires_type_inference(&self) -> bool {
-        match self {
-            Self::ArrayIndex(value) => value.requires_type_inference(),
-            Self::ArraySlice(value) => value.requires_type_inference(),
-            Self::MemberRef(value) => value.requires_type_inference(),
-        }
-    }
     pub(crate) fn collect_constraints(
         &self,
         parameters: &mut crate::sem::parameter_resolution::ParameterResolution,
-    ) {
-        if self.requires_type_inference() {
-            parameters.constrain_indirection(self);
+        context: &mut impl crate::sem::ParseContext,
+    ) -> Option<SemScalarExpr> {
+        match self {
+            Self::ArrayIndex(value) => Some(value.collect_constraints(parameters, context)),
+            Self::ArraySlice(value) => Some(value.collect_constraints(parameters, context)),
+            Self::MemberRef(value) => value.collect_constraints(parameters),
         }
     }
 }

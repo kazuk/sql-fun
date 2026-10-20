@@ -346,6 +346,11 @@ impl SemScalarExpr {
     pub(crate) fn min_max(value: &MinMaxExpr) -> Self {
         Self::MinMax(value.clone())
     }
+    pub(crate) fn retain_indirection(&mut self, indirection: &IndirectionExpr) {
+        if let Self::Constrained(value) = self {
+            value.retain_indirection(indirection);
+        }
+    }
     pub(crate) fn constrained(value: &ConstrainedExpr) -> Self {
         Self::Constrained(value.clone())
     }
@@ -734,14 +739,9 @@ impl SemScalarExpr {
         context: &mut TContext,
     ) -> Result<(), AnalysisError> {
         if let Some(ty) = self.get_type()
+            && ty != PgBuiltInType::int4()
             && context
-                .get_implicit_cast(&ty, &PgBuiltInType::int2())
-                .is_none()
-            && context
-                .get_implicit_cast(&ty, &PgBuiltInType::int4())
-                .is_none()
-            && context
-                .get_implicit_cast(&ty, &PgBuiltInType::int8())
+                .get_assignment_cast(&ty, &PgBuiltInType::int4())
                 .is_none()
         {
             context
@@ -846,6 +846,14 @@ impl SemScalarExpr {
     pub fn named_argument(name: &str, value: &Self, span: &Option<crate::StringSpan>) -> Self {
         Self::NamedArg(NamedArgExpr::new(name, value, span))
     }
+    /// Array/composite access, including a parameter-dependent analyzed binding.
+    pub fn as_indirection(&self) -> Option<&IndirectionExpr> {
+        match self {
+            Self::Indirection(value) => Some(value),
+            Self::Constrained(value) => value.indirection(),
+            _ => None,
+        }
+    }
     /// Function invocation retained independently of signature resolution.
     pub const fn as_function_call(&self) -> Option<&FuncCallExpr> {
         match self {
@@ -905,10 +913,7 @@ impl SemScalarExpr {
                 value.collect_constraints(parameters);
                 None
             }
-            Self::Indirection(value) => {
-                value.collect_constraints(parameters);
-                None
-            }
+            Self::Indirection(value) => value.collect_constraints(parameters, context),
             _ => None,
         };
         if let Some(mut replacement) = replacement {

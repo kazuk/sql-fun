@@ -11,6 +11,8 @@ pub struct ConstrainedExpr {
     cast_binding: Option<crate::sem::QueryNameResolution>,
     #[serde(default)]
     semantic_call: Option<Box<crate::sem::scalar_expr::func_call::FunctionBinding>>,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    indirection: Option<Box<crate::sem::IndirectionExpr>>,
     arguments: Vec<SemScalarExpr>,
     types: InputTypeConstraint,
     not_null: Option<bool>,
@@ -34,11 +36,19 @@ impl ConstrainedExpr {
             operator_binding: None,
             cast_binding: None,
             semantic_call: None,
+            indirection: None,
             arguments: arguments.to_vec(),
             types: types.clone(),
             not_null,
             name: name.to_owned(),
         }
+    }
+    pub(crate) fn retain_indirection(&mut self, value: &crate::sem::IndirectionExpr) {
+        self.indirection = Some(Box::new(value.clone()));
+    }
+    /// Structured array or composite access retained during parameter inference.
+    pub fn indirection(&self) -> Option<&crate::sem::IndirectionExpr> {
+        self.indirection.as_deref()
     }
     pub(crate) fn retain_semantic_call(&mut self, call: &crate::sem::FuncCallExpr) {
         self.semantic_call = Some(Box::new(call.binding_snapshot()));
@@ -65,7 +75,8 @@ impl ConstrainedExpr {
     pub fn operation(&self) -> &str {
         &self.operation
     }
-    /// Analyzed operands, preserving numbered parameter references.
+    /// Direct operation operands, preserving numbered parameter references.
+    /// Structured access operands are retained by [`Self::indirection`].
     pub fn arguments(&self) -> &[SemScalarExpr] {
         &self.arguments
     }
@@ -92,6 +103,9 @@ impl ConstrainedExpr {
         &mut self,
         visitor: &mut V,
     ) -> Result<(), crate::sem::AnalysisError> {
+        if let Some(indirection) = &mut self.indirection {
+            indirection.walk(visitor)?;
+        }
         if let Some(call) = &mut self.semantic_call {
             call.walk(visitor)?;
         }
@@ -113,6 +127,9 @@ impl ConstrainedExpr {
         let domain = constraints.node_domain(self.node);
         if !domain.is_any() {
             self.types = domain.clone();
+        }
+        if let Some(indirection) = &mut self.indirection {
+            indirection.set_result_type(&domain.single_type());
         }
     }
 }

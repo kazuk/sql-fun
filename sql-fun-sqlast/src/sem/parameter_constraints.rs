@@ -1,5 +1,11 @@
 //! SQL-derived parameter domains and correlated overload alternatives.
 
+mod structural;
+
+pub(crate) use self::structural::TypeProjection;
+
+use self::structural::StructuralConstraint;
+
 use crate::sem::{ParameterConstraintProblem, TypeReference};
 use std::collections::BTreeMap;
 
@@ -55,6 +61,30 @@ impl InputTypeConstraint {
             _ => {}
         }
         *self != before
+    }
+
+    fn retain_projection(&mut self, projection: &TypeProjection, result: &Self) {
+        if let Some(types) = &mut self.0 {
+            types.retain(|source| {
+                projection
+                    .project(source)
+                    .is_some_and(|ty| result.allows(&ty))
+            });
+        }
+    }
+
+    fn projected(&self, projection: &TypeProjection) -> Self {
+        match &self.0 {
+            Some(types) => Self::types(types.iter().filter_map(|ty| projection.project(ty))),
+            None => Self::any(),
+        }
+    }
+
+    fn preimage(&self, projection: &TypeProjection) -> Self {
+        match &self.0 {
+            Some(types) => Self::types(types.iter().filter_map(|ty| projection.inverse(ty))),
+            None => Self::any(),
+        }
     }
 
     fn overlaps(&self, other: &Self) -> bool {
@@ -145,6 +175,9 @@ impl ParameterConstraints {
     /// Whether the supplied concrete types can coexist in at least one valid
     /// overload assignment. Omitted positions remain unconstrained by this check.
     /// Unknown positions are rejected. This is inspection, not an analysis hint.
+    /// Composite definitions encountered during analysis are retained. To inspect
+    /// a previously unknown composite, supply a dynamic reference owning its
+    /// definition; a new concrete name alone cannot provide its fields.
     pub fn allows(&self, types: &BTreeMap<u32, TypeReference>) -> bool {
         match &self.graph {
             Some(graph) => graph.accepts(types),
@@ -230,6 +263,7 @@ pub(crate) struct ConstraintGraph {
     parameters: BTreeMap<u32, usize>,
     overloads: Vec<OverloadConstraint>,
     equalities: Vec<(usize, usize)>,
+    structural: Vec<StructuralConstraint>,
     requirements: Vec<String>,
 }
 
@@ -247,7 +281,15 @@ impl ConstraintGraph {
             let Some(node) = graph.parameters.get(position).copied() else {
                 return false;
             };
-            graph.domains[node].intersect(&InputTypeConstraint::exact(ty));
+            for relation in &mut graph.structural {
+                relation.retain_owned(ty);
+            }
+            let supplied = if graph.domains[node].allows(ty) {
+                ty.clone()
+            } else {
+                TypeProjection::identity(ty)
+            };
+            graph.domains[node].intersect(&InputTypeConstraint::exact(&supplied));
         }
         graph.satisfiable()
     }
@@ -291,6 +333,43 @@ impl ConstraintGraph {
             .push(OverloadConstraint::new(nodes, alternatives, context));
     }
 
+    pub(crate) fn project(&mut self, source: usize, result: usize, projection: TypeProjection) {
+        self.structural
+            .push(StructuralConstraint::new(source, result, projection));
+    }
+
+    pub(crate) fn prepare_projections(&mut self, context: &impl crate::sem::ParseContext) {
+        let mut types: Vec<_> = self
+            .domains
+            .iter()
+            .filter_map(InputTypeConstraint::admissible_types)
+            .flatten()
+            .cloned()
+            .collect();
+        let mut visited = Vec::new();
+        while let Some(ty) = types.pop() {
+            if visited.contains(&ty) {
+                continue;
+            }
+            for relation in &mut self.structural {
+                if let Some(result) = relation.prepare(context, &ty) {
+                    types.push(result);
+                }
+            }
+            visited.push(ty);
+        }
+    }
+
+    pub(crate) fn report_projection_problems(
+        &self,
+        context: &mut impl crate::sem::ParseContext,
+    ) -> Result<(), crate::sem::AnalysisError> {
+        for relation in &self.structural {
+            relation.report_problem(&self.domains, context)?;
+        }
+        Ok(())
+    }
+
     fn propagate(&mut self) -> bool {
         loop {
             if self.domains.iter().any(InputTypeConstraint::is_empty) {
@@ -308,6 +387,10 @@ impl ConstraintGraph {
                     return false;
                 }
                 changed |= overload.propagate_domains(&mut self.domains);
+            }
+
+            for relation in &self.structural {
+                changed |= relation.propagate(&mut self.domains);
             }
 
             if !changed {

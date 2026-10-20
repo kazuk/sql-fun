@@ -255,9 +255,12 @@ query, a CTE definition, or generated SQL. Clients must not assume every
 span is an offset into the same SQL string. If an exact original location
 cannot be recovered, it must not be fabricated.
 
-The `AnalysisProbrem` type carries `code`, `file_path`, `statement_span`,
-`probrem_span`, and `statement_relative_span`. Message, severity, and richer source
-identity are intended capabilities that are not yet part of that type.
+The `AnalysisProbrem` type carries `code`, `severity`, `file_path`,
+`statement_span`, `probrem_span`, and `statement_relative_span`. Severity is
+`error`, `warning`, or `advice`. Clients should use it to distinguish rejected
+SQL from accepted SQL with a warning, such as a statistics target clamped to
+10000. Message and richer source identity are intended capabilities that are
+not yet part of that type.
 Schema diagnostic codes identify the retained problem kind. Diagnostics keep
 layer order (builtin, ordered extensions, application dump) and analysis order
 within each layer. A missing `statement_span` or `probrem_span` is `null`.

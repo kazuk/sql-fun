@@ -152,7 +152,7 @@ impl AlterCommand {
     }
 }
 impl crate::ast::AlterRelationKind {
-    const fn supports_table_column_attributes(self) -> bool {
+    pub(super) const fn supports_table_column_attributes(self) -> bool {
         matches!(self, Self::Table)
     }
 }

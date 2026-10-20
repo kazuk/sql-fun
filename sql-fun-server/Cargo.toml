@@ -25,6 +25,7 @@ elsa.workspace = true
 futures-core.workspace = true
 futures-util.workspace = true
 indexmap = { workspace = true }
+miette.workspace = true
 notify = "8.2.0"
 rand = { workspace = true }
 scopeguard = "1.2.0"

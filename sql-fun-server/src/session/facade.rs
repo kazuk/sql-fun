@@ -7,8 +7,8 @@ use std::sync::Arc;
 use sql_fun_server_api::{
     SqlFunServerApiError,
     payloads::{
-        AnalysisProbrem, CollectionHandle, ContextHandle, InitializeSchemaArgs, ReadCollectionArgs,
-        ReleaseCollectionArgs, SchemaContext, StatementByteRange,
+        AnalysisProbrem, CollectionHandle, ContextHandle, DiagnosticSeverity, InitializeSchemaArgs,
+        ReadCollectionArgs, ReleaseCollectionArgs, SchemaContext, StatementByteRange,
     },
 };
 
@@ -182,8 +182,18 @@ impl Diagnostics<'_> {
 
     fn map(item: Diagnostic<'_>) -> ::serde_json::Value {
         let span = item.problem.statement_relative_span().map(Self::span);
-        ::serde_json::to_value(AnalysisProbrem::new(item.problem.code(), item.path, span))
-            .expect("diagnostic serializes")
+        let severity = match item.problem.severity() {
+            ::miette::Severity::Error => DiagnosticSeverity::error(),
+            ::miette::Severity::Warning => DiagnosticSeverity::warning(),
+            ::miette::Severity::Advice => DiagnosticSeverity::advice(),
+        };
+        ::serde_json::to_value(AnalysisProbrem::new(
+            item.problem.code(),
+            severity,
+            item.path,
+            span,
+        ))
+        .expect("diagnostic serializes")
     }
 }
 

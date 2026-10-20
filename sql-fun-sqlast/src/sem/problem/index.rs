@@ -170,16 +170,19 @@ impl IndexProblem {
             "index_invalid_alteration"
         }
     }
+    pub(super) const fn severity(&self) -> ::miette::Severity {
+        if self.is_warning() {
+            ::miette::Severity::Warning
+        } else {
+            ::miette::Severity::Error
+        }
+    }
     pub(super) fn render_report(
         &self,
         handler: &::miette::GraphicalReportHandler,
         source: String,
     ) -> Result<String, AnalysisError> {
-        let severity = if self.is_warning() {
-            ::miette::Severity::Warning
-        } else {
-            ::miette::Severity::Error
-        };
+        let severity = self.severity();
         let mut message = format!("{}: {}", self.target, self.kind.message());
         if let Some(parameter) = &self.parameter {
             message.push_str(&format!(" ({parameter})"));

@@ -184,6 +184,15 @@ impl AnalysisProblem {
             None
         }
     }
+    /// Diagnostic severity, independent of rendering and catalog applicability.
+    pub const fn severity(&self) -> ::miette::Severity {
+        match self {
+            Self::AlterColumn(problem) => problem.reason().severity(),
+            Self::Index(problem) => problem.severity(),
+            _ => ::miette::Severity::Error,
+        }
+    }
+
     pub(crate) fn alter_column(
         table: &TableName,
         column: &ColumnName,

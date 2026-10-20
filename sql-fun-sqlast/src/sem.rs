@@ -1,7 +1,7 @@
 #![doc = include_str!("sem.md")]
 
-mod alter_index;
 mod alter_column;
+mod alter_index;
 mod alter_owner;
 mod alter_seq;
 mod alter_table;
@@ -98,13 +98,13 @@ pub use self::drop_trigger::DropTrigger;
 
 #[expect(deprecated)]
 pub use self::{
-    alter_index::{
-        AlterIndex, IndexAlteration, IndexStatisticsChange, IndexStorageChange,
-        IndexStorageParameter, IndexTarget,
-    },
     alter_column::{
         AlterColumnAttributes, ColumnAttributeAction, ColumnAttributeBinding,
         ColumnAttributeOption, ColumnStatisticsTarget,
+    },
+    alter_index::{
+        AlterIndex, IndexAlteration, IndexStatisticsChange, IndexStorageChange,
+        IndexStorageParameter, IndexTarget,
     },
     alter_owner::{AlterOwner, OwnershipArgumentFailure, OwnershipLookup},
     alter_seq::{AlterSequence, SequenceDependency},

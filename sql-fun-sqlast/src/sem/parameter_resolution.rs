@@ -653,16 +653,27 @@ impl ParameterResolution {
 pub(crate) struct Signature {
     inputs: Vec<TypeReference>,
     result: TypeReference,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    declared_inputs: Option<Vec<TypeReference>>,
 }
 impl Signature {
     pub(crate) fn new(inputs: &[TypeReference], result: &TypeReference) -> Self {
         Self {
             inputs: inputs.to_vec(),
             result: result.clone(),
+            declared_inputs: None,
         }
     }
-    pub(crate) fn new_concrete(inputs: &[TypeReference], result: &TypeReference) -> Option<Self> {
-        let signature = Self::new(inputs, result);
+    pub(crate) fn new_function(
+        inputs: &[TypeReference],
+        declared_inputs: &[TypeReference],
+        result: &TypeReference,
+    ) -> Option<Self> {
+        if inputs.len() != declared_inputs.len() {
+            return None;
+        }
+        let mut signature = Self::new(inputs, result);
+        signature.declared_inputs = Some(declared_inputs.to_vec());
         if signature.is_concrete_for_arity(inputs.len()) {
             Some(signature)
         } else {
@@ -697,7 +708,16 @@ impl Signature {
         source: &TypeReference,
         index: usize,
     ) -> Option<OverloadRank> {
-        OverloadRank::argument(catalog, Some(source), Some(&self.inputs[index]))
+        if let Some(declared_inputs) = &self.declared_inputs {
+            OverloadRank::function_argument(
+                catalog,
+                Some(source),
+                Some(&self.inputs[index]),
+                Some(&declared_inputs[index]),
+            )
+        } else {
+            OverloadRank::argument(catalog, Some(source), Some(&self.inputs[index]))
+        }
     }
 
     fn result_alternative(&self, inputs: &[InputTypeConstraint]) -> SignatureAlternative {

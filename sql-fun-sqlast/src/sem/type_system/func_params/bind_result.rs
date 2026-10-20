@@ -61,21 +61,41 @@ impl ParameterBindResult {
     pub(crate) fn overload_rank(
         &self,
         catalog: &impl crate::sem::BaseParseContext,
+        declaration: &Self,
     ) -> Option<crate::sem::overload_rank::OverloadRank> {
         use crate::sem::overload_rank::OverloadRank;
+        let declared_target = declaration.call_argument_type();
         match self {
-            Self::One(source, parameter) => {
-                OverloadRank::argument(catalog, source.as_ref(), parameter.get_type())
-            }
+            Self::One(source, parameter) => OverloadRank::function_argument(
+                catalog,
+                source.as_ref(),
+                parameter.get_type(),
+                declared_target.as_ref(),
+            ),
             Self::NoInputParam(_) => Some(OverloadRank::default()),
             Self::VariadicParam(arguments, _) => {
                 let targets = self.constraint_input_types()?;
                 let mut rank = OverloadRank::default();
                 for (source, target) in arguments.into_iter().zip(&targets) {
-                    rank = rank + OverloadRank::argument(catalog, source.as_ref(), Some(target))?;
+                    rank = rank
+                        + OverloadRank::function_argument(
+                            catalog,
+                            source.as_ref(),
+                            Some(target),
+                            declared_target.as_ref(),
+                        )?;
                 }
                 Some(rank)
             }
+        }
+    }
+
+    fn call_argument_type(&self) -> Option<TypeReference> {
+        match self {
+            Self::One(_, parameter) | Self::VariadicParam(_, parameter) => {
+                parameter.call_argument_type()
+            }
+            Self::NoInputParam(_) => None,
         }
     }
 

@@ -19,6 +19,24 @@ impl OverloadRank {
         };
         Some(Self::from(source.implicit_match_context(target, catalog)?))
     }
+
+    // Instantiated inputs decide applicability; only the declaration can earn
+    // exact/preferred credit. A substituted polymorphic placeholder earns none.
+    pub(crate) fn function_argument(
+        catalog: &impl BaseParseContext,
+        source: Option<&TypeReference>,
+        target: Option<&TypeReference>,
+        declared_target: Option<&TypeReference>,
+    ) -> Option<Self> {
+        let rank = Self::argument(catalog, source, target)?;
+        if declared_target.is_some_and(|ty| {
+            !ty.is_dynamic() && (ty.is_simple_infer_arg() || ty.is_common_infer_arg())
+        }) {
+            Some(Self::default())
+        } else {
+            Some(rank)
+        }
+    }
 }
 
 impl From<CastContext> for OverloadRank {

@@ -449,3 +449,273 @@ fn declared_composite_scalar_field_rejects_subscripts(
     assert_eq!(analyzed.context().problems()[0].code(), "require_array");
     Ok(())
 }
+
+#[rstest::rstest]
+#[case::two_indices("(NULL::integer[][])[1][2]", false)]
+#[case::three_indices("(NULL::integer[][][])[1][2][3]", false)]
+#[case::slice_index("(NULL::integer[][])[1:2][2]", true)]
+#[case::index_slice("(NULL::integer[][])[1][1:2]", true)]
+#[case::two_slices("(NULL::integer[][])[1:2][1:2]", true)]
+#[case::omitted_bounds("(NULL::integer[][])[:][:]", true)]
+#[case::omitted_lower("(NULL::integer[][])[:2][1]", true)]
+#[case::omitted_upper("(NULL::integer[][])[1][2:]", true)]
+#[case::separate_access("((NULL::integer[][])[1:2])[2]", false)]
+#[case::separate_group("((NULL::integer[][])[1:2])[1][2]", false)]
+#[case::assignment_bounds("(NULL::integer[][])[1.0::numeric][2.0::numeric]", false)]
+fn consecutive_subscript_result_matches_postgres(
+    #[case] expression: &str,
+    #[case] array_result: bool,
+) -> Result<(), Box<dyn std::error::Error>> {
+    let analyzed = parse_statements(&format!("SELECT {expression}"), Dialect::postgres())
+        .next()
+        .unwrap()?
+        .analyze(test_helpers::context())?;
+    assert!(
+        analyzed.context().problems().is_empty(),
+        "{:?}",
+        analyzed.context().problems()
+    );
+    let query = analyzed.ast().clone().into_select_statemtnt().unwrap();
+    let expected = crate::sem::TypeReference::concrete_type_ref(
+        PgBuiltInType::int4().full_name(),
+        array_result,
+    );
+    assert_eq!(
+        query.result_columns().get_column_at(0).unwrap().col_type(),
+        &Some(expected)
+    );
+    Ok(())
+}
+
+#[rstest::rstest]
+#[case::indices("SELECT ($1)[$2][$3]", false, 3)]
+#[case::mixed("SELECT ($1)[$2:][$3]", true, 3)]
+#[case::omitted("SELECT ($1)[:][$2:$3]", true, 3)]
+#[case::full("SELECT ($1)[$2:$3][$4:$5]", true, 5)]
+fn consecutive_subscripts_retain_all_parameter_domains(
+    #[case] sql: &str,
+    #[case] slice: bool,
+    #[case] parameters: usize,
+) -> Result<(), Box<dyn std::error::Error>> {
+    let analyzed = parse_statements(sql, Dialect::postgres())
+        .next()
+        .unwrap()?
+        .analyze(test_helpers::context())?;
+    assert!(
+        analyzed.context().problems().is_empty(),
+        "{:?}",
+        analyzed.context().problems()
+    );
+    let constraints = analyzed.context().parameter_constraints();
+    assert!(constraints.parameter(1).unwrap().constraint().is_any());
+    assert!(constraints.result_column(0).unwrap().is_any());
+    let array = PgBuiltInType::int4().array_type();
+    let mut supplied = BTreeMap::from([(1, array)]);
+    for position in 2..=parameters {
+        supplied.insert(position as u32, PgBuiltInType::numeric());
+    }
+    assert!(constraints.allows(&supplied));
+    for position in 2..=parameters {
+        let mut invalid = supplied.clone();
+        invalid.insert(position as u32, PgBuiltInType::bool());
+        assert!(!constraints.allows(&invalid));
+    }
+    supplied.insert(1, PgBuiltInType::int4());
+    assert!(!constraints.allows(&supplied));
+    let query = analyzed.ast().clone().into_select_statemtnt().unwrap();
+    let expression = query
+        .result_columns()
+        .get_column_at(0)
+        .unwrap()
+        .expression()
+        .unwrap();
+    let group = expression
+        .as_indirection()
+        .unwrap()
+        .as_array_subscripts()
+        .unwrap();
+    assert_eq!(group.is_slice(), slice);
+    assert_eq!(group.subscripts().len(), 2);
+    assert_eq!(
+        test_helpers::serialized_parameter_domains(&::serde_json::to_value(expression)?).len(),
+        parameters
+    );
+    let restored: crate::sem::SemScalarExpr =
+        ::serde_json::from_value(::serde_json::to_value(expression)?)?;
+    let restored_group = restored
+        .as_indirection()
+        .unwrap()
+        .as_array_subscripts()
+        .unwrap();
+    assert_eq!(restored_group.is_slice(), slice);
+    assert_eq!(restored_group.subscripts().len(), 2);
+    Ok(())
+}
+
+#[rstest::rstest]
+#[case::operator("SELECT ($1)[$2][$3] + 1", 0, false, false)]
+#[case::cast("SELECT (($1)[$2][$3])::integer", 0, false, true)]
+#[case::slice_cast("SELECT (($1)[$2][$3:])::integer[]", 0, true, false)]
+#[case::later_base("SELECT ($1)[$2][$3], $1::integer[]", 0, false, false)]
+#[case::earlier_base("SELECT $1::integer[], ($1)[$2][$3]", 1, false, false)]
+#[case::later_slice_base("SELECT ($1)[$2:][$3], $1::integer[]", 0, true, false)]
+fn consecutive_subscripts_share_deferred_constraints(
+    #[case] sql: &str,
+    #[case] result: usize,
+    #[case] array_result: bool,
+    #[case] text_element_cast: bool,
+) -> Result<(), Box<dyn std::error::Error>> {
+    let analyzed = parse_statements(sql, Dialect::postgres())
+        .next()
+        .unwrap()?
+        .analyze(test_helpers::context())?;
+    assert!(
+        analyzed.context().problems().is_empty(),
+        "{:?}",
+        analyzed.context().problems()
+    );
+    let constraints = analyzed.context().parameter_constraints();
+    let expected = crate::sem::TypeReference::concrete_type_ref(
+        PgBuiltInType::int4().full_name(),
+        array_result,
+    );
+    let domain = constraints.result_column(result).unwrap();
+    assert!(!domain.is_any());
+    assert!(domain.allows(&expected));
+    assert!(!domain.allows(&PgBuiltInType::text()));
+    assert!(constraints.allows(&BTreeMap::from([
+        (1, PgBuiltInType::int4().array_type()),
+        (2, PgBuiltInType::int4()),
+        (3, PgBuiltInType::numeric())
+    ])));
+    // Explicit text-to-integer casts admit a text element without choosing it.
+    assert_eq!(
+        constraints.allows(&BTreeMap::from([(1, PgBuiltInType::text().array_type())])),
+        text_element_cast
+    );
+    Ok(())
+}
+
+#[rstest::rstest]
+#[case::scalar("SELECT (1)[1][2]", "require_array")]
+#[case::separate_scalar("SELECT ((NULL::integer[])[1])[2]", "require_array")]
+#[case::first_bound("SELECT (NULL::integer[])[true][2]", "array_index_type_mismatch")]
+#[case::second_bound("SELECT (NULL::integer[])[1][true]", "array_index_type_mismatch")]
+#[case::slice_bound("SELECT (NULL::integer[])[1][true:]", "array_index_type_mismatch")]
+#[case::late_base("SELECT ($1)[1][2], $1::integer", "parameter_constraint")]
+#[case::late_bound("SELECT ($1::integer[])[$2][$3], $3::boolean", "parameter_constraint")]
+fn consecutive_subscripts_retain_structured_failures(
+    #[case] sql: &str,
+    #[case] diagnostic: &str,
+) -> Result<(), Box<dyn std::error::Error>> {
+    let analyzed = parse_statements(sql, Dialect::postgres())
+        .next()
+        .unwrap()?
+        .analyze(test_helpers::context())?;
+    assert!(
+        analyzed
+            .context()
+            .problems()
+            .iter()
+            .any(|problem| problem.code() == diagnostic),
+        "{:?}",
+        analyzed.context().problems()
+    );
+    if sql.contains('$') {
+        assert!(
+            !analyzed
+                .context()
+                .parameter_constraints()
+                .allows(&BTreeMap::new())
+        );
+    }
+    Ok(())
+}
+
+#[rstest::rstest]
+#[case::insert("INSERT INTO arrays (a[$1][$2]) VALUES ($3)")]
+#[case::update("UPDATE arrays SET a[$1][$2] = $3")]
+#[case::merge_insert(
+    "MERGE INTO arrays t USING arrays s ON true WHEN NOT MATCHED THEN INSERT (a[$1][$2]) VALUES ($3)"
+)]
+#[case::merge_update(
+    "MERGE INTO arrays t USING arrays s ON true WHEN MATCHED THEN UPDATE SET a[$1][$2] = $3"
+)]
+fn consecutive_assignment_subscripts_preserve_bound_constraints(
+    #[case] sql: &str,
+) -> Result<(), Box<dyn std::error::Error>> {
+    let context = test_helpers::schema("CREATE TABLE arrays (a integer[])", false)?;
+    let analyzed = parse_statements(sql, Dialect::postgres())
+        .next()
+        .unwrap()?
+        .analyze(context)?;
+    assert!(
+        analyzed.context().problems().is_empty(),
+        "{:?}",
+        analyzed.context().problems()
+    );
+    let constraints = analyzed.context().parameter_constraints();
+    assert!(constraints.allows(&BTreeMap::from([
+        (1, PgBuiltInType::numeric()),
+        (2, PgBuiltInType::int4()),
+        (3, PgBuiltInType::int4())
+    ])));
+    assert!(!constraints.allows(&BTreeMap::from([(2, PgBuiltInType::bool())])));
+    Ok(())
+}
+
+#[test]
+fn consecutive_subscripts_preserve_source_bounds_and_nested_access()
+-> Result<(), Box<dyn std::error::Error>> {
+    let analyzed = parse_statements("SELECT ((NULL::integer[])[1:2])[:][2]", Dialect::postgres())
+        .next()
+        .unwrap()?
+        .analyze(test_helpers::context())?;
+    assert!(analyzed.context().problems().is_empty());
+    let query = analyzed.ast().clone().into_select_statemtnt().unwrap();
+    let expression = query
+        .result_columns()
+        .get_column_at(0)
+        .unwrap()
+        .expression()
+        .unwrap();
+    let group = expression
+        .as_indirection()
+        .unwrap()
+        .as_array_subscripts()
+        .unwrap();
+    assert!(group.is_slice());
+    assert!(group.array().as_indirection().is_some());
+    let dimensions = group.subscripts();
+    assert!(dimensions[0].is_slice());
+    assert!(dimensions[0].lower().is_none());
+    assert!(dimensions[0].upper().is_none());
+    assert!(!dimensions[1].is_slice());
+    assert!(dimensions[1].lower().is_none());
+    assert!(dimensions[1].upper().is_some());
+    Ok(())
+}
+
+#[test]
+fn consecutive_subscripts_preserve_member_boundary() -> Result<(), Box<dyn std::error::Error>> {
+    // SQL-declared scalar fields exercise member resolution after a group.
+    let context = test_helpers::schema("CREATE TYPE public.point_value AS (n integer)", false)?;
+    let analyzed = parse_statements(
+        "SELECT ((NULL::public.point_value[])[1][2]).n",
+        Dialect::postgres(),
+    )
+    .next()
+    .unwrap()?
+    .analyze(context)?;
+    assert!(
+        analyzed.context().problems().is_empty(),
+        "{:?}",
+        analyzed.context().problems()
+    );
+    let query = analyzed.ast().clone().into_select_statemtnt().unwrap();
+    assert_eq!(
+        query.result_columns().get_column_at(0).unwrap().col_type(),
+        &Some(PgBuiltInType::int4())
+    );
+    Ok(())
+}

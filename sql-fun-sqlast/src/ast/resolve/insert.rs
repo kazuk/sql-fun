@@ -357,12 +357,15 @@ impl InsertTargetCollection {
                     ))?;
                     return Err(ResolutionFailure::reported());
                 };
-                let mut destination =
+                let destination =
                     Name::from_parts(&[alias.name().as_str().to_owned(), assignment.name.clone()])
                         .resolve_column(context, scope)?;
-                for access in &assignment.indirection {
-                    destination = access.resolve(context, expression_scope, destination)?;
-                }
+                let destination = crate::ast::Access::resolve_sequence(
+                    &assignment.indirection,
+                    context,
+                    expression_scope,
+                    destination,
+                )?;
                 columns.push(InsertTarget::new(column, destination));
             }
         }

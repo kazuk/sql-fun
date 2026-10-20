@@ -1,6 +1,9 @@
 mod array_index;
 mod array_slice;
+mod array_subscripts;
 mod member_ref;
+
+pub use self::array_subscripts::{ArraySubscript, ArraySubscripts};
 
 use self::{array_index::ArrayIndex, array_slice::ArraySlice, member_ref::MemberRef};
 
@@ -14,11 +17,33 @@ pub enum IndirectionExpr {
     ArrayIndex(Box<ArrayIndex>),
     /// Array range slice
     ArraySlice(Box<ArraySlice>),
+    /// One consecutive PostgreSQL group of multiple array subscripts.
+    ArraySubscripts(Box<ArraySubscripts>),
     /// composite type member
     MemberRef(Box<MemberRef>),
 }
 
 impl IndirectionExpr {
+    pub(super) fn subscripts(value: &ArraySubscripts) -> Self {
+        Self::ArraySubscripts(Box::new(value.clone()))
+    }
+
+    /// Consecutive subscripts, when this operation contains multiple dimensions.
+    pub fn as_array_subscripts(&self) -> Option<&ArraySubscripts> {
+        match self {
+            Self::ArraySubscripts(value) => Some(value),
+            _ => None,
+        }
+    }
+
+    pub(crate) fn resolved_subscripts(
+        context: &mut impl crate::sem::ParseContext,
+        base: &SemScalarExpr,
+        subscripts: &[ArraySubscript],
+    ) -> Result<SemScalarExpr, AnalysisError> {
+        let group = ArraySubscripts::resolve(context, base, subscripts)?;
+        Ok(SemScalarExpr::indirection(&Self::subscripts(&group)))
+    }
     pub(super) fn index(value: &ArrayIndex) -> Self {
         Self::ArrayIndex(Box::new(value.clone()))
     }
@@ -29,6 +54,7 @@ impl IndirectionExpr {
         match self {
             Self::ArrayIndex(value) => value.set_item_type(result),
             Self::ArraySlice(_) => {}
+            Self::ArraySubscripts(value) => value.set_result_type(result),
             Self::MemberRef(value) => value.set_member_type(result),
         }
     }
@@ -71,6 +97,7 @@ impl SemScalarExprNode for IndirectionExpr {
         match &self {
             Self::ArrayIndex(ind) => ind.item_type().clone(),
             Self::ArraySlice(slice) => slice.array_type().clone(),
+            Self::ArraySubscripts(value) => value.result_type().cloned(),
             Self::MemberRef(mem_ref) => mem_ref.member_type().clone(),
         }
     }
@@ -79,6 +106,7 @@ impl SemScalarExprNode for IndirectionExpr {
         match &self {
             Self::ArrayIndex(ind) => ind.array().is_not_null(),
             Self::ArraySlice(slice) => slice.array_is_not_null(),
+            Self::ArraySubscripts(value) => value.array().is_not_null(),
             Self::MemberRef(mem_ref) => mem_ref.base_is_not_null(),
         }
     }
@@ -92,6 +120,7 @@ impl IndirectionExpr {
         match self {
             Self::ArrayIndex(v) => v.walk(visitor)?,
             Self::ArraySlice(v) => v.walk(visitor)?,
+            Self::ArraySubscripts(value) => value.walk(visitor)?,
             Self::MemberRef(v) => v.walk(visitor)?,
         }
         Ok(())
@@ -107,6 +136,7 @@ impl IndirectionExpr {
         match self {
             Self::ArrayIndex(value) => Some(value.collect_constraints(parameters, context)),
             Self::ArraySlice(value) => Some(value.collect_constraints(parameters, context)),
+            Self::ArraySubscripts(value) => Some(value.collect_constraints(parameters, context)),
             Self::MemberRef(value) => value.collect_constraints(parameters),
         }
     }
@@ -120,6 +150,7 @@ impl IndirectionExpr {
         match self {
             Self::ArrayIndex(target) => target.walk_assignment_target(visitor),
             Self::ArraySlice(target) => target.walk_assignment_target(visitor),
+            Self::ArraySubscripts(value) => value.walk_assignment_target(visitor),
             Self::MemberRef(target) => target.walk_assignment_target(visitor),
         }
     }

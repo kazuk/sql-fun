@@ -72,7 +72,7 @@ impl ArrayIndex {
         ))))
     }
 
-    fn resolved_item_type(
+    pub(super) fn resolved_item_type(
         context: &impl ParseContext,
         array: &TypeReference,
     ) -> Option<TypeReference> {

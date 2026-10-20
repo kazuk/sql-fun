@@ -83,7 +83,7 @@ impl MinMaxExpr {
         }
         let mut base = ty.clone();
         let mut seen = std::collections::HashSet::new();
-        while base.is_array() != Some(true) && seen.insert(base.clone()) {
+        while !base.is_dynamic() && base.is_array() != Some(true) && seen.insert(base.clone()) {
             let Some(reference) = context.domain_base_type(base.full_name()) else {
                 break;
             };
@@ -99,14 +99,24 @@ impl MinMaxExpr {
         if ty.is_array() == Some(true) {
             return Ok(('A', false));
         }
-        if let Some(definition) = context.get_type_impl(ty.full_name())
-            && let Some(category) = definition.user_type_category()
-        {
-            return Ok((category, false));
-        }
-        context
-            .builtin_type_category(ty.full_name())
-            .ok_or_else(|| crate::sem::problem::MinMaxProblem::missing_type_facts(ty))
+        let definition = if let Some(definition) = ty.type_definition() {
+            Some(definition)
+        } else {
+            context.get_type_impl(ty.full_name())
+        };
+        let category = if let Some(definition) = definition {
+            definition.category(context)
+        } else {
+            None
+        };
+        let category =
+            category.ok_or_else(|| crate::sem::problem::MinMaxProblem::missing_type_facts(ty))?;
+        let preferred = context.cast_sources(ty, false).into_iter().any(|source| {
+            context
+                .get_implicit_cast(&source, ty)
+                .is_some_and(|cast| cast.is_implicit_preferred())
+        });
+        Ok((category.code(), preferred))
     }
 
     pub(crate) fn can_coerce(
@@ -160,17 +170,18 @@ impl MinMaxExpr {
         if base.is_array() == Some(true) {
             return Self::ordered(context, &base.element_type());
         }
-        if context
-            .get_type_impl(base.full_name())
-            .is_some_and(|definition| definition.has_structural_ordering())
-        {
+        let definition = if let Some(definition) = base.type_definition() {
+            Some(definition)
+        } else {
+            context.get_type_impl(base.full_name())
+        };
+        if definition.is_some_and(|definition| definition.has_structural_ordering()) {
             return true;
         }
         // PostgreSQL's default B-tree classes for these concrete families
         // have polymorphic input types, not the concrete result type's name.
-        let range_family = context
-            .builtin_type_category(base.full_name())
-            .is_some_and(|(category, _)| category == 'R');
+        let range_family =
+            Self::category(context, &base).is_ok_and(|(category, _)| category == 'R');
         let family = if range_family && base.is_range() {
             Some("anyrange")
         } else if range_family && base.is_multi_range() {

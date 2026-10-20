@@ -7,7 +7,7 @@ pub enum MinMaxProblem {
     Empty,
     /// Two operand types cannot be coerced to the selected common type.
     Incompatible(Box<TypeReference>, Box<TypeReference>),
-    /// Required category/preferred-type metadata is unavailable.
+    /// Required type-category metadata is unavailable.
     MissingTypeFacts(TypeReference),
     /// The result type has no PostgreSQL comparison implementation.
     NotOrdered(TypeReference),
@@ -44,7 +44,7 @@ impl MinMaxProblem {
                 format!("GREATEST/LEAST cannot match {left} and {right}")
             }
             Self::MissingTypeFacts(ty) => {
-                format!("GREATEST/LEAST requires category/preferred-type metadata for {ty}")
+                format!("GREATEST/LEAST requires type-category metadata for {ty}")
             }
             Self::NotOrdered(ty) => {
                 format!("GREATEST/LEAST cannot identify a comparison function for {ty}")

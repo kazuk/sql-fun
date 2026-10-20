@@ -282,6 +282,33 @@ fn nullable_operands_do_not_prove_non_null() -> Result<(), Box<dyn std::error::E
     Ok(())
 }
 
+#[rstest::rstest]
+fn dynamic_composite_operands_retain_their_type(
+    #[values("greatest", "least")] operation: &str,
+) -> Result<(), Box<dyn std::error::Error>> {
+    // The shipped function catalog supplies pg_control_system's dynamic record type.
+    let analyzed = heavy::analyze(
+        &format!("select {operation}(pg_control_system(), pg_control_system()) as result"),
+        &[],
+    )?;
+    assert!(
+        analyzed.context().problems().is_empty(),
+        "{:?}",
+        analyzed.context().problems()
+    );
+    let query = analyzed.ast().clone().into_select_statemtnt().unwrap();
+    let column = query.result_columns().get_column_at(0).unwrap();
+    assert!(column.col_type().as_ref().unwrap().is_dynamic());
+    let expression = column.expression().unwrap().as_min_max().unwrap();
+    assert_eq!(expression.operation(), operation);
+    assert_eq!(expression.arguments().len(), 2);
+    assert_eq!(
+        expression.arguments()[0].get_type().as_ref(),
+        column.col_type().as_ref()
+    );
+    Ok(())
+}
+
 mod test_helpers {
     pub(super) mod heavy {
         use ::sql_fun_sqlast::{

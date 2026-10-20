@@ -13,7 +13,7 @@ fn loader_preserves_preference_only_for_implicit_casts(
     #[case] expected: CastContext,
 ) -> testresult::TestResult {
     let catalog = test_helpers::cast_catalog(context, preferred)?;
-    let casts = PgBuiltinCasts::load(catalog.path())?;
+    let (casts, _) = PgBuiltinCasts::load(catalog.path(), &crate::sem::ConflictMasters::sqlite())?;
     let cast = casts.get("source").unwrap().get("target").unwrap();
     assert_eq!(cast.context(), expected);
     assert_eq!(cast.use_in_implicit(), expected.use_in_implicit());

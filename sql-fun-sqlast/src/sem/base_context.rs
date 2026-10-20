@@ -110,7 +110,9 @@ impl BaseContext {
         self.masters.declare_sqlite_collation(name)
     }
 
-    fn load_builtin_types(paths: &PostgresBuiltinPaths) -> Result<TrieMap<TypeDefinition>, AnalysisError> {
+    fn load_builtin_types(
+        paths: &PostgresBuiltinPaths,
+    ) -> Result<TrieMap<TypeDefinition>, AnalysisError> {
         let builtin_types_path = paths.types()?;
         let builtin_types: Vec<BuiltinTypeInfo> = serde_json::from_reader(BufReader::new(
             File::open(&builtin_types_path)?,

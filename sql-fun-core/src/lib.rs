@@ -41,6 +41,7 @@ mod coll;
 mod cte_catalog;
 mod extensions;
 mod highlighter;
+mod lookup_result;
 mod metadata;
 mod placehlodered_sql;
 mod postgres_version;
@@ -82,6 +83,7 @@ pub use self::{
         PostgresExtensionsCollection, PostgresExtensionsParseError,
     },
     highlighter::{HighlighterStyle, HighlighterTheme, HighlighterThemeError, TerminalColor},
+    lookup_result::LookupResult,
     metadata::{
         InitializationDatasources, MetadataError, PostgresEngineVersion, SqlFunMetadata,
         SqlFunMetadataCollection,

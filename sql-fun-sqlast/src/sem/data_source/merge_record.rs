@@ -135,17 +135,14 @@ impl MergeRecordDataSource {
         Some((wrapper, self.nullable || source_nullable))
     }
 
-    pub(super) fn get_aliases_for_column<C: ParseContext>(
+    pub(super) fn column_candidates<C: ParseContext>(
         &self,
         column: &ColumnName,
         context: &C,
         with: &WithClause,
-        names: &mut Vec<AliasSpec>,
-    ) {
+    ) -> super::ColumnCandidates {
         self.source
-            .get_aliases_for_column(column, context, with)
-            .into_iter()
-            .for_each(|alias| names.push(alias));
+            .aliases_for_column_resolved(column, context, with)
     }
 
     pub(super) fn projection_names(

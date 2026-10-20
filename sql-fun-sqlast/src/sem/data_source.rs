@@ -1,5 +1,6 @@
 mod alias;
 mod analyze;
+mod column_candidates;
 mod cte;
 mod deferred_fun;
 mod group;
@@ -15,7 +16,6 @@ mod table_fun;
 mod undefined;
 mod view;
 
-pub(crate) use self::join_expr::JoinUsingClause;
 pub use self::{
     alias::{AliasName, AliasSpec},
     cte::CteDataSource,
@@ -31,6 +31,7 @@ pub use self::{
     undefined::UndefinedTableFuncDataSource,
     view::ViewDataSource,
 };
+pub(crate) use self::{column_candidates::ColumnCandidates, join_expr::JoinUsingClause};
 
 use crate::sem::{
     AnalysisError, ColumnName, ParseContext, SemScalarExpr, WithClause,
@@ -185,17 +186,21 @@ impl DataSource {
         }
     }
 
-    /// list alias name for column name
+    /// Look up aliases that can conclusively supply a column.
+    ///
+    /// An unresolved source makes this lookup `Unknown`, even when another
+    /// source has a known candidate. Only `NotFound` proves local absence.
     pub fn get_aliases_for_column<TParseContext>(
         &self,
         column: &ColumnName,
         context: &TParseContext,
         with_clause: &WithClause,
-    ) -> Vec<AliasSpec>
+    ) -> ::sql_fun_core::LookupResult<Vec<AliasSpec>>
     where
         TParseContext: ParseContext,
     {
         self.aliases_for_column_resolved(column, context, with_clause)
+            .into_lookup()
     }
 
     pub(crate) fn aliases_for_column_resolved<TContext: crate::sem::ParseContext>(
@@ -203,19 +208,15 @@ impl DataSource {
         column: &ColumnName,
         context: &TContext,
         with_clause: &WithClause,
-    ) -> Vec<AliasSpec> {
+    ) -> ColumnCandidates {
         let mut result = Vec::new();
         match self {
             Self::CteQuery(d) => d.get_aliases_for_column(column, with_clause, &mut result),
             Self::Table(d) => d.get_aliases_for_column(column, context, &mut result),
             Self::View(d) => d.get_aliases_for_column(column, context, &mut result),
-            Self::JoinExpr(d) => {
-                d.get_aliases_for_column(column, context, with_clause, &mut result);
-            }
-            Self::MergeRecord(d) => {
-                d.get_aliases_for_column(column, context, with_clause, &mut result);
-            }
-            Self::Group(d) => d.get_aliases_for_column(column, context, with_clause, &mut result),
+            Self::JoinExpr(d) => return d.column_candidates(column, context, with_clause),
+            Self::MergeRecord(d) => return d.column_candidates(column, context, with_clause),
+            Self::Group(d) => return d.column_candidates(column, context, with_clause),
             Self::SubQuery(d) => {
                 d.get_aliases_for_column(column, context, with_clause, &mut result);
             }
@@ -225,10 +226,10 @@ impl DataSource {
             Self::UndefinedTableFunc(_) => {}
             Self::DeferredTableFunc(d) => d.push_alias_names(&mut result),
             Self::RangeTableSample() => todo!(),
-            Self::Unknown(_, _) => {}
+            Self::Unknown(_, _) => return ColumnCandidates::unknown(),
             Self::RowFunctions(_) => todo!(),
         }
-        result
+        ColumnCandidates::from(result)
     }
 }
 
@@ -251,6 +252,13 @@ impl DataSource {
         context: &C,
         with: &WithClause,
     ) -> Option<(&'a Self, Nullable)> {
+        // An unresolved descendant can compete even with a known column.
+        if self
+            .aliases_for_column_resolved(column, context, with)
+            .is_unknown()
+        {
+            return None;
+        }
         match self {
             Self::JoinExpr(join) => join.group_column_source(column, context, with),
             Self::Group(group) => group.column_source(column, context, with),

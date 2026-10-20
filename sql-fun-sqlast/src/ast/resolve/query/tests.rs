@@ -1,5 +1,6 @@
 //! Semantic behavior at the query-analysis boundary. All fixtures use a small catalog.
 mod call_arguments;
+mod column_scope;
 mod exists;
 
 use super::test_helpers::{output_index, output_type, query, resolve};

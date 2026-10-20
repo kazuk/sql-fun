@@ -71,23 +71,20 @@ impl JoinExprDataSource {
         }
     }
 
-    pub(super) fn get_aliases_for_column<TParseContext>(
+    pub(super) fn column_candidates<TParseContext: crate::sem::ParseContext>(
         &self,
         column: &ColumnName,
         context: &TParseContext,
         with_clause: &WithClause,
-        names: &mut Vec<AliasSpec>,
-    ) where
-        TParseContext: crate::sem::ParseContext,
-    {
-        let mut left_aliases = self
+    ) -> super::ColumnCandidates {
+        let mut candidates = self
             .left
             .aliases_for_column_resolved(column, context, with_clause);
-        let mut right_aliases =
+        candidates.append(
             self.right
-                .aliases_for_column_resolved(column, context, with_clause);
-        names.append(&mut left_aliases);
-        names.append(&mut right_aliases);
+                .aliases_for_column_resolved(column, context, with_clause),
+        );
+        candidates
     }
 }
 

@@ -122,3 +122,33 @@ pub(super) fn grouping_table_context() -> TestParseContext {
         .unwrap()
         .into_context()
 }
+
+/// Resolve a query against explicitly selected, minimal column-scope fixtures.
+pub(super) fn column_scope_query(
+    sql: &str,
+    dialect: Dialect,
+) -> (SelectStatement, TestParseContext) {
+    let mut context = catalog().with_dialect(dialect);
+    for ddl in [
+        "CREATE TABLE outer_items(id integer)",
+        "CREATE TABLE local_items(other integer)",
+        "CREATE TABLE known_items(id integer)",
+    ] {
+        context = crate::parse_statements(ddl, dialect)
+            .next()
+            .unwrap()
+            .unwrap()
+            .analyze(context)
+            .unwrap()
+            .into_context();
+    }
+    let statement = crate::parse_statements(sql, dialect)
+        .next()
+        .unwrap()
+        .unwrap();
+    let StatementNode::Query(query) = statement.node else {
+        panic!("query fixture");
+    };
+    let query = query.resolve_in(&mut context, None).unwrap();
+    (query, context)
+}

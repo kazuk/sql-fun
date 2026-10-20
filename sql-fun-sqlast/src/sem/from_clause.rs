@@ -159,13 +159,17 @@ impl FromClause {
         None
     }
 
-    /// find alias name by column name
+    /// Resolve the unique local alias supplying a column.
+    ///
+    /// `Unknown` means an unresolved source could supply the column; only
+    /// `NotFound` permits enclosing-scope lookup. Competing known aliases are
+    /// returned as an ambiguity error.
     pub fn find_alias_for_column<TParseContext>(
         &self,
         column: &ColumnName,
         context: &TParseContext,
         with_clause: &WithClause,
-    ) -> Result<Option<AliasSpec>, Vec<AliasSpec>>
+    ) -> Result<::sql_fun_core::LookupResult<AliasSpec>, Vec<AliasSpec>>
     where
         TParseContext: ParseContext,
     {
@@ -177,21 +181,67 @@ impl FromClause {
         column: &ColumnName,
         context: &TContext,
         with_clause: &WithClause,
-    ) -> Result<Option<AliasSpec>, Vec<AliasSpec>> {
-        let mut aliases = Vec::new();
-
+    ) -> Result<::sql_fun_core::LookupResult<AliasSpec>, Vec<AliasSpec>> {
+        let mut candidates = crate::sem::data_source::ColumnCandidates::default();
         for source in &self.0 {
-            let mut results = source.aliases_for_column_resolved(column, context, with_clause);
-            aliases.append(&mut results);
+            candidates.append(source.aliases_for_column_resolved(column, context, with_clause));
         }
+        candidates.resolve()
+    }
+}
 
-        if aliases.is_empty() {
-            Ok(None)
-        } else if aliases.len() == 1 {
-            Ok(Some(aliases[0].clone()))
-        } else {
-            Err(aliases)
-        }
+#[cfg(test)]
+mod test_find_alias_for_column {
+    use crate::sem::{AliasSpec, ColumnName, WithClause};
+    use crate::test_helpers::TestParseContext;
+    use ::sql_fun_core::LookupResult;
+
+    #[rstest::rstest]
+    #[case::found(
+        "(SELECT 1 AS id) a",
+        LookupResult::found(AliasSpec::from_local_name("a"))
+    )]
+    #[case::absent("(SELECT 1 AS other) a", LookupResult::not_found())]
+    #[case::unknown("missing.items a", LookupResult::unknown())]
+    #[case::competing("(SELECT 1 AS id) a, missing.items b", LookupResult::unknown())]
+    #[case::reversed("missing.items b, (SELECT 1 AS id) a", LookupResult::unknown())]
+    fn preserves_lookup_conclusiveness(
+        #[case] from_sql: &str,
+        #[case] expected: LookupResult<AliasSpec>,
+    ) -> testresult::TestResult {
+        let (from, context) = TestParseContext::scalar_scope_from_sql(from_sql)?;
+        let actual =
+            from.find_alias_for_column(&ColumnName::from("id"), &context, &WithClause::default());
+        assert_eq!(actual, Ok(expected));
+        Ok(())
+    }
+
+    #[rstest::rstest]
+    #[case::known("(SELECT 1 AS id) a")]
+    #[case::absent("(SELECT 1 AS other) a")]
+    #[case::unknown("missing.items a")]
+    fn source_candidate_api_preserves_lookup_conclusiveness(
+        #[case] from_sql: &str,
+    ) -> testresult::TestResult {
+        let (from, context) = TestParseContext::scalar_scope_from_sql(from_sql)?;
+        let with = WithClause::default();
+        let column = ColumnName::from("id");
+        let (source, _) = from
+            .resolve_alias(&crate::sem::AliasName::from("a"))
+            .unwrap();
+        let expected = match from
+            .find_alias_for_column(&column, &context, &with)
+            .unwrap()
+        {
+            LookupResult::Found(alias) => LookupResult::found(vec![alias]),
+            LookupResult::NotFound => LookupResult::not_found(),
+            LookupResult::Unknown => LookupResult::unknown(),
+        };
+        assert_eq!(
+            source.get_aliases_for_column(&column, &context, &with),
+            expected
+        );
+        Ok(())
     }
 }
 

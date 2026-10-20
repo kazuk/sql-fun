@@ -408,7 +408,7 @@ impl<'a> ScalarAnalysisContext<'a> {
             .from_clause
             .find_alias_resolved(column, context, &self.with_clause)
         {
-            Ok(None) => self
+            Ok(result) if result.is_not_found() => self
                 .parent
                 .as_ref()
                 .is_some_and(|parent| parent.has_input_column(context, column)),
@@ -571,28 +571,35 @@ impl ScalarAnalysisContext<'_> {
             let expr = ColumnReferenceExpr::ambiguous_column_resolved(context, column)?;
             return Ok((expr, context));
         };
-        let Some(alias) = find_alias_result else {
-            if let Some(columns) = &self.output_aliases {
-                match columns.resolve_output(column, context) {
-                    Ok(Some(index)) => {
-                        return Ok((
-                            columns.output_reference(index).expect("bound output"),
-                            context,
-                        ));
+        let alias = match find_alias_result {
+            ::sql_fun_core::LookupResult::Found(alias) => alias,
+            ::sql_fun_core::LookupResult::Unknown => {
+                let expr = ColumnReferenceExpr::undefined_column_resolved(context, column)?;
+                return Ok((expr, context));
+            }
+            ::sql_fun_core::LookupResult::NotFound => {
+                if let Some(columns) = &self.output_aliases {
+                    match columns.resolve_output(column, context) {
+                        Ok(Some(index)) => {
+                            return Ok((
+                                columns.output_reference(index).expect("bound output"),
+                                context,
+                            ));
+                        }
+                        Err(()) => {
+                            let expression =
+                                ColumnReferenceExpr::ambiguous_column_resolved(context, column)?;
+                            return Ok((expression, context));
+                        }
+                        Ok(None) => {}
                     }
-                    Err(()) => {
-                        let expression =
-                            ColumnReferenceExpr::ambiguous_column_resolved(context, column)?;
-                        return Ok((expression, context));
-                    }
-                    Ok(None) => {}
                 }
+                if let Some(parent) = &self.parent {
+                    return parent.resolve_column(context, None, column);
+                }
+                let expr = ColumnReferenceExpr::undefined_column_resolved(context, column)?;
+                return Ok((expr, context));
             }
-            if let Some(parent) = &self.parent {
-                return parent.resolve_column(context, None, column);
-            }
-            let expr = ColumnReferenceExpr::undefined_column_resolved(context, column)?;
-            return Ok((expr, context));
         };
         self.resolve_source_column_ref(context, alias.name(), column)
     }

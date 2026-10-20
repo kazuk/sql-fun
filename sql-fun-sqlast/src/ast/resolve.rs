@@ -17,9 +17,8 @@ use crate::ast::{
 };
 use crate::sem::{
     AliasName, AnalysisError, AnalysisProblem, ArithExpr, CaseExpr, CaseExprAnalysisContext,
-    CoalesceAnalysis, CoalesceExpr, ColumnName, FullName, FuncCallExpr, IndirectionExpr,
-    OperatorName, ParseContext, ScalarAnalysisContext, ScalarConstExpr, SemScalarExpr,
-    SqlValueExpr, TypeReference,
+    CoalesceExpr, ColumnName, FullName, FuncCallExpr, IndirectionExpr, OperatorName, ParseContext,
+    ScalarAnalysisContext, ScalarConstExpr, SemScalarExpr, SqlValueExpr, TypeReference,
 };
 
 impl Name {
@@ -557,6 +556,9 @@ impl CallKind {
         scope: &ScalarAnalysisContext<'_>,
     ) -> Result<SemScalarExpr, AnalysisError> {
         if context.dialect() == Dialect::sqlite() {
+            if call.name.0.len() == 1 && call.name.0[0].eq_ignore_ascii_case("coalesce") {
+                return call.resolve_coalesce(context, scope);
+            }
             todo!("SQLite function affinity and overload semantics");
         }
         match self {
@@ -599,14 +601,7 @@ impl Call {
         scope: &ScalarAnalysisContext<'_>,
     ) -> Result<SemScalarExpr, AnalysisError> {
         let arguments = Expr::resolve_list(&self.arguments, context, scope)?;
-        if let Some(expression) = CoalesceExpr::defer_untyped(&arguments) {
-            return Ok(expression);
-        }
-        let mut analysis = CoalesceAnalysis::new();
-        for argument in &arguments {
-            analysis.push(context, argument)?;
-        }
-        Ok(analysis.finish(&mut *context)?.0)
+        CoalesceExpr::resolve(context, &arguments)
     }
 
     fn resolve_ordinary(

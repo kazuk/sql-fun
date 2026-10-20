@@ -239,8 +239,12 @@ impl ParameterResolution {
         }
         node
     }
-    pub(crate) fn unify_coalesce_types(&mut self, _coalesce: &crate::sem::CoalesceExpr) {
-        todo!("parameter-dependent COALESCE type unification");
+    pub(crate) fn unify_coalesce_types(
+        &mut self,
+        context: &mut impl crate::sem::ParseContext,
+        arguments: &[SemScalarExpr],
+    ) -> Result<(usize, InputTypeConstraint), AnalysisError> {
+        self.common_type(context, "COALESCE", arguments, false)
     }
     pub(crate) fn member_access(&mut self, base: &SemScalarExpr, member: &str) -> SemScalarExpr {
         let source = self.input(base);

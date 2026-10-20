@@ -22,7 +22,6 @@ mod sql_value;
 mod sub_link;
 
 pub(crate) use self::case_expr::CaseExprAnalysisContext;
-pub(crate) use self::coalesce::CoalesceAnalysis;
 pub use self::{
     arith_expr::ArithExpr,
     array::ArrayExpr,
@@ -167,6 +166,7 @@ impl SemScalarExpr {
             Self::MinMax(value) => value.canonicalize_grouping_key(),
             Self::Array(value) => value.canonicalize_grouping_key(),
             Self::Case(value) => value.canonicalize_grouping_key(),
+            Self::Coalesce(value) => value.canonicalize_grouping_key(),
             Self::FuncCall(value) => value.canonicalize_grouping_key(),
             Self::Arith(value) => value.canonicalize_grouping_key(),
             Self::Param(value) => value.canonicalize_grouping_key(),
@@ -345,6 +345,7 @@ impl SemScalarExpr {
             Self::MinMax(value) => value.node(),
             Self::Array(value) => value.node(),
             Self::Case(value) => value.node(),
+            Self::Coalesce(value) => value.node(),
             _ => None,
         }
     }
@@ -354,6 +355,14 @@ impl SemScalarExpr {
         constraint: &crate::sem::InputTypeConstraint,
     ) -> Self {
         Self::Param(ParamRef::new(position, node, constraint))
+    }
+    /// Structured COALESCE with analyzed operands and inferred coercions.
+    pub const fn as_coalesce(&self) -> Option<&CoalesceExpr> {
+        if let Self::Coalesce(value) = self {
+            Some(value)
+        } else {
+            None
+        }
     }
     /// Structured CASE with analyzed conditions, results, and implicit coercions.
     pub const fn as_case(&self) -> Option<&CaseExpr> {
@@ -927,6 +936,7 @@ impl SemScalarExpr {
             Self::MinMax(value) => value.apply_constraints(constraints),
             Self::Array(value) => value.apply_constraints(constraints),
             Self::Case(value) => value.apply_constraints(constraints),
+            Self::Coalesce(value) => value.apply_constraints(constraints),
             _ => {}
         }
     }
@@ -959,7 +969,7 @@ impl SemScalarExpr {
                 None
             }
             Self::Coalesce(value) => {
-                value.collect_constraints(parameters);
+                value.collect_constraints(parameters, context)?;
                 None
             }
             Self::Indirection(value) => value.collect_constraints(parameters, context),

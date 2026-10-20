@@ -390,7 +390,7 @@ does not imply complete aggregate or window legality checking.
 
 Concrete PostgreSQL function signatures are supported; unresolved polymorphic
 signatures remain unsupported. Type unification of unresolved inputs in
-COALESCE and indirection is unimplemented and can terminate analysis.
+indirection is unimplemented and can terminate analysis.
 
 PostgreSQL parameter-dependent CASE expressions constrain searched WHEN
 conditions to boolean and simple CASE operands through equality overloads.
@@ -401,14 +401,28 @@ Input and result domains can contain several alternatives; inspect them through
 `CASE WHEN true THEN $1 ELSE 1 END` accepts integer and bigint inputs with
 corresponding numeric result alternatives.
 
-A known shared common-type inference limitation affects CASE when untyped
-result parameters have no typed result branch to anchor them: inference can
-narrow the result to text too early and reject valid explicitly typed
-assignments.
-This also affects ARRAY and GREATEST/LEAST parameter analysis. Such CASE results
-are not fully supported yet. SQLite CASE analysis does not apply these
-PostgreSQL boolean or implicit-cast constraints; parameter-dependent SQLite
-result typing remains incomplete.
+PostgreSQL COALESCE uses the same common-type constraints, considering operands
+in source order. All operands participate, even after a known non-null operand;
+unreachable operands produce a warning. The analyzed expression retains its
+operands and determined implicit conversions. For example, `COALESCE($1,1)`
+admits integer and bigint inputs with corresponding result alternatives;
+inspect `ParameterConstraints::result_column` when no single result is known.
+COALESCE nullability metadata remains conservative and does not yet prove that
+a non-null fallback makes the result non-null.
+
+A known shared common-type inference limitation affects CASE and COALESCE when
+untyped result parameters have no typed result operand to anchor them:
+inference can narrow the result to text too early and reject valid explicitly
+typed assignments. This also affects ARRAY and GREATEST/LEAST parameter
+analysis. Such CASE and COALESCE results are not fully supported yet. For
+example, `SELECT COALESCE($1,NULL), $1::integer` can reject a valid explicitly
+typed integer input (tracked in #676).
+
+SQLite CASE analysis does not apply PostgreSQL boolean or implicit-cast
+constraints; parameter-dependent SQLite result typing remains incomplete.
+SQLite COALESCE retains its operands without imposing PostgreSQL common-type
+conversions; its result typing also remains incomplete, and its input
+parameters remain unconstrained by COALESCE.
 
 ## DELETE analysis
 

@@ -218,7 +218,7 @@ pub(crate) use self::{
     delete_statement::{DeleteDestination, DeletePredicate},
     parameter_constraints::{ConstraintGraph, SignatureAlternative},
     parse_context::CursorBindings,
-    scalar_expr::{CaseExprAnalysisContext, CoalesceAnalysis, grouping::ReferenceCapture},
+    scalar_expr::{CaseExprAnalysisContext, grouping::ReferenceCapture},
     select_statement::{ResultColumn, SelectStatementNode},
     stack::with_stack,
     update_statement::{UpdateDestination, UpdatePredicate},

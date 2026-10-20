@@ -98,6 +98,9 @@ pub enum AnalysisProblem {
     /// explicit cast not defined
     ExplicitCastNotDefined(TypeReference, TypeReference),
 
+    /// A COALESCE argument follows a proven non-null operand.
+    UnreachableCoalesceArgument(SemScalarExpr, SemScalarExpr),
+
     /// Coalesce expr type unknown
     CoalesceExprTypeUnknown(ExpressionList),
 
@@ -161,6 +164,7 @@ impl AnalysisProblem {
         match self {
             Self::AlterColumn(problem) => problem.reason().severity(),
             Self::Index(problem) => problem.severity(),
+            Self::UnreachableCoalesceArgument(..) => DiagnosticSeverity::Warning,
             _ => DiagnosticSeverity::Error,
         }
     }
@@ -360,6 +364,7 @@ impl AnalysisProblem {
             Self::DuplicateDefElemKey(..) => "duplicate_def_elem_key",
             Self::ExplicitCastNotDefined(..) => "explicit_cast_not_defined",
             Self::CoalesceExprTypeUnknown(..) => "coalesce_expr_type_unknown",
+            Self::UnreachableCoalesceArgument(..) => "unreachable_coalesce_argument",
             Self::ExpressionTypeNotKnown(..) => "expression_type_not_known",
             Self::UndefinedOperator(..) => "undefined_operator",
             Self::RequireArray(..) => "require_array",
@@ -393,6 +398,12 @@ impl AnalysisProblem {
     pub fn render_metadata(&self) -> Option<DiagnosticMetadata> {
         Some(match self {
             Self::Index(problem) => problem.render_metadata(),
+            Self::UnreachableCoalesceArgument(..) => DiagnosticMetadata::from(
+                "COALESCE argument is unreachable after a non-null operand",
+            ),
+            Self::CoalesceExprTypeUnknown(..) => DiagnosticMetadata::from(
+                "COALESCE operands do not have a common implicit result type",
+            ),
             Self::AlterColumn(problem) => problem.render_metadata(),
             Self::Creation(problem) => problem.render_metadata(),
             Self::Ownership(problem) => problem.render_metadata(),
@@ -505,13 +516,13 @@ impl AnalysisProblem {
         todo!("{}", ret_type.into())
     }
 
-    /// coalece argument unreachable
+    /// A COALESCE argument follows a proven non-null operand.
     #[must_use]
     pub fn unreachable_coalesce_argument(
-        _arg_expr: impl Into<SemScalarExpr>,
-        _first_non_null: impl Into<SemScalarExpr>,
+        arg_expr: impl Into<SemScalarExpr>,
+        first_non_null: impl Into<SemScalarExpr>,
     ) -> Self {
-        todo!()
+        Self::UnreachableCoalesceArgument(arg_expr.into(), first_non_null.into())
     }
 
     /// unknown type used in coalesce
@@ -634,6 +645,23 @@ impl AnalysisProblem {
         _name: &str,
     ) -> Self {
         todo!()
+    }
+}
+
+#[cfg(test)]
+mod coalesce_diagnostic_tests {
+    use super::{AnalysisProblem, DiagnosticSeverity};
+
+    #[test]
+    fn unreachable_argument_is_a_serializable_warning() {
+        let problem = AnalysisProblem::unreachable_coalesce_argument("later", "first");
+        assert_eq!(problem.code(), "unreachable_coalesce_argument");
+        assert_eq!(problem.severity(), DiagnosticSeverity::Warning);
+        assert!(problem.render_metadata().is_some());
+        let encoded = ::serde_json::to_string(&problem).unwrap();
+        let restored: AnalysisProblem = ::serde_json::from_str(&encoded).unwrap();
+        assert_eq!(restored.code(), problem.code());
+        assert_eq!(restored.severity(), problem.severity());
     }
 }
 

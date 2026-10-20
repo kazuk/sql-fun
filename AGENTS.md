@@ -345,6 +345,10 @@ directly:
 
 ## SQL Analysis Context Architecture
 
+- Before planning, implementing, or reviewing type resolution, type ownership,
+  casts, overload resolution, or parameter inference in `sql-fun-sqlast`, read
+  [docs/internal-rules/sqlast-type-system-guideline.md](docs/internal-rules/sqlast-type-system-guideline.md).
+  Keep the representation, lifetime, constraint, and test-context guidance there.
 - Before planning, implementing, or reviewing SQL analyzers, name resolution,
   semantic analysis, type/constraint inference, or their diagnostic and lint
   behavior, read and apply

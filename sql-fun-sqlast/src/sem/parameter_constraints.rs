@@ -364,16 +364,25 @@ impl ConstraintGraph {
         &self,
         context: &mut impl crate::sem::ParseContext,
     ) -> Result<(), crate::sem::AnalysisError> {
-        for relation in &self.structural {
-            relation.report_problem(&self.domains, context)?;
-        }
+        // Inspect each relationship before it can discard an invalid source.
+        // A clone preserves the original graph for solving and conflict reporting.
+        self.clone()
+            .propagate_with(|relation, domains| relation.report_problem(domains, context))?;
         Ok(())
     }
 
     fn propagate(&mut self) -> bool {
+        self.propagate_with(|_, _| Ok::<(), std::convert::Infallible>(()))
+            .expect("propagation without diagnostic delivery is infallible")
+    }
+
+    fn propagate_with<E>(
+        &mut self,
+        mut inspect: impl FnMut(&StructuralConstraint, &[InputTypeConstraint]) -> Result<(), E>,
+    ) -> Result<bool, E> {
         loop {
             if self.domains.iter().any(InputTypeConstraint::is_empty) {
-                return false;
+                return Ok(false);
             }
             let mut changed = false;
             for (left, right) in &self.equalities {
@@ -384,17 +393,18 @@ impl ConstraintGraph {
             }
             for overload in &mut self.overloads {
                 if !overload.retain_compatible(&self.domains) {
-                    return false;
+                    return Ok(false);
                 }
                 changed |= overload.propagate_domains(&mut self.domains);
             }
 
             for relation in &self.structural {
+                inspect(relation, &self.domains)?;
                 changed |= relation.propagate(&mut self.domains);
             }
 
             if !changed {
-                return true;
+                return Ok(true);
             }
         }
     }

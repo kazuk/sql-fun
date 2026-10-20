@@ -112,8 +112,7 @@ impl Update {
             &scope,
         )?;
         let predicate = self.resolve_predicate(context, table.name(), &scope)?;
-        let returning =
-            self.resolve_returning_scope(context, &requested, &table, &alias, &scope)?;
+        let returning = self.resolve_returning_scope(context, &requested, &table, &scope)?;
         let mut update = UpdateStatement::new(
             table.name(),
             &assignments,
@@ -209,15 +208,14 @@ impl Update {
         // FROM subqueries cannot implicitly see the UPDATE target. Correlation
         // within RHS expressions uses the complete scope assembled below.
         let mut from = FromItem::resolve_list_in(&self.from, context, with, outer)?;
-        if from.resolve_alias(alias.name()).is_some() {
-            context.report_analysis_problem(AnalysisProblem::duplicate_alias(alias.name()))?;
-        }
-        from.push(DataSource::resolve_relation(
+        let source = DataSource::resolve_relation(
             context,
             table.name().full_name(),
             alias,
             &WithClause::default(),
-        )?);
+        )?;
+        from.validate_source(context, &source)?;
+        from.push(source);
         Ok(from)
     }
     fn resolve_predicate(
@@ -257,7 +255,6 @@ impl Update {
         context: &mut impl ParseContext,
         requested: &TableName,
         table: &UpdateDestination,
-        alias: &AliasSpec,
         outer: &ScalarAnalysisContext<'_>,
     ) -> Result<ResultColumnCollection, ResolutionFailure> {
         let with = outer.with_clause();
@@ -278,20 +275,12 @@ impl Update {
                 with,
                 &returning_from,
                 &scope,
-                &returning_alias,
             )
             .map_err(Into::into)
         } else {
             let scope = ScalarAnalysisContext::nested(with, from, Some(outer));
-            ResultColumnCollection::resolve_for_update(
-                &self.returning,
-                context,
-                with,
-                from,
-                &scope,
-                alias,
-            )
-            .map_err(Into::into)
+            ResultColumnCollection::resolve_for_update(&self.returning, context, with, from, &scope)
+                .map_err(Into::into)
         }
     }
 }

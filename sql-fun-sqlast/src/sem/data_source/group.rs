@@ -38,6 +38,16 @@ impl GroupedDataSource {
         }
     }
 
+    pub(super) fn namespace<'a>(&'a self, source: &'a DataSource) -> super::SourceNamespace<'a> {
+        let mut namespace = super::SourceNamespace::default();
+        namespace.push(source, &self.alias);
+        if self.is_joined() {
+            namespace.hide_group_columns();
+            namespace.append(self.source.namespace());
+        }
+        namespace
+    }
+
     pub(super) fn new(source: &DataSource, alias: &AliasSpec) -> Self {
         Self {
             source: source.clone(),
@@ -45,16 +55,17 @@ impl GroupedDataSource {
         }
     }
 
-    pub(super) fn projection_names(
-        &self,
+    pub(super) fn projection_names<'a>(
+        &'a self,
+        source: &'a DataSource,
         context: &impl ParseContext,
         with: &WithClause,
-    ) -> Result<Vec<(AliasName, ColumnName)>, AnalysisError> {
+    ) -> Result<Vec<super::ProjectionColumn<'a>>, AnalysisError> {
         Ok(self
             .source
             .projection_names(context, with, None)?
             .into_iter()
-            .map(|(_, name)| (self.alias.name().clone(), name))
+            .map(|column| column.with_group(source, self.alias.name()))
             .collect())
     }
 

@@ -101,10 +101,13 @@ impl<'a> ScalarAnalysisContext<'a> {
     }
     pub(crate) fn projection_names(
         &self,
-        context: &impl ParseContext,
+        context: &mut impl ParseContext,
         qualifier: &AliasName,
-    ) -> Result<Vec<(AliasName, ColumnName)>, AnalysisError> {
-        if self.from_clause.resolve_alias(qualifier).is_some() {
+    ) -> Result<Vec<crate::sem::data_source::ProjectionColumn<'_>>, AnalysisError> {
+        if !matches!(
+            self.from_clause.namespace().resolve_name(qualifier),
+            Ok(None)
+        ) {
             self.from_clause
                 .projection_names(context, &self.with_clause, Some(qualifier))
         } else if let Some(parent) = &self.parent {
@@ -137,7 +140,7 @@ impl<'a> ScalarAnalysisContext<'a> {
     ) -> Result<(), AnalysisError> {
         if let Some(identity) = self.direct_rule_identity() {
             for name in ["old", "new"] {
-                if from.resolve_alias(&AliasName::from(name)).is_some() {
+                if from.contains_alias(&AliasName::from(name)) {
                     context.report_analysis_problem(crate::sem::AnalysisProblem::rule(
                         &crate::sem::problem::RuleProblem::definition(
                             identity,
@@ -390,7 +393,7 @@ impl<'a> ScalarAnalysisContext<'a> {
         &self,
         alias: &AliasName,
     ) -> Option<(&AliasName, crate::sem::DeleteRowVersion)> {
-        if self.from_clause.resolve_alias(alias).is_some() {
+        if self.from_clause.contains_alias(alias) {
             return None;
         }
         let version = crate::sem::DeleteRowVersion::from_alias(alias.as_str())?;
@@ -401,26 +404,29 @@ impl<'a> ScalarAnalysisContext<'a> {
     }
     pub(crate) fn has_input_column(
         &self,
-        context: &impl crate::sem::ParseContext,
+        context: &impl ParseContext,
         column: &ColumnName,
-    ) -> bool {
-        match self
-            .from_clause
-            .find_alias_resolved(column, context, &self.with_clause)
-        {
-            Ok(result) if result.is_not_found() => self
-                .parent
-                .as_ref()
-                .is_some_and(|parent| parent.has_input_column(context, column)),
-            _ => true,
+    ) -> Result<bool, AnalysisError> {
+        let lookup =
+            self.from_clause
+                .namespace()
+                .resolve_column(context, &self.with_clause, column)?;
+        if let Ok(::sql_fun_core::LookupResult::NotFound) = lookup {
+            if let Some(parent) = &self.parent {
+                parent.has_input_column(context, column)
+            } else {
+                Ok(false)
+            }
+        } else {
+            Ok(true)
         }
     }
     pub(crate) fn resolve_lock(&self, name: &str) -> crate::sem::QueryNameResolution {
         let alias = AliasName::from(name);
-        if self.from_clause.resolve_alias(&alias).is_some() {
-            crate::sem::QueryNameResolution::source(&alias)
-        } else {
-            crate::sem::QueryNameResolution::not_found()
+        match self.from_clause.namespace().resolve_name(&alias) {
+            Ok(Some(_)) => crate::sem::QueryNameResolution::source(&alias),
+            Ok(None) => crate::sem::QueryNameResolution::not_found(),
+            Err(()) => crate::sem::QueryNameResolution::ambiguous(),
         }
     }
     pub(crate) fn with_window_names(&self, names: Vec<String>) -> Self {
@@ -601,17 +607,30 @@ impl ScalarAnalysisContext<'_> {
                 let (value, context) = self.resolve_source_column_ref(context, target, column)?;
                 return Ok((value.merge_record_column(role, nullable), context));
             }
-            if let Some((target, version)) = self.delete_row_target(alias) {
-                let (value, context) = self.resolve_source_column_ref(context, target, column)?;
+            if let Some((target, version)) = self.delete_row_target(alias)
+                && let Some(source) = self.from_clause.destination_source(target)
+            {
+                let (value, context) = self.bind_source(context, &source, column)?;
                 return Ok((value.delete_row_column(version), context));
             }
 
-            if self.from_clause.resolve_alias(alias).is_none()
-                && let Some(parent) = &self.parent
-            {
-                return parent.resolve_column(context, Some(alias), column);
+            match self.from_clause.namespace().resolve_name(alias) {
+                Err(()) => {
+                    let expression = super::column_ref::QualifiedColumnFailure::ambiguous(
+                        context,
+                        &crate::sem::FullName::from_local_name(alias.as_str()),
+                        column,
+                    )?;
+                    return Ok((expression, context));
+                }
+                Ok(Some(source)) => return self.bind_source(context, &source, column),
+                Ok(None) => {
+                    if let Some(parent) = &self.parent {
+                        return parent.resolve_column(context, Some(alias), column);
+                    }
+                    return self.resolve_source_column_ref(context, alias, column);
+                }
             }
-            return self.resolve_source_column_ref(context, alias, column);
         }
 
         if self.qualified_only {
@@ -620,7 +639,8 @@ impl ScalarAnalysisContext<'_> {
         }
         let Ok(find_alias_result) =
             self.from_clause
-                .find_alias_resolved(column, &*context, &self.with_clause)
+                .namespace()
+                .resolve_column(&*context, &self.with_clause, column)?
         else {
             let expr = ColumnReferenceExpr::ambiguous_column_resolved(context, column)?;
             return Ok((expr, context));
@@ -655,7 +675,19 @@ impl ScalarAnalysisContext<'_> {
                 return Ok((expr, context));
             }
         };
-        self.resolve_source_column_ref(context, alias.name(), column)
+        self.bind_source(context, &alias, column)
+    }
+
+    pub(crate) fn bind_source<'context, C: ParseContext>(
+        &self,
+        context: &'context mut C,
+        source: &crate::sem::data_source::QualifiedSource<'_>,
+        column: &ColumnName,
+    ) -> Result<(SemScalarExpr, &'context mut C), AnalysisError> {
+        self.grouping.reference();
+        self.validate_rule_reference(context, source.alias())?;
+        let expression = source.bind(context, &self.with_clause, column)?;
+        Ok((expression, context))
     }
 }
 

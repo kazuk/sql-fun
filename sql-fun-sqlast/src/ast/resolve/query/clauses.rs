@@ -52,7 +52,7 @@ impl Expr {
             }
             if let Some(name) = self.unqualified_column() {
                 let column = ColumnName::from(name);
-                if binding.input_first() && scope.has_input_column(context, &column) {
+                if binding.input_first() && scope.has_input_column(context, &column)? {
                     return self.resolve_in(context, scope);
                 }
                 match columns.resolve_output(&column, context) {

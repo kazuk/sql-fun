@@ -71,6 +71,7 @@ pub use self::create_trigger::{
     TriggerEventColumn, TriggerFunction, TriggerGranularity, TriggerIdentity, TriggerReferences,
     TriggerTiming, TriggerTransition,
 };
+pub(crate) use self::data_source::ProjectionColumn;
 pub use self::drop_rule::DropRule;
 pub use self::view_definition::{ViewCheckOption, ViewColumnLineage, ViewOption};
 pub use self::view_write::{ViewAssignmentColumn, ViewWriteEvaluation, ViewWriteSupport};

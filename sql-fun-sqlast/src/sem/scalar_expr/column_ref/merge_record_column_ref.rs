@@ -13,6 +13,15 @@ pub struct MergeRecordColumnRef {
 }
 
 impl MergeRecordColumnRef {
+    pub(super) fn with_reference_name(
+        mut self,
+        alias: &crate::sem::AliasName,
+        column: &ColumnName,
+    ) -> Self {
+        self.source = Box::new((*self.source).with_reference_name(alias, column));
+        self
+    }
+
     pub(crate) fn new(role: MergeRecordRole, source: &ColumnReferenceExpr, nullable: bool) -> Self {
         Self {
             role,

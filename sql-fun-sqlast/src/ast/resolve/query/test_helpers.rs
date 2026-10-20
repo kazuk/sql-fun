@@ -152,3 +152,57 @@ pub(super) fn column_scope_query(
     let query = query.resolve_in(&mut context, None).unwrap();
     (query, context)
 }
+
+/// Analyze against explicitly supplied, small cross-schema relation fixtures.
+pub(super) fn source_namespace_statement(sql: &str) -> crate::AstAndContextPair<TestParseContext> {
+    source_namespace_statement_at_version(sql, "17")
+}
+
+pub(super) fn source_namespace_statement_at_version(
+    sql: &str,
+    version: &str,
+) -> crate::AstAndContextPair<TestParseContext> {
+    let dialect = Dialect::postgres();
+    let metadata = ::serde_json::from_value(::serde_json::json!({
+        "engine": "postgres", "dialect": "postgres", "version": version, "search_path": ["a", "public"]
+    })).unwrap();
+    let mut context = catalog().with_metadata(&metadata);
+    context.set_get_search_path_result(&[SchemaName::from("a"), SchemaName::from("public")]);
+    let schema = r#"
+CREATE TABLE a.t(id integer NOT NULL, only_a integer NOT NULL);
+CREATE TABLE b.t(id bigint NOT NULL, only_b bigint NOT NULL);
+CREATE TABLE a.u(aid integer NOT NULL);
+CREATE TABLE b.u(bid bigint NOT NULL);
+CREATE TABLE "a.b"."t.x"(id integer NOT NULL);
+CREATE TABLE "b.b"."t.x"(id bigint NOT NULL);
+"#;
+    for statement in crate::parse_statements(schema, dialect) {
+        context = statement.unwrap().analyze(context).unwrap().into_context();
+    }
+    for (schema, name, source) in [("a", "v", "a.t"), ("b", "v", "b.t"), ("c", "t", "b.t")] {
+        let sql = format!("SELECT id FROM {source}");
+        let query = crate::parse_statements(&sql, dialect)
+            .next()
+            .unwrap()
+            .unwrap()
+            .node
+            .resolve(&mut context)
+            .unwrap()
+            .into_select_statemtnt()
+            .unwrap();
+        let name = crate::sem::FullName::with_schema(schema, name);
+        let view = crate::sem::CreateView::new(&name, &query, &[], &None, false);
+        context.set_get_view_impl_result(&name, &Some(crate::sem::ViewLike::from(&view)));
+    }
+    assert!(
+        context.reported_problems().is_empty(),
+        "{:?}",
+        context.reported_problems()
+    );
+    crate::parse_statements(sql, dialect)
+        .next()
+        .unwrap()
+        .unwrap()
+        .analyze(context)
+        .unwrap()
+}

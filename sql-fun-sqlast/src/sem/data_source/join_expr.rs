@@ -34,6 +34,24 @@ pub struct JoinExprDataSource {
 }
 
 impl JoinExprDataSource {
+    pub(super) fn namespace<'a>(&'a self, source: &'a DataSource) -> super::SourceNamespace<'a> {
+        if let Some(alias) = &self.alias {
+            let mut namespace = super::SourceNamespace::default();
+            namespace.push(source, alias);
+            return namespace;
+        }
+        let mut namespace = self
+            .left
+            .namespace()
+            .with_nullability(self.kind.left_nullable(false));
+        namespace.append(
+            self.right
+                .namespace()
+                .with_nullability(self.kind.right_nullable(false)),
+        );
+        namespace
+    }
+
     pub(super) fn qualified_source<'a>(
         &'a self,
         context: &impl crate::sem::ParseContext,
@@ -77,14 +95,26 @@ impl JoinExprDataSource {
     }
 
     pub(super) fn push_alias_names(&self, names: &mut Vec<AliasSpec>) {
-        self.left.push_alias_names(names);
-        self.right.push_alias_names(names);
+        if let Some(alias) = &self.alias {
+            names.push(alias.clone());
+        } else {
+            self.left.push_alias_names(names);
+            self.right.push_alias_names(names);
+        }
     }
 
     pub(super) fn resolve_alias<'a>(
         &'a self,
+        source: &'a DataSource,
         name: &AliasName,
     ) -> Option<(&'a DataSource, Nullable)> {
+        if let Some(alias) = &self.alias {
+            return if alias.name() == name {
+                Some((source, false))
+            } else {
+                None
+            };
+        }
         if let Some((left_source, left_nullable)) = self.left.resolve_alias(name) {
             Some((left_source, self.kind.left_nullable(left_nullable)))
         } else {
@@ -111,6 +141,43 @@ impl JoinExprDataSource {
 }
 
 impl JoinExprDataSource {
+    pub(super) fn create_column_ref<'context, C: crate::sem::ParseContext>(
+        &self,
+        context: &'context mut C,
+        with: &WithClause,
+        column: &ColumnName,
+        nullable: bool,
+    ) -> Result<(SemScalarExpr, &'context mut C), crate::sem::AnalysisError> {
+        if self.column_candidates(column, context, with).is_unknown() {
+            let expression =
+                crate::sem::ColumnReferenceExpr::undefined_column_resolved(context, column)?;
+            return Ok((expression, context));
+        }
+        let columns = self.project(context, with, None)?;
+        let mut selected = None;
+        for candidate in columns {
+            if candidate.name() == column {
+                if selected.is_some() {
+                    return Ok((
+                        crate::sem::ColumnReferenceExpr::ambiguous_column_resolved(
+                            context, column,
+                        )?,
+                        context,
+                    ));
+                }
+                selected = Some(candidate);
+            }
+        }
+        let value = if let Some(selected) = selected {
+            selected
+                .with_nullability(nullable)
+                .bind_direct(context, with)?
+        } else {
+            crate::sem::ColumnReferenceExpr::undefined_column_resolved(context, column)?
+        };
+        Ok((value, context))
+    }
+
     pub(super) fn group_column_source<'a, C: crate::sem::ParseContext>(
         &'a self,
         column: &ColumnName,
@@ -156,6 +223,50 @@ impl JoinExprDataSource {
 }
 
 impl JoinExprDataSource {
+    pub(super) fn project(
+        &self,
+        context: &impl crate::sem::ParseContext,
+        with: &WithClause,
+        qualifier: Option<&AliasName>,
+    ) -> Result<Vec<super::ProjectionColumn<'_>>, crate::sem::AnalysisError> {
+        if self.matches_projection_qualifier(qualifier) {
+            let columns = self.projection_names(context, with)?;
+            return Ok(columns
+                .into_iter()
+                .enumerate()
+                .map(|(index, column)| {
+                    if let Some(alias) = &self.alias {
+                        let column = if let Some(name) = alias.derived_column_at(index) {
+                            column.with_name(name)
+                        } else {
+                            column
+                        };
+                        column.with_join_alias(alias.name())
+                    } else {
+                        column
+                    }
+                })
+                .collect());
+        }
+        if self.alias.is_some() {
+            return Ok(Vec::new());
+        }
+        let mut columns = Vec::new();
+        columns.extend(
+            self.left
+                .projection_names(context, with, qualifier)?
+                .into_iter()
+                .map(|column| column.with_nullability(self.kind.left_nullable(false))),
+        );
+        columns.extend(
+            self.right
+                .projection_names(context, with, qualifier)?
+                .into_iter()
+                .map(|column| column.with_nullability(self.kind.right_nullable(false))),
+        );
+        Ok(columns)
+    }
+
     pub(super) fn matches_projection_qualifier(&self, qualifier: Option<&AliasName>) -> bool {
         qualifier.is_none_or(|name| {
             self.alias
@@ -168,15 +279,25 @@ impl JoinExprDataSource {
         &self,
         context: &impl crate::sem::ParseContext,
         with: &WithClause,
-    ) -> Result<Vec<(AliasName, ColumnName)>, crate::sem::AnalysisError> {
-        let left = self.left.projection_names(context, with, None)?;
-        let right = self.right.projection_names(context, with, None)?;
+    ) -> Result<Vec<super::ProjectionColumn<'_>>, crate::sem::AnalysisError> {
+        let left: Vec<_> = self
+            .left
+            .projection_names(context, with, None)?
+            .into_iter()
+            .map(|column| column.with_nullability(self.kind.left_nullable(false)))
+            .collect();
+        let right: Vec<_> = self
+            .right
+            .projection_names(context, with, None)?
+            .into_iter()
+            .map(|column| column.with_nullability(self.kind.right_nullable(false)))
+            .collect();
         let merged = if let Some(using) = &self.using_clause {
             using.using_columns.clone()
         } else if self.natural {
             left.iter()
-                .filter(|(_, name)| right.iter().any(|(_, other)| name == other))
-                .map(|(_, name)| name.clone())
+                .filter(|column| right.iter().any(|other| column.name() == other.name()))
+                .map(|column| column.name().clone())
                 .collect()
         } else {
             Vec::new()
@@ -193,15 +314,22 @@ impl JoinExprDataSource {
                 } else {
                     &left
                 };
-                if let Some(column) = source.iter().find(|(_, column)| column == name) {
+                if let Some(column) = source.iter().find(|column| column.name() == name) {
                     columns.push(column.clone());
                 }
             }
-            columns.extend(left.into_iter().filter(|(_, name)| !merged.contains(name)));
+            columns.extend(
+                left.into_iter()
+                    .filter(|column| !merged.contains(column.name())),
+            );
         } else {
             columns.extend(left);
         }
-        columns.extend(right.into_iter().filter(|(_, name)| !merged.contains(name)));
+        columns.extend(
+            right
+                .into_iter()
+                .filter(|column| !merged.contains(column.name())),
+        );
         Ok(columns)
     }
 }

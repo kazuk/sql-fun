@@ -38,6 +38,12 @@ impl super::ColumnReference for SubQueryColumnRef {
 }
 
 impl SubQueryColumnRef {
+    pub(super) fn with_reference_name(mut self, alias: &AliasName, column: &ColumnName) -> Self {
+        self.alias = alias.clone();
+        self.column = column.clone();
+        self
+    }
+
     pub(super) fn canonicalize_grouping_key(&mut self) {
         self.column_def = None;
     }

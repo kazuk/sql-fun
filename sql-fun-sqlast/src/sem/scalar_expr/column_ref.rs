@@ -79,6 +79,26 @@ impl SemScalarExprNode for ColumnReferenceExpr {
 }
 
 impl ColumnReferenceExpr {
+    pub(super) fn with_reference_name(
+        self,
+        alias: &crate::sem::AliasName,
+        column: &ColumnName,
+    ) -> Self {
+        match self {
+            Self::MergeRecord(value) => Self::MergeRecord(value.with_reference_name(alias, column)),
+            Self::TableColumn(value) => Self::TableColumn(value.with_reference_name(alias, column)),
+            Self::ViewColumn(value) => Self::ViewColumn(value.with_reference_name(alias, column)),
+            Self::CteColumn(value) => Self::CteColumn(value.with_reference_name(alias, column)),
+            Self::SubQueryColumn(value) => {
+                Self::SubQueryColumn(value.with_reference_name(alias, column))
+            }
+            Self::TableFuncColumn(value) => {
+                Self::TableFuncColumn(value.with_reference_name(alias, column))
+            }
+            _ => self,
+        }
+    }
+
     pub(crate) fn qualified_failure(failure: &QualifiedColumnFailure) -> Self {
         Self::QualifiedFailure(failure.clone())
     }

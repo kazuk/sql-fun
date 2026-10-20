@@ -3197,6 +3197,7 @@ dependencies = [
  "futures-core",
  "futures-util",
  "indexmap",
+ "miette",
  "notify",
  "rand",
  "rstest",

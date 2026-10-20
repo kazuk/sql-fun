@@ -338,6 +338,55 @@ async fn retained_statement_ranges_are_not_misreported_as_file_positions() {
     connection.finish().await.unwrap();
 }
 
+#[rstest::rstest]
+#[case::table(
+    "CREATE TABLE measured (id int4); \
+     ALTER TABLE measured ALTER COLUMN id SET STATISTICS 10001; \
+     ALTER TABLE measured ALTER COLUMN id SET STATISTICS -2;",
+    "alter_column_statistics_reduced",
+    "alter_column_statistics_too_low"
+)]
+#[case::index(
+    "CREATE TABLE measured (id int4); \
+     CREATE INDEX measured_idx ON measured ((1)); \
+     ALTER INDEX measured_idx ALTER COLUMN 1 SET STATISTICS 10001; \
+     ALTER INDEX measured_idx ALTER COLUMN 1 SET STATISTICS -2;",
+    "index_statistics_clamped",
+    "index_invalid_alteration"
+)]
+#[tokio::test(flavor = "multi_thread")]
+async fn statistics_warning_and_rejection_retain_distinct_wire_severities(
+    #[case] sql: &str,
+    #[case] warning_code: &str,
+    #[case] error_code: &str,
+) {
+    let project = SchemaProject::new();
+    let request = project.rpc_request(sql);
+    // Real RPC verifies severity survives the diagnostic collection transport.
+    let mut connection = heavy::Connection::start(4096, 2).await;
+    connection.authenticate().await;
+    let response = connection.rpc("initialize_schema_context", &request).await;
+    let problems = response["result"]["problems"]["items"].as_array().unwrap();
+    let warning = problems
+        .iter()
+        .find(|problem| problem["code"] == warning_code)
+        .unwrap();
+    let rejection = problems
+        .iter()
+        .find(|problem| problem["code"] == error_code)
+        .unwrap();
+    assert_eq!(warning["severity"], "warning");
+    assert_eq!(rejection["severity"], "error");
+    let typed: ::sql_fun_server_api::payloads::AnalysisProbrem =
+        ::serde_json::from_value(warning.clone()).unwrap();
+    assert_eq!(
+        *typed.severity(),
+        ::sql_fun_server_api::payloads::DiagnosticSeverity::warning()
+    );
+    connection.end_requests().await;
+    connection.finish().await.unwrap();
+}
+
 #[tokio::test(flavor = "multi_thread")]
 async fn initialization_accepts_core_configuration_transfer() {
     let project = SchemaProject::new();

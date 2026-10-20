@@ -78,6 +78,14 @@ impl AlterColumnProblem {
         !matches!(self, Self::StatisticsReduced(_))
     }
 
+    pub(crate) const fn severity(&self) -> Severity {
+        if self.is_error() {
+            Severity::Error
+        } else {
+            Severity::Warning
+        }
+    }
+
     pub(super) const fn code(&self) -> &'static str {
         match self {
             Self::MissingRelation => "alter_column_missing_relation",
@@ -131,11 +139,7 @@ impl AlterColumnProblem {
             }
             Self::ResetValue(name) => format!("RESET option {name} must not include a value"),
         };
-        let severity = if self.is_error() {
-            Severity::Error
-        } else {
-            Severity::Warning
-        };
+        let severity = self.severity();
         let message = format!("{table}.{column}: {message}");
         let diagnostic = MietteDiagnostic::new(message)
             .with_code(self.code())

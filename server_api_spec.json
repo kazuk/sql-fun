@@ -190,6 +190,10 @@
               "description": "semantic analysis probrem",
               "type": "object",
               "properties": {
+                "severity": {
+                  "description": "Diagnostic severity, retained independently of its code.",
+                  "$ref": "#/$defs/DiagnosticSeverity"
+                },
                 "code": {
                   "description": "error code",
                   "type": "string"
@@ -233,8 +237,29 @@
                 }
               },
               "required": [
+                "severity",
                 "code",
                 "file_path"
+              ]
+            },
+            "DiagnosticSeverity": {
+              "description": "Severity of a retained semantic diagnostic.",
+              "oneOf": [
+                {
+                  "description": "SQL semantic error.",
+                  "type": "string",
+                  "const": "error"
+                },
+                {
+                  "description": "Accepted SQL with a warning.",
+                  "type": "string",
+                  "const": "warning"
+                },
+                {
+                  "description": "Informational advice.",
+                  "type": "string",
+                  "const": "advice"
+                }
               ]
             },
             "TextSpan": {
@@ -755,6 +780,10 @@
               "description": "semantic analysis probrem",
               "type": "object",
               "properties": {
+                "severity": {
+                  "description": "Diagnostic severity, retained independently of its code.",
+                  "$ref": "#/$defs/DiagnosticSeverity"
+                },
                 "code": {
                   "description": "error code",
                   "type": "string"
@@ -798,8 +827,29 @@
                 }
               },
               "required": [
+                "severity",
                 "code",
                 "file_path"
+              ]
+            },
+            "DiagnosticSeverity": {
+              "description": "Severity of a retained semantic diagnostic.",
+              "oneOf": [
+                {
+                  "description": "SQL semantic error.",
+                  "type": "string",
+                  "const": "error"
+                },
+                {
+                  "description": "Accepted SQL with a warning.",
+                  "type": "string",
+                  "const": "warning"
+                },
+                {
+                  "description": "Informational advice.",
+                  "type": "string",
+                  "const": "advice"
+                }
               ]
             },
             "StatementByteRange": {

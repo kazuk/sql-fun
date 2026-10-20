@@ -94,10 +94,44 @@ pub struct TypeReference {
     local_name: String,
 }
 
+/// Severity of a retained semantic diagnostic.
+#[cfg_attr(feature = "openrpc-schema", derive(schemars::JsonSchema))]
+#[derive(Clone, Copy, Debug, PartialEq, Eq, serde::Serialize, serde::Deserialize)]
+#[serde(rename_all = "snake_case")]
+pub enum DiagnosticSeverity {
+    /// SQL semantic error.
+    Error,
+    /// Accepted SQL with a warning.
+    Warning,
+    /// Informational advice.
+    Advice,
+}
+
+impl DiagnosticSeverity {
+    /// Construct an error severity.
+    #[must_use]
+    pub const fn error() -> Self {
+        Self::Error
+    }
+    /// Construct a warning severity.
+    #[must_use]
+    pub const fn warning() -> Self {
+        Self::Warning
+    }
+    /// Construct an advice severity.
+    #[must_use]
+    pub const fn advice() -> Self {
+        Self::Advice
+    }
+}
+
 /// semantic analysis probrem
 #[cfg_attr(feature = "openrpc-schema", derive(schemars::JsonSchema))]
 #[derive(serde::Serialize, serde::Deserialize, derive_getters::Getters)]
 pub struct AnalysisProbrem {
+    /// Diagnostic severity, retained independently of its code.
+    severity: DiagnosticSeverity,
+
     /// error code
     code: String,
 
@@ -120,10 +154,12 @@ impl AnalysisProbrem {
     #[must_use]
     pub fn new(
         code: &str,
+        severity: DiagnosticSeverity,
         file_path: &std::path::Path,
         statement_relative_span: Option<StatementByteRange>,
     ) -> Self {
         Self {
+            severity,
             code: code.to_owned(),
             file_path: file_path.to_path_buf(),
             statement_span: None,
@@ -141,6 +177,7 @@ mod test_retained_diagnostic {
     fn retains_byte_offsets_without_inventing_line_or_statement_positions() {
         let problem = AnalysisProbrem::new(
             "SF000001",
+            super::DiagnosticSeverity::error(),
             std::path::Path::new("schema.sql"),
             Some(StatementByteRange::new(9, 7)),
         );
@@ -148,7 +185,7 @@ mod test_retained_diagnostic {
         assert_eq!(
             value,
             ::serde_json::json!({
-                "code":"SF000001", "file_path":"schema.sql", "statement_span":null,
+                "code":"SF000001", "severity":"error", "file_path":"schema.sql", "statement_span":null,
                 "probrem_span":null,
                 "statement_relative_span":{"offset":9,"length":7}
             })

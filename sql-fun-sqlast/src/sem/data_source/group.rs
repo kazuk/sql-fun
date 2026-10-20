@@ -56,20 +56,19 @@ impl GroupedDataSource {
         }
     }
 
-    pub(super) fn get_aliases_for_column<C: ParseContext>(
+    pub(super) fn column_candidates<C: ParseContext>(
         &self,
         column: &ColumnName,
         context: &C,
         with: &WithClause,
-        names: &mut Vec<AliasSpec>,
-    ) {
-        let aliases = self
+    ) -> super::ColumnCandidates {
+        let candidates = self
             .source
             .aliases_for_column_resolved(column, context, with);
         if self.is_joined() {
-            names.extend(aliases);
-        } else if !aliases.is_empty() {
-            names.push(self.alias.clone());
+            candidates
+        } else {
+            candidates.with_group_alias(&self.alias)
         }
     }
 

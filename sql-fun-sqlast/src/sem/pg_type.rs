@@ -101,15 +101,14 @@ impl TypeDefinition {
             None
         }
     }
-    pub(crate) const fn user_type_category(&self) -> Option<char> {
-        match self {
-            Self::Enum(_) => Some('E'),
-            Self::CompositeType(_) | Self::TableRef(..) | Self::ImplicitComposite(_) => Some('C'),
-            _ => None,
-        }
-    }
     pub(crate) const fn has_structural_ordering(&self) -> bool {
-        self.user_type_category().is_some()
+        matches!(
+            self,
+            Self::Enum(_)
+                | Self::CompositeType(_)
+                | Self::TableRef(..)
+                | Self::ImplicitComposite(_)
+        )
     }
 
     /// type is array?

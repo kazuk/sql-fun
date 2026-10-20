@@ -451,9 +451,6 @@ impl crate::sem::TypeInfoRead for FrozenBaseContext {
         self.catalog().domain_base_type(name)
     }
 
-    fn builtin_type_category(&self, name: &FullName) -> Option<(char, bool)> {
-        self.catalog().builtin_type_category(name)
-    }
     fn builtin_type_ordered(&self, name: &FullName) -> bool {
         self.catalog().builtin_type_ordered(name)
     }

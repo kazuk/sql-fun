@@ -79,9 +79,6 @@ impl TypeInfoRead for ParsedSchemaDump {
         self.base_context().domain_base_type(name)
     }
 
-    fn builtin_type_category(&self, name: &FullName) -> Option<(char, bool)> {
-        self.base_context().builtin_type_category(name)
-    }
     fn builtin_type_ordered(&self, name: &FullName) -> bool {
         self.base_context().builtin_type_ordered(name)
     }

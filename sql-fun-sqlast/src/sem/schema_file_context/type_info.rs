@@ -22,9 +22,6 @@ impl TypeInfoRead for SchemaCatalog {
         self.base.domain_base_type(name)
     }
 
-    fn builtin_type_category(&self, name: &FullName) -> Option<(char, bool)> {
-        self.base.builtin_type_category(name)
-    }
     fn builtin_type_ordered(&self, name: &FullName) -> bool {
         self.base.builtin_type_ordered(name)
     }
@@ -47,9 +44,6 @@ impl TypeInfoRead for SchemaFileContext {
         self.catalog.domain_base_type(name)
     }
 
-    fn builtin_type_category(&self, name: &FullName) -> Option<(char, bool)> {
-        self.catalog.builtin_type_category(name)
-    }
     fn builtin_type_ordered(&self, name: &FullName) -> bool {
         self.catalog.builtin_type_ordered(name)
     }

@@ -389,8 +389,7 @@ Missing and ambiguous references produce diagnostics. Successful name binding
 does not imply complete aggregate or window legality checking.
 
 Concrete PostgreSQL function signatures are supported; unresolved polymorphic
-signatures remain unsupported. Type unification of unresolved inputs in
-indirection is unimplemented and can terminate analysis.
+signatures remain unsupported.
 
 PostgreSQL parameter-dependent CASE expressions constrain searched WHEN
 conditions to boolean and simple CASE operands through equality overloads.

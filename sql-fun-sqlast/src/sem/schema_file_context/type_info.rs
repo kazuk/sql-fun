@@ -8,6 +8,14 @@ use crate::TrieMap;
 use super::{SchemaCatalog, SchemaFileContext};
 
 impl TypeInfoRead for SchemaCatalog {
+    fn type_references(&self) -> Vec<TypeReference> {
+        let mut types = self.base.type_references();
+        types.extend(self.types.cast_source_types());
+        types.sort_by_cached_key(|ty| format!("{ty:?}"));
+        types.dedup();
+        types
+    }
+
     fn builtin_type_ordered(&self, name: &FullName) -> Option<bool> {
         self.base.builtin_type_ordered(name)
     }
@@ -26,6 +34,10 @@ impl TypeInfoRead for SchemaCatalog {
 }
 
 impl TypeInfoRead for SchemaFileContext {
+    fn type_references(&self) -> Vec<TypeReference> {
+        self.catalog.type_references()
+    }
+
     fn builtin_type_ordered(&self, name: &FullName) -> Option<bool> {
         self.catalog.builtin_type_ordered(name)
     }

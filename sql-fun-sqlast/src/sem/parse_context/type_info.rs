@@ -5,6 +5,10 @@ use crate::sem::{
 
 /// get type definition
 pub trait TypeInfoRead {
+    /// Enumerate catalog type identities for deferred type relationships.
+    /// Definitions and unrelated catalog objects are not copied.
+    fn type_references(&self) -> Vec<TypeReference>;
+
     /// get type by name
     fn get_type_impl(&self, key: &FullName) -> Option<&TypeDefinition>;
 

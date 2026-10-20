@@ -61,6 +61,14 @@ impl TypeDefinition {
         other: &Self,
         context: &impl crate::sem::BaseParseContext,
     ) -> bool {
+        self.matches_structure_with(other, |left, right| left.matches_structure(right, context))
+    }
+
+    pub(crate) fn matches_structure_with(
+        &self,
+        other: &Self,
+        matches: impl Fn(&TypeReference, &TypeReference) -> bool,
+    ) -> bool {
         if self == other {
             return true;
         }
@@ -68,7 +76,7 @@ impl TypeDefinition {
         // retains nominal identity; equal field layouts do not authorize an
         // implicit conversion from an anonymous record to that named type.
         match (self.structural_columns(), other.structural_columns()) {
-            (Some(left), Some(right)) => left.matches_type_structure(&right, context),
+            (Some(left), Some(right)) => left.matches_type_structure_with(&right, matches),
             _ => false,
         }
     }
@@ -81,6 +89,10 @@ impl TypeDefinition {
             Self::ImplicitComposite(value) => Some(value.clone()),
             _ => None,
         }
+    }
+
+    pub(crate) fn is_anonymous_record(&self) -> bool {
+        self.structural_columns().is_some()
     }
 
     /// Construct a catalog type without inferring classification from its name.
@@ -99,6 +111,10 @@ impl TypeDefinition {
         if crate::ast::Dialect::from(context.metadata()) != crate::ast::Dialect::postgres() {
             return None;
         }
+        self.intrinsic_category()
+    }
+
+    pub(crate) fn intrinsic_category(&self) -> Option<TypeCategory> {
         match self {
             Self::Array(_) => TypeCategory::try_from('A').ok(),
             Self::Builtin(definition) => definition.category,

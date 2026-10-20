@@ -256,6 +256,13 @@ impl TableInfoWrite for TestParseContext {
 }
 
 impl TypeInfoRead for TestParseContext {
+    fn type_references(&self) -> Vec<TypeReference> {
+        self.type_definitions
+            .keys()
+            .map(|name| TypeReference::concrete_type_ref(name, false))
+            .collect()
+    }
+
     fn builtin_type_ordered(&self, _name: &FullName) -> Option<bool> {
         None
     }

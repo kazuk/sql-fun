@@ -13,6 +13,7 @@ pub(super) struct StructuralConstraint {
 #[derive(Clone, Debug)]
 pub(crate) enum TypeProjection {
     ArrayElement,
+    ConstructArray,
     Array,
     Member {
         name: String,
@@ -21,6 +22,10 @@ pub(crate) enum TypeProjection {
 }
 
 impl TypeProjection {
+    pub(crate) const fn construct_array() -> Self {
+        Self::ConstructArray
+    }
+
     pub(crate) const fn array_element() -> Self {
         Self::ArrayElement
     }
@@ -107,10 +112,14 @@ impl TypeProjection {
                 _ => None,
             };
         }
+        if matches!(self, Self::ConstructArray) {
+            return Some(source.array_type());
+        }
         if source.is_dynamic() || source.is_array() != Some(true) {
             return None;
         }
         match self {
+            Self::ConstructArray => unreachable!("array construction handled above"),
             Self::ArrayElement => Some(source.element_type()),
             Self::Array => Some(source.clone()),
             Self::Member { .. } => unreachable!("member projection handled above"),
@@ -118,6 +127,9 @@ impl TypeProjection {
     }
 
     pub(super) fn inverse(&self, result: &TypeReference) -> Option<TypeReference> {
+        if matches!(self, Self::ConstructArray) && result.is_array() == Some(true) {
+            return Some(result.element_type());
+        }
         if result.is_dynamic() {
             return None;
         }
@@ -201,7 +213,12 @@ impl StructuralConstraint {
         } else if !domains[self.result].is_any()
             && !matches!(self.projection, TypeProjection::Member { .. })
         {
-            let sources = domains[self.result].preimage(&self.projection);
+            let mut sources = domains[self.result].preimage(&self.projection);
+            if matches!(self.projection, TypeProjection::ConstructArray) {
+                // ARRAY[array_value] has the same SQL array identity. Its source
+                // may therefore be either an element or an already-array value.
+                sources.union(&domains[self.result]);
+            }
             domains[self.source].intersect(&sources)
         } else {
             false

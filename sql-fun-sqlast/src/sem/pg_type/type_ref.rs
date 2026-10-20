@@ -89,6 +89,40 @@ impl TypeReference {
         }
     }
 
+    /// Structural evidence available without a borrowed catalog. Named types
+    /// still require identity; anonymous records compare positional field types.
+    pub(crate) fn implicit_match_owned(&self, target: &Self) -> bool {
+        if *target == Self::from_master_type_name("record")
+            && self
+                .type_definition()
+                .is_some_and(TypeDefinition::is_anonymous_record)
+        {
+            return true;
+        }
+        self.matches_owned_structure(target)
+    }
+
+    fn matches_owned_structure(&self, other: &Self) -> bool {
+        if self == other {
+            return true;
+        }
+        if !self.is_dynamic() && !other.is_dynamic() {
+            return false;
+        }
+        if self.is_array() == Some(true) || other.is_array() == Some(true) {
+            return self.is_array() == Some(true)
+                && other.is_array() == Some(true)
+                && self
+                    .element_type()
+                    .matches_owned_structure(&other.element_type());
+        }
+        self.type_definition()
+            .zip(other.type_definition())
+            .is_some_and(|(left, right)| {
+                left.matches_structure_with(right, Self::matches_owned_structure)
+            })
+    }
+
     // Structural matching is separate from catalog cast lookup: anonymous
     // definitions cannot be used as keys in the cast master.
     pub(crate) fn matches_structure(

@@ -34,15 +34,15 @@ impl ColumnCollection {
         Self(columns)
     }
 
-    pub(crate) fn matches_type_structure(
+    pub(crate) fn matches_type_structure_with(
         &self,
         other: &Self,
-        context: &impl crate::sem::BaseParseContext,
+        matches: impl Fn(&crate::sem::TypeReference, &crate::sem::TypeReference) -> bool,
     ) -> bool {
         self.0.len() == other.0.len()
             && self.0.iter().zip(&other.0).all(|(left, right)| {
                 match (left.get_type_cloned(), right.get_type_cloned()) {
-                    (Some(left), Some(right)) => left.matches_structure(&right, context),
+                    (Some(left), Some(right)) => matches(&left, &right),
                     _ => false,
                 }
             })

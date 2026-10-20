@@ -408,15 +408,28 @@ impl ParameterResolution {
                 choices.extend(types.iter().cloned());
             }
         }
-        // A wholly unknown PostgreSQL common-type expression resolves to text.
-        // Keep admissible source types (e.g. varchar) separate from that target.
-        if choices.is_empty() {
-            let target = crate::sem::PgBuiltInType::text();
-            for argument in arguments {
-                self.require(context, argument, &target, false);
-            }
-            let domain = InputTypeConstraint::exact(&target);
+        if choices.is_empty()
+            && arguments
+                .iter()
+                .all(|argument| argument.constraint_node().is_none())
+        {
+            let domain = InputTypeConstraint::exact(&crate::sem::PgBuiltInType::text());
             return Ok((self.graph.node(&domain), domain));
+        }
+        if choices.is_empty() {
+            let nodes: Vec<_> = arguments
+                .iter()
+                .map(|argument| {
+                    argument.constraint_node().unwrap_or_else(|| {
+                        self.graph
+                            .node(&InputTypeConstraint::exact(&MinMaxExpr::unknown()))
+                    })
+                })
+                .collect();
+            let node = self
+                .graph
+                .common_type(context, &nodes, comparison, operation);
+            return Ok((node, InputTypeConstraint::any()));
         }
         for target in choices.clone() {
             choices.extend(context.cast_sources(&target, false));
@@ -556,6 +569,15 @@ impl ParameterResolution {
             return Ok((self.graph.node(&domain), domain));
         }
         let (element, domain) = self.common_type(context, "ARRAY", arguments, false)?;
+        if domain.is_any() {
+            let result = self.graph.node(&InputTypeConstraint::any());
+            self.graph.project(
+                element,
+                result,
+                crate::sem::parameter_constraints::TypeProjection::construct_array(),
+            );
+            return Ok((result, InputTypeConstraint::any()));
+        }
         let mut alternatives = Vec::new();
         let mut arrays = Vec::new();
         for ty in domain.admissible_types().unwrap_or(&[]) {

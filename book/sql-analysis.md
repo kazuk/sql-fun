@@ -327,7 +327,11 @@ implementation, such as `json`, produce diagnostics.
 Numbered parameters participate in common-type analysis, including nested
 expressions, subqueries, and nonrecursive CTEs. Several admissible input types
 can produce different result types; the analysis retains these alternatives.
-An explicit SQL cast can specify an operand's type. These expressions are
+When every result operand is unresolved, the result domain remains open until
+input assignments are supplied to `ParameterConstraints::allows`. For example,
+`GREATEST($1,NULL)` admits explicitly typed integer, text, and other ordered
+inputs, while an all-unknown literal expression resolves to `text`. An explicit
+SQL cast can specify an operand's type. These expressions are
 separate from aggregate `MIN`/`MAX` and SQLite scalar `min`/`max`.
 
 Mixed-type selection uses PostgreSQL type categories and the preferred-type
@@ -340,8 +344,13 @@ refresh the selected builtin catalog using the existing
 `ARRAY[...]` retains its ordered elements and selects a common type using
 PostgreSQL's type categories and implicit conversions. For example,
 `ARRAY[1,2.5]` has type `numeric[]`; all-unknown strings or NULLs produce
-`text[]`. The constructed array is non-null even when its elements may be NULL.
-Its implicit output name is `array`; an explicit alias supplies the output name.
+`text[]`. When the element type is wholly unresolved, the result domain remains
+open and `ParameterConstraints::allows` checks each supplied input assignment;
+for example, `ARRAY[$1,NULL]` admits integer and text inputs with their
+corresponding array types. SQL NULL and string literals that have no parameter
+source still resolve to `text`. The constructed array is non-null even when its
+elements may be NULL. Its implicit output name is `array`; an explicit alias
+supplies the output name.
 
 An empty constructor requires an explicit array cast, such as
 `ARRAY[]::integer[]`. The cast also supplies the element type to nested
@@ -409,19 +418,12 @@ inspect `ParameterConstraints::result_column` when no single result is known.
 COALESCE nullability metadata remains conservative and does not yet prove that
 a non-null fallback makes the result non-null.
 
-A known shared common-type inference limitation affects CASE and COALESCE when
-untyped result parameters have no typed result operand to anchor them:
-inference can narrow the result to text too early and reject valid explicitly
-typed assignments. This also affects ARRAY and GREATEST/LEAST parameter
-analysis. Such CASE and COALESCE results are not fully supported yet. For
-example, `SELECT COALESCE($1,NULL), $1::integer` can reject a valid explicitly
-typed integer input (tracked in #676).
-
-SQLite CASE analysis does not apply PostgreSQL boolean or implicit-cast
-constraints; parameter-dependent SQLite result typing remains incomplete.
-SQLite COALESCE retains its operands without imposing PostgreSQL common-type
-conversions; its result typing also remains incomplete, and its input
-parameters remain unconstrained by COALESCE.
+When every CASE result branch is unresolved, the result domain remains open
+until input assignments are supplied to `ParameterConstraints::allows`. This
+also applies to ARRAY and GREATEST/LEAST. All-unknown SQL literals still resolve
+to `text`. SQLite CASE analysis does not apply these PostgreSQL boolean or
+implicit-cast constraints; parameter-dependent SQLite result typing remains
+incomplete.
 
 ## DELETE analysis
 

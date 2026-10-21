@@ -74,6 +74,25 @@ for operational details.
 
 ## Planning
 
+- Before finalizing requirements or an implementation plan, trace each proposed
+  behavior to the user's stated goal, its intended consumer, and an observable
+  benefit. Check the actual end-to-end contracts, including the downstream API,
+  protocol, and runtime, to establish which data they carry, preserve, and use.
+  Verify relevant contracts against authoritative documentation or existing
+  implementations; do not infer usefulness from SQL syntax or representability
+  alone.
+- For data that a downstream boundary cannot carry or use, identify a concrete
+  purpose for accepting, interpreting, retaining, or validating it in this
+  feature. Record that purpose and its consumer in the plan. Without such a
+  purpose, flag the proposed behavior as unnecessary scope before implementation;
+  syntax completeness or a hypothetical future consumer alone is insufficient.
+- When translating or expanding a maintainer's outline into an issue or plan,
+  distinguish the maintainer's requirements from agent-proposed additions and
+  assumptions. Translation does not authorize additional requirements. Surface
+  requirements that lack a consumer benefit or conflict with downstream
+  contracts, even if they already appear in the issue, and obtain a maintainer
+  scope decision before implementing them. Do not silently expand or discard
+  explicit requirements.
 - During planning, check available disk space on the filesystem containing
   the worktree and build directories. Use 20 GB as the minimum baseline,
   and allow more if the planned builds or tests require it.

@@ -1,12 +1,14 @@
-use super::{submit, test_helpers};
+use super::{test_helpers, test_helpers::collect_submission};
 
 #[tokio::test]
 async fn submits_recovered_catalogs_with_datasource_scoped_contexts() {
     let project = test_helpers::Project::new();
     let catalog = test_helpers::catalog();
     let expected = ::serde_json::to_value(&catalog).unwrap();
+    let expected_fingerprint = catalog.finger_print().unwrap();
+    let expected_query = catalog.base_query().encode();
     let (mut client, peer) = test_helpers::peer(None).await;
-    let analyses = submit(
+    let analyses = collect_submission(
         &mut client,
         &project.args(),
         test_helpers::requirements(&["first", "second", "first"], &catalog),
@@ -21,6 +23,8 @@ async fn submits_recovered_catalogs_with_datasource_scoped_contexts() {
     assert_eq!(analyses[2].source_file, "src/queries.rs");
     assert_eq!(analyses[2].source_line, 42);
     assert_eq!(analyses[2].datasource, "first");
+    assert_eq!(analyses[2].original_query, expected_query);
+    assert_eq!(analyses[2].query_finger_print, expected_fingerprint);
     for (index, datasource) in [(1, "first"), (3, "second"), (4, "first")] {
         let request = &requests[index];
         assert_eq!(request["method"], "analyze_query");
@@ -59,7 +63,7 @@ async fn submits_recovered_catalogs_with_datasource_scoped_contexts() {
 async fn propagates_server_failures(#[case] method: &'static str, #[case] count: usize) {
     let project = test_helpers::Project::new();
     let (mut client, peer) = test_helpers::peer(Some(method)).await;
-    let result = submit(
+    let result = collect_submission(
         &mut client,
         &project.args(),
         test_helpers::requirements(&["first", "second"], &test_helpers::catalog()),
@@ -78,7 +82,7 @@ async fn sends_base_only_catalog_without_a_second_query_input() {
         &::sql_fun_core::PlaceholderedSql::from_query("SELECT 1"),
     );
     let (mut client, peer) = test_helpers::peer(None).await;
-    submit(
+    collect_submission(
         &mut client,
         &project.args(),
         test_helpers::requirements(&["first"], &catalog),
@@ -104,7 +108,7 @@ async fn recovered_catalog_reaches_real_server_realization() -> ::testresult::Te
 async fn missing_context_handle_stops_before_query_submission() {
     let project = test_helpers::Project::new();
     let (mut client, peer) = test_helpers::peer(Some("missing_handle")).await;
-    let result = submit(
+    let result = collect_submission(
         &mut client,
         &project.args(),
         test_helpers::requirements(&["first"], &test_helpers::catalog()),
@@ -125,7 +129,7 @@ async fn missing_context_handle_stops_before_query_submission() {
 async fn unknown_datasource_is_not_replaced_with_an_available_one() {
     let project = test_helpers::Project::new();
     let (mut client, peer) = test_helpers::peer(None).await;
-    let result = submit(
+    let result = collect_submission(
         &mut client,
         &project.args(),
         test_helpers::requirements(&["missing"], &test_helpers::catalog()),
@@ -134,4 +138,62 @@ async fn unknown_datasource_is_not_replaced_with_an_available_one() {
     assert!(result.is_err());
     client.finish().await.unwrap();
     assert_eq!(peer.await.unwrap().len(), 0);
+}
+
+#[tokio::test]
+async fn delivers_identity_before_completion_and_distinguishes_partial_failure() {
+    let project = test_helpers::Project::new();
+    let args = project.args();
+    let catalog = test_helpers::catalog();
+    let original_query = catalog.base_query().encode();
+    let fingerprint = catalog.finger_print().unwrap();
+    let requirements = test_helpers::requirements(&["first", "first"], &catalog);
+    let (release, released) = ::tokio::sync::oneshot::channel();
+    let (mut client, peer) = test_helpers::gated_second_failure(released).await;
+    let (sender, mut receiver) = ::tokio::sync::mpsc::channel(1);
+    let producer = super::submit(&mut client, &args, requirements, sender);
+    let consumer = async {
+        let first = receiver.recv().await.expect("first completed query");
+        assert_eq!(first.function_name, "query_0");
+        assert_eq!(first.original_query, original_query);
+        assert_eq!(first.query_finger_print, fingerprint);
+        assert_eq!(first.source_file, "src/queries.rs");
+        assert_eq!(first.source_line, 42);
+        assert_eq!(first.datasource, "first");
+        assert!(first.response.queries().is_completed());
+        release.send(()).unwrap();
+        // A failed second RPC closes delivery, but is not successful completion.
+        assert!(receiver.recv().await.is_none());
+    };
+    let (completion, ()) = ::tokio::time::timeout(std::time::Duration::from_secs(5), async {
+        ::tokio::join!(producer, consumer)
+    })
+    .await
+    .expect("incremental channel delivery must not wait for the full batch");
+    assert!(format!("{:#}", completion.unwrap_err()).contains("injected failure"));
+    client.finish().await.unwrap();
+    assert_eq!(peer.await.unwrap().len(), 3);
+}
+
+#[tokio::test]
+async fn closed_consumer_is_a_delivery_failure() {
+    let project = test_helpers::Project::new();
+    let (mut client, peer) = test_helpers::peer(None).await;
+    let (sender, receiver) = ::tokio::sync::mpsc::channel(1);
+    drop(receiver);
+    let result = super::submit(
+        &mut client,
+        &project.args(),
+        test_helpers::requirements(&["first", "first"], &test_helpers::catalog()),
+        sender,
+    )
+    .await;
+    assert!(
+        result
+            .unwrap_err()
+            .to_string()
+            .contains("receiver closed before delivery")
+    );
+    client.finish().await.unwrap();
+    assert_eq!(peer.await.unwrap().len(), 2);
 }

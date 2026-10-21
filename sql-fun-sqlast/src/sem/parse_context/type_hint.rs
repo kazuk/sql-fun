@@ -1,3 +1,7 @@
+mod resolve;
+#[cfg(test)]
+mod tests;
+
 use crate::sem::{AnalysisError, ParseContext, TypeReference};
 use std::sync::RwLock;
 
@@ -14,6 +18,7 @@ pub trait ParameterTypeHintWrite {
     /// dialect, catalog, and effective search path. Resolve every hint before
     /// replacing state; an error preserves the previous setup completely.
     /// Empty input and all-`None` input successfully replace the previous setup.
+    /// PostgreSQL `unknown` hints leave the corresponding slot unspecified.
     ///
     /// Hints belong to this query layer, never its shared frozen catalog. Set up
     /// each independent query explicitly, including queries without hints.
@@ -48,16 +53,12 @@ impl ParameterTypeHints {
         let mut resolved = Vec::with_capacity(hints.len());
         for (slot, hint) in hints.iter().enumerate() {
             let ty = if let Some(hint) = hint {
-                Some(
-                    crate::ast::TypeName::resolve_parameter_hint(hint, context).map_err(
-                        |error| {
-                            AnalysisError::unexpected_input_error(&format!(
-                                "parameter ${} type hint {hint:?}: {error}",
-                                slot + 1,
-                            ))
-                        },
-                    )?,
-                )
+                self::resolve::resolve_parameter_hint(hint, context).map_err(|error| {
+                    AnalysisError::unexpected_input_error(&format!(
+                        "parameter ${} type hint {hint:?}: {error}",
+                        slot + 1,
+                    ))
+                })?
             } else {
                 None
             };

@@ -27,7 +27,6 @@ mod sqlite_retention;
 #[cfg(test)]
 mod tests;
 mod trigger;
-mod type_hint;
 mod validation;
 mod view_definition;
 

@@ -190,6 +190,17 @@
               "description": "semantic analysis probrem",
               "type": "object",
               "properties": {
+                "semantic_problem": {
+                  "description": "Structured semantic problem when a reliable source presentation is unavailable.",
+                  "anyOf": [
+                    {
+                      "$ref": "#/$defs/AnalysisProblem"
+                    },
+                    {
+                      "type": "null"
+                    }
+                  ]
+                },
                 "presentation": {
                   "description": "Structured diagnostic and analyzed source for optional CLI presentation.",
                   "anyOf": [
@@ -253,35 +264,37 @@
                 "file_path"
               ]
             },
-            "DiagnosticPresentation": {
-              "description": "An analyzed SQL statement and its diagnostic, supplied for presentation.\n\nDiagnostic label spans are relative to `source`, while `statement_offset`\nrecords the statement's byte offset in the explicitly analyzed file.",
-              "type": "object",
-              "properties": {
-                "problem": {
-                  "$ref": "#/$defs/AnalysisProblem"
-                },
-                "source": {
-                  "type": "string"
-                },
-                "dialect": {
-                  "$ref": "#/$defs/SqlDialect"
-                },
-                "statement_offset": {
-                  "type": "integer",
-                  "format": "uint",
-                  "minimum": 0
-                }
-              },
-              "required": [
-                "problem",
-                "source",
-                "dialect",
-                "statement_offset"
-              ]
-            },
             "AnalysisProblem": {
               "description": "Semantic analysis problems",
               "oneOf": [
+                {
+                  "description": "SQL analysis could not establish a finalized parameter type.",
+                  "type": "object",
+                  "properties": {
+                    "ParameterTypeUnresolved": {
+                      "type": "integer",
+                      "format": "uint32",
+                      "minimum": 0
+                    }
+                  },
+                  "required": [
+                    "ParameterTypeUnresolved"
+                  ],
+                  "additionalProperties": false
+                },
+                {
+                  "description": "Input could not be parsed, realized, hinted, analyzed, or deparsed.",
+                  "type": "object",
+                  "properties": {
+                    "QueryAnalysis": {
+                      "$ref": "#/$defs/QueryAnalysisProblem"
+                    }
+                  },
+                  "required": [
+                    "QueryAnalysis"
+                  ],
+                  "additionalProperties": false
+                },
                 {
                   "description": "Invalid ARRAY constructor typing.",
                   "type": "object",
@@ -853,6 +866,67 @@
                     "ParameterTypeMismatchForTableFunction"
                   ],
                   "additionalProperties": false
+                }
+              ]
+            },
+            "QueryAnalysisProblem": {
+              "description": "A query-input or analysis-capability failure, distinct from semantic inference.",
+              "type": "object",
+              "properties": {
+                "stage": {
+                  "$ref": "#/$defs/QueryAnalysisStage"
+                },
+                "message": {
+                  "type": "string"
+                }
+              },
+              "required": [
+                "stage",
+                "message"
+              ]
+            },
+            "QueryAnalysisStage": {
+              "description": "Structured failure stage; kept distinct from semantic name/type diagnostics.",
+              "oneOf": [
+                {
+                  "description": "Parse capability or input failure.",
+                  "type": "string",
+                  "const": "parse"
+                },
+                {
+                  "description": "Realization capability or input failure.",
+                  "type": "string",
+                  "const": "realization"
+                },
+                {
+                  "description": "Hint capability or input failure.",
+                  "type": "string",
+                  "const": "hint"
+                },
+                {
+                  "description": "Statement capability or input failure.",
+                  "type": "string",
+                  "const": "statement"
+                },
+                {
+                  "description": "Analysis capability or input failure.",
+                  "type": "string",
+                  "const": "analysis"
+                },
+                {
+                  "description": "Deparse capability or input failure.",
+                  "type": "string",
+                  "const": "deparse"
+                },
+                {
+                  "description": "Parameter semantics capability or input failure.",
+                  "type": "string",
+                  "const": "parameter_semantics"
+                },
+                {
+                  "description": "Case semantics capability or input failure.",
+                  "type": "string",
+                  "const": "case_semantics"
                 }
               ]
             },
@@ -2780,6 +2854,32 @@
             "TypeDefinition": {
               "description": "Retained diagnostic text for `TypeDefinition`.",
               "type": "string"
+            },
+            "DiagnosticPresentation": {
+              "description": "An analyzed SQL statement and its diagnostic, supplied for presentation.\n\nDiagnostic label spans are relative to `source`, while `statement_offset`\nrecords the statement's byte offset in the explicitly analyzed file.",
+              "type": "object",
+              "properties": {
+                "problem": {
+                  "$ref": "#/$defs/AnalysisProblem"
+                },
+                "source": {
+                  "type": "string"
+                },
+                "dialect": {
+                  "$ref": "#/$defs/SqlDialect"
+                },
+                "statement_offset": {
+                  "type": "integer",
+                  "format": "uint",
+                  "minimum": 0
+                }
+              },
+              "required": [
+                "problem",
+                "source",
+                "dialect",
+                "statement_offset"
+              ]
             },
             "SqlDialect": {
               "description": "SQL Dialect",
@@ -3043,12 +3143,30 @@
               },
               "query": {
                 "description": "Query input source",
-                "$ref": "#/$defs/AnalyzeQueryInput"
+                "anyOf": [
+                  {
+                    "$ref": "#/$defs/AnalyzeQueryInput"
+                  },
+                  {
+                    "type": "null"
+                  }
+                ]
+              },
+              "resolved_cte_catalog": {
+                "description": "Resolved catalog; mutually exclusive with query. Its base query is authoritative.",
+                "anyOf": [
+                  {
+                    "$ref": "#/$defs/ResolvedCteCatalog"
+                  },
+                  {
+                    "type": "null"
+                  }
+                ],
+                "default": null
               }
             },
             "required": [
-              "context_handle",
-              "query"
+              "context_handle"
             ],
             "$defs": {
               "ContextHandle": {
@@ -3099,6 +3217,191 @@
                     "additionalProperties": false
                   }
                 ]
+              },
+              "ResolvedCteCatalog": {
+                "description": "resolved CTE catalog",
+                "type": "object",
+                "properties": {
+                  "parameters": {
+                    "$ref": "#/$defs/CteParameterCollection"
+                  },
+                  "base_query": {
+                    "$ref": "#/$defs/PlaceholderedSql"
+                  },
+                  "cte_queries": {
+                    "type": "object",
+                    "additionalProperties": {
+                      "$ref": "#/$defs/PlaceholderedSql"
+                    }
+                  }
+                },
+                "required": [
+                  "parameters",
+                  "base_query",
+                  "cte_queries"
+                ]
+              },
+              "CteParameterCollection": {
+                "description": "parameter collection for CTE",
+                "type": "object",
+                "properties": {
+                  "parameters": {
+                    "type": "object",
+                    "additionalProperties": {
+                      "$ref": "#/$defs/CteParameterBindingCollection"
+                    }
+                  }
+                },
+                "required": [
+                  "parameters"
+                ]
+              },
+              "CteParameterBindingCollection": {
+                "description": "collection of parameter binding",
+                "type": "array",
+                "items": {
+                  "type": "array",
+                  "prefixItems": [
+                    {
+                      "$ref": "#/$defs/CteName"
+                    },
+                    {
+                      "type": "array",
+                      "items": {
+                        "$ref": "#/$defs/PlaceholderTypeHint"
+                      }
+                    }
+                  ],
+                  "minItems": 2,
+                  "maxItems": 2
+                }
+              },
+              "CteName": {
+                "description": "CTE definition name",
+                "type": "string"
+              },
+              "PlaceholderTypeHint": {
+                "description": "Type annotation written on a named SQL parameter placeholder.",
+                "type": "string"
+              },
+              "PlaceholderedSql": {
+                "description": "SQL text contains `sql-fun` named parameter syntax and fragment embedding marker",
+                "type": "object",
+                "properties": {
+                  "tokens": {
+                    "type": "array",
+                    "items": {
+                      "$ref": "#/$defs/PlaceholderedSqlToken"
+                    }
+                  },
+                  "parameters": {
+                    "type": "object",
+                    "additionalProperties": {
+                      "type": "array",
+                      "items": {
+                        "$ref": "#/$defs/PlaceholderTypeHint"
+                      }
+                    }
+                  },
+                  "fragments": {
+                    "type": "array",
+                    "uniqueItems": true,
+                    "items": {
+                      "$ref": "#/$defs/FragmentName"
+                    }
+                  }
+                },
+                "required": [
+                  "tokens",
+                  "parameters",
+                  "fragments"
+                ]
+              },
+              "PlaceholderedSqlToken": {
+                "description": "A token in SQL containing sql-fun placeholders.",
+                "oneOf": [
+                  {
+                    "description": "A named parameter placeholder such as `${user_id}`.",
+                    "type": "object",
+                    "properties": {
+                      "ParameterPlaceholder": {
+                        "$ref": "#/$defs/NamedParameterPlaceholder"
+                      }
+                    },
+                    "required": [
+                      "ParameterPlaceholder"
+                    ],
+                    "additionalProperties": false
+                  },
+                  {
+                    "description": "A fragment placeholder such as `#[where_clause]`.",
+                    "type": "object",
+                    "properties": {
+                      "FragmentPlaceholder": {
+                        "$ref": "#/$defs/FragmentName"
+                      }
+                    },
+                    "required": [
+                      "FragmentPlaceholder"
+                    ],
+                    "additionalProperties": false
+                  },
+                  {
+                    "description": "A SQL string literal.",
+                    "type": "object",
+                    "properties": {
+                      "LiteralText": {
+                        "type": "string"
+                      }
+                    },
+                    "required": [
+                      "LiteralText"
+                    ],
+                    "additionalProperties": false
+                  },
+                  {
+                    "description": "SQL text that is neither a placeholder nor a string literal.",
+                    "type": "object",
+                    "properties": {
+                      "RawSqlText": {
+                        "type": "string"
+                      }
+                    },
+                    "required": [
+                      "RawSqlText"
+                    ],
+                    "additionalProperties": false
+                  }
+                ]
+              },
+              "NamedParameterPlaceholder": {
+                "type": "object",
+                "properties": {
+                  "name": {
+                    "$ref": "#/$defs/ParameterName"
+                  },
+                  "type_hint": {
+                    "anyOf": [
+                      {
+                        "$ref": "#/$defs/PlaceholderTypeHint"
+                      },
+                      {
+                        "type": "null"
+                      }
+                    ]
+                  }
+                },
+                "required": [
+                  "name"
+                ]
+              },
+              "ParameterName": {
+                "description": "A named sql-fun query parameter.",
+                "type": "string"
+              },
+              "FragmentName": {
+                "description": "fragment embedding placeholder name",
+                "type": "string"
               }
             }
           },
@@ -3171,11 +3474,36 @@
               "properties": {
                 "query_span": {
                   "description": "query span in input",
-                  "$ref": "#/$defs/TextSpan"
+                  "anyOf": [
+                    {
+                      "$ref": "#/$defs/TextSpan"
+                    },
+                    {
+                      "type": "null"
+                    }
+                  ]
+                },
+                "execute_sql": {
+                  "description": "Executable SQL deparsed from the realized AST, when rendering succeeds.",
+                  "type": [
+                    "string",
+                    "null"
+                  ]
+                },
+                "complete": {
+                  "description": "Whether analysis finished without errors or unresolved parameter types.",
+                  "type": "boolean"
                 },
                 "query_kind": {
                   "description": "query statement kind",
-                  "$ref": "#/$defs/QueryKind"
+                  "anyOf": [
+                    {
+                      "$ref": "#/$defs/QueryKind"
+                    },
+                    {
+                      "type": "null"
+                    }
+                  ]
                 },
                 "probrems": {
                   "description": "semantic probrems",
@@ -3199,8 +3527,7 @@
                 }
               },
               "required": [
-                "query_span",
-                "query_kind",
+                "complete",
                 "probrems",
                 "accessing_relations",
                 "column_access",
@@ -3329,6 +3656,17 @@
               "description": "semantic analysis probrem",
               "type": "object",
               "properties": {
+                "semantic_problem": {
+                  "description": "Structured semantic problem when a reliable source presentation is unavailable.",
+                  "anyOf": [
+                    {
+                      "$ref": "#/$defs/AnalysisProblem"
+                    },
+                    {
+                      "type": "null"
+                    }
+                  ]
+                },
                 "presentation": {
                   "description": "Structured diagnostic and analyzed source for optional CLI presentation.",
                   "anyOf": [
@@ -3392,35 +3730,37 @@
                 "file_path"
               ]
             },
-            "DiagnosticPresentation": {
-              "description": "An analyzed SQL statement and its diagnostic, supplied for presentation.\n\nDiagnostic label spans are relative to `source`, while `statement_offset`\nrecords the statement's byte offset in the explicitly analyzed file.",
-              "type": "object",
-              "properties": {
-                "problem": {
-                  "$ref": "#/$defs/AnalysisProblem"
-                },
-                "source": {
-                  "type": "string"
-                },
-                "dialect": {
-                  "$ref": "#/$defs/SqlDialect"
-                },
-                "statement_offset": {
-                  "type": "integer",
-                  "format": "uint",
-                  "minimum": 0
-                }
-              },
-              "required": [
-                "problem",
-                "source",
-                "dialect",
-                "statement_offset"
-              ]
-            },
             "AnalysisProblem": {
               "description": "Semantic analysis problems",
               "oneOf": [
+                {
+                  "description": "SQL analysis could not establish a finalized parameter type.",
+                  "type": "object",
+                  "properties": {
+                    "ParameterTypeUnresolved": {
+                      "type": "integer",
+                      "format": "uint32",
+                      "minimum": 0
+                    }
+                  },
+                  "required": [
+                    "ParameterTypeUnresolved"
+                  ],
+                  "additionalProperties": false
+                },
+                {
+                  "description": "Input could not be parsed, realized, hinted, analyzed, or deparsed.",
+                  "type": "object",
+                  "properties": {
+                    "QueryAnalysis": {
+                      "$ref": "#/$defs/QueryAnalysisProblem"
+                    }
+                  },
+                  "required": [
+                    "QueryAnalysis"
+                  ],
+                  "additionalProperties": false
+                },
                 {
                   "description": "Invalid ARRAY constructor typing.",
                   "type": "object",
@@ -3992,6 +4332,67 @@
                     "ParameterTypeMismatchForTableFunction"
                   ],
                   "additionalProperties": false
+                }
+              ]
+            },
+            "QueryAnalysisProblem": {
+              "description": "A query-input or analysis-capability failure, distinct from semantic inference.",
+              "type": "object",
+              "properties": {
+                "stage": {
+                  "$ref": "#/$defs/QueryAnalysisStage"
+                },
+                "message": {
+                  "type": "string"
+                }
+              },
+              "required": [
+                "stage",
+                "message"
+              ]
+            },
+            "QueryAnalysisStage": {
+              "description": "Structured failure stage; kept distinct from semantic name/type diagnostics.",
+              "oneOf": [
+                {
+                  "description": "Parse capability or input failure.",
+                  "type": "string",
+                  "const": "parse"
+                },
+                {
+                  "description": "Realization capability or input failure.",
+                  "type": "string",
+                  "const": "realization"
+                },
+                {
+                  "description": "Hint capability or input failure.",
+                  "type": "string",
+                  "const": "hint"
+                },
+                {
+                  "description": "Statement capability or input failure.",
+                  "type": "string",
+                  "const": "statement"
+                },
+                {
+                  "description": "Analysis capability or input failure.",
+                  "type": "string",
+                  "const": "analysis"
+                },
+                {
+                  "description": "Deparse capability or input failure.",
+                  "type": "string",
+                  "const": "deparse"
+                },
+                {
+                  "description": "Parameter semantics capability or input failure.",
+                  "type": "string",
+                  "const": "parameter_semantics"
+                },
+                {
+                  "description": "Case semantics capability or input failure.",
+                  "type": "string",
+                  "const": "case_semantics"
                 }
               ]
             },
@@ -5919,6 +6320,32 @@
             "TypeDefinition": {
               "description": "Retained diagnostic text for `TypeDefinition`.",
               "type": "string"
+            },
+            "DiagnosticPresentation": {
+              "description": "An analyzed SQL statement and its diagnostic, supplied for presentation.\n\nDiagnostic label spans are relative to `source`, while `statement_offset`\nrecords the statement's byte offset in the explicitly analyzed file.",
+              "type": "object",
+              "properties": {
+                "problem": {
+                  "$ref": "#/$defs/AnalysisProblem"
+                },
+                "source": {
+                  "type": "string"
+                },
+                "dialect": {
+                  "$ref": "#/$defs/SqlDialect"
+                },
+                "statement_offset": {
+                  "type": "integer",
+                  "format": "uint",
+                  "minimum": 0
+                }
+              },
+              "required": [
+                "problem",
+                "source",
+                "dialect",
+                "statement_offset"
+              ]
             },
             "SqlDialect": {
               "description": "SQL Dialect",
@@ -6308,12 +6735,22 @@
                     "$ref": "#/$defs/TextSpan"
                   }
                 },
-                "type_candidate": {
-                  "description": "type candidates for this parameter",
-                  "type": "array",
-                  "items": {
-                    "$ref": "#/$defs/TypeReference2"
-                  }
+                "parameter_index": {
+                  "description": "Actual one-based numbered SQL placeholder identity, independent of collection order.",
+                  "type": "integer",
+                  "format": "uint32",
+                  "minimum": 0
+                },
+                "parameter_type": {
+                  "description": "Finalized SQL type, absent when inference has not established one.",
+                  "anyOf": [
+                    {
+                      "$ref": "#/$defs/TypeReference2"
+                    },
+                    {
+                      "type": "null"
+                    }
+                  ]
                 },
                 "nullability": {
                   "description": "parameter nullability",
@@ -6323,7 +6760,7 @@
               "required": [
                 "name",
                 "spans",
-                "type_candidate",
+                "parameter_index",
                 "nullability"
               ]
             },
@@ -6338,6 +6775,11 @@
                 "local_name": {
                   "description": "local name",
                   "type": "string"
+                },
+                "is_array": {
+                  "description": "Whether this is an array of the named type.",
+                  "type": "boolean",
+                  "default": false
                 }
               },
               "required": [

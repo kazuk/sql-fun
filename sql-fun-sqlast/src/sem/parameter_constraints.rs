@@ -50,7 +50,9 @@ impl InputTypeConstraint {
         self.0.as_ref().is_none_or(|types| types.contains(ty))
     }
 
-    pub(crate) fn single_type(&self) -> Option<TypeReference> {
+    /// A definite SQL type only when exactly one candidate remains.
+    #[must_use]
+    pub fn single_type(&self) -> Option<TypeReference> {
         match self.0.as_deref() {
             Some([ty]) => Some(ty.clone()),
             _ => None,

@@ -2,7 +2,7 @@ use std::fmt::Write;
 
 /// A small synthetic catalog for real-server diagnostic paging tests.
 pub struct SchemaFixture {
-    _directory: ::tempfile::TempDir,
+    directory: ::tempfile::TempDir,
     request: ::serde_json::Value,
 }
 impl SchemaFixture {
@@ -77,9 +77,25 @@ connector = "products-connector"
             "expected_hash": ::sha256::digest(sql),
             "environments": {"SQL_FUN_HOME":root.join("home"), "SQL_FUN_METADATA_FILE":root.join("Cargo.toml")}
         });
-        Ok(Self {
-            _directory: directory,
-            request,
-        })
+        Ok(Self { directory, request })
+    }
+}
+
+impl SchemaFixture {
+    /// A lightweight query catalog with the SQL types used by bridge analysis tests.
+    #[allow(
+        dead_code,
+        reason = "shared with CLI analysis tests; client initialization tests do not call this constructor"
+    )]
+    pub fn with_query_schema(sql: &str) -> ::testresult::TestResult<Self> {
+        let fixture = Self::with_sql(sql)?;
+        std::fs::write(
+            fixture
+                .directory
+                .path()
+                .join("home/postgres/17/pg_type.json"),
+            r#"[{"name":"int4"},{"name":"text"},{"name":"bool"}]"#,
+        )?;
+        Ok(fixture)
     }
 }

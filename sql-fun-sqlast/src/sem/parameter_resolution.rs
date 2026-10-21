@@ -155,6 +155,7 @@ impl QueryScope {
 #[derive(Default)]
 pub(crate) struct ParameterResolution {
     graph: ConstraintGraph,
+    unsupported: Vec<crate::sem::AnalysisProblem>,
     scopes: Vec<QueryScope>,
     completed: Outputs,
 }
@@ -167,6 +168,9 @@ impl ParameterResolution {
     }
 
     fn solve(&mut self, context: &mut impl crate::sem::ParseContext) -> Result<(), AnalysisError> {
+        for problem in std::mem::take(&mut self.unsupported) {
+            context.report_analysis_problem(problem)?;
+        }
         self.graph.prepare_projections(context);
         self.graph.report_projection_problems(context)?;
         if let Err(problem) = self.graph.solve() {
@@ -312,8 +316,12 @@ impl ParameterResolution {
     ) -> SemScalarExpr {
         todo!("SQLite operator type constraints");
     }
-    pub(crate) fn special_operator(&mut self, _operation: &str, _arguments: &[&SemScalarExpr]) {
-        todo!("parameter constraints for this operator form");
+    pub(crate) fn special_operator(&mut self, operation: &str, _arguments: &[&SemScalarExpr]) {
+        self.unsupported
+            .push(crate::sem::AnalysisProblem::query_analysis(
+                ::sql_fun_core::analysis_problem::QueryAnalysisStage::parameter_semantics(),
+                &format!("parameter constraints for {operation} are not implemented (#513)"),
+            ));
     }
 
     fn input(&mut self, value: &SemScalarExpr) -> usize {

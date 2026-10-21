@@ -101,6 +101,9 @@ pub struct TypeReference {
     schema_name: String,
     /// local name
     local_name: String,
+    /// Whether this is an array of the named type.
+    #[serde(default)]
+    is_array: bool,
 }
 
 /// Severity of a retained semantic diagnostic.
@@ -149,6 +152,9 @@ impl From<::sql_fun_core::analysis_problem::DiagnosticSeverity> for DiagnosticSe
 #[cfg_attr(feature = "openrpc-schema", derive(schemars::JsonSchema))]
 #[derive(serde::Serialize, serde::Deserialize, derive_getters::Getters)]
 pub struct AnalysisProbrem {
+    /// Structured semantic problem when a reliable source presentation is unavailable.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    semantic_problem: Option<::sql_fun_core::analysis_problem::AnalysisProblem>,
     /// Structured diagnostic and analyzed source for optional CLI presentation.
     #[serde(default, skip_serializing_if = "Option::is_none")]
     presentation: Option<::sql_fun_core::DiagnosticPresentation>,
@@ -172,6 +178,16 @@ pub struct AnalysisProbrem {
 }
 
 impl AnalysisProbrem {
+    /// Preserve the original semantic diagnostic without inventing source coordinates.
+    #[must_use]
+    pub fn with_semantic_problem(
+        mut self,
+        problem: &::sql_fun_core::analysis_problem::AnalysisProblem,
+    ) -> Self {
+        self.semantic_problem = Some(problem.clone());
+        self
+    }
+
     /// Attach presentation data without changing the existing summary fields.
     #[must_use]
     pub fn with_presentation(
@@ -193,6 +209,7 @@ impl AnalysisProbrem {
     ) -> Self {
         Self {
             presentation: None,
+            semantic_problem: None,
             severity,
             code: code.to_owned(),
             file_path: file_path.to_path_buf(),
@@ -352,3 +369,69 @@ pub struct ReadCollectionArgs {
 }
 
 impl CollectionTraversal for AnalysisProbrem {}
+
+impl TypeReference {
+    /// Construct a named SQL type, preserving array identity.
+    #[must_use]
+    pub fn new(schema_name: &str, local_name: &str, is_array: bool) -> Self {
+        Self {
+            schema_name: schema_name.to_owned(),
+            local_name: local_name.to_owned(),
+            is_array,
+        }
+    }
+}
+impl TextSpan {
+    /// Range in UTF-8 bytes of the explicit SQL source. Lines and columns are one-based.
+    #[must_use]
+    pub fn from_offsets(source: &str, from: usize, to: usize) -> Self {
+        Self {
+            from: TextPosition::at(source, from),
+            to: TextPosition::at(source, to),
+        }
+    }
+}
+impl TextPosition {
+    fn at(source: &str, offset: usize) -> Self {
+        let prefix = &source[..offset];
+        Self {
+            offset,
+            line: u32::try_from(prefix.bytes().filter(|b| *b == b'\n').count() + 1)
+                .expect("parsed SQL line fits u32"),
+            col: u32::try_from(prefix.rsplit('\n').next().unwrap_or("").chars().count() + 1)
+                .expect("parsed SQL column fits u32"),
+        }
+    }
+}
+impl Nullability {
+    /// Preserve the analyzer's three-state nullability.
+    #[must_use]
+    pub const fn from_not_null(value: Option<bool>) -> Self {
+        match value {
+            Some(true) => Self::NotNull,
+            Some(false) => Self::Nullable,
+            None => Self::Unknown,
+        }
+    }
+}
+
+impl ReadCollectionArgs {
+    /// Read a bounded page of an existing session collection.
+    #[must_use]
+    pub fn new(handle: &CollectionHandle, start_offset: usize, count: Option<usize>) -> Self {
+        Self {
+            collection_handle: handle.clone(),
+            start_offset,
+            count,
+        }
+    }
+}
+impl ReleaseCollectionArgs {
+    /// Release an existing session collection.
+    #[must_use]
+    pub fn new(handle: &CollectionHandle) -> Self {
+        Self {
+            collection_handle: handle.clone(),
+        }
+    }
+}

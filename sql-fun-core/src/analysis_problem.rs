@@ -48,6 +48,10 @@ pub use self::values::{
 #[derive(Debug, Clone, ::serde::Serialize, ::serde::Deserialize)]
 #[cfg_attr(feature = "openrpc-schema", derive(::schemars::JsonSchema))]
 pub enum AnalysisProblem {
+    /// SQL analysis could not establish a finalized parameter type.
+    ParameterTypeUnresolved(u32),
+    /// Input could not be parsed, realized, hinted, analyzed, or deparsed.
+    QueryAnalysis(QueryAnalysisProblem),
     /// Invalid ARRAY constructor typing.
     Array(ArrayProblem),
     /// Invalid index alteration or a statistics warning.
@@ -341,6 +345,8 @@ impl AnalysisProblem {
     #[must_use]
     pub fn code(&self) -> &str {
         match self {
+            Self::ParameterTypeUnresolved(_) => "parameter_type_unresolved",
+            Self::QueryAnalysis(problem) => problem.code(),
             Self::Index(problem) => problem.code(),
             Self::AlterColumn(problem) => problem.code(),
             Self::Creation(_) => "conflicting_creation",
@@ -397,6 +403,13 @@ impl AnalysisProblem {
     #[must_use]
     pub fn render_metadata(&self) -> Option<DiagnosticMetadata> {
         Some(match self {
+            Self::ParameterTypeUnresolved(index) => DiagnosticMetadata::from(
+                format!(
+                    "SQL type of parameter ${index} is unresolved; supply an explicit SQL type hint"
+                )
+                .as_str(),
+            ),
+            Self::QueryAnalysis(problem) => DiagnosticMetadata::from(problem.message()),
             Self::Index(problem) => problem.render_metadata(),
             Self::UnreachableCoalesceArgument(..) => DiagnosticMetadata::from(
                 "COALESCE argument is unreachable after a non-null operand",
@@ -697,5 +710,122 @@ mod test_transport {
         assert_eq!(restored.code(), "extension_not_found");
         assert!(restored.render_metadata().is_none());
         assert!(restored.statement_relative_span().is_none());
+    }
+}
+
+/// A query-input or analysis-capability failure, distinct from semantic inference.
+#[derive(Clone, Debug, ::serde::Serialize, ::serde::Deserialize)]
+#[cfg_attr(feature = "openrpc-schema", derive(::schemars::JsonSchema))]
+pub struct QueryAnalysisProblem {
+    stage: QueryAnalysisStage,
+    message: String,
+}
+impl QueryAnalysisProblem {
+    /// Preserve a stage-specific failure without reclassifying it as a type-hint problem.
+    #[must_use]
+    pub fn new(stage: QueryAnalysisStage, message: &str) -> Self {
+        Self {
+            stage,
+            message: message.to_owned(),
+        }
+    }
+    /// Stable failure stage code.
+    #[must_use]
+    pub const fn code(&self) -> &str {
+        self.stage.code()
+    }
+    /// Original failure explanation.
+    #[must_use]
+    pub fn message(&self) -> &str {
+        &self.message
+    }
+}
+impl AnalysisProblem {
+    /// Report an input or analysis capability failure.
+    #[must_use]
+    pub fn query_analysis(stage: QueryAnalysisStage, message: &str) -> Self {
+        Self::QueryAnalysis(QueryAnalysisProblem::new(stage, message))
+    }
+    /// Report a parameter whose existing inference did not establish one type.
+    #[must_use]
+    pub const fn parameter_type_unresolved(index: u32) -> Self {
+        Self::ParameterTypeUnresolved(index)
+    }
+}
+
+/// Structured failure stage; kept distinct from semantic name/type diagnostics.
+#[derive(Clone, Copy, Debug, ::serde::Serialize, ::serde::Deserialize)]
+#[cfg_attr(feature = "openrpc-schema", derive(::schemars::JsonSchema))]
+#[serde(rename_all = "snake_case")]
+pub enum QueryAnalysisStage {
+    /// Parse capability or input failure.
+    Parse,
+    /// Realization capability or input failure.
+    Realization,
+    /// Hint capability or input failure.
+    Hint,
+    /// Statement capability or input failure.
+    Statement,
+    /// Analysis capability or input failure.
+    Analysis,
+    /// Deparse capability or input failure.
+    Deparse,
+    /// Parameter semantics capability or input failure.
+    ParameterSemantics,
+    /// Case semantics capability or input failure.
+    CaseSemantics,
+}
+impl QueryAnalysisStage {
+    /// Identify the parse stage.
+    #[must_use]
+    pub const fn parse() -> Self {
+        Self::Parse
+    }
+    /// Identify the realization stage.
+    #[must_use]
+    pub const fn realization() -> Self {
+        Self::Realization
+    }
+    /// Identify the hint stage.
+    #[must_use]
+    pub const fn hint() -> Self {
+        Self::Hint
+    }
+    /// Identify the statement stage.
+    #[must_use]
+    pub const fn statement() -> Self {
+        Self::Statement
+    }
+    /// Identify the analysis stage.
+    #[must_use]
+    pub const fn analysis() -> Self {
+        Self::Analysis
+    }
+    /// Identify the deparse stage.
+    #[must_use]
+    pub const fn deparse() -> Self {
+        Self::Deparse
+    }
+    /// Identify the parameter semantics stage.
+    #[must_use]
+    pub const fn parameter_semantics() -> Self {
+        Self::ParameterSemantics
+    }
+    /// Identify the case semantics stage.
+    #[must_use]
+    pub const fn case_semantics() -> Self {
+        Self::CaseSemantics
+    }
+    const fn code(self) -> &'static str {
+        match self {
+            Self::Parse => "query_parse",
+            Self::Realization => "query_realization",
+            Self::Hint => "invalid_parameter_hint",
+            Self::Statement => "unsupported_statement",
+            Self::Analysis => "query_analysis",
+            Self::Deparse => "query_deparse",
+            Self::ParameterSemantics => "unsupported_parameter_semantics",
+            Self::CaseSemantics => "unsupported_case_semantics",
+        }
     }
 }

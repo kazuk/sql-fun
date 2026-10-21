@@ -198,7 +198,7 @@ impl Scenario {
     fn analyzed_response(collections: &mut HashMap<String, Vec<Value>>) -> Value {
         let mut item = ::serde_json::json!({
             "query_span": {"from":{"offset":0,"line":1,"col":1}, "to":{"offset":1,"line":1,"col":2}},
-            "query_kind":"Select"
+            "query_kind":"Select", "execute_sql":"SELECT 1", "complete":true
         });
         for name in [
             "probrems",

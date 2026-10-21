@@ -18,6 +18,7 @@ use toml_parser::decoder::StringBuilder;
 #[derive(Debug, Hash, Eq, PartialEq, Clone, serde::Serialize, serde::Deserialize)]
 #[serde(transparent)]
 /// A named sql-fun query parameter.
+#[cfg_attr(feature = "openrpc-schema", derive(::schemars::JsonSchema))]
 pub struct ParameterName(String);
 
 impl From<&str> for ParameterName {
@@ -53,6 +54,7 @@ impl AsRef<str> for ParameterName {
 #[derive(Debug, Clone, serde::Serialize, serde::Deserialize)]
 #[serde(transparent)]
 /// Type annotation written on a named SQL parameter placeholder.
+#[cfg_attr(feature = "openrpc-schema", derive(::schemars::JsonSchema))]
 pub struct PlaceholderTypeHint(String);
 
 impl PlaceholderTypeHint {
@@ -156,6 +158,7 @@ fn host_sql_opener<'a>() -> impl Parser<&'a str, Output = ()> {
 /// fragment embedding placeholder name
 #[derive(Debug, Hash, Eq, PartialEq, Clone, serde::Serialize, serde::Deserialize)]
 #[serde(transparent)]
+#[cfg_attr(feature = "openrpc-schema", derive(::schemars::JsonSchema))]
 pub struct FragmentName(String);
 
 impl FragmentName {
@@ -198,6 +201,7 @@ impl std::fmt::Display for FragmentName {
 }
 
 #[derive(Debug, Clone, serde::Serialize, serde::Deserialize)]
+#[cfg_attr(feature = "openrpc-schema", derive(::schemars::JsonSchema))]
 pub struct NamedParameterPlaceholder {
     name: ParameterName,
     type_hint: Option<PlaceholderTypeHint>,
@@ -241,6 +245,7 @@ impl NamedParameterPlaceholder {
 
 #[derive(Debug, Clone, serde::Serialize, serde::Deserialize)]
 #[serde(transparent)]
+#[cfg_attr(feature = "openrpc-schema", derive(::schemars::JsonSchema))]
 pub struct SqlLiteralText(String);
 
 impl SqlLiteralText {
@@ -280,6 +285,7 @@ impl SqlLiteralText {
 
 #[derive(Debug, Clone, serde::Serialize, serde::Deserialize)]
 #[serde(transparent)]
+#[cfg_attr(feature = "openrpc-schema", derive(::schemars::JsonSchema))]
 pub struct RawSqlText(String);
 
 impl RawSqlText {
@@ -294,6 +300,7 @@ impl RawSqlText {
 
 #[derive(Debug, Clone, serde::Serialize, serde::Deserialize)]
 /// A token in SQL containing sql-fun placeholders.
+#[cfg_attr(feature = "openrpc-schema", derive(::schemars::JsonSchema))]
 pub enum PlaceholderedSqlToken {
     /// A named parameter placeholder such as `${user_id}`.
     ParameterPlaceholder(NamedParameterPlaceholder),
@@ -370,7 +377,9 @@ impl PlaceholderedSqlToken {
         results
     }
 
-    const fn parameter_name(&self) -> Option<&ParameterName> {
+    /// Named binding identity when this token is a parameter placeholder.
+    #[must_use]
+    pub const fn parameter_name(&self) -> Option<&ParameterName> {
         match self {
             Self::ParameterPlaceholder(parameter) => Some(parameter.name()),
             _ => None,
@@ -407,8 +416,13 @@ impl PlaceholderedSqlToken {
 
 #[derive(Debug, Clone, serde::Serialize, serde::Deserialize)]
 /// SQL text contains `sql-fun` named parameter syntax and fragment embedding marker
+#[cfg_attr(feature = "openrpc-schema", derive(::schemars::JsonSchema))]
 pub struct PlaceholderedSql {
     tokens: Vec<PlaceholderedSqlToken>,
+    #[cfg_attr(
+        feature = "openrpc-schema",
+        schemars(with = "std::collections::BTreeMap<ParameterName, Vec<PlaceholderTypeHint>>")
+    )]
     parameters: IndexMap<ParameterName, Vec<PlaceholderTypeHint>>,
     fragments: HashSet<FragmentName>,
 }

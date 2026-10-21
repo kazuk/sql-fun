@@ -103,3 +103,17 @@ pub struct ObjectSummary {
 }
 
 impl super::CollectionTraversal for ObjectSummary {}
+
+impl ObjectSummary {
+    /// A semantically resolved relation without invented definition locations.
+    #[must_use]
+    pub fn relation(schema_name: &str, local_name: &str, kind: ObjectKind) -> Self {
+        Self {
+            schema_name: schema_name.to_owned(),
+            local_name: local_name.to_owned(),
+            kind,
+            definition_file: None,
+            definition_span: None,
+        }
+    }
+}

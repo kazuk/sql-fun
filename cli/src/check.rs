@@ -139,14 +139,14 @@ impl CheckArgs {
         if self.workspace {
             let deps_members = Self::dependent_members()?;
             for member in deps_members {
-                requirements.extend(self.expand_member(member.as_str()).await?);
+                requirements.extend(self.expand_member(member.as_str(), common_args).await?);
             }
         } else if let Some(member) = &self.package {
-            requirements.extend(self.expand_member(member).await?);
+            requirements.extend(self.expand_member(member, common_args).await?);
         } else {
             let default_members = Self::default_packages()?;
             for member in default_members {
-                requirements.extend(self.expand_member(&member).await?);
+                requirements.extend(self.expand_member(&member, common_args).await?);
             }
         }
 
@@ -179,8 +179,9 @@ impl CheckArgs {
     async fn expand_member(
         &self,
         member: &str,
+        common_args: &SqlFunArgs,
     ) -> Result<::sql_fun_codegen::QueryRequirements, anyhow::Error> {
-        let mut cargo_expand_command = CargoExpand::new(member)?;
+        let mut cargo_expand_command = CargoExpand::new(member, common_args)?;
         cargo_expand_command.set("--lib", self.lib);
         cargo_expand_command.set("--tests", self.tests);
         cargo_expand_command.set_value("--bin", self.bin.as_deref());
@@ -271,13 +272,14 @@ mod test_check_args {
 pub struct CargoExpand(tokio::process::Command, std::fs::File);
 
 impl CargoExpand {
-    pub fn new(package: &str) -> Result<Self, anyhow::Error> {
+    pub fn new(package: &str, common_args: &SqlFunArgs) -> Result<Self, anyhow::Error> {
         let temp = tempfile::tempfile()?;
 
         let mut command = tokio::process::Command::new("cargo");
         command.stdin(Stdio::null());
         command.stdout(Stdio::from(temp.try_clone()?));
         command.arg("expand");
+        command.envs(common_args.environments()?);
         command.env("SQL_FUN_MODE", "CHECK");
         command.args(["--package", package]);
 
@@ -329,5 +331,69 @@ impl CargoExpand {
         } else {
             anyhow::bail!("cargo-expand exited non-success ({status})");
         }
+    }
+}
+
+#[cfg(test)]
+mod test_cargo_expand {
+    use super::CargoExpand;
+    use ::sql_fun_core::SqlFunArgs;
+
+    #[rstest::rstest]
+    #[case::query_selected(None)]
+    #[case::cli_selected(Some("selected"))]
+    fn forwards_explicit_configuration_in_check_mode(#[case] datasource: Option<&str>) {
+        let project = ::tempfile::tempdir().unwrap();
+        let metadata = project.path().join("selected.toml");
+        std::fs::write(
+            &metadata,
+            r#"
+[package.metadata.database.selected]
+engine = "PostgreSQL"
+dialect = "postgres"
+version = "17"
+search_path = ["chosen"]
+"#,
+        )
+        .unwrap();
+        std::fs::write(
+            project.path().join("selected.sql"),
+            "CREATE TABLE entries(id int4);",
+        )
+        .unwrap();
+        let catalog = project.path().join("selected-catalog");
+        let args = SqlFunArgs::builder(&std::collections::HashMap::new())
+            .unwrap()
+            .sql_fun_home(project.path())
+            .metadata_file(metadata.to_str().unwrap())
+            .schema_file(project.path().join("selected.sql"))
+            .cte_catalog_dir(&catalog)
+            .datasource(datasource.map(str::to_owned))
+            .build()
+            .unwrap();
+        let expansion = CargoExpand::new("selected-package", &args).unwrap();
+        let environments: std::collections::HashMap<_, _> = expansion
+            .0
+            .as_std()
+            .get_envs()
+            .map(|(name, value)| {
+                (
+                    name.to_str().unwrap().to_owned(),
+                    value.unwrap().to_str().unwrap().to_owned(),
+                )
+            })
+            .collect();
+        assert_eq!(environments["SQL_FUN_MODE"], "CHECK");
+        assert_eq!(
+            environments["SQL_FUN_METADATA_FILE"],
+            metadata.to_str().unwrap()
+        );
+        assert_eq!(
+            environments["SQL_FUN_CTE_CATALOG_DIR"],
+            catalog.to_str().unwrap()
+        );
+        let restored = SqlFunArgs::from_environments(&environments).unwrap();
+        assert_eq!(restored.datasource(), datasource);
+        assert_eq!(restored.metadata_file().unwrap(), metadata);
     }
 }

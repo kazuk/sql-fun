@@ -27,33 +27,11 @@ fn maps_sql_numbers(#[case] index: usize, #[case] expected: Option<&str>) {
 }
 
 #[rstest::rstest]
-#[case::alias("integer", "int4")]
+#[case::unqualified("int4", "int4")]
 #[case::qualified("pg_catalog.int4", "int4")]
 #[case::quoted(r#""pg_catalog"."int4""#, "int4")]
-#[case::array("integer[]", "_int4")]
-#[case::bounds("integer[3][4]", "_int4")]
-#[case::multiword("double precision", "float8")]
-#[case::float_single("float(24)", "float4")]
-#[case::float_hex("float(0x18)", "float4")]
-#[case::float_separators("float(2_4)", "float4")]
-#[case::numeric_hex("numeric(0x5,0x2)", "numeric")]
-#[case::float_double("float(53)", "float8")]
-#[case::length("varchar(3)", "varchar")]
-#[case::precision("numeric(5,2)", "numeric")]
-#[case::timestamp("timestamp(2) without time zone", "timestamp")]
-#[case::capitalized("INTEGER", "int4")]
-#[case::comments("integer /* type */ []", "_int4")]
-#[case::array_hex("integer[0x3]", "_int4")]
-#[case::array_separators("integer[1_0]", "_int4")]
-#[case::parenthesized_modifier("numeric((5),2)", "numeric")]
-#[case::array_keyword("integer ARRAY[3]", "_int4")]
-#[case::varying_array("character varying(3)[]", "_varchar")]
-#[case::national("national character(2)", "bpchar")]
-#[case::bit_varying("bit varying(4)", "varbit")]
-#[case::time_zone("timestamp(2) with time zone", "timestamptz")]
-#[case::time_without_zone("time(2) without time zone", "time")]
-#[case::interval("interval day to second(2)", "interval")]
-fn resolves_sql_spelling(#[case] hint: &str, #[case] expected: &str) {
+#[case::array("int4[]", "_int4")]
+fn resolves_existing_type_name_spelling(#[case] hint: &str, #[case] expected: &str) {
     let context = context();
     context.setup_typehinting(&[Some(hint)]).unwrap();
     assert_eq!(
@@ -65,16 +43,10 @@ fn resolves_sql_spelling(#[case] hint: &str, #[case] expected: &str) {
 #[rstest::rstest]
 #[case::unknown("no_such_type")]
 #[case::wrong_schema("absent.int4")]
-#[case::syntax("integer[")]
+#[case::syntax("int4[")]
 #[case::empty("")]
-#[case::modifier_wildcard("numeric(*)")]
-#[case::modifier_statement("numeric(select)")]
-#[case::modifier_list("numeric(5,,2)")]
-#[case::two_types("integer, text")]
-#[case::expression("integer) + (1")]
-#[case::extra_statement("integer); SELECT CAST(NULL AS text")]
-#[case::alias("integer) AS renamed --")]
-#[case::nested_cast("integer)::text --")]
+#[case::two_types("int4, text")]
+#[case::extra_statement("int4; SELECT 1")]
 fn failure_is_atomic(#[case] invalid: &str) {
     let context = context();
     context
@@ -257,7 +229,7 @@ fn sqlite_uses_its_type_spelling_and_catalog() {
         false,
     );
     base.setup_type(expected.clone());
-    base.setup_typehinting(&[Some("DOUBLE PRECISION(5,2)")])
+    base.setup_typehinting(&[Some(r#""DOUBLE PRECISION""#)])
         .unwrap();
     assert_eq!(base.get_parameter_typehint(1), Some(expected.clone()));
     assert!(base.setup_typehinting(&[Some("pg_catalog.int4")]).is_err());
@@ -385,10 +357,6 @@ fn unknown_hint_leaves_parameter_for_inference(#[case] hint: &str) {
 #[case::quotes(r#""a""b""#, "a\"b")]
 #[case::literal_suffix(r#""kind[]""#, "kind[]")]
 #[case::quoted_alias(r#""integer""#, "integer")]
-#[case::unicode_escape(r#"U&"k\0069nd""#, "kind")]
-#[case::custom_escape(r#"U&"k!0069nd" UESCAPE '!'"#, "kind")]
-#[case::unicode_alias(r#"U&"integer""#, "integer")]
-#[case::unicode_pair(r#"U&"\D83D\DE00""#, "😀")]
 fn preserves_quoted_type_identity(#[case] hint: &str, #[case] logical: &str) {
     let mut context = crate::test_helpers::TestParseContext::default();
     context.set_get_search_path_result(&[SchemaName::from("public")]);
@@ -402,8 +370,6 @@ fn preserves_quoted_type_identity(#[case] hint: &str, #[case] logical: &str) {
 #[cfg(feature = "sqlite")]
 #[rstest::rstest]
 #[case::double_quote(r#""a.b""#, "a.b", false)]
-#[case::backtick("`a.b`", "a.b", false)]
-#[case::brackets("[a.b]", "a.b", false)]
 #[case::literal_suffix(r#""kind[]""#, "kind[]", false)]
 #[case::array("kind[]", "kind", true)]
 fn preserves_sqlite_type_identity(#[case] hint: &str, #[case] logical: &str, #[case] array: bool) {
@@ -426,17 +392,5 @@ fn sqlite_unknown_type_remains_explicit() {
     let expected = TypeReference::from_master_type_name("unknown");
     context.setup_type(expected.clone());
     context.setup_typehinting(&[Some("unknown")]).unwrap();
-    assert_eq!(context.get_parameter_typehint(1), Some(expected));
-}
-
-#[test]
-fn reserved_type_name_requires_sql_quoting() {
-    let mut context = crate::test_helpers::TestParseContext::default();
-    context.set_get_search_path_result(&[SchemaName::from("public")]);
-    let expected =
-        TypeReference::from_full_name(crate::sem::FullName::with_schema("public", "select"));
-    context.setup_type(expected.clone());
-    context.setup_typehinting(&[Some(r#""select""#)]).unwrap();
-    assert!(context.setup_typehinting(&[Some("select")]).is_err());
     assert_eq!(context.get_parameter_typehint(1), Some(expected));
 }

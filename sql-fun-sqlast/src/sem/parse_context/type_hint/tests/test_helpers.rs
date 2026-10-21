@@ -8,26 +8,7 @@ use crate::test_helpers::TestParseContext;
 pub(super) fn context() -> SchemaFileContext {
     let mut base = TestParseContext::default().with_dialect(Dialect::postgres());
     base.set_get_search_path_result(&[SchemaName::from("public"), SchemaName::from("pg_catalog")]);
-    for name in [
-        "int4",
-        "int2",
-        "int8",
-        "bpchar",
-        "bit",
-        "varbit",
-        "time",
-        "timetz",
-        "timestamptz",
-        "unknown",
-        "text",
-        "bool",
-        "numeric",
-        "float4",
-        "float8",
-        "varchar",
-        "timestamp",
-        "interval",
-    ] {
+    for name in ["int4", "unknown", "text", "bool"] {
         let ty = TypeReference::from_master_type_name(name);
         base.setup_type(ty.clone());
         base.add_implicit_castable(&ty, &ty);

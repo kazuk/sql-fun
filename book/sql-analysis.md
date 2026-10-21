@@ -377,13 +377,13 @@ unchanged; zero and numbers outside the supplied slice return `None`.
 PostgreSQL `unknown` (including its qualified spelling) leaves the slot for
 normal inference, like `None`.
 
-Type hints use the selected dialect's type syntax and the analysis context's
-catalog and search path. PostgreSQL aliases, qualified or quoted names, arrays,
-and type modifiers are accepted. As with PostgreSQL parameter declarations,
-modifiers such as `varchar(3)` or `numeric(5,2)` do not constrain input values.
-Modifier compatibility and bounds are not yet validated: declarations such as
-`int4(5)` or `numeric(0)` may be accepted even though PostgreSQL rejects them
-([known limitation #690](https://github.com/kazuk/sql-fun/issues/690)).
+Type hints use the existing `TypeReference` / `FullName` spelling and the
+analysis context's catalog and search path. Use catalog type names such as
+`int4`, qualified names such as `pg_catalog.int4`, double-quoted names, or a
+single array suffix such as `int4[]`. Full SQL type syntax, including aliases
+such as `integer`, type modifiers and dialect-specific quoting, is outside
+this API's current supported spelling
+([shared type-name parsing #694](https://github.com/kazuk/sql-fun/issues/694)).
 Malformed or unresolved names return an error and preserve the complete previous
 setup. Successful setup replaces all previous hints, including when passed an
 empty slice or only `None` entries.
@@ -393,8 +393,8 @@ each query. If reusing a mutable context, explicitly install the next query's
 hints, including an empty setup for unhinted queries. Nested queries and realized
 CTEs share that query's finalized parameter order and hints. Hints assign SQL
 types during name resolution; incompatible uses still produce semantic
-diagnostics. They do not insert casts or change executable SQL. This API accepts
-full type-name syntax independently of the named-placeholder lexer's current
+diagnostics. They do not insert casts or change executable SQL. The accepted
+spelling is independent of the named-placeholder lexer's current
 `${name:ident}` hint syntax.
 
 Numbered parameters (`$1` in PostgreSQL and `?1` in SQLite) can be used across

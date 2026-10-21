@@ -86,6 +86,15 @@ for operational details.
   feature. Record that purpose and its consumer in the plan. Without such a
   purpose, flag the proposed behavior as unnecessary scope before implementation;
   syntax completeness or a hypothetical future consumer alone is insufficient.
+- Identify the purpose of user-supplied detail before choosing its granularity.
+  Hints compensate for a concrete analysis limitation: prefer making them
+  unnecessary through supported analysis, or require only the shortest, simplest
+  sufficient input. Excess specification increases user burden; richer hint
+  syntax and finer control are not benefits by themselves. Audit and validation
+  inputs serve a different purpose: detailed, explicit criteria can be valuable
+  when users need to specify what must be checked. Evaluate detail against the
+  actual task rather than treating either minimal or exhaustive specification
+  as universally preferable, and record the intended use in the plan.
 - When translating or expanding a maintainer's outline into an issue or plan,
   distinguish the maintainer's requirements from agent-proposed additions and
   assumptions. Translation does not authorize additional requirements. Surface

@@ -175,12 +175,26 @@ owns domains, correlated alternatives, and the common propagation graph.
   supply a dynamic reference containing its definition; a new concrete name
   alone cannot provide its fields. This is not a catalog snapshot API.
 
-Diagnostics must remain specific when a type becomes known through another
-expression or projection. Propagation can discard invalid candidates; inspect
-the relevant state before losing the evidence needed for a structured problem.
-Use the existing propagation path rather than a second diagnostic solver.
-Regression coverage should check the diagnostic identity as well as inferred
-domains and retained expression structure, including nested deferred failures.
+Diagnostic attribution must follow the available evidence. When independently
+established operand types violate an operation's requirements, report the
+operation-specific structured problem (for example, array access on a known
+scalar). When multiple requirements on the same unresolved parameter conflict,
+the solver cannot determine which expression is erroneous. Report the
+unsatisfiable parameter constraints without arbitrarily treating one requirement
+as correct and blaming another operation. In particular:
+
+- `SELECT ($1)[1], $1::integer;` conflicts between an array requirement and
+  an integer cast; the conflict does not establish `require_array`.
+- `SELECT ($1::integer[])[$2], $2::boolean;` conflicts between an array-index
+  requirement and a boolean cast; it does not establish
+  `array_index_type_mismatch`.
+
+Do not preserve discarded candidates solely to manufacture operation-specific
+errors from otherwise unattributable conflicts. Constraint satisfaction and
+`ParameterConstraints::allows` remain independent of diagnostic presentation.
+See the maintainer decision in [#683](https://github.com/kazuk/sql-fun/issues/683#issuecomment-6324548856).
+Regression coverage should verify diagnostic identities, admissible assignments,
+and the absence of falsely attributed errors.
 
 ## Test context selection
 

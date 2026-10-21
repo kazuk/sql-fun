@@ -3,7 +3,6 @@ mod resolve;
 mod tests;
 
 use crate::sem::{AnalysisError, ParseContext, TypeReference};
-use std::sync::RwLock;
 
 /// Read the explicit SQL input types installed for this query.
 pub trait ParameterTypeHintRead {
@@ -28,29 +27,23 @@ pub trait ParameterTypeHintWrite {
     ///
     /// # Errors
     /// Returns an error for malformed type syntax or an unresolved catalog type.
-    fn setup_typehinting(&self, hints: &[Option<&str>]) -> Result<(), AnalysisError>;
+    fn setup_typehinting(&mut self, hints: &[Option<&str>]) -> Result<(), AnalysisError>;
 }
 
 /// Mutable request state, deliberately excluded from the frozen schema catalog.
 #[derive(Debug, Default)]
-pub(crate) struct ParameterTypeHints(RwLock<Vec<Option<TypeReference>>>);
+pub(crate) struct ParameterTypeHints(Vec<Option<TypeReference>>);
 
 impl ParameterTypeHints {
     pub(crate) fn lookup(&self, index: usize) -> Option<TypeReference> {
         let slot = index.checked_sub(1)?;
-        self.0
-            .read()
-            .expect("parameter hint state poisoned")
-            .get(slot)
-            .cloned()
-            .flatten()
+        self.0.get(slot).cloned().flatten()
     }
 
-    pub(crate) fn setup(
-        &self,
+    pub(crate) fn resolve(
         hints: &[Option<&str>],
         context: &impl ParseContext,
-    ) -> Result<(), AnalysisError> {
+    ) -> Result<Self, AnalysisError> {
         let mut resolved = Vec::with_capacity(hints.len());
         for (slot, hint) in hints.iter().enumerate() {
             let ty = if let Some(hint) = hint {
@@ -60,7 +53,6 @@ impl ParameterTypeHints {
             };
             resolved.push(ty);
         }
-        *self.0.write().expect("parameter hint state poisoned") = resolved;
-        Ok(())
+        Ok(Self(resolved))
     }
 }

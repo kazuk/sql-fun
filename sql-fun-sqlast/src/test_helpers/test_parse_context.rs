@@ -584,8 +584,9 @@ impl crate::sem::ParameterTypeHintRead for TestParseContext {
 }
 
 impl crate::sem::ParameterTypeHintWrite for TestParseContext {
-    fn setup_typehinting(&self, hints: &[Option<&str>]) -> Result<(), AnalysisError> {
-        self.parameter_type_hints.setup(hints, self)
+    fn setup_typehinting(&mut self, hints: &[Option<&str>]) -> Result<(), AnalysisError> {
+        self.parameter_type_hints = crate::sem::ParameterTypeHints::resolve(hints, self)?;
+        Ok(())
     }
 }
 

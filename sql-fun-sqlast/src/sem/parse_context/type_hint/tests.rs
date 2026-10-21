@@ -16,7 +16,7 @@ use crate::sem::{
 #[case::beyond(4, None)]
 #[case::maximum(usize::MAX, None)]
 fn maps_sql_numbers(#[case] index: usize, #[case] expected: Option<&str>) {
-    let context = context();
+    let mut context = context();
     context
         .setup_typehinting(&[Some("int4"), Some("text"), None])
         .unwrap();
@@ -32,7 +32,7 @@ fn maps_sql_numbers(#[case] index: usize, #[case] expected: Option<&str>) {
 #[case::quoted(r#""pg_catalog"."int4""#, "int4")]
 #[case::array("int4[]", "_int4")]
 fn resolves_existing_type_name_spelling(#[case] hint: &str, #[case] expected: &str) {
-    let context = context();
+    let mut context = context();
     context.setup_typehinting(&[Some(hint)]).unwrap();
     assert_eq!(
         context.get_parameter_typehint(1),
@@ -48,7 +48,7 @@ fn resolves_existing_type_name_spelling(#[case] hint: &str, #[case] expected: &s
 #[case::two_types("int4, text")]
 #[case::extra_statement("int4; SELECT 1")]
 fn failure_is_atomic(#[case] invalid: &str) {
-    let context = context();
+    let mut context = context();
     context
         .setup_typehinting(&[Some("text"), Some("bool")])
         .unwrap();
@@ -70,7 +70,7 @@ fn failure_is_atomic(#[case] invalid: &str) {
 #[case::empty(&[])]
 #[case::all_absent(&[None, None])]
 fn replaces_previous_setup(#[case] replacement: &[Option<&str>]) {
-    let context = context();
+    let mut context = context();
     context
         .setup_typehinting(&[Some("int4"), Some("text")])
         .unwrap();
@@ -90,7 +90,7 @@ fn typed_parameters_survive_full_analysis(
     #[case] hints: &[Option<&str>],
     #[case] types: &[Option<&str>],
 ) {
-    let context = context();
+    let mut context = context();
     context.setup_typehinting(hints).unwrap();
     let analyzed = analyze(sql, context);
     assert!(
@@ -143,13 +143,13 @@ fn hinted_type_is_assigned_before_constraint_collection() {
 
 #[test]
 fn independent_queries_share_only_the_catalog() {
-    let context = context();
+    let mut context = context();
     let args = context.get_args().clone();
     let metadata = context.metadata().clone();
     context.setup_typehinting(&[Some("bool")]).unwrap();
     let base = context.freeze();
-    let first = layer(&base, &args, &metadata);
-    let second = layer(&base, &args, &metadata);
+    let mut first = layer(&base, &args, &metadata);
+    let mut second = layer(&base, &args, &metadata);
     assert_eq!(first.get_parameter_typehint(1), None);
     first.setup_typehinting(&[Some("int4")]).unwrap();
     second.setup_typehinting(&[Some("text")]).unwrap();
@@ -206,7 +206,7 @@ fn resolves_custom_types_using_effective_search_path() {
 
 #[test]
 fn incompatible_use_reports_semantic_diagnostics() {
-    let context = context();
+    let mut context = context();
     context.setup_typehinting(&[Some("int4")]).unwrap();
     let analyzed = analyze("SELECT $1 AND true", context);
     assert!(!analyzed.context().problems().is_empty());
@@ -273,10 +273,10 @@ fn hinted_type_selects_existing_function_overload(#[case] hint: &str, #[case] re
 
 #[test]
 fn reusing_a_layer_with_empty_setup_restores_unhinted_inference() {
-    let context = context();
+    let mut context = context();
     context.setup_typehinting(&[Some("int4")]).unwrap();
     let first = analyze("SELECT $1", context);
-    let context = first.into_context();
+    let mut context = first.into_context();
     context.setup_typehinting(&[]).unwrap();
     let second = analyze("SELECT $1 IS NULL", context);
     assert!(
@@ -294,7 +294,7 @@ fn reusing_a_layer_with_empty_setup_restores_unhinted_inference() {
 #[case::unhinted(None)]
 #[case::hinted(Some("int4"))]
 fn operator_constraints_and_executable_sql_stay_consistent(#[case] hint: Option<&str>) {
-    let context = context();
+    let mut context = context();
     context.setup_typehinting(&[hint]).unwrap();
     let statement = crate::parse_statements("SELECT $1 + 1, $1", context.dialect())
         .next()
@@ -329,7 +329,7 @@ fn operator_constraints_and_executable_sql_stay_consistent(#[case] hint: Option<
 #[case::qualified("pg_catalog.unknown")]
 #[case::quoted(r#""pg_catalog"."unknown""#)]
 fn unknown_hint_leaves_parameter_for_inference(#[case] hint: &str) {
-    let context = context();
+    let mut context = context();
     context.setup_typehinting(&[Some("text")]).unwrap();
     context.setup_typehinting(&[Some(hint)]).unwrap();
     assert_eq!(context.get_parameter_typehint(1), None);

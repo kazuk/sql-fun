@@ -446,9 +446,17 @@ impl<'a> WithClause<'a> {
 impl Dialect {
     pub(super) fn same_identifier(self, left: &str, right: &str) -> bool {
         if self == Self::sqlite() {
-            left.eq_ignore_ascii_case(right)
+            #[cfg(feature = "sqlite")]
+            {
+                ::sql_fun_core::SqlDialect::SQLite.same_identifier(left, right)
+            }
+            // SQLite AST editing remains available without the SQLite parser.
+            #[cfg(not(feature = "sqlite"))]
+            {
+                left.eq_ignore_ascii_case(right)
+            }
         } else {
-            left == right
+            ::sql_fun_core::SqlDialect::PostgreSQL.same_identifier(left, right)
         }
     }
 }

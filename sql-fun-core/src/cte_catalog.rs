@@ -10,7 +10,7 @@ use std::{
     path::{Path, PathBuf},
 };
 
-use crate::PlaceholderedSql;
+use crate::{PlaceholderedSql, SqlDialect};
 use ::indexmap::IndexMap;
 use ::petgraph::graph::NodeIndex;
 use ::walkdir::WalkDir;
@@ -316,21 +316,68 @@ impl<'a> CteCatalogEntry<'a> {
     /// # Errors
     ///
     /// [`CteCatalogError`]
-    pub fn expand(
+    fn expand(
         &self,
         catalog: &CteCatalog<'a>,
         alias: &CteAlias,
-        cte_queries: &mut IndexMap<CteAlias, PlaceholderedSql>,
+        state: &mut CteResolutionState,
     ) -> Result<(), CteCatalogError> {
+        if state.already_expanded(alias, &self.cte_name)? {
+            return Ok(());
+        }
         for cte in &self.with {
             let Some(entry) = catalog.get_cte(cte.cte_name()) else {
                 CteCatalogError::raise_cte_not_found(cte.cte_name())?;
                 CteCatalogError::never()
             };
-            entry.expand(catalog, cte.alias(), cte_queries)?;
+            entry.expand(catalog, cte.alias(), state)?;
         }
-        cte_queries.insert(alias.clone(), self.query.clone());
+        if !state.already_expanded(alias, &self.cte_name)? {
+            state.insert(alias, &self.cte_name, &self.query);
+        }
         Ok(())
+    }
+}
+
+/// Definition identity is retained only during one validated catalog expansion.
+struct CteResolutionState {
+    dialect: SqlDialect,
+    definitions: IndexMap<CteAlias, CteName>,
+    queries: IndexMap<CteAlias, PlaceholderedSql>,
+}
+
+impl CteResolutionState {
+    fn new(dialect: SqlDialect) -> Self {
+        Self {
+            dialect,
+            definitions: IndexMap::new(),
+            queries: IndexMap::new(),
+        }
+    }
+
+    fn already_expanded(&self, alias: &CteAlias, name: &CteName) -> Result<bool, CteCatalogError> {
+        for (existing_alias, existing_name) in &self.definitions {
+            if self
+                .dialect
+                .same_identifier(existing_alias.as_str(), alias.as_str())
+            {
+                if existing_name == name {
+                    return Ok(true);
+                }
+                return CteCatalogError::conflicting_alias(
+                    existing_alias,
+                    existing_name,
+                    alias,
+                    name,
+                );
+            }
+        }
+        Ok(false)
+    }
+
+    fn insert(&mut self, alias: &CteAlias, name: &CteName, query: &PlaceholderedSql) {
+        self.definitions.insert(alias.clone(), name.clone());
+        self.queries.insert(alias.clone(), query.clone());
     }
 }
 
@@ -1160,7 +1207,10 @@ impl CteCatalog<'_> {
 }
 
 impl CteCatalog<'_> {
-    /// resolve CTE references
+    /// Resolve references using the explicitly selected SQL dialect.
+    /// Shared definitions under equivalent aliases are emitted once, in dependency
+    /// order. Different definitions claiming equivalent aliases are rejected.
+    /// The catalog must have passed validation before resolution.
     ///
     /// # Errors
     ///
@@ -1170,9 +1220,10 @@ impl CteCatalog<'_> {
         &self,
         base_query: &PlaceholderedSql,
         references: &[CteCatalogReference],
+        dialect: SqlDialect,
     ) -> Result<ResolvedCteCatalog, CteCatalogError> {
         let mut parameters = CteParameterCollection::default();
-        let mut cte_queries = IndexMap::default();
+        let mut state = CteResolutionState::new(dialect);
 
         for reference in references {
             let cte_name = &reference.cte_name();
@@ -1182,16 +1233,19 @@ impl CteCatalog<'_> {
             };
             let params = cte.try_get_parameters()?;
             parameters.marge(params.clone());
-            cte.expand(self, reference.alias(), &mut cte_queries)?;
+            cte.expand(self, reference.alias(), &mut state)?;
         }
 
         Ok(ResolvedCteCatalog::new(
             base_query,
             &parameters,
-            &cte_queries,
+            &state.queries,
         ))
     }
 }
+
+#[cfg(test)]
+mod resolve_tests;
 
 /// resolved CTE catalog
 #[derive(Debug, serde::Serialize, serde::Deserialize)]
@@ -1351,7 +1405,11 @@ mod test_resolved_cte_catalog {
     #[test]
     fn resolver_keeps_base_only_metadata_in_query() {
         let catalog = super::CteCatalog::default()
-            .resolve(&PlaceholderedSql::from_query("select ${base:int}"), &[])
+            .resolve(
+                &PlaceholderedSql::from_query("select ${base:int}"),
+                &[],
+                crate::SqlDialect::PostgreSQL,
+            )
             .unwrap();
         let name = ParameterName::from("base");
         assert!(catalog.parameters().binding(&name).is_none());

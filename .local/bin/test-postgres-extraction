@@ -5,6 +5,7 @@ import errno
 import fcntl
 import pty
 import re
+import runpy
 import select
 import struct
 import termios
@@ -108,6 +109,9 @@ def validate_interactive_init(binary, destination, fixture, declarations, ambien
         wait_for("Select at least one option explicitly.", start)
         wait_for("Space to select, Enter to confirm.", start)
         os.write(master, b"\x1b[B \r")  # Move to SQLite, select, and confirm.
+        wait_for("Choose one action to finish initialization")
+        assert not home.exists(), "home must not be created before final Ok"
+        os.write(master, b" \r")  # Explicit fresh final Ok.
         wait_for("SQLite development-support setup is still under development.")
         assert process.wait(timeout=15) == 0
         assert home.is_dir() and not (home / "postgres").exists()
@@ -365,6 +369,8 @@ def main():
     destination = Path(args.output).resolve()
     destination.mkdir(parents=True, exist_ok=True)
     args.binary = str(Path(args.binary).resolve())
+    interaction = runpy.run_path(str(Path(__file__).resolve().parents[1] / "sbin/test-init-interaction.py"))
+    interaction["validate"](args.binary, destination)
     # Run the packaged CLI outside the checkout: all runtime resources must be embedded.
     os.chdir(destination)
     validate_interactive_init(args.binary, destination, "connector",

@@ -1,9 +1,9 @@
-mod choice;
 mod error;
 mod install;
 mod postgres;
 mod presentation;
 mod prompt;
+mod selection;
 mod sqlite;
 mod workflow;
 
@@ -12,11 +12,9 @@ use self::{
     postgres::PostgresSetup,
     workflow::{Initialization, Workflow},
 };
-
-use std::{path::Path, process::ExitCode};
-
-use ::sql_fun_core::{InitializationDatasources, InitializeArgs, SqlFunArgs};
+use ::sql_fun_core::{InitializeArgs, SqlFunArgs};
 use ::statig::blocking::IntoStateMachineExt;
+use std::{path::Path, process::ExitCode};
 
 /// Initialize explicitly selected engine-specific development support.
 ///
@@ -27,162 +25,20 @@ pub async fn initialize(
     init_args: &InitializeArgs,
     metadata_file_from_cli: bool,
 ) -> Result<ExitCode, anyhow::Error> {
-    if init_args.assume_yes() {
-        anyhow::ensure!(
-            init_args.sql_fun_home().is_some(),
-            "--yes requires --sql-fun-home"
-        );
-        anyhow::ensure!(
-            init_args.engines().is_some() || init_args.datasources().is_some(),
-            "--yes requires --engines or --datasource"
-        );
-    }
+    let mut context = Initialization::new(args, init_args, metadata_file_from_cli)?;
     if !init_args.assume_yes() {
         println!("{}", include_str!("init/banner.txt"));
     }
-    let mut context = Initialization::from(init_args);
-    if init_args.sql_fun_home().is_none()
-        && let Some(candidate) = args.initialization_home_candidate()
-    {
-        context.set_home(candidate);
-    }
-    // Interactive setup starts with the user's home choice; --yes validates all
-    // supplied choices before any filesystem setup.
-    if !init_args.assume_yes() && !prepare_home(&mut context)? {
-        return Ok(ExitCode::FAILURE);
-    }
-    let selection = SetupSelection::resolve(args, init_args, metadata_file_from_cli)?;
-    selection.check_choices(init_args)?;
-    let plans = selection.prepare(args, init_args).await?;
-    if init_args.assume_yes() && !prepare_home(&mut context)? {
-        return Ok(ExitCode::FAILURE);
-    }
-    for plan in plans {
-        plan.install(context.home()).await?;
-    }
-    Ok(ExitCode::SUCCESS)
-}
-
-fn prepare_home(context: &mut Initialization) -> Result<bool, InitError> {
     let mut machine = Workflow.state_machine();
-    while let Some(request) = machine.state().request(context) {
-        let event = request.run()?;
-        machine.handle_with_context(&event, context);
-        context.present();
+    while machine.state().is_asking() {
+        let event = context.prompt().await?;
+        machine.handle_with_context(&event, &mut context);
     }
-    context.finish()?;
-    Ok(!machine.state().is_cancelled())
-}
-
-/// Selection is explicit: datasource metadata describes candidates, never consent.
-struct SetupSelection {
-    engines: Vec<String>,
-    datasource_names: Vec<String>,
-    metadata: Option<InitializationDatasources>,
-}
-impl SetupSelection {
-    fn resolve(
-        common: &SqlFunArgs,
-        args: &InitializeArgs,
-        metadata_file_from_cli: bool,
-    ) -> Result<Self, anyhow::Error> {
-        let metadata = if metadata_file_from_cli || args.datasources().is_some() {
-            Some(InitializationDatasources::load_from(
-                &common.metadata_file()?,
-            )?)
-        } else {
-            None
-        };
-        let mut selection = Self {
-            engines: Vec::new(),
-            datasource_names: Vec::new(),
-            metadata,
-        };
-        if let Some(engines) = args.engines() {
-            for engine in engines {
-                selection.add_engine(engine);
-            }
-        } else {
-            let names = if let Some(names) = args.datasources() {
-                names.to_vec()
-            } else if let Some(metadata) = &selection.metadata {
-                if metadata.names().is_empty() {
-                    Vec::new()
-                } else {
-                    choice::select("Choose datasources to initialize", &metadata.names())?
-                }
-            } else {
-                Vec::new()
-            };
-            if names.is_empty() {
-                selection.engines = choice::select(
-                    "Choose engines for development support",
-                    &["postgres".to_owned(), "sqlite".to_owned()],
-                )?;
-            } else {
-                for name in names {
-                    let metadata = selection.metadata.as_ref().ok_or_else(|| {
-                        anyhow::anyhow!("selected datasource requires project metadata")
-                    })?;
-                    let engine = metadata.engine(&name)?;
-                    let engine = if engine == "PostgreSQL" {
-                        "postgres"
-                    } else if engine == "sqlite" {
-                        "sqlite"
-                    } else {
-                        return Err(anyhow::anyhow!(
-                            "no initializer for datasource {name} engine {engine}"
-                        ));
-                    };
-                    selection.add_engine(engine);
-                    selection.datasource_names.push(name);
-                }
-            }
-        }
-        Ok(selection)
+    let exit = context.finish()?;
+    if machine.state().is_authorized() {
+        context.install().await?;
     }
-
-    fn add_engine(&mut self, name: &str) {
-        if !self.engines.contains(&name.to_owned()) {
-            self.engines.push(name.to_owned());
-        }
-    }
-
-    fn check_choices(&self, args: &InitializeArgs) -> Result<(), anyhow::Error> {
-        if self.engines.contains(&"postgres".to_owned()) {
-            PostgresSetup::check_choices(args)?;
-        } else {
-            anyhow::ensure!(
-                !args.has_postgres_options(),
-                "PostgreSQL options require selecting PostgreSQL setup"
-            );
-        }
-        Ok(())
-    }
-
-    async fn prepare(
-        &self,
-        common: &SqlFunArgs,
-        args: &InitializeArgs,
-    ) -> Result<Vec<EngineSetup>, anyhow::Error> {
-        let mut plans = Vec::new();
-        for engine in &self.engines {
-            if engine == "postgres" {
-                plans.push(EngineSetup::postgres(
-                    &PostgresSetup::prepare(
-                        common,
-                        args,
-                        self.metadata.as_ref(),
-                        &self.datasource_names,
-                    )
-                    .await?,
-                ));
-            } else {
-                plans.push(EngineSetup::sqlite());
-            }
-        }
-        Ok(plans)
-    }
+    Ok(exit)
 }
 
 enum EngineSetup {

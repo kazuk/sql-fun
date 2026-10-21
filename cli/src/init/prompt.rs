@@ -1,239 +1,242 @@
-//! The terminal boundary depends only on input primitives, never workflow states.
+//! Input primitives and control outcomes, independent of initialization steps.
 
 use super::error::InitError;
+
+const NAVIGATION: &str = "Esc: Back. Ctrl+C: Cancel.";
 
 #[derive(Clone, Debug, PartialEq, Eq)]
 pub enum PromptResponse {
     Confirm(bool),
     Text(String),
-    MultiSelect(Vec<usize>),
+    Selection(Vec<usize>),
 }
-
 impl PromptResponse {
-    pub const fn confirm(confirmed: bool) -> Self {
-        Self::Confirm(confirmed)
+    pub const fn confirm(value: bool) -> Self {
+        Self::Confirm(value)
     }
-
-    pub fn text(input: &str) -> Self {
-        Self::Text(input.to_owned())
+    pub fn text(value: &str) -> Self {
+        Self::Text(value.to_owned())
     }
-
-    pub fn multi_select(indices: &[usize]) -> Self {
-        Self::MultiSelect(indices.to_vec())
+    pub fn selection(value: &[usize]) -> Self {
+        Self::Selection(value.to_vec())
     }
-}
-
-impl PromptResponse {
     pub const fn confirmation(&self) -> Option<bool> {
-        if let Self::Confirm(confirmed) = self {
-            Some(*confirmed)
+        if let Self::Confirm(value) = self {
+            Some(*value)
         } else {
             None
         }
     }
-
     pub fn text_input(&self) -> Option<&str> {
-        if let Self::Text(input) = self {
-            Some(input)
+        if let Self::Text(value) = self {
+            Some(value)
         } else {
             None
         }
     }
+    pub fn indices(&self) -> &[usize] {
+        if let Self::Selection(value) = self {
+            value
+        } else {
+            &[]
+        }
+    }
+    pub fn selected_names(&self, options: &[String]) -> Vec<String> {
+        match self {
+            Self::Selection(indices) => indices
+                .iter()
+                .filter_map(|index| options.get(*index).cloned())
+                .collect(),
+            _ => Vec::new(),
+        }
+    }
+}
 
-    pub fn selected_indices(&self) -> Option<&[usize]> {
-        if let Self::MultiSelect(indices) = self {
-            Some(indices)
+#[derive(Debug, PartialEq, Eq)]
+pub enum PromptOutcome {
+    Answer(PromptResponse),
+    Back,
+    Cancel,
+}
+impl PromptOutcome {
+    pub fn answer(value: &PromptResponse) -> Self {
+        Self::Answer(value.clone())
+    }
+    pub const fn back() -> Self {
+        Self::Back
+    }
+    pub const fn cancel() -> Self {
+        Self::Cancel
+    }
+    pub const fn response(&self) -> Option<&PromptResponse> {
+        if let Self::Answer(value) = self {
+            Some(value)
         } else {
             None
+        }
+    }
+    pub const fn is_back(&self) -> bool {
+        matches!(self, Self::Back)
+    }
+    pub const fn is_cancel(&self) -> bool {
+        matches!(self, Self::Cancel)
+    }
+    fn from_result(
+        result: Result<PromptResponse, inquire::InquireError>,
+    ) -> Result<Self, InitError> {
+        match result {
+            Ok(value) => Ok(Self::answer(&value)),
+            Err(inquire::InquireError::OperationCanceled) => Ok(Self::back()),
+            Err(inquire::InquireError::OperationInterrupted) => Ok(Self::cancel()),
+            Err(error) => InitError::prompt(error),
         }
     }
 }
 
 #[cfg(test)]
-mod test_prompt_response_values {
-    use super::PromptResponse;
-
-    #[rstest::rstest]
-    #[case::confirmed(&PromptResponse::confirm(true), Some(true), None, None)]
-    #[case::declined(&PromptResponse::confirm(false), Some(false), None, None)]
-    #[case::text(&PromptResponse::text("home"), None, Some("home"), None)]
-    #[case::empty_text(&PromptResponse::text(""), None, Some(""), None)]
-    #[case::selection(&PromptResponse::multi_select(&[2, 0, 2]), None, None, Some(&[2, 0, 2][..]))]
-    #[case::empty_selection(&PromptResponse::multi_select(&[]), None, None, Some(&[][..]))]
-    fn exposes_only_the_matching_value(
-        #[case] response: &PromptResponse,
-        #[case] confirmation: Option<bool>,
-        #[case] text: Option<&str>,
-        #[case] indices: Option<&[usize]>,
-    ) {
-        assert_eq!(response.confirmation(), confirmation);
-        assert_eq!(response.text_input(), text);
-        assert_eq!(response.selected_indices(), indices);
+mod test_outcomes {
+    use super::PromptOutcome;
+    #[test]
+    fn only_control_errors_become_navigation() {
+        assert!(
+            PromptOutcome::from_result(Err(inquire::InquireError::OperationCanceled))
+                .unwrap()
+                .is_back()
+        );
+        assert!(
+            PromptOutcome::from_result(Err(inquire::InquireError::OperationInterrupted))
+                .unwrap()
+                .is_cancel()
+        );
+        assert!(PromptOutcome::from_result(Err(inquire::InquireError::NotTTY)).is_err());
     }
 }
 
-#[derive(Clone, Debug, PartialEq, Eq)]
-enum Input {
-    Confirm,
-    Text(TextInput),
+pub enum PromptRequest {
+    Confirm(String),
+    Text(String),
+    Select(Selection),
     MultiSelect(Selection),
 }
 
-#[derive(Clone, Debug, PartialEq, Eq)]
-struct TextInput {
-    default: String,
-    initial: String,
-}
-
-#[derive(Clone, Debug, PartialEq, Eq)]
-struct Selection {
-    options: Vec<String>,
-    defaults: Vec<usize>,
-}
-
-impl Input {
-    const fn confirm() -> Self {
-        Self::Confirm
-    }
-
-    fn text(default: &str) -> Self {
-        Self::Text(TextInput {
-            default: default.to_owned(),
-            initial: String::new(),
-        })
-    }
-
-    fn multi_select(options: &[String], defaults: &[usize]) -> Self {
-        Self::MultiSelect(Selection {
-            options: options.to_vec(),
-            defaults: defaults.to_vec(),
-        })
-    }
-
-    fn set_initial_text(&mut self, initial: &str) {
-        if let Self::Text(input) = self {
-            initial.clone_into(&mut input.initial);
-        }
-    }
-
-    fn run(&self, title: &str) -> Result<PromptResponse, InitError> {
-        match self {
-            Self::Confirm => Self::run_confirm(title),
-            Self::Text(input) => Self::run_text(title, input),
-            Self::MultiSelect(selection) => Self::run_multi_select(title, selection),
-        }
-    }
-
-    fn run_confirm(title: &str) -> Result<PromptResponse, InitError> {
-        Ok(PromptResponse::confirm(
-            inquire::Confirm::new(title)
-                .prompt()
-                .or_else(InitError::prompt)?,
-        ))
-    }
-
-    fn run_text(title: &str, input: &TextInput) -> Result<PromptResponse, InitError> {
-        Ok(PromptResponse::text(
-            &inquire::Text::new(title)
-                .with_default(&input.default)
-                .with_initial_value(&input.initial)
-                .prompt()
-                .or_else(InitError::prompt)?,
-        ))
-    }
-
-    fn run_multi_select(title: &str, selection: &Selection) -> Result<PromptResponse, InitError> {
-        Ok(PromptResponse::multi_select(
-            &inquire::MultiSelect::new(title, selection.options.clone())
-                .with_help_message("Use arrows to move, Space to select, Enter to confirm.")
-                .with_default(&selection.defaults)
-                .raw_prompt()
-                .or_else(InitError::prompt)?
-                .into_iter()
-                .map(|item| item.index)
-                .collect::<Vec<_>>(),
-        ))
-    }
-}
-
-#[derive(Clone, Debug, PartialEq, Eq)]
-pub struct PromptRequest {
+pub struct Selection {
     title: String,
-    input: Input,
-    automatic: Option<PromptResponse>,
+    options: Vec<String>,
+    exactly_one: bool,
 }
-
+impl Selection {
+    fn new(title: &str, options: &[String], exactly_one: bool) -> Self {
+        Self {
+            title: title.to_owned(),
+            options: options.to_vec(),
+            exactly_one,
+        }
+    }
+    fn validate<T>(exactly_one: bool, selected: &[T]) -> inquire::validator::Validation {
+        if exactly_one && selected.len() != 1 {
+            inquire::validator::Validation::Invalid("Select exactly one action explicitly.".into())
+        } else if selected.is_empty() {
+            inquire::validator::Validation::Invalid("Select at least one option explicitly.".into())
+        } else {
+            inquire::validator::Validation::Valid
+        }
+    }
+}
 impl PromptRequest {
     pub fn confirm(title: &str) -> Self {
-        Self {
-            title: title.to_owned(),
-            input: Input::confirm(),
-            automatic: None,
+        Self::Confirm(title.to_owned())
+    }
+    pub fn text(title: &str) -> Self {
+        Self::Text(title.to_owned())
+    }
+    pub fn select(title: &str, options: &[String]) -> Self {
+        Self::Select(Selection::new(title, options, true))
+    }
+    pub fn multi_select(title: &str, options: &[String]) -> Self {
+        Self::MultiSelect(Selection::new(title, options, false))
+    }
+    pub fn authorization() -> Self {
+        Self::MultiSelect(Selection::new(
+            "Choose one action to finish initialization",
+            &["Ok".to_owned(), "Cancel".to_owned()],
+            true,
+        ))
+    }
+    pub fn run(&self, previous: Option<&PromptResponse>) -> Result<PromptOutcome, InitError> {
+        PromptOutcome::from_result(self.read(previous))
+    }
+    fn read(
+        &self,
+        previous: Option<&PromptResponse>,
+    ) -> Result<PromptResponse, inquire::InquireError> {
+        let render = inquire::ui::RenderConfig::default()
+            .with_canceled_prompt_indicator(inquire::ui::Styled::new("<back>"));
+        match self {
+            Self::Confirm(title) => {
+                let help = format!("Type y/n, Enter to confirm. {NAVIGATION}");
+                let mut prompt = inquire::Confirm::new(title)
+                    .with_render_config(render)
+                    .with_help_message(&help);
+                if let Some(answer) = previous
+                    && let Some(value) = answer.confirmation()
+                {
+                    prompt = prompt.with_default(value);
+                }
+                prompt.prompt().map(PromptResponse::confirm)
+            }
+            Self::Text(title) => {
+                let help = format!("Enter to confirm. {NAVIGATION}");
+                let mut prompt = inquire::Text::new(title)
+                    .with_render_config(render)
+                    .with_help_message(&help);
+                if let Some(answer) = previous
+                    && let Some(value) = answer.text_input()
+                {
+                    prompt = prompt.with_initial_value(value);
+                }
+                prompt.prompt().map(|value| PromptResponse::text(&value))
+            }
+            Self::Select(selection) => {
+                inquire::Select::new(&selection.title, selection.options.clone())
+                    .with_render_config(render)
+                    .with_starting_cursor(if let Some(answer) = previous {
+                        answer.indices().first().copied().unwrap_or(0)
+                    } else {
+                        0
+                    })
+                    .with_help_message(&format!(
+                        "Use arrows to move, Enter to choose one. {NAVIGATION}"
+                    ))
+                    .raw_prompt()
+                    .map(|value| PromptResponse::selection(&[value.index]))
+            }
+            Self::MultiSelect(selection) => {
+                let exactly_one = selection.exactly_one;
+                inquire::MultiSelect::new(&selection.title, selection.options.clone())
+                    .with_render_config(render)
+                    .with_default(if let Some(answer) = previous {
+                        answer.indices()
+                    } else {
+                        &[]
+                    })
+                    .with_help_message(&format!(
+                        "Use arrows to move, Space to select, Enter to confirm. {NAVIGATION}"
+                    ))
+                    .with_validator(
+                        move |values: &[inquire::list_option::ListOption<&String>]| {
+                            Ok(Selection::validate(exactly_one, values))
+                        },
+                    )
+                    .raw_prompt()
+                    .map(|values| {
+                        PromptResponse::selection(
+                            &values
+                                .into_iter()
+                                .map(|value| value.index)
+                                .collect::<Vec<_>>(),
+                        )
+                    })
+            }
         }
-    }
-
-    pub fn text(title: &str, default: &str) -> Self {
-        Self {
-            title: title.to_owned(),
-            input: Input::text(default),
-            automatic: None,
-        }
-    }
-
-    pub fn with_initial_text(mut self, initial: &str) -> Self {
-        self.input.set_initial_text(initial);
-        self
-    }
-
-    pub fn multi_select(title: &str, options: &[String], defaults: &[usize]) -> Self {
-        Self {
-            title: title.to_owned(),
-            input: Input::multi_select(options, defaults),
-            automatic: None,
-        }
-    }
-
-    pub fn with_automatic(mut self, response: Option<PromptResponse>) -> Self {
-        self.automatic = response;
-        self
-    }
-
-    pub const fn automatic_response(&self) -> Option<&PromptResponse> {
-        self.automatic.as_ref()
-    }
-
-    pub fn run(&self) -> Result<PromptResponse, InitError> {
-        if let Some(response) = self.automatic_response() {
-            return Ok(response.clone());
-        }
-        self.input.run(&self.title)
-    }
-}
-
-#[cfg(test)]
-mod tests {
-    use super::{PromptRequest, PromptResponse};
-
-    #[rstest::rstest]
-    #[case::confirm(PromptRequest::confirm("confirm"), PromptResponse::confirm(true))]
-    #[case::text(
-        PromptRequest::text("text", "default"),
-        PromptResponse::text("supplied")
-    )]
-    #[case::multi_select(
-        PromptRequest::multi_select("select", &["first".to_owned(), "second".to_owned()], &[0]),
-        PromptResponse::multi_select(&[1]),
-    )]
-    fn supplied_responses_bypass_the_terminal(
-        #[case] request: PromptRequest,
-        #[case] response: PromptResponse,
-    ) {
-        assert_eq!(
-            request
-                .with_automatic(Some(response.clone()))
-                .run()
-                .unwrap(),
-            response,
-        );
     }
 }

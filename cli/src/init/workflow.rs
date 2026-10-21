@@ -1,491 +1,599 @@
 #[cfg(test)]
-mod test_helpers;
-#[cfg(test)]
 mod tests;
 
 use super::{
+    EngineSetup,
     error::InitError,
     presentation::{HomePathError, Notice},
-    prompt::{PromptRequest, PromptResponse},
+    prompt::{PromptOutcome, PromptRequest, PromptResponse},
+    selection::SetupSelection,
+};
+use ::sql_fun_core::{
+    InitializeArgs, PostgresVersion, PostgresVersionInventory, SqlFunArgs,
+    resolve_sql_fun_home_path,
+};
+use ::statig::Outcome;
+use std::{
+    collections::BTreeMap,
+    path::{Path, PathBuf},
+    process::ExitCode,
 };
 
-use std::path::PathBuf;
-
-use ::sql_fun_core::{InitializeArgs, resolve_sql_fun_home_path};
-use ::statig::Outcome;
-
-pub struct Initialization {
-    yes: bool,
-    supplied_home: bool,
+/// Navigation and confirmed answers belong to the conversation, not individual prompts.
+pub(super) struct Initialization {
+    common: SqlFunArgs,
+    args: InitializeArgs,
+    metadata_requested: bool,
+    selection: Option<SetupSelection>,
+    step: Step,
+    history: Vec<Step>,
+    answers: BTreeMap<Step, PromptResponse>,
+    retry: Option<PromptResponse>,
     home: PathBuf,
-    default_home: String,
-    home_input: String,
-    notices: Vec<Notice>,
+    edit_home: bool,
+    detected: Option<PostgresVersion>,
+    plans: Vec<EngineSetup>,
     error: Option<InitError>,
+    exit: ExitCode,
 }
-
-impl From<&InitializeArgs> for Initialization {
-    fn from(args: &InitializeArgs) -> Self {
-        let home = args
-            .sql_fun_home()
-            .clone()
-            .unwrap_or_else(|| PathBuf::from(shellexpand::tilde("~/.sql-fun").as_ref()));
-        Self {
-            yes: args.assume_yes(),
-            supplied_home: args.sql_fun_home().is_some(),
-            default_home: home.to_string_lossy().into_owned(),
-            home_input: String::new(),
-            home,
-            notices: Vec::new(),
-            error: None,
-        }
-    }
-}
-
 impl Initialization {
-    pub fn present(&mut self) {
-        for notice in self.notices.drain(..) {
-            notice.show();
+    pub(super) fn new(
+        common: &SqlFunArgs,
+        args: &InitializeArgs,
+        metadata_requested: bool,
+    ) -> Result<Self, anyhow::Error> {
+        if args.assume_yes() {
+            anyhow::ensure!(
+                args.sql_fun_home().is_some(),
+                "--yes requires --sql-fun-home"
+            );
+            anyhow::ensure!(
+                args.engines().is_some() || args.datasources().is_some(),
+                "--yes requires --engines or --datasource"
+            );
         }
-    }
-
-    pub fn finish(&mut self) -> Result<(), InitError> {
-        match self.error.take() {
-            Some(error) => Err(error),
-            None => Ok(()),
-        }
-    }
-
-    pub fn set_home(&mut self, home: &std::path::Path) {
-        self.home = home.to_path_buf();
-        self.default_home = home.to_string_lossy().into_owned();
-    }
-    pub fn home(&self) -> &std::path::Path {
-        &self.home
-    }
-    fn fail(&mut self, error: InitError) -> Outcome<State> {
-        self.error = Some(error);
-        Outcome::Transition(State::failed())
-    }
-}
-
-#[derive(Debug, PartialEq, Eq)]
-pub enum Event {
-    Advance,
-    Answer(PromptResponse),
-}
-
-impl Event {
-    const fn response(&self) -> Option<&PromptResponse> {
-        if let Self::Answer(response) = self {
-            Some(response)
+        let home = if let Some(home) = args.sql_fun_home() {
+            home.clone()
+        } else if let Some(home) = common.initialization_home_candidate() {
+            home.to_path_buf()
         } else {
-            None
-        }
+            PathBuf::from(shellexpand::tilde("~/.sql-fun").as_ref())
+        };
+        Ok(Self {
+            common: common.clone(),
+            args: args.clone(),
+            metadata_requested,
+            selection: None,
+            step: Step::initial(),
+            history: Vec::new(),
+            answers: BTreeMap::new(),
+            retry: None,
+            home,
+            edit_home: args.sql_fun_home().is_none(),
+            detected: None,
+            plans: Vec::new(),
+            error: None,
+            exit: ExitCode::SUCCESS,
+        })
     }
-
-    const fn confirmation(&self) -> Option<bool> {
-        if let Some(response) = self.response() {
-            response.confirmation()
-        } else {
-            None
-        }
+    const fn selection(&self) -> &SetupSelection {
+        self.selection
+            .as_ref()
+            .expect("selection loaded after home confirmation")
     }
-
-    fn text_input(&self) -> Option<&str> {
-        if let Some(response) = self.response() {
-            response.text_input()
-        } else {
-            None
-        }
-    }
-}
-
-#[derive(Debug, PartialEq, Eq)]
-pub enum Request {
-    Advance,
-    Prompt(PromptRequest),
-}
-
-impl Request {
-    pub fn run(&self) -> Result<Event, InitError> {
-        match self {
-            Self::Advance => Ok(Event::Advance),
-            Self::Prompt(prompt) => Ok(Event::Answer(prompt.run()?)),
-        }
-    }
-}
-
-pub struct Workflow;
-
-#[statig::state_machine(
-    initial = "State::confirm_install()",
-    state(derive(Debug, PartialEq, Eq))
-)]
-impl Workflow {
-    #[state]
-    fn confirm_install(event: &Event) -> Outcome<State> {
-        match event.confirmation() {
-            Some(true) => Outcome::Transition(State::prepare_home()),
-            Some(false) => Outcome::Transition(State::cancelled()),
-            _ => Outcome::Handled,
-        }
-    }
-
-    #[state]
-    fn prepare_home(event: &Event, context: &mut Initialization) -> Outcome<State> {
-        if *event != Event::Advance {
-            return Outcome::Handled;
-        }
-        if !context.yes {
-            context.notices.push(Notice::home_description());
-        }
-        if context.supplied_home {
-            context.home = match resolve_sql_fun_home_path(&context.home) {
-                Ok(path) => path,
-                Err(error) => {
-                    if context.yes {
-                        return context.fail(anyhow::Error::from(error).into());
-                    }
-                    context
-                        .notices
-                        .push(Notice::invalid_home(HomePathError::resolution(&error)));
-                    return Outcome::Transition(State::edit_home());
-                }
-            };
-            if context.home.exists() && !context.home.is_dir() {
-                if context.yes {
-                    return context
-                        .fail(anyhow::anyhow!("sql-fun home must be a directory").into());
-                }
-                context
-                    .notices
-                    .push(Notice::invalid_home(HomePathError::not_directory_error(
-                        &context.home,
-                    )));
-                return Outcome::Transition(State::edit_home());
+    fn resolved_args(&self) -> InitializeArgs {
+        let mut args = self.args.clone();
+        if !args.docker() && args.database_url().is_none() {
+            if self
+                .answers
+                .get(&Step::source())
+                .is_some_and(|value| value.indices() == [0])
+            {
+                args.select_docker();
+            } else if let Some(answer) = self.answers.get(&Step::connection())
+                && let Some(connection) = answer.text_input()
+            {
+                args.set_database_url(connection);
             }
-            Outcome::Transition(State::confirm_home())
-        } else if context.yes {
-            context.fail(anyhow::anyhow!("--yes requires --sql-fun-home").into())
+        }
+        args
+    }
+    fn existing_server(&self) -> bool {
+        self.args.database_url().is_some()
+            || self
+                .answers
+                .get(&Step::source())
+                .is_some_and(|value| value.indices() == [1])
+    }
+    fn version_options(&self) -> Vec<String> {
+        if let Some(version) = self.detected {
+            vec![version.to_string()]
         } else {
-            Outcome::Transition(State::edit_home())
+            PostgresVersionInventory::builtin()
+                .targets()
+                .into_iter()
+                .map(|value| value.to_string())
+                .collect()
         }
     }
-
-    #[state]
-    fn confirm_home(event: &Event, context: &Initialization) -> Outcome<State> {
-        match event.confirmation() {
-            Some(true) if context.supplied_home => Outcome::Transition(State::create_home()),
-            Some(true) => Outcome::Transition(State::create_edited_home()),
-            Some(false) => Outcome::Transition(State::edit_home()),
-            _ => Outcome::Handled,
+    fn versions(&self) -> Result<Vec<PostgresVersion>, anyhow::Error> {
+        let names = if let Some(names) = self.args.requested_versions() {
+            names.to_vec()
+        } else {
+            self.step_names(Step::versions(), &self.version_options())
+        };
+        let versions = PostgresVersionInventory::builtin()
+            .select(&names)
+            .map_err(anyhow::Error::msg)?;
+        if let Some(detected) = self.detected {
+            anyhow::ensure!(
+                versions == [detected],
+                "selected versions must match connected PostgreSQL {detected}"
+            );
+        }
+        Ok(versions)
+    }
+    fn step_names(&self, step: Step, options: &[String]) -> Vec<String> {
+        if let Some(answer) = self.answers.get(&step) {
+            answer.selected_names(options)
+        } else {
+            Vec::new()
         }
     }
-
-    // An explicitly supplied CLI path retains fail-fast creation behavior.
-    #[state]
-    fn create_home(event: &Event, context: &mut Initialization) -> Outcome<State> {
-        if *event != Event::Advance {
-            return Outcome::Handled;
+    /// The single dependency table. Merely visiting a question never invalidates answers.
+    fn remember(&mut self, answer: &PromptResponse) {
+        if self.answers.get(&self.step) == Some(answer) {
+            return;
         }
-        let existed = context.home.exists();
-        if let Err(error) = std::fs::create_dir_all(&context.home).or_else(InitError::io) {
-            return context.fail(error);
+        for dependent in self.step.dependents() {
+            self.answers.remove(dependent);
+        }
+        if self.step.invalidates_detection() {
+            self.detected = None;
+        }
+        self.plans.clear();
+        self.answers.insert(self.step, answer.clone());
+    }
+    fn visit(&mut self, step: Step) {
+        if self.step != step {
+            self.history.push(self.step);
+            self.step = step;
+        }
+    }
+    fn back(&mut self) {
+        if let Some(step) = self.history.pop() {
+            self.step = step;
+        }
+    }
+    fn advance(&mut self) {
+        let next = self.step.next();
+        self.visit(next);
+    }
+    fn cancel(&mut self, interrupted: bool) -> Outcome<State> {
+        self.exit = if interrupted {
+            ExitCode::from(130)
+        } else {
+            ExitCode::SUCCESS
+        };
+        println!("Initialization cancelled.");
+        Outcome::Transition(State::cancelled())
+    }
+    pub(super) fn finish(&mut self) -> Result<ExitCode, InitError> {
+        if let Some(error) = self.error.take() {
+            Err(error)
+        } else {
+            Ok(self.exit)
+        }
+    }
+    /// Automatic preparation is read-only. Only interactive visits enter navigation history.
+    pub(super) async fn prompt(&mut self) -> Result<PromptOutcome, anyhow::Error> {
+        if !self.prepare_question().await? {
+            return Ok(PromptOutcome::answer(&PromptResponse::selection(&[0])));
+        }
+        let request = self.step.request(self);
+        let retry = self.retry.take();
+        let previous = if self.step.is_review() {
+            None
+        } else if let Some(retry) = &retry {
+            Some(retry)
+        } else {
+            self.answers.get(&self.step)
+        };
+        let suggestion = PromptResponse::text(&self.home.to_string_lossy());
+        let previous = if previous.is_none() && self.step.is_home_editor() {
+            Some(&suggestion)
+        } else {
+            previous
+        };
+        Ok(request.run(previous)?)
+    }
+    async fn prepare_question(&mut self) -> Result<bool, anyhow::Error> {
+        loop {
+            self.prepare().await?;
+            if self.step.applicable(self) {
+                return Ok(true);
+            }
+            if self.step.is_review() {
+                return Ok(false);
+            }
+            self.step = self.step.next();
+        }
+    }
+    async fn prepare(&mut self) -> Result<(), anyhow::Error> {
+        if self.step.is_home_confirmation() && !self.args.assume_yes() {
+            match resolve_sql_fun_home_path(&self.home) {
+                Ok(path) if !path.exists() || path.is_dir() => {
+                    self.home = path;
+                }
+                result => {
+                    let error = match result {
+                        Ok(path) => HomePathError::not_directory_error(&path),
+                        Err(error) => HomePathError::resolution(&error),
+                    };
+                    Notice::invalid_home(error).show();
+                    self.edit_home = true;
+                    self.step = Step::home_editor();
+                }
+            }
+        }
+        if self.step.is_selection() && self.selection.is_none() {
+            self.selection = Some(SetupSelection::load(
+                &self.common,
+                &self.args,
+                self.metadata_requested,
+            )?);
+        }
+        if self.step.needs_postgres_validation() {
+            self.selection().check_choices(&self.args)?;
+        }
+        if self.step.is_versions() && self.selection().postgres() {
+            // Reject unsupported explicit versions before any server contact.
+            if let Some(names) = self.args.requested_versions() {
+                PostgresVersionInventory::builtin()
+                    .select(names)
+                    .map_err(anyhow::Error::msg)?;
+            }
+            if self.existing_server() && self.detected.is_none() {
+                let args = self.resolved_args();
+                println!("Checking the explicitly selected PostgreSQL server version (read-only).");
+                self.detected = Some(
+                    crate::extract::detect_server(
+                        args.database_url().expect("confirmed connection"),
+                        args.timeout_seconds(),
+                    )
+                    .await?,
+                );
+            }
+        }
+        if self.step.is_review() {
+            let versions = if self.selection().postgres() {
+                self.versions()?
+            } else {
+                Vec::new()
+            };
+            self.plans =
+                self.selection()
+                    .prepare(&self.common, &self.resolved_args(), &versions)?;
+            if self.args.assume_yes() {
+                self.home = resolve_sql_fun_home_path(&self.home)?;
+            } else {
+                println!(
+                    "Initialization review\nHome: {}\n{}",
+                    self.home.display(),
+                    self.selection().summary()
+                );
+                if self.selection().postgres() {
+                    println!(
+                        "PostgreSQL source: {}\nVersions: {}",
+                        if self.existing_server() {
+                            "Existing PostgreSQL server"
+                        } else {
+                            "Docker"
+                        },
+                        versions
+                            .into_iter()
+                            .map(|value| value.to_string())
+                            .collect::<Vec<_>>()
+                            .join(", ")
+                    );
+                }
+            }
+        }
+        Ok(())
+    }
+    fn accept(&mut self, answer: &PromptResponse) -> Result<Outcome<State>, InitError> {
+        // All steps use the same change detection and answer storage.
+        let step = self.step;
+        if !step.validate(self, answer) {
+            if !step.is_review() {
+                self.retry = Some(answer.clone());
+            }
+            return Ok(Outcome::Handled);
+        }
+        if step.is_review() {
+            if answer.indices() == [1] {
+                return Ok(self.cancel(false));
+            }
+            return self.authorize();
+        }
+        self.remember(answer);
+        if step.is_initial() && answer.confirmation() == Some(false) {
+            return Ok(self.cancel(false));
+        }
+        if step.is_home_confirmation() && answer.confirmation() == Some(false) {
+            self.edit_home = true;
+            self.visit(Step::home_editor());
+        } else if step.is_selection() {
+            let names = self.step_names(step, &self.selection().options());
+            self.selection
+                .as_mut()
+                .expect("loaded selection")
+                .choose(&names)?;
+            self.advance();
+        } else {
+            self.advance();
+        }
+        Ok(Outcome::Handled)
+    }
+    /// Home creation is the first mutation, reachable only after fresh authorization.
+    fn authorize(&mut self) -> Result<Outcome<State>, InitError> {
+        let existed = self.home.exists();
+        if let Err(error) = std::fs::create_dir_all(&self.home) {
+            if !self.args.assume_yes() && self.edit_home {
+                Notice::home_create_failed(&self.home, error).show();
+                self.plans.clear();
+                self.visit(Step::home_editor());
+                return Ok(Outcome::Handled);
+            }
+            return InitError::io(error);
         }
         if existed {
-            context.notices.push(Notice::home_exists(&context.home));
+            Notice::home_exists(&self.home).show();
         } else {
-            context.notices.push(Notice::home_created(&context.home));
+            Notice::home_created(&self.home).show();
         }
-        Outcome::Transition(State::home_prepared())
+        Ok(Outcome::Transition(State::authorized()))
     }
-
-    #[state]
-    fn edit_home(event: &Event, context: &mut Initialization) -> Outcome<State> {
-        let Some(input) = event.text_input() else {
-            return Outcome::Handled;
-        };
-        let path = match resolve_sql_fun_home_path(std::path::Path::new(input)) {
-            Ok(path) => path,
-            Err(error) => {
-                input.clone_into(&mut context.home_input);
-                context
-                    .notices
-                    .push(Notice::invalid_home(HomePathError::resolution(&error)));
-                return Outcome::Handled;
-            }
-        };
-        let validation = if path.exists() {
-            if path.is_dir() {
-                Ok(())
-            } else {
-                HomePathError::not_directory(&path)
-            }
-        } else if let Some(parent) = path.parent() {
-            if parent.is_dir() {
-                Ok(())
-            } else if parent.exists() {
-                Err(HomePathError::not_directory_error(parent))
-            } else {
-                HomePathError::parent_not_found(parent)
-            }
-        } else {
-            HomePathError::parent_unavailable()
-        };
-        if let Err(error) = validation {
-            input.clone_into(&mut context.home_input);
-            context.notices.push(Notice::invalid_home(error));
-            return Outcome::Handled;
+    pub(super) async fn install(&self) -> Result<(), InitError> {
+        for plan in &self.plans {
+            plan.install(&self.home).await?;
         }
-        context.home_input.clear();
-        context.home = path;
-        context.supplied_home = false;
-        Outcome::Transition(State::confirm_home())
-    }
-
-    // Only a path entered in the editor retries after a filesystem failure.
-    #[state]
-    fn create_edited_home(event: &Event, context: &mut Initialization) -> Outcome<State> {
-        if *event != Event::Advance {
-            return Outcome::Handled;
-        }
-        let existed = context.home.exists();
-        match std::fs::create_dir_all(&context.home) {
-            Ok(()) => {
-                if existed {
-                    context.notices.push(Notice::home_exists(&context.home));
-                } else {
-                    context.notices.push(Notice::home_created(&context.home));
-                }
-                Outcome::Transition(State::home_prepared())
-            }
-            Err(error) => {
-                context
-                    .notices
-                    .push(Notice::home_create_failed(&context.home, error));
-                Outcome::Transition(State::edit_home())
-            }
-        }
-    }
-
-    #[state]
-    const fn home_prepared() -> Outcome<State> {
-        Outcome::Handled
-    }
-
-    #[state]
-    const fn cancelled() -> Outcome<State> {
-        Outcome::Handled
-    }
-
-    #[state]
-    const fn failed() -> Outcome<State> {
-        Outcome::Handled
+        Ok(())
     }
 }
 
-impl State {
-    pub fn request(&self, context: &Initialization) -> Option<Request> {
+#[derive(Clone, Copy, Debug, PartialEq, Eq, PartialOrd, Ord)]
+enum Step {
+    Initial,
+    HomeEditor,
+    HomeConfirmation,
+    Selection,
+    Source,
+    Connection,
+    Versions,
+    Review,
+}
+impl Step {
+    const fn initial() -> Self {
+        Self::Initial
+    }
+    const fn home_editor() -> Self {
+        Self::HomeEditor
+    }
+    const fn home_confirmation() -> Self {
+        Self::HomeConfirmation
+    }
+    const fn selection() -> Self {
+        Self::Selection
+    }
+    const fn review() -> Self {
+        Self::Review
+    }
+    const fn source() -> Self {
+        Self::Source
+    }
+    const fn connection() -> Self {
+        Self::Connection
+    }
+    const fn versions() -> Self {
+        Self::Versions
+    }
+    const fn is_initial(self) -> bool {
+        matches!(self, Self::Initial)
+    }
+    const fn is_home_editor(self) -> bool {
+        matches!(self, Self::HomeEditor)
+    }
+    const fn is_home_confirmation(self) -> bool {
+        matches!(self, Self::HomeConfirmation)
+    }
+    const fn is_selection(self) -> bool {
+        matches!(self, Self::Selection)
+    }
+    const fn is_versions(self) -> bool {
+        matches!(self, Self::Versions)
+    }
+    const fn is_review(self) -> bool {
+        matches!(self, Self::Review)
+    }
+    const fn needs_postgres_validation(self) -> bool {
+        matches!(self, Self::Source | Self::Review)
+    }
+    const fn invalidates_detection(self) -> bool {
+        matches!(self, Self::Selection | Self::Source | Self::Connection)
+    }
+    const fn dependents(self) -> &'static [Self] {
         match self {
-            Self::ConfirmInstall {} => Some(Self::confirm_install_request(context)),
-            Self::PrepareHome {} => Some(Self::prepare_home_request()),
-            Self::ConfirmHome {} => Some(Self::confirm_home_request(context)),
-            Self::CreateHome {} => Some(Self::create_home_request()),
-            Self::EditHome {} => Some(Self::edit_home_request(context)),
-            Self::CreateEditedHome {} => Some(Self::create_edited_home_request()),
-            Self::HomePrepared {} => None,
-            Self::Cancelled {} => Self::cancelled_request(),
-            Self::Failed {} => Self::failed_request(),
+            Self::HomeEditor => &[Self::HomeConfirmation],
+            Self::Selection => &[Self::Source, Self::Connection, Self::Versions],
+            Self::Source => &[Self::Connection, Self::Versions],
+            Self::Connection => &[Self::Versions],
+            _ => &[],
         }
     }
-
-    pub const fn is_cancelled(&self) -> bool {
-        matches!(self, Self::Cancelled {})
+    const fn next(self) -> Self {
+        match self {
+            Self::Initial => Self::HomeEditor,
+            Self::HomeEditor => Self::home_confirmation(),
+            Self::HomeConfirmation => Self::selection(),
+            Self::Selection => Self::Source,
+            Self::Source => Self::Connection,
+            Self::Connection => Self::Versions,
+            Self::Versions | Self::Review => Self::review(),
+        }
     }
-}
-
-impl State {
-    fn confirm_install_request(context: &Initialization) -> Request {
-        let automatic = if context.yes {
-            Some(PromptResponse::confirm(true))
-        } else {
-            None
-        };
-        Request::Prompt(
-            PromptRequest::confirm(include_str!("confirm_install.txt").trim_end())
-                .with_automatic(automatic),
-        )
+    fn applicable(self, context: &Initialization) -> bool {
+        if context.args.assume_yes() {
+            return false;
+        }
+        match self {
+            Self::Initial | Self::HomeConfirmation | Self::Review => true,
+            Self::HomeEditor => context.edit_home,
+            Self::Selection => {
+                context.args.engines().is_none() && context.args.datasources().is_none()
+            }
+            Self::Source => {
+                context.selection().postgres()
+                    && !context.args.docker()
+                    && context.args.database_url().is_none()
+            }
+            Self::Connection => {
+                context.selection().postgres()
+                    && context.existing_server()
+                    && context.args.database_url().is_none()
+            }
+            Self::Versions => {
+                context.selection().postgres() && context.args.requested_versions().is_none()
+            }
+        }
     }
-}
-
-#[cfg(test)]
-mod test_confirm_install_request {
-    use super::test_helpers::initialization;
-    use super::{PromptRequest, PromptResponse, Request, State};
-
-    #[rstest::rstest]
-    #[case::interactive(false, None)]
-    #[case::assume_yes(true, Some(PromptResponse::confirm(true)))]
-    fn requests_confirmation(#[case] yes: bool, #[case] automatic: Option<PromptResponse>) {
-        assert_eq!(
-            State::confirm_install_request(&initialization(yes)),
-            Request::Prompt(
-                PromptRequest::confirm(include_str!("confirm_install.txt").trim_end())
-                    .with_automatic(automatic)
-            ),
-        );
-    }
-}
-
-impl State {
-    const fn prepare_home_request() -> Request {
-        Request::Advance
-    }
-}
-
-#[cfg(test)]
-mod test_prepare_home_request {
-    use super::{Request, State};
-
-    #[test]
-    fn prepare_home_requests_advance() {
-        assert_eq!(State::prepare_home_request(), Request::Advance);
-    }
-}
-
-impl State {
-    fn confirm_home_request(context: &Initialization) -> Request {
-        let automatic = if context.yes {
-            Some(PromptResponse::confirm(true))
-        } else {
-            None
-        };
-        Request::Prompt(
-            PromptRequest::confirm(
+    fn request(self, context: &Initialization) -> PromptRequest {
+        match self {
+            Self::Initial => PromptRequest::confirm(include_str!("confirm_install.txt").trim_end()),
+            Self::HomeEditor => {
+                Notice::home_description().show();
+                PromptRequest::text(include_str!("home_prompt.txt").trim_end())
+            }
+            Self::HomeConfirmation => PromptRequest::confirm(
                 format!(
                     include_str!("confirm_home.txt"),
                     path = context.home.display()
                 )
                 .trim_end(),
-            )
-            .with_automatic(automatic),
-        )
-    }
-}
-
-#[cfg(test)]
-mod test_confirm_home_request {
-    use super::test_helpers::initialization;
-    use super::{PromptRequest, PromptResponse, Request, State};
-
-    #[rstest::rstest]
-    #[case::interactive(false, None)]
-    #[case::assume_yes(true, Some(PromptResponse::confirm(true)))]
-    fn requests_confirmation(#[case] yes: bool, #[case] automatic: Option<PromptResponse>) {
-        assert_eq!(
-            State::confirm_home_request(&initialization(yes)),
-            Request::Prompt(
-                PromptRequest::confirm("Use chosen/home as sql-fun home?")
-                    .with_automatic(automatic)
             ),
-        );
-    }
-}
-
-impl State {
-    const fn create_home_request() -> Request {
-        Request::Advance
-    }
-}
-
-#[cfg(test)]
-mod test_create_home_request {
-    use super::{Request, State};
-
-    #[test]
-    fn create_home_requests_advance() {
-        assert_eq!(State::create_home_request(), Request::Advance);
-    }
-}
-
-impl State {
-    fn edit_home_request(context: &Initialization) -> Request {
-        Request::Prompt(
-            PromptRequest::text(
-                include_str!("home_prompt.txt").trim_end(),
-                &context.default_home,
-            )
-            .with_initial_text(&context.home_input),
-        )
-    }
-}
-
-#[cfg(test)]
-mod test_edit_home_request {
-    use super::test_helpers::initialization;
-    use super::{PromptRequest, Request, State};
-
-    #[rstest::rstest]
-    #[case::first_attempt("")]
-    #[case::invalid_input("invalid input")]
-    fn retains_input_and_original_default(#[case] input: &str) {
-        let mut context = initialization(false);
-        input.clone_into(&mut context.home_input);
-        assert_eq!(
-            State::edit_home_request(&context),
-            Request::Prompt(
-                PromptRequest::text(include_str!("home_prompt.txt").trim_end(), "original/home")
-                    .with_initial_text(input),
+            Self::Selection => PromptRequest::multi_select(
+                context.selection().title(),
+                &context.selection().options(),
             ),
-        );
+            Self::Source => PromptRequest::select(
+                "Choose the PostgreSQL builtin source",
+                &["Docker".to_owned(), "Existing PostgreSQL server".to_owned()],
+            ),
+            Self::Connection => PromptRequest::text(
+                "PostgreSQL libpq connection string (confirm to contact this server for read-only version detection; prefer a password file)",
+            ),
+            Self::Versions => PromptRequest::multi_select(
+                if context.existing_server() {
+                    "Choose the connected PostgreSQL version to initialize"
+                } else {
+                    "Choose PostgreSQL versions to initialize"
+                },
+                &context.version_options(),
+            ),
+            Self::Review => PromptRequest::authorization(),
+        }
+    }
+    fn validate(self, context: &mut Initialization, answer: &PromptResponse) -> bool {
+        match self {
+            Self::Initial | Self::HomeConfirmation => answer.confirmation().is_some(),
+            Self::HomeEditor => {
+                let Some(input) = answer.text_input() else {
+                    return false;
+                };
+                match Self::validate_home(input) {
+                    Ok(path) => {
+                        context.home = path;
+                        true
+                    }
+                    Err(error) => {
+                        Notice::invalid_home(error).show();
+                        false
+                    }
+                }
+            }
+            Self::Connection => answer
+                .text_input()
+                .is_some_and(|value| !value.trim().is_empty()),
+            Self::Review => answer.indices() == [0] || answer.indices() == [1],
+            Self::Selection | Self::Source | Self::Versions => !answer.indices().is_empty(),
+        }
+    }
+    fn validate_home(input: &str) -> Result<PathBuf, HomePathError> {
+        let path = resolve_sql_fun_home_path(Path::new(input))
+            .map_err(|error| HomePathError::resolution(&error))?;
+        if path.exists() {
+            if !path.is_dir() {
+                return HomePathError::not_directory(&path);
+            }
+        } else if let Some(parent) = path.parent() {
+            if !parent.is_dir() {
+                if parent.exists() {
+                    return HomePathError::not_directory(parent);
+                }
+                return HomePathError::parent_not_found(parent);
+            }
+        } else {
+            return HomePathError::parent_unavailable();
+        }
+        Ok(path)
     }
 }
 
+pub(super) struct Workflow;
+#[statig::state_machine(initial = "State::asking()", state(derive(Debug, PartialEq, Eq)))]
+impl Workflow {
+    #[state(superstate = "navigating")]
+    fn asking(event: &PromptOutcome, context: &mut Initialization) -> Outcome<State> {
+        let Some(answer) = event.response() else {
+            return Outcome::Super;
+        };
+        match context.accept(answer) {
+            Ok(outcome) => outcome,
+            Err(error) => {
+                context.error = Some(error);
+                Outcome::Transition(State::failed())
+            }
+        }
+    }
+    #[superstate]
+    fn navigating(event: &PromptOutcome, context: &mut Initialization) -> Outcome<State> {
+        if event.is_back() {
+            context.back();
+            Outcome::Handled
+        } else if event.is_cancel() {
+            context.cancel(true)
+        } else {
+            Outcome::Super
+        }
+    }
+    #[state]
+    const fn authorized() -> Outcome<State> {
+        Outcome::Handled
+    }
+    #[state]
+    const fn cancelled() -> Outcome<State> {
+        Outcome::Handled
+    }
+    #[state]
+    const fn failed() -> Outcome<State> {
+        Outcome::Handled
+    }
+}
 impl State {
-    const fn create_edited_home_request() -> Request {
-        Request::Advance
+    pub(super) const fn is_asking(&self) -> bool {
+        matches!(self, Self::Asking {})
     }
-}
-
-#[cfg(test)]
-mod test_create_edited_home_request {
-    use super::{Request, State};
-
-    #[test]
-    fn create_edited_home_requests_advance() {
-        assert_eq!(State::create_edited_home_request(), Request::Advance);
-    }
-}
-
-impl State {
-    const fn cancelled_request() -> Option<Request> {
-        None
-    }
-}
-
-#[cfg(test)]
-mod test_cancelled_request {
-    use super::State;
-
-    #[test]
-    fn cancelled_requests_no_further_work() {
-        assert_eq!(State::cancelled_request(), None);
-    }
-}
-
-impl State {
-    const fn failed_request() -> Option<Request> {
-        None
-    }
-}
-
-#[cfg(test)]
-mod test_failed_request {
-    use super::State;
-
-    #[test]
-    fn failed_requests_no_further_work() {
-        assert_eq!(State::failed_request(), None);
+    pub(super) const fn is_authorized(&self) -> bool {
+        matches!(self, Self::Authorized {})
     }
 }

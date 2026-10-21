@@ -34,6 +34,42 @@ Declining returns to path editing. A supplied `--sql-fun-home` skips this
 confirmation under `--yes`; `SQL_FUN_HOME` alone does not satisfy `--yes`.
 Application schemas and migrations remain managed by your own tools.
 
+## Going back, reviewing, and cancelling
+
+At every setup question, **Esc goes back** and **Ctrl+C cancels**. Esc at the
+first question does nothing, including when pressed repeatedly. Returning to a
+question restores its confirmed answer for editing. Enter confirms that answer
+again. Changing an earlier answer can require dependent choices to be made again;
+merely going back or confirming an unchanged answer preserves them.
+
+Engine, datasource, and version questions accept multiple choices: use arrows to
+move, Space to check or uncheck items, and Enter to confirm a nonempty selection.
+The PostgreSQL source question accepts one choice: use arrows and Enter. Even a
+single available version requires an explicit selection. Choices supplied through
+CLI arguments are retained; back navigation revisits the interactive questions.
+
+After the questions, review the selected home, engines/datasources, PostgreSQL
+source, and versions. The final **Ok / Cancel** actions start unchecked. Use Space
+to select exactly one action, then Enter. Enter without a selection, or with both
+actions checked, stays at review. Only an explicitly selected **Ok** starts setup.
+Esc returns to editing; returning to review clears the final action so starting
+always requires a fresh selection. Pressing Enter through restored answers never
+starts installation on its own.
+
+Cancelling prints `Initialization cancelled.` without an error/cause chain.
+Ctrl+C at a setup question exits with status 130. Selecting final Cancel or
+answering no to the initial initialization question exits with status 0.
+Declining home-path confirmation returns to editing rather than cancelling.
+
+Before final Ok, initialization does not create the home, provision engines, or
+install metadata. Path validation is read-only. Confirming an existing-server
+connection authorizes read-only version detection before review; this contact is
+needed to present the supported version choice. It does not start extraction.
+Cancellation never deletes existing user data. After Ok, a failed directory
+creation may leave directories already created; correcting an interactively
+entered path requires reviewing and selecting Ok again. Completed version
+installations and created directories remain if later setup fails.
+
 ## Automatic setup
 
 `--yes` completes setup without prompts only when all required choices are

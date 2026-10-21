@@ -3,6 +3,7 @@ mod analyze;
 mod column_candidates;
 mod cte;
 mod deferred_fun;
+mod function_columns;
 mod group;
 mod join_expr;
 mod join_kind;
@@ -34,8 +35,9 @@ pub use self::{
     view::ViewDataSource,
 };
 pub(crate) use self::{
-    column_candidates::ColumnCandidates, join_expr::JoinUsingClause, namespace::SourceNamespace,
-    projection::ProjectionColumn, qualified::QualifiedSource,
+    column_candidates::ColumnCandidates, function_columns::TableFunctionOutput,
+    join_expr::JoinUsingClause, namespace::SourceNamespace, projection::ProjectionColumn,
+    qualified::QualifiedSource,
 };
 
 use crate::sem::{
@@ -120,19 +122,15 @@ impl DataSource {
             Self::MergeRecord(record) => {
                 record.create_column_ref(context, with_clause, alias, column, nullability)
             }
-            Self::CallTableFunc(ds) => ColumnReferenceExpr::function_source_ref(
-                context,
-                alias,
-                column,
-                ds.function(),
-                ds.arguments(),
-                nullability,
-            ),
-            Self::UndefinedTableFunc(_) | Self::DeferredTableFunc(_) => {
+            Self::CallTableFunc(ds) => ds.bind_column(context, alias, column, nullability),
+            Self::DeferredTableFunc(ds) => ds.bind_column(context, alias, column, nullability),
+            Self::UndefinedTableFunc(_) => {
                 ColumnReferenceExpr::unknown_function_source_ref(context, alias, column)
             }
             Self::RangeTableSample() => todo!(),
-            Self::RowFunctions(_) => todo!(),
+            Self::RowFunctions(source) => {
+                source.bind_column(context, with_clause, alias, column, nullability)
+            }
         }
     }
 
@@ -231,10 +229,12 @@ impl DataSource {
                 d.get_aliases_for_column(column, context, with_clause, &mut result);
             }
             Self::UndefinedTableFunc(_) => return ColumnCandidates::unknown(),
-            Self::DeferredTableFunc(d) => d.push_alias_names(&mut result),
+            Self::DeferredTableFunc(d) => return d.candidates(column),
             Self::RangeTableSample() => todo!(),
             Self::Unknown(_, _) => return ColumnCandidates::unknown(),
-            Self::RowFunctions(_) => todo!(),
+            Self::RowFunctions(source) => {
+                return source.candidates(column);
+            }
         }
         ColumnCandidates::from(result)
     }
@@ -320,6 +320,67 @@ impl DataSource {
     ) -> Option<(&AliasName, MergeRecordRole, bool)> {
         match self {
             Self::MergeRecord(record) => record.merge_row_target(alias),
+            _ => None,
+        }
+    }
+}
+
+impl DataSource {
+    pub(crate) fn apply_function_output(
+        &mut self,
+        context: &mut impl ParseContext,
+        output: &TableFunctionOutput,
+    ) -> Result<(), AnalysisError> {
+        match self {
+            Self::CallTableFunc(source) => source.apply_output(context, output),
+            Self::DeferredTableFunc(source) => source.apply_output(context, output),
+            Self::UndefinedTableFunc(source) => {
+                source.retain_output(output);
+                Ok(())
+            }
+            _ => Ok(()),
+        }
+    }
+}
+
+impl DataSource {
+    pub(crate) fn validate_function_aliases(
+        &mut self,
+        context: &mut impl ParseContext,
+    ) -> Result<(), AnalysisError> {
+        match self {
+            Self::RowFunctions(source) => source.validate_aliases(context),
+            Self::CallTableFunc(source) => source.validate_aliases(context),
+            Self::DeferredTableFunc(source) => source.validate_aliases(context),
+            _ => Ok(()),
+        }
+    }
+}
+
+impl DataSource {
+    pub(crate) fn append_function_ordinality(&mut self) {
+        match self {
+            Self::CallTableFunc(source) => source.append_ordinality(),
+            Self::DeferredTableFunc(source) => source.append_ordinality(),
+            Self::RowFunctions(source) => source.append_ordinality(),
+            _ => {}
+        }
+    }
+}
+
+impl DataSource {
+    pub(crate) fn retain_rows_definition(&mut self, definition: &TableFunctionOutput) {
+        if let Self::RowFunctions(source) = self {
+            source.retain_outer_definition(definition);
+        }
+    }
+}
+
+impl DataSource {
+    pub(super) fn known_function_columns(&self) -> Option<Vec<ColumnName>> {
+        match self {
+            Self::CallTableFunc(source) => Some(source.column_names()),
+            Self::DeferredTableFunc(source) => source.known_column_names(),
             _ => None,
         }
     }

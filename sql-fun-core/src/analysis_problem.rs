@@ -13,6 +13,7 @@ mod ownership;
 mod parameter_constraint;
 mod query;
 mod rule;
+mod table_function;
 mod trigger;
 mod update;
 mod view;
@@ -32,6 +33,7 @@ pub use self::ownership::OwnershipProblem;
 pub use self::parameter_constraint::ParameterConstraintProblem;
 pub use self::query::QueryProblem;
 pub use self::rule::{RuleDefinitionProblem, RuleProblem};
+pub use self::table_function::TableFunctionProblem;
 pub use self::trigger::TriggerProblem;
 pub use self::update::{UpdateProblem, UpdateProblemKind};
 pub use self::view::ViewProblem;
@@ -80,6 +82,8 @@ pub enum AnalysisProblem {
     Update(UpdateProblem),
     /// A structured SELECT clause violation.
     Query(QueryProblem),
+    /// Invalid table-function output declarations.
+    TableFunction(TableFunctionProblem),
     /// SQL-derived parameter requirements cannot be reconciled.
     ParameterConstraint(ParameterConstraintProblem),
     /// Name resolution problems
@@ -148,6 +152,20 @@ pub enum AnalysisProblem {
 }
 
 impl AnalysisProblem {
+    /// Invalid table-function output declaration.
+    #[must_use]
+    pub const fn table_function(problem: TableFunctionProblem) -> Self {
+        Self::TableFunction(problem)
+    }
+    /// Retained table-function diagnostic identity.
+    #[must_use]
+    pub const fn table_function_problem(&self) -> Option<&TableFunctionProblem> {
+        if let Self::TableFunction(problem) = self {
+            Some(problem)
+        } else {
+            None
+        }
+    }
     /// Diagnostic index.
     #[must_use]
     pub fn index(problem: &IndexProblem) -> Self {
@@ -358,6 +376,7 @@ impl AnalysisProblem {
             Self::Update(_) => "update_semantics",
             Self::Delete(_) => "delete_semantics",
             Self::Query(problem) => problem.code(),
+            Self::TableFunction(problem) => problem.code(),
             Self::CallArgument(problem) => problem.code(),
             Self::MinMax(problem) => problem.code(),
             Self::Array(problem) => problem.code(),
@@ -427,6 +446,7 @@ impl AnalysisProblem {
             Self::Update(problem) => problem.render_metadata(),
             Self::Delete(problem) => problem.render_metadata(),
             Self::Query(problem) => problem.render_metadata(),
+            Self::TableFunction(problem) => problem.render_metadata(),
             Self::CallArgument(problem) => problem.render_metadata(),
             Self::MinMax(problem) => problem.render_metadata(),
             Self::Array(problem) => problem.render_metadata(),

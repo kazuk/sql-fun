@@ -61,6 +61,33 @@ also outside the currently modeled schema behavior. The semantic API exposes
 completed column bindings, requested settings, validation outcomes, and statement
 applicability for the implemented operations.
 
+## PostgreSQL record-returning table functions
+
+For a table function that returns an unnamed `record`, provide the output column
+names and types explicitly:
+
+```sql
+SELECT result.row_name, result.value
+FROM public.crosstab('SELECT 1, 2, 3')
+AS result(row_name text, value integer);
+```
+
+The function and column types must exist in the explicitly supplied schema and
+builtin metadata. For extensions such as `tablefunc`, include their schema
+objects as well. Analysis uses the declared names and types for both qualified
+and unqualified references; it does not execute the function or analyze SQL
+contained in its string arguments.
+
+In `ROWS FROM`, put definitions next to each record-returning function. An outer
+column alias list renames the combined output by position; omitted aliases keep
+their declared names. When using `WITH ORDINALITY`, put typed definitions inside
+`ROWS FROM` and use an outer name-only alias list to rename columns, including
+the final `bigint` ordinality column.
+
+Typed definition lists cannot override scalar, named-composite, or OUT/TABLE
+return declarations. Missing required definitions, duplicate definition names,
+and unresolved declared types or collation names produce diagnostics.
+
 ## SQLite parser limitations
 
 SQLite support is under development. Its sql-fun parser currently limits

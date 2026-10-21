@@ -16,27 +16,29 @@ pub(crate) struct ProjectionColumn<'a> {
 #[derive(Debug, Clone)]
 enum ProjectionBinding<'a> {
     Source(QualifiedSource<'a>),
-    Failure(Box<SemScalarExpr>),
+    Expression(Box<SemScalarExpr>),
 }
 
 impl<'a> ProjectionBinding<'a> {
     const fn source(source: QualifiedSource<'a>) -> Self {
         Self::Source(source)
     }
-    fn failure(expression: SemScalarExpr) -> Self {
-        Self::Failure(Box::new(expression))
+    fn expression(expression: SemScalarExpr) -> Self {
+        Self::Expression(Box::new(expression))
     }
 
     fn with_nullability(self, nullable: bool) -> Self {
         match self {
             Self::Source(source) => Self::Source(source.with_nullability(nullable)),
-            Self::Failure(_) => self,
+            Self::Expression(expression) => Self::Expression(Box::new(
+                expression.with_function_source_nullability(nullable),
+            )),
         }
     }
     fn with_merge(self, role: super::MergeRecordRole, nullable: bool) -> Self {
         match self {
             Self::Source(source) => Self::Source(source.with_merge(role, nullable)),
-            Self::Failure(_) => self,
+            Self::Expression(_) => self,
         }
     }
     fn bind_direct(
@@ -47,7 +49,7 @@ impl<'a> ProjectionBinding<'a> {
     ) -> Result<SemScalarExpr, AnalysisError> {
         match self {
             Self::Source(source) => source.bind(context, with, column),
-            Self::Failure(expression) => Ok(expression.as_ref().clone()),
+            Self::Expression(expression) => Ok(expression.as_ref().clone()),
         }
     }
     fn bind(
@@ -58,7 +60,7 @@ impl<'a> ProjectionBinding<'a> {
     ) -> Result<SemScalarExpr, AnalysisError> {
         match self {
             Self::Source(source) => Ok(scope.bind_source(context, source, column)?.0),
-            Self::Failure(expression) => Ok(expression.as_ref().clone()),
+            Self::Expression(expression) => Ok(expression.as_ref().clone()),
         }
     }
 }
@@ -70,6 +72,14 @@ impl<'a> ProjectionColumn<'a> {
             name,
             alias: None,
             binding: ProjectionBinding::source(source),
+        }
+    }
+    pub(super) fn expression(name: &ColumnName, expression: &SemScalarExpr) -> Self {
+        Self {
+            name: name.clone(),
+            column: name.clone(),
+            alias: None,
+            binding: ProjectionBinding::expression(expression.clone()),
         }
     }
     pub(crate) fn ambiguous(
@@ -86,7 +96,7 @@ impl<'a> ProjectionColumn<'a> {
             column: name.clone(),
             name,
             alias: None,
-            binding: ProjectionBinding::failure(failure),
+            binding: ProjectionBinding::expression(failure),
         })
     }
     pub(crate) const fn name(&self) -> &ColumnName {
@@ -145,6 +155,12 @@ impl DataSource {
         with: &WithClause,
         qualifier: Option<&AliasName>,
     ) -> Result<Vec<ProjectionColumn<'_>>, AnalysisError> {
+        if let Self::RowFunctions(source) = self {
+            if qualifier.is_some_and(|name| !source.matches_alias(name)) {
+                return Ok(Vec::new());
+            }
+            return source.project(context, with);
+        }
         if let Self::MergeRecord(record) = self {
             return record.projection_names(context, with, qualifier);
         }
@@ -220,7 +236,10 @@ impl DataSource {
                 .into_iter()
                 .map(|column| column.name().clone())
                 .collect()),
-            Self::Unknown(_, _) => Ok(Vec::new()),
+            Self::Unknown(_, _) | Self::UndefinedTableFunc(_) => Ok(Vec::new()),
+            Self::CallTableFunc(source) => Ok(source.column_names()),
+            Self::DeferredTableFunc(source) => Ok(source.column_names()),
+            Self::RowFunctions(source) => source.column_names(context, with),
             Self::MergeRecord(record) => record.column_names(context, with),
             Self::SubQuery(query) => Ok(query.select_statement().result_columns().names()),
             _ => AnalysisError::raise_unexpected_input(

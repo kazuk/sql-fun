@@ -190,7 +190,11 @@ mod implementation {
         }
     }
     impl FuncCallExpr {
-        /// resolved calling overload
+        pub(crate) const fn name(&self) -> &FullName {
+            &self.func_name
+        }
+
+        /// Selected overload, independently of name lookup.
         #[must_use]
         pub const fn overload(&self) -> &Option<OverloadVariant> {
             &self.overload
@@ -318,7 +322,8 @@ impl FuncCallExpr {
             }
             args.push(FuncCallArgs::new(argument, &None));
         }
-        let found = context.get_function_by_name(name).is_some();
+        let candidates = context.get_function_by_name(name);
+        let found = candidates.is_some();
         if !found {
             context.report_analysis_problem(AnalysisProblem::function_not_found(
                 name,
@@ -333,6 +338,7 @@ impl FuncCallExpr {
         } else {
             crate::sem::QueryNameResolution::not_found()
         });
+        call.set_candidates(candidates.map(crate::sem::FunctionOverloadCollection::into_snapshot));
         call.defer_signature();
         Ok(call)
     }

@@ -325,10 +325,11 @@ fn tablefunc_crosstab_call_resolves_after_explicit_extension_loading()
     );
     let resolved = query(
         &extension,
-        "SELECT 1 AS n FROM public.crosstab('SELECT 1, 2, 3') \
+        "SELECT result.row_name, result.value FROM public.crosstab('SELECT 1, 2, 3') \
          AS result(row_name text, value integer)",
     )?;
-    assert_query_type(&resolved, "n", &PgBuiltInType::int4());
+    assert_query_type(&resolved, "row_name", &PgBuiltInType::text());
+    assert_query_type(&resolved, "value", &PgBuiltInType::int4());
     let composite_call = query(
         &extension,
         "SELECT public.crosstab2('SELECT 1, 2, 3') AS row_value",

@@ -3,6 +3,7 @@ mod call_arguments;
 mod column_scope;
 mod exists;
 mod source_namespace;
+mod table_functions;
 
 use super::test_helpers::{output_index, output_type, query, resolve};
 use crate::ast::Dialect;

@@ -9,8 +9,8 @@ mod tests;
 use self::clauses::ClauseBinding;
 use crate::ast::{
     Alias, Call, CallKind, CteBody, DerivedTable, Dialect, Expr, FromGroup, FromItem, Grouping,
-    Join, JoinKind, Lock, Merge, Order, Query, QueryBody, Relation, Select, SetOperation, SetQuery,
-    TableFunctions, Window, With,
+    Join, JoinKind, Lock, Merge, Name, Order, Query, QueryBody, Relation, Select, SetOperation,
+    SetQuery, TableFunctions, TypedColumn, Window, With,
 };
 use crate::sem::ColumnName;
 use crate::sem::{
@@ -504,6 +504,25 @@ impl Join {
     }
 }
 
+impl TypedColumn {
+    fn resolve_function_output(
+        columns: &[Self],
+        context: &mut impl ParseContext,
+    ) -> Result<crate::sem::TableFunctionOutput, AnalysisError> {
+        let mut output = crate::sem::TableFunctionOutput::default();
+        for column in columns {
+            let collation = column.collation.as_ref().map(Name::full_name).transpose()?;
+            output.declare(
+                context,
+                &column.name,
+                &column.type_name.reference()?,
+                collation.as_ref(),
+            )?;
+        }
+        Ok(output)
+    }
+}
+
 impl TableFunctions {
     fn resolve(
         &self,
@@ -511,23 +530,60 @@ impl TableFunctions {
         scope: &ScalarAnalysisContext<'_>,
     ) -> Result<DataSource, AnalysisError> {
         if self.rows_from {
+            let mut outer_output = TypedColumn::resolve_function_output(&self.columns, context)?;
+            let outer_allowed =
+                self.calls.len() == 1 && !self.ordinality && self.calls[0].columns.is_empty();
+            if !self.columns.is_empty() && !outer_allowed {
+                outer_output.reject_placement(context)?;
+            }
             let mut functions = Vec::new();
             for function in &self.calls {
-                functions.push(function.expression.resolve_rows_call(context, scope)?);
+                let local_output =
+                    TypedColumn::resolve_function_output(&function.columns, context)?;
+                let output = if outer_allowed && !self.columns.is_empty() {
+                    &outer_output
+                } else {
+                    &local_output
+                };
+                let mut source = function
+                    .expression
+                    .resolve_table_call(context, scope, None)?;
+                source.apply_function_output(context, output)?;
+                functions.push(crate::sem::DataSourceRowsFromFunc::invocation(&source));
             }
-            let alias = self
-                .alias
-                .as_ref()
-                .map(Alias::resolve)
-                .unwrap_or_else(|| AliasSpec::from_local_name(""));
-            return Ok(DataSource::resolved_rows(&functions, &alias));
+            let alias = self.alias.as_ref().map(Alias::resolve).unwrap_or_else(|| {
+                AliasSpec::from_local_name(
+                    &functions
+                        .first()
+                        .map(|function| function.default_alias())
+                        .unwrap_or_default(),
+                )
+            });
+            let mut source = DataSource::resolved_rows(&functions, &alias);
+            source.retain_rows_definition(&outer_output);
+            if self.ordinality {
+                source.append_function_ordinality();
+            }
+            source.validate_function_aliases(context)?;
+            return Ok(source);
         }
         let [function] = self.calls.as_slice() else {
             return AnalysisError::raise_unexpected_input("table function count");
         };
-        function
-            .expression
-            .resolve_table_call(context, scope, self.alias.as_ref())
+        let mut output = TypedColumn::resolve_function_output(&self.columns, context)?;
+        if self.ordinality && !self.columns.is_empty() {
+            output.reject_placement(context)?;
+        }
+        let mut source =
+            function
+                .expression
+                .resolve_table_call(context, scope, self.alias.as_ref())?;
+        source.apply_function_output(context, &output)?;
+        if self.ordinality {
+            source.append_function_ordinality();
+        }
+        source.validate_function_aliases(context)?;
+        Ok(source)
     }
 }
 

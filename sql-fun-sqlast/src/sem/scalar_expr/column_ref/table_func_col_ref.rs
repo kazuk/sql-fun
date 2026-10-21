@@ -11,7 +11,7 @@ pub struct TableFunctionColumnRef {
     alias: AliasName,
     column: ColumnName,
     column_def: Option<ColumnDefinition>,
-    table_function: OverloadVariant,
+    table_function: Option<OverloadVariant>,
     args: IVec<SemScalarExpr>,
     datasource_nullable: Nullable,
 }
@@ -51,6 +51,11 @@ impl TableFunctionColumnRef {
         self
     }
 
+    pub(super) const fn with_nullability(mut self, nullable: bool) -> Self {
+        self.datasource_nullable |= nullable;
+        self
+    }
+
     pub(super) fn canonicalize_grouping_key(&mut self) {
         self.column_def = None;
     }
@@ -58,7 +63,7 @@ impl TableFunctionColumnRef {
         alias: &AliasName,
         column: &ColumnName,
         column_def: Option<&ColumnDefinition>,
-        table_function: &OverloadVariant,
+        table_function: Option<&OverloadVariant>,
         args: &IVec<SemScalarExpr>,
         datasource_nullable: Nullable,
     ) -> Self {
@@ -66,7 +71,7 @@ impl TableFunctionColumnRef {
             alias: alias.clone(),
             column: column.clone(),
             column_def: column_def.cloned(),
-            table_function: table_function.clone(),
+            table_function: table_function.cloned(),
             args: args.clone(),
             datasource_nullable,
         }
@@ -76,29 +81,22 @@ impl TableFunctionColumnRef {
         context: &'context mut TParseContext,
         alias: &AliasName,
         column: &ColumnName,
-        calling_func: &OverloadVariant,
+        calling_func: Option<&OverloadVariant>,
+        column_def: Option<&ColumnDefinition>,
         args: &IVec<SemScalarExpr>,
         nullability: Nullable,
     ) -> Result<(SemScalarExpr, &'context mut TParseContext), AnalysisError>
     where
         TParseContext: crate::sem::ParseContext,
     {
-        let column_def = calling_func.get_result_column_def(column);
         if column_def.is_none() {
             context.report_analysis_problem(
                 AnalysisProblem::column_not_found_in_table_function(alias, column),
             )?;
         }
-        let col_ref = Self::new(
-            alias,
-            column,
-            column_def.as_ref(),
-            calling_func,
-            args,
-            nullability,
-        );
+        let col_ref = Self::new(alias, column, column_def, calling_func, args, nullability);
         Ok((
-            SemScalarExpr::ColumnRef(ColumnReferenceExpr::TableFuncColumn(col_ref)),
+            SemScalarExpr::column_reference(ColumnReferenceExpr::table_function(col_ref)),
             context,
         ))
     }
@@ -109,7 +107,8 @@ impl ColumnReferenceExpr {
         context: &'context mut TParseContext,
         alias: &AliasName,
         column: &ColumnName,
-        calling_func: &OverloadVariant,
+        calling_func: Option<&OverloadVariant>,
+        column_def: Option<&ColumnDefinition>,
         args: &IVec<SemScalarExpr>,
         nullability: Nullable,
     ) -> Result<(SemScalarExpr, &'context mut TParseContext), AnalysisError>
@@ -121,8 +120,54 @@ impl ColumnReferenceExpr {
             alias,
             column,
             calling_func,
+            column_def,
             args,
             nullability,
         )
+    }
+}
+
+impl ColumnReferenceExpr {
+    pub(crate) fn function_output(
+        alias: &crate::sem::AliasSpec,
+        definition: &ColumnDefinition,
+    ) -> SemScalarExpr {
+        let name = definition
+            .name()
+            .as_ref()
+            .expect("function output has a name");
+        let reference = TableFunctionColumnRef::new(
+            alias.name(),
+            name,
+            Some(definition),
+            None,
+            &IVec::default(),
+            false,
+        );
+        SemScalarExpr::column_reference(Self::TableFuncColumn(reference))
+    }
+}
+
+impl ColumnReferenceExpr {
+    fn with_function_source_nullability(self, nullable: bool) -> Self {
+        match self {
+            Self::TableFuncColumn(reference) => {
+                Self::TableFuncColumn(reference.with_nullability(nullable))
+            }
+            _ => self,
+        }
+    }
+    const fn table_function(reference: TableFunctionColumnRef) -> Self {
+        Self::TableFuncColumn(reference)
+    }
+}
+impl SemScalarExpr {
+    pub(crate) fn with_function_source_nullability(self, nullable: bool) -> Self {
+        match self {
+            Self::ColumnRef(reference) => {
+                Self::column_reference(reference.with_function_source_nullability(nullable))
+            }
+            _ => self,
+        }
     }
 }

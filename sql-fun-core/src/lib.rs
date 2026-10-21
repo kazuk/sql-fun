@@ -110,6 +110,19 @@ pub enum SqlDialect {
     SQLite,
 }
 
+impl SqlDialect {
+    /// Compare identifier values, after SQL parsing or explicit alias selection.
+    /// PostgreSQL values preserve case; SQLite ignores ASCII case only.
+    #[must_use]
+    pub fn same_identifier(self, left: &str, right: &str) -> bool {
+        match self {
+            Self::PostgreSQL => left == right,
+            #[cfg(feature = "sqlite")]
+            Self::SQLite => left.eq_ignore_ascii_case(right),
+        }
+    }
+}
+
 impl FromStr for SqlDialect {
     type Err = String;
 

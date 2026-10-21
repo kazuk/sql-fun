@@ -4,10 +4,7 @@
 //! order, followed by the entire base query, defines the binding contract passed
 //! downstream to analysis responses and `LockfileEntry.bind_parameters`.
 
-use ::sql_fun_core::{
-    CteName, CteParameterBindingCollection, ParameterName, PlaceholderTypeHint, PlaceholderedSql,
-    ResolvedCteCatalog,
-};
+use ::sql_fun_core::{ParameterName, PlaceholderTypeHint, PlaceholderedSql, ResolvedCteCatalog};
 use ::sql_fun_sqlast::{
     ast::{CteDefinition, Dialect, HaveWithClause, Statement},
     parse_statements,
@@ -35,26 +32,37 @@ pub(crate) struct OrderedBindings(Vec<ResolvedBinding>);
 
 impl OrderedBindings {
     fn from_catalog(catalog: &ResolvedCteCatalog) -> Result<Self, CteRealizationError> {
-        let mut bindings = Vec::new();
-        let mut names = Vec::new();
-        catalog.append_cte_parameter_order(&mut names);
-        let cte_name_count = names.len();
-        catalog.base_query().append_parameter_order(&mut names);
-        for (index, name) in names.into_iter().enumerate() {
-            let metadata = catalog.parameters().binding(&name);
-            if index < cte_name_count && metadata.is_none() {
-                return Err(CteRealizationError::invalid_input(
-                    "binding metadata",
-                    &format!("required parameter {name:?} is absent from the resolved catalog"),
-                ));
-            }
-            bindings.push(ResolvedBinding::new(&name, metadata, catalog.base_query()));
+        let mut result = Self(Vec::new());
+        catalog.try_map_cte_queries(|_, query| result.include_query(query))?;
+        result.include_query(catalog.base_query())?;
+        Ok(result)
+    }
+
+    fn include_query(&mut self, query: &PlaceholderedSql) -> Result<(), CteRealizationError> {
+        // parameters() retains first token occurrence order within each SQL piece.
+        for (name, hints) in query.parameters() {
+            let binding =
+                if let Some(index) = self.0.iter().position(|binding| binding.name() == name) {
+                    &mut self.0[index]
+                } else {
+                    self.0.push(ResolvedBinding::new(name));
+                    self.0.last_mut().expect("just inserted a binding")
+                };
+            binding.include_hints(hints)?;
         }
-        Ok(Self(bindings))
+        Ok(())
     }
 
     fn parameter_names(&self) -> Vec<&ParameterName> {
         self.0.iter().map(ResolvedBinding::name).collect()
+    }
+
+    /// Explicit hints aligned one-for-one with the numbered parameter order.
+    pub(crate) fn type_hints(&self) -> Vec<Option<String>> {
+        self.0
+            .iter()
+            .map(|binding| binding.type_hint.clone())
+            .collect()
     }
 
     /// Iteration order is the one-based numbered-placeholder binding contract.
@@ -63,95 +71,69 @@ impl OrderedBindings {
     }
 }
 
-/// A catalog entry's contribution to one realized parameter.
-#[derive(Debug)]
-struct CteQueryBinding {
-    cte_name: CteName,
-    type_hints: Vec<PlaceholderTypeHint>,
-}
-
-impl CteQueryBinding {
-    fn new(cte_name: &CteName, hints: &[PlaceholderTypeHint]) -> Self {
-        Self {
-            cte_name: cte_name.clone(),
-            type_hints: hints.to_owned(),
-        }
-    }
-
-    const fn cte_name(&self) -> &CteName {
-        &self.cte_name
-    }
-
-    fn type_hints(&self) -> &[PlaceholderTypeHint] {
-        &self.type_hints
-    }
-}
-
-/// Binding metadata assembled for this realization only.
-#[derive(Debug)]
-struct RealizedParameterMetadata {
-    cte_bindings: Vec<CteQueryBinding>,
-    query_type_hints: Vec<PlaceholderTypeHint>,
-}
-
-impl RealizedParameterMetadata {
-    fn from_sources(
-        name: &ParameterName,
-        catalog: Option<&CteParameterBindingCollection>,
-        base_query: &PlaceholderedSql,
-    ) -> Self {
-        let cte_bindings = if let Some(catalog) = catalog {
-            catalog
-                .catalog_bindings()
-                .map(|(cte_name, hints)| CteQueryBinding::new(cte_name, hints))
-                .collect()
-        } else {
-            Vec::new()
-        };
-        let query_type_hints = base_query
-            .parameters()
-            .find(|(parameter_name, _)| *parameter_name == name)
-            .map(|(_, hints)| hints.clone())
-            .unwrap_or_default();
-        Self {
-            cte_bindings,
-            query_type_hints,
-        }
-    }
-
-    fn cte_bindings(&self) -> &[CteQueryBinding] {
-        &self.cte_bindings
-    }
-
-    fn query_type_hints(&self) -> &[PlaceholderTypeHint] {
-        &self.query_type_hints
-    }
-}
-
 #[derive(Debug)]
 pub(crate) struct ResolvedBinding {
     name: ParameterName,
-    metadata: RealizedParameterMetadata,
+    type_hint: Option<String>,
 }
 
 impl ResolvedBinding {
-    fn new(
-        name: &ParameterName,
-        catalog_metadata: Option<&CteParameterBindingCollection>,
-        base_query: &PlaceholderedSql,
-    ) -> Self {
+    fn new(name: &ParameterName) -> Self {
         Self {
             name: name.clone(),
-            metadata: RealizedParameterMetadata::from_sources(name, catalog_metadata, base_query),
+            type_hint: None,
+        }
+    }
+
+    fn include_hints(&mut self, hints: &[PlaceholderTypeHint]) -> Result<(), CteRealizationError> {
+        for hint in hints {
+            let value = hint.hint_value();
+            if let Some(existing) = &self.type_hint {
+                if existing != value {
+                    let conflict = ParameterHintConflict::new(&self.name, existing, value);
+                    return Err(CteRealizationError::from_source(
+                        "parameter hints",
+                        conflict,
+                    ));
+                }
+            } else {
+                self.type_hint = Some(value.to_owned());
+            }
+        }
+        Ok(())
+    }
+
+    pub(crate) const fn name(&self) -> &ParameterName {
+        &self.name
+    }
+}
+
+/// Explicit hint strings disagree for one logical numbered parameter.
+#[derive(Debug, thiserror::Error)]
+#[error("parameter {name:?} has conflicting explicit type hints {first:?} and {second:?}")]
+pub(crate) struct ParameterHintConflict {
+    name: ParameterName,
+    first: String,
+    second: String,
+}
+
+impl ParameterHintConflict {
+    fn new(name: &ParameterName, first: &str, second: &str) -> Self {
+        Self {
+            name: name.clone(),
+            first: first.to_owned(),
+            second: second.to_owned(),
         }
     }
 
     pub(crate) const fn name(&self) -> &ParameterName {
         &self.name
     }
-
-    const fn metadata(&self) -> &RealizedParameterMetadata {
-        &self.metadata
+    pub(crate) fn first_hint(&self) -> &str {
+        &self.first
+    }
+    pub(crate) fn second_hint(&self) -> &str {
+        &self.second
     }
 }
 

@@ -111,12 +111,23 @@ select ...
   from prior_users pu
 ```
 
-When conflict alias, `sql-fun` automatically rename alias with `_NN` postfix and
-resolve conflicts.
+Repeated references to the same catalog definition with the same alias produce
+one CTE declaration. Different definitions using the same alias produce an error,
+even if their SQL text is identical. Distinct aliases produce separate declarations.
+Aliases are identifier values: PostgreSQL preserves their case, while SQLite
+compares ASCII letters without regard to case. No automatic renaming occurs.
 
 ### Renaming named place holder in CTE
 
 CTE query can contains `sql-fun` named place holder like `${name}` syntax.
+
+Parameters are numbered in first-occurrence order across the expanded CTE
+declarations (dependencies first), followed by the application query. Repeated
+occurrences of the same parameter name reuse one position and one optional type
+hint. Each name may have at most one distinct explicit type-hint string across
+all declarations and the application query. Identical hints may repeat, and an
+unannotated occurrence is compatible with an explicit hint; different explicit
+strings produce an error. Hints do not determine SQL semantic type inference.
 
 Named place holder shown in final query in default. `renames` override this
 behavior.

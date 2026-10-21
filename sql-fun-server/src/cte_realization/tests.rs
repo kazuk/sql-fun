@@ -146,7 +146,6 @@ fn returns_first_occurrence_bindings(#[case] dialect: Dialect) {
         ],
     );
     let result = realize_cte_catalog(&catalog, dialect).unwrap();
-    let bindings = result.bindings().iter().collect::<Vec<_>>();
     assert_eq!(
         result
             .bindings()
@@ -156,36 +155,25 @@ fn returns_first_occurrence_bindings(#[case] dialect: Dialect) {
             .collect::<Vec<_>>(),
         ["shared", "cte_only", "later", "existing", "base"]
     );
-    assert_eq!(bindings[0].metadata().cte_bindings().len(), 1);
-    assert_eq!(bindings[3].metadata().query_type_hints().len(), 1);
-    assert!(bindings[4].metadata().cte_bindings().is_empty());
-    // The actual common AST must retain the shared numbered identities, including
-    // gaps in individual pieces. Span offsets are intentionally not asserted.
-    let ast = format!("{:?}", result.statement());
+    assert_eq!(
+        result.bindings().type_hints(),
+        [
+            Some("int".to_owned()),
+            None,
+            None,
+            Some("text".to_owned()),
+            None
+        ]
+    );
+    // SQL emission must preserve shared numbered positions and gaps in each piece.
+    let sql = result.statement().deparse_sql(dialect).unwrap();
     for (index, occurrences) in [(1, 4), (2, 2), (3, 1), (4, 2), (5, 1)] {
         assert_eq!(
-            ast.matches(&format!("Parameter {{ position: {index},"))
-                .count(),
+            test_helpers::parameter_occurrences(&sql, dialect, index),
             occurrences,
-            "{ast}"
+            "{sql}"
         );
     }
-}
-
-#[test]
-fn errors_when_required_catalog_metadata_is_absent() {
-    let mut queries = ::indexmap::IndexMap::new();
-    queries.insert(
-        ::sql_fun_core::CteAlias::new("chosen"),
-        ::sql_fun_core::PlaceholderedSql::from_query("select ${missing}"),
-    );
-    let catalog = ::sql_fun_core::ResolvedCteCatalog::new(
-        &::sql_fun_core::PlaceholderedSql::from_query("select 1"),
-        &::sql_fun_core::CteParameterCollection::default(),
-        &queries,
-    );
-    let error = realize_cte_catalog(&catalog, Dialect::postgres()).unwrap_err();
-    assert!(error.to_string().contains("missing"));
 }
 
 #[cfg(feature = "sqlite")]
@@ -234,14 +222,13 @@ fn keeps_distinct_resolved_names_including_renamed_parameters() {
             .collect::<Vec<_>>(),
         ["id", "renamed", "ID"]
     );
-    let renamed = result.bindings().iter().nth(1).unwrap();
-    assert_eq!(renamed.metadata().cte_bindings().len(), 1);
+    assert_eq!(result.bindings().type_hints(), [None, None, None]);
 }
 
 #[rstest::rstest]
 #[case::absent("shared", "shared")]
 #[case::matching("shared:int4", "shared:int4")]
-#[case::conflicting("shared:uuid", "shared:text")]
+#[case::explicit_hint_is_not_inference("shared:uuid", "shared:uuid")]
 fn realized_query_analysis_ignores_parameter_hints(
     #[case] cte_parameter: &str,
     #[case] base_parameter: &str,
@@ -272,4 +259,112 @@ fn realized_query_analysis_ignores_parameter_hints(
         query.result_columns().get_column_at(0).unwrap().col_type(),
         &Some(::sql_fun_sqlast::sem::PgBuiltInType::int4())
     );
+}
+
+#[rstest::rstest]
+#[case::postgres(Dialect::postgres(), ::sql_fun_core::SqlDialect::PostgreSQL)]
+#[cfg_attr(
+    feature = "sqlite",
+    case::sqlite(Dialect::sqlite(), ::sql_fun_core::SqlDialect::SQLite)
+)]
+fn realizes_catalog_diamond_output(
+    #[case] dialect: Dialect,
+    #[case] core_dialect: ::sql_fun_core::SqlDialect,
+) -> ::testresult::TestResult {
+    let catalog = test_helpers::resolved_diamond(core_dialect)?;
+    let result = realize_cte_catalog(&catalog, dialect)?;
+    assert_eq!(
+        result
+            .statement()
+            .with_clause()
+            .unwrap()
+            .iter()
+            .map(|cte| cte.name().to_owned())
+            .collect::<Vec<_>>(),
+        ["shared", "q1", "q2"]
+    );
+    assert_eq!(
+        result
+            .bindings()
+            .parameter_names()
+            .into_iter()
+            .map(::sql_fun_core::ParameterName::as_str)
+            .collect::<Vec<_>>(),
+        ["id", "untyped", "left", "right", "base"]
+    );
+    assert_eq!(
+        result.bindings().type_hints(),
+        [
+            Some("int".to_owned()),
+            None,
+            Some("text".to_owned()),
+            Some("text".to_owned()),
+            None
+        ]
+    );
+    let sql = result.statement().deparse_sql(dialect).unwrap();
+    for (position, occurrences) in [(1, 4), (2, 1), (3, 1), (4, 2), (5, 1)] {
+        assert_eq!(
+            test_helpers::parameter_occurrences(&sql, dialect, position),
+            occurrences,
+            "{sql}"
+        );
+    }
+    Ok(())
+}
+
+#[rstest::rstest]
+#[case::absent_postgres("select ${p}, ${p}", &[], None, Dialect::postgres())]
+#[cfg_attr(feature = "sqlite", case::absent_sqlite("select ${p}, ${p}", &[], None, Dialect::sqlite()))]
+#[case::repeated_base_postgres("select ${p:text}, ${p:text}", &[], Some("text"), Dialect::postgres())]
+#[cfg_attr(feature = "sqlite", case::repeated_base_sqlite("select ${p:text}, ${p:text}", &[], Some("text"), Dialect::sqlite()))]
+#[case::late_base_hint_postgres("select ${p}, ${p:text}", &[], Some("text"), Dialect::postgres())]
+#[cfg_attr(feature = "sqlite", case::late_base_hint_sqlite("select ${p}, ${p:text}", &[], Some("text"), Dialect::sqlite()))]
+#[case::base_hint_postgres("select ${p:text}", &[("first", "select ${p}")], Some("text"), Dialect::postgres())]
+#[cfg_attr(feature = "sqlite", case::base_hint_sqlite("select ${p:text}", &[("first", "select ${p}")], Some("text"), Dialect::sqlite()))]
+#[case::cte_hint_postgres("select ${p}", &[("first", "select ${p:text}, ${p}")], Some("text"), Dialect::postgres())]
+#[cfg_attr(feature = "sqlite", case::cte_hint_sqlite("select ${p}", &[("first", "select ${p:text}, ${p}")], Some("text"), Dialect::sqlite()))]
+#[case::repeated_ctes_postgres("select ${p:text}", &[("first", "select ${p:text}"), ("second", "select ${p:text}")], Some("text"), Dialect::postgres())]
+#[cfg_attr(feature = "sqlite", case::repeated_ctes_sqlite("select ${p:text}", &[("first", "select ${p:text}"), ("second", "select ${p:text}")], Some("text"), Dialect::sqlite()))]
+fn returns_one_hint_per_logical_parameter(
+    #[case] base: &str,
+    #[case] ctes: &[(&str, &str)],
+    #[case] hint: Option<&str>,
+    #[case] dialect: Dialect,
+) {
+    let result = realize_cte_catalog(&resolved(base, ctes), dialect).unwrap();
+    assert_eq!(
+        result
+            .bindings()
+            .parameter_names()
+            .into_iter()
+            .map(::sql_fun_core::ParameterName::as_str)
+            .collect::<Vec<_>>(),
+        ["p"]
+    );
+    assert_eq!(result.bindings().type_hints(), [hint.map(str::to_owned)]);
+}
+
+#[rstest::rstest]
+#[case::base_only_postgres("select ${p:uuid}, ${p:text}", &[], Dialect::postgres())]
+#[cfg_attr(feature = "sqlite", case::base_only_sqlite("select ${p:uuid}, ${p:text}", &[], Dialect::sqlite()))]
+#[case::within_cte_postgres("select 1", &[("first", "select ${p:uuid}, ${p:text}")], Dialect::postgres())]
+#[cfg_attr(feature = "sqlite", case::within_cte_sqlite("select 1", &[("first", "select ${p:uuid}, ${p:text}")], Dialect::sqlite()))]
+#[case::between_ctes_postgres("select 1", &[("first", "select ${p:uuid}"), ("second", "select ${p:text}")], Dialect::postgres())]
+#[cfg_attr(feature = "sqlite", case::between_ctes_sqlite("select 1", &[("first", "select ${p:uuid}"), ("second", "select ${p:text}")], Dialect::sqlite()))]
+#[case::cte_and_base_postgres("select ${p:text}", &[("first", "select ${p:uuid}")], Dialect::postgres())]
+#[cfg_attr(feature = "sqlite", case::cte_and_base_sqlite("select ${p:text}", &[("first", "select ${p:uuid}")], Dialect::sqlite()))]
+fn rejects_conflicting_explicit_hints(
+    #[case] base: &str,
+    #[case] ctes: &[(&str, &str)],
+    #[case] dialect: Dialect,
+) {
+    let error = realize_cte_catalog(&resolved(base, ctes), dialect).unwrap_err();
+    let conflict = error
+        .source
+        .downcast_ref::<super::ParameterHintConflict>()
+        .expect("structured hint conflict");
+    assert_eq!(conflict.name().as_str(), "p");
+    assert_eq!(conflict.first_hint(), "uuid");
+    assert_eq!(conflict.second_hint(), "text");
 }

@@ -168,7 +168,7 @@ impl CteReferenceCollection {
                     .map(|item| item.as_cte_reference().clone())
                     .collect();
 
-                let resolved = catalog.resolve(query, &cte_refs)?;
+                let resolved = catalog.resolve(query, &cte_refs, metadata.sql_dialect())?;
                 Ok(resolved)
             },
         )?;

@@ -206,3 +206,105 @@ CREATE TABLE "b.b"."t.x"(id bigint NOT NULL);
         .analyze(context)
         .unwrap()
 }
+
+/// Analyze using only the signatures/types needed by record-output tests.
+pub(super) fn table_function_query(sql: &str, infer: bool) -> (SelectStatement, TestParseContext) {
+    let dialect = Dialect::postgres();
+    let mut context = catalog();
+    let record = TypeReference::from_master_type_name("record");
+    context.setup_type(record.clone());
+    context.setup_type(PgBuiltInType::text().array_type());
+    let input = FunctionParam::new_input_param(
+        &Some("src".to_owned()),
+        &Some(PgBuiltInType::text()),
+        &None,
+    );
+    let overload = OverloadVariant::new(&Some(record.clone()), &vec![input.clone()], false, false);
+    context.setup_function("record_fun", std::slice::from_ref(&overload));
+    let integer_overload = OverloadVariant::new(
+        &Some(record.clone()),
+        &vec![FunctionParam::new_input_param(
+            &Some("src".to_owned()),
+            &Some(PgBuiltInType::int4()),
+            &None,
+        )],
+        false,
+        false,
+    );
+    context.setup_function("overloaded_record", &[overload, integer_overload]);
+    let collation_name = crate::sem::FullName::from_local_name("C");
+    context.set_collation_lookup(
+        &collation_name,
+        &crate::sem::CatalogNameLookup::found(
+            &collation_name,
+            &crate::sem::FullName::with_schema("pg_catalog", "C"),
+        ),
+    );
+    context.setup_function(
+        "out_fun",
+        &[OverloadVariant::new(
+            &Some(record),
+            &vec![
+                FunctionParam::new_table_param(&Some("a".to_owned()), &Some(PgBuiltInType::int4())),
+                FunctionParam::new_table_param(&Some("b".to_owned()), &Some(PgBuiltInType::text())),
+            ],
+            false,
+            false,
+        )],
+    );
+    let name = crate::sem::FullName::with_schema("public", "pair");
+    let mut fields = crate::sem::CompositeFieldCollection::default();
+    fields.push(crate::sem::CompositeFieldDefinition::new(
+        "a",
+        &Some(PgBuiltInType::int4()),
+        &None,
+    ));
+    fields.push(crate::sem::CompositeFieldDefinition::new(
+        "b",
+        &Some(PgBuiltInType::text()),
+        &None,
+    ));
+    let definition = crate::sem::CreateCompositeType::new(&name, &fields);
+    context.set_get_type_impl_result(&name, &crate::sem::TypeDefinition::from(&definition));
+    let pair = TypeReference::concrete_type_ref(&name, false);
+    context.setup_function(
+        "pair_fun",
+        &[OverloadVariant::new(&Some(pair), &vec![], false, false)],
+    );
+    context = crate::parse_statements("CREATE TABLE public.row_item(a integer NOT NULL)", dialect)
+        .next()
+        .unwrap()
+        .unwrap()
+        .analyze(context)
+        .unwrap()
+        .into_context();
+    let row_name = crate::sem::FullName::with_schema("public", "row_item");
+    context.set_get_type_impl_result(
+        &row_name,
+        &crate::sem::TypeDefinition::table_ref(&crate::sem::TableName::from(row_name.clone())),
+    );
+    context.setup_function(
+        "row_fun",
+        &[OverloadVariant::new(
+            &Some(TypeReference::concrete_type_ref(&row_name, false)),
+            &vec![],
+            false,
+            false,
+        )],
+    );
+    let statement = crate::parse_statements(sql, dialect)
+        .next()
+        .unwrap()
+        .unwrap();
+    let StatementNode::Query(query) = statement.node else {
+        panic!("query fixture");
+    };
+    context.begin_parameter_type_analysis();
+    let query = query.resolve_in(&mut context, None);
+    let query = if infer {
+        context.infer_query_parameter_types(query)
+    } else {
+        query
+    };
+    (context.finish_analysis(query).unwrap(), context)
+}

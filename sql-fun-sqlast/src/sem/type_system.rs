@@ -151,6 +151,10 @@ impl OverloadVariant {
         }
     }
 
+    pub(crate) fn requires_record_definition(&self) -> bool {
+        self.returns_record() && self.returning_table().get_at(0).is_none()
+    }
+
     fn returns_record(&self) -> bool {
         self.ret_type()
             .as_ref()

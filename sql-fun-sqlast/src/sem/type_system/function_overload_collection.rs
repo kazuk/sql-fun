@@ -33,6 +33,19 @@ impl FunctionOverloadCollection {
             .collect()
     }
 
+    pub(crate) fn record_definition_requirement(&self) -> Option<bool> {
+        let requirement = self.overloads.first()?.requires_record_definition();
+        if self
+            .overloads
+            .iter()
+            .all(|overload| overload.requires_record_definition() == requirement)
+        {
+            Some(requirement)
+        } else {
+            None
+        }
+    }
+
     pub(crate) fn into_snapshot(self) -> Vec<OverloadVariant> {
         self.overloads
     }

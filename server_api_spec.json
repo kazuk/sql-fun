@@ -478,6 +478,19 @@
                   "additionalProperties": false
                 },
                 {
+                  "description": "Invalid table-function output declarations.",
+                  "type": "object",
+                  "properties": {
+                    "TableFunction": {
+                      "$ref": "#/$defs/TableFunctionProblem"
+                    }
+                  },
+                  "required": [
+                    "TableFunction"
+                  ],
+                  "additionalProperties": false
+                },
+                {
                   "description": "SQL-derived parameter requirements cannot be reconciled.",
                   "type": "object",
                   "properties": {
@@ -2227,6 +2240,70 @@
                   "description": "A compound ORDER BY expression does not identify an output column.",
                   "type": "string",
                   "const": "InvalidCompoundOrder"
+                }
+              ]
+            },
+            "TableFunctionProblem": {
+              "description": "Invalid caller-supplied table-function output definitions.",
+              "oneOf": [
+                {
+                  "description": "A record result needs a caller-supplied shape.",
+                  "type": "string",
+                  "const": "DefinitionRequired"
+                },
+                {
+                  "description": "Outer definitions conflict with ROWS FROM placement or WITH ORDINALITY.",
+                  "type": "string",
+                  "const": "InvalidPlacement"
+                },
+                {
+                  "description": "The function already declares its result shape.",
+                  "type": "string",
+                  "const": "DefinitionNotAllowed"
+                },
+                {
+                  "description": "A definition repeats a column name.",
+                  "type": "object",
+                  "properties": {
+                    "DuplicateColumn": {
+                      "type": "string"
+                    }
+                  },
+                  "required": [
+                    "DuplicateColumn"
+                  ],
+                  "additionalProperties": false
+                },
+                {
+                  "description": "A declared type cannot be resolved.",
+                  "type": "object",
+                  "properties": {
+                    "TypeNotFound": {
+                      "type": "string"
+                    }
+                  },
+                  "required": [
+                    "TypeNotFound"
+                  ],
+                  "additionalProperties": false
+                },
+                {
+                  "description": "A declared collation cannot be uniquely resolved.",
+                  "type": "object",
+                  "properties": {
+                    "CollationNotFound": {
+                      "type": "string"
+                    }
+                  },
+                  "required": [
+                    "CollationNotFound"
+                  ],
+                  "additionalProperties": false
+                },
+                {
+                  "description": "More column aliases than output columns were supplied.",
+                  "type": "string",
+                  "const": "TooManyAliases"
                 }
               ]
             },
@@ -3934,6 +4011,19 @@
                   "additionalProperties": false
                 },
                 {
+                  "description": "Invalid table-function output declarations.",
+                  "type": "object",
+                  "properties": {
+                    "TableFunction": {
+                      "$ref": "#/$defs/TableFunctionProblem"
+                    }
+                  },
+                  "required": [
+                    "TableFunction"
+                  ],
+                  "additionalProperties": false
+                },
+                {
                   "description": "SQL-derived parameter requirements cannot be reconciled.",
                   "type": "object",
                   "properties": {
@@ -5683,6 +5773,70 @@
                   "description": "A compound ORDER BY expression does not identify an output column.",
                   "type": "string",
                   "const": "InvalidCompoundOrder"
+                }
+              ]
+            },
+            "TableFunctionProblem": {
+              "description": "Invalid caller-supplied table-function output definitions.",
+              "oneOf": [
+                {
+                  "description": "A record result needs a caller-supplied shape.",
+                  "type": "string",
+                  "const": "DefinitionRequired"
+                },
+                {
+                  "description": "Outer definitions conflict with ROWS FROM placement or WITH ORDINALITY.",
+                  "type": "string",
+                  "const": "InvalidPlacement"
+                },
+                {
+                  "description": "The function already declares its result shape.",
+                  "type": "string",
+                  "const": "DefinitionNotAllowed"
+                },
+                {
+                  "description": "A definition repeats a column name.",
+                  "type": "object",
+                  "properties": {
+                    "DuplicateColumn": {
+                      "type": "string"
+                    }
+                  },
+                  "required": [
+                    "DuplicateColumn"
+                  ],
+                  "additionalProperties": false
+                },
+                {
+                  "description": "A declared type cannot be resolved.",
+                  "type": "object",
+                  "properties": {
+                    "TypeNotFound": {
+                      "type": "string"
+                    }
+                  },
+                  "required": [
+                    "TypeNotFound"
+                  ],
+                  "additionalProperties": false
+                },
+                {
+                  "description": "A declared collation cannot be uniquely resolved.",
+                  "type": "object",
+                  "properties": {
+                    "CollationNotFound": {
+                      "type": "string"
+                    }
+                  },
+                  "required": [
+                    "CollationNotFound"
+                  ],
+                  "additionalProperties": false
+                },
+                {
+                  "description": "More column aliases than output columns were supplied.",
+                  "type": "string",
+                  "const": "TooManyAliases"
                 }
               ]
             },

@@ -9,6 +9,7 @@ pub struct UndefinedTableFuncDataSource {
     func_name: FullName,
     args: IVec<SemScalarExpr>,
     alias: AliasSpec,
+    output: super::TableFunctionOutput,
 }
 
 impl super::DataSource {
@@ -28,6 +29,7 @@ impl UndefinedTableFuncDataSource {
             func_name: name.clone(),
             args: args.to_vec().into(),
             alias: alias.clone(),
+            output: super::TableFunctionOutput::default(),
         }
     }
 
@@ -46,6 +48,7 @@ impl UndefinedTableFuncDataSource {
             func_name,
             args,
             alias: alias.clone(),
+            output: super::TableFunctionOutput::default(),
         }))
     }
 
@@ -77,5 +80,15 @@ impl UndefinedTableFuncDataSource {
         }
         self.args = args.into();
         Ok(())
+    }
+}
+
+impl UndefinedTableFuncDataSource {
+    pub(super) fn retain_output(&mut self, output: &super::TableFunctionOutput) {
+        self.output = output.clone();
+    }
+    /// Caller-declared columns retained even when function lookup failed.
+    pub const fn output_columns(&self) -> &crate::sem::ColumnCollection {
+        self.output.columns()
     }
 }

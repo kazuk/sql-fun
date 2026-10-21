@@ -10,6 +10,7 @@ pub struct TableFunctionDataSource {
     function: OverloadVariant,
     args: IVec<SemScalarExpr>,
     alias: AliasSpec,
+    output: super::TableFunctionOutput,
 }
 
 impl super::DataSource {
@@ -38,6 +39,7 @@ impl TableFunctionDataSource {
         alias: &AliasSpec,
     ) -> DataSource {
         DataSource::CallTableFunc(Self {
+            output: super::TableFunctionOutput::declared(&function),
             function,
             args,
             alias: alias.clone(),
@@ -69,10 +71,7 @@ impl TableFunctionDataSource {
     ) where
         TParseContext: crate::sem::ParseContext,
     {
-        let returning_table = &self.function.returning_table();
-        if returning_table.has_column(column) {
-            names.push(self.alias.clone());
-        }
+        names.extend(self.output.candidates(column, &self.alias));
     }
 }
 
@@ -87,5 +86,65 @@ impl TableFunctionDataSource {
         }
         self.args = args.into();
         Ok(())
+    }
+}
+
+impl TableFunctionDataSource {
+    pub(super) fn apply_output(
+        &mut self,
+        context: &mut impl crate::sem::ParseContext,
+        output: &super::TableFunctionOutput,
+    ) -> Result<(), crate::sem::AnalysisError> {
+        self.output = output.clone();
+        self.output.apply(context, &self.function, &self.alias)
+    }
+    pub(super) fn column_names(&self) -> Vec<ColumnName> {
+        self.output.names()
+    }
+    pub(super) fn bind_column<'a, C: crate::sem::ParseContext>(
+        &self,
+        context: &'a mut C,
+        alias: &AliasName,
+        column: &ColumnName,
+        nullable: bool,
+    ) -> Result<(SemScalarExpr, &'a mut C), crate::sem::AnalysisError> {
+        if self.output.candidates(column, &self.alias).len() > 1 {
+            return Ok((
+                crate::sem::ColumnReferenceExpr::ambiguous_column_resolved(context, column)?,
+                context,
+            ));
+        }
+        crate::sem::ColumnReferenceExpr::function_source_ref(
+            context,
+            alias,
+            column,
+            Some(&self.function),
+            self.output.column(column, &self.alias),
+            &self.args,
+            nullable,
+        )
+    }
+}
+
+impl TableFunctionDataSource {
+    pub(super) fn append_ordinality(&mut self) {
+        self.output.append_ordinality();
+    }
+    pub(super) fn validate_aliases(
+        &mut self,
+        context: &mut impl crate::sem::ParseContext,
+    ) -> Result<(), crate::sem::AnalysisError> {
+        self.output.validate_aliases(context, &self.alias)
+    }
+}
+
+impl TableFunctionDataSource {
+    /// Effective invocation columns, independently of the catalog return declaration.
+    pub const fn output_columns(&self) -> &crate::sem::ColumnCollection {
+        self.output.columns()
+    }
+    /// Retained invalid-definition outcomes, independently of diagnostic delivery.
+    pub fn output_problems(&self) -> &[crate::sem::TableFunctionProblem] {
+        self.output.problems()
     }
 }

@@ -255,6 +255,38 @@ impl TypeDefinition {
         }
     }
 
+    pub(crate) fn table_function_columns(
+        &self,
+        context: &impl ParseContext,
+    ) -> Option<ColumnCollection> {
+        match self {
+            Self::CompositeType(composite) => Some(composite.get_column_collection()),
+            Self::ImplicitComposite(columns) => Some(columns.clone()),
+            Self::TableRef(name, _) => {
+                let table = context.get_table(name)?;
+                let mut columns = ColumnCollection::default();
+                let mut index = 0;
+                while let Some(column) = table.get_column_at(index) {
+                    // A function returns the row type, not a stored table row;
+                    // table constraints do not constrain its returned fields.
+                    columns.push(&crate::sem::ColumnDefinition::new(
+                        column.name(),
+                        column.get_type_cloned().as_ref(),
+                        None,
+                        &[],
+                    ));
+                    index += 1;
+                }
+                Some(columns)
+            }
+            Self::Domain(domain) => domain
+                .base_type()?
+                .definition_from_catalog(context)?
+                .table_function_columns(context),
+            _ => None,
+        }
+    }
+
     /// get member type
     pub fn get_member_type<TParseContext>(
         &self,

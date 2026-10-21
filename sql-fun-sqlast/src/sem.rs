@@ -188,7 +188,7 @@ pub use self::{
         ArrayTypeDefinition, BuiltinTypeDefinition, PgBuiltInType, TypeCategory, TypeDefinition,
         TypeReference,
     },
-    problem::{AnalysisProblem, ParameterConstraintProblem, QueryProblem},
+    problem::{AnalysisProblem, ParameterConstraintProblem, QueryProblem, TableFunctionProblem},
     query::{
         FunctionModifiers, QueryCte, QueryFrame, QueryFrameBound, QueryGrouping, QueryLock,
         QueryName, QueryNameResolution, QueryOrder, QueryWindow, ResolvedOperator, SelectClauses,
@@ -668,3 +668,5 @@ impl SemAst {
         Self::semantic_analysis_sqlite_stmt(context, syn.into_statement(), tokens)
     }
 }
+
+pub(crate) use self::data_source::TableFunctionOutput;

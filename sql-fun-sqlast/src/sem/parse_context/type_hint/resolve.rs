@@ -13,12 +13,12 @@ pub(super) fn resolve_parameter_hint(
             slot + 1,
         ))
     })?;
-    let canonical = context.canonicalize_type_ref(&reference).ok_or_else(|| {
-        AnalysisError::unexpected_input_error(&format!(
+    let Some(canonical) = context.canonicalize_type_ref(&reference) else {
+        return Err(AnalysisError::unexpected_input_error(&format!(
             "parameter ${} type hint {hint:?}: SQL type {reference} not found",
             slot + 1,
-        ))
-    })?;
+        )));
+    };
     // PostgreSQL treats an explicitly declared unknown parameter as unspecified.
     if context.dialect() == Dialect::postgres()
         && canonical == TypeReference::from_master_type_name("unknown")

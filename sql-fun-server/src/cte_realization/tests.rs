@@ -393,7 +393,7 @@ fn realized_bindings_accept_query_scoped_sql_type_hints() {
     );
     // The caller supplies one optional type per finalized SQL index. Occurrence
     // metadata does not introduce a second numbering or conflict-validation pass.
-    let context = ::sql_fun_sqlast::parse_statements(
+    let mut context = ::sql_fun_sqlast::parse_statements(
         "CREATE TYPE public.kind AS ENUM ('a')",
         Dialect::postgres(),
     )

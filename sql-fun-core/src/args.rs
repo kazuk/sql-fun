@@ -238,6 +238,87 @@ mod test_transferred_configuration {
         assert!(restored.selected_metadata("missing").is_err());
     }
 
+    #[test]
+    fn transfers_overrides_without_selecting_a_datasource() {
+        let project = TestProjectDir::new().unwrap();
+        let fixture = write_postgres_metadata_project(&project);
+        let catalog = project.path().join("chosen-catalog");
+        let original = SqlFunArgs::builder(
+            &TestMetadataEnvs::new()
+                .with_sql_fun_home(project.path())
+                .with_metadata_project(&fixture, "qa")
+                .with_cte_catalog_dir(&catalog)
+                .with_sql_dialect("postgresql")
+                .into_map(),
+        )
+        .unwrap()
+        .postgres_version("17".parse::<crate::PostgresEngineVersion>().unwrap())
+        .postgres_search_path(vec!["chosen".to_owned()])
+        .builtin_schema_dir(project.path().join("selected-builtins"))
+        .postgres_extensions_dir(project.path().join("selected-extensions"))
+        .build()
+        .unwrap();
+        let environments = original.environments().unwrap();
+        assert!(!environments.contains_key("SQL_FUN_DATASOURCE"));
+        let restored = SqlFunArgs::from_environments(&environments).unwrap();
+        assert_eq!(restored.datasource(), None);
+        assert_eq!(restored.metadata_file().unwrap(), fixture.metadata_file);
+        let metadata = restored.selected_metadata("default").unwrap();
+        assert_eq!(restored.cte_catalog_dir(&metadata).unwrap(), Some(catalog));
+        assert_eq!(
+            restored.schema_file(&fixture.metadata_file).unwrap(),
+            fixture.schema_file
+        );
+        assert_eq!(
+            restored.postgres_search_path(&metadata).unwrap(),
+            vec!["chosen"]
+        );
+        assert_eq!(
+            restored.postgres_version(&metadata).unwrap().to_string(),
+            "17"
+        );
+        assert_eq!(
+            restored.builtin_info_dir(&metadata).unwrap(),
+            original.builtin_info_dir(&metadata).unwrap()
+        );
+        assert_eq!(
+            restored.postgres_extensions_dir(&metadata).unwrap(),
+            original.postgres_extensions_dir(&metadata).unwrap()
+        );
+    }
+
+    #[test]
+    fn unselected_datasource_does_not_supply_derived_environment_values() {
+        let project = TestProjectDir::new().unwrap();
+        let fixture = write_postgres_metadata_project(&project);
+        let args = SqlFunArgs::builder(
+            &TestMetadataEnvs::new()
+                .with_sql_fun_home(project.path())
+                .with_metadata_file(&fixture.metadata_file)
+                .into_map(),
+        )
+        .unwrap()
+        .build()
+        .unwrap();
+        let environments = args.environments().unwrap();
+        for name in [
+            "SQL_FUN_DATASOURCE",
+            "SQL_FUN_DIALECT",
+            "SQL_FUN_CTE_CATALOG_DIR",
+            "SQL_FUN_SCHEMA_FILE",
+            "SQL_FUN_POSTGRES_VERSION",
+            "SQL_FUN_PG_SEARCH_PATH",
+            "SQL_FUN_EXTENSIONS",
+            "SQL_FUN_BUILTIN_SCHEMA",
+            "SQL_FUN_EXTENSIONS_DIR",
+        ] {
+            assert!(
+                !environments.contains_key(name),
+                "unexpected derived value: {name}"
+            );
+        }
+    }
+
     #[rstest::rstest]
     #[case::omitted_home(false)]
     #[case::omitted_metadata(true)]
@@ -439,7 +520,9 @@ impl SqlFunArgs {
         self.datasource.as_ref().map(std::convert::AsRef::as_ref)
     }
 
-    /// get environments for child process
+    /// Get child-process configuration, preserving common overrides even when no
+    /// datasource is selected. Datasource-derived values are resolved only for an
+    /// explicit selection.
     ///
     /// # Errors
     ///
@@ -447,9 +530,8 @@ impl SqlFunArgs {
     /// encounters an error.
     pub fn environments(&self) -> Result<HashMap<String, String>, SqlFunArgsError> {
         let mut result = HashMap::new();
-        let metadata_file = self.metadata_file()?;
-        let metadatas = SqlFunMetadataCollection::load_from(&metadata_file)?;
         if let Some(datasource) = &self.datasource {
+            let metadatas = SqlFunMetadataCollection::load_from(&self.metadata_file()?)?;
             let Some(metadata) = metadatas.get(datasource) else {
                 return SqlFunArgsError::datasource_not_found(datasource);
             };
@@ -457,6 +539,9 @@ impl SqlFunArgs {
             self.postgres_args.get_envs(&mut result, self, metadata)?;
 
             result.insert(Self::SQL_FUN_DATASOURCE.to_string(), datasource.clone());
+        } else {
+            self.metadata_args.get_common_envs(&mut result)?;
+            self.postgres_args.get_explicit_envs(&mut result);
         }
 
         self.log_args.get_envs(&mut result);

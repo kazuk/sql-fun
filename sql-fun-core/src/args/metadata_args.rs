@@ -640,18 +640,11 @@ mod test_cte_catalog_dir {
 }
 
 impl MetadataArgs {
-    /// Populate env map with derived values.
-    ///
-    /// # Errors
-    ///
-    /// Returns [`SqlFunArgsError`] when metadata resolution fails.
-    pub fn get_envs(
+    /// Transfer common choices without selecting or resolving a datasource.
+    pub(super) fn get_common_envs(
         &self,
         envs: &mut HashMap<String, String>,
-        metadata: &SqlFunMetadata,
     ) -> Result<(), SqlFunArgsError> {
-        let metadata_file = self.metadata_file()?;
-
         envs.insert(
             Self::SQL_FUN_HOME.to_string(),
             self.sql_fun_home()?.to_string_lossy().to_string(),
@@ -662,9 +655,39 @@ impl MetadataArgs {
         );
         envs.insert(
             Self::SQL_FUN_METADATA_FILE.to_string(),
-            metadata_file.to_string_lossy().to_string(),
+            self.metadata_file()?.to_string_lossy().to_string(),
         );
         envs.insert(Self::SQL_FUN_SCHEMA.to_string(), self.schema.clone());
+        if let Some(path) = &self.schema_file {
+            envs.insert(
+                Self::SQL_FUN_SCHEMA_FILE.to_string(),
+                path.to_string_lossy().to_string(),
+            );
+        }
+        if let Some(dialect) = &self.sql_dialect {
+            envs.insert(Self::SQL_FUN_DIALECT.to_string(), dialect.clone());
+        }
+        if let Some(path) = &self.cte_catalog_dir {
+            envs.insert(
+                Self::SQL_FUN_CTE_CATALOG_DIR.to_string(),
+                path.to_string_lossy().to_string(),
+            );
+        }
+        Ok(())
+    }
+
+    /// Populate env map with derived values.
+    ///
+    /// # Errors
+    ///
+    /// Returns [`SqlFunArgsError`] when metadata resolution fails.
+    pub fn get_envs(
+        &self,
+        envs: &mut HashMap<String, String>,
+        metadata: &SqlFunMetadata,
+    ) -> Result<(), SqlFunArgsError> {
+        self.get_common_envs(envs)?;
+        let metadata_file = self.metadata_file()?;
         envs.insert(
             Self::SQL_FUN_SCHEMA_FILE.to_string(),
             self.schema_file(&metadata_file)?

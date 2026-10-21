@@ -77,6 +77,7 @@ mod unix {
 
         pub(super) fn expand_tools(executable: bool) -> ::tempfile::TempDir {
             let tools = ::tempfile::tempdir().unwrap();
+            std::fs::write(tools.path().join("Cargo.toml"), "[package.metadata]\n").unwrap();
             for name in ["cargo", "cargo-expand"] {
                 let path = tools.path().join(name);
                 std::fs::write(&path, "#!/bin/sh\nexit 17\n").unwrap();

@@ -195,23 +195,37 @@ impl Scenario {
         }
     }
 
-    fn analyzed_response(collections: &mut HashMap<String, Vec<Value>>) -> Value {
-        let mut item = ::serde_json::json!({
+    pub const fn analyzed_pages(total: usize, initial: usize) -> Self {
+        Self {
+            total,
+            initial,
+            ..Self::analyzed()
+        }
+    }
+
+    fn analyzed_response(&self, collections: &mut HashMap<String, Vec<Value>>) -> Value {
+        let item = ::serde_json::json!({
             "query_span": {"from":{"offset":0,"line":1,"col":1}, "to":{"offset":1,"line":1,"col":2}},
             "query_kind":"Select", "execute_sql":"SELECT 1", "complete":true
         });
-        for name in [
-            "probrems",
-            "accessing_relations",
-            "column_access",
-            "parameters",
-            "result_columns",
-        ] {
-            item[name] = page(name, &[], 0, 0, true);
-            collections.insert(name.to_owned(), Vec::new());
+        let mut items = Vec::new();
+        for index in 0..self.total {
+            let mut item = item.clone();
+            for name in [
+                "probrems",
+                "accessing_relations",
+                "column_access",
+                "parameters",
+                "result_columns",
+            ] {
+                let handle = format!("{name}-{index}");
+                item[name] = page(&handle, &[], 0, 0, true);
+                collections.insert(handle, Vec::new());
+            }
+            items.push(item);
         }
-        let items = vec![item];
-        let response = ::serde_json::json!({"queries":page("queries", &items, 0, 1, true)});
+        let response =
+            ::serde_json::json!({"queries":page("queries", &items, 0, self.initial, true)});
         collections.insert("queries".to_owned(), items);
         response
     }
@@ -230,7 +244,7 @@ impl Scenario {
 
     fn respond(&self, number: usize, collections: &mut HashMap<String, Vec<Value>>) -> Value {
         if self.shape.is_analyzed() {
-            return Self::analyzed_response(collections);
+            return self.analyzed_response(collections);
         }
         if self.shape.is_opaque() {
             return ::serde_json::json!({"handle":"opaque","items":[],"total_length":100,"offset":0,"require_release":true});

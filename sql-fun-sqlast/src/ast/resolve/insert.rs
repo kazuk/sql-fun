@@ -46,7 +46,7 @@ impl Insert {
         outer: Option<&ScalarAnalysisContext<'_>>,
     ) -> Result<InsertStatement, ResolutionFailure> {
         if let Some(conflict) = &self.conflict {
-            conflict.require_insert_action()?;
+            conflict.require_insert_action();
         }
         let name = self.relation.name.full_name()?;
         let name = if let Some(scope) = outer {
@@ -581,24 +581,20 @@ impl Assignment {
     }
 }
 impl ConflictAction {
-    fn require_insert_action(&self) -> Result<(), AnalysisError> {
+    fn require_insert_action(&self) {
         if matches!(self, Self::Update) {
-            return Err(AnalysisError::unexpected_input_error(
-                "unsupported ON CONFLICT DO UPDATE semantics (#474)",
-            ));
+            todo!("ON CONFLICT DO UPDATE semantics are tracked in #474");
         }
-        Ok(())
     }
 }
 impl Conflict {
-    fn require_insert_action(&self) -> Result<(), AnalysisError> {
+    fn require_insert_action(&self) {
         if let Some(action) = &self.action {
-            action.require_insert_action()?;
+            action.require_insert_action();
         }
         if let Some(next) = &self.next {
-            next.require_insert_action()?;
+            next.require_insert_action();
         }
-        Ok(())
     }
     fn resolve_insert(
         &self,

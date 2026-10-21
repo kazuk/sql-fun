@@ -490,6 +490,9 @@ impl SemAst {
     /// Ordered output columns for SELECT or DML RETURNING.
     #[must_use]
     pub fn result_columns(&self) -> Option<&ResultColumnCollection> {
+        if let Some(merge) = self.as_merge() {
+            return Some(merge.result_columns());
+        }
         if let Some(columns) = self.query_result_columns() {
             Some(columns)
         } else {

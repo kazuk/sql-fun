@@ -12,7 +12,9 @@ impl QueryMetadata {
     /// Inspect an analyzed SELECT or DML statement without changing its model.
     pub fn from_statement(statement: &SemAst) -> Result<Self, AnalysisError> {
         let mut metadata = Self::default();
-        if statement.result_columns().is_some() {
+        if let Some(merge) = statement.as_merge() {
+            merge.clone().walk(&mut metadata)?;
+        } else if statement.result_columns().is_some() {
             statement.clone().walk_nested_command(&mut metadata)?;
         }
         Ok(metadata)

@@ -482,9 +482,7 @@ impl FromItem {
             Self::Functions(functions) => functions.resolve(context, scope),
             Self::Group(group) => group.resolve(context, with, scope),
             Self::Xml(table) => table.resolve(context, scope),
-            Self::Sample(_) => Err(AnalysisError::unexpected_input_error(
-                "unsupported TABLESAMPLE semantic analysis",
-            )),
+            Self::Sample(_) => todo!("table expression semantic analysis"),
             Self::Json(_) => AnalysisError::raise_unexpected_none("from_clause inner node"),
         }
     }
@@ -563,9 +561,7 @@ impl Expr {
                     &arguments,
                 )
             }
-            Self::SqlValue(_) => Err(AnalysisError::unexpected_input_error(
-                "unsupported ROWS FROM SQL value analysis",
-            )),
+            Self::SqlValue(_) => todo!("ROWS FROM expression analysis"),
             _ => AnalysisError::raise_unexpected_input("ROWS FROM expression"),
         }
     }

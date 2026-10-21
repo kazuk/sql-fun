@@ -295,6 +295,41 @@ impl QueryResult {
             relations: Vec::new(),
         }
     }
+    fn parse_failure(
+        error: &::sql_fun_sqlast::ParseStatementError,
+        source: &QuerySource,
+        schema: &InitializedSchema,
+        mapping: &SourceMap,
+    ) -> Self {
+        let start = error.span().offset();
+        let end = start + error.span().len();
+        let stage = if error.is_syntax() {
+            QueryAnalysisStage::parse()
+        } else {
+            QueryAnalysisStage::statement()
+        };
+        let dialect = schema.base_context().metadata().sql_dialect();
+        let mut result = Self::failure(stage, &error.to_string(), source, dialect);
+        let original_start = mapping.original_offset(start);
+        let original_end = mapping.original_offset(end);
+        result.span = Some(TextSpan::from_offsets(
+            &mapping.original,
+            original_start,
+            original_end,
+        ));
+        if !error.is_syntax() {
+            result.kind = Some(classify_kind(error.statement_kind()));
+        }
+        result.problems = vec![diagnostic(
+            &AnalysisProblem::query_analysis(stage, &error.to_string()),
+            &source.path,
+            Some(&mapping.original[original_start..original_end]),
+            dialect,
+            original_start,
+        )];
+        result
+    }
+
     fn analyze(
         statement: &Statement,
         bindings: &Bindings,
@@ -307,7 +342,7 @@ impl QueryResult {
         let dialect = base.metadata().sql_dialect();
         let mut result = Self {
             span: Some(mapping.statement_span(statement)),
-            kind: query_kind(statement),
+            kind: Some(query_kind(statement)),
             sql: None,
             complete: false,
             problems: Vec::new(),
@@ -330,19 +365,6 @@ impl QueryResult {
         if let Err(error) = context.setup_typehinting(&hints) {
             result.problems.push(diagnostic(
                 &AnalysisProblem::query_analysis(QueryAnalysisStage::hint(), &error.to_string()),
-                &source.path,
-                diagnostic_source,
-                dialect,
-                statement.span().offset(),
-            ));
-            return result;
-        }
-        if result.kind.is_none() {
-            result.problems.push(diagnostic(
-                &AnalysisProblem::query_analysis(
-                    QueryAnalysisStage::statement(),
-                    "query analysis supports SELECT, INSERT, UPDATE and DELETE",
-                ),
                 &source.path,
                 diagnostic_source,
                 dialect,
@@ -524,17 +546,20 @@ fn named_type(ty: &SqlType) -> Option<TypeReference> {
     ))
 }
 
-const fn query_kind(statement: &Statement) -> Option<QueryKind> {
-    if statement.is_query() {
-        Some(QueryKind::Select)
-    } else if statement.is_insert() {
-        Some(QueryKind::Insert)
-    } else if statement.is_update() {
-        Some(QueryKind::Update)
-    } else if statement.is_delete() {
-        Some(QueryKind::Delete)
-    } else {
-        None
+const fn query_kind(statement: &Statement) -> QueryKind {
+    classify_kind(Some(statement.kind()))
+}
+
+const fn classify_kind(kind: Option<::sql_fun_sqlast::ast::StatementKind>) -> QueryKind {
+    use ::sql_fun_sqlast::ast::StatementKind;
+    match kind {
+        Some(StatementKind::Query) => QueryKind::Select,
+        Some(StatementKind::Insert) => QueryKind::Insert,
+        Some(StatementKind::Update) => QueryKind::Update,
+        Some(StatementKind::Delete) => QueryKind::Delete,
+        Some(StatementKind::Merge) => QueryKind::Merge,
+        Some(StatementKind::Truncate) => QueryKind::Truncate,
+        _ => QueryKind::Other,
     }
 }
 
@@ -635,16 +660,7 @@ fn analyze(
     parse_statements(&mapping.rendered, dialect)
         .map(|statement| match statement {
             Ok(statement) => QueryResult::analyze(&statement, &bindings, source, schema, &mapping),
-            Err(error) => QueryResult::failure(
-                if error.is_syntax() {
-                    QueryAnalysisStage::parse()
-                } else {
-                    QueryAnalysisStage::statement()
-                },
-                &error.to_string(),
-                source,
-                schema.base_context().metadata().sql_dialect(),
-            ),
+            Err(error) => QueryResult::parse_failure(&error, source, schema, &mapping),
         })
         .collect()
 }

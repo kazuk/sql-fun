@@ -65,6 +65,10 @@ pub enum QueryKind {
     Delete,
     /// truncate statement
     Truncate,
+    /// merge statement
+    Merge,
+    /// Any other valid SQL statement, including DDL.
+    Other,
 }
 
 /// analyzed single query
@@ -362,6 +366,14 @@ mod test_analyze_query_contract {
         assert!(schema["properties"].get("parameter_index").is_some());
         assert!(schema["properties"].get("parameter_type").is_some());
         assert!(schema["properties"].get("type_candidate").is_none());
+        let schema = ::serde_json::to_value(::schemars::schema_for!(super::QueryKind)).unwrap();
+        let mut kinds = Vec::new();
+        for variant in schema["oneOf"].as_array().unwrap() {
+            kinds.push(variant["const"].as_str().unwrap());
+        }
+        for kind in ["Merge", "Truncate", "Other"] {
+            assert!(kinds.contains(&kind));
+        }
         let schema = ::serde_json::to_value(::schemars::schema_for!(AnalyzeQueryArgs)).unwrap();
         assert!(schema["properties"].get("resolved_cte_catalog").is_some());
     }

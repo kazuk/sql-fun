@@ -141,8 +141,24 @@ fn parse_statement(sql: &str, span: StringSpan) -> Result<Statement, ParseStatem
         return AnalysisError::raise_unexpected_none("single PostgreSQL statement")
             .map_err(|error| ParseStatementError::conversion(span, &error));
     };
-    let statement = StatementNode::try_from_with_tokens(&node, &tokens)
-        .map_err(|error| ParseStatementError::conversion(span, &error))?;
+    let statement = StatementNode::try_from_with_tokens(&node, &tokens).map_err(|error| {
+        let failure = ParseStatementError::conversion(span, &error);
+        if node.as_select_stmt().as_inner().is_some() {
+            failure.with_statement_kind(crate::ast::StatementKind::query())
+        } else if node.as_insert_stmt().as_inner().is_some() {
+            failure.with_statement_kind(crate::ast::StatementKind::insert())
+        } else if node.as_update_stmt().as_inner().is_some() {
+            failure.with_statement_kind(crate::ast::StatementKind::update())
+        } else if node.as_delete_stmt().as_inner().is_some() {
+            failure.with_statement_kind(crate::ast::StatementKind::delete())
+        } else if node.as_merge_stmt().as_inner().is_some() {
+            failure.with_statement_kind(crate::ast::StatementKind::merge())
+        } else if node.as_truncate_stmt().as_inner().is_some() {
+            failure.with_statement_kind(crate::ast::StatementKind::truncate())
+        } else {
+            failure
+        }
+    })?;
     Ok(Statement::from_node(statement, Dialect::postgres(), span))
 }
 

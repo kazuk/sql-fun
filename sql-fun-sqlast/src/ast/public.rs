@@ -157,6 +157,8 @@ pub enum StatementKind {
     Delete,
     /// MERGE.
     Merge,
+    /// TRUNCATE; common-AST conversion may still be unavailable.
+    Truncate,
     /// A view definition.
     View,
     /// An extension definition.
@@ -194,6 +196,11 @@ pub enum StatementKind {
 }
 
 impl StatementKind {
+    /// The TRUNCATE category, independently of common-AST conversion support.
+    pub const fn truncate() -> Self {
+        Self::Truncate
+    }
+
     /// The CREATE TRIGGER category.
     pub const fn create_trigger() -> Self {
         Self::CreateTrigger

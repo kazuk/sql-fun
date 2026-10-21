@@ -7,7 +7,7 @@ mod sqlite;
 pub(crate) use self::postgres::split_postgres_statements;
 
 use crate::StringSpan;
-use crate::ast::{Dialect, Statement};
+use crate::ast::{Dialect, Statement, StatementKind};
 use crate::sem::AnalysisError;
 
 /// A failed statement conversion, statement syntax error, or terminal boundary failure.
@@ -21,6 +21,7 @@ pub struct ParseStatementError {
     span: StringSpan,
     kind: FailureKind,
     position: Option<StringSpan>,
+    statement_kind: Option<StatementKind>,
 }
 
 impl ParseStatementError {
@@ -30,6 +31,7 @@ impl ParseStatementError {
             span,
             kind: FailureKind::syntax(),
             position: None,
+            statement_kind: None,
         }
     }
 
@@ -39,6 +41,7 @@ impl ParseStatementError {
             span,
             kind: FailureKind::boundary_discovery(),
             position: None,
+            statement_kind: None,
         }
     }
 
@@ -53,6 +56,7 @@ impl ParseStatementError {
             span,
             kind: FailureKind::unavailable_dialect(),
             position: None,
+            statement_kind: None,
         }
     }
 
@@ -62,12 +66,24 @@ impl ParseStatementError {
             span,
             kind: FailureKind::conversion(),
             position: None,
+            statement_kind: None,
         }
     }
 
     #[cfg(feature = "sqlite")]
     pub(crate) const fn with_position(mut self, position: StringSpan) -> Self {
         self.position = Some(position);
+        self
+    }
+
+    /// Parsed statement category retained when common-AST conversion fails.
+    /// A missing value does not imply invalid SQL.
+    pub const fn statement_kind(&self) -> Option<StatementKind> {
+        self.statement_kind
+    }
+
+    pub(crate) const fn with_statement_kind(mut self, kind: StatementKind) -> Self {
+        self.statement_kind = Some(kind);
         self
     }
 

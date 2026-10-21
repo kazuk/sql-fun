@@ -183,7 +183,7 @@ inference is performed by this API.
 | Field | Meaning |
 | --- | --- |
 | `query_span` | Original base-input UTF-8 byte range, when known; line/column are one-based |
-| `query_kind` | SELECT, INSERT, UPDATE or DELETE; absent when unavailable |
+| `query_kind` | SELECT, INSERT, UPDATE, DELETE, MERGE, TRUNCATE or Other; absent when unavailable |
 | `execute_sql` | SQL deparsed from the realized AST; absent when unavailable |
 | `complete` | Analysis finished without errors or unresolved parameter types |
 | `probrems` | Structured diagnostics (the existing wire spelling is retained) |
@@ -201,7 +201,7 @@ retains `query_name` and `query_finger_print`; they are not echoed.
 Only definite named SQL types are returned as typed parameter metadata, with
 array identity preserved by `is_array`. Unresolved parameter inference is a
 SQLAST diagnostic, not a candidate list or a server-side inference solver.
-Contradictory constraints and unsupported capabilities have distinct diagnostics.
+Contradictory constraints retain their SQLAST diagnostics.
 A result-column `column_type: null` is preserved without inventing a type or
 adding an error solely for its absence. Anonymous dynamic types currently have
 no named API representation. Nullability is `NotNull`, `Nullable` or `Unknown`.
@@ -215,11 +215,17 @@ source: diagnostics instead retain `semantic_problem` without inventing a
 presentation or location. Parameter spans describe occurrences in the original
 base input, not locations in separately supplied CTE definitions.
 
-SELECT and INSERT/UPDATE/DELETE, including RETURNING, use the same existing
-semantic analyzer. Legal syntax with unsupported semantics returns explicit
-incomplete results; it does not become an empty successful DML result. Current
-capability boundaries include parameter-dependent special operators (#513),
-TABLESAMPLE, and ON CONFLICT DO UPDATE (#474). PostgreSQL is the first
+Statement classification is independent of semantic support. `Other` classifies
+valid statements outside the named execution kinds, including DDL; it does not
+mean invalid SQL. Statements without result columns can complete successfully.
+Analysis does not execute DDL or retain its schema changes for subsequent statements.
+MERGE uses the existing analyzer, including RETURNING. TRUNCATE retains its
+classification even though common-AST conversion is currently unavailable.
+
+Existing SQLAST `todo!()` paths remain explicitly unimplemented, including
+special operators (#513), TABLESAMPLE, ON CONFLICT DO UPDATE (#474), and some
+CASE common-type selections. The RPC neither catches these panics nor converts
+them into ordinary diagnostics or unknown metadata. PostgreSQL is the first
 end-to-end target; SQLite schema initialization is not yet available here.
 
 ### 4. Display diagnostics

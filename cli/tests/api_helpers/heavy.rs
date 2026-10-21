@@ -137,3 +137,54 @@ impl BridgeSession {
         Ok(())
     }
 }
+
+/// Verify query handles on a persistent bridge, reusing the lifecycle test server.
+pub async fn verify_query_analysis_session(server: &ApiServer) -> ::testresult::TestResult {
+    let schema =
+        super::schema::SchemaFixture::with_query_schema("CREATE TABLE entries(id int4 NOT NULL);")?;
+    let mut bridge = BridgeSession::start(server)?;
+    let initialized = bridge
+        .rpc("initialize_schema_context", schema.request())
+        .await?;
+    let handle = &initialized["result"]["context_handle"];
+    let malformed = bridge
+        .rpc(
+            "analyze_query",
+            &::serde_json::json!({"context_handle":handle, "query":{"Text":"SELECT ("}}),
+        )
+        .await?;
+    assert_eq!(
+        malformed["result"]["queries"]["items"][0]["complete"],
+        false
+    );
+    let response = bridge.rpc("analyze_query", &::serde_json::json!({"context_handle":handle, "query":{"Text":"SELECT ${id:int4} AS id; SELECT id FROM entries"}})).await?;
+    let queries = &response["result"]["queries"];
+    assert_eq!(queries["total_length"], 2, "{response}");
+    let first = &queries["items"][0];
+    assert_eq!(first["complete"], true, "{response}");
+    assert!(first["execute_sql"].as_str().unwrap().contains("$1"));
+    assert_eq!(first["parameters"]["items"][0]["parameter_index"], 1);
+    assert_eq!(
+        first["parameters"]["items"][0]["parameter_type"]["local_name"],
+        "int4"
+    );
+    for collection in [queries, &first["parameters"], &first["result_columns"]] {
+        let args = ::serde_json::json!({"collection_handle":collection["handle"], "start_offset":0, "count":null});
+        assert_eq!(
+            bridge.rpc("read_collection", &args).await?["result"],
+            *collection
+        );
+        bridge
+            .rpc(
+                "release_collection",
+                &::serde_json::json!({"collection_handle":collection["handle"]}),
+            )
+            .await?;
+        assert_eq!(
+            bridge.rpc("read_collection", &args).await?["error"]["data"],
+            "InvalidCollectionHandle"
+        );
+    }
+    bridge.finish().await?;
+    Ok(())
+}

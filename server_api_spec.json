@@ -917,16 +917,6 @@
                   "description": "Deparse capability or input failure.",
                   "type": "string",
                   "const": "deparse"
-                },
-                {
-                  "description": "Parameter semantics capability or input failure.",
-                  "type": "string",
-                  "const": "parameter_semantics"
-                },
-                {
-                  "description": "Case semantics capability or input failure.",
-                  "type": "string",
-                  "const": "case_semantics"
                 }
               ]
             },
@@ -3609,6 +3599,16 @@
                   "description": "truncate statement",
                   "type": "string",
                   "const": "Truncate"
+                },
+                {
+                  "description": "merge statement",
+                  "type": "string",
+                  "const": "Merge"
+                },
+                {
+                  "description": "Any other valid SQL statement, including DDL.",
+                  "type": "string",
+                  "const": "Other"
                 }
               ]
             },
@@ -4383,16 +4383,6 @@
                   "description": "Deparse capability or input failure.",
                   "type": "string",
                   "const": "deparse"
-                },
-                {
-                  "description": "Parameter semantics capability or input failure.",
-                  "type": "string",
-                  "const": "parameter_semantics"
-                },
-                {
-                  "description": "Case semantics capability or input failure.",
-                  "type": "string",
-                  "const": "case_semantics"
                 }
               ]
             },

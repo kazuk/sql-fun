@@ -770,10 +770,6 @@ pub enum QueryAnalysisStage {
     Analysis,
     /// Deparse capability or input failure.
     Deparse,
-    /// Parameter semantics capability or input failure.
-    ParameterSemantics,
-    /// Case semantics capability or input failure.
-    CaseSemantics,
 }
 impl QueryAnalysisStage {
     /// Identify the parse stage.
@@ -806,16 +802,6 @@ impl QueryAnalysisStage {
     pub const fn deparse() -> Self {
         Self::Deparse
     }
-    /// Identify the parameter semantics stage.
-    #[must_use]
-    pub const fn parameter_semantics() -> Self {
-        Self::ParameterSemantics
-    }
-    /// Identify the case semantics stage.
-    #[must_use]
-    pub const fn case_semantics() -> Self {
-        Self::CaseSemantics
-    }
     const fn code(self) -> &'static str {
         match self {
             Self::Parse => "query_parse",
@@ -824,8 +810,6 @@ impl QueryAnalysisStage {
             Self::Statement => "unsupported_statement",
             Self::Analysis => "query_analysis",
             Self::Deparse => "query_deparse",
-            Self::ParameterSemantics => "unsupported_parameter_semantics",
-            Self::CaseSemantics => "unsupported_case_semantics",
         }
     }
 }

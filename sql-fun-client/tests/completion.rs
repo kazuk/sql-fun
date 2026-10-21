@@ -314,26 +314,41 @@ async fn custom_response_completion_is_idempotent() -> ::testresult::TestResult 
     Ok(())
 }
 
+#[rstest::rstest]
+#[case::initial(1, 1, 0)]
+#[case::continuations(4, 1, 2)]
 #[tokio::test]
-async fn copied_api_response_completes_every_nested_analysis_field() -> ::testresult::TestResult {
-    let mut peer = Peer::start(Scenario::analyzed()).await?;
+async fn copied_api_response_completes_every_nested_analysis_field(
+    #[case] total: usize,
+    #[case] initial: usize,
+    #[case] reads: usize,
+) -> ::testresult::TestResult {
+    let mut peer = Peer::start(Scenario::analyzed_pages(total, initial)).await?;
     let (sent, received) = ::tokio::sync::oneshot::channel();
-    peer.client().invoke_typed("probe", &::serde_json::json!({}), move |response: Result<::sql_fun_client::payloads::AnalyzeQueryResponse, _>| async move {
-        let response = response.unwrap();
-        assert!(response.queries().is_completed());
-        let item = &response.queries().items()[0];
-        assert!(item.probrems().is_completed());
-        assert!(item.accessing_relations().is_completed());
-        assert!(item.column_access().is_completed());
-        assert!(item.parameters().is_completed());
-        assert!(item.result_columns().is_completed());
-        let _ = sent.send(());
-        Ok(())
-    }).await?;
+    peer.client()
+        .invoke_typed(
+            "probe",
+            &::serde_json::json!({}),
+            move |response: Result<::sql_fun_client::payloads::AnalyzeQueryResponse, _>| async move {
+                let response = response.unwrap();
+                assert!(response.queries().is_completed());
+                assert_eq!(response.queries().items().len(), total);
+                for item in response.queries().items() {
+                    assert!(item.probrems().is_completed());
+                    assert!(item.accessing_relations().is_completed());
+                    assert!(item.column_access().is_completed());
+                    assert!(item.parameters().is_completed());
+                    assert!(item.result_columns().is_completed());
+                }
+                let _ = sent.send(());
+                Ok(())
+            },
+        )
+        .await?;
     let log = ::tokio::time::timeout(Duration::from_secs(5), peer.finish()).await??;
     received.await?;
-    assert_eq!(log.releases(), 6);
-    assert_eq!(log.reads(), 0);
+    assert_eq!(log.releases(), 1 + 5 * total);
+    assert_eq!(log.reads(), reads);
     Ok(())
 }
 

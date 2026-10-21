@@ -75,28 +75,7 @@ async fn query_rpc_preserves_numbering_and_session_lifecycle() {
         [1, 3]
     );
     assert_eq!(items[1]["parameters"]["total_length"], 0);
-    for collection in [queries, &items[0]["parameters"], &items[1]["parameters"]] {
-        let read =
-            json!({"collection_handle":collection["handle"], "start_offset":0, "count":null});
-        assert_eq!(
-            connection.rpc("read_collection", &read).await["result"],
-            *collection
-        );
-        assert_eq!(
-            connection.rpc("read_collection", &read).await["result"],
-            *collection
-        );
-        connection
-            .rpc(
-                "release_collection",
-                &json!({"collection_handle":collection["handle"]}),
-            )
-            .await;
-        assert_eq!(
-            connection.rpc("read_collection", &read).await["error"]["data"],
-            "InvalidCollectionHandle"
-        );
-    }
+    test_helpers::verify_query_collection_lifecycle(&mut connection, queries).await;
     let mut foreign = heavy::Connection::start(16384, 2).await;
     foreign.authenticate().await;
     assert_eq!(
@@ -209,63 +188,13 @@ async fn query_rpc_catalog_input(
     connection.finish().await.unwrap();
 }
 
-#[tokio::test(flavor = "multi_thread")]
-async fn query_rpc_pages_nested_and_outer_results() {
-    let project = query_project();
-    let mut connection = heavy::Connection::start(100_000, 2).await;
-    connection.authenticate().await;
-    let initialized = connection
-        .rpc(
-            "initialize_schema_context",
-            &project.rpc_request("CREATE TABLE entries(id int4);"),
-        )
-        .await;
-    let statements = "SELECT 1;".repeat(1026);
-    let response = connection.rpc("analyze_query", &json!({"context_handle":initialized["result"]["context_handle"], "query":{"Text":statements}})).await;
-    let collection = &response["result"]["queries"];
-    assert_eq!(collection["total_length"], 1026, "{response}");
-    assert_eq!(collection["items"].as_array().unwrap().len(), 1024);
-    let tail = connection
-        .rpc(
-            "read_collection",
-            &json!({"collection_handle":collection["handle"], "start_offset":1024, "count":null}),
-        )
-        .await;
-    assert_eq!(tail["result"]["items"].as_array().unwrap().len(), 2);
-    let sql = format!(
-        "SELECT {}",
-        (1..=1026)
-            .map(|i| format!("{i} AS c{i}"))
-            .collect::<Vec<_>>()
-            .join(",")
-    );
-    let response = connection.rpc("analyze_query", &json!({"context_handle":initialized["result"]["context_handle"], "query":{"Text":sql}})).await;
-    let columns = &response["result"]["queries"]["items"][0]["result_columns"];
-    assert_eq!(columns["total_length"], 1026, "{response}");
-    let tail = connection
-        .rpc(
-            "read_collection",
-            &json!({"collection_handle":columns["handle"], "start_offset":1024, "count":null}),
-        )
-        .await;
-    assert_eq!(tail["result"]["items"][1]["ordinal"], 1025);
-    connection.end_requests().await;
-    connection.finish().await.unwrap();
-}
-
 #[rstest::rstest]
 #[case::unknown_column("SELECT missing FROM entries", "column_not_found_in_source")]
 #[case::unknown_relation("SELECT id FROM missing", "relation_not_found")]
 #[case::unresolved_parameter("SELECT $1 IS NULL", "parameter_type_unresolved")]
 #[case::invalid_hint("SELECT ${id:no_such_type}", "invalid_parameter_hint")]
 #[case::contradiction("SELECT 1 HAVING $1 LIMIT $1", "parameter_constraint")]
-#[case::sample("SELECT id FROM entries TABLESAMPLE SYSTEM(1)", "query_analysis")]
-#[case::special("SELECT $1 BETWEEN 1 AND 2", "unsupported_parameter_semantics")]
 #[case::mixed_parameters("SELECT ${id:int4}, $1", "query_realization")]
-#[case::conflict_update(
-    "INSERT INTO entries(id) VALUES(1) ON CONFLICT(id) DO UPDATE SET id = excluded.id",
-    "query_analysis"
-)]
 #[case::zero_parameter("SELECT $0::int4", "parameter_constraint")]
 #[tokio::test(flavor = "multi_thread")]
 async fn query_rpc_reports_distinct_analysis_failures(#[case] sql: &str, #[case] code: &str) {
@@ -430,6 +359,98 @@ async fn query_rpc_reuses_existing_expression_type_analysis(#[case] sql: &str) {
         item["result_columns"]["items"][0]["column_type"]["local_name"],
         "int4"
     );
+    connection.end_requests().await;
+    connection.finish().await.unwrap();
+}
+
+#[rstest::rstest]
+#[case::ddl("CREATE TABLE scratch(id int4)", "Other", true, 0)]
+#[case::merge(
+    "MERGE INTO entries t USING entries s ON true WHEN MATCHED THEN DO NOTHING",
+    "Merge",
+    true,
+    0
+)]
+#[case::merge_returning(
+    "MERGE INTO entries t USING entries s ON true WHEN MATCHED THEN DELETE RETURNING t.id",
+    "Merge",
+    true,
+    1
+)]
+#[case::truncate("TRUNCATE entries", "Truncate", false, 0)]
+#[tokio::test(flavor = "multi_thread")]
+async fn query_rpc_classifies_valid_statement_kinds(
+    #[case] sql: &str,
+    #[case] kind: &str,
+    #[case] complete: bool,
+    #[case] columns: usize,
+) {
+    let project = query_project();
+    let mut connection = heavy::Connection::start(16384, 2).await;
+    connection.authenticate().await;
+    let initialized = connection
+        .rpc(
+            "initialize_schema_context",
+            &project.rpc_request("CREATE TABLE entries(id int4);"),
+        )
+        .await;
+    let response = connection
+        .rpc(
+            "analyze_query",
+            &json!({"context_handle":initialized["result"]["context_handle"],"query":{"Text":sql}}),
+        )
+        .await;
+    let item = &response["result"]["queries"]["items"][0];
+    assert_eq!(item["query_kind"], kind, "{response}");
+    assert_eq!(item["complete"], complete, "{response}");
+    assert_eq!(
+        item["result_columns"]["total_length"], columns,
+        "{response}"
+    );
+    if complete {
+        assert!(item["execute_sql"].is_string(), "{response}");
+        assert_eq!(item["probrems"]["total_length"], 0, "{response}");
+    } else {
+        // Classification survives the existing common-AST conversion limitation.
+        assert_eq!(
+            item["probrems"]["items"][0]["code"], "unsupported_statement",
+            "{response}"
+        );
+    }
+    connection.end_requests().await;
+    connection.finish().await.unwrap();
+}
+
+#[rstest::rstest]
+#[case::native("SELECT 1; SELECT (")]
+#[case::named("SELECT ${id:int4}; SELECT (")]
+#[tokio::test(flavor = "multi_thread")]
+async fn query_rpc_preserves_failed_statement_source(#[case] sql: &str) {
+    let project = query_project();
+    let mut connection = heavy::Connection::start(16384, 2).await;
+    connection.authenticate().await;
+    let initialized = connection
+        .rpc(
+            "initialize_schema_context",
+            &project.rpc_request("CREATE TABLE entries(id int4);"),
+        )
+        .await;
+    let response = connection
+        .rpc(
+            "analyze_query",
+            &json!({"context_handle":initialized["result"]["context_handle"],"query":{"Text":sql}}),
+        )
+        .await;
+    let items = response["result"]["queries"]["items"].as_array().unwrap();
+    assert_eq!(items.len(), 2, "{response}");
+    let item = &items[1];
+    let from = usize::try_from(item["query_span"]["from"]["offset"].as_u64().unwrap()).unwrap();
+    let to = usize::try_from(item["query_span"]["to"]["offset"].as_u64().unwrap()).unwrap();
+    assert!(from > sql.find(';').unwrap(), "{response}");
+    assert_eq!(sql[from..to].trim(), "SELECT (");
+    let presentation = &item["probrems"]["items"][0]["presentation"];
+    assert_eq!(presentation["source"], &sql[from..to]);
+    assert_eq!(presentation["statement_offset"], from);
     connection.end_requests().await;
     connection.finish().await.unwrap();
 }

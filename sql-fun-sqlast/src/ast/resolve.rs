@@ -425,16 +425,8 @@ impl OperatorKind {
                 )
             }
             Self::NullIf => Ok(ArithExpr::build_null_if(context, left, right)?.0),
-            Self::Between | Self::NotBetween => {
-                context.report_analysis_problem(crate::sem::AnalysisProblem::query_analysis(
-                    ::sql_fun_core::analysis_problem::QueryAnalysisStage::analysis(),
-                    "BETWEEN type/nullability semantics are not implemented (#513)",
-                ))?;
-                self.resolve_between(left, right)
-            }
-            _ => Err(AnalysisError::unexpected_input_error(
-                "unsupported operator semantic analysis",
-            )),
+            Self::Between | Self::NotBetween => self.resolve_between(left, right),
+            _ => todo!("operator semantic analysis"),
         }
     }
     fn resolve_between(

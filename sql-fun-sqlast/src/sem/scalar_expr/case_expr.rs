@@ -387,11 +387,7 @@ impl CaseExprAnalysisContext {
             if implicit_castable.len() == 1 {
                 Ok(implicit_castable.into_iter().next())
             } else {
-                context.report_analysis_problem(AnalysisProblem::query_analysis(
-                    ::sql_fun_core::analysis_problem::QueryAnalysisStage::case_semantics(),
-                    "CASE common-type selection is not implemented for these candidates",
-                ))?;
-                Ok(None)
+                todo!("{implicit_castable:#?}");
             }
         }
     }

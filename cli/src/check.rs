@@ -152,13 +152,25 @@ impl CheckArgs {
 
         if !requirements.is_empty() {
             let mut client = crate::api::ApiArgs::from_environment()?.connect().await?;
-            let submitted = submission::submit(&mut client, common_args, requirements).await;
-            let finished = client.finish().await;
-            let analyses = submitted?;
-            finished?;
-            for analysis in analyses {
-                analysis.log_received();
-            }
+            let (sender, mut receiver) = ::tokio::sync::mpsc::channel(8);
+            let producer = async {
+                let submitted =
+                    submission::submit(&mut client, common_args, requirements, sender).await;
+                let finished = client.finish().await;
+                submitted?;
+                finished?;
+                Ok::<(), ::anyhow::Error>(())
+            };
+            // Replace this dummy consumer with diagnostics/lockfile processing in
+            // #699/#689. EOF only ends delivery; the producer result establishes
+            // whether every requirement and the RPC connection completed.
+            let consumer = async {
+                while let Some(analysis) = receiver.recv().await {
+                    analysis.log_received();
+                }
+            };
+            let (completed, ()) = ::tokio::join!(producer, consumer);
+            completed?;
         }
 
         todo!("connect analysis diagnostics and lockfile policy (#689)")

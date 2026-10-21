@@ -9,7 +9,6 @@ mod schema;
 /// Starts a real server and loads a synthetic builtin catalog per test process.
 /// Required to verify extracted requirements reach the actual realization service.
 pub(crate) async fn analyze_recovered_catalog() -> ::testresult::TestResult {
-    use super::super::submit;
     let server = lifecycle::ServerFixture::new()?;
     let schema = schema::SchemaFixture::with_query_schema("CREATE TABLE entries(id int4);")?;
     let request = schema.request();
@@ -24,7 +23,7 @@ pub(crate) async fn analyze_recovered_catalog() -> ::testresult::TestResult {
         .build()?;
     let catalog = super::catalog();
     let mut client = ::sql_fun_client::connect(&server.options()).await?;
-    let results = submit(
+    let results = super::collect_submission(
         &mut client,
         &args,
         super::requirements(&["products"], &catalog),

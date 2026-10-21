@@ -111,12 +111,27 @@ fn query_{index}() {{
 pub(super) async fn peer(
     fail_method: Option<&'static str>,
 ) -> (TcpJsonRpcClientAsync, ::tokio::task::JoinHandle<Vec<Value>>) {
+    peer_with_gate(fail_method, None).await
+}
+
+/// Hold the second RPC until the first envelope has reached its consumer.
+pub(super) async fn gated_second_failure(
+    release: ::tokio::sync::oneshot::Receiver<()>,
+) -> (TcpJsonRpcClientAsync, ::tokio::task::JoinHandle<Vec<Value>>) {
+    peer_with_gate(Some("second_analysis"), Some(release)).await
+}
+
+async fn peer_with_gate(
+    fail_method: Option<&'static str>,
+    mut release: Option<::tokio::sync::oneshot::Receiver<()>>,
+) -> (TcpJsonRpcClientAsync, ::tokio::task::JoinHandle<Vec<Value>>) {
     let listener = TcpListener::bind("127.0.0.1:0").await.unwrap();
     let address = listener.local_addr().unwrap();
     let task = ::tokio::spawn(async move {
         let (stream, _) = listener.accept().await.unwrap();
         let mut stream = BufReader::new(stream);
         let mut requests = Vec::new();
+        let mut analyses = 0;
         loop {
             let mut line = String::new();
             if stream.read_line(&mut line).await.unwrap() == 0 {
@@ -124,7 +139,16 @@ pub(super) async fn peer(
             }
             let request: Value = ::serde_json::from_str(&line).unwrap();
             let method = request["method"].as_str().unwrap();
-            let response = if fail_method == Some(method) {
+            if method == "analyze_query" {
+                analyses += 1;
+                if analyses == 2
+                    && let Some(release) = release.take()
+                {
+                    release.await.unwrap();
+                }
+            }
+            let second_failure = fail_method == Some("second_analysis") && analyses == 2;
+            let response = if fail_method == Some(method) || second_failure {
                 json!({"jsonrpc":"2.0", "id":request["id"], "error":{"code":-32602,"message":"injected failure"}})
             } else {
                 let result = match method {
@@ -156,4 +180,24 @@ pub(super) async fn peer(
 
 fn page() -> Value {
     json!({"handle":"empty","total_length":0,"offset":0,"require_release":false,"items":[]})
+}
+
+/// Collect channel items on the consumer side while preserving producer failures.
+pub(super) async fn collect_submission(
+    client: &mut TcpJsonRpcClientAsync,
+    args: &SqlFunArgs,
+    requirements: Vec<QueryRequirement>,
+) -> Result<Vec<super::QueryAnalysis>, ::anyhow::Error> {
+    let (sender, mut receiver) = ::tokio::sync::mpsc::channel(1);
+    let producer = super::submit(client, args, requirements, sender);
+    let consumer = async {
+        let mut collected = Vec::new();
+        while let Some(result) = receiver.recv().await {
+            collected.push(result);
+        }
+        collected
+    };
+    let (completed, collected) = ::tokio::join!(producer, consumer);
+    completed?;
+    Ok(collected)
 }

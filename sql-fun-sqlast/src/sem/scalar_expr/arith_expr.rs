@@ -94,7 +94,7 @@ impl ArithExpr {
             Self::UndefinedOperatorAny(call_site) => call_site.is_not_null(),
             Self::UndefinedOperatorAll(call_site) => call_site.is_not_null(),
             Self::NullIfExpr(null_if) => null_if.is_not_null(),
-            Self::Between(_) => todo!(),
+            Self::Between(_) => None,
         }
     }
 
@@ -115,7 +115,7 @@ impl SemScalarExprNode for ArithExpr {
             Self::UndefinedOperator(_)
             | Self::UndefinedOperatorAny(_)
             | Self::UndefinedOperatorAll(_) => None,
-            Self::Between(_) => todo!(),
+            Self::Between(_) => None,
         }
     }
 
@@ -130,7 +130,7 @@ impl SemScalarExprNode for ArithExpr {
             Self::UndefinedOperator(_)
             | Self::UndefinedOperatorAny(_)
             | Self::UndefinedOperatorAll(_) => return None,
-            Self::Between(_) => todo!(),
+            Self::Between(_) => return None,
         };
         if is_strict {
             if matches!(self.inputs_is_not_null(), Some(true)) {

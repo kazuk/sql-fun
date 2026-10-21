@@ -27,6 +27,7 @@ pub use self::params::{
 /// CTE definition name
 #[derive(Debug, serde::Serialize, serde::Deserialize, Clone, Eq, Hash, PartialEq)]
 #[serde(transparent)]
+#[cfg_attr(feature = "openrpc-schema", derive(::schemars::JsonSchema))]
 pub struct CteName(String);
 
 impl PartialEq<str> for CteName {
@@ -61,6 +62,7 @@ where
 /// CTE alias name
 #[derive(Debug, serde::Serialize, serde::Deserialize, Clone, Eq, Hash, PartialEq)]
 #[serde(transparent)]
+#[cfg_attr(feature = "openrpc-schema", derive(::schemars::JsonSchema))]
 pub struct CteAlias(String);
 
 impl PartialEq<str> for CteAlias {
@@ -1249,9 +1251,14 @@ mod resolve_tests;
 
 /// resolved CTE catalog
 #[derive(Debug, serde::Serialize, serde::Deserialize)]
+#[cfg_attr(feature = "openrpc-schema", derive(::schemars::JsonSchema))]
 pub struct ResolvedCteCatalog {
     parameters: CteParameterCollection,
     base_query: PlaceholderedSql,
+    #[cfg_attr(
+        feature = "openrpc-schema",
+        schemars(with = "std::collections::BTreeMap<CteAlias, PlaceholderedSql>")
+    )]
     cte_queries: IndexMap<CteAlias, PlaceholderedSql>,
 }
 

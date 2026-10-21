@@ -167,8 +167,14 @@ impl SchemaFileContext {
         &self.catalog
     }
 
+    /// Retained diagnostic presentations aligned with problems.
+    #[must_use]
+    pub fn diagnostic_presentations(&self) -> &[Option<::sql_fun_core::DiagnosticPresentation>] {
+        &self.presentations
+    }
+
     /// Retain the explicitly analyzed statement for diagnostic presentation.
-    pub(crate) fn set_diagnostic_source(&mut self, source: &str) {
+    pub fn set_diagnostic_source(&mut self, source: &str) {
         self.diagnostic_source = Some(source.to_owned());
     }
 

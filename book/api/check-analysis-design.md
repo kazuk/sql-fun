@@ -5,12 +5,9 @@ analysis from `sql-fun-server`. It covers the intended API for `sql-fun check`
 and other clients that need parameter descriptions, result-set columns, and
 SQL diagnostics without executing a query.
 
-> **API design draft:** The workflow and response capabilities below describe
-> the intended contract, not a fully available server feature. The server
-> implements connection-local `initialize_schema_context`, `read_collection`,
-> and `release_collection` after authentication. `analyze_query` is declared in
-> `sql-fun-server-api` but is not yet dispatched by the JSON-RPC server.
-> Examples marked **proposed** are illustrative, not executable requests.
+The authenticated server implements schema initialization, query analysis and
+session-local paged collections. CLI `check` submission of recovered query
+requirements remains separate work (#378).
 
 ## Before you begin
 
@@ -30,7 +27,7 @@ not make it an implicitly selected input.
 
 ## Workflow
 
-The intended call sequence is:
+The call sequence is:
 
 ```text
 initialize                -> authenticate connection
@@ -137,98 +134,97 @@ Call `analyze_query` with the handle returned by
 it does **not** execute SQL or connect to the application's database to
 fetch query results.
 
-For `sql-fun check`, a query may refer to reusable CTE definitions. The
-client can supply the shared `sql-fun-core::ResolvedCteCatalog` value, which
-already contains the base query and its resolved CTE definitions. The server
-is responsible for realizing those definitions into the query.
+Supply exactly one of `query` and `resolved_cte_catalog`:
 
-**Proposed logical input for the `sql-fun check` use case** (field layout is
-not yet the wire schema):
-
-```text
-analyze_query
-  context_handle: ContextHandle
-  query: ResolvedCteCatalog
-  query_identity: optional client correlation identifier
+```json
+{
+  "jsonrpc": "2.0",
+  "id": 2,
+  "method": "analyze_query",
+  "params": {
+    "context_handle": "context-0",
+    "query": {"Text": "SELECT ${id:int4} AS id; SELECT 2 AS next"}
+  }
+}
 ```
 
-The client does not need to submit a second copy of the SQL alongside that
-catalog. If a future API also supports direct SQL input, direct SQL and a
-resolved CTE catalog will be alternative input forms rather than two sources
-that must agree.
+`query` accepts `Text` or `File` (an explicitly selected server-local path).
+`Url` input returns `InvalidAnalysisInput` without fetching. A resolved CTE
+catalog uses the shared `sql-fun-core::ResolvedCteCatalog` JSON representation;
+its base query is authoritative, so `query` must be omitted. The server never
+loads CTE catalog files. #458 provides this receiving API; #378 adds CLI
+`check` submission to it.
 
-The **currently declared** `AnalyzeQueryArgs` instead accepts a
-`context_handle` and `AnalyzeQueryInput` (`Text`, `File`, or `Url`).
-That existing declaration does not yet accept the resolved catalog required
-by this workflow.
+Without referenced CTE expansion, multiple SQL statements are accepted and
+analyzed in input order, including a catalog with zero referenced CTEs. The
+caller does not split SQL. With referenced CTE expansion, the base SQL must
+contain exactly one statement; otherwise the result contains a realization
+diagnostic. Empty direct or zero-reference input returns an empty query
+collection. This does not introduce a separate batch protocol.
 
-For a query without reusable CTEs, the caller should still use an explicitly
-supported input form; do not assume the server will discover or attach CTEs.
+Named `${name}` placeholders retain their identity across repeated occurrences;
+`${name:int4}` supplies an explicit SQL parameter type. Catalog CTE parameters
+precede base-query parameters in dependency and first-occurrence order. The
+same numbered binding order is used for hint application, analysis and returned
+SQL. Native numbered parameters retain their actual slots, including gaps.
+Use one placeholder style per input; named and native numbered parameters must
+not be combined because their slots can collide.
+
+Hints apply only to the current query's semantic construction and do not insert
+SQL casts. Unhinted inputs use SQLAST inference. Hints use the existing type-name
+resolver, including its documented syntax and type-modifier limitations; see
+[parameter analysis](../sql-analysis.md#parameter-analysis). No Rust type
+inference is performed by this API.
 
 ### 3. Read the analysis result
 
-The intended `analyze_query` result describes the query, not a set of rows
-returned from a database.
+`result.queries` is the existing `Collection<AnalyzeQueryItem>`. Each item has:
 
-| Result | What the client can use it for |
+| Field | Meaning |
 | --- | --- |
-| Query identity and statement kind | Associate results with the submitted query and classify the statement |
-| Realized executable SQL | Generate or validate the SQL recorded in the lockfile |
-| Bind parameter descriptions | Map placeholder positions to parameter names, inferred SQL type constraints, and nullability |
-| Result-set columns | Determine ordered output column names, SQL types, and nullability |
-| Accessed relations and columns | Identify schema dependencies for inventory and validation |
-| Diagnostics | Report SQL syntax/semantic errors and warnings at their available source locations |
-| Analysis completeness | Recognize when an error prevented some fields from being inferred |
+| `query_span` | Original base-input UTF-8 byte range, when known; line/column are one-based |
+| `query_kind` | SELECT, INSERT, UPDATE or DELETE; absent when unavailable |
+| `execute_sql` | SQL deparsed from the realized AST; absent when unavailable |
+| `complete` | Analysis finished without errors or unresolved parameter types |
+| `probrems` | Structured diagnostics (the existing wire spelling is retained) |
+| `parameters` | Binding names, actual one-based `parameter_index`, optional finalized `parameter_type`, base-input spans and nullability |
+| `result_columns` | Zero-based ordinal, name, optional `column_type` and three-state nullability |
+| `accessing_relations` | Available resolved relation identities |
+| `column_access` | Reserved collection; detailed CRUD/provenance is separate work (#425) |
 
-These are **target response capabilities**. They are not all represented by
-today's `AnalyzeQueryResponse` or `AnalyzeQueryItem` types.
+The `parameter_index` is the SQL `$n` identity, not a collection ordinal. For
+`SELECT $3::int4, $1::int4, $3::int4`, the binding metadata describes slots 1 and
+3; repeated use does not create a new binding. `execute_sql` and these indexes
+supply the missing data for the caller's `LockfileEntry`. The originating caller
+retains `query_name` and `query_finger_print`; they are not echoed.
 
-In the existing type declarations, `AnalyzeQueryResponse` contains a
-`Collection<AnalyzeQueryItem>`. Each item has `query_span`,
-`query_kind`, `probrems`, `accessing_relations`, `column_access`,
-`parameters`, and `result_columns`. The fields for executable SQL and
-analysis completeness are not present yet.
+Only definite named SQL types are returned as typed parameter metadata, with
+array identity preserved by `is_array`. Unresolved parameter inference is a
+SQLAST diagnostic, not a candidate list or a server-side inference solver.
+Contradictory constraints and unsupported capabilities have distinct diagnostics.
+A result-column `column_type: null` is preserved without inventing a type or
+adding an error solely for its absence. Anonymous dynamic types currently have
+no named API representation. Nullability is `NotNull`, `Nullable` or `Unknown`.
+The CLI/lockfile consumer decides whether these results suffice for its task;
+`execute_sql` availability alone does not establish fully typed analysis.
 
-#### Bind parameters
+SQLAST diagnostics retain their original structured problem. Direct-input
+presentations retain the analyzed, numbered statement and its offset. For
+expanded CTEs, individual AST locations cannot reliably identify one combined
+source: diagnostics instead retain `semantic_problem` without inventing a
+presentation or location. Parameter spans describe occurrences in the original
+base input, not locations in separately supplied CTE definitions.
 
-A parameter description should tell the caller how to bind a value and
-where a parameter occurs. The existing `ParameterDescribe` includes
-`name`, `spans`, `type_candidate`, and `nullability`.
-
-For a query using reusable CTEs, **binding order is significant**: parameters
-from catalog CTEs appear first in their placeholder-token order, followed
-by parameters from the complete base query in its placeholder-token order.
-The server must return the definitive order so that the client can produce
-`LockfileEntry.bind_parameters` consistently. Callers must not alphabetize
-parameters or derive order from parameter names.
-
-SQL dialects can have distinct placeholder forms and type semantics.
-Inferred type alternatives, unknown types, and contradictory constraints
-must be distinguishable; a client should not interpret an empty type-candidate
-list as an unambiguous type.
-
-#### Result-set columns
-
-Result columns are ordered by their ordinal. The current
-`ResultSetColumn` declaration includes `ordinal`, `name`,
-`column_type: Option<TypeReference>`, and `nullability`.
-
-The eventual response needs to represent dialect-specific type information,
-including cases where more than one type is possible. A missing type must
-not be reported as a concrete SQL type.
-
-#### Referenced schema objects
-
-Relation and column access information can be used to track dependencies
-and explain unresolved references. If a reference cannot be resolved,
-clients should use the diagnostic rather than assume the response contains
-a valid object identity. The fidelity of source-object attribution through
-CTEs, views, joins, and derived expressions remains subject to the semantic
-analysis capabilities.
+SELECT and INSERT/UPDATE/DELETE, including RETURNING, use the same existing
+semantic analyzer. Legal syntax with unsupported semantics returns explicit
+incomplete results; it does not become an empty successful DML result. Current
+capability boundaries include parameter-dependent special operators (#513),
+TABLESAMPLE, and ON CONFLICT DO UPDATE (#474). PostgreSQL is the first
+end-to-end target; SQLite schema initialization is not yet available here.
 
 ### 4. Display diagnostics
 
-A valid API request can contain invalid SQL. In that case, the intended
+A valid API request can contain invalid SQL. In that case, the
 response carries SQL diagnostics instead of treating the syntax or semantic
 error as a transport failure.
 
@@ -259,8 +255,9 @@ The `AnalysisProbrem` type carries `code`, `severity`, `file_path`,
 `statement_span`, `probrem_span`, and `statement_relative_span`. Severity is
 `error`, `warning`, or `advice`. Clients should use it to distinguish rejected
 SQL from accepted SQL with a warning, such as a statistics target clamped to
-10000. Message and richer source identity are intended capabilities that are
-not yet part of that type.
+10000. `presentation` carries the retained statement and structured diagnostic
+for CLI rendering. `semantic_problem` preserves a diagnostic when a reliable
+source presentation is unavailable.
 Schema diagnostic codes identify the retained problem kind. Diagnostics keep
 layer order (builtin, ordered extensions, application dump) and analysis order
 within each layer. A missing `statement_span` or `probrem_span` is `null`.
@@ -274,8 +271,11 @@ A JSON-RPC error represents a problem with the request, context state, or
 service operation. SQL diagnostics are analysis results. For schema
 initialization, loading failures and expected-hash mismatches use
 `SchemaContextInitializeFailed`. The error envelope includes a readable message
-and its serialized API error in `data`. Other query-analysis error details remain
-under design.
+and its serialized API error in `data`. Query analysis uses
+`InvalidContextHandle` for an unknown or foreign context and
+`InvalidAnalysisInput` for missing, conflicting, or unsupported input sources.
+An unreadable explicitly selected file is a service operation error. SQL parse,
+realization, and analysis failures remain diagnostics in the query result.
 
 ### 5. Read and release result collections
 
@@ -333,7 +333,7 @@ implementation and reference documentation cover the behavior.
 | Component | Present state |
 | --- | --- |
 | `sql-fun-server-api/src/initialize_schema.rs` | Implemented initialization request/response; PostgreSQL-only dialect/version enums |
-| `sql-fun-server-api/src/analyze_query.rs` | Historical query input and result shapes |
+| `sql-fun-server-api/src/payloads/analyze_query.rs` | Query input and result shapes |
 | `sql-fun-sqlast` | `FrozenBaseContext`, layered schema loading, recoverable schema problems |
 | `sql-fun-core` | Shared `ResolvedCteCatalog` and its serialization |
 | `sql-fun-codegen` | `QueryRequirements::extract` |

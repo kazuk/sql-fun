@@ -92,3 +92,48 @@ impl ApiServer {
         Ok(::tokio::time::timeout(Duration::from_secs(60), child.wait_with_output()).await??)
     }
 }
+
+/// A persistent API bridge owns the connection on which its handles are valid.
+/// Starting the real bridge/server is costly and required for lifecycle assertions.
+pub struct BridgeSession {
+    child: ::tokio::process::Child,
+    stdin: ::tokio::process::ChildStdin,
+    stdout: ::tokio::io::BufReader<::tokio::process::ChildStdout>,
+}
+impl BridgeSession {
+    pub fn start(server: &ApiServer) -> ::testresult::TestResult<Self> {
+        let mut child = server.command().spawn()?;
+        let stdin = child.stdin.take().unwrap();
+        let stdout = ::tokio::io::BufReader::new(child.stdout.take().unwrap());
+        Ok(Self {
+            child,
+            stdin,
+            stdout,
+        })
+    }
+    pub async fn rpc(
+        &mut self,
+        method: &str,
+        params: &::serde_json::Value,
+    ) -> ::testresult::TestResult<::serde_json::Value> {
+        use ::tokio::io::AsyncBufReadExt;
+        let request = ::serde_json::json!({"method":method, "params":params});
+        self.stdin
+            .write_all(format!("{request}\n").as_bytes())
+            .await?;
+        let mut line = String::new();
+        ::tokio::time::timeout(Duration::from_secs(45), self.stdout.read_line(&mut line)).await??;
+        Ok(::serde_json::from_str(&line)?)
+    }
+    pub async fn finish(self) -> ::testresult::TestResult {
+        drop(self.stdin);
+        let output = ::tokio::time::timeout(Duration::from_secs(45), self.child.wait_with_output())
+            .await??;
+        assert!(
+            output.status.success(),
+            "{}",
+            String::from_utf8_lossy(&output.stderr)
+        );
+        Ok(())
+    }
+}

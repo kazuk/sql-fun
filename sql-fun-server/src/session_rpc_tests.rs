@@ -404,3 +404,5 @@ async fn initialization_accepts_core_configuration_transfer() {
     connection.end_requests().await;
     connection.finish().await.unwrap();
 }
+
+mod query_analysis;

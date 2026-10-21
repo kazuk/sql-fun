@@ -271,3 +271,57 @@ async fn renders_server_diagnostic_from_retained_source_after_file_changes()
     assert!(!output.contains("\x1b["));
     Ok(())
 }
+
+#[tokio::test]
+async fn analyzes_and_releases_queries_in_one_bridge_session() -> ::testresult::TestResult {
+    // The actual bridge/server lifecycle is the behavior under test.
+    let server = heavy::ApiServer::new()?;
+    let schema = test_helpers::schema::SchemaFixture::with_query_schema(
+        "CREATE TABLE entries(id int4 NOT NULL);",
+    )?;
+    let mut bridge = heavy::BridgeSession::start(&server)?;
+    let initialized = bridge
+        .rpc("initialize_schema_context", schema.request())
+        .await?;
+    let handle = &initialized["result"]["context_handle"];
+    let malformed = bridge
+        .rpc(
+            "analyze_query",
+            &::serde_json::json!({"context_handle":handle, "query":{"Text":"SELECT ("}}),
+        )
+        .await?;
+    assert_eq!(
+        malformed["result"]["queries"]["items"][0]["complete"],
+        false
+    );
+    let response = bridge.rpc("analyze_query", &::serde_json::json!({"context_handle":handle, "query":{"Text":"SELECT ${id:int4} AS id; SELECT id FROM entries"}})).await?;
+    let queries = &response["result"]["queries"];
+    assert_eq!(queries["total_length"], 2, "{response}");
+    let first = &queries["items"][0];
+    assert_eq!(first["complete"], true, "{response}");
+    assert!(first["execute_sql"].as_str().unwrap().contains("$1"));
+    assert_eq!(first["parameters"]["items"][0]["parameter_index"], 1);
+    assert_eq!(
+        first["parameters"]["items"][0]["parameter_type"]["local_name"],
+        "int4"
+    );
+    for collection in [queries, &first["parameters"], &first["result_columns"]] {
+        let args = ::serde_json::json!({"collection_handle":collection["handle"], "start_offset":0, "count":null});
+        assert_eq!(
+            bridge.rpc("read_collection", &args).await?["result"],
+            *collection
+        );
+        bridge
+            .rpc(
+                "release_collection",
+                &::serde_json::json!({"collection_handle":collection["handle"]}),
+            )
+            .await?;
+        assert_eq!(
+            bridge.rpc("read_collection", &args).await?["error"]["data"],
+            "InvalidCollectionHandle"
+        );
+    }
+    bridge.finish().await?;
+    Ok(())
+}

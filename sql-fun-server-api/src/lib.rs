@@ -33,6 +33,14 @@ pub enum SqlFunServerApiError {
     #[error("invalid collection handle")]
     InvalidCollectionHandle,
 
+    /// Unknown or foreign-session schema context.
+    #[error("invalid context handle")]
+    InvalidContextHandle,
+
+    /// Invalid or unsupported analysis request input.
+    #[error("invalid analysis input: {0}")]
+    InvalidAnalysisInput(String),
+
     /// Generic unexpected error
     #[error("unexpected {0}")]
     Unexpected(String),
@@ -43,6 +51,17 @@ pub enum SqlFunServerApiError {
 }
 
 impl SqlFunServerApiError {
+    /// Unknown context without disclosing its owner.
+    #[must_use]
+    pub const fn invalid_context_handle() -> Self {
+        Self::InvalidContextHandle
+    }
+    /// Invalid or unsupported input selection.
+    #[must_use]
+    pub fn invalid_analysis_input(message: &str) -> Self {
+        Self::InvalidAnalysisInput(message.to_owned())
+    }
+
     /// Construct an invalid collection handle error without revealing its owner.
     #[must_use]
     pub const fn invalid_collection_handle() -> Self {

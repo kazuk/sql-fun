@@ -137,12 +137,16 @@ fn default_values_retains_analyzed_target_without_fabricated_source() {
 }
 
 #[test]
-#[should_panic(expected = "#474")]
-fn update_action_stays_explicitly_unimplemented() {
-    analyze(
+fn update_action_returns_an_explicit_unsupported_error() {
+    let context = test_helpers::catalog(Dialect::postgres());
+    let statement = crate::parse_statements(
         "INSERT INTO items(id) VALUES (1) ON CONFLICT(id) DO UPDATE SET id = excluded.id",
         Dialect::postgres(),
-    );
+    )
+    .next()
+    .unwrap()
+    .unwrap();
+    assert!(statement.analyze(context).is_err());
 }
 
 #[cfg(feature = "sqlite")]
@@ -469,12 +473,10 @@ fn returning_retains_expression_alias_and_nullability() {
 
 #[cfg(feature = "sqlite")]
 #[test]
-#[should_panic(expected = "#474")]
-fn sqlite_later_update_action_remains_explicitly_unimplemented() {
-    analyze(
-        "INSERT INTO items VALUES(1,'x') ON CONFLICT(id) DO NOTHING ON CONFLICT DO UPDATE SET label='x'",
-        Dialect::sqlite(),
-    );
+fn sqlite_later_update_action_returns_an_explicit_unsupported_error() {
+    let context = test_helpers::catalog(Dialect::sqlite());
+    let statement = crate::parse_statements("INSERT INTO items VALUES(1,'x') ON CONFLICT(id) DO NOTHING ON CONFLICT DO UPDATE SET label='x'", Dialect::sqlite()).next().unwrap().unwrap();
+    assert!(statement.analyze(context).is_err());
 }
 
 #[rstest::rstest]

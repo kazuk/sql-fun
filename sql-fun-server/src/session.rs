@@ -2,6 +2,7 @@ mod collection_registry;
 mod context_handle_registry;
 mod facade;
 mod initialization;
+mod query_analysis;
 
 use self::{
     collection_registry::CollectionRegistry, context_handle_registry::ContextHandleRegistry,

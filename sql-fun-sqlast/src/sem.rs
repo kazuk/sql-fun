@@ -48,6 +48,7 @@ mod parse_context;
 mod pg_type;
 pub mod problem;
 mod query;
+mod query_metadata;
 mod resolution;
 mod scalar_expr;
 mod schema_file_context;
@@ -56,6 +57,7 @@ mod select_statement;
 mod stack;
 mod top_level_statement;
 pub(crate) mod traversal;
+pub use self::query_metadata::QueryMetadata;
 
 mod type_system;
 mod update_statement;
@@ -485,6 +487,16 @@ impl SemAst {
             None
         }
     }
+    /// Ordered output columns for SELECT or DML RETURNING.
+    #[must_use]
+    pub fn result_columns(&self) -> Option<&ResultColumnCollection> {
+        if let Some(columns) = self.query_result_columns() {
+            Some(columns)
+        } else {
+            self.rule_returning()
+        }
+    }
+
     pub(crate) fn query_result_columns(&self) -> Option<&ResultColumnCollection> {
         if let Self::SelectStatement(query) = self {
             Some(query.result_columns())

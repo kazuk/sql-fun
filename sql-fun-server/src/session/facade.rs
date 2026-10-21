@@ -123,6 +123,10 @@ impl<'request, 'ctx> Session<'request, 'ctx> {
     ) -> Result<::serde_json::Value, JsonRpcError> {
         let method = request.method();
         match method {
+            "analyze_query" => {
+                let args = Self::arguments(request)?;
+                Ok(::serde_json::to_value(self.analyze_query(&args)?)?)
+            }
             "initialize_schema_context" => {
                 let args: InitializeSchemaArgs = Self::arguments(request)?;
                 let result = self.initialize_schema_context(api, &args).await?;

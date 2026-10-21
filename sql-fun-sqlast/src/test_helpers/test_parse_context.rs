@@ -56,6 +56,7 @@ pub struct TestParseContext {
     cursors: crate::sem::CursorBindings,
     analysis_state: crate::sem::AnalysisState,
     parameter_constraints: crate::sem::ParameterConstraints,
+    parameter_type_hints: crate::sem::ParameterTypeHints,
     report_failure_after: Option<usize>,
     source: Option<SourcePathWithSpan>,
     table_ref_types: Vec<TableName>,
@@ -576,6 +577,18 @@ impl crate::sem::TriggerInfoWrite for TestParseContext {
     }
 }
 
+impl crate::sem::ParameterTypeHintRead for TestParseContext {
+    fn get_parameter_typehint(&self, index: usize) -> Option<TypeReference> {
+        self.parameter_type_hints.lookup(index)
+    }
+}
+
+impl crate::sem::ParameterTypeHintWrite for TestParseContext {
+    fn setup_typehinting(&self, hints: &[Option<&str>]) -> Result<(), AnalysisError> {
+        self.parameter_type_hints.setup(hints, self)
+    }
+}
+
 impl ParseContext for TestParseContext {
     fn apply_creation_group<F>(
         self,
@@ -633,6 +646,7 @@ impl ParseContext for TestParseContext {
     fn freeze(mut self) -> crate::sem::FrozenBaseContext {
         self.problems.clear();
         self.parameter_constraints = crate::sem::ParameterConstraints::default();
+        self.parameter_type_hints = Default::default();
         self.report_failure_after = None;
         crate::sem::FrozenBaseContext::new(self)
     }

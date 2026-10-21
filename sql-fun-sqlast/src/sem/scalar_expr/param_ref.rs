@@ -1,7 +1,7 @@
 use crate::sem::scalar_expr::SemScalarExprNode;
 use crate::sem::{InputTypeConstraint, TypeReference};
 
-/// A numbered SQL input, independent of application hints and Rust type mapping.
+/// A numbered SQL input with its assigned or inferred SQL type domain.
 #[derive(Debug, Clone, Eq, Hash, PartialEq, serde::Serialize, serde::Deserialize)]
 pub struct ParamRef {
     position: u32,
@@ -22,7 +22,7 @@ impl ParamRef {
     pub const fn position(&self) -> u32 {
         self.position
     }
-    /// SQL-derived admissible input types; `any` is a successful inference result.
+    /// Assigned or SQL-derived input types; `any` is a successful inference result.
     pub const fn constraint(&self) -> &InputTypeConstraint {
         &self.constraint
     }

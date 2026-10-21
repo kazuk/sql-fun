@@ -31,7 +31,7 @@ use crate::{
         CreateIndex, CreateSchema, DiagnosticContext, FrozenBaseContext, FullName,
         GetSourcePathWithSpanOpt, ImplicitChange, MutSourcePathWithSpan, ObjectKind,
         OperatorDefinition, OperatorInfoRead, OperatorName, ParseContext, SchemaName,
-        SemScalarExpr, SourceAccessService, VariableSet,
+        SemScalarExpr, SourceAccessService, TypeReference, VariableSet,
         parse_context::{IndexInfoRead, SearchPathRead},
     },
 };
@@ -54,6 +54,7 @@ pub struct SchemaFileContext {
     cursors: crate::sem::CursorBindings,
     analysis_state: crate::sem::AnalysisState,
     parameter_constraints: crate::sem::ParameterConstraints,
+    parameter_type_hints: crate::sem::ParameterTypeHints,
 }
 
 #[derive(Debug)]
@@ -151,6 +152,7 @@ impl SchemaFileContext {
             cursors: crate::sem::CursorBindings::default(),
             analysis_state: crate::sem::AnalysisState::default(),
             parameter_constraints: crate::sem::ParameterConstraints::default(),
+            parameter_type_hints: Default::default(),
         }
     }
 
@@ -769,6 +771,18 @@ impl crate::sem::TriggerInfoWrite for SchemaFileContext {
             ))?;
         }
         Ok(self)
+    }
+}
+
+impl crate::sem::ParameterTypeHintRead for SchemaFileContext {
+    fn get_parameter_typehint(&self, index: usize) -> Option<TypeReference> {
+        self.parameter_type_hints.lookup(index)
+    }
+}
+
+impl crate::sem::ParameterTypeHintWrite for SchemaFileContext {
+    fn setup_typehinting(&self, hints: &[Option<&str>]) -> Result<(), AnalysisError> {
+        self.parameter_type_hints.setup(hints, self)
     }
 }
 

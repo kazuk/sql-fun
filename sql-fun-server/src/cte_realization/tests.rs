@@ -368,3 +368,83 @@ fn rejects_conflicting_explicit_hints(
     assert_eq!(conflict.first_hint(), "uuid");
     assert_eq!(conflict.second_hint(), "text");
 }
+
+#[test]
+fn realized_bindings_accept_query_scoped_sql_type_hints() {
+    use ::sql_fun_sqlast::sem::{FullName, ParameterTypeHintWrite, PgBuiltInType, TypeReference};
+
+    let project = crate::schema_cache::test_helpers::SchemaProject::new();
+    let realized = realize_cte_catalog(
+        &resolved(
+            "select n, ${base:kind} as m, ${shared:int4} as repeated from chosen",
+            &[("chosen", "select ${shared:int4} as n")],
+        ),
+        Dialect::postgres(),
+    )
+    .unwrap();
+    assert_eq!(
+        realized
+            .bindings()
+            .parameter_names()
+            .into_iter()
+            .map(::sql_fun_core::ParameterName::as_str)
+            .collect::<Vec<_>>(),
+        ["shared", "base"]
+    );
+    // The caller supplies one optional type per finalized SQL index. Occurrence
+    // metadata does not introduce a second numbering or conflict-validation pass.
+    let context = ::sql_fun_sqlast::parse_statements(
+        "CREATE TYPE public.kind AS ENUM ('a')",
+        Dialect::postgres(),
+    )
+    .next()
+    .unwrap()
+    .unwrap()
+    .analyze(project.analysis_context("products"))
+    .unwrap()
+    .into_context();
+    let kind = TypeReference::concrete_type_ref(&FullName::with_schema("public", "kind"), false);
+    context
+        .setup_typehinting(&[Some("int4"), Some("kind")])
+        .unwrap();
+    let sql = realized
+        .statement()
+        .deparse_sql(Dialect::postgres())
+        .unwrap();
+    let analyzed = realized.statement().analyze(context).unwrap();
+    assert!(analyzed.context().problems().is_empty());
+    let query = analyzed.ast().clone().into_select_statemtnt().unwrap();
+    for (index, expected) in [PgBuiltInType::int4(), kind.clone(), PgBuiltInType::int4()]
+        .into_iter()
+        .enumerate()
+    {
+        assert_eq!(
+            query
+                .result_columns()
+                .get_column_at(index)
+                .unwrap()
+                .col_type(),
+            &Some(expected)
+        );
+    }
+    for (position, expected) in [(1, PgBuiltInType::int4()), (2, kind)] {
+        assert_eq!(
+            analyzed
+                .context()
+                .parameter_constraints()
+                .parameter(position)
+                .unwrap()
+                .constraint()
+                .admissible_types(),
+            Some([expected].as_slice())
+        );
+    }
+    assert_eq!(
+        realized
+            .statement()
+            .deparse_sql(Dialect::postgres())
+            .unwrap(),
+        sql
+    );
+    assert!(!sql.to_ascii_lowercase().contains("cast"));
+}

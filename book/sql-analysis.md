@@ -368,6 +368,33 @@ constrain the target type. `ARRAY(SELECT ...)` is tracked separately (#572).
 
 ## Parameter analysis
 
+SQLAST API callers can install explicit SQL input types before calling
+`Statement::analyze`. Import `ParameterTypeHintWrite` and call
+`context.setup_typehinting(&[Some("pg_catalog.int4"), None])`: the first slot
+supplies the type of `$1`, and the second leaves `$2` for normal inference.
+`ParameterTypeHintRead::get_parameter_typehint` takes the SQL parameter number
+unchanged; zero and numbers outside the supplied slice return `None`.
+
+Type hints use the selected dialect's type syntax and the analysis context's
+catalog and search path. PostgreSQL aliases, qualified or quoted names, arrays,
+and type modifiers are accepted. As with PostgreSQL parameter declarations,
+modifiers such as `varchar(3)` or `numeric(5,2)` do not constrain input values.
+Modifier compatibility and bounds are not yet validated: declarations such as
+`int4(5)` or `numeric(0)` may be accepted even though PostgreSQL rejects them
+([known limitation #690](https://github.com/kazuk/sql-fun/issues/690)).
+Malformed or unresolved names return an error and preserve the complete previous
+setup. Successful setup replaces all previous hints, including when passed an
+empty slice or only `None` entries.
+
+Create an independent `SchemaFileContext` over the shared frozen catalog for
+each query. If reusing a mutable context, explicitly install the next query's
+hints, including an empty setup for unhinted queries. Nested queries and realized
+CTEs share that query's finalized parameter order and hints. Hints assign SQL
+types during name resolution; incompatible uses still produce semantic
+diagnostics. They do not insert casts or change executable SQL. This API accepts
+full type-name syntax independently of the named-placeholder lexer's current
+`${name:ident}` hint syntax.
+
 Numbered parameters (`$1` in PostgreSQL and `?1` in SQLite) can be used across
 supported nonrecursive CTEs and the outer statement, including INSERT sources,
 RETURNING, and conflict predicates. Repeated uses of a parameter

@@ -959,7 +959,7 @@ impl SemScalarExpr {
         context: &mut impl crate::sem::ParseContext,
     ) -> Result<(), AnalysisError> {
         let replacement = match self {
-            Self::Param(value) => Some(parameters.parameter(value.position())),
+            Self::Param(value) => Some(parameters.parameter(value.position(), value.constraint())),
             Self::ColumnRef(_) => parameters.column(self),
             Self::Arith(value) => value.collect_constraints(parameters, context)?,
             Self::FuncCall(value) => value.collect_constraints(parameters, context)?,

@@ -5,6 +5,7 @@ mod rule_info;
 mod seq_info;
 mod table_info;
 mod trigger_info;
+pub(crate) mod type_hint;
 mod type_info;
 mod view_info;
 
@@ -21,6 +22,7 @@ pub use self::{
     seq_info::{SequenceInfoRead, SequenceInfoWrite},
     table_info::{TableInfoRead, TableInfoWrite},
     trigger_info::{TriggerInfoRead, TriggerInfoWrite},
+    type_hint::{ParameterTypeHintRead, ParameterTypeHintWrite},
     type_info::{TypeInfoRead, TypeInfoWrite},
     view_info::{ViewInfoRead, ViewInfoWrite},
 };
@@ -298,7 +300,9 @@ pub trait DiagnosticContext {
 /// initialization; a frozen catalog does not supply their configuration.
 ///
 pub trait ParseContext:
-    RuleInfoWrite
+    ParameterTypeHintRead
+    + ParameterTypeHintWrite
+    + RuleInfoWrite
     + TriggerInfoWrite
     + SequenceInfoWrite
     + TypeInfoWrite
@@ -472,11 +476,12 @@ where
     /// Record a parameter operand without starting constraint collection.
     fn parameter(&mut self, position: u32) -> SemScalarExpr {
         self.analysis_state_mut().parameter();
-        SemScalarExpr::parameter(
-            position,
-            usize::MAX,
-            &crate::sem::InputTypeConstraint::any(),
-        )
+        let constraint = if let Some(ty) = self.get_parameter_typehint(position as usize) {
+            crate::sem::InputTypeConstraint::exact(&ty)
+        } else {
+            crate::sem::InputTypeConstraint::any()
+        };
+        SemScalarExpr::parameter(position, usize::MAX, &constraint)
     }
 
     /// Infer parameters over an already name-resolved query, when required.
@@ -520,7 +525,7 @@ where
 
     /// Constraints derived from the most recently reported semantic analysis.
     /// Parameter-free analyses skip inference and leave this result empty.
-    /// These are independent of parameter metadata hints and Rust type mapping.
+    /// These retain explicit SQL input types but do not perform Rust type mapping.
     /// Conflicts are reported through [`DiagnosticContext::report_problem`]; a
     /// returned analysis result does not imply satisfiable constraints.
     fn parameter_constraints(&self) -> &crate::sem::ParameterConstraints;

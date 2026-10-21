@@ -424,6 +424,15 @@ impl SqlFunArgs {
     const SQL_FUN_DATASOURCE: &str = "SQL_FUN_DATASOURCE";
     const SQL_FUN_MODE: &str = "SQL_FUN_MODE";
 
+    /// Copy the effective options with an explicitly selected datasource.
+    /// Other selections and overrides are preserved.
+    #[must_use]
+    pub fn with_datasource(&self, datasource: &str) -> Self {
+        let mut selected = self.clone();
+        selected.datasource = Some(datasource.to_owned());
+        selected
+    }
+
     /// selected datasource name
     #[must_use]
     pub fn datasource(&self) -> Option<&str> {

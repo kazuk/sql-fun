@@ -35,6 +35,84 @@ pub struct AnalyzeQueryArgs {
     resolved_cte_catalog: Option<::sql_fun_core::ResolvedCteCatalog>,
 }
 
+impl AnalyzeQueryArgs {
+    /// Submit a resolved catalog whose base query is the sole SQL input.
+    /// Takes ownership to preserve the recovered catalog without copying it.
+    #[must_use]
+    pub fn from_catalog(
+        context_handle: &ContextHandle,
+        catalog: ::sql_fun_core::ResolvedCteCatalog,
+    ) -> Self {
+        Self {
+            context_handle: context_handle.clone(),
+            query: None,
+            resolved_cte_catalog: Some(catalog),
+        }
+    }
+}
+
+#[cfg(test)]
+mod test_catalog_request_transport {
+    use super::AnalyzeQueryArgs;
+
+    #[rstest::rstest]
+    #[case::omitted(false)]
+    #[case::explicit_null(true)]
+    fn plain_query_remains_valid(#[case] explicit_null: bool) {
+        let mut value = ::serde_json::json!({
+            "context_handle":"context-1", "query":{"Text":"SELECT 1"}
+        });
+        if explicit_null {
+            value["resolved_cte_catalog"] = ::serde_json::Value::Null;
+        }
+        let request: AnalyzeQueryArgs = ::serde_json::from_value(value).unwrap();
+        assert!(request.resolved_cte_catalog().is_none());
+        assert_eq!(request.query().as_ref().unwrap().text(), Some("SELECT 1"));
+    }
+
+    #[test]
+    fn constructor_preserves_dependency_order_aliases_and_binding_metadata() {
+        use ::sql_fun_core::{
+            CteName, CteParameterCollection, PlaceholderedSql, ResolvedCteCatalog,
+        };
+        let base = PlaceholderedSql::from_query("SELECT ${shared:int4} FROM a_visible");
+        let leaf = PlaceholderedSql::from_query("SELECT ${shared:int4} AS id");
+        let mut bindings = CteParameterCollection::default();
+        for (name, hints) in leaf.parameters() {
+            bindings.push_query_parameter(&CteName::new("library::leaf"), name, hints);
+        }
+        let mut catalog = ::serde_json::to_value(ResolvedCteCatalog::from(&base)).unwrap();
+        catalog["parameters"] = ::serde_json::to_value(bindings).unwrap();
+        catalog["cte_queries"]["z_dependency"] = ::serde_json::to_value(&leaf).unwrap();
+        catalog["cte_queries"]["a_visible"] =
+            ::serde_json::to_value(PlaceholderedSql::from_query("SELECT id FROM z_dependency"))
+                .unwrap();
+        let handle = crate::payloads::ContextHandle::from("context-1".to_owned());
+        let request = AnalyzeQueryArgs::from_catalog(
+            &handle,
+            ::serde_json::from_value(catalog.clone()).unwrap(),
+        );
+        let wire = ::serde_json::to_value(request).unwrap();
+        assert!(wire["query"].is_null());
+        assert_eq!(wire["resolved_cte_catalog"], catalog);
+        let restored: AnalyzeQueryArgs = ::serde_json::from_value(wire).unwrap();
+        let restored = restored.resolved_cte_catalog().as_ref().unwrap();
+        let aliases = restored
+            .try_map_cte_queries(|alias, _| {
+                Ok::<_, std::convert::Infallible>(alias.as_str().to_owned())
+            })
+            .unwrap();
+        assert_eq!(aliases, ["z_dependency", "a_visible"]);
+        let mut order = Vec::new();
+        restored.append_cte_parameter_order(&mut order);
+        assert_eq!(order[0].as_str(), "shared");
+        assert_eq!(
+            ::serde_json::to_value(restored.parameters()).unwrap(),
+            catalog["parameters"]
+        );
+    }
+}
+
 /// response for `analyze_query`
 #[cfg_attr(feature = "openrpc-schema", derive(schemars::JsonSchema))]
 #[derive(serde::Serialize, serde::Deserialize, derive_getters::Getters)]

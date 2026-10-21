@@ -29,21 +29,37 @@ pub struct ApiArgs {
 }
 
 impl ApiArgs {
-    pub(crate) async fn execute(&self) -> Result<ExitCode, ::anyhow::Error> {
-        // The application owns logging; the shared server/client do not configure it.
-        let _ = ::tracing_subscriber::fmt()
-            .with_env_filter(::tracing_subscriber::EnvFilter::from_default_env())
-            .with_writer(std::io::stderr)
-            .try_init();
+    pub(crate) async fn connect(&self) -> Result<TcpJsonRpcClientAsync, ::anyhow::Error> {
         let executable = resolve_executable(std::env::var_os("SQL_FUN_SERVER"))?;
         let options = ConnectionOptions::builder()
             .server_executable(executable)
             .user(&self.user)
             .maybe_server_command(self.server_command.clone())
             .build();
-        let client = ::sql_fun_client::connect(&options)
-            .await
-            .context("api: cannot connect to sql-fun-server; check USER, SQL_FUN_SERVER and the launch command")?;
+        ::sql_fun_client::connect(&options).await.context(
+            "cannot connect to sql-fun-server; check USER, SQL_FUN_SERVER and the launch command",
+        )
+    }
+
+    pub(crate) fn from_environment() -> Result<Self, ::anyhow::Error> {
+        let server_command = match std::env::var("SQL_FUN_SERVER_COMMAND") {
+            Ok(command) => Some(command),
+            Err(std::env::VarError::NotPresent) => None,
+            Err(error) => return Err(error).context("SQL_FUN_SERVER_COMMAND must be valid UTF-8"),
+        };
+        Ok(Self {
+            user: std::env::var("USER").context("USER is required to connect to sql-fun-server")?,
+            server_command,
+        })
+    }
+
+    pub(crate) async fn execute(&self) -> Result<ExitCode, ::anyhow::Error> {
+        // The application owns logging; the shared server/client do not configure it.
+        let _ = ::tracing_subscriber::fmt()
+            .with_env_filter(::tracing_subscriber::EnvFilter::from_default_env())
+            .with_writer(std::io::stderr)
+            .try_init();
+        let client = self.connect().await?;
         bridge(
             client,
             BufReader::new(::tokio::io::stdin()),

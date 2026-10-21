@@ -3,12 +3,21 @@ use crate::ast::Dialect;
 use crate::sem::{AnalysisError, ParseContext, TypeReference};
 
 pub(super) fn resolve_parameter_hint(
+    slot: usize,
     hint: &str,
     context: &impl ParseContext,
 ) -> Result<Option<TypeReference>, AnalysisError> {
-    let reference = hint.parse::<TypeReference>()?;
+    let reference = hint.parse::<TypeReference>().map_err(|error| {
+        AnalysisError::unexpected_input_error(&format!(
+            "parameter ${} type hint {hint:?}: {error}",
+            slot + 1,
+        ))
+    })?;
     let canonical = context.canonicalize_type_ref(&reference).ok_or_else(|| {
-        AnalysisError::unexpected_input_error(&format!("SQL type {reference} not found"))
+        AnalysisError::unexpected_input_error(&format!(
+            "parameter ${} type hint {hint:?}: SQL type {reference} not found",
+            slot + 1,
+        ))
     })?;
     // PostgreSQL treats an explicitly declared unknown parameter as unspecified.
     if context.dialect() == Dialect::postgres()

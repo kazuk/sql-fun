@@ -54,12 +54,7 @@ impl ParameterTypeHints {
         let mut resolved = Vec::with_capacity(hints.len());
         for (slot, hint) in hints.iter().enumerate() {
             let ty = if let Some(hint) = hint {
-                self::resolve::resolve_parameter_hint(hint, context).map_err(|error| {
-                    AnalysisError::unexpected_input_error(&format!(
-                        "parameter ${} type hint {hint:?}: {error}",
-                        slot + 1,
-                    ))
-                })?
+                self::resolve::resolve_parameter_hint(slot, hint, context)?
             } else {
                 None
             };

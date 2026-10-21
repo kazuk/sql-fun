@@ -374,6 +374,8 @@ SQLAST API callers can install explicit SQL input types before calling
 supplies the type of `$1`, and the second leaves `$2` for normal inference.
 `ParameterTypeHintRead::get_parameter_typehint` takes the SQL parameter number
 unchanged; zero and numbers outside the supplied slice return `None`.
+PostgreSQL `unknown` (including its qualified spelling) leaves the slot for
+normal inference, like `None`.
 
 Type hints use the selected dialect's type syntax and the analysis context's
 catalog and search path. PostgreSQL aliases, qualified or quoted names, arrays,

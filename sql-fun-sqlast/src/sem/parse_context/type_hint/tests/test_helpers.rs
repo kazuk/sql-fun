@@ -10,6 +10,15 @@ pub(super) fn context() -> SchemaFileContext {
     base.set_get_search_path_result(&[SchemaName::from("public"), SchemaName::from("pg_catalog")]);
     for name in [
         "int4",
+        "int2",
+        "int8",
+        "bpchar",
+        "bit",
+        "varbit",
+        "time",
+        "timetz",
+        "timestamptz",
+        "unknown",
         "text",
         "bool",
         "numeric",

@@ -341,7 +341,7 @@ mod comparison_knowledge_tests {
         let mut context = TestParseContext::default();
         let mut parameters = crate::sem::parameter_resolution::ParameterResolution::default();
         let arguments = [
-            parameters.parameter(1),
+            parameters.parameter(1, &crate::sem::InputTypeConstraint::any()),
             SemScalarExpr::new_const(ScalarConstExpr::new_integer(1)),
         ];
         let (_, types) = parameters

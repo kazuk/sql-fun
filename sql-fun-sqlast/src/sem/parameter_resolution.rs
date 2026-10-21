@@ -207,8 +207,15 @@ impl ParameterResolution {
             );
         }
     }
-    pub(crate) fn parameter(&mut self, position: u32) -> SemScalarExpr {
+    pub(crate) fn parameter(
+        &mut self,
+        position: u32,
+        domain: &InputTypeConstraint,
+    ) -> SemScalarExpr {
         let node = self.graph.parameter(position);
+        if !domain.is_any() {
+            self.graph.restrict(node, domain);
+        }
         SemScalarExpr::parameter(position, node, self.graph.domain(node))
     }
 

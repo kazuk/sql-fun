@@ -81,6 +81,7 @@ pub(crate) use self::insert_statement::{
 };
 #[cfg(test)]
 pub(crate) use self::parse_context::conflict_info::infer_from_catalog;
+pub(crate) use self::parse_context::type_hint::ParameterTypeHints;
 pub(crate) use self::resolution::ResolutionFailure;
 pub(crate) use self::update_statement::UpdateAssignmentCollection;
 
@@ -175,10 +176,11 @@ pub use self::{
     parse_context::{
         BaseParseContext, CastInfoRead, CatalogNameLookup, ConflictArbiterInference,
         ConflictInfoRead, CursorInfo, DefaultSourceAccessService, DiagnosticContext,
-        FunctionInfoRead, FunctionInfoWrite, IndexInfoRead, OperatorInfoRead, ParseContext,
-        RuleInfoRead, RuleInfoWrite, SearchPathRead, SequenceInfoRead, SequenceInfoWrite,
-        SourceAccessService, TableInfoRead, TableInfoWrite, TriggerInfoRead, TriggerInfoWrite,
-        TypeInfoRead, TypeInfoWrite, ViewInfoRead, ViewInfoWrite,
+        FunctionInfoRead, FunctionInfoWrite, IndexInfoRead, OperatorInfoRead,
+        ParameterTypeHintRead, ParameterTypeHintWrite, ParseContext, RuleInfoRead, RuleInfoWrite,
+        SearchPathRead, SequenceInfoRead, SequenceInfoWrite, SourceAccessService, TableInfoRead,
+        TableInfoWrite, TriggerInfoRead, TriggerInfoWrite, TypeInfoRead, TypeInfoWrite,
+        ViewInfoRead, ViewInfoWrite,
     },
     pg_type::{
         ArrayTypeDefinition, BuiltinTypeDefinition, PgBuiltInType, TypeCategory, TypeDefinition,

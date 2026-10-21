@@ -48,6 +48,24 @@ pub struct InitializeSchemaArgs {
     environments: HashMap<String, String>,
 }
 
+impl InitializeSchemaArgs {
+    /// Select schema input and transfer its effective configuration to the server.
+    #[must_use]
+    pub fn new(
+        datasource: &str,
+        schema_dump: &std::path::Path,
+        expected_hash: &str,
+        environments: &HashMap<String, String>,
+    ) -> Self {
+        Self {
+            datasource: datasource.to_owned(),
+            schema_dump: schema_dump.to_path_buf(),
+            expected_hash: expected_hash.to_owned(),
+            environments: environments.clone(),
+        }
+    }
+}
+
 /// schema context
 #[cfg_attr(feature = "openrpc-schema", derive(schemars::JsonSchema))]
 #[derive(serde::Serialize, serde::Deserialize, derive_getters::Getters)]

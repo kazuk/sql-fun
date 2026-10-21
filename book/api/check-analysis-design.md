@@ -6,8 +6,9 @@ and other clients that need parameter descriptions, result-set columns, and
 SQL diagnostics without executing a query.
 
 The authenticated server implements schema initialization, query analysis and
-session-local paged collections. CLI `check` submission of recovered query
-requirements remains separate work (#378).
+session-local paged collections. CLI `check` submits recovered query
+requirements; diagnostic presentation and lockfile integration remain unfinished
+(#689).
 
 ## Before you begin
 
@@ -152,8 +153,8 @@ Supply exactly one of `query` and `resolved_cte_catalog`:
 `Url` input returns `InvalidAnalysisInput` without fetching. A resolved CTE
 catalog uses the shared `sql-fun-core::ResolvedCteCatalog` JSON representation;
 its base query is authoritative, so `query` must be omitted. The server never
-loads CTE catalog files. #458 provides this receiving API; #378 adds CLI
-`check` submission to it.
+loads CTE catalog files. CLI `check` submits the recovered catalog directly to
+this API, including catalogs without referenced CTEs.
 
 Without referenced CTE expansion, multiple SQL statements are accepted and
 analyzed in input order, including a catalog with zero referenced CTEs. The
@@ -313,15 +314,16 @@ connection when continuation is needed.
 
 The CLI extracts query requirements from expanded Rust source. Each requirement
 contains its datasource, query, `ResolvedCteCatalog`, and Rust source
-location. The intended integration is:
+location. It initializes a context per referenced datasource on one persistent
+connection and submits each recovered catalog with the corresponding context
+handle. It materializes and releases response collections while retaining source
+identity. Catalog definitions, aliases and parameter bindings are transported
+unchanged; the CLI does not send a second copy of the base SQL.
 
-1. Initialize a context for each explicitly selected datasource used by the
-   extracted queries.
-2. Submit each resolved catalog with the corresponding context handle.
-3. Read diagnostics, definitive bind order, inferred types, result columns,
-   and referenced schema objects.
-4. Associate diagnostics with the originating Rust query and use successful
-   analysis for lockfile validation or generation.
+The remaining consumer integration (#689) will display diagnostics, use the
+returned definitive bind order and result shape, and validate or generate
+lockfile entries for successful analyses. Until that integration is complete,
+`check` still fails at its unimplemented completion step after submission.
 
 The server handles SQL analysis and reusable CTE expansion. The CLI handles
 Rust source extraction, source-level reporting, and lockfile policy. The
@@ -344,8 +346,8 @@ implementation and reference documentation cover the behavior.
 | `sql-fun-core` | Shared `ResolvedCteCatalog` and its serialization |
 | `sql-fun-codegen` | `QueryRequirements::extract` |
 | `sql-fun-server/src/cte_realization.rs` | `realize_cte_catalog` produces a common AST and `OrderedBindings`; it is server-internal |
-| `sql-fun-server/src/lib.rs` | Connection-local initialization and collection RPCs implemented; query-analysis and object-consumer handlers remain unfinished |
-| `cli/src/check.rs` | Requirements extraction exists; server analysis and lockfile integration are incomplete |
+| `sql-fun-server/src/lib.rs` | Connection-local initialization, query analysis and collection RPCs implemented; object-consumer handlers remain unfinished |
+| `cli/src/check.rs` | Requirements extraction and server submission exist; diagnostic presentation and lockfile integration are incomplete |
 
 ### Pending design and implementation decisions
 

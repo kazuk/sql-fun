@@ -92,6 +92,12 @@ impl QueryRequirement {
         &self.query
     }
 
+    /// Transfer the already-resolved catalog to an analysis request.
+    #[must_use]
+    pub fn into_cte_catalog(self) -> ResolvedCteCatalog {
+        self.cte_catalog
+    }
+
     /// Deserialized CTE information, ready for analysis.
     #[must_use]
     pub const fn cte_catalog(&self) -> &ResolvedCteCatalog {
@@ -198,6 +204,15 @@ impl QueryRequirements {
     /// Visit the extracted requirements.
     pub fn iter(&self) -> impl Iterator<Item = &QueryRequirement> {
         self.0.iter()
+    }
+}
+
+impl IntoIterator for QueryRequirements {
+    type Item = QueryRequirement;
+    type IntoIter = std::vec::IntoIter<QueryRequirement>;
+
+    fn into_iter(self) -> Self::IntoIter {
+        self.0.into_iter()
     }
 }
 

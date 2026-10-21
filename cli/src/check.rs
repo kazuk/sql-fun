@@ -1,3 +1,5 @@
+mod submission;
+
 use std::{
     ffi::OsStr,
     io::{Read, Seek, SeekFrom},
@@ -126,31 +128,46 @@ impl CheckArgs {
     ///
     /// [`anyhow::Error`] for runtime error
     ///
-    pub async fn execute(&self, _common_args: &SqlFunArgs) -> Result<ExitCode, anyhow::Error> {
+    pub async fn execute(&self, common_args: &SqlFunArgs) -> Result<ExitCode, anyhow::Error> {
         ::which::which("cargo-expand").map_err(|_| {
             anyhow::anyhow!(
                 "sql-fun check requires cargo-expand on PATH; install it with \"cargo install --locked cargo-expand\" and ensure Cargo's binary directory is on PATH"
             )
         })?;
 
+        let mut requirements = Vec::new();
         if self.workspace {
             let deps_members = Self::dependent_members()?;
             for member in deps_members {
-                self.expand_member(member.as_str()).await?;
+                requirements.extend(self.expand_member(member.as_str()).await?);
             }
         } else if let Some(member) = &self.package {
-            self.expand_member(member).await?;
+            requirements.extend(self.expand_member(member).await?);
         } else {
             let default_members = Self::default_packages()?;
             for member in default_members {
-                self.expand_member(&member).await?;
+                requirements.extend(self.expand_member(&member).await?);
             }
         }
 
-        todo!()
+        if !requirements.is_empty() {
+            let mut client = crate::api::ApiArgs::from_environment()?.connect().await?;
+            let submitted = submission::submit(&mut client, common_args, requirements).await;
+            let finished = client.finish().await;
+            let analyses = submitted?;
+            finished?;
+            for analysis in analyses {
+                analysis.log_received();
+            }
+        }
+
+        todo!("connect analysis diagnostics and lockfile policy (#689)")
     }
 
-    async fn expand_member(&self, member: &str) -> Result<(), anyhow::Error> {
+    async fn expand_member(
+        &self,
+        member: &str,
+    ) -> Result<::sql_fun_codegen::QueryRequirements, anyhow::Error> {
         let mut cargo_expand_command = CargoExpand::new(member)?;
         cargo_expand_command.set("--lib", self.lib);
         cargo_expand_command.set("--tests", self.tests);
@@ -195,7 +212,7 @@ impl CheckArgs {
             "extracted {} query requirements from {member}",
             requirements.len()
         );
-        Ok(())
+        Ok(requirements)
     }
 
     fn dependent_members() -> Result<Vec<String>, anyhow::Error> {

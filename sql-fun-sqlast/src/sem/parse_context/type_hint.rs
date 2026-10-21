@@ -15,8 +15,9 @@ pub trait ParameterTypeHintRead {
 /// Install explicit SQL input types before analyzing an independent query.
 pub trait ParameterTypeHintWrite {
     /// Resolve zero-based slots (`hints[0]` describes `$1`) using this context's
-    /// dialect, catalog, and effective search path. Resolve every hint before
-    /// replacing state; an error preserves the previous setup completely.
+    /// catalog and effective search path. Type spelling follows the existing
+    /// `TypeReference` / `FullName` parser, rather than the full SQL type grammar.
+    /// Resolve every hint before replacing state; an error preserves the previous setup completely.
     /// Empty input and all-`None` input successfully replace the previous setup.
     /// PostgreSQL `unknown` hints leave the corresponding slot unspecified.
     ///

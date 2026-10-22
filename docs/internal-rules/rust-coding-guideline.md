@@ -642,6 +642,46 @@ impl TryFrom<&syn::NullTest> for NullTest {
     }
     ```
 
+### Grow shared operations
+
+The collection traversal rule keeps syntax-specific interpretation small and
+concentrates reusable decisions and operations in their responsible shared
+types. Removing `.iter()` from a caller is a means to that design, not the
+completion criterion.
+
+- Check existing shared operations before implementing a decision or
+  transformation in a syntax handler. If an operation is missing, extend the
+  type responsible for that data or decision with an intent-revealing method.
+  A first consumer is sufficient when the operation belongs to that shared
+  responsibility; multiple callers are not a prerequisite.
+- Keep syntax-specific decoding, placement rules, and syntax distinctions in
+  the interpretation layer. Pass semantic inputs to shared operations instead
+  of making shared types depend on a particular syntax node or handler.
+- Do not avoid syntax-specific dependencies in shared code by reimplementing
+  shared decisions or collection logic in each syntax handler. Such duplication
+  is a more serious design failure than the dependency problem it attempts to
+  avoid. Find the semantic operation and its responsible owner rather than
+  choosing either form of misplaced logic.
+- Encapsulate the complete logical operation. Index loops, repeated element
+  lookups, and sequences of empty checks, replacement, and insertion can leak
+  collection logic just as iterators do. Callers should request the intended
+  result rather than reconstruct the operation from primitives.
+- Moving a loop into a handler-specific helper or collection wrapper is not
+  sufficient by itself. Prefer extending an applicable shared operation over
+  adding another strategy. Keep total code size and the number of concepts
+  small; introduce a new type only when it establishes a useful responsibility
+  that existing types cannot express clearly.
+
+During design and review, check both the handler and the shared implementation:
+
+- Does the handler primarily interpret its syntax and compose shared operations?
+- Does each shared operation belong to its owner's responsibility and accept
+  semantic inputs without depending on a particular syntax representation?
+- Are existing shared decisions reused, with missing capabilities added to their
+  responsible owners rather than duplicated across handlers?
+- Does the change reduce future implementation sites without merely relocating
+  handler-specific code or adding unnecessary wrappers and code volume?
+
 ### Express intent above low-level mechanisms
 
 - Write processing and coordination logic in terms of the operations it

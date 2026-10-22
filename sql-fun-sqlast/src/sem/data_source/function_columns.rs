@@ -95,27 +95,11 @@ impl TableFunctionOutput {
         overload: &OverloadVariant,
         alias: &AliasSpec,
     ) -> Result<(), AnalysisError> {
-        let declared = overload.returning_table();
         let record = overload.requires_record_definition();
         self.validate_requirement(context, record)?;
         if !record {
-            self.columns = declared;
-            if self.columns.get_at(0).is_none()
-                && let Some(ty) = overload.ret_type()
-            {
-                if let Some(definition) = ty.definition_from_catalog(context)
-                    && let Some(columns) = definition.table_function_columns(context)
-                {
-                    self.columns = columns;
-                } else {
-                    self.columns.push(&ColumnDefinition::new(
-                        &Some(ColumnName::from(alias.name().as_str())),
-                        Some(ty),
-                        None,
-                        &[],
-                    ));
-                }
-            }
+            self.columns = overload
+                .table_function_output_columns(context, &ColumnName::from(alias.name().as_str()));
         }
         Ok(())
     }

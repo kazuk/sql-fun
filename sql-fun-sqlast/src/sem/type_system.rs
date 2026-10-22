@@ -151,8 +151,28 @@ impl OverloadVariant {
         }
     }
 
+    pub(crate) fn table_function_output_columns(
+        &self,
+        context: &impl crate::sem::ParseContext,
+        scalar_name: &crate::sem::ColumnName,
+    ) -> crate::sem::ColumnCollection {
+        let declared = self.returning_table();
+        if !declared.is_empty() {
+            return declared;
+        }
+        let Some(ty) = self.ret_type() else {
+            return declared;
+        };
+        if let Some(definition) = ty.definition_from_catalog(context)
+            && let Some(columns) = definition.table_function_columns(context)
+        {
+            return columns;
+        }
+        crate::sem::ColumnCollection::scalar_function_output(scalar_name, ty)
+    }
+
     pub(crate) fn requires_record_definition(&self) -> bool {
-        self.returns_record() && self.returning_table().get_at(0).is_none()
+        self.returns_record() && self.returning_table().is_empty()
     }
 
     fn returns_record(&self) -> bool {

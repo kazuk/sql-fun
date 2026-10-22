@@ -48,6 +48,12 @@ impl ColumnCollection {
             })
     }
 
+    /// Whether the collection contains no columns.
+    #[must_use]
+    pub const fn is_empty(&self) -> bool {
+        self.0.is_empty()
+    }
+
     /// Named columns in declaration order, preserving duplicate names.
     #[must_use]
     pub fn names(&self) -> Vec<ColumnName> {
@@ -55,6 +61,18 @@ impl ColumnCollection {
             .iter()
             .filter_map(|column| column.name().clone())
             .collect()
+    }
+
+    pub(crate) fn scalar_function_output(
+        name: &ColumnName,
+        ty: &crate::sem::TypeReference,
+    ) -> Self {
+        Self(vec![ColumnDefinition::new(
+            &Some(name.clone()),
+            Some(ty),
+            None,
+            &[],
+        )])
     }
 
     pub(crate) fn row_type_columns(&self) -> Self {

@@ -116,10 +116,8 @@ impl DataSource {
                 UndefinedTableFuncDataSource::from_name(name, arguments, alias),
             ));
         };
-        Ok(Self::table_function(
-            &overload,
-            arguments.to_vec().into(),
-            alias,
-        ))
+        let mut source = Self::table_function(&overload, arguments.to_vec().into(), alias);
+        source.record_function_name(name, &context.resolve_function_name_with_search_path(name));
+        Ok(source)
     }
 }

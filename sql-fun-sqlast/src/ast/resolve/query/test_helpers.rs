@@ -211,6 +211,23 @@ CREATE TABLE "b.b"."t.x"(id bigint NOT NULL);
 pub(super) fn table_function_query(sql: &str, infer: bool) -> (SelectStatement, TestParseContext) {
     let dialect = Dialect::postgres();
     let mut context = catalog();
+    for name in [
+        "varchar",
+        "bpchar",
+        "bit",
+        "varbit",
+        "timestamp",
+        "timestamptz",
+        "time",
+        "timetz",
+    ] {
+        context.setup_type(TypeReference::from_master_type_name(name));
+        context.setup_type(TypeReference::from_master_type_name(name).array_type());
+    }
+    context.setup_type(TypeReference::concrete_type_ref(
+        &crate::sem::FullName::with_schema("public", "custom_type"),
+        false,
+    ));
     let record = TypeReference::from_master_type_name("record");
     context.setup_type(record.clone());
     context.setup_type(PgBuiltInType::text().array_type());

@@ -18,6 +18,8 @@ pub enum TableFunctionProblem {
     CollationNotFound(String),
     /// More column aliases than output columns were supplied.
     TooManyAliases,
+    /// Invalid declaration-local type modifiers.
+    InvalidTypmod(String),
 }
 impl TableFunctionProblem {
     /// Invalid placement of outer record definitions.
@@ -55,8 +57,14 @@ impl TableFunctionProblem {
     pub const fn too_many_aliases() -> Self {
         Self::TooManyAliases
     }
+    /// Invalid type modifier arguments for the declared type.
+    #[must_use]
+    pub fn invalid_typmod(message: &str) -> Self {
+        Self::InvalidTypmod(message.to_owned())
+    }
     pub(super) const fn code(&self) -> &'static str {
         match self {
+            Self::InvalidTypmod(_) => "table_function_invalid_typmod",
             Self::DefinitionRequired => "table_function_definition_required",
             Self::InvalidPlacement => "table_function_definition_placement",
             Self::DefinitionNotAllowed => "table_function_definition_not_allowed",
@@ -68,6 +76,7 @@ impl TableFunctionProblem {
     }
     pub(super) fn render_metadata(&self) -> DiagnosticMetadata {
         DiagnosticMetadata::from(match self {
+            Self::InvalidTypmod(message) => format!("invalid table-function column type modifier: {message}"),
             Self::InvalidPlacement => "outer column definitions require one function, no per-function definitions, and no WITH ORDINALITY".to_owned(),
             Self::DefinitionRequired => "a column definition list is required for functions returning record".to_owned(),
             Self::DefinitionNotAllowed => "a column definition list is only allowed for functions returning record without declared output columns".to_owned(),

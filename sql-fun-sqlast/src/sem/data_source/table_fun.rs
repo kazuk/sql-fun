@@ -8,6 +8,7 @@ use ::sql_fun_core::IVec;
 #[derive(Debug, Clone, Eq, Hash, PartialEq, serde::Serialize, serde::Deserialize)]
 pub struct TableFunctionDataSource {
     function: OverloadVariant,
+    function_name: Option<crate::sem::QueryName>,
     args: IVec<SemScalarExpr>,
     alias: AliasSpec,
     output: super::TableFunctionOutput,
@@ -25,6 +26,10 @@ impl super::DataSource {
 }
 
 impl TableFunctionDataSource {
+    /// Requested function name and its recorded search-path resolution.
+    pub const fn function_name(&self) -> Option<&crate::sem::QueryName> {
+        self.function_name.as_ref()
+    }
     pub const fn function(&self) -> &OverloadVariant {
         &self.function
     }
@@ -39,6 +44,7 @@ impl TableFunctionDataSource {
         alias: &AliasSpec,
     ) -> DataSource {
         DataSource::CallTableFunc(Self {
+            function_name: None,
             output: super::TableFunctionOutput::declared(&function),
             function,
             args,
@@ -114,7 +120,7 @@ impl TableFunctionDataSource {
                 context,
             ));
         }
-        crate::sem::ColumnReferenceExpr::function_source_ref(
+        let (expression, context) = crate::sem::ColumnReferenceExpr::function_source_ref(
             context,
             alias,
             column,
@@ -122,7 +128,11 @@ impl TableFunctionDataSource {
             self.output.column(column, &self.alias),
             &self.args,
             nullable,
-        )
+        )?;
+        Ok((
+            expression.with_function_type_declaration(self.output.declaration(column, &self.alias)),
+            context,
+        ))
     }
 }
 
@@ -139,6 +149,13 @@ impl TableFunctionDataSource {
 }
 
 impl TableFunctionDataSource {
+    /// Caller-supplied type and modifiers for an effective output column.
+    pub fn output_type_declaration(
+        &self,
+        column: &ColumnName,
+    ) -> Option<&crate::sem::WithTypmod<crate::sem::TypeReference>> {
+        self.output.declaration(column, &self.alias)
+    }
     /// Effective invocation columns, independently of the catalog return declaration.
     pub const fn output_columns(&self) -> &crate::sem::ColumnCollection {
         self.output.columns()
@@ -146,5 +163,20 @@ impl TableFunctionDataSource {
     /// Retained invalid-definition outcomes, independently of diagnostic delivery.
     pub fn output_problems(&self) -> &[crate::sem::TableFunctionProblem] {
         self.output.problems()
+    }
+}
+
+impl DataSource {
+    pub(crate) fn record_function_name(
+        &mut self,
+        requested: &crate::sem::FullName,
+        resolved: &crate::sem::FullName,
+    ) {
+        if let Self::CallTableFunc(source) = self {
+            source.function_name = Some(crate::sem::QueryName::new(
+                &requested.to_string(),
+                crate::sem::QueryNameResolution::function(resolved),
+            ));
+        }
     }
 }

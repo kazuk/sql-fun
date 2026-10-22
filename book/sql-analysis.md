@@ -88,6 +88,14 @@ Typed definition lists cannot override scalar, named-composite, or OUT/TABLE
 return declarations. Missing required definitions, duplicate definition names,
 and unresolved declared types or collation names produce diagnostics.
 
+Column declarations retain type modifiers separately from type identity. Builtin
+character/bit lengths, numeric precision/scale, and time/interval precision are
+interpreted using PostgreSQL rules; invalid arguments produce diagnostics.
+Negative numeric scales and scales exceeding precision are allowed. Time
+precision above six is retained as requested and interpreted as six. Extension
+type modifiers are retained with an explicit unvalidated outcome; analysis does
+not execute extension typmod input functions.
+
 ## SQLite parser limitations
 
 SQLite support is under development. Its sql-fun parser currently limits

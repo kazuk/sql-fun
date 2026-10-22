@@ -512,10 +512,20 @@ impl TypedColumn {
         let mut output = crate::sem::TableFunctionOutput::default();
         for column in columns {
             let collation = column.collation.as_ref().map(Name::full_name).transpose()?;
+            use crate::ast::deparse::{SqlEmit, SqlWriter};
+            let mut modifiers = Vec::new();
+            for modifier in &column.type_name.modifiers {
+                let mut writer = SqlWriter::new(crate::ast::Dialect::postgres());
+                modifier
+                    .emit(&mut writer)
+                    .map_err(|error| AnalysisError::unexpected_input_error(&error.to_string()))?;
+                modifiers.push(writer.into_sql());
+            }
             output.declare(
                 context,
                 &column.name,
                 &column.type_name.reference()?,
+                &modifiers,
                 collation.as_ref(),
             )?;
         }

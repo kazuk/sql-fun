@@ -274,11 +274,16 @@ mod test_data_source_analyze_range_func_rows_from {
             &tokens,
         )?;
 
-        let expected_rows_func = DataSourceRowsFromFunc::invocation(&DataSource::table_function(
+        let mut invocation = DataSource::table_function(
             &overload,
             IVec::default(),
             &AliasSpec::from_local_name(&func_name.local_name()),
-        ));
+        );
+        invocation.record_function_name(
+            &crate::sem::FullName::from_local_name(&func_name.local_name()),
+            &func_name,
+        );
+        let expected_rows_func = DataSourceRowsFromFunc::invocation(&invocation);
         let expected_functions: IVec<_> = vec![expected_rows_func].into();
         let expected_alias = AliasSpec::from_names("rows_alias", &[]);
         let expected_row_functions =

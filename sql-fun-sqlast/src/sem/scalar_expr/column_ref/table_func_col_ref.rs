@@ -11,6 +11,7 @@ pub struct TableFunctionColumnRef {
     alias: AliasName,
     column: ColumnName,
     column_def: Option<ColumnDefinition>,
+    type_declaration: Option<crate::sem::WithTypmod<crate::sem::TypeReference>>,
     table_function: Option<OverloadVariant>,
     args: IVec<SemScalarExpr>,
     datasource_nullable: Nullable,
@@ -45,6 +46,12 @@ impl ColumnReference for TableFunctionColumnRef {
 }
 
 impl TableFunctionColumnRef {
+    /// Declaration-local modifiers retained from the table invocation.
+    pub const fn type_declaration(
+        &self,
+    ) -> Option<&crate::sem::WithTypmod<crate::sem::TypeReference>> {
+        self.type_declaration.as_ref()
+    }
     pub(super) fn with_reference_name(mut self, alias: &AliasName, column: &ColumnName) -> Self {
         self.alias = alias.clone();
         self.column = column.clone();
@@ -71,6 +78,7 @@ impl TableFunctionColumnRef {
             alias: alias.clone(),
             column: column.clone(),
             column_def: column_def.cloned(),
+            type_declaration: None,
             table_function: table_function.cloned(),
             args: args.clone(),
             datasource_nullable,
@@ -169,5 +177,17 @@ impl SemScalarExpr {
             }
             _ => self,
         }
+    }
+}
+
+impl SemScalarExpr {
+    pub(crate) fn with_function_type_declaration(
+        mut self,
+        declaration: Option<&crate::sem::WithTypmod<crate::sem::TypeReference>>,
+    ) -> Self {
+        if let Self::ColumnRef(ColumnReferenceExpr::TableFuncColumn(reference)) = &mut self {
+            reference.type_declaration = declaration.cloned();
+        }
+        self
     }
 }

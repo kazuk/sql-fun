@@ -206,3 +206,263 @@ async fn closed_consumer_is_a_delivery_failure() {
     client.finish().await.unwrap();
     assert_eq!(peer.await.unwrap().len(), 2);
 }
+
+#[rstest::rstest]
+#[case::ordinary(false)]
+#[case::force(true)]
+#[tokio::test]
+async fn check_session_regenerates_multiple_statements_and_removes_stale_entries(
+    #[case] force: bool,
+) {
+    use crate::check::{
+        CheckArgs,
+        lockfiles::Lockfiles,
+        progress::{Progress, ProgressMode},
+    };
+    use ::clap::Parser;
+    use ::sql_fun_core::lockfile::{Lockfile, LockfileEntry, LockfileStatement};
+    let project = test_helpers::Project::new();
+    let args = project.args();
+    let path = args.lockfile_path("first").unwrap();
+    project.write_lockfile(
+        "first",
+        "old hash",
+        &[LockfileEntry::new(
+            "stale",
+            "removed",
+            &[LockfileStatement::new("SELECT old", &[], &[])],
+        )
+        .unwrap()],
+    );
+    let requirements = test_helpers::requirements(
+        &["first", "first"],
+        "SELECT 0; SELECT 1",
+        &::sql_fun_core::ResolvedCteCatalog::default(),
+    );
+    let lockfiles = Lockfiles::new(&args, &requirements, force, false).unwrap();
+    let (client, peer) =
+        test_helpers::peer_with_response(test_helpers::successful_response(2), None).await;
+    let mut output = Vec::new();
+    let mut progress = Progress::new(&mut output, ProgressMode::dots());
+    let result = CheckArgs::try_parse_from(["check"])
+        .unwrap()
+        .process_analyses(client, &args, requirements, lockfiles, &mut progress)
+        .await
+        .unwrap();
+    progress
+        .finish(result == std::process::ExitCode::SUCCESS)
+        .unwrap();
+    assert_eq!(result, std::process::ExitCode::SUCCESS);
+    assert_eq!(peer.await.unwrap().len(), 3);
+    let hash = project.schema_hash();
+    let reader = Lockfile::from_file(&path, &hash).unwrap();
+    assert!(reader.get_entry("stale").unwrap().is_none());
+    let content = std::fs::read_to_string(path).unwrap();
+    assert_eq!(content.matches("[[entries]]").count(), 2);
+    assert_eq!(content.matches("[[entries.statements]]").count(), 4);
+    assert_eq!(
+        String::from_utf8(output).unwrap(),
+        "Analyzing 2 query functions\n..\nWriting lockfiles\nCompleted: 2/2 query functions analyzed\n"
+    );
+}
+
+#[rstest::rstest]
+#[case::initialization("initialize_schema_context")]
+#[case::first_analysis("analyze_query")]
+#[case::after_partial_results("second_analysis")]
+#[case::connection_completion("finish")]
+#[tokio::test]
+async fn check_session_does_not_write_on_rpc_failure(#[case] failure: &'static str) {
+    use crate::check::{
+        CheckArgs,
+        lockfiles::Lockfiles,
+        progress::{Progress, ProgressMode},
+    };
+    use ::clap::Parser;
+    let project = test_helpers::Project::new();
+    let args = project.args();
+    let path = args.lockfile_path("first").unwrap();
+    project.write_lockfile("first", "old hash", &[]);
+    let old = std::fs::read_to_string(&path).unwrap();
+    let requirements = test_helpers::requirements(
+        &["first", "first"],
+        "SELECT 1",
+        &::sql_fun_core::ResolvedCteCatalog::default(),
+    );
+    let lockfiles = Lockfiles::new(&args, &requirements, false, false).unwrap();
+    let (client, peer) =
+        test_helpers::peer_with_response(test_helpers::successful_response(1), Some(failure)).await;
+    let mut output = Vec::new();
+    let mut progress = Progress::new(&mut output, ProgressMode::dots());
+    let result = CheckArgs::try_parse_from(["check"])
+        .unwrap()
+        .process_analyses(client, &args, requirements, lockfiles, &mut progress)
+        .await;
+    progress.finish(false).unwrap();
+    assert!(result.is_err());
+    assert_eq!(std::fs::read_to_string(path).unwrap(), old);
+    peer.await.unwrap();
+    let output = String::from_utf8(output).unwrap();
+    assert!(output.contains("Stopped:"));
+    assert!(!output.contains("Writing") && !output.contains("Completed:"));
+    if failure == "second_analysis" {
+        assert!(output.contains(".\nStopped: 1/2"));
+    }
+}
+
+#[rstest::rstest]
+#[case::single(1, 0)]
+#[case::later_statement(2, 1)]
+#[tokio::test]
+async fn completed_ineligible_analysis_removes_old_entries_and_returns_failure(
+    #[case] count: usize,
+    #[case] failed: usize,
+) {
+    use crate::check::{
+        CheckArgs,
+        lockfiles::Lockfiles,
+        progress::{Progress, ProgressMode},
+    };
+    use ::clap::Parser;
+    let project = test_helpers::Project::new();
+    let args = project.args();
+    project.write_lockfile(
+        "first",
+        &project.schema_hash(),
+        &[::sql_fun_core::lockfile::LockfileEntry::new(
+            "stale",
+            "removed",
+            &[::sql_fun_core::lockfile::LockfileStatement::new(
+                "SELECT old",
+                &[],
+                &[],
+            )],
+        )
+        .unwrap()],
+    );
+    let requirements = test_helpers::requirements(
+        &["first"],
+        "invalid SQL",
+        &::sql_fun_core::ResolvedCteCatalog::default(),
+    );
+    let lockfiles = Lockfiles::new(&args, &requirements, false, false).unwrap();
+    let mut response = test_helpers::successful_response(count);
+    response["queries"]["items"][failed]["complete"] = ::serde_json::json!(false);
+    response["queries"]["items"][failed]["execute_sql"] = ::serde_json::Value::Null;
+    let (client, peer) = test_helpers::peer_with_response(response, None).await;
+    let mut progress = Progress::new(Vec::new(), ProgressMode::silent());
+    let result = CheckArgs::try_parse_from(["check"])
+        .unwrap()
+        .process_analyses(client, &args, requirements, lockfiles, &mut progress)
+        .await
+        .unwrap();
+    assert_eq!(result, std::process::ExitCode::FAILURE);
+    let content = std::fs::read_to_string(args.lockfile_path("first").unwrap()).unwrap();
+    assert!(content.contains("entries = []"));
+    peer.await.unwrap();
+}
+
+#[rstest::rstest]
+#[case::absent_empty(false, 0, false, true)]
+#[case::valid_empty(true, 0, false, true)]
+#[case::bad_hash_empty(true, 0, true, false)]
+#[case::absent_nonempty(false, 1, false, false)]
+#[case::unchanged(true, 1, false, true)]
+#[tokio::test]
+async fn validate_only_compares_prospective_state_without_mutation(
+    #[case] exists: bool,
+    #[case] statements: usize,
+    #[case] old_hash: bool,
+    #[case] expected_match: bool,
+) {
+    use crate::check::{lockfiles::Lockfiles, submission::QueryAnalysis};
+    use ::sql_fun_client::payloads::AnalyzeQueryResponse;
+    use ::sql_fun_core::lockfile::{LockfileDocument, LockfileEntry, LockfileStatement};
+    let project = test_helpers::Project::new();
+    let args = project.args();
+    let path = args.lockfile_path("first").unwrap();
+    let hash = project.schema_hash();
+    if exists {
+        let mut old = LockfileDocument::new(if old_hash { "wrong hash" } else { &hash });
+        if statements != 0 {
+            old.push(
+                LockfileEntry::new(
+                    "fingerprint",
+                    "query",
+                    &[LockfileStatement::new("SELECT 0", &[], &[])],
+                )
+                .unwrap(),
+            );
+        }
+        LockfileDocument::replace(&path, &old.encode().unwrap()).unwrap();
+    }
+    let before = std::fs::read(&path).ok();
+    let requirements = test_helpers::requirements(
+        &["first"],
+        "SELECT 0",
+        &::sql_fun_core::ResolvedCteCatalog::default(),
+    );
+    let mut lockfiles = Lockfiles::new(&args, &requirements, false, false).unwrap();
+    if statements != 0 {
+        let response: AnalyzeQueryResponse =
+            ::serde_json::from_value(test_helpers::successful_response(statements)).unwrap();
+        let analysis = QueryAnalysis {
+            function_name: "query".to_owned(),
+            original_query: "SELECT 0".to_owned(),
+            query_finger_print: "fingerprint".to_owned(),
+            source_file: "queries.rs".to_owned(),
+            source_line: 1,
+            datasource: "first".to_owned(),
+            response,
+        };
+        lockfiles.receive(&analysis).unwrap();
+    }
+    assert_eq!(lockfiles.finalize(true).unwrap(), expected_match);
+    assert_eq!(std::fs::read(path).ok(), before);
+}
+
+#[tokio::test]
+async fn conversion_failure_drains_delivery_without_writing_partial_inventory() {
+    use crate::check::{
+        CheckArgs,
+        lockfiles::Lockfiles,
+        progress::{Progress, ProgressMode},
+    };
+    use ::clap::Parser;
+    let project = test_helpers::Project::new();
+    let args = project.args();
+    project.write_lockfile("first", &project.schema_hash(), &[]);
+    let path = args.lockfile_path("first").unwrap();
+    let before = std::fs::read(&path).unwrap();
+    // More results than channel capacity proves a failed consumer still drains delivery.
+    let requirements = test_helpers::requirements(
+        &["first"; 12],
+        "SELECT 0",
+        &::sql_fun_core::ResolvedCteCatalog::default(),
+    );
+    let lockfiles = Lockfiles::new(&args, &requirements, false, false).unwrap();
+    let mut response = test_helpers::successful_response(1);
+    response["queries"]["items"][0]["parameters"] = ::serde_json::json!({
+        "handle":"parameters", "total_length":1, "offset":0, "require_release":false,
+        "items":[{"name":"p", "spans":[], "parameter_index":65536, "parameter_type":{"schema_name":"pg_catalog", "local_name":"int4", "is_array":false}, "nullability":"Unknown"}]
+    });
+    let (client, peer) = test_helpers::peer_with_response(response, None).await;
+    let mut output = Vec::new();
+    let mut progress = Progress::new(&mut output, ProgressMode::dots());
+    let options = CheckArgs::try_parse_from(["check"]).unwrap();
+    let result = ::tokio::time::timeout(
+        std::time::Duration::from_secs(5),
+        options.process_analyses(client, &args, requirements, lockfiles, &mut progress),
+    )
+    .await
+    .expect("failed mapping must not deadlock result delivery");
+    progress.finish(false).unwrap();
+    assert!(format!("{:#}", result.unwrap_err()).contains("parameter index exceeds"));
+    assert_eq!(std::fs::read(path).unwrap(), before);
+    assert_eq!(peer.await.unwrap().len(), 13);
+    assert!(
+        String::from_utf8(output)
+            .unwrap()
+            .contains("............\nStopped: 12/12")
+    );
+}

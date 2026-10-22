@@ -38,7 +38,7 @@ use std::{collections::VecDeque, sync::Arc};
 use ::sql_fun_core::{
     BuilderSetter, CodegenOptions, CteName, PlaceholderedSql, ResolvedCteCatalog, SqlFunArgs,
     SqlFunMetadata,
-    lockfile::{Lockfile, LockfileEntry},
+    lockfile::{Lockfile, LockfileEntry, LockfileStatement},
 };
 use proc_macro2::{Span, TokenStream};
 use proc_macro2_diagnostic::DiagnosticResult;
@@ -310,8 +310,12 @@ impl QueryFunctionSpec {
         &self.connection
     }
 
-    const fn lockfile_entry(&self) -> Option<&LockfileEntry> {
-        self.lockfile_entry.as_ref()
+    fn lockfile_entry(&self) -> Result<Option<&LockfileStatement>, SqlFunCodegenError> {
+        self.lockfile_entry
+            .as_ref()
+            .map(LockfileEntry::single_statement)
+            .transpose()
+            .map_err(SqlFunCodegenError::from)
     }
 
     const fn row_type(&self) -> &Type {

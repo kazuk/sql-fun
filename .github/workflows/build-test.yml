@@ -100,6 +100,15 @@ jobs:
             fi
           done
 
+      - name: Upload nextest JUnit report
+        uses: actions/upload-artifact@v7
+        if: ${{ always() }}
+        with:
+          name: nextest-junit-workspace
+          path: target/nextest/ci/junit.xml
+          retention-days: 30
+          if-no-files-found: warn
+
       - name: Test Report
         uses: dorny/test-reporter@v3
         if: ${{ !cancelled() }}
@@ -172,6 +181,15 @@ jobs:
         with:
           name: cargo-timings-workspace-all-features
           path: target/cargo-timings/*.html
+          retention-days: 30
+          if-no-files-found: warn
+
+      - name: Upload nextest JUnit report
+        uses: actions/upload-artifact@v7
+        if: ${{ always() }}
+        with:
+          name: nextest-junit-workspace-all-features
+          path: target/nextest/ci/junit.xml
           retention-days: 30
           if-no-files-found: warn
 

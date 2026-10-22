@@ -1,5 +1,6 @@
 use super::{
-    AnalysisProblem, ArgumentBindingCollection, FullName, OperatorDefinition, TypeReference,
+    AnalysisProblem, ArgumentBindingCollection, DiagnosticMessage, FullName, OperatorDefinition,
+    TypeReference,
 };
 
 #[derive(Debug, Clone, ::serde::Serialize, ::serde::Deserialize)]
@@ -22,9 +23,8 @@ pub enum OverloadResolution {
     UnaryOperatorOverloadAmbiguous(OperatorDefinition, TypeReference),
 }
 
-impl OverloadResolution {
-    /// Minimum description when a detailed source-label renderer is unavailable.
-    pub(super) fn minimum_message(&self) -> String {
+impl DiagnosticMessage for OverloadResolution {
+    fn diagnostic_message(&self) -> String {
         match self {
             Self::FunctionOverloadResolutionFailed(name, args) => {
                 format!("no matching overload for function {name} with {args}")
@@ -43,7 +43,9 @@ impl OverloadResolution {
             }
         }
     }
+}
 
+impl OverloadResolution {
     /// Stable diagnostic classification, independent of formatted debug output.
     #[must_use]
     pub(super) const fn code(&self) -> &'static str {

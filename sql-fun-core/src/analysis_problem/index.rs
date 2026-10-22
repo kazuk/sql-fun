@@ -97,7 +97,7 @@ impl IndexProblemKind {
     pub const fn is_warning(self) -> bool {
         matches!(self, Self::StatisticsClamped)
     }
-    const fn message(self) -> &'static str {
+    pub(super) const fn message(self) -> &'static str {
         match self {
             Self::MissingTarget => "index does not exist",
             Self::WrongKind => "relation is not an index",

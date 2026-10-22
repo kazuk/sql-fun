@@ -41,7 +41,16 @@ jobs:
           fi
 
   workspace-all-features:
+    name: SQLite ${{ matrix.sqlite }}
     needs: pr-freshness
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - sqlite: bundled
+            use_pkg_config: "0"
+          - sqlite: system
+            use_pkg_config: "1"
     runs-on: ubuntu-24.04
     container:
       image: ghcr.io/kazuk/ci-builder@sha256:911d5ec28d1a1981022eb07d510c90c73df720e214e2e164b83cec6aa7bb5636
@@ -51,7 +60,7 @@ jobs:
     steps:
       - uses: actions/checkout@v5
 
-      - name: Prepare explicit system SQLite experiment
+      - name: Prepare explicitly selected SQLite comparison
         run: |
           rustc -Vv
           cargo --version
@@ -84,9 +93,9 @@ jobs:
       - uses: actions/cache@v5
         with:
           path: /github/home/.cache/sccache
-          key: sccache-${{ runner.os }}-workspace-all-features-${{ hashFiles('**/Cargo.lock') }}
+          key: sqlite-eval-698-sccache-${{ runner.os }}-${{ matrix.sqlite }}-${{ hashFiles('**/Cargo.lock') }}
           restore-keys: |
-            sccache-${{ runner.os }}-
+            sccache-${{ runner.os }}-workspace-all-features-${{ hashFiles('**/Cargo.lock') }}
 
       - name: Build and test with all features
         run: |
@@ -95,7 +104,7 @@ jobs:
           export SQL_FUN_HOME="${GIT_ROOT}/sql-fun-home"
           sccache --start-server
           export RUSTC_WRAPPER=sccache
-          export LIBSQLITE3_SYS_USE_PKG_CONFIG=1
+          export LIBSQLITE3_SYS_USE_PKG_CONFIG="${{ matrix.use_pkg_config }}"
           export SCCACHE_DIR=/github/home/.cache/sccache
           cargo tree --workspace --all-features --locked -e features -i libsqlite3-sys
           .local/bin/check-test-flow --all-features --step=workspace --nextest-extra="
@@ -131,7 +140,7 @@ jobs:
         uses: actions/upload-artifact@v7
         if: ${{ always() }}
         with:
-          name: cargo-timings-workspace-all-features
+          name: cargo-timings-${{ matrix.sqlite }}-${{ github.run_attempt }}
           path: target/cargo-timings/*.html
           retention-days: 30
           if-no-files-found: warn

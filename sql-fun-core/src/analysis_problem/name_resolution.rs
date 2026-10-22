@@ -169,6 +169,57 @@ pub enum NameResolution {
 }
 
 impl NameResolution {
+    /// Minimum description when a detailed source-label renderer is unavailable.
+    pub(super) fn minimum_message(&self) -> String {
+        match self {
+            Self::DomainTypeNameNotFound(problem) => {
+                format!("domain base type not found: {}", problem.base_type_name())
+            }
+            Self::FunctionNotFound(problem) => {
+                format!("function not found: {}", problem.function_name())
+            }
+            Self::TableFunctionNotFound(name) => format!("table function not found: {name}"),
+            Self::UndefinedColumn(name) => format!("column not found: {name}"),
+            Self::ColumnTypeNotFound(table, column, ty) => {
+                format!("type {ty} of column {table}.{column} not found")
+            }
+            Self::ColumnNotFoundInTableFunction(alias, column) => {
+                format!("column {column} not found in table function {alias}")
+            }
+            Self::ColumnNotFoundInTable(table, column) => {
+                format!("column {column} not found in table {table}")
+            }
+            Self::ColumnAlreadyExists(table, column) => {
+                format!("column {column} already exists in table {table}")
+            }
+            Self::ColumnNotFoundInCte(cte, column) => {
+                format!("column {column} not found in CTE {cte}")
+            }
+            Self::ColumnNotFoundInSubQuery(alias, column) => {
+                format!("column {column} not found in subquery {alias}")
+            }
+            Self::ColumnNotFoundInSource(column) => {
+                format!("column {column} not found in query source")
+            }
+            Self::ColumnNotFoundInView(view, column) => {
+                format!("column {column} not found in view {view}")
+            }
+            Self::AmbiguousColumn(column) => format!("column reference {column} is ambiguous"),
+            Self::DuplicateAlias(alias) => format!("alias {alias} is defined more than once"),
+            Self::UndefinedAlias(alias) => format!("alias {alias} is not defined in FROM"),
+            Self::RelationNotFound(name) => format!("relation not found: {name}"),
+            Self::RelationAlreadyExists(name) => format!("relation already exists: {name}"),
+            Self::ViewNotFound(name) => format!("view not found: {name}"),
+            Self::IndexNotFound(name) => format!("index not found: {name}"),
+            Self::SequenceNotFound(name) => format!("sequence not found: {name}"),
+            Self::TableNotFound(name) => format!("table not found: {name}"),
+            Self::CompositeTypeFieldNotFound(ty, field) => {
+                format!("field {field} not found in composite type {ty}")
+            }
+            Self::CollationNotFound(name) => format!("collation not found: {name}"),
+        }
+    }
+
     /// Stable diagnostic classification, independent of formatted debug output.
     #[must_use]
     pub(super) const fn code(&self) -> &'static str {

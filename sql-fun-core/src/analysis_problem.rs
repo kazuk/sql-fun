@@ -456,6 +456,64 @@ impl AnalysisProblem {
         })
     }
 
+    /// Explanatory text for every diagnostic, including problems whose detailed
+    /// source-label renderer is not implemented yet.
+    #[must_use]
+    pub fn minimum_message(&self) -> String {
+        if let Some(metadata) = self.render_metadata() {
+            return metadata.message().to_owned();
+        }
+        match self {
+            Self::ExtensionNotFound(name) => format!("extension not found: {name}"),
+            Self::NullabilityUnknown(name) => {
+                format!("nullability could not be determined for {name}")
+            }
+            Self::ArgumentTypeMismatch(name, index) => {
+                format!("argument {index} has an incompatible type for {name}")
+            }
+            Self::DuplicateDefElemKey(key) => format!("duplicate definition option: {key}"),
+            Self::ExplicitCastNotDefined(source, target) => {
+                format!("explicit cast from {source} to {target} is not defined")
+            }
+            Self::ExpressionTypeNotKnown(expression) => {
+                format!("type of expression {expression} could not be determined")
+            }
+            Self::UndefinedOperator(kind, operator, left, right) => {
+                format!("operator {operator} is not defined for {kind} operands {left} and {right}")
+            }
+            Self::RequireArray(expression, ty) => {
+                format!("expression {expression} requires an array, found {ty}")
+            }
+            Self::SubQueryNotHaveColumnForDerivedColumnName() => {
+                "subquery has no column for the derived column name".to_owned()
+            }
+            Self::IncompatibleCaseValues(types) => {
+                format!("CASE values have incompatible types: {types}")
+            }
+            Self::CaseWhenExprTypeUnknown(expression) => {
+                format!("type of CASE WHEN expression {expression} could not be determined")
+            }
+            Self::ArrayIndexTypeMismatch(expression, ty) => {
+                format!("array index {expression} has an incompatible type: {ty}")
+            }
+            Self::MemberAccessRequiresCompositeType(name, member) => {
+                format!("member {member} of {name} requires a composite type")
+            }
+            Self::FunctionArgImplicitCastNotFound(name, index, ty, expression) => {
+                format!("argument {index} of {name} cannot implicitly cast {expression} to {ty}")
+            }
+            Self::ImplicitCastNotFound(source, target) => {
+                format!("implicit cast from {source} to {target} is not defined")
+            }
+            Self::ParameterTypeMismatchForTableFunction(name, arguments) => {
+                format!("no matching table-function signature for {name} with {arguments}")
+            }
+            Self::NameResolution(problem) => problem.minimum_message(),
+            Self::OverloadResolution(problem) => problem.minimum_message(),
+            _ => format!("SQL analysis problem: {}", self.code().replace('_', " ")),
+        }
+    }
+
     /// extension not found
     #[must_use]
     pub fn extension_not_found(name: &str) -> Self {
@@ -730,6 +788,7 @@ mod test_transport {
         assert_eq!(restored.code(), "extension_not_found");
         assert!(restored.render_metadata().is_none());
         assert!(restored.statement_relative_span().is_none());
+        assert_eq!(restored.minimum_message(), "extension not found: missing");
     }
 }
 

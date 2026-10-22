@@ -26,8 +26,9 @@ catalog application.
 
 `AnalysisProblem::code` and `severity` are available independently of rendering.
 `render_metadata` supplies the currently implemented message and labels without
-invoking a renderer. An absent value denotes an unimplemented renderer tracked
-by issue #522; the CLI retains the explicit unimplemented path for those cases.
+invoking a renderer. An absent value denotes an unimplemented detailed renderer
+tracked by issue #522. `minimum_message` supplies explanatory text for every
+problem so CLI presentation can still report one with no detailed metadata.
 
 ## Source and transport
 
@@ -59,8 +60,12 @@ They are unrelated to Rust procedural-macro token streams.
 representation for highlighting. It does not replace semantic scans or
 `TryFromWithTokens`. Future semantic adoption requires its own scope decision.
 
+The server exposes `tokenize_sql`, adapting the existing SQLAST lexer to a
+lossless wire token collection. The client fetches and releases the collection,
+then validates its UTF-8 byte ranges against the caller's exact source.
 CLI `DiagnosticRenderer` owns miette integration, theme selection/loading,
-terminal detection, and styling. `render_diagnostic` accepts transported
-presentation data and explicit arguments. It tokenizes the full supplied
-statement once; the highlighter clips those tokens to miette's snippet and line
-ranges rather than lexing potentially incomplete snippets.
+terminal detection, and styling. It uses those server-produced tokens for
+retained statement presentations; the highlighter clips them to miette's
+snippet and line ranges. `check` pairs each report with the extracted Rust
+function/source identity and complete original SQL. A semantic-only problem
+uses the same renderer without invented source labels.

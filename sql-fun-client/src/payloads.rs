@@ -151,6 +151,16 @@ impl From<::sql_fun_core::analysis_problem::DiagnosticSeverity> for DiagnosticSe
     }
 }
 
+impl From<DiagnosticSeverity> for ::sql_fun_core::analysis_problem::DiagnosticSeverity {
+    fn from(value: DiagnosticSeverity) -> Self {
+        match value {
+            DiagnosticSeverity::Error => Self::Error,
+            DiagnosticSeverity::Warning => Self::Warning,
+            DiagnosticSeverity::Advice => Self::Advice,
+        }
+    }
+}
+
 /// semantic analysis probrem
 #[cfg_attr(feature = "openrpc-schema", derive(schemars::JsonSchema))]
 #[derive(serde::Serialize, serde::Deserialize, derive_getters::Getters)]

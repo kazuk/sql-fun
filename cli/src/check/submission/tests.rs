@@ -414,6 +414,7 @@ async fn validate_only_compares_prospective_state_without_mutation(
             source_line: 1,
             datasource: "first".to_owned(),
             response,
+            tokenizations: Vec::new(),
         };
         lockfiles.receive(&analysis).unwrap();
     }
@@ -465,4 +466,205 @@ async fn conversion_failure_drains_delivery_without_writing_partial_inventory() 
             .unwrap()
             .contains("............\nStopped: 12/12")
     );
+}
+
+#[tokio::test]
+async fn check_renders_all_diagnostics_for_incomplete_multistatement_query()
+-> ::testresult::TestResult {
+    use crate::check::{
+        CheckArgs,
+        lockfiles::Lockfiles,
+        progress::{Progress, ProgressMode},
+    };
+    use ::clap::Parser;
+    let project = test_helpers::Project::new();
+    let args = project.args();
+    let query = "SELECT 1; SELECT α FROM missing /* original comment */";
+    let statement = "SELECT α FROM missing /* original comment */";
+    let requirements = test_helpers::requirements(
+        &["first"],
+        query,
+        &::sql_fun_core::ResolvedCteCatalog::default(),
+    );
+    let lockfiles = Lockfiles::new(&args, &requirements, false, false)?;
+    let response = test_helpers::incomplete_diagnostic_response(statement);
+    let (client, peer) = test_helpers::peer_with_response(response, None).await;
+    let mut progress = Progress::new(Vec::new(), ProgressMode::silent());
+    let mut diagnostics = Vec::new();
+    let status = CheckArgs::try_parse_from(["check"])?
+        .process_analyses_to(
+            client,
+            &args,
+            requirements,
+            lockfiles,
+            &mut progress,
+            &mut diagnostics,
+        )
+        .await?;
+    assert_eq!(status, std::process::ExitCode::FAILURE);
+    let output = String::from_utf8(diagnostics)?;
+    assert_eq!(output.matches("Original SQL:\n").count(), 4);
+    assert_eq!(output.matches(query).count(), 4);
+    assert_eq!(
+        output
+            .matches("SQL query query_0 at src/queries.rs:42")
+            .count(),
+        4
+    );
+    for expected in [
+        "SF000001",
+        "unreachable_coalesce_argument",
+        "parameter_constraint",
+        "extension_not_found",
+        "extension not found: missing_extension",
+        "base type name",
+        "consider a type hint",
+    ] {
+        assert!(output.contains(expected), "missing {expected}: {output}");
+    }
+    assert!(output.contains("⚠"), "warning severity: {output}");
+    assert!(output.contains("☞"), "advice severity: {output}");
+    assert!(
+        output.contains("SQL:1:16"),
+        "UTF-8 source position: {output}"
+    );
+    assert!(output.contains(statement));
+    let locationless = output
+        .rsplit("SQL query query_0 at src/queries.rs:42")
+        .next()
+        .unwrap();
+    assert!(!locationless.contains("╭─[SQL:"));
+    let requests = peer.await?;
+    assert_eq!(
+        requests
+            .iter()
+            .filter(|request| request["method"] == "tokenize_sql")
+            .count(),
+        1
+    );
+    assert_eq!(requests[2]["params"]["source"], statement);
+    assert_eq!(requests[2]["params"]["dialect"], "postgres");
+    let lockfile = std::fs::read_to_string(args.lockfile_path("first")?)?;
+    assert!(lockfile.contains("entries = []"));
+    Ok(())
+}
+
+#[tokio::test]
+async fn diagnostics_keep_each_query_function_identity() -> ::testresult::TestResult {
+    use crate::check::{
+        CheckArgs,
+        lockfiles::Lockfiles,
+        progress::{Progress, ProgressMode},
+    };
+    use ::clap::Parser;
+    use ::sql_fun_client::payloads::{AnalysisProbrem, DiagnosticSeverity};
+    use ::sql_fun_core::analysis_problem::AnalysisProblem;
+
+    let project = test_helpers::Project::new();
+    let args = project.args();
+    let source = "SELECT 1";
+    let requirements = test_helpers::requirements(
+        &["first", "first"],
+        source,
+        &::sql_fun_core::ResolvedCteCatalog::default(),
+    );
+    let lockfiles = Lockfiles::new(&args, &requirements, false, false)?;
+    let problem = AnalysisProblem::unreachable_coalesce_argument("later", "first");
+    let mut response = test_helpers::successful_response(1);
+    response["queries"]["items"][0]["probrems"] =
+        test_helpers::diagnostic_page(&[AnalysisProbrem::new(
+            problem.code(),
+            DiagnosticSeverity::warning(),
+            std::path::Path::new("<query>"),
+            None,
+        )
+        .with_semantic_problem(&problem)]);
+    let (client, peer) = test_helpers::peer_with_response(response, None).await;
+    let mut progress = Progress::new(Vec::new(), ProgressMode::silent());
+    let mut diagnostics = Vec::new();
+    let status = CheckArgs::try_parse_from(["check"])?
+        .process_analyses_to(
+            client,
+            &args,
+            requirements,
+            lockfiles,
+            &mut progress,
+            &mut diagnostics,
+        )
+        .await?;
+    assert_eq!(status, std::process::ExitCode::SUCCESS);
+    let output = String::from_utf8(diagnostics)?;
+    assert_eq!(
+        output
+            .matches("SQL query query_0 at src/queries.rs:42")
+            .count(),
+        1
+    );
+    assert_eq!(
+        output
+            .matches("SQL query query_1 at src/queries.rs:42")
+            .count(),
+        1
+    );
+    assert_eq!(output.matches("Original SQL:\nSELECT 1").count(), 2);
+    assert_eq!(output.matches("unreachable_coalesce_argument").count(), 2);
+    assert_eq!(peer.await?.len(), 3);
+    Ok(())
+}
+
+#[tokio::test]
+async fn tokenization_failure_still_renders_received_diagnostic() -> ::testresult::TestResult {
+    use crate::check::{
+        CheckArgs,
+        lockfiles::Lockfiles,
+        progress::{Progress, ProgressMode},
+    };
+    use ::clap::Parser;
+    use ::sql_fun_client::payloads::{AnalysisProbrem, DiagnosticSeverity};
+    use ::sql_fun_core::{DiagnosticPresentation, SqlDialect, analysis_problem::AnalysisProblem};
+
+    let project = test_helpers::Project::new();
+    let args = project.args();
+    let source = "SELECT α /* comment */";
+    let requirements = test_helpers::requirements(
+        &["first"],
+        source,
+        &::sql_fun_core::ResolvedCteCatalog::default(),
+    );
+    let lockfiles = Lockfiles::new(&args, &requirements, false, false)?;
+    let problem = AnalysisProblem::extension_not_found("missing_extension");
+    let presentation = DiagnosticPresentation::new(&problem, source, SqlDialect::PostgreSQL, 0);
+    let mut response = test_helpers::successful_response(1);
+    response["queries"]["items"][0]["probrems"] =
+        test_helpers::diagnostic_page(&[AnalysisProbrem::new(
+            problem.code(),
+            DiagnosticSeverity::error(),
+            std::path::Path::new("<query>"),
+            None,
+        )
+        .with_presentation(Some(&presentation))]);
+    let (client, peer) = test_helpers::peer_with_response(response, Some("tokenize_sql")).await;
+    let mut progress = Progress::new(Vec::new(), ProgressMode::silent());
+    let mut diagnostics = Vec::new();
+    let failure = CheckArgs::try_parse_from(["check"])?
+        .process_analyses_to(
+            client,
+            &args,
+            requirements,
+            lockfiles,
+            &mut progress,
+            &mut diagnostics,
+        )
+        .await
+        .unwrap_err();
+    assert!(
+        failure
+            .to_string()
+            .contains("cannot tokenize SQL diagnostic")
+    );
+    let output = String::from_utf8(diagnostics)?;
+    assert!(output.contains("extension not found: missing_extension"));
+    assert!(output.contains(source));
+    assert_eq!(peer.await?.len(), 3);
+    Ok(())
 }

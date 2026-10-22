@@ -1,7 +1,7 @@
 use super::values::Problem;
 use super::{
-    AliasName, AnalysisProblem, ColumnName, CteName, DiagnosticMetadata, FullName, StringSpan,
-    TableName, TypeName, TypeReference, ViewName,
+    AliasName, AnalysisProblem, ColumnName, CteName, DiagnosticMessage, DiagnosticMetadata,
+    FullName, StringSpan, TableName, TypeName, TypeReference, ViewName,
 };
 
 /// Domain base type name not found
@@ -52,6 +52,12 @@ impl Problem for DomainBaseTypeNameNotFound {
     }
 }
 
+impl DiagnosticMessage for DomainBaseTypeNameNotFound {
+    fn diagnostic_message(&self) -> String {
+        format!("domain base type not found: {}", self.base_type_name())
+    }
+}
+
 #[derive(Debug, Clone, ::serde::Serialize, ::serde::Deserialize)]
 #[cfg_attr(feature = "openrpc-schema", derive(::schemars::JsonSchema))]
 /// A function name that could not be resolved.
@@ -91,6 +97,12 @@ impl Problem for FunctionNotFound {
 
     fn get_problem_span(&self) -> StringSpan {
         self.function_span
+    }
+}
+
+impl DiagnosticMessage for FunctionNotFound {
+    fn diagnostic_message(&self) -> String {
+        format!("function not found: {}", self.function_name())
     }
 }
 
@@ -168,16 +180,11 @@ pub enum NameResolution {
     CollationNotFound(String),
 }
 
-impl NameResolution {
-    /// Minimum description when a detailed source-label renderer is unavailable.
-    pub(super) fn minimum_message(&self) -> String {
+impl DiagnosticMessage for NameResolution {
+    fn diagnostic_message(&self) -> String {
         match self {
-            Self::DomainTypeNameNotFound(problem) => {
-                format!("domain base type not found: {}", problem.base_type_name())
-            }
-            Self::FunctionNotFound(problem) => {
-                format!("function not found: {}", problem.function_name())
-            }
+            Self::DomainTypeNameNotFound(problem) => problem.diagnostic_message(),
+            Self::FunctionNotFound(problem) => problem.diagnostic_message(),
             Self::TableFunctionNotFound(name) => format!("table function not found: {name}"),
             Self::UndefinedColumn(name) => format!("column not found: {name}"),
             Self::ColumnTypeNotFound(table, column, ty) => {
@@ -219,7 +226,9 @@ impl NameResolution {
             Self::CollationNotFound(name) => format!("collation not found: {name}"),
         }
     }
+}
 
+impl NameResolution {
     /// Stable diagnostic classification, independent of formatted debug output.
     #[must_use]
     pub(super) const fn code(&self) -> &'static str {

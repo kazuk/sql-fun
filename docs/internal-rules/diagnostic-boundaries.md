@@ -19,16 +19,17 @@ owning semantic objects:
 | Rule, trigger, and ownership identities | Typed identity text |
 | Existing reliable source locations | Statement-relative diagnostic byte spans |
 
-The conversion preserves existing formatting, including diagnostic messages that
-historically use debug-formatted identities. These values are diagnostic evidence;
-they must not be converted back into a semantic model to drive resolution or
-catalog application.
+The conversion preserves retained identity text, including values originally
+formed with Rust debug formatting. These values are diagnostic evidence; they
+must not be parsed back into semantic facts to drive resolution or catalog
+application. Issue #717 tracks the missing structured facts.
 
 `AnalysisProblem::code` and `severity` are available independently of rendering.
 `render_metadata` supplies the currently implemented message and labels without
 invoking a renderer. An absent value denotes an unimplemented detailed renderer
-tracked by issue #522. `minimum_message` supplies explanatory text for every
-problem so CLI presentation can still report one with no detailed metadata.
+tracked by issue #522. `DiagnosticMessage::diagnostic_message` is a separate,
+exhaustive contract for explanatory text, so CLI presentation can report every
+problem even when detailed metadata is absent.
 
 ## Source and transport
 

@@ -4,7 +4,7 @@ use self::sql_highlighter::SqlHighlighter;
 use crate::highlighter_theme::HighlighterTheme;
 use std::io::IsTerminal;
 
-use ::sql_fun_core::analysis_problem::{AnalysisProblem, DiagnosticSeverity};
+use ::sql_fun_core::analysis_problem::{AnalysisProblem, DiagnosticMessage, DiagnosticSeverity};
 use ::sql_fun_core::{SqlFunArgs, TerminalColor, TokenStream};
 
 /// CLI-owned diagnostic rendering, including terminal and theme configuration.
@@ -69,7 +69,7 @@ impl DiagnosticRenderer {
             DiagnosticSeverity::Warning => ::miette::Severity::Warning,
             DiagnosticSeverity::Advice => ::miette::Severity::Advice,
         };
-        let mut diagnostic = ::miette::MietteDiagnostic::new(problem.minimum_message())
+        let mut diagnostic = ::miette::MietteDiagnostic::new(problem.diagnostic_message())
             .with_code(problem.code())
             .with_severity(severity);
         if source.is_some()
@@ -185,8 +185,8 @@ mod test_implemented_family_rendering {
     use ::sql_fun_core::SqlDialect;
     use ::sql_fun_core::analysis_problem::{
         AlterColumnProblem, AnalysisProblem, CallArgumentProblem, DeleteProblemKind,
-        DiagnosticSeverity, IndexProblem, IndexProblemKind, InsertProblemKind, QueryProblem,
-        RuleProblem, TriggerProblem, UpdateProblemKind, ViewProblem,
+        DiagnosticMessage, DiagnosticSeverity, IndexProblem, IndexProblemKind, InsertProblemKind,
+        QueryProblem, RuleProblem, TriggerProblem, UpdateProblemKind, ViewProblem,
     };
 
     #[rstest::rstest]
@@ -284,7 +284,10 @@ mod test_implemented_family_rendering {
         assert!(output.contains(code));
         assert!(output.contains(marker));
         let normalized = output.split_whitespace().collect::<Vec<_>>().join(" ");
-        assert!(normalized.contains(message), "{output}");
+        assert!(
+            normalized.contains(&problem.diagnostic_message()),
+            "{output}"
+        );
         assert!(!output.contains("\x1b["));
         Ok(())
     }
@@ -330,7 +333,7 @@ mod test_rendering {
         let mut session = crate::test_helpers::heavy::DiagnosticSession::new().await?;
         let output = render_diagnostic(session.client(), &received, &args).await?;
         assert!(output.contains("SF000001"));
-        assert!(output.contains("Domain base type not found"));
+        assert!(output.contains("domain base type not found: missing"));
         assert!(output.contains("base type name"));
         assert!(output.contains("missing"));
         assert!(output.contains(source));

@@ -6,6 +6,7 @@ mod creation;
 mod delete;
 mod index;
 mod insert;
+mod message;
 mod min_max;
 mod name_resolution;
 mod overload_resolution;
@@ -45,6 +46,11 @@ pub use self::values::{
     RuleIdentity, SemScalarExpr, StringSpan, TableName, TriggerIdentity, TypeDefinition, TypeList,
     TypeName, TypeReference, ViewName,
 };
+/// Explanatory text available for every semantic diagnostic, without source labels.
+pub trait DiagnosticMessage {
+    /// Describe the problem using the facts retained by its semantic payload.
+    fn diagnostic_message(&self) -> String;
+}
 /// Semantic analysis problems
 #[allow(clippy::large_enum_variant)]
 #[derive(Debug, Clone, ::serde::Serialize, ::serde::Deserialize)]
@@ -455,15 +461,35 @@ impl AnalysisProblem {
             _ => return None,
         })
     }
+}
 
-    /// Explanatory text for every diagnostic, including problems whose detailed
-    /// source-label renderer is not implemented yet.
-    #[must_use]
-    pub fn minimum_message(&self) -> String {
-        if let Some(metadata) = self.render_metadata() {
-            return metadata.message().to_owned();
-        }
+impl DiagnosticMessage for AnalysisProblem {
+    fn diagnostic_message(&self) -> String {
         match self {
+            Self::ParameterTypeUnresolved(index) => {
+                format!(
+                    "SQL type of parameter ${index} is unresolved; supply an explicit SQL type hint"
+                )
+            }
+            Self::QueryAnalysis(problem) => problem.diagnostic_message(),
+            Self::Array(problem) => problem.diagnostic_message(),
+            Self::Index(problem) => problem.diagnostic_message(),
+            Self::AlterColumn(problem) => problem.diagnostic_message(),
+            Self::MinMax(problem) => problem.diagnostic_message(),
+            Self::CallArgument(problem) => problem.diagnostic_message(),
+            Self::Creation(problem) => problem.diagnostic_message(),
+            Self::Rule(problem) => problem.diagnostic_message(),
+            Self::Ownership(problem) => problem.diagnostic_message(),
+            Self::Trigger(problem) => problem.diagnostic_message(),
+            Self::View(problem) => problem.diagnostic_message(),
+            Self::Insert(problem) => problem.diagnostic_message(),
+            Self::Delete(problem) => problem.diagnostic_message(),
+            Self::Update(problem) => problem.diagnostic_message(),
+            Self::Query(problem) => problem.diagnostic_message(),
+            Self::TableFunction(problem) => problem.diagnostic_message(),
+            Self::ParameterConstraint(problem) => problem.diagnostic_message(),
+            Self::NameResolution(problem) => problem.diagnostic_message(),
+            Self::OverloadResolution(problem) => problem.diagnostic_message(),
             Self::ExtensionNotFound(name) => format!("extension not found: {name}"),
             Self::NullabilityUnknown(name) => {
                 format!("nullability could not be determined for {name}")
@@ -475,32 +501,32 @@ impl AnalysisProblem {
             Self::ExplicitCastNotDefined(source, target) => {
                 format!("explicit cast from {source} to {target} is not defined")
             }
-            Self::ExpressionTypeNotKnown(expression) => {
-                format!("type of expression {expression} could not be determined")
+            Self::ExpressionTypeNotKnown(_) => {
+                "SQL type of an expression could not be determined".to_owned()
             }
-            Self::UndefinedOperator(kind, operator, left, right) => {
-                format!("operator {operator} is not defined for {kind} operands {left} and {right}")
+            Self::UndefinedOperator(_, operator, _, _) => {
+                format!("operator {operator} has no definition for the supplied operands")
             }
-            Self::RequireArray(expression, ty) => {
-                format!("expression {expression} requires an array, found {ty}")
+            Self::RequireArray(_, ty) => {
+                format!("array operation requires an array value, found {ty}")
             }
             Self::SubQueryNotHaveColumnForDerivedColumnName() => {
                 "subquery has no column for the derived column name".to_owned()
             }
-            Self::IncompatibleCaseValues(types) => {
-                format!("CASE values have incompatible types: {types}")
+            Self::IncompatibleCaseValues(_) => {
+                "CASE result expressions have no common type".to_owned()
             }
-            Self::CaseWhenExprTypeUnknown(expression) => {
-                format!("type of CASE WHEN expression {expression} could not be determined")
+            Self::CaseWhenExprTypeUnknown(_) => {
+                "SQL type of a CASE WHEN condition could not be determined".to_owned()
             }
-            Self::ArrayIndexTypeMismatch(expression, ty) => {
-                format!("array index {expression} has an incompatible type: {ty}")
+            Self::ArrayIndexTypeMismatch(_, ty) => {
+                format!("array subscript has an incompatible type: {ty}")
             }
             Self::MemberAccessRequiresCompositeType(name, member) => {
                 format!("member {member} of {name} requires a composite type")
             }
-            Self::FunctionArgImplicitCastNotFound(name, index, ty, expression) => {
-                format!("argument {index} of {name} cannot implicitly cast {expression} to {ty}")
+            Self::FunctionArgImplicitCastNotFound(name, index, ty, _) => {
+                format!("argument {index} of {name} cannot be implicitly cast to {ty}")
             }
             Self::ImplicitCastNotFound(source, target) => {
                 format!("implicit cast from {source} to {target} is not defined")
@@ -508,12 +534,52 @@ impl AnalysisProblem {
             Self::ParameterTypeMismatchForTableFunction(name, arguments) => {
                 format!("no matching table-function signature for {name} with {arguments}")
             }
-            Self::NameResolution(problem) => problem.minimum_message(),
-            Self::OverloadResolution(problem) => problem.minimum_message(),
-            _ => format!("SQL analysis problem: {}", self.code().replace('_', " ")),
+            Self::UnreachableCoalesceArgument(..) => {
+                "COALESCE argument is unreachable after a non-null operand".to_owned()
+            }
+            Self::CoalesceExprTypeUnknown(..) => {
+                "COALESCE operands do not have a common implicit result type".to_owned()
+            }
         }
     }
+}
 
+#[cfg(test)]
+mod diagnostic_message_tests {
+    use super::{AExprKind, AnalysisProblem, DiagnosticMessage, RuleProblem, TriggerProblem};
+
+    #[test]
+    fn rule_and_trigger_messages_explain_the_problem_without_debug_output() {
+        let rule = AnalysisProblem::rule(&RuleProblem::target("public.orders"));
+        let trigger = AnalysisProblem::trigger(&TriggerProblem::function("public.audit"));
+
+        assert_eq!(
+            rule.diagnostic_message(),
+            "rule target public.orders does not resolve to a supported relation"
+        );
+        assert_eq!(
+            trigger.diagnostic_message(),
+            "trigger function public.audit is missing or cannot be called without arguments"
+        );
+    }
+
+    #[test]
+    fn undefined_operator_message_does_not_expose_rust_expression_debug_text() {
+        let problem = AnalysisProblem::undefined_operator(
+            AExprKind::new("AexprOp"),
+            "+",
+            &Some("left expression"),
+            &Some("right expression"),
+        );
+
+        assert_eq!(
+            problem.diagnostic_message(),
+            "operator + has no definition for the supplied operands"
+        );
+    }
+}
+
+impl AnalysisProblem {
     /// extension not found
     #[must_use]
     pub fn extension_not_found(name: &str) -> Self {
@@ -758,7 +824,7 @@ mod coalesce_diagnostic_tests {
 
 #[cfg(test)]
 mod test_transport {
-    use super::{AnalysisProblem, DiagnosticSeverity, StringSpan};
+    use super::{AnalysisProblem, DiagnosticMessage, DiagnosticSeverity, StringSpan};
 
     #[test]
     fn transports_typed_diagnostic_without_source_or_rendered_output() {
@@ -788,7 +854,10 @@ mod test_transport {
         assert_eq!(restored.code(), "extension_not_found");
         assert!(restored.render_metadata().is_none());
         assert!(restored.statement_relative_span().is_none());
-        assert_eq!(restored.minimum_message(), "extension not found: missing");
+        assert_eq!(
+            restored.diagnostic_message(),
+            "extension not found: missing"
+        );
     }
 }
 
@@ -817,6 +886,11 @@ impl QueryAnalysisProblem {
     #[must_use]
     pub fn message(&self) -> &str {
         &self.message
+    }
+}
+impl DiagnosticMessage for QueryAnalysisProblem {
+    fn diagnostic_message(&self) -> String {
+        self.message.clone()
     }
 }
 impl AnalysisProblem {

@@ -1,8 +1,5 @@
 use crate::test_helpers::{TestProjectDir, write_cte_catalog_toml};
-use crate::{
-    CteAlias, CteCatalog, CteCatalogError, CteCatalogReference, CteName, PlaceholderedSql,
-    SqlDialect,
-};
+use crate::{CteAlias, CteCatalog, CteCatalogError, CteCatalogReference, CteName, SqlDialect};
 use ::testresult::TestResult;
 
 mod test_helpers {
@@ -54,11 +51,7 @@ fn preserves_unique_dependency_order(
             &CteAlias::new(alias),
         ));
     }
-    let resolved = catalog.resolve(
-        &PlaceholderedSql::from_query("select 1"),
-        &catalog_references,
-        SqlDialect::PostgreSQL,
-    )?;
+    let resolved = catalog.resolve(&catalog_references, SqlDialect::PostgreSQL)?;
     let aliases =
         resolved.try_map_cte_queries(|alias, _| Ok::<_, CteCatalogError>(alias.to_string()))?;
     assert_eq!(aliases, expected);
@@ -82,11 +75,7 @@ fn rejects_conflicting_definitions(#[case] references: &[(&str, &str)]) -> TestR
         ));
     }
     let error = catalog
-        .resolve(
-            &PlaceholderedSql::from_query("select 1"),
-            &catalog_references,
-            SqlDialect::PostgreSQL,
-        )
+        .resolve(&catalog_references, SqlDialect::PostgreSQL)
         .unwrap_err();
     let CteCatalogError::ConflictingAlias(first_alias, first_name, alias, name) = error else {
         panic!("expected conflicting alias");
@@ -129,11 +118,7 @@ fn compares_alias_values_for_the_selected_dialect(
             &CteAlias::new(second),
         ),
     ];
-    let result = catalog.resolve(
-        &PlaceholderedSql::from_query("select 1"),
-        &references,
-        dialect,
-    );
+    let result = catalog.resolve(&references, dialect);
     if equivalent && !same_definition {
         let CteCatalogError::ConflictingAlias(first_alias, first_name, alias, name) =
             result.unwrap_err()

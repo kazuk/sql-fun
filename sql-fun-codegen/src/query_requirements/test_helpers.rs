@@ -8,7 +8,9 @@ use ::proc_macro2::TokenStream;
 use ::sql_fun_core::{CodegenOptions, PlaceholderedSql, ResolvedCteCatalog};
 
 pub(super) fn specification() -> QueryFunctionSpec {
-    let query = PlaceholderedSql::from_query("select ${id} from users");
+    let query = PlaceholderedSql::from_query(
+        "/* 日本語 */ select ${id:int4}, ${id}, ${other:text} from users -- retained\n",
+    );
     let item_fn = ItemFunction::new(syn::parse_quote!(
         async fn lookup() {}
     ));
@@ -17,7 +19,7 @@ pub(super) fn specification() -> QueryFunctionSpec {
         function_kind: QueryFunctionKind::query_one(),
         connector_spec: ConnectorSpec::realize("postgresql".parse().unwrap(), "tokio-postgres")
             .unwrap(),
-        resolved_cte_catalog: resolved_cte(&query),
+        resolved_cte_catalog: resolved_cte(),
         query,
         item_fn,
         connection: syn::parse_quote!(connection),
@@ -48,8 +50,8 @@ connector = "rusqlite""#,
     spec
 }
 
-fn resolved_cte(query: &PlaceholderedSql) -> ResolvedCteCatalog {
-    let mut value = serde_json::to_value(ResolvedCteCatalog::from(query)).unwrap();
+fn resolved_cte() -> ResolvedCteCatalog {
+    let mut value = serde_json::to_value(ResolvedCteCatalog::default()).unwrap();
     value["cte_queries"]["active_users"] = serde_json::to_value(PlaceholderedSql::from_query(
         "select id from users where active = true",
     ))

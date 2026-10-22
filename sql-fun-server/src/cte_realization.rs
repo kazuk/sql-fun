@@ -31,10 +31,13 @@ impl RealizedCteQuery {
 pub(crate) struct OrderedBindings(Vec<ResolvedBinding>);
 
 impl OrderedBindings {
-    fn from_catalog(catalog: &ResolvedCteCatalog) -> Result<Self, CteRealizationError> {
+    fn from_catalog(
+        base_query: &PlaceholderedSql,
+        catalog: &ResolvedCteCatalog,
+    ) -> Result<Self, CteRealizationError> {
         let mut result = Self(Vec::new());
         catalog.try_map_cte_queries(|_, query| result.include_query(query))?;
-        result.include_query(catalog.base_query())?;
+        result.include_query(base_query)?;
         Ok(result)
     }
 
@@ -167,12 +170,13 @@ impl CteRealizationError {
 /// Existing recursion flags are preserved; dependency expansion does not enable
 /// SQL recursion. Missing inputs and validation failures are returned directly.
 pub(crate) fn realize_cte_catalog(
+    base_query: &PlaceholderedSql,
     catalog: &ResolvedCteCatalog,
     dialect: Dialect,
 ) -> Result<RealizedCteQuery, CteRealizationError> {
-    let bindings = OrderedBindings::from_catalog(catalog)?;
+    let bindings = OrderedBindings::from_catalog(base_query, catalog)?;
     let order = bindings.parameter_names();
-    let mut statement = parse_piece(catalog.base_query(), dialect, &order, "base query")?;
+    let mut statement = parse_piece(base_query, dialect, &order, "base query")?;
     let definitions = catalog.try_map_cte_queries(|alias, query| {
         let piece = format!("CTE {alias}");
         let body = parse_piece(query, dialect, &order, &piece)?;

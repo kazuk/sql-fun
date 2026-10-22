@@ -58,14 +58,13 @@ connector = "tokio-postgres"
 
 /// A dependency-ordered catalog with a parameter shared across base and CTEs.
 pub(super) fn catalog() -> ResolvedCteCatalog {
-    let base = PlaceholderedSql::from_query("SELECT ${shared:int4}, id FROM a_visible");
     let leaf = PlaceholderedSql::from_query("SELECT ${shared:int4} AS id");
     let outer = PlaceholderedSql::from_query("SELECT id FROM z_dependency");
     let mut parameters = CteParameterCollection::default();
     for (name, hints) in leaf.parameters() {
         parameters.push_query_parameter(&CteName::new("library::leaf"), name, hints);
     }
-    let mut value = ::serde_json::to_value(ResolvedCteCatalog::from(&base)).unwrap();
+    let mut value = ::serde_json::to_value(ResolvedCteCatalog::default()).unwrap();
     value["parameters"] = ::serde_json::to_value(parameters).unwrap();
     value["cte_queries"] = ::serde_json::from_str(&format!(
         r#"{{"z_dependency":{},"a_visible":{}}}"#,
@@ -79,11 +78,11 @@ pub(super) fn catalog() -> ResolvedCteCatalog {
 /// Model the expanded constants consumed by the public extraction API.
 pub(super) fn requirements(
     datasources: &[&str],
+    query: &str,
     catalog: &ResolvedCteCatalog,
 ) -> Vec<QueryRequirement> {
     let mut source = String::new();
     let encoded = ::serde_json::to_string(catalog).unwrap();
-    let query = catalog.base_query().encode();
     for (index, datasource) in datasources.iter().enumerate() {
         ::std::write!(
             source,

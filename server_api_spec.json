@@ -3132,18 +3132,11 @@
                 "$ref": "#/$defs/ContextHandle"
               },
               "query": {
-                "description": "Query input source",
-                "anyOf": [
-                  {
-                    "$ref": "#/$defs/AnalyzeQueryInput"
-                  },
-                  {
-                    "type": "null"
-                  }
-                ]
+                "description": "Required, authoritative application SQL input.",
+                "$ref": "#/$defs/AnalyzeQueryInput"
               },
               "resolved_cte_catalog": {
-                "description": "Resolved catalog; mutually exclusive with query. Its base query is authoritative.",
+                "description": "Optional resolved CTE dependencies, without application SQL.",
                 "anyOf": [
                   {
                     "$ref": "#/$defs/ResolvedCteCatalog"
@@ -3156,7 +3149,8 @@
               }
             },
             "required": [
-              "context_handle"
+              "context_handle",
+              "query"
             ],
             "$defs": {
               "ContextHandle": {
@@ -3215,9 +3209,6 @@
                   "parameters": {
                     "$ref": "#/$defs/CteParameterCollection"
                   },
-                  "base_query": {
-                    "$ref": "#/$defs/PlaceholderedSql"
-                  },
                   "cte_queries": {
                     "type": "object",
                     "additionalProperties": {
@@ -3227,7 +3218,6 @@
                 },
                 "required": [
                   "parameters",
-                  "base_query",
                   "cte_queries"
                 ]
               },

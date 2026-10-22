@@ -504,28 +504,27 @@ impl Join {
     }
 }
 
-impl TypedColumn {
+struct TypedColumns<'a>(&'a [TypedColumn]);
+
+impl<'a> From<&'a [TypedColumn]> for TypedColumns<'a> {
+    fn from(columns: &'a [TypedColumn]) -> Self {
+        Self(columns)
+    }
+}
+
+impl TypedColumns<'_> {
     fn resolve_function_output(
-        columns: &[Self],
+        &self,
         context: &mut impl ParseContext,
     ) -> Result<crate::sem::TableFunctionOutput, AnalysisError> {
         let mut output = crate::sem::TableFunctionOutput::default();
-        for column in columns {
+        for column in self.0 {
             let collation = column.collation.as_ref().map(Name::full_name).transpose()?;
-            use crate::ast::deparse::{SqlEmit, SqlWriter};
-            let mut modifiers = Vec::new();
-            for modifier in &column.type_name.modifiers {
-                let mut writer = SqlWriter::new(crate::ast::Dialect::postgres());
-                modifier
-                    .emit(&mut writer)
-                    .map_err(|error| AnalysisError::unexpected_input_error(&error.to_string()))?;
-                modifiers.push(writer.into_sql());
-            }
             output.declare(
                 context,
                 &column.name,
                 &column.type_name.reference()?,
-                &modifiers,
+                &column.type_name.modifier_arguments()?,
                 collation.as_ref(),
             )?;
         }
@@ -540,7 +539,8 @@ impl TableFunctions {
         scope: &ScalarAnalysisContext<'_>,
     ) -> Result<DataSource, AnalysisError> {
         if self.rows_from {
-            let mut outer_output = TypedColumn::resolve_function_output(&self.columns, context)?;
+            let mut outer_output =
+                TypedColumns::from(self.columns.as_slice()).resolve_function_output(context)?;
             let outer_allowed =
                 self.calls.len() == 1 && !self.ordinality && self.calls[0].columns.is_empty();
             if !self.columns.is_empty() && !outer_allowed {
@@ -548,8 +548,8 @@ impl TableFunctions {
             }
             let mut functions = Vec::new();
             for function in &self.calls {
-                let local_output =
-                    TypedColumn::resolve_function_output(&function.columns, context)?;
+                let local_output = TypedColumns::from(function.columns.as_slice())
+                    .resolve_function_output(context)?;
                 let output = if outer_allowed && !self.columns.is_empty() {
                     &outer_output
                 } else {
@@ -580,7 +580,8 @@ impl TableFunctions {
         let [function] = self.calls.as_slice() else {
             return AnalysisError::raise_unexpected_input("table function count");
         };
-        let mut output = TypedColumn::resolve_function_output(&self.columns, context)?;
+        let mut output =
+            TypedColumns::from(self.columns.as_slice()).resolve_function_output(context)?;
         if self.ordinality && !self.columns.is_empty() {
             output.reject_placement(context)?;
         }
@@ -930,5 +931,20 @@ impl crate::ast::Into {
             &self.relation.name.full_name()?,
             &self.relation.persistence,
         ))
+    }
+}
+
+impl crate::ast::TypeName {
+    fn modifier_arguments(&self) -> Result<Vec<String>, AnalysisError> {
+        use crate::ast::deparse::{SqlEmit, SqlWriter};
+        let mut arguments = Vec::new();
+        for modifier in &self.modifiers {
+            let mut writer = SqlWriter::new(Dialect::postgres());
+            modifier
+                .emit(&mut writer)
+                .map_err(|error| AnalysisError::unexpected_input_error(&error.to_string()))?;
+            arguments.push(writer.into_sql());
+        }
+        Ok(arguments)
     }
 }

@@ -49,6 +49,15 @@ impl DataSourceRowFunctions {
         &self.functions
     }
 
+    /// Names retained on resolved invocations, in call order.
+    /// Deferred or unresolved calls without a resolved invocation are omitted.
+    pub fn resolved_function_names(&self) -> Vec<crate::sem::QueryName> {
+        self.functions
+            .iter()
+            .filter_map(|function| function.source().resolved_function_name().cloned())
+            .collect()
+    }
+
     /// get alias name
     #[must_use]
     pub fn get_aliases(&self) -> Vec<AliasSpec> {
@@ -169,74 +178,38 @@ impl DataSourceRowFunctions {
         &'a self,
         context: &impl ParseContext,
         with: &WithClause,
-    ) -> Result<Vec<super::ProjectionColumn<'a>>, AnalysisError> {
-        let mut columns = Vec::new();
+    ) -> Result<super::projection::ProjectionColumns<'a>, AnalysisError> {
+        let mut columns = super::projection::ProjectionColumns::default();
         for function in &self.functions {
             function.append_projection(context, with, &mut columns)?;
         }
         if self.ordinality {
-            let name = crate::sem::ColumnName::from("ordinality");
-            let definition = crate::sem::ColumnDefinition::new(
-                &Some(name.clone()),
-                Some(&crate::sem::PgBuiltInType::int8()),
-                Some(true),
-                &[],
-            );
-            let expression =
-                crate::sem::ColumnReferenceExpr::function_output(&self.alias, &definition);
-            columns.push(super::ProjectionColumn::expression(&name, &expression));
+            columns.append_ordinality(&self.alias);
         }
-        Ok(columns
-            .into_iter()
-            .enumerate()
-            .map(|(index, column)| {
-                let column = if let Some(name) = self.alias.derived_column_at(index) {
-                    column.with_name(name)
-                } else {
-                    column
-                };
-                column.with_join_alias(self.alias.name())
-            })
-            .collect())
+        Ok(columns.with_aliases(&self.alias))
     }
     pub(super) fn column_names(
         &self,
         context: &impl ParseContext,
         with: &WithClause,
     ) -> Result<Vec<crate::sem::ColumnName>, AnalysisError> {
-        Ok(self
-            .project(context, with)?
-            .into_iter()
-            .map(|column| column.name().clone())
-            .collect())
+        Ok(self.project(context, with)?.names())
     }
-    fn known_column_names(&self) -> Option<Vec<crate::sem::ColumnName>> {
-        let mut names = Vec::new();
+    fn known_column_names(&self) -> Option<super::function_columns::OutputColumnNames> {
+        let mut names = super::function_columns::OutputColumnNames::default();
         for function in &self.functions {
             function.append_known_column_names(&mut names)?;
         }
         if self.ordinality {
-            names.push(crate::sem::ColumnName::from("ordinality"));
+            names.append_ordinality();
         }
-        Some(
-            names
-                .into_iter()
-                .enumerate()
-                .map(|(index, name)| self.alias.derived_column_at(index).cloned().unwrap_or(name))
-                .collect(),
-        )
+        Some(names)
     }
     pub(super) fn candidates(&self, name: &crate::sem::ColumnName) -> super::ColumnCandidates {
         let Some(names) = self.known_column_names() else {
             return super::ColumnCandidates::unknown();
         };
-        let mut candidates = Vec::new();
-        for column in names {
-            if &column == name {
-                candidates.push(self.alias.clone());
-            }
-        }
-        super::ColumnCandidates::from(candidates)
+        super::ColumnCandidates::from(names.candidates(name, &self.alias))
     }
     pub(super) fn bind_column<'a, C: ParseContext>(
         &self,
@@ -246,33 +219,10 @@ impl DataSourceRowFunctions {
         name: &crate::sem::ColumnName,
         nullable: bool,
     ) -> Result<(SemScalarExpr, &'a mut C), AnalysisError> {
-        let mut matches = self
+        let expression = self
             .project(context, with)?
-            .into_iter()
-            .filter(|column| column.name() == name);
-        let Some(column) = matches.next() else {
-            return crate::sem::ColumnReferenceExpr::function_source_ref(
-                context,
-                alias,
-                name,
-                None,
-                None,
-                &IVec::default(),
-                nullable,
-            );
-        };
-        if matches.next().is_some() {
-            return Ok((
-                crate::sem::ColumnReferenceExpr::ambiguous_column_resolved(context, name)?,
-                context,
-            ));
-        }
-        Ok((
-            column
-                .with_nullability(nullable)
-                .bind_direct(context, with)?,
-            context,
-        ))
+            .bind_column(context, with, alias, name, nullable)?;
+        Ok((expression, context))
     }
     pub(super) fn validate_aliases(
         &mut self,
@@ -293,10 +243,9 @@ impl DataSourceRowsFromFunc {
         &'a self,
         context: &impl ParseContext,
         with: &WithClause,
-        columns: &mut Vec<super::ProjectionColumn<'a>>,
+        columns: &mut super::projection::ProjectionColumns<'a>,
     ) -> Result<(), AnalysisError> {
-        columns.extend(self.source.projection_names(context, with, None)?);
-        Ok(())
+        columns.append_source(&self.source, context, with)
     }
 }
 
@@ -313,8 +262,10 @@ impl DataSourceRowFunctions {
 }
 
 impl DataSourceRowsFromFunc {
-    fn append_known_column_names(&self, names: &mut Vec<crate::sem::ColumnName>) -> Option<()> {
-        names.extend(self.source.known_function_columns()?);
-        Some(())
+    fn append_known_column_names(
+        &self,
+        names: &mut super::function_columns::OutputColumnNames,
+    ) -> Option<()> {
+        names.append_function_columns(&self.source)
     }
 }

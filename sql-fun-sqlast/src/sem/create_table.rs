@@ -48,6 +48,31 @@ impl ColumnCollection {
             })
     }
 
+    /// Named columns in declaration order, preserving duplicate names.
+    #[must_use]
+    pub fn names(&self) -> Vec<ColumnName> {
+        self.0
+            .iter()
+            .filter_map(|column| column.name().clone())
+            .collect()
+    }
+
+    pub(crate) fn row_type_columns(&self) -> Self {
+        Self(
+            self.0
+                .iter()
+                .map(|column| {
+                    ColumnDefinition::new(
+                        column.name(),
+                        column.get_type_cloned().as_ref(),
+                        None,
+                        &[],
+                    )
+                })
+                .collect(),
+        )
+    }
+
     /// find mutateble column by name
     pub fn get_column_mut(&mut self, column_name: &ColumnName) -> Option<&mut ColumnDefinition> {
         self.0
@@ -96,6 +121,25 @@ impl ColumnCollection {
     /// append column definition
     pub fn push(&mut self, column: &ColumnDefinition) {
         self.0.push(column.clone());
+    }
+}
+
+#[cfg(test)]
+mod column_collection_tests {
+    use super::{ColumnCollection, ColumnDefinition, ColumnName};
+
+    #[test]
+    fn names_keep_order_and_duplicates_without_unnamed_columns() {
+        let b = ColumnName::from("b");
+        let a = ColumnName::from("a");
+        let columns = ColumnCollection::new(vec![
+            ColumnDefinition::new(&Some(b.clone()), None, None, &[]),
+            ColumnDefinition::new(&None, None, None, &[]),
+            ColumnDefinition::new(&Some(a.clone()), None, None, &[]),
+            ColumnDefinition::new(&Some(b.clone()), None, None, &[]),
+        ]);
+        assert_eq!(columns.names(), vec![b.clone(), a, b]);
+        assert!(ColumnCollection::default().names().is_empty());
     }
 }
 
@@ -330,6 +374,11 @@ impl CreateTable {
     ) -> Option<&ColumnDefinition> {
         self.columns
             .get_column_def_with_skip_count(column_name, skip_count)
+    }
+
+    pub(crate) fn function_row_columns(&self) -> ColumnCollection {
+        // A function returns the row type, without the table's storage constraints.
+        self.columns.row_type_columns()
     }
 
     /// get column definition by index

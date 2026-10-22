@@ -111,11 +111,11 @@ fn preserves_declared_returns_and_positional_aliases(#[case] sql: &str) {
 )]
 fn diagnoses_invalid_definitions(#[case] sql: &str, #[case] code: &str) {
     let (_, context) = table_function_query(sql, false);
-    let mut found = false;
-    for problem in context.reported_problems() {
-        found |= problem.code() == code;
-    }
-    assert!(found, "{sql}: {:?}", context.reported_problems());
+    assert!(
+        context.has_reported_problem(code),
+        "{sql}: {:?}",
+        context.reported_problems()
+    );
 }
 
 #[rstest::rstest]
@@ -240,9 +240,7 @@ fn keeps_selected_overload_separate_from_output_definitions() {
         .get_function_by_name(&FullName::from_local_name("overloaded_record"))
         .unwrap();
     assert_eq!(catalog.len(), 2);
-    for overload in &catalog {
-        assert!(overload.returning_table().get_at(0).is_none());
-    }
+    assert_eq!(catalog.record_definition_requirement(), Some(true));
     let restored: DataSource =
         ::serde_json::from_str(&::serde_json::to_string(source).unwrap()).unwrap();
     assert_eq!(&restored, source);
@@ -442,10 +440,7 @@ fn diagnoses_invalid_record_typmods(#[case] declared: &str) {
     let sql = format!("SELECT r.a FROM record_fun('') r(a {declared})");
     let (_, context) = table_function_query(&sql, false);
     assert!(
-        context
-            .reported_problems()
-            .iter()
-            .any(|problem| problem.code() == "table_function_invalid_typmod"),
+        context.has_reported_problem("table_function_invalid_typmod"),
         "{:?}",
         context.reported_problems()
     );
@@ -511,14 +506,20 @@ fn preserves_distinct_rows_function_names_with_equal_signatures() {
     let DataSource::RowFunctions(rows) = &restored else {
         panic!("ROWS FROM")
     };
-    for (index, name) in ["record_fun", "overloaded_record"].iter().enumerate() {
-        let DataSource::CallTableFunc(call) = rows.functions()[index].source() else {
-            panic!("resolved call")
-        };
-        let identity = call.function_name().unwrap();
-        assert_eq!(identity.name(), *name);
-        assert!(
-            matches!(identity.resolution(), QueryNameResolution::Function(resolved) if resolved == &FullName::with_schema("public", name))
-        );
-    }
+    assert_eq!(
+        rows.resolved_function_names(),
+        vec![
+            crate::sem::QueryName::new(
+                "record_fun",
+                QueryNameResolution::function(&FullName::with_schema("public", "record_fun"))
+            ),
+            crate::sem::QueryName::new(
+                "overloaded_record",
+                QueryNameResolution::function(&FullName::with_schema(
+                    "public",
+                    "overloaded_record"
+                ))
+            ),
+        ]
+    );
 }

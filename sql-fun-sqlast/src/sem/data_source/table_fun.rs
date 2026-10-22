@@ -167,6 +167,13 @@ impl TableFunctionDataSource {
 }
 
 impl DataSource {
+    pub(super) const fn resolved_function_name(&self) -> Option<&crate::sem::QueryName> {
+        if let Self::CallTableFunc(source) = self {
+            source.function_name()
+        } else {
+            None
+        }
+    }
     pub(crate) fn record_function_name(
         &mut self,
         requested: &crate::sem::FullName,

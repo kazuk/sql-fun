@@ -159,7 +159,7 @@ impl DataSource {
             if qualifier.is_some_and(|name| !source.matches_alias(name)) {
                 return Ok(Vec::new());
             }
-            return source.project(context, with);
+            return Ok(source.project(context, with)?.into_columns());
         }
         if let Self::MergeRecord(record) = self {
             return record.projection_names(context, with, qualifier);
@@ -246,5 +246,81 @@ impl DataSource {
                 "star source has no enumerable result columns",
             ),
         }
+    }
+}
+
+/// Projection occurrences retain order and duplicates until column binding.
+#[derive(Default)]
+pub(super) struct ProjectionColumns<'a>(Vec<ProjectionColumn<'a>>);
+
+impl<'a> ProjectionColumns<'a> {
+    pub(super) fn append_source(
+        &mut self,
+        source: &'a DataSource,
+        context: &impl ParseContext,
+        with: &WithClause,
+    ) -> Result<(), AnalysisError> {
+        self.0.extend(source.projection_names(context, with, None)?);
+        Ok(())
+    }
+    pub(super) fn append_ordinality(&mut self, alias: &crate::sem::AliasSpec) {
+        let name = ColumnName::from("ordinality");
+        let definition = crate::sem::ColumnDefinition::new(
+            &Some(name.clone()),
+            Some(&crate::sem::PgBuiltInType::int8()),
+            Some(true),
+            &[],
+        );
+        let expression = crate::sem::ColumnReferenceExpr::function_output(alias, &definition);
+        self.0
+            .push(ProjectionColumn::expression(&name, &expression));
+    }
+    pub(super) fn with_aliases(self, alias: &crate::sem::AliasSpec) -> Self {
+        Self(
+            self.0
+                .into_iter()
+                .enumerate()
+                .map(|(index, column)| {
+                    let column = if let Some(name) = alias.derived_column_at(index) {
+                        column.with_name(name)
+                    } else {
+                        column
+                    };
+                    column.with_join_alias(alias.name())
+                })
+                .collect(),
+        )
+    }
+    pub(super) fn names(&self) -> Vec<ColumnName> {
+        self.0.iter().map(|column| column.name().clone()).collect()
+    }
+    pub(super) fn into_columns(self) -> Vec<ProjectionColumn<'a>> {
+        self.0
+    }
+    pub(super) fn bind_column<C: ParseContext>(
+        self,
+        context: &mut C,
+        with: &WithClause,
+        alias: &AliasName,
+        name: &ColumnName,
+        nullable: bool,
+    ) -> Result<SemScalarExpr, AnalysisError> {
+        let mut matches = self.0.into_iter().filter(|column| column.name() == name);
+        let Some(column) = matches.next() else {
+            return Ok(crate::sem::ColumnReferenceExpr::function_source_ref(
+                context,
+                alias,
+                name,
+                None,
+                None,
+                &::sql_fun_core::IVec::default(),
+                nullable,
+            )?
+            .0);
+        };
+        if matches.next().is_some() {
+            return crate::sem::ColumnReferenceExpr::ambiguous_column_resolved(context, name);
+        }
+        column.with_nullability(nullable).bind_direct(context, with)
     }
 }

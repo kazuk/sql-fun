@@ -2304,6 +2304,19 @@
                   "description": "More column aliases than output columns were supplied.",
                   "type": "string",
                   "const": "TooManyAliases"
+                },
+                {
+                  "description": "Invalid declaration-local type modifiers.",
+                  "type": "object",
+                  "properties": {
+                    "InvalidTypmod": {
+                      "type": "string"
+                    }
+                  },
+                  "required": [
+                    "InvalidTypmod"
+                  ],
+                  "additionalProperties": false
                 }
               ]
             },
@@ -5837,6 +5850,19 @@
                   "description": "More column aliases than output columns were supplied.",
                   "type": "string",
                   "const": "TooManyAliases"
+                },
+                {
+                  "description": "Invalid declaration-local type modifiers.",
+                  "type": "object",
+                  "properties": {
+                    "InvalidTypmod": {
+                      "type": "string"
+                    }
+                  },
+                  "required": [
+                    "InvalidTypmod"
+                  ],
+                  "additionalProperties": false
                 }
               ]
             },

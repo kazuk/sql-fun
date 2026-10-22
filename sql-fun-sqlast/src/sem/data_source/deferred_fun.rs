@@ -99,7 +99,7 @@ impl DeferredTableFunction {
         for argument in self.call.args() {
             arguments.push(argument.value().clone());
         }
-        crate::sem::ColumnReferenceExpr::function_source_ref(
+        let (expression, context) = crate::sem::ColumnReferenceExpr::function_source_ref(
             context,
             alias,
             column,
@@ -107,7 +107,11 @@ impl DeferredTableFunction {
             self.output.column(column, &self.alias),
             &arguments.into(),
             nullable,
-        )
+        )?;
+        Ok((
+            expression.with_function_type_declaration(self.output.declaration(column, &self.alias)),
+            context,
+        ))
     }
 }
 
@@ -128,6 +132,13 @@ impl DeferredTableFunction {
 }
 
 impl DeferredTableFunction {
+    /// Caller-supplied type and modifiers for an effective output column.
+    pub fn output_type_declaration(
+        &self,
+        column: &crate::sem::ColumnName,
+    ) -> Option<&crate::sem::WithTypmod<crate::sem::TypeReference>> {
+        self.output.declaration(column, &self.alias)
+    }
     /// Effective invocation columns, independently of the catalog return declaration.
     pub const fn output_columns(&self) -> &crate::sem::ColumnCollection {
         self.output.columns()

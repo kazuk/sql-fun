@@ -15,7 +15,7 @@ pub(crate) struct TableFunctionOutput {
 #[derive(Debug, Clone, Eq, Hash, PartialEq, serde::Serialize, serde::Deserialize)]
 struct RecordColumn {
     name: ColumnName,
-    requested_type: TypeReference,
+    requested_type: crate::sem::WithTypmod<TypeReference>,
     resolved_type: Option<TypeReference>,
     collation: Option<CatalogNameLookup>,
 }
@@ -32,6 +32,7 @@ impl TableFunctionOutput {
         context: &mut impl ParseContext,
         name: &str,
         requested_type: &TypeReference,
+        modifiers: &[String],
         collation: Option<&FullName>,
     ) -> Result<(), AnalysisError> {
         let name = ColumnName::from(name);
@@ -42,6 +43,13 @@ impl TableFunctionOutput {
             )?;
         }
         let resolved_type = context.canonicalize_type_ref(requested_type);
+        let mut declaration = crate::sem::WithTypmod::new(requested_type, modifiers);
+        if let Some(resolved) = &resolved_type {
+            declaration.interpret_postgres(resolved);
+            if let Some(message) = declaration.validation_error() {
+                self.report(context, TableFunctionProblem::invalid_typmod(message))?;
+            }
+        }
         if resolved_type.is_none() {
             self.report(
                 context,
@@ -65,7 +73,7 @@ impl TableFunctionOutput {
         ));
         self.declarations.push(RecordColumn {
             name,
-            requested_type: requested_type.clone(),
+            requested_type: declaration,
             resolved_type,
             collation,
         });
@@ -123,6 +131,21 @@ impl TableFunctionOutput {
             self.report(context, TableFunctionProblem::definition_not_allowed())?;
         }
         Ok(())
+    }
+    pub(crate) fn declaration(
+        &self,
+        column: &ColumnName,
+        alias: &AliasSpec,
+    ) -> Option<&crate::sem::WithTypmod<TypeReference>> {
+        for (index, name) in self.names().into_iter().enumerate() {
+            if alias.derived_column_at(index).unwrap_or(&name) == column {
+                return self
+                    .declarations
+                    .get(index)
+                    .map(|column| &column.requested_type);
+            }
+        }
+        None
     }
     pub(crate) const fn columns(&self) -> &ColumnCollection {
         &self.columns

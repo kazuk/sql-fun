@@ -58,6 +58,7 @@ mod stack;
 mod top_level_statement;
 pub(crate) mod traversal;
 pub use self::query_metadata::QueryMetadata;
+pub use self::with_typmod::WithTypmod;
 
 mod type_system;
 mod update_statement;
@@ -65,6 +66,7 @@ mod variable_set;
 mod view_definition;
 mod view_like;
 pub(crate) mod view_write;
+mod with_typmod;
 pub use self::create_rule::{
     CreateRule, RuleDependencies, RuleEvent, RuleIdentity, RuleReferences,
 };

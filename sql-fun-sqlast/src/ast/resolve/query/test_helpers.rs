@@ -167,6 +167,16 @@ pub(super) fn source_namespace_statement_at_version(
         "engine": "postgres", "dialect": "postgres", "version": version, "search_path": ["a", "public"]
     })).unwrap();
     let mut context = catalog().with_metadata(&metadata);
+    // Merged FULL JOIN keys use PostgreSQL's common-type selection.
+    for ty in [PgBuiltInType::int4(), PgBuiltInType::int8()] {
+        context.set_get_type_impl_result(
+            ty.full_name(),
+            &crate::sem::TypeDefinition::builtin_with_category(
+                ty.full_name(),
+                Some(crate::sem::TypeCategory::try_from('N').unwrap()),
+            ),
+        );
+    }
     context.set_get_search_path_result(&[SchemaName::from("a"), SchemaName::from("public")]);
     let schema = r#"
 CREATE TABLE a.t(id integer NOT NULL, only_a integer NOT NULL);

@@ -2,18 +2,19 @@
 
 use self::test_helpers::heavy;
 
-#[test]
-fn supported_select_reaches_public_resolution() {
-    assert!(heavy::analyze("select 1 as n").is_ok());
+#[rstest::rstest]
+#[case::literal("select 1 as n")]
+#[case::row("select row(1, 2)")]
+#[case::invalid_star_diagnostic("select (1).*")]
+fn supported_select_reaches_public_resolution(#[case] sql: &str) {
+    assert!(heavy::analyze(sql).is_ok());
 }
 
 #[rstest::rstest]
-#[case("select row(1, 2)")]
 #[case("select true is true")]
 #[case("select json_object('x': 1)")]
 #[case("select 'x' collate \"C\"")]
 #[case("select merge_action()")]
-#[case("select (1).*")]
 #[case("select 1 from coalesce(1, 2) as t")]
 #[case("select 1 from rows from(coalesce(1, 2)) as t")]
 #[case("select x from xmltable('/x' passing '<x/>' columns x text path '.') as t")]

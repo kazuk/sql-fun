@@ -30,6 +30,36 @@ struct MergeRowImageNullability {
 }
 
 impl FromClause {
+    pub(crate) fn joined_projection(
+        &self,
+        context: &impl ParseContext,
+        with: &WithClause,
+        column: &ColumnName,
+    ) -> Result<Option<crate::sem::data_source::ProjectionColumn<'_>>, AnalysisError> {
+        if !self.0.iter().any(DataSource::is_joined) {
+            return Ok(None);
+        }
+        let mut selected = None;
+        for source in &self.0 {
+            if source
+                .aliases_for_column_resolved(column, context, with)
+                .is_unknown()
+            {
+                return Ok(None);
+            }
+            for candidate in source.projection_names(context, with, None)? {
+                if candidate.name() != column {
+                    continue;
+                }
+                if selected.is_some() {
+                    return Ok(None);
+                }
+                selected = Some(candidate);
+            }
+        }
+        Ok(selected)
+    }
+
     pub(crate) fn namespace(&self) -> crate::sem::data_source::SourceNamespace<'_> {
         let mut namespace = crate::sem::data_source::SourceNamespace::default();
         for source in &self.0 {

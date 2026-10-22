@@ -10,6 +10,10 @@ pub struct CoalesceExpr {
     arg_exprs: Vec<SemScalarExpr>,
     coalesce_type: Option<TypeReference>,
     #[serde(default, skip_serializing_if = "Option::is_none")]
+    join_key_not_null: Option<bool>,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    join_key_name: Option<String>,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
     types: Option<InputTypeConstraint>,
     #[serde(skip)]
     node: Option<usize>,
@@ -21,6 +25,9 @@ impl SemScalarExprNode for CoalesceExpr {
     }
 
     fn is_not_null(&self) -> Option<bool> {
+        if let Some(not_null) = self.join_key_not_null {
+            return Some(not_null);
+        }
         // Preserve the existing conservative metadata; general nullability
         // analysis is separate from common-type constraint registration.
         Some(false)
@@ -35,6 +42,8 @@ impl CoalesceExpr {
         let mut value = Self {
             arg_exprs: arguments.to_vec(),
             coalesce_type: None,
+            join_key_not_null: None,
+            join_key_name: None,
             types: Some(InputTypeConstraint::any()),
             node: None,
         };
@@ -82,6 +91,36 @@ impl CoalesceExpr {
             }
         }
         Ok(SemScalarExpr::coalesce(&value))
+    }
+
+    pub(crate) fn resolve_join_key(
+        context: &mut impl ParseContext,
+        arguments: &[SemScalarExpr],
+        name: &crate::sem::ColumnName,
+        not_null: bool,
+    ) -> Result<SemScalarExpr, AnalysisError> {
+        let sqlite_type = if context.dialect() == crate::ast::Dialect::sqlite() {
+            if let Some(first) = arguments.first() {
+                first.get_type()
+            } else {
+                None
+            }
+        } else {
+            None
+        };
+        let mut expression = Self::resolve(context, arguments)?;
+        if let SemScalarExpr::Coalesce(value) = &mut expression {
+            value.join_key_not_null = Some(not_null);
+            value.join_key_name = Some(name.as_str().to_owned());
+            if let Some(ty) = sqlite_type {
+                value.coalesce_type = Some(ty);
+            }
+        }
+        Ok(expression)
+    }
+
+    pub(crate) fn join_key_name(&self) -> Option<&str> {
+        self.join_key_name.as_deref()
     }
 
     /// Operands in source order, including any determined implicit coercions.

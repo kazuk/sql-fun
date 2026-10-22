@@ -9,9 +9,17 @@ pub struct ResultColumn {
     // Retain the semantic projection without changing serialized column metadata.
     #[serde(skip)]
     expression: Option<Box<SemScalarExpr>>,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    star_expansion: Option<StarExpansion>,
     col_name: Option<ColumnName>,
     col_type: Option<TypeReference>,
     is_not_null: Option<bool>,
+}
+
+#[derive(Debug, Clone, Eq, Hash, PartialEq, serde::Serialize, serde::Deserialize)]
+enum StarExpansion {
+    Pending(SemScalarExpr),
+    Invalid(SemScalarExpr),
 }
 
 impl ResultColumn {
@@ -23,6 +31,7 @@ impl ResultColumn {
     ) -> Self {
         Self {
             expression: None,
+            star_expansion: None,
             col_name: col_name.clone(),
             col_type: col_type.clone(),
             is_not_null: *is_not_null,
@@ -45,6 +54,11 @@ mod test_result_column_new {
 }
 
 impl ResultColumn {
+    /// Whether this result awaits a composite type before its output width is known.
+    pub const fn has_pending_star(&self) -> bool {
+        matches!(self.star_expansion, Some(StarExpansion::Pending(_)))
+    }
+
     /// The retained name-resolved projection, when available.
     pub fn expression(&self) -> Option<&SemScalarExpr> {
         self.expression.as_deref()
@@ -139,6 +153,64 @@ mod test_result_column_composite_field_definition {
 pub struct ResultColumnCollection(Vec<ResultColumn>);
 
 impl ResultColumnCollection {
+    pub(crate) fn append_composite_star(
+        &mut self,
+        context: &mut impl crate::sem::ParseContext,
+        base: SemScalarExpr,
+    ) -> Result<(), AnalysisError> {
+        let Some(ty) = base.get_type() else {
+            self.push_pending_star(base);
+            return Ok(());
+        };
+        let Some(fields) = ty.row_columns(context) else {
+            context.report_analysis_problem(crate::sem::AnalysisProblem::query(
+                crate::sem::QueryProblem::star_projection_requires_composite_type(),
+            ))?;
+            self.push_invalid_star(base);
+            return Ok(());
+        };
+        for name in fields.names() {
+            let expression =
+                crate::sem::IndirectionExpr::resolved_member(context, base.clone(), name.as_str())?;
+            self.push_expression(&name, expression);
+        }
+        Ok(())
+    }
+
+    pub(crate) fn push_pending_star(&mut self, base: SemScalarExpr) {
+        let mut column = ResultColumn::new(&None, &None, &None);
+        column.expression = Some(Box::new(base.clone()));
+        column.star_expansion = Some(StarExpansion::Pending(base));
+        self.0.push(column);
+    }
+
+    pub(crate) fn push_invalid_star(&mut self, base: SemScalarExpr) {
+        let mut column = ResultColumn::new(&None, &None, &None);
+        column.expression = Some(Box::new(base.clone()));
+        column.star_expansion = Some(StarExpansion::Invalid(base));
+        self.0.push(column);
+    }
+
+    pub(crate) fn expand_pending_stars(
+        &mut self,
+        context: &mut impl crate::sem::ParseContext,
+    ) -> Result<(), AnalysisError> {
+        if !self.0.iter().any(ResultColumn::has_pending_star) {
+            return Ok(());
+        }
+        let mut expanded = Self::default();
+        for column in &self.0 {
+            if !column.has_pending_star() {
+                expanded.0.push(column.clone());
+                continue;
+            }
+            let base = column.expression().expect("pending star base").clone();
+            expanded.append_composite_star(context, base)?;
+        }
+        self.0 = expanded.0;
+        Ok(())
+    }
+
     pub(crate) fn validate_grouping_target(
         &mut self,
         index: usize,
@@ -356,6 +428,18 @@ impl ResultColumnCollection {
         for (index, column) in self.0.iter_mut().enumerate() {
             if let Some(expression) = &mut column.expression {
                 expression.walk(visitor)?;
+                if column.star_expansion.is_some() {
+                    column.star_expansion = match column.star_expansion.take() {
+                        Some(StarExpansion::Pending(_)) => {
+                            Some(StarExpansion::Pending(expression.as_ref().clone()))
+                        }
+                        Some(StarExpansion::Invalid(_)) => {
+                            Some(StarExpansion::Invalid(expression.as_ref().clone()))
+                        }
+                        None => None,
+                    };
+                    continue;
+                }
                 if let Some(target) = targets.get(index) {
                     visitor.assignment(expression, target)?;
                 }

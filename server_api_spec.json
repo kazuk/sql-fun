@@ -2397,6 +2397,16 @@
                   "description": "A compound ORDER BY expression does not identify an output column.",
                   "type": "string",
                   "const": "InvalidCompoundOrder"
+                },
+                {
+                  "description": "A row expansion target does not have a composite type.",
+                  "type": "string",
+                  "const": "StarProjectionRequiresCompositeType"
+                },
+                {
+                  "description": "Row expansion appears outside a projection target.",
+                  "type": "string",
+                  "const": "InvalidStarProjectionPlacement"
                 }
               ]
             },
@@ -5943,6 +5953,16 @@
                   "description": "A compound ORDER BY expression does not identify an output column.",
                   "type": "string",
                   "const": "InvalidCompoundOrder"
+                },
+                {
+                  "description": "A row expansion target does not have a composite type.",
+                  "type": "string",
+                  "const": "StarProjectionRequiresCompositeType"
+                },
+                {
+                  "description": "Row expansion appears outside a projection target.",
+                  "type": "string",
+                  "const": "InvalidStarProjectionPlacement"
                 }
               ]
             },

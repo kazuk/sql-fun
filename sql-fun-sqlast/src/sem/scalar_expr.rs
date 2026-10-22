@@ -61,6 +61,45 @@ trait SemScalarExprNode {
 #[derive(Debug, Clone, Eq, Hash, PartialEq, serde::Serialize, serde::Deserialize)]
 pub struct ListExpr(Vec<SemScalarExpr>);
 
+/// An anonymous SQL row with ordered, analyzed fields.
+#[derive(Debug, Clone, Eq, Hash, PartialEq, serde::Serialize, serde::Deserialize)]
+pub struct RowExpr(Vec<SemScalarExpr>);
+
+impl RowExpr {
+    pub(crate) fn new(fields: &[SemScalarExpr]) -> Self {
+        Self(fields.to_vec())
+    }
+
+    fn get_type(&self) -> TypeReference {
+        let columns = self
+            .0
+            .iter()
+            .enumerate()
+            .map(|(index, value)| {
+                ColumnDefinition::new(
+                    &Some(ColumnName::from(format!("f{}", index + 1).as_str())),
+                    value.get_type().as_ref(),
+                    value.is_not_null(),
+                    &[],
+                )
+            })
+            .collect();
+        TypeReference::dynamic(&crate::sem::TypeDefinition::ImplicitComposite(
+            crate::sem::ColumnCollection::new(columns),
+        ))
+    }
+
+    fn walk<V: crate::sem::traversal::SemanticVisitor>(
+        &mut self,
+        visitor: &mut V,
+    ) -> Result<(), AnalysisError> {
+        for field in &mut self.0 {
+            field.walk(visitor)?;
+        }
+        Ok(())
+    }
+}
+
 impl ListExpr {
     pub const fn len(&self) -> usize {
         self.0.len()
@@ -78,6 +117,8 @@ impl ListExpr {
 /// scalar explation in semantic ast
 #[derive(Debug, Clone, Eq, Hash, PartialEq, serde::Serialize, serde::Deserialize)]
 pub enum SemScalarExpr {
+    /// Anonymous SQL row constructor.
+    Row(RowExpr),
     /// array expression
     Array(ArrayExpr),
     /// const expression
@@ -455,6 +496,7 @@ impl SemScalarExpr {
             Self::SubLink(sub_link_expr) => sub_link_expr.get_type(),
             Self::Exists(value) => value.get_type(),
             Self::Coalesce(coalesce_expr) => coalesce_expr.get_type(),
+            Self::Row(row) => Some(row.get_type()),
             Self::MinMax(min_max_expr) => min_max_expr.get_type(),
             Self::Collate(collate_expr) => collate_expr.get_type(),
             Self::SqlValue(sql_value_expr) => sql_value_expr.get_type(),
@@ -486,6 +528,7 @@ impl SemScalarExpr {
             Self::SubLink(sub_link_expr) => sub_link_expr.is_not_null(),
             Self::Exists(value) => value.is_not_null(),
             Self::Coalesce(coalesce_expr) => coalesce_expr.is_not_null(),
+            Self::Row(_) => Some(true),
             Self::MinMax(min_max_expr) => min_max_expr.is_not_null(),
             Self::Collate(collate_expr) => collate_expr.is_not_null(),
             Self::SqlValue(sql_value_expr) => sql_value_expr.is_not_null(),
@@ -558,7 +601,8 @@ impl SemScalarExpr {
             Self::Boolean(_boolean_expr) => String::new(),
             Self::NullTest(_null_test_expr) => String::new(),
             Self::SubLink(_) | Self::Exists(_) => String::new(),
-            Self::Coalesce(_coalesce_expr) => String::new(),
+            Self::Coalesce(coalesce_expr) => coalesce_expr.join_key_name().unwrap_or("").to_owned(),
+            Self::Row(_) => String::new(),
             Self::MinMax(value) => value.operation().to_owned(),
             Self::Collate(_collate_expr) => todo!(),
             Self::SqlValue(_sql_value_expr) => todo!(),
@@ -889,6 +933,7 @@ impl SemScalarExpr {
             Self::SubLink(v) => v.walk(visitor)?,
             Self::Exists(value) => value.walk(visitor)?,
             Self::Coalesce(v) => v.walk(visitor)?,
+            Self::Row(v) => v.walk(visitor)?,
             Self::MinMax(v) => v.walk(visitor)?,
             Self::Constrained(v) => v.walk(visitor)?,
             Self::Indirection(v) => v.walk(visitor)?,

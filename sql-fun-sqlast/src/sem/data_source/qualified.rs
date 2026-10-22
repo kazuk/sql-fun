@@ -37,6 +37,19 @@ impl<'a> QualifiedSource<'a> {
         &self.alias
     }
 
+    pub(crate) fn projection_columns(
+        &self,
+        context: &impl ParseContext,
+        with: &WithClause,
+    ) -> Result<Vec<super::ProjectionColumn<'a>>, AnalysisError> {
+        Ok(self
+            .source
+            .projection_names(context, with, Some(&self.alias))?
+            .into_iter()
+            .map(|column| column.with_nullability(self.nullable))
+            .collect())
+    }
+
     pub(super) fn column_candidates(
         &self,
         context: &impl ParseContext,

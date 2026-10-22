@@ -34,6 +34,21 @@ pub enum SelectStatement {
 }
 
 impl SelectStatement {
+    pub(crate) fn expand_pending_stars(
+        &mut self,
+        context: &mut impl ParseContext,
+    ) -> Result<(), AnalysisError> {
+        match self {
+            Self::Simple(query) => query.result_columns.expand_pending_stars(context),
+            Self::Query(query) => query.body_mut().expand_pending_stars(context),
+            Self::Union(left, right) | Self::Intersect(left, right) | Self::Except(left, right) => {
+                left.expand_pending_stars(context)?;
+                right.expand_pending_stars(context)
+            }
+            Self::Values(_) => Ok(()),
+        }
+    }
+
     pub(crate) fn assign_update_output<V: crate::sem::traversal::SemanticVisitor>(
         &mut self,
         visitor: &mut V,

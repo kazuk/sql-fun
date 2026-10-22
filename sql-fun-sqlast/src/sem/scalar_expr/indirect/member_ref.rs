@@ -11,6 +11,8 @@ pub struct MemberRef {
     member: String,
     /// member type
     member_type: Option<TypeReference>,
+    #[serde(skip)]
+    member_not_null: Option<bool>,
 }
 
 impl MemberRef {
@@ -18,15 +20,21 @@ impl MemberRef {
         base: SemScalarExpr,
         member: String,
         member_type: Option<TypeReference>,
+        member_not_null: Option<bool>,
     ) -> Self {
         Self {
             base,
             member,
             member_type,
+            member_not_null,
         }
     }
     pub fn base_is_not_null(&self) -> Option<bool> {
-        self.base.is_not_null()
+        match (self.base.is_not_null(), self.member_not_null) {
+            (Some(false), _) | (_, Some(false)) => Some(false),
+            (Some(true), Some(true)) => Some(true),
+            _ => None,
+        }
     }
 
     /// Base expression whose composite field is accessed.
@@ -48,17 +56,19 @@ impl MemberRef {
         context: &mut TParseContext,
         td: &TypeDefinition,
         ty: &TypeReference,
-    ) -> Result<Option<TypeReference>, AnalysisError>
+    ) -> Result<(Option<TypeReference>, Option<bool>), AnalysisError>
     where
         TParseContext: crate::sem::ParseContext,
     {
-        if let Some(member_type) = td.member_type_from_catalog(context, member) {
-            Ok(Some(member_type))
+        if let Some(columns) = td.row_columns(context)
+            && let Some(field) = columns.get_column_def(&crate::sem::ColumnName::from(member))
+        {
+            Ok((field.get_type_cloned(), field.is_not_null()))
         } else {
             context.report_analysis_problem(AnalysisProblem::composite_type_field_not_found(
                 ty, member,
             ))?;
-            Ok(None)
+            Ok((None, None))
         }
     }
 
@@ -78,7 +88,7 @@ impl MemberRef {
         member: String,
         context: &mut TContext,
     ) -> Result<IndirectionExpr, AnalysisError> {
-        let member_type = if let Some(ty) = &source.get_type() {
+        let (member_type, member_not_null) = if let Some(ty) = &source.get_type() {
             if let Some(td) = ty.type_definition().cloned() {
                 Self::test_member_exist(&member, context, &td, ty)?
             } else if let Some(td) = context.get_type(ty.full_name()).cloned() {
@@ -87,15 +97,16 @@ impl MemberRef {
                 context.report_analysis_problem(
                     AnalysisProblem::member_access_requires_composite_type(ty.full_name(), &member),
                 )?;
-                None
+                (None, None)
             }
         } else {
-            None
+            (None, None)
         };
         Ok(IndirectionExpr::MemberRef(Box::new(Self::new(
             source,
             member,
             member_type,
+            member_not_null,
         ))))
     }
 }

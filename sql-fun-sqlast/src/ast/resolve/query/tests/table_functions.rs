@@ -55,6 +55,92 @@ fn preserves_declared_returns_and_positional_aliases(#[case] sql: &str) {
 }
 
 #[rstest::rstest]
+#[case::named("SELECT (pair_fun()).*")]
+#[case::table_row("SELECT (row_fun()).*")]
+#[case::column("SELECT x.* FROM (SELECT pair_fun() AS x) s")]
+#[case::qualified_column("SELECT (s.x).* FROM (SELECT pair_fun() AS x) s")]
+#[case::anonymous("SELECT (ROW(1::integer, 'x'::text)).*")]
+fn expands_composite_expression_targets(#[case] sql: &str) {
+    let (query, context) = table_function_query(sql, true);
+    assert!(
+        context.reported_problems().is_empty(),
+        "{:?}",
+        context.reported_problems()
+    );
+    let columns = query.result_columns();
+    assert_eq!(
+        columns.get_column_at(0).unwrap().col_type(),
+        &Some(PgBuiltInType::int4())
+    );
+    let expression = columns.get_column_at(0).unwrap().expression().unwrap();
+    assert!(matches!(expression, SemScalarExpr::Indirection(_)));
+}
+
+#[test]
+fn unresolved_composite_star_retains_its_base_for_parameter_inference() {
+    let (query, context) = table_function_query("SELECT ($1).*", true);
+    let output = query.result_columns().get_column_at(0).unwrap();
+    assert!(output.has_pending_star());
+    assert!(output.column_name().is_none());
+    assert!(output.expression().is_some());
+    let serialized = ::serde_json::to_value(output).unwrap();
+    assert!(serialized["star_expansion"]["Pending"].is_object());
+    assert!(
+        context.reported_problems().is_empty(),
+        "{:?}",
+        context.reported_problems()
+    );
+}
+
+#[test]
+fn scalar_star_reports_a_structured_problem() {
+    let (query, context) = table_function_query("SELECT (1).*", true);
+    assert!(
+        context
+            .reported_problems()
+            .iter()
+            .any(|problem| { problem.code() == "query_star_projection_requires_composite_type" })
+    );
+    assert_eq!(query.result_columns().len(), 1);
+    assert!(
+        query
+            .result_columns()
+            .get_column_at(0)
+            .unwrap()
+            .column_name()
+            .is_none()
+    );
+}
+
+#[test]
+fn row_star_in_scalar_argument_reports_placement() {
+    let (_, context) = table_function_query("SELECT identity((ROW(1)).*)", true);
+    assert!(
+        context
+            .reported_problems()
+            .iter()
+            .any(|problem| { problem.code() == "query_invalid_star_projection_placement" })
+    );
+}
+
+#[test]
+fn anonymous_row_star_keeps_nullable_fields() {
+    let (query, context) = table_function_query("SELECT (ROW(1::integer, NULL)).*", true);
+    assert!(
+        context.reported_problems().is_empty(),
+        "{:?}",
+        context.reported_problems()
+    );
+    let columns = query.result_columns();
+    assert_eq!(columns.len(), 2);
+    assert_eq!(columns.get_column_at(0).unwrap().is_not_null(), &Some(true));
+    assert_eq!(
+        columns.get_column_at(1).unwrap().is_not_null(),
+        &Some(false)
+    );
+}
+
+#[rstest::rstest]
 #[case::missing("SELECT 1 FROM record_fun('') r", "table_function_definition_required")]
 #[case::duplicate(
     "SELECT 1 FROM record_fun('') r(a int,a text)",

@@ -152,3 +152,24 @@ normal human review before it is merged into `main`.
 After the adoption pull request is merged, `main` contains both the source
 needed to reproduce the active CI image and the immutable digest identifying
 the exact image used by CI.
+
+## Compilation timing reports
+
+The regular `workspace-all-features` job uploads Cargo HTML timing reports as
+`cargo-timings-workspace-all-features`, retained for 30 days. The upload runs
+even if compilation or tests fail. A failure before Cargo generates a report
+can leave no timing files; consult the failed step's log in that case.
+
+When investigating CI performance, download the artifact from the selected
+Actions run and open its HTML report. Compare long compilation units and
+parallelism with earlier retained reports before they expire, recording the
+run links, source revisions, toolchain, image digest, and cache state alongside
+any conclusions. Periodically revisit these reports during CI maintenance to
+identify regressions and newly dominant units.
+
+The reports measure the existing nextest build, without an additional build
+for telemetry. The job also performs feature-boundary checks and a workspace
+`cargo check` before nextest; those phases and test execution contribute to
+job duration separately. Build-script timings include more than native C
+compilation, so a slow `libsqlite3-sys` unit alone does not establish SQLite C
+compilation cost. Correlate reports with build logs and sccache statistics.

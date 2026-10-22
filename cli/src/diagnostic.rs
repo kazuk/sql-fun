@@ -89,8 +89,8 @@ mod test_ansi_rendering {
     use ::sql_fun_core::SqlDialect;
     use ::sql_fun_core::analysis_problem::{AnalysisProblem, FullName, StringSpan};
 
-    #[test]
-    fn applies_selected_theme_to_retained_sql() -> testresult::TestResult {
+    #[tokio::test]
+    async fn applies_selected_theme_to_retained_sql() -> testresult::TestResult {
         let source = "create domain example as missing;";
         let problem = AnalysisProblem::domain_base_type_not_found(
             FullName::new("example"),
@@ -101,7 +101,8 @@ mod test_ansi_rendering {
             theme: HighlighterTheme::from_toml_str(r#"keyword = { foreground = "blue" }"#)?,
             color: true,
         };
-        let tokens = ::sql_fun_sqlast::tokenize_sql(source, SqlDialect::PostgreSQL)?;
+        let tokens =
+            crate::test_helpers::heavy::tokenize_sql(source, SqlDialect::PostgreSQL).await?;
         let output = renderer.render(&problem, &tokens)?;
         assert!(output.contains("\x1b[34mcreate"));
         assert!(output.contains("SF000001"));
@@ -132,7 +133,8 @@ mod test_min_max_rendering {
         "min_max_not_ordered",
         "cannot identify a comparison function for pg_catalog.json"
     )]
-    fn preserves_min_max_message_and_code(
+    #[tokio::test]
+    async fn preserves_min_max_message_and_code(
         #[case] problem: MinMaxProblem,
         #[case] code: &str,
         #[case] message: &str,
@@ -141,8 +143,11 @@ mod test_min_max_rendering {
             theme: HighlighterTheme::default(),
             color: false,
         };
-        let tokens =
-            ::sql_fun_sqlast::tokenize_sql("select greatest(1, 2)", SqlDialect::PostgreSQL)?;
+        let tokens = crate::test_helpers::heavy::tokenize_sql(
+            "select greatest(1, 2)",
+            SqlDialect::PostgreSQL,
+        )
+        .await?;
         let output = renderer.render(&AnalysisProblem::min_max(problem), &tokens)?;
         assert!(output.contains(code));
         let normalized = output.split_whitespace().collect::<Vec<_>>().join(" ");
@@ -231,7 +236,8 @@ mod test_implemented_family_rendering {
         AnalysisProblem::trigger(&TriggerProblem::target("missing")),
         "trigger_invalid_definition", "invalid trigger statement: Target(missing)", false
     )]
-    fn preserves_implemented_family_presentation(
+    #[tokio::test]
+    async fn preserves_implemented_family_presentation(
         #[case] problem: AnalysisProblem,
         #[case] code: &str,
         #[case] message: &str,
@@ -241,7 +247,8 @@ mod test_implemented_family_rendering {
             theme: HighlighterTheme::default(),
             color: false,
         };
-        let tokens = ::sql_fun_sqlast::tokenize_sql("select 1", SqlDialect::PostgreSQL)?;
+        let tokens =
+            crate::test_helpers::heavy::tokenize_sql("select 1", SqlDialect::PostgreSQL).await?;
         let metadata = problem.render_metadata().expect("existing renderer");
         assert_eq!(metadata.message(), message);
         assert_eq!(problem.code(), code);
@@ -261,15 +268,19 @@ mod test_implemented_family_rendering {
     }
 }
 
-/// Render a transported SQL diagnostic using the CLI's presentation settings.
+/// Fetch and release tokens on the supplied connection, then synchronously render
+/// a transported diagnostic using its retained SQL and CLI presentation settings.
 ///
 /// # Errors
 /// Returns an error if tokenization, theme loading, or rendering fails.
-pub fn render_diagnostic(
+pub async fn render_diagnostic(
+    client: &mut ::sql_fun_client::TcpJsonRpcClientAsync,
     presentation: &::sql_fun_core::DiagnosticPresentation,
     args: &SqlFunArgs,
 ) -> Result<String, anyhow::Error> {
-    let tokens = ::sql_fun_sqlast::tokenize_sql(presentation.source(), presentation.dialect())?;
+    let tokens = client
+        .tokenize_sql(presentation.source(), presentation.dialect())
+        .await?;
     DiagnosticRenderer::from_args(args)?.render(presentation.problem(), &tokens)
 }
 
@@ -280,8 +291,9 @@ mod test_rendering {
     use ::sql_fun_core::analysis_problem::{AnalysisProblem, FullName, StringSpan};
     use ::sql_fun_core::{DiagnosticPresentation, SqlDialect, SqlFunArgs};
 
-    #[test]
-    fn renders_transported_diagnostic_with_original_metadata_and_label() -> testresult::TestResult {
+    #[tokio::test]
+    async fn renders_transported_diagnostic_with_original_metadata_and_label()
+    -> testresult::TestResult {
         let source = "create domain example as missing;";
         let problem = AnalysisProblem::domain_base_type_not_found(
             FullName::new("example"),
@@ -293,7 +305,8 @@ mod test_rendering {
         let wire = ::serde_json::to_string(&presentation)?;
         let received = ::serde_json::from_str(&wire)?;
         let args = SqlFunArgs::try_parse_from(["sql-fun", "--term-color", "never"])?;
-        let output = render_diagnostic(&received, &args)?;
+        let mut session = crate::test_helpers::heavy::DiagnosticSession::new().await?;
+        let output = render_diagnostic(session.client(), &received, &args).await?;
         assert!(output.contains("SF000001"));
         assert!(output.contains("Domain base type not found"));
         assert!(output.contains("base type name"));

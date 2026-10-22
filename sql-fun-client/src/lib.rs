@@ -7,6 +7,7 @@ mod completion;
 mod connection;
 /// api payload
 pub mod payloads;
+mod tokenize_sql;
 
 pub use self::async_tokio::{TcpJsonRpcClientAsync, TcpJsonRpcClientAsyncError};
 pub use self::completion::{

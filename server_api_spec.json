@@ -62,6 +62,163 @@
       }
     },
     {
+      "name": "tokenize_sql",
+      "summary": "tokenize original SQL without schema analysis",
+      "deprecated": null,
+      "tags": [],
+      "params": [
+        {
+          "name": "params",
+          "schema": {
+            "$schema": "https://json-schema.org/draft/2020-12/schema",
+            "title": "TokenizeSqlArgs",
+            "description": "Original source and explicitly selected lexer. No schema context is needed.",
+            "type": "object",
+            "properties": {
+              "source": {
+                "type": "string"
+              },
+              "dialect": {
+                "$ref": "#/$defs/SqlDialect"
+              }
+            },
+            "required": [
+              "source",
+              "dialect"
+            ],
+            "$defs": {
+              "SqlDialect": {
+                "description": "SQL Dialect",
+                "oneOf": [
+                  {
+                    "description": "postgres using a `pg_query` crate for parsing a syntax.",
+                    "type": "string",
+                    "const": "postgres"
+                  }
+                ]
+              }
+            }
+          },
+          "required": true
+        }
+      ],
+      "result": {
+        "name": "result",
+        "schema": {
+          "$schema": "https://json-schema.org/draft/2020-12/schema",
+          "title": "Collection",
+          "description": "collection",
+          "type": "object",
+          "properties": {
+            "handle": {
+              "description": "handle for collecttion",
+              "$ref": "#/$defs/CollectionHandle"
+            },
+            "total_length": {
+              "description": "length of collection",
+              "type": "integer",
+              "format": "uint",
+              "minimum": 0
+            },
+            "offset": {
+              "description": "offset of items",
+              "type": "integer",
+              "format": "uint",
+              "minimum": 0
+            },
+            "require_release": {
+              "description": "When true, client must be call `SqlFunServerApi::release_collection`",
+              "type": "boolean"
+            },
+            "items": {
+              "description": "collection items",
+              "type": "array",
+              "items": {
+                "$ref": "#/$defs/SqlToken"
+              }
+            }
+          },
+          "required": [
+            "handle",
+            "total_length",
+            "offset",
+            "require_release",
+            "items"
+          ],
+          "$defs": {
+            "CollectionHandle": {
+              "description": "collection handle",
+              "type": "string"
+            },
+            "SqlToken": {
+              "description": "Category and half-open UTF-8 byte range in the request's original source.\nCollections contain all tokens in order, including comments and whitespace.",
+              "type": "object",
+              "properties": {
+                "kind": {
+                  "$ref": "#/$defs/TokenCategory"
+                },
+                "start": {
+                  "type": "integer",
+                  "format": "uint",
+                  "minimum": 0
+                },
+                "end": {
+                  "type": "integer",
+                  "format": "uint",
+                  "minimum": 0
+                }
+              },
+              "required": [
+                "kind",
+                "start",
+                "end"
+              ]
+            },
+            "TokenCategory": {
+              "description": "Parser-independent presentation category on the wire.",
+              "oneOf": [
+                {
+                  "description": "Identifier.",
+                  "type": "string",
+                  "const": "identifier"
+                },
+                {
+                  "description": "Literal or parameter.",
+                  "type": "string",
+                  "const": "constant"
+                },
+                {
+                  "description": "Operator.",
+                  "type": "string",
+                  "const": "operator"
+                },
+                {
+                  "description": "Keyword.",
+                  "type": "string",
+                  "const": "keyword"
+                },
+                {
+                  "description": "Comment, including its delimiters.",
+                  "type": "string",
+                  "const": "comment"
+                },
+                {
+                  "description": "Whitespace.",
+                  "type": "string",
+                  "const": "trivia"
+                },
+                {
+                  "description": "Punctuation.",
+                  "type": "string",
+                  "const": "delimiter"
+                }
+              ]
+            }
+          }
+        }
+      }
+    },
+    {
       "name": "initialize_schema_context",
       "summary": "load schema dump file for semantic analysis",
       "deprecated": null,

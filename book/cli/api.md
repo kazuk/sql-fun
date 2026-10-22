@@ -85,9 +85,10 @@ string `"2.0"`. An explicitly invalid version is rejected.
 `echo` requires `params` to be an object or array. Both can contain nested JSON
 values, including null. Scalar or null parameters are rejected. Other accepted
 method names are `initialize_schema_context`, `read_collection`,
-`release_collection`, `analyze_query`, `list_object`, and `describe_table`, with
-parameters matching their public API argument types. Currently only `echo` and
-`initialize_schema_context` are dispatched by the server, and schema-context
+`release_collection`, `tokenize_sql`, `analyze_query`, `list_object`, and
+`describe_table`, with parameters matching their public API argument types.
+Currently `echo`, `tokenize_sql`, and `initialize_schema_context` are dispatched
+by the server, and schema-context
 initialization remains incomplete. Other declared methods can return a server
 method error; `echo` verifies the transport, not SQL analysis functionality.
 
@@ -107,3 +108,43 @@ transport failure.
 
 Draining has no implicit timeout. The command waits for outstanding responses
 and output completion; keep the output consumer reading until EOF.
+
+## SQL tokenization
+
+`tokenize_sql` needs the original SQL string and an explicit dialect; it does
+not read project files or require a schema context. For example:
+
+```sh
+printf '%s\n' \
+  '{"method":"tokenize_sql","params":{"source":"BEGIN","dialect":"postgres"}}' |
+  sql-fun api --user alice
+```
+
+Use `"postgres"` for PostgreSQL or `"SQLite"` when the CLI and server are built
+with SQLite support. Missing or unavailable dialects are errors; the server does
+not select another lexer. Invalid SQL syntax or unknown database objects do not
+prevent tokenization when the selected lexer accepts the text. Lexical errors
+return a JSON-RPC error with `TokenizationFailed` in its `data`.
+
+The result is a collection page. Each item contains `kind`, `start`, and `end`;
+`start` is inclusive and `end` is exclusive, measured in UTF-8 bytes from the
+beginning of the original request source. Categories are `identifier`,
+`constant`, `operator`, `keyword`, `comment`, `trivia`, and `delimiter`. Ordered
+ranges cover all original SQL bytes, including whitespace and comments. The
+response does not repeat the SQL text; retain the original source to extract
+each token's spelling.
+
+The raw API command returns pages without collecting or releasing them. Keep the
+same API connection open to send `read_collection` requests using the returned
+`handle` and successive `start_offset` values until `total_length` items have
+been read. If `require_release` is true, send `release_collection` with that
+`collection_handle`, including for an empty collection or after the last page.
+Handles belong to that connection and cannot be reused by a later CLI
+invocation.
+
+Rust callers preparing diagnostics can instead use
+`TcpJsonRpcClientAsync::tokenize_sql(source, dialect)`. This explicitly requests
+all pages and releases the retained collection before returning a validated core
+`TokenStream`. A read, decode, release, or invalid-range failure returns an
+error rather than a partial stream. CLI diagnostic preparation awaits this
+operation; rendering and highlighting remain synchronous.

@@ -153,6 +153,7 @@ impl ApiInput {
             Ok(())
         }
         match method {
+            "tokenize_sql" => typed::<::sql_fun_server_api::payloads::TokenizeSqlArgs>(params),
             "echo" => typed::<EchoArgs>(params),
             "initialize_schema_context" => typed::<InitializeSchemaArgs>(params),
             "read_collection" => typed::<ReadCollectionArgs>(params),
@@ -192,6 +193,7 @@ mod test_input {
     }
 
     #[rstest::rstest]
+    #[case::tokenize("tokenize_sql", r#"{"source":"SELECT 名","dialect":"postgres"}"#)]
     #[case::echo("echo", r#"[{"nested":[null,1,true]}]"#)]
     #[case::initialize("initialize_schema_context", r#"{"datasource":"d","schema_dump":"schema.sql","expected_hash":"0000000000000000000000000000000000000000000000000000000000000000","environments":{}}"#)]
     #[case::read(
@@ -218,6 +220,7 @@ mod test_input {
     #[rstest::rstest]
     fn rejects_wrong_typed_params(
         #[values(
+            "tokenize_sql",
             "initialize_schema_context",
             "read_collection",
             "release_collection",

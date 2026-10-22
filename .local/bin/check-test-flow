@@ -215,10 +215,32 @@ function run_sqlast_feature_boundaries() {
   run_check -p sql-fun-sqlast --all-targets --features workaround_turso_9791
 }
 
+function run_cli_dependency_boundaries() {
+  echo "== CLI SQLAST dependency boundary (including test/build dependencies)"
+  local tree mode
+  local -a features=()
+  for mode in default sqlite; do
+    features=()
+    if [[ "$mode" == sqlite ]]; then
+      features=(--features sqlite)
+    fi
+    tree="$(cargo tree --locked -p sql-fun-cli --edges normal,build,dev "${features[@]}")"
+    case "$tree" in
+      *sql-fun-sqlast*)
+        echo "CLI $mode dependency graph includes sql-fun-sqlast" >&2
+        return 1
+        ;;
+    esac
+    # Keep package selections separate from workspace feature unification.
+    run_check -p sql-fun-cli --all-targets "${features[@]}"
+  done
+}
+
 function run_workspace() {
   require_command cargo-nextest
   echo "== Workspace verification"
   run_sqlast_feature_boundaries
+  run_cli_dependency_boundaries
   run_check   --workspace "${FEATURES[@]}"
   run_nextest --workspace --exclude sql-fun "${FEATURES[@]}" ${NEXTEST_EXTRA} --no-tests pass
 }

@@ -94,7 +94,7 @@ jobs:
         id: compiler-cache
         with:
           path: /github/home/.cache/sccache
-          key: sqlite-eval-698-sccache-${{ runner.os }}-${{ matrix.sqlite }}-${{ hashFiles('**/Cargo.lock') }}
+          key: sqlite-eval-698-sccache-${{ runner.os }}-${{ matrix.sqlite }}-${{ github.sha }}-${{ hashFiles('**/Cargo.lock') }}
           restore-keys: |
             sccache-${{ runner.os }}-workspace-all-features-${{ hashFiles('**/Cargo.lock') }}
 
@@ -113,14 +113,17 @@ jobs:
             --profile ci
             --show-progress none
             --timings"
-          sccache --show-stats
+
+      - name: Record compiler cache statistics
+        if: ${{ always() }}
+        run: sccache --show-stats
 
       - name: Save experiment compiler cache even after compatibility failure
         uses: actions/cache/save@v5
         if: ${{ always() && steps.compiler-cache.outputs.cache-hit != 'true' }}
         with:
           path: /github/home/.cache/sccache
-          key: sqlite-eval-698-sccache-${{ runner.os }}-${{ matrix.sqlite }}-${{ hashFiles('**/Cargo.lock') }}
+          key: sqlite-eval-698-sccache-${{ runner.os }}-${{ matrix.sqlite }}-${{ github.sha }}-${{ hashFiles('**/Cargo.lock') }}
 
       - name: Disk usage after build and test
         if: ${{ always() }}

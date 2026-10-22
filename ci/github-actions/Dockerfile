@@ -103,8 +103,13 @@ RUN apt-get update && apt-get install -y --no-install-recommends \
     unzip zip xz-utils sudo \
     libssl-dev clang jq python3 \
     postgresql-client libpq-dev \
+    libsqlite3-dev sqlite3 \
     autoconf automake libtool libtool-bin bsdextrautils \
     && rm -rf /var/lib/apt/lists/*
+
+# Expose the system SQLite version and build options for linkage evaluation.
+RUN pkg-config --modversion sqlite3 \
+    && sqlite3 :memory: 'SELECT sqlite_version(); PRAGMA compile_options;'
 
 # Rust (stable)
 RUN curl -fsSL https://sh.rustup.rs | sh -s -- -y --profile minimal --default-toolchain stable \

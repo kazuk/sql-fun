@@ -9,6 +9,7 @@ use super::{
 /// Concrete types display their canonical [`FullName`] followed by `[]` for
 /// an array. `FromStr` reads that canonical spelling without SQL case folding
 /// or type-alias interpretation; dynamic types have no canonical text form.
+/// Use [`crate::sem::parse_client_type`] for SQL client parameter type spelling.
 #[derive(Debug, Clone, Eq, PartialEq, Hash, serde::Serialize, serde::Deserialize)]
 pub enum TypeReference {
     /// concrete type with array qualifies

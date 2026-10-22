@@ -11,6 +11,7 @@
 //! See <https://github.com/kazuk/sql-fun/issues/450>.
 
 mod catalog;
+mod client_type;
 mod full;
 mod local;
 mod ope;
@@ -18,6 +19,7 @@ mod schema;
 
 pub use self::{
     catalog::CatalogName,
+    client_type::parse_client_type,
     full::FullName,
     local::LocalName,
     ope::{OperatorName, ValidOperatorName},

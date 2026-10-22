@@ -1,13 +1,13 @@
 //! Construct named type references directly, without a statement or expression AST.
 use crate::ast::Dialect;
-use crate::sem::{AnalysisError, ParseContext, TypeReference};
+use crate::sem::{AnalysisError, ParseContext, TypeReference, parse_client_type};
 
 pub(super) fn resolve_parameter_hint(
     slot: usize,
     hint: &str,
     context: &impl ParseContext,
 ) -> Result<Option<TypeReference>, AnalysisError> {
-    let reference = hint.parse::<TypeReference>().map_err(|error| {
+    let reference = parse_client_type(hint, context).map_err(|error| {
         AnalysisError::unexpected_input_error(&format!(
             "parameter ${} type hint {hint:?}: {error}",
             slot + 1,

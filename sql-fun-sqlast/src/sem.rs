@@ -169,7 +169,10 @@ pub use self::{
         InsertTarget, InsertValue, ViewInsertInfoRead, ViewInsertSupport, ViewSourceArbiter,
         analyze_insert_statement,
     },
-    names::{CatalogName, FullName, LocalName, OperatorName, SchemaName, ValidOperatorName},
+    names::{
+        CatalogName, FullName, LocalName, OperatorName, SchemaName, ValidOperatorName,
+        parse_client_type,
+    },
     object_info::{ExtensionInfoRead, Kind, ObjectInfoRead},
     operators::{BinaryOperatorDefinition, OperatorDefinition, UnaryOperatorDefinition},
     ownership::{

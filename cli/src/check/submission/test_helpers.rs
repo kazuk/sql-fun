@@ -188,6 +188,16 @@ async fn peer_with_gate(
                     "analyze_query" => response
                         .clone()
                         .unwrap_or_else(|| json!({"queries":page()})),
+                    "tokenize_sql" => {
+                        let source = request["params"]["source"].as_str().unwrap();
+                        if source.is_empty() {
+                            page()
+                        } else {
+                            json!({"handle":"tokens","total_length":1,"offset":0,
+                                "require_release":false,
+                                "items":[{"kind":"keyword","start":0,"end":source.len()}]})
+                        }
+                    }
                     _ => panic!("unexpected method: {method}"),
                 };
                 json!({"jsonrpc":"2.0", "id":request["id"], "result":result})
@@ -209,6 +219,12 @@ async fn peer_with_gate(
 
 fn page() -> Value {
     json!({"handle":"empty","total_length":0,"offset":0,"require_release":false,"items":[]})
+}
+
+/// A completed diagnostic collection for an analysis response fixture.
+pub(super) fn diagnostic_page(problems: &[::sql_fun_client::payloads::AnalysisProbrem]) -> Value {
+    json!({"handle":"diagnostics","total_length":problems.len(),"offset":0,
+        "require_release":false,"items":problems})
 }
 
 /// Collect channel items on the consumer side while preserving producer failures.
@@ -248,4 +264,44 @@ pub(super) fn successful_response(statement_count: usize) -> Value {
     queries["total_length"] = json!(statement_count);
     queries["items"] = json!(statements);
     json!({"queries":queries})
+}
+
+/// A successful statement followed by an incomplete one, each with diagnostics.
+pub(super) fn incomplete_diagnostic_response(statement: &str) -> Value {
+    use ::sql_fun_client::payloads::{AnalysisProbrem, DiagnosticSeverity};
+    use ::sql_fun_core::{
+        DiagnosticPresentation, SqlDialect,
+        analysis_problem::{AnalysisProblem, StringSpan},
+    };
+
+    let detailed = AnalysisProblem::domain_base_type_not_found(
+        "example",
+        "missing",
+        StringSpan::new(statement.find("missing").unwrap(), 7),
+    );
+    let presentation =
+        DiagnosticPresentation::new(&detailed, statement, SqlDialect::PostgreSQL, 10);
+    let warning = AnalysisProblem::unreachable_coalesce_argument("later", "first");
+    let advice = AnalysisProblem::parameter_constraint("consider a type hint");
+    let fallback = AnalysisProblem::extension_not_found("missing_extension");
+    let source = std::path::Path::new("<query>");
+    let mut response = successful_response(2);
+    response["queries"]["items"][0]["probrems"] = diagnostic_page(&[
+        AnalysisProbrem::new(detailed.code(), DiagnosticSeverity::error(), source, None)
+            .with_presentation(Some(&presentation)),
+        AnalysisProbrem::new(warning.code(), DiagnosticSeverity::warning(), source, None)
+            .with_semantic_problem(&warning),
+        AnalysisProbrem::new(advice.code(), DiagnosticSeverity::advice(), source, None)
+            .with_semantic_problem(&advice),
+    ]);
+    response["queries"]["items"][1]["complete"] = json!(false);
+    response["queries"]["items"][1]["execute_sql"] = Value::Null;
+    response["queries"]["items"][1]["probrems"] = diagnostic_page(&[AnalysisProbrem::new(
+        fallback.code(),
+        DiagnosticSeverity::error(),
+        source,
+        None,
+    )
+    .with_semantic_problem(&fallback)]);
+    response
 }

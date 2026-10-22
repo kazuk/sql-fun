@@ -46,36 +46,58 @@ impl DiagnosticRenderer {
         problem: &AnalysisProblem,
         tokens: &TokenStream,
     ) -> Result<String, anyhow::Error> {
-        let Some(metadata) = problem.render_metadata() else {
-            todo!("diagnostic rendering tracked in #522")
-        };
-        let severity = match problem.severity() {
+        self.render_problem(
+            problem,
+            problem.severity(),
+            Some(tokens.source()),
+            Some(tokens),
+        )
+    }
+
+    /// Render a structured problem even when source positions or tokens are absent.
+    /// Labels are attached only to the exact retained statement source.
+    pub(crate) fn render_problem(
+        &self,
+        problem: &AnalysisProblem,
+        diagnostic_severity: DiagnosticSeverity,
+        source: Option<&str>,
+        tokens: Option<&TokenStream>,
+    ) -> Result<String, anyhow::Error> {
+        let metadata = problem.render_metadata();
+        let severity = match diagnostic_severity {
             DiagnosticSeverity::Error => ::miette::Severity::Error,
             DiagnosticSeverity::Warning => ::miette::Severity::Warning,
             DiagnosticSeverity::Advice => ::miette::Severity::Advice,
         };
-        let mut diagnostic = ::miette::MietteDiagnostic::new(metadata.message())
+        let mut diagnostic = ::miette::MietteDiagnostic::new(problem.minimum_message())
             .with_code(problem.code())
             .with_severity(severity);
-        for label in metadata.labels() {
-            let span = label.span();
-            diagnostic = diagnostic.with_label(::miette::LabeledSpan::new(
-                Some(label.message().to_owned()),
-                span.offset(),
-                span.len(),
-            ));
+        if source.is_some()
+            && let Some(metadata) = &metadata
+        {
+            for label in metadata.labels() {
+                let span = label.span();
+                diagnostic = diagnostic.with_label(::miette::LabeledSpan::new(
+                    Some(label.message().to_owned()),
+                    span.offset(),
+                    span.len(),
+                ));
+            }
         }
-        let report = ::miette::Report::new(diagnostic).with_source_code(
-            ::miette::NamedSource::new("SQL", tokens.source().to_owned()),
-        );
+        let mut report = ::miette::Report::new(diagnostic);
+        if let Some(source) = source {
+            report = report.with_source_code(::miette::NamedSource::new("SQL", source.to_owned()));
+        }
         let theme = if self.color {
             ::miette::GraphicalTheme::unicode()
         } else {
             ::miette::GraphicalTheme::unicode_nocolor()
         };
-        let handler = ::miette::GraphicalReportHandler::new()
-            .with_theme(theme)
-            .with_syntax_highlighting(SqlHighlighter::from_theme(&self.theme, tokens)?);
+        let mut handler = ::miette::GraphicalReportHandler::new().with_theme(theme);
+        if let Some(tokens) = tokens {
+            handler =
+                handler.with_syntax_highlighting(SqlHighlighter::from_theme(&self.theme, tokens)?);
+        }
         let mut output = String::new();
         handler.render_report(&mut output, &*report)?;
         Ok(output)

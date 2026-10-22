@@ -1,3 +1,4 @@
+mod diagnostics;
 mod lockfiles;
 mod progress;
 mod submission;
@@ -185,13 +186,34 @@ impl CheckArgs {
 
     async fn process_analyses<W: std::io::Write>(
         &self,
+        client: ::sql_fun_client::TcpJsonRpcClientAsync,
+        args: &SqlFunArgs,
+        requirements: Vec<::sql_fun_codegen::QueryRequirement>,
+        lockfiles: lockfiles::Lockfiles,
+        progress: &mut Progress<W>,
+    ) -> Result<ExitCode, anyhow::Error> {
+        self.process_analyses_to(
+            client,
+            args,
+            requirements,
+            lockfiles,
+            progress,
+            &mut std::io::stderr(),
+        )
+        .await
+    }
+
+    async fn process_analyses_to<W: std::io::Write, D: std::io::Write>(
+        &self,
         mut client: ::sql_fun_client::TcpJsonRpcClientAsync,
         args: &SqlFunArgs,
         requirements: Vec<::sql_fun_codegen::QueryRequirement>,
         mut lockfiles: lockfiles::Lockfiles,
         progress: &mut Progress<W>,
+        diagnostics_output: &mut D,
     ) -> Result<ExitCode, anyhow::Error> {
         progress.begin(requirements.len())?;
+        let renderer = crate::diagnostic::DiagnosticRenderer::from_args(args)?;
         let (sender, mut receiver) = ::tokio::sync::mpsc::channel(8);
         let producer = async {
             let submitted = submission::submit(&mut client, args, requirements, sender).await;
@@ -203,13 +225,26 @@ impl CheckArgs {
         let consumer = async {
             let mut failure = None;
             while let Some(analysis) = receiver.recv().await {
-                // Preserve the envelope, including every diagnostic, for #699.
                 analysis.log_received();
                 let reported = progress.received(analysis.function_name());
                 if let Err(error) = reported
                     && failure.is_none()
                 {
                     failure = Some(anyhow::Error::from(error));
+                }
+                if let Err(error) =
+                    diagnostics::render_all(&analysis, &renderer, diagnostics_output)
+                    && failure.is_none()
+                {
+                    failure = Some(error);
+                }
+                if let Some(error) = analysis.tokenization_error()
+                    && failure.is_none()
+                {
+                    failure = Some(anyhow::anyhow!(
+                        "cannot tokenize SQL diagnostic for {}: {error}",
+                        analysis.function_name()
+                    ));
                 }
                 if failure.is_none()
                     && let Err(error) = lockfiles.receive(&analysis)

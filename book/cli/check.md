@@ -140,3 +140,14 @@ only to **stdout**, including when redirected. Select `silent` if stdout must be
 free of progress. Warnings and diagnostic rendering use **stderr**. A completed
 analysis count does not imply successful finalization: errors report termination
 instead of successful completion.
+
+## SQL diagnostics
+
+`check` reports every SQL analysis diagnostic on stderr, including errors,
+warnings, and advice for queries that cannot produce a lockfile entry. Each
+report identifies the Rust query function and its source file and line, and
+shows the complete original SQL query. When the server retains a reliable
+statement position, the report also highlights the relevant SQL and labels its
+source span. Diagnostics without reliable positions still show their code,
+explanation, and complete query without a guessed location. `--progress silent`
+suppresses progress output, not diagnostics.

@@ -23,6 +23,27 @@ pub enum OverloadResolution {
 }
 
 impl OverloadResolution {
+    /// Minimum description when a detailed source-label renderer is unavailable.
+    pub(super) fn minimum_message(&self) -> String {
+        match self {
+            Self::FunctionOverloadResolutionFailed(name, args) => {
+                format!("no matching overload for function {name} with {args}")
+            }
+            Self::BinaryOperatorOverloadResolutionFailed(operator, left, right) => {
+                format!("no matching overload for operator {operator} with {left} and {right}")
+            }
+            Self::UnaryOperatorOverloadResolutionFailed(operator, ty) => {
+                format!("no matching overload for unary operator {operator} with {ty}")
+            }
+            Self::BinaryOperatorOverloadAmbiguous(operator, left, right) => {
+                format!("ambiguous overload for operator {operator} with {left} and {right}")
+            }
+            Self::UnaryOperatorOverloadAmbiguous(operator, ty) => {
+                format!("ambiguous overload for unary operator {operator} with {ty}")
+            }
+        }
+    }
+
     /// Stable diagnostic classification, independent of formatted debug output.
     #[must_use]
     pub(super) const fn code(&self) -> &'static str {

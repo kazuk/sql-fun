@@ -13,12 +13,11 @@ use ::sql_fun_client::{
     },
 };
 use ::sql_fun_codegen::QueryRequirement;
-use ::sql_fun_core::{Hasher, PlaceholderedSql, SqlFunArgs};
+use ::sql_fun_core::{Hasher, PlaceholderedSql, SqlDialect, SqlFunArgs, TokenStream};
 use ::tokio::sync::mpsc::Sender;
 
 /// CLI-owned source identity paired with a fully materialized server response.
 /// Original SQL and the core catalog fingerprint are captured before transfer.
-/// Diagnostic and lockfile consumers are connected separately under #699/#689.
 pub(super) struct QueryAnalysis {
     function_name: String,
     original_query: String,
@@ -27,6 +26,13 @@ pub(super) struct QueryAnalysis {
     source_line: u32,
     datasource: String,
     response: AnalyzeQueryResponse,
+    tokenizations: Vec<PreparedTokenization>,
+}
+
+struct PreparedTokenization {
+    source: String,
+    dialect: SqlDialect,
+    result: Result<TokenStream, String>,
 }
 
 impl QueryAnalysis {
@@ -50,6 +56,26 @@ impl QueryAnalysis {
     }
     pub(super) const fn response(&self) -> &AnalyzeQueryResponse {
         &self.response
+    }
+
+    pub(super) fn tokens(&self, source: &str, dialect: SqlDialect) -> Option<&TokenStream> {
+        let entry = self
+            .tokenizations
+            .iter()
+            .find(|item| item.source == source && item.dialect == dialect);
+        if let Some(entry) = entry
+            && let Ok(tokens) = &entry.result
+        {
+            Some(tokens)
+        } else {
+            None
+        }
+    }
+
+    pub(super) fn tokenization_error(&self) -> Option<&str> {
+        self.tokenizations
+            .iter()
+            .find_map(|item| item.result.as_ref().err().map(String::as_str))
     }
 
     pub(super) fn log_received(&self) {
@@ -106,6 +132,7 @@ pub(super) async fn submit(
         let response = request_typed(client, "analyze_query", &request)
             .await
             .with_context(|| format!("cannot analyze {function_name} at {source_file}:{source_line} (datasource {datasource})"))?;
+        let tokenizations = prepare_tokens(client, &response).await;
         let analysis = QueryAnalysis {
             function_name,
             original_query,
@@ -114,6 +141,7 @@ pub(super) async fn submit(
             source_line,
             datasource,
             response,
+            tokenizations,
         };
         results
             .send(analysis)
@@ -121,6 +149,37 @@ pub(super) async fn submit(
             .map_err(|_| ::anyhow::anyhow!("analysis result receiver closed before delivery"))?;
     }
     Ok(())
+}
+
+/// Lex only sources explicitly retained for presentation. Failed lexing is
+/// carried with the analysis so the consumer can still show each diagnostic.
+async fn prepare_tokens(
+    client: &mut TcpJsonRpcClientAsync,
+    response: &AnalyzeQueryResponse,
+) -> Vec<PreparedTokenization> {
+    let mut prepared: Vec<PreparedTokenization> = Vec::new();
+    for item in response.queries().items() {
+        for diagnostic in item.probrems().items() {
+            let Some(presentation) = diagnostic.presentation() else {
+                continue;
+            };
+            if prepared.iter().any(|entry| {
+                entry.source == presentation.source() && entry.dialect == presentation.dialect()
+            }) {
+                continue;
+            }
+            let result = client
+                .tokenize_sql(presentation.source(), presentation.dialect())
+                .await
+                .map_err(|error| error.to_string());
+            prepared.push(PreparedTokenization {
+                source: presentation.source().to_owned(),
+                dialect: presentation.dialect(),
+                result,
+            });
+        }
+    }
+    prepared
 }
 
 fn initialization(

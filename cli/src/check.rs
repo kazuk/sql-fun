@@ -1,4 +1,8 @@
+mod lockfiles;
+mod progress;
 mod submission;
+
+use self::progress::{Progress, ProgressMode};
 
 use std::{
     ffi::OsStr,
@@ -15,6 +19,15 @@ use syn::File;
 #[derive(clap::Parser, Debug, Clone)]
 #[expect(clippy::struct_excessive_bools)]
 pub struct CheckArgs {
+    /// Progress output on stdout (CLI overrides `SQL_FUN_CHECK_PROGRESS`).
+    #[clap(
+        long,
+        env = "SQL_FUN_CHECK_PROGRESS",
+        value_enum,
+        default_value = "names"
+    )]
+    progress: ProgressMode,
+
     /// Check all packages in the cargo workspace
     #[clap(long, help_heading = Self::PACKAGE_SELECTION_HEADING, conflicts_with ="package")]
     workspace: bool,
@@ -59,22 +72,20 @@ pub struct CheckArgs {
     #[clap(long, help_heading = Self::FEATURE_SELECTION_HEADING, conflicts_with ="all_features")]
     no_default_features: bool,
 
-    /// Force rebuild schema cache
-    ///
-    /// When specified, Clean schema dump cache before checking, force parse schema dump and rebuild schema information
-    #[clap(long, help_heading = Self::SCHEMA_CACHE_CONTROL_HEADING, conflicts_with = "validate_only")]
+    /// Build the lockfile from an empty initial state
+    #[clap(long, help_heading = Self::LOCKFILE_CONTROL_HEADING, conflicts_with = "validate_only")]
     force_rebuild: bool,
 
     /// Validate only
     ///
     /// When specified, Fail if schema dump or SQL statement change.
-    #[clap(long, help_heading = Self::SCHEMA_CACHE_CONTROL_HEADING, conflicts_with = "force_rebuild")]
+    #[clap(long, help_heading = Self::LOCKFILE_CONTROL_HEADING, conflicts_with = "force_rebuild")]
     validate_only: bool,
 
     /// Expect Schema dump not changed
     ///
     /// When specified, Fail if schema dump changed
-    #[clap(long, help_heading = Self::SCHEMA_CACHE_CONTROL_HEADING, conflicts_with = "force_rebuild")]
+    #[clap(long, help_heading = Self::LOCKFILE_CONTROL_HEADING, conflicts_with = "force_rebuild")]
     expect_schema_dump_valid: bool,
 
     /// Number of parallel jobs, default to # of CPUs
@@ -118,7 +129,7 @@ impl CheckArgs {
     const PACKAGE_SELECTION_HEADING: &str = "Package Selection";
     const TARGET_SELECTION_HEADING: &str = "Target Selection";
     const FEATURE_SELECTION_HEADING: &str = "Feature Selection";
-    const SCHEMA_CACHE_CONTROL_HEADING: &str = "Schema Cache Control";
+    const LOCKFILE_CONTROL_HEADING: &str = "Lockfile Control";
     const COMPILATION_OPTIONS_HEADERS: &str = "Compilation Options";
     const MANIFEST_OPTIONS_HEADERS: &str = "Manifest Options";
 
@@ -129,51 +140,103 @@ impl CheckArgs {
     /// [`anyhow::Error`] for runtime error
     ///
     pub async fn execute(&self, common_args: &SqlFunArgs) -> Result<ExitCode, anyhow::Error> {
-        ::which::which("cargo-expand").map_err(|_| {
-            anyhow::anyhow!(
-                "sql-fun check requires cargo-expand on PATH; install it with \"cargo install --locked cargo-expand\" and ensure Cargo's binary directory is on PATH"
-            )
-        })?;
+        ::which::which("cargo-expand").map_err(|_| anyhow::anyhow!(
+            "sql-fun check requires cargo-expand on PATH; install it with \"cargo install --locked cargo-expand\" and ensure Cargo's binary directory is on PATH"
+        ))?;
+        let mut progress = Progress::new(std::io::stdout(), self.progress);
+        let result = self.execute_with_progress(common_args, &mut progress).await;
+        // Finish framing even when extraction, RPC, or finalization fails.
+        progress.finish(matches!(&result, Ok(code) if *code == ExitCode::SUCCESS))?;
+        result
+    }
 
+    async fn execute_with_progress<W: std::io::Write>(
+        &self,
+        common_args: &SqlFunArgs,
+        progress: &mut Progress<W>,
+    ) -> Result<ExitCode, anyhow::Error> {
+        progress.phase("Extracting SQL queries from selected Cargo targets")?;
         let mut requirements = Vec::new();
-        if self.workspace {
-            let deps_members = Self::dependent_members()?;
-            for member in deps_members {
-                requirements.extend(self.expand_member(member.as_str(), common_args).await?);
-            }
+        let members = if self.workspace {
+            Self::dependent_members()?
         } else if let Some(member) = &self.package {
-            requirements.extend(self.expand_member(member, common_args).await?);
+            vec![member.clone()]
         } else {
-            let default_members = Self::default_packages()?;
-            for member in default_members {
-                requirements.extend(self.expand_member(&member, common_args).await?);
-            }
+            Self::default_packages()?
+        };
+        for member in members {
+            requirements.extend(self.expand_member(&member, common_args).await?);
         }
+        if requirements.is_empty() {
+            eprintln!("warning: no SQL queries found in the selected targets");
+            return Ok(ExitCode::SUCCESS);
+        }
+        progress.set_total(requirements.len());
+        let lockfiles = lockfiles::Lockfiles::new(
+            common_args,
+            &requirements,
+            self.force_rebuild,
+            self.expect_schema_dump_valid,
+        )?;
+        let client = crate::api::ApiArgs::from_environment()?.connect().await?;
+        self.process_analyses(client, common_args, requirements, lockfiles, progress)
+            .await
+    }
 
-        if !requirements.is_empty() {
-            let mut client = crate::api::ApiArgs::from_environment()?.connect().await?;
-            let (sender, mut receiver) = ::tokio::sync::mpsc::channel(8);
-            let producer = async {
-                let submitted =
-                    submission::submit(&mut client, common_args, requirements, sender).await;
-                let finished = client.finish().await;
-                submitted?;
-                finished?;
-                Ok::<(), ::anyhow::Error>(())
-            };
-            // Replace this dummy consumer with diagnostics/lockfile processing in
-            // #699/#689. EOF only ends delivery; the producer result establishes
-            // whether every requirement and the RPC connection completed.
-            let consumer = async {
-                while let Some(analysis) = receiver.recv().await {
-                    analysis.log_received();
+    async fn process_analyses<W: std::io::Write>(
+        &self,
+        mut client: ::sql_fun_client::TcpJsonRpcClientAsync,
+        args: &SqlFunArgs,
+        requirements: Vec<::sql_fun_codegen::QueryRequirement>,
+        mut lockfiles: lockfiles::Lockfiles,
+        progress: &mut Progress<W>,
+    ) -> Result<ExitCode, anyhow::Error> {
+        progress.begin(requirements.len())?;
+        let (sender, mut receiver) = ::tokio::sync::mpsc::channel(8);
+        let producer = async {
+            let submitted = submission::submit(&mut client, args, requirements, sender).await;
+            let finished = client.finish().await;
+            submitted?;
+            finished?;
+            Ok::<(), anyhow::Error>(())
+        };
+        let consumer = async {
+            let mut failure = None;
+            while let Some(analysis) = receiver.recv().await {
+                // Preserve the envelope, including every diagnostic, for #699.
+                analysis.log_received();
+                let reported = progress.received(analysis.function_name());
+                if let Err(error) = reported
+                    && failure.is_none()
+                {
+                    failure = Some(anyhow::Error::from(error));
                 }
-            };
-            let (completed, ()) = ::tokio::join!(producer, consumer);
-            completed?;
+                if failure.is_none()
+                    && let Err(error) = lockfiles.receive(&analysis)
+                {
+                    failure = Some(error);
+                }
+            }
+            if let Some(error) = failure {
+                Err(error)
+            } else {
+                Ok(())
+            }
+        };
+        let (completed, processed) = ::tokio::join!(producer, consumer);
+        completed?;
+        processed?;
+        let phase = if self.validate_only {
+            "Validating lockfiles"
+        } else {
+            "Writing lockfiles"
+        };
+        progress.phase(phase)?;
+        if lockfiles.finalize(self.validate_only)? {
+            Ok(ExitCode::SUCCESS)
+        } else {
+            Ok(ExitCode::FAILURE)
         }
-
-        todo!("connect analysis diagnostics and lockfile policy (#689)")
     }
 
     async fn expand_member(

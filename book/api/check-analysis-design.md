@@ -327,10 +327,12 @@ handle. It materializes and releases response collections while retaining source
 identity. Catalog definitions, aliases and parameter bindings are transported
 unchanged; the CLI does not send a second copy of the base SQL.
 
-The remaining consumer integration (#689) will display diagnostics, use the
-returned definitive bind order and result shape, and validate or generate
-lockfile entries for successful analyses. Until that integration is complete,
-`check` still fails at its unimplemented completion step after submission.
+The CLI consumes correlated responses to regenerate or validate lockfiles from
+this session's eligible query functions. It preserves statement order and
+per-statement bindings and result shapes for multi-statement functions. It waits
+for successful submission and connection completion before saving any output.
+See [`check`](../cli/check.md) for validation, empty-session, and progress behavior.
+Diagnostic rendering remains separate work (#699).
 
 The server handles SQL analysis and reusable CTE expansion. The CLI handles
 Rust source extraction, source-level reporting, and lockfile policy. The

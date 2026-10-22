@@ -45,6 +45,25 @@ connector = "tokio-postgres"
         Self(directory)
     }
 
+    pub(super) fn schema_hash(&self) -> String {
+        ::sql_fun_core::Hasher::hash_file(self.0.path().join("schema.sql")).unwrap()
+    }
+
+    pub(super) fn write_lockfile(
+        &self,
+        datasource: &str,
+        hash: &str,
+        entries: &[::sql_fun_core::lockfile::LockfileEntry],
+    ) {
+        let mut document = ::sql_fun_core::lockfile::LockfileDocument::new(hash);
+        for entry in entries {
+            document.push(entry.clone());
+        }
+        let path = self.args().lockfile_path(datasource).unwrap();
+        ::sql_fun_core::lockfile::LockfileDocument::replace(&path, &document.encode().unwrap())
+            .unwrap();
+    }
+
     pub(super) fn args(&self) -> SqlFunArgs {
         SqlFunArgs::builder(&std::collections::HashMap::new())
             .unwrap()
@@ -110,19 +129,20 @@ fn query_{index}() {{
 pub(super) async fn peer(
     fail_method: Option<&'static str>,
 ) -> (TcpJsonRpcClientAsync, ::tokio::task::JoinHandle<Vec<Value>>) {
-    peer_with_gate(fail_method, None).await
+    peer_with_gate(fail_method, None, None).await
 }
 
 /// Hold the second RPC until the first envelope has reached its consumer.
 pub(super) async fn gated_second_failure(
     release: ::tokio::sync::oneshot::Receiver<()>,
 ) -> (TcpJsonRpcClientAsync, ::tokio::task::JoinHandle<Vec<Value>>) {
-    peer_with_gate(Some("second_analysis"), Some(release)).await
+    peer_with_gate(Some("second_analysis"), Some(release), None).await
 }
 
 async fn peer_with_gate(
     fail_method: Option<&'static str>,
     mut release: Option<::tokio::sync::oneshot::Receiver<()>>,
+    response: Option<Value>,
 ) -> (TcpJsonRpcClientAsync, ::tokio::task::JoinHandle<Vec<Value>>) {
     let listener = TcpListener::bind("127.0.0.1:0").await.unwrap();
     let address = listener.local_addr().unwrap();
@@ -134,6 +154,14 @@ async fn peer_with_gate(
         loop {
             let mut line = String::new();
             if stream.read_line(&mut line).await.unwrap() == 0 {
+                if fail_method == Some("finish") {
+                    // Fail protocol completion only after accepted analyses were delivered.
+                    stream
+                        .get_mut()
+                        .write_all(b"invalid completion JSON\n")
+                        .await
+                        .unwrap();
+                }
                 break;
             }
             let request: Value = ::serde_json::from_str(&line).unwrap();
@@ -157,7 +185,9 @@ async fn peer_with_gate(
                     "initialize_schema_context" => {
                         json!({"context_handle":format!("context-{}",request["params"]["datasource"].as_str().unwrap()),"schema_dump_hash":"hash","problems":page()})
                     }
-                    "analyze_query" => json!({"queries":page()}),
+                    "analyze_query" => response
+                        .clone()
+                        .unwrap_or_else(|| json!({"queries":page()})),
                     _ => panic!("unexpected method: {method}"),
                 };
                 json!({"jsonrpc":"2.0", "id":request["id"], "result":result})
@@ -199,4 +229,23 @@ pub(super) async fn collect_submission(
     let (completed, collected) = ::tokio::join!(producer, consumer);
     completed?;
     Ok(collected)
+}
+
+/// Use realistic completed statement DTOs with the existing recording peer.
+pub(super) async fn peer_with_response(
+    response: Value,
+    fail: Option<&'static str>,
+) -> (TcpJsonRpcClientAsync, ::tokio::task::JoinHandle<Vec<Value>>) {
+    peer_with_gate(fail, None, Some(response)).await
+}
+
+pub(super) fn successful_response(statement_count: usize) -> Value {
+    let statements = (0..statement_count).map(|index| json!({
+        "query_span":null, "execute_sql":format!("SELECT {index}"), "complete":true, "query_kind":"Select",
+        "probrems":page(), "accessing_relations":page(), "column_access":page(), "parameters":page(), "result_columns":page()
+    })).collect::<Vec<_>>();
+    let mut queries = page();
+    queries["total_length"] = json!(statement_count);
+    queries["items"] = json!(statements);
+    json!({"queries":queries})
 }

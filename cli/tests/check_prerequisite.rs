@@ -72,8 +72,118 @@ mod unix {
         assert!(!error.contains("requires cargo-expand on PATH"), "{error}");
     }
 
+    #[rstest::rstest]
+    #[case::ordinary(&[])]
+    #[case::validate_only(&["--validate-only"])]
+    #[case::force(&["--force-rebuild"])]
+    fn empty_extraction_warns_without_opening_lockfiles(#[case] options: &[&str]) {
+        let tools = test_helpers::empty_query_tools();
+        let sentinel = tools.path().join("selected.develop.lock");
+        let before = std::fs::read(&sentinel).unwrap();
+        let output = Command::new(env!("CARGO_BIN_EXE_sql-fun"))
+            .current_dir(tools.path())
+            .env("PATH", tools.path())
+            .env("SQL_FUN_CHECK_PROGRESS", "silent")
+            .env("SQL_FUN_SERVER", "/nonexistent/server")
+            .args(["--datasource", "selected", "check", "--package", "fixture"])
+            .args(options)
+            .output()
+            .unwrap();
+        assert!(
+            output.status.success(),
+            "{}",
+            String::from_utf8_lossy(&output.stderr)
+        );
+        assert_eq!(output.stdout, Vec::<u8>::new());
+        assert!(
+            String::from_utf8_lossy(&output.stderr)
+                .contains("warning: no SQL queries found in the selected targets")
+        );
+        assert_eq!(std::fs::read(&sentinel).unwrap(), before);
+    }
+
+    #[rstest::rstest]
+    #[case::default(None, None, true)]
+    #[case::silent_env(Some("silent"), None, false)]
+    #[case::names_env(Some("names"), None, true)]
+    #[case::dots_env(Some("dots"), None, true)]
+    #[case::cli_wins(Some("names"), Some("silent"), false)]
+    #[case::cli_names(Some("silent"), Some("names"), true)]
+    fn progress_configuration_uses_cli_over_environment(
+        #[case] env: Option<&str>,
+        #[case] cli: Option<&str>,
+        #[case] visible: bool,
+    ) {
+        let tools = test_helpers::expand_tools(true);
+        let mut command = Command::new(env!("CARGO_BIN_EXE_sql-fun"));
+        command
+            .current_dir(tools.path())
+            .env("PATH", tools.path())
+            .env_remove("SQL_FUN_CHECK_PROGRESS")
+            .args(["check", "--package", "fixture"]);
+        if let Some(value) = env {
+            command.env("SQL_FUN_CHECK_PROGRESS", value);
+        }
+        if let Some(value) = cli {
+            command.args(["--progress", value]);
+        }
+        let output = command.output().unwrap();
+        assert!(!output.status.success());
+        let stdout = String::from_utf8(output.stdout).unwrap();
+        assert_eq!(stdout.contains("Extracting"), visible);
+        assert_eq!(stdout.contains("Stopped"), visible);
+        assert!(!stdout.contains("Completed"));
+        assert!(
+            String::from_utf8_lossy(&output.stderr).contains("cargo-expand exited non-success")
+        );
+    }
+
+    #[test]
+    fn invalid_progress_is_an_argument_error() {
+        let output = Command::new(env!("CARGO_BIN_EXE_sql-fun"))
+            .env("SQL_FUN_CHECK_PROGRESS", "unknown")
+            .arg("check")
+            .output()
+            .unwrap();
+        assert!(!output.status.success());
+        assert_eq!(output.stdout, Vec::<u8>::new());
+        assert!(String::from_utf8_lossy(&output.stderr).contains("invalid value"));
+    }
+
     mod test_helpers {
         use std::os::unix::fs::PermissionsExt;
+
+        pub(super) fn empty_query_tools() -> ::tempfile::TempDir {
+            let tools = expand_tools(true);
+            std::fs::write(
+                tools.path().join("sqlfun.develop.sql"),
+                "-- extraction configuration\n",
+            )
+            .unwrap();
+            std::fs::write(
+                tools.path().join("cargo"),
+                "#!/bin/sh\necho 'fn unrelated() {}'\n",
+            )
+            .unwrap();
+            std::fs::write(
+                tools.path().join("selected.develop.lock"),
+                "malformed lockfile sentinel",
+            )
+            .unwrap();
+            std::fs::write(
+                tools.path().join("Cargo.toml"),
+                r#"
+[package.metadata.database.selected]
+engine = "PostgreSQL"
+dialect = "postgres"
+version = "17"
+connector = "tokio-postgres"
+search_path = ["public"]
+"#,
+            )
+            .unwrap();
+            tools
+        }
 
         pub(super) fn expand_tools(executable: bool) -> ::tempfile::TempDir {
             let tools = ::tempfile::tempdir().unwrap();

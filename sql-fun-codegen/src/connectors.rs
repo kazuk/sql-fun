@@ -4,7 +4,7 @@ mod test_rendering;
 use std::{path::Path, str::FromStr};
 
 use proc_macro2::{Span, TokenStream};
-use sql_fun_core::{SqlDialect, lockfile::LockfileEntry};
+use sql_fun_core::{SqlDialect, lockfile::LockfileStatement};
 use syn::{Ident, LitInt, LitStr};
 
 use crate::rust_syn::GeneratedIdentifiers;
@@ -354,7 +354,7 @@ mod test_source_file_for {
 
 impl TokioPostgresCodeGenerator {
     fn builder_setter_calls(
-        lockfile_entry: &LockfileEntry,
+        lockfile_entry: &LockfileStatement,
         builder: &crate::row_builder::RowBuilder<'_>,
         result: &Ident,
     ) -> Vec<TokenStream> {
@@ -609,7 +609,7 @@ impl TokioPostgresCodeGenerator {
         spec: &QueryFunctionSpec,
         sig: &syn::Signature,
         connection: &Ident,
-        lockfile_entry: &LockfileEntry,
+        lockfile_entry: &LockfileStatement,
     ) -> TokenStream {
         let mut identifiers = GeneratedIdentifiers::from(sig);
         let params = identifiers.allocate("params");
@@ -675,7 +675,7 @@ impl TokioPostgresCodeGenerator {
         spec: &QueryFunctionSpec,
         sig: &syn::Signature,
         connection: &Ident,
-        lockfile_entry: &LockfileEntry,
+        lockfile_entry: &LockfileStatement,
     ) -> TokenStream {
         let mut identifiers = GeneratedIdentifiers::from(sig);
         let params = identifiers.allocate("params");
@@ -746,7 +746,7 @@ impl TokioPostgresCodeGenerator {
         spec: &QueryFunctionSpec,
         sig: &syn::Signature,
         connection: &Ident,
-        lockfile_entry: &LockfileEntry,
+        lockfile_entry: &LockfileStatement,
     ) -> Result<TokenStream, SqlFunCodegenError> {
         let mut identifiers = GeneratedIdentifiers::from(sig);
         let params = identifiers.allocate("params");
@@ -831,7 +831,7 @@ impl TokioPostgresCodeGenerator {
         spec: &QueryFunctionSpec,
         sig: &syn::Signature,
         connection: &Ident,
-        lockfile_entry: &LockfileEntry,
+        lockfile_entry: &LockfileStatement,
     ) -> TokenStream {
         let mut identifiers = GeneratedIdentifiers::from(sig);
         let params = identifiers.allocate("params");
@@ -887,7 +887,7 @@ impl ConnectorCodeGenerator for TokioPostgresCodeGenerator {
         let item_fn = spec.item_fn();
         let sig = &item_fn.codegen_signature();
         let connection = spec.connection_ident();
-        if let Some(lockfile_entry) = spec.lockfile_entry() {
+        if let Some(lockfile_entry) = spec.lockfile_entry()? {
             let function = Self::query_one_function(spec, sig, connection, lockfile_entry);
             tracing::info!("generated source \n{}", function.to_string());
             Ok(function)
@@ -906,7 +906,7 @@ impl ConnectorCodeGenerator for TokioPostgresCodeGenerator {
         let item_fn = spec.item_fn();
         let sig = &item_fn.codegen_signature();
         let connection = spec.connection_ident();
-        if let Some(lockfile_entry) = spec.lockfile_entry() {
+        if let Some(lockfile_entry) = spec.lockfile_entry()? {
             let function = Self::query_opt_function(spec, sig, connection, lockfile_entry);
             tracing::info!("generated source \n{}", function.to_string());
             Ok(function)
@@ -925,7 +925,7 @@ impl ConnectorCodeGenerator for TokioPostgresCodeGenerator {
         let item_fn = spec.item_fn();
         let sig = &item_fn.codegen_signature();
         let connection = spec.connection_ident();
-        if let Some(lockfile_entry) = spec.lockfile_entry() {
+        if let Some(lockfile_entry) = spec.lockfile_entry()? {
             let function = Self::query_many_function(spec, sig, connection, lockfile_entry)?;
             tracing::info!("generated source \n{}", function.to_string());
             Ok(function)
@@ -941,7 +941,7 @@ impl ConnectorCodeGenerator for TokioPostgresCodeGenerator {
         let item_fn = spec.item_fn();
         let sig = &item_fn.codegen_signature();
         let connection = spec.connection_ident();
-        if let Some(lockfile_entry) = spec.lockfile_entry() {
+        if let Some(lockfile_entry) = spec.lockfile_entry()? {
             let function = Self::execute_function(spec, sig, connection, lockfile_entry);
             tracing::info!("generated source \n{}", function.to_string());
             Ok(function)
@@ -951,6 +951,34 @@ impl ConnectorCodeGenerator for TokioPostgresCodeGenerator {
             tracing::info!("generated source \n{}", function.to_string());
             Ok(function)
         }
+    }
+}
+
+#[cfg(test)]
+mod test_statement_capability {
+    use super::{ConnectorCodeGenerator, TokioPostgresCodeGenerator};
+    use crate::test_helpers::query_spec;
+    use ::sql_fun_core::lockfile::{LockfileEntry, LockfileStatement};
+
+    #[test]
+    fn multi_statement_lockfile_is_rejected_at_connector_boundary() {
+        let mut spec = query_spec(::syn::parse_quote!(
+            async fn query(client: &Client) -> Result<Row, QueryError> {}
+        ));
+        spec.lockfile_entry = Some(
+            LockfileEntry::new(
+                "fingerprint",
+                "query",
+                &[
+                    LockfileStatement::new("SELECT 1", &[], &[]),
+                    LockfileStatement::new("SELECT 2", &[], &[]),
+                ],
+            )
+            .unwrap(),
+        );
+        let generator = TokioPostgresCodeGenerator::new();
+        let error = generator.render_query_one(&spec).unwrap_err();
+        assert!(error.to_string().contains("multiple statements"));
     }
 }
 
@@ -968,7 +996,7 @@ impl RusqliteCodeGenerator {
 #[cfg(feature = "sqlite")]
 impl RusqliteCodeGenerator {
     fn builder_setter_calls(
-        lockfile_entry: &LockfileEntry,
+        lockfile_entry: &LockfileStatement,
         builder: &crate::row_builder::RowBuilder<'_>,
         result: &Ident,
     ) -> Vec<TokenStream> {
@@ -1056,7 +1084,7 @@ impl RusqliteCodeGenerator {
         spec: &QueryFunctionSpec,
         sig: &syn::Signature,
         connection: &Ident,
-        lockfile_entry: &LockfileEntry,
+        lockfile_entry: &LockfileStatement,
     ) -> TokenStream {
         let mut identifiers = GeneratedIdentifiers::from(sig);
         let params = identifiers.allocate("params");
@@ -1097,7 +1125,7 @@ impl RusqliteCodeGenerator {
         spec: &QueryFunctionSpec,
         sig: &syn::Signature,
         connection: &Ident,
-        lockfile_entry: &LockfileEntry,
+        lockfile_entry: &LockfileStatement,
     ) -> TokenStream {
         let mut identifiers = GeneratedIdentifiers::from(sig);
         let params = identifiers.allocate("params");
@@ -1139,7 +1167,7 @@ impl RusqliteCodeGenerator {
         spec: &QueryFunctionSpec,
         sig: &syn::Signature,
         connection: &Ident,
-        lockfile_entry: &LockfileEntry,
+        lockfile_entry: &LockfileStatement,
     ) -> Result<TokenStream, SqlFunCodegenError> {
         let mut identifiers = GeneratedIdentifiers::from(sig);
         let params = identifiers.allocate("params");
@@ -1184,7 +1212,7 @@ impl RusqliteCodeGenerator {
         spec: &QueryFunctionSpec,
         sig: &syn::Signature,
         connection: &Ident,
-        lockfile_entry: &LockfileEntry,
+        lockfile_entry: &LockfileStatement,
     ) -> TokenStream {
         let mut identifiers = GeneratedIdentifiers::from(sig);
         let params = identifiers.allocate("params");
@@ -1210,7 +1238,7 @@ impl ConnectorCodeGenerator for RusqliteCodeGenerator {
         let item_fn = spec.item_fn();
         let sig = &item_fn.codegen_signature();
         let connection = spec.connection_ident();
-        if let Some(lockfile_entry) = spec.lockfile_entry() {
+        if let Some(lockfile_entry) = spec.lockfile_entry()? {
             let function = Self::query_one_function(spec, sig, connection, lockfile_entry);
             tracing::info!("generated source \n{}", function.to_string());
             Ok(function)
@@ -1232,7 +1260,7 @@ impl ConnectorCodeGenerator for RusqliteCodeGenerator {
         let item_fn = spec.item_fn();
         let sig = &item_fn.codegen_signature();
         let connection = spec.connection_ident();
-        if let Some(lockfile_entry) = spec.lockfile_entry() {
+        if let Some(lockfile_entry) = spec.lockfile_entry()? {
             let function = Self::query_opt_function(spec, sig, connection, lockfile_entry);
             tracing::info!("generated source \n{}", function.to_string());
             Ok(function)
@@ -1254,7 +1282,7 @@ impl ConnectorCodeGenerator for RusqliteCodeGenerator {
         let item_fn = spec.item_fn();
         let sig = &item_fn.codegen_signature();
         let connection = spec.connection_ident();
-        if let Some(lockfile_entry) = spec.lockfile_entry() {
+        if let Some(lockfile_entry) = spec.lockfile_entry()? {
             let function = Self::query_many_function(spec, sig, connection, lockfile_entry)?;
             tracing::info!("generated source \n{}", function.to_string());
             Ok(function)
@@ -1273,7 +1301,7 @@ impl ConnectorCodeGenerator for RusqliteCodeGenerator {
         let item_fn = spec.item_fn();
         let sig = &item_fn.codegen_signature();
         let connection = spec.connection_ident();
-        if let Some(lockfile_entry) = spec.lockfile_entry() {
+        if let Some(lockfile_entry) = spec.lockfile_entry()? {
             let function = Self::execute_function(spec, sig, connection, lockfile_entry);
             tracing::info!("generated source \n{}", function.to_string());
             Ok(function)
@@ -1295,7 +1323,7 @@ impl ConnectorCodeGenerator for RusqliteCodeGenerator {
 // execute_sql is only the final SQL literal; bind_parameters is the binding contract.
 fn parameters(
     bindings: &crate::rust_syn::ParameterBindings,
-    lockfile_entry: &LockfileEntry,
+    lockfile_entry: &LockfileStatement,
 ) -> Vec<TokenStream> {
     lockfile_entry
         .bind_parameters()
@@ -1319,11 +1347,13 @@ mod test_parameters {
             &[("name", 0), ("id", 1)],
             &[],
         );
-        let expressions: Vec<syn::Expr> =
-            parameters(&function.parameter_bindings().unwrap(), &entry)
-                .into_iter()
-                .map(|expression| syn::parse2(expression).unwrap())
-                .collect();
+        let expressions: Vec<syn::Expr> = parameters(
+            &function.parameter_bindings().unwrap(),
+            entry.single_statement().unwrap(),
+        )
+        .into_iter()
+        .map(|expression| syn::parse2(expression).unwrap())
+        .collect();
         assert_eq!(
             expressions,
             vec![syn::parse_quote!(&dto.name()), syn::parse_quote!(&id)]
@@ -1336,6 +1366,12 @@ mod test_parameters {
             fn query(id: i64) {}
         ));
         let entry = lockfile_entry("opaque SQL", &[], &[]);
-        assert!(parameters(&function.parameter_bindings().unwrap(), &entry).is_empty());
+        assert!(
+            parameters(
+                &function.parameter_bindings().unwrap(),
+                entry.single_statement().unwrap()
+            )
+            .is_empty()
+        );
     }
 }

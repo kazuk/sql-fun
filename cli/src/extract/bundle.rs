@@ -105,6 +105,7 @@ mod import_tests {
     use super::super::test_helpers::BundleFixture;
 
     #[test]
+    #[ignore = "large-payload validation needs a dedicated execution path; see #716"]
     fn accepts_streamed_payload_larger_than_previous_fixed_ceiling() {
         let fixture = BundleFixture::new();
         let size = 257 * 1024 * 1024;

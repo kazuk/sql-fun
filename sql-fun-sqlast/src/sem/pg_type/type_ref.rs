@@ -68,6 +68,13 @@ impl TypeReference {
         }
     }
 
+    pub(crate) fn row_columns(
+        &self,
+        context: &impl crate::sem::ParseContext,
+    ) -> Option<crate::sem::ColumnCollection> {
+        self.definition_from_catalog(context)?.row_columns(context)
+    }
+
     pub(crate) fn implicit_match_context(
         &self,
         target: &Self,

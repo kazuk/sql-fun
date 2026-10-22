@@ -1,4 +1,8 @@
+#[cfg(feature = "sqlite")]
+use super::super::test_helpers::resolve;
 use super::super::test_helpers::source_namespace_statement;
+#[cfg(feature = "sqlite")]
+use crate::ast::Dialect;
 use crate::sem::{ColumnReferenceExpr, FullName, PgBuiltInType, SemScalarExpr};
 
 #[rstest::rstest]
@@ -198,6 +202,7 @@ fn genuine_source_collisions_remain_invalid(#[case] sql: &str) {
 #[rstest::rstest]
 #[case::comma("SELECT * FROM a.t, b.t", &["a", "a", "b", "b"])]
 #[case::reversed("SELECT * FROM b.t, a.t", &["b", "b", "a", "a"])]
+#[case::schema_qualified("SELECT a.t.* FROM a.t, b.t", &["a", "a"])]
 #[case::join("SELECT * FROM a.t CROSS JOIN b.t", &["a", "a", "b", "b"])]
 #[case::left("SELECT * FROM a.t LEFT JOIN b.t ON true", &["a", "a", "b", "b"])]
 #[case::right("SELECT * FROM a.t RIGHT JOIN b.t ON true", &["a", "a", "b", "b"])]
@@ -313,6 +318,114 @@ fn joined_star_keeps_selected_sources(#[case] sql: &str, #[case] schemas: &[&str
             &FullName::with_schema(schema, "t")
         );
     }
+}
+
+#[rstest::rstest]
+#[case::star("SELECT * FROM a.t FULL JOIN b.t USING(id)")]
+#[case::explicit("SELECT id, only_a, only_b FROM a.t FULL JOIN b.t USING(id)")]
+#[case::aliased("SELECT j.* FROM (a.t FULL JOIN b.t USING(id)) AS j")]
+fn full_join_using_keeps_merged_key_and_order(#[case] sql: &str) {
+    let analyzed = source_namespace_statement(sql);
+    assert!(
+        analyzed.context().reported_problems().is_empty(),
+        "{:?}",
+        analyzed.context().reported_problems()
+    );
+    let query = analyzed.ast().clone().into_select_statemtnt().unwrap();
+    let columns = query.result_columns();
+    assert_eq!(
+        columns
+            .names()
+            .iter()
+            .map(|n| n.as_str())
+            .collect::<Vec<_>>(),
+        ["id", "only_a", "only_b"]
+    );
+    let merged = columns.get_column_at(0).unwrap();
+    assert_eq!(merged.col_type(), &Some(PgBuiltInType::int8()));
+    assert_eq!(merged.is_not_null(), &Some(true));
+    let coalesce = merged.expression().unwrap().as_coalesce().unwrap();
+    assert_eq!(coalesce.arguments().len(), 2);
+    assert_eq!(
+        coalesce.arguments()[0].get_type(),
+        Some(PgBuiltInType::int8())
+    );
+    assert_eq!(
+        coalesce.arguments()[1]
+            .table_column_reference()
+            .unwrap()
+            .relation(),
+        &FullName::with_schema("b", "t")
+    );
+}
+
+#[rstest::rstest]
+#[case::nested("SELECT * FROM a.t FULL JOIN b.t USING(id) FULL JOIN c.t USING(id)", &["id", "only_a", "only_b"])]
+#[case::natural("SELECT * FROM a.t NATURAL FULL JOIN b.t", &["id", "only_a", "only_b"])]
+fn full_join_merged_key_survives_other_join_shapes(#[case] sql: &str, #[case] names: &[&str]) {
+    let analyzed = source_namespace_statement(sql);
+    assert!(
+        analyzed.context().reported_problems().is_empty(),
+        "{:?}",
+        analyzed.context().reported_problems()
+    );
+    let query = analyzed.ast().clone().into_select_statemtnt().unwrap();
+    let columns = query.result_columns();
+    assert_eq!(
+        columns
+            .names()
+            .iter()
+            .map(|name| name.as_str())
+            .collect::<Vec<_>>(),
+        names
+    );
+    let key = columns.get_column_at(0).unwrap();
+    assert_eq!(key.col_type(), &Some(PgBuiltInType::int8()));
+    assert_eq!(key.is_not_null(), &Some(true));
+    assert!(key.expression().unwrap().as_coalesce().is_some());
+}
+
+#[cfg(feature = "sqlite")]
+#[rstest::rstest]
+#[case::bare("SELECT * FROM (SELECT 1 AS id) l FULL JOIN (SELECT 2 AS id) r USING(id)")]
+#[case::grouped("SELECT * FROM ((SELECT 1 AS id) l FULL JOIN (SELECT 2 AS id) r USING(id)) AS j")]
+fn sqlite_full_join_using_keeps_left_position_and_right_fallback(#[case] sql: &str) {
+    let (query, context) = resolve(sql, Dialect::sqlite(), false).unwrap();
+    assert!(
+        context.reported_problems().is_empty(),
+        "{:?}",
+        context.reported_problems()
+    );
+    let columns = query.result_columns();
+    assert_eq!(columns.len(), 1);
+    let key = columns.get_column_at(0).unwrap();
+    assert!(key.expression().unwrap().as_coalesce().is_some());
+    assert_eq!(key.column_name().as_ref().unwrap().as_str(), "id");
+}
+
+#[cfg(feature = "sqlite")]
+#[rstest::rstest]
+#[case::qualified("j.id")]
+#[case::unqualified("id")]
+fn sqlite_grouped_full_join_key_keeps_both_inputs(#[case] key: &str) {
+    let (query, _) = resolve(
+        &format!(
+            "SELECT {key} FROM ((SELECT 1 AS id) l FULL JOIN (SELECT 2 AS id) r USING(id)) AS j"
+        ),
+        Dialect::sqlite(),
+        false,
+    )
+    .unwrap();
+    assert!(
+        query
+            .result_columns()
+            .get_column_at(0)
+            .unwrap()
+            .expression()
+            .unwrap()
+            .as_coalesce()
+            .is_some()
+    );
 }
 
 #[rstest::rstest]

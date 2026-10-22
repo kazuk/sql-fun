@@ -17,6 +17,42 @@ pub(crate) struct ProjectionColumn<'a> {
 enum ProjectionBinding<'a> {
     Source(QualifiedSource<'a>),
     Expression(Box<SemScalarExpr>),
+    Merged(Box<MergedProjection<'a>>),
+}
+
+#[derive(Debug, Clone)]
+struct MergedProjection<'a> {
+    left: Box<ProjectionColumn<'a>>,
+    right: Box<ProjectionColumn<'a>>,
+    nullable: bool,
+}
+
+impl MergedProjection<'_> {
+    fn bind(
+        &self,
+        context: &mut impl ParseContext,
+        with: &WithClause,
+    ) -> Result<SemScalarExpr, AnalysisError> {
+        let left = self.left.bind_direct(context, with)?;
+        let right = self.right.bind_direct(context, with)?;
+        let not_null = left.is_not_null() == Some(true) && right.is_not_null() == Some(true);
+        let left = self
+            .left
+            .clone()
+            .with_nullability(true)
+            .bind_direct(context, with)?;
+        let right = self
+            .right
+            .clone()
+            .with_nullability(true)
+            .bind_direct(context, with)?;
+        crate::sem::CoalesceExpr::resolve_join_key(
+            context,
+            &[left, right],
+            self.left.name(),
+            not_null && !self.nullable,
+        )
+    }
 }
 
 impl<'a> ProjectionBinding<'a> {
@@ -33,12 +69,17 @@ impl<'a> ProjectionBinding<'a> {
             Self::Expression(expression) => Self::Expression(Box::new(
                 expression.with_function_source_nullability(nullable),
             )),
+            Self::Merged(mut merged) => {
+                merged.nullable |= nullable;
+                Self::Merged(merged)
+            }
         }
     }
     fn with_merge(self, role: super::MergeRecordRole, nullable: bool) -> Self {
         match self {
             Self::Source(source) => Self::Source(source.with_merge(role, nullable)),
             Self::Expression(_) => self,
+            Self::Merged(_) => self,
         }
     }
     fn bind_direct(
@@ -50,6 +91,7 @@ impl<'a> ProjectionBinding<'a> {
         match self {
             Self::Source(source) => source.bind(context, with, column),
             Self::Expression(expression) => Ok(expression.as_ref().clone()),
+            Self::Merged(merged) => merged.bind(context, with),
         }
     }
     fn bind(
@@ -61,11 +103,15 @@ impl<'a> ProjectionBinding<'a> {
         match self {
             Self::Source(source) => Ok(scope.bind_source(context, source, column)?.0),
             Self::Expression(expression) => Ok(expression.as_ref().clone()),
+            Self::Merged(merged) => merged.bind(context, scope.with_clause()),
         }
     }
 }
 
 impl<'a> ProjectionColumn<'a> {
+    pub(super) const fn is_merged(&self) -> bool {
+        matches!(self.binding, ProjectionBinding::Merged(_))
+    }
     fn new(source: QualifiedSource<'a>, name: ColumnName) -> Self {
         Self {
             column: name.clone(),
@@ -80,6 +126,18 @@ impl<'a> ProjectionColumn<'a> {
             column: name.clone(),
             alias: None,
             binding: ProjectionBinding::expression(expression.clone()),
+        }
+    }
+    pub(super) fn merged(left: &Self, right: &Self) -> Self {
+        Self {
+            name: left.name.clone(),
+            column: left.name.clone(),
+            alias: None,
+            binding: ProjectionBinding::Merged(Box::new(MergedProjection {
+                left: Box::new(left.clone()),
+                right: Box::new(right.clone()),
+                nullable: false,
+            })),
         }
     }
     pub(crate) fn ambiguous(
@@ -142,6 +200,10 @@ impl<'a> ProjectionColumn<'a> {
         self
     }
     pub(super) fn with_group(mut self, source: &'a DataSource, alias: &AliasName) -> Self {
+        if self.is_merged() {
+            self.alias = Some(alias.clone());
+            return self;
+        }
         self.binding = ProjectionBinding::source(QualifiedSource::new(source, alias));
         self.alias = None;
         self

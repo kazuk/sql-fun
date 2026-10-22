@@ -117,6 +117,29 @@ impl<'a> ScalarAnalysisContext<'a> {
         }
     }
 
+    pub(crate) fn relation_projection_names(
+        &self,
+        context: &mut impl ParseContext,
+        relation: &crate::sem::FullName,
+    ) -> Result<Vec<crate::sem::data_source::ProjectionColumn<'_>>, AnalysisError> {
+        match self.from_clause.qualified_source(context, relation) {
+            Ok(Some(source)) => source.projection_columns(context, &self.with_clause),
+            Err(()) => {
+                context.report_analysis_problem(crate::sem::AnalysisProblem::query(
+                    crate::sem::QueryProblem::ambiguous_reference("star source"),
+                ))?;
+                Ok(Vec::new())
+            }
+            Ok(None) => {
+                if let Some(parent) = &self.parent {
+                    parent.relation_projection_names(context, relation)
+                } else {
+                    Ok(Vec::new())
+                }
+            }
+        }
+    }
+
     pub(crate) fn rule(
         with: &'a WithClause,
         from: &'a FromClause,
@@ -636,6 +659,14 @@ impl ScalarAnalysisContext<'_> {
         if self.qualified_only {
             let expr = ColumnReferenceExpr::undefined_column_resolved(context, column)?;
             return Ok((expr, context));
+        }
+        if let Some(projected) =
+            self.from_clause
+                .joined_projection(context, &self.with_clause, column)?
+        {
+            self.grouping.reference();
+            let expression = projected.bind(context, self)?;
+            return Ok((expression, context));
         }
         let Ok(find_alias_result) =
             self.from_clause

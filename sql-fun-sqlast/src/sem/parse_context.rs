@@ -499,6 +499,7 @@ where
             )?;
             self.set_parameter_constraints(&constraints);
         }
+        query.expand_pending_stars(self)?;
         Ok(query)
     }
 

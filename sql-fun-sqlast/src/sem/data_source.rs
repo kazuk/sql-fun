@@ -245,7 +245,7 @@ impl DataSource {
         Self::Group(Box::new(GroupedDataSource::new(self, alias)))
     }
 
-    fn is_joined(&self) -> bool {
+    pub(crate) fn is_joined(&self) -> bool {
         match self {
             Self::JoinExpr(_) => true,
             Self::Group(group) => group.is_joined(),

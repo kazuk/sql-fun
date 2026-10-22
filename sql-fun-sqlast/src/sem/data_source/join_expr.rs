@@ -280,16 +280,16 @@ impl JoinExprDataSource {
         context: &impl crate::sem::ParseContext,
         with: &WithClause,
     ) -> Result<Vec<super::ProjectionColumn<'_>>, crate::sem::AnalysisError> {
-        let left: Vec<_> = self
-            .left
-            .projection_names(context, with, None)?
-            .into_iter()
+        let original_left = self.left.projection_names(context, with, None)?;
+        let original_right = self.right.projection_names(context, with, None)?;
+        let left: Vec<_> = original_left
+            .iter()
+            .cloned()
             .map(|column| column.with_nullability(self.kind.left_nullable(false)))
             .collect();
-        let right: Vec<_> = self
-            .right
-            .projection_names(context, with, None)?
-            .into_iter()
+        let right: Vec<_> = original_right
+            .iter()
+            .cloned()
             .map(|column| column.with_nullability(self.kind.right_nullable(false)))
             .collect();
         let merged = if let Some(using) = &self.using_clause {
@@ -305,17 +305,25 @@ impl JoinExprDataSource {
         if merged.is_empty() {
             return Ok(left.into_iter().chain(right).collect());
         }
-        self.kind.require_projectable_merged_columns();
         let mut columns = Vec::new();
         if context.dialect() == crate::ast::Dialect::postgres() {
             for name in &merged {
-                let source = if self.kind.uses_right_join_column() {
-                    &right
+                if self.kind.is_full() {
+                    if let (Some(left), Some(right)) = (
+                        original_left.iter().find(|column| column.name() == name),
+                        original_right.iter().find(|column| column.name() == name),
+                    ) {
+                        columns.push(super::ProjectionColumn::merged(left, right));
+                    }
                 } else {
-                    &left
-                };
-                if let Some(column) = source.iter().find(|column| column.name() == name) {
-                    columns.push(column.clone());
+                    let source = if self.kind.uses_right_join_column() {
+                        &right
+                    } else {
+                        &left
+                    };
+                    if let Some(column) = source.iter().find(|column| column.name() == name) {
+                        columns.push(column.clone());
+                    }
                 }
             }
             columns.extend(
@@ -323,7 +331,25 @@ impl JoinExprDataSource {
                     .filter(|column| !merged.contains(column.name())),
             );
         } else {
-            columns.extend(left);
+            if self.kind.is_full() {
+                for column in left {
+                    if merged.contains(column.name()) {
+                        let original = original_left
+                            .iter()
+                            .find(|left| left.name() == column.name());
+                        let right = original_right
+                            .iter()
+                            .find(|right| right.name() == column.name());
+                        if let (Some(original), Some(right)) = (original, right) {
+                            columns.push(super::ProjectionColumn::merged(original, right));
+                        }
+                    } else {
+                        columns.push(column);
+                    }
+                }
+            } else {
+                columns.extend(left);
+            }
         }
         columns.extend(
             right

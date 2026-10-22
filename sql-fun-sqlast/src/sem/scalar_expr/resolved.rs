@@ -6,6 +6,9 @@ use crate::sem::scalar_expr::{
 use crate::sem::{AnalysisError, SelectStatement, TypeReference};
 
 impl SemScalarExpr {
+    pub(crate) fn row(fields: &[Self]) -> Self {
+        Self::Row(super::RowExpr::new(fields))
+    }
     pub(crate) fn function_call(value: &crate::sem::FuncCallExpr) -> Self {
         Self::FuncCall(value.clone())
     }

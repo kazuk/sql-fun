@@ -239,6 +239,12 @@ impl DiagnosticMessage for QueryProblem {
             Self::AmbiguousReference(name) => format!("ambiguous clause reference: {name}"),
             Self::PositionOutOfRange(position) => format!("ORDER/GROUP BY position {position} is outside the select list"),
             Self::InvalidCompoundOrder => "compound ORDER BY must refer to a result column".to_owned(),
+            Self::StarProjectionRequiresCompositeType => {
+                "row expansion requires a composite value".to_owned()
+            }
+            Self::InvalidStarProjectionPlacement => {
+                "row expansion is only valid in a projection target".to_owned()
+            }
         }
     }
 }

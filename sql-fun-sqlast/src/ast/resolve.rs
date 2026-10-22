@@ -30,6 +30,14 @@ impl Name {
         }
     }
 
+    pub(in crate::ast) fn star_relation(&self) -> Result<Option<FullName>, AnalysisError> {
+        if self.0.len() < 2 {
+            Ok(None)
+        } else {
+            self.full_name().map(Some)
+        }
+    }
+
     pub(in crate::ast) fn full_name(&self) -> Result<FullName, AnalysisError> {
         match self.0.as_slice() {
             [local] => Ok(FullName::from_local_name(local)),
@@ -118,9 +126,14 @@ impl Expr {
             Self::Parameter(parameter) => Ok(context.parameter(parameter.position)),
             Self::Literal(value) => Ok(value.resolve()),
             Self::Column(name) => name.resolve_column(context, scope),
-            // The legacy column adapter discarded the star component. Preserve
-            // its binding behavior here; projection expansion is a separate task.
-            Self::Star(name) => name.resolve_column(context, scope),
+            Self::Star(_) => {
+                context.report_analysis_problem(AnalysisProblem::query(
+                    crate::sem::QueryProblem::invalid_star_projection_placement(),
+                ))?;
+                Ok(SemScalarExpr::Unexpected(
+                    "invalid star projection placement".to_owned(),
+                ))
+            }
             Self::Operator(operator) => operator.resolve(context, scope),
             Self::Boolean(boolean) => boolean.resolve(context, scope),
             Self::NullTest(test) => test.resolve(context, scope),
@@ -131,6 +144,9 @@ impl Expr {
             Self::Case(case) => case.resolve(context, scope),
             Self::Subquery(query) => query.resolve(context, scope),
             Self::Array(items) => Self::resolve_array(items, context, scope, None),
+            Self::Row(items) => Ok(SemScalarExpr::row(&Self::resolve_list(
+                items, context, scope,
+            )?)),
             Self::List(items) => Ok(SemScalarExpr::list(&Self::resolve_list(
                 items, context, scope,
             )?)),
@@ -148,11 +164,7 @@ impl Expr {
             }
             // Retain the legacy rejection of raw PostgreSQL syntax that was not
             // accepted by the scalar dispatcher, independently of its conversion.
-            Self::Collate(_)
-            | Self::Document(_)
-            | Self::Row(_)
-            | Self::CurrentOf(_)
-            | Self::TruthTest(_) => {
+            Self::Collate(_) | Self::Document(_) | Self::CurrentOf(_) | Self::TruthTest(_) => {
                 AnalysisError::raise_unexpected_input("unsupported raw scalar expression")
             }
             Self::Default if context.dialect() == Dialect::postgres() => {
@@ -689,6 +701,20 @@ impl SqlValue {
 }
 
 impl Indirection {
+    pub(in crate::ast) fn projection_base(
+        &self,
+        context: &mut impl ParseContext,
+        scope: &ScalarAnalysisContext<'_>,
+    ) -> Result<Option<SemScalarExpr>, AnalysisError> {
+        let Some((Access::Star, preceding)) = self.items.split_last() else {
+            return Ok(None);
+        };
+        let base = self.argument.resolve_in(context, scope)?;
+        Ok(Some(Access::resolve_sequence(
+            preceding, context, scope, base,
+        )?))
+    }
+
     fn resolve(
         &self,
         context: &mut impl ParseContext,
@@ -783,7 +809,14 @@ impl Access {
                 let upper = Expr::resolve_optional(&slice.upper, context, scope)?;
                 IndirectionExpr::resolved_slice(context, base, lower, upper)
             }
-            Self::Star => AnalysisError::raise_unexpected_input("indirection star"),
+            Self::Star => {
+                context.report_analysis_problem(AnalysisProblem::query(
+                    crate::sem::QueryProblem::invalid_star_projection_placement(),
+                ))?;
+                Ok(SemScalarExpr::Unexpected(
+                    "invalid star projection placement".to_owned(),
+                ))
+            }
         }
     }
 }

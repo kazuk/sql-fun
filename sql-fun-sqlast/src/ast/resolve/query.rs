@@ -234,12 +234,24 @@ impl Select {
         let mut results = ResultColumnCollection::default();
         for target in &self.targets {
             if let Expr::Star(name) = &target.expression {
-                let qualifier = name.star_qualifier()?;
-                let columns = if let Some(qualifier) = &qualifier {
+                let relation = name.star_relation()?;
+                let qualifier = if relation.is_none() {
+                    name.star_qualifier()?
+                } else {
+                    None
+                };
+                let columns = if let Some(relation) = &relation {
+                    scope.relation_projection_names(context, relation)?
+                } else if let Some(qualifier) = &qualifier {
                     scope.projection_names(context, qualifier)?
                 } else {
                     from.projection_names(context, with, None)?
                 };
+                if columns.is_empty() && qualifier.is_some() {
+                    let base = name.resolve_column(context, &scope)?;
+                    results.append_composite_star(context, base)?;
+                    continue;
+                }
                 if columns.is_empty() {
                     context.report_analysis_problem(AnalysisProblem::query(
                         crate::sem::problem::QueryProblem::reference_not_found("star source"),
@@ -249,6 +261,12 @@ impl Select {
                     let expression = column.bind(context, &scope)?;
                     results.push_expression(column.name(), expression);
                 }
+                continue;
+            }
+            if let Expr::Indirection(indirection) = &target.expression
+                && let Some(base) = indirection.projection_base(context, &scope)?
+            {
+                results.append_composite_star(context, base)?;
                 continue;
             }
             let expression = target.expression.resolve_in(context, &scope)?;

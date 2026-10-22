@@ -344,9 +344,8 @@ link in the child, preserving parent and sibling catalogs.
 
 Deferrable unique-key catalog definitions, recursive CTE binding, and expressions
 already unsupported by the SELECT analyzer remain unsupported. Star expansion
-supports tables, ordinary views, derived queries, nonrecursive CTEs, and joins;
-merged columns in FULL JOIN
-stars remain unimplemented. The PostgreSQL parser currently accepts PostgreSQL 17
+supports tables, ordinary views, derived queries, nonrecursive CTEs, and joins.
+The PostgreSQL parser currently accepts PostgreSQL 17
 grammar, so PostgreSQL 18's RETURNING OLD/NEW alias syntax is unavailable.
 These limitations can terminate analysis; parsing a statement does not establish
 that its semantics are supported.
@@ -636,6 +635,21 @@ one relation contains the requested column. An unqualified column can still
 resolve when exactly one relation supplies it. `SELECT *` includes both sources
 in FROM order. Repeating the same relation without distinct aliases remains
 invalid, as does reusing an explicit alias.
+
+In SELECT targets, `*`, `alias.*`, and `schema.table.*` expand visible source
+columns in order. PostgreSQL also expands `(composite_expression).*`, including
+named composite values, table rows, and `ROW(...)` values. A composite column
+can be expanded as `column.*` when no source uses that name. A row expansion
+outside a projection target, or on a scalar value, produces a diagnostic.
+When a composite input's type is still unresolved, the result retains an
+explicit pending expansion until parameter inference determines its fields.
+
+For PostgreSQL `FULL JOIN ... USING` and NATURAL FULL JOIN, the merged keys
+appear first, followed by the remaining left and right columns. Each merged key
+uses the common type of both inputs and retains the value present on an
+unmatched row. SQLite keeps merged keys in the left source's column positions
+and also retains the value from an unmatched right row. Qualified stars keep
+each source's own columns and their outer-join nullability.
 
 To analyze PostgreSQL database-qualified columns, explicitly set the actual
 database name in the selected datasource metadata:

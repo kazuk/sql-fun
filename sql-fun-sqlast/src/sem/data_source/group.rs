@@ -127,6 +127,11 @@ impl GroupedDataSource {
         column: &ColumnName,
         nullable: Nullable,
     ) -> Result<(SemScalarExpr, &'context mut C), AnalysisError> {
+        for projected in self.source.projection_names(context, with, None)? {
+            if projected.name() == column && projected.is_merged() {
+                return Ok((projected.bind_direct(context, with)?, context));
+            }
+        }
         let Some((source, source_nullable)) = self.column_source(column, &*context, with) else {
             let expr = ColumnReferenceExpr::undefined_column_resolved(context, column)?;
             return Ok((expr, context));

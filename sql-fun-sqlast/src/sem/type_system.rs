@@ -164,7 +164,7 @@ impl OverloadVariant {
             return declared;
         };
         if let Some(definition) = ty.definition_from_catalog(context)
-            && let Some(columns) = definition.table_function_columns(context)
+            && let Some(columns) = definition.row_columns(context)
         {
             return columns;
         }

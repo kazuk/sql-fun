@@ -255,10 +255,7 @@ impl TypeDefinition {
         }
     }
 
-    pub(crate) fn table_function_columns(
-        &self,
-        context: &impl ParseContext,
-    ) -> Option<ColumnCollection> {
+    pub(crate) fn row_columns(&self, context: &impl ParseContext) -> Option<ColumnCollection> {
         match self {
             Self::CompositeType(composite) => Some(composite.get_column_collection()),
             Self::ImplicitComposite(columns) => Some(columns.clone()),
@@ -266,7 +263,7 @@ impl TypeDefinition {
             Self::Domain(domain) => domain
                 .base_type()?
                 .definition_from_catalog(context)?
-                .table_function_columns(context),
+                .row_columns(context),
             _ => None,
         }
     }

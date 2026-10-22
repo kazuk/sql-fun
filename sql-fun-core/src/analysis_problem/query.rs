@@ -33,6 +33,10 @@ pub enum QueryProblem {
     PositionOutOfRange(i64),
     /// A compound ORDER BY expression does not identify an output column.
     InvalidCompoundOrder,
+    /// A row expansion target does not have a composite type.
+    StarProjectionRequiresCompositeType,
+    /// Row expansion appears outside a projection target.
+    InvalidStarProjectionPlacement,
 }
 
 impl QueryProblem {
@@ -107,6 +111,16 @@ impl QueryProblem {
     pub const fn invalid_compound_order() -> Self {
         Self::InvalidCompoundOrder
     }
+    /// Diagnostic row expansion of a scalar value.
+    #[must_use]
+    pub const fn star_projection_requires_composite_type() -> Self {
+        Self::StarProjectionRequiresCompositeType
+    }
+    /// Diagnostic row expansion outside a target list.
+    #[must_use]
+    pub const fn invalid_star_projection_placement() -> Self {
+        Self::InvalidStarProjectionPlacement
+    }
     /// Diagnostic code.
     pub(super) const fn code(&self) -> &'static str {
         match self {
@@ -124,6 +138,10 @@ impl QueryProblem {
             Self::AmbiguousReference(_) => "query_reference_ambiguous",
             Self::PositionOutOfRange(_) => "query_position_out_of_range",
             Self::InvalidCompoundOrder => "query_invalid_compound_order",
+            Self::StarProjectionRequiresCompositeType => {
+                "query_star_projection_requires_composite_type"
+            }
+            Self::InvalidStarProjectionPlacement => "query_invalid_star_projection_placement",
         }
     }
     /// Diagnostic presentation data.
@@ -147,6 +165,12 @@ impl QueryProblem {
             }
             Self::InvalidCompoundOrder => {
                 "compound ORDER BY must refer to a result column".to_owned()
+            }
+            Self::StarProjectionRequiresCompositeType => {
+                "row expansion requires a composite value".to_owned()
+            }
+            Self::InvalidStarProjectionPlacement => {
+                "row expansion is only valid in a projection target".to_owned()
             }
         };
         DiagnosticMetadata::from(message)

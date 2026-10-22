@@ -412,13 +412,31 @@ unchanged; zero and numbers outside the supplied slice return `None`.
 PostgreSQL `unknown` (including its qualified spelling) leaves the slot for
 normal inference, like `None`.
 
-Type hints use the existing `TypeReference` / `FullName` spelling and the
-analysis context's catalog and search path. Use catalog type names such as
-`int4`, qualified names such as `pg_catalog.int4`, double-quoted names, or a
-single array suffix such as `int4[]`. Full SQL type syntax, including aliases
-such as `integer`, type modifiers and dialect-specific quoting, is outside
-this API's current supported spelling
-([shared type-name parsing #694](https://github.com/kazuk/sql-fun/issues/694)).
+Type hints accept SQL type names for the context's explicitly selected dialect,
+then resolve them using its catalog and search path. PostgreSQL examples include
+`INTEGER`, `double precision`, `character varying`, `timestamp with time zone`,
+`pg_catalog.int4`, quoted names, and arrays such as `integer[2][]` or
+`integer ARRAY`. Quoted identifiers preserve case; unquoted identifiers follow
+SQL case folding. `float(24)` selects `real`, and `float(53)` selects
+`double precision`. Bare `character` and `bit` select their type identities
+without imposing column-declaration length constraints. SQLite accepts its
+quoted and multiword declared type names, including backticks and brackets;
+PostgreSQL aliases are not applied to SQLite names. Empty `[]` suffixes retain
+the existing SQLite/Turso array type identity, while `[name]` quotes a name.
+
+Parameter types describe client-protocol type identities. PostgreSQL parameter
+OIDs carry no type modifiers, so declarations such as `varchar(100)`,
+`numeric(10,2)`, `timestamp(2) with time zone`, and `interval day to second`
+are rejected rather than silently losing their constraints. Declaration size
+syntax is also rejected for SQLite hints.
+
+Callers that only need to interpret spelling can use
+`parse_client_type(input, &context)` from `sql_fun_sqlast::sem`. This shared API
+returns a `TypeReference` without catalog lookup or search-path resolution;
+syntactically valid user-defined names need not exist yet. Canonical
+`FullName::from_str` and `TypeReference::from_str` retain their separate,
+case-preserving spelling and serialization contracts.
+
 Malformed or unresolved names return an error and preserve the complete previous
 setup. Successful setup replaces all previous hints, including when passed an
 empty slice or only `None` entries.

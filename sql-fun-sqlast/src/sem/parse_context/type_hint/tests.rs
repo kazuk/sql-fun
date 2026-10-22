@@ -31,6 +31,11 @@ fn maps_sql_numbers(#[case] index: usize, #[case] expected: Option<&str>) {
 #[case::qualified("pg_catalog.int4", "int4")]
 #[case::quoted(r#""pg_catalog"."int4""#, "int4")]
 #[case::array("int4[]", "_int4")]
+#[case::sql_alias("INTEGER", "int4")]
+#[case::sql_boolean("BOOLEAN", "bool")]
+#[case::sql_array("integer[2][]", "_int4")]
+#[case::sql_array_keyword("integer ARRAY[2]", "_int4")]
+#[case::unicode(r#"U&"int\0034""#, "int4")]
 fn resolves_existing_type_name_spelling(#[case] hint: &str, #[case] expected: &str) {
     let mut context = context();
     context.setup_typehinting(&[Some(hint)]).unwrap();
@@ -47,6 +52,9 @@ fn resolves_existing_type_name_spelling(#[case] hint: &str, #[case] expected: &s
 #[case::empty("")]
 #[case::two_types("int4, text")]
 #[case::extra_statement("int4; SELECT 1")]
+#[case::typmod("varchar(100)")]
+#[case::numeric_typmod("numeric(5,2)")]
+#[case::interval_typmod("interval day to second")]
 fn failure_is_atomic(#[case] invalid: &str) {
     let mut context = context();
     context
@@ -328,6 +336,7 @@ fn operator_constraints_and_executable_sql_stay_consistent(#[case] hint: Option<
 #[case::unqualified("unknown")]
 #[case::qualified("pg_catalog.unknown")]
 #[case::quoted(r#""pg_catalog"."unknown""#)]
+#[case::uppercase("UNKNOWN")]
 fn unknown_hint_leaves_parameter_for_inference(#[case] hint: &str) {
     let mut context = context();
     context.setup_typehinting(&[Some("text")]).unwrap();
@@ -371,6 +380,9 @@ fn preserves_quoted_type_identity(#[case] hint: &str, #[case] logical: &str) {
 #[rstest::rstest]
 #[case::double_quote(r#""a.b""#, "a.b", false)]
 #[case::literal_suffix(r#""kind[]""#, "kind[]", false)]
+#[case::backtick("`kind`", "kind", false)]
+#[case::bracket("[kind]", "kind", false)]
+#[case::multiword("DOUBLE PRECISION", "DOUBLE PRECISION", false)]
 #[case::array("kind[]", "kind", true)]
 fn preserves_sqlite_type_identity(#[case] hint: &str, #[case] logical: &str, #[case] array: bool) {
     let mut context =

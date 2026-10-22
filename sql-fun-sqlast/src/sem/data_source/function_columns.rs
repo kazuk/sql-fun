@@ -137,16 +137,12 @@ impl TableFunctionOutput {
         column: &ColumnName,
         alias: &AliasSpec,
     ) -> Option<&crate::sem::WithTypmod<TypeReference>> {
-        for (index, name) in self.names().into_iter().enumerate() {
-            if alias.derived_column_at(index).unwrap_or(&name) == column {
-                return self
-                    .declarations
-                    .get(index)
-                    .map(|column| &column.requested_type);
-            }
-        }
-        None
+        let index = OutputColumnNames::from(self.names()).matching_index(column, alias)?;
+        self.declarations
+            .get(index)
+            .map(|column| &column.requested_type)
     }
+
     pub(crate) const fn columns(&self) -> &ColumnCollection {
         &self.columns
     }
@@ -190,35 +186,60 @@ impl TableFunctionOutput {
         !self.declarations.is_empty()
     }
     pub(crate) fn names(&self) -> Vec<ColumnName> {
-        let mut names = Vec::new();
-        let mut index = 0;
-        while let Some(column) = self.columns.get_at(index) {
-            if let Some(name) = column.name() {
-                names.push(name.clone());
-            }
-            index += 1;
-        }
-        names
+        self.columns.names()
     }
+
     pub(crate) fn candidates(&self, column: &ColumnName, alias: &AliasSpec) -> Vec<AliasSpec> {
-        let mut candidates = Vec::new();
-        for (index, name) in self.names().into_iter().enumerate() {
-            if alias.derived_column_at(index).unwrap_or(&name) == column {
-                candidates.push(alias.clone());
-            }
-        }
-        candidates
+        OutputColumnNames::from(self.names()).candidates(column, alias)
     }
+
     pub(crate) fn column(
         &self,
         column: &ColumnName,
         alias: &AliasSpec,
     ) -> Option<&ColumnDefinition> {
-        for (index, name) in self.names().into_iter().enumerate() {
-            if alias.derived_column_at(index).unwrap_or(&name) == column {
-                return self.columns.get_at(index);
-            }
-        }
-        None
+        let index = OutputColumnNames::from(self.names()).matching_index(column, alias)?;
+        self.columns.get_at(index)
+    }
+}
+
+/// Ordered invocation output names, including duplicates used for ambiguity checks.
+#[derive(Default)]
+pub(super) struct OutputColumnNames(Vec<ColumnName>);
+
+impl From<Vec<ColumnName>> for OutputColumnNames {
+    fn from(names: Vec<ColumnName>) -> Self {
+        Self(names)
+    }
+}
+
+impl OutputColumnNames {
+    pub(super) fn append_function_columns(
+        &mut self,
+        source: &crate::sem::DataSource,
+    ) -> Option<()> {
+        self.0.extend(source.known_function_columns()?);
+        Some(())
+    }
+    pub(super) fn append_ordinality(&mut self) {
+        self.0.push(ColumnName::from("ordinality"));
+    }
+    pub(super) const fn len(&self) -> usize {
+        self.0.len()
+    }
+    fn matching_index(&self, column: &ColumnName, alias: &AliasSpec) -> Option<usize> {
+        self.0
+            .iter()
+            .enumerate()
+            .position(|(index, name)| alias.derived_column_at(index).unwrap_or(name) == column)
+    }
+    pub(super) fn candidates(&self, column: &ColumnName, alias: &AliasSpec) -> Vec<AliasSpec> {
+        let count = self
+            .0
+            .iter()
+            .enumerate()
+            .filter(|(index, name)| alias.derived_column_at(*index).unwrap_or(name) == column)
+            .count();
+        vec![alias.clone(); count]
     }
 }

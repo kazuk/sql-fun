@@ -202,6 +202,13 @@ mod implementation {
     }
 
     impl FuncCallExpr {
+        pub(crate) fn argument_values(&self) -> IVec<SemScalarExpr> {
+            self.args
+                .iter()
+                .map(|argument| argument.value().clone())
+                .collect::<Vec<_>>()
+                .into()
+        }
         /// argument expression and definitions
         #[must_use]
         pub const fn args(&self) -> &IVec<FuncCallArgs> {

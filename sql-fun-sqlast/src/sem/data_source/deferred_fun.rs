@@ -95,17 +95,13 @@ impl DeferredTableFunction {
                 context, alias, column,
             );
         }
-        let mut arguments = Vec::new();
-        for argument in self.call.args() {
-            arguments.push(argument.value().clone());
-        }
         let (expression, context) = crate::sem::ColumnReferenceExpr::function_source_ref(
             context,
             alias,
             column,
             self.call.overload().as_ref(),
             self.output.column(column, &self.alias),
-            &arguments.into(),
+            &self.call.argument_values(),
             nullable,
         )?;
         Ok((

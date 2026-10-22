@@ -94,6 +94,9 @@ impl TestParseContext {
         self.report_failure_after = Some(count);
     }
 
+    pub(crate) fn has_reported_problem(&self, code: &str) -> bool {
+        self.problems.iter().any(|problem| problem.code() == code)
+    }
     pub(crate) fn reported_problems(&self) -> &[AnalysisProblem] {
         &self.problems
     }

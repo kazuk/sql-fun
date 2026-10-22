@@ -408,6 +408,13 @@ directly:
 - Before implementing or modifying Rust code, including tests, read
   `docs/internal-rules/rust-coding-guideline.md` and identify the rules that
   apply to the change.
+- Keep syntax-specific interpretation thin by composing shared semantic
+  operations. Extend the responsible shared types when an operation is missing;
+  do not duplicate shared decisions or collection logic in individual syntax
+  handlers to avoid introducing syntax-specific dependencies into shared code.
+  Apply the responsibility and review rules in the "Grow shared operations"
+  section of
+  [the Rust coding guideline](docs/internal-rules/rust-coding-guideline.md#grow-shared-operations).
 - In particular, test placement follows a repository-specific convention. Before
   adding or moving tests, read and apply the "Test placement" section of that
   guideline.

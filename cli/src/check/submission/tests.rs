@@ -1,17 +1,21 @@
 use super::{test_helpers, test_helpers::collect_submission};
 
+const QUERY: &str = "SELECT ${shared:int4}, id FROM a_visible";
+
 #[tokio::test]
 async fn submits_recovered_catalogs_with_datasource_scoped_contexts() {
     let project = test_helpers::Project::new();
     let catalog = test_helpers::catalog();
     let expected = ::serde_json::to_value(&catalog).unwrap();
-    let expected_fingerprint = catalog.finger_print().unwrap();
-    let expected_query = catalog.base_query().encode();
+    let expected_fingerprint = catalog
+        .finger_print(&::sql_fun_core::PlaceholderedSql::from_query(QUERY))
+        .unwrap();
+    let expected_query = QUERY.to_owned();
     let (mut client, peer) = test_helpers::peer(None).await;
     let analyses = collect_submission(
         &mut client,
         &project.args(),
-        test_helpers::requirements(&["first", "second", "first"], &catalog),
+        test_helpers::requirements(&["first", "second", "first"], QUERY, &catalog),
     )
     .await
     .unwrap();
@@ -32,7 +36,12 @@ async fn submits_recovered_catalogs_with_datasource_scoped_contexts() {
             request["params"]["context_handle"],
             format!("context-{datasource}")
         );
-        assert!(request["params"]["query"].is_null());
+        assert_eq!(request["params"]["query"]["Text"], QUERY);
+        assert!(
+            request["params"]["resolved_cte_catalog"]
+                .get("base_query")
+                .is_none()
+        );
         assert_eq!(request["params"]["resolved_cte_catalog"], expected);
         let restored: ::sql_fun_core::ResolvedCteCatalog =
             ::serde_json::from_value(request["params"]["resolved_cte_catalog"].clone()).unwrap();
@@ -66,7 +75,7 @@ async fn propagates_server_failures(#[case] method: &'static str, #[case] count:
     let result = collect_submission(
         &mut client,
         &project.args(),
-        test_helpers::requirements(&["first", "second"], &test_helpers::catalog()),
+        test_helpers::requirements(&["first", "second"], QUERY, &test_helpers::catalog()),
     )
     .await;
     assert!(result.is_err());
@@ -76,16 +85,14 @@ async fn propagates_server_failures(#[case] method: &'static str, #[case] count:
 }
 
 #[tokio::test]
-async fn sends_base_only_catalog_without_a_second_query_input() {
+async fn sends_explicit_query_with_empty_catalog() {
     let project = test_helpers::Project::new();
-    let catalog = ::sql_fun_core::ResolvedCteCatalog::from(
-        &::sql_fun_core::PlaceholderedSql::from_query("SELECT 1"),
-    );
+    let catalog = ::sql_fun_core::ResolvedCteCatalog::default();
     let (mut client, peer) = test_helpers::peer(None).await;
     collect_submission(
         &mut client,
         &project.args(),
-        test_helpers::requirements(&["first"], &catalog),
+        test_helpers::requirements(&["first"], "SELECT 1", &catalog),
     )
     .await
     .unwrap();
@@ -95,7 +102,7 @@ async fn sends_base_only_catalog_without_a_second_query_input() {
         requests[1]["params"]["resolved_cte_catalog"],
         ::serde_json::to_value(catalog).unwrap()
     );
-    assert!(requests[1]["params"]["query"].is_null());
+    assert_eq!(requests[1]["params"]["query"]["Text"], "SELECT 1");
 }
 
 #[tokio::test]
@@ -111,7 +118,7 @@ async fn missing_context_handle_stops_before_query_submission() {
     let result = collect_submission(
         &mut client,
         &project.args(),
-        test_helpers::requirements(&["first"], &test_helpers::catalog()),
+        test_helpers::requirements(&["first"], QUERY, &test_helpers::catalog()),
     )
     .await;
     assert!(
@@ -132,7 +139,7 @@ async fn unknown_datasource_is_not_replaced_with_an_available_one() {
     let result = collect_submission(
         &mut client,
         &project.args(),
-        test_helpers::requirements(&["missing"], &test_helpers::catalog()),
+        test_helpers::requirements(&["missing"], QUERY, &test_helpers::catalog()),
     )
     .await;
     assert!(result.is_err());
@@ -145,9 +152,11 @@ async fn delivers_identity_before_completion_and_distinguishes_partial_failure()
     let project = test_helpers::Project::new();
     let args = project.args();
     let catalog = test_helpers::catalog();
-    let original_query = catalog.base_query().encode();
-    let fingerprint = catalog.finger_print().unwrap();
-    let requirements = test_helpers::requirements(&["first", "first"], &catalog);
+    let original_query = QUERY.to_owned();
+    let fingerprint = catalog
+        .finger_print(&::sql_fun_core::PlaceholderedSql::from_query(QUERY))
+        .unwrap();
+    let requirements = test_helpers::requirements(&["first", "first"], QUERY, &catalog);
     let (release, released) = ::tokio::sync::oneshot::channel();
     let (mut client, peer) = test_helpers::gated_second_failure(released).await;
     let (sender, mut receiver) = ::tokio::sync::mpsc::channel(1);
@@ -184,7 +193,7 @@ async fn closed_consumer_is_a_delivery_failure() {
     let result = super::submit(
         &mut client,
         &project.args(),
-        test_helpers::requirements(&["first", "first"], &test_helpers::catalog()),
+        test_helpers::requirements(&["first", "first"], QUERY, &test_helpers::catalog()),
         sender,
     )
     .await;

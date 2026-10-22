@@ -2,8 +2,7 @@
 use super::facade::Session;
 use crate::InitializedSchema;
 use ::sql_fun_core::{
-    DiagnosticPresentation, PlaceholderedSql, ResolvedCteCatalog,
-    analysis_problem::QueryAnalysisStage,
+    DiagnosticPresentation, PlaceholderedSql, analysis_problem::QueryAnalysisStage,
 };
 use ::sql_fun_server_api::{
     Collection, SqlFunServerApiError,
@@ -30,34 +29,23 @@ struct QuerySource {
 
 impl QuerySource {
     fn from_request(args: &AnalyzeQueryArgs) -> Result<Self, SqlFunServerApiError> {
-        match (args.query(), args.resolved_cte_catalog()) {
-            (Some(input), None) => {
-                if let Some(text) = input.text() {
-                    Ok(Self {
-                        text: text.to_owned(),
-                        path: PathBuf::from("<query>"),
-                    })
-                } else if let Some(path) = input.file() {
-                    let text = std::fs::read_to_string(path).map_err(|error| {
-                        SqlFunServerApiError::new_unexpected(&error.to_string())
-                    })?;
-                    Ok(Self {
-                        text,
-                        path: path.to_path_buf(),
-                    })
-                } else {
-                    Err(SqlFunServerApiError::invalid_analysis_input(
-                        "URL query input is not supported",
-                    ))
-                }
-            }
-            (None, Some(catalog)) => Ok(Self {
-                text: catalog.base_query().encode(),
+        let input = args.query();
+        if let Some(text) = input.text() {
+            Ok(Self {
+                text: text.to_owned(),
                 path: PathBuf::from("<query>"),
-            }),
-            _ => Err(SqlFunServerApiError::invalid_analysis_input(
-                "supply exactly one of query or resolved_cte_catalog",
-            )),
+            })
+        } else if let Some(path) = input.file() {
+            let text = std::fs::read_to_string(path)
+                .map_err(|error| SqlFunServerApiError::new_unexpected(&error.to_string()))?;
+            Ok(Self {
+                text,
+                path: path.to_path_buf(),
+            })
+        } else {
+            Err(SqlFunServerApiError::invalid_analysis_input(
+                "URL query input is not supported",
+            ))
         }
     }
 }
@@ -607,12 +595,13 @@ fn analyze(
             schema.base_context().metadata().sql_dialect(),
         )]
     };
+    let query = PlaceholderedSql::from_query(&source.text);
     if let Some(catalog) = args.resolved_cte_catalog() {
         let ctes = catalog
             .try_map_cte_queries(|_, _| Ok::<_, std::convert::Infallible>(()))
             .expect("infallible inspection");
         if !ctes.is_empty() {
-            return match crate::cte_realization::realize_cte_catalog(catalog, dialect) {
+            return match crate::cte_realization::realize_cte_catalog(&query, catalog, dialect) {
                 Ok(realized) => {
                     let bindings = Bindings::from_realized(&realized);
                     if let Err(error) =
@@ -621,7 +610,7 @@ fn analyze(
                         return fail(QueryAnalysisStage::realization(), &error);
                     }
                     // Spans of the realized AST refer to the rendered base input.
-                    match bindings.spans(catalog.base_query(), dialect) {
+                    match bindings.spans(&query, dialect) {
                         Ok(mut mapping) => {
                             mapping.expanded = true;
                             vec![QueryResult::analyze(
@@ -639,12 +628,6 @@ fn analyze(
             };
         }
     }
-    let query = args
-        .resolved_cte_catalog()
-        .as_ref()
-        .map(ResolvedCteCatalog::base_query)
-        .cloned()
-        .unwrap_or_else(|| PlaceholderedSql::from_query(&source.text));
     let bindings = match Bindings::from_query(&query) {
         Ok(bindings) => bindings,
         Err(error) => {

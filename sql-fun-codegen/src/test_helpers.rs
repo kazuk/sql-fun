@@ -16,7 +16,7 @@ pub(crate) fn query_spec(function: syn::ItemFn) -> QueryFunctionSpec {
         parameter_bindings: item_fn.parameter_bindings().unwrap(),
         function_kind: QueryFunctionKind::query_one(),
         connector_spec: ConnectorSpec::realize(SqlDialect::PostgreSQL, "tokio-postgres").unwrap(),
-        resolved_cte_catalog: ResolvedCteCatalog::from(&query),
+        resolved_cte_catalog: ResolvedCteCatalog::default(),
         query,
         item_fn,
         connection: syn::parse_quote!(connection),
@@ -161,8 +161,14 @@ pub(crate) fn assert_stub(render: RenderFunction, spec: &QueryFunctionSpec) {
     );
     let actual: ::sql_fun_core::ResolvedCteCatalog =
         serde_json::from_str(&observation.string_constant("__SQL_FUN_USING_CTE")).unwrap();
+    assert!(
+        serde_json::to_value(&actual)
+            .unwrap()
+            .get("base_query")
+            .is_none()
+    );
     assert_eq!(
-        actual.finger_print().unwrap(),
-        spec.resolved_cte_catalog.finger_print().unwrap()
+        actual.finger_print(&spec.query).unwrap(),
+        spec.resolved_cte_catalog.finger_print(&spec.query).unwrap()
     );
 }

@@ -126,7 +126,7 @@ async fn query_rpc_preserves_numbering_and_session_lifecycle() {
     connection.finish().await.unwrap();
 }
 
-fn catalog(base: &str, ctes: &[(&str, &str)]) -> Value {
+fn catalog(ctes: &[(&str, &str)]) -> Value {
     let mut parameters = ::sql_fun_core::CteParameterCollection::default();
     let mut queries = ::indexmap::IndexMap::new();
     for (alias, sql) in ctes {
@@ -137,7 +137,6 @@ fn catalog(base: &str, ctes: &[(&str, &str)]) -> Value {
         queries.insert(::sql_fun_core::CteAlias::new(alias), query);
     }
     ::serde_json::to_value(::sql_fun_core::ResolvedCteCatalog::new(
-        &::sql_fun_core::PlaceholderedSql::from_query(base),
         &parameters,
         &queries,
     ))
@@ -147,7 +146,7 @@ fn catalog(base: &str, ctes: &[(&str, &str)]) -> Value {
 #[rstest::rstest]
 #[case::expansion("SELECT ${base:int4}, id FROM chosen", &[ ("chosen", "SELECT ${cte:int4} AS id") ], 1, true)]
 #[case::base_only("SELECT ${base:int4}; SELECT 2", &[], 2, true)]
-#[case::invalid_expansion("SELECT missing FROM chosen", &[ ("chosen", "SELECT 1 AS id") ], 1, false)]
+#[case::invalid_expansion("/* 日本語 */ SELECT missing FROM chosen", &[ ("chosen", "SELECT 1 AS id") ], 1, false)]
 #[case::multiple_expanded("SELECT 1; SELECT 2", &[ ("chosen", "SELECT 1 AS id") ], 1, false)]
 #[tokio::test(flavor = "multi_thread")]
 async fn query_rpc_catalog_input(
@@ -165,7 +164,7 @@ async fn query_rpc_catalog_input(
             &project.rpc_request("CREATE TABLE entries(id int4);"),
         )
         .await;
-    let response = connection.rpc("analyze_query", &json!({"context_handle":initialized["result"]["context_handle"], "resolved_cte_catalog":catalog(base, ctes)})).await;
+    let response = connection.rpc("analyze_query", &json!({"context_handle":initialized["result"]["context_handle"], "query":{"Text":base}, "resolved_cte_catalog":catalog(ctes)})).await;
     let queries = &response["result"]["queries"];
     assert_eq!(queries["total_length"], length, "{response}");
     assert_eq!(queries["items"][0]["complete"], complete, "{response}");
@@ -229,8 +228,11 @@ async fn query_rpc_reports_distinct_analysis_failures(#[case] sql: &str, #[case]
     connection.finish().await.unwrap();
 }
 
+#[rstest::rstest]
 #[tokio::test(flavor = "multi_thread")]
-async fn query_rpc_preserves_source_spans_and_independent_hint_state() {
+async fn query_rpc_preserves_source_spans_and_independent_hint_state(
+    #[values(false, true)] empty_catalog: bool,
+) {
     let project = query_project();
     let mut connection = heavy::Connection::start(16384, 2).await;
     connection.authenticate().await;
@@ -241,13 +243,16 @@ async fn query_rpc_preserves_source_spans_and_independent_hint_state() {
         )
         .await;
     let handle = &initialized["result"]["context_handle"];
-    let sql = "SELECT ${first:int4}, ${first}; SELECT ${second:text}, ';' -- ; ignored\n";
-    let response = connection
-        .rpc(
-            "analyze_query",
-            &json!({"context_handle":handle, "query":{"Text":sql}}),
-        )
-        .await;
+    let prefix = "/* 日本語 */ ";
+    let sql = concat!(
+        "/* 日本語 */ ",
+        "SELECT ${first:int4}, ${first}; SELECT ${second:text}, ';' -- ; ignored\n"
+    );
+    let mut params = json!({"context_handle":handle, "query":{"Text":sql}});
+    if empty_catalog {
+        params["resolved_cte_catalog"] = catalog(&[]);
+    }
+    let response = connection.rpc("analyze_query", &params).await;
     let items = &response["result"]["queries"]["items"];
     assert_eq!(items.as_array().unwrap().len(), 2, "{response}");
     assert_eq!(
@@ -259,11 +264,11 @@ async fn query_rpc_preserves_source_spans_and_independent_hint_state() {
     );
     assert_eq!(
         items[0]["parameters"]["items"][0]["spans"][0]["from"]["offset"],
-        7
+        prefix.len() + 7
     );
     assert_eq!(
         items[0]["parameters"]["items"][0]["spans"][0]["to"]["offset"],
-        20
+        prefix.len() + 20
     );
     assert_eq!(items[1]["parameters"]["items"][0]["parameter_index"], 2);
     assert_eq!(
@@ -320,19 +325,20 @@ async fn query_rpc_accepts_only_explicit_input_and_retains_file_results() {
         )
         .await;
     assert_eq!(page["result"], *queries);
-    for params in [
-        json!({"context_handle":handle}),
-        json!({"context_handle":handle,"query":{"Url":"https://example.invalid/query.sql"}}),
-        json!({"context_handle":handle,"query":{"Text":"SELECT 1"},"resolved_cte_catalog":catalog("SELECT 2", &[])}),
-    ] {
-        let response = connection.rpc("analyze_query", &params).await;
-        assert!(
-            response["error"]["data"]
-                .get("InvalidAnalysisInput")
-                .is_some(),
-            "{response}"
-        );
-    }
+    let unsupported = connection
+        .rpc(
+            "analyze_query",
+            &::serde_json::json!({
+                "context_handle":handle, "query":{"Url":"https://example.invalid/query.sql"}
+            }),
+        )
+        .await;
+    assert!(
+        unsupported["error"]["data"]
+            .get("InvalidAnalysisInput")
+            .is_some(),
+        "{unsupported}"
+    );
     connection.end_requests().await;
     connection.finish().await.unwrap();
 }
@@ -451,6 +457,81 @@ async fn query_rpc_preserves_failed_statement_source(#[case] sql: &str) {
     let presentation = &item["probrems"]["items"][0]["presentation"];
     assert_eq!(presentation["source"], &sql[from..to]);
     assert_eq!(presentation["statement_offset"], from);
+    connection.end_requests().await;
+    connection.finish().await.unwrap();
+}
+
+#[rstest::rstest]
+#[tokio::test(flavor = "multi_thread")]
+async fn query_rpc_reuses_dependencies_with_explicit_base_sql(#[values(false, true)] file: bool) {
+    let project = query_project();
+    // Real session analysis verifies that the same dependency closure is independent of SQL input.
+    let mut connection = heavy::Connection::start(16384, 2).await;
+    connection.authenticate().await;
+    let initialized = connection
+        .rpc(
+            "initialize_schema_context",
+            &project.rpc_request("CREATE TABLE entries(id int4);"),
+        )
+        .await;
+    let handle = &initialized["result"]["context_handle"];
+    let dependencies = catalog(&[("chosen", "SELECT ${shared:int4} AS id")]);
+    let first_sql = "/* 日本語 */ SELECT id AS first, ${base:int4} AS base FROM chosen";
+    let second_sql = "/* second */ SELECT ${shared} AS second FROM chosen";
+    // Sequential requests deliberately reuse the identical catalog and context.
+    for (sql, column, binding_count) in [(first_sql, "first", 2), (second_sql, "second", 1)] {
+        let query = if file {
+            ::serde_json::json!({"File":test_helpers::query_file(&project, sql)})
+        } else {
+            ::serde_json::json!({"Text":sql})
+        };
+        let response = connection
+            .rpc(
+                "analyze_query",
+                &::serde_json::json!({
+                    "context_handle":handle, "query":query, "resolved_cte_catalog":dependencies
+                }),
+            )
+            .await;
+        let item = &response["result"]["queries"]["items"][0];
+        assert_eq!(item["complete"], true, "{response}");
+        assert_eq!(
+            item["result_columns"]["items"][0]["name"], column,
+            "{response}"
+        );
+        let bindings = item["parameters"]["items"].as_array().unwrap();
+        assert_eq!(bindings.len(), binding_count);
+        assert_eq!(bindings[0]["name"], "shared");
+        assert_eq!(bindings[0]["parameter_index"], 1);
+        if binding_count == 2 {
+            assert_eq!(bindings[1]["name"], "base");
+            assert_eq!(bindings[1]["parameter_index"], 2);
+        }
+    }
+    connection.end_requests().await;
+    connection.finish().await.unwrap();
+}
+
+#[rstest::rstest]
+#[case::missing("{}")]
+#[case::null(r#"{"query":null}"#)]
+#[case::catalog_only(
+    r#"{"resolved_cte_catalog":{"parameters":{"parameters":{}},"cte_queries":{}}}"#
+)]
+#[case::malformed_query(r#"{"query":42}"#)]
+#[case::malformed_catalog(r#"{"query":{"Text":"SELECT 1"},"resolved_cte_catalog":42}"#)]
+#[tokio::test(flavor = "multi_thread")]
+async fn query_rpc_rejects_invalid_request_shape(#[case] params: &str) {
+    // A socket is required to verify rejection at the JSON-RPC boundary, before context lookup.
+    let mut connection = heavy::Connection::start(16384, 2).await;
+    connection.authenticate().await;
+    let mut params: Value = ::serde_json::from_str(params).unwrap();
+    params["context_handle"] = ::serde_json::json!("unused-context");
+    let response = connection.rpc("analyze_query", &params).await;
+    assert_eq!(
+        response["error"]["message"], "unexpected params",
+        "{response}"
+    );
     connection.end_requests().await;
     connection.finish().await.unwrap();
 }

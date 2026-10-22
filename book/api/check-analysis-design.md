@@ -20,7 +20,7 @@ To analyze a query, a client needs:
 
 - a selected datasource and its schema configuration;
 - the schema dump and applicable engine/builtin and extension definitions;
-- the SQL query or a resolved CTE catalog representing the query.
+- the application SQL query and, optionally, its resolved CTE dependencies.
 
 The server reads explicitly selected local schema files. Client and server
 therefore need a shared view of those file paths. A file's availability does
@@ -135,7 +135,8 @@ Call `analyze_query` with the handle returned by
 it does **not** execute SQL or connect to the application's database to
 fetch query results.
 
-Supply exactly one of `query` and `resolved_cte_catalog`:
+Always supply `query`. Supply `resolved_cte_catalog` separately when using
+resolved CTE dependencies:
 
 ```json
 {
@@ -151,10 +152,16 @@ Supply exactly one of `query` and `resolved_cte_catalog`:
 
 `query` accepts `Text` or `File` (an explicitly selected server-local path).
 `Url` input returns `InvalidAnalysisInput` without fetching. A resolved CTE
-catalog uses the shared `sql-fun-core::ResolvedCteCatalog` JSON representation;
-its base query is authoritative, so `query` must be omitted. The server never
-loads CTE catalog files. CLI `check` submits the recovered catalog directly to
-this API, including catalogs without referenced CTEs.
+catalog uses the shared `sql-fun-core::ResolvedCteCatalog` JSON representation
+and contains dependency definitions, aliases, and aggregated CTE parameter
+metadata. It does not contain the application query. `query` remains required
+and authoritative with or without a catalog; missing or null SQL input is an
+invalid request. The catalog may be omitted or null for a plain query.
+
+The server never loads CTE catalog files. CLI `check` sends recovered SQL as
+`query.Text` and its resolved dependencies as `resolved_cte_catalog`, including
+empty catalogs for queries without referenced CTEs. Both text and explicitly
+selected file inputs can be combined with resolved dependencies.
 
 Without referenced CTE expansion, multiple SQL statements are accepted and
 analyzed in input order, including a catalog with zero referenced CTEs. The

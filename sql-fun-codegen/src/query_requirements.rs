@@ -122,9 +122,10 @@ mod test_query_requirement {
         assert_eq!(requirement.datasource(), "reporting");
         let spec = test_helpers::specification();
         assert_eq!(requirement.query(), spec.query.encode());
+        let query = ::sql_fun_core::PlaceholderedSql::from_query(requirement.query());
         assert_eq!(
-            requirement.cte_catalog().finger_print().unwrap(),
-            spec.resolved_cte_catalog.finger_print().unwrap()
+            requirement.cte_catalog().finger_print(&query).unwrap(),
+            spec.resolved_cte_catalog.finger_print(&spec.query).unwrap()
         );
     }
 
@@ -159,9 +160,10 @@ mod test_query_requirement {
             let requirement = requirements.iter().next().unwrap();
             assert_eq!(requirement.datasource(), "reporting");
             assert_eq!(requirement.query(), spec.query.encode());
+            let query = ::sql_fun_core::PlaceholderedSql::from_query(requirement.query());
             assert_eq!(
-                requirement.cte_catalog().finger_print().unwrap(),
-                spec.resolved_cte_catalog.finger_print().unwrap()
+                requirement.cte_catalog().finger_print(&query).unwrap(),
+                spec.resolved_cte_catalog.finger_print(&spec.query).unwrap()
             );
         }
     }

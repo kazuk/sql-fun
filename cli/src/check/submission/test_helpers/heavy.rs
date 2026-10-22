@@ -26,7 +26,11 @@ pub(crate) async fn analyze_recovered_catalog() -> ::testresult::TestResult {
     let results = super::collect_submission(
         &mut client,
         &args,
-        super::requirements(&["products"], &catalog),
+        super::requirements(
+            &["products"],
+            "SELECT ${shared:int4}, id FROM a_visible",
+            &catalog,
+        ),
     )
     .await?;
     assert_eq!(results.len(), 1);

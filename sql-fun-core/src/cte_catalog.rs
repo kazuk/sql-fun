@@ -1220,7 +1220,6 @@ impl CteCatalog<'_> {
     ///
     pub fn resolve(
         &self,
-        base_query: &PlaceholderedSql,
         references: &[CteCatalogReference],
         dialect: SqlDialect,
     ) -> Result<ResolvedCteCatalog, CteCatalogError> {
@@ -1238,11 +1237,7 @@ impl CteCatalog<'_> {
             cte.expand(self, reference.alias(), &mut state)?;
         }
 
-        Ok(ResolvedCteCatalog::new(
-            base_query,
-            &parameters,
-            &state.queries,
-        ))
+        Ok(ResolvedCteCatalog::new(&parameters, &state.queries))
     }
 }
 
@@ -1250,11 +1245,10 @@ impl CteCatalog<'_> {
 mod resolve_tests;
 
 /// resolved CTE catalog
-#[derive(Debug, serde::Serialize, serde::Deserialize)]
+#[derive(Debug, Default, serde::Serialize, serde::Deserialize)]
 #[cfg_attr(feature = "openrpc-schema", derive(::schemars::JsonSchema))]
 pub struct ResolvedCteCatalog {
     parameters: CteParameterCollection,
-    base_query: PlaceholderedSql,
     #[cfg_attr(
         feature = "openrpc-schema",
         schemars(with = "std::collections::BTreeMap<CteAlias, PlaceholderedSql>")
@@ -1262,36 +1256,17 @@ pub struct ResolvedCteCatalog {
     cte_queries: IndexMap<CteAlias, PlaceholderedSql>,
 }
 
-impl From<&PlaceholderedSql> for ResolvedCteCatalog {
-    fn from(value: &PlaceholderedSql) -> Self {
-        Self::new(
-            value,
-            &CteParameterCollection::default(),
-            &IndexMap::default(),
-        )
-    }
-}
-
 impl ResolvedCteCatalog {
     /// Construct from queries whose catalog dependencies have already been resolved.
-    /// Application parameter hints remain in the base query's SQL metadata.
     #[must_use]
     pub fn new(
-        base_query: &PlaceholderedSql,
         parameters: &CteParameterCollection,
         cte_queries: &IndexMap<CteAlias, PlaceholderedSql>,
     ) -> Self {
         Self {
             parameters: parameters.clone(),
-            base_query: base_query.clone(),
             cte_queries: cte_queries.clone(),
         }
-    }
-
-    /// Application query before catalog CTE insertion.
-    #[must_use]
-    pub const fn base_query(&self) -> &PlaceholderedSql {
-        &self.base_query
     }
 
     /// Aggregated binding metadata, independent of placeholder numbering.
@@ -1323,16 +1298,16 @@ impl ResolvedCteCatalog {
             .collect()
     }
 
-    /// compute query finger print
+    /// Compute full query identity from explicit application SQL and resolved dependencies.
     ///
     /// # Errors
     ///
     /// [`CteCatalogError`]
-    #[tracing::instrument(ret, err, skip(self))]
-    pub fn finger_print(&self) -> Result<String, CteCatalogError> {
+    #[tracing::instrument(ret, err, skip(self, base_query))]
+    pub fn finger_print(&self, base_query: &PlaceholderedSql) -> Result<String, CteCatalogError> {
         let mut hasher = crate::Hasher::new();
         hasher.append_str(&serde_json::to_string(&self.parameters)?);
-        hasher.append_str(&serde_json::to_string(&self.base_query)?);
+        hasher.append_str(&serde_json::to_string(base_query)?);
         hasher.append_str(&serde_json::to_string(&self.cte_queries)?);
         Ok(hasher.finish())
     }
@@ -1344,20 +1319,22 @@ mod test_resolved_cte_catalog {
     use crate::{ParameterName, PlaceholderedSql};
     use ::indexmap::IndexMap;
 
-    fn ordered_names(catalog: &ResolvedCteCatalog) -> Vec<ParameterName> {
+    fn ordered_names(
+        base_query: &PlaceholderedSql,
+        catalog: &ResolvedCteCatalog,
+    ) -> Vec<ParameterName> {
         let mut names = Vec::new();
         catalog.append_cte_parameter_order(&mut names);
-        catalog.base_query().append_parameter_order(&mut names);
+        base_query.append_parameter_order(&mut names);
         names
     }
 
     #[test]
-    fn base_only_catalog_preserves_parameter_shape_and_hints() {
-        let catalog = ResolvedCteCatalog::from(&PlaceholderedSql::from_query(
-            "select ${id:int}, ${id}, ${other}",
-        ));
+    fn empty_catalog_keeps_application_parameter_metadata_separate() {
+        let base_query = PlaceholderedSql::from_query("select ${id:int}, ${id}, ${other}");
+        let catalog = ResolvedCteCatalog::default();
         assert_eq!(
-            ordered_names(&catalog),
+            ordered_names(&base_query, &catalog),
             [ParameterName::from("id"), ParameterName::from("other")]
         );
         assert_eq!(
@@ -1366,8 +1343,7 @@ mod test_resolved_cte_catalog {
         );
         let name = ParameterName::from("id");
         assert!(catalog.parameters().binding(&name).is_none());
-        let (_, hints) = catalog
-            .base_query()
+        let (_, hints) = base_query
             .parameters()
             .find(|(parameter_name, _)| *parameter_name == &name)
             .unwrap();
@@ -1383,15 +1359,12 @@ mod test_resolved_cte_catalog {
             parameters.push_query_parameter(&CteName::new("definition"), name, hints);
         }
         queries.insert(CteAlias::new("chosen"), query);
-        let catalog = ResolvedCteCatalog::new(
-            &PlaceholderedSql::from_query(
-                "with existing as (select ${second:text}) select ${shared}, ${base}",
-            ),
-            &parameters,
-            &queries,
+        let base_query = PlaceholderedSql::from_query(
+            "with existing as (select ${second:text}) select ${shared}, ${base}",
         );
+        let catalog = ResolvedCteCatalog::new(&parameters, &queries);
         assert_eq!(
-            ordered_names(&catalog),
+            ordered_names(&base_query, &catalog),
             ["shared", "first", "second", "base"].map(ParameterName::from)
         );
         let name = ParameterName::from("shared");
@@ -1404,27 +1377,35 @@ mod test_resolved_cte_catalog {
             ::serde_json::to_value(catalog.parameters()).unwrap()["parameters"]["shared"],
             ::serde_json::json!([["definition", ["int"]]])
         );
+        assert!(
+            ::serde_json::to_value(&catalog)
+                .unwrap()
+                .get("base_query")
+                .is_none()
+        );
         let restored: ResolvedCteCatalog =
             ::serde_json::from_str(&::serde_json::to_string(&catalog).unwrap()).unwrap();
-        assert_eq!(ordered_names(&restored), ordered_names(&catalog));
+        assert_eq!(
+            ordered_names(&base_query, &restored),
+            ordered_names(&base_query, &catalog)
+        );
     }
 
     #[test]
     fn resolver_keeps_base_only_metadata_in_query() {
+        let base_query = PlaceholderedSql::from_query("select ${base:int}");
         let catalog = super::CteCatalog::default()
-            .resolve(
-                &PlaceholderedSql::from_query("select ${base:int}"),
-                &[],
-                crate::SqlDialect::PostgreSQL,
-            )
+            .resolve(&[], crate::SqlDialect::PostgreSQL)
             .unwrap();
         let name = ParameterName::from("base");
         assert!(catalog.parameters().binding(&name).is_none());
-        let (_, hints) = catalog
-            .base_query()
+        let (_, hints) = base_query
             .parameters()
             .find(|(parameter_name, _)| *parameter_name == &name)
             .unwrap();
         assert_eq!(hints.len(), 1);
     }
 }
+
+#[cfg(test)]
+mod fingerprint_tests;

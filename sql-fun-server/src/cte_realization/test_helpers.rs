@@ -4,7 +4,7 @@ use ::sql_fun_core::{
 };
 
 /// Build an already-resolved dependency closure without catalog files.
-pub(super) fn resolved(base: &str, ctes: &[(&str, &str)]) -> ResolvedCteCatalog {
+pub(super) fn resolved(ctes: &[(&str, &str)]) -> ResolvedCteCatalog {
     let mut parameters = CteParameterCollection::default();
     let mut queries = IndexMap::new();
     for (alias, sql) in ctes {
@@ -14,7 +14,7 @@ pub(super) fn resolved(base: &str, ctes: &[(&str, &str)]) -> ResolvedCteCatalog 
         }
         queries.insert(CteAlias::new(alias), query);
     }
-    ResolvedCteCatalog::new(&PlaceholderedSql::from_query(base), &parameters, &queries)
+    ResolvedCteCatalog::new(&parameters, &queries)
 }
 
 /// Resolve a diamond with repeated roots and repeated dependency references.
@@ -44,11 +44,7 @@ with = [{cte_name = "shared", alias = "shared"}]
     let references = ["q1", "q2", "q1"].map(|name| {
         ::sql_fun_core::CteCatalogReference::new(&CteName::new(name), &CteAlias::new(name))
     });
-    Ok(catalog.resolve(
-        &PlaceholderedSql::from_query("select ${base}, ${right:text}, ${id} from q1"),
-        &references,
-        dialect,
-    )?)
+    Ok(catalog.resolve(&references, dialect)?)
 }
 
 /// Count actual parameter tokens, excluding quoted column labels such as "?1".

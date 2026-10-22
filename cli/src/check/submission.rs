@@ -13,7 +13,7 @@ use ::sql_fun_client::{
     },
 };
 use ::sql_fun_codegen::QueryRequirement;
-use ::sql_fun_core::{Hasher, SqlFunArgs};
+use ::sql_fun_core::{Hasher, PlaceholderedSql, SqlFunArgs};
 use ::tokio::sync::mpsc::Sender;
 
 /// CLI-owned source identity paired with a fully materialized server response.
@@ -84,7 +84,9 @@ pub(super) async fn submit(
         let source_file = requirement.source_file().to_owned();
         let source_line = requirement.source_line();
         let original_query = requirement.query().to_owned();
-        let query_finger_print = requirement.cte_catalog().finger_print()?;
+        let query_finger_print = requirement
+            .cte_catalog()
+            .finger_print(&PlaceholderedSql::from_query(requirement.query()))?;
         if let Entry::Vacant(entry) = contexts.entry(datasource.clone()) {
             let request = initialization(args, &datasource)?;
             let initialized: SchemaContext =
@@ -96,8 +98,11 @@ pub(super) async fn submit(
             })?;
             entry.insert(handle.clone());
         }
-        let request =
-            AnalyzeQueryArgs::from_catalog(&contexts[&datasource], requirement.into_cte_catalog());
+        let request = AnalyzeQueryArgs::with_catalog(
+            &contexts[&datasource],
+            &original_query,
+            requirement.into_cte_catalog(),
+        );
         let response = request_typed(client, "analyze_query", &request)
             .await
             .with_context(|| format!("cannot analyze {function_name} at {source_file}:{source_line} (datasource {datasource})"))?;

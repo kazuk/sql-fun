@@ -28,24 +28,25 @@ pub enum AnalyzeQueryInput {
 pub struct AnalyzeQueryArgs {
     /// specify semantic analysis context
     context_handle: ContextHandle,
-    /// Query input source
-    query: Option<AnalyzeQueryInput>,
-    /// Resolved catalog; mutually exclusive with query. Its base query is authoritative.
+    /// Required, authoritative application SQL input.
+    query: AnalyzeQueryInput,
+    /// Optional resolved CTE dependencies, without application SQL.
     #[serde(default)]
     resolved_cte_catalog: Option<::sql_fun_core::ResolvedCteCatalog>,
 }
 
 impl AnalyzeQueryArgs {
-    /// Submit a resolved catalog whose base query is the sole SQL input.
+    /// Submit explicit inline application SQL with its resolved CTE dependencies.
     /// Takes ownership to preserve the recovered catalog without copying it.
     #[must_use]
-    pub fn from_catalog(
+    pub fn with_catalog(
         context_handle: &ContextHandle,
+        query: &str,
         catalog: ::sql_fun_core::ResolvedCteCatalog,
     ) -> Self {
         Self {
             context_handle: context_handle.clone(),
-            query: None,
+            query: AnalyzeQueryInput::from_text(query),
             resolved_cte_catalog: Some(catalog),
         }
     }
@@ -67,7 +68,19 @@ mod test_catalog_request_transport {
         }
         let request: AnalyzeQueryArgs = ::serde_json::from_value(value).unwrap();
         assert!(request.resolved_cte_catalog().is_none());
-        assert_eq!(request.query().as_ref().unwrap().text(), Some("SELECT 1"));
+        assert_eq!(request.query().text(), Some("SELECT 1"));
+    }
+
+    #[rstest::rstest]
+    #[case::missing_query(r#"{"context_handle":"context-1"}"#)]
+    #[case::null_query(r#"{"context_handle":"context-1","query":null}"#)]
+    #[case::catalog_only(r#"{"context_handle":"context-1","resolved_cte_catalog":{"parameters":{"parameters":{}},"cte_queries":{}}}"#)]
+    #[case::invalid_query(r#"{"context_handle":"context-1","query":42}"#)]
+    #[case::invalid_catalog(
+        r#"{"context_handle":"context-1","query":{"Text":"SELECT 1"},"resolved_cte_catalog":42}"#
+    )]
+    fn rejects_invalid_request_shape(#[case] input: &str) {
+        assert!(::serde_json::from_str::<AnalyzeQueryArgs>(input).is_err());
     }
 
     #[test]
@@ -81,19 +94,21 @@ mod test_catalog_request_transport {
         for (name, hints) in leaf.parameters() {
             bindings.push_query_parameter(&CteName::new("library::leaf"), name, hints);
         }
-        let mut catalog = ::serde_json::to_value(ResolvedCteCatalog::from(&base)).unwrap();
+        let mut catalog = ::serde_json::to_value(ResolvedCteCatalog::default()).unwrap();
         catalog["parameters"] = ::serde_json::to_value(bindings).unwrap();
         catalog["cte_queries"]["z_dependency"] = ::serde_json::to_value(&leaf).unwrap();
         catalog["cte_queries"]["a_visible"] =
             ::serde_json::to_value(PlaceholderedSql::from_query("SELECT id FROM z_dependency"))
                 .unwrap();
         let handle = crate::payloads::ContextHandle::from("context-1".to_owned());
-        let request = AnalyzeQueryArgs::from_catalog(
+        let request = AnalyzeQueryArgs::with_catalog(
             &handle,
+            &base.encode(),
             ::serde_json::from_value(catalog.clone()).unwrap(),
         );
         let wire = ::serde_json::to_value(request).unwrap();
-        assert!(wire["query"].is_null());
+        assert_eq!(wire["query"]["Text"], base.encode());
+        assert!(wire["resolved_cte_catalog"].get("base_query").is_none());
         assert_eq!(wire["resolved_cte_catalog"], catalog);
         let restored: AnalyzeQueryArgs = ::serde_json::from_value(wire).unwrap();
         let restored = restored.resolved_cte_catalog().as_ref().unwrap();
@@ -306,6 +321,12 @@ pub struct ResultSetColumn {
 impl super::CollectionTraversal for ResultSetColumn {}
 
 impl AnalyzeQueryInput {
+    /// Select inline SQL as the application query input.
+    #[must_use]
+    pub fn from_text(text: &str) -> Self {
+        Self::Text(text.to_owned())
+    }
+
     /// Inline SQL, if explicitly selected.
     #[must_use]
     pub fn text(&self) -> Option<&str> {
@@ -410,10 +431,8 @@ mod test_analyze_query_contract {
 
     #[test]
     fn resolved_catalog_round_trips_through_existing_core_type() {
-        let catalog = ::sql_fun_core::ResolvedCteCatalog::from(
-            &::sql_fun_core::PlaceholderedSql::from_query("SELECT ${id:int4}"),
-        );
-        let value = ::serde_json::json!({"context_handle":"context-1", "query":null, "resolved_cte_catalog":catalog});
+        let catalog = ::sql_fun_core::ResolvedCteCatalog::default();
+        let value = ::serde_json::json!({"context_handle":"context-1", "query":{"Text":"SELECT ${id:int4}"}, "resolved_cte_catalog":catalog});
         let args: AnalyzeQueryArgs = ::serde_json::from_value(value.clone()).unwrap();
         assert_eq!(::serde_json::to_value(args).unwrap(), value);
     }
@@ -454,5 +473,12 @@ mod test_analyze_query_contract {
         }
         let schema = ::serde_json::to_value(::schemars::schema_for!(AnalyzeQueryArgs)).unwrap();
         assert!(schema["properties"].get("resolved_cte_catalog").is_some());
+        let required = schema["required"].as_array().unwrap();
+        assert!(required.contains(&::serde_json::json!("query")));
+        assert!(!required.contains(&::serde_json::json!("resolved_cte_catalog")));
+        let catalog_schema =
+            ::serde_json::to_value(::schemars::schema_for!(::sql_fun_core::ResolvedCteCatalog))
+                .unwrap();
+        assert!(catalog_schema["properties"].get("base_query").is_none());
     }
 }

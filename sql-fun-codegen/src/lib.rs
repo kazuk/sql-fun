@@ -622,8 +622,8 @@ impl FragmentExpandQueueItem {
             let interrupt_handler = item_fn
                 .find_attributed_argument_ident(&connector_spec.interrupt_arg_attr())?
                 .cloned();
-            let resolved_cte_catalog = cte_references.resolve(metadata, &query)?;
-            let query_finger_print = &resolved_cte_catalog.finger_print()?;
+            let resolved_cte_catalog = cte_references.resolve(metadata)?;
+            let query_finger_print = &resolved_cte_catalog.finger_print(&query)?;
 
             let lockfile_entry = if let Some(lockfile) = lockfile {
                 let Some(lockfile_entry) = lockfile.get_entry(query_finger_print)? else {

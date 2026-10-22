@@ -46,6 +46,19 @@ that capability decision and reports unsupported operations.
 Diagnostic rendering is separate work tracked by #699. Analysis results retain
 their diagnostics even when no lockfile entry can be produced.
 
+## SQL input rules
+
+A query function may contain multiple SQL statements when no catalog CTE
+expansion is required, including when catalog resolution produces zero referenced
+CTEs. Each statement keeps its own parameters and result columns in source order.
+
+A query function that uses catalog-resolved CTE expansion must contain **exactly
+one base SQL statement**. Combining multiple base statements with referenced
+catalog CTEs is an invalid query definition. Analysis produces a diagnostic,
+`check` fails as it does for SQL syntax or analysis errors, and the function is
+omitted from the generated lockfile, including any previous entry for it.
+This is an SQL input rule, independent of the connector's execution capabilities.
+
 ## Prerequisites
 
 `sql-fun check` requires `cargo-expand` for both PostgreSQL and SQLite.

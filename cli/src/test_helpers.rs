@@ -1,3 +1,5 @@
+pub(crate) mod heavy;
+
 use tokio::io::{AsyncWrite, AsyncWriteExt, DuplexStream};
 
 /// Create a duplex stream pair for async IO tests.

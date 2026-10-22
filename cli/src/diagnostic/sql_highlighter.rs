@@ -115,11 +115,12 @@ mod test_highlighting {
     use ::miette::highlighters::Highlighter;
     use ::sql_fun_core::SqlDialect;
 
-    #[test]
-    fn preserves_complete_lines_with_utf8_comments_and_trailing_whitespace()
+    #[tokio::test]
+    async fn preserves_complete_lines_with_utf8_comments_and_trailing_whitespace()
     -> testresult::TestResult {
         let source = "select '日本語', 1;  -- comment\n  select 2;  \n";
-        let tokens = ::sql_fun_sqlast::tokenize_sql(source, SqlDialect::PostgreSQL)?;
+        let tokens =
+            crate::test_helpers::heavy::tokenize_sql(source, SqlDialect::PostgreSQL).await?;
         let highlighter = SqlHighlighter::from_theme(&HighlighterTheme::default(), &tokens)?;
         let contents = source.read_span(&(0, source.len()).into(), 0, 0)?;
         let mut state = highlighter.start_highlighter_state(&*contents);
@@ -134,10 +135,11 @@ mod test_highlighting {
         Ok(())
     }
 
-    #[test]
-    fn clips_existing_multiline_tokens_for_snippet_highlighting() -> testresult::TestResult {
+    #[tokio::test]
+    async fn clips_existing_multiline_tokens_for_snippet_highlighting() -> testresult::TestResult {
         let source = "select 1;\n/* first\n日本語 middle\nlast */ select 2;";
-        let tokens = ::sql_fun_sqlast::tokenize_sql(source, SqlDialect::PostgreSQL)?;
+        let tokens =
+            crate::test_helpers::heavy::tokenize_sql(source, SqlDialect::PostgreSQL).await?;
         let theme = HighlighterTheme::from_toml_str(r#"comment = { foreground = "green" }"#)?;
         let highlighter = SqlHighlighter::from_theme(&theme, &tokens)?;
         let start = source.find("日本語").unwrap();

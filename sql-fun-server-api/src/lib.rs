@@ -9,7 +9,7 @@ pub mod payloads;
 use crate::payloads::{
     AnalyzeQueryArgs, AnalyzeQueryResponse, CollectionHandle, DescribeTableArgs,
     DescribeTableResponse, EchoArgs, InitializeSchemaArgs, ListObjectArgs, ObjectSummary,
-    ReadCollectionArgs, ReleaseCollectionArgs, SchemaContext,
+    ReadCollectionArgs, ReleaseCollectionArgs, SchemaContext, SqlToken, TokenizeSqlArgs,
 };
 
 pub use self::collection_management::Collection;
@@ -41,6 +41,10 @@ pub enum SqlFunServerApiError {
     #[error("invalid analysis input: {0}")]
     InvalidAnalysisInput(String),
 
+    /// The selected lexer rejected the original source.
+    #[error("SQL tokenization failed: {0}")]
+    TokenizationFailed(String),
+
     /// Generic unexpected error
     #[error("unexpected {0}")]
     Unexpected(String),
@@ -51,6 +55,12 @@ pub enum SqlFunServerApiError {
 }
 
 impl SqlFunServerApiError {
+    /// Retain a lexical failure separately from semantic diagnostics.
+    #[must_use]
+    pub fn tokenization_failed(message: &str) -> Self {
+        Self::TokenizationFailed(message.to_owned())
+    }
+
     /// Unknown context without disclosing its owner.
     #[must_use]
     pub const fn invalid_context_handle() -> Self {
@@ -111,6 +121,13 @@ impl SqlFunServerApiError {
 /// `sql-fun` Server API functions
 #[async_trait::async_trait]
 pub trait SqlFunServerApi {
+    /// Tokenize original SQL with an explicit dialect, without schema analysis.
+    /// Returned pages include trivia/comments and require collection release.
+    async fn tokenize_sql(
+        &self,
+        args: TokenizeSqlArgs,
+    ) -> Result<Collection<SqlToken>, SqlFunServerApiError>;
+
     /// Return object or array parameters unchanged for transport diagnostics.
     async fn echo(&self, args: EchoArgs) -> Result<serde_json::Value, SqlFunServerApiError>;
 
@@ -179,6 +196,14 @@ mod rpc_schema {
         type Result = super::SchemaContext;
     }
 
+    pub struct TokenizeSqlMethod;
+    impl RpcMethod for TokenizeSqlMethod {
+        const NAME: &'static str = "tokenize_sql";
+        const SUMMARY: &'static str = "tokenize original SQL without schema analysis";
+        type Params = super::TokenizeSqlArgs;
+        type Result = super::Collection<super::SqlToken>;
+    }
+
     pub struct EchoMethod;
 
     impl RpcMethod for EchoMethod {
@@ -232,10 +257,38 @@ mod rpc_schema {
     /// register all JSON-RPC methods
     pub fn register_methods(registry: &mut typed_openrpc::Registry) {
         registry.register_method::<EchoMethod>();
+        registry.register_method::<TokenizeSqlMethod>();
         registry.register_method::<InitializeSchemaContextMethod>();
         registry.register_method::<ReadCollectionMethod>();
         registry.register_method::<ReleaseCollectionMethod>();
         registry.register_method::<AnalyzeQueryMethod>();
         registry.register_method::<ListObjectMethod>();
+    }
+}
+
+#[cfg(all(test, feature = "openrpc-schema"))]
+mod test_tokenize_openrpc {
+    #[test]
+    fn registers_tokenization_with_required_inputs_and_collection_result() {
+        let mut registry = ::typed_openrpc::Registry::new();
+        super::register_methods(&mut registry);
+        let info = ::typed_openrpc::OpenRpcInfo {
+            title: "test".to_owned(),
+            version: "test".to_owned(),
+            description: None,
+        };
+        let doc = ::serde_json::to_value(registry.generate_openrpc_doc_with_info(&info)).unwrap();
+        let mut found = false;
+        for method in doc["methods"].as_array().unwrap() {
+            if method["name"] == "tokenize_sql" {
+                found = true;
+                let json = method.to_string();
+                assert!(json.contains("source"));
+                assert!(json.contains("dialect"));
+                assert!(json.contains("SqlToken"));
+                assert!(method.get("result").is_some());
+            }
+        }
+        assert!(found, "tokenize_sql missing from OpenRPC");
     }
 }

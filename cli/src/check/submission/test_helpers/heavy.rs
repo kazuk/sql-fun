@@ -1,7 +1,5 @@
 // Reuse the maintained real-server lifecycle and lightweight schema fixtures.
-#[allow(dead_code)]
-#[path = "../../../../../sql-fun-client/tests/test_helpers/heavy.rs"]
-mod lifecycle;
+use crate::test_helpers::heavy::lifecycle;
 #[allow(dead_code)]
 #[path = "../../../../../sql-fun-client/tests/test_helpers/schema.rs"]
 mod schema;

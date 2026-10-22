@@ -12,7 +12,10 @@ mod describe_table;
 mod echo;
 mod initialize_schema;
 mod list_objects;
+mod tokenize_sql;
 mod traversal;
+
+pub use self::tokenize_sql::{SqlToken, TokenCategory, TokenizeSqlArgs};
 
 pub use self::traversal::{CollectionPage, CollectionReference, CollectionTraversal};
 

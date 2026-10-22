@@ -3085,7 +3085,6 @@ dependencies = [
  "sql-fun-codegen",
  "sql-fun-core",
  "sql-fun-server-api",
- "sql-fun-sqlast",
  "statig",
  "syn 3.0.9",
  "tar",

@@ -56,6 +56,12 @@ impl ApiServer {
         )?)
     }
 
+    pub async fn connect(
+        &self,
+    ) -> ::testresult::TestResult<::sql_fun_client::TcpJsonRpcClientAsync> {
+        Ok(::sql_fun_client::connect(&self.0.options()).await?)
+    }
+
     pub fn executable(&self) -> &Path {
         self.0.executable()
     }

@@ -264,11 +264,44 @@ async fn renders_server_diagnostic_from_retained_source_after_file_changes()
         .expect("duplicate schema diagnostic");
     let presentation = problem.presentation().as_ref().expect("retained statement");
     let args = ::sql_fun_core::SqlFunArgs::try_parse_from(["sql-fun", "--term-color", "never"])?;
-    let output = ::sql_fun_cli::render_diagnostic(presentation, &args)?;
+    let mut client = server.connect().await?;
+    let output = ::sql_fun_cli::render_diagnostic(&mut client, presentation, &args).await?;
+    client.finish().await?;
     assert_eq!(problem.code(), "conflicting_creation");
     assert_eq!(presentation.source(), " CREATE SCHEMA retained");
     assert!(output.contains(presentation.source()), "{output}");
     assert!(!output.contains("changed after analysis"));
     assert!(!output.contains("\x1b["));
+    Ok(())
+}
+
+#[tokio::test]
+async fn tokenization_is_available_without_schema_or_project_discovery() -> ::testresult::TestResult
+{
+    let server = heavy::ApiServer::new()?;
+    let mut bridge = heavy::BridgeSession::start(&server)?;
+    let source = "SELECT '日本語'; -- comment\n";
+    let reply = bridge
+        .rpc(
+            "tokenize_sql",
+            &::serde_json::json!({"source":source, "dialect":"postgres"}),
+        )
+        .await?;
+    let tokens = &reply["result"];
+    assert!(tokens["items"].as_array().unwrap().len() > 1, "{reply}");
+    assert_eq!(tokens["items"][0]["kind"], "keyword");
+    assert_eq!(tokens["items"][0]["start"], 0);
+    assert_eq!(
+        tokens["items"].as_array().unwrap().last().unwrap()["end"],
+        source.len()
+    );
+    let released = bridge
+        .rpc(
+            "release_collection",
+            &::serde_json::json!({"collection_handle":tokens["handle"]}),
+        )
+        .await?;
+    assert!(released.get("error").is_none(), "{released}");
+    bridge.finish().await?;
     Ok(())
 }

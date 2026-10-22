@@ -4,11 +4,6 @@ use std::{
     process::Command,
 };
 
-use ::sql_fun_sqlast::{
-    PostgresDialect,
-    sem::{BaseContext, BaseParseContext, FullName, TableName},
-};
-
 struct InitializedProject {
     directory: tempfile::TempDir,
 }
@@ -144,50 +139,31 @@ impl InitializedProject {
             std::fs::copy(source.join(name), target.join(name)).unwrap();
         }
     }
-    fn assert_semantics(&self, version: &str) {
-        let metadata = self.directory.path().join("Cargo.toml");
-        std::fs::write(&metadata, format!("[package.metadata.database.default]\nengine = 'PostgreSQL'\ndialect = 'postgres'\nversion = '{version}'\n")).unwrap();
-        let args = sql_fun_core::SqlFunArgsBuilder::default()
-            .metadata_file(metadata.to_str().unwrap())
-            .sql_fun_home(self.home())
-            .build()
-            .unwrap();
-        let metadata = args.load_metadata().unwrap();
-        let context = BaseContext::new(&args, metadata.get("default").unwrap()).unwrap();
-        let builtins = {
-            let analysis_base = &::sql_fun_sqlast::sem::FrozenBaseContext::from(context);
-            PostgresDialect::parse_schema_file(
-                &self.home().join(format!("postgres/{version}/schema.sql")),
-                analysis_base,
-                &mut None,
-                &args,
-                metadata.get("default").unwrap(),
-            )
+    fn assert_installed_catalog(&self, version: &str) {
+        let source = Path::new(env!("CARGO_MANIFEST_DIR"))
+            .parent()
+            .unwrap()
+            .join("sql-fun-home/postgres")
+            .join(version);
+        for name in [
+            "metadata.json",
+            "schema.sql",
+            "pg_type.json",
+            "functions.json",
+            "func_detail.json",
+            "binary_op.json",
+            "left_unary_op.json",
+            "right_unary_op.json",
+            "casts.json",
+            "collations.json",
+            "operator_classes.json",
+        ] {
+            assert_eq!(
+                std::fs::read(self.home().join("postgres").join(version).join(name)).unwrap(),
+                std::fs::read(source.join(name)).unwrap(),
+                "installed {name}"
+            );
         }
-        .unwrap();
-        let pg_class = TableName::from(FullName::with_schema("pg_catalog", "pg_class"));
-        assert!(builtins.get_table(&pg_class).is_some());
-        let user = self.directory.path().join("schema.develop.sql");
-        let sql =
-            "CREATE TABLE hoge (id int PRIMARY KEY); SELECT abs(id) + 1 AS next_id FROM hoge;";
-        std::fs::write(&user, sql).unwrap();
-        let parsed = {
-            let analysis_base = builtins.base_context();
-            PostgresDialect::parse_schema_file(
-                &user,
-                analysis_base,
-                &mut None,
-                &args,
-                metadata.get("default").unwrap(),
-            )
-        }
-        .unwrap();
-        assert!(
-            parsed
-                .get_table(&TableName::from(FullName::with_schema("public", "hoge")))
-                .is_some()
-        );
-        assert_eq!(std::fs::read_to_string(user).unwrap(), sql);
     }
 }
 
@@ -201,7 +177,7 @@ fn initialization_preserves_and_loads_an_existing_valid_generation() {
         "{}",
         String::from_utf8_lossy(&result.stderr)
     );
-    project.assert_semantics("17");
+    project.assert_installed_catalog("17");
 }
 
 #[test]
@@ -269,7 +245,7 @@ fn a_later_version_failure_preserves_the_completed_version() {
     assert!(!result.status.success());
     assert!(String::from_utf8_lossy(&result.stderr).contains("failed for PostgreSQL 18"));
     assert_eq!(std::fs::read(metadata).unwrap(), before);
-    project.assert_semantics("17");
+    project.assert_installed_catalog("17");
 }
 
 #[test]
@@ -447,7 +423,7 @@ fn explicit_mixed_engine_setup_retains_both_dispatch_paths() {
         String::from_utf8_lossy(&result.stdout)
             .contains("SQLite development-support setup is still under development")
     );
-    project.assert_semantics("17");
+    project.assert_installed_catalog("17");
 }
 
 #[test]

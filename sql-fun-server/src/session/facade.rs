@@ -116,6 +116,36 @@ impl<'request, 'ctx> Session<'request, 'ctx> {
         ))
     }
 
+    fn tokenize_sql(
+        &mut self,
+        args: &::sql_fun_server_api::payloads::TokenizeSqlArgs,
+    ) -> Result<::serde_json::Value, SqlFunServerApiError> {
+        let stream = ::sql_fun_sqlast::tokenize_sql(args.source(), args.dialect())
+            .map_err(|error| SqlFunServerApiError::tokenization_failed(&error.to_string()))?;
+        let tokens: Vec<_> = stream
+            .tokens()
+            .map(::sql_fun_server_api::payloads::SqlToken::from)
+            .collect();
+        let handle = self.register_collection(tokens, Vec::len, Self::token_value)?;
+        let result = self
+            .state
+            .collections
+            .read(&handle, 0, None)
+            .map_err(SqlFunServerApiError::from)
+            .and_then(|page| {
+                ::serde_json::to_value(page)
+                    .map_err(|error| SqlFunServerApiError::new_unexpected(&error.to_string()))
+            });
+        if result.is_err() {
+            self.state.collections.release(&handle)?;
+        }
+        result
+    }
+
+    fn token_value(token: &::sql_fun_server_api::payloads::SqlToken) -> ::serde_json::Value {
+        ::serde_json::to_value(token).expect("presentation token serializes")
+    }
+
     pub(super) async fn process_request(
         &mut self,
         api: &Api,
@@ -123,6 +153,7 @@ impl<'request, 'ctx> Session<'request, 'ctx> {
     ) -> Result<::serde_json::Value, JsonRpcError> {
         let method = request.method();
         match method {
+            "tokenize_sql" => Ok(self.tokenize_sql(&Self::arguments(request)?)?),
             "analyze_query" => {
                 let args = Self::arguments(request)?;
                 Ok(::serde_json::to_value(self.analyze_query(&args)?)?)

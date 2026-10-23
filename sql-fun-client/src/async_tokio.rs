@@ -242,7 +242,7 @@ impl TcpJsonRpcClientAsync {
         json.push(b'\n');
         reader.get_mut().write_all(&json).await?;
         ::tracing::info!(request_id = id, method, "request written");
-        let Some(response) = read_response(&mut reader, limit).await? else {
+        let Some(response) = read_response(&mut reader, Some(limit)).await? else {
             return Err(
                 std::io::Error::new(std::io::ErrorKind::UnexpectedEof, "response EOF").into(),
             );
@@ -296,6 +296,30 @@ mod streaming_tests {
                 .is_err()
         );
         assert!(client.finish().await.is_err());
+        Ok(())
+    }
+
+    #[tokio::test]
+    async fn delivers_response_larger_than_two_mebibytes() -> ::testresult::TestResult {
+        let payload = "x".repeat(2 * 1024 * 1024);
+        let response = ::serde_json::json!({"jsonrpc":"2.0", "id":0, "result":payload});
+        let mut frame = ::serde_json::to_vec(&response)?;
+        frame.push(b'\n');
+        let mut client = test_helpers::response_peer(&frame).await?;
+        let (sent, received) = ::tokio::sync::oneshot::channel();
+        client
+            .invoke_method(
+                "large_response",
+                &::serde_json::json!({"sql_fun_token":"secret"}),
+                move |response| async move {
+                    let _ = sent.send(response.into_result());
+                    Ok(())
+                },
+            )
+            .await?;
+        let result = ::tokio::time::timeout(Duration::from_secs(5), received).await???;
+        assert_eq!(result, payload);
+        ::tokio::time::timeout(Duration::from_secs(5), client.finish()).await??;
         Ok(())
     }
 
@@ -582,17 +606,17 @@ mod tests {
 
 async fn read_response<R: ::tokio::io::AsyncBufRead + Unpin>(
     reader: &mut R,
-    limit: usize,
+    limit: Option<usize>,
 ) -> Result<Option<JsonRpcResponse>, TcpJsonRpcClientAsyncError> {
     let mut frame = Vec::new();
     let count = reader
-        .take(limit as u64 + 1)
+        .take(limit.map_or(u64::MAX, |limit| limit as u64 + 1))
         .read_until(b'\n', &mut frame)
         .await?;
     if count == 0 {
         return Ok(None);
     }
-    if count > limit || frame.last() != Some(&b'\n') {
+    if limit.is_some_and(|limit| count > limit) || frame.last() != Some(&b'\n') {
         return Err(std::io::Error::new(
             std::io::ErrorKind::InvalidData,
             "incomplete or oversized response frame",

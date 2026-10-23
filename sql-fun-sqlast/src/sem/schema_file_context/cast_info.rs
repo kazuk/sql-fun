@@ -27,6 +27,12 @@ impl CastInfoRead for SchemaCatalog {
         }
         sources.extend(self.types.cast_source_types());
         if explicit {
+            // The parent cannot see a target domain declared in this layer.
+            let Some(base) = self.explicit_cast_base(target) else {
+                return HashSet::new();
+            };
+            sources.extend(self.base.cast_sources(&base, true));
+            sources.extend(self.type_references());
             sources.extend(Self::io_string_types());
         }
         sources.retain(|source| {
@@ -49,19 +55,31 @@ impl CastInfoRead for SchemaCatalog {
             return None;
         }
 
-        if let Some(s) = self.casts.get(&source_type.to_string())
-            && let Some(t) = s.get(&target_type.to_string())
-        {
-            if t.use_in_explicit() {
-                Some(t.clone())
-            } else {
-                None
-            }
-        } else if let Some(cast) = self.base.get_explicit_cast(source_type, target_type) {
-            Some(cast)
-        } else {
-            self.io_cast(source_type, target_type)
+        let source = self.explicit_cast_base(source_type)?;
+        let target = self.explicit_cast_base(target_type)?;
+        if source_type == target_type {
+            return self.direct_explicit_cast(source_type, target_type);
         }
+
+        if source_type.is_array() == Some(true) && target_type.is_array() == Some(true) {
+            let source_element = source_type.element_type();
+            let target_element = target_type.element_type();
+            if self.explicit_cast_base(&source_element)? != source_element
+                || self.explicit_cast_base(&target_element)? != target_element
+            {
+                self.get_explicit_cast(&source_element, &target_element)?;
+                return Some(CastDefinition::new(CastContext::explicit()));
+            }
+        }
+
+        if source != *source_type || target != *target_type {
+            // This is a real domain coercion, even when the bases are identical.
+            // Do not expose base identity/implicit priority to other contexts.
+            self.get_explicit_cast(&source, &target)?;
+            return Some(CastDefinition::new(CastContext::explicit()));
+        }
+
+        self.direct_explicit_cast(source_type, target_type)
     }
 
     fn get_implicit_castable(&self, source_type: &TypeReference) -> HashSet<TypeReference> {
@@ -112,6 +130,56 @@ impl CastInfoRead for SchemaCatalog {
 }
 
 impl SchemaCatalog {
+    /// Preserve local shadowing, inherited lookup, and I/O fallback for base types.
+    fn direct_explicit_cast(
+        &self,
+        source_type: &TypeReference,
+        target_type: &TypeReference,
+    ) -> Option<CastDefinition> {
+        if let Some(s) = self.casts.get(&source_type.to_string())
+            && let Some(t) = s.get(&target_type.to_string())
+        {
+            if t.use_in_explicit() {
+                Some(t.clone())
+            } else {
+                None
+            }
+        } else if let Some(cast) = self.base.get_explicit_cast(source_type, target_type) {
+            Some(cast)
+        } else {
+            self.io_cast(source_type, target_type)
+        }
+    }
+    /// Resolve domains only; an array of domains remains an array type.
+    /// Broken or cyclic domain definitions cannot establish cast eligibility.
+    fn explicit_cast_base(&self, reference: &TypeReference) -> Option<TypeReference> {
+        let mut base = reference.clone();
+        let mut seen = HashSet::new();
+        loop {
+            if base.is_dynamic() {
+                return None;
+            }
+            if base.is_array() == Some(true) {
+                return Some(base);
+            }
+            if !seen.insert(base.clone()) {
+                return None;
+            }
+            let Some(definition) = self.get_type_impl(base.full_name()) else {
+                // Leave ordinary cast lookup responsible for non-domain names,
+                // but a domain must point to an existing base definition.
+                if base == *reference {
+                    return Some(base);
+                }
+                return None;
+            };
+            if !definition.is_domain() {
+                return Some(base);
+            }
+            base = definition.domain_base()?.clone();
+        }
+    }
+
     fn io_string_types() -> [TypeReference; 4] {
         ["text", "varchar", "bpchar", "name"].map(TypeReference::from_master_type_name)
     }
@@ -124,6 +192,117 @@ impl SchemaCatalog {
             return Some(CastDefinition::new(CastContext::explicit()));
         }
         None
+    }
+}
+
+#[cfg(test)]
+mod test_domain_casts {
+    use crate::sem::{CastInfoRead, ParseContext, PgBuiltInType};
+
+    #[rstest::rstest]
+    fn domains_use_explicit_base_conversion_without_implicit_credit(
+        #[values(false, true)] frozen: bool,
+    ) {
+        let mut context = test_helpers::context();
+        let domain = test_helpers::domain(&mut context, "amount", Some(&PgBuiltInType::int4()));
+        let nested = test_helpers::domain(&mut context, "nested", Some(&domain));
+        let context = if frozen {
+            crate::test_helpers::schema_layer(std::path::Path::new("child.sql"), &context.freeze())
+        } else {
+            context
+        };
+        let cast = context
+            .get_explicit_cast(&PgBuiltInType::numeric(), &nested)
+            .unwrap();
+        assert!(!cast.context().is_no_conversion());
+        assert!(!cast.context().use_in_implicit());
+        assert!(!cast.context().use_in_assignment());
+        assert!(
+            context
+                .get_explicit_cast(&PgBuiltInType::int4(), &domain)
+                .is_some()
+        );
+        assert!(
+            context
+                .get_explicit_cast(&nested, &PgBuiltInType::int4())
+                .is_some()
+        );
+        assert!(
+            context
+                .get_explicit_cast(&PgBuiltInType::text(), &nested)
+                .is_some()
+        );
+        assert!(
+            context
+                .get_explicit_cast(&PgBuiltInType::bool(), &nested)
+                .is_none()
+        );
+        assert!(
+            context
+                .get_implicit_cast(&PgBuiltInType::numeric(), &nested)
+                .is_none()
+        );
+        let sources = context.cast_sources(&nested, true);
+        assert!(sources.contains(&PgBuiltInType::numeric()));
+        assert!(sources.contains(&PgBuiltInType::int4()));
+        assert!(sources.contains(&domain));
+        assert!(!sources.contains(&PgBuiltInType::bool()));
+    }
+
+    #[rstest::rstest]
+    #[case::unresolved(None)]
+    #[case::missing(Some("missing"))]
+    #[case::cycle(Some("broken"))]
+    fn invalid_domain_bases_do_not_establish_a_conversion(#[case] base: Option<&str>) {
+        let mut context = test_helpers::context();
+        let base = base.map(test_helpers::reference);
+        let domain = test_helpers::domain(&mut context, "broken", base.as_ref());
+        assert!(
+            context
+                .get_explicit_cast(&PgBuiltInType::int4(), &domain)
+                .is_none()
+        );
+        assert!(context.cast_sources(&domain, true).is_empty());
+    }
+
+    mod test_helpers {
+        use crate::sem::{
+            CastContext, CastDefinition, CreateDomain, FullName, ParseContext, PgBuiltInType,
+            SchemaFileContext, TypeInfoWrite, TypeReference,
+        };
+
+        pub(super) fn reference(name: &str) -> TypeReference {
+            TypeReference::from_full_name(FullName::with_schema("public", name))
+        }
+
+        pub(super) fn context() -> SchemaFileContext {
+            let mut base = crate::test_helpers::TestParseContext::default();
+            for ty in [
+                PgBuiltInType::int4(),
+                PgBuiltInType::numeric(),
+                PgBuiltInType::bool(),
+                PgBuiltInType::text(),
+            ] {
+                base.setup_type(ty);
+            }
+            base.set_get_implicit_cast_result(
+                &PgBuiltInType::numeric(),
+                &PgBuiltInType::int4(),
+                Some(CastDefinition::new(CastContext::explicit())),
+            );
+            crate::test_helpers::schema_layer(std::path::Path::new("domains.sql"), &base.freeze())
+        }
+
+        pub(super) fn domain(
+            context: &mut SchemaFileContext,
+            name: &str,
+            base: Option<&TypeReference>,
+        ) -> TypeReference {
+            let reference = reference(name);
+            let definition = CreateDomain::new(&reference, &base.cloned());
+            context.insert_create_domain(reference.full_name(), &definition);
+            reference
+        }
     }
 }
 

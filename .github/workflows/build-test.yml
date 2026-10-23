@@ -491,7 +491,9 @@ jobs:
                 /validation/e2e/run.sh /validation/e2e
             '
 
-      - uses: taiki-e/install-action@cargo-expand
+      - uses: taiki-e/install-action@v2
+        with:
+          tool: cargo-expand@1.0.126
 
       - name: Execute checked SQL against PostgreSQL
         run: |

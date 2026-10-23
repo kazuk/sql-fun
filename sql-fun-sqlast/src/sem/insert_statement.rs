@@ -101,6 +101,23 @@ impl InsertStatement {
     pub(crate) fn rename_columns(&mut self, columns: &[String]) {
         self.returning.rename(columns);
     }
+    pub(crate) fn source_has_pending_stars(&self) -> bool {
+        self.source
+            .as_query()
+            .is_some_and(SelectStatement::has_pending_stars)
+    }
+    pub(crate) fn expand_source_stars(
+        &mut self,
+        context: &mut impl ParseContext,
+    ) -> Result<bool, AnalysisError> {
+        match &mut self.source {
+            InsertSource::Query(query) => query.expand_pending_stars(context),
+            InsertSource::DefaultValues | InsertSource::Values(_) => Ok(false),
+        }
+    }
+    pub(crate) fn truncate_implicit_targets(&mut self) {
+        self.columns.truncate(self.source.width());
+    }
     pub(crate) fn validate_assignments(
         &mut self,
         context: &mut impl ParseContext,
@@ -345,8 +362,20 @@ impl InsertSource {
                 }
                 Ok(())
             }
-            Self::Query(query) => query.walk_assigned(visitor, targets),
+            Self::Query(query) => Self::walk_query(query, visitor, targets),
         }
+    }
+    fn walk_query<V: SemanticVisitor>(
+        query: &mut SelectStatement,
+        visitor: &mut V,
+        targets: &[InsertTarget],
+    ) -> Result<(), AnalysisError> {
+        let targets = if query.has_pending_stars() {
+            &[]
+        } else {
+            targets
+        };
+        query.walk_assigned(visitor, targets)
     }
 }
 

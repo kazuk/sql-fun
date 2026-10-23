@@ -34,19 +34,43 @@ pub enum SelectStatement {
 }
 
 impl SelectStatement {
+    pub(crate) fn has_pending_stars(&self) -> bool {
+        match self {
+            Self::Simple(query) => query.result_columns.has_pending_stars(),
+            Self::Query(query) => query.body().has_pending_stars(),
+            Self::Union(left, right) | Self::Intersect(left, right) | Self::Except(left, right) => {
+                Self::set_has_pending_stars(left, right)
+            }
+            Self::Values(_) => false,
+        }
+    }
+
+    fn set_has_pending_stars(left: &Self, right: &Self) -> bool {
+        left.has_pending_stars() || right.has_pending_stars()
+    }
+
     pub(crate) fn expand_pending_stars(
         &mut self,
         context: &mut impl ParseContext,
-    ) -> Result<(), AnalysisError> {
+    ) -> Result<bool, AnalysisError> {
         match self {
             Self::Simple(query) => query.result_columns.expand_pending_stars(context),
             Self::Query(query) => query.body_mut().expand_pending_stars(context),
             Self::Union(left, right) | Self::Intersect(left, right) | Self::Except(left, right) => {
-                left.expand_pending_stars(context)?;
-                right.expand_pending_stars(context)
+                Self::expand_set_pending_stars(left, right, context)
             }
-            Self::Values(_) => Ok(()),
+            Self::Values(_) => Ok(false),
         }
+    }
+
+    fn expand_set_pending_stars(
+        left: &mut Self,
+        right: &mut Self,
+        context: &mut impl ParseContext,
+    ) -> Result<bool, AnalysisError> {
+        let left_changed = left.expand_pending_stars(context)?;
+        let right_changed = right.expand_pending_stars(context)?;
+        Ok(left_changed || right_changed)
     }
 
     pub(crate) fn assign_update_output<V: crate::sem::traversal::SemanticVisitor>(

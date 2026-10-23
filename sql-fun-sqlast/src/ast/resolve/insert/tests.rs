@@ -84,6 +84,64 @@ fn infers_assignment_parameters(#[case] sql: &str) {
 }
 
 #[rstest::rstest]
+#[case::explicit(
+    "INSERT INTO expanded_items(a, b, c) SELECT ($1).*, $2 WHERE $1::public.pair IS NOT NULL"
+)]
+#[case::implicit("INSERT INTO expanded_items SELECT ($1).*, $2 WHERE $1::public.pair IS NOT NULL")]
+fn inferred_composite_star_assigns_expanded_insert_columns(#[case] sql: &str) {
+    let dialect = Dialect::postgres();
+    let mut context = test_helpers::catalog(dialect);
+    let pair_name = crate::sem::FullName::with_schema("public", "pair");
+    let mut fields = crate::sem::CompositeFieldCollection::default();
+    fields.push(crate::sem::CompositeFieldDefinition::new(
+        "a",
+        &Some(PgBuiltInType::int4()),
+        &None,
+    ));
+    fields.push(crate::sem::CompositeFieldDefinition::new(
+        "b",
+        &Some(PgBuiltInType::text()),
+        &None,
+    ));
+    let pair = crate::sem::CreateCompositeType::new(&pair_name, &fields);
+    context.set_get_type_impl_result(&pair_name, &crate::sem::TypeDefinition::from(&pair));
+    let table_statement = crate::parse_statements(
+        "CREATE TABLE expanded_items(a integer, b text, c integer, d integer GENERATED ALWAYS AS (1) STORED)",
+        dialect,
+    )
+    .next()
+    .unwrap()
+    .unwrap();
+    context = table_statement.analyze(context).unwrap().into_context();
+    let statement = crate::parse_statements(sql, dialect)
+        .next()
+        .unwrap()
+        .unwrap();
+    let result = statement.node.resolve(&mut context).unwrap();
+    assert!(result.as_insert().is_some());
+    assert_eq!(
+        context.reported_problem_count(),
+        0,
+        "{:#?}",
+        context.reported_problems()
+    );
+    assert_eq!(
+        result
+            .as_insert()
+            .unwrap()
+            .source()
+            .as_query()
+            .unwrap()
+            .result_columns()
+            .len(),
+        3
+    );
+    let second = context.parameter_constraints().parameter(2).unwrap();
+    assert!(second.constraint().allows(&PgBuiltInType::int4()));
+    assert!(!second.constraint().allows(&PgBuiltInType::text()));
+}
+
+#[rstest::rstest]
 #[case::arity("INSERT INTO items VALUES (1, 'x', 3)")]
 #[case::duplicate("INSERT INTO items(id, id) VALUES (1, 2)")]
 #[case::types("INSERT INTO items(id) VALUES (true)")]

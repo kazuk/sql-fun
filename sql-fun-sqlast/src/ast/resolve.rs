@@ -126,14 +126,7 @@ impl Expr {
             Self::Parameter(parameter) => Ok(context.parameter(parameter.position)),
             Self::Literal(value) => Ok(value.resolve()),
             Self::Column(name) => name.resolve_column(context, scope),
-            Self::Star(_) => {
-                context.report_analysis_problem(AnalysisProblem::query(
-                    crate::sem::QueryProblem::invalid_star_projection_placement(),
-                ))?;
-                Ok(SemScalarExpr::Unexpected(
-                    "invalid star projection placement".to_owned(),
-                ))
-            }
+            Self::Star(_) => Self::invalid_star_projection(context),
             Self::Operator(operator) => operator.resolve(context, scope),
             Self::Boolean(boolean) => boolean.resolve(context, scope),
             Self::NullTest(test) => test.resolve(context, scope),
@@ -144,9 +137,7 @@ impl Expr {
             Self::Case(case) => case.resolve(context, scope),
             Self::Subquery(query) => query.resolve(context, scope),
             Self::Array(items) => Self::resolve_array(items, context, scope, None),
-            Self::Row(items) => Ok(SemScalarExpr::row(&Self::resolve_list(
-                items, context, scope,
-            )?)),
+            Self::Row(items) => Self::resolve_row(items, context, scope),
             Self::List(items) => Ok(SemScalarExpr::list(&Self::resolve_list(
                 items, context, scope,
             )?)),
@@ -175,6 +166,27 @@ impl Expr {
                 todo!("expression semantic analysis")
             }
         }
+    }
+
+    fn invalid_star_projection(
+        context: &mut impl ParseContext,
+    ) -> Result<SemScalarExpr, AnalysisError> {
+        context.report_analysis_problem(AnalysisProblem::query(
+            crate::sem::QueryProblem::invalid_star_projection_placement(),
+        ))?;
+        Ok(SemScalarExpr::Unexpected(
+            "invalid star projection placement".to_owned(),
+        ))
+    }
+
+    fn resolve_row(
+        items: &[Self],
+        context: &mut impl ParseContext,
+        scope: &ScalarAnalysisContext<'_>,
+    ) -> Result<SemScalarExpr, AnalysisError> {
+        Ok(SemScalarExpr::row(&Self::resolve_list(
+            items, context, scope,
+        )?))
     }
 
     fn resolve_array(
@@ -809,14 +821,7 @@ impl Access {
                 let upper = Expr::resolve_optional(&slice.upper, context, scope)?;
                 IndirectionExpr::resolved_slice(context, base, lower, upper)
             }
-            Self::Star => {
-                context.report_analysis_problem(AnalysisProblem::query(
-                    crate::sem::QueryProblem::invalid_star_projection_placement(),
-                ))?;
-                Ok(SemScalarExpr::Unexpected(
-                    "invalid star projection placement".to_owned(),
-                ))
-            }
+            Self::Star => Expr::invalid_star_projection(context),
         }
     }
 }

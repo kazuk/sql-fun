@@ -124,19 +124,30 @@ impl<'a> ScalarAnalysisContext<'a> {
     ) -> Result<Vec<crate::sem::data_source::ProjectionColumn<'_>>, AnalysisError> {
         match self.from_clause.qualified_source(context, relation) {
             Ok(Some(source)) => source.projection_columns(context, &self.with_clause),
-            Err(()) => {
-                context.report_analysis_problem(crate::sem::AnalysisProblem::query(
-                    crate::sem::QueryProblem::ambiguous_reference("star source"),
-                ))?;
-                Ok(Vec::new())
-            }
-            Ok(None) => {
-                if let Some(parent) = &self.parent {
-                    parent.relation_projection_names(context, relation)
-                } else {
-                    Ok(Vec::new())
-                }
-            }
+            Err(()) => self.ambiguous_relation_projection(context),
+            Ok(None) => self.parent_relation_projection_names(context, relation),
+        }
+    }
+
+    fn ambiguous_relation_projection(
+        &self,
+        context: &mut impl ParseContext,
+    ) -> Result<Vec<crate::sem::data_source::ProjectionColumn<'_>>, AnalysisError> {
+        context.report_analysis_problem(crate::sem::AnalysisProblem::query(
+            crate::sem::QueryProblem::ambiguous_reference("star source"),
+        ))?;
+        Ok(Vec::new())
+    }
+
+    fn parent_relation_projection_names(
+        &self,
+        context: &mut impl ParseContext,
+        relation: &crate::sem::FullName,
+    ) -> Result<Vec<crate::sem::data_source::ProjectionColumn<'_>>, AnalysisError> {
+        if let Some(parent) = &self.parent {
+            parent.relation_projection_names(context, relation)
+        } else {
+            Ok(Vec::new())
         }
     }
 

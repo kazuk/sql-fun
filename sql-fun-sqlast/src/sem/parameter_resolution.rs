@@ -1147,14 +1147,25 @@ impl ParameterResolution {
         let constraints = collector.parameters.constraints();
         query.walk(&mut Finalizer {
             constraints: &constraints,
-            context: collector.context,
+            context: &*collector.context,
+        })?;
+        if !query.expand_pending_stars(collector.context)? {
+            return Ok(constraints);
+        }
+        query.walk(&mut collector)?;
+        collector.parameters.solve(collector.context)?;
+        let constraints = collector.parameters.constraints();
+        query.walk(&mut Finalizer {
+            constraints: &constraints,
+            context: &*collector.context,
         })?;
         Ok(constraints)
     }
     pub(crate) fn infer_insert(
         insert: &mut crate::sem::InsertStatement,
         context: &mut impl crate::sem::ParseContext,
-    ) -> Result<ParameterConstraints, AnalysisError> {
+        implicit_targets: bool,
+    ) -> Result<(ParameterConstraints, bool), AnalysisError> {
         #[cfg(test)]
         INFERENCE_RUNS.with(|runs| runs.set(runs.get() + 1));
         let mut collector = Collector {
@@ -1167,9 +1178,22 @@ impl ParameterResolution {
         let constraints = collector.parameters.constraints();
         insert.walk(&mut Finalizer {
             constraints: &constraints,
-            context: collector.context,
+            context: &*collector.context,
         })?;
-        Ok(constraints)
+        if !insert.expand_source_stars(collector.context)? {
+            return Ok((constraints, false));
+        }
+        if implicit_targets {
+            insert.truncate_implicit_targets();
+        }
+        insert.walk(&mut collector)?;
+        collector.parameters.solve(collector.context)?;
+        let constraints = collector.parameters.constraints();
+        insert.walk(&mut Finalizer {
+            constraints: &constraints,
+            context: &*collector.context,
+        })?;
+        Ok((constraints, true))
     }
     pub(crate) fn infer_update(
         update: &mut crate::sem::UpdateStatement,

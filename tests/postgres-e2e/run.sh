@@ -43,6 +43,9 @@ lockfile="$fixture_dir/default.${run_dir##*/}.lock"
 function cleanup() {
   local status=$? running_pid
   trap - EXIT
+  if (( status != 0 )) && [[ -f "$run_dir/server.log" ]]; then
+    cat "$run_dir/server.log" >&2
+  fi
   for running_pid in $(jobs -pr); do
     if [[ "$running_pid" == "$server_pid" ]]; then
       kill -KILL "$running_pid" 2>/dev/null || true
@@ -99,6 +102,10 @@ export SQL_FUN_METADATA_FILE="$fixture_dir/Cargo.toml"
 export SQL_FUN_SCHEMA_FILE="$fixture_dir/schema.sql"
 export SQL_FUN_SCHEMA="${run_dir##*/}"
 unset SQL_FUN_SERVER_COMMAND SQL_FUN_MODE SQL_FUN_DATASOURCE SQL_FUN_DIALECT
+unset SQL_FUN_METADATA_FORMAT SQL_FUN_CTE_CATALOG_DIR SQL_FUN_PG_SEARCH_PATH
+unset SQL_FUN_POSTGRES_VERSION SQL_FUN_EXTENSIONS SQL_FUN_BUILTIN_SCHEMA SQL_FUN_EXTENSIONS_DIR
+unset SQL_FUN_LOG_FILE SQL_FUN_LOG_LEVEL SQL_FUN_HIGHLIGHTER_THEME SQL_FUN_NO_BUILTIN
+unset SQL_FUN_OUTPUT_FORMAT SQL_FUN_TERM_COLOR
 
 # Own the server child so cleanup never signals a developer's server.
 "$server_binary" --server-idle-timeout 0 </dev/null >"$run_dir/server.log" 2>&1 &

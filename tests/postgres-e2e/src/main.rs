@@ -8,24 +8,26 @@ struct Item {
     name: String,
 }
 
-#[sql_fun::sql_statement(sql = "INSERT INTO e2e_items (id, name) VALUES (${id}, ${name})")]
+#[sql_fun::sql_statement(
+    sql = "INSERT INTO e2e_items (id, name) VALUES (${id:bigint}, ${name:text})"
+)]
 async fn insert_item(client: &Client, id: i64, name: &str) -> Result<u64, tokio_postgres::Error> {}
 
 #[sql_fun::sql_query_one(
-    sql = "SELECT id, name FROM e2e_items WHERE id = ${id}",
+    sql = "SELECT id, name FROM e2e_items WHERE id = ${id:bigint}",
     builder_setter = "consuming",
     builder_build_fallible = false
 )]
 async fn select_item(client: &Client, id: i64) -> Result<Item, tokio_postgres::Error> {}
 
-#[sql_fun::sql_statement(sql = "UPDATE e2e_items SET name = ${name} WHERE id = ${id}")]
+#[sql_fun::sql_statement(sql = "UPDATE e2e_items SET name = ${name:text} WHERE id = ${id:bigint}")]
 async fn update_item(client: &Client, id: i64, name: &str) -> Result<u64, tokio_postgres::Error> {}
 
-#[sql_fun::sql_statement(sql = "DELETE FROM e2e_items WHERE id = ${id}")]
+#[sql_fun::sql_statement(sql = "DELETE FROM e2e_items WHERE id = ${id:bigint}")]
 async fn delete_item(client: &Client, id: i64) -> Result<u64, tokio_postgres::Error> {}
 
 #[sql_fun::sql_query_opt(
-    sql = "SELECT id, name FROM e2e_items WHERE id = ${id}",
+    sql = "SELECT id, name FROM e2e_items WHERE id = ${id:bigint}",
     builder_setter = "consuming",
     builder_build_fallible = false
 )]

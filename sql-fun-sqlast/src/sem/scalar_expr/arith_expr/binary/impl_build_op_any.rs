@@ -1,5 +1,8 @@
+use super::BinaryCastCandidate;
+
 use crate::sem::{
-    AnalysisError, OperatorName, ParseContext, SemScalarExpr,
+    AnalysisError, OperatorName, ParseContext, PgBuiltInType, SemScalarExpr,
+    scalar_expr::arith_expr::AnyBinaryCallSite,
     scalar_expr::arith_expr::UndefinedOperatorAnyCallSite,
 };
 
@@ -34,52 +37,161 @@ impl super::ArithExpr {
             AnalysisError::raise_unexpected_none("a_expr.rexpr")?
         };
 
-        if let Some(operator_def) = context.get_operator_op(name, true, true) {
-            if lexpr.get_type().is_none() || rexpr.get_type().is_none() {
-                return Ok((Self::deferred_any_operator(name, lexpr, rexpr), context));
-            }
-            let operator_def = operator_def.clone();
-
-            let resolved_bin_op =
-                Self::resolve_overload_binary(context, operator_def, lexpr, rexpr)?;
-            resolved_bin_op.into_any_call_site_expr(context, name)
-        } else {
-            UndefinedOperatorAnyCallSite::undefined_operator_any_resolved(
+        let Some(operator_def) = context.get_operator_op(name, true, true).cloned() else {
+            return UndefinedOperatorAnyCallSite::undefined_operator_any_resolved(
                 context, name, lexpr, rexpr,
-            )
+            );
+        };
+        let (Some(left_type), Some(array_type)) = (lexpr.get_type(), rexpr.get_type()) else {
+            return Ok((Self::deferred_any_operator(name, lexpr, rexpr), context));
+        };
+        if array_type.is_array() != Some(true) {
+            rexpr.require_array_resolved(context)?;
+            return UndefinedOperatorAnyCallSite::undefined_operator_any_resolved(
+                context, name, lexpr, rexpr,
+            );
         }
+        let candidates = BinaryCastCandidate::resolve(
+            context,
+            &operator_def,
+            &left_type,
+            &array_type.element_type(),
+        )?;
+        if candidates.len() != 1 {
+            return UndefinedOperatorAnyCallSite::undefined_operator_any_resolved(
+                context, name, lexpr, rexpr,
+            );
+        }
+        let candidate = &candidates[0];
+        if candidate.operator().get_return_type() != &PgBuiltInType::bool() {
+            return UndefinedOperatorAnyCallSite::undefined_operator_any_resolved(
+                context, name, lexpr, rexpr,
+            );
+        }
+        let (left, right) = candidate.wrap_array_implicit_cast(lexpr, rexpr);
+        AnyBinaryCallSite::from_operator_definition_resolved(
+            context,
+            name,
+            candidate.operator().clone(),
+            left,
+            right,
+        )
     }
 }
 
 #[cfg(test)]
-mod test_arith_expr_build_op_any {
-    use crate::{
-        sem::{
-            ArithExpr, BinaryOperatorDefinition, CastContext, CastDefinition, OperatorDefinition,
-            OperatorName, SemScalarExpr, TypeReference, names::ValidOperatorName,
-            scalar_expr::const_expr::ScalarConstExpr,
-        },
-        test_helpers::{TestParseContext, test_context},
+mod test_build_op_any {
+    use crate::sem::scalar_expr::{ArrayExpr, ScalarConstExpr};
+    use crate::sem::{
+        ArithExpr, BinaryOperatorDefinition, CastContext, CastDefinition, OperatorDefinition,
+        OperatorName, PgBuiltInType, SemScalarExpr, TypeDefinition, TypeReference,
     };
-
-    use ::testresult::TestResult;
+    use crate::test_helpers::TestParseContext;
 
     #[rstest::rstest]
-    fn test_build_op_any(mut test_context: TestParseContext) -> TestResult {
-        let name = OperatorName::Valid(ValidOperatorName::new("+"));
-        let type_ref = TypeReference::from_master_type_name("int4");
-        test_context.set_get_implicit_cast_result(
-            &type_ref,
-            &type_ref,
-            Some(CastDefinition::new(CastContext::NoConversion)),
+    #[case::exact(false, false)]
+    #[case::implicit(true, false)]
+    #[case::ambiguous(false, true)]
+    fn element_overloads_and_array_coercions(
+        #[case] coercion: bool,
+        #[case] ambiguous: bool,
+    ) -> testresult::TestResult {
+        let mut context = TestParseContext::default();
+        let source = PgBuiltInType::int4();
+        let target = if coercion || ambiguous {
+            PgBuiltInType::int8()
+        } else {
+            source.clone()
+        };
+        context.setup_type(source.clone());
+        context.set_get_implicit_cast_result(
+            &source,
+            &target,
+            Some(CastDefinition::new(if coercion || ambiguous {
+                CastContext::implicit()
+            } else {
+                CastContext::no_conversion()
+            })),
         );
-        let expr = SemScalarExpr::new_const(ScalarConstExpr::new_integer(10));
-        let operator_def = BinaryOperatorDefinition::new(&type_ref, &type_ref, &type_ref, true);
-        let operator_def = OperatorDefinition::Binary(vec![operator_def]);
-        test_context.set_get_operator_op_result(&name, true, true, Some(&operator_def));
+        let name = OperatorName::new("=");
+        let operator =
+            BinaryOperatorDefinition::new(&source, &target, &PgBuiltInType::bool(), true);
+        let definitions = if ambiguous {
+            let alternate = PgBuiltInType::numeric();
+            context.set_get_implicit_cast_result(
+                &source,
+                &alternate,
+                Some(CastDefinition::new(CastContext::implicit())),
+            );
+            vec![
+                operator,
+                BinaryOperatorDefinition::new(&source, &alternate, &PgBuiltInType::bool(), true),
+            ]
+        } else {
+            vec![operator]
+        };
+        context.set_get_operator_op_result(
+            &name,
+            true,
+            true,
+            Some(&OperatorDefinition::binary(&definitions)),
+        );
+        let left = SemScalarExpr::new_const(ScalarConstExpr::new_integer(1));
+        let right = ArrayExpr::resolve(
+            &mut context,
+            std::slice::from_ref(&left),
+            Some(&source.array_type()),
+        )?;
+        let (value, context) =
+            ArithExpr::build_op_any(context, &name, Some(left), Some(right.clone()))?;
+        if ambiguous {
+            assert!(context.has_reported_problem("binary_operator_overload_ambiguous"));
+            assert_eq!(value.get_type(), None);
+            let encoded = ::serde_json::to_value(value)?;
+            assert_eq!(
+                encoded["Arith"]["UndefinedOperatorAny"]["rarg"],
+                ::serde_json::to_value(right)?
+            );
+        } else {
+            assert!(context.reported_problems().is_empty());
+            assert_eq!(value.get_type(), Some(PgBuiltInType::bool()));
+            let encoded = ::serde_json::to_value(value)?;
+            let encoded_right = &encoded["Arith"]["OpAnyBinary"]["right_arg"];
+            if coercion {
+                assert_eq!(
+                    encoded_right["ImplicitCast"]["cast_target"],
+                    ::serde_json::to_value(target.array_type())?
+                );
+                assert_eq!(
+                    encoded_right["ImplicitCast"]["value"],
+                    ::serde_json::to_value(&right)?
+                );
+            } else {
+                assert_eq!(encoded_right, &::serde_json::to_value(right)?);
+            }
+        }
+        Ok(())
+    }
 
-        ArithExpr::build_op_any(test_context, &name, Some(expr.clone()), Some(expr.clone()))?;
-
+    #[test]
+    fn dynamic_non_array_is_rejected_without_element_projection() -> testresult::TestResult {
+        let mut context = TestParseContext::default();
+        let source = PgBuiltInType::int4();
+        let name = OperatorName::new("=");
+        let operator =
+            BinaryOperatorDefinition::new(&source, &source, &PgBuiltInType::bool(), true);
+        context.set_get_operator_op_result(
+            &name,
+            true,
+            true,
+            Some(&OperatorDefinition::binary(&[operator])),
+        );
+        let left = SemScalarExpr::new_const(ScalarConstExpr::new_integer(1));
+        let dynamic = TypeReference::dynamic(&TypeDefinition::builtin(source.full_name()));
+        let right = SemScalarExpr::wrap_implicit_cast(&dynamic, &left);
+        let (value, context) = ArithExpr::build_op_any(context, &name, Some(left), Some(right))?;
+        assert_eq!(value.get_type(), None);
+        assert!(context.has_reported_problem("undefined_operator"));
         Ok(())
     }
 }

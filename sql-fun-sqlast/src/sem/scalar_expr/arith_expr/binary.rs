@@ -133,28 +133,6 @@ impl ResolvedBinaryOperator {
         }
     }
 
-    pub(super) fn into_any_call_site_expr<'context, TParseContext>(
-        self,
-        context: &'context mut TParseContext,
-        name: &OperatorName,
-    ) -> Result<(SemScalarExpr, &'context mut TParseContext), AnalysisError>
-    where
-        TParseContext: crate::sem::ParseContext,
-    {
-        if let Some(operator) = self.operator_def {
-            super::AnyBinaryCallSite::from_operator_definition_resolved(
-                context, name, operator, self.lexpr, self.rexpr,
-            )
-        } else {
-            super::UndefinedOperatorCallSite::undefined_operator_resolved(
-                context,
-                name,
-                Some(self.lexpr),
-                Some(self.rexpr),
-            )
-        }
-    }
-
     pub(super) fn into_all_call_site_expr<'context, TParseContext>(
         self,
         context: &'context mut TParseContext,
@@ -188,38 +166,13 @@ impl ArithExpr {
     where
         TParseContext: crate::sem::ParseContext,
     {
-        let OperatorDefinition::Binary(ref overloads) = operator_def else {
-            AnalysisError::raise_unexpected_input("resolve_overload_binary with non binary op")?
-        };
-
         if let Some(left_type) = lexpr.get_type()
             && let Some(right_type) = rexpr.get_type()
         {
-            let candidates = BinaryCastCandidate::enumerate_from_context_resolved(
-                context,
-                overloads,
-                &left_type,
-                &right_type,
-            );
-            if candidates.is_empty() {
-                context.report_analysis_problem(
-                    AnalysisProblem::binary_operator_overload_resolution_failed(
-                        &operator_def,
-                        &left_type,
-                        &right_type,
-                    ),
-                )?;
+            let filtered =
+                BinaryCastCandidate::resolve(context, &operator_def, &left_type, &right_type)?;
+            if filtered.is_empty() {
                 return Ok(ResolvedBinaryOperator::new(None, lexpr, rexpr));
-            }
-            let filtered = BinaryCastCandidate::filter_best_candidate(candidates);
-            if filtered.len() > 1 {
-                context.report_analysis_problem(
-                    AnalysisProblem::binary_operator_overload_ambiguous(
-                        &operator_def,
-                        &left_type,
-                        &right_type,
-                    ),
-                )?;
             }
             let candidate = &filtered[0];
             let (lexpr, rexpr) = candidate.wrap_implicit_cast(lexpr, rexpr);

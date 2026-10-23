@@ -61,8 +61,9 @@ impl AnyBinaryCallSite {
         ))
     }
 
-    pub fn is_not_null(&self) -> Option<bool> {
-        super::binary_is_not_null(&self.left_arg, &self.right_arg)
+    pub const fn is_not_null(&self) -> Option<bool> {
+        // Empty arrays and NULL elements make scalar strictness insufficient.
+        None
     }
 
     pub const fn get_return_type(&self) -> &TypeReference {
@@ -111,7 +112,7 @@ impl UndefinedOperatorAnyCallSite {
         TParseContext: crate::sem::ParseContext,
     {
         context.report_analysis_problem(AnalysisProblem::undefined_operator(
-            AExprKind::AexprOp,
+            AExprKind::AexprOpAny,
             name,
             &Some(lexpr.clone()),
             &Some(rexpr.clone()),

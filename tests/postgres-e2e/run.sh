@@ -127,6 +127,8 @@ if [[ ! -s "$run_dir/sql-fun-server.pid" ]]; then
 fi
 
 cd "$fixture_dir"
-"$cli_binary" check --locked --bin sql-fun-postgres-e2e
+"$cli_binary" check --bin sql-fun-postgres-e2e
 test -s "$lockfile"
-cargo run --locked --bin sql-fun-postgres-e2e
+# Macro inputs include this run's lockfile and are not Cargo fingerprint inputs.
+cargo clean --package sql-fun-postgres-e2e
+cargo run --bin sql-fun-postgres-e2e

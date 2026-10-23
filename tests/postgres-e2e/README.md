@@ -14,8 +14,10 @@ SQL types using `${id:bigint}` and `${name:text}`. Rust assertions verify bound
 integer and text values through `INSERT`, `SELECT`, `UPDATE`, and `DELETE`.
 Failure in any phase makes the command fail. Containers, server processes, generated
 lockfiles, and temporary state are cleaned up on exit or handled interruption.
-Cargo artifacts persist in the repository's `target/` (or an explicitly supplied
-`CARGO_TARGET_DIR`) and are reused across queries and subsequent runs.
+Dependency artifacts persist in the repository's `target/` (or an explicitly
+supplied `CARGO_TARGET_DIR`) and are reused across queries and subsequent local
+runs. The consumer itself is rebuilt against each run's generated lockfile.
+CI discards build artifacts after E2E execution.
 
 In addition to the [contributor setup](../../CONTRIBUTING.md#getting-started),
 install the PostgreSQL client (`sudo apt-get install postgresql-client` on

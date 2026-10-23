@@ -1,6 +1,7 @@
 /target
 /user_manual
 /stats/coverage.txt
+/tests/postgres-e2e/Cargo.lock
 /.worktrees/
 
 .serena

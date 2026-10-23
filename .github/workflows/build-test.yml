@@ -201,6 +201,10 @@ jobs:
           path: target/nextest/ci/junit.xml
           reporter: java-junit
 
+      - name: Clean build artifacts before cache save
+        if: ${{ always() }}
+        run: cargo clean
+
   msrv:
     needs: pr-freshness
     runs-on: ubuntu-24.04
@@ -487,6 +491,8 @@ jobs:
                 /validation/e2e/run.sh /validation/e2e
             '
 
+      - uses: taiki-e/install-action@cargo-expand
+
       - name: Execute checked SQL against PostgreSQL
         run: |
           sudo apt-get update
@@ -494,8 +500,11 @@ jobs:
             "$RUNNER_TEMP/sql-fun-artifact"/sql-fun_*.deb
           rustup toolchain install stable --profile minimal
           rustup default stable
-          cargo install --locked cargo-expand --version 1.0.126
           tests/postgres-e2e/run.sh --installed /usr/bin/sql-fun /usr/bin/sql-fun-server
+
+      - name: Clean PostgreSQL E2E build artifacts
+        if: ${{ always() }}
+        run: cargo clean
 
   postgres-extraction:
     needs: [pr-freshness, packaging]

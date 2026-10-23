@@ -36,6 +36,16 @@ pub struct AnalyzeQueryArgs {
 }
 
 impl AnalyzeQueryArgs {
+    /// Submit explicit SQL without Rust extraction or a CTE dependency catalog.
+    #[must_use]
+    pub fn new(context_handle: &ContextHandle, query: &str) -> Self {
+        Self {
+            context_handle: context_handle.clone(),
+            query: AnalyzeQueryInput::from_text(query),
+            resolved_cte_catalog: None,
+        }
+    }
+
     /// Submit explicit inline application SQL with its resolved CTE dependencies.
     /// Takes ownership to preserve the recovered catalog without copying it.
     #[must_use]

@@ -1,4 +1,4 @@
-use crate::{ApiArgs, CheckArgs, ExtractArgs};
+use crate::{AnalyzeArgs, ApiArgs, CheckArgs, ExtractArgs, TestArgs};
 use sql_fun_core::InitializeArgs;
 
 /// daemon control args
@@ -15,6 +15,12 @@ pub struct DaemonControlArgs {
 pub enum CliSubCommand {
     /// Stream JSON Lines requests to the authenticated per-user server
     Api(ApiArgs),
+
+    /// Analyze SQL without Rust extraction or lockfiles.
+    Analyze(AnalyzeArgs),
+
+    /// Test diagnostic sets and result-column contracts without executing SQL.
+    Test(TestArgs),
 
     /// Extract `PostgreSQL` catalogs or import extension files
     Extract(ExtractArgs),
@@ -92,7 +98,12 @@ impl CliSubCommand {
     pub(crate) const fn is_builtin(&self) -> bool {
         matches!(
             self,
-            Self::Api(_) | Self::Initialize(_) | Self::Check(_) | Self::Extract(_)
+            Self::Api(_)
+                | Self::Initialize(_)
+                | Self::Check(_)
+                | Self::Extract(_)
+                | Self::Analyze(_)
+                | Self::Test(_)
         )
     }
 
@@ -103,6 +114,8 @@ impl CliSubCommand {
     ) -> Result<std::process::ExitCode, anyhow::Error> {
         match self {
             Self::Api(args) => args.execute().await,
+            Self::Analyze(args) => args.execute(common).await,
+            Self::Test(args) => args.execute(common).await,
             Self::Initialize(args) => {
                 Ok(crate::init::initialize(common, args, metadata_file_from_cli).await?)
             }
@@ -132,6 +145,7 @@ impl CliSubCommand {
             Self::Check(_check_args) => todo!(),
             Self::Versions => todo!(),
             Self::Api(_) => unreachable!("builtin api"),
+            Self::Analyze(_) | Self::Test(_) => unreachable!("builtin direct SQL"),
             Self::Extract(_) => unreachable!("builtin extraction"),
         }
     }
@@ -159,6 +173,8 @@ impl CliSubCommand {
             }
             Self::Initialize(_) => (false, "init".to_string()),
             Self::Check(_) => (false, "check".to_string()),
+            Self::Analyze(_) => (false, "analyze".to_string()),
+            Self::Test(_) => (false, "test".to_string()),
             Self::Extract(_) => (false, "extract".to_string()),
             Self::Versions => (false, "versions".to_string()),
             Self::Api(_) => (false, "api".to_string()),

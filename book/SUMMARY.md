@@ -21,6 +21,8 @@
 - [init](./cli/init.md) sub command
 - [Extract PostgreSQL metadata](cli/extract.md)
 - [check](./cli/check.md) sub command
+- [Analyze SQL files](cli/analyze.md)
+- [Test SQL contracts](cli/test.md)
 <!-- Empty links mark draft chapters in mdBook. -->
 <!-- rumdl-disable MD042 -->
 - [api](./cli/api.md)

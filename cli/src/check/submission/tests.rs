@@ -414,7 +414,7 @@ async fn validate_only_compares_prospective_state_without_mutation(
             source_line: 1,
             datasource: "first".to_owned(),
             response,
-            tokenizations: Vec::new(),
+            tokenizations: crate::analysis::PreparedDiagnostics::default(),
         };
         lockfiles.receive(&analysis).unwrap();
     }

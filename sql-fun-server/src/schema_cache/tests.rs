@@ -102,7 +102,7 @@ async fn mismatch_populates_actual_hash_and_retry_reuses_result() {
         loaded.analysis(),
         SchemaCacheService::successful(&cached).unwrap().as_ref()
     ));
-    assert_eq!(loaded.actual_hash(), actual);
+    assert_eq!(loaded.actual_hash(), Some(actual.as_str()));
     assert!(
         service
             .initialize(&request)
@@ -316,7 +316,7 @@ fn selection_never_infers_a_datasource(#[case] datasource: &str) {
             &metadata,
             &[],
             &dump,
-            &explicit.expected_hash
+            explicit.expected_hash.as_deref().unwrap()
         )
         .is_err()
     );
@@ -378,7 +378,7 @@ async fn unspecified_search_path_shares_effective_default_identity() {
         &metadata,
         &[],
         &dump,
-        &explicit.expected_hash,
+        explicit.expected_hash.as_deref().unwrap(),
     )
     .unwrap();
     assert_eq!(default.search_path, vec!["public"]);
@@ -509,8 +509,8 @@ async fn expected_hash_selects_historical_schema_after_dump_changes_or_deletion(
     let new = service.initialize(&revised).await.unwrap();
     assert!(std::ptr::eq(first.analysis(), old.analysis()));
     assert!(std::ptr::eq(second.analysis(), new.analysis()));
-    assert_eq!(old.actual_hash(), original_hash);
-    assert_eq!(new.actual_hash(), revised_hash);
+    assert_eq!(old.actual_hash(), Some(original_hash.as_str()));
+    assert_eq!(new.actual_hash(), Some(revised_hash.as_str()));
     let table = TableName::from(FullName::with_schema("public", "original"));
     assert!(old.base_context().get_table(&table).is_some());
     assert!(new.base_context().get_table(&table).is_none());
@@ -530,4 +530,76 @@ async fn expected_hash_retains_deterministic_error_after_dump_repair() {
         service.initialize(&failed).await.err().unwrap().to_string(),
         original_error
     );
+}
+
+#[rstest::rstest]
+#[case::builtin(::sql_fun_core::SchemaLevel::builtin(), 0)]
+#[case::default_sql(::sql_fun_core::SchemaLevel::default_sql(), 1)]
+#[case::extensions(::sql_fun_core::SchemaLevel::extensions(), 2)]
+#[case::project(::sql_fun_core::SchemaLevel::project(), 3)]
+#[tokio::test]
+async fn requested_prefix_preserves_objects_cache_identity_and_excludes_later_files(
+    #[case] level: ::sql_fun_core::SchemaLevel,
+    #[case] depth: usize,
+) {
+    let project = SchemaProject::new();
+    let service = project.service();
+    let builtin = project.schema(
+        "postgres/17/schema.sql",
+        "CREATE TABLE builtin_sql (id int4);",
+    );
+    let extension = project.schema("extension.sql", "CREATE TABLE extension_sql (id int4);");
+    let dump = project.schema("dump.sql", "CREATE TABLE project_sql (id int4);");
+    let hash = SchemaProject::hash(&dump);
+    // Excluded paths deliberately do not exist. Root must not read builtin SQL either.
+    if depth < 3 {
+        std::fs::remove_file(&dump).unwrap();
+    }
+    if depth < 2 {
+        std::fs::remove_file(&extension).unwrap();
+    }
+    if depth < 1 {
+        std::fs::remove_file(&builtin).unwrap();
+    }
+    let (args, metadata) = project.analysis_inputs("products");
+    let selection = SchemaSelection::for_level(
+        "products",
+        &args,
+        &metadata,
+        std::slice::from_ref(&extension),
+        Some(&dump),
+        Some(if depth == 3 {
+            &hash
+        } else {
+            "ignored-invalid-hash"
+        }),
+        level,
+    )
+    .unwrap();
+    let first = service.initialize(&selection).await.unwrap();
+    let second = service.initialize(&selection).await.unwrap();
+    assert!(std::ptr::eq(first.analysis(), second.analysis()));
+    assert_eq!(
+        first.actual_hash(),
+        if depth == 3 {
+            Some(hash.as_str())
+        } else {
+            None
+        }
+    );
+    for (index, name) in ["builtin_sql", "extension_sql", "project_sql"]
+        .iter()
+        .enumerate()
+    {
+        let name = TableName::from(FullName::with_schema("public", name));
+        assert_eq!(
+            first.base_context().get_table(&name).is_some(),
+            index < depth
+        );
+    }
+    // A nonexistent excluded file cannot have entered the path/hash-watch registry.
+    let known = service.known_paths.lock().unwrap();
+    for (index, path) in [builtin, extension, dump].iter().enumerate() {
+        assert_eq!(known.contains_key(path), index < depth);
+    }
 }

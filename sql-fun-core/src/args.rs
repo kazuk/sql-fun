@@ -553,6 +553,38 @@ impl SqlFunArgs {
         Ok(result)
     }
 
+    /// Transfer explicitly selected analysis settings without resolving excluded schema files.
+    ///
+    /// # Errors
+    /// Rejects missing datasource, metadata, or invalid selected configuration.
+    pub fn analysis_environments(
+        &self,
+        level: crate::SchemaLevel,
+    ) -> Result<HashMap<String, String>, SqlFunArgsError> {
+        let datasource = self
+            .datasource()
+            .ok_or_else(|| SqlFunArgsError::Unexpected("explicit datasource is required".into()))?;
+        let metadata = self.selected_metadata(datasource)?;
+        let mut result = HashMap::new();
+        if level.includes_project() {
+            self.metadata_args.get_envs(&mut result, &metadata)?;
+            self.postgres_args.get_envs(&mut result, self, &metadata)?;
+        } else {
+            self.metadata_args.get_common_envs(&mut result)?;
+            self.postgres_args.get_explicit_envs(&mut result);
+        }
+        self.log_args.get_envs(&mut result);
+        result.insert(
+            Self::SQL_FUN_OUTPUT_FORMAT.to_owned(),
+            self.output_format.clone(),
+        );
+        // Validate the selected engine configuration without opening any SQL layer.
+        self.postgres_version(&metadata)?;
+        self.postgres_search_path(&metadata)?;
+        result.insert(Self::SQL_FUN_DATASOURCE.to_owned(), datasource.to_owned());
+        Ok(result)
+    }
+
     /// Requested terminal color mode, without inspecting the terminal.
     #[must_use]
     pub const fn term_color(&self) -> TerminalColor {
@@ -635,6 +667,38 @@ impl SqlFunArgs {
             args.log_args.set_log_level("debug");
         }
         Ok(args)
+    }
+}
+
+#[cfg(test)]
+mod test_analysis_transfer {
+    use crate::{
+        SchemaLevel, SqlFunArgs,
+        test_helpers::{TestProjectDir, write_postgres_metadata_project},
+    };
+    #[rstest::rstest]
+    #[case::builtin(SchemaLevel::builtin())]
+    #[case::default_sql(SchemaLevel::default_sql())]
+    #[case::extensions(SchemaLevel::extensions())]
+    fn lower_prefix_transfer_does_not_require_a_dump_or_resolve_extensions(
+        #[case] level: SchemaLevel,
+    ) -> ::testresult::TestResult {
+        let project = TestProjectDir::new()?;
+        let fixture = write_postgres_metadata_project(&project);
+        std::fs::remove_file(&fixture.schema_file)?;
+        let args = SqlFunArgs::builder(&std::collections::HashMap::new())?
+            .metadata_file(fixture.metadata_file.to_str().unwrap())
+            .sql_fun_home(project.path())
+            .schema_file(&fixture.schema_file)
+            .datasource(Some("default".to_owned()))
+            .postgres_extensions_dir(project.path().join("missing-extensions"))
+            .build()?;
+        assert!(args.environments().is_err());
+        let restored = SqlFunArgs::from_environments(&args.analysis_environments(level)?)?;
+        let metadata = restored.selected_metadata("default")?;
+        assert_eq!(restored.postgres_version(&metadata)?.to_string(), "16");
+        assert_eq!(restored.postgres_search_path(&metadata)?, ["public"]);
+        Ok(())
     }
 }
 

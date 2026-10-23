@@ -5,15 +5,14 @@ mod tests;
 
 use std::collections::{HashMap, hash_map::Entry};
 
+use crate::analysis::{prepare_tokens, request_typed};
 use ::anyhow::Context;
 use ::sql_fun_client::{
     TcpJsonRpcClientAsync,
-    payloads::{
-        AnalyzeQueryArgs, AnalyzeQueryResponse, ContextHandle, InitializeSchemaArgs, SchemaContext,
-    },
+    payloads::{AnalyzeQueryArgs, AnalyzeQueryResponse, ContextHandle, SchemaContext},
 };
 use ::sql_fun_codegen::QueryRequirement;
-use ::sql_fun_core::{Hasher, PlaceholderedSql, SqlDialect, SqlFunArgs, TokenStream};
+use ::sql_fun_core::{PlaceholderedSql, SqlFunArgs};
 use ::tokio::sync::mpsc::Sender;
 
 /// CLI-owned source identity paired with a fully materialized server response.
@@ -26,13 +25,7 @@ pub(super) struct QueryAnalysis {
     source_line: u32,
     datasource: String,
     response: AnalyzeQueryResponse,
-    tokenizations: Vec<PreparedTokenization>,
-}
-
-struct PreparedTokenization {
-    source: String,
-    dialect: SqlDialect,
-    result: Result<TokenStream, String>,
+    tokenizations: crate::analysis::PreparedDiagnostics,
 }
 
 impl QueryAnalysis {
@@ -58,24 +51,16 @@ impl QueryAnalysis {
         &self.response
     }
 
-    pub(super) fn tokens(&self, source: &str, dialect: SqlDialect) -> Option<&TokenStream> {
-        let entry = self
-            .tokenizations
-            .iter()
-            .find(|item| item.source == source && item.dialect == dialect);
-        if let Some(entry) = entry
-            && let Ok(tokens) = &entry.result
-        {
-            Some(tokens)
-        } else {
-            None
-        }
+    pub(super) fn render(
+        &self,
+        diagnostic: &::sql_fun_client::payloads::AnalysisProbrem,
+        renderer: &crate::DiagnosticRenderer,
+    ) -> Result<String, ::anyhow::Error> {
+        self.tokenizations.render(diagnostic, renderer)
     }
 
     pub(super) fn tokenization_error(&self) -> Option<&str> {
-        self.tokenizations
-            .iter()
-            .find_map(|item| item.result.as_ref().err().map(String::as_str))
+        self.tokenizations.error()
     }
 
     pub(super) fn log_received(&self) {
@@ -114,7 +99,11 @@ pub(super) async fn submit(
             .cte_catalog()
             .finger_print(&PlaceholderedSql::from_query(requirement.query()))?;
         if let Entry::Vacant(entry) = contexts.entry(datasource.clone()) {
-            let request = initialization(args, &datasource)?;
+            let request = crate::analysis::initialization(
+                args,
+                &datasource,
+                ::sql_fun_core::SchemaLevel::project(),
+            )?;
             let initialized: SchemaContext =
                 request_typed(client, "initialize_schema_context", &request)
                     .await
@@ -149,72 +138,4 @@ pub(super) async fn submit(
             .map_err(|_| ::anyhow::anyhow!("analysis result receiver closed before delivery"))?;
     }
     Ok(())
-}
-
-/// Lex only sources explicitly retained for presentation. Failed lexing is
-/// carried with the analysis so the consumer can still show each diagnostic.
-async fn prepare_tokens(
-    client: &mut TcpJsonRpcClientAsync,
-    response: &AnalyzeQueryResponse,
-) -> Vec<PreparedTokenization> {
-    let mut prepared: Vec<PreparedTokenization> = Vec::new();
-    for item in response.queries().items() {
-        for diagnostic in item.probrems().items() {
-            let Some(presentation) = diagnostic.presentation() else {
-                continue;
-            };
-            if prepared.iter().any(|entry| {
-                entry.source == presentation.source() && entry.dialect == presentation.dialect()
-            }) {
-                continue;
-            }
-            let result = client
-                .tokenize_sql(presentation.source(), presentation.dialect())
-                .await
-                .map_err(|error| error.to_string());
-            prepared.push(PreparedTokenization {
-                source: presentation.source().to_owned(),
-                dialect: presentation.dialect(),
-                result,
-            });
-        }
-    }
-    prepared
-}
-
-fn initialization(
-    args: &SqlFunArgs,
-    datasource: &str,
-) -> Result<InitializeSchemaArgs, ::anyhow::Error> {
-    let selected = args.with_datasource(datasource);
-    let metadata_file = selected.metadata_file()?;
-    let schema_dump = std::path::absolute(selected.schema_file(&metadata_file)?)?;
-    let hash = Hasher::hash_file(&schema_dump)?;
-    let environments = selected.environments()?;
-    Ok(InitializeSchemaArgs::new(
-        datasource,
-        &schema_dump,
-        &hash,
-        &environments,
-    ))
-}
-
-/// Await the existing typed client's completion, including paging and releases.
-async fn request_typed<R>(
-    client: &mut TcpJsonRpcClientAsync,
-    method: &str,
-    request: &impl ::serde::Serialize,
-) -> Result<R, ::anyhow::Error>
-where
-    R: ::sql_fun_client::CompleteResponse + ::serde::de::DeserializeOwned + Send + 'static,
-{
-    let params = ::serde_json::to_value(request)?;
-    let (sender, receiver) = ::tokio::sync::oneshot::channel();
-    client
-        .invoke_typed(method, &params, |result| async move {
-            let _ = sender.send(result);
-            Ok(())
-        })
-        .await?;
-    Ok(receiver.await??)
 }

@@ -417,6 +417,16 @@ impl TextPosition {
     }
 }
 impl Nullability {
+    /// Stable spelling for human-authored SQL result contracts.
+    #[must_use]
+    pub const fn contract_name(&self) -> &'static str {
+        match self {
+            Self::NotNull => "not_null",
+            Self::Nullable => "nullable",
+            Self::Unknown => "unknown",
+        }
+    }
+
     /// Preserve the analyzer's three-state nullability.
     #[must_use]
     pub const fn from_not_null(value: Option<bool>) -> Self {

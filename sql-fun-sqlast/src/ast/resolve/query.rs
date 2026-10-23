@@ -203,6 +203,24 @@ impl Select {
         outer: Option<&ScalarAnalysisContext<'_>>,
         query_id: usize,
     ) -> Result<SelectStatement, AnalysisError> {
+        self.validate_rule_destination(context, outer)?;
+        let from = self.resolve_from(context, with, outer, query_id)?;
+        let mut scope = self.scope(with, &from, outer, query_id);
+        let windows = self.resolve_windows(context, &scope)?;
+        let predicate = self.resolve_where(context, &scope)?;
+        let mut results = self.resolve_targets(context, with, &from, &scope)?;
+        let distinct = self.resolve_distinct(context, &scope, &results)?;
+        let group = self.resolve_grouping(context, &mut scope, &mut results, query_id)?;
+        let having = self.resolve_having(context, &scope)?;
+        let clauses = self.resolve_clauses(distinct, group, having, windows)?;
+        Ok(Self::build_result(results, from, predicate, clauses))
+    }
+
+    fn validate_rule_destination(
+        &self,
+        context: &mut impl ParseContext,
+        outer: Option<&ScalarAnalysisContext<'_>>,
+    ) -> Result<(), AnalysisError> {
         if self.into.is_some()
             && let Some(scope) = outer
             && let Some(identity) = scope.rule_identity()
@@ -214,6 +232,16 @@ impl Select {
                 ),
             ))?;
         }
+        Ok(())
+    }
+
+    fn resolve_from(
+        &self,
+        context: &mut impl ParseContext,
+        with: &WithClause,
+        outer: Option<&ScalarAnalysisContext<'_>>,
+        query_id: usize,
+    ) -> Result<FromClause, AnalysisError> {
         let empty = FromClause::default();
         let mut from_scope = ScalarAnalysisContext::nested(with, &empty, outer);
         from_scope.set_grouping_query(query_id);
@@ -222,67 +250,69 @@ impl Select {
         if let Some(scope) = outer {
             scope.validate_rule_sources(context, &from)?;
         }
-        let mut scope = ScalarAnalysisContext::nested(with, &from, outer);
+        Ok(from)
+    }
+
+    fn scope<'a>(
+        &self,
+        with: &'a WithClause,
+        from: &'a FromClause,
+        outer: Option<&ScalarAnalysisContext<'a>>,
+        query_id: usize,
+    ) -> ScalarAnalysisContext<'a> {
+        let mut scope = ScalarAnalysisContext::nested(with, from, outer);
         scope.set_grouping_query(query_id);
         scope.set_windows(Window::names(&self.windows));
-        let windows = Window::resolve_definitions(&self.windows, context, &scope)?;
-        let predicate = Expr::resolve_optional(
+        scope
+    }
+
+    fn resolve_windows(
+        &self,
+        context: &mut impl ParseContext,
+        scope: &ScalarAnalysisContext<'_>,
+    ) -> Result<Vec<crate::sem::QueryWindow>, AnalysisError> {
+        Window::resolve_definitions(&self.windows, context, scope)
+    }
+
+    fn resolve_where(
+        &self,
+        context: &mut impl ParseContext,
+        scope: &ScalarAnalysisContext<'_>,
+    ) -> Result<Option<crate::sem::SemScalarExpr>, AnalysisError> {
+        Expr::resolve_optional(
             &self.predicate,
             context,
             &scope.with_grouping_placement("WHERE"),
-        )?;
+        )
+    }
+
+    fn resolve_targets(
+        &self,
+        context: &mut impl ParseContext,
+        with: &WithClause,
+        from: &FromClause,
+        scope: &ScalarAnalysisContext<'_>,
+    ) -> Result<ResultColumnCollection, AnalysisError> {
         let mut results = ResultColumnCollection::default();
         for target in &self.targets {
-            if let Expr::Star(name) = &target.expression {
-                let relation = name.star_relation()?;
-                let qualifier = if relation.is_none() {
-                    name.star_qualifier()?
-                } else {
-                    None
-                };
-                let columns = if let Some(relation) = &relation {
-                    scope.relation_projection_names(context, relation)?
-                } else if let Some(qualifier) = &qualifier {
-                    scope.projection_names(context, qualifier)?
-                } else {
-                    from.projection_names(context, with, None)?
-                };
-                if columns.is_empty() && qualifier.is_some() {
-                    let base = name.resolve_column(context, &scope)?;
-                    results.append_composite_star(context, base)?;
-                    continue;
-                }
-                if columns.is_empty() {
-                    context.report_analysis_problem(AnalysisProblem::query(
-                        crate::sem::problem::QueryProblem::reference_not_found("star source"),
-                    ))?;
-                }
-                for column in columns {
-                    let expression = column.bind(context, &scope)?;
-                    results.push_expression(column.name(), expression);
-                }
-                continue;
-            }
-            if let Expr::Indirection(indirection) = &target.expression
-                && let Some(base) = indirection.projection_base(context, &scope)?
-            {
-                results.append_composite_star(context, base)?;
-                continue;
-            }
-            let expression = target.expression.resolve_in(context, &scope)?;
-            let name = target
-                .alias
-                .clone()
-                .unwrap_or_else(|| expression.get_column_name());
-            results.push_expression(&ColumnName::from(name.as_str()), expression);
+            target.append_to_results(context, with, from, scope, &mut results)?;
         }
+        Ok(results)
+    }
+
+    fn resolve_distinct(
+        &self,
+        context: &mut impl ParseContext,
+        scope: &ScalarAnalysisContext<'_>,
+        results: &ResultColumnCollection,
+    ) -> Result<Option<Vec<crate::sem::SemScalarExpr>>, AnalysisError> {
         let distinct = if let Some(distinct) = &self.distinct {
             let mut resolved = Vec::new();
             for expression in distinct {
                 resolved.push(expression.resolve_clause(
                     context,
-                    &scope,
-                    &results,
+                    scope,
+                    results,
                     ClauseBinding::Order,
                 )?);
             }
@@ -290,18 +320,45 @@ impl Select {
         } else {
             None
         };
+        Ok(distinct)
+    }
+
+    fn resolve_grouping(
+        &self,
+        context: &mut impl ParseContext,
+        scope: &mut ScalarAnalysisContext<'_>,
+        results: &mut ResultColumnCollection,
+        query_id: usize,
+    ) -> Result<Vec<crate::sem::QueryGrouping>, AnalysisError> {
         if context.dialect() == Dialect::sqlite() {
-            scope.set_output_aliases(&results);
+            scope.set_output_aliases(results);
         }
-        let group = Grouping::resolve_list(&self.group, context, &scope, &results)?;
+        let group = Grouping::resolve_list(&self.group, context, scope, results)?;
         for grouping in &group {
-            grouping.validate_grouping_targets(&mut results, query_id, context)?;
+            grouping.validate_grouping_targets(results, query_id, context)?;
         }
         context
             .analysis_state_mut()
             .grouping_mut()
-            .set_keys(query_id, &group, &results)?;
-        let having = Expr::resolve_optional(&self.having, context, &scope)?;
+            .set_keys(query_id, &group, results)?;
+        Ok(group)
+    }
+
+    fn resolve_having(
+        &self,
+        context: &mut impl ParseContext,
+        scope: &ScalarAnalysisContext<'_>,
+    ) -> Result<Option<crate::sem::SemScalarExpr>, AnalysisError> {
+        Expr::resolve_optional(&self.having, context, scope)
+    }
+
+    fn resolve_clauses(
+        &self,
+        distinct: Option<Vec<crate::sem::SemScalarExpr>>,
+        group: Vec<crate::sem::QueryGrouping>,
+        having: Option<crate::sem::SemScalarExpr>,
+        windows: Vec<crate::sem::QueryWindow>,
+    ) -> Result<crate::sem::SelectClauses, AnalysisError> {
         let mut clauses =
             crate::sem::SelectClauses::new(distinct, group, self.group_distinct, having, windows);
         let destination = self
@@ -310,13 +367,86 @@ impl Select {
             .map(|into| into.resolve_destination())
             .transpose()?;
         clauses.set_destination(destination);
-        Ok(SelectStatement::from(SelectStatementNode::from_resolution(
+        Ok(clauses)
+    }
+
+    fn build_result(
+        results: ResultColumnCollection,
+        from: FromClause,
+        predicate: Option<crate::sem::SemScalarExpr>,
+        clauses: crate::sem::SelectClauses,
+    ) -> SelectStatement {
+        SelectStatement::from(SelectStatementNode::from_resolution(
             results,
             &WithClause::default(),
             from,
             predicate,
             clauses,
-        )))
+        ))
+    }
+}
+
+impl crate::ast::Target {
+    fn append_to_results(
+        &self,
+        context: &mut impl ParseContext,
+        with: &WithClause,
+        from: &FromClause,
+        scope: &ScalarAnalysisContext<'_>,
+        results: &mut ResultColumnCollection,
+    ) -> Result<(), AnalysisError> {
+        if let Expr::Star(name) = &self.expression {
+            return Self::append_source_star(name, context, with, from, scope, results);
+        }
+        if let Expr::Indirection(indirection) = &self.expression
+            && let Some(base) = indirection.projection_base(context, scope)?
+        {
+            return results.append_composite_star(context, base);
+        }
+        let expression = self.expression.resolve_in(context, scope)?;
+        let name = self
+            .alias
+            .clone()
+            .unwrap_or_else(|| expression.get_column_name());
+        results.push_expression(&ColumnName::from(name.as_str()), expression);
+        Ok(())
+    }
+
+    fn append_source_star(
+        name: &Name,
+        context: &mut impl ParseContext,
+        with: &WithClause,
+        from: &FromClause,
+        scope: &ScalarAnalysisContext<'_>,
+        results: &mut ResultColumnCollection,
+    ) -> Result<(), AnalysisError> {
+        let relation = name.star_relation()?;
+        let qualifier = if relation.is_none() {
+            name.star_qualifier()?
+        } else {
+            None
+        };
+        let columns = if let Some(relation) = &relation {
+            scope.relation_projection_names(context, relation)?
+        } else if let Some(qualifier) = &qualifier {
+            scope.projection_names(context, qualifier)?
+        } else {
+            from.projection_names(context, with, None)?
+        };
+        if columns.is_empty() && qualifier.is_some() {
+            let base = name.resolve_column(context, scope)?;
+            return results.append_composite_star(context, base);
+        }
+        if columns.is_empty() {
+            context.report_analysis_problem(AnalysisProblem::query(
+                crate::sem::problem::QueryProblem::reference_not_found("star source"),
+            ))?;
+        }
+        for column in columns {
+            let expression = column.bind(context, scope)?;
+            results.push_expression(column.name(), expression);
+        }
+        Ok(())
     }
 }
 

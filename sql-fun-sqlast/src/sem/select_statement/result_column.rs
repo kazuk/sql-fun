@@ -22,6 +22,15 @@ enum StarExpansion {
     Invalid(SemScalarExpr),
 }
 
+impl StarExpansion {
+    const fn with_expression(&self, expression: SemScalarExpr) -> Self {
+        match self {
+            Self::Pending(_) => Self::Pending(expression),
+            Self::Invalid(_) => Self::Invalid(expression),
+        }
+    }
+}
+
 impl ResultColumn {
     /// Construct result-column metadata without a retained expression.
     pub fn new(
@@ -153,6 +162,10 @@ mod test_result_column_composite_field_definition {
 pub struct ResultColumnCollection(Vec<ResultColumn>);
 
 impl ResultColumnCollection {
+    pub(crate) fn has_pending_stars(&self) -> bool {
+        self.0.iter().any(ResultColumn::has_pending_star)
+    }
+
     pub(crate) fn append_composite_star(
         &mut self,
         context: &mut impl crate::sem::ParseContext,
@@ -194,21 +207,26 @@ impl ResultColumnCollection {
     pub(crate) fn expand_pending_stars(
         &mut self,
         context: &mut impl crate::sem::ParseContext,
-    ) -> Result<(), AnalysisError> {
-        if !self.0.iter().any(ResultColumn::has_pending_star) {
-            return Ok(());
+    ) -> Result<bool, AnalysisError> {
+        if !self.has_pending_stars() {
+            return Ok(false);
         }
         let mut expanded = Self::default();
+        let mut changed = false;
         for column in &self.0 {
             if !column.has_pending_star() {
                 expanded.0.push(column.clone());
                 continue;
             }
             let base = column.expression().expect("pending star base").clone();
+            let previous_len = expanded.0.len();
             expanded.append_composite_star(context, base)?;
+            changed |= expanded.0[previous_len..]
+                .iter()
+                .any(|column| !column.has_pending_star());
         }
         self.0 = expanded.0;
-        Ok(())
+        Ok(changed)
     }
 
     pub(crate) fn validate_grouping_target(
@@ -425,19 +443,15 @@ impl ResultColumnCollection {
         visitor: &mut V,
         targets: &[crate::sem::InsertTarget],
     ) -> Result<(), AnalysisError> {
+        let pending = self.has_pending_stars();
         for (index, column) in self.0.iter_mut().enumerate() {
             if let Some(expression) = &mut column.expression {
                 expression.walk(visitor)?;
-                if column.star_expansion.is_some() {
-                    column.star_expansion = match column.star_expansion.take() {
-                        Some(StarExpansion::Pending(_)) => {
-                            Some(StarExpansion::Pending(expression.as_ref().clone()))
-                        }
-                        Some(StarExpansion::Invalid(_)) => {
-                            Some(StarExpansion::Invalid(expression.as_ref().clone()))
-                        }
-                        None => None,
-                    };
+                if let Some(star) = &mut column.star_expansion {
+                    *star = star.with_expression(expression.as_ref().clone());
+                    continue;
+                }
+                if pending {
                     continue;
                 }
                 if let Some(target) = targets.get(index) {

@@ -11,7 +11,7 @@ pub struct MemberRef {
     member: String,
     /// member type
     member_type: Option<TypeReference>,
-    #[serde(skip)]
+    #[serde(default, skip_serializing_if = "Option::is_none")]
     member_not_null: Option<bool>,
 }
 

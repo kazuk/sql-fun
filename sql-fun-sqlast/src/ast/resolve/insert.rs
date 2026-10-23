@@ -7,7 +7,8 @@ use crate::sem::{
     AliasSpec, AnalysisError, AnalysisProblem, ColumnName, DataSource, FromClause,
     InsertClauseSemantics, InsertClauseValues, InsertConflict, InsertDestination, InsertSource,
     InsertStatement, InsertTarget, InsertTargetCollection, InsertValue, InsertValueCollection,
-    ParseContext, ResultColumnCollection, ScalarAnalysisContext, TableName, WithClause,
+    ParseContext, ResultColumnCollection, ScalarAnalysisContext, SelectStatement, TableName,
+    WithClause,
 };
 
 impl Insert {
@@ -20,17 +21,88 @@ impl Insert {
             let Some(mut statement) = value else {
                 return Ok(None);
             };
-            if context.parameter_inference_needed() {
-                let constraints =
+            let implicit_targets =
+                self.columns.is_empty() && context.dialect() == Dialect::postgres();
+            let expanded = if context.parameter_inference_needed() {
+                let (constraints, changed) =
                     crate::sem::parameter_resolution::ParameterResolution::infer_insert(
                         &mut statement,
                         context,
+                        implicit_targets,
                     )?;
                 context.set_parameter_constraints(&constraints);
+                changed
+            } else {
+                let changed = statement.expand_source_stars(context)?;
+                if changed && implicit_targets {
+                    statement.truncate_implicit_targets();
+                }
+                changed
+            };
+            if expanded {
+                if ResolutionFailure::finish(
+                    self.validate_expanded_source(&statement, context),
+                    context,
+                )?
+                .is_none()
+                {
+                    return Ok(None);
+                }
+                statement.validate_assignments(context)?;
             }
             Ok(Some(statement))
         });
         context.finish_analysis(result)
+    }
+
+    fn validate_expanded_source(
+        &self,
+        statement: &InsertStatement,
+        context: &mut impl ParseContext,
+    ) -> Result<(), ResolutionFailure> {
+        let source = statement.source();
+        source.validate_width(context, statement.columns().len())?;
+        for (index, target) in statement.columns().iter().enumerate() {
+            let defaults_only = source.rows().is_some_and(|rows| {
+                rows.iter()
+                    .all(|row| row.get(index).is_some_and(InsertValue::is_default))
+            });
+            target.validate_value(
+                context,
+                defaults_only,
+                self.overriding
+                    .as_ref()
+                    .is_some_and(OverridingKind::overrides_identity),
+            )?;
+            if let Some(name) = target.column().name()
+                && statement
+                    .view_support()
+                    .is_some_and(|support| !support.can_assign(name))
+            {
+                context.report_analysis_problem(AnalysisProblem::insert(
+                    crate::sem::problem::InsertProblemKind::read_only_target(),
+                    &format!("view column {name} does not accept assignments"),
+                ))?;
+            }
+        }
+        if self.columns.is_empty()
+            && context.dialect() == Dialect::postgres()
+            && let Some(support) = statement.view_support()
+        {
+            let mut seen = Vec::new();
+            for target in statement.columns() {
+                let name = target.column().name().as_ref().expect("named destination");
+                let key = support.assignment_column(name);
+                if seen.contains(&key) {
+                    context.report_analysis_problem(AnalysisProblem::insert(
+                        crate::sem::problem::InsertProblemKind::duplicate_target(),
+                        "underlying column is assigned more than once",
+                    ))?;
+                }
+                seen.push(key);
+            }
+        }
+        Ok(())
     }
     pub(in crate::ast) fn resolve_in(
         &self,
@@ -130,19 +202,29 @@ impl Insert {
         let scope = ScalarAnalysisContext::nested(&with, &from, outer);
         let implicit_width = if context.dialect() == Dialect::postgres() {
             if self.source.is_some() {
-                Some(source.width())
+                if source
+                    .as_query()
+                    .is_some_and(SelectStatement::has_pending_stars)
+                {
+                    None
+                } else {
+                    Some(source.width())
+                }
             } else {
                 None
             }
         } else {
             None
         };
+        let pending_source = source
+            .as_query()
+            .is_some_and(SelectStatement::has_pending_stars);
         let columns = InsertTargetCollection::resolve(
             context,
             &self.columns,
             &InsertTargetBinding::new(&table, &alias, &scope),
             &scope,
-            InsertTargetMode::new(self.source.is_some(), implicit_width),
+            InsertTargetMode::new(self.source.is_some(), implicit_width, pending_source),
         )?;
         columns.validate_source(
             context,
@@ -196,7 +278,9 @@ impl Insert {
         };
         insert.set_view_support(table.view_support());
         insert.set_modifiers(conflicts, overriding, self.or_conflict.clone());
-        insert.validate_assignments(context)?;
+        if !insert.source_has_pending_stars() {
+            insert.validate_assignments(context)?;
+        }
         Ok(insert)
     }
 }
@@ -217,7 +301,7 @@ impl InsertClauseSemantics {
             assignments,
             destination,
             value_scope,
-            InsertTargetMode::new(values.is_some(), implicit_width),
+            InsertTargetMode::new(values.is_some(), implicit_width, false),
         )?;
         let values = values
             .map(|values| InsertValueCollection::resolve(values, context, value_scope))
@@ -266,12 +350,18 @@ impl<'a, 'scope> InsertTargetBinding<'a, 'scope> {
 pub(super) struct InsertTargetMode {
     source_is_present: bool,
     implicit_width: Option<usize>,
+    pending_source: bool,
 }
 impl InsertTargetMode {
-    pub(super) const fn new(source_is_present: bool, implicit_width: Option<usize>) -> Self {
+    pub(super) const fn new(
+        source_is_present: bool,
+        implicit_width: Option<usize>,
+        pending_source: bool,
+    ) -> Self {
         Self {
             source_is_present,
             implicit_width,
+            pending_source,
         }
     }
 }
@@ -315,6 +405,7 @@ impl InsertTargetCollection {
             }
             if context.dialect() == Dialect::postgres()
                 && mode.source_is_present
+                && !mode.pending_source
                 && let Some(support) = table.view_support()
             {
                 let mut seen = Vec::new();
@@ -371,6 +462,7 @@ impl InsertTargetCollection {
         }
         for target in columns.as_slice() {
             if mode.source_is_present
+                && !mode.pending_source
                 && let Some(name) = target.column().name()
                 && !table.can_assign(name)
             {
@@ -416,6 +508,12 @@ impl InsertTargetCollection {
         overriding: Option<&OverridingKind>,
     ) -> Result<(), ResolutionFailure> {
         if !source_is_present {
+            return Ok(());
+        }
+        if source
+            .as_query()
+            .is_some_and(SelectStatement::has_pending_stars)
+        {
             return Ok(());
         }
         source.validate_width(context, self.as_slice().len())?;
@@ -483,7 +581,7 @@ impl InsertTarget {
 }
 
 impl InsertSource {
-    fn validate_width(
+    pub(crate) fn validate_width(
         &self,
         context: &mut impl ParseContext,
         width: usize,

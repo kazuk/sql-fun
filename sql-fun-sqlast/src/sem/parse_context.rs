@@ -498,8 +498,9 @@ where
                 &mut query, self,
             )?;
             self.set_parameter_constraints(&constraints);
+        } else {
+            query.expand_pending_stars(self)?;
         }
-        query.expand_pending_stars(self)?;
         Ok(query)
     }
 

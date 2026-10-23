@@ -282,17 +282,33 @@ impl JoinExprDataSource {
     ) -> Result<Vec<super::ProjectionColumn<'_>>, crate::sem::AnalysisError> {
         let original_left = self.left.projection_names(context, with, None)?;
         let original_right = self.right.projection_names(context, with, None)?;
-        let left: Vec<_> = original_left
+        let merged = self.merged_projection_names(&original_left, &original_right);
+        let left = original_left
             .iter()
             .cloned()
             .map(|column| column.with_nullability(self.kind.left_nullable(false)))
-            .collect();
-        let right: Vec<_> = original_right
+            .collect::<Vec<_>>();
+        let right = original_right
             .iter()
             .cloned()
             .map(|column| column.with_nullability(self.kind.right_nullable(false)))
-            .collect();
-        let merged = if let Some(using) = &self.using_clause {
+            .collect::<Vec<_>>();
+        if merged.is_empty() {
+            return Ok(left.into_iter().chain(right).collect());
+        }
+        if context.dialect() == crate::ast::Dialect::postgres() {
+            Ok(self.postgres_projection(&original_left, &original_right, left, right, &merged))
+        } else {
+            Ok(self.sqlite_projection(&original_left, &original_right, left, right, &merged))
+        }
+    }
+
+    fn merged_projection_names(
+        &self,
+        left: &[super::ProjectionColumn<'_>],
+        right: &[super::ProjectionColumn<'_>],
+    ) -> Vec<ColumnName> {
+        if let Some(using) = &self.using_clause {
             using.using_columns.clone()
         } else if self.natural {
             left.iter()
@@ -301,54 +317,72 @@ impl JoinExprDataSource {
                 .collect()
         } else {
             Vec::new()
-        };
-        if merged.is_empty() {
-            return Ok(left.into_iter().chain(right).collect());
         }
+    }
+
+    fn full_join_key<'a>(
+        name: &ColumnName,
+        left: &[super::ProjectionColumn<'a>],
+        right: &[super::ProjectionColumn<'a>],
+    ) -> Option<super::ProjectionColumn<'a>> {
+        let left = left.iter().find(|column| column.name() == name)?;
+        let right = right.iter().find(|column| column.name() == name)?;
+        Some(super::ProjectionColumn::merged(left, right))
+    }
+
+    fn postgres_projection<'a>(
+        &self,
+        original_left: &[super::ProjectionColumn<'a>],
+        original_right: &[super::ProjectionColumn<'a>],
+        left: Vec<super::ProjectionColumn<'a>>,
+        right: Vec<super::ProjectionColumn<'a>>,
+        merged: &[ColumnName],
+    ) -> Vec<super::ProjectionColumn<'a>> {
         let mut columns = Vec::new();
-        if context.dialect() == crate::ast::Dialect::postgres() {
-            for name in &merged {
-                if self.kind.is_full() {
-                    if let (Some(left), Some(right)) = (
-                        original_left.iter().find(|column| column.name() == name),
-                        original_right.iter().find(|column| column.name() == name),
-                    ) {
-                        columns.push(super::ProjectionColumn::merged(left, right));
-                    }
+        for name in merged {
+            let key = if self.kind.is_full() {
+                Self::full_join_key(name, original_left, original_right)
+            } else {
+                let source = if self.kind.uses_right_join_column() {
+                    &right
                 } else {
-                    let source = if self.kind.uses_right_join_column() {
-                        &right
-                    } else {
-                        &left
-                    };
-                    if let Some(column) = source.iter().find(|column| column.name() == name) {
-                        columns.push(column.clone());
-                    }
-                }
+                    &left
+                };
+                source.iter().find(|column| column.name() == name).cloned()
+            };
+            if let Some(key) = key {
+                columns.push(key);
             }
-            columns.extend(
-                left.into_iter()
-                    .filter(|column| !merged.contains(column.name())),
-            );
-        } else {
-            if self.kind.is_full() {
-                for column in left {
-                    if merged.contains(column.name()) {
-                        let original = original_left
-                            .iter()
-                            .find(|left| left.name() == column.name());
-                        let right = original_right
-                            .iter()
-                            .find(|right| right.name() == column.name());
-                        if let (Some(original), Some(right)) = (original, right) {
-                            columns.push(super::ProjectionColumn::merged(original, right));
-                        }
-                    } else {
-                        columns.push(column);
-                    }
+        }
+        columns.extend(
+            left.into_iter()
+                .filter(|column| !merged.contains(column.name())),
+        );
+        columns.extend(
+            right
+                .into_iter()
+                .filter(|column| !merged.contains(column.name())),
+        );
+        columns
+    }
+
+    fn sqlite_projection<'a>(
+        &self,
+        original_left: &[super::ProjectionColumn<'a>],
+        original_right: &[super::ProjectionColumn<'a>],
+        left: Vec<super::ProjectionColumn<'a>>,
+        right: Vec<super::ProjectionColumn<'a>>,
+        merged: &[ColumnName],
+    ) -> Vec<super::ProjectionColumn<'a>> {
+        let mut columns = Vec::new();
+        for column in left {
+            if self.kind.is_full() && merged.contains(column.name()) {
+                if let Some(key) = Self::full_join_key(column.name(), original_left, original_right)
+                {
+                    columns.push(key);
                 }
             } else {
-                columns.extend(left);
+                columns.push(column);
             }
         }
         columns.extend(
@@ -356,6 +390,6 @@ impl JoinExprDataSource {
                 .into_iter()
                 .filter(|column| !merged.contains(column.name())),
         );
-        Ok(columns)
+        columns
     }
 }

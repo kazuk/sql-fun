@@ -1,5 +1,5 @@
 use super::super::test_helpers::{output_type, table_function_query};
-use crate::sem::{ColumnReferenceExpr, PgBuiltInType, SemScalarExpr};
+use crate::sem::{ColumnReferenceExpr, ParseContext, PgBuiltInType, SemScalarExpr};
 
 #[rstest::rstest]
 #[case::qualified("SELECT r.a, r.b FROM record_fun('') AS r(a integer,b text)")]
@@ -93,6 +93,46 @@ fn unresolved_composite_star_retains_its_base_for_parameter_inference() {
 }
 
 #[test]
+fn inferred_composite_star_preserves_following_output_positions() {
+    let (query, context) = table_function_query("SELECT ($1).*, $2, $1::public.pair", true);
+    assert!(
+        context.reported_problems().is_empty(),
+        "{:?}",
+        context.reported_problems()
+    );
+    let columns = query.result_columns();
+    assert_eq!(columns.len(), 4);
+    assert_eq!(
+        columns.get_column_at(0).unwrap().col_type(),
+        &Some(PgBuiltInType::int4())
+    );
+    assert_eq!(
+        columns.get_column_at(1).unwrap().col_type(),
+        &Some(PgBuiltInType::text())
+    );
+    let constraints = context.parameter_constraints();
+    assert!(
+        constraints
+            .result_column(0)
+            .unwrap()
+            .allows(&PgBuiltInType::int4())
+    );
+    assert!(
+        constraints
+            .result_column(1)
+            .unwrap()
+            .allows(&PgBuiltInType::text())
+    );
+    assert!(
+        constraints
+            .result_column(2)
+            .unwrap()
+            .allows(&PgBuiltInType::text())
+    );
+    assert!(constraints.result_column(3).is_some());
+}
+
+#[test]
 fn scalar_star_reports_a_structured_problem() {
     let (query, context) = table_function_query("SELECT (1).*", true);
     assert!(
@@ -138,6 +178,27 @@ fn anonymous_row_star_keeps_nullable_fields() {
         columns.get_column_at(1).unwrap().is_not_null(),
         &Some(false)
     );
+}
+
+#[rstest::rstest]
+#[case::not_null("SELECT (ROW(1::integer)).*", Some(true))]
+#[case::nullable("SELECT (ROW(NULL)).*", Some(false))]
+fn composite_member_nullability_survives_serialization(
+    #[case] sql: &str,
+    #[case] expected: Option<bool>,
+) {
+    let (query, context) = table_function_query(sql, true);
+    assert!(context.reported_problems().is_empty());
+    let expression = query
+        .result_columns()
+        .get_column_at(0)
+        .unwrap()
+        .expression()
+        .unwrap();
+    assert_eq!(expression.is_not_null(), expected);
+    let restored: SemScalarExpr =
+        ::serde_json::from_value(::serde_json::to_value(expression).unwrap()).unwrap();
+    assert_eq!(restored.is_not_null(), expected);
 }
 
 #[rstest::rstest]

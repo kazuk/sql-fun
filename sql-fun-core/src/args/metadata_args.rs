@@ -56,6 +56,12 @@ pub struct MetadataArgs {
     cte_catalog_dir: Option<PathBuf>,
 }
 
+impl MetadataArgs {
+    pub(super) fn schema_file_override(&self) -> Option<&Path> {
+        self.schema_file.as_deref()
+    }
+}
+
 impl MetadataArgsBuilder {
     fn sql_fun_metadata_format_default() -> String {
         String::from(MetadataArgs::SQL_FUN_METADATA_FORMAT_DEFAULT)

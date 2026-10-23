@@ -594,12 +594,15 @@ impl SqlFunArgs {
         ))
     }
 
-    /// get schema dump path
+    /// Get the explicitly selected schema dump, or derive its datasource-specific path.
     ///
     /// # Errors
     ///
     /// Returns an error if the metadata file cannot be located.
     pub fn schema_dump_path(&self, datasource_name: &str) -> Result<PathBuf, SqlFunArgsError> {
+        if let Some(path) = self.metadata_args.schema_file_override() {
+            return Ok(path.to_path_buf());
+        }
         let schema = self.schema();
         Ok(Self::with_file_name(
             self.project_dir()?,

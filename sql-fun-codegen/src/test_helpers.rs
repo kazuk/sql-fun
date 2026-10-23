@@ -172,3 +172,82 @@ pub(crate) fn assert_stub(render: RenderFunction, spec: &QueryFunctionSpec) {
         spec.resolved_cte_catalog.finger_print(&spec.query).unwrap()
     );
 }
+
+/// A selected schema and matching lockfile for the normal macro loading path.
+pub(crate) struct LockfileProject {
+    _project: ::tempfile::TempDir,
+    args: ::sql_fun_core::SqlFunArgs,
+    metadata: ::sql_fun_core::SqlFunMetadata,
+}
+
+impl LockfileProject {
+    pub(crate) fn new(explicit: bool, competing_default: bool) -> Self {
+        use ::sql_fun_core::{Hasher, SqlFunArgsBuilder, lockfile::LockfileDocument};
+
+        let project = ::tempfile::tempdir().unwrap();
+        let manifest = project.path().join("Cargo.toml");
+        std::fs::write(
+            &manifest,
+            r#"
+[package]
+name = "fixture"
+version = "0.1.0"
+[package.metadata.database.default]
+engine = "PostgreSQL"
+dialect = "postgres"
+"#,
+        )
+        .unwrap();
+        let mut builder = SqlFunArgsBuilder::default();
+        builder
+            .metadata_file(manifest.to_string_lossy())
+            .schema("qa");
+        let schema = if explicit {
+            let path = project.path().join("selected.sql");
+            std::fs::write(&path, "CREATE TABLE selected (id integer);").unwrap();
+            builder.schema_file(&path);
+            if competing_default {
+                std::fs::write(project.path().join("default.qa.sql"), "-- unrelated schema")
+                    .unwrap();
+            }
+            path
+        } else {
+            let path = project.path().join("default.qa.sql");
+            std::fs::write(&path, "CREATE TABLE original (id integer);").unwrap();
+            path
+        };
+        let args = builder.build().unwrap();
+        let collection = args.load_metadata().unwrap();
+        let metadata = collection.get("default").unwrap().clone();
+        let hash = Hasher::hash_file(&schema).unwrap();
+        let document = LockfileDocument::new(&hash);
+        std::fs::write(
+            metadata.lockfile_path(&args).unwrap(),
+            document.encode().unwrap(),
+        )
+        .unwrap();
+        Self {
+            _project: project,
+            args,
+            metadata,
+        }
+    }
+
+    pub(crate) fn args(&self) -> &::sql_fun_core::SqlFunArgs {
+        &self.args
+    }
+
+    pub(crate) fn metadata(&self) -> &::sql_fun_core::SqlFunMetadata {
+        &self.metadata
+    }
+
+    pub(crate) fn remove_selected_schema(&self) {
+        let path = self.metadata.schema_dump_path(&self.args).unwrap();
+        std::fs::remove_file(path).unwrap();
+    }
+
+    pub(crate) fn change_selected_schema(&self) {
+        let path = self.metadata.schema_dump_path(&self.args).unwrap();
+        std::fs::write(path, "-- schema changed after check").unwrap();
+    }
+}

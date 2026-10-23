@@ -1,0 +1,19 @@
+[package]
+name = "sql-fun-postgres-e2e"
+version = "0.0.0"
+edition = "2024"
+publish = false
+
+[workspace]
+
+[package.metadata.database.default]
+engine = "PostgreSQL"
+dialect = "postgres"
+version = "18"
+connector = "tokio-postgres"
+
+[dependencies]
+bon = "3.10.1"
+sql-fun = { path = "../.." }
+tokio = { version = "1", features = ["macros", "rt-multi-thread"] }
+tokio-postgres = "0.7"

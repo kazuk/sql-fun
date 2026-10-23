@@ -65,3 +65,38 @@ impl LockfileProvider {
         Ok(lockfile)
     }
 }
+
+#[cfg(test)]
+mod test_lockfile_provider {
+    use super::LockfileProvider;
+    use crate::test_helpers::LockfileProject;
+
+    #[rstest::rstest]
+    #[case::explicit_without_default(true, false)]
+    #[case::explicit_overrides_competing_default(true, true)]
+    #[case::derived_default(false, false)]
+    fn loads_lockfile_for_selected_schema(#[case] explicit: bool, #[case] competing: bool) {
+        let project = LockfileProject::new(explicit, competing);
+        let mut provider = LockfileProvider::default();
+        assert!(provider.load(project.args(), project.metadata()).is_ok());
+    }
+
+    #[test]
+    fn missing_explicit_schema_does_not_use_existing_default() {
+        let project = LockfileProject::new(true, true);
+        project.remove_selected_schema();
+        let mut provider = LockfileProvider::default();
+        let error = provider
+            .load(project.args(), project.metadata())
+            .unwrap_err();
+        assert!(error.to_string().contains("selected.sql"));
+    }
+
+    #[test]
+    fn rejects_changed_explicit_schema() {
+        let project = LockfileProject::new(true, true);
+        project.change_selected_schema();
+        let mut provider = LockfileProvider::default();
+        assert!(provider.load(project.args(), project.metadata()).is_err());
+    }
+}

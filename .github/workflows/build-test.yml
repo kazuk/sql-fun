@@ -487,6 +487,16 @@ jobs:
                 /validation/e2e/run.sh /validation/e2e
             '
 
+      - name: Execute checked SQL against PostgreSQL
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y postgresql-client build-essential pkg-config libssl-dev clang \
+            "$RUNNER_TEMP/sql-fun-artifact"/sql-fun_*.deb
+          rustup toolchain install stable --profile minimal
+          rustup default stable
+          cargo install --locked cargo-expand --version 1.0.126
+          tests/postgres-e2e/run.sh --installed /usr/bin/sql-fun /usr/bin/sql-fun-server
+
   postgres-extraction:
     needs: [pr-freshness, packaging]
     runs-on: ubuntu-24.04

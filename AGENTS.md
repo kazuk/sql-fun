@@ -422,6 +422,12 @@ directly:
   rules and fix any violations. Include test code, constructors, and callers in
   this review. A successful build or test run does not establish guideline
   compliance.
+- Before submitting a pull request, review functions materially enlarged by the
+  change. If the resulting function combines distinct responsibilities or is
+  difficult to follow, refactor the affected function into cohesive helpers as
+  part of the implementation. Do not limit the refactor to newly added lines
+  when the surrounding flow also needs separation; preserve behavior and keep
+  unrelated cleanup outside the task scope.
 - Existing code is not a justification for repeating a pattern that conflicts
   with the guidelines. Keep corrections within the scope of the task rather than
   expanding into unrelated cleanup.

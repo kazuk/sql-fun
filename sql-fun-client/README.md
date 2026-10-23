@@ -124,8 +124,10 @@ including their reads/releases, before half-closing TCP writes. It then drains
 responses through EOF and waits for callback completion. EOF with missing responses
 is an error. Transport/protocol failures also surface through subsequent submissions
 and completion. `wait_for_failure()` permits observing terminal failure while
-waiting for further application input. Ordinary response frames are bounded to
-2 MiB; calls after initialization have no implicit deadline. Callers can apply
+waiting for further application input. After authentication, response frames have
+no fixed byte limit: catalog diagnostics can exceed 2 MiB even within one
+collection page. The client buffers each complete frame in memory. Calls after
+initialization have no implicit deadline. Callers can apply
 `tokio::time::timeout`. Cancelling submission before acceptance leaves no pending
 request; dropping the client or cancelling `finish` closes its socket/tasks.
 Neither completion nor drop stops the shared server.

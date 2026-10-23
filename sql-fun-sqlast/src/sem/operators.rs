@@ -101,6 +101,13 @@ pub enum OperatorDefinition {
 }
 
 impl OperatorDefinition {
+    pub(crate) const fn binary_overloads(&self) -> Option<&[BinaryOperatorDefinition]> {
+        match self {
+            Self::Binary(overloads) => Some(overloads.as_slice()),
+            _ => None,
+        }
+    }
+
     /// binary
     #[must_use]
     pub fn binary(binaries: &[BinaryOperatorDefinition]) -> Self {

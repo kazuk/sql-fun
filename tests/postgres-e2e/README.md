@@ -11,8 +11,8 @@ The command builds the local CLI/server, starts disposable PostgreSQL 18,
 applies `schema.sql` with `psql`, generates a fresh lockfile with `sql-fun check`,
 and executes the ordinary Cargo consumer. Parameters explicitly declare their
 SQL types using `${id:bigint}` and `${name:text}`. Rust assertions verify bound
-integer and text values through `INSERT`, `SELECT`, `UPDATE`, and `DELETE`. Failure in
-any phase makes the command fail. Containers, server processes, generated
+integer and text values through `INSERT`, `SELECT`, `UPDATE`, and `DELETE`.
+Failure in any phase makes the command fail. Containers, server processes, generated
 lockfiles, and temporary state are cleaned up on exit or handled interruption.
 Cargo artifacts persist in the repository's `target/` (or an explicitly supplied
 `CARGO_TARGET_DIR`) and are reused across queries and subsequent runs.

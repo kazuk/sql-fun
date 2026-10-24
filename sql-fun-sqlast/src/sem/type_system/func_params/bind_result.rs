@@ -112,10 +112,14 @@ impl ParameterBindResult {
     /// # Errors
     ///
     /// Returns [`TypeError`] if inference fails.
-    pub fn collect_simple(&self, context: &mut SimpleInferContext) -> Result<(), TypeError> {
+    pub fn collect_simple(
+        &self,
+        context: &mut SimpleInferContext,
+        catalog: &impl crate::sem::BaseParseContext,
+    ) -> Result<(), TypeError> {
         match self {
             Self::One(_, fp) | Self::NoInputParam(fp) | Self::VariadicParam(_, fp) => {
-                fp.collect_simple(context, self)
+                fp.collect_simple(context, catalog, self)
             }
         }
     }
@@ -125,10 +129,14 @@ impl ParameterBindResult {
     /// # Errors
     ///
     /// Returns [`TypeError`] if inference fails.
-    pub fn collect_common(&self, context: &mut CommonInferContext) -> Result<(), TypeError> {
+    pub fn collect_common(
+        &self,
+        context: &mut CommonInferContext,
+        catalog: &impl crate::sem::BaseParseContext,
+    ) -> Result<(), TypeError> {
         match self {
             Self::One(_, fp) | Self::NoInputParam(fp) | Self::VariadicParam(_, fp) => {
-                fp.collect_common(context, self)
+                fp.collect_common(context, catalog, self)
             }
         }
     }

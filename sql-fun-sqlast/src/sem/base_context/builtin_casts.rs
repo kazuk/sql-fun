@@ -5,7 +5,10 @@ use std::{
 
 use crate::{
     TrieMap,
-    sem::{AnalysisError, CastContext, CastDefinition, CastInfoRead, FullName, TypeReference},
+    sem::{
+        AnalysisError, CastContext, CastDefinition, CastInfoRead, FullName, TypeInfoRead,
+        TypeReference,
+    },
 };
 
 pub struct PgBuiltinCasts {}
@@ -95,6 +98,17 @@ impl CastInfoRead for super::BaseContext {
                 sources.insert(source);
             }
         }
+        for vector in ["int2vector", "oidvector"] {
+            let source = TypeReference::from_master_type_name(vector);
+            let cast = if explicit {
+                self.get_explicit_cast(&source, target)
+            } else {
+                self.get_implicit_cast(&source, target)
+            };
+            if cast.is_some() {
+                sources.insert(source);
+            }
+        }
         if explicit {
             for (_, definition) in self.types.iter() {
                 if let Some(source) = definition.type_reference()
@@ -127,6 +141,9 @@ impl CastInfoRead for super::BaseContext {
         {
             return Some(cast.clone());
         }
+        if let Some(cast) = self.vector_array_cast(source_type, target_type, false) {
+            return Some(cast);
+        }
         // PostgreSQL find_coercion_pathway permits explicit I/O coercion
         // to or from the builtin string category even without a pg_cast row.
         let source_string =
@@ -154,7 +171,7 @@ impl CastInfoRead for super::BaseContext {
             return Some(CastDefinition::new(CastContext::NoConversion));
         }
         if source_array != target_array {
-            return None;
+            return self.vector_array_cast(source_type, target_type, true);
         }
 
         let from_source = self.casts.get(source_local_name)?;
@@ -176,6 +193,13 @@ impl CastInfoRead for super::BaseContext {
             &FullName::with_schema("pg_catalog", source_local_name),
             source_array,
         ));
+        if !source_array && let Some(element) = self.get_array_item_type(source_type) {
+            results.extend(
+                self.get_implicit_castable(&element)
+                    .into_iter()
+                    .map(|ty| ty.array_type()),
+            );
+        }
         if let Some(from_source) = self.casts.get(source_local_name) {
             for (target, cast) in from_source.iter() {
                 if cast.use_in_implicit() {
@@ -191,7 +215,35 @@ impl CastInfoRead for super::BaseContext {
 }
 
 impl super::BaseContext {
-    fn builtin_cast_type<'a>(&self, ty: &'a TypeReference) -> Option<(&'a str, bool)> {
+    // PostgreSQL derives vector-source array conversions from the element cast;
+    // the inverse conversion to a vector is deliberately not synthesized.
+    fn vector_array_cast(
+        &self,
+        source: &TypeReference,
+        target: &TypeReference,
+        implicit: bool,
+    ) -> Option<CastDefinition> {
+        if source.is_array() != Some(false) || target.is_array() != Some(true) {
+            return None;
+        }
+        let element = self.get_array_item_type(source)?;
+        let target_element = self.get_array_item_type(target)?;
+        let cast = if implicit {
+            self.get_implicit_cast(&element, &target_element)?
+        } else {
+            self.get_explicit_cast(&element, &target_element)?
+        };
+        // Equal elements still require a conversion between distinct containers.
+        // An element's preferred-conversion score is not a container preference.
+        let context = if cast.use_in_implicit() {
+            CastContext::implicit()
+        } else {
+            cast.context()
+        };
+        Some(CastDefinition::new(context))
+    }
+
+    pub(super) fn builtin_cast_type<'a>(&self, ty: &'a TypeReference) -> Option<(&'a str, bool)> {
         if ty.is_dynamic() {
             return None;
         }

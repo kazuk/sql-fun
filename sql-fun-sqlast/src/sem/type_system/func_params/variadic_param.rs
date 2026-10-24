@@ -120,9 +120,12 @@ impl FunctionParameterTrait for FunctionParamVariadic {
         true
     }
 
-    fn apply_simple_infer_result(&mut self, simple_infer_result: &TypeReference) {
+    fn apply_simple_infer_result(
+        &mut self,
+        simple_infer_result: &crate::sem::type_system::SimpleInferResult,
+    ) {
         if let Some(ty) = self.param_type.as_mut() {
-            ty.apply_simple_infer_result(simple_infer_result);
+            simple_infer_result.apply(ty);
         }
     }
 

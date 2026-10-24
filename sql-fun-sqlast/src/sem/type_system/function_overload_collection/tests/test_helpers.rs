@@ -15,6 +15,9 @@ fn context() -> SchemaFileContext {
     base.set_get_search_path_result(&[SchemaName::from("public"), SchemaName::from("pg_catalog")]);
     for name in [
         "int2",
+        "int2vector",
+        "oidvector",
+        "oid",
         "int4",
         "int8",
         "float8",
@@ -32,6 +35,22 @@ fn context() -> SchemaFileContext {
         base.setup_type(ty.clone());
         base.add_implicit_castable(&ty, &ty);
     }
+    for (vector, element) in [("int2vector", "int2"), ("oidvector", "oid")] {
+        let vector = TypeReference::from_master_type_name(vector);
+        let element = TypeReference::from_master_type_name(element);
+        base.set_array_element(&vector, &element);
+        let array = vector.array_type();
+        base.set_get_implicit_cast_result(
+            &array,
+            &array,
+            Some(CastDefinition::new(CastContext::no_conversion())),
+        );
+        base.set_get_implicit_cast_result(
+            &vector,
+            &element.array_type(),
+            Some(CastDefinition::new(CastContext::implicit())),
+        );
+    }
     for (source, target) in [("int2", "int4"), ("int2", "int8"), ("int4", "int8")] {
         base.add_implicit_castable(
             &TypeReference::from_master_type_name(source),
@@ -45,6 +64,7 @@ fn context() -> SchemaFileContext {
     }
     for ty in [
         TypeReference::from_master_type_name("int4").array_type(),
+        TypeReference::from_master_type_name("int2").array_type(),
         TypeReference::from_full_name(crate::sem::FullName::with_schema("public", "control")),
         TypeReference::from_full_name(crate::sem::FullName::with_schema("public", "control"))
             .array_type(),
@@ -102,6 +122,26 @@ pub(super) fn analyze(
     for statement in parse_statements(&schema, Dialect::postgres()) {
         context = statement?.analyze(context)?.into_context();
     }
+    assert!(context.problems().is_empty(), "{:?}", context.problems());
+    Ok(parse_statements(query, Dialect::postgres())
+        .next()
+        .unwrap()?
+        .analyze(context)?)
+}
+
+pub(super) fn analyze_vector(
+    query: &str,
+    parameters: &str,
+    result: &str,
+) -> Result<AstAndContextPair<SchemaFileContext>, Box<dyn std::error::Error>> {
+    let mut context = context();
+    let definition =
+        format!("CREATE FUNCTION vf({parameters}) RETURNS {result} LANGUAGE sql AS ''");
+    context = parse_statements(&definition, Dialect::postgres())
+        .next()
+        .unwrap()?
+        .analyze(context)?
+        .into_context();
     assert!(context.problems().is_empty(), "{:?}", context.problems());
     Ok(parse_statements(query, Dialect::postgres())
         .next()

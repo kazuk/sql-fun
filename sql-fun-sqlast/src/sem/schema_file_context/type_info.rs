@@ -28,7 +28,7 @@ impl TypeInfoRead for SchemaCatalog {
         if type_name.is_array() == Some(true) {
             Some(type_name.element_type())
         } else {
-            None
+            self.base.get_array_item_type(type_name)
         }
     }
 }

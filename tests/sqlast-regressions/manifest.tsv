@@ -36,7 +36,7 @@ schema-expressions-record-ambiguity	project	schema-expressions-record-ambiguity.
 schema-expressions-record-array	project	schema-expressions-record-array.sql	1	17,18
 schema-expressions-record-overloads	project	schema-expressions-record-overloads.sql	6	17,18
 schema-expressions-record-scalar	project	schema-expressions-record-scalar.sql	1	17,18
-schema-expressions	project	schema-expressions.sql	24	17,18
+schema-expressions	project	schema-expressions.sql	72	17,18
 schema-insert	project	schema-insert.sql	32	17,18
 schema-join	project	schema-join.sql	1	17,18
 schema-merge	project	schema-merge.sql	31	17,18

@@ -18,10 +18,10 @@ internal array-node value count.
 
 | Rust test and cases | CLI result contract |
 | --- | --- |
-| `arrays::schema_types_and_bindings_survive_frozen_contexts`: `domain`, `domain_base`, `domain_unknown`, `array_domain`, `array_of_domains`, `enum_values`, `composite`, `nullable_column` | Exact public array type identity and constructor nullability. `array_of_domains` currently remains `pg_catalog.int4[]` in SQLAST, as in the original Rust assertion; see [the verified PostgreSQL discrepancy](#postgresql-common-type-discrepancy). |
+| `arrays::schema_types_and_bindings_survive_frozen_contexts`: `domain`, `domain_base`, `domain_unknown`, `array_domain`, `array_of_domains`, `enum_values`, `composite`, `nullable_column` | Exact public array type identity and constructor nullability. `array_of_domains` preserves `public.amount[]`; see [the common-type regression coverage](#postgresql-common-type-regressions). |
 | `case_parameters::schema_result_types_survive_inference`: `domain`, `domain_base`, `domain_unknown`, `enum_values` | CASE result type identity and nullability. |
 | `coalesce_parameters::catalog_types_survive_inference`: `same_domain`, `domain_base`, `domain_unknown`, `enum_values` | COALESCE result type identity. The CLI captures `parameter_type_unresolved` for these untyped parameters; Rust retains the source-context success and output-type assertion because those diagnostics are additional. |
-| `min_max::schema_types_preserve_common_type_rules`: `domain`, `array_domain`, `array_domain_nested`, `domain_base`, `domain_array`, `domain_unknown`, `enum_values`, `composite` | GREATEST/LEAST result type identity and nullability. `domain_array` currently remains `pg_catalog.int4[]` in SQLAST, as in the original Rust assertion; see [the verified PostgreSQL discrepancy](#postgresql-common-type-discrepancy). |
+| `min_max::schema_types_preserve_common_type_rules`: `domain`, `array_domain`, `array_domain_nested`, `domain_base`, `domain_array`, `domain_unknown`, `enum_values`, `composite` | GREATEST/LEAST result type identity and nullability. `domain_array` preserves `public.amount[]`; see [the common-type regression coverage](#postgresql-common-type-regressions). |
 
 ## Record overloads and composite array fields
 
@@ -43,7 +43,7 @@ overload, two ambiguity, and composite-field result groups had no separate
 internal assertion and were removed after their CLI cases passed. The catalog
 shape equality Rust case stays because it checks operator binding metadata.
 
-All 36 cases passed the SQL CLI contract on PostgreSQL 17 and 18 catalogs. For
+The original migration covered 36 SQL inputs across these fixture groups. For
 COALESCE parameter cases, the CLI reports `parameter_type_unresolved` while
 retaining the known result type. Rust keeps its source-context success and
 output-type assertions alongside these CLI cases; the source and CLI diagnostics
@@ -52,16 +52,35 @@ parameter domains; PostgreSQL's single untyped PREPARE parameter signature is a
 different contract from those admissible domains, as documented in the
 [type-system guideline](../../docs/internal-rules/sqlast-type-system-guideline.md#deferred-parameter-constraints).
 
-## PostgreSQL common-type discrepancy
+## PostgreSQL common-type regressions
 
-The CLI and original SQLAST assertions return `pg_catalog.int4[]` for both
-`ARRAY[NULL::amount[],NULL::integer[]]` and
-`greatest(NULL::amount[],NULL::integer[])`. PostgreSQL 17 and 18 return
-`public.amount[]` for both expressions when `public.amount` is a domain over
-`integer`. The difference is recorded in [issue #767](https://github.com/kazuk/sql-fun/issues/767).
-This migration preserves and makes the current analyzer result observable; it
-does not change common-type semantics.
+[Issue #767](https://github.com/kazuk/sql-fun/issues/767) corrects the two
+migrated ARRAY/GREATEST expectations from `pg_catalog.int4[]` to
+`public.amount[]`. The shared schema-expressions fixture now has 72 cases,
+including 48 additional common-type regressions for ARRAY, GREATEST, LEAST,
+COALESCE and parameter-dependent CASE. The original fixture case names remain
+unchanged.
 
-The oracle checks used a transaction-local `CREATE DOMAIN public.amount AS
-integer`, queried `pg_typeof` for both expressions on PostgreSQL 17 and 18, and
-rolled back the DDL. Reproductions and observed results are recorded in #767.
+The matrix checks both operand orders, identical domain arrays, unknown NULL
+operands in either position, scalar domain/base mixtures, domains over arrays,
+nested domains over arrays, nested domain elements and numeric promotion.
+CASE uses a boolean condition parameter to exercise its existing shared
+common-type path, which considers ELSE before THEN. Thus a domain-element array
+can remain the common type when it appears first; reversing the order can select
+the base array instead. Domain-over-array controls still select ordinary `integer[]`.
+
+The 50 matrix expressions (including the two corrected cases) were checked
+with `pg_typeof` on PostgreSQL 15 through 18 using small transactions and
+rollback-only schema setup; parameter-dependent CASE was also checked through
+PREPARE/EXECUTE with an explicit boolean condition type. The maintained CLI
+fixture runs offline against the supported PostgreSQL 17 and 18 catalogs in
+source and installed checks.
+Rust common-type tests retain coercion/candidate identity, owned-fact lifetime,
+and correlated parameter/input/result-domain coverage with a minimal catalog.
+
+Parameter-free CASE has a separate legacy candidate-enumeration path, which
+rejects domain/base mixtures and can lose the result type for unknown NULL
+branches. [Issue #776](https://github.com/kazuk/sql-fun/issues/776) records
+reproductions, PostgreSQL results and the path distinction. That independent
+resolver repair is outside #767; the CASE matrix here checks the shared path
+without changing or suppressing the legacy behavior.

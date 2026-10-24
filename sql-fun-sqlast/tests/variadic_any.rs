@@ -3,7 +3,6 @@ use self::test_helpers::heavy;
 use ::sql_fun_sqlast::sem::{FullName, PgBuiltInType, TypeReference};
 
 #[test]
-#[ignore = "Blocked by #749: builtin scalar return types are loaded as empty composites"]
 fn shipped_format_keeps_binding_and_name_argument() -> testresult::TestResult {
     // Real imported signatures and their use in builtin views are the contract.
     let analyzed = heavy::analyze_format()?;
@@ -31,6 +30,13 @@ fn shipped_format_keeps_binding_and_name_argument() -> testresult::TestResult {
         argument.arg_definition().as_ref().unwrap().get_type(),
         Some(&TypeReference::from_master_type_name("any"))
     );
+    assert_eq!(
+        query.result_columns().get_column_at(1).unwrap().col_type(),
+        &Some(TypeReference::from_full_name(FullName::with_schema(
+            "information_schema",
+            "character_data",
+        )))
+    );
     Ok(())
 }
 
@@ -40,7 +46,10 @@ mod test_helpers {
             AstAndContextPair, PostgresDialect, SqlFunArgs,
             ast::Dialect,
             parse_statements,
-            sem::{BaseContext, FrozenBaseContext, SchemaFileContext},
+            sem::{
+                BaseContext, FrozenBaseContext, MutSourcePathWithSpan, SchemaFileContext,
+                SourcePathWithSpan,
+            },
         };
         use std::{collections::BTreeMap, path::PathBuf};
 
@@ -76,21 +85,27 @@ mod test_helpers {
                 "PostgreSQL 18 catalog diagnostics by code: {}",
                 ::serde_json::to_string(&counts)?
             );
-            let context = SchemaFileContext::new(
+            let mut context = SchemaFileContext::new(
                 std::path::Path::new("format_query.sql"),
                 schema.base_context(),
                 &args,
                 &selected,
             );
-            let analyzed = parse_statements(
-                "CREATE TABLE e2e_items (id bigint PRIMARY KEY, name text NOT NULL)",
-                Dialect::postgres(),
-            )
-            .next()
-            .unwrap()?
-            .analyze(context)?;
+            let fixture_sql = "CREATE TABLE e2e_items (id bigint PRIMARY KEY, attname name)";
+            context.set_source_path_with_span(&SourcePathWithSpan::new(
+                "format_query.sql",
+                &::sql_fun_sqlast::StringSpan::new(0, fixture_sql.len()),
+            ));
+            let analyzed = parse_statements(fixture_sql, Dialect::postgres())
+                .next()
+                .unwrap()?
+                .analyze(context)?;
             Ok(parse_statements(
-                "SELECT format('%s'::text, 'abc'::name)",
+                r"SELECT format('%s'::text, 'abc'::name),
+                          format('%s IS NOT NULL'::text,
+                                 COALESCE(at.attname, 'VALUE'::name))
+                              ::information_schema.character_data
+                   FROM e2e_items AS at",
                 Dialect::postgres(),
             )
             .next()

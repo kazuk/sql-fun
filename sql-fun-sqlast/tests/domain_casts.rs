@@ -140,7 +140,6 @@ fn parameter_cast_preserves_admissible_inputs_and_domain_output(
 }
 
 #[test]
-#[ignore = "Blocked by #749: builtin scalar return types are loaded as empty composites"]
 fn shipped_postgres18_catalog_domain_casts_resolve() -> testresult::TestResult {
     // Full SQL catalog loading checks the shipped domains and schema layering.
     let analyzed = heavy::analyze("18", "SELECT 1::information_schema.cardinal_number", true)?;

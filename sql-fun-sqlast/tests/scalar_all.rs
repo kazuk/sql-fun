@@ -92,7 +92,6 @@ fn invalid_all_keeps_operands_and_failure(
 }
 
 #[test]
-#[ignore = "#749: builtin scalar return-type loader panics during full catalog loading"]
 fn shipped_catalog_all_clauses_resolve() -> testresult::TestResult {
     // Full catalog DDL is needed to check all seven affected view clauses.
     let analyzed = heavy::analyze(

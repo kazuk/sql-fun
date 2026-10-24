@@ -50,7 +50,6 @@ fn extracted_catalogs_load_and_schema_is_postgresql_syntax(#[case] version: &str
 #[rstest::rstest]
 #[case::seventeen("17")]
 #[case::eighteen("18")]
-#[ignore = "Blocked by #749: builtin scalar return types are loaded as empty composites"]
 fn installed_generation_bootstraps_builtin_and_user_schemas(#[case] version: &str) {
     let fixture = heavy::InitializedCatalog::new(version);
     fixture.assert_semantics(version);

@@ -11,7 +11,6 @@ use std::{
 };
 
 #[test]
-#[ignore = "Blocked by #749: builtin scalar return types are loaded as empty composites"]
 fn shipped_catalog_whole_rows() -> testresult::TestResult {
     // This integration assertion requires the actual builtin signatures and SQL
     // views; small-catalog binding cases live beside query resolution tests.

@@ -246,15 +246,18 @@ impl PgBuiltInFunctions {
                     args.push(arg.arg_mode.function_param(&arg_name, &arg_type));
                 }
 
-                let mut composite_fields = CompositeFieldCollection::default();
-                for arg in &args {
-                    if let Some(field_def) = arg.field_definition() {
-                        composite_fields.push(field_def);
+                let mut ret_type = TypeReference::from_master_type_name(&overload.ret);
+                if details.out_args().next().is_some() {
+                    let mut composite_fields = CompositeFieldCollection::default();
+                    for arg in &args {
+                        if let Some(field_def) = arg.field_definition() {
+                            composite_fields.push(field_def);
+                        }
                     }
+                    let create_comp_type = CreateCompositeType::from_fields(&composite_fields);
+                    let type_def = TypeDefinition::CompositeType(create_comp_type);
+                    ret_type = TypeReference::dynamic(&type_def);
                 }
-                let create_comp_type = CreateCompositeType::from_fields(&composite_fields);
-                let type_def = TypeDefinition::CompositeType(create_comp_type);
-                let ret_type = TypeReference::dynamic(&type_def);
                 variants.push(&OverloadVariant::new(
                     &Some(ret_type),
                     &args,
@@ -310,6 +313,121 @@ impl PgBuiltInFunctions {
         );
 
         Some(func)
+    }
+}
+
+#[cfg(test)]
+mod test_declared_builtin_results {
+    use self::test_helpers::functions_with_scalar_and_output_overloads;
+    use crate::sem::{
+        ColumnCollection, ColumnDefinition, ColumnName, FullName, FunctionParam, TypeReference,
+    };
+
+    #[rstest::rstest]
+    #[case::input_only(0, "text", false, Some("value"))]
+    #[case::variadic_scalar(1, "text", true, Some("pattern"))]
+    #[case::no_details(2, "bool", false, None)]
+    fn preserves_scalar_result_and_input_metadata(
+        #[case] index: usize,
+        #[case] declared_type: &str,
+        #[case] variadic: bool,
+        #[case] input_name: Option<&str>,
+    ) {
+        let functions = functions_with_scalar_and_output_overloads();
+        let function = functions
+            .find_function_by_name(&FullName::with_schema("pg_catalog", "probe"))
+            .unwrap();
+        let overload = function.overloads().get_at(index).unwrap();
+        assert_eq!(
+            overload.ret_type(),
+            &Some(TypeReference::from_master_type_name(declared_type))
+        );
+        let input_type =
+            TypeReference::from_master_type_name(if variadic { "text" } else { declared_type });
+        let mut expected = vec![FunctionParam::new_input_param(
+            &input_name.map(String::from),
+            &Some(input_type),
+            &None,
+        )];
+        if variadic {
+            expected.push(FunctionParam::new_variadig_param(
+                &Some(String::from("values")),
+                &Some(TypeReference::from_master_type_name("any")),
+            ));
+        }
+        assert_eq!(overload.params(), &expected);
+    }
+
+    #[rstest::rstest]
+    #[case::two_output_fields(3, "int4", &[ ("label", "text"), ("count", "int4") ])]
+    #[case::different_output_overload(4, "int8", &[ ("total", "int8") ])]
+    fn preserves_output_fields_per_overload(
+        #[case] index: usize,
+        #[case] input_type: &str,
+        #[case] output_fields: &[(&str, &str)],
+    ) {
+        let functions = functions_with_scalar_and_output_overloads();
+        let function = functions
+            .find_function_by_name(&FullName::with_schema("pg_catalog", "probe"))
+            .unwrap();
+        let overload = function.overloads().get_at(index).unwrap();
+        let result = overload.ret_type().as_ref().unwrap();
+        assert!(result.is_dynamic());
+        let columns = result
+            .type_definition()
+            .unwrap()
+            .get_composite_type_columns();
+        let mut expected = vec![FunctionParam::new_input_param(
+            &Some(String::from("value")),
+            &Some(TypeReference::from_master_type_name(input_type)),
+            &None,
+        )];
+        let mut expected_columns = Vec::new();
+        for (name, ty) in output_fields {
+            let ty = TypeReference::from_master_type_name(ty);
+            expected_columns.push(ColumnDefinition::new(
+                &Some(ColumnName::from(*name)),
+                Some(&ty),
+                Some(false),
+                &[],
+            ));
+            expected.push(FunctionParam::new_output_param(
+                &Some(String::from(*name)),
+                &Some(ty),
+            ));
+        }
+        assert_eq!(columns, ColumnCollection::new(expected_columns));
+        assert_eq!(overload.params(), &expected);
+    }
+
+    mod test_helpers {
+        use super::super::{PgBuiltInFunctions, PgFunctionDetail, PgFunctionProto};
+        use std::collections::HashMap;
+
+        pub(super) fn functions_with_scalar_and_output_overloads() -> PgBuiltInFunctions {
+            let prototypes: Vec<PgFunctionProto> = ::serde_json::from_str(
+                r#"[
+                    {"args":["text"],"ret":"text","is_strict":true},
+                    {"args":["text","any"],"ret":"text","is_strict":false},
+                    {"args":["bool"],"ret":"bool","is_strict":true},
+                    {"args":["int4"],"ret":"record","is_strict":true},
+                    {"args":["int8"],"ret":"record","is_strict":true}
+                ]"#,
+            )
+            .unwrap();
+            let details: Vec<PgFunctionDetail> = ::serde_json::from_str(
+                r#"[
+                    {"name":"probe","allargtypes":"{text}","argmodes":"{i}","argnames":"{value}"},
+                    {"name":"probe","allargtypes":"{text,any}","argmodes":"{i,v}","argnames":"{pattern,values}"},
+                    {"name":"probe","allargtypes":"{int4,text,int4}","argmodes":"{i,o,o}","argnames":"{value,label,count}"},
+                    {"name":"probe","allargtypes":"{int8,int8}","argmodes":"{i,o}","argnames":"{value,total}"}
+                ]"#,
+            ).unwrap();
+            PgBuiltInFunctions {
+                function_by_name: HashMap::from([(String::from("probe"), prototypes)]),
+                function_details: HashMap::from([(String::from("probe"), details)]),
+            }
+        }
     }
 }
 

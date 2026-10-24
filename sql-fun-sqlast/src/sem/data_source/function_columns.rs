@@ -116,6 +116,15 @@ impl TableFunctionOutput {
         }
         Ok(())
     }
+    pub(super) fn declaration_at(
+        &self,
+        index: usize,
+    ) -> Option<&crate::sem::WithTypmod<TypeReference>> {
+        self.declarations
+            .get(index)
+            .map(|column| &column.requested_type)
+    }
+
     pub(crate) fn declaration(
         &self,
         column: &ColumnName,

@@ -202,6 +202,7 @@ impl<'a> QualifiedSource<'a> {
                 self.nullable,
             )?
             .0
+            .with_function_type_declaration(function.output_type_declaration_at(index))
         } else {
             self.source
                 .create_column_ref(context, with, &self.alias, column, self.nullable)?

@@ -156,6 +156,13 @@ impl TableFunctionDataSource {
     ) -> Option<&crate::sem::WithTypmod<crate::sem::TypeReference>> {
         self.output.declaration(column, &self.alias)
     }
+    pub(super) fn output_type_declaration_at(
+        &self,
+        index: usize,
+    ) -> Option<&crate::sem::WithTypmod<crate::sem::TypeReference>> {
+        self.output.declaration_at(index)
+    }
+
     /// Effective invocation columns, independently of the catalog return declaration.
     pub const fn output_columns(&self) -> &crate::sem::ColumnCollection {
         self.output.columns()

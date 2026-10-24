@@ -136,7 +136,13 @@ impl<'a> QualifiedSource<'a> {
             .source
             .projection_names(context, with, Some(&self.alias))?
             .into_iter()
-            .map(|column| column.with_nullability(self.nullable))
+            .map(|column| {
+                if let Some(role) = self.merge_role {
+                    column.with_merge(role, self.nullable)
+                } else {
+                    column.with_nullability(self.nullable)
+                }
+            })
             .collect())
     }
 

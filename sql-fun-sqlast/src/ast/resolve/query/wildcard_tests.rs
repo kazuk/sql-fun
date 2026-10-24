@@ -434,3 +434,29 @@ fn named_row_cast_does_not_accept_mismatched_field_count() {
     let analyzed = source_namespace_statement("SELECT (ROW(1)::a.mixed).id");
     assert!(!analyzed.context().reported_problems().is_empty());
 }
+
+#[rstest::rstest]
+#[case::duplicate_join(
+    "MERGE INTO a.u d USING (a.t CROSS JOIN b.t) j ON true WHEN MATCHED THEN DELETE RETURNING j.*"
+)]
+#[case::rows(
+    "MERGE INTO a.u d USING ROWS FROM (mixed_fun(), mixed_fun()) r ON true WHEN MATCHED THEN DELETE RETURNING r.*"
+)]
+fn merge_wildcard_columns_preserve_record_roles_after_positional_binding(#[case] sql: &str) {
+    let analyzed = source_namespace_statement(sql);
+    assert!(
+        analyzed.context().reported_problems().is_empty(),
+        "{:?}",
+        analyzed.context().reported_problems()
+    );
+    let group = &analyzed.context().analysis_state().wildcard_expansions()[0];
+    for column in group.columns() {
+        let role = column
+            .expression()
+            .unwrap()
+            .merge_record_reference()
+            .unwrap()
+            .role();
+        assert_eq!(role, crate::sem::MergeRecordRole::source());
+    }
+}

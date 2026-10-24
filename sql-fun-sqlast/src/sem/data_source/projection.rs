@@ -14,6 +14,7 @@ pub(crate) struct ProjectionColumn<'a> {
     origin: Option<ProjectionOrigin<'a>>,
     typed_record: Option<crate::sem::WildcardTypedRecord>,
     rows_origin: Option<(std::sync::Arc<crate::sem::WildcardRowsSource>, usize)>,
+    merge_record: Option<(super::MergeRecordRole, bool)>,
 }
 
 #[derive(Clone, Debug)]
@@ -97,13 +98,6 @@ impl<'a> ProjectionBinding<'a> {
                 merged.nullable |= nullable;
                 Self::Merged(merged)
             }
-        }
-    }
-    fn with_merge(self, role: super::MergeRecordRole, nullable: bool) -> Self {
-        match self {
-            Self::Source(source) => Self::Source(source.with_merge(role, nullable)),
-            Self::Expression(_) => self,
-            Self::Merged(_) => self,
         }
     }
     fn bind_direct(
@@ -285,6 +279,7 @@ impl<'a> ProjectionColumn<'a> {
             origin: None,
             typed_record: None,
             rows_origin: None,
+            merge_record: None,
         }
     }
     pub(super) fn expression(name: &ColumnName, expression: &SemScalarExpr) -> Self {
@@ -296,6 +291,7 @@ impl<'a> ProjectionColumn<'a> {
             origin: None,
             typed_record: None,
             rows_origin: None,
+            merge_record: None,
         }
     }
     pub(super) fn merged(left: &Self, right: &Self) -> Self {
@@ -306,6 +302,7 @@ impl<'a> ProjectionColumn<'a> {
             origin: None,
             typed_record: None,
             rows_origin: None,
+            merge_record: None,
             binding: ProjectionBinding::Merged(Box::new(MergedProjection {
                 left: Box::new(left.clone()),
                 right: Box::new(right.clone()),
@@ -331,6 +328,7 @@ impl<'a> ProjectionColumn<'a> {
             origin: None,
             typed_record: None,
             rows_origin: None,
+            merge_record: None,
         })
     }
     pub(crate) const fn name(&self) -> &ColumnName {
@@ -342,7 +340,15 @@ impl<'a> ProjectionColumn<'a> {
         scope: &ScalarAnalysisContext<'_>,
     ) -> Result<SemScalarExpr, AnalysisError> {
         let expression = self.binding.bind(context, scope, &self.column)?;
-        Ok(self.relabel(expression))
+        Ok(self.finish_binding(expression))
+    }
+    fn finish_binding(&self, expression: SemScalarExpr) -> SemScalarExpr {
+        let expression = self.relabel(expression);
+        if let Some((role, nullable)) = self.merge_record {
+            expression.merge_record_column(role, nullable)
+        } else {
+            expression
+        }
     }
     fn relabel(&self, expression: SemScalarExpr) -> SemScalarExpr {
         if let Some(alias) = &self.alias {
@@ -365,14 +371,15 @@ impl<'a> ProjectionColumn<'a> {
         with: &WithClause,
     ) -> Result<SemScalarExpr, AnalysisError> {
         let expression = self.binding.bind_direct(context, with, &self.column)?;
-        Ok(self.relabel(expression))
+        Ok(self.finish_binding(expression))
     }
     pub(super) fn with_nullability(mut self, nullable: bool) -> Self {
         self.binding = self.binding.with_nullability(nullable);
         self
     }
     pub(super) fn with_merge(mut self, role: super::MergeRecordRole, nullable: bool) -> Self {
-        self.binding = self.binding.with_merge(role, nullable);
+        self.binding = self.binding.with_nullability(nullable);
+        self.merge_record = Some((role, nullable));
         self
     }
     pub(super) fn with_group(mut self, source: &'a DataSource, alias: &AliasName) -> Self {

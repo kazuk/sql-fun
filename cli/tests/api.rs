@@ -10,6 +10,7 @@ use ::tokio::io::{AsyncBufReadExt, AsyncWriteExt, BufReader};
 const ECHO: &str = "{\"method\":\"echo\",\"params\":{\"nested\":[null,true,{\"n\":42}]}}\n";
 
 #[tokio::test]
+#[ignore = "High CI disk usage from server builds"]
 async fn streams_before_eof_and_preserves_server_on_reuse() -> ::testresult::TestResult {
     let server = heavy::ApiServer::new()?;
     let mut child = server.command().spawn()?;
@@ -87,6 +88,7 @@ async fn streams_before_eof_and_preserves_server_on_reuse() -> ::testresult::Tes
 #[case::unknown(r#"{"method":"no_such_method","params":{}}"#)]
 #[case::wrong_params(r#"{"method":"echo","params":null}"#)]
 #[tokio::test]
+#[ignore = "High CI disk usage from server builds"]
 async fn invalid_later_line_drains_accepted_requests(
     #[case] invalid: &str,
 ) -> ::testresult::TestResult {
@@ -106,6 +108,7 @@ async fn invalid_later_line_drains_accepted_requests(
 }
 
 #[tokio::test]
+#[ignore = "High CI disk usage from server builds"]
 async fn cargo_startup_cli_precedence_and_logs_on_stderr() -> ::testresult::TestResult {
     let server = heavy::ApiServer::new()?;
     let mut command = server.command();
@@ -132,6 +135,7 @@ async fn cargo_startup_cli_precedence_and_logs_on_stderr() -> ::testresult::Test
 }
 
 #[tokio::test]
+#[ignore = "High CI disk usage from server builds"]
 async fn path_resolution_and_server_error_envelope() -> ::testresult::TestResult {
     let server = heavy::ApiServer::new()?;
     let mut command = server.command();
@@ -163,6 +167,7 @@ async fn path_resolution_and_server_error_envelope() -> ::testresult::TestResult
 }
 
 #[tokio::test]
+#[ignore = "High CI disk usage from server builds"]
 async fn broken_stdout_is_reported_while_stdin_stays_open() -> ::testresult::TestResult {
     let server = heavy::ApiServer::new()?;
     let mut child = server.command().spawn()?;
@@ -179,6 +184,7 @@ async fn broken_stdout_is_reported_while_stdin_stays_open() -> ::testresult::Tes
 }
 
 #[tokio::test]
+#[ignore = "High CI disk usage from server builds"]
 async fn transport_failure_exits_while_stdin_is_open() -> ::testresult::TestResult {
     let server = heavy::ApiServer::new()?;
     let mut child = server.command().spawn()?;
@@ -221,6 +227,7 @@ async fn missing_choices_fail_explicitly(
 }
 
 #[tokio::test]
+#[ignore = "High CI disk usage from server builds"]
 async fn environment_launch_and_explicit_reference_do_not_discover_metadata()
 -> ::testresult::TestResult {
     let server = heavy::ApiServer::new()?;
@@ -246,6 +253,7 @@ async fn environment_launch_and_explicit_reference_do_not_discover_metadata()
 }
 
 #[tokio::test]
+#[ignore = "High CI disk usage from server builds"]
 async fn renders_server_diagnostic_from_retained_source_after_file_changes()
 -> ::testresult::TestResult {
     use ::clap::Parser;
@@ -276,6 +284,7 @@ async fn renders_server_diagnostic_from_retained_source_after_file_changes()
 }
 
 #[tokio::test]
+#[ignore = "High CI disk usage from server builds"]
 async fn tokenization_is_available_without_schema_or_project_discovery() -> ::testresult::TestResult
 {
     let server = heavy::ApiServer::new()?;

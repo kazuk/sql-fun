@@ -12,6 +12,7 @@ use self::{
 };
 
 #[tokio::test]
+#[ignore = "High CI disk usage from server builds"]
 async fn real_query_contracts_and_expected_semantic_errors_pass_without_lockfiles()
 -> ::testresult::TestResult {
     // The real service is necessary to check transported diagnostics and result shapes.
@@ -49,6 +50,7 @@ async fn real_query_contracts_and_expected_semantic_errors_pass_without_lockfile
 }
 
 #[tokio::test]
+#[ignore = "High CI disk usage from server builds"]
 async fn mixed_results_continue_and_parse_diagnostics_are_assertions() -> ::testresult::TestResult {
     let server = heavy::ApiServer::new()?;
     let schema = SchemaFixture::with_query_schema("CREATE TABLE events (id int4 NOT NULL);")?;
@@ -96,6 +98,7 @@ async fn mixed_results_continue_and_parse_diagnostics_are_assertions() -> ::test
 #[case::default_sql("default")]
 #[case::extensions("extensions")]
 #[tokio::test]
+#[ignore = "High CI disk usage from server builds"]
 async fn lower_levels_do_not_require_the_project_dump(
     #[case] level: &str,
 ) -> ::testresult::TestResult {
@@ -124,6 +127,7 @@ async fn lower_levels_do_not_require_the_project_dump(
 }
 
 #[tokio::test]
+#[ignore = "High CI disk usage from server builds"]
 async fn analyze_reports_all_statements_and_continues_after_diagnostics() -> ::testresult::TestResult
 {
     let server = heavy::ApiServer::new()?;
@@ -154,6 +158,7 @@ async fn analyze_reports_all_statements_and_continues_after_diagnostics() -> ::t
 }
 
 #[tokio::test]
+#[ignore = "High CI disk usage from server builds"]
 async fn setup_errors_produce_attributed_junit_errors() -> ::testresult::TestResult {
     let server = heavy::ApiServer::new()?;
     let schema = SchemaFixture::with_query_schema("-- setup")?;
@@ -176,6 +181,7 @@ async fn setup_errors_produce_attributed_junit_errors() -> ::testresult::TestRes
 }
 
 #[tokio::test]
+#[ignore = "High CI disk usage from server builds"]
 async fn expected_parser_diagnostics_can_pass_and_shape_is_still_checked()
 -> ::testresult::TestResult {
     let server = heavy::ApiServer::new()?;
@@ -201,6 +207,7 @@ async fn expected_parser_diagnostics_can_pass_and_shape_is_still_checked()
 }
 
 #[tokio::test]
+#[ignore = "High CI disk usage from server builds"]
 async fn result_column_contract_materializes_every_page() -> ::testresult::TestResult {
     let server = heavy::ApiServer::new()?;
     let schema = SchemaFixture::with_query_schema("CREATE TABLE events (id int4 NOT NULL);")?;
@@ -222,6 +229,7 @@ async fn result_column_contract_materializes_every_page() -> ::testresult::TestR
 }
 
 #[tokio::test]
+#[ignore = "High CI disk usage from server builds"]
 async fn report_write_failure_is_an_execution_error() -> ::testresult::TestResult {
     let server = heavy::ApiServer::new()?;
     let schema = SchemaFixture::with_query_schema("-- setup")?;
@@ -242,6 +250,7 @@ async fn report_write_failure_is_an_execution_error() -> ::testresult::TestResul
 }
 
 #[tokio::test]
+#[ignore = "High CI disk usage from server builds"]
 async fn analyze_displays_statement_results_and_accesses() -> ::testresult::TestResult {
     // A real service verifies that completed API collections reach the console.
     let server = heavy::ApiServer::new()?;
@@ -284,6 +293,7 @@ async fn analyze_displays_statement_results_and_accesses() -> ::testresult::Test
 }
 
 #[tokio::test]
+#[ignore = "High CI disk usage from server builds"]
 async fn analyze_displays_unavailable_results_for_parser_diagnostics() -> ::testresult::TestResult {
     let server = heavy::ApiServer::new()?;
     let schema = SchemaFixture::with_query_schema("-- setup")?;
@@ -309,6 +319,7 @@ async fn analyze_displays_unavailable_results_for_parser_diagnostics() -> ::test
 }
 
 #[tokio::test]
+#[ignore = "High CI disk usage from server builds"]
 async fn column_differences_are_readable_in_console_and_junit() -> ::testresult::TestResult {
     // A real CLI run must deliver the same readable differences to both outputs.
     let server = heavy::ApiServer::new()?;

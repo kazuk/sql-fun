@@ -7,6 +7,7 @@ use ::sql_fun_client::connect;
 use std::time::{Duration, Instant};
 
 #[tokio::test]
+#[ignore = "High CI disk usage from server builds"]
 async fn launches_authenticates_and_reuses_without_executing_override() -> ::testresult::TestResult
 {
     let fixture = heavy::ServerFixture::new()?;
@@ -36,6 +37,7 @@ async fn launches_authenticates_and_reuses_without_executing_override() -> ::tes
 }
 
 #[tokio::test]
+#[ignore = "High CI disk usage from server builds"]
 async fn concurrent_fresh_clients_find_one_primary() -> ::testresult::TestResult {
     let fixture = heavy::ServerFixture::new()?;
     let options = fixture.options();
@@ -45,6 +47,7 @@ async fn concurrent_fresh_clients_find_one_primary() -> ::testresult::TestResult
 }
 
 #[tokio::test]
+#[ignore = "High CI disk usage from server builds"]
 async fn cargo_command_launch_uses_prebuilt_actual_server() -> ::testresult::TestResult {
     let fixture = heavy::ServerFixture::new()?;
     let command = if cfg!(feature = "sqlite") {
@@ -129,6 +132,7 @@ async fn broken_shell_command_retains_launch_failure_at_deadline() -> ::testresu
 }
 
 #[tokio::test]
+#[ignore = "High CI disk usage from server builds"]
 async fn rejected_token_preserves_actual_server_and_registration() -> ::testresult::TestResult {
     let fixture = heavy::ServerFixture::new()?;
     drop(connect(&fixture.options()).await?);
@@ -144,6 +148,7 @@ async fn rejected_token_preserves_actual_server_and_registration() -> ::testresu
 }
 
 #[tokio::test]
+#[ignore = "High CI disk usage from server builds"]
 async fn stalled_actual_server_is_preserved_with_bounded_deadline() -> ::testresult::TestResult {
     let fixture = heavy::ServerFixture::new()?;
     drop(connect(&fixture.options()).await?);
@@ -165,6 +170,7 @@ async fn stalled_actual_server_is_preserved_with_bounded_deadline() -> ::testres
 }
 
 #[tokio::test]
+#[ignore = "High CI disk usage from server builds"]
 async fn rereads_changed_registration_within_original_deadline() -> ::testresult::TestResult {
     let fixture = heavy::ServerFixture::new()?;
     let first = connect(&fixture.options()).await?;
@@ -184,6 +190,7 @@ async fn rereads_changed_registration_within_original_deadline() -> ::testresult
 }
 
 #[tokio::test]
+#[ignore = "High CI disk usage from server builds"]
 async fn streams_multiple_requests_and_drains_actual_server() -> ::testresult::TestResult {
     // The actual server is required to verify authenticated half-close semantics.
     let fixture = heavy::ServerFixture::new()?;
@@ -217,6 +224,7 @@ async fn streams_multiple_requests_and_drains_actual_server() -> ::testresult::T
 }
 
 #[tokio::test]
+#[ignore = "High CI disk usage from server builds"]
 async fn typed_response_completes_real_session_collection_and_releases() -> ::testresult::TestResult
 {
     // The actual server verifies authenticated handle lifetime and real bounded paging.

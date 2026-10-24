@@ -184,3 +184,125 @@ fn sqlite_does_not_use_postgres_condition_constraints(#[case] sql: &str) -> test
     );
     Ok(())
 }
+
+#[rstest::rstest]
+#[case::array_else_domain(
+    "CASE WHEN true THEN NULL::integer[] ELSE NULL::amount[] END",
+    "public.amount[]",
+    false
+)]
+#[case::array_else_base(
+    "CASE WHEN true THEN NULL::amount[] ELSE NULL::integer[] END",
+    "pg_catalog.int4[]",
+    false
+)]
+#[case::scalar_domain(
+    "CASE WHEN true THEN NULL::integer ELSE NULL::amount END",
+    "pg_catalog.int4",
+    false
+)]
+#[case::unknown_array(
+    "CASE WHEN true THEN NULL ELSE NULL::amount[] END",
+    "public.amount[]",
+    false
+)]
+#[case::domain_over_array(
+    "CASE WHEN true THEN NULL::integer[] ELSE NULL::amount_array END",
+    "pg_catalog.int4[]",
+    false
+)]
+#[case::simple(
+    "CASE 1 WHEN 1 THEN NULL::integer[] ELSE NULL::amount[] END",
+    "public.amount[]",
+    false
+)]
+#[case::multiple(
+    "CASE WHEN true THEN NULL::integer[] WHEN false THEN NULL::amount[] ELSE NULL::amount[] END",
+    "public.amount[]",
+    false
+)]
+#[case::identical_domain(
+    "CASE WHEN true THEN NULL::amount ELSE NULL::amount END",
+    "public.amount",
+    false
+)]
+#[case::identical_array(
+    "CASE WHEN true THEN NULL::amount[] ELSE NULL::amount[] END",
+    "public.amount[]",
+    false
+)]
+#[case::string_unknown("CASE WHEN true THEN '1' ELSE 2 END", "pg_catalog.int4", true)]
+#[case::all_unknown("CASE WHEN true THEN NULL ELSE NULL END", "pg_catalog.text", false)]
+#[case::omitted_else("CASE WHEN true THEN NULL::amount END", "pg_catalog.int4", false)]
+#[case::nested(
+    "CASE WHEN true THEN CASE WHEN false THEN NULL::integer[] ELSE NULL::amount[] END ELSE NULL::amount[] END",
+    "public.amount[]",
+    false
+)]
+#[case::parent_operator("(CASE WHEN true THEN 1 ELSE 2 END) + 1", "pg_catalog.int4", false)]
+#[case::array_null_else(
+    "CASE WHEN true THEN NULL::amount[] ELSE NULL END",
+    "public.amount[]",
+    false
+)]
+#[case::array_omitted_else("CASE WHEN true THEN NULL::amount[] END", "public.amount[]", false)]
+#[case::parameter_condition(
+    "CASE WHEN $1 THEN NULL::integer[] ELSE NULL::amount[] END",
+    "public.amount[]",
+    false
+)]
+fn known_results_use_ordered_common_types(
+    #[case] expression: &str,
+    #[case] expected: &str,
+    #[case] not_null: bool,
+) -> testresult::TestResult {
+    let analyzed = parse_statements(&format!("SELECT {expression}"), Dialect::postgres())
+        .next()
+        .unwrap()?
+        .analyze(test_helpers::context())?;
+    assert!(
+        analyzed.context().problems().is_empty(),
+        "{:?}",
+        analyzed.context().problems()
+    );
+    let query = analyzed.ast().clone().into_select_statemtnt().unwrap();
+    let column = query.result_columns().get_column_at(0).unwrap();
+    assert_eq!(column.col_type(), &Some(expected.parse()?));
+    assert_eq!(column.is_not_null(), &Some(not_null));
+    if let Some(case) = column.expression().unwrap().as_case() {
+        assert_eq!(case.arms()[0].result().get_type(), Some(expected.parse()?));
+        if let Some(otherwise) = case.otherwise() {
+            assert_eq!(otherwise.get_type(), Some(expected.parse()?));
+        }
+    }
+    Ok(())
+}
+
+#[rstest::rstest]
+#[case::standalone("SELECT CASE WHEN true THEN 1 ELSE false END")]
+#[case::unrelated_parameter("SELECT CASE WHEN true THEN 1 ELSE false END, $1::integer")]
+fn incompatible_known_results_keep_specific_diagnostic(
+    #[case] sql: &str,
+) -> testresult::TestResult {
+    let analyzed = parse_statements(sql, Dialect::postgres())
+        .next()
+        .unwrap()?
+        .analyze(test_helpers::context())?;
+    let problems = analyzed.context().problems();
+    assert_eq!(problems.len(), 1, "{problems:?}");
+    assert_eq!(problems[0].code(), "incompatible_case_values");
+    let query = analyzed.ast().clone().into_select_statemtnt().unwrap();
+    let column = query.result_columns().get_column_at(0).unwrap();
+    assert!(column.col_type().is_none());
+    assert!(column.expression().unwrap().as_case().is_some());
+    let next = parse_statements("SELECT 1", Dialect::postgres())
+        .next()
+        .unwrap()?
+        .analyze(analyzed.into_context())?;
+    assert!(
+        next.context()
+            .parameter_constraints()
+            .allows(&BTreeMap::new())
+    );
+    Ok(())
+}

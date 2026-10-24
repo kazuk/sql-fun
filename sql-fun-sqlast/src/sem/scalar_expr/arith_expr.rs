@@ -125,7 +125,7 @@ impl SemScalarExprNode for ArithExpr {
             Self::OpRightUnary(site) => site.is_strict(),
             Self::OpBinary(call_site) => call_site.is_strict(),
             Self::OpAnyBinary(call_site) => return call_site.is_not_null(),
-            Self::OpAllBinary(call_site) => call_site.is_strict(),
+            Self::OpAllBinary(call_site) => return call_site.is_not_null(),
             Self::NullIfExpr(null_if) => null_if.is_strict(),
             Self::UndefinedOperator(_)
             | Self::UndefinedOperatorAny(_)

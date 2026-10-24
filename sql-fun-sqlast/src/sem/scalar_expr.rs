@@ -271,6 +271,10 @@ impl SemScalarExpr {
         }
     }
 
+    pub(crate) const fn is_row_constructor(&self) -> bool {
+        matches!(self, Self::Row(_))
+    }
+
     pub(crate) const fn merge_action() -> Self {
         Self::MergeAction
     }

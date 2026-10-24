@@ -669,3 +669,70 @@ async fn tokenization_failure_still_renders_received_diagnostic() -> ::testresul
     assert_eq!(peer.await?.len(), 3);
     Ok(())
 }
+
+#[tokio::test]
+async fn check_preserves_expanded_server_sql_in_lockfile() {
+    use crate::check::{
+        CheckArgs,
+        lockfiles::Lockfiles,
+        progress::{Progress, ProgressMode},
+    };
+    use ::clap::Parser;
+    use ::sql_fun_core::lockfile::Lockfile;
+
+    let project = test_helpers::Project::new();
+    project.enable_asterisk_expansion();
+    let args = project.args();
+    let catalog = ::sql_fun_core::ResolvedCteCatalog::default();
+    let original = "SELECT *, ${lookup:int4} AS requested FROM entries WHERE id = ${lookup:int4}";
+    let executable = "SELECT entries.id AS id, $1 AS requested FROM entries WHERE id = $1";
+    let fingerprint = catalog
+        .finger_print(&::sql_fun_core::PlaceholderedSql::from_query(original))
+        .unwrap();
+    let requirements = test_helpers::requirements(&["first"], original, &catalog);
+    let lockfiles = Lockfiles::new(&args, &requirements, false, false).unwrap();
+    let (client, peer) = test_helpers::peer_with_response(
+        test_helpers::expanded_projection_response(executable),
+        None,
+    )
+    .await;
+    let mut output = Vec::new();
+    let mut progress = Progress::new(&mut output, ProgressMode::dots());
+    let result = CheckArgs::try_parse_from(["check"])
+        .unwrap()
+        .process_analyses(client, &args, requirements, lockfiles, &mut progress)
+        .await
+        .unwrap();
+    progress
+        .finish(result == std::process::ExitCode::SUCCESS)
+        .unwrap();
+    assert_eq!(result, std::process::ExitCode::SUCCESS);
+
+    let requests = peer.await.unwrap();
+    assert_eq!(requests[1]["params"]["query"]["Text"], original);
+    let transferred = ::sql_fun_core::SqlFunArgs::from_environments(
+        &::serde_json::from_value(requests[0]["params"]["environments"].clone()).unwrap(),
+    )
+    .unwrap();
+    assert_eq!(
+        transferred
+            .selected_metadata("first")
+            .unwrap()
+            .rewrite_options()
+            .expand_asterisk(),
+        Some(true)
+    );
+
+    let path = args.lockfile_path("first").unwrap();
+    let reader = Lockfile::from_file(&path, &project.schema_hash()).unwrap();
+    let entry = reader.get_entry(&fingerprint).unwrap().unwrap();
+    let statement = entry.single_statement().unwrap();
+    assert_eq!(statement.execute_sql(), executable);
+    assert_eq!(statement.bind_parameters().len(), 1);
+    assert_eq!(statement.bind_parameters()[0].name(), "lookup");
+    assert_eq!(statement.bind_parameters()[0].parameter_index(), 1);
+    assert_eq!(statement.result_set_shape()[0].field_name(), "id");
+    assert_eq!(statement.result_set_shape()[0].field_index(), 0);
+    assert_eq!(statement.result_set_shape()[1].field_name(), "requested");
+    assert_eq!(statement.result_set_shape()[1].field_index(), 1);
+}

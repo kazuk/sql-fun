@@ -396,7 +396,7 @@ impl crate::ast::Target {
         results: &mut ResultColumnCollection,
     ) -> Result<(), AnalysisError> {
         if let Expr::Star(name) = &self.expression {
-            return Self::append_source_star(name, context, with, from, scope, results);
+            return self.append_source_star(name, context, with, from, scope, results);
         }
         if let Expr::Indirection(indirection) = &self.expression
             && let Some(base) = indirection.projection_base(context, scope)?
@@ -413,6 +413,7 @@ impl crate::ast::Target {
     }
 
     fn append_source_star(
+        &self,
         name: &Name,
         context: &mut impl ParseContext,
         with: &WithClause,
@@ -426,29 +427,50 @@ impl crate::ast::Target {
         } else {
             None
         };
-        let columns = if let Some(relation) = &relation {
+        let projection = if let Some(relation) = &relation {
             scope.relation_projection_names(context, relation)?
         } else if let Some(qualifier) = &qualifier {
             scope.projection_names(context, qualifier)?
         } else {
-            from.projection_names(context, with, None)?
+            from.wildcard_projection(context, with, None)?
         };
-        if columns.is_empty() && qualifier.is_some() {
+        let (columns, source_found, table_dependent) = projection.into_parts();
+        if !source_found && qualifier.is_some() {
             let base = name.resolve_column(context, scope)?;
             return results.append_composite_star(context, base);
         }
-        if columns.is_empty() {
+        if !source_found {
             context.report_analysis_problem(AnalysisProblem::query(
                 crate::sem::problem::QueryProblem::reference_not_found("star source"),
             ))?;
         }
-        for column in columns {
+        let first = results.len();
+        let references: Vec<_> = columns
+            .iter()
+            .map(crate::sem::ProjectionColumn::visible_reference)
+            .collect();
+        for column in &columns {
             let expression = column.bind(context, scope)?;
             results.push_expression(column.name(), expression);
         }
+        let source_projections =
+            crate::sem::WildcardSourceProjection::from_columns(&columns, context, scope)?;
+        let mut expansion = crate::sem::WildcardExpansion::new(
+            self.location,
+            results,
+            first,
+            table_dependent,
+            &references,
+        );
+        expansion.retain_source_projections(&source_projections);
+        expansion.retain_projection_origins(&columns);
+        context.analysis_state_mut().record_wildcard(expansion);
         Ok(())
     }
 }
+
+#[cfg(test)]
+mod wildcard_tests;
 
 impl With {
     pub(in crate::ast) fn local_definitions(

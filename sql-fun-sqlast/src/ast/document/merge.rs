@@ -324,15 +324,15 @@ impl ResultColumnCollection {
                         .merge_row_target(alias)
                         .map_or(alias, |(target, _, _)| target)
                 });
-                if results.expand_projection(
+                if !results.expand_projection(
                     context,
                     with,
                     scope.sources(),
                     scope,
+                    target.location,
                     projection_qualifier,
                     qualifier.as_ref(),
-                )? == 0
-                {
+                )? {
                     return Err(AnalysisError::unexpected_input_error(
                         "MERGE RETURNING star source is not visible",
                     ));

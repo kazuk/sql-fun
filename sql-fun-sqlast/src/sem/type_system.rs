@@ -151,6 +151,18 @@ impl OverloadVariant {
         }
     }
 
+    pub(crate) fn table_output_depends_on_table(
+        &self,
+        context: &impl crate::sem::ParseContext,
+    ) -> bool {
+        self.returning_table().is_empty()
+            && self
+                .ret_type()
+                .as_ref()
+                .and_then(|ty| ty.definition_from_catalog(context))
+                .is_some_and(|definition| definition.row_table_name(context).is_some())
+    }
+
     pub(crate) fn table_function_output_columns(
         &self,
         context: &impl crate::sem::ParseContext,

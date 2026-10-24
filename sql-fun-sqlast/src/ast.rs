@@ -29,11 +29,13 @@ mod tests;
 mod trigger;
 mod validation;
 mod view_definition;
+mod wildcard;
 
 pub use self::deparse::DeparseError;
 pub(crate) use self::deparse::render_full_name;
 pub use self::mutation::{AstMutationError, CteDefinition, HaveWithClause, WithClauseMut};
 pub use self::public::{CommonTableExpression, Statement, StatementKind, WithClause};
+pub use self::wildcard::WildcardRewriteError;
 
 use sql_fun_core::IVec;
 
@@ -1476,6 +1478,7 @@ pub(crate) struct Select {
 
 #[derive(Clone, Debug)]
 pub(crate) struct Target {
+    location: Option<usize>,
     expression: Expr,
     alias: Option<String>,
 }

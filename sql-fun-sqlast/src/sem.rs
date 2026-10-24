@@ -57,6 +57,7 @@ mod select_statement;
 mod stack;
 mod top_level_statement;
 pub(crate) mod traversal;
+mod wildcard_expansion;
 pub use self::query_metadata::QueryMetadata;
 pub use self::with_typmod::WithTypmod;
 
@@ -75,10 +76,14 @@ pub use self::create_trigger::{
     TriggerEventColumn, TriggerFunction, TriggerGranularity, TriggerIdentity, TriggerReferences,
     TriggerTiming, TriggerTransition,
 };
-pub(crate) use self::data_source::ProjectionColumn;
+pub(crate) use self::data_source::{ProjectionColumn, WildcardProjection};
 pub use self::drop_rule::DropRule;
 pub use self::view_definition::{ViewCheckOption, ViewColumnLineage, ViewOption};
 pub use self::view_write::{ViewAssignmentColumn, ViewWriteEvaluation, ViewWriteSupport};
+pub(crate) use self::wildcard_expansion::{
+    WildcardQualifier, WildcardRowsFunction, WildcardRowsSource, WildcardSourceProjection,
+    WildcardTypedRecord,
+};
 
 pub(crate) use self::insert_statement::{
     InsertClauseSemantics, InsertClauseValues, InsertTargetCollection, InsertValueCollection,
@@ -218,6 +223,7 @@ pub use self::{
     },
     variable_set::{VariableSet, analyze_variable_set},
     view_like::ViewLike,
+    wildcard_expansion::WildcardExpansion,
 };
 pub use crate::AstAndContextPair;
 

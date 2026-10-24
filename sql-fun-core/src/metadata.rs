@@ -326,6 +326,9 @@ pub struct SqlFunMetadata {
     #[serde(flatten)]
     codegen_options: crate::CodegenOptions,
 
+    #[serde(default)]
+    rewrite_options: crate::RewriteOptions,
+
     /// Datasource name
     #[serde(skip)]
     name: Option<String>,
@@ -424,6 +427,12 @@ impl SqlFunMetadata {
     #[must_use]
     pub const fn codegen_options(&self) -> &crate::CodegenOptions {
         &self.codegen_options
+    }
+
+    /// Executable SQL rewrite choices configured for this datasource.
+    #[must_use]
+    pub const fn rewrite_options(&self) -> &crate::RewriteOptions {
+        &self.rewrite_options
     }
 
     /// deserialize form TOML Value
@@ -531,6 +540,35 @@ impl SqlFunMetadata {
     #[must_use]
     pub const fn connector(&self) -> &Option<String> {
         &self.connector
+    }
+}
+
+#[cfg(test)]
+mod test_rewrite_metadata {
+    use crate::test_helpers::metadata_with_codegen_options;
+
+    #[rstest::rstest]
+    #[case::omitted("", None)]
+    #[case::empty("[package.metadata.database.default.rewrite_options]", None)]
+    #[case::disabled("rewrite_options = { expand_asterisk = false }", Some(false))]
+    #[case::enabled("rewrite_options = { expand_asterisk = true }", Some(true))]
+    #[case::nested(
+        "[package.metadata.database.default.rewrite_options]\nexpand_asterisk = true",
+        Some(true)
+    )]
+    fn retains_explicit_rewrite_choice(#[case] input: &str, #[case] expected: Option<bool>) {
+        let metadata = metadata_with_codegen_options(input).unwrap();
+        let selected = metadata.get("default").unwrap();
+        assert_eq!(selected.rewrite_options().expand_asterisk(), expected);
+        assert!(selected.codegen_options().builder_setter().is_mutable());
+    }
+
+    #[rstest::rstest]
+    #[case::scalar("rewrite_options = true")]
+    #[case::string(r#"rewrite_options = { expand_asterisk = "true" }"#)]
+    #[case::number("rewrite_options = { expand_asterisk = 1 }")]
+    fn rejects_invalid_rewrite_options(#[case] input: &str) {
+        assert!(metadata_with_codegen_options(input).is_err());
     }
 }
 

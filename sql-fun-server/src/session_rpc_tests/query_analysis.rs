@@ -1,4 +1,5 @@
 mod test_helpers;
+mod wildcard_rewrite;
 
 use self::test_helpers::query_project;
 use crate::test_helpers::heavy;

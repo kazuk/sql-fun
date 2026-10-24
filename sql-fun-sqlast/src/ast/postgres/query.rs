@@ -178,6 +178,7 @@ impl TryCollectFromWithTokens<syn::NodeListOpt> for Target {
         for node in nodes.as_inner().unwrap_or_default() {
             let target = required(node.as_res_target().as_inner(), "query target")?;
             targets.push(Self {
+                location: usize::try_from(target.get_location()).ok(),
                 expression: Expr::try_from_with_tokens(&target.get_val(), tokens)?,
                 alias: nonempty(target.get_name()),
             });
@@ -980,15 +981,32 @@ impl TryFromWithTokens<&syn::JoinExpr> for Join {
         join: &syn::JoinExpr,
         tokens: &IVec<crate::syn::ScanToken>,
     ) -> Result<Self, Self::Error> {
+        let condition = Expr::try_from_with_tokens_opt(join.get_quals(), tokens)?;
+        let using = Name::try_from(join.get_using_clause())?.0;
+        let kind = JoinKind::try_from(required(join.get_jointype().as_inner(), "join kind")?)?
+            .with_postgres_join_clause(
+                join.get_is_natural() || condition.is_some() || !using.is_empty(),
+            );
         Ok(Self {
             left: FromItem::try_from_with_tokens(&join.get_larg(), tokens)?,
             right: FromItem::try_from_with_tokens(&join.get_rarg(), tokens)?,
-            kind: JoinKind::try_from(required(join.get_jointype().as_inner(), "join kind")?)?,
+            kind,
             natural: join.get_is_natural(),
-            condition: Expr::try_from_with_tokens_opt(join.get_quals(), tokens)?,
-            using: Name::try_from(join.get_using_clause())?.0,
+            condition,
+            using,
             using_alias: Alias::postgres(join.get_join_using_alias())?,
             alias: Alias::postgres(join.get_alias())?,
         })
+    }
+}
+
+impl JoinKind {
+    // PostgreSQL represents CROSS JOIN as an INNER join with no join clause.
+    fn with_postgres_join_clause(self, present: bool) -> Self {
+        if matches!(self, Self::Inner) && !present {
+            Self::Cross
+        } else {
+            self
+        }
     }
 }

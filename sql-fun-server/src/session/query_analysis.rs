@@ -324,6 +324,7 @@ impl QueryResult {
         source: &QuerySource,
         schema: &InitializedSchema,
         mapping: &SourceMap,
+        expand_asterisk: bool,
     ) -> Self {
         let rendered = &mapping.rendered;
         let base = schema.base_context();
@@ -360,7 +361,8 @@ impl QueryResult {
             ));
             return result;
         }
-        // Rendering is fallible and always uses the exact same realized AST.
+        // Preserve the pre-analysis rendering of the realized AST. Rewriting
+        // produces executable output in a separate post-analysis rendering.
         match statement.deparse_sql(statement.dialect()) {
             Ok(sql) => result.sql = Some(sql),
             Err(error) => result.problems.push(diagnostic(
@@ -371,8 +373,73 @@ impl QueryResult {
                 statement.span().offset(),
             )),
         }
-        match statement.analyze(context) {
-            Ok(pair) => result.describe(pair, bindings, source, statement, mapping),
+        // Imported catalog CTEs have independently parsed target locations.
+        // Reparse their realized SQL to synchronize only projection locations;
+        // retain all original parser spans used by semantic diagnostics.
+        // Query/parameter spans always use the original statement and SourceMap.
+        let mut output_statement = if expand_asterisk {
+            let Some(sql) = result.sql.as_deref() else {
+                return result;
+            };
+            let output = if mapping.expanded {
+                parse_realized_statement(sql, statement.dialect()).and_then(|parsed| {
+                    let mut output = statement.clone();
+                    output
+                        .synchronize_target_locations(parsed)
+                        .map_err(|error| error.to_string())?;
+                    Ok(output)
+                })
+            } else {
+                Ok(statement.clone())
+            };
+            match output {
+                Ok(output) => Some(output),
+                Err(error) => {
+                    result.sql = None;
+                    result.problems.push(diagnostic(
+                        &AnalysisProblem::query_analysis(QueryAnalysisStage::parse(), &error),
+                        &source.path,
+                        diagnostic_source,
+                        dialect,
+                        statement.span().offset(),
+                    ));
+                    return result;
+                }
+            }
+        } else {
+            None
+        };
+        let analysis_statement = output_statement.as_ref().unwrap_or(statement);
+        match analysis_statement.analyze(context) {
+            Ok(pair) => {
+                if let Some(output) = &mut output_statement {
+                    let rewritten = output
+                        .rewrite_wildcards(pair.context().analysis_state().wildcard_expansions())
+                        .map_err(|error| error.to_string())
+                        .and_then(|_| {
+                            output
+                                .deparse_sql(output.dialect())
+                                .map_err(|error| error.to_string())
+                        });
+                    match rewritten {
+                        Ok(sql) => result.sql = Some(sql),
+                        Err(error) => {
+                            result.sql = None;
+                            result.problems.push(diagnostic(
+                                &AnalysisProblem::query_analysis(
+                                    QueryAnalysisStage::deparse(),
+                                    &error,
+                                ),
+                                &source.path,
+                                diagnostic_source,
+                                dialect,
+                                statement.span().offset(),
+                            ));
+                        }
+                    }
+                }
+                result.describe(pair, bindings, source, statement, mapping);
+            }
             Err(error) => result.problems.push(diagnostic(
                 &AnalysisProblem::query_analysis(
                     QueryAnalysisStage::analysis(),
@@ -386,6 +453,19 @@ impl QueryResult {
         }
         result
     }
+}
+
+/// Re-establish parser locations after structural catalog CTE insertion.
+fn parse_realized_statement(sql: &str, dialect: Dialect) -> Result<Statement, String> {
+    let mut statements = parse_statements(sql, dialect);
+    let statement = statements
+        .next()
+        .ok_or_else(|| "deparsed query has no statement".to_owned())?
+        .map_err(|error| error.to_string())?;
+    if statements.next().is_some() {
+        return Err("deparsed query must contain exactly one statement".to_owned());
+    }
+    Ok(statement)
 }
 
 impl QueryResult {
@@ -585,6 +665,7 @@ fn analyze(
     args: &AnalyzeQueryArgs,
     source: &QuerySource,
     schema: &InitializedSchema,
+    expand_asterisk: bool,
 ) -> Vec<QueryResult> {
     let dialect = Dialect::from(schema.base_context().metadata());
     let fail = |stage: QueryAnalysisStage, message: &str| {
@@ -619,6 +700,7 @@ fn analyze(
                                 source,
                                 schema,
                                 &mapping,
+                                expand_asterisk,
                             )]
                         }
                         Err(error) => fail(QueryAnalysisStage::realization(), &error),
@@ -642,7 +724,14 @@ fn analyze(
     };
     parse_statements(&mapping.rendered, dialect)
         .map(|statement| match statement {
-            Ok(statement) => QueryResult::analyze(&statement, &bindings, source, schema, &mapping),
+            Ok(statement) => QueryResult::analyze(
+                &statement,
+                &bindings,
+                source,
+                schema,
+                &mapping,
+                expand_asterisk,
+            ),
             Err(error) => QueryResult::parse_failure(&error, source, schema, &mapping),
         })
         .collect()
@@ -657,7 +746,12 @@ impl Session<'_, '_> {
             .context(args.context_handle())
             .ok_or_else(SqlFunServerApiError::invalid_context_handle)?;
         let source = QuerySource::from_request(args)?;
-        let results = analyze(args, &source, schema);
+        let results = analyze(
+            args,
+            &source,
+            schema,
+            self.expand_asterisk(args.context_handle()),
+        );
         let mut handles = Vec::new();
         let response = (|| {
             let mut items = Vec::new();

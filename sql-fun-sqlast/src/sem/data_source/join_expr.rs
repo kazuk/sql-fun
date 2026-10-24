@@ -1,5 +1,5 @@
 use crate::sem::{
-    AliasSpec, ColumnName, DataSource, JoinKind, Nullable, SemScalarExpr, WithClause,
+    AliasSpec, ColumnName, DataSource, JoinKind, Nullable, ParseContext, SemScalarExpr, WithClause,
     data_source::AliasName,
 };
 
@@ -34,6 +34,11 @@ pub struct JoinExprDataSource {
 }
 
 impl JoinExprDataSource {
+    pub(super) fn projection_is_table_dependent(&self, context: &impl ParseContext) -> bool {
+        self.left.projection_is_table_dependent(context)
+            || self.right.projection_is_table_dependent(context)
+    }
+
     pub(super) fn namespace<'a>(&'a self, source: &'a DataSource) -> super::SourceNamespace<'a> {
         if let Some(alias) = &self.alias {
             let mut namespace = super::SourceNamespace::default();
@@ -231,22 +236,11 @@ impl JoinExprDataSource {
     ) -> Result<Vec<super::ProjectionColumn<'_>>, crate::sem::AnalysisError> {
         if self.matches_projection_qualifier(qualifier) {
             let columns = self.projection_names(context, with)?;
-            return Ok(columns
-                .into_iter()
-                .enumerate()
-                .map(|(index, column)| {
-                    if let Some(alias) = &self.alias {
-                        let column = if let Some(name) = alias.derived_column_at(index) {
-                            column.with_name(name)
-                        } else {
-                            column
-                        };
-                        column.with_join_alias(alias.name())
-                    } else {
-                        column
-                    }
-                })
-                .collect());
+            return Ok(if let Some(alias) = &self.alias {
+                super::ProjectionColumn::alias_join_columns(columns, alias)
+            } else {
+                columns
+            });
         }
         if self.alias.is_some() {
             return Ok(Vec::new());

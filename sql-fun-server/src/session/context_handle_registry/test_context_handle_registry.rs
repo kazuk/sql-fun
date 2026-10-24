@@ -179,3 +179,65 @@ async fn cancelling_a_connection_task_drops_borrowed_state_before_schema_owners(
     assert!(task.await.unwrap_err().is_cancelled());
     assert!(weak.upgrade().is_none());
 }
+
+#[tokio::test]
+async fn sessions_share_a_schema_without_sharing_rewrite_policy() {
+    let project = SchemaProject::new();
+    let service = project.service();
+    let schema = project.initialized_schema(&service).await;
+    let enabled: ::sql_fun_core::RewriteOptions =
+        ::serde_json::from_value(::serde_json::json!({"expand_asterisk": true})).unwrap();
+    let disabled: ::sql_fun_core::RewriteOptions =
+        ::serde_json::from_value(::serde_json::json!({"expand_asterisk": false})).unwrap();
+    let first = SessionWrapper::new();
+    let second = SessionWrapper::new();
+    let first_handle = first
+        .contexts
+        .register_with_options(&schema, &enabled)
+        .unwrap();
+    let second_handle = second
+        .contexts
+        .register_with_options(&schema, &disabled)
+        .unwrap();
+    let omitted = second.contexts.register(&schema).unwrap();
+
+    assert!(std::ptr::eq(
+        first.contexts.resolve(&first_handle).unwrap(),
+        second.contexts.resolve(&second_handle).unwrap(),
+    ));
+    assert_eq!(
+        first
+            .contexts
+            .rewrite_options(&first_handle)
+            .unwrap()
+            .expand_asterisk(),
+        Some(true)
+    );
+    assert_eq!(
+        second
+            .contexts
+            .rewrite_options(&second_handle)
+            .unwrap()
+            .expand_asterisk(),
+        Some(false)
+    );
+    assert_eq!(
+        second
+            .contexts
+            .rewrite_options(&omitted)
+            .unwrap()
+            .expand_asterisk(),
+        None
+    );
+    assert!(first.contexts.rewrite_options(&second_handle).is_none());
+    assert!(second.contexts.rewrite_options(&first_handle).is_none());
+    drop(second);
+    assert_eq!(
+        first
+            .contexts
+            .rewrite_options(&first_handle)
+            .unwrap()
+            .expand_asterisk(),
+        Some(true)
+    );
+}

@@ -11,6 +11,10 @@ pub struct GroupedDataSource {
 }
 
 impl GroupedDataSource {
+    pub(super) fn projection_is_table_dependent(&self, context: &impl ParseContext) -> bool {
+        self.source.projection_is_table_dependent(context)
+    }
+
     pub(super) fn sqlite_qualified_group_source<'a>(
         &'a self,
         context: &impl ParseContext,

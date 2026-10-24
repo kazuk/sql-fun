@@ -45,6 +45,15 @@ connector = "tokio-postgres"
         Self(directory)
     }
 
+    pub(super) fn enable_asterisk_expansion(&self) {
+        let path = self.0.path().join("metadata.toml");
+        let mut metadata = std::fs::read_to_string(&path).unwrap();
+        metadata.push_str(
+            "\n[package.metadata.database.first.rewrite_options]\nexpand_asterisk = true\n",
+        );
+        std::fs::write(path, metadata).unwrap();
+    }
+
     pub(super) fn schema_hash(&self) -> String {
         ::sql_fun_core::Hasher::hash_file(self.0.path().join("schema.sql")).unwrap()
     }
@@ -303,5 +312,40 @@ pub(super) fn incomplete_diagnostic_response(statement: &str) -> Value {
         None,
     )
     .with_semantic_problem(&fallback)]);
+    response
+}
+
+/// A server response whose executable projection differs from its original star.
+pub(super) fn expanded_projection_response(sql: &str) -> Value {
+    use ::sql_fun_client::payloads::{
+        Nullability, ParameterDescribe, ResultSetColumn, TypeReference,
+    };
+    let parameters = vec![ParameterDescribe::new(
+        "lookup",
+        1,
+        Some(TypeReference::new("pg_catalog", "int4", false)),
+        Vec::new(),
+    )];
+    let columns = vec![
+        ResultSetColumn::new(
+            0,
+            "id",
+            Some(TypeReference::new("pg_catalog", "int4", false)),
+            Nullability::from_not_null(None),
+        ),
+        ResultSetColumn::new(
+            1,
+            "requested",
+            Some(TypeReference::new("pg_catalog", "int4", false)),
+            Nullability::from_not_null(None),
+        ),
+    ];
+    let mut response = successful_response(1);
+    let item = &mut response["queries"]["items"][0];
+    item["execute_sql"] = json!(sql);
+    item["parameters"] = json!({"handle":"bindings","total_length":parameters.len(),"offset":0,
+        "require_release":false,"items":parameters});
+    item["result_columns"] = json!({"handle":"columns","total_length":columns.len(),"offset":0,
+        "require_release":false,"items":columns});
     response
 }

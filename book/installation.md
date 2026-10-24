@@ -79,6 +79,19 @@ The datasource selection name does not supply the database identity.
   - When `engine` is "PostgreSQL": Can be "tokio-postgres".
   - When `engine` is "sqlite": Can be "rusqlite".
 
+To expand table-dependent wildcard projections in PostgreSQL executable SQL,
+explicitly enable the option for the selected datasource:
+
+```toml
+[package.metadata.database.default.rewrite_options]
+expand_asterisk = true
+```
+
+Omitting this option, using an empty `rewrite_options` table, or setting
+`expand_asterisk = false` preserves existing SQL output. See
+[wildcard projection expansion](sql-analysis.md#wildcard-projection-expansion)
+for its scope and schema requirements. SQLite expansion is not available.
+
 You can use multiple database in application like a bellow.
 
 ```toml

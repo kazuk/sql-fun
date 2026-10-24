@@ -48,6 +48,7 @@ mod lookup_result;
 mod metadata;
 mod placehlodered_sql;
 mod postgres_version;
+mod rewrite_options;
 mod schema_level;
 mod sql_tokens;
 pub use self::schema_level::SchemaLevel;
@@ -97,6 +98,7 @@ pub use self::{
         SqlFunMetadataCollection,
     },
     postgres_version::{PostgresVersion, PostgresVersionInventory},
+    rewrite_options::RewriteOptions,
 };
 
 /// SQL Dialect

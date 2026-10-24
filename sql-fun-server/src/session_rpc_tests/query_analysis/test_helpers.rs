@@ -66,3 +66,22 @@ pub(super) async fn verify_query_collection_lifecycle(
         );
     }
 }
+
+/// Select rewrite policy without changing the fixture's shared schema inputs.
+pub(super) fn rewrite_request(
+    project: &SchemaProject,
+    schema: &str,
+    enabled: Option<bool>,
+) -> ::serde_json::Value {
+    let path = project.home().join("Cargo.toml");
+    let metadata = std::fs::read_to_string(&path).unwrap();
+    let marker = "\n[package.metadata.database.products.rewrite_options]";
+    let base = metadata
+        .split_once(marker)
+        .map_or(metadata.as_str(), |(base, _)| base);
+    let options = enabled.map_or_else(String::new, |enabled| {
+        format!("{marker}\nexpand_asterisk = {enabled}\n")
+    });
+    std::fs::write(path, format!("{base}{options}")).unwrap();
+    project.rpc_request(schema)
+}

@@ -194,7 +194,7 @@ inference is performed by this API.
 | --- | --- |
 | `query_span` | Original base-input UTF-8 byte range, when known; line/column are one-based |
 | `query_kind` | SELECT, INSERT, UPDATE, DELETE, MERGE, TRUNCATE or Other; absent when unavailable |
-| `execute_sql` | SQL deparsed from the realized AST; absent when unavailable |
+| `execute_sql` | Executable SQL, including explicitly enabled datasource rewrites; absent when unavailable |
 | `complete` | Analysis finished without errors or unresolved parameter types |
 | `probrems` | Structured diagnostics (the existing wire spelling is retained) |
 | `parameters` | Binding names, actual one-based `parameter_index`, optional finalized `parameter_type`, base-input spans and nullability |
@@ -224,6 +224,12 @@ adding an error solely for its absence. Anonymous dynamic types currently have
 no named API representation. Nullability is `NotNull`, `Nullable` or `Unknown`.
 The CLI/lockfile consumer decides whether these results suffice for its task;
 `execute_sql` availability alone does not establish fully typed analysis.
+
+For PostgreSQL datasources with `rewrite_options.expand_asterisk = true`,
+`execute_sql` contains explicit projections for table-dependent wildcards. This
+preserves the analyzed column names and order; unrelated stars remain unchanged.
+See [wildcard projection expansion](../sql-analysis.md#wildcard-projection-expansion)
+for configuration scope and schema limitations.
 
 SQLAST diagnostics retain their original structured problem. Direct-input
 presentations retain the analyzed, numbered statement and its offset. For

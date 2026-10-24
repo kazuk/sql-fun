@@ -13,6 +13,10 @@ pub(crate) struct InsertDestination {
     merge_view_support: Option<ViewMergeSupport>,
 }
 impl InsertDestination {
+    pub(crate) const fn is_base_table(&self) -> bool {
+        self.table.is_some()
+    }
+
     /// Rule definition analysis binds the destination shape without evaluating whether a future write can execute.
     pub(crate) fn resolve_rule_target(
         context: &mut impl ParseContext,

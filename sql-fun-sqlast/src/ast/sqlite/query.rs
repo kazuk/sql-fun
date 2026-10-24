@@ -151,6 +151,7 @@ impl TryFrom<&syn::ResultColumnExpr> for Target {
 
     fn try_from(value: &syn::ResultColumnExpr) -> Result<Self, Self::Error> {
         Ok(Self {
+            location: None,
             expression: Expr::try_from(value.expr())?,
             alias: value.as_().as_ref().map(alias_name),
         })
@@ -174,6 +175,7 @@ impl TryFrom<&syn::Name> for Target {
 
     fn try_from(value: &syn::Name) -> Result<Self, Self::Error> {
         Ok(Self {
+            location: None,
             expression: Expr::star(&Name::local(value.value())),
             alias: None,
         })
@@ -183,6 +185,7 @@ impl TryFrom<&syn::Name> for Target {
 impl Target {
     fn star() -> Self {
         Self {
+            location: None,
             expression: Expr::star(&Name::default()),
             alias: None,
         }

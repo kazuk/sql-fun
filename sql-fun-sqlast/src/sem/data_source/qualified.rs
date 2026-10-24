@@ -10,15 +10,104 @@ pub(crate) struct QualifiedSource<'a> {
     alias: AliasName,
     nullable: bool,
     merge_role: Option<MergeRecordRole>,
+    projection_ordinal: Option<usize>,
 }
 
 impl<'a> QualifiedSource<'a> {
+    pub(super) const fn with_projection_ordinal(mut self, ordinal: usize) -> Self {
+        self.projection_ordinal = Some(ordinal);
+        self
+    }
+
+    pub(super) fn typed_record(
+        &self,
+        context: &impl ParseContext,
+        index: usize,
+    ) -> Option<crate::sem::WildcardTypedRecord> {
+        if let DataSource::View(source) = self.source {
+            let column = context
+                .get_view(source.view_name())?
+                .result_columns()
+                .get_column_at(index)?
+                .column_name()
+                .as_ref()?;
+            return Some(crate::sem::WildcardTypedRecord::new(
+                &self.alias,
+                source.view_name().full_name(),
+                column,
+            ));
+        }
+        let table = match self.source {
+            DataSource::Table(table) => table.name().clone(),
+            DataSource::CallTableFunc(source) => source
+                .function()
+                .ret_type()
+                .as_ref()?
+                .definition_from_catalog(context)?
+                .row_table_name(context)?,
+            _ => return None,
+        };
+        let column = context
+            .get_table(&table)?
+            .get_column_at(index)?
+            .name()
+            .as_ref()?;
+        Some(crate::sem::WildcardTypedRecord::new(
+            &self.alias,
+            table.full_name(),
+            column,
+        ))
+    }
+
+    pub(super) fn wildcard_qualifier(&self) -> Option<crate::sem::WildcardQualifier> {
+        let relation = match self.source {
+            DataSource::Table(table) => table.name().full_name(),
+            DataSource::View(view) => view.view_name().full_name(),
+            _ => return None,
+        };
+        let mut parts = self.projection_reference(&ColumnName::from(""));
+        parts.pop();
+        Some(crate::sem::WildcardQualifier::new(
+            relation,
+            &self.alias,
+            &parts,
+        ))
+    }
+
+    pub(super) fn projection_reference(&self, column: &ColumnName) -> Vec<String> {
+        let relation = self
+            .source
+            .get_aliases()
+            .iter()
+            .find(|alias| alias.name() == &self.alias)
+            .and_then(|alias| self.source.unaliased_relation(alias));
+        let mut parts = Vec::new();
+        if let Some(relation) = relation {
+            if let Some(catalog) = relation.catalog() {
+                parts.push(catalog.as_str().to_owned());
+            }
+            if let Some(schema) = relation.schema() {
+                parts.push(schema.as_str().to_owned());
+            }
+            parts.push(relation.local_name());
+        } else {
+            parts.push(self.alias.as_str().to_owned());
+        }
+        parts.push(column.as_str().to_owned());
+        parts
+    }
+
+    pub(crate) fn is_table_dependent(&self, context: &impl ParseContext) -> bool {
+        self.source.projection_is_table_dependent(context)
+    }
+
     pub(super) fn new(source: &'a DataSource, alias: &AliasName) -> Self {
         Self {
             source,
             alias: alias.clone(),
             nullable: false,
             merge_role: None,
+            projection_ordinal: None,
         }
     }
 
@@ -73,10 +162,51 @@ impl<'a> QualifiedSource<'a> {
         } else {
             column
         };
-        let value = self
-            .source
-            .create_column_ref(context, with, &self.alias, column, self.nullable)?
-            .0;
+        let value = if let Some(index) = self.projection_ordinal
+            && let DataSource::Table(table) = self.source
+        {
+            let definition = context
+                .get_table(table.name())
+                .and_then(|table| table.get_column_at(index));
+            SemScalarExpr::column_reference(crate::sem::ColumnReferenceExpr::table_column(
+                &self.alias,
+                column,
+                table.name(),
+                definition,
+                self.nullable,
+            ))
+        } else if let Some(index) = self.projection_ordinal
+            && let DataSource::View(source) = self.source
+        {
+            let definition = context
+                .get_view(source.view_name())
+                .and_then(|view| view.result_columns().get_column_at(index))
+                .map(crate::sem::ResultColumn::create_column_definition);
+            SemScalarExpr::column_reference(crate::sem::ColumnReferenceExpr::view_column(
+                &self.alias,
+                column,
+                source.view_name(),
+                definition.as_ref(),
+                self.nullable,
+            ))
+        } else if let Some(index) = self.projection_ordinal
+            && let DataSource::CallTableFunc(function) = self.source
+        {
+            crate::sem::ColumnReferenceExpr::function_source_ref(
+                context,
+                &self.alias,
+                column,
+                Some(function.function()),
+                function.output_columns().column_at(index),
+                function.arguments(),
+                self.nullable,
+            )?
+            .0
+        } else {
+            self.source
+                .create_column_ref(context, with, &self.alias, column, self.nullable)?
+                .0
+        };
         Ok(if let Some(role) = self.merge_role {
             value.merge_record_column(role, self.nullable)
         } else {

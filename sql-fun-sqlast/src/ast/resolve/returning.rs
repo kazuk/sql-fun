@@ -17,6 +17,7 @@ impl ResultColumnCollection {
         for target in targets {
             if let Expr::Star(name) = &target.expression {
                 name.require_returning_star(context, alias)?;
+                let first = results.len();
                 let mut index = 0;
                 while let Some(column) = table.get_column_at(index) {
                     index += 1;
@@ -28,6 +29,15 @@ impl ResultColumnCollection {
                         scope,
                     )?;
                 }
+                context
+                    .analysis_state_mut()
+                    .record_wildcard(crate::sem::WildcardExpansion::new(
+                        target.location,
+                        &results,
+                        first,
+                        table.is_base_table(),
+                        &[],
+                    ));
             } else {
                 results.append_resolved_target(target, context, scope)?;
             }
@@ -53,15 +63,15 @@ impl ResultColumnCollection {
                 }
                 // Unqualified RETURNING * expands only the modified relation.
                 let qualifier = name.star_qualifier()?;
-                if results.expand_returning_projection(
+                if !results.expand_returning_projection(
                     context,
                     with,
                     from,
                     scope,
+                    target_expr.location,
                     qualifier.as_ref(),
                     None,
-                )? == 0
-                {
+                )? {
                     context.report_analysis_problem(AnalysisProblem::update(
                         UpdateProblemKind::returning_qualifier(),
                         "RETURNING star source is not visible",
@@ -98,17 +108,17 @@ impl ResultColumnCollection {
                         .delete_row_target(alias)
                         .map_or(alias, |(target, _)| target)
                 });
-                if results.expand_returning_projection(
+                if !results.expand_returning_projection(
                     context,
                     with,
                     from,
                     scope,
+                    target_expr.location,
                     projection_qualifier,
                     qualifier
                         .as_ref()
                         .filter(|alias| scope.delete_row_target(alias).is_some()),
-                )? == 0
-                {
+                )? {
                     context.report_analysis_problem(AnalysisProblem::delete(
                         DeleteProblemKind::returning_qualifier(),
                     ))?;
@@ -153,11 +163,12 @@ impl ResultColumnCollection {
         with: &WithClause,
         from: &FromClause,
         scope: &ScalarAnalysisContext<'_>,
+        location: Option<usize>,
         projection_qualifier: Option<&AliasName>,
         binding_qualifier: Option<&AliasName>,
-    ) -> Result<usize, AnalysisError> {
-        let columns = from.projection_names(context, with, projection_qualifier)?;
-        self.append_projection_columns(columns, context, scope, binding_qualifier)
+    ) -> Result<bool, AnalysisError> {
+        let columns = from.wildcard_projection(context, with, projection_qualifier)?;
+        self.append_projection_columns(columns, context, scope, location, binding_qualifier)
     }
 
     fn expand_returning_projection(
@@ -166,26 +177,37 @@ impl ResultColumnCollection {
         with: &WithClause,
         from: &FromClause,
         scope: &ScalarAnalysisContext<'_>,
+        location: Option<usize>,
         projection_qualifier: Option<&AliasName>,
         binding_qualifier: Option<&AliasName>,
-    ) -> Result<usize, AnalysisError> {
+    ) -> Result<bool, AnalysisError> {
         let columns = if projection_qualifier.is_none() || binding_qualifier.is_some() {
-            from.destination_projection(context, with)?
+            from.destination_wildcard_projection(context, with)?
         } else {
-            from.projection_names(context, with, projection_qualifier)?
+            from.wildcard_projection(context, with, projection_qualifier)?
         };
-        self.append_projection_columns(columns, context, scope, binding_qualifier)
+        self.append_projection_columns(columns, context, scope, location, binding_qualifier)
     }
 
     fn append_projection_columns(
         &mut self,
-        columns: Vec<crate::sem::ProjectionColumn<'_>>,
+        projection: crate::sem::WildcardProjection<'_>,
         context: &mut impl ParseContext,
         scope: &ScalarAnalysisContext<'_>,
+        location: Option<usize>,
         binding_qualifier: Option<&AliasName>,
-    ) -> Result<usize, AnalysisError> {
-        let count = columns.len();
-        for column in columns {
+    ) -> Result<bool, AnalysisError> {
+        let (columns, source_found, table_dependent) = projection.into_parts();
+        let first = self.len();
+        let references: Vec<_> = columns
+            .iter()
+            .map(|column| {
+                binding_qualifier
+                    .map(|alias| vec![alias.as_str().to_owned(), column.name().as_str().to_owned()])
+                    .or_else(|| column.visible_reference())
+            })
+            .collect();
+        for column in &columns {
             let value = if let Some(qualifier) = binding_qualifier {
                 scope
                     .resolve_column(context, Some(qualifier), column.name())?
@@ -195,7 +217,14 @@ impl ResultColumnCollection {
             };
             self.push_expression(column.name(), value);
         }
-        Ok(count)
+        let source_projections =
+            crate::sem::WildcardSourceProjection::from_columns(&columns, context, scope)?;
+        let mut expansion =
+            crate::sem::WildcardExpansion::new(location, self, first, table_dependent, &references);
+        expansion.retain_source_projections(&source_projections);
+        expansion.retain_projection_origins(&columns);
+        context.analysis_state_mut().record_wildcard(expansion);
+        Ok(source_found)
     }
 }
 

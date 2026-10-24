@@ -18,7 +18,13 @@ static HANDLE_IDS: HandleIdAllocator = HandleIdAllocator::new();
 /// The synchronized map permits the connection future to move between workers;
 /// schema reads return ordinary borrows, without retaining a lock guard.
 pub(super) struct ContextHandleRegistry {
-    schemas: FrozenMap<ContextHandle, Arc<InitializedSchema>>,
+    schemas: FrozenMap<ContextHandle, Box<RegisteredContext>>,
+}
+
+// Query output policy belongs to a registration, independently of shared catalog layers.
+struct RegisteredContext {
+    schema: Arc<InitializedSchema>,
+    rewrite_options: ::sql_fun_core::RewriteOptions,
 }
 
 impl ContextHandleRegistry {
@@ -33,9 +39,23 @@ impl ContextHandleRegistry {
         &self,
         schema: &Arc<InitializedSchema>,
     ) -> Result<ContextHandle, HandleIssuanceError> {
+        self.register_with_options(schema, &::sql_fun_core::RewriteOptions::default())
+    }
+
+    pub(super) fn register_with_options(
+        &self,
+        schema: &Arc<InitializedSchema>,
+        rewrite_options: &::sql_fun_core::RewriteOptions,
+    ) -> Result<ContextHandle, HandleIssuanceError> {
         // Exhaustion must be detected before any registration is inserted.
         let handle = HANDLE_IDS.issue()?;
-        self.schemas.insert(handle.clone(), Arc::clone(schema));
+        self.schemas.insert(
+            handle.clone(),
+            Box::new(RegisteredContext {
+                schema: Arc::clone(schema),
+                rewrite_options: *rewrite_options,
+            }),
+        );
         Ok(handle)
     }
 
@@ -43,7 +63,18 @@ impl ContextHandleRegistry {
     ///
     /// The result borrows the registry, not a request, facade, or lock guard.
     pub(super) fn resolve(&self, handle: &ContextHandle) -> Option<&InitializedSchema> {
-        self.schemas.get(handle)
+        self.schemas
+            .get(handle)
+            .map(|context| context.schema.as_ref())
+    }
+
+    pub(super) fn rewrite_options(
+        &self,
+        handle: &ContextHandle,
+    ) -> Option<&::sql_fun_core::RewriteOptions> {
+        self.schemas
+            .get(handle)
+            .map(|context| &context.rewrite_options)
     }
 }
 

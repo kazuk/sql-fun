@@ -35,8 +35,11 @@ pub use self::{
     view::ViewDataSource,
 };
 pub(crate) use self::{
-    column_candidates::ColumnCandidates, function_columns::TableFunctionOutput,
-    join_expr::JoinUsingClause, namespace::SourceNamespace, projection::ProjectionColumn,
+    column_candidates::ColumnCandidates,
+    function_columns::TableFunctionOutput,
+    join_expr::JoinUsingClause,
+    namespace::SourceNamespace,
+    projection::{ProjectionColumn, WildcardProjection},
     qualified::QualifiedSource,
 };
 
@@ -80,6 +83,26 @@ pub enum DataSource {
 }
 
 impl DataSource {
+    pub(crate) fn projection_is_table_dependent(&self, context: &impl ParseContext) -> bool {
+        match self {
+            Self::Table(_) => true,
+            Self::JoinExpr(join) => join.projection_is_table_dependent(context),
+            Self::Group(group) => group.projection_is_table_dependent(context),
+            Self::MergeRecord(record) => record.source().projection_is_table_dependent(context),
+            Self::CallTableFunc(source) => source.function().table_output_depends_on_table(context),
+            Self::DeferredTableFunc(source) => source
+                .call()
+                .overload()
+                .as_ref()
+                .is_some_and(|overload| overload.table_output_depends_on_table(context)),
+            Self::RowFunctions(source) => source
+                .functions()
+                .iter()
+                .any(|function| function.source().projection_is_table_dependent(context)),
+            _ => false,
+        }
+    }
+
     pub(super) fn create_column_ref<'context, TParseContext>(
         &self,
         context: &'context mut TParseContext,

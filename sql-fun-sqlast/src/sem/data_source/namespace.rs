@@ -155,7 +155,7 @@ impl<'a> SourceNamespace<'a> {
 }
 
 impl DataSource {
-    fn unaliased_relation(&self, alias: &AliasSpec) -> Option<FullName> {
+    pub(super) fn unaliased_relation(&self, alias: &AliasSpec) -> Option<FullName> {
         if alias.is_explicit() {
             return None;
         }

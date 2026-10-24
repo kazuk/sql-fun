@@ -188,9 +188,31 @@ impl Expr {
         context: &mut impl ParseContext,
         scope: &ScalarAnalysisContext<'_>,
     ) -> Result<SemScalarExpr, AnalysisError> {
-        Ok(SemScalarExpr::row(&Self::resolve_list(
-            items, context, scope,
-        )?))
+        let mut fields = Vec::new();
+        for item in items {
+            if let Self::Star(name) = item
+                && !name.0.is_empty()
+                && context.dialect() == Dialect::postgres()
+            {
+                let projection = if let Some(relation) = name.star_relation()? {
+                    scope.relation_projection_names(context, &relation)?
+                } else if let Some(qualifier) = name.star_qualifier()? {
+                    scope.projection_names(context, &qualifier)?
+                } else {
+                    fields.push(item.resolve_in(context, scope)?);
+                    continue;
+                };
+                let (columns, found, _) = projection.into_parts();
+                if found {
+                    for column in columns {
+                        fields.push(column.bind(context, scope)?);
+                    }
+                    continue;
+                }
+            }
+            fields.push(item.resolve_in(context, scope)?);
+        }
+        Ok(SemScalarExpr::row(&fields))
     }
 
     fn resolve_array(
@@ -533,8 +555,22 @@ impl Cast {
             && let Some(source) = argument.get_type()
         {
             // Stored declarations may retain unqualified source names.
-            let source = context.canonicalize_type_ref(&source).unwrap_or(source);
-            if context.get_explicit_cast(&source, &target).is_none() {
+            let source = if source.is_dynamic() {
+                source
+            } else {
+                context.canonicalize_type_ref(&source).unwrap_or(source)
+            };
+            // A row constructor can be explicitly assigned a named row identity
+            // positionally, without a pg_cast entry for its anonymous type.
+            let exact_row_constructor = argument.is_row_constructor()
+                && source
+                    .row_columns(context)
+                    .zip(target.row_columns(context))
+                    .is_some_and(|(source, target)| {
+                        source
+                            .matches_type_structure_with(&target, |source, target| source == target)
+                    });
+            if !exact_row_constructor && context.get_explicit_cast(&source, &target).is_none() {
                 context.report_analysis_problem(AnalysisProblem::explicit_cast_not_defined(
                     &source, &target,
                 ))?;

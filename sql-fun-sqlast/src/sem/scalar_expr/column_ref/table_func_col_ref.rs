@@ -46,6 +46,10 @@ impl ColumnReference for TableFunctionColumnRef {
 }
 
 impl TableFunctionColumnRef {
+    pub(super) fn projection_alias(&self) -> &str {
+        self.alias.as_str()
+    }
+
     /// Declaration-local modifiers retained from the table invocation.
     pub const fn type_declaration(
         &self,

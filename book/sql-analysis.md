@@ -4,6 +4,43 @@ This page is for application developers writing queries or investigating SQL
 analysis diagnostics. It describes supported forms and current limitations;
 installation and initial configuration are covered in [Installation](installation.md).
 
+## Wildcard projection expansion
+
+PostgreSQL datasources can opt in to expanding table-dependent wildcard
+projections in executable SQL. Enable `rewrite_options.expand_asterisk = true`
+in the [datasource configuration](installation.md). The option is disabled unless
+explicitly true, and applies independently to each datasource.
+
+For example, when the analyzed `users` table has columns `id` and `name`, this
+query:
+
+```sql
+SELECT u.* FROM users AS u
+```
+
+produces executable SQL equivalent to:
+
+```sql
+SELECT u.id AS id, u.name AS name FROM users AS u
+```
+
+Expansion uses the supplied schema's column order and preserves output names,
+including duplicate names. It covers table-dependent projections in nested
+queries, CTEs, joins, and DML `RETURNING` clauses. Joined wildcard projections
+preserve `USING` and `NATURAL JOIN` column order and merged values.
+
+Only projections depending on a table's column set are expanded. `count(*)`,
+composite-value expansion such as `(record_value).*`, and stars over fixed view,
+derived-query, or table-function outputs remain unchanged. An inner
+table-dependent star can be expanded while an outer star over its resulting
+fixed projection remains unchanged.
+
+The explicit projection keeps result columns stable across database environments
+with added columns or dropped unreferenced columns. Every explicitly referenced
+column must still exist: dropping a required column causes execution to fail.
+Expansion does not make differently migrated schemas interchangeable in general.
+SQLite expansion is not available.
+
 ## Conflicting schema definitions
 
 Schema analysis diagnoses duplicate definitions in the supplied schema files,

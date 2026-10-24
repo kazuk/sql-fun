@@ -186,7 +186,32 @@ impl DataSourceRowFunctions {
         if self.ordinality {
             columns.append_ordinality(&self.alias);
         }
-        Ok(columns.with_aliases(&self.alias))
+        let columns = columns.with_aliases(&self.alias);
+        if self
+            .functions
+            .iter()
+            .any(|function| function.source().projection_is_table_dependent(context))
+        {
+            let functions = self
+                .functions
+                .iter()
+                .map(|function| {
+                    function
+                        .source()
+                        .column_names(context, with)
+                        .map(|columns| crate::sem::WildcardRowsFunction::from_columns(&columns))
+                })
+                .collect::<Result<Vec<_>, _>>()?;
+            let source = crate::sem::WildcardRowsSource::new(
+                self.alias.name(),
+                &functions,
+                &columns.names(),
+                self.ordinality,
+            );
+            Ok(columns.with_rows_source(&source))
+        } else {
+            Ok(columns)
+        }
     }
     pub(super) fn column_names(
         &self,

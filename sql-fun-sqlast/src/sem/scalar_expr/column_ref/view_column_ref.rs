@@ -43,6 +43,10 @@ impl ColumnReference for ViewColumnRef {
 }
 
 impl ViewColumnRef {
+    pub(super) fn projection_alias(&self) -> &str {
+        self.alias.as_str()
+    }
+
     pub(super) fn with_reference_name(mut self, alias: &AliasName, column: &ColumnName) -> Self {
         self.alias = alias.clone();
         self.column = column.clone();

@@ -12,9 +12,20 @@ pub struct AnalysisState {
     has_parameters: bool,
     problems: Vec<AnalysisProblem>,
     grouping: crate::sem::scalar_expr::grouping::GroupingAnalysis,
+    wildcard_expansions: Vec<crate::sem::WildcardExpansion>,
 }
 
 impl AnalysisState {
+    /// Wildcard groups recorded by this analysis, including nested query scopes.
+    /// Groups remain available after analysis completes and reset at the next run.
+    pub fn wildcard_expansions(&self) -> &[crate::sem::WildcardExpansion] {
+        &self.wildcard_expansions
+    }
+
+    pub(crate) fn record_wildcard(&mut self, expansion: crate::sem::WildcardExpansion) {
+        self.wildcard_expansions.push(expansion);
+    }
+
     pub(crate) const fn grouping(&self) -> &crate::sem::scalar_expr::grouping::GroupingAnalysis {
         &self.grouping
     }

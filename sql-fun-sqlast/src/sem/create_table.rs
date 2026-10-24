@@ -28,6 +28,10 @@ use crate::{SqliteToken, syn::sqlite::CreateTableBody};
 pub struct ColumnCollection(Vec<ColumnDefinition>);
 
 impl ColumnCollection {
+    pub(crate) fn column_at(&self, index: usize) -> Option<&ColumnDefinition> {
+        self.0.get(index)
+    }
+
     /// add column
     #[must_use]
     pub const fn new(columns: Vec<ColumnDefinition>) -> Self {

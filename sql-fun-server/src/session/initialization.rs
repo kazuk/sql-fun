@@ -8,6 +8,7 @@ use ::sql_fun_server_api::{SqlFunServerApiError, payloads::InitializeSchemaArgs}
 pub(super) struct Initialization {
     home: PathBuf,
     selection: SchemaSelection,
+    rewrite_options: ::sql_fun_core::RewriteOptions,
 }
 
 impl Initialization {
@@ -49,7 +50,15 @@ impl Initialization {
             request.expected_hash().as_deref(),
             level,
         )?;
-        Ok(Self { home, selection })
+        Ok(Self {
+            home,
+            selection,
+            rewrite_options: *metadata.rewrite_options(),
+        })
+    }
+
+    pub(super) const fn rewrite_options(&self) -> &::sql_fun_core::RewriteOptions {
+        &self.rewrite_options
     }
 
     pub(super) async fn initialize(

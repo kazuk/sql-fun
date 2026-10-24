@@ -103,17 +103,29 @@ impl<'a> ScalarAnalysisContext<'a> {
         &self,
         context: &mut impl ParseContext,
         qualifier: &AliasName,
-    ) -> Result<Vec<crate::sem::data_source::ProjectionColumn<'_>>, AnalysisError> {
-        if !matches!(
-            self.from_clause.namespace().resolve_name(qualifier),
-            Ok(None)
-        ) {
-            self.from_clause
-                .projection_names(context, &self.with_clause, Some(qualifier))
-        } else if let Some(parent) = &self.parent {
-            parent.projection_names(context, qualifier)
-        } else {
-            Ok(Vec::new())
+    ) -> Result<crate::sem::data_source::WildcardProjection<'_>, AnalysisError> {
+        match self.from_clause.namespace().resolve_name(qualifier) {
+            Ok(Some(source)) => Ok(crate::sem::data_source::WildcardProjection::new(
+                source.projection_columns(context, &self.with_clause)?,
+                true,
+                source.is_table_dependent(context),
+            )),
+            Err(()) => Ok(crate::sem::data_source::WildcardProjection::new(
+                vec![crate::sem::ProjectionColumn::ambiguous(context, qualifier)?],
+                true,
+                false,
+            )),
+            Ok(None) => {
+                if let Some(parent) = &self.parent {
+                    parent.projection_names(context, qualifier)
+                } else {
+                    Ok(crate::sem::data_source::WildcardProjection::new(
+                        Vec::new(),
+                        false,
+                        false,
+                    ))
+                }
+            }
         }
     }
 
@@ -121,11 +133,30 @@ impl<'a> ScalarAnalysisContext<'a> {
         &self,
         context: &mut impl ParseContext,
         relation: &crate::sem::FullName,
-    ) -> Result<Vec<crate::sem::data_source::ProjectionColumn<'_>>, AnalysisError> {
+    ) -> Result<crate::sem::data_source::WildcardProjection<'_>, AnalysisError> {
         match self.from_clause.qualified_source(context, relation) {
-            Ok(Some(source)) => source.projection_columns(context, &self.with_clause),
-            Err(()) => self.ambiguous_relation_projection(context),
-            Ok(None) => self.parent_relation_projection_names(context, relation),
+            Ok(Some(source)) => Ok(crate::sem::data_source::WildcardProjection::new(
+                source.projection_columns(context, &self.with_clause)?,
+                true,
+                source.is_table_dependent(context),
+            )),
+            Err(()) => {
+                let columns = self.ambiguous_relation_projection(context)?;
+                Ok(crate::sem::data_source::WildcardProjection::new(
+                    columns, true, false,
+                ))
+            }
+            Ok(None) => {
+                if let Some(parent) = &self.parent {
+                    parent.relation_projection_names(context, relation)
+                } else {
+                    Ok(crate::sem::data_source::WildcardProjection::new(
+                        Vec::new(),
+                        false,
+                        false,
+                    ))
+                }
+            }
         }
     }
 
@@ -137,18 +168,6 @@ impl<'a> ScalarAnalysisContext<'a> {
             crate::sem::QueryProblem::ambiguous_reference("star source"),
         ))?;
         Ok(Vec::new())
-    }
-
-    fn parent_relation_projection_names(
-        &self,
-        context: &mut impl ParseContext,
-        relation: &crate::sem::FullName,
-    ) -> Result<Vec<crate::sem::data_source::ProjectionColumn<'_>>, AnalysisError> {
-        if let Some(parent) = &self.parent {
-            parent.relation_projection_names(context, relation)
-        } else {
-            Ok(Vec::new())
-        }
     }
 
     pub(crate) fn rule(

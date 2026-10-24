@@ -22,10 +22,18 @@ multiple selected nodes, empty arrays, mixed arrays, and other selected types
 are input errors. Multiple selected nodes are never flattened. Relative filenames
 are resolved from the command's working directory.
 
-Each selected SQL string can contain multiple statements. Diagnostics are shown
-for every statement with SQL source context. Error diagnostics do not stop later
-inputs. Each input uses the same selected schema base, without inheriting changes
-from preceding inputs.
+Each selected SQL string can contain multiple statements. For every returned
+statement, output identifies the input and zero-based statement index and shows
+the query kind, completion status, executable SQL, parameters, result columns,
+and relation/column accesses. Parameters include their SQL placeholder index,
+name, type, and nullability; result columns appear in ordinal order with their
+name, type, and nullability. Array types have a `[]` suffix. Unavailable SQL or
+query kinds and unresolved types are marked explicitly; collection counts show
+when no parameters, columns, or accesses were returned.
+
+Diagnostics are shown for every statement with SQL source context. Error
+diagnostics do not stop later inputs. Each input uses the same selected schema
+base, without inheriting changes from preceding inputs.
 
 ## Schema loading
 

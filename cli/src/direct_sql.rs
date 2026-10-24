@@ -1,6 +1,7 @@
 mod expectation;
 mod input;
 mod report;
+mod results;
 
 use self::{expectation::Expectation, input::SqlInputs, report::Case};
 use crate::analysis::{initialization, prepare_diagnostics, prepare_tokens, request_typed};
@@ -159,6 +160,13 @@ async fn execute_session(
                         prepared.render(diagnostic, &renderer)?
                     )?;
                 }
+            }
+            if expectations.is_none() {
+                results::write_response(
+                    &mut std::io::stdout().lock(),
+                    &inputs.identity(index),
+                    &response,
+                )?;
             }
             if let Some(error) = prepared.error() {
                 ::anyhow::bail!("cannot tokenize SQL diagnostics: {error}");

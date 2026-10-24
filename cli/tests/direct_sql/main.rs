@@ -132,7 +132,12 @@ async fn analyze_reports_all_statements_and_continues_after_diagnostics() -> ::t
         .output()
         .await?;
     assert_eq!(output.status.code(), Some(1));
-    assert!(String::from_utf8_lossy(&output.stdout).contains("PASS"));
+    let stdout = String::from_utf8_lossy(&output.stdout);
+    assert!(stdout.contains("PASS"), "{stdout}");
+    assert_eq!(stdout.matches("Query kind: Select").count(), 3, "{stdout}");
+    assert!(stdout.contains("statement 1"), "{stdout}");
+    assert!(stdout.contains("Complete: false"), "{stdout}");
+    assert!(stdout.contains("Complete: true"), "{stdout}");
     let stderr = String::from_utf8_lossy(&output.stderr);
     assert!(stderr.contains("missing"), "{stderr}");
     assert!(stderr.contains("statement 0"), "{stderr}");
@@ -224,5 +229,72 @@ async fn report_write_failure_is_an_execution_error() -> ::testresult::TestResul
         .await?;
     assert_eq!(output.status.code(), Some(1));
     assert!(String::from_utf8_lossy(&output.stderr).contains("cannot write JUnit report"));
+    Ok(())
+}
+
+#[tokio::test]
+async fn analyze_displays_statement_results_and_accesses() -> ::testresult::TestResult {
+    // A real service verifies that completed API collections reach the console.
+    let server = heavy::ApiServer::new()?;
+    let schema = SchemaFixture::with_query_schema("CREATE TABLE events (id int4 NOT NULL);")?;
+    let suite = Suite::new(
+        &["SELECT id, ${id:int4} AS argument FROM events; INSERT INTO events (id) VALUES (1)"],
+        &::serde_json::json!([]),
+    )?;
+    let output = server
+        .sql_command(&schema, "analyze")
+        .arg(suite.selection())
+        .output()
+        .await?;
+    let stdout = String::from_utf8_lossy(&output.stdout);
+    assert!(
+        output.status.success(),
+        "{stdout}\n{}",
+        String::from_utf8_lossy(&output.stderr)
+    );
+    assert!(
+        stdout.contains(&format!("{}[0] (statement 0)", suite.selection())),
+        "{stdout}"
+    );
+    assert!(stdout.contains("statement 1"), "{stdout}");
+    assert!(stdout.contains("Query kind: Select"), "{stdout}");
+    assert!(stdout.contains("Query kind: Insert"), "{stdout}");
+    assert!(stdout.contains("Complete: true"), "{stdout}");
+    assert!(stdout.contains("Executable SQL:"), "{stdout}");
+    assert!(stdout.contains("$1"), "{stdout}");
+    assert!(stdout.contains("Parameters (1):"), "{stdout}");
+    assert!(stdout.contains("$1 id: pg_catalog.int4;"), "{stdout}");
+    assert!(
+        stdout.contains("[0] id: pg_catalog.int4; not_null"),
+        "{stdout}"
+    );
+    assert!(stdout.contains("Result columns (0):"), "{stdout}");
+    assert!(stdout.contains("public.events (Table)"), "{stdout}");
+    assert!(stdout.contains("Column access (0):"), "{stdout}");
+    Ok(())
+}
+
+#[tokio::test]
+async fn analyze_displays_unavailable_results_for_parser_diagnostics() -> ::testresult::TestResult {
+    let server = heavy::ApiServer::new()?;
+    let schema = SchemaFixture::with_query_schema("-- setup")?;
+    let suite = Suite::new(&["SELECT ("], &::serde_json::json!([]))?;
+    let output = server
+        .sql_command(&schema, "analyze")
+        .arg(suite.selection())
+        .output()
+        .await?;
+    let stdout = String::from_utf8_lossy(&output.stdout);
+    assert_eq!(output.status.code(), Some(1));
+    assert!(stdout.contains("Query kind: unavailable"), "{stdout}");
+    assert!(stdout.contains("Complete: false"), "{stdout}");
+    assert!(
+        stdout.contains("Executable SQL:\n    unavailable"),
+        "{stdout}"
+    );
+    assert!(stdout.contains("Parameters (0):"), "{stdout}");
+    assert!(stdout.contains("Relations (0):"), "{stdout}");
+    assert!(stdout.contains("Column access (0):"), "{stdout}");
+    assert!(String::from_utf8_lossy(&output.stderr).contains("query_parse"));
     Ok(())
 }

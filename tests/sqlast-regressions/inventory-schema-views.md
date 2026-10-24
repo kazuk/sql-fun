@@ -31,15 +31,17 @@ same invalid statements for the underlying missing relation/rule/trigger. This
 extra renderer diagnostic is recorded as the current CLI contract; it does not
 indicate a PostgreSQL behavior discrepancy.
 
-Two current CLI expectations in `schema-views-precedence.json` expose a
-PostgreSQL behavior discrepancy: `automatic_rule_precedence::instead::conflict`
-and `automatic_rule_precedence::conditional_trigger::conflict` expect
-`insert_semantics`, while PostgreSQL 17.6 and 18.1 accept the matching INSERT
-with `ON CONFLICT DO NOTHING`. The first case rewrites the INSERT to nothing;
-the second plans the trigger-backed view INSERT with conflict handling. These
-cases remain mapped to their current CLI output here and are reported for a
-separate semantic issue, [#768](https://github.com/kazuk/sql-fun/issues/768);
-this migration does not change product behavior.
+Issue [#768](https://github.com/kazuk/sql-fun/issues/768) corrects
+`automatic_rule_precedence::instead::conflict` and
+`automatic_rule_precedence::conditional_trigger::conflict` in
+`schema-views-precedence.json` to expect successful analysis with no columns.
+PostgreSQL 17.6 and 18.1 accept both inputs: the first rewrites to nothing,
+while the second plans a trigger-backed INSERT with conflict handling.
+`view-conflict-rules.json` adds six independent rule-action and UPDATE-rule
+boundaries using `view-conflict-rules.sql`; automatic-view exceptions and the
+other precedence outcomes remain covered by the migrated fixture.
+All added boundaries were checked using EXPLAIN in rolled-back transactions on
+both oracles. Ordinary and RETURNING forms remain in the existing fixtures.
 
 ## Assertions retained in Rust
 
@@ -48,6 +50,7 @@ this migration does not change product behavior.
 | `read_only_shapes` | Internal INSERT/UPDATE view-write applicability for DISTINCT, LIMIT, join, expression, constant, and grouping projections. |
 | `writable_columns_preserve_effective_constraints` | Identity, generated, and default constraints carried onto writable view columns, plus omission of a computed column. The diagnostic forms of rejected assignments are in the CLI fixture. |
 | `independent_write_mechanisms` | Internal insert/update writability, RETURNING support, and ON CONFLICT support for each trigger/rule mechanism. The SQL-level outcomes are in the CLI fixture. |
+| `rule_precedence_support_and_bindings` | Effective INSERT/RETURNING/ON CONFLICT support across all six precedence configurations, bound INSERT target and attached support, retained conflict clause, and typed rejection diagnostics. |
 | `view_default_overrides_base_default` | The retained default expression is the view's replacement constant. |
 | `sqlite_trigger_oracle`, `sqlite_drop_masks_inherited_trigger`, `sqlite_trigger_namespace_and_column_case_match_engine` | SQLite-specific trigger behavior and the SQLite engine oracle. |
 | `function_row_properties`, `declared_function_properties`, `polymorphic_function_properties_use_the_producer_signature` | Internal function row properties and producer-signature use when deciding view writability. |

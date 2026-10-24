@@ -92,12 +92,11 @@ impl<'a> EvaluationView<'a> {
             .collect()
     }
     fn has_conflict_rules(&self, context: &impl ParseContext) -> bool {
-        self.definition.rules().resolve(context).iter().any(|rule| {
-            matches!(
-                rule.event(),
-                crate::sem::RuleEvent::Insert | crate::sem::RuleEvent::Update
-            )
-        })
+        self.definition
+            .rules()
+            .resolve(context)
+            .into_iter()
+            .any(crate::sem::CreateRule::blocks_insert_on_conflict)
     }
     fn matching_triggers<'c>(
         &self,
@@ -209,7 +208,7 @@ impl<'a> EvaluationView<'a> {
             return Some(Decision::writable(
                 &self.visible_columns(),
                 returning,
-                false,
+                !self.has_conflict_rules(context),
             ));
         }
         if !triggers.is_empty() {

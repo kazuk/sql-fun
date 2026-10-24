@@ -173,9 +173,7 @@
     "name": "automatic_rule_precedence::instead::conflict",
     "sql": "INSERT INTO public.v_instead(id) VALUES(1) ON CONFLICT DO NOTHING",
     "expected": {
-      "diagnostics": [
-        "insert_semantics"
-      ],
+      "diagnostics": [],
       "columns": []
     }
   },
@@ -219,9 +217,7 @@
     "name": "automatic_rule_precedence::conditional_trigger::conflict",
     "sql": "INSERT INTO public.v_conditional_trigger(id) VALUES(1) ON CONFLICT DO NOTHING",
     "expected": {
-      "diagnostics": [
-        "insert_semantics"
-      ],
+      "diagnostics": [],
       "columns": []
     }
   },

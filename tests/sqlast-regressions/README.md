@@ -59,8 +59,8 @@ path, database identity, or intermediate catalog states stay in Rust.
 
 The [schema-dependent inventory](inventory-schema.md) maps public assertions and
 retained internal coverage, including non-equivalent synthetic contexts. The
-manifest totals are 493 inputs for PostgreSQL 17 and 499 for
-PostgreSQL 18 (992 total). These count positive contract inputs separately from
+manifest totals are 499 inputs for PostgreSQL 17 and 505 for
+PostgreSQL 18 (1004 total). These count positive contract inputs separately from
 the three negative-control inputs, invalid-selector check and missing-datasource
 check per version.
 
@@ -82,3 +82,13 @@ fixture projection, report processing/upload and negative controls are excluded
 from this timing. These values provide a baseline in source and installed CI
 logs; timing variation does not affect success and no performance threshold is
 enforced.
+
+Issue #768 corrects the two DO NOTHING rule ON CONFLICT expectations in
+`schema-views-precedence.json`. The project-schema `view-conflict-rules.json`
+fixture adds six adjacent boundaries: action-bearing unconditional/conditional
+INSTEAD rules, mixed INSERT rules, UPDATE-rule restrictions, and an ALSO NOTHING
+rule with a trigger. Both fixtures use explicitly selected schema dumps on
+PostgreSQL 17/18 through the shared source and installed regression paths.
+Oracle probes used EXPLAIN only in rolled-back transactions on PostgreSQL 17.6
+and 18.1. Rust retains direct support, destination binding, structured diagnostic
+and catalog-state checks; see [the view inventory](inventory-schema-views.md).

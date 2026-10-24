@@ -49,3 +49,4 @@ schema-views-diagnostics	project	schema-views-diagnostics.sql	22	17,18
 schema-views-mechanisms	project	schema-views-mechanisms.sql	20	17,18
 schema-views-precedence	project	schema-views-precedence.sql	24	17,18
 schema-views-special	project	schema-views-special.sql	8	17,18
+view-conflict-rules	project	view-conflict-rules.sql	6	17,18

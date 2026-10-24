@@ -1,7 +1,5 @@
 use crate::sem::scalar_expr::indirect::IndirectionExpr;
-use crate::sem::{
-    AnalysisError, AnalysisProblem, ParseContext, SemScalarExpr, TypeDefinition, TypeReference,
-};
+use crate::sem::{AnalysisError, AnalysisProblem, ParseContext, SemScalarExpr, TypeReference};
 
 #[derive(Debug, Clone, Eq, Hash, PartialEq, serde::Serialize, serde::Deserialize)]
 pub struct MemberRef {
@@ -54,13 +52,13 @@ impl MemberRef {
     fn test_member_exist<TParseContext>(
         member: &str,
         context: &mut TParseContext,
-        td: &TypeDefinition,
+        source: &SemScalarExpr,
         ty: &TypeReference,
     ) -> Result<(Option<TypeReference>, Option<bool>), AnalysisError>
     where
         TParseContext: crate::sem::ParseContext,
     {
-        if let Some(columns) = td.row_columns(context)
+        if let Some(columns) = source.composite_columns(context)
             && let Some(field) = columns.get_column_def(&crate::sem::ColumnName::from(member))
         {
             Ok((field.get_type_cloned(), field.is_not_null()))
@@ -89,10 +87,8 @@ impl MemberRef {
         context: &mut TContext,
     ) -> Result<IndirectionExpr, AnalysisError> {
         let (member_type, member_not_null) = if let Some(ty) = &source.get_type() {
-            if let Some(td) = ty.type_definition().cloned() {
-                Self::test_member_exist(&member, context, &td, ty)?
-            } else if let Some(td) = context.get_type(ty.full_name()).cloned() {
-                Self::test_member_exist(&member, context, &td, ty)?
+            if ty.definition_from_catalog(context).is_some() {
+                Self::test_member_exist(&member, context, &source, ty)?
             } else {
                 context.report_analysis_problem(
                     AnalysisProblem::member_access_requires_composite_type(ty.full_name(), &member),

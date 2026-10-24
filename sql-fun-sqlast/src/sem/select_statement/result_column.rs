@@ -171,11 +171,11 @@ impl ResultColumnCollection {
         context: &mut impl crate::sem::ParseContext,
         base: SemScalarExpr,
     ) -> Result<(), AnalysisError> {
-        let Some(ty) = base.get_type() else {
+        let Some(_) = base.get_type() else {
             self.push_pending_star(base);
             return Ok(());
         };
-        let Some(fields) = ty.row_columns(context) else {
+        let Some(fields) = base.composite_columns(context) else {
             context.report_analysis_problem(crate::sem::AnalysisProblem::query(
                 crate::sem::QueryProblem::star_projection_requires_composite_type(),
             ))?;

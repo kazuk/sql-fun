@@ -1,0 +1,2 @@
+CREATE FUNCTION choose(numeric, numeric) RETURNS numeric LANGUAGE SQL AS 'SELECT $1';
+CREATE FUNCTION choose(float8, float8) RETURNS float8 LANGUAGE SQL AS 'SELECT $1';

@@ -169,39 +169,6 @@ fn simple_case_retains_equality_binding(#[case] sql: &str) -> testresult::TestRe
 }
 
 #[rstest::rstest]
-#[case::domain(
-    "CASE WHEN $1 THEN NULL::amount ELSE NULL::amount END",
-    "public.amount"
-)]
-#[case::domain_base("CASE WHEN $1 THEN NULL::amount ELSE 1 END", "pg_catalog.int4")]
-#[case::domain_unknown("CASE WHEN $1 THEN NULL::amount END", "pg_catalog.int4")]
-#[case::enum_values("CASE WHEN $1 THEN 'low'::mood ELSE 'high'::mood END", "public.mood")]
-fn schema_result_types_survive_inference(
-    #[case] expression: &str,
-    #[case] ty: &str,
-) -> testresult::TestResult {
-    // Domain and enum identity depend on the real builtin catalog plus schema DDL/freeze.
-    let analyzed = heavy::analyze(
-        &format!("SELECT {expression}"),
-        &[
-            "CREATE DOMAIN amount AS integer",
-            "CREATE TYPE mood AS ENUM ('low','high')",
-        ],
-    )?;
-    assert!(
-        analyzed.context().problems().is_empty(),
-        "{:?}",
-        analyzed.context().problems()
-    );
-    let query = analyzed.ast().clone().into_select_statemtnt().unwrap();
-    assert_eq!(
-        query.result_columns().get_column_at(0).unwrap().col_type(),
-        &Some(ty.parse()?)
-    );
-    Ok(())
-}
-
-#[rstest::rstest]
 #[case::two_results("SELECT CASE WHEN true THEN $1 WHEN false THEN $2 ELSE 1 END")]
 #[case::simple_comparison("SELECT CASE $1 WHEN $2 THEN 1 ELSE 2 END")]
 fn repeated_inputs_remain_jointly_constrained(#[case] sql: &str) -> testresult::TestResult {

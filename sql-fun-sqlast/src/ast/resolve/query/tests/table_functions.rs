@@ -1,57 +1,20 @@
 use super::super::test_helpers::{output_type, table_function_query};
 use crate::sem::{ColumnReferenceExpr, ParseContext, PgBuiltInType, SemScalarExpr};
 
-#[rstest::rstest]
-#[case::qualified("SELECT r.a, r.b FROM record_fun('') AS r(a integer,b text)")]
-#[case::unqualified("SELECT a,b FROM record_fun('') AS r(a integer,b text)")]
-#[case::star("SELECT * FROM record_fun('') AS r(a integer,b text)")]
-#[case::qualified_star("SELECT r.* FROM record_fun('') AS r(a integer,b text)")]
-#[case::subquery("SELECT a,b FROM (SELECT * FROM record_fun('') AS r(a integer,b text)) s")]
-#[case::cte("WITH s AS (SELECT * FROM record_fun('') AS r(a integer,b text)) SELECT a,b FROM s")]
-#[case::rows("SELECT r.a,r.b FROM ROWS FROM(record_fun('') AS(a integer,b text)) r")]
-#[case::rows_unqualified("SELECT a,b FROM ROWS FROM(record_fun('') AS(a integer,b text)) r")]
-#[case::rows_star("SELECT r.* FROM ROWS FROM(record_fun('') AS(a integer,b text)) r")]
-#[case::rows_outer_definition("SELECT a,b FROM ROWS FROM(record_fun('')) AS r(a integer,b text)")]
-#[case::rows_partial_alias(
-    "SELECT x AS a,b FROM ROWS FROM(record_fun('') AS(a integer,b text)) AS r(x)"
-)]
-#[case::rows_implicit_alias(
-    "SELECT record_fun.a,record_fun.b FROM ROWS FROM(record_fun('') AS(a integer,b text))"
-)]
-#[case::named_arguments("SELECT a,b FROM record_fun(src => '') AS r(a integer,b text)")]
-#[case::rows_named_arguments(
-    "SELECT a,b FROM ROWS FROM(record_fun(src => '') AS(a integer,b text)) r"
-)]
-#[case::parameter("SELECT a,b FROM record_fun($1::text) AS r(a int,b text)")]
-#[case::rows_ordinality(
-    "SELECT r.a,r.b FROM ROWS FROM(record_fun('') AS(a int,b text)) WITH ORDINALITY r"
-)]
-#[case::collation(r#"SELECT a,b FROM record_fun('') r(a int,b text COLLATE "C")"#)]
-fn resolves_declared_record_fields(#[case] sql: &str, #[values(false, true)] infer: bool) {
-    let (query, context) = table_function_query(sql, infer);
-    assert_eq!(
-        context.reported_problem_count(),
-        0,
-        "{sql}: {:?}",
-        context.reported_problems()
-    );
-    assert_eq!(output_type(&query, "a"), Some(PgBuiltInType::int4()));
-    assert_eq!(output_type(&query, "b"), Some(PgBuiltInType::text()));
-}
-
-#[rstest::rstest]
-#[case::scalar("SELECT x AS a FROM identity(1) r(x)")]
-#[case::composite("SELECT x AS a FROM pair_fun() r(x)")]
-#[case::out("SELECT x AS a FROM out_fun() r(x)")]
-fn preserves_declared_returns_and_positional_aliases(#[case] sql: &str) {
-    let (query, context) = table_function_query(sql, false);
-    assert_eq!(
-        context.reported_problem_count(),
-        0,
-        "{:?}",
-        context.reported_problems()
-    );
-    assert_eq!(output_type(&query, "a"), Some(PgBuiltInType::int4()));
+#[test]
+fn typed_record_parameter_is_warning_free_in_the_controlled_context() {
+    for infer in [false, true] {
+        let (_, context) = table_function_query(
+            "SELECT a,b FROM record_fun($1::text) AS r(a int,b text)",
+            infer,
+        );
+        assert_eq!(
+            context.reported_problem_count(),
+            0,
+            "infer={infer}: {:?}",
+            context.reported_problems()
+        );
+    }
 }
 
 #[rstest::rstest]

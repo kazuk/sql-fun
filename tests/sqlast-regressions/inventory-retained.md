@@ -1,5 +1,9 @@
 # Builtin-dependent SQL AST test inventory
 
+This records the #757 builtin-only migration. The
+[schema-dependent follow-up](inventory-schema.md) supersedes its custom-schema
+exclusions and provides the current migrated/retained assertion mappings.
+
 This inventory covers builtin-dependent tests in `sql-fun-sqlast/src` and
 `sql-fun-sqlast/tests`, including real-catalog fixtures, `TestParseContext`,
 and helpers that install synthetic type, cast, operator, or function data.
@@ -105,11 +109,12 @@ they are not unresolved migration candidates.
 
 ## Catalog scope
 
-The accepted migration scope is builtin-only. The CASE/COALESCE fixtures use
+The #757 migration scope was builtin-only. The CASE/COALESCE fixtures use
 `--schema-level builtin` and passed against PostgreSQL 17 and 18. Custom-schema
 cases remain in their Rust integration tests. #761 resolved the earlier #727
-catalog initialization failure; the accepted scope still excludes project/default
-schema migrations. Its eligible ARRAY-query additions are mapped in
+catalog initialization failure; project/default schema consumers are now mapped
+separately in
+[inventory-schema.md](inventory-schema.md). Its eligible ARRAY-query additions are mapped in
 [inventory-array-subqueries.md](inventory-array-subqueries.md).
 
 ## Fixture representation

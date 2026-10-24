@@ -1,0 +1,38 @@
+[
+  {
+    "name": "schema_context_chain::full_join_star_publishes_ordered_view_columns",
+    "sql": "SELECT * FROM public.joined_items",
+    "expected": {
+      "diagnostics": [],
+      "columns": [
+        {
+          "name": "id",
+          "type": {
+            "schema_name": "pg_catalog",
+            "local_name": "int8",
+            "is_array": false
+          },
+          "nullability": "not_null"
+        },
+        {
+          "name": "left_value",
+          "type": {
+            "schema_name": "pg_catalog",
+            "local_name": "text",
+            "is_array": false
+          },
+          "nullability": "nullable"
+        },
+        {
+          "name": "right_value",
+          "type": {
+            "schema_name": "pg_catalog",
+            "local_name": "text",
+            "is_array": false
+          },
+          "nullability": "nullable"
+        }
+      ]
+    }
+  }
+]

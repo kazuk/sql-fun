@@ -1,0 +1,58 @@
+[
+  {
+    "name": "type_metadata_regressions::omitted_defaults_do_not_contribute_matches::preferred",
+    "sql": "SELECT choose(1)",
+    "expected": {
+      "diagnostics": [],
+      "columns": [
+        {
+          "name": "",
+          "type": {
+            "schema_name": "pg_catalog",
+            "local_name": "float8",
+            "is_array": false
+          },
+          "nullability": "nullable"
+        }
+      ]
+    }
+  },
+  {
+    "name": "type_metadata_regressions::omitted_defaults_do_not_contribute_matches::exact",
+    "sql": "SELECT choose(1.2)",
+    "expected": {
+      "diagnostics": [],
+      "columns": [
+        {
+          "name": "",
+          "type": {
+            "schema_name": "pg_catalog",
+            "local_name": "numeric",
+            "is_array": false
+          },
+          "nullability": "nullable"
+        }
+      ]
+    }
+  },
+  {
+    "name": "type_metadata_regressions::omitted_defaults_do_not_contribute_matches::parameter",
+    "sql": "SELECT choose($1::numeric)",
+    "expected": {
+      "diagnostics": [
+        "parameter_type_unresolved"
+      ],
+      "columns": [
+        {
+          "name": "",
+          "type": {
+            "schema_name": "pg_catalog",
+            "local_name": "numeric",
+            "is_array": false
+          },
+          "nullability": "unknown"
+        }
+      ]
+    }
+  }
+]

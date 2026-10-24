@@ -1,5 +1,9 @@
 # ARRAY query migration inventory
 
+The [schema-dependent follow-up](inventory-schema.md) supersedes this earlier
+builtin-only migration's custom-schema exclusions. Use its detailed mappings
+for the current destinations and retained internal assertions.
+
 These tests arrived in [#761](https://github.com/kazuk/sql-fun/pull/761) before
 this migration merged. The source is
 [`array_subquery.rs`](../../sql-fun-sqlast/src/ast/resolve/query/tests/array_subquery.rs).

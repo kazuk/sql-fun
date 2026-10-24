@@ -1,0 +1,517 @@
+[
+  {
+    "name": "ast::resolve::query::tests::table_functions::resolves_declared_record_fields::qualified",
+    "sql": "SELECT r.a, r.b FROM record_fun('') AS r(a integer,b text)",
+    "expected": {
+      "diagnostics": [],
+      "columns": [
+        {
+          "name": "a",
+          "type": {
+            "schema_name": "pg_catalog",
+            "local_name": "int4",
+            "is_array": false
+          },
+          "nullability": "unknown"
+        },
+        {
+          "name": "b",
+          "type": {
+            "schema_name": "pg_catalog",
+            "local_name": "text",
+            "is_array": false
+          },
+          "nullability": "unknown"
+        }
+      ]
+    }
+  },
+  {
+    "name": "ast::resolve::query::tests::table_functions::resolves_declared_record_fields::unqualified",
+    "sql": "SELECT a,b FROM record_fun('') AS r(a integer,b text)",
+    "expected": {
+      "diagnostics": [],
+      "columns": [
+        {
+          "name": "a",
+          "type": {
+            "schema_name": "pg_catalog",
+            "local_name": "int4",
+            "is_array": false
+          },
+          "nullability": "unknown"
+        },
+        {
+          "name": "b",
+          "type": {
+            "schema_name": "pg_catalog",
+            "local_name": "text",
+            "is_array": false
+          },
+          "nullability": "unknown"
+        }
+      ]
+    }
+  },
+  {
+    "name": "ast::resolve::query::tests::table_functions::resolves_declared_record_fields::star",
+    "sql": "SELECT * FROM record_fun('') AS r(a integer,b text)",
+    "expected": {
+      "diagnostics": [],
+      "columns": [
+        {
+          "name": "a",
+          "type": {
+            "schema_name": "pg_catalog",
+            "local_name": "int4",
+            "is_array": false
+          },
+          "nullability": "unknown"
+        },
+        {
+          "name": "b",
+          "type": {
+            "schema_name": "pg_catalog",
+            "local_name": "text",
+            "is_array": false
+          },
+          "nullability": "unknown"
+        }
+      ]
+    }
+  },
+  {
+    "name": "ast::resolve::query::tests::table_functions::resolves_declared_record_fields::qualified_star",
+    "sql": "SELECT r.* FROM record_fun('') AS r(a integer,b text)",
+    "expected": {
+      "diagnostics": [],
+      "columns": [
+        {
+          "name": "a",
+          "type": {
+            "schema_name": "pg_catalog",
+            "local_name": "int4",
+            "is_array": false
+          },
+          "nullability": "unknown"
+        },
+        {
+          "name": "b",
+          "type": {
+            "schema_name": "pg_catalog",
+            "local_name": "text",
+            "is_array": false
+          },
+          "nullability": "unknown"
+        }
+      ]
+    }
+  },
+  {
+    "name": "ast::resolve::query::tests::table_functions::resolves_declared_record_fields::subquery",
+    "sql": "SELECT a,b FROM (SELECT * FROM record_fun('') AS r(a integer,b text)) s",
+    "expected": {
+      "diagnostics": [],
+      "columns": [
+        {
+          "name": "a",
+          "type": {
+            "schema_name": "pg_catalog",
+            "local_name": "int4",
+            "is_array": false
+          },
+          "nullability": "unknown"
+        },
+        {
+          "name": "b",
+          "type": {
+            "schema_name": "pg_catalog",
+            "local_name": "text",
+            "is_array": false
+          },
+          "nullability": "unknown"
+        }
+      ]
+    }
+  },
+  {
+    "name": "ast::resolve::query::tests::table_functions::resolves_declared_record_fields::cte",
+    "sql": "WITH s AS (SELECT * FROM record_fun('') AS r(a integer,b text)) SELECT a,b FROM s",
+    "expected": {
+      "diagnostics": [],
+      "columns": [
+        {
+          "name": "a",
+          "type": {
+            "schema_name": "pg_catalog",
+            "local_name": "int4",
+            "is_array": false
+          },
+          "nullability": "unknown"
+        },
+        {
+          "name": "b",
+          "type": {
+            "schema_name": "pg_catalog",
+            "local_name": "text",
+            "is_array": false
+          },
+          "nullability": "unknown"
+        }
+      ]
+    }
+  },
+  {
+    "name": "ast::resolve::query::tests::table_functions::resolves_declared_record_fields::rows",
+    "sql": "SELECT r.a,r.b FROM ROWS FROM(record_fun('') AS(a integer,b text)) r",
+    "expected": {
+      "diagnostics": [],
+      "columns": [
+        {
+          "name": "a",
+          "type": {
+            "schema_name": "pg_catalog",
+            "local_name": "int4",
+            "is_array": false
+          },
+          "nullability": "unknown"
+        },
+        {
+          "name": "b",
+          "type": {
+            "schema_name": "pg_catalog",
+            "local_name": "text",
+            "is_array": false
+          },
+          "nullability": "unknown"
+        }
+      ]
+    }
+  },
+  {
+    "name": "ast::resolve::query::tests::table_functions::resolves_declared_record_fields::rows_unqualified",
+    "sql": "SELECT a,b FROM ROWS FROM(record_fun('') AS(a integer,b text)) r",
+    "expected": {
+      "diagnostics": [],
+      "columns": [
+        {
+          "name": "a",
+          "type": {
+            "schema_name": "pg_catalog",
+            "local_name": "int4",
+            "is_array": false
+          },
+          "nullability": "unknown"
+        },
+        {
+          "name": "b",
+          "type": {
+            "schema_name": "pg_catalog",
+            "local_name": "text",
+            "is_array": false
+          },
+          "nullability": "unknown"
+        }
+      ]
+    }
+  },
+  {
+    "name": "ast::resolve::query::tests::table_functions::resolves_declared_record_fields::rows_star",
+    "sql": "SELECT r.* FROM ROWS FROM(record_fun('') AS(a integer,b text)) r",
+    "expected": {
+      "diagnostics": [],
+      "columns": [
+        {
+          "name": "a",
+          "type": {
+            "schema_name": "pg_catalog",
+            "local_name": "int4",
+            "is_array": false
+          },
+          "nullability": "unknown"
+        },
+        {
+          "name": "b",
+          "type": {
+            "schema_name": "pg_catalog",
+            "local_name": "text",
+            "is_array": false
+          },
+          "nullability": "unknown"
+        }
+      ]
+    }
+  },
+  {
+    "name": "ast::resolve::query::tests::table_functions::resolves_declared_record_fields::rows_outer_definition",
+    "sql": "SELECT a,b FROM ROWS FROM(record_fun('')) AS r(a integer,b text)",
+    "expected": {
+      "diagnostics": [],
+      "columns": [
+        {
+          "name": "a",
+          "type": {
+            "schema_name": "pg_catalog",
+            "local_name": "int4",
+            "is_array": false
+          },
+          "nullability": "unknown"
+        },
+        {
+          "name": "b",
+          "type": {
+            "schema_name": "pg_catalog",
+            "local_name": "text",
+            "is_array": false
+          },
+          "nullability": "unknown"
+        }
+      ]
+    }
+  },
+  {
+    "name": "ast::resolve::query::tests::table_functions::resolves_declared_record_fields::rows_partial_alias",
+    "sql": "SELECT x AS a,b FROM ROWS FROM(record_fun('') AS(a integer,b text)) AS r(x)",
+    "expected": {
+      "diagnostics": [],
+      "columns": [
+        {
+          "name": "a",
+          "type": {
+            "schema_name": "pg_catalog",
+            "local_name": "int4",
+            "is_array": false
+          },
+          "nullability": "unknown"
+        },
+        {
+          "name": "b",
+          "type": {
+            "schema_name": "pg_catalog",
+            "local_name": "text",
+            "is_array": false
+          },
+          "nullability": "unknown"
+        }
+      ]
+    }
+  },
+  {
+    "name": "ast::resolve::query::tests::table_functions::resolves_declared_record_fields::rows_implicit_alias",
+    "sql": "SELECT record_fun.a,record_fun.b FROM ROWS FROM(record_fun('') AS(a integer,b text))",
+    "expected": {
+      "diagnostics": [],
+      "columns": [
+        {
+          "name": "a",
+          "type": {
+            "schema_name": "pg_catalog",
+            "local_name": "int4",
+            "is_array": false
+          },
+          "nullability": "unknown"
+        },
+        {
+          "name": "b",
+          "type": {
+            "schema_name": "pg_catalog",
+            "local_name": "text",
+            "is_array": false
+          },
+          "nullability": "unknown"
+        }
+      ]
+    }
+  },
+  {
+    "name": "ast::resolve::query::tests::table_functions::resolves_declared_record_fields::named_arguments",
+    "sql": "SELECT a,b FROM record_fun(src => '') AS r(a integer,b text)",
+    "expected": {
+      "diagnostics": [],
+      "columns": [
+        {
+          "name": "a",
+          "type": {
+            "schema_name": "pg_catalog",
+            "local_name": "int4",
+            "is_array": false
+          },
+          "nullability": "unknown"
+        },
+        {
+          "name": "b",
+          "type": {
+            "schema_name": "pg_catalog",
+            "local_name": "text",
+            "is_array": false
+          },
+          "nullability": "unknown"
+        }
+      ]
+    }
+  },
+  {
+    "name": "ast::resolve::query::tests::table_functions::resolves_declared_record_fields::rows_named_arguments",
+    "sql": "SELECT a,b FROM ROWS FROM(record_fun(src => '') AS(a integer,b text)) r",
+    "expected": {
+      "diagnostics": [],
+      "columns": [
+        {
+          "name": "a",
+          "type": {
+            "schema_name": "pg_catalog",
+            "local_name": "int4",
+            "is_array": false
+          },
+          "nullability": "unknown"
+        },
+        {
+          "name": "b",
+          "type": {
+            "schema_name": "pg_catalog",
+            "local_name": "text",
+            "is_array": false
+          },
+          "nullability": "unknown"
+        }
+      ]
+    }
+  },
+  {
+    "name": "ast::resolve::query::tests::table_functions::resolves_declared_record_fields::parameter",
+    "sql": "SELECT a,b FROM record_fun($1::text) AS r(a int,b text)",
+    "expected": {
+      "diagnostics": [
+        "parameter_type_unresolved"
+      ],
+      "columns": [
+        {
+          "name": "a",
+          "type": {
+            "schema_name": "pg_catalog",
+            "local_name": "int4",
+            "is_array": false
+          },
+          "nullability": "unknown"
+        },
+        {
+          "name": "b",
+          "type": {
+            "schema_name": "pg_catalog",
+            "local_name": "text",
+            "is_array": false
+          },
+          "nullability": "unknown"
+        }
+      ]
+    }
+  },
+  {
+    "name": "ast::resolve::query::tests::table_functions::resolves_declared_record_fields::rows_ordinality",
+    "sql": "SELECT r.a,r.b FROM ROWS FROM(record_fun('') AS(a int,b text)) WITH ORDINALITY r",
+    "expected": {
+      "diagnostics": [],
+      "columns": [
+        {
+          "name": "a",
+          "type": {
+            "schema_name": "pg_catalog",
+            "local_name": "int4",
+            "is_array": false
+          },
+          "nullability": "unknown"
+        },
+        {
+          "name": "b",
+          "type": {
+            "schema_name": "pg_catalog",
+            "local_name": "text",
+            "is_array": false
+          },
+          "nullability": "unknown"
+        }
+      ]
+    }
+  },
+  {
+    "name": "ast::resolve::query::tests::table_functions::resolves_declared_record_fields::collation",
+    "sql": "SELECT a,b FROM record_fun('') r(a int,b text COLLATE \"C\")",
+    "expected": {
+      "diagnostics": [],
+      "columns": [
+        {
+          "name": "a",
+          "type": {
+            "schema_name": "pg_catalog",
+            "local_name": "int4",
+            "is_array": false
+          },
+          "nullability": "unknown"
+        },
+        {
+          "name": "b",
+          "type": {
+            "schema_name": "pg_catalog",
+            "local_name": "text",
+            "is_array": false
+          },
+          "nullability": "unknown"
+        }
+      ]
+    }
+  },
+  {
+    "name": "ast::resolve::query::tests::table_functions::preserves_declared_returns_and_positional_aliases::scalar",
+    "sql": "SELECT x AS a FROM identity(1) r(x)",
+    "expected": {
+      "diagnostics": [],
+      "columns": [
+        {
+          "name": "a",
+          "type": {
+            "schema_name": "pg_catalog",
+            "local_name": "int4",
+            "is_array": false
+          },
+          "nullability": "unknown"
+        }
+      ]
+    }
+  },
+  {
+    "name": "ast::resolve::query::tests::table_functions::preserves_declared_returns_and_positional_aliases::composite",
+    "sql": "SELECT x AS a FROM pair_fun() r(x)",
+    "expected": {
+      "diagnostics": [],
+      "columns": [
+        {
+          "name": "a",
+          "type": {
+            "schema_name": "pg_catalog",
+            "local_name": "int4",
+            "is_array": false
+          },
+          "nullability": "nullable"
+        }
+      ]
+    }
+  },
+  {
+    "name": "ast::resolve::query::tests::table_functions::preserves_declared_returns_and_positional_aliases::out",
+    "sql": "SELECT x AS a FROM out_fun() r(x)",
+    "expected": {
+      "diagnostics": [],
+      "columns": [
+        {
+          "name": "a",
+          "type": {
+            "schema_name": "pg_catalog",
+            "local_name": "int4",
+            "is_array": false
+          },
+          "nullability": "unknown"
+        }
+      ]
+    }
+  }
+]

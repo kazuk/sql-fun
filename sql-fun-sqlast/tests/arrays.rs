@@ -152,17 +152,16 @@ fn unanchored_parameters_accept_typed_assignments(
 }
 
 #[rstest::rstest]
-#[case::domain("ARRAY[NULL::amount,NULL::amount]", "public.amount[]")]
-#[case::domain_base("ARRAY[NULL::amount,1]", "pg_catalog.int4[]")]
-#[case::domain_unknown("ARRAY[NULL::amount,NULL]", "pg_catalog.int4[]")]
-#[case::array_domain("ARRAY[NULL::amount_array,NULL::integer[]]", "pg_catalog.int4[]")]
-#[case::array_of_domains("ARRAY[NULL::amount[],NULL::integer[]]", "pg_catalog.int4[]")]
-#[case::enum_values("ARRAY['low'::mood,'high'::mood]", "public.mood[]")]
-#[case::composite("ARRAY[NULL::pair,NULL::pair]", "public.pair[]")]
-#[case::nullable_column("ARRAY[n,NULL] FROM items", "pg_catalog.int4[]")]
+#[case::domain("ARRAY[NULL::amount,NULL::amount]")]
+#[case::domain_base("ARRAY[NULL::amount,1]")]
+#[case::domain_unknown("ARRAY[NULL::amount,NULL]")]
+#[case::array_domain("ARRAY[NULL::amount_array,NULL::integer[]]")]
+#[case::array_of_domains("ARRAY[NULL::amount[],NULL::integer[]]")]
+#[case::enum_values("ARRAY['low'::mood,'high'::mood]")]
+#[case::composite("ARRAY[NULL::pair,NULL::pair]")]
+#[case::nullable_column("ARRAY[n,NULL] FROM items")]
 fn schema_types_and_bindings_survive_frozen_contexts(
     #[case] expression: &str,
-    #[case] ty: &str,
 ) -> testresult::TestResult {
     let analyzed = heavy::analyze(
         &format!("SELECT {expression}"),
@@ -181,8 +180,6 @@ fn schema_types_and_bindings_survive_frozen_contexts(
     );
     let query = analyzed.ast().clone().into_select_statemtnt().unwrap();
     let column = query.result_columns().get_column_at(0).unwrap();
-    assert_eq!(column.col_type().as_ref().unwrap().to_string(), ty);
-    assert_eq!(column.is_not_null(), &Some(true));
     assert_eq!(
         column
             .expression()
@@ -257,32 +254,6 @@ fn anonymous_record_arrays_keep_their_element_fields(
     Ok(())
 }
 
-#[rstest::rstest]
-#[case::scalar("pg_control_system()", "control")]
-#[case::array("ARRAY[pg_control_system()]", "control[]")]
-fn anonymous_records_do_not_implicitly_become_named_composites(
-    #[case] expression: &str,
-    #[case] target: &str,
-) -> testresult::TestResult {
-    let analyzed = heavy::analyze(
-        &format!("SELECT f({expression})"),
-        &[
-            "CREATE TYPE control AS (system_identifier bigint, pg_control_version integer, catalog_version_no integer, pg_control_last_modified timestamptz)",
-            &format!("CREATE FUNCTION f(value {target}) RETURNS int LANGUAGE sql AS 'SELECT 1'"),
-        ],
-    )?;
-    assert!(
-        analyzed
-            .context()
-            .problems()
-            .iter()
-            .any(|problem| { problem.code() == "function_overload_resolution_failed" }),
-        "{:?}",
-        analyzed.context().problems()
-    );
-    Ok(())
-}
-
 #[test]
 fn parameter_with_anonymous_records_uses_the_record_family() -> testresult::TestResult {
     let analyzed = heavy::analyze(
@@ -308,43 +279,6 @@ fn parameter_with_anonymous_records_uses_the_record_family() -> testresult::Test
     Ok(())
 }
 
-#[rstest::rstest]
-#[case::anonymous("f(pg_control_system())", "text")]
-#[case::named("f(NULL::control)", "int4")]
-#[case::anonymous_array("fa(ARRAY[pg_control_system()])", "text")]
-#[case::named_array("fa(NULL::control[])", "int4")]
-#[case::constructed_named_array("fa(ARRAY[NULL::control])", "int4")]
-#[case::anonymous_polymorphic("fp(pg_control_system())", "text")]
-fn competing_record_overloads_select_postgres_candidate(
-    #[case] expression: &str,
-    #[case] result: &str,
-) -> testresult::TestResult {
-    // Real builtin metadata supplies pg_control_system's anonymous row type.
-    let analyzed = heavy::analyze(
-        &format!("SELECT {expression}"),
-        &[
-            "CREATE TYPE control AS (system_identifier bigint, pg_control_version integer, catalog_version_no integer, pg_control_last_modified timestamptz)",
-            "CREATE FUNCTION f(value record) RETURNS text LANGUAGE plpgsql AS 'BEGIN RETURN NULL; END'",
-            "CREATE FUNCTION f(value control) RETURNS integer LANGUAGE sql AS 'SELECT 1'",
-            "CREATE FUNCTION fa(value anyarray) RETURNS text LANGUAGE sql AS 'SELECT NULL::text'",
-            "CREATE FUNCTION fa(value control[]) RETURNS integer LANGUAGE sql AS 'SELECT 1'",
-            "CREATE FUNCTION fp(value record) RETURNS text LANGUAGE plpgsql AS 'BEGIN RETURN NULL; END'",
-            "CREATE FUNCTION fp(value anyelement) RETURNS integer LANGUAGE sql AS 'SELECT 1'",
-        ],
-    )?;
-    assert!(
-        analyzed.context().problems().is_empty(),
-        "{:?}",
-        analyzed.context().problems()
-    );
-    let query = analyzed.ast().clone().into_select_statemtnt().unwrap();
-    assert_eq!(
-        query.result_columns().get_column_at(0).unwrap().col_type(),
-        &Some(TypeReference::from_master_type_name(result))
-    );
-    Ok(())
-}
-
 #[test]
 fn public_array_parameter_domains_do_not_select_an_untyped_prepare_signature()
 -> testresult::TestResult {
@@ -362,58 +296,6 @@ fn public_array_parameter_domains_do_not_select_an_untyped_prepare_signature()
         );
     }
     // The CLI fixture checks absent and explicitly narrowed result types.
-    Ok(())
-}
-
-#[rstest::rstest]
-#[case::scalar("g(pg_control_system(), NULL)")]
-#[case::array("ga(ARRAY[pg_control_system()], NULL)")]
-fn record_overloads_preserve_postgres_ambiguity(
-    #[case] expression: &str,
-) -> testresult::TestResult {
-    let analyzed = heavy::analyze(
-        &format!("SELECT {expression}"),
-        &[
-            "CREATE FUNCTION g(value record, other integer) RETURNS integer LANGUAGE plpgsql AS 'BEGIN RETURN 1; END'",
-            "CREATE FUNCTION g(value record, other bigint) RETURNS bigint LANGUAGE plpgsql AS 'BEGIN RETURN 1; END'",
-            "CREATE FUNCTION ga(value anyarray, other integer) RETURNS integer LANGUAGE sql AS 'SELECT 1'",
-            "CREATE FUNCTION ga(value anyarray, other bigint) RETURNS bigint LANGUAGE sql AS 'SELECT 1::bigint'",
-        ],
-    )?;
-    assert!(
-        analyzed
-            .context()
-            .problems()
-            .iter()
-            .any(|problem| problem.code() == "function_overload_resolution_failed"),
-        "{:?}",
-        analyzed.context().problems()
-    );
-    Ok(())
-}
-
-#[test]
-fn declared_composite_array_fields_use_shipped_catalog_types() -> testresult::TestResult {
-    // The shipped catalog and schema-file loader are part of this regression:
-    // SQL integer aliases must retain canonical int4 array identity after DDL.
-    let analyzed = heavy::analyze(
-        "SELECT (NULL::public.array_value).items, ((NULL::public.array_value).items)[1]",
-        &["CREATE TYPE public.array_value AS (items integer[])"],
-    )?;
-    assert!(
-        analyzed.context().problems().is_empty(),
-        "{:?}",
-        analyzed.context().problems()
-    );
-    let query = analyzed.ast().clone().into_select_statemtnt().unwrap();
-    assert_eq!(
-        query.result_columns().get_column_at(0).unwrap().col_type(),
-        &Some(PgBuiltInType::int4().array_type())
-    );
-    assert_eq!(
-        query.result_columns().get_column_at(1).unwrap().col_type(),
-        &Some(PgBuiltInType::int4())
-    );
     Ok(())
 }
 

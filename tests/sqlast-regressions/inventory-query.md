@@ -4,12 +4,14 @@ This inventory maps every original parameterized case and test function in
 [`query_resolution.rs`](../../sql-fun-sqlast/tests/query_resolution.rs),
 [`type_metadata_regressions.rs`](../../sql-fun-sqlast/tests/type_metadata_regressions.rs),
 and [`writable_views.rs`](../../sql-fun-sqlast/tests/writable_views.rs).
-The only active migration in this batch is the builtin-only overload result
-contract fixture. Custom-schema candidates remain in Rust under the accepted
-builtin-only scope. #761 resolved the earlier #727 catalog-initialization failure;
-that resolution does not expand this migration to project/default schemas.
+This table records dispositions for the #757 builtin-only migration. Its
+project/default exclusions are superseded by the
+[schema-dependent inventory](inventory-schema.md), including split assertions
+and renamed/removed Rust cases. Historical case identities below remain useful
+for tracing the original scenarios; the linked schema inventories describe their
+current destinations.
 
-| Original Rust test/case identity | Destination | Disposition |
+| Original Rust test/case identity | Destination in #757 | Disposition in #757 |
 | --- | --- | --- |
 | `query_resolution::supported_select_reaches_public_resolution::literal` | `-` | Retained: public analysis/API success or failure boundary; this test does not assert a CLI result-column or exact diagnostic contract. |
 | `query_resolution::supported_select_reaches_public_resolution::row` | `-` | Retained: public analysis/API success or failure boundary; this test does not assert a CLI result-column or exact diagnostic contract. |

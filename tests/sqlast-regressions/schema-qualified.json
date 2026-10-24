@@ -1,0 +1,432 @@
+[
+  {
+    "name": "qualified_columns::binds_canonical_table_identity::schema",
+    "sql": "SELECT a.t.id FROM a.t",
+    "expected": {
+      "diagnostics": [],
+      "columns": [
+        {
+          "name": "id",
+          "type": {
+            "schema_name": "pg_catalog",
+            "local_name": "int4",
+            "is_array": false
+          },
+          "nullability": "not_null"
+        }
+      ]
+    }
+  },
+  {
+    "name": "qualified_columns::binds_canonical_table_identity::aliased_other_occurrence",
+    "sql": "SELECT a.t.id FROM a.t, a.t AS b",
+    "expected": {
+      "diagnostics": [],
+      "columns": [
+        {
+          "name": "id",
+          "type": {
+            "schema_name": "pg_catalog",
+            "local_name": "int4",
+            "is_array": false
+          },
+          "nullability": "not_null"
+        }
+      ]
+    }
+  },
+  {
+    "name": "qualified_columns::binds_canonical_table_identity::quoted",
+    "sql": "SELECT \"a.b\".\"t.x\".id FROM \"a.b\".\"t.x\"",
+    "expected": {
+      "diagnostics": [],
+      "columns": [
+        {
+          "name": "id",
+          "type": {
+            "schema_name": "pg_catalog",
+            "local_name": "int4",
+            "is_array": false
+          },
+          "nullability": "nullable"
+        }
+      ]
+    }
+  },
+  {
+    "name": "qualified_columns::same_named_relations_keep_distinct_qualified_bindings",
+    "sql": "SELECT a.t.id, b.t.id FROM a.t, b.t",
+    "expected": {
+      "diagnostics": [],
+      "columns": [
+        {
+          "name": "id",
+          "type": {
+            "schema_name": "pg_catalog",
+            "local_name": "int4",
+            "is_array": false
+          },
+          "nullability": "not_null"
+        },
+        {
+          "name": "id",
+          "type": {
+            "schema_name": "pg_catalog",
+            "local_name": "int8",
+            "is_array": false
+          },
+          "nullability": "nullable"
+        }
+      ]
+    }
+  },
+  {
+    "name": "qualified_columns::retains_failed_qualified_lookup::alias",
+    "sql": "SELECT a.t.id FROM a.t AS other",
+    "expected": {
+      "diagnostics": [
+        "column_source_not_found"
+      ],
+      "columns": [
+        {
+          "name": "id",
+          "nullability": "unknown"
+        }
+      ]
+    }
+  },
+  {
+    "name": "qualified_columns::retains_failed_qualified_lookup::same_alias",
+    "sql": "SELECT a.t.id FROM a.t AS t",
+    "expected": {
+      "diagnostics": [
+        "column_source_not_found"
+      ],
+      "columns": [
+        {
+          "name": "id",
+          "nullability": "unknown"
+        }
+      ]
+    }
+  },
+  {
+    "name": "qualified_columns::retains_failed_qualified_lookup::absent_from",
+    "sql": "SELECT a.t.id",
+    "expected": {
+      "diagnostics": [
+        "column_source_not_found"
+      ],
+      "columns": [
+        {
+          "name": "id",
+          "nullability": "unknown"
+        }
+      ]
+    }
+  },
+  {
+    "name": "qualified_columns::retains_failed_qualified_lookup::wrong_schema",
+    "sql": "SELECT b.t.id FROM a.t",
+    "expected": {
+      "diagnostics": [
+        "column_source_not_found"
+      ],
+      "columns": [
+        {
+          "name": "id",
+          "nullability": "unknown"
+        }
+      ]
+    }
+  },
+  {
+    "name": "qualified_columns::retains_failed_qualified_lookup::cte",
+    "sql": "WITH t AS (SELECT 1 AS id) SELECT a.t.id FROM t",
+    "expected": {
+      "diagnostics": [
+        "column_source_not_found"
+      ],
+      "columns": [
+        {
+          "name": "id",
+          "nullability": "unknown"
+        }
+      ]
+    }
+  },
+  {
+    "name": "qualified_columns::retains_failed_qualified_lookup::derived",
+    "sql": "SELECT a.t.id FROM (SELECT 1 AS id) AS t",
+    "expected": {
+      "diagnostics": [
+        "column_source_not_found"
+      ],
+      "columns": [
+        {
+          "name": "id",
+          "nullability": "unknown"
+        }
+      ]
+    }
+  },
+  {
+    "name": "qualified_columns::retains_failed_qualified_lookup::join_alias",
+    "sql": "SELECT a.t.id FROM (a.t JOIN a.u ON true) AS j",
+    "expected": {
+      "diagnostics": [
+        "column_source_not_found"
+      ],
+      "columns": [
+        {
+          "name": "id",
+          "nullability": "unknown"
+        }
+      ]
+    }
+  },
+  {
+    "name": "qualified_columns::retains_failed_qualified_lookup::duplicate_source",
+    "sql": "SELECT a.t.id FROM a.t, a.t",
+    "expected": {
+      "diagnostics": [
+        "duplicate_alias",
+        "column_source_ambiguous"
+      ],
+      "columns": [
+        {
+          "name": "id",
+          "nullability": "unknown"
+        }
+      ]
+    }
+  },
+  {
+    "name": "qualified_columns::preserves_source_type_and_nullability::view",
+    "sql": "SELECT a.v.id FROM a.v",
+    "expected": {
+      "diagnostics": [],
+      "columns": [
+        {
+          "name": "id",
+          "type": {
+            "schema_name": "pg_catalog",
+            "local_name": "int4",
+            "is_array": false
+          },
+          "nullability": "not_null"
+        }
+      ]
+    }
+  },
+  {
+    "name": "qualified_columns::preserves_source_type_and_nullability::left_join",
+    "sql": "SELECT a.t.id FROM a.u LEFT JOIN a.t ON true",
+    "expected": {
+      "diagnostics": [],
+      "columns": [
+        {
+          "name": "id",
+          "type": {
+            "schema_name": "pg_catalog",
+            "local_name": "int4",
+            "is_array": false
+          },
+          "nullability": "nullable"
+        }
+      ]
+    }
+  },
+  {
+    "name": "qualified_columns::preserves_source_type_and_nullability::right_join",
+    "sql": "SELECT a.t.id FROM a.t RIGHT JOIN a.u ON true",
+    "expected": {
+      "diagnostics": [],
+      "columns": [
+        {
+          "name": "id",
+          "type": {
+            "schema_name": "pg_catalog",
+            "local_name": "int4",
+            "is_array": false
+          },
+          "nullability": "nullable"
+        }
+      ]
+    }
+  },
+  {
+    "name": "qualified_columns::preserves_source_type_and_nullability::full_join",
+    "sql": "SELECT a.t.id FROM a.t FULL JOIN a.u ON true",
+    "expected": {
+      "diagnostics": [],
+      "columns": [
+        {
+          "name": "id",
+          "type": {
+            "schema_name": "pg_catalog",
+            "local_name": "int4",
+            "is_array": false
+          },
+          "nullability": "nullable"
+        }
+      ]
+    }
+  },
+  {
+    "name": "qualified_columns::preserves_source_type_and_nullability::inner_join",
+    "sql": "SELECT a.t.id FROM a.t JOIN a.u ON true",
+    "expected": {
+      "diagnostics": [],
+      "columns": [
+        {
+          "name": "id",
+          "type": {
+            "schema_name": "pg_catalog",
+            "local_name": "int4",
+            "is_array": false
+          },
+          "nullability": "not_null"
+        }
+      ]
+    }
+  },
+  {
+    "name": "qualified_columns::correlated_references_obey_relation_visibility::correlation",
+    "sql": "SELECT (SELECT a.t.id) FROM a.t",
+    "expected": {
+      "diagnostics": [],
+      "columns": [
+        {
+          "name": "",
+          "type": {
+            "schema_name": "pg_catalog",
+            "local_name": "int4",
+            "is_array": false
+          },
+          "nullability": "nullable"
+        }
+      ]
+    }
+  },
+  {
+    "name": "qualified_columns::correlated_references_obey_relation_visibility::local_alias_does_not_mask",
+    "sql": "SELECT (SELECT a.t.id FROM (SELECT 'inner'::text AS id) AS t) FROM a.t",
+    "expected": {
+      "diagnostics": [],
+      "columns": [
+        {
+          "name": "",
+          "type": {
+            "schema_name": "pg_catalog",
+            "local_name": "int4",
+            "is_array": false
+          },
+          "nullability": "nullable"
+        }
+      ]
+    }
+  },
+  {
+    "name": "qualified_columns::correlated_references_obey_relation_visibility::hidden_local_relation",
+    "sql": "SELECT (SELECT a.u.id FROM a.u AS u(renamed)) FROM a.u",
+    "expected": {
+      "diagnostics": [],
+      "columns": [
+        {
+          "name": "",
+          "type": {
+            "schema_name": "pg_catalog",
+            "local_name": "int4",
+            "is_array": false
+          },
+          "nullability": "nullable"
+        }
+      ]
+    }
+  },
+  {
+    "name": "qualified_columns::correlated_references_obey_relation_visibility::missing_column",
+    "sql": "SELECT (SELECT a.t.absent FROM a.t) FROM a.t",
+    "expected": {
+      "diagnostics": [
+        "column_not_found_in_table"
+      ],
+      "columns": [
+        {
+          "name": "",
+          "nullability": "nullable"
+        }
+      ]
+    }
+  },
+  {
+    "name": "qualified_columns::dml_consumes_the_same_qualified_bindings::insert",
+    "sql": "INSERT INTO a.u(id) VALUES(1) RETURNING a.u.id",
+    "expected": {
+      "diagnostics": [],
+      "columns": [
+        {
+          "name": "id",
+          "type": {
+            "schema_name": "pg_catalog",
+            "local_name": "int4",
+            "is_array": false
+          },
+          "nullability": "nullable"
+        }
+      ]
+    }
+  },
+  {
+    "name": "qualified_columns::dml_consumes_the_same_qualified_bindings::update",
+    "sql": "UPDATE a.u SET id = a.u.id RETURNING a.u.id",
+    "expected": {
+      "diagnostics": [],
+      "columns": [
+        {
+          "name": "id",
+          "type": {
+            "schema_name": "pg_catalog",
+            "local_name": "int4",
+            "is_array": false
+          },
+          "nullability": "nullable"
+        }
+      ]
+    }
+  },
+  {
+    "name": "qualified_columns::dml_consumes_the_same_qualified_bindings::delete",
+    "sql": "DELETE FROM a.u WHERE a.u.id = 1 RETURNING a.u.id",
+    "expected": {
+      "diagnostics": [],
+      "columns": [
+        {
+          "name": "id",
+          "type": {
+            "schema_name": "pg_catalog",
+            "local_name": "int4",
+            "is_array": false
+          },
+          "nullability": "nullable"
+        }
+      ]
+    }
+  },
+  {
+    "name": "qualified_columns::missing_column_retains_the_selected_relation",
+    "sql": "SELECT a.t.absent FROM a.t",
+    "expected": {
+      "diagnostics": [
+        "column_not_found_in_table"
+      ],
+      "columns": [
+        {
+          "name": "absent",
+          "nullability": "unknown"
+        }
+      ]
+    }
+  }
+]

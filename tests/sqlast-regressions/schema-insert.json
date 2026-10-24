@@ -1,0 +1,478 @@
+[
+  {
+    "name": "insert::resolves_insert_semantics::values",
+    "sql": "INSERT INTO items VALUES (1, 'one') RETURNING *",
+    "expected": {
+      "diagnostics": [],
+      "columns": [
+        {
+          "name": "id",
+          "nullability": "not_null",
+          "type": {
+            "schema_name": "pg_catalog",
+            "local_name": "int4",
+            "is_array": false
+          }
+        },
+        {
+          "name": "label",
+          "nullability": "nullable",
+          "type": {
+            "schema_name": "pg_catalog",
+            "local_name": "text",
+            "is_array": false
+          }
+        }
+      ]
+    }
+  },
+  {
+    "name": "insert::resolves_insert_semantics::partial",
+    "sql": "INSERT INTO items VALUES (1) RETURNING id",
+    "expected": {
+      "diagnostics": [],
+      "columns": [
+        {
+          "name": "id",
+          "nullability": "not_null",
+          "type": {
+            "schema_name": "pg_catalog",
+            "local_name": "int4",
+            "is_array": false
+          }
+        }
+      ]
+    }
+  },
+  {
+    "name": "insert::resolves_insert_semantics::named",
+    "sql": "INSERT INTO items(label, id) VALUES ('one', 1) RETURNING id AS n",
+    "expected": {
+      "diagnostics": [],
+      "columns": [
+        {
+          "name": "n",
+          "nullability": "not_null",
+          "type": {
+            "schema_name": "pg_catalog",
+            "local_name": "int4",
+            "is_array": false
+          }
+        }
+      ]
+    }
+  },
+  {
+    "name": "insert::resolves_insert_semantics::defaults",
+    "sql": "INSERT INTO items DEFAULT VALUES RETURNING *",
+    "expected": {
+      "diagnostics": [],
+      "columns": [
+        {
+          "name": "id",
+          "nullability": "not_null",
+          "type": {
+            "schema_name": "pg_catalog",
+            "local_name": "int4",
+            "is_array": false
+          }
+        },
+        {
+          "name": "label",
+          "nullability": "nullable",
+          "type": {
+            "schema_name": "pg_catalog",
+            "local_name": "text",
+            "is_array": false
+          }
+        }
+      ]
+    }
+  },
+  {
+    "name": "insert::resolves_insert_semantics::default_cell",
+    "sql": "INSERT INTO items VALUES (DEFAULT, 'one') RETURNING id",
+    "expected": {
+      "diagnostics": [],
+      "columns": [
+        {
+          "name": "id",
+          "nullability": "not_null",
+          "type": {
+            "schema_name": "pg_catalog",
+            "local_name": "int4",
+            "is_array": false
+          }
+        }
+      ]
+    }
+  },
+  {
+    "name": "insert::resolves_insert_semantics::multi_row",
+    "sql": "INSERT INTO items(id) VALUES (1), (2) RETURNING id",
+    "expected": {
+      "diagnostics": [],
+      "columns": [
+        {
+          "name": "id",
+          "nullability": "not_null",
+          "type": {
+            "schema_name": "pg_catalog",
+            "local_name": "int4",
+            "is_array": false
+          }
+        }
+      ]
+    }
+  },
+  {
+    "name": "insert::resolves_insert_semantics::select",
+    "sql": "INSERT INTO items(id) SELECT 1 RETURNING id",
+    "expected": {
+      "diagnostics": [],
+      "columns": [
+        {
+          "name": "id",
+          "nullability": "not_null",
+          "type": {
+            "schema_name": "pg_catalog",
+            "local_name": "int4",
+            "is_array": false
+          }
+        }
+      ]
+    }
+  },
+  {
+    "name": "insert::resolves_insert_semantics::select_star",
+    "sql": "INSERT INTO items SELECT * FROM items RETURNING id",
+    "expected": {
+      "diagnostics": [],
+      "columns": [
+        {
+          "name": "id",
+          "nullability": "not_null",
+          "type": {
+            "schema_name": "pg_catalog",
+            "local_name": "int4",
+            "is_array": false
+          }
+        }
+      ]
+    }
+  },
+  {
+    "name": "insert::resolves_insert_semantics::join_star",
+    "sql": "INSERT INTO items SELECT * FROM (SELECT id FROM items) l JOIN (SELECT label FROM items) r ON true RETURNING id",
+    "expected": {
+      "diagnostics": [],
+      "columns": [
+        {
+          "name": "id",
+          "nullability": "not_null",
+          "type": {
+            "schema_name": "pg_catalog",
+            "local_name": "int4",
+            "is_array": false
+          }
+        }
+      ]
+    }
+  },
+  {
+    "name": "insert::resolves_insert_semantics::using_star",
+    "sql": "INSERT INTO items(id) SELECT * FROM (SELECT id FROM items) l JOIN (SELECT id FROM items) r USING(id) RETURNING id",
+    "expected": {
+      "diagnostics": [],
+      "columns": [
+        {
+          "name": "id",
+          "nullability": "not_null",
+          "type": {
+            "schema_name": "pg_catalog",
+            "local_name": "int4",
+            "is_array": false
+          }
+        }
+      ]
+    }
+  },
+  {
+    "name": "insert::resolves_insert_semantics::derived_star",
+    "sql": "INSERT INTO items(id) SELECT s.* FROM (SELECT 1 AS n) s RETURNING id",
+    "expected": {
+      "diagnostics": [],
+      "columns": [
+        {
+          "name": "id",
+          "nullability": "not_null",
+          "type": {
+            "schema_name": "pg_catalog",
+            "local_name": "int4",
+            "is_array": false
+          }
+        }
+      ]
+    }
+  },
+  {
+    "name": "insert::resolves_insert_semantics::cte_star",
+    "sql": "WITH c AS (SELECT 1 AS n) INSERT INTO items(id) SELECT * FROM c RETURNING id",
+    "expected": {
+      "diagnostics": [],
+      "columns": [
+        {
+          "name": "id",
+          "nullability": "not_null",
+          "type": {
+            "schema_name": "pg_catalog",
+            "local_name": "int4",
+            "is_array": false
+          }
+        }
+      ]
+    }
+  },
+  {
+    "name": "insert::resolves_insert_semantics::compound",
+    "sql": "INSERT INTO items(id) SELECT 1 UNION ALL SELECT 2 RETURNING id",
+    "expected": {
+      "diagnostics": [],
+      "columns": [
+        {
+          "name": "id",
+          "nullability": "not_null",
+          "type": {
+            "schema_name": "pg_catalog",
+            "local_name": "int4",
+            "is_array": false
+          }
+        }
+      ]
+    }
+  },
+  {
+    "name": "insert::resolves_insert_semantics::cte_source",
+    "sql": "WITH c AS (SELECT 1 AS n) INSERT INTO items(id) SELECT n FROM c RETURNING id",
+    "expected": {
+      "diagnostics": [],
+      "columns": [
+        {
+          "name": "id",
+          "nullability": "not_null",
+          "type": {
+            "schema_name": "pg_catalog",
+            "local_name": "int4",
+            "is_array": false
+          }
+        }
+      ]
+    }
+  },
+  {
+    "name": "insert::resolves_insert_semantics::no_returning",
+    "sql": "INSERT INTO items(id) VALUES (1)",
+    "expected": {
+      "diagnostics": [],
+      "columns": []
+    }
+  },
+  {
+    "name": "insert::resolves_insert_semantics::alias",
+    "sql": "INSERT INTO items AS i VALUES (1, 'one') RETURNING i.id",
+    "expected": {
+      "diagnostics": [],
+      "columns": [
+        {
+          "name": "id",
+          "nullability": "not_null",
+          "type": {
+            "schema_name": "pg_catalog",
+            "local_name": "int4",
+            "is_array": false
+          }
+        }
+      ]
+    }
+  },
+  {
+    "name": "insert::resolves_insert_semantics::nothing",
+    "sql": "INSERT INTO items(id) VALUES (1) ON CONFLICT DO NOTHING RETURNING id",
+    "expected": {
+      "diagnostics": [],
+      "columns": [
+        {
+          "name": "id",
+          "nullability": "not_null",
+          "type": {
+            "schema_name": "pg_catalog",
+            "local_name": "int4",
+            "is_array": false
+          }
+        }
+      ]
+    }
+  },
+  {
+    "name": "insert::reports_invalid_insert::arity",
+    "sql": "INSERT INTO items VALUES (1, 'x', 3)",
+    "expected": {
+      "diagnostics": [
+        "insert_semantics"
+      ],
+      "columns": []
+    }
+  },
+  {
+    "name": "insert::reports_invalid_insert::duplicate",
+    "sql": "INSERT INTO items(id, id) VALUES (1, 2)",
+    "expected": {
+      "diagnostics": [
+        "insert_semantics"
+      ],
+      "columns": []
+    }
+  },
+  {
+    "name": "insert::reports_invalid_insert::types",
+    "sql": "INSERT INTO items(id) VALUES (true)",
+    "expected": {
+      "diagnostics": [
+        "insert_semantics"
+      ],
+      "columns": []
+    }
+  },
+  {
+    "name": "insert::reports_invalid_insert::explicit_partial",
+    "sql": "INSERT INTO items(id, label) VALUES (1)",
+    "expected": {
+      "diagnostics": [
+        "insert_semantics"
+      ],
+      "columns": []
+    }
+  },
+  {
+    "name": "insert::reports_invalid_insert::branch_arity",
+    "sql": "INSERT INTO items(id) SELECT 1 UNION ALL SELECT 1, 2",
+    "expected": {
+      "diagnostics": [
+        "insert_semantics"
+      ],
+      "columns": []
+    }
+  },
+  {
+    "name": "insert::reports_invalid_insert::conflicting_parameter",
+    "sql": "INSERT INTO flags(id, flag) VALUES ($1, $1)",
+    "expected": {
+      "diagnostics": [
+        "parameter_constraint"
+      ],
+      "columns": []
+    }
+  },
+  {
+    "name": "insert::reports_invalid_insert::cte_alias_arity",
+    "sql": "WITH c(a,b) AS (INSERT INTO items(id) VALUES(1) RETURNING id) SELECT a FROM c",
+    "expected": {
+      "diagnostics": [
+        "insert_semantics"
+      ],
+      "columns": [
+        {
+          "name": "a",
+          "nullability": "not_null",
+          "type": {
+            "schema_name": "pg_catalog",
+            "local_name": "int4",
+            "is_array": false
+          }
+        }
+      ]
+    }
+  },
+  {
+    "name": "insert::reports_invalid_insert::alias_scope",
+    "sql": "INSERT INTO items AS i VALUES (1) RETURNING items.id",
+    "expected": {
+      "diagnostics": [
+        "undefined_alias"
+      ],
+      "columns": [
+        {
+          "name": "id",
+          "nullability": "unknown"
+        }
+      ]
+    }
+  },
+  {
+    "name": "insert::reports_invalid_insert::source_scope",
+    "sql": "INSERT INTO items(id) SELECT n FROM (SELECT 1 AS n) s RETURNING s.n",
+    "expected": {
+      "diagnostics": [
+        "undefined_alias"
+      ],
+      "columns": [
+        {
+          "name": "n",
+          "nullability": "unknown"
+        }
+      ]
+    }
+  },
+  {
+    "name": "insert::validates_generated_destinations::always",
+    "sql": "INSERT INTO identity_items(id) VALUES(1)",
+    "expected": {
+      "diagnostics": [
+        "insert_semantics"
+      ],
+      "columns": []
+    }
+  },
+  {
+    "name": "insert::validates_generated_destinations::default_value",
+    "sql": "INSERT INTO identity_items(id) VALUES(DEFAULT)",
+    "expected": {
+      "diagnostics": [],
+      "columns": []
+    }
+  },
+  {
+    "name": "insert::validates_generated_destinations::system",
+    "sql": "INSERT INTO identity_items(id) OVERRIDING SYSTEM VALUE VALUES(1)",
+    "expected": {
+      "diagnostics": [],
+      "columns": []
+    }
+  },
+  {
+    "name": "insert::validates_generated_destinations::user",
+    "sql": "INSERT INTO identity_items(id) OVERRIDING USER VALUE VALUES(1)",
+    "expected": {
+      "diagnostics": [],
+      "columns": []
+    }
+  },
+  {
+    "name": "insert::validates_generated_destinations::generated",
+    "sql": "INSERT INTO generated_items(id,g) VALUES(1,2)",
+    "expected": {
+      "diagnostics": [
+        "insert_semantics"
+      ],
+      "columns": []
+    }
+  },
+  {
+    "name": "insert::validates_generated_destinations::generated_default",
+    "sql": "INSERT INTO generated_items(id,g) VALUES(1,DEFAULT)",
+    "expected": {
+      "diagnostics": [],
+      "columns": []
+    }
+  }
+]

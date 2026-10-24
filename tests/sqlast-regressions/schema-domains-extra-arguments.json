@@ -1,0 +1,10 @@
+[
+  {
+    "name": "type_metadata_regressions::extra_arguments_do_not_create_a_false_exact_match",
+    "sql": "SELECT choose(1.2, 1)",
+    "expected": {
+      "diagnostics": [],
+      "columns": [{"name": "", "type": {"schema_name": "pg_catalog", "local_name": "float8", "is_array": false}, "nullability": "nullable"}]
+    }
+  }
+]

@@ -77,56 +77,6 @@ fn invalid_operands_render_specific_diagnostics(
 }
 
 #[rstest::rstest]
-#[case::domain("greatest(NULL::amount,NULL::amount)", "public.amount")]
-#[case::array_domain("greatest(NULL::amount_array,NULL::integer[])", "pg_catalog.int4[]")]
-#[case::array_domain_nested(
-    "greatest(NULL::nested_amount_array,NULL::integer[])",
-    "pg_catalog.int4[]"
-)]
-#[case::domain_base("least(NULL::amount,1)", "pg_catalog.int4")]
-#[case::domain_array("greatest(NULL::amount[],NULL::integer[])", "pg_catalog.int4[]")]
-#[case::domain_unknown("greatest(NULL::amount,NULL)", "pg_catalog.int4")]
-#[case::enum_values("least('low'::mood,'high'::mood)", "public.mood")]
-#[case::composite("greatest(NULL::pair,NULL::pair)", "public.pair")]
-fn schema_types_preserve_common_type_rules(
-    #[case] expression: &str,
-    #[case] ty: &str,
-) -> Result<(), Box<dyn std::error::Error>> {
-    let analyzed = heavy::analyze(
-        &format!("select {expression} as result"),
-        &[
-            "create domain amount as integer",
-            "create domain amount_array as integer[]",
-            "create domain nested_amount_array as amount_array",
-            "create type mood as enum ('low','high')",
-            "create type pair as (n integer)",
-        ],
-    )?;
-    assert!(
-        !analyzed
-            .context()
-            .problems()
-            .iter()
-            .any(|problem| problem.code().starts_with("min_max_")),
-        "{:?}",
-        analyzed.context().problems()
-    );
-    let query = analyzed.ast().clone().into_select_statemtnt().unwrap();
-    assert_eq!(
-        query
-            .result_columns()
-            .get_column_at(0)
-            .unwrap()
-            .col_type()
-            .as_ref()
-            .unwrap()
-            .to_string(),
-        ty
-    );
-    Ok(())
-}
-
-#[rstest::rstest]
 #[case::numeric("select greatest($1,1) as result")]
 #[case::nested("select least(greatest($1,1),2) as result")]
 #[case::repeated("select greatest($1,$1,1) as result")]

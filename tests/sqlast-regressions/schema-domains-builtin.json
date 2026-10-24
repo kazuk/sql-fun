@@ -1,0 +1,189 @@
+[
+  {
+    "name": "domain_casts::explicit_cast_retains_domain_binding::identity",
+    "sql": "SELECT 1::information_schema.cardinal_number",
+    "expected": {
+      "diagnostics": [],
+      "columns": [
+        {
+          "name": "",
+          "type": {
+            "schema_name": "information_schema",
+            "local_name": "cardinal_number",
+            "is_array": false
+          },
+          "nullability": "not_null"
+        }
+      ]
+    }
+  },
+  {
+    "name": "domain_casts::explicit_cast_retains_domain_binding::smallint",
+    "sql": "SELECT 1::smallint::information_schema.cardinal_number",
+    "expected": {
+      "diagnostics": [],
+      "columns": [
+        {
+          "name": "",
+          "type": {
+            "schema_name": "information_schema",
+            "local_name": "cardinal_number",
+            "is_array": false
+          },
+          "nullability": "not_null"
+        }
+      ]
+    }
+  },
+  {
+    "name": "domain_casts::explicit_cast_retains_domain_binding::bigint",
+    "sql": "SELECT 1::bigint::information_schema.cardinal_number",
+    "expected": {
+      "diagnostics": [],
+      "columns": [
+        {
+          "name": "",
+          "type": {
+            "schema_name": "information_schema",
+            "local_name": "cardinal_number",
+            "is_array": false
+          },
+          "nullability": "not_null"
+        }
+      ]
+    }
+  },
+  {
+    "name": "domain_casts::explicit_cast_retains_domain_binding::string_io",
+    "sql": "SELECT 1::bigint::information_schema.character_data",
+    "expected": {
+      "diagnostics": [],
+      "columns": [
+        {
+          "name": "",
+          "type": {
+            "schema_name": "information_schema",
+            "local_name": "character_data",
+            "is_array": false
+          },
+          "nullability": "not_null"
+        }
+      ]
+    }
+  },
+  {
+    "name": "domain_casts::explicit_cast_retains_domain_binding::identifier",
+    "sql": "SELECT 1::smallint::information_schema.sql_identifier",
+    "expected": {
+      "diagnostics": [],
+      "columns": [
+        {
+          "name": "",
+          "type": {
+            "schema_name": "information_schema",
+            "local_name": "sql_identifier",
+            "is_array": false
+          },
+          "nullability": "not_null"
+        }
+      ]
+    }
+  },
+  {
+    "name": "domain_casts::explicit_cast_retains_domain_binding::timestamp",
+    "sql": "SELECT NULL::timestamptz::information_schema.time_stamp",
+    "expected": {
+      "diagnostics": [],
+      "columns": [
+        {
+          "name": "",
+          "type": {
+            "schema_name": "information_schema",
+            "local_name": "time_stamp",
+            "is_array": false
+          },
+          "nullability": "nullable"
+        }
+      ]
+    }
+  },
+  {
+    "name": "domain_casts::explicit_cast_retains_domain_binding::null",
+    "sql": "SELECT NULL::information_schema.cardinal_number",
+    "expected": {
+      "diagnostics": [],
+      "columns": [
+        {
+          "name": "",
+          "type": {
+            "schema_name": "information_schema",
+            "local_name": "cardinal_number",
+            "is_array": false
+          },
+          "nullability": "nullable"
+        }
+      ]
+    }
+  },
+  {
+    "name": "domain_casts::invalid_cast_keeps_target_lookup_and_argument::invalid",
+    "sql": "SELECT true::information_schema.time_stamp",
+    "expected": {
+      "diagnostics": [
+        "explicit_cast_not_defined"
+      ],
+      "columns": [
+        {
+          "name": "",
+          "type": {
+            "schema_name": "information_schema",
+            "local_name": "time_stamp",
+            "is_array": false
+          },
+          "nullability": "not_null"
+        }
+      ]
+    }
+  },
+  {
+    "name": "domain_casts::invalid_cast_keeps_target_lookup_and_argument::invalid_array",
+    "sql": "SELECT NULL::boolean[]::information_schema.time_stamp[]",
+    "expected": {
+      "diagnostics": [
+        "explicit_cast_not_defined"
+      ],
+      "columns": [
+        {
+          "name": "",
+          "type": {
+            "schema_name": "information_schema",
+            "local_name": "time_stamp",
+            "is_array": true
+          },
+          "nullability": "nullable"
+        }
+      ]
+    }
+  },
+  {
+    "name": "domain_casts::invalid_cast_keeps_target_lookup_and_argument::missing",
+    "sql": "SELECT 1::public.no_such_domain",
+    "expected": {
+      "diagnostics": [
+        "parameter_constraint",
+        "explicit_cast_not_defined"
+      ],
+      "columns": [
+        {
+          "name": "",
+          "type": {
+            "schema_name": "public",
+            "local_name": "no_such_domain",
+            "is_array": false
+          },
+          "nullability": "not_null"
+        }
+      ]
+    }
+  }
+]

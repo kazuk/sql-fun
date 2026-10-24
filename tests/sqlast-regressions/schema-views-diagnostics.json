@@ -1,0 +1,246 @@
+[
+  {
+    "name": "invalid_view_declarations_are_structured::missing_alter",
+    "sql": "ALTER VIEW public.absent ALTER COLUMN id SET DEFAULT 2",
+    "expected": {
+      "diagnostics": [
+        "view_invalid_target"
+      ],
+      "columns": []
+    }
+  },
+  {
+    "name": "invalid_view_declarations_are_structured::table_alter",
+    "sql": "ALTER VIEW public.items ALTER COLUMN id SET DEFAULT 2",
+    "expected": {
+      "diagnostics": [
+        "view_invalid_target"
+      ],
+      "columns": []
+    }
+  },
+  {
+    "name": "invalid_view_declarations_are_structured::default",
+    "sql": "ALTER VIEW public.item_view ALTER COLUMN absent SET DEFAULT 2",
+    "expected": {
+      "diagnostics": [
+        "view_unknown_default_column"
+      ],
+      "columns": []
+    }
+  },
+  {
+    "name": "invalid_view_declarations_are_structured::replace",
+    "sql": "CREATE OR REPLACE VIEW public.item_view AS SELECT id FROM public.items",
+    "expected": {
+      "diagnostics": [
+        "conflicting_creation"
+      ],
+      "columns": []
+    }
+  },
+  {
+    "name": "invalid_view_declarations_are_structured::rename",
+    "sql": "CREATE OR REPLACE VIEW public.item_view AS SELECT id AS renamed, value, value+1 AS computed FROM public.items",
+    "expected": {
+      "diagnostics": [
+        "conflicting_creation"
+      ],
+      "columns": []
+    }
+  },
+  {
+    "name": "invalid_view_declarations_are_structured::type_change",
+    "sql": "CREATE OR REPLACE VIEW public.item_view AS SELECT id::bigint AS key, value, value+1 AS computed FROM public.items",
+    "expected": {
+      "diagnostics": [
+        "conflicting_creation"
+      ],
+      "columns": []
+    }
+  },
+  {
+    "name": "invalid_view_declarations_are_structured::duplicate_view",
+    "sql": "CREATE VIEW public.item_view AS SELECT id FROM public.items",
+    "expected": {
+      "diagnostics": [
+        "conflicting_creation"
+      ],
+      "columns": []
+    }
+  },
+  {
+    "name": "invalid_view_declarations_are_structured::alter",
+    "sql": "ALTER VIEW public.item_view DISABLE RULE r",
+    "expected": {
+      "diagnostics": [
+        "view_invalid_alter"
+      ],
+      "columns": []
+    }
+  },
+  {
+    "name": "semantic_problems_allow_subsequent_statements::insert_cte",
+    "sql": "WITH rejected AS (INSERT INTO public.typo VALUES (1) RETURNING *) SELECT 1",
+    "expected": {
+      "diagnostics": [
+        "relation_not_found"
+      ],
+      "columns": [
+        {
+          "name": "",
+          "type": {
+            "schema_name": "pg_catalog",
+            "local_name": "int4",
+            "is_array": false
+          },
+          "nullability": "not_null"
+        }
+      ]
+    }
+  },
+  {
+    "name": "semantic_problems_allow_subsequent_statements::update_cte",
+    "sql": "WITH rejected AS (UPDATE public.typo SET id = 1 RETURNING *) SELECT 1",
+    "expected": {
+      "diagnostics": [
+        "relation_not_found"
+      ],
+      "columns": [
+        {
+          "name": "",
+          "type": {
+            "schema_name": "pg_catalog",
+            "local_name": "int4",
+            "is_array": false
+          },
+          "nullability": "not_null"
+        }
+      ]
+    }
+  },
+  {
+    "name": "semantic_problems_allow_subsequent_statements::insert_typo",
+    "sql": "INSERT INTO public.typo VALUES (1)",
+    "expected": {
+      "diagnostics": [
+        "relation_not_found"
+      ],
+      "columns": []
+    }
+  },
+  {
+    "name": "semantic_problems_allow_subsequent_statements::update_typo",
+    "sql": "UPDATE public.typo SET id = 1",
+    "expected": {
+      "diagnostics": [
+        "relation_not_found"
+      ],
+      "columns": []
+    }
+  },
+  {
+    "name": "semantic_problems_allow_subsequent_statements::insert_read_only",
+    "sql": "INSERT INTO public.read_only VALUES (1)",
+    "expected": {
+      "diagnostics": [
+        "insert_semantics"
+      ],
+      "columns": []
+    }
+  },
+  {
+    "name": "semantic_problems_allow_subsequent_statements::update_read_only",
+    "sql": "UPDATE public.read_only SET id = 1",
+    "expected": {
+      "diagnostics": [
+        "update_semantics"
+      ],
+      "columns": []
+    }
+  },
+  {
+    "name": "semantic_problems_allow_subsequent_statements::insert_column",
+    "sql": "INSERT INTO public.writable(typo) VALUES (1)",
+    "expected": {
+      "diagnostics": [
+        "column_not_found_in_table"
+      ],
+      "columns": []
+    }
+  },
+  {
+    "name": "semantic_problems_allow_subsequent_statements::update_column",
+    "sql": "UPDATE public.writable SET typo = 1",
+    "expected": {
+      "diagnostics": [
+        "column_not_found_in_table"
+      ],
+      "columns": []
+    }
+  },
+  {
+    "name": "semantic_problems_allow_subsequent_statements::create_rule",
+    "sql": "CREATE RULE invalid AS ON INSERT TO public.typo DO NOTHING",
+    "expected": {
+      "diagnostics": [
+        "query_deparse",
+        "rule_invalid_definition"
+      ],
+      "columns": []
+    }
+  },
+  {
+    "name": "semantic_problems_allow_subsequent_statements::drop_rule",
+    "sql": "DROP RULE missing ON public.items",
+    "expected": {
+      "diagnostics": [
+        "query_deparse",
+        "rule_invalid_definition"
+      ],
+      "columns": []
+    }
+  },
+  {
+    "name": "semantic_problems_allow_subsequent_statements::create_trigger",
+    "sql": "CREATE TRIGGER invalid BEFORE INSERT ON public.typo EXECUTE FUNCTION public.absent()",
+    "expected": {
+      "diagnostics": [
+        "query_deparse",
+        "trigger_invalid_definition"
+      ],
+      "columns": []
+    }
+  },
+  {
+    "name": "semantic_problems_allow_subsequent_statements::drop_trigger",
+    "sql": "DROP TRIGGER missing ON public.items",
+    "expected": {
+      "diagnostics": [
+        "query_deparse",
+        "trigger_invalid_definition"
+      ],
+      "columns": []
+    }
+  },
+  {
+    "name": "semantic_problems_allow_subsequent_statements::view_default",
+    "sql": "ALTER VIEW public.writable ALTER COLUMN typo SET DEFAULT 1",
+    "expected": {
+      "diagnostics": [
+        "view_unknown_default_column"
+      ],
+      "columns": []
+    }
+  },
+  {
+    "name": "semantic_problems_allow_subsequent_statements::view_rule_state",
+    "sql": "ALTER VIEW public.writable DISABLE RULE missing",
+    "expected": {
+      "diagnostics": [
+        "view_invalid_alter"
+      ],
+      "columns": []
+    }
+  }
+]

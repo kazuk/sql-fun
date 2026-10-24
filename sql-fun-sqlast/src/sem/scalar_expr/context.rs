@@ -895,3 +895,60 @@ impl ScalarAnalysisContext<'_> {
         source.create_column_ref(context, &self.with_clause, alias, column, nullability)
     }
 }
+
+impl ScalarAnalysisContext<'_> {
+    pub(crate) fn resolve_whole_row(
+        &self,
+        context: &mut impl ParseContext,
+        requested: &crate::sem::FullName,
+    ) -> Result<SemScalarExpr, AnalysisError> {
+        use crate::sem::{FullName, WholeRowExpr};
+        let mut relation = requested.clone();
+        if let Some(catalog) = requested.catalog() {
+            let Some(database) = context.metadata().database_name() else {
+                return WholeRowExpr::database_required(context, requested);
+            };
+            if catalog.as_str() != database {
+                return WholeRowExpr::cross_database(context, requested);
+            }
+            relation = FullName::new(&None, &requested.schema().cloned(), requested.name());
+        }
+        self.resolve_whole_row_in_scope(context, &relation, requested, 0)
+    }
+
+    fn resolve_whole_row_in_scope(
+        &self,
+        context: &mut impl ParseContext,
+        relation: &crate::sem::FullName,
+        requested: &crate::sem::FullName,
+        levels_up: usize,
+    ) -> Result<SemScalarExpr, AnalysisError> {
+        use crate::sem::WholeRowExpr;
+        let source = if relation.schema().is_some() {
+            if self.qualified_only {
+                Ok(None)
+            } else {
+                self.from_clause.qualified_source(context, relation)
+            }
+        } else {
+            self.from_clause
+                .namespace()
+                .resolve_name(&AliasName::from(relation.name().as_str()))
+        };
+        match source {
+            Ok(Some(source)) => {
+                self.grouping.reference();
+                self.validate_rule_reference(context, source.alias())?;
+                source.bind_whole_row(context, &self.with_clause, requested, levels_up)
+            }
+            Err(()) => WholeRowExpr::ambiguous(context, requested),
+            Ok(None) => {
+                if let Some(parent) = &self.parent {
+                    parent.resolve_whole_row_in_scope(context, relation, requested, levels_up + 1)
+                } else {
+                    WholeRowExpr::not_found(context, requested)
+                }
+            }
+        }
+    }
+}

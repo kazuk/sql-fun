@@ -126,6 +126,9 @@ impl Expr {
             Self::Parameter(parameter) => Ok(context.parameter(parameter.position)),
             Self::Literal(value) => Ok(value.resolve()),
             Self::Column(name) => name.resolve_column(context, scope),
+            Self::Star(name) if context.dialect() == Dialect::postgres() && !name.0.is_empty() => {
+                scope.resolve_whole_row(context, &name.full_name()?)
+            }
             Self::Star(_) => Self::invalid_star_projection(context),
             Self::Operator(operator) => operator.resolve(context, scope),
             Self::Boolean(boolean) => boolean.resolve(context, scope),

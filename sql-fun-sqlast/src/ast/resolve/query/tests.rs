@@ -4,6 +4,7 @@ mod column_scope;
 mod exists;
 mod source_namespace;
 mod table_functions;
+mod whole_rows;
 
 use super::test_helpers::{output_index, output_type, query, resolve};
 use crate::ast::Dialect;

@@ -20,8 +20,8 @@ mod param_ref;
 mod resolved;
 mod sql_value;
 mod sub_link;
+mod whole_row;
 
-pub(crate) use self::case_expr::CaseExprAnalysisContext;
 pub use self::{
     arith_expr::ArithExpr,
     array::ArrayExpr,
@@ -46,7 +46,9 @@ pub use self::{
     param_ref::ParamRef,
     sql_value::SqlValueExpr,
     sub_link::SubLinkExpr,
+    whole_row::WholeRowExpr,
 };
+pub(crate) use self::{case_expr::CaseExprAnalysisContext, whole_row::WholeRowFields};
 
 use crate::sem::{
     AnalysisError, AnalysisProblem, ColumnName, ParseContext, PgBuiltInType, TypeReference,
@@ -117,6 +119,8 @@ impl ListExpr {
 /// scalar explation in semantic ast
 #[derive(Debug, Clone, Eq, Hash, PartialEq, serde::Serialize, serde::Deserialize)]
 pub enum SemScalarExpr {
+    /// A qualified whole-row value with its completed source lookup.
+    WholeRow(Box<WholeRowExpr>),
     /// Anonymous SQL row constructor.
     Row(RowExpr),
     /// array expression
@@ -497,6 +501,7 @@ impl SemScalarExpr {
             Self::Exists(value) => value.get_type(),
             Self::Coalesce(coalesce_expr) => coalesce_expr.get_type(),
             Self::Row(row) => Some(row.get_type()),
+            Self::WholeRow(row) => row.get_type(),
             Self::MinMax(min_max_expr) => min_max_expr.get_type(),
             Self::Collate(collate_expr) => collate_expr.get_type(),
             Self::SqlValue(sql_value_expr) => sql_value_expr.get_type(),
@@ -529,6 +534,7 @@ impl SemScalarExpr {
             Self::Exists(value) => value.is_not_null(),
             Self::Coalesce(coalesce_expr) => coalesce_expr.is_not_null(),
             Self::Row(_) => Some(true),
+            Self::WholeRow(row) => row.is_not_null(),
             Self::MinMax(min_max_expr) => min_max_expr.is_not_null(),
             Self::Collate(collate_expr) => collate_expr.is_not_null(),
             Self::SqlValue(sql_value_expr) => sql_value_expr.is_not_null(),
@@ -575,7 +581,8 @@ impl SemScalarExpr {
             | Self::Constrained(_)
             | Self::Exists(_)
             | Self::Grouping(_)
-            | Self::MergeAction => None,
+            | Self::MergeAction
+            | Self::WholeRow(_) => None,
             _ => todo!("not implemented {self:?}"),
         }
     }
@@ -603,6 +610,7 @@ impl SemScalarExpr {
             Self::SubLink(_) | Self::Exists(_) => String::new(),
             Self::Coalesce(coalesce_expr) => coalesce_expr.join_key_name().unwrap_or("").to_owned(),
             Self::Row(_) => String::new(),
+            Self::WholeRow(row) => row.qualifier().name().as_str().to_owned(),
             Self::MinMax(value) => value.operation().to_owned(),
             Self::Collate(_collate_expr) => todo!(),
             Self::SqlValue(_sql_value_expr) => todo!(),
@@ -934,6 +942,7 @@ impl SemScalarExpr {
             Self::Exists(value) => value.walk(visitor)?,
             Self::Coalesce(v) => v.walk(visitor)?,
             Self::Row(v) => v.walk(visitor)?,
+            Self::WholeRow(v) => v.walk(visitor)?,
             Self::MinMax(v) => v.walk(visitor)?,
             Self::Constrained(v) => v.walk(visitor)?,
             Self::Indirection(v) => v.walk(visitor)?,

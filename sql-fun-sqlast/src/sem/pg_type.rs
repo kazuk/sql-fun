@@ -42,6 +42,10 @@ pub struct BuiltinTypeDefinition {
 }
 
 impl TypeDefinition {
+    pub(crate) fn implicit_composite(columns: &ColumnCollection) -> Self {
+        Self::ImplicitComposite(columns.clone())
+    }
+
     /// Define a structural array without requiring a catalog name for its element.
     #[must_use]
     pub fn array(element: &TypeReference) -> Self {

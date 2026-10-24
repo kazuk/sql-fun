@@ -11,6 +11,7 @@ Options:
   --workspace-only
   --changed-only
   --nextest-extra="..."
+  --workspace-phase=build|test   Split workspace compilation and execution.
   --fmt-check           Check formatting without rewriting files.
   --step=<name>          Run only the selected step. Can be repeated.
   --list-steps           Print available step names.
@@ -91,6 +92,7 @@ SINCE=""
 WORKSPACE_ONLY=0
 CHANGED_ONLY=0
 NEXTEST_EXTRA=""
+WORKSPACE_PHASE=""
 FMT_CHECK=0
 SELECTED_STEPS=()
 
@@ -101,6 +103,7 @@ for a in "$@"; do
     --workspace-only) WORKSPACE_ONLY=1 ;;
     --changed-only)   CHANGED_ONLY=1 ;;
     --nextest-extra=*) NEXTEST_EXTRA="${a#*=}" ;;
+    --workspace-phase=build|--workspace-phase=test) WORKSPACE_PHASE="${a#*=}" ;;
     --fmt-check) FMT_CHECK=1 ;;
     --step=*) SELECTED_STEPS+=("$(normalize_step "${a#*=}")") ;;
     --list-steps) list_steps; exit 0 ;;
@@ -239,23 +242,47 @@ function run_cli_dependency_boundaries() {
 function run_workspace() {
   require_command cargo-nextest
   echo "== Workspace verification"
-  run_sqlast_feature_boundaries
-  run_cli_dependency_boundaries
-  run_check   --workspace "${FEATURES[@]}"
-  run_nextest --workspace --exclude sql-fun "${FEATURES[@]}" ${NEXTEST_EXTRA} --no-tests pass
-  run_sqlast_regressions
+  if [[ "$WORKSPACE_PHASE" != "test" ]]; then
+    run_sqlast_feature_boundaries
+    run_cli_dependency_boundaries
+    run_check --workspace "${FEATURES[@]}"
+  fi
+  if [[ "$WORKSPACE_PHASE" == "build" ]]; then
+    : "${SQL_FUN_CI_ARTIFACT_DIR:?SQL_FUN_CI_ARTIFACT_DIR is required for split workspace verification}"
+    mkdir -p "$SQL_FUN_CI_ARTIFACT_DIR"
+    cargo nextest archive --locked --workspace --exclude sql-fun "${FEATURES[@]}" \
+      --timings --archive-file "$SQL_FUN_CI_ARTIFACT_DIR/nextest.tar.zst"
+    cargo build --locked --workspace --exclude sql-fun --all-targets "${FEATURES[@]}"
+    local target_dir
+    target_dir=$(cargo metadata --locked --no-deps --format-version 1 | jq -er '.target_directory')
+    cp "$target_dir/debug/sql-fun" "$target_dir/debug/sql-fun-server" "$SQL_FUN_CI_ARTIFACT_DIR/"
+  elif [[ "$WORKSPACE_PHASE" == "test" ]]; then
+    : "${SQL_FUN_CI_ARTIFACT_DIR:?SQL_FUN_CI_ARTIFACT_DIR is required for split workspace verification}"
+    run_nextest --archive-file "$SQL_FUN_CI_ARTIFACT_DIR/nextest.tar.zst" \
+      ${NEXTEST_EXTRA} --no-tests pass
+    run_sqlast_regressions
+  else
+    run_nextest --workspace --exclude sql-fun "${FEATURES[@]}" ${NEXTEST_EXTRA} --no-tests pass
+    run_sqlast_regressions
+  fi
 }
 
 # Shared offline SQL contracts are part of workspace verification in local and CI runs.
 function run_sqlast_regressions() {
   require_command jq
   # Match nextest package/target selection to reuse its unified dependency artifacts.
-  cargo build --locked --workspace --exclude sql-fun --all-targets "${FEATURES[@]}"
+  if [[ "$WORKSPACE_PHASE" != "test" ]]; then
+    cargo build --locked --workspace --exclude sql-fun --all-targets "${FEATURES[@]}"
+  fi
   local target_dir
   target_dir=$(cargo metadata --locked --no-deps --format-version 1 | jq -er '.target_directory')
+  local binary_dir="${target_dir}/debug"
+  if [[ "$WORKSPACE_PHASE" == "test" ]]; then
+    binary_dir="$SQL_FUN_CI_ARTIFACT_DIR"
+  fi
   SQL_FUN_HOME="${GIT_ROOT}/sql-fun-home" \
-    SQL_FUN_BIN="${target_dir}/debug/sql-fun" \
-    SQL_FUN_TEST_SERVER_BIN="${target_dir}/debug/sql-fun-server" \
+    SQL_FUN_BIN="${binary_dir}/sql-fun" \
+    SQL_FUN_TEST_SERVER_BIN="${binary_dir}/sql-fun-server" \
     SQL_FUN_REGRESSION_REPORT_DIR="${target_dir}/sqlast-regressions" \
     "${GIT_ROOT}/tests/sqlast-regressions/run.sh"
 }

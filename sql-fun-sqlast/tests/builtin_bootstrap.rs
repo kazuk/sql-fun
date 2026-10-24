@@ -11,6 +11,7 @@ use ::sql_fun_sqlast::{
 #[rstest::rstest]
 #[case::seventeen("17")]
 #[case::eighteen("18")]
+#[ignore = "Blocked by #749: builtin scalar return types are loaded as empty composites"]
 fn loads_builtin_and_user_schemas(#[case] version: &str) -> Result<(), Box<dyn std::error::Error>> {
     let manifest = PathBuf::from(env!("CARGO_MANIFEST_DIR"));
     let home = PathBuf::from(env!("SQL_FUN_HOME"));

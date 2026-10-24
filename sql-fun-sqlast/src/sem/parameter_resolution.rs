@@ -684,6 +684,8 @@ pub(crate) struct Signature {
     result: TypeReference,
     #[serde(default, skip_serializing_if = "Option::is_none")]
     declared_inputs: Option<Vec<TypeReference>>,
+    #[serde(default, skip_serializing_if = "Vec::is_empty")]
+    unrestricted_inputs: Vec<usize>,
 }
 impl Signature {
     pub(crate) fn new(inputs: &[TypeReference], result: &TypeReference) -> Self {
@@ -691,11 +693,13 @@ impl Signature {
             inputs: inputs.to_vec(),
             result: result.clone(),
             declared_inputs: None,
+            unrestricted_inputs: Vec::new(),
         }
     }
     pub(crate) fn new_function(
         inputs: &[TypeReference],
         declared_inputs: &[TypeReference],
+        unrestricted_inputs: &[usize],
         result: &TypeReference,
     ) -> Option<Self> {
         if inputs.len() != declared_inputs.len() {
@@ -703,6 +707,7 @@ impl Signature {
         }
         let mut signature = Self::new(inputs, result);
         signature.declared_inputs = Some(declared_inputs.to_vec());
+        signature.unrestricted_inputs = unrestricted_inputs.to_vec();
         if signature.is_concrete_for_arity(inputs.len()) {
             Some(signature)
         } else {
@@ -723,6 +728,10 @@ impl Signature {
         !ty.is_dynamic() && !ty.is_simple_infer_arg() && !ty.is_common_infer_arg()
     }
 
+    fn accepts_any_type(&self, index: usize) -> bool {
+        self.unrestricted_inputs.contains(&index)
+    }
+
     fn source_types(
         &self,
         catalog: &impl BaseParseContext,
@@ -737,6 +746,9 @@ impl Signature {
         source: &TypeReference,
         index: usize,
     ) -> Option<OverloadRank> {
+        if self.accepts_any_type(index) {
+            return Some(OverloadRank::default());
+        }
         if let Some(declared_inputs) = &self.declared_inputs {
             OverloadRank::function_argument(
                 catalog,
@@ -749,10 +761,14 @@ impl Signature {
         }
     }
 
-    fn result_alternative(&self, inputs: &[InputTypeConstraint]) -> SignatureAlternative {
+    fn result_alternative(
+        &self,
+        inputs: &[InputTypeConstraint],
+        excluded: &[Vec<TypeReference>],
+    ) -> SignatureAlternative {
         let mut domains = inputs.to_vec();
         domains.push(InputTypeConstraint::exact(&self.result));
-        SignatureAlternative::new(&domains)
+        SignatureAlternative::excluding(&domains, excluded)
     }
 
     // Partition source types by their cast scores against all candidates. Types
@@ -774,6 +790,7 @@ impl Signature {
             &choices,
             0,
             &[],
+            &[],
             &OverloadScores::initial(signatures.len()),
             &mut alternatives,
         );
@@ -785,6 +802,7 @@ impl Signature {
         choices: &[Vec<SourcePartition>],
         index: usize,
         domains: &[InputTypeConstraint],
+        excluded: &[Vec<TypeReference>],
         scores: &OverloadScores,
         alternatives: &mut Vec<SignatureAlternative>,
     ) {
@@ -792,7 +810,7 @@ impl Signature {
             let Some(candidate) = scores.unique_best() else {
                 return;
             };
-            alternatives.push(signatures[candidate].result_alternative(domains));
+            alternatives.push(signatures[candidate].result_alternative(domains, excluded));
             return;
         }
         for choice in &choices[index] {
@@ -801,12 +819,15 @@ impl Signature {
                 continue;
             }
             let domains = choice.extend_domains(domains);
+            let mut excluded = excluded.to_vec();
+            excluded.push(choice.excluded.clone());
             crate::sem::with_stack(|| {
                 Self::combine(
                     signatures,
                     choices,
                     index + 1,
                     &domains,
+                    &excluded,
                     &next_scores,
                     alternatives,
                 )
@@ -818,6 +839,7 @@ impl Signature {
 struct SourcePartition {
     scores: OverloadScores,
     domain: InputTypeConstraint,
+    excluded: Vec<TypeReference>,
 }
 
 impl SourcePartition {
@@ -831,8 +853,17 @@ impl SourcePartition {
         for (index, input) in inputs.iter().enumerate() {
             let mut sources = std::collections::HashSet::new();
             for signature in signatures {
-                sources.extend(signature.source_types(catalog, index));
+                if !signature.accepts_any_type(index) {
+                    sources.extend(signature.source_types(catalog, index));
+                }
             }
+            let has_unrestricted = signatures
+                .iter()
+                .any(|signature| signature.accepts_any_type(index));
+            if has_unrestricted && let Some(types) = input.admissible_types() {
+                sources.extend(types.iter().cloned());
+            }
+            let excluded: Vec<_> = sources.iter().cloned().collect();
             let mut groups = BTreeMap::<Vec<Option<OverloadRank>>, Vec<TypeReference>>::new();
             for source in sources {
                 if !input.allows(&source) {
@@ -844,12 +875,28 @@ impl SourcePartition {
                     .collect();
                 groups.entry(scores).or_default().push(source);
             }
-            choices.push(
-                groups
-                    .into_iter()
-                    .map(|(scores, types)| Self::new(&scores, &types))
-                    .collect::<Vec<_>>(),
-            );
+            let mut partitions: Vec<_> = groups
+                .into_iter()
+                .map(|(scores, types)| Self::new(&scores, &types))
+                .collect();
+            if input.is_any() && has_unrestricted {
+                let scores: Vec<_> = signatures
+                    .iter()
+                    .map(|signature| {
+                        if signature.accepts_any_type(index) {
+                            Some(OverloadRank::default())
+                        } else {
+                            None
+                        }
+                    })
+                    .collect();
+                partitions.push(Self {
+                    scores: OverloadScores::new(&scores),
+                    domain: InputTypeConstraint::any(),
+                    excluded,
+                });
+            }
+            choices.push(partitions);
         }
         choices
     }
@@ -858,6 +905,7 @@ impl SourcePartition {
         Self {
             scores: OverloadScores::new(scores),
             domain: InputTypeConstraint::types(types.to_vec()),
+            excluded: Vec::new(),
         }
     }
 

@@ -282,6 +282,7 @@ impl OverloadVariant {
         crate::sem::parameter_resolution::Signature::new_function(
             &inputs,
             &declared_inputs,
+            &ParameterBindResult::unrestricted_inputs(bindings),
             self.ret_type.as_ref()?,
         )
     }

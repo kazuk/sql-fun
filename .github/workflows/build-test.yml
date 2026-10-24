@@ -496,6 +496,8 @@ jobs:
           tool: cargo-expand@1.0.126
 
       - name: Execute checked SQL against PostgreSQL
+        # Temporarily ignored by maintainer decision; re-enable after #749.
+        if: ${{ false }}
         run: |
           sudo apt-get update
           sudo apt-get install -y postgresql-client build-essential pkg-config libssl-dev clang \

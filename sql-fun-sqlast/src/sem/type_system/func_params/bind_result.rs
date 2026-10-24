@@ -42,6 +42,24 @@ impl ParameterBindResult {
         Some(inputs)
     }
 
+    pub(crate) fn unrestricted_inputs(bindings: &[Self]) -> Vec<usize> {
+        let mut positions = Vec::new();
+        let mut offset = 0;
+        for binding in bindings {
+            match binding {
+                Self::One(_, _) => offset += 1,
+                Self::NoInputParam(_) => {}
+                Self::VariadicParam(arguments, parameter) => {
+                    if parameter.accepts_any_type() {
+                        positions.extend(offset..offset + arguments.len());
+                    }
+                    offset += arguments.len();
+                }
+            }
+        }
+        positions
+    }
+
     pub(crate) fn constraint_input_types(&self) -> Option<Vec<TypeReference>> {
         match self {
             Self::One(_, parameter) => Some(vec![parameter.get_type()?.clone()]),
@@ -73,6 +91,9 @@ impl ParameterBindResult {
                 declared_target.as_ref(),
             ),
             Self::NoInputParam(_) => Some(OverloadRank::default()),
+            Self::VariadicParam(_, parameter) if parameter.accepts_any_type() => {
+                Some(OverloadRank::default())
+            }
             Self::VariadicParam(arguments, _) => {
                 let targets = self.constraint_input_types()?;
                 let mut rank = OverloadRank::default();

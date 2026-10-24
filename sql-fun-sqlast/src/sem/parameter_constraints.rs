@@ -69,6 +69,12 @@ impl InputTypeConstraint {
         *self != before
     }
 
+    fn exclude(&mut self, excluded: &[TypeReference]) {
+        if let Some(types) = &mut self.0 {
+            types.retain(|ty| !excluded.contains(ty));
+        }
+    }
+
     fn retain_projection(&mut self, projection: &TypeProjection, result: &Self) {
         if let Some(types) = &mut self.0 {
             types.retain(|source| {
@@ -91,12 +97,6 @@ impl InputTypeConstraint {
             Some(types) => Self::types(types.iter().filter_map(|ty| projection.inverse(ty))),
             None => Self::any(),
         }
-    }
-
-    fn overlaps(&self, other: &Self) -> bool {
-        let mut domain = self.clone();
-        domain.intersect(other);
-        !domain.is_empty()
     }
 
     fn is_empty(&self) -> bool {
@@ -205,29 +205,62 @@ impl ParameterConstraints {
 }
 
 #[derive(Clone, Debug)]
-pub(crate) struct SignatureAlternative(Vec<InputTypeConstraint>);
+pub(crate) struct SignatureAlternative {
+    domains: Vec<InputTypeConstraint>,
+    // Unrestricted variadic positions exclude source types that were ranked
+    // separately against concrete overloads. Kept private to the solver.
+    excluded: Vec<Vec<TypeReference>>,
+}
 
 impl SignatureAlternative {
     pub(crate) fn new(domains: &[InputTypeConstraint]) -> Self {
-        Self(domains.to_vec())
+        Self::excluding(domains, &[])
     }
+
+    pub(crate) fn excluding(
+        domains: &[InputTypeConstraint],
+        excluded: &[Vec<TypeReference>],
+    ) -> Self {
+        Self {
+            domains: domains.to_vec(),
+            excluded: excluded.to_vec(),
+        }
+    }
+
+    fn remove_excluded(&self, index: usize, domain: &mut InputTypeConstraint) {
+        if let Some(excluded) = self.excluded.get(index) {
+            domain.exclude(excluded);
+        }
+    }
+
     // Repeated operands share one node, so their requirements must intersect
     // before comparing this alternative with the current graph domains.
     fn compatible_with(&self, nodes: &[usize], domains: &[InputTypeConstraint]) -> bool {
         let mut requirements = BTreeMap::<usize, InputTypeConstraint>::new();
-        for (node, required) in nodes.iter().zip(&self.0) {
+        for (node, required) in nodes.iter().zip(&self.domains) {
             requirements
                 .entry(*node)
                 .or_insert_with(InputTypeConstraint::any)
                 .intersect(required);
         }
-        requirements
-            .into_iter()
-            .all(|(node, required)| domains[node].overlaps(&required))
+        for (index, node) in nodes.iter().enumerate() {
+            let required = requirements.get_mut(node).expect("operand requirement");
+            required.intersect(&domains[*node]);
+            self.remove_excluded(index, required);
+        }
+        requirements.values().all(|required| !required.is_empty())
     }
 
-    fn include_domain(&self, index: usize, allowed: &mut InputTypeConstraint) {
-        allowed.union(&self.0[index]);
+    fn include_domain(
+        &self,
+        index: usize,
+        current: &InputTypeConstraint,
+        allowed: &mut InputTypeConstraint,
+    ) {
+        let mut domain = self.domains[index].clone();
+        domain.intersect(current);
+        self.remove_excluded(index, &mut domain);
+        allowed.union(&domain);
     }
 }
 
@@ -258,7 +291,7 @@ impl OverloadConstraint {
         for (index, node) in self.nodes.iter().enumerate() {
             let mut allowed = InputTypeConstraint::types([]);
             for alternative in &self.alternatives {
-                alternative.include_domain(index, &mut allowed);
+                alternative.include_domain(index, &domains[*node], &mut allowed);
             }
             changed |= domains[*node].intersect(&allowed);
         }

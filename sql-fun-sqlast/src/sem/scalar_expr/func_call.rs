@@ -364,6 +364,7 @@ impl FuncCallExpr {
             let mut arg = arg.clone();
             let arg_def = overload.call_argument(index);
             if let Some(arg_definition) = arg_def
+                && !arg_definition.accepts_any_type()
                 && let Some(arg_def_type) = arg_definition.call_argument_type()
                 && let Some(arg_val_type) = arg.get_type()
             {

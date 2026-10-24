@@ -183,6 +183,8 @@ jobs:
         env:
           SQL_FUN_CI_ARTIFACT_DIR: /github/home/sql-fun-workspace-ci
         run: |
+          GIT_ROOT="$(git rev-parse --show-toplevel)"
+          export SQL_FUN_HOME="${GIT_ROOT}/sql-fun-home"
           .local/bin/check-test-flow --all-features --step=workspace --workspace-phase=test --nextest-extra="
             --config-file ./ci/nextest/config.toml
             --profile ci

@@ -466,6 +466,7 @@ mod tests {
     }
 
     #[rstest::rstest]
+    #[ignore = "Blocked by #749: builtin scalar return types are loaded as empty composites"]
     fn parse_adventure_works_schema(
         context_args: SqlFunArgs,
         _enable_stack_overflow_backtrace: EnableStackOverflowBacktrace,

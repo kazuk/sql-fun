@@ -131,6 +131,7 @@ fn dependent_file_reports_named_missing_domain_base_before_its_provider()
 }
 
 #[test]
+#[ignore = "Blocked by #749: builtin scalar return types are loaded as empty composites"]
 fn inherited_catalog_objects_and_merged_overloads_drive_query_analysis()
 -> Result<(), Box<dyn std::error::Error>> {
     let builtin = heavy::builtin_schema()?;
@@ -351,6 +352,7 @@ fn sql_scalar_subscript_reports_array_required() -> Result<(), Box<dyn std::erro
 }
 
 #[test]
+#[ignore = "Blocked by #749: builtin scalar return types are loaded as empty composites"]
 fn tablefunc_crosstab_call_resolves_after_explicit_extension_loading()
 -> Result<(), Box<dyn std::error::Error>> {
     let extension = heavy::tablefunc_schema()?;

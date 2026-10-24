@@ -24,6 +24,8 @@ fn context() -> SchemaFileContext {
         "text",
         "bool",
         "record",
+        "name",
+        "any",
         "anyelement",
         "anyarray",
         "anynonarray",
@@ -142,6 +144,25 @@ pub(super) fn analyze_vector(
         .unwrap()?
         .analyze(context)?
         .into_context();
+    assert!(context.problems().is_empty(), "{:?}", context.problems());
+    Ok(parse_statements(query, Dialect::postgres())
+        .next()
+        .unwrap()?
+        .analyze(context)?)
+}
+
+/// A format-like builtin signature in the small explicit catalog.
+pub(super) fn analyze_variadic_any(
+    query: &str,
+) -> Result<AstAndContextPair<SchemaFileContext>, Box<dyn std::error::Error>> {
+    let mut context = context();
+    for statement in parse_statements(
+        r#"CREATE FUNCTION format(text) RETURNS text LANGUAGE internal AS 'text_format';
+           CREATE FUNCTION format(text, VARIADIC "any") RETURNS text LANGUAGE internal AS 'text_format';"#,
+        Dialect::postgres(),
+    ) {
+        context = statement?.analyze(context)?.into_context();
+    }
     assert!(context.problems().is_empty(), "{:?}", context.problems());
     Ok(parse_statements(query, Dialect::postgres())
         .next()

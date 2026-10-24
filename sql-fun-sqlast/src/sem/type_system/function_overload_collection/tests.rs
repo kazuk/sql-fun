@@ -25,6 +25,7 @@ use std::collections::BTreeMap;
     "f(1)",
     "int4"
 )]
+#[case::heterogeneous(r#"VARIADIC "any""#, "integer", "f(1)", "int4")]
 #[case::expanded("VARIADIC anyarray", "integer", "f(1)", "int4")]
 #[case::nonvariadic("VARIADIC integer[]", "integer", "f(1)", "int4")]
 fn declared_inputs_determine_selection(
@@ -349,6 +350,144 @@ fn deferred_vector_element_preserves_array_result() -> testresult::TestResult {
     assert_eq!(
         constraints.result_column(0).unwrap().admissible_types(),
         Some(std::slice::from_ref(&expected))
+    );
+    Ok(())
+}
+
+#[rstest::rstest]
+#[case::name("format('%s'::text, 'abc'::name)", &["text", "name"])]
+#[case::heterogeneous("format('%s %s %s'::text, 'abc'::name, 42, true)", &["text", "name", "int4", "bool"])]
+#[case::array("format('%s'::text, ARRAY[1,2])", &["text", "int4[]"])]
+#[case::int2vector("format('%s'::text, NULL::int2vector)", &["text", "int2vector"])]
+#[case::oidvector("format('%s'::text, NULL::oidvector)", &["text", "oidvector"])]
+#[case::typed_null("format('%s'::text, NULL::integer)", &["text", "int4"])]
+#[case::zero_tail("format('literal'::text)", &["text"])]
+fn variadic_any_preserves_independent_argument_types(
+    #[case] call: &str,
+    #[case] types: &[&str],
+) -> testresult::TestResult {
+    let analyzed = test_helpers::analyze_variadic_any(&format!("SELECT {call}"))?;
+    assert!(
+        analyzed.context().problems().is_empty(),
+        "{:?}",
+        analyzed.context().problems()
+    );
+    let query = analyzed.ast().clone().into_select_statemtnt().unwrap();
+    let column = query.result_columns().get_column_at(0).unwrap();
+    assert_eq!(column.col_type(), &Some(PgBuiltInType::text()));
+    let function = column.expression().unwrap().as_function_call().unwrap();
+    assert_eq!(
+        function.overload().as_ref().unwrap().scaler_ret_type(),
+        Some(PgBuiltInType::text())
+    );
+    assert_eq!(function.args().len(), types.len());
+    for (argument, expected) in function.args().into_iter().zip(types) {
+        let expected = if *expected == "int4[]" {
+            PgBuiltInType::int4().array_type()
+        } else {
+            TypeReference::from_master_type_name(expected)
+        };
+        assert_eq!(argument.value().get_type(), Some(expected));
+        assert!(argument.arg_definition().is_some());
+    }
+    Ok(())
+}
+
+#[rstest::rstest]
+#[case::wrong_prefix("format(42, 'abc'::name)")]
+#[case::missing_prefix("format()")]
+fn variadic_any_does_not_relax_fixed_inputs(#[case] call: &str) -> testresult::TestResult {
+    let analyzed = test_helpers::analyze_variadic_any(&format!("SELECT {call}"))?;
+    assert!(
+        analyzed
+            .context()
+            .problems()
+            .iter()
+            .any(|p| p.code() == "function_overload_resolution_failed")
+    );
+    let query = analyzed.ast().clone().into_select_statemtnt().unwrap();
+    let function = query
+        .result_columns()
+        .get_column_at(0)
+        .unwrap()
+        .expression()
+        .unwrap()
+        .as_function_call()
+        .unwrap();
+    assert!(function.overload().is_none());
+    Ok(())
+}
+
+#[rstest::rstest]
+#[case::untyped("SELECT format('%s'::text, $1)")]
+#[case::typed("SELECT format('%s'::text, $1::integer)")]
+#[case::independent("SELECT format('%s %s'::text, $1, $2)")]
+fn variadic_any_parameter_domains(#[case] sql: &str) -> testresult::TestResult {
+    let analyzed = test_helpers::analyze_variadic_any(sql)?;
+    assert!(
+        analyzed.context().problems().is_empty(),
+        "{:?}",
+        analyzed.context().problems()
+    );
+    let constraints = analyzed.context().parameter_constraints();
+    assert!(constraints.allows(&BTreeMap::from([(1, PgBuiltInType::int4())])));
+    if !sql.contains("::integer") {
+        assert!(constraints.allows(&BTreeMap::from([(1, PgBuiltInType::bool())])));
+        assert!(constraints.allows(&BTreeMap::from([(1, PgBuiltInType::int4().array_type())])));
+        assert!(constraints.allows(&BTreeMap::from([(
+            1,
+            TypeReference::from_full_name(crate::sem::FullName::with_schema(
+                "public",
+                "unlisted_type"
+            ))
+        )])));
+    }
+    if sql.contains("$2") {
+        assert!(constraints.allows(&BTreeMap::from([
+            (1, PgBuiltInType::bool()),
+            (2, PgBuiltInType::int4().array_type())
+        ])));
+    }
+    assert_eq!(
+        constraints.result_column(0).unwrap().single_type(),
+        Some(PgBuiltInType::text())
+    );
+    Ok(())
+}
+
+#[rstest::rstest]
+#[case::concrete("accept_integer", "int4", "bool", "int4")]
+#[case::heterogeneous("accept_text", "bool", "int4", "text")]
+fn deferred_variadic_any_keeps_concrete_overload_correlation(
+    #[case] consumer: &str,
+    #[case] admitted: &str,
+    #[case] rejected: &str,
+    #[case] result: &str,
+    #[values(false, true)] reversed: bool,
+) -> testresult::TestResult {
+    let analyzed = test_helpers::analyze(
+        &format!("SELECT {consumer}(f('x'::text,$1))"),
+        r#"text, VARIADIC "any""#,
+        "text, integer",
+        reversed,
+    )?;
+    assert!(
+        analyzed.context().problems().is_empty(),
+        "{:?}",
+        analyzed.context().problems()
+    );
+    let constraints = analyzed.context().parameter_constraints();
+    assert!(constraints.allows(&BTreeMap::from([(
+        1,
+        TypeReference::from_master_type_name(admitted)
+    )])));
+    assert!(!constraints.allows(&BTreeMap::from([(
+        1,
+        TypeReference::from_master_type_name(rejected)
+    )])));
+    assert_eq!(
+        constraints.result_column(0).unwrap().single_type(),
+        Some(TypeReference::from_master_type_name(result))
     );
     Ok(())
 }

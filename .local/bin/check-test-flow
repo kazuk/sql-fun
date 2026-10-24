@@ -249,7 +249,8 @@ function run_workspace() {
 # Shared offline SQL contracts are part of workspace verification in local and CI runs.
 function run_sqlast_regressions() {
   require_command jq
-  cargo build --locked -p sql-fun-cli -p sql-fun-server --bins "${FEATURES[@]}"
+  # Match nextest package/target selection to reuse its unified dependency artifacts.
+  cargo build --locked --workspace --exclude sql-fun --all-targets "${FEATURES[@]}"
   local target_dir
   target_dir=$(cargo metadata --locked --no-deps --format-version 1 | jq -er '.target_directory')
   SQL_FUN_HOME="${GIT_ROOT}/sql-fun-home" \

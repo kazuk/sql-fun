@@ -144,7 +144,7 @@ impl BinaryCastCandidate {
         Ok(candidates)
     }
 
-    // ANY compares scalar elements, but the retained operand is the whole array.
+    // ANY/ALL compare scalar elements, but retain the whole array operand.
     pub(super) fn wrap_array_implicit_cast(
         &self,
         left: SemScalarExpr,

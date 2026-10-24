@@ -1,4 +1,3 @@
-use crate::sem::scalar_expr::arith_expr::call_sites::binary_is_not_null;
 use crate::{
     sem::{
         AnalysisError, AnalysisProblem, BinaryOperatorDefinition, OperatorName, ParseContext,
@@ -62,8 +61,9 @@ impl AllBinaryCallSite {
         ))
     }
 
-    pub fn is_not_null(&self) -> Option<bool> {
-        binary_is_not_null(&self.left_arg, &self.right_arg)
+    pub const fn is_not_null(&self) -> Option<bool> {
+        // Empty arrays and NULL elements make scalar strictness insufficient.
+        None
     }
 
     pub const fn get_return_type(&self) -> &TypeReference {
@@ -112,7 +112,7 @@ impl UndefinedOperatorAllCallSite {
         TParseContext: crate::sem::ParseContext,
     {
         context.report_analysis_problem(AnalysisProblem::undefined_operator(
-            AExprKind::AexprOp,
+            AExprKind::AexprOpAll,
             name,
             &Some(lexpr.clone()),
             &Some(rexpr.clone()),

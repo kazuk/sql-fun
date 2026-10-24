@@ -137,6 +137,21 @@ impl SemScalarExpr {
     pub(crate) fn whole_row(row: &WholeRowExpr) -> Self {
         Self::WholeRow(Box::new(row.clone()))
     }
+    /// Fields exposed by this composite value, including source-occurrence aliases.
+    pub(crate) fn composite_columns(
+        &self,
+        context: &impl ParseContext,
+    ) -> Option<ColumnCollection> {
+        // A scalar table-function source also retains projection fields. Its
+        // scalar type must not become a composite merely because fields exist.
+        let columns = self.get_type()?.row_columns(context)?;
+        if let Some(row) = self.as_whole_row() {
+            Some(row.fields.columns())
+        } else {
+            Some(columns)
+        }
+    }
+
     /// Completed qualified whole-row binding, including failed lookup outcomes.
     pub fn as_whole_row(&self) -> Option<&WholeRowExpr> {
         match self {
@@ -246,11 +261,11 @@ impl WholeRowFields {
     pub(crate) fn push(&mut self, name: &ColumnName, value: &SemScalarExpr) {
         self.0.push(WholeRowField::new(name, value));
     }
+    fn columns(&self) -> ColumnCollection {
+        ColumnCollection::new(self.0.iter().map(WholeRowField::definition).collect())
+    }
     fn get_type(&self) -> TypeReference {
-        let columns = self.0.iter().map(WholeRowField::definition).collect();
-        TypeReference::dynamic(&TypeDefinition::implicit_composite(&ColumnCollection::new(
-            columns,
-        )))
+        TypeReference::dynamic(&TypeDefinition::implicit_composite(&self.columns()))
     }
     fn walk<V: crate::sem::traversal::SemanticVisitor>(
         &mut self,

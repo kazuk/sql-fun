@@ -1,0 +1,179 @@
+{
+  "names": [
+    "invalid_operands_report_semantic_problems::types",
+    "invalid_operands_report_semantic_problems::typed_string",
+    "invalid_operands_report_semantic_problems::preferred_category",
+    "invalid_operands_report_semantic_problems::json",
+    "invalid_operands_report_semantic_problems::parameter_json",
+    "invalid_operands_report_semantic_problems::parameter_json_reverse",
+    "invalid_operands_report_semantic_problems::parameter_json_array",
+    "invalid_operands_report_semantic_problems::dynamic_left",
+    "invalid_operands_report_semantic_problems::dynamic_right",
+    "invalid_operands_report_semantic_problems::json_array",
+    "incompatible_parameter_uses_report_constraints",
+    "later_operands_are_resolved_even_after_non_null_literal"
+  ],
+  "sql": [
+    "select greatest(1,true)",
+    "select least('2'::text,1)",
+    "select least('a'::text,'b'::\"char\")",
+    "select greatest('{}'::json,'{}'::json)",
+    "select greatest($1,'{}'::json)",
+    "select least('{}'::json,$1)",
+    "select least($1,'{}'::json[])",
+    "select greatest(pg_control_system(),1)",
+    "select least(1,pg_control_system())",
+    "select least('{}'::json[],'{}'::json[])",
+    "select greatest($1,1) where $1",
+    "select least(1,missing.n)"
+  ],
+  "expected": [
+    {
+      "diagnostics": [
+        "min_max_incompatible_types"
+      ],
+      "columns": [
+        {
+          "name": "greatest",
+          "type": null,
+          "nullability": "not_null"
+        }
+      ]
+    },
+    {
+      "diagnostics": [
+        "min_max_incompatible_types"
+      ],
+      "columns": [
+        {
+          "name": "least",
+          "type": null,
+          "nullability": "not_null"
+        }
+      ]
+    },
+    {
+      "diagnostics": [
+        "min_max_incompatible_types"
+      ],
+      "columns": [
+        {
+          "name": "least",
+          "type": null,
+          "nullability": "not_null"
+        }
+      ]
+    },
+    {
+      "diagnostics": [
+        "min_max_not_ordered"
+      ],
+      "columns": [
+        {
+          "name": "greatest",
+          "type": null,
+          "nullability": "not_null"
+        }
+      ]
+    },
+    {
+      "diagnostics": [
+        "min_max_not_ordered",
+        "parameter_constraint"
+      ],
+      "columns": [
+        {
+          "name": "greatest",
+          "type": null,
+          "nullability": "not_null"
+        }
+      ]
+    },
+    {
+      "diagnostics": [
+        "min_max_not_ordered",
+        "parameter_constraint"
+      ],
+      "columns": [
+        {
+          "name": "least",
+          "type": null,
+          "nullability": "not_null"
+        }
+      ]
+    },
+    {
+      "diagnostics": [
+        "min_max_not_ordered",
+        "parameter_constraint"
+      ],
+      "columns": [
+        {
+          "name": "least",
+          "type": null,
+          "nullability": "not_null"
+        }
+      ]
+    },
+    {
+      "diagnostics": [
+        "min_max_incompatible_types"
+      ],
+      "columns": [
+        {
+          "name": "greatest",
+          "type": null,
+          "nullability": "not_null"
+        }
+      ]
+    },
+    {
+      "diagnostics": [
+        "min_max_incompatible_types"
+      ],
+      "columns": [
+        {
+          "name": "least",
+          "type": null,
+          "nullability": "not_null"
+        }
+      ]
+    },
+    {
+      "diagnostics": [
+        "min_max_not_ordered"
+      ],
+      "columns": [
+        {
+          "name": "least",
+          "type": null,
+          "nullability": "not_null"
+        }
+      ]
+    },
+    {
+      "diagnostics": [
+        "parameter_constraint"
+      ],
+      "columns": [
+        {
+          "name": "greatest",
+          "type": null,
+          "nullability": "not_null"
+        }
+      ]
+    },
+    {
+      "diagnostics": [
+        "undefined_alias"
+      ],
+      "columns": [
+        {
+          "name": "least",
+          "type": null,
+          "nullability": "not_null"
+        }
+      ]
+    }
+  ]
+}

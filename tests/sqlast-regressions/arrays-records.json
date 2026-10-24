@@ -1,0 +1,60 @@
+{
+  "names": [
+    "anonymous_record_arrays_keep_their_element_fields::single",
+    "anonymous_record_arrays_keep_their_element_fields::repeated",
+    "anonymous_record_arrays_keep_their_element_fields::nested",
+    "parameter_with_anonymous_records_uses_the_record_family"
+  ],
+  "sql": [
+    "SELECT ARRAY[pg_control_system()]",
+    "SELECT ARRAY[pg_control_system(),pg_control_system()]",
+    "SELECT ARRAY[ARRAY[pg_control_system()],ARRAY[pg_control_system()]]",
+    "SELECT ARRAY[$1,pg_control_system(),pg_control_checkpoint()]"
+  ],
+  "expected": [
+    {
+      "diagnostics": [],
+      "columns": [
+        {
+          "name": "array",
+          "type": null,
+          "nullability": "not_null"
+        }
+      ]
+    },
+    {
+      "diagnostics": [],
+      "columns": [
+        {
+          "name": "array",
+          "type": null,
+          "nullability": "not_null"
+        }
+      ]
+    },
+    {
+      "diagnostics": [],
+      "columns": [
+        {
+          "name": "array",
+          "type": null,
+          "nullability": "not_null"
+        }
+      ]
+    },
+    {
+      "diagnostics": [],
+      "columns": [
+        {
+          "name": "array",
+          "type": {
+            "schema_name": "pg_catalog",
+            "local_name": "record",
+            "is_array": true
+          },
+          "nullability": "not_null"
+        }
+      ]
+    }
+  ]
+}

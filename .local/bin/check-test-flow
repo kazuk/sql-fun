@@ -243,6 +243,20 @@ function run_workspace() {
   run_cli_dependency_boundaries
   run_check   --workspace "${FEATURES[@]}"
   run_nextest --workspace --exclude sql-fun "${FEATURES[@]}" ${NEXTEST_EXTRA} --no-tests pass
+  run_sqlast_regressions
+}
+
+# Shared offline SQL contracts are part of workspace verification in local and CI runs.
+function run_sqlast_regressions() {
+  require_command jq
+  cargo build --locked -p sql-fun-cli -p sql-fun-server --bins "${FEATURES[@]}"
+  local target_dir
+  target_dir=$(cargo metadata --locked --no-deps --format-version 1 | jq -er '.target_directory')
+  SQL_FUN_HOME="${GIT_ROOT}/sql-fun-home" \
+    SQL_FUN_BIN="${target_dir}/debug/sql-fun" \
+    SQL_FUN_TEST_SERVER_BIN="${target_dir}/debug/sql-fun-server" \
+    SQL_FUN_REGRESSION_REPORT_DIR="${target_dir}/sqlast-regressions" \
+    "${GIT_ROOT}/tests/sqlast-regressions/run.sh"
 }
 
 function run_proc_macro_tests() {

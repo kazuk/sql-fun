@@ -3,45 +3,6 @@ use self::test_helpers::heavy;
 use ::sql_fun_sqlast::sem::{ParseContext, PgBuiltInType, TypeReference};
 use std::collections::BTreeMap;
 
-#[rstest::rstest]
-#[case::integers("ARRAY[1,2]", "_int4")]
-#[case::mixed("ARRAY[1,2.5]", "_numeric")]
-#[case::mixed_reverse("ARRAY[2.5,1]", "_numeric")]
-#[case::nulls("ARRAY[NULL,NULL]", "_text")]
-#[case::strings("ARRAY['a','b']", "_text")]
-#[case::unknown("ARRAY['1',2]", "_int4")]
-#[case::nullable("ARRAY[NULL::int,1]", "_int4")]
-#[case::empty("ARRAY[]::integer[]", "_int4")]
-#[case::cast_empty("CAST(ARRAY[] AS integer[])", "_int4")]
-#[case::parenthesized_empty("(ARRAY[])::integer[]", "_int4")]
-#[case::nested_empty("ARRAY[ARRAY[],ARRAY[]]::integer[]", "_int4")]
-#[case::nested("ARRAY[ARRAY[1],ARRAY[2.5]]", "_numeric")]
-#[case::nested_cast("ARRAY[ARRAY[1.5],ARRAY[2]]::integer[]", "_int4")]
-#[case::array_operands("ARRAY[NULL::int[],NULL::int[]]", "_int4")]
-#[case::json("ARRAY['{}'::json,'{}'::json]", "_json")]
-#[case::different_records("ARRAY[pg_control_system(),pg_control_checkpoint()]", "_record")]
-#[case::record_null("ARRAY[pg_control_system(),NULL]", "_record")]
-#[case::record_cast("ARRAY[pg_control_system()]::record[]", "_record")]
-#[case::preferred("ARRAY[1::numeric,2::float8,3::int4]", "_float8")]
-#[case::varchar_first("ARRAY['a'::varchar,'b'::bpchar]", "_varchar")]
-#[case::bpchar_first("ARRAY['a'::bpchar,'b'::varchar]", "_bpchar")]
-fn metadata_matches_postgres(#[case] expression: &str, #[case] ty: &str) -> testresult::TestResult {
-    let analyzed = heavy::analyze(&format!("SELECT {expression} AS result"), &[])?;
-    assert!(
-        analyzed.context().problems().is_empty(),
-        "{:?}",
-        analyzed.context().problems()
-    );
-    let query = analyzed.ast().clone().into_select_statemtnt().unwrap();
-    let column = query.result_columns().get_column_at(0).unwrap();
-    assert_eq!(
-        column.col_type(),
-        &Some(TypeReference::from_master_type_name(ty))
-    );
-    assert_eq!(column.is_not_null(), &Some(true));
-    Ok(())
-}
-
 #[test]
 fn ordered_elements_and_coercions_are_retained() -> testresult::TestResult {
     let analyzed = heavy::analyze("SELECT ARRAY[1,2.5,NULL]", &[])?;
@@ -73,6 +34,8 @@ fn invalid_arrays_keep_failure_and_allow_next_statement(
     #[case] code: &str,
     #[case] count: usize,
 ) -> testresult::TestResult {
+    // The CLI regression asserts diagnostic identities and result metadata;
+    // this integration test keeps rendered diagnostics, array shape, and recovery.
     let analyzed = heavy::analyze(&format!("SELECT {expression}"), &[])?;
     let problem = analyzed
         .context()
@@ -189,51 +152,6 @@ fn unanchored_parameters_accept_typed_assignments(
 }
 
 #[rstest::rstest]
-#[case::only("ARRAY[$1]", None)]
-#[case::null("ARRAY[$1,NULL]", None)]
-#[case::explicit("ARRAY[$1]::int[]", Some("_int4"))]
-fn parameters_retain_uncertainty_or_use_explicit_target(
-    #[case] expression: &str,
-    #[case] ty: Option<&str>,
-) -> testresult::TestResult {
-    let analyzed = heavy::analyze(&format!("SELECT {expression} AS result"), &[])?;
-    assert!(
-        analyzed.context().problems().is_empty(),
-        "{:?}",
-        analyzed.context().problems()
-    );
-    let query = analyzed.ast().clone().into_select_statemtnt().unwrap();
-    assert_eq!(
-        query.result_columns().get_column_at(0).unwrap().col_type(),
-        &ty.map(TypeReference::from_master_type_name)
-    );
-    Ok(())
-}
-
-#[rstest::rstest]
-#[case::implicit("SELECT ARRAY[1]", "array")]
-#[case::alias("SELECT ARRAY[1] AS chosen", "chosen")]
-#[case::empty_cast("SELECT ARRAY[]::int[]", "array")]
-#[case::nested_cast("SELECT ARRAY[]::int[]::bigint[]", "array")]
-#[case::parameter_cast("SELECT ARRAY[$1]::int[]", "array")]
-fn projection_names(#[case] sql: &str, #[case] name: &str) -> testresult::TestResult {
-    let analyzed = heavy::analyze(sql, &[])?;
-    let query = analyzed.ast().clone().into_select_statemtnt().unwrap();
-    assert_eq!(
-        query
-            .result_columns()
-            .get_column_at(0)
-            .unwrap()
-            .column_name()
-            .as_ref()
-            .unwrap()
-            .as_str(),
-        name
-    );
-    Ok(())
-}
-
-#[rstest::rstest]
 #[case::domain("ARRAY[NULL::amount,NULL::amount]", "public.amount[]")]
 #[case::domain_base("ARRAY[NULL::amount,1]", "pg_catalog.int4[]")]
 #[case::domain_unknown("ARRAY[NULL::amount,NULL]", "pg_catalog.int4[]")]
@@ -301,21 +219,6 @@ fn operands_keep_successful_and_failed_column_bindings() -> testresult::TestResu
     Ok(())
 }
 
-#[test]
-fn conflicting_parameter_use_reports_a_constraint_failure() -> testresult::TestResult {
-    let analyzed = heavy::analyze("SELECT ARRAY[$1,1] WHERE $1", &[])?;
-    assert!(
-        analyzed
-            .context()
-            .problems()
-            .iter()
-            .any(|problem| problem.code() == "parameter_constraint"),
-        "{:?}",
-        analyzed.context().problems()
-    );
-    Ok(())
-}
-
 #[rstest::rstest]
 #[case::single("ARRAY[pg_control_system()]", 1)]
 #[case::repeated("ARRAY[pg_control_system(),pg_control_system()]", 2)]
@@ -324,6 +227,8 @@ fn anonymous_record_arrays_keep_their_element_fields(
     #[case] expression: &str,
     #[case] count: usize,
 ) -> testresult::TestResult {
+    // The CLI contract records the absent public type; this checks the internal
+    // dynamic array and retains the anonymous record's field definition.
     use ::sql_fun_sqlast::sem::TypeInfoRead;
     let analyzed = heavy::analyze(&format!("SELECT {expression}"), &[])?;
     assert!(
@@ -349,25 +254,6 @@ fn anonymous_record_arrays_keep_their_element_fields(
     assert_eq!(array.values().len(), count);
     let encoded = ::serde_json::to_value(array)?;
     assert!(!encoded.is_null());
-    Ok(())
-}
-
-#[rstest::rstest]
-#[case::subscript("SELECT (ARRAY[1,2])[1]")]
-#[case::array_function("SELECT array_length(ARRAY[1,2],1)")]
-#[case::record_array_function("SELECT array_length(ARRAY[pg_control_system()],1)")]
-fn constructed_types_reach_existing_consumers(#[case] sql: &str) -> testresult::TestResult {
-    let analyzed = heavy::analyze(sql, &[])?;
-    assert!(
-        analyzed.context().problems().is_empty(),
-        "{:?}",
-        analyzed.context().problems()
-    );
-    let query = analyzed.ast().clone().into_select_statemtnt().unwrap();
-    assert_eq!(
-        query.result_columns().get_column_at(0).unwrap().col_type(),
-        &Some(PgBuiltInType::int4())
-    );
     Ok(())
 }
 
@@ -398,24 +284,6 @@ fn anonymous_records_do_not_implicitly_become_named_composites(
 }
 
 #[test]
-fn subscripted_anonymous_record_has_no_sql_field_descriptor() -> testresult::TestResult {
-    let analyzed = heavy::analyze(
-        "SELECT ((ARRAY[pg_control_system()])[1]).pg_control_version",
-        &[],
-    )?;
-    assert!(
-        analyzed
-            .context()
-            .problems()
-            .iter()
-            .any(|problem| problem.code() == "composite_type_field_not_found"),
-        "{:?}",
-        analyzed.context().problems()
-    );
-    Ok(())
-}
-
-#[test]
 fn parameter_with_anonymous_records_uses_the_record_family() -> testresult::TestResult {
     let analyzed = heavy::analyze(
         "SELECT ARRAY[$1,pg_control_system(),pg_control_checkpoint()]",
@@ -426,12 +294,8 @@ fn parameter_with_anonymous_records_uses_the_record_family() -> testresult::Test
         "{:?}",
         analyzed.context().problems()
     );
-    let query = analyzed.ast().clone().into_select_statemtnt().unwrap();
-    let column = query.result_columns().get_column_at(0).unwrap();
-    assert_eq!(
-        column.col_type(),
-        &Some(TypeReference::from_master_type_name("_record"))
-    );
+    // The CLI regression checks the result type; this test keeps parameter
+    // family admissibility inside the constraint graph.
     assert!(
         analyzed
             .context()
@@ -497,21 +361,7 @@ fn public_array_parameter_domains_do_not_select_an_untyped_prepare_signature()
                 .allows(&ty.array_type())
         );
     }
-    let query = analyzed.ast().clone().into_select_statemtnt().unwrap();
-    assert!(
-        query
-            .result_columns()
-            .get_column_at(0)
-            .unwrap()
-            .col_type()
-            .is_none()
-    );
-    let narrowed = heavy::analyze("SELECT ARRAY[$1::integer,1]", &[])?;
-    let query = narrowed.ast().clone().into_select_statemtnt().unwrap();
-    assert_eq!(
-        query.result_columns().get_column_at(0).unwrap().col_type(),
-        &Some(PgBuiltInType::int4().array_type())
-    );
+    // The CLI fixture checks absent and explicitly narrowed result types.
     Ok(())
 }
 
@@ -697,7 +547,8 @@ fn ordinary_array_equality_retains_binding_and_types(
     #[case] definitions: &[&str],
     #[case] array_type: &str,
 ) -> testresult::TestResult {
-    // The shipped anyarray operator declaration and casts are the contract here.
+    // The CLI regression checks the result column; this keeps the resolved
+    // operator binding and its argument, result, and strictness metadata.
     let analyzed = heavy::analyze(sql, definitions)?;
     assert!(
         analyzed.context().problems().is_empty(),
@@ -706,7 +557,6 @@ fn ordinary_array_equality_retains_binding_and_types(
     );
     let select = analyzed.ast().clone().into_select_statemtnt().unwrap();
     let column = select.result_columns().get_column_at(0).unwrap();
-    assert_eq!(column.col_type(), &Some(PgBuiltInType::bool()));
     let expression = column.expression().unwrap();
     assert!(
         expression
@@ -734,25 +584,11 @@ fn ordinary_array_equality_retains_binding_and_types(
 #[case::scalar_right("ARRAY[1::oid] = 1::oid")]
 #[case::scalar_left("1::oid = ARRAY[1::oid]")]
 fn invalid_array_equality_retains_failure(#[case] expression: &str) -> testresult::TestResult {
-    // Real builtin candidate families must not accept incompatible array inputs.
+    // The CLI regression checks the diagnostic set and unresolved result type;
+    // this retains the unresolved operator node and its operand payloads.
     let analyzed = heavy::analyze(&format!("SELECT {expression}"), &[])?;
-    assert!(
-        analyzed
-            .context()
-            .problems()
-            .iter()
-            .any(|problem| problem.code() == "binary_operator_overload_resolution_failed")
-    );
-    assert!(
-        analyzed
-            .context()
-            .problems()
-            .iter()
-            .any(|problem| problem.code() == "undefined_operator")
-    );
     let select = analyzed.ast().clone().into_select_statemtnt().unwrap();
     let column = select.result_columns().get_column_at(0).unwrap();
-    assert_eq!(column.col_type(), &None);
     let expression = column.expression().unwrap();
     assert!(
         expression

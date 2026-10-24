@@ -1,0 +1,37 @@
+{
+  "names": [
+    "literal",
+    "undefined-column"
+  ],
+  "sql": [
+    "SELECT 1 AS result",
+    "SELECT missing AS result"
+  ],
+  "expected": [
+    {
+      "diagnostics": [],
+      "columns": [
+        {
+          "name": "result",
+          "type": {
+            "schema_name": "pg_catalog",
+            "local_name": "int4",
+            "is_array": false
+          },
+          "nullability": "not_null"
+        }
+      ]
+    },
+    {
+      "diagnostics": [
+        "column_not_found_in_source"
+      ],
+      "columns": [
+        {
+          "name": "result",
+          "nullability": "unknown"
+        }
+      ]
+    }
+  ]
+}

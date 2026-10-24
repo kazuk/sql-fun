@@ -100,6 +100,14 @@ jobs:
             fi
           done
 
+      - name: Upload SQLAST regression evidence
+        uses: actions/upload-artifact@v7
+        if: ${{ always() }}
+        with:
+          name: sqlast-regressions-source
+          path: target/sqlast-regressions/
+          if-no-files-found: warn
+
       - name: Upload nextest JUnit report
         uses: actions/upload-artifact@v7
         if: ${{ always() }}
@@ -560,6 +568,22 @@ jobs:
           for version in 17 18; do
             diff -r "sql-fun-home/postgres/$version" "$RUNNER_TEMP/sql-fun-postgres/$version"
           done
+
+      - name: Validate installed SQLAST regression contracts
+        env:
+          SQL_FUN_BIN: /usr/bin/sql-fun
+          SQL_FUN_TEST_SERVER_BIN: /usr/bin/sql-fun-server
+        run: |
+          SQL_FUN_HOME="$RUNNER_TEMP/sql-fun-postgres/initialized-docker" \
+            SQL_FUN_REGRESSION_REPORT_DIR="$RUNNER_TEMP/sqlast-regressions" \
+            tests/sqlast-regressions/run.sh
+
+      - uses: actions/upload-artifact@v7
+        if: ${{ always() }}
+        with:
+          name: sqlast-regressions-installed
+          path: ${{ runner.temp }}/sqlast-regressions/
+          if-no-files-found: warn
 
       - uses: actions/upload-artifact@v7
         with:

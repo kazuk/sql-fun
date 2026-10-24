@@ -173,6 +173,17 @@ jobs:
           fi
           sccache --show-stats
 
+      - name: Disk usage at all-features build peak
+        if: ${{ always() }}
+        run: |
+          df -h . /usr/local/cargo /github/home
+          df -i . /usr/local/cargo /github/home
+          for path in target /usr/local/cargo/registry /usr/local/cargo/git /github/home/.cache/sccache /github/home/sql-fun-workspace-ci; do
+            if [ -d "$path" ]; then
+              du -sh "$path"
+            fi
+          done
+
       - name: Drop compilation artifacts before executing tests
         run: |
           cargo clean

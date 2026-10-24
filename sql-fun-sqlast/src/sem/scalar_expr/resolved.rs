@@ -56,6 +56,21 @@ impl SemScalarExpr {
     pub(crate) fn explicit_cast(value: &Self, target: &TypeReference) -> Self {
         Self::TypeCast(TypeCastExpr::from_resolved(target, value))
     }
+    pub(crate) fn array_subquery(
+        context: &mut impl crate::sem::ParseContext,
+        query: &SelectStatement,
+    ) -> Result<Self, AnalysisError> {
+        Ok(Self::ArraySubquery(super::ArraySubqueryExpr::resolve(
+            context, query,
+        )?))
+    }
+    /// ARRAY(query), including its analyzed query and result domain.
+    pub const fn as_array_subquery(&self) -> Option<&super::ArraySubqueryExpr> {
+        match self {
+            Self::ArraySubquery(value) => Some(value),
+            _ => None,
+        }
+    }
     pub(crate) fn exists(query: &SelectStatement) -> Self {
         Self::Exists(ExistsExpr::from(query))
     }

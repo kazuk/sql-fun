@@ -602,6 +602,48 @@ impl ParameterResolution {
         Ok((node, domain))
     }
 
+    pub(crate) fn array_query_result(
+        &mut self,
+        fallback: &InputTypeConstraint,
+        single_output: bool,
+        existing: Option<usize>,
+    ) -> (usize, InputTypeConstraint) {
+        let source = if single_output {
+            self.completed.scalar_node()
+        } else {
+            None
+        };
+        let domain = if let Some(source) = source {
+            if let Some(types) = self.graph.domain(source).admissible_types() {
+                let mut arrays = Vec::new();
+                for ty in types {
+                    arrays.push(ty.array_type());
+                }
+                InputTypeConstraint::types(arrays)
+            } else {
+                InputTypeConstraint::any()
+            }
+        } else {
+            fallback.clone()
+        };
+        // Retain the ARRAY node across projection expansion so enclosing
+        // operations keep their existing links to this result.
+        let result = if let Some(node) = existing {
+            self.graph.restrict(node, &domain);
+            node
+        } else {
+            self.graph.node(&domain)
+        };
+        if let Some(source) = source {
+            self.graph.project(
+                source,
+                result,
+                crate::sem::parameter_constraints::TypeProjection::construct_array(),
+            );
+        }
+        (result, domain)
+    }
+
     pub(crate) fn scalar_result(&mut self, value: &SemScalarExpr) -> Option<SemScalarExpr> {
         let source = self.completed.scalar_node()?;
         let result = self.operation(
@@ -969,6 +1011,15 @@ struct Collector<'a, C: crate::sem::ParseContext> {
 }
 
 impl<C: crate::sem::ParseContext> crate::sem::traversal::SemanticVisitor for Collector<'_, C> {
+    fn array_subquery(
+        &mut self,
+        value: &mut crate::sem::ArraySubqueryExpr,
+    ) -> Result<(), AnalysisError> {
+        if value.expand_pending_stars(self.context)? {
+            value.walk(self)?;
+        }
+        Ok(())
+    }
     fn expression(&mut self, expression: &mut SemScalarExpr) -> Result<(), AnalysisError> {
         expression.collect_constraints(&mut self.parameters, self.context)
     }
@@ -1162,9 +1213,29 @@ impl<C: crate::sem::ParseContext> crate::sem::traversal::SemanticVisitor for Col
 
 struct Finalizer<'a, C: crate::sem::ParseContext> {
     constraints: &'a ParameterConstraints,
-    context: &'a C,
+    context: &'a mut C,
+    expanded_arrays: bool,
+}
+impl<'a, C: crate::sem::ParseContext> Finalizer<'a, C> {
+    const fn new(constraints: &'a ParameterConstraints, context: &'a mut C) -> Self {
+        Self {
+            constraints,
+            context,
+            expanded_arrays: false,
+        }
+    }
 }
 impl<C: crate::sem::ParseContext> crate::sem::traversal::SemanticVisitor for Finalizer<'_, C> {
+    fn array_subquery(
+        &mut self,
+        value: &mut crate::sem::ArraySubqueryExpr,
+    ) -> Result<(), AnalysisError> {
+        if value.expand_pending_stars(self.context)? {
+            self.expanded_arrays = true;
+            value.walk(self)?;
+        }
+        Ok(())
+    }
     fn expression(&mut self, expression: &mut SemScalarExpr) -> Result<(), AnalysisError> {
         expression.apply_constraints(self.constraints);
         Ok(())
@@ -1190,24 +1261,24 @@ impl ParameterResolution {
             parameters: Self::default(),
             context,
         };
-        query.walk(&mut collector)?;
-        collector.parameters.solve(collector.context)?;
-        let constraints = collector.parameters.constraints();
-        query.walk(&mut Finalizer {
-            constraints: &constraints,
-            context: &*collector.context,
-        })?;
-        if !query.expand_pending_stars(collector.context)? {
-            return Ok(constraints);
+        let mut expand_root = true;
+        loop {
+            query.walk(&mut collector)?;
+            collector.parameters.solve(collector.context)?;
+            let constraints = collector.parameters.constraints();
+            let mut finalizer = Finalizer::new(&constraints, collector.context);
+            query.walk(&mut finalizer)?;
+            let expanded_arrays = finalizer.expanded_arrays;
+            let expanded_root = if expand_root || expanded_arrays {
+                query.expand_pending_stars(collector.context)?
+            } else {
+                false
+            };
+            expand_root = expanded_arrays;
+            if !expanded_arrays && !expanded_root {
+                return Ok(constraints);
+            }
         }
-        query.walk(&mut collector)?;
-        collector.parameters.solve(collector.context)?;
-        let constraints = collector.parameters.constraints();
-        query.walk(&mut Finalizer {
-            constraints: &constraints,
-            context: &*collector.context,
-        })?;
-        Ok(constraints)
     }
     pub(crate) fn infer_insert(
         insert: &mut crate::sem::InsertStatement,
@@ -1221,27 +1292,29 @@ impl ParameterResolution {
             parameters: Self::default(),
             context,
         };
-        insert.walk(&mut collector)?;
-        collector.parameters.solve(collector.context)?;
-        let constraints = collector.parameters.constraints();
-        insert.walk(&mut Finalizer {
-            constraints: &constraints,
-            context: &*collector.context,
-        })?;
-        if !insert.expand_source_stars(collector.context)? {
-            return Ok((constraints, false));
+        let mut expand_source = true;
+        let mut expanded_source = false;
+        loop {
+            insert.walk(&mut collector)?;
+            collector.parameters.solve(collector.context)?;
+            let constraints = collector.parameters.constraints();
+            let mut finalizer = Finalizer::new(&constraints, collector.context);
+            insert.walk(&mut finalizer)?;
+            let expanded_arrays = finalizer.expanded_arrays;
+            let expanded = if expand_source || expanded_arrays {
+                insert.expand_source_stars(collector.context)?
+            } else {
+                false
+            };
+            expand_source = expanded_arrays;
+            expanded_source |= expanded;
+            if implicit_targets && expanded {
+                insert.truncate_implicit_targets();
+            }
+            if !expanded_arrays && !expanded {
+                return Ok((constraints, expanded_source));
+            }
         }
-        if implicit_targets {
-            insert.truncate_implicit_targets();
-        }
-        insert.walk(&mut collector)?;
-        collector.parameters.solve(collector.context)?;
-        let constraints = collector.parameters.constraints();
-        insert.walk(&mut Finalizer {
-            constraints: &constraints,
-            context: &*collector.context,
-        })?;
-        Ok((constraints, true))
     }
     pub(crate) fn infer_update(
         update: &mut crate::sem::UpdateStatement,
@@ -1254,14 +1327,17 @@ impl ParameterResolution {
             parameters: Self::default(),
             context,
         };
-        update.walk(&mut collector)?;
-        collector.parameters.solve(collector.context)?;
-        let constraints = collector.parameters.constraints();
-        update.walk(&mut Finalizer {
-            constraints: &constraints,
-            context: collector.context,
-        })?;
-        Ok(constraints)
+        loop {
+            update.walk(&mut collector)?;
+            collector.parameters.solve(collector.context)?;
+            let constraints = collector.parameters.constraints();
+            let mut finalizer = Finalizer::new(&constraints, collector.context);
+            update.walk(&mut finalizer)?;
+            let expanded_arrays = finalizer.expanded_arrays;
+            if !expanded_arrays {
+                return Ok(constraints);
+            }
+        }
     }
     pub(crate) fn infer_delete(
         delete: &mut crate::sem::DeleteStatement,
@@ -1274,14 +1350,17 @@ impl ParameterResolution {
             parameters: Self::default(),
             context,
         };
-        delete.walk(&mut collector)?;
-        collector.parameters.solve(collector.context)?;
-        let constraints = collector.parameters.constraints();
-        delete.walk(&mut Finalizer {
-            constraints: &constraints,
-            context: collector.context,
-        })?;
-        Ok(constraints)
+        loop {
+            delete.walk(&mut collector)?;
+            collector.parameters.solve(collector.context)?;
+            let constraints = collector.parameters.constraints();
+            let mut finalizer = Finalizer::new(&constraints, collector.context);
+            delete.walk(&mut finalizer)?;
+            let expanded_arrays = finalizer.expanded_arrays;
+            if !expanded_arrays {
+                return Ok(constraints);
+            }
+        }
     }
     pub(crate) fn infer_merge(
         merge: &mut crate::sem::MergeStatement,
@@ -1294,14 +1373,17 @@ impl ParameterResolution {
             parameters: Self::default(),
             context,
         };
-        merge.walk(&mut collector)?;
-        collector.parameters.solve(collector.context)?;
-        let constraints = collector.parameters.constraints();
-        merge.walk(&mut Finalizer {
-            constraints: &constraints,
-            context: collector.context,
-        })?;
-        Ok(constraints)
+        loop {
+            merge.walk(&mut collector)?;
+            collector.parameters.solve(collector.context)?;
+            let constraints = collector.parameters.constraints();
+            let mut finalizer = Finalizer::new(&constraints, collector.context);
+            merge.walk(&mut finalizer)?;
+            let expanded_arrays = finalizer.expanded_arrays;
+            if !expanded_arrays {
+                return Ok(constraints);
+            }
+        }
     }
     pub(crate) fn infer_expression(
         expression: &mut SemScalarExpr,
@@ -1314,14 +1396,17 @@ impl ParameterResolution {
             parameters: Self::default(),
             context,
         };
-        expression.walk(&mut collector)?;
-        collector.parameters.solve(collector.context)?;
-        let constraints = collector.parameters.constraints();
-        expression.walk(&mut Finalizer {
-            constraints: &constraints,
-            context: collector.context,
-        })?;
-        Ok(constraints)
+        loop {
+            expression.walk(&mut collector)?;
+            collector.parameters.solve(collector.context)?;
+            let constraints = collector.parameters.constraints();
+            let mut finalizer = Finalizer::new(&constraints, collector.context);
+            expression.walk(&mut finalizer)?;
+            let expanded_arrays = finalizer.expanded_arrays;
+            if !expanded_arrays {
+                return Ok(constraints);
+            }
+        }
     }
 
     pub(crate) fn operator(

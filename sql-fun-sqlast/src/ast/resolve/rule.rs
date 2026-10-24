@@ -386,12 +386,11 @@ impl<C: ParseContext> sem::traversal::SemanticVisitor for PredicateValidator<'_,
 impl crate::ast::SubqueryKind {
     pub(super) const fn pending_rule_semantics(self) -> Option<&'static str> {
         match self {
-            Self::Scalar => None,
+            Self::Scalar | Self::Array => None,
             Self::Exists => Some("EXISTS subquery semantics are pending #570"),
             Self::Any | Self::All | Self::Row => {
                 Some("quantified/row subquery semantics are pending #571")
             }
-            Self::Array => Some("ARRAY subquery semantics are pending #572"),
             Self::MultiExpression => Some("multi-expression subquery semantics are pending #573"),
         }
     }

@@ -18,6 +18,9 @@ impl DiagnosticMessage for ArrayProblem {
                 format!("ARRAY cannot match or convert {left} and {right}")
             }
             Self::MissingTypeFacts(ty) => format!("ARRAY requires type-category metadata for {ty}"),
+            Self::SubqueryColumns(count) => {
+                format!("ARRAY subquery must return exactly one column, found {count}")
+            }
         }
     }
 }

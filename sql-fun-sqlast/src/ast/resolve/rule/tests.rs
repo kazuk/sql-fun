@@ -48,6 +48,11 @@ use crate::sem::{
     RuleEvent::update(),
     1
 )]
+#[case::array_query(
+    "CREATE RULE r AS ON UPDATE TO items DO SELECT ARRAY(SELECT id FROM sink)",
+    RuleEvent::update(),
+    1
+)]
 #[case::cte(
     "CREATE RULE r AS ON UPDATE TO items DO WITH x AS (SELECT id FROM sink) SELECT id FROM x",
     RuleEvent::update(),
@@ -160,7 +165,6 @@ fn resolves_complete_statement_without_applying(
 #[case::any_pending(
     "CREATE RULE r AS ON UPDATE TO items DO SELECT OLD.id = ANY(SELECT id FROM sink)"
 )]
-#[case::array_pending("CREATE RULE r AS ON UPDATE TO items DO SELECT ARRAY(SELECT id FROM sink)")]
 #[case::source_namespace("CREATE RULE r AS ON UPDATE TO items DO SELECT old.id FROM sink old")]
 #[case::insert_union_rows(
     "CREATE RULE r AS ON INSERT TO items DO INSERT INTO sink SELECT NEW.id UNION SELECT NEW.id"

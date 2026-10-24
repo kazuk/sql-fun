@@ -15,7 +15,7 @@ pub use self::{
     err::TypeError,
     func_params::FunctionParam,
     function_overload_collection::FunctionOverloadCollection,
-    infer::{CommonInferContext, SimpleInferContext},
+    infer::{CommonInferContext, SimpleInferContext, SimpleInferResult},
 };
 
 #[derive(Clone, Debug, Default)]
@@ -90,9 +90,9 @@ impl OverloadVariant {
     }
 
     /// apply simple infer result
-    pub fn apply_simple_infer_result(&mut self, infer_result_type: &TypeReference) {
+    pub fn apply_simple_infer_result(&mut self, infer_result_type: &SimpleInferResult) {
         if let Some(t) = self.ret_type.as_mut() {
-            t.apply_simple_infer_result(infer_result_type);
+            infer_result_type.apply(t);
         }
 
         for param in &mut self.params {

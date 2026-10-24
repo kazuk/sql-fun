@@ -49,7 +49,10 @@ where
         arg_types: &mut ArgumentBindingCollection,
     ) -> Result<ParameterBindResult, TypeError>;
 
-    fn apply_simple_infer_result(&mut self, simple_infer_result: &TypeReference);
+    fn apply_simple_infer_result(
+        &mut self,
+        simple_infer_result: &crate::sem::type_system::SimpleInferResult,
+    );
     fn apply_common_infer_result(&mut self, common_infer_result: &TypeReference);
 }
 
@@ -215,14 +218,15 @@ impl FunctionParam {
     pub fn collect_simple(
         &self,
         context: &mut SimpleInferContext,
+        catalog: &impl crate::sem::BaseParseContext,
         bind: &ParameterBindResult,
     ) -> Result<(), TypeError> {
         match self {
-            Self::In(p) => context.collect(p, bind),
-            Self::Out(p) => context.collect(p, bind),
-            Self::InOut(p) => context.collect(p, bind),
-            Self::Variadic(p) => context.collect(p, bind),
-            Self::Table(p) => context.collect(p, bind),
+            Self::In(p) => context.collect(p, bind, catalog),
+            Self::Out(p) => context.collect(p, bind, catalog),
+            Self::InOut(p) => context.collect(p, bind, catalog),
+            Self::Variadic(p) => context.collect(p, bind, catalog),
+            Self::Table(p) => context.collect(p, bind, catalog),
         }
     }
 
@@ -235,19 +239,23 @@ impl FunctionParam {
     pub fn collect_common(
         &self,
         context: &mut CommonInferContext,
+        catalog: &impl crate::sem::BaseParseContext,
         bind: &ParameterBindResult,
     ) -> Result<(), TypeError> {
         match self {
-            Self::In(p) => context.collect(p, bind),
-            Self::Out(p) => context.collect(p, bind),
-            Self::InOut(p) => context.collect(p, bind),
-            Self::Variadic(p) => context.collect(p, bind),
-            Self::Table(p) => context.collect(p, bind),
+            Self::In(p) => context.collect(p, bind, catalog),
+            Self::Out(p) => context.collect(p, bind, catalog),
+            Self::InOut(p) => context.collect(p, bind, catalog),
+            Self::Variadic(p) => context.collect(p, bind, catalog),
+            Self::Table(p) => context.collect(p, bind, catalog),
         }
     }
 
     /// apply simple infer result
-    pub fn apply_simple_infer_result(&mut self, simple_infer_result: &TypeReference) {
+    pub fn apply_simple_infer_result(
+        &mut self,
+        simple_infer_result: &crate::sem::type_system::SimpleInferResult,
+    ) {
         match self {
             Self::In(p) => p.apply_simple_infer_result(simple_infer_result),
             Self::Out(p) => p.apply_simple_infer_result(simple_infer_result),

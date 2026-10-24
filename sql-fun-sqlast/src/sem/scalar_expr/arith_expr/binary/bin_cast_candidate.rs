@@ -39,7 +39,7 @@ impl BinaryCastCandidate {
         let mut candidates = Vec::new();
         for overload in overloads {
             let Some(instantiated) =
-                Self::instantiate_array_overload(overload, left_type, right_type)
+                Self::instantiate_array_overload(context, overload, left_type, right_type)
             else {
                 continue;
             };
@@ -67,6 +67,7 @@ impl BinaryCastCandidate {
     // A simple polymorphic array declaration shares one element type across
     // both operands. Instantiate a local signature, leaving catalog data intact.
     fn instantiate_array_overload(
+        context: &impl ParseContext,
         overload: &BinaryOperatorDefinition,
         left: &TypeReference,
         right: &TypeReference,
@@ -84,16 +85,16 @@ impl BinaryCastCandidate {
         let mut inference = SimpleInferContext::default();
         for (declared, actual) in inputs {
             if !declared.is_dynamic() {
-                inference.push_input_param(declared, actual).ok()?;
+                inference.push_input_param(declared, actual, context).ok()?;
             }
         }
-        let element = inference.get_inference_result().ok()?;
+        let substitution = inference.get_inference_result().ok()?;
         let mut left = overload.left_arg_type().clone();
         let mut right = overload.right_arg_type().clone();
         let mut result = overload.get_return_type().clone();
         for ty in [&mut left, &mut right, &mut result] {
             if !ty.is_dynamic() && ty.is_simple_infer_arg() {
-                ty.apply_simple_infer_result(&element);
+                substitution.apply(ty);
             }
         }
         Some(BinaryOperatorDefinition::new(
@@ -223,8 +224,12 @@ mod tests {
         let declaration = BinaryOperatorDefinition::new(&placeholder, &placeholder, &element, true);
         let left = TypeReference::from_master_type_name(left);
         let right = TypeReference::from_master_type_name(right);
-        let instantiated =
-            BinaryCastCandidate::instantiate_array_overload(&declaration, &left, &right);
+        let instantiated = BinaryCastCandidate::instantiate_array_overload(
+            &TestParseContext::default(),
+            &declaration,
+            &left,
+            &right,
+        );
         assert_eq!(instantiated.is_some(), applicable);
         if let Some(instantiated) = instantiated {
             assert_eq!(instantiated.left_arg_type(), &left);

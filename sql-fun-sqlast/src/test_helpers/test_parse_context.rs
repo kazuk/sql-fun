@@ -39,6 +39,7 @@ pub struct TestParseContext {
     operator_op_results: HashMap<(OperatorName, bool, bool), Option<OperatorDefinition>>,
     search_path: Vec<SchemaName>,
     type_definitions: HashMap<FullName, TypeDefinition>,
+    array_elements: HashMap<TypeReference, TypeReference>,
     table_definitions: HashMap<FullName, Option<CreateTable>>,
     view_definitions: HashMap<FullName, Option<ViewLike>>,
     view_delete_support: HashMap<FullName, crate::sem::ViewDeleteSupport>,
@@ -113,6 +114,10 @@ impl TestParseContext {
     ) {
         self.type_definitions
             .insert(type_name.clone(), type_definition.clone());
+    }
+
+    pub(crate) fn set_array_element(&mut self, array: &TypeReference, element: &TypeReference) {
+        self.array_elements.insert(array.clone(), element.clone());
     }
 
     /// setup type for TypeReference
@@ -276,6 +281,9 @@ impl TypeInfoRead for TestParseContext {
     }
 
     fn get_array_item_type(&self, type_name: &TypeReference) -> Option<TypeReference> {
+        if let Some(element) = self.array_elements.get(type_name) {
+            return Some(element.clone());
+        }
         if type_name.is_array() == Some(true) {
             Some(type_name.element_type())
         } else {

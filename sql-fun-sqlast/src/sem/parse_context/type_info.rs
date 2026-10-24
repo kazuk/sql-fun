@@ -18,7 +18,8 @@ pub trait TypeInfoRead {
     /// the provider lacks the knowledge needed to answer for this identity.
     fn builtin_type_ordered(&self, name: &FullName) -> Option<bool>;
 
-    /// get item type for array type
+    /// Element type for semantic array operations, including PostgreSQL catalog vectors.
+    /// A named vector retains its identity and has no ordinary array qualifier.
     fn get_array_item_type(&self, type_name: &TypeReference) -> Option<TypeReference>;
 }
 

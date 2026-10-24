@@ -10,10 +10,37 @@ use std::collections::HashSet;
 
 use ::sql_fun_core::IVec;
 
+/// Simple-family substitution retains both element constraints and array identity.
+pub struct SimpleInferResult {
+    element: TypeReference,
+    array: Option<TypeReference>,
+}
+
+impl SimpleInferResult {
+    fn new(element: &TypeReference, array: Option<&TypeReference>) -> Self {
+        Self {
+            element: element.clone(),
+            array: array.cloned(),
+        }
+    }
+
+    pub(crate) fn apply(&self, target: &mut TypeReference) {
+        if !target.is_dynamic()
+            && target.is_any_array()
+            && let Some(array) = &self.array
+        {
+            *target = array.clone();
+        } else {
+            target.apply_simple_infer_result(&self.element);
+        }
+    }
+}
+
 #[derive(Default)]
 pub struct SimpleInferContext {
     require_infer: bool,
     element_types: HashSet<TypeReference>,
+    array_types: HashSet<TypeReference>,
 }
 
 impl SimpleInferContext {
@@ -24,9 +51,14 @@ impl SimpleInferContext {
     }
 
     /// insert candidate for anyarray
-    fn push_array(&mut self, array_ty: &TypeReference) -> Result<(), TypeError> {
-        if array_ty.is_array().unwrap_or(false) {
-            self.element_types.insert(array_ty.element_type());
+    fn push_array(
+        &mut self,
+        array_ty: &TypeReference,
+        catalog: &impl crate::sem::BaseParseContext,
+    ) -> Result<(), TypeError> {
+        if let Some(element) = catalog.get_array_item_type(array_ty) {
+            self.array_types.insert(array_ty.clone());
+            self.element_types.insert(element);
             self.set_require_infer();
             Ok(())
         } else {
@@ -34,8 +66,12 @@ impl SimpleInferContext {
         }
     }
 
-    fn push_non_array_element(&mut self, ty: &TypeReference) -> Result<(), TypeError> {
-        if ty.is_array().unwrap_or(false) {
+    fn push_non_array_element(
+        &mut self,
+        ty: &TypeReference,
+        catalog: &impl crate::sem::BaseParseContext,
+    ) -> Result<(), TypeError> {
+        if catalog.get_array_item_type(ty).is_some() {
             Err(TypeError::RequireNonArray(ty.clone()))
         } else {
             self.push_element(ty);
@@ -66,13 +102,14 @@ impl SimpleInferContext {
         &mut self,
         param_type: &TypeReference,
         arg_type: &TypeReference,
+        catalog: &impl crate::sem::BaseParseContext,
     ) -> Result<(), TypeError> {
         if param_type.is_any_element() {
             self.push_element(arg_type);
         } else if param_type.is_any_array() {
-            self.push_array(arg_type)?;
+            self.push_array(arg_type, catalog)?;
         } else if param_type.is_any_non_array() {
-            self.push_non_array_element(arg_type)?;
+            self.push_non_array_element(arg_type, catalog)?;
         } else if param_type.is_any_range() {
             self.push_range_element(arg_type)?;
         } else if param_type.is_any_multi_range() {
@@ -83,16 +120,20 @@ impl SimpleInferContext {
     }
 
     /// get inference result
-    pub fn get_inference_result(&self) -> Result<TypeReference, TypeError> {
+    pub fn get_inference_result(&self) -> Result<SimpleInferResult, TypeError> {
         if self.element_types.is_empty() {
             return Err(TypeError::SimpleInferNoArgs());
         }
         if self.element_types.len() != 1 {
-            return Err(TypeError::SimpleInferAmbiguous(
-                self.element_types.iter().cloned().collect(),
-            ));
+            return Err(TypeError::simple_infer_ambiguous(&self.element_types));
         }
-        Ok(self.element_types.iter().next().unwrap().clone())
+        if self.array_types.len() > 1 {
+            return Err(TypeError::simple_infer_ambiguous(&self.array_types));
+        }
+        Ok(SimpleInferResult::new(
+            self.element_types.iter().next().unwrap(),
+            self.array_types.iter().next(),
+        ))
     }
 
     pub const fn set_require_infer(&mut self) {
@@ -107,6 +148,7 @@ impl SimpleInferContext {
         &mut self,
         param: &TParam,
         bind: &ParameterBindResult,
+        catalog: &impl crate::sem::BaseParseContext,
     ) -> Result<(), TypeError>
     where
         TParam: FunctionParameterTrait + Sized,
@@ -116,7 +158,7 @@ impl SimpleInferContext {
             && param.is_input_param()
         {
             for arg_type in bind.get_arg_types() {
-                self.push_input_param(param_type, &arg_type)?;
+                self.push_input_param(param_type, &arg_type, catalog)?;
             }
         }
         Ok(())
@@ -136,7 +178,11 @@ mod test_simple_infer_context {
         let param_type = TypeReference::from_full_name(FullName::with_schema("pg_catalog", "int4"));
         let arg_type = TypeReference::from_full_name(FullName::with_schema("pg_catalog", "int4"));
 
-        context.push_input_param(&param_type, &arg_type)?;
+        context.push_input_param(
+            &param_type,
+            &arg_type,
+            &crate::test_helpers::TestParseContext::default(),
+        )?;
         assert!(!context.is_require_infer());
         assert!(context.element_types.is_empty());
         assert!(matches!(
@@ -149,7 +195,11 @@ mod test_simple_infer_context {
         assert!(param_type.is_simple_infer_arg());
         assert!(param_type.is_any_element());
         let arg_type = TypeReference::from_full_name(FullName::with_schema("pg_catalog", "int4"));
-        context.push_input_param(&param_type, &arg_type)?;
+        context.push_input_param(
+            &param_type,
+            &arg_type,
+            &crate::test_helpers::TestParseContext::default(),
+        )?;
 
         assert!(context.is_require_infer());
         assert!(context.element_types.contains(&arg_type));
@@ -161,7 +211,11 @@ mod test_simple_infer_context {
         let arg_type =
             TypeReference::concrete_type_ref(&FullName::with_schema("pg_catalog", "int4"), true);
 
-        context.push_input_param(&param_type, &arg_type)?;
+        context.push_input_param(
+            &param_type,
+            &arg_type,
+            &crate::test_helpers::TestParseContext::default(),
+        )?;
         assert!(context.is_require_infer());
         assert_eq!(context.element_types.len(), 1);
         assert!(context.get_inference_result().is_ok());
@@ -171,7 +225,11 @@ mod test_simple_infer_context {
         assert!(param_type.is_simple_infer_arg());
         assert!(param_type.is_any_element());
         let arg_type = TypeReference::from_full_name(FullName::with_schema("pg_catalog", "int8"));
-        context.push_input_param(&param_type, &arg_type)?;
+        context.push_input_param(
+            &param_type,
+            &arg_type,
+            &crate::test_helpers::TestParseContext::default(),
+        )?;
         assert_eq!(context.element_types.len(), 2);
         assert!(matches!(
             context.get_inference_result(),
@@ -193,17 +251,25 @@ impl CommonInferContext {
         self.element_types.insert(ty.clone());
     }
 
-    pub fn push_compat_array(&mut self, array_ty: &TypeReference) -> Result<(), TypeError> {
-        if array_ty.is_array().unwrap_or(false) {
-            self.element_types.insert(array_ty.element_type());
+    pub fn push_compat_array(
+        &mut self,
+        array_ty: &TypeReference,
+        catalog: &impl crate::sem::BaseParseContext,
+    ) -> Result<(), TypeError> {
+        if let Some(element) = catalog.get_array_item_type(array_ty) {
+            self.element_types.insert(element);
             Ok(())
         } else {
             Err(TypeError::RequireArray(array_ty.clone()))
         }
     }
 
-    pub fn push_compat_non_array(&mut self, ty: &TypeReference) -> Result<(), TypeError> {
-        if ty.is_array().unwrap_or(false) {
+    pub fn push_compat_non_array(
+        &mut self,
+        ty: &TypeReference,
+        catalog: &impl crate::sem::BaseParseContext,
+    ) -> Result<(), TypeError> {
+        if catalog.get_array_item_type(ty).is_some() {
             Err(TypeError::RequireNonArray(ty.clone()))
         } else {
             self.push_compat_element(ty);
@@ -234,13 +300,14 @@ impl CommonInferContext {
         &mut self,
         param_type: &TypeReference,
         arg_type: &TypeReference,
+        catalog: &impl crate::sem::BaseParseContext,
     ) -> Result<(), TypeError> {
         if param_type.is_any_compatible() {
             self.push_compat_element(arg_type);
         } else if param_type.is_any_compatible_array() {
-            self.push_compat_array(arg_type)?;
+            self.push_compat_array(arg_type, catalog)?;
         } else if param_type.is_any_compatible_non_array() {
-            self.push_compat_non_array(arg_type)?;
+            self.push_compat_non_array(arg_type, catalog)?;
         } else if param_type.is_any_compatible_range() {
             self.push_compat_range_element(arg_type)?;
         } else if param_type.is_any_compatible_multi_range() {
@@ -326,6 +393,7 @@ impl CommonInferContext {
         &mut self,
         param: &TParam,
         bind: &ParameterBindResult,
+        catalog: &impl crate::sem::BaseParseContext,
     ) -> Result<(), TypeError>
     where
         TParam: FunctionParameterTrait + Sized,
@@ -336,7 +404,7 @@ impl CommonInferContext {
             self.set_require_infer();
             if param.is_input_param() {
                 for arg_type in bind.get_arg_types() {
-                    self.push_input_param(param_type, &arg_type)?;
+                    self.push_input_param(param_type, &arg_type, catalog)?;
                 }
             }
         }
@@ -365,7 +433,11 @@ mod test_common_infer_context {
         ));
         let arg_type = TypeReference::from_master_type_name("int4");
 
-        let result = context.push_input_param(&param_type, &arg_type);
+        let result = context.push_input_param(
+            &param_type,
+            &arg_type,
+            &crate::test_helpers::TestParseContext::default(),
+        );
 
         assert!(matches!(result, Err(TypeError::RequireArray(_))));
         assert!(context.element_types.is_empty());
@@ -381,7 +453,11 @@ mod test_common_infer_context {
         ));
         let arg_type = TypeReference::from_master_type_name("_int4");
 
-        let result = context.push_input_param(&param_type, &arg_type);
+        let result = context.push_input_param(
+            &param_type,
+            &arg_type,
+            &crate::test_helpers::TestParseContext::default(),
+        );
 
         assert!(matches!(result, Err(TypeError::RequireNonArray(_))));
         assert!(context.element_types.is_empty());

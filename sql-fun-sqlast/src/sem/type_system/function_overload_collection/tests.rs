@@ -10,6 +10,8 @@ use std::collections::BTreeMap;
 #[case::common("anycompatible", "integer", "f(1)", "int4")]
 #[case::nonarray("anynonarray", "integer", "f(1)", "int4")]
 #[case::compatible_nonarray("anycompatiblenonarray", "integer", "f(1)", "int4")]
+#[case::vector("anyarray", "int2vector", "f(NULL::int2vector)", "int4")]
+#[case::vector_common("anycompatiblearray", "int2vector", "f(NULL::int2vector)", "int4")]
 #[case::array("anyarray", "integer[]", "f(NULL::integer[])", "int4")]
 #[case::common_array("anycompatiblearray", "integer[]", "f(NULL::integer[])", "int4")]
 #[case::named_array("anyarray", "control[]", "f(NULL::control[])", "int4")]
@@ -230,6 +232,123 @@ fn deferred_results_remain_correlated(
             .result_column(0)
             .unwrap()
             .allows(&TypeReference::from_master_type_name(result))
+    );
+    Ok(())
+}
+
+#[rstest::rstest]
+#[case::element("anyarray", "anyelement", "vf(NULL::int2vector)", "int2")]
+#[case::identity("anyarray", "anyarray", "vf(NULL::int2vector)", "int2vector")]
+#[case::oid_identity("anyarray", "anyarray", "vf(NULL::oidvector)", "oidvector")]
+#[case::nested("anyarray", "anyelement", "vf(NULL::int2vector[])", "int2vector")]
+#[case::ordinary("anyarray", "anyarray", "vf(NULL::int4[])", "_int4")]
+#[case::common(
+    "anycompatiblearray",
+    "anycompatiblearray",
+    "vf(NULL::int2vector)",
+    "_int2"
+)]
+#[case::typed_parameter("anyarray", "anyarray", "vf($1::int2vector)", "int2vector")]
+fn vector_polymorphism_retains_binding_and_result(
+    #[case] parameters: &str,
+    #[case] result: &str,
+    #[case] call: &str,
+    #[case] expected: &str,
+) -> testresult::TestResult {
+    let analyzed = test_helpers::analyze_vector(&format!("SELECT {call}"), parameters, result)?;
+    assert!(
+        analyzed.context().problems().is_empty(),
+        "{:?}",
+        analyzed.context().problems()
+    );
+    let query = analyzed.ast().clone().into_select_statemtnt().unwrap();
+    let column = query.result_columns().get_column_at(0).unwrap();
+    let expected = TypeReference::from_master_type_name(expected);
+    assert_eq!(column.col_type(), &Some(expected.clone()));
+    if let Some(function) = column.expression().unwrap().as_function_call() {
+        assert_eq!(
+            function.overload().as_ref().unwrap().scaler_ret_type(),
+            Some(expected)
+        );
+    } else {
+        assert_eq!(
+            analyzed
+                .context()
+                .parameter_constraints()
+                .result_column(0)
+                .unwrap()
+                .admissible_types(),
+            Some(std::slice::from_ref(&expected))
+        );
+        let retained = ::serde_json::to_value(column.expression().unwrap())?;
+        assert!(retained["Constrained"]["semantic_call"].is_object());
+    }
+    Ok(())
+}
+
+#[rstest::rstest]
+#[case::nonarray("anynonarray", "vf(NULL::int2vector)")]
+#[case::common_nonarray("anycompatiblenonarray", "vf(NULL::int2vector)")]
+#[case::scalar("anyarray", "vf(1)")]
+#[case::element_mismatch("anyarray, anyelement", "vf(NULL::int2vector, NULL::text)")]
+#[case::array_identity_mismatch("anyarray, anyarray", "vf(NULL::int2vector, NULL::smallint[])")]
+#[case::array_identity_mismatch_reversed(
+    "anyarray, anyarray",
+    "vf(NULL::smallint[], NULL::int2vector)"
+)]
+fn invalid_vector_polymorphism_retains_failure(
+    #[case] parameters: &str,
+    #[case] call: &str,
+) -> testresult::TestResult {
+    let analyzed = test_helpers::analyze_vector(&format!("SELECT {call}"), parameters, "text")?;
+    assert!(
+        analyzed
+            .context()
+            .problems()
+            .iter()
+            .any(|p| p.code() == "function_overload_resolution_failed")
+    );
+    let query = analyzed.ast().clone().into_select_statemtnt().unwrap();
+    assert!(
+        query
+            .result_columns()
+            .get_column_at(0)
+            .unwrap()
+            .expression()
+            .unwrap()
+            .as_function_call()
+            .unwrap()
+            .overload()
+            .is_none()
+    );
+    Ok(())
+}
+
+#[test]
+fn deferred_vector_element_preserves_array_result() -> testresult::TestResult {
+    let analyzed = test_helpers::analyze_vector(
+        "SELECT vf(NULL::int2vector, $1)",
+        "anyarray, anyelement",
+        "anyarray",
+    )?;
+    assert!(
+        analyzed.context().problems().is_empty(),
+        "{:?}",
+        analyzed.context().problems()
+    );
+    let constraints = analyzed.context().parameter_constraints();
+    assert!(constraints.allows(&BTreeMap::from([(
+        1,
+        TypeReference::from_master_type_name("int2")
+    )])));
+    assert!(!constraints.allows(&BTreeMap::from([(
+        1,
+        TypeReference::from_master_type_name("text")
+    )])));
+    let expected = TypeReference::from_master_type_name("int2vector");
+    assert_eq!(
+        constraints.result_column(0).unwrap().admissible_types(),
+        Some(std::slice::from_ref(&expected))
     );
     Ok(())
 }

@@ -1,0 +1,56 @@
+[
+  {
+    "name": "constructed_types_reach_existing_consumers::subscript",
+    "sql": "SELECT (ARRAY[1,2])[1]",
+    "expected": {
+      "diagnostics": [],
+      "columns": [
+        {
+          "name": "",
+          "type": {
+            "schema_name": "pg_catalog",
+            "local_name": "int4",
+            "is_array": false
+          },
+          "nullability": "not_null"
+        }
+      ]
+    }
+  },
+  {
+    "name": "constructed_types_reach_existing_consumers::array_function",
+    "sql": "SELECT array_length(ARRAY[1,2],1)",
+    "expected": {
+      "diagnostics": [],
+      "columns": [
+        {
+          "name": "",
+          "type": {
+            "schema_name": "pg_catalog",
+            "local_name": "int4",
+            "is_array": false
+          },
+          "nullability": "nullable"
+        }
+      ]
+    }
+  },
+  {
+    "name": "constructed_types_reach_existing_consumers::record_array_function",
+    "sql": "SELECT array_length(ARRAY[pg_control_system()],1)",
+    "expected": {
+      "diagnostics": [],
+      "columns": [
+        {
+          "name": "",
+          "type": {
+            "schema_name": "pg_catalog",
+            "local_name": "int4",
+            "is_array": false
+          },
+          "nullability": "nullable"
+        }
+      ]
+    }
+  }
+]

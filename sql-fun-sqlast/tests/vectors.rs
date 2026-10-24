@@ -90,34 +90,6 @@ fn vector_catalog_reads_and_conversion_contexts(
 }
 
 #[rstest::rstest]
-#[case::reverse(
-    "SELECT ARRAY[1,2]::smallint[]::int2vector",
-    "explicit_cast_not_defined"
-)]
-#[case::incompatible_cast("SELECT '1 2'::oidvector::smallint[]", "explicit_cast_not_defined")]
-#[case::scalar(
-    "SELECT * FROM unnest(1::smallint)",
-    "parameter_type_mismatch_for_table_function"
-)]
-#[case::wrong_element(
-    "SELECT array_position('1 2'::int2vector, true)",
-    "function_overload_resolution_failed"
-)]
-fn invalid_vector_inputs(#[case] sql: &str, #[case] code: &str) -> testresult::TestResult {
-    let analyzed = heavy::analyze(sql, &[])?;
-    assert!(
-        analyzed
-            .context()
-            .problems()
-            .iter()
-            .any(|p| p.code() == code),
-        "{:?}",
-        analyzed.context().problems()
-    );
-    Ok(())
-}
-
-#[rstest::rstest]
 #[case::widening("int2vector", "_int8", true, true)]
 #[case::assignment("oidvector", "_int4", false, true)]
 #[case::io_explicit("int2vector", "_text", false, false)]

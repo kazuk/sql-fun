@@ -49,40 +49,32 @@ fn loads_builtin_and_user_schemas(#[case] version: &str) -> Result<(), Box<dyn s
         );
     }
     if version == "18" {
-        // #572 blocks #727: the complete shipped catalog must have zero problems,
-        // and the affected view must retain its real array output type.
+        // #572/#727: retain complete catalog initialization and the affected
+        // pg_policies view's real array output type.
         assert!(builtins.problems().is_empty(), "{:?}", builtins.problems());
-        for sql in [
-            "SELECT ARRAY(SELECT 'role'::name) AS roles",
-            "SELECT CASE WHEN true THEN string_to_array('public'::text, ''::text)::name[] ELSE ARRAY(SELECT 'role'::name) END AS roles",
-            "SELECT roles FROM pg_catalog.pg_policies",
-        ] {
-            let context = ::sql_fun_sqlast::sem::SchemaFileContext::new(
-                std::path::Path::new("array-query.sql"),
-                builtins.base_context(),
-                &args,
-                selected,
-            );
-            let analyzed =
-                ::sql_fun_sqlast::parse_statements(sql, ::sql_fun_sqlast::ast::Dialect::postgres())
-                    .next()
-                    .unwrap()?
-                    .analyze(context)?;
-            assert!(
-                analyzed.context().problems().is_empty(),
-                "{sql}: {:?}",
-                analyzed.context().problems()
-            );
-            let query = analyzed.ast().clone().into_select_statemtnt().unwrap();
-            assert_eq!(
-                query.result_columns().get_column_at(0).unwrap().col_type(),
-                &Some(
-                    ::sql_fun_sqlast::sem::TypeReference::from_master_type_name("name")
-                        .array_type()
-                ),
-                "{sql}"
-            );
-        }
+        let sql = "SELECT roles FROM pg_catalog.pg_policies";
+        let context = ::sql_fun_sqlast::sem::SchemaFileContext::new(
+            std::path::Path::new("array-query.sql"),
+            builtins.base_context(),
+            &args,
+            selected,
+        );
+        let analyzed =
+            ::sql_fun_sqlast::parse_statements(sql, ::sql_fun_sqlast::ast::Dialect::postgres())
+                .next()
+                .unwrap()?
+                .analyze(context)?;
+        assert!(
+            analyzed.context().problems().is_empty(),
+            "{sql}: {:?}",
+            analyzed.context().problems()
+        );
+        let query = analyzed.ast().clone().into_select_statemtnt().unwrap();
+        assert_eq!(
+            query.result_columns().get_column_at(0).unwrap().col_type(),
+            &Some(::sql_fun_sqlast::sem::TypeReference::from_master_type_name("name").array_type()),
+            "{sql}"
+        );
     }
     let sql = "SELECT c.tableoid FROM pg_catalog.pg_class c";
     let mut query_context = ::sql_fun_sqlast::sem::SchemaFileContext::new(

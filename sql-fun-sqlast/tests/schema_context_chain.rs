@@ -315,28 +315,6 @@ fn sql_array_declarations_survive_schema_layers(
     Ok(())
 }
 
-#[rstest::rstest]
-#[case::cast("CAST(NULL AS integer[])", true)]
-#[case::postgres_cast("NULL::integer[]", true)]
-#[case::qualified("NULL::pg_catalog.int4[]", true)]
-#[case::bounded("CAST(NULL AS integer[3][4])", true)]
-#[case::scalar("CAST(NULL AS integer)", false)]
-fn sql_casts_preserve_array_identity(
-    #[case] expression: &str,
-    #[case] is_array: bool,
-) -> Result<(), Box<dyn std::error::Error>> {
-    let root = builtin_root()?;
-    let resolved = query(&root, &format!("SELECT {expression} AS value"))?;
-    let expected =
-        TypeReference::concrete_type_ref(&FullName::with_schema("pg_catalog", "int4"), is_array);
-    assert_query_type(&resolved, "value", &expected);
-    if is_array {
-        let indexed = query(&root, &format!("SELECT ({expression})[1] AS value"))?;
-        assert_query_type(&indexed, "value", &PgBuiltInType::int4());
-    }
-    Ok(())
-}
-
 #[test]
 fn sql_scalar_subscript_reports_array_required() -> Result<(), Box<dyn std::error::Error>> {
     let root = builtin_root()?;

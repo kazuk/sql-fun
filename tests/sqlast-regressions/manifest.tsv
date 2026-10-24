@@ -1,0 +1,18 @@
+# fixture	schema-level	schema-file	case-count	versions
+pilot	builtin	-	2	17,18
+casts	builtin	-	9	17,18
+vectors	builtin	-	4	18
+arrays-metadata	builtin	-	21	17,18
+arrays-names	builtin	-	5	17,18
+arrays-parameters	builtin	-	5	17,18
+arrays-diagnostics	builtin	-	11	17,18
+arrays-consumers	builtin	-	3	17,18
+arrays-records	builtin	-	4	17,18
+arrays-operators	builtin	-	4	17,18
+minmax-metadata	builtin	-	20	17,18
+minmax-diagnostics	builtin	-	12	17,18
+metadata-overloads	builtin	-	10	17,18
+case_semantic	builtin	-	3	17,18
+coalesce_semantic	builtin	-	3	17,18
+array-subqueries	builtin	-	25	17,18
+bootstrap-array-expressions	builtin	-	2	18

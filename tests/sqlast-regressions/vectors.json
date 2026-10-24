@@ -1,0 +1,67 @@
+[
+  {
+    "name": "vectors::invalid_vector_inputs::reverse",
+    "sql": "SELECT ARRAY[1,2]::smallint[]::int2vector",
+    "expected": {
+      "diagnostics": [
+        "explicit_cast_not_defined"
+      ],
+      "columns": [
+        {
+          "name": "array",
+          "type": {
+            "schema_name": "pg_catalog",
+            "local_name": "int2vector",
+            "is_array": false
+          },
+          "nullability": "not_null"
+        }
+      ]
+    }
+  },
+  {
+    "name": "vectors::invalid_vector_inputs::incompatible_cast",
+    "sql": "SELECT '1 2'::oidvector::smallint[]",
+    "expected": {
+      "diagnostics": [
+        "explicit_cast_not_defined"
+      ],
+      "columns": [
+        {
+          "name": "",
+          "type": {
+            "schema_name": "pg_catalog",
+            "local_name": "int2",
+            "is_array": true
+          },
+          "nullability": "not_null"
+        }
+      ]
+    }
+  },
+  {
+    "name": "vectors::invalid_vector_inputs::scalar",
+    "sql": "SELECT * FROM unnest(1::smallint)",
+    "expected": {
+      "diagnostics": [
+        "parameter_type_mismatch_for_table_function",
+        "query_reference_not_found"
+      ]
+    }
+  },
+  {
+    "name": "vectors::invalid_vector_inputs::wrong_element",
+    "sql": "SELECT array_position('1 2'::int2vector, true)",
+    "expected": {
+      "diagnostics": [
+        "function_overload_resolution_failed"
+      ],
+      "columns": [
+        {
+          "name": "",
+          "nullability": "unknown"
+        }
+      ]
+    }
+  }
+]

@@ -1,0 +1,197 @@
+[
+  {
+    "name": "invalid_operands_report_semantic_problems::types",
+    "sql": "select greatest(1,true)",
+    "expected": {
+      "diagnostics": [
+        "min_max_incompatible_types"
+      ],
+      "columns": [
+        {
+          "name": "greatest",
+          "type": null,
+          "nullability": "not_null"
+        }
+      ]
+    }
+  },
+  {
+    "name": "invalid_operands_report_semantic_problems::typed_string",
+    "sql": "select least('2'::text,1)",
+    "expected": {
+      "diagnostics": [
+        "min_max_incompatible_types"
+      ],
+      "columns": [
+        {
+          "name": "least",
+          "type": null,
+          "nullability": "not_null"
+        }
+      ]
+    }
+  },
+  {
+    "name": "invalid_operands_report_semantic_problems::preferred_category",
+    "sql": "select least('a'::text,'b'::\"char\")",
+    "expected": {
+      "diagnostics": [
+        "min_max_incompatible_types"
+      ],
+      "columns": [
+        {
+          "name": "least",
+          "type": null,
+          "nullability": "not_null"
+        }
+      ]
+    }
+  },
+  {
+    "name": "invalid_operands_report_semantic_problems::json",
+    "sql": "select greatest('{}'::json,'{}'::json)",
+    "expected": {
+      "diagnostics": [
+        "min_max_not_ordered"
+      ],
+      "columns": [
+        {
+          "name": "greatest",
+          "type": null,
+          "nullability": "not_null"
+        }
+      ]
+    }
+  },
+  {
+    "name": "invalid_operands_report_semantic_problems::parameter_json",
+    "sql": "select greatest($1,'{}'::json)",
+    "expected": {
+      "diagnostics": [
+        "min_max_not_ordered",
+        "parameter_constraint"
+      ],
+      "columns": [
+        {
+          "name": "greatest",
+          "type": null,
+          "nullability": "not_null"
+        }
+      ]
+    }
+  },
+  {
+    "name": "invalid_operands_report_semantic_problems::parameter_json_reverse",
+    "sql": "select least('{}'::json,$1)",
+    "expected": {
+      "diagnostics": [
+        "min_max_not_ordered",
+        "parameter_constraint"
+      ],
+      "columns": [
+        {
+          "name": "least",
+          "type": null,
+          "nullability": "not_null"
+        }
+      ]
+    }
+  },
+  {
+    "name": "invalid_operands_report_semantic_problems::parameter_json_array",
+    "sql": "select least($1,'{}'::json[])",
+    "expected": {
+      "diagnostics": [
+        "min_max_not_ordered",
+        "parameter_constraint"
+      ],
+      "columns": [
+        {
+          "name": "least",
+          "type": null,
+          "nullability": "not_null"
+        }
+      ]
+    }
+  },
+  {
+    "name": "invalid_operands_report_semantic_problems::dynamic_left",
+    "sql": "select greatest(pg_control_system(),1)",
+    "expected": {
+      "diagnostics": [
+        "min_max_incompatible_types"
+      ],
+      "columns": [
+        {
+          "name": "greatest",
+          "type": null,
+          "nullability": "not_null"
+        }
+      ]
+    }
+  },
+  {
+    "name": "invalid_operands_report_semantic_problems::dynamic_right",
+    "sql": "select least(1,pg_control_system())",
+    "expected": {
+      "diagnostics": [
+        "min_max_incompatible_types"
+      ],
+      "columns": [
+        {
+          "name": "least",
+          "type": null,
+          "nullability": "not_null"
+        }
+      ]
+    }
+  },
+  {
+    "name": "invalid_operands_report_semantic_problems::json_array",
+    "sql": "select least('{}'::json[],'{}'::json[])",
+    "expected": {
+      "diagnostics": [
+        "min_max_not_ordered"
+      ],
+      "columns": [
+        {
+          "name": "least",
+          "type": null,
+          "nullability": "not_null"
+        }
+      ]
+    }
+  },
+  {
+    "name": "incompatible_parameter_uses_report_constraints",
+    "sql": "select greatest($1,1) where $1",
+    "expected": {
+      "diagnostics": [
+        "parameter_constraint"
+      ],
+      "columns": [
+        {
+          "name": "greatest",
+          "type": null,
+          "nullability": "not_null"
+        }
+      ]
+    }
+  },
+  {
+    "name": "later_operands_are_resolved_even_after_non_null_literal",
+    "sql": "select least(1,missing.n)",
+    "expected": {
+      "diagnostics": [
+        "undefined_alias"
+      ],
+      "columns": [
+        {
+          "name": "least",
+          "type": null,
+          "nullability": "not_null"
+        }
+      ]
+    }
+  }
+]

@@ -1,0 +1,48 @@
+[
+  {
+    "name": "sem::parameter_resolution::case_tests::failures_retain_case_and_allow_next_statement::contradictory",
+    "sql": "SELECT CASE WHEN $1 THEN $1 ELSE 1 END",
+    "expected": {
+      "diagnostics": [
+        "parameter_constraint"
+      ],
+      "columns": [
+        {
+          "name": "",
+          "nullability": "unknown"
+        }
+      ]
+    }
+  },
+  {
+    "name": "sem::parameter_resolution::case_tests::failures_retain_case_and_allow_next_statement::mixed_results",
+    "sql": "SELECT CASE WHEN $1 THEN 1 ELSE true END",
+    "expected": {
+      "diagnostics": [
+        "parameter_constraint"
+      ],
+      "columns": [
+        {
+          "name": "",
+          "nullability": "not_null"
+        }
+      ]
+    }
+  },
+  {
+    "name": "sem::parameter_resolution::case_tests::failures_retain_case_and_allow_next_statement::non_boolean",
+    "sql": "SELECT CASE WHEN 1 THEN $1 ELSE 1 END",
+    "expected": {
+      "diagnostics": [
+        "parameter_constraint",
+        "parameter_type_unresolved"
+      ],
+      "columns": [
+        {
+          "name": "",
+          "nullability": "unknown"
+        }
+      ]
+    }
+  }
+]

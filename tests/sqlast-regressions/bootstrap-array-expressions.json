@@ -1,0 +1,38 @@
+[
+  {
+    "name": "builtin_bootstrap::array_expression",
+    "sql": "SELECT ARRAY(SELECT 'role'::name) AS roles",
+    "expected": {
+      "diagnostics": [],
+      "columns": [
+        {
+          "name": "roles",
+          "type": {
+            "schema_name": "pg_catalog",
+            "local_name": "name",
+            "is_array": true
+          },
+          "nullability": "not_null"
+        }
+      ]
+    }
+  },
+  {
+    "name": "builtin_bootstrap::case_expression",
+    "sql": "SELECT CASE WHEN true THEN string_to_array('public'::text, ''::text)::name[] ELSE ARRAY(SELECT 'role'::name) END AS roles",
+    "expected": {
+      "diagnostics": [],
+      "columns": [
+        {
+          "name": "roles",
+          "type": {
+            "schema_name": "pg_catalog",
+            "local_name": "name",
+            "is_array": true
+          },
+          "nullability": "nullable"
+        }
+      ]
+    }
+  }
+]

@@ -1,4 +1,5 @@
 //! Semantic behavior at the query-analysis boundary. All fixtures use a small catalog.
+mod array_subquery;
 mod call_arguments;
 mod column_scope;
 mod derived_aliases;

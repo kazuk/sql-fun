@@ -1144,6 +1144,21 @@
                   "const": "Empty"
                 },
                 {
+                  "description": "ARRAY(query) requires exactly one output column.",
+                  "type": "object",
+                  "properties": {
+                    "SubqueryColumns": {
+                      "type": "integer",
+                      "format": "uint",
+                      "minimum": 0
+                    }
+                  },
+                  "required": [
+                    "SubqueryColumns"
+                  ],
+                  "additionalProperties": false
+                },
+                {
                   "description": "Operand types cannot be matched or coerced to the target.",
                   "type": "object",
                   "properties": {
@@ -4698,6 +4713,21 @@
                   "description": "An empty constructor has no explicit element type.",
                   "type": "string",
                   "const": "Empty"
+                },
+                {
+                  "description": "ARRAY(query) requires exactly one output column.",
+                  "type": "object",
+                  "properties": {
+                    "SubqueryColumns": {
+                      "type": "integer",
+                      "format": "uint",
+                      "minimum": 0
+                    }
+                  },
+                  "required": [
+                    "SubqueryColumns"
+                  ],
+                  "additionalProperties": false
                 },
                 {
                   "description": "Operand types cannot be matched or coerced to the target.",

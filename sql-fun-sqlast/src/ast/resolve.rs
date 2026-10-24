@@ -696,14 +696,19 @@ impl Subquery {
             ))?;
         }
         let query = self.query.resolve_in(context, Some(scope))?;
-        self.kind.resolve(&query)
+        self.kind.resolve(context, &query)
     }
 }
 
 impl SubqueryKind {
-    fn resolve(&self, query: &crate::sem::SelectStatement) -> Result<SemScalarExpr, AnalysisError> {
+    fn resolve(
+        &self,
+        context: &mut impl ParseContext,
+        query: &crate::sem::SelectStatement,
+    ) -> Result<SemScalarExpr, AnalysisError> {
         match self {
             Self::Exists => Ok(SemScalarExpr::exists(query)),
+            Self::Array => SemScalarExpr::array_subquery(context, query),
             _ => SemScalarExpr::subquery(query),
         }
     }

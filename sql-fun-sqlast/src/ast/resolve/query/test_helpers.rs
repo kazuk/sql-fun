@@ -15,6 +15,7 @@ pub(super) fn catalog() -> TestParseContext {
     for ty in [
         PgBuiltInType::int2(),
         PgBuiltInType::int4(),
+        PgBuiltInType::int4().array_type(),
         PgBuiltInType::int8(),
         PgBuiltInType::bool(),
         PgBuiltInType::text(),

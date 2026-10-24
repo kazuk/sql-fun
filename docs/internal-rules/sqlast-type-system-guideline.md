@@ -149,6 +149,19 @@ that subsequent SQL member access is legal. See
 [`tests/arrays.rs`](../../sql-fun-sqlast/tests/arrays.rs) for the constructor,
 parameter, coercion, and record-overload regression coverage.
 
+### ARRAY query results
+
+`ArraySubqueryExpr` retains an analyzed one-column query separately from the
+operand-list `ArrayExpr`. It constructs a non-null array, including empty
+results and nullable scalar elements. Array-valued columns retain the same
+PostgreSQL array type identity; runtime accumulation restrictions do not justify
+rejecting their static types. A pending star projection defers the width check
+until parameter finalization can expand it. The existing construction projection
+keeps both scalar and array-valued source alternatives when an enclosing result
+constraint is propagated backwards. Keep the result node stable across expansion
+so enclosing operations retain their graph links. Invalid widths retain the
+query, an empty result domain, and an `array_subquery_columns` diagnostic.
+
 ## Deferred parameter constraints
 
 [`parameter_resolution.rs`](../../sql-fun-sqlast/src/sem/parameter_resolution.rs)

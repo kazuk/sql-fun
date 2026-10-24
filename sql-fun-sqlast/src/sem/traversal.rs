@@ -29,6 +29,12 @@ pub(crate) trait SemanticVisitor {
     {
         columns.walk(self)
     }
+    fn array_subquery(
+        &mut self,
+        _value: &mut crate::sem::ArraySubqueryExpr,
+    ) -> Result<(), AnalysisError> {
+        Ok(())
+    }
     fn subscript(&mut self, _value: &SemScalarExpr) {}
     // UPDATE/DELETE finalize subquery projections before surrounding uses.
     // INSERT SELECT instead receives destination assignment context.

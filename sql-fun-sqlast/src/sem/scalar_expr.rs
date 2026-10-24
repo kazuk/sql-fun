@@ -1,6 +1,7 @@
 mod analyze;
 mod arith_expr;
 mod array;
+mod array_subquery;
 mod boolean;
 mod case_expr;
 mod cast_expr;
@@ -25,6 +26,7 @@ mod whole_row;
 pub use self::{
     arith_expr::ArithExpr,
     array::ArrayExpr,
+    array_subquery::ArraySubqueryExpr,
     boolean::{BooleanExpr, NullTestExpr},
     case_expr::{CaseExpr, CaseWhen},
     cast_expr::{ImplicitCastExpr, TypeCastExpr},
@@ -125,6 +127,8 @@ pub enum SemScalarExpr {
     Row(RowExpr),
     /// array expression
     Array(ArrayExpr),
+    /// ARRAY(query) retaining its analyzed child and result type domain.
+    ArraySubquery(ArraySubqueryExpr),
     /// const expression
     Const(ScalarConstExpr),
     /// column reference expression
@@ -210,6 +214,7 @@ impl SemScalarExpr {
             Self::Grouping(value) => value.canonicalize_grouping_key(),
             Self::MinMax(value) => value.canonicalize_grouping_key(),
             Self::Array(value) => value.canonicalize_grouping_key(),
+            Self::ArraySubquery(value) => value.canonicalize_grouping_key(),
             Self::Case(value) => value.canonicalize_grouping_key(),
             Self::Coalesce(value) => value.canonicalize_grouping_key(),
             Self::FuncCall(value) => value.canonicalize_grouping_key(),
@@ -410,6 +415,7 @@ impl SemScalarExpr {
             Self::Constrained(value) => Some(value.node()),
             Self::MinMax(value) => value.node(),
             Self::Array(value) => value.node(),
+            Self::ArraySubquery(value) => value.node(),
             Self::Case(value) => value.node(),
             Self::Coalesce(value) => value.node(),
             _ => None,
@@ -507,6 +513,7 @@ impl SemScalarExpr {
             Self::NullTest(_null_test_expr) => Self::builtin_boolean_type(),
             Self::SubLink(sub_link_expr) => sub_link_expr.get_type(),
             Self::Exists(value) => value.get_type(),
+            Self::ArraySubquery(value) => value.get_type(),
             Self::Coalesce(coalesce_expr) => coalesce_expr.get_type(),
             Self::Row(row) => Some(row.get_type()),
             Self::WholeRow(row) => row.get_type(),
@@ -540,6 +547,7 @@ impl SemScalarExpr {
             Self::NullTest(null_test_expr) => null_test_expr.is_not_null(),
             Self::SubLink(sub_link_expr) => sub_link_expr.is_not_null(),
             Self::Exists(value) => value.is_not_null(),
+            Self::ArraySubquery(value) => value.is_not_null(),
             Self::Coalesce(coalesce_expr) => coalesce_expr.is_not_null(),
             Self::Row(_) => Some(true),
             Self::WholeRow(row) => row.is_not_null(),
@@ -588,6 +596,7 @@ impl SemScalarExpr {
             | Self::Param(_)
             | Self::Constrained(_)
             | Self::Exists(_)
+            | Self::ArraySubquery(_)
             | Self::Grouping(_)
             | Self::MergeAction
             | Self::WholeRow(_) => None,
@@ -597,7 +606,7 @@ impl SemScalarExpr {
 
     pub(super) fn array_projection_name(&self) -> Option<&'static str> {
         match self {
-            Self::Array(_) => Some("array"),
+            Self::Array(_) | Self::ArraySubquery(_) => Some("array"),
             Self::TypeCast(value) => value.array_projection_name(),
             _ => None,
         }
@@ -627,7 +636,7 @@ impl SemScalarExpr {
             Self::NamedArg(named_arg_expr) => named_arg_expr.value().get_column_name(),
             Self::Indirection(_indirection_expr) => String::new(),
             Self::ImplicitCast(_implicit_cast_expr) => todo!(),
-            Self::Array(_) => "array".to_owned(),
+            Self::Array(_) | Self::ArraySubquery(_) => "array".to_owned(),
             Self::Grouping(_) => "grouping".to_owned(),
             Self::MergeAction => "merge_action".to_owned(),
             Self::Unexpected(_node) => todo!(),
@@ -948,6 +957,7 @@ impl SemScalarExpr {
             Self::NullTest(v) => v.walk(visitor)?,
             Self::SubLink(v) => v.walk(visitor)?,
             Self::Exists(value) => value.walk(visitor)?,
+            Self::ArraySubquery(value) => value.walk(visitor)?,
             Self::Coalesce(v) => v.walk(visitor)?,
             Self::Row(v) => v.walk(visitor)?,
             Self::WholeRow(v) => v.walk(visitor)?,
@@ -1010,6 +1020,7 @@ impl SemScalarExpr {
             Self::Constrained(value) => value.apply_constraints(constraints),
             Self::MinMax(value) => value.apply_constraints(constraints),
             Self::Array(value) => value.apply_constraints(constraints),
+            Self::ArraySubquery(value) => value.apply_constraints(constraints),
             Self::Case(value) => value.apply_constraints(constraints),
             Self::Coalesce(value) => value.apply_constraints(constraints),
             _ => {}
@@ -1031,6 +1042,10 @@ impl SemScalarExpr {
             Self::SubLink(_) => parameters.scalar_result(self),
             // Child constraints are collected by traversal; EXISTS has its own boolean type.
             Self::Exists(_) => None,
+            Self::ArraySubquery(value) => {
+                value.collect_constraints(parameters, context)?;
+                None
+            }
             Self::Case(value) => {
                 value.collect_constraints(parameters, context)?;
                 None

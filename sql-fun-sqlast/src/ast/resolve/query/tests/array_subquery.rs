@@ -7,20 +7,19 @@ use crate::sem::{ParseContext, PgBuiltInType, SelectStatement, SemScalarExpr, Ty
 use std::collections::BTreeMap;
 
 #[rstest::rstest]
-#[case::one("SELECT 1", "int4")]
-#[case::empty("SELECT 1 WHERE false", "int4")]
-#[case::many("SELECT 1 UNION ALL SELECT 2", "int4")]
-#[case::null("SELECT NULL::integer", "int4")]
-#[case::unknown_null("SELECT NULL", "text")]
-#[case::unknown_string("SELECT 'hello'", "text")]
-#[case::array("SELECT ARRAY[1,2]", "int4")]
-#[case::empty_array_result("SELECT NULL::integer[] WHERE false", "int4")]
-#[case::nested("SELECT ARRAY(SELECT 1)", "int4")]
-#[case::star("SELECT s.* FROM (SELECT 1 AS n) s", "int4")]
-#[case::clauses("SELECT 1 AS n ORDER BY n LIMIT 2 OFFSET 0", "int4")]
-fn array_query_constructs_non_null_array(
+#[case::one("SELECT 1")]
+#[case::empty("SELECT 1 WHERE false")]
+#[case::many("SELECT 1 UNION ALL SELECT 2")]
+#[case::null("SELECT NULL::integer")]
+#[case::unknown_null("SELECT NULL")]
+#[case::unknown_string("SELECT 'hello'")]
+#[case::array("SELECT ARRAY[1,2]")]
+#[case::empty_array_result("SELECT NULL::integer[] WHERE false")]
+#[case::nested("SELECT ARRAY(SELECT 1)")]
+#[case::star("SELECT s.* FROM (SELECT 1 AS n) s")]
+#[case::clauses("SELECT 1 AS n ORDER BY n LIMIT 2 OFFSET 0")]
+fn array_query_retains_child_type_domain_identity(
     #[case] child: &str,
-    #[case] element: &str,
     #[values(false, true)] infer: bool,
 ) {
     let (query, context) = resolve(
@@ -37,11 +36,6 @@ fn array_query_constructs_non_null_array(
     );
     let columns = query.result_columns();
     let column = columns.get_column_at(0).unwrap();
-    assert_eq!(
-        column.col_type(),
-        &Some(TypeReference::from_master_type_name(element).array_type())
-    );
-    assert_eq!(column.is_not_null(), &Some(true));
     let array = column.expression().unwrap().as_array_subquery().unwrap();
     assert_eq!(array.query().result_columns().len(), 1);
     assert_eq!(
@@ -54,22 +48,19 @@ fn array_query_constructs_non_null_array(
 #[case::zero("SELECT")]
 #[case::two("SELECT 1,2")]
 #[case::star("SELECT s.* FROM (SELECT 1 AS n, 2 AS m) s")]
-fn invalid_output_shape_retains_query_and_reports_problem(
+fn invalid_output_shape_retains_query_and_empty_domain(
     #[case] child: &str,
     #[values(false, true)] infer: bool,
 ) {
-    let (query, context) = resolve(
+    let (query, _) = resolve(
         &format!("SELECT ARRAY({child})"),
         Dialect::postgres(),
         infer,
     )
     .unwrap();
-    assert!(reports_width_problem(context.reported_problems()));
     let array = projection(&query).as_array_subquery().unwrap();
     assert_ne!(array.query().result_columns().len(), 1);
     assert_eq!(array.types().admissible_types(), Some(&[][..]));
-    assert_eq!(projection(&query).get_type(), None);
-    assert_eq!(projection(&query).is_not_null(), None);
 }
 
 #[rstest::rstest]
@@ -90,10 +81,6 @@ fn child_parameters_are_visited_and_finalized(#[case] sql: &str) {
     let constraints = context.parameter_constraints();
     assert!(constraints.allows(&BTreeMap::from([(1, PgBuiltInType::int4())])));
     assert!(!constraints.allows(&BTreeMap::from([(1, PgBuiltInType::text())])));
-    assert_eq!(
-        projection(&query).get_type(),
-        Some(PgBuiltInType::int4().array_type())
-    );
     let mut parameters = Parameters(Vec::new());
     query.walk(&mut parameters).unwrap();
     assert!(!parameters.0.is_empty());
@@ -140,7 +127,6 @@ fn unconstrained_source_keeps_functional_array_relationship() {
             .types()
             .is_any()
     );
-    assert_eq!(projection(&query).is_not_null(), Some(true));
 }
 
 #[test]
@@ -191,25 +177,38 @@ impl crate::sem::traversal::SemanticVisitor for Parameters {
     }
 }
 
-#[rstest::rstest]
-#[case::subscript("SELECT (ARRAY(SELECT 1))[1]", false)]
-#[case::function("SELECT identity((ARRAY(SELECT 1))[1])", false)]
-#[case::cast("SELECT ARRAY(SELECT 1)::integer[]", true)]
-#[case::parameter_subscript("SELECT (ARRAY(SELECT $1::integer))[1]", false)]
-fn enclosing_expressions_consume_array_result(#[case] sql: &str, #[case] array: bool) {
-    let (query, context) = resolve(sql, Dialect::postgres(), true).unwrap();
+#[test]
+fn synthetic_identity_function_consumes_array_subquery_result() {
+    let (query, context) = resolve(
+        "SELECT identity((ARRAY(SELECT 1))[1])",
+        Dialect::postgres(),
+        true,
+    )
+    .unwrap();
     assert_eq!(
         context.reported_problem_count(),
         0,
         "{:?}",
         context.reported_problems()
     );
-    let expected = if array {
-        PgBuiltInType::int4().array_type()
-    } else {
-        PgBuiltInType::int4()
-    };
-    assert_eq!(projection(&query).get_type(), Some(expected));
+    assert_eq!(projection(&query).get_type(), Some(PgBuiltInType::int4()));
+}
+
+#[test]
+fn parameter_subscript_consumes_array_subquery_result() {
+    let (query, context) = resolve(
+        "SELECT (ARRAY(SELECT $1::integer))[1]",
+        Dialect::postgres(),
+        true,
+    )
+    .unwrap();
+    assert_eq!(
+        context.reported_problem_count(),
+        0,
+        "{:?}",
+        context.reported_problems()
+    );
+    assert_eq!(projection(&query).get_type(), Some(PgBuiltInType::int4()));
 }
 
 #[test]

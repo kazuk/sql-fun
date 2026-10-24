@@ -37,5 +37,6 @@ accept `COALESCE(1,$1)`. The `COALESCE(1,$1)` case in the
 assigned real-catalog integration group remains in Rust: the builtin-only CLI
 reports `unreachable_coalesce_argument` and `parameter_type_unresolved`, while
 the source test's contract is its internal input-domain restriction and warning
-metadata. This is not a duplicate public assertion. The default/project catalog
-initialization issue is tracked separately by #727.
+metadata. This is not a duplicate public assertion. PR #761 resolved the earlier
+catalog initialization issue (#727); default/project schema levels remain outside
+the accepted migration scope.

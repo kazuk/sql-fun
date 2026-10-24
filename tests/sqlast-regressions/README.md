@@ -38,16 +38,18 @@ AST structure, binding identity, parameter domains, internal error contracts and
 schema-layer state transitions stay at their existing unit/integration boundary.
 
 The accepted scope for issue #757 is builtin-only migration. Tests requiring
-project/default SQL schemas remain in Rust while [#727](https://github.com/kazuk/sql-fun/issues/727)
-tracks shipped-schema diagnostics. No catalog substitution or diagnostic
-suppression is used. The current manifest executes 228 positive contract inputs
-(112 for PostgreSQL 17 and 116 for PostgreSQL 18), plus three negative-control
+project/default SQL schemas remain in Rust. [#761](https://github.com/kazuk/sql-fun/pull/761)
+resolved the earlier #727 catalog-initialization problem without expanding this
+scope. No catalog substitution or diagnostic suppression is used. The current
+manifest executes 280 positive contract inputs (137 for PostgreSQL 17 and 143
+for PostgreSQL 18), plus three negative-control
 inputs, an invalid-selector check and a missing-datasource check for each version.
 
 See [the broad inventory](inventory-retained.md) and the detailed
 [ARRAY/min-max](inventory-arrays.md), [CASE/COALESCE](inventory-expressions.md),
-[query/type/view](inventory-query.md), [cast](inventory-casts.md), and
-[vector](inventory-vectors.md) mappings for preserved scenarios and reasons that
+[query/type/view](inventory-query.md), [cast](inventory-casts.md),
+[vector](inventory-vectors.md), and [ARRAY-query](inventory-array-subqueries.md)
+mappings for preserved scenarios and reasons that
 internal assertions remain in Rust. Counts refer to SQL inputs, not removed Rust
 tests: one old test may check multiple SQL expressions, and mixed tests retain
 internal assertions after their observable result assertions move to the CLI.

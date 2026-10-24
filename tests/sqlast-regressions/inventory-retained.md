@@ -28,7 +28,7 @@ integration scope is visible without duplicating each fixture row.
 | [`case_parameters.rs`](../../sql-fun-sqlast/tests/case_parameters.rs) and [`coalesce_parameters.rs`](../../sql-fun-sqlast/tests/coalesce_parameters.rs) | Retain real-catalog correlated parameter domains, result-column selections, comparison/operand AST bindings, and cast metadata. Separate error-only cases are mapped in [`inventory-expressions.md`](inventory-expressions.md); cases whose CLI output omits a source-required diagnostic remain Rust-only there. |
 | [`query_resolution.rs`](../../sql-fun-sqlast/tests/query_resolution.rs) | Per-case public resolver success/failure disposition is recorded in [`inventory-query.md`](inventory-query.md). |
 | [`type_metadata_regressions.rs`](../../sql-fun-sqlast/tests/type_metadata_regressions.rs) | Qualified domain identity, preferred cast priority, and concrete/parameter overload selection are covered by the metadata fixture where applicable; custom-schema cases stay in Rust under the accepted builtin-only scope. |
-| [`writable_views.rs`](../../sql-fun-sqlast/tests/writable_views.rs) | Per-case dispositions are in [`inventory-query.md`](inventory-query.md). Custom project-schema scenarios remain Rust coverage under #727; many cases inspect view-write support, binding/lineage, applicability, and catalog-layer state that the CLI result contract does not expose. |
+| [`writable_views.rs`](../../sql-fun-sqlast/tests/writable_views.rs) | Per-case dispositions are in [`inventory-query.md`](inventory-query.md). Custom project-schema scenarios remain Rust coverage under the accepted builtin-only scope; many cases inspect view-write support, binding/lineage, applicability, and catalog-layer state that the CLI result contract does not expose. |
 
 ## Other real-catalog semantic coverage
 
@@ -107,8 +107,10 @@ they are not unresolved migration candidates.
 
 The accepted migration scope is builtin-only. The CASE/COALESCE fixtures use
 `--schema-level builtin` and passed against PostgreSQL 17 and 18. Custom-schema
-cases remain in their Rust integration tests; default/project catalog
-initialization is tracked separately by #727.
+cases remain in their Rust integration tests. #761 resolved the earlier #727
+catalog initialization failure; the accepted scope still excludes project/default
+schema migrations. Its eligible ARRAY-query additions are mapped in
+[inventory-array-subqueries.md](inventory-array-subqueries.md).
 
 ## Fixture representation
 

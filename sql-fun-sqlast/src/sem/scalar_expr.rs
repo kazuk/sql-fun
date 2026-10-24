@@ -32,7 +32,7 @@ pub use self::{
     collate::CollateExpr,
     column_ref::{
         ColumnReferenceExpr, CteColumnRef, MergeRecordColumnRef, OutputColumnRef,
-        QualifiedColumnFailure, SubQueryColumnRef, TableColumnRef,
+        QualifiedColumnFailure, SubQueryColumnRef, SystemColumnRef, TableColumnRef,
     },
     const_expr::ScalarConstExpr,
     constrained::ConstrainedExpr,
@@ -233,6 +233,14 @@ impl SemScalarExpr {
     pub const fn table_column_reference(&self) -> Option<&TableColumnRef> {
         if let Self::ColumnRef(reference) = self {
             reference.table_column_reference()
+        } else {
+            None
+        }
+    }
+    /// Resolved PostgreSQL system attribute, when directly referenced.
+    pub const fn system_column_reference(&self) -> Option<&SystemColumnRef> {
+        if let Self::ColumnRef(reference) = self {
+            reference.system_column_reference()
         } else {
             None
         }

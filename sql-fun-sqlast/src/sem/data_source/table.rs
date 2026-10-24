@@ -1,7 +1,7 @@
 use crate::sem::{
     AliasSpec, AnalysisError, AnalysisProblem, ColumnName, DataSource, Nullable, TableName,
     data_source::AliasName,
-    scalar_expr::{ColumnReferenceExpr, TableColumnRef},
+    scalar_expr::{ColumnReferenceExpr, SystemColumnRef},
 };
 
 #[derive(Debug, Clone, Eq, Hash, PartialEq, serde::Serialize, serde::Deserialize)]
@@ -64,7 +64,8 @@ impl TableDataSource {
                 .is_some_and(|index| table.get_column_at(index).is_some())
                 || table
                     .get_column_def_with_skip_count(column, self.alias.len_derived_column())
-                    .is_some())
+                    .is_some()
+                || SystemColumnRef::lookup_type(context, column).is_some())
         {
             names.push(self.alias.clone());
         }
@@ -105,21 +106,32 @@ impl TableDataSource {
             table.get_column_def_with_skip_count(column, self.alias.len_derived_column())
         {
             Some(column_def)
+        } else if let Some(column_type) = SystemColumnRef::lookup_type(context, column) {
+            return Ok(ColumnReferenceExpr::system_column(
+                alias,
+                column,
+                &self.name,
+                &column_type,
+                nullability,
+            ));
         } else {
             context.report_analysis_problem(AnalysisProblem::column_not_found_in_table(
                 &self.name, column,
             ))?;
             None
         };
-        Ok(ColumnReferenceExpr::TableColumn(TableColumnRef::new(
+        Ok(ColumnReferenceExpr::table_column(
             alias,
             column,
             &self.name,
             column_def,
             nullability,
-        )))
+        ))
     }
 }
+
+#[cfg(test)]
+mod tests;
 
 impl TableDataSource {
     pub(crate) fn walk<V: crate::sem::traversal::SemanticVisitor>(

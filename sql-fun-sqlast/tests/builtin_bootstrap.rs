@@ -40,6 +40,58 @@ fn loads_builtin_and_user_schemas(#[case] version: &str) -> Result<(), Box<dyn s
         builtins.get_table(&pg_class).is_some(),
         "PostgreSQL {version}"
     );
+    // The shipped catalog's pg_seclabels joins use implicit tableoid attributes.
+    for problem in builtins.problems() {
+        assert_ne!(
+            problem.code(),
+            "column_not_found_in_table",
+            "PostgreSQL {version}: {problem:?}"
+        );
+    }
+    let sql = "SELECT c.tableoid FROM pg_catalog.pg_class c";
+    let mut query_context = ::sql_fun_sqlast::sem::SchemaFileContext::new(
+        std::path::Path::new("system-column.sql"),
+        builtins.base_context(),
+        &args,
+        selected,
+    );
+    ::sql_fun_sqlast::sem::MutSourcePathWithSpan::set_source_path_with_span(
+        &mut query_context,
+        &::sql_fun_sqlast::sem::SourcePathWithSpan::new(
+            "system-column.sql",
+            &::sql_fun_sqlast::StringSpan::new(0, sql.len()),
+        ),
+    );
+    let analyzed =
+        ::sql_fun_sqlast::parse_statements(sql, ::sql_fun_sqlast::ast::Dialect::postgres())
+            .next()
+            .unwrap()?
+            .analyze(query_context)?;
+    assert!(analyzed.context().problems().is_empty());
+    let query = analyzed.ast().clone().into_select_statemtnt().unwrap();
+    let result = query.result_columns().get_column_at(0).unwrap();
+    assert_eq!(
+        result.col_type(),
+        &Some(::sql_fun_sqlast::sem::TypeReference::from_master_type_name(
+            "oid"
+        ))
+    );
+    let binding = result
+        .expression()
+        .unwrap()
+        .system_column_reference()
+        .unwrap();
+    assert_eq!(
+        binding.relation(),
+        &FullName::with_schema("pg_catalog", "pg_class")
+    );
+    assert_eq!(binding.attribute().as_str(), "tableoid");
+    let table = builtins.get_table(&pg_class).unwrap();
+    assert!(
+        table
+            .get_column_def(&::sql_fun_sqlast::sem::ColumnName::from("tableoid"))
+            .is_none()
+    );
     let user_schema = tempfile::NamedTempFile::new()?;
     std::fs::write(
         user_schema.path(),

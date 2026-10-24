@@ -4,6 +4,7 @@ mod merge_record_column_ref;
 mod output_column_ref;
 mod qualified_column_failure;
 mod subquery_column_ref;
+mod system_column_ref;
 mod table_column_ref;
 mod table_func_col_ref;
 mod view_column_ref;
@@ -17,6 +18,7 @@ pub use self::{
     output_column_ref::OutputColumnRef,
     qualified_column_failure::QualifiedColumnFailure,
     subquery_column_ref::SubQueryColumnRef,
+    system_column_ref::SystemColumnRef,
     table_column_ref::TableColumnRef,
     table_func_col_ref::TableFunctionColumnRef,
     view_column_ref::ViewColumnRef,
@@ -49,6 +51,8 @@ pub enum ColumnReferenceExpr {
     CteColumn(CteColumnRef),
     /// Table column
     TableColumn(TableColumnRef),
+    /// PostgreSQL system attribute, separate from declared table columns.
+    SystemColumn(SystemColumnRef),
     /// View column
     ViewColumn(ViewColumnRef),
     /// table function result column
@@ -87,6 +91,9 @@ impl ColumnReferenceExpr {
         match self {
             Self::MergeRecord(value) => Self::MergeRecord(value.with_reference_name(alias, column)),
             Self::TableColumn(value) => Self::TableColumn(value.with_reference_name(alias, column)),
+            Self::SystemColumn(value) => {
+                Self::SystemColumn(value.with_reference_name(alias, column))
+            }
             Self::ViewColumn(value) => Self::ViewColumn(value.with_reference_name(alias, column)),
             Self::CteColumn(value) => Self::CteColumn(value.with_reference_name(alias, column)),
             Self::SubQueryColumn(value) => {
@@ -140,6 +147,31 @@ impl ColumnReferenceExpr {
             None
         }
     }
+    /// Resolved PostgreSQL system-attribute binding.
+    pub const fn system_column_reference(&self) -> Option<&SystemColumnRef> {
+        if let Self::SystemColumn(reference) = self {
+            Some(reference)
+        } else {
+            None
+        }
+    }
+
+    pub(crate) fn system_column(
+        alias: &crate::sem::AliasName,
+        column: &ColumnName,
+        table: &crate::sem::TableName,
+        column_type: &TypeReference,
+        nullable: bool,
+    ) -> Self {
+        Self::SystemColumn(SystemColumnRef::new(
+            alias,
+            column,
+            table,
+            column_type,
+            nullable,
+        ))
+    }
+
     /// MERGE record binding, when this reference belongs to a MERGE record.
     pub const fn merge_record_reference(&self) -> Option<&MergeRecordColumnRef> {
         if let Self::MergeRecord(reference) = self {
@@ -269,6 +301,7 @@ impl ColumnReferenceExpr {
             Self::OutputColumn(r) => r.get_type(),
             Self::CteColumn(r) => r.get_type(),
             Self::TableColumn(r) => r.get_type(),
+            Self::SystemColumn(r) => r.get_type(),
             Self::ViewColumn(r) => r.get_type(),
             Self::TableFuncColumn(r) => r.get_type(),
             Self::SubQueryColumn(r) => r.get_type(),
@@ -289,6 +322,7 @@ impl ColumnReferenceExpr {
             Self::OutputColumn(r) => r.is_not_null(),
             Self::CteColumn(r) => r.is_not_null(),
             Self::TableColumn(r) => r.is_not_null(),
+            Self::SystemColumn(r) => r.is_not_null(),
             Self::ViewColumn(r) => r.is_not_null(),
             Self::TableFuncColumn(r) => r.is_not_null(),
             Self::SubQueryColumn(r) => r.is_not_null(),
@@ -309,6 +343,7 @@ impl ColumnReferenceExpr {
             Self::OutputColumn(r) => r.get_column_def(),
             Self::CteColumn(r) => r.get_column_def(),
             Self::TableColumn(r) => r.get_column_def(),
+            Self::SystemColumn(r) => r.get_column_def(),
             Self::ViewColumn(r) => r.get_column_def(),
             Self::TableFuncColumn(r) => r.get_column_def(),
             Self::SubQueryColumn(r) => r.get_column_def(),
@@ -329,6 +364,7 @@ impl ColumnReferenceExpr {
             Self::OutputColumn(r) => r.get_column_name(),
             Self::CteColumn(r) => r.get_column_name(),
             Self::TableColumn(r) => r.get_column_name(),
+            Self::SystemColumn(r) => r.get_column_name(),
             Self::ViewColumn(r) => r.get_column_name(),
             Self::TableFuncColumn(r) => r.get_column_name(),
             Self::SubQueryColumn(r) => r.get_column_name(),

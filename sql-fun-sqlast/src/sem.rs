@@ -206,7 +206,7 @@ pub use self::{
         ImplicitCastExpr, IndirectionExpr, MergeRecordColumnRef, MinMaxExpr, NamedArgExpr,
         NullTestExpr, OutputColumnRef, ParamRef, QualifiedColumnFailure, ScalarAnalysisContext,
         ScalarConstExpr, SemScalarExpr, SqlValueExpr, SubLinkExpr, SubQueryColumnRef,
-        TableColumnRef, TypeCastExpr, WholeRowExpr,
+        SystemColumnRef, TableColumnRef, TypeCastExpr, WholeRowExpr,
     },
     schema_file_context::SchemaFileContext,
     select_statement::{ResultColumnCollection, SelectStatement},

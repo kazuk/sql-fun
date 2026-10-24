@@ -13,7 +13,7 @@ use crate::StringSpan;
 use crate::ast::{
     Access, BooleanExpr, BooleanOperator, Call, CallKind, Case, Cast, Dialect, Expr, Indirection,
     Literal, Name, NamedArgument, NullTest, OperatorExpr, OperatorKind, SqlValue, Subquery,
-    SubqueryKind, TypeName,
+    SubqueryKind, TruthTest, TypeName,
 };
 use crate::sem::{
     AliasName, AnalysisError, AnalysisProblem, ArithExpr, CaseExpr, CaseExprAnalysisContext,
@@ -133,6 +133,7 @@ impl Expr {
             Self::Operator(operator) => operator.resolve(context, scope),
             Self::Boolean(boolean) => boolean.resolve(context, scope),
             Self::NullTest(test) => test.resolve(context, scope),
+            Self::TruthTest(test) => test.resolve(context, scope),
             Self::Cast(cast) => cast.resolve(context, scope),
             Self::Call(call) => call.resolve(context, scope),
             Self::NamedArgument(argument) => argument.resolve(context, scope),
@@ -158,7 +159,7 @@ impl Expr {
             }
             // Retain the legacy rejection of raw PostgreSQL syntax that was not
             // accepted by the scalar dispatcher, independently of its conversion.
-            Self::Collate(_) | Self::Document(_) | Self::CurrentOf(_) | Self::TruthTest(_) => {
+            Self::Collate(_) | Self::Document(_) | Self::CurrentOf(_) => {
                 AnalysisError::raise_unexpected_input("unsupported raw scalar expression")
             }
             Self::Default if context.dialect() == Dialect::postgres() => {
@@ -315,6 +316,19 @@ impl BooleanExpr {
     ) -> Result<SemScalarExpr, AnalysisError> {
         let arguments = Expr::resolve_list(&self.arguments, context, scope)?;
         self.operator.resolve(&arguments)
+    }
+}
+
+impl TruthTest {
+    fn resolve(
+        &self,
+        context: &mut impl ParseContext,
+        scope: &ScalarAnalysisContext<'_>,
+    ) -> Result<SemScalarExpr, AnalysisError> {
+        let argument = self.argument.resolve_in(context, scope)?;
+        let value =
+            crate::sem::TruthTestExpr::resolve(context, &argument, self.value, self.negated)?;
+        Ok(SemScalarExpr::truth_test(&value))
     }
 }
 

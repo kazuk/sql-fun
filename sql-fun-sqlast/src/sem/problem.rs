@@ -6,7 +6,8 @@ pub use ::sql_fun_core::analysis_problem::{
     FunctionNotFound, IndexProblem, IndexProblemKind, InsertProblem, InsertProblemKind,
     MinMaxProblem, NameResolution, OverloadResolution, OwnershipProblem,
     ParameterConstraintProblem, QueryProblem, RuleDefinitionProblem, RuleProblem,
-    TableFunctionProblem, TriggerProblem, UpdateProblem, UpdateProblemKind, ViewProblem,
+    TableFunctionProblem, TriggerProblem, TruthTestProblem, UpdateProblem, UpdateProblemKind,
+    ViewProblem,
 };
 impl From<&crate::sem::FullName> for diagnostic::FullName {
     fn from(value: &crate::sem::FullName) -> Self {

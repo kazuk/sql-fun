@@ -511,6 +511,19 @@
                   "additionalProperties": false
                 },
                 {
+                  "description": "Invalid boolean input to a truth predicate.",
+                  "type": "object",
+                  "properties": {
+                    "TruthTest": {
+                      "$ref": "#/$defs/TruthTestProblem"
+                    }
+                  },
+                  "required": [
+                    "TruthTest"
+                  ],
+                  "additionalProperties": false
+                },
+                {
                   "description": "Invalid index alteration or a statistics warning.",
                   "type": "object",
                   "properties": {
@@ -1199,6 +1212,37 @@
             "TypeReference": {
               "description": "Retained diagnostic text for `TypeReference`.",
               "type": "string"
+            },
+            "TruthTestProblem": {
+              "description": "Invalid input to a PostgreSQL truth predicate.",
+              "oneOf": [
+                {
+                  "description": "The operand cannot be implicitly converted to boolean.",
+                  "type": "object",
+                  "properties": {
+                    "OperandType": {
+                      "$ref": "#/$defs/TypeReference"
+                    }
+                  },
+                  "required": [
+                    "OperandType"
+                  ],
+                  "additionalProperties": false
+                },
+                {
+                  "description": "An unknown string literal is not valid PostgreSQL boolean input.",
+                  "type": "object",
+                  "properties": {
+                    "InvalidLiteral": {
+                      "type": "string"
+                    }
+                  },
+                  "required": [
+                    "InvalidLiteral"
+                  ],
+                  "additionalProperties": false
+                }
+              ]
             },
             "IndexProblem": {
               "description": "Structured index diagnostic, retained independently of diagnostic delivery.",
@@ -4082,6 +4126,19 @@
                   "additionalProperties": false
                 },
                 {
+                  "description": "Invalid boolean input to a truth predicate.",
+                  "type": "object",
+                  "properties": {
+                    "TruthTest": {
+                      "$ref": "#/$defs/TruthTestProblem"
+                    }
+                  },
+                  "required": [
+                    "TruthTest"
+                  ],
+                  "additionalProperties": false
+                },
+                {
                   "description": "Invalid index alteration or a statistics warning.",
                   "type": "object",
                   "properties": {
@@ -4770,6 +4827,37 @@
             "TypeReference": {
               "description": "Retained diagnostic text for `TypeReference`.",
               "type": "string"
+            },
+            "TruthTestProblem": {
+              "description": "Invalid input to a PostgreSQL truth predicate.",
+              "oneOf": [
+                {
+                  "description": "The operand cannot be implicitly converted to boolean.",
+                  "type": "object",
+                  "properties": {
+                    "OperandType": {
+                      "$ref": "#/$defs/TypeReference"
+                    }
+                  },
+                  "required": [
+                    "OperandType"
+                  ],
+                  "additionalProperties": false
+                },
+                {
+                  "description": "An unknown string literal is not valid PostgreSQL boolean input.",
+                  "type": "object",
+                  "properties": {
+                    "InvalidLiteral": {
+                      "type": "string"
+                    }
+                  },
+                  "required": [
+                    "InvalidLiteral"
+                  ],
+                  "additionalProperties": false
+                }
+              ]
             },
             "IndexProblem": {
               "description": "Structured index diagnostic, retained independently of diagnostic delivery.",

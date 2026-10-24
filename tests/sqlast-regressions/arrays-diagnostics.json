@@ -178,7 +178,7 @@
         {
           "name": "",
           "type": null,
-          "nullability": "unknown"
+          "nullability": "nullable"
         }
       ]
     }

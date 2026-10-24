@@ -285,11 +285,17 @@ impl ParameterResolution {
             );
         }
         let source = self.input(base);
+        // Scalar reads may select NULL elements or indices outside the array.
+        let is_not_null = if slice {
+            base.is_not_null()
+        } else {
+            Some(false)
+        };
         let result = self.operation(
             "array access",
             &[],
             &InputTypeConstraint::any(),
-            base.is_not_null(),
+            is_not_null,
         );
         let projection = if slice {
             crate::sem::parameter_constraints::TypeProjection::array()

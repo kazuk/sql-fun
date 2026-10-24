@@ -22,6 +22,25 @@ Custom-schema cases remain in Rust under the accepted builtin-only scope.
 initialization failure; no custom-schema fixture or substitute schema setup is
 included in this batch.
 
+## Scalar access nullability regressions (#762)
+
+[arrays-consumers.json](arrays-consumers.json) adds twelve cases covering NULL
+and empty constructors, out-of-range and NULL indices, NULL arrays,
+multidimensional reads, deferred parameters and late element constraints. Scalar
+reads conservatively expose nullable metadata, including the existing nonempty
+subscript case. Single and mixed multidimensional slice controls preserve
+array-valued results and non-null constructor-container metadata. Both PostgreSQL
+17 and 18 catalogs run these cases through the shared manifest. The outer
+`(ARRAY[$1])[1] + 1` expression retains an absent public type and unknown
+nullability under the real catalogs; its exact unresolved-parameter diagnostic
+is asserted without selecting a wire type. The retained
+`late_constraints_reach_array_results` Rust test checks the admissible `int4`
+result domain without asserting that it is the unique public type. The
+anonymous-record array
+subscript followed by an invalid field access also reports nullable metadata
+through the existing member-access propagation, while preserving its
+`composite_type_field_not_found` diagnostic and absent type.
+
 ## `arrays.rs`
 
 | Original test and cases | Disposition |

@@ -101,11 +101,11 @@ mod test_helpers {
                 .unwrap()?
                 .analyze(context)?;
             Ok(parse_statements(
-                r#"SELECT format('%s'::text, 'abc'::name),
+                r"SELECT format('%s'::text, 'abc'::name),
                           format('%s IS NOT NULL'::text,
                                  COALESCE(at.attname, 'VALUE'::name))
                               ::information_schema.character_data
-                   FROM e2e_items AS at"#,
+                   FROM e2e_items AS at",
                 Dialect::postgres(),
             )
             .next()

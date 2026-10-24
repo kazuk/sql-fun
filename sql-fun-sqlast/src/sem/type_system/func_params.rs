@@ -106,6 +106,12 @@ impl FunctionParam {
         matches!(self, Self::Variadic(_))
     }
 
+    // PostgreSQL's variadic "any" accepts each argument independently. It is
+    // neither a real cast target nor an array-polymorphic placeholder.
+    pub(crate) fn accepts_any_type(&self) -> bool {
+        self.is_variadic() && self.get_type() == Some(&TypeReference::from_master_type_name("any"))
+    }
+
     pub(crate) fn call_argument_type(&self) -> Option<TypeReference> {
         let ty = self.get_type()?;
         if self.is_variadic() && ty.is_array() == Some(true) {
@@ -348,6 +354,9 @@ impl FunctionParam {
         context: &TCatalog,
         source_types: &IVec<Option<TypeReference>>,
     ) -> Result<i32, TypeError> {
+        if self.accepts_any_type() {
+            return Ok(0);
+        }
         if let Some(target_type) = self.get_type() {
             let mut scores: Vec<i32> = Vec::new();
             #[expect(clippy::manual_flatten)]
@@ -368,5 +377,32 @@ impl FunctionParam {
         } else {
             Ok(0)
         }
+    }
+}
+
+#[cfg(test)]
+mod test_variadic_any_castability {
+    use crate::sem::{FunctionParam, PgBuiltInType, TypeReference};
+    use crate::test_helpers::TestParseContext;
+
+    #[test]
+    fn heterogeneous_arguments_need_no_catalog_cast_or_exact_credit() {
+        let parameter = FunctionParam::new_variadig_param(
+            &None,
+            &Some(TypeReference::from_master_type_name("any")),
+        );
+        let arguments = vec![
+            Some(PgBuiltInType::int4()),
+            Some(PgBuiltInType::bool()),
+            Some(PgBuiltInType::int4().array_type()),
+            None,
+        ]
+        .into();
+        assert_eq!(
+            parameter
+                .test_castability_variadic(&TestParseContext::default(), &arguments)
+                .unwrap(),
+            0
+        );
     }
 }

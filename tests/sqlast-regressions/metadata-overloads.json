@@ -96,7 +96,7 @@
       "diagnostics": [],
       "columns": [
         {
-          "name": "",
+          "name": "power",
           "type": {
             "schema_name": "pg_catalog",
             "local_name": "numeric",
@@ -114,7 +114,7 @@
       "diagnostics": [],
       "columns": [
         {
-          "name": "",
+          "name": "power",
           "type": {
             "schema_name": "pg_catalog",
             "local_name": "numeric",
@@ -132,7 +132,7 @@
       "diagnostics": [],
       "columns": [
         {
-          "name": "",
+          "name": "abs",
           "type": {
             "schema_name": "pg_catalog",
             "local_name": "int4",
@@ -150,7 +150,7 @@
       "diagnostics": [],
       "columns": [
         {
-          "name": "",
+          "name": "power",
           "type": {
             "schema_name": "pg_catalog",
             "local_name": "float8",
@@ -168,7 +168,7 @@
       "diagnostics": [],
       "columns": [
         {
-          "name": "",
+          "name": "power",
           "type": {
             "schema_name": "pg_catalog",
             "local_name": "float8",

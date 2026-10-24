@@ -58,7 +58,7 @@
       ],
       "columns": [
         {
-          "name": "",
+          "name": "array_position",
           "nullability": "unknown"
         }
       ]

@@ -59,8 +59,8 @@ path, database identity, or intermediate catalog states stay in Rust.
 
 The [schema-dependent inventory](inventory-schema.md) maps public assertions and
 retained internal coverage, including non-equivalent synthetic contexts. The
-manifest totals are 547 inputs for PostgreSQL 17 and 553 for
-PostgreSQL 18 (1100 total). These count positive contract inputs separately from
+manifest totals are 565 inputs for PostgreSQL 17 and 571 for
+PostgreSQL 18 (1136 total). These count positive contract inputs separately from
 the three negative-control inputs, invalid-selector check and missing-datasource
 check per version.
 
@@ -92,3 +92,14 @@ PostgreSQL 17/18 through the shared source and installed regression paths.
 Oracle probes used EXPLAIN only in rolled-back transactions on PostgreSQL 17.6
 and 18.1. Rust retains direct support, destination binding, structured diagnostic
 and catalog-state checks; see [the view inventory](inventory-schema-views.md).
+
+Issue #765 restores implicit names for ordinary function calls and scalar
+subqueries. [`output-names.json`](output-names.json) covers builtin output names,
+alias precedence, nested queries, derived/CTE consumers, and parameter inference
+on PostgreSQL 17/18. The schema-qualified and DML fixtures also assert corrected
+correlated and RETURNING names. Existing ordinary-call expectations in the
+metadata, array/vector consumer, domain-overload, composite and record fixtures
+now retain the unqualified function name, including diagnostic-bearing calls.
+These cases use the
+shared source and installed paths; parameter diagnostics retain their existing
+policy (tracked separately in #766).

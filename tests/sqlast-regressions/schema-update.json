@@ -409,5 +409,23 @@
       ],
       "columns": []
     }
+  },
+  {
+    "name": "output_names::returning_update",
+    "sql": "UPDATE items SET id=2 RETURNING (SELECT items.label)",
+    "expected": {
+      "diagnostics": [],
+      "columns": [
+        {
+          "name": "label",
+          "type": {
+            "schema_name": "pg_catalog",
+            "local_name": "text",
+            "is_array": false
+          },
+          "nullability": "nullable"
+        }
+      ]
+    }
   }
 ]

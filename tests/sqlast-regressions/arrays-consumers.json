@@ -24,7 +24,7 @@
       "diagnostics": [],
       "columns": [
         {
-          "name": "",
+          "name": "array_length",
           "type": {
             "schema_name": "pg_catalog",
             "local_name": "int4",
@@ -42,7 +42,7 @@
       "diagnostics": [],
       "columns": [
         {
-          "name": "",
+          "name": "array_length",
           "type": {
             "schema_name": "pg_catalog",
             "local_name": "int4",

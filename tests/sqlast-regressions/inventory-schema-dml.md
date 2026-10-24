@@ -160,3 +160,13 @@ serialization remain internal contracts. SQLite-only cases remain outside this
 PostgreSQL suite. Version tests with custom engines or unsupported parser syntax
 remain at their version/parser boundary. These are not replaced by the public
 column contract.
+
+## Output-name correction (#765)
+
+The correlated DELETE and scalar-subquery MERGE RETURNING cases now assert
+`label` and `merge_action`, respectively, preserving their other metadata.
+The INSERT, UPDATE and DELETE fixtures add `output_names::returning_insert`,
+`output_names::returning_update` and `output_names::returning_delete` for scalar
+subquery naming and explicit alias precedence. Each uses its existing project
+schema dump and runs on both maintained catalog versions through the shared
+source/installed suite.

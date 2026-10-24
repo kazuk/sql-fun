@@ -51,6 +51,7 @@ impl ConstrainedExpr {
         self.indirection.as_deref()
     }
     pub(crate) fn retain_semantic_call(&mut self, call: &crate::sem::FuncCallExpr) {
+        self.name = call.name().local_name();
         self.semantic_call = Some(Box::new(call.binding_snapshot()));
     }
     /// Original function binding and modifiers, when this represents a function.

@@ -2,31 +2,31 @@
   {
     "name": "arrays::competing_record_overloads_select_postgres_candidate::anonymous",
     "sql": "SELECT f(pg_control_system())",
-    "expected": {"diagnostics": [], "columns": [{"name": "", "type": {"schema_name": "pg_catalog", "local_name": "text", "is_array": false}, "nullability": "nullable"}]}
+    "expected": {"diagnostics": [], "columns": [{"name": "f", "type": {"schema_name": "pg_catalog", "local_name": "text", "is_array": false}, "nullability": "nullable"}]}
   },
   {
     "name": "arrays::competing_record_overloads_select_postgres_candidate::named",
     "sql": "SELECT f(NULL::control)",
-    "expected": {"diagnostics": [], "columns": [{"name": "", "type": {"schema_name": "pg_catalog", "local_name": "int4", "is_array": false}, "nullability": "nullable"}]}
+    "expected": {"diagnostics": [], "columns": [{"name": "f", "type": {"schema_name": "pg_catalog", "local_name": "int4", "is_array": false}, "nullability": "nullable"}]}
   },
   {
     "name": "arrays::competing_record_overloads_select_postgres_candidate::anonymous_array",
     "sql": "SELECT fa(ARRAY[pg_control_system()])",
-    "expected": {"diagnostics": [], "columns": [{"name": "", "type": {"schema_name": "pg_catalog", "local_name": "text", "is_array": false}, "nullability": "nullable"}]}
+    "expected": {"diagnostics": [], "columns": [{"name": "fa", "type": {"schema_name": "pg_catalog", "local_name": "text", "is_array": false}, "nullability": "nullable"}]}
   },
   {
     "name": "arrays::competing_record_overloads_select_postgres_candidate::named_array",
     "sql": "SELECT fa(NULL::control[])",
-    "expected": {"diagnostics": [], "columns": [{"name": "", "type": {"schema_name": "pg_catalog", "local_name": "int4", "is_array": false}, "nullability": "nullable"}]}
+    "expected": {"diagnostics": [], "columns": [{"name": "fa", "type": {"schema_name": "pg_catalog", "local_name": "int4", "is_array": false}, "nullability": "nullable"}]}
   },
   {
     "name": "arrays::competing_record_overloads_select_postgres_candidate::constructed_named_array",
     "sql": "SELECT fa(ARRAY[NULL::control])",
-    "expected": {"diagnostics": [], "columns": [{"name": "", "type": {"schema_name": "pg_catalog", "local_name": "int4", "is_array": false}, "nullability": "nullable"}]}
+    "expected": {"diagnostics": [], "columns": [{"name": "fa", "type": {"schema_name": "pg_catalog", "local_name": "int4", "is_array": false}, "nullability": "nullable"}]}
   },
   {
     "name": "arrays::competing_record_overloads_select_postgres_candidate::anonymous_polymorphic",
     "sql": "SELECT fp(pg_control_system())",
-    "expected": {"diagnostics": [], "columns": [{"name": "", "type": {"schema_name": "pg_catalog", "local_name": "text", "is_array": false}, "nullability": "nullable"}]}
+    "expected": {"diagnostics": [], "columns": [{"name": "fp", "type": {"schema_name": "pg_catalog", "local_name": "text", "is_array": false}, "nullability": "nullable"}]}
   }
 ]

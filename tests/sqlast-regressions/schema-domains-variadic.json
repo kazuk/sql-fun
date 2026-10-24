@@ -6,7 +6,7 @@
       "diagnostics": [],
       "columns": [
         {
-          "name": "",
+          "name": "choose",
           "type": {
             "schema_name": "pg_catalog",
             "local_name": "numeric",
@@ -24,7 +24,7 @@
       "diagnostics": [],
       "columns": [
         {
-          "name": "",
+          "name": "choose",
           "type": {
             "schema_name": "pg_catalog",
             "local_name": "float8",
@@ -44,7 +44,7 @@
       ],
       "columns": [
         {
-          "name": "",
+          "name": "choose",
           "type": {
             "schema_name": "pg_catalog",
             "local_name": "numeric",

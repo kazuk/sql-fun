@@ -158,7 +158,7 @@
       "diagnostics": [],
       "columns": [
         {
-          "name": "",
+          "name": "label",
           "nullability": "nullable",
           "type": {
             "schema_name": "pg_catalog",
@@ -289,6 +289,24 @@
             "local_name": "int4",
             "is_array": false
           }
+        }
+      ]
+    }
+  },
+  {
+    "name": "output_names::returning_delete",
+    "sql": "DELETE FROM items RETURNING (SELECT items.label) AS chosen",
+    "expected": {
+      "diagnostics": [],
+      "columns": [
+        {
+          "name": "chosen",
+          "type": {
+            "schema_name": "pg_catalog",
+            "local_name": "text",
+            "is_array": false
+          },
+          "nullability": "nullable"
         }
       ]
     }

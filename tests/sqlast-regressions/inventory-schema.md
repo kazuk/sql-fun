@@ -74,14 +74,18 @@ workspace tests and the shared source/installed SQLAST regression suite.
 
 ## PostgreSQL discrepancies tracked separately
 
-[Bug #765](https://github.com/kazuk/sql-fun/issues/765) records empty implicit
-output names for function calls and scalar subqueries: PG 17/18 return their
-function/subquery names. The public fixtures record actual empty names where
-observed. Original type/diagnostic assertions remain equivalent; those source
-cases did not assert the missing implicit names. This migration does not repair
-or hide the naming defect. The DML counterpart includes
-`delete::resolves_delete::correlated` and
-`merge::resolves_merge::returning_subquery`.
+[Bug #765](https://github.com/kazuk/sql-fun/issues/765) corrects implicit
+output names for ordinary function calls and scalar subqueries. The migrated
+fixtures now assert their function/subquery names, preserving types, nullability
+and diagnostics. DML corrections include `delete::resolves_delete::correlated`
+and `merge::resolves_merge::returning_subquery`. The added
+[`output-names.json`](output-names.json) contract covers aliases, nesting,
+parameter inference, derived tables and CTEs. Ordinary-call name corrections
+also cover the existing composite, domain-overload and record-expression
+fixtures, including diagnostic-bearing calls; their other expectations remain
+unchanged. Each of `schema-insert.json`,
+`schema-update.json` and `schema-delete.json` also adds one named
+`output_names::returning_*` case through its existing schema dump.
 
 [Maintenance #766](https://github.com/kazuk/sql-fun/issues/766) records the
 public unresolved-parameter diagnostic versus PostgreSQL PREPARE, explicitly

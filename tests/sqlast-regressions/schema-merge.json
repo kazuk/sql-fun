@@ -186,7 +186,7 @@
       "diagnostics": [],
       "columns": [
         {
-          "name": "",
+          "name": "merge_action",
           "nullability": "nullable",
           "type": {
             "schema_name": "pg_catalog",

@@ -1,5 +1,6 @@
 # fixture	schema-level	schema-file	case-count	versions
 pilot	builtin	-	2	17,18
+output-names	builtin	-	15	17,18
 casts	builtin	-	9	17,18
 vectors	builtin	-	4	18
 arrays-metadata	builtin	-	21	17,18
@@ -17,7 +18,7 @@ coalesce_semantic	builtin	-	3	17,18
 array-subqueries	builtin	-	28	17,18
 bootstrap-array-expressions	builtin	-	2	18
 schema-composites	project	schema-composites.sql	6	17,18
-schema-delete	project	schema-delete.sql	17	17,18
+schema-delete	project	schema-delete.sql	18	17,18
 schema-domains-builtin	default	-	10	17,18
 schema-domains-default-tie	project	schema-domains-default-tie.sql	1	17,18
 schema-domains-defaults	project	schema-domains-defaults.sql	3	17,18
@@ -37,12 +38,12 @@ schema-expressions-record-array	project	schema-expressions-record-array.sql	1	17
 schema-expressions-record-overloads	project	schema-expressions-record-overloads.sql	6	17,18
 schema-expressions-record-scalar	project	schema-expressions-record-scalar.sql	1	17,18
 schema-expressions	project	schema-expressions.sql	72	17,18
-schema-insert	project	schema-insert.sql	32	17,18
+schema-insert	project	schema-insert.sql	33	17,18
 schema-join	project	schema-join.sql	1	17,18
 schema-merge	project	schema-merge.sql	31	17,18
 schema-qualified	project	schema-qualified.sql	25	17,18
 schema-table-functions	project	schema-table-functions.sql	20	17,18
-schema-update	project	schema-update.sql	31	17,18
+schema-update	project	schema-update.sql	32	17,18
 schema-views-assignments	project	schema-views-assignments.sql	17	17,18
 schema-views-automatic	project	schema-views-automatic.sql	10	17,18
 schema-views-diagnostics	project	schema-views-diagnostics.sql	22	17,18

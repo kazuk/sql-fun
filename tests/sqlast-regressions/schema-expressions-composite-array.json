@@ -1,0 +1,29 @@
+[
+  {
+    "name": "arrays::declared_composite_array_fields_use_shipped_catalog_types",
+    "sql": "SELECT (NULL::public.array_value).items, ((NULL::public.array_value).items)[1]",
+    "expected": {
+      "diagnostics": [],
+      "columns": [
+        {
+          "name": "",
+          "type": {
+            "schema_name": "pg_catalog",
+            "local_name": "int4",
+            "is_array": true
+          },
+          "nullability": "nullable"
+        },
+        {
+          "name": "",
+          "type": {
+            "schema_name": "pg_catalog",
+            "local_name": "int4",
+            "is_array": false
+          },
+          "nullability": "nullable"
+        }
+      ]
+    }
+  }
+]

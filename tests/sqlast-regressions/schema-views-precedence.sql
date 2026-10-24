@@ -1,0 +1,17 @@
+CREATE TABLE public.items (id integer PRIMARY KEY);
+CREATE TABLE public.audit (id integer);
+CREATE FUNCTION public.noop() RETURNS trigger LANGUAGE plpgsql AS $$BEGIN RETURN NEW; END$$;
+CREATE VIEW public.v_conditional AS SELECT id FROM public.items;
+CREATE RULE r_conditional AS ON INSERT TO public.v_conditional WHERE NEW.id > 0 DO INSTEAD NOTHING;
+CREATE VIEW public.v_additional AS SELECT id FROM public.items;
+CREATE RULE r_additional AS ON INSERT TO public.v_additional DO ALSO INSERT INTO public.audit VALUES(NEW.id);
+CREATE VIEW public.v_additional_update AS SELECT id FROM public.items;
+CREATE RULE r_additional_update AS ON UPDATE TO public.v_additional_update DO ALSO INSERT INTO public.audit VALUES(NEW.id);
+CREATE VIEW public.v_instead AS SELECT id FROM public.items;
+CREATE RULE r_instead AS ON INSERT TO public.v_instead DO INSTEAD NOTHING;
+CREATE VIEW public.v_conditional_trigger AS SELECT id FROM public.items;
+CREATE RULE r_conditional_trigger AS ON INSERT TO public.v_conditional_trigger WHERE NEW.id > 0 DO INSTEAD NOTHING;
+CREATE TRIGGER ti_conditional INSTEAD OF INSERT ON public.v_conditional_trigger FOR EACH ROW EXECUTE FUNCTION public.noop();
+CREATE VIEW public.v_additional_trigger AS SELECT id FROM public.items;
+CREATE RULE r_additional_trigger AS ON INSERT TO public.v_additional_trigger DO ALSO INSERT INTO public.audit VALUES(NEW.id);
+CREATE TRIGGER ti_additional INSTEAD OF INSERT ON public.v_additional_trigger FOR EACH ROW EXECUTE FUNCTION public.noop();

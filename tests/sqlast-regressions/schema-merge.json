@@ -1,0 +1,374 @@
+[
+  {
+    "name": "merge::resolves_merge::on_bindings",
+    "sql": "MERGE INTO items t USING incoming s ON t.id=s.sid WHEN MATCHED THEN DELETE",
+    "expected": {
+      "diagnostics": [],
+      "columns": []
+    }
+  },
+  {
+    "name": "merge::resolves_merge::update",
+    "sql": "MERGE INTO items t USING incoming s ON true WHEN MATCHED THEN UPDATE SET id=s.sid",
+    "expected": {
+      "diagnostics": [],
+      "columns": []
+    }
+  },
+  {
+    "name": "merge::resolves_merge::insert",
+    "sql": "MERGE INTO items t USING incoming s ON true WHEN NOT MATCHED THEN INSERT (id,label) VALUES(s.sid,s.slabel)",
+    "expected": {
+      "diagnostics": [],
+      "columns": []
+    }
+  },
+  {
+    "name": "merge::resolves_merge::defaults",
+    "sql": "MERGE INTO items t USING incoming s ON true WHEN NOT MATCHED THEN INSERT DEFAULT VALUES",
+    "expected": {
+      "diagnostics": [],
+      "columns": []
+    }
+  },
+  {
+    "name": "merge::resolves_merge::delete",
+    "sql": "MERGE INTO items t USING incoming s ON true WHEN MATCHED THEN DELETE",
+    "expected": {
+      "diagnostics": [],
+      "columns": []
+    }
+  },
+  {
+    "name": "merge::resolves_merge::nothing",
+    "sql": "MERGE INTO items t USING incoming s ON true WHEN MATCHED THEN DO NOTHING",
+    "expected": {
+      "diagnostics": [],
+      "columns": []
+    }
+  },
+  {
+    "name": "merge::resolves_merge::by_source",
+    "sql": "MERGE INTO items t USING incoming s ON true WHEN NOT MATCHED BY SOURCE THEN UPDATE SET id=t.id",
+    "expected": {
+      "diagnostics": [],
+      "columns": []
+    }
+  },
+  {
+    "name": "merge::resolves_merge::returning",
+    "sql": "MERGE INTO items t USING incoming s ON true WHEN MATCHED THEN DELETE RETURNING t.id,s.sid,merge_action()",
+    "expected": {
+      "diagnostics": [],
+      "columns": [
+        {
+          "name": "id",
+          "nullability": "nullable",
+          "type": {
+            "schema_name": "pg_catalog",
+            "local_name": "int4",
+            "is_array": false
+          }
+        },
+        {
+          "name": "sid",
+          "nullability": "nullable",
+          "type": {
+            "schema_name": "pg_catalog",
+            "local_name": "int4",
+            "is_array": false
+          }
+        },
+        {
+          "name": "merge_action",
+          "nullability": "not_null",
+          "type": {
+            "schema_name": "pg_catalog",
+            "local_name": "text",
+            "is_array": false
+          }
+        }
+      ]
+    }
+  },
+  {
+    "name": "merge::resolves_merge::star",
+    "sql": "MERGE INTO items t USING incoming s ON true WHEN MATCHED THEN DELETE RETURNING *",
+    "expected": {
+      "diagnostics": [],
+      "columns": [
+        {
+          "name": "sid",
+          "nullability": "nullable",
+          "type": {
+            "schema_name": "pg_catalog",
+            "local_name": "int4",
+            "is_array": false
+          }
+        },
+        {
+          "name": "slabel",
+          "nullability": "nullable",
+          "type": {
+            "schema_name": "pg_catalog",
+            "local_name": "text",
+            "is_array": false
+          }
+        },
+        {
+          "name": "id",
+          "nullability": "nullable",
+          "type": {
+            "schema_name": "pg_catalog",
+            "local_name": "int4",
+            "is_array": false
+          }
+        },
+        {
+          "name": "label",
+          "nullability": "nullable",
+          "type": {
+            "schema_name": "pg_catalog",
+            "local_name": "text",
+            "is_array": false
+          }
+        }
+      ]
+    }
+  },
+  {
+    "name": "merge::resolves_merge::qualified_star",
+    "sql": "MERGE INTO items t USING incoming s ON true WHEN MATCHED THEN DELETE RETURNING t.*",
+    "expected": {
+      "diagnostics": [],
+      "columns": [
+        {
+          "name": "id",
+          "nullability": "nullable",
+          "type": {
+            "schema_name": "pg_catalog",
+            "local_name": "int4",
+            "is_array": false
+          }
+        },
+        {
+          "name": "label",
+          "nullability": "nullable",
+          "type": {
+            "schema_name": "pg_catalog",
+            "local_name": "text",
+            "is_array": false
+          }
+        }
+      ]
+    }
+  },
+  {
+    "name": "merge::resolves_merge::correlated_update",
+    "sql": "MERGE INTO items t USING incoming s ON true WHEN MATCHED THEN UPDATE SET id=(SELECT s.sid)",
+    "expected": {
+      "diagnostics": [],
+      "columns": []
+    }
+  },
+  {
+    "name": "merge::resolves_merge::correlated_insert",
+    "sql": "MERGE INTO items t USING incoming s ON true WHEN NOT MATCHED THEN INSERT(id) VALUES((SELECT s.sid))",
+    "expected": {
+      "diagnostics": [],
+      "columns": []
+    }
+  },
+  {
+    "name": "merge::resolves_merge::returning_subquery",
+    "sql": "MERGE INTO items t USING incoming s ON true WHEN MATCHED THEN DELETE RETURNING (SELECT merge_action())",
+    "expected": {
+      "diagnostics": [],
+      "columns": [
+        {
+          "name": "",
+          "nullability": "nullable",
+          "type": {
+            "schema_name": "pg_catalog",
+            "local_name": "text",
+            "is_array": false
+          }
+        }
+      ]
+    }
+  },
+  {
+    "name": "merge::resolves_merge::row_assignment",
+    "sql": "MERGE INTO items t USING incoming s ON true WHEN MATCHED THEN UPDATE SET (id,label)=(SELECT s.sid,s.slabel)",
+    "expected": {
+      "diagnostics": [],
+      "columns": []
+    }
+  },
+  {
+    "name": "merge::resolves_merge::using_cte",
+    "sql": "WITH incoming AS (SELECT 1 sid) MERGE INTO items t USING incoming s ON true WHEN MATCHED THEN UPDATE SET id=s.sid",
+    "expected": {
+      "diagnostics": [],
+      "columns": []
+    }
+  },
+  {
+    "name": "merge::resolves_merge::using_query",
+    "sql": "MERGE INTO items t USING (SELECT 1 sid) s ON true WHEN MATCHED THEN UPDATE SET id=s.sid",
+    "expected": {
+      "diagnostics": [],
+      "columns": []
+    }
+  },
+  {
+    "name": "merge::rejects_invalid_merge::target_in_insert",
+    "sql": "MERGE INTO items t USING incoming s ON true WHEN NOT MATCHED THEN INSERT(id) VALUES(t.id)",
+    "expected": {
+      "diagnostics": [
+        "undefined_alias"
+      ],
+      "columns": []
+    }
+  },
+  {
+    "name": "merge::rejects_invalid_merge::nested_target_in_insert",
+    "sql": "MERGE INTO items t USING incoming s ON true WHEN NOT MATCHED THEN INSERT(id) VALUES((SELECT t.id))",
+    "expected": {
+      "diagnostics": [
+        "undefined_alias"
+      ],
+      "columns": []
+    }
+  },
+  {
+    "name": "merge::rejects_invalid_merge::source_by_source",
+    "sql": "MERGE INTO items t USING incoming s ON true WHEN NOT MATCHED BY SOURCE AND s.sid IS NULL THEN DELETE",
+    "expected": {
+      "diagnostics": [
+        "undefined_alias"
+      ],
+      "columns": []
+    }
+  },
+  {
+    "name": "merge::rejects_invalid_merge::nested_source_by_source",
+    "sql": "MERGE INTO items t USING incoming s ON true WHEN NOT MATCHED BY SOURCE AND (SELECT s.sid IS NULL) THEN DELETE",
+    "expected": {
+      "diagnostics": [
+        "undefined_alias"
+      ],
+      "columns": []
+    }
+  },
+  {
+    "name": "merge::rejects_invalid_merge::target_in_source",
+    "sql": "MERGE INTO items t USING (SELECT t.id) s ON true WHEN MATCHED THEN DELETE",
+    "expected": {
+      "diagnostics": [
+        "undefined_alias"
+      ],
+      "columns": []
+    }
+  },
+  {
+    "name": "merge::rejects_invalid_merge::hidden_alias",
+    "sql": "MERGE INTO items t USING incoming s ON true WHEN MATCHED THEN UPDATE SET id=items.id",
+    "expected": {
+      "diagnostics": [
+        "undefined_alias"
+      ],
+      "columns": []
+    }
+  },
+  {
+    "name": "merge::rejects_invalid_merge::unreachable",
+    "sql": "MERGE INTO items t USING incoming s ON true WHEN MATCHED THEN DELETE WHEN MATCHED THEN DO NOTHING",
+    "expected": {
+      "diagnostics": [
+        "query_analysis"
+      ],
+      "columns": []
+    }
+  },
+  {
+    "name": "merge::rejects_invalid_merge::nonboolean",
+    "sql": "MERGE INTO items t USING incoming s ON 1 WHEN MATCHED THEN DELETE",
+    "expected": {
+      "diagnostics": [
+        "query_analysis"
+      ],
+      "columns": []
+    }
+  },
+  {
+    "name": "merge::rejects_invalid_merge::action_in_on",
+    "sql": "MERGE INTO items t USING incoming s ON merge_action() IS NULL WHEN MATCHED THEN DELETE",
+    "expected": {
+      "diagnostics": [
+        "query_analysis"
+      ],
+      "columns": []
+    }
+  },
+  {
+    "name": "merge::rejects_invalid_merge::action_in_when",
+    "sql": "MERGE INTO items t USING incoming s ON true WHEN MATCHED AND merge_action() IS NULL THEN DELETE",
+    "expected": {
+      "diagnostics": [
+        "query_analysis"
+      ],
+      "columns": []
+    }
+  },
+  {
+    "name": "merge::rejects_invalid_merge::action_in_assignment",
+    "sql": "MERGE INTO items t USING incoming s ON true WHEN MATCHED THEN UPDATE SET label=merge_action()",
+    "expected": {
+      "diagnostics": [
+        "query_analysis"
+      ],
+      "columns": []
+    }
+  },
+  {
+    "name": "merge::rejects_invalid_merge::missing_target",
+    "sql": "MERGE INTO absent t USING incoming s ON true WHEN MATCHED THEN DELETE",
+    "expected": {
+      "diagnostics": [
+        "query_analysis"
+      ],
+      "columns": []
+    }
+  },
+  {
+    "name": "merge::rejects_invalid_merge::missing_column",
+    "sql": "MERGE INTO items t USING incoming s ON true WHEN MATCHED THEN UPDATE SET absent=1",
+    "expected": {
+      "diagnostics": [
+        "column_not_found_in_table"
+      ],
+      "columns": []
+    }
+  },
+  {
+    "name": "merge::rejects_invalid_merge::recursive",
+    "sql": "WITH RECURSIVE c AS (SELECT 1) MERGE INTO items t USING incoming s ON true WHEN MATCHED THEN DELETE",
+    "expected": {
+      "diagnostics": [
+        "query_analysis"
+      ],
+      "columns": []
+    }
+  },
+  {
+    "name": "merge::rejects_invalid_merge::cte_unreadable",
+    "sql": "WITH m AS (MERGE INTO items t USING incoming s ON true WHEN MATCHED THEN DELETE) SELECT * FROM m",
+    "expected": {
+      "diagnostics": [
+        "query_analysis"
+      ],
+      "columns": []
+    }
+  }
+]

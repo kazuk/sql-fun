@@ -361,36 +361,6 @@ CREATE VIEW public.nested (renamed, value) AS SELECT key, value FROM public.item
 ";
 
 #[rstest::rstest]
-#[case::insert(
-    "INSERT INTO public.item_view(key) VALUES (1) RETURNING key, computed",
-    true
-)]
-#[case::default_values("INSERT INTO public.item_view DEFAULT VALUES", true)]
-#[case::update("UPDATE public.item_view SET value = 9 RETURNING key, computed", true)]
-#[case::computed_insert("INSERT INTO public.item_view(computed) VALUES (2)", false)]
-#[case::computed_default("INSERT INTO public.item_view(computed) VALUES (DEFAULT)", false)]
-#[case::computed_update("UPDATE public.item_view SET computed = DEFAULT", false)]
-#[case::nested_insert("INSERT INTO public.nested(renamed) VALUES (1)", true)]
-#[case::nested_update("UPDATE public.nested SET value = 2", true)]
-#[case::conflict(
-    "INSERT INTO public.item_view(key) VALUES (1) ON CONFLICT(key) DO NOTHING",
-    true
-)]
-#[case::nested_conflict(
-    "INSERT INTO public.nested(renamed) VALUES (1) ON CONFLICT(renamed) DO NOTHING",
-    true
-)]
-fn automatic_view_query(
-    #[case] sql: &str,
-    #[case] accepted: bool,
-) -> Result<(), Box<dyn std::error::Error>> {
-    let schema = heavy::ViewSchema::postgres(AUTOMATIC)?;
-    let result = schema.analyze(sql);
-    assert_eq!(result.is_ok(), accepted, "{sql}: {result:?}");
-    Ok(())
-}
-
-#[rstest::rstest]
 #[case::distinct("SELECT DISTINCT id FROM public.items")]
 #[case::limit("SELECT id FROM public.items LIMIT 1")]
 #[case::join("SELECT a.id FROM public.items a JOIN public.items b ON a.id=b.id")]
@@ -440,12 +410,6 @@ CREATE VIEW public.v AS SELECT id AS key, value, calc, value+1 AS computed FROM 
             .any(|constraint| constraint.as_default().is_some())
     );
     assert!(support.column_definition(&"computed".into()).is_none());
-    assert!(schema.analyze("UPDATE public.v SET key=1").is_err());
-    assert!(
-        schema
-            .analyze("UPDATE public.v SET key=DEFAULT, calc=DEFAULT")
-            .is_err()
-    );
     Ok(())
 }
 
@@ -525,19 +489,6 @@ CREATE FUNCTION public.noop() RETURNS trigger LANGUAGE plpgsql AS 'BEGIN RETURN 
     }
     if declaration.contains("RULE") {
         assert!(!i.supports_on_conflict());
-    }
-    assert_eq!(
-        schema.analyze("INSERT INTO public.v(id) VALUES(1)").is_ok(),
-        insert
-    );
-    assert_eq!(schema.analyze("UPDATE public.v SET id=1").is_ok(), update);
-    if insert {
-        assert_eq!(
-            schema
-                .analyze("INSERT INTO public.v(id) VALUES(1) RETURNING id")
-                .is_ok(),
-            returning
-        );
     }
     Ok(())
 }
@@ -634,26 +585,6 @@ fn function_row_properties(
     Ok(())
 }
 
-// PostgreSQL 15.19/16.15/17.6/18.1: rollback-scoped probes agree on this matrix.
-#[rstest::rstest]
-#[case::explicit_insert("INSERT INTO public.v(x,y) VALUES(1,2)", false)]
-#[case::implicit_insert("INSERT INTO public.v VALUES(1,2)", false)]
-#[case::first_implicit("INSERT INTO public.v VALUES(1)", true)]
-#[case::default_values("INSERT INTO public.v DEFAULT VALUES", true)]
-#[case::duplicate_update("UPDATE public.v SET x=1,y=2", false)]
-#[case::subscripts("UPDATE public.v SET p[1]=1,q[2]=2", true)]
-fn duplicate_projection_assignments(
-    #[case] query: &str,
-    #[case] accepted: bool,
-) -> Result<(), Box<dyn std::error::Error>> {
-    let schema = heavy::ViewSchema::postgres(
-        "CREATE TABLE public.items(a int,b int[]); CREATE VIEW public.v AS SELECT a AS x,a AS y,b AS p,b AS q FROM public.items;",
-    )?;
-    let result = schema.analyze(query);
-    assert_eq!(result.is_ok(), accepted, "{query}: {result:?}");
-    Ok(())
-}
-
 #[test]
 fn nested_arbiters_retain_the_actual_source() -> Result<(), Box<dyn std::error::Error>> {
     let schema = heavy::ViewSchema::postgres(AUTOMATIC)?;
@@ -707,80 +638,6 @@ CREATE OR REPLACE VIEW public.v AS SELECT DISTINCT id FROM public.items;
     Ok(())
 }
 
-#[rstest::rstest]
-#[case::conditional(
-    "CREATE RULE r AS ON INSERT TO public.v WHERE NEW.id>0 DO INSTEAD NOTHING;",
-    false,
-    false,
-    false
-)]
-#[case::additional(
-    "CREATE RULE r AS ON INSERT TO public.v DO ALSO INSERT INTO public.audit VALUES(NEW.id);",
-    true,
-    true,
-    true
-)]
-#[case::additional_update(
-    "CREATE RULE r AS ON UPDATE TO public.v DO ALSO INSERT INTO public.audit VALUES(NEW.id);",
-    true,
-    true,
-    true
-)]
-#[case::instead(
-    "CREATE RULE r AS ON INSERT TO public.v DO INSTEAD NOTHING;",
-    true,
-    false,
-    false
-)]
-#[case::conditional_trigger(
-    "CREATE RULE r AS ON INSERT TO public.v WHERE NEW.id>0 DO INSTEAD NOTHING; CREATE TRIGGER it INSTEAD OF INSERT ON public.v FOR EACH ROW EXECUTE FUNCTION public.noop();",
-    true,
-    false,
-    false
-)]
-#[case::additional_trigger(
-    "CREATE RULE r AS ON INSERT TO public.v DO ALSO INSERT INTO public.audit VALUES(NEW.id); CREATE TRIGGER it INSTEAD OF INSERT ON public.v FOR EACH ROW EXECUTE FUNCTION public.noop();",
-    true,
-    true,
-    false
-)]
-fn automatic_rule_precedence(
-    #[case] declaration: &str,
-    #[case] insert: bool,
-    #[case] returning: bool,
-    #[case] conflict: bool,
-) -> Result<(), Box<dyn std::error::Error>> {
-    let schema = heavy::ViewSchema::postgres(&format!(
-        r"
-CREATE TABLE public.items(id int PRIMARY KEY);
-CREATE TABLE public.audit(id int);
-CREATE VIEW public.v AS SELECT id FROM public.items;
-CREATE FUNCTION public.noop() RETURNS trigger LANGUAGE plpgsql AS $$BEGIN RETURN NEW; END$$;
-{declaration}
-"
-    ))?;
-    let result = schema.analyze("INSERT INTO public.v(id) VALUES(1)");
-    assert_eq!(result.is_ok(), insert, "{result:?}");
-    assert_eq!(
-        schema
-            .analyze("INSERT INTO public.v(id) VALUES(1) RETURNING id")
-            .is_ok(),
-        insert && returning
-    );
-    assert_eq!(
-        schema
-            .analyze("INSERT INTO public.v(id) VALUES(1) ON CONFLICT DO NOTHING")
-            .is_ok(),
-        insert && conflict
-    );
-    assert!(
-        schema
-            .analyze("UPDATE public.v SET id=1 RETURNING id")
-            .is_ok()
-    );
-    Ok(())
-}
-
 #[test]
 fn bound_names_do_not_reselect_shadowed_views() -> Result<(), Box<dyn std::error::Error>> {
     let schema = heavy::ViewSchema::postgres(
@@ -820,10 +677,6 @@ fn materialized_views_are_not_write_destinations() -> Result<(), Box<dyn std::er
     .unwrap();
     assert!(!support.insert().is_writable());
     assert!(!support.update().is_writable());
-    assert!(schema.analyze("INSERT INTO public.v VALUES(1)").is_err());
-    assert!(schema.analyze("UPDATE public.v SET id=1").is_err());
-    assert!(schema.analyze("SELECT id FROM public.v").is_ok());
-    assert!(schema.analyze("SELECT * FROM public.v").is_ok());
     Ok(())
 }
 
@@ -922,24 +775,6 @@ fn extracted_builtin_rules_reach_production_analysis(
     Ok(())
 }
 
-#[rstest::rstest]
-#[case::same_type("SELECT id::int AS key FROM public.items", "key", true)]
-#[case::different_type("SELECT id::bigint AS key FROM public.items", "key", false)]
-#[case::star_then_cast("SELECT *, id::int AS key FROM public.items", "key", true)]
-#[case::typmod("SELECT value::varchar(5) AS key FROM public.items", "key", false)]
-fn view_cast_lineage(
-    #[case] query: &str,
-    #[case] column: &str,
-    #[case] writable: bool,
-) -> Result<(), Box<dyn std::error::Error>> {
-    let schema = heavy::ViewSchema::postgres(&format!(
-        "CREATE TABLE public.items(id int,value varchar); CREATE VIEW public.v AS {query};"
-    ))?;
-    let result = schema.analyze(&format!("UPDATE public.v SET {column}=DEFAULT"));
-    assert_eq!(result.is_ok(), writable, "{result:?}");
-    Ok(())
-}
-
 #[test]
 fn view_write_bindings_and_diagnostics_remain_structured() -> Result<(), Box<dyn std::error::Error>>
 {
@@ -971,26 +806,6 @@ fn view_write_bindings_and_diagnostics_remain_structured() -> Result<(), Box<dyn
             .insert_problem()
             .is_some_and(|problem| problem.kind() == InsertProblemKind::DuplicateTarget)
     }));
-    Ok(())
-}
-
-// All four PostgreSQL development versions reject view UPDATE DEFAULT for
-// GENERATED/ALWAYS identity, but accept the corresponding INSERT DEFAULT.
-#[rstest::rstest]
-#[case::identity_insert("INSERT INTO public.v(key) VALUES(DEFAULT)", true)]
-#[case::generated_insert("INSERT INTO public.v(calc) VALUES(DEFAULT)", true)]
-#[case::identity_update("UPDATE public.v SET key=DEFAULT", false)]
-#[case::generated_update("UPDATE public.v SET calc=DEFAULT", false)]
-#[case::by_default_update("UPDATE public.v SET other=DEFAULT", true)]
-fn view_default_rewrite(
-    #[case] query: &str,
-    #[case] accepted: bool,
-) -> Result<(), Box<dyn std::error::Error>> {
-    let schema = heavy::ViewSchema::postgres(
-        "CREATE TABLE public.items(id int GENERATED ALWAYS AS IDENTITY, calc int GENERATED ALWAYS AS(42) STORED, other int GENERATED BY DEFAULT AS IDENTITY); CREATE VIEW public.v AS SELECT id AS key,calc,other FROM public.items;",
-    )?;
-    let result = schema.analyze(query);
-    assert_eq!(result.is_ok(), accepted, "{result:?}");
     Ok(())
 }
 
@@ -1032,27 +847,6 @@ fn view_inference_expands_projection_expressions(
         arbiters[0].source_relation().unwrap().full_name(),
         &FullName::with_schema("public", "items")
     );
-    Ok(())
-}
-
-#[rstest::rstest]
-#[case::insert("INSERT INTO public.alias_view(x) VALUES (1) ON CONFLICT(x) DO NOTHING")]
-#[case::update("UPDATE public.alias_view SET x = 2 RETURNING x")]
-#[case::nested("UPDATE public.alias_nested SET y = 2 RETURNING y")]
-#[case::cast("UPDATE public.alias_cast SET x = 2")]
-fn from_column_aliases_preserve_source_identity(
-    #[case] sql: &str,
-) -> Result<(), Box<dyn std::error::Error>> {
-    let schema = heavy::ViewSchema::postgres(
-        r"
-CREATE TABLE public.items(id integer PRIMARY KEY);
-CREATE VIEW public.alias_view AS SELECT x FROM public.items AS i(x);
-CREATE VIEW public.alias_nested AS SELECT y FROM public.alias_view AS v(y);
-CREATE VIEW public.alias_cast AS SELECT x::integer AS x FROM public.items AS i(x);
-",
-    )?;
-    let result = schema.analyze(sql);
-    assert!(result.is_ok(), "{result:?}");
     Ok(())
 }
 

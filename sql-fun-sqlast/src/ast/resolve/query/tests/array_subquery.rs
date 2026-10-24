@@ -215,23 +215,6 @@ fn invalid_array_query_does_not_stop_following_statement() {
 }
 
 #[rstest::rstest]
-#[case::named("SELECT ARRAY(SELECT NULL::singleton)", "singleton")]
-#[case::named_pair("SELECT ARRAY(SELECT NULL::pair)", "pair")]
-fn named_composite_elements_keep_nominal_identity(#[case] sql: &str, #[case] name: &str) {
-    let analyzed = test_helpers::composite_query(sql);
-    assert!(
-        analyzed.context().problems().is_empty(),
-        "{:?}",
-        analyzed.context().problems()
-    );
-    let query = analyzed.ast().clone().into_select_statemtnt().unwrap();
-    let expected =
-        TypeReference::concrete_type_ref(&crate::sem::FullName::with_schema("public", name), false)
-            .array_type();
-    assert_eq!(projection(&query).get_type(), Some(expected));
-}
-
-#[rstest::rstest]
 #[case::one("singleton", true)]
 #[case::two("pair", false)]
 fn deferred_star_checks_final_output_width(#[case] name: &str, #[case] valid: bool) {
@@ -240,37 +223,13 @@ fn deferred_star_checks_final_output_width(#[case] name: &str, #[case] valid: bo
     ));
     let query = analyzed.ast().clone().into_select_statemtnt().unwrap();
     let array = projection(&query).as_array_subquery().unwrap();
-    if valid {
-        assert!(
-            analyzed.context().problems().is_empty(),
-            "{:?}",
-            analyzed.context().problems()
-        );
-        assert_eq!(
-            projection(&query).get_type(),
-            Some(PgBuiltInType::int4().array_type())
-        );
-    } else {
-        assert!(reports_width_problem(analyzed.context().problems()));
+    if !valid {
         assert_eq!(array.types().admissible_types(), Some(&[][..]));
     }
     assert_eq!(
         array.query().result_columns().len(),
         if valid { 1 } else { 2 }
     );
-}
-
-#[test]
-fn deferred_star_preserves_enclosing_result_link() {
-    let analyzed =
-        test_helpers::composite_query("SELECT (ARRAY(SELECT ($1).*))[1], take_singleton($1)");
-    assert!(
-        analyzed.context().problems().is_empty(),
-        "{:?}",
-        analyzed.context().problems()
-    );
-    let query = analyzed.ast().clone().into_select_statemtnt().unwrap();
-    assert_eq!(projection(&query).get_type(), Some(PgBuiltInType::int4()));
 }
 
 fn reports_width_problem(problems: &[crate::sem::AnalysisProblem]) -> bool {
@@ -280,21 +239,4 @@ fn reports_width_problem(problems: &[crate::sem::AnalysisProblem]) -> bool {
         }
     }
     false
-}
-
-#[test]
-fn nested_deferred_arrays_finish_after_each_projection_expands() {
-    let analyzed = test_helpers::composite_query(
-        "SELECT ARRAY(SELECT ((ARRAY(SELECT ($1).*))[1]).*), take_container($1)",
-    );
-    assert!(
-        analyzed.context().problems().is_empty(),
-        "{:?}",
-        analyzed.context().problems()
-    );
-    let query = analyzed.ast().clone().into_select_statemtnt().unwrap();
-    assert_eq!(
-        projection(&query).get_type(),
-        Some(PgBuiltInType::int4().array_type())
-    );
 }

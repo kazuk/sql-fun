@@ -1,0 +1,110 @@
+[
+  {
+    "name": "materialized_views_are_not_write_destinations::insert",
+    "sql": "INSERT INTO public.mv VALUES(1)",
+    "expected": {
+      "diagnostics": [
+        "insert_semantics"
+      ],
+      "columns": []
+    }
+  },
+  {
+    "name": "materialized_views_are_not_write_destinations::update",
+    "sql": "UPDATE public.mv SET id=1",
+    "expected": {
+      "diagnostics": [
+        "update_semantics"
+      ],
+      "columns": []
+    }
+  },
+  {
+    "name": "materialized_views_are_not_write_destinations::select",
+    "sql": "SELECT id FROM public.mv",
+    "expected": {
+      "diagnostics": [],
+      "columns": [
+        {
+          "name": "id",
+          "type": {
+            "schema_name": "pg_catalog",
+            "local_name": "int4",
+            "is_array": false
+          },
+          "nullability": "not_null"
+        }
+      ]
+    }
+  },
+  {
+    "name": "materialized_views_are_not_write_destinations::star",
+    "sql": "SELECT * FROM public.mv",
+    "expected": {
+      "diagnostics": [],
+      "columns": [
+        {
+          "name": "id",
+          "type": {
+            "schema_name": "pg_catalog",
+            "local_name": "int4",
+            "is_array": false
+          },
+          "nullability": "not_null"
+        }
+      ]
+    }
+  },
+  {
+    "name": "from_column_aliases_preserve_source_identity::insert",
+    "sql": "INSERT INTO public.alias_view(x) VALUES (1) ON CONFLICT(x) DO NOTHING",
+    "expected": {
+      "diagnostics": [],
+      "columns": []
+    }
+  },
+  {
+    "name": "from_column_aliases_preserve_source_identity::update",
+    "sql": "UPDATE public.alias_view SET x = 2 RETURNING x",
+    "expected": {
+      "diagnostics": [],
+      "columns": [
+        {
+          "name": "x",
+          "type": {
+            "schema_name": "pg_catalog",
+            "local_name": "int4",
+            "is_array": false
+          },
+          "nullability": "not_null"
+        }
+      ]
+    }
+  },
+  {
+    "name": "from_column_aliases_preserve_source_identity::nested",
+    "sql": "UPDATE public.alias_nested SET y = 2 RETURNING y",
+    "expected": {
+      "diagnostics": [],
+      "columns": [
+        {
+          "name": "y",
+          "type": {
+            "schema_name": "pg_catalog",
+            "local_name": "int4",
+            "is_array": false
+          },
+          "nullability": "not_null"
+        }
+      ]
+    }
+  },
+  {
+    "name": "from_column_aliases_preserve_source_identity::cast",
+    "sql": "UPDATE public.alias_cast SET x = 2",
+    "expected": {
+      "diagnostics": [],
+      "columns": []
+    }
+  }
+]

@@ -1,0 +1,10 @@
+[
+  {
+    "name": "arrays::ordinary_array_equality_retains_binding_and_types::catalog_shape",
+    "sql": "SELECT polroles = '{0}'::oid[] FROM policies",
+    "expected": {
+      "diagnostics": [],
+      "columns": [{"name": "", "type": {"schema_name": "pg_catalog", "local_name": "bool", "is_array": false}, "nullability": "nullable"}]
+    }
+  }
+]

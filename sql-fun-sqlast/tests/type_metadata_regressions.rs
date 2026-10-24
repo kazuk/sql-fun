@@ -5,29 +5,6 @@ use ::sql_fun_sqlast::sem::{
     TypeReference, ViewName,
 };
 
-#[rstest::rstest]
-#[case::cast("SELECT NULL::amount")]
-#[case::case_result("SELECT CASE WHEN true THEN NULL::amount ELSE NULL::amount END")]
-#[case::coalesce("SELECT coalesce(NULL::amount,NULL::amount)")]
-fn expression_results_retain_qualified_domain_identity(
-    #[case] sql: &str,
-) -> Result<(), Box<dyn std::error::Error>> {
-    let analyzed = heavy::analyze("CREATE DOMAIN amount AS integer", sql)?;
-    assert!(
-        analyzed.context().problems().is_empty(),
-        "{:?}",
-        analyzed.context().problems()
-    );
-    let query = analyzed.ast().clone().into_select_statemtnt().unwrap();
-    assert_eq!(
-        query.result_columns().get_column_at(0).unwrap().col_type(),
-        &Some(TypeReference::from_full_name(FullName::with_schema(
-            "public", "amount"
-        )))
-    );
-    Ok(())
-}
-
 #[test]
 fn parameter_cast_accepts_the_qualified_domain_reference() -> Result<(), Box<dyn std::error::Error>>
 {
@@ -166,44 +143,11 @@ fn parameter_dependent_overloads_match_concrete_calls(
     Ok(())
 }
 
-#[rstest::rstest]
-#[case::left("SELECT choose(1.2, 1)")]
-#[case::right("SELECT choose(1, 1.2)")]
-fn function_choice_is_independent_of_catalog_order(
-    #[case] sql: &str,
-    #[values(false, true)] reverse: bool,
-) -> Result<(), Box<dyn std::error::Error>> {
-    let numeric =
-        "CREATE FUNCTION choose(numeric,numeric) RETURNS numeric LANGUAGE SQL AS 'SELECT $1'";
-    let float = "CREATE FUNCTION choose(float8,float8) RETURNS float8 LANGUAGE SQL AS 'SELECT $1'";
-    let schema = if reverse {
-        format!("{float};{numeric}")
-    } else {
-        format!("{numeric};{float}")
-    };
-    let analyzed = heavy::analyze(&schema, sql)?;
-    assert!(
-        analyzed.context().problems().is_empty(),
-        "{:?}",
-        analyzed.context().problems()
-    );
-    let query = analyzed.ast().clone().into_select_statemtnt().unwrap();
-    assert_eq!(
-        query.result_columns().get_column_at(0).unwrap().col_type(),
-        &Some(TypeReference::from_master_type_name("numeric"))
-    );
-    Ok(())
-}
-
-#[rstest::rstest]
-#[case::concrete("SELECT choose(1::int2,2::int2)")]
-#[case::parameter("SELECT choose($1::int2,2::int2)")]
-fn equal_function_ranks_remain_ambiguous(
-    #[case] sql: &str,
-) -> Result<(), Box<dyn std::error::Error>> {
+#[test]
+fn equal_function_ranks_remain_ambiguous() -> Result<(), Box<dyn std::error::Error>> {
     let schema = "CREATE FUNCTION choose(int4,int8) RETURNS int4 LANGUAGE SQL AS 'SELECT $1';
         CREATE FUNCTION choose(int8,int4) RETURNS int8 LANGUAGE SQL AS 'SELECT $1'";
-    let analyzed = heavy::analyze(schema, sql)?;
+    let analyzed = heavy::analyze(schema, "SELECT choose($1::int2,2::int2)")?;
     assert!(
         analyzed.context().problems().iter().any(|problem| {
             matches!(
@@ -257,17 +201,11 @@ fn expanded_variadic_arguments_count_individually(
     Ok(())
 }
 
-#[rstest::rstest]
-#[case::preferred("SELECT choose(1)", "float8")]
-#[case::exact("SELECT choose(1.2)", "numeric")]
-#[case::parameter("SELECT choose($1::numeric)", "numeric")]
-fn omitted_defaults_do_not_contribute_matches(
-    #[case] sql: &str,
-    #[case] expected: &str,
-) -> Result<(), Box<dyn std::error::Error>> {
+#[test]
+fn omitted_defaults_do_not_contribute_matches() -> Result<(), Box<dyn std::error::Error>> {
     let schema = "CREATE FUNCTION choose(numeric, int4 DEFAULT 1) RETURNS numeric LANGUAGE SQL AS 'SELECT $1';
         CREATE FUNCTION choose(float8, float8 DEFAULT 1) RETURNS float8 LANGUAGE SQL AS 'SELECT $1'";
-    let analyzed = heavy::analyze(schema, sql)?;
+    let analyzed = heavy::analyze(schema, "SELECT choose($1::numeric)")?;
     assert!(
         analyzed.context().problems().is_empty(),
         "{:?}",
@@ -276,82 +214,43 @@ fn omitted_defaults_do_not_contribute_matches(
     let query = analyzed.ast().clone().into_select_statemtnt().unwrap();
     assert_eq!(
         query.result_columns().get_column_at(0).unwrap().col_type(),
-        &Some(TypeReference::from_master_type_name(expected))
+        &Some(TypeReference::from_master_type_name("numeric"))
     );
     Ok(())
 }
 
-#[rstest::rstest]
-#[case::concrete("SELECT choose(1.2)")]
-#[case::parameter("SELECT choose($1::numeric)")]
-fn ordinary_signature_precedes_identical_variadic_expansion(
-    #[case] sql: &str,
-    #[values(false, true)] reverse: bool,
-) -> Result<(), Box<dyn std::error::Error>> {
+#[test]
+fn ordinary_signature_precedes_identical_variadic_expansion()
+-> Result<(), Box<dyn std::error::Error>> {
     let variadic =
         "CREATE FUNCTION choose(VARIADIC numeric[]) RETURNS numeric LANGUAGE SQL AS 'SELECT $1[1]'";
     let ordinary = "CREATE FUNCTION choose(numeric) RETURNS int4 LANGUAGE SQL AS 'SELECT 1'";
-    let schema = if reverse {
-        format!("{ordinary};{variadic}")
-    } else {
-        format!("{variadic};{ordinary}")
-    };
-    let analyzed = heavy::analyze(&schema, sql)?;
-    assert!(
-        analyzed.context().problems().is_empty(),
-        "{:?}",
-        analyzed.context().problems()
-    );
-    let query = analyzed.ast().clone().into_select_statemtnt().unwrap();
-    assert_eq!(
-        query.result_columns().get_column_at(0).unwrap().col_type(),
-        &Some(PgBuiltInType::int4())
-    );
+    for reverse in [false, true] {
+        let schema = if reverse {
+            format!("{ordinary};{variadic}")
+        } else {
+            format!("{variadic};{ordinary}")
+        };
+        let analyzed = heavy::analyze(&schema, "SELECT choose($1::numeric)")?;
+        assert!(
+            analyzed.context().problems().is_empty(),
+            "{:?}",
+            analyzed.context().problems()
+        );
+        let query = analyzed.ast().clone().into_select_statemtnt().unwrap();
+        assert_eq!(
+            query.result_columns().get_column_at(0).unwrap().col_type(),
+            &Some(PgBuiltInType::int4())
+        );
+    }
     Ok(())
 }
 
 #[test]
-fn omitted_defaults_do_not_resolve_an_equal_input_tie() -> Result<(), Box<dyn std::error::Error>> {
-    let schema = "CREATE FUNCTION choose(numeric, int4 DEFAULT 1) RETURNS numeric LANGUAGE SQL AS 'SELECT $1';
-        CREATE FUNCTION choose(numeric, float8 DEFAULT 1) RETURNS float8 LANGUAGE SQL AS 'SELECT $1'";
-    let analyzed = heavy::analyze(schema, "SELECT choose(1.2)")?;
-    assert!(
-        analyzed
-            .context()
-            .problems()
-            .iter()
-            .any(|problem| problem.code() == "function_overload_resolution_failed")
-    );
-    Ok(())
-}
-
-#[test]
-fn extra_arguments_do_not_create_a_false_exact_match() -> Result<(), Box<dyn std::error::Error>> {
-    let schema = "CREATE FUNCTION choose(numeric) RETURNS int4 LANGUAGE SQL AS 'SELECT 1';
-        CREATE FUNCTION choose(float8,float8) RETURNS float8 LANGUAGE SQL AS 'SELECT $1'";
-    let analyzed = heavy::analyze(schema, "SELECT choose(1.2, 1)")?;
-    assert!(
-        analyzed.context().problems().is_empty(),
-        "{:?}",
-        analyzed.context().problems()
-    );
-    let query = analyzed.ast().clone().into_select_statemtnt().unwrap();
-    assert_eq!(
-        query.result_columns().get_column_at(0).unwrap().col_type(),
-        &Some(TypeReference::from_master_type_name("float8"))
-    );
-    Ok(())
-}
-
-#[rstest::rstest]
-#[case::concrete("SELECT choose(1.2)")]
-#[case::parameter("SELECT choose($1::numeric)")]
-fn output_parameters_do_not_contribute_input_matches(
-    #[case] sql: &str,
-) -> Result<(), Box<dyn std::error::Error>> {
+fn output_parameters_do_not_contribute_input_matches() -> Result<(), Box<dyn std::error::Error>> {
     let schema = "CREATE FUNCTION choose(OUT result int4, value numeric) RETURNS int4 LANGUAGE SQL AS 'SELECT 1';
         CREATE FUNCTION choose(value float8) RETURNS float8 LANGUAGE SQL AS 'SELECT $1'";
-    let analyzed = heavy::analyze(schema, sql)?;
+    let analyzed = heavy::analyze(schema, "SELECT choose($1::numeric)")?;
     assert!(
         analyzed.context().problems().is_empty(),
         "{:?}",

@@ -1,0 +1,212 @@
+[
+  {
+    "name": "independent_write_mechanisms::insert_trigger::insert",
+    "sql": "INSERT INTO public.v_insert_trigger(id) VALUES(1)",
+    "expected": {
+      "diagnostics": [],
+      "columns": []
+    }
+  },
+  {
+    "name": "independent_write_mechanisms::insert_trigger::update",
+    "sql": "UPDATE public.v_insert_trigger SET id=1",
+    "expected": {
+      "diagnostics": [
+        "update_semantics"
+      ],
+      "columns": []
+    }
+  },
+  {
+    "name": "independent_write_mechanisms::insert_trigger::returning",
+    "sql": "INSERT INTO public.v_insert_trigger(id) VALUES(1) RETURNING id",
+    "expected": {
+      "diagnostics": [],
+      "columns": [
+        {
+          "name": "id",
+          "type": {
+            "schema_name": "pg_catalog",
+            "local_name": "int4",
+            "is_array": false
+          },
+          "nullability": "not_null"
+        }
+      ]
+    }
+  },
+  {
+    "name": "independent_write_mechanisms::update_trigger::insert",
+    "sql": "INSERT INTO public.v_update_trigger(id) VALUES(1)",
+    "expected": {
+      "diagnostics": [
+        "insert_semantics"
+      ],
+      "columns": []
+    }
+  },
+  {
+    "name": "independent_write_mechanisms::update_trigger::update",
+    "sql": "UPDATE public.v_update_trigger SET id=1",
+    "expected": {
+      "diagnostics": [],
+      "columns": []
+    }
+  },
+  {
+    "name": "independent_write_mechanisms::both_triggers::insert",
+    "sql": "INSERT INTO public.v_both_triggers(id) VALUES(1)",
+    "expected": {
+      "diagnostics": [],
+      "columns": []
+    }
+  },
+  {
+    "name": "independent_write_mechanisms::both_triggers::update",
+    "sql": "UPDATE public.v_both_triggers SET id=1",
+    "expected": {
+      "diagnostics": [],
+      "columns": []
+    }
+  },
+  {
+    "name": "independent_write_mechanisms::both_triggers::returning",
+    "sql": "INSERT INTO public.v_both_triggers(id) VALUES(1) RETURNING id",
+    "expected": {
+      "diagnostics": [],
+      "columns": [
+        {
+          "name": "id",
+          "type": {
+            "schema_name": "pg_catalog",
+            "local_name": "int4",
+            "is_array": false
+          },
+          "nullability": "not_null"
+        }
+      ]
+    }
+  },
+  {
+    "name": "independent_write_mechanisms::insert_rule::insert",
+    "sql": "INSERT INTO public.v_insert_rule(id) VALUES(1)",
+    "expected": {
+      "diagnostics": [],
+      "columns": []
+    }
+  },
+  {
+    "name": "independent_write_mechanisms::insert_rule::update",
+    "sql": "UPDATE public.v_insert_rule SET id=1",
+    "expected": {
+      "diagnostics": [
+        "update_semantics"
+      ],
+      "columns": []
+    }
+  },
+  {
+    "name": "independent_write_mechanisms::insert_rule::returning",
+    "sql": "INSERT INTO public.v_insert_rule(id) VALUES(1) RETURNING id",
+    "expected": {
+      "diagnostics": [
+        "insert_semantics"
+      ],
+      "columns": []
+    }
+  },
+  {
+    "name": "independent_write_mechanisms::update_rule::insert",
+    "sql": "INSERT INTO public.v_update_rule(id) VALUES(1)",
+    "expected": {
+      "diagnostics": [
+        "insert_semantics"
+      ],
+      "columns": []
+    }
+  },
+  {
+    "name": "independent_write_mechanisms::update_rule::update",
+    "sql": "UPDATE public.v_update_rule SET id=1",
+    "expected": {
+      "diagnostics": [],
+      "columns": []
+    }
+  },
+  {
+    "name": "independent_write_mechanisms::rule_returning::insert",
+    "sql": "INSERT INTO public.v_rule_returning(id) VALUES(1)",
+    "expected": {
+      "diagnostics": [],
+      "columns": []
+    }
+  },
+  {
+    "name": "independent_write_mechanisms::rule_returning::update",
+    "sql": "UPDATE public.v_rule_returning SET id=1",
+    "expected": {
+      "diagnostics": [
+        "update_semantics"
+      ],
+      "columns": []
+    }
+  },
+  {
+    "name": "independent_write_mechanisms::rule_returning::returning",
+    "sql": "INSERT INTO public.v_rule_returning(id) VALUES(1) RETURNING id",
+    "expected": {
+      "diagnostics": [],
+      "columns": [
+        {
+          "name": "id",
+          "type": {
+            "schema_name": "pg_catalog",
+            "local_name": "int4",
+            "is_array": false
+          },
+          "nullability": "not_null"
+        }
+      ]
+    }
+  },
+  {
+    "name": "independent_write_mechanisms::conditional_rule::insert",
+    "sql": "INSERT INTO public.v_conditional_rule(id) VALUES(1)",
+    "expected": {
+      "diagnostics": [
+        "insert_semantics"
+      ],
+      "columns": []
+    }
+  },
+  {
+    "name": "independent_write_mechanisms::conditional_rule::update",
+    "sql": "UPDATE public.v_conditional_rule SET id=1",
+    "expected": {
+      "diagnostics": [
+        "update_semantics"
+      ],
+      "columns": []
+    }
+  },
+  {
+    "name": "independent_write_mechanisms::additional_rule::insert",
+    "sql": "INSERT INTO public.v_additional_rule(id) VALUES(1)",
+    "expected": {
+      "diagnostics": [
+        "insert_semantics"
+      ],
+      "columns": []
+    }
+  },
+  {
+    "name": "independent_write_mechanisms::additional_rule::update",
+    "sql": "UPDATE public.v_additional_rule SET id=1",
+    "expected": {
+      "diagnostics": [
+        "update_semantics"
+      ],
+      "columns": []
+    }
+  }
+]

@@ -1,5 +1,9 @@
 # ARRAY and min/max regression inventory
 
+The [schema-dependent follow-up](inventory-schema.md) supersedes this earlier
+builtin-only migration's custom-schema exclusions. Use its detailed mappings
+for the current destinations and retained internal assertions.
+
 This inventory maps each original parameterized case in `arrays.rs` and
 `min_max.rs` to the maintained SQL CLI regression contract or to retained Rust
 coverage. CLI fixtures assert exact API type identities (`schema_name`, base

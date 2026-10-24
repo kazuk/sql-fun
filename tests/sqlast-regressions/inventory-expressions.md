@@ -1,5 +1,9 @@
 # CASE and COALESCE expression inventory
 
+The [schema-dependent follow-up](inventory-schema.md) supersedes this earlier
+builtin-only migration's custom-schema exclusions. Use its detailed mappings
+for the current destinations and retained internal assertions.
+
 These rows map semantic-only source cases to public SQL regression fixtures.
 Expected diagnostics and result-column properties are checked by the runner;
 parameter domains and semantic AST details remain checked by the Rust tests.

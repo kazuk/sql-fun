@@ -53,7 +53,6 @@ fn explicit_cast_retains_domain_binding(
     let query = analyzed.ast().clone().into_select_statemtnt().unwrap();
     let column = query.result_columns().get_column_at(0).unwrap();
     let expected: TypeReference = target.parse()?;
-    assert_eq!(column.col_type(), &Some(expected.clone()));
     let encoded = ::serde_json::to_value(column.expression().unwrap())?;
     assert_eq!(
         encoded["TypeCast"]["target_type"],

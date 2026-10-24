@@ -8,20 +8,19 @@ use crate::ast::Dialect;
 use crate::sem::{BaseParseContext, ColumnName, ParseContext, PgBuiltInType};
 
 #[rstest::rstest]
-#[case::plain("DELETE FROM items", 0)]
-#[case::star("DELETE FROM items RETURNING *", 2)]
-#[case::only("DELETE FROM ONLY items RETURNING id", 1)]
-#[case::alias("DELETE FROM items AS i WHERE true RETURNING i.id AS removed", 1)]
-#[case::using("DELETE FROM items USING (SELECT 2 n) s RETURNING s.n", 1)]
-#[case::target_star("DELETE FROM items USING (SELECT 2 n) s RETURNING *", 2)]
-#[case::source_star("DELETE FROM items USING (SELECT 2 n) s RETURNING s.*", 1)]
-#[case::with("WITH s AS (SELECT 2 n) DELETE FROM items USING s RETURNING s.n", 1)]
+#[case::plain("DELETE FROM items")]
+#[case::star("DELETE FROM items RETURNING *")]
+#[case::only("DELETE FROM ONLY items RETURNING id")]
+#[case::alias("DELETE FROM items AS i WHERE true RETURNING i.id AS removed")]
+#[case::using("DELETE FROM items USING (SELECT 2 n) s RETURNING s.n")]
+#[case::target_star("DELETE FROM items USING (SELECT 2 n) s RETURNING *")]
+#[case::source_star("DELETE FROM items USING (SELECT 2 n) s RETURNING s.*")]
+#[case::with("WITH s AS (SELECT 2 n) DELETE FROM items USING s RETURNING s.n")]
 #[case::correlated(
-    "DELETE FROM items WHERE (SELECT items.id IS NULL) RETURNING (SELECT items.label)",
-    1
+    "DELETE FROM items WHERE (SELECT items.id IS NULL) RETURNING (SELECT items.label)"
 )]
-#[case::cte_shadow("WITH items AS (SELECT 2 other) DELETE FROM items RETURNING id", 1)]
-fn resolves_delete(#[case] sql: &str, #[case] width: usize) {
+#[case::cte_shadow("WITH items AS (SELECT 2 other) DELETE FROM items RETURNING id")]
+fn retains_delete_bindings(#[case] sql: &str) {
     let (statement, context) = analyze(sql, Dialect::postgres());
     assert_eq!(
         context.reported_problem_count(),
@@ -31,7 +30,6 @@ fn resolves_delete(#[case] sql: &str, #[case] width: usize) {
     );
     let delete = statement.as_delete().unwrap();
     assert_eq!(delete.target().to_string(), "public.items");
-    assert_eq!(delete.result_columns().len(), width);
     assert_eq!(delete.includes_descendants(), !sql.contains("ONLY"));
     assert!(
         delete
@@ -147,18 +145,13 @@ fn infers_parameters(#[case] sql: &str, #[case] boolean: bool) {
     );
 }
 
-#[rstest::rstest]
-#[case::alias_hidden("DELETE FROM items AS i RETURNING items.id")]
-#[case::ambiguous("DELETE FROM items USING items AS other RETURNING id")]
-#[case::duplicate_alias("DELETE FROM items USING items RETURNING id")]
-#[case::missing_column("DELETE FROM items RETURNING absent")]
-#[case::predicate("DELETE FROM items WHERE 1")]
-#[case::using_correlation("DELETE FROM items USING LATERAL (SELECT items.id) s RETURNING s.id")]
-#[case::cte_aliases("WITH d(a,b,c) AS (DELETE FROM items RETURNING id) SELECT a FROM d")]
-#[case::parameter_conflict("DELETE FROM items WHERE $1 RETURNING $1::integer")]
-fn reports_invalid_delete(#[case] sql: &str) {
-    let (_, context) = analyze(sql, Dialect::postgres());
-    assert!(context.reported_problem_count() > 0, "{sql}");
+#[test]
+fn synthetic_parameter_conflict_retains_its_diagnostic() {
+    let (_, context) = analyze(
+        "DELETE FROM items WHERE $1 RETURNING $1::integer",
+        Dialect::postgres(),
+    );
+    assert!(context.reported_problem_count() > 0);
 }
 
 #[test]

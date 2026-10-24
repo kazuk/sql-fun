@@ -6,42 +6,28 @@ use crate::ast::Dialect;
 use crate::sem::{ColumnName, ParseContext, PgBuiltInType};
 
 #[rstest::rstest]
-#[case::values("INSERT INTO items VALUES (1, 'one') RETURNING *", 2)]
-#[case::partial("INSERT INTO items VALUES (1) RETURNING id", 1)]
-#[case::named("INSERT INTO items(label, id) VALUES ('one', 1) RETURNING id AS n", 1)]
-#[case::defaults("INSERT INTO items DEFAULT VALUES RETURNING *", 2)]
-#[case::default_cell("INSERT INTO items VALUES (DEFAULT, 'one') RETURNING id", 1)]
-#[case::multi_row("INSERT INTO items(id) VALUES (1), (2) RETURNING id", 1)]
-#[case::select("INSERT INTO items(id) SELECT 1 RETURNING id", 1)]
-#[case::select_star("INSERT INTO items SELECT * FROM items RETURNING id", 1)]
+#[case::values("INSERT INTO items VALUES (1, 'one') RETURNING *")]
+#[case::partial("INSERT INTO items VALUES (1) RETURNING id")]
+#[case::named("INSERT INTO items(label, id) VALUES ('one', 1) RETURNING id AS n")]
+#[case::defaults("INSERT INTO items DEFAULT VALUES RETURNING *")]
+#[case::default_cell("INSERT INTO items VALUES (DEFAULT, 'one') RETURNING id")]
+#[case::multi_row("INSERT INTO items(id) VALUES (1), (2) RETURNING id")]
+#[case::select("INSERT INTO items(id) SELECT 1 RETURNING id")]
+#[case::select_star("INSERT INTO items SELECT * FROM items RETURNING id")]
 #[case::join_star(
-    "INSERT INTO items SELECT * FROM (SELECT id FROM items) l JOIN (SELECT label FROM items) r ON true RETURNING id",
-    1
+    "INSERT INTO items SELECT * FROM (SELECT id FROM items) l JOIN (SELECT label FROM items) r ON true RETURNING id"
 )]
 #[case::using_star(
-    "INSERT INTO items(id) SELECT * FROM (SELECT id FROM items) l JOIN (SELECT id FROM items) r USING(id) RETURNING id",
-    1
+    "INSERT INTO items(id) SELECT * FROM (SELECT id FROM items) l JOIN (SELECT id FROM items) r USING(id) RETURNING id"
 )]
-#[case::derived_star(
-    "INSERT INTO items(id) SELECT s.* FROM (SELECT 1 AS n) s RETURNING id",
-    1
-)]
-#[case::cte_star(
-    "WITH c AS (SELECT 1 AS n) INSERT INTO items(id) SELECT * FROM c RETURNING id",
-    1
-)]
-#[case::compound("INSERT INTO items(id) SELECT 1 UNION ALL SELECT 2 RETURNING id", 1)]
-#[case::cte_source(
-    "WITH c AS (SELECT 1 AS n) INSERT INTO items(id) SELECT n FROM c RETURNING id",
-    1
-)]
-#[case::no_returning("INSERT INTO items(id) VALUES (1)", 0)]
-#[case::alias("INSERT INTO items AS i VALUES (1, 'one') RETURNING i.id", 1)]
-#[case::nothing(
-    "INSERT INTO items(id) VALUES (1) ON CONFLICT DO NOTHING RETURNING id",
-    1
-)]
-fn resolves_insert_semantics(#[case] sql: &str, #[case] width: usize) {
+#[case::derived_star("INSERT INTO items(id) SELECT s.* FROM (SELECT 1 AS n) s RETURNING id")]
+#[case::cte_star("WITH c AS (SELECT 1 AS n) INSERT INTO items(id) SELECT * FROM c RETURNING id")]
+#[case::compound("INSERT INTO items(id) SELECT 1 UNION ALL SELECT 2 RETURNING id")]
+#[case::cte_source("WITH c AS (SELECT 1 AS n) INSERT INTO items(id) SELECT n FROM c RETURNING id")]
+#[case::no_returning("INSERT INTO items(id) VALUES (1)")]
+#[case::alias("INSERT INTO items AS i VALUES (1, 'one') RETURNING i.id")]
+#[case::nothing("INSERT INTO items(id) VALUES (1) ON CONFLICT DO NOTHING RETURNING id")]
+fn retains_insert_target_binding(#[case] sql: &str) {
     let (statement, context) = analyze(sql, Dialect::postgres());
     assert_eq!(
         context.reported_problem_count(),
@@ -51,13 +37,6 @@ fn resolves_insert_semantics(#[case] sql: &str, #[case] width: usize) {
     );
     let insert = statement.as_insert().expect("analyzed INSERT");
     assert_eq!(insert.target().to_string(), "public.items");
-    assert_eq!(insert.result_columns().len(), width);
-    if width > 0 {
-        assert_eq!(
-            insert.result_columns().get_column_at(0).unwrap().col_type(),
-            &Some(PgBuiltInType::int4())
-        );
-    }
 }
 
 #[rstest::rstest]
@@ -141,23 +120,6 @@ fn inferred_composite_star_assigns_expanded_insert_columns(#[case] sql: &str) {
     assert!(!second.constraint().allows(&PgBuiltInType::text()));
 }
 
-#[rstest::rstest]
-#[case::arity("INSERT INTO items VALUES (1, 'x', 3)")]
-#[case::duplicate("INSERT INTO items(id, id) VALUES (1, 2)")]
-#[case::types("INSERT INTO items(id) VALUES (true)")]
-#[case::explicit_partial("INSERT INTO items(id, label) VALUES (1)")]
-#[case::branch_arity("INSERT INTO items(id) SELECT 1 UNION ALL SELECT 1, 2")]
-#[case::conflicting_parameter("INSERT INTO flags(id, flag) VALUES ($1, $1)")]
-#[case::cte_alias_arity(
-    "WITH c(a,b) AS (INSERT INTO items(id) VALUES(1) RETURNING id) SELECT a FROM c"
-)]
-#[case::alias_scope("INSERT INTO items AS i VALUES (1) RETURNING items.id")]
-#[case::source_scope("INSERT INTO items(id) SELECT n FROM (SELECT 1 AS n) s RETURNING s.n")]
-fn reports_invalid_insert(#[case] sql: &str) {
-    let (_, context) = analyze(sql, Dialect::postgres());
-    assert!(context.reported_problem_count() > 0);
-}
-
 #[test]
 fn returning_is_exposed_through_insert_cte() {
     let (statement, context) = analyze(
@@ -228,29 +190,6 @@ fn sqlite_insert(#[case] sql: &str) {
 fn sqlite_implicit_columns_require_full_arity() {
     let (_, context) = analyze("INSERT INTO items VALUES (1)", Dialect::sqlite());
     assert!(context.reported_problem_count() > 0);
-}
-
-#[rstest::rstest]
-#[case::always("INSERT INTO identity_items(id) VALUES(1)", true)]
-#[case::default_value("INSERT INTO identity_items(id) VALUES(DEFAULT)", false)]
-#[case::system(
-    "INSERT INTO identity_items(id) OVERRIDING SYSTEM VALUE VALUES(1)",
-    false
-)]
-#[case::user(
-    "INSERT INTO identity_items(id) OVERRIDING USER VALUE VALUES(1)",
-    false
-)]
-#[case::generated("INSERT INTO generated_items(id,g) VALUES(1,2)", true)]
-#[case::generated_default("INSERT INTO generated_items(id,g) VALUES(1,DEFAULT)", false)]
-fn validates_generated_destinations(#[case] sql: &str, #[case] invalid: bool) {
-    let (_, context) = analyze(sql, Dialect::postgres());
-    assert_eq!(
-        context.reported_problem_count() > 0,
-        invalid,
-        "{:#?}",
-        context.reported_problems()
-    );
 }
 
 #[rstest::rstest]
@@ -875,24 +814,6 @@ mod test_helpers {
             ],
             &source_span(),
         );
-        context.setup_table(
-            "flags",
-            &[
-                ColumnDefinition::new(
-                    &Some(ColumnName::from("id")),
-                    Some(&PgBuiltInType::int4()),
-                    Some(false),
-                    &[],
-                ),
-                ColumnDefinition::new(
-                    &Some(ColumnName::from("flag")),
-                    Some(&PgBuiltInType::bool()),
-                    Some(false),
-                    &[],
-                ),
-            ],
-            &source_span(),
-        );
         let array =
             crate::sem::TypeReference::concrete_type_ref(PgBuiltInType::int4().full_name(), true);
         context.setup_type(array.clone());
@@ -922,33 +843,6 @@ mod test_helpers {
                 Some(true),
                 &[crate::sem::ColumnConstraint::identity(identity)],
             )],
-            &source_span(),
-        );
-        let generated = crate::sem::GeneratedColumnConstraint::new(
-            &crate::sem::TableName::from(crate::sem::FullName::with_schema(
-                "public",
-                "generated_items",
-            )),
-            &ColumnName::from("g"),
-            crate::sem::ScalarConstExpr::null(),
-            Some(crate::sem::GeneratedColumnMode::stored()),
-        );
-        context.setup_table(
-            "generated_items",
-            &[
-                ColumnDefinition::new(
-                    &Some(ColumnName::from("id")),
-                    Some(&PgBuiltInType::int4()),
-                    Some(false),
-                    &[],
-                ),
-                ColumnDefinition::new(
-                    &Some(ColumnName::from("g")),
-                    Some(&PgBuiltInType::int4()),
-                    Some(false),
-                    &[crate::sem::ColumnConstraint::generated(generated)],
-                ),
-            ],
             &source_span(),
         );
         context

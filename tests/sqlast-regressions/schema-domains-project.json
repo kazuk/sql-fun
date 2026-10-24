@@ -1,0 +1,204 @@
+[
+  {
+    "name": "domain_casts::explicit_cast_retains_domain_binding::source_domain",
+    "sql": "SELECT 1::public.amount::bigint",
+    "expected": {
+      "diagnostics": [],
+      "columns": [
+        {
+          "name": "",
+          "type": {
+            "schema_name": "pg_catalog",
+            "local_name": "int8",
+            "is_array": false
+          },
+          "nullability": "not_null"
+        }
+      ]
+    }
+  },
+  {
+    "name": "domain_casts::explicit_cast_retains_domain_binding::same_domain",
+    "sql": "SELECT 1::public.amount::public.amount",
+    "expected": {
+      "diagnostics": [],
+      "columns": [
+        {
+          "name": "",
+          "type": {
+            "schema_name": "public",
+            "local_name": "amount",
+            "is_array": false
+          },
+          "nullability": "not_null"
+        }
+      ]
+    }
+  },
+  {
+    "name": "domain_casts::explicit_cast_retains_domain_binding::nested",
+    "sql": "SELECT 1::public.nested_amount",
+    "expected": {
+      "diagnostics": [],
+      "columns": [
+        {
+          "name": "",
+          "type": {
+            "schema_name": "public",
+            "local_name": "nested_amount",
+            "is_array": false
+          },
+          "nullability": "not_null"
+        }
+      ]
+    }
+  },
+  {
+    "name": "domain_casts::explicit_cast_retains_domain_binding::empty_array",
+    "sql": "SELECT ARRAY[]::public.amounts",
+    "expected": {
+      "diagnostics": [],
+      "columns": [
+        {
+          "name": "array",
+          "type": {
+            "schema_name": "public",
+            "local_name": "amounts",
+            "is_array": false
+          },
+          "nullability": "not_null"
+        }
+      ]
+    }
+  },
+  {
+    "name": "domain_casts::explicit_cast_retains_domain_binding::array_domain",
+    "sql": "SELECT ARRAY[1]::public.amounts",
+    "expected": {
+      "diagnostics": [],
+      "columns": [
+        {
+          "name": "array",
+          "type": {
+            "schema_name": "public",
+            "local_name": "amounts",
+            "is_array": false
+          },
+          "nullability": "not_null"
+        }
+      ]
+    }
+  },
+  {
+    "name": "domain_casts::explicit_cast_retains_domain_binding::domain_elements",
+    "sql": "SELECT ARRAY[1]::public.amount[]",
+    "expected": {
+      "diagnostics": [],
+      "columns": [
+        {
+          "name": "array",
+          "type": {
+            "schema_name": "public",
+            "local_name": "amount",
+            "is_array": true
+          },
+          "nullability": "not_null"
+        }
+      ]
+    }
+  },
+  {
+    "name": "type_metadata_regressions::expression_results_retain_qualified_domain_identity::cast",
+    "sql": "SELECT NULL::amount",
+    "expected": {
+      "diagnostics": [],
+      "columns": [
+        {
+          "name": "",
+          "type": {
+            "schema_name": "public",
+            "local_name": "amount",
+            "is_array": false
+          },
+          "nullability": "nullable"
+        }
+      ]
+    }
+  },
+  {
+    "name": "type_metadata_regressions::expression_results_retain_qualified_domain_identity::case_result",
+    "sql": "SELECT CASE WHEN true THEN NULL::amount ELSE NULL::amount END",
+    "expected": {
+      "diagnostics": [],
+      "columns": [
+        {
+          "name": "",
+          "type": {
+            "schema_name": "public",
+            "local_name": "amount",
+            "is_array": false
+          },
+          "nullability": "nullable"
+        }
+      ]
+    }
+  },
+  {
+    "name": "type_metadata_regressions::expression_results_retain_qualified_domain_identity::coalesce",
+    "sql": "SELECT coalesce(NULL::amount,NULL::amount)",
+    "expected": {
+      "diagnostics": [],
+      "columns": [
+        {
+          "name": "",
+          "type": {
+            "schema_name": "public",
+            "local_name": "amount",
+            "is_array": false
+          },
+          "nullability": "nullable"
+        }
+      ]
+    }
+  },
+  {
+    "name": "type_metadata_regressions::parameter_cast_accepts_the_qualified_domain_reference",
+    "sql": "SELECT $1::amount",
+    "expected": {
+      "diagnostics": [
+        "parameter_type_unresolved"
+      ],
+      "columns": [
+        {
+          "name": "",
+          "type": {
+            "schema_name": "public",
+            "local_name": "amount",
+            "is_array": false
+          },
+          "nullability": "unknown"
+        }
+      ]
+    }
+  },
+  {
+    "name": "domain_casts::parameter_cast_preserves_admissible_inputs_and_domain_output",
+    "sql": "SELECT $1::public.nested_amount",
+    "expected": {
+      "diagnostics": [
+        "parameter_type_unresolved"
+      ],
+      "columns": [
+        {
+          "name": "",
+          "type": {
+            "schema_name": "public",
+            "local_name": "nested_amount",
+            "is_array": false
+          },
+          "nullability": "unknown"
+        }
+      ]
+    }
+  }
+]

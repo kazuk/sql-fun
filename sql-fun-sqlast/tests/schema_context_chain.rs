@@ -55,44 +55,6 @@ fn missing_from_relation_reports_a_recoverable_problem(
 }
 
 #[test]
-fn full_join_star_publishes_ordered_view_columns() -> Result<(), Box<dyn std::error::Error>> {
-    // The real catalog is needed to verify view application and PostgreSQL
-    // common-type selection; this fixture loads it once for this test process.
-    let root = builtin_root()?;
-    let parsed = load_schema(
-        &root,
-        "CREATE TABLE public.left_items (id integer NOT NULL, left_value text); \
-         CREATE TABLE public.right_items (id bigint NOT NULL, right_value text); \
-         CREATE VIEW public.joined_items AS \
-         SELECT * FROM public.left_items l FULL JOIN public.right_items r USING (id);",
-    )?;
-    assert!(parsed.problems().is_empty(), "{:?}", parsed.problems());
-    let view = parsed
-        .get_view_impl(&FullName::with_schema("public", "joined_items"))
-        .expect("published view");
-    let columns = view.ordinary_definition().unwrap().query().result_columns();
-    assert_eq!(columns.len(), 3);
-    assert_eq!(
-        (0..3)
-            .map(|index| columns
-                .get_column_at(index)
-                .unwrap()
-                .column_name()
-                .as_ref()
-                .unwrap()
-                .as_str())
-            .collect::<Vec<_>>(),
-        ["id", "left_value", "right_value"]
-    );
-    assert_eq!(
-        columns.get_column_at(0).unwrap().col_type(),
-        &Some(PgBuiltInType::int8())
-    );
-    assert_query_type(view, "id", &PgBuiltInType::int8());
-    Ok(())
-}
-
-#[test]
 fn dependent_view_keeps_missing_relation_problem_after_provider_is_loaded()
 -> Result<(), Box<dyn std::error::Error>> {
     let root = builtin_root()?;

@@ -130,7 +130,8 @@ fn catalog_types_survive_inference(
     #[case] expression: &str,
     #[case] expected: &str,
 ) -> testresult::TestResult {
-    // Real catalog domain/enum metadata and schema freeze determine these identities.
+    // Keep the source-context success contract; the CLI additionally reports
+    // unresolved parameter metadata for these same result-type cases.
     let analyzed = heavy::analyze(
         &format!("SELECT {expression}"),
         &[

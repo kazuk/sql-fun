@@ -1,0 +1,127 @@
+[
+  {
+    "name": "automatic_view_query::insert",
+    "sql": "INSERT INTO public.item_view(key) VALUES (1) RETURNING key, computed",
+    "expected": {
+      "diagnostics": [],
+      "columns": [
+        {
+          "name": "key",
+          "type": {
+            "schema_name": "pg_catalog",
+            "local_name": "int4",
+            "is_array": false
+          },
+          "nullability": "not_null"
+        },
+        {
+          "name": "computed",
+          "type": {
+            "schema_name": "pg_catalog",
+            "local_name": "int4",
+            "is_array": false
+          },
+          "nullability": "nullable"
+        }
+      ]
+    }
+  },
+  {
+    "name": "automatic_view_query::default_values",
+    "sql": "INSERT INTO public.item_view DEFAULT VALUES",
+    "expected": {
+      "diagnostics": [],
+      "columns": []
+    }
+  },
+  {
+    "name": "automatic_view_query::update",
+    "sql": "UPDATE public.item_view SET value = 9 RETURNING key, computed",
+    "expected": {
+      "diagnostics": [],
+      "columns": [
+        {
+          "name": "key",
+          "type": {
+            "schema_name": "pg_catalog",
+            "local_name": "int4",
+            "is_array": false
+          },
+          "nullability": "not_null"
+        },
+        {
+          "name": "computed",
+          "type": {
+            "schema_name": "pg_catalog",
+            "local_name": "int4",
+            "is_array": false
+          },
+          "nullability": "nullable"
+        }
+      ]
+    }
+  },
+  {
+    "name": "automatic_view_query::computed_insert",
+    "sql": "INSERT INTO public.item_view(computed) VALUES (2)",
+    "expected": {
+      "diagnostics": [
+        "insert_semantics"
+      ],
+      "columns": []
+    }
+  },
+  {
+    "name": "automatic_view_query::computed_default",
+    "sql": "INSERT INTO public.item_view(computed) VALUES (DEFAULT)",
+    "expected": {
+      "diagnostics": [
+        "insert_semantics"
+      ],
+      "columns": []
+    }
+  },
+  {
+    "name": "automatic_view_query::computed_update",
+    "sql": "UPDATE public.item_view SET computed = DEFAULT",
+    "expected": {
+      "diagnostics": [
+        "update_semantics",
+        "update_semantics"
+      ],
+      "columns": []
+    }
+  },
+  {
+    "name": "automatic_view_query::nested_insert",
+    "sql": "INSERT INTO public.nested(renamed) VALUES (1)",
+    "expected": {
+      "diagnostics": [],
+      "columns": []
+    }
+  },
+  {
+    "name": "automatic_view_query::nested_update",
+    "sql": "UPDATE public.nested SET value = 2",
+    "expected": {
+      "diagnostics": [],
+      "columns": []
+    }
+  },
+  {
+    "name": "automatic_view_query::conflict",
+    "sql": "INSERT INTO public.item_view(key) VALUES (1) ON CONFLICT(key) DO NOTHING",
+    "expected": {
+      "diagnostics": [],
+      "columns": []
+    }
+  },
+  {
+    "name": "automatic_view_query::nested_conflict",
+    "sql": "INSERT INTO public.nested(renamed) VALUES (1) ON CONFLICT(renamed) DO NOTHING",
+    "expected": {
+      "diagnostics": [],
+      "columns": []
+    }
+  }
+]

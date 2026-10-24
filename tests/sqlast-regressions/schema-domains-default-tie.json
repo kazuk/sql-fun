@@ -1,0 +1,10 @@
+[
+  {
+    "name": "type_metadata_regressions::omitted_defaults_do_not_resolve_an_equal_input_tie",
+    "sql": "SELECT choose(1.2)",
+    "expected": {
+      "diagnostics": ["function_overload_resolution_failed"],
+      "columns": [{"name": "", "type": null, "nullability": "unknown"}]
+    }
+  }
+]

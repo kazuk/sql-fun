@@ -1,0 +1,10 @@
+[
+  {
+    "name": "arrays::anonymous_records_do_not_implicitly_become_named_composites::scalar",
+    "sql": "SELECT f(pg_control_system())",
+    "expected": {
+      "diagnostics": ["function_overload_resolution_failed"],
+      "columns": [{"name": "", "type": null, "nullability": "unknown"}]
+    }
+  }
+]

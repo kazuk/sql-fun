@@ -44,7 +44,13 @@ impl SubQueryDataSource {
     ) where
         TParseContext: crate::sem::ParseContext,
     {
-        if self.select_statement.has_column(column) {
+        let result_columns = self.select_statement.result_columns();
+        let result_column = if let Some(index) = self.alias.derived_column_index(column) {
+            result_columns.get_column_at(index)
+        } else {
+            result_columns.get_column_with_skip_count(column, self.alias.len_derived_column())
+        };
+        if result_column.is_some() {
             names.push(self.alias.clone());
         }
     }

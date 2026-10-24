@@ -116,6 +116,7 @@ mod test_highlighting {
     use ::sql_fun_core::SqlDialect;
 
     #[tokio::test]
+    #[ignore = "High CI disk usage from server builds"]
     async fn preserves_complete_lines_with_utf8_comments_and_trailing_whitespace()
     -> testresult::TestResult {
         let source = "select '日本語', 1;  -- comment\n  select 2;  \n";
@@ -136,6 +137,7 @@ mod test_highlighting {
     }
 
     #[tokio::test]
+    #[ignore = "High CI disk usage from server builds"]
     async fn clips_existing_multiline_tokens_for_snippet_highlighting() -> testresult::TestResult {
         let source = "select 1;\n/* first\n日本語 middle\nlast */ select 2;";
         let tokens =

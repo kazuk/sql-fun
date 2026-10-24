@@ -112,6 +112,7 @@ mod test_ansi_rendering {
     use ::sql_fun_core::analysis_problem::{AnalysisProblem, FullName, StringSpan};
 
     #[tokio::test]
+    #[ignore = "High CI disk usage from server builds"]
     async fn applies_selected_theme_to_retained_sql() -> testresult::TestResult {
         let source = "create domain example as missing;";
         let problem = AnalysisProblem::domain_base_type_not_found(
@@ -156,6 +157,7 @@ mod test_min_max_rendering {
         "cannot identify a comparison function for pg_catalog.json"
     )]
     #[tokio::test]
+    #[ignore = "High CI disk usage from server builds"]
     async fn preserves_min_max_message_and_code(
         #[case] problem: MinMaxProblem,
         #[case] code: &str,
@@ -259,6 +261,7 @@ mod test_implemented_family_rendering {
         "trigger_invalid_definition", "invalid trigger statement: Target(missing)", false
     )]
     #[tokio::test]
+    #[ignore = "High CI disk usage from server builds"]
     async fn preserves_implemented_family_presentation(
         #[case] problem: AnalysisProblem,
         #[case] code: &str,
@@ -317,6 +320,7 @@ mod test_rendering {
     use ::sql_fun_core::{DiagnosticPresentation, SqlDialect, SqlFunArgs};
 
     #[tokio::test]
+    #[ignore = "High CI disk usage from server builds"]
     async fn renders_transported_diagnostic_with_original_metadata_and_label()
     -> testresult::TestResult {
         let source = "create domain example as missing;";

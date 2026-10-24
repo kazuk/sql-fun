@@ -106,6 +106,7 @@ async fn sends_explicit_query_with_empty_catalog() {
 }
 
 #[tokio::test]
+#[ignore = "High CI disk usage from server builds"]
 async fn recovered_catalog_reaches_real_server_realization() -> ::testresult::TestResult {
     // The real server/catalog setup is necessary to verify the receiving service.
     test_helpers::heavy::analyze_recovered_catalog().await

@@ -197,6 +197,27 @@ fn derived_whole_row_retains_field_names_and_parameter_types() {
     assert_eq!(test_helpers::row_levels(query), vec![0]);
 }
 
+#[rstest::rstest]
+#[case::member("SELECT (v.*).n FROM v")]
+#[case::star("SELECT (v.*).* FROM v")]
+fn view_whole_row_fields_remain_accessible(#[case] sql: &str) {
+    let (query, context) = test_helpers::view_query(sql);
+    assert!(context.problems().is_empty(), "{:?}", context.problems());
+    assert_eq!(expression(&query).get_type(), Some(PgBuiltInType::int4()));
+    assert!(query.result_columns().get_column_at(1).is_none());
+}
+
+#[test]
+fn view_whole_row_rejects_a_missing_field() {
+    let (query, context) = test_helpers::view_query("SELECT (v.*).missing FROM v");
+    assert_eq!(context.problems().len(), 1, "{:?}", context.problems());
+    assert_eq!(
+        context.problems()[0].code(),
+        "composite_type_field_not_found"
+    );
+    assert!(expression(&query).get_type().is_none());
+}
+
 #[test]
 fn projection_star_keeps_its_column_expansion() {
     let (query, context) = catalog_query("SELECT t.* FROM pg_catalog.pg_type t");
@@ -288,6 +309,41 @@ mod test_helpers {
             .unwrap()
             .expression()
             .unwrap()
+    }
+    pub(super) fn view_query(sql: &str) -> (SelectStatement, crate::sem::SchemaFileContext) {
+        use crate::sem::BaseParseContext;
+        let base = super::super::super::test_helpers::catalog();
+        let args = base.get_args().clone();
+        let metadata = base.metadata().clone();
+        let mut context = crate::sem::SchemaFileContext::new(
+            std::path::Path::new("whole_rows.sql"),
+            &base.freeze(),
+            &args,
+            &metadata,
+        );
+        let ddl = crate::parse_statements("CREATE VIEW v AS SELECT 1 AS n", Dialect::postgres())
+            .next()
+            .unwrap()
+            .unwrap();
+        context = ddl.analyze(context).unwrap().into_context();
+        assert!(context.problems().is_empty(), "{:?}", context.problems());
+        // Exercise actual view application: a stub that only stores a ViewLike
+        // would omit the nominal row type registered by SchemaCatalog::store_view.
+        let row_type =
+            TypeReference::concrete_type_ref(&FullName::with_schema("public", "v"), false);
+        assert!(row_type.row_columns(&context).is_some());
+        let statement = crate::parse_statements(sql, Dialect::postgres())
+            .next()
+            .unwrap()
+            .unwrap();
+        let StatementNode::Query(query) = statement.node else {
+            panic!("query fixture");
+        };
+        context.begin_parameter_type_analysis();
+        let result = query.resolve_in(&mut context, None);
+        let result = context.infer_query_parameter_types(result);
+        let query = context.finish_analysis(result).unwrap();
+        (query, context)
     }
     pub(super) fn catalog_query(sql: &str) -> (SelectStatement, TestParseContext) {
         let mut context = super::super::super::test_helpers::catalog();

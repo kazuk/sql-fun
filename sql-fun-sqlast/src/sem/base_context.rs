@@ -176,7 +176,17 @@ impl TypeInfoRead for BaseContext {
         if type_name.is_array() == Some(true) {
             Some(type_name.element_type())
         } else {
-            None
+            if crate::ast::Dialect::from(&self.metadata) != crate::ast::Dialect::postgres() {
+                return None;
+            }
+            let (name, _) = self.builtin_cast_type(type_name)?;
+            // pg_type.json omits typelem for these PostgreSQL catalog vectors.
+            let element = match name {
+                "int2vector" => "int2",
+                "oidvector" => "oid",
+                _ => return None,
+            };
+            Some(TypeReference::from_master_type_name(element))
         }
     }
 }

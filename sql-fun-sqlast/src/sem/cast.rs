@@ -63,8 +63,7 @@ impl CastContext {
         Self::NoConversion
     }
 
-    /// Construct an implicit context for semantic test fixtures.
-    #[cfg(test)]
+    /// Construct an implicit conversion context.
     pub(crate) const fn implicit() -> Self {
         Self::Implicit
     }

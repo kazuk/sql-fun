@@ -53,6 +53,15 @@ do not provide a text representation for dynamic definitions.
 `TypeReference::array_type()` constructs either a concrete array qualifier or a
 dynamic `TypeDefinition::Array`. On a dynamic array, `element_type()` returns the
 retained element reference; calling it on a non-array dynamic definition panics.
+For semantic array applicability, use the context's `get_array_item_type`:
+PostgreSQL `int2vector` and `oidvector` have elements even though their concrete
+array qualifier is false. Their names remain distinct from `int2[]` / `oid[]`
+and from arrays of vectors. Simple-family inference retains the actual array
+argument identity as well as its element; common-family substitution constructs
+the ordinary array of its chosen common element. Vector-source coercion to an
+ordinary array follows the element conversion context; the reverse conversion
+is not synthesized.
+
 `ArrayTypeDefinition::element()` exposes the element by reference. See
 [`pg_type/array.rs`](../../sql-fun-sqlast/src/sem/pg_type/array.rs).
 An already-array reference stays the same when `array_type()` is called again.

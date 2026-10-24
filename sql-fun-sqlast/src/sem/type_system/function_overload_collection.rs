@@ -109,10 +109,11 @@ impl FunctionOverloadCollection {
     fn infer_simple(
         bind_result: &Vec<ParameterBindResult>,
         overload: &mut OverloadVariant,
+        catalog: &impl crate::sem::BaseParseContext,
     ) -> Result<(), TypeError> {
         let mut simple_infer_context = SimpleInferContext::default();
         for param in bind_result {
-            param.collect_simple(&mut simple_infer_context)?;
+            param.collect_simple(&mut simple_infer_context, catalog)?;
         }
         if simple_infer_context.is_require_infer() {
             let inferred_type = simple_infer_context.get_inference_result()?;
@@ -131,7 +132,7 @@ impl FunctionOverloadCollection {
     {
         let mut common_infer_context = CommonInferContext::default();
         for param in bind_result {
-            param.collect_common(&mut common_infer_context)?;
+            param.collect_common(&mut common_infer_context, context)?;
         }
         if common_infer_context.is_require_infer() {
             let inferred_type = common_infer_context.infer_from_catalog(context)?;
@@ -203,7 +204,7 @@ impl FunctionOverloadCollection {
                 continue;
             }
             let declared_bindings = bind_result;
-            let Ok(()) = Self::infer_simple(&declared_bindings, &mut overload) else {
+            let Ok(()) = Self::infer_simple(&declared_bindings, &mut overload, context) else {
                 continue 'overload;
             };
 
@@ -254,7 +255,7 @@ impl FunctionOverloadCollection {
                 continue;
             }
             let declared_bindings = bindings;
-            if Self::infer_simple(&declared_bindings, &mut overload).is_err()
+            if Self::infer_simple(&declared_bindings, &mut overload, catalog).is_err()
                 || Self::infer_common(&declared_bindings, &mut overload, catalog).is_err()
             {
                 continue;

@@ -331,7 +331,9 @@ impl ResultColumnCollection {
                     scope,
                     target.location,
                     projection_qualifier,
-                    qualifier.as_ref(),
+                    qualifier
+                        .as_ref()
+                        .filter(|alias| scope.merge_row_target(alias).is_some()),
                 )? {
                     return Err(AnalysisError::unexpected_input_error(
                         "MERGE RETURNING star source is not visible",

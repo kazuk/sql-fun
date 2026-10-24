@@ -158,3 +158,82 @@ pub(super) fn relation_matches(
         !alias.is_explicit() && name == relation
     }
 }
+
+impl QualifiedSource<'_> {
+    pub(crate) fn bind_whole_row(
+        &self,
+        context: &mut impl ParseContext,
+        with: &WithClause,
+        requested: &FullName,
+        levels_up: usize,
+    ) -> Result<SemScalarExpr, AnalysisError> {
+        if self.source.whole_row_is_missing() {
+            return crate::sem::WholeRowExpr::not_found(context, requested);
+        }
+        let mut fields = crate::sem::WholeRowFields::default();
+        for column in self.projection_columns(context, with)? {
+            fields.push(column.name(), &column.bind_direct(context, with)?);
+        }
+        let type_ref = self.source.whole_row_type(context);
+        let not_null = if self.nullable {
+            Some(false)
+        } else if type_ref
+            .as_ref()
+            .is_some_and(|ty| ty.row_columns(context).is_none())
+            && self.source.whole_row_relation().is_none()
+        {
+            fields.scalar_not_null()
+        } else {
+            Some(true)
+        };
+        Ok(SemScalarExpr::whole_row(
+            &crate::sem::WholeRowExpr::resolved(
+                requested,
+                &self.alias,
+                self.source.whole_row_relation(),
+                type_ref.as_ref(),
+                levels_up,
+                not_null,
+                &fields,
+            ),
+        ))
+    }
+}
+
+impl DataSource {
+    const fn whole_row_is_missing(&self) -> bool {
+        matches!(self, Self::Unknown(..) | Self::UndefinedTableFunc(_))
+    }
+
+    fn whole_row_type(&self, context: &impl ParseContext) -> Option<crate::sem::TypeReference> {
+        if let Some(relation) = self.whole_row_relation() {
+            return Some(crate::sem::TypeReference::concrete_type_ref(
+                relation, false,
+            ));
+        }
+        if let Self::CallTableFunc(function) = self {
+            let ty = function.function().ret_type().as_ref()?;
+            if !ty.is_dynamic() && *ty != crate::sem::TypeReference::from_master_type_name("record")
+            {
+                let matches_output = if let Some(columns) = ty.row_columns(context) {
+                    columns.matches_type_structure_with(function.output_columns(), PartialEq::eq)
+                } else {
+                    function.output_columns().get_at(0).is_some()
+                        && function.output_columns().get_at(1).is_none()
+                };
+                if matches_output {
+                    return Some(ty.clone());
+                }
+            }
+        }
+        None
+    }
+
+    const fn whole_row_relation(&self) -> Option<&FullName> {
+        match self {
+            Self::Table(table) => Some(table.name().full_name()),
+            Self::View(view) => Some(view.view_name().full_name()),
+            _ => None,
+        }
+    }
+}

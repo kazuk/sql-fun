@@ -66,11 +66,15 @@ impl VisitTargets for DocumentExpr {
 
 impl VisitTargets for Merge {
     fn visit_targets(&mut self, visitor: &mut impl FnMut(&mut Vec<Target>, bool, &mut [FromItem])) {
-        self.source_relation.visit_targets(visitor);
         self.join_condition.visit_targets(visitor);
         self.merge_when_clauses.visit_targets(visitor);
         self.returning_list.visit_targets(visitor);
-        visitor(&mut self.returning_list, true, &mut []);
+        visitor(
+            &mut self.returning_list,
+            true,
+            std::slice::from_mut(&mut self.source_relation),
+        );
+        self.source_relation.visit_targets(visitor);
         self.with_clause.visit_targets(visitor);
     }
 }

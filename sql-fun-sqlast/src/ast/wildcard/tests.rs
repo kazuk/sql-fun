@@ -337,3 +337,50 @@ fn target_location_synchronization_rejects_colliding_source_locations_atomically
     let groups = expansions(&owner);
     assert_eq!(owner.rewrite_wildcards(&groups).unwrap(), 2);
 }
+
+#[rstest::rstest]
+#[case::duplicate_join(
+    "MERGE INTO t target USING (t a CROSS JOIN u b) j ON true WHEN MATCHED THEN DELETE RETURNING j.*"
+)]
+#[case::rows(
+    "MERGE INTO t target USING ROWS FROM (rows_fun(),rows_fun()) r ON true WHEN MATCHED THEN DELETE RETURNING r.*"
+)]
+fn merge_returning_fixes_its_source_projection(
+    #[case] sql: &str,
+    #[values("17", "18")] version: &str,
+) {
+    let metadata = serde_json::from_value(serde_json::json!({
+        "engine": "postgres", "dialect": "postgres", "version": version, "search_path": ["public"]
+    }))
+    .unwrap();
+    let context = || test_helpers::rows_catalog().with_metadata(&metadata);
+    let mut owner = statement(sql);
+    let original = owner.analyze(context()).unwrap();
+    assert!(
+        original.context().reported_problems().is_empty(),
+        "{:?}",
+        original.context().reported_problems()
+    );
+    assert_eq!(
+        owner
+            .rewrite_wildcards(original.context().analysis_state().wildcard_expansions())
+            .unwrap(),
+        1
+    );
+    let emitted = owner.deparse_sql(Dialect::postgres()).unwrap();
+    let rewritten = statement(&emitted).analyze(context()).unwrap();
+    assert!(
+        rewritten.context().reported_problems().is_empty(),
+        "{emitted}: {:?}",
+        rewritten.context().reported_problems()
+    );
+    let before = original.ast().result_columns().unwrap();
+    let after = rewritten.ast().result_columns().unwrap();
+    assert_eq!(before.len(), after.len(), "{emitted}");
+    for ordinal in 0..before.len() {
+        let left = before.get_column_at(ordinal).unwrap();
+        let right = after.get_column_at(ordinal).unwrap();
+        assert_eq!(left.column_name(), right.column_name(), "{emitted}");
+        assert_eq!(left.col_type(), right.col_type(), "{emitted}");
+    }
+}

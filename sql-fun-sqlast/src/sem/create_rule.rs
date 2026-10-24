@@ -200,6 +200,12 @@ impl CreateRule {
     pub(crate) const fn replaces_unconditionally(&self) -> bool {
         self.instead && self.predicate.is_none()
     }
+    // PostgreSQL checks INSERT rule product queries and the presence of UPDATE
+    // rules on explicit rule/trigger paths. DO NOTHING produces no action query.
+    pub(crate) fn blocks_insert_on_conflict(&self) -> bool {
+        self.event == RuleEvent::update()
+            || (self.event == RuleEvent::insert() && !self.actions.is_empty())
+    }
     pub(crate) fn has_returning(&self) -> bool {
         self.actions
             .iter()

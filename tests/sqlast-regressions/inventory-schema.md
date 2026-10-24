@@ -91,5 +91,7 @@ common-type selection of `int4[]` where PG17/18 preserve an array of domains.
 The expression inventory identifies those pre-existing expectations; no semantic
 fix or workaround is included here.
 
-[Bug #768](https://github.com/kazuk/sql-fun/issues/768) records INSERT rules
-rejecting ON CONFLICT that PostgreSQL accepts.
+[Bug #768](https://github.com/kazuk/sql-fun/issues/768) addresses INSERT rules
+rejecting ON CONFLICT that PostgreSQL accepts. The two corrected precedence
+expectations and six additional rule-action boundaries are documented in
+[the view inventory](inventory-schema-views.md).

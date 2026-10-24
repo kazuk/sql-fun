@@ -418,16 +418,19 @@ CREATE VIEW public.v AS SELECT id AS key, value, calc, value+1 AS computed FROM 
     "CREATE TRIGGER ti INSTEAD OF INSERT ON public.v FOR EACH ROW EXECUTE FUNCTION public.noop();",
     true,
     false,
+    true,
     true
 )]
 #[case::update_trigger(
     "CREATE TRIGGER tu INSTEAD OF UPDATE ON public.v FOR EACH ROW EXECUTE FUNCTION public.noop();",
     false,
     true,
-    true
+    true,
+    false
 )]
 #[case::both_triggers(
     "CREATE TRIGGER ti INSTEAD OF INSERT OR UPDATE ON public.v FOR EACH ROW EXECUTE FUNCTION public.noop();",
+    true,
     true,
     true,
     true
@@ -436,28 +439,33 @@ CREATE VIEW public.v AS SELECT id AS key, value, calc, value+1 AS computed FROM 
     "CREATE RULE ri AS ON INSERT TO public.v DO INSTEAD NOTHING;",
     true,
     false,
-    false
+    false,
+    true
 )]
 #[case::update_rule(
     "CREATE RULE ru AS ON UPDATE TO public.v DO INSTEAD NOTHING;",
     false,
     true,
+    false,
     false
 )]
 #[case::rule_returning(
     "CREATE RULE ri AS ON INSERT TO public.v DO INSTEAD INSERT INTO public.items VALUES(NEW.id) RETURNING id;",
     true,
     false,
-    true
+    true,
+    false
 )]
 #[case::conditional_rule(
     "CREATE RULE ri AS ON INSERT TO public.v WHERE NEW.id > 0 DO INSTEAD NOTHING;",
+    false,
     false,
     false,
     false
 )]
 #[case::additional_rule(
     "CREATE RULE ri AS ON INSERT TO public.v DO ALSO INSERT INTO public.items VALUES(NEW.id);",
+    false,
     false,
     false,
     false
@@ -467,6 +475,7 @@ fn independent_write_mechanisms(
     #[case] insert: bool,
     #[case] update: bool,
     #[case] returning: bool,
+    #[case] conflict: bool,
 ) -> Result<(), Box<dyn std::error::Error>> {
     let schema = heavy::ViewSchema::postgres(&format!(
         r"
@@ -487,9 +496,7 @@ CREATE FUNCTION public.noop() RETURNS trigger LANGUAGE plpgsql AS 'BEGIN RETURN 
     if update {
         assert_eq!(u.supports_returning(), returning);
     }
-    if declaration.contains("RULE") {
-        assert!(!i.supports_on_conflict());
-    }
+    assert_eq!(i.supports_on_conflict(), conflict);
     Ok(())
 }
 
@@ -635,6 +642,84 @@ CREATE OR REPLACE VIEW public.v AS SELECT DISTINCT id FROM public.items;
     let dropped = schema.layer("DROP TRIGGER it ON public.v;")?;
     assert!(!schema.analyze_insert_at(&dropped, &name).is_writable());
     assert!(schema.analyze_insert(&name).is_writable());
+    Ok(())
+}
+
+#[rstest::rstest]
+#[case::conditional(
+    "CREATE RULE r AS ON INSERT TO public.v WHERE NEW.id>0 DO INSTEAD NOTHING;",
+    false,
+    false,
+    false
+)]
+#[case::additional(
+    "CREATE RULE r AS ON INSERT TO public.v DO ALSO INSERT INTO public.audit VALUES(NEW.id);",
+    true,
+    true,
+    true
+)]
+#[case::additional_update(
+    "CREATE RULE r AS ON UPDATE TO public.v DO ALSO INSERT INTO public.audit VALUES(NEW.id);",
+    true,
+    true,
+    true
+)]
+#[case::instead(
+    "CREATE RULE r AS ON INSERT TO public.v DO INSTEAD NOTHING;",
+    true,
+    false,
+    true
+)]
+#[case::conditional_trigger(
+    "CREATE RULE r AS ON INSERT TO public.v WHERE NEW.id>0 DO INSTEAD NOTHING; CREATE TRIGGER it INSTEAD OF INSERT ON public.v FOR EACH ROW EXECUTE FUNCTION public.noop();",
+    true,
+    false,
+    true
+)]
+#[case::additional_trigger(
+    "CREATE RULE r AS ON INSERT TO public.v DO ALSO INSERT INTO public.audit VALUES(NEW.id); CREATE TRIGGER it INSTEAD OF INSERT ON public.v FOR EACH ROW EXECUTE FUNCTION public.noop();",
+    true,
+    true,
+    false
+)]
+fn rule_precedence_support_and_bindings(
+    #[case] declaration: &str,
+    #[case] insert: bool,
+    #[case] returning: bool,
+    #[case] conflict: bool,
+) -> Result<(), Box<dyn std::error::Error>> {
+    let schema = heavy::ViewSchema::postgres(&format!(
+        r"
+CREATE TABLE public.items(id int PRIMARY KEY);
+CREATE TABLE public.audit(id int);
+CREATE VIEW public.v AS SELECT id FROM public.items;
+CREATE FUNCTION public.noop() RETURNS trigger LANGUAGE plpgsql AS $$BEGIN RETURN NEW; END$$;
+{declaration}
+"
+    ))?;
+    let name = FullName::with_schema("public", "v");
+    let support = schema.analyze_insert(&name);
+    assert_eq!(support.is_writable(), insert);
+    assert_eq!(support.supports_returning(), insert && returning);
+    assert_eq!(support.supports_on_conflict(), insert && conflict);
+    let sql = "INSERT INTO public.v(id) VALUES(1) ON CONFLICT DO NOTHING";
+    if insert && conflict {
+        let statement = schema.analyze(sql)?;
+        let statement = statement.as_insert().unwrap();
+        assert_eq!(statement.target().full_name(), &name);
+        assert!(statement.view_support().unwrap().supports_on_conflict());
+        assert_eq!(statement.conflicts().len(), 1);
+    } else {
+        use ::sql_fun_sqlast::sem::problem::InsertProblemKind;
+        let problems = schema.query_problems(sql)?;
+        assert_eq!(problems.len(), 1);
+        let expected = if insert {
+            InsertProblemKind::view_operation()
+        } else {
+            InsertProblemKind::read_only_target()
+        };
+        assert_eq!(problems[0].insert_problem().unwrap().kind(), expected);
+    }
     Ok(())
 }
 

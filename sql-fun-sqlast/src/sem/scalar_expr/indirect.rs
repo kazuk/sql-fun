@@ -104,9 +104,16 @@ impl SemScalarExprNode for IndirectionExpr {
 
     fn is_not_null(&self) -> Option<bool> {
         match &self {
-            Self::ArrayIndex(ind) => ind.array().is_not_null(),
+            // A non-null container can hold NULL or have no element at the index.
+            Self::ArrayIndex(_) => Some(false),
             Self::ArraySlice(slice) => slice.array_is_not_null(),
-            Self::ArraySubscripts(value) => value.array().is_not_null(),
+            Self::ArraySubscripts(value) => {
+                if value.is_slice() {
+                    value.array().is_not_null()
+                } else {
+                    Some(false)
+                }
+            }
             Self::MemberRef(mem_ref) => mem_ref.base_is_not_null(),
         }
     }

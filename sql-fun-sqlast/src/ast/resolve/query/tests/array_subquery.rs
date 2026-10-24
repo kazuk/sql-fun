@@ -195,23 +195,6 @@ fn synthetic_identity_function_consumes_array_subquery_result() {
 }
 
 #[test]
-fn parameter_subscript_consumes_array_subquery_result() {
-    let (query, context) = resolve(
-        "SELECT (ARRAY(SELECT $1::integer))[1]",
-        Dialect::postgres(),
-        true,
-    )
-    .unwrap();
-    assert_eq!(
-        context.reported_problem_count(),
-        0,
-        "{:?}",
-        context.reported_problems()
-    );
-    assert_eq!(projection(&query).get_type(), Some(PgBuiltInType::int4()));
-}
-
-#[test]
 fn invalid_array_query_does_not_stop_following_statement() {
     let mut context = super::super::test_helpers::catalog();
     let mut results = Vec::new();

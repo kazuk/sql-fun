@@ -3,7 +3,7 @@
 These tests arrived in [#761](https://github.com/kazuk/sql-fun/pull/761) before
 this migration merged. The source is
 [`array_subquery.rs`](../../sql-fun-sqlast/src/ast/resolve/query/tests/array_subquery.rs).
-The fixture [array-subqueries.json](array-subqueries.json) stores 25 named case
+The fixture [array-subqueries.json](array-subqueries.json) stores 28 named case
 objects and runs against PostgreSQL 17 and 18. The two isolated expressions from
 [`builtin_bootstrap.rs`](../../sql-fun-sqlast/tests/builtin_bootstrap.rs) are in
 [bootstrap-array-expressions.json](bootstrap-array-expressions.json), selected
@@ -32,12 +32,21 @@ PostgreSQL 17/18 oracle checks confirmed all eleven construction result types an
 non-null array containers and all three invalid-width rejections. An array's
 non-null container does not imply non-null elements.
 
+## Scalar access nullability regressions (#762)
+
+`array-subqueries.json` additionally covers empty ARRAY-query access, a NULL
+query element, and the migrated parameter-subscript case. The latter replaces
+`parameter_subscript_consumes_array_subquery_result`: its scalar `int4` type,
+nullable result and `parameter_type_unresolved` CLI diagnostic now have an exact
+public contract. Parameter domains remain covered by the internal inference tests.
+The existing nonempty subscript case also expects conservative nullable metadata.
+ARRAY construction itself retains its non-null container contract.
+
 ## Retained cases and non-equivalent boundaries
 
 | Original test/cases | Reason retained in Rust |
 | --- | --- |
 | `array_query_projection_preserves_both_source_shapes_and_correlations` | Retains scalar/array parameter alternatives and the narrowed `int4[]` result in the controlled context. The builtin CLI reports `parameter_type_unresolved` and an absent result type, so no equivalent fixture replaces this assertion. |
-| `enclosing_expressions_consume_array_result::parameter_subscript` | Retained as `parameter_subscript_consumes_array_subquery_result`, asserting scalar `int4`. CLI nullability is unsound for NULL elements ([#762](https://github.com/kazuk/sql-fun/issues/762)); no exact fixture pins its incorrect `not_null` metadata. PostgreSQL 17/18 return NULL for a NULL parameter and for indexing an empty ARRAY query result. |
 | `enclosing_expressions_consume_array_result::function` | Retained as `synthetic_identity_function_consumes_array_subquery_result`; `identity()` exists only in the controlled helper catalog. Replacing it with a builtin would change the scenario. |
 | `invalid_array_query_does_not_stop_following_statement` | Retains sequential analysis and shared-context recovery. Independent CLI fixture inputs do not replace that state-transition contract. The invalid/valid SQL forms already appear in the CLI width/construction cases. |
 | `named_composite_elements_keep_nominal_identity`: `named`, `named_pair` | Uses explicit custom composite DDL; outside the accepted builtin-only scope. |
@@ -45,5 +54,6 @@ non-null container does not imply non-null elements.
 | `deferred_star_preserves_enclosing_result_link` | Uses custom composites/functions to verify the internal result link survives expansion. |
 | `nested_deferred_arrays_finish_after_each_projection_expands` | Uses nested custom composite projections and verifies finalization after successive expansions. |
 
-The retained mismatches do not block the other migrations. No production
-inference or nullability fix, fallback, or diagnostic suppression is included.
+The retained mismatches do not block the other migrations. The #757 migration
+included no production inference or nullability fix, fallback, or diagnostic
+suppression. The scalar-access correction and added contracts are tracked in #762.

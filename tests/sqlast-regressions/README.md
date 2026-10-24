@@ -41,7 +41,7 @@ The accepted scope for issue #757 is builtin-only migration. Tests requiring
 project/default SQL schemas remain in Rust. [#761](https://github.com/kazuk/sql-fun/pull/761)
 resolved the earlier #727 catalog-initialization problem without expanding this
 scope. No catalog substitution or diagnostic suppression is used. The current
-manifest executes 280 positive contract inputs (137 for PostgreSQL 17 and 143
+manifest executes 310 positive contract inputs (152 for PostgreSQL 17 and 158
 for PostgreSQL 18), plus three negative-control
 inputs, an invalid-selector check and a missing-datasource check for each version.
 

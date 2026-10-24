@@ -606,6 +606,7 @@ impl<'a> WildcardProjection<'a> {
         source_found: bool,
         table_dependent: bool,
     ) -> Self {
+        let source_found = !columns.is_empty() || source_found;
         Self {
             columns,
             source_found,

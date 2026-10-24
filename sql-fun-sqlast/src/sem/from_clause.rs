@@ -40,7 +40,7 @@ impl FromClause {
             return match self.namespace().resolve_name(qualifier) {
                 Ok(Some(source)) => Ok(crate::sem::data_source::WildcardProjection::new(
                     source.projection_columns(context, with)?,
-                    true,
+                    source.projection_shape_is_resolved(),
                     source.is_table_dependent(context),
                 )),
                 Ok(None) => Ok(crate::sem::data_source::WildcardProjection::new(
@@ -61,9 +61,11 @@ impl FromClause {
             columns.extend(source.projection_names(context, with, None)?);
             table_dependent |= source.projection_is_table_dependent(context);
         }
+        let source_found = !columns.is_empty()
+            || (!self.0.is_empty() && self.0.iter().all(DataSource::projection_shape_is_resolved));
         Ok(crate::sem::data_source::WildcardProjection::new(
             columns,
-            !self.0.is_empty(),
+            source_found,
             table_dependent,
         ))
     }
@@ -76,7 +78,7 @@ impl FromClause {
         if let Some(source) = self.0.last() {
             Ok(crate::sem::data_source::WildcardProjection::new(
                 source.projection_names(context, with, None)?,
-                true,
+                source.projection_shape_is_resolved(),
                 source.projection_is_table_dependent(context),
             ))
         } else {

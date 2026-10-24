@@ -107,7 +107,7 @@ impl<'a> ScalarAnalysisContext<'a> {
         match self.from_clause.namespace().resolve_name(qualifier) {
             Ok(Some(source)) => Ok(crate::sem::data_source::WildcardProjection::new(
                 source.projection_columns(context, &self.with_clause)?,
-                true,
+                source.projection_shape_is_resolved(),
                 source.is_table_dependent(context),
             )),
             Err(()) => Ok(crate::sem::data_source::WildcardProjection::new(
@@ -137,7 +137,7 @@ impl<'a> ScalarAnalysisContext<'a> {
         match self.from_clause.qualified_source(context, relation) {
             Ok(Some(source)) => Ok(crate::sem::data_source::WildcardProjection::new(
                 source.projection_columns(context, &self.with_clause)?,
-                true,
+                source.projection_shape_is_resolved(),
                 source.is_table_dependent(context),
             )),
             Err(()) => {

@@ -83,6 +83,21 @@ pub enum DataSource {
 }
 
 impl DataSource {
+    pub(crate) fn projection_shape_is_resolved(&self) -> bool {
+        crate::sem::with_stack(|| match self {
+            Self::Unknown(_, _) | Self::UndefinedTableFunc(_) => false,
+            Self::DeferredTableFunc(source) => source.known_column_names().is_some(),
+            Self::RowFunctions(source) => source
+                .functions()
+                .iter()
+                .all(|function| function.source().projection_shape_is_resolved()),
+            Self::JoinExpr(source) => source.projection_shape_is_resolved(),
+            Self::Group(source) => source.projection_shape_is_resolved(),
+            Self::MergeRecord(source) => source.source().projection_shape_is_resolved(),
+            _ => true,
+        })
+    }
+
     pub(crate) fn projection_is_table_dependent(&self, context: &impl ParseContext) -> bool {
         match self {
             Self::Table(_) => true,

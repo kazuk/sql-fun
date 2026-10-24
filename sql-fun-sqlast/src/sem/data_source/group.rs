@@ -11,6 +11,10 @@ pub struct GroupedDataSource {
 }
 
 impl GroupedDataSource {
+    pub(super) fn projection_shape_is_resolved(&self) -> bool {
+        self.source.projection_shape_is_resolved()
+    }
+
     pub(super) fn projection_is_table_dependent(&self, context: &impl ParseContext) -> bool {
         self.source.projection_is_table_dependent(context)
     }

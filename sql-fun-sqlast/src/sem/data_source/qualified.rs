@@ -98,6 +98,10 @@ impl<'a> QualifiedSource<'a> {
         parts
     }
 
+    pub(crate) fn projection_shape_is_resolved(&self) -> bool {
+        self.source.projection_shape_is_resolved()
+    }
+
     pub(crate) fn is_table_dependent(&self, context: &impl ParseContext) -> bool {
         self.source.projection_is_table_dependent(context)
     }

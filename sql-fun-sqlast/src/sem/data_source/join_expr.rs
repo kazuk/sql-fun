@@ -34,6 +34,10 @@ pub struct JoinExprDataSource {
 }
 
 impl JoinExprDataSource {
+    pub(super) fn projection_shape_is_resolved(&self) -> bool {
+        self.left.projection_shape_is_resolved() && self.right.projection_shape_is_resolved()
+    }
+
     pub(super) fn projection_is_table_dependent(&self, context: &impl ParseContext) -> bool {
         self.left.projection_is_table_dependent(context)
             || self.right.projection_is_table_dependent(context)

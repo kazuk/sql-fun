@@ -460,3 +460,19 @@ fn merge_wildcard_columns_preserve_record_roles_after_positional_binding(#[case]
         assert_eq!(role, crate::sem::MergeRecordRole::source());
     }
 }
+
+#[rstest::rstest]
+#[case::unknown_function("SELECT * FROM missing_wildcard_function()")]
+#[case::invalid_arguments("SELECT * FROM row_fun(1)")]
+#[case::rows_from("SELECT * FROM ROWS FROM (row_fun(1))")]
+fn unresolved_function_output_is_not_a_known_empty_projection(#[case] sql: &str) {
+    let (_, context) = super::test_helpers::table_function_query(sql, false);
+    assert!(
+        context
+            .reported_problems()
+            .iter()
+            .any(|problem| problem.code() == "query_reference_not_found"),
+        "{:?}",
+        context.reported_problems()
+    );
+}

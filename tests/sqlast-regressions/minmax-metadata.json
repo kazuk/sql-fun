@@ -1,50 +1,8 @@
-{
-  "names": [
-    "result_metadata_matches_postgres::single",
-    "result_metadata_matches_postgres::numeric",
-    "result_metadata_matches_postgres::numeric_reverse",
-    "result_metadata_matches_postgres::null_first",
-    "result_metadata_matches_postgres::null_last",
-    "result_metadata_matches_postgres::all_null",
-    "result_metadata_matches_postgres::order_left",
-    "result_metadata_matches_postgres::order_right",
-    "result_metadata_matches_postgres::strings",
-    "result_metadata_matches_postgres::unknown_string",
-    "result_metadata_matches_postgres::typed_null",
-    "result_metadata_matches_postgres::preferred",
-    "result_metadata_matches_postgres::range",
-    "result_metadata_matches_postgres::multirange",
-    "result_metadata_matches_postgres::vector",
-    "result_metadata_matches_postgres::arrays",
-    "result_metadata_matches_postgres::nested",
-    "an_explicit_parameter_cast_sets_the_result_type",
-    "dynamic_composite_operands_retain_their_type::greatest",
-    "dynamic_composite_operands_retain_their_type::least"
-  ],
-  "sql": [
-    "select greatest(1) as result",
-    "select greatest(1,2.5) as result",
-    "select least(2.5,1) as result",
-    "select greatest(NULL,1) as result",
-    "select least(1,NULL) as result",
-    "select greatest(NULL,NULL) as result",
-    "select greatest('a'::varchar,'b'::bpchar) as result",
-    "select least('a'::bpchar,'b'::varchar) as result",
-    "select least('a','b') as result",
-    "select greatest('2',1) as result",
-    "select least(NULL::integer,NULL) as result",
-    "select greatest(1::numeric,2::float8,3::int4) as result",
-    "select least(NULL::int4range,NULL::int4range) as result",
-    "select greatest(NULL::int4multirange,NULL::int4multirange) as result",
-    "select greatest(NULL::int2vector,NULL::int2vector) as result",
-    "select greatest('{1}'::int4[],'{2}'::int8[]) as result",
-    "select least(greatest(1,NULL),2.5) as result",
-    "select least($1::bigint,1) as result",
-    "select greatest(pg_control_system(),pg_control_system()) as result",
-    "select least(pg_control_system(),pg_control_system()) as result"
-  ],
-  "expected": [
-    {
+[
+  {
+    "name": "result_metadata_matches_postgres::single",
+    "sql": "select greatest(1) as result",
+    "expected": {
       "diagnostics": [],
       "columns": [
         {
@@ -57,8 +15,12 @@
           "nullability": "not_null"
         }
       ]
-    },
-    {
+    }
+  },
+  {
+    "name": "result_metadata_matches_postgres::numeric",
+    "sql": "select greatest(1,2.5) as result",
+    "expected": {
       "diagnostics": [],
       "columns": [
         {
@@ -71,8 +33,12 @@
           "nullability": "not_null"
         }
       ]
-    },
-    {
+    }
+  },
+  {
+    "name": "result_metadata_matches_postgres::numeric_reverse",
+    "sql": "select least(2.5,1) as result",
+    "expected": {
       "diagnostics": [],
       "columns": [
         {
@@ -85,8 +51,12 @@
           "nullability": "not_null"
         }
       ]
-    },
-    {
+    }
+  },
+  {
+    "name": "result_metadata_matches_postgres::null_first",
+    "sql": "select greatest(NULL,1) as result",
+    "expected": {
       "diagnostics": [],
       "columns": [
         {
@@ -99,8 +69,12 @@
           "nullability": "not_null"
         }
       ]
-    },
-    {
+    }
+  },
+  {
+    "name": "result_metadata_matches_postgres::null_last",
+    "sql": "select least(1,NULL) as result",
+    "expected": {
       "diagnostics": [],
       "columns": [
         {
@@ -113,8 +87,12 @@
           "nullability": "not_null"
         }
       ]
-    },
-    {
+    }
+  },
+  {
+    "name": "result_metadata_matches_postgres::all_null",
+    "sql": "select greatest(NULL,NULL) as result",
+    "expected": {
       "diagnostics": [],
       "columns": [
         {
@@ -127,8 +105,12 @@
           "nullability": "nullable"
         }
       ]
-    },
-    {
+    }
+  },
+  {
+    "name": "result_metadata_matches_postgres::order_left",
+    "sql": "select greatest('a'::varchar,'b'::bpchar) as result",
+    "expected": {
       "diagnostics": [],
       "columns": [
         {
@@ -141,8 +123,12 @@
           "nullability": "not_null"
         }
       ]
-    },
-    {
+    }
+  },
+  {
+    "name": "result_metadata_matches_postgres::order_right",
+    "sql": "select least('a'::bpchar,'b'::varchar) as result",
+    "expected": {
       "diagnostics": [],
       "columns": [
         {
@@ -155,8 +141,12 @@
           "nullability": "not_null"
         }
       ]
-    },
-    {
+    }
+  },
+  {
+    "name": "result_metadata_matches_postgres::strings",
+    "sql": "select least('a','b') as result",
+    "expected": {
       "diagnostics": [],
       "columns": [
         {
@@ -169,8 +159,12 @@
           "nullability": "not_null"
         }
       ]
-    },
-    {
+    }
+  },
+  {
+    "name": "result_metadata_matches_postgres::unknown_string",
+    "sql": "select greatest('2',1) as result",
+    "expected": {
       "diagnostics": [],
       "columns": [
         {
@@ -183,8 +177,12 @@
           "nullability": "not_null"
         }
       ]
-    },
-    {
+    }
+  },
+  {
+    "name": "result_metadata_matches_postgres::typed_null",
+    "sql": "select least(NULL::integer,NULL) as result",
+    "expected": {
       "diagnostics": [],
       "columns": [
         {
@@ -197,8 +195,12 @@
           "nullability": "nullable"
         }
       ]
-    },
-    {
+    }
+  },
+  {
+    "name": "result_metadata_matches_postgres::preferred",
+    "sql": "select greatest(1::numeric,2::float8,3::int4) as result",
+    "expected": {
       "diagnostics": [],
       "columns": [
         {
@@ -211,8 +213,12 @@
           "nullability": "not_null"
         }
       ]
-    },
-    {
+    }
+  },
+  {
+    "name": "result_metadata_matches_postgres::range",
+    "sql": "select least(NULL::int4range,NULL::int4range) as result",
+    "expected": {
       "diagnostics": [],
       "columns": [
         {
@@ -225,8 +231,12 @@
           "nullability": "nullable"
         }
       ]
-    },
-    {
+    }
+  },
+  {
+    "name": "result_metadata_matches_postgres::multirange",
+    "sql": "select greatest(NULL::int4multirange,NULL::int4multirange) as result",
+    "expected": {
       "diagnostics": [],
       "columns": [
         {
@@ -239,8 +249,12 @@
           "nullability": "nullable"
         }
       ]
-    },
-    {
+    }
+  },
+  {
+    "name": "result_metadata_matches_postgres::vector",
+    "sql": "select greatest(NULL::int2vector,NULL::int2vector) as result",
+    "expected": {
       "diagnostics": [],
       "columns": [
         {
@@ -253,8 +267,12 @@
           "nullability": "nullable"
         }
       ]
-    },
-    {
+    }
+  },
+  {
+    "name": "result_metadata_matches_postgres::arrays",
+    "sql": "select greatest('{1}'::int4[],'{2}'::int8[]) as result",
+    "expected": {
       "diagnostics": [],
       "columns": [
         {
@@ -267,8 +285,12 @@
           "nullability": "not_null"
         }
       ]
-    },
-    {
+    }
+  },
+  {
+    "name": "result_metadata_matches_postgres::nested",
+    "sql": "select least(greatest(1,NULL),2.5) as result",
+    "expected": {
       "diagnostics": [],
       "columns": [
         {
@@ -281,8 +303,12 @@
           "nullability": "not_null"
         }
       ]
-    },
-    {
+    }
+  },
+  {
+    "name": "an_explicit_parameter_cast_sets_the_result_type",
+    "sql": "select least($1::bigint,1) as result",
+    "expected": {
       "diagnostics": [
         "parameter_type_unresolved"
       ],
@@ -297,18 +323,12 @@
           "nullability": "not_null"
         }
       ]
-    },
-    {
-      "diagnostics": [],
-      "columns": [
-        {
-          "name": "result",
-          "type": null,
-          "nullability": "nullable"
-        }
-      ]
-    },
-    {
+    }
+  },
+  {
+    "name": "dynamic_composite_operands_retain_their_type::greatest",
+    "sql": "select greatest(pg_control_system(),pg_control_system()) as result",
+    "expected": {
       "diagnostics": [],
       "columns": [
         {
@@ -318,5 +338,19 @@
         }
       ]
     }
-  ]
-}
+  },
+  {
+    "name": "dynamic_composite_operands_retain_their_type::least",
+    "sql": "select least(pg_control_system(),pg_control_system()) as result",
+    "expected": {
+      "diagnostics": [],
+      "columns": [
+        {
+          "name": "result",
+          "type": null,
+          "nullability": "nullable"
+        }
+      ]
+    }
+  }
+]

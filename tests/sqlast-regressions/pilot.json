@@ -1,14 +1,8 @@
-{
-  "names": [
-    "literal",
-    "undefined-column"
-  ],
-  "sql": [
-    "SELECT 1 AS result",
-    "SELECT missing AS result"
-  ],
-  "expected": [
-    {
+[
+  {
+    "name": "literal",
+    "sql": "SELECT 1 AS result",
+    "expected": {
       "diagnostics": [],
       "columns": [
         {
@@ -21,8 +15,12 @@
           "nullability": "not_null"
         }
       ]
-    },
-    {
+    }
+  },
+  {
+    "name": "undefined-column",
+    "sql": "SELECT missing AS result",
+    "expected": {
       "diagnostics": [
         "column_not_found_in_source"
       ],
@@ -33,5 +31,5 @@
         }
       ]
     }
-  ]
-}
+  }
+]

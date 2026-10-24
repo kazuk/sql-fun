@@ -1,20 +1,8 @@
-{
-  "names": [
-    "projection_names::implicit",
-    "projection_names::alias",
-    "projection_names::empty_cast",
-    "projection_names::nested_cast",
-    "projection_names::parameter_cast"
-  ],
-  "sql": [
-    "SELECT ARRAY[1]",
-    "SELECT ARRAY[1] AS chosen",
-    "SELECT ARRAY[]::int[]",
-    "SELECT ARRAY[]::int[]::bigint[]",
-    "SELECT ARRAY[$1]::int[]"
-  ],
-  "expected": [
-    {
+[
+  {
+    "name": "projection_names::implicit",
+    "sql": "SELECT ARRAY[1]",
+    "expected": {
       "diagnostics": [],
       "columns": [
         {
@@ -27,8 +15,12 @@
           "nullability": "not_null"
         }
       ]
-    },
-    {
+    }
+  },
+  {
+    "name": "projection_names::alias",
+    "sql": "SELECT ARRAY[1] AS chosen",
+    "expected": {
       "diagnostics": [],
       "columns": [
         {
@@ -41,8 +33,12 @@
           "nullability": "not_null"
         }
       ]
-    },
-    {
+    }
+  },
+  {
+    "name": "projection_names::empty_cast",
+    "sql": "SELECT ARRAY[]::int[]",
+    "expected": {
       "diagnostics": [],
       "columns": [
         {
@@ -55,8 +51,12 @@
           "nullability": "not_null"
         }
       ]
-    },
-    {
+    }
+  },
+  {
+    "name": "projection_names::nested_cast",
+    "sql": "SELECT ARRAY[]::int[]::bigint[]",
+    "expected": {
       "diagnostics": [],
       "columns": [
         {
@@ -69,8 +69,12 @@
           "nullability": "not_null"
         }
       ]
-    },
-    {
+    }
+  },
+  {
+    "name": "projection_names::parameter_cast",
+    "sql": "SELECT ARRAY[$1]::int[]",
+    "expected": {
       "diagnostics": [
         "parameter_type_unresolved"
       ],
@@ -86,5 +90,5 @@
         }
       ]
     }
-  ]
-}
+  }
+]

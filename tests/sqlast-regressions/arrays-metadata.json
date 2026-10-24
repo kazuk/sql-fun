@@ -1,52 +1,8 @@
-{
-  "names": [
-    "metadata_matches_postgres::integers",
-    "metadata_matches_postgres::mixed",
-    "metadata_matches_postgres::mixed_reverse",
-    "metadata_matches_postgres::nulls",
-    "metadata_matches_postgres::strings",
-    "metadata_matches_postgres::unknown",
-    "metadata_matches_postgres::nullable",
-    "metadata_matches_postgres::empty",
-    "metadata_matches_postgres::cast_empty",
-    "metadata_matches_postgres::parenthesized_empty",
-    "metadata_matches_postgres::nested_empty",
-    "metadata_matches_postgres::nested",
-    "metadata_matches_postgres::nested_cast",
-    "metadata_matches_postgres::array_operands",
-    "metadata_matches_postgres::json",
-    "metadata_matches_postgres::different_records",
-    "metadata_matches_postgres::record_null",
-    "metadata_matches_postgres::record_cast",
-    "metadata_matches_postgres::preferred",
-    "metadata_matches_postgres::varchar_first",
-    "metadata_matches_postgres::bpchar_first"
-  ],
-  "sql": [
-    "SELECT ARRAY[1,2] AS result",
-    "SELECT ARRAY[1,2.5] AS result",
-    "SELECT ARRAY[2.5,1] AS result",
-    "SELECT ARRAY[NULL,NULL] AS result",
-    "SELECT ARRAY['a','b'] AS result",
-    "SELECT ARRAY['1',2] AS result",
-    "SELECT ARRAY[NULL::int,1] AS result",
-    "SELECT ARRAY[]::integer[] AS result",
-    "SELECT CAST(ARRAY[] AS integer[]) AS result",
-    "SELECT (ARRAY[])::integer[] AS result",
-    "SELECT ARRAY[ARRAY[],ARRAY[]]::integer[] AS result",
-    "SELECT ARRAY[ARRAY[1],ARRAY[2.5]] AS result",
-    "SELECT ARRAY[ARRAY[1.5],ARRAY[2]]::integer[] AS result",
-    "SELECT ARRAY[NULL::int[],NULL::int[]] AS result",
-    "SELECT ARRAY['{}'::json,'{}'::json] AS result",
-    "SELECT ARRAY[pg_control_system(),pg_control_checkpoint()] AS result",
-    "SELECT ARRAY[pg_control_system(),NULL] AS result",
-    "SELECT ARRAY[pg_control_system()]::record[] AS result",
-    "SELECT ARRAY[1::numeric,2::float8,3::int4] AS result",
-    "SELECT ARRAY['a'::varchar,'b'::bpchar] AS result",
-    "SELECT ARRAY['a'::bpchar,'b'::varchar] AS result"
-  ],
-  "expected": [
-    {
+[
+  {
+    "name": "metadata_matches_postgres::integers",
+    "sql": "SELECT ARRAY[1,2] AS result",
+    "expected": {
       "diagnostics": [],
       "columns": [
         {
@@ -59,8 +15,12 @@
           "nullability": "not_null"
         }
       ]
-    },
-    {
+    }
+  },
+  {
+    "name": "metadata_matches_postgres::mixed",
+    "sql": "SELECT ARRAY[1,2.5] AS result",
+    "expected": {
       "diagnostics": [],
       "columns": [
         {
@@ -73,8 +33,12 @@
           "nullability": "not_null"
         }
       ]
-    },
-    {
+    }
+  },
+  {
+    "name": "metadata_matches_postgres::mixed_reverse",
+    "sql": "SELECT ARRAY[2.5,1] AS result",
+    "expected": {
       "diagnostics": [],
       "columns": [
         {
@@ -87,8 +51,12 @@
           "nullability": "not_null"
         }
       ]
-    },
-    {
+    }
+  },
+  {
+    "name": "metadata_matches_postgres::nulls",
+    "sql": "SELECT ARRAY[NULL,NULL] AS result",
+    "expected": {
       "diagnostics": [],
       "columns": [
         {
@@ -101,8 +69,12 @@
           "nullability": "not_null"
         }
       ]
-    },
-    {
+    }
+  },
+  {
+    "name": "metadata_matches_postgres::strings",
+    "sql": "SELECT ARRAY['a','b'] AS result",
+    "expected": {
       "diagnostics": [],
       "columns": [
         {
@@ -115,8 +87,12 @@
           "nullability": "not_null"
         }
       ]
-    },
-    {
+    }
+  },
+  {
+    "name": "metadata_matches_postgres::unknown",
+    "sql": "SELECT ARRAY['1',2] AS result",
+    "expected": {
       "diagnostics": [],
       "columns": [
         {
@@ -129,8 +105,12 @@
           "nullability": "not_null"
         }
       ]
-    },
-    {
+    }
+  },
+  {
+    "name": "metadata_matches_postgres::nullable",
+    "sql": "SELECT ARRAY[NULL::int,1] AS result",
+    "expected": {
       "diagnostics": [],
       "columns": [
         {
@@ -143,8 +123,12 @@
           "nullability": "not_null"
         }
       ]
-    },
-    {
+    }
+  },
+  {
+    "name": "metadata_matches_postgres::empty",
+    "sql": "SELECT ARRAY[]::integer[] AS result",
+    "expected": {
       "diagnostics": [],
       "columns": [
         {
@@ -157,8 +141,12 @@
           "nullability": "not_null"
         }
       ]
-    },
-    {
+    }
+  },
+  {
+    "name": "metadata_matches_postgres::cast_empty",
+    "sql": "SELECT CAST(ARRAY[] AS integer[]) AS result",
+    "expected": {
       "diagnostics": [],
       "columns": [
         {
@@ -171,8 +159,12 @@
           "nullability": "not_null"
         }
       ]
-    },
-    {
+    }
+  },
+  {
+    "name": "metadata_matches_postgres::parenthesized_empty",
+    "sql": "SELECT (ARRAY[])::integer[] AS result",
+    "expected": {
       "diagnostics": [],
       "columns": [
         {
@@ -185,8 +177,12 @@
           "nullability": "not_null"
         }
       ]
-    },
-    {
+    }
+  },
+  {
+    "name": "metadata_matches_postgres::nested_empty",
+    "sql": "SELECT ARRAY[ARRAY[],ARRAY[]]::integer[] AS result",
+    "expected": {
       "diagnostics": [],
       "columns": [
         {
@@ -199,8 +195,12 @@
           "nullability": "not_null"
         }
       ]
-    },
-    {
+    }
+  },
+  {
+    "name": "metadata_matches_postgres::nested",
+    "sql": "SELECT ARRAY[ARRAY[1],ARRAY[2.5]] AS result",
+    "expected": {
       "diagnostics": [],
       "columns": [
         {
@@ -213,8 +213,12 @@
           "nullability": "not_null"
         }
       ]
-    },
-    {
+    }
+  },
+  {
+    "name": "metadata_matches_postgres::nested_cast",
+    "sql": "SELECT ARRAY[ARRAY[1.5],ARRAY[2]]::integer[] AS result",
+    "expected": {
       "diagnostics": [],
       "columns": [
         {
@@ -227,8 +231,12 @@
           "nullability": "not_null"
         }
       ]
-    },
-    {
+    }
+  },
+  {
+    "name": "metadata_matches_postgres::array_operands",
+    "sql": "SELECT ARRAY[NULL::int[],NULL::int[]] AS result",
+    "expected": {
       "diagnostics": [],
       "columns": [
         {
@@ -241,8 +249,12 @@
           "nullability": "not_null"
         }
       ]
-    },
-    {
+    }
+  },
+  {
+    "name": "metadata_matches_postgres::json",
+    "sql": "SELECT ARRAY['{}'::json,'{}'::json] AS result",
+    "expected": {
       "diagnostics": [],
       "columns": [
         {
@@ -255,8 +267,12 @@
           "nullability": "not_null"
         }
       ]
-    },
-    {
+    }
+  },
+  {
+    "name": "metadata_matches_postgres::different_records",
+    "sql": "SELECT ARRAY[pg_control_system(),pg_control_checkpoint()] AS result",
+    "expected": {
       "diagnostics": [],
       "columns": [
         {
@@ -269,8 +285,12 @@
           "nullability": "not_null"
         }
       ]
-    },
-    {
+    }
+  },
+  {
+    "name": "metadata_matches_postgres::record_null",
+    "sql": "SELECT ARRAY[pg_control_system(),NULL] AS result",
+    "expected": {
       "diagnostics": [],
       "columns": [
         {
@@ -283,8 +303,12 @@
           "nullability": "not_null"
         }
       ]
-    },
-    {
+    }
+  },
+  {
+    "name": "metadata_matches_postgres::record_cast",
+    "sql": "SELECT ARRAY[pg_control_system()]::record[] AS result",
+    "expected": {
       "diagnostics": [],
       "columns": [
         {
@@ -297,8 +321,12 @@
           "nullability": "not_null"
         }
       ]
-    },
-    {
+    }
+  },
+  {
+    "name": "metadata_matches_postgres::preferred",
+    "sql": "SELECT ARRAY[1::numeric,2::float8,3::int4] AS result",
+    "expected": {
       "diagnostics": [],
       "columns": [
         {
@@ -311,8 +339,12 @@
           "nullability": "not_null"
         }
       ]
-    },
-    {
+    }
+  },
+  {
+    "name": "metadata_matches_postgres::varchar_first",
+    "sql": "SELECT ARRAY['a'::varchar,'b'::bpchar] AS result",
+    "expected": {
       "diagnostics": [],
       "columns": [
         {
@@ -325,8 +357,12 @@
           "nullability": "not_null"
         }
       ]
-    },
-    {
+    }
+  },
+  {
+    "name": "metadata_matches_postgres::bpchar_first",
+    "sql": "SELECT ARRAY['a'::bpchar,'b'::varchar] AS result",
+    "expected": {
       "diagnostics": [],
       "columns": [
         {
@@ -340,5 +376,5 @@
         }
       ]
     }
-  ]
-}
+  }
+]

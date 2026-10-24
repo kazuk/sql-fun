@@ -1,34 +1,8 @@
-{
-  "names": [
-    "invalid_operands_report_semantic_problems::types",
-    "invalid_operands_report_semantic_problems::typed_string",
-    "invalid_operands_report_semantic_problems::preferred_category",
-    "invalid_operands_report_semantic_problems::json",
-    "invalid_operands_report_semantic_problems::parameter_json",
-    "invalid_operands_report_semantic_problems::parameter_json_reverse",
-    "invalid_operands_report_semantic_problems::parameter_json_array",
-    "invalid_operands_report_semantic_problems::dynamic_left",
-    "invalid_operands_report_semantic_problems::dynamic_right",
-    "invalid_operands_report_semantic_problems::json_array",
-    "incompatible_parameter_uses_report_constraints",
-    "later_operands_are_resolved_even_after_non_null_literal"
-  ],
-  "sql": [
-    "select greatest(1,true)",
-    "select least('2'::text,1)",
-    "select least('a'::text,'b'::\"char\")",
-    "select greatest('{}'::json,'{}'::json)",
-    "select greatest($1,'{}'::json)",
-    "select least('{}'::json,$1)",
-    "select least($1,'{}'::json[])",
-    "select greatest(pg_control_system(),1)",
-    "select least(1,pg_control_system())",
-    "select least('{}'::json[],'{}'::json[])",
-    "select greatest($1,1) where $1",
-    "select least(1,missing.n)"
-  ],
-  "expected": [
-    {
+[
+  {
+    "name": "invalid_operands_report_semantic_problems::types",
+    "sql": "select greatest(1,true)",
+    "expected": {
       "diagnostics": [
         "min_max_incompatible_types"
       ],
@@ -39,8 +13,12 @@
           "nullability": "not_null"
         }
       ]
-    },
-    {
+    }
+  },
+  {
+    "name": "invalid_operands_report_semantic_problems::typed_string",
+    "sql": "select least('2'::text,1)",
+    "expected": {
       "diagnostics": [
         "min_max_incompatible_types"
       ],
@@ -51,8 +29,12 @@
           "nullability": "not_null"
         }
       ]
-    },
-    {
+    }
+  },
+  {
+    "name": "invalid_operands_report_semantic_problems::preferred_category",
+    "sql": "select least('a'::text,'b'::\"char\")",
+    "expected": {
       "diagnostics": [
         "min_max_incompatible_types"
       ],
@@ -63,8 +45,12 @@
           "nullability": "not_null"
         }
       ]
-    },
-    {
+    }
+  },
+  {
+    "name": "invalid_operands_report_semantic_problems::json",
+    "sql": "select greatest('{}'::json,'{}'::json)",
+    "expected": {
       "diagnostics": [
         "min_max_not_ordered"
       ],
@@ -75,8 +61,12 @@
           "nullability": "not_null"
         }
       ]
-    },
-    {
+    }
+  },
+  {
+    "name": "invalid_operands_report_semantic_problems::parameter_json",
+    "sql": "select greatest($1,'{}'::json)",
+    "expected": {
       "diagnostics": [
         "min_max_not_ordered",
         "parameter_constraint"
@@ -88,8 +78,12 @@
           "nullability": "not_null"
         }
       ]
-    },
-    {
+    }
+  },
+  {
+    "name": "invalid_operands_report_semantic_problems::parameter_json_reverse",
+    "sql": "select least('{}'::json,$1)",
+    "expected": {
       "diagnostics": [
         "min_max_not_ordered",
         "parameter_constraint"
@@ -101,8 +95,12 @@
           "nullability": "not_null"
         }
       ]
-    },
-    {
+    }
+  },
+  {
+    "name": "invalid_operands_report_semantic_problems::parameter_json_array",
+    "sql": "select least($1,'{}'::json[])",
+    "expected": {
       "diagnostics": [
         "min_max_not_ordered",
         "parameter_constraint"
@@ -114,8 +112,12 @@
           "nullability": "not_null"
         }
       ]
-    },
-    {
+    }
+  },
+  {
+    "name": "invalid_operands_report_semantic_problems::dynamic_left",
+    "sql": "select greatest(pg_control_system(),1)",
+    "expected": {
       "diagnostics": [
         "min_max_incompatible_types"
       ],
@@ -126,8 +128,12 @@
           "nullability": "not_null"
         }
       ]
-    },
-    {
+    }
+  },
+  {
+    "name": "invalid_operands_report_semantic_problems::dynamic_right",
+    "sql": "select least(1,pg_control_system())",
+    "expected": {
       "diagnostics": [
         "min_max_incompatible_types"
       ],
@@ -138,8 +144,12 @@
           "nullability": "not_null"
         }
       ]
-    },
-    {
+    }
+  },
+  {
+    "name": "invalid_operands_report_semantic_problems::json_array",
+    "sql": "select least('{}'::json[],'{}'::json[])",
+    "expected": {
       "diagnostics": [
         "min_max_not_ordered"
       ],
@@ -150,8 +160,12 @@
           "nullability": "not_null"
         }
       ]
-    },
-    {
+    }
+  },
+  {
+    "name": "incompatible_parameter_uses_report_constraints",
+    "sql": "select greatest($1,1) where $1",
+    "expected": {
       "diagnostics": [
         "parameter_constraint"
       ],
@@ -162,8 +176,12 @@
           "nullability": "not_null"
         }
       ]
-    },
-    {
+    }
+  },
+  {
+    "name": "later_operands_are_resolved_even_after_non_null_literal",
+    "sql": "select least(1,missing.n)",
+    "expected": {
       "diagnostics": [
         "undefined_alias"
       ],
@@ -175,5 +193,5 @@
         }
       ]
     }
-  ]
-}
+  }
+]

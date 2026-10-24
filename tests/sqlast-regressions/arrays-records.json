@@ -1,18 +1,8 @@
-{
-  "names": [
-    "anonymous_record_arrays_keep_their_element_fields::single",
-    "anonymous_record_arrays_keep_their_element_fields::repeated",
-    "anonymous_record_arrays_keep_their_element_fields::nested",
-    "parameter_with_anonymous_records_uses_the_record_family"
-  ],
-  "sql": [
-    "SELECT ARRAY[pg_control_system()]",
-    "SELECT ARRAY[pg_control_system(),pg_control_system()]",
-    "SELECT ARRAY[ARRAY[pg_control_system()],ARRAY[pg_control_system()]]",
-    "SELECT ARRAY[$1,pg_control_system(),pg_control_checkpoint()]"
-  ],
-  "expected": [
-    {
+[
+  {
+    "name": "anonymous_record_arrays_keep_their_element_fields::single",
+    "sql": "SELECT ARRAY[pg_control_system()]",
+    "expected": {
       "diagnostics": [],
       "columns": [
         {
@@ -21,8 +11,12 @@
           "nullability": "not_null"
         }
       ]
-    },
-    {
+    }
+  },
+  {
+    "name": "anonymous_record_arrays_keep_their_element_fields::repeated",
+    "sql": "SELECT ARRAY[pg_control_system(),pg_control_system()]",
+    "expected": {
       "diagnostics": [],
       "columns": [
         {
@@ -31,8 +25,12 @@
           "nullability": "not_null"
         }
       ]
-    },
-    {
+    }
+  },
+  {
+    "name": "anonymous_record_arrays_keep_their_element_fields::nested",
+    "sql": "SELECT ARRAY[ARRAY[pg_control_system()],ARRAY[pg_control_system()]]",
+    "expected": {
       "diagnostics": [],
       "columns": [
         {
@@ -41,8 +39,12 @@
           "nullability": "not_null"
         }
       ]
-    },
-    {
+    }
+  },
+  {
+    "name": "parameter_with_anonymous_records_uses_the_record_family",
+    "sql": "SELECT ARRAY[$1,pg_control_system(),pg_control_checkpoint()]",
+    "expected": {
       "diagnostics": [],
       "columns": [
         {
@@ -56,5 +58,5 @@
         }
       ]
     }
-  ]
-}
+  }
+]

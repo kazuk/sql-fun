@@ -109,3 +109,12 @@ The accepted migration scope is builtin-only. The CASE/COALESCE fixtures use
 `--schema-level builtin` and passed against PostgreSQL 17 and 18. Custom-schema
 cases remain in their Rust integration tests; default/project catalog
 initialization is tracked separately by #727.
+
+## Fixture representation
+
+Every migrated fixture stores an array of `{name, sql, expected}` case objects.
+The names used in these inventories live beside their SQL and expectations, so
+case edits and reordering cannot misalign parallel arrays. The shared runner
+projects these objects to the existing CLI arrays only in its temporary runtime
+directory, and logs each index-to-name mapping beside the CLI result. This
+representation change preserves all mapped scenarios and assertion contents.

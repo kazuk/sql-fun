@@ -7,9 +7,15 @@ verification (`postgres-extraction`, after initialization and catalog comparison
 No regression SQL is executed against PostgreSQL.
 
 `manifest.tsv` explicitly selects each fixture, schema level, optional project
-schema, expected case count and PostgreSQL versions. Each JSON fixture contains
-parallel `names`, `sql` and `expected` arrays. Names preserve original Rust case
-identities; CLI/JUnit identities include fixture and array index. Expectations
+schema, expected case count and PostgreSQL versions. Each JSON fixture is an
+array of self-contained cases with `name`, `sql` and `expected` fields. Keep each
+SQL input and its expectation in the same object when adding, deleting or
+reordering cases. Names preserve original Rust case identities and must be
+nonempty and unique within the fixture. The runner validates object fields and
+case counts, then projects cases to temporary SQL and expectation arrays for the
+existing CLI input contract. CLI/JUnit identities retain the fixture basename
+and array index; each group log also maps those indices to case names.
+Expectations
 use the existing `sql-fun test` contract: complete diagnostic sets and exact
 ordered columns, including absent types and unknown nullability.
 

@@ -1,60 +1,8 @@
-{
-  "names": [
-    "ordinary_array_equality_retains_binding_and_types::constructor",
-    "ordinary_array_equality_retains_binding_and_types::integers",
-    "ordinary_array_equality_retains_binding_and_types::empty",
-    "ordinary_array_equality_retains_binding_and_types::null_array"
-  ],
-  "sql": [
-    "SELECT ARRAY[1::oid] = ARRAY[1::oid]",
-    "SELECT ARRAY[1] = ARRAY[1]",
-    "SELECT ARRAY[]::oid[] = ARRAY[]::oid[]",
-    "SELECT NULL::oid[] = ARRAY[1::oid]"
-  ],
-  "expected": [
-    {
-      "diagnostics": [],
-      "columns": [
-        {
-          "name": "",
-          "type": {
-            "schema_name": "pg_catalog",
-            "local_name": "bool",
-            "is_array": false
-          },
-          "nullability": "nullable"
-        }
-      ]
-    },
-    {
-      "diagnostics": [],
-      "columns": [
-        {
-          "name": "",
-          "type": {
-            "schema_name": "pg_catalog",
-            "local_name": "bool",
-            "is_array": false
-          },
-          "nullability": "nullable"
-        }
-      ]
-    },
-    {
-      "diagnostics": [],
-      "columns": [
-        {
-          "name": "",
-          "type": {
-            "schema_name": "pg_catalog",
-            "local_name": "bool",
-            "is_array": false
-          },
-          "nullability": "nullable"
-        }
-      ]
-    },
-    {
+[
+  {
+    "name": "ordinary_array_equality_retains_binding_and_types::constructor",
+    "sql": "SELECT ARRAY[1::oid] = ARRAY[1::oid]",
+    "expected": {
       "diagnostics": [],
       "columns": [
         {
@@ -68,5 +16,59 @@
         }
       ]
     }
-  ]
-}
+  },
+  {
+    "name": "ordinary_array_equality_retains_binding_and_types::integers",
+    "sql": "SELECT ARRAY[1] = ARRAY[1]",
+    "expected": {
+      "diagnostics": [],
+      "columns": [
+        {
+          "name": "",
+          "type": {
+            "schema_name": "pg_catalog",
+            "local_name": "bool",
+            "is_array": false
+          },
+          "nullability": "nullable"
+        }
+      ]
+    }
+  },
+  {
+    "name": "ordinary_array_equality_retains_binding_and_types::empty",
+    "sql": "SELECT ARRAY[]::oid[] = ARRAY[]::oid[]",
+    "expected": {
+      "diagnostics": [],
+      "columns": [
+        {
+          "name": "",
+          "type": {
+            "schema_name": "pg_catalog",
+            "local_name": "bool",
+            "is_array": false
+          },
+          "nullability": "nullable"
+        }
+      ]
+    }
+  },
+  {
+    "name": "ordinary_array_equality_retains_binding_and_types::null_array",
+    "sql": "SELECT NULL::oid[] = ARRAY[1::oid]",
+    "expected": {
+      "diagnostics": [],
+      "columns": [
+        {
+          "name": "",
+          "type": {
+            "schema_name": "pg_catalog",
+            "local_name": "bool",
+            "is_array": false
+          },
+          "nullability": "nullable"
+        }
+      ]
+    }
+  }
+]

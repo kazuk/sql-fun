@@ -474,5 +474,23 @@
       "diagnostics": [],
       "columns": []
     }
+  },
+  {
+    "name": "output_names::returning_insert",
+    "sql": "INSERT INTO items(id) VALUES(1) RETURNING (SELECT items.id)",
+    "expected": {
+      "diagnostics": [],
+      "columns": [
+        {
+          "name": "id",
+          "type": {
+            "schema_name": "pg_catalog",
+            "local_name": "int4",
+            "is_array": false
+          },
+          "nullability": "nullable"
+        }
+      ]
+    }
   }
 ]

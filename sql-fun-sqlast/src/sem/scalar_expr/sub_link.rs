@@ -9,6 +9,17 @@ pub struct SubLinkExpr {
 }
 
 impl SubLinkExpr {
+    pub(super) fn output_name(&self) -> String {
+        let columns = self.subselect.result_columns();
+        if columns.len() == 1
+            && let Some(column) = columns.get_column_at(0)
+            && let Some(name) = column.column_name()
+        {
+            return name.to_string();
+        }
+        String::new()
+    }
+
     pub(super) fn from_resolved(query: &SelectStatement) -> Result<Self, AnalysisError> {
         Ok(Self {
             subselect: Box::new(query.clone()),

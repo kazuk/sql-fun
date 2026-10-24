@@ -8,7 +8,7 @@
       ],
       "columns": [
         {
-          "name": "",
+          "name": "choose",
           "type": null,
           "nullability": "unknown"
         }
@@ -26,7 +26,7 @@
       ],
       "columns": [
         {
-          "name": "",
+          "name": "choose",
           "type": null,
           "nullability": "unknown"
         }

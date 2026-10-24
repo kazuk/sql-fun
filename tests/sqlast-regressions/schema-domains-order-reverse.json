@@ -4,7 +4,7 @@
     "sql": "SELECT choose(1.2, 1)",
     "expected": {
       "diagnostics": [],
-      "columns": [{"name": "", "type": {"schema_name": "pg_catalog", "local_name": "numeric", "is_array": false}, "nullability": "nullable"}]
+      "columns": [{"name": "choose", "type": {"schema_name": "pg_catalog", "local_name": "numeric", "is_array": false}, "nullability": "nullable"}]
     }
   },
   {
@@ -12,7 +12,7 @@
     "sql": "SELECT choose(1, 1.2)",
     "expected": {
       "diagnostics": [],
-      "columns": [{"name": "", "type": {"schema_name": "pg_catalog", "local_name": "numeric", "is_array": false}, "nullability": "nullable"}]
+      "columns": [{"name": "choose", "type": {"schema_name": "pg_catalog", "local_name": "numeric", "is_array": false}, "nullability": "nullable"}]
     }
   }
 ]

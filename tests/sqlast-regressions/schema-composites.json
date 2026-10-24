@@ -51,7 +51,7 @@
           "nullability": "not_null"
         },
         {
-          "name": "",
+          "name": "take_singleton",
           "type": {
             "schema_name": "pg_catalog",
             "local_name": "int4",
@@ -76,7 +76,7 @@
           "nullability": "unknown"
         },
         {
-          "name": "",
+          "name": "take_pair",
           "type": {
             "schema_name": "pg_catalog",
             "local_name": "int4",
@@ -103,7 +103,7 @@
           "nullability": "nullable"
         },
         {
-          "name": "",
+          "name": "take_singleton",
           "type": {
             "schema_name": "pg_catalog",
             "local_name": "int4",
@@ -130,7 +130,7 @@
           "nullability": "not_null"
         },
         {
-          "name": "",
+          "name": "take_container",
           "type": {
             "schema_name": "pg_catalog",
             "local_name": "int4",

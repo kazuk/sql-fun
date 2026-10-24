@@ -298,7 +298,7 @@
       "diagnostics": [],
       "columns": [
         {
-          "name": "",
+          "name": "id",
           "type": {
             "schema_name": "pg_catalog",
             "local_name": "int4",
@@ -316,7 +316,7 @@
       "diagnostics": [],
       "columns": [
         {
-          "name": "",
+          "name": "id",
           "type": {
             "schema_name": "pg_catalog",
             "local_name": "int4",
@@ -334,7 +334,7 @@
       "diagnostics": [],
       "columns": [
         {
-          "name": "",
+          "name": "id",
           "type": {
             "schema_name": "pg_catalog",
             "local_name": "int4",
@@ -354,7 +354,7 @@
       ],
       "columns": [
         {
-          "name": "",
+          "name": "absent",
           "nullability": "nullable"
         }
       ]

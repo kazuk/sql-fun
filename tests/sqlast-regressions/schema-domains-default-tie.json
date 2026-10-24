@@ -4,7 +4,7 @@
     "sql": "SELECT choose(1.2)",
     "expected": {
       "diagnostics": ["function_overload_resolution_failed"],
-      "columns": [{"name": "", "type": null, "nullability": "unknown"}]
+      "columns": [{"name": "choose", "type": null, "nullability": "unknown"}]
     }
   }
 ]

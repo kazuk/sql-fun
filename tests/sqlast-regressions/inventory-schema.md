@@ -88,8 +88,11 @@ public unresolved-parameter diagnostic versus PostgreSQL PREPARE, explicitly
 distinguishing the documented admissible-domain contract from a solver bug.
 [Bug #767](https://github.com/kazuk/sql-fun/issues/767) records ARRAY/GREATEST
 common-type selection of `int4[]` where PG17/18 preserve an array of domains.
-The expression inventory identifies those pre-existing expectations; no semantic
-fix or workaround is included here.
+The #767 follow-up corrects those expectations and extends the expression
+inventory with order-sensitive ARRAY/GREATEST/LEAST/COALESCE and
+parameter-dependent CASE regressions.
+[Bug #776](https://github.com/kazuk/sql-fun/issues/776) separately records
+parameter-free CASE rejecting domain mixtures through its legacy resolver.
 
 [Bug #768](https://github.com/kazuk/sql-fun/issues/768) addresses INSERT rules
 rejecting ON CONFLICT that PostgreSQL accepts. The two corrected precedence

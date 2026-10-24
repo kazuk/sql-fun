@@ -135,8 +135,11 @@ impl CommonTypeFacts {
         if source == target || *source == MinMaxExpr::unknown() {
             return true;
         }
+        // Mirror context-backed coercion: target domains accept conversions
+        // through their bases while selection retains nominal array identity.
         let source = self.base(source);
-        if Self::identity(&source) == Self::identity(target) {
+        let target = self.base(target);
+        if Self::identity(&source) == Self::identity(&target) {
             return true;
         }
         if source.is_array() == Some(true) && target.is_array() == Some(true) {
@@ -145,11 +148,11 @@ impl CommonTypeFacts {
         if self
             .0
             .get(&source)
-            .is_some_and(|facts| facts.targets.contains(&Self::identity(target)))
+            .is_some_and(|facts| facts.targets.contains(&Self::identity(&target)))
         {
             return true;
         }
-        source.implicit_match_owned(target)
+        source.implicit_match_owned(&target)
     }
 
     fn select(&self, left: &TypeReference, right: &TypeReference) -> Option<TypeReference> {
@@ -338,7 +341,7 @@ mod tests {
     use crate::sem::parameter_constraints::{
         ConstraintGraph, InputTypeConstraint, ParameterConstraints, TypeProjection,
     };
-    use crate::sem::{MinMaxExpr, PgBuiltInType};
+    use crate::sem::{MinMaxExpr, PgBuiltInType, TypeReference};
     use std::collections::BTreeMap;
 
     #[rstest::rstest]
@@ -368,6 +371,107 @@ mod tests {
             ])),
             allowed
         );
+    }
+
+    #[rstest::rstest]
+    #[case::domain_first("public.amount[]", "pg_catalog.int4[]", "public.amount[]")]
+    #[case::base_first("pg_catalog.int4[]", "public.amount[]", "pg_catalog.int4[]")]
+    #[case::nested_elements(
+        "public.nested_amount[]",
+        "pg_catalog.int4[]",
+        "public.nested_amount[]"
+    )]
+    #[case::promoted("public.amount[]", "pg_catalog.int8[]", "pg_catalog.int8[]")]
+    #[case::array_domain("public.amount_array", "pg_catalog.int4[]", "pg_catalog.int4[]")]
+    #[case::nested_array_domain(
+        "public.nested_amount_array",
+        "pg_catalog.int4[]",
+        "pg_catalog.int4[]"
+    )]
+    fn domain_array_coercions_keep_candidate_identity(
+        #[case] left: &str,
+        #[case] right: &str,
+        #[case] result: &str,
+    ) {
+        let left: TypeReference = left.parse().unwrap();
+        let right: TypeReference = right.parse().unwrap();
+        let result: TypeReference = result.parse().unwrap();
+        let context = test_helpers::domain_context();
+        assert_eq!(
+            MinMaxExpr::select_common_type(&context, &[left.clone(), right.clone()]).unwrap(),
+            result
+        );
+        assert!(MinMaxExpr::can_coerce(&context, &left, &result));
+        assert!(MinMaxExpr::can_coerce(&context, &right, &result));
+
+        let facts = super::CommonTypeFacts::prepare(&context);
+        drop(context);
+        assert_eq!(facts.select(&left, &right), Some(result.clone()));
+        assert!(facts.coerce(&left, &result));
+        assert!(facts.coerce(&right, &result));
+    }
+
+    #[rstest::rstest]
+    #[case::domain_first("public.amount[]", "pg_catalog.int4[]", "public.amount[]", true)]
+    #[case::wrong_result("public.amount[]", "pg_catalog.int4[]", "pg_catalog.int4[]", false)]
+    #[case::base_first("pg_catalog.int4[]", "public.amount[]", "pg_catalog.int4[]", true)]
+    #[case::wrong_reverse_result("pg_catalog.int4[]", "public.amount[]", "public.amount[]", false)]
+    #[case::promoted("public.amount[]", "pg_catalog.int8[]", "pg_catalog.int8[]", true)]
+    #[case::incompatible("public.amount[]", "pg_catalog.text[]", "public.amount[]", false)]
+    fn deferred_domain_arrays_keep_input_result_correlations(
+        #[case] left: &str,
+        #[case] right: &str,
+        #[case] result: &str,
+        #[case] allowed: bool,
+    ) {
+        let mut graph = ConstraintGraph::default();
+        let left_node = graph.parameter(1);
+        let right_node = graph.parameter(2);
+        let output = graph.parameter(3);
+        {
+            let context = test_helpers::domain_context();
+            let node = graph.common_type(&context, &[left_node, right_node], false, "common type");
+            graph.equal(node, output);
+            graph.solve().unwrap();
+        }
+        // Instantiation and conversion checks now use only retained owned facts.
+        let constraints = ParameterConstraints::from_graph(&graph);
+        assert_eq!(
+            constraints.allows(&BTreeMap::from([
+                (1, left.parse().unwrap()),
+                (2, right.parse().unwrap()),
+                (3, result.parse().unwrap()),
+            ])),
+            allowed
+        );
+    }
+
+    #[rstest::rstest]
+    fn constructed_domain_arrays_keep_deferred_parameter_identity(
+        #[values("public.amount", "public.amount[]", "public.nested_amount")] source: &str,
+    ) {
+        let mut graph = ConstraintGraph::default();
+        let source_node = graph.parameter(1);
+        let array = graph.node(&InputTypeConstraint::any());
+        graph.project(source_node, array, TypeProjection::construct_array());
+        let right = graph.parameter(2);
+        let output = graph.parameter(3);
+        {
+            let context = test_helpers::domain_context();
+            let result = graph.common_type(&context, &[array, right], false, "ARRAY");
+            graph.equal(result, output);
+            graph.solve().unwrap();
+        }
+        let constraints = ParameterConstraints::from_graph(&graph);
+        let source: TypeReference = source.parse().unwrap();
+        let mut assignment = BTreeMap::from([
+            (1, source.clone()),
+            (2, PgBuiltInType::int4().array_type()),
+            (3, source.array_type()),
+        ]);
+        assert!(constraints.allows(&assignment));
+        assignment.insert(3, PgBuiltInType::int4().array_type());
+        assert!(!constraints.allows(&assignment));
     }
 
     #[test]

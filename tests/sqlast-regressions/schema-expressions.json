@@ -80,8 +80,8 @@
         {
           "name": "array",
           "type": {
-            "schema_name": "pg_catalog",
-            "local_name": "int4",
+            "schema_name": "public",
+            "local_name": "amount",
             "is_array": true
           },
           "nullability": "not_null"
@@ -376,8 +376,8 @@
         {
           "name": "result",
           "type": {
-            "schema_name": "pg_catalog",
-            "local_name": "int4",
+            "schema_name": "public",
+            "local_name": "amount",
             "is_array": true
           },
           "nullability": "nullable"
@@ -433,6 +433,870 @@
             "schema_name": "public",
             "local_name": "pair",
             "is_array": false
+          },
+          "nullability": "nullable"
+        }
+      ]
+    }
+  },
+  {
+    "name": "domain_array_common_type::array::base_first",
+    "sql": "SELECT ARRAY[NULL::integer[],NULL::amount[]] AS result",
+    "expected": {
+      "diagnostics": [],
+      "columns": [
+        {
+          "name": "result",
+          "type": {
+            "schema_name": "pg_catalog",
+            "local_name": "int4",
+            "is_array": true
+          },
+          "nullability": "not_null"
+        }
+      ]
+    }
+  },
+  {
+    "name": "domain_array_common_type::array::identical",
+    "sql": "SELECT ARRAY[NULL::amount[],NULL::amount[]] AS result",
+    "expected": {
+      "diagnostics": [],
+      "columns": [
+        {
+          "name": "result",
+          "type": {
+            "schema_name": "public",
+            "local_name": "amount",
+            "is_array": true
+          },
+          "nullability": "not_null"
+        }
+      ]
+    }
+  },
+  {
+    "name": "domain_array_common_type::array::unknown_last",
+    "sql": "SELECT ARRAY[NULL::amount[],NULL] AS result",
+    "expected": {
+      "diagnostics": [],
+      "columns": [
+        {
+          "name": "result",
+          "type": {
+            "schema_name": "public",
+            "local_name": "amount",
+            "is_array": true
+          },
+          "nullability": "not_null"
+        }
+      ]
+    }
+  },
+  {
+    "name": "domain_array_common_type::array::unknown_first",
+    "sql": "SELECT ARRAY[NULL,NULL::amount[]] AS result",
+    "expected": {
+      "diagnostics": [],
+      "columns": [
+        {
+          "name": "result",
+          "type": {
+            "schema_name": "public",
+            "local_name": "amount",
+            "is_array": true
+          },
+          "nullability": "not_null"
+        }
+      ]
+    }
+  },
+  {
+    "name": "domain_array_common_type::array::domain_over_array",
+    "sql": "SELECT ARRAY[NULL::amount_array,NULL::integer[]] AS result",
+    "expected": {
+      "diagnostics": [],
+      "columns": [
+        {
+          "name": "result",
+          "type": {
+            "schema_name": "pg_catalog",
+            "local_name": "int4",
+            "is_array": true
+          },
+          "nullability": "not_null"
+        }
+      ]
+    }
+  },
+  {
+    "name": "domain_array_common_type::array::nested_domain_over_array",
+    "sql": "SELECT ARRAY[NULL::nested_amount_array,NULL::integer[]] AS result",
+    "expected": {
+      "diagnostics": [],
+      "columns": [
+        {
+          "name": "result",
+          "type": {
+            "schema_name": "pg_catalog",
+            "local_name": "int4",
+            "is_array": true
+          },
+          "nullability": "not_null"
+        }
+      ]
+    }
+  },
+  {
+    "name": "domain_array_common_type::array::scalar_domain_base",
+    "sql": "SELECT ARRAY[NULL::amount,NULL::integer] AS result",
+    "expected": {
+      "diagnostics": [],
+      "columns": [
+        {
+          "name": "result",
+          "type": {
+            "schema_name": "pg_catalog",
+            "local_name": "int4",
+            "is_array": true
+          },
+          "nullability": "not_null"
+        }
+      ]
+    }
+  },
+  {
+    "name": "domain_array_common_type::array::nested_domain_elements",
+    "sql": "SELECT ARRAY[NULL::nested_amount[],NULL::integer[]] AS result",
+    "expected": {
+      "diagnostics": [],
+      "columns": [
+        {
+          "name": "result",
+          "type": {
+            "schema_name": "public",
+            "local_name": "nested_amount",
+            "is_array": true
+          },
+          "nullability": "not_null"
+        }
+      ]
+    }
+  },
+  {
+    "name": "domain_array_common_type::array::numeric_promotion",
+    "sql": "SELECT ARRAY[NULL::amount[],NULL::bigint[]] AS result",
+    "expected": {
+      "diagnostics": [],
+      "columns": [
+        {
+          "name": "result",
+          "type": {
+            "schema_name": "pg_catalog",
+            "local_name": "int8",
+            "is_array": true
+          },
+          "nullability": "not_null"
+        }
+      ]
+    }
+  },
+  {
+    "name": "domain_array_common_type::greatest::base_first",
+    "sql": "SELECT greatest(NULL::integer[],NULL::amount[]) AS result",
+    "expected": {
+      "diagnostics": [],
+      "columns": [
+        {
+          "name": "result",
+          "type": {
+            "schema_name": "pg_catalog",
+            "local_name": "int4",
+            "is_array": true
+          },
+          "nullability": "nullable"
+        }
+      ]
+    }
+  },
+  {
+    "name": "domain_array_common_type::greatest::identical",
+    "sql": "SELECT greatest(NULL::amount[],NULL::amount[]) AS result",
+    "expected": {
+      "diagnostics": [],
+      "columns": [
+        {
+          "name": "result",
+          "type": {
+            "schema_name": "public",
+            "local_name": "amount",
+            "is_array": true
+          },
+          "nullability": "nullable"
+        }
+      ]
+    }
+  },
+  {
+    "name": "domain_array_common_type::greatest::unknown_last",
+    "sql": "SELECT greatest(NULL::amount[],NULL) AS result",
+    "expected": {
+      "diagnostics": [],
+      "columns": [
+        {
+          "name": "result",
+          "type": {
+            "schema_name": "public",
+            "local_name": "amount",
+            "is_array": true
+          },
+          "nullability": "nullable"
+        }
+      ]
+    }
+  },
+  {
+    "name": "domain_array_common_type::greatest::unknown_first",
+    "sql": "SELECT greatest(NULL,NULL::amount[]) AS result",
+    "expected": {
+      "diagnostics": [],
+      "columns": [
+        {
+          "name": "result",
+          "type": {
+            "schema_name": "public",
+            "local_name": "amount",
+            "is_array": true
+          },
+          "nullability": "nullable"
+        }
+      ]
+    }
+  },
+  {
+    "name": "domain_array_common_type::greatest::domain_over_array",
+    "sql": "SELECT greatest(NULL::amount_array,NULL::integer[]) AS result",
+    "expected": {
+      "diagnostics": [],
+      "columns": [
+        {
+          "name": "result",
+          "type": {
+            "schema_name": "pg_catalog",
+            "local_name": "int4",
+            "is_array": true
+          },
+          "nullability": "nullable"
+        }
+      ]
+    }
+  },
+  {
+    "name": "domain_array_common_type::greatest::nested_domain_over_array",
+    "sql": "SELECT greatest(NULL::nested_amount_array,NULL::integer[]) AS result",
+    "expected": {
+      "diagnostics": [],
+      "columns": [
+        {
+          "name": "result",
+          "type": {
+            "schema_name": "pg_catalog",
+            "local_name": "int4",
+            "is_array": true
+          },
+          "nullability": "nullable"
+        }
+      ]
+    }
+  },
+  {
+    "name": "domain_array_common_type::greatest::scalar_domain_base",
+    "sql": "SELECT greatest(NULL::amount,NULL::integer) AS result",
+    "expected": {
+      "diagnostics": [],
+      "columns": [
+        {
+          "name": "result",
+          "type": {
+            "schema_name": "pg_catalog",
+            "local_name": "int4",
+            "is_array": false
+          },
+          "nullability": "nullable"
+        }
+      ]
+    }
+  },
+  {
+    "name": "domain_array_common_type::greatest::nested_domain_elements",
+    "sql": "SELECT greatest(NULL::nested_amount[],NULL::integer[]) AS result",
+    "expected": {
+      "diagnostics": [],
+      "columns": [
+        {
+          "name": "result",
+          "type": {
+            "schema_name": "public",
+            "local_name": "nested_amount",
+            "is_array": true
+          },
+          "nullability": "nullable"
+        }
+      ]
+    }
+  },
+  {
+    "name": "domain_array_common_type::greatest::numeric_promotion",
+    "sql": "SELECT greatest(NULL::amount[],NULL::bigint[]) AS result",
+    "expected": {
+      "diagnostics": [],
+      "columns": [
+        {
+          "name": "result",
+          "type": {
+            "schema_name": "pg_catalog",
+            "local_name": "int8",
+            "is_array": true
+          },
+          "nullability": "nullable"
+        }
+      ]
+    }
+  },
+  {
+    "name": "domain_array_common_type::least::domain_first",
+    "sql": "SELECT least(NULL::amount[],NULL::integer[]) AS result",
+    "expected": {
+      "diagnostics": [],
+      "columns": [
+        {
+          "name": "result",
+          "type": {
+            "schema_name": "public",
+            "local_name": "amount",
+            "is_array": true
+          },
+          "nullability": "nullable"
+        }
+      ]
+    }
+  },
+  {
+    "name": "domain_array_common_type::least::base_first",
+    "sql": "SELECT least(NULL::integer[],NULL::amount[]) AS result",
+    "expected": {
+      "diagnostics": [],
+      "columns": [
+        {
+          "name": "result",
+          "type": {
+            "schema_name": "pg_catalog",
+            "local_name": "int4",
+            "is_array": true
+          },
+          "nullability": "nullable"
+        }
+      ]
+    }
+  },
+  {
+    "name": "domain_array_common_type::least::identical",
+    "sql": "SELECT least(NULL::amount[],NULL::amount[]) AS result",
+    "expected": {
+      "diagnostics": [],
+      "columns": [
+        {
+          "name": "result",
+          "type": {
+            "schema_name": "public",
+            "local_name": "amount",
+            "is_array": true
+          },
+          "nullability": "nullable"
+        }
+      ]
+    }
+  },
+  {
+    "name": "domain_array_common_type::least::unknown_last",
+    "sql": "SELECT least(NULL::amount[],NULL) AS result",
+    "expected": {
+      "diagnostics": [],
+      "columns": [
+        {
+          "name": "result",
+          "type": {
+            "schema_name": "public",
+            "local_name": "amount",
+            "is_array": true
+          },
+          "nullability": "nullable"
+        }
+      ]
+    }
+  },
+  {
+    "name": "domain_array_common_type::least::unknown_first",
+    "sql": "SELECT least(NULL,NULL::amount[]) AS result",
+    "expected": {
+      "diagnostics": [],
+      "columns": [
+        {
+          "name": "result",
+          "type": {
+            "schema_name": "public",
+            "local_name": "amount",
+            "is_array": true
+          },
+          "nullability": "nullable"
+        }
+      ]
+    }
+  },
+  {
+    "name": "domain_array_common_type::least::domain_over_array",
+    "sql": "SELECT least(NULL::amount_array,NULL::integer[]) AS result",
+    "expected": {
+      "diagnostics": [],
+      "columns": [
+        {
+          "name": "result",
+          "type": {
+            "schema_name": "pg_catalog",
+            "local_name": "int4",
+            "is_array": true
+          },
+          "nullability": "nullable"
+        }
+      ]
+    }
+  },
+  {
+    "name": "domain_array_common_type::least::nested_domain_over_array",
+    "sql": "SELECT least(NULL::nested_amount_array,NULL::integer[]) AS result",
+    "expected": {
+      "diagnostics": [],
+      "columns": [
+        {
+          "name": "result",
+          "type": {
+            "schema_name": "pg_catalog",
+            "local_name": "int4",
+            "is_array": true
+          },
+          "nullability": "nullable"
+        }
+      ]
+    }
+  },
+  {
+    "name": "domain_array_common_type::least::scalar_domain_base",
+    "sql": "SELECT least(NULL::amount,NULL::integer) AS result",
+    "expected": {
+      "diagnostics": [],
+      "columns": [
+        {
+          "name": "result",
+          "type": {
+            "schema_name": "pg_catalog",
+            "local_name": "int4",
+            "is_array": false
+          },
+          "nullability": "nullable"
+        }
+      ]
+    }
+  },
+  {
+    "name": "domain_array_common_type::least::nested_domain_elements",
+    "sql": "SELECT least(NULL::nested_amount[],NULL::integer[]) AS result",
+    "expected": {
+      "diagnostics": [],
+      "columns": [
+        {
+          "name": "result",
+          "type": {
+            "schema_name": "public",
+            "local_name": "nested_amount",
+            "is_array": true
+          },
+          "nullability": "nullable"
+        }
+      ]
+    }
+  },
+  {
+    "name": "domain_array_common_type::least::numeric_promotion",
+    "sql": "SELECT least(NULL::amount[],NULL::bigint[]) AS result",
+    "expected": {
+      "diagnostics": [],
+      "columns": [
+        {
+          "name": "result",
+          "type": {
+            "schema_name": "pg_catalog",
+            "local_name": "int8",
+            "is_array": true
+          },
+          "nullability": "nullable"
+        }
+      ]
+    }
+  },
+  {
+    "name": "domain_array_common_type::coalesce::domain_first",
+    "sql": "SELECT coalesce(NULL::amount[],NULL::integer[]) AS result",
+    "expected": {
+      "diagnostics": [],
+      "columns": [
+        {
+          "name": "result",
+          "type": {
+            "schema_name": "public",
+            "local_name": "amount",
+            "is_array": true
+          },
+          "nullability": "nullable"
+        }
+      ]
+    }
+  },
+  {
+    "name": "domain_array_common_type::coalesce::base_first",
+    "sql": "SELECT coalesce(NULL::integer[],NULL::amount[]) AS result",
+    "expected": {
+      "diagnostics": [],
+      "columns": [
+        {
+          "name": "result",
+          "type": {
+            "schema_name": "pg_catalog",
+            "local_name": "int4",
+            "is_array": true
+          },
+          "nullability": "nullable"
+        }
+      ]
+    }
+  },
+  {
+    "name": "domain_array_common_type::coalesce::identical",
+    "sql": "SELECT coalesce(NULL::amount[],NULL::amount[]) AS result",
+    "expected": {
+      "diagnostics": [],
+      "columns": [
+        {
+          "name": "result",
+          "type": {
+            "schema_name": "public",
+            "local_name": "amount",
+            "is_array": true
+          },
+          "nullability": "nullable"
+        }
+      ]
+    }
+  },
+  {
+    "name": "domain_array_common_type::coalesce::unknown_last",
+    "sql": "SELECT coalesce(NULL::amount[],NULL) AS result",
+    "expected": {
+      "diagnostics": [],
+      "columns": [
+        {
+          "name": "result",
+          "type": {
+            "schema_name": "public",
+            "local_name": "amount",
+            "is_array": true
+          },
+          "nullability": "nullable"
+        }
+      ]
+    }
+  },
+  {
+    "name": "domain_array_common_type::coalesce::unknown_first",
+    "sql": "SELECT coalesce(NULL,NULL::amount[]) AS result",
+    "expected": {
+      "diagnostics": [],
+      "columns": [
+        {
+          "name": "result",
+          "type": {
+            "schema_name": "public",
+            "local_name": "amount",
+            "is_array": true
+          },
+          "nullability": "nullable"
+        }
+      ]
+    }
+  },
+  {
+    "name": "domain_array_common_type::coalesce::domain_over_array",
+    "sql": "SELECT coalesce(NULL::amount_array,NULL::integer[]) AS result",
+    "expected": {
+      "diagnostics": [],
+      "columns": [
+        {
+          "name": "result",
+          "type": {
+            "schema_name": "pg_catalog",
+            "local_name": "int4",
+            "is_array": true
+          },
+          "nullability": "nullable"
+        }
+      ]
+    }
+  },
+  {
+    "name": "domain_array_common_type::coalesce::nested_domain_over_array",
+    "sql": "SELECT coalesce(NULL::nested_amount_array,NULL::integer[]) AS result",
+    "expected": {
+      "diagnostics": [],
+      "columns": [
+        {
+          "name": "result",
+          "type": {
+            "schema_name": "pg_catalog",
+            "local_name": "int4",
+            "is_array": true
+          },
+          "nullability": "nullable"
+        }
+      ]
+    }
+  },
+  {
+    "name": "domain_array_common_type::coalesce::scalar_domain_base",
+    "sql": "SELECT coalesce(NULL::amount,NULL::integer) AS result",
+    "expected": {
+      "diagnostics": [],
+      "columns": [
+        {
+          "name": "result",
+          "type": {
+            "schema_name": "pg_catalog",
+            "local_name": "int4",
+            "is_array": false
+          },
+          "nullability": "nullable"
+        }
+      ]
+    }
+  },
+  {
+    "name": "domain_array_common_type::coalesce::nested_domain_elements",
+    "sql": "SELECT coalesce(NULL::nested_amount[],NULL::integer[]) AS result",
+    "expected": {
+      "diagnostics": [],
+      "columns": [
+        {
+          "name": "result",
+          "type": {
+            "schema_name": "public",
+            "local_name": "nested_amount",
+            "is_array": true
+          },
+          "nullability": "nullable"
+        }
+      ]
+    }
+  },
+  {
+    "name": "domain_array_common_type::coalesce::numeric_promotion",
+    "sql": "SELECT coalesce(NULL::amount[],NULL::bigint[]) AS result",
+    "expected": {
+      "diagnostics": [],
+      "columns": [
+        {
+          "name": "result",
+          "type": {
+            "schema_name": "pg_catalog",
+            "local_name": "int8",
+            "is_array": true
+          },
+          "nullability": "nullable"
+        }
+      ]
+    }
+  },
+  {
+    "name": "domain_array_common_type::case::domain_first",
+    "sql": "SELECT CASE WHEN $1 THEN NULL::integer[] ELSE NULL::amount[] END AS result",
+    "expected": {
+      "diagnostics": [],
+      "columns": [
+        {
+          "name": "result",
+          "type": {
+            "schema_name": "public",
+            "local_name": "amount",
+            "is_array": true
+          },
+          "nullability": "nullable"
+        }
+      ]
+    }
+  },
+  {
+    "name": "domain_array_common_type::case::base_first",
+    "sql": "SELECT CASE WHEN $1 THEN NULL::amount[] ELSE NULL::integer[] END AS result",
+    "expected": {
+      "diagnostics": [],
+      "columns": [
+        {
+          "name": "result",
+          "type": {
+            "schema_name": "pg_catalog",
+            "local_name": "int4",
+            "is_array": true
+          },
+          "nullability": "nullable"
+        }
+      ]
+    }
+  },
+  {
+    "name": "domain_array_common_type::case::identical",
+    "sql": "SELECT CASE WHEN $1 THEN NULL::amount[] ELSE NULL::amount[] END AS result",
+    "expected": {
+      "diagnostics": [],
+      "columns": [
+        {
+          "name": "result",
+          "type": {
+            "schema_name": "public",
+            "local_name": "amount",
+            "is_array": true
+          },
+          "nullability": "nullable"
+        }
+      ]
+    }
+  },
+  {
+    "name": "domain_array_common_type::case::unknown_last",
+    "sql": "SELECT CASE WHEN $1 THEN NULL ELSE NULL::amount[] END AS result",
+    "expected": {
+      "diagnostics": [],
+      "columns": [
+        {
+          "name": "result",
+          "type": {
+            "schema_name": "public",
+            "local_name": "amount",
+            "is_array": true
+          },
+          "nullability": "nullable"
+        }
+      ]
+    }
+  },
+  {
+    "name": "domain_array_common_type::case::unknown_first",
+    "sql": "SELECT CASE WHEN $1 THEN NULL::amount[] ELSE NULL END AS result",
+    "expected": {
+      "diagnostics": [],
+      "columns": [
+        {
+          "name": "result",
+          "type": {
+            "schema_name": "public",
+            "local_name": "amount",
+            "is_array": true
+          },
+          "nullability": "nullable"
+        }
+      ]
+    }
+  },
+  {
+    "name": "domain_array_common_type::case::domain_over_array",
+    "sql": "SELECT CASE WHEN $1 THEN NULL::integer[] ELSE NULL::amount_array END AS result",
+    "expected": {
+      "diagnostics": [],
+      "columns": [
+        {
+          "name": "result",
+          "type": {
+            "schema_name": "pg_catalog",
+            "local_name": "int4",
+            "is_array": true
+          },
+          "nullability": "nullable"
+        }
+      ]
+    }
+  },
+  {
+    "name": "domain_array_common_type::case::nested_domain_over_array",
+    "sql": "SELECT CASE WHEN $1 THEN NULL::integer[] ELSE NULL::nested_amount_array END AS result",
+    "expected": {
+      "diagnostics": [],
+      "columns": [
+        {
+          "name": "result",
+          "type": {
+            "schema_name": "pg_catalog",
+            "local_name": "int4",
+            "is_array": true
+          },
+          "nullability": "nullable"
+        }
+      ]
+    }
+  },
+  {
+    "name": "domain_array_common_type::case::scalar_domain_base",
+    "sql": "SELECT CASE WHEN $1 THEN NULL::integer ELSE NULL::amount END AS result",
+    "expected": {
+      "diagnostics": [],
+      "columns": [
+        {
+          "name": "result",
+          "type": {
+            "schema_name": "pg_catalog",
+            "local_name": "int4",
+            "is_array": false
+          },
+          "nullability": "nullable"
+        }
+      ]
+    }
+  },
+  {
+    "name": "domain_array_common_type::case::nested_domain_elements",
+    "sql": "SELECT CASE WHEN $1 THEN NULL::integer[] ELSE NULL::nested_amount[] END AS result",
+    "expected": {
+      "diagnostics": [],
+      "columns": [
+        {
+          "name": "result",
+          "type": {
+            "schema_name": "public",
+            "local_name": "nested_amount",
+            "is_array": true
+          },
+          "nullability": "nullable"
+        }
+      ]
+    }
+  },
+  {
+    "name": "domain_array_common_type::case::numeric_promotion",
+    "sql": "SELECT CASE WHEN $1 THEN NULL::bigint[] ELSE NULL::amount[] END AS result",
+    "expected": {
+      "diagnostics": [],
+      "columns": [
+        {
+          "name": "result",
+          "type": {
+            "schema_name": "pg_catalog",
+            "local_name": "int8",
+            "is_array": true
           },
           "nullability": "nullable"
         }

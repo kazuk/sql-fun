@@ -133,8 +133,11 @@ impl MinMaxExpr {
         if source == target || *source == Self::unknown() {
             return true;
         }
+        // Coercion into a domain uses its base type too. This checks conversion
+        // applicability without replacing the nominal common-type candidate.
         let source = Self::base_type(context, source);
-        if source == *target || source.implicit_match_context(target, context).is_some() {
+        let target = Self::base_type(context, target);
+        if source == target || source.implicit_match_context(&target, context).is_some() {
             return true;
         }
         if source.is_array() == Some(true) && target.is_array() == Some(true) {

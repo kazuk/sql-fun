@@ -187,9 +187,12 @@ jobs:
             --config-file ./ci/nextest/config.toml
             --profile ci
             --show-progress none"
-          if [ -d "$SQL_FUN_CI_ARTIFACT_DIR/cargo-timings" ]; then
+      - name: Restore compilation timing reports
+        if: ${{ always() }}
+        run: |
+          if [ -d /github/home/sql-fun-workspace-ci/cargo-timings ]; then
             mkdir -p target/cargo-timings
-            cp "$SQL_FUN_CI_ARTIFACT_DIR/cargo-timings/"*.html target/cargo-timings/
+            cp /github/home/sql-fun-workspace-ci/cargo-timings/*.html target/cargo-timings/
           fi
 
       - name: Disk usage after build and test

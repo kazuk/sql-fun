@@ -125,6 +125,8 @@ jq '.sql += [.sql[0]] | .expected += [.expected[0]] |
 for version in "${!checked_versions[@]}"; do
   control="$reports/controls/negative-$version"
   rm -f "$control.xml"
+  echo "== Expected-failure controls: PostgreSQL $version (not regression failures)"
+  echo "The next 2 FAIL results are intentional; exit 1 and a later PASS are required."
   status=0
   "$SQL_FUN_BIN" --term-color never --metadata-file "$runtime/metadata-$version.toml" \
     --datasource regression test "$runtime/negative.json#$.sql" \

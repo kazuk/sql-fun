@@ -771,22 +771,19 @@ impl CaseExpr {
         if context.dialect() == crate::ast::Dialect::sqlite() {
             return Ok(());
         }
+        if self
+            .types
+            .as_ref()
+            .is_some_and(|types| types.admissible_types() == Some(&[]))
+        {
+            return Ok(());
+        }
         for arm in &self.when_exprs {
             let condition = arm.comparison.as_ref().unwrap_or(&arm.when_value);
             self.condition_nodes
                 .push(parameters.case_condition(context, condition));
         }
-        // PostgreSQL considers ELSE first for historical reasons. An absent
-        // ELSE supplies an unknown NULL, not a parameter or an inferred value.
-        let mut results = vec![
-            self.default_expr
-                .as_ref()
-                .clone()
-                .unwrap_or_else(crate::sem::ScalarConstExpr::null),
-        ];
-        for arm in &self.when_exprs {
-            results.push(arm.result.clone());
-        }
+        let results = self.ordered_results();
         let (node, types) = parameters.unify_case_types(context, &results)?;
         self.node = Some(node);
         self.case_expr_type = types.single_type();
@@ -813,12 +810,8 @@ impl CaseExpr {
         self.case_expr_type = types.single_type();
         self.types = Some(types);
         if let Some(target) = &self.case_expr_type {
-            for arm in &mut self.when_exprs {
-                Self::coerce(&mut arm.result, target);
-            }
-            if let Some(otherwise) = self.default_expr.as_mut() {
-                Self::coerce(otherwise, target);
-            }
+            let target = target.clone();
+            self.coerce_results(&target);
         }
         for (arm, node) in self.when_exprs.iter_mut().zip(&self.condition_nodes) {
             if arm.comparison.is_none()
@@ -828,6 +821,29 @@ impl CaseExpr {
             }
         }
         self.is_not_null = self.result_nullability();
+    }
+
+    // PostgreSQL considers ELSE first; omission supplies unknown NULL.
+    fn ordered_results(&self) -> Vec<SemScalarExpr> {
+        let mut results = vec![
+            self.default_expr
+                .as_ref()
+                .clone()
+                .unwrap_or_else(crate::sem::ScalarConstExpr::null),
+        ];
+        for arm in &self.when_exprs {
+            results.push(arm.result.clone());
+        }
+        results
+    }
+
+    fn coerce_results(&mut self, target: &TypeReference) {
+        for arm in &mut self.when_exprs {
+            Self::coerce(&mut arm.result, target);
+        }
+        if let Some(otherwise) = self.default_expr.as_mut() {
+            Self::coerce(otherwise, target);
+        }
     }
 
     fn coerce(value: &mut SemScalarExpr, target: &TypeReference) {
@@ -929,19 +945,20 @@ impl CaseExpr {
         Ok(())
     }
 
-    pub(crate) fn defer_untyped(
+    // SQLite's fully typed expressions retain their dialect-specific resolver.
+    pub(crate) fn resolve_postgres_or_untyped(
         context: &mut impl crate::sem::ParseContext,
         argument: &Option<SemScalarExpr>,
         arms: &[(SemScalarExpr, SemScalarExpr)],
         otherwise: &Option<SemScalarExpr>,
     ) -> Result<Option<SemScalarExpr>, AnalysisError> {
         let unknown = |value: &SemScalarExpr| value.get_type().is_none();
-        if !argument.as_ref().is_some_and(unknown)
-            && !otherwise.as_ref().is_some_and(unknown)
-            && !arms
+        let untyped = argument.as_ref().is_some_and(unknown)
+            || otherwise.as_ref().is_some_and(unknown)
+            || arms
                 .iter()
-                .any(|(condition, result)| unknown(condition) || unknown(result))
-        {
+                .any(|(condition, result)| unknown(condition) || unknown(result));
+        if context.dialect() != crate::ast::Dialect::postgres() && !untyped {
             return Ok(None);
         }
         let mut when_exprs = Vec::new();
@@ -957,6 +974,43 @@ impl CaseExpr {
         );
         value.bind_comparisons(context)?;
         value.types = Some(InputTypeConstraint::any());
+        if context.dialect() == crate::ast::Dialect::postgres() {
+            // Eager typing keeps the result available to enclosing resolvers.
+            // Parameter-dependent errors retain the existing graph diagnostic.
+            let pending = |value: &SemScalarExpr| {
+                MinMaxExpr::input_type(value).is_none() || value.constraint_node().is_some()
+            };
+            let dependent = argument.as_ref().is_some_and(pending)
+                || otherwise
+                    .as_ref()
+                    .is_some_and(|value| value.constraint_node().is_some())
+                || value
+                    .when_exprs
+                    .iter()
+                    .any(|arm| pending(&arm.when_value) || arm.result.constraint_node().is_some());
+            let results = value.ordered_results();
+            let inputs: Option<Vec<_>> = results.iter().map(MinMaxExpr::input_type).collect();
+            if let Some(inputs) = inputs {
+                match MinMaxExpr::select_common_type(context, &inputs) {
+                    Ok(target) => {
+                        value.case_expr_type = Some(target.clone());
+                        value.types = if dependent {
+                            Some(InputTypeConstraint::exact(&target))
+                        } else {
+                            None
+                        };
+                        value.coerce_results(&target);
+                    }
+                    Err(_) if !dependent => {
+                        context.report_analysis_problem(
+                            AnalysisProblem::incompatible_case_values(inputs),
+                        )?;
+                        value.types = Some(InputTypeConstraint::types([]));
+                    }
+                    Err(_) => {}
+                }
+            }
+        }
         value.is_not_null = value.result_nullability();
         Ok(Some(SemScalarExpr::case(&value)))
     }

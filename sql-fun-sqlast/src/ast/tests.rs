@@ -390,7 +390,7 @@ mod sqlite {
 
     #[test]
     fn sqlite_case_does_not_use_postgres_implicit_casts() -> testresult::TestResult {
-        let sql = "select case when true then 1 else 'text' end as n";
+        let sql = "select case when true then 1 else '2' end as n";
         let mut catalog = AnalysisFixture::with_integer_to_text_cast();
         let pg = postgres(sql)?.resolve(&mut catalog)?;
         catalog = catalog.with_dialect(crate::ast::Dialect::sqlite());
@@ -401,7 +401,7 @@ mod sqlite {
                 .get_result_column_def(&name)
                 .expect("n")
                 .get_type_cloned(),
-            Some(PgBuiltInType::text())
+            Some(PgBuiltInType::int4())
         );
         assert_eq!(
             sqlite

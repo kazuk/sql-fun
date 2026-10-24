@@ -223,58 +223,35 @@ async fn plain_rewrite_preserves_parser_anchored_diagnostic_spans() {
 
 #[tokio::test(flavor = "multi_thread")]
 async fn explicit_output_shape_survives_schema_additions_and_unreferenced_drops() {
-    let project = query_project();
-    let mut connection = heavy::Connection::start(16384, 2).await;
-    connection.authenticate().await;
-    let initial = connection
-        .rpc(
-            "initialize_schema_context",
-            &rewrite_request(&project, SCHEMA, Some(true)),
-        )
-        .await;
-    let response = connection.rpc("analyze_query", &json!({"context_handle": initial["result"]["context_handle"], "query": {"Text": "SELECT * FROM entries"}})).await;
-    let item = &response["result"]["queries"]["items"][0];
-    assert_eq!(item["complete"], true, "{response}");
-    let explicit = item["execute_sql"].as_str().unwrap().to_owned();
-    let expected = item["result_columns"]["items"].clone();
+    use super::test_helpers::heavy;
+
+    let item = heavy::analyze_schema_snapshot(SCHEMA, "SELECT * FROM entries", Some(true)).await;
+    assert_eq!(item["complete"], true, "{item}");
+    let explicit = item["execute_sql"].as_str().unwrap();
+    let expected = &item["result_columns"]["items"];
     for schema in [
         "CREATE TABLE entries(id int4 NOT NULL, value int4, added int4);",
         "CREATE TABLE entries(id int4 NOT NULL, value int4);",
     ] {
-        let initialized = connection
-            .rpc(
-                "initialize_schema_context",
-                &rewrite_request(&project, schema, Some(false)),
-            )
-            .await;
-        let response = connection.rpc("analyze_query", &json!({"context_handle": initialized["result"]["context_handle"], "query": {"Text": explicit}})).await;
-        let item = &response["result"]["queries"]["items"][0];
-        assert_eq!(item["complete"], true, "{response}");
-        assert_eq!(item["result_columns"]["items"], expected);
+        let item = heavy::analyze_schema_snapshot(schema, explicit, Some(false)).await;
+        assert_eq!(item["complete"], true, "{item}");
+        assert_eq!(&item["result_columns"]["items"], expected);
     }
-    let initialized = connection
-        .rpc(
-            "initialize_schema_context",
-            &rewrite_request(
-                &project,
-                "CREATE TABLE entries(id int4 NOT NULL);",
-                Some(false),
-            ),
-        )
-        .await;
-    let response = connection.rpc("analyze_query", &json!({"context_handle": initialized["result"]["context_handle"], "query": {"Text": explicit}})).await;
-    let item = &response["result"]["queries"]["items"][0];
-    assert_eq!(item["complete"], false, "{response}");
+    let item = heavy::analyze_schema_snapshot(
+        "CREATE TABLE entries(id int4 NOT NULL);",
+        explicit,
+        Some(false),
+    )
+    .await;
+    assert_eq!(item["complete"], false, "{item}");
     assert!(
         item["probrems"]["items"]
             .as_array()
             .unwrap()
             .iter()
             .any(|problem| problem["code"] == "column_not_found_in_table"),
-        "{response}"
+        "{item}"
     );
-    connection.end_requests().await;
-    connection.finish().await.unwrap();
 }
 
 #[rstest::rstest]

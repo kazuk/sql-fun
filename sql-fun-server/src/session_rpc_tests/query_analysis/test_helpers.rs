@@ -1,3 +1,5 @@
+pub(super) mod heavy;
+
 use crate::schema_cache::test_helpers::SchemaProject;
 
 /// A small int4 catalog with the comparison used by the RPC scenarios.

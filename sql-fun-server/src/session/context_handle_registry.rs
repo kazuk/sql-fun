@@ -39,13 +39,13 @@ impl ContextHandleRegistry {
         &self,
         schema: &Arc<InitializedSchema>,
     ) -> Result<ContextHandle, HandleIssuanceError> {
-        self.register_with_options(schema, &::sql_fun_core::RewriteOptions::default())
+        self.register_with_options(schema, ::sql_fun_core::RewriteOptions::default())
     }
 
     pub(super) fn register_with_options(
         &self,
         schema: &Arc<InitializedSchema>,
-        rewrite_options: &::sql_fun_core::RewriteOptions,
+        rewrite_options: ::sql_fun_core::RewriteOptions,
     ) -> Result<ContextHandle, HandleIssuanceError> {
         // Exhaustion must be detected before any registration is inserted.
         let handle = HANDLE_IDS.issue()?;
@@ -53,7 +53,7 @@ impl ContextHandleRegistry {
             handle.clone(),
             Box::new(RegisteredContext {
                 schema: Arc::clone(schema),
-                rewrite_options: *rewrite_options,
+                rewrite_options,
             }),
         );
         Ok(handle)

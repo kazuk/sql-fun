@@ -302,15 +302,15 @@ impl FromItem {
             let name = match self {
                 Self::Join(node) => node.alias.as_ref().map(|alias| alias.name.as_str()),
                 Self::Group(node) => node.alias.as_ref().map(|alias| alias.name.as_str()),
-                Self::Functions(node) => node
-                    .alias
-                    .as_ref()
-                    .map(|alias| alias.name.as_str())
-                    .or_else(|| {
-                        node.calls
-                            .first()
-                            .and_then(|call| call.expression.projection_function_alias())
-                    }),
+                Self::Functions(node) => {
+                    if let Some(alias) = &node.alias {
+                        Some(alias.name.as_str())
+                    } else if let Some(call) = node.calls.first() {
+                        call.expression.projection_function_alias()
+                    } else {
+                        None
+                    }
+                }
                 _ => None,
             };
             if let Some(name) = name {

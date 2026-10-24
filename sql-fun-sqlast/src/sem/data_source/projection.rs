@@ -29,7 +29,7 @@ pub(crate) struct ProjectionSource<'a> {
 }
 
 impl ProjectionSource<'_> {
-    pub(crate) fn alias(&self) -> &AliasName {
+    pub(crate) const fn alias(&self) -> &AliasName {
         &self.alias
     }
     pub(crate) fn columns(&self) -> &[ProjectionColumn<'_>] {
@@ -202,12 +202,14 @@ impl<'a> ProjectionColumn<'a> {
         let requires_fixed_children = columns
             .iter()
             .any(|column| column.origin.is_some() || column.rows_origin.is_some());
-        let source = (duplicates || requires_fixed_children).then(|| {
-            std::sync::Arc::new(ProjectionSource {
+        let source = if duplicates || requires_fixed_children {
+            Some(std::sync::Arc::new(ProjectionSource {
                 alias: alias.name().clone(),
                 columns: columns.clone(),
-            })
-        });
+            }))
+        } else {
+            None
+        };
         columns
             .into_iter()
             .enumerate()
@@ -224,36 +226,34 @@ impl<'a> ProjectionColumn<'a> {
             .collect()
     }
     pub(crate) fn source_ordinal(&self) -> Option<(&str, usize)> {
-        self.origin
-            .as_ref()
-            .filter(|origin| {
-                self.alias
-                    .as_ref()
-                    .is_none_or(|alias| alias == &origin.source.alias)
-            })
-            .map(|origin| (origin.source.alias.as_str(), origin.ordinal))
-            .or_else(|| {
-                self.rows_origin
-                    .as_ref()
-                    .filter(|(source, _)| {
-                        self.alias
-                            .as_ref()
-                            .is_none_or(|alias| alias.as_str() == source.alias())
-                    })
-                    .map(|(source, ordinal)| (source.alias(), *ordinal))
-            })
+        if let Some(origin) = &self.origin
+            && self
+                .alias
+                .as_ref()
+                .is_none_or(|alias| alias == &origin.source.alias)
+        {
+            return Some((origin.source.alias.as_str(), origin.ordinal));
+        }
+        if let Some((source, ordinal)) = &self.rows_origin
+            && self
+                .alias
+                .as_ref()
+                .is_none_or(|alias| alias.as_str() == source.alias())
+        {
+            return Some((source.alias(), *ordinal));
+        }
+        None
     }
     pub(crate) fn collect_projection_sources<'b>(
         &'b self,
         sources: &mut Vec<&'b ProjectionSource<'a>>,
     ) {
-        if let Some(origin) = &self.origin {
-            if !sources
+        if let Some(origin) = &self.origin
+            && !sources
                 .iter()
                 .any(|source| source.alias == origin.source.alias)
-            {
-                sources.push(&origin.source);
-            }
+        {
+            sources.push(&origin.source);
         }
         if let ProjectionBinding::Merged(merged) = &self.binding {
             merged.left.collect_projection_sources(sources);
@@ -594,7 +594,7 @@ pub(crate) struct WildcardProjection<'a> {
 }
 
 impl<'a> WildcardProjection<'a> {
-    pub(crate) fn new(
+    pub(crate) const fn new(
         columns: Vec<ProjectionColumn<'a>>,
         source_found: bool,
         table_dependent: bool,

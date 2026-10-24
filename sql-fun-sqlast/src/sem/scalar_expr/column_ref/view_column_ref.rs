@@ -43,7 +43,7 @@ impl ColumnReference for ViewColumnRef {
 }
 
 impl ViewColumnRef {
-    pub(super) fn projection_alias(&self) -> &str {
+    pub(super) const fn projection_alias(&self) -> &str {
         self.alias.as_str()
     }
 

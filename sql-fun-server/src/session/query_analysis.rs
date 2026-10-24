@@ -248,6 +248,7 @@ impl SourceMap {
     }
 }
 
+#[derive(Default)]
 struct QueryResult {
     span: Option<TextSpan>,
     kind: Option<QueryKind>,
@@ -332,12 +333,7 @@ impl QueryResult {
         let mut result = Self {
             span: Some(mapping.statement_span(statement)),
             kind: Some(query_kind(statement)),
-            sql: None,
-            complete: false,
-            problems: Vec::new(),
-            parameters: Vec::new(),
-            columns: Vec::new(),
-            relations: Vec::new(),
+            ..Self::default()
         };
         let mut context =
             SchemaFileContext::new(&source.path, base, base.get_args(), base.metadata());
@@ -381,18 +377,7 @@ impl QueryResult {
             let Some(sql) = result.sql.as_deref() else {
                 return result;
             };
-            let output = if mapping.expanded {
-                parse_realized_statement(sql, statement.dialect()).and_then(|parsed| {
-                    let mut output = statement.clone();
-                    output
-                        .synchronize_target_locations(parsed)
-                        .map_err(|error| error.to_string())?;
-                    Ok(output)
-                })
-            } else {
-                Ok(statement.clone())
-            };
-            match output {
+            match prepare_output_statement(statement, sql, mapping.expanded) {
                 Ok(output) => Some(output),
                 Err(error) => {
                     result.sql = None;
@@ -413,14 +398,8 @@ impl QueryResult {
         match analysis_statement.analyze(context) {
             Ok(pair) => {
                 if let Some(output) = &mut output_statement {
-                    let rewritten = output
-                        .rewrite_wildcards(pair.context().analysis_state().wildcard_expansions())
-                        .map_err(|error| error.to_string())
-                        .and_then(|_| {
-                            output
-                                .deparse_sql(output.dialect())
-                                .map_err(|error| error.to_string())
-                        });
+                    let expansions = pair.context().analysis_state().wildcard_expansions();
+                    let rewritten = rewrite_executable_sql(output, expansions);
                     match rewritten {
                         Ok(sql) => result.sql = Some(sql),
                         Err(error) => {
@@ -453,6 +432,35 @@ impl QueryResult {
         }
         result
     }
+}
+
+/// Preserve diagnostic anchors while giving imported projections one coordinate space.
+fn prepare_output_statement(
+    statement: &Statement,
+    sql: &str,
+    expanded: bool,
+) -> Result<Statement, String> {
+    let mut output = statement.clone();
+    if expanded {
+        let parsed = parse_realized_statement(sql, statement.dialect())?;
+        output
+            .synchronize_target_locations(parsed)
+            .map_err(|error| error.to_string())?;
+    }
+    Ok(output)
+}
+
+/// Render executable SQL only after the checked mutation has completed.
+fn rewrite_executable_sql(
+    statement: &mut Statement,
+    expansions: &[::sql_fun_sqlast::sem::WildcardExpansion],
+) -> Result<String, String> {
+    statement
+        .rewrite_wildcards(expansions)
+        .map_err(|error| error.to_string())?;
+    statement
+        .deparse_sql(statement.dialect())
+        .map_err(|error| error.to_string())
 }
 
 /// Re-establish parser locations after structural catalog CTE insertion.

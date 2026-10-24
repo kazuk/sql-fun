@@ -1002,7 +1002,7 @@ impl TryFromWithTokens<&syn::JoinExpr> for Join {
 
 impl JoinKind {
     // PostgreSQL represents CROSS JOIN as an INNER join with no join clause.
-    fn with_postgres_join_clause(self, present: bool) -> Self {
+    const fn with_postgres_join_clause(self, present: bool) -> Self {
         if matches!(self, Self::Inner) && !present {
             Self::Cross
         } else {

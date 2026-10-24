@@ -101,7 +101,7 @@ impl<'request, 'ctx> Session<'request, 'ctx> {
         let schema = Arc::new(initialization.initialize(api).await?);
         let context_handle = self
             .contexts
-            .register_with_options(&schema, initialization.rewrite_options())
+            .register_with_options(&schema, *initialization.rewrite_options())
             .map_err(|error| SqlFunServerApiError::new_unexpected(&error.to_string()))?;
         let retained = self.context(&context_handle).expect("registered schema");
         let diagnostics = Diagnostics::from(retained);

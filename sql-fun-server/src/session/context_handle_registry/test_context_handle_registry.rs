@@ -193,11 +193,11 @@ async fn sessions_share_a_schema_without_sharing_rewrite_policy() {
     let second = SessionWrapper::new();
     let first_handle = first
         .contexts
-        .register_with_options(&schema, &enabled)
+        .register_with_options(&schema, enabled)
         .unwrap();
     let second_handle = second
         .contexts
-        .register_with_options(&schema, &disabled)
+        .register_with_options(&schema, disabled)
         .unwrap();
     let omitted = second.contexts.register(&schema).unwrap();
 

@@ -2,7 +2,7 @@ use crate::ast::{Dialect, Expr, Name, Target};
 use crate::sem::problem::{DeleteProblemKind, InsertProblemKind, UpdateProblemKind};
 use crate::sem::{
     AliasName, AliasSpec, AnalysisError, AnalysisProblem, ColumnName, FromClause,
-    InsertDestination, ParseContext, ResultColumnCollection, ScalarAnalysisContext, WithClause,
+    InsertDestination, ParseContext, ResultColumnCollection, ScalarAnalysisContext,
 };
 
 impl ResultColumnCollection {
@@ -48,7 +48,6 @@ impl ResultColumnCollection {
     pub(in crate::ast) fn resolve_for_update(
         targets: &[Target],
         context: &mut impl ParseContext,
-        with: &WithClause,
         from: &FromClause,
         scope: &ScalarAnalysisContext<'_>,
     ) -> Result<Self, AnalysisError> {
@@ -65,7 +64,6 @@ impl ResultColumnCollection {
                 let qualifier = name.star_qualifier()?;
                 if !results.expand_returning_projection(
                     context,
-                    with,
                     from,
                     scope,
                     target_expr.location,
@@ -87,7 +85,6 @@ impl ResultColumnCollection {
     pub(in crate::ast) fn resolve_for_delete(
         targets: &[Target],
         context: &mut impl ParseContext,
-        with: &WithClause,
         from: &FromClause,
         scope: &ScalarAnalysisContext<'_>,
     ) -> Result<Self, AnalysisError> {
@@ -110,7 +107,6 @@ impl ResultColumnCollection {
                 });
                 if !results.expand_returning_projection(
                     context,
-                    with,
                     from,
                     scope,
                     target_expr.location,
@@ -160,21 +156,20 @@ impl ResultColumnCollection {
     pub(in crate::ast) fn expand_projection(
         &mut self,
         context: &mut impl ParseContext,
-        with: &WithClause,
         from: &FromClause,
         scope: &ScalarAnalysisContext<'_>,
         location: Option<usize>,
         projection_qualifier: Option<&AliasName>,
         binding_qualifier: Option<&AliasName>,
     ) -> Result<bool, AnalysisError> {
-        let columns = from.wildcard_projection(context, with, projection_qualifier)?;
+        let columns =
+            from.wildcard_projection(context, scope.with_clause(), projection_qualifier)?;
         self.append_projection_columns(columns, context, scope, location, binding_qualifier)
     }
 
     fn expand_returning_projection(
         &mut self,
         context: &mut impl ParseContext,
-        with: &WithClause,
         from: &FromClause,
         scope: &ScalarAnalysisContext<'_>,
         location: Option<usize>,
@@ -182,9 +177,9 @@ impl ResultColumnCollection {
         binding_qualifier: Option<&AliasName>,
     ) -> Result<bool, AnalysisError> {
         let columns = if projection_qualifier.is_none() || binding_qualifier.is_some() {
-            from.destination_wildcard_projection(context, with)?
+            from.destination_wildcard_projection(context, scope.with_clause())?
         } else {
-            from.wildcard_projection(context, with, projection_qualifier)?
+            from.wildcard_projection(context, scope.with_clause(), projection_qualifier)?
         };
         self.append_projection_columns(columns, context, scope, location, binding_qualifier)
     }
@@ -202,9 +197,14 @@ impl ResultColumnCollection {
         let references: Vec<_> = columns
             .iter()
             .map(|column| {
-                binding_qualifier
-                    .map(|alias| vec![alias.as_str().to_owned(), column.name().as_str().to_owned()])
-                    .or_else(|| column.visible_reference())
+                if let Some(alias) = binding_qualifier {
+                    Some(vec![
+                        alias.as_str().to_owned(),
+                        column.name().as_str().to_owned(),
+                    ])
+                } else {
+                    column.visible_reference()
+                }
             })
             .collect();
         for column in &columns {

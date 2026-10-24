@@ -272,14 +272,13 @@ impl Update {
             ResultColumnCollection::resolve_for_update(
                 &self.returning,
                 context,
-                with,
                 &returning_from,
                 &scope,
             )
             .map_err(Into::into)
         } else {
             let scope = ScalarAnalysisContext::nested(with, from, Some(outer));
-            ResultColumnCollection::resolve_for_update(&self.returning, context, with, from, &scope)
+            ResultColumnCollection::resolve_for_update(&self.returning, context, from, &scope)
                 .map_err(Into::into)
         }
     }

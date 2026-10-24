@@ -110,7 +110,6 @@ impl Merge {
         let returning = ResultColumnCollection::resolve_for_merge(
             &self.returning_list,
             context,
-            &with,
             &returning_scope,
         )?;
         let mut statement = MergeStatement::new(
@@ -312,7 +311,6 @@ impl ResultColumnCollection {
     fn resolve_for_merge(
         targets: &[crate::ast::Target],
         context: &mut impl ParseContext,
-        with: &WithClause,
         scope: &ScalarAnalysisContext<'_>,
     ) -> Result<Self, AnalysisError> {
         let mut results = Self::default();
@@ -326,7 +324,6 @@ impl ResultColumnCollection {
                 });
                 if !results.expand_projection(
                     context,
-                    with,
                     scope.sources(),
                     scope,
                     target.location,

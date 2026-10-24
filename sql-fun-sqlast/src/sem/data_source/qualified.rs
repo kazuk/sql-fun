@@ -75,12 +75,13 @@ impl<'a> QualifiedSource<'a> {
     }
 
     pub(super) fn projection_reference(&self, column: &ColumnName) -> Vec<String> {
-        let relation = self
-            .source
-            .get_aliases()
-            .iter()
-            .find(|alias| alias.name() == &self.alias)
-            .and_then(|alias| self.source.unaliased_relation(alias));
+        let aliases = self.source.get_aliases();
+        let relation = if let Some(alias) = aliases.iter().find(|alias| alias.name() == &self.alias)
+        {
+            self.source.unaliased_relation(alias)
+        } else {
+            None
+        };
         let mut parts = Vec::new();
         if let Some(relation) = relation {
             if let Some(catalog) = relation.catalog() {
@@ -165,9 +166,11 @@ impl<'a> QualifiedSource<'a> {
         let value = if let Some(index) = self.projection_ordinal
             && let DataSource::Table(table) = self.source
         {
-            let definition = context
-                .get_table(table.name())
-                .and_then(|table| table.get_column_at(index));
+            let definition = if let Some(table) = context.get_table(table.name()) {
+                table.get_column_at(index)
+            } else {
+                None
+            };
             SemScalarExpr::column_reference(crate::sem::ColumnReferenceExpr::table_column(
                 &self.alias,
                 column,
@@ -178,10 +181,13 @@ impl<'a> QualifiedSource<'a> {
         } else if let Some(index) = self.projection_ordinal
             && let DataSource::View(source) = self.source
         {
-            let definition = context
-                .get_view(source.view_name())
-                .and_then(|view| view.result_columns().get_column_at(index))
-                .map(crate::sem::ResultColumn::create_column_definition);
+            let definition = if let Some(view) = context.get_view(source.view_name()) {
+                view.result_columns()
+                    .get_column_at(index)
+                    .map(crate::sem::ResultColumn::create_column_definition)
+            } else {
+                None
+            };
             SemScalarExpr::column_reference(crate::sem::ColumnReferenceExpr::view_column(
                 &self.alias,
                 column,

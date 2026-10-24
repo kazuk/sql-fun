@@ -245,7 +245,7 @@ impl Statement {
         for expansion in expansions.iter().filter(|value| value.is_table_dependent()) {
             let location = expansion
                 .location()
-                .ok_or_else(|| WildcardRewriteError::missing_location())?;
+                .ok_or_else(WildcardRewriteError::missing_location)?;
             if edits.iter().any(|(previous, _)| *previous == location) {
                 return Err(WildcardRewriteError::duplicate_location());
             }
@@ -341,7 +341,7 @@ impl Statement {
 mod tests;
 
 impl Expr {
-    fn is_projection_star(&self) -> bool {
+    const fn is_projection_star(&self) -> bool {
         matches!(self, Self::Star(_))
     }
 }
@@ -530,7 +530,7 @@ impl VisitTargets for Expr {
 }
 
 impl VisitTargets for FromItem {
-    fn visit_targets(&mut self, visitor: &mut impl FnMut(&mut Vec<Target>, bool, &mut [FromItem])) {
+    fn visit_targets(&mut self, visitor: &mut impl FnMut(&mut Vec<Target>, bool, &mut [Self])) {
         crate::sem::with_stack(|| match self {
             Self::Relation(_) => {}
             Self::Query(node) => node.visit_targets(visitor),
@@ -599,17 +599,17 @@ impl SemScalarExpr {
     ) -> Result<Expr, WildcardRewriteError> {
         crate::sem::with_stack(|| match self {
             Self::ColumnRef(reference) => {
-                if let Some(table) = self.table_column_reference() {
-                    if let Some(qualifier) = qualifiers.iter().find(|qualifier| {
+                if let Some(table) = self.table_column_reference()
+                    && let Some(qualifier) = qualifiers.iter().find(|qualifier| {
                         qualifier.relation() == table.relation()
                             && qualifier.alias() == table.alias()
-                    }) {
-                        let mut parts = qualifier.parts().to_vec();
-                        parts.push(reference.get_column_name().to_string());
-                        return Ok(Expr::projection_column(crate::ast::Name::from_parts(
-                            &parts,
-                        )));
-                    }
+                    })
+                {
+                    let mut parts = qualifier.parts().to_vec();
+                    parts.push(reference.get_column_name().to_string());
+                    return Ok(Expr::projection_column(crate::ast::Name::from_parts(
+                        &parts,
+                    )));
                 }
                 let (alias, column) = reference.projection_reference().ok_or_else(|| {
                     WildcardRewriteError::invalid("wildcard column binding is unresolved")
@@ -707,7 +707,7 @@ impl Expr {
             _ => None,
         }
     }
-    fn projection_column(name: Name) -> Self {
+    const fn projection_column(name: Name) -> Self {
         Self::Column(name)
     }
     fn projection_call(call: Call) -> Self {
@@ -727,7 +727,7 @@ impl Expr {
     }
 }
 impl Access {
-    fn projection_field(field: String) -> Self {
+    const fn projection_field(field: String) -> Self {
         Self::Field(field)
     }
 }

@@ -227,10 +227,10 @@ impl WildcardQualifier {
             parts: parts.to_vec(),
         }
     }
-    pub(crate) fn relation(&self) -> &crate::sem::FullName {
+    pub(crate) const fn relation(&self) -> &crate::sem::FullName {
         &self.relation
     }
-    pub(crate) fn alias(&self) -> &crate::sem::AliasName {
+    pub(crate) const fn alias(&self) -> &crate::sem::AliasName {
         &self.alias
     }
     pub(crate) fn parts(&self) -> &[String] {
@@ -261,7 +261,7 @@ impl WildcardTypedRecord {
     pub(crate) fn alias(&self) -> &str {
         &self.alias
     }
-    pub(crate) fn relation(&self) -> &crate::sem::FullName {
+    pub(crate) const fn relation(&self) -> &crate::sem::FullName {
         &self.relation
     }
     pub(crate) fn column(&self) -> &str {

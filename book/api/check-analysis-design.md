@@ -55,11 +55,13 @@ The **initialization request** (`InitializeSchemaArgs`) contains:
 | Field | Meaning |
 | --- | --- |
 | `datasource` | Datasource to initialize |
-| `schema_dump` | Server-visible path to the schema dump |
-| `expected_hash` | Required lowercase hexadecimal SHA-256 of the original dump text |
-| `environments` | Configuration map from `sql_fun_core::SqlFunArgs::environments` |
+| `schema_dump` | Server-visible project dump path; required only for `project` |
+| `expected_hash` | Lowercase hexadecimal SHA-256 of the original dump text; required only for `project` |
+| `schema_level` | Optional completed prefix: `builtin`, `default`, `extensions`, or `project` |
+| `environments` | Configuration map from core configuration-transfer APIs |
 
-Clients transfer configuration using `sql_fun_core::SqlFunArgs::environments`.
+Clients transfer configuration using `sql_fun_core::SqlFunArgs::environments`
+or the depth-aware `analysis_environments` method.
 The server passes this map to core to restore `SqlFunArgs`, then asks core for the
 named datasource's metadata and effective configuration. Dialect, engine version,
 extensions, search path, and directory overrides follow core's existing argument
@@ -87,7 +89,7 @@ The **currently declared response** (`SchemaContext`) contains:
 | Field | Meaning |
 | --- | --- |
 | `context_handle` | Optional opaque handle to a usable schema context |
-| `schema_dump_hash` | SHA-256 of the schema dump (not a fingerprint of all analysis settings) |
+| `schema_dump_hash` | SHA-256 of the project dump, or null for a lower schema prefix |
 | `problems` | Collection of diagnostics from schema loading |
 
 A context handle, when provided, is passed unchanged to later analysis
@@ -106,7 +108,7 @@ Client and server must see the same local files. Aliases resolving to the same
 canonical path share a file identity; separate canonical paths have separate
 identities even when contents match.
 
-Initialization requires an `expected_hash` of the original schema-dump file
+Full-project initialization requires an `expected_hash` of the original dump
 text, calculated by the client using `sql_fun_core::Hasher::hash_file`. The server
 first searches its in-memory schema
 cache for that hash under the same parent schema and resolved dump path. A hit
@@ -386,3 +388,15 @@ implementation and reference documentation cover the behavior.
 Implementation should update the caller-facing sections to the **actual**
 wire format and remove this temporary section rather than leaving draft
 internals in the published manual.
+
+## Schema prefix selection
+
+`initialize_schema_context` accepts optional `schema_level`: `builtin`, `default`,
+`extensions`, or `project`. Omission preserves full-project behavior for existing
+clients. Each value returns a completed prefix of the existing layered schema
+cache. `builtin` loads catalog definitions only, `default` adds bundled
+`schema.sql`, `extensions` adds configured extensions in order, and `project`
+adds the selected project dump. Excluded SQL inputs are not resolved or read.
+`schema_dump` and `expected_hash` may be omitted below `project` and are validated
+only for `project`; lower-prefix responses have a null `schema_dump_hash`.
+The returned context handle works with the existing analysis API at every level.

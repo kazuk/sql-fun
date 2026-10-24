@@ -124,7 +124,8 @@ async fn collection_rpc_pages_repeatably_and_releases(
 }
 
 #[rstest::rstest]
-#[case::missing_hash("expected_hash", ::serde_json::Value::Null, "unexpected params")]
+#[case::missing_hash("expected_hash", ::serde_json::Value::Null, "project requires")]
+#[case::unknown_level("schema_level", ::serde_json::json!("invalid"), "unexpected params")]
 #[case::bad_hash("expected_hash", ::serde_json::json!("BAD"), "expected_hash")]
 #[case::mismatch("expected_hash", ::serde_json::json!("0".repeat(64)), "schema dump changed")]
 #[case::unknown_datasource("datasource", ::serde_json::json!("unknown"), "selected datasource")]
@@ -406,3 +407,47 @@ async fn initialization_accepts_core_configuration_transfer() {
 }
 
 mod query_analysis;
+
+#[rstest::rstest]
+#[case::builtin("builtin", 0)]
+#[case::default_sql("default", 1)]
+#[case::extensions("extensions", 3)]
+#[case::project("project", 4)]
+#[tokio::test(flavor = "multi_thread")]
+async fn initialization_rpc_accepts_prefix_and_omits_project_only_requirements(
+    #[case] level: &str,
+    #[case] layers: usize,
+) {
+    let project = SchemaProject::new();
+    let mut request = project.request_with_extensions();
+    request["schema_level"] = ::serde_json::json!(level);
+    if level != "project" {
+        std::fs::remove_file(request["schema_dump"].as_str().unwrap()).unwrap();
+        request.as_object_mut().unwrap().remove("schema_dump");
+        request.as_object_mut().unwrap().remove("expected_hash");
+    }
+    if layers < 3 {
+        request["environments"]["SQL_FUN_EXTENSIONS"] = ::serde_json::json!("missing@9.9");
+        request["environments"]["SQL_FUN_EXTENSIONS_DIR"] =
+            ::serde_json::json!(project.home().join("missing-directory"));
+    }
+    if layers == 0 {
+        std::fs::remove_file(project.home().join("postgres/17/schema.sql")).unwrap();
+    }
+    let mut connection = heavy::Connection::start(4096, 2).await;
+    connection.authenticate().await;
+    let response = connection.rpc("initialize_schema_context", &request).await;
+    assert!(response.get("error").is_none(), "{response}");
+    assert!(response["result"]["context_handle"].is_string());
+    assert_eq!(
+        response["result"]["schema_dump_hash"].is_string(),
+        level == "project"
+    );
+    // Each DROP fixture produces two diagnostics, whereas builtin SQL is empty.
+    assert_eq!(
+        response["result"]["problems"]["total_length"],
+        ::serde_json::json!(layers.saturating_sub(1) * 2)
+    );
+    connection.end_requests().await;
+    connection.finish().await.unwrap();
+}

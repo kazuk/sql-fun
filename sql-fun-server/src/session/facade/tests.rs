@@ -163,7 +163,7 @@ async fn retained_presentation_survives_source_file_changes() {
         .await
         .unwrap();
     // Presentation must use the analyzed statement, even after file replacement.
-    std::fs::write(args.schema_dump(), "SELECT 42;").unwrap();
+    std::fs::write(args.schema_dump().as_ref().unwrap(), "SELECT 42;").unwrap();
     let value = ::serde_json::to_value(response).unwrap();
     let items = value["problems"]["items"].as_array().unwrap();
     assert_eq!(items.len(), 1);

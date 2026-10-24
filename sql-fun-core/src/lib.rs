@@ -48,7 +48,9 @@ mod lookup_result;
 mod metadata;
 mod placehlodered_sql;
 mod postgres_version;
+mod schema_level;
 mod sql_tokens;
+pub use self::schema_level::SchemaLevel;
 
 /// `sql-fun` code generator lockfile
 pub mod lockfile;

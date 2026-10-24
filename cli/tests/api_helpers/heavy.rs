@@ -19,9 +19,40 @@ impl ApiServer {
     }
 
     pub fn command(&self) -> ::tokio::process::Command {
+        let mut command = self.cli_command();
+        command.arg("api");
+        command
+    }
+
+    #[allow(dead_code, reason = "used by the direct SQL integration target")]
+    pub fn sql_command(
+        &self,
+        schema: &super::schema::SchemaFixture,
+        verb: &str,
+    ) -> ::tokio::process::Command {
+        let mut command = self.cli_command();
+        let request = schema.request();
+        command.args([
+            "--metadata-file",
+            request["environments"]["SQL_FUN_METADATA_FILE"]
+                .as_str()
+                .unwrap(),
+            "--sql-fun-home",
+            request["environments"]["SQL_FUN_HOME"].as_str().unwrap(),
+            "--datasource",
+            "products",
+            "--schema-file",
+            request["schema_dump"].as_str().unwrap(),
+            "--term-color",
+            "never",
+            verb,
+        ]);
+        command
+    }
+
+    fn cli_command(&self) -> ::tokio::process::Command {
         let mut command = ::tokio::process::Command::new(env!("CARGO_BIN_EXE_sql-fun"));
         command
-            .args(["api"])
             .env("USER", self.0.user())
             .env("SQL_FUN_SERVER", self.0.executable())
             .env_remove("SQL_FUN_SERVER_COMMAND")

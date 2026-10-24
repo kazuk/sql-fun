@@ -146,8 +146,9 @@ pub struct SchemaSelection {
     version: PostgresEngineVersion,
     search_path: Vec<String>,
     extensions: Vec<PathBuf>,
-    dump: PathBuf,
-    expected_hash: String,
+    dump: Option<PathBuf>,
+    expected_hash: Option<String>,
+    level: ::sql_fun_core::SchemaLevel,
 }
 
 impl SchemaSelection {
@@ -164,6 +165,30 @@ impl SchemaSelection {
         dump: &Path,
         expected_hash: &str,
     ) -> Result<Self, SchemaLoadError> {
+        Self::for_level(
+            datasource,
+            args,
+            metadata,
+            extensions,
+            Some(dump),
+            Some(expected_hash),
+            ::sql_fun_core::SchemaLevel::project(),
+        )
+    }
+
+    /// Validate only inputs required by an explicitly requested schema prefix.
+    ///
+    /// # Errors
+    /// Rejects invalid datasource/engine configuration and missing project inputs.
+    pub fn for_level(
+        datasource: &str,
+        args: &SqlFunArgs,
+        metadata: &SqlFunMetadata,
+        extensions: &[PathBuf],
+        dump: Option<&Path>,
+        expected_hash: Option<&str>,
+        level: ::sql_fun_core::SchemaLevel,
+    ) -> Result<Self, SchemaLoadError> {
         if datasource.is_empty() || datasource != metadata.name() {
             return Err(SchemaLoadError::invalid(
                 "missing or unknown selected datasource",
@@ -174,10 +199,20 @@ impl SchemaSelection {
                 "schema cache initialization currently supports PostgreSQL",
             ));
         }
-        if expected_hash.len() != 64
-            || !expected_hash
-                .bytes()
-                .all(|b| b.is_ascii_digit() || (b'a'..=b'f').contains(&b))
+        if level.includes_project()
+            && (dump.is_none_or(|path| path.as_os_str().is_empty()) || expected_hash.is_none())
+        {
+            return Err(SchemaLoadError::invalid(
+                "project requires schema_dump and expected_hash",
+            ));
+        }
+        if level.includes_project()
+            && expected_hash.is_some_and(|expected_hash| {
+                expected_hash.len() != 64
+                    || !expected_hash
+                        .bytes()
+                        .all(|b| b.is_ascii_digit() || (b'a'..=b'f').contains(&b))
+            })
         {
             return Err(SchemaLoadError::invalid(
                 "expected_hash must be a lowercase hexadecimal SHA-256",
@@ -191,8 +226,9 @@ impl SchemaSelection {
                 .postgres_search_path(metadata)
                 .map_err(|e| SchemaLoadError::source(&e))?,
             extensions: extensions.to_vec(),
-            dump: dump.to_path_buf(),
-            expected_hash: expected_hash.to_owned(),
+            dump: dump.map(Path::to_path_buf),
+            expected_hash: expected_hash.map(str::to_owned),
+            level,
         })
     }
 }
@@ -200,7 +236,7 @@ impl SchemaSelection {
 /// Independently owned result ready for a session to register.
 pub struct InitializedSchema {
     key: SchemaContextKey,
-    actual_hash: String,
+    actual_hash: Option<String>,
     analysis: Arc<CachedSchemaAnalysis>,
 }
 
@@ -212,8 +248,8 @@ impl InitializedSchema {
     }
     /// Hash of the original application dump contents.
     #[must_use]
-    pub fn actual_hash(&self) -> &str {
-        &self.actual_hash
+    pub fn actual_hash(&self) -> Option<&str> {
+        self.actual_hash.as_deref()
     }
     /// Frozen analysis and its unchanged analysis-time metadata and arguments.
     ///
@@ -316,6 +352,9 @@ impl SchemaCacheService {
                 .expect("builtin loader panicked")
             })
             .await?;
+        if !selection.level.includes_default() {
+            return Self::prefix(layer);
+        }
         let builtin_sql = selection
             .version
             .definition_base_path(&self.home)
@@ -324,35 +363,46 @@ impl SchemaCacheService {
             .load_layer(&layer, &builtin_sql, None, &args, &metadata)
             .await?;
         Self::successful(&layer.outcome)?;
+        if !selection.level.includes_extensions() {
+            return Self::prefix(layer);
+        }
         for extension in &selection.extensions {
             layer = self
                 .load_layer(&layer, extension, None, &args, &metadata)
                 .await?;
             Self::successful(&layer.outcome)?;
         }
+        if !selection.level.includes_project() {
+            return Self::prefix(layer);
+        }
+        let dump = selection.dump.as_deref().expect("validated project dump");
+        let expected_hash = selection
+            .expected_hash
+            .as_deref()
+            .expect("validated project hash");
         layer = self
-            .load_layer(
-                &layer,
-                &selection.dump,
-                Some(&selection.expected_hash),
-                &args,
-                &metadata,
-            )
+            .load_layer(&layer, dump, Some(expected_hash), &args, &metadata)
             .await?;
         // Mismatch takes precedence even over deterministic SQL failure, after publication.
         let actual_hash = layer
             .hash
             .expect("application file layer has a content hash");
-        if actual_hash != selection.expected_hash {
-            return Err(SchemaLoadError::mismatch(
-                &selection.expected_hash,
-                &actual_hash,
-            ));
+        if actual_hash != expected_hash {
+            return Err(SchemaLoadError::mismatch(expected_hash, &actual_hash));
         }
         let analysis = Arc::clone(Self::successful(&layer.outcome)?);
         Ok(InitializedSchema {
             key: layer.key,
-            actual_hash,
+            actual_hash: Some(actual_hash),
+            analysis,
+        })
+    }
+
+    fn prefix(layer: LoadedLayer) -> Result<InitializedSchema, SchemaLoadError> {
+        let analysis = Arc::clone(Self::successful(&layer.outcome)?);
+        Ok(InitializedSchema {
+            key: layer.key,
+            actual_hash: None,
             analysis,
         })
     }

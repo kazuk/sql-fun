@@ -18,10 +18,8 @@ impl Initialization {
     }
 
     fn resolve(request: &InitializeSchemaArgs) -> Result<Self, SchemaLoadError> {
-        if request.datasource().is_empty() || request.schema_dump().as_os_str().is_empty() {
-            return Err(SchemaLoadError::source(
-                &"explicit datasource and schema_dump are required",
-            ));
+        if request.datasource().is_empty() {
+            return Err(SchemaLoadError::source(&"explicit datasource is required"));
         }
         let args = SqlFunArgs::from_environments(request.environments())
             .map_err(|error| SchemaLoadError::source(&error))?;
@@ -31,20 +29,25 @@ impl Initialization {
         let home = args
             .sql_fun_home()
             .map_err(|error| SchemaLoadError::source(&error))?;
-        let directory = args
-            .postgres_extensions_dir(&metadata)
-            .map_err(|error| SchemaLoadError::source(&error))?;
-        let files = args
-            .postgres_extensions(&metadata)
-            .sql_files(directory)
-            .map_err(|error| SchemaLoadError::source(&error))?;
-        let selection = SchemaSelection::new(
+        let level = request.level();
+        let files = if level.includes_extensions() {
+            let directory = args
+                .postgres_extensions_dir(&metadata)
+                .map_err(|error| SchemaLoadError::source(&error))?;
+            args.postgres_extensions(&metadata)
+                .sql_files(directory)
+                .map_err(|error| SchemaLoadError::source(&error))?
+        } else {
+            ::sql_fun_core::IVec::default()
+        };
+        let selection = SchemaSelection::for_level(
             request.datasource(),
             &args,
             &metadata,
             &files,
-            request.schema_dump(),
-            request.expected_hash(),
+            request.schema_dump().as_deref(),
+            request.expected_hash().as_deref(),
+            level,
         )?;
         Ok(Self { home, selection })
     }

@@ -237,12 +237,30 @@
                 "type": "string"
               },
               "schema_dump": {
-                "description": "schema dump file",
-                "type": "string"
+                "description": "Project dump file; required only when the selected prefix includes it.",
+                "type": [
+                  "string",
+                  "null"
+                ]
               },
               "expected_hash": {
                 "description": "Expected SHA-256 of the original dump text, supplied by the client.",
-                "type": "string"
+                "type": [
+                  "string",
+                  "null"
+                ]
+              },
+              "schema_level": {
+                "description": "Requested prefix; omission preserves full-project initialization.",
+                "anyOf": [
+                  {
+                    "$ref": "#/$defs/SchemaLevel"
+                  },
+                  {
+                    "type": "null"
+                  }
+                ],
+                "default": null
               },
               "environments": {
                 "description": "Configuration transferred by `sql_fun_core::SqlFunArgs::environments`.",
@@ -254,10 +272,35 @@
             },
             "required": [
               "datasource",
-              "schema_dump",
-              "expected_hash",
               "environments"
-            ]
+            ],
+            "$defs": {
+              "SchemaLevel": {
+                "description": "Completed schema prefix requested by an analysis client.",
+                "oneOf": [
+                  {
+                    "description": "Builtin catalog definitions, without builtin SQL.",
+                    "type": "string",
+                    "const": "builtin"
+                  },
+                  {
+                    "description": "Builtin definitions and the server's default SQL.",
+                    "type": "string",
+                    "const": "default"
+                  },
+                  {
+                    "description": "Default SQL followed by configured extensions.",
+                    "type": "string",
+                    "const": "extensions"
+                  },
+                  {
+                    "description": "Extensions followed by the selected project dump.",
+                    "type": "string",
+                    "const": "project"
+                  }
+                ]
+              }
+            }
           },
           "required": true
         }
@@ -282,8 +325,11 @@
               ]
             },
             "schema_dump_hash": {
-              "description": "SHA 256 hash for schema dump",
-              "type": "string"
+              "description": "SHA-256 of the project dump, absent for lower schema prefixes.",
+              "type": [
+                "string",
+                "null"
+              ]
             },
             "problems": {
               "description": "schema analysis problems",
@@ -291,7 +337,6 @@
             }
           },
           "required": [
-            "schema_dump_hash",
             "problems"
           ],
           "$defs": {

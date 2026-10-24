@@ -1,9 +1,11 @@
 #![deny(missing_docs)]
 //! sql-fun cli binary louncher
+mod analysis;
 mod api;
 mod child_proc;
 mod cli_sub_command;
 mod diagnostic;
+mod direct_sql;
 mod docker;
 mod extract;
 mod highlighter_theme;
@@ -18,6 +20,7 @@ pub use self::{
     check::CheckArgs,
     cli_sub_command::CliSubCommand,
     diagnostic::{DiagnosticRenderer, render_diagnostic},
+    direct_sql::{AnalyzeArgs, TestArgs},
     extract::ExtractArgs,
     runnable::{RunnableCommand, StdStream},
 };

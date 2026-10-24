@@ -13,22 +13,7 @@ pub(super) fn render_all(
 ) -> Result<(), ::anyhow::Error> {
     for item in analysis.response().queries().items() {
         for diagnostic in item.probrems().items() {
-            let report = if let Some(presentation) = diagnostic.presentation() {
-                renderer.render_problem(
-                    presentation.problem(),
-                    (*diagnostic.severity()).into(),
-                    Some(presentation.source()),
-                    analysis.tokens(presentation.source(), presentation.dialect()),
-                )?
-            } else if let Some(problem) = diagnostic.semantic_problem() {
-                renderer.render_problem(problem, (*diagnostic.severity()).into(), None, None)?
-            } else {
-                ::anyhow::bail!(
-                    "analysis diagnostic {} for {} lacks a structured problem",
-                    diagnostic.code(),
-                    analysis.function_name()
-                );
-            };
+            let report = analysis.render(diagnostic, renderer)?;
             writeln!(
                 output,
                 "SQL query {} at {}:{}\n{}Original SQL:\n{}\n",

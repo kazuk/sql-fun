@@ -237,3 +237,8 @@ ownership of the schema itself.
 
 > ⚠️ Make sure schema definition is part of your project or CI pipeline.  
 > `sql-fun` focuses on code generation, not schema evolution.
+
+`sql-fun analyze` and `sql-fun test` use the same installed server and builtin
+catalogs as the API. They require an explicitly selected datasource, but do not
+require `cargo-expand` or a live database. See [analyze](cli/analyze.md) and
+[test](cli/test.md) for input selection, schema levels, and query contracts.

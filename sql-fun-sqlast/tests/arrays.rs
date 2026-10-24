@@ -682,6 +682,92 @@ fn deferred_arrays_accept_catalog_defined_types() -> testresult::TestResult {
     Ok(())
 }
 
+#[rstest::rstest]
+#[case::constructor("SELECT ARRAY[1::oid] = ARRAY[1::oid]", &[], "_oid")]
+#[case::catalog_shape(
+    "SELECT polroles = '{0}'::oid[] FROM policies",
+    &["CREATE TABLE policies (polroles oid[])"],
+    "_oid"
+)]
+#[case::integers("SELECT ARRAY[1] = ARRAY[1]", &[], "_int4")]
+#[case::empty("SELECT ARRAY[]::oid[] = ARRAY[]::oid[]", &[], "_oid")]
+#[case::null_array("SELECT NULL::oid[] = ARRAY[1::oid]", &[], "_oid")]
+fn ordinary_array_equality_retains_binding_and_types(
+    #[case] sql: &str,
+    #[case] definitions: &[&str],
+    #[case] array_type: &str,
+) -> testresult::TestResult {
+    // The shipped anyarray operator declaration and casts are the contract here.
+    let analyzed = heavy::analyze(sql, definitions)?;
+    assert!(
+        analyzed.context().problems().is_empty(),
+        "{:?}",
+        analyzed.context().problems()
+    );
+    let select = analyzed.ast().clone().into_select_statemtnt().unwrap();
+    let column = select.result_columns().get_column_at(0).unwrap();
+    assert_eq!(column.col_type(), &Some(PgBuiltInType::bool()));
+    let expression = column.expression().unwrap();
+    assert!(
+        expression
+            .operator_binding()
+            .unwrap()
+            .resolution()
+            .is_resolved()
+    );
+    let encoded = ::serde_json::to_value(expression)?;
+    let call = &encoded["Arith"]["OpBinary"];
+    let expected = ::serde_json::to_value(TypeReference::from_master_type_name(array_type))?;
+    assert_eq!(call["left_arg_type"], expected);
+    assert_eq!(call["right_arg_type"], expected);
+    assert_eq!(
+        call["return_type"],
+        ::serde_json::to_value(PgBuiltInType::bool())?
+    );
+    assert_eq!(call["strict"], true);
+    Ok(())
+}
+
+#[rstest::rstest]
+#[case::different_elements("ARRAY[1::oid] = ARRAY['x'::text]")]
+#[case::numeric_elements("ARRAY[1::integer] = ARRAY[1::bigint]")]
+#[case::scalar_right("ARRAY[1::oid] = 1::oid")]
+#[case::scalar_left("1::oid = ARRAY[1::oid]")]
+fn invalid_array_equality_retains_failure(#[case] expression: &str) -> testresult::TestResult {
+    // Real builtin candidate families must not accept incompatible array inputs.
+    let analyzed = heavy::analyze(&format!("SELECT {expression}"), &[])?;
+    assert!(
+        analyzed
+            .context()
+            .problems()
+            .iter()
+            .any(|problem| problem.code() == "binary_operator_overload_resolution_failed")
+    );
+    assert!(
+        analyzed
+            .context()
+            .problems()
+            .iter()
+            .any(|problem| problem.code() == "undefined_operator")
+    );
+    let select = analyzed.ast().clone().into_select_statemtnt().unwrap();
+    let column = select.result_columns().get_column_at(0).unwrap();
+    assert_eq!(column.col_type(), &None);
+    let expression = column.expression().unwrap();
+    assert!(
+        expression
+            .operator_binding()
+            .unwrap()
+            .resolution()
+            .is_resolved()
+    );
+    let encoded = ::serde_json::to_value(expression)?;
+    let call = &encoded["Arith"]["UndefinedOperator"];
+    assert!(!call["larg"].is_null());
+    assert!(!call["rarg"].is_null());
+    Ok(())
+}
+
 mod test_helpers {
     pub(super) mod heavy {
         use ::sql_fun_sqlast::{
